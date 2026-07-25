@@ -3,6 +3,19 @@
 SkyGenPanel follows [Semantic Versioning](https://semver.org/). Release versions
 are calculated from conventional commits since the previous `v*` Git tag.
 
+## [1.12.0] - 2026-07-25
+
+### New
+
+- Expand customer operations and device management (`6bf6a8e`)
+
+### Maintenance
+
+- Redesign project readme (`feea67e`)
+- Add product screenshots and community badges (`97ef8d6`)
+
+[Full comparison](https://github.com/skydashnet/genieacs-panel/compare/v1.11.0...v1.12.0)
+
 ## [1.11.0] - 2026-07-24
 
 ### New

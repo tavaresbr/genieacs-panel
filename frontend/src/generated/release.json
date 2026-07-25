@@ -1,28 +1,28 @@
 {
-  "version": "1.11.0",
-  "build": 46,
-  "sourceCommit": "9406d0eb68ff",
-  "releasedAt": "2026-07-24",
-  "basedOnTag": "v1.10.2",
-  "compareUrl": "https://github.com/skydashnet/genieacs-panel/compare/v1.10.2...v1.11.0",
+  "version": "1.12.0",
+  "build": 50,
+  "sourceCommit": "6bf6a8ee975b",
+  "releasedAt": "2026-07-25",
+  "basedOnTag": "v1.11.0",
+  "compareUrl": "https://github.com/skydashnet/genieacs-panel/compare/v1.11.0...v1.12.0",
   "changes": [
     {
-      "shortHash": "9406d0e",
+      "shortHash": "feea67e",
       "date": "2026-07-24",
-      "title": "Customer portal can now change WiFi names and passwords",
+      "title": "Redesign project readme",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "97ef8d6",
+      "date": "2026-07-24",
+      "title": "Add product screenshots and community badges",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "6bf6a8e",
+      "date": "2026-07-25",
+      "title": "Expand customer operations and device management",
       "category": "New"
-    },
-    {
-      "shortHash": "9406d0e",
-      "date": "2026-07-24",
-      "title": "Saved WiFi passwords use encrypted, on-demand recovery",
-      "category": "Security"
-    },
-    {
-      "shortHash": "9406d0e",
-      "date": "2026-07-24",
-      "title": "GenieACS WiFi enabled values now display consistently",
-      "category": "Fixed"
     }
   ]
 }
