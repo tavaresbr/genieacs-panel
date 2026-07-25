@@ -31,7 +31,7 @@ export default function Sidebar() {
 
   return (
     <>
-      <header className="fixed inset-x-0 top-0 z-[1200] flex h-16 items-center justify-between border-b border-border bg-card px-4 md:hidden">
+      <header className="fixed inset-x-0 top-0 z-[1200] flex h-16 items-center justify-between border-b border-border bg-card px-4 lg:hidden">
         <Link to="/dashboard" className="flex min-w-0 items-center gap-2.5" aria-label="SkyGenPanel operations">
           <BrandMark className="size-8 shrink-0" />
           <div className="min-w-0">
@@ -51,7 +51,7 @@ export default function Sidebar() {
       </header>
 
       {isMobileOpen && (
-        <div className="fixed inset-0 z-[2000] md:hidden" role="dialog" aria-modal="true" aria-label="Main navigation">
+        <div className="fixed inset-0 z-[2000] lg:hidden" role="dialog" aria-modal="true" aria-label="Main navigation">
           <button
             type="button"
             className="absolute inset-0 bg-black/55"
@@ -65,7 +65,7 @@ export default function Sidebar() {
       )}
 
       <aside
-        className={`sticky top-0 z-[1000] hidden h-screen max-h-screen shrink-0 self-start flex-col overflow-visible bg-[#18211d] text-[#f4f3ed] transition-[width] duration-200 md:flex ${
+        className={`sticky top-0 z-[1000] hidden h-screen max-h-screen shrink-0 self-start flex-col overflow-visible bg-[#18211d] text-[#f4f3ed] transition-[width] duration-200 lg:flex ${
           isCollapsed ? 'w-[4.75rem]' : 'w-[16.5rem]'
         }`}
       >

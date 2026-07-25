@@ -273,7 +273,12 @@ export default function DashboardPage() {
         <section className="modern-card overflow-hidden">
           <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-5 py-4">
             <div><h2 className="section-heading">GenieACS fault list</h2><p className="section-description">Active provisioning and connection faults from the NBI.</p></div>
-            <span className={data.faults.length ? 'modern-badge-error' : 'modern-badge-success'}>{faultsLoading ? 'Refreshing…' : `${data.faults.length} active`}</span>
+            <div className="flex items-center gap-2">
+              <span className={data.faults.length ? 'modern-badge-error' : 'modern-badge-success'}>{faultsLoading ? 'Refreshing…' : `${data.faults.length} active`}</span>
+              <button type="button" className="modern-button-secondary min-h-9 px-3 py-1.5" disabled={faultsLoading} onClick={() => void loadFaults()}>
+                <Icon name="refresh" size={16} className={faultsLoading ? 'animate-spin' : ''} /> Refresh
+              </button>
+            </div>
           </div>
           {data.faultsError && <div className="border-b border-border bg-[hsl(var(--status-warning))]/10 px-5 py-3 text-sm">{data.faultsError}</div>}
           <div className="overflow-x-auto">

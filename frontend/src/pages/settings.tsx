@@ -36,6 +36,9 @@ export default function Settings() {
     appName: 'SkyGenPanel',
     genieAcsUrl: 'http://127.0.0.1:7557',
     autoGenerateCustomerId: 'false',
+    customerIdPrefixMode: 'default',
+    customerIdCompanyPrefix: 'CSG',
+    customerIdSuffixMode: 'random',
     ...INSTALLER_VIRTUAL_PARAMETERS
   })
   const [loading, setLoading] = useState(false)
@@ -169,7 +172,11 @@ export default function Settings() {
     loadingCtl.show('Saving settings...')
     let ok = true
     try {
-      const entries = Object.entries(settings)
+      const entries = Object.entries(settings).sort(([left], [right]) => {
+        if (left === 'autoGenerateCustomerId') return 1
+        if (right === 'autoGenerateCustomerId') return -1
+        return 0
+      })
       for (const [key, value] of entries) {
         const res = await settingsAPI.update(key, String(value))
         if (!res.success) {
@@ -582,11 +589,66 @@ export default function Settings() {
               </span>
             </label>
 
+            <div className="mt-5 grid gap-5 rounded-md border border-border p-4 sm:grid-cols-2">
+              <fieldset>
+                <legend className="field-label">Awalan ID</legend>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="radio" name="customer-prefix" value="default"
+                      checked={settings.customerIdPrefixMode === 'default'}
+                      onChange={() => setSettings((current) => ({ ...current, customerIdPrefixMode: 'default' }))} />
+                    Bawaan <span className="font-mono font-semibold">CSG</span>
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="radio" name="customer-prefix" value="company"
+                      checked={settings.customerIdPrefixMode === 'company'}
+                      onChange={() => setSettings((current) => ({ ...current, customerIdPrefixMode: 'company' }))} />
+                    ID perusahaan
+                  </label>
+                  {settings.customerIdPrefixMode === 'company' && (
+                    <input
+                      aria-label="ID perusahaan"
+                      className="modern-input mt-2 font-mono uppercase"
+                      minLength={2}
+                      maxLength={4}
+                      pattern="[A-Za-z]{2,4}"
+                      value={settings.customerIdCompanyPrefix}
+                      onChange={(event) => setSettings((current) => ({
+                        ...current,
+                        customerIdCompanyPrefix: event.target.value.replace(/[^a-z]/gi, '').toUpperCase().slice(0, 4)
+                      }))}
+                      placeholder="ISP"
+                    />
+                  )}
+                </div>
+                <p className="field-hint">Huruf saja, 2–4 karakter. Berlaku untuk ID baru.</p>
+              </fieldset>
+
+              <fieldset>
+                <legend className="field-label">Enam karakter terakhir</legend>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="radio" name="customer-suffix" value="random"
+                      checked={settings.customerIdSuffixMode === 'random'}
+                      onChange={() => setSettings((current) => ({ ...current, customerIdSuffixMode: 'random' }))} />
+                    Acak huruf dan angka
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="radio" name="customer-suffix" value="installation_date"
+                      checked={settings.customerIdSuffixMode === 'installation_date'}
+                      onChange={() => setSettings((current) => ({ ...current, customerIdSuffixMode: 'installation_date' }))} />
+                    Tanggal pemasangan <span className="font-mono text-xs text-muted-foreground">YYMMDD</span>
+                  </label>
+                </div>
+                <p className="field-hint">Mode tanggal menunggu tanggal pemasangan di detail device sebelum membuat ID.</p>
+              </fieldset>
+            </div>
+
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               <div className="rounded-md border border-border p-4">
                 <p className="metric-label">Login pelanggan</p>
                 <p className="mt-2 text-sm font-semibold">ID Customer</p>
-                <p className="mt-1 text-xs text-muted-foreground">Password awal: enam digit terakhir ID Customer.</p>
+                <p className="mt-1 text-xs text-muted-foreground">Password awal: enam karakter terakhir ID Customer.</p>
               </div>
               <div className="rounded-md border border-border p-4">
                 <p className="metric-label">Identitas permanen</p>

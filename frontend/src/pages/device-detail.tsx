@@ -53,7 +53,26 @@ interface ProcessedDeviceDetail {
   };
   wifi: WifiNetwork[];
   wan: Array<WanConnection>;
+  wanContainers: Array<{ path: string; label: string }>;
+  clients: ClientDevice[];
+  customer: {
+    customerId: string | null;
+    installationDate: string | null;
+    generated: boolean;
+  };
   _raw?: any;
+}
+
+interface ClientDevice {
+  instance: string;
+  dataModel: string;
+  hostName?: string | null;
+  ipAddress?: string | null;
+  macAddress?: string | null;
+  interfaceType?: string | null;
+  addressSource?: string | null;
+  leaseTimeRemaining?: number | null;
+  active: boolean | null;
 }
 
 interface WifiNetwork {
@@ -519,6 +538,11 @@ export default function DeviceDetailPage() {
   const [credentialType, setCredentialType] = useState<'super' | 'user' | null>(null);
   const [editingWifi, setEditingWifi] = useState<WifiNetwork | null>(null)
   const [savingWifi, setSavingWifi] = useState(false)
+  const [installationDate, setInstallationDate] = useState('')
+  const [savingInstallationDate, setSavingInstallationDate] = useState(false)
+  const [wanContainer, setWanContainer] = useState('')
+  const [newWanType, setNewWanType] = useState<'ppp' | 'ip'>('ppp')
+  const [addingWan, setAddingWan] = useState(false)
 
 
   const handleOpenEditModal = (wan: WanConnection) => {
@@ -640,7 +664,10 @@ export default function DeviceDetailPage() {
       }
       const res = await devicesAPI.getDevice(deviceId)
       if (res.success && res.data) {
-        setDevice(res.data as ProcessedDeviceDetail)
+        const nextDevice = res.data as ProcessedDeviceDetail
+        setDevice(nextDevice)
+        setInstallationDate(nextDevice.customer?.installationDate || '')
+        setWanContainer((current) => current || nextDevice.wanContainers?.[0]?.path || '')
       } else {
         toast.error(res.message || 'Failed to load device details')
         setDevice(null)
@@ -652,6 +679,55 @@ export default function DeviceDetailPage() {
       setLoading(false);
     }
   }, [deviceId, toast])
+
+  const handleSaveInstallationDate = async () => {
+    if (!installationDate) {
+      toast.error('Select an installation date first')
+      return
+    }
+    setSavingInstallationDate(true)
+    try {
+      const res = await devicesAPI.updateInstallationDate(deviceId, installationDate)
+      if (!res.success) {
+        toast.error(res.message || 'Failed to save installation date')
+        return
+      }
+      const result = res.data as { customerId?: string | null; installationDate?: string }
+      setDevice((current) => current ? {
+        ...current,
+        customer: {
+          customerId: result.customerId ?? current.customer?.customerId ?? null,
+          installationDate: result.installationDate || installationDate,
+          generated: Boolean(result.customerId ?? current.customer?.customerId)
+        }
+      } : current)
+      toast.success(res.message || 'Installation date saved')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to save installation date')
+    } finally {
+      setSavingInstallationDate(false)
+    }
+  }
+
+  const handleAddWan = async () => {
+    if (!wanContainer) {
+      toast.error('This device did not report a WAN connection container')
+      return
+    }
+    setAddingWan(true)
+    try {
+      const res = await devicesAPI.addWanConnection(deviceId, wanContainer, newWanType)
+      if (!res.success) {
+        toast.error(res.message || 'Failed to add WAN connection')
+        return
+      }
+      toast.success(res.message || 'WAN creation task queued')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to add WAN connection')
+    } finally {
+      setAddingWan(false)
+    }
+  }
 
   useEffect(() => {
     fetchDeviceDetails(false);
@@ -857,6 +933,9 @@ export default function DeviceDetailPage() {
                 Last Inform {formatDate(device._lastInform)}
               </span>
               <span className="max-w-full truncate font-mono text-[0.68rem] text-muted-foreground">{device._id}</span>
+              <span className={device.customer?.customerId ? 'modern-badge-info font-mono' : 'modern-badge'}>
+                {device.customer?.customerId || 'Customer ID not generated'}
+              </span>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -949,6 +1028,15 @@ export default function DeviceDetailPage() {
               WiFi
             </button>
             <button
+              onClick={() => setActiveTab('clients')}
+              className="tab-button"
+              data-active={activeTab === 'clients'}
+              role="tab"
+              aria-selected={activeTab === 'clients'}
+            >
+              Clients ({device.clients?.length || 0})
+            </button>
+            <button
               onClick={() => setActiveTab('advanced')}
               className="tab-button"
               data-active={activeTab === 'advanced'}
@@ -1001,6 +1089,38 @@ export default function DeviceDetailPage() {
               </div>
             </div>
 
+            <div className="modern-card p-5 sm:p-6">
+              <p className="page-kicker">Customer access</p>
+              <h2 className="section-heading">Customer ID</h2>
+              <p className="mt-3 break-all font-mono text-lg font-bold">
+                {device.customer?.customerId || 'Not generated'}
+              </p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                This ID is permanent after generation and remains bound to SoftwareID plus PPPoE username.
+              </p>
+              <div className="mt-5 border-t border-border pt-4">
+                <label htmlFor="installation-date" className="field-label">Installation date</label>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <input
+                    id="installation-date"
+                    type="date"
+                    className="modern-input"
+                    value={installationDate}
+                    onChange={(event) => setInstallationDate(event.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="modern-button shrink-0"
+                    disabled={savingInstallationDate}
+                    onClick={() => void handleSaveInstallationDate()}
+                  >
+                    {savingInstallationDate ? 'Saving…' : 'Save date'}
+                  </button>
+                </div>
+                <p className="field-hint">Saved in SkyGenPanel and synchronized to GenieACS as an installation tag.</p>
+              </div>
+            </div>
+
             <div className="modern-card p-6">
               <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Signal Information</h2>
               <div className="space-y-3">
@@ -1025,8 +1145,38 @@ export default function DeviceDetailPage() {
 
         {/* Tab WAN */}
         {activeTab === 'wan' && (
-          <div className="modern-card p-6">
-            <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">WAN Configuration</h2>
+          <div className="modern-card p-5 sm:p-6">
+            <div className="mb-5 flex flex-col gap-4 border-b border-border pb-5 xl:flex-row xl:items-end xl:justify-between">
+              <div>
+                <h2 className="section-heading">WAN configuration</h2>
+                <p className="section-description">Existing connections reported by the ONT and a safe GenieACS addObject workflow.</p>
+              </div>
+              {user?.role === 'admin' && (
+                <div className="grid gap-2 sm:grid-cols-[minmax(15rem,1fr)_8rem_auto]">
+                  <div>
+                    <label htmlFor="wan-container" className="field-label">WAN container</label>
+                    <select id="wan-container" className="modern-input max-w-full" value={wanContainer}
+                      onChange={(event) => setWanContainer(event.target.value)}>
+                      {(device.wanContainers || []).map((container) => (
+                        <option key={container.path} value={container.path}>{container.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="wan-type" className="field-label">Type</label>
+                    <select id="wan-type" className="modern-input" value={newWanType}
+                      onChange={(event) => setNewWanType(event.target.value as 'ppp' | 'ip')}>
+                      <option value="ppp">PPPoE</option>
+                      <option value="ip">IP</option>
+                    </select>
+                  </div>
+                  <button type="button" className="modern-button self-end" disabled={addingWan || !wanContainer}
+                    onClick={() => void handleAddWan()}>
+                    {addingWan ? 'Queuing…' : 'Add WAN'}
+                  </button>
+                </div>
+              )}
+            </div>
             <div className="space-y-6">
               {device.wan && device.wan.length > 0 ? (
                 device.wan.map((wan) => (
@@ -1159,6 +1309,67 @@ export default function DeviceDetailPage() {
                 <p className="text-gray-500 dark:text-gray-400">No WAN connection data found.</p>
               )}
             </div>
+          </div>
+        )}
+
+        {activeTab === 'clients' && (
+          <div className="modern-card overflow-hidden">
+            <div className="flex flex-col gap-3 border-b border-border p-5 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h2 className="section-heading">Connected-device inventory</h2>
+                <p className="section-description">Online and offline hosts reported by the ONT through TR-098 or TR-181.</p>
+              </div>
+              <div className="flex gap-2">
+                <span className="modern-badge-success">{device.clients?.filter((client) => client.active === true).length || 0} online</span>
+                <span className="modern-badge">{device.clients?.filter((client) => client.active === false).length || 0} offline</span>
+              </div>
+            </div>
+            {device.clients?.length ? (
+              <>
+                <div className="grid gap-3 p-4 md:hidden">
+                  {device.clients.map((client) => (
+                    <article key={`${client.dataModel}-${client.instance}-${client.macAddress || client.ipAddress || ''}`} className="rounded-md border border-border p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <h3 className="truncate font-semibold">{client.hostName || 'Unnamed client'}</h3>
+                          <p className="mt-1 break-all font-mono text-xs text-muted-foreground">{client.macAddress || 'MAC not reported'}</p>
+                        </div>
+                        <span className={client.active === true ? 'modern-badge-success' : client.active === false ? 'modern-badge' : 'modern-badge-warning'}>
+                          {client.active === true ? 'Online' : client.active === false ? 'Offline' : 'Unknown'}
+                        </span>
+                      </div>
+                      <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                        <div><dt className="text-xs text-muted-foreground">IP address</dt><dd className="mt-1 break-all font-mono">{client.ipAddress || '—'}</dd></div>
+                        <div><dt className="text-xs text-muted-foreground">Interface</dt><dd className="mt-1 break-all">{client.interfaceType || '—'}</dd></div>
+                      </dl>
+                    </article>
+                  ))}
+                </div>
+                <div className="hidden overflow-x-auto md:block">
+                  <table className="modern-table">
+                    <thead><tr><th>Status</th><th>Hostname</th><th>IP address</th><th>MAC address</th><th>Interface</th><th>Source</th></tr></thead>
+                    <tbody>
+                      {device.clients.map((client) => (
+                        <tr key={`${client.dataModel}-${client.instance}-${client.macAddress || client.ipAddress || ''}`}>
+                          <td><span className={client.active === true ? 'modern-badge-success' : client.active === false ? 'modern-badge' : 'modern-badge-warning'}>{client.active === true ? 'Online' : client.active === false ? 'Offline' : 'Unknown'}</span></td>
+                          <td className="font-semibold">{client.hostName || 'Unnamed client'}</td>
+                          <td className="font-mono text-xs">{client.ipAddress || '—'}</td>
+                          <td className="font-mono text-xs">{client.macAddress || '—'}</td>
+                          <td>{client.interfaceType || '—'}</td>
+                          <td>{client.addressSource || client.dataModel}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            ) : (
+              <div className="empty-state">
+                <div className="empty-state-icon"><Icon name="phone" size={22} /></div>
+                <h3 className="empty-state-title">No host inventory reported</h3>
+                <p className="empty-state-copy">Request an Inform or confirm that the ONT exposes its Hosts table through CWMP.</p>
+              </div>
+            )}
           </div>
         )}
 

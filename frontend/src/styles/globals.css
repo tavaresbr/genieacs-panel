@@ -124,7 +124,7 @@
 
 @layer components {
   .page-shell {
-    @apply px-4 pb-24 pt-20 sm:px-6 md:px-8 md:py-8;
+    @apply px-4 pb-24 pt-20 sm:px-6 lg:px-8 lg:py-8;
   }
 
   .page-frame {

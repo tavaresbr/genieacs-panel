@@ -24,10 +24,10 @@ Server default menggunakan port `5890`. Setup akun admin pertama dilakukan dari 
 ## Pemeriksaan
 
 ```bash
-npm test
+npm run check
 npm audit
 ```
 
-Test suite mencakup autentikasi, CORS, error handling production, migrasi database dengan foreign key, normalisasi data perangkat, jalur WAN, serta script installer/init/reset-password.
+Pemeriksaan lokal memvalidasi syntax entrypoint, service GenieACS, dan controller perangkat. Build frontend, lint, typecheck, serta audit dependency dijalankan dari root project sebelum release.
 
 Konfigurasi environment dijelaskan di [`.env.example`](.env.example). URL GenieACS dan database runtime dikelola dari UI.

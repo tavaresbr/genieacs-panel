@@ -9,7 +9,7 @@
     "dev": "node src/server.js",
     "db:init": "node scripts/init-db.js",
     "reset-password": "node scripts/reset-password.js",
-    "test": "node --test --test-concurrency=1"
+    "check": "node --check src/server.js && node --check src/services/deviceService.js && node --check src/controllers/deviceController.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",

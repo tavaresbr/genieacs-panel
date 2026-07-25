@@ -406,6 +406,8 @@ class DeviceService {
       'InternetGatewayDevice.DeviceInfo.SoftwareVersion',
       'InternetGatewayDevice.DeviceInfo.UpTime',
       'InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.1.MACAddress',
+      'InternetGatewayDevice.LANDevice.1.Hosts.Host',
+      'Device.Hosts.Host',
       'InternetGatewayDevice.WANDevice.1.WANEthernetInterfaceConfig.MACAddress',
       'InternetGatewayDevice.WANDevice',
       '_lastInform',
@@ -558,6 +560,7 @@ class DeviceService {
     }
     
     const wan = [];
+    const wanContainers = [];
     const wanDevice = item.InternetGatewayDevice?.WANDevice;
 
     if (wanDevice) {
@@ -569,6 +572,10 @@ class DeviceService {
           if (connKey.startsWith('_')) continue;
           const connDev = wanDevice[devKey].WANConnectionDevice[connKey];
           if (!connDev) continue;
+          wanContainers.push({
+            path: `InternetGatewayDevice.WANDevice.${devKey}.WANConnectionDevice.${connKey}`,
+            label: `WAN ${devKey} / connection device ${connKey}`
+          });
 
           const connections = [];
           for (const [collection, connType, indexType] of [
@@ -649,6 +656,37 @@ class DeviceService {
       }
     }
 
+    const clients = [];
+    const seenClients = new Set();
+    const collectHosts = (hostCollection, dataModel) => {
+      if (!hostCollection || typeof hostCollection !== 'object') return;
+      for (const [instance, host] of Object.entries(hostCollection)) {
+        if (instance.startsWith('_') || !host || typeof host !== 'object') continue;
+        const value = (key) => getRelativeValue(host, key);
+        const macAddress = value('MACAddress') || value('PhysAddress');
+        const ipAddress = value('IPAddress');
+        const hostName = value('HostName');
+        const identity = String(macAddress || `${dataModel}:${instance}:${ipAddress || hostName || ''}`).toUpperCase();
+        if (seenClients.has(identity)) continue;
+        seenClients.add(identity);
+        const activeValue = value('Active');
+        clients.push({
+          instance: String(instance),
+          dataModel,
+          hostName,
+          ipAddress,
+          macAddress,
+          interfaceType: value('InterfaceType') || value('Layer2Interface'),
+          addressSource: value('AddressSource'),
+          leaseTimeRemaining: value('LeaseTimeRemaining'),
+          active: activeValue === null ? null : this.isEnabledValue(activeValue)
+        });
+      }
+    };
+    collectHosts(item.InternetGatewayDevice?.LANDevice?.['1']?.Hosts?.Host, 'TR-098');
+    collectHosts(item.Device?.Hosts?.Host, 'TR-181');
+    clients.sort((left, right) => Number(right.active === true) - Number(left.active === true));
+
     return {
       _id: item._id,
       _lastInform: item._lastInform,
@@ -659,6 +697,8 @@ class DeviceService {
       virtualParameters,
       wifi, 
       wan,
+      wanContainers,
+      clients,
       vendorDetection: {
         vendor: vendor,
         vendorId: vendorId,
@@ -778,6 +818,82 @@ class DeviceService {
   static async postTask(deviceId, task) {
     const endpoint = `${encodeURIComponent(deviceId)}/tasks`;
     return this.fetchFromGenieAcs(endpoint, { connection_request: 1 }, 'POST', task);
+  }
+
+  static installationTag(installationDate) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(installationDate))) {
+      throw new Error('Invalid installation date');
+    }
+    return `Installed_${String(installationDate).replaceAll('-', '')}`;
+  }
+
+  static async mutateDeviceTag(deviceId, tag, method) {
+    if (!deviceId || !/^[A-Za-z0-9_]+$/.test(String(tag))) {
+      throw new Error('Invalid device tag');
+    }
+    const root = await this.getGenieAcsRootUrl();
+    const url = `${root}/devices/${encodeURIComponent(String(deviceId))}/tags/${encodeURIComponent(String(tag))}`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15_000);
+    try {
+      const response = await fetch(url, { method, signal: controller.signal });
+      if (!response.ok && !(method === 'DELETE' && response.status === 404)) {
+        const errorText = await response.text().catch(() => '');
+        throw new Error(`GenieACS tag API responded with status: ${response.status}${errorText ? ` - ${errorText}` : ''}`);
+      }
+      return true;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  static async syncInstallationTag(deviceId, installationDate, previousTag = null) {
+    const nextTag = this.installationTag(installationDate);
+    await this.mutateDeviceTag(deviceId, nextTag, 'POST');
+    if (previousTag && previousTag !== nextTag && /^[A-Za-z0-9_]+$/.test(String(previousTag))) {
+      await this.mutateDeviceTag(deviceId, previousTag, 'DELETE');
+    }
+    return nextTag;
+  }
+
+  static discoverWanContainers(item) {
+    const containers = [];
+    const wanDevices = item?.InternetGatewayDevice?.WANDevice;
+    if (!wanDevices || typeof wanDevices !== 'object') return containers;
+    for (const [wanIndex, wanDevice] of Object.entries(wanDevices)) {
+      if (wanIndex.startsWith('_') || !wanDevice || typeof wanDevice !== 'object') continue;
+      const connectionDevices = wanDevice.WANConnectionDevice;
+      if (!connectionDevices || typeof connectionDevices !== 'object') continue;
+      for (const [connectionIndex, connectionDevice] of Object.entries(connectionDevices)) {
+        if (connectionIndex.startsWith('_') || !connectionDevice || typeof connectionDevice !== 'object') continue;
+        containers.push(`InternetGatewayDevice.WANDevice.${wanIndex}.WANConnectionDevice.${connectionIndex}`);
+      }
+    }
+    return containers;
+  }
+
+  static async addWanConnection(deviceId, containerPath, type) {
+    if (!['ppp', 'ip'].includes(type)) {
+      throw new Error('Invalid WAN connection type');
+    }
+    const rawDeviceData = await this.fetchFromGenieAcs('', {
+      query: JSON.stringify({ _id: deviceId }),
+      projection: '_id,InternetGatewayDevice.WANDevice'
+    });
+    if (!Array.isArray(rawDeviceData) || rawDeviceData.length === 0) {
+      throw new Error('Device not found');
+    }
+    const allowedContainers = this.discoverWanContainers(rawDeviceData[0]);
+    if (!allowedContainers.includes(containerPath)) {
+      throw new Error('Invalid WAN connection container');
+    }
+    const objectName = `${containerPath}.${type === 'ppp' ? 'WANPPPConnection' : 'WANIPConnection'}`;
+    const task = await this.postTask(deviceId, { name: 'addObject', objectName });
+    return {
+      task,
+      objectName,
+      message: `${type === 'ppp' ? 'PPPoE' : 'IP'} WAN creation task queued. The new instance appears after the next Inform.`
+    };
   }
 
   static async deleteDevice(deviceId) {
@@ -1063,32 +1179,45 @@ class DeviceService {
 
   static normalizeFault(fault) {
     if (!fault || typeof fault !== 'object') return null;
-    const id = this.normalizeParameterValue(fault._id);
+    const scalar = (value) => {
+      const direct = this.normalizeParameterValue(value);
+      if (direct !== null) return direct;
+      if (!value || typeof value !== 'object') return null;
+      for (const key of ['$oid', '$date', '_value', 'value', 'id']) {
+        if (value[key] !== undefined && value[key] !== value) {
+          const nested = scalar(value[key]);
+          if (nested !== null) return nested;
+        }
+      }
+      return null;
+    };
+    const id = scalar(fault._id);
     if (!id) return null;
     const detail = fault.detail && typeof fault.detail === 'object' ? fault.detail : {};
-    const deviceId = this.normalizeParameterValue(fault.device) || String(id).split(':')[0] || null;
-    const timestamp = this.normalizeParameterValue(fault.timestamp) ||
-      this.normalizeParameterValue(fault.retryTimestamp) ||
-      this.normalizeParameterValue(fault._timestamp) ||
+    const deviceId = scalar(fault.device) || String(id).split(':')[0] || null;
+    const timestamp = scalar(fault.timestamp) ||
+      scalar(fault.retryTimestamp) ||
+      scalar(fault._timestamp) ||
       null;
     return {
       id: String(id),
       deviceId: deviceId ? String(deviceId) : null,
-      channel: String(this.normalizeParameterValue(fault.channel) || String(id).split(':').slice(1).join(':') || 'default'),
+      channel: String(scalar(fault.channel) || String(id).split(':').slice(1).join(':') || 'default'),
       code: String(
-        this.normalizeParameterValue(fault.code) ||
-        this.normalizeParameterValue(detail.faultCode) ||
-        this.normalizeParameterValue(detail.code) ||
+        scalar(fault.code) ||
+        scalar(detail.faultCode) ||
+        scalar(detail.code) ||
         'FAULT'
       ),
       message: String(
-        this.normalizeParameterValue(fault.message) ||
-        this.normalizeParameterValue(detail.faultString) ||
-        this.normalizeParameterValue(detail.message) ||
+        scalar(fault.message) ||
+        scalar(detail.faultString) ||
+        scalar(detail.message) ||
+        scalar(fault.faultString) ||
         'GenieACS reported a provisioning fault'
       ),
       timestamp: timestamp ? String(timestamp) : null,
-      retries: Number(this.normalizeParameterValue(fault.retries) || 0)
+      retries: Number(scalar(fault.retries) || scalar(fault.retryCount) || 0)
     };
   }
 
@@ -1097,8 +1226,7 @@ class DeviceService {
     const data = await this.fetchGenieAcsCollection(
       'faults',
       {
-        limit: safeLimit,
-        sort: JSON.stringify({ timestamp: -1 })
+        limit: safeLimit
       },
       'GET',
       null,
@@ -1107,7 +1235,14 @@ class DeviceService {
     if (!Array.isArray(data)) {
       throw new Error('Invalid faults API response');
     }
-    return data.map((fault) => this.normalizeFault(fault)).filter(Boolean);
+    return data
+      .map((fault) => this.normalizeFault(fault))
+      .filter(Boolean)
+      .sort((left, right) => {
+        const a = left.timestamp ? new Date(left.timestamp).getTime() : 0;
+        const b = right.timestamp ? new Date(right.timestamp).getTime() : 0;
+        return (Number.isFinite(b) ? b : 0) - (Number.isFinite(a) ? a : 0);
+      });
   }
 
   static async deleteFault(faultId) {
@@ -1120,7 +1255,7 @@ class DeviceService {
     const timeoutId = setTimeout(() => controller.abort(), 15_000);
     try {
       const response = await fetch(url, { method: 'DELETE', signal: controller.signal });
-      if (!response.ok) {
+      if (!response.ok && response.status !== 404) {
         const errorText = await response.text().catch(() => '');
         throw new Error(`GenieACS fault API responded with status: ${response.status}${errorText ? ` - ${errorText}` : ''}`);
       }

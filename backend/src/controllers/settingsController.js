@@ -7,6 +7,9 @@ const ALLOWED_SETTING_KEYS = new Set([
   'appName',
   'genieAcsUrl',
   'autoGenerateCustomerId',
+  'customerIdPrefixMode',
+  'customerIdCompanyPrefix',
+  'customerIdSuffixMode',
   'vpPppoeUsername',
   'vpWanBridge',
   'vpRxPower',
@@ -28,6 +31,15 @@ function validateSetting(key, value) {
   }
   if (key === 'autoGenerateCustomerId' && !['true', 'false'].includes(normalized)) {
     return { error: 'Auto generation must be true or false' };
+  }
+  if (key === 'customerIdPrefixMode' && !['default', 'company'].includes(normalized)) {
+    return { error: 'Customer ID prefix mode must be default or company' };
+  }
+  if (key === 'customerIdCompanyPrefix' && !/^[A-Za-z]{2,4}$/.test(normalized.trim())) {
+    return { error: 'Company ID must contain 2 to 4 letters' };
+  }
+  if (key === 'customerIdSuffixMode' && !['random', 'installation_date'].includes(normalized)) {
+    return { error: 'Customer ID suffix mode must be random or installation_date' };
   }
   if (key === 'appName' && (normalized.trim().length < 1 || normalized.length > 80)) {
     return { error: 'Application name must be between 1 and 80 characters' };

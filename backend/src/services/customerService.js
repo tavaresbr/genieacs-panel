@@ -1,10 +1,15 @@
 import crypto from 'node:crypto';
 import CustomerAccount from '../models/CustomerAccount.js';
+import DeviceProfile from '../models/DeviceProfile.js';
 import Setting from '../models/Setting.js';
 
-const CUSTOMER_ID_PATTERN = /^CSG-[A-Z0-9]{7}-[0-9]{6}$/;
+const CUSTOMER_ID_PATTERN = /^[A-Z]{2,4}-[A-Z0-9]{7}-[A-Z0-9]{6}$/;
 const ID_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-const DIGITS = '0123456789';
+const DEFAULT_GENERATION_SETTINGS = Object.freeze({
+  prefixMode: 'default',
+  companyPrefix: 'CSG',
+  suffixMode: 'random'
+});
 
 function randomString(alphabet, length) {
   let result = '';
@@ -39,8 +44,49 @@ class CustomerService {
       .digest('hex');
   }
 
-  static generateCustomerId() {
-    return `CSG-${randomString(ID_ALPHABET, 7)}-${randomString(DIGITS, 6)}`;
+  static normalizeInstallationDate(value) {
+    const normalized = String(value ?? '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return null;
+    const parsed = new Date(`${normalized}T00:00:00.000Z`);
+    if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== normalized) {
+      return null;
+    }
+    return normalized;
+  }
+
+  static installationDateSuffix(value) {
+    const date = this.normalizeInstallationDate(value);
+    return date ? `${date.slice(2, 4)}${date.slice(5, 7)}${date.slice(8, 10)}` : null;
+  }
+
+  static normalizeGenerationSettings(settings = {}) {
+    const prefixMode = settings.prefixMode === 'company' ? 'company' : 'default';
+    const companyPrefix = String(settings.companyPrefix || 'CSG').trim().toUpperCase();
+    const suffixMode = settings.suffixMode === 'installation_date' ? 'installation_date' : 'random';
+    return {
+      prefixMode,
+      companyPrefix: /^[A-Z]{2,4}$/.test(companyPrefix) ? companyPrefix : 'CSG',
+      suffixMode
+    };
+  }
+
+  static async getGenerationSettings() {
+    const [prefixMode, companyPrefix, suffixMode] = await Promise.all([
+      Setting.getByKey('customerIdPrefixMode'),
+      Setting.getByKey('customerIdCompanyPrefix'),
+      Setting.getByKey('customerIdSuffixMode')
+    ]);
+    return this.normalizeGenerationSettings({ prefixMode, companyPrefix, suffixMode });
+  }
+
+  static generateCustomerId(settings = DEFAULT_GENERATION_SETTINGS, installationDate = null) {
+    const config = this.normalizeGenerationSettings(settings);
+    const prefix = config.prefixMode === 'company' ? config.companyPrefix : 'CSG';
+    const suffix = config.suffixMode === 'installation_date'
+      ? this.installationDateSuffix(installationDate)
+      : randomString(ID_ALPHABET, 6);
+    if (!suffix) return null;
+    return `${prefix}-${randomString(ID_ALPHABET, 7)}-${suffix}`;
   }
 
   static passwordForCustomerId(customerId) {
@@ -69,10 +115,19 @@ class CustomerService {
       return CustomerAccount.touch(existingByIdentity.id, deviceId);
     }
 
+    const generationSettings = await this.getGenerationSettings();
+    const profile = generationSettings.suffixMode === 'installation_date'
+      ? await DeviceProfile.getByDeviceId(deviceId)
+      : null;
+    const customerId = this.generateCustomerId(generationSettings, profile?.installation_date);
+    if (!customerId) return null;
+
     for (let attempt = 0; attempt < 8; attempt += 1) {
       try {
         return await CustomerAccount.create({
-          customer_id: this.generateCustomerId(),
+          customer_id: attempt === 0
+            ? customerId
+            : this.generateCustomerId(generationSettings, profile?.installation_date),
           device_id: deviceId,
           identity_hash: identityHash,
           software_id: softwareId,

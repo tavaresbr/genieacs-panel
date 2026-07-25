@@ -328,7 +328,7 @@ export default function CustomerPortal() {
             <p className="page-kicker">Akses mandiri pelanggan</p>
             <h1 className="text-2xl font-bold">Periksa kondisi ONT</h1>
             <p className="mb-6 mt-2 text-sm leading-6 text-muted-foreground">
-              Masukkan ID Customer yang diberikan penyedia layanan. Password awal adalah enam digit terakhir ID.
+              Masukkan ID Customer yang diberikan penyedia layanan. Password awal adalah enam karakter terakhir ID.
             </p>
             <form className="space-y-4" onSubmit={login}>
               <div>
@@ -339,7 +339,7 @@ export default function CustomerPortal() {
                   value={customerId}
                   onChange={(event) => setCustomerId(event.target.value.toUpperCase())}
                   autoComplete="username"
-                  maxLength={18}
+                  maxLength={19}
                   placeholder="CSG-XXXXXXX-XXXXXX"
                   required
                 />
@@ -351,13 +351,13 @@ export default function CustomerPortal() {
                     id="customer-password"
                     className="modern-input pr-12 font-mono"
                     type={showLoginPassword ? 'text' : 'password'}
-                    inputMode="numeric"
-                    pattern="[0-9]{6}"
+                    inputMode="text"
+                    pattern="[A-Za-z0-9]{6}"
                     maxLength={6}
                     value={password}
-                    onChange={(event) => setPassword(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                    onChange={(event) => setPassword(event.target.value.replace(/[^a-z0-9]/gi, '').toUpperCase().slice(0, 6))}
                     autoComplete="current-password"
-                    placeholder="6 digit"
+                    placeholder="6 karakter"
                     required
                   />
                   <button

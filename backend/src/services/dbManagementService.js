@@ -15,6 +15,7 @@ const COPY_TABLES = [
   'mapping_edges',
   'map_settings',
   'customer_accounts',
+  'device_profiles',
   'customer_wifi_credentials'
 ];
 

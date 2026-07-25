@@ -1,5 +1,7 @@
 import DeviceService from '../services/deviceService.js';
 import CustomerService from '../services/customerService.js';
+import CustomerAccount from '../models/CustomerAccount.js';
+import DeviceProfile from '../models/DeviceProfile.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 
 class DeviceController {
@@ -68,8 +70,24 @@ class DeviceController {
       }
 
       const deviceDetail = await DeviceService.getDetailDevice(deviceId);
+      const profile = await DeviceProfile.getByDeviceId(deviceId);
+      let account = await CustomerAccount.getByDeviceId(deviceId);
+      if (!account && await CustomerService.isAutoGenerationEnabled()) {
+        account = await CustomerService.ensureAccount({
+          _id: deviceId,
+          softwareId: deviceDetail.deviceInfo?.softwareVersion,
+          pppoe: deviceDetail.virtualParameters?.pppoeUsername?.value
+        });
+      }
       return res.json(
-        createResponse('Device detail retrieved successfully', deviceDetail)
+        createResponse('Device detail retrieved successfully', {
+          ...deviceDetail,
+          customer: {
+            customerId: account?.customer_id || null,
+            installationDate: profile?.installation_date || null,
+            generated: Boolean(account)
+          }
+        })
       );
     } catch (error) {
       console.error('Get device detail error:', error);
@@ -171,6 +189,62 @@ class DeviceController {
       const validationError = /^(Invalid|VLAN ID|PPP |No editable|Only PPPoE|Vendor not found)/.test(error.message);
       res.status(validationError ? 400 : 500).json(
         createErrorResponse('Failed to update WAN config', error.message)
+      );
+    }
+  }
+
+  static async addWanConnection(req, res) {
+    const { id } = req.params;
+    const { containerPath, type } = req.body || {};
+    if (!containerPath || !type) {
+      return res.status(400).json(createErrorResponse('WAN container and connection type are required'));
+    }
+    try {
+      const result = await DeviceService.addWanConnection(id, String(containerPath), String(type));
+      DeviceService.dashboardCache.expiresAt = 0;
+      return res.json(createResponse(result.message, result));
+    } catch (error) {
+      console.error(`Error adding WAN connection for ${id}:`, error);
+      const validationError = /^(Invalid WAN|Device not found)/.test(error.message);
+      return res.status(validationError ? 400 : 502).json(
+        createErrorResponse('Failed to add WAN connection', error.message)
+      );
+    }
+  }
+
+  static async updateInstallationDate(req, res) {
+    const { id } = req.params;
+    const installationDate = CustomerService.normalizeInstallationDate(req.body?.installationDate);
+    if (!installationDate) {
+      return res.status(400).json(createErrorResponse('Installation date must use YYYY-MM-DD'));
+    }
+    try {
+      const detail = await DeviceService.getDetailDevice(id);
+      const previous = await DeviceProfile.getByDeviceId(id);
+      const installationTag = await DeviceService.syncInstallationTag(
+        id,
+        installationDate,
+        previous?.installation_tag || null
+      );
+      const profile = await DeviceProfile.upsertInstallationDate(id, installationDate, installationTag);
+      let account = await CustomerAccount.getByDeviceId(id);
+      if (!account && await CustomerService.isAutoGenerationEnabled()) {
+        account = await CustomerService.ensureAccount({
+          _id: id,
+          softwareId: detail.deviceInfo?.softwareVersion,
+          pppoe: detail.virtualParameters?.pppoeUsername?.value
+        });
+      }
+      return res.json(createResponse('Installation date saved and GenieACS tag synchronized', {
+        installationDate: profile.installation_date,
+        installationTag,
+        customerId: account?.customer_id || null
+      }));
+    } catch (error) {
+      console.error(`Error saving installation date for ${id}:`, error);
+      const status = error.message === 'Device not found' ? 404 : 502;
+      return res.status(status).json(
+        createErrorResponse('Failed to save installation date', error.message)
       );
     }
   }

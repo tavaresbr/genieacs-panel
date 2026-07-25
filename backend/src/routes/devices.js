@@ -13,6 +13,8 @@ router.delete('/:deviceId', authenticateToken, requireRole(['admin']), DeviceCon
 router.post('/reboot', authenticateToken, requireRole(['admin']), DeviceController.rebootDevice);
 router.post('/summon', authenticateToken, requireRole(['admin']), DeviceController.summonDevice);
 router.post('/:id/update-wan', authenticateToken, requireRole(['admin']), DeviceController.updateWanConfig);
+router.post('/:id/add-wan', authenticateToken, requireRole(['admin']), DeviceController.addWanConnection);
+router.put('/:id/installation-date', authenticateToken, requireRole(['admin']), DeviceController.updateInstallationDate);
 router.post('/:id/update-wifi', authenticateToken, requireRole(['admin']), DeviceController.updateWifiConfig);
 router.post('/:id/update-credentials', authenticateToken, requireRole(['admin']), DeviceController.updateCredentials);
 

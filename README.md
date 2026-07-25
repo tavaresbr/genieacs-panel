@@ -149,7 +149,7 @@ Open **Settings → Database** as an administrator to:
 3. Migrate existing application data.
 4. Switch the running application to the new database.
 
-The migration includes related customer accounts and encrypted customer WiFi credentials.
+The migration includes device installation profiles, related customer accounts, and encrypted customer WiFi credentials.
 
 ## Development
 
@@ -164,7 +164,7 @@ npm run dev:frontend
 Useful project checks:
 
 ```bash
-npm test
+npm run check:backend
 npm run lint
 npm run typecheck
 npm run build

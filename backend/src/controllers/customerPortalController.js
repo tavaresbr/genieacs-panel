@@ -26,8 +26,8 @@ class CustomerPortalController {
   static async login(req, res) {
     try {
       const customerId = CustomerService.normalizeCustomerId(req.body?.customerId);
-      const password = String(req.body?.password ?? '').trim();
-      if (!customerId || !/^\d{6}$/.test(password)) {
+      const password = String(req.body?.password ?? '').trim().toUpperCase();
+      if (!customerId || !/^[A-Z0-9]{6}$/.test(password)) {
         return res.status(401).json(createErrorResponse('ID Customer atau password salah'));
       }
 

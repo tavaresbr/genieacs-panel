@@ -237,7 +237,7 @@ export default function DevicesPage() {
           </section>
         ) : (
           <>
-            <section className="mb-4 grid gap-3 rounded-[var(--radius)] border border-border bg-card p-3 md:grid-cols-[minmax(18rem,1fr)_13rem_auto] md:items-end">
+            <section className="mb-4 grid gap-3 rounded-[var(--radius)] border border-border bg-card p-3 lg:grid-cols-[minmax(18rem,1fr)_13rem_auto] lg:items-end">
               <div>
                 <label htmlFor="device-search" className="field-label">Search inventory</label>
                 <div className="relative">
@@ -254,13 +254,16 @@ export default function DevicesPage() {
               </div>
               <div>
                 <label htmlFor="device-status" className="field-label">Connection status</label>
-                <select id="device-status" className="modern-input" value={filterStatus} onChange={(event) => setFilterStatus(event.target.value)}>
-                  <option value="all">All devices</option>
-                  <option value="online">Online only</option>
-                  <option value="offline">Offline only</option>
-                </select>
+                <div className="relative">
+                  <select id="device-status" className="modern-input appearance-none pr-10" value={filterStatus} onChange={(event) => setFilterStatus(event.target.value)}>
+                    <option value="all">All devices</option>
+                    <option value="online">Online only</option>
+                    <option value="offline">Offline only</option>
+                  </select>
+                  <Icon name="chevron-down" size={17} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                </div>
               </div>
-              <div className="flex min-h-11 items-center justify-between gap-3 px-1 text-sm text-muted-foreground md:justify-end">
+              <div className="flex min-h-11 items-center justify-between gap-3 px-1 text-sm text-muted-foreground lg:justify-end">
                 <span><strong className="data-value">{filteredDevices.length}</strong> shown</span>
                 {hasFilters && (
                   <button type="button" onClick={() => { setSearchTerm(''); setFilterStatus('all') }} className="font-semibold text-primary hover:underline">

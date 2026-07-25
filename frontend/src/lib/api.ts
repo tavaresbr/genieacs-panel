@@ -223,6 +223,12 @@ export const devicesAPI = {
     return apiClient.post(`/devices/${encodeURIComponent(deviceId)}/update-wan`, { wanIndex, formData });
   },
 
+  addWanConnection: (deviceId: string, containerPath: string, type: 'ppp' | 'ip') =>
+    apiClient.post(`/devices/${encodeURIComponent(deviceId)}/add-wan`, { containerPath, type }),
+
+  updateInstallationDate: (deviceId: string, installationDate: string) =>
+    apiClient.put(`/devices/${encodeURIComponent(deviceId)}/installation-date`, { installationDate }),
+
   updateWifiConfig: (deviceId: string, index: number, formData: any) => {
     return apiClient.post(`/devices/${encodeURIComponent(deviceId)}/update-wifi`, { index, formData });
   },

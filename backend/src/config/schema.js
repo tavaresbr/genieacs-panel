@@ -136,6 +136,17 @@ export async function ensureSchema(db = getDb()) {
     });
   }
 
+  if (!(await db.schema.hasTable('device_profiles'))) {
+    await db.schema.createTable('device_profiles', (t) => {
+      t.increments('id').primary();
+      t.string('device_id', 255).notNullable().unique();
+      t.date('installation_date');
+      t.string('installation_tag', 64);
+      t.timestamp('created_at').defaultTo(db.fn.now());
+      t.timestamp('updated_at').defaultTo(db.fn.now());
+    });
+  }
+
   if (!(await db.schema.hasTable('customer_wifi_credentials'))) {
     await db.schema.createTable('customer_wifi_credentials', (t) => {
       t.increments('id').primary();
