@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation } from 'react-router'
 import { useTheme } from '@/contexts/theme-context'
 import { useAuth } from '@/contexts/auth-context'
 import { Icon } from '@/components/ui/icon'

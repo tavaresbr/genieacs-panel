@@ -4,7 +4,7 @@ API Express 5 yang juga menyajikan hasil static export frontend. Database defaul
 
 ## Menjalankan
 
-Butuh Node.js 20 atau lebih baru.
+Butuh Node.js 22.22 atau lebih baru.
 
 ```bash
 npm ci

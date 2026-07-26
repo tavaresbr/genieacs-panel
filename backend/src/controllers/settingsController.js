@@ -2,6 +2,7 @@ import Setting from '../models/Setting.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import CustomerService from '../services/customerService.js';
 import DeviceService from '../services/deviceService.js';
+import CustomerAccount from '../models/CustomerAccount.js';
 
 const ALLOWED_SETTING_KEYS = new Set([
   'appName',
@@ -45,15 +46,6 @@ function validateSetting(key, value) {
     return { error: 'Application name must be between 1 and 80 characters' };
   }
   return { value: normalized };
-}
-
-function startCustomerSyncIfEnabled(key, value) {
-  if (key !== 'autoGenerateCustomerId' || value !== 'true') return;
-  void DeviceService.getCustomerIdentityDevices()
-    .then((devices) => CustomerService.syncDevices(devices, { enabled: true }))
-    .catch((error) => {
-      console.warn(`Customer ID background sync skipped: ${error.message}`);
-    });
 }
 
 class SettingsController {
@@ -119,8 +111,6 @@ class SettingsController {
       }
 
       await Setting.create(key, validated.value);
-      startCustomerSyncIfEnabled(key, validated.value);
-      
       return res.json(
         createResponse('Setting created successfully', { [key]: validated.value })
       );
@@ -156,7 +146,6 @@ class SettingsController {
         );
       }
 
-      startCustomerSyncIfEnabled(key, validated.value);
       return res.json(
         createResponse('Setting updated successfully', { [key]: validated.value })
       );
@@ -164,6 +153,48 @@ class SettingsController {
       console.error('Update setting error:', error);
       return res.status(500).json(
         createErrorResponse('Failed to update setting', error.message)
+      );
+    }
+  }
+
+  static async syncCustomerIds(req, res) {
+    try {
+      const enabled = await CustomerService.isAutoGenerationEnabled();
+      if (!enabled) {
+        return res.json(createResponse('Customer ID auto generation is disabled', {
+          enabled: false,
+          total: 0,
+          existing: 0,
+          generated: 0,
+          pending: 0
+        }));
+      }
+      const devices = await DeviceService.getCustomerIdentityDevices();
+      const deviceIds = devices.map((device) => String(device?._id || '')).filter(Boolean);
+      const identityHashes = devices
+        .filter((device) => device?._id && device?.softwareId && device?.pppoe)
+        .map((device) => CustomerService.identityHash(device.softwareId, device.pppoe));
+      const existingRows = await CustomerAccount.getExistingForIdentities(deviceIds, identityHashes);
+      const customerIds = await CustomerService.syncDevices(devices, { enabled: true });
+      const generated = Math.max(customerIds.size - existingRows.length, 0);
+      const preserved = Math.min(existingRows.length, customerIds.size);
+      const pending = Math.max(new Set(deviceIds).size - customerIds.size, 0);
+      return res.json(createResponse(
+        pending
+          ? `Customer IDs synchronized; ${pending} device(s) still need SoftwareID, PPPoE, or installation date`
+          : 'Customer IDs synchronized successfully',
+        {
+          enabled: true,
+          total: deviceIds.length,
+          existing: preserved,
+          generated,
+          pending
+        }
+      ));
+    } catch (error) {
+      console.error('Customer ID sync error:', error);
+      return res.status(502).json(
+        createErrorResponse('Failed to synchronize Customer IDs', error.message)
       );
     }
   }

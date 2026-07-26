@@ -5,6 +5,25 @@ import WifiSecurityConfig from '../models/WifiSecurityConfig.js';
 import AppState from '../models/AppState.js';
 import { DEFAULT_SETTINGS } from '../config/seed.js';
 
+const WAN_PARAMETER_CANDIDATES = Object.freeze({
+  vlan: [
+    'X_ZTE-COM_VLANID',
+    'X_HW_VLAN',
+    'X_CMCC_VLANIDMark',
+    'VLANID',
+    'X_CT-COM_WANEponLinkConfig.VLANIDMark'
+  ],
+  serviceList: [
+    'X_ZTE-COM_ServiceList',
+    'X_HW_SERVICELIST',
+    'X_FH_ServiceList',
+    'ServiceList'
+  ],
+  bindings: [
+    'X_HW_LANBIND'
+  ]
+});
+
 class DeviceService {
   static dashboardCache = {
     data: null,
@@ -68,6 +87,26 @@ class DeviceService {
       return configuredPath;
     }
     return `${basePath}.${configuredPath.replace(/^\.+/, '')}`;
+  }
+
+  static findWanParameter(item, basePath, configuredPath, candidates = []) {
+    const requested = [configuredPath, ...candidates].filter(Boolean);
+    const unique = [...new Set(requested)];
+    for (const parameterPath of unique) {
+      const fullPath = this.resolveParameterPath(basePath, parameterPath);
+      const node = this.getParameterNode(item, fullPath);
+      if (node === null) continue;
+      const writableValue = node && typeof node === 'object'
+        ? this.normalizeParameterValue(node._writable)
+        : null;
+      return {
+        path: fullPath,
+        node,
+        value: this.getParameterValue(item, fullPath),
+        writable: writableValue !== false && writableValue !== 0
+      };
+    }
+    return null;
   }
 
   static async getGenieAcsUrl() {
@@ -597,28 +636,33 @@ class DeviceService {
 
           for (const { connection, connType, connPath, index } of connections) {
             
-            let vlanId = null;
-            const vlanPath = vendorObj?.vlan_id_path;
-            if (vlanPath) {
-              vlanId = this.resolveParameterPath(connPath, vlanPath) === vlanPath
-                ? getValue(vlanPath)
-                : getRelativeValue(connection, vlanPath);
-            }
-            
-            let serviceList = null;
-            const servicePath = vendorObj?.service_list_path;
-            if (servicePath) {
-              serviceList = this.resolveParameterPath(connPath, servicePath) === servicePath
-                ? getValue(servicePath)
-                : getRelativeValue(connection, servicePath);
-            }
-            
+            const vlanParameter = this.findWanParameter(
+              item,
+              connPath,
+              vendorObj?.vlan_id_path,
+              WAN_PARAMETER_CANDIDATES.vlan
+            );
+            const serviceParameter = this.findWanParameter(
+              item,
+              connPath,
+              vendorObj?.service_list_path,
+              WAN_PARAMETER_CANDIDATES.serviceList
+            );
+            const nameParameter = this.findWanParameter(item, connPath, 'Name');
+            const usernameParameter = this.findWanParameter(item, connPath, 'Username');
+            const passwordParameter = this.findWanParameter(item, connPath, 'Password');
+            const connectionTypeParameter = this.findWanParameter(item, connPath, 'ConnectionType');
+            const natParameter = this.findWanParameter(item, connPath, 'NATEnabled');
+
             let bindings = null;
-            const bindingPath = vendorObj?.lan_binding_path;
-            if (bindingPath) {
-              const bindingObj = this.resolveParameterPath(connPath, bindingPath) === bindingPath
-                ? this.getParameterNode(item, bindingPath)
-                : getRelativeNode(connection, bindingPath);
+            const bindingParameter = this.findWanParameter(
+              item,
+              connPath,
+              vendorObj?.lan_binding_path,
+              WAN_PARAMETER_CANDIDATES.bindings
+            );
+            if (bindingParameter) {
+              const bindingObj = bindingParameter.node;
               if (bindingObj && typeof bindingObj === 'object') {
                 bindings = { lan: [], ssid: [] };
                 for (let i = 1; i <= 4; i++) {
@@ -633,23 +677,36 @@ class DeviceService {
                 }
               }
             }
+            const bindingConfigurable = bindingParameter
+              ? [...Array(4)].some((_, offset) => Boolean(
+                  this.findWanParameter(item, bindingParameter.path, `Lan${offset + 1}Enable`)?.writable
+                )) || [...Array(8)].some((_, offset) => Boolean(
+                  this.findWanParameter(item, bindingParameter.path, `SSID${offset + 1}Enable`)?.writable
+                ))
+              : false;
 
             wan.push({
               index,
               connType: connType,
-              name: getRelativeValue(connection, 'Name'),
+              name: nameParameter?.value ?? null,
               status: getValue(`${connPath}.ConnectionStatus`),
               ipAddress: getValue(`${connPath}.ExternalIPAddress`),
               macAddress: getValue(`InternetGatewayDevice.WANDevice.${devKey}.WANEthernetInterfaceConfig.MACAddress`),
-              vlanId: vlanId,
-              username: getRelativeValue(connection, 'Username'),
-              serviceList: serviceList,
-              connectionType: getRelativeValue(connection, 'ConnectionType'),
-              natEnabled: getRelativeValue(connection, 'NATEnabled'),
+              vlanId: vlanParameter?.value ?? null,
+              username: usernameParameter?.value ?? null,
+              serviceList: serviceParameter?.value ?? null,
+              connectionType: connectionTypeParameter?.value ?? null,
+              natEnabled: natParameter?.value ?? null,
               bindings,
               editable: connType === 'PPPoE',
-              vlanConfigurable: Boolean(vendorObj?.vlan_id_path),
-              bindingsConfigurable: Boolean(vendorObj?.lan_binding_path)
+              nameConfigurable: Boolean(nameParameter?.writable),
+              usernameConfigurable: Boolean(usernameParameter?.writable),
+              passwordConfigurable: Boolean(passwordParameter?.writable),
+              vlanConfigurable: Boolean(vlanParameter?.writable),
+              serviceListConfigurable: Boolean(serviceParameter?.writable),
+              connectionTypeConfigurable: Boolean(connectionTypeParameter?.writable),
+              natConfigurable: Boolean(natParameter?.writable),
+              bindingsConfigurable: bindingConfigurable
             });
           }
         }
@@ -958,10 +1015,6 @@ class DeviceService {
     const productClass = item._deviceId?._ProductClass || null;
     const vendorObj = await VendorService.detectVendor(manufacturer, productClass, item);
     
-    if (!vendorObj) {
-      throw new Error('Vendor not found, cannot determine parameter paths.');
-    }
-    
     if (!/^\d+\.\d+(?:\.ppp\.\d+)?$/.test(String(wanIndex))) {
       throw new Error('Invalid WAN connection index.');
     }
@@ -987,51 +1040,120 @@ class DeviceService {
     }
     const parameterValues = [];
     const {
+      name,
       vlanEnabled,
       vlanId,
       username,
       password,
+      serviceList,
+      connectionType,
+      natEnabled,
       bindings = {}
     } = formData;
-    const vlanPath = vendorObj?.vlan_id_path;
-    if (vlanPath) {
+    const nameParameter = this.findWanParameter(item, basePath, 'Name');
+    const usernameParameter = this.findWanParameter(item, basePath, 'Username');
+    const passwordParameter = this.findWanParameter(item, basePath, 'Password');
+    const vlanParameter = this.findWanParameter(
+      item,
+      basePath,
+      vendorObj?.vlan_id_path,
+      WAN_PARAMETER_CANDIDATES.vlan
+    );
+    const serviceParameter = this.findWanParameter(
+      item,
+      basePath,
+      vendorObj?.service_list_path,
+      WAN_PARAMETER_CANDIDATES.serviceList
+    );
+    const connectionTypeParameter = this.findWanParameter(item, basePath, 'ConnectionType');
+    const natParameter = this.findWanParameter(item, basePath, 'NATEnabled');
+    const bindingParameter = this.findWanParameter(
+      item,
+      basePath,
+      vendorObj?.lan_binding_path,
+      WAN_PARAMETER_CANDIDATES.bindings
+    );
+
+    if (nameParameter?.writable && name !== undefined && name !== nameParameter.value) {
+      if (typeof name !== 'string' || name.trim().length < 1 || name.length > 256) {
+        throw new Error('WAN name must contain 1 to 256 characters.');
+      }
+      parameterValues.push([nameParameter.path, name.trim(), 'xsd:string']);
+    }
+    if (vlanParameter?.writable) {
       const parsedVlanId = Number(vlanId);
       if (vlanEnabled && (!Number.isInteger(parsedVlanId) || parsedVlanId < 1 || parsedVlanId > 4094)) {
         throw new Error('VLAN ID must be an integer between 1 and 4094.');
       }
-      parameterValues.push([
-        this.resolveParameterPath(basePath, vlanPath),
-        vlanEnabled ? parsedVlanId : 0,
-        'xsd:unsignedInt'
-      ]);
+      const nextVlan = vlanEnabled ? parsedVlanId : 0;
+      if (String(nextVlan) !== String(vlanParameter.value ?? '')) {
+        parameterValues.push([vlanParameter.path, nextVlan, 'xsd:unsignedInt']);
+      }
     }
 
-    if (username !== undefined) {
+    if (usernameParameter?.writable && username !== undefined && username !== usernameParameter.value) {
       if (typeof username !== 'string' || username.length > 256) {
         throw new Error('PPP username must be a string of at most 256 characters.');
       }
-      parameterValues.push([`${basePath}.Username`, username, 'xsd:string']);
+      parameterValues.push([usernameParameter.path, username, 'xsd:string']);
     }
-    if (password) {
+    if (passwordParameter?.writable && password) {
       if (typeof password !== 'string' || password.length > 256) {
         throw new Error('PPP password must be a string of at most 256 characters.');
       }
-      parameterValues.push([`${basePath}.Password`, password, 'xsd:string']);
+      parameterValues.push([passwordParameter.path, password, 'xsd:string']);
+    }
+    if (
+      serviceParameter?.writable &&
+      serviceList !== undefined &&
+      serviceList !== serviceParameter.value
+    ) {
+      if (typeof serviceList !== 'string' || serviceList.length > 128) {
+        throw new Error('WAN service list must be a string of at most 128 characters.');
+      }
+      parameterValues.push([serviceParameter.path, serviceList, 'xsd:string']);
+    }
+    if (
+      connectionTypeParameter?.writable &&
+      connectionType !== undefined &&
+      connectionType !== connectionTypeParameter.value
+    ) {
+      if (!['IP_Routed', 'PPPoE_Bridged'].includes(connectionType)) {
+        throw new Error('Invalid WAN connection type.');
+      }
+      parameterValues.push([connectionTypeParameter.path, connectionType, 'xsd:string']);
+    }
+    if (
+      natParameter?.writable &&
+      typeof natEnabled === 'boolean' &&
+      natEnabled !== this.isEnabledValue(natParameter.value)
+    ) {
+      parameterValues.push([natParameter.path, natEnabled, 'xsd:boolean']);
     }
     
-    const bindingPath = vendorObj?.lan_binding_path;
-    if (bindingPath) {
-      const fullBindingPath = this.resolveParameterPath(basePath, bindingPath);
+    if (bindingParameter) {
       for (let i = 1; i <= 4; i++) {
-        parameterValues.push([`${fullBindingPath}.Lan${i}Enable`, bindings[`LAN${i}`] ? 1 : 0, 'xsd:unsignedInt']);
+        const parameter = this.findWanParameter(item, bindingParameter.path, `Lan${i}Enable`);
+        if (parameter?.writable) {
+          const next = Boolean(bindings[`LAN${i}`]);
+          if (next !== this.isEnabledValue(parameter.value)) {
+            parameterValues.push([parameter.path, next, 'xsd:boolean']);
+          }
+        }
       }
       for (let i = 1; i <= 8; i++) {
-        parameterValues.push([`${fullBindingPath}.SSID${i}Enable`, bindings[`SSID${i}`] ? 1 : 0, 'xsd:unsignedInt']);
+        const parameter = this.findWanParameter(item, bindingParameter.path, `SSID${i}Enable`);
+        if (parameter?.writable) {
+          const next = Boolean(bindings[`SSID${i}`]);
+          if (next !== this.isEnabledValue(parameter.value)) {
+            parameterValues.push([parameter.path, next, 'xsd:boolean']);
+          }
+        }
       }
     }
 
     if (parameterValues.length === 0) {
-      throw new Error('No editable WAN parameters are configured for this vendor.');
+      return { success: true, message: 'No WAN changes were detected.', parameterCount: 0 };
     }
 
     await this.postTask(deviceId, {
@@ -1039,7 +1161,11 @@ class DeviceService {
       parameterValues
     });
 
-    return { success: true, message: 'WAN configuration updated. Device will refresh on next inform.' };
+    return {
+      success: true,
+      message: 'WAN configuration update task queued.',
+      parameterCount: parameterValues.length
+    };
   }
 
   static async updateCredentials(deviceId, type, password) {

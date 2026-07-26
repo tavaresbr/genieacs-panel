@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { useAuth } from '@/contexts/auth-context'
 import { Icon } from '@/components/ui/icon'
 import { BrandMark } from '@/components/brand-mark'

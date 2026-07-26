@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { devicesAPI, vendorsAPI } from '@/lib/api'
 import { useLoading } from '@/components/ui/loading'
 import { useToast } from '@/components/ui/toast'

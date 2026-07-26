@@ -252,6 +252,9 @@ export const settingsAPI = {
   update: (key: string, value: string) =>
     apiClient.put(`/settings/${key}`, { value }),
 
+  syncCustomerIds: () =>
+    apiClient.post('/settings/sync-customer-ids'),
+
   delete: (key: string) =>
     apiClient.delete(`/settings/${key}`),
 

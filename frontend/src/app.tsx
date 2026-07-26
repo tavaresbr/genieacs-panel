@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { Navigate, Outlet, Route, Routes } from 'react-router-dom'
+import { Navigate, Outlet, Route, Routes } from 'react-router'
 import Sidebar from '@/components/sidebar'
 import { ThemeProvider } from '@/contexts/theme-context'
 import { AuthProvider, useAuth } from '@/contexts/auth-context'

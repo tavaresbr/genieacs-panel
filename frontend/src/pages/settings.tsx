@@ -184,7 +184,19 @@ export default function Settings() {
           break
         }
       }
-      toast[ok ? 'success' : 'error'](ok ? 'Settings saved successfully' : 'Some settings failed to save')
+      let successMessage = 'Settings saved successfully'
+      let errorMessage = 'Some settings failed to save'
+      if (ok && settings.autoGenerateCustomerId === 'true') {
+        const sync = await settingsAPI.syncCustomerIds()
+        if (!sync.success) {
+          ok = false
+          errorMessage = sync.message || 'Failed to synchronize Customer IDs'
+        } else {
+          const result = sync.data as { generated?: number; existing?: number; pending?: number }
+          successMessage = `${sync.message || 'Customer IDs synchronized'} · ${result.generated || 0} new, ${result.existing || 0} preserved`
+        }
+      }
+      toast[ok ? 'success' : 'error'](ok ? successMessage : errorMessage)
       if (ok) {
         try {
           localStorage.setItem('appName', settings.appName)

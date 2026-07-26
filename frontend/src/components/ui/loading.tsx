@@ -2,7 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useMemo, useState, useEffect } from 'react'
 import clsx from 'clsx'
-import { useLocation } from 'react-router-dom'
+import { useLocation } from 'react-router'
 
 type LoadingContextType = {
   visible: boolean

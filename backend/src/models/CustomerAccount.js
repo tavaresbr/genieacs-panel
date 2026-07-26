@@ -47,6 +47,24 @@ class CustomerAccount {
       .select('device_id', 'customer_id')
       .whereIn('device_id', deviceIds);
   }
+
+  static async getExistingForIdentities(deviceIds, identityHashes) {
+    const normalizedDeviceIds = Array.isArray(deviceIds) ? deviceIds.filter(Boolean) : [];
+    const normalizedIdentityHashes = Array.isArray(identityHashes) ? identityHashes.filter(Boolean) : [];
+    if (normalizedDeviceIds.length === 0 && normalizedIdentityHashes.length === 0) return [];
+
+    return getDb()('customer_accounts')
+      .select('id', 'device_id', 'identity_hash', 'customer_id')
+      .where((query) => {
+        if (normalizedDeviceIds.length > 0) {
+          query.whereIn('device_id', normalizedDeviceIds);
+        }
+        if (normalizedIdentityHashes.length > 0) {
+          const method = normalizedDeviceIds.length > 0 ? 'orWhereIn' : 'whereIn';
+          query[method]('identity_hash', normalizedIdentityHashes);
+        }
+      });
+  }
 }
 
 export default CustomerAccount;

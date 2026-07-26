@@ -14,7 +14,8 @@ SERVICE_USER="${SKYGP_USER:-skygenpanel}"
 APP_PORT="${SKYGP_PORT:-5890}"
 PORTAL_PORT="${SKYGP_PORTAL_PORT:-5891}"
 CLI_PATH="/usr/local/bin/skygenpanel"
-NODE_MAJOR_MIN=20
+NODE_MAJOR_MIN=22
+NODE_MINOR_MIN=22
 NODE_RELEASE_LINE=22
 
 log()  { printf '\033[1;34m[skygp]\033[0m %s\n' "$*"; }
@@ -98,7 +99,7 @@ node_archive_arch() {
 }
 
 node_runtime_ready() {
-  local major resolved_node
+  local major minor resolved_node
   command -v node >/dev/null 2>&1 || return 1
   command -v npm >/dev/null 2>&1 || return 1
   resolved_node="$(realpath "$(command -v node)" 2>/dev/null || true)"
@@ -106,7 +107,10 @@ node_runtime_ready() {
     /home/*|/root/*|'') return 1 ;;
   esac
   major="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || true)"
-  [[ "$major" =~ ^[0-9]+$ ]] && [ "$major" -ge "$NODE_MAJOR_MIN" ]
+  minor="$(node -p 'process.versions.node.split(".")[1]' 2>/dev/null || true)"
+  [[ "$major" =~ ^[0-9]+$ ]] && [[ "$minor" =~ ^[0-9]+$ ]] \
+    && { [ "$major" -gt "$NODE_MAJOR_MIN" ] \
+      || { [ "$major" -eq "$NODE_MAJOR_MIN" ] && [ "$minor" -ge "$NODE_MINOR_MIN" ]; }; }
 }
 
 install_node_runtime() {

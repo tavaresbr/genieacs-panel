@@ -4,7 +4,7 @@ Frontend Vite + React Router yang dibangun sebagai SPA statis dan disajikan oleh
 
 ## Menjalankan
 
-Butuh Node.js 20 atau lebih baru.
+Butuh Node.js 22.22 atau lebih baru.
 
 ```bash
 npm ci --include=dev

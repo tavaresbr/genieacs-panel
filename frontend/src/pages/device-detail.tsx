@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router'
 import { useToast } from '@/components/ui/toast'
 import { useLoading } from '@/components/ui/loading'
 import { devicesAPI } from '@/lib/api'
@@ -28,7 +28,13 @@ interface WanConnection {
   natEnabled?: boolean;
   bindings?: WanBindingData | null;
   editable?: boolean;
+  nameConfigurable?: boolean;
+  usernameConfigurable?: boolean;
+  passwordConfigurable?: boolean;
   vlanConfigurable?: boolean;
+  serviceListConfigurable?: boolean;
+  connectionTypeConfigurable?: boolean;
+  natConfigurable?: boolean;
   bindingsConfigurable?: boolean;
 }
 
@@ -95,10 +101,14 @@ interface WifiFormState {
 }
 
 interface WanFormState {
+  name: string;
   vlanEnabled: boolean;
   vlanId: string;
   username: string;
   password: string;
+  serviceList: string;
+  connectionType: string;
+  natEnabled: boolean;
   bindings: {
     LAN1: boolean; LAN2: boolean; LAN3: boolean; LAN4: boolean;
     SSID1: boolean; SSID2: boolean; SSID3: boolean; SSID4: boolean;
@@ -118,10 +128,14 @@ function EditWanModal({
   onSave: (formData: WanFormState) => void;
 }) {
   const [wanForm, setWanForm] = useState<WanFormState>({
+    name: '',
     vlanEnabled: false,
     vlanId: '',
     username: '',
     password: '',
+    serviceList: '',
+    connectionType: 'IP_Routed',
+    natEnabled: false,
     bindings: {
       LAN1: false, LAN2: false, LAN3: false, LAN4: false,
       SSID1: false, SSID2: false, SSID3: false, SSID4: false,
@@ -149,10 +163,14 @@ function EditWanModal({
       });
 
       setWanForm({
+        name: wanData.name || '',
         vlanEnabled: isVlanSet,
         vlanId: isVlanSet ? String(wanData.vlanId) : '',
         username: wanData.username || '',
         password: '',
+        serviceList: wanData.serviceList || '',
+        connectionType: wanData.connectionType || 'IP_Routed',
+        natEnabled: Boolean(wanData.natEnabled),
         bindings: newBindings
       });
     }
@@ -195,14 +213,17 @@ function EditWanModal({
 
         {/* Form Body */}
         <div className="p-6 space-y-6 overflow-y-auto">
-          {/* 1. WAN Name (Readonly) */}
+          {/* 1. WAN Name */}
           <div>
             <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">WAN Name</label>
             <input
               type="text"
-              value={wanData.name || 'N/A'}
-              readOnly
-              className="modern-input w-full bg-gray-100 dark:bg-gray-800 cursor-not-allowed"
+              value={wanForm.name}
+              maxLength={256}
+              disabled={!wanData.nameConfigurable}
+              onChange={(event) => setWanForm((current) => ({ ...current, name: event.target.value }))}
+              placeholder={wanData.nameConfigurable ? 'Enter WAN connection name' : 'Name parameter is not writable'}
+              className="modern-input w-full"
             />
           </div>
 
@@ -243,7 +264,9 @@ function EditWanModal({
             <input
               type="text"
               value={wanForm.username}
+              disabled={!wanData.usernameConfigurable}
               onChange={(e) => setWanForm(f => ({ ...f, username: e.target.value }))}
+              placeholder={wanData.usernameConfigurable ? 'Enter PPPoE username' : 'Username parameter is not writable'}
               className="modern-input w-full font-mono"
             />
           </div>
@@ -254,25 +277,69 @@ function EditWanModal({
             <input
               type="password"
               value={wanForm.password}
+              disabled={!wanData.passwordConfigurable}
               onChange={(e) => setWanForm(f => ({ ...f, password: e.target.value }))}
-              placeholder="Enter new password (leave blank to keep unchanged)"
+              placeholder={wanData.passwordConfigurable ? 'Enter new password (leave blank to keep unchanged)' : 'Password parameter is not writable'}
               className="modern-input w-full font-mono"
             />
           </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Service list</label>
+              <input
+                type="text"
+                value={wanForm.serviceList}
+                maxLength={128}
+                disabled={!wanData.serviceListConfigurable}
+                onChange={(event) => setWanForm((current) => ({ ...current, serviceList: event.target.value }))}
+                placeholder={wanData.serviceListConfigurable ? 'INTERNET' : 'Service parameter is not writable'}
+                className="modern-input w-full font-mono"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Connection mode</label>
+              <select
+                value={wanForm.connectionType}
+                disabled={!wanData.connectionTypeConfigurable}
+                onChange={(event) => setWanForm((current) => ({ ...current, connectionType: event.target.value }))}
+                className="modern-input w-full"
+              >
+                <option value="IP_Routed">Routed</option>
+                <option value="PPPoE_Bridged">Bridged</option>
+              </select>
+            </div>
+          </div>
+
+          <label className={`flex items-center gap-3 rounded-md border border-border p-3 ${wanData.natConfigurable ? 'cursor-pointer' : 'opacity-60'}`}>
+            <input
+              type="checkbox"
+              checked={wanForm.natEnabled}
+              disabled={!wanData.natConfigurable}
+              onChange={(event) => setWanForm((current) => ({ ...current, natEnabled: event.target.checked }))}
+              className="size-4 accent-[hsl(var(--primary))]"
+            />
+            <span>
+              <span className="block text-sm font-semibold">Enable NAT</span>
+              <span className="block text-xs text-muted-foreground">
+                {wanData.natConfigurable ? 'Apply NAT on this routed WAN.' : 'NAT parameter is not writable on this connection.'}
+              </span>
+            </span>
+          </label>
 
           {/* 5. Interface Binding */}
           <div>
             <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Interface Binding</label>
             {!wanData.bindingsConfigurable && (
               <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
-                Binding parameters are not configured for this vendor.
+                This ONT did not report writable interface-binding parameters.
               </p>
             )}
             <div className="space-y-4">
               {/* LAN */}
               <div>
                 <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">LAN Ports</p>
-                <div className="grid grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   {([1, 2, 3, 4] as const).map(i => (
                     <label key={`lan-${i}`} className="flex items-center space-x-2 p-2 border dark:border-gray-700 rounded-md">
                       <input
@@ -291,7 +358,7 @@ function EditWanModal({
               {/* WiFi */}
               <div>
                 <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">WiFi Networks</p>
-                <div className="grid grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   {([1, 2, 3, 4, 5, 6, 7, 8] as const).map(i => (
                     <label key={`ssid-${i}`} className="flex items-center space-x-2 p-2 border dark:border-gray-700 rounded-md">
                       <input

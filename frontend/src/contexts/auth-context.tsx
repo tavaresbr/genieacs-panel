@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect } from 'react'
 import { apiClient, authAPI } from '@/lib/api'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import type { User } from '@/types'
 
 interface AuthContextType {

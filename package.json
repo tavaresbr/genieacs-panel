@@ -16,7 +16,7 @@
     "release:prepare": "node scripts/prepare-release.mjs"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.22.0"
   },
   "license": "SEE LICENSE IN LICENSE"
 }

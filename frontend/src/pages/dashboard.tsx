@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { devicesAPI } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
 import { useAuth } from '@/contexts/auth-context'

@@ -10,7 +10,7 @@
     <a href="https://github.com/skydashnet/genieacs-panel/tags"><img alt="Latest release" src="https://img.shields.io/github/v/tag/skydashnet/genieacs-panel?sort=semver&style=for-the-badge&label=Release&color=173F35"></a>
     <a href="https://github.com/skydashnet/genieacs-panel/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/skydashnet/genieacs-panel?style=for-the-badge&logo=github&color=D97706"></a>
     <a href="https://github.com/skydashnet/genieacs-panel/forks"><img alt="GitHub forks" src="https://img.shields.io/github/forks/skydashnet/genieacs-panel?style=for-the-badge&logo=github&color=2563EB"></a>
-    <img alt="Node.js 20 or newer" src="https://img.shields.io/badge/Node.js-20%2B-339933?style=for-the-badge&logo=nodedotjs&logoColor=white">
+    <img alt="Node.js 22.22 or newer" src="https://img.shields.io/badge/Node.js-22.22%2B-339933?style=for-the-badge&logo=nodedotjs&logoColor=white">
     <img alt="React and Vite" src="https://img.shields.io/badge/React%20%2B%20Vite-Production-646CFF?style=for-the-badge&logo=vite&logoColor=white">
     <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/License-MIT-D97706?style=for-the-badge"></a>
     <a href="https://saweria.co/skydashnet"><img alt="Support SkyDashNET on Saweria" src="https://img.shields.io/badge/Support-Saweria-FAAE2B?style=for-the-badge&labelColor=173F35"></a>
@@ -76,7 +76,7 @@ The production installer targets Linux systems running `systemd`. It supports:
 - Arch Linux
 - openSUSE
 
-Git, native build tools, and Node.js 22 are installed automatically when required. An existing Node.js 20 or newer installation is reused.
+Git, native build tools, and the latest Node.js 22 release are installed automatically when required. An existing Node.js 22.22 or newer installation is reused.
 
 Run as a regular user:
 

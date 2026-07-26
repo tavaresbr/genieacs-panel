@@ -10,6 +10,8 @@ router.get('/:key', authenticateToken, requireRole(['admin']), SettingsControlle
 
 router.post('/', authenticateToken, requireRole(['admin']), SettingsController.createSetting);
 
+router.post('/sync-customer-ids', authenticateToken, requireRole(['admin']), SettingsController.syncCustomerIds);
+
 router.put('/:key', authenticateToken, requireRole(['admin']), SettingsController.updateSetting);
 
 router.delete('/:key', authenticateToken, requireRole(['admin']), SettingsController.deleteSetting);

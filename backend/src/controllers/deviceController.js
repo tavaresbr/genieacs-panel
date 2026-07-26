@@ -183,10 +183,10 @@ class DeviceController {
 
     try {
       const result = await DeviceService.updateWanConfig(id, wanIndex, formData);
-      res.json({ success: true, data: result, message: 'WAN config update task queued.' });
+      return res.json(createResponse(result.message, result));
     } catch (error) {
       console.error(`Error in updateWanConfig for ${id}:`, error);
-      const validationError = /^(Invalid|VLAN ID|PPP |No editable|Only PPPoE|Vendor not found)/.test(error.message);
+      const validationError = /^(Invalid|VLAN ID|PPP |WAN |No editable|Only PPPoE|Vendor not found)/.test(error.message);
       res.status(validationError ? 400 : 500).json(
         createErrorResponse('Failed to update WAN config', error.message)
       );
