@@ -46,7 +46,7 @@ SkyGenPanel is a management layer for GenieACS deployments. It combines an opera
 - Network topology editor with Google Maps and OpenStreetMap-compatible providers.
 - Automatic Customer ID generation that can be enabled or disabled in Settings.
 - Encrypted recovery of the last WiFi password changed through the customer portal.
-- Automatic Linux dependency and Node.js installation through the production installer.
+- Automatic Linux dependency and Node.js installation during both first install and CLI updates.
 
 ## Screenshots
 

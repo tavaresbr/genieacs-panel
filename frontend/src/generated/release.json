@@ -1,28 +1,28 @@
 {
-  "version": "1.12.0",
-  "build": 50,
-  "sourceCommit": "6bf6a8ee975b",
-  "releasedAt": "2026-07-25",
-  "basedOnTag": "v1.11.0",
-  "compareUrl": "https://github.com/skydashnet/genieacs-panel/compare/v1.11.0...v1.12.0",
+  "version": "1.13.0",
+  "build": 53,
+  "sourceCommit": "95c1c29dda17",
+  "releasedAt": "2026-07-26",
+  "basedOnTag": "v1.12.0",
+  "compareUrl": "https://github.com/skydashnet/genieacs-panel/compare/v1.12.0...v1.13.0",
   "changes": [
     {
-      "shortHash": "feea67e",
-      "date": "2026-07-24",
-      "title": "Redesign project readme",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "97ef8d6",
-      "date": "2026-07-24",
-      "title": "Add product screenshots and community badges",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "6bf6a8e",
-      "date": "2026-07-25",
-      "title": "Expand customer operations and device management",
+      "shortHash": "95c1c29",
+      "date": "2026-07-26",
+      "title": "Customer identity synchronization and vendor-aware WAN editing",
       "category": "New"
+    },
+    {
+      "shortHash": "95c1c29",
+      "date": "2026-07-26",
+      "title": "React 19, React Router 8, and automatic Node.js 22.22 runtime",
+      "category": "Changed"
+    },
+    {
+      "shortHash": "95c1c29",
+      "date": "2026-07-26",
+      "title": "Production dependency security hardening",
+      "category": "Security"
     }
   ]
 }

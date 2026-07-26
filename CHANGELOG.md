@@ -3,6 +3,30 @@
 SkyGenPanel follows [Semantic Versioning](https://semver.org/). Release versions
 are calculated from conventional commits since the previous `v*` Git tag.
 
+## [1.13.0] - 2026-07-26
+
+### New
+
+- Added explicit Customer ID synchronization when settings are saved, with immutable identity preservation and accurate generated, preserved, and pending counts.
+- Added writable WAN parameter discovery across ZTE, Huawei, CMCC, and FiberHome conventions, including name, VLAN, PPPoE credentials, service list, connection mode, NAT, and interface bindings.
+
+### Changed
+
+- Migrated the frontend to React 19 and React Router 8.
+- Raised the supported runtime to Node.js 22.22 and updated both install and CLI update flows to replace older runtimes automatically.
+
+### Fixed
+
+- Fixed disabled or read-only WAN fields when the ONT reports writable parameters.
+- Fixed misleading WAN task responses when no values changed.
+- Fixed Customer ID preservation counts when a stable SoftwareID and PPPoE identity moves to a new GenieACS device ID.
+
+### Security
+
+- Removed the affected React Router 7 dependency line and verified zero production dependency vulnerabilities.
+
+[Full comparison](https://github.com/skydashnet/genieacs-panel/compare/v1.12.0...v1.13.0)
+
 ## [1.12.0] - 2026-07-25
 
 ### New
