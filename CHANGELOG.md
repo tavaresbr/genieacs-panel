@@ -3,6 +3,14 @@
 SkyGenPanel follows [Semantic Versioning](https://semver.org/). Release versions
 are calculated from conventional commits since the previous `v*` Git tag.
 
+## [1.13.1] - 2026-07-26
+
+### Fixed
+
+- Bootstrap legacy CLI updates (`5e2c9d5`)
+
+[Full comparison](https://github.com/skydashnet/genieacs-panel/compare/v1.13.0...v1.13.1)
+
 ## [1.13.0] - 2026-07-26
 
 ### New
