@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { useToast } from '@/components/ui/toast'
 import { useLoading } from '@/components/ui/loading'
-import { devicesAPI } from '@/lib/api'
+import { devicesAPI, sgpAPI, type SgpContractLink, type SgpInvoice } from '@/lib/api'
 import { formatDate } from '@/lib/utils'
 import { Icon } from '@/components/ui/icon'
 import { useAuth } from '@/contexts/auth-context'
@@ -588,6 +588,35 @@ function EditWifiModal({
 }
 
 
+function formatBrl(amount: number | null) {
+  if (amount === null || !Number.isFinite(amount)) return '—'
+  return amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+}
+
+function formatDueDate(value: string | null) {
+  if (!value) return '—'
+  const [year, month, day] = value.split('-')
+  return year && month && day ? `${day}/${month}/${year}` : value
+}
+
+function isSafeExternalUrl(value: string | null): value is string {
+  if (!value) return false
+  try {
+    return ['http:', 'https:'].includes(new URL(value).protocol)
+  } catch {
+    return false
+  }
+}
+
+async function copyToClipboard(value: string) {
+  try {
+    await navigator.clipboard.writeText(value)
+    return true
+  } catch {
+    return false
+  }
+}
+
 export default function DeviceDetailPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -610,6 +639,13 @@ export default function DeviceDetailPage() {
   const [wanContainer, setWanContainer] = useState('')
   const [newWanType, setNewWanType] = useState<'ppp' | 'ip'>('ppp')
   const [addingWan, setAddingWan] = useState(false)
+  const [sgpLink, setSgpLink] = useState<SgpContractLink | null>(null)
+  const [sgpInvoices, setSgpInvoices] = useState<SgpInvoice[]>([])
+  const [sgpLoading, setSgpLoading] = useState(false)
+  const [sgpMessage, setSgpMessage] = useState<string | null>(null)
+  const [sgpAvailable, setSgpAvailable] = useState(false)
+  const [sgpContractInput, setSgpContractInput] = useState('')
+  const [sgpUnlocking, setSgpUnlocking] = useState(false)
 
 
   const handleOpenEditModal = (wan: WanConnection) => {
@@ -746,6 +782,78 @@ export default function DeviceDetailPage() {
       setLoading(false);
     }
   }, [deviceId, toast])
+
+  const loadSgpData = useCallback(async (refresh = false) => {
+    if (!deviceId) return
+    setSgpLoading(true)
+    setSgpMessage(null)
+    try {
+      const res = await sgpAPI.getDeviceIntegration(deviceId, { refresh })
+      if (res.success && res.data) {
+        setSgpAvailable(true)
+        setSgpLink(res.data.link)
+        setSgpInvoices(res.data.invoices || [])
+        setSgpMessage(res.data.invoiceError)
+        return
+      }
+      setSgpLink(null)
+      setSgpInvoices([])
+      // The card stays hidden while the integration is switched off.
+      setSgpAvailable(res.code !== 'not_configured')
+      setSgpMessage(res.message || 'Não foi possível consultar o SGP')
+    } finally {
+      setSgpLoading(false)
+    }
+  }, [deviceId])
+
+  useEffect(() => {
+    void loadSgpData(false)
+  }, [loadSgpData])
+
+  const handleSgpLink = async () => {
+    const contract = sgpContractInput.trim()
+    if (!contract) {
+      toast.error('Informe o número do contrato no SGP')
+      return
+    }
+    setSgpLoading(true)
+    try {
+      const res = await sgpAPI.linkDevice(deviceId, { contract })
+      if (!res.success) {
+        toast.error(res.message || 'Falha ao vincular o contrato')
+        return
+      }
+      toast.success(res.message || 'Contrato vinculado')
+      setSgpContractInput('')
+      await loadSgpData(false)
+    } finally {
+      setSgpLoading(false)
+    }
+  }
+
+  const handleSgpUnlink = async () => {
+    if (!confirm('Remover o vínculo deste ONT com o contrato do SGP?')) return
+    const res = await sgpAPI.unlinkDevice(deviceId)
+    if (!res.success) {
+      toast.error(res.message || 'Falha ao remover o vínculo')
+      return
+    }
+    setSgpLink(null)
+    setSgpInvoices([])
+    setSgpMessage(null)
+    toast.success(res.message || 'Vínculo removido')
+  }
+
+  const handleSgpUnlock = async () => {
+    if (!confirm('Solicitar liberação em confiança para este contrato no SGP?')) return
+    setSgpUnlocking(true)
+    try {
+      const res = await sgpAPI.requestTrustUnlock(deviceId)
+      toast[res.success ? 'success' : 'error'](res.message || 'Solicitação enviada ao SGP')
+    } finally {
+      setSgpUnlocking(false)
+    }
+  }
 
   const handleSaveInstallationDate = async () => {
     if (!installationDate) {
@@ -1187,6 +1295,177 @@ export default function DeviceDetailPage() {
                 <p className="field-hint">Saved in SkyGenPanel and synchronized to GenieACS as an installation tag.</p>
               </div>
             </div>
+
+            {sgpAvailable && (
+              <div className="modern-card p-5 sm:p-6 lg:col-span-2">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="page-kicker">Integração SGP</p>
+                    <h2 className="section-heading">Contrato e faturas</h2>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="modern-button-secondary"
+                      disabled={sgpLoading}
+                      onClick={() => void loadSgpData(true)}
+                    >
+                      <Icon name="refresh" size={16} className="mr-2" />
+                      {sgpLoading ? 'Consultando…' : 'Atualizar do SGP'}
+                    </button>
+                    {sgpLink && (
+                      <>
+                        <button
+                          type="button"
+                          className="modern-button"
+                          disabled={sgpUnlocking}
+                          onClick={() => void handleSgpUnlock()}
+                        >
+                          {sgpUnlocking ? 'Solicitando…' : 'Liberação em confiança'}
+                        </button>
+                        <button
+                          type="button"
+                          className="modern-button-secondary"
+                          onClick={() => void handleSgpUnlink()}
+                        >
+                          Desvincular
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {sgpLink ? (
+                  <>
+                    <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                      <div>
+                        <p className="metric-label">Contrato</p>
+                        <p className="mt-1 font-mono font-semibold">{sgpLink.contract}</p>
+                      </div>
+                      <div>
+                        <p className="metric-label">Cliente</p>
+                        <p className="mt-1 font-semibold">{sgpLink.clientName || '—'}</p>
+                      </div>
+                      <div>
+                        <p className="metric-label">Plano</p>
+                        <p className="mt-1 font-semibold">{sgpLink.plan || '—'}</p>
+                      </div>
+                      <div>
+                        <p className="metric-label">Situação</p>
+                        <p className="mt-1">
+                          <span className={/ativo/i.test(sgpLink.statusLabel || '') ? 'modern-badge-success' : 'modern-badge'}>
+                            {sgpLink.statusLabel || sgpLink.status || 'Desconhecida'}
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+                    <p className="mt-3 text-xs text-muted-foreground">
+                      Vínculo {sgpLink.linkMode === 'manual' ? 'manual' : 'automático'}
+                      {sgpLink.login ? ` · login ${sgpLink.login}` : ''}
+                      {sgpLink.lastSyncedAt ? ` · sincronizado em ${new Date(sgpLink.lastSyncedAt).toLocaleString('pt-BR')}` : ''}
+                    </p>
+
+                    <div className="mt-5 border-t border-border pt-4">
+                      <h3 className="font-semibold">Faturas em aberto</h3>
+                      {sgpMessage && (
+                        <p className="mt-2 text-sm text-[hsl(var(--status-warning))]">{sgpMessage}</p>
+                      )}
+                      {sgpInvoices.length === 0 ? (
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          {sgpMessage ? 'Títulos não puderam ser carregados.' : 'Nenhuma fatura em aberto para este contrato.'}
+                        </p>
+                      ) : (
+                        <ul className="mt-3 space-y-3">
+                          {sgpInvoices.map((invoice, index) => (
+                            <li
+                              key={invoice.id || `${invoice.dueDate}-${index}`}
+                              className="rounded-md border border-border p-4"
+                            >
+                              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                                <span className="font-semibold">{formatBrl(invoice.amount)}</span>
+                                <span className="text-sm text-muted-foreground">
+                                  Vence em {formatDueDate(invoice.dueDate)}
+                                </span>
+                              </div>
+                              <p className="mt-1 text-sm text-muted-foreground">
+                                {invoice.description || 'Título do SGP'}
+                                {invoice.status ? ` · ${invoice.status}` : ''}
+                              </p>
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                {invoice.digitableLine && (
+                                  <button
+                                    type="button"
+                                    className="modern-button-secondary"
+                                    onClick={async () => {
+                                      const copied = await copyToClipboard(invoice.digitableLine as string)
+                                      toast[copied ? 'success' : 'error'](
+                                        copied ? 'Linha digitável copiada' : 'Não foi possível copiar'
+                                      )
+                                    }}
+                                  >
+                                    Copiar linha digitável
+                                  </button>
+                                )}
+                                {invoice.pix && (
+                                  <button
+                                    type="button"
+                                    className="modern-button-secondary"
+                                    onClick={async () => {
+                                      const copied = await copyToClipboard(invoice.pix as string)
+                                      toast[copied ? 'success' : 'error'](
+                                        copied ? 'Código PIX copiado' : 'Não foi possível copiar'
+                                      )
+                                    }}
+                                  >
+                                    Copiar PIX
+                                  </button>
+                                )}
+                                {isSafeExternalUrl(invoice.link) && (
+                                  <a
+                                    className="modern-button-secondary"
+                                    href={invoice.link}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    Abrir boleto
+                                  </a>
+                                )}
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="mt-5">
+                    <p className="text-sm text-muted-foreground">
+                      {sgpMessage || 'Este ONT ainda não está vinculado a um contrato do SGP.'}
+                    </p>
+                    <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                      <input
+                        type="text"
+                        className="modern-input sm:max-w-xs"
+                        placeholder="Número do contrato no SGP"
+                        value={sgpContractInput}
+                        onChange={(event) => setSgpContractInput(event.target.value)}
+                      />
+                      <button
+                        type="button"
+                        className="modern-button shrink-0"
+                        disabled={sgpLoading}
+                        onClick={() => void handleSgpLink()}
+                      >
+                        Vincular contrato
+                      </button>
+                    </div>
+                    <p className="field-hint">
+                      O vínculo automático usa o identificador escolhido em Configurações &gt; SGP integration.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="modern-card p-6">
               <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Signal Information</h2>

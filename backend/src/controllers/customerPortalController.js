@@ -3,6 +3,7 @@ import CustomerAccount from '../models/CustomerAccount.js';
 import CustomerService from '../services/customerService.js';
 import CustomerWifiCredentialService from '../services/customerWifiCredentialService.js';
 import DeviceService from '../services/deviceService.js';
+import SgpService, { SgpError } from '../services/sgpService.js';
 import {
   PORTAL_COOKIE_NAME,
   portalCookieOptions,
@@ -182,6 +183,73 @@ class CustomerPortalController {
       console.error('Customer portal WiFi password reveal error:', error);
       return res.status(500).json(createErrorResponse(
         'Password WiFi belum dapat dibuka. Coba lagi beberapa saat.'
+      ));
+    }
+  }
+
+  static async billing(req, res) {
+    try {
+      const config = await SgpService.getConfig();
+      if (!SgpService.isReady(config) || !config.portalBilling) {
+        return res.status(404).json({
+          ...createErrorResponse('Consulta de faturas não está disponível neste portal'),
+          code: 'billing_disabled'
+        });
+      }
+
+      // The contract is resolved from the authenticated account only; the
+      // browser never chooses which SGP contract is read.
+      const { link } = await SgpService.resolveDeviceContract(req.customer.device_id, {
+        refresh: req.query?.refresh === '1'
+      });
+      const { invoices } = await SgpService.listInvoices({
+        contract: link.contract,
+        onlyOpen: true
+      });
+
+      return res.json(createResponse('Faturas disponíveis', {
+        contract: SgpService.portalLink(link),
+        invoices,
+        trustUnlockAvailable: config.portalUnlock === true,
+        generatedAt: new Date().toISOString()
+      }));
+    } catch (error) {
+      if (error instanceof SgpError) {
+        return res.status(error.status === 409 ? 404 : error.status).json({
+          ...createErrorResponse(error.message),
+          code: error.code
+        });
+      }
+      console.error('Customer portal billing error:', error);
+      return res.status(502).json(createErrorResponse(
+        'Não foi possível consultar suas faturas agora. Tente novamente em instantes.'
+      ));
+    }
+  }
+
+  static async trustUnlock(req, res) {
+    try {
+      const config = await SgpService.getConfig();
+      if (!SgpService.isReady(config) || !config.portalUnlock) {
+        return res.status(404).json({
+          ...createErrorResponse('Liberação em confiança não está disponível neste portal'),
+          code: 'unlock_disabled'
+        });
+      }
+
+      const { link } = await SgpService.resolveDeviceContract(req.customer.device_id);
+      const result = await SgpService.requestTrustUnlock({ contract: link.contract });
+      return res.json(createResponse(result.message));
+    } catch (error) {
+      if (error instanceof SgpError) {
+        return res.status(error.status === 409 ? 404 : error.status).json({
+          ...createErrorResponse(error.message),
+          code: error.code
+        });
+      }
+      console.error('Customer portal trust unlock error:', error);
+      return res.status(502).json(createErrorResponse(
+        'Não foi possível solicitar a liberação agora. Tente novamente em instantes.'
       ));
     }
   }

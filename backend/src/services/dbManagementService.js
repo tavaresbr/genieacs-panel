@@ -16,7 +16,8 @@ const COPY_TABLES = [
   'map_settings',
   'customer_accounts',
   'device_profiles',
-  'customer_wifi_credentials'
+  'customer_wifi_credentials',
+  'sgp_links'
 ];
 
 function normalizeConfig(input) {

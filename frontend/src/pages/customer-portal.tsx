@@ -28,7 +28,46 @@ type PortalOverview = {
   generatedAt: string
 }
 
-type ApiResult<T> = { success: boolean; message?: string; data?: T }
+type PortalInvoice = {
+  id: string | null
+  description: string | null
+  amount: number | null
+  dueDate: string | null
+  status: string | null
+  digitableLine: string | null
+  barcode: string | null
+  link: string | null
+  pix: string | null
+  paid: boolean
+}
+
+type PortalBilling = {
+  contract: {
+    contract: string
+    clientName: string | null
+    document: string | null
+    plan: string | null
+    status: string | null
+    statusLabel: string | null
+  }
+  invoices: PortalInvoice[]
+  trustUnlockAvailable: boolean
+  generatedAt: string
+}
+
+type ApiResult<T> = { success: boolean; message?: string; data?: T; code?: string }
+
+// Only an upstream hiccup is worth showing to a subscriber. A disabled
+// integration or a contract that is not linked yet hides the section instead.
+const TRANSIENT_BILLING_CODES = new Set([
+  'timeout',
+  'unreachable',
+  'sgp_rejected',
+  'http_error',
+  'invalid_response',
+  'unauthorized'
+])
+
 type WifiEditor = { index: number; ssid: string; password: string }
 
 async function portalRequest<T>(path: string, init?: RequestInit): Promise<ApiResult<T>> {
@@ -62,6 +101,33 @@ function dateTime(value: string | null) {
   return Number.isNaN(date.getTime())
     ? 'Belum dilaporkan'
     : date.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })
+}
+
+function currency(amount: number | null) {
+  if (amount === null || !Number.isFinite(amount)) return '—'
+  return amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+}
+
+function dueDate(value: string | null) {
+  if (!value) return '—'
+  const [year, month, day] = value.split('-')
+  return year && month && day ? `${day}/${month}/${year}` : value
+}
+
+function isOverdue(value: string | null) {
+  if (!value) return false
+  const due = new Date(`${value}T23:59:59`)
+  return !Number.isNaN(due.getTime()) && due.getTime() < Date.now()
+}
+
+function safeBoletoUrl(value: string | null) {
+  if (!value) return null
+  try {
+    const url = new URL(value)
+    return ['http:', 'https:'].includes(url.protocol) ? url.toString() : null
+  } catch {
+    return null
+  }
 }
 
 function uptime(value: unknown) {
@@ -110,6 +176,15 @@ export default function CustomerPortal() {
   const [visibleSavedPasswordIndex, setVisibleSavedPasswordIndex] = useState<number | null>(null)
   const [revealedWifiPasswords, setRevealedWifiPasswords] = useState<Record<number, string>>({})
   const [revealingWifiPasswordIndex, setRevealingWifiPasswordIndex] = useState<number | null>(null)
+  const [billing, setBilling] = useState<PortalBilling | null>(null)
+  const [billingLoading, setBillingLoading] = useState(false)
+  const [billingError, setBillingError] = useState('')
+  const [unlockPending, setUnlockPending] = useState(false)
+  const [billingFeedback, setBillingFeedback] = useState<{
+    type: 'success' | 'error'
+    message: string
+  } | null>(null)
+  const [copiedInvoiceId, setCopiedInvoiceId] = useState<string | null>(null)
   const [wifiFeedback, setWifiFeedback] = useState<{
     type: 'success' | 'error'
     message: string
@@ -133,19 +208,84 @@ export default function CustomerPortal() {
     }
   }, [])
 
+  const loadBilling = useCallback(async () => {
+    setBillingLoading(true)
+    try {
+      const result = await portalRequest<PortalBilling>('/billing')
+      if (!result.success || !result.data) {
+        setBilling(null)
+        setBillingError(
+          result.code && TRANSIENT_BILLING_CODES.has(result.code)
+            ? (result.message || 'Falha temporária ao consultar as faturas.')
+            : ''
+        )
+        return
+      }
+      setBilling(result.data)
+      setBillingError('')
+    } catch {
+      setBilling(null)
+      setBillingError('')
+    } finally {
+      setBillingLoading(false)
+    }
+  }, [])
+
+  const requestTrustUnlock = async () => {
+    if (!confirm('Deseja solicitar a liberação em confiança do seu acesso?')) return
+    setUnlockPending(true)
+    setBillingFeedback(null)
+    try {
+      const result = await portalRequest('/billing/trust-unlock', { method: 'POST' })
+      setBillingFeedback({
+        type: result.success ? 'success' : 'error',
+        message: result.message || (result.success
+          ? 'Solicitação enviada.'
+          : 'Não foi possível solicitar a liberação agora.')
+      })
+      if (result.success) await loadBilling()
+    } catch {
+      setBillingFeedback({
+        type: 'error',
+        message: 'Portal tidak dapat terhubung ke server. Coba lagi.'
+      })
+    } finally {
+      setUnlockPending(false)
+    }
+  }
+
+  const copyInvoiceCode = async (invoice: PortalInvoice) => {
+    const code = invoice.digitableLine || invoice.barcode || invoice.pix
+    if (!code) return
+    try {
+      await navigator.clipboard.writeText(code)
+      setCopiedInvoiceId(invoice.id)
+      setBillingFeedback(null)
+      window.setTimeout(() => setCopiedInvoiceId(null), 4000)
+    } catch {
+      setBillingFeedback({
+        type: 'error',
+        message: 'Não foi possível copiar automaticamente. Selecione o código e copie manualmente.'
+      })
+    }
+  }
+
   useEffect(() => {
     let cancelled = false
     void portalRequest<{ customerId: string }>('/session')
       .then((result) => {
         if (cancelled) return
         setAuthenticated(result.success)
-        if (result.success) void loadOverview()
+        if (result.success) {
+          void loadOverview()
+          void loadBilling()
+        }
       })
       .finally(() => {
         if (!cancelled) setCheckingSession(false)
       })
     return () => { cancelled = true }
-  }, [loadOverview])
+  }, [loadOverview, loadBilling])
 
   useEffect(() => {
     if (!authenticated) return
@@ -162,6 +302,10 @@ export default function CustomerPortal() {
     setRevealedWifiPasswords({})
     setRevealingWifiPasswordIndex(null)
     setWifiFeedback(null)
+    setBilling(null)
+    setBillingError('')
+    setBillingFeedback(null)
+    setCopiedInvoiceId(null)
   }, [authenticated])
 
   const login = async (event: FormEvent) => {
@@ -181,6 +325,7 @@ export default function CustomerPortal() {
       setPassword('')
       setShowLoginPassword(false)
       await loadOverview()
+      void loadBilling()
     } catch {
       setError('Portal tidak dapat terhubung ke server. Coba lagi.')
     } finally {
@@ -665,6 +810,136 @@ export default function CustomerPortal() {
             </p>
           </>
         ) : null}
+
+          {billing && (
+            <section className="modern-card mt-5 p-5 sm:p-6" aria-label="Faturas do contrato">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h2 className="section-heading">Faturas — {billing.contract.plan || 'seu plano'}</h2>
+                  <p className="section-description">
+                    Contrato <span className="font-mono">{billing.contract.contract}</span>
+                    {billing.contract.statusLabel ? ` · ${billing.contract.statusLabel}` : ''}
+                    {billing.contract.document ? ` · CPF/CNPJ ${billing.contract.document}` : ''}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="modern-button-secondary"
+                    onClick={() => void loadBilling()}
+                    disabled={billingLoading}
+                  >
+                    <Icon name="refresh" size={17} className={billingLoading ? 'animate-spin' : ''} />
+                    Atualizar
+                  </button>
+                  {billing.trustUnlockAvailable && (
+                    <button
+                      type="button"
+                      className="modern-button"
+                      onClick={() => void requestTrustUnlock()}
+                      disabled={unlockPending}
+                    >
+                      <Icon name={unlockPending ? 'refresh' : 'unlock'} size={17} className={unlockPending ? 'animate-spin' : ''} />
+                      {unlockPending ? 'Solicitando…' : 'Liberação em confiança'}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {billingFeedback && (
+                <div
+                  className={`mt-4 rounded-md border p-3 text-sm ${
+                    billingFeedback.type === 'success'
+                      ? 'border-[hsl(var(--status-success))]/40 bg-[hsl(var(--status-success))]/10'
+                      : 'border-destructive/40 bg-destructive/10'
+                  }`}
+                  role={billingFeedback.type === 'error' ? 'alert' : 'status'}
+                  aria-live="polite"
+                >
+                  {billingFeedback.message}
+                </div>
+              )}
+
+              {billing.invoices.length === 0 ? (
+                <div className="mt-5 rounded-md border border-dashed border-border p-6 text-center">
+                  <Icon name="check" className="mx-auto text-[hsl(var(--status-success))]" />
+                  <p className="mt-2 text-sm font-semibold">Nenhuma fatura em aberto</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Suas mensalidades estão em dia.</p>
+                </div>
+              ) : (
+                <ul className="mt-5 space-y-3">
+                  {billing.invoices.map((invoice, index) => (
+                    <li
+                      key={invoice.id || `${invoice.dueDate}-${index}`}
+                      className="rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-4"
+                    >
+                      <div className="flex flex-wrap items-baseline justify-between gap-2">
+                        <span className="text-lg font-bold">{currency(invoice.amount)}</span>
+                        <span className={isOverdue(invoice.dueDate) ? 'modern-badge-error' : 'modern-badge'}>
+                          {isOverdue(invoice.dueDate) ? 'Vencida em ' : 'Vence em '}{dueDate(invoice.dueDate)}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {invoice.description || 'Mensalidade'}
+                        {invoice.status ? ` · ${invoice.status}` : ''}
+                      </p>
+                      {(invoice.digitableLine || invoice.barcode) && (
+                        <p className="mt-3 break-all rounded-md border border-border bg-card px-3 py-2 font-mono text-xs">
+                          {invoice.digitableLine || invoice.barcode}
+                        </p>
+                      )}
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {(invoice.digitableLine || invoice.barcode || invoice.pix) && (
+                          <button
+                            type="button"
+                            className="modern-button-secondary"
+                            onClick={() => void copyInvoiceCode(invoice)}
+                          >
+                            <Icon name={copiedInvoiceId === invoice.id ? 'check' : 'copy'} size={17} />
+                            {copiedInvoiceId === invoice.id ? 'Código copiado' : 'Copiar código'}
+                          </button>
+                        )}
+                        {safeBoletoUrl(invoice.link) && (
+                          <a
+                            className="modern-button-secondary"
+                            href={safeBoletoUrl(invoice.link) as string}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <Icon name="external" size={17} /> Abrir 2ª via
+                          </a>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <p className="mt-4 text-xs text-muted-foreground">
+                Dados financeiros fornecidos pelo sistema do provedor (SGP) em {dateTime(billing.generatedAt)}.
+              </p>
+            </section>
+          )}
+
+          {!billing && billingError && (
+            <section className="modern-card mt-5 border-destructive/40 p-4" role="alert">
+              <div className="flex items-start gap-3">
+                <Icon name="warning" className="mt-0.5 shrink-0 text-destructive" />
+                <div>
+                  <h2 className="font-semibold">Faturas indisponíveis</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">{billingError}</p>
+                  <button
+                    type="button"
+                    className="mt-3 text-sm font-semibold text-primary hover:underline"
+                    onClick={() => void loadBilling()}
+                  >
+                    Tentar novamente
+                  </button>
+                </div>
+              </div>
+            </section>
+          )}
+
       </div>
     </main>
   )

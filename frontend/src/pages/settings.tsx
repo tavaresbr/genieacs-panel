@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { apiClient, vendorsAPI, settingsAPI, authAPI, databaseAPI, type DbConfigPayload } from '@/lib/api'
+import { apiClient, vendorsAPI, settingsAPI, authAPI, databaseAPI, sgpAPI, type DbConfigPayload, type SgpConfig } from '@/lib/api'
 import { useToast } from '@/components/ui/toast'
 import { useLoading } from '@/components/ui/loading'
 import { Icon } from '@/components/ui/icon'
@@ -48,6 +48,21 @@ export default function Settings() {
     client: 'mysql2', host: 'localhost', port: 3306, user: '', password: '', database: '', migrateData: true
   })
   const [activeDb, setActiveDb] = useState<{ client: string; host?: string; database?: string } | null>(null)
+  const [sgpConfig, setSgpConfig] = useState<SgpConfig | null>(null)
+  const [sgpForm, setSgpForm] = useState({
+    enabled: false,
+    baseUrl: '',
+    app: '',
+    token: '',
+    linkMode: 'pppoe' as SgpConfig['linkMode'],
+    portalBilling: true,
+    portalUnlock: false,
+    invoiceLimit: 6,
+    sample: ''
+  })
+  const [sgpSaving, setSgpSaving] = useState(false)
+  const [sgpTesting, setSgpTesting] = useState(false)
+  const [sgpTestResult, setSgpTestResult] = useState<{ success: boolean; message: string } | null>(null)
   const [dbTesting, setDbTesting] = useState(false)
   const [dbSwitching, setDbSwitching] = useState(false)
 
@@ -74,6 +89,99 @@ export default function Settings() {
     })()
     return () => { cancelled = true }
   }, [activeTab])
+
+  useEffect(() => {
+    if (activeTab !== 'sgp') return
+    let cancelled = false
+    ;(async () => {
+      const res = await sgpAPI.getConfig()
+      if (cancelled || !res.success || !res.data) return
+      const config = res.data
+      setSgpConfig(config)
+      setSgpForm((current) => ({
+        ...current,
+        enabled: config.enabled,
+        baseUrl: config.baseUrl,
+        app: config.app,
+        // The stored token never leaves the server; an empty field keeps it.
+        token: '',
+        linkMode: config.linkMode,
+        portalBilling: config.portalBilling,
+        portalUnlock: config.portalUnlock,
+        invoiceLimit: config.invoiceLimit
+      }))
+      setSgpTestResult(null)
+    })()
+    return () => { cancelled = true }
+  }, [activeTab])
+
+  const sgpSamplePayload = () => {
+    const sample = sgpForm.sample.trim()
+    if (!sample) return {}
+    if (/^\d[\d.\-/]*$/.test(sample)) {
+      return sample.replace(/\D/g, '').length > 8
+        ? { document: sample }
+        : { contract: sample }
+    }
+    return { login: sample }
+  }
+
+  const handleSgpTest = async () => {
+    setSgpTesting(true)
+    setSgpTestResult(null)
+    try {
+      const res = await sgpAPI.test({
+        baseUrl: sgpForm.baseUrl,
+        app: sgpForm.app,
+        token: sgpForm.token || undefined,
+        ...sgpSamplePayload()
+      })
+      const message = res.message || (res.success ? 'Conexão estabelecida' : 'Falha na conexão')
+      setSgpTestResult({ success: res.success, message })
+      toast[res.success ? 'success' : 'error'](message)
+    } finally {
+      setSgpTesting(false)
+    }
+  }
+
+  const handleSgpSave = async () => {
+    setSgpSaving(true)
+    try {
+      const res = await sgpAPI.updateConfig({
+        enabled: sgpForm.enabled,
+        baseUrl: sgpForm.baseUrl,
+        app: sgpForm.app,
+        // Only send the token when the operator typed a new one.
+        ...(sgpForm.token ? { token: sgpForm.token } : {}),
+        linkMode: sgpForm.linkMode,
+        portalBilling: sgpForm.portalBilling,
+        portalUnlock: sgpForm.portalUnlock,
+        invoiceLimit: sgpForm.invoiceLimit
+      })
+      if (res.success && res.data) {
+        setSgpConfig(res.data)
+        setSgpForm((current) => ({ ...current, token: '' }))
+      }
+      toast[res.success ? 'success' : 'error'](res.message || (res.success ? 'Configuração salva' : 'Falha ao salvar'))
+    } finally {
+      setSgpSaving(false)
+    }
+  }
+
+  const handleSgpClearToken = async () => {
+    if (!confirm('Remover o token do SGP?\n\nA integração será desativada até que um novo token seja informado.')) return
+    setSgpSaving(true)
+    try {
+      const res = await sgpAPI.updateConfig({ enabled: false, token: '' })
+      if (res.success && res.data) {
+        setSgpConfig(res.data)
+        setSgpForm((current) => ({ ...current, enabled: false, token: '' }))
+      }
+      toast[res.success ? 'success' : 'error'](res.message || 'Token removido')
+    } finally {
+      setSgpSaving(false)
+    }
+  }
 
   const handleDbTest = async () => {
     setDbTesting(true)
@@ -433,6 +541,15 @@ export default function Settings() {
               Customer portal
             </button>
             <button
+              onClick={() => setActiveTab('sgp')}
+              className="tab-button"
+              data-active={activeTab === 'sgp'}
+              role="tab"
+              aria-selected={activeTab === 'sgp'}
+            >
+              SGP integration
+            </button>
+            <button
               onClick={() => setActiveTab('security')}
               className="tab-button"
               data-active={activeTab === 'security'}
@@ -671,6 +788,209 @@ export default function Settings() {
 
             <div className="mt-5 rounded-md border border-[hsl(var(--status-warning))]/40 bg-[hsl(var(--status-warning))]/10 p-4 text-sm leading-6">
               Jika opsi dimatikan, SkyGenPanel tidak membuat ID baru. ID yang sudah ada tetap disimpan agar akses pelanggan tidak berubah.
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'sgp' && (
+          <div className="modern-card max-w-3xl p-5 sm:p-6">
+            <p className="page-kicker">Integração externa</p>
+            <h2 className="section-heading">SGP — Sistema de Gestão de Provedores</h2>
+            <p className="section-description mb-6">
+              Consulta contrato, plano e faturas do assinante direto no SGP usando as rotas de
+              integração <span className="font-mono">/api/ura/</span>. O token é gravado
+              criptografado e nunca retorna para o navegador.
+            </p>
+
+            <div className="mb-5 flex flex-wrap items-center gap-2">
+              <span className={sgpConfig?.ready ? 'modern-badge-success' : 'modern-badge'}>
+                {sgpConfig?.ready ? 'Integração ativa' : 'Integração inativa'}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {sgpConfig?.tokenConfigured ? 'Token armazenado' : 'Nenhum token armazenado'}
+                {sgpConfig?.updatedAt
+                  ? ` · atualizado em ${new Date(sgpConfig.updatedAt).toLocaleString('pt-BR')}`
+                  : ''}
+              </span>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="sgp-base-url" className="field-label">URL do SGP</label>
+                <input
+                  id="sgp-base-url"
+                  type="url"
+                  className="modern-input w-full"
+                  placeholder="https://provedor.sgp.net.br"
+                  value={sgpForm.baseUrl}
+                  onChange={(event) => setSgpForm((current) => ({ ...current, baseUrl: event.target.value }))}
+                />
+                <p className="field-hint">Somente o domínio base; os caminhos da API são adicionados automaticamente.</p>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="sgp-app" className="field-label">App</label>
+                  <input
+                    id="sgp-app"
+                    type="text"
+                    className="modern-input w-full"
+                    placeholder="nome-do-app"
+                    value={sgpForm.app}
+                    onChange={(event) => setSgpForm((current) => ({ ...current, app: event.target.value }))}
+                  />
+                  <p className="field-hint">Administração &gt; Integrações &gt; Tokens, no SGP.</p>
+                </div>
+                <div>
+                  <label htmlFor="sgp-token" className="field-label">Token</label>
+                  <input
+                    id="sgp-token"
+                    type="password"
+                    autoComplete="new-password"
+                    className="modern-input w-full"
+                    placeholder={sgpConfig?.tokenConfigured ? '•••••••• (mantém o token salvo)' : 'token de integração'}
+                    value={sgpForm.token}
+                    onChange={(event) => setSgpForm((current) => ({ ...current, token: event.target.value }))}
+                  />
+                  <p className="field-hint">Deixe em branco para manter o token já salvo.</p>
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="sgp-link-mode" className="field-label">Vínculo ONT → contrato</label>
+                  <select
+                    id="sgp-link-mode"
+                    className="modern-input w-full"
+                    value={sgpForm.linkMode}
+                    onChange={(event) => setSgpForm((current) => ({
+                      ...current,
+                      linkMode: event.target.value as SgpConfig['linkMode']
+                    }))}
+                  >
+                    <option value="pppoe">Login PPPoE do ONT</option>
+                    <option value="customer_id">ID Customer do painel</option>
+                    <option value="manual">Somente vínculo manual</option>
+                  </select>
+                  <p className="field-hint">Identificador enviado ao SGP quando o ONT ainda não tem contrato vinculado.</p>
+                </div>
+                <div>
+                  <label htmlFor="sgp-invoice-limit" className="field-label">Faturas por consulta</label>
+                  <input
+                    id="sgp-invoice-limit"
+                    type="number"
+                    min={1}
+                    max={24}
+                    className="modern-input w-full"
+                    value={sgpForm.invoiceLimit}
+                    onChange={(event) => setSgpForm((current) => ({
+                      ...current,
+                      invoiceLimit: Number(event.target.value) || 1
+                    }))}
+                  />
+                  <p className="field-hint">Máximo de títulos em aberto retornados por consulta (1–24).</p>
+                </div>
+              </div>
+
+              <div className="space-y-3 rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-4">
+                <label className="flex cursor-pointer items-start gap-3">
+                  <input
+                    type="checkbox"
+                    className="mt-1 h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
+                    checked={sgpForm.enabled}
+                    onChange={(event) => setSgpForm((current) => ({ ...current, enabled: event.target.checked }))}
+                  />
+                  <span>
+                    <span className="block font-semibold">Ativar integração com o SGP</span>
+                    <span className="mt-1 block text-sm leading-6 text-muted-foreground">
+                      Habilita as consultas de contrato e faturas no painel do operador.
+                    </span>
+                  </span>
+                </label>
+                <label className="flex cursor-pointer items-start gap-3">
+                  <input
+                    type="checkbox"
+                    className="mt-1 h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
+                    checked={sgpForm.portalBilling}
+                    onChange={(event) => setSgpForm((current) => ({ ...current, portalBilling: event.target.checked }))}
+                  />
+                  <span>
+                    <span className="block font-semibold">Mostrar faturas no portal do assinante</span>
+                    <span className="mt-1 block text-sm leading-6 text-muted-foreground">
+                      O assinante vê apenas os títulos em aberto do próprio contrato, com CPF/CNPJ mascarado.
+                    </span>
+                  </span>
+                </label>
+                <label className="flex cursor-pointer items-start gap-3">
+                  <input
+                    type="checkbox"
+                    className="mt-1 h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
+                    checked={sgpForm.portalUnlock}
+                    onChange={(event) => setSgpForm((current) => ({ ...current, portalUnlock: event.target.checked }))}
+                  />
+                  <span>
+                    <span className="block font-semibold">Permitir liberação em confiança pelo portal</span>
+                    <span className="mt-1 block text-sm leading-6 text-muted-foreground">
+                      Limitado a 3 solicitações por hora; a regra de elegibilidade continua sendo do SGP.
+                    </span>
+                  </span>
+                </label>
+              </div>
+
+              <div>
+                <label htmlFor="sgp-sample" className="field-label">Cliente de teste (opcional)</label>
+                <input
+                  id="sgp-sample"
+                  type="text"
+                  className="modern-input w-full"
+                  placeholder="CPF/CNPJ, contrato ou login PPPoE"
+                  value={sgpForm.sample}
+                  onChange={(event) => setSgpForm((current) => ({ ...current, sample: event.target.value }))}
+                />
+                <p className="field-hint">Sem esse dado o teste apenas confirma URL, app e token.</p>
+              </div>
+            </div>
+
+            {sgpTestResult && (
+              <div className={`mt-4 rounded-md p-4 ${
+                sgpTestResult.success
+                  ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-800'
+                  : 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-800'
+              }`}>
+                <div className="flex items-center">
+                  <Icon name={sgpTestResult.success ? 'check' : 'x'} size={18} className="mr-2" />
+                  <span className="font-medium">{sgpTestResult.message}</span>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-6 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => void handleSgpTest()}
+                disabled={sgpTesting}
+                className="modern-button-secondary"
+              >
+                {sgpTesting ? 'Testando…' : 'Testar conexão'}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleSgpSave()}
+                disabled={sgpSaving}
+                className="modern-button"
+              >
+                {sgpSaving ? 'Salvando…' : 'Salvar integração'}
+              </button>
+              {sgpConfig?.tokenConfigured && (
+                <button
+                  type="button"
+                  onClick={() => void handleSgpClearToken()}
+                  disabled={sgpSaving}
+                  className="modern-button-secondary"
+                >
+                  Remover token
+                </button>
+              )}
             </div>
           </div>
         )}

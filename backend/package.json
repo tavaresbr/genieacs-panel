@@ -10,7 +10,7 @@
     "postinstall": "node scripts/install-cli.js",
     "db:init": "node scripts/init-db.js",
     "reset-password": "node scripts/reset-password.js",
-    "check": "node --check src/server.js && node --check src/services/deviceService.js && node --check src/controllers/deviceController.js"
+    "check": "node --check src/server.js && node --check src/services/deviceService.js && node --check src/controllers/deviceController.js && node --check src/services/sgpService.js && node --check src/controllers/sgpController.js && node --check src/controllers/customerPortalController.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",

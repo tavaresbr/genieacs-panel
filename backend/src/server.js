@@ -20,6 +20,7 @@ import mappingRoutes from './routes/mapping.js';
 import mapSettingsRoutes from './routes/mapSettings.js';
 import databaseRoutes from './routes/database.js';
 import customerPortalRoutes from './routes/customerPortal.js';
+import sgpRoutes from './routes/sgp.js';
 
 dotenv.config();
 
@@ -158,6 +159,7 @@ app.use('/api/vendor-management', vendorRoutes);
 app.use('/api/mapping-data', mappingRoutes);
 app.use('/api/map-settings', mapSettingsRoutes);
 app.use('/api/database', databaseRoutes);
+app.use('/api/sgp', sgpRoutes);
 
 app.get('/api/health', async (req, res) => {
   const database = await testConnection();
@@ -271,11 +273,36 @@ const portalRevealLimiter = rateLimit({
   }
 });
 
+const portalBillingLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Muitas consultas de faturas. Aguarde um instante e tente novamente.'
+  }
+});
+// Every trust unlock reaches the provider's billing system, so the portal
+// allows only a handful of attempts per session window.
+const portalUnlockLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Limite de solicitações de liberação atingido. Tente novamente mais tarde.'
+  }
+});
+
 portalApp.use(portalOriginGuard);
 portalApp.use(express.json({ limit: '16kb' }));
 portalApp.use('/api/customer/login', portalLoginLimiter);
 portalApp.use('/api/customer/wifi/:index/password', portalRevealLimiter);
 portalApp.use('/api/customer/wifi', portalMutationLimiter);
+portalApp.use('/api/customer/billing/trust-unlock', portalUnlockLimiter);
+portalApp.use('/api/customer/billing', portalBillingLimiter);
 portalApp.use('/api', portalApiLimiter);
 portalApp.use('/api/customer', customerPortalRoutes);
 portalApp.get('/api/health', (req, res) => {
