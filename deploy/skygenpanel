@@ -75,6 +75,13 @@ ensure_env_defaults() {
     printf 'PORTAL_JWT_SECRET=%s\n' \
       "$(node -e 'console.log(require("crypto").randomBytes(48).toString("hex"))')" >> "$ENV_FILE"
   fi
+  if ! grep -qE '^TRUST_PROXY=' "$ENV_FILE"; then
+    if grep -qE '^APP_HOST=127\.0\.0\.1$' "$ENV_FILE"; then
+      printf 'TRUST_PROXY=1\n' >> "$ENV_FILE"
+    else
+      printf 'TRUST_PROXY=0\n' >> "$ENV_FILE"
+    fi
+  fi
 }
 
 set_env() {
@@ -140,9 +147,13 @@ cmd_expose() {
   need_root
   validate_install_dir
   set_env APP_HOST "0.0.0.0"
+  # A directly reachable listener must not believe forwarded headers: a client
+  # could otherwise forge its source address and escape every rate limit.
+  set_env TRUST_PROXY "0"
   local port portal; port="$(app_port)"; portal="$(portal_port)"
   log "Panel will bind to 0.0.0.0:${port} (reachable from the network)."
   log "Customer portal will bind to 0.0.0.0:${portal}."
+  log "Proxy headers are now untrusted (TRUST_PROXY=0)."
   warn "Anyone on your network can now reach the panel. Ensure a strong admin password and a firewall."
   systemctl restart "$SERVICE_NAME"
   log "Done."
@@ -152,7 +163,11 @@ cmd_unexpose() {
   need_root
   validate_install_dir
   set_env APP_HOST "127.0.0.1"
+  # Back to loopback-only, so the reverse proxy or tunnel in front is again the
+  # single trusted hop that carries the real client address.
+  set_env TRUST_PROXY "1"
   log "Panel restricted to localhost (127.0.0.1)."
+  log "Proxy headers from the local reverse proxy are trusted again (TRUST_PROXY=1)."
   systemctl restart "$SERVICE_NAME"
   log "Done."
 }
