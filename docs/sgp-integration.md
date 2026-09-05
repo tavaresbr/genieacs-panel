@@ -45,8 +45,9 @@ accepted. Requests time out after 15 seconds.
    contract number, or PPPoE login also verifies the lookup itself.
 5. Enable **Ativar integração com o SGP** and save.
 
-The token is encrypted with AES-256-GCM (keyed from `JWT_SECRET`) before being
-stored, and it is never returned to the browser. Saving with an empty token
+The token is encrypted with the shared secret box (AES-256-GCM, keyed from
+`JWT_SECRET` under its own context) before being stored, and it is never
+returned to the browser. Saving with an empty token
 field keeps the stored one; **Remover token** clears it and disables the
 integration.
 
@@ -80,8 +81,10 @@ Two portal options are configured in the same settings tab:
   SGP still decides whether the request is granted.
 
 The contract is always resolved from the authenticated portal session; the
-browser cannot choose which contract is read. Portal billing requests are rate
-limited to 20 per minute and trust unlocks to 3 per hour.
+browser cannot choose which contract is read. Both endpoints are rate limited
+per customer account rather than per source address — 20 billing reads a minute
+and 3 trust unlocks an hour — so one subscriber cannot exhaust the quota for
+everyone behind the same proxy.
 
 ## API reference
 

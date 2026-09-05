@@ -777,7 +777,7 @@ export default function Settings() {
               <div className="rounded-md border border-border p-4">
                 <p className="metric-label">Login pelanggan</p>
                 <p className="mt-2 text-sm font-semibold">ID Customer</p>
-                <p className="mt-1 text-xs text-muted-foreground">Password awal: enam karakter terakhir ID Customer.</p>
+                <p className="mt-1 text-xs text-muted-foreground">Password portal dibuat otomatis per pelanggan dan dapat dilihat atau diganti di halaman detail device.</p>
               </div>
               <div className="rounded-md border border-border p-4">
                 <p className="metric-label">Identitas permanen</p>

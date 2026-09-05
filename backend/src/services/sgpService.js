@@ -1,8 +1,7 @@
-import 'dotenv/config';
-import crypto from 'node:crypto';
 import AppState from '../models/AppState.js';
 import CustomerAccount from '../models/CustomerAccount.js';
 import SgpLink from '../models/SgpLink.js';
+import { createSecretBox } from '../utils/secretBox.js';
 
 const CONFIG_KEY = 'sgp_integration_config';
 const CONFIG_CACHE_TTL_MS = 30_000;
@@ -19,14 +18,7 @@ export const DEFAULT_ENDPOINTS = Object.freeze({
 
 export const LINK_MODES = Object.freeze(['pppoe', 'customer_id', 'manual']);
 
-const baseSecret = process.env.JWT_SECRET;
-if (!baseSecret && process.env.APP_ENV === 'production') {
-  throw new Error('JWT_SECRET must be set to protect the stored SGP token');
-}
-const tokenKey = crypto
-  .createHmac('sha256', baseSecret || 'insecure-development-secret')
-  .update('skygenpanel-sgp-token-v1')
-  .digest();
+const tokenBox = createSecretBox('skygenpanel-sgp-token-v1');
 
 export class SgpError extends Error {
   constructor(message, { code = 'sgp_error', status = 502, details = null } = {}) {
@@ -39,33 +31,11 @@ export class SgpError extends Error {
 }
 
 function encryptToken(token) {
-  const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv('aes-256-gcm', tokenKey, iv);
-  const ciphertext = Buffer.concat([cipher.update(token, 'utf8'), cipher.final()]);
-  return {
-    v: 1,
-    iv: iv.toString('base64'),
-    tag: cipher.getAuthTag().toString('base64'),
-    ct: ciphertext.toString('base64')
-  };
+  return { v: 1, ...tokenBox.encrypt(token) };
 }
 
 function decryptToken(box) {
-  if (!box?.iv || !box?.tag || !box?.ct) return '';
-  try {
-    const decipher = crypto.createDecipheriv(
-      'aes-256-gcm',
-      tokenKey,
-      Buffer.from(box.iv, 'base64')
-    );
-    decipher.setAuthTag(Buffer.from(box.tag, 'base64'));
-    return Buffer.concat([
-      decipher.update(Buffer.from(box.ct, 'base64')),
-      decipher.final()
-    ]).toString('utf8');
-  } catch {
-    return '';
-  }
+  return box ? (tokenBox.decrypt(box) ?? '') : '';
 }
 
 function normalizeKey(key) {

@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import CustomerAccount from '../models/CustomerAccount.js';
+import CustomerPortalPasswordService from './customerPortalPasswordService.js';
 import DeviceProfile from '../models/DeviceProfile.js';
 import Setting from '../models/Setting.js';
 
@@ -89,10 +90,6 @@ class CustomerService {
     return `${prefix}-${randomString(ID_ALPHABET, 7)}-${suffix}`;
   }
 
-  static passwordForCustomerId(customerId) {
-    return CUSTOMER_ID_PATTERN.test(customerId) ? customerId.slice(-6) : '';
-  }
-
   static normalizeCustomerId(value) {
     const customerId = String(value ?? '').trim().toUpperCase();
     return CUSTOMER_ID_PATTERN.test(customerId) ? customerId : null;
@@ -122,6 +119,10 @@ class CustomerService {
     const customerId = this.generateCustomerId(generationSettings, profile?.installation_date);
     if (!customerId) return null;
 
+    // Every account gets its own portal password. The Customer ID identifies
+    // the account; it must never be usable as the credential for it.
+    const { record: passwordRecord } = await CustomerPortalPasswordService.createRecord();
+
     for (let attempt = 0; attempt < 8; attempt += 1) {
       try {
         return await CustomerAccount.create({
@@ -133,6 +134,7 @@ class CustomerService {
           software_id: softwareId,
           pppoe_username: pppoeUsername,
           active: true,
+          ...passwordRecord,
           last_seen_at: new Date()
         });
       } catch (error) {

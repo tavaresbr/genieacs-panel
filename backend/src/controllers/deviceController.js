@@ -1,5 +1,6 @@
 import DeviceService from '../services/deviceService.js';
 import CustomerService from '../services/customerService.js';
+import CustomerPortalPasswordService from '../services/customerPortalPasswordService.js';
 import CustomerAccount from '../models/CustomerAccount.js';
 import DeviceProfile from '../models/DeviceProfile.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
@@ -85,7 +86,9 @@ class DeviceController {
           customer: {
             customerId: account?.customer_id || null,
             installationDate: profile?.installation_date || null,
-            generated: Boolean(account)
+            generated: Boolean(account),
+            portalPasswordSet: Boolean(account?.password_hash),
+            portalPasswordUpdatedAt: account?.password_updated_at || null
           }
         })
       );
@@ -100,6 +103,58 @@ class DeviceController {
       
       return res.status(500).json(
         createErrorResponse('Failed to get device detail', error.message)
+      );
+    }
+  }
+
+  /**
+   * Portal passwords are independent of the Customer ID, so staff need a way to
+   * read the current one back and to rotate it. Both are admin-only.
+   */
+  static async getPortalPassword(req, res) {
+    try {
+      const account = await CustomerAccount.getByDeviceId(req.params.deviceId);
+      if (!account) {
+        return res.status(404).json(
+          createErrorResponse('This device has no customer account yet')
+        );
+      }
+      const password = CustomerPortalPasswordService.reveal(account);
+      if (!password) {
+        return res.status(404).json(createErrorResponse(
+          'No readable portal password is stored. Generate a new one.'
+        ));
+      }
+      return res.json(createResponse('Portal password retrieved', {
+        customerId: account.customer_id,
+        password,
+        updatedAt: account.password_updated_at || null
+      }));
+    } catch (error) {
+      console.error('Get portal password error:', error);
+      return res.status(500).json(
+        createErrorResponse('Failed to read the portal password', error.message)
+      );
+    }
+  }
+
+  static async resetPortalPassword(req, res) {
+    try {
+      const account = await CustomerAccount.getByDeviceId(req.params.deviceId);
+      if (!account) {
+        return res.status(404).json(
+          createErrorResponse('This device has no customer account yet')
+        );
+      }
+      const password = await CustomerPortalPasswordService.reset(account.id);
+      return res.json(createResponse('Portal password regenerated', {
+        customerId: account.customer_id,
+        password
+      }));
+    } catch (error) {
+      console.error('Reset portal password error:', error);
+      return res.status(500).json(
+        createErrorResponse('Failed to regenerate the portal password', error.message)
       );
     }
   }

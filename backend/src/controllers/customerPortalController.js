@@ -1,25 +1,16 @@
-import crypto from 'node:crypto';
 import CustomerAccount from '../models/CustomerAccount.js';
 import CustomerService from '../services/customerService.js';
+import CustomerPortalPasswordService from '../services/customerPortalPasswordService.js';
 import CustomerWifiCredentialService from '../services/customerWifiCredentialService.js';
 import DeviceService from '../services/deviceService.js';
 import SgpService, { SgpError } from '../services/sgpService.js';
 import {
   PORTAL_COOKIE_NAME,
+  portalClearCookieOptions,
   portalCookieOptions,
   signPortalSession
 } from '../middleware/portalAuth.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
-
-function safeEqual(left, right) {
-  const a = Buffer.from(String(left));
-  const b = Buffer.from(String(right));
-  if (a.length !== b.length) {
-    crypto.timingSafeEqual(a, Buffer.alloc(a.length));
-    return false;
-  }
-  return crypto.timingSafeEqual(a, b);
-}
 
 class CustomerPortalController {
   static overviewCache = new Map();
@@ -28,13 +19,16 @@ class CustomerPortalController {
     try {
       const customerId = CustomerService.normalizeCustomerId(req.body?.customerId);
       const password = String(req.body?.password ?? '').trim().toUpperCase();
-      if (!customerId || !/^[A-Z0-9]{6}$/.test(password)) {
+      if (!customerId || !/^[A-Z0-9]{6,32}$/.test(password)) {
         return res.status(401).json(createErrorResponse('ID Customer atau password salah'));
       }
 
       const account = await CustomerAccount.getByCustomerId(customerId);
-      const expectedPassword = CustomerService.passwordForCustomerId(customerId);
-      if (!account || !safeEqual(password, expectedPassword)) {
+      if (!account) {
+        await CustomerPortalPasswordService.rejectUnknownAccount(password);
+        return res.status(401).json(createErrorResponse('ID Customer atau password salah'));
+      }
+      if (!(await CustomerPortalPasswordService.verify(account, password))) {
         return res.status(401).json(createErrorResponse('ID Customer atau password salah'));
       }
 
@@ -255,12 +249,7 @@ class CustomerPortalController {
   }
 
   static async logout(req, res) {
-    res.clearCookie(PORTAL_COOKIE_NAME, {
-      httpOnly: true,
-      sameSite: 'strict',
-      secure: req.secure,
-      path: '/'
-    });
+    res.clearCookie(PORTAL_COOKIE_NAME, portalClearCookieOptions(req));
     return res.json(createResponse('Sesi pelanggan telah berakhir'));
   }
 }

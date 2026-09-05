@@ -473,7 +473,8 @@ export default function CustomerPortal() {
             <p className="page-kicker">Akses mandiri pelanggan</p>
             <h1 className="text-2xl font-bold">Periksa kondisi ONT</h1>
             <p className="mb-6 mt-2 text-sm leading-6 text-muted-foreground">
-              Masukkan ID Customer yang diberikan penyedia layanan. Password awal adalah enam karakter terakhir ID.
+              Masukkan ID Customer dan password portal yang diberikan penyedia layanan.
+              Password portal berbeda dari ID Customer.
             </p>
             <form className="space-y-4" onSubmit={login}>
               <div>
@@ -497,12 +498,12 @@ export default function CustomerPortal() {
                     className="modern-input pr-12 font-mono"
                     type={showLoginPassword ? 'text' : 'password'}
                     inputMode="text"
-                    pattern="[A-Za-z0-9]{6}"
-                    maxLength={6}
+                    pattern="[A-Za-z0-9]{6,32}"
+                    maxLength={32}
                     value={password}
-                    onChange={(event) => setPassword(event.target.value.replace(/[^a-z0-9]/gi, '').toUpperCase().slice(0, 6))}
+                    onChange={(event) => setPassword(event.target.value.replace(/[^a-z0-9]/gi, '').toUpperCase().slice(0, 32))}
                     autoComplete="current-password"
-                    placeholder="6 karakter"
+                    placeholder="Password portal"
                     required
                   />
                   <button
