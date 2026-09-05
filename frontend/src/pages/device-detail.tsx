@@ -8,6 +8,7 @@ import { devicesAPI } from '@/lib/api'
 import { formatDate } from '@/lib/utils'
 import { Icon } from '@/components/ui/icon'
 import { useAuth } from '@/contexts/auth-context'
+import { useTranslation } from '@/contexts/language-context'
 
 interface WanBindingData {
   lan: string[];
@@ -143,6 +144,7 @@ function EditWanModal({
     }
   });
 
+  const { t } = useTranslation();
   const [isVlanConfigurable, setIsVlanConfigurable] = useState(false);
 
   useEffect(() => {
@@ -199,7 +201,7 @@ function EditWanModal({
         {/* Header Modal */}
         <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-gray-700">
           <h3 id="wan-dialog-title" className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-            Edit WAN Connection
+            {t('detail.wan.edit')}
           </h3>
           <button
             onClick={onClose}
@@ -215,21 +217,21 @@ function EditWanModal({
         <div className="p-6 space-y-6 overflow-y-auto">
           {/* 1. WAN Name */}
           <div>
-            <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">WAN Name</label>
+            <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">{t('detail.wanModal.name')}</label>
             <input
               type="text"
               value={wanForm.name}
               maxLength={256}
               disabled={!wanData.nameConfigurable}
               onChange={(event) => setWanForm((current) => ({ ...current, name: event.target.value }))}
-              placeholder={wanData.nameConfigurable ? 'Enter WAN connection name' : 'Name parameter is not writable'}
+              placeholder={wanData.nameConfigurable ? t('detail.wanModal.namePlaceholder') : t('detail.wanModal.nameReadOnly')}
               className="modern-input w-full"
             />
           </div>
 
           {/* 2. VLAN */}
           <div>
-            <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">VLAN</label>
+            <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">{t('detail.wanModal.vlan')}</label>
             <div className="flex items-center space-x-3">
               <input
                 type="checkbox"
@@ -243,7 +245,7 @@ function EditWanModal({
                 htmlFor="vlanEnabled"
                 className={`text-sm ${!isVlanConfigurable ? 'text-gray-400 dark:text-gray-500 cursor-not-allowed' : ''}`}
               >
-                Enable VLAN
+                {t('detail.wanModal.enableVlan')}
               </label>
             </div>
             <input
@@ -253,60 +255,60 @@ function EditWanModal({
               value={wanForm.vlanId}
               onChange={(e) => setWanForm(f => ({ ...f, vlanId: e.target.value }))}
               disabled={!wanForm.vlanEnabled}
-              placeholder={!isVlanConfigurable ? 'VLAN Not Available' : (wanForm.vlanEnabled ? 'Enter VLAN ID (1-4094)' : 'VLAN Not Enabled')}
+              placeholder={!isVlanConfigurable ? t('detail.wanModal.vlanNotAvailable') : (wanForm.vlanEnabled ? t('detail.wanModal.vlanPlaceholder') : t('detail.wanModal.vlanNotEnabled'))}
               className="modern-input w-full mt-2"
             />
           </div>
 
           {/* 3. PPP Username */}
           <div>
-            <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">PPP Username</label>
+            <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">{t('detail.wanModal.pppUsername')}</label>
             <input
               type="text"
               value={wanForm.username}
               disabled={!wanData.usernameConfigurable}
               onChange={(e) => setWanForm(f => ({ ...f, username: e.target.value }))}
-              placeholder={wanData.usernameConfigurable ? 'Enter PPPoE username' : 'Username parameter is not writable'}
+              placeholder={wanData.usernameConfigurable ? t('detail.wanModal.usernamePlaceholder') : t('detail.wanModal.usernameReadOnly')}
               className="modern-input w-full font-mono"
             />
           </div>
 
           {/* 4. PPP Password */}
           <div>
-            <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">PPP Password</label>
+            <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">{t('detail.wanModal.pppPassword')}</label>
             <input
               type="password"
               value={wanForm.password}
               disabled={!wanData.passwordConfigurable}
               onChange={(e) => setWanForm(f => ({ ...f, password: e.target.value }))}
-              placeholder={wanData.passwordConfigurable ? 'Enter new password (leave blank to keep unchanged)' : 'Password parameter is not writable'}
+              placeholder={wanData.passwordConfigurable ? t('detail.wanModal.passwordPlaceholder') : t('detail.wanModal.passwordReadOnly')}
               className="modern-input w-full font-mono"
             />
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Service list</label>
+              <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">{t('detail.wanModal.serviceList')}</label>
               <input
                 type="text"
                 value={wanForm.serviceList}
                 maxLength={128}
                 disabled={!wanData.serviceListConfigurable}
                 onChange={(event) => setWanForm((current) => ({ ...current, serviceList: event.target.value }))}
-                placeholder={wanData.serviceListConfigurable ? 'INTERNET' : 'Service parameter is not writable'}
+                placeholder={wanData.serviceListConfigurable ? 'INTERNET' : t('detail.wanModal.serviceReadOnly')}
                 className="modern-input w-full font-mono"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Connection mode</label>
+              <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">{t('detail.wanModal.connectionMode')}</label>
               <select
                 value={wanForm.connectionType}
                 disabled={!wanData.connectionTypeConfigurable}
                 onChange={(event) => setWanForm((current) => ({ ...current, connectionType: event.target.value }))}
                 className="modern-input w-full"
               >
-                <option value="IP_Routed">Routed</option>
-                <option value="PPPoE_Bridged">Bridged</option>
+                <option value="IP_Routed">{t('detail.wanModal.routed')}</option>
+                <option value="PPPoE_Bridged">{t('detail.wanModal.bridged')}</option>
               </select>
             </div>
           </div>
@@ -320,25 +322,25 @@ function EditWanModal({
               className="size-4 accent-[hsl(var(--primary))]"
             />
             <span>
-              <span className="block text-sm font-semibold">Enable NAT</span>
+              <span className="block text-sm font-semibold">{t('detail.wanModal.enableNat')}</span>
               <span className="block text-xs text-muted-foreground">
-                {wanData.natConfigurable ? 'Apply NAT on this routed WAN.' : 'NAT parameter is not writable on this connection.'}
+                {wanData.natConfigurable ? t('detail.wanModal.natHint') : t('detail.wanModal.natReadOnly')}
               </span>
             </span>
           </label>
 
           {/* 5. Interface Binding */}
           <div>
-            <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Interface Binding</label>
+            <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">{t('detail.wanModal.interfaceBinding')}</label>
             {!wanData.bindingsConfigurable && (
               <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
-                This ONT did not report writable interface-binding parameters.
+                {t('detail.wanModal.bindingsReadOnly')}
               </p>
             )}
             <div className="space-y-4">
               {/* LAN */}
               <div>
-                <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">LAN Ports</p>
+                <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">{t('detail.wan.lanPorts')}</p>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   {([1, 2, 3, 4] as const).map(i => (
                     <label key={`lan-${i}`} className="flex items-center space-x-2 p-2 border dark:border-gray-700 rounded-md">
@@ -357,7 +359,7 @@ function EditWanModal({
               </div>
               {/* WiFi */}
               <div>
-                <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">WiFi Networks</p>
+                <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">{t('detail.wan.wifiNetworks')}</p>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   {([1, 2, 3, 4, 5, 6, 7, 8] as const).map(i => (
                     <label key={`ssid-${i}`} className="flex items-center space-x-2 p-2 border dark:border-gray-700 rounded-md">
@@ -384,13 +386,13 @@ function EditWanModal({
             onClick={onClose}
             className="modern-button-secondary"
           >
-            Cancel
+            {t('common.cancel')}
           </button>
           <button
             onClick={handleSaveClick}
             className="modern-button"
           >
-            Save Changes
+            {t('detail.wanModal.save')}
           </button>
         </div>
       </div>
@@ -411,6 +413,7 @@ function EditCredentialModal({
   username: string;
   onSave: (type: 'super' | 'user', password: string) => void;
 }) {
+  const { t } = useTranslation();
   const [password, setPassword] = useState('');
 
   const handleSaveClick = () => {
@@ -420,7 +423,7 @@ function EditCredentialModal({
     }
   };
 
-  const title = credentialType === 'super' ? 'Superadmin (ISP)' : 'Useradmin (Client)';
+  const title = credentialType === 'super' ? t('detail.credentials.superadmin') : t('detail.credentials.useradmin');
 
   if (!isOpen || !credentialType) return null;
 
@@ -430,7 +433,7 @@ function EditCredentialModal({
         {/* Header Modal */}
         <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-gray-700">
           <h3 id="credential-dialog-title" className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-            Update {title}
+            {t('detail.credentials.title', { target: title })}
           </h3>
           <button
             onClick={onClose}
@@ -445,21 +448,21 @@ function EditCredentialModal({
         {/* Form Body */}
         <div className="p-6 space-y-4">
            <div>
-            <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Username</label>
+            <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">{t('detail.credentials.username')}</label>
             <input
               type="text"
-              value={username || 'N/A'}
+              value={username || t('common.na')}
               readOnly
               className="modern-input w-full bg-gray-100 dark:bg-gray-800 cursor-not-allowed"
             />
           </div>
            <div>
-            <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">New Password</label>
+            <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">{t('detail.credentials.newPassword')}</label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter new password"
+              placeholder={t('detail.credentials.newPasswordPlaceholder')}
               className="modern-input w-full font-mono"
             />
           </div>
@@ -471,14 +474,14 @@ function EditCredentialModal({
             onClick={onClose}
             className="modern-button-secondary"
           >
-            Cancel
+            {t('common.cancel')}
           </button>
           <button
             onClick={handleSaveClick}
             disabled={!password}
             className="modern-button"
           >
-            Save Password
+            {t('detail.credentials.save')}
           </button>
         </div>
       </div>
@@ -497,6 +500,7 @@ function EditWifiModal({
   onSave: (form: WifiFormState) => void;
   saving: boolean;
 }) {
+  const { t } = useTranslation()
   const [form, setForm] = useState<WifiFormState>({
     enable: true,
     ssid: '',
@@ -523,38 +527,38 @@ function EditWifiModal({
       <div className="modern-card flex max-h-[92vh] w-full max-w-lg flex-col">
         <div className="flex items-start justify-between border-b border-border p-5">
           <div>
-            <h3 id="wifi-dialog-title" className="section-heading">Edit WiFi SSID {wifi.index}</h3>
+            <h3 id="wifi-dialog-title" className="section-heading">{t('detail.wifiModal.title', { index: wifi.index })}</h3>
             <p className="section-description mt-1">
-              {wifi.usesVirtualParameters ? 'Using genieacs-installer virtual parameters.' : 'Using the device TR-098 WLAN path.'}
+              {wifi.usesVirtualParameters ? t('detail.wifiModal.vpNote') : t('detail.wifiModal.tr098Note')}
             </p>
           </div>
-          <button type="button" onClick={onClose} className="icon-button" aria-label="Close WiFi editor">
+          <button type="button" onClick={onClose} className="icon-button" aria-label={t('detail.wifiModal.close')}>
             <Icon name="x" size={19} />
           </button>
         </div>
         <div className="space-y-4 overflow-y-auto p-5">
           <label className="flex min-h-11 items-center justify-between gap-4 rounded-md border border-border bg-[hsl(var(--surface-subtle))] px-4">
             <span>
-              <span className="block text-sm font-semibold">Radio enabled</span>
-              <span className="block text-xs text-muted-foreground">Applied only when the CPE exposes the Enable parameter.</span>
+              <span className="block text-sm font-semibold">{t('detail.wifiModal.radioEnabled')}</span>
+              <span className="block text-xs text-muted-foreground">{t('detail.wifiModal.radioHint')}</span>
             </span>
             <input type="checkbox" checked={form.enable} onChange={(event) => setForm((current) => ({ ...current, enable: event.target.checked }))} />
           </label>
           <div>
-            <label htmlFor="wifi-ssid" className="field-label">Network name (SSID)</label>
+            <label htmlFor="wifi-ssid" className="field-label">{t('detail.wifiModal.ssidLabel')}</label>
             <input id="wifi-ssid" className="modern-input w-full" maxLength={32} value={form.ssid}
               onChange={(event) => setForm((current) => ({ ...current, ssid: event.target.value }))} />
-            <p className="field-hint">{form.ssid.length}/32 characters</p>
+            <p className="field-hint">{t('detail.wifiModal.ssidCount', { count: form.ssid.length })}</p>
           </div>
           <div>
-            <label htmlFor="wifi-password" className="field-label">New password</label>
+            <label htmlFor="wifi-password" className="field-label">{t('detail.wifiModal.newPassword')}</label>
             <input id="wifi-password" type="password" className="modern-input w-full font-mono" minLength={8} maxLength={63}
-              value={form.password} placeholder="Leave blank to keep the existing password"
+              value={form.password} placeholder={t('detail.wifiModal.passwordPlaceholder')}
               onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} />
-            <p className="field-hint">WPA/WPA2 passphrases require 8–63 characters.</p>
+            <p className="field-hint">{t('detail.wifiModal.passwordHint')}</p>
           </div>
           <div>
-            <label htmlFor="wifi-security" className="field-label">Beacon/security type</label>
+            <label htmlFor="wifi-security" className="field-label">{t('detail.wifiModal.securityLabel')}</label>
             <input id="wifi-security" className="modern-input w-full" list="wifi-security-options" value={form.security}
               onChange={(event) => setForm((current) => ({ ...current, security: event.target.value }))} />
             <datalist id="wifi-security-options">
@@ -564,22 +568,22 @@ function EditWifiModal({
               <option value="11i" />
               <option value="WPAand11i" />
             </datalist>
-            <p className="field-hint">The exact accepted value depends on the CPE firmware.</p>
+            <p className="field-hint">{t('detail.wifiModal.securityHint')}</p>
           </div>
           <div>
-            <label htmlFor="wifi-channel" className="field-label">Channel</label>
+            <label htmlFor="wifi-channel" className="field-label">{t('detail.wifiModal.channel')}</label>
             <input id="wifi-channel" type="number" min={0} max={196} className="modern-input w-full"
-              value={form.channel} placeholder="0 for automatic when supported"
+              value={form.channel} placeholder={t('detail.wifiModal.channelPlaceholder')}
               onChange={(event) => setForm((current) => ({ ...current, channel: event.target.value }))} />
           </div>
           <div className="rounded-md border border-[hsl(var(--warning)/0.35)] bg-[hsl(var(--warning)/0.08)] p-4 text-sm">
-            Updating the SSID, password, or security mode can disconnect every client currently using this network.
+            {t('detail.wifiModal.warning')}
           </div>
         </div>
         <div className="flex justify-end gap-2 border-t border-border p-5">
-          <button type="button" onClick={onClose} className="modern-button-secondary" disabled={saving}>Cancel</button>
+          <button type="button" onClick={onClose} className="modern-button-secondary" disabled={saving}>{t('common.cancel')}</button>
           <button type="button" onClick={() => onSave(form)} className="modern-button" disabled={saving || !form.ssid.trim()}>
-            {saving ? 'Queuing task…' : 'Apply WiFi changes'}
+            {saving ? t('detail.wifiModal.queuing') : t('detail.wifiModal.apply')}
           </button>
         </div>
       </div>
@@ -597,6 +601,7 @@ export default function DeviceDetailPage() {
   const [activeTab, setActiveTab] = useState('overview')
   const [rebooting, setRebooting] = useState(false)
   const { user } = useAuth()
+  const { t } = useTranslation()
   const toast = useToast()
   const loadingCtl = useLoading()
   const [isWanModalOpen, setIsWanModalOpen] = useState(false)
@@ -627,17 +632,17 @@ export default function DeviceDetailPage() {
     if (formData.vlanEnabled) {
       const vlanId = Number(formData.vlanId)
       if (!Number.isInteger(vlanId) || vlanId < 1 || vlanId > 4094) {
-        toast.error('VLAN ID must be between 1 and 4094')
+        toast.error(t('detail.wan.vlanRange'))
         return
       }
     }
 
-    loadingCtl.show('Saving WAN changes...');
+    loadingCtl.show(t('detail.wan.saving'));
     try {
       const res = await devicesAPI.updateWanConfig(deviceId, editingWan.index, formData);
 
       if (res.success) {
-        toast.success(res.message || 'WAN config updated!');
+        toast.success(res.message || t('detail.wan.updated'));
         handleCloseWanModal();
 
         setTimeout(() => {
@@ -645,10 +650,10 @@ export default function DeviceDetailPage() {
         }, 1500);
 
       } else {
-        toast.error(res.message || 'Failed to update WAN config');
+        toast.error(res.message || t('detail.wan.updateFailed'));
       }
     } catch (error: any) {
-      toast.error(error.message || 'Failed to save WAN config');
+      toast.error(error.message || t('detail.wan.saveFailed'));
     } finally {
       loadingCtl.hide();
     }
@@ -665,21 +670,21 @@ export default function DeviceDetailPage() {
   }
 
   const handleSaveCredentials = async (type: 'super' | 'user', password: string) => {
-    loadingCtl.show('Updating credentials...');
+    loadingCtl.show(t('detail.credentials.updating'));
     try {
       const res = await devicesAPI.updateCredentials(deviceId, type, password);
 
       if (res.success) {
-        toast.success(res.message || 'Credentials update task queued!');
+        toast.success(res.message || t('detail.credentials.queued'));
         handleCloseCredentialModal();
         setTimeout(() => {
           fetchDeviceDetails(true);
         }, 1500);
       } else {
-        toast.error(res.message || 'Failed to update credentials');
+        toast.error(res.message || t('detail.credentials.failed'));
       }
     } catch (error: any) {
-      toast.error(error.message || 'Failed to update credentials');
+      toast.error(error.message || t('detail.credentials.failed'));
     } finally {
       loadingCtl.hide();
     }
@@ -688,15 +693,15 @@ export default function DeviceDetailPage() {
   const handleSaveWifi = async (formData: WifiFormState) => {
     if (!editingWifi) return
     if (formData.password && (formData.password.length < 8 || formData.password.length > 63)) {
-      toast.error('WiFi password must contain 8 to 63 characters')
+      toast.error(t('detail.wifiModal.passwordLength'))
       return
     }
     setSavingWifi(true)
-    loadingCtl.show(`Queuing WiFi SSID ${editingWifi.index} update…`)
+    loadingCtl.show(t('detail.wifiModal.queuingProgress', { index: editingWifi.index }))
     try {
       const res = await devicesAPI.updateWifiConfig(deviceId, editingWifi.index, formData)
       if (!res.success) {
-        toast.error(res.message || 'Failed to update WiFi configuration')
+        toast.error(res.message || t('detail.wifiModal.updateFailed'))
         return
       }
       setDevice((current) => current ? {
@@ -709,10 +714,10 @@ export default function DeviceDetailPage() {
           channel: formData.channel === '' ? network.channel : Number(formData.channel)
         } : network)
       } : current)
-      toast.success(res.message || 'WiFi update task queued')
+      toast.success(res.message || t('detail.wifiModal.updateQueued'))
       setEditingWifi(null)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to update WiFi configuration')
+      toast.error(error instanceof Error ? error.message : t('detail.wifiModal.updateFailed'))
     } finally {
       setSavingWifi(false)
       loadingCtl.hide()
@@ -736,27 +741,27 @@ export default function DeviceDetailPage() {
         setInstallationDate(nextDevice.customer?.installationDate || '')
         setWanContainer((current) => current || nextDevice.wanContainers?.[0]?.path || '')
       } else {
-        toast.error(res.message || 'Failed to load device details')
+        toast.error(res.message || t('detail.loadFailed'))
         setDevice(null)
       }
     } catch (error) {
       console.error('Error fetching device details:', error)
-      toast.error('Network error fetching device details')
+      toast.error(t('detail.networkError'))
     } finally {
       setLoading(false);
     }
-  }, [deviceId, toast])
+  }, [deviceId, t, toast])
 
   const handleSaveInstallationDate = async () => {
     if (!installationDate) {
-      toast.error('Select an installation date first')
+      toast.error(t('detail.customer.selectDate'))
       return
     }
     setSavingInstallationDate(true)
     try {
       const res = await devicesAPI.updateInstallationDate(deviceId, installationDate)
       if (!res.success) {
-        toast.error(res.message || 'Failed to save installation date')
+        toast.error(res.message || t('detail.customer.dateSaveFailed'))
         return
       }
       const result = res.data as { customerId?: string | null; installationDate?: string }
@@ -768,9 +773,9 @@ export default function DeviceDetailPage() {
           generated: Boolean(result.customerId ?? current.customer?.customerId)
         }
       } : current)
-      toast.success(res.message || 'Installation date saved')
+      toast.success(res.message || t('detail.customer.dateSaved'))
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to save installation date')
+      toast.error(error instanceof Error ? error.message : t('detail.customer.dateSaveFailed'))
     } finally {
       setSavingInstallationDate(false)
     }
@@ -778,19 +783,19 @@ export default function DeviceDetailPage() {
 
   const handleAddWan = async () => {
     if (!wanContainer) {
-      toast.error('This device did not report a WAN connection container')
+      toast.error(t('detail.wan.containerMissing'))
       return
     }
     setAddingWan(true)
     try {
       const res = await devicesAPI.addWanConnection(deviceId, wanContainer, newWanType)
       if (!res.success) {
-        toast.error(res.message || 'Failed to add WAN connection')
+        toast.error(res.message || t('detail.wan.addFailed'))
         return
       }
-      toast.success(res.message || 'WAN creation task queued')
+      toast.success(res.message || t('detail.wan.addQueued'))
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to add WAN connection')
+      toast.error(error instanceof Error ? error.message : t('detail.wan.addFailed'))
     } finally {
       setAddingWan(false)
     }
@@ -801,20 +806,20 @@ export default function DeviceDetailPage() {
   }, [fetchDeviceDetails]);
 
   const handleReboot = async () => {
-    if (!window.confirm(`Reboot ${device?._id || deviceId}?\n\nThe subscriber connection may be unavailable while the device restarts. Existing configuration is preserved.`)) {
+    if (!window.confirm(t('detail.rebootConfirm', { device: device?._id || deviceId }))) {
       return
     }
     setRebooting(true)
-    loadingCtl.show('Sending reboot command...')
+    loadingCtl.show(t('detail.rebootSending'))
     try {
       const res = await devicesAPI.rebootDevice(deviceId)
       if (res.success) {
-        toast.success('Device reboot command sent successfully!')
+        toast.success(t('detail.rebootSent'))
       } else {
-        toast.error(res.message || 'Failed to send reboot command')
+        toast.error(res.message || t('detail.rebootFailed'))
       }
     } catch {
-      toast.error('Error sending reboot command')
+      toast.error(t('detail.rebootError'))
     } finally {
       setRebooting(false)
       loadingCtl.hide()
@@ -822,16 +827,16 @@ export default function DeviceDetailPage() {
   }
 
   const handleSummon = async () => {
-    loadingCtl.show('Summoning device...')
+    loadingCtl.show(t('devices.summon.loading'))
     try {
       const res = await devicesAPI.summonDevice(deviceId)
       if (res.success) {
-        toast.success(res.message || 'Summon command sent!')
+        toast.success(res.message || t('devices.summon.success'))
       } else {
-        toast.error(res.message || 'Failed to send summon')
+        toast.error(res.message || t('devices.summon.failed'))
       }
     } catch {
-      toast.error('Error sending summon command')
+      toast.error(t('devices.summon.error'))
     } finally {
       loadingCtl.hide()
     }
@@ -843,7 +848,7 @@ export default function DeviceDetailPage() {
     if (isNaN(rxpower)) {
       return {
         color: 'text-gray-500 dark:text-gray-400',
-        label: 'N/A',
+        label: t('common.na'),
         badgeClass: 'modern-badge'
       };
     }
@@ -851,64 +856,64 @@ export default function DeviceDetailPage() {
     if (rxpower >= -21.99) {
       return {
         color: 'text-green-600 dark:text-green-400',
-        label: 'Excellent',
+        label: t('devices.signal.excellent'),
         badgeClass: 'modern-badge-success'
       };
     }
     if (rxpower >= -24.99) {
       return {
         color: 'text-blue-600 dark:text-blue-400',
-        label: 'Good',
+        label: t('devices.signal.good'),
         badgeClass: 'modern-badge-info'
       };
     }
     if (rxpower >= -26.99) {
       return {
         color: 'text-yellow-600 dark:text-yellow-400',
-        label: 'Poor',
+        label: t('devices.signal.poor'),
         badgeClass: 'modern-badge-warning'
       };
     }
     return {
       color: 'text-red-600 dark:text-red-400',
-      label: 'Danger',
+      label: t('devices.signal.danger'),
       badgeClass: 'modern-badge-error'
     };
   }
 
   const getStatusBadge = (status: string | undefined) => {
-    if (!status) return <span className="modern-badge">Unknown</span>
+    if (!status) return <span className="modern-badge">{t('common.unknown')}</span>
 
     if (status.includes(':') || status.includes('Z')) {
        try {
          const lastSeen = new Date(status)
          if (Number.isNaN(lastSeen.getTime())) {
-           return <span className="modern-badge">Invalid Date</span>
+           return <span className="modern-badge">{t('common.invalidDate')}</span>
          }
          const now = new Date()
          const diffMinutes = Math.floor((now.getTime() - lastSeen.getTime()) / (1000 * 60))
 
          if (diffMinutes < 10) {
-           return <span className="modern-badge-success">Online</span>
+           return <span className="modern-badge-success">{t('detail.status.online')}</span>
          } else if (diffMinutes < 60) {
-           return <span className="modern-badge-warning">Away</span>
+           return <span className="modern-badge-warning">{t('detail.status.away')}</span>
          } else {
-           return <span className="modern-badge-error">Offline</span>
+           return <span className="modern-badge-error">{t('detail.status.offline')}</span>
          }
        } catch {
-          return <span className="modern-badge">Invalid Date</span>
+          return <span className="modern-badge">{t('common.invalidDate')}</span>
        }
     }
 
     switch (status.toLowerCase()) {
       case 'connected':
-        return <span className="modern-badge-success">Connected</span>
+        return <span className="modern-badge-success">{t('detail.status.connected')}</span>
       case 'disconnected':
-        return <span className="modern-badge-error">Disconnected</span>
+        return <span className="modern-badge-error">{t('detail.status.disconnected')}</span>
       case 'connecting':
-        return <span className="modern-badge-warning">Connecting</span>
+        return <span className="modern-badge-warning">{t('detail.status.connecting')}</span>
       case 'idle':
-        return <span className="modern-badge-warning">Idle</span>
+        return <span className="modern-badge-warning">{t('detail.status.idle')}</span>
       default:
         return <span className="modern-badge">{status}</span>
     }
@@ -959,12 +964,12 @@ export default function DeviceDetailPage() {
         <div className="page-frame">
           <div className="modern-card empty-state">
             <div className="empty-state-icon"><Icon name="server" size={22} /></div>
-            <h2 className="empty-state-title">Device could not be opened</h2>
-            <p className="empty-state-copy">Perangkat mungkin sudah dihapus atau GenieACS tidak mengembalikan detailnya. Kembali ke inventory lalu cari ulang serial perangkat.</p>
+            <h2 className="empty-state-title">{t('detail.notFound.title')}</h2>
+            <p className="empty-state-copy">{t('detail.notFound.copy')}</p>
             <button
               onClick={() => navigate('/devices')} className="modern-button mt-5"
             >
-              Back to inventory
+              {t('detail.notFound.back')}
             </button>
           </div>
         </div>
@@ -987,21 +992,21 @@ export default function DeviceDetailPage() {
                 onClick={() => navigate('/devices')}
                 className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-primary hover:underline"
               >
-                <Icon name="back" size={17} /> Device inventory
+                <Icon name="back" size={17} /> {t('detail.back')}
               </button>
             </div>
-            <p className="page-kicker">Managed endpoint</p>
+            <p className="page-kicker">{t('detail.kicker')}</p>
             <h1 className="page-title break-all">
               {deviceInfo.serialNumber || device._id}
             </h1>
             <div className="mt-2 flex flex-wrap items-center gap-3">
               {getStatusBadge(device._lastInform)}
               <span className="text-xs text-muted-foreground">
-                Last Inform {formatDate(device._lastInform)}
+                {t('detail.lastInform', { time: formatDate(device._lastInform) })}
               </span>
               <span className="max-w-full truncate font-mono text-[0.68rem] text-muted-foreground">{device._id}</span>
               <span className={device.customer?.customerId ? 'modern-badge-info font-mono' : 'modern-badge'}>
-                {device.customer?.customerId || 'Customer ID not generated'}
+                {device.customer?.customerId || t('detail.customerIdMissing')}
               </span>
             </div>
           </div>
@@ -1012,14 +1017,14 @@ export default function DeviceDetailPage() {
               className="modern-button-secondary"
             >
               <Icon name="power" size={17} />
-              {rebooting ? 'Rebooting…' : 'Reboot device'}
+              {rebooting ? t('detail.rebooting') : t('detail.reboot')}
             </button>
             <button
               onClick={handleSummon}
               className="modern-button inline-flex items-center gap-1.5"
-              title="Summon Device"
+              title={t('detail.summonTitle')}
             >
-              <Icon name="bell" size={16} /> Request Inform
+              <Icon name="bell" size={16} /> {t('detail.requestInform')}
             </button>
           </div>
         </header>
@@ -1028,25 +1033,25 @@ export default function DeviceDetailPage() {
         <div className="mb-6 grid grid-cols-2 overflow-hidden rounded-[var(--radius)] border border-border bg-card lg:grid-cols-4">
           <div className="border-b border-r border-border p-4 lg:border-b-0">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Signal Strength</span>
+              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('detail.metric.signal')}</span>
               <span className={signalInfo.badgeClass}>{signalInfo.label}</span>
             </div>
             <div className={`text-2xl font-bold ${signalInfo.color}`}>
-              {vp.rxpower?.value !== null && vp.rxpower?.value !== undefined ? `${vp.rxpower.value} dBm` : 'N/A'}
+              {vp.rxpower?.value !== null && vp.rxpower?.value !== undefined ? `${vp.rxpower.value} dBm` : t('common.na')}
             </div>
           </div>
           <div className="border-b border-border p-4 lg:border-b-0 lg:border-r">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Temperature</span>
+              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('detail.metric.temperature')}</span>
               <Icon name="thermometer" size={20} className="text-gray-400 dark:text-gray-500" />
             </div>
             <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-              {vp.temperature?.value ?? 'N/A'}
+              {vp.temperature?.value ?? t('common.na')}
             </div>
           </div>
           <div className="border-r border-border p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Active Devices</span>
+              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('detail.metric.activeDevices')}</span>
               <Icon name="phone" size={20} className="text-gray-400 dark:text-gray-500" />
             </div>
             <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
@@ -1055,18 +1060,18 @@ export default function DeviceDetailPage() {
           </div>
           <div className="p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Model</span>
+              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('detail.metric.model')}</span>
               <Icon name="server" size={20} className="text-gray-400 dark:text-gray-500" />
             </div>
             <div className="text-lg font-bold text-gray-900 dark:text-gray-100">
-              {deviceInfo.productclass || 'N/A'}
+              {deviceInfo.productclass || t('common.na')}
             </div>
           </div>
         </div>
 
         {/* Tabs */}
         <div className="mb-6">
-          <div className="tab-rail" role="tablist" aria-label="Device details">
+          <div className="tab-rail" role="tablist" aria-label={t('detail.tabsAria')}>
             <button
               onClick={() => setActiveTab('overview')}
               className="tab-button"
@@ -1074,7 +1079,7 @@ export default function DeviceDetailPage() {
               role="tab"
               aria-selected={activeTab === 'overview'}
             >
-              Overview
+              {t('detail.tab.overview')}
             </button>
             <button
               onClick={() => setActiveTab('wan')}
@@ -1083,7 +1088,7 @@ export default function DeviceDetailPage() {
               role="tab"
               aria-selected={activeTab === 'wan'}
             >
-              WAN
+              {t('detail.tab.wan')}
             </button>
             <button
               onClick={() => setActiveTab('wifi')}
@@ -1092,7 +1097,7 @@ export default function DeviceDetailPage() {
               role="tab"
               aria-selected={activeTab === 'wifi'}
             >
-              WiFi
+              {t('detail.tab.wifi')}
             </button>
             <button
               onClick={() => setActiveTab('clients')}
@@ -1101,7 +1106,7 @@ export default function DeviceDetailPage() {
               role="tab"
               aria-selected={activeTab === 'clients'}
             >
-              Clients ({device.clients?.length || 0})
+              {t('detail.tab.clients', { count: device.clients?.length || 0 })}
             </button>
             <button
               onClick={() => setActiveTab('advanced')}
@@ -1110,7 +1115,7 @@ export default function DeviceDetailPage() {
               role="tab"
               aria-selected={activeTab === 'advanced'}
             >
-              Advanced
+              {t('detail.tab.advanced')}
             </button>
           </div>
         </div>
@@ -1119,54 +1124,54 @@ export default function DeviceDetailPage() {
         {activeTab === 'overview' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="modern-card p-6">
-              <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Device Information</h2>
+              <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">{t('detail.info.title')}</h2>
               <div className="space-y-3">
                 <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Device ID:</span>
+                  <span className="text-gray-600 dark:text-gray-400">{t('detail.info.deviceId')}:</span>
                   <span className="font-mono text-sm">{device._id}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Serial Number:</span>
-                  <span className="font-mono text-sm">{deviceInfo.serialNumber || 'N/A'}</span>
+                  <span className="text-gray-600 dark:text-gray-400">{t('detail.info.serialNumber')}:</span>
+                  <span className="font-mono text-sm">{deviceInfo.serialNumber || t('common.na')}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Manufacturer:</span>
-                  <span>{deviceInfo.manufacturer || 'N/A'}</span>
+                  <span className="text-gray-600 dark:text-gray-400">{t('detail.info.manufacturer')}:</span>
+                  <span>{deviceInfo.manufacturer || t('common.na')}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Product Class:</span>
-                  <span>{deviceInfo.productclass || 'N/A'}</span>
+                  <span className="text-gray-600 dark:text-gray-400">{t('detail.info.productClass')}:</span>
+                  <span>{deviceInfo.productclass || t('common.na')}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Hardware Version:</span>
-                  <span>{deviceInfo.hardwareVersion || 'N/A'}</span>
+                  <span className="text-gray-600 dark:text-gray-400">{t('detail.info.hardwareVersion')}:</span>
+                  <span>{deviceInfo.hardwareVersion || t('common.na')}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Software Version:</span>
-                  <span>{deviceInfo.softwareVersion || 'N/A'}</span>
+                  <span className="text-gray-600 dark:text-gray-400">{t('detail.info.softwareVersion')}:</span>
+                  <span>{deviceInfo.softwareVersion || t('common.na')}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Last Boot:</span>
+                  <span className="text-gray-600 dark:text-gray-400">{t('detail.info.lastBoot')}:</span>
                   <span>{formatDate(device._lastBoot)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Last Registered:</span>
+                  <span className="text-gray-600 dark:text-gray-400">{t('detail.info.lastRegistered')}:</span>
                   <span>{formatDate(device._registered)}</span>
                 </div>
               </div>
             </div>
 
             <div className="modern-card p-5 sm:p-6">
-              <p className="page-kicker">Customer access</p>
-              <h2 className="section-heading">Customer ID</h2>
+              <p className="page-kicker">{t('detail.customer.kicker')}</p>
+              <h2 className="section-heading">{t('detail.customer.title')}</h2>
               <p className="mt-3 break-all font-mono text-lg font-bold">
-                {device.customer?.customerId || 'Not generated'}
+                {device.customer?.customerId || t('detail.customer.notGenerated')}
               </p>
               <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                This ID is permanent after generation and remains bound to SoftwareID plus PPPoE username.
+                {t('detail.customer.hint')}
               </p>
               <div className="mt-5 border-t border-border pt-4">
-                <label htmlFor="installation-date" className="field-label">Installation date</label>
+                <label htmlFor="installation-date" className="field-label">{t('detail.customer.installationDate')}</label>
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <input
                     id="installation-date"
@@ -1181,29 +1186,29 @@ export default function DeviceDetailPage() {
                     disabled={savingInstallationDate}
                     onClick={() => void handleSaveInstallationDate()}
                   >
-                    {savingInstallationDate ? 'Saving…' : 'Save date'}
+                    {savingInstallationDate ? t('detail.customer.savingDate') : t('detail.customer.saveDate')}
                   </button>
                 </div>
-                <p className="field-hint">Saved in SkyGenPanel and synchronized to GenieACS as an installation tag.</p>
+                <p className="field-hint">{t('detail.customer.dateHint')}</p>
               </div>
             </div>
 
             <div className="modern-card p-6">
-              <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Signal Information</h2>
+              <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">{t('detail.signalInfo.title')}</h2>
               <div className="space-y-3">
                  <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">RX Power:</span>
+                    <span className="text-gray-600 dark:text-gray-400">{t('detail.signalInfo.rxPower')}:</span>
                     <span className={`font-medium ${signalInfo.color}`}>
-                      {vp.rxpower?.value !== null && vp.rxpower?.value !== undefined ? `${vp.rxpower.value} dBm` : 'N/A'}
+                      {vp.rxpower?.value !== null && vp.rxpower?.value !== undefined ? `${vp.rxpower.value} dBm` : t('common.na')}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">Temperature:</span>
-                    <span className="font-medium">{vp.temperature?.value ?? 'N/A'}</span>
+                    <span className="text-gray-600 dark:text-gray-400">{t('detail.signalInfo.temperature')}:</span>
+                    <span className="font-medium">{vp.temperature?.value ?? t('common.na')}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">Connection Status:</span>
-                    {primaryWAN ? getStatusBadge(primaryWAN.status || 'Disconnected') : <span className="modern-badge">N/A</span>}
+                    <span className="text-gray-600 dark:text-gray-400">{t('detail.signalInfo.connectionStatus')}:</span>
+                    {primaryWAN ? getStatusBadge(primaryWAN.status || 'Disconnected') : <span className="modern-badge">{t('common.na')}</span>}
                   </div>
                 </div>
             </div>
@@ -1215,13 +1220,13 @@ export default function DeviceDetailPage() {
           <div className="modern-card p-5 sm:p-6">
             <div className="mb-5 flex flex-col gap-4 border-b border-border pb-5 xl:flex-row xl:items-end xl:justify-between">
               <div>
-                <h2 className="section-heading">WAN configuration</h2>
-                <p className="section-description">Existing connections reported by the ONT and a safe GenieACS addObject workflow.</p>
+                <h2 className="section-heading">{t('detail.wan.title')}</h2>
+                <p className="section-description">{t('detail.wan.description')}</p>
               </div>
               {user?.role === 'admin' && (
                 <div className="grid gap-2 sm:grid-cols-[minmax(15rem,1fr)_8rem_auto]">
                   <div>
-                    <label htmlFor="wan-container" className="field-label">WAN container</label>
+                    <label htmlFor="wan-container" className="field-label">{t('detail.wan.container')}</label>
                     <select id="wan-container" className="modern-input max-w-full" value={wanContainer}
                       onChange={(event) => setWanContainer(event.target.value)}>
                       {(device.wanContainers || []).map((container) => (
@@ -1230,7 +1235,7 @@ export default function DeviceDetailPage() {
                     </select>
                   </div>
                   <div>
-                    <label htmlFor="wan-type" className="field-label">Type</label>
+                    <label htmlFor="wan-type" className="field-label">{t('detail.wan.type')}</label>
                     <select id="wan-type" className="modern-input" value={newWanType}
                       onChange={(event) => setNewWanType(event.target.value as 'ppp' | 'ip')}>
                       <option value="ppp">PPPoE</option>
@@ -1239,7 +1244,7 @@ export default function DeviceDetailPage() {
                   </div>
                   <button type="button" className="modern-button self-end" disabled={addingWan || !wanContainer}
                     onClick={() => void handleAddWan()}>
-                    {addingWan ? 'Queuing…' : 'Add WAN'}
+                    {addingWan ? t('detail.wan.queuing') : t('detail.wan.add')}
                   </button>
                 </div>
               )}
@@ -1251,7 +1256,7 @@ export default function DeviceDetailPage() {
                     <div className="p-5 space-y-3">
                       <div className="flex justify-between items-center">
                         <h3 className="text-md font-semibold text-gray-900 dark:text-gray-100">
-                          {wan.name || `Connection ${wan.index}`}
+                          {wan.name || t('detail.wan.connection', { index: wan.index })}
                         </h3>
                         {getStatusBadge(wan.status || 'Disconnected')}
                       </div>
@@ -1259,11 +1264,11 @@ export default function DeviceDetailPage() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3 pt-3 border-t border-gray-200 dark:border-gray-700">
                         <div className="space-y-3">
                           <div className="flex justify-between">
-                            <span className="text-gray-600 dark:text-gray-400">VLAN ID:</span>
+                            <span className="text-gray-600 dark:text-gray-400">{t('detail.wan.vlanId')}:</span>
                             <span className="font-medium">
                               { (wan.vlanId === null || wan.vlanId === undefined) ? (
                                 <span className="px-2 py-0.5 rounded-md bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-xs">
-                                  not set
+                                  {t('detail.wan.notSet')}
                                 </span>
                               ) : (
                                 String(wan.vlanId)
@@ -1271,21 +1276,21 @@ export default function DeviceDetailPage() {
                             </span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-gray-600 dark:text-gray-400">Username:</span>
-                            <span className="font-mono text-sm">{wan.username || 'N/A'}</span>
+                            <span className="text-gray-600 dark:text-gray-400">{t('detail.wan.username')}:</span>
+                            <span className="font-mono text-sm">{wan.username || t('common.na')}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-gray-600 dark:text-gray-400">IP Address:</span>
-                            <span className="font-mono text-sm">{wan.ipAddress || 'N/A'}</span>
+                            <span className="text-gray-600 dark:text-gray-400">{t('detail.wan.ipAddress')}:</span>
+                            <span className="font-mono text-sm">{wan.ipAddress || t('common.na')}</span>
                           </div>
                         </div>
                         <div className="space-y-3">
                           <div className="flex justify-between">
-                            <span className="text-gray-600 dark:text-gray-400">Service:</span>
+                            <span className="text-gray-600 dark:text-gray-400">{t('detail.wan.service')}:</span>
                             <span className="font-medium">
                             { (wan.serviceList === null || wan.serviceList === undefined) ? (
                                 <span className="px-2 py-0.5 rounded-md bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-xs">
-                                  not set
+                                  {t('detail.wan.notSet')}
                                 </span>
                               ) : (
                                 wan.serviceList
@@ -1293,14 +1298,14 @@ export default function DeviceDetailPage() {
                             </span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-gray-600 dark:text-gray-400">Connection Type:</span>
-                            <span className="font-medium">{wan.connectionType || 'N/A'}</span>
+                            <span className="text-gray-600 dark:text-gray-400">{t('detail.wan.connectionType')}:</span>
+                            <span className="font-medium">{wan.connectionType || t('common.na')}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-gray-600 dark:text-gray-400">NAT:</span>
+                            <span className="text-gray-600 dark:text-gray-400">{t('detail.wan.nat')}:</span>
                             <span className="font-medium">
-                              { (wan.natEnabled === null || wan.natEnabled === undefined) ? 'N/A' : (
-                                wan.natEnabled ? 'Enabled' : 'Disabled'
+                              { (wan.natEnabled === null || wan.natEnabled === undefined) ? t('common.na') : (
+                                wan.natEnabled ? t('common.enabled') : t('common.disabled')
                               )}
                             </span>
                           </div>
@@ -1314,12 +1319,12 @@ export default function DeviceDetailPage() {
                             <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.135a4 4 0 000-5.656l-4-4a4 4 0 00-5.656 0zm0 0L9.5 7.5"></path>
                             </svg>
-                            Interface Bindings
+                            {t('detail.wan.bindings')}
                           </h4>
 
                           {/* LAN Ports */}
                           <div className="mb-4">
-                            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">LAN Ports</p>
+                            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('detail.wan.lanPorts')}</p>
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                               {[1, 2, 3, 4].map(i => (
                                 <div key={`lan-${i}`} className="flex-1 min-w-[80px]">
@@ -1331,7 +1336,7 @@ export default function DeviceDetailPage() {
 
                           {/* WiFi Networks */}
                           <div>
-                            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">WiFi Networks</p>
+                            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('detail.wan.wifiNetworks')}</p>
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                               {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
                                 <div key={`ssid-${i}`} className="flex-1 min-w-[80px]">
@@ -1347,9 +1352,9 @@ export default function DeviceDetailPage() {
                             <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.135a4 4 0 000-5.656l-4-4a4 4 0 00-5.656 0zm0 0L9.5 7.5"></path>
                             </svg>
-                            Interface Bindings
+                            {t('detail.wan.bindings')}
                           </h4>
-                          <span className="text-gray-500 dark:text-gray-400 text-sm">No active interface bindings found for this connection.</span>
+                          <span className="text-gray-500 dark:text-gray-400 text-sm">{t('detail.wan.noBindings')}</span>
                         </div>
                       ) : null}
                     </div>
@@ -1362,18 +1367,18 @@ export default function DeviceDetailPage() {
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                           </svg>
-                          <span>Edit WAN Connection</span>
+                          <span>{t('detail.wan.edit')}</span>
                         </button>
                       ) : (
                         <p className="text-center text-xs text-gray-500 dark:text-gray-400">
-                          Only PPPoE connections can be edited.
+                          {t('detail.wan.onlyPppoe')}
                         </p>
                       )}
                     </div>
                   </div>
                 ))
               ) : (
-                <p className="text-gray-500 dark:text-gray-400">No WAN connection data found.</p>
+                <p className="text-gray-500 dark:text-gray-400">{t('detail.wan.empty')}</p>
               )}
             </div>
           </div>
@@ -1383,12 +1388,12 @@ export default function DeviceDetailPage() {
           <div className="modern-card overflow-hidden">
             <div className="flex flex-col gap-3 border-b border-border p-5 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <h2 className="section-heading">Connected-device inventory</h2>
-                <p className="section-description">Online and offline hosts reported by the ONT through TR-098 or TR-181.</p>
+                <h2 className="section-heading">{t('detail.clients.title')}</h2>
+                <p className="section-description">{t('detail.clients.description')}</p>
               </div>
               <div className="flex gap-2">
-                <span className="modern-badge-success">{device.clients?.filter((client) => client.active === true).length || 0} online</span>
-                <span className="modern-badge">{device.clients?.filter((client) => client.active === false).length || 0} offline</span>
+                <span className="modern-badge-success">{t('detail.clients.onlineCount', { count: device.clients?.filter((client) => client.active === true).length || 0 })}</span>
+                <span className="modern-badge">{t('detail.clients.offlineCount', { count: device.clients?.filter((client) => client.active === false).length || 0 })}</span>
               </div>
             </div>
             {device.clients?.length ? (
@@ -1398,28 +1403,28 @@ export default function DeviceDetailPage() {
                     <article key={`${client.dataModel}-${client.instance}-${client.macAddress || client.ipAddress || ''}`} className="rounded-md border border-border p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <h3 className="truncate font-semibold">{client.hostName || 'Unnamed client'}</h3>
-                          <p className="mt-1 break-all font-mono text-xs text-muted-foreground">{client.macAddress || 'MAC not reported'}</p>
+                          <h3 className="truncate font-semibold">{client.hostName || t('detail.clients.unnamed')}</h3>
+                          <p className="mt-1 break-all font-mono text-xs text-muted-foreground">{client.macAddress || t('detail.clients.macNotReported')}</p>
                         </div>
                         <span className={client.active === true ? 'modern-badge-success' : client.active === false ? 'modern-badge' : 'modern-badge-warning'}>
-                          {client.active === true ? 'Online' : client.active === false ? 'Offline' : 'Unknown'}
+                          {client.active === true ? t('detail.status.online') : client.active === false ? t('detail.status.offline') : t('common.unknown')}
                         </span>
                       </div>
                       <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                        <div><dt className="text-xs text-muted-foreground">IP address</dt><dd className="mt-1 break-all font-mono">{client.ipAddress || '—'}</dd></div>
-                        <div><dt className="text-xs text-muted-foreground">Interface</dt><dd className="mt-1 break-all">{client.interfaceType || '—'}</dd></div>
+                        <div><dt className="text-xs text-muted-foreground">{t('detail.clients.ipAddress')}</dt><dd className="mt-1 break-all font-mono">{client.ipAddress || '—'}</dd></div>
+                        <div><dt className="text-xs text-muted-foreground">{t('detail.clients.interface')}</dt><dd className="mt-1 break-all">{client.interfaceType || '—'}</dd></div>
                       </dl>
                     </article>
                   ))}
                 </div>
                 <div className="hidden overflow-x-auto md:block">
                   <table className="modern-table">
-                    <thead><tr><th>Status</th><th>Hostname</th><th>IP address</th><th>MAC address</th><th>Interface</th><th>Source</th></tr></thead>
+                    <thead><tr><th>{t('common.status')}</th><th>{t('detail.clients.hostname')}</th><th>{t('detail.clients.ipAddress')}</th><th>{t('detail.clients.macAddress')}</th><th>{t('detail.clients.interface')}</th><th>{t('detail.clients.source')}</th></tr></thead>
                     <tbody>
                       {device.clients.map((client) => (
                         <tr key={`${client.dataModel}-${client.instance}-${client.macAddress || client.ipAddress || ''}`}>
-                          <td><span className={client.active === true ? 'modern-badge-success' : client.active === false ? 'modern-badge' : 'modern-badge-warning'}>{client.active === true ? 'Online' : client.active === false ? 'Offline' : 'Unknown'}</span></td>
-                          <td className="font-semibold">{client.hostName || 'Unnamed client'}</td>
+                          <td><span className={client.active === true ? 'modern-badge-success' : client.active === false ? 'modern-badge' : 'modern-badge-warning'}>{client.active === true ? t('detail.status.online') : client.active === false ? t('detail.status.offline') : t('common.unknown')}</span></td>
+                          <td className="font-semibold">{client.hostName || t('detail.clients.unnamed')}</td>
                           <td className="font-mono text-xs">{client.ipAddress || '—'}</td>
                           <td className="font-mono text-xs">{client.macAddress || '—'}</td>
                           <td>{client.interfaceType || '—'}</td>
@@ -1433,8 +1438,8 @@ export default function DeviceDetailPage() {
             ) : (
               <div className="empty-state">
                 <div className="empty-state-icon"><Icon name="phone" size={22} /></div>
-                <h3 className="empty-state-title">No host inventory reported</h3>
-                <p className="empty-state-copy">Request an Inform or confirm that the ONT exposes its Hosts table through CWMP.</p>
+                <h3 className="empty-state-title">{t('detail.clients.emptyTitle')}</h3>
+                <p className="empty-state-copy">{t('detail.clients.emptyCopy')}</p>
               </div>
             )}
           </div>
@@ -1444,8 +1449,8 @@ export default function DeviceDetailPage() {
         {activeTab === 'wifi' && (
           <div className="modern-card p-5 sm:p-6">
             <div className="mb-5">
-              <h2 className="section-heading">WiFi configuration</h2>
-              <p className="section-description mt-1">Review every reported WLAN instance and queue typed GenieACS configuration tasks.</p>
+              <h2 className="section-heading">{t('detail.wifi.title')}</h2>
+              <p className="section-description mt-1">{t('detail.wifi.description')}</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {device.wifi && device.wifi.length > 0 ? (
@@ -1453,45 +1458,45 @@ export default function DeviceDetailPage() {
                   <div key={ssid.index} className="rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-4">
                     <div className="mb-4 flex items-start justify-between gap-3">
                       <div>
-                        <h3 className="font-semibold text-foreground">SSID {ssid.index}</h3>
+                        <h3 className="font-semibold text-foreground">{t('detail.wifi.ssidTitle', { index: ssid.index })}</h3>
                         <div className="mt-1 flex flex-wrap gap-2">
                           <span className={ssid.enable === false ? 'modern-badge-error' : ssid.enable === true ? 'modern-badge-success' : 'modern-badge'}>
-                            {ssid.enable === false ? 'Disabled' : ssid.enable === true ? 'Enabled' : 'Unknown state'}
+                            {ssid.enable === false ? t('common.disabled') : ssid.enable === true ? t('common.enabled') : t('detail.wifi.unknownState')}
                           </span>
-                          {ssid.usesVirtualParameters && <span className="modern-badge-info">Installer VP</span>}
+                          {ssid.usesVirtualParameters && <span className="modern-badge-info">{t('detail.wifi.installerVp')}</span>}
                         </div>
                       </div>
-                      <span className="font-mono text-xs text-muted-foreground">CH {ssid.channel ?? '—'}</span>
+                      <span className="font-mono text-xs text-muted-foreground">{t('detail.wifi.channelShort')} {ssid.channel ?? '—'}</span>
                     </div>
                     <dl className="space-y-3 text-sm">
                       <div className="flex justify-between gap-4">
-                        <dt className="text-muted-foreground">Network name</dt>
-                        <dd className="max-w-[65%] break-all text-right font-mono font-semibold">{ssid.ssid || 'Not reported'}</dd>
+                        <dt className="text-muted-foreground">{t('detail.wifi.networkName')}</dt>
+                        <dd className="max-w-[65%] break-all text-right font-mono font-semibold">{ssid.ssid || t('detail.wifi.notReported')}</dd>
                       </div>
                       <div className="flex justify-between gap-4">
-                        <dt className="text-muted-foreground">Password</dt>
-                        <dd className="font-mono">{ssid.password ? '••••••••' : 'Not reported'}</dd>
+                        <dt className="text-muted-foreground">{t('detail.wifi.password')}</dt>
+                        <dd className="font-mono">{ssid.password ? '••••••••' : t('detail.wifi.notReported')}</dd>
                       </div>
                       <div className="flex justify-between gap-4">
-                        <dt className="text-muted-foreground">Security</dt>
-                        <dd className="text-right">{ssid.security || 'Not reported'}</dd>
+                        <dt className="text-muted-foreground">{t('detail.wifi.security')}</dt>
+                        <dd className="text-right">{ssid.security || t('detail.wifi.notReported')}</dd>
                       </div>
                       <div className="flex justify-between gap-4">
-                        <dt className="text-muted-foreground">Associated clients</dt>
+                        <dt className="text-muted-foreground">{t('detail.wifi.associatedClients')}</dt>
                         <dd className="font-mono font-semibold">{ssid.totalAssociations ?? 0}</dd>
                       </div>
                     </dl>
                     {user?.role === 'admin' ? (
                       <button type="button" onClick={() => setEditingWifi(ssid)} className="modern-button-secondary mt-5 w-full">
-                        <Icon name="edit" size={17} /> Edit SSID {ssid.index}
+                        <Icon name="edit" size={17} /> {t('detail.wifi.edit', { index: ssid.index })}
                       </button>
                     ) : (
-                      <p className="mt-4 text-xs text-muted-foreground">Administrator access is required to change WiFi configuration.</p>
+                      <p className="mt-4 text-xs text-muted-foreground">{t('detail.wifi.adminRequired')}</p>
                     )}
                   </div>
                 ))
               ) : (
-                <p className="text-gray-500 dark:text-gray-400 md:col-span-2">No WiFi SSIDs reported.</p>
+                <p className="text-gray-500 dark:text-gray-400 md:col-span-2">{t('detail.wifi.empty')}</p>
               )}
             </div>
           </div>
@@ -1500,31 +1505,31 @@ export default function DeviceDetailPage() {
         {/* Tab Advanced */}
         {activeTab === 'advanced' && (
           <div className="modern-card p-6">
-            <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Advanced Configuration</h2>
+            <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">{t('detail.advanced.title')}</h2>
             <div className="space-y-6">
               <div>
-                <h3 className="text-md font-medium mb-3 text-gray-900 dark:text-gray-100">Change Credentials</h3>
+                <h3 className="text-md font-medium mb-3 text-gray-900 dark:text-gray-100">{t('detail.advanced.changeCredentials')}</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="border border-gray-200 dark:border-gray-700 rounded-md p-4">
-                    <h4 className="font-medium mb-2 text-gray-900 dark:text-gray-100">Superadmin (ISP)</h4>
-                    <p className="text-sm text-gray-500">User: {vp.superAdmin?.value || 'N/A'}</p>
-                    <p className="text-sm text-gray-500">Pass: {vp.superPassword?.value ? '******' : 'N/A'}</p>
+                    <h4 className="font-medium mb-2 text-gray-900 dark:text-gray-100">{t('detail.credentials.superadmin')}</h4>
+                    <p className="text-sm text-gray-500">{t('detail.advanced.user')}: {vp.superAdmin?.value || t('common.na')}</p>
+                    <p className="text-sm text-gray-500">{t('detail.advanced.pass')}: {vp.superPassword?.value ? '******' : t('common.na')}</p>
                     <button
                       onClick={() => handleOpenCredentialModal('super')}
                       className="modern-button mt-3"
                     >
-                      Update Superadmin
+                      {t('detail.advanced.updateSuperadmin')}
                     </button>
                   </div>
                   <div className="border border-gray-200 dark:border-gray-700 rounded-md p-4">
-                    <h4 className="font-medium mb-2 text-gray-900 dark:text-gray-100">Useradmin (Client)</h4>
-                    <p className="text-sm text-gray-500">User: {vp.userAdmin?.value || 'N/A'}</p>
-                    <p className="text-sm text-gray-500">Pass: {vp.userPassword?.value ? '******' : 'N/A'}</p>
+                    <h4 className="font-medium mb-2 text-gray-900 dark:text-gray-100">{t('detail.credentials.useradmin')}</h4>
+                    <p className="text-sm text-gray-500">{t('detail.advanced.user')}: {vp.userAdmin?.value || t('common.na')}</p>
+                    <p className="text-sm text-gray-500">{t('detail.advanced.pass')}: {vp.userPassword?.value ? '******' : t('common.na')}</p>
                     <button
                       onClick={() => handleOpenCredentialModal('user')}
                       className="modern-button mt-3"
                     >
-                      Update Useradmin
+                      {t('detail.advanced.updateUseradmin')}
                     </button>
                   </div>
                 </div>
@@ -1552,8 +1557,8 @@ export default function DeviceDetailPage() {
           onClose={handleCloseCredentialModal}
           credentialType={credentialType}
           username={
-            credentialType === 'super' ? (vp.superAdmin?.value || 'N/A') :
-            credentialType === 'user' ? (vp.userAdmin?.value || 'N/A') :
+            credentialType === 'super' ? (vp.superAdmin?.value || t('common.na')) :
+            credentialType === 'user' ? (vp.userAdmin?.value || t('common.na')) :
             ''
           }
           onSave={handleSaveCredentials}
