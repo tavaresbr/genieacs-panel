@@ -65,6 +65,8 @@ interface ProcessedDeviceDetail {
     customerId: string | null;
     installationDate: string | null;
     generated: boolean;
+    portalPasswordSet?: boolean;
+    portalPasswordUpdatedAt?: string | null;
   };
   _raw?: any;
 }
@@ -607,6 +609,8 @@ export default function DeviceDetailPage() {
   const [savingWifi, setSavingWifi] = useState(false)
   const [installationDate, setInstallationDate] = useState('')
   const [savingInstallationDate, setSavingInstallationDate] = useState(false)
+  const [portalPassword, setPortalPassword] = useState<string | null>(null)
+  const [portalPasswordBusy, setPortalPasswordBusy] = useState(false)
   const [wanContainer, setWanContainer] = useState('')
   const [newWanType, setNewWanType] = useState<'ppp' | 'ip'>('ppp')
   const [addingWan, setAddingWan] = useState(false)
@@ -763,6 +767,7 @@ export default function DeviceDetailPage() {
       setDevice((current) => current ? {
         ...current,
         customer: {
+          ...current.customer,
           customerId: result.customerId ?? current.customer?.customerId ?? null,
           installationDate: result.installationDate || installationDate,
           generated: Boolean(result.customerId ?? current.customer?.customerId)
@@ -773,6 +778,50 @@ export default function DeviceDetailPage() {
       toast.error(error instanceof Error ? error.message : 'Failed to save installation date')
     } finally {
       setSavingInstallationDate(false)
+    }
+  }
+
+  const handleRevealPortalPassword = async () => {
+    setPortalPasswordBusy(true)
+    try {
+      const res = await devicesAPI.getPortalPassword(deviceId)
+      if (!res.success || !res.data) {
+        toast.error(res.message || 'Failed to read the portal password')
+        return
+      }
+      setPortalPassword(res.data.password)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to read the portal password')
+    } finally {
+      setPortalPasswordBusy(false)
+    }
+  }
+
+  const handleResetPortalPassword = async () => {
+    if (!window.confirm('Generate a new portal password? The current one stops working immediately.')) {
+      return
+    }
+    setPortalPasswordBusy(true)
+    try {
+      const res = await devicesAPI.resetPortalPassword(deviceId)
+      if (!res.success || !res.data) {
+        toast.error(res.message || 'Failed to regenerate the portal password')
+        return
+      }
+      setPortalPassword(res.data.password)
+      setDevice((current) => current ? {
+        ...current,
+        customer: {
+          ...current.customer,
+          portalPasswordSet: true,
+          portalPasswordUpdatedAt: new Date().toISOString()
+        }
+      } : current)
+      toast.success('New portal password generated')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to regenerate the portal password')
+    } finally {
+      setPortalPasswordBusy(false)
     }
   }
 
@@ -1164,7 +1213,41 @@ export default function DeviceDetailPage() {
               </p>
               <p className="mt-1 text-xs leading-5 text-muted-foreground">
                 This ID is permanent after generation and remains bound to SoftwareID plus PPPoE username.
+                It identifies the customer only &mdash; the portal password below is a separate credential.
               </p>
+              {user?.role === 'admin' && device.customer?.customerId && (
+                <div className="mt-5 border-t border-border pt-4">
+                  <p className="field-label">Portal password</p>
+                  {portalPassword ? (
+                    <p className="break-all font-mono text-lg font-bold">{portalPassword}</p>
+                  ) : (
+                    <p className="font-mono text-lg font-bold tracking-widest">••••••••••</p>
+                  )}
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="modern-button-secondary"
+                      disabled={portalPasswordBusy || !device.customer?.portalPasswordSet}
+                      onClick={() => void handleRevealPortalPassword()}
+                    >
+                      {portalPasswordBusy ? 'Working…' : 'Reveal'}
+                    </button>
+                    <button
+                      type="button"
+                      className="modern-button"
+                      disabled={portalPasswordBusy}
+                      onClick={() => void handleResetPortalPassword()}
+                    >
+                      Generate new
+                    </button>
+                  </div>
+                  <p className="field-hint">
+                    {device.customer?.portalPasswordUpdatedAt
+                      ? `Last changed ${formatDate(device.customer.portalPasswordUpdatedAt)}.`
+                      : 'Generated automatically when the account was created.'}
+                  </p>
+                </div>
+              )}
               <div className="mt-5 border-t border-border pt-4">
                 <label htmlFor="installation-date" className="field-label">Installation date</label>
                 <div className="flex flex-col gap-2 sm:flex-row">

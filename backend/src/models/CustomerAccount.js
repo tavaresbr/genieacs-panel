@@ -41,6 +41,30 @@ class CustomerAccount {
     return this.getById(id);
   }
 
+  static async updatePassword(id, record) {
+    await getDb()('customer_accounts').where({ id }).update({
+      ...record,
+      updated_at: new Date()
+    });
+    return this.getById(id);
+  }
+
+  static async getWithoutPassword(limit = 25) {
+    return getDb()('customer_accounts')
+      .select('id')
+      .whereNull('password_hash')
+      .orderBy('id', 'asc')
+      .limit(limit);
+  }
+
+  static async countWithoutPassword() {
+    const row = await getDb()('customer_accounts')
+      .whereNull('password_hash')
+      .count({ n: '*' })
+      .first();
+    return Number(row?.n || 0);
+  }
+
   static async getIdsByDeviceIds(deviceIds) {
     if (!Array.isArray(deviceIds) || deviceIds.length === 0) return [];
     return getDb()('customer_accounts')

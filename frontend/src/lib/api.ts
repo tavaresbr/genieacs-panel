@@ -193,6 +193,12 @@ export const authAPI = {
     apiClient.post('/auth/change-username', { currentUsername, newUsername }),
 }
 
+export interface PortalPasswordResponse {
+  customerId: string
+  password: string
+  updatedAt?: string | null
+}
+
 // Devices API
 export const devicesAPI = {
   getDevices: () =>
@@ -235,7 +241,17 @@ export const devicesAPI = {
 
   updateCredentials: (deviceId: string, type: 'super' | 'user', password: string) => {
     return apiClient.post(`/devices/${encodeURIComponent(deviceId)}/update-credentials`, { type, password });
-  }
+  },
+
+  getPortalPassword: (deviceId: string) =>
+    apiClient.get<PortalPasswordResponse>(
+      `/devices/${encodeURIComponent(deviceId)}/portal-password`
+    ),
+
+  resetPortalPassword: (deviceId: string) =>
+    apiClient.post<PortalPasswordResponse>(
+      `/devices/${encodeURIComponent(deviceId)}/portal-password/reset`
+    )
 }
 
 // Settings API

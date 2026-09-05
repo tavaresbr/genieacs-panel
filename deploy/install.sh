@@ -260,6 +260,12 @@ APP_PORT=${APP_PORT}
 PORTAL_PORT=${PORTAL_PORT}
 APP_HOST=127.0.0.1
 APP_ENV=production
+# Both listeners bind to loopback, so the only way in is a reverse proxy or
+# Cloudflare Tunnel on this host. Trusting that single hop is what gives every
+# customer their own rate-limit bucket and marks portal cookies Secure.
+# 'skygenpanel expose' turns this off, because a directly reachable listener
+# must not believe a client-supplied X-Forwarded-For.
+TRUST_PROXY=1
 JWT_SECRET=${JWT_SECRET}
 PORTAL_JWT_SECRET=${PORTAL_JWT_SECRET}
 JWT_EXPIRES_IN=1h
@@ -276,6 +282,15 @@ else
   if ! grep -qE '^PORTAL_JWT_SECRET=' "$ENV_FILE"; then
     PORTAL_JWT_SECRET="$(node -e 'console.log(require("crypto").randomBytes(48).toString("hex"))')"
     printf 'PORTAL_JWT_SECRET=%s\n' "$PORTAL_JWT_SECRET" >> "$ENV_FILE"
+  fi
+  if ! grep -qE '^TRUST_PROXY=' "$ENV_FILE"; then
+    # Only assume a proxy when the panel is still loopback-only; an exposed
+    # listener would let clients forge their own source address.
+    if grep -qE '^APP_HOST=127\.0\.0\.1$' "$ENV_FILE"; then
+      printf 'TRUST_PROXY=1\n' >> "$ENV_FILE"
+    else
+      printf 'TRUST_PROXY=0\n' >> "$ENV_FILE"
+    fi
   fi
 fi
 
