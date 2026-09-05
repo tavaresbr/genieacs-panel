@@ -1,3 +1,5 @@
+import { getActiveLocale, translate } from '@/lib/i18n'
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || ''
 
 export interface ApiResponse<T = any> {
@@ -62,8 +64,8 @@ class ApiClient {
       if (!response.ok) {
         return {
           success: false,
-          message: data.message || 'Request failed',
-          error: data.error || 'Unknown error',
+          message: data.message || translate(getActiveLocale(), 'api.requestFailed'),
+          error: data.error || translate(getActiveLocale(), 'api.unknownError'),
           code: data.code,
         }
       }
@@ -72,8 +74,8 @@ class ApiClient {
     } catch (error) {
       return {
         success: false,
-        message: 'Network error occurred',
-        error: error instanceof Error ? error.message : 'Unknown error',
+        message: translate(getActiveLocale(), 'api.networkError'),
+        error: error instanceof Error ? error.message : translate(getActiveLocale(), 'api.unknownError'),
       }
     }
   }

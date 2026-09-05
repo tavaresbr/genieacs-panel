@@ -5,6 +5,8 @@ import { Link } from 'react-router'
 import { devicesAPI } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
 import { useAuth } from '@/contexts/auth-context'
+import { useTranslation } from '@/contexts/language-context'
+import type { TranslationKey } from '@/lib/i18n'
 import { useToast } from '@/components/ui/toast'
 import { PieChart } from '@/components/charts/pie-chart'
 import { BarChart } from '@/components/charts/bar-chart'
@@ -56,6 +58,26 @@ const PALETTES = {
 
 const DASHBOARD_SESSION_KEY = 'skygenpanel.dashboard.snapshot.v1'
 
+/** GenieACS reports these bucket names in English; the panel shows them translated. */
+const BUCKET_LABEL_KEYS: Record<string, TranslationKey> = {
+  Excellent: 'dashboard.bucket.excellent',
+  Good: 'dashboard.bucket.good',
+  Poor: 'dashboard.bucket.poor',
+  Danger: 'dashboard.bucket.danger',
+  Unknown: 'dashboard.bucket.unknown',
+  'Under 10m': 'dashboard.bucket.under10m',
+  '10–60m': 'dashboard.bucket.from10to60m',
+  '1–24h': 'dashboard.bucket.from1to24h',
+  'Over 24h': 'dashboard.bucket.over24h',
+  Normal: 'dashboard.bucket.normal',
+  Warm: 'dashboard.bucket.warm',
+  Hot: 'dashboard.bucket.hot',
+  '0': 'dashboard.bucket.clients0',
+  '1–5': 'dashboard.bucket.clients1to5',
+  '6–15': 'dashboard.bucket.clients6to15',
+  '16+': 'dashboard.bucket.clients16plus',
+}
+
 function readDashboardSession(): DashboardData | null {
   try {
     const raw = sessionStorage.getItem(DASHBOARD_SESSION_KEY)
@@ -75,17 +97,18 @@ function writeDashboardSession(data: DashboardData) {
   }
 }
 
-function pieData(distribution: Record<string, number>, palette: Record<string, string>) {
+function pieData(
+  distribution: Record<string, number>,
+  palette: Record<string, string>,
+  translateBucket: (name: string) => string,
+) {
   return Object.entries(distribution)
-    .map(([name, value]) => ({ name, value: Number(value) || 0, color: palette[name] || '#64748b' }))
+    .map(([name, value]) => ({
+      name: translateBucket(name),
+      value: Number(value) || 0,
+      color: palette[name] || '#64748b',
+    }))
     .filter((entry) => entry.value > 0)
-}
-
-function formatFaultTime(timestamp: string | null) {
-  if (!timestamp) return 'Unknown time'
-  const date = new Date(timestamp)
-  if (Number.isNaN(date.getTime())) return timestamp
-  return date.toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })
 }
 
 export default function DashboardPage() {
@@ -99,6 +122,7 @@ export default function DashboardPage() {
   const [clearingFault, setClearingFault] = useState<string | null>(null)
   const faultsLoadedRef = useRef(false)
   const { user } = useAuth()
+  const { t, formatDateTime, formatTime } = useTranslation()
   const toast = useToast()
   const isAdmin = user?.role === 'admin'
 
@@ -108,7 +132,7 @@ export default function DashboardPage() {
     try {
       const response = await devicesAPI.getDashboard(force)
       if (!response.success || !response.data) {
-        throw new Error(response.message || 'Dashboard data is unavailable')
+        throw new Error(response.message || t('dashboard.error.dashboardUnavailable'))
       }
       const incoming = response.data as DashboardData
       setData((current) => {
@@ -121,19 +145,19 @@ export default function DashboardPage() {
       const generatedAt = incoming.generatedAt ? new Date(incoming.generatedAt) : new Date()
       setLastUpdated(Number.isNaN(generatedAt.getTime()) ? new Date() : generatedAt)
     } catch (error) {
-      setLoadError(error instanceof Error ? error.message : 'Panel could not reach GenieACS')
+      setLoadError(error instanceof Error ? error.message : t('dashboard.error.unreachable'))
     } finally {
       setInitialLoading(false)
       setRefreshing(false)
     }
-  }, [])
+  }, [t])
 
   const loadFaults = useCallback(async () => {
     setFaultsLoading(true)
     try {
       const response = await devicesAPI.getFaults(50)
       if (!response.success || !Array.isArray(response.data)) {
-        throw new Error(response.message || 'Fault list is unavailable')
+        throw new Error(response.message || t('dashboard.error.faultsUnavailable'))
       }
       faultsLoadedRef.current = true
       setData((current) => {
@@ -143,11 +167,11 @@ export default function DashboardPage() {
       })
     } catch {
       faultsLoadedRef.current = true
-      setData((current) => ({ ...current, faultsError: 'Fault list could not be loaded from GenieACS.' }))
+      setData((current) => ({ ...current, faultsError: t('dashboard.error.faultsLoad') }))
     } finally {
       setFaultsLoading(false)
     }
-  }, [])
+  }, [t])
 
   useEffect(() => {
     if (cachedDashboard?.generatedAt) {
@@ -158,10 +182,19 @@ export default function DashboardPage() {
     void loadFaults()
   }, [cachedDashboard, loadDashboard, loadFaults])
 
-  const rxData = useMemo(() => pieData(data.rxDistribution, PALETTES.rx), [data.rxDistribution])
-  const freshnessData = useMemo(() => pieData(data.informFreshness, PALETTES.freshness), [data.informFreshness])
-  const temperatureData = useMemo(() => pieData(data.temperatureDistribution, PALETTES.temperature), [data.temperatureDistribution])
-  const clientData = useMemo(() => pieData(data.clientDistribution, PALETTES.clients), [data.clientDistribution])
+  const translateBucket = useCallback(
+    (name: string) => (BUCKET_LABEL_KEYS[name] ? t(BUCKET_LABEL_KEYS[name]) : name),
+    [t],
+  )
+  const formatFaultTime = useCallback(
+    (timestamp: string | null) => (timestamp ? formatDateTime(timestamp) : t('dashboard.faults.unknownTime')),
+    [formatDateTime, t],
+  )
+
+  const rxData = useMemo(() => pieData(data.rxDistribution, PALETTES.rx, translateBucket), [data.rxDistribution, translateBucket])
+  const freshnessData = useMemo(() => pieData(data.informFreshness, PALETTES.freshness, translateBucket), [data.informFreshness, translateBucket])
+  const temperatureData = useMemo(() => pieData(data.temperatureDistribution, PALETTES.temperature, translateBucket), [data.temperatureDistribution, translateBucket])
+  const clientData = useMemo(() => pieData(data.clientDistribution, PALETTES.clients, translateBucket), [data.clientDistribution, translateBucket])
   const productData = useMemo(() => [...data.productClasses].reverse(), [data.productClasses])
   const manufacturerData = useMemo(() => [...data.manufacturers].reverse(), [data.manufacturers])
 
@@ -169,15 +202,19 @@ export default function DashboardPage() {
   const signalRisk = (data.rxDistribution.Poor || 0) + (data.rxDistribution.Danger || 0)
 
   const clearFault = async (fault: Fault) => {
-    if (!window.confirm(`Clear fault ${fault.code} for ${fault.deviceId || 'unknown device'}?`)) return
+    const confirmMessage = t('dashboard.faults.confirmClear', {
+      code: fault.code,
+      device: fault.deviceId || t('dashboard.faults.unknownDevice'),
+    })
+    if (!window.confirm(confirmMessage)) return
     try {
       setClearingFault(fault.id)
       const response = await devicesAPI.clearFault(fault.id)
-      if (!response.success) throw new Error(response.message || 'Fault could not be cleared')
+      if (!response.success) throw new Error(response.message || t('dashboard.faults.clearFailed'))
       setData((current) => ({ ...current, faults: current.faults.filter((entry) => entry.id !== fault.id) }))
-      toast.success('Fault cleared from GenieACS')
+      toast.success(t('dashboard.faults.cleared'))
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Fault could not be cleared')
+      toast.error(error instanceof Error ? error.message : t('dashboard.faults.clearFailed'))
     } finally {
       setClearingFault(null)
     }
@@ -186,7 +223,7 @@ export default function DashboardPage() {
   if (initialLoading) {
     return (
       <div className="page-shell"><div className="page-frame">
-        <header className="page-header"><div><p className="page-kicker">Fleet operations</p><h1 className="page-title">Network condition</h1><p className="page-description">Loading compact operational summary from GenieACS…</p></div></header>
+        <header className="page-header"><div><p className="page-kicker">{t('dashboard.kicker')}</p><h1 className="page-title">{t('dashboard.title')}</h1><p className="page-description">{t('dashboard.loadingDescription')}</p></div></header>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" role="status">
           {[0, 1, 2, 3].map((item) => <div key={item} className="modern-card h-28 animate-pulse bg-muted" />)}
         </div>
@@ -199,14 +236,14 @@ export default function DashboardPage() {
       <div className="page-frame">
         <header className="page-header">
           <div>
-            <p className="page-kicker">Fleet operations</p>
-            <h1 className="page-title">Network condition</h1>
-            <p className="page-description">Ringkasan fleet, optical health, client load, dan fault untuk {user?.username || 'operator'}.</p>
+            <p className="page-kicker">{t('dashboard.kicker')}</p>
+            <h1 className="page-title">{t('dashboard.title')}</h1>
+            <p className="page-description">{t('dashboard.description', { user: user?.username || t('dashboard.operatorFallback') })}</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <span className="text-xs text-muted-foreground">{lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}` : 'No update yet'}</span>
+            <span className="text-xs text-muted-foreground">{lastUpdated ? t('dashboard.updatedAt', { time: formatTime(lastUpdated) }) : t('dashboard.noUpdate')}</span>
             <button type="button" className="modern-button-secondary" disabled={refreshing} onClick={() => void loadDashboard(true)}>
-              <Icon name="refresh" size={17} className={refreshing ? 'animate-spin' : ''} />{refreshing ? 'Refreshing…' : 'Refresh'}
+              <Icon name="refresh" size={17} className={refreshing ? 'animate-spin' : ''} />{refreshing ? t('dashboard.refreshing') : t('common.refresh')}
             </button>
           </div>
         </header>
@@ -214,19 +251,19 @@ export default function DashboardPage() {
         {loadError && (
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-md border border-[hsl(var(--status-danger))]/40 bg-[hsl(var(--status-danger))]/10 p-4" role="alert">
             <div className="flex items-center gap-3"><Icon name="warning" className="text-[hsl(var(--status-danger))]" /><span className="text-sm font-semibold">{loadError}</span></div>
-            <button className="modern-button-secondary" onClick={() => void loadDashboard(true)}>Retry</button>
+            <button className="modern-button-secondary" onClick={() => void loadDashboard(true)}>{t('common.retry')}</button>
           </div>
         )}
 
         <section className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {[
-            ['Total devices', data.stats.total, 'server', 'text-foreground'],
-            ['Online now', data.stats.online, 'check', 'text-[hsl(var(--status-success))]'],
-            ['Needs contact', data.stats.offline, 'warning', 'text-[hsl(var(--status-danger))]'],
-            ['New in 24h', data.stats.new24h, 'bell', 'text-primary'],
-          ].map(([label, value, icon, color]) => (
-            <div key={String(label)} className="modern-card p-5">
-              <div className="flex items-start justify-between"><p className="metric-label">{label}</p><Icon name={String(icon)} size={19} className="text-muted-foreground" /></div>
+          {([
+            ['dashboard.stat.total', data.stats.total, 'server', 'text-foreground'],
+            ['dashboard.stat.online', data.stats.online, 'check', 'text-[hsl(var(--status-success))]'],
+            ['dashboard.stat.offline', data.stats.offline, 'warning', 'text-[hsl(var(--status-danger))]'],
+            ['dashboard.stat.new24h', data.stats.new24h, 'bell', 'text-primary'],
+          ] as const).map(([labelKey, value, icon, color]) => (
+            <div key={labelKey} className="modern-card p-5">
+              <div className="flex items-start justify-between"><p className="metric-label">{t(labelKey)}</p><Icon name={icon} size={19} className="text-muted-foreground" /></div>
               <p className={`metric-value mt-4 ${color}`}>{value}</p>
             </div>
           ))}
@@ -236,65 +273,65 @@ export default function DashboardPage() {
           <div className="modern-card overflow-hidden">
             <div className="grid min-h-56 sm:grid-cols-[1fr_1.3fr]">
               <div className="flex flex-col justify-between bg-[#173f35] p-6 text-[#f4f3ed] sm:p-7">
-                <div><p className="text-[0.68rem] font-bold uppercase tracking-[0.14em] text-[#b7c7be]">Online availability</p><p className="mt-3 font-mono text-5xl font-semibold tracking-[-0.05em]">{availability}%</p></div>
-                <p className="mt-8 text-sm leading-6 text-[#c8d4ce]">{data.stats.online} dari {data.stats.total} perangkat melapor dalam 10 menit terakhir.</p>
+                <div><p className="text-[0.68rem] font-bold uppercase tracking-[0.14em] text-[#b7c7be]">{t('dashboard.availability.label')}</p><p className="mt-3 font-mono text-5xl font-semibold tracking-[-0.05em]">{availability}%</p></div>
+                <p className="mt-8 text-sm leading-6 text-[#c8d4ce]">{t('dashboard.availability.description', { online: data.stats.online, total: data.stats.total })}</p>
               </div>
               <div className="grid grid-cols-2">
-                <div className="border-b border-r border-border p-5"><p className="metric-label">Optical risk</p><p className="metric-value text-[hsl(var(--status-warning))]">{signalRisk}</p></div>
-                <div className="border-b border-border p-5"><p className="metric-label">Active faults</p><p className="metric-value text-[hsl(var(--status-danger))]">{data.faults.length}</p></div>
-                <div className="border-r border-border p-5"><p className="metric-label">Hot devices</p><p className="metric-value">{data.temperatureDistribution.Hot || 0}</p></div>
-                <div className="p-5"><p className="metric-label">16+ clients</p><p className="metric-value">{data.clientDistribution['16+'] || 0}</p></div>
+                <div className="border-b border-r border-border p-5"><p className="metric-label">{t('dashboard.metric.opticalRisk')}</p><p className="metric-value text-[hsl(var(--status-warning))]">{signalRisk}</p></div>
+                <div className="border-b border-border p-5"><p className="metric-label">{t('dashboard.metric.activeFaults')}</p><p className="metric-value text-[hsl(var(--status-danger))]">{data.faults.length}</p></div>
+                <div className="border-r border-border p-5"><p className="metric-label">{t('dashboard.metric.hotDevices')}</p><p className="metric-value">{data.temperatureDistribution.Hot || 0}</p></div>
+                <div className="p-5"><p className="metric-label">{t('dashboard.metric.manyClients')}</p><p className="metric-value">{data.clientDistribution['16+'] || 0}</p></div>
               </div>
             </div>
           </div>
           <div className="modern-card p-5">
-            <div className="flex items-start justify-between"><div><h2 className="section-heading">Operator queue</h2><p className="section-description">Prioritas gangguan pelanggan.</p></div><Icon name="bell" /></div>
+            <div className="flex items-start justify-between"><div><h2 className="section-heading">{t('dashboard.queue.title')}</h2><p className="section-description">{t('dashboard.queue.description')}</p></div><Icon name="bell" /></div>
             <div className="mt-5 divide-y divide-border">
-              <Link to="/devices" className="flex min-h-16 items-center justify-between py-3 hover:text-primary"><span><strong className="block text-sm">Offline devices</strong><small className="text-muted-foreground">Review last Inform</small></span><span className="data-value text-[hsl(var(--status-danger))]">{data.stats.offline}</span></Link>
-              <div className="flex min-h-16 items-center justify-between py-3"><span><strong className="block text-sm">GenieACS faults</strong><small className="text-muted-foreground">Provisioning failures</small></span><span className="data-value text-[hsl(var(--status-danger))]">{data.faults.length}</span></div>
-              <Link to="/devices" className="flex min-h-16 items-center justify-between py-3 hover:text-primary"><span><strong className="block text-sm">Weak optical signal</strong><small className="text-muted-foreground">Poor or danger RX</small></span><span className="data-value text-[hsl(var(--status-warning))]">{signalRisk}</span></Link>
+              <Link to="/devices" className="flex min-h-16 items-center justify-between py-3 hover:text-primary"><span><strong className="block text-sm">{t('dashboard.queue.offline')}</strong><small className="text-muted-foreground">{t('dashboard.queue.offlineHint')}</small></span><span className="data-value text-[hsl(var(--status-danger))]">{data.stats.offline}</span></Link>
+              <div className="flex min-h-16 items-center justify-between py-3"><span><strong className="block text-sm">{t('dashboard.queue.faults')}</strong><small className="text-muted-foreground">{t('dashboard.queue.faultsHint')}</small></span><span className="data-value text-[hsl(var(--status-danger))]">{data.faults.length}</span></div>
+              <Link to="/devices" className="flex min-h-16 items-center justify-between py-3 hover:text-primary"><span><strong className="block text-sm">{t('dashboard.queue.weakSignal')}</strong><small className="text-muted-foreground">{t('dashboard.queue.weakSignalHint')}</small></span><span className="data-value text-[hsl(var(--status-warning))]">{signalRisk}</span></Link>
             </div>
           </div>
         </section>
 
         <section className="mb-5 grid gap-4 xl:grid-cols-2">
-          <div className="modern-card p-5"><h2 className="section-heading">Optical signal distribution</h2><p className="section-description mb-3">RX power health across the fleet.</p>{rxData.length ? <PieChart data={rxData} /> : <p className="empty-state-copy py-16 text-center">No RX power data.</p>}</div>
-          <div className="modern-card p-5"><h2 className="section-heading">Inform freshness</h2><p className="section-description mb-3">How recently devices contacted GenieACS.</p>{freshnessData.length ? <PieChart data={freshnessData} /> : <p className="empty-state-copy py-16 text-center">No Inform data.</p>}</div>
-          <div className="modern-card p-5"><h2 className="section-heading">Temperature health</h2><p className="section-description mb-3">Reported ONT temperature buckets.</p>{temperatureData.length ? <PieChart data={temperatureData} /> : <p className="empty-state-copy py-16 text-center">No temperature data.</p>}</div>
-          <div className="modern-card p-5"><h2 className="section-heading">Connected client load</h2><p className="section-description mb-3">Active subscriber devices per ONT.</p>{clientData.length ? <PieChart data={clientData} /> : <p className="empty-state-copy py-16 text-center">No client count data.</p>}</div>
+          <div className="modern-card p-5"><h2 className="section-heading">{t('dashboard.chart.rx.title')}</h2><p className="section-description mb-3">{t('dashboard.chart.rx.description')}</p>{rxData.length ? <PieChart data={rxData} /> : <p className="empty-state-copy py-16 text-center">{t('dashboard.chart.rx.empty')}</p>}</div>
+          <div className="modern-card p-5"><h2 className="section-heading">{t('dashboard.chart.freshness.title')}</h2><p className="section-description mb-3">{t('dashboard.chart.freshness.description')}</p>{freshnessData.length ? <PieChart data={freshnessData} /> : <p className="empty-state-copy py-16 text-center">{t('dashboard.chart.freshness.empty')}</p>}</div>
+          <div className="modern-card p-5"><h2 className="section-heading">{t('dashboard.chart.temperature.title')}</h2><p className="section-description mb-3">{t('dashboard.chart.temperature.description')}</p>{temperatureData.length ? <PieChart data={temperatureData} /> : <p className="empty-state-copy py-16 text-center">{t('dashboard.chart.temperature.empty')}</p>}</div>
+          <div className="modern-card p-5"><h2 className="section-heading">{t('dashboard.chart.clients.title')}</h2><p className="section-description mb-3">{t('dashboard.chart.clients.description')}</p>{clientData.length ? <PieChart data={clientData} /> : <p className="empty-state-copy py-16 text-center">{t('dashboard.chart.clients.empty')}</p>}</div>
         </section>
 
         <section className="mb-5 grid gap-4 xl:grid-cols-3">
-          <div className="modern-card p-5 xl:col-span-2"><h2 className="section-heading">7-day registrations</h2><p className="section-description mb-3">New CPE registrations reported per day.</p><TrendChart data={data.registrations} valueLabel="Registrations" /></div>
-          <div className="modern-card p-5"><h2 className="section-heading">Manufacturers</h2><p className="section-description mb-3">Largest vendor groups.</p>{manufacturerData.length ? <BarChart data={manufacturerData} /> : <p className="empty-state-copy py-16 text-center">No manufacturer data.</p>}</div>
-          <div className="modern-card p-5 xl:col-span-3"><h2 className="section-heading">Product classes</h2><p className="section-description mb-3">Largest device model families.</p>{productData.length ? <BarChart data={productData} /> : <p className="empty-state-copy py-16 text-center">No product class data.</p>}</div>
+          <div className="modern-card p-5 xl:col-span-2"><h2 className="section-heading">{t('dashboard.chart.registrations.title')}</h2><p className="section-description mb-3">{t('dashboard.chart.registrations.description')}</p><TrendChart data={data.registrations} valueLabel={t('dashboard.chart.registrations.valueLabel')} /></div>
+          <div className="modern-card p-5"><h2 className="section-heading">{t('dashboard.chart.manufacturers.title')}</h2><p className="section-description mb-3">{t('dashboard.chart.manufacturers.description')}</p>{manufacturerData.length ? <BarChart data={manufacturerData} /> : <p className="empty-state-copy py-16 text-center">{t('dashboard.chart.manufacturers.empty')}</p>}</div>
+          <div className="modern-card p-5 xl:col-span-3"><h2 className="section-heading">{t('dashboard.chart.products.title')}</h2><p className="section-description mb-3">{t('dashboard.chart.products.description')}</p>{productData.length ? <BarChart data={productData} /> : <p className="empty-state-copy py-16 text-center">{t('dashboard.chart.products.empty')}</p>}</div>
         </section>
 
         <section className="modern-card overflow-hidden">
           <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-5 py-4">
-            <div><h2 className="section-heading">GenieACS fault list</h2><p className="section-description">Active provisioning and connection faults from the NBI.</p></div>
+            <div><h2 className="section-heading">{t('dashboard.faults.title')}</h2><p className="section-description">{t('dashboard.faults.description')}</p></div>
             <div className="flex items-center gap-2">
-              <span className={data.faults.length ? 'modern-badge-error' : 'modern-badge-success'}>{faultsLoading ? 'Refreshing…' : `${data.faults.length} active`}</span>
+              <span className={data.faults.length ? 'modern-badge-error' : 'modern-badge-success'}>{faultsLoading ? t('dashboard.refreshing') : t('dashboard.faults.activeCount', { count: data.faults.length })}</span>
               <button type="button" className="modern-button-secondary min-h-9 px-3 py-1.5" disabled={faultsLoading} onClick={() => void loadFaults()}>
-                <Icon name="refresh" size={16} className={faultsLoading ? 'animate-spin' : ''} /> Refresh
+                <Icon name="refresh" size={16} className={faultsLoading ? 'animate-spin' : ''} /> {t('common.refresh')}
               </button>
             </div>
           </div>
           {data.faultsError && <div className="border-b border-border bg-[hsl(var(--status-warning))]/10 px-5 py-3 text-sm">{data.faultsError}</div>}
           <div className="overflow-x-auto">
             <table className="modern-table">
-              <thead><tr><th>Time</th><th>Device</th><th>Channel / code</th><th>Message</th>{isAdmin && <th>Action</th>}</tr></thead>
+              <thead><tr><th>{t('dashboard.faults.time')}</th><th>{t('dashboard.faults.device')}</th><th>{t('dashboard.faults.channelCode')}</th><th>{t('dashboard.faults.message')}</th>{isAdmin && <th>{t('dashboard.faults.action')}</th>}</tr></thead>
               <tbody>
                 {data.faults.slice(0, 25).map((fault) => (
                   <tr key={fault.id}>
                     <td className="whitespace-nowrap text-xs">{formatFaultTime(fault.timestamp)}</td>
                     <td className="max-w-60 break-all font-mono text-xs">{fault.deviceId || '—'}</td>
-                    <td><span className="modern-badge-error">{fault.code}</span><small className="mt-1 block text-muted-foreground">{fault.channel}{fault.retries ? ` · retry ${fault.retries}` : ''}</small></td>
+                    <td><span className="modern-badge-error">{fault.code}</span><small className="mt-1 block text-muted-foreground">{fault.channel}{fault.retries ? ` · ${t('dashboard.faults.retry', { count: fault.retries })}` : ''}</small></td>
                     <td className="min-w-72 max-w-xl text-sm">{fault.message}</td>
-                    {isAdmin && <td><button type="button" className="modern-button-secondary" disabled={clearingFault === fault.id} onClick={() => void clearFault(fault)}>{clearingFault === fault.id ? 'Clearing…' : 'Clear fault'}</button></td>}
+                    {isAdmin && <td><button type="button" className="modern-button-secondary" disabled={clearingFault === fault.id} onClick={() => void clearFault(fault)}>{clearingFault === fault.id ? t('dashboard.faults.clearing') : t('dashboard.faults.clear')}</button></td>}
                   </tr>
                 ))}
-                {!data.faults.length && <tr><td colSpan={isAdmin ? 5 : 4} className="py-12 text-center text-muted-foreground">No active GenieACS faults.</td></tr>}
+                {!data.faults.length && <tr><td colSpan={isAdmin ? 5 : 4} className="py-12 text-center text-muted-foreground">{t('dashboard.faults.empty')}</td></tr>}
               </tbody>
             </table>
           </div>

@@ -5,6 +5,9 @@ import { apiClient, vendorsAPI, settingsAPI, authAPI, databaseAPI, type DbConfig
 import { useToast } from '@/components/ui/toast'
 import { useLoading } from '@/components/ui/loading'
 import { Icon } from '@/components/ui/icon'
+import { LanguageSwitcher } from '@/components/language-switcher'
+import { useTranslation } from '@/contexts/language-context'
+import type { TranslationKey } from '@/lib/i18n'
 import type { Vendor as VendorType, WifiSecurityConfig as WifiSecurityConfigType } from '@/types'
 
 const INSTALLER_VIRTUAL_PARAMETERS = {
@@ -19,19 +22,26 @@ const INSTALLER_VIRTUAL_PARAMETERS = {
   vpUserPassword: ''
 }
 
-const VIRTUAL_PARAMETER_FIELDS = [
-  { key: 'vpPppoeUsername', label: 'PPPoE username', description: 'PPPUsername' },
-  { key: 'vpWanBridge', label: 'WAN bridge status', description: 'WANBridge' },
-  { key: 'vpRxPower', label: 'Optical RX power', description: 'OpticalRXPower' },
-  { key: 'vpTemperature', label: 'Optical temperature', description: 'OpticalTemperature' },
-  { key: 'vpActiveDevices', label: 'Connected stations', description: 'TotalStations' },
-  { key: 'vpSuperAdmin', label: 'Super-admin username', description: 'LoginSuperUser' },
-  { key: 'vpSuperPassword', label: 'Super-admin password', description: 'LoginSuperPass' },
-  { key: 'vpUserAdmin', label: 'Operator username', description: 'Optional; not supplied by genieacs-installer' },
-  { key: 'vpUserPassword', label: 'Operator password', description: 'Optional; not supplied by genieacs-installer' }
-] as const
+/** `hintKey` is set for the fields the installer does not provide; the others show the raw parameter name. */
+const VIRTUAL_PARAMETER_FIELDS: {
+  key: keyof typeof INSTALLER_VIRTUAL_PARAMETERS
+  labelKey: TranslationKey
+  parameterName?: string
+  hintKey?: TranslationKey
+}[] = [
+  { key: 'vpPppoeUsername', labelKey: 'settings.vp.pppoeUsername', parameterName: 'PPPUsername' },
+  { key: 'vpWanBridge', labelKey: 'settings.vp.wanBridge', parameterName: 'WANBridge' },
+  { key: 'vpRxPower', labelKey: 'settings.vp.rxPower', parameterName: 'OpticalRXPower' },
+  { key: 'vpTemperature', labelKey: 'settings.vp.temperature', parameterName: 'OpticalTemperature' },
+  { key: 'vpActiveDevices', labelKey: 'settings.vp.activeDevices', parameterName: 'TotalStations' },
+  { key: 'vpSuperAdmin', labelKey: 'settings.vp.superAdmin', parameterName: 'LoginSuperUser' },
+  { key: 'vpSuperPassword', labelKey: 'settings.vp.superPassword', parameterName: 'LoginSuperPass' },
+  { key: 'vpUserAdmin', labelKey: 'settings.vp.userAdmin', hintKey: 'settings.vp.optionalHint' },
+  { key: 'vpUserPassword', labelKey: 'settings.vp.userPassword', hintKey: 'settings.vp.optionalHint' }
+]
 
 export default function Settings() {
+  const { t } = useTranslation()
   const [settings, setSettings] = useState({
     appName: 'SkyGenPanel',
     genieAcsUrl: 'http://127.0.0.1:7557',
@@ -79,26 +89,29 @@ export default function Settings() {
     setDbTesting(true)
     try {
       const res = await databaseAPI.test(dbForm)
-      const message = res.message || (res.success ? 'Connection successful' : 'Connection failed')
+      const message = res.message || (res.success ? t('settings.db.testSuccess') : t('settings.db.testFailed'))
       toast[res.success ? 'success' : 'error'](message)
     } catch (e: any) {
-      toast.error(e?.message || 'Test failed')
+      toast.error(e?.message || t('settings.db.testFailed'))
     } finally {
       setDbTesting(false)
     }
   }
 
   const handleDbSwitch = async () => {
-    const label = dbForm.client === 'sqlite3' ? 'SQLite (local file)' : `MySQL ${dbForm.database}@${dbForm.host}`
-    if (!confirm(`Switch database to ${label}?\n\n${dbForm.migrateData ? 'Existing data WILL be copied to the new database.' : 'The target database will be used without copying existing data.'}\n\nThe change takes effect immediately.`)) return
+    const label = dbForm.client === 'sqlite3'
+      ? t('settings.db.sqlite')
+      : t('settings.db.mysql', { database: String(dbForm.database), host: String(dbForm.host) })
+    const dataNotice = dbForm.migrateData ? t('settings.db.confirmCopy') : t('settings.db.confirmNoCopy')
+    if (!confirm(t('settings.db.confirmSwitch', { label, dataNotice }))) return
     setDbSwitching(true)
     try {
       const res = await databaseAPI.switch(dbForm)
-      const message = res.message || (res.success ? 'Database switched' : 'Switch failed')
+      const message = res.message || (res.success ? t('settings.db.switched') : t('settings.db.switchFailed'))
       toast[res.success ? 'success' : 'error'](message)
       if (res.success && res.data) setActiveDb(res.data as any)
     } catch (e: any) {
-      toast.error(e?.message || 'Switch failed')
+      toast.error(e?.message || t('settings.db.switchFailed'))
     } finally {
       setDbSwitching(false)
     }
@@ -106,22 +119,22 @@ export default function Settings() {
 
   const handleTestConnection = async () => {
     setLoading(true)
-    loadingCtl.show('Testing GenieACS connection...')
+    loadingCtl.show(t('settings.general.testingProgress'))
     try {
       const res = await settingsAPI.testGenieAcs(settings.genieAcsUrl)
       if (res.success) {
         setTestResult({
           success: true,
-          message: res.message || 'Connection successful!',
+          message: res.message || t('settings.general.connectionOk'),
           deviceCount: (res.data as any)?.deviceCount
         })
-        toast.success('GenieACS connection OK')
+        toast.success(t('settings.general.connectionToastOk'))
       } else {
         setTestResult({
           success: false,
-          message: res.message || 'Connection failed'
+          message: res.message || t('settings.general.connectionFailed')
         })
-        toast.error(res.message || 'Connection failed')
+        toast.error(res.message || t('settings.general.connectionFailed'))
       }
     } finally {
       setLoading(false)
@@ -145,31 +158,31 @@ export default function Settings() {
   const submitChangeUsername = async () => {
     const res = await authAPI.changeUsername(usernameForm.currentUsername, usernameForm.newUsername)
     if (res.success) {
-      toast.success(res.message || 'Username updated successfully')
+      toast.success(res.message || t('settings.security.usernameUpdated'))
       setUsernameForm({ currentUsername: '', newUsername: '' })
     } else {
-      toast.error(res.message || 'Failed to update username')
+      toast.error(res.message || t('settings.security.usernameFailed'))
     }
   }
 
   const submitChangePassword = async () => {
     if (!passwordForm.newPassword || passwordForm.newPassword !== passwordForm.confirmNewPassword) {
-      toast.error('New password and confirmation do not match')
+      toast.error(t('settings.security.passwordMismatch'))
       return
     }
     const res = await authAPI.changePassword(passwordForm.currentPassword, passwordForm.newPassword)
     if (res.success) {
-      toast.success('Password updated. Sign in again with the new password.')
+      toast.success(t('settings.security.passwordUpdated'))
       setPasswordForm({ currentPassword: '', newPassword: '', confirmNewPassword: '' })
       apiClient.clearTokens()
     } else {
-      toast.error(res.message || 'Failed to update password')
+      toast.error(res.message || t('settings.security.passwordFailed'))
     }
   }
 
   const handleSaveSettings = async () => {
     setLoading(true)
-    loadingCtl.show('Saving settings...')
+    loadingCtl.show(t('settings.savingProgress'))
     let ok = true
     try {
       const entries = Object.entries(settings).sort(([left], [right]) => {
@@ -184,16 +197,20 @@ export default function Settings() {
           break
         }
       }
-      let successMessage = 'Settings saved successfully'
-      let errorMessage = 'Some settings failed to save'
+      let successMessage = t('settings.saveSuccess')
+      let errorMessage = t('settings.saveError')
       if (ok && settings.autoGenerateCustomerId === 'true') {
         const sync = await settingsAPI.syncCustomerIds()
         if (!sync.success) {
           ok = false
-          errorMessage = sync.message || 'Failed to synchronize Customer IDs'
+          errorMessage = sync.message || t('settings.syncError')
         } else {
           const result = sync.data as { generated?: number; existing?: number; pending?: number }
-          successMessage = `${sync.message || 'Customer IDs synchronized'} · ${result.generated || 0} new, ${result.existing || 0} preserved`
+          successMessage = t('settings.syncSummary', {
+            message: sync.message || t('settings.syncSuccess'),
+            generated: result.generated || 0,
+            existing: result.existing || 0,
+          })
         }
       }
       toast[ok ? 'success' : 'error'](ok ? successMessage : errorMessage)
@@ -302,25 +319,25 @@ export default function Settings() {
       res = await vendorsAPI.create(payload)
     }
     if (res.success) {
-      const msg = editingVendor ? 'Vendor updated' : 'Vendor created'
+      const msg = editingVendor ? t('settings.vendors.updated') : t('settings.vendors.created')
       toast.success(msg)
       await fetchVendors()
       resetVendorForm()
     } else {
-      const msg = res.message || 'Operation failed'
+      const msg = res.message || t('settings.operationFailed')
       toast.error(msg)
     }
   }
 
   const deleteVendor = async (id: number) => {
     const vendor = vendorList.find((item) => item.id === id)
-    if (!confirm(`Delete vendor profile "${vendor?.name || id}"?\n\nDevices will no longer use this profile for parameter discovery. This cannot be undone.`)) return
+    if (!confirm(t('settings.vendors.confirmDelete', { name: vendor?.name || id }))) return
     const res = await vendorsAPI.delete(id)
     if (res.success) {
       setVendorList(prev => prev.filter(v => v.id !== id))
-      toast.success('Vendor deleted')
+      toast.success(t('settings.vendors.deleted'))
     } else {
-      const msg = res.message || 'Failed to delete vendor'
+      const msg = res.message || t('settings.vendors.deleteFailed')
       toast.error(msg)
     }
   }
@@ -369,25 +386,25 @@ export default function Settings() {
       res = await vendorsAPI.createWifiSecurityConfig(payload)
     }
     if (res.success) {
-      const msg = editingConfig ? 'WiFi security config updated' : 'WiFi security config created'
+      const msg = editingConfig ? t('settings.wifi.updated') : t('settings.wifi.created')
       toast.success(msg)
       await fetchWifiConfigs()
       resetConfigForm()
     } else {
-      const msg = res.message || 'Operation failed'
+      const msg = res.message || t('settings.operationFailed')
       toast.error(msg)
     }
   }
 
   const deleteWifiConfig = async (id: number) => {
     const config = wifiConfigs.find((item) => item.id === id)
-    if (!confirm(`Delete WiFi mapping for "${config?.product_class || id}"?\n\nPassword and security parameters for this product class will no longer be resolved. This cannot be undone.`)) return
+    if (!confirm(t('settings.wifi.confirmDelete', { name: config?.product_class || id }))) return
     const res = await vendorsAPI.deleteWifiSecurityConfig(id)
     if (res.success) {
       setWifiConfigs(prev => prev.filter(c => c.id !== id))
-      toast.success('WiFi security config deleted')
+      toast.success(t('settings.wifi.deleted'))
     } else {
-      const msg = res.message || 'Failed to delete config'
+      const msg = res.message || t('settings.wifi.deleteFailed')
       toast.error(msg)
     }
   }
@@ -397,14 +414,14 @@ export default function Settings() {
       <div className="page-frame">
         <header className="page-header">
           <div>
-            <p className="page-kicker">System administration</p>
-            <h1 className="page-title">Panel configuration</h1>
-            <p className="page-description">Kelola koneksi GenieACS, jalur parameter vendor, akun administrator, dan penyimpanan data panel.</p>
+            <p className="page-kicker">{t('settings.kicker')}</p>
+            <h1 className="page-title">{t('settings.title')}</h1>
+            <p className="page-description">{t('settings.description')}</p>
           </div>
         </header>
 
         <div className="mb-6">
-          <div className="tab-rail" role="tablist" aria-label="Configuration sections">
+          <div className="tab-rail" role="tablist" aria-label={t('settings.sectionsAria')}>
             <button
               onClick={() => setActiveTab('general')}
               className="tab-button"
@@ -412,7 +429,7 @@ export default function Settings() {
               role="tab"
               aria-selected={activeTab === 'general'}
             >
-              Panel & ACS
+              {t('settings.tab.general')}
             </button>
             <button
               onClick={() => setActiveTab('virtual-params')}
@@ -421,7 +438,7 @@ export default function Settings() {
               role="tab"
               aria-selected={activeTab === 'virtual-params'}
             >
-              TR-069 parameters
+              {t('settings.tab.virtualParams')}
             </button>
             <button
               onClick={() => setActiveTab('customer-portal')}
@@ -430,7 +447,7 @@ export default function Settings() {
               role="tab"
               aria-selected={activeTab === 'customer-portal'}
             >
-              Customer portal
+              {t('settings.tab.customerPortal')}
             </button>
             <button
               onClick={() => setActiveTab('security')}
@@ -439,7 +456,7 @@ export default function Settings() {
               role="tab"
               aria-selected={activeTab === 'security'}
             >
-              Account access
+              {t('settings.tab.security')}
             </button>
             <button
               onClick={() => setActiveTab('vendors')}
@@ -448,7 +465,7 @@ export default function Settings() {
               role="tab"
               aria-selected={activeTab === 'vendors'}
             >
-              Vendor profiles
+              {t('settings.tab.vendors')}
             </button>
             <button
               onClick={() => setActiveTab('wifi-security')}
@@ -457,7 +474,7 @@ export default function Settings() {
               role="tab"
               aria-selected={activeTab === 'wifi-security'}
             >
-              WiFi mappings
+              {t('settings.tab.wifiSecurity')}
             </button>
             <button
               onClick={() => setActiveTab('database')}
@@ -466,7 +483,7 @@ export default function Settings() {
               role="tab"
               aria-selected={activeTab === 'database'}
             >
-              Data store
+              {t('settings.tab.database')}
             </button>
           </div>
         </div>
@@ -476,11 +493,11 @@ export default function Settings() {
           <div className="space-y-6">
             {/* App Settings */}
             <div className="modern-card max-w-3xl p-5 sm:p-6">
-              <h2 className="section-heading">Panel identity and ACS endpoint</h2>
-              <p className="section-description mb-6">Nama tampil panel dan alamat northbound API GenieACS.</p>
+              <h2 className="section-heading">{t('settings.general.title')}</h2>
+              <p className="section-description mb-6">{t('settings.general.description')}</p>
               <div className="space-y-4">
                 <div>
-                  <label htmlFor="application-name" className="field-label">Application name</label>
+                  <label htmlFor="application-name" className="field-label">{t('settings.general.appName')}</label>
                   <input
                     id="application-name"
                     type="text"
@@ -490,7 +507,12 @@ export default function Settings() {
                   />
                 </div>
                 <div>
-                  <label htmlFor="genieacs-url" className="field-label">GenieACS URL</label>
+                  <p className="field-label">{t('settings.general.language')}</p>
+                  <LanguageSwitcher className="w-full sm:w-72" />
+                  <p className="field-hint">{t('settings.general.languageHint')}</p>
+                </div>
+                <div>
+                  <label htmlFor="genieacs-url" className="field-label">{t('settings.general.genieAcsUrl')}</label>
                   <div className="flex flex-col gap-2 sm:flex-row">
                   <input
                     id="genieacs-url"
@@ -505,10 +527,10 @@ export default function Settings() {
                       disabled={loading}
                       className="modern-button"
                     >
-                      {loading ? 'Testing…' : 'Test connection'}
+                      {loading ? t('settings.general.testing') : t('settings.general.testConnection')}
                     </button>
                   </div>
-                  <p className="field-hint">Masukkan base URL northbound API (NBI), biasanya port 7557. Path <code>/devices</code> ditambahkan otomatis.</p>
+                  <p className="field-hint">{t('settings.general.urlHint', { path: '/devices' })}</p>
                 </div>
               </div>
 
@@ -523,7 +545,7 @@ export default function Settings() {
                     <span className="font-medium">{testResult.message}</span>
                     {testResult.deviceCount && (
                       <span className="ml-2 text-sm">
-                        ({testResult.deviceCount} devices found)
+                        {t('settings.general.devicesFound', { count: testResult.deviceCount })}
                       </span>
                     )}
                   </div>
@@ -537,9 +559,9 @@ export default function Settings() {
           <div className="modern-card p-5 sm:p-6">
             <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <h2 className="section-heading">Virtual parameter mappings</h2>
+                <h2 className="section-heading">{t('settings.vp.title')}</h2>
                 <p className="section-description mt-1">
-                  Preset ini mengikuti nama virtual parameter dari repository <span className="font-mono">skydashnet/genieacs-installer</span>.
+                  {t('settings.vp.description', { repo: 'skydashnet/genieacs-installer' })}
                 </p>
               </div>
               <button
@@ -548,27 +570,27 @@ export default function Settings() {
                 onClick={() => setSettings((current) => ({ ...current, ...INSTALLER_VIRTUAL_PARAMETERS }))}
               >
                 <Icon name="refresh" size={17} />
-                Use installer preset
+                {t('settings.vp.usePreset')}
               </button>
             </div>
             <div className="mb-6 rounded-md border border-[hsl(var(--warning)/0.35)] bg-[hsl(var(--warning)/0.08)] p-4 text-sm text-foreground">
-              SkyGenPanel hanya membaca mapping ini. Script virtual parameter harus sudah diimpor ke GenieACS menggunakan installer tersebut.
+              {t('settings.vp.readOnlyNotice')}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {VIRTUAL_PARAMETER_FIELDS.map((field) => (
                 <div key={field.key}>
                   <label htmlFor={field.key} className="field-label">
-                    {field.label}
+                    {t(field.labelKey)}
                   </label>
                   <input
                     id={field.key}
                     type="text"
                     value={settings[field.key]}
-                    placeholder={field.description.startsWith('Optional') ? 'Leave empty if unavailable' : undefined}
+                    placeholder={field.hintKey ? t('settings.vp.optionalPlaceholder') : undefined}
                     onChange={(e) => setSettings({...settings, [field.key]: e.target.value})}
                     className="modern-input w-full font-mono text-sm"
                   />
-                  <p className="field-hint">{field.description}</p>
+                  <p className="field-hint">{field.hintKey ? t(field.hintKey) : field.parameterName}</p>
                 </div>
               ))}
             </div>
@@ -577,10 +599,10 @@ export default function Settings() {
 
         {activeTab === 'customer-portal' && (
           <div className="modern-card max-w-3xl p-5 sm:p-6">
-            <p className="page-kicker">Self-service access</p>
-            <h2 className="section-heading">Portal pelanggan</h2>
+            <p className="page-kicker">{t('settings.portal.kicker')}</p>
+            <h2 className="section-heading">{t('settings.portal.title')}</h2>
             <p className="section-description mb-6">
-              Portal berjalan terpisah pada port <span className="font-mono font-semibold">5891</span> dan hanya menampilkan ringkasan ONT yang aman untuk pelanggan.
+              {t('settings.portal.description', { port: '5891' })}
             </p>
 
             <label className="flex cursor-pointer items-start gap-3 rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-4">
@@ -594,32 +616,32 @@ export default function Settings() {
                 }))}
               />
               <span>
-                <span className="block font-semibold">Auto Generate ID Customer</span>
+                <span className="block font-semibold">{t('settings.portal.autoGenerate')}</span>
                 <span className="mt-1 block text-sm leading-6 text-muted-foreground">
-                  Buat ID permanen berformat <span className="font-mono">CSG-XXXXXXX-XXXXXX</span> untuk ONT yang memiliki SoftwareVersion dan PPPoE username.
+                  {t('settings.portal.autoGenerateHint', { format: 'CSG-XXXXXXX-XXXXXX' })}
                 </span>
               </span>
             </label>
 
             <div className="mt-5 grid gap-5 rounded-md border border-border p-4 sm:grid-cols-2">
               <fieldset>
-                <legend className="field-label">Awalan ID</legend>
+                <legend className="field-label">{t('settings.portal.prefixLegend')}</legend>
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 text-sm">
                     <input type="radio" name="customer-prefix" value="default"
                       checked={settings.customerIdPrefixMode === 'default'}
                       onChange={() => setSettings((current) => ({ ...current, customerIdPrefixMode: 'default' }))} />
-                    Bawaan <span className="font-mono font-semibold">CSG</span>
+                    {t('settings.portal.prefixDefault')} <span className="font-mono font-semibold">CSG</span>
                   </label>
                   <label className="flex items-center gap-2 text-sm">
                     <input type="radio" name="customer-prefix" value="company"
                       checked={settings.customerIdPrefixMode === 'company'}
                       onChange={() => setSettings((current) => ({ ...current, customerIdPrefixMode: 'company' }))} />
-                    ID perusahaan
+                    {t('settings.portal.prefixCompany')}
                   </label>
                   {settings.customerIdPrefixMode === 'company' && (
                     <input
-                      aria-label="ID perusahaan"
+                      aria-label={t('settings.portal.companyIdAria')}
                       className="modern-input mt-2 font-mono uppercase"
                       minLength={2}
                       maxLength={4}
@@ -633,118 +655,118 @@ export default function Settings() {
                     />
                   )}
                 </div>
-                <p className="field-hint">Huruf saja, 2–4 karakter. Berlaku untuk ID baru.</p>
+                <p className="field-hint">{t('settings.portal.prefixHint')}</p>
               </fieldset>
 
               <fieldset>
-                <legend className="field-label">Enam karakter terakhir</legend>
+                <legend className="field-label">{t('settings.portal.suffixLegend')}</legend>
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 text-sm">
                     <input type="radio" name="customer-suffix" value="random"
                       checked={settings.customerIdSuffixMode === 'random'}
                       onChange={() => setSettings((current) => ({ ...current, customerIdSuffixMode: 'random' }))} />
-                    Acak huruf dan angka
+                    {t('settings.portal.suffixRandom')}
                   </label>
                   <label className="flex items-center gap-2 text-sm">
                     <input type="radio" name="customer-suffix" value="installation_date"
                       checked={settings.customerIdSuffixMode === 'installation_date'}
                       onChange={() => setSettings((current) => ({ ...current, customerIdSuffixMode: 'installation_date' }))} />
-                    Tanggal pemasangan <span className="font-mono text-xs text-muted-foreground">YYMMDD</span>
+                    {t('settings.portal.suffixDate')} <span className="font-mono text-xs text-muted-foreground">YYMMDD</span>
                   </label>
                 </div>
-                <p className="field-hint">Mode tanggal menunggu tanggal pemasangan di detail device sebelum membuat ID.</p>
+                <p className="field-hint">{t('settings.portal.suffixHint')}</p>
               </fieldset>
             </div>
 
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               <div className="rounded-md border border-border p-4">
-                <p className="metric-label">Login pelanggan</p>
-                <p className="mt-2 text-sm font-semibold">ID Customer</p>
-                <p className="mt-1 text-xs text-muted-foreground">Password portal dibuat otomatis per pelanggan dan dapat dilihat atau diganti di halaman detail device.</p>
+                <p className="metric-label">{t('settings.portal.loginTitle')}</p>
+                <p className="mt-2 text-sm font-semibold">{t('settings.portal.loginValue')}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{t('settings.portal.loginHint')}</p>
               </div>
               <div className="rounded-md border border-border p-4">
-                <p className="metric-label">Identitas permanen</p>
-                <p className="mt-2 text-sm font-semibold">SoftwareID + PPPoE</p>
-                <p className="mt-1 text-xs text-muted-foreground">ID yang sudah tersimpan tidak berubah ketika proses sinkronisasi dijalankan ulang.</p>
+                <p className="metric-label">{t('settings.portal.identityTitle')}</p>
+                <p className="mt-2 text-sm font-semibold">{t('settings.portal.identityValue')}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{t('settings.portal.identityHint')}</p>
               </div>
             </div>
 
             <div className="mt-5 rounded-md border border-[hsl(var(--status-warning))]/40 bg-[hsl(var(--status-warning))]/10 p-4 text-sm leading-6">
-              Jika opsi dimatikan, SkyGenPanel tidak membuat ID baru. ID yang sudah ada tetap disimpan agar akses pelanggan tidak berubah.
+              {t('settings.portal.disabledNotice')}
             </div>
           </div>
         )}
 
         {activeTab === 'security' && (
           <div className="modern-card max-w-5xl p-5 sm:p-6">
-            <h2 className="section-heading">Administrator credentials</h2>
-            <p className="section-description mb-6">Perubahan berlaku pada sesi login panel, bukan kredensial perangkat atau GenieACS.</p>
+            <h2 className="section-heading">{t('settings.security.title')}</h2>
+            <p className="section-description mb-6">{t('settings.security.description')}</p>
             <div className="space-y-6">
               <section className="rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-4">
-                <h3 className="font-semibold text-foreground">Change username</h3>
-                <p className="mb-4 mt-1 text-sm text-muted-foreground">Masukkan username saat ini untuk mengonfirmasi kepemilikan akun.</p>
+                <h3 className="font-semibold text-foreground">{t('settings.security.changeUsername')}</h3>
+                <p className="mb-4 mt-1 text-sm text-muted-foreground">{t('settings.security.changeUsernameHint')}</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium mb-1">Current Username</label>
+                    <label className="block text-sm font-medium mb-1">{t('settings.security.currentUsername')}</label>
                     <input
                       value={usernameForm.currentUsername}
                       onChange={(e) => setUsernameForm(f => ({ ...f, currentUsername: e.target.value }))}
                       className="modern-input w-full"
-                      placeholder="current username"
+                      placeholder={t('settings.security.currentUsername').toLowerCase()}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1">New Username</label>
+                    <label className="block text-sm font-medium mb-1">{t('settings.security.newUsername')}</label>
                     <input
                       value={usernameForm.newUsername}
                       onChange={(e) => setUsernameForm(f => ({ ...f, newUsername: e.target.value }))}
                       className="modern-input w-full"
-                      placeholder="new username"
+                      placeholder={t('settings.security.newUsername').toLowerCase()}
                     />
                   </div>
                 </div>
                 <div className="mt-4">
-                  <button onClick={submitChangeUsername} className="modern-button">Update Username</button>
+                  <button onClick={submitChangeUsername} className="modern-button">{t('settings.security.updateUsername')}</button>
                 </div>
               </section>
 
               <section className="rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-4">
-                <h3 className="font-semibold text-foreground">Change password</h3>
-                <p className="mb-4 mt-1 text-sm text-muted-foreground">Gunakan minimal 8 karakter dan password yang berbeda dari akun ONT.</p>
+                <h3 className="font-semibold text-foreground">{t('settings.security.changePassword')}</h3>
+                <p className="mb-4 mt-1 text-sm text-muted-foreground">{t('settings.security.changePasswordHint')}</p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-sm font-medium mb-1">Current Password</label>
+                    <label className="block text-sm font-medium mb-1">{t('settings.security.currentPassword')}</label>
                     <input
                       type="password"
                       value={passwordForm.currentPassword}
                       onChange={(e) => setPasswordForm(f => ({ ...f, currentPassword: e.target.value }))}
                       className="modern-input w-full"
-                      placeholder="current password"
+                      placeholder={t('settings.security.currentPassword').toLowerCase()}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1">New Password</label>
+                    <label className="block text-sm font-medium mb-1">{t('settings.security.newPassword')}</label>
                     <input
                       type="password"
                       value={passwordForm.newPassword}
                       onChange={(e) => setPasswordForm(f => ({ ...f, newPassword: e.target.value }))}
                       className="modern-input w-full"
-                      placeholder="new password"
+                      placeholder={t('settings.security.newPassword').toLowerCase()}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1">Confirm New Password</label>
+                    <label className="block text-sm font-medium mb-1">{t('settings.security.confirmPassword')}</label>
                     <input
                       type="password"
                       value={passwordForm.confirmNewPassword}
                       onChange={(e) => setPasswordForm(f => ({ ...f, confirmNewPassword: e.target.value }))}
                       className="modern-input w-full"
-                      placeholder="confirm new password"
+                      placeholder={t('settings.security.confirmPassword').toLowerCase()}
                     />
                   </div>
                 </div>
                 <div className="mt-4">
-                  <button onClick={submitChangePassword} className="modern-button">Update Password</button>
+                  <button onClick={submitChangePassword} className="modern-button">{t('settings.security.updatePassword')}</button>
                 </div>
               </section>
             </div>
@@ -757,12 +779,12 @@ export default function Settings() {
             {/* Vendor List */}
             <div className="modern-card p-6">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Vendor Management</h2>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{t('settings.vendors.title')}</h2>
                 <button
                   onClick={() => { resetVendorForm(); setCreatingVendor(true) }}
                   className="modern-button"
                 >
-                  + Add Vendor
+                  {t('settings.vendors.add')}
                 </button>
               </div>
 
@@ -772,17 +794,17 @@ export default function Settings() {
 
                     {/* General Info */}
                     <div className="md:col-span-3">
-                      <label className="block text-sm font-medium mb-1">Name *</label>
+                      <label className="block text-sm font-medium mb-1">{t('settings.vendors.name')} *</label>
                       <input
                         value={vendorForm.name}
                         onChange={(e) => setVendorForm(v => ({ ...v, name: e.target.value }))}
                         className="modern-input w-full"
-                        placeholder="Vendor name"
+                        placeholder={t('settings.vendors.namePlaceholder')}
                       />
                     </div>
 
                     <div className="md:col-span-3">
-                      <label className="block text-sm font-medium mb-1">Manufacturer Patterns (Comma-separated) *</label>
+                      <label className="block text-sm font-medium mb-1">{t('settings.vendors.manufacturerPatterns')} *</label>
                       <input
                         value={vendorForm.manufacturer_patterns}
                         onChange={(e) => setVendorForm(v => ({ ...v, manufacturer_patterns: e.target.value }))}
@@ -792,7 +814,7 @@ export default function Settings() {
                     </div>
 
                     <div className="md:col-span-3">
-                      <label className="block text-sm font-medium mb-1">Product Patterns (Comma-separated) *</label>
+                      <label className="block text-sm font-medium mb-1">{t('settings.vendors.productPatterns')} *</label>
                       <input
                         value={vendorForm.product_patterns}
                         onChange={(e) => setVendorForm(v => ({ ...v, product_patterns: e.target.value }))}
@@ -802,7 +824,7 @@ export default function Settings() {
                     </div>
 
                     <div className="md:col-span-3">
-                      <label className="block text-sm font-medium mb-1">Parameter Prefix</label>
+                      <label className="block text-sm font-medium mb-1">{t('settings.vendors.parameterPrefix')}</label>
                       <input
                         value={vendorForm.parameter_prefix}
                         onChange={(e) => setVendorForm(v => ({ ...v, parameter_prefix: e.target.value }))}
@@ -812,10 +834,10 @@ export default function Settings() {
                     </div>
 
                     {/* WAN Connection Parameters */}
-                    <h3 className="md:col-span-3 text-md font-semibold text-gray-800 dark:text-gray-200 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">WAN Connection Parameters</h3>
+                    <h3 className="md:col-span-3 text-md font-semibold text-gray-800 dark:text-gray-200 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">{t('settings.vendors.wanSection')}</h3>
 
                     <div>
-                      <label className="block text-sm font-medium mb-1">Service List Path</label>
+                      <label className="block text-sm font-medium mb-1">{t('settings.vendors.serviceListPath')}</label>
                       <input
                         value={vendorForm.service_list_path}
                         onChange={(e) => setVendorForm(v => ({ ...v, service_list_path: e.target.value }))}
@@ -825,7 +847,7 @@ export default function Settings() {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium mb-1">LAN Binding Path</label>
+                      <label className="block text-sm font-medium mb-1">{t('settings.vendors.lanBindingPath')}</label>
                       <input
                         value={vendorForm.lan_binding_path}
                         onChange={(e) => setVendorForm(v => ({ ...v, lan_binding_path: e.target.value }))}
@@ -835,7 +857,7 @@ export default function Settings() {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium mb-1">VLAN ID Path</label>
+                      <label className="block text-sm font-medium mb-1">{t('settings.vendors.vlanIdPath')}</label>
                       <input
                         value={vendorForm.vlan_id_path}
                         onChange={(e) => setVendorForm(v => ({ ...v, vlan_id_path: e.target.value }))}
@@ -845,10 +867,10 @@ export default function Settings() {
                     </div>
 
                     {/* WiFi & Security Parameters */}
-                    <h3 className="md:col-span-3 text-md font-semibold text-gray-800 dark:text-gray-200 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">WiFi & Security Parameters</h3>
+                    <h3 className="md:col-span-3 text-md font-semibold text-gray-800 dark:text-gray-200 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">{t('settings.vendors.wifiSection')}</h3>
 
                     <div>
-                      <label className="block text-sm font-medium mb-1">WiFi Password Path</label>
+                      <label className="block text-sm font-medium mb-1">{t('settings.vendors.wifiPasswordPath')}</label>
                       <input
                         value={vendorForm.wifi_password_path}
                         onChange={(e) => setVendorForm(v => ({ ...v, wifi_password_path: e.target.value }))}
@@ -858,7 +880,7 @@ export default function Settings() {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium mb-1">HTTP WAN Enable Path</label>
+                      <label className="block text-sm font-medium mb-1">{t('settings.vendors.httpWanEnablePath')}</label>
                       <input
                         value={vendorForm.http_wan_enable_path}
                         onChange={(e) => setVendorForm(v => ({ ...v, http_wan_enable_path: e.target.value }))}
@@ -868,7 +890,7 @@ export default function Settings() {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium mb-1">Firewall Level Path</label>
+                      <label className="block text-sm font-medium mb-1">{t('settings.vendors.firewallLevelPath')}</label>
                       <input
                         value={vendorForm.firewall_level_path}
                         onChange={(e) => setVendorForm(v => ({ ...v, firewall_level_path: e.target.value }))}
@@ -878,10 +900,10 @@ export default function Settings() {
                     </div>
 
                     {/* Other Parameters */}
-                    <h3 className="md:col-span-3 text-md font-semibold text-gray-800 dark:text-gray-200 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">Other Parameters</h3>
+                    <h3 className="md:col-span-3 text-md font-semibold text-gray-800 dark:text-gray-200 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">{t('settings.vendors.otherSection')}</h3>
 
                     <div>
-                      <label className="block text-sm font-medium mb-1">Priority</label>
+                      <label className="block text-sm font-medium mb-1">{t('settings.vendors.priority')}</label>
                       <input
                         type="number"
                         value={vendorForm.priority}
@@ -892,37 +914,37 @@ export default function Settings() {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium mb-1">Status</label>
+                      <label className="block text-sm font-medium mb-1">{t('settings.vendors.status')}</label>
                       <select
                         value={vendorForm.enabled}
                         onChange={(e) => setVendorForm(v => ({ ...v, enabled: Number(e.target.value) }))}
                         className="modern-input w-full"
                       >
-                        <option value={1}>Enabled</option>
-                        <option value={0}>Disabled</option>
+                        <option value={1}>{t('common.enabled')}</option>
+                        <option value={0}>{t('common.disabled')}</option>
                       </select>
                     </div>
 
                     <div className="md:col-span-3">
-                      <label className="block text-sm font-medium mb-1">Description</label>
+                      <label className="block text-sm font-medium mb-1">{t('settings.vendors.descriptionLabel')}</label>
                       <textarea
                         value={vendorForm.description}
                         onChange={(e) => setVendorForm(v => ({ ...v, description: e.target.value }))}
                         className="modern-input w-full"
                         rows={2}
-                        placeholder="Optional description"
+                        placeholder={t('settings.vendors.descriptionPlaceholder')}
                       />
                     </div>
                   </div>
                   <div className="flex items-center gap-2 mt-4">
                     <button onClick={submitVendor} className="modern-button">
-                      {editingVendor ? 'Update Vendor' : 'Create Vendor'}
+                      {editingVendor ? t('settings.vendors.update') : t('settings.vendors.create')}
                     </button>
                     <button
                       onClick={resetVendorForm}
                       className="modern-button-secondary"
                     >
-                      Cancel
+                      {t('common.cancel')}
                     </button>
                   </div>
                 </div>
@@ -932,12 +954,12 @@ export default function Settings() {
                 <table className="modern-table">
                   <thead>
                     <tr>
-                      <th>Name</th>
-                      <th>Parameter Prefix</th>
-                      <th>Patterns</th>
-                      <th>Priority</th>
-                      <th>Status</th>
-                      <th>Action</th>
+                      <th>{t('settings.vendors.name')}</th>
+                      <th>{t('settings.vendors.parameterPrefix')}</th>
+                      <th>{t('settings.vendors.patterns')}</th>
+                      <th>{t('settings.vendors.priority')}</th>
+                      <th>{t('settings.vendors.status')}</th>
+                      <th>{t('common.actions')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -945,13 +967,13 @@ export default function Settings() {
                       <tr>
                         <td colSpan={6} className="text-center py-8">
                           <div className="w-8 h-8 border-4 border-gray-200 dark:border-gray-700 border-t-blue-600 rounded-full animate-spin mx-auto"></div>
-                          <p className="mt-2 text-gray-500 dark:text-gray-400">Loading vendors...</p>
+                          <p className="mt-2 text-gray-500 dark:text-gray-400">{t('settings.vendors.loading')}</p>
                         </td>
                       </tr>
                     ) : vendorList.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="text-center py-8 text-gray-500 dark:text-gray-400">
-                          No vendors
+                          {t('settings.vendors.empty')}
                         </td>
                       </tr>
                     ) : (
@@ -969,7 +991,7 @@ export default function Settings() {
                           <td>{v.priority}</td>
                           <td>
                             <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${v.enabled ? 'modern-badge-success' : 'modern-badge-error'}`}>
-                              {v.enabled ? 'Enabled' : 'Disabled'}
+                              {v.enabled ? t('common.enabled') : t('common.disabled')}
                             </span>
                           </td>
                           <td>
@@ -995,16 +1017,16 @@ export default function Settings() {
                                   })
                                 }}
                                 className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                                title="Edit"
-                                aria-label="Edit"
+                                title={t('common.edit')}
+                                aria-label={t('common.edit')}
                               >
                                 <Icon name="edit" size={18} />
                               </button>
                               <button
                                 onClick={() => deleteVendor(v.id)}
                                 className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
-                                title="Delete"
-                                aria-label="Delete"
+                                title={t('common.delete')}
+                                aria-label={t('common.delete')}
                               >
                                 <Icon name="trash" size={18} />
                               </button>
@@ -1026,7 +1048,7 @@ export default function Settings() {
             {/* WiFi Security Configs */}
             <div className="modern-card p-6">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">WiFi Security Configuration</h2>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{t('settings.wifi.title')}</h2>
                 <button
                   onClick={() => {
                     resetConfigForm();
@@ -1034,14 +1056,14 @@ export default function Settings() {
                   }}
                   className="modern-button"
                 >
-                  + Add WiFi Config
+                  {t('settings.wifi.add')}
                 </button>
               </div>
               {(creatingConfig || editingConfig) && (
                 <div className="mb-6 p-4 rounded-md border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-sm font-medium mb-1">Product Class</label>
+                      <label className="block text-sm font-medium mb-1">{t('settings.wifi.productClass')}</label>
                       <input
                         value={configForm.product_class}
                         onChange={(e) => setConfigForm(c => ({ ...c, product_class: e.target.value }))}
@@ -1050,7 +1072,7 @@ export default function Settings() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium mb-1">Security Types (comma separated)</label>
+                      <label className="block text-sm font-medium mb-1">{t('settings.wifi.securityTypes')}</label>
                       <input
                         value={configForm.security_types}
                         onChange={(e) => setConfigForm(c => ({ ...c, security_types: e.target.value }))}
@@ -1059,7 +1081,7 @@ export default function Settings() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium mb-1">Password Param Path</label>
+                      <label className="block text-sm font-medium mb-1">{t('settings.wifi.passwordPath')}</label>
                       <input
                         value={configForm.password_param_path}
                         onChange={(e) => setConfigForm(c => ({ ...c, password_param_path: e.target.value }))}
@@ -1070,9 +1092,9 @@ export default function Settings() {
                   </div>
                   <div className="flex items-center gap-2 mt-4">
                     <button onClick={submitWifiConfig} className="modern-button">
-                      {editingConfig ? 'Update Config' : 'Create Config'}
+                      {editingConfig ? t('settings.wifi.update') : t('settings.wifi.create')}
                     </button>
-                    <button onClick={resetConfigForm} className="modern-button-secondary">Cancel</button>
+                    <button onClick={resetConfigForm} className="modern-button-secondary">{t('common.cancel')}</button>
                   </div>
                 </div>
               )}
@@ -1082,20 +1104,20 @@ export default function Settings() {
                   {/* Style Header Tabel Sesuai SS */}
                   <thead>
                     <tr>
-                      <th className="uppercase">Product Class</th>
-                      <th className="uppercase">Password Path</th>
-                      <th className="uppercase">Security Types</th>
-                      <th className="uppercase">Actions</th>
+                      <th className="uppercase">{t('settings.wifi.productClass')}</th>
+                      <th className="uppercase">{t('settings.wifi.passwordPath')}</th>
+                      <th className="uppercase">{t('settings.wifi.securityTypes')}</th>
+                      <th className="uppercase">{t('common.actions')}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {wifiConfigLoading ? (
                       <tr>
-                        <td colSpan={4} className="text-center py-8 text-gray-500 dark:text-gray-400">Loading configs...</td>
+                        <td colSpan={4} className="text-center py-8 text-gray-500 dark:text-gray-400">{t('settings.wifi.loading')}</td>
                       </tr>
                     ) : wifiConfigs.length === 0 ? (
                       <tr>
-                        <td colSpan={4} className="text-center py-8 text-gray-500 dark:text-gray-400">No configs</td>
+                        <td colSpan={4} className="text-center py-8 text-gray-500 dark:text-gray-400">{t('settings.wifi.empty')}</td>
                       </tr>
                     ) : (
                       wifiConfigs.map(cfg => (
@@ -1123,13 +1145,13 @@ export default function Settings() {
                                 }}
                                 className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium text-sm"
                               >
-                                Edit
+                                {t('common.edit')}
                               </button>
                               <button
                                 onClick={() => deleteWifiConfig(cfg.id)}
                                 className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 font-medium text-sm"
                               >
-                                Delete
+                                {t('common.delete')}
                               </button>
                             </div>
                           </td>
@@ -1145,49 +1167,53 @@ export default function Settings() {
 
         {activeTab === 'database' && (
           <div className="modern-card p-6 max-w-2xl">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Database</h2>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">{t('settings.db.title')}</h2>
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-              Active: <span className="font-mono font-semibold">
-                {activeDb ? (activeDb.client === 'mysql2' ? `MySQL (${activeDb.database}@${activeDb.host})` : 'SQLite (local file)') : '...'}
-              </span>
+              {t('settings.db.active', {
+                database: activeDb
+                  ? (activeDb.client === 'mysql2'
+                      ? t('settings.db.mysql', { database: String(activeDb.database), host: String(activeDb.host) })
+                      : t('settings.db.sqlite'))
+                  : '…',
+              })}
             </p>
 
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('settings.db.type')}</label>
               <select
                 value={dbForm.client}
                 onChange={(e) => setDbForm({ ...dbForm, client: e.target.value as DbConfigPayload['client'] })}
                 className="modern-input w-full"
               >
                 <option value="mysql2">MySQL / MariaDB</option>
-                <option value="sqlite3">SQLite (local file)</option>
+                <option value="sqlite3">{t('settings.db.sqlite')}</option>
               </select>
             </div>
 
             {dbForm.client === 'mysql2' && (
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Host</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('settings.db.host')}</label>
                   <input className="modern-input w-full" value={dbForm.host || ''}
                     onChange={(e) => setDbForm({ ...dbForm, host: e.target.value })} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Port</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('settings.db.port')}</label>
                   <input type="number" className="modern-input w-full" value={dbForm.port || 3306}
                     onChange={(e) => setDbForm({ ...dbForm, port: Number(e.target.value) })} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">User</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('settings.db.user')}</label>
                   <input className="modern-input w-full" value={dbForm.user || ''}
                     onChange={(e) => setDbForm({ ...dbForm, user: e.target.value })} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('settings.db.password')}</label>
                   <input type="password" className="modern-input w-full" value={dbForm.password || ''}
                     onChange={(e) => setDbForm({ ...dbForm, password: e.target.value })} />
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Database</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('settings.db.database')}</label>
                   <input className="modern-input w-full" value={dbForm.database || ''}
                     onChange={(e) => setDbForm({ ...dbForm, database: e.target.value })} />
                 </div>
@@ -1197,20 +1223,20 @@ export default function Settings() {
             <label className="flex items-center gap-2 mb-6 text-sm text-gray-700 dark:text-gray-300">
               <input type="checkbox" checked={Boolean(dbForm.migrateData)}
                 onChange={(e) => setDbForm({ ...dbForm, migrateData: e.target.checked })} />
-              Copy existing data to the new database
+              {t('settings.db.copyData')}
             </label>
 
             <div className="flex gap-3">
               <button onClick={handleDbTest} disabled={dbTesting} className="modern-button-secondary">
-                {dbTesting ? 'Testing...' : 'Test Connection'}
+                {dbTesting ? t('settings.db.testing') : t('settings.db.test')}
               </button>
               <button onClick={handleDbSwitch} disabled={dbSwitching} className="modern-button">
-                {dbSwitching ? 'Switching...' : 'Switch Database'}
+                {dbSwitching ? t('settings.db.switching') : t('settings.db.switch')}
               </button>
             </div>
 
             <p className="text-xs text-gray-400 mt-4">
-              After switching, restart the service (skygenpanel restart) for the change to take effect.
+              {t('settings.db.restartHint')}
             </p>
           </div>
         )}
@@ -1223,7 +1249,7 @@ export default function Settings() {
               disabled={loading}
               className="modern-button"
             >
-              {loading ? 'Saving...' : 'Save Settings'}
+              {loading ? t('settings.saving') : t('settings.save')}
             </button>
           </div>
         )}

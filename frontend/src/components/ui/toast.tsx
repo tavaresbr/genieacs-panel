@@ -2,6 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from './icon'
+import { useTranslation } from '@/contexts/language-context'
 
 type ToastType = 'success' | 'error' | 'info' | 'warning'
 const MAX_VISIBLE_TOASTS = 4
@@ -55,6 +56,7 @@ const typeStyles: Record<ToastType, { base: string; icon: string }> = {
 }
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
+  const { t: translate } = useTranslation()
   const [toasts, setToasts] = useState<ToastItem[]>([])
   const toastsRef = useRef<ToastItem[]>([])
   const timersRef = useRef<Record<string, any>>({})
@@ -178,7 +180,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             <button
               onClick={() => dismiss(t.id)}
               className="flex size-8 shrink-0 items-center justify-center rounded text-current opacity-70 transition hover:bg-black/5 hover:opacity-100"
-              aria-label="Dismiss notification"
+              aria-label={translate('toast.dismiss')}
             >
               <Icon name="x" size={16} />
             </button>
