@@ -3,6 +3,7 @@
 import React, { createContext, useCallback, useContext, useMemo, useState, useEffect } from 'react'
 import clsx from 'clsx'
 import { useLocation } from 'react-router'
+import { useTranslation } from '@/contexts/language-context'
 
 type LoadingContextType = {
   visible: boolean
@@ -14,6 +15,7 @@ type LoadingContextType = {
 const LoadingContext = createContext<LoadingContextType | null>(null)
 
 export function LoadingProvider({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation()
   const [visible, setVisible] = useState(false)
   const [message, setMessage] = useState<string | undefined>(undefined)
 
@@ -37,8 +39,8 @@ export function LoadingProvider({ children }: { children: React.ReactNode }) {
           <div className="flex min-h-12 w-full items-center gap-3 rounded-md border border-border bg-card px-4 py-3 text-foreground shadow-lg sm:w-auto sm:min-w-64">
             <Spinner />
             <div>
-              <div className="text-sm font-semibold">{message || 'Processing request'}</div>
-              <div className="text-xs text-muted-foreground">You can keep reviewing this page.</div>
+              <div className="text-sm font-semibold">{message || t('loading.defaultMessage')}</div>
+              <div className="text-xs text-muted-foreground">{t('loading.hint')}</div>
             </div>
           </div>
         </div>

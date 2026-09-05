@@ -6,6 +6,7 @@ import { devicesAPI, vendorsAPI } from '@/lib/api'
 import { useLoading } from '@/components/ui/loading'
 import { useToast } from '@/components/ui/toast'
 import { Icon } from '@/components/ui/icon'
+import { useTranslation } from '@/contexts/language-context'
 import { formatDate } from '@/lib/utils'
 import type { Device, Vendor } from '@/types'
 
@@ -24,6 +25,7 @@ export default function DevicesPage() {
 
   const loadingCtl = useLoading()
   const toast = useToast()
+  const { t } = useTranslation()
 
   const getSignalStrengthInfo = (rxPowerStr: any) => {
     const rxpower = parseFloat(String(rxPowerStr));
@@ -31,7 +33,7 @@ export default function DevicesPage() {
     if (isNaN(rxpower)) {
       return {
         color: 'text-gray-500 dark:text-gray-400',
-        label: 'N/A',
+        label: t('common.na'),
         badgeClass: 'modern-badge'
       };
     }
@@ -39,27 +41,27 @@ export default function DevicesPage() {
     if (rxpower >= -21.99) {
       return {
         color: 'text-green-600 dark:text-green-400',
-        label: 'Excellent',
+        label: t('devices.signal.excellent'),
         badgeClass: 'modern-badge-success'
       };
     }
     if (rxpower >= -24.99) {
       return {
         color: 'text-blue-600 dark:text-blue-400',
-        label: 'Good',
+        label: t('devices.signal.good'),
         badgeClass: 'modern-badge-info'
       };
     }
     if (rxpower >= -26.99) {
       return {
         color: 'text-yellow-600 dark:text-yellow-400',
-        label: 'Poor',
+        label: t('devices.signal.poor'),
         badgeClass: 'modern-badge-warning'
       };
     }
     return {
       color: 'text-red-600 dark:text-red-400',
-      label: 'Danger',
+      label: t('devices.signal.danger'),
       badgeClass: 'modern-badge-error'
     };
   }
@@ -109,16 +111,16 @@ export default function DevicesPage() {
     e.preventDefault();
     e.stopPropagation();
 
-    loadingCtl.show('Summoning device...');
+    loadingCtl.show(t('devices.summon.loading'));
     try {
       const res = await devicesAPI.summonDevice(deviceId);
       if (res.success) {
-        toast.success(res.message || 'Summon command sent!');
+        toast.success(res.message || t('devices.summon.success'));
       } else {
-        toast.error(res.message || 'Failed to send summon');
+        toast.error(res.message || t('devices.summon.failed'));
       }
     } catch (error: any) {
-      toast.error(error.message || 'Error sending summon command');
+      toast.error(error.message || t('devices.summon.error'));
     } finally {
       loadingCtl.hide();
     }
@@ -146,13 +148,11 @@ export default function DevicesPage() {
           setDevices(processed)
 
         } else {
-          const message = 'GenieACS did not return the device inventory. Verify the ACS URL and network access, then retry.'
-          setLoadError(message)
+          setLoadError(t('devices.error.inventory'))
         }
       } catch {
         if (!cancelled) {
-          const message = 'Panel could not reach GenieACS. Check the ACS connection, then retry.'
-          setLoadError(message)
+          setLoadError(t('devices.error.unreachable'))
         }
       } finally {
         if (!cancelled) {
@@ -164,7 +164,7 @@ export default function DevicesPage() {
     fetchData()
 
     return () => { cancelled = true }
-  }, [processDeviceData, refreshNonce])
+  }, [processDeviceData, refreshNonce, t])
 
   const filteredDevices = useMemo(() => {
     return devices.filter(device => {
@@ -190,7 +190,7 @@ export default function DevicesPage() {
       <div className="page-shell">
         <div className="page-frame">
           <div className="mb-5 h-24 animate-pulse rounded-md bg-muted" />
-          <div className="modern-card h-[28rem] animate-pulse bg-muted" aria-label="Loading device inventory" />
+          <div className="modern-card h-[28rem] animate-pulse bg-muted" aria-label={t('devices.loadingAria')} />
         </div>
       </div>
     )
@@ -202,7 +202,7 @@ export default function DevicesPage() {
   const DeviceStatus = ({ device }: { device: ProcessedDevice }) => (
     <span className={device.isOnline ? 'modern-badge-success' : 'modern-badge-error'}>
       <span className="status-dot" />
-      {device.isOnline ? 'Online' : 'Offline'}
+      {device.isOnline ? t('devices.status.online') : t('devices.status.offline')}
     </span>
   )
 
@@ -211,15 +211,15 @@ export default function DevicesPage() {
       <div className="page-frame">
         <header className="page-header">
           <div>
-            <p className="page-kicker">GenieACS inventory</p>
-            <h1 className="page-title">Managed devices</h1>
-            <p className="page-description">Cari ONT berdasarkan serial, pelanggan PPPoE, vendor, atau product class lalu buka detail konfigurasi.</p>
+            <p className="page-kicker">{t('devices.kicker')}</p>
+            <h1 className="page-title">{t('devices.title')}</h1>
+            <p className="page-description">{t('devices.description')}</p>
           </div>
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
-            <span><strong className="data-value">{totalOnline}</strong> online</span>
+            <span><strong className="data-value">{totalOnline}</strong> {t('devices.onlineLabel')}</span>
             <span aria-hidden="true">/</span>
-            <span><strong className="data-value">{devices.length}</strong> total</span>
-            <button type="button" onClick={() => setRefreshNonce((value) => value + 1)} className="icon-button" aria-label="Refresh device inventory">
+            <span><strong className="data-value">{devices.length}</strong> {t('devices.totalLabel')}</span>
+            <button type="button" onClick={() => setRefreshNonce((value) => value + 1)} className="icon-button" aria-label={t('devices.refreshAria')}>
               <Icon name="refresh" size={18} />
             </button>
           </div>
@@ -228,24 +228,24 @@ export default function DevicesPage() {
         {loadError ? (
           <section className="modern-card empty-state" role="alert">
             <div className="empty-state-icon text-[hsl(var(--status-danger))]"><Icon name="warning" size={22} /></div>
-            <h2 className="empty-state-title">Device inventory is unavailable</h2>
+            <h2 className="empty-state-title">{t('devices.error.title')}</h2>
             <p className="empty-state-copy">{loadError}</p>
             <div className="mt-5 flex flex-wrap justify-center gap-2">
-              <button type="button" onClick={() => setRefreshNonce((value) => value + 1)} className="modern-button">Retry inventory</button>
-              <Link to="/settings" className="modern-button-secondary">Check ACS configuration</Link>
+              <button type="button" onClick={() => setRefreshNonce((value) => value + 1)} className="modern-button">{t('devices.error.retry')}</button>
+              <Link to="/settings" className="modern-button-secondary">{t('devices.error.checkConfig')}</Link>
             </div>
           </section>
         ) : (
           <>
             <section className="mb-4 grid gap-3 rounded-[var(--radius)] border border-border bg-card p-3 lg:grid-cols-[minmax(18rem,1fr)_13rem_auto] lg:items-end">
               <div>
-                <label htmlFor="device-search" className="field-label">Search inventory</label>
+                <label htmlFor="device-search" className="field-label">{t('devices.filter.searchLabel')}</label>
                 <div className="relative">
                   <Icon name="search" size={18} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                   <input
                     id="device-search"
                     type="search"
-                    placeholder="Serial, Customer ID, PPPoE, brand, or model"
+                    placeholder={t('devices.filter.searchPlaceholder')}
                     className="modern-input pl-10"
                     value={searchTerm}
                     onChange={(event) => setSearchTerm(event.target.value)}
@@ -253,21 +253,21 @@ export default function DevicesPage() {
                 </div>
               </div>
               <div>
-                <label htmlFor="device-status" className="field-label">Connection status</label>
+                <label htmlFor="device-status" className="field-label">{t('devices.filter.statusLabel')}</label>
                 <div className="relative">
                   <select id="device-status" className="modern-input appearance-none pr-10" value={filterStatus} onChange={(event) => setFilterStatus(event.target.value)}>
-                    <option value="all">All devices</option>
-                    <option value="online">Online only</option>
-                    <option value="offline">Offline only</option>
+                    <option value="all">{t('devices.filter.all')}</option>
+                    <option value="online">{t('devices.filter.onlineOnly')}</option>
+                    <option value="offline">{t('devices.filter.offlineOnly')}</option>
                   </select>
                   <Icon name="chevron-down" size={17} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 </div>
               </div>
               <div className="flex min-h-11 items-center justify-between gap-3 px-1 text-sm text-muted-foreground lg:justify-end">
-                <span><strong className="data-value">{filteredDevices.length}</strong> shown</span>
+                <span><strong className="data-value">{filteredDevices.length}</strong> {t('devices.shownLabel')}</span>
                 {hasFilters && (
                   <button type="button" onClick={() => { setSearchTerm(''); setFilterStatus('all') }} className="font-semibold text-primary hover:underline">
-                    Clear filters
+                    {t('devices.filter.clear')}
                   </button>
                 )}
               </div>
@@ -276,16 +276,14 @@ export default function DevicesPage() {
             {filteredDevices.length === 0 ? (
               <section className="modern-card empty-state">
                 <div className="empty-state-icon"><Icon name={hasFilters ? 'search' : 'server'} size={22} /></div>
-                <h2 className="empty-state-title">{hasFilters ? 'No devices match these filters' : 'No devices have reported yet'}</h2>
+                <h2 className="empty-state-title">{hasFilters ? t('devices.empty.filteredTitle') : t('devices.empty.title')}</h2>
                 <p className="empty-state-copy">
-                  {hasFilters
-                    ? 'Ubah kata pencarian atau tampilkan semua status untuk memperluas hasil.'
-                    : 'Periksa koneksi GenieACS dan tunggu Inform pertama dari ONT.'}
+                  {hasFilters ? t('devices.empty.filteredCopy') : t('devices.empty.copy')}
                 </p>
                 {hasFilters ? (
-                  <button type="button" onClick={() => { setSearchTerm(''); setFilterStatus('all') }} className="modern-button-secondary mt-5">Clear filters</button>
+                  <button type="button" onClick={() => { setSearchTerm(''); setFilterStatus('all') }} className="modern-button-secondary mt-5">{t('devices.filter.clear')}</button>
                 ) : (
-                  <Link to="/settings" className="modern-button mt-5">Check ACS connection</Link>
+                  <Link to="/settings" className="modern-button mt-5">{t('devices.empty.checkConnection')}</Link>
                 )}
               </section>
             ) : (
@@ -295,14 +293,14 @@ export default function DevicesPage() {
                     <table className="modern-table">
                       <thead>
                         <tr>
-                          <th>Status</th>
-                          <th>Serial / Device ID</th>
-                          <th>Vendor & model</th>
-                          <th>Subscriber</th>
-                          <th>Customer ID</th>
-                          <th>Optical RX</th>
-                          <th>Last Inform</th>
-                          <th><span className="sr-only">Actions</span></th>
+                          <th>{t('devices.table.status')}</th>
+                          <th>{t('devices.table.serial')}</th>
+                          <th>{t('devices.table.vendorModel')}</th>
+                          <th>{t('devices.table.subscriber')}</th>
+                          <th>{t('devices.table.customerId')}</th>
+                          <th>{t('devices.table.opticalRx')}</th>
+                          <th>{t('devices.table.lastInform')}</th>
+                          <th><span className="sr-only">{t('common.actions')}</span></th>
                         </tr>
                       </thead>
                       <tbody>
@@ -319,23 +317,23 @@ export default function DevicesPage() {
                               </td>
                               <td>
                                 <span className="block font-semibold">{device.brand}</span>
-                                <span className="mt-0.5 block text-xs text-muted-foreground">{device.productclass || 'Model not reported'}</span>
+                                <span className="mt-0.5 block text-xs text-muted-foreground">{device.productclass || t('devices.modelNotReported')}</span>
                               </td>
-                              <td className="font-mono text-xs">{device.pppoe || 'Not reported'}</td>
-                              <td className="font-mono text-xs font-semibold">{device.customerId || 'Not generated'}</td>
+                              <td className="font-mono text-xs">{device.pppoe || t('devices.notReported')}</td>
+                              <td className="font-mono text-xs font-semibold">{device.customerId || t('devices.notGenerated')}</td>
                               <td>
                                 <span className={`font-mono text-sm font-semibold ${signalInfo.color}`}>
-                                  {device.rxpower !== null && device.rxpower !== undefined ? `${device.rxpower} dBm` : 'N/A'}
+                                  {device.rxpower !== null && device.rxpower !== undefined ? `${device.rxpower} dBm` : t('common.na')}
                                 </span>
                                 <span className="mt-0.5 block text-[0.68rem] text-muted-foreground">{signalInfo.label}</span>
                               </td>
                               <td className="whitespace-nowrap text-xs text-muted-foreground">{formatDate(device._lastInform)}</td>
                               <td>
                                 <div className="flex justify-end gap-1">
-                                  <button onClick={(event) => handleSummon(event, device._id)} className="icon-button" title="Request a new Inform" aria-label={`Summon ${device.SerialNumber || device._id}`}>
+                                  <button onClick={(event) => handleSummon(event, device._id)} className="icon-button" title={t('devices.summon.title')} aria-label={t('devices.summon.aria', { device: device.SerialNumber || device._id })}>
                                     <Icon name="bell" size={17} />
                                   </button>
-                                  <Link to={`/devices/detail?id=${encodeURIComponent(device._id)}`} className="icon-button" aria-label={`Open ${device.SerialNumber || device._id}`}>
+                                  <Link to={`/devices/detail?id=${encodeURIComponent(device._id)}`} className="icon-button" aria-label={t('devices.summon.open', { device: device.SerialNumber || device._id })}>
                                     <Icon name="chevron-right" size={17} />
                                   </Link>
                                 </div>
@@ -348,7 +346,7 @@ export default function DevicesPage() {
                   </div>
                 </section>
 
-                <section className="mobile-card-list space-y-3" aria-label="Device inventory">
+                <section className="mobile-card-list space-y-3" aria-label={t('devices.title')}>
                   {filteredDevices.map((device) => {
                     const signalInfo = getSignalStrengthInfo(device.rxpower)
                     return (
@@ -359,20 +357,20 @@ export default function DevicesPage() {
                             <Link to={`/devices/detail?id=${encodeURIComponent(device._id)}`} className="mt-2 block truncate font-mono text-sm font-semibold text-primary">
                               {device.SerialNumber || device._id}
                             </Link>
-                            <p className="mt-1 truncate text-xs text-muted-foreground">{device.brand} · {device.productclass || 'Unknown model'}</p>
+                            <p className="mt-1 truncate text-xs text-muted-foreground">{device.brand} · {device.productclass || t('devices.unknownModel')}</p>
                           </div>
-                          <Link to={`/devices/detail?id=${encodeURIComponent(device._id)}`} className="icon-button shrink-0" aria-label={`Open ${device.SerialNumber || device._id}`}>
+                          <Link to={`/devices/detail?id=${encodeURIComponent(device._id)}`} className="icon-button shrink-0" aria-label={t('devices.summon.open', { device: device.SerialNumber || device._id })}>
                             <Icon name="chevron-right" size={18} />
                           </Link>
                         </div>
                         <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-border pt-4 text-sm">
-                          <div><dt className="text-xs text-muted-foreground">PPPoE</dt><dd className="mt-1 truncate font-mono text-xs">{device.pppoe || 'Not reported'}</dd></div>
-                          <div><dt className="text-xs text-muted-foreground">Customer ID</dt><dd className="mt-1 truncate font-mono text-xs font-semibold">{device.customerId || 'Not generated'}</dd></div>
-                          <div><dt className="text-xs text-muted-foreground">Optical RX</dt><dd className={`mt-1 font-mono text-xs font-semibold ${signalInfo.color}`}>{device.rxpower ?? 'N/A'}{device.rxpower !== null && device.rxpower !== undefined ? ' dBm' : ''}</dd></div>
-                          <div className="col-span-2"><dt className="text-xs text-muted-foreground">Last Inform</dt><dd className="mt-1 text-xs">{formatDate(device._lastInform)}</dd></div>
+                          <div><dt className="text-xs text-muted-foreground">PPPoE</dt><dd className="mt-1 truncate font-mono text-xs">{device.pppoe || t('devices.notReported')}</dd></div>
+                          <div><dt className="text-xs text-muted-foreground">{t('devices.table.customerId')}</dt><dd className="mt-1 truncate font-mono text-xs font-semibold">{device.customerId || t('devices.notGenerated')}</dd></div>
+                          <div><dt className="text-xs text-muted-foreground">{t('devices.table.opticalRx')}</dt><dd className={`mt-1 font-mono text-xs font-semibold ${signalInfo.color}`}>{device.rxpower ?? t('common.na')}{device.rxpower !== null && device.rxpower !== undefined ? ' dBm' : ''}</dd></div>
+                          <div className="col-span-2"><dt className="text-xs text-muted-foreground">{t('devices.table.lastInform')}</dt><dd className="mt-1 text-xs">{formatDate(device._lastInform)}</dd></div>
                         </dl>
                         <button onClick={(event) => handleSummon(event, device._id)} className="modern-button-secondary mt-4 w-full">
-                          <Icon name="bell" size={17} /> Request new Inform
+                          <Icon name="bell" size={17} /> {t('devices.summon.button')}
                         </button>
                       </article>
                     )
