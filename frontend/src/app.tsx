@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from '@/contexts/auth-context'
 import { ToastProvider } from '@/components/ui/toast'
 import { LoadingProvider, RouteChangeLoader } from '@/components/ui/loading'
 import { BrandMark } from '@/components/brand-mark'
+import { LanguageProvider, useTranslation } from '@/contexts/language-context'
 
 const DashboardPage = lazy(() => import('@/pages/dashboard'))
 const DevicesPage = lazy(() => import('@/pages/devices'))
@@ -16,6 +17,7 @@ const LoginPage = lazy(() => import('@/pages/login'))
 const SetupPage = lazy(() => import('@/pages/setup'))
 
 function PageFallback() {
+  const { t } = useTranslation()
   return (
     <div className="page-shell" role="status" aria-live="polite">
       <div className="page-frame">
@@ -24,15 +26,16 @@ function PageFallback() {
           <div className="h-56 animate-pulse rounded-md bg-muted" />
           <div className="h-56 animate-pulse rounded-md bg-muted" />
         </div>
-        <span className="sr-only">Loading page</span>
+        <span className="sr-only">{t('app.loadingPage')}</span>
       </div>
     </div>
   )
 }
 
 function AuthFallback() {
+  const { t } = useTranslation()
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background" role="status" aria-label="Checking panel access">
+    <div className="flex min-h-screen items-center justify-center bg-background" role="status" aria-label={t('app.checkingAccess')}>
       <BrandMark className="size-11 animate-pulse" />
     </div>
   )
@@ -74,26 +77,28 @@ function SetupRoute() {
 export default function App() {
   return (
     <AuthProvider>
-      <ThemeProvider>
-        <LoadingProvider>
-          <ToastProvider>
-            <RouteChangeLoader />
-            <Routes>
-              <Route path="/login" element={<Suspense fallback={<AuthFallback />}><LoginRoute /></Suspense>} />
-              <Route path="/setup" element={<Suspense fallback={<AuthFallback />}><SetupRoute /></Suspense>} />
-              <Route element={<ProtectedShell />}>
-                <Route index element={<Navigate to="/dashboard" replace />} />
-                <Route path="/dashboard" element={<DashboardPage />} />
-                <Route path="/devices" element={<DevicesPage />} />
-                <Route path="/devices/detail" element={<DeviceDetailPage />} />
-                <Route path="/network-map" element={<NetworkMapPage />} />
-                <Route path="/settings" element={<SettingsPage />} />
-                <Route path="*" element={<Navigate to="/dashboard" replace />} />
-              </Route>
-            </Routes>
-          </ToastProvider>
-        </LoadingProvider>
-      </ThemeProvider>
+      <LanguageProvider>
+        <ThemeProvider>
+          <LoadingProvider>
+            <ToastProvider>
+              <RouteChangeLoader />
+              <Routes>
+                <Route path="/login" element={<Suspense fallback={<AuthFallback />}><LoginRoute /></Suspense>} />
+                <Route path="/setup" element={<Suspense fallback={<AuthFallback />}><SetupRoute /></Suspense>} />
+                <Route element={<ProtectedShell />}>
+                  <Route index element={<Navigate to="/dashboard" replace />} />
+                  <Route path="/dashboard" element={<DashboardPage />} />
+                  <Route path="/devices" element={<DevicesPage />} />
+                  <Route path="/devices/detail" element={<DeviceDetailPage />} />
+                  <Route path="/network-map" element={<NetworkMapPage />} />
+                  <Route path="/settings" element={<SettingsPage />} />
+                  <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                </Route>
+              </Routes>
+            </ToastProvider>
+          </LoadingProvider>
+        </ThemeProvider>
+      </LanguageProvider>
     </AuthProvider>
   )
 }

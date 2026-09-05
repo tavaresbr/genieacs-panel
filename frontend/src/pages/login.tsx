@@ -5,6 +5,8 @@ import { useNavigate } from 'react-router'
 import { useAuth } from '@/contexts/auth-context'
 import { Icon } from '@/components/ui/icon'
 import { BrandMark } from '@/components/brand-mark'
+import { LanguageSwitcher } from '@/components/language-switcher'
+import { useTranslation } from '@/contexts/language-context'
 
 export default function Login() {
   const [formData, setFormData] = useState({ username: '', password: '' })
@@ -13,6 +15,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false)
   const navigate = useNavigate()
   const { login } = useAuth()
+  const { t } = useTranslation()
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -21,9 +24,9 @@ export default function Login() {
     try {
       const ok = await login(formData.username, formData.password)
       if (ok) navigate('/dashboard')
-      else setError('Username atau password tidak cocok. Periksa kembali kredensial administrator.')
+      else setError(t('login.error.invalidCredentials'))
     } catch {
-      setError('Panel tidak dapat menghubungi server. Periksa koneksi lalu coba lagi.')
+      setError(t('login.error.unreachable'))
     } finally {
       setLoading(false)
     }
@@ -31,44 +34,47 @@ export default function Login() {
 
   return (
     <div className="grid min-h-screen bg-background lg:grid-cols-[minmax(22rem,0.8fr)_minmax(32rem,1.2fr)]">
-      <section className="hidden flex-col justify-between bg-[#18211d] p-10 text-[#f4f3ed] lg:flex xl:p-14" aria-label="Product information">
+      <section className="hidden flex-col justify-between bg-[#18211d] p-10 text-[#f4f3ed] lg:flex xl:p-14" aria-label={t('login.productInformation')}>
         <div className="flex items-center gap-3">
           <BrandMark className="size-11" />
           <div>
             <div className="text-lg font-bold">SkyGenPanel</div>
-            <div className="text-xs font-bold uppercase tracking-[0.14em] text-[#9aa9a2]">GenieACS operations</div>
+            <div className="text-xs font-bold uppercase tracking-[0.14em] text-[#9aa9a2]">{t('app.genieacsOperations')}</div>
           </div>
         </div>
         <div className="max-w-lg">
           <div className="mb-5 h-px w-16 bg-[#d97706]" />
           <h1 className="text-4xl font-semibold leading-[1.12] tracking-[-0.035em] text-white">
-            Monitor ONT health. Recover subscriber service.
+            {t('login.hero.title')}
           </h1>
           <p className="mt-5 max-w-md text-base leading-7 text-[#b8c4bd]">
-            Satu konsol untuk meninjau inform terakhir, redaman optik, konfigurasi WAN, dan topologi jaringan yang dilaporkan GenieACS.
+            {t('login.hero.description')}
           </p>
         </div>
         <p className="text-xs leading-5 text-[#819087]">
-          Administrative access only · SkydashNET
+          {t('login.hero.footer')}
         </p>
       </section>
 
       <main className="flex min-h-screen items-start justify-center px-4 pb-10 pt-16 sm:px-8 lg:items-center lg:py-10">
         <div className="w-full max-w-md">
-          <div className="mb-8 flex items-center gap-3 lg:hidden">
-            <BrandMark className="size-10" title="SkyGenPanel" />
-            <div>
-              <div className="font-bold">SkyGenPanel</div>
-              <div className="text-[0.65rem] font-bold uppercase tracking-[0.13em] text-muted-foreground">GenieACS operations</div>
+          <div className="mb-8 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 lg:hidden">
+              <BrandMark className="size-10" title="SkyGenPanel" />
+              <div>
+                <div className="font-bold">SkyGenPanel</div>
+                <div className="text-[0.65rem] font-bold uppercase tracking-[0.13em] text-muted-foreground">{t('app.genieacsOperations')}</div>
+              </div>
             </div>
+            <LanguageSwitcher className="ml-auto" />
           </div>
 
           <div className="auth-panel">
             <div className="mb-7">
-              <p className="page-kicker">Operator access</p>
-              <h1 className="text-2xl font-bold text-foreground">Sign in to the panel</h1>
+              <p className="page-kicker">{t('login.kicker')}</p>
+              <h1 className="text-2xl font-bold text-foreground">{t('login.title')}</h1>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Gunakan akun administrator SkyGenPanel untuk membuka data perangkat.
+                {t('login.subtitle')}
               </p>
             </div>
 
@@ -81,7 +87,7 @@ export default function Login() {
               )}
 
               <div>
-                <label htmlFor="username" className="field-label">Username</label>
+                <label htmlFor="username" className="field-label">{t('login.username')}</label>
                 <input
                   id="username"
                   name="username"
@@ -99,7 +105,7 @@ export default function Login() {
               </div>
 
               <div>
-                <label htmlFor="password" className="field-label">Password</label>
+                <label htmlFor="password" className="field-label">{t('login.password')}</label>
                 <div className="relative">
                   <input
                     id="password"
@@ -110,7 +116,7 @@ export default function Login() {
                     value={formData.password}
                     onChange={(event) => setFormData((value) => ({ ...value, password: event.target.value }))}
                     className="modern-input pr-12"
-                    placeholder="Masukkan password"
+                    placeholder={t('login.passwordPlaceholder')}
                     aria-invalid={Boolean(error)}
                     aria-describedby={error ? 'login-error' : undefined}
                   />
@@ -118,7 +124,7 @@ export default function Login() {
                     type="button"
                     onClick={() => setShowPassword((value) => !value)}
                     className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-muted-foreground hover:text-foreground"
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    aria-label={showPassword ? t('login.hidePassword') : t('login.showPassword')}
                   >
                     <Icon name={showPassword ? 'eye-off' : 'eye'} size={19} />
                   </button>
@@ -129,14 +135,14 @@ export default function Login() {
                 {loading ? (
                   <>
                     <span className="size-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                    Verifying account…
+                    {t('login.submitting')}
                   </>
-                ) : 'Sign in'}
+                ) : t('login.submit')}
               </button>
             </form>
           </div>
           <p className="mt-5 text-center text-xs leading-5 text-muted-foreground">
-            Jika akses ditolak, hubungi administrator panel untuk mereset kredensial.
+            {t('login.helpText')}
           </p>
         </div>
       </main>

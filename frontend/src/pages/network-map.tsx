@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '@/contexts/auth-context'
 import { useTheme } from '@/contexts/theme-context'
+import { useTranslation } from '@/contexts/language-context'
+import type { TranslationKey } from '@/lib/i18n'
 import { mappingAPI, mapSettingsAPI } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
@@ -43,21 +45,21 @@ interface MapEdge {
 type NodeForm = Omit<MapNode, 'id'>
 type EdgeForm = Omit<MapEdge, 'id'>
 
-const NODE_TYPES: { value: NodeType; label: string }[] = [
-  { value: 'htb', label: 'HTB' },
-  { value: 'olt', label: 'OLT' },
-  { value: 'odc', label: 'ODC' },
-  { value: 'odp', label: 'ODP' },
-  { value: 'ont', label: 'ONT' },
-  { value: 'server', label: 'Server' },
+const NODE_TYPES: { value: NodeType; labelKey: TranslationKey }[] = [
+  { value: 'htb', labelKey: 'map.nodeType.htb' },
+  { value: 'olt', labelKey: 'map.nodeType.olt' },
+  { value: 'odc', labelKey: 'map.nodeType.odc' },
+  { value: 'odp', labelKey: 'map.nodeType.odp' },
+  { value: 'ont', labelKey: 'map.nodeType.ont' },
+  { value: 'server', labelKey: 'map.nodeType.server' },
 ]
 
-const FIBER_TYPES: { value: FiberType; label: string; color: string }[] = [
-  { value: 'backbone', label: 'Backbone', color: '#8b5cf6' },
-  { value: 'feeder', label: 'Feeder', color: '#0ea5e9' },
-  { value: 'distribution', label: 'Distribution', color: '#22c55e' },
-  { value: 'drop', label: 'Drop cable', color: '#f59e0b' },
-  { value: 'patch', label: 'Patch', color: '#94a3b8' },
+const FIBER_TYPES: { value: FiberType; labelKey: TranslationKey; color: string }[] = [
+  { value: 'backbone', labelKey: 'map.fiberType.backbone', color: '#8b5cf6' },
+  { value: 'feeder', labelKey: 'map.fiberType.feeder', color: '#0ea5e9' },
+  { value: 'distribution', labelKey: 'map.fiberType.distribution', color: '#22c55e' },
+  { value: 'drop', labelKey: 'map.fiberType.drop', color: '#f59e0b' },
+  { value: 'patch', labelKey: 'map.fiberType.patch', color: '#94a3b8' },
 ]
 
 function escapeHtml(value: unknown) {
@@ -69,8 +71,8 @@ function escapeHtml(value: unknown) {
     .replaceAll("'", '&#039;')
 }
 
-function getTypeLabel(type: NodeType) {
-  return NODE_TYPES.find((entry) => entry.value === type)?.label || type.toUpperCase()
+function getTypeLabelKey(type: NodeType) {
+  return NODE_TYPES.find((entry) => entry.value === type)?.labelKey
 }
 
 function getFiberMeta(type: FiberType) {
@@ -116,12 +118,13 @@ function nodeIconName(type: NodeType) {
 }
 
 function ModalShell({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  const { t } = useTranslation()
   return (
     <div className="fixed inset-0 z-[2200] flex items-center justify-center bg-black/65 p-4" role="dialog" aria-modal="true">
       <div className="modern-card max-h-[92vh] w-full max-w-2xl overflow-y-auto p-5 sm:p-6">
         <div className="mb-5 flex items-center justify-between gap-4">
           <h2 className="section-heading">{title}</h2>
-          <button type="button" onClick={onClose} className="icon-button" aria-label="Close">
+          <button type="button" onClick={onClose} className="icon-button" aria-label={t('common.close')}>
             <Icon name="x" size={20} />
           </button>
         </div>
@@ -140,68 +143,69 @@ function NodeEditor({
   onClose: () => void
   onSave: (value: NodeForm) => void
 }) {
+  const { t } = useTranslation()
   const [form, setForm] = useState(initial)
   const set = <K extends keyof NodeForm>(key: K, value: NodeForm[K]) =>
     setForm((current) => ({ ...current, [key]: value }))
 
   return (
-    <ModalShell title={editing ? `Edit ${initial.node_id}` : 'Add network node'} onClose={onClose}>
+    <ModalShell title={editing ? t('map.editor.editEntry', { id: initial.node_id }) : t('map.editor.addNode')} onClose={onClose}>
       <form onSubmit={(event) => { event.preventDefault(); onSave(form) }} className="space-y-5">
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="space-y-2 text-sm font-semibold">
-            Node ID
+            {t('map.node.id')}
             <input className="modern-input w-full font-mono" required maxLength={128}
               pattern="[A-Za-z0-9._:-]+" disabled={editing} value={form.node_id}
-              onChange={(event) => set('node_id', event.target.value)} placeholder="ODP-ZONE-001" />
+              onChange={(event) => set('node_id', event.target.value)} placeholder={t('map.node.idPlaceholder')} />
           </label>
           <label className="space-y-2 text-sm font-semibold">
-            Type
+            {t('map.table.type')}
             <select className="modern-input w-full" value={form.type}
               onChange={(event) => set('type', event.target.value as NodeType)}>
-              {NODE_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
+              {NODE_TYPES.map((type) => <option key={type.value} value={type.value}>{t(type.labelKey)}</option>)}
             </select>
           </label>
           <label className="space-y-2 text-sm font-semibold sm:col-span-2">
-            Name
+            {t('map.node.name')}
             <input className="modern-input w-full" required maxLength={255} value={form.name}
-              onChange={(event) => set('name', event.target.value)} placeholder="ODP Jalan Merdeka" />
+              onChange={(event) => set('name', event.target.value)} placeholder={t('map.node.namePlaceholder')} />
           </label>
           <label className="space-y-2 text-sm font-semibold">
-            Latitude
+            {t('map.node.latitude')}
             <input className="modern-input w-full font-mono" required type="number" min={-90} max={90} step="any"
               value={form.latitude} onChange={(event) => set('latitude', Number(event.target.value))} />
           </label>
           <label className="space-y-2 text-sm font-semibold">
-            Longitude
+            {t('map.node.longitude')}
             <input className="modern-input w-full font-mono" required type="number" min={-180} max={180} step="any"
               value={form.longitude} onChange={(event) => set('longitude', Number(event.target.value))} />
           </label>
           <label className="space-y-2 text-sm font-semibold">
-            Capacity
+            {t('map.node.capacity')}
             <input className="modern-input w-full" type="number" min={0} step={1}
               value={form.capacity ?? ''} onChange={(event) => set('capacity', event.target.value === '' ? null : Number(event.target.value))} />
           </label>
           <label className="space-y-2 text-sm font-semibold">
-            Splitter
+            {t('map.node.splitter')}
             <input className="modern-input w-full" maxLength={64} value={form.splitter ?? ''}
               onChange={(event) => set('splitter', event.target.value)} placeholder="1:8" />
           </label>
           <label className="space-y-2 text-sm font-semibold sm:col-span-2">
-            PPPoE / subscriber reference
+            {t('map.node.pppoe')}
             <input className="modern-input w-full" maxLength={255} value={form.pppoe ?? ''}
               onChange={(event) => set('pppoe', event.target.value)} />
           </label>
           <label className="space-y-2 text-sm font-semibold sm:col-span-2">
-            Notes
+            {t('map.node.notes')}
             <textarea className="modern-input min-h-24 w-full" maxLength={5000} value={form.notes ?? ''}
               onChange={(event) => set('notes', event.target.value)} />
           </label>
         </div>
         <div className="flex justify-end gap-2">
-          <button type="button" className="modern-button-secondary" onClick={onClose}>Cancel</button>
+          <button type="button" className="modern-button-secondary" onClick={onClose}>{t('common.cancel')}</button>
           <button type="submit" className="modern-button" disabled={saving}>
             <Icon name={saving ? 'refresh' : 'check'} size={17} className={saving ? 'animate-spin' : ''} />
-            {saving ? 'Saving…' : 'Save node'}
+            {saving ? t('common.saving') : t('map.editor.saveNode')}
           </button>
         </div>
       </form>
@@ -219,67 +223,68 @@ function EdgeEditor({
   onClose: () => void
   onSave: (value: EdgeForm) => void
 }) {
+  const { t } = useTranslation()
   const [form, setForm] = useState(initial)
   const set = <K extends keyof EdgeForm>(key: K, value: EdgeForm[K]) =>
     setForm((current) => ({ ...current, [key]: value }))
 
   return (
-    <ModalShell title={editing ? `Edit ${initial.edge_id}` : 'Draw fiber cable'} onClose={onClose}>
+    <ModalShell title={editing ? t('map.editor.editEntry', { id: initial.edge_id }) : t('map.editor.drawCable')} onClose={onClose}>
       <form onSubmit={(event) => { event.preventDefault(); onSave(form) }} className="space-y-5">
         {nodes.length < 2 && (
           <div className="rounded-md border border-[hsl(var(--status-warning))]/40 bg-[hsl(var(--status-warning))]/10 p-3 text-sm">
-            Add at least two nodes before drawing a cable.
+            {t('map.edge.needTwoNodes')}
           </div>
         )}
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="space-y-2 text-sm font-semibold sm:col-span-2">
-            Cable ID
+            {t('map.edge.id')}
             <input className="modern-input w-full font-mono" required maxLength={128}
               pattern="[A-Za-z0-9._:-]+" disabled={editing} value={form.edge_id}
-              onChange={(event) => set('edge_id', event.target.value)} placeholder="FBR-ODC01-ODP01" />
+              onChange={(event) => set('edge_id', event.target.value)} placeholder={t('map.edge.idPlaceholder')} />
           </label>
           <label className="space-y-2 text-sm font-semibold">
-            Source node
+            {t('map.edge.source')}
             <select className="modern-input w-full" required value={form.source}
               onChange={(event) => set('source', event.target.value)}>
-              <option value="">Select source</option>
+              <option value="">{t('map.edge.selectSource')}</option>
               {nodes.map((node) => <option key={node.node_id} value={node.node_id}>{node.name} ({node.node_id})</option>)}
             </select>
           </label>
           <label className="space-y-2 text-sm font-semibold">
-            Target node
+            {t('map.edge.target')}
             <select className="modern-input w-full" required value={form.target}
               onChange={(event) => set('target', event.target.value)}>
-              <option value="">Select target</option>
+              <option value="">{t('map.edge.selectTarget')}</option>
               {nodes.map((node) => <option key={node.node_id} value={node.node_id}>{node.name} ({node.node_id})</option>)}
             </select>
           </label>
           <label className="space-y-2 text-sm font-semibold">
-            Fiber type
+            {t('map.edge.fiberType')}
             <select className="modern-input w-full" value={form.fiber_type}
               onChange={(event) => set('fiber_type', event.target.value as FiberType)}>
-              {FIBER_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
+              {FIBER_TYPES.map((type) => <option key={type.value} value={type.value}>{t(type.labelKey)}</option>)}
             </select>
           </label>
           <label className="space-y-2 text-sm font-semibold">
-            Distance (meter)
+            {t('map.edge.distance')}
             <input className="modern-input w-full" type="number" min={0} step="any"
               value={form.distance ?? ''} onChange={(event) => set('distance', event.target.value === '' ? null : Number(event.target.value))} />
           </label>
           <label className="space-y-2 text-sm font-semibold sm:col-span-2">
-            Notes
+            {t('map.node.notes')}
             <textarea className="modern-input min-h-24 w-full" maxLength={5000} value={form.notes ?? ''}
               onChange={(event) => set('notes', event.target.value)} />
           </label>
         </div>
         <p className="text-xs text-muted-foreground">
-          The cable is drawn automatically between both nodes. Existing route waypoints are preserved when editing.
+          {t('map.edge.autoDrawHint')}
         </p>
         <div className="flex justify-end gap-2">
-          <button type="button" className="modern-button-secondary" onClick={onClose}>Cancel</button>
+          <button type="button" className="modern-button-secondary" onClick={onClose}>{t('common.cancel')}</button>
           <button type="submit" className="modern-button" disabled={saving || nodes.length < 2 || form.source === form.target}>
             <Icon name={saving ? 'refresh' : 'check'} size={17} className={saving ? 'animate-spin' : ''} />
-            {saving ? 'Saving…' : 'Save cable'}
+            {saving ? t('common.saving') : t('map.editor.saveCable')}
           </button>
         </div>
       </form>
@@ -307,8 +312,17 @@ export default function NetworkMap() {
   const [basemap, setBasemap] = useState<Basemap>('osm')
   const { isDarkMode } = useTheme()
   const { user } = useAuth()
+  const { t, formatTime } = useTranslation()
   const toast = useToast()
   const isAdmin = user?.role === 'admin'
+
+  const nodeTypeLabel = useCallback(
+    (type: NodeType) => {
+      const labelKey = getTypeLabelKey(type)
+      return labelKey ? t(labelKey) : type.toUpperCase()
+    },
+    [t],
+  )
 
   const mapContainerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<any>(null)
@@ -350,7 +364,7 @@ export default function NetworkMap() {
       const requests: Promise<any>[] = [mappingAPI.getNodes(), mappingAPI.getEdges()]
       if (withSettings) requests.push(mapSettingsAPI.get())
       const [nodesRes, edgesRes, settingsRes] = await Promise.all(requests)
-      if (!nodesRes.success || !edgesRes.success) throw new Error('Topology data could not be loaded')
+      if (!nodesRes.success || !edgesRes.success) throw new Error(t('map.toast.topologyLoadFailed'))
       setNodes(normalizeNodes(nodesRes.data))
       setEdges(normalizeEdges(edgesRes.data))
       const settings = settingsRes?.data as any
@@ -363,11 +377,11 @@ export default function NetworkMap() {
       }
       setLastRefresh(new Date())
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed loading network topology')
+      toast.error(error instanceof Error ? error.message : t('map.toast.topologyLoadError'))
     } finally {
       setLoading(false)
     }
-  }, [toast])
+  }, [t, toast])
 
   useEffect(() => { void loadData() }, [loadData])
   useEffect(() => {
@@ -417,7 +431,7 @@ export default function NetworkMap() {
         opacity: 0.9,
         dashArray: edge.fiber_type === 'drop' ? '7 7' : undefined,
       }).addTo(cablesLayerRef.current)
-      line.bindTooltip(`<strong>${escapeHtml(edge.edge_id)}</strong><br>${escapeHtml(meta.label)} · ${escapeHtml(edge.source)} → ${escapeHtml(edge.target)}`)
+      line.bindTooltip(`<strong>${escapeHtml(edge.edge_id)}</strong><br>${escapeHtml(t(meta.labelKey))} · ${escapeHtml(edge.source)} → ${escapeHtml(edge.target)}`)
       line.on('click', () => { setSelectedEdge(edge); setSelectedNode(null) })
     })
 
@@ -427,7 +441,7 @@ export default function NetworkMap() {
       const marker = L.marker([node.latitude, node.longitude], {
         icon: L.divIcon({ className: '', html, iconSize: [28, 28], iconAnchor: [14, 14] })
       }).addTo(markersLayerRef.current)
-      marker.bindTooltip(`<strong>${escapeHtml(node.name)}</strong><br>${escapeHtml(getTypeLabel(node.type))} · ${escapeHtml(node.node_id)}`)
+      marker.bindTooltip(`<strong>${escapeHtml(node.name)}</strong><br>${escapeHtml(nodeTypeLabel(node.type))} · ${escapeHtml(node.node_id)}`)
       marker.on('click', () => { setSelectedNode(node); setSelectedEdge(null) })
     })
     if (nodes.length && !hasCenteredAssetsRef.current) {
@@ -441,7 +455,7 @@ export default function NetworkMap() {
       )
       hasCenteredAssetsRef.current = true
     }
-  }, [edges, isDarkMode, maxZoom, minZoom, nodes])
+  }, [edges, isDarkMode, maxZoom, minZoom, nodeTypeLabel, nodes, t])
 
   useEffect(() => {
     if (mapView !== 'map') return
@@ -494,13 +508,13 @@ export default function NetworkMap() {
       const response = editingNode
         ? await mappingAPI.updateNode(form.node_id, form)
         : await mappingAPI.createNode(form)
-      if (!response.success) throw new Error(response.message || 'Node could not be saved')
-      toast.success(editingNode ? 'Node updated' : 'Node added')
+      if (!response.success) throw new Error(response.message || t('map.toast.nodeSaveFailed'))
+      toast.success(editingNode ? t('map.toast.nodeUpdated') : t('map.toast.nodeAdded'))
       setNodeEditor(null)
       setSelectedNode(null)
       await loadData(false)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Node could not be saved')
+      toast.error(error instanceof Error ? error.message : t('map.toast.nodeSaveFailed'))
     } finally {
       setSaving(false)
     }
@@ -511,39 +525,39 @@ export default function NetworkMap() {
       const response = editingEdge
         ? await mappingAPI.updateEdge(form.edge_id, form)
         : await mappingAPI.createEdge(form)
-      if (!response.success) throw new Error(response.message || 'Cable could not be saved')
-      toast.success(editingEdge ? 'Cable updated' : 'Cable drawn')
+      if (!response.success) throw new Error(response.message || t('map.toast.cableSaveFailed'))
+      toast.success(editingEdge ? t('map.toast.cableUpdated') : t('map.toast.cableDrawn'))
       setEdgeEditor(null)
       setSelectedEdge(null)
       await loadData(false)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Cable could not be saved')
+      toast.error(error instanceof Error ? error.message : t('map.toast.cableSaveFailed'))
     } finally {
       setSaving(false)
     }
   }
   const deleteNode = async (node: MapNode) => {
-    if (!window.confirm(`Delete ${node.node_id}? Every cable connected to this node will also be deleted.`)) return
+    if (!window.confirm(t('map.confirm.deleteNode', { id: node.node_id }))) return
     try {
       const response = await mappingAPI.deleteNode(node.node_id)
-      if (!response.success) throw new Error(response.message || 'Node could not be deleted')
-      toast.success('Node deleted')
+      if (!response.success) throw new Error(response.message || t('map.toast.nodeDeleteFailed'))
+      toast.success(t('map.toast.nodeDeleted'))
       setSelectedNode(null)
       await loadData(false)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Node could not be deleted')
+      toast.error(error instanceof Error ? error.message : t('map.toast.nodeDeleteFailed'))
     }
   }
   const deleteEdge = async (edge: MapEdge) => {
-    if (!window.confirm(`Delete cable ${edge.edge_id}?`)) return
+    if (!window.confirm(t('map.confirm.deleteCable', { id: edge.edge_id }))) return
     try {
       const response = await mappingAPI.deleteEdge(edge.edge_id)
-      if (!response.success) throw new Error(response.message || 'Cable could not be deleted')
-      toast.success('Cable deleted')
+      if (!response.success) throw new Error(response.message || t('map.toast.cableDeleteFailed'))
+      toast.success(t('map.toast.cableDeleted'))
       setSelectedEdge(null)
       await loadData(false)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Cable could not be deleted')
+      toast.error(error instanceof Error ? error.message : t('map.toast.cableDeleteFailed'))
     }
   }
 
@@ -556,35 +570,35 @@ export default function NetworkMap() {
       <div className="page-frame">
         <header className="page-header">
           <div>
-            <p className="page-kicker">Outside plant</p>
-            <h1 className="page-title">Network topology</h1>
-            <p className="page-description">Kelola HTB, OLT, ODC, ODP, ONT, dan jalur kabel fiber langsung pada peta.</p>
+            <p className="page-kicker">{t('map.kicker')}</p>
+            <h1 className="page-title">{t('map.title')}</h1>
+            <p className="page-description">{t('map.description')}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {isAdmin && <button type="button" className="modern-button" onClick={openNewNode}><Icon name="pin" size={17} />Add node</button>}
-            {isAdmin && <button type="button" className="modern-button-secondary" onClick={openNewEdge}><Icon name="signal" size={17} />Draw cable</button>}
+            {isAdmin && <button type="button" className="modern-button" onClick={openNewNode}><Icon name="pin" size={17} />{t('map.addNode')}</button>}
+            {isAdmin && <button type="button" className="modern-button-secondary" onClick={openNewEdge}><Icon name="signal" size={17} />{t('map.drawCable')}</button>}
             <button type="button" className="modern-button-secondary" disabled={loading} onClick={() => void loadData(false)}>
-              <Icon name="refresh" size={17} className={loading ? 'animate-spin' : ''} />Refresh
+              <Icon name="refresh" size={17} className={loading ? 'animate-spin' : ''} />{t('common.refresh')}
             </button>
           </div>
         </header>
 
         <section className="mb-4 grid grid-cols-2 overflow-hidden rounded-[var(--radius)] border border-border bg-card sm:grid-cols-4">
-          <div className="border-b border-r border-border p-4 sm:border-b-0"><p className="metric-label">Nodes</p><p className="metric-value">{nodes.length}</p></div>
-          <div className="border-b border-border p-4 sm:border-b-0 sm:border-r"><p className="metric-label">Fiber cables</p><p className="metric-value">{edges.length}</p></div>
-          <div className="border-r border-border p-4"><p className="metric-label">OLT / ODC</p><p className="metric-value">{nodes.filter((n) => n.type === 'olt' || n.type === 'odc').length}</p></div>
-          <div className="p-4"><p className="metric-label">Last refresh</p><p className="mt-2 font-mono text-sm font-semibold">{lastRefresh?.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) || '—'}</p></div>
+          <div className="border-b border-r border-border p-4 sm:border-b-0"><p className="metric-label">{t('map.metric.nodes')}</p><p className="metric-value">{nodes.length}</p></div>
+          <div className="border-b border-border p-4 sm:border-b-0 sm:border-r"><p className="metric-label">{t('map.metric.cables')}</p><p className="metric-value">{edges.length}</p></div>
+          <div className="border-r border-border p-4"><p className="metric-label">{t('map.metric.oltOdc')}</p><p className="metric-value">{nodes.filter((n) => n.type === 'olt' || n.type === 'odc').length}</p></div>
+          <div className="p-4"><p className="metric-label">{t('map.metric.lastRefresh')}</p><p className="mt-2 font-mono text-sm font-semibold">{lastRefresh ? formatTime(lastRefresh) : '—'}</p></div>
         </section>
 
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap gap-2">
-            {nodeCounts.map((entry) => <span key={entry.value} className="modern-badge">{entry.label} {entry.count}</span>)}
+            {nodeCounts.map((entry) => <span key={entry.value} className="modern-badge">{t(entry.labelKey)} {entry.count}</span>)}
           </div>
           <div className="flex rounded-md border border-border bg-card p-1">
             {(['map', 'list'] as const).map((view) => (
               <button key={view} type="button" onClick={() => setMapView(view)}
                 className={`min-h-9 rounded px-3 text-sm font-semibold ${mapView === view ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>
-                {view === 'map' ? 'Map' : 'Inventory'}
+                {view === 'map' ? t('map.view.map') : t('map.view.list')}
               </button>
             ))}
           </div>
@@ -594,8 +608,8 @@ export default function NetworkMap() {
           <section className={`modern-card overflow-hidden ${mapView === 'map' ? '' : 'hidden'}`}>
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
               <div>
-                <h2 className="section-heading">Physical fiber map</h2>
-                <p className="text-xs text-muted-foreground">Click a node or cable to inspect and edit it.</p>
+                <h2 className="section-heading">{t('map.physicalMap')}</h2>
+                <p className="text-xs text-muted-foreground">{t('map.physicalMapHint')}</p>
               </div>
               <div className="inline-flex rounded-md border border-border bg-muted p-1">
                 {([['osm', 'OpenStreetMap'], ['google', 'Google Maps']] as const).map(([value, label]) => (
@@ -611,41 +625,41 @@ export default function NetworkMap() {
 
           <section className={`space-y-4 ${mapView === 'list' ? '' : 'hidden'}`}>
             <div className="modern-card overflow-hidden">
-              <div className="border-b border-border px-5 py-4"><h2 className="section-heading">Nodes</h2></div>
+              <div className="border-b border-border px-5 py-4"><h2 className="section-heading">{t('map.metric.nodes')}</h2></div>
               <div className="overflow-x-auto">
                 <table className="modern-table">
-                  <thead><tr><th>ID</th><th>Name</th><th>Type</th><th>Coordinates</th><th>Action</th></tr></thead>
+                  <thead><tr><th>{t('map.table.id')}</th><th>{t('map.table.name')}</th><th>{t('map.table.type')}</th><th>{t('map.table.coordinates')}</th><th>{t('common.actions')}</th></tr></thead>
                   <tbody>
                     {nodes.map((node) => (
                       <tr key={node.node_id}>
                         <td className="font-mono text-sm">{node.node_id}</td>
                         <td>{node.name}</td>
-                        <td><span className="flex items-center gap-2"><Icon name={nodeIconName(node.type)} size={17} />{getTypeLabel(node.type)}</span></td>
+                        <td><span className="flex items-center gap-2"><Icon name={nodeIconName(node.type)} size={17} />{nodeTypeLabel(node.type)}</span></td>
                         <td className="font-mono text-xs">{node.latitude.toFixed(6)}, {node.longitude.toFixed(6)}</td>
-                        <td><button className="min-h-11 font-semibold text-primary hover:underline" onClick={() => setSelectedNode(node)}>Details</button></td>
+                        <td><button className="min-h-11 font-semibold text-primary hover:underline" onClick={() => setSelectedNode(node)}>{t('common.details')}</button></td>
                       </tr>
                     ))}
-                    {!nodes.length && <tr><td colSpan={5} className="py-10 text-center text-muted-foreground">No nodes mapped yet.</td></tr>}
+                    {!nodes.length && <tr><td colSpan={5} className="py-10 text-center text-muted-foreground">{t('map.nodes.empty')}</td></tr>}
                   </tbody>
                 </table>
               </div>
             </div>
             <div className="modern-card overflow-hidden">
-              <div className="border-b border-border px-5 py-4"><h2 className="section-heading">Fiber cables</h2></div>
+              <div className="border-b border-border px-5 py-4"><h2 className="section-heading">{t('map.metric.cables')}</h2></div>
               <div className="overflow-x-auto">
                 <table className="modern-table">
-                  <thead><tr><th>ID</th><th>Route</th><th>Type</th><th>Distance</th><th>Action</th></tr></thead>
+                  <thead><tr><th>{t('map.table.id')}</th><th>{t('map.table.route')}</th><th>{t('map.table.type')}</th><th>{t('map.table.distance')}</th><th>{t('common.actions')}</th></tr></thead>
                   <tbody>
                     {edges.map((edge) => (
                       <tr key={edge.edge_id}>
                         <td className="font-mono text-sm">{edge.edge_id}</td>
                         <td>{edge.source} → {edge.target}</td>
-                        <td><span className="flex items-center gap-2"><span className="h-2 w-6 rounded" style={{ background: getFiberMeta(edge.fiber_type).color }} />{getFiberMeta(edge.fiber_type).label}</span></td>
+                        <td><span className="flex items-center gap-2"><span className="h-2 w-6 rounded" style={{ background: getFiberMeta(edge.fiber_type).color }} />{t(getFiberMeta(edge.fiber_type).labelKey)}</span></td>
                         <td>{edge.distance == null ? '—' : `${edge.distance} m`}</td>
-                        <td><button className="min-h-11 font-semibold text-primary hover:underline" onClick={() => setSelectedEdge(edge)}>Details</button></td>
+                        <td><button className="min-h-11 font-semibold text-primary hover:underline" onClick={() => setSelectedEdge(edge)}>{t('common.details')}</button></td>
                       </tr>
                     ))}
-                    {!edges.length && <tr><td colSpan={5} className="py-10 text-center text-muted-foreground">No fiber cables drawn yet.</td></tr>}
+                    {!edges.length && <tr><td colSpan={5} className="py-10 text-center text-muted-foreground">{t('map.cables.empty')}</td></tr>}
                   </tbody>
                 </table>
               </div>
@@ -654,7 +668,7 @@ export default function NetworkMap() {
           {loading && (
             <div className="pointer-events-none absolute right-3 top-3 z-[500] flex items-center gap-2 rounded-md border border-border bg-card/95 px-3 py-2 text-xs font-semibold shadow-sm">
               <Icon name="refresh" size={15} className="animate-spin" />
-              Loading topology…
+              {t('map.loadingTopology')}
             </div>
           )}
         </div>
@@ -662,34 +676,34 @@ export default function NetworkMap() {
         {selectedNode && (
           <ModalShell title={selectedNode.name} onClose={() => setSelectedNode(null)}>
             <dl className="grid gap-4 sm:grid-cols-2">
-              <div><dt className="metric-label">Node ID</dt><dd className="mt-1 font-mono">{selectedNode.node_id}</dd></div>
-              <div><dt className="metric-label">Type</dt><dd className="mt-1">{getTypeLabel(selectedNode.type)}</dd></div>
-              <div><dt className="metric-label">Coordinates</dt><dd className="mt-1 font-mono text-sm">{selectedNode.latitude}, {selectedNode.longitude}</dd></div>
-              <div><dt className="metric-label">Capacity</dt><dd className="mt-1">{selectedNode.capacity ?? '—'}</dd></div>
-              <div><dt className="metric-label">Splitter</dt><dd className="mt-1">{selectedNode.splitter || '—'}</dd></div>
+              <div><dt className="metric-label">{t('map.node.id')}</dt><dd className="mt-1 font-mono">{selectedNode.node_id}</dd></div>
+              <div><dt className="metric-label">{t('map.table.type')}</dt><dd className="mt-1">{nodeTypeLabel(selectedNode.type)}</dd></div>
+              <div><dt className="metric-label">{t('map.table.coordinates')}</dt><dd className="mt-1 font-mono text-sm">{selectedNode.latitude}, {selectedNode.longitude}</dd></div>
+              <div><dt className="metric-label">{t('map.node.capacity')}</dt><dd className="mt-1">{selectedNode.capacity ?? '—'}</dd></div>
+              <div><dt className="metric-label">{t('map.node.splitter')}</dt><dd className="mt-1">{selectedNode.splitter || '—'}</dd></div>
               <div><dt className="metric-label">PPPoE</dt><dd className="mt-1">{selectedNode.pppoe || '—'}</dd></div>
-              {selectedNode.notes && <div className="sm:col-span-2"><dt className="metric-label">Notes</dt><dd className="mt-1 whitespace-pre-wrap">{selectedNode.notes}</dd></div>}
+              {selectedNode.notes && <div className="sm:col-span-2"><dt className="metric-label">{t('map.node.notes')}</dt><dd className="mt-1 whitespace-pre-wrap">{selectedNode.notes}</dd></div>}
             </dl>
             <div className="mt-6 flex flex-wrap justify-end gap-2">
-              {isAdmin && <button className="modern-button-secondary" onClick={() => { setEditingNode(true); setNodeEditor({ ...selectedNode }); setSelectedNode(null) }}><Icon name="edit" size={17} />Edit</button>}
-              {isAdmin && <button className="modern-button-secondary text-[hsl(var(--status-danger))]" onClick={() => void deleteNode(selectedNode)}><Icon name="trash" size={17} />Delete</button>}
-              <button className="modern-button" onClick={() => setSelectedNode(null)}>Close</button>
+              {isAdmin && <button className="modern-button-secondary" onClick={() => { setEditingNode(true); setNodeEditor({ ...selectedNode }); setSelectedNode(null) }}><Icon name="edit" size={17} />{t('common.edit')}</button>}
+              {isAdmin && <button className="modern-button-secondary text-[hsl(var(--status-danger))]" onClick={() => void deleteNode(selectedNode)}><Icon name="trash" size={17} />{t('common.delete')}</button>}
+              <button className="modern-button" onClick={() => setSelectedNode(null)}>{t('common.close')}</button>
             </div>
           </ModalShell>
         )}
         {selectedEdge && (
           <ModalShell title={selectedEdge.edge_id} onClose={() => setSelectedEdge(null)}>
             <dl className="grid gap-4 sm:grid-cols-2">
-              <div><dt className="metric-label">Route</dt><dd className="mt-1">{selectedEdge.source} → {selectedEdge.target}</dd></div>
-              <div><dt className="metric-label">Fiber type</dt><dd className="mt-1">{getFiberMeta(selectedEdge.fiber_type).label}</dd></div>
-              <div><dt className="metric-label">Distance</dt><dd className="mt-1">{selectedEdge.distance == null ? '—' : `${selectedEdge.distance} m`}</dd></div>
-              <div><dt className="metric-label">Waypoints</dt><dd className="mt-1">{selectedEdge.waypoints?.length || 0}</dd></div>
-              {selectedEdge.notes && <div className="sm:col-span-2"><dt className="metric-label">Notes</dt><dd className="mt-1 whitespace-pre-wrap">{selectedEdge.notes}</dd></div>}
+              <div><dt className="metric-label">{t('map.table.route')}</dt><dd className="mt-1">{selectedEdge.source} → {selectedEdge.target}</dd></div>
+              <div><dt className="metric-label">{t('map.edge.fiberType')}</dt><dd className="mt-1">{t(getFiberMeta(selectedEdge.fiber_type).labelKey)}</dd></div>
+              <div><dt className="metric-label">{t('map.table.distance')}</dt><dd className="mt-1">{selectedEdge.distance == null ? '—' : `${selectedEdge.distance} m`}</dd></div>
+              <div><dt className="metric-label">{t('map.edge.waypoints')}</dt><dd className="mt-1">{selectedEdge.waypoints?.length || 0}</dd></div>
+              {selectedEdge.notes && <div className="sm:col-span-2"><dt className="metric-label">{t('map.node.notes')}</dt><dd className="mt-1 whitespace-pre-wrap">{selectedEdge.notes}</dd></div>}
             </dl>
             <div className="mt-6 flex flex-wrap justify-end gap-2">
-              {isAdmin && <button className="modern-button-secondary" onClick={() => { setEditingEdge(true); setEdgeEditor({ ...selectedEdge }); setSelectedEdge(null) }}><Icon name="edit" size={17} />Edit</button>}
-              {isAdmin && <button className="modern-button-secondary text-[hsl(var(--status-danger))]" onClick={() => void deleteEdge(selectedEdge)}><Icon name="trash" size={17} />Delete</button>}
-              <button className="modern-button" onClick={() => setSelectedEdge(null)}>Close</button>
+              {isAdmin && <button className="modern-button-secondary" onClick={() => { setEditingEdge(true); setEdgeEditor({ ...selectedEdge }); setSelectedEdge(null) }}><Icon name="edit" size={17} />{t('common.edit')}</button>}
+              {isAdmin && <button className="modern-button-secondary text-[hsl(var(--status-danger))]" onClick={() => void deleteEdge(selectedEdge)}><Icon name="trash" size={17} />{t('common.delete')}</button>}
+              <button className="modern-button" onClick={() => setSelectedEdge(null)}>{t('common.close')}</button>
             </div>
           </ModalShell>
         )}

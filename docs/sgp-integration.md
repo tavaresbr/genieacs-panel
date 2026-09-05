@@ -32,23 +32,23 @@ accepted. Requests time out after 15 seconds.
    Note the *app* name and the generated token.
 2. In SkyGenPanel, open **Settings → SGP integration** as an administrator.
 3. Fill in:
-   - **URL do SGP** — the provider base URL, e.g. `https://provedor.sgp.net.br`.
+   - **SGP URL** — the provider base URL, e.g. `https://provedor.sgp.net.br`.
    - **App** and **Token** — the credentials from step 1.
-   - **Vínculo ONT → contrato** — which identifier is sent to SGP when a device
+   - **ONT to contract link** — which identifier is sent to SGP when a device
      has no contract linked yet:
-     - `Login PPPoE do ONT` (default) — uses the PPPoE username the ONT reports.
-     - `ID Customer do painel` — uses the panel's generated Customer ID.
-     - `Somente vínculo manual` — no automatic lookup; an operator links each ONT.
-   - **Faturas por consulta** — how many open invoices to request (1–24).
-4. Use **Testar conexão** to verify. Without a sample customer the probe only
+     - *PPPoE login of the ONT* (default) — uses the PPPoE username the ONT reports.
+     - *Panel Customer ID* — uses the panel's generated Customer ID.
+     - *Manual link only* — no automatic lookup; an operator links each ONT.
+   - **Invoices per query** — how many open invoices to request (1–24).
+4. Use **Test connection** to verify. Without a sample customer the probe only
    confirms that the URL, app, and token are accepted; entering a CPF/CNPJ,
    contract number, or PPPoE login also verifies the lookup itself.
-5. Enable **Ativar integração com o SGP** and save.
+5. Enable **Enable the SGP integration** and save.
 
 The token is encrypted with the shared secret box (AES-256-GCM, keyed from
 `JWT_SECRET` under its own context) before being stored, and it is never
 returned to the browser. Saving with an empty token
-field keeps the stored one; **Remover token** clears it and disables the
+field keeps the stored one; **Remove token** clears it and disables the
 integration.
 
 > Because the key is derived from `JWT_SECRET`, changing that secret invalidates
@@ -56,13 +56,13 @@ integration.
 
 ## Operator view
 
-**Device Inventory → device → Overview** shows an *Integração SGP* card with the
+**Device Inventory → device → Overview** shows an *SGP integration* card with the
 contract number, customer name, plan, and service status, followed by the open
 invoices with their digitable line, PIX code, and second-copy link.
 
-- **Atualizar do SGP** re-queries SGP and refreshes the cached link.
-- **Liberação em confiança** requests a trust unlock for the linked contract.
-- **Desvincular** removes the stored link so the ONT resolves again (or can be
+- **Refresh from SGP** re-queries SGP and refreshes the cached link.
+- **Trust unlock** requests a trust unlock for the linked contract.
+- **Unlink** removes the stored link so the ONT resolves again (or can be
   linked to a different contract).
 - When automatic resolution finds nothing, the card offers a manual link by
   contract number.
@@ -74,11 +74,11 @@ not re-query SGP.
 
 Two portal options are configured in the same settings tab:
 
-- **Mostrar faturas no portal do assinante** adds a *Faturas* section to the
+- **Show invoices in the customer portal** adds an *Invoices* section to the
   portal listing the subscriber's open invoices, with the CPF/CNPJ masked to its
   last four digits. Paid invoices are filtered out.
-- **Permitir liberação em confiança pelo portal** adds a trust-unlock button.
-  SGP still decides whether the request is granted.
+- **Allow trust unlock from the portal** adds a trust-unlock button. SGP still
+  decides whether the request is granted.
 
 The contract is always resolved from the authenticated portal session; the
 browser cannot choose which contract is read. Both endpoints are rate limited
@@ -112,7 +112,15 @@ Errors carry a machine-readable `code`: `not_configured`, `unlinked`,
 `not_found`, `unauthorized`, `timeout`, `unreachable`, `sgp_rejected`,
 `invalid_response`.
 
-## Troubleshooting
+All panel and portal strings for the integration go through the panel's
+translation dictionaries (`pt-BR`, `en`, `es`), so the labels above appear in
+the reader's language. Two kinds of text are not translated: values that come
+from SGP itself (contract status, plan name, invoice description) are shown
+exactly as the provider's system returns them, and the API error messages in
+the table below are returned in Portuguese, like the rest of this API's
+messages.
+
+## Troubleshooting reference
 
 | Symptom | Likely cause |
 | --- | --- |

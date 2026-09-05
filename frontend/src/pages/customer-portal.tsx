@@ -1,6 +1,9 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react'
 import { BrandMark } from '@/components/brand-mark'
 import { Icon } from '@/components/ui/icon'
+import { LanguageSwitcher } from '@/components/language-switcher'
+import { useTranslation } from '@/contexts/language-context'
+import { getActiveLocale, translate } from '@/lib/i18n'
 
 type PortalOverview = {
   customerId: string
@@ -82,36 +85,15 @@ async function portalRequest<T>(path: string, init?: RequestInit): Promise<ApiRe
   const contentType = response.headers.get('content-type') || ''
   const result = contentType.includes('application/json')
     ? await response.json()
-    : { success: false, message: 'Respons portal tidak valid' }
+    : { success: false, message: translate(getActiveLocale(), 'portal.invalidResponse') }
   if (!response.ok) return { ...result, success: false }
   return result
 }
 
-function text(value: unknown) {
-  if (value === null || value === undefined || value === '') return 'Belum dilaporkan'
-  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-    return String(value)
-  }
-  return 'Belum dilaporkan'
-}
-
-function dateTime(value: string | null) {
-  if (!value) return 'Belum dilaporkan'
-  const date = new Date(value)
-  return Number.isNaN(date.getTime())
-    ? 'Belum dilaporkan'
-    : date.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })
-}
-
-function currency(amount: number | null) {
+/** Formats an SGP invoice amount in the subscriber's locale as BRL. */
+function currency(amount: number | null, intlLocale: string) {
   if (amount === null || !Number.isFinite(amount)) return '—'
-  return amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-}
-
-function dueDate(value: string | null) {
-  if (!value) return '—'
-  const [year, month, day] = value.split('-')
-  return year && month && day ? `${day}/${month}/${year}` : value
+  return amount.toLocaleString(intlLocale, { style: 'currency', currency: 'BRL' })
 }
 
 function isOverdue(value: string | null) {
@@ -128,17 +110,6 @@ function safeBoletoUrl(value: string | null) {
   } catch {
     return null
   }
-}
-
-function uptime(value: unknown) {
-  const seconds = Number(value)
-  if (!Number.isFinite(seconds) || seconds < 0) return 'Belum dilaporkan'
-  const days = Math.floor(seconds / 86400)
-  const hours = Math.floor((seconds % 86400) / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-  return [days ? `${days} hari` : '', hours ? `${hours} jam` : '', `${minutes} menit`]
-    .filter(Boolean)
-    .join(' ')
 }
 
 function MetricCard({
@@ -162,6 +133,7 @@ function MetricCard({
 }
 
 export default function CustomerPortal() {
+  const { t, formatDateTime, intlLocale } = useTranslation()
   const [checkingSession, setCheckingSession] = useState(true)
   const [authenticated, setAuthenticated] = useState(false)
   const [customerId, setCustomerId] = useState('')
@@ -190,6 +162,38 @@ export default function CustomerPortal() {
     message: string
   } | null>(null)
 
+  const notReported = t('portal.notReported')
+
+  /** Values arrive from the ONT as unknown JSON, so anything unusable reads as "not reported". */
+  const text = (value: unknown) => {
+    if (value === null || value === undefined || value === '') return notReported
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+      return String(value)
+    }
+    return notReported
+  }
+
+  const dateTime = (value: string | null) => {
+    if (!value) return notReported
+    const date = new Date(value)
+    return Number.isNaN(date.getTime())
+      ? notReported
+      : formatDateTime(date, { dateStyle: 'medium', timeStyle: 'short' })
+  }
+
+  const uptime = (value: unknown) => {
+    const seconds = Number(value)
+    if (!Number.isFinite(seconds) || seconds < 0) return notReported
+    const days = Math.floor(seconds / 86400)
+    const hours = Math.floor((seconds % 86400) / 3600)
+    const minutes = Math.floor((seconds % 3600) / 60)
+    return [
+      days ? t('portal.uptime.days', { count: days }) : '',
+      hours ? t('portal.uptime.hours', { count: hours }) : '',
+      t('portal.uptime.minutes', { count: minutes }),
+    ].filter(Boolean).join(' ')
+  }
+
   const loadOverview = useCallback(async () => {
     setLoading(true)
     setError('')
@@ -197,16 +201,24 @@ export default function CustomerPortal() {
       const result = await portalRequest<PortalOverview>('/overview')
       if (!result.success || !result.data) {
         if (result.message?.toLowerCase().includes('session')) setAuthenticated(false)
-        setError(result.message || 'Informasi ONT belum dapat dimuat.')
+        setError(result.message || t('portal.error.overview'))
         return
       }
       setOverview(result.data)
     } catch {
-      setError('Portal tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.')
+      setError(t('portal.error.unreachable'))
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [t])
+
+  // An SGP due date is a plain YYYY-MM-DD; anchor it to local midnight so the
+  // reader's locale, not UTC, decides the displayed day.
+  const invoiceDueDate = (value: string | null) => (
+    value
+      ? new Intl.DateTimeFormat(intlLocale, { dateStyle: 'short' }).format(new Date(`${value}T00:00:00`))
+      : '—'
+  )
 
   const loadBilling = useCallback(async () => {
     setBillingLoading(true)
@@ -216,7 +228,7 @@ export default function CustomerPortal() {
         setBilling(null)
         setBillingError(
           result.code && TRANSIENT_BILLING_CODES.has(result.code)
-            ? (result.message || 'Falha temporária ao consultar as faturas.')
+            ? (result.message || t('portal.billing.temporaryFailure'))
             : ''
         )
         return
@@ -229,26 +241,23 @@ export default function CustomerPortal() {
     } finally {
       setBillingLoading(false)
     }
-  }, [])
+  }, [t])
 
   const requestTrustUnlock = async () => {
-    if (!confirm('Deseja solicitar a liberação em confiança do seu acesso?')) return
+    if (!confirm(t('portal.billing.trustUnlockConfirm'))) return
     setUnlockPending(true)
     setBillingFeedback(null)
     try {
       const result = await portalRequest('/billing/trust-unlock', { method: 'POST' })
       setBillingFeedback({
         type: result.success ? 'success' : 'error',
-        message: result.message || (result.success
-          ? 'Solicitação enviada.'
-          : 'Não foi possível solicitar a liberação agora.')
+        message: result.message || t(result.success
+          ? 'portal.billing.trustUnlockSent'
+          : 'portal.billing.trustUnlockFailed')
       })
       if (result.success) await loadBilling()
     } catch {
-      setBillingFeedback({
-        type: 'error',
-        message: 'Portal tidak dapat terhubung ke server. Coba lagi.'
-      })
+      setBillingFeedback({ type: 'error', message: t('portal.error.retry') })
     } finally {
       setUnlockPending(false)
     }
@@ -263,10 +272,7 @@ export default function CustomerPortal() {
       setBillingFeedback(null)
       window.setTimeout(() => setCopiedInvoiceId(null), 4000)
     } catch {
-      setBillingFeedback({
-        type: 'error',
-        message: 'Não foi possível copiar automaticamente. Selecione o código e copie manualmente.'
-      })
+      setBillingFeedback({ type: 'error', message: t('portal.billing.copyFailed') })
     }
   }
 
@@ -318,7 +324,7 @@ export default function CustomerPortal() {
         body: JSON.stringify({ customerId, password }),
       })
       if (!result.success) {
-        setError(result.message || 'ID Customer atau password salah.')
+        setError(result.message || t('portal.login.invalidCredentials'))
         return
       }
       setAuthenticated(true)
@@ -327,7 +333,7 @@ export default function CustomerPortal() {
       await loadOverview()
       void loadBilling()
     } catch {
-      setError('Portal tidak dapat terhubung ke server. Coba lagi.')
+      setError(t('portal.error.retry'))
     } finally {
       setLoading(false)
     }
@@ -367,7 +373,7 @@ export default function CustomerPortal() {
         if (result.message?.toLowerCase().includes('session')) setAuthenticated(false)
         setWifiFeedback({
           type: 'error',
-          message: result.message || 'Password WiFi belum dapat dibuka.'
+          message: result.message || t('portal.wifi.error.revealFailed')
         })
         return
       }
@@ -379,7 +385,7 @@ export default function CustomerPortal() {
     } catch {
       setWifiFeedback({
         type: 'error',
-        message: 'Portal tidak dapat terhubung ke server. Coba lagi.'
+        message: t('portal.error.retry')
       })
     } finally {
       setRevealingWifiPasswordIndex(null)
@@ -391,11 +397,11 @@ export default function CustomerPortal() {
     if (!wifiEditor) return
     const ssid = wifiEditor.ssid.trim()
     if (!ssid || ssid.length > 32) {
-      setWifiFeedback({ type: 'error', message: 'Nama WiFi harus berisi 1 sampai 32 karakter.' })
+      setWifiFeedback({ type: 'error', message: t('portal.wifi.error.ssidLength') })
       return
     }
     if (wifiEditor.password && !/^[\x20-\x7e]{8,63}$/.test(wifiEditor.password)) {
-      setWifiFeedback({ type: 'error', message: 'Password WiFi harus terdiri dari 8 sampai 63 karakter.' })
+      setWifiFeedback({ type: 'error', message: t('portal.wifi.error.passwordLength') })
       return
     }
 
@@ -414,7 +420,7 @@ export default function CustomerPortal() {
         if (result.message?.toLowerCase().includes('session')) setAuthenticated(false)
         setWifiFeedback({
           type: 'error',
-          message: result.message || 'Perubahan WiFi belum dapat dikirim.'
+          message: result.message || t('portal.wifi.error.saveFailed')
         })
         return
       }
@@ -434,12 +440,12 @@ export default function CustomerPortal() {
       setShowWifiPassword(false)
       setWifiFeedback({
         type: 'success',
-        message: result.message || 'Perubahan WiFi dikirim ke ONT.'
+        message: result.message || t('portal.wifi.success')
       })
     } catch {
       setWifiFeedback({
         type: 'error',
-        message: 'Portal tidak dapat terhubung ke server. Coba lagi.'
+        message: t('portal.error.retry')
       })
     } finally {
       setWifiSaving(false)
@@ -452,7 +458,7 @@ export default function CustomerPortal() {
         <div className="text-center" aria-live="polite">
           <BrandMark className="mx-auto h-12 w-12" title="SkyGenPanel" />
           <Icon name="refresh" className="mx-auto mt-5 animate-spin text-primary" />
-          <p className="mt-2 text-sm text-muted-foreground">Memeriksa sesi portal…</p>
+          <p className="mt-2 text-sm text-muted-foreground">{t('portal.checkingSession')}</p>
         </div>
       </main>
     )
@@ -464,21 +470,21 @@ export default function CustomerPortal() {
         <div className="mx-auto w-full max-w-md">
           <header className="mb-8 flex items-center gap-3">
             <BrandMark className="h-12 w-12 shrink-0" title="SkyGenPanel" />
-            <div>
+            <div className="min-w-0">
               <p className="text-lg font-bold">SkyGenPanel</p>
-              <p className="text-sm text-muted-foreground">Portal pelanggan</p>
+              <p className="text-sm text-muted-foreground">{t('portal.name')}</p>
             </div>
+            <LanguageSwitcher className="ml-auto shrink-0" />
           </header>
           <section className="modern-card p-5 sm:p-7">
-            <p className="page-kicker">Akses mandiri pelanggan</p>
-            <h1 className="text-2xl font-bold">Periksa kondisi ONT</h1>
+            <p className="page-kicker">{t('portal.login.kicker')}</p>
+            <h1 className="text-2xl font-bold">{t('portal.login.title')}</h1>
             <p className="mb-6 mt-2 text-sm leading-6 text-muted-foreground">
-              Masukkan ID Customer dan password portal yang diberikan penyedia layanan.
-              Password portal berbeda dari ID Customer.
+              {t('portal.login.subtitle')}
             </p>
             <form className="space-y-4" onSubmit={login}>
               <div>
-                <label className="field-label" htmlFor="customer-id">ID Customer</label>
+                <label className="field-label" htmlFor="customer-id">{t('portal.login.customerId')}</label>
                 <input
                   id="customer-id"
                   className="modern-input font-mono uppercase"
@@ -491,7 +497,7 @@ export default function CustomerPortal() {
                 />
               </div>
               <div>
-                <label className="field-label" htmlFor="customer-password">Password</label>
+                <label className="field-label" htmlFor="customer-password">{t('portal.login.password')}</label>
                 <div className="relative">
                   <input
                     id="customer-password"
@@ -503,14 +509,14 @@ export default function CustomerPortal() {
                     value={password}
                     onChange={(event) => setPassword(event.target.value.replace(/[^a-z0-9]/gi, '').toUpperCase().slice(0, 32))}
                     autoComplete="current-password"
-                    placeholder="Password portal"
+                    placeholder={t('portal.login.passwordPlaceholder')}
                     required
                   />
                   <button
                     type="button"
                     className="absolute right-1 top-1/2 inline-flex size-10 -translate-y-1/2 items-center justify-center rounded text-muted-foreground hover:bg-secondary"
                     onClick={() => setShowLoginPassword((visible) => !visible)}
-                    aria-label={showLoginPassword ? 'Sembunyikan password login' : 'Tampilkan password login'}
+                    aria-label={showLoginPassword ? t('portal.login.hidePassword') : t('portal.login.showPassword')}
                     aria-pressed={showLoginPassword}
                   >
                     <Icon name={showLoginPassword ? 'eye-off' : 'eye'} size={18} />
@@ -524,12 +530,12 @@ export default function CustomerPortal() {
               )}
               <button className="modern-button w-full" type="submit" disabled={loading}>
                 {loading ? <Icon name="refresh" size={17} className="animate-spin" /> : <Icon name="lock" size={17} />}
-                {loading ? 'Memeriksa…' : 'Masuk ke portal'}
+                {loading ? t('portal.login.submitting') : t('portal.login.submit')}
               </button>
             </form>
           </section>
           <p className="mt-5 text-center text-xs leading-5 text-muted-foreground">
-            Data berasal dari laporan terakhir ONT ke sistem operator.
+            {t('portal.login.footer')}
           </p>
         </div>
       </main>
@@ -543,26 +549,29 @@ export default function CustomerPortal() {
           <div className="flex min-w-0 items-center gap-3">
             <BrandMark className="h-10 w-10 shrink-0" title="SkyGenPanel" />
             <div className="min-w-0">
-              <p className="font-bold">Portal Pelanggan</p>
+              <p className="font-bold">{t('portal.name')}</p>
               <p className="truncate font-mono text-xs text-muted-foreground">{overview?.customerId || customerId}</p>
             </div>
           </div>
-          <button type="button" className="modern-button-secondary shrink-0 px-3" onClick={logout}>
-            <Icon name="logout" size={17} /> <span className="hidden sm:inline">Keluar</span>
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            <LanguageSwitcher />
+            <button type="button" className="modern-button-secondary shrink-0 px-3" onClick={logout}>
+              <Icon name="logout" size={17} /> <span className="hidden sm:inline">{t('portal.signOut')}</span>
+            </button>
+          </div>
         </div>
       </header>
 
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
         <div className="mb-6 flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="page-kicker">Ringkasan koneksi</p>
-            <h1 className="page-title">Kondisi internet rumah Anda</h1>
-            <p className="page-description">Status ONT, sinyal optik, dan WiFi berdasarkan laporan perangkat terakhir.</p>
+            <p className="page-kicker">{t('portal.overview.kicker')}</p>
+            <h1 className="page-title">{t('portal.overview.title')}</h1>
+            <p className="page-description">{t('portal.overview.description')}</p>
           </div>
           <button type="button" className="modern-button-secondary" onClick={() => void loadOverview()} disabled={loading}>
             <Icon name="refresh" size={17} className={loading ? 'animate-spin' : ''} />
-            Perbarui
+            {t('portal.overview.refresh')}
           </button>
         </div>
 
@@ -571,10 +580,10 @@ export default function CustomerPortal() {
             <div className="flex items-start gap-3">
               <Icon name="warning" className="mt-0.5 shrink-0 text-destructive" />
               <div>
-                <h2 className="font-semibold">Data belum tersedia</h2>
+                <h2 className="font-semibold">{t('portal.overview.errorTitle')}</h2>
                 <p className="mt-1 text-sm text-muted-foreground">{error}</p>
                 <button type="button" className="mt-3 text-sm font-semibold text-primary hover:underline" onClick={() => void loadOverview()}>
-                  Coba lagi
+                  {t('common.retry')}
                 </button>
               </div>
             </div>
@@ -582,42 +591,42 @@ export default function CustomerPortal() {
         )}
 
         {!overview && loading ? (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="Memuat informasi ONT">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label={t('portal.overview.loadingAria')}>
             {[0, 1, 2, 3].map((item) => <div key={item} className="h-36 animate-pulse rounded-[var(--radius)] bg-muted" />)}
           </div>
         ) : overview ? (
           <>
             {overview.status === 'offline' && (
               <div className="mb-4 rounded-md border border-[hsl(var(--status-warning))]/40 bg-[hsl(var(--status-warning))]/10 p-4 text-sm">
-                ONT belum mengirim laporan dalam 10 menit terakhir. Periksa daya dan kabel fiber sebelum menghubungi operator.
+                {t('portal.overview.offlineWarning')}
               </div>
             )}
-            <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="Metrik koneksi">
+            <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label={t('portal.overview.metricsAria')}>
               <MetricCard
                 icon="power"
-                label="Status ONT"
-                value={overview.status === 'online' ? 'Online' : 'Offline'}
-                helper={`Inform terakhir ${dateTime(overview.lastInform)}`}
+                label={t('portal.metric.status')}
+                value={overview.status === 'online' ? t('portal.metric.statusOnline') : t('portal.metric.statusOffline')}
+                helper={t('portal.metric.lastInform', { time: dateTime(overview.lastInform) })}
               />
-              <MetricCard icon="signal" label="Sinyal optik RX" value={`${text(overview.optical.rxPower)}${text(overview.optical.rxPower) === 'Belum dilaporkan' ? '' : ' dBm'}`} />
-              <MetricCard icon="thermometer" label="Suhu perangkat" value={`${text(overview.optical.temperature)}${text(overview.optical.temperature) === 'Belum dilaporkan' ? '' : ' °C'}`} />
-              <MetricCard icon="phone" label="Perangkat terhubung" value={text(overview.connectedDevices)} helper="Total klien yang dilaporkan ONT" />
+              <MetricCard icon="signal" label={t('portal.metric.rxPower')} value={`${text(overview.optical.rxPower)}${text(overview.optical.rxPower) === notReported ? '' : ' dBm'}`} />
+              <MetricCard icon="thermometer" label={t('portal.metric.temperature')} value={`${text(overview.optical.temperature)}${text(overview.optical.temperature) === notReported ? '' : ' °C'}`} />
+              <MetricCard icon="phone" label={t('portal.metric.connectedDevices')} value={text(overview.connectedDevices)} helper={t('portal.metric.connectedDevicesHelper')} />
             </section>
 
             <div className="mt-5 grid gap-5 lg:grid-cols-[1.05fr_.95fr]">
               <section className="modern-card p-5 sm:p-6">
-                <h2 className="section-heading">Informasi ONT</h2>
-                <p className="section-description mb-5">Identitas dan kondisi perangkat di lokasi pelanggan.</p>
+                <h2 className="section-heading">{t('portal.ont.title')}</h2>
+                <p className="section-description mb-5">{t('portal.ont.description')}</p>
                 <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
                   {[
-                    ['Pabrikan', text(overview.ont.manufacturer)],
-                    ['Model', text(overview.ont.model)],
-                    ['Serial number', text(overview.ont.serialNumber)],
-                    ['Hardware', text(overview.ont.hardwareVersion)],
-                    ['Software', text(overview.ont.softwareVersion)],
-                    ['Uptime', uptime(overview.ont.uptimeSeconds)],
-                    ['Boot terakhir', dateTime(overview.lastBoot)],
-                    ['Terdaftar', dateTime(overview.registered)],
+                    [t('portal.ont.manufacturer'), text(overview.ont.manufacturer)],
+                    [t('portal.ont.model'), text(overview.ont.model)],
+                    [t('portal.ont.serialNumber'), text(overview.ont.serialNumber)],
+                    [t('portal.ont.hardware'), text(overview.ont.hardwareVersion)],
+                    [t('portal.ont.software'), text(overview.ont.softwareVersion)],
+                    [t('portal.ont.uptime'), uptime(overview.ont.uptimeSeconds)],
+                    [t('portal.ont.lastBoot'), dateTime(overview.lastBoot)],
+                    [t('portal.ont.registered'), dateTime(overview.registered)],
                   ].map(([label, value]) => (
                     <div key={label} className="border-b border-border pb-3">
                       <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</dt>
@@ -628,8 +637,8 @@ export default function CustomerPortal() {
               </section>
 
               <section className="modern-card p-5 sm:p-6">
-                <h2 className="section-heading">Jaringan WiFi</h2>
-                <p className="section-description mb-5">Lihat atau ubah nama dan password jaringan di ONT Anda.</p>
+                <h2 className="section-heading">{t('portal.wifi.title')}</h2>
+                <p className="section-description mb-5">{t('portal.wifi.description')}</p>
                 {wifiFeedback && (
                   <div
                     className={`mb-4 rounded-md border p-3 text-sm ${
@@ -650,7 +659,7 @@ export default function CustomerPortal() {
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <p className="truncate font-semibold">{text(network.ssid)}</p>
-                            <p className="mt-1 text-xs text-muted-foreground">WiFi #{network.index}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">{t('portal.wifi.networkLabel', { index: network.index })}</p>
                           </div>
                           <span className={
                             network.enabled === false
@@ -661,19 +670,19 @@ export default function CustomerPortal() {
                           }>
                             {
                               network.enabled === false
-                                ? 'Nonaktif'
+                                ? t('portal.wifi.disabled')
                                 : network.enabled === true
-                                  ? 'Aktif'
-                                  : 'Status belum dilaporkan'
+                                  ? t('portal.wifi.enabled')
+                                  : t('portal.wifi.statusUnknown')
                             }
                           </span>
                         </div>
                         <p className="mt-3 text-sm text-muted-foreground">
-                          <strong className="text-foreground">{text(network.connectedDevices)}</strong> perangkat terhubung
+                          <strong className="text-foreground">{text(network.connectedDevices)}</strong> {t('portal.wifi.connectedDevices')}
                         </p>
                         <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-border bg-card px-3 py-2">
                           <div className="min-w-0">
-                            <p className="text-[0.68rem] font-semibold uppercase tracking-wide text-muted-foreground">Password tersimpan</p>
+                            <p className="text-[0.68rem] font-semibold uppercase tracking-wide text-muted-foreground">{t('portal.wifi.savedPassword')}</p>
                             <p className="mt-1 truncate font-mono text-sm">
                               {network.hasSavedPassword
                                 ? (
@@ -682,7 +691,7 @@ export default function CustomerPortal() {
                                       ? revealedWifiPasswords[network.index]
                                       : '••••••••••••'
                                   )
-                                : 'Belum tersimpan'}
+                                : t('portal.wifi.noSavedPassword')}
                             </p>
                           </div>
                           {network.hasSavedPassword && (
@@ -693,8 +702,8 @@ export default function CustomerPortal() {
                               onClick={() => void toggleSavedWifiPassword(network.index)}
                               aria-label={
                                 visibleSavedPasswordIndex === network.index
-                                  ? 'Sembunyikan password tersimpan'
-                                  : 'Tampilkan password tersimpan'
+                                  ? t('portal.wifi.hideSavedPassword')
+                                  : t('portal.wifi.showSavedPassword')
                               }
                               aria-pressed={visibleSavedPasswordIndex === network.index}
                             >
@@ -713,12 +722,12 @@ export default function CustomerPortal() {
                           )}
                         </div>
                         <p className="mt-1.5 text-[0.68rem] leading-5 text-muted-foreground">
-                          Hanya password terakhir yang pernah dikirim melalui portal ini.
+                          {t('portal.wifi.savedPasswordHint')}
                         </p>
                         {wifiEditor?.index === network.index ? (
                           <form className="mt-4 space-y-4 border-t border-border pt-4" onSubmit={saveWifi}>
                             <div>
-                              <label className="field-label" htmlFor={`wifi-ssid-${network.index}`}>Nama WiFi</label>
+                              <label className="field-label" htmlFor={`wifi-ssid-${network.index}`}>{t('portal.wifi.ssidLabel')}</label>
                               <input
                                 id={`wifi-ssid-${network.index}`}
                                 className="modern-input"
@@ -730,10 +739,10 @@ export default function CustomerPortal() {
                                 autoComplete="off"
                                 required
                               />
-                              <p className="field-hint">Maksimal 32 karakter.</p>
+                              <p className="field-hint">{t('portal.wifi.ssidHint')}</p>
                             </div>
                             <div>
-                              <label className="field-label" htmlFor={`wifi-password-${network.index}`}>Password baru</label>
+                              <label className="field-label" htmlFor={`wifi-password-${network.index}`}>{t('portal.wifi.newPassword')}</label>
                               <div className="relative">
                                 <input
                                   id={`wifi-password-${network.index}`}
@@ -746,22 +755,22 @@ export default function CustomerPortal() {
                                     current ? { ...current, password: event.target.value } : current
                                   ))}
                                   autoComplete="new-password"
-                                  placeholder="Kosongkan jika tidak diubah"
+                                  placeholder={t('portal.wifi.newPasswordPlaceholder')}
                                 />
                                 <button
                                   type="button"
                                   className="absolute right-1 top-1/2 inline-flex size-10 -translate-y-1/2 items-center justify-center rounded text-muted-foreground hover:bg-secondary"
                                   onClick={() => setShowWifiPassword((visible) => !visible)}
-                                  aria-label={showWifiPassword ? 'Sembunyikan password' : 'Tampilkan password'}
+                                  aria-label={showWifiPassword ? t('portal.wifi.hidePassword') : t('portal.wifi.showPassword')}
                                   aria-pressed={showWifiPassword}
                                 >
                                   <Icon name={showWifiPassword ? 'eye-off' : 'eye'} size={18} />
                                 </button>
                               </div>
-                              <p className="field-hint">8–63 karakter. Kosongkan untuk mempertahankan password saat ini.</p>
+                              <p className="field-hint">{t('portal.wifi.passwordHint')}</p>
                             </div>
                             <div className="rounded-md border border-[hsl(var(--status-warning))]/35 bg-[hsl(var(--status-warning))]/10 p-3 text-xs leading-5">
-                              Perangkat yang memakai jaringan ini dapat terputus dan harus tersambung ulang setelah perubahan diterapkan.
+                              {t('portal.wifi.disconnectWarning')}
                             </div>
                             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                               <button
@@ -770,7 +779,7 @@ export default function CustomerPortal() {
                                 disabled={wifiSaving}
                                 onClick={() => setWifiEditor(null)}
                               >
-                                Batal
+                                {t('common.cancel')}
                               </button>
                               <button
                                 type="submit"
@@ -781,7 +790,7 @@ export default function CustomerPortal() {
                                 }
                               >
                                 <Icon name={wifiSaving ? 'refresh' : 'check'} size={17} className={wifiSaving ? 'animate-spin' : ''} />
-                                {wifiSaving ? 'Mengirim…' : 'Simpan perubahan'}
+                                {wifiSaving ? t('portal.wifi.saving') : t('portal.wifi.save')}
                               </button>
                             </div>
                           </form>
@@ -791,7 +800,7 @@ export default function CustomerPortal() {
                             className="modern-button-secondary mt-4 w-full"
                             onClick={() => openWifiEditor(network.index, network.ssid)}
                           >
-                            <Icon name="edit" size={17} /> Ubah nama atau password
+                            <Icon name="edit" size={17} /> {t('portal.wifi.edit')}
                           </button>
                         )}
                       </article>
@@ -800,27 +809,33 @@ export default function CustomerPortal() {
                 ) : (
                   <div className="rounded-md border border-dashed border-border p-6 text-center">
                     <Icon name="wifi" className="mx-auto text-muted-foreground" />
-                    <p className="mt-2 text-sm font-semibold">WiFi belum dilaporkan</p>
-                    <p className="mt-1 text-xs text-muted-foreground">Data akan muncul setelah ONT mengirim parameter WiFi.</p>
+                    <p className="mt-2 text-sm font-semibold">{t('portal.wifi.empty')}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{t('portal.wifi.emptyHint')}</p>
                   </div>
                 )}
               </section>
             </div>
             <p className="mt-5 text-center text-xs text-muted-foreground">
-              Data diperbarui {dateTime(overview.generatedAt)} · otomatis setiap 60 detik
+              {t('portal.footer.updated', { time: dateTime(overview.generatedAt) })}
             </p>
           </>
         ) : null}
 
           {billing && (
-            <section className="modern-card mt-5 p-5 sm:p-6" aria-label="Faturas do contrato">
+            <section className="modern-card mt-5 p-5 sm:p-6" aria-label={t('portal.billing.title', { plan: billing.contract.plan || t('portal.billing.yourPlan') })}>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <h2 className="section-heading">Faturas — {billing.contract.plan || 'seu plano'}</h2>
+                  <h2 className="section-heading">
+                    {t('portal.billing.title', {
+                      plan: billing.contract.plan || t('portal.billing.yourPlan')
+                    })}
+                  </h2>
                   <p className="section-description">
-                    Contrato <span className="font-mono">{billing.contract.contract}</span>
+                    {t('portal.billing.summary', { contract: billing.contract.contract })}
                     {billing.contract.statusLabel ? ` · ${billing.contract.statusLabel}` : ''}
-                    {billing.contract.document ? ` · CPF/CNPJ ${billing.contract.document}` : ''}
+                    {billing.contract.document
+                      ? ` · ${t('portal.billing.summaryDocument', { document: billing.contract.document })}`
+                      : ''}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -831,7 +846,7 @@ export default function CustomerPortal() {
                     disabled={billingLoading}
                   >
                     <Icon name="refresh" size={17} className={billingLoading ? 'animate-spin' : ''} />
-                    Atualizar
+                    {t('portal.billing.refresh')}
                   </button>
                   {billing.trustUnlockAvailable && (
                     <button
@@ -841,7 +856,7 @@ export default function CustomerPortal() {
                       disabled={unlockPending}
                     >
                       <Icon name={unlockPending ? 'refresh' : 'unlock'} size={17} className={unlockPending ? 'animate-spin' : ''} />
-                      {unlockPending ? 'Solicitando…' : 'Liberação em confiança'}
+                      {t(unlockPending ? 'portal.billing.trustUnlockPending' : 'portal.billing.trustUnlock')}
                     </button>
                   )}
                 </div>
@@ -864,8 +879,8 @@ export default function CustomerPortal() {
               {billing.invoices.length === 0 ? (
                 <div className="mt-5 rounded-md border border-dashed border-border p-6 text-center">
                   <Icon name="check" className="mx-auto text-[hsl(var(--status-success))]" />
-                  <p className="mt-2 text-sm font-semibold">Nenhuma fatura em aberto</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Suas mensalidades estão em dia.</p>
+                  <p className="mt-2 text-sm font-semibold">{t('portal.billing.none')}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{t('portal.billing.noneHint')}</p>
                 </div>
               ) : (
                 <ul className="mt-5 space-y-3">
@@ -875,13 +890,15 @@ export default function CustomerPortal() {
                       className="rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-4"
                     >
                       <div className="flex flex-wrap items-baseline justify-between gap-2">
-                        <span className="text-lg font-bold">{currency(invoice.amount)}</span>
+                        <span className="text-lg font-bold">{currency(invoice.amount, intlLocale)}</span>
                         <span className={isOverdue(invoice.dueDate) ? 'modern-badge-error' : 'modern-badge'}>
-                          {isOverdue(invoice.dueDate) ? 'Vencida em ' : 'Vence em '}{dueDate(invoice.dueDate)}
+                          {t(isOverdue(invoice.dueDate) ? 'portal.billing.overdueOn' : 'portal.billing.dueOn', {
+                            date: invoiceDueDate(invoice.dueDate)
+                          })}
                         </span>
                       </div>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        {invoice.description || 'Mensalidade'}
+                        {invoice.description || t('portal.billing.defaultDescription')}
                         {invoice.status ? ` · ${invoice.status}` : ''}
                       </p>
                       {(invoice.digitableLine || invoice.barcode) && (
@@ -897,7 +914,7 @@ export default function CustomerPortal() {
                             onClick={() => void copyInvoiceCode(invoice)}
                           >
                             <Icon name={copiedInvoiceId === invoice.id ? 'check' : 'copy'} size={17} />
-                            {copiedInvoiceId === invoice.id ? 'Código copiado' : 'Copiar código'}
+                            {t(copiedInvoiceId === invoice.id ? 'portal.billing.copied' : 'portal.billing.copy')}
                           </button>
                         )}
                         {safeBoletoUrl(invoice.link) && (
@@ -907,7 +924,7 @@ export default function CustomerPortal() {
                             target="_blank"
                             rel="noopener noreferrer"
                           >
-                            <Icon name="external" size={17} /> Abrir 2ª via
+                            <Icon name="external" size={17} /> {t('portal.billing.openBoleto')}
                           </a>
                         )}
                       </div>
@@ -917,7 +934,7 @@ export default function CustomerPortal() {
               )}
 
               <p className="mt-4 text-xs text-muted-foreground">
-                Dados financeiros fornecidos pelo sistema do provedor (SGP) em {dateTime(billing.generatedAt)}.
+                {t('portal.billing.source', { time: dateTime(billing.generatedAt) })}
               </p>
             </section>
           )}
@@ -927,14 +944,14 @@ export default function CustomerPortal() {
               <div className="flex items-start gap-3">
                 <Icon name="warning" className="mt-0.5 shrink-0 text-destructive" />
                 <div>
-                  <h2 className="font-semibold">Faturas indisponíveis</h2>
+                  <h2 className="font-semibold">{t('portal.billing.unavailable')}</h2>
                   <p className="mt-1 text-sm text-muted-foreground">{billingError}</p>
                   <button
                     type="button"
                     className="mt-3 text-sm font-semibold text-primary hover:underline"
                     onClick={() => void loadBilling()}
                   >
-                    Tentar novamente
+                    {t('portal.billing.retry')}
                   </button>
                 </div>
               </div>

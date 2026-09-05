@@ -43,6 +43,7 @@ SkyGenPanel is a management layer for GenieACS deployments. It combines an opera
 - Dedicated operator and customer listeners served by one application.
 - First-run setup wizard for the initial administrator account.
 - Fast Vite and React interface with responsive light and dark themes.
+- Multi-language interface in Portuguese (Brazil), English, and Spanish for both the operator panel and the customer portal.
 - GenieACS fault visibility and dependency-light dashboard charts.
 - Network topology editor with Google Maps and OpenStreetMap-compatible providers.
 - Automatic Customer ID generation that can be enabled or disabled in Settings.
@@ -163,7 +164,7 @@ the old one no longer works.
 
 ## SGP Integration
 
-Open **Settings → SGP integration** to connect the panel to
+Open **Settings → SGP integration** (*Integração SGP*) to connect the panel to
 [SGP](https://sgp.net.br) and show contract, plan, and open-invoice data next to
 each ONT. The integration token is encrypted with `JWT_SECRET` and never leaves
 the server. See [`docs/sgp-integration.md`](docs/sgp-integration.md) for setup,
@@ -207,6 +208,26 @@ Build and run the production bundle locally:
 npm run build
 npm start
 ```
+
+## Languages
+
+The operator panel and the customer portal ship with Portuguese (Brazil),
+English, and Spanish. The active language follows the browser preference on
+first load and falls back to Portuguese (Brazil); the choice is stored per
+browser in `localStorage` under the `language` key. Operators change it from
+the sidebar or from **Settings → Panel & ACS**, and subscribers change it from
+the portal header. Dates and numbers follow the active locale and the viewer
+time zone.
+
+Translations live in `frontend/src/lib/i18n/locales/`. `en.ts` is the source of
+truth: the other dictionaries are typed against it, so `npm run typecheck`
+fails whenever a key is added without a translation in every language. To add a
+language, create a locale file, register it in
+`frontend/src/lib/i18n/config.ts`, and add it to `dictionaries` in
+`frontend/src/lib/i18n/index.ts`.
+
+Messages returned by the backend API are not translated yet and still reach the
+interface in English.
 
 ## Architecture
 

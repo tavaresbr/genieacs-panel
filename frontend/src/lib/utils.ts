@@ -1,5 +1,6 @@
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
+import { getActiveLocale, getIntlLocale, translate } from "@/lib/i18n"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -22,22 +23,25 @@ export function formatRelativeTime(dateString: string): string {
   const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
 
   if (diffInSeconds < 60) {
-    return 'Just now'
+    return translate(getActiveLocale(), 'common.justNow')
   }
+
+  // Intl handles the plural rules of every supported locale.
+  const relative = new Intl.RelativeTimeFormat(getIntlLocale(), { numeric: 'always' })
 
   const diffInMinutes = Math.floor(diffInSeconds / 60)
   if (diffInMinutes < 60) {
-    return `${diffInMinutes} minute${diffInMinutes > 1 ? 's' : ''} ago`
+    return relative.format(-diffInMinutes, 'minute')
   }
 
   const diffInHours = Math.floor(diffInMinutes / 60)
   if (diffInHours < 24) {
-    return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`
+    return relative.format(-diffInHours, 'hour')
   }
 
   const diffInDays = Math.floor(diffInHours / 24)
   if (diffInDays < 7) {
-    return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`
+    return relative.format(-diffInDays, 'day')
   }
 
   return formatDate(dateString)
@@ -108,27 +112,24 @@ export function copyToClipboard(text: string): Promise<boolean> {
   }
 }
 
+/** Formats a timestamp in the active locale and the viewer's own time zone. */
 export function formatDate(isoString: string | undefined | null): string {
-  if (!isoString) return 'N/A';
+  if (!isoString) return translate(getActiveLocale(), 'common.na');
 
   try {
     const date = new Date(isoString);
-    const options: Intl.DateTimeFormatOptions = {
+    if (Number.isNaN(date.getTime())) return translate(getActiveLocale(), 'common.invalidDate');
+
+    return new Intl.DateTimeFormat(getIntlLocale(), {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
-      hour12: false,
-      timeZone: 'Asia/Jakarta'
-    };
-
-    let formatted = new Intl.DateTimeFormat('id-ID', options).format(date);
-    formatted = formatted.replace(/\//g, '-').replace(/\./g, ':').replace(',', '');
-
-    return formatted;
+      hour12: false
+    }).format(date);
   } catch {
-    return 'Invalid Date';
+    return translate(getActiveLocale(), 'common.invalidDate');
   }
 }
