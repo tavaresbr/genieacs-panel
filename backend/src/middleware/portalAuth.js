@@ -2,6 +2,7 @@ import 'dotenv/config';
 import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import CustomerAccount from '../models/CustomerAccount.js';
+import { isRequestSecure } from '../config/proxy.js';
 
 export const PORTAL_COOKIE_NAME = 'skygp_portal_session';
 const PORTAL_SESSION_TTL_SECONDS = 30 * 60;
@@ -47,8 +48,17 @@ export function portalCookieOptions(req) {
   return {
     httpOnly: true,
     sameSite: 'strict',
-    secure: req.secure,
+    secure: isRequestSecure(req),
     maxAge: PORTAL_SESSION_TTL_SECONDS * 1000,
+    path: '/'
+  };
+}
+
+export function portalClearCookieOptions(req) {
+  return {
+    httpOnly: true,
+    sameSite: 'strict',
+    secure: isRequestSecure(req),
     path: '/'
   };
 }

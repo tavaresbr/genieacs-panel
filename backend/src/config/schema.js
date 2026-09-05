@@ -130,10 +130,35 @@ export async function ensureSchema(db = getDb()) {
       t.string('software_id', 255).notNullable();
       t.string('pppoe_username', 255).notNullable();
       t.boolean('active').notNullable().defaultTo(true);
+      // Portal credentials are independent of the Customer ID: the ID only
+      // identifies the account, the hash authenticates it, and the encrypted
+      // copy lets an operator hand the password back without resetting it.
+      t.string('password_hash', 255);
+      t.text('password_ciphertext');
+      t.string('password_iv', 32);
+      t.string('password_tag', 32);
+      t.timestamp('password_updated_at');
       t.timestamp('last_seen_at').defaultTo(db.fn.now());
       t.timestamp('created_at').defaultTo(db.fn.now());
       t.timestamp('updated_at').defaultTo(db.fn.now());
     });
+  } else {
+    const customerPasswordColumns = [
+      ['password_hash', (t) => t.string('password_hash', 255)],
+      ['password_ciphertext', (t) => t.text('password_ciphertext')],
+      ['password_iv', (t) => t.string('password_iv', 32)],
+      ['password_tag', (t) => t.string('password_tag', 32)],
+      ['password_updated_at', (t) => t.timestamp('password_updated_at')]
+    ];
+    const missing = [];
+    for (const [column, add] of customerPasswordColumns) {
+      if (!(await db.schema.hasColumn('customer_accounts', column))) missing.push(add);
+    }
+    if (missing.length > 0) {
+      await db.schema.alterTable('customer_accounts', (t) => {
+        for (const add of missing) add(t);
+      });
+    }
   }
 
   if (!(await db.schema.hasTable('device_profiles'))) {

@@ -362,10 +362,10 @@ export default function CustomerPortal() {
                     className="modern-input pr-12 font-mono"
                     type={showLoginPassword ? 'text' : 'password'}
                     inputMode="text"
-                    pattern="[A-Za-z0-9]{6}"
-                    maxLength={6}
+                    pattern="[A-Za-z0-9]{6,32}"
+                    maxLength={32}
                     value={password}
-                    onChange={(event) => setPassword(event.target.value.replace(/[^a-z0-9]/gi, '').toUpperCase().slice(0, 6))}
+                    onChange={(event) => setPassword(event.target.value.replace(/[^a-z0-9]/gi, '').toUpperCase().slice(0, 32))}
                     autoComplete="current-password"
                     placeholder={t('portal.login.passwordPlaceholder')}
                     required

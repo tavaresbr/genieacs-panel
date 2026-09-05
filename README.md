@@ -35,6 +35,7 @@ SkyGenPanel is a management layer for GenieACS deployments. It combines an opera
 | Fleet health, faults, optical signal, temperature, and registration trends | ONT health, optical signal, uptime, and connected-device visibility |
 | ONT, OLT, ODC, and ODP topology management with a network map | Permanent Customer IDs bound to SoftwareVersion and PPPoE identity |
 | Multi-vendor WAN, WiFi, credential, and virtual-parameter configuration | Safe SSID and WiFi password changes for the authenticated customer's ONT |
+| Per-customer portal passwords that operators can reveal or regenerate | Portal sign-in with a credential independent of the Customer ID |
 | Runtime SQLite-to-MySQL migration and deployment controls | No WAN or administrative credential exposure |
 
 ## Highlights
@@ -46,6 +47,7 @@ SkyGenPanel is a management layer for GenieACS deployments. It combines an opera
 - GenieACS fault visibility and dependency-light dashboard charts.
 - Network topology editor with Google Maps and OpenStreetMap-compatible providers.
 - Automatic Customer ID generation that can be enabled or disabled in Settings.
+- Independent portal passwords per customer, generated automatically and rotatable from the device page.
 - Encrypted recovery of the last WiFi password changed through the customer portal.
 - Automatic Linux dependency and Node.js installation during both first install and CLI updates.
 
@@ -137,9 +139,27 @@ Environment configuration lives in `backend/.env`; see [`backend/.env.example`](
 | `PORTAL_JWT_SECRET` | Optional independent customer-session secret |
 | `CORS_ORIGINS` | Explicitly allowed browser origins |
 | `DATA_DIR` | Optional persistent application data directory |
-| `TRUST_PROXY` | Set to `1` only when requests arrive through a trusted direct proxy |
+| `TRUST_PROXY` | Number of trusted proxy hops in front of the panel; `1` for the default reverse-proxy or Cloudflare Tunnel deployment, `0` when the listeners are exposed directly |
+| `PORTAL_COOKIE_SECURE` | `auto` (default), `true`, or `false`; overrides the portal cookie `Secure` flag when a proxy terminates TLS without advertising it |
 
 The GenieACS URL and optional MySQL connection are managed from the Settings interface rather than environment variables. Runtime database configuration is stored in `DATA_DIR/db-config.json`.
+
+## Customer Portal Credentials
+
+Each customer account carries its own portal password. The Customer ID identifies
+the account; it is never the credential for it.
+
+- A password is generated automatically when an account is created.
+- Open a device in the operator panel and use **Customer access → Portal password**
+  to reveal the current password or generate a new one.
+- Passwords are stored as a bcrypt hash for authentication plus an AES-256-GCM
+  encrypted copy so staff can read one back without disrupting the customer.
+
+Accounts created before this release authenticated with the last six characters of
+their own Customer ID. On the first start after upgrading, every one of them
+receives a freshly generated password in the background, and the log reports how
+many were issued. Reveal the new password from the device page before sharing it —
+the old one no longer works.
 
 ## Database Migration
 
@@ -165,10 +185,12 @@ npm run dev:frontend
 Useful project checks:
 
 ```bash
-npm run check:backend
+npm run check:backend   # syntax-check every backend module
+npm run test:backend    # operator and customer portal integration tests
 npm run lint
 npm run typecheck
 npm run build
+npm run verify          # all of the above, the same sequence CI runs
 ```
 
 Build and run the production bundle locally:
@@ -210,12 +232,14 @@ The operator and customer APIs use separate listeners. Administrative routes are
 ## Security
 
 - Role-based operator access with bcrypt password hashing and separate access and refresh tokens.
+- Per-customer portal passwords, bcrypt hashed and independent of the Customer ID.
 - Customer sessions stored in `HttpOnly`, `SameSite=Strict` cookies.
 - Customer actions resolve the target device exclusively from the authenticated account.
 - Saved WiFi passwords protected at rest with authenticated AES-256-GCM encryption.
 - Password values revealed only through an authenticated, rate-limited request.
 - Same-origin mutation checks, strict CSP, security headers, and request-size limits.
 - Dedicated rate limits for login, portal API access, WiFi mutations, and password reveals.
+- Authenticated portal limits keyed per customer account, so one visitor cannot exhaust the quota for the rest of the customer base behind a shared proxy address.
 - Session revocation after operator password changes and logout.
 - Loopback-only listeners by default.
 - Hardened `systemd` unit with restricted write paths and `NoNewPrivileges`.

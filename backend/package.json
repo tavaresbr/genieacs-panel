@@ -10,7 +10,8 @@
     "postinstall": "node scripts/install-cli.js",
     "db:init": "node scripts/init-db.js",
     "reset-password": "node scripts/reset-password.js",
-    "check": "node --check src/server.js && node --check src/services/deviceService.js && node --check src/controllers/deviceController.js"
+    "check": "node scripts/check-syntax.js",
+    "test": "node --test test/*.test.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",
