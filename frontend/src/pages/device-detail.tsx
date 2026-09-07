@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { useToast } from '@/components/ui/toast'
 import { useLoading } from '@/components/ui/loading'
-import { devicesAPI } from '@/lib/api'
+import { devicesAPI, sgpAPI, type SgpContractLink, type SgpInvoice } from '@/lib/api'
 import { formatDate } from '@/lib/utils'
 import { Icon } from '@/components/ui/icon'
 import { useAuth } from '@/contexts/auth-context'
@@ -594,6 +594,30 @@ function EditWifiModal({
 }
 
 
+/** SGP reports amounts in BRL; only the grouping follows the reader's locale. */
+function formatBrl(amount: number | null, intlLocale: string) {
+  if (amount === null || !Number.isFinite(amount)) return '—'
+  return amount.toLocaleString(intlLocale, { style: 'currency', currency: 'BRL' })
+}
+
+function isSafeExternalUrl(value: string | null): value is string {
+  if (!value) return false
+  try {
+    return ['http:', 'https:'].includes(new URL(value).protocol)
+  } catch {
+    return false
+  }
+}
+
+async function copyToClipboard(value: string) {
+  try {
+    await navigator.clipboard.writeText(value)
+    return true
+  } catch {
+    return false
+  }
+}
+
 export default function DeviceDetailPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -603,7 +627,7 @@ export default function DeviceDetailPage() {
   const [activeTab, setActiveTab] = useState('overview')
   const [rebooting, setRebooting] = useState(false)
   const { user } = useAuth()
-  const { t } = useTranslation()
+  const { t, formatDateTime, intlLocale } = useTranslation()
   const toast = useToast()
   const loadingCtl = useLoading()
   const [isWanModalOpen, setIsWanModalOpen] = useState(false)
@@ -619,6 +643,13 @@ export default function DeviceDetailPage() {
   const [wanContainer, setWanContainer] = useState('')
   const [newWanType, setNewWanType] = useState<'ppp' | 'ip'>('ppp')
   const [addingWan, setAddingWan] = useState(false)
+  const [sgpLink, setSgpLink] = useState<SgpContractLink | null>(null)
+  const [sgpInvoices, setSgpInvoices] = useState<SgpInvoice[]>([])
+  const [sgpLoading, setSgpLoading] = useState(false)
+  const [sgpMessage, setSgpMessage] = useState<string | null>(null)
+  const [sgpAvailable, setSgpAvailable] = useState(false)
+  const [sgpContractInput, setSgpContractInput] = useState('')
+  const [sgpUnlocking, setSgpUnlocking] = useState(false)
 
 
   const handleOpenEditModal = (wan: WanConnection) => {
@@ -755,6 +786,86 @@ export default function DeviceDetailPage() {
       setLoading(false);
     }
   }, [deviceId, t, toast])
+
+  // An SGP due date is a plain YYYY-MM-DD; anchor it to local midnight so the
+  // reader's locale, not UTC, decides the displayed day.
+  const invoiceDueDate = (value: string | null) => (
+    value
+      ? new Intl.DateTimeFormat(intlLocale, { dateStyle: 'short' }).format(new Date(`${value}T00:00:00`))
+      : '—'
+  )
+
+  const loadSgpData = useCallback(async (refresh = false) => {
+    if (!deviceId) return
+    setSgpLoading(true)
+    setSgpMessage(null)
+    try {
+      const res = await sgpAPI.getDeviceIntegration(deviceId, { refresh })
+      if (res.success && res.data) {
+        setSgpAvailable(true)
+        setSgpLink(res.data.link)
+        setSgpInvoices(res.data.invoices || [])
+        setSgpMessage(res.data.invoiceError)
+        return
+      }
+      setSgpLink(null)
+      setSgpInvoices([])
+      // The card stays hidden while the integration is switched off.
+      setSgpAvailable(res.code !== 'not_configured')
+      setSgpMessage(res.message || t('detail.sgp.queryFailed'))
+    } finally {
+      setSgpLoading(false)
+    }
+  }, [deviceId, t])
+
+  useEffect(() => {
+    void loadSgpData(false)
+  }, [loadSgpData])
+
+  const handleSgpLink = async () => {
+    const contract = sgpContractInput.trim()
+    if (!contract) {
+      toast.error(t('detail.sgp.linkRequired'))
+      return
+    }
+    setSgpLoading(true)
+    try {
+      const res = await sgpAPI.linkDevice(deviceId, { contract })
+      if (!res.success) {
+        toast.error(res.message || t('detail.sgp.linkFailed'))
+        return
+      }
+      toast.success(res.message || t('detail.sgp.linked'))
+      setSgpContractInput('')
+      await loadSgpData(false)
+    } finally {
+      setSgpLoading(false)
+    }
+  }
+
+  const handleSgpUnlink = async () => {
+    if (!confirm(t('detail.sgp.unlinkConfirm'))) return
+    const res = await sgpAPI.unlinkDevice(deviceId)
+    if (!res.success) {
+      toast.error(res.message || t('detail.sgp.unlinkFailed'))
+      return
+    }
+    setSgpLink(null)
+    setSgpInvoices([])
+    setSgpMessage(null)
+    toast.success(res.message || t('detail.sgp.unlinked'))
+  }
+
+  const handleSgpUnlock = async () => {
+    if (!confirm(t('detail.sgp.unlockConfirm'))) return
+    setSgpUnlocking(true)
+    try {
+      const res = await sgpAPI.requestTrustUnlock(deviceId)
+      toast[res.success ? 'success' : 'error'](res.message || t('detail.sgp.unlockSent'))
+    } finally {
+      setSgpUnlocking(false)
+    }
+  }
 
   const handleSaveInstallationDate = async () => {
     if (!installationDate) {
@@ -1274,6 +1385,177 @@ export default function DeviceDetailPage() {
                 <p className="field-hint">{t('detail.customer.dateHint')}</p>
               </div>
             </div>
+
+            {sgpAvailable && (
+              <div className="modern-card p-5 sm:p-6 lg:col-span-2">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="page-kicker">{t('detail.sgp.kicker')}</p>
+                    <h2 className="section-heading">{t('detail.sgp.title')}</h2>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="modern-button-secondary"
+                      disabled={sgpLoading}
+                      onClick={() => void loadSgpData(true)}
+                    >
+                      <Icon name="refresh" size={16} className="mr-2" />
+                      {sgpLoading ? t('detail.sgp.refreshing') : t('detail.sgp.refresh')}
+                    </button>
+                    {sgpLink && (
+                      <>
+                        <button
+                          type="button"
+                          className="modern-button"
+                          disabled={sgpUnlocking}
+                          onClick={() => void handleSgpUnlock()}
+                        >
+                          {sgpUnlocking ? t('detail.sgp.unlocking') : t('detail.sgp.unlock')}
+                        </button>
+                        <button
+                          type="button"
+                          className="modern-button-secondary"
+                          onClick={() => void handleSgpUnlink()}
+                        >
+                          {t('detail.sgp.unlink')}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {sgpLink ? (
+                  <>
+                    <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                      <div>
+                        <p className="metric-label">{t('detail.sgp.contract')}</p>
+                        <p className="mt-1 font-mono font-semibold">{sgpLink.contract}</p>
+                      </div>
+                      <div>
+                        <p className="metric-label">{t('detail.sgp.client')}</p>
+                        <p className="mt-1 font-semibold">{sgpLink.clientName || '—'}</p>
+                      </div>
+                      <div>
+                        <p className="metric-label">{t('detail.sgp.plan')}</p>
+                        <p className="mt-1 font-semibold">{sgpLink.plan || '—'}</p>
+                      </div>
+                      <div>
+                        <p className="metric-label">{t('detail.sgp.status')}</p>
+                        <p className="mt-1">
+                          <span className={/ativo/i.test(sgpLink.statusLabel || '') ? 'modern-badge-success' : 'modern-badge'}>
+                            {sgpLink.statusLabel || sgpLink.status || t('detail.sgp.statusUnknown')}
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+                    <p className="mt-3 text-xs text-muted-foreground">
+                      {t(sgpLink.linkMode === 'manual' ? 'detail.sgp.linkManual' : 'detail.sgp.linkAuto')}
+                      {sgpLink.login ? ` · ${t('detail.sgp.linkLogin', { login: sgpLink.login })}` : ''}
+                      {sgpLink.lastSyncedAt
+                        ? ` · ${t('detail.sgp.linkSynced', { time: formatDateTime(sgpLink.lastSyncedAt) })}`
+                        : ''}
+                    </p>
+
+                    <div className="mt-5 border-t border-border pt-4">
+                      <h3 className="font-semibold">{t('detail.sgp.openInvoices')}</h3>
+                      {sgpMessage && (
+                        <p className="mt-2 text-sm text-[hsl(var(--status-warning))]">{sgpMessage}</p>
+                      )}
+                      {sgpInvoices.length === 0 ? (
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          {t(sgpMessage ? 'detail.sgp.invoicesUnavailable' : 'detail.sgp.noInvoices')}
+                        </p>
+                      ) : (
+                        <ul className="mt-3 space-y-3">
+                          {sgpInvoices.map((invoice, index) => (
+                            <li
+                              key={invoice.id || `${invoice.dueDate}-${index}`}
+                              className="rounded-md border border-border p-4"
+                            >
+                              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                                <span className="font-semibold">{formatBrl(invoice.amount, intlLocale)}</span>
+                                <span className="text-sm text-muted-foreground">
+                                  {t('detail.sgp.dueOn', { date: invoiceDueDate(invoice.dueDate) })}
+                                </span>
+                              </div>
+                              <p className="mt-1 text-sm text-muted-foreground">
+                                {invoice.description || t('detail.sgp.invoiceFallback')}
+                                {invoice.status ? ` · ${invoice.status}` : ''}
+                              </p>
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                {invoice.digitableLine && (
+                                  <button
+                                    type="button"
+                                    className="modern-button-secondary"
+                                    onClick={async () => {
+                                      const copied = await copyToClipboard(invoice.digitableLine as string)
+                                      toast[copied ? 'success' : 'error'](
+                                        t(copied ? 'detail.sgp.copiedLine' : 'detail.sgp.copyFailed')
+                                      )
+                                    }}
+                                  >
+                                    {t('detail.sgp.copyLine')}
+                                  </button>
+                                )}
+                                {invoice.pix && (
+                                  <button
+                                    type="button"
+                                    className="modern-button-secondary"
+                                    onClick={async () => {
+                                      const copied = await copyToClipboard(invoice.pix as string)
+                                      toast[copied ? 'success' : 'error'](
+                                        t(copied ? 'detail.sgp.copiedPix' : 'detail.sgp.copyFailed')
+                                      )
+                                    }}
+                                  >
+                                    {t('detail.sgp.copyPix')}
+                                  </button>
+                                )}
+                                {isSafeExternalUrl(invoice.link) && (
+                                  <a
+                                    className="modern-button-secondary"
+                                    href={invoice.link}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    {t('detail.sgp.openBoleto')}
+                                  </a>
+                                )}
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="mt-5">
+                    <p className="text-sm text-muted-foreground">
+                      {sgpMessage || t('detail.sgp.notLinked')}
+                    </p>
+                    <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                      <input
+                        type="text"
+                        className="modern-input sm:max-w-xs"
+                        placeholder={t('detail.sgp.contractPlaceholder')}
+                        value={sgpContractInput}
+                        onChange={(event) => setSgpContractInput(event.target.value)}
+                      />
+                      <button
+                        type="button"
+                        className="modern-button shrink-0"
+                        disabled={sgpLoading}
+                        onClick={() => void handleSgpLink()}
+                      >
+                        {t('detail.sgp.link')}
+                      </button>
+                    </div>
+                    <p className="field-hint">{t('detail.sgp.linkHint')}</p>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="modern-card p-6">
               <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">{t('detail.signalInfo.title')}</h2>

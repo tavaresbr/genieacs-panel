@@ -172,6 +172,26 @@ export async function ensureSchema(db = getDb()) {
     });
   }
 
+  if (!(await db.schema.hasTable('sgp_links'))) {
+    await db.schema.createTable('sgp_links', (t) => {
+      t.increments('id').primary();
+      t.string('device_id', 255).notNullable().unique();
+      t.integer('account_id').unsigned()
+        .references('id').inTable('customer_accounts').onDelete('SET NULL');
+      t.string('contract', 64).notNullable();
+      t.string('document', 32);
+      t.string('client_name', 255);
+      t.string('plan', 255);
+      t.string('status', 64);
+      t.string('status_label', 128);
+      t.string('login', 255);
+      t.string('link_mode', 16).notNullable().defaultTo('auto');
+      t.timestamp('last_synced_at').defaultTo(db.fn.now());
+      t.timestamp('created_at').defaultTo(db.fn.now());
+      t.timestamp('updated_at').defaultTo(db.fn.now());
+    });
+  }
+
   if (!(await db.schema.hasTable('customer_wifi_credentials'))) {
     await db.schema.createTable('customer_wifi_credentials', (t) => {
       t.increments('id').primary();

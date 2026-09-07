@@ -49,6 +49,7 @@ SkyGenPanel is a management layer for GenieACS deployments. It combines an opera
 - Automatic Customer ID generation that can be enabled or disabled in Settings.
 - Independent portal passwords per customer, generated automatically and rotatable from the device page.
 - Encrypted recovery of the last WiFi password changed through the customer portal.
+- SGP integration for subscriber contract, plan, and open-invoice data, with optional invoice display and trust unlock in the customer portal.
 - Automatic Linux dependency and Node.js installation during both first install and CLI updates.
 
 ## Screenshots
@@ -161,6 +162,14 @@ receives a freshly generated password in the background, and the log reports how
 many were issued. Reveal the new password from the device page before sharing it —
 the old one no longer works.
 
+## SGP Integration
+
+Open **Settings → SGP integration** (*Integração SGP*) to connect the panel to
+[SGP](https://sgp.net.br) and show contract, plan, and open-invoice data next to
+each ONT. The integration token is encrypted with `JWT_SECRET` and never leaves
+the server. See [`docs/sgp-integration.md`](docs/sgp-integration.md) for setup,
+endpoints, and troubleshooting.
+
 ## Database Migration
 
 Open **Settings → Database** as an administrator to:
@@ -170,7 +179,7 @@ Open **Settings → Database** as an administrator to:
 3. Migrate existing application data.
 4. Switch the running application to the new database.
 
-The migration includes device installation profiles, related customer accounts, and encrypted customer WiFi credentials.
+The migration includes device installation profiles, related customer accounts, encrypted customer WiFi credentials, and SGP contract links.
 
 ## Development
 

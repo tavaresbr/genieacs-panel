@@ -3,8 +3,10 @@ import CustomerPortalController from '../controllers/customerPortalController.js
 import { authenticatePortalCustomer } from '../middleware/portalAuth.js';
 import {
   portalAccountLimiter,
+  portalBillingLimiter,
   portalMutationLimiter,
-  portalRevealLimiter
+  portalRevealLimiter,
+  portalUnlockLimiter
 } from '../middleware/rateLimit.js';
 
 const router = express.Router();
@@ -38,6 +40,20 @@ router.put(
   portalAccountLimiter,
   portalMutationLimiter,
   CustomerPortalController.updateWifi
+);
+router.get(
+  '/billing',
+  authenticatePortalCustomer,
+  portalAccountLimiter,
+  portalBillingLimiter,
+  CustomerPortalController.billing
+);
+router.post(
+  '/billing/trust-unlock',
+  authenticatePortalCustomer,
+  portalAccountLimiter,
+  portalUnlockLimiter,
+  CustomerPortalController.trustUnlock
 );
 router.post(
   '/logout',

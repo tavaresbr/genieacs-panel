@@ -38,7 +38,10 @@ import {
   CircleStackIcon,
   CommandLineIcon,
   EyeIcon,
-  EyeSlashIcon
+  EyeSlashIcon,
+  DocumentDuplicateIcon,
+  LockOpenIcon,
+  BanknotesIcon
 } from '@heroicons/react/24/outline'
 
 const ICONS: Record<string, React.ComponentType<React.SVGProps<SVGSVGElement>>> = {
@@ -79,6 +82,9 @@ const ICONS: Record<string, React.ComponentType<React.SVGProps<SVGSVGElement>>> 
   wifi: WifiIcon,
   database: CircleStackIcon,
   terminal: CommandLineIcon,
+  copy: DocumentDuplicateIcon,
+  unlock: LockOpenIcon,
+  invoice: BanknotesIcon,
   eye: EyeIcon,
   'eye-off': EyeSlashIcon
 }

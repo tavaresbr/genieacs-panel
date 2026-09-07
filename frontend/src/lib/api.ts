@@ -280,6 +280,80 @@ export const settingsAPI = {
     apiClient.post('/settings/test-genieacs', { url }),
 }
 
+export interface SgpConfig {
+  enabled: boolean
+  baseUrl: string
+  app: string
+  linkMode: 'pppoe' | 'customer_id' | 'manual'
+  portalBilling: boolean
+  portalUnlock: boolean
+  invoiceLimit: number
+  endpoints: { customer: string; invoices: string; unlock: string }
+  tokenConfigured: boolean
+  ready: boolean
+  updatedAt: string | null
+}
+
+export interface SgpContractLink {
+  contract: string
+  clientName: string | null
+  document: string | null
+  plan: string | null
+  status: string | null
+  statusLabel: string | null
+  login: string | null
+  linkMode: 'auto' | 'manual'
+  lastSyncedAt: string | null
+}
+
+export interface SgpInvoice {
+  id: string | null
+  description: string | null
+  amount: number | null
+  dueDate: string | null
+  paidAt: string | null
+  status: string | null
+  digitableLine: string | null
+  barcode: string | null
+  link: string | null
+  pix: string | null
+  paid: boolean
+}
+
+// SGP (Sistema de Gestão de Provedores) integration API
+export const sgpAPI = {
+  getConfig: () =>
+    apiClient.get<SgpConfig>('/sgp/config'),
+
+  updateConfig: (config: Partial<SgpConfig> & { token?: string }) =>
+    apiClient.put<SgpConfig>('/sgp/config', config),
+
+  test: (payload: { baseUrl?: string; app?: string; token?: string; document?: string; contract?: string; login?: string }) =>
+    apiClient.post<{ contracts: number; probe: string; message: string | null }>('/sgp/test', payload),
+
+  lookup: (filters: { document?: string; contract?: string; login?: string }) => {
+    const params = new URLSearchParams()
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value) params.set(key, value)
+    })
+    return apiClient.get<{ contracts: SgpContractLink[] }>(`/sgp/customers?${params.toString()}`)
+  },
+
+  getDeviceIntegration: (deviceId: string, options: { refresh?: boolean } = {}) =>
+    apiClient.get<{ link: SgpContractLink; invoices: SgpInvoice[]; invoiceError: string | null }>(
+      `/sgp/devices/${encodeURIComponent(deviceId)}${options.refresh ? '?refresh=1' : ''}`
+    ),
+
+  linkDevice: (deviceId: string, payload: { contract: string; document?: string }) =>
+    apiClient.post<{ link: SgpContractLink }>(`/sgp/devices/${encodeURIComponent(deviceId)}/link`, payload),
+
+  unlinkDevice: (deviceId: string) =>
+    apiClient.delete(`/sgp/devices/${encodeURIComponent(deviceId)}/link`),
+
+  requestTrustUnlock: (deviceId: string) =>
+    apiClient.post<{ contract: string }>(`/sgp/devices/${encodeURIComponent(deviceId)}/unlock`),
+}
+
 /* Vendors API */
 export const vendorsAPI = {
   getAll: () =>

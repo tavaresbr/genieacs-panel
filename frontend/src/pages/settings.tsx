@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { apiClient, vendorsAPI, settingsAPI, authAPI, databaseAPI, type DbConfigPayload } from '@/lib/api'
+import { apiClient, vendorsAPI, settingsAPI, authAPI, databaseAPI, sgpAPI, type DbConfigPayload, type SgpConfig } from '@/lib/api'
 import { useToast } from '@/components/ui/toast'
 import { useLoading } from '@/components/ui/loading'
 import { Icon } from '@/components/ui/icon'
@@ -41,7 +41,7 @@ const VIRTUAL_PARAMETER_FIELDS: {
 ]
 
 export default function Settings() {
-  const { t } = useTranslation()
+  const { t, formatDateTime } = useTranslation()
   const [settings, setSettings] = useState({
     appName: 'SkyGenPanel',
     genieAcsUrl: 'http://127.0.0.1:7557',
@@ -58,6 +58,21 @@ export default function Settings() {
     client: 'mysql2', host: 'localhost', port: 3306, user: '', password: '', database: '', migrateData: true
   })
   const [activeDb, setActiveDb] = useState<{ client: string; host?: string; database?: string } | null>(null)
+  const [sgpConfig, setSgpConfig] = useState<SgpConfig | null>(null)
+  const [sgpForm, setSgpForm] = useState({
+    enabled: false,
+    baseUrl: '',
+    app: '',
+    token: '',
+    linkMode: 'pppoe' as SgpConfig['linkMode'],
+    portalBilling: true,
+    portalUnlock: false,
+    invoiceLimit: 6,
+    sample: ''
+  })
+  const [sgpSaving, setSgpSaving] = useState(false)
+  const [sgpTesting, setSgpTesting] = useState(false)
+  const [sgpTestResult, setSgpTestResult] = useState<{ success: boolean; message: string } | null>(null)
   const [dbTesting, setDbTesting] = useState(false)
   const [dbSwitching, setDbSwitching] = useState(false)
 
@@ -84,6 +99,101 @@ export default function Settings() {
     })()
     return () => { cancelled = true }
   }, [activeTab])
+
+  useEffect(() => {
+    if (activeTab !== 'sgp') return
+    let cancelled = false
+    ;(async () => {
+      const res = await sgpAPI.getConfig()
+      if (cancelled || !res.success || !res.data) return
+      const config = res.data
+      setSgpConfig(config)
+      setSgpForm((current) => ({
+        ...current,
+        enabled: config.enabled,
+        baseUrl: config.baseUrl,
+        app: config.app,
+        // The stored token never leaves the server; an empty field keeps it.
+        token: '',
+        linkMode: config.linkMode,
+        portalBilling: config.portalBilling,
+        portalUnlock: config.portalUnlock,
+        invoiceLimit: config.invoiceLimit
+      }))
+      setSgpTestResult(null)
+    })()
+    return () => { cancelled = true }
+  }, [activeTab])
+
+  const sgpSamplePayload = () => {
+    const sample = sgpForm.sample.trim()
+    if (!sample) return {}
+    if (/^\d[\d.\-/]*$/.test(sample)) {
+      return sample.replace(/\D/g, '').length > 8
+        ? { document: sample }
+        : { contract: sample }
+    }
+    return { login: sample }
+  }
+
+  const handleSgpTest = async () => {
+    setSgpTesting(true)
+    setSgpTestResult(null)
+    try {
+      const res = await sgpAPI.test({
+        baseUrl: sgpForm.baseUrl,
+        app: sgpForm.app,
+        token: sgpForm.token || undefined,
+        ...sgpSamplePayload()
+      })
+      const message = res.message || t(res.success ? 'settings.sgp.testSuccess' : 'settings.sgp.testFailed')
+      setSgpTestResult({ success: res.success, message })
+      toast[res.success ? 'success' : 'error'](message)
+    } finally {
+      setSgpTesting(false)
+    }
+  }
+
+  const handleSgpSave = async () => {
+    setSgpSaving(true)
+    try {
+      const res = await sgpAPI.updateConfig({
+        enabled: sgpForm.enabled,
+        baseUrl: sgpForm.baseUrl,
+        app: sgpForm.app,
+        // Only send the token when the operator typed a new one.
+        ...(sgpForm.token ? { token: sgpForm.token } : {}),
+        linkMode: sgpForm.linkMode,
+        portalBilling: sgpForm.portalBilling,
+        portalUnlock: sgpForm.portalUnlock,
+        invoiceLimit: sgpForm.invoiceLimit
+      })
+      if (res.success && res.data) {
+        setSgpConfig(res.data)
+        setSgpForm((current) => ({ ...current, token: '' }))
+      }
+      toast[res.success ? 'success' : 'error'](
+        res.message || t(res.success ? 'settings.sgp.saved' : 'settings.sgp.saveFailed')
+      )
+    } finally {
+      setSgpSaving(false)
+    }
+  }
+
+  const handleSgpClearToken = async () => {
+    if (!confirm(t('settings.sgp.clearTokenConfirm'))) return
+    setSgpSaving(true)
+    try {
+      const res = await sgpAPI.updateConfig({ enabled: false, token: '' })
+      if (res.success && res.data) {
+        setSgpConfig(res.data)
+        setSgpForm((current) => ({ ...current, enabled: false, token: '' }))
+      }
+      toast[res.success ? 'success' : 'error'](res.message || t('settings.sgp.tokenCleared'))
+    } finally {
+      setSgpSaving(false)
+    }
+  }
 
   const handleDbTest = async () => {
     setDbTesting(true)
@@ -450,6 +560,15 @@ export default function Settings() {
               {t('settings.tab.customerPortal')}
             </button>
             <button
+              onClick={() => setActiveTab('sgp')}
+              className="tab-button"
+              data-active={activeTab === 'sgp'}
+              role="tab"
+              aria-selected={activeTab === 'sgp'}
+            >
+              {t('settings.tab.sgp')}
+            </button>
+            <button
               onClick={() => setActiveTab('security')}
               className="tab-button"
               data-active={activeTab === 'security'}
@@ -693,6 +812,207 @@ export default function Settings() {
 
             <div className="mt-5 rounded-md border border-[hsl(var(--status-warning))]/40 bg-[hsl(var(--status-warning))]/10 p-4 text-sm leading-6">
               {t('settings.portal.disabledNotice')}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'sgp' && (
+          <div className="modern-card max-w-3xl p-5 sm:p-6">
+            <p className="page-kicker">{t('settings.sgp.kicker')}</p>
+            <h2 className="section-heading">{t('settings.sgp.title')}</h2>
+            <p className="section-description mb-6">
+              {t('settings.sgp.description', { path: '/api/ura/' })}
+            </p>
+
+            <div className="mb-5 flex flex-wrap items-center gap-2">
+              <span className={sgpConfig?.ready ? 'modern-badge-success' : 'modern-badge'}>
+                {t(sgpConfig?.ready ? 'settings.sgp.statusActive' : 'settings.sgp.statusInactive')}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {t(sgpConfig?.tokenConfigured ? 'settings.sgp.tokenStored' : 'settings.sgp.tokenMissing')}
+                {sgpConfig?.updatedAt
+                  ? ` · ${t('settings.sgp.updatedAt', { time: formatDateTime(sgpConfig.updatedAt) })}`
+                  : ''}
+              </span>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="sgp-base-url" className="field-label">{t('settings.sgp.baseUrl')}</label>
+                <input
+                  id="sgp-base-url"
+                  type="url"
+                  className="modern-input w-full"
+                  placeholder="https://provedor.sgp.net.br"
+                  value={sgpForm.baseUrl}
+                  onChange={(event) => setSgpForm((current) => ({ ...current, baseUrl: event.target.value }))}
+                />
+                <p className="field-hint">{t('settings.sgp.baseUrlHint')}</p>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="sgp-app" className="field-label">{t('settings.sgp.app')}</label>
+                  <input
+                    id="sgp-app"
+                    type="text"
+                    className="modern-input w-full"
+                    placeholder="nome-do-app"
+                    value={sgpForm.app}
+                    onChange={(event) => setSgpForm((current) => ({ ...current, app: event.target.value }))}
+                  />
+                  <p className="field-hint">{t('settings.sgp.appHint')}</p>
+                </div>
+                <div>
+                  <label htmlFor="sgp-token" className="field-label">{t('settings.sgp.token')}</label>
+                  <input
+                    id="sgp-token"
+                    type="password"
+                    autoComplete="new-password"
+                    className="modern-input w-full"
+                    placeholder={t(sgpConfig?.tokenConfigured ? 'settings.sgp.tokenPlaceholderStored' : 'settings.sgp.tokenPlaceholderEmpty')}
+                    value={sgpForm.token}
+                    onChange={(event) => setSgpForm((current) => ({ ...current, token: event.target.value }))}
+                  />
+                  <p className="field-hint">{t('settings.sgp.tokenHint')}</p>
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="sgp-link-mode" className="field-label">{t('settings.sgp.linkMode')}</label>
+                  <select
+                    id="sgp-link-mode"
+                    className="modern-input w-full"
+                    value={sgpForm.linkMode}
+                    onChange={(event) => setSgpForm((current) => ({
+                      ...current,
+                      linkMode: event.target.value as SgpConfig['linkMode']
+                    }))}
+                  >
+                    <option value="pppoe">{t('settings.sgp.linkModePppoe')}</option>
+                    <option value="customer_id">{t('settings.sgp.linkModeCustomerId')}</option>
+                    <option value="manual">{t('settings.sgp.linkModeManual')}</option>
+                  </select>
+                  <p className="field-hint">{t('settings.sgp.linkModeHint')}</p>
+                </div>
+                <div>
+                  <label htmlFor="sgp-invoice-limit" className="field-label">{t('settings.sgp.invoiceLimit')}</label>
+                  <input
+                    id="sgp-invoice-limit"
+                    type="number"
+                    min={1}
+                    max={24}
+                    className="modern-input w-full"
+                    value={sgpForm.invoiceLimit}
+                    onChange={(event) => setSgpForm((current) => ({
+                      ...current,
+                      invoiceLimit: Number(event.target.value) || 1
+                    }))}
+                  />
+                  <p className="field-hint">{t('settings.sgp.invoiceLimitHint')}</p>
+                </div>
+              </div>
+
+              <div className="space-y-3 rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-4">
+                <label className="flex cursor-pointer items-start gap-3">
+                  <input
+                    type="checkbox"
+                    className="mt-1 h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
+                    checked={sgpForm.enabled}
+                    onChange={(event) => setSgpForm((current) => ({ ...current, enabled: event.target.checked }))}
+                  />
+                  <span>
+                    <span className="block font-semibold">{t('settings.sgp.enable')}</span>
+                    <span className="mt-1 block text-sm leading-6 text-muted-foreground">
+                      {t('settings.sgp.enableHint')}
+                    </span>
+                  </span>
+                </label>
+                <label className="flex cursor-pointer items-start gap-3">
+                  <input
+                    type="checkbox"
+                    className="mt-1 h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
+                    checked={sgpForm.portalBilling}
+                    onChange={(event) => setSgpForm((current) => ({ ...current, portalBilling: event.target.checked }))}
+                  />
+                  <span>
+                    <span className="block font-semibold">{t('settings.sgp.portalBilling')}</span>
+                    <span className="mt-1 block text-sm leading-6 text-muted-foreground">
+                      {t('settings.sgp.portalBillingHint')}
+                    </span>
+                  </span>
+                </label>
+                <label className="flex cursor-pointer items-start gap-3">
+                  <input
+                    type="checkbox"
+                    className="mt-1 h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
+                    checked={sgpForm.portalUnlock}
+                    onChange={(event) => setSgpForm((current) => ({ ...current, portalUnlock: event.target.checked }))}
+                  />
+                  <span>
+                    <span className="block font-semibold">{t('settings.sgp.portalUnlock')}</span>
+                    <span className="mt-1 block text-sm leading-6 text-muted-foreground">
+                      {t('settings.sgp.portalUnlockHint')}
+                    </span>
+                  </span>
+                </label>
+              </div>
+
+              <div>
+                <label htmlFor="sgp-sample" className="field-label">{t('settings.sgp.sample')}</label>
+                <input
+                  id="sgp-sample"
+                  type="text"
+                  className="modern-input w-full"
+                  placeholder={t('settings.sgp.samplePlaceholder')}
+                  value={sgpForm.sample}
+                  onChange={(event) => setSgpForm((current) => ({ ...current, sample: event.target.value }))}
+                />
+                <p className="field-hint">{t('settings.sgp.sampleHint')}</p>
+              </div>
+            </div>
+
+            {sgpTestResult && (
+              <div className={`mt-4 rounded-md p-4 ${
+                sgpTestResult.success
+                  ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-800'
+                  : 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-800'
+              }`}>
+                <div className="flex items-center">
+                  <Icon name={sgpTestResult.success ? 'check' : 'x'} size={18} className="mr-2" />
+                  <span className="font-medium">{sgpTestResult.message}</span>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-6 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => void handleSgpTest()}
+                disabled={sgpTesting}
+                className="modern-button-secondary"
+              >
+                {sgpTesting ? t('settings.sgp.testing') : t('settings.sgp.test')}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleSgpSave()}
+                disabled={sgpSaving}
+                className="modern-button"
+              >
+                {sgpSaving ? t('common.saving') : t('settings.sgp.save')}
+              </button>
+              {sgpConfig?.tokenConfigured && (
+                <button
+                  type="button"
+                  onClick={() => void handleSgpClearToken()}
+                  disabled={sgpSaving}
+                  className="modern-button-secondary"
+                >
+                  {t('settings.sgp.clearToken')}
+                </button>
+              )}
             </div>
           </div>
         )}

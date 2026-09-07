@@ -100,6 +100,30 @@ export const portalRevealLimiter = limiter({
   }
 });
 
+export const portalBillingLimiter = limiter({
+  windowMs: 60 * 1000,
+  max: 20,
+  keyGenerator: accountKey,
+  message: {
+    success: false,
+    message: 'Muitas consultas de faturas. Aguarde um instante e tente novamente.'
+  }
+});
+
+/**
+ * Every trust unlock reaches the provider's billing system, so the portal
+ * allows only a handful of attempts per account.
+ */
+export const portalUnlockLimiter = limiter({
+  windowMs: 60 * 60 * 1000,
+  max: 3,
+  keyGenerator: accountKey,
+  message: {
+    success: false,
+    message: 'Limite de solicitações de liberação atingido. Tente novamente mais tarde.'
+  }
+});
+
 /** Operator-side reveal/reset of a customer portal password. */
 export const portalPasswordAdminLimiter = limiter({
   windowMs: 15 * 60 * 1000,

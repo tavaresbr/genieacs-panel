@@ -28,6 +28,10 @@ npm run check
 npm audit
 ```
 
-Pemeriksaan lokal memvalidasi syntax entrypoint, service GenieACS, dan controller perangkat. Build frontend, lint, typecheck, serta audit dependency dijalankan dari root project sebelum release.
+Pemeriksaan lokal memvalidasi syntax entrypoint, service GenieACS, service SGP, controller perangkat, controller SGP, dan controller portal pelanggan. Build frontend, lint, typecheck, serta audit dependency dijalankan dari root project sebelum release.
 
 Konfigurasi environment dijelaskan di [`.env.example`](.env.example). URL GenieACS dan database runtime dikelola dari UI.
+
+## Integrasi SGP
+
+Kredensial SGP (URL, app, token) dikelola dari Settings > SGP integration dan disimpan terenkripsi di tabel `app_state`, bukan di environment. Lihat [`docs/sgp-integration.md`](../docs/sgp-integration.md).
