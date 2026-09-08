@@ -59,7 +59,11 @@ class WhatsAppMessageController {
         body: body.body,
         attachment: body.attachment,
         isNote: body.isNote === true,
-        userId: req.user?.userId ?? null
+        userId: req.user?.userId ?? null,
+        // Said rather than left to the default: this route is the one place a
+        // human is demonstrably behind the message, and the row should say so
+        // in its own right and not only by having a `sentBy`.
+        source: 'operator'
       });
       return res.status(201).json(createResponse(
         req.t('whatsapp.messageQueued'),

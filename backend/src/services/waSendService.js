@@ -16,6 +16,25 @@ const BODY_ATTACHMENT_PATH_LIMIT = 255;
 const ATTACHMENT_TYPE_LIMIT = 128;
 
 /**
+ * Who composed an outbound message — `wa_messages.source`.
+ *
+ * All three automatic senders write `sent_by: NULL`, so that column answers
+ * "was a human behind this" and nothing else. It cannot tell the bot's own
+ * reply from a dunning message or a technical alert, and the bot's ceiling was
+ * reading it as if it could: three campaign messages in an hour and the bot
+ * went silent on a subscriber it had never answered.
+ *
+ * 'operator' is also what an INBOUND row carries, and that is not a fudge.
+ * `source` names which of the panel's senders composed the text; the panel
+ * composed none of an inbound message, and neither did any of its automatic
+ * senders — so the honest value is the one that means "not one of them". It is
+ * the column default, which is how `waInboundService` gets it without saying
+ * so: an outbound echo of the provider typing on their own phone is literally
+ * an operator's message, and every reader here looks at outbound rows anyway.
+ */
+export const WA_MESSAGE_SOURCES = Object.freeze(['operator', 'bot', 'campaign', 'alert']);
+
+/**
  * Composing and delivering one outbound message.
  *
  * The two halves are deliberately apart. `enqueue()` is what a request touches:
@@ -39,7 +58,24 @@ class WaSendService {
    * answering someone who wrote in. Campaigns and alerts enforce it — the reply
    * box does not.
    */
-  static async enqueue({ conversationId, body, attachment, isNote = false, userId = null } = {}) {
+  static async enqueue({
+    conversationId,
+    body,
+    attachment,
+    isNote = false,
+    userId = null,
+    source = 'operator'
+  } = {}) {
+    // Defaulting to 'operator' rather than to the caller's intent: a sender
+    // that forgets to say must never end up claiming to be the bot, because
+    // the bot's ceiling counts exactly this column. An unrecognised value
+    // throws instead of being coerced — coercing it to 'operator' would take
+    // the bot's own replies out of its own count, which is the loop the
+    // ceiling exists to stop, and it would do it silently.
+    if (!WA_MESSAGE_SOURCES.includes(source)) {
+      throw new Error(`waSend: unknown message source '${source}'`);
+    }
+
     const conversation = await this.requireConversation(conversationId);
     const text = String(body ?? '').trim();
     const anexo = normalizeAttachment(attachment);
@@ -74,6 +110,7 @@ class WaSendService {
       // worker, and the one thing a note must never do is reach the customer.
       delivery_status: note ? null : 'queued',
       sent_by: userId || null,
+      source,
       created_at: now,
       updated_at: now
     });
@@ -168,6 +205,9 @@ class WaSendService {
       deliveryError: row.delivery_error || null,
       attempts: Number(row.attempts || 0),
       sentBy: row.sent_by ?? null,
+      // The column is NOT NULL, so the fallback is only for a row a test or a
+      // fixture built by hand; the browser's type has no null in it.
+      source: row.source || 'operator',
       readAt: row.read_at || null,
       createdAt: row.created_at || null,
       updatedAt: row.updated_at || null

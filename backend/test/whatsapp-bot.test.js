@@ -177,6 +177,60 @@ async function limparFio(telefone) {
   await getDb()('wa_conversations').where({ id: conversa.id }).del();
 }
 
+/**
+ * A thread that exists and holds nothing.
+ *
+ * The seeded tests below need the conversation — `wa_messages.conversation_id`
+ * has to point somewhere — but not a single message on it, and `limparFio`
+ * takes the conversation with it. So the thread is opened the only way the
+ * panel opens one, by an inbound message, and then emptied.
+ */
+async function fioVazio(telefone) {
+  await limparFio(telefone);
+  await receber(telefone, 'oi');
+  const conversa = await conversaDe(telefone);
+  await getDb()('wa_messages').where({ conversation_id: conversa.id }).del();
+  return conversa;
+}
+
+/**
+ * Automatic outbound rows, written the way the sender named by `origem` writes
+ * them: inside the hour, no `sent_by`, delivered by nobody.
+ *
+ * `origem` of `null` omits the column entirely rather than writing a null into
+ * it, which is exactly the shape of a row that existed before the migration:
+ * `source` is NOT NULL DEFAULT 'operator', so the upgrade gave every old row
+ * that value and none of them may be read as the bot's.
+ */
+async function semear(conversa, origem, quantas) {
+  const agora = new Date();
+  for (let i = 0; i < quantas; i += 1) {
+    const linha = {
+      conversation_id: conversa.id,
+      direction: 'out',
+      body: `mensagem automatica ${origem ?? 'sem origem'} ${i}`,
+      is_note: false,
+      delivery_status: 'sent',
+      sent_by: null,
+      created_at: agora,
+      updated_at: agora
+    };
+    if (origem) linha.source = origem;
+    // eslint-disable-next-line no-await-in-loop -- the ceiling counts rows, and the order they were written in is the fixture
+    await insertReturningId('wa_messages', linha);
+  }
+}
+
+/** What the panel put on this thread, with the origin recorded against each. */
+async function origens(telefone) {
+  const conversa = await conversaDe(telefone);
+  if (!conversa) return [];
+  return getDb()('wa_messages')
+    .where({ conversation_id: conversa.id, direction: 'out' })
+    .orderBy('id')
+    .pluck('source');
+}
+
 /** The single answer to one inbound message, asserted to be exactly one. */
 async function unicaResposta(telefone, texto) {
   await limparFio(telefone);
@@ -419,6 +473,7 @@ describe('when the bot stays quiet', () => {
 
   it('holds the per-contact ceiling', async () => {
     const telefone = ASSINANTE;
+    await limparFio(telefone);
     for (let i = 0; i < WaBotService.TETO_POR_HORA + 3; i += 1) {
       // Sequential on purpose: the ceiling is a count of rows already written.
       // eslint-disable-next-line no-await-in-loop
@@ -426,6 +481,117 @@ describe('when the bot stays quiet', () => {
     }
     const saidas = await respostas(telefone);
     assert.equal(saidas.length, WaBotService.TETO_POR_HORA);
+    // And every one of the rows it stopped at is its own: the ceiling counts
+    // what the bot wrote, so what the bot writes has to say so.
+    assert.deepEqual(await origens(telefone), Array(WaBotService.TETO_POR_HORA).fill('bot'));
+  });
+});
+
+/**
+ * The bug this column exists for.
+ *
+ * All three automatic senders write `sent_by: NULL`, so a ceiling built on that
+ * column counted a billing campaign and a technical alert as the bot's own
+ * answers. A subscriber who got three dunning messages in an hour had spent the
+ * bot's whole budget on their thread before asking anything, and the question
+ * they then asked was met with silence — no reply, no hand-off, nothing on the
+ * thread at all.
+ */
+describe('the ceiling counts the bot and nothing else', () => {
+  it('still answers after three campaign messages on the same thread', async () => {
+    const telefone = ASSINANTE;
+    const conversa = await fioVazio(telefone);
+    await semear(conversa, 'campaign', WaBotService.TETO_POR_HORA);
+
+    const antes = await respostas(telefone);
+    assert.equal(antes.length, WaBotService.TETO_POR_HORA, 'the campaign wrote its three');
+
+    await receber(telefone, 'quero a segunda via do boleto');
+
+    const depois = await respostas(telefone);
+    assert.equal(depois.length, antes.length + 1, 'a campaign must not spend the bot budget');
+    assert.ok(
+      depois.at(-1).includes(LINHA_DIGITAVEL),
+      'and the answer is the real one, not a hand-off'
+    );
+  });
+
+  it('goes quiet after three of its own replies', async () => {
+    const telefone = ASSINANTE;
+    const conversa = await fioVazio(telefone);
+    await semear(conversa, 'bot', WaBotService.TETO_POR_HORA);
+
+    await receber(telefone, 'quero a segunda via do boleto');
+
+    const depois = await respostas(telefone);
+    assert.equal(depois.length, WaBotService.TETO_POR_HORA, 'the loop guard still holds');
+    assert.ok(depois.every((body) => !String(body).includes(LINHA_DIGITAVEL)));
+  });
+
+  it('never reads a row written before the column existed as one of its own', async () => {
+    const telefone = ASSINANTE;
+    const conversa = await fioVazio(telefone);
+    // Three rows with no `source` given: the migration's default is what they
+    // carry, and the panel cannot tell whose they were. Counting them as the
+    // bot's would silence it over history it has no evidence about.
+    await semear(conversa, null, WaBotService.TETO_POR_HORA);
+    assert.deepEqual(
+      await origens(telefone),
+      Array(WaBotService.TETO_POR_HORA).fill('operator'),
+      'the column is NOT NULL DEFAULT operator, so an old row reads as operator'
+    );
+
+    await receber(telefone, 'quero a segunda via do boleto');
+
+    const depois = await respostas(telefone);
+    assert.equal(depois.length, WaBotService.TETO_POR_HORA + 1);
+    assert.ok(depois.at(-1).includes(LINHA_DIGITAVEL));
+  });
+
+  it('does not let an alert on the thread count against it either', async () => {
+    const telefone = ASSINANTE;
+    const conversa = await fioVazio(telefone);
+    // An on-duty number is a subscriber too, and a busy night is three alerts.
+    await semear(conversa, 'alert', WaBotService.TETO_POR_HORA);
+
+    await receber(telefone, 'quero a segunda via do boleto');
+
+    const depois = await respostas(telefone);
+    assert.equal(depois.length, WaBotService.TETO_POR_HORA + 1);
+    assert.ok(depois.at(-1).includes(LINHA_DIGITAVEL));
+  });
+
+  it('stays quiet while the provider answers from their own phone', async () => {
+    const telefone = ASSINANTE;
+    await limparFio(telefone);
+    await receber(telefone, 'oi, tudo bem?');
+    // The provider answers on the phone app, not in the panel. That echo comes
+    // back `fromMe` with the server's id on it and no `sent_by` behind it —
+    // which the ceiling used to catch by accident, three messages late, because
+    // it counted every outbound row without a `sent_by` as automatic.
+    await receber(telefone, 'oi João, já estou vendo', { fromMe: true });
+    const antes = (await respostas(telefone)).length;
+
+    await receber(telefone, 'quero a segunda via do boleto');
+
+    const depois = await respostas(telefone);
+    assert.equal(depois.length, antes, 'the bot must not talk over the phone in a hand');
+    assert.ok(depois.every((body) => !String(body).includes(LINHA_DIGITAVEL)));
+  });
+
+  it('marks its own answer as the bot\'s and leaves the inbound message alone', async () => {
+    const telefone = ASSINANTE;
+    await limparFio(telefone);
+    await receber(telefone, 'quero a segunda via do boleto');
+
+    assert.deepEqual(await origens(telefone), ['bot']);
+    const conversa = await conversaDe(telefone);
+    const entrada = await getDb()('wa_messages')
+      .where({ conversation_id: conversa.id, direction: 'in' })
+      .first();
+    // The panel composed none of an inbound message, and neither did any of its
+    // automatic senders — 'operator' is the value that means "not one of them".
+    assert.equal(entrada.source, 'operator');
   });
 });
 
