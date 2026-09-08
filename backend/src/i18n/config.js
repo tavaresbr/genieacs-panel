@@ -1,4 +1,4 @@
-export const LOCALES = ['pt-BR', 'en', 'es', 'it', 'de', 'fr', 'ja'];
+export const LOCALES = ['pt-BR', 'en', 'es', 'it', 'de', 'fr', 'ja', 'zh-CN'];
 
 export const DEFAULT_LOCALE = 'pt-BR';
 
@@ -23,6 +23,8 @@ export function resolveLocale(tag) {
   if (base === 'de') return 'de';
   if (base === 'fr') return 'fr';
   if (base === 'ja') return 'ja';
+  // Only Simplified Chinese ships today, so every zh tag folds to it.
+  if (base === 'zh') return 'zh-CN';
   return null;
 }
 

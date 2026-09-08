@@ -26,6 +26,7 @@ const loaders: Record<LazyLocale, () => Promise<{ default: Dictionary }>> = {
   it: () => import('@/lib/i18n/locales/it'),
   ja: () => import('@/lib/i18n/locales/ja'),
   'pt-BR': () => import('@/lib/i18n/locales/pt-BR'),
+  'zh-CN': () => import('@/lib/i18n/locales/zh-CN'),
 }
 
 const pending = new Map<Locale, Promise<void>>()
