@@ -4,6 +4,7 @@ import en from './locales/en.js';
 import fr from './locales/fr.js';
 import es from './locales/es.js';
 import it from './locales/it.js';
+import ja from './locales/ja.js';
 import ptBR from './locales/pt-BR.js';
 
 export { DEFAULT_LOCALE, FALLBACK_LOCALE, LOCALES, negotiateLocale, resolveLocale };
@@ -14,7 +15,8 @@ export const dictionaries = {
   es,
   it,
   de,
-  fr
+  fr,
+  ja
 };
 
 const PLACEHOLDER_PATTERN = /\{(\w+)\}/g;
