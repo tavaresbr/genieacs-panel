@@ -17,6 +17,10 @@ are calculated from conventional commits since the previous `v*` Git tag.
 - Surface contract state across the device fleet (`00dd64b`)
 - Reconcile the ONT fleet against SGP contracts (`a88e62d`)
 
+### Maintenance
+
+- Add the multi-tenant SaaS conversion plan (`7071b38`)
+
 [Full comparison](https://github.com/skydashnet/genieacs-panel/compare/v1.13.1...v1.14.0)
 
 ## [1.13.1] - 2026-07-26

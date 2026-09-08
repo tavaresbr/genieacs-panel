@@ -141,7 +141,11 @@ const logOutput = git([
   '--format=%H%x1f%h%x1f%cs%x1f%s',
   logRange
 ]);
-const commits = logOutput ? logOutput.split('\n').map(parseCommit) : [];
+// A release commit documents the release itself, so it is never a note in the
+// next one — which happens whenever a release is regenerated before its tag
+// exists.
+const commits = (logOutput ? logOutput.split('\n').map(parseCommit) : [])
+  .filter((commit) => !/^chore\(release\)/i.test(commit.subject));
 if (commits.length === 0) {
   throw new Error(`No commits found after ${latestTag || 'repository start'}; there is nothing to release.`);
 }

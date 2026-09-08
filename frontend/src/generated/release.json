@@ -1,7 +1,7 @@
 {
   "version": "1.14.0",
-  "build": 69,
-  "sourceCommit": "0fd9ed81d421",
+  "build": 73,
+  "sourceCommit": "2e2f2e8aebc4",
   "releasedAt": "2026-09-08",
   "basedOnTag": "v1.13.1",
   "compareUrl": "https://github.com/skydashnet/genieacs-panel/compare/v1.13.1...v1.14.0",
@@ -53,6 +53,12 @@
       "date": "2026-09-08",
       "title": "Surface contract state across the device fleet",
       "category": "New"
+    },
+    {
+      "shortHash": "7071b38",
+      "date": "2026-09-08",
+      "title": "Add the multi-tenant SaaS conversion plan",
+      "category": "Maintenance"
     },
     {
       "shortHash": "a88e62d",
