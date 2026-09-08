@@ -24,6 +24,7 @@ const loaders: Record<LazyLocale, () => Promise<{ default: Dictionary }>> = {
   es: () => import('@/lib/i18n/locales/es'),
   fr: () => import('@/lib/i18n/locales/fr'),
   it: () => import('@/lib/i18n/locales/it'),
+  ja: () => import('@/lib/i18n/locales/ja'),
   'pt-BR': () => import('@/lib/i18n/locales/pt-BR'),
 }
 
