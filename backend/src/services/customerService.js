@@ -4,6 +4,7 @@ import SgpLink from '../models/SgpLink.js';
 import CustomerPortalPasswordService from './customerPortalPasswordService.js';
 import DeviceProfile from '../models/DeviceProfile.js';
 import Setting from '../models/Setting.js';
+import { TranslatableError } from '../i18n/index.js';
 
 const CUSTOMER_ID_PATTERN = /^[A-Z]{2,4}-[A-Z0-9]{7}-[A-Z0-9]{6}$/;
 const ID_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -198,7 +199,7 @@ class CustomerService {
         if (concurrent) return concurrent;
       }
     }
-    throw new Error('Unable to allocate a unique customer ID');
+    throw new TranslatableError('settings.customerIdAllocationFailed');
   }
 
   /**

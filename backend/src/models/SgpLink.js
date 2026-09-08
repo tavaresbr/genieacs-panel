@@ -27,6 +27,10 @@ class SgpLink {
     if (!Array.isArray(deviceIds) || deviceIds.length === 0) return [];
     return getDb()('sgp_links').whereIn('device_id', deviceIds);
   }
+
+  static async getAll() {
+    return getDb()('sgp_links').orderBy('device_id', 'asc');
+  }
 }
 
 export default SgpLink;

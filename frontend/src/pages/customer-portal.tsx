@@ -3,12 +3,7 @@ import { BrandMark } from '@/components/brand-mark'
 import { Icon } from '@/components/ui/icon'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import { useTranslation } from '@/contexts/language-context'
-import {
-  getActiveLocale,
-  isCustomerSessionCode,
-  translate,
-  translateApiMessage,
-} from '@/lib/i18n'
+import { getActiveLocale, isCustomerSessionCode, translate } from '@/lib/i18n'
 
 type PortalOverview = {
   customerId: string
@@ -84,6 +79,8 @@ async function portalRequest<T>(path: string, init?: RequestInit): Promise<ApiRe
     credentials: 'same-origin',
     headers: {
       ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+      // Answer in the language the subscriber picked, not the browser default.
+      'Accept-Language': getActiveLocale(),
       ...init?.headers,
     },
   })
@@ -206,7 +203,7 @@ export default function CustomerPortal() {
       const result = await portalRequest<PortalOverview>('/overview')
       if (!result.success || !result.data) {
         if (isCustomerSessionCode(result.code)) setAuthenticated(false)
-        setError(translateApiMessage(result, t, 'portal.error.overview'))
+        setError(result.message || t('portal.error.overview'))
         return
       }
       setOverview(result.data)
@@ -234,7 +231,7 @@ export default function CustomerPortal() {
         setBilling(null)
         setBillingError(
           result.code && TRANSIENT_BILLING_CODES.has(result.code)
-            ? translateApiMessage(result, t, 'portal.billing.temporaryFailure')
+            ? (result.message || t('portal.billing.temporaryFailure'))
             : ''
         )
         return
@@ -257,9 +254,7 @@ export default function CustomerPortal() {
       const result = await portalRequest('/billing/trust-unlock', { method: 'POST' })
       setBillingFeedback({
         type: result.success ? 'success' : 'error',
-        // A successful unlock answers with the provider's own wording and no
-        // code, so the backend message is what the subscriber should read.
-        message: translateApiMessage(result, t, result.success
+        message: result.message || t(result.success
           ? 'portal.billing.trustUnlockSent'
           : 'portal.billing.trustUnlockFailed')
       })
@@ -332,7 +327,7 @@ export default function CustomerPortal() {
         body: JSON.stringify({ customerId, password }),
       })
       if (!result.success) {
-        setError(translateApiMessage(result, t, 'portal.login.invalidCredentials'))
+        setError(result.message || t('portal.login.invalidCredentials'))
         return
       }
       setAuthenticated(true)
@@ -381,7 +376,7 @@ export default function CustomerPortal() {
         if (isCustomerSessionCode(result.code)) setAuthenticated(false)
         setWifiFeedback({
           type: 'error',
-          message: translateApiMessage(result, t, 'portal.wifi.error.revealFailed')
+          message: result.message || t('portal.wifi.error.revealFailed')
         })
         return
       }
@@ -428,8 +423,7 @@ export default function CustomerPortal() {
         if (isCustomerSessionCode(result.code)) setAuthenticated(false)
         setWifiFeedback({
           type: 'error',
-          // `wifi_rejected` carries the ONT's own reason, which the helper keeps.
-          message: translateApiMessage(result, t, 'portal.wifi.error.saveFailed')
+          message: result.message || t('portal.wifi.error.saveFailed')
         })
         return
       }
@@ -449,7 +443,7 @@ export default function CustomerPortal() {
       setShowWifiPassword(false)
       setWifiFeedback({
         type: 'success',
-        message: translateApiMessage(result, t, 'portal.wifi.success')
+        message: result.message || t('portal.wifi.success')
       })
     } catch {
       setWifiFeedback({

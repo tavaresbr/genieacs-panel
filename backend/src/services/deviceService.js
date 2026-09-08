@@ -5,6 +5,7 @@ import Vendor from '../models/Vendor.js';
 import WifiSecurityConfig from '../models/WifiSecurityConfig.js';
 import AppState from '../models/AppState.js';
 import { DEFAULT_SETTINGS } from '../config/seed.js';
+import { TranslatableError } from '../i18n/index.js';
 
 const WAN_PARAMETER_CANDIDATES = Object.freeze({
   vlan: [
@@ -641,7 +642,7 @@ class DeviceService {
     });
 
     if (!Array.isArray(data) || data.length === 0) {
-      throw new Error('Device not found');
+      throw new TranslatableError('device.notFound', null, { status: 404 });
     }
 
     return await this.processDetailDeviceData(data[0], virtualParams);
@@ -941,6 +942,7 @@ class DeviceService {
     const virtualParams = await this.getVirtualParameters();
     const projection = [
       '_id',
+      '_lastInform',
       'InternetGatewayDevice.DeviceInfo.SoftwareVersion',
       virtualParams.vpPppoeUsername
     ].filter(Boolean);
@@ -952,6 +954,7 @@ class DeviceService {
     }
     return data.map((item) => ({
       _id: item._id || null,
+      _lastInform: item._lastInform || null,
       softwareId: this.getParameterValue(
         item,
         'InternetGatewayDevice.DeviceInfo.SoftwareVersion'
@@ -992,7 +995,7 @@ class DeviceService {
       projection: projection.filter(Boolean).join(',')
     });
     if (!Array.isArray(data) || data.length === 0) {
-      throw new Error('Device not found');
+      throw new TranslatableError('device.notFound', null, { status: 404 });
     }
 
     const item = data[0];
@@ -1110,7 +1113,7 @@ class DeviceService {
       projection: '_id,InternetGatewayDevice.WANDevice'
     });
     if (!Array.isArray(rawDeviceData) || rawDeviceData.length === 0) {
-      throw new Error('Device not found');
+      throw new TranslatableError('device.notFound', null, { status: 404 });
     }
     const allowedContainers = this.discoverWanContainers(rawDeviceData[0]);
     if (!allowedContainers.includes(containerPath)) {
@@ -1121,7 +1124,8 @@ class DeviceService {
     return {
       task,
       objectName,
-      message: `${type === 'ppp' ? 'PPPoE' : 'IP'} WAN creation task queued. The new instance appears after the next Inform.`
+      messageKey: 'device.service.wanCreateQueued',
+      messageVars: { type: type === 'ppp' ? 'PPPoE' : 'IP' }
     };
   }
 
@@ -1180,7 +1184,7 @@ class DeviceService {
       query: JSON.stringify({ _id: deviceId })
     });
     if (!Array.isArray(rawDeviceData) || rawDeviceData.length === 0) {
-      throw new Error('Device not found');
+      throw new TranslatableError('device.notFound', null, { status: 404 });
     }
     const item = rawDeviceData[0];
     const manufacturer = item._deviceId?._Manufacturer || null;
@@ -1325,7 +1329,7 @@ class DeviceService {
     }
 
     if (parameterValues.length === 0) {
-      return { success: true, message: 'No WAN changes were detected.', parameterCount: 0 };
+      return { success: true, messageKey: 'device.service.wanNoChanges', parameterCount: 0 };
     }
 
     await this.postTask(deviceId, {
@@ -1335,7 +1339,7 @@ class DeviceService {
 
     return {
       success: true,
-      message: 'WAN configuration update task queued.',
+      messageKey: 'device.service.wanUpdateQueued',
       parameterCount: parameterValues.length
     };
   }
@@ -1366,7 +1370,7 @@ class DeviceService {
       ]
     });
 
-    return { success: true, message: `${type} admin password update task queued.` };
+    return { success: true, messageKey: 'device.service.credentialQueued', messageVars: { type } };
   }
 
   static resolveWifiConfiguredPath(basePath, configuredPath, index) {
@@ -1381,33 +1385,33 @@ class DeviceService {
   static async updateWifiConfig(deviceId, index, formData) {
     const wifiIndex = Number(index);
     if (!Number.isInteger(wifiIndex) || wifiIndex < 1 || wifiIndex > 8) {
-      throw new Error('WiFi index must be an integer between 1 and 8.');
+      throw new TranslatableError('device.service.wifiIndexInvalid', null, { status: 400 });
     }
     const ssid = String(formData?.ssid ?? '').trim();
     const password = formData?.password === undefined ? '' : String(formData.password);
     const security = String(formData?.security ?? '').trim();
     const channelRaw = formData?.channel;
     if (!ssid || ssid.length > 32) {
-      throw new Error('WiFi SSID must contain 1 to 32 characters.');
+      throw new TranslatableError('device.service.wifiSsidInvalid', null, { status: 400 });
     }
     if (password && (password.length < 8 || password.length > 63)) {
-      throw new Error('WiFi password must contain 8 to 63 characters.');
+      throw new TranslatableError('device.service.wifiPasswordInvalid', null, { status: 400 });
     }
     if (security.length > 128) {
-      throw new Error('WiFi security value is too long.');
+      throw new TranslatableError('device.service.wifiSecurityTooLong', null, { status: 400 });
     }
     if (
       channelRaw !== '' && channelRaw !== null && channelRaw !== undefined &&
       (!Number.isInteger(Number(channelRaw)) || Number(channelRaw) < 0 || Number(channelRaw) > 196)
     ) {
-      throw new Error('WiFi channel must be an integer between 0 and 196.');
+      throw new TranslatableError('device.service.wifiChannelInvalid', null, { status: 400 });
     }
 
     const rawDeviceData = await this.fetchFromGenieAcs('', {
       query: JSON.stringify({ _id: deviceId })
     });
     if (!Array.isArray(rawDeviceData) || rawDeviceData.length === 0) {
-      throw new Error('Device not found');
+      throw new TranslatableError('device.notFound', null, { status: 404 });
     }
     const item = rawDeviceData[0];
     const basePath = `InternetGatewayDevice.LANDevice.1.WLANConfiguration.${wifiIndex}`;
@@ -1470,7 +1474,8 @@ class DeviceService {
     });
     return {
       success: true,
-      message: `WiFi SSID ${wifiIndex} update task queued.`,
+      messageKey: 'device.service.wifiQueued',
+      messageVars: { index: wifiIndex },
       parameterCount: parameterValues.length
     };
   }

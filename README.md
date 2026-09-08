@@ -51,7 +51,7 @@ SkyGenPanel is a management layer for GenieACS deployments. It combines an opera
 - Operator accounts with an administrator and a read-only role.
 - Server-side paging, search and status filtering for large ONT fleets.
 - Encrypted recovery of the last WiFi password changed through the customer portal.
-- SGP integration for subscriber contract, plan, and open-invoice data, with optional invoice display and trust unlock in the customer portal.
+- SGP integration for subscriber contract, plan, and open-invoice data, with fleet-wide synchronization, contract-state filtering, and optional invoice display and trust unlock in the customer portal.
 - Automatic Linux dependency and Node.js installation during both first install and CLI updates.
 
 ## Screenshots
@@ -217,8 +217,15 @@ so the UI is a convenience rather than the control.
 Open **Settings → SGP integration** (*Integração SGP*) to connect the panel to
 [SGP](https://sgp.net.br) and show contract, plan, and open-invoice data next to
 each ONT. The integration token is encrypted with `JWT_SECRET` and never leaves
-the server. See [`docs/sgp-integration.md`](docs/sgp-integration.md) for setup,
-endpoints, and troubleshooting.
+the server.
+
+A fleet synchronization links every ONT to its contract in one pass, after which
+the device inventory can be filtered by contract state and the dashboard reports
+the divergences neither system sees alone: an ONT answering while its contract is
+blocked or cancelled, a contract that is active while the ONT stays silent, and a
+device with no contract linked. See
+[`docs/sgp-integration.md`](docs/sgp-integration.md) for setup, endpoints, and
+troubleshooting.
 
 Invoices are always read live from SGP. The contract behind a device (holder,
 plan, status) is cached for 24 hours and re-read after that, and a cached link
@@ -274,15 +281,23 @@ the sidebar or from **Settings → Panel & ACS**, and subscribers change it from
 the portal header. Dates and numbers follow the active locale and the viewer
 time zone.
 
-Translations live in `frontend/src/lib/i18n/locales/`. `en.ts` is the source of
-truth: the other dictionaries are typed against it, so `npm run typecheck`
-fails whenever a key is added without a translation in every language. To add a
-language, create a locale file, register it in
-`frontend/src/lib/i18n/config.ts`, and add it to `dictionaries` in
-`frontend/src/lib/i18n/index.ts`.
+API responses follow the same language. The panel and the portal send the
+active locale in `Accept-Language`, the backend negotiates it per request
+(falling back to Portuguese), and every response carries `Content-Language`
+plus `Vary: Accept-Language` so a proxy never serves one language to a client
+that asked for another.
 
-Messages returned by the backend API are not translated yet and still reach the
-interface in English.
+Translations live in `frontend/src/lib/i18n/locales/` for the interface and
+`backend/src/i18n/locales/` for the API messages. In both places `en` is the
+source of truth: the frontend dictionaries are typed against it, so
+`npm run typecheck` fails whenever a key is added without a translation in
+every language, and `npm run test:backend` fails on the same gap for the API
+dictionaries. To add a language, create a locale file on both sides, register
+it in `frontend/src/lib/i18n/config.ts` and `backend/src/i18n/config.js`, and
+add it to `dictionaries` in the matching `index` module.
+
+Text that SGP or GenieACS itself returns is passed through as the provider
+phrased it, since only the provider can translate it.
 
 ## Architecture
 

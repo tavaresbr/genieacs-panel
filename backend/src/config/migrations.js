@@ -163,6 +163,9 @@ const sgpLinksTable = (db) => (t) => {
   t.string('plan', 255);
   t.string('status', 64);
   t.string('status_label', 128);
+  // Derived from the SGP status so the fleet views can group contracts
+  // without depending on each install's Portuguese labels.
+  t.string('state', 16).notNullable().defaultTo('unknown');
   t.string('login', 255);
   t.string('link_mode', 16).notNullable().defaultTo('auto');
   t.timestamp('last_synced_at').defaultTo(db.fn.now());
@@ -272,6 +275,21 @@ export const migrations = [
     },
     async up(db) {
       await createTableIfMissing(db, 'sgp_links', sgpLinksTable(db));
+    }
+  },
+  {
+    // Installations whose sgp_links predates the derived contract state.
+    id: '0005_sgp_link_state',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('sgp_links'))) return false;
+      return db.schema.hasColumn('sgp_links', 'state');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('sgp_links'))) return;
+      if (await db.schema.hasColumn('sgp_links', 'state')) return;
+      await db.schema.alterTable('sgp_links', (t) => {
+        t.string('state', 16).notNullable().defaultTo('unknown');
+      });
     }
   }
 ];

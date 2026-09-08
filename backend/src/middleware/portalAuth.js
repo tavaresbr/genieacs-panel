@@ -69,7 +69,7 @@ export async function authenticatePortalCustomer(req, res, next) {
     if (!token) {
       return res.status(401).json({
         success: false,
-        message: 'Customer session required',
+        message: req.t('portal.sessionRequired'),
         code: 'customer_session_required'
       });
     }
@@ -80,7 +80,7 @@ export async function authenticatePortalCustomer(req, res, next) {
     if (decoded.tokenType !== 'customer' || !decoded.accountId) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid customer session',
+        message: req.t('portal.sessionInvalid'),
         code: 'customer_session_invalid'
       });
     }
@@ -88,7 +88,7 @@ export async function authenticatePortalCustomer(req, res, next) {
     if (!account || !account.active || account.customer_id !== decoded.customerId) {
       return res.status(401).json({
         success: false,
-        message: 'Customer session is no longer valid',
+        message: req.t('portal.sessionStale'),
         code: 'customer_session_invalid'
       });
     }
@@ -97,7 +97,7 @@ export async function authenticatePortalCustomer(req, res, next) {
   } catch {
     return res.status(401).json({
       success: false,
-      message: 'Customer session expired',
+      message: req.t('portal.sessionExpired'),
       code: 'customer_session_expired'
     });
   }
