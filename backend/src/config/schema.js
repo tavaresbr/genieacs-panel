@@ -186,9 +186,107 @@ export async function ensureSchema(db = getDb()) {
       t.string('status_label', 128);
       t.string('login', 255);
       t.string('link_mode', 16).notNullable().defaultTo('auto');
+      t.boolean('blocked');
       t.timestamp('last_synced_at').defaultTo(db.fn.now());
       t.timestamp('created_at').defaultTo(db.fn.now());
       t.timestamp('updated_at').defaultTo(db.fn.now());
+    });
+  } else if (!(await db.schema.hasColumn('sgp_links', 'blocked'))) {
+    // Reconciliation compares the previous blocked flag with the current one to
+    // detect a transition, so the flag has to survive between passes. Older
+    // installs stored only the status text, which SGP phrases inconsistently.
+    await db.schema.alterTable('sgp_links', (t) => {
+      t.boolean('blocked');
+    });
+  }
+
+  if (!(await db.schema.hasTable('provisioning_profiles'))) {
+    await db.schema.createTable('provisioning_profiles', (t) => {
+      t.increments('id').primary();
+      t.string('name', 128).notNullable().unique();
+      // Case-insensitive substrings matched against the SGP plan name, stored
+      // as a JSON array like the vendor pattern columns.
+      t.text('plan_patterns');
+      // A cleared pattern list must not silently become a catch-all, so the
+      // fallback profile is an explicit choice instead.
+      t.boolean('is_default').notNullable().defaultTo(false);
+      t.integer('priority').notNullable().defaultTo(10);
+      t.boolean('enabled').notNullable().defaultTo(true);
+      t.boolean('apply_wan').notNullable().defaultTo(true);
+      t.boolean('apply_pppoe_password').notNullable().defaultTo(true);
+      t.string('wan_name', 256);
+      t.integer('wan_vlan_id');
+      t.string('wan_service_list', 128);
+      t.string('wan_connection_type', 32);
+      t.boolean('wan_nat_enabled');
+      t.boolean('apply_wifi').notNullable().defaultTo(true);
+      t.text('wifi_indexes');
+      t.string('wifi_ssid_template', 64);
+      t.string('wifi_password_mode', 16).notNullable().defaultTo('random');
+      t.text('wifi_password_ciphertext');
+      t.string('wifi_password_iv', 32);
+      t.string('wifi_password_tag', 32);
+      t.boolean('apply_credentials').notNullable().defaultTo(false);
+      t.string('credential_targets', 16).notNullable().defaultTo('super');
+      t.text('cpe_password_ciphertext');
+      t.string('cpe_password_iv', 32);
+      t.string('cpe_password_tag', 32);
+      t.text('description');
+      t.timestamp('created_at').defaultTo(db.fn.now());
+      t.timestamp('updated_at').defaultTo(db.fn.now());
+    });
+  }
+
+  if (!(await db.schema.hasTable('provisioning_runs'))) {
+    await db.schema.createTable('provisioning_runs', (t) => {
+      t.increments('id').primary();
+      t.string('device_id', 255).notNullable();
+      t.string('contract', 64);
+      t.integer('profile_id').unsigned()
+        .references('id').inTable('provisioning_profiles').onDelete('SET NULL');
+      // Denormalized so deleting a profile does not erase why a run behaved
+      // the way it did.
+      t.string('profile_name', 128);
+      t.string('trigger', 16).notNullable().defaultTo('poller');
+      t.string('status', 24).notNullable().defaultTo('pending');
+      t.integer('attempt_count').notNullable().defaultTo(0);
+      t.timestamp('next_attempt_at');
+      // JSON array of { step, status, detail, parameterCount, at }, redacted.
+      t.text('steps');
+      t.text('error');
+      t.timestamp('started_at');
+      t.timestamp('finished_at');
+      t.timestamp('created_at').defaultTo(db.fn.now());
+      t.timestamp('updated_at').defaultTo(db.fn.now());
+      t.index(['device_id', 'status'], 'provisioning_runs_device_status_idx');
+      t.index(['status', 'next_attempt_at'], 'provisioning_runs_due_idx');
+    });
+  }
+
+  if (!(await db.schema.hasTable('sgp_events'))) {
+    await db.schema.createTable('sgp_events', (t) => {
+      t.increments('id').primary();
+      // A redelivered webhook and a transition seen twice by reconciliation
+      // both collapse onto the same key, so neither is processed twice.
+      t.string('dedupe_key', 128).notNullable().unique();
+      t.string('source', 16).notNullable();
+      t.string('type', 32).notNullable();
+      t.string('raw_type', 128);
+      t.string('contract', 64);
+      t.string('document', 32);
+      t.string('login', 255);
+      t.string('device_id', 255);
+      t.string('status', 16).notNullable().defaultTo('pending');
+      t.integer('attempts').notNullable().defaultTo(0);
+      t.text('payload');
+      t.text('error');
+      t.timestamp('occurred_at');
+      t.timestamp('received_at').defaultTo(db.fn.now());
+      t.timestamp('processed_at');
+      t.timestamp('created_at').defaultTo(db.fn.now());
+      t.timestamp('updated_at').defaultTo(db.fn.now());
+      t.index(['status', 'id'], 'sgp_events_status_idx');
+      t.index(['contract'], 'sgp_events_contract_idx');
     });
   }
 

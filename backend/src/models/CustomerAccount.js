@@ -21,6 +21,16 @@ class CustomerAccount {
     return (await getDb()('customer_accounts').where({ device_id: deviceId }).first()) || null;
   }
 
+  static async getByPppoeUsername(pppoeUsername) {
+    if (!pppoeUsername) return null;
+    return (
+      (await getDb()('customer_accounts')
+        .where({ pppoe_username: pppoeUsername })
+        .orderBy('id', 'desc')
+        .first()) || null
+    );
+  }
+
   static async getByIdentityHash(identityHash) {
     return (
       (await getDb()('customer_accounts').where({ identity_hash: identityHash }).first()) || null
