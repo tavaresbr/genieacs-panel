@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import AppState from '../models/AppState.js';
 import CustomerAccount from '../models/CustomerAccount.js';
 import SgpLink from '../models/SgpLink.js';
@@ -29,6 +30,53 @@ export const DEFAULT_ENDPOINTS = Object.freeze({
 
 export const LINK_MODES = Object.freeze(['pppoe', 'customer_id', 'manual']);
 
+/** Public path SGP posts to. Fixed, so the Settings page can show it verbatim. */
+export const WEBHOOK_PATH = '/api/sgp/events/webhook';
+
+/** Normalized event vocabulary the dispatcher understands. */
+export const EVENT_TYPES = Object.freeze([
+  'payment_confirmed', 'unblocked', 'blocked', 'cancelled', 'activated',
+  'contract_changed', 'unknown'
+]);
+
+/**
+ * Maps what SGP calls an event onto that vocabulary. Both sides are compared
+ * through `normalizeKey`, so accents, case and separators do not matter, and
+ * an operator can extend the map from Settings when their install uses a
+ * wording that is not covered here.
+ */
+export const DEFAULT_EVENT_TYPE_MAP = Object.freeze({
+  pagamentoconfirmado: 'payment_confirmed',
+  pagamento: 'payment_confirmed',
+  pagamentorecebido: 'payment_confirmed',
+  pago: 'payment_confirmed',
+  baixatitulo: 'payment_confirmed',
+  quitado: 'payment_confirmed',
+  liberado: 'unblocked',
+  liberacao: 'unblocked',
+  liberacaoconfianca: 'unblocked',
+  desbloqueado: 'unblocked',
+  desbloqueio: 'unblocked',
+  bloqueado: 'blocked',
+  bloqueio: 'blocked',
+  suspenso: 'blocked',
+  suspensao: 'blocked',
+  cancelado: 'cancelled',
+  cancelamento: 'cancelled',
+  rescindido: 'cancelled',
+  rescisao: 'cancelled',
+  encerrado: 'cancelled',
+  ativado: 'activated',
+  ativacao: 'activated',
+  habilitado: 'activated',
+  instalado: 'activated',
+  instalacaoconcluida: 'activated',
+  alteracaoplano: 'contract_changed',
+  mudancaplano: 'contract_changed',
+  planoalterado: 'contract_changed',
+  trocaplano: 'contract_changed'
+});
+
 export const CONTRACT_STATES = Object.freeze(['active', 'blocked', 'cancelled', 'unknown']);
 
 const CONTRACT_STATE_PATTERNS = Object.freeze({
@@ -38,6 +86,9 @@ const CONTRACT_STATE_PATTERNS = Object.freeze({
 });
 
 const tokenBox = createSecretBox('skygenpanel-sgp-token-v1');
+// A separate context, so the webhook secret's ciphertext can never be read
+// with the integration token's key.
+const webhookSecretBox = createSecretBox('skygenpanel-sgp-webhook-secret-v1');
 
 /**
  * The message is a translation key so the controller can answer in the
@@ -75,6 +126,14 @@ function encryptToken(token) {
 
 function decryptToken(box) {
   return box ? (tokenBox.decrypt(box) ?? '') : '';
+}
+
+function encryptWebhookSecret(secret) {
+  return { v: 1, ...webhookSecretBox.encrypt(secret) };
+}
+
+function decryptWebhookSecret(box) {
+  return box ? (webhookSecretBox.decrypt(box) ?? '') : '';
 }
 
 function normalizeKey(key) {
@@ -128,6 +187,30 @@ function asDate(value) {
   return iso ? iso[0] : null;
 }
 
+/**
+ * Like `asDate`, but keeps the time of day. Event payloads carry a moment, not
+ * a due date, and SGP writes it as `DD/MM/YYYY HH:mm:ss`, as ISO, or as an
+ * epoch, depending on where in the system it came from.
+ */
+function asDateTime(value) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    const epoch = value > 1e11 ? value : value * 1000;
+    const parsed = new Date(epoch);
+    return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+  }
+  const text = asText(value);
+  if (!text) return null;
+  if (/^\d{9,13}$/.test(text)) return asDateTime(Number(text));
+  const brazilian = text.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?/);
+  if (brazilian) {
+    const [, day, month, year, hour = '00', minute = '00', second = '00'] = brazilian;
+    const parsed = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}`);
+    return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+  }
+  const parsed = new Date(text);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
 function firstArray(payload, names) {
   const direct = pick(payload, names);
   if (Array.isArray(direct)) return direct;
@@ -136,11 +219,23 @@ function firstArray(payload, names) {
   return [];
 }
 
-function normalizeContract(entry) {
+// The PPPoE password is the one field of a contract that must never reach a
+// browser: `normalizeContract` output is returned verbatim by the operator
+// lookup endpoint. Reading it is therefore opt-in, and only provisioning asks.
+const PPPOE_PASSWORD_NAMES = Object.freeze([
+  'senha', 'senhaPppoe', 'senha_pppoe', 'senhaPPPoE', 'senhaLogin', 'senhaAcesso',
+  'senhaConexao', 'senhaUsuario', 'senhaRadius', 'password', 'pppoePassword',
+  'pppoe_password', 'passwordPppoe', 'clave'
+]);
+
+function normalizeContract(entry, { includeSecrets = false } = {}) {
   const contract = asText(pick(entry, ['contrato', 'contratoId', 'idContrato', 'contract']));
   if (!contract) return null;
   return {
     contract,
+    ...(includeSecrets
+      ? { loginPassword: asText(pick(entry, PPPOE_PASSWORD_NAMES)) }
+      : {}),
     status: asText(pick(entry, ['contratoStatus', 'status', 'situacao'])),
     statusLabel: asText(pick(entry, [
       'contratoStatusDisplay', 'statusDisplay', 'situacaoDisplay', 'statusDescricao'
@@ -209,6 +304,53 @@ function maskDocument(document) {
   return `${'*'.repeat(digits.length - 4)}${digits.slice(-4)}`;
 }
 
+function clampNumber(value, min, max, fallback) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(Math.max(Math.trunc(parsed), min), max);
+}
+
+/**
+ * Operator-supplied additions to the event vocabulary. Keys are normalized the
+ * same way the payload's type is, so `Pagamento Confirmado` and
+ * `pagamento_confirmado` are one entry, and an unknown target type is dropped
+ * rather than silently routing an event to a handler that does not exist.
+ */
+function normalizeEventTypeMap(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const map = {};
+  for (const [key, target] of Object.entries(value)) {
+    const normalizedKey = normalizeKey(key);
+    const normalizedTarget = String(target ?? '').trim();
+    if (!normalizedKey || !EVENT_TYPES.includes(normalizedTarget)) continue;
+    map[normalizedKey] = normalizedTarget;
+  }
+  return map;
+}
+
+/**
+ * Event payloads may put the interesting fields at the top level or nest them
+ * under a wrapper. Every lookup walks these scopes in order, so one shape does
+ * not have to be guessed correctly up front.
+ */
+function candidateScopes(body) {
+  if (!body || typeof body !== 'object') return [];
+  const scopes = [body];
+  for (const key of ['dados', 'data', 'payload', 'evento', 'contrato', 'contract', 'cliente', 'customer']) {
+    const nested = body[key];
+    if (nested && typeof nested === 'object' && !Array.isArray(nested)) scopes.push(nested);
+  }
+  return scopes;
+}
+
+function pickScoped(scopes, names) {
+  for (const scope of scopes) {
+    const value = pick(scope, names);
+    if (value !== null) return value;
+  }
+  return null;
+}
+
 const DEFAULT_CONFIG = Object.freeze({
   enabled: false,
   baseUrl: '',
@@ -217,8 +359,18 @@ const DEFAULT_CONFIG = Object.freeze({
   portalBilling: true,
   portalUnlock: false,
   invoiceLimit: 6,
-  endpoints: DEFAULT_ENDPOINTS
+  endpoints: DEFAULT_ENDPOINTS,
+  webhookEnabled: false,
+  webhookRequireTimestamp: false,
+  webhookToleranceSeconds: 300,
+  reconcileEnabled: false,
+  reconcileIntervalMinutes: 15,
+  reconcileBatchSize: 25,
+  eventRetentionDays: 90,
+  eventTypeMap: {}
 });
+
+const MIN_RECONCILE_INTERVAL_MINUTES = 5;
 
 class SgpService {
   static configCache = { value: null, expiresAt: 0 };
@@ -298,6 +450,17 @@ class SgpService {
       portalUnlock: stored.portalUnlock === true,
       invoiceLimit: Number(stored.invoiceLimit) > 0 ? Math.min(Number(stored.invoiceLimit), 24) : 6,
       endpoints: { ...DEFAULT_ENDPOINTS, ...(stored.endpoints || {}) },
+      webhookSecret: decryptWebhookSecret(stored.webhookSecret),
+      webhookEnabled: stored.webhookEnabled === true,
+      webhookRequireTimestamp: stored.webhookRequireTimestamp === true,
+      webhookToleranceSeconds: clampNumber(stored.webhookToleranceSeconds, 30, 3600, 300),
+      reconcileEnabled: stored.reconcileEnabled === true,
+      reconcileIntervalMinutes: clampNumber(
+        stored.reconcileIntervalMinutes, MIN_RECONCILE_INTERVAL_MINUTES, 1440, 15
+      ),
+      reconcileBatchSize: clampNumber(stored.reconcileBatchSize, 1, 200, 25),
+      eventRetentionDays: clampNumber(stored.eventRetentionDays, 1, 365, 90),
+      eventTypeMap: normalizeEventTypeMap(stored.eventTypeMap),
       updatedAt: stored.updatedAt || null
     };
     this.configCache = { value: config, expiresAt: Date.now() + CONFIG_CACHE_TTL_MS };
@@ -306,10 +469,12 @@ class SgpService {
 
   static async getPublicConfig() {
     const config = await this.getConfig();
-    const { token, ...rest } = config;
+    const { token, webhookSecret, ...rest } = config;
     return {
       ...rest,
       tokenConfigured: Boolean(token),
+      webhookSecretConfigured: Boolean(webhookSecret),
+      webhookPath: WEBHOOK_PATH,
       ready: this.isReady(config)
     };
   }
@@ -346,6 +511,30 @@ class SgpService {
       invoiceLimit: patch.invoiceLimit === undefined
         ? current.invoiceLimit
         : Math.min(Math.max(Number(patch.invoiceLimit) || 6, 1), 24),
+      webhookEnabled: patch.webhookEnabled === undefined
+        ? current.webhookEnabled
+        : patch.webhookEnabled === true,
+      webhookRequireTimestamp: patch.webhookRequireTimestamp === undefined
+        ? current.webhookRequireTimestamp
+        : patch.webhookRequireTimestamp === true,
+      webhookToleranceSeconds: patch.webhookToleranceSeconds === undefined
+        ? current.webhookToleranceSeconds
+        : clampNumber(patch.webhookToleranceSeconds, 30, 3600, 300),
+      reconcileEnabled: patch.reconcileEnabled === undefined
+        ? current.reconcileEnabled
+        : patch.reconcileEnabled === true,
+      reconcileIntervalMinutes: patch.reconcileIntervalMinutes === undefined
+        ? current.reconcileIntervalMinutes
+        : clampNumber(patch.reconcileIntervalMinutes, MIN_RECONCILE_INTERVAL_MINUTES, 1440, 15),
+      reconcileBatchSize: patch.reconcileBatchSize === undefined
+        ? current.reconcileBatchSize
+        : clampNumber(patch.reconcileBatchSize, 1, 200, 25),
+      eventRetentionDays: patch.eventRetentionDays === undefined
+        ? current.eventRetentionDays
+        : clampNumber(patch.eventRetentionDays, 1, 365, 90),
+      eventTypeMap: patch.eventTypeMap === undefined
+        ? current.eventTypeMap
+        : normalizeEventTypeMap(patch.eventTypeMap),
       endpoints: {
         customer: this.normalizeEndpoint(
           patch.endpoints?.customer ?? current.endpoints.customer, DEFAULT_ENDPOINTS.customer
@@ -374,12 +563,68 @@ class SgpService {
       });
     }
 
+    // Same semantics as the token: omitted keeps the stored secret, an empty
+    // string clears it. The secret is only ever set through the rotate action.
+    let webhookSecret = current.webhookSecret;
+    if (patch.webhookSecret !== undefined) {
+      webhookSecret = String(patch.webhookSecret).trim();
+    }
+
+    if (next.webhookEnabled && !webhookSecret) {
+      throw new SgpError('sgp.error.webhookSecretRequired', {
+        code: 'webhook_secret_required',
+        status: 400
+      });
+    }
+
     await AppState.upsert(CONFIG_KEY, JSON.stringify({
       ...next,
-      token: token ? encryptToken(token) : null
+      token: token ? encryptToken(token) : null,
+      webhookSecret: webhookSecret ? encryptWebhookSecret(webhookSecret) : null
     }));
     this.invalidateConfigCache();
     return this.getPublicConfig();
+  }
+
+  /**
+   * Maps an arbitrary SGP event body onto the internal vocabulary. Nothing
+   * about the payload shape is assumed: the type may be called `evento`,
+   * `tipo`, `acao` or `status`, and the fields may be nested one level down.
+   * An unrecognised event is deliberately returned as `unknown` rather than
+   * dropped, so an operator can read the stored body and add a mapping.
+   */
+  static normalizeEvent(body, typeMap = {}) {
+    const scopes = candidateScopes(body);
+    const rawType = asText(pickScoped(scopes, [
+      'evento', 'event', 'eventType', 'tipo', 'tipoEvento', 'type',
+      'acao', 'action', 'ocorrencia', 'status', 'situacao'
+    ]));
+    const merged = { ...DEFAULT_EVENT_TYPE_MAP, ...normalizeEventTypeMap(typeMap) };
+    const type = rawType ? (merged[normalizeKey(rawType)] ?? 'unknown') : 'unknown';
+    const document = asText(pickScoped(scopes, ['cpfcnpj', 'cpfCnpj', 'documento', 'document']));
+    return {
+      type,
+      rawType,
+      contract: asText(pickScoped(scopes, ['contrato', 'contratoId', 'idContrato', 'contract'])),
+      document: document ? document.replace(/\D/g, '').slice(0, 32) || null : null,
+      login: asText(pickScoped(scopes, ['login', 'usuario', 'pppoe', 'loginPppoe'])),
+      occurredAt: asDateTime(pickScoped(scopes, [
+        'data', 'dataEvento', 'dataHora', 'datahora', 'timestamp', 'occurredAt', 'criadoEm'
+      ])),
+      eventId: asText(pickScoped(scopes, [
+        'id', 'eventoId', 'evento_id', 'eventId', 'uuid', 'notificacaoId', 'protocolo'
+      ]))
+    };
+  }
+
+  /**
+   * Generates a new webhook secret and returns it once. Nothing else ever
+   * hands the plaintext back, so an operator who loses it must rotate again.
+   */
+  static async rotateWebhookSecret() {
+    const secret = randomBytes(32).toString('hex');
+    await this.saveConfig({ webhookSecret: secret });
+    return secret;
   }
 
   static async request(endpointKey, payload = {}, configOverride = null) {
@@ -476,19 +721,40 @@ class SgpService {
     return payload;
   }
 
-  static async lookupCustomer(filters, configOverride = null) {
+  static async lookupCustomer(filters, configOverride = null, { includeSecrets = false } = {}) {
     const data = await this.request(
       'customer',
       this.buildLookupPayload(filters),
       configOverride
     );
     const contracts = firstArray(data, ['contratos', 'contrato', 'dados', 'data', 'clientes'])
-      .map((entry) => normalizeContract(entry))
+      .map((entry) => normalizeContract(entry, { includeSecrets }))
       .filter(Boolean);
     return {
       contracts,
       message: asText(pick(data, ['msg', 'mensagem', 'message']))
     };
+  }
+
+  /**
+   * A contract without its secret, for anything that leaves the process.
+   * `lookupContractForProvisioning` is the only source of a contract that
+   * carries `loginPassword`, and this is how that value is dropped again.
+   */
+  static publicContract(contract) {
+    if (!contract) return null;
+    const { loginPassword, ...rest } = contract;
+    return rest;
+  }
+
+  /**
+   * Contract lookup for the provisioning path, which is the only caller allowed
+   * to read the PPPoE password. The result must never be returned by a route,
+   * written to `sgp_links`, or logged.
+   */
+  static async lookupContractForProvisioning(filters, configOverride = null) {
+    const { contracts } = await this.lookupCustomer(filters, configOverride, { includeSecrets: true });
+    return this.pickContract(contracts, filters?.contract ?? null);
   }
 
   static async listInvoices({ contract, document, onlyOpen = true, limit } = {}) {

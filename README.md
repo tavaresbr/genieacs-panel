@@ -52,6 +52,8 @@ SkyGenPanel is a management layer for GenieACS deployments. It combines an opera
 - Server-side paging, search and status filtering for large ONT fleets.
 - Encrypted recovery of the last WiFi password changed through the customer portal.
 - SGP integration for subscriber contract, plan, and open-invoice data, with fleet-wide synchronization, contract-state filtering, and optional invoice display and trust unlock in the customer portal.
+- Automatic activation of a new ONT from its SGP contract, with per-step run history and a dry run before anything is written.
+- SGP event handling through a signed webhook and periodic contract reconciliation.
 - Automatic Linux dependency and Node.js installation during both first install and CLI updates.
 
 ## Screenshots
@@ -227,10 +229,24 @@ device with no contract linked. See
 [`docs/sgp-integration.md`](docs/sgp-integration.md) for setup, endpoints, and
 troubleshooting.
 
+The same tab receives events from SGP — a signed webhook when the provider's
+install can push one, and periodic reconciliation of the linked contracts when
+it cannot — so a payment, a block, or a cancellation reaches the panel and the
+customer portal without anyone reloading a page.
+
 Invoices are always read live from SGP. The contract behind a device (holder,
 plan, status) is cached for 24 hours and re-read after that, and a cached link
 recorded for a different customer account than the device currently serves is
 discarded rather than shown.
+
+## Automatic activation
+
+Open **Settings → Automatic activation** to let a newly installed ONT configure
+itself. The panel resolves the SGP contract from the PPPoE login the ONT already
+reports, applies the profile matching the contract's plan (WiFi, administrative
+password, PPPoE WAN, VLAN), and records every step so a failed activation can be
+diagnosed. It is off by default, and every action has a dry run. See
+[`docs/provisioning.md`](docs/provisioning.md).
 
 ## Database Migration
 
@@ -241,7 +257,7 @@ Open **Settings → Database** as an administrator to:
 3. Migrate existing application data.
 4. Switch the running application to the new database.
 
-The migration includes device installation profiles, related customer accounts, encrypted customer WiFi credentials, and SGP contract links.
+The migration includes device installation profiles, related customer accounts, encrypted customer WiFi credentials, SGP contract links, provisioning profiles and their run history, and stored SGP events.
 
 ## Development
 

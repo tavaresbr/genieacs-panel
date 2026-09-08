@@ -18,7 +18,10 @@ const COPY_TABLES = [
   'customer_accounts',
   'device_profiles',
   'customer_wifi_credentials',
-  'sgp_links'
+  'sgp_links',
+  'provisioning_profiles',
+  'provisioning_runs',
+  'sgp_events'
 ];
 
 function normalizeConfig(input) {

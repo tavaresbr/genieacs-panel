@@ -338,6 +338,34 @@ export interface SgpConfig {
   tokenConfigured: boolean
   ready: boolean
   updatedAt: string | null
+  webhookEnabled: boolean
+  webhookRequireTimestamp: boolean
+  webhookToleranceSeconds: number
+  webhookSecretConfigured: boolean
+  webhookPath: string
+  reconcileEnabled: boolean
+  reconcileIntervalMinutes: number
+  reconcileBatchSize: number
+  eventRetentionDays: number
+  eventTypeMap: Record<string, string>
+}
+
+export interface SgpEvent {
+  id: number
+  source: 'webhook' | 'reconcile' | 'manual'
+  type: string
+  rawType: string | null
+  contract: string | null
+  document: string | null
+  login: string | null
+  deviceId: string | null
+  status: 'pending' | 'processed' | 'ignored' | 'failed'
+  attempts: number
+  payload: string | null
+  error: string | null
+  occurredAt: string | null
+  receivedAt: string | null
+  processedAt: string | null
 }
 
 export interface SgpContractLink {
@@ -348,6 +376,7 @@ export interface SgpContractLink {
   status: string | null
   statusLabel: string | null
   login: string | null
+  blocked: boolean | null
   linkMode: 'auto' | 'manual'
   lastSyncedAt: string | null
 }
@@ -468,6 +497,154 @@ export const sgpAPI = {
 
   syncAll: () =>
     apiClient.post<SgpSyncSummary>('/sgp/sync'),
+
+  listEvents: (filters: { status?: string; type?: string; limit?: number } = {}) => {
+    const params = new URLSearchParams()
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== '') params.set(key, String(value))
+    })
+    const query = params.toString()
+    return apiClient.get<{ events: SgpEvent[] }>(`/sgp/events${query ? `?${query}` : ''}`)
+  },
+
+  retryEvent: (id: number) =>
+    apiClient.post<{ event: SgpEvent }>(`/sgp/events/${id}/retry`),
+
+  // The secret comes back once and is never readable again.
+  rotateWebhookSecret: () =>
+    apiClient.post<{ secret: string; path: string }>('/sgp/events/secret/rotate'),
+
+  reconcile: () =>
+    apiClient.post<{ checked: number; changed: number; errors: number }>('/sgp/reconcile'),
+}
+
+export interface ProvisioningConfig {
+  enabled: boolean
+  intervalSeconds: number
+  batchSize: number
+  informWindowHours: number
+  markerTag: string
+  verifyEnabled: boolean
+  verifyDelaySeconds: number
+  requirePppoePassword: boolean
+  runRetentionDays: number
+  updatedAt: string | null
+}
+
+export interface ProvisioningProfile {
+  id: number
+  name: string
+  planPatterns: string[]
+  isDefault: boolean
+  priority: number
+  enabled: boolean
+  applyWan: boolean
+  applyPppoePassword: boolean
+  wanName: string | null
+  wanVlanId: number | null
+  wanServiceList: string | null
+  wanConnectionType: string | null
+  wanNatEnabled: boolean | null
+  applyWifi: boolean
+  wifiIndexes: number[]
+  wifiSsidTemplate: string | null
+  wifiPasswordMode: 'fixed' | 'random' | 'keep'
+  applyCredentials: boolean
+  credentialTargets: 'super' | 'user' | 'both'
+  description: string | null
+  wifiPasswordConfigured: boolean
+  cpePasswordConfigured: boolean
+  updatedAt: string | null
+}
+
+export type ProvisioningProfileInput = Partial<Omit<ProvisioningProfile,
+  'id' | 'wifiPasswordConfigured' | 'cpePasswordConfigured' | 'updatedAt'>>
+  & { wifiPassword?: string; cpePassword?: string }
+
+export interface ProvisioningStep {
+  step: string
+  target: string | number | null
+  status: string
+  detail: string | null
+  parameters: { path: string; value: unknown }[]
+  at?: string
+}
+
+export interface ProvisioningRun {
+  id: number
+  deviceId: string
+  contract: string | null
+  profileId: number | null
+  profileName: string | null
+  trigger: 'poller' | 'manual' | 'event' | 'dry_run'
+  status: string
+  attemptCount: number
+  nextAttemptAt: string | null
+  steps: ProvisioningStep[]
+  /** Translation key the run recorded; `errorMessage` is it rendered. */
+  error: string | null
+  errorMessage: string | null
+  startedAt: string | null
+  finishedAt: string | null
+  updatedAt: string | null
+}
+
+export interface ProvisioningPreview {
+  deviceId: string
+  login: string | null
+  contract: SgpContractLink | null
+  profile: { id: number; name: string } | null
+  pppoePasswordFound?: boolean
+  skip?: string
+  steps: ProvisioningStep[]
+}
+
+/* Automatic provisioning API */
+export const provisioningAPI = {
+  getConfig: () =>
+    apiClient.get<ProvisioningConfig>('/provisioning/config'),
+
+  updateConfig: (config: Partial<ProvisioningConfig>) =>
+    apiClient.put<ProvisioningConfig>('/provisioning/config', config),
+
+  listProfiles: () =>
+    apiClient.get<{ profiles: ProvisioningProfile[] }>('/provisioning/profiles'),
+
+  createProfile: (profile: ProvisioningProfileInput) =>
+    apiClient.post<{ profile: ProvisioningProfile }>('/provisioning/profiles', profile),
+
+  updateProfile: (id: number, profile: ProvisioningProfileInput) =>
+    apiClient.put<{ profile: ProvisioningProfile }>(`/provisioning/profiles/${id}`, profile),
+
+  deleteProfile: (id: number) =>
+    apiClient.delete(`/provisioning/profiles/${id}`),
+
+  listRuns: (filters: { deviceId?: string; status?: string; limit?: number } = {}) => {
+    const params = new URLSearchParams()
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== '') params.set(key, String(value))
+    })
+    const query = params.toString()
+    return apiClient.get<{ runs: ProvisioningRun[] }>(`/provisioning/runs${query ? `?${query}` : ''}`)
+  },
+
+  listDeviceRuns: (deviceId: string) =>
+    apiClient.get<{ runs: ProvisioningRun[] }>(
+      `/provisioning/devices/${encodeURIComponent(deviceId)}/runs`
+    ),
+
+  preview: (deviceId: string) =>
+    apiClient.post<ProvisioningPreview>(
+      `/provisioning/devices/${encodeURIComponent(deviceId)}/preview`
+    ),
+
+  provision: (deviceId: string, payload: { force?: boolean } = {}) =>
+    apiClient.post<{ run: ProvisioningRun }>(
+      `/provisioning/devices/${encodeURIComponent(deviceId)}/provision`, payload
+    ),
+
+  runPass: () =>
+    apiClient.post<{ executed: number; verified: number; queued: number }>('/provisioning/run'),
 }
 
 /* Vendors API */
