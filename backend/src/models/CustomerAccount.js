@@ -1,4 +1,4 @@
-import { getDb } from '../config/database.js';
+import { getDb, insertReturningId } from '../config/database.js';
 
 class CustomerAccount {
   static async getAll() {
@@ -38,7 +38,7 @@ class CustomerAccount {
   }
 
   static async create(account) {
-    const [id] = await getDb()('customer_accounts').insert(account);
+    const id = await insertReturningId('customer_accounts', account);
     return this.getById(id);
   }
 

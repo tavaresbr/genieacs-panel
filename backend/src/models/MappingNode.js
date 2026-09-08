@@ -1,4 +1,4 @@
-import { getDb } from '../config/database.js';
+import { getDb, insertReturningId } from '../config/database.js';
 
 class MappingNode {
   static async getAll() {
@@ -12,7 +12,7 @@ class MappingNode {
 
   static async create(nodeData) {
     const { node_id, type, name, latitude, longitude, capacity, splitter, pppoe, notes } = nodeData;
-    const [id] = await getDb()('mapping_nodes').insert({
+    const id = await insertReturningId('mapping_nodes', {
       node_id, type, name, latitude, longitude, capacity, splitter, pppoe, notes
     });
     return id;

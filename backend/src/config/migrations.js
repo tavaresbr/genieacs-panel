@@ -12,8 +12,10 @@
  *    is what lets `ensureSchema` baseline an old database (record the step as
  *    applied) rather than migrate it again.
  *
- * Only knex builders that behave the same on better-sqlite3 and mysql2 are used
- * here; there is no raw SQL and no dialect-specific syntax.
+ * Only knex builders that behave the same on better-sqlite3, mysql2 and pg are
+ * used here; there is no raw SQL and no dialect-specific syntax. CI runs the
+ * whole suite against all three, so a step that holds on only one of them fails
+ * before it reaches anyone's database.
  */
 
 /** Portal credential columns, shared by the initial table and the 0003 upgrade. */

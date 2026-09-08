@@ -45,6 +45,64 @@ jobs:
       - name: Build
         run: npm run build
 
+  dialects:
+    name: Backend on ${{ matrix.dialect }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dialect: [postgres, mysql]
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: skygp
+          POSTGRES_PASSWORD: skygp
+          POSTGRES_DB: skygp_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U skygp -d skygp_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ROOT_PASSWORD: skygp
+          MYSQL_DATABASE: skygp_test
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -pskygp"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.22'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      # The suite runs on SQLite in the `verify` job. Repeating it against the
+      # servers is what catches dialect bugs SQLite is too forgiving to
+      # surface: an insert whose generated id only comes back on some clients,
+      # a foreign key between a signed and an unsigned column, a timestamp
+      # outside MySQL's range.
+      - name: Backend tests
+        working-directory: backend
+        env:
+          TEST_DB_CLIENT: ${{ matrix.dialect == 'postgres' && 'pg' || 'mysql2' }}
+          TEST_DB_HOST: 127.0.0.1
+          TEST_DB_PORT: ${{ matrix.dialect == 'postgres' && '5432' || '3306' }}
+          TEST_DB_USER: ${{ matrix.dialect == 'postgres' && 'skygp' || 'root' }}
+          TEST_DB_PASSWORD: skygp
+          TEST_DB_NAME: skygp_test
+        run: npm test
+
   audit:
     name: Dependency audit
     runs-on: ubuntu-latest

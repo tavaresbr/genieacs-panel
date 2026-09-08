@@ -1,4 +1,4 @@
-import { getDb } from '../config/database.js';
+import { getDb, insertReturningId } from '../config/database.js';
 
 /** One thread with one contact on one connected number. */
 class WaConversation {
@@ -36,7 +36,7 @@ class WaConversation {
       await getDb()('wa_conversations').where({ id: existing.id }).update({ ...patch, updated_at: now });
       return this.getById(existing.id);
     }
-    const [id] = await getDb()('wa_conversations').insert({
+    const id = await insertReturningId('wa_conversations', {
       account_id: accountId,
       external_thread_id: externalThreadId,
       wa_phone_e164: waPhone || null,

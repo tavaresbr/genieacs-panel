@@ -1,4 +1,4 @@
-import { getDb } from '../config/database.js';
+import { getDb, insertReturningId } from '../config/database.js';
 
 /**
  * "Não perturbe".
@@ -56,7 +56,7 @@ class WaOptOut {
   static async record({ waPhone, waLid, conversationId, origin = 'customer', reasonText }) {
     if (await this.isActive({ waPhone, waLid })) return null;
     const now = new Date();
-    const [id] = await getDb()('wa_opt_outs').insert({
+    const id = await insertReturningId('wa_opt_outs', {
       wa_phone_e164: waPhone || null,
       wa_lid: waLid || null,
       conversation_id: conversationId || null,

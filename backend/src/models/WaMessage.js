@@ -1,4 +1,4 @@
-import { getDb } from '../config/database.js';
+import { getDb, insertReturningId } from '../config/database.js';
 
 /** How long a message may sit in 'sending' before another pass may retake it. */
 export const RECLAIM_MS = 5 * 60 * 1000;
@@ -25,7 +25,7 @@ class WaMessage {
   }
 
   static async create(message) {
-    const [id] = await getDb()('wa_messages').insert(message);
+    const id = await insertReturningId('wa_messages', message);
     return this.getById(id);
   }
 

@@ -1,4 +1,4 @@
-import { getDb } from '../config/database.js';
+import { getDb, insertReturningId } from '../config/database.js';
 
 function parseRow(row) {
   if (!row) return null;
@@ -64,7 +64,7 @@ class Vendor {
   }
 
   static async create(vendorData) {
-    const [id] = await getDb()('vendors').insert(serialize(vendorData));
+    const id = await insertReturningId('vendors', serialize(vendorData));
     return id;
   }
 

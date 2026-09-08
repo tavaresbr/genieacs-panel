@@ -1,6 +1,6 @@
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { call, getDb, startTestServers, stopTestServers } from './helpers/harness.js';
+import { call, getDb, insertReturningId, startTestServers, stopTestServers } from './helpers/harness.js';
 
 const { default: CustomerPortalPasswordService } = await import(
   '../src/services/customerPortalPasswordService.js'
@@ -12,7 +12,7 @@ const bob = { customerId: 'CSG-HJKLMNP-234568', password: null, id: null };
 
 async function createAccount(account, index) {
   const { password, record } = await CustomerPortalPasswordService.createRecord();
-  const [id] = await getDb()('customer_accounts').insert({
+  const id = await insertReturningId('customer_accounts', {
     customer_id: account.customerId,
     device_id: `test-device-${index}`,
     identity_hash: `hash-${index}`.padEnd(64, '0'),
