@@ -1129,7 +1129,7 @@ const de: Dictionary = {
   'whatsapp.billing.empty': 'Kein Teilnehmer in diesem Fenster.',
   'whatsapp.billing.template': 'Vorlage',
   'whatsapp.billing.templatePick': 'Vorlage wählen',
-  'whatsapp.billing.templateMismatch': 'Eine Vorlage mit {dias_para_vencer} ist eine Erinnerung und erreicht nur noch nicht fällige Rechnungen; eine mit {dias_atraso} nur überfällige. Der Versand mischt beides nicht.',
+  'whatsapp.billing.templateMismatch': 'Eine Vorlage mit {{dias_para_vencer}} ist eine Erinnerung und erreicht nur noch nicht fällige Rechnungen; eine mit {{dias_atraso}} nur überfällige. Der Versand mischt beides nicht.',
   'whatsapp.billing.selected': '{count} ausgewählt',
   'whatsapp.billing.selectAll': 'Alle auswählen',
   'whatsapp.billing.campaignTitle': 'Kampagnenname',

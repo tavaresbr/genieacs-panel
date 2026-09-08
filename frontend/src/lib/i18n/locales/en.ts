@@ -1248,7 +1248,7 @@ const en = {
   'whatsapp.billing.empty': 'No subscriber in this window.',
   'whatsapp.billing.template': 'Template',
   'whatsapp.billing.templatePick': 'Pick a template',
-  'whatsapp.billing.templateMismatch': 'A template citing {dias_para_vencer} is a reminder and only reaches invoices not yet due; one citing {dias_atraso} only reaches overdue ones. The dispatcher refuses to mix them.',
+  'whatsapp.billing.templateMismatch': 'A template citing {{dias_para_vencer}} is a reminder and only reaches invoices not yet due; one citing {{dias_atraso}} only reaches overdue ones. The dispatcher refuses to mix them.',
   'whatsapp.billing.selected': '{count} selected',
   'whatsapp.billing.selectAll': 'Select all',
   'whatsapp.billing.campaignTitle': 'Campaign name',

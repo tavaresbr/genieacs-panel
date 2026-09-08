@@ -1246,7 +1246,7 @@ const es: Dictionary = {
   'whatsapp.billing.empty': 'Ningún suscriptor en esta ventana.',
   'whatsapp.billing.template': 'Plantilla',
   'whatsapp.billing.templatePick': 'Elige una plantilla',
-  'whatsapp.billing.templateMismatch': 'Una plantilla que cita {dias_para_vencer} es recordatorio y solo alcanza facturas por vencer; una que cita {dias_atraso} solo alcanza a los vencidos. El envío se niega a mezclar.',
+  'whatsapp.billing.templateMismatch': 'Una plantilla que cita {{dias_para_vencer}} es recordatorio y solo alcanza facturas por vencer; una que cita {{dias_atraso}} solo alcanza a los vencidos. El envío se niega a mezclar.',
   'whatsapp.billing.selected': '{count} seleccionados',
   'whatsapp.billing.selectAll': 'Seleccionar todos',
   'whatsapp.billing.campaignTitle': 'Nombre de la campaña',

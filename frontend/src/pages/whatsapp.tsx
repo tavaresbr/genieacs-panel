@@ -13,6 +13,11 @@ import { whatsappErrorMessage } from '@/components/whatsapp-connection'
 import { ConversationList } from '@/components/whatsapp/conversation-list'
 import { ConversationThread } from '@/components/whatsapp/conversation-thread'
 import { ThreadComposer } from '@/components/whatsapp/thread-composer'
+import { BillingPanel } from '@/components/whatsapp/billing-panel'
+import { CampaignsPanel } from '@/components/whatsapp/campaigns-panel'
+import { TemplatesPanel } from '@/components/whatsapp/templates-panel'
+import { OptOutPanel } from '@/components/whatsapp/opt-out-panel'
+import { AlertsPanel } from '@/components/whatsapp/alerts-panel'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Polling
@@ -60,7 +65,7 @@ const MESSAGE_PAGE = 60
  * the reply box on the right. The routes it consumes are frozen in
  * `docs/whatsapp-api-contract.md`.
  */
-export default function WhatsAppInbox() {
+function InboxTab() {
   const { t } = useTranslation()
   const toast = useToast()
 
@@ -281,13 +286,12 @@ export default function WhatsAppInbox() {
   const unreadTotal = conversations.reduce((sum, row) => sum + row.unreadCount, 0)
 
   return (
-    <div className="page-shell">
-      <div className="page-frame">
-        <header className="page-header">
-          <div>
-            <p className="page-kicker">{t('sidebar.nav.whatsapp')}</p>
-            <h1 className="page-title">{t('whatsapp.inbox.title')}</h1>
-            <p className="page-description">{t('whatsapp.inbox.subtitle')}</p>
+    <section className="space-y-5">
+      <div>
+        <header className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="section-heading">{t('whatsapp.inbox.title')}</h2>
+            <p className="section-description">{t('whatsapp.inbox.subtitle')}</p>
           </div>
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
             {unreadTotal > 0 && (
@@ -350,6 +354,73 @@ export default function WhatsAppInbox() {
             </div>
           </section>
         )}
+      </div>
+    </section>
+  )
+}
+
+/** The tabs, in the order an operator meets them. */
+const TABS = [
+  ['inbox', 'whatsapp.inbox.title'],
+  ['billing', 'whatsapp.billing.title'],
+  ['campaigns', 'whatsapp.broadcast.title'],
+  ['templates', 'whatsapp.templates.title'],
+  ['optOut', 'whatsapp.optOut.title'],
+  ['alerts', 'whatsapp.alerts.title']
+] as const
+
+type TabId = (typeof TABS)[number][0]
+
+/**
+ * Everything the operator does with WhatsApp, behind one route.
+ *
+ * Only the open tab is mounted. That is not a rendering nicety: four of these
+ * panels poll, and a mounted-but-hidden inbox would keep asking the panel for
+ * conversations — and keep zeroing unread counts — from a screen nobody is
+ * looking at. Switching tabs unmounts the old one and its effects clear their
+ * own timers.
+ *
+ * The connection and the global settings are NOT here. They live under
+ * Settings, because pairing a number is something an admin does once and this
+ * page is where the work happens afterwards.
+ */
+export default function WhatsAppPage() {
+  const { t } = useTranslation()
+  const [tab, setTab] = useState<TabId>('inbox')
+
+  return (
+    <div className="page-shell">
+      <div className="page-frame">
+        <header className="page-header">
+          <div>
+            <p className="page-kicker">{t('sidebar.nav.whatsapp')}</p>
+            <h1 className="page-title">{t('sidebar.nav.whatsapp')}</h1>
+            <p className="page-description">{t('sidebar.nav.whatsappDescription')}</p>
+          </div>
+        </header>
+
+        <div className="tab-rail" role="tablist" aria-label={t('sidebar.nav.whatsapp')}>
+          {TABS.map(([id, labelKey]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setTab(id)}
+              className="tab-button"
+              data-active={tab === id}
+              role="tab"
+              aria-selected={tab === id}
+            >
+              {t(labelKey)}
+            </button>
+          ))}
+        </div>
+
+        {tab === 'inbox' && <InboxTab />}
+        {tab === 'billing' && <BillingPanel />}
+        {tab === 'campaigns' && <CampaignsPanel />}
+        {tab === 'templates' && <TemplatesPanel />}
+        {tab === 'optOut' && <OptOutPanel />}
+        {tab === 'alerts' && <AlertsPanel />}
       </div>
     </div>
   )

@@ -1252,7 +1252,7 @@ const it: Dictionary = {
   'whatsapp.billing.empty': 'Nessun abbonato in questa finestra.',
   'whatsapp.billing.template': 'Modello',
   'whatsapp.billing.templatePick': 'Scegli un modello',
-  'whatsapp.billing.templateMismatch': 'Un modello che cita {dias_para_vencer} è un promemoria e raggiunge solo fatture non ancora scadute; uno che cita {dias_atraso} solo quelle scadute. L’invio si rifiuta di mescolarli.',
+  'whatsapp.billing.templateMismatch': 'Un modello che cita {{dias_para_vencer}} è un promemoria e raggiunge solo fatture non ancora scadute; uno che cita {{dias_atraso}} solo quelle scadute. L’invio si rifiuta di mescolarli.',
   'whatsapp.billing.selected': '{count} selezionati',
   'whatsapp.billing.selectAll': 'Seleziona tutti',
   'whatsapp.billing.campaignTitle': 'Nome della campagna',

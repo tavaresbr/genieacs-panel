@@ -1228,7 +1228,7 @@ const fr: Dictionary = {
   'whatsapp.billing.empty': 'Aucun abonné dans cette fenêtre.',
   'whatsapp.billing.template': 'Modèle',
   'whatsapp.billing.templatePick': 'Choisissez un modèle',
-  'whatsapp.billing.templateMismatch': 'Un modèle citant {dias_para_vencer} est un rappel et ne touche que les factures non échues ; un modèle citant {dias_atraso} ne touche que les impayés. L’envoi refuse de les mélanger.',
+  'whatsapp.billing.templateMismatch': 'Un modèle citant {{dias_para_vencer}} est un rappel et ne touche que les factures non échues ; un modèle citant {{dias_atraso}} ne touche que les impayés. L’envoi refuse de les mélanger.',
   'whatsapp.billing.selected': '{count} sélectionnés',
   'whatsapp.billing.selectAll': 'Tout sélectionner',
   'whatsapp.billing.campaignTitle': 'Nom de la campagne',

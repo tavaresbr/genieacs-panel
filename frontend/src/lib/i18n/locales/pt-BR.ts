@@ -1246,7 +1246,7 @@ const ptBR: Dictionary = {
   'whatsapp.billing.empty': 'Nenhum assinante nesta janela.',
   'whatsapp.billing.template': 'Modelo',
   'whatsapp.billing.templatePick': 'Escolha um modelo',
-  'whatsapp.billing.templateMismatch': 'Um modelo que cita {dias_para_vencer} é lembrete e só alcança fatura a vencer; um que cita {dias_atraso} só alcança quem está em atraso. O disparo se recusa a misturar.',
+  'whatsapp.billing.templateMismatch': 'Um modelo que cita {{dias_para_vencer}} é lembrete e só alcança fatura a vencer; um que cita {{dias_atraso}} só alcança quem está em atraso. O disparo se recusa a misturar.',
   'whatsapp.billing.selected': '{count} selecionados',
   'whatsapp.billing.selectAll': 'Selecionar todos',
   'whatsapp.billing.campaignTitle': 'Nome da campanha',
