@@ -6,6 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { testConnection } from './config/database.js';
+import { IS_SELF_HOSTED } from './config/edition.js';
 import { TRUST_PROXY } from './config/proxy.js';
 import { attachLocale } from './middleware/locale.js';
 import { DEFAULT_LOCALE, translate, translateError } from './i18n/index.js';
@@ -160,7 +161,13 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/vendor-management', vendorRoutes);
 app.use('/api/mapping-data', mappingRoutes);
 app.use('/api/map-settings', mapSettingsRoutes);
-app.use('/api/database', databaseRoutes);
+// Switching databases copies the panel into the target and wipes whatever was
+// there first, which is a reasonable thing to offer an ISP that owns its own
+// install and a catastrophic one on a deployment shared by several. The route
+// only exists in the self-hosted edition.
+if (IS_SELF_HOSTED) {
+  app.use('/api/database', databaseRoutes);
+}
 app.use('/api/users', userRoutes);
 app.use('/api/sgp', sgpRoutes);
 app.use('/api/whatsapp', whatsappRoutes);

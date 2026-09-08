@@ -27,7 +27,18 @@ const APP_TABLES = [
   'customer_wifi_credentials',
   'provisioning_profiles',
   'provisioning_runs',
-  'sgp_events'
+  'sgp_events',
+  'whatsapp_accounts'
+];
+
+/** Every secret kept in its own columns records which key encrypted it. */
+const SECRET_KEY_VERSION_COLUMNS = [
+  ['customer_accounts', 'password_key_version'],
+  ['customer_wifi_credentials', 'password_key_version'],
+  ['provisioning_profiles', 'wifi_password_key_version'],
+  ['provisioning_profiles', 'cpe_password_key_version'],
+  ['whatsapp_accounts', 'token_key_version'],
+  ['whatsapp_accounts', 'webhook_token_key_version']
 ];
 
 const ALL_IDS = migrations.map((migration) => migration.id);
@@ -118,6 +129,17 @@ describe('migrating a fresh database', () => {
       assert.ok(
         await db.schema.hasColumn('customer_accounts', column),
         `expected column ${column}`
+      );
+    }
+  });
+
+  // Without these, rotating JWT_SECRET makes every stored secret unreadable
+  // and says nothing about it, because decryption reports failure as "empty".
+  it('records which key encrypted every secret held in its own columns', async () => {
+    for (const [table, column] of SECRET_KEY_VERSION_COLUMNS) {
+      assert.ok(
+        await db.schema.hasColumn(table, column),
+        `expected ${table}.${column}`
       );
     }
   });

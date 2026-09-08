@@ -250,14 +250,20 @@ class WhatsAppConfigService {
 
   static encryptInstanceToken(token) {
     const box = encryptSecret(instanceTokenBox, token);
-    return { token_ciphertext: box.password_ciphertext, token_iv: box.password_iv, token_tag: box.password_tag };
+    return {
+      token_ciphertext: box.password_ciphertext,
+      token_iv: box.password_iv,
+      token_tag: box.password_tag,
+      token_key_version: box.password_key_version
+    };
   }
 
   static decryptInstanceToken(row) {
     return instanceTokenBox.decrypt({
       password_ciphertext: row?.token_ciphertext,
       password_iv: row?.token_iv,
-      password_tag: row?.token_tag
+      password_tag: row?.token_tag,
+      password_key_version: row?.token_key_version
     }) ?? '';
   }
 
@@ -266,7 +272,8 @@ class WhatsAppConfigService {
     return {
       webhook_token_ciphertext: box.password_ciphertext,
       webhook_token_iv: box.password_iv,
-      webhook_token_tag: box.password_tag
+      webhook_token_tag: box.password_tag,
+      webhook_token_key_version: box.password_key_version
     };
   }
 
@@ -274,7 +281,8 @@ class WhatsAppConfigService {
     return webhookTokenBox.decrypt({
       password_ciphertext: row?.webhook_token_ciphertext,
       password_iv: row?.webhook_token_iv,
-      password_tag: row?.webhook_token_tag
+      password_tag: row?.webhook_token_tag,
+      password_key_version: row?.webhook_token_key_version
     }) ?? '';
   }
 

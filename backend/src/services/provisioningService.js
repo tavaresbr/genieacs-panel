@@ -51,7 +51,8 @@ function encryptTo(prefix, plaintext) {
   return {
     [`${prefix}_ciphertext`]: box.password_ciphertext,
     [`${prefix}_iv`]: box.password_iv,
-    [`${prefix}_tag`]: box.password_tag
+    [`${prefix}_tag`]: box.password_tag,
+    [`${prefix}_key_version`]: box.password_key_version
   };
 }
 
@@ -59,7 +60,8 @@ function decryptFrom(prefix, row) {
   return profileBox.decrypt({
     password_ciphertext: row?.[`${prefix}_ciphertext`],
     password_iv: row?.[`${prefix}_iv`],
-    password_tag: row?.[`${prefix}_tag`]
+    password_tag: row?.[`${prefix}_tag`],
+    password_key_version: row?.[`${prefix}_key_version`]
   });
 }
 
@@ -241,7 +243,8 @@ class ProvisioningService {
       const password = String(input.wifiPassword);
       if (password === '') {
         Object.assign(row, {
-          wifi_password_ciphertext: null, wifi_password_iv: null, wifi_password_tag: null
+          wifi_password_ciphertext: null, wifi_password_iv: null, wifi_password_tag: null,
+          wifi_password_key_version: null
         });
       } else {
         if (password.length < 8 || password.length > 63) {
@@ -254,7 +257,8 @@ class ProvisioningService {
       const password = String(input.cpePassword);
       if (password === '') {
         Object.assign(row, {
-          cpe_password_ciphertext: null, cpe_password_iv: null, cpe_password_tag: null
+          cpe_password_ciphertext: null, cpe_password_iv: null, cpe_password_tag: null,
+          cpe_password_key_version: null
         });
       } else {
         if (password.length < 1 || password.length > 256) {

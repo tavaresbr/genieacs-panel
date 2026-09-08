@@ -140,14 +140,34 @@ Environment configuration lives in `backend/.env`; see [`backend/.env.example`](
 | `APP_PORT` | Operator panel port; defaults to `5890` |
 | `PORTAL_HOST` | Optional customer portal bind address |
 | `PORTAL_PORT` | Customer portal port; defaults to `5891` |
-| `JWT_SECRET` | Stable application secret used for sessions and encrypted WiFi credential recovery |
+| `JWT_SECRET` | Stable application secret used for operator and customer sessions |
 | `PORTAL_JWT_SECRET` | Optional independent customer-session secret |
+| `SECRET_BOX_KEY` | Encrypts the secrets an operator can read back (portal and WiFi passwords, SGP and WhatsApp tokens); falls back to `JWT_SECRET` when unset |
+| `EDITION` | `selfhosted` (default) or `saas`; the hosted edition withdraws the runtime database switcher |
 | `CORS_ORIGINS` | Explicitly allowed browser origins |
 | `DATA_DIR` | Optional persistent application data directory |
 | `TRUST_PROXY` | Number of trusted proxy hops in front of the panel; `1` for the default reverse-proxy or Cloudflare Tunnel deployment, `0` when the listeners are exposed directly |
 | `PORTAL_COOKIE_SECURE` | `auto` (default), `true`, or `false`; overrides the portal cookie `Secure` flag when a proxy terminates TLS without advertising it |
 
 The GenieACS URL and optional MySQL connection are managed from the Settings interface rather than environment variables. Runtime database configuration is stored in `DATA_DIR/db-config.json`.
+
+### Rotating `JWT_SECRET`
+
+`SECRET_BOX_KEY` exists so that rotating `JWT_SECRET` does not destroy stored
+data. Until it was introduced, session signing and secret encryption derived
+from the same value, and decryption reports failure by returning nothing — so a
+rotation quietly turned every portal password, saved WiFi password, provisioning
+password and integration token into an unreadable blob.
+
+Each encrypted secret now records which key wrote it, so both keys are readable
+side by side. `install.sh` generates `SECRET_BOX_KEY` for new installs and adds
+one to an existing `.env` on update, which is safe: data already stored stays
+readable through `JWT_SECRET`, and only new writes use the dedicated key.
+
+Anything written before `SECRET_BOX_KEY` was configured remains tied to
+`JWT_SECRET` until it is written again. Regenerating a customer's portal
+password, or re-saving a provisioning profile or WhatsApp instance, moves that
+secret onto the new key.
 
 ## Customer Portal Credentials
 
