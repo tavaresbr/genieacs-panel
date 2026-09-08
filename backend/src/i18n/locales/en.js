@@ -463,4 +463,14 @@ export default {
   'whatsapp.phoneSaved': 'Phone number saved',
   'whatsapp.phoneSaveFailed': 'The phone number could not be saved',
   'whatsapp.error.invalidPhone': 'That does not look like a usable phone number',
+  // WhatsApp — inbox e bot de autoatendimento (onda 3)
+  'whatsapp.error.conversationNotFound': 'Conversation not found',
+  'whatsapp.bot.portalHint': 'For your WiFi password and to change the network name, sign in to the customer portal: {link}',
+  'whatsapp.bot.notRecognised': 'We could not find a contract for this number. An attendant will reply shortly.',
+  'whatsapp.bot.handoff': 'I will pass this to an attendant.',
+  'whatsapp.bot.noOpenInvoice': 'You have no open invoice right now.',
+  'whatsapp.bot.invoice': 'Invoice of {amount}, due {dueDate}.',
+  'whatsapp.bot.signalOk': 'Your connection is online. Optical signal: {rxPower} dBm.',
+  'whatsapp.bot.signalDown': 'Your equipment is not responding. We have opened a ticket.',
+  'whatsapp.bot.optedOut': 'You will not receive our notices any more. Write STOP at any time to change that.',
 };

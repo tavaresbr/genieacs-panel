@@ -464,4 +464,14 @@ export default {
   'whatsapp.phoneSaved': 'Telefonnummer gespeichert',
   'whatsapp.phoneSaveFailed': 'Die Telefonnummer konnte nicht gespeichert werden',
   'whatsapp.error.invalidPhone': 'Das sieht nicht nach einer nutzbaren Telefonnummer aus',
+  // WhatsApp — inbox e bot de autoatendimento (onda 3)
+  'whatsapp.error.conversationNotFound': 'Unterhaltung nicht gefunden',
+  'whatsapp.bot.portalHint': 'Für dein WLAN-Passwort und zum Ändern des Netzwerknamens melde dich im Kundenportal an: {link}',
+  'whatsapp.bot.notRecognised': 'Zu dieser Nummer wurde kein Vertrag gefunden. Ein Mitarbeiter meldet sich in Kürze.',
+  'whatsapp.bot.handoff': 'Ich gebe das an einen Mitarbeiter weiter.',
+  'whatsapp.bot.noOpenInvoice': 'Du hast derzeit keine offene Rechnung.',
+  'whatsapp.bot.invoice': 'Rechnung über {amount}, fällig am {dueDate}.',
+  'whatsapp.bot.signalOk': 'Deine Verbindung ist online. Optisches Signal: {rxPower} dBm.',
+  'whatsapp.bot.signalDown': 'Dein Gerät antwortet nicht. Wir haben ein Ticket eröffnet.',
+  'whatsapp.bot.optedOut': 'Du erhältst unsere Hinweise nicht mehr. Schreib uns jederzeit, um das zu ändern.',
 };

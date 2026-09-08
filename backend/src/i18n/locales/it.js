@@ -461,4 +461,14 @@ export default {
   'whatsapp.phoneSaved': 'Telefono salvato',
   'whatsapp.phoneSaveFailed': 'Non è stato possibile salvare il telefono',
   'whatsapp.error.invalidPhone': 'Non sembra un telefono utilizzabile',
+  // WhatsApp — inbox e bot de autoatendimento (onda 3)
+  'whatsapp.error.conversationNotFound': 'Conversazione non trovata',
+  'whatsapp.bot.portalHint': 'Per la password del WiFi e per cambiare il nome della rete, accedi al portale clienti: {link}',
+  'whatsapp.bot.notRecognised': 'Non abbiamo trovato un contratto per questo numero. Un operatore risponderà a breve.',
+  'whatsapp.bot.handoff': 'Passo a un operatore.',
+  'whatsapp.bot.noOpenInvoice': 'Non hai fatture aperte al momento.',
+  'whatsapp.bot.invoice': 'Fattura di {amount}, scadenza {dueDate}.',
+  'whatsapp.bot.signalOk': 'La tua connessione è online. Segnale ottico: {rxPower} dBm.',
+  'whatsapp.bot.signalDown': 'La tua apparecchiatura non risponde. Abbiamo aperto un ticket.',
+  'whatsapp.bot.optedOut': 'Non riceverai più i nostri avvisi. Scrivici quando vuoi per tornare a riceverli.',
 };

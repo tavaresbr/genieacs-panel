@@ -876,6 +876,42 @@ export interface WhatsAppAlertSettings {
   rules: Record<WhatsAppAlertRule, { enabled: boolean; threshold: number | null; cooldownMinutes: number }>
 }
 
+export interface WhatsAppConversation {
+  id: number
+  accountId: number
+  waPhoneE164: string | null
+  waLid: string | null
+  pushName: string | null
+  deviceId: string | null
+  contract: string | null
+  clientName: string | null
+  /** The contact asked not to be contacted. Replying is still allowed. */
+  optedOut: boolean
+  lastMessageAt: string | null
+  lastInboundAt: string | null
+  unreadCount: number
+  closedAt: string | null
+  createdAt: string | null
+  updatedAt: string | null
+}
+
+export interface WhatsAppMessage {
+  id: number
+  conversationId: number
+  direction: 'in' | 'out'
+  body: string | null
+  attachment: { url: string; type: string | null; name: string | null } | null
+  isNote: boolean
+  externalId: string | null
+  deliveryStatus: 'queued' | 'sending' | 'sent' | 'delivered' | 'read' | 'failed' | null
+  deliveryError: string | null
+  attempts: number
+  sentBy: number | null
+  readAt: string | null
+  createdAt: string | null
+  updatedAt: string | null
+}
+
 export const whatsappAPI = {
   getConfig: () =>
     apiClient.get<WhatsAppConfig>('/whatsapp/config'),
@@ -986,6 +1022,29 @@ export const whatsappAPI = {
 
   runAlertScan: () =>
     apiClient.post<{ fired: number; cleared: number }>('/whatsapp/alerts/scan', {}),
+
+  // ── Inbox ────────────────────────────────────────────────────────────
+  listConversations: (params: { limit?: number; offset?: number } = {}) => {
+    const query = new URLSearchParams()
+    if (params.limit) query.set('limit', String(params.limit))
+    if (params.offset) query.set('offset', String(params.offset))
+    const suffix = query.toString()
+    return apiClient.get<WhatsAppConversation[]>(`/whatsapp/conversations${suffix ? `?${suffix}` : ''}`)
+  },
+
+  // Reading a thread clears its unread count server-side — the operator looking
+  // at it is the only thing "read" can mean here.
+  listMessages: (conversationId: number, params: { limit?: number } = {}) => {
+    const suffix = params.limit ? `?limit=${params.limit}` : ''
+    return apiClient.get<{ conversation: WhatsAppConversation; messages: WhatsAppMessage[] }>(
+      `/whatsapp/conversations/${conversationId}/messages${suffix}`
+    )
+  },
+
+  // Enqueues and returns; the outbox worker delivers. An internal note is
+  // stored and never sent.
+  sendMessage: (conversationId: number, payload: { body?: string; attachment?: { url: string; type?: string; name?: string }; isNote?: boolean }) =>
+    apiClient.post<WhatsAppMessage>(`/whatsapp/conversations/${conversationId}/messages`, payload),
 
   // ── Subscriber phone ─────────────────────────────────────────────────
   // Overrides what SGP returned. An empty string clears the override and falls
