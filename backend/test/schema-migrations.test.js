@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import knexFactory from 'knex';
-import { getDb, startTestServers, stopTestServers } from './helpers/harness.js';
+import { getDb, insertReturningId, startTestServers, stopTestServers } from './helpers/harness.js';
 
 const { ensureSchema, MIGRATIONS_TABLE } = await import('../src/config/schema.js');
 const { migrations, SCHEMA_TABLES } = await import('../src/config/migrations.js');
@@ -42,6 +42,7 @@ const SECRET_KEY_VERSION_COLUMNS = [
 ];
 
 const ALL_IDS = migrations.map((migration) => migration.id);
+const TENANCY_MIGRATION = '0010_customer_accounts_tenant';
 const LEGACY_USERNAME = 'legacy-admin';
 const LEGACY_APP_NAME = 'Legacy Panel';
 
@@ -249,5 +250,88 @@ describe('the schema table list', () => {
         `${parent} must come before ${child}`
       );
     }
+  });
+});
+
+describe('making customer accounts per-provider', () => {
+  const db = createDatabase('tenancy');
+  let alfa;
+
+  before(async () => {
+    // The state just before tenancy, populated the way a running install is:
+    // an account with children pointing at it, so the rebuild the unique swap
+    // needs on SQLite has something to lose if it goes wrong.
+    for (const migration of migrations.filter((m) => m.id !== TENANCY_MIGRATION)) {
+      await migration.up(db);
+    }
+    await db('settings').insert({ key: 'appName', value: 'Provedor Alfa' });
+    const accountId = await insertReturningId('customer_accounts', {
+      customer_id: 'CSG-AAAAAAA-111111',
+      device_id: 'dev-1',
+      identity_hash: 'h'.repeat(64),
+      software_id: 'V1',
+      pppoe_username: 'cliente01',
+      active: true
+    }, db);
+    await db('customer_wifi_credentials').insert({
+      account_id: accountId, wifi_index: 1, ssid: 'CasaDoJoao'
+    });
+    await db('sgp_links').insert({ device_id: 'dev-1', account_id: accountId, contract: '4321' });
+
+    await ensureSchema(db);
+    alfa = await db('tenants').orderBy('id', 'asc').first();
+  });
+
+  it('turns the install into the first provider, under the name already on screen', async () => {
+    assert.equal(alfa.slug, 'default');
+    assert.equal(alfa.name, 'Provedor Alfa');
+  });
+
+  it('keeps the accounts and everything pointing at them', async () => {
+    const account = await db('customer_accounts').where({ device_id: 'dev-1' }).first();
+    assert.equal(account.customer_id, 'CSG-AAAAAAA-111111');
+    assert.equal(Number(account.tenant_id), Number(alfa.id));
+
+    // The unique swap rebuilds the table on SQLite, where a cascading delete
+    // would take these with it.
+    const [{ n }] = await db('customer_wifi_credentials').count({ n: '*' });
+    assert.equal(Number(n), 1);
+    const link = await db('sgp_links').where({ device_id: 'dev-1' }).first();
+    assert.equal(Number(link.account_id), Number(account.id));
+  });
+
+  // The whole point: identity_hash is sha256(softwareId, pppoe_username), so
+  // two providers running the same firmware with a subscriber of the same name
+  // produce the same value. Globally unique, the second provider's sync would
+  // find the first provider's account.
+  it('lets a second provider reuse every identity value', async () => {
+    const betaId = await insertReturningId('tenants', {
+      slug: 'beta', name: 'Provedor Beta', status: 'active'
+    }, db);
+    await insertReturningId('customer_accounts', {
+      tenant_id: betaId,
+      customer_id: 'CSG-AAAAAAA-111111',
+      device_id: 'dev-1',
+      identity_hash: 'h'.repeat(64),
+      software_id: 'V1',
+      pppoe_username: 'cliente01',
+      active: true
+    }, db);
+
+    const [{ n }] = await db('customer_accounts').where({ device_id: 'dev-1' }).count({ n: '*' });
+    assert.equal(Number(n), 2, 'both providers should hold the same device id');
+  });
+
+  it('still rejects a duplicate inside one provider', async () => {
+    const beta = await db('tenants').where({ slug: 'beta' }).first();
+    await assert.rejects(() => insertReturningId('customer_accounts', {
+      tenant_id: beta.id,
+      customer_id: 'CSG-AAAAAAA-111111',
+      device_id: 'dev-9',
+      identity_hash: 'x'.repeat(64),
+      software_id: 'V1',
+      pppoe_username: 'outro',
+      active: true
+    }, db));
   });
 });
