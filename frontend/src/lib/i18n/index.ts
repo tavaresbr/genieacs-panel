@@ -22,6 +22,7 @@ const loaded: Partial<Record<Locale, Dictionary>> = { en }
 const loaders: Record<LazyLocale, () => Promise<{ default: Dictionary }>> = {
   de: () => import('@/lib/i18n/locales/de'),
   es: () => import('@/lib/i18n/locales/es'),
+  fr: () => import('@/lib/i18n/locales/fr'),
   it: () => import('@/lib/i18n/locales/it'),
   'pt-BR': () => import('@/lib/i18n/locales/pt-BR'),
 }
