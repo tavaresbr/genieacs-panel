@@ -1,4 +1,5 @@
 import WhatsAppConfigService, { WaError } from '../services/whatsappConfigService.js';
+import EvolutionInstanceService from '../services/evolutionInstanceService.js';
 import WhatsAppAccount from '../models/WhatsAppAccount.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { translateError } from '../i18n/index.js';
@@ -56,6 +57,117 @@ class WhatsAppController {
       ));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.accountsLoadFailed');
+    }
+  }
+
+  static async createAccount(req, res) {
+    try {
+      const body = req.body ?? {};
+      const { account, qr, pending } = await EvolutionInstanceService.createAccount({
+        // Both are ignored in managed mode, where the panel owns the server and
+        // the operator never sees its address or its key.
+        baseUrl: body.baseUrl,
+        adminKey: body.adminKey,
+        label: body.label,
+        purpose: body.purpose
+      });
+      return res.status(201).json(createResponse(req.t('whatsapp.accountConnecting'), {
+        account: WhatsAppConfigService.publicAccount(account),
+        qr,
+        pending
+      }));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.accountActionFailed');
+    }
+  }
+
+  static async getQr(req, res) {
+    try {
+      const { account, qr, pending } = await EvolutionInstanceService.refreshQr(req.params?.id);
+      return res.json(createResponse(req.t('whatsapp.qrReady'), {
+        account: WhatsAppConfigService.publicAccount(account),
+        qr,
+        pending
+      }));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.accountActionFailed');
+    }
+  }
+
+  static async getStatus(req, res) {
+    try {
+      const { account, state } = await EvolutionInstanceService.checkStatus(req.params?.id);
+      return res.json(createResponse(req.t('whatsapp.statusChecked'), {
+        account: WhatsAppConfigService.publicAccount(account),
+        // What the server said, which is not always what was stored: a
+        // `disconnected` on a number still pairing is reported and not written.
+        state
+      }));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.accountActionFailed');
+    }
+  }
+
+  static async restartAccount(req, res) {
+    try {
+      const { account } = await EvolutionInstanceService.restart(req.params?.id);
+      return res.json(createResponse(req.t('whatsapp.accountConnecting'), {
+        account: WhatsAppConfigService.publicAccount(account)
+      }));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.accountActionFailed');
+    }
+  }
+
+  static async disconnectAccount(req, res) {
+    try {
+      const { account } = await EvolutionInstanceService.disconnect(req.params?.id);
+      return res.json(createResponse(req.t('whatsapp.disconnected'), {
+        account: WhatsAppConfigService.publicAccount(account)
+      }));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.accountActionFailed');
+    }
+  }
+
+  static async deleteAccount(req, res) {
+    try {
+      const result = await EvolutionInstanceService.remove(req.params?.id, {
+        adminKey: req.body?.adminKey
+      });
+      // Success even when the server refused: the row is gone either way, and
+      // `serverError` is how the operator learns an instance was left running.
+      return res.json(createResponse(req.t('whatsapp.accountDeleted'), result));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.accountActionFailed');
+    }
+  }
+
+  static async updateAccount(req, res) {
+    try {
+      const body = req.body ?? {};
+      const account = await EvolutionInstanceService.updateAccount(req.params?.id, {
+        label: body.label,
+        purpose: body.purpose,
+        isDefault: body.isDefault
+      });
+      return res.json(createResponse(req.t('whatsapp.accountUpdated'), {
+        account: WhatsAppConfigService.publicAccount(account)
+      }));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.accountActionFailed');
+    }
+  }
+
+  static async checkNumbers(req, res) {
+    try {
+      const results = await EvolutionInstanceService.checkNumbers(req.body?.numbers);
+      return res.json(createResponse(
+        req.t('whatsapp.numbersChecked', { count: results.length }),
+        results
+      ));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.accountActionFailed');
     }
   }
 }
