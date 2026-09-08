@@ -55,8 +55,58 @@ class WaConversation {
     return this.getById(id);
   }
 
-  static async listRecent({ limit = 50, offset = 0 } = {}) {
-    return tdb('wa_conversations')
+  /**
+   * `%` and `_` are LIKE's own wildcards, and the three engines the panel
+   * supports spell the escape clause differently enough that getting it right
+   * everywhere costs more than it buys: a phone, a name and a contract never
+   * contain either, so a term carrying them is stripped rather than escaped.
+   */
+  static likeTerm(term) {
+    return String(term ?? '').trim().toLowerCase().replace(/[%_]/g, '');
+  }
+
+  /**
+   * The inbox page.
+   *
+   * `status` picks which pile: the open threads, the filed ones, or both.
+   * `search` matches the two columns the thread carries itself — the pushed
+   * WhatsApp name and the contract — plus the phone, which is compared as
+   * digits because that is how it is stored. The subscriber's name lives in
+   * `sgp_links`, so the caller resolves it to `searchContracts` in one batched
+   * query and hands the result down; matching it here would mean a join per row.
+   */
+  static async listRecent({ limit = 50, offset = 0, status = 'open', search = '', searchContracts = [] } = {}) {
+    const query = tdb('wa_conversations');
+
+    if (status === 'closed') query.whereNotNull('closed_at');
+    else if (status !== 'all') query.whereNull('closed_at');
+
+    const raw = String(search ?? '').trim();
+    const term = this.likeTerm(raw);
+    if (raw) {
+      const like = `%${term}%`;
+      const digits = term.replace(/\D/g, '');
+      query.where((match) => {
+        // The operator typed something, but stripping LIKE's wildcards left no
+        // searchable text behind. Falling through to "no filter" would hand
+        // back the whole inbox under a search term, and every row of it would
+        // read as a match.
+        if (!term) {
+          match.whereRaw('1 = 0');
+          return;
+        }
+        match
+          .whereRaw('lower(push_name) like ?', [like])
+          .orWhereRaw('lower(contract) like ?', [like]);
+        // Stored as digits only, so what the operator typed has to be reduced
+        // the same way: "(93) 98111-0001" and 5593981110001 are one number
+        // written twice, and only one of the two spellings is in the column.
+        if (digits) match.orWhere('wa_phone_e164', 'like', `%${digits}%`);
+        if (searchContracts.length > 0) match.orWhereIn('contract', searchContracts);
+      });
+    }
+
+    return query
       .orderBy('last_message_at', 'desc')
       .limit(limit)
       .offset(offset);

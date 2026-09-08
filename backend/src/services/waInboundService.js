@@ -329,6 +329,12 @@ async function gravarMensagem(account, item) {
   const patch = { last_message_at: agora };
   if (!fromMe) {
     patch.last_inbound_at = agora;
+    // Quem escreveu de novo reabre o próprio fio. Encerrar é arquivar, e um
+    // arquivo não responde ninguém: sem isto, o cliente que volta a falar cai
+    // fora da lista padrão do operador e vira invisível — que é exatamente o
+    // contrário do que a lista existe para fazer. Só na ENTRADA: um eco de
+    // saída é o operador digitando, e não é notícia do cliente.
+    if (conversation.closed_at) patch.closed_at = null;
     // Incremento no banco, não `lido + 1` em memória: dois eventos do mesmo
     // contato chegam concorrentes e um leria o contador antes do outro escrever.
     patch.unread_count = getDb().raw('unread_count + 1');

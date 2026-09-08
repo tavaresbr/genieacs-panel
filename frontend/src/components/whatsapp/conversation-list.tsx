@@ -58,6 +58,8 @@ interface ConversationListProps {
   conversations: WhatsAppConversation[]
   selectedId: number | null
   onSelect: (conversation: WhatsAppConversation) => void
+  /** A search term or a non-default pile is narrowing what is drawn here. */
+  filtered: boolean
 }
 
 /**
@@ -66,14 +68,17 @@ interface ConversationListProps {
  * clears when a thread is opened have to be settled in one place, and that
  * place is the page.
  */
-export function ConversationList({ conversations, selectedId, onSelect }: ConversationListProps) {
+export function ConversationList({ conversations, selectedId, onSelect, filtered }: ConversationListProps) {
   const { t, intlLocale } = useTranslation()
 
   if (conversations.length === 0) {
+    // "Nothing matches that" sends the operator back to the search box;
+    // "no conversation yet" tells them the panel is simply new. Reading the
+    // first as the second is how a working search looks broken.
     return (
       <div className="empty-state">
-        <div className="empty-state-icon"><Icon name="chat" size={22} /></div>
-        <p className="empty-state-title">{t('whatsapp.inbox.empty')}</p>
+        <div className="empty-state-icon"><Icon name={filtered ? 'search' : 'chat'} size={22} /></div>
+        <p className="empty-state-title">{t(filtered ? 'whatsapp.inbox.noMatch' : 'whatsapp.inbox.empty')}</p>
       </div>
     )
   }
@@ -113,6 +118,14 @@ export function ConversationList({ conversations, selectedId, onSelect }: Conver
               )}
 
               <span className="flex flex-wrap items-center gap-1.5">
+                {/* Only ever visible under the closed or the all pile, which is
+                    exactly where a row's state stops being obvious. */}
+                {conversation.closedAt && (
+                  <span className="modern-badge" title={t('whatsapp.inbox.closeHint')}>
+                    <Icon name="check" size={12} />
+                    {t('whatsapp.inbox.closed')}
+                  </span>
+                )}
                 {conversation.unreadCount > 0 && (
                   <span className="modern-badge-success">
                     {t('whatsapp.inbox.unread', { count: conversation.unreadCount })}

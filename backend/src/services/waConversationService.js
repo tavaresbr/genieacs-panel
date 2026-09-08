@@ -89,10 +89,41 @@ class WaConversationService {
     };
   }
 
-  static async list({ limit = 50, offset = 0 } = {}) {
+  /**
+   * The contracts whose subscriber name matches what the operator typed.
+   *
+   * One batched query standing in for a join: `sgp_links` is not a scoped table
+   * (see `config/tenantScope.js`), so it is read through `getDb()` exactly like
+   * the client-name lookup below it and like `resolveSubscriber` above. Reading
+   * it unfiltered cannot widen the result: the conversations themselves come
+   * back through `tdb`, so a contract borrowed from another provider's link
+   * simply matches no thread in this one.
+   */
+  static async contractsMatchingClientName(term) {
+    const like = `%${WaConversation.likeTerm(term)}%`;
+    if (like === '%%') return [];
+    const links = await getDb()('sgp_links').whereRaw('lower(client_name) like ?', [like]).select('contract');
+    return [...new Set(links.map((link) => link.contract).filter(Boolean))];
+  }
+
+  /**
+   * @param {'open'|'closed'|'all'} status which pile to draw.
+   *
+   * The default is `open`, and that is the whole point of the closing work: an
+   * inbox is a list of what still needs answering, not an archive of everything
+   * that ever arrived. A thread an operator closed is a decision already taken,
+   * and leaving it in the default view would put the panel back where it
+   * started — a list nobody can read past its first hundred rows. Closing is
+   * still not deletion, so `closed` and `all` are one parameter away.
+   */
+  static async list({ limit = 50, offset = 0, search = '', status = 'open' } = {}) {
+    const term = String(search ?? '').trim();
     const rows = await WaConversation.listRecent({
       limit: Math.min(Math.max(Number(limit) || 50, 1), 200),
-      offset: Math.max(Number(offset) || 0, 0)
+      offset: Math.max(Number(offset) || 0, 0),
+      status: ['open', 'closed', 'all'].includes(status) ? status : 'open',
+      search: term,
+      searchContracts: term ? await this.contractsMatchingClientName(term) : []
     });
     if (rows.length === 0) return [];
 
@@ -126,6 +157,38 @@ class WaConversationService {
     return row;
   }
 
+  /** The thread as the browser wants it, with the two facts the row cannot hold. */
+  static async decorate(conversation) {
+    const link = conversation.contract ? await SgpLink.getByDeviceId(conversation.device_id) : null;
+    return this.publicConversation(conversation, {
+      clientName: link?.client_name ?? null,
+      optedOut: await WaOptOut.isActive({
+        waPhone: conversation.wa_phone_e164,
+        waLid: conversation.wa_lid
+      })
+    });
+  }
+
+  /**
+   * Files a thread away, or takes it back out.
+   *
+   * Closing is a filing decision and nothing else: the conversation and every
+   * message in it stay exactly where they are, and only `closed_at` moves. The
+   * counterpart lives in `waInboundService` — a customer who writes again
+   * reopens their own thread, because an archive cannot answer anybody.
+   */
+  static async setStatus(id, status) {
+    const conversation = await this.get(id);
+    const closing = status === 'closed';
+    // Reopening an open thread and closing a closed one are both writes that
+    // change nothing; letting them through keeps the route idempotent, which is
+    // what a double-click on the button deserves.
+    const updated = await WaConversation.update(conversation.id, {
+      closed_at: closing ? new Date() : null
+    });
+    return this.decorate(updated);
+  }
+
   /**
    * One thread's messages, newest first.
    *
@@ -139,15 +202,8 @@ class WaConversationService {
     });
     if (conversation.unread_count > 0) await WaConversation.update(conversation.id, { unread_count: 0 });
 
-    const link = conversation.contract ? await SgpLink.getByDeviceId(conversation.device_id) : null;
     return {
-      conversation: this.publicConversation(conversation, {
-        clientName: link?.client_name ?? null,
-        optedOut: await WaOptOut.isActive({
-          waPhone: conversation.wa_phone_e164,
-          waLid: conversation.wa_lid
-        })
-      }),
+      conversation: await this.decorate(conversation),
       messages: rows.map((row) => WaSendService.publicMessage(row))
     };
   }
