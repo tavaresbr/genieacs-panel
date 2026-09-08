@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -16,12 +17,40 @@ process.env.CORS_ORIGINS = 'http://localhost:5890';
 process.env.TRUST_PROXY = '0';
 process.env.PORTAL_COOKIE_SECURE = 'auto';
 
+// SQLite unless the run asks for another dialect. Pointed at a server, every
+// suite would otherwise share one database: `node --test` runs files in
+// parallel, so each process claims its own namespace and drops it on the way
+// out. Postgres namespaces with a schema inside the shared database; MySQL has
+// no such thing, so there the namespace is a database of its own.
+const TEST_DB_CLIENT = process.env.TEST_DB_CLIENT || 'sqlite3';
+const IS_SERVER_DB = TEST_DB_CLIENT !== 'sqlite3';
+const testNamespace = `skygp_test_${process.pid}_${crypto.randomBytes(4).toString('hex')}`;
+
+const serverConnection = {
+  host: process.env.TEST_DB_HOST || '127.0.0.1',
+  port: Number(process.env.TEST_DB_PORT) || undefined,
+  user: process.env.TEST_DB_USER,
+  password: process.env.TEST_DB_PASSWORD || ''
+};
+
+if (IS_SERVER_DB) {
+  fs.writeFileSync(path.join(dataDir, 'db-config.json'), JSON.stringify({
+    client: TEST_DB_CLIENT,
+    ...serverConnection,
+    database: TEST_DB_CLIENT === 'pg' ? process.env.TEST_DB_NAME : testNamespace,
+    ...(TEST_DB_CLIENT === 'pg' ? { schema: testNamespace } : {})
+  }));
+}
+
 const { app, portalApp } = await import('../../src/app.js');
 const { ensureSchema } = await import('../../src/config/schema.js');
 const { seedDefaults } = await import('../../src/config/seed.js');
-const { getDb, closePool } = await import('../../src/config/database.js');
+const { getDb, closePool, insertReturningId } = await import('../../src/config/database.js');
 
-export { app, portalApp, getDb };
+// Re-exported so fixtures reach for the same dialect-aware helper the models
+// use: `const [id] = await knex(...).insert(...)` only yields an id on SQLite
+// and MySQL, so a fixture written that way passes locally and fails on Postgres.
+export { app, portalApp, getDb, insertReturningId };
 
 const listeners = [];
 
@@ -37,6 +66,7 @@ function listen(target) {
  * exercise the upgrade path.
  */
 export async function startTestServers({ beforeSchema } = {}) {
+  await createNamespace();
   if (beforeSchema) await beforeSchema(getDb());
   await ensureSchema();
   await seedDefaults();
@@ -48,11 +78,52 @@ export async function startTestServers({ beforeSchema } = {}) {
   };
 }
 
+/**
+ * A connection to the server itself rather than to this process's namespace,
+ * since a database cannot create or drop itself.
+ */
+async function withServerConnection(fn) {
+  const { default: knexFactory } = await import('knex');
+  const admin = knexFactory({
+    client: TEST_DB_CLIENT,
+    connection: TEST_DB_CLIENT === 'pg'
+      ? { ...serverConnection, database: process.env.TEST_DB_NAME }
+      : serverConnection
+  });
+  try {
+    await fn(admin);
+  } finally {
+    await admin.destroy();
+  }
+}
+
+async function createNamespace() {
+  if (!IS_SERVER_DB) return;
+  await withServerConnection((admin) => admin.raw(
+    TEST_DB_CLIENT === 'pg'
+      ? 'CREATE SCHEMA IF NOT EXISTS ??'
+      : 'CREATE DATABASE IF NOT EXISTS ??',
+    [testNamespace]
+  ));
+}
+
+async function dropNamespace() {
+  if (!IS_SERVER_DB) return;
+  await withServerConnection((admin) => admin.raw(
+    TEST_DB_CLIENT === 'pg'
+      ? 'DROP SCHEMA IF EXISTS ?? CASCADE'
+      : 'DROP DATABASE IF EXISTS ??',
+    [testNamespace]
+  ));
+}
+
 export async function stopTestServers() {
   await Promise.all(listeners.splice(0).map(
     (server) => new Promise((resolve) => server.close(resolve))
   ));
+  // After closePool, so nothing is still connected to what is being dropped.
   await closePool();
+  await dropNamespace();
   fs.rmSync(dataDir, { recursive: true, force: true });
 }
 

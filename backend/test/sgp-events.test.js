@@ -243,7 +243,9 @@ describe('event dispatch', () => {
   it('refreshes the cached link on a payment', async () => {
     await getDb()('sgp_links').where({ device_id: DEVICE_ID }).update({
       status_label: 'Desatualizado',
-      last_synced_at: new Date(0)
+      // Not `new Date(0)`: MySQL's TIMESTAMP range begins a second after the
+      // epoch, so that value is unstorable rather than merely stale.
+      last_synced_at: new Date('2000-01-01T00:00:00Z')
     });
     const body = JSON.stringify({ id: 'evt-pay', evento: 'pagamento_confirmado', contrato: '4321' });
     await postWebhook(body, { 'X-SGP-Signature': sign(body) });

@@ -1,4 +1,4 @@
-import { getDb } from '../config/database.js';
+import { getDb, insertReturningId } from '../config/database.js';
 
 class WifiSecurityMapping {
   static async getByVendor(vendorId) {
@@ -8,7 +8,7 @@ class WifiSecurityMapping {
   }
 
   static async create({ vendor_id, raw_security_value, normalized_security, description }) {
-    const [id] = await getDb()('wifi_security_mappings').insert({
+    const id = await insertReturningId('wifi_security_mappings', {
       vendor_id,
       raw_security_value,
       normalized_security,

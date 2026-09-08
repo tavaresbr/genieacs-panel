@@ -1,4 +1,4 @@
-import { getDb } from '../config/database.js';
+import { getDb, insertReturningId } from '../config/database.js';
 
 function parseList(value, fallback = []) {
   if (!value) return fallback;
@@ -53,7 +53,7 @@ class ProvisioningProfile {
   }
 
   static async create(row) {
-    const [id] = await getDb()('provisioning_profiles').insert(row);
+    const id = await insertReturningId('provisioning_profiles', row);
     return this.getById(id);
   }
 

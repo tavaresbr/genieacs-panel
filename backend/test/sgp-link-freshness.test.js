@@ -1,7 +1,7 @@
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { getDb, startTestServers, stopTestServers } from './helpers/harness.js';
+import { getDb, insertReturningId, startTestServers, stopTestServers } from './helpers/harness.js';
 
 const { default: SgpService } = await import('../src/services/sgpService.js');
 const { default: SgpLink } = await import('../src/models/SgpLink.js');
@@ -51,7 +51,7 @@ function startSgpStub() {
 
 async function createAccount(deviceId, pppoe, customerId) {
   const { record } = await CustomerPortalPasswordService.createRecord();
-  const [id] = await getDb()('customer_accounts').insert({
+  const id = await insertReturningId('customer_accounts', {
     customer_id: customerId,
     device_id: deviceId,
     identity_hash: customerId.padEnd(64, '0'),

@@ -1,4 +1,4 @@
-import { getDb } from '../config/database.js';
+import { getDb, insertReturningId } from '../config/database.js';
 
 /** Statuses a run can still move on from; a device with one is already busy. */
 export const ACTIVE_STATUSES = Object.freeze(['pending', 'running', 'awaiting_verify']);
@@ -19,7 +19,7 @@ function parseRow(row) {
 
 class ProvisioningRun {
   static async create(row) {
-    const [id] = await getDb()('provisioning_runs').insert({
+    const id = await insertReturningId('provisioning_runs', {
       ...row,
       steps: row.steps ? JSON.stringify(row.steps) : null
     });

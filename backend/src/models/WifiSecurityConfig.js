@@ -1,4 +1,4 @@
-import { getDb } from '../config/database.js';
+import { getDb, insertReturningId } from '../config/database.js';
 
 function withArray(row) {
   if (!row) return null;
@@ -30,7 +30,7 @@ class WifiSecurityConfig {
     const { product_class, security_types, password_param_path } = configData;
     const securityTypesString = Array.isArray(security_types) ? security_types.join(',') : security_types;
 
-    const [id] = await getDb()('wifi_security_config').insert({
+    const id = await insertReturningId('wifi_security_config', {
       product_class,
       security_types: securityTypesString,
       password_param_path

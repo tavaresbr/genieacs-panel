@@ -1,4 +1,4 @@
-import { getDb } from '../config/database.js';
+import { getDb, insertReturningId } from '../config/database.js';
 
 class User {
   static async findByUsername(username) {
@@ -21,7 +21,7 @@ class User {
 
   static async create(userData) {
     const { username, password, role = 'viewer' } = userData;
-    const [id] = await getDb()('users').insert({ username, password, role });
+    const id = await insertReturningId('users', { username, password, role });
     return id;
   }
 
@@ -78,12 +78,11 @@ class User {
         throw error;
       }
 
-      const [id] = await trx('users').insert({
+      return insertReturningId('users', {
         username,
         password,
         role: 'admin'
-      });
-      return id;
+      }, trx);
     });
   }
 

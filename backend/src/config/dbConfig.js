@@ -4,6 +4,17 @@ import { DB_CONFIG_PATH, SQLITE_PATH, ensureDataDir } from './paths.js';
 
 const DEFAULT_CONFIG = { client: 'sqlite3' };
 
+const MYSQL_CLIENTS = new Set(['mysql', 'mysql2']);
+const POSTGRES_CLIENTS = new Set(['pg', 'postgres', 'postgresql']);
+
+/** Canonical knex client name for whatever spelling the stored config uses. */
+export function resolveClient(config = readDbConfig()) {
+  const client = String(config?.client || '').toLowerCase();
+  if (MYSQL_CLIENTS.has(client)) return 'mysql2';
+  if (POSTGRES_CLIENTS.has(client)) return 'pg';
+  return 'better-sqlite3';
+}
+
 export function readDbConfig() {
   try {
     if (fs.existsSync(DB_CONFIG_PATH)) {
@@ -38,7 +49,28 @@ export function writeDbConfig(config) {
 }
 
 export function buildKnexConfig(config = readDbConfig()) {
-  if (config.client === 'mysql2' || config.client === 'mysql') {
+  const client = resolveClient(config);
+
+  if (client === 'pg') {
+    return {
+      client: 'pg',
+      connection: {
+        host: config.host,
+        port: Number(config.port) || 5432,
+        user: config.user,
+        password: config.password,
+        database: config.database,
+        ssl: config.ssl ? { rejectUnauthorized: config.sslRejectUnauthorized !== false } : false
+      },
+      // Lets one database hold several independent panels — which is how the
+      // test suite keeps parallel files apart, and how a deployment can share
+      // a managed Postgres it does not own outright.
+      ...(config.schema ? { searchPath: [config.schema] } : {}),
+      pool: { min: 0, max: Number(config.poolMax) || 10 }
+    };
+  }
+
+  if (client === 'mysql2') {
     return {
       client: 'mysql2',
       connection: {
@@ -68,5 +100,5 @@ export function buildKnexConfig(config = readDbConfig()) {
 }
 
 export function isSqlite(config = readDbConfig()) {
-  return config.client !== 'mysql2' && config.client !== 'mysql';
+  return resolveClient(config) === 'better-sqlite3';
 }
