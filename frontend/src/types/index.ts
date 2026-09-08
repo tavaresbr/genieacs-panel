@@ -1,8 +1,12 @@
 // Authentication Types
+
+/** Administrators may change anything; viewers get read-only access. */
+export type OperatorRole = 'admin' | 'viewer'
+
 export interface User {
   id: number
   username: string
-  role: string
+  role: OperatorRole
   createdAt: string
   updatedAt: string
 }

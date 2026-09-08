@@ -61,6 +61,7 @@ export const portalLoginLimiter = limiter({
   },
   message: {
     success: false,
+    code: 'rate_limited_login',
     message: 'Terlalu banyak percobaan login. Tunggu 15 menit lalu coba lagi.'
   }
 });
@@ -70,14 +71,22 @@ export const portalIpLimiter = limiter({
   windowMs: 60 * 1000,
   max: 600,
   keyGenerator: ipKey,
-  message: { success: false, message: 'Terlalu banyak permintaan. Coba lagi sebentar.' }
+  message: {
+    success: false,
+    code: 'rate_limited',
+    message: 'Terlalu banyak permintaan. Coba lagi sebentar.'
+  }
 });
 
 export const portalAccountLimiter = limiter({
   windowMs: 60 * 1000,
   max: 120,
   keyGenerator: accountKey,
-  message: { success: false, message: 'Terlalu banyak permintaan. Coba lagi sebentar.' }
+  message: {
+    success: false,
+    code: 'rate_limited',
+    message: 'Terlalu banyak permintaan. Coba lagi sebentar.'
+  }
 });
 
 export const portalMutationLimiter = limiter({
@@ -86,6 +95,7 @@ export const portalMutationLimiter = limiter({
   keyGenerator: accountKey,
   message: {
     success: false,
+    code: 'rate_limited_wifi',
     message: 'Terlalu banyak perubahan WiFi. Tunggu 15 menit lalu coba lagi.'
   }
 });
@@ -96,6 +106,7 @@ export const portalRevealLimiter = limiter({
   keyGenerator: accountKey,
   message: {
     success: false,
+    code: 'rate_limited_reveal',
     message: 'Terlalu banyak permintaan password. Tunggu 15 menit lalu coba lagi.'
   }
 });
@@ -106,6 +117,7 @@ export const portalBillingLimiter = limiter({
   keyGenerator: accountKey,
   message: {
     success: false,
+    code: 'rate_limited_billing',
     message: 'Muitas consultas de faturas. Aguarde um instante e tente novamente.'
   }
 });
@@ -120,7 +132,23 @@ export const portalUnlockLimiter = limiter({
   keyGenerator: accountKey,
   message: {
     success: false,
+    code: 'rate_limited_unlock',
     message: 'Limite de solicitações de liberação atingido. Tente novamente mais tarde.'
+  }
+});
+
+/**
+ * Operator SGP calls reach the provider's billing system on every request, so
+ * they get a tighter budget than the generic API limiter allows.
+ */
+export const sgpAdminLimiter = limiter({
+  windowMs: 60 * 1000,
+  max: 60,
+  keyGenerator: (req) => (req.user?.userId ? `user:${req.user.userId}` : `ip:${ipKey(req)}`),
+  message: {
+    success: false,
+    code: 'rate_limited_sgp',
+    message: 'Too many SGP requests, please slow down'
   }
 });
 

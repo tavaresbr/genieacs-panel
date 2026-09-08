@@ -1,4 +1,5 @@
 import Setting from '../models/Setting.js';
+import CustomerAccount from '../models/CustomerAccount.js';
 import VendorService from './vendorService.js';
 import Vendor from '../models/Vendor.js';
 import WifiSecurityConfig from '../models/WifiSecurityConfig.js';
@@ -244,45 +245,216 @@ class DeviceService {
     }
   }
 
-  static async getDevices() {
+  static ONLINE_WINDOW_MS = 10 * 60 * 1000;
+
+  static DEVICE_PAGE_SIZE_DEFAULT = 25;
+
+  static DEVICE_PAGE_SIZE_MAX = 100;
+
+  static DEVICE_SEARCH_MAX_LENGTH = 128;
+
+  /**
+   * Every listing parameter arrives from the browser, so each one is coerced and
+   * clamped here instead of being trusted. `page` is only bounded from below:
+   * the real upper bound depends on the total, which is known further down.
+   */
+  static normalizeDeviceListQuery(query = {}) {
+    const rawPage = Number.parseInt(String(query.page ?? ''), 10);
+    const rawPageSize = Number.parseInt(String(query.pageSize ?? ''), 10);
+    const rawStatus = String(query.status ?? 'all').trim().toLowerCase();
+
+    return {
+      page: Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1,
+      pageSize: Number.isFinite(rawPageSize) && rawPageSize > 0
+        ? Math.min(rawPageSize, this.DEVICE_PAGE_SIZE_MAX)
+        : this.DEVICE_PAGE_SIZE_DEFAULT,
+      search: String(query.search ?? '').trim().slice(0, this.DEVICE_SEARCH_MAX_LENGTH),
+      status: ['online', 'offline'].includes(rawStatus) ? rawStatus : 'all'
+    };
+  }
+
+  static buildDeviceListProjection(virtualParams) {
+    return [
+      '_id',
+      '_deviceId._ProductClass',
+      '_deviceId._SerialNumber',
+      '_deviceId._Manufacturer',
+      'InternetGatewayDevice.DeviceInfo.SoftwareVersion',
+      virtualParams.vpPppoeUsername,
+      virtualParams.vpWanBridge,
+      virtualParams.vpRxPower,
+      virtualParams.vpTemperature,
+      virtualParams.vpActiveDevices,
+      'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID',
+      'InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.SSID',
+      'InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.SSID',
+      'InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.SSID',
+      'InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.SSID',
+      'InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.SSID',
+      'InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.SSID',
+      'InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.SSID',
+      '_lastInform',
+      '_registered'
+    ].filter(Boolean);
+  }
+
+  /**
+   * Online/offline is purely a `_lastInform` comparison, and GenieACS owns that
+   * field, so the whole status filter can be evaluated by the NBI. The window
+   * moves with wall-clock time, hence the cutoff is recomputed per request.
+   */
+  static buildDeviceStatusQuery(status, now = Date.now()) {
+    if (status !== 'online' && status !== 'offline') return null;
+    const cutoff = new Date(now - this.ONLINE_WINDOW_MS).toISOString();
+    return status === 'online'
+      ? { _lastInform: { $gte: cutoff } }
+      : { _lastInform: { $lt: cutoff } };
+  }
+
+  static isDeviceOnline(device, now = Date.now()) {
+    const lastInform = device?._lastInform ? new Date(device._lastInform).getTime() : Number.NaN;
+    const ageMs = now - lastInform;
+    return Number.isFinite(ageMs) && ageMs >= 0 && ageMs < this.ONLINE_WINDOW_MS;
+  }
+
+  static async fetchGenieAcsWithHeaders(query = {}) {
+    const url = await this.buildGenieAcsUrl('', query);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15_000);
     try {
-      const virtualParams = await this.getVirtualParameters();
-      
-      const projection = [
-        '_id',
-        '_deviceId._ProductClass',
-        '_deviceId._SerialNumber',
-        '_deviceId._Manufacturer',
-        'InternetGatewayDevice.DeviceInfo.SoftwareVersion',
-        virtualParams.vpPppoeUsername,
-        virtualParams.vpWanBridge,
-        virtualParams.vpRxPower,
-        virtualParams.vpTemperature,
-        virtualParams.vpActiveDevices,
-        'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID',
-        'InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.SSID',
-        'InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.SSID',
-        'InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.SSID',
-        'InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.SSID',
-        'InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.SSID',
-        'InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.SSID',
-        'InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.SSID',
-        '_lastInform',
-        '_registered'
-      ].filter(Boolean);
-
-      const apiUrl = `?projection=${encodeURIComponent(projection.join(','))}`;
-      const data = await this.fetchFromGenieAcs(apiUrl);
-
-      if (!Array.isArray(data)) {
-        throw new Error('Invalid API response');
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+        signal: controller.signal
+      });
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => '');
+        throw new Error(`GenieACS API responded with status: ${response.status}${errorText ? ` - ${errorText}` : ''}`);
       }
-
-      return data.map(item => this.processDeviceData(item, virtualParams));
-    } catch (error) {
-      console.error('Error getting devices:', error);
-      throw error;
+      const text = await response.text();
+      return { response, data: text ? JSON.parse(text) : null };
+    } finally {
+      clearTimeout(timeoutId);
     }
+  }
+
+  /**
+   * The NBI reports the unpaged match count in a `total` response header. Older
+   * or proxied deployments may drop it, so fall back to an `_id`-only scan,
+   * which still keeps the payload tiny compared with a full projection.
+   */
+  static async countDevicesFromGenieAcs(queryParam) {
+    const baseQuery = queryParam ? { query: queryParam } : {};
+    const { response, data } = await this.fetchGenieAcsWithHeaders({
+      ...baseQuery,
+      projection: '_id',
+      limit: 1
+    });
+    const rawTotal = response.headers.get('total');
+    const reported = rawTotal === null || rawTotal.trim() === '' ? Number.NaN : Number(rawTotal);
+    if (Number.isInteger(reported) && reported >= 0) return reported;
+    if (Array.isArray(data) && data.length === 0) return 0;
+
+    const all = await this.fetchFromGenieAcs('', { ...baseQuery, projection: '_id' });
+    return Array.isArray(all) ? all.length : 0;
+  }
+
+  static async fetchDeviceListPage(queryParam, projection, { skip, limit } = {}) {
+    const data = await this.fetchFromGenieAcs('', {
+      ...(queryParam ? { query: queryParam } : {}),
+      projection: projection.join(','),
+      ...(Number.isInteger(skip) ? { skip } : {}),
+      ...(Number.isInteger(limit) ? { limit } : {})
+    });
+    if (!Array.isArray(data)) {
+      throw new Error('Invalid API response');
+    }
+    return data;
+  }
+
+  static deviceMatchesSearch(device, needle) {
+    if (!needle) return true;
+    return [
+      device._id,
+      device.SerialNumber,
+      device.productclass,
+      device.manufacturer,
+      device.pppoe,
+      device.customerId
+    ].some((field) => String(field ?? '').toLowerCase().includes(needle));
+  }
+
+  /**
+   * Returns one page of the inventory plus the paging metadata the UI needs.
+   * Paging is pushed to GenieACS whenever nothing has to be filtered locally;
+   * a free-text search always matches against the panel's own Customer IDs, so
+   * that path fetches the (status-filtered) match set and pages it here.
+   */
+  static async getDevicesPage(options = {}) {
+    const { page, pageSize, search, status } = this.normalizeDeviceListQuery(options);
+    const virtualParams = await this.getVirtualParameters();
+    const projection = this.buildDeviceListProjection(virtualParams);
+    const statusQuery = this.buildDeviceStatusQuery(status);
+    const queryParam = statusQuery ? JSON.stringify(statusQuery) : null;
+
+    if (!search) {
+      const total = await this.countDevicesFromGenieAcs(queryParam);
+      const totalPages = Math.ceil(total / pageSize);
+      const currentPage = totalPages > 0 ? Math.min(page, totalPages) : 1;
+      // The listing has always been shown newest-first, i.e. the natural
+      // GenieACS order reversed. Mapping the page onto a skip/limit taken from
+      // the tail keeps that order without asking the NBI to sort.
+      const end = total - (currentPage - 1) * pageSize;
+      const skip = Math.max(0, end - pageSize);
+      const limit = Math.max(0, end - skip);
+      const rows = limit > 0
+        ? await this.fetchDeviceListPage(queryParam, projection, { skip, limit })
+        : [];
+      return {
+        devices: rows.map((item) => this.processDeviceData(item, virtualParams)).reverse(),
+        page: currentPage,
+        pageSize,
+        total,
+        totalPages
+      };
+    }
+
+    const rows = await this.fetchDeviceListPage(queryParam, projection);
+    const candidates = rows
+      .map((item) => this.processDeviceData(item, virtualParams))
+      .reverse();
+    const customerIds = await this.lookupCustomerIds(candidates.map((device) => device._id));
+    const needle = search.toLowerCase();
+    const matches = candidates.filter((device) => this.deviceMatchesSearch(
+      { ...device, customerId: customerIds.get(String(device._id)) || null },
+      needle
+    ));
+
+    const total = matches.length;
+    const totalPages = Math.ceil(total / pageSize);
+    const currentPage = totalPages > 0 ? Math.min(page, totalPages) : 1;
+    const offset = (currentPage - 1) * pageSize;
+    return {
+      devices: matches.slice(offset, offset + pageSize),
+      page: currentPage,
+      pageSize,
+      total,
+      totalPages
+    };
+  }
+
+  /**
+   * Read-only Customer ID lookup used while matching a search term. Account
+   * creation stays in CustomerService and is only run over the returned page.
+   */
+  static async lookupCustomerIds(deviceIds) {
+    const ids = deviceIds.map((id) => String(id ?? '')).filter(Boolean);
+    const found = new Map();
+    for (let offset = 0; offset < ids.length; offset += 500) {
+      const rows = await CustomerAccount.getIdsByDeviceIds(ids.slice(offset, offset + 500));
+      for (const row of rows) found.set(row.device_id, row.customer_id);
+    }
+    return found;
   }
 
   static async getDashboardDevices() {

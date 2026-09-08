@@ -59,6 +59,17 @@ function ProtectedShell() {
   )
 }
 
+/**
+ * Routes whose API is administrator-only. A viewer that reaches one by typing
+ * the URL is sent to the dashboard instead of a page where every request 403s.
+ */
+function AdminRoute() {
+  const { user, loading } = useAuth()
+  if (loading) return <AuthFallback />
+  if (user?.role !== 'admin') return <Navigate to="/dashboard" replace />
+  return <Outlet />
+}
+
 function LoginRoute() {
   const { isAuthenticated, loading, needsSetup } = useAuth()
   if (loading) return <AuthFallback />
@@ -90,8 +101,10 @@ export default function App() {
                   <Route path="/dashboard" element={<DashboardPage />} />
                   <Route path="/devices" element={<DevicesPage />} />
                   <Route path="/devices/detail" element={<DeviceDetailPage />} />
-                  <Route path="/network-map" element={<NetworkMapPage />} />
-                  <Route path="/settings" element={<SettingsPage />} />
+                  <Route element={<AdminRoute />}>
+                    <Route path="/network-map" element={<NetworkMapPage />} />
+                    <Route path="/settings" element={<SettingsPage />} />
+                  </Route>
                   <Route path="*" element={<Navigate to="/dashboard" replace />} />
                 </Route>
               </Routes>

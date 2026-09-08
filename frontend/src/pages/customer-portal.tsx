@@ -3,7 +3,12 @@ import { BrandMark } from '@/components/brand-mark'
 import { Icon } from '@/components/ui/icon'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import { useTranslation } from '@/contexts/language-context'
-import { getActiveLocale, translate } from '@/lib/i18n'
+import {
+  getActiveLocale,
+  isCustomerSessionCode,
+  translate,
+  translateApiMessage,
+} from '@/lib/i18n'
 
 type PortalOverview = {
   customerId: string
@@ -200,8 +205,8 @@ export default function CustomerPortal() {
     try {
       const result = await portalRequest<PortalOverview>('/overview')
       if (!result.success || !result.data) {
-        if (result.message?.toLowerCase().includes('session')) setAuthenticated(false)
-        setError(result.message || t('portal.error.overview'))
+        if (isCustomerSessionCode(result.code)) setAuthenticated(false)
+        setError(translateApiMessage(result, t, 'portal.error.overview'))
         return
       }
       setOverview(result.data)
@@ -225,10 +230,11 @@ export default function CustomerPortal() {
     try {
       const result = await portalRequest<PortalBilling>('/billing')
       if (!result.success || !result.data) {
+        if (isCustomerSessionCode(result.code)) setAuthenticated(false)
         setBilling(null)
         setBillingError(
           result.code && TRANSIENT_BILLING_CODES.has(result.code)
-            ? (result.message || t('portal.billing.temporaryFailure'))
+            ? translateApiMessage(result, t, 'portal.billing.temporaryFailure')
             : ''
         )
         return
@@ -251,7 +257,9 @@ export default function CustomerPortal() {
       const result = await portalRequest('/billing/trust-unlock', { method: 'POST' })
       setBillingFeedback({
         type: result.success ? 'success' : 'error',
-        message: result.message || t(result.success
+        // A successful unlock answers with the provider's own wording and no
+        // code, so the backend message is what the subscriber should read.
+        message: translateApiMessage(result, t, result.success
           ? 'portal.billing.trustUnlockSent'
           : 'portal.billing.trustUnlockFailed')
       })
@@ -324,7 +332,7 @@ export default function CustomerPortal() {
         body: JSON.stringify({ customerId, password }),
       })
       if (!result.success) {
-        setError(result.message || t('portal.login.invalidCredentials'))
+        setError(translateApiMessage(result, t, 'portal.login.invalidCredentials'))
         return
       }
       setAuthenticated(true)
@@ -370,10 +378,10 @@ export default function CustomerPortal() {
     try {
       const result = await portalRequest<{ password: string }>(`/wifi/${index}/password`)
       if (!result.success || !result.data?.password) {
-        if (result.message?.toLowerCase().includes('session')) setAuthenticated(false)
+        if (isCustomerSessionCode(result.code)) setAuthenticated(false)
         setWifiFeedback({
           type: 'error',
-          message: result.message || t('portal.wifi.error.revealFailed')
+          message: translateApiMessage(result, t, 'portal.wifi.error.revealFailed')
         })
         return
       }
@@ -417,10 +425,11 @@ export default function CustomerPortal() {
         }),
       })
       if (!result.success) {
-        if (result.message?.toLowerCase().includes('session')) setAuthenticated(false)
+        if (isCustomerSessionCode(result.code)) setAuthenticated(false)
         setWifiFeedback({
           type: 'error',
-          message: result.message || t('portal.wifi.error.saveFailed')
+          // `wifi_rejected` carries the ONT's own reason, which the helper keeps.
+          message: translateApiMessage(result, t, 'portal.wifi.error.saveFailed')
         })
         return
       }
@@ -440,7 +449,7 @@ export default function CustomerPortal() {
       setShowWifiPassword(false)
       setWifiFeedback({
         type: 'success',
-        message: result.message || t('portal.wifi.success')
+        message: translateApiMessage(result, t, 'portal.wifi.success')
       })
     } catch {
       setWifiFeedback({
