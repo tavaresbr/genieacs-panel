@@ -37,6 +37,7 @@ class WhatsAppController {
         allowedHosts: body.allowedHosts,
         webhookBaseUrl: body.webhookBaseUrl,
         rejectCallMessage: body.rejectCallMessage,
+        portalPublicUrl: body.portalPublicUrl,
         rateLimitPerMin: body.rateLimitPerMin,
         managedUrl: body.managedUrl,
         // An absent key keeps the stored one; "" clears it.

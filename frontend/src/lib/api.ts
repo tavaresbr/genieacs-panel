@@ -775,6 +775,9 @@ export interface WhatsAppConfig {
   allowedHosts: string[]
   webhookBaseUrl: string
   rejectCallMessage: string
+  // Where the customer portal answers from outside. Its own field, not the
+  // panel's address: the portal is a separate app on a separate port.
+  portalPublicUrl: string
   rateLimitPerMin: number
   managedUrl: string
   managed: boolean

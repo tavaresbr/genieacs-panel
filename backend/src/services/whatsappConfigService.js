@@ -61,6 +61,14 @@ const DEFAULT_CONFIG = Object.freeze({
   // external hostname is nowhere in the process.
   webhookBaseUrl: '',
   rejectCallMessage: 'Este número não recebe chamadas. Envie sua mensagem por escrito.',
+  // Where a subscriber reaches the customer portal from outside.
+  //
+  // The bot needs this and cannot derive it: the portal is a SEPARATE app on a
+  // separate port (`portalApp`), so the panel's own address is only the same
+  // hostname when a reverse proxy fronts both. Guessing it produces a link that
+  // 404s for the one person the bot exists to help, so an empty value makes the
+  // bot hand off to a human instead of sending a broken link.
+  portalPublicUrl: '',
   // Per-minute ceiling for outbound messages, shared by the outbox worker and
   // any campaign that does not set its own.
   rateLimitPerMin: 20,
@@ -108,6 +116,7 @@ class WhatsAppConfigService {
       allowedHosts: parseAllowedHosts(stored.allowedHosts),
       webhookBaseUrl: String(stored.webhookBaseUrl || ''),
       rejectCallMessage: String(stored.rejectCallMessage || DEFAULT_CONFIG.rejectCallMessage),
+      portalPublicUrl: String(stored.portalPublicUrl || ''),
       rateLimitPerMin: Number(stored.rateLimitPerMin) > 0
         ? Math.min(Number(stored.rateLimitPerMin), 120)
         : DEFAULT_CONFIG.rateLimitPerMin,
@@ -148,6 +157,13 @@ class WhatsAppConfigService {
       rejectCallMessage: patch.rejectCallMessage === undefined
         ? current.rejectCallMessage
         : String(patch.rejectCallMessage).trim().slice(0, 300),
+      portalPublicUrl: patch.portalPublicUrl === undefined
+        ? current.portalPublicUrl
+        : this.normalizePublicUrl(
+          patch.portalPublicUrl,
+          'whatsapp.error.invalidPortalUrl',
+          'invalid_portal_url'
+        ),
       rateLimitPerMin: patch.rateLimitPerMin === undefined
         ? current.rateLimitPerMin
         : Math.min(Math.max(Number(patch.rateLimitPerMin) || DEFAULT_CONFIG.rateLimitPerMin, 1), 120),
@@ -185,25 +201,36 @@ class WhatsAppConfigService {
    * setup, but the host still goes through the SSRF literal check at use time.
    */
   static normalizeWebhookBaseUrl(raw) {
+    return this.normalizePublicUrl(raw, 'whatsapp.error.invalidWebhookUrl', 'invalid_webhook_url');
+  }
+
+  /**
+   * An address that has to work from outside this process.
+   *
+   * Shared by the webhook URL and the portal URL because the checks are the
+   * same ones for both reasons: an address that is not absolute, not http(s),
+   * or carries credentials is not something to write into a third-party server
+   * or to send to a customer.
+   *
+   * The `code` stays per FIELD rather than per check, so all three failures on
+   * the portal URL say `invalid_portal_url` and the form can put the message on
+   * the input that caused it. The message itself is per check, because "must be
+   * http or https" is the useful sentence and "invalid" is not.
+   */
+  static normalizePublicUrl(raw, key, code) {
     const text = String(raw || '').trim();
     if (!text) return '';
     let url;
     try {
       url = new URL(text);
     } catch {
-      throw new WaError('whatsapp.error.invalidWebhookUrl', { code: 'invalid_webhook_url', status: 400 });
+      throw new WaError(key, { code, status: 400 });
     }
     if (!['http:', 'https:'].includes(url.protocol)) {
-      throw new WaError('whatsapp.error.webhookUrlProtocol', {
-        code: 'invalid_webhook_url',
-        status: 400
-      });
+      throw new WaError('whatsapp.error.publicUrlProtocol', { code, status: 400 });
     }
     if (url.username || url.password) {
-      throw new WaError('whatsapp.error.webhookUrlCredentials', {
-        code: 'invalid_webhook_url',
-        status: 400
-      });
+      throw new WaError('whatsapp.error.publicUrlCredentials', { code, status: 400 });
     }
     // Query and hash are stripped because the secret is appended as `?t=` later;
     // an existing query would make the token stop parsing as one.

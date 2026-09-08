@@ -9,10 +9,12 @@ programam contra este arquivo, não contra o código um do outro.
 silenciosa entre o que o servidor devolve e o que a tela espera é exatamente o
 tipo de falha que não tem aparência.
 
-Estado: **Ondas 0, 1 e 2 implementadas** — ciclo de vida das instâncias, webhook
-de entrada, envio, modelos, não perturbe, cobrança, campanhas e alertas técnicos.
-As linhas marcadas ⏳ estão especificadas mas ainda não existem; a onda indicada
-as implementa.
+Estado: **Ondas 0 a 3 implementadas no backend** — ciclo de vida das instâncias,
+webhook de entrada, envio, modelos, não perturbe, cobrança, campanhas, alertas
+técnicos, caixa de entrada e bot de autoatendimento. Cada seção abaixo é o
+contrato da parte que ela nomeia. Nada aqui está pendente: o que falta da
+integração é tela, não rota — a caixa de entrada do operador ainda não tem
+front-end.
 
 ---
 
@@ -40,6 +42,7 @@ que é público e tem credencial própria.
 | `not_configured` | integração desligada | `whatsapp.error.notConfigured` |
 | `incomplete_config` | falta a URL do webhook | `whatsapp.error.incompleteConfig` |
 | `invalid_webhook_url` | URL do webhook inválida | `whatsapp.error.invalidWebhookUrl` |
+| `invalid_portal_url` | URL do portal do cliente inválida | `whatsapp.error.invalidPortalUrl` |
 | `invalid_base_url` | URL do Evolution inválida | `whatsapp.error.invalidBaseUrl` |
 | `host_not_allowed` | fora da allowlist do admin | `whatsapp.error.hostNotAllowed` |
 | `blocked_host` | endereço interno, barrado pelo guard SSRF | `whatsapp.error.blockedHost` |
@@ -66,6 +69,7 @@ que é público e tem credencial própria.
   allowedHosts: string[]        // PUT aceita string (uma por linha) ou array
   webhookBaseUrl: string        // absoluta, http(s), sem query nem credencial
   rejectCallMessage: string
+  portalPublicUrl: string       // onde o portal do cliente responde, de fora
   rateLimitPerMin: number       // 1..120
   managedUrl: string
   managed: boolean              // derivado: managedUrl preenchido
@@ -82,6 +86,14 @@ formulário não pode revogar a integração sem querer.
 Ativar (`enabled: true`) sem `webhookBaseUrl` responde `400 incomplete_config` —
 sem webhook o servidor não devolve QR, mensagem nem recibo, e a integração
 ficaria ligada e muda.
+
+`portalPublicUrl` é um endereço próprio, não derivado. O portal do cliente é
+outro app Express em outra porta (`portalApp`), então o endereço público do
+painel só é o do portal quando um proxy reverso põe os dois atrás do mesmo
+hostname. É a URL que o bot manda; vazia, ele passa para um atendente em vez de
+mandar link que não abre. Passa pelas mesmas checagens de `webhookBaseUrl`
+(absoluta, http(s), sem credencial) e devolve `400 invalid_public_url` quando
+não passa.
 
 ---
 
@@ -377,6 +389,109 @@ no shutdown. `wa_messages` **é** a fila; não existe tabela paralela.
   fora do alcance do worker e faria "três tentativas" significar uma. Na
   terceira ela fica `failed` e ninguém mais a toca.
 - Uma passada **nunca lança**: uma mensagem impossível não pode parar a fila.
+
+---
+
+## Bot de autoatendimento
+
+`services/waBotService.js`. Não tem rota: ele é chamado de dentro do webhook, no
+passo 9 de `gravarMensagem`, depois da mensagem gravada e depois do opt-out.
+
+### A regra de produto, e ela define o escopo inteiro
+
+**O bot informa, e manda para o portal o resto.**
+
+Uma mensagem de WhatsApp não carrega login nenhum. `resolveSubscriber` casa o
+telefone com um contrato como **conveniência, nunca como autenticação** — quem
+escreveu provou apenas que tem um aparelho para o qual o WhatsApp entrega.
+Qualquer pessoa que saiba o número de um assinante pode escrever para o provedor
+e ser tratada como ele.
+
+| O bot PODE | O bot NUNCA PODE |
+| --- | --- |
+| valor, vencimento, linha digitável, PIX e link da fatura em aberto | mandar senha de WiFi |
+| se a conexão está online e o sinal óptico (`rxPower`) | mandar senha do portal |
+| passar para um atendente | trocar SSID, reiniciar ONT, mudar qualquer coisa do serviço |
+
+Para tudo da coluna da direita a resposta é `whatsapp.bot.portalHint` com o link
+do portal, que tem senha de verdade. **Nada no arquivo lê uma credencial.** O
+leitor de sinal é `DeviceService.getCustomerPortalOverview`, escolhido porque
+projeta status, SSID e potência óptica e não toca em `KeyPassphrase`.
+
+### Intenções
+
+Casamento **por regra, não por modelo**: determinístico, testável e — o que
+importa mais — impossível de convencer a ignorar o parágrafo acima. O texto é
+normalizado como em `waOptOutTexto.js` (sem acento, minúsculo, sem pontuação) e
+os termos casam **por palavra inteira**, nunca por substring: `sinal` dentro de
+"assinalar" não é reclamação de sinal.
+
+| Ordem | Intenção | Resposta |
+| --- | --- | --- |
+| 1 | `portal` — senha, ssid, nome da rede, reiniciar, resetar | `whatsapp.bot.portalHint` |
+| 2 | `fatura` — fatura, boleto, segunda via, pix, vencimento, pagar | `whatsapp.bot.invoice` ou `whatsapp.bot.noOpenInvoice` |
+| 3 | `sinal` — sem internet, caiu, sem sinal, lento, offline | `whatsapp.bot.signalOk` ou `whatsapp.bot.signalDown` |
+| 4 | qualquer outra coisa | `whatsapp.bot.handoff` |
+
+A ordem é parte do contrato:
+
+- **`portal` primeiro** porque é o grupo cuja resposta é fixa. Uma mensagem que
+  pede a senha *e* reclama do sinal tem de cair nele.
+- **`fatura` antes de `sinal`** porque "estou sem internet, é o boleto?" é a
+  frase de quem está bloqueado por falta de pagamento, e a fatura é o que
+  desbloqueia.
+
+A fatura citada é a mais antiga em aberto (`maisAntigaEmAberto`, com a marca de
+lembrete ligada: aqui o cliente **perguntou**, então uma fatura a vencer é
+resposta legítima, ao contrário de um disparo de cobrança).
+
+### Uma mensagem de entrada gera no máximo UMA de saída
+
+Enfileirada por `WaSendService.enqueue()` com `userId: null` — é essa coluna
+nula que marca a mensagem como automática, e é ela que a checagem de presença
+humana lê. O bot nunca fala com o Evolution; quem entrega é o worker.
+
+Os códigos de pagamento saem **sem rótulo**, um por linha, separados por linha
+em branco. Não há chave `whatsapp.bot.*` para "linha digitável" ou "PIX", e um
+rótulo em português dentro de uma mensagem que os outros quatro locales também
+renderizam seria pior que a forma atual.
+
+### As travas
+
+Todas obrigatórias; qualquer uma delas responde com silêncio.
+
+| Trava | Por quê |
+| --- | --- |
+| só `direction === 'in'` | o eco `fromMe` é o provedor digitando no próprio celular; respondê-lo mandaria as palavras dele de volta ao cliente dele |
+| nunca com humano no fio — **30 min** desde a última mensagem com `sent_by` (nota interna conta) | um atendente atropelado por um bot é pior que bot nenhum; 30 min cobre quem foi olhar a OLT e não deixa o chamado de ontem calar o bot hoje |
+| nunca duas vezes pela mesma mensagem | o índice único de `external_id` é a dedupe real (o reenvio nem chega aqui); o cinto é "existe saída com `id` maior que o da entrada" |
+| nunca em pedido de saída | `pedeSaida()` — responder um "SAIR" com mensagem é responder com o oposto do pedido |
+| teto de **3 respostas automáticas por hora por contato** | um auto-respondedor do outro lado vira laço, e um laço manda milhares de mensagens pelo número do provedor antes de alguém notar |
+| assinante não resolvido → `whatsapp.bot.notRecognised` | número não reconhecido **nunca** recebe dado de contrato |
+
+E **nunca levanta**: `responder()` engole tudo e registra em log. Uma falha do
+bot virando 500 no webhook faria o servidor Evolution reenviar o mesmo evento
+para sempre. Bot quebrado vira silêncio, e o fio continua não-lido para o
+operador.
+
+Quando a intenção falha por fora (SGP fora do ar, GenieACS inalcançável, ONT
+online mas sem `rxPower` mapeado) a resposta cai para `whatsapp.bot.handoff` —
+a pergunta era real e merece um humano, não silêncio.
+
+### Duas coisas resolvidas depois da entrega
+
+1. **O link do portal.** Virou `whatsappConfig.portalPublicUrl`, campo próprio.
+   Derivar da origem de `webhookBaseUrl` acerta no deploy com proxy reverso na
+   frente dos dois e erra no deploy em que o portal responde em `:3001`. Vazio,
+   o bot manda `whatsapp.bot.handoff` — link quebrado é pior que link nenhum.
+2. **O chamado.** `whatsapp.bot.signalDown` dizia "abrimos um chamado" e o
+   painel não tem sistema de chamados. O texto passou a dizer o que é verdade:
+   o equipamento não está respondendo e um atendente já está vendo. O "chamado"
+   continua sendo o fio não-lido na caixa de entrada do operador.
+
+E o caso "online sem `rxPower`" deixou de cair para humano: a pergunta era se a
+conexão está de pé, e isso o painel sabe. Responde
+`whatsapp.bot.signalOkNoReading` e para aí, sem inventar número.
 
 ---
 

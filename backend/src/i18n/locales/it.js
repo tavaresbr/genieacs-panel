@@ -386,8 +386,9 @@ export default {
   'whatsapp.accountsLoadFailed': 'Impossibile elencare i numeri WhatsApp',
   'whatsapp.error.incompleteConfig': 'Indica l’URL pubblico del webhook prima di attivare l’integrazione: è da lì che il server Evolution restituisce QR, messaggi e ricevute',
   'whatsapp.error.invalidWebhookUrl': 'L’URL del webhook non è valido',
-  'whatsapp.error.webhookUrlProtocol': 'L’URL del webhook deve essere http o https',
-  'whatsapp.error.webhookUrlCredentials': 'L’URL del webhook non può contenere utente e password',
+  'whatsapp.error.publicUrlProtocol': 'L’indirizzo deve essere http o https',
+  'whatsapp.error.publicUrlCredentials': 'L’indirizzo non può contenere utente e password',
+  'whatsapp.error.invalidPortalUrl': 'L’URL del portale clienti non è valido',
   'whatsapp.error.invalidBaseUrl': 'L’URL del server Evolution non è configurato',
   'whatsapp.error.hostNotAllowed': 'Questo server Evolution non è nella lista autorizzata',
   'whatsapp.error.blockedHost': 'Server Evolution rifiutato: {reason}',
@@ -469,7 +470,7 @@ export default {
   'whatsapp.bot.noOpenInvoice': 'Non hai fatture aperte al momento.',
   'whatsapp.bot.invoice': 'Fattura di {amount}, scadenza {dueDate}.',
   'whatsapp.bot.signalOk': 'La tua connessione è online. Segnale ottico: {rxPower} dBm.',
-  'whatsapp.bot.signalDown': 'La tua apparecchiatura non risponde. Abbiamo aperto un ticket.',
+  'whatsapp.bot.signalDown': 'La tua apparecchiatura non risponde. Un operatore sta già controllando.',
   'whatsapp.bot.optedOut': 'Non riceverai più i nostri avvisi. Scrivici quando vuoi per tornare a riceverli.',
   // WhatsApp — corpo das mensagens de alerta técnico
   'whatsapp.alerts.ontOffline': 'ONT {device} offline da {minutes} min',
@@ -480,4 +481,9 @@ export default {
   'whatsapp.alerts.temperatureHighCleared': 'ONT {device} temperatura rientrata',
   'whatsapp.alerts.massOutage': 'Guasto di massa: {count} ONT offline su {node}',
   'whatsapp.alerts.massOutageCleared': '{node} ripristinato: le ONT rispondono di nuovo',
+  // WhatsApp — corpo das respostas do bot
+  'whatsapp.bot.invoiceDigitableLine': 'Codice a barre: {value}',
+  'whatsapp.bot.invoicePix': 'PIX copia e incolla: {value}',
+  'whatsapp.bot.invoiceLink': 'Copia della fattura: {value}',
+  'whatsapp.bot.signalOkNoReading': 'La tua connessione è online.',
 };

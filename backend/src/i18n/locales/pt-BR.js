@@ -385,8 +385,9 @@ export default {
   'whatsapp.accountsLoadFailed': 'Falha ao listar os números do WhatsApp',
   'whatsapp.error.incompleteConfig': 'Informe a URL pública do webhook antes de ativar a integração: é por ela que o servidor Evolution devolve QR, mensagens e recibos',
   'whatsapp.error.invalidWebhookUrl': 'A URL do webhook é inválida',
-  'whatsapp.error.webhookUrlProtocol': 'A URL do webhook precisa ser http ou https',
-  'whatsapp.error.webhookUrlCredentials': 'A URL do webhook não pode conter usuário e senha',
+  'whatsapp.error.publicUrlProtocol': 'O endereço precisa ser http ou https',
+  'whatsapp.error.publicUrlCredentials': 'O endereço não pode conter usuário e senha',
+  'whatsapp.error.invalidPortalUrl': 'A URL do portal do cliente é inválida',
   'whatsapp.error.invalidBaseUrl': 'A URL do servidor Evolution não está configurada',
   'whatsapp.error.hostNotAllowed': 'Este servidor Evolution não está na lista autorizada',
   'whatsapp.error.blockedHost': 'Servidor Evolution recusado: {reason}',
@@ -468,7 +469,7 @@ export default {
   'whatsapp.bot.noOpenInvoice': 'Você não tem fatura em aberto agora.',
   'whatsapp.bot.invoice': 'Fatura de {amount}, vencimento {dueDate}.',
   'whatsapp.bot.signalOk': 'Sua conexão está online. Sinal óptico: {rxPower} dBm.',
-  'whatsapp.bot.signalDown': 'Seu equipamento não está respondendo. Abrimos um chamado.',
+  'whatsapp.bot.signalDown': 'Seu equipamento não está respondendo. Um atendente já está vendo isso.',
   'whatsapp.bot.optedOut': 'Você não receberá mais nossos avisos. Escreva a qualquer momento para voltar a receber.',
   // WhatsApp — corpo das mensagens de alerta técnico
   'whatsapp.alerts.ontOffline': 'ONT {device} offline há {minutes} min',
@@ -479,4 +480,9 @@ export default {
   'whatsapp.alerts.temperatureHighCleared': 'ONT {device} com temperatura normalizada',
   'whatsapp.alerts.massOutage': 'Queda em massa: {count} ONTs offline em {node}',
   'whatsapp.alerts.massOutageCleared': '{node} restabelecido: as ONTs voltaram a responder',
+  // WhatsApp — corpo das respostas do bot
+  'whatsapp.bot.invoiceDigitableLine': 'Linha digitável: {value}',
+  'whatsapp.bot.invoicePix': 'PIX copia e cola: {value}',
+  'whatsapp.bot.invoiceLink': 'Segunda via: {value}',
+  'whatsapp.bot.signalOkNoReading': 'Sua conexão está online.',
 };

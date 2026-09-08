@@ -341,8 +341,9 @@ export default {
   'whatsapp.accountsLoadFailed': 'WhatsApp-Nummern konnten nicht aufgelistet werden',
   'whatsapp.error.incompleteConfig': 'Gib die öffentliche Webhook-URL an, bevor du die Integration aktivierst: darüber liefert der Evolution-Server QR-Codes, Nachrichten und Empfangsbestätigungen zurück',
   'whatsapp.error.invalidWebhookUrl': 'Die Webhook-URL ist ungültig',
-  'whatsapp.error.webhookUrlProtocol': 'Die Webhook-URL muss http oder https sein',
-  'whatsapp.error.webhookUrlCredentials': 'Die Webhook-URL darf keinen Benutzernamen und kein Passwort enthalten',
+  'whatsapp.error.publicUrlProtocol': 'Die Adresse muss http oder https sein',
+  'whatsapp.error.publicUrlCredentials': 'Die Adresse darf keinen Benutzernamen und kein Passwort enthalten',
+  'whatsapp.error.invalidPortalUrl': 'Die URL des Kundenportals ist ungültig',
   'whatsapp.error.invalidBaseUrl': 'Die URL des Evolution-Servers ist nicht konfiguriert',
   'whatsapp.error.hostNotAllowed': 'Dieser Evolution-Server steht nicht auf der zugelassenen Liste',
   'whatsapp.error.blockedHost': 'Evolution-Server abgelehnt: {reason}',
@@ -472,7 +473,7 @@ export default {
   'whatsapp.bot.noOpenInvoice': 'Du hast derzeit keine offene Rechnung.',
   'whatsapp.bot.invoice': 'Rechnung über {amount}, fällig am {dueDate}.',
   'whatsapp.bot.signalOk': 'Deine Verbindung ist online. Optisches Signal: {rxPower} dBm.',
-  'whatsapp.bot.signalDown': 'Dein Gerät antwortet nicht. Wir haben ein Ticket eröffnet.',
+  'whatsapp.bot.signalDown': 'Dein Gerät antwortet nicht. Ein Mitarbeiter sieht sich das gerade an.',
   'whatsapp.bot.optedOut': 'Du erhältst unsere Hinweise nicht mehr. Schreib uns jederzeit, um das zu ändern.',
   // WhatsApp — corpo das mensagens de alerta técnico
   'whatsapp.alerts.ontOffline': 'ONT {device} seit {minutes} Min offline',
@@ -483,4 +484,9 @@ export default {
   'whatsapp.alerts.temperatureHighCleared': 'ONT {device} Temperatur wieder normal',
   'whatsapp.alerts.massOutage': 'Massenausfall: {count} ONTs offline an {node}',
   'whatsapp.alerts.massOutageCleared': '{node} wiederhergestellt: die ONTs antworten wieder',
+  // WhatsApp — corpo das respostas do bot
+  'whatsapp.bot.invoiceDigitableLine': 'Zahlcode: {value}',
+  'whatsapp.bot.invoicePix': 'PIX zum Kopieren: {value}',
+  'whatsapp.bot.invoiceLink': 'Zweitausfertigung: {value}',
+  'whatsapp.bot.signalOkNoReading': 'Deine Verbindung ist online.',
 };
