@@ -43,6 +43,8 @@ que é público e tem credencial própria.
 | `incomplete_config` | falta a URL do webhook | `whatsapp.error.incompleteConfig` |
 | `invalid_webhook_url` | URL do webhook inválida | `whatsapp.error.invalidWebhookUrl` |
 | `invalid_portal_url` | URL do portal do cliente inválida | `whatsapp.error.invalidPortalUrl` |
+| `invalid_conversation_status` | conversa só é `open` ou `closed` | `whatsapp.error.invalidConversationStatus` |
+| `subscriber_not_found` | contrato inexistente em `sgp_links` | `whatsapp.error.subscriberNotFound` |
 | `template_mirrors` | modelo cita os dois espelhos de dias | `whatsapp.error.templateMirrors` |
 | `invalid_base_url` | URL do Evolution inválida | `whatsapp.error.invalidBaseUrl` |
 | `host_not_allowed` | fora da allowlist do admin | `whatsapp.error.hostNotAllowed` |

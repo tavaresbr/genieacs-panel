@@ -474,6 +474,7 @@ export default {
   'whatsapp.conversationClosed': '会话已结束',
   'whatsapp.conversationReopened': '会话已重新打开',
   'whatsapp.conversationStatusFailed': '无法更新该会话',
+  'whatsapp.error.invalidConversationStatus': '会话只有进行中或已结束两种状态',
   'whatsapp.bot.portalHint': '如需查看 Wi-Fi 密码或修改网络名称，请登录客户门户：{link}',
   'whatsapp.bot.notRecognised': '未查询到该号码对应的合同。客服人员会尽快回复您。',
   'whatsapp.bot.handoff': '将为您转接客服人员。',

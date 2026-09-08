@@ -42,6 +42,8 @@ const ERROR_KEYS: Record<string, TranslationKey> = {
   // failure, which is not wrong but tells the operator nothing.
   message_empty: 'whatsapp.error.messageEmpty',
   conversation_not_found: 'whatsapp.error.conversationNotFound',
+  invalid_conversation_status: 'whatsapp.error.invalidConversationStatus',
+  subscriber_not_found: 'whatsapp.error.subscriberNotFound',
   // Templates, campaigns and the alert rules. `no_recipients` is the campaign's
   // — the alert scan raises `no_alert_recipients` precisely so one code does
   // not have to mean both "nobody is on duty" and "the filters left nobody".

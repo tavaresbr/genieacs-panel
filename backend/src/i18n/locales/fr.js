@@ -428,6 +428,7 @@ export default {
   'whatsapp.conversationClosed': 'Conversation clôturée',
   'whatsapp.conversationReopened': 'Conversation rouverte',
   'whatsapp.conversationStatusFailed': 'La conversation n’a pas pu être mise à jour',
+  'whatsapp.error.invalidConversationStatus': 'Une conversation est ouverte ou clôturée',
   'whatsapp.billing.overdueLoaded': '{count} abonné(s) trouvé(s)',
   'whatsapp.billing.overdueLoadFailed': 'Impossible de lister les abonnés',
   'whatsapp.billing.campaignBuilt': 'Campagne créée avec {count} destinataire(s), en brouillon',

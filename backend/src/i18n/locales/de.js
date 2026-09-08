@@ -475,6 +475,7 @@ export default {
   'whatsapp.conversationClosed': 'Unterhaltung geschlossen',
   'whatsapp.conversationReopened': 'Unterhaltung wieder geöffnet',
   'whatsapp.conversationStatusFailed': 'Die Unterhaltung konnte nicht aktualisiert werden',
+  'whatsapp.error.invalidConversationStatus': 'Eine Unterhaltung ist entweder offen oder geschlossen',
   'whatsapp.bot.portalHint': 'Für dein WLAN-Passwort und zum Ändern des Netzwerknamens melde dich im Kundenportal an: {link}',
   'whatsapp.bot.notRecognised': 'Zu dieser Nummer wurde kein Vertrag gefunden. Ein Mitarbeiter meldet sich in Kürze.',
   'whatsapp.bot.handoff': 'Ich gebe das an einen Mitarbeiter weiter.',

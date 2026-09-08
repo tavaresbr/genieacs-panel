@@ -472,6 +472,7 @@ export default {
   'whatsapp.conversationClosed': 'Conversazione chiusa',
   'whatsapp.conversationReopened': 'Conversazione riaperta',
   'whatsapp.conversationStatusFailed': 'Non è stato possibile aggiornare la conversazione',
+  'whatsapp.error.invalidConversationStatus': 'Una conversazione è aperta o chiusa',
   'whatsapp.bot.portalHint': 'Per la password del WiFi e per cambiare il nome della rete, accedi al portale clienti: {link}',
   'whatsapp.bot.notRecognised': 'Non abbiamo trovato un contratto per questo numero. Un operatore risponderà a breve.',
   'whatsapp.bot.handoff': 'Passo a un operatore.',

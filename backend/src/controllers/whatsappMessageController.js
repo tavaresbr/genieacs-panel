@@ -63,7 +63,14 @@ class WhatsAppMessageController {
   static async setStatus(req, res) {
     const status = req.body?.status;
     if (status !== 'open' && status !== 'closed') {
-      return res.status(400).json(createErrorResponse(req.t('whatsapp.conversationStatusFailed')));
+      // With a machine `code`, like every other refusal here: a screen that
+      // translates codes cannot translate a bare message, and this route was
+      // the only one in the WhatsApp surface answering without one.
+      return res.status(400).json(createErrorResponse(
+        req.t('whatsapp.error.invalidConversationStatus'),
+        null,
+        'invalid_conversation_status'
+      ));
     }
     try {
       const conversation = await WaConversationService.setStatus(req.params?.id, status);

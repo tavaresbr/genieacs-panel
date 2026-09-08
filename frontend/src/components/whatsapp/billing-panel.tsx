@@ -225,11 +225,14 @@ export function BillingPanel() {
       setRows((current) => current.map((row) => (row.contract === contract
         ? { ...row, phone: saved.phone, phoneSource: saved.phoneSource }
         : row)))
-      // Said out loud only for the clear. A set explains itself — the row now
-      // shows the number and reads "typed by hand" — but a clear replaces what
-      // was typed with a different number, and silently swapping one for
-      // another looks like the save went wrong.
-      if (saved.phoneSource !== 'manual') toast.success(t('whatsapp.billing.phoneCleared'))
+      // Both are said out loud, and they say different things. A clear replaces
+      // what was typed with the ERP's number, which looks like the save went
+      // wrong unless the swap is named; a set is worth confirming because what
+      // it really did is take precedence over the ERP from now on — the row
+      // alone cannot say that.
+      toast.success(t(saved.phoneSource === 'manual'
+        ? 'whatsapp.billing.phoneSaved'
+        : 'whatsapp.billing.phoneCleared'))
       closeEditor()
     } finally {
       if (alive.current) setSavingPhone(false)
