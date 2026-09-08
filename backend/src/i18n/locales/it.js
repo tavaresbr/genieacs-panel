@@ -377,4 +377,18 @@ export default {
   'common.buildUnavailable': 'La build dell’applicazione non è disponibile',
   'database.missingMysqlFields': 'Campi MySQL mancanti: {fields}',
   'settings.customerIdAllocationFailed': 'Non è stato possibile assegnare un ID cliente univoco',
+  // WhatsApp / Evolution API
+  'whatsapp.configLoaded': 'Configurazione WhatsApp caricata',
+  'whatsapp.configLoadFailed': 'Impossibile caricare la configurazione WhatsApp',
+  'whatsapp.configSaved': 'Configurazione WhatsApp salvata',
+  'whatsapp.configSaveFailed': 'Impossibile salvare la configurazione WhatsApp',
+  'whatsapp.accountsLoaded': '{count} numero/i WhatsApp',
+  'whatsapp.accountsLoadFailed': 'Impossibile elencare i numeri WhatsApp',
+  'whatsapp.error.incompleteConfig': 'Indica l’URL pubblico del webhook prima di attivare l’integrazione: è da lì che il server Evolution restituisce QR, messaggi e ricevute',
+  'whatsapp.error.invalidWebhookUrl': 'L’URL del webhook non è valido',
+  'whatsapp.error.webhookUrlProtocol': 'L’URL del webhook deve essere http o https',
+  'whatsapp.error.webhookUrlCredentials': 'L’URL del webhook non può contenere utente e password',
+  'whatsapp.error.invalidBaseUrl': 'L’URL del server Evolution non è configurato',
+  'whatsapp.error.hostNotAllowed': 'Questo server Evolution non è nella lista autorizzata',
+  'whatsapp.error.blockedHost': 'Server Evolution rifiutato: {reason}',
 };

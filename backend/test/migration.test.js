@@ -144,4 +144,32 @@ describe('upgrading an existing installation', () => {
     // Existing rows keep the default until the next sync rewrites them.
     assert.equal(link.state, 'unknown');
   });
+
+  it('adds the WhatsApp phone columns without losing links', async () => {
+    const db = getDb();
+    for (const column of ['phone_e164', 'phone_manual']) {
+      assert.ok(await db.schema.hasColumn('sgp_links', column), column);
+    }
+    const link = await db('sgp_links').where({ device_id: 'legacy-device-1' }).first();
+    assert.equal(link.client_name, 'Cliente Legado');
+    // Nothing to backfill: the number arrives on the next SGP sync, or an
+    // operator types it.
+    assert.equal(link.phone_e164, null);
+  });
+
+  it('creates the WhatsApp tables on an installation that predates them', async () => {
+    const db = getDb();
+    for (const table of [
+      'whatsapp_accounts',
+      'wa_conversations',
+      'wa_messages',
+      'wa_opt_outs',
+      'wa_templates',
+      'wa_broadcasts',
+      'wa_broadcast_recipients',
+      'wa_alert_state'
+    ]) {
+      assert.ok(await db.schema.hasTable(table), table);
+    }
+  });
 });

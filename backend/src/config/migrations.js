@@ -30,6 +30,23 @@ function addTokenVersion(t) {
   t.integer('token_version').notNullable().defaultTo(0);
 }
 
+/**
+ * Shared by `sgp_links` and the 0008 upgrade.
+ *
+ * WhatsApp needs a number and the panel never had one anywhere. `phone_e164` is
+ * what SGP returned on the last sync; `phone_manual` is what an operator typed
+ * and always wins, because the ERP cadastre is often stale and the operator is
+ * the one holding the correction.
+ */
+const SGP_PHONE_COLUMNS = [
+  ['phone_e164', (t) => t.string('phone_e164', 24)],
+  ['phone_manual', (t) => t.string('phone_manual', 24)]
+];
+
+function addSgpPhoneColumns(t) {
+  for (const [, add] of SGP_PHONE_COLUMNS) add(t);
+}
+
 // Table definitions. Each is a factory so the builder can reach `db.fn.now()`,
 // and each is referenced by exactly one place per table so the initial schema
 // and the later upgrade steps can never drift apart.
@@ -168,6 +185,7 @@ const sgpLinksTable = (db) => (t) => {
   t.string('state', 16).notNullable().defaultTo('unknown');
   t.string('login', 255);
   t.string('link_mode', 16).notNullable().defaultTo('auto');
+  addSgpPhoneColumns(t);
   t.timestamp('last_synced_at').defaultTo(db.fn.now());
   t.timestamp('created_at').defaultTo(db.fn.now());
   t.timestamp('updated_at').defaultTo(db.fn.now());
@@ -276,6 +294,219 @@ const PROVISIONING_TABLES = [
   ['provisioning_profiles', provisioningProfilesTable],
   ['provisioning_runs', provisioningRunsTable],
   ['sgp_events', sgpEventsTable]
+];
+
+// ── WhatsApp / Evolution API ───────────────────────────────────────────
+//
+// Two constraints shape every table below and are easy to violate by habit:
+//
+// 1. No partial index and no array column: MySQL has neither. Where the source
+//    system used `UNIQUE ... WHERE revoked IS NULL`, uniqueness moves into the
+//    model instead, and the comment there says why.
+// 2. Secrets are stored through the shared secret box (AES-256-GCM keyed from
+//    JWT_SECRET under its own context), never in plaintext — the rule the SGP
+//    token already follows.
+
+const whatsappAccountsTable = (db) => (t) => {
+  t.increments('id').primary();
+  // The instance name on the Evolution server. The inbound webhook resolves the
+  // account by this value, so it has to be unique.
+  t.string('name', 128).notNullable().unique();
+  t.string('label', 128);
+  // Which kind of traffic this number carries. The sender routes on it and
+  // falls back to the default account when no number claims the purpose.
+  t.string('purpose', 32).notNullable().defaultTo('general');
+  // 'go' | 'v2' — detected by probe, not configured by hand.
+  t.string('flavor', 8).notNullable().defaultTo('v2');
+  t.string('base_url', 255).notNullable();
+  // The server-side UUID. Evolution GO deletes instances by id, not name, so
+  // losing this means we can only log out and drop the local row.
+  t.string('instance_id', 64);
+  t.string('status', 16).notNullable().defaultTo('pending');
+  t.text('qr_code');
+  t.timestamp('qr_updated_at');
+  t.string('phone_e164', 24);
+  t.boolean('is_default').notNullable().defaultTo(false);
+  t.timestamp('last_seen_at');
+  t.text('last_error');
+  // The instance token: sending messages and reading contacts as the provider.
+  t.text('token_ciphertext');
+  t.string('token_iv', 32);
+  t.string('token_tag', 32);
+  // A DIFFERENT secret, deliberately: it travels in the webhook URL and is
+  // stored on the Evolution server, so it shows up in logs on both ends.
+  // Leaking it lets someone forge an inbound event; leaking the instance token
+  // would let them send as the provider.
+  t.text('webhook_token_ciphertext');
+  t.string('webhook_token_iv', 32);
+  t.string('webhook_token_tag', 32);
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  t.timestamp('updated_at').defaultTo(db.fn.now());
+};
+
+const waConversationsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('account_id').unsigned().notNullable()
+    .references('id').inTable('whatsapp_accounts').onDelete('CASCADE');
+  // Phone and LID are both identities and neither is guaranteed: a contact
+  // addressed only by LID has no phone at all. See utils/wa/waJid.js.
+  t.string('wa_phone_e164', 24);
+  t.string('wa_lid', 32);
+  t.string('external_thread_id', 128);
+  t.string('push_name', 128);
+  // Who this is, once we know: the ONT, the portal account, the contract.
+  t.string('device_id', 255);
+  t.integer('customer_account_id').unsigned()
+    .references('id').inTable('customer_accounts').onDelete('SET NULL');
+  t.string('contract', 64);
+  t.timestamp('last_message_at');
+  t.timestamp('last_inbound_at');
+  t.integer('unread_count').notNullable().defaultTo(0);
+  t.timestamp('closed_at');
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  t.timestamp('updated_at').defaultTo(db.fn.now());
+  // One thread per contact per instance. A subscriber who writes to both the
+  // billing and the support number gets two conversations, which is what an
+  // operator expects to see.
+  t.unique(['account_id', 'external_thread_id']);
+  t.index(['wa_phone_e164']);
+  t.index(['last_message_at']);
+};
+
+const waMessagesTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('conversation_id').unsigned().notNullable()
+    .references('id').inTable('wa_conversations').onDelete('CASCADE');
+  t.string('direction', 3).notNullable(); // 'in' | 'out'
+  // The WhatsApp message id. Unique so a redelivered webhook cannot double an
+  // inbound message, and so a receipt can find the outbound one. NULL until an
+  // outbound message is accepted by the server, and repeated NULLs do not
+  // collide in either engine.
+  t.string('external_id', 128).unique();
+  t.text('body');
+  t.string('attachment_path', 255);
+  t.string('attachment_type', 128);
+  t.string('attachment_name', 255);
+  // An internal note is written by an operator and never sent.
+  t.boolean('is_note').notNullable().defaultTo(false);
+  // queued | sending | sent | delivered | read | failed. NULL for inbound.
+  t.string('delivery_status', 16);
+  t.string('delivery_error', 500);
+  t.timestamp('claimed_at');
+  t.integer('attempts').notNullable().defaultTo(0);
+  t.integer('sent_by').unsigned().references('id').inTable('users').onDelete('SET NULL');
+  t.timestamp('read_at');
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  t.timestamp('updated_at').defaultTo(db.fn.now());
+  t.index(['conversation_id', 'created_at']);
+  // The outbox worker's only query.
+  t.index(['delivery_status', 'created_at']);
+};
+
+const waOptOutsTable = (db) => (t) => {
+  t.increments('id').primary();
+  // Keyed by phone and LID, NOT by customer: an opt-out has to survive a record
+  // being merged, deleted, or created again. Whoever asked to be left alone
+  // asked as a phone number.
+  t.string('wa_phone_e164', 24);
+  t.string('wa_lid', 32);
+  t.integer('conversation_id').unsigned()
+    .references('id').inTable('wa_conversations').onDelete('SET NULL');
+  t.string('origin', 16).notNullable().defaultTo('customer'); // customer | operator
+  t.string('reason_text', 500);
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  // Revocation is soft, so the history of who asked out and when survives.
+  // Uniqueness of the *active* row is enforced in models/WaOptOut.js — MySQL
+  // has no partial index, and a duplicate here is noise rather than a safety
+  // failure (the dangerous direction is a MISSING opt-out).
+  t.timestamp('revoked_at');
+  t.integer('revoked_by').unsigned().references('id').inTable('users').onDelete('SET NULL');
+  t.index(['wa_phone_e164']);
+  t.index(['wa_lid']);
+};
+
+const waTemplatesTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.string('name', 80).notNullable().unique();
+  t.text('body').notNullable();
+  // cobranca | alerta | suporte | geral. The dunning renderer only accepts the
+  // variables it can fill.
+  t.string('category', 32).notNullable().defaultTo('geral');
+  t.boolean('active').notNullable().defaultTo(true);
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  t.timestamp('updated_at').defaultTo(db.fn.now());
+};
+
+const waBroadcastsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.string('title', 200).notNullable();
+  t.integer('template_id').unsigned()
+    .references('id').inTable('wa_templates').onDelete('SET NULL');
+  t.text('body').notNullable();
+  t.integer('account_id').unsigned()
+    .references('id').inTable('whatsapp_accounts').onDelete('SET NULL');
+  // A campaign is born as 'draft' on purpose. Messaging hundreds of people must
+  // never be the side effect of a click on a listing screen: an operator opens
+  // the campaign, reads it, and presses start.
+  t.string('status', 16).notNullable().defaultTo('draft');
+  t.timestamp('start_at');
+  t.integer('rate_limit_per_min');
+  t.integer('total_count').notNullable().defaultTo(0);
+  t.integer('sent_count').notNullable().defaultTo(0);
+  t.integer('failed_count').notNullable().defaultTo(0);
+  t.integer('created_by').unsigned().references('id').inTable('users').onDelete('SET NULL');
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  t.timestamp('updated_at').defaultTo(db.fn.now());
+};
+
+const waBroadcastRecipientsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('broadcast_id').unsigned().notNullable()
+    .references('id').inTable('wa_broadcasts').onDelete('CASCADE');
+  t.string('phone_e164', 24).notNullable();
+  t.string('contract', 64);
+  t.string('client_name', 255);
+  // Rendered once, when the campaign is built, so what an operator reviews is
+  // exactly what goes out.
+  t.text('rendered_body').notNullable();
+  t.integer('message_id').unsigned()
+    .references('id').inTable('wa_messages').onDelete('SET NULL');
+  t.string('status', 16).notNullable().defaultTo('pending');
+  t.string('error_msg', 500);
+  t.integer('attempts').notNullable().defaultTo(0);
+  t.timestamp('sent_at');
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  t.index(['broadcast_id', 'status']);
+};
+
+const waAlertStateTable = (db) => (t) => {
+  t.increments('id').primary();
+  // 'ont_offline', 'rx_power_low', 'temperature_high', 'mass_outage', …
+  t.string('rule', 48).notNullable();
+  // What the rule is about: a device id, or an ODP/OLT node id.
+  t.string('subject', 255).notNullable();
+  t.string('state', 16).notNullable().defaultTo('firing');
+  t.timestamp('fired_at').defaultTo(db.fn.now());
+  t.timestamp('cleared_at');
+  // Cooldown lives here: an ONT that stays down must not produce a message on
+  // every scan.
+  t.timestamp('last_notified_at');
+  t.integer('notify_count').notNullable().defaultTo(0);
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  t.timestamp('updated_at').defaultTo(db.fn.now());
+  t.unique(['rule', 'subject']);
+};
+
+/** In creation order; foreign keys dictate it. */
+const WHATSAPP_TABLES = [
+  ['whatsapp_accounts', whatsappAccountsTable],
+  ['wa_conversations', waConversationsTable],
+  ['wa_messages', waMessagesTable],
+  ['wa_opt_outs', waOptOutsTable],
+  ['wa_templates', waTemplatesTable],
+  ['wa_broadcasts', waBroadcastsTable],
+  ['wa_broadcast_recipients', waBroadcastRecipientsTable],
+  ['wa_alert_state', waAlertStateTable]
 ];
 
 /**
@@ -396,6 +627,39 @@ export const migrations = [
       for (const [name, table] of PROVISIONING_TABLES) {
         await createTableIfMissing(db, name, table(db));
       }
+    }
+  }
+,
+  {
+    // The WhatsApp integration through the Evolution API.
+    id: '0007_whatsapp_tables',
+    async isApplied(db) {
+      for (const [name] of WHATSAPP_TABLES) {
+        if (!(await db.schema.hasTable(name))) return false;
+      }
+      return true;
+    },
+    async up(db) {
+      for (const [name, table] of WHATSAPP_TABLES) {
+        await createTableIfMissing(db, name, table(db));
+      }
+    }
+  },
+  {
+    // Installations whose sgp_links predates WhatsApp needing a phone number.
+    id: '0008_sgp_link_phone',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('sgp_links'))) return false;
+      const missing = await missingColumns(db, 'sgp_links', SGP_PHONE_COLUMNS);
+      return missing.length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('sgp_links'))) return;
+      const missing = await missingColumns(db, 'sgp_links', SGP_PHONE_COLUMNS);
+      if (missing.length === 0) return;
+      await db.schema.alterTable('sgp_links', (t) => {
+        for (const add of missing) add(t);
+      });
     }
   }
 ];

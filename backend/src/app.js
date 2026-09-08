@@ -26,6 +26,8 @@ import databaseRoutes from './routes/database.js';
 import userRoutes from './routes/users.js';
 import customerPortalRoutes from './routes/customerPortal.js';
 import sgpRoutes from './routes/sgp.js';
+import whatsappRoutes from './routes/whatsapp.js';
+import whatsappWebhookRoutes from './routes/whatsappWebhook.js';
 import provisioningRoutes from './routes/provisioning.js';
 import { WEBHOOK_PATH } from './services/sgpService.js';
 
@@ -139,6 +141,14 @@ app.use(cors({
 app.use(WEBHOOK_PATH, express.raw({ type: '*/*', limit: '64kb' }));
 app.use(express.json({ limit: '1mb' }));
 
+// Mounted BEFORE the shared `apiLimiter` on purpose. The Evolution server is a
+// server, not a browser session: it authenticates with the token in its own
+// query string, so this route stays outside `authenticateToken`, and its normal
+// burst — a QR rotation every 20 s, one receipt per recipient per delivery
+// state — would trip a 300/min bucket sized for a human clicking around. It
+// declares its own, much higher, ceiling instead.
+app.use('/api/whatsapp-webhook', whatsappWebhookRoutes);
+
 app.use('/api', apiLimiter);
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/refresh', authLimiter);
@@ -153,6 +163,7 @@ app.use('/api/map-settings', mapSettingsRoutes);
 app.use('/api/database', databaseRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/sgp', sgpRoutes);
+app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/provisioning', provisioningRoutes);
 
 app.get('/api/health', async (req, res) => {

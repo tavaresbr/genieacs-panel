@@ -768,3 +768,52 @@ export const databaseAPI = {
   switch: (config: DbConfigPayload) =>
     apiClient.post('/database/switch', config),
 }
+
+// WhatsApp via Evolution API
+export interface WhatsAppConfig {
+  enabled: boolean
+  allowedHosts: string[]
+  webhookBaseUrl: string
+  rejectCallMessage: string
+  rateLimitPerMin: number
+  managedUrl: string
+  managed: boolean
+  managedAdminKeyConfigured: boolean
+  ready: boolean
+  updatedAt: string | null
+}
+
+export type WhatsAppPurpose = 'general' | 'billing' | 'support' | 'sales' | 'alerts'
+export type WhatsAppStatus = 'pending' | 'connecting' | 'connected' | 'disconnected' | 'expired'
+
+export interface WhatsAppAccount {
+  id: number
+  name: string
+  label: string | null
+  purpose: WhatsAppPurpose
+  flavor: 'go' | 'v2'
+  baseUrl: string
+  status: WhatsAppStatus
+  /** Data URI, refreshed by the server while pairing. Never a stable value. */
+  qrCode: string | null
+  qrUpdatedAt: string | null
+  phoneE164: string | null
+  isDefault: boolean
+  lastSeenAt: string | null
+  lastError: string | null
+  createdAt: string | null
+  updatedAt: string | null
+}
+
+export const whatsappAPI = {
+  getConfig: () =>
+    apiClient.get<WhatsAppConfig>('/whatsapp/config'),
+
+  // An omitted managedAdminKey keeps the stored one; "" clears it. The server
+  // never returns it either way.
+  updateConfig: (config: Partial<Omit<WhatsAppConfig, 'allowedHosts'>> & { allowedHosts?: string | string[]; managedAdminKey?: string }) =>
+    apiClient.put<WhatsAppConfig>('/whatsapp/config', config),
+
+  listAccounts: () =>
+    apiClient.get<WhatsAppAccount[]>('/whatsapp/accounts'),
+}

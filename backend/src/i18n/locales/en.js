@@ -378,5 +378,19 @@ export default {
 
   'common.buildUnavailable': 'The application build is unavailable',
   'database.missingMysqlFields': 'Missing MySQL fields: {fields}',
-  'settings.customerIdAllocationFailed': 'Unable to allocate a unique customer ID'
+  'settings.customerIdAllocationFailed': 'Unable to allocate a unique customer ID',
+  // WhatsApp / Evolution API
+  'whatsapp.configLoaded': 'WhatsApp configuration loaded',
+  'whatsapp.configLoadFailed': 'Failed to load the WhatsApp configuration',
+  'whatsapp.configSaved': 'WhatsApp configuration saved',
+  'whatsapp.configSaveFailed': 'Failed to save the WhatsApp configuration',
+  'whatsapp.accountsLoaded': '{count} WhatsApp number(s)',
+  'whatsapp.accountsLoadFailed': 'Failed to list the WhatsApp numbers',
+  'whatsapp.error.incompleteConfig': 'Enter the public webhook URL before enabling the integration: it is how the Evolution server returns QR codes, messages and receipts',
+  'whatsapp.error.invalidWebhookUrl': 'The webhook URL is invalid',
+  'whatsapp.error.webhookUrlProtocol': 'The webhook URL has to be http or https',
+  'whatsapp.error.webhookUrlCredentials': 'The webhook URL cannot carry a username and password',
+  'whatsapp.error.invalidBaseUrl': 'The Evolution server URL is not configured',
+  'whatsapp.error.hostNotAllowed': 'This Evolution server is not on the authorized list',
+  'whatsapp.error.blockedHost': 'Evolution server refused: {reason}',
 };

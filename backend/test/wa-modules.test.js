@@ -1,0 +1,394 @@
+import { test, describe } from 'node:test';
+import assert from 'node:assert/strict';
+
+import { extractHost, parseAllowedHosts, hostMatchesPattern, isHostAllowed } from '../src/utils/wa/hostAllowlist.js';
+import { parseIPv4, isPrivateIPv4, isPrivateIPv6, isBlockedHost } from '../src/utils/wa/ssrfGuard.js';
+import { normalizeEvoUrl } from '../src/utils/wa/evolutionPolicy.js';
+import { classificarJid, telefoneDoJid } from '../src/utils/wa/waJid.js';
+import { destinoWa, normalizarTelefoneBr } from '../src/utils/wa/waDestino.js';
+import { urlBaixavel, lerMidiaBase64 } from '../src/utils/wa/waMidia.js';
+import { lerRecibo } from '../src/utils/wa/waRecibo.js';
+import { pedeSaida } from '../src/utils/wa/waOptOutTexto.js';
+import { canonicalizarEvento, EVENTOS } from '../src/utils/wa/waEventos.js';
+import { pedidoAutorizado, tokenDaQuery, segredosIguais } from '../src/utils/wa/waWebhookAuth.js';
+import {
+  flavorFromProbes,
+  readLicenseBlock,
+  createInstanceRequest,
+  connectRequest,
+  qrRequest,
+  deleteRequest,
+  sendMediaRequest,
+  sendAudioRequest,
+  readQr,
+  readStatus,
+  readSentId,
+  readInstances,
+  readNumberChecks,
+  webhookUrlWithToken
+} from '../src/utils/wa/evolutionApi.js';
+
+describe('host allowlist', () => {
+  test('reads a host out of a URL, a bare host, and a host with a port', () => {
+    assert.equal(extractHost('https://evo.loja.com/manager'), 'evo.loja.com');
+    assert.equal(extractHost('evo.loja.com'), 'evo.loja.com');
+    assert.equal(extractHost('evo.loja.com:8080'), 'evo.loja.com');
+  });
+
+  test('a wildcard matches subdomains but never the bare domain', () => {
+    assert.equal(hostMatchesPattern('a.loja.com', '*.loja.com'), true);
+    assert.equal(hostMatchesPattern('a.b.loja.com', '*.loja.com'), true);
+    assert.equal(hostMatchesPattern('loja.com', '*.loja.com'), false);
+  });
+
+  test('the dot is part of the suffix, so a lookalike domain cannot pass', () => {
+    // Without comparing '.loja.com' rather than 'loja.com', an attacker
+    // registering malicioso-loja.com would satisfy a naive endsWith.
+    assert.equal(hostMatchesPattern('malicioso-loja.com', '*.loja.com'), false);
+  });
+
+  test('an empty allowlist permits any host; a filled one is strict', () => {
+    assert.equal(isHostAllowed('https://qualquer.com', []), true);
+    assert.equal(isHostAllowed('https://qualquer.com', ['evo.loja.com']), false);
+    assert.equal(isHostAllowed('https://evo.loja.com', ['evo.loja.com']), true);
+  });
+
+  test('parsing tolerates the shapes a human types into a textarea', () => {
+    assert.deepEqual(
+      parseAllowedHosts(' https://Evo.Loja.com/ \n\n *.outra.com , terceira.com:8080 '),
+      ['evo.loja.com', '*.outra.com', 'terceira.com']
+    );
+  });
+});
+
+describe('ssrf guard', () => {
+  test('parses every IPv4 notation a resolver accepts', () => {
+    assert.equal(parseIPv4('127.0.0.1'), 2130706433);
+    assert.equal(parseIPv4('2130706433'), 2130706433); // decimal
+    assert.equal(parseIPv4('0x7f.1'), 2130706433); //     hex + short form
+    assert.equal(parseIPv4('127.1'), 2130706433); //      short form
+    assert.equal(parseIPv4('nao-e-ip'), null);
+  });
+
+  test('blocks loopback, RFC1918, link-local and CGNAT', () => {
+    for (const ip of ['127.0.0.1', '10.1.2.3', '192.168.0.1', '172.16.0.1', '169.254.169.254', '100.64.0.1']) {
+      assert.equal(isPrivateIPv4(parseIPv4(ip)), true, ip);
+    }
+    assert.equal(isPrivateIPv4(parseIPv4('8.8.8.8')), false);
+  });
+
+  test('blocks IPv6 loopback, ULA and IPv4-mapped loopback', () => {
+    assert.equal(isPrivateIPv6('::1'), true);
+    assert.equal(isPrivateIPv6('fd00::1'), true);
+    assert.equal(isPrivateIPv6('fe80::1'), true);
+    assert.equal(isPrivateIPv6('::ffff:127.0.0.1'), true);
+    assert.equal(isPrivateIPv6('2001:4860:4860::8888'), false);
+  });
+
+  test('blocks internal-sounding names, and the decimal form of loopback', () => {
+    assert.equal(isBlockedHost('localhost'), true);
+    assert.equal(isBlockedHost('acs.internal'), true);
+    assert.equal(isBlockedHost('router.home.arpa'), true);
+    assert.equal(isBlockedHost('2130706433'), true);
+    assert.equal(isBlockedHost('evo.provedor.com.br'), false);
+  });
+});
+
+describe('evolution policy', () => {
+  test('strips the Manager path an operator is likely to paste', () => {
+    assert.equal(normalizeEvoUrl('https://evo.loja.com/manager/instances'), 'https://evo.loja.com');
+    assert.equal(normalizeEvoUrl('https://evo.loja.com/'), 'https://evo.loja.com');
+  });
+});
+
+describe('wa jid', () => {
+  test('a LID is not a phone, however long it looks', () => {
+    const lid = classificarJid('140076734488739@lid');
+    assert.equal(lid.tipo, 'lid');
+    assert.equal(telefoneDoJid('140076734488739@lid'), '');
+  });
+
+  test('the device suffix is stripped instead of glued onto the number', () => {
+    // The regression this encodes: stripping only non-digits turned
+    // 559381104499:22 into 55938110449922, a phone that does not exist.
+    assert.equal(telefoneDoJid('559381104499:22@s.whatsapp.net'), '559381104499');
+    assert.equal(telefoneDoJid('559381104499.0:22@s.whatsapp.net'), '559381104499');
+  });
+
+  test('groups, broadcasts and unknown domains are not phones', () => {
+    assert.equal(classificarJid('12345@g.us').tipo, 'grupo');
+    assert.equal(classificarJid('status@broadcast').tipo, 'broadcast');
+    assert.equal(classificarJid('algo@novidade.net').tipo, 'desconhecido');
+  });
+
+  test('no domain still counts as a phone, which connection_update relies on', () => {
+    assert.equal(telefoneDoJid('5593981110449'), '5593981110449');
+  });
+});
+
+describe('wa destino', () => {
+  test('phone wins over LID, and the thread is only a last resort', () => {
+    assert.deepEqual(
+      destinoWa({ wa_phone_e164: '5593981110449', wa_lid: '1400767' }),
+      { valor: '5593981110449', tipo: 'phone' }
+    );
+    assert.deepEqual(destinoWa({ wa_lid: '1400767' }), { valor: '1400767', tipo: 'lid' });
+    assert.deepEqual(
+      destinoWa({}, { external_thread_id: '1400767@lid' }),
+      { valor: '1400767', tipo: 'lid' }
+    );
+    assert.equal(destinoWa({}, {}), null);
+  });
+
+  test('adds the country code but never invents the ninth digit', () => {
+    assert.equal(normalizarTelefoneBr('(93) 98111-0449'), '5593981110449');
+    assert.equal(normalizarTelefoneBr('93 3522-1234'), '559335221234');
+    // Already 12 digits: 55 + DDD + 8. Landlines stay 8 digits forever, and a
+    // guessed 9 would address a real number belonging to someone else.
+    assert.equal(normalizarTelefoneBr('559335221234'), '559335221234');
+    assert.equal(normalizarTelefoneBr(''), '');
+  });
+});
+
+describe('wa midia', () => {
+  test('rejects the WhatsApp CDN, which serves the encrypted object', () => {
+    assert.equal(urlBaixavel('https://mmg.whatsapp.net/v/t62.7118-24/x.enc'), null);
+    assert.equal(urlBaixavel('https://minio.evo.com/anexo.jpg'), 'https://minio.evo.com/anexo.jpg');
+    assert.equal(urlBaixavel('nao-e-url'), null);
+  });
+
+  test('reads the base64 payload flat and nested', () => {
+    assert.deepEqual(lerMidiaBase64({ base64: 'AAA', mimetype: 'image/png' }), {
+      base64: 'AAA',
+      mimetype: 'image/png'
+    });
+    assert.deepEqual(lerMidiaBase64({ media: { base64: 'BBB' } }), { base64: 'BBB' });
+    assert.equal(lerMidiaBase64({ base64: '' }), null);
+  });
+});
+
+describe('wa recibo', () => {
+  // The three formats. Reading only one of them cost the source system sixteen
+  // days of silently missing receipts after a server swap.
+  test('Evolution API v2 sends the id flat, in keyId', () => {
+    assert.deepEqual(
+      lerRecibo({ event: 'messages.update', data: { messageId: 'interno', keyId: 'ABC', status: 'DELIVERY_ACK' } }),
+      { ids: ['ABC'], status: 'delivered' }
+    );
+  });
+
+  test('Evolution API v1 nests it in key.id and update.status', () => {
+    assert.deepEqual(
+      lerRecibo({ data: { key: { id: 'ABC' }, update: { status: 'READ' } } }),
+      { ids: ['ABC'], status: 'read' }
+    );
+  });
+
+  test('Evolution GO batches ids and puts the state on the envelope', () => {
+    assert.deepEqual(
+      lerRecibo({ state: 'Delivered', data: { MessageIDs: ['A', 'B'] } }),
+      { ids: ['A', 'B'], status: 'delivered' }
+    );
+  });
+
+  test('numeric Baileys statuses are understood', () => {
+    assert.equal(lerRecibo({ data: { keyId: 'A', status: 4 } }).status, 'read');
+    assert.equal(lerRecibo({ data: { keyId: 'A', status: 2 } }).status, 'sent');
+  });
+
+  test('ReadSelf is ignored: that is the operator reading on their own phone', () => {
+    assert.equal(lerRecibo({ state: 'ReadSelf', data: { MessageIDs: ['A'] } }), null);
+  });
+
+  test('an update with no status at all is not a receipt', () => {
+    assert.equal(lerRecibo({ data: { keyId: 'A' } }), null);
+    assert.equal(lerRecibo({}), null);
+  });
+});
+
+describe('opt-out detection', () => {
+  test('the whole message must be the request', () => {
+    assert.equal(pedeSaida('SAIR'), true);
+    assert.equal(pedeSaida('sair.'), true);
+    assert.equal(pedeSaida('Não quero receber'), true);
+  });
+
+  test('real customer messages that merely contain the word are not opt-outs', () => {
+    // Measured against 1,887 real inbound messages in the source system.
+    assert.equal(pedeSaida('Então pode separar'), false);
+    assert.equal(pedeSaida('pra preparar o bolso'), false);
+    assert.equal(pedeSaida('Passo sim daqui a pouco vou sair'), false);
+    assert.equal(pedeSaida(''), false);
+  });
+});
+
+describe('event canonicalisation', () => {
+  test('both dialects collapse onto four names', () => {
+    assert.equal(canonicalizarEvento('messages.upsert'), EVENTOS.MENSAGEM);
+    assert.equal(canonicalizarEvento('Message'), EVENTOS.MENSAGEM);
+    assert.equal(canonicalizarEvento('qrcode'), EVENTOS.QR);
+    assert.equal(canonicalizarEvento('QRCODE_UPDATED'), EVENTOS.QR);
+    assert.equal(canonicalizarEvento('LoggedOut'), EVENTOS.CONEXAO);
+    assert.equal(canonicalizarEvento('Receipt'), EVENTOS.RECIBO);
+  });
+});
+
+describe('webhook authentication', () => {
+  const segredos = { webhookToken: 'segredo-do-webhook', instanceToken: 'token-da-instancia' };
+
+  test('the query token authorises, and a wrong one does not', () => {
+    assert.equal(pedidoAutorizado(segredos, { urlToken: 'segredo-do-webhook', credencial: '' }), true);
+    assert.equal(pedidoAutorizado(segredos, { urlToken: 'errado', credencial: '' }), false);
+  });
+
+  test('no credential at all is a refusal, not a pass', () => {
+    // The bug this closes: the previous shape short-circuited to "authorised"
+    // whenever the server sent nothing — which is exactly what Evolution GO does.
+    assert.equal(pedidoAutorizado(segredos, { urlToken: '', credencial: '' }), false);
+  });
+
+  test('the instance key still works for an instance created before ?t=', () => {
+    assert.equal(pedidoAutorizado(segredos, { urlToken: '', credencial: 'token-da-instancia' }), true);
+  });
+
+  test('the query token wins, so the instance key cannot be used to bypass it', () => {
+    assert.equal(
+      pedidoAutorizado(segredos, { urlToken: 'errado', credencial: 'token-da-instancia' }),
+      false
+    );
+  });
+
+  test('a trailing slash added by a proxy does not break the token', () => {
+    assert.equal(tokenDaQuery({ t: 'abc/' }), 'abc');
+  });
+
+  test('comparison tolerates different lengths without throwing', () => {
+    assert.equal(segredosIguais('curto', 'muito-mais-comprido'), false);
+    assert.equal(segredosIguais('', ''), false);
+  });
+});
+
+describe('evolution api translation', () => {
+  test('detects the flavour from unauthenticated probes', () => {
+    assert.equal(flavorFromProbes({ ok: true, data: { status: 'ok' } }, { ok: false, data: null }), 'go');
+    assert.equal(flavorFromProbes({ ok: false, data: null }, { ok: true, data: { version: '2.1.1' } }), 'v2');
+    // Inconclusive falls back to v2, whose failure mode is a readable 404.
+    assert.equal(flavorFromProbes({ ok: false, data: null }, { ok: false, data: null }), 'v2');
+  });
+
+  test('recognises a licence block by code in any status, and by text only on 503', () => {
+    assert.deepEqual(
+      readLicenseBlock(401, { code: 'LICENSE_REQUIRED', register_url: 'https://evo.com/manager/login' }),
+      { registerUrl: 'https://evo.com/manager/login' }
+    );
+    assert.ok(readLicenseBlock(503, { error: 'license required' }));
+    assert.equal(readLicenseBlock(500, { error: 'license required' }), null);
+    // A hostile register_url never reaches the operator as a link.
+    assert.deepEqual(readLicenseBlock(503, { code: 'LICENSE_REQUIRED', register_url: 'javascript:alert(1)' }), {
+      registerUrl: null
+    });
+  });
+
+  test('the create payload differs where the servers differ', () => {
+    const p = { name: 'painel', token: 'tok', instanceId: 'uuid', webhookUrl: 'https://p/hook?t=s', rejectCallMessage: 'não atendo' };
+    const go = createInstanceRequest('go', p);
+    const v2 = createInstanceRequest('v2', p);
+
+    assert.equal(go.key, 'admin');
+    assert.equal(go.body.instanceId, 'uuid');
+    // alwaysOnline true on GO would suppress notifications on the operator's phone.
+    assert.equal(go.body.advancedSettings.alwaysOnline, false);
+    assert.equal(go.body.advancedSettings.readMessages, false);
+    // GO takes no webhook at create; it goes on connect.
+    assert.equal(go.body.webhook, undefined);
+
+    assert.equal(v2.body.name, 'painel');
+    assert.equal(v2.body.instanceName, 'painel');
+    // byEvents true would append the event name after the query string and the
+    // ?t= secret would stop parsing as a query param.
+    assert.equal(v2.body.webhook.byEvents, false);
+    assert.equal(v2.body.webhook.base64, true);
+  });
+
+  test('only GO needs the connect call, and it carries the webhook', () => {
+    assert.equal(connectRequest('v2', 'https://p/hook'), null);
+    const go = connectRequest('go', 'https://p/hook');
+    assert.equal(go.path, '/instance/connect');
+    assert.equal(go.body.webhookUrl, 'https://p/hook');
+    assert.ok(go.body.subscribe.includes('QRCODE'));
+  });
+
+  test('routes that carry no instance name use the instance key', () => {
+    assert.deepEqual(qrRequest('go', 'painel'), { path: '/instance/qr', method: 'GET', key: 'instance' });
+    assert.equal(qrRequest('v2', 'painel').path, '/instance/connect/painel');
+  });
+
+  test('GO deletes by id with the admin key, and refuses without one', () => {
+    assert.equal(deleteRequest('go', 'painel', null), null);
+    assert.deepEqual(deleteRequest('go', 'painel', 'uuid'), {
+      path: '/instance/delete/uuid',
+      method: 'DELETE',
+      key: 'admin'
+    });
+    assert.equal(deleteRequest('v2', 'painel').key, 'admin');
+  });
+
+  test('media field names are not the same on the two servers', () => {
+    const p = { number: '55', type: 'image', url: 'u', caption: 'c', fileName: 'f.png' };
+    assert.deepEqual(sendMediaRequest('go', 'painel', p).body, {
+      number: '55', type: 'image', url: 'u', caption: 'c', filename: 'f.png'
+    });
+    assert.deepEqual(sendMediaRequest('v2', 'painel', p).body, {
+      number: '55', mediatype: 'image', media: 'u', caption: 'c', fileName: 'f.png'
+    });
+  });
+
+  test('voice notes are unavailable on GO, so callers fall back to media', () => {
+    assert.equal(sendAudioRequest('go', 'painel', { number: '55', url: 'u' }), null);
+    assert.equal(sendAudioRequest('v2', 'painel', { number: '55', url: 'u' }).path, '/message/sendWhatsAppAudio/painel');
+  });
+
+  test('reads the QR from all three shapes the servers use', () => {
+    assert.equal(readQr({ qrcode: 'data:image/png;base64,AAA' }).qr, 'data:image/png;base64,AAA');
+    assert.equal(readQr({ base64: 'BBB' }).qr, 'BBB');
+    assert.equal(readQr({ qrcode: { base64: 'CCC' } }).qr, 'CCC');
+    assert.equal(readQr({ data: { base64: 'DDD' } }).qr, 'DDD'); // GO envelope
+  });
+
+  test('GO reports status in capitalised Go struct fields', () => {
+    assert.equal(readStatus('go', { data: { Connected: true, LoggedIn: true } }), 'connected');
+    assert.equal(readStatus('go', { data: { Connected: true, LoggedIn: false } }), 'connecting');
+    assert.equal(readStatus('go', { data: { Connected: false } }), 'disconnected');
+    assert.equal(readStatus('v2', { state: 'open' }), 'connected');
+    assert.equal(readStatus('v2', { instance: { state: 'close' } }), 'disconnected');
+    assert.equal(readStatus('v2', { state: 'sei-la' }), null);
+  });
+
+  test('finds the sent id in either dialect', () => {
+    assert.equal(readSentId({ data: { Info: { ID: 'GO1' } } }), 'GO1');
+    assert.equal(readSentId({ key: { id: 'V2' } }), 'V2');
+    assert.equal(readSentId({}), null);
+  });
+
+  test('the instance listing never carries the token through', () => {
+    const rows = readInstances('v2', [
+      { name: 'painel', connectionStatus: 'open', ownerJid: '5593981110449@s.whatsapp.net', id: 'x', token: 'SEGREDO' }
+    ]);
+    assert.deepEqual(rows, [{ name: 'painel', status: 'open', owner: '5593981110449', id: 'x' }]);
+    assert.equal(JSON.stringify(rows).includes('SEGREDO'), false);
+  });
+
+  test('number checks read both shapes', () => {
+    assert.deepEqual(readNumberChecks('go', { data: { Users: [{ Query: '55 93 98111-0449', IsInWhatsapp: true }] } }), [
+      { number: '5593981110449', exists: true }
+    ]);
+    assert.deepEqual(readNumberChecks('v2', [{ number: '5593981110449', exists: false }]), [
+      { number: '5593981110449', exists: false }
+    ]);
+  });
+
+  test('the webhook secret goes in the query, and an existing query is dropped', () => {
+    assert.equal(webhookUrlWithToken('https://p/hook', 'a b'), 'https://p/hook?t=a%20b');
+    assert.equal(webhookUrlWithToken('https://p/hook?x=1#f', 'tok'), 'https://p/hook?t=tok');
+  });
+});
