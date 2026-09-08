@@ -38,6 +38,7 @@ import {
   CircleStackIcon,
   CommandLineIcon,
   EyeIcon,
+  ChatBubbleLeftRightIcon,
   EyeSlashIcon,
   DocumentDuplicateIcon,
   LockOpenIcon,
@@ -86,6 +87,7 @@ const ICONS: Record<string, React.ComponentType<React.SVGProps<SVGSVGElement>>> 
   unlock: LockOpenIcon,
   invoice: BanknotesIcon,
   eye: EyeIcon,
+  chat: ChatBubbleLeftRightIcon,
   'eye-off': EyeSlashIcon
 }
 

@@ -13,6 +13,7 @@ const DevicesPage = lazy(() => import('@/pages/devices'))
 const DeviceDetailPage = lazy(() => import('@/pages/device-detail'))
 const NetworkMapPage = lazy(() => import('@/pages/network-map'))
 const SettingsPage = lazy(() => import('@/pages/settings'))
+const WhatsAppPage = lazy(() => import('@/pages/whatsapp'))
 const LoginPage = lazy(() => import('@/pages/login'))
 const SetupPage = lazy(() => import('@/pages/setup'))
 
@@ -104,6 +105,7 @@ export default function App() {
                   <Route element={<AdminRoute />}>
                     <Route path="/network-map" element={<NetworkMapPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
+                    <Route path="/whatsapp" element={<WhatsAppPage />} />
                   </Route>
                   <Route path="*" element={<Navigate to="/dashboard" replace />} />
                 </Route>
