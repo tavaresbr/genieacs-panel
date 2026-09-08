@@ -245,6 +245,17 @@ class DeviceService {
     }
   }
 
+  /** Full device document, the shape the vendor-aware writers need. */
+  static async fetchDeviceDocument(deviceId) {
+    const rawDeviceData = await this.fetchFromGenieAcs('', {
+      query: JSON.stringify({ _id: deviceId })
+    });
+    if (!Array.isArray(rawDeviceData) || rawDeviceData.length === 0) {
+      throw new TranslatableError('device.notFound', null, { status: 404 });
+    }
+    return rawDeviceData[0];
+  }
+
   static async getDevices() {
     try {
       const virtualParams = await this.getVirtualParameters();
@@ -878,6 +889,76 @@ class DeviceService {
     return this.fetchFromGenieAcs(endpoint, { connection_request: 1 }, 'POST', task);
   }
 
+  /**
+   * Posts a task and reports how GenieACS took it. `fetchFromGenieAcs`
+   * discards the status code, but provisioning has to tell the two cases
+   * apart: 200 means the connection request reached the CPE and the task ran,
+   * 202 means it was only queued for some later inform. Recording a 202 as
+   * "applied" would mark a device provisioned that never received anything.
+   */
+  static async postProvisioningTask(deviceId, task) {
+    const url = await this.buildGenieAcsUrl(
+      `${encodeURIComponent(deviceId)}/tasks`,
+      { connection_request: 1 }
+    );
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify(task),
+        signal: controller.signal
+      });
+      const text = await response.text().catch(() => '');
+      if (!response.ok) {
+        throw new Error(`GenieACS API responded with status: ${response.status}${text ? ` - ${text}` : ''}`);
+      }
+      let body = null;
+      try {
+        body = text ? JSON.parse(text) : null;
+      } catch {
+        body = null;
+      }
+      if (body?.fault?.faultString) {
+        throw new Error(`GenieACS reported a fault: ${body.fault.faultString}`);
+      }
+      return { status: response.status, applied: response.status === 200, body };
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  /**
+   * The WAN index provisioning should write to, in the `dev.conn.ppp.instance`
+   * form `updateWanConfig` expects. An instance that already carries a PPPoE
+   * username wins, since that is the one the CPE is actually dialling with.
+   */
+  static findPppoeWanIndex(item) {
+    const wanDevice = item?.InternetGatewayDevice?.WANDevice;
+    if (!wanDevice || typeof wanDevice !== 'object') return null;
+    let fallback = null;
+    for (const devKey of Object.keys(wanDevice)) {
+      if (devKey.startsWith('_')) continue;
+      const connectionDevices = wanDevice[devKey]?.WANConnectionDevice;
+      if (!connectionDevices || typeof connectionDevices !== 'object') continue;
+      for (const connKey of Object.keys(connectionDevices)) {
+        if (connKey.startsWith('_')) continue;
+        const pppConnections = connectionDevices[connKey]?.WANPPPConnection;
+        if (!pppConnections || typeof pppConnections !== 'object') continue;
+        for (const instanceKey of Object.keys(pppConnections)) {
+          if (instanceKey.startsWith('_') || !pppConnections[instanceKey]) continue;
+          const index = `${devKey}.${connKey}.ppp.${instanceKey}`;
+          const basePath = `InternetGatewayDevice.WANDevice.${devKey}.WANConnectionDevice.${connKey}.WANPPPConnection.${instanceKey}`;
+          const username = this.findWanParameter(item, basePath, 'Username')?.value;
+          if (username) return index;
+          if (!fallback) fallback = index;
+        }
+      }
+    }
+    return fallback;
+  }
+
   static installationTag(installationDate) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(installationDate))) {
       throw new Error('Invalid installation date');
@@ -1005,14 +1086,14 @@ class DeviceService {
     return data;
   }
 
-  static async updateWanConfig(deviceId, wanIndex, formData) {
-    const rawDeviceData = await this.fetchFromGenieAcs('', {
-      query: JSON.stringify({ _id: deviceId })
-    });
-    if (!Array.isArray(rawDeviceData) || rawDeviceData.length === 0) {
-      throw new TranslatableError('device.notFound', null, { status: 404 });
-    }
-    const item = rawDeviceData[0];
+  /**
+   * `options.item` lets a caller that already holds the full device document
+   * reuse it, so one provisioning run does not fetch the same document once
+   * per step. `options.dryRun` returns the parameter list without queueing a
+   * task, which is what lets the preview and the real run share one path.
+   */
+  static async updateWanConfig(deviceId, wanIndex, formData, options = {}) {
+    const item = options.item ?? await this.fetchDeviceDocument(deviceId);
     const manufacturer = item._deviceId?._Manufacturer || null;
     const productClass = item._deviceId?._ProductClass || null;
     const vendorObj = await VendorService.detectVendor(manufacturer, productClass, item);
@@ -1158,6 +1239,10 @@ class DeviceService {
       return { success: true, messageKey: 'device.service.wanNoChanges', parameterCount: 0 };
     }
 
+    if (options.dryRun) {
+      return { success: true, dryRun: true, parameterValues, parameterCount: parameterValues.length };
+    }
+
     await this.postTask(deviceId, {
       name: 'setParameterValues',
       parameterValues
@@ -1166,11 +1251,12 @@ class DeviceService {
     return {
       success: true,
       messageKey: 'device.service.wanUpdateQueued',
-      parameterCount: parameterValues.length
+      parameterCount: parameterValues.length,
+      parameterValues
     };
   }
 
-  static async updateCredentials(deviceId, type, password) {
+  static async updateCredentials(deviceId, type, password, options = {}) {
     if (typeof password !== 'string' || password.length < 1 || password.length > 256) {
       throw new Error('Password must be between 1 and 256 characters.');
     }
@@ -1189,11 +1275,14 @@ class DeviceService {
       throw new Error(`VirtualParameter path for ${type} password is not set in settings.`);
     }
 
+    const parameterValues = [[passPath, password, 'xsd:string']];
+    if (options.dryRun) {
+      return { success: true, dryRun: true, parameterValues, parameterCount: parameterValues.length };
+    }
+
     await this.postTask(deviceId, {
       name: 'setParameterValues',
-      parameterValues: [
-        [passPath, password, 'xsd:string']
-      ]
+      parameterValues
     });
 
     return { success: true, messageKey: 'device.service.credentialQueued', messageVars: { type } };
@@ -1208,7 +1297,7 @@ class DeviceService {
     return this.resolveParameterPath(basePath, expanded);
   }
 
-  static async updateWifiConfig(deviceId, index, formData) {
+  static async updateWifiConfig(deviceId, index, formData, options = {}) {
     const wifiIndex = Number(index);
     if (!Number.isInteger(wifiIndex) || wifiIndex < 1 || wifiIndex > 8) {
       throw new TranslatableError('device.service.wifiIndexInvalid', null, { status: 400 });
@@ -1233,13 +1322,7 @@ class DeviceService {
       throw new TranslatableError('device.service.wifiChannelInvalid', null, { status: 400 });
     }
 
-    const rawDeviceData = await this.fetchFromGenieAcs('', {
-      query: JSON.stringify({ _id: deviceId })
-    });
-    if (!Array.isArray(rawDeviceData) || rawDeviceData.length === 0) {
-      throw new TranslatableError('device.notFound', null, { status: 404 });
-    }
-    const item = rawDeviceData[0];
+    const item = options.item ?? await this.fetchDeviceDocument(deviceId);
     const basePath = `InternetGatewayDevice.LANDevice.1.WLANConfiguration.${wifiIndex}`;
     const virtualPrefix = wifiIndex === 1 ? 'SSID1' : wifiIndex === 5 ? 'SSID5' : null;
     const virtualNamePath = virtualPrefix ? `VirtualParameters.${virtualPrefix}-Name` : null;
@@ -1294,12 +1377,17 @@ class DeviceService {
       }
     }
 
+    if (options.dryRun) {
+      return { success: true, dryRun: true, parameterValues, parameterCount: parameterValues.length };
+    }
+
     await this.postTask(deviceId, {
       name: 'setParameterValues',
       parameterValues
     });
     return {
       success: true,
+      parameterValues,
       messageKey: 'device.service.wifiQueued',
       messageVars: { index: wifiIndex },
       parameterCount: parameterValues.length
