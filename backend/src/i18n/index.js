@@ -1,6 +1,7 @@
 import { DEFAULT_LOCALE, FALLBACK_LOCALE, LOCALES, negotiateLocale, resolveLocale } from './config.js';
 import en from './locales/en.js';
 import es from './locales/es.js';
+import it from './locales/it.js';
 import ptBR from './locales/pt-BR.js';
 
 export { DEFAULT_LOCALE, FALLBACK_LOCALE, LOCALES, negotiateLocale, resolveLocale };
@@ -8,7 +9,8 @@ export { DEFAULT_LOCALE, FALLBACK_LOCALE, LOCALES, negotiateLocale, resolveLocal
 export const dictionaries = {
   'pt-BR': ptBR,
   en,
-  es
+  es,
+  it
 };
 
 const PLACEHOLDER_PATTERN = /\{(\w+)\}/g;
