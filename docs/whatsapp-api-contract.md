@@ -403,6 +403,28 @@ Duas regras de produto que a API precisa preservar:
 
 ---
 
+## Telas — quem consome o quê
+
+Para achar o consumidor de uma rota sem varrer o `frontend/`:
+
+| Rota | Tela |
+| --- | --- |
+| `GET/PUT /whatsapp/config` | aba **WhatsApp** de `pages/settings.tsx` (formulário global) |
+| `GET /accounts` · `POST /accounts` · `PATCH` · `DELETE` | `components/whatsapp-connection.tsx` (um cartão por número) |
+| `GET /accounts/:id/qr` · `GET /accounts/:id/status` | o bloco de pareamento do mesmo componente — os dois únicos pontos com polling |
+| `POST /accounts/:id/restart` · `POST /accounts/:id/disconnect` | ações do cartão; `disconnect` + `POST /accounts` é o "desparear e gerar novo QR" |
+| `POST /accounts/check-number` | ainda sem tela |
+| conversas, modelos, opt-out, campanhas, cobrança, alertas | ondas 2 e 3, sem tela ainda |
+
+O polling do bloco de pareamento é **medido**, não escolhido: QR a cada 8 s por
+até 45 s, status a cada 10 s por até 4 min, os dois em single-flight (um `get_qr`
+foi cronometrado em ~5,4 s, mais que o próprio intervalo), pulando o tique
+inteiro com a aba em segundo plano e desistindo depois de três falhas seguidas.
+Ao desistir a tela troca o bloco pela explicação `whatsapp.qr.silent` — nada
+aqui fica girando para sempre.
+
+---
+
 ## Modelos de cobrança
 
 Variáveis aceitas: `nome`, `valor`, `vencimento`, `dias_atraso`,

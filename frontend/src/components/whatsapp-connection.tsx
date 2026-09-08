@@ -1,0 +1,802 @@
+'use client'
+
+import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  whatsappAPI,
+  type WhatsAppAccount,
+  type WhatsAppConfig,
+  type WhatsAppPurpose,
+  type WhatsAppStatus
+} from '@/lib/api'
+import { Icon } from '@/components/ui/icon'
+import { useToast } from '@/components/ui/toast'
+import { useTranslation } from '@/contexts/language-context'
+import type { TranslationKey } from '@/lib/i18n'
+
+const PURPOSES: WhatsAppPurpose[] = ['general', 'billing', 'support', 'sales', 'alerts']
+
+/**
+ * The machine `code` from the API is the only thing this screen is allowed to
+ * translate. The `message` that comes with it can carry the Evolution server's
+ * own words, and a JSON dump on screen sends an operator off re-checking a URL
+ * and a key that were never the problem — `license_required` above all.
+ * A code we do not know yet reads as the generic failure, never as raw text.
+ */
+const ERROR_KEYS: Record<string, TranslationKey> = {
+  not_configured: 'whatsapp.error.notConfigured',
+  incomplete_config: 'whatsapp.error.incompleteConfig',
+  invalid_webhook_url: 'whatsapp.error.invalidWebhookUrl',
+  invalid_base_url: 'whatsapp.error.invalidBaseUrl',
+  host_not_allowed: 'whatsapp.error.hostNotAllowed',
+  blocked_host: 'whatsapp.error.blockedHost',
+  unauthorized: 'whatsapp.error.unauthorized',
+  license_required: 'whatsapp.error.licenseRequired',
+  timeout: 'whatsapp.error.timeout',
+  unreachable: 'whatsapp.error.unreachable',
+  no_session: 'whatsapp.error.noSession',
+  no_account: 'whatsapp.error.noAccount',
+  no_destination: 'whatsapp.error.noDestination'
+}
+
+type Translate = (key: TranslationKey, vars?: Record<string, string | number>) => string
+
+export function whatsappErrorMessage(t: Translate, code?: string): string {
+  return t(ERROR_KEYS[code ?? ''] ?? 'api.requestFailed')
+}
+
+const STATUS_BADGE: Record<WhatsAppStatus, string> = {
+  pending: 'modern-badge',
+  connecting: 'modern-badge-warning',
+  connected: 'modern-badge-success',
+  disconnected: 'modern-badge-error',
+  expired: 'modern-badge-error'
+}
+
+const STATUS_LABEL: Record<WhatsAppStatus, TranslationKey> = {
+  pending: 'whatsapp.status.pending',
+  connecting: 'whatsapp.status.connecting',
+  connected: 'whatsapp.status.connected',
+  disconnected: 'whatsapp.status.disconnected',
+  expired: 'whatsapp.status.expired'
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Polling
+//
+// These numbers are MEASURED against a real Evolution server, not picked to
+// look tidy, and the three rules under them are what keeps a pairing screen
+// from becoming load on a box that is already struggling:
+//
+//   · a `get_qr` round trip was timed at ~5.4 s — LONGER than its own 8 s
+//     interval once the server is busy — so every poll is single-flight and a
+//     tick that lands on an open call is dropped, never queued;
+//   · a hidden tab skips the tick entirely: an operator leaves this open in a
+//     background tab all afternoon, and a QR nobody is looking at is pure cost;
+//   · a failing server is backed off as `2 ** failures - 1` skipped ticks and
+//     abandoned after three in a row, because the failure that matters here is
+//     the one that never ends.
+// ─────────────────────────────────────────────────────────────────────────────
+const QR_POLL_MS = 8_000
+const QR_POLL_BUDGET_MS = 45_000
+const STATUS_POLL_MS = 10_000
+const STATUS_POLL_BUDGET_MS = 4 * 60_000
+const QR_LIFETIME_S = 60
+const QR_REFRESH_AT_S = 5
+const MAX_FAILURES = 3
+
+/** When the code on the row was issued, or null when there is no code. */
+function seedQrAt(account: WhatsAppAccount): number | null {
+  if (!account.qrCode) return null
+  const stamped = account.qrUpdatedAt ? Date.parse(account.qrUpdatedAt) : Number.NaN
+  return Number.isNaN(stamped) ? Date.now() : stamped
+}
+
+function secondsLeft(since: number): number {
+  return Math.max(0, QR_LIFETIME_S - Math.floor((Date.now() - since) / 1000))
+}
+
+interface QrPairingProps {
+  account: WhatsAppAccount
+  busy: boolean
+  onAccount: (account: WhatsAppAccount) => void
+  onForceNew: (account: WhatsAppAccount) => void
+}
+
+/**
+ * The pairing block for one number. Every timer it starts is owned by an effect
+ * and cleared on unmount: the settings page is lazy-loaded and an operator
+ * flips between tabs constantly, and an interval that survives the card would
+ * keep hitting the Evolution server from a screen nobody is on.
+ */
+function QrPairing({ account, busy, onAccount, onForceNew }: QrPairingProps) {
+  const { t } = useTranslation()
+  const toast = useToast()
+
+  const [qr, setQr] = useState<string | null>(account.qrCode)
+  // Both seeded from the server's own timestamp, so a card rebuilt from a stale
+  // listing shows the code's real age instead of a fresh sixty for a second.
+  const [qrAt, setQrAt] = useState<number | null>(() => seedQrAt(account))
+  const [remaining, setRemaining] = useState(() => {
+    const stamped = seedQrAt(account)
+    return stamped === null ? QR_LIFETIME_S : secondsLeft(stamped)
+  })
+  const [silent, setSilent] = useState(false)
+  const [checking, setChecking] = useState(false)
+
+  const qrInFlight = useRef(false)
+  const qrFailures = useRef(0)
+  // The backoff is held as an instant rather than a counter of skipped ticks
+  // because two different clocks ask for a QR — the 8 s acquisition poll and
+  // the 1 s countdown, once the code on screen is about to die. A counter is
+  // only decremented by the poll, and a failing refresh would then retry every
+  // second with no backoff at all. `2 ** failures - 1` intervals is the same
+  // number of ticks, expressed in a way both callers can honour.
+  // Armed on mount, not at declaration: a clock read during render is not
+  // idempotent.
+  const qrBlockedUntil = useRef(0)
+  const qrDeadline = useRef(0)
+  const statusInFlight = useRef(false)
+  const statusFailures = useRef(0)
+  const statusBlockedUntil = useRef(0)
+  const alive = useRef(true)
+
+  useEffect(() => {
+    alive.current = true
+    qrDeadline.current = Date.now() + QR_POLL_BUDGET_MS
+    return () => { alive.current = false }
+  }, [])
+
+  const runQr = useCallback(async () => {
+    if (qrInFlight.current) return
+    qrInFlight.current = true
+    try {
+      const res = await whatsappAPI.getQr(account.id)
+      if (!alive.current) return
+      if (!res.success) {
+        qrFailures.current += 1
+        if (qrFailures.current >= MAX_FAILURES) {
+          setSilent(true)
+          return
+        }
+        qrBlockedUntil.current = Date.now() + (2 ** qrFailures.current - 1) * QR_POLL_MS
+        return
+      }
+      qrFailures.current = 0
+      qrBlockedUntil.current = 0
+      if (res.data?.account) onAccount(res.data.account)
+      const next = res.data?.qr ?? null
+      if (next) {
+        setQr(next)
+        setQrAt(Date.now())
+        setRemaining(QR_LIFETIME_S)
+        // A QR in hand opens a fresh acquisition window: the budget below only
+        // bounds the wait for the NEXT one.
+        qrDeadline.current = Date.now() + QR_POLL_BUDGET_MS
+        return
+      }
+      // `pending: true` with a null `qr` is a "not yet", not a failure — the GO
+      // client answers `400 no QR code available` for its first few seconds.
+      setQr(null)
+      setQrAt(null)
+    } finally {
+      qrInFlight.current = false
+    }
+  }, [account.id, onAccount])
+
+  const runStatus = useCallback(async (manual: boolean) => {
+    if (statusInFlight.current) return
+    statusInFlight.current = true
+    if (manual) setChecking(true)
+    try {
+      const res = await whatsappAPI.getStatus(account.id)
+      if (!alive.current) return
+      if (!res.success) {
+        statusFailures.current += 1
+        statusBlockedUntil.current = Date.now() + (2 ** statusFailures.current - 1) * STATUS_POLL_MS
+        if (manual) toast.error(whatsappErrorMessage(t, res.code))
+        return
+      }
+      statusFailures.current = 0
+      statusBlockedUntil.current = 0
+      // The parent decides what to render from the status; a promotion to
+      // `connected` unmounts this block and clears every timer with it.
+      if (res.data?.account) onAccount(res.data.account)
+    } finally {
+      statusInFlight.current = false
+      if (manual) setChecking(false)
+    }
+  }, [account.id, onAccount, t, toast])
+
+  // Acquisition: runs only while there is no QR on screen. When the budget
+  // runs out without one, the server is almost certainly resuming an old
+  // session instead of issuing a code — that is what the silent block explains.
+  useEffect(() => {
+    if (silent || qr) return
+    const timer = setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      if (Date.now() < qrBlockedUntil.current) return
+      if (Date.now() > qrDeadline.current) {
+        setSilent(true)
+        return
+      }
+      void runQr()
+    }, QR_POLL_MS)
+    return () => clearInterval(timer)
+  }, [silent, qr, runQr])
+
+  // Countdown. It also drives the refresh at five seconds left, which is finer
+  // than the 8 s cadence above and has to be: a QR that dies on screen is a
+  // camera pointed at nothing.
+  useEffect(() => {
+    if (silent || !qr || qrAt === null) return
+    const timer = setInterval(() => {
+      const left = secondsLeft(qrAt)
+      setRemaining(left)
+      if (left > QR_REFRESH_AT_S) return
+      if (document.visibilityState !== 'visible') return
+      if (Date.now() < qrBlockedUntil.current) return
+      void runQr()
+    }, 1_000)
+    return () => clearInterval(timer)
+  }, [silent, qr, qrAt, runQr])
+
+  // Status. The budget is generous because the four minutes are the operator's,
+  // not the server's — finding the phone and the menu takes that long. When it
+  // runs out the polling stops but the card stays as it is: the "already
+  // scanned" button below is still there, and it is the way out of an amber
+  // card left behind by a lost connection_update.
+  useEffect(() => {
+    if (silent) return
+    const startedAt = Date.now()
+    const timer = setInterval(() => {
+      if (Date.now() - startedAt > STATUS_POLL_BUDGET_MS) {
+        clearInterval(timer)
+        return
+      }
+      if (document.visibilityState !== 'visible') return
+      if (Date.now() < statusBlockedUntil.current) return
+      if (statusFailures.current >= MAX_FAILURES) {
+        clearInterval(timer)
+        return
+      }
+      void runStatus(false)
+    }, STATUS_POLL_MS)
+    return () => clearInterval(timer)
+  }, [silent, runStatus])
+
+  const checkStatusButton = (
+    <div>
+      <button
+        type="button"
+        className="modern-button-secondary"
+        disabled={checking}
+        onClick={() => void runStatus(true)}
+      >
+        <Icon name="refresh" size={16} className={checking ? 'animate-spin' : ''} />
+        {t('whatsapp.qr.checkStatus')}
+      </button>
+      <p className="field-hint">{t('whatsapp.qr.checkStatusHint')}</p>
+    </div>
+  )
+
+  if (silent) {
+    return (
+      <div className="mt-4 rounded-md border border-amber-500/50 bg-amber-500/10 p-4">
+        <p className="text-sm leading-6 text-foreground">{t('whatsapp.qr.silent')}</p>
+        <div className="mt-3 flex flex-wrap items-start gap-3">
+          <button
+            type="button"
+            className="modern-button"
+            disabled={busy}
+            onClick={() => onForceNew(account)}
+          >
+            {t('whatsapp.qr.forceNew')}
+          </button>
+          {checkStatusButton}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="mt-4 rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-4">
+      <p className="text-sm font-semibold text-foreground">{t('whatsapp.qr.scan')}</p>
+      <p className="field-hint">{t('whatsapp.qr.path')}</p>
+
+      {qr ? (
+        <div className="mt-3 flex flex-col items-start gap-3 sm:flex-row sm:items-center">
+          {/* The white plate is not decoration: a QR rendered on the dark theme's
+              background is not readable by a phone camera. */}
+          <img
+            src={qr}
+            alt={t('whatsapp.qr.scan')}
+            className="size-48 rounded-md bg-white p-2 sm:size-56"
+          />
+          <p className="text-sm text-muted-foreground" aria-live="polite">
+            {remaining <= 0
+              ? t('whatsapp.qr.expired')
+              : remaining <= QR_REFRESH_AT_S
+                ? t('whatsapp.qr.expiring', { seconds: remaining })
+                : t('whatsapp.qr.expiresIn', { seconds: remaining })}
+          </p>
+        </div>
+      ) : (
+        <p className="mt-3 text-sm text-muted-foreground" aria-live="polite">
+          {t('whatsapp.qr.waiting')}
+        </p>
+      )}
+
+      <div className="mt-4 flex flex-wrap items-start gap-3">
+        <button
+          type="button"
+          className="modern-button-secondary"
+          disabled={busy}
+          onClick={() => onForceNew(account)}
+        >
+          {t('whatsapp.qr.forceNew')}
+        </button>
+        {checkStatusButton}
+      </div>
+    </div>
+  )
+}
+
+interface Props {
+  config: WhatsAppConfig | null
+}
+
+/**
+ * The connected numbers, one card each. It lives outside `settings.tsx` so the
+ * pairing state machine does not have to share a component with nine other
+ * tabs' worth of form state.
+ */
+export function WhatsAppConnection({ config }: Props) {
+  const { t, formatDateTime } = useTranslation()
+  const toast = useToast()
+
+  const [accounts, setAccounts] = useState<WhatsAppAccount[]>([])
+  const [loading, setLoading] = useState(true)
+  const [busyId, setBusyId] = useState<number | null>(null)
+  const [creating, setCreating] = useState(false)
+  const [adding, setAdding] = useState(false)
+  const [editing, setEditing] = useState<number | null>(null)
+  const [form, setForm] = useState<{
+    label: string
+    purpose: WhatsAppPurpose
+    baseUrl: string
+    adminKey: string
+  }>({ label: '', purpose: 'general', baseUrl: '', adminKey: '' })
+  const [edit, setEdit] = useState<{ label: string; purpose: WhatsAppPurpose }>({
+    label: '',
+    purpose: 'general'
+  })
+
+  const managed = Boolean(config?.managed)
+
+  const load = useCallback(async () => {
+    const res = await whatsappAPI.listAccounts()
+    if (res.success && res.data) setAccounts(res.data)
+    setLoading(false)
+  }, [])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  // Stable: the pairing block keys its intervals off this callback, and a new
+  // identity on every render would reset the 8 s cadence before it ever fired.
+  const mergeAccount = useCallback((account: WhatsAppAccount) => {
+    setAccounts((current) => current.map((row) => (row.id === account.id ? account : row)))
+  }, [])
+
+  const createAccount = useCallback(async () => {
+    setCreating(true)
+    try {
+      const res = await whatsappAPI.createAccount({
+        label: form.label || undefined,
+        purpose: form.purpose,
+        // Ignored in managed mode, where the panel owns the server and the
+        // operator never sees its address or its key.
+        ...(managed ? {} : {
+          ...(form.baseUrl ? { baseUrl: form.baseUrl } : {}),
+          ...(form.adminKey ? { adminKey: form.adminKey } : {})
+        })
+      })
+      if (!res.success || !res.data) {
+        toast.error(whatsappErrorMessage(t, res.code))
+        return
+      }
+      const created = { ...res.data.account, qrCode: res.data.qr ?? res.data.account.qrCode }
+      setAccounts((current) => [...current, created])
+      setAdding(false)
+      setForm({ label: '', purpose: 'general', baseUrl: '', adminKey: '' })
+    } finally {
+      setCreating(false)
+    }
+  }, [form, managed, t, toast])
+
+  /**
+   * "Unpair and generate a new QR". A server still holding a session RESUMES it
+   * instead of issuing a code, so a logout is the only escape — and after the
+   * logout the pairing has to start from a new instance. The old row is dropped
+   * only once the new one exists: it is the panel's single handle on the
+   * instance, and losing it early would leave something running on the server
+   * with no way to reach it.
+   */
+  const forceNew = useCallback(async (account: WhatsAppAccount) => {
+    setBusyId(account.id)
+    try {
+      const out = await whatsappAPI.disconnectAccount(account.id)
+      if (!out.success) {
+        toast.error(whatsappErrorMessage(t, out.code))
+        return
+      }
+      const res = await whatsappAPI.createAccount({
+        label: account.label || undefined,
+        purpose: account.purpose,
+        ...(managed ? {} : { baseUrl: account.baseUrl })
+      })
+      if (!res.success || !res.data) {
+        toast.error(whatsappErrorMessage(t, res.code))
+        await load()
+        return
+      }
+      await whatsappAPI.deleteAccount(account.id)
+      await load()
+    } finally {
+      setBusyId(null)
+    }
+  }, [load, managed, t, toast])
+
+  const act = useCallback(async (
+    account: WhatsAppAccount,
+    run: () => Promise<{ success: boolean; code?: string; message?: string }>
+  ) => {
+    setBusyId(account.id)
+    try {
+      const res = await run()
+      if (!res.success) {
+        toast.error(whatsappErrorMessage(t, res.code))
+        return
+      }
+      await load()
+    } finally {
+      setBusyId(null)
+    }
+  }, [load, t, toast])
+
+  const removeAccount = useCallback(async (account: WhatsAppAccount) => {
+    const title = account.label || account.phoneE164 || account.name
+    if (!window.confirm(`${t('whatsapp.actions.delete')} — ${title}`)) return
+    setBusyId(account.id)
+    try {
+      const res = await whatsappAPI.deleteAccount(account.id)
+      if (!res.success) {
+        toast.error(whatsappErrorMessage(t, res.code))
+        return
+      }
+      // The row goes either way; the server may have kept the instance. The
+      // reason it gives is the Evolution server's own words, so the operator
+      // gets the warning without the dump.
+      if (res.data && !res.data.removedOnServer) toast.warning(t('api.requestFailed'))
+      await load()
+    } finally {
+      setBusyId(null)
+    }
+  }, [load, t, toast])
+
+  const saveEdit = useCallback(async (account: WhatsAppAccount) => {
+    setBusyId(account.id)
+    try {
+      const res = await whatsappAPI.updateAccount(account.id, {
+        label: edit.label,
+        purpose: edit.purpose
+      })
+      if (!res.success) {
+        toast.error(whatsappErrorMessage(t, res.code))
+        return
+      }
+      setEditing(null)
+      await load()
+    } finally {
+      setBusyId(null)
+    }
+  }, [edit, load, t, toast])
+
+  return (
+    <div className="mt-8 border-t border-border pt-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h3 className="section-heading">{t('whatsapp.accounts.title')}</h3>
+        <div className="flex gap-2">
+          <button type="button" className="modern-button-secondary" onClick={() => void load()}>
+            <Icon name="refresh" size={16} />
+            {t('common.refresh')}
+          </button>
+          <button
+            type="button"
+            className="modern-button"
+            disabled={!config?.ready}
+            onClick={() => setAdding((current) => !current)}
+          >
+            {t('whatsapp.accounts.add')}
+          </button>
+        </div>
+      </div>
+
+      {!config?.ready && (
+        <p className="field-hint">{t('whatsapp.error.notConfigured')}</p>
+      )}
+
+      {adding && (
+        <div className="mt-4 space-y-4 rounded-md border border-border p-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="wa-new-label" className="field-label">
+                {t('whatsapp.accounts.label')}
+              </label>
+              <input
+                id="wa-new-label"
+                type="text"
+                className="modern-input w-full"
+                value={form.label}
+                onChange={(event) => setForm((c) => ({ ...c, label: event.target.value }))}
+              />
+            </div>
+            <div className="flex flex-col justify-end">
+              {/* The dictionary ships the purpose VALUES but no field label for
+                  them, and inventing one would mean editing five locales another
+                  agent owns. The control is named by the value it carries rather
+                  than by an untranslated string invented here. */}
+              <select
+                aria-label={t(`whatsapp.purpose.${form.purpose}`)}
+                className="modern-input w-full"
+                value={form.purpose}
+                onChange={(event) =>
+                  setForm((c) => ({ ...c, purpose: event.target.value as WhatsAppPurpose }))}
+              >
+                {PURPOSES.map((purpose) => (
+                  <option key={purpose} value={purpose}>{t(`whatsapp.purpose.${purpose}`)}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {!managed && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="wa-new-base-url" className="field-label">
+                  {t('whatsapp.accounts.serverUrl')}
+                </label>
+                <input
+                  id="wa-new-base-url"
+                  type="url"
+                  className="modern-input w-full"
+                  placeholder="https://evolution.exemplo.com"
+                  value={form.baseUrl}
+                  onChange={(event) => setForm((c) => ({ ...c, baseUrl: event.target.value }))}
+                />
+              </div>
+              <div>
+                <label htmlFor="wa-new-admin-key" className="field-label">
+                  {t('settings.whatsapp.adminKey')}
+                </label>
+                <input
+                  id="wa-new-admin-key"
+                  type="password"
+                  autoComplete="new-password"
+                  className="modern-input w-full"
+                  value={form.adminKey}
+                  onChange={(event) => setForm((c) => ({ ...c, adminKey: event.target.value }))}
+                />
+                <p className="field-hint">{t('settings.whatsapp.adminKeyHint')}</p>
+              </div>
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              className="modern-button"
+              disabled={creating}
+              onClick={() => void createAccount()}
+            >
+              {creating ? t('common.saving') : t('whatsapp.actions.connect')}
+            </button>
+            <button
+              type="button"
+              className="modern-button-secondary"
+              onClick={() => setAdding(false)}
+            >
+              {t('common.cancel')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {loading ? (
+        <p className="mt-4 text-sm text-muted-foreground">{t('common.loading')}</p>
+      ) : accounts.length === 0 ? (
+        <p className="mt-4 text-sm text-muted-foreground">{t('whatsapp.accounts.empty')}</p>
+      ) : (
+        <ul className="mt-4 space-y-3">
+          {accounts.map((account) => {
+            const busy = busyId === account.id
+            const pairing = account.status === 'pending' || account.status === 'connecting'
+            const down = account.status === 'disconnected' || account.status === 'expired'
+            return (
+              <li key={account.id} className="rounded-md border border-border p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">
+                      {account.label || account.name}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {account.phoneE164 || t('common.notAvailable')}
+                      {' · '}
+                      {t(`whatsapp.purpose.${account.purpose}`)}
+                      {' · '}
+                      {account.lastSeenAt ? formatDateTime(account.lastSeenAt) : t('common.never')}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {account.isDefault && (
+                      <span className="modern-badge-info">{t('whatsapp.accounts.isDefault')}</span>
+                    )}
+                    <span className={STATUS_BADGE[account.status]}>
+                      <span className="status-dot" />
+                      {t(STATUS_LABEL[account.status])}
+                    </span>
+                  </div>
+                </div>
+
+                {account.lastError && (
+                  /* The stored diagnostic, shown on purpose: it is the only
+                     record of why a number stopped, and it is already in the
+                     row rather than in a response we are translating. */
+                  <p className="mt-2 break-all font-mono text-xs text-muted-foreground">
+                    {account.lastError}
+                  </p>
+                )}
+
+                {editing === account.id ? (
+                  <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label htmlFor={`wa-label-${account.id}`} className="field-label">
+                        {t('whatsapp.accounts.label')}
+                      </label>
+                      <input
+                        id={`wa-label-${account.id}`}
+                        type="text"
+                        className="modern-input w-full"
+                        value={edit.label}
+                        onChange={(event) => setEdit((c) => ({ ...c, label: event.target.value }))}
+                      />
+                    </div>
+                    <div className="flex flex-col justify-end">
+                      <select
+                        aria-label={t(`whatsapp.purpose.${edit.purpose}`)}
+                        className="modern-input w-full"
+                        value={edit.purpose}
+                        onChange={(event) =>
+                          setEdit((c) => ({ ...c, purpose: event.target.value as WhatsAppPurpose }))}
+                      >
+                        {PURPOSES.map((purpose) => (
+                          <option key={purpose} value={purpose}>
+                            {t(`whatsapp.purpose.${purpose}`)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex flex-wrap gap-3 sm:col-span-2">
+                      <button
+                        type="button"
+                        className="modern-button"
+                        disabled={busy}
+                        onClick={() => void saveEdit(account)}
+                      >
+                        {busy ? t('common.saving') : t('common.save')}
+                      </button>
+                      <button
+                        type="button"
+                        className="modern-button-secondary"
+                        onClick={() => setEditing(null)}
+                      >
+                        {t('common.cancel')}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {account.status === 'connected' && !account.isDefault && (
+                      <button
+                        type="button"
+                        className="modern-button-secondary"
+                        disabled={busy}
+                        onClick={() => void act(account, () =>
+                          whatsappAPI.updateAccount(account.id, { isDefault: true }))}
+                      >
+                        {t('whatsapp.accounts.makeDefault')}
+                      </button>
+                    )}
+                    {down && (
+                      <button
+                        type="button"
+                        className="modern-button-secondary"
+                        disabled={busy}
+                        onClick={() => void act(account, () => whatsappAPI.restartAccount(account.id))}
+                      >
+                        {t('whatsapp.actions.reconnect')}
+                      </button>
+                    )}
+                    {account.status === 'connected' && (
+                      <>
+                        <button
+                          type="button"
+                          className="modern-button-secondary"
+                          disabled={busy}
+                          onClick={() => void act(account, () => whatsappAPI.restartAccount(account.id))}
+                        >
+                          {t('whatsapp.actions.restart')}
+                        </button>
+                        <button
+                          type="button"
+                          className="modern-button-secondary"
+                          disabled={busy}
+                          onClick={() => void act(account, () => whatsappAPI.disconnectAccount(account.id))}
+                        >
+                          {t('whatsapp.actions.disconnect')}
+                        </button>
+                      </>
+                    )}
+                    {down && (
+                      <button
+                        type="button"
+                        className="modern-button-secondary"
+                        disabled={busy}
+                        onClick={() => void forceNew(account)}
+                      >
+                        {t('whatsapp.qr.forceNew')}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="modern-button-secondary"
+                      disabled={busy}
+                      onClick={() => {
+                        setEdit({ label: account.label ?? '', purpose: account.purpose })
+                        setEditing(account.id)
+                      }}
+                    >
+                      <Icon name="edit" size={16} />
+                      {t('common.edit')}
+                    </button>
+                    <button
+                      type="button"
+                      className="modern-button-danger"
+                      disabled={busy}
+                      onClick={() => void removeAccount(account)}
+                    >
+                      <Icon name="trash" size={16} />
+                      {t('whatsapp.actions.delete')}
+                    </button>
+                  </div>
+                )}
+
+                {pairing && (
+                  <QrPairing
+                    account={account}
+                    busy={busy}
+                    onAccount={mergeAccount}
+                    onForceNew={(row) => void forceNew(row)}
+                  />
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+export default WhatsAppConnection
