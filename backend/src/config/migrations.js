@@ -239,6 +239,21 @@ const customerWifiCredentialsTable = (db) => (t) => {
   t.unique(['account_id', 'wifi_index']);
 };
 
+/**
+ * A provider. One row today — the install itself — so that every table that
+ * will be scoped has something real to point at before anything depends on it.
+ */
+const tenantsTable = (db) => (t) => {
+  t.increments('id').primary();
+  // The subdomain the panel will be reached at once tenants are resolved by
+  // host; unique from the start so nothing has to be de-duplicated later.
+  t.string('slug', 64).notNullable().unique();
+  t.string('name', 128).notNullable();
+  t.string('status', 16).notNullable().defaultTo('active');
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  t.timestamp('updated_at').defaultTo(db.fn.now());
+};
+
 const provisioningProfilesTable = (db) => (t) => {
   t.increments('id').primary();
   t.string('name', 128).notNullable().unique();
@@ -549,6 +564,10 @@ const WHATSAPP_TABLES = [
  * `mapping_edges`, and `customer_accounts` before `sgp_links` and
  * `customer_wifi_credentials`.
  */
+const TENANCY_TABLES = [
+  ['tenants', tenantsTable]
+];
+
 const INITIAL_TABLES = [
   ['users', usersTable],
   ['settings', keyValueTable],
@@ -575,10 +594,24 @@ const INITIAL_TABLES = [
  * quietly behind.
  */
 export const SCHEMA_TABLES = [
+  ...TENANCY_TABLES,
   ...INITIAL_TABLES,
   ...PROVISIONING_TABLES,
   ...WHATSAPP_TABLES
 ].map(([name]) => name);
+
+/**
+ * The columns that identify a subscriber account. Each is unique across the
+ * whole table today; each has to become unique per provider instead.
+ *
+ * `identity_hash` is the one that matters most: it is
+ * sha256(softwareId, pppoe_username), so two providers running the same
+ * firmware with a subscriber of the same name produce the same value. Left
+ * globally unique, the second provider's device sync would find the first
+ * provider's account and re-point it — which is the correct behaviour for an
+ * ONT swap inside one provider, and account theft across two.
+ */
+const CUSTOMER_ACCOUNT_IDENTITY_COLUMNS = ['customer_id', 'device_id', 'identity_hash'];
 
 async function createTableIfMissing(db, name, builder) {
   if (await db.schema.hasTable(name)) return;
@@ -731,6 +764,61 @@ export const migrations = [
           for (const add of missing) add(t);
         });
       }
+    }
+  },
+  {
+    // The first table to become per-provider, and the one that cannot wait:
+    // its identity columns are unique across the whole table, so a second
+    // provider's device sync would collide with — and re-point — the first
+    // provider's accounts.
+    id: '0010_customer_accounts_tenant',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return false;
+      return db.schema.hasColumn('customer_accounts', 'tenant_id');
+    },
+    async up(db) {
+      for (const [name, table] of TENANCY_TABLES) {
+        await createTableIfMissing(db, name, table(db));
+      }
+
+      // The install itself becomes provider #1, under the name already on
+      // screen, so nothing looks different to an operator.
+      let tenant = await db('tenants').orderBy('id', 'asc').first();
+      if (!tenant) {
+        const appName = await db('settings').where({ key: 'appName' }).first();
+        await db('tenants').insert({
+          slug: 'default',
+          name: appName?.value || 'SkyGenPanel',
+          status: 'active'
+        });
+        tenant = await db('tenants').orderBy('id', 'asc').first();
+      }
+
+      if (await db.schema.hasColumn('customer_accounts', 'tenant_id')) return;
+
+      // Nullable first: the table already has rows, and the schema alone has
+      // no sensible default to give them.
+      await db.schema.alterTable('customer_accounts', (t) => {
+        t.integer('tenant_id').unsigned();
+      });
+      await db('customer_accounts').whereNull('tenant_id').update({ tenant_id: tenant.id });
+
+      // One rebuild on SQLite rather than several: tighten the column, point it
+      // at tenants, and move every identity unique to be per-provider.
+      //
+      // The default is this install's own provider, baked in from the row just
+      // created rather than hardcoded. Until requests carry a tenant, every
+      // write belongs to it, so existing code keeps inserting correct rows
+      // without knowing tenancy exists. The scoping work that follows sets the
+      // column explicitly on every insert and can then drop the default.
+      await db.schema.alterTable('customer_accounts', (t) => {
+        t.integer('tenant_id').unsigned().notNullable().defaultTo(tenant.id).alter();
+        t.foreign('tenant_id').references('id').inTable('tenants');
+        for (const column of CUSTOMER_ACCOUNT_IDENTITY_COLUMNS) {
+          t.dropUnique([column]);
+          t.unique(['tenant_id', column]);
+        }
+      });
     }
   }
 ];
