@@ -269,6 +269,22 @@ class WaBroadcastService {
    * Built field by field like `publicAccount`, and for the same reason: a
    * column added later must not reach the browser by default.
    */
+  /**
+   * A timestamp the browser can read, whatever the driver handed back.
+   *
+   * The same column arrives three ways: a string from SQLite, a `Date` from
+   * MySQL and Postgres, and — on the row a build has just written — whatever
+   * the insert put there, which came out as epoch millis. All three are typed
+   * `string | null` on the other side, so two of them are a lie the screen only
+   * survives because its formatter is forgiving.
+   */
+  static asIso(value) {
+    if (value === null || value === undefined || value === '') return null;
+    if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value.toISOString();
+    if (typeof value === 'number') return new Date(value).toISOString();
+    return String(value);
+  }
+
   static publicBroadcast(row) {
     if (!row) return null;
     return {
@@ -280,9 +296,9 @@ class WaBroadcastService {
       sentCount: Number(row.sent_count || 0),
       failedCount: Number(row.failed_count || 0),
       rateLimitPerMin: row.rate_limit_per_min ?? null,
-      startAt: row.start_at || null,
-      createdAt: row.created_at || null,
-      updatedAt: row.updated_at || null
+      startAt: this.asIso(row.start_at),
+      createdAt: this.asIso(row.created_at),
+      updatedAt: this.asIso(row.updated_at)
     };
   }
 }
