@@ -222,6 +222,8 @@ export default function DashboardPage() {
   const sgpGroups = useMemo<SgpDivergenceGroup[]>(() => {
     if (!sgpOverview) return []
     const { onlineBlocked, offlineActive, unlinked } = sgpOverview.divergences
+    // The lists are samples; the counts to show come from `totals`.
+    const { totals } = sgpOverview
     return [
       {
         key: 'onlineBlocked',
@@ -229,7 +231,7 @@ export default function DashboardPage() {
         hintKey: 'dashboard.sgp.onlineBlocked.hint',
         emptyKey: 'dashboard.sgp.onlineBlocked.empty',
         tone: 'text-[hsl(var(--status-danger))]',
-        total: onlineBlocked.length,
+        total: totals.onlineBlocked,
         rows: onlineBlocked.slice(0, SGP_PREVIEW_ROWS).map((row) => ({
           deviceId: row.deviceId,
           detail: [row.clientName, row.statusLabel || row.state, row.contract].filter(Boolean).join(' · '),
@@ -241,7 +243,7 @@ export default function DashboardPage() {
         hintKey: 'dashboard.sgp.offlineActive.hint',
         emptyKey: 'dashboard.sgp.offlineActive.empty',
         tone: 'text-[hsl(var(--status-warning))]',
-        total: offlineActive.length,
+        total: totals.offlineActive,
         rows: offlineActive.slice(0, SGP_PREVIEW_ROWS).map((row) => ({
           deviceId: row.deviceId,
           detail: [row.clientName, row.contract, row.lastInform ? t('dashboard.sgp.lastInform', { time: formatDateTime(row.lastInform) }) : null]
@@ -255,7 +257,7 @@ export default function DashboardPage() {
         hintKey: 'dashboard.sgp.unlinked.hint',
         emptyKey: 'dashboard.sgp.unlinked.empty',
         tone: 'text-foreground',
-        total: unlinked.length,
+        total: totals.unlinked,
         rows: unlinked.slice(0, SGP_PREVIEW_ROWS).map((row) => ({
           deviceId: row.deviceId,
           detail: [row.pppoe, row.customerId].filter(Boolean).join(' · ') || t('dashboard.sgp.noIdentifier'),

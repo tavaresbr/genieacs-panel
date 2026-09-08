@@ -30,11 +30,43 @@ async function createLegacyCustomerAccounts(db) {
   });
 }
 
+// The SGP link layout shipped before contract states were derived.
+async function createLegacySgpLinks(db) {
+  await db.schema.createTable('sgp_links', (t) => {
+    t.increments('id').primary();
+    t.string('device_id', 255).notNullable().unique();
+    t.integer('account_id').unsigned();
+    t.string('contract', 64).notNullable();
+    t.string('document', 32);
+    t.string('client_name', 255);
+    t.string('plan', 255);
+    t.string('status', 64);
+    t.string('status_label', 128);
+    t.string('login', 255);
+    t.string('link_mode', 16).notNullable().defaultTo('auto');
+    t.timestamp('last_synced_at').defaultTo(db.fn.now());
+    t.timestamp('created_at').defaultTo(db.fn.now());
+    t.timestamp('updated_at').defaultTo(db.fn.now());
+  });
+  await db('sgp_links').insert({
+    device_id: 'legacy-device-1',
+    contract: '4321',
+    client_name: 'Cliente Legado',
+    status_label: 'Ativo',
+    link_mode: 'auto'
+  });
+}
+
 const LEGACY_CUSTOMER_ID = 'CSG-LEGACY1-234567';
 let portalUrl;
 
 before(async () => {
-  ({ portalUrl } = await startTestServers({ beforeSchema: createLegacyCustomerAccounts }));
+  ({ portalUrl } = await startTestServers({
+    beforeSchema: async (db) => {
+      await createLegacyCustomerAccounts(db);
+      await createLegacySgpLinks(db);
+    }
+  }));
 });
 
 after(async () => {
@@ -95,5 +127,14 @@ describe('upgrading an existing installation', () => {
 
   it('is a no-op on a second run', async () => {
     assert.equal(await CustomerPortalPasswordService.backfillMissing(), 0);
+  });
+
+  it('adds the derived SGP contract state without losing links', async () => {
+    const db = getDb();
+    assert.ok(await db.schema.hasColumn('sgp_links', 'state'));
+    const link = await db('sgp_links').where({ device_id: 'legacy-device-1' }).first();
+    assert.equal(link.contract, '4321');
+    // Existing rows keep the default until the next sync rewrites them.
+    assert.equal(link.state, 'unknown');
   });
 });

@@ -89,6 +89,39 @@ class SgpController {
     }
   }
 
+  static async listLinks(req, res) {
+    try {
+      const links = await SgpService.listLinks();
+      return res.json(createResponse(
+        `${links.length} vínculo(s) com o SGP`,
+        { links }
+      ));
+    } catch (error) {
+      return handleError(res, error, 'Falha ao listar os vínculos com o SGP');
+    }
+  }
+
+  static async syncFleet(req, res) {
+    try {
+      const result = await SgpService.syncFleet();
+      return res.json(createResponse(
+        `Sincronização concluída: ${result.linked} de ${result.total} ONT(s) vinculados`,
+        result
+      ));
+    } catch (error) {
+      return handleError(res, error, 'Falha ao sincronizar a base com o SGP');
+    }
+  }
+
+  static async getOverview(req, res) {
+    try {
+      const overview = await SgpService.getFleetOverview();
+      return res.json(createResponse('Panorama do SGP carregado', overview));
+    } catch (error) {
+      return handleError(res, error, 'Falha ao carregar o panorama do SGP');
+    }
+  }
+
   static async getDeviceIntegration(req, res) {
     try {
       const deviceId = readDeviceId(req);

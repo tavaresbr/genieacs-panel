@@ -349,7 +349,14 @@ export interface SgpSyncSummary {
 
 export interface SgpFleetOverview {
   enabled: boolean
-  totals: { devices: number; linked: number; unlinked: number }
+  // `totals` carries the full counts; the `divergences` lists are capped samples.
+  totals: {
+    devices: number
+    linked: number
+    unlinked: number
+    onlineBlocked: number
+    offlineActive: number
+  }
   byState: Record<SgpContractState, number>
   divergences: {
     onlineBlocked: SgpDivergenceRow[]

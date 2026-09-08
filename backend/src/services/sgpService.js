@@ -1,11 +1,19 @@
 import AppState from '../models/AppState.js';
 import CustomerAccount from '../models/CustomerAccount.js';
 import SgpLink from '../models/SgpLink.js';
+import DeviceService from './deviceService.js';
 import { createSecretBox } from '../utils/secretBox.js';
 
 const CONFIG_KEY = 'sgp_integration_config';
+const SYNC_STATE_KEY = 'sgp_sync_last_run';
 const CONFIG_CACHE_TTL_MS = 30_000;
 const REQUEST_TIMEOUT_MS = 15_000;
+// The provider's SGP is a production billing system shared with the call
+// centre, so a fleet sync never opens more than a handful of connections.
+const SYNC_CONCURRENCY = 5;
+// Same freshness rule the customer portal overview uses for "online".
+const ONLINE_WINDOW_MS = 10 * 60 * 1000;
+const DIVERGENCE_LIMIT = 50;
 
 // SGP exposes the URA (self-service) endpoints below on every provider
 // instance. They stay configurable because deployments occasionally publish
@@ -18,6 +26,14 @@ export const DEFAULT_ENDPOINTS = Object.freeze({
 
 export const LINK_MODES = Object.freeze(['pppoe', 'customer_id', 'manual']);
 
+export const CONTRACT_STATES = Object.freeze(['active', 'blocked', 'cancelled', 'unknown']);
+
+const CONTRACT_STATE_PATTERNS = Object.freeze({
+  cancelled: /cancelad|encerrad|desativad|inativ/,
+  blocked: /bloquead|suspens|inadimplen/,
+  active: /ativo/
+});
+
 const tokenBox = createSecretBox('skygenpanel-sgp-token-v1');
 
 export class SgpError extends Error {
@@ -28,6 +44,17 @@ export class SgpError extends Error {
     this.status = status;
     this.details = details;
   }
+}
+
+// SGP answers "no such customer" the same way it answers a real failure: a
+// rejected status with a message. Telling them apart keeps a fleet sync from
+// reporting every unregistered ONT as a provider error.
+const NOT_FOUND_PATTERN = /nao encontrad|inexistente|not found|nenhum (cliente|contrato)|sem (cliente|contrato)/;
+
+function isNotFound(error) {
+  return error instanceof SgpError
+    && error.code === 'sgp_rejected'
+    && NOT_FOUND_PATTERN.test(stripAccents(error.message).toLowerCase());
 }
 
 function encryptToken(token) {
@@ -118,6 +145,28 @@ function normalizeContract(entry) {
       return ['1', 'true', 'sim', 's'].includes(String(value).trim().toLowerCase());
     })()
   };
+}
+
+function stripAccents(value) {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+// Every install words its contract statuses differently, so the panel derives a
+// stable state instead of grouping by the label itself. The order of the checks
+// is the whole point: a cancellation is matched first because "Inativo" and
+// "Desativado" contain "ativo", and an explicit `bloqueado` flag outranks a
+// label that still reads "Ativo". The two fields are matched separately, never
+// concatenated, so no pattern can straddle the boundary between them.
+function deriveContractState(contract) {
+  const labels = [contract?.statusLabel, contract?.status].map(stripAccents);
+  const matches = (pattern) => labels.some((label) => pattern.test(label));
+  if (matches(CONTRACT_STATE_PATTERNS.cancelled)) return 'cancelled';
+  if (contract?.blocked === true || matches(CONTRACT_STATE_PATTERNS.blocked)) return 'blocked';
+  if (matches(CONTRACT_STATE_PATTERNS.active)) return 'active';
+  return 'unknown';
 }
 
 function normalizeInvoice(entry) {
@@ -257,6 +306,16 @@ class SgpService {
     return Boolean(config.enabled && config.baseUrl && config.app && config.token);
   }
 
+  static requireReady(config) {
+    if (!this.isReady(config)) {
+      throw new SgpError('Integração com o SGP não está configurada', {
+        code: 'not_configured',
+        status: 409
+      });
+    }
+    return config;
+  }
+
   static async saveConfig(patch = {}) {
     const current = await this.getConfig();
     const next = {
@@ -312,13 +371,7 @@ class SgpService {
   }
 
   static async request(endpointKey, payload = {}, configOverride = null) {
-    const config = configOverride || await this.getConfig();
-    if (!this.isReady(config)) {
-      throw new SgpError('Integração com o SGP não está configurada', {
-        code: 'not_configured',
-        status: 409
-      });
-    }
+    const config = this.requireReady(configOverride || await this.getConfig());
 
     const endpoint = config.endpoints[endpointKey] || DEFAULT_ENDPOINTS[endpointKey];
     const url = `${config.baseUrl}${endpoint}`;
@@ -470,6 +523,7 @@ class SgpService {
       plan: contract.plan ? String(contract.plan).slice(0, 255) : null,
       status: contract.status ? String(contract.status).slice(0, 64) : null,
       status_label: contract.statusLabel ? String(contract.statusLabel).slice(0, 128) : null,
+      state: deriveContractState(contract),
       login: contract.login ? String(contract.login).slice(0, 255) : null,
       link_mode: linkMode,
       last_synced_at: new Date()
@@ -491,14 +545,7 @@ class SgpService {
   // wins; otherwise the configured link mode decides which identifier is sent
   // to the SGP lookup, and a successful match is cached in sgp_links.
   static async resolveDeviceContract(deviceId, { refresh = false } = {}) {
-    const config = await this.getConfig();
-    if (!this.isReady(config)) {
-      throw new SgpError('Integração com o SGP não está configurada', {
-        code: 'not_configured',
-        status: 409
-      });
-    }
-
+    const config = this.requireReady(await this.getConfig());
     const stored = await SgpLink.getByDeviceId(deviceId);
     const account = await CustomerAccount.getByDeviceId(deviceId);
 
@@ -540,13 +587,7 @@ class SgpService {
   }
 
   static async linkDevice(deviceId, { contract, document }) {
-    const config = await this.getConfig();
-    if (!this.isReady(config)) {
-      throw new SgpError('Integração com o SGP não está configurada', {
-        code: 'not_configured',
-        status: 409
-      });
-    }
+    const config = this.requireReady(await this.getConfig());
     const { contracts } = await this.lookupCustomer({ contract, document }, config);
     const selected = this.pickContract(contracts, contract);
     if (!selected) {
@@ -564,6 +605,12 @@ class SgpService {
     return SgpLink.deleteByDeviceId(deviceId);
   }
 
+  // Rows written before the `state` column existed carry no value at all, so the
+  // reader always falls back instead of trusting what is stored.
+  static linkState(link) {
+    return CONTRACT_STATES.includes(link?.state) ? link.state : 'unknown';
+  }
+
   static publicLink(link) {
     if (!link) return null;
     return {
@@ -573,6 +620,7 @@ class SgpService {
       plan: link.plan,
       status: link.status,
       statusLabel: link.status_label,
+      state: this.linkState(link),
       login: link.login,
       linkMode: link.link_mode,
       lastSyncedAt: link.last_synced_at
@@ -586,6 +634,205 @@ class SgpService {
     const base = this.publicLink(link);
     if (!base) return null;
     return { ...base, document: maskDocument(base.document) };
+  }
+
+  static async listLinks() {
+    this.requireReady(await this.getConfig());
+    const links = await SgpLink.getAll();
+    return links.map((link) => ({
+      deviceId: link.device_id,
+      contract: link.contract,
+      clientName: link.client_name,
+      plan: link.plan,
+      status: link.status,
+      statusLabel: link.status_label,
+      state: this.linkState(link),
+      linkMode: link.link_mode,
+      lastSyncedAt: link.last_synced_at
+        ? new Date(link.last_synced_at).toISOString()
+        : null
+    }));
+  }
+
+  // Refreshes one account during a fleet sync. A manual link is never
+  // re-pointed: the operator chose that contract, so only its cached fields are
+  // refreshed even when SGP would now answer with a different one.
+  static async syncAccount(account, stored, config) {
+    const manual = stored?.link_mode === 'manual';
+    const filters = manual || config.linkMode === 'manual'
+      ? { contract: stored?.contract }
+      : config.linkMode === 'customer_id'
+        ? { contract: account.customer_id }
+        : { login: account.pppoe_username };
+    if (!filters.contract && !filters.login) return 'skipped';
+
+    const { contracts } = await this.lookupCustomer(filters, config);
+    const contract = manual
+      ? contracts.find((entry) => entry.contract === stored.contract) || null
+      : this.pickContract(contracts, stored?.contract || null);
+    if (!contract) return 'skipped';
+
+    await SgpLink.upsert(this.contractToLinkRow(contract, {
+      deviceId: account.device_id,
+      accountId: account.id,
+      linkMode: manual ? 'manual' : 'auto'
+    }));
+    return stored ? 'updated' : 'created';
+  }
+
+  // Fleet-wide refresh of every device that has a customer account.
+  // `linked` counts the devices that hold a link once the run is over, so it
+  // also covers the ones whose refresh failed but whose cached link survived.
+  // `skipped` covers devices with no identifier for the configured link mode
+  // and lookups that matched no contract, however SGP phrased that answer;
+  // `failed` covers real SGP errors only.
+  static async syncFleet() {
+    const config = this.requireReady(await this.getConfig());
+    const startedAt = new Date();
+    const accounts = await CustomerAccount.getSyncTargets();
+    const stored = new Map(
+      (await SgpLink.getAll()).map((link) => [link.device_id, link])
+    );
+    const summary = {
+      total: accounts.length,
+      linked: 0,
+      created: 0,
+      updated: 0,
+      failed: 0,
+      skipped: 0
+    };
+
+    let cursor = 0;
+    const worker = async () => {
+      while (cursor < accounts.length) {
+        const account = accounts[cursor];
+        cursor += 1;
+        const link = stored.get(account.device_id) || null;
+        let outcome;
+        try {
+          outcome = await this.syncAccount(account, link, config);
+        } catch (error) {
+          // One unreachable contract must never cost the operator the run.
+          outcome = isNotFound(error) ? 'skipped' : 'failed';
+          if (!(error instanceof SgpError)) {
+            console.error(`SGP fleet sync failed for ${account.device_id}:`, error);
+          }
+        }
+        summary[outcome] += 1;
+        if (outcome === 'created' || outcome === 'updated' || link) summary.linked += 1;
+      }
+    };
+    await Promise.all(Array.from(
+      { length: Math.min(SYNC_CONCURRENCY, accounts.length) },
+      () => worker()
+    ));
+
+    const finishedAt = new Date();
+    const result = {
+      ...summary,
+      durationMs: finishedAt.getTime() - startedAt.getTime(),
+      startedAt: startedAt.toISOString(),
+      finishedAt: finishedAt.toISOString()
+    };
+    await AppState.upsert(SYNC_STATE_KEY, JSON.stringify(result));
+    return result;
+  }
+
+  static async getLastSync() {
+    const raw = await AppState.get(SYNC_STATE_KEY);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+
+  // Cross-references what GenieACS knows (is the ONT informing?) with what SGP
+  // knows (is the contract payable?). Neither system can see these two on its
+  // own: an ONT online on a blocked contract is a possible unauthorised
+  // reconnection, and an active contract with a silent ONT is a customer with a
+  // problem who has not called yet.
+  static async getFleetOverview() {
+    this.requireReady(await this.getConfig());
+    const devices = await DeviceService.getCustomerIdentityDevices();
+    const links = new Map(
+      (await SgpLink.getAll()).map((link) => [link.device_id, link])
+    );
+    const deviceIds = devices.map((device) => String(device._id || '')).filter(Boolean);
+    const customerIds = new Map(
+      (await CustomerAccount.getIdsByDeviceIds(deviceIds))
+        .map((row) => [row.device_id, row.customer_id])
+    );
+
+    const now = Date.now();
+    const byState = { active: 0, blocked: 0, cancelled: 0, unknown: 0 };
+    const onlineBlocked = [];
+    const offlineActive = [];
+    const unlinked = [];
+    let linked = 0;
+
+    for (const device of devices) {
+      const deviceId = String(device._id || '');
+      if (!deviceId) continue;
+      const link = links.get(deviceId);
+      if (!link) {
+        unlinked.push({
+          deviceId,
+          customerId: customerIds.get(deviceId) || null,
+          pppoe: device.pppoe || null
+        });
+        continue;
+      }
+
+      linked += 1;
+      const state = this.linkState(link);
+      byState[state] += 1;
+      const lastInform = device._lastInform || null;
+      const age = lastInform ? now - new Date(lastInform).getTime() : Number.NaN;
+      const online = Number.isFinite(age) && age >= 0 && age < ONLINE_WINDOW_MS;
+      const entry = {
+        deviceId,
+        contract: link.contract,
+        clientName: link.client_name,
+        statusLabel: link.status_label,
+        state,
+        lastInform
+      };
+      if (online && (state === 'blocked' || state === 'cancelled')) {
+        onlineBlocked.push(entry);
+      } else if (!online && state === 'active') {
+        offlineActive.push(entry);
+      }
+    }
+
+    // GenieACS timestamps are ISO strings, so they order lexicographically.
+    // The most recent reconnection and the longest silence come first.
+    const informOrder = (left, right) => String(left.lastInform || '')
+      .localeCompare(String(right.lastInform || ''));
+    onlineBlocked.sort((left, right) => informOrder(right, left));
+    offlineActive.sort(informOrder);
+
+    return {
+      enabled: true,
+      totals: {
+        devices: deviceIds.length,
+        linked,
+        unlinked: unlinked.length,
+        onlineBlocked: onlineBlocked.length,
+        offlineActive: offlineActive.length
+      },
+      byState,
+      // The lists are samples capped at DIVERGENCE_LIMIT; `totals` always
+      // carries the full counts.
+      divergences: {
+        onlineBlocked: onlineBlocked.slice(0, DIVERGENCE_LIMIT),
+        offlineActive: offlineActive.slice(0, DIVERGENCE_LIMIT),
+        unlinked: unlinked.slice(0, DIVERGENCE_LIMIT)
+      },
+      lastSync: await this.getLastSync(),
+      generatedAt: new Date().toISOString()
+    };
   }
 
   static async testConnection(overrides = {}) {
@@ -650,5 +897,5 @@ class SgpService {
   }
 }
 
-export { maskDocument, normalizeContract, normalizeInvoice };
+export { deriveContractState, maskDocument, normalizeContract, normalizeInvoice };
 export default SgpService;
