@@ -565,6 +565,21 @@ const INITIAL_TABLES = [
   ['customer_wifi_credentials', customerWifiCredentialsTable]
 ];
 
+/**
+ * Every table the schema owns, in creation order — which is also the order the
+ * foreign keys require, so it is safe to insert along and to delete against.
+ *
+ * Derived from the lists above rather than written out again: anything that
+ * needs to know the full set (copying a panel to another database, asserting
+ * coverage in a test) reads this, so adding a table cannot leave a second list
+ * quietly behind.
+ */
+export const SCHEMA_TABLES = [
+  ...INITIAL_TABLES,
+  ...PROVISIONING_TABLES,
+  ...WHATSAPP_TABLES
+].map(([name]) => name);
+
 async function createTableIfMissing(db, name, builder) {
   if (await db.schema.hasTable(name)) return;
   await db.schema.createTable(name, builder);

@@ -16,6 +16,33 @@ O objetivo é chegar a um deploy único capaz de atender dois provedores diferen
 qualquer possibilidade de um enxergar dados do outro**, com onboarding self-service,
 planos com limites e suspensão por inadimplência.
 
+### Estado: Fase 0 concluída
+
+As correções de segurança e a fundação de banco entraram
+([#12](https://github.com/tavaresbr/genieacs-panel/pull/12) e
+[#16](https://github.com/tavaresbr/genieacs-panel/pull/16)): flag `EDITION` com o seletor de
+banco fora da edição hospedada, `SECRET_BOX_KEY` separada do `JWT_SECRET` com versão de chave
+por segredo, PostgreSQL, `insertReturningId`, e a suíte rodando nos três dialetos no CI.
+
+O runner de migrations foi construído em paralelo por outra frente e vive em
+`backend/src/config/migrations.js` — passos com id estável e `isApplied` para baselining —
+não no migrator do knex como este documento propunha originalmente.
+
+**O alvo cresceu enquanto a Fase 0 era executada**: WhatsApp, provisionamento automático e
+gestão de usuários entraram. Os números abaixo são de um levantamento em `0127f49` e
+substituem os do primeiro rascunho.
+
+| | Primeiro rascunho | Hoje |
+| --- | --- | --- |
+| Tabelas | 13 | **24** |
+| Models | 13 | **20** |
+| Chamadas `getDb()(...)` nos models | 65 | **121** |
+| Caches globais em memória | 3 | **5** |
+
+A Fase 2 encolheu na mesma proporção: a API de gestão de usuários que este plano listava como
+inexistente já existe, em `/api/users`, com papéis `viewer`/`admin` e revogação de sessão na
+troca de papel.
+
 ### Decisões já tomadas
 
 | Tema | Decisão |
@@ -34,32 +61,44 @@ arquivo `LICENSE` e o aviso de copyright da SkydashNET devem ser mantidos no pro
 
 ## Estado atual relevante
 
-- **Backend**: Node ESM + Express 5 + **Knex 3** (sem ORM, **sem sistema de migrations**).
-  Schema aplicado imperativamente no boot por `ensureSchema()` em `backend/src/config/schema.js`.
+- **Backend**: Node ESM + Express 5 + **Knex 3**, sem ORM. Migrations em
+  `backend/src/config/migrations.js`, aplicadas no boot por `ensureSchema()`
+  (`backend/src/config/schema.js`), com ledger em `schema_migrations`.
 - **Dois listeners no mesmo processo**: painel (`app`, 5890) e portal do assinante
   (`portalApp`, 5891) — `backend/src/app.js`, `backend/src/server.js`.
-- **Banco**: SQLite padrão, MySQL opcional, **trocado em runtime pela UI de Settings**
-  (`backend/src/services/dbManagementService.js`, `backend/src/routes/database.js`).
-- **Acesso a dados**: 13 classes estáticas finas em `backend/src/models/*.js`, todas sobre
-  um único `getDb()` (`backend/src/config/database.js`). Isso é a boa notícia: os pontos de
-  inserção do filtro de tenant são poucos e bem definidos.
+- **Banco**: SQLite padrão; MySQL e PostgreSQL suportados. A troca em runtime pela UI de
+  Settings (`backend/src/services/dbManagementService.js`, `backend/src/routes/database.js`)
+  existe **só na edição self-hosted** desde a Fase 0.
+- **Acesso a dados**: 20 classes estáticas finas em `backend/src/models/*.js`, todas sobre
+  um único `getDb()` (`backend/src/config/database.js`), mais o helper
+  `insertReturningId`. A boa notícia continua valendo: os pontos de inserção do filtro de
+  tenant são muitos (121) mas ficam todos num diretório.
 - **GenieACS**: URL única em `settings.genieAcsUrl`, resolvida em
   `DeviceService.getGenieAcsRootUrl()` (`backend/src/services/deviceService.js:117`).
   **Nenhum header de autenticação é enviado** e credenciais na URL são explicitamente
   rejeitadas — assume-se NBI em loopback/rede privada.
 - **Auth operador**: JWT bearer, `backend/src/middleware/auth.js`, payload
-  `{userId, username, role, tokenVersion}`, `audience: 'skygenpanel-admin'`.
+  `{userId, username, role, tokenVersion}`, `audience: 'skygenpanel-admin'`. Já existe
+  gestão de usuários em `/api/users`, com papéis `viewer`/`admin`.
+- **Integrações que guardam segredos**: SGP, provisionamento automático e WhatsApp via
+  Evolution API. Todas cifram com `secretBox`, e desde a Fase 0 registram a versão da chave.
 - **Auth assinante**: cookie `skygp_portal_session`, `backend/src/middleware/portalAuth.js`,
   login resolve **só por `customer_id`** (`customerPortalController.login:27`).
 
 ### Achados críticos para o multi-tenant
 
-1. **Três caches globais em memória** que hoje vazariam dados entre provedores:
-   - `DeviceService.dashboardCache` (`deviceService.js:28`) — objeto único, serviria o
+1. **Cinco caches globais em memória** que hoje vazariam dados entre provedores:
+   - `DeviceService.dashboardCache` (`deviceService.js`) — objeto único, serviria o
      dashboard do provedor A para o B. Persistido em `app_state.dashboard_snapshot`.
-   - `CustomerPortalController.overviewCache` (`customerPortalController.js:16`) — chaveado
+   - `CustomerPortalController.overviewCache` (`customerPortalController.js`) — chaveado
      só por `account.id`.
-   - `SgpService.configCache` (`sgpService.js:163`) — config SGP única.
+   - `SgpService.configCache` (`sgpService.js`) — config SGP única, **com o token decifrado**.
+   - `ProvisioningService.configCache` (`provisioningService.js`).
+   - `WhatsAppConfigService.configCache` (`whatsappConfigService.js`) — inclui a chave admin
+     decifrada do Evolution.
+
+   Os três `configCache` são o caso mais grave: além de servirem a configuração do provedor
+   errado, dois deles carregam segredo decifrado em memória.
 2. **Uniques globais** que se tornam colisão entre tenants: `users.username`,
    `customer_accounts.customer_id` / `device_id` / `identity_hash`, `device_profiles.device_id`,
    `sgp_links.device_id`, `mapping_nodes.node_id`, `mapping_edges.edge_id`.
@@ -127,23 +166,22 @@ e o GenieACS em rede privada; a edição SaaS desliga tudo isso.
 
 ## Fases
 
-### Fase 0 — Fundação: migrations reais e banco do SaaS *(esforço: médio)*
+### Fase 0 — Fundação: banco do SaaS e segurança ✅ *(concluída)*
 
-Sem migrations versionadas não dá para evoluir o schema de um SaaS em produção.
-
-- Introduzir **knex migrations**: `backend/knexfile.js` + `backend/migrations/`.
-- Migration `001_baseline` reproduz exatamente o schema atual. Para installs existentes,
-  o boot roda `ensureSchema()` uma última vez e marca a baseline como aplicada
-  (`knex.migrate.latest()` a partir daí). `ensureSchema()` deixa de crescer.
-- **Banco do SaaS: PostgreSQL.** Motivo principal: `RLS` (Row Level Security) é a única
-  defesa estrutural real contra vazamento no modelo de banco compartilhado, e Postgres tem
-  índices parciais/uniques compostos com `NULL` que vamos precisar nos catálogos.
-  Custo honesto: é um terceiro dialeto. Ajustes concretos necessários:
-  - `insert()` retornando id — hoje `const [id] = await getDb()(...).insert(...)` funciona em
-    sqlite/mysql; no Postgres exige `.returning('id')`. Criar helper
-    `insertReturningId(table, row)` em `backend/src/config/database.js` e trocar nos ~13 models.
-  - booleanos (`active`, `enabled`) e `db.fn.now()` — validar por dialeto.
-- Manter SQLite/MySQL apenas na edição self-hosted.
+- **Migrations**: construídas em paralelo por outra frente, em
+  `backend/src/config/migrations.js` — array ordenado de passos com id estável e `isApplied`
+  para baselinear um install anterior ao runner. Este documento propunha o migrator do knex;
+  o que existe é melhor e chegou primeiro.
+- **PostgreSQL**, porque `RLS` é a única defesa estrutural real contra vazamento no modelo de
+  banco compartilhado. Helper `insertReturningId` (`backend/src/config/database.js`) porque
+  `const [id] = ...insert()` só devolve id em sqlite e mysql.
+- **Suíte nos três dialetos no CI.** É o que impede a próxima migration de depender de algo
+  que só um banco aceita — e foi o que revelou quatro defeitos que já estavam no repositório,
+  incluindo uma FK entre coluna com e sem sinal que tornava **impossível criar um banco MySQL
+  novo**.
+- **`SECRET_BOX_KEY`** separada do `JWT_SECRET`, com a versão da chave gravada em cada
+  segredo, para que rotacionar o segredo de sessão deixe de destruir os dados cifrados.
+- **`EDITION`**, tirando o seletor de banco da edição hospedada.
 
 **Dois itens de segurança que precisam entrar já aqui, antes de existir um segundo tenant:**
 
@@ -252,7 +290,7 @@ não só contra um fixture sintético — `backend/test/migration.test.js` já t
 
 #### Mecanismo anti-vazamento — o ponto mais importante do plano
 
-Confiar em lembrar de escrever `.where('tenant_id')` em 13 arquivos **não é aceitável**
+Confiar em lembrar de escrever `.where('tenant_id')` em 20 arquivos **não é aceitável**
 para um produto comercial. Proposta em três camadas:
 
 **(a) Contexto implícito por requisição** — `backend/src/config/tenantContext.js`:
@@ -301,9 +339,11 @@ Todos os models trocam `getDb()('tabela')` por `tdb('tabela')`. Como o `where` j
 aplicado, esquecer o filtro deixa de ser possível — e uma chamada fora de contexto
 **lança exceção** em vez de retornar dados de todo mundo.
 
-Escopo real dessa troca: **65 chamadas `getDb()(...)`, todas confinadas aos 13 arquivos de
-`backend/src/models/`**. Nenhum controller ou service acessa o banco direto — é por isso que
-essa abordagem é viável aqui e o guarda automatizado da letra (c) consegue ser absoluto.
+Escopo real dessa troca: **121 chamadas `getDb()(...)` em 20 arquivos de
+`backend/src/models/`**. O único acesso ao banco fora dali é
+`backend/src/services/dbManagementService.js`, que copia o painel inteiro entre bancos e
+portanto precisa ver todas as linhas — é a exceção legítima, e o guarda da letra (c) a lista
+nominalmente em vez de abrir uma brecha por diretório.
 
 **(c) Guardas automatizados**
 - Teste de análise estática (`backend/test/tenant-scoping.test.js`) que varre
@@ -323,8 +363,12 @@ essa abordagem é viável aqui e o guarda automatizado da letra (c) consegue ser
 
 #### `dbManagementService.COPY_TABLES`
 
-O array em `dbManagementService.js:7` precisa listar toda tabela nova — ou o serviço inteiro
-sai da edição SaaS (ver Fase 7). Recomendo **remover da edição SaaS** e manter no self-hosted.
+Resolvido na atualização deste documento: a lista passou a ser derivada de `SCHEMA_TABLES`,
+exportada por `migrations.js` na ordem de criação, com um teste que falha se ela deixar de
+cobrir o schema. Antes disso era escrita à mão e já tinha ficado **oito tabelas para trás** —
+uma troca de banco teria levado o painel sem nenhum dado de WhatsApp.
+
+A rota em si já saiu da edição SaaS na Fase 0.
 
 ---
 
@@ -339,8 +383,9 @@ sai da edição SaaS (ver Fase 7). Recomendo **remover da edição SaaS** e mant
 - **Plano de plataforma** (nós, operando o SaaS): audience separada
   `skygenpanel-platform`, rotas `/api/platform/*`, capaz de listar/suspender tenants e de
   fazer *impersonation* auditada. Nunca compartilha o mesmo token do operador.
-- **API de usuários que hoje não existe**: convidar, listar, trocar papel, remover —
-  `backend/src/routes/team.js` + `backend/src/controllers/teamController.js`.
+- **API de usuários**: já existe em `/api/users` (listar, criar, trocar papel, remover, com
+  revogação de sessão na troca). Falta escopá-la por tenant e acrescentar o fluxo de
+  convite por e-mail — bem menos do que este plano previa.
 - **Portal do assinante**: `CustomerAccount.getByCustomerId` passa a receber o tenant;
   login resolve `(tenant_id, customer_id)`. O cookie precisa ser **host-only** (sem
   `domain=.dominio`) para não vazar sessão entre subdomínios de provedores diferentes —
@@ -520,7 +565,7 @@ mesmo `node_id` nos dois — e então, para cada recurso:
   (`auth.test.js`, `customer-portal.test.js`, `sgp.test.js`, `portal-password-admin.test.js`,
   `rate-limit.test.js`), de modo que todo teste legado vira também teste de escopo.
 
-**Testes por model** (`backend/test/tenant-scoping.test.js`): para cada um dos 13 models,
+**Testes por model** (`backend/test/tenant-scoping.test.js`): para cada um dos 20 models,
 gravar em A e em B e conferir a leitura cruzada; e afirmar que **todo método público lança
 `TenantScopeError` fora de contexto de tenant**. Essa última asserção é o teste de melhor
 custo-benefício da suíte inteira.
@@ -573,7 +618,7 @@ Os arquivos que concentram o trabalho, por tamanho atual:
 `frontend/src/pages/device-detail.tsx` (1939 — pouco afetado),
 `frontend/src/pages/customer-portal.tsx` (964 — Fase 2),
 `backend/src/services/sgpService.js` (654 — cache e config por tenant).
-Os 13 models são pequenos e a troca para `tdb()` é mecânica.
+Os 20 models são pequenos e a troca para `tdb()` é mecânica, mas são 121 pontos.
 
 ## Ordem recomendada de entrega
 
@@ -594,7 +639,7 @@ Nada disso é negociável:
 2. Nenhum código de aplicação alcança tabela de tenant sem contexto — `currentTenantId()`
    lança, o ESLint bloqueia `getDb`, e o CI verifica os dois.
 3. Login e sessão do portal do assinante escopados por tenant.
-4. Os três caches em memória e o blob `app_state.dashboard_snapshot` separados por tenant.
+4. Os cinco caches em memória e o blob `app_state.dashboard_snapshot` separados por tenant.
 5. JWT do operador e do assinante carregam o tenant, e ambos são conferidos contra o host.
 6. Credenciais ACS por tenant, cifradas, com a guarda de egresso no lugar e o branch de URL
    absoluta removido.

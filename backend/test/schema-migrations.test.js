@@ -7,7 +7,7 @@ import knexFactory from 'knex';
 import { getDb, startTestServers, stopTestServers } from './helpers/harness.js';
 
 const { ensureSchema, MIGRATIONS_TABLE } = await import('../src/config/schema.js');
-const { migrations } = await import('../src/config/migrations.js');
+const { migrations, SCHEMA_TABLES } = await import('../src/config/migrations.js');
 const { buildKnexConfig } = await import('../src/config/dbConfig.js');
 
 /** Every table the application expects once the runner is done. */
@@ -206,5 +206,48 @@ describe('baselining an installation created before the runner existed', () => {
     assert.deepEqual(await appliedIds(db), [...ALL_IDS].sort());
     const user = await db('users').where({ username: 'pre-existing' }).first();
     assert.equal(user.password, 'hash');
+  });
+});
+
+describe('the schema table list', () => {
+  const db = createDatabase('coverage');
+
+  before(async () => {
+    await ensureSchema(db);
+  });
+
+  // Copying a panel to another database walks this list. When it was written
+  // out by hand it fell eight tables behind, and a switch would have carried
+  // the panel across without any of the WhatsApp data.
+  it('names every table the migrations create', async () => {
+    const created = [];
+    for (const table of SCHEMA_TABLES) {
+      if (await db.schema.hasTable(table)) created.push(table);
+    }
+    assert.deepEqual(created.sort(), [...SCHEMA_TABLES].sort());
+  });
+
+  it('covers every application table the tests know about', () => {
+    const missing = APP_TABLES.filter((table) => !SCHEMA_TABLES.includes(table));
+    assert.deepEqual(missing, []);
+  });
+
+  // Order is what makes the list safe to insert along and delete against.
+  it('lists parents before the tables that reference them', () => {
+    const position = (table) => SCHEMA_TABLES.indexOf(table);
+    for (const [child, parent] of [
+      ['wifi_security_mappings', 'vendors'],
+      ['mapping_edges', 'mapping_nodes'],
+      ['sgp_links', 'customer_accounts'],
+      ['customer_wifi_credentials', 'customer_accounts'],
+      ['provisioning_runs', 'provisioning_profiles'],
+      ['wa_conversations', 'whatsapp_accounts'],
+      ['wa_messages', 'wa_conversations']
+    ]) {
+      assert.ok(
+        position(parent) < position(child),
+        `${parent} must come before ${child}`
+      );
+    }
   });
 });

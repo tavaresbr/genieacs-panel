@@ -2,27 +2,15 @@ import knexFactory from 'knex';
 import { getDb, closePool } from '../config/database.js';
 import { buildKnexConfig, readDbConfig, writeDbConfig } from '../config/dbConfig.js';
 import { ensureSchema } from '../config/schema.js';
+import { SCHEMA_TABLES } from '../config/migrations.js';
 import { seedDefaults } from '../config/seed.js';
 import { TranslatableError } from '../i18n/index.js';
 
-const COPY_TABLES = [
-  'users',
-  'settings',
-  'app_state',
-  'vendors',
-  'wifi_security_config',
-  'wifi_security_mappings',
-  'mapping_nodes',
-  'mapping_edges',
-  'map_settings',
-  'customer_accounts',
-  'device_profiles',
-  'customer_wifi_credentials',
-  'sgp_links',
-  'provisioning_profiles',
-  'provisioning_runs',
-  'sgp_events'
-];
+// Every table the schema owns, straight from the migrations. Kept derived
+// rather than listed here: the hand-written version fell eight tables behind
+// when WhatsApp landed, and a switch would have carried the panel across
+// without a single conversation, message or broadcast.
+const COPY_TABLES = SCHEMA_TABLES;
 
 function normalizeConfig(input) {
   const client = input.client === 'mysql' || input.client === 'mysql2' ? 'mysql2' : 'sqlite3';
