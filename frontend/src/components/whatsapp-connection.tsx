@@ -26,6 +26,7 @@ const ERROR_KEYS: Record<string, TranslationKey> = {
   not_configured: 'whatsapp.error.notConfigured',
   incomplete_config: 'whatsapp.error.incompleteConfig',
   invalid_webhook_url: 'whatsapp.error.invalidWebhookUrl',
+  invalid_portal_url: 'whatsapp.error.invalidPortalUrl',
   invalid_base_url: 'whatsapp.error.invalidBaseUrl',
   host_not_allowed: 'whatsapp.error.hostNotAllowed',
   blocked_host: 'whatsapp.error.blockedHost',
@@ -476,9 +477,11 @@ export function WhatsAppConnection({ config }: Props) {
         return
       }
       // The row goes either way; the server may have kept the instance. The
-      // reason it gives is the Evolution server's own words, so the operator
-      // gets the warning without the dump.
-      if (res.data && !res.data.removedOnServer) toast.warning(t('api.requestFailed'))
+      // reason it gives is the Evolution server's own words, so the warning
+      // says what the operator has to DO about it instead of quoting them.
+      if (res.data && !res.data.removedOnServer) {
+        toast.warning(t('whatsapp.accounts.removedLocallyOnly'))
+      }
       await load()
     } finally {
       setBusyId(null)

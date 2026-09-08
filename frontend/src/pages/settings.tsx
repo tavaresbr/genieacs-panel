@@ -102,6 +102,7 @@ export default function Settings() {
   const [waForm, setWaForm] = useState({
     enabled: false,
     webhookBaseUrl: '',
+    portalPublicUrl: '',
     allowedHosts: '',
     managedUrl: '',
     managedAdminKey: '',
@@ -180,6 +181,7 @@ export default function Settings() {
       setWaForm({
         enabled: config.enabled,
         webhookBaseUrl: config.webhookBaseUrl,
+        portalPublicUrl: config.portalPublicUrl,
         allowedHosts: config.allowedHosts.join('\n'),
         managedUrl: config.managedUrl,
         // The stored admin key never leaves the server; an empty field keeps it.
@@ -286,6 +288,7 @@ export default function Settings() {
       const res = await whatsappAPI.updateConfig({
         enabled: waForm.enabled,
         webhookBaseUrl: waForm.webhookBaseUrl,
+        portalPublicUrl: waForm.portalPublicUrl,
         // The API takes the textarea verbatim, one host per line.
         allowedHosts: waForm.allowedHosts,
         managedUrl: waForm.managedUrl,
@@ -1362,6 +1365,21 @@ export default function Settings() {
                   onChange={(event) => setWaForm((current) => ({ ...current, webhookBaseUrl: event.target.value }))}
                 />
                 <p className="field-hint">{t('settings.whatsapp.webhookUrlHint')}</p>
+              </div>
+
+              <div>
+                <label htmlFor="wa-portal-url" className="field-label">
+                  {t('settings.whatsapp.portalUrl')}
+                </label>
+                <input
+                  id="wa-portal-url"
+                  type="url"
+                  className="modern-input w-full"
+                  placeholder="https://portal.exemplo.com"
+                  value={waForm.portalPublicUrl}
+                  onChange={(event) => setWaForm((current) => ({ ...current, portalPublicUrl: event.target.value }))}
+                />
+                <p className="field-hint">{t('settings.whatsapp.portalUrlHint')}</p>
               </div>
 
               <div>
