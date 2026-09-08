@@ -587,6 +587,52 @@ precisa de conserto.
 com **~150 ms entre chamadas**. O SGP do provedor é o mesmo sistema que está,
 naquele instante, atendendo a URA de quem ligou.
 
+### Corrigir o número — `PUT /api/whatsapp/subscribers/:contract/phone`
+
+```ts
+// corpo
+{ phone: string }
+// resposta 200 — o assinante como a listagem o mostra, sem os campos da fatura
+{ contract, clientName, document, deviceId, phone, phoneSource: 'manual'|'sgp'|null }
+```
+
+Escreve `sgp_links.phone_manual`, que é a **correção do operador** e ganha de
+`phone_e164` em todo lugar que o painel resolve um número. Existe porque o
+cadastro do ERP envelhece e quem tem a correção na mão é o operador — e porque
+um número errado é mudo: o assinante cai no `noPhone` da campanha, disparo após
+disparo, sem nada aparecer na tela.
+
+**String vazia LIMPA a correção** e devolve o contrato para o registro do ERP.
+É operação de verdade, não requisição malformada: quem digitou errado precisa
+poder desfazer sem inventar um número para sobrescrever.
+
+O valor entra normalizado por `normalizarTelefoneBr` — a mesma forma que o
+envio usa. Guardar "(93) 98111-0449" ficaria certo na tela e não casaria com
+nada na hora de disparar.
+
+Escreve em **todas as ONTs do contrato**, não em uma: o leitor reduz
+`sgp_links` a um assinante por contrato e fica com a linha que vier primeiro por
+`device_id`, então uma correção pela metade voltaria a mostrar o número velho
+dependendo de qual ONT ganhasse.
+
+| Código | Quando | HTTP |
+| --- | --- | --- |
+| `invalid_phone` | número não discável (`whatsapp.error.invalidPhone`) | 400 |
+| `subscriber_not_found` | contrato que o painel nunca viu (`whatsapp.error.subscriberNotFound`) | 404 |
+
+**Um sync do SGP nunca apaga isto.** `contractToLinkRow`
+(`services/sgpService.js`) deixa `phone_manual` fora da linha de propósito, de
+modo que o `onConflict().merge()` do upsert não tem com o que sobrescrever — só
+`phone_e164` é atualizado. É a razão de o override ser uma coluna separada em
+vez de uma edição em `phone_e164`, e há teste cobrindo exatamente isso
+(`backend/test/whatsapp-subscriber-phone.test.js`).
+
+A resposta **não traz `amount`, `dueDate` nem `daysOverdue`**: eles custam um
+round trip ao SGP e corrigir um telefone não pode tê-los mudado. A tela aplica
+só `phone` e `phoneSource` na linha que já está na mão. Note que
+`whatsappAPI.setSubscriberPhone` declara `WhatsAppOverdueSubscriber` como
+retorno, que é mais largo do que o que a rota devolve.
+
 ### Montar a campanha — `POST /api/whatsapp/billing/campaign`
 
 ```ts

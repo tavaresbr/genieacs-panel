@@ -1,4 +1,4 @@
-import { getDb } from '../config/database.js';
+import { getDb, tdb } from '../config/database.js';
 
 class SgpLink {
   static async getByDeviceId(deviceId) {
@@ -32,6 +32,28 @@ class SgpLink {
   static async getByContract(contract) {
     if (!contract) return [];
     return getDb()('sgp_links').where({ contract: String(contract) }).orderBy('id', 'asc');
+  }
+
+  /**
+   * The operator's correction to a subscriber's number, written on every ONT
+   * the contract covers.
+   *
+   * All of them, not just one: the reader collapses `sgp_links` to one
+   * subscriber per contract and keeps whichever row sorts first by `device_id`,
+   * so correcting a single row would leave the panel showing the old number
+   * whenever a different ONT happened to sort ahead of it.
+   *
+   * `null` clears the override; nothing else in the row is touched, because
+   * everything else in it belongs to the ERP.
+   *
+   * Through `tdb` rather than `getDb` even though `sgp_links` is still one of
+   * the unfiltered tables: the day it gains its `tenant_id` this write starts
+   * being scoped without anybody having to remember this line exists.
+   */
+  static async setManualPhone(contract, phone) {
+    return tdb('sgp_links')
+      .where({ contract: String(contract) })
+      .update({ phone_manual: phone, updated_at: new Date() });
   }
 
   /** Round-robin page used by reconciliation so no link is starved. */

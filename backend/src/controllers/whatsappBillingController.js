@@ -199,6 +199,27 @@ class WhatsAppBillingController {
     }
   }
 
+  // ── The subscriber's number ──────────────────────────────────────────
+
+  /**
+   * Sets or clears the operator's correction to a subscriber's number.
+   *
+   * An empty `phone` is not a missing field to reject: it is the operator
+   * withdrawing a correction, which hands the contract back to the ERP record.
+   * Only a non-empty entry that could not be dialled is refused.
+   */
+  static async setSubscriberPhone(req, res) {
+    try {
+      const subscriber = await WaBillingService.setSubscriberPhone(
+        req.params.contract,
+        req.body?.phone
+      );
+      return res.json(createResponse(req.t('whatsapp.phoneSaved'), subscriber));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.phoneSaveFailed');
+    }
+  }
+
   // ── Campaigns ────────────────────────────────────────────────────────
 
   static async listBroadcasts(req, res) {
