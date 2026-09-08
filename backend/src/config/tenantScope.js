@@ -14,8 +14,12 @@ import { SCHEMA_TABLES } from './migrations.js';
  * difference matters, so the shared ones are named rather than left implicit.
  */
 export const SCOPED_TABLES = new Set([
-  // Nothing yet. `customer_accounts` has the column and the constraints; it
-  // enters here when its model and its leak test land.
+  // The three whose models delete or update without a where clause. Scoped
+  // first because a half-converted destructive write does not leak data, it
+  // destroys someone else's.
+  'mapping_nodes',
+  'mapping_edges',
+  'whatsapp_accounts'
 ]);
 
 /** Tables that belong to the deployment rather than to any one provider. */

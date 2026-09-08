@@ -1,9 +1,14 @@
 import { after, before, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { authHeaders, call, getDb, insertReturningId, startTestServers, stopTestServers } from './helpers/harness.js';
+import { asTenant, authHeaders, call, getDb, insertReturningId, startTestServers, stopTestServers } from './helpers/harness.js';
 
 const { default: WhatsAppConfigService } = await import('../src/services/whatsappConfigService.js');
 const { default: WhatsAppAccount } = await import('../src/models/WhatsAppAccount.js');
+
+// A scan reached directly has no request behind it, so nothing has resolved a
+// provider — the same position the timer is in, and why `tick` opens one. The
+// routes that call `scan` are already inside a request.
+const scan = (options) => asTenant(() => WaAlertService.scan(options));
 const { default: WaAlertService } = await import('../src/services/waAlertService.js');
 const { default: DeviceService } = await import('../src/services/deviceService.js');
 
@@ -60,12 +65,14 @@ async function reset() {
 }
 
 async function setRules(rules, extra = {}) {
-  await WaAlertService.saveSettings({
+  // Scoped for the same reason `scan` is: saving settings reads back the
+  // alert number to report whether alerts are actually deliverable.
+  await asTenant(() => WaAlertService.saveSettings({
     enabled: true,
     recipients: [ON_CALL],
     rules,
     ...extra
-  });
+  }));
 }
 
 /** Only the rule under test is on, so no fixture can trip a second one. */
@@ -96,7 +103,7 @@ before(async () => {
     webhookBaseUrl: 'https://painel.provedor.test/api/whatsapp-webhook'
   });
 
-  const account = await WhatsAppAccount.create({
+  const account = await asTenant(() => WhatsAppAccount.create({
     name: ALERTS,
     purpose: 'alerts',
     flavor: 'v2',
@@ -105,7 +112,7 @@ before(async () => {
     is_default: true,
     ...WhatsAppConfigService.encryptInstanceToken('token-alertas'),
     ...WhatsAppConfigService.encryptWebhookToken('webhook-alertas')
-  });
+  }));
   alertsAccountId = account.id;
 });
 
@@ -168,12 +175,12 @@ describe('each rule fires at its threshold and not just inside it', () => {
     await setRules(onlyRule('ont_offline', { threshold: 30, cooldownMinutes: 120 }));
 
     fleet = [device('dev-quase', { _lastInform: informedMinutesAgo(29) })];
-    let summary = await WaAlertService.scan({ now: now() });
+    let summary = await scan({ now: now() });
     assert.equal(summary.fired, 0, 'twenty-nine minutes is inside the window');
     assert.equal((await outbox()).length, 0);
 
     fleet = [device('dev-fora', { _lastInform: informedMinutesAgo(30) })];
-    summary = await WaAlertService.scan({ now: now() });
+    summary = await scan({ now: now() });
     assert.equal(summary.fired, 1);
     const rows = await alertRows();
     assert.equal(rows.length, 1);
@@ -186,11 +193,11 @@ describe('each rule fires at its threshold and not just inside it', () => {
     await setRules(onlyRule('rx_power_low', { threshold: -27, cooldownMinutes: 360 }));
 
     fleet = [device('dev-ok', { rxpower: -26.9 })];
-    let summary = await WaAlertService.scan({ now: now() });
+    let summary = await scan({ now: now() });
     assert.equal(summary.fired, 0);
 
     fleet = [device('dev-fraco', { rxpower: -27 })];
-    summary = await WaAlertService.scan({ now: now() });
+    summary = await scan({ now: now() });
     assert.equal(summary.fired, 1);
     assert.equal((await alertRows())[0].rule, 'rx_power_low');
   });
@@ -199,11 +206,11 @@ describe('each rule fires at its threshold and not just inside it', () => {
     await setRules(onlyRule('temperature_high', { threshold: 70, cooldownMinutes: 360 }));
 
     fleet = [device('dev-morno', { temperature: 69.9 })];
-    let summary = await WaAlertService.scan({ now: now() });
+    let summary = await scan({ now: now() });
     assert.equal(summary.fired, 0);
 
     fleet = [device('dev-quente', { temperature: 70 })];
-    summary = await WaAlertService.scan({ now: now() });
+    summary = await scan({ now: now() });
     assert.equal(summary.fired, 1);
     assert.equal((await alertRows())[0].rule, 'temperature_high');
   });
@@ -214,14 +221,14 @@ describe('a firing condition speaks once', () => {
     await setRules(onlyRule('ont_offline', { threshold: 30, cooldownMinutes: 60 }));
     fleet = [device('dev-teimoso', { _lastInform: informedMinutesAgo(120) })];
 
-    const first = await WaAlertService.scan({ now: now() });
+    const first = await scan({ now: now() });
     assert.equal(first.fired, 1);
     assert.equal((await outbox()).length, 1);
 
     // Three more passes over the same unchanged fault.
-    await WaAlertService.scan({ now: now() });
-    await WaAlertService.scan({ now: now() });
-    await WaAlertService.scan({ now: now() });
+    await scan({ now: now() });
+    await scan({ now: now() });
+    await scan({ now: now() });
     assert.equal((await outbox()).length, 1, 'a repeated alert is how a channel gets muted');
     let row = (await alertRows())[0];
     assert.equal(Number(row.notify_count), 1);
@@ -233,7 +240,7 @@ describe('a firing condition speaks once', () => {
       .where({ id: row.id })
       .update({ last_notified_at: new Date(Date.now() - 61 * MINUTE) });
 
-    const later = await WaAlertService.scan({ now: now() });
+    const later = await scan({ now: now() });
     assert.equal(later.fired, 0, 'a repeat is not a new condition');
     assert.equal((await outbox()).length, 2);
     row = (await alertRows())[0];
@@ -245,12 +252,12 @@ describe('a recovery is a message too', () => {
   it('says so once and clears the row', async () => {
     await setRules(onlyRule('ont_offline', { threshold: 30, cooldownMinutes: 60 }));
     fleet = [device('dev-volta', { _lastInform: informedMinutesAgo(120) })];
-    await WaAlertService.scan({ now: now() });
+    await scan({ now: now() });
     const alerted = await outbox();
     assert.equal(alerted.length, 1);
 
     fleet = [device('dev-volta', { _lastInform: informedMinutesAgo(1) })];
-    const summary = await WaAlertService.scan({ now: now() });
+    const summary = await scan({ now: now() });
     assert.equal(summary.cleared, 1);
     assert.equal((await alertRows()).length, 0, 'the row goes with the fault');
 
@@ -263,7 +270,7 @@ describe('a recovery is a message too', () => {
     );
 
     // And only once: a cleared condition has nothing left to say.
-    await WaAlertService.scan({ now: now() });
+    await scan({ now: now() });
     assert.equal((await outbox()).length, 2);
   });
 });
@@ -313,7 +320,7 @@ describe('a mass outage is one message, not forty', () => {
       _lastInform: index < 5 ? informedMinutesAgo(45) : informedMinutesAgo(1)
     }));
 
-    const summary = await WaAlertService.scan({ now: now() });
+    const summary = await scan({ now: now() });
     assert.equal(summary.fired, 1, 'one fibre cut is one alert');
 
     const rows = await alertRows();
@@ -343,7 +350,7 @@ describe('a mass outage is one message, not forty', () => {
       _lastInform: index < 4 ? informedMinutesAgo(45) : informedMinutesAgo(1)
     }));
 
-    const summary = await WaAlertService.scan({ now: now() });
+    const summary = await scan({ now: now() });
     assert.equal(summary.fired, 4);
     const rules = new Set((await alertRows()).map((row) => row.rule));
     assert.deepEqual([...rules], ['ont_offline']);
@@ -355,9 +362,9 @@ describe('a scan that cannot say anything says why', () => {
     await setRules(onlyRule('ont_offline', { threshold: 30 }));
     fleet = [device('dev-mudo', { _lastInform: informedMinutesAgo(120) })];
 
-    await WhatsAppAccount.update(alertsAccountId, { status: 'disconnected' });
+    await asTenant(() => WhatsAppAccount.update(alertsAccountId, { status: 'disconnected' }));
     try {
-      const summary = await WaAlertService.scan({ now: now() });
+      const summary = await scan({ now: now() });
       assert.equal(summary.skipped, 'no_recipients');
       assert.equal(summary.fired, 0);
       assert.equal((await alertRows()).length, 0, 'nothing may be recorded as announced');
@@ -371,7 +378,7 @@ describe('a scan that cannot say anything says why', () => {
       assert.equal(status, 409);
       assert.equal(body.code, 'no_recipients');
     } finally {
-      await WhatsAppAccount.update(alertsAccountId, { status: 'connected' });
+      await asTenant(() => WhatsAppAccount.update(alertsAccountId, { status: 'connected' }));
     }
   });
 
@@ -408,7 +415,7 @@ describe('one bad reading is not the fleet', () => {
       device('dev-real', { _lastInform: informedMinutesAgo(90) })
     ];
 
-    const summary = await WaAlertService.scan({ now: now() });
+    const summary = await scan({ now: now() });
     assert.equal(summary.error, null, 'a scan must never throw out of a tick');
     const rows = await alertRows();
     assert.equal(rows.length, 1);
@@ -421,7 +428,7 @@ describe('one bad reading is not the fleet', () => {
       throw new Error('GenieACS API responded with status: 502');
     };
     try {
-      const summary = await WaAlertService.scan({ now: now() });
+      const summary = await scan({ now: now() });
       assert.equal(summary.skipped, 'error');
       assert.match(summary.error, /502/);
     } finally {
@@ -432,13 +439,13 @@ describe('one bad reading is not the fleet', () => {
   it('refuses to call an empty fleet a fleet-wide recovery', async () => {
     await setRules(onlyRule('ont_offline', { threshold: 30, cooldownMinutes: 60 }));
     fleet = [device('dev-vivo', { _lastInform: informedMinutesAgo(90) })];
-    await WaAlertService.scan({ now: now() });
+    await scan({ now: now() });
     assert.equal((await alertRows()).length, 1);
 
     // An empty read is a broken ACS far more often than a provider with no
     // ONTs, and treating it as "all clear" would blast one recovery per row.
     fleet = [];
-    const summary = await WaAlertService.scan({ now: now() });
+    const summary = await scan({ now: now() });
     assert.equal(summary.skipped, 'no_devices');
     assert.equal(summary.cleared, 0);
     assert.equal((await alertRows()).length, 1);
@@ -447,14 +454,14 @@ describe('one bad reading is not the fleet', () => {
 
 describe('the recipients are staff, and the do-not-disturb list still holds', () => {
   it('writes one message per recipient and skips a number that opted out', async () => {
-    await WaAlertService.saveSettings({
+    await asTenant(() => WaAlertService.saveSettings({
       enabled: true,
       recipients: [ON_CALL, SECOND_ON_CALL],
       rules: onlyRule('ont_offline', { threshold: 30, cooldownMinutes: 60 })
-    });
+    }));
     fleet = [device('dev-dois', { _lastInform: informedMinutesAgo(90) })];
 
-    await WaAlertService.scan({ now: now() });
+    await scan({ now: now() });
     assert.equal((await outbox()).length, 2);
 
     await getDb()('wa_alert_state').del();
@@ -465,7 +472,7 @@ describe('the recipients are staff, and the do-not-disturb list still holds', ()
       created_at: new Date()
     });
 
-    await WaAlertService.scan({ now: now() });
+    await scan({ now: now() });
     assert.equal((await outbox()).length, 1, 'an alert is the provider initiating contact');
     await getDb()('wa_opt_outs').del();
   });

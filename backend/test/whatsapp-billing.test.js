@@ -1,7 +1,7 @@
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { authHeaders, call, getDb, startTestServers, stopTestServers } from './helpers/harness.js';
+import { asTenant, authHeaders, call, getDb, startTestServers, stopTestServers } from './helpers/harness.js';
 
 const { default: SgpService } = await import('../src/services/sgpService.js');
 const { default: WhatsAppConfigService } = await import('../src/services/whatsappConfigService.js');
@@ -178,7 +178,7 @@ before(async () => {
     webhookBaseUrl: 'https://painel.provedor.test/api/whatsapp-webhook',
     rateLimitPerMin: 60
   });
-  await WhatsAppAccount.create({
+  await asTenant(() => WhatsAppAccount.create({
     name: 'painel-cobranca',
     purpose: 'billing',
     flavor: 'v2',
@@ -187,7 +187,7 @@ before(async () => {
     is_default: true,
     ...WhatsAppConfigService.encryptInstanceToken('token-instancia'),
     ...WhatsAppConfigService.encryptWebhookToken('token-webhook')
-  });
+  }));
 
   // One `sgp_links` row per subscriber: that table is where the panel keeps the
   // phone, so it is the campaign's address book.

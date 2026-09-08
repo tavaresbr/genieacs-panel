@@ -1,6 +1,6 @@
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { authHeaders, call, getDb, startTestServers, stopTestServers } from './helpers/harness.js';
+import { asTenant, authHeaders, call, getDb, startTestServers, stopTestServers } from './helpers/harness.js';
 
 const { default: WhatsAppConfigService } = await import('../src/services/whatsappConfigService.js');
 const { default: WhatsAppAccount } = await import('../src/models/WhatsAppAccount.js');
@@ -25,7 +25,7 @@ before(async () => {
   });
   token = setup.body.data.token;
 
-  const account = await WhatsAppAccount.create({
+  const account = await asTenant(() => WhatsAppAccount.create({
     name: INSTANCE,
     label: 'Cobrança',
     purpose: 'billing',
@@ -35,7 +35,7 @@ before(async () => {
     is_default: true,
     ...WhatsAppConfigService.encryptInstanceToken(INSTANCE_TOKEN),
     ...WhatsAppConfigService.encryptWebhookToken(WEBHOOK_TOKEN)
-  });
+  }));
   accountId = account.id;
 });
 
@@ -167,7 +167,7 @@ describe('whatsapp accounts', () => {
   });
 
   it('round-trips both secrets through independent boxes', async () => {
-    const row = await WhatsAppAccount.getById(accountId);
+    const row = await asTenant(() => WhatsAppAccount.getById(accountId));
     assert.equal(WhatsAppConfigService.decryptInstanceToken(row), INSTANCE_TOKEN);
     assert.equal(WhatsAppConfigService.decryptWebhookToken(row), WEBHOOK_TOKEN);
     // A ciphertext from one context must never decrypt as the other.
@@ -182,8 +182,8 @@ describe('whatsapp accounts', () => {
   });
 
   it('routes by purpose, and falls back to the default number', async () => {
-    assert.equal((await WhatsAppAccount.getForPurpose('billing')).id, accountId);
-    assert.equal((await WhatsAppAccount.getForPurpose('support')).id, accountId);
+    assert.equal((await asTenant(() => WhatsAppAccount.getForPurpose('billing'))).id, accountId);
+    assert.equal((await asTenant(() => WhatsAppAccount.getForPurpose('support'))).id, accountId);
   });
 });
 

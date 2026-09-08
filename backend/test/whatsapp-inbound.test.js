@@ -2,7 +2,7 @@ import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { call, getDb, startTestServers, stopTestServers } from './helpers/harness.js';
+import { asTenant, call, getDb, startTestServers, stopTestServers } from './helpers/harness.js';
 
 const { default: WhatsAppConfigService } = await import('../src/services/whatsappConfigService.js');
 const { default: WhatsAppAccount } = await import('../src/models/WhatsAppAccount.js');
@@ -75,7 +75,7 @@ function eventoGo({ id, chat, fromMe = false, texto = '', pushName = 'Cliente', 
 
 before(async () => {
   ({ panelUrl } = await startTestServers());
-  const account = await WhatsAppAccount.create({
+  const account = await asTenant(() => WhatsAppAccount.create({
     name: INSTANCE,
     purpose: 'support',
     flavor: 'v2',
@@ -84,7 +84,7 @@ before(async () => {
     is_default: true,
     ...WhatsAppConfigService.encryptInstanceToken(INSTANCE_TOKEN),
     ...WhatsAppConfigService.encryptWebhookToken(WEBHOOK_TOKEN)
-  });
+  }));
   accountId = account.id;
 });
 
@@ -492,7 +492,7 @@ describe('qr and connection', () => {
     assert.equal(status, 200);
     assert.equal(body.handled, true);
 
-    const conta = await WhatsAppAccount.getById(accountId);
+    const conta = await asTenant(() => WhatsAppAccount.getById(accountId));
     assert.equal(conta.qr_code, 'data:image/png;base64,AAAA');
     assert.equal(conta.status, 'connecting');
     assert.ok(conta.qr_updated_at);
@@ -506,7 +506,7 @@ describe('qr and connection', () => {
     });
     assert.equal(body.handled, true);
 
-    const conta = await WhatsAppAccount.getById(accountId);
+    const conta = await asTenant(() => WhatsAppAccount.getById(accountId));
     assert.equal(conta.status, 'connected');
     assert.equal(conta.phone_e164, '5593981110000');
     assert.equal(conta.qr_code, null, 'a paired session has no QR left to read');
@@ -518,10 +518,10 @@ describe('qr and connection', () => {
     // body: `readStatus('go', {})` would read that as disconnected, so the raw
     // event name has to be the fallback.
     await hook({ event: 'LoggedOut', instance: INSTANCE, data: {} });
-    assert.equal((await WhatsAppAccount.getById(accountId)).status, 'disconnected');
+    assert.equal((await asTenant(() => WhatsAppAccount.getById(accountId))).status, 'disconnected');
 
     await hook({ event: 'Connected', instance: INSTANCE, data: {} });
-    assert.equal((await WhatsAppAccount.getById(accountId)).status, 'connected');
+    assert.equal((await asTenant(() => WhatsAppAccount.getById(accountId))).status, 'connected');
   });
 
   it('answers 200 with a reason for an event it does not handle', async () => {

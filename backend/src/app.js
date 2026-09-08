@@ -9,6 +9,7 @@ import { testConnection } from './config/database.js';
 import { IS_SELF_HOSTED } from './config/edition.js';
 import { TRUST_PROXY } from './config/proxy.js';
 import { attachLocale } from './middleware/locale.js';
+import { resolveTenant } from './middleware/tenantResolver.js';
 import { DEFAULT_LOCALE, translate, translateError } from './i18n/index.js';
 import {
   apiLimiter,
@@ -154,6 +155,22 @@ app.use(express.json({ limit: '1mb' }));
 app.use('/api/whatsapp-webhook', whatsappWebhookRoutes);
 
 app.use('/api', apiLimiter);
+
+// Health answers before a provider is resolved, deliberately. It reports
+// whether the database is reachable, and resolving the provider is itself a
+// database read — behind the resolver, an unreachable database would answer a
+// blank 500 instead of naming the thing that is down.
+app.get('/api/health', async (req, res) => {
+  const database = await testConnection();
+  res.status(database ? 200 : 503).json({
+    status: database ? 'ok' : 'degraded',
+    database: database ? 'ok' : 'unavailable',
+    timestamp: new Date().toISOString(),
+    version: APP_VERSION
+  });
+});
+
+app.use('/api', resolveTenant);
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/refresh', authLimiter);
 app.use('/api/auth/setup', authLimiter);
@@ -178,16 +195,6 @@ app.use('/api/whatsapp', whatsappMessageRoutes);
 app.use('/api/whatsapp', whatsappAlertRoutes);
 app.use('/api/whatsapp', whatsappBillingRoutes);
 app.use('/api/provisioning', provisioningRoutes);
-
-app.get('/api/health', async (req, res) => {
-  const database = await testConnection();
-  res.status(database ? 200 : 503).json({
-    status: database ? 'ok' : 'degraded',
-    database: database ? 'ok' : 'unavailable',
-    timestamp: new Date().toISOString(),
-    version: APP_VERSION
-  });
-});
 
 app.use('/api', (req, res) => {
   res.status(404).json({ success: false, message: req.t('common.routeNotFound') });
@@ -272,10 +279,12 @@ portalApp.use(express.json({ limit: '16kb' }));
 // The login limiter keys on the submitted customer ID, so it must see a parsed body.
 portalApp.use('/api/customer/login', portalLoginLimiter);
 portalApp.use('/api', portalIpLimiter);
-portalApp.use('/api/customer', customerPortalRoutes);
+// Ahead of the resolver for the same reason as the panel's.
 portalApp.get('/api/health', (req, res) => {
   res.json({ status: 'ok', service: 'customer-portal', version: APP_VERSION });
 });
+portalApp.use('/api', resolveTenant);
+portalApp.use('/api/customer', customerPortalRoutes);
 portalApp.use('/api', (req, res) => {
   res.status(404).json({ success: false, message: req.t('common.routeNotFound') });
 });
