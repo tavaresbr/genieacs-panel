@@ -128,6 +128,13 @@ rebuilt.
   contract query returns no password, only the login is written. Turn on
   **Require the PPPoE password from SGP** to make that stop the run instead.
 
+## Schema
+
+The three tables (`provisioning_profiles`, `provisioning_runs`, `sgp_events`)
+are created by the `0006_provisioning_and_sgp_events` migration, so an existing
+installation picks them up on the first boot after upgrading and a fresh one
+gets them with the rest of the schema.
+
 ## API reference
 
 Administrator endpoints on the panel port:
