@@ -1,4 +1,4 @@
-export const LOCALES = ['pt-BR', 'en', 'es', 'it', 'de', 'fr', 'ja'] as const
+export const LOCALES = ['pt-BR', 'en', 'es', 'it', 'de', 'fr', 'ja', 'zh-CN'] as const
 
 export type Locale = (typeof LOCALES)[number]
 
@@ -27,6 +27,7 @@ export const LOCALE_METADATA: Record<Locale, LocaleMetadata> = {
   de: { label: 'Deutsch', shortLabel: 'DE', flag: '🇩🇪', intlLocale: 'de-DE' },
   fr: { label: 'Français', shortLabel: 'FR', flag: '🇫🇷', intlLocale: 'fr-FR' },
   ja: { label: '日本語', shortLabel: 'JA', flag: '🇯🇵', intlLocale: 'ja-JP' },
+  'zh-CN': { label: '简体中文', shortLabel: '中', flag: '🇨🇳', intlLocale: 'zh-CN' },
 }
 
 export function isLocale(value: unknown): value is Locale {
@@ -35,7 +36,8 @@ export function isLocale(value: unknown): value is Locale {
 
 /**
  * Resolves an arbitrary BCP-47 tag to a supported locale.
- * `pt`, `pt-PT` and `pt-BR` all resolve to `pt-BR`; `es-419` resolves to `es`.
+ * `pt`, `pt-PT` and `pt-BR` all resolve to `pt-BR`; `es-419` resolves to `es`;
+ * every `zh` tag resolves to `zh-CN`.
  */
 export function resolveLocale(tag: string | null | undefined): Locale | null {
   if (!tag) return null
@@ -51,6 +53,9 @@ export function resolveLocale(tag: string | null | undefined): Locale | null {
   if (base === 'de') return 'de'
   if (base === 'fr') return 'fr'
   if (base === 'ja') return 'ja'
+  // Only Simplified Chinese ships today, so every zh tag folds to it: Simplified
+  // is far closer for a zh-TW reader than the pt-BR default would be.
+  if (base === 'zh') return 'zh-CN'
   return null
 }
 
