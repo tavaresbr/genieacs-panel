@@ -7,6 +7,7 @@ import it from './locales/it.js';
 import ja from './locales/ja.js';
 import ptBR from './locales/pt-BR.js';
 import zhCN from './locales/zh-CN.js';
+import zhTW from './locales/zh-TW.js';
 
 export { DEFAULT_LOCALE, FALLBACK_LOCALE, LOCALES, negotiateLocale, resolveLocale };
 
@@ -18,7 +19,8 @@ export const dictionaries = {
   de,
   fr,
   ja,
-  'zh-CN': zhCN
+  'zh-CN': zhCN,
+  'zh-TW': zhTW
 };
 
 const PLACEHOLDER_PATTERN = /\{(\w+)\}/g;
