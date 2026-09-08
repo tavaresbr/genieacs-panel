@@ -1,4 +1,4 @@
-export const LOCALES = ['pt-BR', 'en', 'es'];
+export const LOCALES = ['pt-BR', 'en', 'es', 'it'];
 
 export const DEFAULT_LOCALE = 'pt-BR';
 
@@ -19,6 +19,7 @@ export function resolveLocale(tag) {
   if (base === 'pt') return 'pt-BR';
   if (base === 'en') return 'en';
   if (base === 'es') return 'es';
+  if (base === 'it') return 'it';
   return null;
 }
 

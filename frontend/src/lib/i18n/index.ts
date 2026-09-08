@@ -15,12 +15,13 @@ type LazyLocale = Exclude<Locale, 'en'>
 /**
  * English is bundled: it is the fallback, and `translate()` must stay
  * synchronous for the plain helpers in `lib/utils`. Every other dictionary is
- * fetched on demand so a visitor downloads one locale instead of three.
+ * fetched on demand so a visitor downloads one locale instead of all of them.
  */
 const loaded: Partial<Record<Locale, Dictionary>> = { en }
 
 const loaders: Record<LazyLocale, () => Promise<{ default: Dictionary }>> = {
   es: () => import('@/lib/i18n/locales/es'),
+  it: () => import('@/lib/i18n/locales/it'),
   'pt-BR': () => import('@/lib/i18n/locales/pt-BR'),
 }
 
