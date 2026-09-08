@@ -5,6 +5,7 @@ import { seedDefaults } from './config/seed.js';
 import DeviceService from './services/deviceService.js';
 import CustomerService from './services/customerService.js';
 import CustomerPortalPasswordService from './services/customerPortalPasswordService.js';
+import SchedulerService from './services/schedulerService.js';
 
 const PORT = Number(process.env.APP_PORT) || 5890;
 const PORTAL_PORT = process.env.PORTAL_PORT === '0'
@@ -60,6 +61,11 @@ export const startServer = async () => {
         .catch((error) => {
           console.warn(`Customer portal password backfill skipped: ${error.message}`);
         });
+      // The periodic jobs read their own enabled flags, so this starts the
+      // driver whether or not the features are on.
+      void SchedulerService.start().catch((error) => {
+        console.warn(`Background scheduler not started: ${error.message}`);
+      });
       console.log(`Panel: http://localhost:${PORT}`);
     });
     portalServer = portalApp.listen(PORTAL_PORT, PORTAL_HOST, () => {
@@ -78,6 +84,7 @@ startServer();
 
 async function shutdown(signal) {
   console.log(`Received ${signal}; shutting down`);
+  SchedulerService.stop();
   if (server) {
     await new Promise((resolve) => server.close(resolve));
   }

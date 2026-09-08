@@ -116,6 +116,17 @@ export const portalUnlockLimiter = limiter({
 
 /** Operator-side reveal/reset of a customer portal password. */
 /**
+ * The webhook is public, so it gets its own bucket rather than sharing the
+ * one the panel's own UI draws from.
+ */
+export const sgpWebhookLimiter = limiter({
+  windowMs: 60 * 1000,
+  max: 120,
+  keyGenerator: ipKey,
+  message: limitMessage('rateLimit.requests')
+});
+
+/**
  * Provisioning actions write to a subscriber's CPE and each one waits on a
  * connection request, so they are limited per operator on top of the shared
  * API limit rather than by source address.
