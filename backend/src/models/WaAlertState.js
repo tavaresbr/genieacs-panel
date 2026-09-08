@@ -1,4 +1,4 @@
-import { getDb, insertReturningId } from '../config/database.js';
+import { getDb, tdb, tinsert, tinsertReturningId } from '../config/database.js';
 
 /**
  * The set of technical conditions the panel currently believes are firing.
@@ -33,12 +33,12 @@ class WaAlertState {
    * minutes to discover that nothing changed.
    */
   static async listOpen() {
-    return getDb()('wa_alert_state').where({ state: 'firing' }).orderBy('id');
+    return tdb('wa_alert_state').where({ state: 'firing' }).orderBy('id');
   }
 
   static async get(rule, subject) {
     return (
-      (await getDb()('wa_alert_state')
+      (await tdb('wa_alert_state')
         .where({ rule, subject: this.subjectOf(subject) })
         .first()) || null
     );
@@ -49,13 +49,14 @@ class WaAlertState {
    *
    * The upsert is not decorative: two scans can overlap (a manual
    * `POST /alerts/scan` while the loop is mid-pass), and the unique index on
-   * `(rule, subject)` is what makes that safe. Losing the race must not throw.
+   * `(tenant_id, rule, subject)` is what makes that safe. Losing the race must
+   * not throw.
    */
   static async open({ rule, subject, now = new Date() }) {
     const key = { rule, subject: this.subjectOf(subject) };
     const existing = await this.get(rule, key.subject);
     if (existing) {
-      await getDb()('wa_alert_state').where({ id: existing.id }).update({
+      await tdb('wa_alert_state').where({ id: existing.id }).update({
         state: 'firing',
         fired_at: now,
         cleared_at: null,
@@ -63,7 +64,7 @@ class WaAlertState {
       });
       return this.get(rule, key.subject);
     }
-    await insertReturningId('wa_alert_state', {
+    await tinsertReturningId('wa_alert_state', {
       ...key,
       state: 'firing',
       fired_at: now,
@@ -84,24 +85,23 @@ class WaAlertState {
    * two statements would leave a row that looks notified but is not counted.
    */
   static async markNotified(id, now = new Date()) {
-    const db = getDb();
-    await db('wa_alert_state').where({ id }).update({
+    await tdb('wa_alert_state').where({ id }).update({
       last_notified_at: now,
-      notify_count: db.raw('notify_count + 1'),
+      notify_count: getDb().raw('notify_count + 1'),
       updated_at: now
     });
-    return (await db('wa_alert_state').where({ id }).first()) || null;
+    return (await tdb('wa_alert_state').where({ id }).first()) || null;
   }
 
   /** The condition recovered. The row goes with it — see the class comment. */
   static async clear(rule, subject) {
-    return getDb()('wa_alert_state')
+    return tdb('wa_alert_state')
       .where({ rule, subject: this.subjectOf(subject) })
       .del();
   }
 
   static async removeById(id) {
-    return getDb()('wa_alert_state').where({ id }).del();
+    return tdb('wa_alert_state').where({ id }).del();
   }
 }
 

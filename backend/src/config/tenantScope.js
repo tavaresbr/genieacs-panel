@@ -29,7 +29,14 @@ export const SCOPED_TABLES = new Set([
   // outbox worker drain one provider at a time instead of the deployment.
   'wa_conversations',
   'wa_messages',
-  'wa_opt_outs'
+  'wa_opt_outs',
+  // Campaigns and the alert cooldown. Scoping these lets the campaign flush
+  // run per provider, and stops one provider's ONT outage from suppressing
+  // another provider's alert for the same rule.
+  'wa_templates',
+  'wa_broadcasts',
+  'wa_broadcast_recipients',
+  'wa_alert_state'
 ]);
 
 /** Tables that belong to the deployment rather than to any one provider. */

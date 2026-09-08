@@ -546,6 +546,14 @@ const waAlertStateTable = (db) => (t) => {
   t.unique(['rule', 'subject']);
 };
 
+/** The campaign tables that gain a provider in 0013, in dependency order. */
+const TENANT_CAMPAIGN_TABLES = [
+  'wa_templates',
+  'wa_broadcasts',
+  'wa_broadcast_recipients',
+  'wa_alert_state'
+];
+
 /** In creation order; foreign keys dictate it. */
 const WHATSAPP_TABLES = [
   ['whatsapp_accounts', whatsappAccountsTable],
@@ -939,6 +947,57 @@ export const migrations = [
       // once the plant became per-provider, these point at `id` columns that
       // remain globally unique. A cross-provider link would take a bug in a
       // scoped model, not a missing constraint.
+    }
+  },
+  {
+    // Campaigns, their templates, and the alert cooldown. Scoping these
+    // releases the campaign flush from `forSoleTenant`, and fixes a cooldown
+    // that was shared across the whole deployment.
+    id: '0013_wa_campaigns_tenant',
+    async isApplied(db) {
+      for (const table of TENANT_CAMPAIGN_TABLES) {
+        if (!(await db.schema.hasTable(table))) return false;
+        if (!(await db.schema.hasColumn(table, 'tenant_id'))) return false;
+      }
+      return true;
+    },
+    async up(db) {
+      const tenant = await db('tenants').orderBy('id', 'asc').first();
+      if (!tenant) return;
+
+      for (const table of TENANT_CAMPAIGN_TABLES) {
+        if (await db.schema.hasColumn(table, 'tenant_id')) continue;
+        await db.schema.alterTable(table, (t) => t.integer('tenant_id').unsigned());
+        await db(table).whereNull('tenant_id').update({ tenant_id: tenant.id });
+      }
+
+      for (const table of ['wa_broadcasts', 'wa_broadcast_recipients']) {
+        await db.schema.alterTable(table, (t) => {
+          t.integer('tenant_id').unsigned().notNullable().defaultTo(tenant.id).alter();
+          t.foreign('tenant_id').references('id').inTable('tenants');
+        });
+      }
+
+      await db.schema.alterTable('wa_templates', (t) => {
+        t.integer('tenant_id').unsigned().notNullable().defaultTo(tenant.id).alter();
+        t.foreign('tenant_id').references('id').inTable('tenants');
+        // A template is the provider's own wording — its dunning message, in
+        // its voice. Two providers naming one "segunda-via" is expected, not a
+        // conflict.
+        t.dropUnique(['name']);
+        t.unique(['tenant_id', 'name']);
+      });
+
+      await db.schema.alterTable('wa_alert_state', (t) => {
+        t.integer('tenant_id').unsigned().notNullable().defaultTo(tenant.id).alter();
+        t.foreign('tenant_id').references('id').inTable('tenants');
+        // `subject` is a device or node id read from GenieACS, and the row
+        // carries the cooldown. Shared, one provider's ONT going down silenced
+        // the same rule for every other provider — and `clear` on one closed
+        // everyone's alert. The cooldown is per provider because the ONT is.
+        t.dropUnique(['rule', 'subject']);
+        t.unique(['tenant_id', 'rule', 'subject']);
+      });
     }
   }
 ];

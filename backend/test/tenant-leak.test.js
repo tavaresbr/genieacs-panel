@@ -19,6 +19,9 @@ const { default: WaOptOut } = await import('../src/models/WaOptOut.js');
 const { default: WaMessage } = await import('../src/models/WaMessage.js');
 const { default: WaConversation } = await import('../src/models/WaConversation.js');
 const { default: WhatsAppAccount } = await import('../src/models/WhatsAppAccount.js');
+const { default: WaAlertState } = await import('../src/models/WaAlertState.js');
+const { default: WaTemplate } = await import('../src/models/WaTemplate.js');
+const { default: WaBroadcast } = await import('../src/models/WaBroadcast.js');
 
 /**
  * The phase's actual proof.
@@ -296,5 +299,75 @@ describe('the WhatsApp queue and the do-not-disturb list', () => {
     assert.equal((await getDb()('wa_messages').where({ external_id: shared })).length, 2);
     const found = await runInTenant(beta, () => WaMessage.getByExternalId(shared));
     assert.equal(Number(found.tenant_id), Number(beta));
+  });
+});
+
+describe('campaigns and the alert cooldown', () => {
+  const RULE = 'ont_offline';
+  const SUBJECT = 'ONT-SHARED-0001';
+
+  // The cooldown lives on the row. Shared, an ONT going down at one provider
+  // opened the only row for `(rule, subject)` — so the other provider's scan
+  // found the condition already announced and stayed quiet about its own
+  // subscriber's outage. Recovery was worse: `clear` closed it for everyone.
+  it('does not let one provider\'s alert suppress the other\'s', async () => {
+    await runInTenant(alfa, () => WaAlertState.open({ rule: RULE, subject: SUBJECT }));
+
+    assert.ok(await runInTenant(alfa, () => WaAlertState.get(RULE, SUBJECT)));
+    assert.equal(await runInTenant(beta, () => WaAlertState.get(RULE, SUBJECT)), null,
+      'the other provider has not announced anything yet');
+
+    // And it can open its own for the same rule and the same subject.
+    const mine = await runInTenant(beta, () => WaAlertState.open({ rule: RULE, subject: SUBJECT }));
+    assert.ok(mine);
+    assert.equal((await getDb()('wa_alert_state').where({ rule: RULE, subject: SUBJECT })).length, 2);
+  });
+
+  it('does not let one provider\'s recovery close the other\'s alert', async () => {
+    await runInTenant(beta, () => WaAlertState.clear(RULE, SUBJECT));
+
+    assert.ok(await runInTenant(alfa, () => WaAlertState.get(RULE, SUBJECT)),
+      'the other provider\'s ONT is still down and its alert still open');
+    assert.equal(await runInTenant(beta, () => WaAlertState.get(RULE, SUBJECT)), null);
+  });
+
+  it('lets both providers name a template the same thing', async () => {
+    const template = { name: 'segunda-via', body: 'Olá {{nome}}', category: 'cobranca' };
+    await runInTenant(alfa, () => WaTemplate.create(template));
+    await runInTenant(beta, () => WaTemplate.create({ ...template, body: 'Oi {{nome}}' }));
+
+    const theirs = await runInTenant(alfa, () => WaTemplate.getByName('segunda-via'));
+    const mine = await runInTenant(beta, () => WaTemplate.getByName('segunda-via'));
+    assert.equal(theirs.body, 'Olá {{nome}}');
+    assert.equal(mine.body, 'Oi {{nome}}');
+  });
+
+  // `addRecipients` goes through knex's batchInsert, which takes a table name
+  // and never passes through `tdb`. Unstamped, every recipient would have been
+  // filed under the installation's own provider by the column default.
+  it('stamps the provider on recipients added in bulk', async () => {
+    const broadcast = await runInTenant(beta, () => WaBroadcast.create({
+      title: 'Cobrança de setembro', body: 'Olá', status: 'draft'
+    }));
+    await runInTenant(beta, () => WaBroadcast.addRecipients(broadcast.id, [
+      { phone: '5593900000001', body: 'Olá um' },
+      { phone: '5593900000002', body: 'Olá dois' }
+    ]));
+
+    const rows = await getDb()('wa_broadcast_recipients').where({ broadcast_id: broadcast.id });
+    assert.equal(rows.length, 2);
+    for (const row of rows) assert.equal(Number(row.tenant_id), Number(beta));
+
+    assert.deepEqual(await runInTenant(alfa, () => WaBroadcast.listRecipients(broadcast.id)), []);
+  });
+
+  it('gives the campaign flush only its own running campaigns', async () => {
+    await runInTenant(alfa, () => WaBroadcast.create({ title: 'Do alfa', body: 'a', status: 'running' }));
+    await runInTenant(beta, () => WaBroadcast.create({ title: 'Do beta', body: 'b', status: 'running' }));
+
+    const theirs = await runInTenant(alfa, () => WaBroadcast.listByStatus('running'));
+    const mine = await runInTenant(beta, () => WaBroadcast.listByStatus('running'));
+    assert.deepEqual(theirs.map((b) => b.title), ['Do alfa']);
+    assert.deepEqual(mine.map((b) => b.title), ['Do beta']);
   });
 });

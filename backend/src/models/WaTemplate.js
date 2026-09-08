@@ -1,4 +1,4 @@
-import { getDb, insertReturningId } from '../config/database.js';
+import { getDb, tdb, tinsert, tinsertReturningId } from '../config/database.js';
 
 /**
  * Saved message bodies, with `{{variavel}}` placeholders in them.
@@ -11,18 +11,18 @@ import { getDb, insertReturningId } from '../config/database.js';
  */
 class WaTemplate {
   static async getById(id) {
-    return (await getDb()('wa_templates').where({ id }).first()) || null;
+    return (await tdb('wa_templates').where({ id }).first()) || null;
   }
 
   /** Names are unique, so a template can be cited by name from a campaign. */
   static async getByName(name) {
     const clean = String(name ?? '').trim();
     if (!clean) return null;
-    return (await getDb()('wa_templates').where({ name: clean }).first()) || null;
+    return (await tdb('wa_templates').where({ name: clean }).first()) || null;
   }
 
   static async list({ category = null, includeInactive = false } = {}) {
-    const query = getDb()('wa_templates');
+    const query = tdb('wa_templates');
     if (category) query.where({ category });
     // Inactive templates are hidden by default: the picker on a campaign screen
     // must not offer a body the provider retired.
@@ -32,7 +32,7 @@ class WaTemplate {
 
   static async create(template) {
     const now = new Date();
-    const id = await insertReturningId('wa_templates', {
+    const id = await tinsertReturningId('wa_templates', {
       ...template,
       created_at: now,
       updated_at: now
@@ -41,14 +41,14 @@ class WaTemplate {
   }
 
   static async update(id, patch) {
-    await getDb()('wa_templates')
+    await tdb('wa_templates')
       .where({ id })
       .update({ ...patch, updated_at: new Date() });
     return this.getById(id);
   }
 
   static async remove(id) {
-    return getDb()('wa_templates').where({ id }).del();
+    return tdb('wa_templates').where({ id }).del();
   }
 }
 

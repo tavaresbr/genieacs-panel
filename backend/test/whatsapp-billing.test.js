@@ -8,6 +8,13 @@ const { default: WhatsAppConfigService } = await import('../src/services/whatsap
 const { default: WhatsAppAccount } = await import('../src/models/WhatsAppAccount.js');
 const { default: WaOptOut } = await import('../src/models/WaOptOut.js');
 const { default: WaBroadcast } = await import('../src/models/WaBroadcast.js');
+
+// Reached directly, with no request to resolve a provider — the routes that
+// build and flush campaigns already carry theirs.
+const campaign = {
+  listRecipients: (id) => asTenant(() => WaBroadcast.listRecipients(id)),
+  getById: (id) => asTenant(() => WaBroadcast.getById(id))
+};
 const { default: WaBillingService } = await import('../src/services/waBillingService.js');
 const { default: WaBroadcastService } = await import('../src/services/waBroadcastService.js');
 
@@ -350,7 +357,7 @@ describe('building a campaign', () => {
     const after2 = await queuedMessages();
     assert.equal(after2.length, before2.length, 'building must not enqueue a single message');
 
-    const recipients = await WaBroadcast.listRecipients(body.data.broadcast.id);
+    const recipients = await campaign.listRecipients(body.data.broadcast.id);
     assert.equal(recipients.length, 2);
     assert.ok(recipients.every((row) => row.status === 'pending'));
     // Rendered once, at build time, so what the operator reviews is what goes.
@@ -367,7 +374,7 @@ describe('building a campaign', () => {
     });
     assert.equal(body.data.recipients, 1);
     assert.equal(body.data.skipped.optOut, 1);
-    const recipients = await WaBroadcast.listRecipients(body.data.broadcast.id);
+    const recipients = await campaign.listRecipients(body.data.broadcast.id);
     assert.deepEqual(recipients.map((row) => row.phone_e164), ['5593981110001']);
   });
 
@@ -393,7 +400,7 @@ describe('building a campaign', () => {
     assert.equal(status, 201);
     assert.equal(body.data.recipients, 1);
     assert.equal(body.data.broadcast.title, 'Lembrete de vencimento');
-    const [recipient] = await WaBroadcast.listRecipients(body.data.broadcast.id);
+    const [recipient] = await campaign.listRecipients(body.data.broadcast.id);
     assert.match(recipient.rendered_body, /vence em 3 dias/);
   });
 
@@ -444,7 +451,7 @@ describe('the flush loop', () => {
 
     // A draft is inert: the loop must not touch it.
     await WaBroadcastService.tick();
-    assert.equal((await WaBroadcast.listRecipients(broadcastId))
+    assert.equal((await campaign.listRecipients(broadcastId))
       .filter((row) => row.status !== 'pending').length, 0);
 
     const started = await call(`${panelUrl}/api/whatsapp/broadcasts/${broadcastId}/status`, {
@@ -458,7 +465,7 @@ describe('the flush loop', () => {
 
     await WaBroadcastService.tick();
 
-    const recipients = await WaBroadcast.listRecipients(broadcastId);
+    const recipients = await campaign.listRecipients(broadcastId);
     assert.ok(recipients.every((row) => row.status === 'sent'));
     assert.ok(recipients.every((row) => row.message_id));
     const messages = await getDb()('wa_messages').whereIn(
@@ -470,7 +477,7 @@ describe('the flush loop', () => {
     assert.ok(messages.every((row) => row.delivery_status === 'queued'));
     assert.ok(messages.every((row) => row.body.includes('PIX: ')));
 
-    const finished = await WaBroadcast.getById(broadcastId);
+    const finished = await campaign.getById(broadcastId);
     assert.equal(finished.status, 'done');
     assert.equal(finished.sent_count, 2);
     assert.equal(finished.failed_count, 0);
@@ -495,13 +502,13 @@ describe('the flush loop', () => {
     });
     await WaBroadcastService.tick();
 
-    const recipients = await WaBroadcast.listRecipients(broadcastId);
+    const recipients = await campaign.listRecipients(broadcastId);
     const skipped = recipients.find((row) => row.phone_e164 === '5593981110002');
     assert.equal(skipped.status, 'skipped');
     assert.equal(skipped.error_msg, 'opt_out');
     assert.equal(recipients.find((row) => row.phone_e164 === '5593981110001').status, 'sent');
 
-    const finished = await WaBroadcast.getById(broadcastId);
+    const finished = await campaign.getById(broadcastId);
     // If the opt-out had been a filter on the pending query instead of a guard
     // inside the loop, this row would never have left 'pending' and the
     // campaign would still be 'running' with nothing left to do.
@@ -526,7 +533,7 @@ describe('the flush loop', () => {
 
     // Paused means paused: the loop leaves it alone.
     await WaBroadcastService.tick();
-    assert.ok((await WaBroadcast.listRecipients(id)).every((row) => row.status === 'pending'));
+    assert.ok((await campaign.listRecipients(id)).every((row) => row.status === 'pending'));
 
     assert.equal((await move('canceled')).status, 200);
     // A cancelled campaign is history; restarting it would re-send to whoever
