@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router'
-import { devicesAPI } from '@/lib/api'
+import { devicesAPI, sgpAPI, type SgpFleetOverview } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
 import { useAuth } from '@/contexts/auth-context'
 import { useTranslation } from '@/contexts/language-context'
@@ -57,6 +57,18 @@ const PALETTES = {
 }
 
 const DASHBOARD_SESSION_KEY = 'skygenpanel.dashboard.snapshot.v1'
+
+const SGP_PREVIEW_ROWS = 4
+
+interface SgpDivergenceGroup {
+  key: string
+  titleKey: TranslationKey
+  hintKey: TranslationKey
+  emptyKey: TranslationKey
+  tone: string
+  total: number
+  rows: { deviceId: string; detail: string }[]
+}
 
 /** GenieACS reports these bucket names in English; the panel shows them translated. */
 const BUCKET_LABEL_KEYS: Record<string, TranslationKey> = {
@@ -120,6 +132,7 @@ export default function DashboardPage() {
   const [loadError, setLoadError] = useState('')
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [clearingFault, setClearingFault] = useState<string | null>(null)
+  const [sgpOverview, setSgpOverview] = useState<SgpFleetOverview | null>(null)
   const faultsLoadedRef = useRef(false)
   const { user } = useAuth()
   const { t, formatDateTime, formatTime } = useTranslation()
@@ -173,6 +186,13 @@ export default function DashboardPage() {
     }
   }, [t])
 
+  // The reconciliation card disappears when SGP is off or unreachable; there is
+  // nothing an operator could do about it from the dashboard.
+  const loadSgpOverview = useCallback(async () => {
+    const response = await sgpAPI.getOverview()
+    setSgpOverview(response.success && response.data?.enabled ? response.data : null)
+  }, [])
+
   useEffect(() => {
     if (cachedDashboard?.generatedAt) {
       const cachedDate = new Date(cachedDashboard.generatedAt)
@@ -180,7 +200,8 @@ export default function DashboardPage() {
     }
     void loadDashboard(false)
     void loadFaults()
-  }, [cachedDashboard, loadDashboard, loadFaults])
+    void loadSgpOverview()
+  }, [cachedDashboard, loadDashboard, loadFaults, loadSgpOverview])
 
   const translateBucket = useCallback(
     (name: string) => (BUCKET_LABEL_KEYS[name] ? t(BUCKET_LABEL_KEYS[name]) : name),
@@ -197,6 +218,51 @@ export default function DashboardPage() {
   const clientData = useMemo(() => pieData(data.clientDistribution, PALETTES.clients, translateBucket), [data.clientDistribution, translateBucket])
   const productData = useMemo(() => [...data.productClasses].reverse(), [data.productClasses])
   const manufacturerData = useMemo(() => [...data.manufacturers].reverse(), [data.manufacturers])
+
+  const sgpGroups = useMemo<SgpDivergenceGroup[]>(() => {
+    if (!sgpOverview) return []
+    const { onlineBlocked, offlineActive, unlinked } = sgpOverview.divergences
+    return [
+      {
+        key: 'onlineBlocked',
+        titleKey: 'dashboard.sgp.onlineBlocked.title',
+        hintKey: 'dashboard.sgp.onlineBlocked.hint',
+        emptyKey: 'dashboard.sgp.onlineBlocked.empty',
+        tone: 'text-[hsl(var(--status-danger))]',
+        total: onlineBlocked.length,
+        rows: onlineBlocked.slice(0, SGP_PREVIEW_ROWS).map((row) => ({
+          deviceId: row.deviceId,
+          detail: [row.clientName, row.statusLabel || row.state, row.contract].filter(Boolean).join(' · '),
+        })),
+      },
+      {
+        key: 'offlineActive',
+        titleKey: 'dashboard.sgp.offlineActive.title',
+        hintKey: 'dashboard.sgp.offlineActive.hint',
+        emptyKey: 'dashboard.sgp.offlineActive.empty',
+        tone: 'text-[hsl(var(--status-warning))]',
+        total: offlineActive.length,
+        rows: offlineActive.slice(0, SGP_PREVIEW_ROWS).map((row) => ({
+          deviceId: row.deviceId,
+          detail: [row.clientName, row.contract, row.lastInform ? t('dashboard.sgp.lastInform', { time: formatDateTime(row.lastInform) }) : null]
+            .filter(Boolean)
+            .join(' · '),
+        })),
+      },
+      {
+        key: 'unlinked',
+        titleKey: 'dashboard.sgp.unlinked.title',
+        hintKey: 'dashboard.sgp.unlinked.hint',
+        emptyKey: 'dashboard.sgp.unlinked.empty',
+        tone: 'text-foreground',
+        total: unlinked.length,
+        rows: unlinked.slice(0, SGP_PREVIEW_ROWS).map((row) => ({
+          deviceId: row.deviceId,
+          detail: [row.pppoe, row.customerId].filter(Boolean).join(' · ') || t('dashboard.sgp.noIdentifier'),
+        })),
+      },
+    ]
+  }, [formatDateTime, sgpOverview, t])
 
   const availability = data.stats.total ? Math.round((data.stats.online / data.stats.total) * 100) : 0
   const signalRisk = (data.rxDistribution.Poor || 0) + (data.rxDistribution.Danger || 0)
@@ -242,7 +308,7 @@ export default function DashboardPage() {
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <span className="text-xs text-muted-foreground">{lastUpdated ? t('dashboard.updatedAt', { time: formatTime(lastUpdated) }) : t('dashboard.noUpdate')}</span>
-            <button type="button" className="modern-button-secondary" disabled={refreshing} onClick={() => void loadDashboard(true)}>
+            <button type="button" className="modern-button-secondary" disabled={refreshing} onClick={() => { void loadDashboard(true); void loadSgpOverview() }}>
               <Icon name="refresh" size={17} className={refreshing ? 'animate-spin' : ''} />{refreshing ? t('dashboard.refreshing') : t('common.refresh')}
             </button>
           </div>
@@ -293,6 +359,69 @@ export default function DashboardPage() {
             </div>
           </div>
         </section>
+
+        {sgpOverview && (
+          <section className="modern-card mb-5 overflow-hidden">
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-5 py-4">
+              <div>
+                <h2 className="section-heading">{t('dashboard.sgp.title')}</h2>
+                <p className="section-description">{t('dashboard.sgp.description')}</p>
+              </div>
+              <p className="text-xs leading-5 text-muted-foreground sm:text-right">
+                <span className="block">
+                  {t('dashboard.sgp.linkedCount', { linked: sgpOverview.totals.linked, total: sgpOverview.totals.devices })}
+                </span>
+                <span className="block">
+                  {sgpOverview.lastSync
+                    ? t('dashboard.sgp.lastSync', {
+                        time: formatDateTime(sgpOverview.lastSync.finishedAt),
+                        linked: sgpOverview.lastSync.linked,
+                        created: sgpOverview.lastSync.created,
+                        updated: sgpOverview.lastSync.updated,
+                        failed: sgpOverview.lastSync.failed,
+                      })
+                    : t('dashboard.sgp.neverSynced')}
+                </span>
+              </p>
+            </div>
+            <div className="grid gap-px bg-border md:grid-cols-3">
+              {sgpGroups.map((group) => (
+                <div key={group.key} className="bg-card p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <h3 className="text-sm font-semibold">{t(group.titleKey)}</h3>
+                    <span className={`data-value ${group.tone}`}>{group.total}</span>
+                  </div>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">{t(group.hintKey)}</p>
+                  {group.rows.length === 0 ? (
+                    <p className="mt-4 text-sm text-muted-foreground">{t(group.emptyKey)}</p>
+                  ) : (
+                    <ul className="mt-4 divide-y divide-border">
+                      {group.rows.map((row) => (
+                        <li key={row.deviceId}>
+                          <Link
+                            to={`/devices/detail?id=${encodeURIComponent(row.deviceId)}`}
+                            className="flex items-center justify-between gap-2 py-2 hover:text-primary"
+                          >
+                            <span className="min-w-0">
+                              <span className="block truncate font-mono text-xs font-semibold">{row.deviceId}</span>
+                              {row.detail && <span className="mt-0.5 block truncate text-xs text-muted-foreground">{row.detail}</span>}
+                            </span>
+                            <Icon name="chevron-right" size={16} className="shrink-0" />
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {group.total > group.rows.length && (
+                    <p className="mt-3 text-xs text-muted-foreground">
+                      {t('dashboard.sgp.more', { count: group.total - group.rows.length })}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         <section className="mb-5 grid gap-4 xl:grid-cols-2">
           <div className="modern-card p-5"><h2 className="section-heading">{t('dashboard.chart.rx.title')}</h2><p className="section-description mb-3">{t('dashboard.chart.rx.description')}</p>{rxData.length ? <PieChart data={rxData} /> : <p className="empty-state-copy py-16 text-center">{t('dashboard.chart.rx.empty')}</p>}</div>
