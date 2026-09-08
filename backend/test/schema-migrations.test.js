@@ -24,7 +24,10 @@ const APP_TABLES = [
   'customer_accounts',
   'device_profiles',
   'sgp_links',
-  'customer_wifi_credentials'
+  'customer_wifi_credentials',
+  'provisioning_profiles',
+  'provisioning_runs',
+  'sgp_events'
 ];
 
 const ALL_IDS = migrations.map((migration) => migration.id);

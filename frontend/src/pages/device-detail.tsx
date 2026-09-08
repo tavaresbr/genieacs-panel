@@ -7,6 +7,7 @@ import { useLoading } from '@/components/ui/loading'
 import { devicesAPI, sgpAPI, type SgpContractLink, type SgpInvoice } from '@/lib/api'
 import { formatDate } from '@/lib/utils'
 import { Icon } from '@/components/ui/icon'
+import { ProvisioningCard } from '@/components/provisioning-card'
 import { useAuth } from '@/contexts/auth-context'
 import { useTranslation } from '@/contexts/language-context'
 
@@ -1555,6 +1556,10 @@ export default function DeviceDetailPage() {
                   </div>
                 )}
               </div>
+            )}
+
+            {sgpAvailable && (
+              <ProvisioningCard deviceId={deviceId} />
             )}
 
             <div className="modern-card p-6">

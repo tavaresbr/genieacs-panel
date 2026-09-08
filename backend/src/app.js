@@ -28,6 +28,8 @@ import customerPortalRoutes from './routes/customerPortal.js';
 import sgpRoutes from './routes/sgp.js';
 import whatsappRoutes from './routes/whatsapp.js';
 import whatsappWebhookRoutes from './routes/whatsappWebhook.js';
+import provisioningRoutes from './routes/provisioning.js';
+import { WEBHOOK_PATH } from './services/sgpService.js';
 
 dotenv.config();
 
@@ -131,6 +133,12 @@ app.use(cors({
   origin: true,
   methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
 }));
+// The webhook signature covers the exact bytes SGP signed, so this route has
+// to see the raw body. Mounting `express.raw` on the path before the global
+// JSON parser is what reserves it: body-parser marks the body as read, so the
+// parser below skips it. A `verify` hook on the global parser would instead
+// copy every request body in the process.
+app.use(WEBHOOK_PATH, express.raw({ type: '*/*', limit: '64kb' }));
 app.use(express.json({ limit: '1mb' }));
 
 // Mounted BEFORE the shared `apiLimiter` on purpose. The Evolution server is a
@@ -156,6 +164,7 @@ app.use('/api/database', databaseRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/sgp', sgpRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
+app.use('/api/provisioning', provisioningRoutes);
 
 app.get('/api/health', async (req, res) => {
   const database = await testConnection();

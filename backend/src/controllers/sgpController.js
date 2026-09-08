@@ -46,7 +46,17 @@ class SgpController {
         portalBilling: body.portalBilling,
         portalUnlock: body.portalUnlock,
         invoiceLimit: body.invoiceLimit,
-        endpoints: body.endpoints
+        endpoints: body.endpoints,
+        webhookEnabled: body.webhookEnabled,
+        webhookRequireTimestamp: body.webhookRequireTimestamp,
+        webhookToleranceSeconds: body.webhookToleranceSeconds,
+        reconcileEnabled: body.reconcileEnabled,
+        reconcileIntervalMinutes: body.reconcileIntervalMinutes,
+        reconcileBatchSize: body.reconcileBatchSize,
+        eventRetentionDays: body.eventRetentionDays,
+        eventTypeMap: body.eventTypeMap
+        // `webhookSecret` is deliberately not accepted here: it is only ever
+        // set through the rotate action, which shows it once.
       });
       return res.json(createResponse(req.t('sgp.configSaved'), config));
     } catch (error) {

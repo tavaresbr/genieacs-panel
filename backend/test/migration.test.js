@@ -74,6 +74,13 @@ after(async () => {
 });
 
 describe('upgrading an existing installation', () => {
+  it('creates the provisioning tables on an existing database', async () => {
+    const db = getDb();
+    for (const table of ['provisioning_profiles', 'provisioning_runs', 'sgp_events']) {
+      assert.ok(await db.schema.hasTable(table), `expected table ${table}`);
+    }
+  });
+
   it('adds the portal password columns without losing accounts', async () => {
     const db = getDb();
     for (const column of [
