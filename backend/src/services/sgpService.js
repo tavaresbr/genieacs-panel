@@ -4,6 +4,7 @@ import CustomerAccount from '../models/CustomerAccount.js';
 import SgpLink from '../models/SgpLink.js';
 import DeviceService from './deviceService.js';
 import { createSecretBox } from '../utils/secretBox.js';
+import { normalizarTelefoneBr } from '../utils/wa/waDestino.js';
 
 const CONFIG_KEY = 'sgp_integration_config';
 const SYNC_STATE_KEY = 'sgp_sync_last_run';
@@ -222,6 +223,19 @@ function firstArray(payload, names) {
 // The PPPoE password is the one field of a contract that must never reach a
 // browser: `normalizeContract` output is returned verbatim by the operator
 // lookup endpoint. Reading it is therefore opt-in, and only provisioning asks.
+/**
+ * Where SGP keeps a subscriber's mobile number.
+ *
+ * Every install spells it differently and several return more than one, so the
+ * read goes through the same normalized lookup as everything else. WhatsApp is
+ * the only reason the panel wants this: it had no phone number anywhere before.
+ */
+const PHONE_NAMES = Object.freeze([
+  'celular', 'telefonecelular', 'telefone_celular', 'fonecelular',
+  'telefone', 'fone', 'telefone1', 'telefoneprincipal', 'telefonecontato',
+  'whatsapp', 'celular1', 'phone', 'mobile'
+]);
+
 const PPPOE_PASSWORD_NAMES = Object.freeze([
   'senha', 'senhaPppoe', 'senha_pppoe', 'senhaPPPoE', 'senhaLogin', 'senhaAcesso',
   'senhaConexao', 'senhaUsuario', 'senhaRadius', 'password', 'pppoePassword',
@@ -245,6 +259,11 @@ function normalizeContract(entry, { includeSecrets = false } = {}) {
     document: asText(pick(entry, ['cpfcnpj', 'cpfCnpj', 'documento'])),
     address: asText(pick(entry, ['endereco', 'enderecoCompleto', 'contratoEndereco'])),
     login: asText(pick(entry, ['login', 'usuario', 'pppoe', 'loginPppoe'])),
+    // Normalized to sendable digits here rather than at send time, so a cadastre
+    // that stores "(93) 98111-0449" and one that stores "5593981110449" reach
+    // the outbox as the same value. The ninth digit is never invented — see
+    // utils/wa/waDestino.js for why guessing it addresses a stranger.
+    phone: normalizarTelefoneBr(pick(entry, PHONE_NAMES)) || null,
     blocked: (() => {
       const value = pick(entry, ['bloqueado', 'contratoBloqueado', 'bloqueio']);
       if (value === null) return null;
@@ -805,6 +824,10 @@ class SgpService {
       status_label: contract.statusLabel ? String(contract.statusLabel).slice(0, 128) : null,
       state: deriveContractState(contract),
       login: contract.login ? String(contract.login).slice(0, 255) : null,
+      // `phone_manual` is deliberately absent from this row: a sync must never
+      // overwrite the correction an operator made by hand. The reader prefers
+      // the manual value; this only refreshes what the ERP believes.
+      phone_e164: contract.phone || null,
       link_mode: linkMode,
       last_synced_at: new Date()
     };
