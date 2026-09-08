@@ -82,20 +82,20 @@ async function authenticateToken(req, res, next) {
   const token = authHeader && authHeader.split(' ')[1];
   
   if (!token) {
-    return res.status(401).json({ message: 'Authentication token required' });
+    return res.status(401).json({ message: req.t('auth.tokenRequired') });
   }
   
   const decoded = verifyToken(token);
   if (!decoded) {
     return res.status(403).json({ 
-      message: 'Invalid token', 
+      message: req.t('auth.invalidToken'),
       code: 'invalid_token'
     });
   }
 
   if (decoded.tokenType) {
     return res.status(403).json({
-      message: 'Invalid token type',
+      message: req.t('auth.invalidTokenType'),
       code: 'invalid_token'
     });
   }
@@ -104,7 +104,7 @@ async function authenticateToken(req, res, next) {
     req.user = await hydrateAuthenticatedUser(decoded);
     if (!req.user) {
       return res.status(403).json({
-        message: 'Session is no longer valid',
+        message: req.t('auth.sessionInvalid'),
         code: 'invalid_token'
       });
     }
@@ -135,11 +135,11 @@ async function authenticateTokenOptional(req, res, next) {
 function requireRole(roles) {
   return (req, res, next) => {
     if (!req.user) {
-      return res.status(401).json({ message: 'Authentication required' });
+      return res.status(401).json({ message: req.t('auth.required') });
     }
     
     if (roles && !roles.includes(req.user.role)) {
-      return res.status(403).json({ message: 'Insufficient permissions' });
+      return res.status(403).json({ message: req.t('auth.insufficientPermissions') });
     }
     
     next();

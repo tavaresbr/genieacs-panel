@@ -1,5 +1,10 @@
 import rateLimit from 'express-rate-limit';
 
+/** Renders the limiter body in the language negotiated for the request. */
+function limitMessage(key) {
+  return (req) => ({ success: false, message: req.t(key) });
+}
+
 const JSON_HEADERS = {
   standardHeaders: true,
   legacyHeaders: false
@@ -36,14 +41,14 @@ export const apiLimiter = limiter({
   windowMs: 60 * 1000,
   max: 300,
   keyGenerator: ipKey,
-  message: { success: false, message: 'Too many requests, please slow down' }
+  message: limitMessage('rateLimit.requests')
 });
 
 export const authLimiter = limiter({
   windowMs: 15 * 60 * 1000,
   max: 20,
   keyGenerator: ipKey,
-  message: { success: false, message: 'Too many attempts, please try again later' }
+  message: limitMessage('rateLimit.attempts')
 });
 
 /**
@@ -59,10 +64,7 @@ export const portalLoginLimiter = limiter({
     const customerId = String(req.body?.customerId ?? '').trim().toUpperCase().slice(0, 32);
     return `${ipKey(req)}|${customerId || 'unknown'}`;
   },
-  message: {
-    success: false,
-    message: 'Terlalu banyak percobaan login. Tunggu 15 menit lalu coba lagi.'
-  }
+  message: limitMessage('rateLimit.portalLogin')
 });
 
 /** Coarse per-address guard for the whole portal surface. */
@@ -70,44 +72,35 @@ export const portalIpLimiter = limiter({
   windowMs: 60 * 1000,
   max: 600,
   keyGenerator: ipKey,
-  message: { success: false, message: 'Terlalu banyak permintaan. Coba lagi sebentar.' }
+  message: limitMessage('rateLimit.portalRequests')
 });
 
 export const portalAccountLimiter = limiter({
   windowMs: 60 * 1000,
   max: 120,
   keyGenerator: accountKey,
-  message: { success: false, message: 'Terlalu banyak permintaan. Coba lagi sebentar.' }
+  message: limitMessage('rateLimit.portalRequests')
 });
 
 export const portalMutationLimiter = limiter({
   windowMs: 15 * 60 * 1000,
   max: 10,
   keyGenerator: accountKey,
-  message: {
-    success: false,
-    message: 'Terlalu banyak perubahan WiFi. Tunggu 15 menit lalu coba lagi.'
-  }
+  message: limitMessage('rateLimit.portalWifi')
 });
 
 export const portalRevealLimiter = limiter({
   windowMs: 15 * 60 * 1000,
   max: 20,
   keyGenerator: accountKey,
-  message: {
-    success: false,
-    message: 'Terlalu banyak permintaan password. Tunggu 15 menit lalu coba lagi.'
-  }
+  message: limitMessage('rateLimit.portalPassword')
 });
 
 export const portalBillingLimiter = limiter({
   windowMs: 60 * 1000,
   max: 20,
   keyGenerator: accountKey,
-  message: {
-    success: false,
-    message: 'Muitas consultas de faturas. Aguarde um instante e tente novamente.'
-  }
+  message: limitMessage('rateLimit.portalBilling')
 });
 
 /**
@@ -118,10 +111,7 @@ export const portalUnlockLimiter = limiter({
   windowMs: 60 * 60 * 1000,
   max: 3,
   keyGenerator: accountKey,
-  message: {
-    success: false,
-    message: 'Limite de solicitações de liberação atingido. Tente novamente mais tarde.'
-  }
+  message: limitMessage('rateLimit.portalUnlock')
 });
 
 /** Operator-side reveal/reset of a customer portal password. */
@@ -129,5 +119,5 @@ export const portalPasswordAdminLimiter = limiter({
   windowMs: 15 * 60 * 1000,
   max: 60,
   keyGenerator: (req) => (req.user?.userId ? `user:${req.user.userId}` : `ip:${ipKey(req)}`),
-  message: { success: false, message: 'Too many portal password requests, please slow down' }
+  message: limitMessage('rateLimit.portalPasswordAdmin')
 });

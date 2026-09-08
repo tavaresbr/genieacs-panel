@@ -11,6 +11,7 @@ import {
   signPortalSession
 } from '../middleware/portalAuth.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
+import { translateError } from '../i18n/index.js';
 
 class CustomerPortalController {
   static overviewCache = new Map();
@@ -20,30 +21,30 @@ class CustomerPortalController {
       const customerId = CustomerService.normalizeCustomerId(req.body?.customerId);
       const password = String(req.body?.password ?? '').trim().toUpperCase();
       if (!customerId || !/^[A-Z0-9]{6,32}$/.test(password)) {
-        return res.status(401).json(createErrorResponse('ID Customer atau password salah'));
+        return res.status(401).json(createErrorResponse(req.t('portal.invalidCredentials')));
       }
 
       const account = await CustomerAccount.getByCustomerId(customerId);
       if (!account) {
         await CustomerPortalPasswordService.rejectUnknownAccount(password);
-        return res.status(401).json(createErrorResponse('ID Customer atau password salah'));
+        return res.status(401).json(createErrorResponse(req.t('portal.invalidCredentials')));
       }
       if (!(await CustomerPortalPasswordService.verify(account, password))) {
-        return res.status(401).json(createErrorResponse('ID Customer atau password salah'));
+        return res.status(401).json(createErrorResponse(req.t('portal.invalidCredentials')));
       }
 
       res.cookie(PORTAL_COOKIE_NAME, signPortalSession(account), portalCookieOptions(req));
-      return res.json(createResponse('Login pelanggan berhasil', {
+      return res.json(createResponse(req.t('portal.loginSuccess'), {
         customerId: account.customer_id
       }));
     } catch (error) {
       console.error('Customer portal login error:', error);
-      return res.status(500).json(createErrorResponse('Portal pelanggan tidak dapat memproses login'));
+      return res.status(500).json(createErrorResponse(req.t('portal.loginFailed')));
     }
   }
 
   static async session(req, res) {
-    return res.json(createResponse('Sesi pelanggan aktif', {
+    return res.json(createResponse(req.t('portal.sessionActive'), {
       customerId: req.customer.customer_id
     }));
   }
@@ -75,19 +76,19 @@ class CustomerPortalController {
           )
         }))
       };
-      return res.json(createResponse('Informasi ONT tersedia', {
+      return res.json(createResponse(req.t('portal.overviewReady'), {
         customerId: req.customer.customer_id,
         ...data
       }));
     } catch (error) {
       console.error('Customer portal overview error:', error);
-      if (error.message === 'Device not found') {
+      if (error.translationKey === 'device.notFound') {
         return res.status(404).json(createErrorResponse(
-          'ONT tidak ditemukan. Hubungi penyedia layanan untuk memeriksa registrasi perangkat.'
+          req.t('portal.ontNotRegistered')
         ));
       }
       return res.status(502).json(createErrorResponse(
-        'Data ONT sedang tidak dapat diambil. Coba lagi beberapa saat.'
+        req.t('portal.overviewUnavailable')
       ));
     }
   }
@@ -101,16 +102,16 @@ class CustomerPortalController {
         : String(req.body.password);
 
       if (!Number.isInteger(wifiIndex) || wifiIndex < 1 || wifiIndex > 8) {
-        return res.status(400).json(createErrorResponse('Jaringan WiFi tidak valid'));
+        return res.status(400).json(createErrorResponse(req.t('portal.wifiNetworkInvalid')));
       }
       if (!ssid || ssid.length > 32 || /[\u0000-\u001f\u007f]/.test(ssid)) {
         return res.status(400).json(createErrorResponse(
-          'Nama WiFi harus berisi 1 sampai 32 karakter tanpa karakter kontrol'
+          req.t('portal.wifiSsidInvalid')
         ));
       }
       if (password && !/^[\x20-\x7e]{8,63}$/.test(password)) {
         return res.status(400).json(createErrorResponse(
-          'Password WiFi harus terdiri dari 8 sampai 63 karakter'
+          req.t('portal.wifiPasswordInvalid')
         ));
       }
 
@@ -122,7 +123,7 @@ class CustomerPortalController {
       const network = current.wifi.find((entry) => Number(entry.index) === wifiIndex);
       if (!network) {
         return res.status(404).json(createErrorResponse(
-          'Jaringan WiFi tersebut tidak dilaporkan oleh ONT'
+          req.t('portal.wifiNotReported')
         ));
       }
 
@@ -140,19 +141,19 @@ class CustomerPortalController {
       DeviceService.dashboardCache.expiresAt = 0;
 
       return res.json(createResponse(
-        'Perubahan WiFi dikirim ke ONT. Perangkat dapat terputus beberapa saat.',
+        req.t('portal.wifiUpdateQueued'),
         { index: wifiIndex, ssid }
       ));
     } catch (error) {
       console.error('Customer portal WiFi update error:', error);
-      if (error.message === 'Device not found') {
-        return res.status(404).json(createErrorResponse('ONT tidak ditemukan'));
+      if (error.translationKey === 'device.notFound') {
+        return res.status(404).json(createErrorResponse(req.t('portal.ontNotFound')));
       }
-      if (/^WiFi /.test(error.message)) {
-        return res.status(400).json(createErrorResponse(error.message));
+      if (error.translationKey) {
+        return res.status(400).json(createErrorResponse(translateError(req.t, error)));
       }
       return res.status(502).json(createErrorResponse(
-        'Perubahan WiFi belum dapat dikirim. Coba lagi beberapa saat.'
+        req.t('portal.wifiUpdateFailed')
       ));
     }
   }
@@ -161,7 +162,7 @@ class CustomerPortalController {
     try {
       const wifiIndex = Number(req.params?.index);
       if (!Number.isInteger(wifiIndex) || wifiIndex < 1 || wifiIndex > 8) {
-        return res.status(400).json(createErrorResponse('Jaringan WiFi tidak valid'));
+        return res.status(400).json(createErrorResponse(req.t('portal.wifiNetworkInvalid')));
       }
       const password = await CustomerWifiCredentialService.reveal(
         req.customer.id,
@@ -169,14 +170,14 @@ class CustomerPortalController {
       );
       if (!password) {
         return res.status(404).json(createErrorResponse(
-          'Password jaringan ini belum pernah disimpan melalui portal'
+          req.t('portal.wifiPasswordNotSaved')
         ));
       }
-      return res.json(createResponse('Password WiFi tersedia', { password }));
+      return res.json(createResponse(req.t('portal.wifiPasswordReady'), { password }));
     } catch (error) {
       console.error('Customer portal WiFi password reveal error:', error);
       return res.status(500).json(createErrorResponse(
-        'Password WiFi belum dapat dibuka. Coba lagi beberapa saat.'
+        req.t('portal.wifiPasswordRevealFailed')
       ));
     }
   }
@@ -186,7 +187,7 @@ class CustomerPortalController {
       const config = await SgpService.getConfig();
       if (!SgpService.isReady(config) || !config.portalBilling) {
         return res.status(404).json({
-          ...createErrorResponse('Consulta de faturas não está disponível neste portal'),
+          ...createErrorResponse(req.t('portal.billingUnavailable')),
           code: 'billing_disabled'
         });
       }
@@ -201,7 +202,7 @@ class CustomerPortalController {
         onlyOpen: true
       });
 
-      return res.json(createResponse('Faturas disponíveis', {
+      return res.json(createResponse(req.t('portal.invoicesReady'), {
         contract: SgpService.portalLink(link),
         invoices,
         trustUnlockAvailable: config.portalUnlock === true,
@@ -210,13 +211,13 @@ class CustomerPortalController {
     } catch (error) {
       if (error instanceof SgpError) {
         return res.status(error.status === 409 ? 404 : error.status).json({
-          ...createErrorResponse(error.message),
+          ...createErrorResponse(translateError(req.t, error)),
           code: error.code
         });
       }
       console.error('Customer portal billing error:', error);
       return res.status(502).json(createErrorResponse(
-        'Não foi possível consultar suas faturas agora. Tente novamente em instantes.'
+        req.t('portal.billingFailed')
       ));
     }
   }
@@ -226,7 +227,7 @@ class CustomerPortalController {
       const config = await SgpService.getConfig();
       if (!SgpService.isReady(config) || !config.portalUnlock) {
         return res.status(404).json({
-          ...createErrorResponse('Liberação em confiança não está disponível neste portal'),
+          ...createErrorResponse(req.t('portal.unlockUnavailable')),
           code: 'unlock_disabled'
         });
       }
@@ -237,20 +238,20 @@ class CustomerPortalController {
     } catch (error) {
       if (error instanceof SgpError) {
         return res.status(error.status === 409 ? 404 : error.status).json({
-          ...createErrorResponse(error.message),
+          ...createErrorResponse(translateError(req.t, error)),
           code: error.code
         });
       }
       console.error('Customer portal trust unlock error:', error);
       return res.status(502).json(createErrorResponse(
-        'Não foi possível solicitar a liberação agora. Tente novamente em instantes.'
+        req.t('portal.unlockFailed')
       ));
     }
   }
 
   static async logout(req, res) {
     res.clearCookie(PORTAL_COOKIE_NAME, portalClearCookieOptions(req));
-    return res.json(createResponse('Sesi pelanggan telah berakhir'));
+    return res.json(createResponse(req.t('portal.sessionEnded')));
   }
 }
 

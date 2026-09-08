@@ -31,6 +31,9 @@ class ApiClient {
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
+      // The panel answers in the operator's chosen language, which is not
+      // necessarily the browser's, so the backend is told explicitly.
+      'Accept-Language': getActiveLocale(),
       ...options.headers as Record<string, string>,
     }
 

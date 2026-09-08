@@ -3,6 +3,7 @@ import { getDb, closePool } from '../config/database.js';
 import { buildKnexConfig, readDbConfig, writeDbConfig } from '../config/dbConfig.js';
 import { ensureSchema } from '../config/schema.js';
 import { seedDefaults } from '../config/seed.js';
+import { TranslatableError } from '../i18n/index.js';
 
 const COPY_TABLES = [
   'users',
@@ -39,7 +40,7 @@ function validateExternal(config) {
   if (config.client !== 'mysql2') return;
   const missing = ['host', 'user', 'database'].filter((k) => !config[k]);
   if (missing.length > 0) {
-    throw new Error(`Missing MySQL fields: ${missing.join(', ')}`);
+    throw new TranslatableError('database.missingMysqlFields', { fields: missing.join(', ') });
   }
 }
 

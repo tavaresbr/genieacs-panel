@@ -226,15 +226,23 @@ the sidebar or from **Settings → Panel & ACS**, and subscribers change it from
 the portal header. Dates and numbers follow the active locale and the viewer
 time zone.
 
-Translations live in `frontend/src/lib/i18n/locales/`. `en.ts` is the source of
-truth: the other dictionaries are typed against it, so `npm run typecheck`
-fails whenever a key is added without a translation in every language. To add a
-language, create a locale file, register it in
-`frontend/src/lib/i18n/config.ts`, and add it to `dictionaries` in
-`frontend/src/lib/i18n/index.ts`.
+API responses follow the same language. The panel and the portal send the
+active locale in `Accept-Language`, the backend negotiates it per request
+(falling back to Portuguese), and every response carries `Content-Language`
+plus `Vary: Accept-Language` so a proxy never serves one language to a client
+that asked for another.
 
-Messages returned by the backend API are not translated yet and still reach the
-interface in English.
+Translations live in `frontend/src/lib/i18n/locales/` for the interface and
+`backend/src/i18n/locales/` for the API messages. In both places `en` is the
+source of truth: the frontend dictionaries are typed against it, so
+`npm run typecheck` fails whenever a key is added without a translation in
+every language, and `npm run test:backend` fails on the same gap for the API
+dictionaries. To add a language, create a locale file on both sides, register
+it in `frontend/src/lib/i18n/config.ts` and `backend/src/i18n/config.js`, and
+add it to `dictionaries` in the matching `index` module.
+
+Text that SGP or GenieACS itself returns is passed through as the provider
+phrased it, since only the provider can translate it.
 
 ## Architecture
 
