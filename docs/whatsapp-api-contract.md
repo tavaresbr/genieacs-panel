@@ -9,8 +9,9 @@ programam contra este arquivo, não contra o código um do outro.
 silenciosa entre o que o servidor devolve e o que a tela espera é exatamente o
 tipo de falha que não tem aparência.
 
-Estado: **Onda 0 implementada.** As linhas marcadas ⏳ estão especificadas mas
-ainda não existem; a onda indicada as implementa.
+Estado: **Onda 0 implementada; da onda 1, o ciclo de vida das instâncias.**
+As linhas marcadas ⏳ estão especificadas mas ainda não existem; a onda indicada
+as implementa.
 
 ---
 
@@ -108,18 +109,64 @@ O objeto é montado campo a campo no servidor
 carrega os dois segredos cifrados, e uma coluna acrescentada depois vazaria por
 padrão.
 
-### ⏳ Onda 1 — ciclo de vida
+### ✅ Onda 1 — ciclo de vida (implementado)
 
-| Rota | Faz |
-| --- | --- |
-| `POST /accounts` | cria a instância, assina o webhook e devolve o primeiro QR. Body: `{ baseUrl?, adminKey?, label?, purpose? }` — `baseUrl`/`adminKey` só no modo self-host |
-| `GET /accounts/:id/qr` | busca um QR novo |
-| `GET /accounts/:id/status` | pergunta ao servidor e **promove** para `connected`; só rebaixa quem já estava conectado |
-| `POST /accounts/:id/restart` | `reconnect` (GO) / `restart` (v2). Sem sessão viva → `409 no_session` |
-| `POST /accounts/:id/disconnect` | logout; é o único jeito de forçar um QR novo |
-| `DELETE /accounts/:id` | logout + delete no servidor + remove a linha. Devolve `{ removedOnServer, serverError }` — remover a linha sempre, mas relatar honestamente |
-| `PATCH /accounts/:id` | `{ label?, purpose?, isDefault? }` |
-| `POST /accounts/check-number` | `{ numbers: string[] }` → `[{ number, exists }]` |
+Serviço: `services/evolutionInstanceService.js`. Toda resposta de sucesso traz
+`data.account` já passado por `publicAccount()`.
+
+| Rota | Faz | `data` |
+| --- | --- | --- |
+| `POST /accounts` | cria a instância, assina o webhook e devolve o primeiro QR. Body: `{ baseUrl?, adminKey?, label?, purpose? }` — `baseUrl`/`adminKey` só no modo self-host. Responde `201` | `{ account, qr, pending }` |
+| `GET /accounts/:id/qr` | busca um QR novo | `{ account, qr, pending }` |
+| `GET /accounts/:id/status` | pergunta ao servidor e **promove** para `connected`; só rebaixa quem já estava conectado | `{ account, state }` |
+| `POST /accounts/:id/restart` | `reconnect` (GO) / `restart` (v2). Sem sessão viva → `409 no_session` | `{ account }` |
+| `POST /accounts/:id/disconnect` | logout; é o único jeito de forçar um QR novo | `{ account }` |
+| `DELETE /accounts/:id` | logout + delete no servidor + remove a linha. Body opcional `{ adminKey }` no self-host | `{ removedOnServer, serverError }` |
+| `PATCH /accounts/:id` | `{ label?, purpose?, isDefault? }` | `{ account }` |
+| `POST /accounts/check-number` | `{ numbers: string[] }`, no máximo 100 | `[{ number, exists }]` |
+
+O que o `POST /accounts` faz, na ordem — a sequência importa e cada passo já
+custou um bug no sistema de origem:
+
+1. sonda o sabor (`detectFlavor`) **antes** de montar qualquer payload;
+2. cunha `name` (`skygp_<8 hex>_<base36>`), `instanceId`, o token da instância e
+   o token do webhook;
+3. cria a instância. Resposta com `already exists`/`already in use` **não é
+   falha**: é o caminho de reconexão, e o id real vem da listagem;
+4. **só no GO**, `POST /instance/connect` — é ele que grava o webhook e sobe o
+   cliente. Sem essa chamada a instância existe e nunca conecta;
+5. primeiro QR: o da resposta do create, ou uma leitura à parte.
+
+`pending: true` com `qr: null` **não é erro**: o Evolution GO responde
+`400 "no QR code available"` nos primeiros segundos, enquanto o cliente sobe. A
+conta fica em `connecting` e a tela pede o QR de novo.
+
+Se o create funciona mas a conexão ou o QR falham, a linha é gravada mesmo
+assim, em `connecting` e com `lastError` preenchido: a instância já existe no
+servidor, e a linha é a única alça que o painel terá sobre ela — sem ela não dá
+nem para apagar.
+
+`DELETE` remove a linha local **sempre**, e conta a verdade sobre o servidor em
+`removedOnServer`/`serverError`. Recusar a remoção local porque um servidor que
+talvez nem exista mais não confirmou deixaria o operador com uma linha
+impossível de tirar; dizer que deu certo deixaria uma instância rodando sem ele
+saber. No GO o delete é por id e com a chave global: sem uma das duas,
+`serverError` explica qual faltou.
+
+`GET /status` grava só quando `state === 'connected'` ou quando o servidor diz
+`disconnected` para quem estava `connected`. A promoção é a saída de emergência
+para um `connection_update` perdido, que deixaria um número pareado eternamente
+em amarelo; a assimetria evita que um `disconnected` passageiro apague um
+pareamento em andamento — quem ainda não conectou aparece como desconectado no
+servidor o tempo todo em que o QR está na tela.
+
+`purpose` fora da lista responde `400`. `isDefault: true` passa por
+`setDefault()`, porque exatamente uma linha carrega a marca.
+
+Além dos códigos da tabela lá em cima, estas rotas devolvem `account_not_found`
+(`404`, id que não existe), `invalid_purpose` (`400`), `http_error` (`502`, com
+as palavras do próprio servidor) e, quando falta credencial para a rota pedida,
+`admin_key_missing` / `instance_token_missing` (`400`).
 
 ---
 
