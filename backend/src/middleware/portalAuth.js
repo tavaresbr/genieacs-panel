@@ -67,18 +67,30 @@ export async function authenticatePortalCustomer(req, res, next) {
   try {
     const token = parseCookies(req.headers.cookie)[PORTAL_COOKIE_NAME];
     if (!token) {
-      return res.status(401).json({ success: false, message: req.t('portal.sessionRequired') });
+      return res.status(401).json({
+        success: false,
+        message: req.t('portal.sessionRequired'),
+        code: 'customer_session_required'
+      });
     }
     const decoded = jwt.verify(token, portalSecret, {
       issuer: 'skygenpanel',
       audience: 'skygenpanel-customer-portal'
     });
     if (decoded.tokenType !== 'customer' || !decoded.accountId) {
-      return res.status(401).json({ success: false, message: req.t('portal.sessionInvalid') });
+      return res.status(401).json({
+        success: false,
+        message: req.t('portal.sessionInvalid'),
+        code: 'customer_session_invalid'
+      });
     }
     const account = await CustomerAccount.getById(decoded.accountId);
     if (!account || !account.active || account.customer_id !== decoded.customerId) {
-      return res.status(401).json({ success: false, message: req.t('portal.sessionStale') });
+      return res.status(401).json({
+        success: false,
+        message: req.t('portal.sessionStale'),
+        code: 'customer_session_invalid'
+      });
     }
     req.customer = account;
     return next();

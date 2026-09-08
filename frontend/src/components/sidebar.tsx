@@ -10,11 +10,13 @@ import { Icon } from '@/components/ui/icon'
 import { BrandMark } from '@/components/brand-mark'
 import { APP_RELEASE, ReleaseNotesModal } from '@/components/release-notes-modal'
 
+// `adminOnly` mirrors the backend: those routes answer 403 for a viewer, so
+// showing them would only offer a dead end.
 const menuItems = [
-  { href: '/dashboard', labelKey: 'sidebar.nav.dashboard', descriptionKey: 'sidebar.nav.dashboardDescription', icon: 'dashboard' },
-  { href: '/devices', labelKey: 'sidebar.nav.devices', descriptionKey: 'sidebar.nav.devicesDescription', icon: 'devices' },
-  { href: '/network-map', labelKey: 'sidebar.nav.networkMap', descriptionKey: 'sidebar.nav.networkMapDescription', icon: 'map' },
-  { href: '/settings', labelKey: 'sidebar.nav.settings', descriptionKey: 'sidebar.nav.settingsDescription', icon: 'settings' },
+  { href: '/dashboard', labelKey: 'sidebar.nav.dashboard', descriptionKey: 'sidebar.nav.dashboardDescription', icon: 'dashboard', adminOnly: false },
+  { href: '/devices', labelKey: 'sidebar.nav.devices', descriptionKey: 'sidebar.nav.devicesDescription', icon: 'devices', adminOnly: false },
+  { href: '/network-map', labelKey: 'sidebar.nav.networkMap', descriptionKey: 'sidebar.nav.networkMapDescription', icon: 'map', adminOnly: true },
+  { href: '/settings', labelKey: 'sidebar.nav.settings', descriptionKey: 'sidebar.nav.settingsDescription', icon: 'settings', adminOnly: true },
 ] as const
 
 export default function Sidebar() {
@@ -31,6 +33,7 @@ export default function Sidebar() {
   if (hideOnRoutes.some((route) => pathname.startsWith(route))) return null
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`)
+
 
   return (
     <>
@@ -97,6 +100,8 @@ function SidebarContent({
 }) {
   const { isDarkMode, toggleDarkMode } = useTheme()
   const { user, logout } = useAuth()
+  const isAdmin = user?.role === 'admin'
+  const visibleItems = menuItems.filter((item) => !item.adminOnly || isAdmin)
   const { t } = useTranslation()
   const displayName = user?.username || t('sidebar.defaultOperator')
   const initial = displayName.slice(0, 1).toUpperCase()
@@ -130,7 +135,7 @@ function SidebarContent({
       <nav className={`min-h-0 flex-1 overflow-y-auto py-5 ${isCollapsed ? 'px-2.5' : 'px-3'}`} aria-label={t('sidebar.primaryNavigation')}>
         {!isCollapsed && <div className="mb-2 px-3 text-[0.62rem] font-bold uppercase tracking-[0.16em] text-[#829188]">{t('sidebar.sectionLabel')}</div>}
         <ul className="space-y-1">
-          {menuItems.map((item) => {
+          {visibleItems.map((item) => {
             const active = isActive(item.href)
             const label = t(item.labelKey)
             return (
@@ -190,7 +195,9 @@ function SidebarContent({
           {!isCollapsed && (
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-semibold text-white">{displayName}</div>
-              <div className="text-[0.68rem] text-[#91a098]">{t('sidebar.administrator')}</div>
+              <div className="text-[0.68rem] text-[#91a098]">
+                {t(isAdmin ? 'sidebar.administrator' : 'sidebar.viewer')}
+              </div>
             </div>
           )}
         </div>

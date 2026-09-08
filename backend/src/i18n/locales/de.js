@@ -54,6 +54,8 @@ export default {
   'rateLimit.portalBilling': 'Zu viele Rechnungsabfragen. Warten Sie einen Moment und versuchen Sie es erneut.',
   'rateLimit.portalUnlock': 'Limit für Anfragen zur Vertrauensfreigabe erreicht. Versuchen Sie es später erneut.',
   'rateLimit.portalPasswordAdmin': 'Zu viele Anfragen für Portal-Passwörter, bitte langsamer',
+  'rateLimit.sgpAdmin': 'Zu viele SGP-Anfragen, bitte langsamer',
+  'rateLimit.sgpSync': 'Zu viele Flottensynchronisierungen. Versuchen Sie es später erneut.',
 
   // Geräte
   'device.idRequired': 'Die Geräte-ID ist erforderlich',

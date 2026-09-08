@@ -1,8 +1,12 @@
 import rateLimit from 'express-rate-limit';
 
-/** Renders the limiter body in the language negotiated for the request. */
-function limitMessage(key) {
-  return (req) => ({ success: false, message: req.t(key) });
+/**
+ * Renders the limiter body in the language negotiated for the request. The
+ * `code` travels alongside it because it is stable across languages, which is
+ * what a client needs to branch on.
+ */
+function limitMessage(key, code) {
+  return (req) => ({ success: false, code, message: req.t(key) });
 }
 
 const JSON_HEADERS = {
@@ -41,14 +45,14 @@ export const apiLimiter = limiter({
   windowMs: 60 * 1000,
   max: 300,
   keyGenerator: ipKey,
-  message: limitMessage('rateLimit.requests')
+  message: limitMessage('rateLimit.requests', 'rate_limited')
 });
 
 export const authLimiter = limiter({
   windowMs: 15 * 60 * 1000,
   max: 20,
   keyGenerator: ipKey,
-  message: limitMessage('rateLimit.attempts')
+  message: limitMessage('rateLimit.attempts', 'rate_limited_login')
 });
 
 /**
@@ -64,7 +68,7 @@ export const portalLoginLimiter = limiter({
     const customerId = String(req.body?.customerId ?? '').trim().toUpperCase().slice(0, 32);
     return `${ipKey(req)}|${customerId || 'unknown'}`;
   },
-  message: limitMessage('rateLimit.portalLogin')
+  message: limitMessage('rateLimit.portalLogin', 'rate_limited_login')
 });
 
 /** Coarse per-address guard for the whole portal surface. */
@@ -72,35 +76,35 @@ export const portalIpLimiter = limiter({
   windowMs: 60 * 1000,
   max: 600,
   keyGenerator: ipKey,
-  message: limitMessage('rateLimit.portalRequests')
+  message: limitMessage('rateLimit.portalRequests', 'rate_limited')
 });
 
 export const portalAccountLimiter = limiter({
   windowMs: 60 * 1000,
   max: 120,
   keyGenerator: accountKey,
-  message: limitMessage('rateLimit.portalRequests')
+  message: limitMessage('rateLimit.portalRequests', 'rate_limited')
 });
 
 export const portalMutationLimiter = limiter({
   windowMs: 15 * 60 * 1000,
   max: 10,
   keyGenerator: accountKey,
-  message: limitMessage('rateLimit.portalWifi')
+  message: limitMessage('rateLimit.portalWifi', 'rate_limited_wifi')
 });
 
 export const portalRevealLimiter = limiter({
   windowMs: 15 * 60 * 1000,
   max: 20,
   keyGenerator: accountKey,
-  message: limitMessage('rateLimit.portalPassword')
+  message: limitMessage('rateLimit.portalPassword', 'rate_limited_reveal')
 });
 
 export const portalBillingLimiter = limiter({
   windowMs: 60 * 1000,
   max: 20,
   keyGenerator: accountKey,
-  message: limitMessage('rateLimit.portalBilling')
+  message: limitMessage('rateLimit.portalBilling', 'rate_limited_billing')
 });
 
 /**
@@ -111,7 +115,26 @@ export const portalUnlockLimiter = limiter({
   windowMs: 60 * 60 * 1000,
   max: 3,
   keyGenerator: accountKey,
-  message: limitMessage('rateLimit.portalUnlock')
+  message: limitMessage('rateLimit.portalUnlock', 'rate_limited_unlock')
+});
+
+/**
+ * Operator SGP calls reach the provider's billing system on every request, so
+ * they get a tighter budget than the generic API limiter allows.
+ */
+export const sgpAdminLimiter = limiter({
+  windowMs: 60 * 1000,
+  max: 60,
+  keyGenerator: (req) => (req.user?.userId ? `user:${req.user.userId}` : `ip:${ipKey(req)}`),
+  message: limitMessage('rateLimit.sgpAdmin', 'rate_limited_sgp')
+});
+
+/** A fleet sync calls the provider once per ONT, so it is rarer still. */
+export const sgpSyncLimiter = limiter({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  keyGenerator: (req) => (req.user?.userId ? `user:${req.user.userId}` : `ip:${ipKey(req)}`),
+  message: limitMessage('rateLimit.sgpSync', 'rate_limited_sgp')
 });
 
 /** Operator-side reveal/reset of a customer portal password. */
@@ -119,5 +142,5 @@ export const portalPasswordAdminLimiter = limiter({
   windowMs: 15 * 60 * 1000,
   max: 60,
   keyGenerator: (req) => (req.user?.userId ? `user:${req.user.userId}` : `ip:${ipKey(req)}`),
-  message: limitMessage('rateLimit.portalPasswordAdmin')
+  message: limitMessage('rateLimit.portalPasswordAdmin', 'rate_limited')
 });

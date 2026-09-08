@@ -1,24 +1,61 @@
-import de from '@/lib/i18n/locales/de'
 import en from '@/lib/i18n/locales/en'
-import es from '@/lib/i18n/locales/es'
-import it from '@/lib/i18n/locales/it'
-import ptBR from '@/lib/i18n/locales/pt-BR'
 import type { Locale } from '@/lib/i18n/config'
 import type { Dictionary, TranslationKey, TranslationVars } from '@/lib/i18n/dictionary'
 
 export * from '@/lib/i18n/config'
 export * from '@/lib/i18n/runtime'
+export * from '@/lib/i18n/api-messages'
 export type { Dictionary, TranslationKey, TranslationVars }
 
 /** English is the fallback because it is the dictionary the other locales are typed against. */
 const FALLBACK_LOCALE: Locale = 'en'
 
-export const dictionaries: Record<Locale, Dictionary> = {
-  'pt-BR': ptBR,
-  en,
-  es,
-  it,
-  de,
+type LazyLocale = Exclude<Locale, 'en'>
+
+/**
+ * English is bundled: it is the fallback, and `translate()` must stay
+ * synchronous for the plain helpers in `lib/utils`. Every other dictionary is
+ * fetched on demand so a visitor downloads one locale instead of all of them.
+ */
+const loaded: Partial<Record<Locale, Dictionary>> = { en }
+
+const loaders: Record<LazyLocale, () => Promise<{ default: Dictionary }>> = {
+  de: () => import('@/lib/i18n/locales/de'),
+  es: () => import('@/lib/i18n/locales/es'),
+  it: () => import('@/lib/i18n/locales/it'),
+  'pt-BR': () => import('@/lib/i18n/locales/pt-BR'),
+}
+
+const pending = new Map<Locale, Promise<void>>()
+
+/** True once `locale` renders from its own dictionary instead of the fallback. */
+export function isDictionaryLoaded(locale: Locale): boolean {
+  return loaded[locale] !== undefined
+}
+
+/**
+ * Fetches the dictionary for `locale`, if it is not bundled already. Resolves
+ * even when the chunk fails to load: English then stands in for that locale.
+ */
+export function loadDictionary(locale: Locale): Promise<void> {
+  if (isDictionaryLoaded(locale)) return Promise.resolve()
+  const loader = loaders[locale as LazyLocale]
+  if (!loader) return Promise.resolve()
+  const inFlight = pending.get(locale)
+  if (inFlight) return inFlight
+
+  const request = loader()
+    .then((module) => {
+      loaded[locale] = module.default
+    })
+    .catch((error: unknown) => {
+      console.error(`Could not load the "${locale}" dictionary; falling back to ${FALLBACK_LOCALE}.`, error)
+    })
+    .finally(() => {
+      pending.delete(locale)
+    })
+  pending.set(locale, request)
+  return request
 }
 
 const PLACEHOLDER_PATTERN = /\{(\w+)\}/g
@@ -34,8 +71,9 @@ function interpolate(template: string, vars?: TranslationVars): string {
 /**
  * Translates `key` into `locale`, falling back to English and finally to the key
  * itself so a missing string is visible instead of rendering as an empty node.
+ * Stays synchronous: a locale whose chunk has not arrived reads as English.
  */
 export function translate(locale: Locale, key: TranslationKey, vars?: TranslationVars): string {
-  const template = dictionaries[locale]?.[key] ?? dictionaries[FALLBACK_LOCALE][key] ?? key
+  const template = loaded[locale]?.[key] ?? en[key] ?? key
   return interpolate(template, vars)
 }
