@@ -255,6 +255,7 @@ if [ ! -f "$ENV_FILE" ]; then
   log "Generating $ENV_FILE with random session secrets"
   JWT_SECRET="$(node -e 'console.log(require("crypto").randomBytes(48).toString("hex"))')"
   PORTAL_JWT_SECRET="$(node -e 'console.log(require("crypto").randomBytes(48).toString("hex"))')"
+  SECRET_BOX_KEY="$(node -e 'console.log(require("crypto").randomBytes(48).toString("hex"))')"
   cat > "$ENV_FILE" <<EOF
 APP_PORT=${APP_PORT}
 PORTAL_PORT=${PORTAL_PORT}
@@ -268,6 +269,12 @@ APP_ENV=production
 TRUST_PROXY=1
 JWT_SECRET=${JWT_SECRET}
 PORTAL_JWT_SECRET=${PORTAL_JWT_SECRET}
+# Encrypts the secrets an operator can read back. Kept separate from
+# JWT_SECRET so session secrets can be rotated without making that data
+# unreadable.
+SECRET_BOX_KEY=${SECRET_BOX_KEY}
+# This installer produces a single-provider install.
+EDITION=selfhosted
 JWT_EXPIRES_IN=1h
 REFRESH_TOKEN_EXPIRES_IN=7d
 CORS_ORIGINS=http://localhost:${APP_PORT}
@@ -282,6 +289,12 @@ else
   if ! grep -qE '^PORTAL_JWT_SECRET=' "$ENV_FILE"; then
     PORTAL_JWT_SECRET="$(node -e 'console.log(require("crypto").randomBytes(48).toString("hex"))')"
     printf 'PORTAL_JWT_SECRET=%s\n' "$PORTAL_JWT_SECRET" >> "$ENV_FILE"
+  fi
+  if ! grep -qE '^SECRET_BOX_KEY=' "$ENV_FILE"; then
+    # Safe to add to a running install: what is already stored stays readable
+    # through JWT_SECRET, and only new writes use this key.
+    SECRET_BOX_KEY="$(node -e 'console.log(require("crypto").randomBytes(48).toString("hex"))')"
+    printf 'SECRET_BOX_KEY=%s\n' "$SECRET_BOX_KEY" >> "$ENV_FILE"
   fi
   if ! grep -qE '^TRUST_PROXY=' "$ENV_FILE"; then
     # Only assume a proxy when the panel is still loopback-only; an exposed

@@ -25,6 +25,9 @@ class CustomerWifiCredential {
         password_ciphertext: record.password_ciphertext,
         password_iv: record.password_iv,
         password_tag: record.password_tag,
+        // Must move with the ciphertext it describes: a stale version points
+        // decryption at the wrong key and the password is gone.
+        password_key_version: record.password_key_version ?? null,
         updated_at: new Date()
       });
     return this.getByAccountAndIndex(record.account_id, record.wifi_index);

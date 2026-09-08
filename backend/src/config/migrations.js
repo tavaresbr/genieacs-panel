@@ -25,6 +25,33 @@ const CUSTOMER_PASSWORD_COLUMNS = [
   ['password_updated_at', (t) => t.timestamp('password_updated_at')]
 ];
 
+/**
+ * Records which key encrypted each stored secret.
+ *
+ * Every ciphertext used to be derived from JWT_SECRET, and `secretBox.decrypt`
+ * reports failure by returning null. Rotating that secret — an ordinary
+ * security operation — therefore turned every stored secret into an unreadable
+ * blob, silently. With the version on the row, a deployment can move to a
+ * dedicated SECRET_BOX_KEY and still read what was written before the move.
+ *
+ * Only the secrets stored in their own columns need this. The ones kept as
+ * JSON in `app_state` (the SGP token, the Evolution admin key) already carry
+ * the field, because those helpers spread the whole box output into the object.
+ *
+ * Existing rows stay NULL, which already means version 1; writing a value
+ * would be a fleet-sized update that says nothing the absence does not.
+ */
+const SECRET_KEY_VERSION_COLUMNS = [
+  ['customer_accounts', ['password_key_version']],
+  ['customer_wifi_credentials', ['password_key_version']],
+  ['provisioning_profiles', ['wifi_password_key_version', 'cpe_password_key_version']],
+  ['whatsapp_accounts', ['token_key_version', 'webhook_token_key_version']]
+];
+
+function keyVersionColumns(names) {
+  return names.map((name) => [name, (t) => t.integer(name)]);
+}
+
 /** Shared by the initial `users` table and the 0002 upgrade. */
 function addTokenVersion(t) {
   t.integer('token_version').notNullable().defaultTo(0);
@@ -88,7 +115,12 @@ const vendorsTable = (db) => (t) => {
 
 const wifiSecurityMappingsTable = (db) => (t) => {
   t.increments('id').primary();
-  t.integer('vendor_id').notNullable().references('id').inTable('vendors').onDelete('CASCADE');
+  // `unsigned` is what makes this match vendors.id: increments() is
+  // `int unsigned` on MySQL, and MySQL refuses a foreign key between a signed
+  // and an unsigned column (errno 150 / ER_FK_INCOMPATIBLE_COLUMNS), which
+  // aborts the whole schema. The other foreign keys here already carry it.
+  t.integer('vendor_id').unsigned().notNullable()
+    .references('id').inTable('vendors').onDelete('CASCADE');
   t.string('raw_security_value', 128).notNullable();
   t.string('normalized_security', 128).notNullable();
   t.text('description');
@@ -660,6 +692,28 @@ export const migrations = [
       await db.schema.alterTable('sgp_links', (t) => {
         for (const add of missing) add(t);
       });
+    }
+  },
+  {
+    // Lets JWT_SECRET be rotated without destroying the secrets it encrypted.
+    id: '0009_secret_key_version',
+    async isApplied(db) {
+      for (const [table, names] of SECRET_KEY_VERSION_COLUMNS) {
+        if (!(await db.schema.hasTable(table))) return false;
+        const missing = await missingColumns(db, table, keyVersionColumns(names));
+        if (missing.length > 0) return false;
+      }
+      return true;
+    },
+    async up(db) {
+      for (const [table, names] of SECRET_KEY_VERSION_COLUMNS) {
+        if (!(await db.schema.hasTable(table))) continue;
+        const missing = await missingColumns(db, table, keyVersionColumns(names));
+        if (missing.length === 0) continue;
+        await db.schema.alterTable(table, (t) => {
+          for (const add of missing) add(t);
+        });
+      }
     }
   }
 ];
