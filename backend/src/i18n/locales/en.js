@@ -318,6 +318,7 @@ export default {
   'sgp.error.deviceUnlinked': 'This ONT has no SGP contract linked yet. Link it manually or check the PPPoE login.',
   'sgp.error.noContractForDevice': 'No SGP contract was found for this ONT',
   'sgp.error.contractNotFound': 'Contract not found in SGP',
+  'sgp.error.webhookSecretRequired': 'Generate a webhook secret before enabling SGP event delivery',
   'sgp.error.testCredentialsRequired': 'Enter the SGP URL, app, and token to test the connection',
   'sgp.testAccepted': 'SGP accepted the connection and the credentials. Response: {error}',
 
