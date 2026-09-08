@@ -6,6 +6,7 @@ import DeviceService from './services/deviceService.js';
 import CustomerService from './services/customerService.js';
 import CustomerPortalPasswordService from './services/customerPortalPasswordService.js';
 import SchedulerService from './services/schedulerService.js';
+import WaOutboxWorker from './services/waOutboxWorker.js';
 
 const PORT = Number(process.env.APP_PORT) || 5890;
 const PORTAL_PORT = process.env.PORTAL_PORT === '0'
@@ -66,6 +67,12 @@ export const startServer = async () => {
       void SchedulerService.start().catch((error) => {
         console.warn(`Background scheduler not started: ${error.message}`);
       });
+      // The WhatsApp outbox has its own loop rather than a job inside the
+      // scheduler: it runs every few seconds because a reply an operator just
+      // typed is waiting on it, while every scheduler job is on a minute or
+      // longer. It reads the integration's enabled flag inside each tick, so
+      // this arms the driver whether or not WhatsApp is configured.
+      WaOutboxWorker.start();
       console.log(`Panel: http://localhost:${PORT}`);
     });
     portalServer = portalApp.listen(PORTAL_PORT, PORTAL_HOST, () => {
@@ -85,6 +92,7 @@ startServer();
 async function shutdown(signal) {
   console.log(`Received ${signal}; shutting down`);
   SchedulerService.stop();
+  WaOutboxWorker.stop();
   if (server) {
     await new Promise((resolve) => server.close(resolve));
   }

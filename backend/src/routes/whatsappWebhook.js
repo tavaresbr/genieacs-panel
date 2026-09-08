@@ -1,6 +1,7 @@
 import express from 'express';
 import WhatsAppAccount from '../models/WhatsAppAccount.js';
 import WhatsAppConfigService from '../services/whatsappConfigService.js';
+import WaInboundService from '../services/waInboundService.js';
 import { canonicalizarEvento } from '../utils/wa/waEventos.js';
 import { pedidoAutorizado, tokenDaQuery, credencialDoPedido } from '../utils/wa/waWebhookAuth.js';
 import { waWebhookLimiter } from '../middleware/rateLimit.js';
@@ -43,10 +44,22 @@ router.post('/', waWebhookLimiter, async (req, res) => {
 
   const evento = canonicalizarEvento(body.event ?? body.Event ?? '');
 
-  // Wave 1 wires the four handlers (QR, connection, message, receipt) onto the
-  // canonical name above. Until then the receiver is authenticated and inert —
-  // which is the correct state, since no account exists to produce events yet.
-  return res.json({ success: true, event: evento, handled: false });
+  try {
+    const resultado = await WaInboundService.handle(account, evento, body);
+    // The body names what happened. It is the only observability this path has:
+    // an event that was stored and an event that was deliberately dropped both
+    // answer 200, and without `skipped` they are indistinguishable from the
+    // outside — which is how the source system went sixteen days with no
+    // delivery receipts at all and nobody noticed.
+    return res.json({ success: true, event: evento, ...resultado });
+  } catch (error) {
+    // 500 on purpose, and only here. An unexpected failure (the database is
+    // down, the disk is full) IS worth retrying, and a retry is exactly what a
+    // non-2xx buys us. Everything we merely choose not to act on left through
+    // the 200 above.
+    console.error(`[wa] webhook handler failed for ${evento}:`, error.message);
+    return res.status(500).json({ success: false, event: evento, error: 'handler_failed' });
+  }
 });
 
 export default router;
