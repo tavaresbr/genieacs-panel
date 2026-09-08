@@ -148,11 +148,11 @@ before(async () => {
   });
   token = setup.body.data.token;
 
-  await WhatsAppConfigService.saveConfig({
+  await asTenant(() => WhatsAppConfigService.saveConfig({
     enabled: true,
     webhookBaseUrl: 'https://painel.provedor.test/api/whatsapp-webhook',
     rateLimitPerMin: 60
-  });
+  }));
 
   const support = await asTenant(() => WhatsAppAccount.create({
     name: SUPPORT,
@@ -476,7 +476,7 @@ describe('the per-minute ceiling', () => {
     // `stop()` drops the rolling window, so the budget this test measures is
     // not whatever the tests above happened to leave behind.
     WaOutboxWorker.stop();
-    await WhatsAppConfigService.saveConfig({ rateLimitPerMin: 2 });
+    await asTenant(() => WhatsAppConfigService.saveConfig({ rateLimitPerMin: 2 }));
     await clearOutbox();
 
     try {
@@ -503,7 +503,7 @@ describe('the per-minute ceiling', () => {
       assert.equal(statuses.filter((s) => s === 'sent').length, 2);
       assert.equal(statuses.filter((s) => s === 'queued').length, 3);
     } finally {
-      await WhatsAppConfigService.saveConfig({ rateLimitPerMin: 60 });
+      await asTenant(() => WhatsAppConfigService.saveConfig({ rateLimitPerMin: 60 }));
       WaOutboxWorker.stop();
     }
   });
@@ -512,7 +512,7 @@ describe('the per-minute ceiling', () => {
     await clearOutbox();
     const conversation = await newConversation();
     await post(conversation.id, { body: 'com a integração ligada' });
-    await WhatsAppConfigService.saveConfig({ enabled: false });
+    await asTenant(() => WhatsAppConfigService.saveConfig({ enabled: false }));
     requests.length = 0;
 
     try {
@@ -520,7 +520,7 @@ describe('the per-minute ceiling', () => {
       assert.equal(summary.skipped, 'disabled');
       assert.equal(requests.length, 0);
     } finally {
-      await WhatsAppConfigService.saveConfig({ enabled: true });
+      await asTenant(() => WhatsAppConfigService.saveConfig({ enabled: true }));
     }
   });
 });

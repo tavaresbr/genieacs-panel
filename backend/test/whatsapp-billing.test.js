@@ -177,14 +177,14 @@ before(async () => {
   });
   token = setup.body.data.token;
 
-  await SgpService.saveConfig({
+  await asTenant(() => SgpService.saveConfig({
     enabled: true, baseUrl: sgpUrl, app: APP, token: TOKEN, linkMode: 'pppoe'
-  });
-  await WhatsAppConfigService.saveConfig({
+  }));
+  await asTenant(() => WhatsAppConfigService.saveConfig({
     enabled: true,
     webhookBaseUrl: 'https://painel.provedor.test/api/whatsapp-webhook',
     rateLimitPerMin: 60
-  });
+  }));
   await asTenant(() => WhatsAppAccount.create({
     name: 'painel-cobranca',
     purpose: 'billing',

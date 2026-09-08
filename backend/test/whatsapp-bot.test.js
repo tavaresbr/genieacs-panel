@@ -211,10 +211,10 @@ before(async () => {
   // where the customer portal answers. Two settings because they are two
   // addresses: the portal is its own Express app on its own port, and only a
   // reverse proxy in front of both makes them the same hostname.
-  await WhatsAppConfigService.saveConfig({
+  await asTenant(() => WhatsAppConfigService.saveConfig({
     webhookBaseUrl: `${PORTAL_BASE}/api/whatsapp-webhook`,
     portalPublicUrl: PORTAL_BASE
-  });
+  }));
 
   // The number has to be CONNECTED or `enqueue` refuses every answer with
   // `no_account`, and the bot would look silent for the wrong reason.
@@ -343,13 +343,13 @@ describe('the line the bot must not cross', () => {
   });
 
   it('hands off instead of sending a broken link when no public URL is configured', async () => {
-    await WhatsAppConfigService.saveConfig({ portalPublicUrl: '' });
+    await asTenant(() => WhatsAppConfigService.saveConfig({ portalPublicUrl: '' }));
     try {
       const texto = await unicaResposta(ASSINANTE, 'esqueci a senha do wifi');
       assert.match(texto, /atendente/i);
       assert.ok(!texto.includes('http'), 'no link at all beats a link that opens nothing');
     } finally {
-      await WhatsAppConfigService.saveConfig({ portalPublicUrl: PORTAL_BASE });
+      await asTenant(() => WhatsAppConfigService.saveConfig({ portalPublicUrl: PORTAL_BASE }));
     }
   });
 

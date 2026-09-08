@@ -48,6 +48,8 @@ const ALL_IDS = migrations.map((migration) => migration.id);
 const FIRST_TENANCY_MIGRATION = '0010_customer_accounts_tenant';
 const LEGACY_USERNAME = 'legacy-admin';
 const LEGACY_APP_NAME = 'Legacy Panel';
+const LEGACY_STATE_KEY = 'sgp_integration_config';
+const LEGACY_STATE_VALUE = '{"enabled":true,"app":"painel"}';
 
 // Scratch databases for the cases that need a second, independent file: the
 // harness owns a single database and it is spoken for by the legacy fixture.
@@ -86,12 +88,22 @@ async function createLegacyInstallation(db) {
     t.text('value');
     t.timestamp('updated_at').defaultTo(db.fn.now());
   });
+  // Same shape as `settings`: `key` alone is the primary key. 0014 has to move
+  // both, with rows already in them.
+  await db.schema.createTable('app_state', (t) => {
+    t.string('key', 128).primary();
+    t.text('value');
+    t.timestamp('updated_at').defaultTo(db.fn.now());
+  });
   await db('users').insert({
     username: LEGACY_USERNAME,
     password: 'legacy-hash',
     role: 'admin'
   });
   await db('settings').insert({ key: 'appName', value: LEGACY_APP_NAME });
+  // An integration blob, because that is what this table really holds and
+  // losing one in a backfill would cost an operator their SGP credentials.
+  await db('app_state').insert({ key: LEGACY_STATE_KEY, value: LEGACY_STATE_VALUE });
 }
 
 before(async () => {
@@ -185,6 +197,72 @@ describe('baselining an installation created before the runner existed', () => {
 
     const setting = await db('settings').where({ key: 'appName' }).first();
     assert.equal(setting.value, LEGACY_APP_NAME);
+
+    // The blob survives the primary-key move intact. A backfill that mangled
+    // this would cost an operator their stored SGP credentials.
+    const state = await db('app_state').where({ key: LEGACY_STATE_KEY }).first();
+    assert.equal(state.value, LEGACY_STATE_VALUE);
+  });
+
+  // 0014 moves `key` from being the primary key on its own to being half of
+  // `(tenant_id, key)`. This is the only step in the phase that touches a
+  // primary key, and the three dialects spell it differently, so it is checked
+  // here — in the block that runs against whichever dialect is under test —
+  // rather than in the SQLite-only scratch databases below.
+  describe('moving the key/value tables to a per-provider primary key', () => {
+    const rowsFor = (db, table, key) => db(table).where({ key });
+
+    it('carries the legacy rows over to the install\'s own provider', async () => {
+      const db = getDb();
+      const tenant = await db('tenants').orderBy('id', 'asc').first();
+      for (const [table, key] of [['settings', 'appName'], ['app_state', LEGACY_STATE_KEY]]) {
+        const [row] = await rowsFor(db, table, key);
+        assert.equal(Number(row.tenant_id), Number(tenant.id), `${table}.tenant_id`);
+      }
+    });
+
+    it('lets a second provider hold the same key with its own value', async () => {
+      const db = getDb();
+      await db('tenants').insert({ slug: 'pk-beta', name: 'Provedor Beta', status: 'active' });
+      const beta = await db('tenants').where({ slug: 'pk-beta' }).first();
+      try {
+        await db('settings').insert({ tenant_id: beta.id, key: 'appName', value: 'Outro Painel' });
+        const rows = await rowsFor(db, 'settings', 'appName');
+        assert.equal(rows.length, 2);
+        assert.deepEqual(
+          rows.map((r) => r.value).sort(),
+          [LEGACY_APP_NAME, 'Outro Painel'].sort()
+        );
+
+        // Same provider, same key, twice — still refused.
+        await assert.rejects(
+          () => db('settings').insert({ tenant_id: beta.id, key: 'appName', value: 'Terceiro' })
+        );
+
+        // The conflict target has to be the composite key. Getting this wrong
+        // is invisible on MySQL, which ignores the target entirely, and throws
+        // on SQLite and Postgres — so it is asserted behaviourally.
+        await db('settings')
+          .insert({ tenant_id: beta.id, key: 'appName', value: 'Renomeado' })
+          .onConflict(['tenant_id', 'key'])
+          .merge({ value: 'Renomeado' });
+        const merged = await rowsFor(db, 'settings', 'appName');
+        assert.equal(merged.length, 2, 'the upsert must update, not append');
+        assert.equal(
+          merged.find((r) => Number(r.tenant_id) === Number(beta.id)).value,
+          'Renomeado'
+        );
+      } finally {
+        await db('settings').where({ tenant_id: beta.id }).del();
+        await db('tenants').where({ id: beta.id }).del();
+      }
+    });
+
+    it('refuses a row for a provider that does not exist', async () => {
+      await assert.rejects(
+        () => getDb()('settings').insert({ tenant_id: 999999, key: 'appName', value: 'x' })
+      );
+    });
   });
 
   it('fills in what the legacy layout was missing', async () => {
@@ -246,7 +324,12 @@ describe('the schema table list', () => {
       ['customer_wifi_credentials', 'customer_accounts'],
       ['provisioning_runs', 'provisioning_profiles'],
       ['wa_conversations', 'whatsapp_accounts'],
-      ['wa_messages', 'wa_conversations']
+      ['wa_messages', 'wa_conversations'],
+      // Not tidiness: `copyData` deletes in reverse order and inserts forward,
+      // so the foreign key added by 0014 is only satisfiable because `tenants`
+      // precedes both of these.
+      ['settings', 'tenants'],
+      ['app_state', 'tenants']
     ]) {
       assert.ok(
         position(parent) < position(child),

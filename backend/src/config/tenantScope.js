@@ -36,7 +36,12 @@ export const SCOPED_TABLES = new Set([
   'wa_templates',
   'wa_broadcasts',
   'wa_broadcast_recipients',
-  'wa_alert_state'
+  'wa_alert_state',
+  // The configuration pair. `settings` is what an operator sets on screen;
+  // `app_state` holds the integration blobs — and `dashboard_snapshot`, which
+  // is not configuration at all but a provider's own device and fault counts.
+  'settings',
+  'app_state'
 ]);
 
 /** Tables that belong to the deployment rather than to any one provider. */

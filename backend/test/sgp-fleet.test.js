@@ -1,7 +1,11 @@
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { authHeaders, call, getDb, startTestServers, stopTestServers } from './helpers/harness.js';
+import { asTenant, authHeaders, call, getDb, startTestServers, stopTestServers } from './helpers/harness.js';
+
+const { default: Setting } = await import('../src/models/Setting.js');
+
+const { default: AppState } = await import('../src/models/AppState.js');
 
 const { deriveContractState } = await import('../src/services/sgpService.js');
 
@@ -203,7 +207,7 @@ before(async () => {
   });
   token = setup.body.data.token;
 
-  await getDb()('settings').where({ key: 'genieAcsUrl' }).update({ value: genieUrl });
+  await asTenant(() => Setting.upsert('genieAcsUrl', genieUrl));
   await getDb()('customer_accounts').insert(FLEET.map((entry, index) => ({
     customer_id: entry.customerId,
     device_id: entry.device,
@@ -354,7 +358,7 @@ describe('fleet synchronization', () => {
   });
 
   it('stores the last run summary for the next page load', async () => {
-    const row = await getDb()('app_state').where({ key: 'sgp_sync_last_run' }).first();
+    const row = { value: await asTenant(() => AppState.get('sgp_sync_last_run')) };
     assert.deepEqual(JSON.parse(row.value), firstRun);
   });
 
