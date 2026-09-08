@@ -9,6 +9,7 @@ import { classificarJid, telefoneDoJid } from '../utils/wa/waJid.js';
 import { lerRecibo } from '../utils/wa/waRecibo.js';
 import { pedeSaida } from '../utils/wa/waOptOutTexto.js';
 import WaMediaService from './waMediaService.js';
+import WaBotService from './waBotService.js';
 
 /**
  * Os quatro tratadores do webhook de entrada.
@@ -300,8 +301,9 @@ async function gravarMensagem(account, item) {
     ...(anexo ?? {})
   };
 
+  let messageId;
   try {
-    await insertReturningId('wa_messages', linha);
+    messageId = await insertReturningId('wa_messages', linha);
   } catch (error) {
     // O índice único de `external_id` É a deduplicação. Uma violação aqui
     // significa que o evento chegou duas vezes — que é sucesso, não falha:
@@ -332,6 +334,19 @@ async function gravarMensagem(account, item) {
     patch.unread_count = getDb().raw('unread_count + 1');
   }
   await WaConversation.update(conversation.id, patch);
+
+  // 9. O bot de autoatendimento.
+  // Depois de gravar e depois do opt-out, de propósito: o bot decide sobre uma
+  // mensagem que já existe, e uma que pediu saída ele não responde. Não protege
+  // com try: `responder` engole tudo por contrato (ver `waBotService.js`), e
+  // tem que engolir — uma falha dele virando 500 aqui faria o servidor reenviar
+  // este evento para sempre.
+  await WaBotService.responder({
+    conversation,
+    messageId,
+    body: texto,
+    direction: linha.direction
+  });
 
   return { handled: true, conversationId: conversation.id, direction: linha.direction };
 }

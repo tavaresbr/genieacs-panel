@@ -775,6 +775,9 @@ export interface WhatsAppConfig {
   allowedHosts: string[]
   webhookBaseUrl: string
   rejectCallMessage: string
+  // Where the customer portal answers from outside. Its own field, not the
+  // panel's address: the portal is a separate app on a separate port.
+  portalPublicUrl: string
   rateLimitPerMin: number
   managedUrl: string
   managed: boolean
@@ -805,6 +808,113 @@ export interface WhatsAppAccount {
   updatedAt: string | null
 }
 
+/** `pending` with a null `qr` is a "not yet", not a failure — the GO client boots slowly. */
+export interface WhatsAppQrResult {
+  account: WhatsAppAccount
+  qr: string | null
+  pending: boolean
+}
+
+export interface WhatsAppTemplate {
+  id: number
+  name: string
+  body: string
+  category: string
+  active: boolean
+  createdAt: string | null
+  updatedAt: string | null
+}
+
+export interface WhatsAppOptOut {
+  id: number
+  waPhoneE164: string | null
+  waLid: string | null
+  origin: 'customer' | 'operator'
+  reasonText: string | null
+  createdAt: string | null
+}
+
+/** A subscriber the billing cadence could contact. `daysOverdue` is negative when not yet due. */
+export interface WhatsAppOverdueSubscriber {
+  contract: string
+  clientName: string | null
+  document: string | null
+  phone: string | null
+  phoneSource: 'manual' | 'sgp' | null
+  deviceId: string | null
+  amount: number | null
+  dueDate: string | null
+  daysOverdue: number | null
+}
+
+export interface WhatsAppSkipCounts {
+  noPhone: number
+  optOut: number
+  noInvoice: number
+  futureOnly: number
+  sgpRefused: number
+  templateIncomplete: number
+}
+
+export interface WhatsAppBroadcast {
+  id: number
+  title: string
+  body: string
+  status: 'draft' | 'queued' | 'running' | 'paused' | 'done' | 'canceled' | 'failed'
+  totalCount: number
+  sentCount: number
+  failedCount: number
+  rateLimitPerMin: number | null
+  startAt: string | null
+  createdAt: string | null
+  updatedAt: string | null
+}
+
+export type WhatsAppAlertRule = 'ont_offline' | 'rx_power_low' | 'temperature_high' | 'mass_outage'
+
+export interface WhatsAppAlertSettings {
+  enabled: boolean
+  intervalSeconds: number
+  recipients: string[]
+  rules: Record<WhatsAppAlertRule, { enabled: boolean; threshold: number | null; cooldownMinutes: number }>
+}
+
+export interface WhatsAppConversation {
+  id: number
+  accountId: number
+  waPhoneE164: string | null
+  waLid: string | null
+  pushName: string | null
+  deviceId: string | null
+  contract: string | null
+  clientName: string | null
+  /** The contact asked not to be contacted. Replying is still allowed. */
+  optedOut: boolean
+  lastMessageAt: string | null
+  lastInboundAt: string | null
+  unreadCount: number
+  closedAt: string | null
+  createdAt: string | null
+  updatedAt: string | null
+}
+
+export interface WhatsAppMessage {
+  id: number
+  conversationId: number
+  direction: 'in' | 'out'
+  body: string | null
+  attachment: { url: string; type: string | null; name: string | null } | null
+  isNote: boolean
+  externalId: string | null
+  deliveryStatus: 'queued' | 'sending' | 'sent' | 'delivered' | 'read' | 'failed' | null
+  deliveryError: string | null
+  attempts: number
+  sentBy: number | null
+  readAt: string | null
+  createdAt: string | null
+  updatedAt: string | null
+}
+
 export const whatsappAPI = {
   getConfig: () =>
     apiClient.get<WhatsAppConfig>('/whatsapp/config'),
@@ -814,6 +924,137 @@ export const whatsappAPI = {
   updateConfig: (config: Partial<Omit<WhatsAppConfig, 'allowedHosts'>> & { allowedHosts?: string | string[]; managedAdminKey?: string }) =>
     apiClient.put<WhatsAppConfig>('/whatsapp/config', config),
 
+  // ── Connected numbers ────────────────────────────────────────────────
   listAccounts: () =>
     apiClient.get<WhatsAppAccount[]>('/whatsapp/accounts'),
+
+  // `baseUrl`/`adminKey` are ignored in managed mode, where the panel owns the
+  // server and the operator never sees its address or its key.
+  createAccount: (payload: { baseUrl?: string; adminKey?: string; label?: string; purpose?: WhatsAppPurpose }) =>
+    apiClient.post<WhatsAppQrResult>('/whatsapp/accounts', payload),
+
+  getQr: (id: number) =>
+    apiClient.get<WhatsAppQrResult>(`/whatsapp/accounts/${id}/qr`),
+
+  // Asks the server and writes back. This is the escape hatch for a lost
+  // connection_update, which otherwise leaves a paired number amber forever.
+  getStatus: (id: number) =>
+    apiClient.get<{ account: WhatsAppAccount; state: WhatsAppStatus }>(`/whatsapp/accounts/${id}/status`),
+
+  restartAccount: (id: number) =>
+    apiClient.post<{ account: WhatsAppAccount }>(`/whatsapp/accounts/${id}/restart`, {}),
+
+  // The only way to force a new QR: a server holding a session resumes it
+  // instead of issuing one.
+  disconnectAccount: (id: number) =>
+    apiClient.post<{ account: WhatsAppAccount }>(`/whatsapp/accounts/${id}/disconnect`, {}),
+
+  // The row goes either way; `serverError` is how the operator learns an
+  // instance was left running on the server. No admin key is sent from here:
+  // the one stored in the configuration covers a panel pointed at one server,
+  // and a browser is the wrong place to be typing a server's master key.
+  deleteAccount: (id: number) =>
+    apiClient.delete<{ removedOnServer: boolean; serverError: string | null }>(`/whatsapp/accounts/${id}`),
+
+  updateAccount: (id: number, patch: { label?: string; purpose?: WhatsAppPurpose; isDefault?: boolean }) =>
+    apiClient.requestWithBody<{ account: WhatsAppAccount }>('PATCH', `/whatsapp/accounts/${id}`, patch),
+
+  checkNumbers: (numbers: string[]) =>
+    apiClient.post<{ number: string; exists: boolean }[]>('/whatsapp/accounts/check-number', { numbers }),
+
+  // ── Templates ────────────────────────────────────────────────────────
+  listTemplates: (params: { category?: string; includeInactive?: boolean } = {}) => {
+    const query = new URLSearchParams()
+    if (params.category) query.set('category', params.category)
+    if (params.includeInactive) query.set('includeInactive', '1')
+    const suffix = query.toString()
+    return apiClient.get<WhatsAppTemplate[]>(`/whatsapp/templates${suffix ? `?${suffix}` : ''}`)
+  },
+
+  createTemplate: (payload: { name: string; body: string; category?: string }) =>
+    apiClient.post<WhatsAppTemplate>('/whatsapp/templates', payload),
+
+  updateTemplate: (id: number, patch: Partial<{ name: string; body: string; category: string; active: boolean }>) =>
+    apiClient.put<WhatsAppTemplate>(`/whatsapp/templates/${id}`, patch),
+
+  deleteTemplate: (id: number) =>
+    apiClient.delete(`/whatsapp/templates/${id}`),
+
+  // ── Do not disturb ───────────────────────────────────────────────────
+  listOptOuts: () =>
+    apiClient.get<WhatsAppOptOut[]>('/whatsapp/opt-outs'),
+
+  createOptOut: (payload: { phone: string; reasonText?: string }) =>
+    apiClient.post<WhatsAppOptOut>('/whatsapp/opt-outs', payload),
+
+  revokeOptOut: (id: number) =>
+    apiClient.delete(`/whatsapp/opt-outs/${id}`),
+
+  // ── Billing cadence ──────────────────────────────────────────────────
+  // The window is symmetric: a negative `daysMin` means "due within N days".
+  listOverdue: (params: { daysMin?: number; daysMax?: number; search?: string; limit?: number } = {}) => {
+    const query = new URLSearchParams()
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') query.set(key, String(value))
+    })
+    const suffix = query.toString()
+    return apiClient.get<WhatsAppOverdueSubscriber[]>(`/whatsapp/billing/overdue${suffix ? `?${suffix}` : ''}`)
+  },
+
+  // Builds the campaign as a DRAFT and returns it. Messaging hundreds of people
+  // is never the side effect of a click on a listing screen.
+  buildBillingCampaign: (payload: { template: string; contracts: string[]; title?: string }) =>
+    apiClient.post<{ broadcast: WhatsAppBroadcast; recipients: number; skipped: WhatsAppSkipCounts }>(
+      '/whatsapp/billing/campaign',
+      payload
+    ),
+
+  // ── Campaigns ────────────────────────────────────────────────────────
+  listBroadcasts: () =>
+    apiClient.get<WhatsAppBroadcast[]>('/whatsapp/broadcasts'),
+
+  setBroadcastStatus: (id: number, status: 'running' | 'paused' | 'canceled') =>
+    apiClient.post<WhatsAppBroadcast>(`/whatsapp/broadcasts/${id}/status`, { status }),
+
+  // ── Technical alerts ─────────────────────────────────────────────────
+  getAlertSettings: () =>
+    apiClient.get<WhatsAppAlertSettings>('/whatsapp/alerts/settings'),
+
+  updateAlertSettings: (settings: Partial<WhatsAppAlertSettings>) =>
+    apiClient.put<WhatsAppAlertSettings>('/whatsapp/alerts/settings', settings),
+
+  runAlertScan: () =>
+    apiClient.post<{ fired: number; cleared: number }>('/whatsapp/alerts/scan', {}),
+
+  // ── Inbox ────────────────────────────────────────────────────────────
+  listConversations: (params: { limit?: number; offset?: number } = {}) => {
+    const query = new URLSearchParams()
+    if (params.limit) query.set('limit', String(params.limit))
+    if (params.offset) query.set('offset', String(params.offset))
+    const suffix = query.toString()
+    return apiClient.get<WhatsAppConversation[]>(`/whatsapp/conversations${suffix ? `?${suffix}` : ''}`)
+  },
+
+  // Reading a thread clears its unread count server-side — the operator looking
+  // at it is the only thing "read" can mean here.
+  listMessages: (conversationId: number, params: { limit?: number } = {}) => {
+    const suffix = params.limit ? `?limit=${params.limit}` : ''
+    return apiClient.get<{ conversation: WhatsAppConversation; messages: WhatsAppMessage[] }>(
+      `/whatsapp/conversations/${conversationId}/messages${suffix}`
+    )
+  },
+
+  // Enqueues and returns; the outbox worker delivers. An internal note is
+  // stored and never sent.
+  sendMessage: (conversationId: number, payload: { body?: string; attachment?: { url: string; type?: string; name?: string }; isNote?: boolean }) =>
+    apiClient.post<WhatsAppMessage>(`/whatsapp/conversations/${conversationId}/messages`, payload),
+
+  // ── Subscriber phone ─────────────────────────────────────────────────
+  // Overrides what SGP returned. An empty string clears the override and falls
+  // back to the ERP value.
+  setDevicePhone: (deviceId: string, phone: string) =>
+    apiClient.put<{ phoneE164: string | null; phoneManual: string | null }>(
+      `/whatsapp/devices/${encodeURIComponent(deviceId)}/phone`,
+      { phone }
+    ),
 }

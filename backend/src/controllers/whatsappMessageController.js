@@ -1,4 +1,5 @@
 import WaSendService from '../services/waSendService.js';
+import WaConversationService from '../services/waConversationService.js';
 import { WaError } from '../services/whatsappConfigService.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { translateError } from '../i18n/index.js';
@@ -26,6 +27,30 @@ class WhatsAppMessageController {
    * with no message at all when it timed out — the worker despatches, and the
    * webhook moves the row to delivered and read.
    */
+  static async listConversations(req, res) {
+    try {
+      const rows = await WaConversationService.list({
+        limit: req.query?.limit,
+        offset: req.query?.offset
+      });
+      return res.json(createResponse(req.t('whatsapp.conversationsLoaded', { count: rows.length }), rows));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.conversationsLoadFailed');
+    }
+  }
+
+  static async listMessages(req, res) {
+    try {
+      const data = await WaConversationService.messages(req.params?.id, { limit: req.query?.limit });
+      return res.json(createResponse(
+        req.t('whatsapp.messagesLoaded', { count: data.messages.length }),
+        data
+      ));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.messagesLoadFailed');
+    }
+  }
+
   static async send(req, res) {
     try {
       const body = req.body ?? {};

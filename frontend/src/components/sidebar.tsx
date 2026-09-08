@@ -16,6 +16,7 @@ const menuItems = [
   { href: '/dashboard', labelKey: 'sidebar.nav.dashboard', descriptionKey: 'sidebar.nav.dashboardDescription', icon: 'dashboard', adminOnly: false },
   { href: '/devices', labelKey: 'sidebar.nav.devices', descriptionKey: 'sidebar.nav.devicesDescription', icon: 'devices', adminOnly: false },
   { href: '/network-map', labelKey: 'sidebar.nav.networkMap', descriptionKey: 'sidebar.nav.networkMapDescription', icon: 'map', adminOnly: true },
+  { href: '/whatsapp', labelKey: 'sidebar.nav.whatsapp', descriptionKey: 'sidebar.nav.whatsappDescription', icon: 'chat', adminOnly: true },
   { href: '/settings', labelKey: 'sidebar.nav.settings', descriptionKey: 'sidebar.nav.settingsDescription', icon: 'settings', adminOnly: true },
 ] as const
 

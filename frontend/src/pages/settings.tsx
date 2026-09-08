@@ -9,11 +9,13 @@ import {
   databaseAPI,
   sgpAPI,
   usersAPI,
+  whatsappAPI,
   type DbConfigPayload,
   type Operator,
   type OperatorRole,
   type SgpConfig,
-  type SgpSyncSummary
+  type SgpSyncSummary,
+  type WhatsAppConfig
 } from '@/lib/api'
 import { useToast } from '@/components/ui/toast'
 import { useLoading } from '@/components/ui/loading'
@@ -21,6 +23,7 @@ import { Icon } from '@/components/ui/icon'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import { ProvisioningTab } from '@/components/settings/provisioning-tab'
 import { SgpEventsPanel } from '@/components/settings/sgp-events-panel'
+import { WhatsAppConnection, whatsappErrorMessage } from '@/components/whatsapp-connection'
 import { useAuth } from '@/contexts/auth-context'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
@@ -95,6 +98,18 @@ export default function Settings() {
   const [sgpFleetAvailable, setSgpFleetAvailable] = useState(false)
   const [dbTesting, setDbTesting] = useState(false)
   const [dbSwitching, setDbSwitching] = useState(false)
+  const [waConfig, setWaConfig] = useState<WhatsAppConfig | null>(null)
+  const [waForm, setWaForm] = useState({
+    enabled: false,
+    webhookBaseUrl: '',
+    portalPublicUrl: '',
+    allowedHosts: '',
+    managedUrl: '',
+    managedAdminKey: '',
+    rejectCallMessage: '',
+    rateLimitPerMin: 20
+  })
+  const [waSaving, setWaSaving] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -151,6 +166,29 @@ export default function Settings() {
       const fleetReady = overview.success && Boolean(overview.data?.enabled)
       setSgpFleetAvailable(fleetReady)
       setSgpSyncSummary(fleetReady ? overview.data?.lastSync ?? null : null)
+    })()
+    return () => { cancelled = true }
+  }, [activeTab])
+
+  useEffect(() => {
+    if (activeTab !== 'whatsapp') return
+    let cancelled = false
+    ;(async () => {
+      const res = await whatsappAPI.getConfig()
+      if (cancelled || !res.success || !res.data) return
+      const config = res.data
+      setWaConfig(config)
+      setWaForm({
+        enabled: config.enabled,
+        webhookBaseUrl: config.webhookBaseUrl,
+        portalPublicUrl: config.portalPublicUrl,
+        allowedHosts: config.allowedHosts.join('\n'),
+        managedUrl: config.managedUrl,
+        // The stored admin key never leaves the server; an empty field keeps it.
+        managedAdminKey: '',
+        rejectCallMessage: config.rejectCallMessage,
+        rateLimitPerMin: config.rateLimitPerMin
+      })
     })()
     return () => { cancelled = true }
   }, [activeTab])
@@ -241,6 +279,37 @@ export default function Settings() {
       toast[res.success ? 'success' : 'error'](res.message || t('settings.sgp.tokenCleared'))
     } finally {
       setSgpSaving(false)
+    }
+  }
+
+  const handleWhatsappSave = async () => {
+    setWaSaving(true)
+    try {
+      const res = await whatsappAPI.updateConfig({
+        enabled: waForm.enabled,
+        webhookBaseUrl: waForm.webhookBaseUrl,
+        portalPublicUrl: waForm.portalPublicUrl,
+        // The API takes the textarea verbatim, one host per line.
+        allowedHosts: waForm.allowedHosts,
+        managedUrl: waForm.managedUrl,
+        rejectCallMessage: waForm.rejectCallMessage,
+        rateLimitPerMin: waForm.rateLimitPerMin,
+        // Same rule as the SGP token: only send a key the operator typed.
+        // Omitting it keeps the stored one, so saving this form can never
+        // revoke the integration by accident.
+        ...(waForm.managedAdminKey ? { managedAdminKey: waForm.managedAdminKey } : {})
+      })
+      if (res.success && res.data) {
+        setWaConfig(res.data)
+        setWaForm((current) => ({ ...current, managedAdminKey: '' }))
+        toast.success(res.message || t('common.success'))
+        return
+      }
+      // The machine `code` is what gets translated; the message that comes with
+      // it can be the Evolution server's own words.
+      toast.error(whatsappErrorMessage(t, res.code))
+    } finally {
+      setWaSaving(false)
     }
   }
 
@@ -755,6 +824,18 @@ export default function Settings() {
               {t('settings.tab.provisioning')}
             </button>
             <button
+              onClick={() => setActiveTab('whatsapp')}
+              className="tab-button"
+              data-active={activeTab === 'whatsapp'}
+              role="tab"
+              aria-selected={activeTab === 'whatsapp'}
+            >
+              {/* The dictionary has no `settings.tab.whatsapp`; the navigation
+                  label is the same word in every locale and adding a key would
+                  mean editing five files another agent owns. */}
+              {t('sidebar.nav.whatsapp')}
+            </button>
+            <button
               onClick={() => setActiveTab('security')}
               className="tab-button"
               data-active={activeTab === 'security'}
@@ -1249,6 +1330,169 @@ export default function Settings() {
         )}
 
         {activeTab === 'provisioning' && <ProvisioningTab />}
+
+        {activeTab === 'whatsapp' && (
+          <div className="modern-card max-w-3xl p-5 sm:p-6">
+            <p className="page-kicker">{t('settings.whatsapp.kicker')}</p>
+            <h2 className="section-heading">{t('settings.whatsapp.title')}</h2>
+            <p className="section-description mb-6">{t('settings.whatsapp.description')}</p>
+
+            <div className="mb-5 flex flex-wrap items-center gap-2">
+              <span className={waConfig?.ready ? 'modern-badge-success' : 'modern-badge'}>
+                {t(waConfig?.ready ? 'settings.whatsapp.statusActive' : 'settings.whatsapp.statusInactive')}
+              </span>
+              {/* Whether a key is stored, never the key: it is encrypted at rest
+                  and the API does not return it. */}
+              <span className="text-xs text-muted-foreground">
+                {t(waConfig?.managedAdminKeyConfigured
+                  ? 'settings.whatsapp.adminKeyStored'
+                  : 'settings.whatsapp.adminKeyMissing')}
+                {waConfig?.updatedAt ? ` · ${formatDateTime(waConfig.updatedAt)}` : ''}
+              </span>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="wa-webhook-url" className="field-label">
+                  {t('settings.whatsapp.webhookUrl')}
+                </label>
+                <input
+                  id="wa-webhook-url"
+                  type="url"
+                  className="modern-input w-full"
+                  placeholder="https://painel.exemplo.com"
+                  value={waForm.webhookBaseUrl}
+                  onChange={(event) => setWaForm((current) => ({ ...current, webhookBaseUrl: event.target.value }))}
+                />
+                <p className="field-hint">{t('settings.whatsapp.webhookUrlHint')}</p>
+              </div>
+
+              <div>
+                <label htmlFor="wa-portal-url" className="field-label">
+                  {t('settings.whatsapp.portalUrl')}
+                </label>
+                <input
+                  id="wa-portal-url"
+                  type="url"
+                  className="modern-input w-full"
+                  placeholder="https://portal.exemplo.com"
+                  value={waForm.portalPublicUrl}
+                  onChange={(event) => setWaForm((current) => ({ ...current, portalPublicUrl: event.target.value }))}
+                />
+                <p className="field-hint">{t('settings.whatsapp.portalUrlHint')}</p>
+              </div>
+
+              <div>
+                <label htmlFor="wa-allowed-hosts" className="field-label">
+                  {t('settings.whatsapp.allowedHosts')}
+                </label>
+                <textarea
+                  id="wa-allowed-hosts"
+                  rows={4}
+                  className="modern-input w-full font-mono text-xs"
+                  placeholder={'evolution.exemplo.com\n*.exemplo.com'}
+                  value={waForm.allowedHosts}
+                  onChange={(event) => setWaForm((current) => ({ ...current, allowedHosts: event.target.value }))}
+                />
+                <p className="field-hint">{t('settings.whatsapp.allowedHostsHint')}</p>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="wa-managed-url" className="field-label">
+                    {t('settings.whatsapp.managedUrl')}
+                  </label>
+                  <input
+                    id="wa-managed-url"
+                    type="url"
+                    className="modern-input w-full"
+                    placeholder="https://evolution.exemplo.com"
+                    value={waForm.managedUrl}
+                    onChange={(event) => setWaForm((current) => ({ ...current, managedUrl: event.target.value }))}
+                  />
+                  <p className="field-hint">{t('settings.whatsapp.managedUrlHint')}</p>
+                </div>
+                <div>
+                  <label htmlFor="wa-admin-key" className="field-label">
+                    {t('settings.whatsapp.adminKey')}
+                  </label>
+                  <input
+                    id="wa-admin-key"
+                    type="password"
+                    autoComplete="new-password"
+                    className="modern-input w-full"
+                    value={waForm.managedAdminKey}
+                    onChange={(event) => setWaForm((current) => ({ ...current, managedAdminKey: event.target.value }))}
+                  />
+                  <p className="field-hint">{t('settings.whatsapp.adminKeyHint')}</p>
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="wa-reject-call" className="field-label">
+                    {t('settings.whatsapp.rejectCallMessage')}
+                  </label>
+                  <input
+                    id="wa-reject-call"
+                    type="text"
+                    className="modern-input w-full"
+                    value={waForm.rejectCallMessage}
+                    onChange={(event) => setWaForm((current) => ({ ...current, rejectCallMessage: event.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="wa-rate-limit" className="field-label">
+                    {t('settings.whatsapp.rateLimit')}
+                  </label>
+                  <input
+                    id="wa-rate-limit"
+                    type="number"
+                    min={1}
+                    max={120}
+                    className="modern-input w-full"
+                    value={waForm.rateLimitPerMin}
+                    onChange={(event) => setWaForm((current) => ({
+                      ...current,
+                      rateLimitPerMin: Number(event.target.value) || 1
+                    }))}
+                  />
+                  <p className="field-hint">{t('settings.whatsapp.rateLimitHint')}</p>
+                </div>
+              </div>
+
+              <div className="space-y-3 rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-4">
+                <label className="flex cursor-pointer items-start gap-3">
+                  <input
+                    type="checkbox"
+                    className="mt-1 h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
+                    checked={waForm.enabled}
+                    onChange={(event) => setWaForm((current) => ({ ...current, enabled: event.target.checked }))}
+                  />
+                  {/* No sub-hint here on purpose: turning this on without a
+                      webhook URL is refused by the API with `incomplete_config`,
+                      and the reason is already written under that field — saying
+                      it twice on one screen is noise, and the dictionary has no
+                      hint of its own for this toggle. */}
+                  <span className="block font-semibold">{t('settings.whatsapp.enable')}</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="mt-6 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => void handleWhatsappSave()}
+                disabled={waSaving}
+                className="modern-button"
+              >
+                {waSaving ? t('common.saving') : t('common.save')}
+              </button>
+            </div>
+
+            <WhatsAppConnection config={waConfig} />
+          </div>
+        )}
 
         {activeTab === 'security' && (
           <div className="modern-card max-w-5xl p-5 sm:p-6">

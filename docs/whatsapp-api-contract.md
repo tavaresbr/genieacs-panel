@@ -9,10 +9,12 @@ programam contra este arquivo, não contra o código um do outro.
 silenciosa entre o que o servidor devolve e o que a tela espera é exatamente o
 tipo de falha que não tem aparência.
 
-Estado: **Ondas 0 e 1 implementadas** — ciclo de vida das instâncias, webhook de
-entrada e envio (fila + worker).
-As linhas marcadas ⏳ estão especificadas mas ainda não existem; a onda indicada
-as implementa.
+Estado: **Ondas 0 a 3 implementadas no backend** — ciclo de vida das instâncias,
+webhook de entrada, envio, modelos, não perturbe, cobrança, campanhas, alertas
+técnicos, caixa de entrada e bot de autoatendimento. Cada seção abaixo é o
+contrato da parte que ela nomeia. Nada aqui está pendente: o que falta da
+integração é tela, não rota — a caixa de entrada do operador ainda não tem
+front-end.
 
 ---
 
@@ -40,6 +42,7 @@ que é público e tem credencial própria.
 | `not_configured` | integração desligada | `whatsapp.error.notConfigured` |
 | `incomplete_config` | falta a URL do webhook | `whatsapp.error.incompleteConfig` |
 | `invalid_webhook_url` | URL do webhook inválida | `whatsapp.error.invalidWebhookUrl` |
+| `invalid_portal_url` | URL do portal do cliente inválida | `whatsapp.error.invalidPortalUrl` |
 | `invalid_base_url` | URL do Evolution inválida | `whatsapp.error.invalidBaseUrl` |
 | `host_not_allowed` | fora da allowlist do admin | `whatsapp.error.hostNotAllowed` |
 | `blocked_host` | endereço interno, barrado pelo guard SSRF | `whatsapp.error.blockedHost` |
@@ -51,6 +54,8 @@ que é público e tem credencial própria.
 | `no_destination` | contato sem telefone nem LID | `whatsapp.error.noDestination` |
 | `message_empty` | sem texto e sem anexo | `whatsapp.error.messageEmpty` |
 | `conversation_not_found` | `:id` não existe | `common.routeNotFound` |
+| `no_recipients` | nenhum número recebe alerta técnico | `whatsapp.alerts.noRecipients` |
+| `invalid_phone` | telefone de plantão que não dá para discar | `whatsapp.error.invalidPhone` |
 
 ---
 
@@ -64,6 +69,7 @@ que é público e tem credencial própria.
   allowedHosts: string[]        // PUT aceita string (uma por linha) ou array
   webhookBaseUrl: string        // absoluta, http(s), sem query nem credencial
   rejectCallMessage: string
+  portalPublicUrl: string       // onde o portal do cliente responde, de fora
   rateLimitPerMin: number       // 1..120
   managedUrl: string
   managed: boolean              // derivado: managedUrl preenchido
@@ -80,6 +86,14 @@ formulário não pode revogar a integração sem querer.
 Ativar (`enabled: true`) sem `webhookBaseUrl` responde `400 incomplete_config` —
 sem webhook o servidor não devolve QR, mensagem nem recibo, e a integração
 ficaria ligada e muda.
+
+`portalPublicUrl` é um endereço próprio, não derivado. O portal do cliente é
+outro app Express em outra porta (`portalApp`), então o endereço público do
+painel só é o do portal quando um proxy reverso põe os dois atrás do mesmo
+hostname. É a URL que o bot manda; vazia, ele passa para um atendente em vez de
+mandar link que não abre. Passa pelas mesmas checagens de `webhookBaseUrl`
+(absoluta, http(s), sem credencial) e devolve `400 invalid_public_url` quando
+não passa.
 
 ---
 
@@ -378,28 +392,501 @@ no shutdown. `wa_messages` **é** a fila; não existe tabela paralela.
 
 ---
 
-## ⏳ Onda 2 e 3 — rotas previstas
+## Bot de autoatendimento
 
-Especificadas aqui para que as telas possam ser escritas contra elas.
+`services/waBotService.js`. Não tem rota: ele é chamado de dentro do webhook, no
+passo 9 de `gravarMensagem`, depois da mensagem gravada e depois do opt-out.
 
-| Rota | Onda | Faz |
+### A regra de produto, e ela define o escopo inteiro
+
+**O bot informa, e manda para o portal o resto.**
+
+Uma mensagem de WhatsApp não carrega login nenhum. `resolveSubscriber` casa o
+telefone com um contrato como **conveniência, nunca como autenticação** — quem
+escreveu provou apenas que tem um aparelho para o qual o WhatsApp entrega.
+Qualquer pessoa que saiba o número de um assinante pode escrever para o provedor
+e ser tratada como ele.
+
+| O bot PODE | O bot NUNCA PODE |
+| --- | --- |
+| valor, vencimento, linha digitável, PIX e link da fatura em aberto | mandar senha de WiFi |
+| se a conexão está online e o sinal óptico (`rxPower`) | mandar senha do portal |
+| passar para um atendente | trocar SSID, reiniciar ONT, mudar qualquer coisa do serviço |
+
+Para tudo da coluna da direita a resposta é `whatsapp.bot.portalHint` com o link
+do portal, que tem senha de verdade. **Nada no arquivo lê uma credencial.** O
+leitor de sinal é `DeviceService.getCustomerPortalOverview`, escolhido porque
+projeta status, SSID e potência óptica e não toca em `KeyPassphrase`.
+
+### Intenções
+
+Casamento **por regra, não por modelo**: determinístico, testável e — o que
+importa mais — impossível de convencer a ignorar o parágrafo acima. O texto é
+normalizado como em `waOptOutTexto.js` (sem acento, minúsculo, sem pontuação) e
+os termos casam **por palavra inteira**, nunca por substring: `sinal` dentro de
+"assinalar" não é reclamação de sinal.
+
+| Ordem | Intenção | Resposta |
 | --- | --- | --- |
-| `GET /api/whatsapp/conversations` | 3 | lista paginada, ordenada por `lastMessageAt` |
-| `GET /api/whatsapp/conversations/:id/messages` | 3 | histórico |
-| `GET/POST/PUT/DELETE /api/whatsapp/templates` | 2 | CRUD de modelos |
-| `GET /api/whatsapp/opt-outs` · `POST` · `DELETE /:id` | 2 | não perturbe |
-| `GET /api/whatsapp/broadcasts` · `POST` · `POST /:id/status` | 2 | campanhas |
-| `GET /api/whatsapp/billing/overdue` | 2 | inadimplentes, janela simétrica |
-| `POST /api/whatsapp/billing/campaign` | 2 | monta a campanha **em `draft`** |
-| `GET/PUT /api/whatsapp/alerts/rules` | 2 | regras de alerta técnico |
+| 1 | `portal` — senha, ssid, nome da rede, reiniciar, resetar | `whatsapp.bot.portalHint` |
+| 2 | `fatura` — fatura, boleto, segunda via, pix, vencimento, pagar | `whatsapp.bot.invoice` ou `whatsapp.bot.noOpenInvoice` |
+| 3 | `sinal` — sem internet, caiu, sem sinal, lento, offline | `whatsapp.bot.signalOk` ou `whatsapp.bot.signalDown` |
+| 4 | qualquer outra coisa | `whatsapp.bot.handoff` |
 
-Duas regras de produto que a API precisa preservar:
+A ordem é parte do contrato:
 
-- **Montar disparo nunca envia.** `POST /billing/campaign` cria a campanha em
-  `draft` e devolve `{ broadcastId, recipients, skipped: { … } }`. Quem aperta o
-  play é o operador, depois de ver a lista pronta.
-- **Os pulados são explicados por motivo**, nunca por um número só:
-  `{ noPhone, optOut, noInvoice, futureOnly, sgpRefused, templateIncomplete }`.
+- **`portal` primeiro** porque é o grupo cuja resposta é fixa. Uma mensagem que
+  pede a senha *e* reclama do sinal tem de cair nele.
+- **`fatura` antes de `sinal`** porque "estou sem internet, é o boleto?" é a
+  frase de quem está bloqueado por falta de pagamento, e a fatura é o que
+  desbloqueia.
+
+A fatura citada é a mais antiga em aberto (`maisAntigaEmAberto`, com a marca de
+lembrete ligada: aqui o cliente **perguntou**, então uma fatura a vencer é
+resposta legítima, ao contrário de um disparo de cobrança).
+
+### Uma mensagem de entrada gera no máximo UMA de saída
+
+Enfileirada por `WaSendService.enqueue()` com `userId: null` — é essa coluna
+nula que marca a mensagem como automática, e é ela que a checagem de presença
+humana lê. O bot nunca fala com o Evolution; quem entrega é o worker.
+
+Os códigos de pagamento saem **sem rótulo**, um por linha, separados por linha
+em branco. Não há chave `whatsapp.bot.*` para "linha digitável" ou "PIX", e um
+rótulo em português dentro de uma mensagem que os outros quatro locales também
+renderizam seria pior que a forma atual.
+
+### As travas
+
+Todas obrigatórias; qualquer uma delas responde com silêncio.
+
+| Trava | Por quê |
+| --- | --- |
+| só `direction === 'in'` | o eco `fromMe` é o provedor digitando no próprio celular; respondê-lo mandaria as palavras dele de volta ao cliente dele |
+| nunca com humano no fio — **30 min** desde a última mensagem com `sent_by` (nota interna conta) | um atendente atropelado por um bot é pior que bot nenhum; 30 min cobre quem foi olhar a OLT e não deixa o chamado de ontem calar o bot hoje |
+| nunca duas vezes pela mesma mensagem | o índice único de `external_id` é a dedupe real (o reenvio nem chega aqui); o cinto é "existe saída com `id` maior que o da entrada" |
+| nunca em pedido de saída | `pedeSaida()` — responder um "SAIR" com mensagem é responder com o oposto do pedido |
+| teto de **3 respostas automáticas por hora por contato** | um auto-respondedor do outro lado vira laço, e um laço manda milhares de mensagens pelo número do provedor antes de alguém notar |
+| assinante não resolvido → `whatsapp.bot.notRecognised` | número não reconhecido **nunca** recebe dado de contrato |
+
+E **nunca levanta**: `responder()` engole tudo e registra em log. Uma falha do
+bot virando 500 no webhook faria o servidor Evolution reenviar o mesmo evento
+para sempre. Bot quebrado vira silêncio, e o fio continua não-lido para o
+operador.
+
+Quando a intenção falha por fora (SGP fora do ar, GenieACS inalcançável, ONT
+online mas sem `rxPower` mapeado) a resposta cai para `whatsapp.bot.handoff` —
+a pergunta era real e merece um humano, não silêncio.
+
+### Duas coisas resolvidas depois da entrega
+
+1. **O link do portal.** Virou `whatsappConfig.portalPublicUrl`, campo próprio.
+   Derivar da origem de `webhookBaseUrl` acerta no deploy com proxy reverso na
+   frente dos dois e erra no deploy em que o portal responde em `:3001`. Vazio,
+   o bot manda `whatsapp.bot.handoff` — link quebrado é pior que link nenhum.
+2. **O chamado.** `whatsapp.bot.signalDown` dizia "abrimos um chamado" e o
+   painel não tem sistema de chamados. O texto passou a dizer o que é verdade:
+   o equipamento não está respondendo e um atendente já está vendo. O "chamado"
+   continua sendo o fio não-lido na caixa de entrada do operador.
+
+E o caso "online sem `rxPower`" deixou de cair para humano: a pergunta era se a
+conexão está de pé, e isso o painel sabe. Responde
+`whatsapp.bot.signalOkNoReading` e para aí, sem inventar número.
+
+---
+
+## ✅ Onda 2 — modelos, não perturbe, cobrança e campanhas (implementado)
+
+Tudo abaixo é `authenticateToken` + `requireRole(['admin'])`, montado em
+`routes/whatsappBilling.js`.
+
+| `code` | Significado | HTTP | Chave i18n |
+| --- | --- | --- | --- |
+| `unknown_variable` | o corpo cita variável que o disparo não sabe preencher | 400 | `whatsapp.error.unknownVariable` |
+| `template_empty` | modelo sem nome ou sem corpo | 400 | `whatsapp.error.templateEmpty` |
+| `name_taken` | já existe modelo com esse nome | 409 | `whatsapp.templates.nameTaken` |
+| `template_not_found` | `:id` não existe | 404 | `whatsapp.templates.notFound` |
+| `invalid_phone` | não dá para usar como telefone | 400 | `whatsapp.error.invalidPhone` |
+| `too_many_recipients` | mais de 300 contratos no disparo | 400 | `whatsapp.error.tooManyRecipients` |
+| `no_recipients` | ninguém sobrou depois dos filtros | 409 | `whatsapp.error.noRecipients` |
+| `rate_limited` | mais de 3 montagens em 5 minutos | 429 | `whatsapp.error.rateLimited` |
+| `invalid_status` | a campanha não pode ir para lá de onde está | 409 | `whatsapp.error.invalidStatus` |
+| `broadcast_not_found` | `:id` não existe | 404 | `whatsapp.broadcast.notFound` |
+
+### Modelos — `/api/whatsapp/templates`
+
+`GET` (`?category=`, `?includeInactive=1`), `POST`, `PUT /:id`, `DELETE /:id`.
+
+```ts
+{ id, name, body, category: 'cobranca'|'alerta'|'suporte'|'geral', active, createdAt, updatedAt }
+```
+
+**Um corpo que cita variável fora da lista é recusado na entrada, em qualquer
+categoria**, com `unknown_variable` e os nomes ofensores no texto do erro. A
+categoria não entra no teste de propósito: ela pode ser trocada depois por um
+`PUT`, então aceitar `{{fatura_anterior}}` num modelo 'suporte' só adiaria a
+falha. Recusar só na hora do envio seria pior ainda — lá o render devolve
+`null` e o operador vê uma campanha que pulou todo mundo sem dizer por quê.
+
+Um `PUT` que omite um campo mantém o guardado: renomear não pode ser lido como
+"e apague o corpo".
+
+### Não perturbe — `/api/whatsapp/opt-outs`
+
+`GET` lista os ativos, `POST { phone, reasonText? }` acrescenta,
+`DELETE /:id` revoga (revogação é soft; o histórico de quem pediu fica).
+
+```ts
+{ id, waPhoneE164, waLid, origin: 'customer'|'operator', reasonText, createdAt }
+```
+
+O telefone é **normalizado na entrada** (`normalizarTelefoneBr`), porque é
+nessa forma que a campanha pergunta: um registro salvo como `(93) 98111-0449`
+não casaria com nada, e o preço da divergência é uma mensagem enviada a quem
+pediu silêncio. `POST` de um número já ativo devolve `200` com a linha
+existente em vez de erro — o resultado que o operador pediu é o resultado que
+ele tem.
+
+### Inadimplentes — `GET /api/whatsapp/billing/overdue`
+
+`?daysMin=&daysMax=&search=&limit=` → `WhatsAppOverdueSubscriber[]`:
+
+```ts
+{ contract, clientName, document, phone, phoneSource: 'manual'|'sgp'|null,
+  deviceId, amount, dueDate, daysOverdue }
+```
+
+**A janela é simétrica.** `daysOverdue` é positivo para fatura vencida e
+negativo para fatura a vencer, numa reta só — então `daysMin: -5` lê-se
+"incluindo quem vence nos próximos cinco dias". É o que permite a mesma tela
+preparar uma cobrança e um lembrete. Padrões: `daysMin=1`, `daysMax=90`,
+`limit=50` (teto 300).
+
+O endereço vem de `sgp_links`: `phone_manual` (a correção do operador) ganha de
+`phone_e164` (o que o SGP devolveu), e um contrato sem nenhum dos dois aparece
+na lista com `phone: null` — esconder seria esconder justamente o cadastro que
+precisa de conserto.
+
+É a rota mais lenta do painel de propósito: um round trip ao SGP por assinante,
+com **~150 ms entre chamadas**. O SGP do provedor é o mesmo sistema que está,
+naquele instante, atendendo a URA de quem ligou.
+
+### Montar a campanha — `POST /api/whatsapp/billing/campaign`
+
+```ts
+// corpo
+{ template: string, contracts: string[], title?: string }
+// resposta 201
+{ broadcast: WhatsAppBroadcast, recipients: number, skipped: WhatsAppSkipCounts }
+```
+
+`template` é o **nome** (ou o id) de um modelo guardado, ou o corpo digitado
+direto na caixa para um disparo único. Seja qual for, o texto passa pela mesma
+validação de variáveis antes de virar mensagem.
+
+**Montar NUNCA envia.** A campanha nasce `draft` e a rota devolve. Nenhuma linha
+entra no outbox aqui. Mandar mensagem para centenas de pessoas não pode ser o
+efeito colateral de um clique numa tela de listagem: o operador abre a campanha,
+lê os corpos já renderizados, e aperta o play.
+
+**Os pulados são contados por motivo**, nunca num número só, e a soma
+`recipients + Σ skipped` é sempre o total de contratos pedidos (deduplicados):
+
+| Contador | O que aconteceu |
+| --- | --- |
+| `noPhone` | sem celular no cadastro — ou contrato que o painel nunca vinculou |
+| `optOut` | pediu para não ser contatado |
+| `noInvoice` | nada em aberto |
+| `futureOnly` | só tem fatura a vencer, e o modelo é de cobrança (`soFuturas`) |
+| `sgpRefused` | o SGP recusou aquele contrato; os outros seguem |
+| `templateIncomplete` | o render devolveu `null` — variável citada sem valor |
+
+"412 pulados" não diz nada a quem opera; "83 sem celular no cadastro, 12
+pediram para não ser contatados" diz o que dá para consertar.
+
+Detalhes que a tela pode contar com:
+
+- **A lista de opt-out é aplicada aqui** — isto é contato iniciado pelo
+  provedor, ao contrário da caixa de resposta. Uma consulta só para a campanha
+  inteira (`WaOptOut.activePhones`), não uma por destinatário.
+- **Os códigos são buscados vivos**, um round trip por destinatário, com os
+  mesmos ~150 ms de intervalo. Boleto reemitido tem linha digitável e PIX
+  novos, e uma mensagem com o código velho manda o cliente a um banco que vai
+  recusar.
+- **Teto de 300 destinatários** por campanha, e **3 montagens por 5 minutos**
+  (`rate_limited`/429) — cada montagem custa um round trip por destinatário.
+- `renderCobranca` devolvendo `null` **descarta** o destinatário. Nunca há
+  mensagem parcial: "PIX: " sem nada depois manda o cliente pagar um
+  placeholder.
+- Sem ninguém para contatar, a resposta é `409 no_recipients` — **com o
+  `skipped` junto**, porque "todos estão na lista de não perturbe" é a resposta
+  que o operador precisa.
+
+### Campanhas — `/api/whatsapp/broadcasts`
+
+`GET` lista (mais recente primeiro), `POST /:id/status { status }` move.
+
+```ts
+{ id, title, body, status, totalCount, sentCount, failedCount,
+  rateLimitPerMin, startAt, createdAt, updatedAt }
+```
+
+Transições aceitas — só `running`, `paused` e `canceled` podem ser pedidos:
+
+| De | Para |
+| --- | --- |
+| `draft` | `running`, `canceled` |
+| `queued` | `running`, `paused`, `canceled` |
+| `paused` | `running`, `canceled` |
+| `running` | `paused`, `canceled` |
+| `done` · `canceled` · `failed` | nada |
+
+`draft` não pula para `paused`: pausar o que nunca começou não é estado. Os três
+terminais não aceitam nada — recomeçar uma campanha encerrada reenviaria para
+quem ela já alcançou. **Só o start exige número conectado** (`no_account`): um
+rascunho é um plano, e recusá-lo porque ninguém pareou o telefone jogaria fora
+o trabalho do operador por uma condição de um minuto.
+
+### O laço de disparo
+
+`services/waBroadcastService.js`, um `setInterval` iniciado em `server.js` e
+parado no shutdown. Um minuto por passada — o orçamento da campanha é escrito
+por minuto, e ninguém está esperando por ele como se espera por uma resposta.
+
+- Cada passada percorre as campanhas em `running` e reclama até
+  `rate_limit_per_min` destinatários de cada uma, com o mesmo UPDATE
+  condicional do outbox (`claimRecipient`); claim nulo = outra passada pegou.
+- Guardas, **nesta ordem**: opt-out → endereço → envio.
+- **O opt-out é conferido dentro do laço, não como filtro na consulta dos
+  pendentes.** Um destinatário filtrado pela consulta nunca sairia de
+  `pending`, e a campanha ficaria em `running` para sempre sem ter o que fazer.
+  Ele vira `skipped` com `error_msg: 'opt_out'` — estado terminal.
+- Número que não normaliza vira `failed` na primeira tentativa: não é falha de
+  transporte, é endereço que nunca vai existir.
+- O envio é um **enqueue**: `WaSendService.enqueue` numa conversa garantida por
+  `WaConversation.ensure` (mesmo `external_thread_id` canônico da entrada, para
+  cair no fio que já existe). Quem fala com o Evolution é o worker do outbox,
+  sob o mesmo teto e as mesmas três tentativas de todo o resto. Campanha com
+  transporte próprio seria um segundo lugar onde uma mensagem trava.
+- Três tentativas por destinatário; abaixo do teto a linha volta para `pending`.
+- Sem número conectado a campanha é **deixada em `running`** e tentada na
+  passada seguinte — queimar as três tentativas por um número que estava só
+  repareando perderia a campanha inteira.
+- Quando não sobra nenhum `pending`/`sending`, a campanha vira `done`;
+  `sent_count` e `failed_count` são recontados das linhas a cada passada
+  (um `skipped` conta como não entregue no cabeçalho).
+- Uma passada **nunca lança**: uma campanha quebrada não pode parar as outras.
+
+---
+
+## ✅ Caixa de entrada — `/api/whatsapp/conversations` (implementado)
+
+Serviço: `services/waConversationService.js`.
+
+| Rota | Faz | `data` |
+| --- | --- | --- |
+| `GET /conversations` | lista paginada (`limit` ≤ 200, `offset`), do mais recente | array de conversa |
+| `GET /conversations/:id/messages` | histórico (`limit` ≤ 500) e **zera o não lido** | `{ conversation, messages }` |
+| `POST /conversations/:id/messages` | enfileira; ver a seção Envio | a mensagem criada |
+
+```ts
+// conversa
+{
+  id: number
+  accountId: number
+  waPhoneE164: string | null
+  waLid: string | null
+  pushName: string | null
+  deviceId: string | null
+  contract: string | null
+  clientName: string | null
+  optedOut: boolean          // pediu para não ser contatado; responder continua valendo
+  lastMessageAt: string | null
+  lastInboundAt: string | null
+  unreadCount: number
+  closedAt: string | null
+  createdAt: string | null
+  updatedAt: string | null
+}
+```
+
+`GET /conversations/:id/messages` é um GET que **escreve**: ler a conversa zera
+`unread_count`. O operador olhando para ela é a única coisa que "lido" pode
+significar aqui.
+
+A listagem faz **duas** consultas em lote — nomes de cliente e lista de
+não-perturbe — em vez de duas por linha. Uma caixa com cinquenta conversas
+abriria cem queries para desenhar uma tela.
+
+### Quem está do outro lado
+
+`resolveSubscriber(telefone)` casa o número com um `sgp_links`. O
+`phone_manual` que o operador digitou ganha do `phone_e164` que o SGP
+sincronizou, porque digitar foi a correção.
+
+**Essa resolução é conveniência, nunca autenticação.** Quem escreveu provou
+apenas que tem um telefone que o WhatsApp entrega. Nada que ela destrave pode
+ser segredo nem ação destrutiva: o painel já tem um portal do cliente com senha
+de verdade, e o bot manda o link dele em vez de virar uma segunda porta, mais
+fraca, para os mesmos dados.
+
+---
+
+## Alertas técnicos — `/api/whatsapp/alerts`
+
+Quem recebe estes alertas é a **equipe do provedor**, não o assinante: uma lista
+de telefones nas configurações, não uma consulta ao cadastro. Nada aqui sabe de
+quem é a ONT que caiu, e não deve saber — um alerta nomeia equipamento.
+
+| Rota | Faz |
+| --- | --- |
+| `GET /api/whatsapp/alerts/settings` | as regras e seus limiares |
+| `PUT /api/whatsapp/alerts/settings` | grava |
+| `POST /api/whatsapp/alerts/scan` | roda uma passada agora |
+
+### O objeto de configuração
+
+Guardado como um blob JSON em `app_state` (`whatsapp_alert_settings`), com o
+mesmo cache de 30 s do `whatsappConfigService`.
+
+```json
+{
+  "enabled": false,
+  "intervalSeconds": 300,
+  "recipients": ["5593981110001"],
+  "rules": {
+    "ont_offline":      { "enabled": true, "threshold": 30,  "cooldownMinutes": 120 },
+    "rx_power_low":     { "enabled": true, "threshold": -27, "cooldownMinutes": 360 },
+    "temperature_high": { "enabled": true, "threshold": 70,  "cooldownMinutes": 360 },
+    "mass_outage":      { "enabled": true, "threshold": 5,   "cooldownMinutes": 120 }
+  },
+  "hasAlertsNumber": true,
+  "ready": true
+}
+```
+
+`hasAlertsNumber` e `ready` são somente leitura: a tela precisa poder mostrar
+**por que** os alertas estão calados sem disparar uma varredura.
+
+`PUT` aceita qualquer subconjunto. `rules` é **mesclado** sobre o que está
+gravado — uma tela que manda uma regra não pode zerar as outras três. Um número
+que `normalizarTelefoneBr` não consegue usar é **recusado** (`invalid_phone`,
+400): guardá-lo faria a falha acontecer uma vez por alerta, para sempre, num log
+que ninguém lê — enquanto quem digitou ainda está olhando o formulário.
+
+`POST /alerts/scan` devolve `{ fired, cleared, notified, skipped }`. Sem número
+de purpose `alerts` conectado, ou sem destinatários, responde **409
+`no_recipients`** — quem apertou o botão apertou justamente para descobrir se
+isto funciona, e um `{fired: 0}` alegre esconderia a resposta.
+
+### As quatro regras
+
+| Regra | Dispara quando | Assunto (`subject`) |
+| --- | --- | --- |
+| `ont_offline` | `_lastInform` mais velho que o limiar, **em minutos** | id do device |
+| `rx_power_low` | potência óptica **≤** o limiar (dBm, negativo) | id do device |
+| `temperature_high` | temperatura **≥** o limiar (°C) | id do device |
+| `mass_outage` | N ONTs do mesmo nó caem juntas | `node_id` do nó |
+
+**No limiar já dispara.** Quem digita 30 quer dizer "trinta minutos já é demais";
+uma comparação estrita faria do único número que a pessoa escolheu o único que
+nunca alerta.
+
+A telemetria vem dos leitores que já existem — `DeviceService.getDashboardDevices()`
+e `DeviceService.isDeviceOnline()`. **Óptica e temperatura só são julgadas em
+device que está informando**: uma ONT apagada devolve a última leitura que
+conseguiu mandar, e "potência baixa" empilhado em "ONT offline" é o mesmo
+incidente dito duas vezes.
+
+### As regras que impedem isto de virar ruído
+
+`wa_alert_state` é uma tabela de **estado**, não de log: uma linha por
+`(rule, subject)` enquanto a condição dura, apagada quando ela passa.
+
+- **Uma condição fala uma vez.** Depois só volta a falar quando
+  `cooldownMinutes` passa, contado de `last_notified_at`. Um alerta que repete a
+  cada varredura deixa de ser lido, e o que importava deixa de ser lido junto.
+- **Recuperação também é mensagem**, uma só, e a linha vai embora com ela. Quem
+  recebeu "ONT offline" e nunca mais ouviu nada não consegue distinguir fibra
+  consertada de alertador quebrado.
+- **Surto em massa cala os alertas individuais.** N ONTs do mesmo nó caindo
+  juntas é um rompimento, não N incidentes: sai **uma** mensagem nomeando o nó e
+  a contagem, e os `ont_offline` daqueles devices ficam retidos — não são
+  limpos, o que mandaria "ONT recuperada" no meio de um rompimento. Quarenta
+  mensagens às 3 da manhã é como um sistema de alerta é silenciado para sempre.
+- **"Não sei" nunca vira "recuperou".** Leitura ilegível, device apagado,
+  device retido por um surto: a linha fica exatamente como estava.
+- **Leitura de frota vazia aborta a passada** (`skipped: 'no_devices'`). É muito
+  mais provável ser um GenieACS quebrado que um provedor sem ONTs, e tratá-la
+  como "tudo certo" dispararia uma recuperação por linha aberta.
+- **A lista de opt-out vale aqui.** Um alerta é o provedor *iniciando* contato,
+  que é exatamente o que um opt-out recusa.
+- **Uma passada nunca lança.** O motivo de não ter feito nada volta em
+  `skipped` (`disabled`, `no_recipients`, `no_devices`, `error`).
+
+O agrupamento do surto é pelo nó de agregação **mais próximo** — a ODP em que a
+ONT está pendurada, não a OLT no fim da cadeia. Alerta de OLT inteira seria uma
+mensagem para o que normalmente é um drop, e mandaria o técnico para a ponta
+errada da rede. Um rompimento mais acima simplesmente vira uma mensagem por ODP
+afetada. O elo entre device e nó é o **PPPoE**: `mapping_nodes.pppoe` de um nó
+`type: 'ont'`, casado com o PPPoE que `DeviceService.getCustomerIdentityDevices()`
+devolve — lido só quando a frota já parece quebrada.
+
+`threshold` de `mass_outage` é o N. O padrão é **5**: uma ODP atende 8 ou 16
+assinantes, duas ou três fora é uma noite normal em qualquer rede, cinco na
+**mesma** ODP ao mesmo tempo não é coincidência.
+
+### O texto das mensagens
+
+Composto no serviço e traduzido pelo **locale padrão do painel** (`pt-BR`) — um
+job de fundo não tem locale de requisição.
+
+| Chave | Variáveis |
+| --- | --- |
+| `whatsapp.alerts.ontOffline` · `…ontOfflineCleared` | `device`, `minutes` |
+| `whatsapp.alerts.rxPowerLow` · `…rxPowerLowCleared` | `device`, `value`, `threshold` |
+| `whatsapp.alerts.temperatureHigh` · `…temperatureHighCleared` | `device`, `value`, `threshold` |
+| `whatsapp.alerts.massOutage` · `…massOutageCleared` | `node`, `count` |
+
+A metade `*Cleared` não é enfeite: quem olha o celular às 3 da manhã lê a
+primeira linha e mais nada, e "ONT offline ✔" é lido como um segundo alarme, não
+como um fim de alarme. A recuperação ganha frase própria.
+
+### O laço
+
+`WaAlertService.start()` em `server.js`, parado no shutdown. Um `setInterval` de
+60 s que só roda a varredura quando `intervalSeconds` passou. O `enabled` é lido
+**dentro** do tick — mesma escolha do `schedulerService` e do `waOutboxWorker`,
+para um botão em Configurações valer em um minuto sem ciclo de vida a manter em
+sincronia. O "quando foi a última" fica em memória, não em `app_state`: um painel
+que acabou de voltar **deve** varrer na hora, e as linhas de cooldown já impedem
+que uma condição já anunciada seja anunciada de novo.
+
+Envio: uma conversa por número de plantão (`WaConversation.ensure`, do mesmo
+jeito que uma mensagem de entrada faria) e `WaSendService.enqueue`. O worker do
+outbox entrega.
+
+---
+
+## Telas — quem consome o quê
+
+Para achar o consumidor de uma rota sem varrer o `frontend/`:
+
+| Rota | Tela |
+| --- | --- |
+| `GET/PUT /whatsapp/config` | aba **WhatsApp** de `pages/settings.tsx` (formulário global) |
+| `GET /accounts` · `POST /accounts` · `PATCH` · `DELETE` | `components/whatsapp-connection.tsx` (um cartão por número) |
+| `GET /accounts/:id/qr` · `GET /accounts/:id/status` | o bloco de pareamento do mesmo componente — os dois únicos pontos com polling |
+| `POST /accounts/:id/restart` · `POST /accounts/:id/disconnect` | ações do cartão; `disconnect` + `POST /accounts` é o "desparear e gerar novo QR" |
+| `POST /accounts/check-number` | ainda sem tela |
+| conversas, modelos, opt-out, campanhas, cobrança, alertas | ondas 2 e 3, sem tela ainda |
+
+O polling do bloco de pareamento é **medido**, não escolhido: QR a cada 8 s por
+até 45 s, status a cada 10 s por até 4 min, os dois em single-flight (um `get_qr`
+foi cronometrado em ~5,4 s, mais que o próprio intervalo), pulando o tique
+inteiro com a aba em segundo plano e desistindo depois de três falhas seguidas.
+Ao desistir a tela troca o bloco pela explicação `whatsapp.qr.silent` — nada
+aqui fica girando para sempre.
 
 ---
 

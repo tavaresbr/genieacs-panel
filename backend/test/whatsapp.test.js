@@ -76,6 +76,34 @@ describe('whatsapp configuration', () => {
     }
   });
 
+  it('rejects a portal URL under its own code, so the form knows which field', async () => {
+    for (const portalPublicUrl of ['ftp://p/portal', 'https://user:pass@p/portal', 'nao-e-url']) {
+      const { status, body } = await call(`${panelUrl}/api/whatsapp/config`, {
+        method: 'PUT',
+        headers: authHeaders(token),
+        body: { portalPublicUrl }
+      });
+      assert.equal(status, 400, portalPublicUrl);
+      // Not `invalid_webhook_url`: both fields go through the same checks, and
+      // a shared code would put the message under the wrong input.
+      assert.equal(body.code, 'invalid_portal_url', portalPublicUrl);
+    }
+  });
+
+  it('keeps the portal URL as its own setting, separate from the webhook', async () => {
+    const { status, body } = await call(`${panelUrl}/api/whatsapp/config`, {
+      method: 'PUT',
+      headers: authHeaders(token),
+      body: {
+        webhookBaseUrl: 'https://painel.provedor.com.br/api/whatsapp-webhook',
+        portalPublicUrl: 'https://portal.provedor.com.br'
+      }
+    });
+    assert.equal(status, 200);
+    assert.equal(body.data.portalPublicUrl, 'https://portal.provedor.com.br');
+    assert.equal(body.data.webhookBaseUrl, 'https://painel.provedor.com.br/api/whatsapp-webhook');
+  });
+
   it('stores the admin key encrypted and never returns it', async () => {
     const { status, body } = await call(`${panelUrl}/api/whatsapp/config`, {
       method: 'PUT',
