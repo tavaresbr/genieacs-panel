@@ -339,6 +339,7 @@ linha criada:
   deliveryError: string | null
   attempts: number
   sentBy: number | null
+  source: 'operator' | 'bot' | 'campaign' | 'alert'
   readAt: string | null
   createdAt: string | null
   updatedAt: string | null
@@ -359,6 +360,17 @@ na caixa:
 **A lista de opt-out NÃO é consultada aqui.** Opt-out significa que o provedor
 não *inicia* contato; ele nunca pode impedir o operador de responder quem
 escreveu. Quem aplica a lista é o disparo em massa e o alerta (onda 2).
+
+`source` diz **quem redigiu** a mensagem; `sentBy` diz apenas se havia um humano
+atrás dela. Os três remetentes automáticos — o bot, o disparo de cobrança e o
+alerta técnico — gravam `sentBy: null`, então essa coluna sozinha não distingue
+um do outro. O teto do bot (três respostas por conversa por hora) conta
+**somente** `source: 'bot'`: contando todos, três cobranças na hora gastavam a
+cota do bot numa conversa em que ele nunca falou, e a pergunta seguinte do
+assinante ficava sem resposta. Mensagem de entrada — e o eco do provedor
+digitando no próprio celular — fica com `'operator'`, o valor padrão da coluna:
+`source` nomeia qual remetente do painel escreveu o texto, e nenhum deles
+escreveu essa.
 
 `isNote: true` grava a linha com `deliveryStatus: null` e o worker nunca a
 enxerga — é a única forma de garantir que uma anotação interna não chegue ao

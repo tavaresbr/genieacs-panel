@@ -75,13 +75,24 @@ const JANELA_HUMANO_MS = 30 * 60 * 1000;
  * happily send each other several thousand messages before anyone notices, on
  * the provider's number, at the provider's cost, until Meta bans it.
  *
- * The count deliberately covers every automatic outbound message on the thread,
- * not only the bot's: an alert or a dunning message that also went out without
- * an operator behind it is noise from the same number, and erring towards
- * silence is the cheap direction.
+ * It counts the bot's OWN replies and nothing else. It used to count every
+ * outbound row with no `sent_by`, which is every automatic sender there is — so
+ * three dunning messages, or three alerts, spent the bot's whole budget on a
+ * thread it had never spoken in, and the subscriber who then asked a real
+ * question got silence. A campaign cannot loop: it sends what it was told to
+ * send, once per recipient, and stops. Only two auto-responders answering each
+ * other can, and only the bot answers.
  */
 const TETO_POR_HORA = 3;
 const JANELA_TETO_MS = 60 * 60 * 1000;
+
+/**
+ * What the bot writes into `wa_messages.source`, and therefore what it counts.
+ *
+ * One constant for both so the two can never drift: a ceiling that counted a
+ * value nothing writes would be no ceiling at all, and it would fail open.
+ */
+const ORIGEM_BOT = 'bot';
 
 /** `enqueue` refusals that mean "there is nowhere to send", not "something broke". */
 const SEM_ONDE_MANDAR = new Set(['no_account', 'no_destination']);
@@ -309,21 +320,41 @@ class WaBotService {
       : null;
     if (jaRespondida) return { replied: false, reason: 'already_answered' };
 
-    // A human in the thread wins, always.
+    // A human in the thread wins, always — and there are two ways to be one.
     const desde = new Date(Date.now() - JANELA_HUMANO_MS);
     const humano = await tdb('wa_messages')
       .where({ conversation_id: conversation.id })
-      .whereNotNull('sent_by')
       .where('created_at', '>=', desde)
+      .where((quem) => {
+        // Through the panel: somebody was logged in.
+        quem.whereNotNull('sent_by')
+          // Or on the provider's own phone. That echo comes back from the
+          // server with an id already on it and nobody logged in behind it, so
+          // `sent_by` is null — yet there is plainly a human answering. The old
+          // ceiling caught this by accident, because it counted every outbound
+          // row without a `sent_by`; counting only the bot's would have let it
+          // start talking over the person holding the phone.
+          .orWhere((eco) => eco
+            .where({ direction: 'out', source: 'operator' })
+            .whereNotNull('external_id'));
+      })
       .first();
     if (humano) return { replied: false, reason: 'operator_present' };
 
+    // `source` is the evidence now, and `sent_by IS NULL` is gone from this
+    // query: it was true of the campaign and the alert too, which is how they
+    // came to be counted here.
+    //
     // Counted by pulling the ids rather than with COUNT(*): the three engines
     // disagree on whether a count comes back a number or a string, and the
     // ceiling is small enough that the rows are cheaper than the disagreement.
     const automaticas = await tdb('wa_messages')
-      .where({ conversation_id: conversation.id, direction: 'out', is_note: false })
-      .whereNull('sent_by')
+      .where({
+        conversation_id: conversation.id,
+        direction: 'out',
+        is_note: false,
+        source: ORIGEM_BOT
+      })
       .where('created_at', '>=', new Date(Date.now() - JANELA_TETO_MS))
       .limit(TETO_POR_HORA)
       .pluck('id');
@@ -378,9 +409,15 @@ class WaBotService {
    * is what keeps a slow provider server out of the webhook's response time.
    */
   static async responderCom(conversation, texto) {
-    // `userId` stays null, and that is what marks the message as automatic —
-    // the human-presence check above reads exactly this column.
-    await WaSendService.enqueue({ conversationId: conversation.id, body: texto, userId: null });
+    // `userId` stays null so the human-presence check above does not read the
+    // bot as an operator; `source` is what makes this row the bot's, and it is
+    // the only thing the ceiling counts.
+    await WaSendService.enqueue({
+      conversationId: conversation.id,
+      body: texto,
+      userId: null,
+      source: ORIGEM_BOT
+    });
   }
 }
 
