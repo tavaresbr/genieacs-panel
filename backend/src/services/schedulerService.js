@@ -2,6 +2,7 @@ import AppState from '../models/AppState.js';
 import ProvisioningService from './provisioningService.js';
 import SgpEventService from './sgpEventService.js';
 import SgpService from './sgpService.js';
+import { forSoleTenant } from '../config/tenantJobs.js';
 
 const STATE_KEY = 'scheduler_state';
 const BASE_INTERVAL_MS = 60_000;
@@ -28,9 +29,10 @@ class SchedulerService {
   static async start() {
     if (this.timer) return this.timer;
     // A process that died mid-run leaves rows nothing would ever finish.
-    await ProvisioningService.reapInterrupted().catch((error) => {
-      console.warn(`Could not reap interrupted provisioning runs: ${error.message}`);
-    });
+    await forSoleTenant('The interrupted-run reaper', () => ProvisioningService.reapInterrupted())
+      .catch((error) => {
+        console.warn(`Could not reap interrupted provisioning runs: ${error.message}`);
+      });
     this.timer = setInterval(() => {
       void this.tick().catch((error) => {
         console.warn(`Scheduler tick failed: ${error.message}`);
@@ -66,12 +68,20 @@ class SchedulerService {
     return !Number.isFinite(last) || Date.now() - last >= intervalMs;
   }
 
-  /** One pass over every job. Overlapping ticks collapse onto the running one. */
+  /**
+   * One pass over every job. Overlapping ticks collapse onto the running one.
+   *
+   * The scope is opened here, per tick, and not once around `start()`. A scope
+   * taken at boot would be captured by the interval and held for the life of
+   * the process — so a provider added afterwards would never be noticed, and
+   * `forSoleTenant`'s refusal, which is the whole safeguard, would never fire.
+   */
   static async tick() {
     if (this.tickPromise) return this.tickPromise;
-    this.tickPromise = this.runJobs().finally(() => {
-      this.tickPromise = null;
-    });
+    this.tickPromise = forSoleTenant('The provisioning and SGP scheduler', () => this.runJobs())
+      .finally(() => {
+        this.tickPromise = null;
+      });
     return this.tickPromise;
   }
 

@@ -1,6 +1,7 @@
 import WaMessage from '../models/WaMessage.js';
 import WaSendService from './waSendService.js';
 import WhatsAppConfigService from './whatsappConfigService.js';
+import { forEachTenant } from '../config/tenantJobs.js';
 
 /** How often a pass runs. Short, because a reply typed by a human is waiting. */
 const TICK_INTERVAL_MS = 5_000;
@@ -67,12 +68,40 @@ class WaOutboxWorker {
   }
 
   /**
-   * One pass. It NEVER throws: a single unsendable message must not be able to
-   * stop the loop for every other one.
+   * One pass per active provider, each draining only its own queue.
+   *
+   * This was a single pass under `forSoleTenant` while `listSendable()` read
+   * the whole deployment — a loop then would have sent each message once per
+   * provider rather than splitting them. Now that the queue carries a provider,
+   * the loop divides the work, which is what it was always meant to do.
+   *
+   * The per-minute send budget is still one window for the process, so a busy
+   * provider can still spend another's minute. That is a fairness problem, not
+   * a correctness one, and it belongs with the per-provider scheduling in a
+   * later phase.
    *
    * @returns {Promise<{ sent: number, failed: number, skipped: string|null }>}
    */
   static async tick() {
+    const summaries = await forEachTenant(() => this.tickForTenant());
+    return summaries.reduce(
+      (total, one) => ({
+        sent: total.sent + one.sent,
+        failed: total.failed + one.failed,
+        // The first reason given, so a caller still learns why a pass did
+        // nothing rather than seeing a bare pair of zeros.
+        skipped: total.skipped ?? one.skipped
+      }),
+      { sent: 0, failed: 0, skipped: null }
+    );
+  }
+
+  /**
+   * One pass for the provider in scope. It NEVER throws: a single unsendable
+   * message must not be able to stop the loop for every other one — nor, now,
+   * for every other provider.
+   */
+  static async tickForTenant() {
     const summary = { sent: 0, failed: 0, skipped: null };
     try {
       const config = await WhatsAppConfigService.getConfig();

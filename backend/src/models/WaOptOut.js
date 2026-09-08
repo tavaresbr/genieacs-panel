@@ -1,4 +1,4 @@
-import { getDb, insertReturningId } from '../config/database.js';
+import { tdb, tinsertReturningId } from '../config/database.js';
 
 /**
  * "Não perturbe".
@@ -12,6 +12,12 @@ import { getDb, insertReturningId } from '../config/database.js';
  * Keyed by phone and LID, never by customer id: an opt-out has to survive a
  * record being merged, deleted, or created again. Whoever asked to be left
  * alone asked as a phone number.
+ *
+ * And per provider, not per deployment. Unqualified, one ISP's opt-out list
+ * silenced every other ISP's number for that person — and the reverse leak is
+ * just as bad, because the list itself says who asked whom to stop. Each ISP
+ * honours the requests made to it: that list is its own compliance record, and
+ * it can neither be bound by nor read another's.
  */
 class WaOptOut {
   /**
@@ -24,7 +30,7 @@ class WaOptOut {
     const phone = String(waPhone || '').trim();
     const lid = String(waLid || '').trim();
     if (!phone && !lid) return false;
-    const row = await getDb()('wa_opt_outs')
+    const row = await tdb('wa_opt_outs')
       .whereNull('revoked_at')
       .where((q) => {
         if (phone) q.orWhere({ wa_phone_e164: phone });
@@ -38,7 +44,7 @@ class WaOptOut {
   static async activePhones(phones) {
     const list = [...new Set((phones || []).map((p) => String(p || '').trim()).filter(Boolean))];
     if (list.length === 0) return new Set();
-    const rows = await getDb()('wa_opt_outs')
+    const rows = await tdb('wa_opt_outs')
       .whereNull('revoked_at')
       .whereIn('wa_phone_e164', list)
       .pluck('wa_phone_e164');
@@ -56,7 +62,7 @@ class WaOptOut {
   static async record({ waPhone, waLid, conversationId, origin = 'customer', reasonText }) {
     if (await this.isActive({ waPhone, waLid })) return null;
     const now = new Date();
-    const id = await insertReturningId('wa_opt_outs', {
+    const id = await tinsertReturningId('wa_opt_outs', {
       wa_phone_e164: waPhone || null,
       wa_lid: waLid || null,
       conversation_id: conversationId || null,
@@ -64,19 +70,19 @@ class WaOptOut {
       reason_text: reasonText ? String(reasonText).slice(0, 500) : null,
       created_at: now
     });
-    return (await getDb()('wa_opt_outs').where({ id }).first()) || null;
+    return (await tdb('wa_opt_outs').where({ id }).first()) || null;
   }
 
   static async revoke(id, userId) {
-    await getDb()('wa_opt_outs')
+    await tdb('wa_opt_outs')
       .where({ id })
       .whereNull('revoked_at')
       .update({ revoked_at: new Date(), revoked_by: userId || null });
-    return (await getDb()('wa_opt_outs').where({ id }).first()) || null;
+    return (await tdb('wa_opt_outs').where({ id }).first()) || null;
   }
 
   static async listActive({ limit = 200 } = {}) {
-    return getDb()('wa_opt_outs').whereNull('revoked_at').orderBy('created_at', 'desc').limit(limit);
+    return tdb('wa_opt_outs').whereNull('revoked_at').orderBy('created_at', 'desc').limit(limit);
   }
 }
 

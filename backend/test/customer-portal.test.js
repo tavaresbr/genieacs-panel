@@ -1,6 +1,6 @@
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { call, getDb, insertReturningId, startTestServers, stopTestServers } from './helpers/harness.js';
+import { asTenant, call, getDb, insertReturningId, startTestServers, stopTestServers } from './helpers/harness.js';
 
 const { default: CustomerPortalPasswordService } = await import(
   '../src/services/customerPortalPasswordService.js'
@@ -153,7 +153,7 @@ describe('portal session', () => {
 describe('operator password reset', () => {
   it('replaces the password so the previous one stops working', async () => {
     const previous = bob.password;
-    const next = await CustomerPortalPasswordService.reset(bob.id);
+    const next = await asTenant(() => CustomerPortalPasswordService.reset(bob.id));
     assert.notEqual(next, previous);
 
     const stale = await call(`${portalUrl}/api/customer/login`, {

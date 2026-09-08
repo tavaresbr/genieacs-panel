@@ -1,7 +1,7 @@
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { authHeaders, call, getDb, startTestServers, stopTestServers } from './helpers/harness.js';
+import { asTenant, authHeaders, call, getDb, startTestServers, stopTestServers } from './helpers/harness.js';
 
 const { default: SgpService } = await import('../src/services/sgpService.js');
 const { default: WhatsAppConfigService } = await import('../src/services/whatsappConfigService.js');
@@ -178,7 +178,7 @@ before(async () => {
     webhookBaseUrl: 'https://painel.provedor.test/api/whatsapp-webhook',
     rateLimitPerMin: 60
   });
-  await WhatsAppAccount.create({
+  await asTenant(() => WhatsAppAccount.create({
     name: 'painel-cobranca',
     purpose: 'billing',
     flavor: 'v2',
@@ -187,7 +187,7 @@ before(async () => {
     is_default: true,
     ...WhatsAppConfigService.encryptInstanceToken('token-instancia'),
     ...WhatsAppConfigService.encryptWebhookToken('token-webhook')
-  });
+  }));
 
   // One `sgp_links` row per subscriber: that table is where the panel keeps the
   // phone, so it is the campaign's address book.
@@ -204,7 +204,7 @@ before(async () => {
     updated_at: now
   })));
 
-  await WaOptOut.record({ waPhone: byContract.get('C-OPTOUT').phone, origin: 'customer' });
+  await asTenant(() => WaOptOut.record({ waPhone: byContract.get('C-OPTOUT').phone, origin: 'customer' }));
 });
 
 after(async () => {
@@ -520,7 +520,7 @@ describe('the flush loop', () => {
     // The build let this number through; the request arrives afterwards. The
     // loop has to honour it, and — the part that matters — has to move the row
     // to a terminal state rather than leaving it pending forever.
-    await WaOptOut.record({ waPhone: '5593981110002', origin: 'customer' });
+    await asTenant(() => WaOptOut.record({ waPhone: '5593981110002', origin: 'customer' }));
 
     await call(`${panelUrl}/api/whatsapp/broadcasts/${broadcastId}/status`, {
       method: 'POST',
@@ -615,7 +615,7 @@ describe('the do-not-disturb list', () => {
       headers: authHeaders(token)
     });
     assert.equal(revoked.status, 200);
-    assert.equal(await WaOptOut.isActive({ waPhone: '5593981110099' }), false);
+    assert.equal(await asTenant(() => WaOptOut.isActive({ waPhone: '5593981110099' })), false);
 
     const missing = await call(`${panelUrl}/api/whatsapp/opt-outs/999999`, {
       method: 'DELETE',

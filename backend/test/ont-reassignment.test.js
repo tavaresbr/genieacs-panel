@@ -1,12 +1,17 @@
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { call, getDb, startTestServers, stopTestServers } from './helpers/harness.js';
+import { asTenant, call, getDb, startTestServers, stopTestServers } from './helpers/harness.js';
 
 const { default: CustomerService } = await import('../src/services/customerService.js');
 const { default: CustomerPortalPasswordService } = await import(
   '../src/services/customerPortalPasswordService.js'
 );
 const { default: SgpLink } = await import('../src/models/SgpLink.js');
+
+// Reached directly, with no request behind them, so nothing has resolved a
+// provider. The routes that call these are already inside one.
+const ensureAccount = (input) => asTenant(() => CustomerService.ensureAccount(input));
+const syncDevices = (...args) => asTenant(() => CustomerService.syncDevices(...args));
 
 let portalUrl;
 
@@ -30,10 +35,10 @@ describe('a firmware upgrade is not a change of subscriber', () => {
   const DEVICE = 'ONT-FIRMWARE-1';
 
   it('keeps the account, Customer ID and portal password across a version bump', async () => {
-    const before = await CustomerService.ensureAccount({
+    const before = await ensureAccount({
       _id: DEVICE, softwareId: 'V1.0.0', pppoe: 'firmware@isp'
     });
-    const after = await CustomerService.ensureAccount({
+    const after = await ensureAccount({
       _id: DEVICE, softwareId: 'V2.5.1', pppoe: 'firmware@isp'
     });
 
@@ -45,10 +50,10 @@ describe('a firmware upgrade is not a change of subscriber', () => {
   });
 
   it('treats a differently cased PPPoE login as the same subscriber', async () => {
-    const before = await CustomerService.ensureAccount({
+    const before = await ensureAccount({
       _id: 'ONT-CASE-1', softwareId: 'V1.0.0', pppoe: 'MixedCase@isp'
     });
-    const after = await CustomerService.ensureAccount({
+    const after = await ensureAccount({
       _id: 'ONT-CASE-1', softwareId: 'V1.0.0', pppoe: ' mixedcase@isp '
     });
     assert.equal(after.id, before.id);
@@ -61,7 +66,7 @@ describe('an ONT re-provisioned for another subscriber', () => {
   let second;
 
   before(async () => {
-    first = await CustomerService.ensureAccount({
+    first = await ensureAccount({
       _id: DEVICE, softwareId: 'V1.0.0', pppoe: 'subscriber-a@isp'
     });
     await SgpLink.upsert({
@@ -72,7 +77,7 @@ describe('an ONT re-provisioned for another subscriber', () => {
       document: '12345678901',
       link_mode: 'auto'
     });
-    second = await CustomerService.ensureAccount({
+    second = await ensureAccount({
       _id: DEVICE, softwareId: 'V3.0.0', pppoe: 'subscriber-b@isp'
     });
   });
@@ -116,12 +121,12 @@ describe('an ONT re-provisioned for another subscriber', () => {
 
 describe('a replacement ONT for the same subscriber', () => {
   it('carries the Customer ID over to the new device', async () => {
-    const original = await CustomerService.ensureAccount({
+    const original = await ensureAccount({
       _id: 'ONT-SWAP-OLD', softwareId: 'V1.0.0', pppoe: 'swap@isp'
     });
     // New hardware means a new GenieACS device ID and usually new firmware, so
     // the PPPoE login is the only identifier that still matches.
-    const replacement = await CustomerService.ensureAccount({
+    const replacement = await ensureAccount({
       _id: 'ONT-SWAP-NEW', softwareId: 'V9.9.9', pppoe: 'swap@isp'
     });
 
@@ -135,13 +140,13 @@ describe('a replacement ONT for the same subscriber', () => {
 describe('fleet synchronization', () => {
   it('retires an inherited account when the sync sees a new PPPoE login', async () => {
     const DEVICE = 'ONT-SYNC-1';
-    const previous = await CustomerService.ensureAccount({
+    const previous = await ensureAccount({
       _id: DEVICE, softwareId: 'V1.0.0', pppoe: 'sync-a@isp'
     });
 
     // syncDevices used to skip every device that already had an account, so a
     // reassignment was never noticed.
-    const ids = await CustomerService.syncDevices(
+    const ids = await syncDevices(
       [{ _id: DEVICE, softwareId: 'V1.0.0', pppoe: 'sync-b@isp' }],
       { enabled: true }
     );
@@ -156,10 +161,10 @@ describe('fleet synchronization', () => {
 
   it('leaves an unchanged fleet alone', async () => {
     const DEVICE = 'ONT-SYNC-2';
-    const account = await CustomerService.ensureAccount({
+    const account = await ensureAccount({
       _id: DEVICE, softwareId: 'V1.0.0', pppoe: 'sync-stable@isp'
     });
-    const ids = await CustomerService.syncDevices(
+    const ids = await syncDevices(
       [{ _id: DEVICE, softwareId: 'V1.0.0', pppoe: 'sync-stable@isp' }],
       { enabled: true }
     );

@@ -1,5 +1,6 @@
 import express from 'express';
 import WhatsAppAccount from '../models/WhatsAppAccount.js';
+import { runInTenant } from '../config/tenantContext.js';
 import WhatsAppConfigService from '../services/whatsappConfigService.js';
 import WaInboundService from '../services/waInboundService.js';
 import { canonicalizarEvento } from '../utils/wa/waEventos.js';
@@ -45,7 +46,14 @@ router.post('/', waWebhookLimiter, async (req, res) => {
   const evento = canonicalizarEvento(body.event ?? body.Event ?? '');
 
   try {
-    const resultado = await WaInboundService.handle(account, evento, body);
+    // The provider comes from the account the instance name resolved to, not
+    // from whatever the request happened to be scoped to. Those are the same
+    // thing while there is one provider; keeping them separate now is what
+    // stops an event being filed under the wrong one later.
+    const resultado = await runInTenant(
+      account.tenant_id,
+      () => WaInboundService.handle(account, evento, body)
+    );
     // The body names what happened. It is the only observability this path has:
     // an event that was stored and an event that was deliberately dropped both
     // answer 200, and without `skipped` they are indistinguishable from the

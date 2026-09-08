@@ -1,4 +1,4 @@
-import { getDb } from '../config/database.js';
+import { getDb, tdb, tinsert } from '../config/database.js';
 
 function parseWaypoints(row) {
   if (!row) return row;
@@ -15,18 +15,18 @@ function parseWaypoints(row) {
 
 class MappingEdge {
   static async getAll() {
-    const rows = await getDb()('mapping_edges').select('*').orderBy('created_at', 'desc');
+    const rows = await tdb('mapping_edges').select('*').orderBy('created_at', 'desc');
     return rows.map(parseWaypoints);
   }
 
   static async getByEdgeId(edgeId) {
-    const row = await getDb()('mapping_edges').where({ edge_id: edgeId }).first();
+    const row = await tdb('mapping_edges').where({ edge_id: edgeId }).first();
     return row ? parseWaypoints(row) : null;
   }
 
   static async create(edgeData) {
     const { edge_id, source, target, fiber_type, distance, waypoints, notes } = edgeData;
-    await getDb()('mapping_edges').insert({
+    await tinsert('mapping_edges', {
       edge_id,
       source,
       target,
@@ -44,36 +44,46 @@ class MappingEdge {
     if (waypoints !== undefined) {
       patch.waypoints = waypoints ? JSON.stringify(waypoints) : null;
     }
-    const affected = await getDb()('mapping_edges').where({ edge_id: edgeId }).update(patch);
+    const affected = await tdb('mapping_edges').where({ edge_id: edgeId }).update(patch);
     return affected > 0;
   }
 
   static async delete(edgeId) {
-    const affected = await getDb()('mapping_edges').where({ edge_id: edgeId }).del();
+    const affected = await tdb('mapping_edges').where({ edge_id: edgeId }).del();
     return affected > 0;
   }
 
   static async deleteAll() {
-    return getDb()('mapping_edges').del();
+    return tdb('mapping_edges').del();
   }
 
+  /**
+   * Clears the map of the provider in scope.
+   *
+   * Edges before nodes because of the foreign key, and both through the scoped
+   * handle: unqualified, this emptied every provider's plant at once.
+   */
   static async resetAll() {
-    const db = getDb();
-    await db.transaction(async (trx) => {
-      await trx('mapping_edges').del();
-      await trx('mapping_nodes').del();
+    await getDb().transaction(async (trx) => {
+      await tdb('mapping_edges', trx).del();
+      await tdb('mapping_nodes', trx).del();
     });
     return true;
   }
 
+  /**
+   * Replaces the map of the provider in scope, wholesale.
+   *
+   * The delete and the insert both carry the provider. Scoping one and not the
+   * other is how an import would quietly take everyone else's plant with it.
+   */
   static async syncData(nodes, edges) {
-    const db = getDb();
-    await db.transaction(async (trx) => {
-      await trx('mapping_edges').del();
-      await trx('mapping_nodes').del();
+    await getDb().transaction(async (trx) => {
+      await tdb('mapping_edges', trx).del();
+      await tdb('mapping_nodes', trx).del();
 
       if (nodes.length > 0) {
-        await trx('mapping_nodes').insert(nodes.map((n) => ({
+        await tinsert('mapping_nodes', nodes.map((n) => ({
           node_id: n.node_id,
           type: n.type,
           name: n.name,
@@ -83,11 +93,11 @@ class MappingEdge {
           splitter: n.splitter,
           pppoe: n.pppoe,
           notes: n.notes
-        })));
+        })), trx);
       }
 
       if (edges.length > 0) {
-        await trx('mapping_edges').insert(edges.map((e) => ({
+        await tinsert('mapping_edges', edges.map((e) => ({
           edge_id: e.edge_id,
           source: e.source,
           target: e.target,
@@ -95,7 +105,7 @@ class MappingEdge {
           distance: e.distance,
           waypoints: e.waypoints ? JSON.stringify(e.waypoints) : null,
           notes: e.notes
-        })));
+        })), trx);
       }
     });
     return true;

@@ -48,6 +48,7 @@ describe('dictionaries', () => {
     assert.equal(translate('es', 'common.routeNotFound'), 'Ruta no encontrada');
     assert.equal(translate('de', 'common.routeNotFound'), 'Route nicht gefunden');
     assert.equal(translate('fr', 'common.routeNotFound'), 'Route introuvable');
+    assert.equal(translate('ja', 'common.routeNotFound'), 'ルートが見つかりません');
     assert.equal(translate('pt-BR', 'nonexistent.key'), 'nonexistent.key');
   });
 });
@@ -61,6 +62,7 @@ describe('locale negotiation', () => {
     assert.equal(resolveLocale('it-CH'), 'it');
     assert.equal(resolveLocale('de-AT'), 'de');
     assert.equal(resolveLocale('fr-CA'), 'fr');
+    assert.equal(resolveLocale('ja-JP'), 'ja');
     assert.equal(resolveLocale('nl'), null);
   });
 
@@ -76,6 +78,7 @@ describe('locale negotiation', () => {
     assert.equal(negotiateLocale('nl-NL, es;q=0.8'), 'es');
     assert.equal(negotiateLocale('de-DE'), 'de');
     assert.equal(negotiateLocale('fr-FR'), 'fr');
+    assert.equal(negotiateLocale('ja-JP'), 'ja');
     assert.equal(negotiateLocale('nl-NL'), 'pt-BR');
     assert.equal(negotiateLocale(undefined), 'pt-BR');
     assert.equal(negotiateLocale('*'), 'pt-BR');
@@ -97,6 +100,7 @@ describe('translated responses', () => {
       ['it', 'Rotta non trovata'],
       ['de', 'Route nicht gefunden'],
       ['fr', 'Route introuvable'],
+      ['ja', 'ルートが見つかりません'],
       ['nl;q=0.9, en;q=0.5', 'Route not found']
     ]) {
       const { body } = await call(`${panelUrl}/api/does-not-exist`, {

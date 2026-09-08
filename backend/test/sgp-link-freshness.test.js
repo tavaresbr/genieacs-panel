@@ -1,13 +1,17 @@
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { getDb, insertReturningId, startTestServers, stopTestServers } from './helpers/harness.js';
+import { asTenant, getDb, insertReturningId, startTestServers, stopTestServers } from './helpers/harness.js';
 
 const { default: SgpService } = await import('../src/services/sgpService.js');
 const { default: SgpLink } = await import('../src/models/SgpLink.js');
 const { default: CustomerPortalPasswordService } = await import(
   '../src/services/customerPortalPasswordService.js'
 );
+
+// Reached directly, with no request behind them, so nothing has resolved a
+// provider. The routes that call these are already inside one.
+const resolveDeviceContract = (...args) => asTenant(() => SgpService.resolveDeviceContract(...args));
 
 const APP = 'painel';
 const TOKEN = 'token-freshness';
@@ -95,7 +99,7 @@ describe('a cached SGP link', () => {
     });
     const newAccountId = await createAccount(DEVICE, 'novo@isp', 'CSG-FRESH01-234567');
 
-    const { link } = await SgpService.resolveDeviceContract(DEVICE);
+    const { link } = await resolveDeviceContract(DEVICE);
     assert.equal(link.account_id, newAccountId);
     assert.equal(link.contract, '9001');
     assert.notEqual(link.client_name, 'Titular Anterior');
@@ -103,7 +107,7 @@ describe('a cached SGP link', () => {
 
   it('is served from cache while it is still fresh', async () => {
     const before = lookups;
-    await SgpService.resolveDeviceContract(DEVICE);
+    await resolveDeviceContract(DEVICE);
     assert.equal(lookups, before, 'a fresh link must not hit the provider again');
   });
 
@@ -113,7 +117,7 @@ describe('a cached SGP link', () => {
       client_name: 'Plano Antigo'
     });
     const before = lookups;
-    const { link } = await SgpService.resolveDeviceContract(DEVICE);
+    const { link } = await resolveDeviceContract(DEVICE);
     assert.equal(lookups, before + 1, 'an expired link must be looked up again');
     assert.equal(link.client_name, 'Titular Atual');
   });

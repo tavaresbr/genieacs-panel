@@ -9,6 +9,7 @@ import SchedulerService from './services/schedulerService.js';
 import WaOutboxWorker from './services/waOutboxWorker.js';
 import WaAlertService from './services/waAlertService.js';
 import WaBroadcastService from './services/waBroadcastService.js';
+import { forEachTenant, forSoleTenant } from './config/tenantJobs.js';
 
 const PORT = Number(process.env.APP_PORT) || 5890;
 const PORTAL_PORT = process.env.PORTAL_PORT === '0'
@@ -38,22 +39,29 @@ export const startServer = async () => {
 
     server = app.listen(PORT, HOST, () => {
       console.log(`Server running on ${HOST}:${PORT} (${APP_ENV})`);
-      void DeviceService.getDashboardData(false).catch((error) => {
-        console.warn(`Dashboard prewarm skipped: ${error.message}`);
-      });
-      void CustomerService.isAutoGenerationEnabled()
-        .then((enabled) => enabled ? DeviceService.getCustomerIdentityDevices() : [])
-        .then((devices) => devices.length
-          ? CustomerService.syncDevices(devices, { enabled: true })
-          : null)
+      // Every boot job below opens a provider scope: none of them has a
+      // request, and the queries under them now refuse to run without one.
+      // The prewarm and the Customer ID sweep read the deployment's single
+      // GenieACS, so they run once (see `forSoleTenant`); the password
+      // backfill reads only the accounts of the provider in scope, so it runs
+      // per provider and genuinely divides.
+      void forSoleTenant('The dashboard prewarm', () => DeviceService.getDashboardData(false))
         .catch((error) => {
-          console.warn(`Customer ID prewarm skipped: ${error.message}`);
+          console.warn(`Dashboard prewarm skipped: ${error.message}`);
         });
+      void forSoleTenant('The Customer ID sweep', async () => {
+        if (!await CustomerService.isAutoGenerationEnabled()) return null;
+        const devices = await DeviceService.getCustomerIdentityDevices();
+        return devices.length ? CustomerService.syncDevices(devices, { enabled: true }) : null;
+      }).catch((error) => {
+        console.warn(`Customer ID prewarm skipped: ${error.message}`);
+      });
       // Accounts created before portal passwords existed authenticated with a
       // slice of their own Customer ID. Give them real credentials in the
       // background so startup is never blocked by a fleet-sized backfill.
-      void CustomerPortalPasswordService.backfillMissing()
-        .then((generated) => {
+      void forEachTenant(() => CustomerPortalPasswordService.backfillMissing())
+        .then((counts) => {
+          const generated = counts.reduce((total, one) => total + one, 0);
           if (generated > 0) {
             console.log(
               `Generated portal passwords for ${generated} customer account(s); `

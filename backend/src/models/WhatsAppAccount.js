@@ -1,4 +1,4 @@
-import { getDb, insertReturningId } from '../config/database.js';
+import { getDb, tdb, tinsertReturningId } from '../config/database.js';
 
 /**
  * WhatsApp numbers connected through the Evolution API.
@@ -11,14 +11,24 @@ import { getDb, insertReturningId } from '../config/database.js';
  */
 class WhatsAppAccount {
   static async getAll() {
-    return getDb()('whatsapp_accounts').orderBy([{ column: 'is_default', order: 'desc' }, { column: 'id' }]);
+    return tdb('whatsapp_accounts').orderBy([{ column: 'is_default', order: 'desc' }, { column: 'id' }]);
   }
 
   static async getById(id) {
-    return (await getDb()('whatsapp_accounts').where({ id }).first()) || null;
+    return (await tdb('whatsapp_accounts').where({ id }).first()) || null;
   }
 
-  /** The webhook resolves the account from the instance name in the payload. */
+  /**
+   * The webhook resolves the account from the instance name in the payload.
+   *
+   * Deliberately not scoped, and it must stay that way: an Evolution webhook
+   * arrives with no session, so this lookup is what tells us which provider the
+   * event belongs to. Scoping it would mean already knowing the answer. The
+   * name is minted locally (`skygp_<hex>_<ts>`) and keeps a global unique for
+   * exactly this reason, which is why one row can be found without a provider.
+   *
+   * tenant-scope-exempt: this lookup is how the provider is discovered.
+   */
   static async getByName(name) {
     return (await getDb()('whatsapp_accounts').where({ name }).first()) || null;
   }
@@ -31,37 +41,39 @@ class WhatsAppAccount {
    * not silently use a disconnected one.
    */
   static async getForPurpose(purpose) {
-    const db = getDb();
     const connected = { status: 'connected' };
     return (
-      (await db('whatsapp_accounts').where({ ...connected, purpose }).orderBy('id').first())
-      || (await db('whatsapp_accounts').where({ ...connected, is_default: true }).orderBy('id').first())
-      || (await db('whatsapp_accounts').where(connected).orderBy('id').first())
+      (await tdb('whatsapp_accounts').where({ ...connected, purpose }).orderBy('id').first())
+      || (await tdb('whatsapp_accounts').where({ ...connected, is_default: true }).orderBy('id').first())
+      || (await tdb('whatsapp_accounts').where(connected).orderBy('id').first())
       || null
     );
   }
 
   static async create(account) {
-    const id = await insertReturningId('whatsapp_accounts', account);
+    const id = await tinsertReturningId('whatsapp_accounts', account);
     return this.getById(id);
   }
 
   static async update(id, patch) {
-    await getDb()('whatsapp_accounts')
+    await tdb('whatsapp_accounts')
       .where({ id })
       .update({ ...patch, updated_at: new Date() });
     return this.getById(id);
   }
 
   static async remove(id) {
-    return getDb()('whatsapp_accounts').where({ id }).del();
+    return tdb('whatsapp_accounts').where({ id }).del();
   }
 
-  /** Exactly one row may be the default; clearing the others is part of setting it. */
+  /**
+   * Exactly one row may be the default; clearing the others is part of setting
+   * it. "The others" means this provider's — unqualified, choosing a default
+   * here cleared the default number of every provider on the deployment.
+   */
   static async setDefault(id) {
-    const db = getDb();
-    await db('whatsapp_accounts').update({ is_default: false, updated_at: new Date() });
-    await db('whatsapp_accounts').where({ id }).update({ is_default: true, updated_at: new Date() });
+    await tdb('whatsapp_accounts').update({ is_default: false, updated_at: new Date() });
+    await tdb('whatsapp_accounts').where({ id }).update({ is_default: true, updated_at: new Date() });
     return this.getById(id);
   }
 }

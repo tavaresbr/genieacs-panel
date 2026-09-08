@@ -14,8 +14,22 @@ import { SCHEMA_TABLES } from './migrations.js';
  * difference matters, so the shared ones are named rather than left implicit.
  */
 export const SCOPED_TABLES = new Set([
-  // Nothing yet. `customer_accounts` has the column and the constraints; it
-  // enters here when its model and its leak test land.
+  // The three whose models delete or update without a where clause. Scoped
+  // first because a half-converted destructive write does not leak data, it
+  // destroys someone else's.
+  'mapping_nodes',
+  'mapping_edges',
+  'whatsapp_accounts',
+  // The identity table. `identity_hash` is sha256(softwareId, pppoe_username):
+  // within one provider, matching on it is how an ONT swap keeps the
+  // subscriber's portal login. Across two it is account takeover, because the
+  // same firmware and a same-named subscriber produce the same hash.
+  'customer_accounts',
+  // The WhatsApp inbox and its send queue. Scoping these is what lets the
+  // outbox worker drain one provider at a time instead of the deployment.
+  'wa_conversations',
+  'wa_messages',
+  'wa_opt_outs'
 ]);
 
 /** Tables that belong to the deployment rather than to any one provider. */

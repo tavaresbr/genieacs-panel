@@ -46,11 +46,29 @@ const { app, portalApp } = await import('../../src/app.js');
 const { ensureSchema } = await import('../../src/config/schema.js');
 const { seedDefaults } = await import('../../src/config/seed.js');
 const { getDb, closePool, insertReturningId } = await import('../../src/config/database.js');
+const { runInTenant } = await import('../../src/config/tenantContext.js');
 
 // Re-exported so fixtures reach for the same dialect-aware helper the models
 // use: `const [id] = await knex(...).insert(...)` only yields an id on SQLite
 // and MySQL, so a fixture written that way passes locally and fails on Postgres.
-export { app, portalApp, getDb, insertReturningId };
+export { app, portalApp, getDb, insertReturningId, runInTenant };
+
+/**
+ * Runs a fixture as the installation's own provider — what a request resolves
+ * to. Setup that writes to a scoped table needs it, because a model reached
+ * outside a request has no provider and refuses to guess.
+ */
+export async function asTenant(fn) {
+  const tenant = await getDb()('tenants').orderBy('id', 'asc').first();
+  if (!tenant) throw new Error('no provider exists; run the migrations first');
+  return runInTenant(tenant.id, fn);
+}
+
+/** The installation's own provider id. */
+export async function defaultTenantId() {
+  const tenant = await getDb()('tenants').orderBy('id', 'asc').first();
+  return tenant?.id ?? null;
+}
 
 const listeners = [];
 
