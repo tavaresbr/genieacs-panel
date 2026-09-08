@@ -223,7 +223,13 @@ function serveFrontend(target, htmlFile) {
       return res.status(503).send(req.t('common.buildUnavailable'));
     }
     res.setHeader('Cache-Control', 'no-cache');
-    return res.sendFile(htmlPath);
+    // `dotfiles: 'allow'` is about the path this file is AT, not about serving
+    // dotfiles to anyone. `send` refuses any absolute path containing a segment
+    // that starts with a dot, so an install under `/opt/.apps/panel` — or a git
+    // worktree under `.claude/` — answered 404 for every page while its own
+    // assets loaded fine. The static middleware above still denies dotfiles in
+    // the REQUEST path, which is the rule that protects anything.
+    return res.sendFile(htmlPath, { dotfiles: 'allow' });
   });
   return true;
 }

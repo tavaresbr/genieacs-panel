@@ -198,6 +198,10 @@ describe('the send route enqueues and returns', () => {
     assert.equal(body.data.deliveryStatus, 'queued');
     assert.equal(body.data.externalId, null);
     assert.ok(body.data.sentBy, 'the operator who sent it is recorded');
+    // Twice over, because the two answer different questions: `sentBy` is which
+    // human, `source` is which of the panel's senders — and the bot's ceiling
+    // reads only the second one.
+    assert.equal(body.data.source, 'operator');
     assert.equal(requests.length, 0, 'enqueuing must not talk to Evolution');
   });
 

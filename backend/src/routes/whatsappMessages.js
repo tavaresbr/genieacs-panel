@@ -22,6 +22,15 @@ router.get(
   WhatsAppMessageController.listMessages
 );
 
+// Filing, not deleting: the thread and its history stay, and an inbound
+// message takes it back out of the archive on its own.
+router.post(
+  '/conversations/:id/status',
+  authenticateToken,
+  requireRole(['admin']),
+  WhatsAppMessageController.setStatus
+);
+
 router.post(
   '/conversations/:id/messages',
   authenticateToken,

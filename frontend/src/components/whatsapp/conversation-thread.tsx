@@ -20,6 +20,9 @@ interface ConversationThreadProps {
   onLoadMore: () => void
   onResend: (message: WhatsAppMessage) => void
   resendingId: number | null
+  /** A close or reopen is in flight; the button must not be pressed twice. */
+  filing: boolean
+  onFile: (status: 'open' | 'closed') => void
 }
 
 /**
@@ -38,9 +41,12 @@ export function ConversationThread({
   canLoadMore,
   onLoadMore,
   onResend,
-  resendingId
+  resendingId,
+  filing,
+  onFile
 }: ConversationThreadProps) {
   const { t } = useTranslation()
+  const closed = Boolean(conversation.closedAt)
   const scrollRef = useRef<HTMLDivElement>(null)
   const stick = useRef(true)
 
@@ -99,18 +105,39 @@ export function ConversationThread({
                 {t('whatsapp.inbox.optedOut')}
               </span>
             )}
+            {closed && (
+              <span className="modern-badge" title={t('whatsapp.inbox.closeHint')}>
+                <Icon name="check" size={12} />
+                {t('whatsapp.inbox.closed')}
+              </span>
+            )}
           </div>
         </div>
 
-        {conversation.deviceId && (
-          <Link
-            to={`/devices/detail?id=${encodeURIComponent(conversation.deviceId)}`}
-            className="modern-button-secondary shrink-0"
+        <div className="flex shrink-0 items-center gap-2">
+          {/* Closing is not a destructive act and is not offered as one: the
+              hint says what it does, and the same button undoes it. */}
+          <button
+            type="button"
+            className="modern-button-secondary"
+            disabled={filing}
+            title={t('whatsapp.inbox.closeHint')}
+            onClick={() => onFile(closed ? 'open' : 'closed')}
           >
-            <Icon name="server" size={16} />
-            {t('whatsapp.inbox.openDevice')}
-          </Link>
-        )}
+            <Icon name={closed ? 'refresh' : 'check'} size={16} className={filing ? 'animate-spin' : ''} />
+            {t(closed ? 'whatsapp.inbox.reopen' : 'whatsapp.inbox.close')}
+          </button>
+
+          {conversation.deviceId && (
+            <Link
+              to={`/devices/detail?id=${encodeURIComponent(conversation.deviceId)}`}
+              className="modern-button-secondary"
+            >
+              <Icon name="server" size={16} />
+              {t('whatsapp.inbox.openDevice')}
+            </Link>
+          )}
+        </div>
       </header>
 
       <div

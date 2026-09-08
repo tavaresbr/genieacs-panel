@@ -178,6 +178,67 @@ export function BillingPanel() {
     [rows, selected]
   )
 
+  // ── Correcting the number ────────────────────────────────────────────
+  //
+  // The whole cadence hangs off this field, and until this editor existed the
+  // only way to fix a number the ERP had wrong was an UPDATE typed against the
+  // database. It is edited HERE, in the row that already shows the number and
+  // says where it came from, because this listing is where an operator finds
+  // out a number is wrong — a subscriber sitting in `noPhone` run after run.
+  const [editing, setEditing] = useState<string | null>(null)
+  const [draft, setDraft] = useState('')
+  const [savingPhone, setSavingPhone] = useState(false)
+
+  const openEditor = useCallback((row: WhatsAppOverdueSubscriber) => {
+    setEditing(row.contract)
+    // Seeded with the override only. Prefilling the ERP's number would turn
+    // "leave it blank to use the ERP record" into a value the operator has to
+    // delete, and the first save would copy the stale number into the override
+    // — freezing exactly the thing this field exists to correct.
+    setDraft(row.phoneSource === 'manual' ? (row.phone ?? '') : '')
+  }, [])
+
+  const closeEditor = useCallback(() => {
+    setEditing(null)
+    setDraft('')
+  }, [])
+
+  const savePhone = useCallback(async (contract: string) => {
+    setSavingPhone(true)
+    try {
+      // An empty draft is a CLEAR, not a skipped save: it withdraws the
+      // override and hands the contract back to the ERP record.
+      const res = await whatsappAPI.setSubscriberPhone(contract, draft.trim())
+      if (!alive.current) return
+      if (!res.success || !res.data) {
+        // The machine code, never the server's message: the operator reads the
+        // panel's language, and the server answers in its own.
+        toast.error(whatsappErrorMessage(t, res.code))
+        return
+      }
+      const saved = res.data
+      // Patched in place rather than reloaded. A reload here would be one SGP
+      // round trip per subscriber — the slowest route in the panel — to
+      // re-answer a question about invoices that correcting a phone number
+      // cannot have changed. Only the two fields the write touches are taken;
+      // the amount and due date on screen stay the ones already fetched.
+      setRows((current) => current.map((row) => (row.contract === contract
+        ? { ...row, phone: saved.phone, phoneSource: saved.phoneSource }
+        : row)))
+      // Both are said out loud, and they say different things. A clear replaces
+      // what was typed with the ERP's number, which looks like the save went
+      // wrong unless the swap is named; a set is worth confirming because what
+      // it really did is take precedence over the ERP from now on — the row
+      // alone cannot say that.
+      toast.success(t(saved.phoneSource === 'manual'
+        ? 'whatsapp.billing.phoneSaved'
+        : 'whatsapp.billing.phoneCleared'))
+      closeEditor()
+    } finally {
+      if (alive.current) setSavingPhone(false)
+    }
+  }, [closeEditor, draft, t, toast])
+
   const build = useCallback(async () => {
     if (!template || selected.size === 0) return
     setBuilding(true)
@@ -404,24 +465,88 @@ export function BillingPanel() {
                         )}
                       </td>
                       <td>
-                        {row.phone ? (
-                          <>
-                            <span className="block">{row.phone}</span>
-                            {/* Which record answered matters: `manual` is an
-                                operator correcting the ERP, and it is the one
-                                worth trusting when the two disagree. */}
-                            <span className="text-xs text-muted-foreground">
-                              {row.phoneSource === 'manual'
-                                ? t('whatsapp.billing.phoneTyped')
-                                : t('whatsapp.billing.phoneFromSgp')}
-                            </span>
-                          </>
+                        {editing === row.contract ? (
+                          <div className="space-y-2" data-testid={`wa-phone-editor-${row.contract}`}>
+                            <label htmlFor={`wa-phone-${row.contract}`} className="field-label">
+                              {t('whatsapp.billing.phoneManual')}
+                            </label>
+                            <input
+                              id={`wa-phone-${row.contract}`}
+                              type="tel"
+                              className="modern-input"
+                              autoFocus
+                              value={draft}
+                              disabled={savingPhone}
+                              onChange={(event) => setDraft(event.target.value)}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter') void savePhone(row.contract)
+                                if (event.key === 'Escape') closeEditor()
+                              }}
+                            />
+                            {/* Blank is a documented operation, so the hint says
+                                so: it is how an operator withdraws a correction
+                                without having to invent a number to overwrite
+                                it with. */}
+                            <p className="field-hint">{t('whatsapp.billing.phoneManualHint')}</p>
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                className="modern-button"
+                                data-testid={`wa-phone-save-${row.contract}`}
+                                disabled={savingPhone}
+                                onClick={() => void savePhone(row.contract)}
+                              >
+                                {savingPhone ? t('common.saving') : t('common.save')}
+                              </button>
+                              <button
+                                type="button"
+                                className="modern-button-secondary"
+                                disabled={savingPhone}
+                                onClick={closeEditor}
+                              >
+                                {t('common.cancel')}
+                              </button>
+                            </div>
+                          </div>
                         ) : (
-                          // Listed, not hidden — this is exactly the cadastre
-                          // that needs fixing, and this row will be skipped.
-                          <span className="modern-badge-error">
-                            {t('whatsapp.billing.noPhone')}
-                          </span>
+                          <div className="flex items-start gap-2">
+                            <div className="min-w-0">
+                              {row.phone ? (
+                                <>
+                                  <span className="block" data-testid={`wa-phone-value-${row.contract}`}>
+                                    {row.phone}
+                                  </span>
+                                  {/* Which record answered matters: `manual` is an
+                                      operator correcting the ERP, and it is the one
+                                      worth trusting when the two disagree. */}
+                                  <span
+                                    className="text-xs text-muted-foreground"
+                                    data-phone-source={row.phoneSource ?? 'none'}
+                                  >
+                                    {row.phoneSource === 'manual'
+                                      ? t('whatsapp.billing.phoneTyped')
+                                      : t('whatsapp.billing.phoneFromSgp')}
+                                  </span>
+                                </>
+                              ) : (
+                                // Listed, not hidden — this is exactly the cadastre
+                                // that needs fixing, and this row will be skipped.
+                                <span className="modern-badge-error" data-phone-source="none">
+                                  {t('whatsapp.billing.noPhone')}
+                                </span>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              className="modern-button-secondary shrink-0"
+                              data-testid={`wa-phone-edit-${row.contract}`}
+                              title={t('whatsapp.billing.editPhone')}
+                              aria-label={t('whatsapp.billing.editPhone')}
+                              onClick={() => openEditor(row)}
+                            >
+                              <Icon name="edit" size={14} />
+                            </button>
+                          </div>
                         )}
                       </td>
                       <td>{currency(row.amount, intlLocale)}</td>

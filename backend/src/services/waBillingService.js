@@ -274,6 +274,57 @@ class WaBillingService {
     }
   }
 
+  /**
+   * Sets or clears the operator's correction to a subscriber's number.
+   *
+   * The whole billing cadence hangs off this one field. A number the ERP has
+   * wrong does not announce itself: the subscriber lands in `noPhone` — or,
+   * worse, someone else's phone rings — quietly, campaign after campaign, and
+   * until now the only way to fix it was an UPDATE typed against the database.
+   *
+   * An empty `phone` CLEARS the override and hands the contract back to
+   * whatever the last sync wrote. That is a real operation and not a malformed
+   * request: an operator who mistyped a correction has to be able to undo it
+   * without inventing a number, and the ERP's own record is the fallback the
+   * reader already prefers when there is no manual one.
+   *
+   * @returns {Promise<object>} the subscriber as the listing shows them, minus
+   *   the invoice fields — those cost an SGP round trip and nothing about this
+   *   write can have changed them.
+   */
+  static async setSubscriberPhone(contract, phone) {
+    const key = String(contract ?? '').trim();
+    // Read before write: `update` reports rows touched, which on a contract
+    // that does not exist and on one whose number is already the typed value
+    // is the same zero. Only one of those is a 404.
+    const existing = key ? await SgpLink.getByContract(key) : [];
+    if (existing.length === 0) {
+      throw new WaError('whatsapp.error.subscriberNotFound', {
+        code: 'subscriber_not_found',
+        status: 404
+      });
+    }
+
+    const wanted = String(phone ?? '').trim();
+    const digits = wanted ? normalizarTelefoneBr(wanted) : '';
+    // Only a non-empty entry can be invalid. `normalizarTelefoneBr` refuses
+    // rather than guessing — it never invents the ninth digit — so what it
+    // rejects here is a number that could not be dialled, not one it is unsure
+    // about.
+    if (wanted && !digits) {
+      throw new WaError('whatsapp.error.invalidPhone', { code: 'invalid_phone', status: 400 });
+    }
+
+    // Stored normalised, in the form a send actually uses. Keeping "(93)
+    // 98111-0449" would leave the correction looking right on screen and
+    // matching nothing at dispatch time — the same failure the do-not-disturb
+    // list normalises on the way in to avoid.
+    await SgpLink.setManualPhone(key, digits || null);
+
+    const [subscriber] = this.subscribersFrom(await SgpLink.getByContract(key));
+    return subscriber;
+  }
+
   /** `sgp_links` rows as subscribers, one per contract. */
   static subscribersFrom(links) {
     const byContract = new Map();

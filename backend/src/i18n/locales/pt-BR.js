@@ -465,8 +465,13 @@ export default {
   'whatsapp.phoneSaved': 'Telefone salvo',
   'whatsapp.phoneSaveFailed': 'Não foi possível salvar o telefone',
   'whatsapp.error.invalidPhone': 'Isso não parece um telefone utilizável',
+  'whatsapp.error.subscriberNotFound': 'Nenhum assinante com esse contrato',
   // WhatsApp — inbox e bot de autoatendimento (onda 3)
   'whatsapp.error.conversationNotFound': 'Conversa não encontrada',
+  'whatsapp.conversationClosed': 'Conversa encerrada',
+  'whatsapp.conversationReopened': 'Conversa reaberta',
+  'whatsapp.conversationStatusFailed': 'Não foi possível atualizar a conversa',
+  'whatsapp.error.invalidConversationStatus': 'Uma conversa está aberta ou encerrada',
   'whatsapp.bot.portalHint': 'Para a senha do WiFi e para trocar o nome da rede, entre no portal do cliente: {link}',
   'whatsapp.bot.notRecognised': 'Não encontramos um contrato para este número. Um atendente responde em instantes.',
   'whatsapp.bot.handoff': 'Vou passar para um atendente.',

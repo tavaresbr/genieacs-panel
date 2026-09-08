@@ -27,6 +27,12 @@ router.delete('/opt-outs/:id', ...admin, WhatsAppBillingController.revokeOptOut)
 router.get('/billing/overdue', ...admin, WhatsAppBillingController.listOverdue);
 router.post('/billing/campaign', ...admin, WhatsAppBillingController.buildCampaign);
 
+// ── The subscriber's number ────────────────────────────────────────────
+// The only way to correct a number outside the database. `{ phone: '' }` is a
+// clear, not an empty request: it drops the override and hands the contract
+// back to what the ERP last synced.
+router.put('/subscribers/:contract/phone', ...admin, WhatsAppBillingController.setSubscriberPhone);
+
 // ── Campaigns ──────────────────────────────────────────────────────────
 router.get('/broadcasts', ...admin, WhatsAppBillingController.listBroadcasts);
 router.post('/broadcasts/:id/status', ...admin, WhatsAppBillingController.setBroadcastStatus);

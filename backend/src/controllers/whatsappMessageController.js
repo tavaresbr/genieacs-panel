@@ -31,7 +31,9 @@ class WhatsAppMessageController {
     try {
       const rows = await WaConversationService.list({
         limit: req.query?.limit,
-        offset: req.query?.offset
+        offset: req.query?.offset,
+        search: req.query?.search,
+        status: req.query?.status
       });
       return res.json(createResponse(req.t('whatsapp.conversationsLoaded', { count: rows.length }), rows));
     } catch (error) {
@@ -51,6 +53,36 @@ class WhatsAppMessageController {
     }
   }
 
+  /**
+   * Closes a thread, or reopens it.
+   *
+   * The two literals are the whole vocabulary: an unrecognized value is a 400
+   * rather than a silent close, because the difference between the two is what
+   * an operator sees in their list tomorrow morning.
+   */
+  static async setStatus(req, res) {
+    const status = req.body?.status;
+    if (status !== 'open' && status !== 'closed') {
+      // With a machine `code`, like every other refusal here: a screen that
+      // translates codes cannot translate a bare message, and this route was
+      // the only one in the WhatsApp surface answering without one.
+      return res.status(400).json(createErrorResponse(
+        req.t('whatsapp.error.invalidConversationStatus'),
+        null,
+        'invalid_conversation_status'
+      ));
+    }
+    try {
+      const conversation = await WaConversationService.setStatus(req.params?.id, status);
+      return res.json(createResponse(
+        req.t(status === 'closed' ? 'whatsapp.conversationClosed' : 'whatsapp.conversationReopened'),
+        conversation
+      ));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.conversationStatusFailed');
+    }
+  }
+
   static async send(req, res) {
     try {
       const body = req.body ?? {};
@@ -59,7 +91,11 @@ class WhatsAppMessageController {
         body: body.body,
         attachment: body.attachment,
         isNote: body.isNote === true,
-        userId: req.user?.userId ?? null
+        userId: req.user?.userId ?? null,
+        // Said rather than left to the default: this route is the one place a
+        // human is demonstrably behind the message, and the row should say so
+        // in its own right and not only by having a `sentBy`.
+        source: 'operator'
       });
       return res.status(201).json(createResponse(
         req.t('whatsapp.messageQueued'),
