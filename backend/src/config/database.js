@@ -123,6 +123,20 @@ export function tinsert(table, row, trx = null) {
   return knex(table).insert(withTenant(table, row));
 }
 
+/**
+ * Chunked insert with the provider set on every row.
+ *
+ * `knex.batchInsert` takes the table name as a string and never passes through
+ * `tdb`, so a caller reaching for it directly writes rows with no provider —
+ * and the column's default would file them under the installation's own,
+ * silently and wrongly, for anybody else. Long recipient lists still need the
+ * chunking, so the stamping lives here rather than the call site.
+ */
+export function tbatchInsert(table, rows, chunkSize = 50, trx = null) {
+  const knex = trx || getDb();
+  return knex.batchInsert(table, withTenant(table, rows), chunkSize);
+}
+
 /** Insert and return the generated id, with the provider set. */
 export function tinsertReturningId(table, row, trx = null) {
   return insertReturningId(table, withTenant(table, row), trx);

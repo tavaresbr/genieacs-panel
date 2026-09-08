@@ -1,4 +1,4 @@
-import { getDb, insertReturningId } from '../config/database.js';
+import { getDb, tbatchInsert, tdb, tinsertReturningId } from '../config/database.js';
 
 /** How long a recipient may sit in 'sending' before another tick may retake it. */
 export const RECLAIM_MS = 5 * 60 * 1000;
@@ -22,20 +22,20 @@ export const MAX_ATTEMPTS = 3;
  */
 class WaBroadcast {
   static async getById(id) {
-    return (await getDb()('wa_broadcasts').where({ id }).first()) || null;
+    return (await tdb('wa_broadcasts').where({ id }).first()) || null;
   }
 
   static async list({ limit = 100 } = {}) {
-    return getDb()('wa_broadcasts').orderBy('id', 'desc').limit(limit);
+    return tdb('wa_broadcasts').orderBy('id', 'desc').limit(limit);
   }
 
   static async listByStatus(status) {
-    return getDb()('wa_broadcasts').where({ status }).orderBy('id');
+    return tdb('wa_broadcasts').where({ status }).orderBy('id');
   }
 
   static async create(broadcast) {
     const now = new Date();
-    const id = await insertReturningId('wa_broadcasts', {
+    const id = await tinsertReturningId('wa_broadcasts', {
       ...broadcast,
       created_at: now,
       updated_at: now
@@ -44,7 +44,7 @@ class WaBroadcast {
   }
 
   static async update(id, patch) {
-    await getDb()('wa_broadcasts')
+    await tdb('wa_broadcasts')
       .where({ id })
       .update({ ...patch, updated_at: new Date() });
     return this.getById(id);
@@ -68,12 +68,12 @@ class WaBroadcast {
       status: 'pending',
       created_at: now
     }));
-    await getDb().batchInsert('wa_broadcast_recipients', rows, 50);
+    await tbatchInsert('wa_broadcast_recipients', rows, 50);
     return rows.length;
   }
 
   static async listRecipients(broadcastId) {
-    return getDb()('wa_broadcast_recipients')
+    return tdb('wa_broadcast_recipients')
       .where({ broadcast_id: broadcastId })
       .orderBy('id');
   }
@@ -81,7 +81,7 @@ class WaBroadcast {
   /** Ids the flush loop should try next for one campaign, oldest first. */
   static async listPendingIds(broadcastId, limit) {
     const cutoff = new Date(Date.now() - RECLAIM_MS);
-    return getDb()('wa_broadcast_recipients')
+    return tdb('wa_broadcast_recipients')
       .where({ broadcast_id: broadcastId })
       .where((q) => {
         q.where({ status: 'pending' })
@@ -107,7 +107,7 @@ class WaBroadcast {
    */
   static async claimRecipient(id) {
     const cutoff = new Date(Date.now() - RECLAIM_MS);
-    const changed = await getDb()('wa_broadcast_recipients')
+    const changed = await tdb('wa_broadcast_recipients')
       .where({ id })
       .where((q) => {
         q.where({ status: 'pending' })
@@ -121,11 +121,11 @@ class WaBroadcast {
   }
 
   static async getRecipient(id) {
-    return (await getDb()('wa_broadcast_recipients').where({ id }).first()) || null;
+    return (await tdb('wa_broadcast_recipients').where({ id }).first()) || null;
   }
 
   static async updateRecipient(id, patch) {
-    await getDb()('wa_broadcast_recipients').where({ id }).update(patch);
+    await tdb('wa_broadcast_recipients').where({ id }).update(patch);
     return this.getRecipient(id);
   }
 
@@ -137,7 +137,7 @@ class WaBroadcast {
    * it a message short.
    */
   static async countUnfinished(broadcastId) {
-    const [row] = await getDb()('wa_broadcast_recipients')
+    const [row] = await tdb('wa_broadcast_recipients')
       .where({ broadcast_id: broadcastId })
       .whereIn('status', ['pending', 'sending'])
       .count({ total: '*' });
@@ -146,7 +146,7 @@ class WaBroadcast {
 
   /** Totals for the campaign header, recomputed from the recipient rows. */
   static async tally(broadcastId) {
-    const rows = await getDb()('wa_broadcast_recipients')
+    const rows = await tdb('wa_broadcast_recipients')
       .where({ broadcast_id: broadcastId })
       .select('status')
       .count({ total: '*' })

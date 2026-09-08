@@ -2,7 +2,7 @@ import WaBroadcast, { MAX_ATTEMPTS } from '../models/WaBroadcast.js';
 import WaConversation from '../models/WaConversation.js';
 import WaOptOut from '../models/WaOptOut.js';
 import WhatsAppAccount from '../models/WhatsAppAccount.js';
-import { forSoleTenant } from '../config/tenantJobs.js';
+import { forEachTenant } from '../config/tenantJobs.js';
 import WaSendService from './waSendService.js';
 import WhatsAppConfigService, { WaError } from './whatsappConfigService.js';
 import { normalizarTelefoneBr } from '../utils/wa/waDestino.js';
@@ -126,13 +126,19 @@ class WaBroadcastService {
    * @returns {Promise<{ enqueued: number, skipped: number, failed: number }>}
    */
   static async tick() {
-    try {
-      return (await forSoleTenant('The WhatsApp campaign flush', () => this.tickForTenant()))
-        ?? { enqueued: 0, skipped: 0, failed: 0 };
-    } catch (error) {
-      console.warn(`WhatsApp broadcast tick failed: ${error.message}`);
-      return { enqueued: 0, skipped: 0, failed: 0 };
-    }
+    // A pass per provider, now that `listByStatus` only returns that
+    // provider's campaigns. Under `forSoleTenant` this had to be a single
+    // pass: looping over a deployment-wide campaign list would have flushed
+    // each campaign once per provider.
+    const summaries = await forEachTenant(() => this.tickForTenant());
+    return summaries.reduce(
+      (total, one) => ({
+        enqueued: total.enqueued + one.enqueued,
+        skipped: total.skipped + one.skipped,
+        failed: total.failed + one.failed
+      }),
+      { enqueued: 0, skipped: 0, failed: 0 }
+    );
   }
 
   /** One pass for the provider in scope. It NEVER throws, for the same reason. */
