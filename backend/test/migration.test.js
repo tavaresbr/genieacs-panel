@@ -30,11 +30,43 @@ async function createLegacyCustomerAccounts(db) {
   });
 }
 
+// The SGP link layout shipped before reconciliation needed the blocked flag.
+async function createLegacySgpLinks(db) {
+  await db.schema.createTable('sgp_links', (t) => {
+    t.increments('id').primary();
+    t.string('device_id', 255).notNullable().unique();
+    t.integer('account_id').unsigned();
+    t.string('contract', 64).notNullable();
+    t.string('document', 32);
+    t.string('client_name', 255);
+    t.string('plan', 255);
+    t.string('status', 64);
+    t.string('status_label', 128);
+    t.string('login', 255);
+    t.string('link_mode', 16).notNullable().defaultTo('auto');
+    t.timestamp('last_synced_at').defaultTo(db.fn.now());
+    t.timestamp('created_at').defaultTo(db.fn.now());
+    t.timestamp('updated_at').defaultTo(db.fn.now());
+  });
+  await db('sgp_links').insert({
+    device_id: 'legacy-device-1',
+    contract: '9001',
+    client_name: 'Cliente Antigo',
+    status_label: 'Ativo',
+    link_mode: 'manual'
+  });
+}
+
 const LEGACY_CUSTOMER_ID = 'CSG-LEGACY1-234567';
 let portalUrl;
 
 before(async () => {
-  ({ portalUrl } = await startTestServers({ beforeSchema: createLegacyCustomerAccounts }));
+  ({ portalUrl } = await startTestServers({
+    beforeSchema: async (db) => {
+      await createLegacyCustomerAccounts(db);
+      await createLegacySgpLinks(db);
+    }
+  }));
 });
 
 after(async () => {
@@ -42,6 +74,24 @@ after(async () => {
 });
 
 describe('upgrading an existing installation', () => {
+  it('adds the SGP blocked flag without losing links', async () => {
+    const db = getDb();
+    assert.ok(await db.schema.hasColumn('sgp_links', 'blocked'));
+    const link = await db('sgp_links').where({ device_id: 'legacy-device-1' }).first();
+    assert.equal(link.contract, '9001');
+    assert.equal(link.link_mode, 'manual');
+    // Unknown rather than false: nothing has read this contract since the
+    // upgrade, so the first reconciliation must not report a transition.
+    assert.equal(link.blocked, null);
+  });
+
+  it('creates the provisioning tables on an existing database', async () => {
+    const db = getDb();
+    for (const table of ['provisioning_profiles', 'provisioning_runs', 'sgp_events']) {
+      assert.ok(await db.schema.hasTable(table), `expected table ${table}`);
+    }
+  });
+
   it('adds the portal password columns without losing accounts', async () => {
     const db = getDb();
     for (const column of [

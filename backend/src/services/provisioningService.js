@@ -75,7 +75,9 @@ function asText(value) {
   return text === '' ? null : text;
 }
 
-const SECRET_PATH_PATTERN = /password|passphrase|presharedkey|senha/i;
+// Deliberately broad: `LoginSuperPass` is as much a credential as `Password`,
+// and a path this misses ends up in a stored run an operator can read.
+const SECRET_PATH_PATTERN = /pass|presharedkey|senha|secret|key$/i;
 
 /** A generated password an operator can read back later from the Wi-Fi vault. */
 function randomPassword(length = 12) {
@@ -326,10 +328,15 @@ class ProvisioningService {
     return (steps || []).map((step) => ({
       ...step,
       detail: step.detail ? String(step.detail).slice(0, 2000) : null,
-      parameters: (step.parameters || []).map(([path, value]) => ({
-        path,
-        value: SECRET_PATH_PATTERN.test(String(path)) ? '••••' : value
-      }))
+      parameters: (step.parameters || []).map((parameter) => {
+        // A verification pass appends to steps that were redacted on their way
+        // into the database, so both the raw tuple and the stored object shape
+        // reach this point.
+        const [path, value] = Array.isArray(parameter)
+          ? parameter
+          : [parameter?.path, parameter?.value];
+        return { path, value: SECRET_PATH_PATTERN.test(String(path)) ? '••••' : value };
+      })
     }));
   }
 
@@ -564,6 +571,10 @@ class ProvisioningService {
       });
     }
 
+    // Before the steps, not after: the Wi-Fi step files its generated password
+    // against this account, and there would be nothing to file it against.
+    await this.ensurePortalAccount(plan);
+
     const steps = [];
     let failed = false;
     for (const step of plan.steps) {
@@ -596,7 +607,6 @@ class ProvisioningService {
       });
     }
 
-    await this.ensurePortalAccount(plan);
     await this.linkContract(plan);
 
     const shouldVerify = config.verifyEnabled
@@ -646,13 +656,31 @@ class ProvisioningService {
       return this.failRun(run, config, `provisioning.skip.${plan.skip}`);
     }
 
-    const mismatches = [];
+    // What the plan wants, path by path. The writers differ in how they decide
+    // to write — the WAN one only emits changed values, the Wi-Fi one always
+    // emits the SSID — so verification compares the desired value against a
+    // fresh reading rather than against whether a write would happen again.
+    const expectations = [];
     for (const step of plan.steps) {
+      // A credential write is a password by definition and cannot be read
+      // back, so verifying it would fail every run that actually worked.
+      if (step.step === 'credentials') continue;
       const result = await this.runStep(plan, step, { dryRun: true });
-      // A step that would still write something has not taken effect yet.
-      if (result.status === 'planned') {
-        const readable = result.parameters.filter(([path]) => !SECRET_PATH_PATTERN.test(String(path)));
-        if (readable.length > 0) mismatches.push({ step: step.step, parameters: readable });
+      for (const [path, value] of result.parameters) {
+        if (SECRET_PATH_PATTERN.test(String(path))) continue;
+        expectations.push({ step: step.step, path, value });
+      }
+    }
+
+    const fresh = await DeviceService.fetchDeviceDocument(run.device_id);
+    const mismatches = [];
+    for (const expectation of expectations) {
+      const actual = DeviceService.getParameterValue(fresh, expectation.path);
+      if (String(actual ?? '') !== String(expectation.value ?? '')) {
+        mismatches.push({
+          step: expectation.step,
+          parameters: [[expectation.path, expectation.value]]
+        });
       }
     }
 

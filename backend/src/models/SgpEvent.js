@@ -7,13 +7,20 @@ class SgpEvent {
    * keeps retrying, so the caller needs to know whether the row is new.
    */
   static async insertIfNew(row) {
-    const inserted = await getDb()('sgp_events')
-      .insert(row)
-      .onConflict('dedupe_key')
-      .ignore();
-    const stored = await this.getByDedupeKey(row.dedupe_key);
-    const affected = Array.isArray(inserted) ? inserted.filter(Boolean).length : Number(inserted || 0);
-    return { created: affected > 0, event: stored };
+    const existing = await this.getByDedupeKey(row.dedupe_key);
+    if (existing) return { created: false, event: existing };
+    try {
+      await getDb()('sgp_events').insert(row);
+    } catch (error) {
+      // Two deliveries of the same event in flight at once: the unique index
+      // decides, and the loser reports the row the winner stored. The return
+      // value of `onConflict().ignore()` cannot be used for this, since SQLite
+      // and MySQL disagree on what it reports for an ignored insert.
+      const stored = await this.getByDedupeKey(row.dedupe_key);
+      if (!stored) throw error;
+      return { created: false, event: stored };
+    }
+    return { created: true, event: await this.getByDedupeKey(row.dedupe_key) };
   }
 
   static async getById(id) {

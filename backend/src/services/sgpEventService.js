@@ -32,6 +32,12 @@ function serializePayload(body) {
   }
 }
 
+function asBoolean(value) {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'boolean') return value;
+  return Number(value) === 1;
+}
+
 function sha256(value) {
   return crypto.createHash('sha256').update(value).digest('hex');
 }
@@ -191,8 +197,12 @@ class SgpEventService {
   static detectTransition(before, after) {
     const statusText = `${after.status ?? ''} ${after.status_label ?? ''}`;
     if (/cancel|rescind|encerr/i.test(statusText)) return 'cancelled';
-    if (before.blocked === true && after.blocked === false) return 'unblocked';
-    if (before.blocked === false && after.blocked === true) return 'blocked';
+    // SQLite hands booleans back as 0 and 1, so the flag is normalized rather
+    // than compared with `===`, which would never match on that driver.
+    const wasBlocked = asBoolean(before.blocked);
+    const isBlocked = asBoolean(after.blocked);
+    if (wasBlocked === true && isBlocked === false) return 'unblocked';
+    if (wasBlocked === false && isBlocked === true) return 'blocked';
     if ((before.plan ?? null) !== (after.plan ?? null)) return 'contract_changed';
     return null;
   }
