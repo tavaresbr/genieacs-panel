@@ -3,6 +3,26 @@
 SkyGenPanel follows [Semantic Versioning](https://semver.org/). Release versions
 are calculated from conventional commits since the previous `v*` Git tag.
 
+## [1.14.0] - 2026-09-08
+
+### New
+
+- Issue an independent password for each customer account (`ac6157c`)
+- Integrate subscriber contracts and billing from SGP (`675f2dc`)
+- Add multi-language support with pt-BR, en and es (`ab7b32b`)
+- Translate network map and customer portal (`61d9831`)
+- Translate the settings page (`5d4574f`)
+- Translate the device detail page and document languages (`74744a3`)
+- Translate the API responses (`2cf15ca`)
+- Surface contract state across the device fleet (`00dd64b`)
+- Reconcile the ONT fleet against SGP contracts (`a88e62d`)
+
+### Maintenance
+
+- Add the multi-tenant SaaS conversion plan (`7071b38`)
+
+[Full comparison](https://github.com/skydashnet/genieacs-panel/compare/v1.13.1...v1.14.0)
+
 ## [1.13.1] - 2026-07-26
 
 ### Fixed
