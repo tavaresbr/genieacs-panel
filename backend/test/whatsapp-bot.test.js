@@ -516,6 +516,36 @@ describe('the ceiling counts the bot and nothing else', () => {
     );
   });
 
+  it('answers even when a campaign wrote into the thread after the question', async () => {
+    // The dedupe belt reads an outbound row newer than the inbound one as "this
+    // was already answered". A campaign message landing in the seconds between
+    // the two is not an answer to anything, and reading it as one swallows a
+    // real question — the same misidentification as the ceiling, one guard up.
+    const telefone = ASSINANTE;
+    const conversa = await fioVazio(telefone);
+
+    const entrada = await asTenant(() => insertReturningId('wa_messages', {
+      conversation_id: conversa.id,
+      direction: 'in',
+      body: 'quero a segunda via do boleto',
+      is_note: false,
+      created_at: new Date(),
+      updated_at: new Date()
+    }));
+    // Written AFTER the question, exactly as a campaign flush would.
+    await semear(conversa, 'campaign', 1);
+
+    const resposta = await asTenant(() => WaBotService.responder({
+      conversation: conversa,
+      messageId: entrada,
+      body: 'quero a segunda via do boleto',
+      direction: 'in'
+    }));
+    assert.equal(resposta.replied, true, resposta.reason ?? '');
+    const depois = await respostas(telefone);
+    assert.ok(depois.at(-1).includes(LINHA_DIGITAVEL));
+  });
+
   it('goes quiet after three of its own replies', async () => {
     const telefone = ASSINANTE;
     const conversa = await fioVazio(telefone);

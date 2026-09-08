@@ -309,12 +309,18 @@ class WaBotService {
     if (pedeSaida(texto)) return { replied: false, reason: 'opt_out_request' };
 
     // Never twice for the same inbound message. The unique index on
-    // `(tenant_id, external_id)` is the real dedupe — a redelivered event never reaches this
-    // far — and this is the belt: an outbound row newer than the inbound one
-    // means the thread was already answered after it arrived.
+    // `(tenant_id, external_id)` is the real dedupe — a redelivered event never
+    // reaches this far — and this is the belt: a reply of the BOT'S own, newer
+    // than the inbound row, means this message was already answered.
+    //
+    // Scoped to `source: 'bot'` for the same reason the ceiling below is. A
+    // campaign message landing in the seconds between the inbound row and this
+    // pass is not an answer to anything, and reading it as one would swallow a
+    // real question — the operator's own reply is caught by the human check
+    // below, which is where that belongs.
     const jaRespondida = Number.isInteger(Number(messageId))
       ? await tdb('wa_messages')
-        .where({ conversation_id: conversation.id, direction: 'out' })
+        .where({ conversation_id: conversation.id, direction: 'out', source: 'bot' })
         .where('id', '>', Number(messageId))
         .first()
       : null;
