@@ -1,6 +1,6 @@
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { call, getDb, startTestServers, stopTestServers } from './helpers/harness.js';
+import { asTenant, call, getDb, startTestServers, stopTestServers } from './helpers/harness.js';
 
 const { default: CustomerPortalPasswordService } = await import(
   '../src/services/customerPortalPasswordService.js'
@@ -109,7 +109,7 @@ describe('upgrading an existing installation', () => {
   });
 
   it('backfills a real password that is not derived from the Customer ID', async () => {
-    const generated = await CustomerPortalPasswordService.backfillMissing();
+    const generated = await asTenant(() => CustomerPortalPasswordService.backfillMissing());
     assert.equal(generated, 1);
 
     const account = await getDb()('customer_accounts')
@@ -133,7 +133,7 @@ describe('upgrading an existing installation', () => {
   });
 
   it('is a no-op on a second run', async () => {
-    assert.equal(await CustomerPortalPasswordService.backfillMissing(), 0);
+    assert.equal(await asTenant(() => CustomerPortalPasswordService.backfillMissing()), 0);
   });
 
   it('adds the derived SGP contract state without losing links', async () => {

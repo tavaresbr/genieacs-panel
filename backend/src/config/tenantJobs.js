@@ -40,3 +40,29 @@ export async function forSoleTenant(reason, fn) {
 
   return runInTenant(tenants[0].id, fn);
 }
+
+/**
+ * Runs background work once per active provider, each inside its own scope.
+ *
+ * The counterpart to `forSoleTenant`, and the one to reach for whenever the
+ * job's own query is already scoped — then a per-provider loop genuinely
+ * divides the work instead of repeating it. The portal-password backfill is
+ * the first: it reads only the accounts of the provider in scope, so running
+ * it per provider backfills each provider's own and nobody else's.
+ *
+ * One provider failing does not stop the others: a broken integration at one
+ * ISP must not silently halt the job for every other ISP on the deployment.
+ */
+export async function forEachTenant(job, { onError } = {}) {
+  const tenants = await getDb()('tenants').where({ status: 'active' }).orderBy('id', 'asc');
+  const results = [];
+  for (const tenant of tenants) {
+    try {
+      results.push(await runInTenant(tenant.id, () => job(tenant)));
+    } catch (error) {
+      if (onError) onError(error, tenant);
+      else console.warn(`Background job failed for provider ${tenant.slug}: ${error.message}`);
+    }
+  }
+  return results;
+}

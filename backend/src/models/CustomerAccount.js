@@ -1,30 +1,30 @@
-import { getDb, insertReturningId } from '../config/database.js';
+import { tdb, tinsertReturningId } from '../config/database.js';
 
 class CustomerAccount {
   static async getAll() {
-    return getDb()('customer_accounts').orderBy('created_at', 'desc');
+    return tdb('customer_accounts').orderBy('created_at', 'desc');
   }
 
   static async getById(id) {
-    return (await getDb()('customer_accounts').where({ id }).first()) || null;
+    return (await tdb('customer_accounts').where({ id }).first()) || null;
   }
 
   static async getByCustomerId(customerId) {
     return (
-      (await getDb()('customer_accounts')
+      (await tdb('customer_accounts')
         .where({ customer_id: customerId, active: true })
         .first()) || null
     );
   }
 
   static async getByDeviceId(deviceId) {
-    return (await getDb()('customer_accounts').where({ device_id: deviceId }).first()) || null;
+    return (await tdb('customer_accounts').where({ device_id: deviceId }).first()) || null;
   }
 
   static async getByPppoeUsername(pppoeUsername) {
     if (!pppoeUsername) return null;
     return (
-      (await getDb()('customer_accounts')
+      (await tdb('customer_accounts')
         .where({ pppoe_username: pppoeUsername })
         .orderBy('id', 'desc')
         .first()) || null
@@ -33,17 +33,17 @@ class CustomerAccount {
 
   static async getByIdentityHash(identityHash) {
     return (
-      (await getDb()('customer_accounts').where({ identity_hash: identityHash }).first()) || null
+      (await tdb('customer_accounts').where({ identity_hash: identityHash }).first()) || null
     );
   }
 
   static async create(account) {
-    const id = await insertReturningId('customer_accounts', account);
+    const id = await tinsertReturningId('customer_accounts', account);
     return this.getById(id);
   }
 
   static async touch(id, deviceId, identity = {}) {
-    await getDb()('customer_accounts').where({ id }).update({
+    await tdb('customer_accounts').where({ id }).update({
       device_id: deviceId,
       ...identity,
       last_seen_at: new Date(),
@@ -60,7 +60,7 @@ class CustomerAccount {
     const normalized = String(pppoeUsername ?? '').trim();
     if (!normalized) return null;
     return (
-      (await getDb()('customer_accounts')
+      (await tdb('customer_accounts')
         .whereRaw('LOWER(pppoe_username) = ?', [normalized.toLowerCase()])
         .andWhere({ active: true })
         .orderBy('id', 'desc')
@@ -75,7 +75,7 @@ class CustomerAccount {
    * and saved WiFi credentials can never authenticate again.
    */
   static async retire(id) {
-    await getDb()('customer_accounts').where({ id }).update({
+    await tdb('customer_accounts').where({ id }).update({
       active: false,
       device_id: `retired:${id}`,
       identity_hash: `retired:${id}`,
@@ -85,7 +85,7 @@ class CustomerAccount {
   }
 
   static async updatePassword(id, record) {
-    await getDb()('customer_accounts').where({ id }).update({
+    await tdb('customer_accounts').where({ id }).update({
       ...record,
       updated_at: new Date()
     });
@@ -93,7 +93,7 @@ class CustomerAccount {
   }
 
   static async getWithoutPassword(limit = 25) {
-    return getDb()('customer_accounts')
+    return tdb('customer_accounts')
       .select('id')
       .whereNull('password_hash')
       .orderBy('id', 'asc')
@@ -101,7 +101,7 @@ class CustomerAccount {
   }
 
   static async countWithoutPassword() {
-    const row = await getDb()('customer_accounts')
+    const row = await tdb('customer_accounts')
       .whereNull('password_hash')
       .count({ n: '*' })
       .first();
@@ -110,13 +110,13 @@ class CustomerAccount {
 
   static async getIdsByDeviceIds(deviceIds) {
     if (!Array.isArray(deviceIds) || deviceIds.length === 0) return [];
-    return getDb()('customer_accounts')
+    return tdb('customer_accounts')
       .select('device_id', 'customer_id', 'pppoe_username')
       .whereIn('device_id', deviceIds);
   }
 
   static async getSyncTargets() {
-    return getDb()('customer_accounts')
+    return tdb('customer_accounts')
       .select('id', 'device_id', 'customer_id', 'pppoe_username')
       .whereNotNull('device_id')
       .orderBy('id', 'asc');
@@ -127,7 +127,7 @@ class CustomerAccount {
     const normalizedIdentityHashes = Array.isArray(identityHashes) ? identityHashes.filter(Boolean) : [];
     if (normalizedDeviceIds.length === 0 && normalizedIdentityHashes.length === 0) return [];
 
-    return getDb()('customer_accounts')
+    return tdb('customer_accounts')
       .select('id', 'device_id', 'identity_hash', 'customer_id')
       .where((query) => {
         if (normalizedDeviceIds.length > 0) {
