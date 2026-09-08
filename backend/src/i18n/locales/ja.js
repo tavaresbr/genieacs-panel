@@ -463,8 +463,12 @@ export default {
   'whatsapp.phoneSaved': '電話番号を保存しました',
   'whatsapp.phoneSaveFailed': '電話番号を保存できませんでした',
   'whatsapp.error.invalidPhone': '使用できる電話番号の形式ではないようです',
+  'whatsapp.error.subscriberNotFound': 'その契約番号の加入者が見つかりません',
   // WhatsApp — 受信箱とセルフサービスのボット (第 3 段階)
   'whatsapp.error.conversationNotFound': '会話が見つかりません',
+  'whatsapp.conversationClosed': '会話を完了にしました',
+  'whatsapp.conversationReopened': '会話を再開しました',
+  'whatsapp.conversationStatusFailed': '会話を更新できませんでした',
   'whatsapp.bot.portalHint': 'Wi-Fi のパスワードの確認やネットワーク名の変更は、顧客ポータルにログインしてお手続きください: {link}',
   'whatsapp.bot.notRecognised': 'この番号に対応する契約が見つかりませんでした。担当者より追ってご連絡いたします。',
   'whatsapp.bot.handoff': '担当者におつなぎいたします。',

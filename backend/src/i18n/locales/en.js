@@ -468,8 +468,12 @@ export default {
   'whatsapp.phoneSaved': 'Phone number saved',
   'whatsapp.phoneSaveFailed': 'The phone number could not be saved',
   'whatsapp.error.invalidPhone': 'That does not look like a usable phone number',
+  'whatsapp.error.subscriberNotFound': 'No subscriber with that contract',
   // WhatsApp — inbox e bot de autoatendimento (onda 3)
   'whatsapp.error.conversationNotFound': 'Conversation not found',
+  'whatsapp.conversationClosed': 'Conversation closed',
+  'whatsapp.conversationReopened': 'Conversation reopened',
+  'whatsapp.conversationStatusFailed': 'The conversation could not be updated',
   'whatsapp.bot.portalHint': 'For your WiFi password and to change the network name, sign in to the customer portal: {link}',
   'whatsapp.bot.notRecognised': 'We could not find a contract for this number. An attendant will reply shortly.',
   'whatsapp.bot.handoff': 'I will pass this to an attendant.',

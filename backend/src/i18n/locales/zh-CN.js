@@ -468,8 +468,12 @@ export default {
   'whatsapp.phoneSaved': '电话号码已保存',
   'whatsapp.phoneSaveFailed': '无法保存电话号码',
   'whatsapp.error.invalidPhone': '这不像是一个可用的电话号码',
+  'whatsapp.error.subscriberNotFound': '找不到该合同号对应的用户',
   // WhatsApp — 收件箱与自助服务机器人（第三阶段）
   'whatsapp.error.conversationNotFound': '找不到该会话',
+  'whatsapp.conversationClosed': '会话已结束',
+  'whatsapp.conversationReopened': '会话已重新打开',
+  'whatsapp.conversationStatusFailed': '无法更新该会话',
   'whatsapp.bot.portalHint': '如需查看 Wi-Fi 密码或修改网络名称，请登录客户门户：{link}',
   'whatsapp.bot.notRecognised': '未查询到该号码对应的合同。客服人员会尽快回复您。',
   'whatsapp.bot.handoff': '将为您转接客服人员。',

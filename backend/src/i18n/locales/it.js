@@ -466,8 +466,12 @@ export default {
   'whatsapp.phoneSaved': 'Telefono salvato',
   'whatsapp.phoneSaveFailed': 'Non è stato possibile salvare il telefono',
   'whatsapp.error.invalidPhone': 'Non sembra un telefono utilizzabile',
+  'whatsapp.error.subscriberNotFound': 'Nessun abbonato con quel contratto',
   // WhatsApp — inbox e bot de autoatendimento (onda 3)
   'whatsapp.error.conversationNotFound': 'Conversazione non trovata',
+  'whatsapp.conversationClosed': 'Conversazione chiusa',
+  'whatsapp.conversationReopened': 'Conversazione riaperta',
+  'whatsapp.conversationStatusFailed': 'Non è stato possibile aggiornare la conversazione',
   'whatsapp.bot.portalHint': 'Per la password del WiFi e per cambiare il nome della rete, accedi al portale clienti: {link}',
   'whatsapp.bot.notRecognised': 'Non abbiamo trovato un contratto per questo numero. Un operatore risponderà a breve.',
   'whatsapp.bot.handoff': 'Passo a un operatore.',
