@@ -1,5 +1,6 @@
 import en from '@/lib/i18n/locales/en'
 import es from '@/lib/i18n/locales/es'
+import it from '@/lib/i18n/locales/it'
 import ptBR from '@/lib/i18n/locales/pt-BR'
 import type { Locale } from '@/lib/i18n/config'
 import type { Dictionary, TranslationKey, TranslationVars } from '@/lib/i18n/dictionary'
@@ -15,6 +16,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
   'pt-BR': ptBR,
   en,
   es,
+  it,
 }
 
 const PLACEHOLDER_PATTERN = /\{(\w+)\}/g
