@@ -1,5 +1,6 @@
 import Setting from '../models/Setting.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
+import { translateError } from '../i18n/index.js';
 import CustomerService from '../services/customerService.js';
 import DeviceService from '../services/deviceService.js';
 import CustomerAccount from '../models/CustomerAccount.js';
@@ -22,28 +23,30 @@ const ALLOWED_SETTING_KEYS = new Set([
   'vpUserPassword'
 ]);
 
+// Validation runs without a request, so it reports translation keys and the
+// controller renders them in the caller's language.
 function validateSetting(key, value) {
   if (!ALLOWED_SETTING_KEYS.has(key)) {
-    return { error: 'Unsupported setting key' };
+    return { errorKey: 'settings.validation.unsupportedKey' };
   }
   const normalized = String(value);
   if (normalized.length > 2048) {
-    return { error: 'Setting value is too long' };
+    return { errorKey: 'settings.validation.valueTooLong' };
   }
   if (key === 'autoGenerateCustomerId' && !['true', 'false'].includes(normalized)) {
-    return { error: 'Auto generation must be true or false' };
+    return { errorKey: 'settings.validation.autoGeneration' };
   }
   if (key === 'customerIdPrefixMode' && !['default', 'company'].includes(normalized)) {
-    return { error: 'Customer ID prefix mode must be default or company' };
+    return { errorKey: 'settings.validation.prefixMode' };
   }
   if (key === 'customerIdCompanyPrefix' && !/^[A-Za-z]{2,4}$/.test(normalized.trim())) {
-    return { error: 'Company ID must contain 2 to 4 letters' };
+    return { errorKey: 'settings.validation.companyPrefix' };
   }
   if (key === 'customerIdSuffixMode' && !['random', 'installation_date'].includes(normalized)) {
-    return { error: 'Customer ID suffix mode must be random or installation_date' };
+    return { errorKey: 'settings.validation.suffixMode' };
   }
   if (key === 'appName' && (normalized.trim().length < 1 || normalized.length > 80)) {
-    return { error: 'Application name must be between 1 and 80 characters' };
+    return { errorKey: 'settings.validation.appName' };
   }
   return { value: normalized };
 }
@@ -53,12 +56,12 @@ class SettingsController {
     try {
       const settings = await Setting.getAll();
       return res.json(
-        createResponse('Settings retrieved successfully', settings)
+        createResponse(req.t('settings.listRetrieved'), settings)
       );
     } catch (error) {
       console.error('Get all settings error:', error);
       return res.status(500).json(
-        createErrorResponse('Failed to get settings', error.message)
+        createErrorResponse(req.t('settings.listFailed'), error.message)
       );
     }
   }
@@ -69,28 +72,28 @@ class SettingsController {
       
       if (!key) {
         return res.status(400).json(
-          createErrorResponse('Setting key is required')
+          createErrorResponse(req.t('settings.keyRequired'))
         );
       }
       if (!ALLOWED_SETTING_KEYS.has(key)) {
-        return res.status(404).json(createErrorResponse('Setting not found'));
+        return res.status(404).json(createErrorResponse(req.t('settings.notFound')));
       }
 
       const value = await Setting.getByKey(key);
       
       if (value === null) {
         return res.status(404).json(
-          createErrorResponse('Setting not found')
+          createErrorResponse(req.t('settings.notFound'))
         );
       }
 
       return res.json(
-        createResponse('Setting retrieved successfully', { [key]: value })
+        createResponse(req.t('settings.retrieved'), { [key]: value })
       );
     } catch (error) {
       console.error('Get setting error:', error);
       return res.status(500).json(
-        createErrorResponse('Failed to get setting', error.message)
+        createErrorResponse(req.t('settings.getFailed'), error.message)
       );
     }
   }
@@ -101,23 +104,23 @@ class SettingsController {
       
       if (!key || value === undefined || value === null) {
         return res.status(400).json(
-          createErrorResponse('Key and value are required')
+          createErrorResponse(req.t('settings.keyValueRequired'))
         );
       }
 
       const validated = validateSetting(String(key), value);
-      if (validated.error) {
-        return res.status(400).json(createErrorResponse(validated.error));
+      if (validated.errorKey) {
+        return res.status(400).json(createErrorResponse(req.t(validated.errorKey)));
       }
 
       await Setting.create(key, validated.value);
       return res.json(
-        createResponse('Setting created successfully', { [key]: validated.value })
+        createResponse(req.t('settings.created'), { [key]: validated.value })
       );
     } catch (error) {
       console.error('Create setting error:', error);
       return res.status(500).json(
-        createErrorResponse('Failed to create setting', error.message)
+        createErrorResponse(req.t('settings.createFailed'), error.message)
       );
     }
   }
@@ -129,30 +132,30 @@ class SettingsController {
       
       if (!key || value === undefined || value === null) {
         return res.status(400).json(
-          createErrorResponse('Key and value are required')
+          createErrorResponse(req.t('settings.keyValueRequired'))
         );
       }
 
       const validated = validateSetting(String(key), value);
-      if (validated.error) {
-        return res.status(400).json(createErrorResponse(validated.error));
+      if (validated.errorKey) {
+        return res.status(400).json(createErrorResponse(req.t(validated.errorKey)));
       }
 
       const updated = await Setting.update(key, validated.value);
       
       if (!updated) {
         return res.status(404).json(
-          createErrorResponse('Setting not found')
+          createErrorResponse(req.t('settings.notFound'))
         );
       }
 
       return res.json(
-        createResponse('Setting updated successfully', { [key]: validated.value })
+        createResponse(req.t('settings.updated'), { [key]: validated.value })
       );
     } catch (error) {
       console.error('Update setting error:', error);
       return res.status(500).json(
-        createErrorResponse('Failed to update setting', error.message)
+        createErrorResponse(req.t('settings.updateFailed'), error.message)
       );
     }
   }
@@ -161,7 +164,7 @@ class SettingsController {
     try {
       const enabled = await CustomerService.isAutoGenerationEnabled();
       if (!enabled) {
-        return res.json(createResponse('Customer ID auto generation is disabled', {
+        return res.json(createResponse(req.t('settings.customerIdSyncDisabled'), {
           enabled: false,
           total: 0,
           existing: 0,
@@ -181,8 +184,8 @@ class SettingsController {
       const pending = Math.max(new Set(deviceIds).size - customerIds.size, 0);
       return res.json(createResponse(
         pending
-          ? `Customer IDs synchronized; ${pending} device(s) still need SoftwareID, PPPoE, or installation date`
-          : 'Customer IDs synchronized successfully',
+          ? req.t('settings.customerIdSyncedPending', { count: pending })
+          : req.t('settings.customerIdSynced'),
         {
           enabled: true,
           total: deviceIds.length,
@@ -194,7 +197,7 @@ class SettingsController {
     } catch (error) {
       console.error('Customer ID sync error:', error);
       return res.status(502).json(
-        createErrorResponse('Failed to synchronize Customer IDs', error.message)
+        createErrorResponse(req.t('settings.customerIdSyncFailed'), translateError(req.t, error))
       );
     }
   }
@@ -205,28 +208,28 @@ class SettingsController {
       
       if (!key) {
         return res.status(400).json(
-          createErrorResponse('Setting key is required')
+          createErrorResponse(req.t('settings.keyRequired'))
         );
       }
       if (!ALLOWED_SETTING_KEYS.has(key)) {
-        return res.status(404).json(createErrorResponse('Setting not found'));
+        return res.status(404).json(createErrorResponse(req.t('settings.notFound')));
       }
 
       const deleted = await Setting.delete(key);
       
       if (!deleted) {
         return res.status(404).json(
-          createErrorResponse('Setting not found')
+          createErrorResponse(req.t('settings.notFound'))
         );
       }
 
       return res.json(
-        createResponse('Setting deleted successfully')
+        createResponse(req.t('settings.deleted'))
       );
     } catch (error) {
       console.error('Delete setting error:', error);
       return res.status(500).json(
-        createErrorResponse('Failed to delete setting', error.message)
+        createErrorResponse(req.t('settings.deleteFailed'), error.message)
       );
     }
   }
@@ -237,7 +240,7 @@ class SettingsController {
       
       if (!url) {
         return res.status(400).json(
-          createErrorResponse('URL is required')
+          createErrorResponse(req.t('settings.urlRequired'))
         );
       }
       
@@ -246,19 +249,19 @@ class SettingsController {
         testUrl = new URL(String(url).trim());
       } catch {
         return res.status(400).json(
-          createErrorResponse('A valid HTTP or HTTPS URL is required')
+          createErrorResponse(req.t('settings.urlInvalid'))
         );
       }
 
       if (!['http:', 'https:'].includes(testUrl.protocol)) {
         return res.status(400).json(
-          createErrorResponse('Only HTTP and HTTPS URLs are supported')
+          createErrorResponse(req.t('settings.urlSchemeUnsupported'))
         );
       }
 
       if (testUrl.username || testUrl.password) {
         return res.status(400).json(
-          createErrorResponse('Credentials in the URL are not supported')
+          createErrorResponse(req.t('settings.urlCredentialsUnsupported'))
         );
       }
 
@@ -283,7 +286,10 @@ class SettingsController {
         
         if (!response.ok) {
           return res.status(502).json(
-            createErrorResponse(`GenieACS server returned status ${response.status}`, 'Connection test failed')
+            createErrorResponse(
+              req.t('settings.connectionStatus', { status: response.status }),
+              req.t('settings.connectionTestFailed')
+            )
           );
         }
         
@@ -291,13 +297,13 @@ class SettingsController {
         
         if (Array.isArray(data)) {
           return res.json(
-            createResponse('Connection successful!', {
+            createResponse(req.t('settings.connectionSuccess'), {
               deviceCount: data.length
             })
           );
         } else {
           return res.json(
-            createResponse('Connection successful, but unexpected response format')
+            createResponse(req.t('settings.connectionUnexpectedFormat'))
           );
         }
       } catch (error) {
@@ -305,24 +311,24 @@ class SettingsController {
         
         if (error.name === 'AbortError' || error.type === 'request-timeout') {
           return res.status(504).json(
-            createErrorResponse('Connection timeout - GenieACS server did not respond')
+            createErrorResponse(req.t('settings.connectionTimeout'))
           );
         }
         
         if (error.code === 'ECONNREFUSED') {
           return res.status(502).json(
-            createErrorResponse('Connection refused - GenieACS server is not running or URL is incorrect')
+            createErrorResponse(req.t('settings.connectionRefused'))
           );
         }
         
         return res.status(502).json(
-          createErrorResponse('Failed to connect to GenieACS server', error.message)
+          createErrorResponse(req.t('settings.connectionFailed'), error.message)
         );
       }
     } catch (error) {
       console.error('Test GenieACS connection error:', error);
       return res.status(500).json(
-        createErrorResponse('Internal server error', error.message)
+        createErrorResponse(req.t('common.internalError'), error.message)
       );
     }
   }

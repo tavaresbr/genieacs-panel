@@ -20,13 +20,22 @@ export const LINK_MODES = Object.freeze(['pppoe', 'customer_id', 'manual']);
 
 const tokenBox = createSecretBox('skygenpanel-sgp-token-v1');
 
+/**
+ * The message is a translation key so the controller can answer in the
+ * caller's language. Text SGP itself returned is passed through with
+ * `raw: true`, since only the provider can phrase those.
+ */
 export class SgpError extends Error {
-  constructor(message, { code = 'sgp_error', status = 502, details = null } = {}) {
+  constructor(message, { code = 'sgp_error', status = 502, details = null, vars = null, raw = false } = {}) {
     super(message);
     this.name = 'SgpError';
     this.code = code;
     this.status = status;
     this.details = details;
+    if (!raw) {
+      this.translationKey = message;
+      this.translationVars = vars;
+    }
   }
 }
 
@@ -173,19 +182,19 @@ class SgpService {
     try {
       url = new URL(text.includes('://') ? text : `https://${text}`);
     } catch {
-      throw new SgpError('Informe uma URL válida do SGP (https://provedor.sgp.net.br)', {
+      throw new SgpError('sgp.error.urlInvalid', {
         code: 'invalid_base_url',
         status: 400
       });
     }
     if (!['http:', 'https:'].includes(url.protocol)) {
-      throw new SgpError('A URL do SGP deve usar HTTP ou HTTPS', {
+      throw new SgpError('sgp.error.urlScheme', {
         code: 'invalid_base_url',
         status: 400
       });
     }
     if (url.username || url.password) {
-      throw new SgpError('A URL do SGP não pode conter usuário ou senha', {
+      throw new SgpError('sgp.error.urlCredentials', {
         code: 'invalid_base_url',
         status: 400
       });
@@ -199,7 +208,7 @@ class SgpService {
     const text = String(value ?? '').trim();
     if (!text) return fallback;
     if (/^https?:\/\//i.test(text) || text.includes('..')) {
-      throw new SgpError('Os caminhos da API do SGP devem ser relativos, como /api/ura/titulos/', {
+      throw new SgpError('sgp.error.pathsRelative', {
         code: 'invalid_endpoint',
         status: 400
       });
@@ -297,7 +306,7 @@ class SgpService {
     }
 
     if (next.enabled && (!next.baseUrl || !next.app || !token)) {
-      throw new SgpError('Informe URL, app e token do SGP antes de ativar a integração', {
+      throw new SgpError('sgp.error.configIncomplete', {
         code: 'incomplete_config',
         status: 400
       });
@@ -314,7 +323,7 @@ class SgpService {
   static async request(endpointKey, payload = {}, configOverride = null) {
     const config = configOverride || await this.getConfig();
     if (!this.isReady(config)) {
-      throw new SgpError('Integração com o SGP não está configurada', {
+      throw new SgpError('sgp.error.notConfigured', {
         code: 'not_configured',
         status: 409
       });
@@ -336,12 +345,12 @@ class SgpService {
       });
     } catch (error) {
       if (error.name === 'AbortError') {
-        throw new SgpError('O SGP não respondeu dentro do tempo limite', {
+        throw new SgpError('sgp.error.timeout', {
           code: 'timeout',
           status: 504
         });
       }
-      throw new SgpError('Não foi possível conectar ao SGP', {
+      throw new SgpError('sgp.error.unreachable', {
         code: 'unreachable',
         status: 502,
         details: error.message
@@ -359,20 +368,21 @@ class SgpService {
     }
 
     if (response.status === 401 || response.status === 403) {
-      throw new SgpError('O SGP recusou as credenciais de integração (app/token)', {
+      throw new SgpError('sgp.error.credentialsRejected', {
         code: 'unauthorized',
         status: 502
       });
     }
     if (!response.ok) {
-      throw new SgpError(`O SGP respondeu com status ${response.status}`, {
+      throw new SgpError('sgp.error.status', {
+        vars: { status: response.status },
         code: 'http_error',
         status: 502,
         details: asText(pick(data || {}, ['msg', 'mensagem', 'message', 'erro'])) || undefined
       });
     }
     if (data === null) {
-      throw new SgpError('Resposta inválida do SGP', {
+      throw new SgpError('sgp.error.invalidResponse', {
         code: 'invalid_response',
         status: 502
       });
@@ -383,9 +393,10 @@ class SgpService {
     const failed = statusFlag !== null &&
       ['0', 'erro', 'error', 'false'].includes(String(statusFlag).trim().toLowerCase());
     if (failed) {
-      throw new SgpError(message || 'O SGP retornou um erro para esta consulta', {
+      throw new SgpError(message || 'sgp.error.queryFailed', {
         code: 'sgp_rejected',
-        status: 502
+        status: 502,
+        raw: Boolean(message)
       });
     }
 
@@ -401,7 +412,7 @@ class SgpService {
     const cleanLogin = asText(login);
     if (cleanLogin) payload.login = cleanLogin;
     if (Object.keys(payload).length === 0) {
-      throw new SgpError('Informe CPF/CNPJ, contrato ou login PPPoE para consultar o SGP', {
+      throw new SgpError('sgp.error.identifierRequired', {
         code: 'missing_filter',
         status: 400
       });
@@ -448,7 +459,7 @@ class SgpService {
   static async requestTrustUnlock({ contract }) {
     const cleanContract = asText(contract);
     if (!cleanContract) {
-      throw new SgpError('Contrato do SGP é obrigatório para a liberação', {
+      throw new SgpError('sgp.error.contractRequired', {
         code: 'missing_contract',
         status: 400
       });
@@ -493,7 +504,7 @@ class SgpService {
   static async resolveDeviceContract(deviceId, { refresh = false } = {}) {
     const config = await this.getConfig();
     if (!this.isReady(config)) {
-      throw new SgpError('Integração com o SGP não está configurada', {
+      throw new SgpError('sgp.error.notConfigured', {
         code: 'not_configured',
         status: 409
       });
@@ -515,17 +526,14 @@ class SgpService {
 
     if (!filters.contract && !filters.login) {
       if (stored) return { link: stored, account, source: 'cache' };
-      throw new SgpError(
-        'Este ONT ainda não tem contrato do SGP vinculado. Faça o vínculo manual ou verifique o login PPPoE.',
-        { code: 'unlinked', status: 404 }
-      );
+      throw new SgpError('sgp.error.deviceUnlinked', { code: 'unlinked', status: 404 });
     }
 
     const { contracts } = await this.lookupCustomer(filters, config);
     const contract = this.pickContract(contracts, preferredContract);
     if (!contract) {
       if (stored) return { link: stored, account, source: 'cache' };
-      throw new SgpError('Nenhum contrato do SGP encontrado para este ONT', {
+      throw new SgpError('sgp.error.noContractForDevice', {
         code: 'not_found',
         status: 404
       });
@@ -542,7 +550,7 @@ class SgpService {
   static async linkDevice(deviceId, { contract, document }) {
     const config = await this.getConfig();
     if (!this.isReady(config)) {
-      throw new SgpError('Integração com o SGP não está configurada', {
+      throw new SgpError('sgp.error.notConfigured', {
         code: 'not_configured',
         status: 409
       });
@@ -550,7 +558,7 @@ class SgpService {
     const { contracts } = await this.lookupCustomer({ contract, document }, config);
     const selected = this.pickContract(contracts, contract);
     if (!selected) {
-      throw new SgpError('Contrato não encontrado no SGP', { code: 'not_found', status: 404 });
+      throw new SgpError('sgp.error.contractNotFound', { code: 'not_found', status: 404 });
     }
     const account = await CustomerAccount.getByDeviceId(deviceId);
     return SgpLink.upsert(this.contractToLinkRow(selected, {
@@ -602,7 +610,7 @@ class SgpService {
       endpoints: { ...current.endpoints, ...(overrides.endpoints || {}) }
     };
     if (!config.baseUrl || !config.app || !config.token) {
-      throw new SgpError('Informe URL, app e token do SGP para testar a conexão', {
+      throw new SgpError('sgp.error.testCredentialsRequired', {
         code: 'incomplete_config',
         status: 400
       });
@@ -625,7 +633,7 @@ class SgpService {
     } catch (error) {
       if (error instanceof SgpError && error.code === 'sgp_rejected') {
         if (/token|app|autoriza|credenc|permiss/i.test(error.message)) {
-          throw new SgpError('O SGP recusou as credenciais de integração (app/token)', {
+          throw new SgpError('sgp.error.credentialsRejected', {
             code: 'unauthorized',
             status: 502
           });
@@ -633,7 +641,10 @@ class SgpService {
         return {
           contracts: 0,
           probe: hasSample ? 'filtered' : 'anonymous',
-          message: `Conexão e credenciais aceitas pelo SGP. Resposta: ${error.message}`
+          messageKey: 'sgp.testAccepted',
+          // A rejection SGP itself phrased is quoted; our own errors are
+          // identified by code so no untranslated key reaches the operator.
+          messageVars: { error: error.translationKey ? error.code : error.message }
         };
       }
       throw error;

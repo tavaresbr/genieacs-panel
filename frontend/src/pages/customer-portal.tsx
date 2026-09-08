@@ -79,6 +79,8 @@ async function portalRequest<T>(path: string, init?: RequestInit): Promise<ApiRe
     credentials: 'same-origin',
     headers: {
       ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+      // Answer in the language the subscriber picked, not the browser default.
+      'Accept-Language': getActiveLocale(),
       ...init?.headers,
     },
   })
