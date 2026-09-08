@@ -1,3 +1,4 @@
+import de from '@/lib/i18n/locales/de'
 import en from '@/lib/i18n/locales/en'
 import es from '@/lib/i18n/locales/es'
 import it from '@/lib/i18n/locales/it'
@@ -17,6 +18,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
   en,
   es,
   it,
+  de,
 }
 
 const PLACEHOLDER_PATTERN = /\{(\w+)\}/g
