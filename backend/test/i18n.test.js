@@ -47,6 +47,7 @@ describe('dictionaries', () => {
     );
     assert.equal(translate('es', 'common.routeNotFound'), 'Ruta no encontrada');
     assert.equal(translate('de', 'common.routeNotFound'), 'Route nicht gefunden');
+    assert.equal(translate('fr', 'common.routeNotFound'), 'Route introuvable');
     assert.equal(translate('pt-BR', 'nonexistent.key'), 'nonexistent.key');
   });
 });
@@ -59,21 +60,23 @@ describe('locale negotiation', () => {
     assert.equal(resolveLocale('en-GB'), 'en');
     assert.equal(resolveLocale('it-CH'), 'it');
     assert.equal(resolveLocale('de-AT'), 'de');
-    assert.equal(resolveLocale('fr'), null);
+    assert.equal(resolveLocale('fr-CA'), 'fr');
+    assert.equal(resolveLocale('nl'), null);
   });
 
   it('orders Accept-Language entries by quality', () => {
     assert.deepEqual(
-      parseAcceptLanguage('fr;q=0.4, es;q=0.9, en;q=0.6'),
-      ['es', 'en', 'fr']
+      parseAcceptLanguage('nl;q=0.4, es;q=0.9, en;q=0.6'),
+      ['es', 'en', 'nl']
     );
     assert.deepEqual(parseAcceptLanguage(''), []);
   });
 
   it('picks the first supported language and defaults to pt-BR', () => {
-    assert.equal(negotiateLocale('fr-FR, es;q=0.8'), 'es');
+    assert.equal(negotiateLocale('nl-NL, es;q=0.8'), 'es');
     assert.equal(negotiateLocale('de-DE'), 'de');
-    assert.equal(negotiateLocale('fr-FR'), 'pt-BR');
+    assert.equal(negotiateLocale('fr-FR'), 'fr');
+    assert.equal(negotiateLocale('nl-NL'), 'pt-BR');
     assert.equal(negotiateLocale(undefined), 'pt-BR');
     assert.equal(negotiateLocale('*'), 'pt-BR');
   });
@@ -93,7 +96,8 @@ describe('translated responses', () => {
       ['es', 'Ruta no encontrada'],
       ['it', 'Rotta non trovata'],
       ['de', 'Route nicht gefunden'],
-      ['fr;q=0.9, en;q=0.5', 'Route not found']
+      ['fr', 'Route introuvable'],
+      ['nl;q=0.9, en;q=0.5', 'Route not found']
     ]) {
       const { body } = await call(`${panelUrl}/api/does-not-exist`, {
         headers: { 'Accept-Language': header }
