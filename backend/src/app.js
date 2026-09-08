@@ -30,6 +30,7 @@ import sgpRoutes from './routes/sgp.js';
 import whatsappRoutes from './routes/whatsapp.js';
 import whatsappMessageRoutes from './routes/whatsappMessages.js';
 import whatsappAlertRoutes from './routes/whatsappAlerts.js';
+import whatsappBillingRoutes from './routes/whatsappBilling.js';
 import whatsappWebhookRoutes from './routes/whatsappWebhook.js';
 import provisioningRoutes from './routes/provisioning.js';
 import { WEBHOOK_PATH } from './services/sgpService.js';
@@ -175,6 +176,7 @@ app.use('/api/sgp', sgpRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/whatsapp', whatsappMessageRoutes);
 app.use('/api/whatsapp', whatsappAlertRoutes);
+app.use('/api/whatsapp', whatsappBillingRoutes);
 app.use('/api/provisioning', provisioningRoutes);
 
 app.get('/api/health', async (req, res) => {
