@@ -56,6 +56,21 @@ const LIST_POLL_MS = 15_000
 const THREAD_POLL_MS = 45_000
 const BACKOFF_CAP = 6
 
+/**
+ * Long enough that a typed name is one request instead of eight, short enough
+ * that the list still feels like it is answering the keyboard.
+ */
+const SEARCH_DEBOUNCE_MS = 350
+
+type ConversationStatus = 'open' | 'closed' | 'all'
+
+/** The three piles, in the order an operator reaches for them. */
+const FILTERS = [
+  ['open', 'whatsapp.inbox.filterOpen'],
+  ['closed', 'whatsapp.inbox.filterClosed'],
+  ['all', 'whatsapp.inbox.filterAll']
+] as const
+
 /** The API caps the list at 200 and a thread at 500. */
 const LIST_LIMIT = 100
 const MESSAGE_PAGE = 60
@@ -75,9 +90,14 @@ function InboxTab() {
   const [messages, setMessages] = useState<WhatsAppMessage[]>([])
   const [messageLimit, setMessageLimit] = useState(MESSAGE_PAGE)
 
+  const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [status, setStatus] = useState<ConversationStatus>('open')
+
   const [loadingList, setLoadingList] = useState(true)
   const [loadingThread, setLoadingThread] = useState(false)
   const [sending, setSending] = useState(false)
+  const [filing, setFiling] = useState(false)
   const [resendingId, setResendingId] = useState<number | null>(null)
   const [listError, setListError] = useState('')
 
@@ -85,6 +105,11 @@ function InboxTab() {
   const listInFlight = useRef(false)
   const listFailures = useRef(0)
   const listBlockedUntil = useRef(0)
+  // A filter change that lands while a poll is in flight is dropped by the
+  // single-flight guard. Remembering that it was owed, and running it when the
+  // call returns, is what keeps the list from showing the previous filter until
+  // the next tick fifteen seconds later.
+  const listOwed = useRef(false)
   const threadInFlight = useRef(false)
   const threadFailures = useRef(0)
   const threadBlockedUntil = useRef(0)
@@ -94,9 +119,19 @@ function InboxTab() {
   const selectedIdRef = useRef<number | null>(null)
   const messageLimitRef = useRef(MESSAGE_PAGE)
   const threadStampRef = useRef<string | null>(null)
+  // The filter belongs in a ref for the same reason: a poll must ask for what
+  // is on screen now, without the interval being torn down and restarted — and
+  // its clock reset — every time the operator types a letter.
+  const filterRef = useRef<{ search: string; status: ConversationStatus }>({ search: '', status: 'open' })
 
   useEffect(() => { selectedIdRef.current = selectedId }, [selectedId])
   useEffect(() => { messageLimitRef.current = messageLimit }, [messageLimit])
+
+  // One request per pause, not one per keystroke.
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search.trim()), SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
+  }, [search])
 
   useEffect(() => {
     alive.current = true
@@ -145,10 +180,18 @@ function InboxTab() {
 
   // ── The list ───────────────────────────────────────────────────────────────
   const loadList = useCallback(async (initial: boolean) => {
-    if (listInFlight.current) return
+    if (listInFlight.current) {
+      listOwed.current = true
+      return
+    }
     listInFlight.current = true
     try {
-      const res = await whatsappAPI.listConversations({ limit: LIST_LIMIT })
+      const { search: term, status: pile } = filterRef.current
+      const res = await whatsappAPI.listConversations({
+        limit: LIST_LIMIT,
+        status: pile,
+        ...(term ? { search: term } : {})
+      })
       if (!alive.current) return
       if (!res.success) {
         listFailures.current += 1
@@ -182,10 +225,30 @@ function InboxTab() {
     } finally {
       listInFlight.current = false
       if (initial) setLoadingList(false)
+      if (listOwed.current) {
+        listOwed.current = false
+        void loadListRef.current(false)
+      }
     }
   }, [t])
 
+  const loadListRef = useRef(loadList)
+  useEffect(() => { loadListRef.current = loadList }, [loadList])
+
   useEffect(() => { void loadList(true) }, [loadList])
+
+  // A filter the operator changed is asked for at once rather than waited for.
+  // The ref is written here, immediately before the reload it belongs to, so
+  // the two can never describe different filters.
+  useEffect(() => {
+    const next = { search: debouncedSearch, status }
+    const shown = filterRef.current
+    // Unchanged on the first run, which is what keeps this from doubling the
+    // initial load that the effect above already fired.
+    if (shown.search === next.search && shown.status === next.status) return
+    filterRef.current = next
+    void loadListRef.current(false)
+  }, [debouncedSearch, status])
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -228,6 +291,36 @@ function InboxTab() {
     setMessageLimit(MESSAGE_PAGE)
     setSelectedId(next.id)
   }, [])
+
+  // ── Filing ─────────────────────────────────────────────────────────────────
+  /**
+   * Closes the open thread, or takes it back out.
+   *
+   * The thread stays on screen either way: the operator who just closed it is
+   * owed the sight of the state they asked for, and the reopen button next to
+   * it. What moves is the LIST — a closed thread leaves the default pile — so
+   * the list is asked again rather than patched, since only the server knows
+   * whether the row still belongs under the filter on screen.
+   */
+  const file = useCallback(async (next: 'open' | 'closed') => {
+    const id = selectedIdRef.current
+    if (id === null) return
+    setFiling(true)
+    try {
+      const res = await whatsappAPI.setConversationStatus(id, next)
+      if (!alive.current) return
+      if (!res.success || !res.data) {
+        toast.error(whatsappErrorMessage(t, res.code))
+        return
+      }
+      if (selectedIdRef.current === id) setConversation(res.data)
+      void loadListRef.current(false)
+    } catch {
+      if (alive.current) toast.error(t('api.requestFailed'))
+    } finally {
+      if (alive.current) setFiling(false)
+    }
+  }, [t, toast])
 
   // ── Sending ────────────────────────────────────────────────────────────────
   const submit = useCallback(async (body: string, isNote: boolean): Promise<boolean> => {
@@ -324,10 +417,45 @@ function InboxTab() {
         ) : (
           <section className="modern-card grid h-[calc(100vh-16rem)] min-h-[32rem] grid-cols-1 overflow-hidden lg:grid-cols-[minmax(17rem,22rem)_1fr]">
             <div className="flex min-h-0 flex-col border-border lg:border-r">
+              <div className="space-y-2 border-b border-border px-3 py-3">
+                <input
+                  type="search"
+                  className="modern-input"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder={t('whatsapp.inbox.searchPlaceholder')}
+                  aria-label={t('whatsapp.inbox.searchPlaceholder')}
+                />
+                <div className="tab-rail" role="tablist" aria-label={t('whatsapp.inbox.title')}>
+                  {FILTERS.map(([id, labelKey]) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setStatus(id)}
+                      className="tab-button"
+                      data-active={status === id}
+                      role="tab"
+                      aria-selected={status === id}
+                    >
+                      {t(labelKey)}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="min-h-0 flex-1 overflow-y-auto">
                 {loadingList
                   ? <p className="px-3 py-6 text-center text-sm text-muted-foreground">{t('common.loading')}</p>
-                  : <ConversationList conversations={conversations} selectedId={selectedId} onSelect={select} />}
+                  : (
+                    <ConversationList
+                      conversations={conversations}
+                      selectedId={selectedId}
+                      onSelect={select}
+                      // An empty list under a search term is a different fact
+                      // from an empty inbox, and only one of the two is worth
+                      // clearing the box for.
+                      filtered={debouncedSearch !== '' || status !== 'open'}
+                    />
+                  )}
               </div>
             </div>
 
@@ -342,6 +470,8 @@ function InboxTab() {
                     onLoadMore={() => setMessageLimit((limit) => limit + MESSAGE_PAGE)}
                     onResend={(message) => void resend(message)}
                     resendingId={resendingId}
+                    filing={filing}
+                    onFile={(next) => void file(next)}
                   />
                   <ThreadComposer optedOut={conversation.optedOut} sending={sending} onSend={send} />
                 </>

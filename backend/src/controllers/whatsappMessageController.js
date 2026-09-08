@@ -31,7 +31,9 @@ class WhatsAppMessageController {
     try {
       const rows = await WaConversationService.list({
         limit: req.query?.limit,
-        offset: req.query?.offset
+        offset: req.query?.offset,
+        search: req.query?.search,
+        status: req.query?.status
       });
       return res.json(createResponse(req.t('whatsapp.conversationsLoaded', { count: rows.length }), rows));
     } catch (error) {
@@ -48,6 +50,29 @@ class WhatsAppMessageController {
       ));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.messagesLoadFailed');
+    }
+  }
+
+  /**
+   * Closes a thread, or reopens it.
+   *
+   * The two literals are the whole vocabulary: an unrecognized value is a 400
+   * rather than a silent close, because the difference between the two is what
+   * an operator sees in their list tomorrow morning.
+   */
+  static async setStatus(req, res) {
+    const status = req.body?.status;
+    if (status !== 'open' && status !== 'closed') {
+      return res.status(400).json(createErrorResponse(req.t('whatsapp.conversationStatusFailed')));
+    }
+    try {
+      const conversation = await WaConversationService.setStatus(req.params?.id, status);
+      return res.json(createResponse(
+        req.t(status === 'closed' ? 'whatsapp.conversationClosed' : 'whatsapp.conversationReopened'),
+        conversation
+      ));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.conversationStatusFailed');
     }
   }
 
