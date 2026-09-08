@@ -462,13 +462,14 @@ sustenta. Antes do décimo tenant:
 - i18n: as strings novas entram em `frontend/src/lib/i18n/locales/{pt-BR,en,es}.ts`, com
   pt-BR como idioma primário; o tipo em `dictionary.ts` faz o `npm run typecheck` acusar
   chave faltando nos outros dois.
-- **Resíduos do upstream indonésio a corrigir junto**, já que são texto e metadado que o
-  cliente final do provedor vê: as mensagens hardcoded em
-  `backend/src/controllers/customerPortalController.js`
-  (`'ID Customer atau password salah'`, `'Login pelanggan berhasil'`), o
-  `<html lang="id">` em **`frontend/index.html` e `frontend/portal.html`**, e o centro padrão
-  do mapa em Jacarta (`-6.2088, 106.8456`, `backend/src/config/seed.js:56`) — que no
-  provisionamento passa a ser definido por tenant no onboarding.
+- O backend já ganhou sua própria camada de i18n (`backend/src/i18n/`) e o
+  `customerPortalController` já responde por `req.t('portal.*')` — as mensagens novas de
+  limite de plano e de suspensão entram por lá, não hardcoded.
+- **Resíduos do upstream indonésio ainda pendentes**, e são metadado e dado que o cliente
+  final do provedor vê: o `<html lang="id">` em **`frontend/index.html` e
+  `frontend/portal.html`**, e o centro padrão do mapa em Jacarta
+  (`-6.2088, 106.8456`, `backend/src/config/seed.js:56`) — que no provisionamento passa a ser
+  definido por tenant no onboarding.
 
 ---
 
