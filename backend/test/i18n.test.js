@@ -56,6 +56,7 @@ describe('locale negotiation', () => {
     assert.equal(resolveLocale('PT-pt'), 'pt-BR');
     assert.equal(resolveLocale('es-419'), 'es');
     assert.equal(resolveLocale('en-GB'), 'en');
+    assert.equal(resolveLocale('it-CH'), 'it');
     assert.equal(resolveLocale('de'), null);
   });
 
@@ -87,6 +88,7 @@ describe('translated responses', () => {
     for (const [header, message] of [
       ['en', 'Route not found'],
       ['es', 'Ruta no encontrada'],
+      ['it', 'Rotta non trovata'],
       ['fr;q=0.9, en;q=0.5', 'Route not found']
     ]) {
       const { body } = await call(`${panelUrl}/api/does-not-exist`, {
