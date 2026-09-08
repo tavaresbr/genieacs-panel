@@ -7,6 +7,7 @@ import CustomerService from './services/customerService.js';
 import CustomerPortalPasswordService from './services/customerPortalPasswordService.js';
 import SchedulerService from './services/schedulerService.js';
 import WaOutboxWorker from './services/waOutboxWorker.js';
+import WaAlertService from './services/waAlertService.js';
 
 const PORT = Number(process.env.APP_PORT) || 5890;
 const PORTAL_PORT = process.env.PORTAL_PORT === '0'
@@ -73,6 +74,12 @@ export const startServer = async () => {
       // longer. It reads the integration's enabled flag inside each tick, so
       // this arms the driver whether or not WhatsApp is configured.
       WaOutboxWorker.start();
+      // The technical-alert scan has its own driver for the opposite reason to
+      // the outbox: a pass reads the whole fleet from GenieACS, so it is paced
+      // by the operator's `intervalSeconds` rather than by a fixed tick. Like
+      // the others it reads its enabled flag inside the tick, so this arms the
+      // driver whether or not alerts are configured.
+      WaAlertService.start();
       console.log(`Panel: http://localhost:${PORT}`);
     });
     portalServer = portalApp.listen(PORTAL_PORT, PORTAL_HOST, () => {
@@ -93,6 +100,7 @@ async function shutdown(signal) {
   console.log(`Received ${signal}; shutting down`);
   SchedulerService.stop();
   WaOutboxWorker.stop();
+  WaAlertService.stop();
   if (server) {
     await new Promise((resolve) => server.close(resolve));
   }

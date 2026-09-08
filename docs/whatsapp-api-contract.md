@@ -10,7 +10,7 @@ silenciosa entre o que o servidor devolve e o que a tela espera é exatamente o
 tipo de falha que não tem aparência.
 
 Estado: **Ondas 0 e 1 implementadas** — ciclo de vida das instâncias, webhook de
-entrada e envio (fila + worker).
+entrada e envio (fila + worker) — mais os **alertas técnicos** da onda 2.
 As linhas marcadas ⏳ estão especificadas mas ainda não existem; a onda indicada
 as implementa.
 
@@ -51,6 +51,8 @@ que é público e tem credencial própria.
 | `no_destination` | contato sem telefone nem LID | `whatsapp.error.noDestination` |
 | `message_empty` | sem texto e sem anexo | `whatsapp.error.messageEmpty` |
 | `conversation_not_found` | `:id` não existe | `common.routeNotFound` |
+| `no_recipients` | nenhum número recebe alerta técnico | `whatsapp.alerts.noRecipients` |
+| `invalid_phone` | telefone de plantão que não dá para discar | `whatsapp.error.invalidPhone` |
 
 ---
 
@@ -391,7 +393,6 @@ Especificadas aqui para que as telas possam ser escritas contra elas.
 | `GET /api/whatsapp/broadcasts` · `POST` · `POST /:id/status` | 2 | campanhas |
 | `GET /api/whatsapp/billing/overdue` | 2 | inadimplentes, janela simétrica |
 | `POST /api/whatsapp/billing/campaign` | 2 | monta a campanha **em `draft`** |
-| `GET/PUT /api/whatsapp/alerts/rules` | 2 | regras de alerta técnico |
 
 Duas regras de produto que a API precisa preservar:
 
@@ -400,6 +401,142 @@ Duas regras de produto que a API precisa preservar:
   play é o operador, depois de ver a lista pronta.
 - **Os pulados são explicados por motivo**, nunca por um número só:
   `{ noPhone, optOut, noInvoice, futureOnly, sgpRefused, templateIncomplete }`.
+
+---
+
+## Alertas técnicos — `/api/whatsapp/alerts`
+
+Quem recebe estes alertas é a **equipe do provedor**, não o assinante: uma lista
+de telefones nas configurações, não uma consulta ao cadastro. Nada aqui sabe de
+quem é a ONT que caiu, e não deve saber — um alerta nomeia equipamento.
+
+| Rota | Faz |
+| --- | --- |
+| `GET /api/whatsapp/alerts/settings` | as regras e seus limiares |
+| `PUT /api/whatsapp/alerts/settings` | grava |
+| `POST /api/whatsapp/alerts/scan` | roda uma passada agora |
+
+### O objeto de configuração
+
+Guardado como um blob JSON em `app_state` (`whatsapp_alert_settings`), com o
+mesmo cache de 30 s do `whatsappConfigService`.
+
+```json
+{
+  "enabled": false,
+  "intervalSeconds": 300,
+  "recipients": ["5593981110001"],
+  "rules": {
+    "ont_offline":      { "enabled": true, "threshold": 30,  "cooldownMinutes": 120 },
+    "rx_power_low":     { "enabled": true, "threshold": -27, "cooldownMinutes": 360 },
+    "temperature_high": { "enabled": true, "threshold": 70,  "cooldownMinutes": 360 },
+    "mass_outage":      { "enabled": true, "threshold": 5,   "cooldownMinutes": 120 }
+  },
+  "hasAlertsNumber": true,
+  "ready": true
+}
+```
+
+`hasAlertsNumber` e `ready` são somente leitura: a tela precisa poder mostrar
+**por que** os alertas estão calados sem disparar uma varredura.
+
+`PUT` aceita qualquer subconjunto. `rules` é **mesclado** sobre o que está
+gravado — uma tela que manda uma regra não pode zerar as outras três. Um número
+que `normalizarTelefoneBr` não consegue usar é **recusado** (`invalid_phone`,
+400): guardá-lo faria a falha acontecer uma vez por alerta, para sempre, num log
+que ninguém lê — enquanto quem digitou ainda está olhando o formulário.
+
+`POST /alerts/scan` devolve `{ fired, cleared, notified, skipped }`. Sem número
+de purpose `alerts` conectado, ou sem destinatários, responde **409
+`no_recipients`** — quem apertou o botão apertou justamente para descobrir se
+isto funciona, e um `{fired: 0}` alegre esconderia a resposta.
+
+### As quatro regras
+
+| Regra | Dispara quando | Assunto (`subject`) |
+| --- | --- | --- |
+| `ont_offline` | `_lastInform` mais velho que o limiar, **em minutos** | id do device |
+| `rx_power_low` | potência óptica **≤** o limiar (dBm, negativo) | id do device |
+| `temperature_high` | temperatura **≥** o limiar (°C) | id do device |
+| `mass_outage` | N ONTs do mesmo nó caem juntas | `node_id` do nó |
+
+**No limiar já dispara.** Quem digita 30 quer dizer "trinta minutos já é demais";
+uma comparação estrita faria do único número que a pessoa escolheu o único que
+nunca alerta.
+
+A telemetria vem dos leitores que já existem — `DeviceService.getDashboardDevices()`
+e `DeviceService.isDeviceOnline()`. **Óptica e temperatura só são julgadas em
+device que está informando**: uma ONT apagada devolve a última leitura que
+conseguiu mandar, e "potência baixa" empilhado em "ONT offline" é o mesmo
+incidente dito duas vezes.
+
+### As regras que impedem isto de virar ruído
+
+`wa_alert_state` é uma tabela de **estado**, não de log: uma linha por
+`(rule, subject)` enquanto a condição dura, apagada quando ela passa.
+
+- **Uma condição fala uma vez.** Depois só volta a falar quando
+  `cooldownMinutes` passa, contado de `last_notified_at`. Um alerta que repete a
+  cada varredura deixa de ser lido, e o que importava deixa de ser lido junto.
+- **Recuperação também é mensagem**, uma só, e a linha vai embora com ela. Quem
+  recebeu "ONT offline" e nunca mais ouviu nada não consegue distinguir fibra
+  consertada de alertador quebrado.
+- **Surto em massa cala os alertas individuais.** N ONTs do mesmo nó caindo
+  juntas é um rompimento, não N incidentes: sai **uma** mensagem nomeando o nó e
+  a contagem, e os `ont_offline` daqueles devices ficam retidos — não são
+  limpos, o que mandaria "ONT recuperada" no meio de um rompimento. Quarenta
+  mensagens às 3 da manhã é como um sistema de alerta é silenciado para sempre.
+- **"Não sei" nunca vira "recuperou".** Leitura ilegível, device apagado,
+  device retido por um surto: a linha fica exatamente como estava.
+- **Leitura de frota vazia aborta a passada** (`skipped: 'no_devices'`). É muito
+  mais provável ser um GenieACS quebrado que um provedor sem ONTs, e tratá-la
+  como "tudo certo" dispararia uma recuperação por linha aberta.
+- **A lista de opt-out vale aqui.** Um alerta é o provedor *iniciando* contato,
+  que é exatamente o que um opt-out recusa.
+- **Uma passada nunca lança.** O motivo de não ter feito nada volta em
+  `skipped` (`disabled`, `no_recipients`, `no_devices`, `error`).
+
+O agrupamento do surto é pelo nó de agregação **mais próximo** — a ODP em que a
+ONT está pendurada, não a OLT no fim da cadeia. Alerta de OLT inteira seria uma
+mensagem para o que normalmente é um drop, e mandaria o técnico para a ponta
+errada da rede. Um rompimento mais acima simplesmente vira uma mensagem por ODP
+afetada. O elo entre device e nó é o **PPPoE**: `mapping_nodes.pppoe` de um nó
+`type: 'ont'`, casado com o PPPoE que `DeviceService.getCustomerIdentityDevices()`
+devolve — lido só quando a frota já parece quebrada.
+
+`threshold` de `mass_outage` é o N. O padrão é **5**: uma ODP atende 8 ou 16
+assinantes, duas ou três fora é uma noite normal em qualquer rede, cinco na
+**mesma** ODP ao mesmo tempo não é coincidência.
+
+### O texto das mensagens
+
+Composto no serviço e traduzido pelo **locale padrão do painel** (`pt-BR`) — um
+job de fundo não tem locale de requisição.
+
+| Chave | Variáveis |
+| --- | --- |
+| `whatsapp.alerts.ontOffline` · `…ontOfflineCleared` | `device`, `minutes` |
+| `whatsapp.alerts.rxPowerLow` · `…rxPowerLowCleared` | `device`, `value`, `threshold` |
+| `whatsapp.alerts.temperatureHigh` · `…temperatureHighCleared` | `device`, `value`, `threshold` |
+| `whatsapp.alerts.massOutage` · `…massOutageCleared` | `node`, `count` |
+
+A metade `*Cleared` não é enfeite: quem olha o celular às 3 da manhã lê a
+primeira linha e mais nada, e "ONT offline ✔" é lido como um segundo alarme, não
+como um fim de alarme. A recuperação ganha frase própria.
+
+### O laço
+
+`WaAlertService.start()` em `server.js`, parado no shutdown. Um `setInterval` de
+60 s que só roda a varredura quando `intervalSeconds` passou. O `enabled` é lido
+**dentro** do tick — mesma escolha do `schedulerService` e do `waOutboxWorker`,
+para um botão em Configurações valer em um minuto sem ciclo de vida a manter em
+sincronia. O "quando foi a última" fica em memória, não em `app_state`: um painel
+que acabou de voltar **deve** varrer na hora, e as linhas de cooldown já impedem
+que uma condição já anunciada seja anunciada de novo.
+
+Envio: uma conversa por número de plantão (`WaConversation.ensure`, do mesmo
+jeito que uma mensagem de entrada faria) e `WaSendService.enqueue`. O worker do
+outbox entrega.
 
 ---
 
