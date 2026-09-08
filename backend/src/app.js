@@ -7,6 +7,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { testConnection } from './config/database.js';
 import { TRUST_PROXY } from './config/proxy.js';
+import { attachLocale } from './middleware/locale.js';
+import { DEFAULT_LOCALE, translate, translateError } from './i18n/index.js';
 import {
   apiLimiter,
   authLimiter,
@@ -109,12 +111,14 @@ function isAllowedOrigin(req, origin) {
   }
 }
 
+app.use(attachLocale);
+
 app.use((req, res, next) => {
   const origin = req.get('origin');
   if (!isAllowedOrigin(req, origin)) {
     return res.status(403).json({
       success: false,
-      message: 'Origin is not allowed'
+      message: req.t('common.originNotAllowed')
     });
   }
   return next();
@@ -151,7 +155,7 @@ app.get('/api/health', async (req, res) => {
 });
 
 app.use('/api', (req, res) => {
-  res.status(404).json({ success: false, message: 'Route not found' });
+  res.status(404).json({ success: false, message: req.t('common.routeNotFound') });
 });
 
 function serveFrontend(target, htmlFile) {
@@ -174,7 +178,7 @@ function serveFrontend(target, htmlFile) {
       return next();
     }
     if (!fs.existsSync(htmlPath)) {
-      return res.status(503).send('Application build is unavailable');
+      return res.status(503).send(req.t('common.buildUnavailable'));
     }
     res.setHeader('Cache-Control', 'no-cache');
     return res.sendFile(htmlPath);
@@ -186,18 +190,20 @@ function serveFrontend(target, htmlFile) {
 // as an error handler.
 export function errorHandler(err, req, res, next) {
   console.error('Unhandled error:', err);
+  // A failure raised before the locale middleware ran leaves `req.t` unset.
+  const t = req.t || ((key) => translate(DEFAULT_LOCALE, key));
   if (err?.type === 'entity.parse.failed') {
     return res.status(400).json({
       success: false,
-      message: 'Invalid JSON request body'
+      message: t('common.invalidJson')
     });
   }
   const status = err.status || 500;
   res.status(status).json({
     success: false,
     message: status >= 500 && APP_ENV === 'production'
-      ? 'Internal server error'
-      : (err.message || 'Internal server error')
+      ? t('common.internalError')
+      : (translateError(t, err) || t('common.internalError'))
   });
 }
 
@@ -209,7 +215,7 @@ app.use(errorHandler);
 function portalOriginGuard(req, res, next) {
   const origin = req.get('origin');
   if (origin && !isAllowedOrigin(req, origin)) {
-    return res.status(403).json({ success: false, message: 'Origin is not allowed' });
+    return res.status(403).json({ success: false, message: req.t('common.originNotAllowed') });
   }
   const fetchSite = req.get('sec-fetch-site');
   if (
@@ -217,11 +223,12 @@ function portalOriginGuard(req, res, next) {
     fetchSite &&
     !['same-origin', 'none'].includes(fetchSite)
   ) {
-    return res.status(403).json({ success: false, message: 'Cross-site request blocked' });
+    return res.status(403).json({ success: false, message: req.t('common.crossSiteBlocked') });
   }
   return next();
 }
 
+portalApp.use(attachLocale);
 portalApp.use(portalOriginGuard);
 portalApp.use(express.json({ limit: '16kb' }));
 // The login limiter keys on the submitted customer ID, so it must see a parsed body.
@@ -232,7 +239,7 @@ portalApp.get('/api/health', (req, res) => {
   res.json({ status: 'ok', service: 'customer-portal', version: APP_VERSION });
 });
 portalApp.use('/api', (req, res) => {
-  res.status(404).json({ success: false, message: 'Route not found' });
+  res.status(404).json({ success: false, message: req.t('common.routeNotFound') });
 });
 
 serveFrontend(portalApp, 'portal.html');
