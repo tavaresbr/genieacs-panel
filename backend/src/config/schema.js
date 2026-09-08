@@ -1,307 +1,61 @@
 import { getDb } from './database.js';
+import { migrations } from './migrations.js';
 
+export const MIGRATIONS_TABLE = 'schema_migrations';
+
+/**
+ * Creates the bookkeeping table. Returns true when this call created it, which
+ * is how `ensureSchema` tells a brand-new database (or an installation that
+ * predates the runner) from one it has already migrated.
+ */
+async function ensureMigrationsTable(db) {
+  if (await db.schema.hasTable(MIGRATIONS_TABLE)) return false;
+  try {
+    await db.schema.createTable(MIGRATIONS_TABLE, (t) => {
+      t.string('id', 128).primary();
+      t.timestamp('applied_at').defaultTo(db.fn.now());
+    });
+    return true;
+  } catch (error) {
+    // Another process may have created it between the check and the create.
+    if (!(await db.schema.hasTable(MIGRATIONS_TABLE))) throw error;
+    return false;
+  }
+}
+
+async function appliedIds(db) {
+  const rows = await db(MIGRATIONS_TABLE).select('id');
+  return new Set(rows.map((row) => row.id));
+}
+
+async function record(db, id) {
+  await db(MIGRATIONS_TABLE).insert({ id, applied_at: db.fn.now() });
+}
+
+/**
+ * Brings the database up to date, in order, recording every step it applies.
+ *
+ * Safe to call on every boot: steps that are already recorded are skipped, and
+ * the ones that do run are idempotent anyway.
+ *
+ * An installation created before this runner existed has no `schema_migrations`
+ * table but does have application tables. That case is baselined: each step is
+ * asked whether its objects are already present, and if so it is recorded as
+ * applied instead of being executed. Steps whose objects are missing (an old
+ * database that never had `sgp_links`, say) still run, so a partial upgrade is
+ * finished rather than skipped.
+ */
 export async function ensureSchema(db = getDb()) {
-  if (!(await db.schema.hasTable('users'))) {
-    await db.schema.createTable('users', (t) => {
-      t.increments('id').primary();
-      t.string('username', 64).notNullable().unique();
-      t.string('password', 255).notNullable();
-      t.string('role', 32).notNullable().defaultTo('user');
-      t.integer('token_version').notNullable().defaultTo(0);
-      t.timestamp('created_at').defaultTo(db.fn.now());
-      t.timestamp('updated_at').defaultTo(db.fn.now());
-    });
-  } else if (!(await db.schema.hasColumn('users', 'token_version'))) {
-    await db.schema.alterTable('users', (t) => {
-      t.integer('token_version').notNullable().defaultTo(0);
-    });
-  }
+  const isNewLedger = await ensureMigrationsTable(db);
+  const baseline = isNewLedger && (await db.schema.hasTable('users'));
+  const applied = await appliedIds(db);
 
-  if (!(await db.schema.hasTable('settings'))) {
-    await db.schema.createTable('settings', (t) => {
-      t.string('key', 128).primary();
-      t.text('value');
-      t.timestamp('updated_at').defaultTo(db.fn.now());
-    });
-  }
-
-  if (!(await db.schema.hasTable('app_state'))) {
-    await db.schema.createTable('app_state', (t) => {
-      t.string('key', 128).primary();
-      t.text('value');
-      t.timestamp('updated_at').defaultTo(db.fn.now());
-    });
-  }
-
-  if (!(await db.schema.hasTable('vendors'))) {
-    await db.schema.createTable('vendors', (t) => {
-      t.increments('id').primary();
-      t.string('name', 128).notNullable();
-      t.text('manufacturer_patterns');
-      t.text('product_patterns');
-      t.string('parameter_prefix', 255);
-      t.string('service_list_path', 255);
-      t.string('lan_binding_path', 255);
-      t.string('vlan_id_path', 255);
-      t.string('wifi_password_path', 255);
-      t.string('http_wan_enable_path', 255);
-      t.string('firewall_level_path', 255);
-      t.integer('priority').notNullable().defaultTo(10);
-      t.boolean('enabled').notNullable().defaultTo(true);
-      t.text('description');
-      t.timestamp('created_at').defaultTo(db.fn.now());
-      t.timestamp('updated_at').defaultTo(db.fn.now());
-    });
-  }
-
-  if (!(await db.schema.hasTable('wifi_security_mappings'))) {
-    await db.schema.createTable('wifi_security_mappings', (t) => {
-      t.increments('id').primary();
-      t.integer('vendor_id').notNullable().references('id').inTable('vendors').onDelete('CASCADE');
-      t.string('raw_security_value', 128).notNullable();
-      t.string('normalized_security', 128).notNullable();
-      t.text('description');
-      t.timestamp('created_at').defaultTo(db.fn.now());
-      t.timestamp('updated_at').defaultTo(db.fn.now());
-    });
-  }
-
-  if (!(await db.schema.hasTable('wifi_security_config'))) {
-    await db.schema.createTable('wifi_security_config', (t) => {
-      t.increments('id').primary();
-      t.string('product_class', 128).notNullable();
-      t.string('security_types', 255);
-      t.string('password_param_path', 255);
-      t.timestamp('created_at').defaultTo(db.fn.now());
-      t.timestamp('updated_at').defaultTo(db.fn.now());
-    });
-  }
-
-  if (!(await db.schema.hasTable('mapping_nodes'))) {
-    await db.schema.createTable('mapping_nodes', (t) => {
-      t.increments('id').primary();
-      t.string('node_id', 128).notNullable().unique();
-      t.string('type', 32).notNullable();
-      t.string('name', 255).notNullable();
-      t.decimal('latitude', 10, 7).notNullable();
-      t.decimal('longitude', 10, 7).notNullable();
-      t.integer('capacity');
-      t.string('splitter', 64);
-      t.string('pppoe', 255);
-      t.text('notes');
-      t.timestamp('created_at').defaultTo(db.fn.now());
-      t.timestamp('updated_at').defaultTo(db.fn.now());
-    });
-  }
-
-  if (!(await db.schema.hasTable('mapping_edges'))) {
-    await db.schema.createTable('mapping_edges', (t) => {
-      t.increments('id').primary();
-      t.string('edge_id', 128).notNullable().unique();
-      t.string('source', 128).notNullable().references('node_id').inTable('mapping_nodes').onDelete('CASCADE');
-      t.string('target', 128).notNullable().references('node_id').inTable('mapping_nodes').onDelete('CASCADE');
-      t.string('fiber_type', 32);
-      t.decimal('distance', 10, 2);
-      t.text('waypoints');
-      t.text('notes');
-      t.timestamp('created_at').defaultTo(db.fn.now());
-      t.timestamp('updated_at').defaultTo(db.fn.now());
-    });
-  }
-
-  if (!(await db.schema.hasTable('map_settings'))) {
-    await db.schema.createTable('map_settings', (t) => {
-      t.integer('id').primary();
-      t.string('center_lat', 32).notNullable();
-      t.string('center_lng', 32).notNullable();
-      t.string('max_zoom_in', 8).notNullable();
-      t.string('max_zoom_out', 8).notNullable();
-      t.string('default_zoom', 8).notNullable();
-      t.timestamp('updated_at').defaultTo(db.fn.now());
-    });
-  }
-
-  if (!(await db.schema.hasTable('customer_accounts'))) {
-    await db.schema.createTable('customer_accounts', (t) => {
-      t.increments('id').primary();
-      t.string('customer_id', 32).notNullable().unique();
-      t.string('device_id', 255).notNullable().unique();
-      t.string('identity_hash', 64).notNullable().unique();
-      t.string('software_id', 255).notNullable();
-      t.string('pppoe_username', 255).notNullable();
-      t.boolean('active').notNullable().defaultTo(true);
-      // Portal credentials are independent of the Customer ID: the ID only
-      // identifies the account, the hash authenticates it, and the encrypted
-      // copy lets an operator hand the password back without resetting it.
-      t.string('password_hash', 255);
-      t.text('password_ciphertext');
-      t.string('password_iv', 32);
-      t.string('password_tag', 32);
-      t.timestamp('password_updated_at');
-      t.timestamp('last_seen_at').defaultTo(db.fn.now());
-      t.timestamp('created_at').defaultTo(db.fn.now());
-      t.timestamp('updated_at').defaultTo(db.fn.now());
-    });
-  } else {
-    const customerPasswordColumns = [
-      ['password_hash', (t) => t.string('password_hash', 255)],
-      ['password_ciphertext', (t) => t.text('password_ciphertext')],
-      ['password_iv', (t) => t.string('password_iv', 32)],
-      ['password_tag', (t) => t.string('password_tag', 32)],
-      ['password_updated_at', (t) => t.timestamp('password_updated_at')]
-    ];
-    const missing = [];
-    for (const [column, add] of customerPasswordColumns) {
-      if (!(await db.schema.hasColumn('customer_accounts', column))) missing.push(add);
-    }
-    if (missing.length > 0) {
-      await db.schema.alterTable('customer_accounts', (t) => {
-        for (const add of missing) add(t);
-      });
-    }
-  }
-
-  if (!(await db.schema.hasTable('device_profiles'))) {
-    await db.schema.createTable('device_profiles', (t) => {
-      t.increments('id').primary();
-      t.string('device_id', 255).notNullable().unique();
-      t.date('installation_date');
-      t.string('installation_tag', 64);
-      t.timestamp('created_at').defaultTo(db.fn.now());
-      t.timestamp('updated_at').defaultTo(db.fn.now());
-    });
-  }
-
-  if (!(await db.schema.hasTable('sgp_links'))) {
-    await db.schema.createTable('sgp_links', (t) => {
-      t.increments('id').primary();
-      t.string('device_id', 255).notNullable().unique();
-      t.integer('account_id').unsigned()
-        .references('id').inTable('customer_accounts').onDelete('SET NULL');
-      t.string('contract', 64).notNullable();
-      t.string('document', 32);
-      t.string('client_name', 255);
-      t.string('plan', 255);
-      t.string('status', 64);
-      t.string('status_label', 128);
-      // Derived from the SGP status so the fleet views can group contracts
-      // without depending on each install's Portuguese labels.
-      t.string('state', 16).notNullable().defaultTo('unknown');
-      t.string('login', 255);
-      t.string('link_mode', 16).notNullable().defaultTo('auto');
-      t.timestamp('last_synced_at').defaultTo(db.fn.now());
-      t.timestamp('created_at').defaultTo(db.fn.now());
-      t.timestamp('updated_at').defaultTo(db.fn.now());
-    });
-  } else if (!(await db.schema.hasColumn('sgp_links', 'state'))) {
-    await db.schema.alterTable('sgp_links', (t) => {
-      t.string('state', 16).notNullable().defaultTo('unknown');
-    });
-  }
-
-  if (!(await db.schema.hasTable('provisioning_profiles'))) {
-    await db.schema.createTable('provisioning_profiles', (t) => {
-      t.increments('id').primary();
-      t.string('name', 128).notNullable().unique();
-      // Case-insensitive substrings matched against the SGP plan name, stored
-      // as a JSON array like the vendor pattern columns.
-      t.text('plan_patterns');
-      // A cleared pattern list must not silently become a catch-all, so the
-      // fallback profile is an explicit choice instead.
-      t.boolean('is_default').notNullable().defaultTo(false);
-      t.integer('priority').notNullable().defaultTo(10);
-      t.boolean('enabled').notNullable().defaultTo(true);
-      t.boolean('apply_wan').notNullable().defaultTo(true);
-      t.boolean('apply_pppoe_password').notNullable().defaultTo(true);
-      t.string('wan_name', 256);
-      t.integer('wan_vlan_id');
-      t.string('wan_service_list', 128);
-      t.string('wan_connection_type', 32);
-      t.boolean('wan_nat_enabled');
-      t.boolean('apply_wifi').notNullable().defaultTo(true);
-      t.text('wifi_indexes');
-      t.string('wifi_ssid_template', 64);
-      t.string('wifi_password_mode', 16).notNullable().defaultTo('random');
-      t.text('wifi_password_ciphertext');
-      t.string('wifi_password_iv', 32);
-      t.string('wifi_password_tag', 32);
-      t.boolean('apply_credentials').notNullable().defaultTo(false);
-      t.string('credential_targets', 16).notNullable().defaultTo('super');
-      t.text('cpe_password_ciphertext');
-      t.string('cpe_password_iv', 32);
-      t.string('cpe_password_tag', 32);
-      t.text('description');
-      t.timestamp('created_at').defaultTo(db.fn.now());
-      t.timestamp('updated_at').defaultTo(db.fn.now());
-    });
-  }
-
-  if (!(await db.schema.hasTable('provisioning_runs'))) {
-    await db.schema.createTable('provisioning_runs', (t) => {
-      t.increments('id').primary();
-      t.string('device_id', 255).notNullable();
-      t.string('contract', 64);
-      t.integer('profile_id').unsigned()
-        .references('id').inTable('provisioning_profiles').onDelete('SET NULL');
-      // Denormalized so deleting a profile does not erase why a run behaved
-      // the way it did.
-      t.string('profile_name', 128);
-      t.string('trigger', 16).notNullable().defaultTo('poller');
-      t.string('status', 24).notNullable().defaultTo('pending');
-      t.integer('attempt_count').notNullable().defaultTo(0);
-      t.timestamp('next_attempt_at');
-      // JSON array of { step, status, detail, parameterCount, at }, redacted.
-      t.text('steps');
-      t.text('error');
-      t.timestamp('started_at');
-      t.timestamp('finished_at');
-      t.timestamp('created_at').defaultTo(db.fn.now());
-      t.timestamp('updated_at').defaultTo(db.fn.now());
-      t.index(['device_id', 'status'], 'provisioning_runs_device_status_idx');
-      t.index(['status', 'next_attempt_at'], 'provisioning_runs_due_idx');
-    });
-  }
-
-  if (!(await db.schema.hasTable('sgp_events'))) {
-    await db.schema.createTable('sgp_events', (t) => {
-      t.increments('id').primary();
-      // A redelivered webhook and a transition seen twice by reconciliation
-      // both collapse onto the same key, so neither is processed twice.
-      t.string('dedupe_key', 128).notNullable().unique();
-      t.string('source', 16).notNullable();
-      t.string('type', 32).notNullable();
-      t.string('raw_type', 128);
-      t.string('contract', 64);
-      t.string('document', 32);
-      t.string('login', 255);
-      t.string('device_id', 255);
-      t.string('status', 16).notNullable().defaultTo('pending');
-      t.integer('attempts').notNullable().defaultTo(0);
-      t.text('payload');
-      t.text('error');
-      t.timestamp('occurred_at');
-      t.timestamp('received_at').defaultTo(db.fn.now());
-      t.timestamp('processed_at');
-      t.timestamp('created_at').defaultTo(db.fn.now());
-      t.timestamp('updated_at').defaultTo(db.fn.now());
-      t.index(['status', 'id'], 'sgp_events_status_idx');
-      t.index(['contract'], 'sgp_events_contract_idx');
-    });
-  }
-
-  if (!(await db.schema.hasTable('customer_wifi_credentials'))) {
-    await db.schema.createTable('customer_wifi_credentials', (t) => {
-      t.increments('id').primary();
-      t.integer('account_id').unsigned().notNullable()
-        .references('id').inTable('customer_accounts').onDelete('CASCADE');
-      t.integer('wifi_index').notNullable();
-      t.string('ssid', 32).notNullable();
-      t.text('password_ciphertext');
-      t.string('password_iv', 32);
-      t.string('password_tag', 32);
-      t.timestamp('created_at').defaultTo(db.fn.now());
-      t.timestamp('updated_at').defaultTo(db.fn.now());
-      t.unique(['account_id', 'wifi_index']);
-    });
+  for (const migration of migrations) {
+    if (applied.has(migration.id)) continue;
+    const alreadyPresent = baseline && migration.isApplied
+      ? await migration.isApplied(db)
+      : false;
+    if (!alreadyPresent) await migration.up(db);
+    await record(db, migration.id);
   }
 }

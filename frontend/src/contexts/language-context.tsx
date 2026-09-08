@@ -2,13 +2,14 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
-  DEFAULT_LOCALE,
   LANGUAGE_CHANGED_EVENT,
   LANGUAGE_STORAGE_KEY,
   LOCALE_METADATA,
   LOCALES,
   detectLocale,
+  isDictionaryLoaded,
   isLocale,
+  loadDictionary,
   setActiveLocale,
   translate,
   type Locale,
@@ -41,13 +42,48 @@ function toDate(value: Date | string | number | null | undefined): Date | null {
   return Number.isNaN(date.getTime()) ? null : date
 }
 
-export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>(DEFAULT_LOCALE)
+/** English ships with the bundle, so it can always be rendered right away. */
+const BUNDLED_LOCALE: Locale = 'en'
 
+export function LanguageProvider({ children }: { children: ReactNode }) {
+  // The locale the visitor asked for, and the one currently being rendered.
+  // They differ only while a lazily loaded dictionary is on its way: children
+  // keep rendering a complete dictionary instead of a half-loaded one.
+  const [requestedLocale, setRequestedLocale] = useState<Locale>(() => detectLocale())
+  const [locale, setRenderedLocale] = useState<Locale>(() => {
+    const detected = detectLocale()
+    return isDictionaryLoaded(detected) ? detected : BUNDLED_LOCALE
+  })
+  // Switching language later may briefly fall back to English, which reads as
+  // a deliberate response to the click. Doing that on the very first paint
+  // would instead look like the panel ignoring the visitor's language, so the
+  // initial render waits for the dictionary the entry point already requested.
+  const [ready, setReady] = useState<boolean>(() => isDictionaryLoaded(detectLocale()))
+
+  // A dictionary request that never settles must not leave a blank page, so
+  // the app is released in English if the chunk has not arrived in time.
   useEffect(() => {
-    const initial = detectLocale()
-    setLocaleState(initial)
-  }, [])
+    if (ready) return undefined
+    const timer = window.setTimeout(() => setReady(true), 3000)
+    return () => window.clearTimeout(timer)
+  }, [ready])
+
+  // Render a locale only once its dictionary is in memory. `loadDictionary`
+  // resolves even when the chunk fails, and English then stands in for it.
+  useEffect(() => {
+    if (isDictionaryLoaded(requestedLocale)) {
+      setRenderedLocale(requestedLocale)
+      setReady(true)
+      return
+    }
+    let cancelled = false
+    void loadDictionary(requestedLocale).then(() => {
+      if (cancelled) return
+      setRenderedLocale(requestedLocale)
+      setReady(true)
+    })
+    return () => { cancelled = true }
+  }, [requestedLocale])
 
   // Keep `<html lang>` and the non-React formatters in `lib/utils` in sync.
   useEffect(() => {
@@ -58,10 +94,10 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const syncFromEvent = (event: Event) => {
       const detail = (event as CustomEvent<Locale>).detail
-      if (isLocale(detail)) setLocaleState(detail)
+      if (isLocale(detail)) setRequestedLocale(detail)
     }
     const syncFromStorage = (event: StorageEvent) => {
-      if (event.key === LANGUAGE_STORAGE_KEY && isLocale(event.newValue)) setLocaleState(event.newValue)
+      if (event.key === LANGUAGE_STORAGE_KEY && isLocale(event.newValue)) setRequestedLocale(event.newValue)
     }
     window.addEventListener(LANGUAGE_CHANGED_EVENT, syncFromEvent)
     window.addEventListener('storage', syncFromStorage)
@@ -72,7 +108,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const setLocale = useCallback((next: Locale) => {
-    setLocaleState(next)
+    setRequestedLocale(next)
     try {
       localStorage.setItem(LANGUAGE_STORAGE_KEY, next)
     } catch {
@@ -108,7 +144,11 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     }
   }, [locale, setLocale])
 
-  return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>
+  return (
+    <LanguageContext.Provider value={value}>
+      {ready ? children : null}
+    </LanguageContext.Provider>
+  )
 }
 
 export function useLanguage() {

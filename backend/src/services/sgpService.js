@@ -9,6 +9,9 @@ const CONFIG_KEY = 'sgp_integration_config';
 const SYNC_STATE_KEY = 'sgp_sync_last_run';
 const CONFIG_CACHE_TTL_MS = 30_000;
 const REQUEST_TIMEOUT_MS = 15_000;
+// A cached contract keeps plan, status and holder name frozen, so it is only
+// trusted for a day before the next read refreshes it from the SGP.
+const LINK_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 // The provider's SGP is a production billing system shared with the call
 // centre, so a fleet sync never opens more than a handful of connections.
 const SYNC_CONCURRENCY = 5;
@@ -818,6 +821,12 @@ class SgpService {
       || contracts[0];
   }
 
+  static isLinkExpired(link, now = Date.now()) {
+    const syncedAt = link?.last_synced_at ? new Date(link.last_synced_at).getTime() : Number.NaN;
+    if (!Number.isFinite(syncedAt)) return true;
+    return now - syncedAt >= LINK_CACHE_TTL_MS;
+  }
+
   // Resolves the SGP contract bound to a panel device. A stored link always
   // wins; otherwise the configured link mode decides which identifier is sent
   // to the SGP lookup, and a successful match is cached in sgp_links.
@@ -826,26 +835,39 @@ class SgpService {
     const stored = await SgpLink.getByDeviceId(deviceId);
     const account = await CustomerAccount.getByDeviceId(deviceId);
 
-    if (stored && !refresh) {
-      return { link: stored, account, source: 'cache' };
+    // A link recorded for a different account belongs to the previous
+    // subscriber of this ONT. Never serve it: drop it and look the contract up
+    // again for whoever holds the device now.
+    const staleOwner = Boolean(
+      stored && stored.account_id !== null && account && stored.account_id !== account.id
+    );
+    if (staleOwner) {
+      await SgpLink.deleteByDeviceId(deviceId);
     }
 
-    const preferredContract = stored?.contract || null;
-    const filters = stored?.link_mode === 'manual' || config.linkMode === 'manual'
+    const usable = staleOwner ? null : stored;
+    if (usable && !refresh && !this.isLinkExpired(usable)) {
+      return { link: usable, account, source: 'cache' };
+    }
+
+    const preferredContract = usable?.contract || null;
+    const filters = usable?.link_mode === 'manual' || config.linkMode === 'manual'
       ? { contract: preferredContract }
       : config.linkMode === 'customer_id'
         ? { contract: account?.customer_id }
         : { login: account?.pppoe_username };
 
     if (!filters.contract && !filters.login) {
-      if (stored) return { link: stored, account, source: 'cache' };
+      if (usable) return { link: usable, account, source: 'cache' };
       throw new SgpError('sgp.error.deviceUnlinked', { code: 'unlinked', status: 404 });
     }
 
     const { contracts } = await this.lookupCustomer(filters, config);
     const contract = this.pickContract(contracts, preferredContract);
     if (!contract) {
-      if (stored) return { link: stored, account, source: 'cache' };
+      // A stale cache is better than no answer, but only while it still
+      // belongs to the subscriber holding the device.
+      if (usable) return { link: usable, account, source: 'cache' };
       throw new SgpError('sgp.error.noContractForDevice', {
         code: 'not_found',
         status: 404
@@ -855,7 +877,7 @@ class SgpService {
     const link = await SgpLink.upsert(this.contractToLinkRow(contract, {
       deviceId,
       accountId: account?.id ?? null,
-      linkMode: stored?.link_mode === 'manual' ? 'manual' : 'auto'
+      linkMode: usable?.link_mode === 'manual' ? 'manual' : 'auto'
     }));
     return { link, account, contract, source: 'sgp' };
   }

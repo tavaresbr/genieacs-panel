@@ -42,10 +42,43 @@ class CustomerAccount {
     return this.getById(id);
   }
 
-  static async touch(id, deviceId) {
+  static async touch(id, deviceId, identity = {}) {
     await getDb()('customer_accounts').where({ id }).update({
       device_id: deviceId,
+      ...identity,
       last_seen_at: new Date(),
+      updated_at: new Date()
+    });
+    return this.getById(id);
+  }
+
+  /**
+   * The subscriber behind a PPPoE login. Retired accounts are excluded so a
+   * closed account is never resurrected by a new installation.
+   */
+  static async getActiveByPppoe(pppoeUsername) {
+    const normalized = String(pppoeUsername ?? '').trim();
+    if (!normalized) return null;
+    return (
+      (await getDb()('customer_accounts')
+        .whereRaw('LOWER(pppoe_username) = ?', [normalized.toLowerCase()])
+        .andWhere({ active: true })
+        .orderBy('id', 'desc')
+        .first()) || null
+    );
+  }
+
+  /**
+   * Closes an account whose ONT now serves a different subscriber. The unique
+   * device_id and identity_hash are released so the incoming subscriber can
+   * claim them, and the row is deactivated so its Customer ID, portal password
+   * and saved WiFi credentials can never authenticate again.
+   */
+  static async retire(id) {
+    await getDb()('customer_accounts').where({ id }).update({
+      active: false,
+      device_id: `retired:${id}`,
+      identity_hash: `retired:${id}`,
       updated_at: new Date()
     });
     return this.getById(id);
@@ -78,7 +111,7 @@ class CustomerAccount {
   static async getIdsByDeviceIds(deviceIds) {
     if (!Array.isArray(deviceIds) || deviceIds.length === 0) return [];
     return getDb()('customer_accounts')
-      .select('device_id', 'customer_id')
+      .select('device_id', 'customer_id', 'pppoe_username')
       .whereIn('device_id', deviceIds);
   }
 

@@ -3,7 +3,7 @@ import { BrandMark } from '@/components/brand-mark'
 import { Icon } from '@/components/ui/icon'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import { useTranslation } from '@/contexts/language-context'
-import { getActiveLocale, translate } from '@/lib/i18n'
+import { getActiveLocale, isCustomerSessionCode, translate } from '@/lib/i18n'
 
 type PortalOverview = {
   customerId: string
@@ -202,7 +202,7 @@ export default function CustomerPortal() {
     try {
       const result = await portalRequest<PortalOverview>('/overview')
       if (!result.success || !result.data) {
-        if (result.message?.toLowerCase().includes('session')) setAuthenticated(false)
+        if (isCustomerSessionCode(result.code)) setAuthenticated(false)
         setError(result.message || t('portal.error.overview'))
         return
       }
@@ -227,6 +227,7 @@ export default function CustomerPortal() {
     try {
       const result = await portalRequest<PortalBilling>('/billing')
       if (!result.success || !result.data) {
+        if (isCustomerSessionCode(result.code)) setAuthenticated(false)
         setBilling(null)
         setBillingError(
           result.code && TRANSIENT_BILLING_CODES.has(result.code)
@@ -372,7 +373,7 @@ export default function CustomerPortal() {
     try {
       const result = await portalRequest<{ password: string }>(`/wifi/${index}/password`)
       if (!result.success || !result.data?.password) {
-        if (result.message?.toLowerCase().includes('session')) setAuthenticated(false)
+        if (isCustomerSessionCode(result.code)) setAuthenticated(false)
         setWifiFeedback({
           type: 'error',
           message: result.message || t('portal.wifi.error.revealFailed')
@@ -419,7 +420,7 @@ export default function CustomerPortal() {
         }),
       })
       if (!result.success) {
-        if (result.message?.toLowerCase().includes('session')) setAuthenticated(false)
+        if (isCustomerSessionCode(result.code)) setAuthenticated(false)
         setWifiFeedback({
           type: 'error',
           message: result.message || t('portal.wifi.error.saveFailed')

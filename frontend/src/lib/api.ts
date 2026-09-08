@@ -1,4 +1,5 @@
 import { getActiveLocale, translate } from '@/lib/i18n'
+import type { OperatorRole, User } from '@/types'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || ''
 
@@ -198,6 +199,26 @@ export const authAPI = {
     apiClient.post('/auth/change-username', { currentUsername, newUsername }),
 }
 
+// Operator accounts. Every route below is admin-only on the backend.
+// An operator and the signed-in user are the same record, so they share a type.
+export type Operator = User
+export type { OperatorRole }
+
+export const usersAPI = {
+  list: () =>
+    apiClient.get<{ users: Operator[] }>('/users'),
+
+  create: (payload: { username: string; password: string; role: OperatorRole }) =>
+    apiClient.post<{ user: Operator }>('/users', payload),
+
+  /** Sends only what changes: a role, a new password, or both. */
+  update: (id: number, payload: { role?: OperatorRole; password?: string }) =>
+    apiClient.requestWithBody<{ user: Operator }>('PATCH', `/users/${id}`, payload),
+
+  remove: (id: number) =>
+    apiClient.delete<{ id: number }>(`/users/${id}`),
+}
+
 export interface PortalPasswordResponse {
   customerId: string
   password: string
@@ -205,9 +226,31 @@ export interface PortalPasswordResponse {
 }
 
 // Devices API
+export interface DeviceListParams {
+  page?: number
+  pageSize?: number
+  search?: string
+  status?: 'all' | 'online' | 'offline'
+}
+
+export interface DeviceListResponse<T> {
+  devices: T[]
+  page: number
+  pageSize: number
+  total: number
+  totalPages: number
+}
+
 export const devicesAPI = {
-  getDevices: () =>
-    apiClient.get('/devices'),
+  getDevices: (params: DeviceListParams = {}) => {
+    const query = new URLSearchParams()
+    if (params.page !== undefined) query.set('page', String(params.page))
+    if (params.pageSize !== undefined) query.set('pageSize', String(params.pageSize))
+    if (params.search) query.set('search', params.search)
+    if (params.status && params.status !== 'all') query.set('status', params.status)
+    const search = query.toString()
+    return apiClient.get(`/devices${search ? `?${search}` : ''}`)
+  },
 
   getDashboard: (force = false) =>
     apiClient.get(`/devices/dashboard${force ? '?refresh=1' : ''}`),

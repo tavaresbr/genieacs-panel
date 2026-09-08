@@ -51,6 +51,8 @@ export default {
   'rateLimit.portalBilling': 'Demasiadas consultas de facturas. Espera un momento e inténtalo de nuevo.',
   'rateLimit.portalUnlock': 'Se alcanzó el límite de solicitudes de liberación. Inténtalo más tarde.',
   'rateLimit.portalPasswordAdmin': 'Demasiadas solicitudes de contraseña del portal, reduce el ritmo',
+  'rateLimit.sgpAdmin': 'Demasiadas solicitudes al SGP, reduzca el ritmo',
+  'rateLimit.sgpSync': 'Demasiadas sincronizaciones de la red. Inténtelo de nuevo más tarde.',
 
   // Equipos
   'device.idRequired': 'El ID del equipo es obligatorio',

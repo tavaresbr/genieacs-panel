@@ -23,6 +23,7 @@ import vendorRoutes from './routes/vendors.js';
 import mappingRoutes from './routes/mapping.js';
 import mapSettingsRoutes from './routes/mapSettings.js';
 import databaseRoutes from './routes/database.js';
+import userRoutes from './routes/users.js';
 import customerPortalRoutes from './routes/customerPortal.js';
 import sgpRoutes from './routes/sgp.js';
 import provisioningRoutes from './routes/provisioning.js';
@@ -150,6 +151,7 @@ app.use('/api/vendor-management', vendorRoutes);
 app.use('/api/mapping-data', mappingRoutes);
 app.use('/api/map-settings', mapSettingsRoutes);
 app.use('/api/database', databaseRoutes);
+app.use('/api/users', userRoutes);
 app.use('/api/sgp', sgpRoutes);
 app.use('/api/provisioning', provisioningRoutes);
 
@@ -208,9 +210,12 @@ export function errorHandler(err, req, res, next) {
     });
   }
   const status = err.status || 500;
+  // Internal messages are revealed only when the deployment explicitly asks
+  // for them; APP_ENV is unset on most installs, so "not production" would
+  // leak them by default.
   res.status(status).json({
     success: false,
-    message: status >= 500 && APP_ENV === 'production'
+    message: status >= 500 && APP_ENV !== 'development'
       ? t('common.internalError')
       : (translateError(t, err) || t('common.internalError'))
   });
