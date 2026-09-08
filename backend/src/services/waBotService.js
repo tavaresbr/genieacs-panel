@@ -3,7 +3,7 @@ import SgpService from './sgpService.js';
 import WaConversationService from './waConversationService.js';
 import WaSendService from './waSendService.js';
 import WhatsAppConfigService from './whatsappConfigService.js';
-import { getDb } from '../config/database.js';
+import { tdb } from '../config/database.js';
 import { DEFAULT_LOCALE, translate } from '../i18n/index.js';
 import { comoDataBr, comoReal, maisAntigaEmAberto } from '../utils/wa/waCobranca.js';
 import { normalizarTexto, pedeSaida } from '../utils/wa/waOptOutTexto.js';
@@ -297,14 +297,12 @@ class WaBotService {
     // to be left alone with a message.
     if (pedeSaida(texto)) return { replied: false, reason: 'opt_out_request' };
 
-    const db = getDb();
-
     // Never twice for the same inbound message. The unique index on
-    // `external_id` is the real dedupe — a redelivered event never reaches this
+    // `(tenant_id, external_id)` is the real dedupe — a redelivered event never reaches this
     // far — and this is the belt: an outbound row newer than the inbound one
     // means the thread was already answered after it arrived.
     const jaRespondida = Number.isInteger(Number(messageId))
-      ? await db('wa_messages')
+      ? await tdb('wa_messages')
         .where({ conversation_id: conversation.id, direction: 'out' })
         .where('id', '>', Number(messageId))
         .first()
@@ -313,7 +311,7 @@ class WaBotService {
 
     // A human in the thread wins, always.
     const desde = new Date(Date.now() - JANELA_HUMANO_MS);
-    const humano = await db('wa_messages')
+    const humano = await tdb('wa_messages')
       .where({ conversation_id: conversation.id })
       .whereNotNull('sent_by')
       .where('created_at', '>=', desde)
@@ -323,7 +321,7 @@ class WaBotService {
     // Counted by pulling the ids rather than with COUNT(*): the three engines
     // disagree on whether a count comes back a number or a string, and the
     // ceiling is small enough that the rows are cheaper than the disagreement.
-    const automaticas = await db('wa_messages')
+    const automaticas = await tdb('wa_messages')
       .where({ conversation_id: conversation.id, direction: 'out', is_note: false })
       .whereNull('sent_by')
       .where('created_at', '>=', new Date(Date.now() - JANELA_TETO_MS))

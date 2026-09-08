@@ -1,14 +1,14 @@
-import { getDb, insertReturningId } from '../config/database.js';
+import { tdb, tinsertReturningId } from '../config/database.js';
 
 /** One thread with one contact on one connected number. */
 class WaConversation {
   static async getById(id) {
-    return (await getDb()('wa_conversations').where({ id }).first()) || null;
+    return (await tdb('wa_conversations').where({ id }).first()) || null;
   }
 
   static async getByThread(accountId, externalThreadId) {
     return (
-      (await getDb()('wa_conversations')
+      (await tdb('wa_conversations')
         .where({ account_id: accountId, external_thread_id: externalThreadId })
         .first()) || null
     );
@@ -33,10 +33,10 @@ class WaConversation {
       if (waLid && !existing.wa_lid) patch.wa_lid = waLid;
       if (pushName && !existing.push_name) patch.push_name = pushName;
       if (Object.keys(patch).length === 0) return existing;
-      await getDb()('wa_conversations').where({ id: existing.id }).update({ ...patch, updated_at: now });
+      await tdb('wa_conversations').where({ id: existing.id }).update({ ...patch, updated_at: now });
       return this.getById(existing.id);
     }
-    const id = await insertReturningId('wa_conversations', {
+    const id = await tinsertReturningId('wa_conversations', {
       account_id: accountId,
       external_thread_id: externalThreadId,
       wa_phone_e164: waPhone || null,
@@ -49,14 +49,14 @@ class WaConversation {
   }
 
   static async update(id, patch) {
-    await getDb()('wa_conversations')
+    await tdb('wa_conversations')
       .where({ id })
       .update({ ...patch, updated_at: new Date() });
     return this.getById(id);
   }
 
   static async listRecent({ limit = 50, offset = 0 } = {}) {
-    return getDb()('wa_conversations')
+    return tdb('wa_conversations')
       .orderBy('last_message_at', 'desc')
       .limit(limit)
       .offset(offset);

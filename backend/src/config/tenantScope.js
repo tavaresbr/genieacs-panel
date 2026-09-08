@@ -24,7 +24,12 @@ export const SCOPED_TABLES = new Set([
   // within one provider, matching on it is how an ONT swap keeps the
   // subscriber's portal login. Across two it is account takeover, because the
   // same firmware and a same-named subscriber produce the same hash.
-  'customer_accounts'
+  'customer_accounts',
+  // The WhatsApp inbox and its send queue. Scoping these is what lets the
+  // outbox worker drain one provider at a time instead of the deployment.
+  'wa_conversations',
+  'wa_messages',
+  'wa_opt_outs'
 ]);
 
 /** Tables that belong to the deployment rather than to any one provider. */
