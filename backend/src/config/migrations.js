@@ -820,6 +820,71 @@ export const migrations = [
         }
       });
     }
+  },
+  {
+    // The tables whose models delete or update without a where clause: the map
+    // is replaced wholesale on every import, and setting a default WhatsApp
+    // number clears every other row first. Those are correct for one provider
+    // and destructive for a second, so they are scoped before anything that
+    // only reads.
+    id: '0011_mapping_and_whatsapp_tenant',
+    async isApplied(db) {
+      for (const table of ['mapping_nodes', 'mapping_edges', 'whatsapp_accounts']) {
+        if (!(await db.schema.hasTable(table))) return false;
+        if (!(await db.schema.hasColumn(table, 'tenant_id'))) return false;
+      }
+      return true;
+    },
+    async up(db) {
+      const tenant = await db('tenants').orderBy('id', 'asc').first();
+      if (!tenant) return;
+
+      // Before anything else. Rebuilding `mapping_nodes` to move its unique
+      // would otherwise leave these references pointing at a key that no longer
+      // exists, and SQLite's foreign_key_check fails the rebuild on the spot.
+      if (await db.schema.hasColumn('mapping_edges', 'source')) {
+        await db.schema.alterTable('mapping_edges', (t) => {
+          t.dropForeign(['source']);
+          t.dropForeign(['target']);
+        });
+      }
+
+      for (const table of ['mapping_nodes', 'mapping_edges', 'whatsapp_accounts']) {
+        if (await db.schema.hasColumn(table, 'tenant_id')) continue;
+        await db.schema.alterTable(table, (t) => t.integer('tenant_id').unsigned());
+        await db(table).whereNull('tenant_id').update({ tenant_id: tenant.id });
+      }
+
+      await db.schema.alterTable('mapping_nodes', (t) => {
+        t.integer('tenant_id').unsigned().notNullable().defaultTo(tenant.id).alter();
+        t.foreign('tenant_id').references('id').inTable('tenants');
+        t.dropUnique(['node_id']);
+        t.unique(['tenant_id', 'node_id']);
+      });
+
+      await db.schema.alterTable('mapping_edges', (t) => {
+        t.integer('tenant_id').unsigned().notNullable().defaultTo(tenant.id).alter();
+        t.dropUnique(['edge_id']);
+        t.unique(['tenant_id', 'edge_id']);
+        // Composite rather than an integer key, because the API and the map
+        // editor address nodes by their string id. It also buys a guarantee the
+        // old shape could not give: an edge can only reach a node of its own
+        // provider.
+        t.foreign(['tenant_id', 'source'])
+          .references(['tenant_id', 'node_id']).inTable('mapping_nodes').onDelete('CASCADE');
+        t.foreign(['tenant_id', 'target'])
+          .references(['tenant_id', 'node_id']).inTable('mapping_nodes').onDelete('CASCADE');
+      });
+
+      await db.schema.alterTable('whatsapp_accounts', (t) => {
+        t.integer('tenant_id').unsigned().notNullable().defaultTo(tenant.id).alter();
+        t.foreign('tenant_id').references('id').inTable('tenants');
+        // `name` deliberately keeps its global unique. The Evolution webhook
+        // arrives with no session and finds the account — and therefore the
+        // provider — by that name, so it has to identify a row on its own. It
+        // is minted locally and already unique by construction.
+      });
+    }
   }
 ];
 

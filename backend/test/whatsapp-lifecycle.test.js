@@ -1,7 +1,7 @@
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { authHeaders, call, startTestServers, stopTestServers } from './helpers/harness.js';
+import { asTenant, authHeaders, call, startTestServers, stopTestServers } from './helpers/harness.js';
 
 const { default: WhatsAppConfigService } = await import('../src/services/whatsappConfigService.js');
 const { default: WhatsAppAccount } = await import('../src/models/WhatsAppAccount.js');
@@ -284,7 +284,7 @@ describe('creating an instance on an Evolution v2 server', () => {
   });
 
   it('stores the key the server chose over the token it minted', async () => {
-    const row = await WhatsAppAccount.getById(account.id);
+    const row = await asTenant(() => WhatsAppAccount.getById(account.id));
     assert.equal(WhatsAppConfigService.decryptInstanceToken(row), 'server-key-v2');
     assert.equal(row.instance_id, 'v2-instance-id');
   });
@@ -324,7 +324,7 @@ describe('creating an instance on an Evolution GO server', () => {
   });
 
   it('gives each number its own webhook secret', async () => {
-    const rows = await WhatsAppAccount.getAll();
+    const rows = await asTenant(() => WhatsAppAccount.getAll());
     const secrets = rows.map((row) => WhatsAppConfigService.decryptWebhookToken(row));
     assert.equal(new Set(secrets).size, rows.length);
     assert.ok(secrets.every((secret) => secret.length === 64));
@@ -338,7 +338,7 @@ describe('an instance the server already has', () => {
     // "already in use" is the reconnect path: the row can be gone from the
     // panel while the instance is alive on the server.
     assert.equal(status, 201);
-    const row = await WhatsAppAccount.getById(body.data.account.id);
+    const row = await asTenant(() => WhatsAppAccount.getById(body.data.account.id));
     assert.equal(row.instance_id, 'go-recovered-id');
     assert.ok(conflicting.state.requests.some((r) => r.path === '/instance/all'));
   });
@@ -487,7 +487,7 @@ describe('editing what the panel knows about a number', () => {
     assert.equal(body.data.account.isDefault, true);
 
     // Exactly one row may carry the flag.
-    const rows = await WhatsAppAccount.getAll();
+    const rows = await asTenant(() => WhatsAppAccount.getAll());
     assert.equal(rows.filter((row) => row.is_default).length, 1);
   });
 
@@ -545,7 +545,7 @@ describe('removing a number', () => {
     assert.ok(body.data.serverError, 'an instance left running has to be reported');
     // Refusing to delete locally would leave the operator with a row they can
     // never get rid of.
-    assert.equal(await WhatsAppAccount.getById(id), null);
+    assert.equal(await asTenant(() => WhatsAppAccount.getById(id)), null);
   });
 
   it('reports a clean removal when the server agrees', async () => {
@@ -566,7 +566,7 @@ describe('removing a number', () => {
 
 describe('what reaches the browser', () => {
   it('never carries a stored secret, in any response', async () => {
-    const rows = await WhatsAppAccount.getAll();
+    const rows = await asTenant(() => WhatsAppAccount.getAll());
     const secrets = rows.flatMap((row) => [
       WhatsAppConfigService.decryptInstanceToken(row),
       WhatsAppConfigService.decryptWebhookToken(row)

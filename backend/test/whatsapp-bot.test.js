@@ -2,6 +2,7 @@ import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import {
+  asTenant,
   authHeaders,
   call,
   getDb,
@@ -217,7 +218,7 @@ before(async () => {
 
   // The number has to be CONNECTED or `enqueue` refuses every answer with
   // `no_account`, and the bot would look silent for the wrong reason.
-  await WhatsAppAccount.create({
+  await asTenant(() => WhatsAppAccount.create({
     name: INSTANCE,
     purpose: 'support',
     flavor: 'v2',
@@ -226,7 +227,7 @@ before(async () => {
     is_default: true,
     ...WhatsAppConfigService.encryptInstanceToken(INSTANCE_TOKEN),
     ...WhatsAppConfigService.encryptWebhookToken(WEBHOOK_TOKEN)
-  });
+  }));
 
   // What makes `ASSINANTE` a subscriber and `DESCONHECIDO` a stranger.
   await insertReturningId('sgp_links', {

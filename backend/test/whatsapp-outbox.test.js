@@ -1,7 +1,7 @@
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { authHeaders, call, getDb, startTestServers, stopTestServers } from './helpers/harness.js';
+import { asTenant, authHeaders, call, getDb, startTestServers, stopTestServers } from './helpers/harness.js';
 
 const { default: WhatsAppConfigService } = await import('../src/services/whatsappConfigService.js');
 const { default: WhatsAppAccount } = await import('../src/models/WhatsAppAccount.js');
@@ -153,7 +153,7 @@ before(async () => {
     rateLimitPerMin: 60
   });
 
-  const support = await WhatsAppAccount.create({
+  const support = await asTenant(() => WhatsAppAccount.create({
     name: SUPPORT,
     purpose: 'support',
     flavor: 'v2',
@@ -162,10 +162,10 @@ before(async () => {
     is_default: true,
     ...WhatsAppConfigService.encryptInstanceToken(SUPPORT_TOKEN),
     ...WhatsAppConfigService.encryptWebhookToken('webhook-suporte')
-  });
+  }));
   supportId = support.id;
 
-  const backup = await WhatsAppAccount.create({
+  const backup = await asTenant(() => WhatsAppAccount.create({
     name: BACKUP,
     purpose: 'support',
     flavor: 'v2',
@@ -175,7 +175,7 @@ before(async () => {
     status: 'disconnected',
     ...WhatsAppConfigService.encryptInstanceToken(BACKUP_TOKEN),
     ...WhatsAppConfigService.encryptWebhookToken('webhook-reserva')
-  });
+  }));
   backupId = backup.id;
 });
 
@@ -438,8 +438,8 @@ describe('routing picks the number the thread belongs to', () => {
     await clearOutbox();
     const conversation = await newConversation({ accountId: supportId });
     await post(conversation.id, { body: 'pelo reserva' });
-    await WhatsAppAccount.update(supportId, { status: 'disconnected' });
-    await WhatsAppAccount.update(backupId, { status: 'connected' });
+    await asTenant(() => WhatsAppAccount.update(supportId, { status: 'disconnected' }));
+    await asTenant(() => WhatsAppAccount.update(backupId, { status: 'connected' }));
     requests.length = 0;
 
     try {
@@ -447,20 +447,20 @@ describe('routing picks the number the thread belongs to', () => {
       assert.equal(sendTextCalls()[0].path, `/message/sendText/${BACKUP}`);
       assert.equal(sendTextCalls()[0].apikey, BACKUP_TOKEN);
     } finally {
-      await WhatsAppAccount.update(supportId, { status: 'connected' });
-      await WhatsAppAccount.update(backupId, { status: 'disconnected' });
+      await asTenant(() => WhatsAppAccount.update(supportId, { status: 'connected' }));
+      await asTenant(() => WhatsAppAccount.update(backupId, { status: 'disconnected' }));
     }
   });
 
   it('refuses to enqueue at all when no number is connected', async () => {
     const conversation = await newConversation({ accountId: supportId });
-    await WhatsAppAccount.update(supportId, { status: 'disconnected' });
+    await asTenant(() => WhatsAppAccount.update(supportId, { status: 'disconnected' }));
     try {
       const { status, body } = await post(conversation.id, { body: 'ninguém conectado' });
       assert.equal(status, 409);
       assert.equal(body.code, 'no_account');
     } finally {
-      await WhatsAppAccount.update(supportId, { status: 'connected' });
+      await asTenant(() => WhatsAppAccount.update(supportId, { status: 'connected' }));
     }
   });
 });

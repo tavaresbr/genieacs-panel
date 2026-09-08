@@ -1,6 +1,7 @@
 import WaMessage from '../models/WaMessage.js';
 import WaSendService from './waSendService.js';
 import WhatsAppConfigService from './whatsappConfigService.js';
+import { forSoleTenant } from '../config/tenantJobs.js';
 
 /** How often a pass runs. Short, because a reply typed by a human is waiting. */
 const TICK_INTERVAL_MS = 5_000;
@@ -67,12 +68,33 @@ class WaOutboxWorker {
   }
 
   /**
-   * One pass. It NEVER throws: a single unsendable message must not be able to
-   * stop the loop for every other one.
+   * One pass, in the installation's provider.
+   *
+   * The pass has no request and therefore no provider of its own, so it opens
+   * one — the account lookup and everything under it now demand it. It stays a
+   * single pass because `WaMessage.listSendable()` still reads the whole
+   * deployment's queue: see `forSoleTenant`, which refuses rather than let a
+   * second provider turn one message into two.
    *
    * @returns {Promise<{ sent: number, failed: number, skipped: string|null }>}
    */
   static async tick() {
+    try {
+      return (await forSoleTenant('The WhatsApp outbox', () => this.tickForTenant()))
+        ?? { sent: 0, failed: 0, skipped: 'no_provider' };
+    } catch (error) {
+      // Keeps the never-throws contract. The message says what to scope.
+      console.warn(`WhatsApp outbox tick failed: ${error.message}`);
+      return { sent: 0, failed: 0, skipped: 'unscoped' };
+    }
+  }
+
+  /**
+   * One pass for the provider in scope. It NEVER throws: a single unsendable
+   * message must not be able to stop the loop for every other one — nor, now,
+   * for every other provider.
+   */
+  static async tickForTenant() {
     const summary = { sent: 0, failed: 0, skipped: null };
     try {
       const config = await WhatsAppConfigService.getConfig();

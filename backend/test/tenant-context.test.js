@@ -98,8 +98,11 @@ describe('the scoped query builder', () => {
   });
 
   it('returns the generated id', async () => {
-    const id = await tinsertReturningId('mapping_nodes', {
-      node_id: 'scope-probe-1', type: 'ODP', name: 'Probe', latitude: -23.5, longitude: -46.6
+    // device_profiles is still pending, so this exercises the unscoped path.
+    // mapping_nodes moved under scoping and now needs a provider — which is
+    // what tenant-scoping.test.js covers.
+    const id = await tinsertReturningId('device_profiles', {
+      device_id: 'scope-probe-device', installation_tag: 'probe'
     });
     assert.ok(Number(id) > 0);
   });

@@ -42,7 +42,10 @@ const SECRET_KEY_VERSION_COLUMNS = [
 ];
 
 const ALL_IDS = migrations.map((migration) => migration.id);
-const TENANCY_MIGRATION = '0010_customer_accounts_tenant';
+// Everything from here on is the tenancy work; the "before" state is the
+// schema as it stood just ahead of it. Comparing by id rather than naming one
+// migration means a new tenancy step does not need this test edited.
+const FIRST_TENANCY_MIGRATION = '0010_customer_accounts_tenant';
 const LEGACY_USERNAME = 'legacy-admin';
 const LEGACY_APP_NAME = 'Legacy Panel';
 
@@ -261,7 +264,7 @@ describe('making customer accounts per-provider', () => {
     // The state just before tenancy, populated the way a running install is:
     // an account with children pointing at it, so the rebuild the unique swap
     // needs on SQLite has something to lose if it goes wrong.
-    for (const migration of migrations.filter((m) => m.id !== TENANCY_MIGRATION)) {
+    for (const migration of migrations.filter((m) => m.id < FIRST_TENANCY_MIGRATION)) {
       await migration.up(db);
     }
     await db('settings').insert({ key: 'appName', value: 'Provedor Alfa' });
