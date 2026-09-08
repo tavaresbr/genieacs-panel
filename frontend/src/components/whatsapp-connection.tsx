@@ -36,7 +36,31 @@ const ERROR_KEYS: Record<string, TranslationKey> = {
   unreachable: 'whatsapp.error.unreachable',
   no_session: 'whatsapp.error.noSession',
   no_account: 'whatsapp.error.noAccount',
-  no_destination: 'whatsapp.error.noDestination'
+  no_destination: 'whatsapp.error.noDestination',
+  // Both reachable only from the inbox, and both were missing until the screen
+  // that provokes them was built: an unknown code degrades to the generic
+  // failure, which is not wrong but tells the operator nothing.
+  message_empty: 'whatsapp.error.messageEmpty',
+  conversation_not_found: 'whatsapp.error.conversationNotFound',
+  // Templates, campaigns and the alert rules. `no_recipients` is the campaign's
+  // — the alert scan raises `no_alert_recipients` precisely so one code does
+  // not have to mean both "nobody is on duty" and "the filters left nobody".
+  template_empty: 'whatsapp.error.templateEmpty',
+  template_mirrors: 'whatsapp.error.templateMirrors',
+  template_not_found: 'whatsapp.templates.notFound',
+  name_taken: 'whatsapp.templates.nameTaken',
+  unknown_variable: 'whatsapp.error.unknownVariable',
+  invalid_phone: 'whatsapp.error.invalidPhone',
+  no_recipients: 'whatsapp.error.noRecipients',
+  too_many_recipients: 'whatsapp.error.tooManyRecipients',
+  invalid_status: 'whatsapp.error.invalidStatus',
+  rate_limited: 'whatsapp.error.rateLimited',
+  broadcast_not_found: 'whatsapp.broadcast.notFound',
+  no_alert_recipients: 'whatsapp.alerts.noRecipients',
+  no_alert_number: 'whatsapp.alerts.noAlertNumber',
+  alerts_disabled: 'whatsapp.alerts.disabledSkip',
+  no_devices: 'whatsapp.alerts.noDevices',
+  scan_failed: 'whatsapp.error.scanFailed'
 }
 
 type Translate = (key: TranslationKey, vars?: Record<string, string | number>) => string

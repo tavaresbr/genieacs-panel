@@ -9,6 +9,13 @@ export interface ApiResponse<T = any> {
   message?: string
   error?: string
   code?: string
+  /**
+   * Only on a refusal, and only where the route has a breakdown to offer: the
+   * billing build attaches it to its 409 so "every one of them is on the
+   * do-not-disturb list" survives the failure. A refusal has no `data`, so
+   * without this the reason is lost inside a bare status code.
+   */
+  skipped?: Record<string, number>
 }
 
 class ApiClient {
@@ -71,6 +78,8 @@ class ApiClient {
           message: data.message || translate(getActiveLocale(), 'api.requestFailed'),
           error: data.error || translate(getActiveLocale(), 'api.unknownError'),
           code: data.code,
+          // Forwarded, not rebuilt away: see `skipped` above.
+          ...(data.skipped ? { skipped: data.skipped } : {}),
         }
       }
 

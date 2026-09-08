@@ -140,6 +140,22 @@ export function modeloEhLembrete(modelo) {
   return /\{\{\s*dias_para_vencer\s*\}\}/.test(String(modelo ?? ''));
 }
 
+/**
+ * Um modelo que cita os DOIS espelhos não rende para ninguém.
+ *
+ * Pela regra 1, uma variável citada e vazia recusa a mensagem inteira; pela
+ * regra 2, `dias_atraso` e `dias_para_vencer` nunca estão preenchidas ao mesmo
+ * tempo. Citar as duas é, portanto, um modelo que a régua sempre recusa —
+ * silenciosamente, uma vez por destinatário, como `templateIncomplete`.
+ *
+ * Existe para que isso seja pego na hora de salvar, e não na contagem de
+ * pulados de uma campanha que não saiu.
+ */
+export function modeloCitaOsDoisEspelhos(modelo) {
+  const texto = String(modelo ?? '');
+  return /\{\{\s*dias_atraso\s*\}\}/.test(texto) && modeloEhLembrete(texto);
+}
+
 /** As variáveis que o modelo cita e o disparo não sabe preencher. */
 export function variaveisDesconhecidas(modelo) {
   const citadas = [...String(modelo ?? '').matchAll(PLACEHOLDER)].map((m) => m[1]);

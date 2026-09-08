@@ -237,6 +237,40 @@ describe('templates', () => {
     assert.match(body.message, /saldo_devedor/);
   });
 
+  it('refuses a body citing both day mirrors, which could never be sent', async () => {
+    // Both names are fillable, so the unknown-variable check passes and every
+    // other check passes too — and the template still cannot render for
+    // anybody, because one of the two mirrors is always empty and an empty
+    // cited variable refuses the whole message. Left to the dispatcher it would
+    // surface hours later as a `templateIncomplete` count on a campaign that
+    // reached nobody.
+    const { status, body } = await call(`${panelUrl}/api/whatsapp/templates`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: {
+        name: 'espelhos',
+        body: 'Atraso de {{dias_atraso}} dias, vence em {{dias_para_vencer}} dias.',
+        category: 'cobranca'
+      }
+    });
+    assert.equal(status, 400);
+    assert.equal(body.code, 'template_mirrors');
+
+    // Either one alone is a normal template.
+    for (const only of ['{{dias_atraso}}', '{{dias_para_vencer}}']) {
+      const ok = await call(`${panelUrl}/api/whatsapp/templates`, {
+        method: 'POST',
+        headers: authHeaders(token),
+        body: { name: `so ${only}`, body: `Sao ${only} dias.`, category: 'cobranca' }
+      });
+      assert.equal(ok.status, 201, only);
+      await call(`${panelUrl}/api/whatsapp/templates/${ok.body.data.id}`, {
+        method: 'DELETE',
+        headers: authHeaders(token)
+      });
+    }
+  });
+
   it('stores a body that only cites known variables', async () => {
     const { status, body } = await call(`${panelUrl}/api/whatsapp/templates`, {
       method: 'POST',

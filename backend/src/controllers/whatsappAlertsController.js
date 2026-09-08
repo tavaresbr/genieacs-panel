@@ -49,11 +49,24 @@ class WhatsAppAlertsController {
   static async scan(req, res) {
     try {
       const summary = await WaAlertService.scan();
-      if (summary.skipped === 'no_recipients') {
-        throw new WaError('whatsapp.alerts.noRecipients', {
-          code: 'no_recipients',
-          status: 409
-        });
+      // Every reason a pass did nothing is a refusal, never a cheerful
+      // `{fired: 0}`. "Nothing is wrong" and "nothing was checked" look
+      // identical in that number, and the admin pressed the button precisely
+      // to tell them apart. `no_alert_recipients` is not the campaign's
+      // `no_recipients`: one means nobody is on duty to be woken, the other
+      // that the filters left no subscriber to charge, and a screen that
+      // translates the code cannot render both.
+      const REFUSALS = {
+        disabled: ['whatsapp.alerts.disabledSkip', 'alerts_disabled', 409],
+        not_configured: ['whatsapp.error.notConfigured', 'not_configured', 409],
+        no_alert_number: ['whatsapp.alerts.noAlertNumber', 'no_alert_number', 409],
+        no_recipients: ['whatsapp.alerts.noRecipients', 'no_alert_recipients', 409],
+        no_devices: ['whatsapp.alerts.noDevices', 'no_devices', 502]
+      };
+      const refusal = summary.skipped ? REFUSALS[summary.skipped] : null;
+      if (refusal) {
+        const [key, code, status] = refusal;
+        throw new WaError(key, { code, status });
       }
       if (summary.error) {
         throw new WaError('whatsapp.alerts.scanFailed', {
