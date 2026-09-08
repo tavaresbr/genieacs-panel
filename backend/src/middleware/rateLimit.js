@@ -131,3 +131,21 @@ export const portalPasswordAdminLimiter = limiter({
   keyGenerator: (req) => (req.user?.userId ? `user:${req.user.userId}` : `ip:${ipKey(req)}`),
   message: { success: false, message: 'Too many portal password requests, please slow down' }
 });
+
+/**
+ * The Evolution webhook is a public endpoint, so it needs its own bucket — but
+ * a generous one. A busy number legitimately produces a burst: every QR
+ * rotation (~20 s), every message, and one receipt per recipient per delivery
+ * state. Sizing this like a login form would drop real traffic, and a dropped
+ * event is a message that never appears in the inbox.
+ *
+ * The key is the source address because all events come from one server; the
+ * ceiling is what protects against that server, or something pretending to be
+ * it, hammering the panel.
+ */
+export const waWebhookLimiter = limiter({
+  windowMs: 60 * 1000,
+  max: 600,
+  keyGenerator: ipKey,
+  message: { success: false, error: 'too many webhook deliveries' }
+});
