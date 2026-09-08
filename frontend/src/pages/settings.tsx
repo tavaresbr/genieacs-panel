@@ -1,11 +1,25 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { apiClient, vendorsAPI, settingsAPI, authAPI, databaseAPI, sgpAPI, type DbConfigPayload, type SgpConfig } from '@/lib/api'
+import { Fragment, useState, useEffect } from 'react'
+import {
+  apiClient,
+  vendorsAPI,
+  settingsAPI,
+  authAPI,
+  databaseAPI,
+  sgpAPI,
+  usersAPI,
+  type DbConfigPayload,
+  type Operator,
+  type OperatorRole,
+  type SgpConfig,
+  type SgpSyncSummary
+} from '@/lib/api'
 import { useToast } from '@/components/ui/toast'
 import { useLoading } from '@/components/ui/loading'
 import { Icon } from '@/components/ui/icon'
 import { LanguageSwitcher } from '@/components/language-switcher'
+import { useAuth } from '@/contexts/auth-context'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
 import type { Vendor as VendorType, WifiSecurityConfig as WifiSecurityConfigType } from '@/types'
@@ -42,6 +56,7 @@ const VIRTUAL_PARAMETER_FIELDS: {
 
 export default function Settings() {
   const { t, formatDateTime } = useTranslation()
+  const { user: currentUser } = useAuth()
   const [settings, setSettings] = useState({
     appName: 'SkyGenPanel',
     genieAcsUrl: 'http://127.0.0.1:7557',
@@ -73,6 +88,9 @@ export default function Settings() {
   const [sgpSaving, setSgpSaving] = useState(false)
   const [sgpTesting, setSgpTesting] = useState(false)
   const [sgpTestResult, setSgpTestResult] = useState<{ success: boolean; message: string } | null>(null)
+  const [sgpSyncing, setSgpSyncing] = useState(false)
+  const [sgpSyncSummary, setSgpSyncSummary] = useState<SgpSyncSummary | null>(null)
+  const [sgpFleetAvailable, setSgpFleetAvailable] = useState(false)
   const [dbTesting, setDbTesting] = useState(false)
   const [dbSwitching, setDbSwitching] = useState(false)
 
@@ -105,22 +123,32 @@ export default function Settings() {
     let cancelled = false
     ;(async () => {
       const res = await sgpAPI.getConfig()
-      if (cancelled || !res.success || !res.data) return
-      const config = res.data
-      setSgpConfig(config)
-      setSgpForm((current) => ({
-        ...current,
-        enabled: config.enabled,
-        baseUrl: config.baseUrl,
-        app: config.app,
-        // The stored token never leaves the server; an empty field keeps it.
-        token: '',
-        linkMode: config.linkMode,
-        portalBilling: config.portalBilling,
-        portalUnlock: config.portalUnlock,
-        invoiceLimit: config.invoiceLimit
-      }))
-      setSgpTestResult(null)
+      if (cancelled) return
+      if (res.success && res.data) {
+        const config = res.data
+        setSgpConfig(config)
+        setSgpForm((current) => ({
+          ...current,
+          enabled: config.enabled,
+          baseUrl: config.baseUrl,
+          app: config.app,
+          // The stored token never leaves the server; an empty field keeps it.
+          token: '',
+          linkMode: config.linkMode,
+          portalBilling: config.portalBilling,
+          portalUnlock: config.portalUnlock,
+          invoiceLimit: config.invoiceLimit
+        }))
+        setSgpTestResult(null)
+      }
+
+      // The fleet block only exists while the integration answers; the overview
+      // also carries the summary of the last synchronization that ran.
+      const overview = await sgpAPI.getOverview()
+      if (cancelled) return
+      const fleetReady = overview.success && Boolean(overview.data?.enabled)
+      setSgpFleetAvailable(fleetReady)
+      setSgpSyncSummary(fleetReady ? overview.data?.lastSync ?? null : null)
     })()
     return () => { cancelled = true }
   }, [activeTab])
@@ -177,6 +205,25 @@ export default function Settings() {
       )
     } finally {
       setSgpSaving(false)
+    }
+  }
+
+  const handleSgpSyncAll = async () => {
+    setSgpSyncing(true)
+    try {
+      const res = await sgpAPI.syncAll()
+      if (res.success && res.data) {
+        setSgpSyncSummary(res.data)
+        toast.success(res.message || t('settings.sgp.syncDone'))
+        return
+      }
+      if (res.code === 'not_configured') {
+        setSgpFleetAvailable(false)
+        return
+      }
+      toast.error(res.message || t('settings.sgp.syncFailed'))
+    } finally {
+      setSgpSyncing(false)
     }
   }
 
@@ -287,6 +334,134 @@ export default function Settings() {
       apiClient.clearTokens()
     } else {
       toast.error(res.message || t('settings.security.passwordFailed'))
+    }
+  }
+
+  const [operators, setOperators] = useState<Operator[]>([])
+  const [operatorsLoading, setOperatorsLoading] = useState(false)
+  // `null` while the list is fine; otherwise the backend's reason, which may be
+  // empty when the request failed without one.
+  const [operatorsError, setOperatorsError] = useState<string | null>(null)
+  const [creatingOperator, setCreatingOperator] = useState(false)
+  const [operatorSaving, setOperatorSaving] = useState(false)
+  const [operatorBusyId, setOperatorBusyId] = useState<number | null>(null)
+  const [operatorForm, setOperatorForm] = useState<{ username: string; password: string; role: OperatorRole }>({
+    username: '',
+    password: '',
+    role: 'viewer'
+  })
+  const [resetPasswordId, setResetPasswordId] = useState<number | null>(null)
+  const [resetPasswordValue, setResetPasswordValue] = useState('')
+
+  const fetchOperators = async () => {
+    setOperatorsLoading(true)
+    const res = await usersAPI.list()
+    if (res.success && res.data) {
+      setOperators(res.data.users)
+      setOperatorsError(null)
+    } else {
+      setOperators([])
+      setOperatorsError(res.message || '')
+    }
+    setOperatorsLoading(false)
+  }
+
+  useEffect(() => {
+    if (activeTab === 'security') {
+      void fetchOperators()
+    }
+  }, [activeTab])
+
+  const resetOperatorForm = () => {
+    setOperatorForm({ username: '', password: '', role: 'viewer' })
+    setCreatingOperator(false)
+  }
+
+  const submitOperator = async () => {
+    const username = operatorForm.username.trim()
+    if (username.length < 3 || username.length > 64) {
+      toast.error(t('settings.operators.usernameLength'))
+      return
+    }
+    if (operatorForm.password.length < 8 || operatorForm.password.length > 128) {
+      toast.error(t('settings.operators.passwordLength'))
+      return
+    }
+    setOperatorSaving(true)
+    try {
+      const res = await usersAPI.create({
+        username,
+        password: operatorForm.password,
+        role: operatorForm.role
+      })
+      if (res.success) {
+        toast.success(t('settings.operators.created', { username }))
+        resetOperatorForm()
+        await fetchOperators()
+      } else {
+        // 400 and 409 carry the reason (duplicate username, invalid input).
+        toast.error(res.message || t('settings.operators.createFailed'))
+      }
+    } finally {
+      setOperatorSaving(false)
+    }
+  }
+
+  const changeOperatorRole = async (operator: Operator, role: OperatorRole) => {
+    if (role === operator.role) return
+    setOperatorBusyId(operator.id)
+    try {
+      const res = await usersAPI.update(operator.id, { role })
+      const updated = res.success ? res.data?.user : undefined
+      if (updated) {
+        setOperators((current) => current.map((item) => (item.id === updated.id ? updated : item)))
+        toast.success(t('settings.operators.roleUpdated', {
+          username: updated.username,
+          role: t(updated.role === 'admin' ? 'settings.operators.roleAdmin' : 'settings.operators.roleViewer')
+        }))
+      } else {
+        // The backend refuses a demotion that would leave no administrator.
+        toast.error(res.message || t('settings.operators.roleFailed'))
+      }
+    } finally {
+      setOperatorBusyId(null)
+    }
+  }
+
+  const submitOperatorPassword = async (operator: Operator) => {
+    if (resetPasswordValue.length < 8 || resetPasswordValue.length > 128) {
+      toast.error(t('settings.operators.passwordLength'))
+      return
+    }
+    setOperatorBusyId(operator.id)
+    try {
+      const res = await usersAPI.update(operator.id, { password: resetPasswordValue })
+      if (res.success) {
+        toast.success(t('settings.operators.passwordUpdated', { username: operator.username }))
+        setResetPasswordId(null)
+        setResetPasswordValue('')
+      } else {
+        toast.error(res.message || t('settings.operators.passwordFailed'))
+      }
+    } finally {
+      setOperatorBusyId(null)
+    }
+  }
+
+  const deleteOperator = async (operator: Operator) => {
+    if (!confirm(t('settings.operators.confirmDelete', { username: operator.username }))) return
+    setOperatorBusyId(operator.id)
+    try {
+      const res = await usersAPI.remove(operator.id)
+      if (res.success) {
+        setOperators((current) => current.filter((item) => item.id !== operator.id))
+        toast.success(t('settings.operators.deleted', { username: operator.username }))
+      } else {
+        // Own account or last administrator: the backend explains why.
+        toast.error(res.message || t('settings.operators.deleteFailed'))
+      }
+    } finally {
+      setOperatorBusyId(null)
     }
   }
 
@@ -1014,6 +1189,49 @@ export default function Settings() {
                 </button>
               )}
             </div>
+
+            {sgpFleetAvailable && (
+              <div className="mt-6 border-t border-border pt-5">
+                <h3 className="font-semibold">{t('settings.sgp.fleetTitle')}</h3>
+                <p className="mt-1 text-sm leading-6 text-muted-foreground">{t('settings.sgp.fleetHint')}</p>
+                <button
+                  type="button"
+                  onClick={() => void handleSgpSyncAll()}
+                  disabled={sgpSyncing}
+                  className="modern-button-secondary mt-4"
+                >
+                  <Icon name="refresh" size={16} className={`mr-2 ${sgpSyncing ? 'animate-spin' : ''}`} />
+                  {sgpSyncing ? t('settings.sgp.syncing') : t('settings.sgp.syncAll')}
+                </button>
+                {sgpSyncSummary ? (
+                  <>
+                    <dl className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+                      {([
+                        ['settings.sgp.syncTotal', sgpSyncSummary.total],
+                        ['settings.sgp.syncLinked', sgpSyncSummary.linked],
+                        ['settings.sgp.syncCreated', sgpSyncSummary.created],
+                        ['settings.sgp.syncUpdated', sgpSyncSummary.updated],
+                        ['settings.sgp.syncSkipped', sgpSyncSummary.skipped],
+                        ['settings.sgp.syncFailedCount', sgpSyncSummary.failed]
+                      ] as const).map(([labelKey, value]) => (
+                        <div key={labelKey}>
+                          <dt className="metric-label">{t(labelKey)}</dt>
+                          <dd className="data-value mt-1">{value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                    <p className="mt-3 text-xs text-muted-foreground">
+                      {t('settings.sgp.syncFinished', {
+                        time: formatDateTime(sgpSyncSummary.finishedAt),
+                        seconds: (sgpSyncSummary.durationMs / 1000).toFixed(1)
+                      })}
+                    </p>
+                  </>
+                ) : (
+                  <p className="mt-4 text-sm text-muted-foreground">{t('settings.sgp.syncNever')}</p>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -1087,6 +1305,205 @@ export default function Settings() {
                 </div>
                 <div className="mt-4">
                   <button onClick={submitChangePassword} className="modern-button">{t('settings.security.updatePassword')}</button>
+                </div>
+              </section>
+
+              <section className="rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h3 className="font-semibold text-foreground">{t('settings.operators.title')}</h3>
+                    <p className="mb-4 mt-1 text-sm text-muted-foreground">{t('settings.operators.description')}</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (creatingOperator) {
+                        resetOperatorForm()
+                      } else {
+                        setCreatingOperator(true)
+                      }
+                    }}
+                    className="modern-button shrink-0"
+                  >
+                    {t(creatingOperator ? 'common.cancel' : 'settings.operators.add')}
+                  </button>
+                </div>
+
+                {creatingOperator && (
+                  <div className="mb-6 rounded-md border border-border bg-card p-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label htmlFor="operator-username" className="block text-sm font-medium mb-1">
+                          {t('settings.operators.username')}
+                        </label>
+                        <input
+                          id="operator-username"
+                          value={operatorForm.username}
+                          onChange={(e) => setOperatorForm(f => ({ ...f, username: e.target.value }))}
+                          className="modern-input w-full"
+                          autoComplete="off"
+                          placeholder={t('settings.operators.usernamePlaceholder')}
+                        />
+                        <p className="field-hint">{t('settings.operators.usernameHint')}</p>
+                      </div>
+                      <div>
+                        <label htmlFor="operator-password" className="block text-sm font-medium mb-1">
+                          {t('settings.operators.password')}
+                        </label>
+                        <input
+                          id="operator-password"
+                          type="password"
+                          value={operatorForm.password}
+                          onChange={(e) => setOperatorForm(f => ({ ...f, password: e.target.value }))}
+                          className="modern-input w-full"
+                          autoComplete="new-password"
+                          placeholder={t('settings.operators.passwordPlaceholder')}
+                        />
+                        <p className="field-hint">{t('settings.operators.passwordHint')}</p>
+                      </div>
+                      <div>
+                        <label htmlFor="operator-role" className="block text-sm font-medium mb-1">
+                          {t('settings.operators.role')}
+                        </label>
+                        <select
+                          id="operator-role"
+                          value={operatorForm.role}
+                          onChange={(e) => setOperatorForm(f => ({ ...f, role: e.target.value as OperatorRole }))}
+                          className="modern-input w-full"
+                        >
+                          <option value="admin">{t('settings.operators.roleAdmin')}</option>
+                          <option value="viewer">{t('settings.operators.roleViewer')}</option>
+                        </select>
+                        <p className="field-hint">{t('settings.operators.roleHint')}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 mt-4">
+                      <button onClick={() => void submitOperator()} disabled={operatorSaving} className="modern-button">
+                        {operatorSaving ? t('common.saving') : t('settings.operators.create')}
+                      </button>
+                      <button onClick={resetOperatorForm} className="modern-button-secondary">{t('common.cancel')}</button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="overflow-x-auto">
+                  <table className="modern-table">
+                    <thead>
+                      <tr>
+                        <th>{t('settings.operators.username')}</th>
+                        <th>{t('settings.operators.role')}</th>
+                        <th>{t('settings.operators.createdAt')}</th>
+                        <th>{t('common.actions')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {operatorsLoading ? (
+                        <tr>
+                          <td colSpan={4} className="text-center py-8 text-muted-foreground">
+                            {t('settings.operators.loading')}
+                          </td>
+                        </tr>
+                      ) : operatorsError !== null ? (
+                        <tr>
+                          <td colSpan={4} className="text-center py-8 text-destructive">
+                            {operatorsError || t('settings.operators.loadFailed')}
+                          </td>
+                        </tr>
+                      ) : operators.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="text-center py-8 text-muted-foreground">
+                            {t('settings.operators.empty')}
+                          </td>
+                        </tr>
+                      ) : (
+                        operators.map((operator) => {
+                          const isSelf = currentUser?.id === operator.id
+                          return (
+                            <Fragment key={operator.id}>
+                              <tr>
+                                <td className="font-medium">
+                                  {operator.username}
+                                  {isSelf && (
+                                    <span className="modern-badge ml-2">{t('settings.operators.you')}</span>
+                                  )}
+                                </td>
+                                <td>
+                                  <select
+                                    value={operator.role}
+                                    disabled={operatorBusyId === operator.id}
+                                    onChange={(e) => void changeOperatorRole(operator, e.target.value as OperatorRole)}
+                                    className="modern-input w-40"
+                                    aria-label={t('settings.operators.roleFor', { username: operator.username })}
+                                  >
+                                    <option value="admin">{t('settings.operators.roleAdmin')}</option>
+                                    <option value="viewer">{t('settings.operators.roleViewer')}</option>
+                                  </select>
+                                </td>
+                                <td className="text-sm text-muted-foreground">{formatDateTime(operator.createdAt)}</td>
+                                <td>
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      onClick={() => {
+                                        setResetPasswordId((current) => (current === operator.id ? null : operator.id))
+                                        setResetPasswordValue('')
+                                      }}
+                                      className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                                      title={t('settings.operators.resetPassword')}
+                                      aria-label={t('settings.operators.resetPasswordFor', { username: operator.username })}
+                                    >
+                                      <Icon name="lock" size={18} />
+                                    </button>
+                                    <button
+                                      onClick={() => void deleteOperator(operator)}
+                                      disabled={operatorBusyId === operator.id}
+                                      className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                                      title={t('common.delete')}
+                                      aria-label={t('settings.operators.deleteFor', { username: operator.username })}
+                                    >
+                                      <Icon name="trash" size={18} />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                              {resetPasswordId === operator.id && (
+                                <tr>
+                                  <td colSpan={4}>
+                                    <div className="flex flex-col gap-2 py-2 sm:flex-row sm:items-center">
+                                      <label className="text-sm font-medium" htmlFor={`operator-new-password-${operator.id}`}>
+                                        {t('settings.operators.newPassword')}
+                                      </label>
+                                      <input
+                                        id={`operator-new-password-${operator.id}`}
+                                        type="password"
+                                        value={resetPasswordValue}
+                                        onChange={(e) => setResetPasswordValue(e.target.value)}
+                                        className="modern-input sm:w-72"
+                                        autoComplete="new-password"
+                                        placeholder={t('settings.operators.passwordPlaceholder')}
+                                      />
+                                      <button
+                                        onClick={() => void submitOperatorPassword(operator)}
+                                        disabled={operatorBusyId === operator.id}
+                                        className="modern-button"
+                                      >
+                                        {t('settings.operators.savePassword')}
+                                      </button>
+                                      <button
+                                        onClick={() => { setResetPasswordId(null); setResetPasswordValue('') }}
+                                        className="modern-button-secondary"
+                                      >
+                                        {t('common.cancel')}
+                                      </button>
+                                    </div>
+                                    <p className="field-hint">{t('settings.operators.resetPasswordHint')}</p>
+                                  </td>
+                                </tr>
+                              )}
+                            </Fragment>
+                          )
+                        })
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </section>
             </div>

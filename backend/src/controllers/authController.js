@@ -12,7 +12,7 @@ class AuthController {
       
       if (!username || !password) {
         return res.status(400).json(
-          createErrorResponse('Username and password are required')
+          createErrorResponse(req.t('auth.credentialsRequired'))
         );
       }
       const normalizedUsername = String(username).trim();
@@ -23,7 +23,7 @@ class AuthController {
       ) {
         await bcrypt.compare(String(password).slice(0, 128), DUMMY_PASSWORD_HASH);
         return res.status(401).json(
-          createErrorResponse('Invalid username or password')
+          createErrorResponse(req.t('auth.invalidCredentials'))
         );
       }
       
@@ -32,7 +32,7 @@ class AuthController {
       if (!user) {
         await bcrypt.compare(String(password), DUMMY_PASSWORD_HASH);
         return res.status(401).json(
-          createErrorResponse('Invalid username or password')
+          createErrorResponse(req.t('auth.invalidCredentials'))
         );
       }
       
@@ -40,14 +40,14 @@ class AuthController {
       
       if (!isMatch) {
         return res.status(401).json(
-          createErrorResponse('Invalid username or password')
+          createErrorResponse(req.t('auth.invalidCredentials'))
         );
       }
       
       const { accessToken, refreshToken } = generateTokens(user);
       
       return res.json(
-        createResponse('Login successful', {
+        createResponse(req.t('auth.loginSuccess'), {
           user: {
             id: user.id,
             username: user.username,
@@ -62,7 +62,7 @@ class AuthController {
     } catch (error) {
       console.error('Login error:', error);
       return res.status(500).json(
-        createErrorResponse('Internal server error', error.message)
+        createErrorResponse(req.t('common.internalError'), error.message)
       );
     }
   }
@@ -71,12 +71,12 @@ class AuthController {
     try {
       const count = await User.count();
       return res.json(
-        createResponse('Setup status retrieved', { needsSetup: count === 0 })
+        createResponse(req.t('auth.setupStatusRetrieved'), { needsSetup: count === 0 })
       );
     } catch (error) {
       console.error('Setup status error:', error);
       return res.status(500).json(
-        createErrorResponse('Failed to get setup status', error.message)
+        createErrorResponse(req.t('auth.setupStatusFailed'), error.message)
       );
     }
   }
@@ -87,20 +87,20 @@ class AuthController {
 
       if (!username || !password) {
         return res.status(400).json(
-          createErrorResponse('Username and password are required')
+          createErrorResponse(req.t('auth.credentialsRequired'))
         );
       }
 
       const normalizedUsername = String(username).trim();
       if (normalizedUsername.length < 3 || normalizedUsername.length > 64) {
         return res.status(400).json(
-          createErrorResponse('Username must be between 3 and 64 characters')
+          createErrorResponse(req.t('auth.usernameLength'))
         );
       }
 
       if (String(password).length < 8 || String(password).length > 128) {
         return res.status(400).json(
-          createErrorResponse('Password must be between 8 and 128 characters')
+          createErrorResponse(req.t('auth.passwordLength'))
         );
       }
 
@@ -114,7 +114,7 @@ class AuthController {
       const { accessToken, refreshToken } = generateTokens(user);
 
       return res.status(201).json(
-        createResponse('Admin account created successfully', {
+        createResponse(req.t('auth.adminCreated'), {
           user: { id: userId, username: normalizedUsername, role: 'admin' },
           token: accessToken,
           refreshToken
@@ -124,11 +124,11 @@ class AuthController {
       console.error('Setup admin error:', error);
       if (error.code === 'SETUP_COMPLETED') {
         return res.status(409).json(
-          createErrorResponse('Setup already completed')
+          createErrorResponse(req.t('auth.setupAlreadyCompleted'))
         );
       }
       return res.status(500).json(
-        createErrorResponse('Failed to create admin account', error.message)
+        createErrorResponse(req.t('auth.adminCreateFailed'), error.message)
       );
     }
   }
@@ -140,12 +140,12 @@ class AuthController {
       
       if (!user) {
         return res.status(404).json(
-          createErrorResponse('User not found')
+          createErrorResponse(req.t('auth.userNotFound'))
         );
       }
       
       return res.json(
-        createResponse('User retrieved successfully', {
+        createResponse(req.t('auth.userRetrieved'), {
           id: user.id,
           username: user.username,
           role: user.role,
@@ -156,7 +156,7 @@ class AuthController {
     } catch (error) {
       console.error('Get current user error:', error);
       return res.status(500).json(
-        createErrorResponse('Internal server error', error.message)
+        createErrorResponse(req.t('common.internalError'), error.message)
       );
     }
   }
@@ -164,7 +164,7 @@ class AuthController {
   static async logout(req, res) {
     await User.revokeSessions(req.user.userId);
     return res.json(
-      createResponse('Logout successful')
+      createResponse(req.t('auth.logoutSuccess'))
     );
   }
 
@@ -174,24 +174,24 @@ class AuthController {
       
       if (!refreshToken) {
         return res.status(400).json(
-          createErrorResponse('Refresh token is required')
+          createErrorResponse(req.t('auth.refreshTokenRequired'))
         );
       }
       if (typeof refreshToken !== 'string' || refreshToken.length > 4096) {
-        return res.status(403).json(createErrorResponse('Invalid refresh token'));
+        return res.status(403).json(createErrorResponse(req.t('auth.invalidRefreshToken')));
       }
       
       const decoded = verifyToken(refreshToken);
       
       if (!decoded) {
         return res.status(403).json(
-          createErrorResponse('Invalid refresh token')
+          createErrorResponse(req.t('auth.invalidRefreshToken'))
         );
       }
       
       if (!decoded.tokenType || decoded.tokenType !== 'refresh') {
         return res.status(403).json(
-          createErrorResponse('Invalid token type')
+          createErrorResponse(req.t('auth.invalidTokenType'))
         );
       }
       
@@ -199,20 +199,20 @@ class AuthController {
       
       if (!user) {
         return res.status(404).json(
-          createErrorResponse('User not found')
+          createErrorResponse(req.t('auth.userNotFound'))
         );
       }
 
       if (Number(user.token_version || 0) !== Number(decoded.tokenVersion || 0)) {
         return res.status(403).json(
-          createErrorResponse('Refresh session is no longer valid')
+          createErrorResponse(req.t('auth.refreshSessionInvalid'))
         );
       }
       
       const { accessToken, refreshToken: newRefreshToken } = generateTokens(user);
       
       return res.json(
-        createResponse('Token refreshed successfully', {
+        createResponse(req.t('auth.tokenRefreshed'), {
           token: accessToken,
           refreshToken: newRefreshToken
         })
@@ -220,7 +220,7 @@ class AuthController {
     } catch (error) {
       console.error('Refresh token error:', error);
       return res.status(500).json(
-        createErrorResponse('Internal server error', error.message)
+        createErrorResponse(req.t('common.internalError'), error.message)
       );
     }
   }
@@ -232,13 +232,13 @@ class AuthController {
       
       if (!currentPassword || !newPassword) {
         return res.status(400).json(
-          createErrorResponse('Current password and new password are required')
+          createErrorResponse(req.t('auth.passwordChangeRequired'))
         );
       }
 
       if (String(newPassword).length < 8 || String(newPassword).length > 128) {
         return res.status(400).json(
-          createErrorResponse('New password must be between 8 and 128 characters')
+          createErrorResponse(req.t('auth.newPasswordLength'))
         );
       }
       
@@ -246,7 +246,7 @@ class AuthController {
       
       if (!user) {
         return res.status(404).json(
-          createErrorResponse('User not found')
+          createErrorResponse(req.t('auth.userNotFound'))
         );
       }
       
@@ -254,7 +254,7 @@ class AuthController {
       
       if (!isMatch) {
         return res.status(401).json(
-          createErrorResponse('Current password is incorrect')
+          createErrorResponse(req.t('auth.currentPasswordIncorrect'))
         );
       }
       
@@ -262,12 +262,12 @@ class AuthController {
       await User.updatePassword(userId, hashedPassword);
       
       return res.json(
-        createResponse('Password updated successfully')
+        createResponse(req.t('auth.passwordUpdated'))
       );
     } catch (error) {
       console.error('Change password error:', error);
       return res.status(500).json(
-        createErrorResponse('Internal server error', error.message)
+        createErrorResponse(req.t('common.internalError'), error.message)
       );
     }
   }
@@ -279,14 +279,14 @@ class AuthController {
       
       if (!currentUsername || !newUsername) {
         return res.status(400).json(
-          createErrorResponse('Current username and new username are required')
+          createErrorResponse(req.t('auth.usernameChangeRequired'))
         );
       }
 
       const normalizedUsername = String(newUsername).trim();
       if (normalizedUsername.length < 3 || normalizedUsername.length > 64) {
         return res.status(400).json(
-          createErrorResponse('New username must be between 3 and 64 characters')
+          createErrorResponse(req.t('auth.newUsernameLength'))
         );
       }
       
@@ -294,13 +294,13 @@ class AuthController {
       
       if (!user) {
         return res.status(404).json(
-          createErrorResponse('User not found')
+          createErrorResponse(req.t('auth.userNotFound'))
         );
       }
       
       if (user.username !== currentUsername) {
         return res.status(401).json(
-          createErrorResponse('Current username is incorrect')
+          createErrorResponse(req.t('auth.currentUsernameIncorrect'))
         );
       }
       
@@ -308,19 +308,19 @@ class AuthController {
       
       if (existingUser) {
         return res.status(409).json(
-          createErrorResponse('Username already taken')
+          createErrorResponse(req.t('auth.usernameTaken'))
         );
       }
       
       await User.updateUsername(userId, normalizedUsername);
       
       return res.json(
-        createResponse('Username updated successfully')
+        createResponse(req.t('auth.usernameUpdated'))
       );
     } catch (error) {
       console.error('Change username error:', error);
       return res.status(500).json(
-        createErrorResponse('Internal server error', error.message)
+        createErrorResponse(req.t('common.internalError'), error.message)
       );
     }
   }

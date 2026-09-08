@@ -1,4 +1,5 @@
 import { getActiveLocale, translate } from '@/lib/i18n'
+import type { OperatorRole, User } from '@/types'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || ''
 
@@ -31,6 +32,9 @@ class ApiClient {
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
+      // The panel answers in the operator's chosen language, which is not
+      // necessarily the browser's, so the backend is told explicitly.
+      'Accept-Language': getActiveLocale(),
       ...options.headers as Record<string, string>,
     }
 
@@ -195,6 +199,26 @@ export const authAPI = {
     apiClient.post('/auth/change-username', { currentUsername, newUsername }),
 }
 
+// Operator accounts. Every route below is admin-only on the backend.
+// An operator and the signed-in user are the same record, so they share a type.
+export type Operator = User
+export type { OperatorRole }
+
+export const usersAPI = {
+  list: () =>
+    apiClient.get<{ users: Operator[] }>('/users'),
+
+  create: (payload: { username: string; password: string; role: OperatorRole }) =>
+    apiClient.post<{ user: Operator }>('/users', payload),
+
+  /** Sends only what changes: a role, a new password, or both. */
+  update: (id: number, payload: { role?: OperatorRole; password?: string }) =>
+    apiClient.requestWithBody<{ user: Operator }>('PATCH', `/users/${id}`, payload),
+
+  remove: (id: number) =>
+    apiClient.delete<{ id: number }>(`/users/${id}`),
+}
+
 export interface PortalPasswordResponse {
   customerId: string
   password: string
@@ -202,9 +226,31 @@ export interface PortalPasswordResponse {
 }
 
 // Devices API
+export interface DeviceListParams {
+  page?: number
+  pageSize?: number
+  search?: string
+  status?: 'all' | 'online' | 'offline'
+}
+
+export interface DeviceListResponse<T> {
+  devices: T[]
+  page: number
+  pageSize: number
+  total: number
+  totalPages: number
+}
+
 export const devicesAPI = {
-  getDevices: () =>
-    apiClient.get('/devices'),
+  getDevices: (params: DeviceListParams = {}) => {
+    const query = new URLSearchParams()
+    if (params.page !== undefined) query.set('page', String(params.page))
+    if (params.pageSize !== undefined) query.set('pageSize', String(params.pageSize))
+    if (params.search) query.set('search', params.search)
+    if (params.status && params.status !== 'all') query.set('status', params.status)
+    const search = query.toString()
+    return apiClient.get(`/devices${search ? `?${search}` : ''}`)
+  },
 
   getDashboard: (force = false) =>
     apiClient.get(`/devices/dashboard${force ? '?refresh=1' : ''}`),
@@ -306,6 +352,67 @@ export interface SgpContractLink {
   lastSyncedAt: string | null
 }
 
+export type SgpContractState = 'active' | 'blocked' | 'cancelled' | 'unknown'
+
+export interface SgpLinkRow {
+  deviceId: string
+  contract: string
+  clientName: string | null
+  plan: string | null
+  status: string | null
+  statusLabel: string | null
+  state: SgpContractState
+  linkMode: 'auto' | 'manual'
+  lastSyncedAt: string | null
+}
+
+export interface SgpDivergenceRow {
+  deviceId: string
+  contract: string
+  clientName: string | null
+  statusLabel: string | null
+  state: SgpContractState
+  lastInform: string | null
+}
+
+export interface SgpUnlinkedRow {
+  deviceId: string
+  customerId: string | null
+  pppoe: string | null
+}
+
+export interface SgpSyncSummary {
+  total: number
+  linked: number
+  created: number
+  updated: number
+  failed: number
+  skipped: number
+  durationMs: number
+  startedAt: string | null
+  finishedAt: string | null
+}
+
+export interface SgpFleetOverview {
+  enabled: boolean
+  // `totals` carries the full counts; the `divergences` lists are capped samples.
+  totals: {
+    devices: number
+    linked: number
+    unlinked: number
+    onlineBlocked: number
+    offlineActive: number
+  }
+  byState: Record<SgpContractState, number>
+  divergences: {
+    onlineBlocked: SgpDivergenceRow[]
+    offlineActive: SgpDivergenceRow[]
+    unlinked: SgpUnlinkedRow[]
+  }
+  lastSync: SgpSyncSummary | null
+  generatedAt: string
+}
+
 export interface SgpInvoice {
   id: string | null
   description: string | null
@@ -352,6 +459,15 @@ export const sgpAPI = {
 
   requestTrustUnlock: (deviceId: string) =>
     apiClient.post<{ contract: string }>(`/sgp/devices/${encodeURIComponent(deviceId)}/unlock`),
+
+  getLinks: () =>
+    apiClient.get<{ links: SgpLinkRow[] }>('/sgp/links'),
+
+  getOverview: () =>
+    apiClient.get<SgpFleetOverview>('/sgp/overview'),
+
+  syncAll: () =>
+    apiClient.post<SgpSyncSummary>('/sgp/sync'),
 }
 
 /* Vendors API */

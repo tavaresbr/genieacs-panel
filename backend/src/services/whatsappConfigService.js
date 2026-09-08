@@ -36,12 +36,18 @@ const adminKeyBox = createSecretBox('skygenpanel-evolution-admin-key-v1');
  * were already correct.
  */
 export class WaError extends Error {
-  constructor(message, { code = 'wa_error', status = 502, details = null } = {}) {
+  constructor(message, { code = 'wa_error', status = 502, details = null, vars = null, raw = false } = {}) {
     super(message);
     this.name = 'WaError';
     this.code = code;
     this.status = status;
     this.details = details;
+    // `message` is a translation key unless the caller says it is already text
+    // — the shape SgpError established, so one `translateError` handles both.
+    if (!raw) {
+      this.translationKey = message;
+      this.translationVars = vars;
+    }
   }
 }
 
@@ -157,10 +163,10 @@ class WhatsAppConfigService {
     if (patch.managedAdminKey !== undefined) managedAdminKey = String(patch.managedAdminKey).trim();
 
     if (next.enabled && !next.webhookBaseUrl) {
-      throw new WaError(
-        'Informe a URL pública do webhook antes de ativar a integração: é por ela que o servidor Evolution devolve QR, mensagens e recibos.',
-        { code: 'incomplete_config', status: 400 }
-      );
+      throw new WaError('whatsapp.error.incompleteConfig', {
+        code: 'incomplete_config',
+        status: 400
+      });
     }
 
     await AppState.upsert(CONFIG_KEY, JSON.stringify({
@@ -185,16 +191,16 @@ class WhatsAppConfigService {
     try {
       url = new URL(text);
     } catch {
-      throw new WaError('URL do webhook inválida', { code: 'invalid_webhook_url', status: 400 });
+      throw new WaError('whatsapp.error.invalidWebhookUrl', { code: 'invalid_webhook_url', status: 400 });
     }
     if (!['http:', 'https:'].includes(url.protocol)) {
-      throw new WaError('A URL do webhook precisa ser http ou https', {
+      throw new WaError('whatsapp.error.webhookUrlProtocol', {
         code: 'invalid_webhook_url',
         status: 400
       });
     }
     if (url.username || url.password) {
-      throw new WaError('A URL do webhook não pode conter usuário e senha', {
+      throw new WaError('whatsapp.error.webhookUrlCredentials', {
         code: 'invalid_webhook_url',
         status: 400
       });
@@ -214,13 +220,13 @@ class WhatsAppConfigService {
   static async assertTarget(baseUrl, config) {
     const url = normalizeEvoUrl(baseUrl);
     if (!url) {
-      throw new WaError('URL do servidor Evolution não configurada', {
+      throw new WaError('whatsapp.error.invalidBaseUrl', {
         code: 'invalid_base_url',
         status: 400
       });
     }
     if (!isHostAllowed(url, config.allowedHosts)) {
-      throw new WaError('Servidor Evolution fora da lista autorizada', {
+      throw new WaError('whatsapp.error.hostNotAllowed', {
         code: 'host_not_allowed',
         status: 400
       });
@@ -229,9 +235,10 @@ class WhatsAppConfigService {
       await assertPublicUrl(url);
     } catch (error) {
       if (error instanceof SsrfBlockedError) {
-        throw new WaError(`Servidor Evolution recusado: ${error.message}`, {
+        throw new WaError('whatsapp.error.blockedHost', {
           code: 'blocked_host',
-          status: 400
+          status: 400,
+          vars: { reason: error.message }
         });
       }
       throw error;

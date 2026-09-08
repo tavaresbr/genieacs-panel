@@ -4,16 +4,17 @@ import CustomerPortalPasswordService from '../services/customerPortalPasswordSer
 import CustomerAccount from '../models/CustomerAccount.js';
 import DeviceProfile from '../models/DeviceProfile.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
+import { translateError } from '../i18n/index.js';
 
 class DeviceController {
   static async getDashboard(req, res) {
     try {
       const dashboard = await DeviceService.getDashboardData(req.query.refresh === '1');
-      return res.json(createResponse('Dashboard data retrieved successfully', dashboard));
+      return res.json(createResponse(req.t('device.dashboardRetrieved'), dashboard));
     } catch (error) {
       console.error('Get dashboard error:', error);
       return res.status(502).json(
-        createErrorResponse('Failed to get dashboard data from GenieACS', error.message)
+        createErrorResponse(req.t('device.dashboardFailed'), error.message)
       );
     }
   }
@@ -22,11 +23,11 @@ class DeviceController {
     try {
       const faults = await DeviceService.getFaults(req.query.limit);
       void DeviceService.mergeDashboardFaults(faults);
-      return res.json(createResponse('Faults retrieved successfully', faults));
+      return res.json(createResponse(req.t('device.faultsRetrieved'), faults));
     } catch (error) {
       console.error('Get faults error:', error);
       return res.status(502).json(
-        createErrorResponse('Failed to get faults from GenieACS', error.message)
+        createErrorResponse(req.t('device.faultsFailed'), error.message)
       );
     }
   }
@@ -35,27 +36,36 @@ class DeviceController {
     try {
       await DeviceService.deleteFault(req.params.faultId);
       DeviceService.dashboardCache.expiresAt = 0;
-      return res.json(createResponse('Fault cleared successfully'));
+      return res.json(createResponse(req.t('device.faultCleared')));
     } catch (error) {
       console.error('Delete fault error:', error);
       const validationError = error.message === 'Invalid fault ID';
       return res.status(validationError ? 400 : 502).json(
-        createErrorResponse('Failed to clear GenieACS fault', error.message)
+        createErrorResponse(req.t('device.faultClearFailed'), error.message)
       );
     }
   }
 
   static async getDevices(req, res) {
     try {
-      const devices = await DeviceService.getDevices();
+      const { devices, page, pageSize, total, totalPages } =
+        await DeviceService.getDevicesPage(req.query);
+      // Customer accounts are written on demand, so decoration is deliberately
+      // limited to the page being returned instead of the whole fleet.
       const decoratedDevices = await CustomerService.decorateDevices(devices);
       return res.json(
-        createResponse('Devices retrieved successfully', decoratedDevices.reverse())
+        createResponse(req.t('device.listRetrieved'), {
+          devices: decoratedDevices,
+          page,
+          pageSize,
+          total,
+          totalPages
+        })
       );
     } catch (error) {
       console.error('Get devices error:', error);
       return res.status(500).json(
-        createErrorResponse('Failed to get devices', error.message)
+        createErrorResponse(req.t('device.listFailed'), error.message)
       );
     }
   }
@@ -66,22 +76,32 @@ class DeviceController {
       
       if (!deviceId) {
         return res.status(400).json(
-          createErrorResponse('Device ID is required')
+          createErrorResponse(req.t('device.idRequired'))
         );
       }
 
       const deviceDetail = await DeviceService.getDetailDevice(deviceId);
       const profile = await DeviceProfile.getByDeviceId(deviceId);
+      const reportedPppoe = deviceDetail.virtualParameters?.pppoeUsername?.value;
       let account = await CustomerAccount.getByDeviceId(deviceId);
-      if (!account && await CustomerService.isAutoGenerationEnabled()) {
+      // This page is where staff read the Customer ID and portal password
+      // before handing them over, so the account bound to the ONT is
+      // revalidated here: an ONT now serving a different PPPoE login must not
+      // present the previous subscriber's credentials.
+      const staleSubscriber = Boolean(
+        account
+        && String(reportedPppoe ?? '').trim().length >= 3
+        && !CustomerService.isSameSubscriber(account, reportedPppoe)
+      );
+      if ((!account || staleSubscriber) && await CustomerService.isAutoGenerationEnabled()) {
         account = await CustomerService.ensureAccount({
           _id: deviceId,
           softwareId: deviceDetail.deviceInfo?.softwareVersion,
-          pppoe: deviceDetail.virtualParameters?.pppoeUsername?.value
-        });
+          pppoe: reportedPppoe
+        }) || (staleSubscriber ? null : account);
       }
       return res.json(
-        createResponse('Device detail retrieved successfully', {
+        createResponse(req.t('device.detailRetrieved'), {
           ...deviceDetail,
           customer: {
             customerId: account?.customer_id || null,
@@ -95,14 +115,14 @@ class DeviceController {
     } catch (error) {
       console.error('Get device detail error:', error);
       
-      if (error.message === 'Device not found') {
+      if (error.translationKey === 'device.notFound') {
         return res.status(404).json(
-          createErrorResponse('Device not found', error.message)
+          createErrorResponse(req.t('device.notFound'), error.message)
         );
       }
       
       return res.status(500).json(
-        createErrorResponse('Failed to get device detail', error.message)
+        createErrorResponse(req.t('device.detailFailed'), error.message)
       );
     }
   }
@@ -116,7 +136,7 @@ class DeviceController {
       const account = await CustomerAccount.getByDeviceId(req.params.deviceId);
       if (!account) {
         return res.status(404).json(
-          createErrorResponse('This device has no customer account yet')
+          createErrorResponse(req.t('device.noCustomerAccount'))
         );
       }
       const password = CustomerPortalPasswordService.reveal(account);
@@ -125,7 +145,7 @@ class DeviceController {
           'No readable portal password is stored. Generate a new one.'
         ));
       }
-      return res.json(createResponse('Portal password retrieved', {
+      return res.json(createResponse(req.t('device.portalPasswordRetrieved'), {
         customerId: account.customer_id,
         password,
         updatedAt: account.password_updated_at || null
@@ -133,7 +153,7 @@ class DeviceController {
     } catch (error) {
       console.error('Get portal password error:', error);
       return res.status(500).json(
-        createErrorResponse('Failed to read the portal password', error.message)
+        createErrorResponse(req.t('device.portalPasswordReadFailed'), error.message)
       );
     }
   }
@@ -143,18 +163,18 @@ class DeviceController {
       const account = await CustomerAccount.getByDeviceId(req.params.deviceId);
       if (!account) {
         return res.status(404).json(
-          createErrorResponse('This device has no customer account yet')
+          createErrorResponse(req.t('device.noCustomerAccount'))
         );
       }
       const password = await CustomerPortalPasswordService.reset(account.id);
-      return res.json(createResponse('Portal password regenerated', {
+      return res.json(createResponse(req.t('device.portalPasswordRegenerated'), {
         customerId: account.customer_id,
         password
       }));
     } catch (error) {
       console.error('Reset portal password error:', error);
       return res.status(500).json(
-        createErrorResponse('Failed to regenerate the portal password', error.message)
+        createErrorResponse(req.t('device.portalPasswordResetFailed'), error.message)
       );
     }
   }
@@ -165,18 +185,18 @@ class DeviceController {
       
       if (!deviceId) {
         return res.status(400).json(
-          createErrorResponse('Device ID is required')
+          createErrorResponse(req.t('device.idRequired'))
         );
       }
 
       await DeviceService.deleteDevice(deviceId);
       return res.json(
-        createResponse('Device deleted successfully', { deviceId })
+        createResponse(req.t('device.deleted'), { deviceId })
       );
     } catch (error) {
       console.error('Delete device error:', error);
       return res.status(500).json(
-        createErrorResponse('Failed to delete device', error.message)
+        createErrorResponse(req.t('device.deleteFailed'), error.message)
       );
     }
   }
@@ -187,13 +207,13 @@ class DeviceController {
       
       if (!deviceId) {
         return res.status(400).json(
-          createErrorResponse('Device ID is required')
+          createErrorResponse(req.t('device.idRequired'))
         );
       }
 
       const result = await DeviceService.rebootDevice(deviceId);
       return res.json(
-        createResponse('Device reboot initiated successfully', { 
+        createResponse(req.t('device.rebootStarted'), { 
           deviceId, 
           taskResponse: result 
         })
@@ -201,7 +221,7 @@ class DeviceController {
     } catch (error) {
       console.error('Reboot device error:', error);
       return res.status(500).json(
-        createErrorResponse('Failed to reboot device', error.message)
+        createErrorResponse(req.t('device.rebootFailed'), error.message)
       );
     }
   }
@@ -211,19 +231,19 @@ class DeviceController {
 
     if (!deviceId) {
       return res.status(400).json(
-        createErrorResponse('Device ID is required')
+        createErrorResponse(req.t('device.idRequired'))
       );
     }
 
     try {
       const data = await DeviceService.summonDevice(deviceId, parameters);
       return res.json(
-        createResponse('Device summon task queued.', data)
+        createResponse(req.t('device.summonQueued'), data)
       );
     } catch (error) {
       console.error('Error summoning device:', error.message);
       return res.status(500).json(
-        createErrorResponse('Failed to summon device', error.message)
+        createErrorResponse(req.t('device.summonFailed'), error.message)
       );
     }
   }
@@ -233,17 +253,17 @@ class DeviceController {
     const { wanIndex, formData } = req.body;
     
     if (!wanIndex || !formData) {
-      return res.status(400).json({ success: false, message: 'Missing wanIndex or formData' });
+      return res.status(400).json({ success: false, message: req.t('device.wanFieldsRequired') });
     }
 
     try {
       const result = await DeviceService.updateWanConfig(id, wanIndex, formData);
-      return res.json(createResponse(result.message, result));
+      return res.json(createResponse(req.t(result.messageKey, result.messageVars), result));
     } catch (error) {
       console.error(`Error in updateWanConfig for ${id}:`, error);
       const validationError = /^(Invalid|VLAN ID|PPP |WAN |No editable|Only PPPoE|Vendor not found)/.test(error.message);
       res.status(validationError ? 400 : 500).json(
-        createErrorResponse('Failed to update WAN config', error.message)
+        createErrorResponse(req.t('device.wanUpdateFailed'), error.message)
       );
     }
   }
@@ -252,17 +272,22 @@ class DeviceController {
     const { id } = req.params;
     const { containerPath, type } = req.body || {};
     if (!containerPath || !type) {
-      return res.status(400).json(createErrorResponse('WAN container and connection type are required'));
+      return res.status(400).json(createErrorResponse(req.t('device.wanContainerRequired')));
     }
     try {
       const result = await DeviceService.addWanConnection(id, String(containerPath), String(type));
       DeviceService.dashboardCache.expiresAt = 0;
-      return res.json(createResponse(result.message, result));
+      return res.json(createResponse(req.t(result.messageKey, result.messageVars), result));
     } catch (error) {
       console.error(`Error adding WAN connection for ${id}:`, error);
-      const validationError = /^(Invalid WAN|Device not found)/.test(error.message);
+      if (error.translationKey) {
+        return res.status(error.status || 400).json(
+          createErrorResponse(translateError(req.t, error))
+        );
+      }
+      const validationError = /^Invalid WAN/.test(error.message);
       return res.status(validationError ? 400 : 502).json(
-        createErrorResponse('Failed to add WAN connection', error.message)
+        createErrorResponse(req.t('device.wanAddFailed'), error.message)
       );
     }
   }
@@ -271,7 +296,7 @@ class DeviceController {
     const { id } = req.params;
     const installationDate = CustomerService.normalizeInstallationDate(req.body?.installationDate);
     if (!installationDate) {
-      return res.status(400).json(createErrorResponse('Installation date must use YYYY-MM-DD'));
+      return res.status(400).json(createErrorResponse(req.t('device.installationDateFormat')));
     }
     try {
       const detail = await DeviceService.getDetailDevice(id);
@@ -290,16 +315,16 @@ class DeviceController {
           pppoe: detail.virtualParameters?.pppoeUsername?.value
         });
       }
-      return res.json(createResponse('Installation date saved and GenieACS tag synchronized', {
+      return res.json(createResponse(req.t('device.installationDateSaved'), {
         installationDate: profile.installation_date,
         installationTag,
         customerId: account?.customer_id || null
       }));
     } catch (error) {
       console.error(`Error saving installation date for ${id}:`, error);
-      const status = error.message === 'Device not found' ? 404 : 502;
+      const status = error.translationKey === 'device.notFound' ? 404 : 502;
       return res.status(status).json(
-        createErrorResponse('Failed to save installation date', error.message)
+        createErrorResponse(req.t('device.installationDateFailed'), error.message)
       );
     }
   }
@@ -309,17 +334,17 @@ class DeviceController {
     const { type, password } = req.body;
 
     if (!type || !password) {
-      return res.status(400).json({ success: false, message: 'Missing type or password' });
+      return res.status(400).json({ success: false, message: req.t('device.credentialFieldsRequired') });
     }
 
     try {
       const result = await DeviceService.updateCredentials(id, type, password);
-      res.json({ success: true, data: result, message: result.message });
+      res.json({ success: true, data: result, message: req.t(result.messageKey, result.messageVars) });
     } catch (error) {
       console.error(`Error in updateCredentials for ${id}:`, error);
       const validationError = /^(Invalid credential|Password must|VirtualParameter path)/.test(error.message);
       res.status(validationError ? 400 : 500).json(
-        createErrorResponse('Failed to update credentials', error.message)
+        createErrorResponse(req.t('device.credentialUpdateFailed'), error.message)
       );
     }
   }
@@ -328,17 +353,21 @@ class DeviceController {
     const { id } = req.params;
     const { index, formData } = req.body || {};
     if (index === undefined || !formData) {
-      return res.status(400).json(createErrorResponse('WiFi index and form data are required'));
+      return res.status(400).json(createErrorResponse(req.t('device.wifiFieldsRequired')));
     }
     try {
       const result = await DeviceService.updateWifiConfig(id, index, formData);
       DeviceService.dashboardCache.expiresAt = 0;
-      return res.json(createResponse(result.message, result));
+      return res.json(createResponse(req.t(result.messageKey, result.messageVars), result));
     } catch (error) {
       console.error(`Error in updateWifiConfig for ${id}:`, error);
-      const validationError = /^(WiFi |Device not found)/.test(error.message);
-      return res.status(validationError ? 400 : 500).json(
-        createErrorResponse('Failed to update WiFi configuration', error.message)
+      if (error.translationKey) {
+        return res.status(error.status || 400).json(
+          createErrorResponse(translateError(req.t, error))
+        );
+      }
+      return res.status(500).json(
+        createErrorResponse(req.t('device.wifiUpdateFailed'), error.message)
       );
     }
   }

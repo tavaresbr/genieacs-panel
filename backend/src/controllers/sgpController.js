@@ -1,18 +1,19 @@
 import SgpService, { SgpError } from '../services/sgpService.js';
 import SgpLink from '../models/SgpLink.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
+import { translateError } from '../i18n/index.js';
 
-function handleError(res, error, fallbackMessage) {
+function handleError(req, res, error, fallbackKey) {
   if (error instanceof SgpError) {
     // The code lets the UI distinguish "integration is off" from a real
     // failure without leaking SGP internals to the browser.
     return res.status(error.status).json({
-      ...createErrorResponse(error.message, error.details || error.code),
+      ...createErrorResponse(translateError(req.t, error), error.details || error.code),
       code: error.code
     });
   }
-  console.error(`${fallbackMessage}:`, error);
-  return res.status(500).json(createErrorResponse(fallbackMessage, error.message));
+  console.error(`${fallbackKey}:`, error);
+  return res.status(500).json(createErrorResponse(req.t(fallbackKey), error.message));
 }
 
 function readDeviceId(req) {
@@ -24,11 +25,11 @@ class SgpController {
   static async getConfig(req, res) {
     try {
       return res.json(createResponse(
-        'Configuração do SGP carregada',
+        req.t('sgp.configLoaded'),
         await SgpService.getPublicConfig()
       ));
     } catch (error) {
-      return handleError(res, error, 'Falha ao carregar a configuração do SGP');
+      return handleError(req, res, error, 'sgp.configLoadFailed');
     }
   }
 
@@ -47,9 +48,9 @@ class SgpController {
         invoiceLimit: body.invoiceLimit,
         endpoints: body.endpoints
       });
-      return res.json(createResponse('Configuração do SGP salva', config));
+      return res.json(createResponse(req.t('sgp.configSaved'), config));
     } catch (error) {
-      return handleError(res, error, 'Falha ao salvar a configuração do SGP');
+      return handleError(req, res, error, 'sgp.configSaveFailed');
     }
   }
 
@@ -64,12 +65,12 @@ class SgpController {
         contract: body.contract,
         login: body.login
       });
-      return res.json(createResponse(
-        result.message || 'Conexão com o SGP estabelecida',
-        result
-      ));
+      const message = result.messageKey
+        ? req.t(result.messageKey, result.messageVars)
+        : (result.message || req.t('sgp.connectionOk'));
+      return res.json(createResponse(message, result));
     } catch (error) {
-      return handleError(res, error, 'Falha ao testar a conexão com o SGP');
+      return handleError(req, res, error, 'sgp.connectionTestFailed');
     }
   }
 
@@ -81,11 +82,44 @@ class SgpController {
         login: req.query?.login
       });
       return res.json(createResponse(
-        message || `${contracts.length} contrato(s) encontrado(s)`,
+        message || req.t('sgp.contractsFound', { count: contracts.length }),
         { contracts }
       ));
     } catch (error) {
-      return handleError(res, error, 'Falha ao consultar o cliente no SGP');
+      return handleError(req, res, error, 'sgp.lookupFailed');
+    }
+  }
+
+  static async listLinks(req, res) {
+    try {
+      const links = await SgpService.listLinks();
+      return res.json(createResponse(
+        req.t('sgp.linksLoaded', { count: links.length }),
+        { links }
+      ));
+    } catch (error) {
+      return handleError(req, res, error, 'sgp.linksLoadFailed');
+    }
+  }
+
+  static async syncFleet(req, res) {
+    try {
+      const result = await SgpService.syncFleet();
+      return res.json(createResponse(
+        req.t('sgp.syncDone', { linked: result.linked, total: result.total }),
+        result
+      ));
+    } catch (error) {
+      return handleError(req, res, error, 'sgp.syncFailed');
+    }
+  }
+
+  static async getOverview(req, res) {
+    try {
+      const overview = await SgpService.getFleetOverview();
+      return res.json(createResponse(req.t('sgp.overviewLoaded'), overview));
+    } catch (error) {
+      return handleError(req, res, error, 'sgp.overviewFailed');
     }
   }
 
@@ -93,7 +127,7 @@ class SgpController {
     try {
       const deviceId = readDeviceId(req);
       if (!deviceId) {
-        return res.status(400).json(createErrorResponse('Device ID é obrigatório'));
+        return res.status(400).json(createErrorResponse(req.t('sgp.deviceIdRequired')));
       }
       const refresh = req.query?.refresh === '1' || req.query?.refresh === 'true';
       const { link } = await SgpService.resolveDeviceContract(deviceId, { refresh });
@@ -110,13 +144,13 @@ class SgpController {
           invoiceError = error instanceof SgpError ? error.message : 'Falha ao consultar títulos';
         }
       }
-      return res.json(createResponse('Dados do SGP carregados', {
+      return res.json(createResponse(req.t('sgp.dataLoaded'), {
         link: SgpService.publicLink(link),
         invoices,
         invoiceError
       }));
     } catch (error) {
-      return handleError(res, error, 'Falha ao carregar os dados do SGP');
+      return handleError(req, res, error, 'sgp.dataLoadFailed');
     }
   }
 
@@ -124,17 +158,17 @@ class SgpController {
     try {
       const deviceId = readDeviceId(req);
       if (!deviceId) {
-        return res.status(400).json(createErrorResponse('Device ID é obrigatório'));
+        return res.status(400).json(createErrorResponse(req.t('sgp.deviceIdRequired')));
       }
       const link = await SgpService.linkDevice(deviceId, {
         contract: req.body?.contract,
         document: req.body?.document
       });
-      return res.json(createResponse('Contrato do SGP vinculado ao ONT', {
+      return res.json(createResponse(req.t('sgp.contractLinked'), {
         link: SgpService.publicLink(link)
       }));
     } catch (error) {
-      return handleError(res, error, 'Falha ao vincular o contrato do SGP');
+      return handleError(req, res, error, 'sgp.linkFailed');
     }
   }
 
@@ -142,15 +176,15 @@ class SgpController {
     try {
       const deviceId = readDeviceId(req);
       if (!deviceId) {
-        return res.status(400).json(createErrorResponse('Device ID é obrigatório'));
+        return res.status(400).json(createErrorResponse(req.t('sgp.deviceIdRequired')));
       }
       const removed = await SgpService.unlinkDevice(deviceId);
       if (!removed) {
-        return res.status(404).json(createErrorResponse('Nenhum vínculo com o SGP para este ONT'));
+        return res.status(404).json(createErrorResponse(req.t('sgp.noLink')));
       }
-      return res.json(createResponse('Vínculo com o SGP removido'));
+      return res.json(createResponse(req.t('sgp.linkRemoved')));
     } catch (error) {
-      return handleError(res, error, 'Falha ao remover o vínculo com o SGP');
+      return handleError(req, res, error, 'sgp.unlinkFailed');
     }
   }
 
@@ -158,7 +192,7 @@ class SgpController {
     try {
       const deviceId = readDeviceId(req);
       if (!deviceId) {
-        return res.status(400).json(createErrorResponse('Device ID é obrigatório'));
+        return res.status(400).json(createErrorResponse(req.t('sgp.deviceIdRequired')));
       }
       const link = await SgpLink.getByDeviceId(deviceId);
       const contract = link?.contract
@@ -166,7 +200,7 @@ class SgpController {
       const result = await SgpService.requestTrustUnlock({ contract });
       return res.json(createResponse(result.message, { contract }));
     } catch (error) {
-      return handleError(res, error, 'Falha ao solicitar a liberação em confiança');
+      return handleError(req, res, error, 'sgp.unlockFailed');
     }
   }
 }

@@ -1,8 +1,10 @@
 import crypto from 'node:crypto';
 import CustomerAccount from '../models/CustomerAccount.js';
+import SgpLink from '../models/SgpLink.js';
 import CustomerPortalPasswordService from './customerPortalPasswordService.js';
 import DeviceProfile from '../models/DeviceProfile.js';
 import Setting from '../models/Setting.js';
+import { TranslatableError } from '../i18n/index.js';
 
 const CUSTOMER_ID_PATTERN = /^[A-Z]{2,4}-[A-Z0-9]{7}-[A-Z0-9]{6}$/;
 const ID_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -95,21 +97,69 @@ class CustomerService {
     return CUSTOMER_ID_PATTERN.test(customerId) ? customerId : null;
   }
 
+  /**
+   * The PPPoE login is what identifies a subscriber. The software version is
+   * not: a firmware upgrade must never look like a change of customer.
+   */
+  static isSameSubscriber(account, pppoeUsername) {
+    const stored = String(account?.pppoe_username ?? '').trim().toLowerCase();
+    const incoming = String(pppoeUsername ?? '').trim().toLowerCase();
+    return Boolean(stored) && stored === incoming;
+  }
+
+  /**
+   * Closes the account of the previous subscriber of an ONT and drops anything
+   * bound to that device, so the incoming subscriber starts from a clean slate
+   * instead of inheriting a Customer ID, a portal password, saved WiFi
+   * credentials and an SGP contract that belong to someone else.
+   */
+  static async retireAccount(account, incomingPppoe) {
+    const previousDeviceId = account.device_id;
+    // Retiring is destructive: the subscriber gets a new Customer ID and a new
+    // portal password. Log it so a misreported PPPoE login is visible rather
+    // than silently re-issuing credentials for a live customer.
+    console.warn(
+      `Device ${previousDeviceId} now reports PPPoE "${incomingPppoe}" instead of `
+      + `"${account.pppoe_username}"; retiring customer account ${account.customer_id}.`
+    );
+    await CustomerAccount.retire(account.id);
+    try {
+      await SgpLink.deleteByDeviceId(previousDeviceId);
+    } catch (error) {
+      console.warn(`Unable to drop the SGP link of a retired account: ${error.message}`);
+    }
+    return account;
+  }
+
   static async ensureAccount(device) {
     const deviceId = normalizeIdentityValue(device?._id);
     const softwareId = normalizeIdentityValue(device?.softwareId);
     const pppoeUsername = normalizeIdentityValue(device?.pppoe);
     if (!deviceId || !softwareId || !pppoeUsername) return null;
 
+    const identityHash = this.identityHash(softwareId, pppoeUsername);
+
     const existingByDevice = await CustomerAccount.getByDeviceId(deviceId);
     if (existingByDevice) {
-      return CustomerAccount.touch(existingByDevice.id, deviceId);
+      if (this.isSameSubscriber(existingByDevice, pppoeUsername)) {
+        // Same subscriber; refresh the stored identity so a firmware upgrade
+        // does not leave the account describing an old software version.
+        return this.touchIdentity(existingByDevice, deviceId, softwareId, identityHash);
+      }
+      // The ONT was re-provisioned for someone else.
+      await this.retireAccount(existingByDevice, pppoeUsername);
     }
 
-    const identityHash = this.identityHash(softwareId, pppoeUsername);
     const existingByIdentity = await CustomerAccount.getByIdentityHash(identityHash);
     if (existingByIdentity) {
       return CustomerAccount.touch(existingByIdentity.id, deviceId);
+    }
+
+    // The same subscriber on a replacement ONT: the device ID and the software
+    // version both changed, so only the PPPoE login still matches.
+    const existingByPppoe = await CustomerAccount.getActiveByPppoe(pppoeUsername);
+    if (existingByPppoe) {
+      return this.touchIdentity(existingByPppoe, deviceId, softwareId, identityHash);
     }
 
     const generationSettings = await this.getGenerationSettings();
@@ -149,7 +199,28 @@ class CustomerService {
         if (concurrent) return concurrent;
       }
     }
-    throw new Error('Unable to allocate a unique customer ID');
+    throw new TranslatableError('settings.customerIdAllocationFailed');
+  }
+
+  /**
+   * Moves an account onto a device and refreshes its identity columns. The
+   * identity hash is unique, so a collision with another row leaves the stored
+   * hash alone rather than failing the sync.
+   */
+  static async touchIdentity(account, deviceId, softwareId, identityHash) {
+    try {
+      return await CustomerAccount.touch(account.id, deviceId, {
+        software_id: softwareId,
+        identity_hash: identityHash
+      });
+    } catch (error) {
+      const duplicate =
+        error.code === 'SQLITE_CONSTRAINT_UNIQUE' ||
+        error.code === 'ER_DUP_ENTRY' ||
+        /unique/i.test(error.message);
+      if (!duplicate) throw error;
+      return CustomerAccount.touch(account.id, deviceId);
+    }
   }
 
   static async syncDevices(devices, { enabled } = {}) {
@@ -157,19 +228,31 @@ class CustomerService {
     const deviceIds = devices.map((device) => String(device?._id || '')).filter(Boolean);
     let rows = await CustomerAccount.getIdsByDeviceIds(deviceIds);
 
-    if (shouldGenerate && rows.length < deviceIds.length) {
-      const existingDeviceIds = new Set(rows.map((row) => row.device_id));
-      const missing = devices.filter((device) => (
-        device?._id && !existingDeviceIds.has(String(device._id))
-      ));
+    if (shouldGenerate) {
+      const storedByDeviceId = new Map(rows.map((row) => [row.device_id, row]));
+      // A device with no account needs one; a device whose account still names
+      // the previous subscriber's PPPoE login needs that account retired before
+      // the new subscriber inherits it.
+      const pending = devices.filter((device) => {
+        if (!device?._id) return false;
+        const stored = storedByDeviceId.get(String(device._id));
+        if (!stored) return true;
+        // A blank or implausibly short login is a reporting gap, not a new
+        // subscriber, and must never cost a live customer their credentials.
+        const reported = normalizeIdentityValue(device.pppoe);
+        if (reported.length < 3) return false;
+        return !this.isSameSubscriber(stored, reported);
+      });
       // Keep database pressure bounded while avoiding a slow one-by-one sync
       // for larger GenieACS fleets.
-      for (let offset = 0; offset < missing.length; offset += 10) {
+      for (let offset = 0; offset < pending.length; offset += 10) {
         await Promise.all(
-          missing.slice(offset, offset + 10).map((device) => this.ensureAccount(device))
+          pending.slice(offset, offset + 10).map((device) => this.ensureAccount(device))
         );
       }
-      rows = await CustomerAccount.getIdsByDeviceIds(deviceIds);
+      if (pending.length > 0) {
+        rows = await CustomerAccount.getIdsByDeviceIds(deviceIds);
+      }
     }
 
     return new Map(rows.map((row) => [row.device_id, row.customer_id]));

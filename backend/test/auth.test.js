@@ -59,6 +59,7 @@ describe('operator login', () => {
   it('rejects a wrong password without revealing which field failed', async () => {
     const { status, body } = await call(`${panelUrl}/api/auth/login`, {
       method: 'POST',
+      headers: { 'Accept-Language': 'en' },
       body: { username: admin.username, password: 'wrong-password' }
     });
     assert.equal(status, 401);
@@ -68,6 +69,7 @@ describe('operator login', () => {
   it('rejects an unknown user with the same message', async () => {
     const { status, body } = await call(`${panelUrl}/api/auth/login`, {
       method: 'POST',
+      headers: { 'Accept-Language': 'en' },
       body: { username: 'nobody', password: 'wrong-password' }
     });
     assert.equal(status, 401);
