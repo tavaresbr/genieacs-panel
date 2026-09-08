@@ -48,6 +48,8 @@ SkyGenPanel is a management layer for GenieACS deployments. It combines an opera
 - Network topology editor with Google Maps and OpenStreetMap-compatible providers.
 - Automatic Customer ID generation that can be enabled or disabled in Settings.
 - Independent portal passwords per customer, generated automatically and rotatable from the device page.
+- Operator accounts with an administrator and a read-only role.
+- Server-side paging, search and status filtering for large ONT fleets.
 - Encrypted recovery of the last WiFi password changed through the customer portal.
 - SGP integration for subscriber contract, plan, and open-invoice data, with fleet-wide synchronization, contract-state filtering, and optional invoice display and trust unlock in the customer portal.
 - Automatic Linux dependency and Node.js installation during both first install and CLI updates.
@@ -162,6 +164,54 @@ receives a freshly generated password in the background, and the log reports how
 many were issued. Reveal the new password from the device page before sharing it —
 the old one no longer works.
 
+## Customer Account Lifecycle
+
+A customer account is bound to an ONT, and the **PPPoE login is what identifies
+the subscriber** behind it. The software version is not: a firmware upgrade
+refreshes the stored identity in place and changes nothing else.
+
+- **Replacement ONT, same subscriber** — the account, Customer ID and portal
+  password follow the subscriber to the new device.
+- **Same ONT, new subscriber** — when the fleet sync sees a device reporting a
+  different PPPoE login, the previous account is *retired*: it is deactivated,
+  its Customer ID and portal password stop working, and its SGP contract link is
+  dropped. The incoming subscriber gets a fresh account. Without this the new
+  occupant of a recycled ONT would inherit the previous customer's Customer ID,
+  portal password, saved WiFi credentials, and their contract, plan and open
+  invoices from SGP.
+
+Retirement is destructive, so it is logged at warning level with both PPPoE
+logins:
+
+```
+Device <id> now reports PPPoE "b@isp" instead of "a@isp"; retiring customer account CSG-…
+```
+
+Watch that line after changing the `vpPppoeUsername` virtual parameter — a
+misreported login there is the one way a live customer could be retired by
+mistake. Retired rows are kept in `customer_accounts` with `active = 0`, so a
+mistake can be inspected and undone in the database.
+
+## Operator Accounts
+
+**Settings → Operators** (administrators only) manages who can sign in to the
+panel. Two roles exist:
+
+| Role | May do |
+| --- | --- |
+| `admin` | Everything, including settings, device changes, the database, SGP and operator management |
+| `viewer` | Read the dashboard, the device list and GenieACS faults; every administrative route answers `403` |
+
+The panel always keeps at least one administrator: the last one cannot be
+demoted or deleted, and you cannot demote or delete the account you are signed
+in with. Changing an operator's role or password revokes their existing sessions
+immediately.
+
+A viewer sees only the dashboard and the device list; the network map and
+settings are hidden from the navigation and redirect to the dashboard if the
+URL is entered directly. The backend enforces the same boundary independently,
+so the UI is a convenience rather than the control.
+
 ## SGP Integration
 
 Open **Settings → SGP integration** (*Integração SGP*) to connect the panel to
@@ -176,6 +226,11 @@ blocked or cancelled, a contract that is active while the ONT stays silent, and 
 device with no contract linked. See
 [`docs/sgp-integration.md`](docs/sgp-integration.md) for setup, endpoints, and
 troubleshooting.
+
+Invoices are always read live from SGP. The contract behind a device (holder,
+plan, status) is cached for 24 hours and re-read after that, and a cached link
+recorded for a different customer account than the device currently serves is
+discarded rather than shown.
 
 ## Database Migration
 
@@ -247,6 +302,7 @@ phrased it, since only the provider can translate it.
 ## Architecture
 
 - **Backend:** Node.js, Express 5, Knex, SQLite, MySQL, and JWT.
+- **Schema:** ordered, recorded migrations in `backend/src/config/migrations.js`; every applied step is stored in a `schema_migrations` table, and a database created before the runner existed is baselined on first boot rather than rebuilt.
 - **Frontend:** Vite, React, React Router, TypeScript, and Tailwind CSS.
 - **Deployment:** `systemd`, hardened service boundaries, automatic dependency installation, and an update-safe CLI.
 - **Integration:** GenieACS NBI with typed task values and multi-vendor parameter discovery.
@@ -264,7 +320,9 @@ The operator and customer APIs use separate listeners. Administrative routes are
 - Same-origin mutation checks, strict CSP, security headers, and request-size limits.
 - Dedicated rate limits for login, portal API access, WiFi mutations, and password reveals.
 - Authenticated portal limits keyed per customer account, so one visitor cannot exhaust the quota for the rest of the customer base behind a shared proxy address.
-- Session revocation after operator password changes and logout.
+- Session revocation after operator password changes, role changes and logout.
+- A recycled ONT retires the previous subscriber's account instead of handing it to the next one.
+- Internal error text is returned only when `APP_ENV=development` is set explicitly.
 - Loopback-only listeners by default.
 - Hardened `systemd` unit with restricted write paths and `NoNewPrivileges`.
 

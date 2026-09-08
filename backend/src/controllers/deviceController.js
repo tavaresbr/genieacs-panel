@@ -48,10 +48,19 @@ class DeviceController {
 
   static async getDevices(req, res) {
     try {
-      const devices = await DeviceService.getDevices();
+      const { devices, page, pageSize, total, totalPages } =
+        await DeviceService.getDevicesPage(req.query);
+      // Customer accounts are written on demand, so decoration is deliberately
+      // limited to the page being returned instead of the whole fleet.
       const decoratedDevices = await CustomerService.decorateDevices(devices);
       return res.json(
-        createResponse(req.t('device.listRetrieved'), decoratedDevices.reverse())
+        createResponse(req.t('device.listRetrieved'), {
+          devices: decoratedDevices,
+          page,
+          pageSize,
+          total,
+          totalPages
+        })
       );
     } catch (error) {
       console.error('Get devices error:', error);
@@ -73,13 +82,23 @@ class DeviceController {
 
       const deviceDetail = await DeviceService.getDetailDevice(deviceId);
       const profile = await DeviceProfile.getByDeviceId(deviceId);
+      const reportedPppoe = deviceDetail.virtualParameters?.pppoeUsername?.value;
       let account = await CustomerAccount.getByDeviceId(deviceId);
-      if (!account && await CustomerService.isAutoGenerationEnabled()) {
+      // This page is where staff read the Customer ID and portal password
+      // before handing them over, so the account bound to the ONT is
+      // revalidated here: an ONT now serving a different PPPoE login must not
+      // present the previous subscriber's credentials.
+      const staleSubscriber = Boolean(
+        account
+        && String(reportedPppoe ?? '').trim().length >= 3
+        && !CustomerService.isSameSubscriber(account, reportedPppoe)
+      );
+      if ((!account || staleSubscriber) && await CustomerService.isAutoGenerationEnabled()) {
         account = await CustomerService.ensureAccount({
           _id: deviceId,
           softwareId: deviceDetail.deviceInfo?.softwareVersion,
-          pppoe: deviceDetail.virtualParameters?.pppoeUsername?.value
-        });
+          pppoe: reportedPppoe
+        }) || (staleSubscriber ? null : account);
       }
       return res.json(
         createResponse(req.t('device.detailRetrieved'), {

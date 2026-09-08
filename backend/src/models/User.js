@@ -20,9 +20,35 @@ class User {
   }
 
   static async create(userData) {
-    const { username, password, role = 'user' } = userData;
+    const { username, password, role = 'viewer' } = userData;
     const [id] = await getDb()('users').insert({ username, password, role });
     return id;
+  }
+
+  static async list() {
+    return getDb()('users')
+      .select('id', 'username', 'role', 'created_at', 'updated_at')
+      .orderBy('id', 'asc');
+  }
+
+  static async countByRole(role) {
+    const row = await getDb()('users').where({ role }).count({ n: '*' }).first();
+    return Number(row?.n || 0);
+  }
+
+  /** Role changes revoke the user's sessions so the new role applies at once. */
+  static async updateRole(id, role) {
+    await getDb()('users')
+      .where({ id })
+      .update({
+        role,
+        token_version: getDb().raw('token_version + 1'),
+        updated_at: new Date()
+      });
+  }
+
+  static async remove(id) {
+    return getDb()('users').where({ id }).del();
   }
 
   static async createInitialAdmin(userData) {

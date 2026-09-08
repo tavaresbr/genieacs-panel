@@ -54,6 +54,8 @@ export default {
   'rateLimit.portalBilling': 'Too many invoice lookups. Wait a moment and try again.',
   'rateLimit.portalUnlock': 'Trust-unlock request limit reached. Try again later.',
   'rateLimit.portalPasswordAdmin': 'Too many portal password requests, please slow down',
+  'rateLimit.sgpAdmin': 'Too many SGP requests, please slow down',
+  'rateLimit.sgpSync': 'Too many fleet synchronizations. Try again later.',
 
   // Devices
   'device.idRequired': 'The device ID is required',
