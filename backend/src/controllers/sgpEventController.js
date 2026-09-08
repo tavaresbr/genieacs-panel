@@ -1,4 +1,4 @@
-import SgpEvent from '../models/SgpEvent.js';
+import SgpEvent, { publicEvent } from '../models/SgpEvent.js';
 import SgpEventService from '../services/sgpEventService.js';
 import SgpService, { SgpError, WEBHOOK_PATH } from '../services/sgpService.js';
 import { verifyWebhookSignature } from '../utils/webhookSignature.js';
@@ -84,7 +84,9 @@ class SgpEventController {
         contract: req.query?.contract ?? null,
         limit: req.query?.limit
       });
-      return res.json(createResponse(req.t('sgp.events.loaded'), { events }));
+      return res.json(createResponse(req.t('sgp.events.loaded'), {
+        events: events.map((event) => publicEvent(event))
+      }));
     } catch (error) {
       return handleError(req, res, error, 'sgp.events.loadFailed');
     }
@@ -94,7 +96,7 @@ class SgpEventController {
     try {
       const event = await SgpEvent.getById(Number(req.params?.id));
       if (!event) return res.status(404).json(createErrorResponse(req.t('sgp.events.notFound')));
-      return res.json(createResponse(req.t('sgp.events.loaded'), { event }));
+      return res.json(createResponse(req.t('sgp.events.loaded'), { event: publicEvent(event) }));
     } catch (error) {
       return handleError(req, res, error, 'sgp.events.loadFailed');
     }
@@ -104,7 +106,7 @@ class SgpEventController {
     try {
       const event = await SgpEventService.retry(Number(req.params?.id));
       if (!event) return res.status(404).json(createErrorResponse(req.t('sgp.events.notFound')));
-      return res.json(createResponse(req.t('sgp.events.retried'), { event }));
+      return res.json(createResponse(req.t('sgp.events.retried'), { event: publicEvent(event) }));
     } catch (error) {
       return handleError(req, res, error, 'sgp.events.retryFailed');
     }

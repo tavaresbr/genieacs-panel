@@ -132,7 +132,9 @@ class ProvisioningController {
       // Run it inline so the operator sees the outcome instead of a promise,
       // then hand back whatever state the run reached.
       const run = await ProvisioningService.executeRun(queued);
-      return res.json(createResponse(req.t('provisioning.runFinished'), { run }));
+      return res.json(createResponse(req.t('provisioning.runFinished'), {
+        run: ProvisioningService.publicRun(run, req.t)
+      }));
     } catch (error) {
       return handleError(req, res, error, 'provisioning.runFailed');
     }
@@ -143,7 +145,9 @@ class ProvisioningController {
       const deviceId = readDeviceId(req);
       if (!deviceId) return res.status(400).json(createErrorResponse(req.t('sgp.deviceIdRequired')));
       const runs = await ProvisioningRun.listByDeviceId(deviceId, req.query?.limit);
-      return res.json(createResponse(req.t('provisioning.runsLoaded'), { runs }));
+      return res.json(createResponse(req.t('provisioning.runsLoaded'), {
+        runs: runs.map((run) => ProvisioningService.publicRun(run, req.t))
+      }));
     } catch (error) {
       return handleError(req, res, error, 'provisioning.runsLoadFailed');
     }
@@ -156,7 +160,9 @@ class ProvisioningController {
         status: req.query?.status ?? null,
         limit: req.query?.limit
       });
-      return res.json(createResponse(req.t('provisioning.runsLoaded'), { runs }));
+      return res.json(createResponse(req.t('provisioning.runsLoaded'), {
+        runs: runs.map((run) => ProvisioningService.publicRun(run, req.t))
+      }));
     } catch (error) {
       return handleError(req, res, error, 'provisioning.runsLoadFailed');
     }

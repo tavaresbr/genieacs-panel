@@ -6,6 +6,8 @@ import { useToast } from '@/components/ui/toast'
 import { useLoading } from '@/components/ui/loading'
 import { Icon } from '@/components/ui/icon'
 import { LanguageSwitcher } from '@/components/language-switcher'
+import { ProvisioningTab } from '@/components/settings/provisioning-tab'
+import { SgpEventsPanel } from '@/components/settings/sgp-events-panel'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
 import type { Vendor as VendorType, WifiSecurityConfig as WifiSecurityConfigType } from '@/types'
@@ -569,6 +571,15 @@ export default function Settings() {
               {t('settings.tab.sgp')}
             </button>
             <button
+              onClick={() => setActiveTab('provisioning')}
+              className="tab-button"
+              data-active={activeTab === 'provisioning'}
+              role="tab"
+              aria-selected={activeTab === 'provisioning'}
+            >
+              {t('settings.tab.provisioning')}
+            </button>
+            <button
               onClick={() => setActiveTab('security')}
               className="tab-button"
               data-active={activeTab === 'security'}
@@ -1014,8 +1025,12 @@ export default function Settings() {
                 </button>
               )}
             </div>
+
+            <SgpEventsPanel config={sgpConfig} onConfigChange={setSgpConfig} />
           </div>
         )}
+
+        {activeTab === 'provisioning' && <ProvisioningTab />}
 
         {activeTab === 'security' && (
           <div className="modern-card max-w-5xl p-5 sm:p-6">

@@ -217,7 +217,7 @@ describe('webhook delivery', () => {
     const { body: listed } = await call(`${panelUrl}/api/sgp/events?status=ignored`, {
       headers: authHeaders(token)
     });
-    const stored = listed.data.events.find((event) => event.raw_type === 'coisa_nova');
+    const stored = listed.data.events.find((event) => event.rawType === 'coisa_nova');
     assert.ok(stored, 'an unmapped event is kept so the map can be extended');
     assert.equal(stored.type, 'unknown');
     assert.ok(stored.payload.includes('coisa_nova'));

@@ -1,5 +1,27 @@
 import { getDb } from '../config/database.js';
 
+/** Event view for the API. */
+export function publicEvent(event) {
+  if (!event) return null;
+  return {
+    id: event.id,
+    source: event.source,
+    type: event.type,
+    rawType: event.raw_type,
+    contract: event.contract,
+    document: event.document,
+    login: event.login,
+    deviceId: event.device_id,
+    status: event.status,
+    attempts: event.attempts,
+    payload: event.payload,
+    error: event.error,
+    occurredAt: event.occurred_at ? new Date(event.occurred_at).toISOString() : null,
+    receivedAt: event.received_at ? new Date(event.received_at).toISOString() : null,
+    processedAt: event.processed_at ? new Date(event.processed_at).toISOString() : null
+  };
+}
+
 class SgpEvent {
   /**
    * Inserts an event unless its dedupe key is already stored. A redelivered

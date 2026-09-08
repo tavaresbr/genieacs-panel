@@ -851,6 +851,9 @@ class SgpService {
       status: link.status,
       statusLabel: link.status_label,
       login: link.login,
+      blocked: link.blocked === null || link.blocked === undefined
+        ? null
+        : Number(link.blocked) === 1,
       linkMode: link.link_mode,
       lastSyncedAt: link.last_synced_at
         ? new Date(link.last_synced_at).toISOString()

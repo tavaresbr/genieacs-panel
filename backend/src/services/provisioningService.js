@@ -282,19 +282,70 @@ class ProvisioningService {
   /** Profile view for the API: flags and patterns, never the stored secrets. */
   static publicProfile(profile) {
     if (!profile) return null;
-    const {
-      wifi_password_ciphertext: wifiCipher,
-      wifi_password_iv: wifiIv,
-      wifi_password_tag: wifiTag,
-      cpe_password_ciphertext: cpeCipher,
-      cpe_password_iv: cpeIv,
-      cpe_password_tag: cpeTag,
-      ...rest
-    } = profile;
     return {
-      ...rest,
-      wifiPasswordConfigured: Boolean(wifiCipher && wifiIv && wifiTag),
-      cpePasswordConfigured: Boolean(cpeCipher && cpeIv && cpeTag)
+      id: profile.id,
+      name: profile.name,
+      planPatterns: profile.plan_patterns,
+      isDefault: profile.is_default,
+      priority: profile.priority,
+      enabled: profile.enabled,
+      applyWan: profile.apply_wan,
+      applyPppoePassword: profile.apply_pppoe_password,
+      wanName: profile.wan_name,
+      wanVlanId: profile.wan_vlan_id,
+      wanServiceList: profile.wan_service_list,
+      wanConnectionType: profile.wan_connection_type,
+      wanNatEnabled: profile.wan_nat_enabled,
+      applyWifi: profile.apply_wifi,
+      wifiIndexes: profile.wifi_indexes,
+      wifiSsidTemplate: profile.wifi_ssid_template,
+      wifiPasswordMode: profile.wifi_password_mode,
+      applyCredentials: profile.apply_credentials,
+      credentialTargets: profile.credential_targets,
+      description: profile.description,
+      wifiPasswordConfigured: Boolean(
+        profile.wifi_password_ciphertext && profile.wifi_password_iv && profile.wifi_password_tag
+      ),
+      cpePasswordConfigured: Boolean(
+        profile.cpe_password_ciphertext && profile.cpe_password_iv && profile.cpe_password_tag
+      ),
+      updatedAt: profile.updated_at ? new Date(profile.updated_at).toISOString() : null
+    };
+  }
+
+  /**
+   * Run view for the API. Steps are already redacted on their way in.
+   *
+   * `error` and each step's `detail` hold translation keys, because the run
+   * that produced them had no request and therefore no language. `translate`
+   * is the caller's bound translator, so the message is rendered in the
+   * reader's language here instead of leaking a key into the interface.
+   */
+  static publicRun(run, translate = null) {
+    if (!run) return null;
+    const render = (value) => {
+      if (!value) return null;
+      return translate ? translate(value) : value;
+    };
+    return {
+      id: run.id,
+      deviceId: run.device_id,
+      contract: run.contract,
+      profileId: run.profile_id,
+      profileName: run.profile_name,
+      trigger: run.trigger,
+      status: run.status,
+      attemptCount: run.attempt_count,
+      nextAttemptAt: run.next_attempt_at ? new Date(run.next_attempt_at).toISOString() : null,
+      steps: (run.steps ?? []).map((step) => ({
+        ...step,
+        detail: render(step.detail)
+      })),
+      error: run.error,
+      errorMessage: render(run.error),
+      startedAt: run.started_at ? new Date(run.started_at).toISOString() : null,
+      finishedAt: run.finished_at ? new Date(run.finished_at).toISOString() : null,
+      updatedAt: run.updated_at ? new Date(run.updated_at).toISOString() : null
     };
   }
 

@@ -323,7 +323,7 @@ describe('provisioning run', () => {
     // A rejected query may be a transient SGP problem, so it is retried rather
     // than skipped -- but on a schedule that ends.
     assert.equal(body.data.run.status, 'pending');
-    assert.ok(body.data.run.next_attempt_at);
+    assert.ok(body.data.run.nextAttemptAt);
 
     let run = await ProvisioningRun.getById(body.data.run.id);
     for (let attempt = 0; attempt < 4; attempt += 1) {
