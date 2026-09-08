@@ -309,6 +309,67 @@ export interface SgpContractLink {
   lastSyncedAt: string | null
 }
 
+export type SgpContractState = 'active' | 'blocked' | 'cancelled' | 'unknown'
+
+export interface SgpLinkRow {
+  deviceId: string
+  contract: string
+  clientName: string | null
+  plan: string | null
+  status: string | null
+  statusLabel: string | null
+  state: SgpContractState
+  linkMode: 'auto' | 'manual'
+  lastSyncedAt: string | null
+}
+
+export interface SgpDivergenceRow {
+  deviceId: string
+  contract: string
+  clientName: string | null
+  statusLabel: string | null
+  state: SgpContractState
+  lastInform: string | null
+}
+
+export interface SgpUnlinkedRow {
+  deviceId: string
+  customerId: string | null
+  pppoe: string | null
+}
+
+export interface SgpSyncSummary {
+  total: number
+  linked: number
+  created: number
+  updated: number
+  failed: number
+  skipped: number
+  durationMs: number
+  startedAt: string | null
+  finishedAt: string | null
+}
+
+export interface SgpFleetOverview {
+  enabled: boolean
+  // `totals` carries the full counts; the `divergences` lists are capped samples.
+  totals: {
+    devices: number
+    linked: number
+    unlinked: number
+    onlineBlocked: number
+    offlineActive: number
+  }
+  byState: Record<SgpContractState, number>
+  divergences: {
+    onlineBlocked: SgpDivergenceRow[]
+    offlineActive: SgpDivergenceRow[]
+    unlinked: SgpUnlinkedRow[]
+  }
+  lastSync: SgpSyncSummary | null
+  generatedAt: string
+}
+
 export interface SgpInvoice {
   id: string | null
   description: string | null
@@ -355,6 +416,15 @@ export const sgpAPI = {
 
   requestTrustUnlock: (deviceId: string) =>
     apiClient.post<{ contract: string }>(`/sgp/devices/${encodeURIComponent(deviceId)}/unlock`),
+
+  getLinks: () =>
+    apiClient.get<{ links: SgpLinkRow[] }>('/sgp/links'),
+
+  getOverview: () =>
+    apiClient.get<SgpFleetOverview>('/sgp/overview'),
+
+  syncAll: () =>
+    apiClient.post<SgpSyncSummary>('/sgp/sync'),
 }
 
 /* Vendors API */

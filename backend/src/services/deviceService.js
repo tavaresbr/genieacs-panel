@@ -770,6 +770,7 @@ class DeviceService {
     const virtualParams = await this.getVirtualParameters();
     const projection = [
       '_id',
+      '_lastInform',
       'InternetGatewayDevice.DeviceInfo.SoftwareVersion',
       virtualParams.vpPppoeUsername
     ].filter(Boolean);
@@ -781,6 +782,7 @@ class DeviceService {
     }
     return data.map((item) => ({
       _id: item._id || null,
+      _lastInform: item._lastInform || null,
       softwareId: this.getParameterValue(
         item,
         'InternetGatewayDevice.DeviceInfo.SoftwareVersion'

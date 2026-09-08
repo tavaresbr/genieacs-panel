@@ -90,6 +90,39 @@ class SgpController {
     }
   }
 
+  static async listLinks(req, res) {
+    try {
+      const links = await SgpService.listLinks();
+      return res.json(createResponse(
+        req.t('sgp.linksLoaded', { count: links.length }),
+        { links }
+      ));
+    } catch (error) {
+      return handleError(req, res, error, 'sgp.linksLoadFailed');
+    }
+  }
+
+  static async syncFleet(req, res) {
+    try {
+      const result = await SgpService.syncFleet();
+      return res.json(createResponse(
+        req.t('sgp.syncDone', { linked: result.linked, total: result.total }),
+        result
+      ));
+    } catch (error) {
+      return handleError(req, res, error, 'sgp.syncFailed');
+    }
+  }
+
+  static async getOverview(req, res) {
+    try {
+      const overview = await SgpService.getFleetOverview();
+      return res.json(createResponse(req.t('sgp.overviewLoaded'), overview));
+    } catch (error) {
+      return handleError(req, res, error, 'sgp.overviewFailed');
+    }
+  }
+
   static async getDeviceIntegration(req, res) {
     try {
       const deviceId = readDeviceId(req);
