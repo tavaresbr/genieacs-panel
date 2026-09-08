@@ -184,19 +184,18 @@ export async function ensureSchema(db = getDb()) {
       t.string('plan', 255);
       t.string('status', 64);
       t.string('status_label', 128);
+      // Derived from the SGP status so the fleet views can group contracts
+      // without depending on each install's Portuguese labels.
+      t.string('state', 16).notNullable().defaultTo('unknown');
       t.string('login', 255);
       t.string('link_mode', 16).notNullable().defaultTo('auto');
-      t.boolean('blocked');
       t.timestamp('last_synced_at').defaultTo(db.fn.now());
       t.timestamp('created_at').defaultTo(db.fn.now());
       t.timestamp('updated_at').defaultTo(db.fn.now());
     });
-  } else if (!(await db.schema.hasColumn('sgp_links', 'blocked'))) {
-    // Reconciliation compares the previous blocked flag with the current one to
-    // detect a transition, so the flag has to survive between passes. Older
-    // installs stored only the status text, which SGP phrases inconsistently.
+  } else if (!(await db.schema.hasColumn('sgp_links', 'state'))) {
     await db.schema.alterTable('sgp_links', (t) => {
-      t.boolean('blocked');
+      t.string('state', 16).notNullable().defaultTo('unknown');
     });
   }
 

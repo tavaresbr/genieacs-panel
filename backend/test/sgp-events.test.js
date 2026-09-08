@@ -282,7 +282,7 @@ describe('reconciliation', () => {
     assert.equal(body.data.changed, 1);
 
     const link = await getDb()('sgp_links').where({ device_id: DEVICE_ID }).first();
-    assert.equal(Number(link.blocked), 1);
+    assert.equal(link.state, 'blocked');
 
     const events = await getDb()('sgp_events').where({ source: 'reconcile', type: 'blocked' });
     assert.equal(events.length, 1);

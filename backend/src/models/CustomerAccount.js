@@ -82,6 +82,13 @@ class CustomerAccount {
       .whereIn('device_id', deviceIds);
   }
 
+  static async getSyncTargets() {
+    return getDb()('customer_accounts')
+      .select('id', 'device_id', 'customer_id', 'pppoe_username')
+      .whereNotNull('device_id')
+      .orderBy('id', 'asc');
+  }
+
   static async getExistingForIdentities(deviceIds, identityHashes) {
     const normalizedDeviceIds = Array.isArray(deviceIds) ? deviceIds.filter(Boolean) : [];
     const normalizedIdentityHashes = Array.isArray(identityHashes) ? identityHashes.filter(Boolean) : [];

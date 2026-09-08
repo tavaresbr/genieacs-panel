@@ -200,9 +200,12 @@ export function SgpEventsPanel({ config, onConfigChange }: Props) {
           </div>
         </div>
 
-        <button type="button" className="modern-button-secondary" onClick={() => void reconcileNow()}>
-          {t('settings.sgp.events.reconcileNow')}
-        </button>
+        <div>
+          <button type="button" className="modern-button-secondary" onClick={() => void reconcileNow()}>
+            {t('settings.sgp.events.reconcileNow')}
+          </button>
+          <p className="field-hint">{t('settings.sgp.events.reconcileNowHint')}</p>
+        </div>
       </div>
 
       <h4 className="section-heading mt-8 text-sm">{t('settings.sgp.events.eventsTitle')}</h4>

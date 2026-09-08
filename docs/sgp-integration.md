@@ -68,7 +68,65 @@ invoices with their digitable line, PIX code, and second-copy link.
   contract number.
 
 Resolved links are cached in the `sgp_links` table, so day-to-day page loads do
-not re-query SGP.
+not re-query SGP; the whole fleet is refreshed in one batch instead — see
+*Fleet synchronization and reconciliation* below.
+
+## Fleet synchronization and reconciliation
+
+Beyond the per-device card, the integration works over the whole fleet.
+
+### Derived contract state
+
+`sgp_links` stores the SGP `status` and `status_label` exactly as the provider's
+install words them, and adds a derived `state` that the panel can group by:
+
+| State | Matched in the status or its label (case and accent insensitive) |
+| --- | --- |
+| `cancelled` | `cancelad`, `encerrad`, `desativad`, `inativ` |
+| `blocked` | the SGP `bloqueado` flag, or `bloquead`, `suspens`, `inadimplen` |
+| `active` | `ativo` |
+| `unknown` | anything else |
+
+Cancellations are matched first, so "Inativo" and "Desativado" are never read as
+active; an explicit `bloqueado` flag outranks a label that still says "Ativo",
+and a cancellation outranks the flag. The state is rewritten on every link
+write, so links stored by an earlier release show `unknown` until the next sync.
+
+### Batch synchronization
+
+`POST /api/sgp/sync` resolves every device that has a panel customer account,
+five at a time so the provider's SGP is never flooded. Manually linked ONTs keep
+their contract: only their cached fields are refreshed, never the contract they
+point at. A device that fails does not abort the run. The response — also stored
+in `app_state` under `sgp_sync_last_run`, so the panel can show it after a
+reload — counts:
+
+| Field | Meaning |
+| --- | --- |
+| `total` | Customer accounts examined |
+| `linked` | Devices holding a link when the run ended, including ones whose refresh failed but whose cached link survived |
+| `created` | Links written for a device that had none |
+| `updated` | Links refreshed for a device that already had one |
+| `failed` | Devices whose SGP lookup errored |
+| `skipped` | Devices with no identifier for the configured link mode, and lookups that matched no contract |
+| `durationMs`, `startedAt`, `finishedAt` | Wall clock of the run |
+
+### Reconciliation overview
+
+`GET /api/sgp/overview` cross-references GenieACS freshness with the stored
+contract states and reports the two divergences neither system sees alone:
+
+- **`onlineBlocked`** — the ONT informed in the last 10 minutes while the
+  contract is blocked or cancelled: a possible unauthorised reconnection.
+- **`offlineActive`** — the contract is active but the ONT has not informed: a
+  customer with a problem who has not called yet.
+- **`unlinked`** — devices GenieACS knows that have no SGP link at all.
+
+`totals` carries the full counts (`devices`, `linked`, `unlinked`,
+`onlineBlocked`, `offlineActive`) and `byState` the linked contracts per derived
+state; each list under `divergences` is a sample capped at 50 entries, so a
+fleet-sized divergence stays readable. `lastSync` repeats the stored sync
+summary, or is `null` before the first run.
 
 ## Customer portal
 
@@ -142,6 +200,15 @@ contracts straight from SGP, round-robin from a stored cursor so no link is
 starved, and turns any change into the same kind of event a webhook would
 produce.
 
+This is not the same thing as the fleet synchronization above it, which walks
+every device in one pass and refreshes each link without raising anything.
+Reconciliation is the half that notices a contract *changed* and acts on it.
+
+A transition is read from the normalized contract state (`active`, `blocked`,
+`cancelled`), not from the provider's own label, which differs between installs.
+A link that has never been read carries `unknown`; the first pass after an
+upgrade fills that in without reporting a change that did not happen.
+
 With the defaults — 25 contracts every 15 minutes — a base of 1,000 links is
 swept in about 10 hours. Raise the batch or shorten the interval if that is too
 slow for you, keeping in mind that each contract is one query against the
@@ -184,6 +251,9 @@ Operator endpoints (admin role required, `/api` on the panel port):
 | `PUT` | `/api/sgp/config` | Update configuration (omit `token` to keep it) |
 | `POST` | `/api/sgp/test` | Connectivity and credential probe |
 | `GET` | `/api/sgp/customers?login=&contract=&document=` | Contract lookup |
+| `GET` | `/api/sgp/links` | Every stored link, for the devices list |
+| `GET` | `/api/sgp/overview` | Fleet reconciliation (divergences, states, last sync) |
+| `POST` | `/api/sgp/sync` | Batch synchronization of the whole fleet |
 | `GET` | `/api/sgp/devices/:deviceId?refresh=1` | Link plus open invoices for a device |
 | `POST` | `/api/sgp/devices/:deviceId/link` | Manually link a contract |
 | `DELETE` | `/api/sgp/devices/:deviceId/link` | Remove the link |

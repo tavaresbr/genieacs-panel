@@ -271,7 +271,7 @@ describe('provisioning run', () => {
   it('links the contract and stores the generated Wi-Fi password', async () => {
     const link = await getDb()('sgp_links').where({ device_id: DEVICE_ID }).first();
     assert.equal(link.contract, '4321');
-    assert.equal(Number(link.blocked), 0);
+    assert.equal(link.state, 'active');
 
     const account = await getDb()('customer_accounts').where({ device_id: DEVICE_ID }).first();
     assert.ok(account, 'the run creates the portal account');

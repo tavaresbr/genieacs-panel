@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { apiClient, vendorsAPI, settingsAPI, authAPI, databaseAPI, sgpAPI, type DbConfigPayload, type SgpConfig } from '@/lib/api'
+import { apiClient, vendorsAPI, settingsAPI, authAPI, databaseAPI, sgpAPI, type DbConfigPayload, type SgpConfig, type SgpSyncSummary } from '@/lib/api'
 import { useToast } from '@/components/ui/toast'
 import { useLoading } from '@/components/ui/loading'
 import { Icon } from '@/components/ui/icon'
@@ -75,6 +75,9 @@ export default function Settings() {
   const [sgpSaving, setSgpSaving] = useState(false)
   const [sgpTesting, setSgpTesting] = useState(false)
   const [sgpTestResult, setSgpTestResult] = useState<{ success: boolean; message: string } | null>(null)
+  const [sgpSyncing, setSgpSyncing] = useState(false)
+  const [sgpSyncSummary, setSgpSyncSummary] = useState<SgpSyncSummary | null>(null)
+  const [sgpFleetAvailable, setSgpFleetAvailable] = useState(false)
   const [dbTesting, setDbTesting] = useState(false)
   const [dbSwitching, setDbSwitching] = useState(false)
 
@@ -107,22 +110,32 @@ export default function Settings() {
     let cancelled = false
     ;(async () => {
       const res = await sgpAPI.getConfig()
-      if (cancelled || !res.success || !res.data) return
-      const config = res.data
-      setSgpConfig(config)
-      setSgpForm((current) => ({
-        ...current,
-        enabled: config.enabled,
-        baseUrl: config.baseUrl,
-        app: config.app,
-        // The stored token never leaves the server; an empty field keeps it.
-        token: '',
-        linkMode: config.linkMode,
-        portalBilling: config.portalBilling,
-        portalUnlock: config.portalUnlock,
-        invoiceLimit: config.invoiceLimit
-      }))
-      setSgpTestResult(null)
+      if (cancelled) return
+      if (res.success && res.data) {
+        const config = res.data
+        setSgpConfig(config)
+        setSgpForm((current) => ({
+          ...current,
+          enabled: config.enabled,
+          baseUrl: config.baseUrl,
+          app: config.app,
+          // The stored token never leaves the server; an empty field keeps it.
+          token: '',
+          linkMode: config.linkMode,
+          portalBilling: config.portalBilling,
+          portalUnlock: config.portalUnlock,
+          invoiceLimit: config.invoiceLimit
+        }))
+        setSgpTestResult(null)
+      }
+
+      // The fleet block only exists while the integration answers; the overview
+      // also carries the summary of the last synchronization that ran.
+      const overview = await sgpAPI.getOverview()
+      if (cancelled) return
+      const fleetReady = overview.success && Boolean(overview.data?.enabled)
+      setSgpFleetAvailable(fleetReady)
+      setSgpSyncSummary(fleetReady ? overview.data?.lastSync ?? null : null)
     })()
     return () => { cancelled = true }
   }, [activeTab])
@@ -179,6 +192,25 @@ export default function Settings() {
       )
     } finally {
       setSgpSaving(false)
+    }
+  }
+
+  const handleSgpSyncAll = async () => {
+    setSgpSyncing(true)
+    try {
+      const res = await sgpAPI.syncAll()
+      if (res.success && res.data) {
+        setSgpSyncSummary(res.data)
+        toast.success(res.message || t('settings.sgp.syncDone'))
+        return
+      }
+      if (res.code === 'not_configured') {
+        setSgpFleetAvailable(false)
+        return
+      }
+      toast.error(res.message || t('settings.sgp.syncFailed'))
+    } finally {
+      setSgpSyncing(false)
     }
   }
 
@@ -1025,6 +1057,49 @@ export default function Settings() {
                 </button>
               )}
             </div>
+
+            {sgpFleetAvailable && (
+              <div className="mt-6 border-t border-border pt-5">
+                <h3 className="font-semibold">{t('settings.sgp.fleetTitle')}</h3>
+                <p className="mt-1 text-sm leading-6 text-muted-foreground">{t('settings.sgp.fleetHint')}</p>
+                <button
+                  type="button"
+                  onClick={() => void handleSgpSyncAll()}
+                  disabled={sgpSyncing}
+                  className="modern-button-secondary mt-4"
+                >
+                  <Icon name="refresh" size={16} className={`mr-2 ${sgpSyncing ? 'animate-spin' : ''}`} />
+                  {sgpSyncing ? t('settings.sgp.syncing') : t('settings.sgp.syncAll')}
+                </button>
+                {sgpSyncSummary ? (
+                  <>
+                    <dl className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+                      {([
+                        ['settings.sgp.syncTotal', sgpSyncSummary.total],
+                        ['settings.sgp.syncLinked', sgpSyncSummary.linked],
+                        ['settings.sgp.syncCreated', sgpSyncSummary.created],
+                        ['settings.sgp.syncUpdated', sgpSyncSummary.updated],
+                        ['settings.sgp.syncSkipped', sgpSyncSummary.skipped],
+                        ['settings.sgp.syncFailedCount', sgpSyncSummary.failed]
+                      ] as const).map(([labelKey, value]) => (
+                        <div key={labelKey}>
+                          <dt className="metric-label">{t(labelKey)}</dt>
+                          <dd className="data-value mt-1">{value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                    <p className="mt-3 text-xs text-muted-foreground">
+                      {t('settings.sgp.syncFinished', {
+                        time: formatDateTime(sgpSyncSummary.finishedAt),
+                        seconds: (sgpSyncSummary.durationMs / 1000).toFixed(1)
+                      })}
+                    </p>
+                  </>
+                ) : (
+                  <p className="mt-4 text-sm text-muted-foreground">{t('settings.sgp.syncNever')}</p>
+                )}
+              </div>
+            )}
 
             <SgpEventsPanel config={sgpConfig} onConfigChange={setSgpConfig} />
           </div>

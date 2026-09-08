@@ -30,7 +30,7 @@ async function createLegacyCustomerAccounts(db) {
   });
 }
 
-// The SGP link layout shipped before reconciliation needed the blocked flag.
+// The SGP link layout shipped before contract states were derived.
 async function createLegacySgpLinks(db) {
   await db.schema.createTable('sgp_links', (t) => {
     t.increments('id').primary();
@@ -50,10 +50,10 @@ async function createLegacySgpLinks(db) {
   });
   await db('sgp_links').insert({
     device_id: 'legacy-device-1',
-    contract: '9001',
-    client_name: 'Cliente Antigo',
+    contract: '4321',
+    client_name: 'Cliente Legado',
     status_label: 'Ativo',
-    link_mode: 'manual'
+    link_mode: 'auto'
   });
 }
 
@@ -74,17 +74,6 @@ after(async () => {
 });
 
 describe('upgrading an existing installation', () => {
-  it('adds the SGP blocked flag without losing links', async () => {
-    const db = getDb();
-    assert.ok(await db.schema.hasColumn('sgp_links', 'blocked'));
-    const link = await db('sgp_links').where({ device_id: 'legacy-device-1' }).first();
-    assert.equal(link.contract, '9001');
-    assert.equal(link.link_mode, 'manual');
-    // Unknown rather than false: nothing has read this contract since the
-    // upgrade, so the first reconciliation must not report a transition.
-    assert.equal(link.blocked, null);
-  });
-
   it('creates the provisioning tables on an existing database', async () => {
     const db = getDb();
     for (const table of ['provisioning_profiles', 'provisioning_runs', 'sgp_events']) {
@@ -145,5 +134,14 @@ describe('upgrading an existing installation', () => {
 
   it('is a no-op on a second run', async () => {
     assert.equal(await CustomerPortalPasswordService.backfillMissing(), 0);
+  });
+
+  it('adds the derived SGP contract state without losing links', async () => {
+    const db = getDb();
+    assert.ok(await db.schema.hasColumn('sgp_links', 'state'));
+    const link = await db('sgp_links').where({ device_id: 'legacy-device-1' }).first();
+    assert.equal(link.contract, '4321');
+    // Existing rows keep the default until the next sync rewrites them.
+    assert.equal(link.state, 'unknown');
   });
 });

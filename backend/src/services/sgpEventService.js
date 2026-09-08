@@ -32,12 +32,6 @@ function serializePayload(body) {
   }
 }
 
-function asBoolean(value) {
-  if (value === null || value === undefined) return null;
-  if (typeof value === 'boolean') return value;
-  return Number(value) === 1;
-}
-
 function sha256(value) {
   return crypto.createHash('sha256').update(value).digest('hex');
 }
@@ -195,15 +189,17 @@ class SgpEventService {
    * which SGP does not express as a flag.
    */
   static detectTransition(before, after) {
-    const statusText = `${after.status ?? ''} ${after.status_label ?? ''}`;
-    if (/cancel|rescind|encerr/i.test(statusText)) return 'cancelled';
-    // SQLite hands booleans back as 0 and 1, so the flag is normalized rather
-    // than compared with `===`, which would never match on that driver.
-    const wasBlocked = asBoolean(before.blocked);
-    const isBlocked = asBoolean(after.blocked);
-    if (wasBlocked === true && isBlocked === false) return 'unblocked';
-    if (wasBlocked === false && isBlocked === true) return 'blocked';
-    if ((before.plan ?? null) !== (after.plan ?? null)) return 'contract_changed';
+    const was = SgpService.linkState(before);
+    const now = SgpService.linkState(after);
+    // A row that has never been read carries `unknown`, so the first pass after
+    // an upgrade is a backfill, not a transition. Reporting it would tell an
+    // operator a contract just changed when nothing did.
+    if (was !== 'unknown' && was !== now) {
+      if (now === 'cancelled') return 'cancelled';
+      if (now === 'blocked') return 'blocked';
+      if (now === 'active') return was === 'blocked' ? 'unblocked' : 'activated';
+    }
+    if (was === now && (before.plan ?? null) !== (after.plan ?? null)) return 'contract_changed';
     return null;
   }
 
@@ -244,7 +240,7 @@ class SgpEventService {
           // A transition seen twice produces the same key, so a repeated pass
           // never duplicates the event.
           dedupeKey: `reconcile:${after.contract}:${transition}:${sha256(
-            `${after.status ?? ''}|${after.status_label ?? ''}|${after.blocked}|${after.plan ?? ''}`
+            `${SgpService.linkState(after)}|${after.status_label ?? ''}|${after.plan ?? ''}`
           ).slice(0, 24)}`,
           type: transition,
           rawType: after.status_label ?? after.status ?? null,

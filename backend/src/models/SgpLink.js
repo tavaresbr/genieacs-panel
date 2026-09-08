@@ -46,6 +46,10 @@ class SgpLink {
     const [row] = await getDb()('sgp_links').count({ total: '*' });
     return Number(row?.total ?? 0);
   }
+
+  static async getAll() {
+    return getDb()('sgp_links').orderBy('device_id', 'asc');
+  }
 }
 
 export default SgpLink;
