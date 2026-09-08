@@ -1,4 +1,4 @@
-export const LOCALES = ['pt-BR', 'en', 'es', 'it', 'de'] as const
+export const LOCALES = ['pt-BR', 'en', 'es', 'it', 'de', 'fr'] as const
 
 export type Locale = (typeof LOCALES)[number]
 
@@ -25,6 +25,7 @@ export const LOCALE_METADATA: Record<Locale, LocaleMetadata> = {
   es: { label: 'Español', shortLabel: 'ES', flag: '🇪🇸', intlLocale: 'es-ES' },
   it: { label: 'Italiano', shortLabel: 'IT', flag: '🇮🇹', intlLocale: 'it-IT' },
   de: { label: 'Deutsch', shortLabel: 'DE', flag: '🇩🇪', intlLocale: 'de-DE' },
+  fr: { label: 'Français', shortLabel: 'FR', flag: '🇫🇷', intlLocale: 'fr-FR' },
 }
 
 export function isLocale(value: unknown): value is Locale {
@@ -47,6 +48,7 @@ export function resolveLocale(tag: string | null | undefined): Locale | null {
   if (base === 'es') return 'es'
   if (base === 'it') return 'it'
   if (base === 'de') return 'de'
+  if (base === 'fr') return 'fr'
   return null
 }
 
