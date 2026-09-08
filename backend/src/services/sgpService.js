@@ -681,6 +681,17 @@ class SgpService {
   }
 
   /**
+   * A contract without its secret, for anything that leaves the process.
+   * `lookupContractForProvisioning` is the only source of a contract that
+   * carries `loginPassword`, and this is how that value is dropped again.
+   */
+  static publicContract(contract) {
+    if (!contract) return null;
+    const { loginPassword, ...rest } = contract;
+    return rest;
+  }
+
+  /**
    * Contract lookup for the provisioning path, which is the only caller allowed
    * to read the PPPoE password. The result must never be returned by a route,
    * written to `sgp_links`, or logged.

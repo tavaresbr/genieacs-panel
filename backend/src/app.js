@@ -25,6 +25,7 @@ import mapSettingsRoutes from './routes/mapSettings.js';
 import databaseRoutes from './routes/database.js';
 import customerPortalRoutes from './routes/customerPortal.js';
 import sgpRoutes from './routes/sgp.js';
+import provisioningRoutes from './routes/provisioning.js';
 
 dotenv.config();
 
@@ -143,6 +144,7 @@ app.use('/api/mapping-data', mappingRoutes);
 app.use('/api/map-settings', mapSettingsRoutes);
 app.use('/api/database', databaseRoutes);
 app.use('/api/sgp', sgpRoutes);
+app.use('/api/provisioning', provisioningRoutes);
 
 app.get('/api/health', async (req, res) => {
   const database = await testConnection();
