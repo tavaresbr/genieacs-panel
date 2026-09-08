@@ -179,7 +179,8 @@ function parseInteger(value: string, fallback: number): number {
  *    The dictionary says so in `recipientsHint`, and when the list is actually
  *    empty that sentence is promoted out of the small grey hint into a warning
  *    the eye cannot skip. Enabling with an empty list is refused by the API
- *    (`no_recipients`), so the warning is not a guess about what will happen.
+ *    (`no_alert_recipients`), so the warning is not a guess about what will
+ *    happen.
  *  · "Scan now" is REAL. It runs the sweep against the stored settings and can
  *    put messages on the on-duty phones, so it is never run on mount and never
  *    polled — `waAlertService` already runs itself on its own interval from
@@ -303,8 +304,7 @@ export function AlertsPanel() {
         return
       }
       // The machine `code`, never the `message`: an unknown code degrades to
-      // the generic failure. `no_recipients`, `invalid_phone` and
-      // `too_many_recipients` all land there today — see the report.
+      // the generic failure.
       toast.error(whatsappErrorMessage(t, res.code))
     } finally {
       setSaving(false)

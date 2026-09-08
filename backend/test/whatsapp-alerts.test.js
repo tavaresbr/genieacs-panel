@@ -162,6 +162,23 @@ describe('the settings routes', () => {
     assert.equal(refused.body.code, 'invalid_phone');
   });
 
+  it('refuses to be enabled with nobody on duty, under its own code', async () => {
+    const { status, body } = await call(`${panelUrl}/api/whatsapp/alerts/settings`, {
+      method: 'PUT',
+      headers: authHeaders(token),
+      body: { enabled: true, recipients: [] }
+    });
+    assert.equal(status, 400);
+    // Not the campaign's `no_recipients`, which means "the filters left nobody
+    // to charge". A form that translates the code would put that sentence on
+    // this screen.
+    assert.equal(body.code, 'no_alert_recipients');
+
+    // And the refusal is not a silent no-op: the stored list is untouched.
+    const after = await call(`${panelUrl}/api/whatsapp/alerts/settings`, { headers: authHeaders(token) });
+    assert.deepEqual(after.body.data.recipients, [ON_CALL, SECOND_ON_CALL]);
+  });
+
   it('an emptied threshold goes back to the default, never to zero', async () => {
     // `Number(null)` and `Number('')` are both 0, and 0 is finite. Read after
     // the conversion, a box the operator cleared would be stored as a threshold

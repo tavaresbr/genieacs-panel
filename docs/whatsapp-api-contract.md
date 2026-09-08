@@ -55,7 +55,10 @@ que é público e tem credencial própria.
 | `no_destination` | contato sem telefone nem LID | `whatsapp.error.noDestination` |
 | `message_empty` | sem texto e sem anexo | `whatsapp.error.messageEmpty` |
 | `conversation_not_found` | `:id` não existe | `common.routeNotFound` |
-| `no_alert_recipients` | nenhum número recebe alerta técnico | `whatsapp.alerts.noRecipients` |
+| `no_alert_recipients` | nenhum número de plantão para o alerta | `whatsapp.alerts.noRecipients` |
+| `no_alert_number` | nenhum número conectado tem purpose `alerts` | `whatsapp.alerts.noAlertNumber` |
+| `alerts_disabled` | alertas desligados; nada foi verificado | `whatsapp.alerts.disabledSkip` |
+| `no_devices` | não deu para ler a frota; nada foi verificado | `whatsapp.alerts.noDevices` |
 | `invalid_phone` | telefone de plantão que não dá para discar | `whatsapp.error.invalidPhone` |
 
 ---
@@ -823,7 +826,10 @@ incidente dito duas vezes.
 - **A lista de opt-out vale aqui.** Um alerta é o provedor *iniciando* contato,
   que é exatamente o que um opt-out recusa.
 - **Uma passada nunca lança.** O motivo de não ter feito nada volta em
-  `skipped` (`disabled`, `no_recipients`, `no_devices`, `error`).
+  `skipped` (`disabled`, `not_configured`, `no_alert_number`, `no_recipients`,
+  `no_devices`, `error`), e **todos viram recusa** em `POST /alerts/scan`.
+  `{fired: 0}` é a mesma resposta para "nada está errado" e "nada foi
+  verificado", e quem apertou o botão apertou para saber qual dos dois é.
 
 O agrupamento do surto é pelo nó de agregação **mais próximo** — a ODP em que a
 ONT está pendurada, não a OLT no fim da cadeia. Alerta de OLT inteira seria uma
