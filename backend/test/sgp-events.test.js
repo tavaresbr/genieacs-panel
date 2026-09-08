@@ -2,11 +2,16 @@ import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import http from 'node:http';
-import { authHeaders, call, getDb, startTestServers, stopTestServers } from './helpers/harness.js';
+import { asTenant, authHeaders, call, getDb, startTestServers, stopTestServers } from './helpers/harness.js';
 import { buildDevice, startGenieAcsStub } from './helpers/genieacs-stub.js';
 
 const { default: SgpEventService } = await import('../src/services/sgpEventService.js');
 const { default: SgpService } = await import('../src/services/sgpService.js');
+
+// Reached directly, with no request behind them, so nothing has resolved a
+// provider. The routes that call these are already inside one.
+const resolveDeviceContract = (...args) => asTenant(() => SgpService.resolveDeviceContract(...args));
+const processPending = (...args) => asTenant(() => SgpEventService.processPending(...args));
 
 const DEVICE_ID = 'stub-device-1';
 const PPPOE = 'joao@provedor';
@@ -237,7 +242,7 @@ describe('webhook delivery', () => {
 
 describe('event dispatch', () => {
   before(async () => {
-    await SgpService.resolveDeviceContract(DEVICE_ID, { refresh: true });
+    await resolveDeviceContract(DEVICE_ID, { refresh: true });
   });
 
   it('refreshes the cached link on a payment', async () => {
@@ -249,7 +254,7 @@ describe('event dispatch', () => {
     });
     const body = JSON.stringify({ id: 'evt-pay', evento: 'pagamento_confirmado', contrato: '4321' });
     await postWebhook(body, { 'X-SGP-Signature': sign(body) });
-    await SgpEventService.processPending({});
+    await processPending({});
 
     const link = await getDb()('sgp_links').where({ device_id: DEVICE_ID }).first();
     assert.equal(link.status_label, 'Ativo');
@@ -258,7 +263,7 @@ describe('event dispatch', () => {
   it('unlinks the CPE when the contract is cancelled', async () => {
     const body = JSON.stringify({ id: 'evt-cancel', evento: 'cancelado', contrato: '4321' });
     await postWebhook(body, { 'X-SGP-Signature': sign(body) });
-    await SgpEventService.processPending({});
+    await processPending({});
 
     const link = await getDb()('sgp_links').where({ device_id: DEVICE_ID }).first();
     assert.equal(link, undefined);
@@ -269,7 +274,7 @@ describe('reconciliation', () => {
   before(async () => {
     contractState.blocked = false;
     contractState.statusDisplay = 'Ativo';
-    await SgpService.resolveDeviceContract(DEVICE_ID, { refresh: true });
+    await resolveDeviceContract(DEVICE_ID, { refresh: true });
   });
 
   it('turns a status change in SGP into an event and updates the link', async () => {

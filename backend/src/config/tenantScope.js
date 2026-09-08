@@ -19,7 +19,12 @@ export const SCOPED_TABLES = new Set([
   // destroys someone else's.
   'mapping_nodes',
   'mapping_edges',
-  'whatsapp_accounts'
+  'whatsapp_accounts',
+  // The identity table. `identity_hash` is sha256(softwareId, pppoe_username):
+  // within one provider, matching on it is how an ONT swap keeps the
+  // subscriber's portal login. Across two it is account takeover, because the
+  // same firmware and a same-named subscriber produce the same hash.
+  'customer_accounts'
 ]);
 
 /** Tables that belong to the deployment rather than to any one provider. */

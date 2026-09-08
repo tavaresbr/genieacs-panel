@@ -14,21 +14,6 @@ const { SCOPED_TABLES } = await import('../src/config/tenantScope.js');
 
 const SRC = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src');
 
-/**
- * Puts a table under scoping for the duration of one test.
- *
- * For tables the real list has not reached yet, so the mechanism can be
- * exercised ahead of them. `customer_accounts` is used because it already
- * carries the column and the per-provider constraints.
- */
-async function scoped(table, fn) {
-  SCOPED_TABLES.add(table);
-  try {
-    return await fn();
-  } finally {
-    SCOPED_TABLES.delete(table);
-  }
-}
 
 let alfa;
 let beta;
@@ -56,69 +41,59 @@ describe('a scoped table', () => {
   });
 
   it('reads only the provider in scope', async () => {
-    await scoped('customer_accounts', async () => {
-      await runInTenant(alfa, () => tinsert('customer_accounts', account(1)));
-      await runInTenant(beta, () => tinsert('customer_accounts', account(2)));
+    await runInTenant(alfa, () => tinsert('customer_accounts', account(1)));
+    await runInTenant(beta, () => tinsert('customer_accounts', account(2)));
 
-      const mine = await runInTenant(alfa, () => tdb('customer_accounts').select('device_id'));
-      assert.deepEqual(mine.map((r) => r.device_id), ['scope-dev-1']);
+    const mine = await runInTenant(alfa, () => tdb('customer_accounts').select('device_id'));
+    assert.deepEqual(mine.map((r) => r.device_id), ['scope-dev-1']);
 
-      const theirs = await runInTenant(beta, () => tdb('customer_accounts').select('device_id'));
-      assert.deepEqual(theirs.map((r) => r.device_id), ['scope-dev-2']);
-    });
+    const theirs = await runInTenant(beta, () => tdb('customer_accounts').select('device_id'));
+    assert.deepEqual(theirs.map((r) => r.device_id), ['scope-dev-2']);
   });
 
   it('cannot be read at all without a provider in scope', async () => {
-    await scoped('customer_accounts', async () => {
-      assert.throws(() => tdb('customer_accounts'), TenantScopeError);
-      assert.throws(() => tinsert('customer_accounts', account(3)), TenantScopeError);
-    });
+    assert.throws(() => tdb('customer_accounts'), TenantScopeError);
+    assert.throws(() => tinsert('customer_accounts', account(3)), TenantScopeError);
   });
 
   // knex ignores a where clause on an insert, so this would otherwise be an
   // unscoped write that looks entirely reasonable.
   it('refuses an insert through the query builder, pointing at tinsert', async () => {
-    await scoped('customer_accounts', async () => {
-      await runInTenant(alfa, () => {
-        assert.throws(
-          () => tdb('customer_accounts').insert(account(4)),
-          /must go through tinsert/
-        );
-      });
+    await runInTenant(alfa, () => {
+      assert.throws(
+        () => tdb('customer_accounts').insert(account(4)),
+        /must go through tinsert/
+      );
     });
   });
 
   it('stamps the provider on every row written', async () => {
-    await scoped('customer_accounts', async () => {
-      const id = await runInTenant(beta, () => tinsertReturningId('customer_accounts', account(5)));
-      const row = await getDb()('customer_accounts').where({ id }).first();
-      assert.equal(Number(row.tenant_id), Number(beta));
-    });
+    const id = await runInTenant(beta, () => tinsertReturningId('customer_accounts', account(5)));
+    const row = await getDb()('customer_accounts').where({ id }).first();
+    assert.equal(Number(row.tenant_id), Number(beta));
   });
 
   it('will not update or delete across providers', async () => {
-    await scoped('customer_accounts', async () => {
-      // Its own row rather than one left behind by an earlier test: a shared
-      // fixture makes a failure here depend on what ran before it.
-      const target = { ...account(6), device_id: 'scope-dev-target' };
-      await runInTenant(alfa, () => tinsert('customer_accounts', target));
+    // Its own row rather than one left behind by an earlier test: a shared
+    // fixture makes a failure here depend on what ran before it.
+    const target = { ...account(6), device_id: 'scope-dev-target' };
+    await runInTenant(alfa, () => tinsert('customer_accounts', target));
 
-      const changed = await runInTenant(beta, () => tdb('customer_accounts')
-        .where({ device_id: target.device_id })
-        .update({ pppoe_username: 'stolen' }));
-      assert.equal(changed, 0);
+    const changed = await runInTenant(beta, () => tdb('customer_accounts')
+      .where({ device_id: target.device_id })
+      .update({ pppoe_username: 'stolen' }));
+    assert.equal(changed, 0);
 
-      const removed = await runInTenant(beta, () => tdb('customer_accounts')
-        .where({ device_id: target.device_id })
-        .del());
-      assert.equal(removed, 0);
+    const removed = await runInTenant(beta, () => tdb('customer_accounts')
+      .where({ device_id: target.device_id })
+      .del());
+    assert.equal(removed, 0);
 
-      const survivor = await getDb()('customer_accounts')
-        .where({ device_id: target.device_id })
-        .first();
-      assert.ok(survivor, 'the row must still be there');
-      assert.equal(survivor.pppoe_username, target.pppoe_username);
-    });
+    const survivor = await getDb()('customer_accounts')
+      .where({ device_id: target.device_id })
+      .first();
+    assert.ok(survivor, 'the row must still be there');
+    assert.equal(survivor.pppoe_username, target.pppoe_username);
   });
 });
 
@@ -138,7 +113,12 @@ describe('the scoping guard', () => {
     const allowed = new Set([
       // Copies the whole panel between databases; every row is its business.
       path.join(SRC, 'services', 'dbManagementService.js'),
-      // The migration runner and the seed run before any provider exists.
+      // The migration runner and the seed run before any provider exists — and
+      // a backfill's whole job is to touch rows that do not have one yet. This
+      // is the one place a file-wide pass is right rather than lazy: every
+      // access here is legitimately cross-provider, so requiring a marker per
+      // site would train the eye to skip them.
+      path.join(SRC, 'config', 'migrations.js'),
       path.join(SRC, 'config', 'schema.js'),
       path.join(SRC, 'config', 'seed.js'),
       path.join(SRC, 'config', 'database.js')
