@@ -42,3 +42,10 @@ coverage/
 
 # Misc
 **/exported_all_db
+
+# Agent worktrees
+# Transient checkouts of this repository that the Claude Code harness creates
+# when it runs an agent in isolation. They are whole copies of the tree and are
+# removed when the agent finishes; committing one would add the repository to
+# itself. Anything else under .claude/ (settings, skills) stays tracked.
+.claude/worktrees/
