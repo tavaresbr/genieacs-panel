@@ -131,9 +131,13 @@ function renderChangelog(version, date, commits, compareUrl) {
 
 const latestTag = tryGit(['describe', '--tags', '--match', 'v[0-9]*', '--abbrev=0']);
 const logRange = latestTag ? `${latestTag}..HEAD` : 'HEAD';
+// Merge commits carry no release note of their own: their subject repeats the
+// branch that produced them, while the work itself is already listed by the
+// commits they bring in.
 const logOutput = git([
   'log',
   '--reverse',
+  '--no-merges',
   '--format=%H%x1f%h%x1f%cs%x1f%s',
   logRange
 ]);

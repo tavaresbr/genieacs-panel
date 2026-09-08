@@ -1,16 +1,64 @@
 {
-  "version": "1.13.1",
-  "build": 54,
-  "sourceCommit": "5e2c9d576b2c",
-  "releasedAt": "2026-07-26",
-  "basedOnTag": "v1.13.0",
-  "compareUrl": "https://github.com/skydashnet/genieacs-panel/compare/v1.13.0...v1.13.1",
+  "version": "1.14.0",
+  "build": 69,
+  "sourceCommit": "0fd9ed81d421",
+  "releasedAt": "2026-09-08",
+  "basedOnTag": "v1.13.1",
+  "compareUrl": "https://github.com/skydashnet/genieacs-panel/compare/v1.13.1...v1.14.0",
   "changes": [
     {
-      "shortHash": "5e2c9d5",
-      "date": "2026-07-26",
-      "title": "Bootstrap legacy CLI updates",
-      "category": "Fixed"
+      "shortHash": "ac6157c",
+      "date": "2026-09-04",
+      "title": "Issue an independent password for each customer account",
+      "category": "New"
+    },
+    {
+      "shortHash": "675f2dc",
+      "date": "2026-09-04",
+      "title": "Integrate subscriber contracts and billing from SGP",
+      "category": "New"
+    },
+    {
+      "shortHash": "ab7b32b",
+      "date": "2026-09-05",
+      "title": "Add multi-language support with pt-BR, en and es",
+      "category": "New"
+    },
+    {
+      "shortHash": "61d9831",
+      "date": "2026-09-05",
+      "title": "Translate network map and customer portal",
+      "category": "New"
+    },
+    {
+      "shortHash": "5d4574f",
+      "date": "2026-09-05",
+      "title": "Translate the settings page",
+      "category": "New"
+    },
+    {
+      "shortHash": "74744a3",
+      "date": "2026-09-05",
+      "title": "Translate the device detail page and document languages",
+      "category": "New"
+    },
+    {
+      "shortHash": "2cf15ca",
+      "date": "2026-09-08",
+      "title": "Translate the API responses",
+      "category": "New"
+    },
+    {
+      "shortHash": "00dd64b",
+      "date": "2026-09-08",
+      "title": "Surface contract state across the device fleet",
+      "category": "New"
+    },
+    {
+      "shortHash": "a88e62d",
+      "date": "2026-09-08",
+      "title": "Reconcile the ONT fleet against SGP contracts",
+      "category": "New"
     }
   ]
 }
