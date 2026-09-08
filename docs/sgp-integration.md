@@ -86,6 +86,94 @@ per customer account rather than per source address — 20 billing reads a minut
 and 3 trust unlocks an hour — so one subscriber cannot exhaust the quota for
 everyone behind the same proxy.
 
+## Events and reconciliation
+
+Everything above is read on demand: a payment that clears in SGP only reaches
+the panel when somebody opens the page. Two mechanisms close that gap, and they
+feed one another's handler, so there is a single path to reason about.
+
+### Webhook
+
+**Settings → SGP integration → Events and reconciliation** shows the address to
+register in SGP:
+
+```
+https://<your panel host>/api/sgp/events/webhook
+```
+
+Generate a secret there first — it is shown **once**, encrypted at rest under
+its own key, and never returned again. While *Accept events from SGP* is off,
+the endpoint answers `404`, so an unauthenticated prober cannot learn whether
+this panel talks to SGP at all.
+
+A delivery must be signed with HMAC-SHA256 over the request body using that
+secret. Because SGP's exact convention is not documented for integrators, the
+panel accepts several shapes, all of which still require the secret:
+
+- header `X-SGP-Signature`, `X-Signature`, `X-Hub-Signature-256` or
+  `X-Webhook-Signature`, with or without a `sha256=` prefix;
+- the digest in hex or base64;
+- the signed payload being either the body alone or `<timestamp>.<body>`.
+
+Turn on *Require a signed timestamp* only once SGP is confirmed to send one:
+with it on, a delivery without a fresh timestamp is refused.
+
+Verify a delivery by hand with:
+
+```bash
+BODY='{"evento":"pagamento_confirmado","contrato":"4321"}'
+SIG=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$SECRET" -hex | awk '{print $2}')
+curl -X POST -H 'Content-Type: application/json' \
+  -H "X-SGP-Signature: sha256=$SIG" -d "$BODY" \
+  https://panel.example.com/api/sgp/events/webhook
+```
+
+A valid delivery answers `202` and is processed in the background, so SGP never
+waits on the panel's own round-trips. A redelivery answers `200` with
+`duplicate: true` rather than an error — an error would make the sender retry
+forever — and is stored only once.
+
+### Reconciliation
+
+Whether a given SGP install can push at all is not something the panel can
+assume, so *Reconcile contracts periodically* covers the case where it cannot,
+and catches deliveries that go missing. Each pass re-reads a page of linked
+contracts straight from SGP, round-robin from a stored cursor so no link is
+starved, and turns any change into the same kind of event a webhook would
+produce.
+
+With the defaults — 25 contracts every 15 minutes — a base of 1,000 links is
+swept in about 10 hours. Raise the batch or shorten the interval if that is too
+slow for you, keeping in mind that each contract is one query against the
+provider's billing system.
+
+### What each event does
+
+| Event | Action |
+| --- | --- |
+| Payment confirmed, unblocked, blocked | Re-reads the contract and refreshes the cached link, so the panel and the customer portal show the truth immediately |
+| Cancelled | Refreshes, then unlinks the CPE so the equipment can be reused |
+| Activated | Queues an automatic provisioning run, when automatic activation is on |
+| Plan changed | Recorded only |
+| Anything unrecognised | Stored as `unknown` with its body, so an operator can read it and extend the type map |
+
+The panel never writes to a CPE in response to an event. Blocking a subscriber
+is the network's job, not the panel's — a misread status would otherwise take a
+paying customer offline.
+
+A plan change is deliberately not acted on: silently rewriting a live
+subscriber's WAN because a plan was renamed is dangerous, so it surfaces in the
+event list and an operator decides whether to press **Provision now**.
+
+### Extending the type map
+
+The panel already recognises the usual Portuguese wordings
+(`pagamento_confirmado`, `liberado`, `bloqueado`, `cancelado`, `ativado`,
+`alteracao_plano` and several variants), compared ignoring accents, case and
+separators. When your SGP uses something else, the event is stored as `unknown`
+with its body; read it in the events list and add the mapping through
+`PUT /api/sgp/config` in `eventTypeMap`.
+
 ## API reference
 
 Operator endpoints (admin role required, `/api` on the panel port):
@@ -100,6 +188,17 @@ Operator endpoints (admin role required, `/api` on the panel port):
 | `POST` | `/api/sgp/devices/:deviceId/link` | Manually link a contract |
 | `DELETE` | `/api/sgp/devices/:deviceId/link` | Remove the link |
 | `POST` | `/api/sgp/devices/:deviceId/unlock` | Request a trust unlock |
+| `GET` | `/api/sgp/events` | Stored events, filterable by status and type |
+| `GET` | `/api/sgp/events/:id` | One event, including its stored body |
+| `POST` | `/api/sgp/events/:id/retry` | Reprocess a failed event |
+| `POST` | `/api/sgp/events/secret/rotate` | Generate a webhook secret (returned once) |
+| `POST` | `/api/sgp/reconcile` | Run one reconciliation pass now |
+
+Plus one unauthenticated endpoint, where the shared secret is the credential:
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `POST` | `/api/sgp/events/webhook` | Receive an event from SGP |
 
 Customer portal endpoints (portal session required, portal port):
 
@@ -129,3 +228,7 @@ messages.
 | "O SGP não respondeu dentro do tempo limite" | Network path or firewall between the panel and SGP |
 | Invoices missing while the contract loads | The provider's SGP install restricts the `titulos` endpoint for this token |
 | Custom integration paths | Endpoint paths are stored per install and can be adjusted through `PUT /api/sgp/config` (`endpoints.customer`, `endpoints.invoices`, `endpoints.unlock`) |
+| Every webhook delivery returns 404 | Event delivery is off, or no secret has been generated |
+| Every webhook delivery returns 401 | Wrong secret, or *Require a signed timestamp* is on and SGP does not send one |
+| Webhook returns 403 with "Origin is not allowed" | A proxy in front of the panel is adding an `Origin` header. Server-to-server calls send none; add that origin to `CORS_ORIGINS` |
+| Events arrive but nothing changes | The event's contract has no CPE linked to it yet |
