@@ -8,6 +8,23 @@ const { default: WaMessage } = await import('../src/models/WaMessage.js');
 const { default: WaConversation } = await import('../src/models/WaConversation.js');
 const { default: WaOptOut } = await import('../src/models/WaOptOut.js');
 
+// Reached directly here, with no request to resolve a provider — so these open
+// one. The routes and the webhook already carry theirs.
+const outbox = {
+  create: (row) => asTenant(() => WaMessage.create(row)),
+  claim: (id) => asTenant(() => WaMessage.claim(id)),
+  getById: (id) => asTenant(() => WaMessage.getById(id)),
+  listSendable: (limit) => asTenant(() => WaMessage.listSendable(limit)),
+  applyReceipt: (ids, status) => asTenant(() => WaMessage.applyReceipt(ids, status))
+};
+
+const optOut = {
+  record: (input) => asTenant(() => WaOptOut.record(input)),
+  isActive: (who) => asTenant(() => WaOptOut.isActive(who)),
+  revoke: (id, userId) => asTenant(() => WaOptOut.revoke(id, userId)),
+  activePhones: (phones) => asTenant(() => WaOptOut.activePhones(phones))
+};
+
 const INSTANCE = 'painel-teste';
 const INSTANCE_TOKEN = 'token-da-instancia-abc';
 const WEBHOOK_TOKEN = 'segredo-do-webhook-xyz';
@@ -253,58 +270,58 @@ describe('outbox claim', () => {
   let conversationId;
 
   before(async () => {
-    const conversation = await WaConversation.ensure({
+    const conversation = await asTenant(() => WaConversation.ensure({
       accountId,
       externalThreadId: '5593981110449@s.whatsapp.net',
       waPhone: '5593981110449',
       pushName: 'João'
-    });
+    }));
     conversationId = conversation.id;
   });
 
   it('claims a queued message exactly once', async () => {
-    const message = await WaMessage.create({
+    const message = await outbox.create({
       conversation_id: conversationId,
       direction: 'out',
       body: 'olá',
       delivery_status: 'queued'
     });
 
-    const first = await WaMessage.claim(message.id);
+    const first = await outbox.claim(message.id);
     assert.ok(first, 'the first pass should win the claim');
     assert.equal(first.delivery_status, 'sending');
     assert.equal(first.attempts, 1);
 
     // A second pass must not send the same message again.
-    assert.equal(await WaMessage.claim(message.id), null);
+    assert.equal(await outbox.claim(message.id), null);
   });
 
   it('retakes a message abandoned mid-send, so a crash is recoverable', async () => {
-    const message = await WaMessage.create({
+    const message = await outbox.create({
       conversation_id: conversationId,
       direction: 'out',
       body: 'travada',
       delivery_status: 'sending',
       claimed_at: new Date(Date.now() - 10 * 60 * 1000)
     });
-    const sendable = await WaMessage.listSendable(10);
+    const sendable = await outbox.listSendable(10);
     assert.ok(sendable.includes(message.id));
-    assert.ok(await WaMessage.claim(message.id));
+    assert.ok(await outbox.claim(message.id));
   });
 
   it('never claims a message the server already accepted', async () => {
-    const message = await WaMessage.create({
+    const message = await outbox.create({
       conversation_id: conversationId,
       direction: 'out',
       body: 'já foi',
       delivery_status: 'queued',
       external_id: 'ABC123'
     });
-    assert.equal(await WaMessage.claim(message.id), null);
+    assert.equal(await outbox.claim(message.id), null);
   });
 
   it('applies receipts without ever walking the status backwards', async () => {
-    const message = await WaMessage.create({
+    const message = await outbox.create({
       conversation_id: conversationId,
       direction: 'out',
       body: 'com recibo',
@@ -312,23 +329,23 @@ describe('outbox claim', () => {
       external_id: 'RECIBO1'
     });
 
-    await WaMessage.applyReceipt(['RECIBO1'], 'read');
-    assert.equal((await WaMessage.getById(message.id)).delivery_status, 'read');
+    await outbox.applyReceipt(['RECIBO1'], 'read');
+    assert.equal((await outbox.getById(message.id)).delivery_status, 'read');
 
     // A 'delivered' event crossing a 'read' on the wire must not turn the blue
     // ticks grey again.
-    await WaMessage.applyReceipt(['RECIBO1'], 'delivered');
-    assert.equal((await WaMessage.getById(message.id)).delivery_status, 'read');
+    await outbox.applyReceipt(['RECIBO1'], 'delivered');
+    assert.equal((await outbox.getById(message.id)).delivery_status, 'read');
   });
 
   it('refuses a duplicated external id, so a redelivered webhook cannot double a message', async () => {
-    await WaMessage.create({
+    await outbox.create({
       conversation_id: conversationId,
       direction: 'in',
       body: 'primeira',
       external_id: 'DUPLICADA'
     });
-    await assert.rejects(() => WaMessage.create({
+    await assert.rejects(() => outbox.create({
       conversation_id: conversationId,
       direction: 'in',
       body: 'a mesma de novo',
@@ -339,26 +356,26 @@ describe('outbox claim', () => {
 
 describe('opt-out', () => {
   it('records once, matches by phone, and stops matching after revocation', async () => {
-    const created = await WaOptOut.record({ waPhone: '5593999990000', origin: 'customer', reasonText: 'SAIR' });
+    const created = await optOut.record({ waPhone: '5593999990000', origin: 'customer', reasonText: 'SAIR' });
     assert.ok(created);
-    assert.equal(await WaOptOut.isActive({ waPhone: '5593999990000' }), true);
+    assert.equal(await optOut.isActive({ waPhone: '5593999990000' }), true);
 
     // A repeated "SAIR" must not add a second row.
-    assert.equal(await WaOptOut.record({ waPhone: '5593999990000' }), null);
+    assert.equal(await optOut.record({ waPhone: '5593999990000' }), null);
 
-    await WaOptOut.revoke(created.id, null);
-    assert.equal(await WaOptOut.isActive({ waPhone: '5593999990000' }), false);
+    await optOut.revoke(created.id, null);
+    assert.equal(await optOut.isActive({ waPhone: '5593999990000' }), false);
   });
 
   it('matches on the LID too, for a contact that has no phone', async () => {
-    await WaOptOut.record({ waLid: '140076734488739', origin: 'customer' });
-    assert.equal(await WaOptOut.isActive({ waLid: '140076734488739' }), true);
-    assert.equal(await WaOptOut.isActive({ waPhone: '5511000000000' }), false);
+    await optOut.record({ waLid: '140076734488739', origin: 'customer' });
+    assert.equal(await optOut.isActive({ waLid: '140076734488739' }), true);
+    assert.equal(await optOut.isActive({ waPhone: '5511000000000' }), false);
   });
 
   it('filters a whole campaign in one query', async () => {
-    await WaOptOut.record({ waPhone: '5593988887777' });
-    const blocked = await WaOptOut.activePhones(['5593988887777', '5593911112222']);
+    await optOut.record({ waPhone: '5593988887777' });
+    const blocked = await optOut.activePhones(['5593988887777', '5593911112222']);
     assert.equal(blocked.has('5593988887777'), true);
     assert.equal(blocked.has('5593911112222'), false);
   });

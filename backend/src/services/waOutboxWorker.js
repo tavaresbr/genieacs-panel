@@ -1,7 +1,7 @@
 import WaMessage from '../models/WaMessage.js';
 import WaSendService from './waSendService.js';
 import WhatsAppConfigService from './whatsappConfigService.js';
-import { forSoleTenant } from '../config/tenantJobs.js';
+import { forEachTenant } from '../config/tenantJobs.js';
 
 /** How often a pass runs. Short, because a reply typed by a human is waiting. */
 const TICK_INTERVAL_MS = 5_000;
@@ -68,25 +68,32 @@ class WaOutboxWorker {
   }
 
   /**
-   * One pass, in the installation's provider.
+   * One pass per active provider, each draining only its own queue.
    *
-   * The pass has no request and therefore no provider of its own, so it opens
-   * one — the account lookup and everything under it now demand it. It stays a
-   * single pass because `WaMessage.listSendable()` still reads the whole
-   * deployment's queue: see `forSoleTenant`, which refuses rather than let a
-   * second provider turn one message into two.
+   * This was a single pass under `forSoleTenant` while `listSendable()` read
+   * the whole deployment — a loop then would have sent each message once per
+   * provider rather than splitting them. Now that the queue carries a provider,
+   * the loop divides the work, which is what it was always meant to do.
+   *
+   * The per-minute send budget is still one window for the process, so a busy
+   * provider can still spend another's minute. That is a fairness problem, not
+   * a correctness one, and it belongs with the per-provider scheduling in a
+   * later phase.
    *
    * @returns {Promise<{ sent: number, failed: number, skipped: string|null }>}
    */
   static async tick() {
-    try {
-      return (await forSoleTenant('The WhatsApp outbox', () => this.tickForTenant()))
-        ?? { sent: 0, failed: 0, skipped: 'no_provider' };
-    } catch (error) {
-      // Keeps the never-throws contract. The message says what to scope.
-      console.warn(`WhatsApp outbox tick failed: ${error.message}`);
-      return { sent: 0, failed: 0, skipped: 'unscoped' };
-    }
+    const summaries = await forEachTenant(() => this.tickForTenant());
+    return summaries.reduce(
+      (total, one) => ({
+        sent: total.sent + one.sent,
+        failed: total.failed + one.failed,
+        // The first reason given, so a caller still learns why a pass did
+        // nothing rather than seeing a bare pair of zeros.
+        skipped: total.skipped ?? one.skipped
+      }),
+      { sent: 0, failed: 0, skipped: null }
+    );
   }
 
   /**

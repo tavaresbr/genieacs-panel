@@ -885,6 +885,61 @@ export const migrations = [
         // is minted locally and already unique by construction.
       });
     }
+  },
+  {
+    // The WhatsApp inbox and its send queue. Scoping these is what releases the
+    // outbox worker from `forSoleTenant`: once `WaMessage.listSendable()`
+    // carries a provider, a pass per provider divides the queue instead of
+    // sending every message once per provider.
+    id: '0012_wa_queue_tenant',
+    async isApplied(db) {
+      for (const table of ['wa_conversations', 'wa_messages', 'wa_opt_outs']) {
+        if (!(await db.schema.hasTable(table))) return false;
+        if (!(await db.schema.hasColumn(table, 'tenant_id'))) return false;
+      }
+      return true;
+    },
+    async up(db) {
+      const tenant = await db('tenants').orderBy('id', 'asc').first();
+      if (!tenant) return;
+
+      for (const table of ['wa_conversations', 'wa_messages', 'wa_opt_outs']) {
+        if (await db.schema.hasColumn(table, 'tenant_id')) continue;
+        await db.schema.alterTable(table, (t) => t.integer('tenant_id').unsigned());
+        await db(table).whereNull('tenant_id').update({ tenant_id: tenant.id });
+      }
+
+      for (const table of ['wa_conversations', 'wa_opt_outs']) {
+        await db.schema.alterTable(table, (t) => {
+          t.integer('tenant_id').unsigned().notNullable().defaultTo(tenant.id).alter();
+          t.foreign('tenant_id').references('id').inTable('tenants');
+        });
+      }
+
+      await db.schema.alterTable('wa_messages', (t) => {
+        t.integer('tenant_id').unsigned().notNullable().defaultTo(tenant.id).alter();
+        t.foreign('tenant_id').references('id').inTable('tenants');
+        // The id is minted by the Evolution server, so it is unique only within
+        // one of them. Two providers run their own, and a collision on a global
+        // unique would not raise an error a human sees — the inbound dedupe
+        // would treat the second provider's message as one already stored and
+        // drop it. Repeated NULLs still do not collide: an outbound message has
+        // no id until the server accepts it.
+        t.dropUnique(['external_id']);
+        t.unique(['tenant_id', 'external_id']);
+      });
+
+      // `wa_conversations.unique(account_id, external_thread_id)` is left as it
+      // is, deliberately. `account_id` points at `whatsapp_accounts`, which is
+      // already per-provider, so that unique cannot span two providers. Adding
+      // `tenant_id` to it would be churn dressed as a rule.
+      //
+      // The foreign keys stay integer for the same kind of reason. Unlike
+      // `mapping_edges`, whose `source` was a string that stopped being unique
+      // once the plant became per-provider, these point at `id` columns that
+      // remain globally unique. A cross-provider link would take a bug in a
+      // scoped model, not a missing constraint.
+    }
   }
 ];
 

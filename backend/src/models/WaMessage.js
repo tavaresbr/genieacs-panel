@@ -1,4 +1,4 @@
-import { getDb, insertReturningId } from '../config/database.js';
+import { getDb, tdb, tinsertReturningId } from '../config/database.js';
 
 /** How long a message may sit in 'sending' before another pass may retake it. */
 export const RECLAIM_MS = 5 * 60 * 1000;
@@ -10,27 +10,27 @@ export const RECLAIM_MS = 5 * 60 * 1000;
  */
 class WaMessage {
   static async getById(id) {
-    return (await getDb()('wa_messages').where({ id }).first()) || null;
+    return (await tdb('wa_messages').where({ id }).first()) || null;
   }
 
   static async getByExternalId(externalId) {
-    return (await getDb()('wa_messages').where({ external_id: externalId }).first()) || null;
+    return (await tdb('wa_messages').where({ external_id: externalId }).first()) || null;
   }
 
   static async listForConversation(conversationId, { limit = 100 } = {}) {
-    return getDb()('wa_messages')
+    return tdb('wa_messages')
       .where({ conversation_id: conversationId })
       .orderBy('created_at', 'desc')
       .limit(limit);
   }
 
   static async create(message) {
-    const id = await insertReturningId('wa_messages', message);
+    const id = await tinsertReturningId('wa_messages', message);
     return this.getById(id);
   }
 
   static async update(id, patch) {
-    await getDb()('wa_messages')
+    await tdb('wa_messages')
       .where({ id })
       .update({ ...patch, updated_at: new Date() });
     return this.getById(id);
@@ -39,7 +39,7 @@ class WaMessage {
   /** Ids the outbox worker should try next, oldest first. */
   static async listSendable(limit) {
     const cutoff = new Date(Date.now() - RECLAIM_MS);
-    return getDb()('wa_messages')
+    return tdb('wa_messages')
       .whereNull('external_id')
       .where((q) => {
         q.where({ delivery_status: 'queued' })
@@ -66,7 +66,7 @@ class WaMessage {
   static async claim(id) {
     const now = new Date();
     const cutoff = new Date(now.getTime() - RECLAIM_MS);
-    const changed = await getDb()('wa_messages')
+    const changed = await tdb('wa_messages')
       .where({ id })
       .whereNull('external_id')
       .where((q) => {
@@ -93,7 +93,7 @@ class WaMessage {
     const weaker = Object.keys(rank).filter((s) => rank[s] < rank[status]);
     const patch = { delivery_status: status, updated_at: new Date() };
     if (status === 'read') patch.read_at = new Date();
-    return getDb()('wa_messages')
+    return tdb('wa_messages')
       .whereIn('external_id', externalIds)
       .whereIn('delivery_status', ['sending', ...weaker])
       .update(patch);

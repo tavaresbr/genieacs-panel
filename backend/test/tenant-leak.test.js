@@ -15,6 +15,10 @@ const { default: CustomerService } = await import('../src/services/customerServi
 const { default: CustomerPortalPasswordService } = await import(
   '../src/services/customerPortalPasswordService.js'
 );
+const { default: WaOptOut } = await import('../src/models/WaOptOut.js');
+const { default: WaMessage } = await import('../src/models/WaMessage.js');
+const { default: WaConversation } = await import('../src/models/WaConversation.js');
+const { default: WhatsAppAccount } = await import('../src/models/WhatsAppAccount.js');
 
 /**
  * The phase's actual proof.
@@ -197,5 +201,100 @@ describe('a route asked for another provider\'s record', () => {
     });
     assert.equal(status, 401);
     assert.equal(body.code, 'invalid_credentials');
+  });
+});
+
+describe('the WhatsApp queue and the do-not-disturb list', () => {
+  const PHONE = '5593999998888';
+  let accountOf;
+
+  before(async () => {
+    accountOf = {};
+    for (const [name, tenant] of [['alfa', alfa], ['beta', beta]]) {
+      const account = await runInTenant(tenant, () => WhatsAppAccount.create({
+        name: `skygp_leak_${name}`,
+        purpose: 'support',
+        flavor: 'v2',
+        base_url: 'https://evo.example',
+        status: 'connected'
+      }));
+      accountOf[name] = account.id;
+    }
+  });
+
+  // The plan flagged this one: unqualified, `isActive` matched on the phone
+  // alone, so one ISP's opt-out silenced every other ISP's number for that
+  // person. The reverse is just as bad — the list says who asked whom to stop.
+  it('does not let one provider\'s opt-out silence the other', async () => {
+    await runInTenant(alfa, () => WaOptOut.record({ waPhone: PHONE, origin: 'customer' }));
+
+    assert.equal(await runInTenant(alfa, () => WaOptOut.isActive({ waPhone: PHONE })), true);
+    assert.equal(await runInTenant(beta, () => WaOptOut.isActive({ waPhone: PHONE })), false,
+      'the other provider never asked this person for anything');
+
+    const blocked = await runInTenant(beta, () => WaOptOut.activePhones([PHONE]));
+    assert.equal(blocked.has(PHONE), false);
+  });
+
+  it('does not show one provider the other\'s opt-out list', async () => {
+    const theirs = await runInTenant(alfa, () => WaOptOut.listActive());
+    const mine = await runInTenant(beta, () => WaOptOut.listActive());
+    assert.equal(theirs.length, 1);
+    assert.equal(mine.length, 0);
+  });
+
+  // The outbox reads this. Unscoped it drained the deployment, which is why
+  // the worker had to run once for everyone; scoped, a pass per provider
+  // divides the queue instead of repeating it.
+  it('gives each provider only its own sendable messages', async () => {
+    const queue = async (tenant, name, body) => {
+      const conversation = await WaConversation.ensure({
+        accountId: accountOf[name],
+        externalThreadId: `${PHONE}-${name}@s.whatsapp.net`,
+        waPhone: PHONE,
+        pushName: 'Cliente'
+      });
+      return WaMessage.create({
+        conversation_id: conversation.id, direction: 'out', body, delivery_status: 'queued'
+      });
+    };
+
+    const theirs = await runInTenant(alfa, () => queue(alfa, 'alfa', 'do alfa'));
+    const mine = await runInTenant(beta, () => queue(beta, 'beta', 'do beta'));
+
+    const alfaQueue = await runInTenant(alfa, () => WaMessage.listSendable(50));
+    const betaQueue = await runInTenant(beta, () => WaMessage.listSendable(50));
+
+    assert.deepEqual(alfaQueue, [theirs.id]);
+    assert.deepEqual(betaQueue, [mine.id]);
+  });
+
+  it('will not let one provider claim the other\'s message', async () => {
+    const [theirId] = await runInTenant(alfa, () => WaMessage.listSendable(1));
+    assert.equal(await runInTenant(beta, () => WaMessage.claim(theirId)), null);
+
+    const still = await runInTenant(alfa, () => WaMessage.getById(theirId));
+    assert.equal(still.delivery_status, 'queued', 'nobody else took it');
+  });
+
+  // Both Evolution servers mint their own ids, so the same string can arrive
+  // at two providers. On a global unique the second one vanished silently:
+  // the inbound dedupe read it as a message already stored.
+  it('lets the same external id exist for both providers', async () => {
+    const shared = 'WA-MSG-COLLIDE-0001';
+    for (const [tenant, name] of [[alfa, 'alfa'], [beta, 'beta']]) {
+      await runInTenant(tenant, async () => {
+        const conversation = await WaConversation.getByThread(
+          accountOf[name], `${PHONE}-${name}@s.whatsapp.net`
+        );
+        await WaMessage.create({
+          conversation_id: conversation.id, direction: 'in', body: 'oi', external_id: shared
+        });
+      });
+    }
+
+    assert.equal((await getDb()('wa_messages').where({ external_id: shared })).length, 2);
+    const found = await runInTenant(beta, () => WaMessage.getByExternalId(shared));
+    assert.equal(Number(found.tenant_id), Number(beta));
   });
 });

@@ -96,13 +96,14 @@ function startEvolutionStub() {
 let threadSeq = 0;
 async function newConversation({ accountId = supportId, phone = null, lid = null, thread } = {}) {
   threadSeq += 1;
-  return WaConversation.ensure({
+  // The worker opens its own scope now; a fixture reached directly does not.
+  return asTenant(() => WaConversation.ensure({
     accountId,
     externalThreadId: thread || `55939811104${String(threadSeq).padStart(2, '0')}@s.whatsapp.net`,
     waPhone: phone === null && lid === null ? `55939811104${String(threadSeq).padStart(2, '0')}` : phone,
     waLid: lid,
     pushName: 'Cliente'
-  });
+  }));
 }
 
 /**
@@ -235,7 +236,7 @@ describe('the outbox worker despatches', () => {
     const summary = await WaOutboxWorker.tick();
     assert.equal(summary.sent, 1);
 
-    const row = await WaMessage.getById(body.data.id);
+    const row = await asTenant(() => WaMessage.getById(body.data.id));
     assert.equal(row.delivery_status, 'sent');
     // The id comes from the server's answer, not from anything we made up: it
     // is the only thing a delivery receipt can be matched against later.
@@ -254,7 +255,7 @@ describe('the outbox worker despatches', () => {
     await Promise.all([WaOutboxWorker.tick(), WaOutboxWorker.tick()]);
 
     assert.equal(sendTextCalls().length, 1, 'the loser of the claim must do nothing');
-    const row = await WaMessage.getById(body.data.id);
+    const row = await asTenant(() => WaMessage.getById(body.data.id));
     assert.equal(row.delivery_status, 'sent');
     assert.equal(row.attempts, 1);
   });
@@ -268,7 +269,7 @@ describe('the outbox worker despatches', () => {
 
     try {
       await WaOutboxWorker.tick();
-      let row = await WaMessage.getById(body.data.id);
+      let row = await asTenant(() => WaMessage.getById(body.data.id));
       // Still queued: a first failure is a retry, not a verdict.
       assert.equal(row.delivery_status, 'queued');
       assert.equal(row.attempts, 1);
@@ -276,12 +277,12 @@ describe('the outbox worker despatches', () => {
       assert.match(row.delivery_error, /numero invalido/);
 
       await WaOutboxWorker.tick();
-      row = await WaMessage.getById(body.data.id);
+      row = await asTenant(() => WaMessage.getById(body.data.id));
       assert.equal(row.delivery_status, 'queued');
       assert.equal(row.attempts, 2);
 
       await WaOutboxWorker.tick();
-      row = await WaMessage.getById(body.data.id);
+      row = await asTenant(() => WaMessage.getById(body.data.id));
       assert.equal(row.delivery_status, 'failed');
       assert.equal(row.attempts, 3);
       assert.equal(sendTextCalls().length, 3);
@@ -289,7 +290,7 @@ describe('the outbox worker despatches', () => {
       // A fourth pass must not pick it up again.
       await WaOutboxWorker.tick();
       assert.equal(sendTextCalls().length, 3);
-      assert.equal((await WaMessage.getById(body.data.id)).attempts, 3);
+      assert.equal((await asTenant(() => WaMessage.getById(body.data.id))).attempts, 3);
     } finally {
       stub.textStatus = 200;
     }
@@ -302,7 +303,7 @@ describe('the outbox worker despatches', () => {
     // throws for it, and the message queued behind it still has to go out.
     const quebrada = await newConversation();
     await post(quebrada.id, { body: 'sem destino' });
-    await WaConversation.update(quebrada.id, { wa_phone_e164: '12', wa_lid: null });
+    await asTenant(() => WaConversation.update(quebrada.id, { wa_phone_e164: '12', wa_lid: null }));
 
     const boa = await newConversation();
     const { body } = await post(boa.id, { body: 'esta tem de sair' });
@@ -312,7 +313,7 @@ describe('the outbox worker despatches', () => {
     assert.equal(summary.failed, 1);
     assert.equal(summary.sent, 1);
     assert.equal(sendTextCalls().length, 1);
-    assert.equal((await WaMessage.getById(body.data.id)).delivery_status, 'sent');
+    assert.equal((await asTenant(() => WaMessage.getById(body.data.id))).delivery_status, 'sent');
   });
 });
 
@@ -333,7 +334,7 @@ describe('audio is a voice bubble before it is a file', () => {
 
     assert.equal(audioCalls().length, 1);
     assert.equal(mediaCalls().length, 0, 'a 2xx audio must never be repeated as media');
-    assert.equal((await WaMessage.getById(body.data.id)).delivery_status, 'sent');
+    assert.equal((await asTenant(() => WaMessage.getById(body.data.id))).delivery_status, 'sent');
   });
 
   it('falls back to sendMedia on a non-2xx', async () => {
@@ -351,7 +352,7 @@ describe('audio is a voice bubble before it is a file', () => {
       assert.equal(mediaCalls()[0].payload.mediatype, 'audio');
       assert.equal(mediaCalls()[0].payload.media, audio.url);
       assert.equal(mediaCalls()[0].payload.fileName, audio.name);
-      const row = await WaMessage.getById(body.data.id);
+      const row = await asTenant(() => WaMessage.getById(body.data.id));
       assert.equal(row.delivery_status, 'sent');
       assert.ok(row.external_id, 'the id comes from the call that actually worked');
     } finally {
@@ -389,7 +390,7 @@ describe('an internal note is never sent', () => {
     await WaOutboxWorker.tick();
 
     assert.equal(requests.length, 0, 'a note must never reach the server');
-    const row = await WaMessage.getById(body.data.id);
+    const row = await asTenant(() => WaMessage.getById(body.data.id));
     assert.equal(row.delivery_status, null);
     assert.equal(row.attempts, 0);
   });
@@ -405,8 +406,13 @@ describe('an opt-out does not silence a reply', () => {
   it('lets the operator answer someone who asked not to be contacted', async () => {
     await clearOutbox();
     const conversation = await newConversation();
-    await WaOptOut.record({ waPhone: conversation.wa_phone_e164, origin: 'customer', reasonText: 'SAIR' });
-    assert.equal(await WaOptOut.isActive({ waPhone: conversation.wa_phone_e164 }), true);
+    await asTenant(() => WaOptOut.record({
+      waPhone: conversation.wa_phone_e164, origin: 'customer', reasonText: 'SAIR'
+    }));
+    assert.equal(
+      await asTenant(() => WaOptOut.isActive({ waPhone: conversation.wa_phone_e164 })),
+      true
+    );
     requests.length = 0;
 
     // An opt-out means the provider does not INITIATE contact. Refusing to
@@ -418,7 +424,7 @@ describe('an opt-out does not silence a reply', () => {
 
     await WaOutboxWorker.tick();
     assert.equal(sendTextCalls().length, 1);
-    assert.equal((await WaMessage.getById(body.data.id)).delivery_status, 'sent');
+    assert.equal((await asTenant(() => WaMessage.getById(body.data.id))).delivery_status, 'sent');
   });
 });
 
@@ -493,7 +499,7 @@ describe('the per-minute ceiling', () => {
       assert.equal(again.skipped, 'rate_limited');
       assert.equal(sendTextCalls().length, 2);
 
-      const statuses = await Promise.all(ids.map(async (id) => (await WaMessage.getById(id)).delivery_status));
+      const statuses = await Promise.all(ids.map(async (id) => (await asTenant(() => WaMessage.getById(id))).delivery_status));
       assert.equal(statuses.filter((s) => s === 'sent').length, 2);
       assert.equal(statuses.filter((s) => s === 'queued').length, 3);
     } finally {

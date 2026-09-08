@@ -30,7 +30,9 @@ const mensagens = () => getDb()('wa_messages');
 const conversas = () => getDb()('wa_conversations');
 
 async function mensagemPorId(externalId) {
-  return WaMessage.getByExternalId(externalId);
+  // No request behind these; the webhook route opens its own scope from the
+  // account the instance name resolved to.
+  return asTenant(() => WaMessage.getByExternalId(externalId));
 }
 
 async function conversaDaMensagem(externalId) {
@@ -366,13 +368,13 @@ describe('inbound media', () => {
 describe('delivery receipts', () => {
   async function saida(externalId) {
     const conversa = await conversas().where({ external_thread_id: '5593981110449@s.whatsapp.net' }).first();
-    return WaMessage.create({
+    return asTenant(() => WaMessage.create({
       conversation_id: conversa.id,
       direction: 'out',
       body: 'com recibo',
       external_id: externalId,
       delivery_status: 'sending'
-    });
+    }));
   }
 
   it('reads the v2 flat shape, where there is no data.key at all', async () => {
@@ -384,7 +386,7 @@ describe('delivery receipts', () => {
     });
     assert.equal(status, 200);
     assert.equal(body.handled, true);
-    assert.equal((await WaMessage.getById(msg.id)).delivery_status, 'delivered');
+    assert.equal((await asTenant(() => WaMessage.getById(msg.id))).delivery_status, 'delivered');
   });
 
   it('reads the v1 nested shape', async () => {
@@ -394,7 +396,7 @@ describe('delivery receipts', () => {
       instance: INSTANCE,
       data: { key: { id: 'RCPT-V1' }, update: { status: 'READ' } }
     });
-    assert.equal((await WaMessage.getById(msg.id)).delivery_status, 'read');
+    assert.equal((await asTenant(() => WaMessage.getById(msg.id))).delivery_status, 'read');
   });
 
   it('reads the GO shape, which carries the state outside data and covers a batch', async () => {
@@ -408,8 +410,8 @@ describe('delivery receipts', () => {
     });
     assert.equal(body.handled, true);
     assert.equal(body.updated, 2);
-    assert.equal((await WaMessage.getById(um.id)).delivery_status, 'delivered');
-    assert.equal((await WaMessage.getById(dois.id)).delivery_status, 'delivered');
+    assert.equal((await asTenant(() => WaMessage.getById(um.id))).delivery_status, 'delivered');
+    assert.equal((await asTenant(() => WaMessage.getById(dois.id))).delivery_status, 'delivered');
   });
 
   it('skips with 200 when the update carries no state, and says so', async () => {
@@ -434,7 +436,7 @@ describe('delivery receipts', () => {
       state: 'ReadSelf',
       data: { MessageIDs: ['RCPT-READSELF'] }
     });
-    assert.equal((await WaMessage.getById(msg.id)).delivery_status, 'sending');
+    assert.equal((await asTenant(() => WaMessage.getById(msg.id))).delivery_status, 'sending');
   });
 });
 
@@ -445,7 +447,7 @@ describe('opt-out from an inbound message', () => {
       remoteJid: '5599111112222@s.whatsapp.net',
       texto: 'SAIR'
     }));
-    assert.equal(await WaOptOut.isActive({ waPhone: '5599111112222' }), true);
+    assert.equal(await asTenant(() => WaOptOut.isActive({ waPhone: '5599111112222' })), true);
   });
 
   it('does NOT record one on an outbound echo', async () => {
@@ -457,7 +459,7 @@ describe('opt-out from an inbound message', () => {
       fromMe: true,
       texto: 'sair'
     }));
-    assert.equal(await WaOptOut.isActive({ waPhone: '5599222223333' }), false);
+    assert.equal(await asTenant(() => WaOptOut.isActive({ waPhone: '5599222223333' })), false);
     assert.equal((await mensagemPorId('V2-SAIR-ECO')).direction, 'out');
   });
 
@@ -469,7 +471,7 @@ describe('opt-out from an inbound message', () => {
       remoteJid: '5599333334444@s.whatsapp.net',
       texto: 'Então pode separar'
     }));
-    assert.equal(await WaOptOut.isActive({ waPhone: '5599333334444' }), false);
+    assert.equal(await asTenant(() => WaOptOut.isActive({ waPhone: '5599333334444' })), false);
   });
 
   it('records one for a contact known only by LID', async () => {
@@ -478,7 +480,7 @@ describe('opt-out from an inbound message', () => {
       remoteJid: '140076734488799@lid',
       texto: 'parar'
     }));
-    assert.equal(await WaOptOut.isActive({ waLid: '140076734488799' }), true);
+    assert.equal(await asTenant(() => WaOptOut.isActive({ waLid: '140076734488799' })), true);
   });
 });
 

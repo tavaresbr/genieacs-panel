@@ -204,7 +204,7 @@ before(async () => {
     updated_at: now
   })));
 
-  await WaOptOut.record({ waPhone: byContract.get('C-OPTOUT').phone, origin: 'customer' });
+  await asTenant(() => WaOptOut.record({ waPhone: byContract.get('C-OPTOUT').phone, origin: 'customer' }));
 });
 
 after(async () => {
@@ -486,7 +486,7 @@ describe('the flush loop', () => {
     // The build let this number through; the request arrives afterwards. The
     // loop has to honour it, and — the part that matters — has to move the row
     // to a terminal state rather than leaving it pending forever.
-    await WaOptOut.record({ waPhone: '5593981110002', origin: 'customer' });
+    await asTenant(() => WaOptOut.record({ waPhone: '5593981110002', origin: 'customer' }));
 
     await call(`${panelUrl}/api/whatsapp/broadcasts/${broadcastId}/status`, {
       method: 'POST',
@@ -581,7 +581,7 @@ describe('the do-not-disturb list', () => {
       headers: authHeaders(token)
     });
     assert.equal(revoked.status, 200);
-    assert.equal(await WaOptOut.isActive({ waPhone: '5593981110099' }), false);
+    assert.equal(await asTenant(() => WaOptOut.isActive({ waPhone: '5593981110099' })), false);
 
     const missing = await call(`${panelUrl}/api/whatsapp/opt-outs/999999`, {
       method: 'DELETE',
