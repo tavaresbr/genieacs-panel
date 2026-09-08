@@ -470,4 +470,13 @@ export default {
   'whatsapp.bot.signalOk': 'Tu conexión está en línea. Señal óptica: {rxPower} dBm.',
   'whatsapp.bot.signalDown': 'Tu equipo no responde. Hemos abierto un ticket.',
   'whatsapp.bot.optedOut': 'Ya no recibirás nuestros avisos. Escríbenos cuando quieras para volver a recibirlos.',
+  // WhatsApp — corpo das mensagens de alerta técnico
+  'whatsapp.alerts.ontOffline': 'ONT {device} sin conexión hace {minutes} min',
+  'whatsapp.alerts.ontOfflineCleared': 'ONT {device} volvió a responder',
+  'whatsapp.alerts.rxPowerLow': 'ONT {device} con señal óptica en {value} dBm (límite {threshold})',
+  'whatsapp.alerts.rxPowerLowCleared': 'ONT {device} con señal óptica normalizada',
+  'whatsapp.alerts.temperatureHigh': 'ONT {device} a {value} °C (límite {threshold})',
+  'whatsapp.alerts.temperatureHighCleared': 'ONT {device} con temperatura normalizada',
+  'whatsapp.alerts.massOutage': 'Caída masiva: {count} ONTs sin conexión en {node}',
+  'whatsapp.alerts.massOutageCleared': '{node} restablecido: las ONT volvieron a responder',
 };
