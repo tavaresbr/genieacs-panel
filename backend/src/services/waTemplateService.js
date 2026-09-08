@@ -1,6 +1,10 @@
 import WaTemplate from '../models/WaTemplate.js';
 import { WaError } from './whatsappConfigService.js';
-import { VARIAVEIS_DE_COBRANCA, variaveisDesconhecidas } from '../utils/wa/waCobranca.js';
+import {
+  VARIAVEIS_DE_COBRANCA,
+  modeloCitaOsDoisEspelhos,
+  variaveisDesconhecidas
+} from '../utils/wa/waCobranca.js';
 
 /** Column widths from `wa_templates`; truncating here beats a driver error. */
 const NAME_LIMIT = 80;
@@ -113,6 +117,16 @@ class WaTemplateService {
       throw new WaError('whatsapp.error.templateEmpty', { code: 'template_empty', status: 400 });
     }
     this.assertKnownVariables(cleanBody);
+    // A body citing both mirrors passes every other check and can never render
+    // for anybody: one of the two is always empty, and an empty cited variable
+    // refuses the whole message. Left to the dispatcher it shows up as a
+    // `templateIncomplete` count on a campaign that reached nobody, hours later.
+    if (modeloCitaOsDoisEspelhos(cleanBody)) {
+      throw new WaError('whatsapp.error.templateMirrors', {
+        code: 'template_mirrors',
+        status: 400
+      });
+    }
     const cleanCategory = String(category ?? '').trim().slice(0, CATEGORY_LIMIT);
     return {
       name: cleanName,

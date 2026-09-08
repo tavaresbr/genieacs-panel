@@ -161,6 +161,30 @@ describe('the settings routes', () => {
     assert.equal(refused.status, 400);
     assert.equal(refused.body.code, 'invalid_phone');
   });
+
+  it('an emptied threshold goes back to the default, never to zero', async () => {
+    // `Number(null)` and `Number('')` are both 0, and 0 is finite. Read after
+    // the conversion, a box the operator cleared would be stored as a threshold
+    // of zero — and `temperature_high` at 0 °C alerts on the whole fleet,
+    // forever, which is the loudest possible way to be wrong.
+    for (const empty of [null, '']) {
+      const { status, body } = await call(`${panelUrl}/api/whatsapp/alerts/settings`, {
+        method: 'PUT',
+        headers: authHeaders(token),
+        body: { rules: { temperature_high: { enabled: true, threshold: empty } } }
+      });
+      assert.equal(status, 200);
+      assert.equal(body.data.rules.temperature_high.threshold, 70, `for ${JSON.stringify(empty)}`);
+    }
+
+    // And a real zero, typed on purpose, is still a zero.
+    const zero = await call(`${panelUrl}/api/whatsapp/alerts/settings`, {
+      method: 'PUT',
+      headers: authHeaders(token),
+      body: { rules: { rx_power_low: { enabled: true, threshold: 0 } } }
+    });
+    assert.equal(zero.body.data.rules.rx_power_low.threshold, 0);
+  });
 });
 
 describe('each rule fires at its threshold and not just inside it', () => {
@@ -358,7 +382,10 @@ describe('a scan that cannot say anything says why', () => {
     await WhatsAppAccount.update(alertsAccountId, { status: 'disconnected' });
     try {
       const summary = await WaAlertService.scan({ now: now() });
-      assert.equal(summary.skipped, 'no_recipients');
+      // Its own reason, not `no_recipients`: this one is fixed on the
+      // connection screen, that one on the alerts screen, and a single message
+      // for both sends the admin to the wrong place.
+      assert.equal(summary.skipped, 'no_alert_number');
       assert.equal(summary.fired, 0);
       assert.equal((await alertRows()).length, 0, 'nothing may be recorded as announced');
       assert.equal((await outbox()).length, 0);
@@ -369,7 +396,7 @@ describe('a scan that cannot say anything says why', () => {
         body: {}
       });
       assert.equal(status, 409);
-      assert.equal(body.code, 'no_recipients');
+      assert.equal(body.code, 'no_alert_number');
     } finally {
       await WhatsAppAccount.update(alertsAccountId, { status: 'connected' });
     }

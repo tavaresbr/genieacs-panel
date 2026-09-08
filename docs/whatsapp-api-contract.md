@@ -43,6 +43,7 @@ que é público e tem credencial própria.
 | `incomplete_config` | falta a URL do webhook | `whatsapp.error.incompleteConfig` |
 | `invalid_webhook_url` | URL do webhook inválida | `whatsapp.error.invalidWebhookUrl` |
 | `invalid_portal_url` | URL do portal do cliente inválida | `whatsapp.error.invalidPortalUrl` |
+| `template_mirrors` | modelo cita os dois espelhos de dias | `whatsapp.error.templateMirrors` |
 | `invalid_base_url` | URL do Evolution inválida | `whatsapp.error.invalidBaseUrl` |
 | `host_not_allowed` | fora da allowlist do admin | `whatsapp.error.hostNotAllowed` |
 | `blocked_host` | endereço interno, barrado pelo guard SSRF | `whatsapp.error.blockedHost` |
@@ -54,7 +55,7 @@ que é público e tem credencial própria.
 | `no_destination` | contato sem telefone nem LID | `whatsapp.error.noDestination` |
 | `message_empty` | sem texto e sem anexo | `whatsapp.error.messageEmpty` |
 | `conversation_not_found` | `:id` não existe | `common.routeNotFound` |
-| `no_recipients` | nenhum número recebe alerta técnico | `whatsapp.alerts.noRecipients` |
+| `no_alert_recipients` | nenhum número recebe alerta técnico | `whatsapp.alerts.noRecipients` |
 | `invalid_phone` | telefone de plantão que não dá para discar | `whatsapp.error.invalidPhone` |
 
 ---
@@ -776,7 +777,7 @@ que ninguém lê — enquanto quem digitou ainda está olhando o formulário.
 
 `POST /alerts/scan` devolve `{ fired, cleared, notified, skipped }`. Sem número
 de purpose `alerts` conectado, ou sem destinatários, responde **409
-`no_recipients`** — quem apertou o botão apertou justamente para descobrir se
+`no_alert_recipients`** — quem apertou o botão apertou justamente para descobrir se
 isto funciona, e um `{fired: 0}` alegre esconderia a resposta.
 
 ### As quatro regras
