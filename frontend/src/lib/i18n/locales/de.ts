@@ -1170,6 +1170,8 @@ const de: Dictionary = {
   'whatsapp.error.incompleteConfig': 'Gib die öffentliche Webhook-URL an, bevor du die Integration aktivierst.',
   'whatsapp.error.invalidWebhookUrl': 'Die Webhook-URL ist ungültig.',
   'whatsapp.error.invalidPortalUrl': 'Die URL des Kundenportals ist ungültig.',
+  'whatsapp.error.messageEmpty': 'Schreibe etwas, bevor du sendest.',
+  'whatsapp.error.conversationNotFound': 'Diese Unterhaltung gibt es nicht mehr.',
   'whatsapp.error.invalidBaseUrl': 'Die URL des Evolution-Servers ist ungültig.',
   'whatsapp.error.hostNotAllowed': 'Dieser Evolution-Server steht nicht auf der zugelassenen Liste.',
   'whatsapp.error.blockedHost': 'Diese Adresse ist aus dem Internet nicht erreichbar und wurde abgelehnt.',

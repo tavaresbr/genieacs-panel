@@ -1289,6 +1289,8 @@ const en = {
   'whatsapp.error.incompleteConfig': 'Fill in the public webhook URL before enabling the integration.',
   'whatsapp.error.invalidWebhookUrl': 'The webhook URL is invalid.',
   'whatsapp.error.invalidPortalUrl': 'The customer portal URL is invalid.',
+  'whatsapp.error.messageEmpty': 'Write something before sending.',
+  'whatsapp.error.conversationNotFound': 'This conversation no longer exists.',
   'whatsapp.error.invalidBaseUrl': 'The Evolution server URL is invalid.',
   'whatsapp.error.hostNotAllowed': 'This Evolution server is not on the authorized list.',
   'whatsapp.error.blockedHost': 'This address is not reachable from the internet and was refused.',

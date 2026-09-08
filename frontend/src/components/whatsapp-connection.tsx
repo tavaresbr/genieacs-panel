@@ -36,7 +36,12 @@ const ERROR_KEYS: Record<string, TranslationKey> = {
   unreachable: 'whatsapp.error.unreachable',
   no_session: 'whatsapp.error.noSession',
   no_account: 'whatsapp.error.noAccount',
-  no_destination: 'whatsapp.error.noDestination'
+  no_destination: 'whatsapp.error.noDestination',
+  // Both reachable only from the inbox, and both were missing until the screen
+  // that provokes them was built: an unknown code degrades to the generic
+  // failure, which is not wrong but tells the operator nothing.
+  message_empty: 'whatsapp.error.messageEmpty',
+  conversation_not_found: 'whatsapp.error.conversationNotFound'
 }
 
 type Translate = (key: TranslationKey, vars?: Record<string, string | number>) => string

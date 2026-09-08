@@ -1297,6 +1297,8 @@ const fr: Dictionary = {
   'whatsapp.inbox.contract': 'Contrat',
   'whatsapp.inbox.openDevice': 'Ouvrir l’équipement',
   'whatsapp.error.invalidPortalUrl': 'L’URL du portail client est invalide.',
+  'whatsapp.error.messageEmpty': 'Écrivez quelque chose avant d’envoyer.',
+  'whatsapp.error.conversationNotFound': 'Cette conversation n’existe plus.',
 }
 
 export default fr

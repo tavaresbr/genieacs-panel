@@ -1287,6 +1287,8 @@ const ptBR: Dictionary = {
   'whatsapp.error.incompleteConfig': 'Informe a URL pública do webhook antes de ativar a integração.',
   'whatsapp.error.invalidWebhookUrl': 'A URL do webhook é inválida.',
   'whatsapp.error.invalidPortalUrl': 'A URL do portal do cliente é inválida.',
+  'whatsapp.error.messageEmpty': 'Escreva algo antes de enviar.',
+  'whatsapp.error.conversationNotFound': 'Esta conversa não existe mais.',
   'whatsapp.error.invalidBaseUrl': 'A URL do servidor Evolution é inválida.',
   'whatsapp.error.hostNotAllowed': 'Este servidor Evolution não está na lista autorizada.',
   'whatsapp.error.blockedHost': 'Este endereço não é acessível pela internet e foi recusado.',
