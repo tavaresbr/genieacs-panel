@@ -314,6 +314,44 @@ class WaMediaSweeper {
   }
 
   /**
+   * The manual button's entry point: one pass, for the provider making the
+   * request and nobody else.
+   *
+   * `tick` sweeps every provider because it is the deployment's own timer and
+   * nobody's request. This is the opposite: the request arrived inside one
+   * provider's scope, opened by `resolveTenant`, and an admin at one ISP has no
+   * business reclaiming another ISP's disk — nor being handed another ISP's
+   * megabytes as the answer. Routing the button through `tick` would do both,
+   * and would have looked correct for exactly as long as there was one
+   * provider.
+   *
+   * It takes the same guard as the loop, and must: the guard lives on the run,
+   * so a manual pass that skipped it could race the timer onto the same unlink.
+   *
+   * `includeLegacy` is decided here rather than by the caller for the same
+   * reason `tick` decides it — a pass cannot see how many providers exist, and
+   * the pass that assumed would be the one deleting the neighbour's files.
+   *
+   * @returns {Promise<{ files: number, bytes: number, mb: number, skipped?: string }>}
+   */
+  static async sweepCurrentTenant() {
+    if (this.running) return { skipped: 'busy', files: 0, bytes: 0, mb: 0 };
+    this.running = true;
+    try {
+      const [{ total } = {}] = await getDb()('tenants')
+        .where({ status: 'active' })
+        .count({ total: '*' });
+      return await this.sweep({ includeLegacy: Number(total) === 1 });
+    } catch (error) {
+      // Only the provider count can land here; `sweep` never throws.
+      console.warn(`WhatsApp media sweep failed: ${error.message}`);
+      return { skipped: 'failed', files: 0, bytes: 0, mb: 0 };
+    } finally {
+      this.running = false;
+    }
+  }
+
+  /**
    * One pass, inside a provider scope the caller has already opened.
    *
    * It NEVER throws. A file another process removed between the walk and the

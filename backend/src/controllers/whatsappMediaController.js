@@ -62,10 +62,16 @@ class WhatsAppMediaController {
    * saved settings and the rules from the sweeper; there is no parameter here
    * to widen either, so a mistyped body cannot become a wider deletion than
    * the one the operator configured and can see on the settings screen.
+   *
+   * `sweepCurrentTenant` and NOT `tick`: since the sweep became a per-provider
+   * loop, `tick` walks every provider on the deployment. That is right for the
+   * timer, which is nobody's request, and wrong for a button — this request
+   * arrived inside one provider's scope and must reclaim that provider's disk
+   * and report that provider's megabytes.
    */
   static async sweep(req, res) {
     try {
-      const result = await WaMediaSweeper.tick();
+      const result = await WaMediaSweeper.sweepCurrentTenant();
       return res.json(createResponse(
         req.t('whatsapp.mediaSwept', { files: result.files, mb: result.mb }),
         result

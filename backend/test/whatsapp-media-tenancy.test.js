@@ -371,6 +371,59 @@ describe('the sweep, once there is more than one provider', () => {
   });
 });
 
+describe('the manual sweep button, with more than one provider', () => {
+  /**
+   * The button is not the timer. `tick` walks every provider because it belongs
+   * to the deployment; this request belongs to one ISP, and routing it through
+   * `tick` would have had an admin at Alfa reclaim Beta's disk and read Beta's
+   * megabytes as the answer — correct-looking for exactly as long as there was
+   * one provider on the install.
+   *
+   * Beta's window is the aggressive one here, so a run that reached outside
+   * Alfa's scope would delete Beta's file. Asserting on the file and not only
+   * on the count is the point: a leak that deleted Beta's file and forgot to
+   * count it would pass a count-only test.
+   */
+  it('sweeps only the provider making the request', async () => {
+    await comRetencao(alfa, 0);
+    await comRetencao(beta, 1);
+
+    const dele = gravar(`wa-media/t${beta}/${conversaBeta}/velha.png`, 90);
+    await mensagem({
+      tenant: beta, conversationId: conversaBeta, attachment_path: dele, ageDays: 90
+    });
+
+    const result = await runInTenant(alfa, () => WaMediaSweeper.sweepCurrentTenant());
+
+    // Alfa keeps its attachments forever, so the honest answer to Alfa's admin
+    // is "retention is off" — not a count of what Beta's window would have got.
+    assert.equal(result.skipped, 'disabled');
+    assert.equal(result.files, 0);
+    assert.equal(existe(dele), true, 'Beta\'s disk is not Alfa\'s button to press');
+  });
+
+  /**
+   * The other half of the same claim: Alfa's own window does apply, and the
+   * legacy area stays out of it while the install is ambiguous.
+   */
+  it('applies the requesting provider\'s own window, and still spares the legacy area', async () => {
+    await comRetencao(alfa, 1);
+    await comRetencao(beta, 1);
+
+    const meu = gravar(`wa-media/t${alfa}/${conversaAlfa}/velha.png`, 90);
+    const legado = gravar(`wa-media/${conversaAlfa}/legada.png`, 90);
+    await mensagem({
+      tenant: alfa, conversationId: conversaAlfa, attachment_path: meu, ageDays: 90
+    });
+
+    const result = await runInTenant(alfa, () => WaMediaSweeper.sweepCurrentTenant());
+
+    assert.equal(result.files, 1);
+    assert.equal(existe(meu), false);
+    assert.equal(existe(legado), true);
+  });
+});
+
 describe('the sweep on an install with a single provider', () => {
   // Beta stands down for these, which is the shape of every install that
   // upgrades into this wave: one provider, and a tree with no `t<id>/` in it.

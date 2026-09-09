@@ -1077,12 +1077,12 @@ Quatro escolhas que o contrato não fixava e que quem mexer nele precisa saber:
   no boot, de propósito; quem precisa de disco agora tem o botão.
 - **A varredura só anda `DATA_DIR/wa-media`**, nunca `DATA_DIR`. É a diferença
   entre recuperar disco e apagar o `panel.sqlite`, que mora um nível acima.
-- **Roda em `forSoleTenant`**, como a varredura de alertas, e aqui o motivo é o
-  disco: é um sistema de arquivos de que nenhum provedor tem um canto. Uma
-  passagem por provedor não dividiria o trabalho, veria os arquivos do outro
-  como órfãos sem linha e apagaria todos. Quando o segundo provedor entrar, o
-  conserto é dar a cada um sua subpasta de mídia, e só então o laço por
-  provedor.
+- ~~**Roda em `forSoleTenant`**~~ — **superado pela onda 8.** Rodava, porque o
+  disco era um sistema de arquivos de que nenhum provedor tinha um canto: uma
+  passagem por provedor veria os arquivos do outro como órfãos sem linha e
+  apagaria todos. O conserto que este parágrafo previa é o que a onda 8 fez —
+  cada provedor ganhou sua subárvore, e só então o laço por provedor. Ver a
+  seção da onda 8.
 
 ---
 
@@ -1278,3 +1278,20 @@ de contratos, ela só cresce.
   botão da mídia existe para o disco cheio agora; crescimento de tabela não tem
   essa urgência, e o laço de 6 h dá conta. Uma rota que apaga histórico sob
   demanda seria superfície destrutiva a mais sem nada que a peça.
+
+### O botão manual não é o laço
+
+Com a varredura de mídia virando laço por provedor, `WaMediaSweeper.tick()`
+passa a andar o disco de **todos** os provedores ativos. Isso é certo para o
+temporizador, que não é requisição de ninguém, e errado para o botão: a
+requisição chega dentro do escopo de um provedor, e um admin de uma ISP não
+tem por que recuperar o disco de outra nem receber os megabytes dela como
+resposta.
+
+Por isso `POST /api/whatsapp/media/sweep` chama `sweepCurrentTenant()`, que
+varre só o escopo já aberto, pega a mesma trava de concorrência do laço (a
+trava é do *run*, não da passagem) e decide sozinho se a área legada entra —
+entra só quando há um provedor ativo, mesma regra do laço.
+
+Isto teria parecido correto por exatamente o tempo em que houvesse um provedor
+só.
