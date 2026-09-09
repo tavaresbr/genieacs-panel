@@ -111,7 +111,11 @@ export default function Settings() {
     // 0 is forever, and it is what an installation that never touches this
     // field keeps. Anything else is a day count after which a stored
     // attachment is deleted off the disk.
-    mediaRetentionDays: 0
+    mediaRetentionDays: 0,
+    // Its sibling, and the heavier of the two: this one deletes the words of
+    // the conversation rather than a file hanging off it. Same default, and
+    // the same reason for it.
+    messageRetentionDays: 0
   })
   const [waSaving, setWaSaving] = useState(false)
 
@@ -196,7 +200,8 @@ export default function Settings() {
         // from before this field existed answers without it, and `undefined`
         // in a number input makes it uncontrolled from that point on. The
         // fallback is the same one the server keeps — forever.
-        mediaRetentionDays: config.mediaRetentionDays ?? 0
+        mediaRetentionDays: config.mediaRetentionDays ?? 0,
+        messageRetentionDays: config.messageRetentionDays ?? 0
       })
     })()
     return () => { cancelled = true }
@@ -304,6 +309,7 @@ export default function Settings() {
         rejectCallMessage: waForm.rejectCallMessage,
         rateLimitPerMin: waForm.rateLimitPerMin,
         mediaRetentionDays: waForm.mediaRetentionDays,
+        messageRetentionDays: waForm.messageRetentionDays,
         // Same rule as the SGP token: only send a key the operator typed.
         // Omitting it keeps the stored one, so saving this form can never
         // revoke the integration by accident.
@@ -1491,6 +1497,32 @@ export default function Settings() {
                     }))}
                   />
                   <p className="field-hint">{t('settings.whatsapp.mediaRetentionHint')}</p>
+                </div>
+                <div>
+                  <label htmlFor="wa-message-retention" className="field-label">
+                    {t('settings.whatsapp.messageRetention')}
+                  </label>
+                  <input
+                    id="wa-message-retention"
+                    type="number"
+                    min={0}
+                    max={3650}
+                    className="modern-input w-full"
+                    value={waForm.messageRetentionDays}
+                    onChange={(event) => setWaForm((current) => ({
+                      ...current,
+                      // Same `|| 0` as its sibling above, for the same reason:
+                      // 0 is the value that deletes nothing, so an emptied box
+                      // has to land on it.
+                      messageRetentionDays: Math.max(0, Math.trunc(Number(event.target.value)) || 0)
+                    }))}
+                  />
+                  {/* Beside the attachment window rather than under its own
+                      heading, because the two are read together: a message
+                      whose attachment is still on disk is never deleted, so
+                      setting this one alone keeps every thread that ever
+                      carried a file. The hint is where that is said. */}
+                  <p className="field-hint">{t('settings.whatsapp.messageRetentionHint')}</p>
                 </div>
               </div>
 
