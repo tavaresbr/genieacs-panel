@@ -946,7 +946,12 @@ export interface WhatsAppMessage {
   conversationId: number
   direction: 'in' | 'out'
   body: string | null
-  attachment: { url: string; type: string | null; name: string | null } | null
+  /**
+   * What the panel says about a file, never where it is: the browser fetches
+   * the bytes by message id through `fetchAttachment`. The stored path stays on
+   * the server side of the wire.
+   */
+  attachment: { type: string | null; name: string | null } | null
   isNote: boolean
   /**
    * Who produced it. `sentBy` cannot answer that: it is NULL for the bot, for a

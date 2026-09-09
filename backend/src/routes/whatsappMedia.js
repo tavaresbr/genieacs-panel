@@ -1,33 +1,10 @@
 import express from 'express';
-import rateLimit from 'express-rate-limit';
 import { getDb } from '../config/database.js';
-import { ipKey } from '../middleware/rateLimit.js';
+import { waMediaLimiter } from '../middleware/rateLimit.js';
 import { resolveStoredAttachment, streamAttachment } from '../services/waMediaFile.js';
 import { tokenFromQuery, verify } from '../utils/wa/waMediaToken.js';
 
 const router = express.Router();
-
-/**
- * This route's own ceiling, for the same reason `whatsappWebhook.js` has one.
- *
- * It is mounted before the shared `apiLimiter` — see `app.js` — because the
- * caller is a server, not a person clicking: a campaign that attaches a file
- * fetches once per recipient, in a burst, and a bucket sized for a human would
- * turn that into a queue of failed sends. The bucket is still there, and keyed
- * by source address, because the address is what a flood comes from and this
- * route reads files off the disk.
- *
- * Lower than the webhook's 600: one fetch per outbound attachment is a far
- * quieter shape than one delivery receipt per recipient per state.
- */
-const waMediaLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 240,
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: ipKey,
-  message: { success: false, error: 'too many media fetches' }
-});
 
 /**
  * The file the Evolution server fetches in order to send it.

@@ -210,7 +210,10 @@ describe('WhatsApp attachments — what the operator uploads', () => {
     const enviada = await enviar({ attachment: { url: caminho, type, name } });
     assert.equal(enviada.status, 201);
     assert.equal(enviada.body.data.body, null);
-    assert.equal(enviada.body.data.attachment.url, caminho);
+    // The response says WHAT is attached, never where it is: the path stays on
+    // the server's side of the wire, and the browser fetches the bytes by
+    // message id. The row below is where the path has to be right.
+    assert.equal(enviada.body.data.attachment.url, undefined);
     assert.equal(enviada.body.data.attachment.type, 'image/png');
     assert.equal(enviada.body.data.attachment.name, name);
     assert.equal(enviada.body.data.deliveryStatus, 'queued');

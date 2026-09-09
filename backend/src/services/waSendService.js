@@ -193,9 +193,12 @@ class WaSendService {
       conversationId: row.conversation_id,
       direction: row.direction,
       body: row.body ?? null,
+      // No `url`. The stored value is a path on the panel's disk, which is
+      // useless to a browser — it fetches by message id now — and is a shape of
+      // the server's filesystem that nothing outside needs to know. What the
+      // screen actually draws from is `type` and `name`.
       attachment: row.attachment_path
         ? {
-          url: row.attachment_path,
           type: row.attachment_type || null,
           name: row.attachment_name || null
         }

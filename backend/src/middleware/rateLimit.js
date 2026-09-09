@@ -185,3 +185,18 @@ export const waWebhookLimiter = limiter({
   keyGenerator: ipKey,
   message: { success: false, error: 'too many webhook deliveries' }
 });
+
+/**
+ * The signed media route the Evolution server fetches an attachment from.
+ *
+ * Its own bucket for the same reason as the webhook's — no session to key on —
+ * and lower, because one fetch per outbound attachment is a far quieter shape
+ * than one delivery receipt per recipient per state. It also reads a file off
+ * the disk, which the webhook does not.
+ */
+export const waMediaLimiter = limiter({
+  windowMs: 60 * 1000,
+  max: 240,
+  keyGenerator: ipKey,
+  message: { success: false, error: 'too many media fetches' }
+});
