@@ -121,6 +121,41 @@ describe('whatsapp configuration', () => {
     assert.equal(body.data.webhookBaseUrl, 'https://painel.provedor.com.br/api/whatsapp-webhook');
   });
 
+  it('keeps the retention window it is given, and refuses to read a typo as a sweep', async () => {
+    const saved = await call(`${panelUrl}/api/whatsapp/config`, {
+      method: 'PUT',
+      headers: authHeaders(token),
+      body: { mediaRetentionDays: 30 }
+    });
+    assert.equal(saved.status, 200);
+    assert.equal(saved.body.data.mediaRetentionDays, 30);
+
+    // It has to survive a read, not just an answer: the sweeper reads the
+    // stored config, and a field that round-trips only through the response is
+    // a setting the operator watched save and that deletes nothing.
+    const read = await call(`${panelUrl}/api/whatsapp/config`, { headers: authHeaders(token) });
+    assert.equal(read.body.data.mediaRetentionDays, 30);
+
+    // Anything unreadable reads as zero — forever — because the safe direction
+    // here is the one that deletes nothing. A typo in a form must never be able
+    // to mean "sweep the archive tonight".
+    for (const typo of ['trinta', -5, null, Number.NaN]) {
+      const { body } = await call(`${panelUrl}/api/whatsapp/config`, {
+        method: 'PUT',
+        headers: authHeaders(token),
+        body: { mediaRetentionDays: typo }
+      });
+      assert.equal(body.data.mediaRetentionDays, 0, `for ${JSON.stringify(typo)}`);
+    }
+
+    // And back to forever, so the rest of this file sees the default.
+    await call(`${panelUrl}/api/whatsapp/config`, {
+      method: 'PUT',
+      headers: authHeaders(token),
+      body: { mediaRetentionDays: 0 }
+    });
+  });
+
   it('stores the admin key encrypted and never returns it', async () => {
     const { status, body } = await call(`${panelUrl}/api/whatsapp/config`, {
       method: 'PUT',
