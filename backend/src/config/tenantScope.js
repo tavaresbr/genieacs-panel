@@ -25,6 +25,13 @@ export const SCOPED_TABLES = new Set([
   // subscriber's portal login. Across two it is account takeover, because the
   // same firmware and a same-named subscriber produce the same hash.
   'customer_accounts',
+  // The subscriber's SSID and their AES-GCM-encrypted WiFi password. No
+  // provider could read another's before this: every method filters on
+  // `account_id`, and `customer_accounts` has been scoped since 0010, so the
+  // parent already refused to hand one provider another's account. What the
+  // column buys is a filter of its own rather than one inherited through a
+  // join, which is what a stored secret should rest on.
+  'customer_wifi_credentials',
   // The installation dates. Read across providers, the date one ISP recorded
   // for a device id becomes the suffix of another ISP's Customer ID — and since
   // the same read is what decides insert-vs-update, the second provider never
