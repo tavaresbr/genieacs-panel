@@ -415,6 +415,10 @@ export default {
   'whatsapp.error.attachmentTypeNotAllowed': '這裡不能傳送這種類型的檔案',
   'whatsapp.error.noPublicUrl': '傳送附件前請先設定公開的 Webhook URL：Evolution 伺服器從那裡取得檔案',
   'whatsapp.attachmentStored': '檔案已可傳送',
+  'whatsapp.mediaSwept': '已刪除 {files} 個檔案，釋出 {mb} MB',
+  'whatsapp.mediaSweepFailed': '附件清理失敗',
+  'whatsapp.healthLoaded': '已讀取整合運作狀態',
+  'whatsapp.healthLoadFailed': '無法讀取整合運作狀態',
   'whatsapp.accountConnecting': '執行個體已建立；請掃描 QR Code 以完成接入',
   'whatsapp.accountUpdated': 'WhatsApp 號碼已更新',
   'whatsapp.accountDeleted': 'WhatsApp 號碼已移除',
@@ -501,10 +505,6 @@ export default {
   'whatsapp.bot.invoiceDigitableLine': '條碼號：{value}',
   'whatsapp.bot.invoicePix': 'PIX 複製貼上碼：{value}',
   'whatsapp.bot.invoiceLink': '帳單副本：{value}',
-  'whatsapp.bot.signalOkNoReading': '您的寬頻在線。',  'whatsapp.error.subscriberNotFound': '找不到該合約號對應的用戶',
-  'whatsapp.conversationClosed': '會話已結束',
-  'whatsapp.conversationReopened': '會話已重新開啟',
-  'whatsapp.conversationStatusFailed': '無法更新該會話',
-  'whatsapp.error.invalidConversationStatus': '會話只有進行中或已結束兩種狀態',
+  'whatsapp.bot.signalOkNoReading': '您的寬頻在線。',
 
 };

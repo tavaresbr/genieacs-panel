@@ -821,6 +821,8 @@ export interface WhatsAppConfig {
   // Where the customer portal answers from outside. Its own field, not the
   // panel's address: the portal is a separate app on a separate port.
   portalPublicUrl: string
+  /** Days a stored attachment is kept. 0 means forever, and is the default. */
+  mediaRetentionDays: number
   rateLimitPerMin: number
   managedUrl: string
   managed: boolean
@@ -911,6 +913,32 @@ export interface WhatsAppBroadcast {
   startAt: string | null
   createdAt: string | null
   updatedAt: string | null
+}
+
+/**
+ * One read that answers "is this working?".
+ *
+ * Every number here is something an operator today can only learn by opening
+ * conversations one at a time — which means they learn it from a customer
+ * complaining instead.
+ */
+export interface WhatsAppHealth {
+  /** Connected numbers, and how many are not. */
+  accounts: { total: number; connected: number; disconnected: number }
+  outbox: {
+    /** Waiting to go out. A number that only grows is the panel gone quiet. */
+    queued: number
+    sending: number
+    /** Terminal failures in the last 24 hours. */
+    failed24h: number
+    /** ISO timestamp of the oldest message still waiting, or null. */
+    oldestQueuedAt: string | null
+  }
+  inbox: { unread: number; openConversations: number }
+  /** Nothing has come in or gone out since these, whatever the queue says. */
+  lastInboundAt: string | null
+  lastOutboundAt: string | null
+  media: { files: number; bytes: number; oldestAt: string | null }
 }
 
 export type WhatsAppAlertRule = 'ont_offline' | 'rx_power_low' | 'temperature_high' | 'mass_outage'
@@ -1131,6 +1159,12 @@ export const whatsappAPI = {
       `/whatsapp/conversations/${conversationId}/messages${suffix}`
     )
   },
+
+  // ── Is it working? ───────────────────────────────────────────────────
+  // A single aggregate read. Cheap on purpose: a screen that polls it must not
+  // be the reason the panel is slow.
+  getHealth: () =>
+    apiClient.get<WhatsAppHealth>('/whatsapp/health'),
 
   // ── Attachments ──────────────────────────────────────────────────────
   // The raw file as the body, its name in a header. No multipart, and so no

@@ -76,6 +76,20 @@ const DEFAULT_CONFIG = Object.freeze({
   updatedAt: null
 });
 
+/**
+ * Days of retention, or zero for forever.
+ *
+ * Anything unreadable reads as zero — the safe direction here is the one that
+ * deletes nothing. A typo in a settings form must not be able to mean "sweep
+ * the archive tonight".
+ */
+function normalizeRetentionDays(value) {
+  const days = Math.trunc(Number(value));
+  if (!Number.isFinite(days) || days <= 0) return 0;
+  // Ten years. Past that the number is a mistake, not a policy.
+  return Math.min(days, 3650);
+}
+
 function encryptSecret(box, value) {
   return { v: 1, ...box.encrypt(value) };
 }
