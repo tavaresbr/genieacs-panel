@@ -188,7 +188,7 @@ describe('SGP configuration', () => {
   it('keeps the stored token in database at rest', async () => {
     const row = { value: await asTenant(() => AppState.get('sgp_integration_config')) };
     assert.ok(!row.value.includes(TOKEN));
-    const config = await SgpService.getConfig();
+    const config = await asTenant(() => SgpService.getConfig());
     assert.equal(config.token, TOKEN);
   });
 

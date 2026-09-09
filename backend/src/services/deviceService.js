@@ -6,6 +6,7 @@ import WifiSecurityConfig from '../models/WifiSecurityConfig.js';
 import AppState from '../models/AppState.js';
 import { DEFAULT_SETTINGS } from '../config/seed.js';
 import { TranslatableError } from '../i18n/index.js';
+import { currentTenantId } from '../config/tenantContext.js';
 
 const WAN_PARAMETER_CANDIDATES = Object.freeze({
   vlan: [
@@ -27,12 +28,36 @@ const WAN_PARAMETER_CANDIDATES = Object.freeze({
 });
 
 class DeviceService {
-  static dashboardCache = {
-    data: null,
-    expiresAt: 0,
-    promise: null,
-    hydrated: false
-  };
+  /**
+   * One dashboard cache per provider.
+   *
+   * The shape is unchanged; what changed is that there is no longer a single
+   * one. It holds device and fault counts — a provider's own subscribers — and
+   * `promise` collapses concurrent refreshes onto one. Shared, the second
+   * provider to ask did not merely read stale numbers: it awaited the first
+   * provider's in-flight refresh and was handed that result.
+   */
+  static dashboardCaches = new Map();
+
+  static dashboardCacheFor() {
+    const id = currentTenantId();
+    let cache = this.dashboardCaches.get(id);
+    if (!cache) {
+      cache = { data: null, expiresAt: 0, promise: null, hydrated: false };
+      this.dashboardCaches.set(id, cache);
+    }
+    return cache;
+  }
+
+  /** This provider's dashboard is stale — something it owns just changed. */
+  static invalidateDashboard() {
+    this.dashboardCacheFor().expiresAt = 0;
+  }
+
+  /** Every provider's. For a reset between tests. */
+  static forgetDashboards() {
+    this.dashboardCaches.clear();
+  }
 
   static dashboardCacheTtlMs = 60_000;
 
@@ -1766,7 +1791,7 @@ class DeviceService {
   }
 
   static async hydrateDashboardCache() {
-    const cache = this.dashboardCache;
+    const cache = this.dashboardCacheFor();
     if (cache.hydrated) return;
     cache.hydrated = true;
     try {
@@ -1782,7 +1807,7 @@ class DeviceService {
   }
 
   static async persistDashboardCache() {
-    const cache = this.dashboardCache;
+    const cache = this.dashboardCacheFor();
     if (!cache.data) return;
     try {
       await AppState.upsert('dashboard_snapshot', JSON.stringify({
@@ -1795,7 +1820,7 @@ class DeviceService {
   }
 
   static async refreshDashboardData() {
-    const cache = this.dashboardCache;
+    const cache = this.dashboardCacheFor();
     const devices = await this.getDashboardDevices();
     const previousFaults = Array.isArray(cache.data?.faults) ? cache.data.faults : [];
     const data = this.buildDashboardSummary(devices, previousFaults, cache.data?.faultsError || null);
@@ -1806,7 +1831,7 @@ class DeviceService {
   }
 
   static async mergeDashboardFaults(faults, faultsError = null) {
-    const cache = this.dashboardCache;
+    const cache = this.dashboardCacheFor();
     await this.hydrateDashboardCache();
     if (!cache.data) return;
     cache.data = { ...cache.data, faults, faultsError };
@@ -1814,7 +1839,7 @@ class DeviceService {
   }
 
   static async getDashboardData(force = false) {
-    const cache = this.dashboardCache;
+    const cache = this.dashboardCacheFor();
     await this.hydrateDashboardCache();
 
     const startRefresh = () => {

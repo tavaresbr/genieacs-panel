@@ -39,16 +39,26 @@ export const startServer = async () => {
 
     server = app.listen(PORT, HOST, () => {
       console.log(`Server running on ${HOST}:${PORT} (${APP_ENV})`);
-      // Every boot job below opens a provider scope: none of them has a
-      // request, and the queries under them now refuse to run without one.
-      // The prewarm and the Customer ID sweep read the deployment's single
-      // GenieACS, so they run once (see `forSoleTenant`); the password
-      // backfill reads only the accounts of the provider in scope, so it runs
-      // per provider and genuinely divides.
-      void forSoleTenant('The dashboard prewarm', () => DeviceService.getDashboardData(false))
+      // Every boot job below opens a provider scope: none has a request, and
+      // the queries under them refuse to run without one. Which primitive each
+      // takes is not a style choice — `forEachTenant` divides the work, and is
+      // only correct once everything the job reads is itself per provider.
+      //
+      // The prewarm qualifies now: the GenieACS it reads comes from
+      // `settings.genieAcsUrl`, which is per provider, and the accounts it
+      // joins against are too.
+      void forEachTenant(() => DeviceService.getDashboardData(false))
         .catch((error) => {
           console.warn(`Dashboard prewarm skipped: ${error.message}`);
         });
+      // The Customer ID sweep does NOT qualify yet, and the reason is sharper
+      // than a stale read: `CustomerService.retireAccount` calls
+      // `SgpLink.deleteByDeviceId`, and `sgp_links` is still deployment-wide.
+      // Looped per provider, retiring an account would delete another
+      // provider's link for the same device id — and device ids now come from
+      // each provider's own GenieACS, so they can collide. It also reads
+      // `device_profiles`, equally unscoped. Both move in the slice that
+      // scopes them.
       void forSoleTenant('The Customer ID sweep', async () => {
         if (!await CustomerService.isAutoGenerationEnabled()) return null;
         const devices = await DeviceService.getCustomerIdentityDevices();

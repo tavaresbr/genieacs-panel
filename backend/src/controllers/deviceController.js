@@ -35,7 +35,7 @@ class DeviceController {
   static async deleteFault(req, res) {
     try {
       await DeviceService.deleteFault(req.params.faultId);
-      DeviceService.dashboardCache.expiresAt = 0;
+      DeviceService.invalidateDashboard();
       return res.json(createResponse(req.t('device.faultCleared')));
     } catch (error) {
       console.error('Delete fault error:', error);
@@ -276,7 +276,7 @@ class DeviceController {
     }
     try {
       const result = await DeviceService.addWanConnection(id, String(containerPath), String(type));
-      DeviceService.dashboardCache.expiresAt = 0;
+      DeviceService.invalidateDashboard();
       return res.json(createResponse(req.t(result.messageKey, result.messageVars), result));
     } catch (error) {
       console.error(`Error adding WAN connection for ${id}:`, error);
@@ -357,7 +357,7 @@ class DeviceController {
     }
     try {
       const result = await DeviceService.updateWifiConfig(id, index, formData);
-      DeviceService.dashboardCache.expiresAt = 0;
+      DeviceService.invalidateDashboard();
       return res.json(createResponse(req.t(result.messageKey, result.messageVars), result));
     } catch (error) {
       console.error(`Error in updateWifiConfig for ${id}:`, error);

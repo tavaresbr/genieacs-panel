@@ -3,6 +3,7 @@ import AppState from '../models/AppState.js';
 import { createSecretBox } from '../utils/secretBox.js';
 import { normalizeEvoUrl, parseAllowedHosts, isHostAllowed } from '../utils/wa/evolutionPolicy.js';
 import { assertPublicUrl, SsrfBlockedError } from '../utils/wa/ssrfGuard.js';
+import { TenantCache } from '../config/tenantCache.js';
 
 const CONFIG_KEY = 'whatsapp_evolution_config';
 const CONFIG_CACHE_TTL_MS = 30_000;
@@ -90,10 +91,15 @@ export function randomToken() {
 }
 
 class WhatsAppConfigService {
-  static configCache = { value: null, expiresAt: 0 };
+  static configCache = new TenantCache(CONFIG_CACHE_TTL_MS);
 
+  /**
+   * Forget the provider in scope — its own configuration changed.
+   * To forget every provider's, reach for `configCache.clear()`; that is a
+   * reset, not a save, and the two must not share a name.
+   */
   static invalidateConfigCache() {
-    this.configCache = { value: null, expiresAt: 0 };
+    this.configCache.invalidate();
   }
 
   static async readStoredConfig() {
@@ -107,9 +113,8 @@ class WhatsAppConfigService {
   }
 
   static async getConfig() {
-    if (this.configCache.value && this.configCache.expiresAt > Date.now()) {
-      return this.configCache.value;
-    }
+    const cached = this.configCache.get();
+    if (cached) return cached;
     const stored = await this.readStoredConfig();
     const config = {
       enabled: stored.enabled === true,
@@ -124,7 +129,7 @@ class WhatsAppConfigService {
       managedAdminKey: decryptSecret(adminKeyBox, stored.managedAdminKey),
       updatedAt: stored.updatedAt || null
     };
-    this.configCache = { value: config, expiresAt: Date.now() + CONFIG_CACHE_TTL_MS };
+    this.configCache.set(config);
     return config;
   }
 

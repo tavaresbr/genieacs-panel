@@ -623,7 +623,7 @@ describe('with the integration switched off', () => {
     await asTenant(() => AppState.upsert('whatsapp_evolution_config', JSON.stringify({
       ...stored, enabled: true, webhookBaseUrl: ''
     })));
-    WhatsAppConfigService.invalidateConfigCache();
+    WhatsAppConfigService.configCache.clear();
 
     const { status, body } = await createAccount(v2.baseUrl);
     assert.equal(status, 400);

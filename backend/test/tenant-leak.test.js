@@ -22,6 +22,10 @@ const { default: WhatsAppAccount } = await import('../src/models/WhatsAppAccount
 const { default: WaAlertState } = await import('../src/models/WaAlertState.js');
 const { default: WaTemplate } = await import('../src/models/WaTemplate.js');
 const { default: WaBroadcast } = await import('../src/models/WaBroadcast.js');
+const { default: SgpService } = await import('../src/services/sgpService.js');
+const { default: WhatsAppConfigService } = await import('../src/services/whatsappConfigService.js');
+const { default: WaAlertService } = await import('../src/services/waAlertService.js');
+const { default: DeviceService } = await import('../src/services/deviceService.js');
 const { default: Setting } = await import('../src/models/Setting.js');
 const { default: AppState } = await import('../src/models/AppState.js');
 
@@ -438,5 +442,95 @@ describe('the configuration each provider runs on', () => {
 
     assert.equal(await runInTenant(alfa, () => AppState.get('setup_completed')), '1');
     assert.equal(await runInTenant(beta, () => AppState.get('setup_completed')), null);
+  });
+});
+
+describe('the caches a provider reads its own configuration from', () => {
+  // These sit in front of `app_state`, which PR 7 made per provider. A cache
+  // that is not keyed the same way undoes that silently: the second provider
+  // gets a hit on the first provider's entry and never reaches the table.
+  //
+  // Two of them hold decrypted secrets, so a shared hit is not a stale read —
+  // it is one ISP handing another its credentials.
+  it('does not serve one provider the other\'s SGP token', async () => {
+    await runInTenant(alfa, () => SgpService.saveConfig({
+      enabled: true, baseUrl: 'https://sgp.alfa.test', app: 'alfa', token: 'token-do-alfa'
+    }));
+    await runInTenant(beta, () => SgpService.saveConfig({
+      enabled: true, baseUrl: 'https://sgp.beta.test', app: 'beta', token: 'token-do-beta'
+    }));
+
+    // Warm alfa's entry first, then ask as beta. Shared, this is where beta
+    // would be handed alfa's decrypted token.
+    assert.equal((await runInTenant(alfa, () => SgpService.getConfig())).token, 'token-do-alfa');
+    assert.equal((await runInTenant(beta, () => SgpService.getConfig())).token, 'token-do-beta');
+    assert.equal((await runInTenant(alfa, () => SgpService.getConfig())).app, 'alfa');
+  });
+
+  it('does not serve one provider the other\'s Evolution settings', async () => {
+    await runInTenant(alfa, () => WhatsAppConfigService.saveConfig({
+      enabled: true, webhookBaseUrl: 'https://alfa.test/api/whatsapp-webhook'
+    }));
+    await runInTenant(beta, () => WhatsAppConfigService.saveConfig({
+      enabled: true, webhookBaseUrl: 'https://beta.test/api/whatsapp-webhook'
+    }));
+
+    assert.match(
+      (await runInTenant(alfa, () => WhatsAppConfigService.getConfig())).webhookBaseUrl,
+      /alfa/
+    );
+    assert.match(
+      (await runInTenant(beta, () => WhatsAppConfigService.getConfig())).webhookBaseUrl,
+      /beta/
+    );
+  });
+
+  // The alert settings hold the on-call phone numbers.
+  it('does not serve one provider the other\'s on-call list', async () => {
+    await runInTenant(alfa, () => WaAlertService.saveSettings({
+      enabled: true, recipients: ['5593981110001']
+    }));
+    await runInTenant(beta, () => WaAlertService.saveSettings({
+      enabled: true, recipients: ['5593982220002']
+    }));
+
+    assert.deepEqual(
+      (await runInTenant(alfa, () => WaAlertService.getSettings())).recipients,
+      ['5593981110001']
+    );
+    assert.deepEqual(
+      (await runInTenant(beta, () => WaAlertService.getSettings())).recipients,
+      ['5593982220002']
+    );
+  });
+
+  it('invalidating one provider\'s cache leaves the other\'s warm entry alone', async () => {
+    await runInTenant(alfa, () => SgpService.getConfig());
+    await runInTenant(beta, () => SgpService.getConfig());
+
+    await runInTenant(beta, () => SgpService.invalidateConfigCache());
+
+    // Written straight to the table, under alfa: a warm alfa entry still
+    // answers from cache and does not see it. If invalidate had cleared every
+    // provider, this read would go to the table and return the new value.
+    await runInTenant(alfa, () => AppState.upsert(
+      'sgp_integration_config', JSON.stringify({ enabled: true, app: 'alterado-por-fora' })
+    ));
+    assert.equal((await runInTenant(alfa, () => SgpService.getConfig())).app, 'alfa');
+  });
+
+  // Not configuration: device and fault counts, and an in-flight refresh that
+  // a second provider used to await and receive as its own.
+  it('gives each provider its own dashboard cache and its own in-flight refresh', async () => {
+    const alfaCache = await runInTenant(alfa, () => DeviceService.dashboardCacheFor());
+    const betaCache = await runInTenant(beta, () => DeviceService.dashboardCacheFor());
+    assert.notEqual(alfaCache, betaCache, 'two providers, two caches');
+
+    alfaCache.data = { stats: { total: 41 } };
+    alfaCache.expiresAt = Date.now() + 60_000;
+    assert.equal(betaCache.data, null, 'the other provider has nothing cached');
+
+    await runInTenant(beta, () => DeviceService.invalidateDashboard());
+    assert.ok(alfaCache.expiresAt > Date.now(), 'and its entry is untouched by the other');
   });
 });
