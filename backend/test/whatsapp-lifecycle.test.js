@@ -619,10 +619,10 @@ describe('with the integration switched off', () => {
     // Enabling without a webhook is refused by the config route itself, so the
     // state under test is reached by writing it directly.
     const { default: AppState } = await import('../src/models/AppState.js');
-    const stored = JSON.parse(await AppState.get('whatsapp_evolution_config'));
-    await AppState.upsert('whatsapp_evolution_config', JSON.stringify({
+    const stored = JSON.parse(await asTenant(() => AppState.get('whatsapp_evolution_config')));
+    await asTenant(() => AppState.upsert('whatsapp_evolution_config', JSON.stringify({
       ...stored, enabled: true, webhookBaseUrl: ''
-    }));
+    })));
     WhatsAppConfigService.invalidateConfigCache();
 
     const { status, body } = await createAccount(v2.baseUrl);

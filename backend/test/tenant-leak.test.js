@@ -22,6 +22,8 @@ const { default: WhatsAppAccount } = await import('../src/models/WhatsAppAccount
 const { default: WaAlertState } = await import('../src/models/WaAlertState.js');
 const { default: WaTemplate } = await import('../src/models/WaTemplate.js');
 const { default: WaBroadcast } = await import('../src/models/WaBroadcast.js');
+const { default: Setting } = await import('../src/models/Setting.js');
+const { default: AppState } = await import('../src/models/AppState.js');
 
 /**
  * The phase's actual proof.
@@ -369,5 +371,72 @@ describe('campaigns and the alert cooldown', () => {
     const mine = await runInTenant(beta, () => WaBroadcast.listByStatus('running'));
     assert.deepEqual(theirs.map((b) => b.title), ['Do alfa']);
     assert.deepEqual(mine.map((b) => b.title), ['Do beta']);
+  });
+});
+
+describe('the configuration each provider runs on', () => {
+  // `settings` and `app_state` are what a provider IS: its GenieACS, its
+  // Customer ID scheme, its SGP credentials. Shared, the second provider would
+  // manage the first provider's fleet.
+  it('gives each provider its own GenieACS', async () => {
+    await runInTenant(alfa, () => Setting.upsert('genieAcsUrl', 'http://acs.alfa.test:7557'));
+    await runInTenant(beta, () => Setting.upsert('genieAcsUrl', 'http://acs.beta.test:7557'));
+
+    assert.equal(
+      await runInTenant(alfa, () => Setting.getByKey('genieAcsUrl')),
+      'http://acs.alfa.test:7557'
+    );
+    assert.equal(
+      await runInTenant(beta, () => Setting.getByKey('genieAcsUrl')),
+      'http://acs.beta.test:7557'
+    );
+  });
+
+  it('shows each provider only its own settings', async () => {
+    const theirs = await runInTenant(alfa, () => Setting.getAll());
+    const mine = await runInTenant(beta, () => Setting.getAll());
+    assert.equal(theirs.genieAcsUrl, 'http://acs.alfa.test:7557');
+    assert.equal(mine.genieAcsUrl, 'http://acs.beta.test:7557');
+  });
+
+  it('does not let one provider delete the other\'s setting', async () => {
+    await runInTenant(beta, () => Setting.delete('genieAcsUrl'));
+
+    assert.equal(
+      await runInTenant(alfa, () => Setting.getByKey('genieAcsUrl')),
+      'http://acs.alfa.test:7557',
+      'the other provider still knows where its ACS is'
+    );
+    assert.equal(await runInTenant(beta, () => Setting.getByKey('genieAcsUrl')), null);
+  });
+
+  // The blob holds the SGP API token and webhook secret, encrypted. Reading
+  // another provider's is reading their credentials.
+  it('keeps one provider\'s integration blob out of the other\'s reach', async () => {
+    await runInTenant(alfa, () => AppState.upsert('sgp_integration_config', '{"app":"alfa"}'));
+
+    assert.equal(
+      await runInTenant(alfa, () => AppState.get('sgp_integration_config')),
+      '{"app":"alfa"}'
+    );
+    assert.equal(await runInTenant(beta, () => AppState.get('sgp_integration_config')), null);
+  });
+
+  // Not configuration at all: device and fault counts, cached per provider.
+  it('does not show one provider the other\'s dashboard numbers', async () => {
+    await runInTenant(alfa, () => AppState.upsert('dashboard_snapshot', '{"data":{"stats":{"total":41}}}'));
+    await runInTenant(beta, () => AppState.upsert('dashboard_snapshot', '{"data":{"stats":{"total":7}}}'));
+
+    assert.match(await runInTenant(alfa, () => AppState.get('dashboard_snapshot')), /41/);
+    assert.match(await runInTenant(beta, () => AppState.get('dashboard_snapshot')), /"total":7/);
+  });
+
+  // The latch that makes two concurrent setups safe. Per provider now, which is
+  // the point: one provider finishing setup must not lock the other out of it.
+  it('does not let one provider\'s completed setup block the other\'s', async () => {
+    await runInTenant(alfa, () => AppState.upsert('setup_completed', '1'));
+
+    assert.equal(await runInTenant(alfa, () => AppState.get('setup_completed')), '1');
+    assert.equal(await runInTenant(beta, () => AppState.get('setup_completed')), null);
   });
 });

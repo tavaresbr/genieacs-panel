@@ -17,9 +17,10 @@ const SETTINGS_KEY = 'whatsapp_alert_settings';
 /**
  * Where the last scan's stamp lives, beside the settings and read the same way.
  *
- * One key, not one per provider, because `forSoleTenant` already refuses to run
- * this scan at all unless the installation has exactly one — the same reason
- * `SETTINGS_KEY` is a single key.
+ * One key per provider, because `app_state` is scoped: the row this reads and
+ * writes belongs to whoever is in scope, and the scan runs inside one. That is
+ * the stamp handled; the in-memory `lastScanAt` below still short-circuits it
+ * for the whole process, and that is what still has to be made per provider.
  */
 const LAST_SCAN_KEY = 'whatsapp_alert_last_scan';
 

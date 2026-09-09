@@ -579,6 +579,9 @@ const TENANT_CAMPAIGN_TABLES = [
   'wa_alert_state'
 ];
 
+/** The two key/value tables that gain a provider in 0014. */
+const KEY_VALUE_TABLES = ['settings', 'app_state'];
+
 /** In creation order; foreign keys dictate it. */
 const WHATSAPP_TABLES = [
   ['whatsapp_accounts', whatsappAccountsTable],
@@ -1052,22 +1055,75 @@ export const migrations = [
     }
   },
   {
-    // The indexes the health read wants. Separate from the tenancy migrations
-    // around it because it changes no column and moves no data: an index is
-    // the one schema change that can be added to a live table without anyone
-    // noticing, and the one an install that predates the health strip lacks.
+    // The configuration pair. `settings` holds what an operator sets on screen —
+    // the GenieACS URL, the Customer ID scheme, the VirtualParameter names —
+    // and `app_state` holds the integration blobs: Evolution, SGP, alerts,
+    // provisioning, and the dashboard snapshot. All of it is one set for the
+    // whole deployment until this runs.
+    //
+    // Both tables come from `keyValueTable`, where `key` is the PRIMARY KEY
+    // rather than a unique. This is the only step in the phase that moves a
+    // primary key.
+    id: '0015_settings_and_app_state_tenant',
+    async isApplied(db) {
+      for (const table of KEY_VALUE_TABLES) {
+        if (!(await db.schema.hasTable(table))) return false;
+        if (!(await db.schema.hasColumn(table, 'tenant_id'))) return false;
+      }
+      return true;
+    },
+    async up(db) {
+      const tenant = await db('tenants').orderBy('id', 'asc').first();
+      if (!tenant) return;
+
+      for (const table of KEY_VALUE_TABLES) {
+        if (await db.schema.hasColumn(table, 'tenant_id')) continue;
+        await db.schema.alterTable(table, (t) => t.integer('tenant_id').unsigned());
+        await db(table).whereNull('tenant_id').update({ tenant_id: tenant.id });
+      }
+
+      for (const table of KEY_VALUE_TABLES) {
+        await db.schema.alterTable(table, (t) => {
+          t.integer('tenant_id').unsigned().notNullable().defaultTo(tenant.id).alter();
+          t.dropPrimary();
+          t.primary(['tenant_id', 'key']);
+          t.foreign('tenant_id').references('id').inTable('tenants');
+          // Do NOT add `t.string('key', 128).notNullable().alter()` here. It
+          // reads as tidying and it breaks PostgreSQL: knex's alter path emits
+          // `drop not null` unconditionally before the retype, and Postgres
+          // refuses that on a column still in a primary key. knex also fixes
+          // the order — every column alteration is emitted before every table
+          // statement — so moving `dropPrimary()` above it does not help; it
+          // would need its own earlier `alterTable` call. And it buys nothing:
+          // `key` is already NOT NULL on Postgres and MySQL by virtue of
+          // having been the primary key.
+        });
+      }
+
+      // After this step `settings.key` and `app_state.key` are no longer unique
+      // on their own, so no table may ever declare a foreign key against them.
+      // That is what failed the rebuild in 0011: knex appends a bare
+      // `PRAGMA foreign_key_check` with no table argument, so it checks the
+      // whole database and a dangling reference anywhere fails the migration.
+      // Nothing references either key today.
+    }
+  },
+  {
+    // The indexes the health read wants. It changes no column and moves no
+    // data, which is why it sits apart from the tenancy steps around it: an
+    // index is the one schema change that can be added to a live table without
+    // anyone noticing.
+    //
     // No `isApplied`. That hook exists to baseline an install older than this
-    // runner, and answering "yes, present" there would be a guess: the three
+    // runner, and answering "yes, present" there would be a guess — the three
     // engines keep index metadata in three different places and knex has no
-    // portable way to ask. `up` is idempotent instead — each index is attempted
-    // on its own and a duplicate is swallowed — so the honest answer is to let
-    // it run everywhere and cost a no-op on the installs that already have them.
-    id: '0015_wa_conversation_health_indexes',
+    // portable way to ask. `up` is idempotent instead: each index is attempted
+    // on its own and a duplicate is swallowed, so this costs a no-op on the
+    // installs that already have them.
+    id: '0016_wa_conversation_health_indexes',
     async up(db) {
       if (!(await db.schema.hasTable('wa_conversations'))) return;
       for (const column of WA_CONVERSATION_HEALTH_INDEXES) {
-        // One statement per index, each guarded: a rerun on an install that
-        // already has one must not fail the whole migration.
         // eslint-disable-next-line no-await-in-loop -- DDL, and three of them
         await db.schema.alterTable('wa_conversations', (t) => t.index([column])).catch(() => {});
       }

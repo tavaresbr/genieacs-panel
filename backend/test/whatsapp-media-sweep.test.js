@@ -48,25 +48,19 @@ let panelUrl;
 let token;
 let accountId;
 let conversationId;
-let realGetConfig;
 
 /**
  * Sets the retention window the sweeper will read.
  *
- * It patches `getConfig` rather than saving the setting, and that is worth
- * saying out loud: on this branch `whatsappConfigService.saveConfig()` still
- * drops `mediaRetentionDays` on the floor — the normaliser is written and
- * nothing calls it — so a test that saved the value would be testing a config
- * service that is somebody else's file this wave. What the sweeper actually
- * promises is "the window is whatever `getConfig()` reports", and that is what
- * is pinned here; the day the field is wired, these tests do not move.
+ * Through the real setting, not a stub. This was written while
+ * `mediaRetentionDays` was defined but never wired — `saveConfig` dropped it
+ * on the floor — so it patched `getConfig` to pin what the sweeper actually
+ * promises: "the window is whatever the configuration reports". The field is
+ * wired now, so the stub is gone and the same tests exercise the path a real
+ * install takes, from the settings form down.
  */
 function comRetencao(days) {
-  WhatsAppConfigService.getConfig = async () => ({
-    ...(await realGetConfig()),
-    mediaRetentionDays: days
-  });
-  WhatsAppConfigService.invalidateConfigCache();
+  return asTenant(() => WhatsAppConfigService.saveConfig({ mediaRetentionDays: days }));
 }
 
 /** Writes a file under `DATA_DIR`, `ageDays` old, and answers with its path. */
@@ -118,11 +112,12 @@ before(async () => {
   });
   token = setup.body.data.token;
 
-  await WhatsAppConfigService.saveConfig({
+  // Inside a provider: `app_state` became per-provider while this was being
+  // written, so a configuration write with nobody in scope now refuses.
+  await asTenant(() => WhatsAppConfigService.saveConfig({
     enabled: true,
     webhookBaseUrl: WEBHOOK_BASE
-  });
-  realGetConfig = WhatsAppConfigService.getConfig.bind(WhatsAppConfigService);
+  }));
 
   const account = await asTenant(() => WhatsAppAccount.create({
     name: 'painel-varredura',
@@ -150,20 +145,21 @@ before(async () => {
 // reports are the files that test wrote and nothing left over from the one
 // before it.
 beforeEach(async () => {
-  WhatsAppConfigService.getConfig = realGetConfig;
+  // Back to forever between tests, so a window one test set cannot decide what
+  // the next one sweeps.
+  await comRetencao(0);
   fs.rmSync(MEDIA_ROOT, { recursive: true, force: true });
   await getDb()('wa_messages').del();
 });
 
 after(async () => {
-  WhatsAppConfigService.getConfig = realGetConfig;
   WaMediaSweeper.stop();
   await stopTestServers();
 });
 
 describe('what the sweep deletes', () => {
   it('deletes a file past the window and clears the row, keeping the message', async () => {
-    comRetencao(30);
+    await comRetencao(30);
     const relative = gravar(`wa-media/${conversationId}/antiga.png`, 45);
     const message = await mensagem({ attachment_path: relative, ageDays: 45 });
 
@@ -187,7 +183,7 @@ describe('what the sweep deletes', () => {
    * never learns why.
    */
   it('never deletes a file a queued message still has to send, however old', async () => {
-    comRetencao(1);
+    await comRetencao(1);
     const relative = gravar(`wa-media/${conversationId}/na-fila.png`, 400);
     const message = await mensagem({
       attachment_path: relative,
@@ -204,7 +200,7 @@ describe('what the sweep deletes', () => {
   });
 
   it('never deletes a file a sending message still has to send', async () => {
-    comRetencao(1);
+    await comRetencao(1);
     const relative = gravar(`wa-media/${conversationId}/em-envio.png`, 400);
     await mensagem({ attachment_path: relative, delivery_status: 'sending', ageDays: 400 });
 
@@ -215,7 +211,7 @@ describe('what the sweep deletes', () => {
   });
 
   it('leaves a file inside the window alone', async () => {
-    comRetencao(30);
+    await comRetencao(30);
     const relative = gravar(`wa-media/${conversationId}/recente.png`, 5);
     const message = await mensagem({ attachment_path: relative, ageDays: 5 });
 
@@ -229,7 +225,7 @@ describe('what the sweep deletes', () => {
 
   /** An upload nobody ever sent: bytes on disk with no row naming them. */
   it('sweeps an orphan file by the same clock', async () => {
-    comRetencao(30);
+    await comRetencao(30);
     const orfao = gravar('wa-media/out/abandonado.png', 60);
     const novo = gravar('wa-media/out/de-agora.png', 1);
 
@@ -245,7 +241,7 @@ describe('what the sweep deletes', () => {
    * between reclaiming disk and deleting the database that fills it.
    */
   it('never touches anything outside the media directory', async () => {
-    comRetencao(1);
+    await comRetencao(1);
     const vizinho = gravar('nao-e-midia.sqlite', 500, Buffer.from('SQLite format 3\0'));
 
     await WaMediaSweeper.tick();
@@ -256,7 +252,7 @@ describe('what the sweep deletes', () => {
 
 describe('what the sweep reports', () => {
   it('deletes nothing and says so with retention at zero', async () => {
-    comRetencao(0);
+    await comRetencao(0);
     const relative = gravar(`wa-media/${conversationId}/velhissima.png`, 900);
     const message = await mensagem({ attachment_path: relative, ageDays: 900 });
 
@@ -271,7 +267,7 @@ describe('what the sweep reports', () => {
   });
 
   it('reports what it did on the manual route', async () => {
-    comRetencao(10);
+    await comRetencao(10);
     const um = gravar(`wa-media/${conversationId}/um.png`, 20, Buffer.alloc(512 * 1024, 7));
     const dois = gravar(`wa-media/${conversationId}/dois.png`, 20, Buffer.alloc(512 * 1024, 9));
     await mensagem({ attachment_path: um, ageDays: 20 });
@@ -307,7 +303,7 @@ describe('what the sweep reports', () => {
    * a skip rather than as a thrown tick.
    */
   it('refuses to run at all once a second provider exists', async () => {
-    comRetencao(1);
+    await comRetencao(1);
     const relative = gravar(`wa-media/${conversationId}/de-alguem.png`, 90);
     await mensagem({ attachment_path: relative, ageDays: 90 });
     await getDb()('tenants').insert({ slug: 'beta', name: 'Provedor Beta', status: 'active' });

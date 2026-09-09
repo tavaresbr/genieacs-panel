@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import http from 'node:http';
 import { asTenant, authHeaders, call, getDb, startTestServers, stopTestServers } from './helpers/harness.js';
+
+const { default: AppState } = await import('../src/models/AppState.js');
 import { buildDevice, startGenieAcsStub } from './helpers/genieacs-stub.js';
 
 const { default: SgpEventService } = await import('../src/services/sgpEventService.js');
@@ -142,7 +144,7 @@ describe('webhook secret', () => {
   });
 
   it('keeps the secret encrypted at rest', async () => {
-    const row = await getDb()('app_state').where({ key: 'sgp_integration_config' }).first();
+    const row = { value: await asTenant(() => AppState.get('sgp_integration_config')) };
     assert.ok(!row.value.includes(webhookSecret));
   });
 });

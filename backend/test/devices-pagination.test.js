@@ -1,7 +1,9 @@
 import http from 'node:http';
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { authHeaders, call, getDb, startTestServers, stopTestServers } from './helpers/harness.js';
+import { asTenant, authHeaders, call, getDb, startTestServers, stopTestServers } from './helpers/harness.js';
+
+const { default: Setting } = await import('../src/models/Setting.js');
 
 const FLEET_SIZE = 30;
 const ONLINE_COUNT = 12;
@@ -97,14 +99,10 @@ before(async () => {
   });
   token = setup.body.data.token;
 
-  await getDb()('settings')
-    .insert({
-      key: 'genieAcsUrl',
-      value: `http://127.0.0.1:${genieAcs.server.address().port}`,
-      updated_at: new Date()
-    })
-    .onConflict('key')
-    .merge({ value: `http://127.0.0.1:${genieAcs.server.address().port}` });
+  await asTenant(() => Setting.upsert(
+    'genieAcsUrl',
+    `http://127.0.0.1:${genieAcs.server.address().port}`
+  ));
 });
 
 after(async () => {

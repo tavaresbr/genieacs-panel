@@ -116,10 +116,12 @@ before(async () => {
   await db('tenants').insert({ slug: 'vizinho', name: 'Provedor Vizinho', status: 'active' });
   beta = (await db('tenants').orderBy('id', 'desc').first()).id;
 
-  await WhatsAppConfigService.saveConfig({
+  // Inside a provider: `app_state` became per-provider while this was being
+  // written, so a configuration write with nobody in scope now refuses.
+  await runInTenant(alfa, () => WhatsAppConfigService.saveConfig({
     enabled: true,
     webhookBaseUrl: 'https://painel.provedor.test/api/whatsapp-webhook'
-  });
+  }));
 
   const main = await runInTenant(alfa, () => WhatsAppAccount.create({
     name: MAIN,
