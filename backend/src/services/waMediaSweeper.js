@@ -5,6 +5,7 @@ import { DATA_DIR } from '../config/paths.js';
 import { forSoleTenant } from '../config/tenantJobs.js';
 import { MEDIA_DIR } from './waMediaService.js';
 import WhatsAppConfigService from './whatsappConfigService.js';
+import WaHealthService from './waHealthService.js';
 
 /**
  * The only thing in this integration that deletes.
@@ -281,6 +282,12 @@ class WaMediaSweeper {
       // cleared before an unlink that then failed would tell the operator the
       // attachment is off the disk while it is still sitting on it.
       await this.clearAttachments(clearable);
+
+      // The health strip caches its disk reading for five minutes, which is
+      // right for a poll and wrong immediately after a deletion: an operator
+      // who presses "delete the old ones", frees two gigabytes and then reads
+      // the same number as before has been told the sweep did nothing.
+      if (deleted > 0) WaHealthService.forgetMedia();
 
       return { files: deleted, bytes, mb: toMb(bytes) };
     } catch (error) {

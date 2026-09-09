@@ -432,6 +432,14 @@ const waConversationsTable = (db) => (t) => {
   t.unique(['account_id', 'external_thread_id']);
   t.index(['wa_phone_e164']);
   t.index(['last_message_at']);
+  // The health read asks three questions of this table on every poll — when
+  // anything last arrived, how many threads are unread, how many are open —
+  // and without these each one is a scan. On a provider with a hundred
+  // thousand threads that is the panel's own status strip becoming the reason
+  // the panel is slow.
+  t.index(['last_inbound_at']);
+  t.index(['closed_at']);
+  t.index(['unread_count']);
 };
 
 const waMessagesTable = (db) => (t) => {
@@ -650,6 +658,12 @@ async function missingColumns(db, table, columns) {
   }
   return missing;
 }
+
+/**
+ * The columns the health read filters and orders by, and the ones an install
+ * older than that read has no index for.
+ */
+const WA_CONVERSATION_HEALTH_INDEXES = ['last_inbound_at', 'closed_at', 'unread_count'];
 
 /** The ordered list. Ids are stable and are never renumbered or reused. */
 export const migrations = [
@@ -1035,6 +1049,28 @@ export const migrations = [
       await db.schema.alterTable('wa_messages', (t) => {
         for (const add of missing) add(t);
       });
+    }
+  },
+  {
+    // The indexes the health read wants. Separate from the tenancy migrations
+    // around it because it changes no column and moves no data: an index is
+    // the one schema change that can be added to a live table without anyone
+    // noticing, and the one an install that predates the health strip lacks.
+    // No `isApplied`. That hook exists to baseline an install older than this
+    // runner, and answering "yes, present" there would be a guess: the three
+    // engines keep index metadata in three different places and knex has no
+    // portable way to ask. `up` is idempotent instead — each index is attempted
+    // on its own and a duplicate is swallowed — so the honest answer is to let
+    // it run everywhere and cost a no-op on the installs that already have them.
+    id: '0015_wa_conversation_health_indexes',
+    async up(db) {
+      if (!(await db.schema.hasTable('wa_conversations'))) return;
+      for (const column of WA_CONVERSATION_HEALTH_INDEXES) {
+        // One statement per index, each guarded: a rerun on an install that
+        // already has one must not fail the whole migration.
+        // eslint-disable-next-line no-await-in-loop -- DDL, and three of them
+        await db.schema.alterTable('wa_conversations', (t) => t.index([column])).catch(() => {});
+      }
     }
   }
 ];
