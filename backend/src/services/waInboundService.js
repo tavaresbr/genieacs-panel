@@ -1,4 +1,4 @@
-import { getDb, insertReturningId } from '../config/database.js';
+import { getDb, tinsertReturningId } from '../config/database.js';
 import WaConversation from '../models/WaConversation.js';
 import WaMessage from '../models/WaMessage.js';
 import WaOptOut from '../models/WaOptOut.js';
@@ -303,7 +303,14 @@ async function gravarMensagem(account, item) {
 
   let messageId;
   try {
-    messageId = await insertReturningId('wa_messages', linha);
+    // `tinsertReturningId`, nunca `insertReturningId`: `wa_messages` é tabela
+    // escopada, e só a variante com `t` carimba o `tenant_id` da linha. A crua
+    // deixa a coluna cair no DEFAULT que a migração 0012 pôs — o provedor #1 —
+    // e o escopo aberto pelo webhook é simplesmente ignorado. Com um provedor
+    // só as duas se comportam igual, que é por que isto passou despercebido:
+    // com dois, TODA mensagem que chega no Evolution do provedor B é arquivada
+    // no provedor A, aparece na caixa de entrada dele e some da do B.
+    messageId = await tinsertReturningId('wa_messages', linha);
   } catch (error) {
     // O índice único de `external_id` É a deduplicação. Uma violação aqui
     // significa que o evento chegou duas vezes — que é sucesso, não falha:
