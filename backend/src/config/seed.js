@@ -60,20 +60,25 @@ export async function seedDefaults(db = getDb()) {
           .update({ value, updated_at: new Date() });
       }
     }
+
+    // The map centre, per provider — inside the loop since 0025 made the key
+    // `(tenant_id, id)`. Before that it sat outside, with a comment saying so:
+    // the row was a deployment-wide singleton, and a second provider's turn
+    // would have collided on the same `id: 1`. Now every provider gets its own
+    // row 1, which is the whole point — a latitude is literally where one ISP's
+    // city is, and there is nothing shared about it.
+    const map = await db('map_settings').where({ tenant_id: tenant.id, id: 1 }).first();
+    if (!map) {
+      await db('map_settings').insert({
+        tenant_id: tenant.id,
+        id: 1,
+        center_lat: '-6.2088',
+        center_lng: '106.8456',
+        max_zoom_in: '18',
+        max_zoom_out: '5',
+        default_zoom: '13'
+      });
+    }
   }
 
-  // Deliberately outside the loop: `map_settings` is still a single row keyed
-  // `id: 1` and has not been converted yet. Inside the loop, the second
-  // provider's turn would try to insert that same id again.
-  const map = await db('map_settings').where({ id: 1 }).first();
-  if (!map) {
-    await db('map_settings').insert({
-      id: 1,
-      center_lat: '-6.2088',
-      center_lng: '106.8456',
-      max_zoom_in: '18',
-      max_zoom_out: '5',
-      default_zoom: '13'
-    });
-  }
 }

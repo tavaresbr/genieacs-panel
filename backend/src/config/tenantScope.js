@@ -53,7 +53,11 @@ export const SCOPED_TABLES = new Set([
   'device_samples',
   'device_sample_hours',
   // Which ONT replaced which, for one provider's subscriber.
-  'device_swaps'
+  'device_swaps',
+  // Where the operator's own plant is centred. A singleton keyed `id: 1`, so
+  // its WHERE never was an identity filter — it meant "the only row", and the
+  // second provider to save a map centre wrote over the first's.
+  'map_settings'
 ]);
 
 /** Tables that belong to the deployment rather than to any one provider. */
