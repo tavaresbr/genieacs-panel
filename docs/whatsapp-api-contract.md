@@ -1030,6 +1030,65 @@ Como ficou implementada, e as três coisas que o contrato não determinava:
 
 ---
 
+## Retenção de anexos — onda 7
+
+Nada nunca apaga um arquivo. Cada mídia que chega e cada uma que sai fica em
+`DATA_DIR` para sempre, sem cota, sem contagem e sem ninguém olhando. Num
+provedor com movimento isso cresce sozinho, e o disco que enche é o mesmo onde
+o SQLite escreve.
+
+`whatsappConfig.mediaRetentionDays` — **0 é para sempre, e é o padrão.** Esse
+padrão não é preguiça: a configuração chega depois de instalações que já têm
+arquivos, e apagar o histórico de um provedor porque ele atualizou o painel
+seria o painel destruindo dado que ninguém mandou tocar.
+
+### O que a varredura apaga, e o que ela nunca toca
+
+- Apaga o **arquivo** e limpa as colunas `attachment_*` da linha. A mensagem
+  continua no fio, com o texto intacto; o anexo passa a dizer que não está mais
+  em disco, que é a verdade e já tem tela.
+- **Nunca apaga linha de mensagem.** Histórico de conversa é o que um provedor
+  precisa quando o cliente contesta; disco é o que ele precisa quando enche.
+  São problemas diferentes e só um deles é resolvido aqui.
+- **Nunca apaga arquivo que uma mensagem ainda vai usar.** Uma linha `queued`
+  ou `sending` tem um envio pela frente: apagar o arquivo dela transforma um
+  envio pendente numa falha permanente. A idade da mensagem não importa — o que
+  importa é se ela já saiu.
+- Um arquivo em disco sem linha nenhuma apontando para ele é lixo de upload
+  abandonado e some pela mesma regra de idade.
+
+`POST /api/whatsapp/media/sweep` roda a varredura na hora, para quem precisa de
+disco agora. Responde `whatsapp.mediaSwept` com quantos arquivos e quantos MB.
+Com retenção em 0 ela não apaga nada e diz isso.
+
+---
+
+## Saúde da integração — `GET /api/whatsapp/health`
+
+Uma leitura só, que responde "isto está funcionando?". Hoje cada número dela só
+é descoberto abrindo conversa por conversa — ou seja, é descoberto pelo cliente
+reclamando.
+
+```ts
+{
+  accounts: { total, connected, disconnected }
+  outbox: { queued, sending, failed24h, oldestQueuedAt }
+  inbox: { unread, openConversations }
+  lastInboundAt: string | null
+  lastOutboundAt: string | null
+  media: { files, bytes, oldestAt }
+}
+```
+
+`oldestQueuedAt` é o número que importa: uma fila que só cresce, com a mais
+antiga de ontem, é o painel calado sem ninguém saber. `lastInboundAt` é o par
+dele — fila vazia e nada entrando há dois dias não é calmaria, é webhook morto.
+
+**Barato de propósito.** É uma tela que faz poll; um agregado caro aqui vira o
+motivo de o painel estar lento.
+
+---
+
 ## Telas — quem consome o quê
 
 Para achar o consumidor de uma rota sem varrer o `frontend/`:
