@@ -201,6 +201,13 @@ class UsersController {
         // ISP's administrators kept this one from demoting its last, and this
         // one's last could go while the count stayed positive on somebody
         // else's staff.
+        //
+        // Unreachable through this route as it stands, and kept on purpose:
+        // `requireRole(['admin'])` means the caller is an administrator HERE,
+        // so a target who is a different administrator makes the count two.
+        // It is the invariant that matters, not the branch — the day a role
+        // short of administrator may manage the team, this is what stops the
+        // provider from being locked out, and nothing else would.
         if (presentRole(membership.role) === 'admin' && nextRole !== 'admin'
           && await TenantUser.countByRole(tenantId, 'admin') <= 1) {
           return res.status(409).json(
@@ -272,6 +279,9 @@ class UsersController {
       if (!membership) {
         return res.status(404).json(createErrorResponse('Operator not found'));
       }
+      // Same invariant as the demotion above, and unreachable for the same
+      // reason: the caller is an administrator here, so removing a different
+      // one leaves at least themselves.
       if (presentRole(membership.role) === 'admin'
         && await TenantUser.countByRole(tenantId, 'admin') <= 1) {
         return res.status(409).json(
