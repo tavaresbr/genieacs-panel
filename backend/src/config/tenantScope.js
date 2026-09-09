@@ -46,7 +46,9 @@ export const SCOPED_TABLES = new Set([
   // equipment, and the device id it is keyed on is only unique inside that
   // provider's GenieACS — two providers can hand the same id to two ONTs.
   'device_samples',
-  'device_sample_hours'
+  'device_sample_hours',
+  // Which ONT replaced which, for one provider's subscriber.
+  'device_swaps'
 ]);
 
 /** Tables that belong to the deployment rather than to any one provider. */

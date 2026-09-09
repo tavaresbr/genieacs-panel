@@ -303,6 +303,28 @@ export interface DeviceHistory {
   points: DeviceHistoryPoint[]
 }
 
+export interface DeviceSwap {
+  id: number
+  customerId: string | null
+  pppoeUsername: string | null
+  previousDeviceId: string
+  deviceId: string
+  contract: string | null
+  /** Which identity matched: same firmware hashes the same, so most swaps are `identity_hash`. */
+  matchedBy: 'identity_hash' | 'pppoe'
+  /** What became of the previous ONT's SGP link. `held` means the pair is unstable. */
+  linkAction: 'moved' | 'cleared' | 'none' | 'held'
+  flapping: boolean
+  repeatCount: number
+  occurredAt: string | null
+  acknowledgedAt: string | null
+}
+
+export interface DeviceSwapList {
+  swaps: DeviceSwap[]
+  open?: number
+}
+
 export const devicesAPI = {
   getDevices: (params: DeviceListParams = {}) => {
     const query = new URLSearchParams()
@@ -335,6 +357,14 @@ export const devicesAPI = {
       `/devices/${encodeURIComponent(deviceId)}/history${suffix ? `?${suffix}` : ''}`
     )
   },
+
+  getSwaps: () => apiClient.get<DeviceSwapList>('/devices/swaps'),
+
+  getDeviceSwaps: (deviceId: string) =>
+    apiClient.get<DeviceSwapList>(`/devices/${encodeURIComponent(deviceId)}/swaps`),
+
+  acknowledgeSwap: (id: number) =>
+    apiClient.post<DeviceSwap>(`/devices/swaps/${encodeURIComponent(id)}/acknowledge`),
 
   deleteDevice: (deviceId: string) =>
     apiClient.delete(`/devices/${encodeURIComponent(deviceId)}`),

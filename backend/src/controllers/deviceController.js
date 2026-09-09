@@ -4,6 +4,7 @@ import CustomerService from '../services/customerService.js';
 import CustomerPortalPasswordService from '../services/customerPortalPasswordService.js';
 import CustomerAccount from '../models/CustomerAccount.js';
 import DeviceProfile from '../models/DeviceProfile.js';
+import DeviceSwap, { publicSwap } from '../models/DeviceSwap.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { translateError } from '../i18n/index.js';
 
@@ -45,6 +46,67 @@ class DeviceController {
       console.error('Get device history error:', error);
       return res.status(502).json(
         createErrorResponse(req.t('device.history.failed'), error.message)
+      );
+    }
+  }
+
+  /**
+   * The ONT replacements the operator has not looked at yet.
+   *
+   * Open ones rather than all of them: the panel raises this as a banner, and a
+   * list that keeps every swap ever recorded stops being something anyone
+   * reads. The full record stays on each device's page.
+   */
+  static async getSwaps(req, res) {
+    try {
+      const rows = await DeviceSwap.listOpen(req.query?.limit);
+      return res.json(createResponse(req.t('device.swaps.retrieved'), {
+        swaps: rows.map(publicSwap),
+        open: rows.length
+      }));
+    } catch (error) {
+      console.error('List device swaps error:', error);
+      return res.status(500).json(
+        createErrorResponse(req.t('device.swaps.failed'), error.message)
+      );
+    }
+  }
+
+  /** Every replacement one ONT took part in, at either end of it. */
+  static async getDeviceSwaps(req, res) {
+    try {
+      const deviceId = String(req.params?.deviceId ?? '').trim();
+      if (!deviceId) {
+        return res.status(400).json(createErrorResponse(req.t('device.history.deviceIdRequired')));
+      }
+      const rows = await DeviceSwap.listForDevice(deviceId, req.query?.limit);
+      return res.json(createResponse(req.t('device.swaps.retrieved'), {
+        swaps: rows.map(publicSwap)
+      }));
+    } catch (error) {
+      console.error('Get device swaps error:', error);
+      return res.status(500).json(
+        createErrorResponse(req.t('device.swaps.failed'), error.message)
+      );
+    }
+  }
+
+  static async acknowledgeSwap(req, res) {
+    try {
+      const id = Number(req.params?.id);
+      if (!Number.isInteger(id) || id <= 0) {
+        return res.status(400).json(createErrorResponse(req.t('device.swaps.notFound')));
+      }
+      const existing = await DeviceSwap.getById(id);
+      if (!existing) {
+        return res.status(404).json(createErrorResponse(req.t('device.swaps.notFound')));
+      }
+      const swap = await DeviceSwap.acknowledge(id, req.user?.id ?? null);
+      return res.json(createResponse(req.t('device.swaps.acknowledged'), publicSwap(swap)));
+    } catch (error) {
+      console.error('Acknowledge device swap error:', error);
+      return res.status(500).json(
+        createErrorResponse(req.t('device.swaps.failed'), error.message)
       );
     }
   }

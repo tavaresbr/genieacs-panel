@@ -9,6 +9,7 @@ import { formatDate } from '@/lib/utils'
 import { Icon } from '@/components/ui/icon'
 import { ProvisioningCard } from '@/components/provisioning-card'
 import { DeviceHistoryCard } from '@/components/device-history-card'
+import { DeviceSwapsCard } from '@/components/device-swaps-card'
 import { useAuth } from '@/contexts/auth-context'
 import { useTranslation } from '@/contexts/language-context'
 
@@ -1562,6 +1563,8 @@ export default function DeviceDetailPage() {
             {sgpAvailable && (
               <ProvisioningCard deviceId={deviceId} />
             )}
+
+            <DeviceSwapsCard deviceId={deviceId} />
 
             <DeviceHistoryCard deviceId={deviceId} />
 
