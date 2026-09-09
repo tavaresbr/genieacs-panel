@@ -10,6 +10,7 @@ import {
   sendTextRequest
 } from '../utils/wa/evolutionApi.js';
 import { destinoWa, normalizarTelefoneBr } from '../utils/wa/waDestino.js';
+import { sign as signMediaToken } from '../utils/wa/waMediaToken.js';
 
 /** Column widths from `wa_messages`; truncating here beats a driver error. */
 const BODY_ATTACHMENT_PATH_LIMIT = 255;
@@ -147,7 +148,7 @@ class WaSendService {
       config,
       WhatsAppConfigService.decryptInstanceToken(account)
     );
-    const externalId = await sendThrough(client, account, message, number);
+    const externalId = await sendThrough(client, account, message, number, config);
     return { accountId: account.id, externalId };
   }
 
@@ -247,6 +248,35 @@ export function mediaKind(attachmentType) {
   return 'document';
 }
 
+/**
+ * The address the Evolution server can fetch this message's attachment at.
+ *
+ * `attachment_path` is a path on the panel's own disk, relative to `DATA_DIR`.
+ * Handing that to Evolution — which is what this service did until now — asks
+ * another machine to open a file it has no idea about, and the send fails, or
+ * worse, succeeds with nothing attached.
+ *
+ * The origin comes from `webhookBaseUrl` because it is the ONLY address the
+ * panel has been told the Evolution server can reach it on: it is where the
+ * events arrive from. Deriving it from the request would be worse than
+ * guessing — a despatch happens in a worker, with no request in sight.
+ *
+ * @returns {string|null} null when nothing has told the panel its public origin
+ */
+export function publicMediaUrl(webhookBaseUrl, messageId) {
+  let origin;
+  try {
+    ({ origin } = new URL(String(webhookBaseUrl || '')));
+  } catch {
+    return null;
+  }
+  if (!origin || origin === 'null') return null;
+  // The token is minted here, at despatch, and nowhere else: it is good for
+  // fifteen minutes, which covers the fetch the server is about to make and
+  // nothing beyond it.
+  return `${origin}/api/whatsapp-media/${messageId}?t=${encodeURIComponent(signMediaToken(messageId))}`;
+}
+
 /** Accepts the request body's `attachment`, in either naming convention. */
 function normalizeAttachment(attachment) {
   if (!attachment || typeof attachment !== 'object') return null;
@@ -269,7 +299,7 @@ function normalizeAttachment(attachment) {
  * the voice bubble that plays in place. Measured on the source system's real
  * account: three recordings made in the panel came out as attachments.
  */
-async function sendThrough(client, account, message, number) {
+async function sendThrough(client, account, message, number, config) {
   const { flavor, name } = account;
   const caption = String(message.body || '');
 
@@ -278,11 +308,22 @@ async function sendThrough(client, account, message, number) {
     return readSentId(data);
   }
 
+  // Everything below this line is about the attachment, so a message without
+  // one never reaches it — the refusal cannot touch a plain text send.
+  const mediaUrl = publicMediaUrl(config?.webhookBaseUrl, message.id);
+  if (!mediaUrl) {
+    // Refused rather than sent, and this is the same lesson the portal link
+    // already taught: a send that "succeeds" with an address nobody can open
+    // costs the operator a conversation with a customer to find out. Failing
+    // here puts the reason in `delivery_error`, where the bubble shows it.
+    throw new WaError('whatsapp.error.noPublicUrl', { code: 'no_public_url', status: 409 });
+  }
+
   const kind = mediaKind(message.attachment_type);
   if (kind === 'audio') {
     // Null on Evolution GO, whose PTT route has never been measured — and a
     // guessed path is exactly the mistake this integration already paid for.
-    const request = sendAudioRequest(flavor, name, { number, url: message.attachment_path });
+    const request = sendAudioRequest(flavor, name, { number, url: mediaUrl });
     if (request) {
       const result = await client.send(request);
       // ONLY a non-2xx falls through to sendMedia. Retrying after a 2xx sends
@@ -296,7 +337,7 @@ async function sendThrough(client, account, message, number) {
   const { data } = await client.sendOrThrow(sendMediaRequest(flavor, name, {
     number,
     type: kind,
-    url: message.attachment_path,
+    url: mediaUrl,
     caption,
     fileName: message.attachment_name || ''
   }));
