@@ -467,8 +467,13 @@ export default {
   'whatsapp.phoneSaved': '電話號碼已儲存',
   'whatsapp.phoneSaveFailed': '無法儲存電話號碼',
   'whatsapp.error.invalidPhone': '這不像是一個可用的電話號碼',
+  'whatsapp.error.subscriberNotFound': '找不到使用該合約的用戶',
   // WhatsApp — 收件匣與自助服務機器人（第三階段）
   'whatsapp.error.conversationNotFound': '找不到該對話',
+  'whatsapp.conversationClosed': '對話已結束',
+  'whatsapp.conversationReopened': '對話已重新開啟',
+  'whatsapp.conversationStatusFailed': '無法更新對話',
+  'whatsapp.error.invalidConversationStatus': '對話只能是開啟或結束狀態',
   'whatsapp.bot.portalHint': '如需查看 Wi-Fi 密碼或變更網路名稱，請登入客戶入口網站：{link}',
   'whatsapp.bot.notRecognised': '未查到該號碼對應的合約。客服人員會盡快回覆您。',
   'whatsapp.bot.handoff': '將為您轉接客服人員。',

@@ -1,4 +1,4 @@
-export const LOCALES = ['pt-BR', 'en', 'es', 'it', 'de', 'fr', 'ja', 'zh-CN', 'zh-TW'];
+export const LOCALES = ['pt-BR', 'en', 'es', 'it', 'de', 'fr', 'ja', 'zh-CN', 'zh-TW', 'ko'];
 
 export const DEFAULT_LOCALE = 'pt-BR';
 
@@ -28,6 +28,7 @@ export function resolveLocale(tag) {
   if (base === 'de') return 'de';
   if (base === 'fr') return 'fr';
   if (base === 'ja') return 'ja';
+  if (base === 'ko') return 'ko';
   // Traditional-script markers pick zh-TW; every other zh tag gets Simplified.
   if (base === 'zh') return TRADITIONAL_CHINESE.test(normalized) ? 'zh-TW' : 'zh-CN';
   return null;
