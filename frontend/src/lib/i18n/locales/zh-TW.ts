@@ -1371,6 +1371,7 @@ const zhTW: Dictionary = {
   'whatsapp.outbox.requeueAllDone': '已將 {count} 則訊息重新排入佇列',
   'whatsapp.outbox.requeueAllNone': '沒有失敗的訊息需要重傳',
   'whatsapp.outbox.requeueFailed': '無法將訊息重新排入佇列',
+  'whatsapp.health.retrying': '其中 {count} 則等待重試',
 }
 
 export default zhTW

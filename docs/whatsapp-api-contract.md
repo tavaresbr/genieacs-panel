@@ -1360,3 +1360,18 @@ Em lote (`POST /api/whatsapp/messages/requeue-failed`), a mesma regra por linha,
 dentro do escopo do provedor que pediu — pela mesma razão que o botão de
 limpeza da onda 8: a requisição chega no escopo de um provedor e não tem por que
 mexer na fila de outro.
+
+### 4. A saúde tem de saber a diferença
+
+Costura entre as duas metades, e que nenhuma das duas enxerga sozinha: uma
+mensagem que voltou a `queued` esperando o recuo **está** esperando para sair, e
+conta em `queued`. Mas não é a fila parada, e `oldestQueuedAt` reportando-a como
+a mais velha esperando transforma uma tentativa saudável num vermelho de "parada
+desde anteontem" na tela do operador — que é exatamente o alarme que existe para
+significar outra coisa.
+
+- `outbox.retrying` é essa fatia, contada à parte.
+- `oldestQueuedAt` considera só as linhas **vencidas**: `next_attempt_at` NULL
+  (que é "pode agora", e é o caso comum, não a exceção) ou já passada.
+- A tira mostra as três coisas na mesma linha, porque "40 esperando" sem idade
+  nenhuma, sem a contagem de retentativas ao lado, se lê como defeito do painel.

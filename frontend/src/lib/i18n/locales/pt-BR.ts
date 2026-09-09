@@ -1370,6 +1370,7 @@ const ptBR: Dictionary = {
   'whatsapp.outbox.requeueAllDone': '{count} mensagem(ns) de volta à fila',
   'whatsapp.outbox.requeueAllNone': 'Nenhuma mensagem falhada para reenviar',
   'whatsapp.outbox.requeueFailed': 'Não foi possível devolver as mensagens à fila',
+  'whatsapp.health.retrying': 'destas, {count} esperando nova tentativa',
 }
 
 export default ptBR

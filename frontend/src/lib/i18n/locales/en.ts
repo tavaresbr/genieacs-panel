@@ -1372,6 +1372,7 @@ const en = {
   'whatsapp.outbox.requeueAllDone': '{count} message(s) back in the queue',
   'whatsapp.outbox.requeueAllNone': 'No failed message to send again',
   'whatsapp.outbox.requeueFailed': 'Could not put the messages back in the queue',
+  'whatsapp.health.retrying': 'of those, {count} waiting on a retry',
 }
 
 export default en

@@ -1378,6 +1378,7 @@ const ru: Dictionary = {
   'whatsapp.outbox.requeueAllDone': 'Возвращено в очередь: {count}',
   'whatsapp.outbox.requeueAllNone': 'Нет неотправленных сообщений для повтора',
   'whatsapp.outbox.requeueFailed': 'Не удалось вернуть сообщения в очередь',
+  'whatsapp.health.retrying': 'из них {count} ждут повторной попытки',
 }
 
 export default ru

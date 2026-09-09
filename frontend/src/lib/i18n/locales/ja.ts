@@ -1370,6 +1370,7 @@ const ja: Dictionary = {
   'whatsapp.outbox.requeueAllDone': '{count} 件を送信待ちに戻しました',
   'whatsapp.outbox.requeueAllNone': '再送する失敗メッセージはありません',
   'whatsapp.outbox.requeueFailed': 'メッセージを送信待ちに戻せませんでした',
+  'whatsapp.health.retrying': 'うち {count} 件は再試行待ち',
 }
 
 export default ja

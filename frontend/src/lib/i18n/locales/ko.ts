@@ -1377,6 +1377,7 @@ const ko: Dictionary = {
   'whatsapp.outbox.requeueAllDone': '메시지 {count}건을 대기열로 되돌렸습니다',
   'whatsapp.outbox.requeueAllNone': '다시 보낼 실패 메시지가 없습니다',
   'whatsapp.outbox.requeueFailed': '메시지를 대기열로 되돌리지 못했습니다',
+  'whatsapp.health.retrying': '그중 {count}건은 재시도 대기 중',
 }
 
 export default ko

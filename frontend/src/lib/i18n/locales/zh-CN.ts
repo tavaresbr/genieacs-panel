@@ -1370,6 +1370,7 @@ const zhCN: Dictionary = {
   'whatsapp.outbox.requeueAllDone': '已将 {count} 条消息重新排队',
   'whatsapp.outbox.requeueAllNone': '没有失败的消息需要重发',
   'whatsapp.outbox.requeueFailed': '无法将消息重新排队',
+  'whatsapp.health.retrying': '其中 {count} 条等待重试',
 }
 
 export default zhCN

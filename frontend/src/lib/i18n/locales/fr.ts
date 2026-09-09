@@ -1370,6 +1370,7 @@ const fr: Dictionary = {
   'whatsapp.outbox.requeueAllDone': '{count} message(s) de retour dans la file',
   'whatsapp.outbox.requeueAllNone': 'Aucun message en échec à renvoyer',
   'whatsapp.outbox.requeueFailed': 'Impossible de remettre les messages dans la file',
+  'whatsapp.health.retrying': 'dont {count} en attente d’une nouvelle tentative',
 }
 
 export default fr

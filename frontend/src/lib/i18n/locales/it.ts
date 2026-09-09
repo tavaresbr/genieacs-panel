@@ -1376,6 +1376,7 @@ const it: Dictionary = {
   'whatsapp.outbox.requeueAllDone': '{count} messaggio/i di nuovo in coda',
   'whatsapp.outbox.requeueAllNone': 'Nessun messaggio non riuscito da reinviare',
   'whatsapp.outbox.requeueFailed': 'Impossibile rimettere i messaggi in coda',
+  'whatsapp.health.retrying': 'di cui {count} in attesa di un nuovo tentativo',
 }
 
 export default it

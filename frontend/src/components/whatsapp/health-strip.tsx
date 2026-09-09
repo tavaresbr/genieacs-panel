@@ -153,15 +153,24 @@ function notesFor(
     const stuckFor = ageOf(health.outbox.oldestQueuedAt)
     const stuck = stuckFor !== null && stuckFor > STUCK_QUEUE_MS
     const queued = t('whatsapp.health.queued', { count: formatNumber(waiting) })
+    // `oldestQueuedAt` counts only rows that are DUE, so a queue whose whole
+    // backlog is backing off has no age here and cannot read as stuck. The
+    // retry count is what explains the gap between the two numbers — without
+    // it, "40 waiting" with no age looks like a bug in the panel.
+    const parts = [queued]
+    if (health.outbox.oldestQueuedAt) {
+      parts.push(t('whatsapp.health.oldestQueued', {
+        when: formatRelativeTime(health.outbox.oldestQueuedAt)
+      }))
+    }
+    if (health.outbox.retrying > 0) {
+      parts.push(t('whatsapp.health.retrying', { count: formatNumber(health.outbox.retrying) }))
+    }
     notes.push({
       key: 'queue',
       tone: stuck ? 'alarm' : 'calm',
       icon: 'refresh',
-      text: health.outbox.oldestQueuedAt
-        ? `${queued} — ${t('whatsapp.health.oldestQueued', {
-          when: formatRelativeTime(health.outbox.oldestQueuedAt)
-        })}`
-        : queued
+      text: parts.join(' — ')
     })
   }
 

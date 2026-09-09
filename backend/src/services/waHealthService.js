@@ -199,8 +199,20 @@ class WaHealthService {
    * each engine decides an aggregate over a timestamp should be typed as.
    */
   static async outbox() {
+    const now = new Date();
+
     const [queuedRow] = await tdb('wa_messages')
       .where({ delivery_status: 'queued' })
+      .count({ total: '*' });
+
+    // Since the outbox learned to back off, a message that bounced goes back to
+    // 'queued' with a due time in the future. It is still waiting to go out, so
+    // it belongs in `queued` — but it is NOT the queue standing still, and the
+    // two have to be told apart or an operator reads a healthy retry as a stuck
+    // panel. `retrying` is that slice, and `oldestQueuedAt` below excludes it.
+    const [retryingRow] = await tdb('wa_messages')
+      .where({ delivery_status: 'queued' })
+      .where('next_attempt_at', '>', now)
       .count({ total: '*' });
 
     const [sendingRow] = await tdb('wa_messages')
@@ -209,17 +221,22 @@ class WaHealthService {
 
     const [failedRow] = await tdb('wa_messages')
       .where({ delivery_status: 'failed' })
-      .where('created_at', '>=', new Date(Date.now() - FAILURE_WINDOW_MS))
+      .where('created_at', '>=', new Date(now.getTime() - FAILURE_WINDOW_MS))
       .count({ total: '*' });
 
+    // Only rows that are actually DUE. A NULL due time means due now, which is
+    // every row written before the column existed and every first attempt, so
+    // the NULL branch is not an edge case here — it is the common one.
     const oldest = await tdb('wa_messages')
       .where({ delivery_status: 'queued' })
+      .where((q) => q.whereNull('next_attempt_at').orWhere('next_attempt_at', '<=', now))
       .orderBy('created_at', 'asc')
       .select('created_at')
       .first();
 
     return {
       queued: asCount(queuedRow),
+      retrying: asCount(retryingRow),
       sending: asCount(sendingRow),
       failed24h: asCount(failedRow),
       oldestQueuedAt: asIso(oldest?.created_at)

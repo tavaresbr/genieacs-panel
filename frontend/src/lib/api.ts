@@ -930,6 +930,12 @@ export interface WhatsAppHealth {
   outbox: {
     /** Waiting to go out. A number that only grows is the panel gone quiet. */
     queued: number
+    /**
+     * The slice of `queued` that is waiting out a retry rather than waiting for
+     * the worker. Counted separately because a healthy backoff and a stuck
+     * queue look identical from `queued` alone.
+     */
+    retrying: number
     sending: number
     /** Terminal failures in the last 24 hours. */
     failed24h: number

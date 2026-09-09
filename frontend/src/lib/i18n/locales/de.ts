@@ -1374,6 +1374,7 @@ const de: Dictionary = {
   'whatsapp.outbox.requeueAllDone': '{count} Nachricht(en) wieder in der Warteschlange',
   'whatsapp.outbox.requeueAllNone': 'Keine fehlgeschlagene Nachricht zum erneuten Senden',
   'whatsapp.outbox.requeueFailed': 'Die Nachrichten konnten nicht wieder eingereiht werden',
+  'whatsapp.health.retrying': 'davon {count} mit geplantem neuen Versuch',
 }
 
 export default de
