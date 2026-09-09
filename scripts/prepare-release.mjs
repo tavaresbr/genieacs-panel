@@ -156,7 +156,7 @@ const nextVersion = latestTag
 const currentCommit = git(['rev-parse', '--short=12', 'HEAD']);
 const currentCount = Number(git(['rev-list', '--count', 'HEAD']));
 const releaseDate = new Date().toISOString().slice(0, 10);
-const repositoryUrl = 'https://github.com/skydashnet/genieacs-panel';
+const repositoryUrl = 'https://github.com/tavaresbr/genieacs-panel';
 const compareUrl = latestTag
   ? `${repositoryUrl}/compare/${latestTag}...v${nextVersion}`
   : `${repositoryUrl}/commits/${currentCommit}`;
