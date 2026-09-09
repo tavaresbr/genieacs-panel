@@ -1,8 +1,9 @@
 'use client'
 
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Icon } from '@/components/ui/icon'
 import { useTranslation } from '@/contexts/language-context'
-import type { WhatsAppMessage } from '@/lib/api'
+import { whatsappAPI, type WhatsAppMessage } from '@/lib/api'
 import type { TranslationKey } from '@/lib/i18n'
 
 type DeliveryStatus = NonNullable<WhatsAppMessage['deliveryStatus']>
@@ -45,6 +46,145 @@ function truncateReason(reason: string): string {
   return flat.length > REASON_MAX ? `${flat.slice(0, REASON_MAX - 1)}…` : flat
 }
 
+/**
+ * Which attachments are worth showing in place.
+ *
+ * SVG is absent for the same reason the backend refuses to serve it inline: it
+ * is a document that can carry script, and an `<img>` is not the only thing a
+ * browser might be talked into making of it. Everything not on this list is
+ * offered as a download, which is the honest thing to do with bytes we cannot
+ * vouch for.
+ */
+function isInlineImage(type: string | null): boolean {
+  const mime = (type || '').split(';')[0].trim().toLowerCase()
+  return ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp'].includes(mime)
+}
+
+/**
+ * One message's attachment, fetched as a blob.
+ *
+ * A blob and not a URL because the route carries the operator's session in an
+ * `Authorization` header, and `<img src>` cannot send one. Which means an
+ * object URL per image — and a thread of fifty photos is fifty object URLs that
+ * live until the tab is closed unless every one of them is revoked. The ref
+ * below is what does that: every URL this component ever makes goes into it,
+ * and the unmount effect empties it.
+ *
+ * A non-image is not fetched at all until the operator asks. Prefetching a
+ * thread's worth of PDFs to render a button would download files nobody opened.
+ */
+function Attachment({ message }: { message: WhatsAppMessage }) {
+  const { t } = useTranslation()
+  const attachment = message.attachment
+  const inline = isInlineImage(attachment?.type ?? null)
+
+  const [objectUrl, setObjectUrl] = useState<string | null>(null)
+  const [gone, setGone] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const created = useRef<string[]>([])
+
+  const remember = useCallback((blob: Blob) => {
+    const url = URL.createObjectURL(blob)
+    created.current.push(url)
+    return url
+  }, [])
+
+  // Revokes on unmount, and only on unmount: the URLs have to outlive every
+  // render in between, since the `<img>` is still pointing at one of them.
+  useEffect(() => () => {
+    created.current.forEach((url) => URL.revokeObjectURL(url))
+    created.current = []
+  }, [])
+
+  useEffect(() => {
+    if (!inline) return
+    let live = true
+    void whatsappAPI.fetchAttachment(message.id).then((result) => {
+      if (!live) return
+      // A file deleted off the disk, a row from another provider, an expired
+      // session: all the same to the operator, and all better as a line of text
+      // than as the broken-image glyph that says nothing.
+      if (!result.success || !result.blob) return setGone(true)
+      setObjectUrl(remember(result.blob))
+    })
+    return () => { live = false }
+  }, [inline, message.id, remember])
+
+  const download = useCallback(async () => {
+    setBusy(true)
+    try {
+      const result = await whatsappAPI.fetchAttachment(message.id)
+      if (!result.success || !result.blob) return setGone(true)
+      const url = remember(result.blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = attachment?.name || `attachment-${message.id}`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+    } finally {
+      setBusy(false)
+    }
+  }, [attachment?.name, message.id, remember])
+
+  if (!attachment) return null
+
+  const label = attachment.name || t('whatsapp.inbox.attachment')
+
+  if (gone) {
+    return (
+      <span className="mt-2 flex items-center gap-1.5 rounded border border-border/70 bg-background/40 px-2 py-1.5 text-xs text-muted-foreground">
+        <Icon name="warning" size={14} className="shrink-0" />
+        <span className="truncate">{t('whatsapp.inbox.attachmentGone')}</span>
+      </span>
+    )
+  }
+
+  if (inline) {
+    return (
+      <span className="mt-2 block">
+        {objectUrl ? (
+          <a
+            href={objectUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={t('whatsapp.inbox.attachmentOpen')}
+            className="block overflow-hidden rounded border border-border/70"
+          >
+            {/* A plain <img>, not next/image: the source is an object URL for
+                bytes already in memory, and there is no remote asset for an
+                optimiser to fetch, resize or cache. */}
+            <img
+              src={objectUrl}
+              alt={label}
+              className="max-h-72 w-auto max-w-full object-contain"
+            />
+          </a>
+        ) : (
+          <span className="flex items-center gap-1.5 rounded border border-border/70 bg-background/40 px-2 py-1.5 text-xs text-muted-foreground">
+            <Icon name="refresh" size={14} className="shrink-0 animate-spin" />
+            <span className="truncate">{label}</span>
+          </span>
+        )}
+      </span>
+    )
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => { void download() }}
+      disabled={busy}
+      title={label}
+      className="modern-button-secondary mt-2 flex min-h-9 max-w-full items-center gap-1.5 px-2 py-1.5 text-xs"
+    >
+      <Icon name={busy ? 'refresh' : 'box'} size={14} className={`shrink-0 ${busy ? 'animate-spin' : ''}`} />
+      <span className="truncate">{label}</span>
+      <span className="shrink-0 font-semibold opacity-80">{t('whatsapp.inbox.attachmentDownload')}</span>
+    </button>
+  )
+}
+
 function clock(iso: string | null, intlLocale: string): string {
   if (!iso) return ''
   const date = new Date(iso)
@@ -69,14 +209,7 @@ export function MessageBubble({ message, onResend, resending }: MessageBubblePro
   const { t, intlLocale } = useTranslation()
   const stamp = clock(message.createdAt, intlLocale)
 
-  const attachment = message.attachment && (
-    <span className="mt-2 flex items-center gap-1.5 rounded border border-border/70 bg-background/40 px-2 py-1.5 text-xs">
-      <Icon name="box" size={14} className="shrink-0 text-muted-foreground" />
-      <span className="truncate" title={message.attachment.name || message.attachment.url}>
-        {message.attachment.name || t('whatsapp.inbox.attachment')}
-      </span>
-    </span>
-  )
+  const attachment = message.attachment && <Attachment message={message} />
 
   const body = message.body
     ? <p className="whitespace-pre-wrap break-words text-sm leading-6">{message.body}</p>
