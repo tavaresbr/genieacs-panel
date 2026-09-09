@@ -1,6 +1,8 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react'
 import { BrandMark } from '@/components/brand-mark'
 import { Icon } from '@/components/ui/icon'
+import { QrCode } from '@/components/qr-code'
+import { looksLikeBrCode } from '@/lib/qr/encode'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import { useTranslation } from '@/contexts/language-context'
 import { getActiveLocale, isCustomerSessionCode, translate } from '@/lib/i18n'
@@ -158,7 +160,10 @@ export default function CustomerPortal() {
     type: 'success' | 'error'
     message: string
   } | null>(null)
-  const [copiedInvoiceId, setCopiedInvoiceId] = useState<string | null>(null)
+  // Keyed by row and by which of the two codes was copied. Keying it on
+  // `invoice.id` alone made every id-less invoice light up at once, because
+  // `null === null` matched all of them.
+  const [copiedCode, setCopiedCode] = useState<string | null>(null)
   const [wifiFeedback, setWifiFeedback] = useState<{
     type: 'success' | 'error'
     message: string
@@ -266,14 +271,13 @@ export default function CustomerPortal() {
     }
   }
 
-  const copyInvoiceCode = async (invoice: PortalInvoice) => {
-    const code = invoice.digitableLine || invoice.barcode || invoice.pix
+  const copyCode = async (key: string, code: string | null) => {
     if (!code) return
     try {
       await navigator.clipboard.writeText(code)
-      setCopiedInvoiceId(invoice.id)
+      setCopiedCode(key)
       setBillingFeedback(null)
-      window.setTimeout(() => setCopiedInvoiceId(null), 4000)
+      window.setTimeout(() => setCopiedCode((current) => (current === key ? null : current)), 4000)
     } catch {
       setBillingFeedback({ type: 'error', message: t('portal.billing.copyFailed') })
     }
@@ -314,7 +318,7 @@ export default function CustomerPortal() {
     setBilling(null)
     setBillingError('')
     setBillingFeedback(null)
-    setCopiedInvoiceId(null)
+    setCopiedCode(null)
   }, [authenticated])
 
   const login = async (event: FormEvent) => {
@@ -887,9 +891,14 @@ export default function CustomerPortal() {
                 </div>
               ) : (
                 <ul className="mt-5 space-y-3">
-                  {billing.invoices.map((invoice, index) => (
+                  {billing.invoices.map((invoice, index) => {
+                    // The same key the copy state uses, so a row without an id
+                    // is still distinguishable from every other row without one.
+                    const rowKey = invoice.id || `${invoice.dueDate}-${index}`
+                    const bankLine = invoice.digitableLine || invoice.barcode
+                    return (
                     <li
-                      key={invoice.id || `${invoice.dueDate}-${index}`}
+                      key={rowKey}
                       className="rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-4"
                     >
                       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -904,20 +913,50 @@ export default function CustomerPortal() {
                         {invoice.description || t('portal.billing.defaultDescription')}
                         {invoice.status ? ` · ${invoice.status}` : ''}
                       </p>
-                      {(invoice.digitableLine || invoice.barcode) && (
+                      {invoice.pix && (
+                        <div className="mt-3 rounded-md border border-border bg-card p-3">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            {t('portal.billing.pixLabel')}
+                          </p>
+                          <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-start">
+                            {looksLikeBrCode(invoice.pix) && (
+                              <div className="shrink-0 self-center rounded-md bg-white p-2 sm:self-start">
+                                <QrCode
+                                  value={invoice.pix}
+                                  size={168}
+                                  ariaLabel={t('portal.billing.pixQrAlt')}
+                                />
+                              </div>
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs text-muted-foreground">{t('portal.billing.pixHint')}</p>
+                              <p className="mt-2 break-all font-mono text-[0.7rem] leading-5">{invoice.pix}</p>
+                              <button
+                                type="button"
+                                className="modern-button-secondary mt-2"
+                                onClick={() => void copyCode(`${rowKey}:pix`, invoice.pix)}
+                              >
+                                <Icon name={copiedCode === `${rowKey}:pix` ? 'check' : 'copy'} size={17} />
+                                {t(copiedCode === `${rowKey}:pix` ? 'portal.billing.copied' : 'portal.billing.copyPix')}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {bankLine && (
                         <p className="mt-3 break-all rounded-md border border-border bg-card px-3 py-2 font-mono text-xs">
-                          {invoice.digitableLine || invoice.barcode}
+                          {bankLine}
                         </p>
                       )}
                       <div className="mt-3 flex flex-wrap gap-2">
-                        {(invoice.digitableLine || invoice.barcode || invoice.pix) && (
+                        {bankLine && (
                           <button
                             type="button"
                             className="modern-button-secondary"
-                            onClick={() => void copyInvoiceCode(invoice)}
+                            onClick={() => void copyCode(`${rowKey}:line`, bankLine)}
                           >
-                            <Icon name={copiedInvoiceId === invoice.id ? 'check' : 'copy'} size={17} />
-                            {t(copiedInvoiceId === invoice.id ? 'portal.billing.copied' : 'portal.billing.copy')}
+                            <Icon name={copiedCode === `${rowKey}:line` ? 'check' : 'copy'} size={17} />
+                            {t(copiedCode === `${rowKey}:line` ? 'portal.billing.copied' : 'portal.billing.copy')}
                           </button>
                         )}
                         {safeBoletoUrl(invoice.link) && (
@@ -932,7 +971,8 @@ export default function CustomerPortal() {
                         )}
                       </div>
                     </li>
-                  ))}
+                    )
+                  })}
                 </ul>
               )}
 
