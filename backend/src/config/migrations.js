@@ -76,6 +76,18 @@ function addSgpPhoneColumns(t) {
   for (const [, add] of SGP_PHONE_COLUMNS) add(t);
 }
 
+/**
+ * Shared by `wa_messages` and the 0014 upgrade.
+ *
+ * Rows written before this column existed default to 'operator'. That is the
+ * safe direction: the ceiling this column exists to make honest only ever
+ * counts 'bot', so an old row misfiled as an operator's message can silence
+ * nothing.
+ */
+const WA_MESSAGE_SOURCE_COLUMNS = [
+  ['source', (t) => t.string('source', 16).notNullable().defaultTo('operator')]
+];
+
 // Table definitions. Each is a factory so the builder can reach `db.fn.now()`,
 // and each is referenced by exactly one place per table so the initial schema
 // and the later upgrade steps can never drift apart.
@@ -438,6 +450,11 @@ const waMessagesTable = (db) => (t) => {
   t.string('attachment_name', 255);
   // An internal note is written by an operator and never sent.
   t.boolean('is_note').notNullable().defaultTo(false);
+  // Who produced this message: 'operator', 'bot', 'campaign' or 'alert'.
+  // `sent_by` cannot answer that — it is NULL for all three automatic senders,
+  // so a dunning campaign message and a bot reply were indistinguishable, and
+  // the bot's hourly ceiling counted the campaign's messages against itself.
+  t.string('source', 16).notNullable().defaultTo('operator');
   // queued | sending | sent | delivered | read | failed. NULL for inbound.
   t.string('delivery_status', 16);
   t.string('delivery_error', 500);
@@ -1004,6 +1021,26 @@ export const migrations = [
     }
   },
   {
+    // Tells the three automatic senders apart. All of them write `sent_by:
+    // NULL`, so a billing campaign's message and the bot's own reply looked
+    // identical — and the bot's three-an-hour ceiling counted the campaign
+    // against itself, going silent on a subscriber it had never answered.
+    id: '0014_wa_message_source',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('wa_messages'))) return false;
+      const missing = await missingColumns(db, 'wa_messages', WA_MESSAGE_SOURCE_COLUMNS);
+      return missing.length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('wa_messages'))) return;
+      const missing = await missingColumns(db, 'wa_messages', WA_MESSAGE_SOURCE_COLUMNS);
+      if (missing.length === 0) return;
+      await db.schema.alterTable('wa_messages', (t) => {
+        for (const add of missing) add(t);
+      });
+    }
+  },
+  {
     // The configuration pair. `settings` holds what an operator sets on screen —
     // the GenieACS URL, the Customer ID scheme, the VirtualParameter names —
     // and `app_state` holds the integration blobs: Evolution, SGP, alerts,
@@ -1013,7 +1050,7 @@ export const migrations = [
     // Both tables come from `keyValueTable`, where `key` is the PRIMARY KEY
     // rather than a unique. This is the only step in the phase that moves a
     // primary key.
-    id: '0014_settings_and_app_state_tenant',
+    id: '0015_settings_and_app_state_tenant',
     async isApplied(db) {
       for (const table of KEY_VALUE_TABLES) {
         if (!(await db.schema.hasTable(table))) return false;

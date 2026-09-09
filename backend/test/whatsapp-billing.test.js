@@ -510,6 +510,10 @@ describe('the flush loop', () => {
     // transport of its own.
     assert.ok(messages.every((row) => row.delivery_status === 'queued'));
     assert.ok(messages.every((row) => row.body.includes('PIX: ')));
+    // Named on the row, and it goes into the SUBSCRIBER's own thread: unnamed,
+    // the self-service bot counted a dunning message as one of its own three
+    // replies and went silent on the person it had just charged.
+    assert.ok(messages.every((row) => row.source === 'campaign'));
 
     const finished = await campaign.getById(broadcastId);
     assert.equal(finished.status, 'done');

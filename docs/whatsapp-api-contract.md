@@ -43,6 +43,8 @@ que é público e tem credencial própria.
 | `incomplete_config` | falta a URL do webhook | `whatsapp.error.incompleteConfig` |
 | `invalid_webhook_url` | URL do webhook inválida | `whatsapp.error.invalidWebhookUrl` |
 | `invalid_portal_url` | URL do portal do cliente inválida | `whatsapp.error.invalidPortalUrl` |
+| `invalid_conversation_status` | conversa só é `open` ou `closed` | `whatsapp.error.invalidConversationStatus` |
+| `subscriber_not_found` | contrato inexistente em `sgp_links` | `whatsapp.error.subscriberNotFound` |
 | `template_mirrors` | modelo cita os dois espelhos de dias | `whatsapp.error.templateMirrors` |
 | `invalid_base_url` | URL do Evolution inválida | `whatsapp.error.invalidBaseUrl` |
 | `host_not_allowed` | fora da allowlist do admin | `whatsapp.error.hostNotAllowed` |
@@ -339,6 +341,7 @@ linha criada:
   deliveryError: string | null
   attempts: number
   sentBy: number | null
+  source: 'operator' | 'bot' | 'campaign' | 'alert'
   readAt: string | null
   createdAt: string | null
   updatedAt: string | null
@@ -359,6 +362,17 @@ na caixa:
 **A lista de opt-out NÃO é consultada aqui.** Opt-out significa que o provedor
 não *inicia* contato; ele nunca pode impedir o operador de responder quem
 escreveu. Quem aplica a lista é o disparo em massa e o alerta (onda 2).
+
+`source` diz **quem redigiu** a mensagem; `sentBy` diz apenas se havia um humano
+atrás dela. Os três remetentes automáticos — o bot, o disparo de cobrança e o
+alerta técnico — gravam `sentBy: null`, então essa coluna sozinha não distingue
+um do outro. O teto do bot (três respostas por conversa por hora) conta
+**somente** `source: 'bot'`: contando todos, três cobranças na hora gastavam a
+cota do bot numa conversa em que ele nunca falou, e a pergunta seguinte do
+assinante ficava sem resposta. Mensagem de entrada — e o eco do provedor
+digitando no próprio celular — fica com `'operator'`, o valor padrão da coluna:
+`source` nomeia qual remetente do painel escreveu o texto, e nenhum deles
+escreveu essa.
 
 `isNote: true` grava a linha com `deliveryStatus: null` e o worker nunca a
 enxerga — é a única forma de garantir que uma anotação interna não chegue ao
@@ -574,6 +588,52 @@ precisa de conserto.
 É a rota mais lenta do painel de propósito: um round trip ao SGP por assinante,
 com **~150 ms entre chamadas**. O SGP do provedor é o mesmo sistema que está,
 naquele instante, atendendo a URA de quem ligou.
+
+### Corrigir o número — `PUT /api/whatsapp/subscribers/:contract/phone`
+
+```ts
+// corpo
+{ phone: string }
+// resposta 200 — o assinante como a listagem o mostra, sem os campos da fatura
+{ contract, clientName, document, deviceId, phone, phoneSource: 'manual'|'sgp'|null }
+```
+
+Escreve `sgp_links.phone_manual`, que é a **correção do operador** e ganha de
+`phone_e164` em todo lugar que o painel resolve um número. Existe porque o
+cadastro do ERP envelhece e quem tem a correção na mão é o operador — e porque
+um número errado é mudo: o assinante cai no `noPhone` da campanha, disparo após
+disparo, sem nada aparecer na tela.
+
+**String vazia LIMPA a correção** e devolve o contrato para o registro do ERP.
+É operação de verdade, não requisição malformada: quem digitou errado precisa
+poder desfazer sem inventar um número para sobrescrever.
+
+O valor entra normalizado por `normalizarTelefoneBr` — a mesma forma que o
+envio usa. Guardar "(93) 98111-0449" ficaria certo na tela e não casaria com
+nada na hora de disparar.
+
+Escreve em **todas as ONTs do contrato**, não em uma: o leitor reduz
+`sgp_links` a um assinante por contrato e fica com a linha que vier primeiro por
+`device_id`, então uma correção pela metade voltaria a mostrar o número velho
+dependendo de qual ONT ganhasse.
+
+| Código | Quando | HTTP |
+| --- | --- | --- |
+| `invalid_phone` | número não discável (`whatsapp.error.invalidPhone`) | 400 |
+| `subscriber_not_found` | contrato que o painel nunca viu (`whatsapp.error.subscriberNotFound`) | 404 |
+
+**Um sync do SGP nunca apaga isto.** `contractToLinkRow`
+(`services/sgpService.js`) deixa `phone_manual` fora da linha de propósito, de
+modo que o `onConflict().merge()` do upsert não tem com o que sobrescrever — só
+`phone_e164` é atualizado. É a razão de o override ser uma coluna separada em
+vez de uma edição em `phone_e164`, e há teste cobrindo exatamente isso
+(`backend/test/whatsapp-subscriber-phone.test.js`).
+
+A resposta **não traz `amount`, `dueDate` nem `daysOverdue`**: eles custam um
+round trip ao SGP e corrigir um telefone não pode tê-los mudado. A tela aplica
+só `phone` e `phoneSource` na linha que já está na mão. Note que
+`whatsappAPI.setSubscriberPhone` declara `WhatsAppOverdueSubscriber` como
+retorno, que é mais largo do que o que a rota devolve.
 
 ### Montar a campanha — `POST /api/whatsapp/billing/campaign`
 

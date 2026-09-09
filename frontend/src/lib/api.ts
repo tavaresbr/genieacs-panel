@@ -914,6 +914,12 @@ export interface WhatsAppMessage {
   body: string | null
   attachment: { url: string; type: string | null; name: string | null } | null
   isNote: boolean
+  /**
+   * Who produced it. `sentBy` cannot answer that: it is NULL for the bot, for a
+   * campaign and for an alert alike, so the three were indistinguishable in the
+   * thread and in the bot's own hourly ceiling.
+   */
+  source: 'operator' | 'bot' | 'campaign' | 'alert'
   externalId: string | null
   deliveryStatus: 'queued' | 'sending' | 'sent' | 'delivered' | 'read' | 'failed' | null
   deliveryError: string | null
@@ -1025,6 +1031,16 @@ export const whatsappAPI = {
   setBroadcastStatus: (id: number, status: 'running' | 'paused' | 'canceled') =>
     apiClient.post<WhatsAppBroadcast>(`/whatsapp/broadcasts/${id}/status`, { status }),
 
+  // ── The subscriber's number ──────────────────────────────────────────
+  // What an operator typed always beats what SGP synced, because the ERP
+  // cadastre is stale and the operator is the one holding the correction. An
+  // empty string clears the override and hands the contract back to the ERP.
+  setSubscriberPhone: (contract: string, phone: string) =>
+    apiClient.put<WhatsAppOverdueSubscriber>(
+      `/whatsapp/subscribers/${encodeURIComponent(contract)}/phone`,
+      { phone }
+    ),
+
   // ── Technical alerts ─────────────────────────────────────────────────
   getAlertSettings: () =>
     apiClient.get<WhatsAppAlertSettings>('/whatsapp/alerts/settings'),
@@ -1036,13 +1052,31 @@ export const whatsappAPI = {
     apiClient.post<{ fired: number; cleared: number }>('/whatsapp/alerts/scan', {}),
 
   // ── Inbox ────────────────────────────────────────────────────────────
-  listConversations: (params: { limit?: number; offset?: number } = {}) => {
+  // `search` matches the phone, the pushed WhatsApp name, the contract and the
+  // subscriber's name — an operator looking for a thread has one of those four
+  // and does not know which the panel stores. `status` defaults to the open
+  // ones: a closed thread is done, and an inbox that shows everything forever
+  // stops being a list of what needs answering.
+  listConversations: (params: {
+    limit?: number
+    offset?: number
+    search?: string
+    status?: 'open' | 'closed' | 'all'
+  } = {}) => {
     const query = new URLSearchParams()
     if (params.limit) query.set('limit', String(params.limit))
     if (params.offset) query.set('offset', String(params.offset))
+    if (params.search) query.set('search', params.search)
+    if (params.status) query.set('status', params.status)
     const suffix = query.toString()
     return apiClient.get<WhatsAppConversation[]>(`/whatsapp/conversations${suffix ? `?${suffix}` : ''}`)
   },
+
+  // Closing is a filing decision, not a deletion: the thread and its history
+  // stay, and an inbound message reopens it — a customer who writes again is
+  // not answered by an archive.
+  setConversationStatus: (conversationId: number, status: 'open' | 'closed') =>
+    apiClient.post<WhatsAppConversation>(`/whatsapp/conversations/${conversationId}/status`, { status }),
 
   // Reading a thread clears its unread count server-side — the operator looking
   // at it is the only thing "read" can mean here.

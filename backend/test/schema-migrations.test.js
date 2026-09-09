@@ -88,7 +88,7 @@ async function createLegacyInstallation(db) {
     t.text('value');
     t.timestamp('updated_at').defaultTo(db.fn.now());
   });
-  // Same shape as `settings`: `key` alone is the primary key. 0014 has to move
+  // Same shape as `settings`: `key` alone is the primary key. 0015 has to move
   // both, with rows already in them.
   await db.schema.createTable('app_state', (t) => {
     t.string('key', 128).primary();
@@ -204,7 +204,7 @@ describe('baselining an installation created before the runner existed', () => {
     assert.equal(state.value, LEGACY_STATE_VALUE);
   });
 
-  // 0014 moves `key` from being the primary key on its own to being half of
+  // 0015 moves `key` from being the primary key on its own to being half of
   // `(tenant_id, key)`. This is the only step in the phase that touches a
   // primary key, and the three dialects spell it differently, so it is checked
   // here — in the block that runs against whichever dialect is under test —
@@ -326,7 +326,7 @@ describe('the schema table list', () => {
       ['wa_conversations', 'whatsapp_accounts'],
       ['wa_messages', 'wa_conversations'],
       // Not tidiness: `copyData` deletes in reverse order and inserts forward,
-      // so the foreign key added by 0014 is only satisfiable because `tenants`
+      // so the foreign key added by 0015 is only satisfiable because `tenants`
       // precedes both of these.
       ['settings', 'tenants'],
       ['app_state', 'tenants']

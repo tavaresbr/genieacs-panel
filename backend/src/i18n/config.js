@@ -1,13 +1,18 @@
-export const LOCALES = ['pt-BR', 'en', 'es', 'it', 'de', 'fr', 'ja', 'zh-CN'];
+export const LOCALES = ['pt-BR', 'en', 'es', 'it', 'de', 'fr', 'ja', 'zh-CN', 'zh-TW'];
 
 export const DEFAULT_LOCALE = 'pt-BR';
 
 /** English is the dictionary the other locales are checked against. */
 export const FALLBACK_LOCALE = 'en';
 
+/** Tags written in Traditional script: the explicit subtag, plus its regions. */
+const TRADITIONAL_CHINESE = /(^|-)(hant|tw|hk|mo)(-|$)/;
+
 /**
  * Resolves an arbitrary BCP-47 tag to a supported locale.
- * `pt`, `pt-PT` and `pt-BR` all resolve to `pt-BR`; `es-419` resolves to `es`.
+ * `pt`, `pt-PT` and `pt-BR` all resolve to `pt-BR`; `es-419` resolves to `es`;
+ * `zh-TW`, `zh-HK`, `zh-MO` and `zh-Hant` resolve to `zh-TW`, every other `zh`
+ * tag to `zh-CN`.
  */
 export function resolveLocale(tag) {
   if (!tag) return null;
@@ -23,8 +28,8 @@ export function resolveLocale(tag) {
   if (base === 'de') return 'de';
   if (base === 'fr') return 'fr';
   if (base === 'ja') return 'ja';
-  // Only Simplified Chinese ships today, so every zh tag folds to it.
-  if (base === 'zh') return 'zh-CN';
+  // Traditional-script markers pick zh-TW; every other zh tag gets Simplified.
+  if (base === 'zh') return TRADITIONAL_CHINESE.test(normalized) ? 'zh-TW' : 'zh-CN';
   return null;
 }
 

@@ -258,7 +258,11 @@ class WaBroadcastService {
       }
       const message = await WaSendService.enqueue({
         conversationId: conversation.id,
-        body: recipient.rendered_body
+        body: recipient.rendered_body,
+        // Into the subscriber's OWN thread, which is where this mattered: with
+        // no origin on the row the bot read a dunning message as one of its own
+        // three replies and went quiet on the person it had just charged.
+        source: 'campaign'
       });
       await WaBroadcast.updateRecipient(recipient.id, {
         status: 'sent',

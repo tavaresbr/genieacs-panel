@@ -9,7 +9,7 @@ const { default: WhatsAppAccount } = await import('../src/models/WhatsAppAccount
 // provider — the same position the timer is in, and why `tick` opens one. The
 // routes that call `scan` are already inside a request.
 const scan = (options) => asTenant(() => WaAlertService.scan(options));
-const { default: WaAlertService } = await import('../src/services/waAlertService.js');
+const { default: WaAlertService, LAST_SCAN_KEY } = await import('../src/services/waAlertService.js');
 const { default: DeviceService } = await import('../src/services/deviceService.js');
 
 const ALERTS = 'painel-alertas';
@@ -227,7 +227,12 @@ describe('each rule fires at its threshold and not just inside it', () => {
     assert.equal(rows.length, 1);
     assert.equal(rows[0].rule, 'ont_offline');
     assert.equal(rows[0].subject, 'dev-fora');
-    assert.equal((await outbox()).length, 1);
+    const enviadas = await outbox();
+    assert.equal(enviadas.length, 1);
+    // The on-duty thread is a conversation like any other, so the bot reads it
+    // too. Unnamed, a busy night would have counted against the bot's ceiling
+    // for whoever is on call.
+    assert.equal(enviadas[0].source, 'alert');
   });
 
   it('rx_power_low fires at the threshold in dBm, not just above it', async () => {
@@ -519,5 +524,32 @@ describe('the recipients are staff, and the do-not-disturb list still holds', ()
     await scan({ now: now() });
     assert.equal((await outbox()).length, 1, 'an alert is the provider initiating contact');
     await getDb()('wa_opt_outs').del();
+  });
+});
+
+describe('the scan interval survives a restart', () => {
+  it('does not sweep the fleet again on the first tick after the process forgets', async () => {
+    // An hour between passes, which is what the operator asking for an hour
+    // means. Held only in memory, every restart reset it to "never scanned" and
+    // the first tick swept the whole fleet regardless — and a panel restarts
+    // for a deploy, a crash loop or a container rescheduled, none of which is
+    // the operator changing their mind.
+    await setRules(onlyRule('ont_offline', { threshold: 30 }), { intervalSeconds: 3600 });
+    fleet = [device('dev-reinicio', { _lastInform: informedMinutesAgo(90) })];
+
+    try {
+      const primeiro = await asTenant(() => WaAlertService.tickForTenant());
+      assert.equal(primeiro.fired, 1, 'the first tick is due and scans');
+      const stamp = await getDb()('app_state').where({ key: LAST_SCAN_KEY }).first();
+      assert.ok(stamp, 'and it records when, where a restart cannot reach');
+
+      // What a restart looks like from in here: the class is new, the table is not.
+      WaAlertService.lastScanAt = 0;
+      const segundo = await asTenant(() => WaAlertService.tickForTenant());
+      assert.equal(segundo.skipped, 'not_due', 'the hour is still the hour');
+    } finally {
+      await getDb()('app_state').where({ key: LAST_SCAN_KEY }).del();
+      WaAlertService.lastScanAt = 0;
+    }
   });
 });

@@ -14,6 +14,16 @@ import { DEFAULT_LOCALE, translatorFor } from '../i18n/index.js';
 
 const SETTINGS_KEY = 'whatsapp_alert_settings';
 
+/**
+ * Where the last scan's stamp lives, beside the settings and read the same way.
+ *
+ * One key per provider, because `app_state` is scoped: the row this reads and
+ * writes belongs to whoever is in scope, and the scan runs inside one. That is
+ * the stamp handled; the in-memory `lastScanAt` below still short-circuits it
+ * for the whole process, and that is what still has to be made per provider.
+ */
+const LAST_SCAN_KEY = 'whatsapp_alert_last_scan';
+
 /** Same 30 s window `whatsappConfigService` uses, and for the same reason. */
 const SETTINGS_CACHE_TTL_MS = 30_000;
 
@@ -151,12 +161,18 @@ class WaAlertService {
   static scanPromise = null;
 
   /**
-   * When the last pass ran, in memory rather than in `app_state`.
+   * When the last pass ran. In `app_state`, with a memo in memory.
    *
-   * Deliberate: a panel that has just come back up SHOULD scan immediately.
-   * Anything that broke while it was down is exactly what nobody has been told
-   * about, and the cooldown rows still prevent a second announcement of a
-   * condition that was already reported before the restart.
+   * In memory alone it was zero again after every restart, so the first tick
+   * always scanned — and a panel restarts more often than an operator thinks:
+   * a deploy, a crash loop, a container rescheduled. `intervalSeconds` is the
+   * operator saying how hard the fleet may be swept, and a value the process
+   * forgets is not a setting.
+   *
+   * What is given up is the catch-up scan after downtime, and it is worth
+   * little: the delay it saves is bounded by `intervalSeconds`, which is
+   * clamped to an hour, and the alert that would have gone out is still going
+   * out — one interval later, from a panel that is up.
    */
   static lastScanAt = 0;
 
@@ -271,6 +287,27 @@ class WaAlertService {
     };
   }
 
+  /**
+   * The stored stamp, read once and remembered — a tick a minute has no reason
+   * to go back to the table it just wrote.
+   */
+  static async readLastScanAt() {
+    if (this.lastScanAt) return this.lastScanAt;
+    const stored = Number(await AppState.get(LAST_SCAN_KEY));
+    // Anything unusable, and a stamp from the FUTURE — a clock that jumped, a
+    // hand-edited row — reads as "never scanned". Trusted, a stamp a year ahead
+    // would hold the scan off until then, and the scan is the one thing here
+    // that must not be capable of stopping.
+    if (!Number.isFinite(stored) || stored <= 0 || stored > Date.now()) return 0;
+    this.lastScanAt = stored;
+    return this.lastScanAt;
+  }
+
+  static async markScanned(at) {
+    this.lastScanAt = at;
+    await AppState.upsert(LAST_SCAN_KEY, String(at));
+  }
+
   static async saveSettings(patch = {}) {
     const current = await this.getSettings();
     const next = {
@@ -354,10 +391,13 @@ class WaAlertService {
   static async tickForTenant() {
     const settings = await this.getSettings().catch(() => null);
     if (!settings || !settings.enabled) return { skipped: 'disabled' };
-    if (Date.now() - this.lastScanAt < settings.intervalSeconds * 1000) {
+    const lastScanAt = await this.readLastScanAt();
+    if (Date.now() - lastScanAt < settings.intervalSeconds * 1000) {
       return { skipped: 'not_due' };
     }
-    this.lastScanAt = Date.now();
+    // Stamped BEFORE the pass, as it always was: a scan that takes longer than
+    // the interval must not have a second one start behind it.
+    await this.markScanned(Date.now());
     return this.scan();
   }
 
@@ -730,7 +770,10 @@ class WaAlertService {
           waLid: null,
           pushName: null
         });
-        await WaSendService.enqueue({ conversationId: conversation.id, body });
+        // The on-duty staff thread is a conversation like any other, so the bot
+        // reads it too: an unlabelled alert counted against the ceiling for
+        // whoever is on call.
+        await WaSendService.enqueue({ conversationId: conversation.id, body, source: 'alert' });
         sent += 1;
       } catch (error) {
         console.warn(`WhatsApp alert to ${number} not enqueued: ${error.message}`);
@@ -754,5 +797,5 @@ class WaAlertService {
   }
 }
 
-export { DEFAULT_RULES, DEFAULT_SETTINGS, RULE_KEYS, SETTINGS_KEY };
+export { DEFAULT_RULES, DEFAULT_SETTINGS, LAST_SCAN_KEY, RULE_KEYS, SETTINGS_KEY };
 export default WaAlertService;
