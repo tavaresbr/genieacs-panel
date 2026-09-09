@@ -67,4 +67,16 @@ router.get(
   WhatsAppMediaController.fetch
 );
 
+// The attachment sweep, on demand. Admin-only like its neighbours, and for a
+// harder reason than they have: this is the one route in the integration that
+// deletes anything. What it deletes is fixed by the retention window in
+// Settings — the request carries no parameters at all — so the button is
+// "apply the policy now", never "choose one".
+router.post(
+  '/media/sweep',
+  authenticateToken,
+  requireRole(['admin']),
+  WhatsAppMediaController.sweep
+);
+
 export default router;

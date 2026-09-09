@@ -1061,6 +1061,29 @@ seria o painel destruindo dado que ninguém mandou tocar.
 disco agora. Responde `whatsapp.mediaSwept` com quantos arquivos e quantos MB.
 Com retenção em 0 ela não apaga nada e diz isso.
 
+### O que `waMediaSweeper` decidiu ao implementar isso
+
+Quatro escolhas que o contrato não fixava e que quem mexer nele precisa saber:
+
+- **O relógio é o `mtime` do arquivo**, para arquivo com linha e para órfão
+  igual. É o número que o próprio disco guarda, é o único que um órfão tem, e
+  para um arquivo com linha ele fica a segundos do `created_at` dela — os bytes
+  são gravados e só então a linha. Um relógio só, então arquivo e linha nunca
+  discordam sobre a idade.
+- **A passagem periódica é de 6 h**, nada parecido com os 5 s da fila de saída:
+  a janela é medida em dias, a varredura anda a árvore inteira de mídia
+  disputando o mesmo disco do SQLite, e é o único job da integração que apaga —
+  passar raro limita o que um bug ali leva antes de alguém ver. Não há passagem
+  no boot, de propósito; quem precisa de disco agora tem o botão.
+- **A varredura só anda `DATA_DIR/wa-media`**, nunca `DATA_DIR`. É a diferença
+  entre recuperar disco e apagar o `panel.sqlite`, que mora um nível acima.
+- **Roda em `forSoleTenant`**, como a varredura de alertas, e aqui o motivo é o
+  disco: é um sistema de arquivos de que nenhum provedor tem um canto. Uma
+  passagem por provedor não dividiria o trabalho, veria os arquivos do outro
+  como órfãos sem linha e apagaria todos. Quando o segundo provedor entrar, o
+  conserto é dar a cada um sua subpasta de mídia, e só então o laço por
+  provedor.
+
 ---
 
 ## Saúde da integração — `GET /api/whatsapp/health`

@@ -9,6 +9,7 @@ import SchedulerService from './services/schedulerService.js';
 import WaOutboxWorker from './services/waOutboxWorker.js';
 import WaAlertService from './services/waAlertService.js';
 import WaBroadcastService from './services/waBroadcastService.js';
+import WaMediaSweeper from './services/waMediaSweeper.js';
 import { forEachTenant, forSoleTenant } from './config/tenantJobs.js';
 
 const PORT = Number(process.env.APP_PORT) || 5890;
@@ -94,6 +95,15 @@ export const startServer = async () => {
       // and it only ever hands recipients to the outbox above. It reads the
       // integration's enabled flag inside each tick, like the worker does.
       WaBroadcastService.start();
+      // The attachment sweep is the slowest driver here by three orders of
+      // magnitude — a pass every six hours — because it enforces a window
+      // measured in days, it walks the whole media tree to do it, and it is
+      // the only job on this list that deletes. It reads the retention window
+      // inside each tick and does nothing at all while that window is zero,
+      // which is the default, so arming it here changes nothing for an
+      // installation that never sets one. It deliberately does not sweep at
+      // boot: an operator who needs disk now presses the button instead.
+      WaMediaSweeper.start();
       console.log(`Panel: http://localhost:${PORT}`);
     });
     portalServer = portalApp.listen(PORTAL_PORT, PORTAL_HOST, () => {
@@ -116,6 +126,7 @@ async function shutdown(signal) {
   WaOutboxWorker.stop();
   WaAlertService.stop();
   WaBroadcastService.stop();
+  WaMediaSweeper.stop();
   if (server) {
     await new Promise((resolve) => server.close(resolve));
   }
