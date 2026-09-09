@@ -284,6 +284,25 @@ export interface DeviceListResponse<T> {
   totalPages: number
 }
 
+export interface DeviceHistoryPoint {
+  /** Seconds since the epoch. */
+  t: number
+  rx: number | null
+  rxMin?: number | null
+  rxMax?: number | null
+  tc: number | null
+  up: number | null
+}
+
+export interface DeviceHistory {
+  deviceId: string
+  /** Which grain the server chose for the requested window. */
+  resolution: 'raw' | 'hourly'
+  from: string
+  to: string
+  points: DeviceHistoryPoint[]
+}
+
 export const devicesAPI = {
   getDevices: (params: DeviceListParams = {}) => {
     const query = new URLSearchParams()
@@ -306,6 +325,16 @@ export const devicesAPI = {
 
   getDevice: (deviceId: string) =>
     apiClient.get(`/devices/${encodeURIComponent(deviceId)}`),
+
+  getHistory: (deviceId: string, range: { from?: string; to?: string } = {}) => {
+    const query = new URLSearchParams()
+    if (range.from) query.set('from', range.from)
+    if (range.to) query.set('to', range.to)
+    const suffix = query.toString()
+    return apiClient.get<DeviceHistory>(
+      `/devices/${encodeURIComponent(deviceId)}/history${suffix ? `?${suffix}` : ''}`
+    )
+  },
 
   deleteDevice: (deviceId: string) =>
     apiClient.delete(`/devices/${encodeURIComponent(deviceId)}`),
