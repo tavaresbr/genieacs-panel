@@ -41,7 +41,16 @@ export const SCOPED_TABLES = new Set([
   // `app_state` holds the integration blobs — and `dashboard_snapshot`, which
   // is not configuration at all but a provider's own device and fault counts.
   'settings',
-  'app_state'
+  'app_state',
+  // The SGP and provisioning group. Four of its uniques were on values the
+  // panel does not generate — GenieACS device ids, an SGP dedupe key, a
+  // profile name the operator chose — and were global. Scoping them is what
+  // let the last two background jobs move to a per-provider loop.
+  'device_profiles',
+  'sgp_links',
+  'sgp_events',
+  'provisioning_profiles',
+  'provisioning_runs'
 ]);
 
 /** Tables that belong to the deployment rather than to any one provider. */

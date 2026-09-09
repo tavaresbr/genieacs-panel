@@ -579,6 +579,15 @@ const TENANT_CAMPAIGN_TABLES = [
   'wa_alert_state'
 ];
 
+/** The SGP and provisioning tables that gain a provider in 0017. */
+const SGP_PROVISIONING_TABLES = [
+  'device_profiles',
+  'sgp_links',
+  'provisioning_profiles',
+  'provisioning_runs',
+  'sgp_events'
+];
+
 /** The two key/value tables that gain a provider in 0014. */
 const KEY_VALUE_TABLES = ['settings', 'app_state'];
 
@@ -1127,6 +1136,80 @@ export const migrations = [
         // eslint-disable-next-line no-await-in-loop -- DDL, and three of them
         await db.schema.alterTable('wa_conversations', (t) => t.index([column])).catch(() => {});
       }
+    }
+  },
+  {
+    // The SGP link, the provisioning trail and the installation profile.
+    //
+    // Every one of them is addressed by a value the panel does not mint: a
+    // GenieACS device id, an SGP contract number, a name an operator typed.
+    // That was safe while a deployment had one GenieACS and one SGP; each
+    // provider now has its own, so those values genuinely repeat.
+    //
+    // This is the step that releases the last two background jobs. Until it
+    // runs, the Customer ID sweep and the provisioning/SGP scheduler are held
+    // on `forSoleTenant`, because a per-provider loop over these tables would
+    // repeat the work rather than divide it — and, in `retireAccount`'s case,
+    // delete another provider's row.
+    id: '0017_sgp_and_provisioning_tenant',
+    async isApplied(db) {
+      for (const table of SGP_PROVISIONING_TABLES) {
+        if (!(await db.schema.hasTable(table))) return false;
+        if (!(await db.schema.hasColumn(table, 'tenant_id'))) return false;
+      }
+      return true;
+    },
+    async up(db) {
+      const tenant = await db('tenants').orderBy('id', 'asc').first();
+      if (!tenant) return;
+
+      for (const table of SGP_PROVISIONING_TABLES) {
+        if (await db.schema.hasColumn(table, 'tenant_id')) continue;
+        await db.schema.alterTable(table, (t) => t.integer('tenant_id').unsigned());
+        await db(table).whereNull('tenant_id').update({ tenant_id: tenant.id });
+      }
+
+      for (const table of SGP_PROVISIONING_TABLES) {
+        await db.schema.alterTable(table, (t) => {
+          t.integer('tenant_id').unsigned().notNullable().defaultTo(tenant.id).alter();
+          t.foreign('tenant_id').references('id').inTable('tenants');
+        });
+      }
+
+      // A device id is unique within one GenieACS, and there is one per
+      // provider now.
+      await db.schema.alterTable('device_profiles', (t) => {
+        t.dropUnique(['device_id']);
+        t.unique(['tenant_id', 'device_id']);
+      });
+      await db.schema.alterTable('sgp_links', (t) => {
+        t.dropUnique(['device_id']);
+        t.unique(['tenant_id', 'device_id']);
+      });
+
+      // A profile's name is the provider's own wording, like `wa_templates`.
+      await db.schema.alterTable('provisioning_profiles', (t) => {
+        t.dropUnique(['name']);
+        t.unique(['tenant_id', 'name']);
+      });
+
+      // The worst of the four, because its failure is silent. The key is built
+      // from the SGP event id, or from the raw body, or from the contract
+      // number — never from anything naming the provider. Two providers whose
+      // SGP hands out the same contract number produced the same key, and
+      // `SgpEvent.insertIfNew` reads by that key BEFORE inserting: the second
+      // provider's event was reported as already stored, the webhook answered
+      // success, and it was never processed.
+      await db.schema.alterTable('sgp_events', (t) => {
+        t.dropUnique(['dedupe_key']);
+        t.unique(['tenant_id', 'dedupe_key']);
+      });
+
+      // `provisioning_runs.profile_id` and `sgp_links.account_id` stay integer
+      // keys. Both point at surrogate ids that remain globally unique, so a
+      // cross-provider reference would take a bug in a scoped model rather
+      // than a missing constraint — the same call made for `wa_messages` in
+      // 0012.
     }
   }
 ];

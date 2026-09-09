@@ -68,14 +68,14 @@ describe('an ONT re-provisioned for another subscriber', () => {
     first = await ensureAccount({
       _id: DEVICE, softwareId: 'V1.0.0', pppoe: 'subscriber-a@isp'
     });
-    await SgpLink.upsert({
+    await asTenant(() => SgpLink.upsert({
       device_id: DEVICE,
       account_id: first.id,
       contract: '11111',
       client_name: 'Subscriber A',
       document: '12345678901',
       link_mode: 'auto'
-    });
+    }));
     second = await ensureAccount({
       _id: DEVICE, softwareId: 'V3.0.0', pppoe: 'subscriber-b@isp'
     });
@@ -104,7 +104,7 @@ describe('an ONT re-provisioned for another subscriber', () => {
   });
 
   it('drops the SGP contract bound to the previous subscriber', async () => {
-    assert.equal(await SgpLink.getByDeviceId(DEVICE), null);
+    assert.equal(await asTenant(() => SgpLink.getByDeviceId(DEVICE)), null);
   });
 
   it('lets the new subscriber sign in with their own credentials', async () => {

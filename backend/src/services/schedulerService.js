@@ -2,7 +2,8 @@ import AppState from '../models/AppState.js';
 import ProvisioningService from './provisioningService.js';
 import SgpEventService from './sgpEventService.js';
 import SgpService from './sgpService.js';
-import { forSoleTenant } from '../config/tenantJobs.js';
+import { forEachTenant } from '../config/tenantJobs.js';
+import { currentTenantId } from '../config/tenantContext.js';
 
 const STATE_KEY = 'scheduler_state';
 const BASE_INTERVAL_MS = 60_000;
@@ -23,16 +24,20 @@ const PRUNE_INTERVAL_MS = 24 * 3600_000;
  */
 class SchedulerService {
   static timer = null;
-  static tickPromise = null;
-  static lastPruneAt = 0;
+  // Both keyed by provider. A single promise would hand the second provider's
+  // tick the first provider's result, and a single `lastPruneAt` would let the
+  // first provider's prune suppress everyone else's for a day.
+  static tickPromises = new Map();
+  static lastPruneAt = new Map();
 
   static async start() {
     if (this.timer) return this.timer;
     // A process that died mid-run leaves rows nothing would ever finish.
-    await forSoleTenant('The interrupted-run reaper', () => ProvisioningService.reapInterrupted())
-      .catch((error) => {
-        console.warn(`Could not reap interrupted provisioning runs: ${error.message}`);
-      });
+    await forEachTenant(() => ProvisioningService.reapInterrupted(), {
+      onError: (error, tenant) => {
+        console.warn(`Could not reap interrupted provisioning runs for ${tenant.slug}: ${error.message}`);
+      }
+    });
     this.timer = setInterval(() => {
       void this.tick().catch((error) => {
         console.warn(`Scheduler tick failed: ${error.message}`);
@@ -69,20 +74,33 @@ class SchedulerService {
   }
 
   /**
-   * One pass over every job. Overlapping ticks collapse onto the running one.
+   * One pass over every job, for every provider. Overlapping ticks collapse
+   * onto the running one, per provider.
    *
    * The scope is opened here, per tick, and not once around `start()`. A scope
    * taken at boot would be captured by the interval and held for the life of
-   * the process — so a provider added afterwards would never be noticed, and
-   * `forSoleTenant`'s refusal, which is the whole safeguard, would never fire.
+   * the process, so a provider added afterwards would never be seen.
+   *
+   * Each provider's pass reads its own runs, its own pending events and its own
+   * SGP credentials, so the loop divides the work instead of repeating it. One
+   * provider's broken SGP does not stop the others: `forEachTenant` logs and
+   * moves on.
    */
   static async tick() {
-    if (this.tickPromise) return this.tickPromise;
-    this.tickPromise = forSoleTenant('The provisioning and SGP scheduler', () => this.runJobs())
-      .finally(() => {
-        this.tickPromise = null;
-      });
-    return this.tickPromise;
+    return forEachTenant(() => this.tickForTenant());
+  }
+
+  /** One provider's pass, collapsing onto its own running one. */
+  static async tickForTenant() {
+    const tenant = currentTenantId();
+    const running = this.tickPromises.get(tenant);
+    if (running) return running;
+
+    const work = this.runJobs().finally(() => {
+      if (this.tickPromises.get(tenant) === work) this.tickPromises.delete(tenant);
+    });
+    this.tickPromises.set(tenant, work);
+    return work;
   }
 
   static async runJobs() {
@@ -114,8 +132,8 @@ class SchedulerService {
       }
     }
 
-    if (Date.now() - this.lastPruneAt >= PRUNE_INTERVAL_MS) {
-      this.lastPruneAt = Date.now();
+    if (Date.now() - (this.lastPruneAt.get(currentTenantId()) ?? 0) >= PRUNE_INTERVAL_MS) {
+      this.lastPruneAt.set(currentTenantId(), Date.now());
       // Both tables grow with every activation and every delivery, so a busy
       // install would otherwise fill its database.
       await ProvisioningService.prune().catch((error) => {

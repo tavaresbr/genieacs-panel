@@ -163,11 +163,13 @@ async function respostas(telefone) {
 /**
  * Starts the subscriber's thread over.
  *
- * There is exactly one subscriber fixture because `sgp_links.device_id` is
- * unique and the signal answer has to reach the one ONT the GenieACS stub
- * serves. So every test that needs a RESOLVED contact reuses that number and
- * clears the thread first — otherwise the per-contact ceiling, which is the
- * point of another test, would silence the ones after it.
+ * There is exactly one subscriber fixture because the signal answer has to
+ * reach the one ONT the GenieACS stub serves. (The unique on `sgp_links` is
+ * `(tenant_id, device_id)` now, so a second fixture would be possible — it
+ * would just have nothing to read.) So every test that needs a RESOLVED
+ * contact reuses that number and clears the thread first — otherwise the
+ * per-contact ceiling, which is the point of another test, would silence the
+ * ones after it.
  */
 async function limparFio(telefone) {
   const conversa = await conversaDe(telefone);

@@ -10,7 +10,7 @@ import WaOutboxWorker from './services/waOutboxWorker.js';
 import WaAlertService from './services/waAlertService.js';
 import WaBroadcastService from './services/waBroadcastService.js';
 import WaMediaSweeper from './services/waMediaSweeper.js';
-import { forEachTenant, forSoleTenant } from './config/tenantJobs.js';
+import { forEachTenant } from './config/tenantJobs.js';
 
 const PORT = Number(process.env.APP_PORT) || 5890;
 const PORTAL_PORT = process.env.PORTAL_PORT === '0'
@@ -52,20 +52,20 @@ export const startServer = async () => {
         .catch((error) => {
           console.warn(`Dashboard prewarm skipped: ${error.message}`);
         });
-      // The Customer ID sweep does NOT qualify yet, and the reason is sharper
-      // than a stale read: `CustomerService.retireAccount` calls
-      // `SgpLink.deleteByDeviceId`, and `sgp_links` is still deployment-wide.
-      // Looped per provider, retiring an account would delete another
-      // provider's link for the same device id — and device ids now come from
-      // each provider's own GenieACS, so they can collide. It also reads
-      // `device_profiles`, equally unscoped. Both move in the slice that
-      // scopes them.
-      void forSoleTenant('The Customer ID sweep', async () => {
+      // The Customer ID sweep qualifies now. It was held back because
+      // `CustomerService.retireAccount` calls `SgpLink.deleteByDeviceId`, and
+      // a deployment-wide `sgp_links` meant retiring one provider's account
+      // deleted another provider's link for the same GenieACS device id.
+      // `sgp_links` and `device_profiles` are both scoped, so the delete now
+      // reaches only the provider in scope.
+      void forEachTenant(async () => {
         if (!await CustomerService.isAutoGenerationEnabled()) return null;
         const devices = await DeviceService.getCustomerIdentityDevices();
         return devices.length ? CustomerService.syncDevices(devices, { enabled: true }) : null;
-      }).catch((error) => {
-        console.warn(`Customer ID prewarm skipped: ${error.message}`);
+      }, {
+        onError: (error, tenant) => {
+          console.warn(`Customer ID prewarm skipped for ${tenant.slug}: ${error.message}`);
+        }
       });
       // Accounts created before portal passwords existed authenticated with a
       // slice of their own Customer ID. Give them real credentials in the

@@ -280,7 +280,7 @@ describe('provisioning run', () => {
   });
 
   it('waits for verification instead of reporting success straight away', async () => {
-    const run = await ProvisioningRun.getLatestByDeviceId(DEVICE_ID);
+    const run = await asTenant(() => ProvisioningRun.getLatestByDeviceId(DEVICE_ID));
     assert.equal(run.status, 'awaiting_verify');
     assert.ok(run.next_attempt_at, 'the verification deadline lives in the row, not in a timer');
   });
@@ -294,7 +294,7 @@ describe('provisioning run', () => {
     device.InternetGatewayDevice.WANDevice[1].WANConnectionDevice[1]
       .WANPPPConnection[1]['X_ZTE-COM_VLANID']._value = 100;
 
-    const run = await ProvisioningRun.getLatestByDeviceId(DEVICE_ID);
+    const run = await asTenant(() => ProvisioningRun.getLatestByDeviceId(DEVICE_ID));
     const verified = await asTenant(() => ProvisioningService.verifyRun(run));
     assert.equal(verified.status, 'success', JSON.stringify(verified.steps));
     assert.ok(genie.state.tags.some((entry) => entry.tag === 'SkyGenProvisioned' && entry.method === 'POST'));
@@ -325,7 +325,7 @@ describe('provisioning run', () => {
     assert.equal(body.data.run.status, 'pending');
     assert.ok(body.data.run.nextAttemptAt);
 
-    let run = await ProvisioningRun.getById(body.data.run.id);
+    let run = await asTenant(() => ProvisioningRun.getById(body.data.run.id));
     for (let attempt = 0; attempt < 4; attempt += 1) {
       run = await asTenant(() => ProvisioningService.executeRun(run));
     }
@@ -349,13 +349,13 @@ describe('provisioning poller', () => {
   });
 
   it('fails a run that was interrupted mid-flight', async () => {
-    const run = await ProvisioningRun.create({
+    const run = await asTenant(() => ProvisioningRun.create({
       device_id: 'stub-device-3', trigger: 'poller', status: 'running'
-    });
+    }));
     await getDb()('provisioning_runs')
       .where({ id: run.id })
       .update({ updated_at: new Date(Date.now() - 3600_000) });
     await asTenant(() => ProvisioningService.reapInterrupted());
-    assert.equal((await ProvisioningRun.getById(run.id)).status, 'failed');
+    assert.equal((await asTenant(() => ProvisioningRun.getById(run.id))).status, 'failed');
   });
 });

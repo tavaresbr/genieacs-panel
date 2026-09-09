@@ -1,4 +1,4 @@
-import { getDb, insertReturningId } from '../config/database.js';
+import { tdb, tinsertReturningId } from '../config/database.js';
 
 /** Statuses a run can still move on from; a device with one is already busy. */
 export const ACTIVE_STATUSES = Object.freeze(['pending', 'running', 'awaiting_verify']);
@@ -19,7 +19,7 @@ function parseRow(row) {
 
 class ProvisioningRun {
   static async create(row) {
-    const id = await insertReturningId('provisioning_runs', {
+    const id = await tinsertReturningId('provisioning_runs', {
       ...row,
       steps: row.steps ? JSON.stringify(row.steps) : null
     });
@@ -31,17 +31,17 @@ class ProvisioningRun {
     if (Object.hasOwn(next, 'steps')) {
       next.steps = next.steps ? JSON.stringify(next.steps) : null;
     }
-    await getDb()('provisioning_runs').where({ id }).update(next);
+    await tdb('provisioning_runs').where({ id }).update(next);
     return this.getById(id);
   }
 
   static async getById(id) {
-    return parseRow(await getDb()('provisioning_runs').where({ id }).first());
+    return parseRow(await tdb('provisioning_runs').where({ id }).first());
   }
 
   static async getLatestByDeviceId(deviceId) {
     return parseRow(
-      await getDb()('provisioning_runs')
+      await tdb('provisioning_runs')
         .where({ device_id: deviceId })
         .orderBy('id', 'desc')
         .first()
@@ -49,7 +49,7 @@ class ProvisioningRun {
   }
 
   static async listByDeviceId(deviceId, limit = 10) {
-    const rows = await getDb()('provisioning_runs')
+    const rows = await tdb('provisioning_runs')
       .where({ device_id: deviceId })
       .orderBy('id', 'desc')
       .limit(Math.min(Math.max(Number(limit) || 10, 1), 100));
@@ -57,7 +57,7 @@ class ProvisioningRun {
   }
 
   static async list({ deviceId = null, status = null, limit = 25 } = {}) {
-    const query = getDb()('provisioning_runs').orderBy('id', 'desc');
+    const query = tdb('provisioning_runs').orderBy('id', 'desc');
     if (deviceId) query.where({ device_id: deviceId });
     if (status) query.where({ status });
     const rows = await query.limit(Math.min(Math.max(Number(limit) || 25, 1), 200));
@@ -66,7 +66,7 @@ class ProvisioningRun {
 
   static async getActiveByDeviceId(deviceId) {
     return parseRow(
-      await getDb()('provisioning_runs')
+      await tdb('provisioning_runs')
         .where({ device_id: deviceId })
         .whereIn('status', ACTIVE_STATUSES)
         .orderBy('id', 'desc')
@@ -80,7 +80,7 @@ class ProvisioningRun {
    * exactly where the previous process stopped.
    */
   static async getDue(now, limit = 5) {
-    const rows = await getDb()('provisioning_runs')
+    const rows = await tdb('provisioning_runs')
       .whereIn('status', ['pending', 'awaiting_verify'])
       .where((builder) => builder.whereNull('next_attempt_at').orWhere('next_attempt_at', '<=', now))
       .orderBy('id', 'asc')
@@ -89,7 +89,7 @@ class ProvisioningRun {
   }
 
   static async hasSuccess(deviceId) {
-    const row = await getDb()('provisioning_runs')
+    const row = await tdb('provisioning_runs')
       .where({ device_id: deviceId, status: 'success' })
       .first();
     return Boolean(row);
@@ -98,7 +98,7 @@ class ProvisioningRun {
   /** Device ids that are already provisioned or are not eligible for a retry yet. */
   static async settledDeviceIds(deviceIds, now) {
     if (!Array.isArray(deviceIds) || deviceIds.length === 0) return new Set();
-    const rows = await getDb()('provisioning_runs')
+    const rows = await tdb('provisioning_runs')
       .select('device_id', 'status', 'next_attempt_at')
       .whereIn('device_id', deviceIds)
       .whereIn('status', ['success', 'failed_permanent', 'failed', ...ACTIVE_STATUSES]);
@@ -119,7 +119,7 @@ class ProvisioningRun {
    * finish. Failing it puts the device back into the normal backoff instead.
    */
   static async reapInterrupted(before) {
-    return getDb()('provisioning_runs')
+    return tdb('provisioning_runs')
       .where({ status: 'running' })
       .where('updated_at', '<', before)
       .update({
@@ -130,7 +130,7 @@ class ProvisioningRun {
   }
 
   static async pruneOlderThan(date) {
-    return getDb()('provisioning_runs')
+    return tdb('provisioning_runs')
       .whereIn('status', ['success', 'failed_permanent', 'skipped'])
       .where('updated_at', '<', date)
       .del();

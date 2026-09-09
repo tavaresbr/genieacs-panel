@@ -28,6 +28,12 @@ const { default: WaAlertService } = await import('../src/services/waAlertService
 const { default: DeviceService } = await import('../src/services/deviceService.js');
 const { default: Setting } = await import('../src/models/Setting.js');
 const { default: AppState } = await import('../src/models/AppState.js');
+const { default: SgpLink } = await import('../src/models/SgpLink.js');
+const { default: SgpEvent } = await import('../src/models/SgpEvent.js');
+const { default: DeviceProfile } = await import('../src/models/DeviceProfile.js');
+const { default: ProvisioningProfile } = await import('../src/models/ProvisioningProfile.js');
+const { default: ProvisioningRun } = await import('../src/models/ProvisioningRun.js');
+const { default: WaConversationService } = await import('../src/services/waConversationService.js');
 
 /**
  * The phase's actual proof.
@@ -532,5 +538,223 @@ describe('the caches a provider reads its own configuration from', () => {
 
     await runInTenant(beta, () => DeviceService.invalidateDashboard());
     assert.ok(alfaCache.expiresAt > Date.now(), 'and its entry is untouched by the other');
+  });
+});
+
+describe('the SGP link and the device profile, on the same device id', () => {
+  // The device id comes from GenieACS, and each provider runs its own. Two
+  // installations hand out the same `ONT-...` string as a matter of course, so
+  // the unique on it had to become `(tenant_id, device_id)`.
+  const SHARED_DEVICE = 'ONT-SAME-ID-0007';
+
+  it('gives each provider its own link for the same device id', async () => {
+    await runInTenant(alfa, () => SgpLink.upsert({
+      device_id: SHARED_DEVICE, contract: '5001', client_name: 'Cliente do Alfa', link_mode: 'auto'
+    }));
+    await runInTenant(beta, () => SgpLink.upsert({
+      device_id: SHARED_DEVICE, contract: '9002', client_name: 'Cliente do Beta', link_mode: 'auto'
+    }));
+
+    assert.equal((await runInTenant(alfa, () => SgpLink.getByDeviceId(SHARED_DEVICE))).contract, '5001');
+    assert.equal((await runInTenant(beta, () => SgpLink.getByDeviceId(SHARED_DEVICE))).contract, '9002');
+  });
+
+  // The upsert merges on `(tenant_id, device_id)`. Merging on `device_id`
+  // alone would overwrite the other provider's contract instead of inserting.
+  it('does not let one provider\'s upsert overwrite the other\'s link', async () => {
+    await runInTenant(beta, () => SgpLink.upsert({
+      device_id: SHARED_DEVICE, contract: '9002', client_name: 'Cliente do Beta, renomeado', link_mode: 'auto'
+    }));
+
+    const theirs = await runInTenant(alfa, () => SgpLink.getByDeviceId(SHARED_DEVICE));
+    assert.equal(theirs.client_name, 'Cliente do Alfa');
+    assert.equal(theirs.contract, '5001');
+  });
+
+  // The Customer ID sweep retires accounts, and retiring one deletes its link.
+  // Deployment-wide, that deleted the other provider's link for the same id —
+  // which is exactly what kept the sweep on `forSoleTenant`.
+  it('deletes only the deleting provider\'s link', async () => {
+    assert.equal(await runInTenant(beta, () => SgpLink.deleteByDeviceId(SHARED_DEVICE)), true);
+
+    assert.ok(await runInTenant(alfa, () => SgpLink.getByDeviceId(SHARED_DEVICE)));
+    assert.equal(await runInTenant(beta, () => SgpLink.getByDeviceId(SHARED_DEVICE)), null);
+  });
+
+  it('gives each provider its own installation date for the same device id', async () => {
+    await runInTenant(alfa, () => DeviceProfile.upsertInstallationDate(SHARED_DEVICE, '2024-01-10', 'alfa'));
+    await runInTenant(beta, () => DeviceProfile.upsertInstallationDate(SHARED_DEVICE, '2026-08-30', 'beta'));
+
+    assert.equal(
+      (await runInTenant(alfa, () => DeviceProfile.getByDeviceId(SHARED_DEVICE))).installation_tag,
+      'alfa'
+    );
+    assert.equal(
+      (await runInTenant(beta, () => DeviceProfile.getByDeviceId(SHARED_DEVICE))).installation_tag,
+      'beta'
+    );
+  });
+});
+
+describe('an SGP event whose dedupe key the other provider already used', () => {
+  // The worst of the four uniques, because its failure was silent. A key is
+  // `reconcile:<contract>:...` or a hash of the webhook body — nothing in it
+  // names a provider. `insertIfNew` reads by that key before inserting, so the
+  // second provider's event came back as `created: false` and the controller
+  // answered the webhook with success. Nothing was stored and nothing logged.
+  const SHARED_KEY = 'reconcile:7777:activated:abc123';
+
+  it('stores the second provider\'s event instead of reporting it a duplicate', async () => {
+    const first = await runInTenant(alfa, () => SgpEvent.insertIfNew({
+      dedupe_key: SHARED_KEY, source: 'reconcile', type: 'activated', contract: '7777',
+      status: 'pending', received_at: new Date()
+    }));
+    const second = await runInTenant(beta, () => SgpEvent.insertIfNew({
+      dedupe_key: SHARED_KEY, source: 'reconcile', type: 'activated', contract: '7777',
+      status: 'pending', received_at: new Date()
+    }));
+
+    assert.equal(first.created, true);
+    assert.equal(second.created, true, 'the second provider\'s event must not be swallowed as a redelivery');
+    assert.notEqual(first.event.id, second.event.id);
+  });
+
+  it('still recognises a redelivery within the same provider', async () => {
+    const again = await runInTenant(alfa, () => SgpEvent.insertIfNew({
+      dedupe_key: SHARED_KEY, source: 'reconcile', type: 'activated', contract: '7777',
+      status: 'pending', received_at: new Date()
+    }));
+    assert.equal(again.created, false, 'deduplication still works where it should');
+  });
+
+  it('drains only the draining provider\'s pending events', async () => {
+    const theirs = await runInTenant(alfa, () => SgpEvent.getPending(50));
+    const mine = await runInTenant(beta, () => SgpEvent.getPending(50));
+    assert.ok(theirs.every((event) => !mine.some((one) => one.id === event.id)));
+    assert.ok(theirs.length > 0 && mine.length > 0);
+  });
+});
+
+describe('provisioning profiles and runs', () => {
+  // A profile's name is the provider's own wording. Two ISPs both calling one
+  // "Padrao" is ordinary, and the global unique rejected the second.
+  it('lets both providers name a profile the same thing', async () => {
+    const theirs = await runInTenant(alfa, () => ProvisioningProfile.create({
+      name: 'Padrao', priority: 10, enabled: true
+    }));
+    const mine = await runInTenant(beta, () => ProvisioningProfile.create({
+      name: 'Padrao', priority: 20, enabled: true
+    }));
+
+    assert.notEqual(theirs.id, mine.id);
+    assert.equal((await runInTenant(alfa, () => ProvisioningProfile.getByName('Padrao'))).priority, 10);
+    assert.equal((await runInTenant(beta, () => ProvisioningProfile.getByName('Padrao'))).priority, 20);
+  });
+
+  // Deliberately distinct names, so this stands on its own: with a shared name
+  // an unscoped table fails the create above on the unique instead, the second
+  // row never exists, and a listing test would pass for the wrong reason.
+  it('lists each provider only its own profiles', async () => {
+    await runInTenant(alfa, () => ProvisioningProfile.create({ name: 'Fibra Alfa', enabled: true }));
+    await runInTenant(beta, () => ProvisioningProfile.create({ name: 'Fibra Beta', enabled: true }));
+
+    const theirs = (await runInTenant(alfa, () => ProvisioningProfile.getAll())).map((p) => p.name);
+    const mine = (await runInTenant(beta, () => ProvisioningProfile.getEnabled())).map((p) => p.name);
+    assert.ok(theirs.includes('Fibra Alfa') && !theirs.includes('Fibra Beta'));
+    assert.ok(mine.includes('Fibra Beta') && !mine.includes('Fibra Alfa'));
+    assert.equal(await runInTenant(beta, () => ProvisioningProfile.count()), 2);
+  });
+
+  // `reapInterrupted` matches on status alone, with no device and no provider
+  // in the where clause, and `pruneOlderThan` deletes the same way. Both run
+  // from the scheduler, which now loops per provider — so unscoped they would
+  // fail and delete every other provider's rows on the first pass.
+  it('fails only the reaping provider\'s interrupted runs', async () => {
+    const stale = new Date(Date.now() - 3600_000);
+    const theirs = await runInTenant(alfa, () => ProvisioningRun.create({
+      device_id: 'ONT-REAP-1', trigger: 'poller', status: 'running'
+    }));
+    const mine = await runInTenant(beta, () => ProvisioningRun.create({
+      device_id: 'ONT-REAP-1', trigger: 'poller', status: 'running'
+    }));
+    await getDb()('provisioning_runs').whereIn('id', [theirs.id, mine.id]).update({ updated_at: stale });
+
+    await runInTenant(beta, () => ProvisioningRun.reapInterrupted(new Date()));
+
+    assert.equal((await runInTenant(alfa, () => ProvisioningRun.getById(theirs.id))).status, 'running');
+    assert.equal((await runInTenant(beta, () => ProvisioningRun.getById(mine.id))).status, 'failed');
+  });
+
+  it('prunes only the pruning provider\'s history', async () => {
+    const stale = new Date(Date.now() - 3600_000);
+    const theirs = await runInTenant(alfa, () => ProvisioningRun.create({
+      device_id: 'ONT-PRUNE-1', trigger: 'poller', status: 'success'
+    }));
+    const mine = await runInTenant(beta, () => ProvisioningRun.create({
+      device_id: 'ONT-PRUNE-1', trigger: 'poller', status: 'success'
+    }));
+    await getDb()('provisioning_runs').whereIn('id', [theirs.id, mine.id]).update({ updated_at: stale });
+
+    await runInTenant(beta, () => ProvisioningRun.pruneOlderThan(new Date()));
+
+    assert.ok(await runInTenant(alfa, () => ProvisioningRun.getById(theirs.id)));
+    assert.equal(await runInTenant(beta, () => ProvisioningRun.getById(mine.id)), null);
+  });
+});
+
+describe('a subscriber of one provider who messages the other', () => {
+  // The case that motivated this slice, and the only one here that was not a
+  // stale read but a write. `resolveSubscriber` looked the link up by phone
+  // across the deployment, and `bindSubscriber` then wrote that row's
+  // `contract` and `device_id` onto the conversation — a scoped row. So a
+  // person subscribed to Alfa who messaged Beta's number stamped Beta's thread
+  // with Alfa's contract and Alfa's device id.
+  const PHONE = '5511988887777';
+  const thread = (tenant, name) => runInTenant(tenant, async () => {
+    const account = await WhatsAppAccount.create({
+      name: `skygp_bind_${name}`,
+      purpose: 'support',
+      flavor: 'v2',
+      base_url: 'https://evo.example',
+      status: 'connected'
+    });
+    return WaConversation.ensure({
+      accountId: account.id,
+      externalThreadId: `${PHONE}-${name}@s.whatsapp.net`,
+      waPhone: PHONE,
+      pushName: 'Joao'
+    });
+  });
+
+  it('does not stamp the other provider\'s contract onto the conversation', async () => {
+    await runInTenant(alfa, () => SgpLink.upsert({
+      device_id: 'ONT-ALFA-ONLY', contract: '4242', phone_e164: PHONE,
+      client_name: 'Assinante do Alfa', link_mode: 'auto'
+    }));
+
+    const conversa = await thread(beta, 'beta');
+    const bound = await runInTenant(beta, () => WaConversationService.bindSubscriber(conversa));
+
+    assert.equal(bound.contract, null, 'the other provider\'s contract must not be written here');
+    assert.equal(bound.device_id, null);
+  });
+
+  it('still binds the subscriber for the provider they belong to', async () => {
+    const conversa = await thread(alfa, 'alfa');
+    const bound = await runInTenant(alfa, () => WaConversationService.bindSubscriber(conversa));
+
+    assert.equal(bound.contract, '4242');
+    assert.equal(bound.device_id, 'ONT-ALFA-ONLY');
+  });
+
+  it('does not offer the other provider\'s client name to a search', async () => {
+    assert.deepEqual(
+      await runInTenant(beta, () => WaConversationService.contractsMatchingClientName('Assinante do Alfa')),
+      []
+    );
+    assert.deepEqual(
+      await runInTenant(alfa, () => WaConversationService.contractsMatchingClientName('Assinante do Alfa')),
+      ['4242']
+    );
   });
 });

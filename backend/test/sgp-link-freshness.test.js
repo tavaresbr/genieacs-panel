@@ -83,7 +83,7 @@ after(async () => {
 describe('a cached SGP link', () => {
   it('is refused when it belongs to a different account than the device does now', async () => {
     const previousAccountId = await createAccount(DEVICE, 'antigo@isp', 'CSG-STALE01-234567');
-    await SgpLink.upsert({
+    await asTenant(() => SgpLink.upsert({
       device_id: DEVICE,
       account_id: previousAccountId,
       contract: '1111',
@@ -91,7 +91,7 @@ describe('a cached SGP link', () => {
       document: '99999999999',
       login: 'antigo@isp',
       link_mode: 'auto'
-    });
+    }));
 
     // The ONT is handed to someone else, so the account bound to it changes.
     await getDb()('customer_accounts').where({ id: previousAccountId }).update({

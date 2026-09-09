@@ -1,4 +1,4 @@
-import { getDb, insertReturningId } from '../config/database.js';
+import { tdb, tinsertReturningId } from '../config/database.js';
 
 function parseList(value, fallback = []) {
   if (!value) return fallback;
@@ -30,7 +30,7 @@ function parseRow(row) {
 
 class ProvisioningProfile {
   static async getAll() {
-    const rows = await getDb()('provisioning_profiles').orderBy([
+    const rows = await tdb('provisioning_profiles').orderBy([
       { column: 'priority', order: 'desc' },
       { column: 'name', order: 'asc' }
     ]);
@@ -38,44 +38,44 @@ class ProvisioningProfile {
   }
 
   static async getEnabled() {
-    const rows = await getDb()('provisioning_profiles')
+    const rows = await tdb('provisioning_profiles')
       .where({ enabled: true })
       .orderBy([{ column: 'priority', order: 'desc' }, { column: 'name', order: 'asc' }]);
     return rows.map(parseRow);
   }
 
   static async getById(id) {
-    return parseRow(await getDb()('provisioning_profiles').where({ id }).first());
+    return parseRow(await tdb('provisioning_profiles').where({ id }).first());
   }
 
   static async getByName(name) {
-    return parseRow(await getDb()('provisioning_profiles').where({ name }).first());
+    return parseRow(await tdb('provisioning_profiles').where({ name }).first());
   }
 
   static async create(row) {
-    const id = await insertReturningId('provisioning_profiles', row);
+    const id = await tinsertReturningId('provisioning_profiles', row);
     return this.getById(id);
   }
 
   static async update(id, patch) {
-    await getDb()('provisioning_profiles')
+    await tdb('provisioning_profiles')
       .where({ id })
       .update({ ...patch, updated_at: new Date() });
     return this.getById(id);
   }
 
   static async delete(id) {
-    const affected = await getDb()('provisioning_profiles').where({ id }).del();
+    const affected = await tdb('provisioning_profiles').where({ id }).del();
     return affected > 0;
   }
 
   static async count() {
-    const [row] = await getDb()('provisioning_profiles').count({ total: '*' });
+    const [row] = await tdb('provisioning_profiles').count({ total: '*' });
     return Number(row?.total ?? 0);
   }
 
   static async countEnabled() {
-    const [row] = await getDb()('provisioning_profiles').where({ enabled: true }).count({ total: '*' });
+    const [row] = await tdb('provisioning_profiles').where({ enabled: true }).count({ total: '*' });
     return Number(row?.total ?? 0);
   }
 }
