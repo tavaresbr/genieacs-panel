@@ -42,20 +42,6 @@ const ALLOWED_TYPES = [
 ]
 
 /**
- * The two refusals this box can provoke, translated from the machine `code`.
- *
- * `whatsappErrorMessage` maps every other code on this surface and is what any
- * unknown one falls back to; these two are handled here because the "too large"
- * key takes `{max}` — the ceiling in MB — and the shared helper passes no
- * variables. Either way the server's own `message` is never shown: it can carry
- * words from another server, and those belong in a log.
- */
-const ATTACHMENT_ERROR_KEYS: Record<string, TranslationKey> = {
-  attachment_too_large: 'whatsapp.error.attachmentTooLarge',
-  attachment_type_not_allowed: 'whatsapp.error.attachmentTypeNotAllowed'
-}
-
-/**
  * The reply box.
  *
  * Three rules it exists to hold:
@@ -146,9 +132,8 @@ export function ThreadComposer({ optedOut, sending, onSend }: ThreadComposerProp
         setUploading(false)
       }
       if (!stored.success || !stored.data) {
-        const key = ATTACHMENT_ERROR_KEYS[stored.code ?? '']
         toast.error(
-          key ? t(key, { max: MAX_ATTACHMENT_MB }) : whatsappErrorMessage(t, stored.code),
+          whatsappErrorMessage(t, stored.code, { max: MAX_ATTACHMENT_MB }),
           { title: t('whatsapp.inbox.sendFailed') }
         )
         // The file stays chosen, for the same reason the words stay in the box.

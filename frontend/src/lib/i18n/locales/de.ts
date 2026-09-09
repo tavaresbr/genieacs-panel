@@ -1199,6 +1199,7 @@ const de: Dictionary = {
   'whatsapp.error.invalidPortalUrl': 'Die URL des Kundenportals ist ungültig.',
   'whatsapp.error.messageEmpty': 'Schreibe etwas, bevor du sendest.',
   'whatsapp.error.attachmentTooLarge': 'Die Datei ist größer als {max} MB.',
+  'whatsapp.error.attachmentEmpty': 'Die Datei ist leer.',
   'whatsapp.error.attachmentTypeNotAllowed': 'Diese Art von Datei kann von hier nicht gesendet werden.',
   'whatsapp.error.attachmentNotFound': 'Dieser Anhang liegt nicht mehr auf der Platte.',
   'whatsapp.error.noPublicUrl': 'Setze die öffentliche Webhook-URL, bevor du Anhänge sendest: von dort holt der Evolution-Server die Datei.',

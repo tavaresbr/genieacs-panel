@@ -412,6 +412,7 @@ export default {
   'whatsapp.error.messageEmpty': 'The message is empty',
   'whatsapp.error.attachmentNotFound': 'That attachment is no longer on disk',
   'whatsapp.error.attachmentTooLarge': 'The file is larger than {max} MB',
+  'whatsapp.error.attachmentEmpty': 'The file is empty',
   'whatsapp.error.attachmentTypeNotAllowed': 'That kind of file cannot be sent from here',
   'whatsapp.error.noPublicUrl': 'Set the public webhook URL before sending attachments: it is the address the Evolution server fetches them from',
   'whatsapp.attachmentStored': 'File ready to send',

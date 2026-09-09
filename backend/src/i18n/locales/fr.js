@@ -409,6 +409,7 @@ export default {
   'whatsapp.error.messageEmpty': 'Le message est vide',
   'whatsapp.error.attachmentNotFound': 'Cette pièce jointe n’est plus sur le disque',
   'whatsapp.error.attachmentTooLarge': 'Le fichier dépasse {max} Mo',
+  'whatsapp.error.attachmentEmpty': 'Le fichier est vide',
   'whatsapp.error.attachmentTypeNotAllowed': 'Ce type de fichier ne peut pas être envoyé d’ici',
   'whatsapp.error.noPublicUrl': 'Configurez l’URL publique du webhook avant d’envoyer des pièces jointes : c’est par là que le serveur Evolution récupère le fichier',
   'whatsapp.attachmentStored': 'Fichier prêt à être envoyé',

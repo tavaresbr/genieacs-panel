@@ -1316,6 +1316,7 @@ const ptBR: Dictionary = {
   'whatsapp.error.invalidPortalUrl': 'A URL do portal do cliente é inválida.',
   'whatsapp.error.messageEmpty': 'Escreva algo antes de enviar.',
   'whatsapp.error.attachmentTooLarge': 'O arquivo passa de {max} MB.',
+  'whatsapp.error.attachmentEmpty': 'O arquivo está vazio.',
   'whatsapp.error.attachmentTypeNotAllowed': 'Esse tipo de arquivo não sai daqui.',
   'whatsapp.error.attachmentNotFound': 'Esse anexo não está mais em disco.',
   'whatsapp.error.noPublicUrl': 'Configure a URL pública do webhook antes de mandar anexo: é por ela que o servidor Evolution busca o arquivo.',

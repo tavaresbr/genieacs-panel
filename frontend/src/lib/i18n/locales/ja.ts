@@ -1324,6 +1324,7 @@ const ja: Dictionary = {
   'whatsapp.alerts.massOutageHint': '同じノードで何台のONTが停止したら、多数のアラートではなく1件の障害として扱うかです。',
   'whatsapp.error.messageEmpty': '送信する前に何か入力してください。',
   'whatsapp.error.attachmentTooLarge': 'ファイルが {max} MB を超えています。',
+  'whatsapp.error.attachmentEmpty': 'ファイルが空です.',
   'whatsapp.error.attachmentTypeNotAllowed': 'その種類のファイルはここからは送れません。',
   'whatsapp.error.attachmentNotFound': 'その添付ファイルはもうディスクにありません。',
   'whatsapp.error.noPublicUrl': '添付を送る前に公開Webhook URLを設定してください。Evolutionサーバーはそこからファイルを取得します。',

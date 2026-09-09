@@ -110,6 +110,16 @@ class WaAttachmentService {
       });
     }
 
+    if (buffer.length === 0) {
+      // Storing it would put a nought-byte file on the customer's phone: a
+      // download that opens onto nothing, indistinguishable from a corrupt
+      // upload. Refusing costs the operator one retry and says why.
+      throw new WaError('whatsapp.error.attachmentEmpty', {
+        code: 'attachment_empty',
+        status: 400
+      });
+    }
+
     const type = normalizeType(contentType);
     const extension = ALLOWED_TYPES[type];
     if (!extension) {

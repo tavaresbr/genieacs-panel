@@ -411,6 +411,7 @@ export default {
   'whatsapp.error.messageEmpty': 'メッセージが空です',
   'whatsapp.error.attachmentNotFound': 'その添付ファイルはもうディスクにありません',
   'whatsapp.error.attachmentTooLarge': 'ファイルが {max} MB を超えています',
+  'whatsapp.error.attachmentEmpty': 'ファイルが空です',
   'whatsapp.error.attachmentTypeNotAllowed': 'その種類のファイルはここからは送れません',
   'whatsapp.error.noPublicUrl': '添付を送る前に公開Webhook URLを設定してください。Evolutionサーバーはそこからファイルを取得します',
   'whatsapp.attachmentStored': 'ファイルを送信できます',

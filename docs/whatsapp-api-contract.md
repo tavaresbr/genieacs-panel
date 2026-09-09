@@ -997,7 +997,10 @@ upload para uma tela só; é a mesma escolha que o webhook do SGP já faz.
 - Grava em `DATA_DIR/wa-media/out/<aaaa>/<mm>/<uuid>.<ext>` e devolve
   `{ path, type, name }` — `path` relativo a `DATA_DIR`, exatamente como a
   entrada grava.
-- Recusas: `attachment_too_large` (413), `attachment_type_not_allowed` (415).
+- Recusas: `attachment_too_large` (413), `attachment_type_not_allowed` (415),
+  `attachment_empty` (400) — arquivo de zero byte não é arquivo pequeno:
+  gravado, ele chega ao cliente como um download que não abre, igualzinho a
+  um upload corrompido.
 
 Como ficou implementada, e as três coisas que o contrato não determinava:
 

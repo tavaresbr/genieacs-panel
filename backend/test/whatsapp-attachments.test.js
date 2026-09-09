@@ -180,6 +180,18 @@ describe('WhatsApp attachments — what the operator uploads', () => {
     }
   });
 
+  it('refuses a nought-byte file rather than store one', async () => {
+    // An empty file is not a small file. Stored, it reaches the customer as a
+    // download that opens onto nothing — indistinguishable from a corrupt
+    // upload, and impossible for the operator to tell apart afterwards.
+    const { status, body } = await upload(Buffer.alloc(0), {
+      type: 'image/png',
+      name: 'vazio.png'
+    });
+    assert.equal(status, 400);
+    assert.equal(body.code, 'attachment_empty');
+  });
+
   it('demands a session, like every other route on this surface', async () => {
     const response = await fetch(`${panelUrl}/api/whatsapp/attachments`, {
       method: 'POST',
