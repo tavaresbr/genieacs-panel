@@ -11,6 +11,7 @@ import SgpService from './sgpService.js';
 import Setting from '../models/Setting.js';
 import { TranslatableError } from '../i18n/index.js';
 import { createSecretBox } from '../utils/secretBox.js';
+import { TenantCache } from '../config/tenantCache.js';
 
 const CONFIG_KEY = 'provisioning_config';
 const CONFIG_CACHE_TTL_MS = 30_000;
@@ -91,16 +92,20 @@ function randomPassword(length = 12) {
 }
 
 class ProvisioningService {
-  static configCache = { value: null, expiresAt: 0 };
+  static configCache = new TenantCache(CONFIG_CACHE_TTL_MS);
 
+  /**
+   * Forget the provider in scope — its own configuration changed.
+   * To forget every provider's, reach for `configCache.clear()`; that is a
+   * reset, not a save, and the two must not share a name.
+   */
   static invalidateConfigCache() {
-    this.configCache = { value: null, expiresAt: 0 };
+    this.configCache.invalidate();
   }
 
   static async getConfig() {
-    if (this.configCache.value && this.configCache.expiresAt > Date.now()) {
-      return this.configCache.value;
-    }
+    const cached = this.configCache.get();
+    if (cached) return cached;
     let stored = {};
     const raw = await AppState.get(CONFIG_KEY);
     if (raw) {
@@ -122,7 +127,7 @@ class ProvisioningService {
       runRetentionDays: clampNumber(stored.runRetentionDays, 1, 365, 90),
       updatedAt: stored.updatedAt || null
     };
-    this.configCache = { value: config, expiresAt: Date.now() + CONFIG_CACHE_TTL_MS };
+    this.configCache.set(config);
     return config;
   }
 

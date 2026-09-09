@@ -157,7 +157,7 @@ class CustomerPortalController {
         password
       );
       CustomerPortalController.overviewCache.delete(String(req.customer.id));
-      DeviceService.dashboardCache.expiresAt = 0;
+      DeviceService.invalidateDashboard();
 
       return res.json(createResponse(
         req.t('portal.wifiUpdateQueued'),

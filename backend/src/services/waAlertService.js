@@ -5,12 +5,14 @@ import WaAlertState from '../models/WaAlertState.js';
 import WaConversation from '../models/WaConversation.js';
 import WaOptOut from '../models/WaOptOut.js';
 import WhatsAppAccount from '../models/WhatsAppAccount.js';
-import { forSoleTenant } from '../config/tenantJobs.js';
+import { forEachTenant } from '../config/tenantJobs.js';
 import DeviceService from './deviceService.js';
 import WaSendService from './waSendService.js';
 import WhatsAppConfigService, { WaError } from './whatsappConfigService.js';
 import { normalizarTelefoneBr } from '../utils/wa/waDestino.js';
 import { DEFAULT_LOCALE, translatorFor } from '../i18n/index.js';
+import { TenantCache } from '../config/tenantCache.js';
+import { currentTenantId } from '../config/tenantContext.js';
 
 const SETTINGS_KEY = 'whatsapp_alert_settings';
 
@@ -18,9 +20,8 @@ const SETTINGS_KEY = 'whatsapp_alert_settings';
  * Where the last scan's stamp lives, beside the settings and read the same way.
  *
  * One key per provider, because `app_state` is scoped: the row this reads and
- * writes belongs to whoever is in scope, and the scan runs inside one. That is
- * the stamp handled; the in-memory `lastScanAt` below still short-circuits it
- * for the whole process, and that is what still has to be made per provider.
+ * writes belongs to whoever is in scope, and the scan runs inside one. The
+ * in-memory shortcut over it is keyed the same way.
  */
 const LAST_SCAN_KEY = 'whatsapp_alert_last_scan';
 
@@ -154,11 +155,19 @@ const conditionKey = (rule, subject) => `${rule}\u0000${subject}`;
  * owns the ONT that failed, and it should not: an alert names equipment.
  */
 class WaAlertService {
-  static settingsCache = { value: null, expiresAt: 0 };
+  static settingsCache = new TenantCache(SETTINGS_CACHE_TTL_MS);
 
   static timer = null;
 
-  static scanPromise = null;
+  /**
+   * The pass in flight, per provider.
+   *
+   * Collapsing was right and stays right — a manual scan while the loop is
+   * mid-pass must not read the same rows and send twice. What was wrong was
+   * collapsing ACROSS providers: the second provider's scan awaited the
+   * first's and was handed its summary, so it never looked at its own fleet.
+   */
+  static scanPromises = new Map();
 
   /**
    * When the last pass ran. In `app_state`, with a memo in memory.
@@ -174,12 +183,18 @@ class WaAlertService {
    * clamped to an hour, and the alert that would have gone out is still going
    * out — one interval later, from a panel that is up.
    */
-  static lastScanAt = 0;
+  /** The last scan's stamp, per provider — see `readLastScanAt`. */
+  static lastScanAt = new Map();
 
   // ── Settings ───────────────────────────────────────────────────────
 
+  /**
+   * Forget the provider in scope — its own configuration changed.
+   * To forget every provider's, reach for `settingsCache.clear()`; that is a
+   * reset, not a save, and the two must not share a name.
+   */
   static invalidateSettingsCache() {
-    this.settingsCache = { value: null, expiresAt: 0 };
+    this.settingsCache.invalidate();
   }
 
   static async readStoredSettings() {
@@ -253,9 +268,8 @@ class WaAlertService {
   }
 
   static async getSettings() {
-    if (this.settingsCache.value && this.settingsCache.expiresAt > Date.now()) {
-      return this.settingsCache.value;
-    }
+    const cached = this.settingsCache.get();
+    if (cached) return cached;
     const stored = await this.readStoredSettings();
     const settings = {
       enabled: stored.enabled === true,
@@ -268,7 +282,7 @@ class WaAlertService {
       rules: this.normalizeRules(stored.rules),
       updatedAt: stored.updatedAt || null
     };
-    this.settingsCache = { value: settings, expiresAt: Date.now() + SETTINGS_CACHE_TTL_MS };
+    this.settingsCache.set(settings);
     return settings;
   }
 
@@ -292,19 +306,21 @@ class WaAlertService {
    * to go back to the table it just wrote.
    */
   static async readLastScanAt() {
-    if (this.lastScanAt) return this.lastScanAt;
+    const tenant = currentTenantId();
+    const remembered = this.lastScanAt.get(tenant);
+    if (remembered) return remembered;
     const stored = Number(await AppState.get(LAST_SCAN_KEY));
     // Anything unusable, and a stamp from the FUTURE — a clock that jumped, a
     // hand-edited row — reads as "never scanned". Trusted, a stamp a year ahead
     // would hold the scan off until then, and the scan is the one thing here
     // that must not be capable of stopping.
     if (!Number.isFinite(stored) || stored <= 0 || stored > Date.now()) return 0;
-    this.lastScanAt = stored;
-    return this.lastScanAt;
+    this.lastScanAt.set(tenant, stored);
+    return stored;
   }
 
   static async markScanned(at) {
-    this.lastScanAt = at;
+    this.lastScanAt.set(currentTenantId(), at);
     await AppState.upsert(LAST_SCAN_KEY, String(at));
   }
 
@@ -369,22 +385,24 @@ class WaAlertService {
     this.timer = null;
   }
 
-  /**
-   * One wake-up, in the installation's provider.
-   *
-   * A tick has no request, and both the settings read and the fleet scan under
-   * it now need a provider. It stays a single pass — the scan reads the whole
-   * GenieACS fleet, so `forSoleTenant` refuses rather than let a second
-   * provider scan it twice and alert on it twice.
-   */
+  /** One wake-up, one pass per active provider. */
   static async tick() {
-    try {
-      return (await forSoleTenant('The WhatsApp alert scan', () => this.tickForTenant()))
-        ?? { skipped: 'no_provider' };
-    } catch (error) {
-      console.warn(`WhatsApp alert tick failed: ${error.message}`);
-      return { skipped: 'unscoped' };
-    }
+    // A pass per provider. Everything the scan reads is now per provider —
+    // its settings and stamp in `app_state`, the alert state, the fiber plant,
+    // the opt-out list, the WhatsApp number, and the GenieACS the fleet comes
+    // from, which follows `settings.genieAcsUrl`. So the loop divides the work
+    // rather than repeating it, which is what `forSoleTenant` was holding it
+    // back from.
+    const summaries = await forEachTenant(() => this.tickForTenant());
+    return summaries.reduce(
+      (total, one) => ({
+        fired: (total.fired || 0) + (one.fired || 0),
+        cleared: (total.cleared || 0) + (one.cleared || 0),
+        notified: (total.notified || 0) + (one.notified || 0),
+        skipped: total.skipped ?? one.skipped ?? null
+      }),
+      { fired: 0, cleared: 0, notified: 0, skipped: null }
+    );
   }
 
   /** One wake-up for the provider in scope. Scans only when `intervalSeconds` has elapsed. */
@@ -419,11 +437,14 @@ class WaAlertService {
   static async scan({ now = Date.now() } = {}) {
     // Overlapping passes collapse onto the running one: a manual scan while the
     // loop is mid-pass would otherwise read the same rows and send twice.
-    if (this.scanPromise) return this.scanPromise;
-    this.scanPromise = this.runScan({ now }).finally(() => {
-      this.scanPromise = null;
+    const tenant = currentTenantId();
+    const running = this.scanPromises.get(tenant);
+    if (running) return running;
+    const work = this.runScan({ now }).finally(() => {
+      if (this.scanPromises.get(tenant) === work) this.scanPromises.delete(tenant);
     });
-    return this.scanPromise;
+    this.scanPromises.set(tenant, work);
+    return work;
   }
 
   static async runScan({ now = Date.now() } = {}) {

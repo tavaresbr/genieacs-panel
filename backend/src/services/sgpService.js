@@ -5,6 +5,7 @@ import SgpLink from '../models/SgpLink.js';
 import DeviceService from './deviceService.js';
 import { createSecretBox } from '../utils/secretBox.js';
 import { normalizarTelefoneBr } from '../utils/wa/waDestino.js';
+import { TenantCache } from '../config/tenantCache.js';
 
 const CONFIG_KEY = 'sgp_integration_config';
 const SYNC_STATE_KEY = 'sgp_sync_last_run';
@@ -392,10 +393,15 @@ const DEFAULT_CONFIG = Object.freeze({
 const MIN_RECONCILE_INTERVAL_MINUTES = 5;
 
 class SgpService {
-  static configCache = { value: null, expiresAt: 0 };
+  static configCache = new TenantCache(CONFIG_CACHE_TTL_MS);
 
+  /**
+   * Forget the provider in scope — its own configuration changed.
+   * To forget every provider's, reach for `configCache.clear()`; that is a
+   * reset, not a save, and the two must not share a name.
+   */
   static invalidateConfigCache() {
-    this.configCache = { value: null, expiresAt: 0 };
+    this.configCache.invalidate();
   }
 
   static normalizeBaseUrl(value) {
@@ -455,9 +461,8 @@ class SgpService {
   }
 
   static async getConfig() {
-    if (this.configCache.value && this.configCache.expiresAt > Date.now()) {
-      return this.configCache.value;
-    }
+    const cached = this.configCache.get();
+    if (cached) return cached;
     const stored = await this.readStoredConfig();
     const config = {
       enabled: stored.enabled === true,
@@ -482,7 +487,7 @@ class SgpService {
       eventTypeMap: normalizeEventTypeMap(stored.eventTypeMap),
       updatedAt: stored.updatedAt || null
     };
-    this.configCache = { value: config, expiresAt: Date.now() + CONFIG_CACHE_TTL_MS };
+    this.configCache.set(config);
     return config;
   }
 

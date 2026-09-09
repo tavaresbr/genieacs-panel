@@ -61,7 +61,7 @@ async function reset() {
   await getDb()('wa_alert_state').del();
   fleet = [];
   identities = [];
-  WaAlertService.invalidateSettingsCache();
+  WaAlertService.settingsCache.clear();
 }
 
 async function setRules(rules, extra = {}) {
@@ -544,12 +544,12 @@ describe('the scan interval survives a restart', () => {
       assert.ok(stamp, 'and it records when, where a restart cannot reach');
 
       // What a restart looks like from in here: the class is new, the table is not.
-      WaAlertService.lastScanAt = 0;
+      WaAlertService.lastScanAt.clear();
       const segundo = await asTenant(() => WaAlertService.tickForTenant());
       assert.equal(segundo.skipped, 'not_due', 'the hour is still the hour');
     } finally {
       await getDb()('app_state').where({ key: LAST_SCAN_KEY }).del();
-      WaAlertService.lastScanAt = 0;
+      WaAlertService.lastScanAt.clear();
     }
   });
 });

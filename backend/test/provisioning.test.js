@@ -159,7 +159,7 @@ describe('provisioning profiles', () => {
 
   it('matches a profile by plan name and falls back to the default', async () => {
     await getDb()('provisioning_profiles').del();
-    ProvisioningService.invalidateConfigCache();
+    ProvisioningService.configCache.clear();
     await createProfile({ name: 'Fibra 500', planPatterns: ['fibra 500'], priority: 30 });
     await createProfile({ name: 'Padrão', planPatterns: [], isDefault: true, priority: 1 });
 
