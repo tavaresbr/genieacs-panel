@@ -32,6 +32,22 @@ function normalizeIdentityValue(value) {
   return String(value ?? '').trim();
 }
 
+/**
+ * The calendar day of a Date, read off its local fields.
+ *
+ * MySQL and Postgres hand a DATE column back as a Date at local midnight,
+ * while SQLite returns the string that was stored — so an installation date
+ * read from the database is one or the other depending on the engine. Read as
+ * an ISO string a local-midnight Date west of UTC is the day before, and
+ * `String(date)` is not a date at all, so on those two engines the suffix would
+ * simply never be minted.
+ */
+function calendarDay(date) {
+  if (Number.isNaN(date.getTime())) return '';
+  const pad = (part) => String(part).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
 class CustomerService {
   static isEnabledValue(value) {
     return value === true || value === 1 || value === '1' || value === 'true';
@@ -49,7 +65,7 @@ class CustomerService {
   }
 
   static normalizeInstallationDate(value) {
-    const normalized = String(value ?? '').trim();
+    const normalized = value instanceof Date ? calendarDay(value) : String(value ?? '').trim();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return null;
     const parsed = new Date(`${normalized}T00:00:00.000Z`);
     if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== normalized) {
