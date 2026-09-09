@@ -1710,6 +1710,60 @@ export const migrations = [
         });
       }
     }
+  },
+  {
+    /**
+     * The subscriber's WiFi credentials, per provider.
+     *
+     * There is no live leak here today, and it is worth saying why rather than
+     * implying one: every method filters on `account_id`, a surrogate key into
+     * `customer_accounts`, which has been scoped since 0010 — so the parent
+     * already refuses to hand one provider another's account, and the portal
+     * session carries the account it belongs to.
+     *
+     * The column is added anyway, for two reasons. The filter becomes direct
+     * instead of inherited, which is what lets `tdb` cover the table like every
+     * other; and the row holds an AES-GCM-encrypted WiFi password, which is the
+     * kind of thing that should not depend on a join staying correct.
+     *
+     * The unique moves to `(tenant_id, account_id, wifi_index)`. Strictly it
+     * need not — `account_id` is globally unique — but the `onConflict` in
+     * `CustomerWifiCredential.upsert` names this exact tuple, and a conflict
+     * target that does not match the index is the failure `sgp_links` hit in
+     * 0019: silent on MySQL, refused on SQLite and Postgres.
+     */
+    id: '0027_customer_wifi_credentials_tenant',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return false;
+      if (!(await db.schema.hasTable('customer_wifi_credentials'))) return false;
+      return db.schema.hasColumn('customer_wifi_credentials', 'tenant_id');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('customer_wifi_credentials'))) return;
+      if (await db.schema.hasColumn('customer_wifi_credentials', 'tenant_id')) return;
+      const tenant = await db('tenants').orderBy('id', 'asc').first();
+      if (!tenant) return;
+
+      await db.schema.alterTable('customer_wifi_credentials', (t) => t.integer('tenant_id').unsigned());
+      await db('customer_wifi_credentials').whereNull('tenant_id').update({ tenant_id: tenant.id });
+
+      // Before the unique moves, and in a statement of its own so it is in
+      // place when it does. `account_id` stops being the leading column of any
+      // index once the unique becomes `(tenant_id, …)`, and that column carries
+      // the cascade from `customer_accounts`: on MySQL InnoDB simply refuses to
+      // drop the index its foreign key is resting on, and on Postgres it would
+      // have accepted the drop and turned every cascading delete into a scan.
+      await db.schema.alterTable('customer_wifi_credentials', (t) => {
+        t.index(['account_id'], 'customer_wifi_credentials_account_idx');
+      });
+
+      await db.schema.alterTable('customer_wifi_credentials', (t) => {
+        t.integer('tenant_id').unsigned().notNullable().defaultTo(tenant.id).alter();
+        t.foreign('tenant_id').references('id').inTable('tenants');
+        t.dropUnique(['account_id', 'wifi_index']);
+        t.unique(['tenant_id', 'account_id', 'wifi_index']);
+      });
+    }
   }
 ];
 

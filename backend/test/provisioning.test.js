@@ -4,10 +4,11 @@ import http from 'node:http';
 import { asTenant, authHeaders, call, getDb, startTestServers, stopTestServers } from './helpers/harness.js';
 import { buildDevice, startGenieAcsStub, writtenParameters } from './helpers/genieacs-stub.js';
 
-// The provisioning models read inside a provider's scope since `0023`, so the
-// direct model calls below are wrapped in `asTenant` — the same scope a request
-// would have resolved. Raw `getDb()` reads stay unwrapped on purpose: they are
-// asserting what the database holds, provider column and all.
+// The provisioning models read inside a provider's scope since `0023`, and the
+// stored Wi-Fi credential since `0027`, so the direct model and service calls
+// below are wrapped in `asTenant` — the same scope a request would have
+// resolved. Raw `getDb()` reads stay unwrapped on purpose: they are asserting
+// what the database holds, provider column and all.
 const { default: ProvisioningRun } = await import('../src/models/ProvisioningRun.js');
 const { default: ProvisioningService } = await import('../src/services/provisioningService.js');
 const { default: CustomerWifiCredentialService } = await import(
@@ -279,7 +280,7 @@ describe('provisioning run', () => {
 
     const account = await getDb()('customer_accounts').where({ device_id: DEVICE_ID }).first();
     assert.ok(account, 'the run creates the portal account');
-    const revealed = await CustomerWifiCredentialService.reveal(account.id, 1);
+    const revealed = await asTenant(() => CustomerWifiCredentialService.reveal(account.id, 1));
     assert.ok(revealed && revealed.length >= 8);
   });
 
