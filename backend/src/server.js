@@ -8,6 +8,7 @@ import CustomerPortalPasswordService from './services/customerPortalPasswordServ
 import SchedulerService from './services/schedulerService.js';
 import WaOutboxWorker from './services/waOutboxWorker.js';
 import WaAlertService from './services/waAlertService.js';
+import DeviceHistoryService from './services/deviceHistoryService.js';
 import WaBroadcastService from './services/waBroadcastService.js';
 import WaMediaSweeper from './services/waMediaSweeper.js';
 import { forEachTenant, forSoleTenant } from './config/tenantJobs.js';
@@ -100,6 +101,7 @@ export const startServer = async () => {
       // the others it reads its enabled flag inside the tick, so this arms the
       // driver whether or not alerts are configured.
       WaAlertService.start();
+      DeviceHistoryService.start();
       // The campaign flush loop is a separate driver on a separate clock: it
       // ticks once a minute because a campaign's budget is written per minute,
       // and it only ever hands recipients to the outbox above. It reads the
@@ -135,6 +137,7 @@ async function shutdown(signal) {
   SchedulerService.stop();
   WaOutboxWorker.stop();
   WaAlertService.stop();
+  DeviceHistoryService.stop();
   WaBroadcastService.stop();
   WaMediaSweeper.stop();
   if (server) {

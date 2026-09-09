@@ -41,7 +41,12 @@ export const SCOPED_TABLES = new Set([
   // `app_state` holds the integration blobs — and `dashboard_snapshot`, which
   // is not configuration at all but a provider's own device and fault counts.
   'settings',
-  'app_state'
+  'app_state',
+  // Telemetry. A sample is a reading from one provider's subscriber's
+  // equipment, and the device id it is keyed on is only unique inside that
+  // provider's GenieACS — two providers can hand the same id to two ONTs.
+  'device_samples',
+  'device_sample_hours'
 ]);
 
 /** Tables that belong to the deployment rather than to any one provider. */
