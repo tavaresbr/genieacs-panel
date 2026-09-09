@@ -421,3 +421,156 @@ describe('making customer accounts per-provider', () => {
     }, db));
   });
 });
+
+describe('making the SGP and provisioning tables per-provider', () => {
+  const db = createDatabase('sgp-provisioning-tenancy');
+  let alfa;
+  let accountId;
+  let profileId;
+
+  /**
+   * The upgrade path, which is the one every install already standing takes —
+   * and the one the tenancy tests cannot reach, because they start from a
+   * database the runner has already finished with.
+   *
+   * Step 0017 drops four global uniques and puts the pair with `tenant_id` in
+   * their place. On SQLite that means rebuilding each table with its rows
+   * inside, so a row still here afterwards is a row the rebuild carried.
+   */
+  before(async () => {
+    for (const migration of migrations.filter((m) => m.id < FIRST_TENANCY_MIGRATION)) {
+      await migration.up(db);
+    }
+    await db('settings').insert({ key: 'appName', value: 'Provedor Alfa' });
+    accountId = await insertReturningId('customer_accounts', {
+      customer_id: 'CSG-CCCCCCC-333333',
+      device_id: 'ont-antiga',
+      identity_hash: 'm'.repeat(64),
+      software_id: 'V4',
+      pppoe_username: 'cliente-antigo',
+      active: true
+    }, db);
+    await db('sgp_links').insert({
+      device_id: 'ont-antiga',
+      account_id: accountId,
+      contract: '3003',
+      client_name: 'Carlos Pereira',
+      document: '11122233344',
+      phone_manual: '5511977776666'
+    });
+    await db('device_profiles').insert({
+      device_id: 'ont-antiga',
+      installation_date: '2023-05-14',
+      installation_tag: 'InstaladoEm'
+    });
+    await db('sgp_events').insert({
+      dedupe_key: 'reconcile:3003:activated:aaa111',
+      source: 'reconcile',
+      type: 'activated',
+      contract: '3003',
+      status: 'processed',
+      received_at: new Date()
+    });
+    profileId = await insertReturningId('provisioning_profiles', {
+      name: 'Padrao', priority: 5, enabled: true
+    }, db);
+    await db('provisioning_runs').insert({
+      device_id: 'ont-antiga',
+      profile_id: profileId,
+      trigger: 'poller',
+      status: 'success',
+      attempt_count: 2
+    });
+
+    await ensureSchema(db);
+    alfa = await db('tenants').orderBy('id', 'asc').first();
+  });
+
+  // Every column, not just the key ones. The link is the row an operator reads
+  // on screen, and the installation date is what the panel dates a warranty
+  // from — losing either in a rebuild would be silent.
+  it('gives the rows it already had to the install\'s own provider', async () => {
+    const link = await db('sgp_links').where({ device_id: 'ont-antiga' }).first();
+    assert.equal(Number(link.tenant_id), Number(alfa.id));
+    assert.equal(link.contract, '3003');
+    assert.equal(link.client_name, 'Carlos Pereira');
+    assert.equal(link.document, '11122233344');
+    assert.equal(link.phone_manual, '5511977776666');
+
+    const profile = await db('device_profiles').where({ device_id: 'ont-antiga' }).first();
+    assert.equal(Number(profile.tenant_id), Number(alfa.id));
+    assert.equal(profile.installation_tag, 'InstaladoEm');
+    assert.match(String(profile.installation_date), /2023-05-14/);
+
+    const event = await db('sgp_events').where({ contract: '3003' }).first();
+    assert.equal(Number(event.tenant_id), Number(alfa.id));
+    assert.equal(event.dedupe_key, 'reconcile:3003:activated:aaa111');
+    assert.equal(event.status, 'processed');
+
+    const provisioningProfile = await db('provisioning_profiles').where({ id: profileId }).first();
+    assert.equal(Number(provisioningProfile.tenant_id), Number(alfa.id));
+    assert.equal(provisioningProfile.name, 'Padrao');
+
+    const run = await db('provisioning_runs').where({ device_id: 'ont-antiga' }).first();
+    assert.equal(Number(run.tenant_id), Number(alfa.id));
+    assert.equal(Number(run.profile_id), Number(profileId));
+    assert.equal(Number(run.attempt_count), 2);
+  });
+
+  // The four values that come from outside the panel. Each was globally unique
+  // before, so each would have refused the second provider's legitimate row.
+  it('lets a second provider reuse every externally-supplied value', async () => {
+    const betaId = await insertReturningId('tenants', {
+      slug: 'beta', name: 'Provedor Beta', status: 'active'
+    }, db);
+
+    await db('sgp_links').insert({ tenant_id: betaId, device_id: 'ont-antiga', contract: '8008' });
+    await db('device_profiles').insert({ tenant_id: betaId, device_id: 'ont-antiga', installation_tag: 'beta' });
+    await db('sgp_events').insert({
+      tenant_id: betaId,
+      dedupe_key: 'reconcile:3003:activated:aaa111',
+      source: 'reconcile',
+      type: 'activated',
+      contract: '3003',
+      status: 'pending',
+      received_at: new Date()
+    });
+    await db('provisioning_profiles').insert({ tenant_id: betaId, name: 'Padrao', priority: 9 });
+
+    for (const [table, where] of [
+      ['sgp_links', { device_id: 'ont-antiga' }],
+      ['device_profiles', { device_id: 'ont-antiga' }],
+      ['sgp_events', { dedupe_key: 'reconcile:3003:activated:aaa111' }],
+      ['provisioning_profiles', { name: 'Padrao' }]
+    ]) {
+      const [{ n }] = await db(table).where(where).count({ n: '*' });
+      assert.equal(Number(n), 2, `${table} still refuses the second provider`);
+    }
+  });
+
+  it('still refuses a duplicate inside one provider', async () => {
+    await assert.rejects(() => db('sgp_links').insert({
+      tenant_id: alfa.id, device_id: 'ont-antiga', contract: '3004'
+    }), 'sgp_links');
+    await assert.rejects(() => db('device_profiles').insert({
+      tenant_id: alfa.id, device_id: 'ont-antiga', installation_tag: 'x'
+    }), 'device_profiles');
+    await assert.rejects(() => db('sgp_events').insert({
+      tenant_id: alfa.id,
+      dedupe_key: 'reconcile:3003:activated:aaa111',
+      source: 'reconcile',
+      type: 'activated',
+      status: 'pending',
+      received_at: new Date()
+    }), 'sgp_events');
+    await assert.rejects(() => db('provisioning_profiles').insert({
+      tenant_id: alfa.id, name: 'Padrao', priority: 1
+    }), 'provisioning_profiles');
+  });
+
+  it('refuses a row for a provider that does not exist', async () => {
+    await assert.rejects(() => db('sgp_links').insert({
+      tenant_id: 999999, device_id: 'ont-fantasma', contract: '1'
+    }));
+  });
+});
