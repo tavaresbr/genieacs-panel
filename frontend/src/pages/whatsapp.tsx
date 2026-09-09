@@ -19,6 +19,7 @@ import { TemplatesPanel } from '@/components/whatsapp/templates-panel'
 import { OptOutPanel } from '@/components/whatsapp/opt-out-panel'
 import { AlertsPanel } from '@/components/whatsapp/alerts-panel'
 import { HealthStrip } from '@/components/whatsapp/health-strip'
+import { useAuth } from '@/contexts/auth-context'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Polling
@@ -549,6 +550,94 @@ function InboxTab() {
   )
 }
 
+/**
+ * "Delete the old attachments now", under the health strip.
+ *
+ * `POST /whatsapp/media/sweep` has existed since the attachment retention
+ * landed and had no screen: the policy was set in Settings and then applied
+ * only by a six-hour timer, so an operator whose disk was full today had
+ * nothing to press. This is that button, and it takes no parameters — the
+ * window and the rules come from the saved settings, so pressing it can never
+ * remove more than the settings screen already says it will.
+ *
+ * It sits BESIDE the strip rather than inside it. The strip is a poll surface
+ * that refreshes itself every sixty seconds and renders nothing at all while
+ * it is loading or failing; a destructive action that disappears under the
+ * operator's cursor when a poll fails is not a button. Keeping it out here also
+ * keeps the strip's own rule intact: that component only ever counts.
+ *
+ * Admin-only, because the route is. A viewer who could press it would get a
+ * 403 and no way to tell that from the sweep having failed.
+ *
+ * The whole point of the reporting below is `skipped`. "0 files" is a real and
+ * common answer with at least four different causes, and an operator staring
+ * at a full disk reads an unexplained zero as a broken button — so retention
+ * being off, a pass already running, a failure, and genuinely nothing old
+ * enough each get their own sentence.
+ */
+function MediaSweepButton() {
+  const { t } = useTranslation()
+  const { user } = useAuth()
+  const toast = useToast()
+  const [sweeping, setSweeping] = useState(false)
+
+  if (user?.role !== 'admin') return null
+
+  const sweep = async () => {
+    setSweeping(true)
+    try {
+      const res = await whatsappAPI.sweepMedia()
+      if (!res.success || !res.data) {
+        toast.error(t('whatsapp.health.sweepFailed'))
+        return
+      }
+      const { skipped, files, mb } = res.data
+      // Retention off is the one answer that is not a failure and not a
+      // no-op worth apologising for: it is the configured state, and the
+      // message says where to change it.
+      if (skipped === 'disabled') {
+        toast.info(t('whatsapp.health.sweepOff'))
+        return
+      }
+      if (skipped === 'busy') {
+        toast.info(t('whatsapp.health.sweepBusy'))
+        return
+      }
+      // `failed`, `no_provider` and `unscoped` are three different bugs and one
+      // operator sentence. None of them is something the person at the panel
+      // can act on differently, and the server log already tells them apart for
+      // whoever can.
+      if (skipped) {
+        toast.error(t('whatsapp.health.sweepFailed'))
+        return
+      }
+      if (!files) {
+        toast.info(t('whatsapp.health.sweepNothing'))
+        return
+      }
+      toast.success(t('whatsapp.health.sweepDone', { files, mb }))
+    } catch {
+      toast.error(t('whatsapp.health.sweepFailed'))
+    } finally {
+      setSweeping(false)
+    }
+  }
+
+  return (
+    <div className="flex justify-end">
+      <button
+        type="button"
+        className="modern-button-secondary"
+        disabled={sweeping}
+        onClick={() => void sweep()}
+      >
+        <Icon name="trash" size={17} />
+        {t('whatsapp.health.sweepNow')}
+      </button>
+    </div>
+  )
+}
+
 /** The tabs, in the order an operator meets them. */
 const TABS = [
   ['inbox', 'whatsapp.inbox.title'],
@@ -597,6 +686,7 @@ export default function WhatsAppPage() {
           somebody opened Campaigns.
         */}
         <HealthStrip />
+        <MediaSweepButton />
 
         <div className="tab-rail" role="tablist" aria-label={t('sidebar.nav.whatsapp')}>
           {TABS.map(([id, labelKey]) => (
