@@ -42,6 +42,13 @@ export const SCOPED_TABLES = new Set([
   'wa_broadcasts',
   'wa_broadcast_recipients',
   'wa_alert_state',
+  // The provisioning rulebook and its history. A profile is one ISP's decision
+  // about its own plans, secrets included; a run names a device id and a
+  // contract, neither of which is unique outside the provider that issued it.
+  // Scoping the pair together is what lets the reaper and the retention prune
+  // — whose WHERE is only a status and a cutoff — stop being deployment-wide.
+  'provisioning_profiles',
+  'provisioning_runs',
   // The configuration pair. `settings` is what an operator sets on screen;
   // `app_state` holds the integration blobs — and `dashboard_snapshot`, which
   // is not configuration at all but a provider's own device and fault counts.
