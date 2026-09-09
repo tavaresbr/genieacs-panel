@@ -1,6 +1,7 @@
 import WaMessage from '../models/WaMessage.js';
 import WaSendService from './waSendService.js';
 import WhatsAppConfigService from './whatsappConfigService.js';
+import { isPermanentFailure } from './waSendFailure.js';
 import { forEachTenant } from '../config/tenantJobs.js';
 
 /** How often a pass runs. Short, because a reply typed by a human is waiting. */
@@ -17,11 +18,63 @@ const WINDOW_MS = 60_000;
  *
  * `WaMessage.claim()` increments the counter, so the value read after a claim
  * is the number of the attempt now under way.
+ *
+ * Seven, not the three this started with. Three only made sense while the
+ * attempts were instantaneous: a failed row went straight back to 'queued', the
+ * loop woke five seconds later, and the whole allowance burned in fifteen
+ * seconds — so an Evolution restart taking twenty failed every message in the
+ * queue for good. What matters is not the count but the window the count buys
+ * with the backoff below, and that window has to outlast a restart.
  */
-export const MAX_ATTEMPTS = 3;
+export const MAX_ATTEMPTS = 7;
+
+/**
+ * The wait after the first failed attempt, doubling from there.
+ *
+ * Half a minute rather than five, because a queued message may be an operator's
+ * reply with a human on the other end: the first retry has to cover a server
+ * that blinked without making a conversation wait for it.
+ */
+const BACKOFF_BASE_MS = 30_000;
+
+/**
+ * The longest single wait. Doubling with nothing to stop it reaches a day by
+ * the tenth attempt, which is not a retry any more — it is a message the panel
+ * quietly held onto.
+ */
+const BACKOFF_CAP_MS = 30 * 60_000;
 
 /** `wa_messages.delivery_error` is 500 characters wide. */
 const ERROR_LIMIT = 500;
+
+/**
+ * How long to wait before the attempt after this one.
+ *
+ * Exponential with a ceiling, and no jitter: the thundering herd a campaign
+ * would otherwise produce is already broken up by the per-minute ceiling below,
+ * which lets a fixed number of messages leave per minute no matter how many
+ * came due at once. Adding randomness on top would only make the schedule
+ * harder to reason about in a `delivery_error` read three days later.
+ *
+ * @param {number} attempts the attempt that just failed, counting from one
+ */
+export function retryDelayMs(attempts) {
+  const step = Math.max(1, Number(attempts) || 1);
+  return Math.min(BACKOFF_BASE_MS * 2 ** (step - 1), BACKOFF_CAP_MS);
+}
+
+/**
+ * Every wait a message will sit through before the outbox gives up, in order.
+ *
+ * Exported because the window is the decision — 30 s, 1, 2, 4, 8 and 16 minutes
+ * is a little over half an hour of Evolution being down, survived — and a
+ * decision measured in minutes cannot be tested by waiting for it.
+ */
+export function retryScheduleMs(maxAttempts = MAX_ATTEMPTS) {
+  const waits = [];
+  for (let attempt = 1; attempt < maxAttempts; attempt += 1) waits.push(retryDelayMs(attempt));
+  return waits;
+}
 
 /**
  * The outbox worker.
@@ -177,17 +230,29 @@ class WaOutboxWorker {
    */
   static async recordFailure(message, error) {
     const attempts = Number(message.attempts || 0);
-    const terminal = attempts >= MAX_ATTEMPTS;
+    // A number that is not on WhatsApp fails the same way on the seventh
+    // attempt as on the first, and spending half an hour of queue on it hides
+    // the verdict from the operator for half an hour. Everything the classifier
+    // cannot name stays a retry — see `waSendFailure.js` for which way the
+    // doubt falls, and why.
+    const permanent = isPermanentFailure(error);
+    const terminal = permanent || attempts >= MAX_ATTEMPTS;
     await WaMessage.update(message.id, {
       // Under the cap the row goes back to 'queued'. `listSendable` — the
       // outbox's only query — looks for 'queued' and for a stale 'sending';
       // leaving a retryable row 'failed' would put it out of the worker's reach
-      // and make "three attempts" mean one.
+      // and make the whole allowance mean one attempt.
       delivery_status: terminal ? 'failed' : 'queued',
-      delivery_error: failureText(error)
+      delivery_error: failureText(error),
+      // The due time is what keeps the row out of the next pass five seconds
+      // from now; without it 'queued' means "immediately" and the backoff is
+      // not a backoff. A terminal row goes back to NULL so that `requeue`, which
+      // means "the reason is over", finds nothing left to wait for.
+      next_attempt_at: terminal ? null : new Date(Date.now() + retryDelayMs(attempts))
     });
     console.warn(
-      `WhatsApp message ${message.id} attempt ${attempts}/${MAX_ATTEMPTS} failed: ${failureText(error)}`
+      `WhatsApp message ${message.id} attempt ${attempts}/${MAX_ATTEMPTS} `
+      + `failed${permanent ? ' permanently' : ''}: ${failureText(error)}`
     );
     return terminal ? 'failed' : 'retry';
   }

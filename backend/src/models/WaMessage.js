@@ -4,6 +4,32 @@ import { getDb, tdb, tinsertReturningId } from '../config/database.js';
 export const RECLAIM_MS = 5 * 60 * 1000;
 
 /**
+ * What the outbox may take, as one WHERE both the listing and the claim use.
+ *
+ * A queued row is only sendable once its backoff has run out. `next_attempt_at`
+ * NULL means due now, and it has to: the column arrived in migration 0018 with
+ * every existing row already written, so any other reading would strand an
+ * install's whole queue the moment it upgraded. The index behind this test is
+ * `(delivery_status, next_attempt_at)`, added by the same migration.
+ *
+ * The stale branch deliberately ignores the due time. A row stuck in 'sending'
+ * is a pass that died mid-send, not a backoff: retaking it after the cutoff is
+ * what makes a crash recoverable, and making that wait on a due time written by
+ * an earlier failure would leave the row untouchable for as long as the backoff
+ * had grown.
+ */
+function sendable(query, now) {
+  const cutoff = new Date(now.getTime() - RECLAIM_MS);
+  return query
+    .where((ready) => ready
+      .where({ delivery_status: 'queued' })
+      .where((due) => due.whereNull('next_attempt_at').orWhere('next_attempt_at', '<=', now)))
+    .orWhere((stale) => stale
+      .where({ delivery_status: 'sending' })
+      .where('claimed_at', '<', cutoff));
+}
+
+/**
  * `wa_messages` is the outbox. There is no separate queue table: an outbound
  * message is a row whose `delivery_status` walks
  * queued → sending → sent → delivered → read, or → failed.
@@ -92,15 +118,10 @@ class WaMessage {
 
   /** Ids the outbox worker should try next, oldest first. */
   static async listSendable(limit) {
-    const cutoff = new Date(Date.now() - RECLAIM_MS);
+    const now = new Date();
     return tdb('wa_messages')
       .whereNull('external_id')
-      .where((q) => {
-        q.where({ delivery_status: 'queued' })
-          // A pass that died mid-send leaves a row in 'sending' forever.
-          // Retaking it after the cutoff is what makes a crash recoverable.
-          .orWhere((stale) => stale.where({ delivery_status: 'sending' }).where('claimed_at', '<', cutoff));
-      })
+      .where((q) => sendable(q, now))
       .orderBy('created_at')
       .limit(limit)
       .pluck('id');
@@ -111,22 +132,21 @@ class WaMessage {
    *
    * This is a conditional UPDATE checked by affected-row count rather than
    * `SELECT ... FOR UPDATE SKIP LOCKED`, because SQLite has no such clause. The
-   * WHERE repeats the eligibility test so two concurrent passes cannot both
-   * win: whoever's UPDATE lands first changes the status, and the loser's UPDATE
-   * matches zero rows.
+   * WHERE repeats the eligibility test — the same `sendable` predicate the
+   * listing uses — so two concurrent passes cannot both win: whoever's UPDATE
+   * lands first changes the status, and the loser's UPDATE matches zero rows.
+   * Repeating the due time in it also means a row that came due between the
+   * listing and the claim is the only kind that can slip through, which is a
+   * message sent on time rather than one sent early.
    *
    * @returns {Promise<object|null>} the claimed row, or null when not claimable
    */
   static async claim(id) {
     const now = new Date();
-    const cutoff = new Date(now.getTime() - RECLAIM_MS);
     const changed = await tdb('wa_messages')
       .where({ id })
       .whereNull('external_id')
-      .where((q) => {
-        q.where({ delivery_status: 'queued' })
-          .orWhere((stale) => stale.where({ delivery_status: 'sending' }).where('claimed_at', '<', cutoff));
-      })
+      .where((q) => sendable(q, now))
       .update({
         delivery_status: 'sending',
         claimed_at: now,
