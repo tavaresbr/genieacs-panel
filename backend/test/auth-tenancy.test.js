@@ -38,8 +38,12 @@ const CONSULTORA = { username: 'consultora', password: 'consultora-senha-1' };
 const PLANTONISTA = { username: 'plantonista', password: 'plantonista-senha-1' };
 // A single membership: the person a token minted before this change belongs to.
 const SOZINHO = { username: 'sozinho', password: 'sozinho-senha-1' };
-// Works for nobody. The account is real and the password is right.
+// Taken off Alfa's team and on nobody else's. The account is real and the
+// password is right, which is exactly what makes this the dangerous case.
 const DESEMPREGADO = { username: 'desempregado', password: 'desempregado-senha-1' };
+// Taken off Alfa's team and still on Beta's. Removal ends a membership, never
+// a person, so she has to keep the login she uses at her other ISP.
+const REMOVIDA = { username: 'removida', password: 'removida-senha-1' };
 // The night shift, signed in at both providers at once.
 const NOTURNO = { username: 'noturno', password: 'noturno-senha-1' };
 
@@ -127,6 +131,7 @@ describe('who works for whom', () => {
     await hire(SOZINHO, 'viewer');
     await hire(NOTURNO, 'admin');
     await hire(DESEMPREGADO, 'viewer');
+    await hire(REMOVIDA, 'viewer');
 
     // Second memberships, at the other ISP. `tenant_users` is written directly
     // because the route that will manage a provider's team belongs to lane B;
@@ -135,11 +140,23 @@ describe('who works for whom', () => {
     await TenantUser.create({ tenantId: beta, userId: idOf.consultora, role: 'admin' });
     await TenantUser.create({ tenantId: beta, userId: idOf.plantonista, role: 'admin' });
     await TenantUser.create({ tenantId: beta, userId: idOf.noturno, role: 'admin' });
+    await TenantUser.create({ tenantId: beta, userId: idOf.removida, role: 'admin' });
 
-    // And one person who works for nobody at all: the account still exists,
-    // with its password, which is the whole point.
-    await TenantUser.remove(alfa, idOf.desempregado);
+    // Two people taken off Alfa's team, through the route an administrator
+    // actually uses. It ends the membership and leaves the person — their name
+    // is on history that points at `users.id` — so what stops them working here
+    // is the login refusing them, not the row being gone.
+    for (const person of [DESEMPREGADO, REMOVIDA]) {
+      const { status } = await call(`${panelUrl}/api/users/${idOf[person.username]}`, {
+        method: 'DELETE',
+        headers: authHeaders(ownerToken)
+      });
+      assert.equal(status, 200, `could not take ${person.username} off the team`);
+      assert.ok(await getDb()('users').where({ username: person.username }).first(),
+        'removal deleted the person instead of the membership');
+    }
     assert.equal((await TenantUser.listForUser(idOf.desempregado)).length, 0);
+    assert.equal((await TenantUser.listForUser(idOf.removida)).length, 1);
   });
 
   it('signs in a person with one membership, and the token names that provider', async () => {
@@ -220,13 +237,38 @@ describe('a request authenticated for one provider', () => {
   });
 
   it('refuses a token naming a provider the person does not work for', async () => {
-    const trespass = await signIn(CONSULTORA, beta);
+    // The same token that worked two assertions ago. Nothing about it changed;
+    // the row it stands on went away, and the membership is re-read from the
+    // table on every request precisely so that ends the session within the hour
+    // rather than at its expiry.
     await TenantUser.remove(beta, idOf.consultora);
-
-    const { status } = await acsSeenBy(trespass.body.data.token);
-    assert.equal(status, 403, 'a membership that ended has to end the session with it');
+    assert.equal((await acsSeenBy(atBeta)).status, 403);
 
     await TenantUser.create({ tenantId: beta, userId: idOf.consultora, role: 'admin' });
+    assert.equal((await acsSeenBy(atBeta)).status, 200, 'and it works again once she is back');
+  });
+});
+
+describe('somebody taken off a provider\'s team', () => {
+  // The regression this closes. `DELETE /api/users/:id` ends the membership and
+  // keeps the person, which is right — she may work for another ISP, and her
+  // name is on `wa_messages.sent_by` and its neighbours. But a login that
+  // resolves by `username` alone would then hand a working session to somebody
+  // who was removed this morning, at the provider that removed her.
+  it('cannot sign in at the provider that removed her', async () => {
+    const { status } = await signIn(REMOVIDA, alfa);
+    assert.equal(status, 401, 'a removed operator kept a working login');
+  });
+
+  it('still signs in at the provider she does work for', async () => {
+    const { status, body } = await signIn(REMOVIDA);
+    assert.equal(status, 200, 'removal from one ISP is not removal from the other');
+    assert.equal(Number(body.data.user.tenantId), Number(beta),
+      'with one membership left there is nothing to choose between');
+
+    // And she reads Beta's rows, not the rows of the provider she left.
+    const { body: seen } = await acsSeenBy(body.data.token);
+    assert.equal(seen.data.genieAcsUrl, ACS_BETA);
   });
 });
 

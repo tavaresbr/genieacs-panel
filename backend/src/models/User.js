@@ -21,32 +21,17 @@ class User {
   }
 
   /**
-   * A person and their membership at the provider doing the creating.
+   * The person only. Their membership is the caller's to write.
    *
-   * The two go together because an operator created without one could not sign
-   * in: the login resolves a membership and refuses when there is none. The
-   * provider comes from the request's scope rather than from an argument —
-   * whoever is adding staff is adding them to their own ISP, and there is no
-   * call site that means anything else.
-   *
-   * `users.role` keeps the same value as the membership's, which is what the
-   * migration's backfill reads and what an install still running the previous
-   * code authorises with. The membership row is the one that counts from here.
-   *
-   * (Wave 12 lane B owns `/api/users` and may well move this into the
-   * controller with the rest of the membership handling. It is here for now
-   * because a person with no membership is not a half-created user, it is an
-   * account nobody can use.)
+   * A person with no membership cannot sign in, so this is half of an act
+   * rather than a whole one — but the other half belongs to `/api/users`, which
+   * creates the membership straight after and deletes the person again if that
+   * fails. Doing it here as well would insert the same row twice.
    */
   static async create(userData) {
     const { username, password, role = 'viewer' } = userData;
-    const tenantId = currentTenantId();
-
-    return getDb().transaction(async (trx) => {
-      const id = await insertReturningId('users', { username, password, role }, trx);
-      await trx('tenant_users').insert({ tenant_id: tenantId, user_id: id, role });
-      return id;
-    });
+    const id = await insertReturningId('users', { username, password, role });
+    return id;
   }
 
   static async list() {
@@ -61,23 +46,16 @@ class User {
   }
 
   /**
-   * Role changes revoke the user's sessions so the new role applies at once.
+   * The person's deployment-wide role, and a revocation so a change bites now.
    *
-   * Both rows move together. Authorisation reads the MEMBERSHIP's role now, so
-   * writing only `users.role` would make a demotion look like it worked and
-   * leave the person an administrator here — the one shape of bug where the
-   * screen says the panel is safe and it is not. `users.role` is still written
-   * for the reason it still exists: an install rolled back to the previous code
-   * authorises from it.
-   *
-   * Only the membership at the provider in scope moves: demoting a consultant
-   * here must not demote them at the ISP that is theirs.
+   * Not the role anything authorises with any more — that is the membership's,
+   * and `/api/users` writes it through `TenantUser.setRole` before calling
+   * here. This column is what the migration's backfill reads and what an
+   * install rolled back to the previous code still authorises from, so it is
+   * kept in step where keeping it in step is meaningful; the caller decides
+   * when that is, because with two memberships one column cannot hold both.
    */
   static async updateRole(id, role) {
-    const tenantId = currentTenantId();
-    await getDb()('tenant_users')
-      .where({ tenant_id: tenantId, user_id: id })
-      .update({ role, updated_at: new Date() });
     await getDb()('users')
       .where({ id })
       .update({

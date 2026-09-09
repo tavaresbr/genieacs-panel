@@ -22,15 +22,14 @@ before(async () => {
   });
   adminToken = setup.body.data.token;
 
-  // `/api/auth/setup` creates the person but not the membership that says she
-  // works for the provider she just set up — the login path owns that row and
-  // is being written alongside this. `/api/users` reads memberships, so without
-  // it the owner would be absent from her own team.
-  await getDb()('tenant_users').insert({
-    tenant_id: await defaultTenantId(),
-    user_id: setup.body.data.user.id,
-    role: 'admin'
-  });
+  // `/api/auth/setup` now creates the membership along with the person, in the
+  // same transaction as the setup latch, so the owner is on her own team from
+  // the moment she exists. This hook used to insert that row by hand while the
+  // login path was still being written; doing it now would insert it twice.
+  const membership = await getDb()('tenant_users')
+    .where({ tenant_id: await defaultTenantId(), user_id: setup.body.data.user.id })
+    .first();
+  assert.ok(membership, 'setup left the first administrator off her own team');
 });
 
 after(async () => {
@@ -193,11 +192,15 @@ describe('guard rails', () => {
       'the operator is off this provider\'s team'
     );
     // The person is NOT deleted — she may work for another provider, and her
-    // name is on history that points at her id. What used to be asserted here,
-    // that she can no longer sign in, is now the login path's job: it has to
-    // refuse a person with no membership, and that is the other half of this
-    // wave. Until it lands she still gets a token on this deployment, which is
-    // the one thing this change leaves open on purpose rather than by mistake.
+    // name is on history that points at her id.
     assert.ok(await getDb()('users').where({ id: viewerId }).first(), 'the person survives');
+
+    // Surviving is not the same as still being able to work here. The login
+    // resolves a membership, and she no longer has one, so the account that
+    // outlives the removal is an account nobody can sign in to. The other half
+    // of the same wave; `auth-tenancy.test.js` covers the case where she is
+    // still on another provider's team and signs in there instead.
+    const login = await call(`${panelUrl}/api/auth/login`, { method: 'POST', body: VIEWER });
+    assert.equal(login.status, 401, 'an operator removed from this provider cannot sign in');
   });
 });
