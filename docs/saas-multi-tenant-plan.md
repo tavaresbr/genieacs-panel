@@ -674,3 +674,65 @@ Validação end-to-end manual, após as fases 0–3:
 7. Abrir o dashboard de `alfa`, depois o de `beta`, e conferir que os números diferem
    (prova de que o cache foi separado).
 8. Suspender a assinatura de `beta` e confirmar 402 no painel com o portal ainda no ar.
+
+---
+
+## Onda 12 — `users` como identidade, `tenant_users` como ponte (decisões congeladas)
+
+A última tabela por converter, e a única que **não** ganha `tenant_id`. Estas
+decisões estão fechadas; quem implementar segue.
+
+### Por que não `users.tenant_id`
+
+Uma linha em `users` é uma **pessoa**. Um consultor ou revenda que atende
+várias ISPs com um login só é o arranjo comum neste mercado, e uma coluna de
+provedor em `users` fecha isso para sempre. Pior: as três chaves estrangeiras
+que apontam para `users.id` — quem enviou a mensagem (`wa_messages.sent_by`),
+quem revogou o opt-out, quem criou a campanha — continuariam apontando só para
+o id. Com `tenant_id` em `users` e nada mais, nada no esquema impediria
+registrar o operador do provedor A como remetente da mensagem do B.
+
+`users` fica global e único por `username`. `tenant_users` diz quem trabalha
+para quem, e com que papel lá.
+
+### O papel é do vínculo, não da pessoa
+
+Alguém pode ser admin na ISP que é dele e operador comum na que ele presta
+serviço. `users.role` fica onde está e mantém o valor — é o que o backfill lê
+e o que um install rodando o código anterior ainda usa —, mas deixa de ser
+consultado assim que o token passa a carregar o papel do vínculo.
+
+### O token nomeia o provedor
+
+- O login resolve a pessoa por `username` (global), depois os vínculos dela.
+  Com um vínculo, é esse. Com vários, o token carrega o escolhido.
+- O token de acesso ganha `tenantId` e o papel **do vínculo**. O escopo da
+  requisição autenticada passa a sair do token, não do "primeiro provedor" que
+  o `resolveTenant` responde hoje.
+- **Token sem `tenantId` continua valendo**, resolvido pelo vínculo único da
+  pessoa. É a transição: derrubar toda sessão aberta num upgrade seria o painel
+  deslogando o plantão inteiro sem motivo. Com mais de um vínculo e nenhum
+  `tenantId`, recusa — aí a ambiguidade é real.
+- `token_version` continua sendo a única revogação, e continua na pessoa: trocar
+  a senha derruba as sessões dela em todos os provedores, que é o certo.
+
+### `/api/users` passa a ser a equipe de um provedor
+
+Hoje ele lista **todos os operadores do deploy** e aceita qualquer id global em
+`update` e `remove`. Passa a operar sobre vínculos do provedor que pediu.
+
+- Remover alguém é **encerrar o vínculo**, nunca apagar a pessoa: ela pode
+  trabalhar para outro provedor, e o nome dela está em histórico que aponta para
+  `users.id`.
+- A guarda do "último admin" conta admins **do provedor**. Contando o deploy
+  inteiro ela estava errada nas duas direções ao mesmo tempo: os admins de outra
+  ISP impediam esta de remover o último dela, e o último desta podia sair com a
+  contagem ainda positiva por causa da equipe de outra.
+- Um id que não tem vínculo aqui responde como inexistente, nunca como proibido:
+  a diferença conta a quem pergunta que a pessoa existe em outro lugar.
+
+### O que NÃO entra nesta onda
+
+O plano quer `users` chaveado por e-mail no lugar de `username`. Muda como todo
+operador entra no painel, não traz isolamento nenhum, e feito junto com a espinha
+de autenticação seriam duas mudanças arriscadas de uma vez. Passo próprio.

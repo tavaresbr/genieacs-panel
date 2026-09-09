@@ -122,6 +122,24 @@ const VENDOR_CATALOGUE_TABLES = ['vendors', 'wifi_security_mappings', 'wifi_secu
 // and each is referenced by exactly one place per table so the initial schema
 // and the later upgrade steps can never drift apart.
 
+const tenantUsersTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.integer('user_id').unsigned().notNullable()
+    .references('id').inTable('users').onDelete('CASCADE');
+  // The role belongs to the MEMBERSHIP, not to the person: someone can be an
+  // admin at the ISP they own and an ordinary operator at one they consult for.
+  t.string('role', 32).notNullable().defaultTo('user');
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  t.timestamp('updated_at').defaultTo(db.fn.now());
+  // One membership per person per provider. This is the row the token names,
+  // so a duplicate would make "which role does she have here" ambiguous.
+  t.unique(['tenant_id', 'user_id']);
+  // How the users screen asks: everyone at this provider.
+  t.index(['tenant_id']);
+};
+
 const usersTable = (db) => (t) => {
   t.increments('id').primary();
   t.string('username', 64).notNullable().unique();
@@ -724,6 +742,14 @@ const TENANCY_TABLES = [
   ['tenants', tenantsTable]
 ];
 
+/**
+ * Created by 0028 rather than with the tenancy tables, because it references
+ * `users` — which step 0001 creates, long after `tenants` exists.
+ */
+const MEMBERSHIP_TABLES = [
+  ['tenant_users', tenantUsersTable]
+];
+
 const INITIAL_TABLES = [
   ['users', usersTable],
   ['settings', keyValueTable],
@@ -752,6 +778,7 @@ const INITIAL_TABLES = [
 export const SCHEMA_TABLES = [
   ...TENANCY_TABLES,
   ...INITIAL_TABLES,
+  ...MEMBERSHIP_TABLES,
   ...PROVISIONING_TABLES,
   ...WHATSAPP_TABLES,
   ...DEVICE_HISTORY_TABLES,
@@ -1763,6 +1790,59 @@ export const migrations = [
         t.dropUnique(['account_id', 'wifi_index']);
         t.unique(['tenant_id', 'account_id', 'wifi_index']);
       });
+    }
+  },
+  {
+    /**
+     * Who works for which provider — the last piece of the conversion, and the
+     * one that deliberately does NOT follow the pattern of the ten before it.
+     *
+     * Every other table got a `tenant_id`. `users` must not. A row here is a
+     * PERSON, and the plan is explicit about why that matters: a consultant or
+     * a reseller serving several ISPs with one login is the common arrangement
+     * in this market, and a `users.tenant_id` forecloses it permanently. So
+     * `users` stays the identity table, globally unique on `username`, and
+     * `tenant_users` is the bridge that says which providers a person works
+     * for and with what role there.
+     *
+     * The role moves onto the membership rather than staying on the person: an
+     * operator can be an admin at the ISP they own and an ordinary operator at
+     * one they consult for. `users.role` is left in place and keeps its value,
+     * because it is what the backfill reads and what an install running the
+     * previous code still answers logins with — it stops being consulted once
+     * the token carries a membership role.
+     *
+     * Note what is NOT here: the plan also wants `users` keyed by email rather
+     * than username. That is a change to how every operator signs in, it buys
+     * no isolation, and doing it in the same step as the authentication spine
+     * would be two risky changes at once. It keeps its own step, later.
+     */
+    id: '0028_tenant_users',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return false;
+      return db.schema.hasTable('tenant_users');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('users'))) return;
+      const tenant = await db('tenants').orderBy('id', 'asc').first();
+      if (!tenant) return;
+
+      await createTableIfMissing(db, 'tenant_users', tenantUsersTable(db));
+
+      // Everybody who can already sign in keeps working, at the provider this
+      // install has always been. Their current `users.role` becomes their role
+      // there, so nobody is promoted or demoted by an upgrade.
+      const existing = await db('users').select('id', 'role');
+      const members = await db('tenant_users').where({ tenant_id: tenant.id }).pluck('user_id');
+      const already = new Set(members.map(Number));
+      const rows = existing
+        .filter((user) => !already.has(Number(user.id)))
+        .map((user) => ({
+          tenant_id: tenant.id,
+          user_id: user.id,
+          role: user.role || 'user'
+        }));
+      if (rows.length > 0) await db('tenant_users').insert(rows);
     }
   }
 ];
