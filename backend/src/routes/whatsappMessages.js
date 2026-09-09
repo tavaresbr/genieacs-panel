@@ -67,6 +67,37 @@ router.get(
   WhatsAppMediaController.fetch
 );
 
+// "Send it again", meaning THIS row and not a copy of it.
+//
+// The screen's old resend read the row's body and posted a new message, which
+// left the failed row behind, gave the subscriber the same message twice, and
+// did nothing at all when the content was an attachment with no caption —
+// there was no body to read, so the button was silent. Requeuing keeps the id,
+// the file, the `source` and the place in the thread.
+//
+// Provider-scoped by the resolver like everything else here: `WaMessage`
+// reads through `tdb`, so another provider's id is not forbidden on this
+// route, it does not exist.
+router.post(
+  '/messages/:id/requeue',
+  authenticateToken,
+  requireRole(['admin']),
+  WhatsAppMessageController.requeue
+);
+
+// The same act at the size failure actually arrives in: an Evolution restart
+// during a dunning run fails thousands of rows at once, and requeuing them one
+// press at a time is not a recovery.
+//
+// The path has one segment where the route above has two, so no id can be
+// mistaken for it and it needs no ordering trick to stay reachable.
+router.post(
+  '/messages/requeue-failed',
+  authenticateToken,
+  requireRole(['admin']),
+  WhatsAppMessageController.requeueFailed
+);
+
 // The attachment sweep, on demand. Admin-only like its neighbours, and for a
 // harder reason than they have: this is the one route in the integration that
 // deletes anything. What it deletes is fixed by the retention window in
