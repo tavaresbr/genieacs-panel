@@ -25,6 +25,12 @@ export const SCOPED_TABLES = new Set([
   // subscriber's portal login. Across two it is account takeover, because the
   // same firmware and a same-named subscriber produce the same hash.
   'customer_accounts',
+  // The installation dates. Read across providers, the date one ISP recorded
+  // for a device id becomes the suffix of another ISP's Customer ID — and since
+  // the same read is what decides insert-vs-update, the second provider never
+  // got a row at all: it overwrote the first's, so correcting a date at one ISP
+  // silently changed a subscriber's at the other.
+  'device_profiles',
   // The contract cadastre. It is what turns a device id into a subscriber, so
   // it is also the table the WhatsApp side resolves an inbound phone number
   // against: unfiltered, one provider's operator could type a number and be

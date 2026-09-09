@@ -12,7 +12,7 @@ import DeviceHistoryService from './services/deviceHistoryService.js';
 import WaBroadcastService from './services/waBroadcastService.js';
 import WaMediaSweeper from './services/waMediaSweeper.js';
 import WaMessageSweeper from './services/waMessageSweeper.js';
-import { forEachTenant, forSoleTenant } from './config/tenantJobs.js';
+import { forEachTenant } from './config/tenantJobs.js';
 
 const PORT = Number(process.env.APP_PORT) || 5890;
 const PORTAL_PORT = process.env.PORTAL_PORT === '0'
@@ -54,18 +54,25 @@ export const startServer = async () => {
         .catch((error) => {
           console.warn(`Dashboard prewarm skipped: ${error.message}`);
         });
-      // The Customer ID sweep does NOT qualify yet, and the reason is sharper
-      // than a stale read: `CustomerService.retireAccount` calls
-      // `SgpLink.deleteByDeviceId`, and `sgp_links` is still deployment-wide.
-      // Looped per provider, retiring an account would delete another
-      // provider's link for the same device id — and device ids now come from
-      // each provider's own GenieACS, so they can collide. It also reads
-      // `device_profiles`, equally unscoped. Both move in the slice that
-      // scopes them.
-      void forSoleTenant('The Customer ID sweep', async () => {
+      // The Customer ID sweep qualifies too, now that `device_profiles` is per
+      // provider — it was the last table under here that was not, `sgp_links`
+      // having moved earlier. Everything the sweep reaches is scoped: the
+      // devices come from the provider's own GenieACS (`settings.genieAcsUrl`),
+      // the accounts it creates and retires are its own, and the SGP link a
+      // retirement drops belongs to it. That last one is why this could not be
+      // a loop before: two providers' GenieACS hand out the same device ids, so
+      // retiring an account used to delete another provider's link for the
+      // device id it happened to share.
+      void forEachTenant(async () => {
         if (!await CustomerService.isAutoGenerationEnabled()) return null;
         const devices = await DeviceService.getCustomerIdentityDevices();
         return devices.length ? CustomerService.syncDevices(devices, { enabled: true }) : null;
+      }, {
+        // Named per provider: one ISP with an unreachable GenieACS must be
+        // legible as that, not as the sweep having skipped the deployment.
+        onError: (error, tenant) => {
+          console.warn(`Customer ID prewarm skipped for provider ${tenant.slug}: ${error.message}`);
+        }
       }).catch((error) => {
         console.warn(`Customer ID prewarm skipped: ${error.message}`);
       });
