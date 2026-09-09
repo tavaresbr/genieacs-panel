@@ -96,7 +96,9 @@ describe('WhatsApp attachments — what the operator uploads', () => {
     assert.equal(status, 201);
     assert.equal(body.success, true);
     assert.equal(body.data.type, 'image/png');
-    assert.match(body.data.path, /^wa-media\/out\/\d{4}\/\d{2}\/[0-9a-f-]{36}\.png$/);
+    // The provider is in the path since wave 8: an upload lands in that
+    // provider's own subtree, which is what lets the sweep run per provider.
+    assert.match(body.data.path, /^wa-media\/t\d+\/out\/\d{4}\/\d{2}\/[0-9a-f-]{36}\.png$/);
 
     const onDisk = path.join(DATA_DIR, body.data.path);
     assert.equal(fs.existsSync(onDisk), true);

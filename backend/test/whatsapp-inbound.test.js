@@ -320,7 +320,7 @@ describe('inbound media', () => {
     const msg = await mensagemPorId('V2-MIDIA-1');
     assert.equal(msg.body, 'olha o modem');
     assert.equal(msg.attachment_type, 'image/png');
-    assert.ok(msg.attachment_path.startsWith(`wa-media/${msg.conversation_id}/`));
+    assert.match(msg.attachment_path, new RegExp(`^wa-media/t\\d+/${msg.conversation_id}/`));
     // A filename from a stranger's phone is not a path.
     assert.equal(msg.attachment_path.includes('..'), false);
     assert.equal(fs.existsSync(path.join(DATA_DIR, msg.attachment_path)), true);
