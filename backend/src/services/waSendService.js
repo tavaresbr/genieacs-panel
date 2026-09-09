@@ -208,6 +208,12 @@ class WaSendService {
       deliveryStatus: row.delivery_status || null,
       deliveryError: row.delivery_error || null,
       attempts: Number(row.attempts || 0),
+      // When the outbox will try again. A message waiting out a backoff is
+      // `queued` with an error on it, which reads on screen exactly like one
+      // that has given up — this is the field that tells the two apart, so the
+      // bubble can say "trying again" instead of showing a failure that is not
+      // one yet. NULL is a row with nothing to wait for: never tried, or done.
+      nextAttemptAt: row.next_attempt_at || null,
       sentBy: row.sent_by ?? null,
       // The column is NOT NULL, so the fallback is only for a row a test or a
       // fixture built by hand; the browser's type has no null in it.
