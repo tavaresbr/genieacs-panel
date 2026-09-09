@@ -1,4 +1,5 @@
 import { getDb, insertReturningId, tinsert } from '../config/database.js';
+import { currentTenantId } from '../config/tenantContext.js';
 
 class User {
   static async findByUsername(username) {
@@ -19,6 +20,14 @@ class User {
     return Number(row?.n || 0);
   }
 
+  /**
+   * The person only. Their membership is the caller's to write.
+   *
+   * A person with no membership cannot sign in, so this is half of an act
+   * rather than a whole one — but the other half belongs to `/api/users`, which
+   * creates the membership straight after and deletes the person again if that
+   * fails. Doing it here as well would insert the same row twice.
+   */
   static async create(userData) {
     const { username, password, role = 'viewer' } = userData;
     const id = await insertReturningId('users', { username, password, role });
@@ -36,7 +45,16 @@ class User {
     return Number(row?.n || 0);
   }
 
-  /** Role changes revoke the user's sessions so the new role applies at once. */
+  /**
+   * The person's deployment-wide role, and a revocation so a change bites now.
+   *
+   * Not the role anything authorises with any more — that is the membership's,
+   * and `/api/users` writes it through `TenantUser.setRole` before calling
+   * here. This column is what the migration's backfill reads and what an
+   * install rolled back to the previous code still authorises from, so it is
+   * kept in step where keeping it in step is meaningful; the caller decides
+   * when that is, because with two memberships one column cannot hold both.
+   */
   static async updateRole(id, role) {
     await getDb()('users')
       .where({ id })
@@ -51,9 +69,24 @@ class User {
     return getDb()('users').where({ id }).del();
   }
 
+  /**
+   * The first administrator of a provider, and their membership at it.
+   *
+   * Returns the membership as well as the id because the caller has to mint a
+   * token for it, and because the two are one fact: an admin row without a
+   * membership is a fresh install nobody can sign in to — right password,
+   * refused login, no explanation on screen. It is the case that breaks first
+   * if the two ever come apart, so they are written in the same transaction as
+   * the setup latch: either this provider has a first admin who can sign in, or
+   * it still needs setup.
+   *
+   * The provider is the request's, the same one `tinsert` files the latch
+   * under. Setup is per provider since 0014, which is the semantics we want.
+   */
   static async createInitialAdmin(userData) {
     const { username, password } = userData;
     const db = getDb();
+    const tenantId = currentTenantId();
 
     return db.transaction(async (trx) => {
       const existing = await trx('users').count({ n: '*' }).first();
@@ -86,11 +119,15 @@ class User {
         throw error;
       }
 
-      return insertReturningId('users', {
+      const id = await insertReturningId('users', {
         username,
         password,
         role: 'admin'
       }, trx);
+
+      await trx('tenant_users').insert({ tenant_id: tenantId, user_id: id, role: 'admin' });
+
+      return { id, tenantId, role: 'admin' };
     });
   }
 

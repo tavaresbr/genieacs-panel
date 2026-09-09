@@ -73,11 +73,12 @@ before(async () => {
   await db('tenants').insert({ slug: 'beta', name: 'Provedor Beta', status: 'active' });
   beta = (await db('tenants').where({ slug: 'beta' }).first()).id;
 
-  // The first administrator is created by `/api/auth/setup`, which does not yet
-  // write a membership — the login path owns that, and it is being written in
-  // the other half of this wave. Until it lands, the row is put here so the
-  // owner is a member of the provider they just set up.
-  await seedMembership(alfa, ownerId, 'admin');
+  // `/api/auth/setup` writes the membership along with the person, in the same
+  // transaction as the setup latch, so the owner is on the team of the provider
+  // she just set up. This hook seeded that row by hand while the login path was
+  // still being written; seeding it now would insert it twice.
+  assert.ok(await membershipOf(alfa, ownerId),
+    'setup left the first administrator off her own team');
 
   // Alfa's staff, hired the way the panel hires: through this endpoint.
   const ana = await call(`${panelUrl}/api/users`, {
@@ -98,9 +99,9 @@ before(async () => {
 
   // Carol is the arrangement the wave exists for: an administrator at the ISP
   // she runs (beta) and an ordinary operator at the one she consults for
-  // (alfa). Her `users.role` is 'admin' because the route guard still reads the
-  // person's deployment role — scoping that guard is the other lane's work —
-  // which is exactly why the guards below must not read it for anything else.
+  // (alfa). Her `users.role` says 'admin', and nothing reads it: the route
+  // guard authorises from the role of the membership the token names, so the
+  // column disagreeing with where she actually holds that role is the point.
   carolId = await seedPerson({ ...CAROL, role: 'admin' });
   await seedMembership(alfa, carolId, 'viewer');
 
@@ -292,11 +293,18 @@ describe('the last administrator of this provider', () => {
       .update({ role: 'admin' });
     await seedMembership(beta, carolId, 'admin');
 
+    // Carol is signed into alfa, where she is an operator, and she is now an
+    // administrator at beta. The route guard reads the role of the membership
+    // the token names, so administering somebody else's ISP buys her nothing
+    // here: she is refused before the count is ever consulted. That refusal
+    // replaces the 409 this test asserted while `requireRole` still read
+    // `users.role` — the deployment-wide administrator whose reach made the
+    // deployment-wide count dangerous does not exist any more.
     const removal = await call(`${panelUrl}/api/users/${ownerId}`, {
       method: 'DELETE',
       headers: authHeaders(carolToken)
     });
-    assert.equal(removal.status, 409);
+    assert.equal(removal.status, 403);
     assert.equal((await membershipOf(alfa, ownerId)).role, 'admin', 'the owner still runs alfa');
 
     const demotion = await call(`${panelUrl}/api/users/${ownerId}`, {
@@ -304,7 +312,23 @@ describe('the last administrator of this provider', () => {
       headers: authHeaders(carolToken),
       body: { role: 'viewer' }
     });
-    assert.equal(demotion.status, 409, 'demoting the last administrator is the same loss');
+    assert.equal(demotion.status, 403, 'demoting the last administrator is the same loss');
+    assert.equal((await membershipOf(alfa, ownerId)).role, 'admin');
+
+    // And signed into beta, where she really is an administrator, alfa's owner
+    // is not somebody she can reach either — answered as nonexistent rather
+    // than forbidden, because "you may not touch this one" would confirm the id
+    // belongs to a real person at another provider.
+    const atBeta = await call(`${panelUrl}/api/auth/login`, {
+      method: 'POST',
+      body: { ...CAROL, tenantId: beta }
+    });
+    assert.equal(atBeta.status, 200);
+    const acrossProviders = await call(`${panelUrl}/api/users/${ownerId}`, {
+      method: 'DELETE',
+      headers: authHeaders(atBeta.body.data.token)
+    });
+    assert.equal(acrossProviders.status, 404);
     assert.equal((await membershipOf(alfa, ownerId)).role, 'admin');
 
     assert.equal(

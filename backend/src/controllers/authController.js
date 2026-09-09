@@ -1,15 +1,51 @@
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
-import { generateTokens, verifyToken } from '../middleware/auth.js';
+import TenantUser from '../models/TenantUser.js';
+import { generateTokens, resolveMembership, verifyToken } from '../middleware/auth.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 
 const DUMMY_PASSWORD_HASH = bcrypt.hashSync('skygenpanel-invalid-login-placeholder', 12);
 
+/**
+ * Which provider this sign-in is for.
+ *
+ * `users` is the identity table and `username` is still global, so the password
+ * answers "who is this"; `tenant_users` answers "and working for whom". A
+ * consultant or a reseller with one login across several ISPs is the ordinary
+ * arrangement in this market, so this can return more than one candidate and
+ * has to choose — but never at random, and never invisibly:
+ *
+ *  - the caller may name the provider outright, in `tenantId`. That is the
+ *    honest answer to ambiguity, and it is what a provider picker on the login
+ *    screen will send. A `tenantId` for a provider the person does not work for
+ *    resolves to nothing rather than falling back to another one, so a wrong
+ *    guess never quietly signs somebody into the wrong ISP.
+ *  - with nothing named, one membership is that membership.
+ *  - with nothing named and several, it is the OLDEST membership — the provider
+ *    they have worked for longest, which for a reseller is the one that is
+ *    theirs and for everybody else is their only real employer. It is chosen by
+ *    a rule rather than by whatever the database felt like returning first, it
+ *    is stable across engines and restarts, and the response says which
+ *    provider was picked so the choice is on screen rather than buried in a
+ *    token. Switching provider is signing in again naming the other one.
+ *
+ * No membership returns null, and the caller must refuse the sign-in.
+ */
+async function membershipForLogin(userId, requestedTenantId) {
+  if (requestedTenantId !== undefined && requestedTenantId !== null && requestedTenantId !== '') {
+    const id = Number(requestedTenantId);
+    if (!Number.isInteger(id) || id <= 0) return null;
+    return TenantUser.find(id, userId);
+  }
+  const memberships = await TenantUser.listForUser(userId);
+  return memberships[0] || null;
+}
+
 class AuthController {
   static async login(req, res) {
     try {
-      const { username, password } = req.body;
-      
+      const { username, password, tenantId } = req.body;
+
       if (!username || !password) {
         return res.status(400).json(
           createErrorResponse(req.t('auth.credentialsRequired'))
@@ -37,21 +73,41 @@ class AuthController {
       }
       
       const isMatch = await bcrypt.compare(password, user.password);
-      
+
       if (!isMatch) {
         return res.status(401).json(
           createErrorResponse(req.t('auth.invalidCredentials'))
         );
       }
-      
-      const { accessToken, refreshToken } = generateTokens(user);
-      
+
+      const membership = await membershipForLogin(user.id, tenantId);
+
+      // Somebody who works for nobody cannot sign in — there is no provider to
+      // put the session in, and a session with no provider is the unscoped read
+      // this whole mechanism exists to prevent. The refusal is the same status
+      // and the same message as a wrong password, deliberately: telling the two
+      // apart would confirm a valid username to whoever is trying them, and on
+      // a deployment with several ISPs it would confirm which staff belong to
+      // which one.
+      if (!membership) {
+        return res.status(401).json(
+          createErrorResponse(req.t('auth.invalidCredentials'))
+        );
+      }
+
+      const { accessToken, refreshToken } = generateTokens(user, membership);
+
       return res.json(
         createResponse(req.t('auth.loginSuccess'), {
           user: {
             id: user.id,
             username: user.username,
-            role: user.role,
+            // The membership's role, not `users.role`: it is what the token
+            // carries and what the panel is about to gate its screens on, so
+            // the two disagreeing would show an operator the buttons of an
+            // administrator they are not, here.
+            role: membership.role,
+            tenantId: Number(membership.tenant_id),
             createdAt: user.created_at,
             updatedAt: user.updated_at
           },
@@ -105,17 +161,21 @@ class AuthController {
       }
 
       const hashedPassword = await bcrypt.hash(password, 12);
-      const userId = await User.createInitialAdmin({
+      // The person AND their membership, in one transaction. A first admin
+      // without a membership would be a fresh install nobody can sign in to:
+      // the account exists, the password is right, and the login refuses
+      // because there is no provider to put the session in.
+      const { id: userId, tenantId, role } = await User.createInitialAdmin({
         username: normalizedUsername,
         password: hashedPassword
       });
-      const user = { id: userId, username: normalizedUsername, role: 'admin' };
+      const user = { id: userId, username: normalizedUsername };
 
-      const { accessToken, refreshToken } = generateTokens(user);
+      const { accessToken, refreshToken } = generateTokens(user, { tenant_id: tenantId, role });
 
       return res.status(201).json(
         createResponse(req.t('auth.adminCreated'), {
-          user: { id: userId, username: normalizedUsername, role: 'admin' },
+          user: { id: userId, username: normalizedUsername, role, tenantId },
           token: accessToken,
           refreshToken
         })
@@ -148,7 +208,12 @@ class AuthController {
         createResponse(req.t('auth.userRetrieved'), {
           id: user.id,
           username: user.username,
-          role: user.role,
+          // From the session rather than from the row, for the same reason the
+          // login response reports it that way: this is the answer the panel
+          // rebuilds its menus from after a page reload, and `users.role` is
+          // not what this session is authorised with.
+          role: req.user.role,
+          tenantId: req.user.tenantId,
           createdAt: user.created_at,
           updatedAt: user.updated_at
         })
@@ -208,9 +273,21 @@ class AuthController {
           createErrorResponse(req.t('auth.refreshSessionInvalid'))
         );
       }
-      
-      const { accessToken, refreshToken: newRefreshToken } = generateTokens(user);
-      
+
+      // The same provider the session was already running in, re-read from the
+      // table so a membership ended since the refresh token was minted ends the
+      // session at its next hour rather than at its next week. A refresh token
+      // from before this change names no provider and is resolved the same way
+      // an old access token is: through the sole membership, or refused.
+      const membership = await resolveMembership(user.id, decoded.tenantId);
+      if (!membership) {
+        return res.status(403).json(
+          createErrorResponse(req.t('auth.refreshSessionInvalid'))
+        );
+      }
+
+      const { accessToken, refreshToken: newRefreshToken } = generateTokens(user, membership);
+
       return res.json(
         createResponse(req.t('auth.tokenRefreshed'), {
           token: accessToken,
