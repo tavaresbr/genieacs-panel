@@ -182,7 +182,12 @@ describe('the Customer ID sweep, per provider', () => {
     // A retirement renames `device_id` to `retired:<id>`. One provider's pass
     // seeing the other's account for the same device would have retired it,
     // because the PPPoE login it carries belongs to a subscriber it cannot see.
-    assert.equal((await getDb()('customer_accounts').whereLike('device_id', 'retired:%')).length, 0);
+    // `where(..., 'like', ...)` and NOT knex's `whereLike`: that helper asks for
+    // a case-SENSITIVE match, which MySQL implements by appending
+    // `COLLATE utf8_bin` — a utf8mb3 collation the server refuses against a
+    // utf8mb4 column. Case does not matter here anyway; the prefix is a literal
+    // this codebase writes itself.
+    assert.equal((await getDb()('customer_accounts').where('device_id', 'like', 'retired:%')).length, 0);
   });
 
   it('does not mint a provider an id out of a date it never recorded', async () => {
