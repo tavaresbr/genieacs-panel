@@ -507,6 +507,4 @@ export default {
   'whatsapp.bot.invoiceLink': '帳單副本：{value}',
   'whatsapp.bot.signalOkNoReading': '您的寬頻在線。',
 
-  'whatsapp.messagesSwept': '已從歷史記錄中刪除 {count} 則訊息',
-  'whatsapp.messageSweepFailed': '無法清理對話歷史記錄',
 };

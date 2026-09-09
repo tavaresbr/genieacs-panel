@@ -1218,7 +1218,7 @@ digitar um número e receber o assinante de outro.
 - `sgp_links` entra em `SCOPED_TABLES` **no mesmo commit** que converte os
   modelos. Entrar antes deixa a tabela filtrada com escritas que não gravam
   `tenant_id`; entrar depois deixa a conversão sem o teste que a prova.
-- O ponto sensível é `waConversationService.resolveByPhone`: hoje ele lê a
+- O ponto sensível é `waConversationService.resolveSubscriber`: hoje ele lê a
   tabela inteira. Depois desta onda, um número que existe em outro provedor
   tem de resolver como **desconhecido**, não como assinante. Resolver telefone
   continua sendo conveniência, nunca autenticação — a regra das ondas 2 e 3
@@ -1268,3 +1268,13 @@ de contratos, ela só cresce.
   disco.
 - Roda no mesmo laço de 6 h, por provedor, dentro de escopo — `wa_messages` é
   tabela escopada, então aqui não há desculpa de `forSoleTenant`.
+- **`delivery_status` é NULL em toda mensagem que CHEGA.** A coluna descreve um
+  envio, e nada foi enviado. Um `whereNotIn('delivery_status', [...])` simples
+  compara contra NULL, resulta em NULL em vez de verdadeiro, e protege para
+  sempre a metade do cliente de toda conversa — uma varredura que parece
+  funcionar até alguém contar as linhas. O ramo `whereNull` explícito é o que
+  deixa uma mensagem recebida envelhecer.
+- Não existe rota de limpeza manual do histórico, ao contrário da mídia. O
+  botão da mídia existe para o disco cheio agora; crescimento de tabela não tem
+  essa urgência, e o laço de 6 h dá conta. Uma rota que apaga histórico sob
+  demanda seria superfície destrutiva a mais sem nada que a peça.

@@ -508,6 +508,4 @@ export default {
   'whatsapp.mediaSweepFailed': 'Не удалось выполнить очистку вложений',
   'whatsapp.healthLoaded': 'Состояние интеграции получено',
   'whatsapp.healthLoadFailed': 'Не удалось получить состояние интеграции',
-  'whatsapp.messagesSwept': 'Из истории удалено сообщений: {count}',
-  'whatsapp.messageSweepFailed': 'Не удалось очистить историю переписки',
 };

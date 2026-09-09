@@ -507,6 +507,4 @@ export default {
   'whatsapp.bot.invoicePix': 'PIX 复制粘贴码：{value}',
   'whatsapp.bot.invoiceLink': '账单副本：{value}',
   'whatsapp.bot.signalOkNoReading': '您的宽带在线。',
-  'whatsapp.messagesSwept': '已从历史记录中删除 {count} 条消息',
-  'whatsapp.messageSweepFailed': '无法清理会话历史记录',
 };
