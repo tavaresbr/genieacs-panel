@@ -56,6 +56,40 @@ class SgpLink {
       .update({ phone_manual: phone, updated_at: new Date() });
   }
 
+  /**
+   * Carries a contract's link from the ONT that was replaced onto the one that
+   * replaced it.
+   *
+   * An update rather than a delete and a fresh `upsert`: the row holds two
+   * things the ERP did not put there — `phone_manual`, the operator's
+   * correction to the subscriber's number, and `link_mode: 'manual'`, which
+   * says reconciliation must not overwrite the binding. Rebuilding the row from
+   * a contract lookup would discard both without any error, and the operator
+   * would find the correction gone with nothing to explain it.
+   *
+   * When the replacement already has a link of its own there is nothing to
+   * carry: the old row is dropped so it stops pointing at equipment that is out
+   * of service. The manual phone does not need carrying over in that case —
+   * `setManualPhone` writes it on every row of the contract, so a link for the
+   * same contract already has it, and a link for a different contract belongs
+   * to another subscriber and must not inherit it.
+   */
+  static async moveDevice(previousDeviceId, deviceId) {
+    const previous = await tdb('sgp_links').where({ device_id: previousDeviceId }).first();
+    if (!previous) return { action: 'none', link: null };
+
+    const target = await tdb('sgp_links').where({ device_id: deviceId }).first();
+    if (target) {
+      await tdb('sgp_links').where({ id: previous.id }).del();
+      return { action: 'cleared', link: target };
+    }
+
+    await tdb('sgp_links')
+      .where({ id: previous.id })
+      .update({ device_id: deviceId, updated_at: new Date() });
+    return { action: 'moved', link: await this.getByDeviceId(deviceId) };
+  }
+
   /** Round-robin page used by reconciliation so no link is starved. */
   static async listAfterId(afterId = 0, limit = 25) {
     return tdb('sgp_links')

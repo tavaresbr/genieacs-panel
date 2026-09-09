@@ -8,6 +8,8 @@ import { devicesAPI, sgpAPI, type SgpContractLink, type SgpInvoice } from '@/lib
 import { formatDate } from '@/lib/utils'
 import { Icon } from '@/components/ui/icon'
 import { ProvisioningCard } from '@/components/provisioning-card'
+import { DeviceHistoryCard } from '@/components/device-history-card'
+import { DeviceSwapsCard } from '@/components/device-swaps-card'
 import { useAuth } from '@/contexts/auth-context'
 import { useTranslation } from '@/contexts/language-context'
 
@@ -1561,6 +1563,10 @@ export default function DeviceDetailPage() {
             {sgpAvailable && (
               <ProvisioningCard deviceId={deviceId} />
             )}
+
+            <DeviceSwapsCard deviceId={deviceId} />
+
+            <DeviceHistoryCard deviceId={deviceId} />
 
             <div className="modern-card p-6">
               <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">{t('detail.signalInfo.title')}</h2>

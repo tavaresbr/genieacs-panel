@@ -515,6 +515,40 @@ class DeviceService {
     return data.map((item) => this.processDeviceData(item, virtualParams));
   }
 
+  /**
+   * The cheapest whole-fleet telemetry read: four parameters, one request.
+   *
+   * Deliberately not `fetchGenieAcsWithHeaders` — that exists to read the
+   * `total` header for paging, and there is no paging here.
+   *
+   * `_lastInform` is part of the projection because it is the sample's time
+   * axis: GenieACS only refreshes a parameter when the device informs, so the
+   * inform is when the reading was actually taken.
+   */
+  static async getTelemetryFleet() {
+    const virtualParams = await this.getVirtualParameters();
+    const projection = [
+      '_id',
+      '_lastInform',
+      virtualParams.vpRxPower,
+      virtualParams.vpTemperature,
+      'InternetGatewayDevice.DeviceInfo.UpTime'
+    ].filter(Boolean);
+    const data = await this.fetchFromGenieAcs(
+      `?projection=${encodeURIComponent(projection.join(','))}`
+    );
+    if (!Array.isArray(data)) {
+      throw new Error('Invalid GenieACS telemetry response');
+    }
+    return data.map((item) => ({
+      deviceId: item._id || null,
+      lastInform: item._lastInform ?? null,
+      rxPower: this.getParameterValue(item, virtualParams.vpRxPower),
+      temperature: this.getParameterValue(item, virtualParams.vpTemperature),
+      uptime: this.getParameterValue(item, 'InternetGatewayDevice.DeviceInfo.UpTime')
+    }));
+  }
+
   static processDeviceData(item, virtualParams) {
     const pppsecret = this.getParameterValue(item, virtualParams.vpPppoeUsername);
     const wanbridge = this.getParameterValue(item, virtualParams.vpWanBridge);

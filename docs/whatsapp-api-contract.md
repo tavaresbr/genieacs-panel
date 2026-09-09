@@ -1210,7 +1210,7 @@ mensagem que chega. Era a última tabela do caminho do WhatsApp lida sem filtro
 de provedor — e, portanto, o último lugar onde o operador de um provedor podia
 digitar um número e receber o assinante de outro.
 
-- A migração `0017_sgp_links_tenant` já existe: adiciona `tenant_id`, faz o
+- A migração `0019_sgp_links_tenant` já existe: adiciona `tenant_id`, faz o
   backfill para o provedor do install, e troca o único global de `device_id`
   pelo par `['tenant_id', 'device_id']`.
 - Todo acesso a `sgp_links` passa a ir por `tdb`. Nenhum `getDb()('sgp_links')`
@@ -1318,7 +1318,7 @@ para ler, e o botão não faz nada em silêncio.
 
 ### 1. Recuo exponencial — `next_attempt_at`
 
-- A coluna já existe (migração `0018`), é anulável, e **NULL significa "pode
+- A coluna já existe (migração `0020`), é anulável, e **NULL significa "pode
   agora"**. É a única leitura que não trava a fila de um install ao atualizar.
 - `listSendable` e `claim` passam a respeitar a hora devida. O índice
   `(delivery_status, next_attempt_at)` existe para essa consulta.
@@ -1396,7 +1396,7 @@ Dois minutos não dão esse tempo, e o preço de estourar é a campanha toda.
   `waSendFailure`, não reescritos. Uma campanha que desistisse num cronograma
   diferente do da fila que ela alimenta seria uma segunda política que ninguém
   decidiu.
-- Migração `0019`, mesmas regras do `0018`: coluna anulável, NULL é "pode
+- Migração `0021`, mesmas regras do `0020`: coluna anulável, NULL é "pode
   agora", índice começando por `broadcast_id` porque é assim que
   `listPendingIds` pergunta.
 - O ramo do `sending` velho **ignora** a hora devida de propósito: retomada de

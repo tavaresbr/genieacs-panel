@@ -11,6 +11,7 @@ import { useToast } from '@/components/ui/toast'
 import { PieChart } from '@/components/charts/pie-chart'
 import { BarChart } from '@/components/charts/bar-chart'
 import { TrendChart } from '@/components/charts/trend-chart'
+import { DeviceSwapsCard } from '@/components/device-swaps-card'
 
 interface Fault {
   id: string
@@ -322,6 +323,8 @@ export default function DashboardPage() {
             <button className="modern-button-secondary" onClick={() => void loadDashboard(true)}>{t('common.retry')}</button>
           </div>
         )}
+
+        {isAdmin && <DeviceSwapsCard />}
 
         <section className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {([

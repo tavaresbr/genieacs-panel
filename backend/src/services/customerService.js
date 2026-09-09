@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import CustomerAccount from '../models/CustomerAccount.js';
 import SgpLink from '../models/SgpLink.js';
 import CustomerPortalPasswordService from './customerPortalPasswordService.js';
+import DeviceSwapService from './deviceSwapService.js';
 import DeviceProfile from '../models/DeviceProfile.js';
 import Setting from '../models/Setting.js';
 import { TranslatableError } from '../i18n/index.js';
@@ -152,14 +153,21 @@ class CustomerService {
 
     const existingByIdentity = await CustomerAccount.getByIdentityHash(identityHash);
     if (existingByIdentity) {
-      return CustomerAccount.touch(existingByIdentity.id, deviceId);
+      // A replacement ONT of the same model on the same firmware hashes to the
+      // same identity, so this branch — not the PPPoE one below — is where the
+      // ordinary swap lands.
+      const moved = await CustomerAccount.touch(existingByIdentity.id, deviceId);
+      await this.noteSwap(existingByIdentity, deviceId, 'identity_hash');
+      return moved;
     }
 
     // The same subscriber on a replacement ONT: the device ID and the software
     // version both changed, so only the PPPoE login still matches.
     const existingByPppoe = await CustomerAccount.getActiveByPppoe(pppoeUsername);
     if (existingByPppoe) {
-      return this.touchIdentity(existingByPppoe, deviceId, softwareId, identityHash);
+      const moved = await this.touchIdentity(existingByPppoe, deviceId, softwareId, identityHash);
+      await this.noteSwap(existingByPppoe, deviceId, 'pppoe');
+      return moved;
     }
 
     const generationSettings = await this.getGenerationSettings();
@@ -200,6 +208,27 @@ class CustomerService {
       }
     }
     throw new TranslatableError('settings.customerIdAllocationFailed');
+  }
+
+  /**
+   * Files the replacement of one ONT by another, once the account has already
+   * moved onto the new one.
+   *
+   * After the move, not before: the record is of something that happened, and
+   * writing it first would leave a swap on file that the sync then failed to
+   * carry out. It also never fails the sync — a device whose account moved but
+   * whose swap could not be filed is a missing line in a list, and refusing the
+   * whole sync over it would take the panel's device page down with it.
+   */
+  static async noteSwap(account, deviceId, matchedBy) {
+    const previousDeviceId = normalizeIdentityValue(account?.device_id);
+    if (!previousDeviceId || previousDeviceId === deviceId) return null;
+    try {
+      return await DeviceSwapService.record(account, previousDeviceId, deviceId, matchedBy);
+    } catch (error) {
+      console.warn(`Unable to record a CPE swap for ${previousDeviceId}: ${error.message}`);
+      return null;
+    }
   }
 
   /**

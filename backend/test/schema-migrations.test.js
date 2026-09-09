@@ -28,7 +28,10 @@ const APP_TABLES = [
   'provisioning_profiles',
   'provisioning_runs',
   'sgp_events',
-  'whatsapp_accounts'
+  'whatsapp_accounts',
+  'device_samples',
+  'device_sample_hours',
+  'device_swaps'
 ];
 
 /** Every secret kept in its own columns records which key encrypted it. */

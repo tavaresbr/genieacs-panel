@@ -10,6 +10,7 @@ import DeviceService from './deviceService.js';
 import WaSendService from './waSendService.js';
 import WhatsAppConfigService, { WaError } from './whatsappConfigService.js';
 import { normalizarTelefoneBr } from '../utils/wa/waDestino.js';
+import { timestampMs } from '../utils/helpers.js';
 import { DEFAULT_LOCALE, translatorFor } from '../i18n/index.js';
 import { TenantCache } from '../config/tenantCache.js';
 import { currentTenantId } from '../config/tenantContext.js';
@@ -109,13 +110,6 @@ const AGGREGATION_TYPES = Object.freeze(['odp', 'odc', 'olt']);
  * or a string depending on the driver's settings. The cooldown is the one
  * comparison in this file that must be right on all three.
  */
-function timestampMs(value) {
-  if (value === null || value === undefined) return Number.NaN;
-  if (value instanceof Date) return value.getTime();
-  if (typeof value === 'number') return value;
-  return Date.parse(String(value));
-}
-
 /** A telemetry reading is only a reading when it is a finite number. */
 function reading(value) {
   if (value === null || value === undefined || value === '') return null;
