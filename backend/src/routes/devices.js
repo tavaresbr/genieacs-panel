@@ -9,6 +9,8 @@ router.get('/', authenticateToken, DeviceController.getDevices);
 router.get('/dashboard', authenticateToken, DeviceController.getDashboard);
 router.get('/faults', authenticateToken, DeviceController.getFaults);
 router.delete('/faults/:faultId', authenticateToken, requireRole(['admin']), DeviceController.deleteFault);
+// Above the bare `/:deviceId` route, like the other device sub-paths.
+router.get('/:deviceId/history', authenticateToken, DeviceController.getHistory);
 router.get('/:deviceId/portal-password', authenticateToken, requireRole(['admin']), portalPasswordAdminLimiter, DeviceController.getPortalPassword);
 router.post('/:deviceId/portal-password/reset', authenticateToken, requireRole(['admin']), portalPasswordAdminLimiter, DeviceController.resetPortalPassword);
 router.get('/:deviceId', authenticateToken, requireRole(['admin']), DeviceController.getDeviceDetail);

@@ -15,11 +15,15 @@ export function buildDevice({
   pppoeUsername = 'joao@provedor',
   ssid = 'FACTORY-SSID',
   vlanId = 0,
-  tags = []
+  tags = [],
+  lastInform = null,
+  rxPower = -21.5,
+  temperature = 42,
+  upTime = 86_400
 } = {}) {
   return {
     _id: id,
-    _lastInform: new Date().toISOString(),
+    _lastInform: lastInform ?? new Date().toISOString(),
     _registered: '2026-09-01T00:00:00.000Z',
     _tags: tags,
     _deviceId: {
@@ -29,12 +33,15 @@ export function buildDevice({
     },
     VirtualParameters: {
       PPPUsername: node(pppoeUsername, false),
-      LoginSuperPass: node('factory', true)
+      LoginSuperPass: node('factory', true),
+      OpticalRXPower: node(rxPower, false),
+      OpticalTemperature: node(temperature, false)
     },
     InternetGatewayDevice: {
       DeviceInfo: {
         SoftwareVersion: node('V1.0.0', false),
-        SerialNumber: node('ZTEG12345678', false)
+        SerialNumber: node('ZTEG12345678', false),
+        UpTime: node(upTime, false)
       },
       WANDevice: {
         1: {

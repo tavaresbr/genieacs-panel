@@ -42,6 +42,11 @@ export const SCOPED_TABLES = new Set([
   // is not configuration at all but a provider's own device and fault counts.
   'settings',
   'app_state',
+  // Telemetry. A sample is a reading from one provider's subscriber's
+  // equipment, and the device id it is keyed on is only unique inside that
+  // provider's GenieACS — two providers can hand the same id to two ONTs.
+  'device_samples',
+  'device_sample_hours',
   // The SGP and provisioning group. Four of its uniques were on values the
   // panel does not generate — GenieACS device ids, an SGP dedupe key, a
   // profile name the operator chose — and were global. Scoping them is what
