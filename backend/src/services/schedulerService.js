@@ -2,7 +2,7 @@ import AppState from '../models/AppState.js';
 import ProvisioningService from './provisioningService.js';
 import SgpEventService from './sgpEventService.js';
 import SgpService from './sgpService.js';
-import { forSoleTenant } from '../config/tenantJobs.js';
+import { forEachTenant } from '../config/tenantJobs.js';
 
 const STATE_KEY = 'scheduler_state';
 const BASE_INTERVAL_MS = 60_000;
@@ -29,10 +29,16 @@ class SchedulerService {
   static async start() {
     if (this.timer) return this.timer;
     // A process that died mid-run leaves rows nothing would ever finish.
-    await forSoleTenant('The interrupted-run reaper', () => ProvisioningService.reapInterrupted())
-      .catch((error) => {
-        console.warn(`Could not reap interrupted provisioning runs: ${error.message}`);
-      });
+    //
+    // Per provider, like the tick below. It reaches `provisioning_runs` and
+    // nothing else, so the loop divides the work rather than repeating it.
+    await forEachTenant(() => ProvisioningService.reapInterrupted(), {
+      onError: (error, tenant) => {
+        console.warn(`Could not reap interrupted provisioning runs for ${tenant.slug}: ${error.message}`);
+      }
+    }).catch((error) => {
+      console.warn(`Could not reap interrupted provisioning runs: ${error.message}`);
+    });
     this.timer = setInterval(() => {
       void this.tick().catch((error) => {
         console.warn(`Scheduler tick failed: ${error.message}`);
@@ -73,19 +79,39 @@ class SchedulerService {
    *
    * The scope is opened here, per tick, and not once around `start()`. A scope
    * taken at boot would be captured by the interval and held for the life of
-   * the process — so a provider added afterwards would never be noticed, and
-   * `forSoleTenant`'s refusal, which is the whole safeguard, would never fire.
+   * the process, so a provider added afterwards would never be visited at all.
+   *
+   * Per provider since `provisioning_runs` and `sgp_events` were scoped: every
+   * driving query now filters by the provider in scope, so the loop divides
+   * the work instead of repeating it. Each provider's own schedule comes from
+   * its own `app_state` row, which is what makes that true of the CADENCE and
+   * not only of the rows — a provider that reconciles hourly no longer drags
+   * one that reconciles daily.
+   *
+   * One provider failing does not stop the others: a broken ERP integration at
+   * one ISP must not be why every other ISP's queue stops draining.
+   *
+   * The daily prune is decided ONCE per tick, above the loop, and handed down.
+   * `lastPruneAt` is a counter on this class rather than a row, so inside the
+   * loop the first provider would set it and every provider after it would
+   * skip its own prune — for that whole day, every day. The cadence is the
+   * deployment's; the rows each pass deletes are the provider's.
    */
   static async tick() {
     if (this.tickPromise) return this.tickPromise;
-    this.tickPromise = forSoleTenant('The provisioning and SGP scheduler', () => this.runJobs())
-      .finally(() => {
-        this.tickPromise = null;
-      });
+    const prune = Date.now() - this.lastPruneAt >= PRUNE_INTERVAL_MS;
+    if (prune) this.lastPruneAt = Date.now();
+    this.tickPromise = forEachTenant((tenant) => this.runJobs({ prune }), {
+      onError: (error, tenant) => {
+        console.warn(`Scheduler tick failed for provider ${tenant.slug}: ${error.message}`);
+      }
+    }).finally(() => {
+      this.tickPromise = null;
+    });
     return this.tickPromise;
   }
 
-  static async runJobs() {
+  static async runJobs({ prune = false } = {}) {
     const summary = { provisioning: null, events: null, reconcile: null };
     const state = await this.readState();
 
@@ -114,10 +140,11 @@ class SchedulerService {
       }
     }
 
-    if (Date.now() - this.lastPruneAt >= PRUNE_INTERVAL_MS) {
-      this.lastPruneAt = Date.now();
+    if (prune) {
       // Both tables grow with every activation and every delivery, so a busy
-      // install would otherwise fill its database.
+      // install would otherwise fill its database. Whether today is a prune day
+      // was decided by `tick`; what gets deleted is this provider's own, by its
+      // own retention setting.
       await ProvisioningService.prune().catch((error) => {
         console.warn(`Could not prune provisioning runs: ${error.message}`);
       });

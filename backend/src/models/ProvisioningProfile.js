@@ -1,4 +1,4 @@
-import { getDb, insertReturningId } from '../config/database.js';
+import { tdb, tinsertReturningId } from '../config/database.js';
 
 function parseList(value, fallback = []) {
   if (!value) return fallback;
@@ -28,9 +28,25 @@ function parseRow(row) {
   };
 }
 
+/**
+ * The provisioning rulebook, one per provider.
+ *
+ * A profile is what an ISP decided its own plans should do to an ONT: which
+ * VLAN, which SSID template, which admin credential. None of that is
+ * meaningful to another ISP, and `wifi_password_ciphertext` and
+ * `cpe_password_ciphertext` are that ISP's secrets — so every read here goes
+ * through `tdb`, which puts the provider in the WHERE rather than trusting
+ * each method to remember it.
+ *
+ * `name` used to be unique deployment-wide, which meant the second provider to
+ * call a profile "Fibra" was told the name was taken by a row it could not
+ * even see. Since 0023 the unique is `(tenant_id, name)`, so `getByName` — the
+ * duplicate check the controller runs before an insert — has to be scoped for
+ * that to be true in the panel and not only in the schema.
+ */
 class ProvisioningProfile {
   static async getAll() {
-    const rows = await getDb()('provisioning_profiles').orderBy([
+    const rows = await tdb('provisioning_profiles').orderBy([
       { column: 'priority', order: 'desc' },
       { column: 'name', order: 'asc' }
     ]);
@@ -38,44 +54,44 @@ class ProvisioningProfile {
   }
 
   static async getEnabled() {
-    const rows = await getDb()('provisioning_profiles')
+    const rows = await tdb('provisioning_profiles')
       .where({ enabled: true })
       .orderBy([{ column: 'priority', order: 'desc' }, { column: 'name', order: 'asc' }]);
     return rows.map(parseRow);
   }
 
   static async getById(id) {
-    return parseRow(await getDb()('provisioning_profiles').where({ id }).first());
+    return parseRow(await tdb('provisioning_profiles').where({ id }).first());
   }
 
   static async getByName(name) {
-    return parseRow(await getDb()('provisioning_profiles').where({ name }).first());
+    return parseRow(await tdb('provisioning_profiles').where({ name }).first());
   }
 
   static async create(row) {
-    const id = await insertReturningId('provisioning_profiles', row);
+    const id = await tinsertReturningId('provisioning_profiles', row);
     return this.getById(id);
   }
 
   static async update(id, patch) {
-    await getDb()('provisioning_profiles')
+    await tdb('provisioning_profiles')
       .where({ id })
       .update({ ...patch, updated_at: new Date() });
     return this.getById(id);
   }
 
   static async delete(id) {
-    const affected = await getDb()('provisioning_profiles').where({ id }).del();
+    const affected = await tdb('provisioning_profiles').where({ id }).del();
     return affected > 0;
   }
 
   static async count() {
-    const [row] = await getDb()('provisioning_profiles').count({ total: '*' });
+    const [row] = await tdb('provisioning_profiles').count({ total: '*' });
     return Number(row?.total ?? 0);
   }
 
   static async countEnabled() {
-    const [row] = await getDb()('provisioning_profiles').where({ enabled: true }).count({ total: '*' });
+    const [row] = await tdb('provisioning_profiles').where({ enabled: true }).count({ total: '*' });
     return Number(row?.total ?? 0);
   }
 }

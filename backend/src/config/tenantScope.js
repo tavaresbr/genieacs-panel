@@ -25,11 +25,31 @@ export const SCOPED_TABLES = new Set([
   // subscriber's portal login. Across two it is account takeover, because the
   // same firmware and a same-named subscriber produce the same hash.
   'customer_accounts',
+  // The subscriber's SSID and their AES-GCM-encrypted WiFi password. No
+  // provider could read another's before this: every method filters on
+  // `account_id`, and `customer_accounts` has been scoped since 0010, so the
+  // parent already refused to hand one provider another's account. What the
+  // column buys is a filter of its own rather than one inherited through a
+  // join, which is what a stored secret should rest on.
+  'customer_wifi_credentials',
+  // The installation dates. Read across providers, the date one ISP recorded
+  // for a device id becomes the suffix of another ISP's Customer ID — and since
+  // the same read is what decides insert-vs-update, the second provider never
+  // got a row at all: it overwrote the first's, so correcting a date at one ISP
+  // silently changed a subscriber's at the other.
+  'device_profiles',
   // The contract cadastre. It is what turns a device id into a subscriber, so
   // it is also the table the WhatsApp side resolves an inbound phone number
   // against: unfiltered, one provider's operator could type a number and be
   // handed another provider's contract, name and document.
   'sgp_links',
+  // The ERP event log, and the heaviest concentration of personal data here:
+  // contract, document, PPPoE login, device id and a redacted payload, per
+  // event. Deployment-wide it also had a second failure that read as no
+  // failure at all — `dedupe_key` was unique across every provider while it is
+  // built from SGP's per-ERP sequential event id, so one ISP's event #12345
+  // was filed as a redelivery of another ISP's and silently discarded.
+  'sgp_events',
   // The WhatsApp inbox and its send queue. Scoping these is what lets the
   // outbox worker drain one provider at a time instead of the deployment.
   'wa_conversations',
@@ -42,6 +62,13 @@ export const SCOPED_TABLES = new Set([
   'wa_broadcasts',
   'wa_broadcast_recipients',
   'wa_alert_state',
+  // The provisioning rulebook and its history. A profile is one ISP's decision
+  // about its own plans, secrets included; a run names a device id and a
+  // contract, neither of which is unique outside the provider that issued it.
+  // Scoping the pair together is what lets the reaper and the retention prune
+  // — whose WHERE is only a status and a cutoff — stop being deployment-wide.
+  'provisioning_profiles',
+  'provisioning_runs',
   // The configuration pair. `settings` is what an operator sets on screen;
   // `app_state` holds the integration blobs — and `dashboard_snapshot`, which
   // is not configuration at all but a provider's own device and fault counts.
@@ -57,13 +84,36 @@ export const SCOPED_TABLES = new Set([
   // Where the operator's own plant is centred. A singleton keyed `id: 1`, so
   // its WHERE never was an identity filter — it meant "the only row", and the
   // second provider to save a map centre wrote over the first's.
-  'map_settings'
+  'map_settings',
+  // The equipment catalogue. Its content really is the same fact about firmware
+  // for every ISP, but the rows are edited on screen, so shared they made one
+  // operator's corrected detection pattern or parameter path silently change
+  // another's WiFi writes. The three move together because a mapping points at
+  // a vendor and the delete cascades down that foreign key — scoping the parent
+  // alone would leave a destructive write reaching across providers.
+  'vendors',
+  'wifi_security_mappings',
+  'wifi_security_config'
 ]);
 
 /** Tables that belong to the deployment rather than to any one provider. */
 export const SHARED_TABLES = new Set([
   // The provider registry itself.
-  'tenants'
+  'tenants',
+  // A row in `users` is a PERSON, not one provider's data. A consultant or a
+  // reseller serving several ISPs with one login is the common arrangement in
+  // this market, and a `tenant_id` here would foreclose it — while the three
+  // foreign keys that point at `users.id` (who sent the message, who revoked
+  // the opt-out, who created the campaign) would still name only the id, so
+  // nothing in the schema would stop one provider's operator being recorded as
+  // the sender of another's message.
+  'users',
+  // The bridge that says which providers a person works for, and with what
+  // role at each. Shared for the same reason `tenants` is: it is asked BEFORE
+  // a scope exists, at login, to decide which scope to open — reading it
+  // through the scope would be circular. `TenantUser` carries the rule that
+  // every query against it must name a person or a provider.
+  'tenant_users'
 ]);
 
 /** Tables still to be converted. Shrinks to empty as the phase progresses. */

@@ -1,6 +1,13 @@
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { authHeaders, call, startTestServers, stopTestServers } from './helpers/harness.js';
+import {
+  authHeaders,
+  call,
+  defaultTenantId,
+  getDb,
+  startTestServers,
+  stopTestServers
+} from './helpers/harness.js';
 
 let panelUrl;
 let adminToken;
@@ -14,6 +21,15 @@ before(async () => {
     body: { username: 'owner', password: 'owner-password-1' }
   });
   adminToken = setup.body.data.token;
+
+  // `/api/auth/setup` now creates the membership along with the person, in the
+  // same transaction as the setup latch, so the owner is on her own team from
+  // the moment she exists. This hook used to insert that row by hand while the
+  // login path was still being written; doing it now would insert it twice.
+  const membership = await getDb()('tenant_users')
+    .where({ tenant_id: await defaultTenantId(), user_id: setup.body.data.user.id })
+    .first();
+  assert.ok(membership, 'setup left the first administrator off her own team');
 });
 
 after(async () => {
@@ -163,14 +179,28 @@ describe('guard rails', () => {
     assert.equal(reused.status, 403);
   });
 
-  it('deletes an operator that is not the last administrator', async () => {
+  it('removes an operator that is not the last administrator', async () => {
     const { status } = await call(`${panelUrl}/api/users/${viewerId}`, {
       method: 'DELETE',
       headers: authHeaders(adminToken)
     });
     assert.equal(status, 200);
 
+    const remaining = await call(`${panelUrl}/api/users`, { headers: authHeaders(adminToken) });
+    assert.ok(
+      !remaining.body.data.users.some((user) => user.id === viewerId),
+      'the operator is off this provider\'s team'
+    );
+    // The person is NOT deleted — she may work for another provider, and her
+    // name is on history that points at her id.
+    assert.ok(await getDb()('users').where({ id: viewerId }).first(), 'the person survives');
+
+    // Surviving is not the same as still being able to work here. The login
+    // resolves a membership, and she no longer has one, so the account that
+    // outlives the removal is an account nobody can sign in to. The other half
+    // of the same wave; `auth-tenancy.test.js` covers the case where she is
+    // still on another provider's team and signs in there instead.
     const login = await call(`${panelUrl}/api/auth/login`, { method: 'POST', body: VIEWER });
-    assert.equal(login.status, 401, 'a deleted operator can no longer sign in');
+    assert.equal(login.status, 401, 'an operator removed from this provider cannot sign in');
   });
 });

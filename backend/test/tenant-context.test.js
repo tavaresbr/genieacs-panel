@@ -85,25 +85,28 @@ describe('the scoped table list', () => {
 
 describe('the scoped query builder', () => {
   // The transition behaviour, and what lets the conversion proceed a few tables
-  // at a time. `device_profiles` stands in for "not converted yet" — it has to
-  // be a table still absent from the allowlist, so this moves as the phase does.
+  // at a time. `users` stands in for "not converted yet" — it has to be a table
+  // still absent from the allowlist, so this moves as the phase does. It took
+  // over from `vendors`, scoped as of 0026, which took over from
+  // `device_profiles`, scoped as of 0022.
   it('leaves a table that has not been converted unfiltered', async () => {
-    const rows = await tdb('device_profiles').select('device_id').limit(1);
+    const rows = await tdb('users').select('username').limit(1);
     assert.ok(Array.isArray(rows));
   });
 
   it('writes through tinsert without a provider while the table is pending', async () => {
-    await tinsert('device_profiles', { device_id: 'scope-probe-pending', installation_tag: 'x' });
-    const row = await getDb()('device_profiles').where({ device_id: 'scope-probe-pending' }).first();
-    assert.equal(row.installation_tag, 'x');
+    await tinsert('users', { username: 'scope-probe-pending', password: 'x' });
+    const row = await getDb()('users').where({ username: 'scope-probe-pending' }).first();
+    assert.equal(row.password, 'x');
   });
 
   it('returns the generated id', async () => {
-    // device_profiles is still pending, so this exercises the unscoped path.
+    // users is still pending, so this exercises the unscoped path.
     // mapping_nodes moved under scoping and now needs a provider — which is
     // what tenant-scoping.test.js covers.
-    const id = await tinsertReturningId('device_profiles', {
-      device_id: 'scope-probe-device', installation_tag: 'probe'
+    const id = await tinsertReturningId('users', {
+      username: 'scope-probe-user',
+      password: 'x'
     });
     assert.ok(Number(id) > 0);
   });

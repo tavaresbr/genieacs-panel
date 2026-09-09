@@ -112,9 +112,33 @@ const PROVISIONING_RUN_TENANT_INDEXES = [
   [['tenant_id', 'status', 'next_attempt_at'], 'provisioning_runs_tenant_due_idx']
 ];
 
+/**
+ * Shared by the 0026 upgrade. In dependency order: `wifi_security_mappings`
+ * points at `vendors`, so the parent is converted first.
+ */
+const VENDOR_CATALOGUE_TABLES = ['vendors', 'wifi_security_mappings', 'wifi_security_config'];
+
 // Table definitions. Each is a factory so the builder can reach `db.fn.now()`,
 // and each is referenced by exactly one place per table so the initial schema
 // and the later upgrade steps can never drift apart.
+
+const tenantUsersTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.integer('user_id').unsigned().notNullable()
+    .references('id').inTable('users').onDelete('CASCADE');
+  // The role belongs to the MEMBERSHIP, not to the person: someone can be an
+  // admin at the ISP they own and an ordinary operator at one they consult for.
+  t.string('role', 32).notNullable().defaultTo('user');
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  t.timestamp('updated_at').defaultTo(db.fn.now());
+  // One membership per person per provider. This is the row the token names,
+  // so a duplicate would make "which role does she have here" ambiguous.
+  t.unique(['tenant_id', 'user_id']);
+  // How the users screen asks: everyone at this provider.
+  t.index(['tenant_id']);
+};
 
 const usersTable = (db) => (t) => {
   t.increments('id').primary();
@@ -718,6 +742,14 @@ const TENANCY_TABLES = [
   ['tenants', tenantsTable]
 ];
 
+/**
+ * Created by 0028 rather than with the tenancy tables, because it references
+ * `users` — which step 0001 creates, long after `tenants` exists.
+ */
+const MEMBERSHIP_TABLES = [
+  ['tenant_users', tenantUsersTable]
+];
+
 const INITIAL_TABLES = [
   ['users', usersTable],
   ['settings', keyValueTable],
@@ -746,6 +778,7 @@ const INITIAL_TABLES = [
 export const SCHEMA_TABLES = [
   ...TENANCY_TABLES,
   ...INITIAL_TABLES,
+  ...MEMBERSHIP_TABLES,
   ...PROVISIONING_TABLES,
   ...WHATSAPP_TABLES,
   ...DEVICE_HISTORY_TABLES,
@@ -1636,6 +1669,180 @@ export const migrations = [
         t.primary(['tenant_id', 'id']);
         t.foreign('tenant_id').references('id').inTable('tenants');
       });
+    }
+  },
+  {
+    /**
+     * The equipment catalogue, per provider — the three tables together.
+     *
+     * The honest counter-argument first, because it is a good one: the CONTENT
+     * really is the same for every ISP on earth. A ZTE's `wifi_password_path`
+     * is a fact about firmware, not about anybody's subscribers. What makes
+     * these per-provider is not the data, it is that the rows are OPERATOR-
+     * EDITABLE: every path, priority and enabled flag is changed through
+     * `/api/vendor-management`, so left shared, one ISP correcting a detection
+     * pattern silently changes another ISP's WiFi writes. `Vendor.delete` also
+     * cascades into `wifi_security_mappings`, so it is destructive across
+     * providers as well as surprising.
+     *
+     * The project already made this call: the plan chooses a per-tenant
+     * catalogue COPY over a `tenant_id NULL = global` row, precisely to keep
+     * the invariant `tdb` depends on — every row of every scoped table carries
+     * a provider, with no nulls to special-case.
+     *
+     * The three move together because `wifi_security_mappings.vendor_id` points
+     * at `vendors.id`: converting one alone leaves a foreign key that can reach
+     * across providers.
+     *
+     * NO new unique is added here. The plan wants `(tenant_id, name)` on
+     * vendors and `(tenant_id, product_class)` on the config, and both would be
+     * NEW constraints rather than conversions of existing ones — a migration
+     * that can fail on data an install already has is a migration that strands
+     * an upgrade halfway. They belong in their own step, after a pass that
+     * reports duplicates.
+     *
+     * CONSEQUENCE, and it is not a schema one: nothing seeds `vendors`. A
+     * provider created after this step starts with an empty catalogue, and an
+     * empty catalogue does not fail loudly — device detection simply matches
+     * nothing. The code half of this slice has to give a new provider a copy.
+     */
+    id: '0026_vendor_catalogue_tenant',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return false;
+      for (const table of VENDOR_CATALOGUE_TABLES) {
+        // eslint-disable-next-line no-await-in-loop -- three schema probes
+        if (!(await db.schema.hasTable(table))) return false;
+        // eslint-disable-next-line no-await-in-loop -- three schema probes
+        if (!(await db.schema.hasColumn(table, 'tenant_id'))) return false;
+      }
+      return true;
+    },
+    async up(db) {
+      const tenant = await db('tenants').orderBy('id', 'asc').first();
+      if (!tenant) return;
+
+      for (const table of VENDOR_CATALOGUE_TABLES) {
+        // eslint-disable-next-line no-await-in-loop -- DDL, three tables
+        if (!(await db.schema.hasTable(table))) continue;
+        // eslint-disable-next-line no-await-in-loop -- DDL, three tables
+        if (await db.schema.hasColumn(table, 'tenant_id')) continue;
+        // eslint-disable-next-line no-await-in-loop -- DDL, three tables
+        await db.schema.alterTable(table, (t) => t.integer('tenant_id').unsigned());
+        // eslint-disable-next-line no-await-in-loop -- DDL, three tables
+        await db(table).whereNull('tenant_id').update({ tenant_id: tenant.id });
+        // eslint-disable-next-line no-await-in-loop -- DDL, three tables
+        await db.schema.alterTable(table, (t) => {
+          t.integer('tenant_id').unsigned().notNullable().defaultTo(tenant.id).alter();
+          t.foreign('tenant_id').references('id').inTable('tenants');
+        });
+      }
+    }
+  },
+  {
+    /**
+     * The subscriber's WiFi credentials, per provider.
+     *
+     * There is no live leak here today, and it is worth saying why rather than
+     * implying one: every method filters on `account_id`, a surrogate key into
+     * `customer_accounts`, which has been scoped since 0010 — so the parent
+     * already refuses to hand one provider another's account, and the portal
+     * session carries the account it belongs to.
+     *
+     * The column is added anyway, for two reasons. The filter becomes direct
+     * instead of inherited, which is what lets `tdb` cover the table like every
+     * other; and the row holds an AES-GCM-encrypted WiFi password, which is the
+     * kind of thing that should not depend on a join staying correct.
+     *
+     * The unique moves to `(tenant_id, account_id, wifi_index)`. Strictly it
+     * need not — `account_id` is globally unique — but the `onConflict` in
+     * `CustomerWifiCredential.upsert` names this exact tuple, and a conflict
+     * target that does not match the index is the failure `sgp_links` hit in
+     * 0019: silent on MySQL, refused on SQLite and Postgres.
+     */
+    id: '0027_customer_wifi_credentials_tenant',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return false;
+      if (!(await db.schema.hasTable('customer_wifi_credentials'))) return false;
+      return db.schema.hasColumn('customer_wifi_credentials', 'tenant_id');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('customer_wifi_credentials'))) return;
+      if (await db.schema.hasColumn('customer_wifi_credentials', 'tenant_id')) return;
+      const tenant = await db('tenants').orderBy('id', 'asc').first();
+      if (!tenant) return;
+
+      await db.schema.alterTable('customer_wifi_credentials', (t) => t.integer('tenant_id').unsigned());
+      await db('customer_wifi_credentials').whereNull('tenant_id').update({ tenant_id: tenant.id });
+
+      // Before the unique moves, and in a statement of its own so it is in
+      // place when it does. `account_id` stops being the leading column of any
+      // index once the unique becomes `(tenant_id, …)`, and that column carries
+      // the cascade from `customer_accounts`: on MySQL InnoDB simply refuses to
+      // drop the index its foreign key is resting on, and on Postgres it would
+      // have accepted the drop and turned every cascading delete into a scan.
+      await db.schema.alterTable('customer_wifi_credentials', (t) => {
+        t.index(['account_id'], 'customer_wifi_credentials_account_idx');
+      });
+
+      await db.schema.alterTable('customer_wifi_credentials', (t) => {
+        t.integer('tenant_id').unsigned().notNullable().defaultTo(tenant.id).alter();
+        t.foreign('tenant_id').references('id').inTable('tenants');
+        t.dropUnique(['account_id', 'wifi_index']);
+        t.unique(['tenant_id', 'account_id', 'wifi_index']);
+      });
+    }
+  },
+  {
+    /**
+     * Who works for which provider — the last piece of the conversion, and the
+     * one that deliberately does NOT follow the pattern of the ten before it.
+     *
+     * Every other table got a `tenant_id`. `users` must not. A row here is a
+     * PERSON, and the plan is explicit about why that matters: a consultant or
+     * a reseller serving several ISPs with one login is the common arrangement
+     * in this market, and a `users.tenant_id` forecloses it permanently. So
+     * `users` stays the identity table, globally unique on `username`, and
+     * `tenant_users` is the bridge that says which providers a person works
+     * for and with what role there.
+     *
+     * The role moves onto the membership rather than staying on the person: an
+     * operator can be an admin at the ISP they own and an ordinary operator at
+     * one they consult for. `users.role` is left in place and keeps its value,
+     * because it is what the backfill reads and what an install running the
+     * previous code still answers logins with — it stops being consulted once
+     * the token carries a membership role.
+     *
+     * Note what is NOT here: the plan also wants `users` keyed by email rather
+     * than username. That is a change to how every operator signs in, it buys
+     * no isolation, and doing it in the same step as the authentication spine
+     * would be two risky changes at once. It keeps its own step, later.
+     */
+    id: '0028_tenant_users',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return false;
+      return db.schema.hasTable('tenant_users');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('users'))) return;
+      const tenant = await db('tenants').orderBy('id', 'asc').first();
+      if (!tenant) return;
+
+      await createTableIfMissing(db, 'tenant_users', tenantUsersTable(db));
+
+      // Everybody who can already sign in keeps working, at the provider this
+      // install has always been. Their current `users.role` becomes their role
+      // there, so nobody is promoted or demoted by an upgrade.
+      const existing = await db('users').select('id', 'role');
+      const members = await db('tenant_users').where({ tenant_id: tenant.id }).pluck('user_id');
+      const already = new Set(members.map(Number));
+      const rows = existing
+        .filter((user) => !already.has(Number(user.id)))
+        .map((user) => ({
+          tenant_id: tenant.id,
+          user_id: user.id,
+          role: user.role || 'user'
+        }));
+      if (rows.length > 0) await db('tenant_users').insert(rows);
     }
   }
 ];
