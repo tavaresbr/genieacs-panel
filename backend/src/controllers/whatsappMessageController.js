@@ -43,7 +43,10 @@ class WhatsAppMessageController {
 
   static async listMessages(req, res) {
     try {
-      const data = await WaConversationService.messages(req.params?.id, { limit: req.query?.limit });
+      const data = await WaConversationService.messages(req.params?.id, {
+        limit: req.query?.limit,
+        before: req.query?.before
+      });
       return res.json(createResponse(
         req.t('whatsapp.messagesLoaded', { count: data.messages.length }),
         data

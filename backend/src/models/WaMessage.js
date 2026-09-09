@@ -17,11 +17,27 @@ class WaMessage {
     return (await tdb('wa_messages').where({ external_id: externalId }).first()) || null;
   }
 
-  static async listForConversation(conversationId, { limit = 100 } = {}) {
-    return tdb('wa_messages')
+  /**
+   * One page of a thread, newest first.
+   *
+   * `before` is a keyset cursor — the id of the oldest row the caller already
+   * has — and not an offset. This table grows while it is being read: a
+   * customer answering mid-scroll shifts every offset by one, so an offset
+   * page would repeat a message or skip one, and the operator would never know
+   * which. A cursor on the id cannot move.
+   *
+   * Ordered by `id` rather than `created_at` for the same reason: two rows can
+   * share a timestamp, and a tie makes the page boundary arbitrary. Insertion
+   * order is arrival order here — `created_at` is when the panel received the
+   * message, not when the sender typed it.
+   */
+  static async listForConversation(conversationId, { limit = 100, before = null } = {}) {
+    const query = tdb('wa_messages')
       .where({ conversation_id: conversationId })
-      .orderBy('created_at', 'desc')
+      .orderBy('id', 'desc')
       .limit(limit);
+    if (Number.isInteger(before) && before > 0) query.where('id', '<', before);
+    return query;
   }
 
   static async create(message) {

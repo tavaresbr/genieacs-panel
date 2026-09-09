@@ -219,6 +219,79 @@ describe('finding a conversation', () => {
   });
 });
 
+describe('paging back through a thread', () => {
+  it('walks the whole history with a cursor, and never repeats a message', async () => {
+    const fio = fios.telefone;
+    // Seven messages, read three at a time: two full pages and a short one,
+    // which is how the screen learns there is nothing older left.
+    for (let i = 1; i <= 7; i += 1) {
+      // eslint-disable-next-line no-await-in-loop -- ids have to come out in order
+      await asTenant(() => getDb()('wa_messages').insert({
+        conversation_id: fio,
+        direction: i % 2 ? 'in' : 'out',
+        body: `mensagem ${i}`,
+        is_note: false,
+        source: i % 2 ? 'operator' : 'bot',
+        tenant_id: 1,
+        created_at: new Date(),
+        updated_at: new Date()
+      }));
+    }
+
+    const vistos = [];
+    let cursor = null;
+    for (let page = 0; page < 4; page += 1) {
+      const query = `limit=3${cursor ? `&before=${cursor}` : ''}`;
+      // eslint-disable-next-line no-await-in-loop -- a cursor is sequential by definition
+      const { status, body } = await call(
+        `${panelUrl}/api/whatsapp/conversations/${fio}/messages?${query}`,
+        { headers: authHeaders(token) }
+      );
+      assert.equal(status, 200);
+      const ids = body.data.messages.map((row) => row.id);
+      if (ids.length === 0) break;
+      vistos.push(...ids);
+      cursor = ids.at(-1);
+    }
+
+    assert.equal(vistos.length, 7, 'every message came back exactly once');
+    assert.equal(new Set(vistos).size, 7, 'and none of them came back twice');
+    // Newest first, all the way down: the order the screen draws.
+    assert.deepEqual([...vistos].sort((a, b) => b - a), vistos);
+  });
+
+  it('a message arriving mid-scroll cannot shift the page under the reader', async () => {
+    const fio = fios.telefone;
+    const primeira = await call(
+      `${panelUrl}/api/whatsapp/conversations/${fio}/messages?limit=3`,
+      { headers: authHeaders(token) }
+    );
+    const cursor = primeira.body.data.messages.at(-1).id;
+
+    // The customer answers while the operator is still reading.
+    await asTenant(() => getDb()('wa_messages').insert({
+      conversation_id: fio,
+      direction: 'in',
+      body: 'oi, ainda estou aqui',
+      is_note: false,
+      source: 'operator',
+      tenant_id: 1,
+      created_at: new Date(),
+      updated_at: new Date()
+    }));
+
+    const segunda = await call(
+      `${panelUrl}/api/whatsapp/conversations/${fio}/messages?limit=3&before=${cursor}`,
+      { headers: authHeaders(token) }
+    );
+    const ids = segunda.body.data.messages.map((row) => row.id);
+    // An offset would have slid by one here and repeated a message the operator
+    // had already read; a cursor cannot.
+    assert.ok(ids.every((id) => id < cursor));
+    assert.equal(new Set(ids).size, ids.length);
+  });
+});
+
 describe('an inbound message and a closed thread', () => {
   it('REOPENS it: a customer who writes again is not answered by an archive', async () => {
     const remoteJid = '5592988887777@s.whatsapp.net';

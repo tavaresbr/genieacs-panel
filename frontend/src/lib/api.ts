@@ -1114,8 +1114,14 @@ export const whatsappAPI = {
 
   // Reading a thread clears its unread count server-side — the operator looking
   // at it is the only thing "read" can mean here.
-  listMessages: (conversationId: number, params: { limit?: number } = {}) => {
-    const suffix = params.limit ? `?limit=${params.limit}` : ''
+  // `before` is the id of the oldest message already on screen — a cursor, not
+  // an offset. The thread grows while it is being read, and an offset page
+  // would repeat or skip a message every time a customer answers mid-scroll.
+  listMessages: (conversationId: number, params: { limit?: number; before?: number } = {}) => {
+    const query = new URLSearchParams()
+    if (params.limit) query.set('limit', String(params.limit))
+    if (params.before) query.set('before', String(params.before))
+    const suffix = query.toString() ? `?${query.toString()}` : ''
     return apiClient.get<{ conversation: WhatsAppConversation; messages: WhatsAppMessage[] }>(
       `/whatsapp/conversations/${conversationId}/messages${suffix}`
     )

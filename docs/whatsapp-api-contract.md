@@ -750,7 +750,7 @@ Serviço: `services/waConversationService.js`.
 | Rota | Faz | `data` |
 | --- | --- | --- |
 | `GET /conversations` | lista paginada (`limit` ≤ 200, `offset`), do mais recente | array de conversa |
-| `GET /conversations/:id/messages` | histórico (`limit` ≤ 500) e **zera o não lido** | `{ conversation, messages }` |
+| `GET /conversations/:id/messages` | histórico (`limit` ≤ 500, `before` = cursor) e **zera o não lido** | `{ conversation, messages }` |
 | `POST /conversations/:id/messages` | enfileira; ver a seção Envio | a mensagem criada |
 
 ```ts
@@ -773,6 +773,13 @@ Serviço: `services/waConversationService.js`.
   updatedAt: string | null
 }
 ```
+
+`before` é o id da mensagem mais antiga que a tela já tem — cursor, não
+offset. Este fio cresce enquanto é lido: um cliente respondendo no meio da
+rolagem desloca todo offset em um, e a página seguinte repetiria uma
+mensagem ou pularia outra sem ninguém perceber. A ordenação é por `id` pelo
+mesmo motivo — dois registros podem dividir o mesmo `created_at`, e o empate
+deixaria a fronteira da página no ar.
 
 `GET /conversations/:id/messages` é um GET que **escreve**: ler a conversa zera
 `unread_count`. O operador olhando para ela é a única coisa que "lido" pode
