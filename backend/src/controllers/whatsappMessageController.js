@@ -1,7 +1,6 @@
 import WaSendService from '../services/waSendService.js';
 import WaConversationService from '../services/waConversationService.js';
 import WaMessage from '../models/WaMessage.js';
-import { tdb } from '../config/database.js';
 import { WaError } from '../services/whatsappConfigService.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { translateError } from '../i18n/index.js';
@@ -169,11 +168,15 @@ class WhatsAppMessageController {
   /**
    * `POST /messages/requeue-failed` — every failure inside a window, at once.
    *
-   * IN THE SCOPE OF THE PROVIDER WHO ASKED, and nobody else's. `tdb` puts the
-   * provider the resolver opened into the WHERE, which is the whole reason this
-   * is safe: the deployment-wide version of this statement would let an admin
-   * at one ISP put another ISP's queue back on the wire, which is the exact bug
-   * wave 8 fixed on the media sweep button.
+   * IN THE SCOPE OF THE PROVIDER WHO ASKED, and nobody else's. The model's
+   * `tdb` puts the provider the resolver opened into the WHERE, which is the
+   * whole reason this is safe: the deployment-wide version of this statement
+   * would let an admin at one ISP put another ISP's queue back on the wire,
+   * which is the exact bug wave 8 fixed on the media sweep button.
+   *
+   * The statement itself is `WaMessage.requeueFailedSince` rather than a query
+   * written here, so the patch and the `failed`-only rule have one definition
+   * shared with the single-row path. This controller decides only the window.
    *
    * One statement rather than a loop over `WaMessage.requeue`, because the case
    * this exists for is thousands of rows and thousands of round trips is not a
@@ -200,17 +203,9 @@ class WhatsAppMessageController {
       : MAX_REQUEUE_HOURS;
 
     try {
-      const requeued = await tdb('wa_messages')
-        .where({ delivery_status: 'failed' })
-        .where('created_at', '>=', new Date(Date.now() - hours * HOUR_MS))
-        .update({
-          delivery_status: 'queued',
-          delivery_error: null,
-          claimed_at: null,
-          attempts: 0,
-          next_attempt_at: null,
-          updated_at: new Date()
-        });
+      const requeued = await WaMessage.requeueFailedSince(
+        new Date(Date.now() - hours * HOUR_MS)
+      );
 
       // Zero is a real answer and comes back as one: nothing failed inside the
       // window is not the same as a button that did not work, and the count is

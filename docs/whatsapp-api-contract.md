@@ -1375,3 +1375,29 @@ significar outra coisa.
   (que é "pode agora", e é o caso comum, não a exceção) ou já passada.
 - A tira mostra as três coisas na mesma linha, porque "40 esperando" sem idade
   nenhuma, sem a contagem de retentativas ao lado, se lê como defeito do painel.
+
+### 5. A campanha também espera — mas não pelo motivo óbvio
+
+`wa_broadcast_recipients` tinha a mesma forma de bug: `MAX_ATTEMPTS` 3, laço de
+60 s, e falha devolvendo a linha direto para `pending`. Três tentativas em dois
+minutos e a campanha inteira terminava em `failed`.
+
+**A falha que chega ali não é o servidor fora do ar**, e vale ser exato porque é
+fácil errar essa frase: `WaBroadcastService.deliver` só **enfileira** — escreve
+em `wa_messages` e quem tem o transporte é a fila de saída. Um Evolution
+reiniciando é problema do item 1 desta seção e já é sobrevivido. O que cai
+naquele `catch` é `no_account` — campanha rodando sem número conectado —, um
+`no_public_url`, ou banco que engasgou. Configuração e infraestrutura: as coisas
+que um operador conserta nos dez minutos depois de começar o disparo e reparar.
+
+Dois minutos não dão esse tempo, e o preço de estourar é a campanha toda.
+
+- A curva e o classificador são **importados** de `waOutboxWorker` e
+  `waSendFailure`, não reescritos. Uma campanha que desistisse num cronograma
+  diferente do da fila que ela alimenta seria uma segunda política que ninguém
+  decidiu.
+- Migração `0019`, mesmas regras do `0018`: coluna anulável, NULL é "pode
+  agora", índice começando por `broadcast_id` porque é assim que
+  `listPendingIds` pergunta.
+- O ramo do `sending` velho **ignora** a hora devida de propósito: retomada de
+  claim travado é recuperação de queda, não espera que alguém agendou.

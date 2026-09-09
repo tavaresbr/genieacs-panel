@@ -1,4 +1,6 @@
 import WaBroadcast, { MAX_ATTEMPTS } from '../models/WaBroadcast.js';
+import { retryDelayMs } from './waOutboxWorker.js';
+import { isPermanentFailure } from './waSendFailure.js';
 import WaConversation from '../models/WaConversation.js';
 import WaOptOut from '../models/WaOptOut.js';
 import WhatsAppAccount from '../models/WhatsAppAccount.js';
@@ -276,10 +278,25 @@ class WaBroadcastService {
       // attempt just made. Below the cap the row goes back to 'pending', which
       // is what `listPendingIds` looks for — leaving it 'failed' would put it
       // out of the loop's reach and make "three attempts" mean one.
-      const terminal = Number(recipient.attempts || 0) >= MAX_ATTEMPTS;
+      // Same two questions the outbox asks, and deliberately the same answers,
+      // through the same classifier and the same curve rather than a second
+      // copy of either.
+      //
+      // Worth being exact about what lands here, because it is NOT a send that
+      // failed: this method only enqueues, and the outbox owns the transport.
+      // A server that is down never reaches this catch. What does is
+      // `no_account` — no number connected — or a database that hiccupped:
+      // conditions an operator fixes in minutes, which is exactly why giving up
+      // on them inside two was wrong.
+      const permanent = isPermanentFailure(error);
+      const attempts = Number(recipient.attempts || 0);
+      const terminal = permanent || attempts >= MAX_ATTEMPTS;
       await WaBroadcast.updateRecipient(recipient.id, {
         status: terminal ? 'failed' : 'pending',
-        error_msg: failureText(error)
+        error_msg: failureText(error),
+        // NULL on a terminal row: there is nothing left to wait for, and a
+        // leftover due time would outlive the reason it was written.
+        next_attempt_at: terminal ? null : new Date(Date.now() + retryDelayMs(attempts))
       });
       return terminal ? 'failed' : 'retry';
     }

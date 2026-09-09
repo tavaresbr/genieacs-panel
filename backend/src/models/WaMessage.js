@@ -30,6 +30,25 @@ function sendable(query, now) {
 }
 
 /**
+ * What putting a failed row back in the queue means, in one place.
+ *
+ * `attempts` to zero and `next_attempt_at` to NULL — due now. Whoever pressed
+ * the button decided the reason for the failure is over, and holding them to a
+ * backoff computed from attempts that no longer apply would be the panel
+ * arguing with the operator.
+ */
+function requeuePatch() {
+  return {
+    delivery_status: 'queued',
+    delivery_error: null,
+    claimed_at: null,
+    attempts: 0,
+    next_attempt_at: null,
+    updated_at: new Date()
+  };
+}
+
+/**
  * `wa_messages` is the outbox. There is no separate queue table: an outbound
  * message is a row whose `delivery_status` walks
  * queued → sending → sent → delivered → read, or → failed.
@@ -93,15 +112,33 @@ class WaMessage {
   static async requeue(id) {
     const changed = await tdb('wa_messages')
       .where({ id, delivery_status: 'failed' })
-      .update({
-        delivery_status: 'queued',
-        delivery_error: null,
-        claimed_at: null,
-        attempts: 0,
-        next_attempt_at: null,
-        updated_at: new Date()
-      });
+      .update(requeuePatch());
     return changed > 0 ? this.getById(id) : null;
+  }
+
+  /**
+   * The same thing, for every failure inside a window.
+   *
+   * One statement rather than a loop over `requeue`, because the case this
+   * exists for is a campaign whose thousands of recipients failed against a
+   * server that was restarting, and thousands of round trips is not a recovery.
+   *
+   * It lives here and not in the controller so that the patch and the
+   * `delivery_status: 'failed'` rule have ONE definition. Written out twice
+   * they agree only until somebody changes one — and the half that would have
+   * been forgotten is the one no test reaches through a screen.
+   *
+   * Scoped like everything else on this model: `tdb` puts the caller's provider
+   * in the WHERE, so an operator at one ISP cannot put another ISP's queue back
+   * on the wire.
+   *
+   * @returns {Promise<number>} how many rows went back to the queue
+   */
+  static async requeueFailedSince(since) {
+    return tdb('wa_messages')
+      .where({ delivery_status: 'failed' })
+      .where('created_at', '>=', since)
+      .update(requeuePatch());
   }
 
   static async create(message) {

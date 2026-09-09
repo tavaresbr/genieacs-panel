@@ -1256,6 +1256,54 @@ export const migrations = [
         await db.schema.alterTable('wa_messages', (t) => t.index(columns)).catch(() => {});
       }
     }
+  },
+  {
+    /**
+     * The campaign queue, given the same patience the outbox got in 0018.
+     *
+     * `waBroadcastService.deliver` has the same shape of bug 0018 fixed one
+     * table over: `MAX_ATTEMPTS` is 3, a failed recipient goes straight back to
+     * 'pending', and the flush loop wakes every 60 s — so three attempts burn
+     * in about two minutes and the row is 'failed' for good.
+     *
+     * The failure it actually meets is NOT an Evolution server that is down.
+     * `deliver` only ENQUEUES: it writes a row to `wa_messages` and the outbox
+     * owns the transport, so a server restart is 0018's problem and is already
+     * survived. What reaches this catch is `no_account` — no number connected —
+     * a `no_public_url`, or a database that hiccupped. Those are configuration
+     * and infrastructure, which is precisely the kind of thing an operator
+     * fixes in the ten minutes after starting a campaign and noticing.
+     *
+     * Two minutes is not enough time for that, and the cost of running out is
+     * the whole campaign: every recipient in flight ends `failed`, and the
+     * operator's only recovery is the bulk requeue on the messages that were
+     * never created.
+     *
+     * Nullable, and NULL means due now, exactly as in 0018: every row written
+     * before this column existed is due, which is the only reading that does
+     * not strand a campaign that was already in flight during the upgrade.
+     *
+     * The index fronts `broadcast_id` because that is how `listPendingIds`
+     * asks — one campaign at a time, never the table.
+     */
+    id: '0019_wa_broadcast_recipient_backoff',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('wa_broadcast_recipients'))) return false;
+      return db.schema.hasColumn('wa_broadcast_recipients', 'next_attempt_at');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('wa_broadcast_recipients'))) return;
+
+      if (!(await db.schema.hasColumn('wa_broadcast_recipients', 'next_attempt_at'))) {
+        await db.schema.alterTable('wa_broadcast_recipients', (t) => {
+          t.timestamp('next_attempt_at');
+        });
+      }
+
+      await db.schema
+        .alterTable('wa_broadcast_recipients', (t) => t.index(['broadcast_id', 'status', 'next_attempt_at']))
+        .catch(() => {});
+    }
   }
 ];
 
