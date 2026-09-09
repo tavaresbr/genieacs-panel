@@ -195,10 +195,12 @@ class WaConversationService {
    * Reading a thread clears its unread count — the operator is looking at it,
    * which is the only thing "read" can mean here.
    */
-  static async messages(id, { limit = PAGE } = {}) {
+  static async messages(id, { limit = PAGE, before = null } = {}) {
     const conversation = await this.get(id);
+    const cursor = Number.parseInt(String(before ?? ''), 10);
     const rows = await WaMessage.listForConversation(conversation.id, {
-      limit: Math.min(Math.max(Number(limit) || PAGE, 1), 500)
+      limit: Math.min(Math.max(Number(limit) || PAGE, 1), 500),
+      before: Number.isInteger(cursor) && cursor > 0 ? cursor : null
     });
     if (conversation.unread_count > 0) await WaConversation.update(conversation.id, { unread_count: 0 });
 

@@ -12,7 +12,7 @@ import { useTranslation } from '@/contexts/language-context'
 import { whatsappErrorMessage } from '@/components/whatsapp-connection'
 import { ConversationList } from '@/components/whatsapp/conversation-list'
 import { ConversationThread } from '@/components/whatsapp/conversation-thread'
-import { ThreadComposer } from '@/components/whatsapp/thread-composer'
+import { ThreadComposer, type ComposerAttachment } from '@/components/whatsapp/thread-composer'
 import { BillingPanel } from '@/components/whatsapp/billing-panel'
 import { CampaignsPanel } from '@/components/whatsapp/campaigns-panel'
 import { TemplatesPanel } from '@/components/whatsapp/templates-panel'
@@ -76,6 +76,21 @@ const LIST_LIMIT = 100
 const MESSAGE_PAGE = 60
 
 /**
+ * The newest page folded into what is already on screen, newest first.
+ *
+ * Only rows the page does not already carry are kept from `current`, so a
+ * message the server has since changed — a delivery status moving from `sent`
+ * to `read` — comes back in its new shape rather than pinned to the one this
+ * browser first saw.
+ */
+function mergeNewest(page: WhatsAppMessage[], current: WhatsAppMessage[]): WhatsAppMessage[] {
+  if (current.length === 0) return page
+  const fresh = new Set(page.map((message) => message.id))
+  return [...page, ...current.filter((message) => !fresh.has(message.id))]
+    .sort((a, b) => b.id - a.id)
+}
+
+/**
  * The operator's WhatsApp inbox: conversations on the left, the open thread and
  * the reply box on the right. The routes it consumes are frozen in
  * `docs/whatsapp-api-contract.md`.
@@ -88,7 +103,8 @@ function InboxTab() {
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [conversation, setConversation] = useState<WhatsAppConversation | null>(null)
   const [messages, setMessages] = useState<WhatsAppMessage[]>([])
-  const [messageLimit, setMessageLimit] = useState(MESSAGE_PAGE)
+  const [hasOlder, setHasOlder] = useState(false)
+  const [loadingOlder, setLoadingOlder] = useState(false)
 
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -117,7 +133,7 @@ function InboxTab() {
   // Read by the pollers, which must not be rebuilt — and their intervals with
   // them — every time a selection or a page size changes.
   const selectedIdRef = useRef<number | null>(null)
-  const messageLimitRef = useRef(MESSAGE_PAGE)
+  const olderInFlight = useRef(false)
   const threadStampRef = useRef<string | null>(null)
   // The filter belongs in a ref for the same reason: a poll must ask for what
   // is on screen now, without the interval being torn down and restarted — and
@@ -125,7 +141,6 @@ function InboxTab() {
   const filterRef = useRef<{ search: string; status: ConversationStatus }>({ search: '', status: 'open' })
 
   useEffect(() => { selectedIdRef.current = selectedId }, [selectedId])
-  useEffect(() => { messageLimitRef.current = messageLimit }, [messageLimit])
 
   // One request per pause, not one per keystroke.
   useEffect(() => {
@@ -139,12 +154,12 @@ function InboxTab() {
   }, [])
 
   // ── The open thread ────────────────────────────────────────────────────────
-  const loadThread = useCallback(async (id: number, limit: number, silent: boolean) => {
+  const loadThread = useCallback(async (id: number, silent: boolean) => {
     if (threadInFlight.current) return
     threadInFlight.current = true
     if (!silent) setLoadingThread(true)
     try {
-      const res = await whatsappAPI.listMessages(id, { limit })
+      const res = await whatsappAPI.listMessages(id, { limit: MESSAGE_PAGE })
       if (!alive.current || selectedIdRef.current !== id) return
       if (!res.success || !res.data) {
         threadFailures.current += 1
@@ -156,7 +171,12 @@ function InboxTab() {
       threadFailures.current = 0
       threadBlockedUntil.current = 0
       setConversation(res.data.conversation)
-      setMessages(res.data.messages)
+      // Merged, never replaced. This fetches the NEWEST page, and the operator
+      // may have paged back through several older ones — replacing would throw
+      // away everything they scrolled to, on a 45 s timer they did not ask for.
+      const page = res.data.messages
+      setMessages((current) => (silent ? mergeNewest(page, current) : page))
+      if (!silent) setHasOlder(page.length >= MESSAGE_PAGE)
       threadStampRef.current = res.data.conversation.lastMessageAt
 
       // Reconciling the badge the server just cleared.
@@ -213,7 +233,7 @@ function InboxTab() {
       // The fast path for a customer's reply: the list sees the open thread
       // move before the thread's own 45 s timer does, so it pulls it in.
       if (open && open.lastMessageAt !== threadStampRef.current) {
-        void loadThreadRef.current(openId as number, messageLimitRef.current, true)
+        void loadThreadRef.current(openId as number, true)
       }
 
       // The open row's own count is written down as read here too: the server
@@ -262,8 +282,8 @@ function InboxTab() {
   // Selecting a thread, or asking for more of it, loads it visibly.
   useEffect(() => {
     if (selectedId === null) return
-    void loadThread(selectedId, messageLimit, false)
-  }, [selectedId, messageLimit, loadThread])
+    void loadThread(selectedId, false)
+  }, [selectedId, loadThread])
 
   // The thread's own clock. It reads the selection from a ref so that switching
   // conversations does not restart the interval.
@@ -273,7 +293,7 @@ function InboxTab() {
       if (id === null) return
       if (document.visibilityState !== 'visible') return
       if (Date.now() < threadBlockedUntil.current) return
-      void loadThreadRef.current(id, messageLimitRef.current, true)
+      void loadThreadRef.current(id, true)
     }, THREAD_POLL_MS)
     return () => clearInterval(timer)
   }, [])
@@ -288,9 +308,41 @@ function InboxTab() {
     // so the pane never opens blank.
     setConversation(next)
     setMessages([])
-    setMessageLimit(MESSAGE_PAGE)
+    setHasOlder(false)
     setSelectedId(next.id)
   }, [])
+
+  /**
+   * One page further back. The cursor is the oldest id on screen, so a customer
+   * answering mid-scroll cannot shift the page boundary under the request —
+   * which is exactly what an offset would have let happen.
+   */
+  const loadOlder = useCallback(async () => {
+    const id = selectedIdRef.current
+    const oldest = messages.at(-1)?.id
+    if (id === null || !oldest || olderInFlight.current) return
+    olderInFlight.current = true
+    setLoadingOlder(true)
+    try {
+      const res = await whatsappAPI.listMessages(id, { limit: MESSAGE_PAGE, before: oldest })
+      if (!alive.current || selectedIdRef.current !== id) return
+      if (!res.success || !res.data) {
+        toast.error(whatsappErrorMessage(t, res.code))
+        return
+      }
+      const page = res.data.messages
+      setMessages((current) => [
+        ...current,
+        ...page.filter((message) => !current.some((held) => held.id === message.id))
+      ])
+      // A short page is the end of the thread. A full one only means there may
+      // be more, which is the honest thing for the button to offer.
+      setHasOlder(page.length >= MESSAGE_PAGE)
+    } finally {
+      olderInFlight.current = false
+      if (alive.current) setLoadingOlder(false)
+    }
+  }, [messages, t, toast])
 
   // ── Filing ─────────────────────────────────────────────────────────────────
   /**
@@ -323,11 +375,18 @@ function InboxTab() {
   }, [t, toast])
 
   // ── Sending ────────────────────────────────────────────────────────────────
-  const submit = useCallback(async (body: string, isNote: boolean): Promise<boolean> => {
+  const submit = useCallback(async (
+    body: string,
+    isNote: boolean,
+    attachment?: ComposerAttachment
+  ): Promise<boolean> => {
     const id = selectedIdRef.current
     if (id === null) return false
     try {
-      const res = await whatsappAPI.sendMessage(id, { body, isNote })
+      // The composer uploads the file first and hands back what the upload
+      // route stored; this call is what puts it on a row. A caption is
+      // optional, so `body` can be empty as long as there is a file.
+      const res = await whatsappAPI.sendMessage(id, { body, attachment, isNote })
       if (!alive.current) return false
       if (!res.success || !res.data) {
         // Only the machine `code` is ever translated. The `message` beside it
@@ -351,10 +410,10 @@ function InboxTab() {
     }
   }, [t, toast])
 
-  const send = useCallback(async (body: string, isNote: boolean) => {
+  const send = useCallback(async (body: string, isNote: boolean, attachment?: ComposerAttachment) => {
     setSending(true)
     try {
-      return await submit(body, isNote)
+      return await submit(body, isNote, attachment)
     } finally {
       if (alive.current) setSending(false)
     }
@@ -397,7 +456,7 @@ function InboxTab() {
               onClick={() => {
                 void loadList(false)
                 const id = selectedIdRef.current
-                if (id !== null) void loadThreadRef.current(id, messageLimitRef.current, true)
+                if (id !== null) void loadThreadRef.current(id, true)
               }}
             >
               <Icon name="refresh" size={18} />
@@ -466,8 +525,8 @@ function InboxTab() {
                     conversation={conversation}
                     messages={messages}
                     loading={loadingThread}
-                    canLoadMore={messages.length >= messageLimit}
-                    onLoadMore={() => setMessageLimit((limit) => limit + MESSAGE_PAGE)}
+                    canLoadMore={hasOlder && !loadingOlder}
+                    onLoadMore={() => void loadOlder()}
                     onResend={(message) => void resend(message)}
                     resendingId={resendingId}
                     filing={filing}

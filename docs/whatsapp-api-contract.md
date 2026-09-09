@@ -750,7 +750,7 @@ Serviço: `services/waConversationService.js`.
 | Rota | Faz | `data` |
 | --- | --- | --- |
 | `GET /conversations` | lista paginada (`limit` ≤ 200, `offset`), do mais recente | array de conversa |
-| `GET /conversations/:id/messages` | histórico (`limit` ≤ 500) e **zera o não lido** | `{ conversation, messages }` |
+| `GET /conversations/:id/messages` | histórico (`limit` ≤ 500, `before` = cursor) e **zera o não lido** | `{ conversation, messages }` |
 | `POST /conversations/:id/messages` | enfileira; ver a seção Envio | a mensagem criada |
 
 ```ts
@@ -773,6 +773,13 @@ Serviço: `services/waConversationService.js`.
   updatedAt: string | null
 }
 ```
+
+`before` é o id da mensagem mais antiga que a tela já tem — cursor, não
+offset. Este fio cresce enquanto é lido: um cliente respondendo no meio da
+rolagem desloca todo offset em um, e a página seguinte repetiria uma
+mensagem ou pularia outra sem ninguém perceber. A ordenação é por `id` pelo
+mesmo motivo — dois registros podem dividir o mesmo `created_at`, e o empate
+deixaria a fronteira da página no ar.
 
 `GET /conversations/:id/messages` é um GET que **escreve**: ler a conversa zera
 `unread_count`. O operador olhando para ela é a única coisa que "lido" pode
@@ -932,6 +939,94 @@ que uma condição já anunciada seja anunciada de novo.
 Envio: uma conversa por número de plantão (`WaConversation.ensure`, do mesmo
 jeito que uma mensagem de entrada faria) e `WaSendService.enqueue`. O worker do
 outbox entrega.
+
+---
+
+## Anexos — onda 6
+
+Hoje um anexo é **gravado e inalcançável**. `waMediaService` baixa a mídia que
+chega e grava o caminho relativo a `DATA_DIR` em `attachment_path`;
+`publicMessage` devolve esse caminho como `attachment.url`, e o navegador não
+tem rota nenhuma para buscá-lo. O cliente manda a foto da ONU, e o operador vê
+a palavra "Anexo".
+
+Do lado da saída é pior: `sendThrough` entrega `url: message.attachment_path`
+ao Evolution — um caminho de disco do painel, que o servidor do Evolution não
+tem como buscar. Nada exercita isso hoje porque nada consegue anexar.
+
+São **dois públicos e duas rotas**, e a diferença entre elas é a única coisa
+que importa aqui.
+
+### 1. O operador, com sessão
+
+`GET /api/whatsapp/messages/:id/media` — `authenticateToken` +
+`requireRole(['admin'])`, escopado por provedor como todo o resto. Devolve o
+arquivo gravado.
+
+- O caminho vem **do banco**, nunca da requisição, e é resolvido com
+  `path.resolve` contra `DATA_DIR`: um `attachment_path` que escape da pasta é
+  recusado com 404, não servido. É a única defesa que importa, porque a coluna
+  foi escrita a partir de um nome de arquivo que veio de fora.
+- `Content-Disposition: inline` só para imagem; qualquer outra coisa vai como
+  `attachment`. **SVG nunca é servido inline** — é executável no navegador, e
+  esta rota está na mesma origem do painel.
+- Mensagem de outro provedor, id inexistente ou linha sem anexo: `404
+  attachment_not_found`.
+
+### 2. O servidor Evolution, sem sessão
+
+`GET /api/whatsapp-media/:id?t=<token>` — montada **antes** do `apiLimiter` e
+fora do `authenticateToken`, pela mesma razão que o webhook: quem busca é um
+servidor, não um navegador com sessão.
+
+- `t` é `<exp>.<hmac>`, com o HMAC-SHA256 de `${id}.${exp}` sob uma chave
+  derivada de `JWT_SECRET` por contexto próprio (`wa-media`), comparado em tempo
+  constante. **15 minutos** — o Evolution busca na hora; um link que sobrevive
+  ao envio é um arquivo do cliente exposto para sempre.
+- Cunhado **pelo worker do outbox, no momento do envio**, nunca pelo navegador.
+- A origem é a de `whatsappConfig.webhookBaseUrl`: é o único endereço que o
+  painel sabe que o Evolution alcança, porque é por ele que os eventos chegam.
+  **Sem ele configurado, o envio com anexo é recusado** (`no_public_url`) em vez
+  de mandar uma URL que não abre — a mesma lição do link do portal.
+
+### 3. O que o operador manda
+
+`POST /api/whatsapp/attachments`, corpo **cru** (`express.raw`), nome em
+`X-File-Name` (percent-encoded), tipo no `Content-Type`. Corpo cru e não
+multipart porque o painel não tem — e não vai ganhar — uma dependência de
+upload para uma tela só; é a mesma escolha que o webhook do SGP já faz.
+
+- Teto de **16 MB**, e uma allowlist de tipos: `image/jpeg`, `image/png`,
+  `image/webp`, `application/pdf`, `video/mp4`, `audio/ogg`, `audio/mpeg`.
+  `image/svg+xml` **fica de fora de propósito**.
+- A extensão gravada vem do tipo aceito, **nunca do nome que o operador mandou**:
+  o nome é guardado para mostrar, não para resolver caminho.
+- Grava em `DATA_DIR/wa-media/out/<aaaa>/<mm>/<uuid>.<ext>` e devolve
+  `{ path, type, name }` — `path` relativo a `DATA_DIR`, exatamente como a
+  entrada grava.
+- Recusas: `attachment_too_large` (413), `attachment_type_not_allowed` (415),
+  `attachment_empty` (400) — arquivo de zero byte não é arquivo pequeno:
+  gravado, ele chega ao cliente como um download que não abre, igualzinho a
+  um upload corrompido.
+
+Como ficou implementada, e as três coisas que o contrato não determinava:
+
+- `authenticateToken` + `requireRole(['admin'])`, na rota de `whatsappMessages`
+  — a mesma que grava a mensagem que vai apontar para o arquivo. Responde
+  **201** com `whatsapp.attachmentStored`.
+- O `express.raw` é montado em `app.js` **antes** do `express.json({ limit:
+  '1mb' })` global, na constante `ATTACHMENT_PATH`. Sem essa reserva uma foto de
+  12 MB morre como erro de parse de JSON, e não como recusa que a tela saiba
+  explicar. O teto do parser é o teto do contrato, então o arquivo grande é
+  recusado antes de ser bufferizado — e a recusa nua do body-parser (413 sem
+  `code`) é reescrita como `attachment_too_large`, porque uma tela que traduz
+  código não traduz mensagem.
+- **Nenhuma tabela é tocada aqui.** A linha sai depois, em
+  `POST /conversations/:id/messages`, a partir do `{ path, type, name }` que esta
+  rota devolveu — a ordem inversa deixaria uma bolha apontando para bytes que
+  nunca chegaram. Quem precisa de escopo de provedor é `wa_messages`, que já tem.
+- Um corpo de **zero byte** com tipo aceito é gravado: não há chave para recusar
+  arquivo vazio, e inventar uma seria pior que gravar zero byte que ninguém pediu.
 
 ---
 

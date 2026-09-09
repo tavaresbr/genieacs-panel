@@ -43,6 +43,13 @@ const ERROR_KEYS: Record<string, TranslationKey> = {
   message_empty: 'whatsapp.error.messageEmpty',
   conversation_not_found: 'whatsapp.error.conversationNotFound',
   invalid_conversation_status: 'whatsapp.error.invalidConversationStatus',
+  // Attachments. `attachment_too_large` reads `{max}`, which is why the helper
+  // above takes vars at all.
+  attachment_too_large: 'whatsapp.error.attachmentTooLarge',
+  attachment_type_not_allowed: 'whatsapp.error.attachmentTypeNotAllowed',
+  attachment_empty: 'whatsapp.error.attachmentEmpty',
+  attachment_not_found: 'whatsapp.error.attachmentNotFound',
+  no_public_url: 'whatsapp.error.noPublicUrl',
   subscriber_not_found: 'whatsapp.error.subscriberNotFound',
   // Templates, campaigns and the alert rules. `no_recipients` is the campaign's
   // — the alert scan raises `no_alert_recipients` precisely so one code does
@@ -67,8 +74,18 @@ const ERROR_KEYS: Record<string, TranslationKey> = {
 
 type Translate = (key: TranslationKey, vars?: Record<string, string | number>) => string
 
-export function whatsappErrorMessage(t: Translate, code?: string): string {
-  return t(ERROR_KEYS[code ?? ''] ?? 'api.requestFailed')
+/**
+ * `vars` because some of these sentences carry a number the operator needs —
+ * "larger than {max} MB" is the whole message. Without it the placeholder
+ * reached the screen literally, so the composer had been keeping its own copy
+ * of two entries from this map rather than render `{max}` to somebody.
+ */
+export function whatsappErrorMessage(
+  t: Translate,
+  code?: string,
+  vars?: Record<string, string | number>
+): string {
+  return t(ERROR_KEYS[code ?? ''] ?? 'api.requestFailed', vars)
 }
 
 const STATUS_BADGE: Record<WhatsAppStatus, string> = {
