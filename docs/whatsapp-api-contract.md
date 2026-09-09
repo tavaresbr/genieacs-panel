@@ -999,6 +999,25 @@ upload para uma tela só; é a mesma escolha que o webhook do SGP já faz.
   entrada grava.
 - Recusas: `attachment_too_large` (413), `attachment_type_not_allowed` (415).
 
+Como ficou implementada, e as três coisas que o contrato não determinava:
+
+- `authenticateToken` + `requireRole(['admin'])`, na rota de `whatsappMessages`
+  — a mesma que grava a mensagem que vai apontar para o arquivo. Responde
+  **201** com `whatsapp.attachmentStored`.
+- O `express.raw` é montado em `app.js` **antes** do `express.json({ limit:
+  '1mb' })` global, na constante `ATTACHMENT_PATH`. Sem essa reserva uma foto de
+  12 MB morre como erro de parse de JSON, e não como recusa que a tela saiba
+  explicar. O teto do parser é o teto do contrato, então o arquivo grande é
+  recusado antes de ser bufferizado — e a recusa nua do body-parser (413 sem
+  `code`) é reescrita como `attachment_too_large`, porque uma tela que traduz
+  código não traduz mensagem.
+- **Nenhuma tabela é tocada aqui.** A linha sai depois, em
+  `POST /conversations/:id/messages`, a partir do `{ path, type, name }` que esta
+  rota devolveu — a ordem inversa deixaria uma bolha apontando para bytes que
+  nunca chegaram. Quem precisa de escopo de provedor é `wa_messages`, que já tem.
+- Um corpo de **zero byte** com tipo aceito é gravado: não há chave para recusar
+  arquivo vazio, e inventar uma seria pior que gravar zero byte que ninguém pediu.
+
 ---
 
 ## Telas — quem consome o quê

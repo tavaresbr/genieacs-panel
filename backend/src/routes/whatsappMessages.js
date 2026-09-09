@@ -1,5 +1,6 @@
 import express from 'express';
 import WhatsAppMessageController from '../controllers/whatsappMessageController.js';
+import WhatsAppAttachmentController from '../controllers/whatsappAttachmentController.js';
 import { authenticateToken, requireRole } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -36,6 +37,21 @@ router.post(
   authenticateToken,
   requireRole(['admin']),
   WhatsAppMessageController.send
+);
+
+// The operator's file, one step ahead of the message that carries it. The body
+// is the raw file and the parser for it is mounted in `app.js`, on this exact
+// path and BEFORE the global JSON one — see `waAttachmentService`. Here the
+// request is already past `apiLimiter` and the provider resolver, and the
+// answer is the `{ path, type, name }` the send route takes back as
+// `attachment`. No table is touched, so nothing here needs scoping of its own:
+// the row that will point at this file is written by the send route, into
+// `wa_messages`, which is scoped.
+router.post(
+  '/attachments',
+  authenticateToken,
+  requireRole(['admin']),
+  WhatsAppAttachmentController.upload
 );
 
 export default router;

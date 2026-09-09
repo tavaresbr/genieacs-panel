@@ -34,6 +34,7 @@ import whatsappAlertRoutes from './routes/whatsappAlerts.js';
 import whatsappBillingRoutes from './routes/whatsappBilling.js';
 import whatsappWebhookRoutes from './routes/whatsappWebhook.js';
 import whatsappMediaRoutes from './routes/whatsappMedia.js';
+import { ATTACHMENT_PATH, attachmentRawBody } from './services/waAttachmentService.js';
 import provisioningRoutes from './routes/provisioning.js';
 import { WEBHOOK_PATH } from './services/sgpService.js';
 
@@ -145,6 +146,13 @@ app.use(cors({
 // parser below skips it. A `verify` hook on the global parser would instead
 // copy every request body in the process.
 app.use(WEBHOOK_PATH, express.raw({ type: '*/*', limit: '64kb' }));
+// The operator's attachment upload, reserved here for the same reason and in
+// the same way: its body is the file itself, and the global parser below is
+// sized for JSON — a 12 MB photo posted past this line would fail as a parse
+// error against a 1 MB ceiling rather than as anything the screen could
+// explain. The route itself is admin-only and lives with the other WhatsApp
+// routes; only the body parser has to be this early.
+app.use(ATTACHMENT_PATH, attachmentRawBody);
 app.use(express.json({ limit: '1mb' }));
 
 // Mounted BEFORE the shared `apiLimiter` on purpose. The Evolution server is a

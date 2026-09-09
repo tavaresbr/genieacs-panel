@@ -12,7 +12,7 @@ import { useTranslation } from '@/contexts/language-context'
 import { whatsappErrorMessage } from '@/components/whatsapp-connection'
 import { ConversationList } from '@/components/whatsapp/conversation-list'
 import { ConversationThread } from '@/components/whatsapp/conversation-thread'
-import { ThreadComposer } from '@/components/whatsapp/thread-composer'
+import { ThreadComposer, type ComposerAttachment } from '@/components/whatsapp/thread-composer'
 import { BillingPanel } from '@/components/whatsapp/billing-panel'
 import { CampaignsPanel } from '@/components/whatsapp/campaigns-panel'
 import { TemplatesPanel } from '@/components/whatsapp/templates-panel'
@@ -323,11 +323,18 @@ function InboxTab() {
   }, [t, toast])
 
   // ── Sending ────────────────────────────────────────────────────────────────
-  const submit = useCallback(async (body: string, isNote: boolean): Promise<boolean> => {
+  const submit = useCallback(async (
+    body: string,
+    isNote: boolean,
+    attachment?: ComposerAttachment
+  ): Promise<boolean> => {
     const id = selectedIdRef.current
     if (id === null) return false
     try {
-      const res = await whatsappAPI.sendMessage(id, { body, isNote })
+      // The composer uploads the file first and hands back what the upload
+      // route stored; this call is what puts it on a row. A caption is
+      // optional, so `body` can be empty as long as there is a file.
+      const res = await whatsappAPI.sendMessage(id, { body, attachment, isNote })
       if (!alive.current) return false
       if (!res.success || !res.data) {
         // Only the machine `code` is ever translated. The `message` beside it
@@ -351,10 +358,10 @@ function InboxTab() {
     }
   }, [t, toast])
 
-  const send = useCallback(async (body: string, isNote: boolean) => {
+  const send = useCallback(async (body: string, isNote: boolean, attachment?: ComposerAttachment) => {
     setSending(true)
     try {
-      return await submit(body, isNote)
+      return await submit(body, isNote, attachment)
     } finally {
       if (alive.current) setSending(false)
     }
