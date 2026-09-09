@@ -34,20 +34,37 @@ export const LEGACY_DEFAULT_SETTINGS = {
 };
 
 export async function seedDefaults(db = getDb()) {
-  for (const [key, value] of Object.entries(DEFAULT_SETTINGS)) {
-    const existing = await db('settings').where({ key }).first();
-    if (!existing) {
-      await db('settings').insert({ key, value });
-    } else if (
-      Object.hasOwn(LEGACY_DEFAULT_SETTINGS, key) &&
-      existing.value === LEGACY_DEFAULT_SETTINGS[key]
-    ) {
-      await db('settings')
-        .where({ key })
-        .update({ value, updated_at: new Date() });
+  // Settings belong to a provider, so every provider gets the defaults — the
+  // panel's name, its GenieACS, its VirtualParameter mapping.
+  //
+  // The providers are read from the connection that was passed in, not from
+  // `getDb()`, and the column is written explicitly rather than through a
+  // tenant context. Both matter: `dbManagementService` calls this against the
+  // TARGET database of a database switch, where `getDb()` is still the source
+  // and no context has been opened. Writing the column here also keeps this
+  // file free of the scoping helpers, which it could not use anyway — it runs
+  // at boot, before any request.
+  const tenants = await db('tenants').orderBy('id', 'asc');
+
+  for (const tenant of tenants) {
+    for (const [key, value] of Object.entries(DEFAULT_SETTINGS)) {
+      const existing = await db('settings').where({ tenant_id: tenant.id, key }).first();
+      if (!existing) {
+        await db('settings').insert({ tenant_id: tenant.id, key, value });
+      } else if (
+        Object.hasOwn(LEGACY_DEFAULT_SETTINGS, key) &&
+        existing.value === LEGACY_DEFAULT_SETTINGS[key]
+      ) {
+        await db('settings')
+          .where({ tenant_id: tenant.id, key })
+          .update({ value, updated_at: new Date() });
+      }
     }
   }
 
+  // Deliberately outside the loop: `map_settings` is still a single row keyed
+  // `id: 1` and has not been converted yet. Inside the loop, the second
+  // provider's turn would try to insert that same id again.
   const map = await db('map_settings').where({ id: 1 }).first();
   if (!map) {
     await db('map_settings').insert({

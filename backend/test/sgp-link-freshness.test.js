@@ -70,9 +70,9 @@ async function createAccount(deviceId, pppoe, customerId) {
 before(async () => {
   await startTestServers();
   sgpUrl = await startSgpStub();
-  await SgpService.saveConfig({
+  await asTenant(() => SgpService.saveConfig({
     enabled: true, baseUrl: sgpUrl, app: APP, token: TOKEN, linkMode: 'pppoe'
-  });
+  }));
 });
 
 after(async () => {

@@ -153,11 +153,11 @@ before(async () => {
   await db('tenants').insert({ slug: 'beta', name: 'Provedor Beta', status: 'active' });
   beta = (await db('tenants').where({ slug: 'beta' }).first()).id;
 
-  await WhatsAppConfigService.saveConfig({
+  await asTenant(() => WhatsAppConfigService.saveConfig({
     enabled: true,
     webhookBaseUrl: WEBHOOK_BASE,
     rateLimitPerMin: 60
-  });
+  }));
 
   const account = await asTenant(() => WhatsAppAccount.create({
     name: INSTANCE,
@@ -467,7 +467,7 @@ describe('the outbox hands Evolution an address it can actually fetch', () => {
     const { body } = await enfileirar({ url: relativo, type: 'application/pdf', name: 'sem-origem.pdf' });
     const row = await asTenant(() => WaMessage.getById(body.data.id));
 
-    await WhatsAppConfigService.saveConfig({ enabled: false, webhookBaseUrl: '' });
+    await asTenant(() => WhatsAppConfigService.saveConfig({ enabled: false, webhookBaseUrl: '' }));
     requests.length = 0;
     try {
       // Straight at `dispatch`: the worker's own readiness check would skip the
@@ -483,7 +483,7 @@ describe('the outbox hands Evolution an address it can actually fetch', () => {
       );
       assert.equal(requests.length, 0, 'nothing may reach Evolution');
     } finally {
-      await WhatsAppConfigService.saveConfig({ enabled: true, webhookBaseUrl: WEBHOOK_BASE });
+      await asTenant(() => WhatsAppConfigService.saveConfig({ enabled: true, webhookBaseUrl: WEBHOOK_BASE }));
     }
   });
 
@@ -492,7 +492,7 @@ describe('the outbox hands Evolution an address it can actually fetch', () => {
     const { body } = await enfileirar({ url: relativo, type: 'application/pdf', name: 'x.pdf' });
     const row = await asTenant(() => WaMessage.getById(body.data.id));
 
-    await WhatsAppConfigService.saveConfig({ enabled: false, webhookBaseUrl: '' });
+    await asTenant(() => WhatsAppConfigService.saveConfig({ enabled: false, webhookBaseUrl: '' }));
     try {
       const erro = await asTenant(() => WaSendService.dispatch(row)).then(() => null, (e) => e);
       assert.ok(erro, 'the despatch must not have succeeded');
@@ -501,7 +501,7 @@ describe('the outbox hands Evolution an address it can actually fetch', () => {
       assert.match(depois.delivery_error, /whatsapp\.error\.noPublicUrl/);
       assert.match(depois.delivery_error, /no_public_url/);
     } finally {
-      await WhatsAppConfigService.saveConfig({ enabled: true, webhookBaseUrl: WEBHOOK_BASE });
+      await asTenant(() => WhatsAppConfigService.saveConfig({ enabled: true, webhookBaseUrl: WEBHOOK_BASE }));
       await getDb()('wa_messages').where({ id: body.data.id }).del();
     }
   });

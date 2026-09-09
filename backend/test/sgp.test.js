@@ -1,7 +1,9 @@
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { authHeaders, call, getDb, startTestServers, stopTestServers } from './helpers/harness.js';
+import { asTenant, authHeaders, call, getDb, startTestServers, stopTestServers } from './helpers/harness.js';
+
+const { default: AppState } = await import('../src/models/AppState.js');
 
 const { default: CustomerPortalPasswordService } = await import(
   '../src/services/customerPortalPasswordService.js'
@@ -184,7 +186,7 @@ describe('SGP configuration', () => {
   });
 
   it('keeps the stored token in database at rest', async () => {
-    const row = await getDb()('app_state').where({ key: 'sgp_integration_config' }).first();
+    const row = { value: await asTenant(() => AppState.get('sgp_integration_config')) };
     assert.ok(!row.value.includes(TOKEN));
     const config = await SgpService.getConfig();
     assert.equal(config.token, TOKEN);
