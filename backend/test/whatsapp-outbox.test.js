@@ -354,7 +354,13 @@ describe('audio is a voice bubble before it is a file', () => {
       assert.equal(audioCalls().length, 1);
       assert.equal(mediaCalls().length, 1);
       assert.equal(mediaCalls()[0].payload.mediatype, 'audio');
-      assert.equal(mediaCalls()[0].payload.media, audio.url);
+      // NOT `audio.url`. What Evolution is given is the panel's own signed
+      // media route, because the stored value is a path on the panel's disk
+      // that no other machine can open — see `whatsapp-attachments.test.js`.
+      assert.match(
+        mediaCalls()[0].payload.media,
+        new RegExp(`^https://painel\\.provedor\\.test/api/whatsapp-media/${body.data.id}\\?t=`)
+      );
       assert.equal(mediaCalls()[0].payload.fileName, audio.name);
       const row = await asTenant(() => WaMessage.getById(body.data.id));
       assert.equal(row.delivery_status, 'sent');

@@ -5,6 +5,7 @@ import fr from './locales/fr.js';
 import es from './locales/es.js';
 import it from './locales/it.js';
 import ja from './locales/ja.js';
+import ko from './locales/ko.js';
 import ptBR from './locales/pt-BR.js';
 import zhCN from './locales/zh-CN.js';
 import zhTW from './locales/zh-TW.js';
@@ -20,7 +21,8 @@ export const dictionaries = {
   fr,
   ja,
   'zh-CN': zhCN,
-  'zh-TW': zhTW
+  'zh-TW': zhTW,
+  ko
 };
 
 const PLACEHOLDER_PATTERN = /\{(\w+)\}/g;

@@ -1,0 +1,240 @@
+import { after, before, describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { asTenant, authHeaders, call, getDb, startTestServers, stopTestServers } from './helpers/harness.js';
+
+const { default: WhatsAppConfigService } = await import('../src/services/whatsappConfigService.js');
+const { default: WhatsAppAccount } = await import('../src/models/WhatsAppAccount.js');
+const { default: WaConversation } = await import('../src/models/WaConversation.js');
+const { DATA_DIR } = await import('../src/config/paths.js');
+const { MAX_ATTACHMENT_BYTES } = await import('../src/services/waAttachmentService.js');
+
+const INSTANCE = 'painel-anexos';
+
+let panelUrl;
+let token;
+let conversationId;
+
+/** A one-pixel PNG, as real bytes: the route stores what it is given. */
+const PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+  'base64'
+);
+
+/**
+ * The upload as the browser makes it: the raw file as the body, its name
+ * percent-encoded in a header, its type in `Content-Type`. `call` from the
+ * harness JSON-stringifies its body, which is exactly what this route must not
+ * receive, so this one talks to `fetch` directly.
+ */
+async function upload(bytes, { type, name } = {}) {
+  const headers = {};
+  if (type) headers['Content-Type'] = type;
+  if (name) headers['X-File-Name'] = encodeURIComponent(name);
+  const response = await fetch(`${panelUrl}/api/whatsapp/attachments`, {
+    method: 'POST',
+    headers: { ...headers, ...authHeaders(token) },
+    body: bytes
+  });
+  const text = await response.text();
+  let body = null;
+  try {
+    body = text ? JSON.parse(text) : null;
+  } catch {
+    body = text;
+  }
+  return { status: response.status, body };
+}
+
+const enviar = (payload) => call(
+  `${panelUrl}/api/whatsapp/conversations/${conversationId}/messages`,
+  { method: 'POST', headers: authHeaders(token), body: payload }
+);
+
+before(async () => {
+  ({ panelUrl } = await startTestServers());
+
+  const setup = await call(`${panelUrl}/api/auth/setup`, {
+    method: 'POST',
+    body: { username: 'operator', password: 'operator-password-1' }
+  });
+  token = setup.body.data.token;
+
+  const account = await asTenant(() => WhatsAppAccount.create({
+    name: INSTANCE,
+    purpose: 'support',
+    flavor: 'v2',
+    base_url: 'https://evo.provedor.com.br',
+    status: 'connected',
+    is_default: true,
+    ...WhatsAppConfigService.encryptInstanceToken('token-da-instancia'),
+    ...WhatsAppConfigService.encryptWebhookToken('segredo-do-webhook')
+  }));
+
+  const conversation = await asTenant(() => WaConversation.ensure({
+    accountId: account.id,
+    externalThreadId: '5548999990000@s.whatsapp.net',
+    waPhone: '5548999990000',
+    waLid: null,
+    pushName: 'Cliente'
+  }));
+  conversationId = conversation.id;
+});
+
+after(async () => {
+  await stopTestServers();
+});
+
+describe('WhatsApp attachments — what the operator uploads', () => {
+  it('stores an accepted file under DATA_DIR, with the extension of its TYPE', async () => {
+    // The name says `.txt` and the type says PNG. The type wins: the extension
+    // is half of what a browser later decides to do with the file, and it is
+    // the only one of the two that this route checked.
+    const { status, body } = await upload(PNG, { type: 'image/png', name: 'planta-do-poste.txt' });
+
+    assert.equal(status, 201);
+    assert.equal(body.success, true);
+    assert.equal(body.data.type, 'image/png');
+    assert.match(body.data.path, /^wa-media\/out\/\d{4}\/\d{2}\/[0-9a-f-]{36}\.png$/);
+
+    const onDisk = path.join(DATA_DIR, body.data.path);
+    assert.equal(fs.existsSync(onDisk), true);
+    assert.deepEqual(fs.readFileSync(onDisk), PNG);
+    // Relative to DATA_DIR, exactly as the inbound side stores it: the volume
+    // moves between the provider's machine and a container.
+    assert.equal(path.isAbsolute(body.data.path), false);
+  });
+
+  it('keeps a hostile X-File-Name as a label and never as a path', async () => {
+    const { status, body } = await upload(PNG, { type: 'image/png', name: '../../etc/passwd' });
+
+    assert.equal(status, 201);
+    // The name survives only as something to show, stripped of everything that
+    // could be read as a path.
+    assert.doesNotMatch(body.data.name, /[\\/]/);
+    assert.doesNotMatch(body.data.name, /\.\./);
+    assert.match(body.data.name, /^passwd\./);
+
+    // And the file itself is where the route decided, not where the name asked.
+    const resolved = path.resolve(DATA_DIR, body.data.path);
+    assert.equal(resolved.startsWith(path.resolve(DATA_DIR) + path.sep), true);
+    assert.equal(fs.existsSync(resolved), true);
+    assert.equal(fs.existsSync('/etc/passwd.png'), false);
+  });
+
+  it('refuses a file over the 16 MB ceiling with attachment_too_large', async () => {
+    const { status, body } = await upload(
+      Buffer.alloc(MAX_ATTACHMENT_BYTES + 1, 0x41),
+      { type: 'image/jpeg', name: 'foto-enorme.jpg' }
+    );
+
+    assert.equal(status, 413);
+    assert.equal(body.success, false);
+    assert.equal(body.code, 'attachment_too_large');
+    // The refusal names the ceiling: the key takes `{max}` in MB.
+    assert.match(body.message, /16/);
+  });
+
+  it('refuses SVG — it is executable on the panel\'s own origin', async () => {
+    // Explicit, and deliberately its own case: SVG is the one type someone
+    // will try to put back in the allowlist because "it is an image", and the
+    // panel serves these files back on the origin the operator's session is on.
+    const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
+    const { status, body } = await upload(svg, { type: 'image/svg+xml', name: 'diagrama.svg' });
+
+    assert.equal(status, 415);
+    assert.equal(body.code, 'attachment_type_not_allowed');
+  });
+
+  it('refuses every other type off the allowlist, and a request with no type at all', async () => {
+    for (const type of ['text/html', 'application/octet-stream', 'application/x-msdownload', 'image/gif']) {
+      const { status, body } = await upload(PNG, { type, name: 'arquivo' });
+      assert.equal(status, 415, `${type} should not be stored`);
+      assert.equal(body.code, 'attachment_type_not_allowed');
+    }
+
+    // No `Content-Type` means no accepted type, which is the same refusal: the
+    // raw parser does not even take a body it cannot name.
+    const semTipo = await upload(PNG, { name: 'arquivo' });
+    assert.equal(semTipo.status, 415);
+    assert.equal(semTipo.body.code, 'attachment_type_not_allowed');
+  });
+
+  it('accepts the whole allowlist, one extension each', async () => {
+    const esperado = {
+      'image/jpeg': '.jpg',
+      'image/png': '.png',
+      'image/webp': '.webp',
+      'application/pdf': '.pdf',
+      'video/mp4': '.mp4',
+      'audio/ogg': '.ogg',
+      'audio/mpeg': '.mp3'
+    };
+    for (const [type, extension] of Object.entries(esperado)) {
+      // The parameters a browser adds to a type must not decide the answer.
+      const { status, body } = await upload(PNG, { type: `${type}; charset=binary`, name: 'x' });
+      assert.equal(status, 201, `${type} should be stored`);
+      assert.equal(body.data.type, type);
+      assert.equal(path.extname(body.data.path), extension);
+    }
+  });
+
+  it('refuses a nought-byte file rather than store one', async () => {
+    // An empty file is not a small file. Stored, it reaches the customer as a
+    // download that opens onto nothing — indistinguishable from a corrupt
+    // upload, and impossible for the operator to tell apart afterwards.
+    const { status, body } = await upload(Buffer.alloc(0), {
+      type: 'image/png',
+      name: 'vazio.png'
+    });
+    assert.equal(status, 400);
+    assert.equal(body.code, 'attachment_empty');
+  });
+
+  it('demands a session, like every other route on this surface', async () => {
+    const response = await fetch(`${panelUrl}/api/whatsapp/attachments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'image/png' },
+      body: PNG
+    });
+    assert.equal(response.status, 401);
+  });
+
+  it('returns a path the send route takes as an attachment', async () => {
+    const stored = await upload(PNG, { type: 'image/png', name: 'fibra.png' });
+    const { path: caminho, type, name } = stored.body.data;
+
+    // No caption: a file on its own is a whole message. This is the pairing the
+    // composer performs, and the only proof that the two halves agree.
+    const enviada = await enviar({ attachment: { url: caminho, type, name } });
+    assert.equal(enviada.status, 201);
+    assert.equal(enviada.body.data.body, null);
+    // The response says WHAT is attached, never where it is: the path stays on
+    // the server's side of the wire, and the browser fetches the bytes by
+    // message id. The row below is where the path has to be right.
+    assert.equal(enviada.body.data.attachment.url, undefined);
+    assert.equal(enviada.body.data.attachment.type, 'image/png');
+    assert.equal(enviada.body.data.attachment.name, name);
+    assert.equal(enviada.body.data.deliveryStatus, 'queued');
+
+    const row = await getDb()('wa_messages').where({ id: enviada.body.data.id }).first();
+    assert.equal(row.attachment_path, caminho);
+    assert.equal(row.attachment_type, 'image/png');
+    assert.equal(fs.existsSync(path.join(DATA_DIR, row.attachment_path)), true);
+  });
+
+  it('keeps an internal note a note when it carries a file', async () => {
+    const stored = await upload(PNG, { type: 'image/png', name: 'interno.png' });
+    const enviada = await enviar({
+      isNote: true,
+      attachment: { url: stored.body.data.path, type: 'image/png', name: 'interno.png' }
+    });
+
+    assert.equal(enviada.status, 201);
+    assert.equal(enviada.body.data.isNote, true);
+    // The one thing a note must never do is reach the customer: no delivery
+    // state at all means the outbox worker never sees it.
+    assert.equal(enviada.body.data.deliveryStatus, null);
+  });
+});

@@ -144,6 +144,40 @@ class ApiClient {
     return this.request<T>(endpoint, { method: 'DELETE' })
   }
 
+  /**
+   * A raw body, not JSON. `request` sets `Content-Type: application/json` and
+   * stringifies, which would corrupt a file; this is the one call that needs
+   * the bytes to arrive as they are.
+   */
+  async sendBlob<T>(
+    endpoint: string,
+    body: Blob,
+    headers: Record<string, string>
+  ): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, { method: 'POST', body, headers })
+  }
+
+  /**
+   * A binary response. `request` reads JSON or text, so a file fetched through
+   * it would arrive mangled and silently — hence its own path, with the same
+   * Authorization header and the same locale.
+   */
+  async getBlob(endpoint: string): Promise<{ success: boolean; blob?: Blob; code?: string }> {
+    const headers: Record<string, string> = { 'Accept-Language': getActiveLocale() }
+    if (this.token) headers['Authorization'] = `Bearer ${this.token}`
+    try {
+      const response = await fetch(`${this.baseURL}/api${endpoint}`, { headers })
+      if (!response.ok) {
+        const contentType = response.headers.get('content-type') || ''
+        const data = contentType.includes('application/json') ? await response.json() : {}
+        return { success: false, code: data.code }
+      }
+      return { success: true, blob: await response.blob() }
+    } catch {
+      return { success: false }
+    }
+  }
+
   async requestWithBody<T>(
     method: 'POST' | 'PUT' | 'PATCH' | 'DELETE',
     endpoint: string,
@@ -912,7 +946,12 @@ export interface WhatsAppMessage {
   conversationId: number
   direction: 'in' | 'out'
   body: string | null
-  attachment: { url: string; type: string | null; name: string | null } | null
+  /**
+   * What the panel says about a file, never where it is: the browser fetches
+   * the bytes by message id through `fetchAttachment`. The stored path stays on
+   * the server side of the wire.
+   */
+  attachment: { type: string | null; name: string | null } | null
   isNote: boolean
   /**
    * Who produced it. `sentBy` cannot answer that: it is NULL for the bot, for a
@@ -1080,12 +1119,35 @@ export const whatsappAPI = {
 
   // Reading a thread clears its unread count server-side — the operator looking
   // at it is the only thing "read" can mean here.
-  listMessages: (conversationId: number, params: { limit?: number } = {}) => {
-    const suffix = params.limit ? `?limit=${params.limit}` : ''
+  // `before` is the id of the oldest message already on screen — a cursor, not
+  // an offset. The thread grows while it is being read, and an offset page
+  // would repeat or skip a message every time a customer answers mid-scroll.
+  listMessages: (conversationId: number, params: { limit?: number; before?: number } = {}) => {
+    const query = new URLSearchParams()
+    if (params.limit) query.set('limit', String(params.limit))
+    if (params.before) query.set('before', String(params.before))
+    const suffix = query.toString() ? `?${query.toString()}` : ''
     return apiClient.get<{ conversation: WhatsAppConversation; messages: WhatsAppMessage[] }>(
       `/whatsapp/conversations/${conversationId}/messages${suffix}`
     )
   },
+
+  // ── Attachments ──────────────────────────────────────────────────────
+  // The raw file as the body, its name in a header. No multipart, and so no
+  // upload dependency for one screen — the same choice the SGP webhook makes
+  // with `express.raw`. Returns the stored reference `sendMessage` takes.
+  uploadAttachment: (file: File) =>
+    apiClient.sendBlob<{ path: string; type: string; name: string }>(
+      '/whatsapp/attachments',
+      file,
+      { 'Content-Type': file.type || 'application/octet-stream', 'X-File-Name': encodeURIComponent(file.name) }
+    ),
+
+  // A blob rather than a URL, because the route is session-authenticated and an
+  // `<img src>` cannot carry an Authorization header. The caller makes an object
+  // URL from it and revokes that when the bubble goes away.
+  fetchAttachment: (messageId: number) =>
+    apiClient.getBlob(`/whatsapp/messages/${messageId}/media`),
 
   // Enqueues and returns; the outbox worker delivers. An internal note is
   // stored and never sent.
