@@ -112,6 +112,12 @@ const PROVISIONING_RUN_TENANT_INDEXES = [
   [['tenant_id', 'status', 'next_attempt_at'], 'provisioning_runs_tenant_due_idx']
 ];
 
+/**
+ * Shared by the 0026 upgrade. In dependency order: `wifi_security_mappings`
+ * points at `vendors`, so the parent is converted first.
+ */
+const VENDOR_CATALOGUE_TABLES = ['vendors', 'wifi_security_mappings', 'wifi_security_config'];
+
 // Table definitions. Each is a factory so the builder can reach `db.fn.now()`,
 // and each is referenced by exactly one place per table so the initial schema
 // and the later upgrade steps can never drift apart.
@@ -1636,6 +1642,73 @@ export const migrations = [
         t.primary(['tenant_id', 'id']);
         t.foreign('tenant_id').references('id').inTable('tenants');
       });
+    }
+  },
+  {
+    /**
+     * The equipment catalogue, per provider — the three tables together.
+     *
+     * The honest counter-argument first, because it is a good one: the CONTENT
+     * really is the same for every ISP on earth. A ZTE's `wifi_password_path`
+     * is a fact about firmware, not about anybody's subscribers. What makes
+     * these per-provider is not the data, it is that the rows are OPERATOR-
+     * EDITABLE: every path, priority and enabled flag is changed through
+     * `/api/vendor-management`, so left shared, one ISP correcting a detection
+     * pattern silently changes another ISP's WiFi writes. `Vendor.delete` also
+     * cascades into `wifi_security_mappings`, so it is destructive across
+     * providers as well as surprising.
+     *
+     * The project already made this call: the plan chooses a per-tenant
+     * catalogue COPY over a `tenant_id NULL = global` row, precisely to keep
+     * the invariant `tdb` depends on — every row of every scoped table carries
+     * a provider, with no nulls to special-case.
+     *
+     * The three move together because `wifi_security_mappings.vendor_id` points
+     * at `vendors.id`: converting one alone leaves a foreign key that can reach
+     * across providers.
+     *
+     * NO new unique is added here. The plan wants `(tenant_id, name)` on
+     * vendors and `(tenant_id, product_class)` on the config, and both would be
+     * NEW constraints rather than conversions of existing ones — a migration
+     * that can fail on data an install already has is a migration that strands
+     * an upgrade halfway. They belong in their own step, after a pass that
+     * reports duplicates.
+     *
+     * CONSEQUENCE, and it is not a schema one: nothing seeds `vendors`. A
+     * provider created after this step starts with an empty catalogue, and an
+     * empty catalogue does not fail loudly — device detection simply matches
+     * nothing. The code half of this slice has to give a new provider a copy.
+     */
+    id: '0026_vendor_catalogue_tenant',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return false;
+      for (const table of VENDOR_CATALOGUE_TABLES) {
+        // eslint-disable-next-line no-await-in-loop -- three schema probes
+        if (!(await db.schema.hasTable(table))) return false;
+        // eslint-disable-next-line no-await-in-loop -- three schema probes
+        if (!(await db.schema.hasColumn(table, 'tenant_id'))) return false;
+      }
+      return true;
+    },
+    async up(db) {
+      const tenant = await db('tenants').orderBy('id', 'asc').first();
+      if (!tenant) return;
+
+      for (const table of VENDOR_CATALOGUE_TABLES) {
+        // eslint-disable-next-line no-await-in-loop -- DDL, three tables
+        if (!(await db.schema.hasTable(table))) continue;
+        // eslint-disable-next-line no-await-in-loop -- DDL, three tables
+        if (await db.schema.hasColumn(table, 'tenant_id')) continue;
+        // eslint-disable-next-line no-await-in-loop -- DDL, three tables
+        await db.schema.alterTable(table, (t) => t.integer('tenant_id').unsigned());
+        // eslint-disable-next-line no-await-in-loop -- DDL, three tables
+        await db(table).whereNull('tenant_id').update({ tenant_id: tenant.id });
+        // eslint-disable-next-line no-await-in-loop -- DDL, three tables
+        await db.schema.alterTable(table, (t) => {
+          t.integer('tenant_id').unsigned().notNullable().defaultTo(tenant.id).alter();
+          t.foreign('tenant_id').references('id').inTable('tenants');
+        });
+      }
     }
   }
 ];
