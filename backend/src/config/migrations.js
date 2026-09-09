@@ -650,6 +650,42 @@ const DEVICE_HISTORY_TABLES = [
   ['device_sample_hours', deviceSampleHoursTable]
 ];
 
+const deviceSwapsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants');
+  t.integer('account_id').unsigned()
+    .references('id').inTable('customer_accounts').onDelete('SET NULL');
+  // Denormalized so the row still says who this was after the account is gone,
+  // the same reason `provisioning_runs` keeps `profile_name`.
+  t.string('customer_id', 32);
+  t.string('pppoe_username', 255);
+  t.string('previous_device_id', 255).notNullable();
+  t.string('device_id', 255).notNullable();
+  t.string('contract', 64);
+  // Which branch of `ensureAccount` matched: 'identity_hash' when the
+  // replacement runs the same firmware, 'pppoe' when it does not.
+  t.string('matched_by', 16).notNullable();
+  t.string('link_action', 16).notNullable();
+  // Two ONTs trading one login during an install produce this pair over and
+  // over. One row saying so beats a hundred each saying it once.
+  t.boolean('flapping').notNullable().defaultTo(false);
+  t.integer('repeat_count').notNullable().defaultTo(1);
+  t.timestamp('occurred_at').defaultTo(db.fn.now());
+  t.timestamp('acknowledged_at');
+  t.integer('acknowledged_by').unsigned()
+    .references('id').inTable('users').onDelete('SET NULL');
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  t.timestamp('updated_at').defaultTo(db.fn.now());
+  t.unique(['tenant_id', 'previous_device_id', 'device_id']);
+  t.index(['tenant_id', 'device_id'], 'device_swaps_device_idx');
+  t.index(['tenant_id', 'acknowledged_at'], 'device_swaps_open_idx');
+};
+
+const DEVICE_SWAP_TABLES = [
+  ['device_swaps', deviceSwapsTable]
+];
+
 const TENANCY_TABLES = [
   ['tenants', tenantsTable]
 ];
@@ -684,7 +720,8 @@ export const SCHEMA_TABLES = [
   ...INITIAL_TABLES,
   ...PROVISIONING_TABLES,
   ...WHATSAPP_TABLES,
-  ...DEVICE_HISTORY_TABLES
+  ...DEVICE_HISTORY_TABLES,
+  ...DEVICE_SWAP_TABLES
 ].map(([name]) => name);
 
 /**
@@ -1203,6 +1240,22 @@ export const migrations = [
         // eslint-disable-next-line no-await-in-loop -- DDL, and two of them
         await createTableIfMissing(db, name, table(db));
       }
+    }
+  },
+  {
+    // A record of one ONT replacing another for the same subscriber.
+    //
+    // Its own table rather than an `sgp_events` row, and the deciding reason is
+    // that a CPE swap happens on installs with no SGP configured at all.
+    // `sgp_events` is also an ingest queue whose rows exist to be acted on and
+    // are pruned on an SGP retention setting, and a swap is a fact that already
+    // happened.
+    id: '0018_device_swaps',
+    async isApplied(db) {
+      return db.schema.hasTable('device_swaps');
+    },
+    async up(db) {
+      await createTableIfMissing(db, 'device_swaps', deviceSwapsTable(db));
     }
   }
 ];
