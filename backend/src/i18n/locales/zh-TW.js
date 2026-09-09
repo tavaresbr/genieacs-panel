@@ -501,10 +501,6 @@ export default {
   'whatsapp.bot.invoiceDigitableLine': '條碼號：{value}',
   'whatsapp.bot.invoicePix': 'PIX 複製貼上碼：{value}',
   'whatsapp.bot.invoiceLink': '帳單副本：{value}',
-  'whatsapp.bot.signalOkNoReading': '您的寬頻在線。',  'whatsapp.error.subscriberNotFound': '找不到該合約號對應的用戶',
-  'whatsapp.conversationClosed': '會話已結束',
-  'whatsapp.conversationReopened': '會話已重新開啟',
-  'whatsapp.conversationStatusFailed': '無法更新該會話',
-  'whatsapp.error.invalidConversationStatus': '會話只有進行中或已結束兩種狀態',
+  'whatsapp.bot.signalOkNoReading': '您的寬頻在線。',
 
 };

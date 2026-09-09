@@ -27,6 +27,7 @@ const loaders: Record<LazyLocale, () => Promise<{ default: Dictionary }>> = {
   ja: () => import('@/lib/i18n/locales/ja'),
   ko: () => import('@/lib/i18n/locales/ko'),
   'pt-BR': () => import('@/lib/i18n/locales/pt-BR'),
+  ru: () => import('@/lib/i18n/locales/ru'),
   'zh-CN': () => import('@/lib/i18n/locales/zh-CN'),
   'zh-TW': () => import('@/lib/i18n/locales/zh-TW'),
 }
