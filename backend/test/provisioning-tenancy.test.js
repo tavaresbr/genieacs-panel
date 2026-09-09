@@ -347,3 +347,37 @@ describe('the boot reaper, once there is more than one provider', () => {
     }
   });
 });
+
+describe('the scheduler tick, once there is more than one provider', () => {
+  /**
+   * The last thing holding `tick` to one provider was `sgp_events`; with that
+   * scoped, the loop divides the work instead of repeating it.
+   *
+   * The trap this covers is not the loop, it is the prune gate. `lastPruneAt`
+   * is a counter on the class rather than a row, so decided INSIDE the loop the
+   * first provider would set it and every provider after it would skip its own
+   * prune — that day, and every day. The cadence is the deployment's; the rows
+   * each pass deletes are the provider's.
+   */
+  it('prunes every provider on a prune day, not just the first', async () => {
+    const velho = secondsAgo(400 * 24 * 60 * 60);
+    const ids = {};
+    for (const [tenant, quem] of [[alfa, 'alfa'], [beta, 'beta']]) {
+      const run = await runInTenant(tenant, () => ProvisioningRun.create({
+        device_id: `ont-${quem}-prune`, status: 'success', trigger: 'poller'
+      }));
+      ids[quem] = run.id;
+      await getDb()('provisioning_runs').where({ id: run.id })
+        .update({ updated_at: velho, created_at: velho });
+    }
+
+    // A prune day: the gate is a class counter, and zero is "never pruned".
+    SchedulerService.lastPruneAt = 0;
+    await SchedulerService.tick();
+
+    for (const [tenant, quem] of [[alfa, 'alfa'], [beta, 'beta']]) {
+      const row = await runInTenant(tenant, () => ProvisioningRun.getById(ids[quem]));
+      assert.equal(row, null, `${quem}'s settled run should have been pruned too`);
+    }
+  });
+});
