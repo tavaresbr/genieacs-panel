@@ -1356,6 +1356,12 @@ const ja: Dictionary = {
   'whatsapp.error.rateLimited': '短い時間に送信が多すぎます。少し待ってください。',
   'whatsapp.error.scanFailed': 'アラートの確認を完了できませんでした。',
 
+  'settings.whatsapp.messageRetention': '会話履歴の保存期間（日）',
+  'settings.whatsapp.messageRetentionHint': '0 は無期限で、これが既定値です。この日数を過ぎたメッセージはパネルから完全に削除されます。添付ファイルがまだディスクにあるメッセージは削除されません。それも消したい場合は添付ファイルの保存期間も設定してください。',
+  'whatsapp.health.sweepDone': '添付ファイル {files} 件を削除し、{mb} MB を解放しました',
+  'whatsapp.health.sweepNothing': '削除できるほど古いものはありません',
+  'whatsapp.health.sweepBusy': 'すでに整理が実行中です',
+  'whatsapp.health.sweepFailed': '整理を完了できませんでした',
 }
 
 export default ja

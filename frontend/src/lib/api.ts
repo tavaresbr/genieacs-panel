@@ -823,6 +823,8 @@ export interface WhatsAppConfig {
   portalPublicUrl: string
   /** Days a stored attachment is kept. 0 means forever, and is the default. */
   mediaRetentionDays: number
+  /** Days a message row is kept. 0 is forever, and is the default. */
+  messageRetentionDays: number
   rateLimitPerMin: number
   managedUrl: string
   managed: boolean
@@ -1165,6 +1167,20 @@ export const whatsappAPI = {
   // be the reason the panel is slow.
   getHealth: () =>
     apiClient.get<WhatsAppHealth>('/whatsapp/health'),
+
+  // The attachment sweep, on demand, for the operator who needs the disk back
+  // before the next pass six hours from now. It takes no parameters: the window
+  // and the rules come from the saved settings, so pressing the button can
+  // never delete more than the settings screen already says it will.
+  //
+  // `skipped` is the answer that matters. "0 files" means one of retention
+  // being off, nothing being old enough, or a pass already running — and those
+  // read identically unless the reason comes back with the count.
+  sweepMedia: () =>
+    apiClient.post<{ files: number; bytes: number; mb: number; skipped?: string }>(
+      '/whatsapp/media/sweep',
+      {}
+    ),
 
   // ── Attachments ──────────────────────────────────────────────────────
   // The raw file as the body, its name in a header. No multipart, and so no

@@ -1362,6 +1362,12 @@ const it: Dictionary = {
   'whatsapp.error.noSession': 'Non c’è una sessione attiva da riavviare. Usa Riconnetti.',
   'whatsapp.error.noAccount': 'Nessun numero collegato da cui inviare.',
   'whatsapp.error.noDestination': 'Questo contatto non ha né telefono né identificatore WhatsApp.',
+  'settings.whatsapp.messageRetention': 'Conservare lo storico delle conversazioni per (giorni)',
+  'settings.whatsapp.messageRetentionHint': '0 lo conserva per sempre, ed è il valore predefinito. Trascorsi quei giorni il messaggio viene eliminato definitivamente dal pannello. Un messaggio con l’allegato ancora su disco non viene mai eliminato: se deve sparire anche quello, imposti pure la scadenza degli allegati.',
+  'whatsapp.health.sweepDone': '{files} allegato/i eliminato/i, {mb} MB liberati',
+  'whatsapp.health.sweepNothing': 'Non c’è nulla di abbastanza vecchio da eliminare',
+  'whatsapp.health.sweepBusy': 'È già in corso una pulizia',
+  'whatsapp.health.sweepFailed': 'La pulizia non è stata completata',
 }
 
 export default it

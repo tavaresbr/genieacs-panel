@@ -510,4 +510,6 @@ export default {
   'whatsapp.mediaSweepFailed': '첨부 파일 정리에 실패했습니다',
   'whatsapp.healthLoaded': '연동 상태를 확인했습니다',
   'whatsapp.healthLoadFailed': '연동 상태를 확인할 수 없습니다',
+  'whatsapp.messagesSwept': '기록에서 메시지 {count}건을 삭제했습니다',
+  'whatsapp.messageSweepFailed': '대화 기록을 정리하지 못했습니다',
 };

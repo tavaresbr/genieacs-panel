@@ -508,4 +508,6 @@ export default {
   'whatsapp.bot.invoicePix': 'PIX zum Kopieren: {value}',
   'whatsapp.bot.invoiceLink': 'Zweitausfertigung: {value}',
   'whatsapp.bot.signalOkNoReading': 'Deine Verbindung ist online.',
+  'whatsapp.messagesSwept': '{count} Nachricht(en) aus dem Verlauf entfernt',
+  'whatsapp.messageSweepFailed': 'Der Gesprächsverlauf konnte nicht bereinigt werden',
 };

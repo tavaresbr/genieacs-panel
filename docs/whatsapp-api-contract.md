@@ -1193,3 +1193,78 @@ opera:
 
 Um modelo que cita `{{dias_para_vencer}}` é, por definição, um lembrete — é
 assim que o disparo sabe que pode incluir faturas a vencer.
+
+---
+
+## Onda 8 — um provedor por vez, de verdade
+
+As ondas 6 e 7 deixaram três dívidas escritas em comentário no próprio
+código. Esta onda paga as três, e as decisões abaixo estão **congeladas**:
+quem implementar não escolhe, implementa.
+
+### 1. `sgp_links` por provedor
+
+`sgp_links` é a tabela que transforma um `device_id` em assinante: contrato,
+documento, nome, plano e o telefone que o lado WhatsApp usa para resolver uma
+mensagem que chega. Era a última tabela do caminho do WhatsApp lida sem filtro
+de provedor — e, portanto, o último lugar onde o operador de um provedor podia
+digitar um número e receber o assinante de outro.
+
+- A migração `0017_sgp_links_tenant` já existe: adiciona `tenant_id`, faz o
+  backfill para o provedor do install, e troca o único global de `device_id`
+  pelo par `['tenant_id', 'device_id']`.
+- Todo acesso a `sgp_links` passa a ir por `tdb`. Nenhum `getDb()('sgp_links')`
+  sobrevive nesta onda.
+- `sgp_links` entra em `SCOPED_TABLES` **no mesmo commit** que converte os
+  modelos. Entrar antes deixa a tabela filtrada com escritas que não gravam
+  `tenant_id`; entrar depois deixa a conversão sem o teste que a prova.
+- O ponto sensível é `waConversationService.resolveByPhone`: hoje ele lê a
+  tabela inteira. Depois desta onda, um número que existe em outro provedor
+  tem de resolver como **desconhecido**, não como assinante. Resolver telefone
+  continua sendo conveniência, nunca autenticação — a regra das ondas 2 e 3
+  não muda aqui, só deixa de vazar entre provedores.
+
+### 2. Subárvore de mídia por provedor
+
+Hoje tudo é escrito em `DATA_DIR/wa-media/<conversa>/`, sem provedor no
+caminho. É por isso que `waMediaSweeper.tick` usa `forSoleTenant` e se recusa
+a rodar assim que existe um segundo provedor: a varredura de um veria os
+arquivos do outro como órfãos e apagaria todos.
+
+- O novo caminho é `DATA_DIR/wa-media/t<tenant_id>/<conversa>/`.
+- Caminhos antigos (sem `t<id>/`) **continuam sendo servidos**. Uma linha
+  gravada antes desta onda aponta para onde o arquivo está, e o arquivo não se
+  move: migrar bytes no disco durante um upgrade é o tipo de coisa que falha na
+  metade. Escrita nova vai para a subárvore; leitura aceita as duas formas.
+- A varredura passa a rodar **por provedor**, e cada passagem enxerga só a sua
+  subárvore. A raiz `wa-media/` fora de qualquer `t<id>/` é a área legada: ela
+  é varrida na passagem do provedor único do install, como hoje, e é ignorada
+  quando existe mais de um provedor — órfão de origem desconhecida não se
+  apaga.
+- O ponto cego que a onda 7 registrou em comentário morre aqui: um provedor com
+  `tenants.status` diferente de `active` não é mais visitado pela varredura, e
+  seus arquivos moram numa subárvore que a varredura dos outros nem enxerga.
+- A confinagem não afrouxa: `path.resolve` contra `DATA_DIR`, `realpath` na
+  leitura, symlink nunca seguido, `wa-media` como teto. Uma subárvore a mais
+  não é permissão a mais.
+
+### 3. Retenção do histórico — `messageRetentionDays`
+
+`wa_messages` nunca perdia linha. Numa base que dispara campanha para milhares
+de contratos, ela só cresce.
+
+- `messageRetentionDays` já está em `whatsappConfigService`: 0 é para sempre e
+  é o padrão, mesmo `normalizeRetentionDays` da retenção de anexos.
+- A varredura de histórico **nunca apaga**:
+  - linha `queued` ou `sending` — é mensagem que ainda vai sair;
+  - linha que ainda tem `attachment_path` preenchido.
+- Essa segunda regra é o que amarra as duas retenções sem que um módulo apague
+  o arquivo do outro: quem apaga arquivo é `waMediaSweeper`, e ele limpa
+  `attachment_path` ao apagar. Só depois disso a linha fica elegível. Com
+  retenção de anexos desligada, mensagem com anexo fica para sempre — que é
+  exatamente o que "guardar os anexos para sempre" quer dizer.
+- A conversa (`wa_conversations`) **nunca** é apagada. Ela guarda o vínculo
+  telefone↔contato; apagá-la é perder de quem era a conversa, não economizar
+  disco.
+- Roda no mesmo laço de 6 h, por provedor, dentro de escopo — `wa_messages` é
+  tabela escopada, então aqui não há desculpa de `forSoleTenant`.

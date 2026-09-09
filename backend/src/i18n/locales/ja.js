@@ -507,4 +507,6 @@ export default {
   'whatsapp.alerts.noAlertNumber': 'アラート用途を持つ接続番号がありません',
   'whatsapp.alerts.noDevices': 'ネットワークを読み取れなかったため、何も確認されませんでした',
 
+  'whatsapp.messagesSwept': '履歴から {count} 件のメッセージを削除しました',
+  'whatsapp.messageSweepFailed': '会話履歴を整理できませんでした',
 };

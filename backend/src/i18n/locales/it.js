@@ -505,4 +505,6 @@ export default {
   'whatsapp.bot.invoicePix': 'PIX copia e incolla: {value}',
   'whatsapp.bot.invoiceLink': 'Copia della fattura: {value}',
   'whatsapp.bot.signalOkNoReading': 'La tua connessione è online.',
+  'whatsapp.messagesSwept': '{count} messaggio/i rimosso/i dallo storico',
+  'whatsapp.messageSweepFailed': 'Impossibile ripulire lo storico delle conversazioni',
 };

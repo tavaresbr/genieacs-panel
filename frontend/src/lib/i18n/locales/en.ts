@@ -1358,6 +1358,12 @@ const en = {
   'whatsapp.error.noSession': 'There is no live session to restart. Use Reconnect instead.',
   'whatsapp.error.noAccount': 'No connected number to send from.',
   'whatsapp.error.noDestination': 'This contact has no phone number or WhatsApp identifier.',
+  'settings.whatsapp.messageRetention': 'Keep conversation history for (days)',
+  'settings.whatsapp.messageRetentionHint': '0 keeps it forever, which is the default. Past that many days a message is deleted from the panel for good. A message whose attachment is still on disk is never deleted — set an attachment window too if those should go as well.',
+  'whatsapp.health.sweepDone': '{files} attachment(s) deleted, {mb} MB freed',
+  'whatsapp.health.sweepNothing': 'Nothing old enough to delete',
+  'whatsapp.health.sweepBusy': 'A sweep is already running',
+  'whatsapp.health.sweepFailed': 'The sweep could not finish',
 }
 
 export default en

@@ -504,4 +504,6 @@ export default {
   'whatsapp.bot.invoicePix': 'PIX copiar y pegar: {value}',
   'whatsapp.bot.invoiceLink': 'Segunda copia: {value}',
   'whatsapp.bot.signalOkNoReading': 'Tu conexión está en línea.',
+  'whatsapp.messagesSwept': '{count} mensaje(s) eliminado(s) del historial',
+  'whatsapp.messageSweepFailed': 'No se pudo limpiar el historial de conversaciones',
 };

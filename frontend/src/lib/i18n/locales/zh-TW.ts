@@ -1357,6 +1357,12 @@ const zhTW: Dictionary = {
   'whatsapp.error.noAccount': '沒有可用於傳送的已接入號碼。',
   'whatsapp.error.noDestination': '該聯絡人既沒有電話號碼也沒有 WhatsApp 識別碼。',
 
+  'settings.whatsapp.messageRetention': '對話記錄保留天數',
+  'settings.whatsapp.messageRetentionHint': '0 表示永久保留，這是預設值。超過該天數後，訊息會從面板中徹底刪除。附件仍在磁碟上的訊息永遠不會被刪除——若希望它也一併清除，請同時設定附件的保留天數。',
+  'whatsapp.health.sweepDone': '已刪除 {files} 個附件，釋放 {mb} MB',
+  'whatsapp.health.sweepNothing': '沒有足夠舊的內容可以刪除',
+  'whatsapp.health.sweepBusy': '已有一次清理正在進行',
+  'whatsapp.health.sweepFailed': '清理未能完成',
 }
 
 export default zhTW

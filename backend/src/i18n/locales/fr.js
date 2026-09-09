@@ -503,4 +503,6 @@ export default {
   'whatsapp.alerts.temperatureHighCleared': 'La température de l’ONT {device} est revenue à la normale',
   'whatsapp.alerts.massOutage': 'Panne massive : {count} ONT hors ligne sur {node}',
   'whatsapp.alerts.massOutageCleared': '{node} est rétabli : les ONT répondent de nouveau',
+  'whatsapp.messagesSwept': '{count} message(s) supprimé(s) de l’historique',
+  'whatsapp.messageSweepFailed': 'Impossible de purger l’historique des conversations',
 };

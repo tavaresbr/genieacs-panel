@@ -1363,6 +1363,12 @@ const ko: Dictionary = {
   'whatsapp.error.noAccount': '발신할 수 있는 연결된 번호가 없습니다.',
   'whatsapp.error.noDestination': '이 연락처에는 전화번호나 WhatsApp 식별자가 없습니다.',
 
+  'settings.whatsapp.messageRetention': '대화 기록 보관 기간(일)',
+  'settings.whatsapp.messageRetentionHint': '0은 영구 보관이며 기본값입니다. 이 기간이 지나면 메시지는 패널에서 완전히 삭제됩니다. 첨부파일이 아직 디스크에 있는 메시지는 삭제되지 않습니다. 그것도 함께 지우려면 첨부파일 보관 기간도 설정하세요.',
+  'whatsapp.health.sweepDone': '첨부파일 {files}개를 삭제하여 {mb} MB를 확보했습니다',
+  'whatsapp.health.sweepNothing': '삭제할 만큼 오래된 것이 없습니다',
+  'whatsapp.health.sweepBusy': '이미 정리가 진행 중입니다',
+  'whatsapp.health.sweepFailed': '정리를 완료하지 못했습니다',
 }
 
 export default ko

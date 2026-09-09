@@ -1356,6 +1356,12 @@ const ptBR: Dictionary = {
   'whatsapp.error.noSession': 'Não há sessão ativa para reiniciar. Use Reconectar.',
   'whatsapp.error.noAccount': 'Nenhum número conectado para enviar.',
   'whatsapp.error.noDestination': 'Este contato não tem telefone nem identificador do WhatsApp.',
+  'settings.whatsapp.messageRetention': 'Guardar o histórico de conversas por (dias)',
+  'settings.whatsapp.messageRetentionHint': '0 guarda para sempre, que é o padrão. Passados esses dias a mensagem é apagada do painel de vez. Mensagem com anexo ainda no disco nunca é apagada — se quiser que ela vá também, defina também o prazo dos anexos.',
+  'whatsapp.health.sweepDone': '{files} anexo(s) apagado(s), {mb} MB liberados',
+  'whatsapp.health.sweepNothing': 'Nada velho o bastante para apagar',
+  'whatsapp.health.sweepBusy': 'Já existe uma limpeza em andamento',
+  'whatsapp.health.sweepFailed': 'A limpeza não pôde ser concluída',
 }
 
 export default ptBR

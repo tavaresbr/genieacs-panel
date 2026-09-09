@@ -1364,6 +1364,12 @@ const ru: Dictionary = {
   'whatsapp.health.sweepNow': 'Удалить старые сейчас',
   'whatsapp.health.sweepOff': 'Вложения хранятся всегда. Чтобы удалять старые, задайте срок хранения в настройках.',
   'whatsapp.health.loadFailed': 'Не удалось получить состояние интеграции.',
+  'settings.whatsapp.messageRetention': 'Хранить историю переписки (дней)',
+  'settings.whatsapp.messageRetentionHint': '0 — хранить всегда, это значение по умолчанию. По истечении срока сообщение удаляется из панели окончательно. Сообщение, вложение которого ещё лежит на диске, не удаляется никогда: чтобы ушло и оно, задайте также срок хранения вложений.',
+  'whatsapp.health.sweepDone': 'Удалено вложений: {files}, освобождено {mb} МБ',
+  'whatsapp.health.sweepNothing': 'Нет ничего достаточно старого для удаления',
+  'whatsapp.health.sweepBusy': 'Очистка уже выполняется',
+  'whatsapp.health.sweepFailed': 'Очистку не удалось завершить',
 }
 
 export default ru

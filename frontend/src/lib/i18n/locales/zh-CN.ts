@@ -1356,6 +1356,12 @@ const zhCN: Dictionary = {
   'whatsapp.error.noSession': '没有可重启的活动会话。请改用“重新连接”。',
   'whatsapp.error.noAccount': '没有可用于发送的已接入号码。',
   'whatsapp.error.noDestination': '该联系人既没有电话号码也没有 WhatsApp 标识。',
+  'settings.whatsapp.messageRetention': '会话历史保留天数',
+  'settings.whatsapp.messageRetentionHint': '0 表示永久保留，这是默认值。超过该天数后，消息将从面板中彻底删除。附件仍在磁盘上的消息永远不会被删除——若希望它也一并清除，请同时设置附件的保留天数。',
+  'whatsapp.health.sweepDone': '已删除 {files} 个附件，释放 {mb} MB',
+  'whatsapp.health.sweepNothing': '没有足够旧的内容可以删除',
+  'whatsapp.health.sweepBusy': '已有一次清理正在进行',
+  'whatsapp.health.sweepFailed': '清理未能完成',
 }
 
 export default zhCN

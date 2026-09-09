@@ -1360,6 +1360,12 @@ const de: Dictionary = {
   'detail.provisioning.profileLine': 'Profil {profile} · Vertrag {contract}',
   'detail.provisioning.noProfile': 'Kein Profil hat gepasst',
   'detail.provisioning.never': 'Diese ONT wurde vom Panel noch nie provisioniert.',
+  'settings.whatsapp.messageRetention': 'Gesprächsverlauf aufbewahren für (Tage)',
+  'settings.whatsapp.messageRetentionHint': '0 bewahrt ihn für immer auf, das ist die Voreinstellung. Nach dieser Frist wird eine Nachricht endgültig aus dem Panel gelöscht. Eine Nachricht, deren Anhang noch auf der Festplatte liegt, wird nie gelöscht – soll auch sie verschwinden, setzen Sie zusätzlich eine Frist für Anhänge.',
+  'whatsapp.health.sweepDone': '{files} Anhang/Anhänge gelöscht, {mb} MB frei',
+  'whatsapp.health.sweepNothing': 'Nichts alt genug zum Löschen',
+  'whatsapp.health.sweepBusy': 'Es läuft bereits eine Bereinigung',
+  'whatsapp.health.sweepFailed': 'Die Bereinigung konnte nicht abgeschlossen werden',
 }
 
 export default de
