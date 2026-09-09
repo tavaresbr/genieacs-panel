@@ -10,6 +10,10 @@ const router = express.Router();
 router.get('/config', authenticateToken, requireRole(['admin']), WhatsAppController.getConfig);
 router.put('/config', authenticateToken, requireRole(['admin']), WhatsAppController.updateConfig);
 router.get('/accounts', authenticateToken, requireRole(['admin']), WhatsAppController.listAccounts);
+
+// The one read that answers "is this working?". A screen polls it, so it is
+// declared with the other reads and stays as cheap as they are.
+router.get('/health', authenticateToken, requireRole(['admin']), WhatsAppController.getHealth);
 router.post('/accounts', authenticateToken, requireRole(['admin']), WhatsAppController.createAccount);
 
 // Declared before the `:id` routes so the matcher can never read

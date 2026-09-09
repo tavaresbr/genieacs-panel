@@ -1,5 +1,6 @@
 import WhatsAppConfigService, { WaError } from '../services/whatsappConfigService.js';
 import EvolutionInstanceService from '../services/evolutionInstanceService.js';
+import WaHealthService from '../services/waHealthService.js';
 import WhatsAppAccount from '../models/WhatsAppAccount.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { translateError } from '../i18n/index.js';
@@ -158,6 +159,24 @@ class WhatsAppController {
       }));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.accountActionFailed');
+    }
+  }
+
+  /**
+   * "Is this working?" — the whole integration in one payload.
+   *
+   * Shaped exactly as `docs/whatsapp-api-contract.md` freezes it, and returned
+   * whole or not at all: a strip that renders half the truth is worse than one
+   * that says it could not read, because a missing queue reads as an empty one.
+   */
+  static async getHealth(req, res) {
+    try {
+      return res.json(createResponse(
+        req.t('whatsapp.healthLoaded'),
+        await WaHealthService.read()
+      ));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.healthLoadFailed');
     }
   }
 
