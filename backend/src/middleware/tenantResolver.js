@@ -2,12 +2,27 @@ import { getDb } from '../config/database.js';
 import { runInTenant } from '../config/tenantContext.js';
 
 /**
- * Puts the provider this request belongs to into scope, for everything under it.
+ * Puts a provider into scope before anything under `/api` runs.
  *
- * There is one provider today, so that is what every request resolves to. When
- * providers are reached by subdomain, only this lookup changes: the host names
- * the provider, and everything downstream already reads it from the context
- * rather than being handed it.
+ * Since wave 12 this is the scope for work done WITHOUT a session — login,
+ * setup, refresh, the customer portal — and nothing more. It is provisional:
+ * an authenticated request is re-scoped by `authenticateToken` to the provider
+ * its token names, once that membership has been read back from
+ * `tenant_users`, and that scope covers the whole route chain underneath.
+ *
+ * The order matters and reads backwards at first glance. This is `app.use`'d
+ * ahead of the routes while `authenticateToken` runs inside each of them, so
+ * the installation's own provider is what a request has until its token has
+ * been verified — which is exactly right, because until then the only thing
+ * naming a provider is the caller. Deciding the scope here, from the token,
+ * would mean opening a provider on a claim nobody has checked against the
+ * table yet.
+ *
+ * The default is the installation's own provider: the first row, which on every
+ * install that has ever existed is the only one. When providers are reached by
+ * subdomain, only this lookup changes — the host names the provider, and
+ * everything downstream already reads it from the context rather than being
+ * handed it.
  *
  * The id is cached because it cannot change under a running process — a second
  * provider arrives by migration or by the platform console, both of which mean
