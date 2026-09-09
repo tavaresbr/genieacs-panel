@@ -30,6 +30,13 @@ export const SCOPED_TABLES = new Set([
   // against: unfiltered, one provider's operator could type a number and be
   // handed another provider's contract, name and document.
   'sgp_links',
+  // The ERP event log, and the heaviest concentration of personal data here:
+  // contract, document, PPPoE login, device id and a redacted payload, per
+  // event. Deployment-wide it also had a second failure that read as no
+  // failure at all — `dedupe_key` was unique across every provider while it is
+  // built from SGP's per-ERP sequential event id, so one ISP's event #12345
+  // was filed as a redelivery of another ISP's and silently discarded.
+  'sgp_events',
   // The WhatsApp inbox and its send queue. Scoping these is what lets the
   // outbox worker drain one provider at a time instead of the deployment.
   'wa_conversations',
