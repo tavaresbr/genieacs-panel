@@ -4,6 +4,7 @@ import { getDb, runInTenant, startTestServers, stopTestServers } from './helpers
 
 const { default: ProvisioningProfile } = await import('../src/models/ProvisioningProfile.js');
 const { default: ProvisioningRun } = await import('../src/models/ProvisioningRun.js');
+const { default: SchedulerService } = await import('../src/services/schedulerService.js');
 
 /**
  * Provisioning, once the rulebook and the history belong to one provider.
@@ -313,5 +314,36 @@ describe('the deployment-wide sweeps, now that they are per provider', () => {
       () => ProvisioningRun.pruneOlderThan(CUTOFF()),
       { name: 'TenantScopeError' }
     );
+  });
+});
+
+describe('the boot reaper, once there is more than one provider', () => {
+  /**
+   * `forSoleTenant` does not degrade when a second provider appears — it
+   * REFUSES. So a job left on it is not a job that does less; it is a job that
+   * stops. The reaper's own query is scoped, so nothing was keeping it there
+   * except moving the scheduler in one piece, and the price of that tidiness
+   * was every provider's interrupted runs sitting `running` for ever.
+   */
+  it('fails every provider\'s interrupted runs, not just the first one', async () => {
+    const velho = secondsAgo(2 * 60 * 60);
+    const doAlfa = await runInTenant(alfa, () => ProvisioningRun.create({
+      device_id: 'ont-alfa-reap', status: 'running', trigger: 'poller'
+    }));
+    const doBeta = await runInTenant(beta, () => ProvisioningRun.create({
+      device_id: 'ont-beta-reap', status: 'running', trigger: 'poller'
+    }));
+    for (const id of [doAlfa.id, doBeta.id]) {
+      await getDb()('provisioning_runs').where({ id }).update({ updated_at: velho });
+    }
+
+    await SchedulerService.start();
+    SchedulerService.stop();
+
+    for (const [tenant, id, quem] of [[alfa, doAlfa.id, 'Alfa'], [beta, doBeta.id, 'Beta']]) {
+      const row = await runInTenant(tenant, () => ProvisioningRun.getById(id));
+      assert.equal(row.status, 'failed', `${quem}'s interrupted run should have been reaped`);
+      assert.equal(row.error, 'provisioning.error.interrupted');
+    }
   });
 });

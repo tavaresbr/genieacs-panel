@@ -2,7 +2,7 @@ import AppState from '../models/AppState.js';
 import ProvisioningService from './provisioningService.js';
 import SgpEventService from './sgpEventService.js';
 import SgpService from './sgpService.js';
-import { forSoleTenant } from '../config/tenantJobs.js';
+import { forEachTenant, forSoleTenant } from '../config/tenantJobs.js';
 
 const STATE_KEY = 'scheduler_state';
 const BASE_INTERVAL_MS = 60_000;
@@ -28,14 +28,22 @@ class SchedulerService {
 
   static async start() {
     if (this.timer) return this.timer;
-    // A process that died mid-run leaves rows nothing would ever finish. The
-    // reaper's own query is scoped now, so this could already run per provider
-    // — it stays here so the scheduler moves off `forSoleTenant` in one piece,
-    // once `sgp_events` is scoped too and `tick` can move with it.
-    await forSoleTenant('The interrupted-run reaper', () => ProvisioningService.reapInterrupted())
-      .catch((error) => {
-        console.warn(`Could not reap interrupted provisioning runs: ${error.message}`);
-      });
+    // A process that died mid-run leaves rows nothing would ever finish.
+    //
+    // Per provider, and NOT `forSoleTenant` like the tick below, because this
+    // path is already entirely scoped: it reaches `provisioning_runs` and
+    // nothing else. Holding it back to move the scheduler off `forSoleTenant`
+    // in one piece would be tidiness bought with a job that does not run —
+    // `forSoleTenant` REFUSES the moment a second provider exists, so on the
+    // installation that has one, the refusal lands in the catch below and
+    // nobody's interrupted runs are ever reaped.
+    await forEachTenant(() => ProvisioningService.reapInterrupted(), {
+      onError: (error, tenant) => {
+        console.warn(`Could not reap interrupted provisioning runs for ${tenant.slug}: ${error.message}`);
+      }
+    }).catch((error) => {
+      console.warn(`Could not reap interrupted provisioning runs: ${error.message}`);
+    });
     this.timer = setInterval(() => {
       void this.tick().catch((error) => {
         console.warn(`Scheduler tick failed: ${error.message}`);
