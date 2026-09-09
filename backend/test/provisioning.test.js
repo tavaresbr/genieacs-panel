@@ -1,7 +1,7 @@
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { authHeaders, call, getDb, startTestServers, stopTestServers } from './helpers/harness.js';
+import { asTenant, authHeaders, call, getDb, startTestServers, stopTestServers } from './helpers/harness.js';
 import { buildDevice, startGenieAcsStub, writtenParameters } from './helpers/genieacs-stub.js';
 
 const { default: ProvisioningRun } = await import('../src/models/ProvisioningRun.js');
@@ -163,8 +163,8 @@ describe('provisioning profiles', () => {
     await createProfile({ name: 'Fibra 500', planPatterns: ['fibra 500'], priority: 30 });
     await createProfile({ name: 'Padrão', planPatterns: [], isDefault: true, priority: 1 });
 
-    assert.equal((await ProvisioningService.matchProfile('Fibra 500MB')).name, 'Fibra 500');
-    assert.equal((await ProvisioningService.matchProfile('Rádio 10MB')).name, 'Padrão');
+    assert.equal((await asTenant(() => ProvisioningService.matchProfile('Fibra 500MB'))).name, 'Fibra 500');
+    assert.equal((await asTenant(() => ProvisioningService.matchProfile('Rádio 10MB'))).name, 'Padrão');
   });
 
   it('refuses to enable the poller without an enabled profile', async () => {
@@ -295,7 +295,7 @@ describe('provisioning run', () => {
       .WANPPPConnection[1]['X_ZTE-COM_VLANID']._value = 100;
 
     const run = await ProvisioningRun.getLatestByDeviceId(DEVICE_ID);
-    const verified = await ProvisioningService.verifyRun(run);
+    const verified = await asTenant(() => ProvisioningService.verifyRun(run));
     assert.equal(verified.status, 'success', JSON.stringify(verified.steps));
     assert.ok(genie.state.tags.some((entry) => entry.tag === 'SkyGenProvisioned' && entry.method === 'POST'));
   });
@@ -327,7 +327,7 @@ describe('provisioning run', () => {
 
     let run = await ProvisioningRun.getById(body.data.run.id);
     for (let attempt = 0; attempt < 4; attempt += 1) {
-      run = await ProvisioningService.executeRun(run);
+      run = await asTenant(() => ProvisioningService.executeRun(run));
     }
     assert.equal(run.status, 'failed_permanent');
     assert.equal(run.attempt_count, 5);
@@ -338,13 +338,13 @@ describe('provisioning poller', () => {
   it('does not touch GenieACS while it is disabled', async () => {
     const { default: SchedulerService } = await import('../src/services/schedulerService.js');
     genie.state.tasks.length = 0;
-    const summary = await SchedulerService.runJobs();
+    const summary = await asTenant(() => SchedulerService.runJobs());
     assert.equal(summary.provisioning, null);
     assert.equal(genie.state.tasks.length, 0);
   });
 
   it('leaves an already provisioned device alone', async () => {
-    const candidates = await ProvisioningService.findCandidates({ limit: 10 });
+    const candidates = await asTenant(() => ProvisioningService.findCandidates({ limit: 10 }));
     assert.ok(!candidates.includes(DEVICE_ID), 'a successful run settles the device');
   });
 
@@ -355,7 +355,7 @@ describe('provisioning poller', () => {
     await getDb()('provisioning_runs')
       .where({ id: run.id })
       .update({ updated_at: new Date(Date.now() - 3600_000) });
-    await ProvisioningService.reapInterrupted();
+    await asTenant(() => ProvisioningService.reapInterrupted());
     assert.equal((await ProvisioningRun.getById(run.id)).status, 'failed');
   });
 });

@@ -84,17 +84,18 @@ describe('the scoped table list', () => {
 });
 
 describe('the scoped query builder', () => {
-  // With the list still empty this is the transition behaviour, and it is what
-  // lets the conversion proceed a few tables at a time.
+  // The transition behaviour, and what lets the conversion proceed a few tables
+  // at a time. `device_profiles` stands in for "not converted yet" — it has to
+  // be a table still absent from the allowlist, so this moves as the phase does.
   it('leaves a table that has not been converted unfiltered', async () => {
-    const rows = await tdb('settings').select('key').limit(1);
+    const rows = await tdb('device_profiles').select('device_id').limit(1);
     assert.ok(Array.isArray(rows));
   });
 
   it('writes through tinsert without a provider while the table is pending', async () => {
-    await tinsert('settings', { key: 'tenant-scope-probe', value: 'x' });
-    const row = await getDb()('settings').where({ key: 'tenant-scope-probe' }).first();
-    assert.equal(row.value, 'x');
+    await tinsert('device_profiles', { device_id: 'scope-probe-pending', installation_tag: 'x' });
+    const row = await getDb()('device_profiles').where({ device_id: 'scope-probe-pending' }).first();
+    assert.equal(row.installation_tag, 'x');
   });
 
   it('returns the generated id', async () => {

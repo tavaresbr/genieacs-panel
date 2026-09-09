@@ -94,9 +94,9 @@ before(async () => {
   });
   token = setup.body.data.token;
 
-  await SgpService.saveConfig({
+  await asTenant(() => SgpService.saveConfig({
     enabled: true, baseUrl: sgpUrl, app: APP, token: TOKEN, linkMode: 'manual'
-  });
+  }));
 
   const now = new Date();
   await getDb()('sgp_links').insert(DEVICES.map((deviceId) => ({

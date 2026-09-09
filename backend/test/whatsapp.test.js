@@ -2,6 +2,8 @@ import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { asTenant, authHeaders, call, getDb, startTestServers, stopTestServers } from './helpers/harness.js';
 
+const { default: AppState } = await import('../src/models/AppState.js');
+
 const { default: WhatsAppConfigService } = await import('../src/services/whatsappConfigService.js');
 const { default: WhatsAppAccount } = await import('../src/models/WhatsAppAccount.js');
 const { default: WaMessage } = await import('../src/models/WaMessage.js');
@@ -141,7 +143,7 @@ describe('whatsapp configuration', () => {
     assert.equal(body.data.webhookBaseUrl, 'https://painel.provedor.com.br/api/whatsapp-webhook');
     assert.deepEqual(body.data.allowedHosts, ['evo.provedor.com.br', '*.outro.com']);
 
-    const stored = await getDb()('app_state').where({ key: 'whatsapp_evolution_config' }).first();
+    const stored = { value: await asTenant(() => AppState.get('whatsapp_evolution_config')) };
     assert.equal(stored.value.includes('chave-global-do-servidor'), false);
   });
 

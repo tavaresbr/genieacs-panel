@@ -98,10 +98,10 @@ before(async () => {
   });
   token = setup.body.data.token;
 
-  await WhatsAppConfigService.saveConfig({
+  await asTenant(() => WhatsAppConfigService.saveConfig({
     enabled: true,
     webhookBaseUrl: 'https://painel.provedor.test/api/whatsapp-webhook'
-  });
+  }));
 
   const account = await asTenant(() => WhatsAppAccount.create({
     name: ALERTS,

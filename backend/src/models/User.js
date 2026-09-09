@@ -1,4 +1,4 @@
-import { getDb, insertReturningId } from '../config/database.js';
+import { getDb, insertReturningId, tinsert } from '../config/database.js';
 
 class User {
   static async findByUsername(username) {
@@ -64,12 +64,20 @@ class User {
       }
 
       try {
-        await trx('app_state').insert({ key: 'setup_completed', value: '1' });
+        // The collision IS the lock: two setups racing, only one row lands.
+        // Per provider since 0014, which is the semantics we want — each
+        // provider does its own first admin.
+        await tinsert('app_state', { key: 'setup_completed', value: '1' }, trx);
       } catch (error) {
         if (
           error.code === 'SQLITE_CONSTRAINT_PRIMARYKEY' ||
           error.code === 'SQLITE_CONSTRAINT_UNIQUE' ||
-          error.code === 'ER_DUP_ENTRY'
+          error.code === 'ER_DUP_ENTRY' ||
+          // Postgres names neither code above. Without this the race answered a
+          // raw 500 instead of "setup already completed" on the one dialect
+          // added last — the same message fallback the rest of the codebase
+          // uses for exactly this reason.
+          /duplicate key|unique/i.test(error.message)
         ) {
           const setupError = new Error('Setup already completed');
           setupError.code = 'SETUP_COMPLETED';

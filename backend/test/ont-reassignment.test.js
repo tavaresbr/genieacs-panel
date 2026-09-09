@@ -2,6 +2,8 @@ import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { asTenant, call, getDb, startTestServers, stopTestServers } from './helpers/harness.js';
 
+const { default: Setting } = await import('../src/models/Setting.js');
+
 const { default: CustomerService } = await import('../src/services/customerService.js');
 const { default: CustomerPortalPasswordService } = await import(
   '../src/services/customerPortalPasswordService.js'
@@ -16,10 +18,7 @@ const syncDevices = (...args) => asTenant(() => CustomerService.syncDevices(...a
 let portalUrl;
 
 async function enableAutoGeneration() {
-  await getDb()('settings')
-    .insert({ key: 'autoGenerateCustomerId', value: 'true' })
-    .onConflict('key')
-    .merge({ value: 'true' });
+  await asTenant(() => Setting.upsert('autoGenerateCustomerId', 'true'));
 }
 
 before(async () => {
