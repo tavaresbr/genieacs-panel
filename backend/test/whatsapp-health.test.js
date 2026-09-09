@@ -37,6 +37,18 @@ const MINUTE = 60 * 1000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
+/**
+ * A moment with its milliseconds cut off.
+ *
+ * MySQL's `TIMESTAMP` keeps whole seconds unless a column asks for fractional
+ * precision, and these do not — so a row seeded at `…347.402` reads back as
+ * `…347.000` there and identically on the other two engines. Comparing what
+ * was written against what came back is the point of these tests, so they
+ * write times the storage can actually hold. Nothing in the product depends on
+ * sub-second ordering of these columns, which is the fact this makes visible.
+ */
+const wholeSecond = (ms) => new Date(Math.floor(ms / 1000) * 1000);
+
 let panelUrl;
 let token;
 let mainAccountId;
@@ -73,7 +85,7 @@ async function seedMessage(conversationId, patch, tenantId = alfa) {
     direction: 'out',
     is_note: false,
     source: 'operator',
-    created_at: new Date(Date.now() - HOUR),
+    created_at: wholeSecond(Date.now() - HOUR),
     ...patch
   }));
 }
@@ -237,11 +249,11 @@ describe('failed24h is a window, not a total', () => {
     const thread = await newConversation();
     await seedMessage(thread.id, {
       delivery_status: 'failed',
-      created_at: new Date(Date.now() - 3 * DAY)
+      created_at: wholeSecond(Date.now() - 3 * DAY)
     });
     await seedMessage(thread.id, {
       delivery_status: 'failed',
-      created_at: new Date(Date.now() - 2 * HOUR)
+      created_at: wholeSecond(Date.now() - 2 * HOUR)
     });
 
     const { outbox } = await health();
@@ -256,11 +268,11 @@ describe('failed24h is a window, not a total', () => {
     const thread = await newConversation();
     await seedMessage(thread.id, {
       delivery_status: 'failed',
-      created_at: new Date(Date.now() - DAY + 5 * MINUTE)
+      created_at: wholeSecond(Date.now() - DAY + 5 * MINUTE)
     });
     await seedMessage(thread.id, {
       delivery_status: 'failed',
-      created_at: new Date(Date.now() - DAY - 5 * MINUTE)
+      created_at: wholeSecond(Date.now() - DAY - 5 * MINUTE)
     });
 
     const { outbox } = await health();
@@ -277,14 +289,14 @@ describe('oldestQueuedAt — the number that says the queue stopped moving', () 
     await seedMessage(thread.id, {
       delivery_status: 'sent',
       external_id: 'EVO-OLD-SENT',
-      created_at: new Date(Date.now() - 5 * DAY)
+      created_at: wholeSecond(Date.now() - 5 * DAY)
     });
 
-    const stuckSince = new Date(Date.now() - 2 * DAY);
+    const stuckSince = wholeSecond(Date.now() - 2 * DAY);
     await seedMessage(thread.id, { delivery_status: 'queued', created_at: stuckSince });
     await seedMessage(thread.id, {
       delivery_status: 'queued',
-      created_at: new Date(Date.now() - 10 * MINUTE)
+      created_at: wholeSecond(Date.now() - 10 * MINUTE)
     });
 
     const { outbox } = await health();
@@ -310,7 +322,7 @@ describe('oldestQueuedAt — the number that says the queue stopped moving', () 
     const thread = await newConversation();
     await seedMessage(thread.id, {
       delivery_status: 'queued',
-      created_at: new Date(Date.now() - 3 * HOUR)
+      created_at: wholeSecond(Date.now() - 3 * HOUR)
     });
 
     const { body } = await call(`${panelUrl}/api/whatsapp/health`, {
@@ -341,8 +353,8 @@ describe('lastInboundAt — the number that catches a dead webhook', () => {
     const quiet = await newConversation();
     const recent = await newConversation();
 
-    const older = new Date(Date.now() - 4 * DAY);
-    const newer = new Date(Date.now() - 30 * MINUTE);
+    const older = wholeSecond(Date.now() - 4 * DAY);
+    const newer = wholeSecond(Date.now() - 30 * MINUTE);
     await runInTenant(alfa, () => WaConversation.update(quiet.id, { last_inbound_at: older }));
     await runInTenant(alfa, () => WaConversation.update(recent.id, { last_inbound_at: newer }));
 
@@ -368,9 +380,9 @@ describe('lastOutboundAt', () => {
     await seedMessage(thread.id, {
       delivery_status: 'sent',
       external_id: 'EVO-A',
-      created_at: new Date(Date.now() - 3 * HOUR)
+      created_at: wholeSecond(Date.now() - 3 * HOUR)
     });
-    const newest = new Date(Date.now() - 20 * MINUTE);
+    const newest = wholeSecond(Date.now() - 20 * MINUTE);
     await seedMessage(thread.id, {
       delivery_status: 'read',
       external_id: 'EVO-B',
@@ -379,7 +391,7 @@ describe('lastOutboundAt', () => {
     await seedMessage(thread.id, {
       delivery_status: 'delivered',
       external_id: 'EVO-C',
-      created_at: new Date(Date.now() - 90 * MINUTE)
+      created_at: wholeSecond(Date.now() - 90 * MINUTE)
     });
 
     const snapshot = await health();
@@ -388,8 +400,8 @@ describe('lastOutboundAt', () => {
 
   it('ignores messages that are still queued or failed — those never left', async () => {
     const thread = await newConversation();
-    await seedMessage(thread.id, { delivery_status: 'queued', created_at: new Date() });
-    await seedMessage(thread.id, { delivery_status: 'failed', created_at: new Date() });
+    await seedMessage(thread.id, { delivery_status: 'queued', created_at: wholeSecond(Date.now()) });
+    await seedMessage(thread.id, { delivery_status: 'failed', created_at: wholeSecond(Date.now()) });
 
     const snapshot = await health();
     assert.equal(snapshot.lastOutboundAt, null);
@@ -412,7 +424,7 @@ describe('the inbox figures', () => {
     const closed = await newConversation();
     await runInTenant(alfa, () => WaConversation.update(closed.id, {
       unread_count: 4,
-      closed_at: new Date()
+      closed_at: wholeSecond(Date.now())
     }));
 
     const before2 = await health();
@@ -440,7 +452,7 @@ describe('one provider never sees another provider\'s numbers', () => {
     await seedMessage(betaConversationId, { delivery_status: 'sending' }, beta);
     await runInTenant(beta, () => WaConversation.update(betaConversationId, {
       unread_count: 7,
-      last_inbound_at: new Date()
+      last_inbound_at: wholeSecond(Date.now())
     }));
 
     const mineHealth = await health();
@@ -468,7 +480,7 @@ describe('the media reading', () => {
     const file = path.join(dir, name);
     await fsp.writeFile(file, Buffer.alloc(bytes, 1));
     if (ageMs > 0) {
-      const when = new Date(Date.now() - ageMs);
+      const when = wholeSecond(Date.now() - ageMs);
       await fsp.utimes(file, when, when);
     }
     return file;
