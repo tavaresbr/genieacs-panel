@@ -303,7 +303,7 @@ describe('making the contract cadastre per-provider', () => {
    * standing — and the one the tenancy tests cannot reach, because they start
    * from a database the runner has already finished with.
    *
-   * `sgp_links.device_id` was unique across the deployment. Step 0017 drops
+   * `sgp_links.device_id` was unique across the deployment. Step 0019 drops
    * that unique and puts `['tenant_id', 'device_id']` in its place, which on
    * SQLite means rebuilding the table with rows in it. A row that is here
    * afterwards is a row the rebuild carried.
@@ -493,5 +493,134 @@ describe('making customer accounts per-provider', () => {
       pppoe_username: 'outro',
       active: true
     }, db));
+  });
+});
+
+describe('making the SGP log and the provisioning trail per-provider', () => {
+  const db = createDatabase('sgp-provisioning-tenancy');
+  let alfa;
+  let profileId;
+
+  /**
+   * The same upgrade path as the cadastre above, for the three steps that
+   * followed it: 0022 on `device_profiles`, 0023 on the provisioning pair and
+   * 0024 on `sgp_events`. Each drops a unique the panel never minted the value
+   * for — a GenieACS device id, a name an operator typed, a key built from an
+   * SGP event id — and puts the pair carrying `tenant_id` in its place. On
+   * SQLite that rebuilds the table with its rows inside.
+   *
+   * The `*-tenancy` suites cover what these tables do afterwards, thoroughly,
+   * but every one of them starts from a database the runner has already
+   * finished with. Nothing else here walks the rebuild with data in it.
+   */
+  before(async () => {
+    for (const migration of migrations.filter((m) => m.id < FIRST_TENANCY_MIGRATION)) {
+      await migration.up(db);
+    }
+    await db('settings').insert({ key: 'appName', value: 'Provedor Alfa' });
+    await db('device_profiles').insert({
+      device_id: 'ont-antiga',
+      installation_date: '2023-05-14',
+      installation_tag: 'InstaladoEm'
+    });
+    await db('sgp_events').insert({
+      dedupe_key: 'webhook:12345',
+      source: 'webhook',
+      type: 'activated',
+      contract: '3003',
+      document: '11122233344',
+      status: 'processed',
+      received_at: new Date()
+    });
+    profileId = await insertReturningId('provisioning_profiles', {
+      name: 'Padrao', priority: 5, enabled: true
+    }, db);
+    await db('provisioning_runs').insert({
+      device_id: 'ont-antiga',
+      profile_id: profileId,
+      trigger: 'poller',
+      status: 'success',
+      attempt_count: 2
+    });
+
+    await ensureSchema(db);
+    alfa = await db('tenants').orderBy('id', 'asc').first();
+  });
+
+  // The non-key columns as much as the keys. An installation date is what the
+  // panel dates a warranty from, and a document is the subscriber's CPF —
+  // losing either in a rebuild would say nothing at the time.
+  it('gives the rows it already had to the install\'s own provider', async () => {
+    const profile = await db('device_profiles').where({ device_id: 'ont-antiga' }).first();
+    assert.equal(Number(profile.tenant_id), Number(alfa.id));
+    assert.equal(profile.installation_tag, 'InstaladoEm');
+    assert.match(String(profile.installation_date), /2023-05-14/);
+
+    const event = await db('sgp_events').where({ dedupe_key: 'webhook:12345' }).first();
+    assert.equal(Number(event.tenant_id), Number(alfa.id));
+    assert.equal(event.contract, '3003');
+    assert.equal(event.document, '11122233344');
+    assert.equal(event.status, 'processed');
+
+    const provisioningProfile = await db('provisioning_profiles').where({ id: profileId }).first();
+    assert.equal(Number(provisioningProfile.tenant_id), Number(alfa.id));
+    assert.equal(provisioningProfile.name, 'Padrao');
+  });
+
+  // `provisioning_runs` gains no composite unique, so what the rebuild of the
+  // profiles table beside it could break is the reference: a run has to still
+  // point at the profile it ran.
+  it('keeps a run pointing at the profile it ran', async () => {
+    const run = await db('provisioning_runs').where({ device_id: 'ont-antiga' }).first();
+    assert.equal(Number(run.tenant_id), Number(alfa.id));
+    assert.equal(Number(run.profile_id), Number(profileId));
+    assert.equal(Number(run.attempt_count), 2);
+  });
+
+  it('lets a second provider reuse every value the panel does not mint', async () => {
+    const betaId = await insertReturningId('tenants', {
+      slug: 'beta', name: 'Provedor Beta', status: 'active'
+    }, db);
+
+    await db('device_profiles').insert({
+      tenant_id: betaId, device_id: 'ont-antiga', installation_tag: 'beta'
+    });
+    await db('sgp_events').insert({
+      tenant_id: betaId,
+      dedupe_key: 'webhook:12345',
+      source: 'webhook',
+      type: 'activated',
+      contract: '8008',
+      status: 'pending',
+      received_at: new Date()
+    });
+    await db('provisioning_profiles').insert({ tenant_id: betaId, name: 'Padrao', priority: 9 });
+
+    for (const [table, where] of [
+      ['device_profiles', { device_id: 'ont-antiga' }],
+      ['sgp_events', { dedupe_key: 'webhook:12345' }],
+      ['provisioning_profiles', { name: 'Padrao' }]
+    ]) {
+      // eslint-disable-next-line no-await-in-loop -- three probes
+      const rows = await db(table).where(where);
+      assert.equal(rows.length, 2, `the old global unique on ${table} would have refused the second`);
+    }
+  });
+
+  it('still refuses a duplicate inside one provider', async () => {
+    await assert.rejects(() => db('device_profiles').insert({
+      tenant_id: alfa.id, device_id: 'ont-antiga', installation_tag: 'x'
+    }), 'device_profiles');
+    await assert.rejects(() => db('sgp_events').insert({
+      tenant_id: alfa.id,
+      dedupe_key: 'webhook:12345',
+      source: 'webhook',
+      type: 'activated',
+      status: 'pending',
+      received_at: new Date()
+    }), 'sgp_events');
+    await assert.rejects(() => db('provisioning_profiles').insert({
+      tenant_id: alfa.id, name: 'Padrao', priority: 1
+    }), 'provisioning_profiles');
   });
 });
