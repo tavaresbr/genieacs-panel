@@ -291,6 +291,77 @@ describe('baselining an installation created before the runner existed', () => {
   });
 });
 
+describe('making the contract cadastre per-provider', () => {
+  const db = createDatabase('sgp-links-tenancy');
+  let alfa;
+
+  /**
+   * The upgrade path, which is the one that runs on every install already
+   * standing — and the one the tenancy tests cannot reach, because they start
+   * from a database the runner has already finished with.
+   *
+   * `sgp_links.device_id` was unique across the deployment. Step 0017 drops
+   * that unique and puts `['tenant_id', 'device_id']` in its place, which on
+   * SQLite means rebuilding the table with rows in it. A row that is here
+   * afterwards is a row the rebuild carried.
+   */
+  before(async () => {
+    for (const migration of migrations.filter((m) => m.id < FIRST_TENANCY_MIGRATION)) {
+      await migration.up(db);
+    }
+    await db('settings').insert({ key: 'appName', value: 'Provedor Alfa' });
+    const accountId = await insertReturningId('customer_accounts', {
+      customer_id: 'CSG-BBBBBBB-222222',
+      device_id: 'ont-legada',
+      identity_hash: 'k'.repeat(64),
+      software_id: 'V2',
+      pppoe_username: 'cliente-legado',
+      active: true
+    }, db);
+    await db('sgp_links').insert({
+      device_id: 'ont-legada',
+      account_id: accountId,
+      contract: '9001',
+      client_name: 'Maria Souza',
+      document: '98765432100',
+      phone_manual: '5511999990000'
+    });
+
+    await ensureSchema(db);
+    alfa = await db('tenants').orderBy('id', 'asc').first();
+  });
+
+  it('gives the cadastre it already had to the install\'s own provider', async () => {
+    const link = await db('sgp_links').where({ device_id: 'ont-legada' }).first();
+    assert.equal(Number(link.tenant_id), Number(alfa.id));
+    // The rebuild has to carry every column, not just the key ones: this is the
+    // row an operator sees on screen, and losing the phone number would break
+    // the WhatsApp side silently.
+    assert.equal(link.contract, '9001');
+    assert.equal(link.client_name, 'Maria Souza');
+    assert.equal(link.document, '98765432100');
+    assert.equal(link.phone_manual, '5511999990000');
+  });
+
+  it('lets a second provider hold the same device id', async () => {
+    const betaId = await insertReturningId('tenants', {
+      slug: 'beta', name: 'Provedor Beta', status: 'active'
+    }, db);
+    await db('sgp_links').insert({
+      tenant_id: betaId, device_id: 'ont-legada', contract: '7002'
+    });
+
+    const rows = await db('sgp_links').where({ device_id: 'ont-legada' });
+    assert.equal(rows.length, 2, 'the old global unique would have refused the second');
+  });
+
+  it('still refuses a duplicate device id inside one provider', async () => {
+    await assert.rejects(() => db('sgp_links').insert({
+      tenant_id: alfa.id, device_id: 'ont-legada', contract: '9002'
+    }));
+  });
+});
+
 describe('the schema table list', () => {
   const db = createDatabase('coverage');
 
