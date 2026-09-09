@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { DATA_DIR } from '../config/paths.js';
+import { currentTenantId } from '../config/tenantContext.js';
 import { lerMidiaBase64, urlBaixavel } from '../utils/wa/waMidia.js';
 import { safeFetch } from '../utils/wa/ssrfGuard.js';
 import WhatsAppConfigService from './whatsappConfigService.js';
@@ -30,6 +31,42 @@ export const MAX_MEDIA_BYTES = 25 * 1024 * 1024;
 
 /** Subpasta de `DATA_DIR`. O caminho gravado no banco é relativo a ela. */
 export const MEDIA_DIR = 'wa-media';
+
+/**
+ * O nome de uma subárvore de provedor dentro de `MEDIA_DIR`.
+ *
+ * `t` na frente porque o resto de `wa-media` são nomes de diretório numéricos —
+ * ids de conversa — e a varredura precisa distinguir os dois olhando só o nome:
+ * `12` é conversa da área legada, `t12` é a subárvore do provedor 12. Sem o
+ * prefixo, um id de conversa e um id de provedor seriam a mesma string.
+ */
+export const TENANT_DIR = /^t([1-9][0-9]*)$/;
+
+/**
+ * A subárvore de mídia do provedor em escopo, relativa a `DATA_DIR`.
+ *
+ * Toda escrita nova passa por aqui. Antes da onda 8 os arquivos iam para
+ * `wa-media/<conversa>/`, um caminho sem provedor nenhum — é por isso que a
+ * varredura não podia rodar por provedor: a passagem de um veria os arquivos do
+ * outro como órfãos sem linha. Com o provedor no caminho, cada passagem enxerga
+ * só o que é seu, e a leitura continua aceitando as duas formas porque os
+ * arquivos antigos não se mudam.
+ */
+export function tenantMediaDir(tenantId = currentTenantId()) {
+  const id = Number(tenantId);
+  if (!Number.isInteger(id) || id <= 0) {
+    // Um id que não é id viraria um segmento de caminho arbitrário dentro de
+    // `wa-media`. Nada aqui chuta um padrão: quem chamou está sem escopo.
+    throw new TypeError(`tenantMediaDir needs a provider id; received ${tenantId}`);
+  }
+  return path.posix.join(MEDIA_DIR, `t${id}`);
+}
+
+/** O id de provedor que um nome de diretório de primeiro nível carrega, ou null. */
+export function tenantIdFromDir(name) {
+  const match = TENANT_DIR.exec(String(name || ''));
+  return match ? Number(match[1]) : null;
+}
 
 /**
  * Os nós de mídia do protocolo, e o tipo que cada um vira para o painel.
@@ -282,7 +319,7 @@ class WaMediaService {
     // ele vem do payload, não da nossa numeração.
     const idSeguro = String(externalId || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64) || 'sem-id';
     const nome = nomeSeguro(bytes.fileName || midia.fileName, midia.tipo, bytes.mimetype || midia.mimetype);
-    const relativo = path.posix.join(MEDIA_DIR, String(conversationId), `${idSeguro}-${nome}`);
+    const relativo = path.posix.join(tenantMediaDir(), String(conversationId), `${idSeguro}-${nome}`);
     if (relativo.length > 255) return null;
 
     const destino = path.join(DATA_DIR, relativo);

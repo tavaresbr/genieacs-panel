@@ -297,12 +297,17 @@ describe('what the sweep reports', () => {
   });
 
   /**
-   * The disk belongs to the deployment, not to a provider: a second provider's
-   * pass would see the first's files as orphans and delete every one of them.
-   * `forSoleTenant` refuses instead, and the refusal has to reach the caller as
-   * a skip rather than as a thrown tick.
+   * Wave 8 gave stored media a per-provider subtree, so the pass no longer
+   * refuses when a second provider appears — it runs once per provider. What it
+   * stops doing is touching the legacy area, whose paths name no provider: with
+   * two of them on the disk, a file there could belong to either, and the sweep
+   * does not guess with somebody's customer photos.
+   *
+   * The rest of that story — each pass inside its own subtree — is in
+   * `whatsapp-media-tenancy.test.js`; here it is only that the refusal is gone
+   * and the legacy area survives it.
    */
-  it('refuses to run at all once a second provider exists', async () => {
+  it('keeps running when a second provider exists, and leaves the legacy area alone', async () => {
     await comRetencao(1);
     const relative = gravar(`wa-media/${conversationId}/de-alguem.png`, 90);
     await mensagem({ attachment_path: relative, ageDays: 90 });
@@ -310,9 +315,9 @@ describe('what the sweep reports', () => {
 
     try {
       const result = await WaMediaSweeper.tick();
-      assert.equal(result.skipped, 'unscoped');
+      assert.equal(result.skipped, undefined, 'the pass runs rather than refusing');
       assert.equal(result.files, 0);
-      assert.equal(existe(relative), true);
+      assert.equal(existe(relative), true, 'a legacy path names no owner, so it is kept');
     } finally {
       await getDb()('tenants').where({ slug: 'beta' }).del();
     }

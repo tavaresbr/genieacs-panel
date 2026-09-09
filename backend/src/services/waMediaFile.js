@@ -17,6 +17,20 @@ import { DATA_DIR } from '../config/paths.js';
  * not a property this module can check. So the path is re-resolved and
  * re-confined here, on every read, and a path that lands outside `DATA_DIR` is
  * simply not a file we have.
+ *
+ * WHY THERE IS NO PROVIDER CHECK HERE, AND WHY THAT IS NOT AN OVERSIGHT
+ *
+ * Since wave 8 a stored path names the provider that wrote it —
+ * `wa-media/t<id>/<conversa>/` — while a row written before it does not. This
+ * module reads both without knowing the difference, deliberately: the string is
+ * a location, not a claim, and the file it names is the one whose row the
+ * caller was already allowed to read. The operator's route reaches the row
+ * through `tdb`, so another provider's message does not exist to it; the
+ * Evolution route reaches it through a signature only the panel can mint, for
+ * one id it chose itself. Comparing the path against the provider in scope
+ * would add nothing to either, and would break every pre-wave-8 row on a panel
+ * that has more than one provider — the exact rows the contract froze as
+ * still-serviceable.
  */
 
 /** Every stored attachment lives under here, and nothing may resolve outside it. */

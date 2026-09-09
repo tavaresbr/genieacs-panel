@@ -1,9 +1,9 @@
 import fsp from 'node:fs/promises';
 import path from 'node:path';
-import { tdb } from '../config/database.js';
+import { getDb, tdb } from '../config/database.js';
 import { DATA_DIR } from '../config/paths.js';
-import { forSoleTenant } from '../config/tenantJobs.js';
-import { MEDIA_DIR } from './waMediaService.js';
+import { currentTenantId, runInTenant } from '../config/tenantContext.js';
+import { MEDIA_DIR, tenantIdFromDir, tenantMediaDir } from './waMediaService.js';
 import WhatsAppConfigService from './whatsappConfigService.js';
 import WaHealthService from './waHealthService.js';
 
@@ -31,6 +31,10 @@ import WaHealthService from './waHealthService.js';
  *   operator who attached the file never finds out why.
  * - A file with no row pointing at it is an abandoned upload — the operator
  *   who attached a photo and closed the tab — and goes by the same age rule.
+ * - It only ever looks inside the subtree of the provider whose pass is
+ *   running. What "orphan" means depends entirely on which rows were read, and
+ *   the rows are one provider's; a file outside that subtree has no row here
+ *   because it was never this provider's to have one.
  *
  * With `mediaRetentionDays` at 0 it deletes nothing and says so. Zero is the
  * default, and that default is not laziness: the setting arrives at
@@ -64,12 +68,28 @@ const PENDING_STATUSES = ['queued', 'sending'];
 /** Every stored attachment lives under here, and the walk never leaves it. */
 const ROOT = path.resolve(DATA_DIR);
 
-/** The subtree the sweep is allowed to delete from. */
+/** The ceiling. Nothing outside this is ever walked, whichever provider runs. */
 const MEDIA_ROOT = path.resolve(ROOT, MEDIA_DIR);
 
 /** Whether `candidate` is `root` itself or something inside it. */
 function inside(root, candidate) {
   return candidate === root || candidate.startsWith(root + path.sep);
+}
+
+/**
+ * The subtree one pass may delete from: `wa-media/t<id>`.
+ *
+ * Confined against `MEDIA_ROOT` even though the only input is a provider id the
+ * scope handed us. One more subtree is not one more permission, and a check
+ * that can only fail on a bug is exactly the check worth keeping — the failure
+ * it would otherwise catch is a `rm` somewhere else on the volume.
+ */
+function tenantRoot() {
+  const absolute = path.resolve(ROOT, tenantMediaDir());
+  if (!inside(MEDIA_ROOT, absolute)) {
+    throw new Error(`media subtree ${absolute} falls outside ${MEDIA_ROOT}`);
+  }
+  return absolute;
 }
 
 /** Megabytes with two decimals — the unit the operator's message speaks. */
@@ -113,11 +133,11 @@ function absoluteFor(relative) {
 }
 
 /**
- * Every regular file under `MEDIA_ROOT`, as absolute paths.
+ * Every regular file under `dir`, as absolute paths.
  *
- * Scoped to `wa-media` and not to `DATA_DIR`, which is the whole difference
- * between a media sweep and a panel that deletes its own database:
- * `panel.sqlite` and `db-config.json` live one directory up.
+ * Only ever called with a directory inside `wa-media`, never with `DATA_DIR`,
+ * which is the whole difference between a media sweep and a panel that deletes
+ * its own database: `panel.sqlite` and `db-config.json` live one directory up.
  *
  * Symlinks are skipped, files and directories alike — nothing in here was
  * written by this panel, and following one is how a sweep confined to a subtree
@@ -142,16 +162,49 @@ async function walk(dir, out = []) {
   return out;
 }
 
+/**
+ * The legacy area: everything under `wa-media` that is not inside a `t<id>/`.
+ *
+ * These are the files written before this wave, when the path carried no
+ * provider at all — `wa-media/<conversa>/` and `wa-media/out/`. They were not
+ * moved and will not be: rewriting a volume's worth of bytes during an upgrade
+ * is the kind of migration that fails halfway and leaves every attachment
+ * unreachable. The rows still point where the files actually are.
+ *
+ * Whether this area may be swept is not this function's decision — see `tick`.
+ * All it does is refuse to descend into anybody's `t<id>/`, so the legacy area
+ * and a provider's own subtree can never be confused for one another.
+ */
+async function walkLegacy(out = []) {
+  let entries;
+  try {
+    entries = await fsp.readdir(MEDIA_ROOT, { withFileTypes: true });
+  } catch {
+    return out;
+  }
+  for (const entry of entries) {
+    if (entry.isSymbolicLink()) continue;
+    const full = path.join(MEDIA_ROOT, entry.name);
+    if (entry.isDirectory()) {
+      if (tenantIdFromDir(entry.name) !== null) continue;
+      await walk(full, out);
+    } else if (entry.isFile()) out.push(full);
+  }
+  return out;
+}
+
 class WaMediaSweeper {
   static timer = null;
 
   /**
-   * Guards against two passes at once.
+   * Guards against two runs at once, held across the whole per-provider loop
+   * rather than around one provider's pass.
    *
-   * A pass is slow by nature, and the manual button exists precisely for the
+   * A run is slow by nature, and the manual button exists precisely for the
    * moment the disk is full — which is the moment an operator presses it twice.
-   * Two passes would race on the same unlink and double-count the megabytes
-   * they each claim to have freed.
+   * Two runs would race on the same unlink and double-count the megabytes they
+   * each claim to have freed. Guarding one pass would not stop that: the second
+   * run would simply overtake the first onto the next provider.
    */
   static running = false;
 
@@ -185,30 +238,78 @@ class WaMediaSweeper {
   }
 
   /**
-   * One wake-up, in the installation's provider.
+   * One wake-up: a pass per active provider, each inside its own scope and its
+   * own subtree.
    *
-   * `forSoleTenant`, like the alert scan, and here the reason is the disk
-   * itself: the walk reads one filesystem, of which no provider owns a corner.
-   * Run once per provider it would not divide the work, it would repeat it —
-   * and worse, the second provider's pass would see the first provider's files
-   * as orphans with no row pointing at them and delete every one of them. So it
-   * refuses the moment a second provider goes live, which is the safer of the
-   * two failures: a sweep that stops is a disk that fills, and a full disk is
-   * noticed and fixed. The fix when that day comes is to give stored media a
-   * per-provider subtree, and only then a per-provider loop.
+   * Now that a stored file's path carries the provider that wrote it, a
+   * per-provider loop genuinely divides the work instead of repeating it. Each
+   * pass walks `wa-media/t<id>` and reads its own rows, so a file outside that
+   * subtree is never even looked at, let alone judged an orphan — which is what
+   * made the old single-provider refusal necessary and is no longer true.
    *
-   * The blind spot this leaves is a provider whose `tenants` row is not
-   * `active`: its messages are invisible to the scoped read below, so its files
-   * would be judged as orphans. Nothing in the panel creates such a provider
-   * today, and the fix for it is that same subtree.
+   * THE LEGACY AREA IS THE ONE ASYMMETRY, AND IT IS DELIBERATE
+   *
+   * `wa-media/` outside any `t<id>/` holds the files written before the subtree
+   * existed, and those paths say nothing about who owns them. On an install
+   * with a single provider that is not ambiguous — every one of those files is
+   * theirs — so it is swept in their pass, exactly as before, and an install
+   * that upgrades keeps reclaiming its disk. The moment a second provider
+   * exists the ownership becomes unknowable from the path, and an orphan of
+   * unknown origin is left alone: deleting it would be guessing with somebody
+   * else's customer photos.
+   *
+   * Only ACTIVE providers get a pass, and that is what closes wave 7's blind
+   * spot rather than widening it. A suspended provider is not visited, and its
+   * files sit in a subtree nobody else's pass can see — so they are kept, which
+   * is the right answer for a provider that may come back.
    */
   static async tick() {
+    if (this.running) return { skipped: 'busy', files: 0, bytes: 0, mb: 0 };
+    this.running = true;
     try {
-      return (await forSoleTenant('The WhatsApp media sweep', () => this.sweep()))
-        ?? { skipped: 'no_provider', files: 0, bytes: 0, mb: 0 };
+      const tenants = await getDb()('tenants')
+        .where({ status: 'active' })
+        .orderBy('id', 'asc')
+        .select('id', 'slug');
+
+      if (tenants.length === 0) return { skipped: 'no_provider', files: 0, bytes: 0, mb: 0 };
+      const sole = tenants.length === 1;
+
+      let files = 0;
+      let bytes = 0;
+      const skips = [];
+
+      for (const tenant of tenants) {
+        // One provider's failure does not end the loop: a broken pass at one
+        // ISP must not be why every other ISP on the deployment stops
+        // reclaiming disk. `sweep` swallows its own errors, so this catch is
+        // for a scope that cannot be opened at all.
+        try {
+          const pass = await runInTenant(tenant.id, () => this.sweep({ includeLegacy: sole }));
+          files += pass.files;
+          bytes += pass.bytes;
+          if (pass.skipped) skips.push(pass.skipped);
+        } catch (error) {
+          console.warn(`WhatsApp media sweep failed for provider ${tenant.slug}: ${error.message}`);
+          skips.push('failed');
+        }
+      }
+
+      // A reason is reported only when EVERY pass skipped for the same one:
+      // that is the case the operator's button has to be able to explain
+      // ("retention is off"), and it is the only case where one word is true of
+      // the whole run.
+      const reasons = new Set(skips);
+      const skipped = skips.length === tenants.length && reasons.size === 1
+        ? [...reasons][0]
+        : null;
+
+      return { files, bytes, mb: toMb(bytes), ...(skipped ? { skipped } : {}) };
     } catch (error) {
       console.warn(`WhatsApp media sweep failed: ${error.message}`);
-      return { skipped: 'unscoped', files: 0, bytes: 0, mb: 0 };
+      return { skipped: 'failed', files: 0, bytes: 0, mb: 0 };
+    } finally {
+      this.running = false;
     }
   }
 
@@ -222,11 +323,14 @@ class WaMediaSweeper {
    * back in `skipped` instead, so the caller — the loop, or the admin who just
    * pressed the button — can tell "retention is off" from "nothing was old".
    *
+   * `includeLegacy` is `tick`'s answer to "is this install unambiguous?", never
+   * this pass's own guess: a pass cannot see how many providers exist, and a
+   * pass that assumed would be the one deleting the neighbour's files.
+   *
+   * @param {{ includeLegacy?: boolean }} options
    * @returns {Promise<{ files: number, bytes: number, mb: number, skipped?: string }>}
    */
-  static async sweep() {
-    if (this.running) return { skipped: 'busy', files: 0, bytes: 0, mb: 0 };
-    this.running = true;
+  static async sweep({ includeLegacy = false } = {}) {
     try {
       const config = await WhatsAppConfigService.getConfig().catch(() => null);
       const days = retentionDays(config);
@@ -238,7 +342,8 @@ class WaMediaSweeper {
 
       const cutoff = Date.now() - days * DAY_MS;
       const { protect, rowsByPath } = await this.indexRows();
-      const files = await walk(MEDIA_ROOT);
+      const files = await walk(tenantRoot());
+      if (includeLegacy) await walkLegacy(files);
 
       let deleted = 0;
       let bytes = 0;
@@ -287,14 +392,12 @@ class WaMediaSweeper {
       // right for a poll and wrong immediately after a deletion: an operator
       // who presses "delete the old ones", frees two gigabytes and then reads
       // the same number as before has been told the sweep did nothing.
-      if (deleted > 0) WaHealthService.forgetMedia();
+      if (deleted > 0) WaHealthService.forgetMedia(currentTenantId());
 
       return { files: deleted, bytes, mb: toMb(bytes) };
     } catch (error) {
       console.warn(`WhatsApp media sweep failed: ${error.message}`);
       return { skipped: 'failed', files: 0, bytes: 0, mb: 0 };
-    } finally {
-      this.running = false;
     }
   }
 
