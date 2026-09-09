@@ -422,20 +422,45 @@ function InboxTab() {
   }, [submit])
 
   /**
-   * A failed message is out of the worker's reach for good — three attempts
-   * spent, `failed` is terminal. Resending queues the same words as a new row
-   * rather than resurrecting the old one, which keeps the record of what did
-   * not go out intact. A note is never offered this: it was never going out.
+   * Puts a failed message back in the queue — the SAME row, not a copy.
+   *
+   * This used to read `message.body` and call `submit`, which posted a new
+   * message: the failed row stayed on screen, the subscriber got the same
+   * notice twice, and a message whose content was an attachment could not be
+   * resent at all, because there was no body to read and the button returned
+   * without a word. `requeueMessage` moves the row itself back to `queued`, so
+   * the id, the file and the place in the thread survive.
+   *
+   * The row is replaced where it stands rather than prepended: it is the same
+   * message, and moving it to the foot of the thread would misdate it.
    */
   const resend = useCallback(async (message: WhatsAppMessage) => {
-    if (!message.body) return
     setResendingId(message.id)
     try {
-      await submit(message.body, false)
+      const res = await whatsappAPI.requeueMessage(message.id)
+      if (!alive.current) return
+      if (!res.success || !res.data) {
+        // The route's `message` and not only its `code`: unlike a send, whose
+        // text can be the Evolution server's own words, every refusal here is
+        // the panel's own sentence, already translated by `req.t`. "Only a
+        // message that failed can be sent again" is worth more to the operator
+        // who just lost a race with a colleague than "the request failed".
+        toast.error(
+          res.message || whatsappErrorMessage(t, res.code),
+          { title: t('whatsapp.inbox.resendFailedTitle') }
+        )
+        return
+      }
+      const requeued = res.data
+      setMessages((rows) => rows.map((row) => (row.id === requeued.id ? requeued : row)))
+    } catch {
+      if (alive.current) {
+        toast.error(t('api.requestFailed'), { title: t('whatsapp.inbox.resendFailedTitle') })
+      }
     } finally {
       if (alive.current) setResendingId(null)
     }
-  }, [submit])
+  }, [t, toast])
 
   const unreadTotal = conversations.reduce((sum, row) => sum + row.unreadCount, 0)
 
@@ -624,17 +649,87 @@ function MediaSweepButton() {
   }
 
   return (
-    <div className="flex justify-end">
-      <button
-        type="button"
-        className="modern-button-secondary"
-        disabled={sweeping}
-        onClick={() => void sweep()}
-      >
-        <Icon name="trash" size={17} />
-        {t('whatsapp.health.sweepNow')}
-      </button>
-    </div>
+    <button
+      type="button"
+      className="modern-button-secondary"
+      disabled={sweeping}
+      onClick={() => void sweep()}
+    >
+      <Icon name="trash" size={17} />
+      {t('whatsapp.health.sweepNow')}
+    </button>
+  )
+}
+
+/**
+ * The window the bulk requeue asks for, and the one the route will give.
+ *
+ * The backend clamps `hours` to the same twenty-four, so this number is not a
+ * limit the screen enforces — it is the number the confirmation must not lie
+ * about. It is also the window the health strip counts as `failed24h`, which is
+ * the figure the operator is looking at when they reach for this button.
+ */
+const REQUEUE_WINDOW_HOURS = 24
+
+/**
+ * "Send the failed ones again", beside the sweep and under the health strip.
+ *
+ * This is where the button belongs because this is where the failure is
+ * reported: the strip above says `failed24h: 3200` after an Evolution restart
+ * ate a dunning run, and the answer to that number has to be within reach of
+ * it. Inside the inbox tab it would be a per-thread action, which is what the
+ * bubble's own resend already is; the campaign case never has a thread open.
+ *
+ * It is NOT destructive and still asks first, because it is bulk: an operator
+ * has to be told how wide the window is before three thousand messages go back
+ * on the wire. What it cannot do is duplicate anything — the route requeues the
+ * rows themselves, and only rows that failed — and the confirmation says so.
+ *
+ * Admin-only, because the route is. A viewer who could press it would get a 403
+ * with no way to tell that from a queue that refused to move.
+ */
+function RequeueFailedButton() {
+  const { t } = useTranslation()
+  const { user } = useAuth()
+  const toast = useToast()
+  const [requeuing, setRequeuing] = useState(false)
+
+  if (user?.role !== 'admin') return null
+
+  const requeueAll = async () => {
+    if (!window.confirm(t('whatsapp.outbox.requeueAllConfirm', { hours: REQUEUE_WINDOW_HOURS }))) return
+    setRequeuing(true)
+    try {
+      const res = await whatsappAPI.requeueFailed(REQUEUE_WINDOW_HOURS)
+      if (!res.success || !res.data) {
+        toast.error(t('whatsapp.outbox.requeueFailed'))
+        return
+      }
+      // Zero is a real answer with its own sentence. "Nothing failed in the
+      // last day" and "the button is broken" look identical otherwise, and the
+      // operator pressing this has just watched a campaign fall over.
+      if (!res.data.requeued) {
+        toast.info(t('whatsapp.outbox.requeueAllNone'))
+        return
+      }
+      toast.success(t('whatsapp.outbox.requeueAllDone', { count: res.data.requeued }))
+    } catch {
+      toast.error(t('whatsapp.outbox.requeueFailed'))
+    } finally {
+      setRequeuing(false)
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      className="modern-button-secondary"
+      disabled={requeuing}
+      onClick={() => void requeueAll()}
+    >
+      <Icon name="refresh" size={17} className={requeuing ? 'animate-spin' : ''} />
+      {t('whatsapp.outbox.requeueAll')}
+    </button>
   )
 }
 
@@ -686,7 +781,12 @@ export default function WhatsAppPage() {
           somebody opened Campaigns.
         */}
         <HealthStrip />
-        <MediaSweepButton />
+        {/* One row of actions on the strip's own figures, in the order the
+            numbers above them read: the failed count first, the disk second. */}
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <RequeueFailedButton />
+          <MediaSweepButton />
+        </div>
 
         <div className="tab-rail" role="tablist" aria-label={t('sidebar.nav.whatsapp')}>
           {TABS.map(([id, labelKey]) => (
