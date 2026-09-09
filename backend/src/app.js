@@ -33,6 +33,7 @@ import whatsappMessageRoutes from './routes/whatsappMessages.js';
 import whatsappAlertRoutes from './routes/whatsappAlerts.js';
 import whatsappBillingRoutes from './routes/whatsappBilling.js';
 import whatsappWebhookRoutes from './routes/whatsappWebhook.js';
+import whatsappMediaRoutes from './routes/whatsappMedia.js';
 import provisioningRoutes from './routes/provisioning.js';
 import { WEBHOOK_PATH } from './services/sgpService.js';
 
@@ -153,6 +154,13 @@ app.use(express.json({ limit: '1mb' }));
 // state — would trip a 300/min bucket sized for a human clicking around. It
 // declares its own, much higher, ceiling instead.
 app.use('/api/whatsapp-webhook', whatsappWebhookRoutes);
+
+// Same reasoning, same place in the stack: the Evolution server fetches a
+// media file to send it, carrying a signed, short-lived token in its own query
+// string rather than a session. It is mounted before `apiLimiter` because a
+// campaign with attachments would otherwise spend a bucket sized for a human
+// clicking around; the route declares its own ceiling.
+app.use('/api/whatsapp-media', whatsappMediaRoutes);
 
 app.use('/api', apiLimiter);
 

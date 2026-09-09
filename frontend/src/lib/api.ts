@@ -144,6 +144,40 @@ class ApiClient {
     return this.request<T>(endpoint, { method: 'DELETE' })
   }
 
+  /**
+   * A raw body, not JSON. `request` sets `Content-Type: application/json` and
+   * stringifies, which would corrupt a file; this is the one call that needs
+   * the bytes to arrive as they are.
+   */
+  async sendBlob<T>(
+    endpoint: string,
+    body: Blob,
+    headers: Record<string, string>
+  ): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, { method: 'POST', body, headers })
+  }
+
+  /**
+   * A binary response. `request` reads JSON or text, so a file fetched through
+   * it would arrive mangled and silently — hence its own path, with the same
+   * Authorization header and the same locale.
+   */
+  async getBlob(endpoint: string): Promise<{ success: boolean; blob?: Blob; code?: string }> {
+    const headers: Record<string, string> = { 'Accept-Language': getActiveLocale() }
+    if (this.token) headers['Authorization'] = `Bearer ${this.token}`
+    try {
+      const response = await fetch(`${this.baseURL}/api${endpoint}`, { headers })
+      if (!response.ok) {
+        const contentType = response.headers.get('content-type') || ''
+        const data = contentType.includes('application/json') ? await response.json() : {}
+        return { success: false, code: data.code }
+      }
+      return { success: true, blob: await response.blob() }
+    } catch {
+      return { success: false }
+    }
+  }
+
   async requestWithBody<T>(
     method: 'POST' | 'PUT' | 'PATCH' | 'DELETE',
     endpoint: string,
@@ -1086,6 +1120,23 @@ export const whatsappAPI = {
       `/whatsapp/conversations/${conversationId}/messages${suffix}`
     )
   },
+
+  // ── Attachments ──────────────────────────────────────────────────────
+  // The raw file as the body, its name in a header. No multipart, and so no
+  // upload dependency for one screen — the same choice the SGP webhook makes
+  // with `express.raw`. Returns the stored reference `sendMessage` takes.
+  uploadAttachment: (file: File) =>
+    apiClient.sendBlob<{ path: string; type: string; name: string }>(
+      '/whatsapp/attachments',
+      file,
+      { 'Content-Type': file.type || 'application/octet-stream', 'X-File-Name': encodeURIComponent(file.name) }
+    ),
+
+  // A blob rather than a URL, because the route is session-authenticated and an
+  // `<img src>` cannot carry an Authorization header. The caller makes an object
+  // URL from it and revokes that when the bubble goes away.
+  fetchAttachment: (messageId: number) =>
+    apiClient.getBlob(`/whatsapp/messages/${messageId}/media`),
 
   // Enqueues and returns; the outbox worker delivers. An internal note is
   // stored and never sent.
