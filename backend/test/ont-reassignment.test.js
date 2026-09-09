@@ -14,6 +14,8 @@ const { default: SgpLink } = await import('../src/models/SgpLink.js');
 // provider. The routes that call these are already inside one.
 const ensureAccount = (input) => asTenant(() => CustomerService.ensureAccount(input));
 const syncDevices = (...args) => asTenant(() => CustomerService.syncDevices(...args));
+const upsertLink = (link) => asTenant(() => SgpLink.upsert(link));
+const linkFor = (deviceId) => asTenant(() => SgpLink.getByDeviceId(deviceId));
 
 let portalUrl;
 
@@ -68,7 +70,7 @@ describe('an ONT re-provisioned for another subscriber', () => {
     first = await ensureAccount({
       _id: DEVICE, softwareId: 'V1.0.0', pppoe: 'subscriber-a@isp'
     });
-    await SgpLink.upsert({
+    await upsertLink({
       device_id: DEVICE,
       account_id: first.id,
       contract: '11111',
@@ -104,7 +106,7 @@ describe('an ONT re-provisioned for another subscriber', () => {
   });
 
   it('drops the SGP contract bound to the previous subscriber', async () => {
-    assert.equal(await SgpLink.getByDeviceId(DEVICE), null);
+    assert.equal(await linkFor(DEVICE), null);
   });
 
   it('lets the new subscriber sign in with their own credentials', async () => {
