@@ -28,7 +28,10 @@ class SchedulerService {
 
   static async start() {
     if (this.timer) return this.timer;
-    // A process that died mid-run leaves rows nothing would ever finish.
+    // A process that died mid-run leaves rows nothing would ever finish. The
+    // reaper's own query is scoped now, so this could already run per provider
+    // — it stays here so the scheduler moves off `forSoleTenant` in one piece,
+    // once `sgp_events` is scoped too and `tick` can move with it.
     await forSoleTenant('The interrupted-run reaper', () => ProvisioningService.reapInterrupted())
       .catch((error) => {
         console.warn(`Could not reap interrupted provisioning runs: ${error.message}`);
@@ -75,6 +78,14 @@ class SchedulerService {
    * taken at boot would be captured by the interval and held for the life of
    * the process — so a provider added afterwards would never be noticed, and
    * `forSoleTenant`'s refusal, which is the whole safeguard, would never fire.
+   *
+   * What still holds it to one provider is `sgp_events`, and only that.
+   * `SgpEvent.getPending` drains every provider's queue and `pruneOlderThan`
+   * deletes every provider's history, so a per-provider loop would process
+   * each event once per provider instead of once. The provisioning half no
+   * longer holds it: `provisioning_runs` is scoped, so `processDue`, the
+   * reaper and the retention prune each stay inside the provider in scope.
+   * Scope `sgp_events` and this becomes `forEachTenant`.
    */
   static async tick() {
     if (this.tickPromise) return this.tickPromise;
