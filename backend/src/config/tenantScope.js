@@ -99,7 +99,21 @@ export const SCOPED_TABLES = new Set([
 /** Tables that belong to the deployment rather than to any one provider. */
 export const SHARED_TABLES = new Set([
   // The provider registry itself.
-  'tenants'
+  'tenants',
+  // A row in `users` is a PERSON, not one provider's data. A consultant or a
+  // reseller serving several ISPs with one login is the common arrangement in
+  // this market, and a `tenant_id` here would foreclose it — while the three
+  // foreign keys that point at `users.id` (who sent the message, who revoked
+  // the opt-out, who created the campaign) would still name only the id, so
+  // nothing in the schema would stop one provider's operator being recorded as
+  // the sender of another's message.
+  'users',
+  // The bridge that says which providers a person works for, and with what
+  // role at each. Shared for the same reason `tenants` is: it is asked BEFORE
+  // a scope exists, at login, to decide which scope to open — reading it
+  // through the scope would be circular. `TenantUser` carries the rule that
+  // every query against it must name a person or a provider.
+  'tenant_users'
 ]);
 
 /** Tables still to be converted. Shrinks to empty as the phase progresses. */
