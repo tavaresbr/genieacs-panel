@@ -43,7 +43,7 @@ SkyGenPanel is a management layer for GenieACS deployments. It combines an opera
 - Dedicated operator and customer listeners served by one application.
 - First-run setup wizard for the initial administrator account.
 - Fast Vite and React interface with responsive light and dark themes.
-- Multi-language interface in Portuguese (Brazil), English, Spanish, Italian, German, French, Japanese, Simplified Chinese, Traditional Chinese, and Korean for both the operator panel and the customer portal.
+- Multi-language interface in Portuguese (Brazil), English, Spanish, Italian, German, French, Japanese, Simplified Chinese, Traditional Chinese, Korean, and Russian for both the operator panel and the customer portal.
 - GenieACS fault visibility and dependency-light dashboard charts.
 - Network topology editor with Google Maps and OpenStreetMap-compatible providers.
 - Automatic Customer ID generation that can be enabled or disabled in Settings.
@@ -311,12 +311,12 @@ npm start
 
 The operator panel and the customer portal ship with Portuguese (Brazil),
 English, Spanish, Italian, German, French, Japanese, Simplified Chinese,
-Traditional Chinese, and Korean. The active language follows the browser
-preference on first load and falls back to Portuguese (Brazil); the choice is
-stored per browser in `localStorage` under the `language` key. Operators change
-it from the sidebar or from **Settings → Panel & ACS**, and subscribers change
-it from the portal header. Dates and numbers follow the active locale and the
-viewer time zone.
+Traditional Chinese, Korean, and Russian. The active language follows the
+browser preference on first load and falls back to Portuguese (Brazil); the
+choice is stored per browser in `localStorage` under the `language` key.
+Operators change it from the sidebar or from **Settings → Panel & ACS**, and
+subscribers change it from the portal header. Dates and numbers follow the
+active locale and the viewer time zone.
 
 API responses follow the same language. The panel and the portal send the
 active locale in `Accept-Language`, the backend negotiates it per request

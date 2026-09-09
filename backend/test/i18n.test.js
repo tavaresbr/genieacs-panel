@@ -52,6 +52,7 @@ describe('dictionaries', () => {
     assert.equal(translate('zh-CN', 'common.routeNotFound'), '找不到该路由');
     assert.equal(translate('zh-TW', 'common.routeNotFound'), '找不到該路由');
     assert.equal(translate('ko', 'common.routeNotFound'), '경로를 찾을 수 없습니다');
+    assert.equal(translate('ru', 'common.routeNotFound'), 'Маршрут не найден');
     assert.equal(translate('pt-BR', 'nonexistent.key'), 'nonexistent.key');
   });
 });
@@ -73,6 +74,7 @@ describe('locale negotiation', () => {
     assert.equal(resolveLocale('zh-HK'), 'zh-TW');
     assert.equal(resolveLocale('zh-Hant'), 'zh-TW');
     assert.equal(resolveLocale('ko-KR'), 'ko');
+    assert.equal(resolveLocale('ru-RU'), 'ru');
     assert.equal(resolveLocale('nl'), null);
   });
 
@@ -92,6 +94,7 @@ describe('locale negotiation', () => {
     assert.equal(negotiateLocale('zh-CN'), 'zh-CN');
     assert.equal(negotiateLocale('zh-TW'), 'zh-TW');
     assert.equal(negotiateLocale('ko-KR'), 'ko');
+    assert.equal(negotiateLocale('ru-RU'), 'ru');
     assert.equal(negotiateLocale('nl-NL'), 'pt-BR');
     assert.equal(negotiateLocale(undefined), 'pt-BR');
     assert.equal(negotiateLocale('*'), 'pt-BR');
@@ -117,6 +120,7 @@ describe('translated responses', () => {
       ['zh-CN', '找不到该路由'],
       ['zh-TW', '找不到該路由'],
       ['ko', '경로를 찾을 수 없습니다'],
+      ['ru', 'Маршрут не найден'],
       ['nl;q=0.9, en;q=0.5', 'Route not found']
     ]) {
       const { body } = await call(`${panelUrl}/api/does-not-exist`, {

@@ -1325,7 +1325,7 @@ const ko: Dictionary = {
   'whatsapp.error.attachmentEmpty': '파일이 비어 있습니다.',
   'whatsapp.error.attachmentTypeNotAllowed': '이 종류의 파일은 여기에서 보낼 수 없습니다.',
   'whatsapp.error.attachmentNotFound': '해당 첨부 파일이 디스크에 더 이상 없습니다.',
-  'whatsapp.error.noPublicUrl': '첨부 파일을 보내기 전에 공개 웹훅 주소를 설정하십시오. Evolution 서버가 파일을 가져오는 주소입니다.',
+  'whatsapp.error.noPublicUrl': '첨부 파일을 보내기 전에 공개 웹훅 URL을 설정하십시오. Evolution 서버가 이 주소에서 파일을 가져옵니다.',
   'whatsapp.error.conversationNotFound': '이 대화는 더 이상 존재하지 않습니다.',
   'whatsapp.error.templateEmpty': '템플릿에는 이름과 내용이 필요합니다.',
   'whatsapp.error.templateMirrors': '하나의 템플릿에서 {{dias_atraso}}와 {{dias_para_vencer}}를 함께 사용할 수 없습니다. 둘 중 하나는 항상 비어 있으므로 메시지가 결코 발송되지 않습니다.',
