@@ -504,4 +504,8 @@ export default {
   'whatsapp.bot.invoicePix': 'Код PIX для копирования: {value}',
   'whatsapp.bot.invoiceLink': 'Дубликат счёта: {value}',
   'whatsapp.bot.signalOkNoReading': 'Ваше подключение работает.',
+  'whatsapp.mediaSwept': 'Удалено файлов: {files}, освобождено {mb} МБ',
+  'whatsapp.mediaSweepFailed': 'Не удалось выполнить очистку вложений',
+  'whatsapp.healthLoaded': 'Состояние интеграции получено',
+  'whatsapp.healthLoadFailed': 'Не удалось получить состояние интеграции',
 };

@@ -1350,6 +1350,20 @@ const ru: Dictionary = {
   'whatsapp.error.noSession': 'Нет активной сессии для перезапуска. Используйте «Переподключить».',
   'whatsapp.error.noAccount': 'Нет подключённого номера для отправки.',
   'whatsapp.error.noDestination': 'У этого контакта нет ни номера телефона, ни идентификатора WhatsApp.',
+  'settings.whatsapp.mediaRetention': 'Хранить вложения (дней)',
+  'settings.whatsapp.mediaRetentionHint': '0 — хранить всегда, это значение по умолчанию. По истечении срока файл удаляется, и в сообщении появляется отметка, что вложения больше нет на диске — текст переписки не затрагивается никогда.',
+  'whatsapp.health.title': 'Всё работает?',
+  'whatsapp.health.connected': 'Подключено номеров: {connected} из {total}',
+  'whatsapp.health.noNumbers': 'Нет подключённых номеров — ничего не отправляется и не приходит',
+  'whatsapp.health.queued': 'Ожидают отправки: {count}',
+  'whatsapp.health.oldestQueued': 'самое старое с {when}',
+  'whatsapp.health.failed24h': 'Не отправлено за последние 24 ч: {count}',
+  'whatsapp.health.silent': 'Ничего не приходило с {when}',
+  'whatsapp.health.neverAny': 'Ещё ничего не приходило',
+  'whatsapp.health.media': 'Вложений на диске: {files}, {size}',
+  'whatsapp.health.sweepNow': 'Удалить старые сейчас',
+  'whatsapp.health.sweepOff': 'Вложения хранятся всегда. Чтобы удалять старые, задайте срок хранения в настройках.',
+  'whatsapp.health.loadFailed': 'Не удалось получить состояние интеграции.',
 }
 
 export default ru
