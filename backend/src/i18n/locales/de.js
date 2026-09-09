@@ -508,4 +508,7 @@ export default {
   'whatsapp.bot.invoicePix': 'PIX zum Kopieren: {value}',
   'whatsapp.bot.invoiceLink': 'Zweitausfertigung: {value}',
   'whatsapp.bot.signalOkNoReading': 'Deine Verbindung ist online.',
+  'whatsapp.messageRequeued': 'Nachricht wieder in die Warteschlange gestellt',
+  'whatsapp.messageNotRequeueable': 'Nur eine fehlgeschlagene Nachricht kann erneut gesendet werden.',
+  'whatsapp.messagesRequeued': '{count} Nachricht(en) wieder in die Warteschlange gestellt',
 };

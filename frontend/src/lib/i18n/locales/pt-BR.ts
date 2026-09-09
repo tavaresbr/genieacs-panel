@@ -1362,6 +1362,14 @@ const ptBR: Dictionary = {
   'whatsapp.health.sweepNothing': 'Nada velho o bastante para apagar',
   'whatsapp.health.sweepBusy': 'Já existe uma limpeza em andamento',
   'whatsapp.health.sweepFailed': 'A limpeza não pôde ser concluída',
+  'whatsapp.inbox.resendFailedTitle': 'Falhou ao enviar',
+  'whatsapp.inbox.retryingIn': 'Tenta de novo {when}',
+  'whatsapp.inbox.attemptsSpent': 'Desistiu depois de {count} tentativas',
+  'whatsapp.outbox.requeueAll': 'Enviar de novo as que falharam',
+  'whatsapp.outbox.requeueAllConfirm': 'Isto devolve à fila toda mensagem que falhou nas últimas {hours} h. Nada que foi enviado é enviado duas vezes.',
+  'whatsapp.outbox.requeueAllDone': '{count} mensagem(ns) de volta à fila',
+  'whatsapp.outbox.requeueAllNone': 'Nenhuma mensagem falhada para reenviar',
+  'whatsapp.outbox.requeueFailed': 'Não foi possível devolver as mensagens à fila',
 }
 
 export default ptBR

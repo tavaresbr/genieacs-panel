@@ -1366,6 +1366,14 @@ const de: Dictionary = {
   'whatsapp.health.sweepNothing': 'Nichts alt genug zum Löschen',
   'whatsapp.health.sweepBusy': 'Es läuft bereits eine Bereinigung',
   'whatsapp.health.sweepFailed': 'Die Bereinigung konnte nicht abgeschlossen werden',
+  'whatsapp.inbox.resendFailedTitle': 'Senden fehlgeschlagen',
+  'whatsapp.inbox.retryingIn': 'Nächster Versuch {when}',
+  'whatsapp.inbox.attemptsSpent': 'Nach {count} Versuchen aufgegeben',
+  'whatsapp.outbox.requeueAll': 'Fehlgeschlagene erneut senden',
+  'whatsapp.outbox.requeueAllConfirm': 'Stellt jede in den letzten {hours} h fehlgeschlagene Nachricht wieder in die Warteschlange. Bereits Gesendetes wird nicht doppelt gesendet.',
+  'whatsapp.outbox.requeueAllDone': '{count} Nachricht(en) wieder in der Warteschlange',
+  'whatsapp.outbox.requeueAllNone': 'Keine fehlgeschlagene Nachricht zum erneuten Senden',
+  'whatsapp.outbox.requeueFailed': 'Die Nachrichten konnten nicht wieder eingereiht werden',
 }
 
 export default de

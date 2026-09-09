@@ -1363,6 +1363,14 @@ const zhTW: Dictionary = {
   'whatsapp.health.sweepNothing': '沒有足夠舊的內容可以刪除',
   'whatsapp.health.sweepBusy': '已有一次清理正在進行',
   'whatsapp.health.sweepFailed': '清理未能完成',
+  'whatsapp.inbox.resendFailedTitle': '傳送失敗',
+  'whatsapp.inbox.retryingIn': '將於 {when} 重試',
+  'whatsapp.inbox.attemptsSpent': '嘗試 {count} 次後放棄',
+  'whatsapp.outbox.requeueAll': '重新傳送失敗的訊息',
+  'whatsapp.outbox.requeueAllConfirm': '這會把最近 {hours} 小時內傳送失敗的訊息全部重新排入佇列。已傳送的不會重複傳送。',
+  'whatsapp.outbox.requeueAllDone': '已將 {count} 則訊息重新排入佇列',
+  'whatsapp.outbox.requeueAllNone': '沒有失敗的訊息需要重傳',
+  'whatsapp.outbox.requeueFailed': '無法將訊息重新排入佇列',
 }
 
 export default zhTW

@@ -1370,6 +1370,14 @@ const ru: Dictionary = {
   'whatsapp.health.sweepNothing': 'Нет ничего достаточно старого для удаления',
   'whatsapp.health.sweepBusy': 'Очистка уже выполняется',
   'whatsapp.health.sweepFailed': 'Очистку не удалось завершить',
+  'whatsapp.inbox.resendFailedTitle': 'Не удалось отправить',
+  'whatsapp.inbox.retryingIn': 'Повтор {when}',
+  'whatsapp.inbox.attemptsSpent': 'Остановлено после {count} попыток',
+  'whatsapp.outbox.requeueAll': 'Отправить заново то, что не ушло',
+  'whatsapp.outbox.requeueAllConfirm': 'Вернёт в очередь все сообщения, отправка которых не удалась за последние {hours} ч. Уже отправленное не уйдёт дважды.',
+  'whatsapp.outbox.requeueAllDone': 'Возвращено в очередь: {count}',
+  'whatsapp.outbox.requeueAllNone': 'Нет неотправленных сообщений для повтора',
+  'whatsapp.outbox.requeueFailed': 'Не удалось вернуть сообщения в очередь',
 }
 
 export default ru

@@ -1362,6 +1362,14 @@ const zhCN: Dictionary = {
   'whatsapp.health.sweepNothing': '没有足够旧的内容可以删除',
   'whatsapp.health.sweepBusy': '已有一次清理正在进行',
   'whatsapp.health.sweepFailed': '清理未能完成',
+  'whatsapp.inbox.resendFailedTitle': '发送失败',
+  'whatsapp.inbox.retryingIn': '将于 {when} 重试',
+  'whatsapp.inbox.attemptsSpent': '尝试 {count} 次后放弃',
+  'whatsapp.outbox.requeueAll': '重新发送失败的消息',
+  'whatsapp.outbox.requeueAllConfirm': '这会把最近 {hours} 小时内发送失败的消息全部重新排队。已发送的不会重复发送。',
+  'whatsapp.outbox.requeueAllDone': '已将 {count} 条消息重新排队',
+  'whatsapp.outbox.requeueAllNone': '没有失败的消息需要重发',
+  'whatsapp.outbox.requeueFailed': '无法将消息重新排队',
 }
 
 export default zhCN

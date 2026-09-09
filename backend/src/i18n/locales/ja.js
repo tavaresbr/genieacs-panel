@@ -507,4 +507,7 @@ export default {
   'whatsapp.alerts.noAlertNumber': 'アラート用途を持つ接続番号がありません',
   'whatsapp.alerts.noDevices': 'ネットワークを読み取れなかったため、何も確認されませんでした',
 
+  'whatsapp.messageRequeued': 'メッセージを送信待ちに戻しました',
+  'whatsapp.messageNotRequeueable': '再送できるのは送信に失敗したメッセージだけです。',
+  'whatsapp.messagesRequeued': '{count} 件のメッセージを送信待ちに戻しました',
 };

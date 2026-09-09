@@ -993,6 +993,14 @@ export interface WhatsAppMessage {
   deliveryStatus: 'queued' | 'sending' | 'sent' | 'delivered' | 'read' | 'failed' | null
   deliveryError: string | null
   attempts: number
+  /**
+   * When the outbox may try this row again, or null for "now".
+   *
+   * A failed send is not terminal on the first bounce any more: it waits, and
+   * the thread says so instead of showing a red mark the operator would read as
+   * final. Null on every row that is not waiting.
+   */
+  nextAttemptAt: string | null
   sentBy: number | null
   readAt: string | null
   createdAt: string | null
@@ -1176,6 +1184,19 @@ export const whatsappAPI = {
   // `skipped` is the answer that matters. "0 files" means one of retention
   // being off, nothing being old enough, or a pass already running — and those
   // read identically unless the reason comes back with the count.
+  // Puts one failed message back in the queue, as ITSELF. The old screen-side
+  // "resend" read the row's body and sent a new message, which left the failed
+  // row behind, produced a duplicate for the subscriber, and did nothing at all
+  // when the content was an attachment and the body was empty.
+  requeueMessage: (id: number) =>
+    apiClient.post<WhatsAppMessage>(`/whatsapp/messages/${id}/requeue`, {}),
+
+  // Every message that failed inside the window, back in the queue, for the
+  // campaign case: an Evolution restart during a dunning run fails thousands,
+  // and requeuing them one at a time is not a recovery.
+  requeueFailed: (hours: number) =>
+    apiClient.post<{ requeued: number }>('/whatsapp/messages/requeue-failed', { hours }),
+
   sweepMedia: () =>
     apiClient.post<{ files: number; bytes: number; mb: number; skipped?: string }>(
       '/whatsapp/media/sweep',

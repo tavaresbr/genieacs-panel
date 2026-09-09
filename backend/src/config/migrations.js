@@ -88,6 +88,18 @@ const WA_MESSAGE_SOURCE_COLUMNS = [
   ['source', (t) => t.string('source', 16).notNullable().defaultTo('operator')]
 ];
 
+/**
+ * Shared by `wa_messages` and the 0018 upgrade.
+ *
+ * Three queries that already existed and had no index that fit them. See the
+ * 0018 step for what each one serves and why the index it had did not.
+ */
+const WA_MESSAGE_OUTBOX_INDEXES = [
+  ['conversation_id', 'id'],
+  ['tenant_id', 'created_at'],
+  ['delivery_status', 'next_attempt_at']
+];
+
 // Table definitions. Each is a factory so the builder can reach `db.fn.now()`,
 // and each is referenced by exactly one place per table so the initial schema
 // and the later upgrade steps can never drift apart.
@@ -475,6 +487,10 @@ const waMessagesTable = (db) => (t) => {
   t.index(['conversation_id', 'created_at']);
   // The outbox worker's only query.
   t.index(['delivery_status', 'created_at']);
+  // The three indexes of 0018 are NOT here. This factory runs in step 0001,
+  // where `tenant_id` (0012) and `next_attempt_at` (0018) do not exist yet, so
+  // indexing them would fail every fresh install. 0018 adds all three, and it
+  // runs on a fresh database too.
 };
 
 const waOptOutsTable = (db) => (t) => {
@@ -1184,6 +1200,61 @@ export const migrations = [
         t.dropUnique(['device_id']);
         t.unique(['tenant_id', 'device_id']);
       });
+    }
+  },
+  {
+    /**
+     * What the outbox needs to survive an Evolution server that blinks, and
+     * what the two sweeps and the thread reader need to stay fast on the
+     * installation they were written for.
+     *
+     * `next_attempt_at` is the important one. Without it a failed send goes
+     * straight back to `queued` and the worker, which wakes every five seconds,
+     * picks it up again immediately: three attempts burn in fifteen seconds and
+     * the row is `failed` for good. An Evolution restart that takes twenty
+     * seconds therefore fails every message in the queue permanently — during a
+     * dunning campaign, thousands of them. `provisioning_runs` already carries
+     * this column and its due index; this is the same pattern, in the place
+     * that needed it more.
+     *
+     * The three indexes are queries that already exist and have no index that
+     * fits them:
+     *
+     * - `(conversation_id, id)` — the thread reader pages by `id` (keyset,
+     *   since the attachments wave) while the only index orders by
+     *   `created_at`, so opening a busy thread filters by index and then sorts.
+     * - `(tenant_id, created_at)` — the history sweep reads a provider's oldest
+     *   rows. The existing `(delivery_status, created_at)` cannot serve it: the
+     *   sweep's test on that column is `IS NULL OR NOT IN (...)`, which no
+     *   engine seeks on.
+     * - `(delivery_status, next_attempt_at)` — the outbox's own query, once it
+     *   has a due time to respect.
+     *
+     * Indexes are attempted one at a time and a duplicate is swallowed, like
+     * 0016: there is no portable way to ask whether an index exists, and
+     * guessing would be dishonest.
+     */
+    id: '0018_wa_outbox_backoff_and_indexes',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('wa_messages'))) return false;
+      return db.schema.hasColumn('wa_messages', 'next_attempt_at');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('wa_messages'))) return;
+
+      if (!(await db.schema.hasColumn('wa_messages', 'next_attempt_at'))) {
+        await db.schema.alterTable('wa_messages', (t) => {
+          // Nullable, and NULL means "due now". Rows written before this
+          // column existed are due, which is the only reading that does not
+          // strand a queue on upgrade.
+          t.timestamp('next_attempt_at');
+        });
+      }
+
+      for (const columns of WA_MESSAGE_OUTBOX_INDEXES) {
+        // eslint-disable-next-line no-await-in-loop -- DDL, and three of them
+        await db.schema.alterTable('wa_messages', (t) => t.index(columns)).catch(() => {});
+      }
     }
   }
 ];

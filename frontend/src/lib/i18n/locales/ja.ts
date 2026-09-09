@@ -1362,6 +1362,14 @@ const ja: Dictionary = {
   'whatsapp.health.sweepNothing': '削除できるほど古いものはありません',
   'whatsapp.health.sweepBusy': 'すでに整理が実行中です',
   'whatsapp.health.sweepFailed': '整理を完了できませんでした',
+  'whatsapp.inbox.resendFailedTitle': '送信に失敗しました',
+  'whatsapp.inbox.retryingIn': '{when} に再試行します',
+  'whatsapp.inbox.attemptsSpent': '{count} 回試して中止しました',
+  'whatsapp.outbox.requeueAll': '失敗した分をもう一度送る',
+  'whatsapp.outbox.requeueAllConfirm': '直近 {hours} 時間に失敗したメッセージをすべて送信待ちに戻します。送信済みのものが二重に送られることはありません。',
+  'whatsapp.outbox.requeueAllDone': '{count} 件を送信待ちに戻しました',
+  'whatsapp.outbox.requeueAllNone': '再送する失敗メッセージはありません',
+  'whatsapp.outbox.requeueFailed': 'メッセージを送信待ちに戻せませんでした',
 }
 
 export default ja

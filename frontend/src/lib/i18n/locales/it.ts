@@ -1368,6 +1368,14 @@ const it: Dictionary = {
   'whatsapp.health.sweepNothing': 'Non c’è nulla di abbastanza vecchio da eliminare',
   'whatsapp.health.sweepBusy': 'È già in corso una pulizia',
   'whatsapp.health.sweepFailed': 'La pulizia non è stata completata',
+  'whatsapp.inbox.resendFailedTitle': 'Invio non riuscito',
+  'whatsapp.inbox.retryingIn': 'Riprova {when}',
+  'whatsapp.inbox.attemptsSpent': 'Ha rinunciato dopo {count} tentativi',
+  'whatsapp.outbox.requeueAll': 'Invia di nuovo quelli non riusciti',
+  'whatsapp.outbox.requeueAllConfirm': 'Rimette in coda ogni messaggio non riuscito nelle ultime {hours} h. Nulla di già inviato viene inviato due volte.',
+  'whatsapp.outbox.requeueAllDone': '{count} messaggio/i di nuovo in coda',
+  'whatsapp.outbox.requeueAllNone': 'Nessun messaggio non riuscito da reinviare',
+  'whatsapp.outbox.requeueFailed': 'Impossibile rimettere i messaggi in coda',
 }
 
 export default it

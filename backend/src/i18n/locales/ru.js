@@ -508,4 +508,7 @@ export default {
   'whatsapp.mediaSweepFailed': 'Не удалось выполнить очистку вложений',
   'whatsapp.healthLoaded': 'Состояние интеграции получено',
   'whatsapp.healthLoadFailed': 'Не удалось получить состояние интеграции',
+  'whatsapp.messageRequeued': 'Сообщение возвращено в очередь',
+  'whatsapp.messageNotRequeueable': 'Повторно отправить можно только сообщение, отправка которого не удалась.',
+  'whatsapp.messagesRequeued': 'Возвращено в очередь сообщений: {count}',
 };

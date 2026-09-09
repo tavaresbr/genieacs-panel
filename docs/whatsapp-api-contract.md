@@ -1295,3 +1295,68 @@ entra só quando há um provedor ativo, mesma regra do laço.
 
 Isto teria parecido correto por exatamente o tempo em que houvesse um provedor
 só.
+
+---
+
+## Onda 9 — a fila que sobrevive a um servidor que pisca
+
+Duas coisas achadas lendo o caminho quente da fila de saída, nenhuma delas
+anotada em comentário antes desta onda. As decisões abaixo estão **congeladas**.
+
+### O problema, medido
+
+`MAX_ATTEMPTS` é 3, o laço acorda a cada 5 s, e uma tentativa que falha devolve
+a linha para `queued` na hora. Ou seja: **três tentativas queimam em quinze
+segundos** e a linha vira `failed` para sempre. Um restart do servidor Evolution
+que leve vinte segundos falha permanentemente toda a fila — numa campanha de
+cobrança, milhares de mensagens de uma vez.
+
+E o "reenviar" da tela não reenvia: ele lê o `body` da linha e manda uma
+mensagem **nova**. A linha falhada fica lá, o assinante recebe duas, e uma
+mensagem cujo conteúdo era um anexo não reenvia de jeito nenhum — não há corpo
+para ler, e o botão não faz nada em silêncio.
+
+### 1. Recuo exponencial — `next_attempt_at`
+
+- A coluna já existe (migração `0018`), é anulável, e **NULL significa "pode
+  agora"**. É a única leitura que não trava a fila de um install ao atualizar.
+- `listSendable` e `claim` passam a respeitar a hora devida. O índice
+  `(delivery_status, next_attempt_at)` existe para essa consulta.
+- O recuo é exponencial com teto. O que importa não é a curva e sim a janela
+  total: ela tem de ser maior que um restart de servidor, medida em minutos, não
+  em segundos. `MAX_ATTEMPTS` sobe junto — três tentativas só faziam sentido
+  quando elas eram imediatas.
+- `provisioning_runs` já carrega `next_attempt_at` e o seu índice de vencimento.
+  É o padrão da casa; siga-o.
+
+### 2. Falha transitória não é falha permanente
+
+Queimar tentativas é certo para um servidor fora do ar e errado para um número
+que não existe. As duas têm de ser distinguidas:
+
+- **Transitória** — servidor inalcançável, timeout, 5xx, sessão desconectada.
+  Recua e tenta de novo.
+- **Permanente** — número inválido, destinatário que não existe no WhatsApp,
+  conteúdo recusado. Vira `failed` na primeira, sem gastar a janela.
+
+Na dúvida, **trate como transitória**. O custo de errar para o lado transitório
+é uma mensagem que sai alguns minutos depois; para o outro lado é uma cobrança
+que nunca chega e ninguém percebe.
+
+### 3. Reenviar é devolver a linha à fila, não criar outra
+
+`WaMessage.requeue(id)` é a superfície congelada:
+
+- Só linha `failed` é elegível, e quem diz isso é o `WHERE`, não o chamador.
+  Reenfileirar uma linha `sent` manda a mesma mensagem duas vezes ao assinante;
+  reenfileirar uma `queued` zera um recuo que está fazendo o seu trabalho.
+- Zera `attempts` e põe `next_attempt_at` em NULL — quem apertou decidiu que o
+  motivo da falha passou, e fazer o operador esperar um recuo calculado sobre
+  tentativas que não valem mais é o painel discutindo com ele.
+- A linha mantém id, anexo, `source` e lugar na conversa. O assinante vê uma
+  mensagem, não duas.
+
+Em lote (`POST /api/whatsapp/messages/requeue-failed`), a mesma regra por linha,
+dentro do escopo do provedor que pediu — pela mesma razão que o botão de
+limpeza da onda 8: a requisição chega no escopo de um provedor e não tem por que
+mexer na fila de outro.

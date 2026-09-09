@@ -1364,6 +1364,14 @@ const en = {
   'whatsapp.health.sweepNothing': 'Nothing old enough to delete',
   'whatsapp.health.sweepBusy': 'A sweep is already running',
   'whatsapp.health.sweepFailed': 'The sweep could not finish',
+  'whatsapp.inbox.resendFailedTitle': 'Send failed',
+  'whatsapp.inbox.retryingIn': 'Trying again {when}',
+  'whatsapp.inbox.attemptsSpent': 'Gave up after {count} attempts',
+  'whatsapp.outbox.requeueAll': 'Send the failed ones again',
+  'whatsapp.outbox.requeueAllConfirm': 'This puts every message that failed in the last {hours} h back in the queue. Nothing that was sent is sent twice.',
+  'whatsapp.outbox.requeueAllDone': '{count} message(s) back in the queue',
+  'whatsapp.outbox.requeueAllNone': 'No failed message to send again',
+  'whatsapp.outbox.requeueFailed': 'Could not put the messages back in the queue',
 }
 
 export default en

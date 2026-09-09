@@ -1369,6 +1369,14 @@ const ko: Dictionary = {
   'whatsapp.health.sweepNothing': '삭제할 만큼 오래된 것이 없습니다',
   'whatsapp.health.sweepBusy': '이미 정리가 진행 중입니다',
   'whatsapp.health.sweepFailed': '정리를 완료하지 못했습니다',
+  'whatsapp.inbox.resendFailedTitle': '전송 실패',
+  'whatsapp.inbox.retryingIn': '{when}에 다시 시도합니다',
+  'whatsapp.inbox.attemptsSpent': '{count}회 시도 후 중단했습니다',
+  'whatsapp.outbox.requeueAll': '실패한 것 다시 보내기',
+  'whatsapp.outbox.requeueAllConfirm': '최근 {hours}시간 동안 실패한 메시지를 모두 전송 대기열로 되돌립니다. 이미 보낸 메시지가 두 번 가지는 않습니다.',
+  'whatsapp.outbox.requeueAllDone': '메시지 {count}건을 대기열로 되돌렸습니다',
+  'whatsapp.outbox.requeueAllNone': '다시 보낼 실패 메시지가 없습니다',
+  'whatsapp.outbox.requeueFailed': '메시지를 대기열로 되돌리지 못했습니다',
 }
 
 export default ko

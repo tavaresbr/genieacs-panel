@@ -503,4 +503,7 @@ export default {
   'whatsapp.alerts.temperatureHighCleared': 'La température de l’ONT {device} est revenue à la normale',
   'whatsapp.alerts.massOutage': 'Panne massive : {count} ONT hors ligne sur {node}',
   'whatsapp.alerts.massOutageCleared': '{node} est rétabli : les ONT répondent de nouveau',
+  'whatsapp.messageRequeued': 'Message remis dans la file',
+  'whatsapp.messageNotRequeueable': 'Seul un message en échec peut être renvoyé.',
+  'whatsapp.messagesRequeued': '{count} message(s) remis dans la file',
 };

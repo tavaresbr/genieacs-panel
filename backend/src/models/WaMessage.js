@@ -40,6 +40,44 @@ class WaMessage {
     return query;
   }
 
+  /**
+   * Puts a failed message back in the queue, as itself.
+   *
+   * The screen's old "resend" was not this: it read the row's `body` and sent a
+   * NEW message, which left the failed row sitting there and produced a second
+   * one — and it did nothing at all for a message whose content was an
+   * attachment, because there was no body to read. Requeuing the row keeps its
+   * attachment, its `source`, its place in the thread and its id, so a
+   * subscriber sees one message rather than a duplicate every time a send is
+   * retried.
+   *
+   * `attempts` goes back to zero and `next_attempt_at` to NULL, which means due
+   * now: an operator pressing this has decided the reason for the failure is
+   * over, and making them wait out a backoff computed from attempts that are no
+   * longer relevant would be the panel arguing with them.
+   *
+   * Only a `failed` row is eligible, and the WHERE says so rather than the
+   * caller: requeuing a `sent` row would send a subscriber the same message
+   * twice, and requeuing a `queued` one would reset a backoff that is doing its
+   * job. The affected-row count is the answer, so two operators pressing at
+   * once cannot both win.
+   *
+   * @returns {Promise<object|null>} the requeued row, or null when not eligible
+   */
+  static async requeue(id) {
+    const changed = await tdb('wa_messages')
+      .where({ id, delivery_status: 'failed' })
+      .update({
+        delivery_status: 'queued',
+        delivery_error: null,
+        claimed_at: null,
+        attempts: 0,
+        next_attempt_at: null,
+        updated_at: new Date()
+      });
+    return changed > 0 ? this.getById(id) : null;
+  }
+
   static async create(message) {
     const id = await tinsertReturningId('wa_messages', message);
     return this.getById(id);

@@ -507,4 +507,7 @@ export default {
   'whatsapp.bot.invoicePix': 'PIX copy and paste: {value}',
   'whatsapp.bot.invoiceLink': 'Second copy: {value}',
   'whatsapp.bot.signalOkNoReading': 'Your connection is online.',
+  'whatsapp.messageRequeued': 'Message put back in the queue',
+  'whatsapp.messageNotRequeueable': 'Only a message that failed can be sent again.',
+  'whatsapp.messagesRequeued': '{count} message(s) put back in the queue',
 };
