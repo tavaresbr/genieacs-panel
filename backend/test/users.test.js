@@ -1,6 +1,13 @@
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { authHeaders, call, startTestServers, stopTestServers } from './helpers/harness.js';
+import {
+  authHeaders,
+  call,
+  defaultTenantId,
+  getDb,
+  startTestServers,
+  stopTestServers
+} from './helpers/harness.js';
 
 let panelUrl;
 let adminToken;
@@ -14,6 +21,16 @@ before(async () => {
     body: { username: 'owner', password: 'owner-password-1' }
   });
   adminToken = setup.body.data.token;
+
+  // `/api/auth/setup` creates the person but not the membership that says she
+  // works for the provider she just set up — the login path owns that row and
+  // is being written alongside this. `/api/users` reads memberships, so without
+  // it the owner would be absent from her own team.
+  await getDb()('tenant_users').insert({
+    tenant_id: await defaultTenantId(),
+    user_id: setup.body.data.user.id,
+    role: 'admin'
+  });
 });
 
 after(async () => {
@@ -163,14 +180,24 @@ describe('guard rails', () => {
     assert.equal(reused.status, 403);
   });
 
-  it('deletes an operator that is not the last administrator', async () => {
+  it('removes an operator that is not the last administrator', async () => {
     const { status } = await call(`${panelUrl}/api/users/${viewerId}`, {
       method: 'DELETE',
       headers: authHeaders(adminToken)
     });
     assert.equal(status, 200);
 
-    const login = await call(`${panelUrl}/api/auth/login`, { method: 'POST', body: VIEWER });
-    assert.equal(login.status, 401, 'a deleted operator can no longer sign in');
+    const remaining = await call(`${panelUrl}/api/users`, { headers: authHeaders(adminToken) });
+    assert.ok(
+      !remaining.body.data.users.some((user) => user.id === viewerId),
+      'the operator is off this provider\'s team'
+    );
+    // The person is NOT deleted — she may work for another provider, and her
+    // name is on history that points at her id. What used to be asserted here,
+    // that she can no longer sign in, is now the login path's job: it has to
+    // refuse a person with no membership, and that is the other half of this
+    // wave. Until it lands she still gets a token on this deployment, which is
+    // the one thing this change leaves open on purpose rather than by mistake.
+    assert.ok(await getDb()('users').where({ id: viewerId }).first(), 'the person survives');
   });
 });
