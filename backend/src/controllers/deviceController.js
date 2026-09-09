@@ -1,4 +1,5 @@
 import DeviceService from '../services/deviceService.js';
+import DeviceHistoryService from '../services/deviceHistoryService.js';
 import CustomerService from '../services/customerService.js';
 import CustomerPortalPasswordService from '../services/customerPortalPasswordService.js';
 import CustomerAccount from '../models/CustomerAccount.js';
@@ -15,6 +16,35 @@ class DeviceController {
       console.error('Get dashboard error:', error);
       return res.status(502).json(
         createErrorResponse(req.t('device.dashboardFailed'), error.message)
+      );
+    }
+  }
+
+  /** The telemetry series for one ONT, for the chart on its page. */
+  static async getHistory(req, res) {
+    try {
+      const deviceId = String(req.params?.deviceId ?? '').trim();
+      if (!deviceId) {
+        return res.status(400).json(createErrorResponse(req.t('device.history.deviceIdRequired')));
+      }
+      const to = req.query?.to ? Date.parse(String(req.query.to)) : Date.now();
+      const from = req.query?.from
+        ? Date.parse(String(req.query.from))
+        : to - 24 * 3600_000;
+      if (!Number.isFinite(from) || !Number.isFinite(to) || from >= to) {
+        return res.status(400).json(createErrorResponse(req.t('device.history.rangeInvalid')));
+      }
+      // A year is already 8760 hourly points, four times what the read returns.
+      // Refusing beyond it keeps a mistyped date from scanning the whole table.
+      if (to - from > 366 * 24 * 3600_000) {
+        return res.status(400).json(createErrorResponse(req.t('device.history.rangeInvalid')));
+      }
+      const history = await DeviceHistoryService.readRange(deviceId, { from, to });
+      return res.json(createResponse(req.t('device.history.retrieved'), history));
+    } catch (error) {
+      console.error('Get device history error:', error);
+      return res.status(502).json(
+        createErrorResponse(req.t('device.history.failed'), error.message)
       );
     }
   }

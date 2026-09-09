@@ -600,6 +600,56 @@ const WHATSAPP_TABLES = [
  * `mapping_edges`, and `customer_accounts` before `sgp_links` and
  * `customer_wifi_credentials`.
  */
+const deviceSamplesTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants');
+  t.string('device_id', 255).notNullable();
+  // The sample's time axis is the inform it came from, not the tick clock.
+  // GenieACS only refreshes a parameter when the device informs, so a tick that
+  // sees an unchanged `_lastInform` has nothing new to store. That one decision
+  // is also why there is no `online` column: a device that stops informing
+  // stops producing rows, and the gap that leaves in the series IS the outage.
+  t.timestamp('inform_at').notNullable();
+  // Float rather than decimal on purpose: `pg` and `mysql2` both hand DECIMAL
+  // back as a string, and 0.01 dBm is far inside what a float carries exactly.
+  t.float('rx_power');
+  t.float('temperature');
+  t.integer('uptime_seconds');
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  // Serves both reads: `max(inform_at) group by device_id` for the per-tick
+  // deduplication, and the range scan the chart does.
+  t.index(['tenant_id', 'device_id', 'inform_at'], 'device_samples_device_time_idx');
+  // Retention walks this one. Without it the daily prune is a full scan of a
+  // table that holds a million rows on a fleet of a thousand.
+  t.index(['tenant_id', 'inform_at'], 'device_samples_age_idx');
+};
+
+const deviceSampleHoursTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants');
+  t.string('device_id', 255).notNullable();
+  t.timestamp('bucket_at').notNullable();
+  t.integer('sample_count').notNullable().defaultTo(0);
+  t.float('rx_min');
+  t.float('rx_avg');
+  t.float('rx_max');
+  t.float('temp_min');
+  t.float('temp_avg');
+  t.float('temp_max');
+  t.integer('uptime_last');
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  // What makes re-running a rollup safe instead of doubling the buckets.
+  t.unique(['tenant_id', 'device_id', 'bucket_at']);
+  t.index(['tenant_id', 'bucket_at'], 'device_sample_hours_age_idx');
+};
+
+const DEVICE_HISTORY_TABLES = [
+  ['device_samples', deviceSamplesTable],
+  ['device_sample_hours', deviceSampleHoursTable]
+];
+
 const TENANCY_TABLES = [
   ['tenants', tenantsTable]
 ];
@@ -633,7 +683,8 @@ export const SCHEMA_TABLES = [
   ...TENANCY_TABLES,
   ...INITIAL_TABLES,
   ...PROVISIONING_TABLES,
-  ...WHATSAPP_TABLES
+  ...WHATSAPP_TABLES,
+  ...DEVICE_HISTORY_TABLES
 ].map(([name]) => name);
 
 /**
@@ -1126,6 +1177,31 @@ export const migrations = [
       for (const column of WA_CONVERSATION_HEALTH_INDEXES) {
         // eslint-disable-next-line no-await-in-loop -- DDL, and three of them
         await db.schema.alterTable('wa_conversations', (t) => t.index([column])).catch(() => {});
+      }
+    }
+  },
+  {
+    // Per-device telemetry over time.
+    //
+    // Tenant-ready at the end state the earlier steps are working towards
+    // rather than the transitional one they had to use. Those tables already
+    // had rows and unconverted writers, so their `tenant_id` carries a default
+    // to keep those writers correct. These two have neither: every write goes
+    // through `tinsert`/`tbatchInsert` from the first commit, so the column is
+    // NOT NULL with no default. A default here would be a mechanism for filing
+    // one provider's samples under another, quietly.
+    id: '0017_device_history',
+    async isApplied(db) {
+      for (const [name] of DEVICE_HISTORY_TABLES) {
+        // eslint-disable-next-line no-await-in-loop -- two schema probes
+        if (!(await db.schema.hasTable(name))) return false;
+      }
+      return true;
+    },
+    async up(db) {
+      for (const [name, table] of DEVICE_HISTORY_TABLES) {
+        // eslint-disable-next-line no-await-in-loop -- DDL, and two of them
+        await createTableIfMissing(db, name, table(db));
       }
     }
   }
