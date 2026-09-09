@@ -1383,6 +1383,21 @@ const ja: Dictionary = {
   'whatsapp.error.rateLimited': '短い時間に送信が多すぎます。少し待ってください。',
   'whatsapp.error.scanFailed': 'アラートの確認を完了できませんでした。',
 
+  'settings.whatsapp.messageRetention': '会話履歴の保存期間（日）',
+  'settings.whatsapp.messageRetentionHint': '0 は無期限で、これが既定値です。この日数を過ぎたメッセージはパネルから完全に削除されます。添付ファイルがまだディスクにあるメッセージは削除されません。それも消したい場合は添付ファイルの保存期間も設定してください。',
+  'whatsapp.health.sweepDone': '添付ファイル {files} 件を削除し、{mb} MB を解放しました',
+  'whatsapp.health.sweepNothing': '削除できるほど古いものはありません',
+  'whatsapp.health.sweepBusy': 'すでに整理が実行中です',
+  'whatsapp.health.sweepFailed': '整理を完了できませんでした',
+  'whatsapp.inbox.resendFailedTitle': '送信に失敗しました',
+  'whatsapp.inbox.retryingIn': '{when} に再試行します',
+  'whatsapp.inbox.attemptsSpent': '{count} 回試して中止しました',
+  'whatsapp.outbox.requeueAll': '失敗した分をもう一度送る',
+  'whatsapp.outbox.requeueAllConfirm': '直近 {hours} 時間に失敗したメッセージをすべて送信待ちに戻します。送信済みのものが二重に送られることはありません。',
+  'whatsapp.outbox.requeueAllDone': '{count} 件を送信待ちに戻しました',
+  'whatsapp.outbox.requeueAllNone': '再送する失敗メッセージはありません',
+  'whatsapp.outbox.requeueFailed': 'メッセージを送信待ちに戻せませんでした',
+  'whatsapp.health.retrying': 'うち {count} 件は再試行待ち',
 }
 
 export default ja

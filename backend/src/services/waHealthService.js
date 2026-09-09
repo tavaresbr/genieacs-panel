@@ -3,7 +3,7 @@ import path from 'node:path';
 import { tdb } from '../config/database.js';
 import { currentTenantId, runInTenant } from '../config/tenantContext.js';
 import { DATA_DIR } from '../config/paths.js';
-import { MEDIA_DIR } from './waMediaService.js';
+import { MEDIA_DIR, tenantIdFromDir, tenantMediaDir } from './waMediaService.js';
 
 /**
  * One read that answers "is this working?".
@@ -199,8 +199,20 @@ class WaHealthService {
    * each engine decides an aggregate over a timestamp should be typed as.
    */
   static async outbox() {
+    const now = new Date();
+
     const [queuedRow] = await tdb('wa_messages')
       .where({ delivery_status: 'queued' })
+      .count({ total: '*' });
+
+    // Since the outbox learned to back off, a message that bounced goes back to
+    // 'queued' with a due time in the future. It is still waiting to go out, so
+    // it belongs in `queued` — but it is NOT the queue standing still, and the
+    // two have to be told apart or an operator reads a healthy retry as a stuck
+    // panel. `retrying` is that slice, and `oldestQueuedAt` below excludes it.
+    const [retryingRow] = await tdb('wa_messages')
+      .where({ delivery_status: 'queued' })
+      .where('next_attempt_at', '>', now)
       .count({ total: '*' });
 
     const [sendingRow] = await tdb('wa_messages')
@@ -209,17 +221,22 @@ class WaHealthService {
 
     const [failedRow] = await tdb('wa_messages')
       .where({ delivery_status: 'failed' })
-      .where('created_at', '>=', new Date(Date.now() - FAILURE_WINDOW_MS))
+      .where('created_at', '>=', new Date(now.getTime() - FAILURE_WINDOW_MS))
       .count({ total: '*' });
 
+    // Only rows that are actually DUE. A NULL due time means due now, which is
+    // every row written before the column existed and every first attempt, so
+    // the NULL branch is not an edge case here — it is the common one.
     const oldest = await tdb('wa_messages')
       .where({ delivery_status: 'queued' })
+      .where((q) => q.whereNull('next_attempt_at').orWhere('next_attempt_at', '<=', now))
       .orderBy('created_at', 'asc')
       .select('created_at')
       .first();
 
     return {
       queued: asCount(queuedRow),
+      retrying: asCount(retryingRow),
       sending: asCount(sendingRow),
       failed24h: asCount(failedRow),
       oldestQueuedAt: asIso(oldest?.created_at)
@@ -326,16 +343,27 @@ class WaHealthService {
    * ─────────────────────────────────────────────────────────────────────────
    * PROVIDER SCOPING, WHICH THE DISK DOES NOT DO FOR US
    *
-   * Files live at `wa-media/<conversationId>/<file>`, and the path carries no
-   * provider. Two providers on one panel share that tree, so walking all of it
-   * would report the other provider's photos as this one's — not a leak of
-   * content, but a wrong number on the one screen whose whole job is to be
-   * believed.
+   * There are two shapes on disk and they are scoped by different means.
    *
-   * So the directory names, which ARE conversation ids, are filtered through
-   * `wa_conversations` — a primary-key lookup that `tdb` has already scoped —
-   * and only the surviving directories are walked. Chunked, because the id list
-   * is as long as the panel has threads with attachments.
+   * Everything written since wave 8 lives under `wa-media/t<id>/`, and there
+   * the path itself is the provider: the subtree is walked whole, with no
+   * lookup, because nothing else can have put a file in it.
+   *
+   * Everything written before it lives at `wa-media/<conversationId>/<file>`,
+   * where the path carries no provider at all. Two providers on one panel share
+   * that area, so walking it wholesale would report the neighbour's photos as
+   * this one's — not a leak of content, but a wrong number on the one screen
+   * whose whole job is to be believed. Those directory names ARE conversation
+   * ids, so they are filtered through `wa_conversations` — a primary-key lookup
+   * `tdb` has already scoped — and only the surviving ones are walked. Chunked,
+   * because the id list is as long as the panel has threads with attachments.
+   *
+   * The legacy area is read here even on a panel with several providers, which
+   * is the opposite of what the sweep does with it, and for a reason that only
+   * looks contradictory: this read counts and the sweep deletes. The ownership
+   * lookup is exact for a file that has a row, so counting is safe; a file with
+   * no row is counted by nobody here, while deleting it would need an answer to
+   * "whose was it?" that the path cannot give.
    */
   static async mediaUsage() {
     const tenantId = currentTenantId();
@@ -375,14 +403,20 @@ class WaHealthService {
    */
   static async scanMedia() {
     const root = path.join(DATA_DIR, MEDIA_DIR);
+    const tally = { files: 0, bytes: 0, oldestMs: Infinity };
+
+    // Ours by construction, so it is walked to the bottom: the outbound folder
+    // under it holds files the operator uploaded, which are as much of this
+    // provider's disk as the ones the customer sent.
+    await this.countTree(path.join(DATA_DIR, tenantMediaDir()), tally);
 
     let dirs;
     try {
       dirs = (await fsp.readdir(root, { withFileTypes: true }))
-        .filter((entry) => entry.isDirectory())
+        .filter((entry) => entry.isDirectory() && tenantIdFromDir(entry.name) === null)
         .map((entry) => entry.name);
     } catch {
-      return { files: 0, bytes: 0, oldestAt: null };
+      dirs = [];
     }
 
     // A directory name that is not a conversation id belongs to nobody, and is
@@ -399,40 +433,53 @@ class WaHealthService {
       for (const id of owned) mine.add(Number(id));
     }
 
-    let files = 0;
-    let bytes = 0;
-    let oldestMs = Infinity;
-
-    for (const id of mine) {
-      const dir = path.join(root, String(id));
-      let names;
-      try {
-        names = (await fsp.readdir(dir, { withFileTypes: true }))
-          .filter((entry) => entry.isFile())
-          .map((entry) => entry.name);
-      } catch {
-        continue;
-      }
-      for (const name of names) {
-        try {
-          const stats = await fsp.stat(path.join(dir, name));
-          files += 1;
-          bytes += stats.size;
-          // `mtime`, not `birthtime`: several filesystems do not record a
-          // creation time and hand back the epoch for it, which would report
-          // every attachment as older than the panel.
-          if (stats.mtimeMs < oldestMs) oldestMs = stats.mtimeMs;
-        } catch {
-          // Swept between the readdir and the stat. Not ours to mourn.
-        }
-      }
-    }
+    for (const id of mine) await this.countTree(path.join(root, String(id)), tally);
 
     return {
-      files,
-      bytes,
-      oldestAt: Number.isFinite(oldestMs) ? new Date(oldestMs).toISOString() : null
+      files: tally.files,
+      bytes: tally.bytes,
+      oldestAt: Number.isFinite(tally.oldestMs)
+        ? new Date(tally.oldestMs).toISOString()
+        : null
     };
+  }
+
+  /**
+   * Adds every regular file under `dir` to `tally`.
+   *
+   * Symlinks are skipped for the sweeper's reason, one step weaker: this only
+   * counts, so following one would not delete anything outside the tree — it
+   * would just charge a provider for bytes that are not theirs, or loop.
+   */
+  static async countTree(dir, tally) {
+    let entries;
+    try {
+      entries = await fsp.readdir(dir, { withFileTypes: true });
+    } catch {
+      // No media directory yet: a fresh install has none, and the rest of the
+      // health read must not be lost to that.
+      return;
+    }
+    for (const entry of entries) {
+      if (entry.isSymbolicLink()) continue;
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        await this.countTree(full, tally);
+        continue;
+      }
+      if (!entry.isFile()) continue;
+      try {
+        const stats = await fsp.stat(full);
+        tally.files += 1;
+        tally.bytes += stats.size;
+        // `mtime`, not `birthtime`: several filesystems do not record a
+        // creation time and hand back the epoch for it, which would report
+        // every attachment as older than the panel.
+        if (stats.mtimeMs < tally.oldestMs) tally.oldestMs = stats.mtimeMs;
+      } catch {
+        // Swept between the readdir and the stat. Not ours to mourn.
+      }
+    }
   }
 }
 

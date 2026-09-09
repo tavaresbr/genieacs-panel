@@ -1383,6 +1383,21 @@ const fr: Dictionary = {
   'whatsapp.error.invalidStatus': 'Une campagne ne peut pas passer à cet état depuis celui où elle est.',
   'whatsapp.error.rateLimited': 'Trop d’envois en peu de temps ; patientez un instant.',
   'whatsapp.error.scanFailed': 'L’analyse des alertes n’a pas pu aboutir.',
+  'settings.whatsapp.messageRetention': 'Conserver l’historique des conversations (jours)',
+  'settings.whatsapp.messageRetentionHint': '0 le conserve pour toujours, c’est la valeur par défaut. Passé ce délai, un message est définitivement supprimé du panneau. Un message dont la pièce jointe est encore sur le disque n’est jamais supprimé : pour qu’elle parte aussi, définissez également un délai pour les pièces jointes.',
+  'whatsapp.health.sweepDone': '{files} pièce(s) jointe(s) supprimée(s), {mb} Mo libérés',
+  'whatsapp.health.sweepNothing': 'Rien d’assez ancien à supprimer',
+  'whatsapp.health.sweepBusy': 'Un nettoyage est déjà en cours',
+  'whatsapp.health.sweepFailed': 'Le nettoyage n’a pas pu aboutir',
+  'whatsapp.inbox.resendFailedTitle': 'Échec de l’envoi',
+  'whatsapp.inbox.retryingIn': 'Nouvel essai {when}',
+  'whatsapp.inbox.attemptsSpent': 'Abandon après {count} tentatives',
+  'whatsapp.outbox.requeueAll': 'Renvoyer celles qui ont échoué',
+  'whatsapp.outbox.requeueAllConfirm': 'Remet dans la file tout message ayant échoué durant les {hours} dernières heures. Rien de déjà envoyé ne part deux fois.',
+  'whatsapp.outbox.requeueAllDone': '{count} message(s) de retour dans la file',
+  'whatsapp.outbox.requeueAllNone': 'Aucun message en échec à renvoyer',
+  'whatsapp.outbox.requeueFailed': 'Impossible de remettre les messages dans la file',
+  'whatsapp.health.retrying': 'dont {count} en attente d’une nouvelle tentative',
 }
 
 export default fr

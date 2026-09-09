@@ -79,6 +79,13 @@ const DEFAULT_CONFIG = Object.freeze({
   // after installs already had files: deleting a provider's history because
   // they upgraded would be the panel destroying data nobody asked it to touch.
   mediaRetentionDays: 0,
+  // How many days a message row is kept before the history sweeper deletes it.
+  //
+  // Zero means forever, same as above and for the same reason. This one is the
+  // heavier of the two: an attachment that goes leaves the words of the
+  // conversation behind, and this deletes the words. It is off unless an
+  // operator turns it on and can see the number they turned it on to.
+  messageRetentionDays: 0,
   managedUrl: '',
   updatedAt: null
 });
@@ -146,6 +153,7 @@ class WhatsAppConfigService {
         ? Math.min(Number(stored.rateLimitPerMin), 120)
         : DEFAULT_CONFIG.rateLimitPerMin,
       mediaRetentionDays: normalizeRetentionDays(stored.mediaRetentionDays),
+      messageRetentionDays: normalizeRetentionDays(stored.messageRetentionDays),
       managedUrl: normalizeEvoUrl(stored.managedUrl || ''),
       managedAdminKey: decryptSecret(adminKeyBox, stored.managedAdminKey),
       updatedAt: stored.updatedAt || null
@@ -193,6 +201,9 @@ class WhatsAppConfigService {
       mediaRetentionDays: patch.mediaRetentionDays === undefined
         ? current.mediaRetentionDays
         : normalizeRetentionDays(patch.mediaRetentionDays),
+      messageRetentionDays: patch.messageRetentionDays === undefined
+        ? current.messageRetentionDays
+        : normalizeRetentionDays(patch.messageRetentionDays),
       rateLimitPerMin: patch.rateLimitPerMin === undefined
         ? current.rateLimitPerMin
         : Math.min(Math.max(Number(patch.rateLimitPerMin) || DEFAULT_CONFIG.rateLimitPerMin, 1), 120),

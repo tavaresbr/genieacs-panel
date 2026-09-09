@@ -198,9 +198,38 @@ function clock(iso: string | null, intlLocale: string): string {
   }).format(date)
 }
 
+/**
+ * "in four minutes", in the operator's language.
+ *
+ * Relative and not a clock time because the fact being reported is a wait, and
+ * "19:42" makes the reader do the subtraction. It is computed at render and
+ * left alone: the thread reloads on its own 45 s timer, and a per-bubble
+ * countdown would be fifty timers running so that a number nobody is watching
+ * could tick.
+ */
+/** Whether the row is waiting out a backoff rather than having given up. */
+function waitingFor(iso: string | null): boolean {
+  if (!iso) return false
+  const due = Date.parse(iso)
+  return !Number.isNaN(due) && due > Date.now()
+}
+
+function relative(iso: string, intlLocale: string): string {
+  const ms = Date.parse(iso) - Date.now()
+  const format = new Intl.RelativeTimeFormat(intlLocale, { numeric: 'always' })
+  const minutes = Math.round(ms / 60_000)
+  if (Math.abs(minutes) < 1) return format.format(Math.round(ms / 1000), 'second')
+  if (Math.abs(minutes) < 60) return format.format(minutes, 'minute')
+  return format.format(Math.round(minutes / 60), 'hour')
+}
+
 interface MessageBubbleProps {
   message: WhatsAppMessage
-  /** Offered only for a failed outbound; the page re-queues the same text. */
+  /**
+   * Offered only for a failed outbound. It puts THIS row back in the queue —
+   * the id, the attachment and the place in the thread are kept — rather than
+   * posting the text again as a new message.
+   */
   onResend: (message: WhatsAppMessage) => void
   resending: boolean
 }
@@ -208,6 +237,13 @@ interface MessageBubbleProps {
 export function MessageBubble({ message, onResend, resending }: MessageBubbleProps) {
   const { t, intlLocale } = useTranslation()
   const stamp = clock(message.createdAt, intlLocale)
+
+  // A send that bounced is not over: it backs off and comes round again, and
+  // `nextAttemptAt` is the panel saying so. Without this line the bubble shows
+  // an untouched "queued" for minutes at a time and the operator resends by
+  // hand something that was always going to go out on its own.
+  const due = message.nextAttemptAt
+  const waiting = waitingFor(due)
 
   const attachment = message.attachment && <Attachment message={message} />
 
@@ -274,6 +310,15 @@ export function MessageBubble({ message, onResend, resending }: MessageBubblePro
               {t(DELIVERY_LABEL[message.deliveryStatus])}
             </span>
           )}
+          {waiting && (
+            <span
+              className="inline-flex items-center gap-1 text-[0.62rem] font-semibold text-muted-foreground"
+              title={clock(due, intlLocale)}
+            >
+              <Icon name="refresh" size={12} />
+              {t('whatsapp.inbox.retryingIn', { when: relative(due as string, intlLocale) })}
+            </span>
+          )}
         </div>
 
         {failed && (
@@ -286,6 +331,15 @@ export function MessageBubble({ message, onResend, resending }: MessageBubblePro
                 reason: truncateReason(message.deliveryError || t('common.unknown'))
               })}
             </p>
+            {/* The queue gave up, and how many times it tried before doing so
+                is what separates "the number is wrong" from "the server was
+                down for a minute". Only on a row that is actually finished:
+                while the backoff is still running, the line above says so. */}
+            {message.attempts > 0 && (
+              <p className="mt-1 text-[0.68rem] text-muted-foreground">
+                {t('whatsapp.inbox.attemptsSpent', { count: message.attempts })}
+              </p>
+            )}
             <button
               type="button"
               className="modern-button-secondary mt-2 min-h-9 px-3 py-1 text-xs"

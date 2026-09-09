@@ -1384,6 +1384,21 @@ const zhTW: Dictionary = {
   'whatsapp.error.noAccount': '沒有可用於傳送的已接入號碼。',
   'whatsapp.error.noDestination': '該聯絡人既沒有電話號碼也沒有 WhatsApp 識別碼。',
 
+  'settings.whatsapp.messageRetention': '對話記錄保留天數',
+  'settings.whatsapp.messageRetentionHint': '0 表示永久保留，這是預設值。超過該天數後，訊息會從面板中徹底刪除。附件仍在磁碟上的訊息永遠不會被刪除——若希望它也一併清除，請同時設定附件的保留天數。',
+  'whatsapp.health.sweepDone': '已刪除 {files} 個附件，釋放 {mb} MB',
+  'whatsapp.health.sweepNothing': '沒有足夠舊的內容可以刪除',
+  'whatsapp.health.sweepBusy': '已有一次清理正在進行',
+  'whatsapp.health.sweepFailed': '清理未能完成',
+  'whatsapp.inbox.resendFailedTitle': '傳送失敗',
+  'whatsapp.inbox.retryingIn': '將於 {when} 重試',
+  'whatsapp.inbox.attemptsSpent': '嘗試 {count} 次後放棄',
+  'whatsapp.outbox.requeueAll': '重新傳送失敗的訊息',
+  'whatsapp.outbox.requeueAllConfirm': '這會把最近 {hours} 小時內傳送失敗的訊息全部重新排入佇列。已傳送的不會重複傳送。',
+  'whatsapp.outbox.requeueAllDone': '已將 {count} 則訊息重新排入佇列',
+  'whatsapp.outbox.requeueAllNone': '沒有失敗的訊息需要重傳',
+  'whatsapp.outbox.requeueFailed': '無法將訊息重新排入佇列',
+  'whatsapp.health.retrying': '其中 {count} 則等待重試',
 }
 
 export default zhTW

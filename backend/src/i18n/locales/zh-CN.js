@@ -515,4 +515,7 @@ export default {
   'whatsapp.bot.invoicePix': 'PIX 复制粘贴码：{value}',
   'whatsapp.bot.invoiceLink': '账单副本：{value}',
   'whatsapp.bot.signalOkNoReading': '您的宽带在线。',
+  'whatsapp.messageRequeued': '消息已重新排队',
+  'whatsapp.messageNotRequeueable': '只有发送失败的消息才能重新发送。',
+  'whatsapp.messagesRequeued': '已将 {count} 条消息重新排队',
 };

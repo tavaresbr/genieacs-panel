@@ -14,6 +14,7 @@ function inform(deviceId, { softwareId = 'V1.0.0', pppoe = PPPOE } = {}) {
 }
 
 const ensure = (device) => asTenant(() => CustomerService.ensureAccount(device));
+const linkFor = (deviceId) => asTenant(() => SgpLink.getByDeviceId(deviceId));
 const swapsFor = (deviceId) => asTenant(() => DeviceSwap.listForDevice(deviceId));
 const openSwaps = () => asTenant(() => DeviceSwap.listOpen());
 
@@ -100,8 +101,8 @@ describe('the SGP link', () => {
 
     await ensure(inform('ont-new'));
 
-    assert.equal(await SgpLink.getByDeviceId('ont-old'), null);
-    const link = await SgpLink.getByDeviceId('ont-new');
+    assert.equal(await linkFor('ont-old'), null);
+    const link = await linkFor('ont-new');
     assert.equal(link.contract, '4242');
     // A delete-and-relookup would leave both of these gone, with nothing said.
     assert.equal(link.phone_manual, '+5511999990000');
@@ -119,8 +120,8 @@ describe('the SGP link', () => {
 
     await ensure(inform('ont-new'));
 
-    assert.equal(await SgpLink.getByDeviceId('ont-old'), null);
-    const link = await SgpLink.getByDeviceId('ont-new');
+    assert.equal(await linkFor('ont-old'), null);
+    const link = await linkFor('ont-new');
     assert.equal(link.phone_manual, '+5511999990000');
     const [swap] = await swapsFor('ont-new');
     assert.equal(swap.link_action, 'cleared');
@@ -143,7 +144,7 @@ describe('two ONTs trading one login', () => {
 
     // The replacement informs, and the link follows it.
     await ensure(inform('ont-new'));
-    assert.ok(await SgpLink.getByDeviceId('ont-new'));
+    assert.ok(await linkFor('ont-new'));
 
     // The old one is still powered on and informs a minute later. Following it
     // back would take the contract off the ONT that is actually in service.
@@ -152,8 +153,8 @@ describe('two ONTs trading one login', () => {
     const back = await asTenant(() => DeviceSwap.getPair('ont-new', 'ont-old'));
     assert.equal(back.link_action, 'held');
     assert.equal(Boolean(back.flapping), true);
-    assert.ok(await SgpLink.getByDeviceId('ont-new'), 'the link must stay where it was');
-    assert.equal(await SgpLink.getByDeviceId('ont-old'), null);
+    assert.ok(await linkFor('ont-new'), 'the link must stay where it was');
+    assert.equal(await linkFor('ont-old'), null);
   });
 
   it('flags both directions, so the pair reads as one story', async () => {

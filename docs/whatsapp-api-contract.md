@@ -1077,12 +1077,12 @@ Quatro escolhas que o contrato não fixava e que quem mexer nele precisa saber:
   no boot, de propósito; quem precisa de disco agora tem o botão.
 - **A varredura só anda `DATA_DIR/wa-media`**, nunca `DATA_DIR`. É a diferença
   entre recuperar disco e apagar o `panel.sqlite`, que mora um nível acima.
-- **Roda em `forSoleTenant`**, como a varredura de alertas, e aqui o motivo é o
-  disco: é um sistema de arquivos de que nenhum provedor tem um canto. Uma
-  passagem por provedor não dividiria o trabalho, veria os arquivos do outro
-  como órfãos sem linha e apagaria todos. Quando o segundo provedor entrar, o
-  conserto é dar a cada um sua subpasta de mídia, e só então o laço por
-  provedor.
+- ~~**Roda em `forSoleTenant`**~~ — **superado pela onda 8.** Rodava, porque o
+  disco era um sistema de arquivos de que nenhum provedor tinha um canto: uma
+  passagem por provedor veria os arquivos do outro como órfãos sem linha e
+  apagaria todos. O conserto que este parágrafo previa é o que a onda 8 fez —
+  cada provedor ganhou sua subárvore, e só então o laço por provedor. Ver a
+  seção da onda 8.
 
 ---
 
@@ -1193,3 +1193,211 @@ opera:
 
 Um modelo que cita `{{dias_para_vencer}}` é, por definição, um lembrete — é
 assim que o disparo sabe que pode incluir faturas a vencer.
+
+---
+
+## Onda 8 — um provedor por vez, de verdade
+
+As ondas 6 e 7 deixaram três dívidas escritas em comentário no próprio
+código. Esta onda paga as três, e as decisões abaixo estão **congeladas**:
+quem implementar não escolhe, implementa.
+
+### 1. `sgp_links` por provedor
+
+`sgp_links` é a tabela que transforma um `device_id` em assinante: contrato,
+documento, nome, plano e o telefone que o lado WhatsApp usa para resolver uma
+mensagem que chega. Era a última tabela do caminho do WhatsApp lida sem filtro
+de provedor — e, portanto, o último lugar onde o operador de um provedor podia
+digitar um número e receber o assinante de outro.
+
+- A migração `0019_sgp_links_tenant` já existe: adiciona `tenant_id`, faz o
+  backfill para o provedor do install, e troca o único global de `device_id`
+  pelo par `['tenant_id', 'device_id']`.
+- Todo acesso a `sgp_links` passa a ir por `tdb`. Nenhum `getDb()('sgp_links')`
+  sobrevive nesta onda.
+- `sgp_links` entra em `SCOPED_TABLES` **no mesmo commit** que converte os
+  modelos. Entrar antes deixa a tabela filtrada com escritas que não gravam
+  `tenant_id`; entrar depois deixa a conversão sem o teste que a prova.
+- O ponto sensível é `waConversationService.resolveSubscriber`: hoje ele lê a
+  tabela inteira. Depois desta onda, um número que existe em outro provedor
+  tem de resolver como **desconhecido**, não como assinante. Resolver telefone
+  continua sendo conveniência, nunca autenticação — a regra das ondas 2 e 3
+  não muda aqui, só deixa de vazar entre provedores.
+
+### 2. Subárvore de mídia por provedor
+
+Hoje tudo é escrito em `DATA_DIR/wa-media/<conversa>/`, sem provedor no
+caminho. É por isso que `waMediaSweeper.tick` usa `forSoleTenant` e se recusa
+a rodar assim que existe um segundo provedor: a varredura de um veria os
+arquivos do outro como órfãos e apagaria todos.
+
+- O novo caminho é `DATA_DIR/wa-media/t<tenant_id>/<conversa>/`.
+- Caminhos antigos (sem `t<id>/`) **continuam sendo servidos**. Uma linha
+  gravada antes desta onda aponta para onde o arquivo está, e o arquivo não se
+  move: migrar bytes no disco durante um upgrade é o tipo de coisa que falha na
+  metade. Escrita nova vai para a subárvore; leitura aceita as duas formas.
+- A varredura passa a rodar **por provedor**, e cada passagem enxerga só a sua
+  subárvore. A raiz `wa-media/` fora de qualquer `t<id>/` é a área legada: ela
+  é varrida na passagem do provedor único do install, como hoje, e é ignorada
+  quando existe mais de um provedor — órfão de origem desconhecida não se
+  apaga.
+- O ponto cego que a onda 7 registrou em comentário morre aqui: um provedor com
+  `tenants.status` diferente de `active` não é mais visitado pela varredura, e
+  seus arquivos moram numa subárvore que a varredura dos outros nem enxerga.
+- A confinagem não afrouxa: `path.resolve` contra `DATA_DIR`, `realpath` na
+  leitura, symlink nunca seguido, `wa-media` como teto. Uma subárvore a mais
+  não é permissão a mais.
+
+### 3. Retenção do histórico — `messageRetentionDays`
+
+`wa_messages` nunca perdia linha. Numa base que dispara campanha para milhares
+de contratos, ela só cresce.
+
+- `messageRetentionDays` já está em `whatsappConfigService`: 0 é para sempre e
+  é o padrão, mesmo `normalizeRetentionDays` da retenção de anexos.
+- A varredura de histórico **nunca apaga**:
+  - linha `queued` ou `sending` — é mensagem que ainda vai sair;
+  - linha que ainda tem `attachment_path` preenchido.
+- Essa segunda regra é o que amarra as duas retenções sem que um módulo apague
+  o arquivo do outro: quem apaga arquivo é `waMediaSweeper`, e ele limpa
+  `attachment_path` ao apagar. Só depois disso a linha fica elegível. Com
+  retenção de anexos desligada, mensagem com anexo fica para sempre — que é
+  exatamente o que "guardar os anexos para sempre" quer dizer.
+- A conversa (`wa_conversations`) **nunca** é apagada. Ela guarda o vínculo
+  telefone↔contato; apagá-la é perder de quem era a conversa, não economizar
+  disco.
+- Roda no mesmo laço de 6 h, por provedor, dentro de escopo — `wa_messages` é
+  tabela escopada, então aqui não há desculpa de `forSoleTenant`.
+- **`delivery_status` é NULL em toda mensagem que CHEGA.** A coluna descreve um
+  envio, e nada foi enviado. Um `whereNotIn('delivery_status', [...])` simples
+  compara contra NULL, resulta em NULL em vez de verdadeiro, e protege para
+  sempre a metade do cliente de toda conversa — uma varredura que parece
+  funcionar até alguém contar as linhas. O ramo `whereNull` explícito é o que
+  deixa uma mensagem recebida envelhecer.
+- Não existe rota de limpeza manual do histórico, ao contrário da mídia. O
+  botão da mídia existe para o disco cheio agora; crescimento de tabela não tem
+  essa urgência, e o laço de 6 h dá conta. Uma rota que apaga histórico sob
+  demanda seria superfície destrutiva a mais sem nada que a peça.
+
+### O botão manual não é o laço
+
+Com a varredura de mídia virando laço por provedor, `WaMediaSweeper.tick()`
+passa a andar o disco de **todos** os provedores ativos. Isso é certo para o
+temporizador, que não é requisição de ninguém, e errado para o botão: a
+requisição chega dentro do escopo de um provedor, e um admin de uma ISP não
+tem por que recuperar o disco de outra nem receber os megabytes dela como
+resposta.
+
+Por isso `POST /api/whatsapp/media/sweep` chama `sweepCurrentTenant()`, que
+varre só o escopo já aberto, pega a mesma trava de concorrência do laço (a
+trava é do *run*, não da passagem) e decide sozinho se a área legada entra —
+entra só quando há um provedor ativo, mesma regra do laço.
+
+Isto teria parecido correto por exatamente o tempo em que houvesse um provedor
+só.
+
+---
+
+## Onda 9 — a fila que sobrevive a um servidor que pisca
+
+Duas coisas achadas lendo o caminho quente da fila de saída, nenhuma delas
+anotada em comentário antes desta onda. As decisões abaixo estão **congeladas**.
+
+### O problema, medido
+
+`MAX_ATTEMPTS` é 3, o laço acorda a cada 5 s, e uma tentativa que falha devolve
+a linha para `queued` na hora. Ou seja: **três tentativas queimam em quinze
+segundos** e a linha vira `failed` para sempre. Um restart do servidor Evolution
+que leve vinte segundos falha permanentemente toda a fila — numa campanha de
+cobrança, milhares de mensagens de uma vez.
+
+E o "reenviar" da tela não reenvia: ele lê o `body` da linha e manda uma
+mensagem **nova**. A linha falhada fica lá, o assinante recebe duas, e uma
+mensagem cujo conteúdo era um anexo não reenvia de jeito nenhum — não há corpo
+para ler, e o botão não faz nada em silêncio.
+
+### 1. Recuo exponencial — `next_attempt_at`
+
+- A coluna já existe (migração `0020`), é anulável, e **NULL significa "pode
+  agora"**. É a única leitura que não trava a fila de um install ao atualizar.
+- `listSendable` e `claim` passam a respeitar a hora devida. O índice
+  `(delivery_status, next_attempt_at)` existe para essa consulta.
+- O recuo é exponencial com teto. O que importa não é a curva e sim a janela
+  total: ela tem de ser maior que um restart de servidor, medida em minutos, não
+  em segundos. `MAX_ATTEMPTS` sobe junto — três tentativas só faziam sentido
+  quando elas eram imediatas.
+- `provisioning_runs` já carrega `next_attempt_at` e o seu índice de vencimento.
+  É o padrão da casa; siga-o.
+
+### 2. Falha transitória não é falha permanente
+
+Queimar tentativas é certo para um servidor fora do ar e errado para um número
+que não existe. As duas têm de ser distinguidas:
+
+- **Transitória** — servidor inalcançável, timeout, 5xx, sessão desconectada.
+  Recua e tenta de novo.
+- **Permanente** — número inválido, destinatário que não existe no WhatsApp,
+  conteúdo recusado. Vira `failed` na primeira, sem gastar a janela.
+
+Na dúvida, **trate como transitória**. O custo de errar para o lado transitório
+é uma mensagem que sai alguns minutos depois; para o outro lado é uma cobrança
+que nunca chega e ninguém percebe.
+
+### 3. Reenviar é devolver a linha à fila, não criar outra
+
+`WaMessage.requeue(id)` é a superfície congelada:
+
+- Só linha `failed` é elegível, e quem diz isso é o `WHERE`, não o chamador.
+  Reenfileirar uma linha `sent` manda a mesma mensagem duas vezes ao assinante;
+  reenfileirar uma `queued` zera um recuo que está fazendo o seu trabalho.
+- Zera `attempts` e põe `next_attempt_at` em NULL — quem apertou decidiu que o
+  motivo da falha passou, e fazer o operador esperar um recuo calculado sobre
+  tentativas que não valem mais é o painel discutindo com ele.
+- A linha mantém id, anexo, `source` e lugar na conversa. O assinante vê uma
+  mensagem, não duas.
+
+Em lote (`POST /api/whatsapp/messages/requeue-failed`), a mesma regra por linha,
+dentro do escopo do provedor que pediu — pela mesma razão que o botão de
+limpeza da onda 8: a requisição chega no escopo de um provedor e não tem por que
+mexer na fila de outro.
+
+### 4. A saúde tem de saber a diferença
+
+Costura entre as duas metades, e que nenhuma das duas enxerga sozinha: uma
+mensagem que voltou a `queued` esperando o recuo **está** esperando para sair, e
+conta em `queued`. Mas não é a fila parada, e `oldestQueuedAt` reportando-a como
+a mais velha esperando transforma uma tentativa saudável num vermelho de "parada
+desde anteontem" na tela do operador — que é exatamente o alarme que existe para
+significar outra coisa.
+
+- `outbox.retrying` é essa fatia, contada à parte.
+- `oldestQueuedAt` considera só as linhas **vencidas**: `next_attempt_at` NULL
+  (que é "pode agora", e é o caso comum, não a exceção) ou já passada.
+- A tira mostra as três coisas na mesma linha, porque "40 esperando" sem idade
+  nenhuma, sem a contagem de retentativas ao lado, se lê como defeito do painel.
+
+### 5. A campanha também espera — mas não pelo motivo óbvio
+
+`wa_broadcast_recipients` tinha a mesma forma de bug: `MAX_ATTEMPTS` 3, laço de
+60 s, e falha devolvendo a linha direto para `pending`. Três tentativas em dois
+minutos e a campanha inteira terminava em `failed`.
+
+**A falha que chega ali não é o servidor fora do ar**, e vale ser exato porque é
+fácil errar essa frase: `WaBroadcastService.deliver` só **enfileira** — escreve
+em `wa_messages` e quem tem o transporte é a fila de saída. Um Evolution
+reiniciando é problema do item 1 desta seção e já é sobrevivido. O que cai
+naquele `catch` é `no_account` — campanha rodando sem número conectado —, um
+`no_public_url`, ou banco que engasgou. Configuração e infraestrutura: as coisas
+que um operador conserta nos dez minutos depois de começar o disparo e reparar.
+
+Dois minutos não dão esse tempo, e o preço de estourar é a campanha toda.
+
+- A curva e o classificador são **importados** de `waOutboxWorker` e
+  `waSendFailure`, não reescritos. Uma campanha que desistisse num cronograma
+  diferente do da fila que ela alimenta seria uma segunda política que ninguém
+  decidiu.
+- Migração `0021`, mesmas regras do `0020`: coluna anulável, NULL é "pode
+  agora", índice começando por `broadcast_id` porque é assim que
+  `listPendingIds` pergunta.
+- O ramo do `sending` velho **ignora** a hora devida de propósito: retomada de
+  claim travado é recuperação de queda, não espera que alguém agendou.

@@ -4,6 +4,51 @@ import { getDb, tdb, tinsertReturningId } from '../config/database.js';
 export const RECLAIM_MS = 5 * 60 * 1000;
 
 /**
+ * What the outbox may take, as one WHERE both the listing and the claim use.
+ *
+ * A queued row is only sendable once its backoff has run out. `next_attempt_at`
+ * NULL means due now, and it has to: the column arrived in migration 0018 with
+ * every existing row already written, so any other reading would strand an
+ * install's whole queue the moment it upgraded. The index behind this test is
+ * `(delivery_status, next_attempt_at)`, added by the same migration.
+ *
+ * The stale branch deliberately ignores the due time. A row stuck in 'sending'
+ * is a pass that died mid-send, not a backoff: retaking it after the cutoff is
+ * what makes a crash recoverable, and making that wait on a due time written by
+ * an earlier failure would leave the row untouchable for as long as the backoff
+ * had grown.
+ */
+function sendable(query, now) {
+  const cutoff = new Date(now.getTime() - RECLAIM_MS);
+  return query
+    .where((ready) => ready
+      .where({ delivery_status: 'queued' })
+      .where((due) => due.whereNull('next_attempt_at').orWhere('next_attempt_at', '<=', now)))
+    .orWhere((stale) => stale
+      .where({ delivery_status: 'sending' })
+      .where('claimed_at', '<', cutoff));
+}
+
+/**
+ * What putting a failed row back in the queue means, in one place.
+ *
+ * `attempts` to zero and `next_attempt_at` to NULL — due now. Whoever pressed
+ * the button decided the reason for the failure is over, and holding them to a
+ * backoff computed from attempts that no longer apply would be the panel
+ * arguing with the operator.
+ */
+function requeuePatch() {
+  return {
+    delivery_status: 'queued',
+    delivery_error: null,
+    claimed_at: null,
+    attempts: 0,
+    next_attempt_at: null,
+    updated_at: new Date()
+  };
+}
+
+/**
  * `wa_messages` is the outbox. There is no separate queue table: an outbound
  * message is a row whose `delivery_status` walks
  * queued → sending → sent → delivered → read, or → failed.
@@ -40,6 +85,62 @@ class WaMessage {
     return query;
   }
 
+  /**
+   * Puts a failed message back in the queue, as itself.
+   *
+   * The screen's old "resend" was not this: it read the row's `body` and sent a
+   * NEW message, which left the failed row sitting there and produced a second
+   * one — and it did nothing at all for a message whose content was an
+   * attachment, because there was no body to read. Requeuing the row keeps its
+   * attachment, its `source`, its place in the thread and its id, so a
+   * subscriber sees one message rather than a duplicate every time a send is
+   * retried.
+   *
+   * `attempts` goes back to zero and `next_attempt_at` to NULL, which means due
+   * now: an operator pressing this has decided the reason for the failure is
+   * over, and making them wait out a backoff computed from attempts that are no
+   * longer relevant would be the panel arguing with them.
+   *
+   * Only a `failed` row is eligible, and the WHERE says so rather than the
+   * caller: requeuing a `sent` row would send a subscriber the same message
+   * twice, and requeuing a `queued` one would reset a backoff that is doing its
+   * job. The affected-row count is the answer, so two operators pressing at
+   * once cannot both win.
+   *
+   * @returns {Promise<object|null>} the requeued row, or null when not eligible
+   */
+  static async requeue(id) {
+    const changed = await tdb('wa_messages')
+      .where({ id, delivery_status: 'failed' })
+      .update(requeuePatch());
+    return changed > 0 ? this.getById(id) : null;
+  }
+
+  /**
+   * The same thing, for every failure inside a window.
+   *
+   * One statement rather than a loop over `requeue`, because the case this
+   * exists for is a campaign whose thousands of recipients failed against a
+   * server that was restarting, and thousands of round trips is not a recovery.
+   *
+   * It lives here and not in the controller so that the patch and the
+   * `delivery_status: 'failed'` rule have ONE definition. Written out twice
+   * they agree only until somebody changes one — and the half that would have
+   * been forgotten is the one no test reaches through a screen.
+   *
+   * Scoped like everything else on this model: `tdb` puts the caller's provider
+   * in the WHERE, so an operator at one ISP cannot put another ISP's queue back
+   * on the wire.
+   *
+   * @returns {Promise<number>} how many rows went back to the queue
+   */
+  static async requeueFailedSince(since) {
+    return tdb('wa_messages')
+      .where({ delivery_status: 'failed' })
+      .where('created_at', '>=', since)
+      .update(requeuePatch());
+  }
+
   static async create(message) {
     const id = await tinsertReturningId('wa_messages', message);
     return this.getById(id);
@@ -54,15 +155,10 @@ class WaMessage {
 
   /** Ids the outbox worker should try next, oldest first. */
   static async listSendable(limit) {
-    const cutoff = new Date(Date.now() - RECLAIM_MS);
+    const now = new Date();
     return tdb('wa_messages')
       .whereNull('external_id')
-      .where((q) => {
-        q.where({ delivery_status: 'queued' })
-          // A pass that died mid-send leaves a row in 'sending' forever.
-          // Retaking it after the cutoff is what makes a crash recoverable.
-          .orWhere((stale) => stale.where({ delivery_status: 'sending' }).where('claimed_at', '<', cutoff));
-      })
+      .where((q) => sendable(q, now))
       .orderBy('created_at')
       .limit(limit)
       .pluck('id');
@@ -73,22 +169,21 @@ class WaMessage {
    *
    * This is a conditional UPDATE checked by affected-row count rather than
    * `SELECT ... FOR UPDATE SKIP LOCKED`, because SQLite has no such clause. The
-   * WHERE repeats the eligibility test so two concurrent passes cannot both
-   * win: whoever's UPDATE lands first changes the status, and the loser's UPDATE
-   * matches zero rows.
+   * WHERE repeats the eligibility test — the same `sendable` predicate the
+   * listing uses — so two concurrent passes cannot both win: whoever's UPDATE
+   * lands first changes the status, and the loser's UPDATE matches zero rows.
+   * Repeating the due time in it also means a row that came due between the
+   * listing and the claim is the only kind that can slip through, which is a
+   * message sent on time rather than one sent early.
    *
    * @returns {Promise<object|null>} the claimed row, or null when not claimable
    */
   static async claim(id) {
     const now = new Date();
-    const cutoff = new Date(now.getTime() - RECLAIM_MS);
     const changed = await tdb('wa_messages')
       .where({ id })
       .whereNull('external_id')
-      .where((q) => {
-        q.where({ delivery_status: 'queued' })
-          .orWhere((stale) => stale.where({ delivery_status: 'sending' }).where('claimed_at', '<', cutoff));
-      })
+      .where((q) => sendable(q, now))
       .update({
         delivery_status: 'sending',
         claimed_at: now,

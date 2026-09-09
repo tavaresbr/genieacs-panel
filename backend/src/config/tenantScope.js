@@ -25,6 +25,11 @@ export const SCOPED_TABLES = new Set([
   // subscriber's portal login. Across two it is account takeover, because the
   // same firmware and a same-named subscriber produce the same hash.
   'customer_accounts',
+  // The contract cadastre. It is what turns a device id into a subscriber, so
+  // it is also the table the WhatsApp side resolves an inbound phone number
+  // against: unfiltered, one provider's operator could type a number and be
+  // handed another provider's contract, name and document.
+  'sgp_links',
   // The WhatsApp inbox and its send queue. Scoping these is what lets the
   // outbox worker drain one provider at a time instead of the deployment.
   'wa_conversations',
@@ -48,7 +53,11 @@ export const SCOPED_TABLES = new Set([
   'device_samples',
   'device_sample_hours',
   // Which ONT replaced which, for one provider's subscriber.
-  'device_swaps'
+  'device_swaps',
+  // Where the operator's own plant is centred. A singleton keyed `id: 1`, so
+  // its WHERE never was an identity filter — it meant "the only row", and the
+  // second provider to save a map centre wrote over the first's.
+  'map_settings'
 ]);
 
 /** Tables that belong to the deployment rather than to any one provider. */

@@ -264,12 +264,15 @@ describe('the outbox worker despatches', () => {
     assert.equal(row.attempts, 1);
   });
 
-  it('records the failure, retries three times, and then stays failed', async () => {
+  it('records the failure and schedules the retry instead of burning it', async () => {
     await clearOutbox();
     const conversation = await newConversation();
     const { body } = await post(conversation.id, { body: 'vai falhar' });
     requests.length = 0;
-    stub.textStatus = 400;
+    // A server that is restarting — the failure the queue exists to survive,
+    // and one the panel cannot tell apart from a server that is gone for good.
+    stub.textStatus = 503;
+    stub.textBody = { message: 'servidor reiniciando' };
 
     try {
       await WaOutboxWorker.tick();
@@ -278,25 +281,21 @@ describe('the outbox worker despatches', () => {
       assert.equal(row.delivery_status, 'queued');
       assert.equal(row.attempts, 1);
       assert.match(row.delivery_error, /http_error/);
-      assert.match(row.delivery_error, /numero invalido/);
+      assert.match(row.delivery_error, /servidor reiniciando/);
+      assert.ok(row.next_attempt_at, 'the retry has a due time rather than happening at once');
 
+      // The pass five seconds from now must not spend a second attempt on it.
+      // That is the whole bug: three instant attempts turned a twenty-second
+      // restart into a permanently failed queue. The full window, and what
+      // happens at the end of it, are `whatsapp-outbox-backoff.test.js`.
       await WaOutboxWorker.tick();
+      assert.equal(sendTextCalls().length, 1);
       row = await asTenant(() => WaMessage.getById(body.data.id));
       assert.equal(row.delivery_status, 'queued');
-      assert.equal(row.attempts, 2);
-
-      await WaOutboxWorker.tick();
-      row = await asTenant(() => WaMessage.getById(body.data.id));
-      assert.equal(row.delivery_status, 'failed');
-      assert.equal(row.attempts, 3);
-      assert.equal(sendTextCalls().length, 3);
-
-      // A fourth pass must not pick it up again.
-      await WaOutboxWorker.tick();
-      assert.equal(sendTextCalls().length, 3);
-      assert.equal((await asTenant(() => WaMessage.getById(body.data.id))).attempts, 3);
+      assert.equal(row.attempts, 1);
     } finally {
       stub.textStatus = 200;
+      stub.textBody = null;
     }
   });
 

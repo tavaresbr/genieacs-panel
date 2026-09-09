@@ -4,17 +4,17 @@ import path from 'node:path';
 import express from 'express';
 import { DATA_DIR } from '../config/paths.js';
 import { WaError } from './whatsappConfigService.js';
-import { MEDIA_DIR, nomeSeguro } from './waMediaService.js';
+import { nomeSeguro, tenantMediaDir } from './waMediaService.js';
 
 /**
  * The file the OPERATOR sends, on its way in.
  *
  * The inbound half of this lives in `waMediaService`: bytes that arrive from
- * the Evolution server, written under `DATA_DIR/wa-media/<conversa>/`. This is
- * the other direction — a photo of the fibre path, the invoice as a PDF — and
- * it shares that module's two decisions on purpose: the path stored in the
- * database is relative to `DATA_DIR`, and the name that came from outside is
- * treated as text to display and never as a path to resolve.
+ * the Evolution server, written under `DATA_DIR/wa-media/t<id>/<conversa>/`.
+ * This is the other direction — a photo of the fibre path, the invoice as a
+ * PDF — and it shares that module's two decisions on purpose: the path stored
+ * in the database is relative to `DATA_DIR`, and the name that came from
+ * outside is treated as text to display and never as a path to resolve.
  *
  * What it does NOT share is the type list. `waMediaService` maps whatever the
  * customer's phone sent so the operator can at least see it; this side is an
@@ -46,8 +46,16 @@ export const ALLOWED_TYPES = Object.freeze({
   'audio/mpeg': '.mp3'
 });
 
-/** Subfolder of `MEDIA_DIR`, so inbound and outbound never collide. */
-export const OUT_DIR = path.posix.join(MEDIA_DIR, 'out');
+/**
+ * The provider's outbound subfolder, so inbound and outbound never collide.
+ *
+ * A function rather than a constant because the provider is now part of the
+ * path: `wa-media/t<id>/out`. Resolved per call, from the scope the request
+ * already opened, which is the only place the answer exists.
+ */
+export function outDir() {
+  return path.posix.join(tenantMediaDir(), 'out');
+}
 
 /** The path the raw-body parser is mounted on. Exported so `app.js` and the
  * router cannot drift apart: reserving the wrong path would hand a 12 MB photo
@@ -136,7 +144,7 @@ class WaAttachmentService {
     // this route has are bytes and a name, and neither may decide where the
     // bytes land. Two operators uploading `foto.jpg` in the same minute is the
     // ordinary case, not the exotic one.
-    const relative = path.posix.join(OUT_DIR, year, month, `${crypto.randomUUID()}${extension}`);
+    const relative = path.posix.join(outDir(), year, month, `${crypto.randomUUID()}${extension}`);
     const destination = path.join(DATA_DIR, relative);
 
     await fs.mkdir(path.dirname(destination), { recursive: true });

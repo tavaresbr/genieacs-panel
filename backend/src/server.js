@@ -11,6 +11,7 @@ import WaAlertService from './services/waAlertService.js';
 import DeviceHistoryService from './services/deviceHistoryService.js';
 import WaBroadcastService from './services/waBroadcastService.js';
 import WaMediaSweeper from './services/waMediaSweeper.js';
+import WaMessageSweeper from './services/waMessageSweeper.js';
 import { forEachTenant, forSoleTenant } from './config/tenantJobs.js';
 
 const PORT = Number(process.env.APP_PORT) || 5890;
@@ -116,6 +117,16 @@ export const startServer = async () => {
       // installation that never sets one. It deliberately does not sweep at
       // boot: an operator who needs disk now presses the button instead.
       WaMediaSweeper.start();
+      // The history sweep keeps the same six-hour clock as the attachment
+      // sweep above and for the same reasons, but it is a separate driver
+      // because it is a different kind of pass: that one walks a filesystem no
+      // provider owns and so runs once for the whole install, this one reads a
+      // provider-scoped table and so runs once per provider. It reads the
+      // retention window inside each tick and does nothing while that window is
+      // zero, which is the default, so arming it here changes nothing for an
+      // installation that never sets one. Like its neighbour it does not sweep
+      // at boot: a restart must not be a fresh chance to delete history.
+      WaMessageSweeper.start();
       console.log(`Panel: http://localhost:${PORT}`);
     });
     portalServer = portalApp.listen(PORTAL_PORT, PORTAL_HOST, () => {
@@ -140,6 +151,7 @@ async function shutdown(signal) {
   DeviceHistoryService.stop();
   WaBroadcastService.stop();
   WaMediaSweeper.stop();
+  WaMessageSweeper.stop();
   if (server) {
     await new Promise((resolve) => server.close(resolve));
   }

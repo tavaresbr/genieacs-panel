@@ -309,6 +309,59 @@ describe('oldestQueuedAt — the number that says the queue stopped moving', () 
     );
   });
 
+  /**
+   * The seam between the health strip and the outbox's backoff.
+   *
+   * A message that bounced goes back to 'queued' with a due time in the future.
+   * It IS waiting to go out, so it counts in `queued` — but it is not the queue
+   * standing still, and reporting it as the oldest waiting message would turn a
+   * healthy retry into a red "stuck since two days ago" on the operator's
+   * screen. `retrying` is the slice, and `oldestQueuedAt` skips it.
+   */
+  it('ignores a message that is waiting out a retry, and counts it separately', async () => {
+    const thread = await newConversation();
+
+    await seedMessage(thread.id, {
+      delivery_status: 'queued',
+      created_at: wholeSecond(Date.now() - 2 * DAY),
+      next_attempt_at: wholeSecond(Date.now() + 10 * MINUTE)
+    });
+
+    const { outbox } = await health();
+    assert.equal(outbox.queued, 1, 'it is still waiting to go out');
+    assert.equal(outbox.retrying, 1, 'and the reason it is waiting is a scheduled attempt');
+    assert.equal(outbox.oldestQueuedAt, null, 'so the queue has no stuck age at all');
+  });
+
+  /**
+   * NULL means due now, and it is the common case rather than an edge one:
+   * every first attempt and every row written before the column existed.
+   */
+  it('treats a null due time as due now', async () => {
+    const thread = await newConversation();
+    const waitingSince = wholeSecond(Date.now() - 3 * MINUTE);
+
+    await seedMessage(thread.id, {
+      delivery_status: 'queued',
+      created_at: waitingSince,
+      next_attempt_at: null
+    });
+    await seedMessage(thread.id, {
+      delivery_status: 'queued',
+      created_at: wholeSecond(Date.now() - 4 * DAY),
+      next_attempt_at: wholeSecond(Date.now() + MINUTE)
+    });
+
+    const { outbox } = await health();
+    assert.equal(outbox.queued, 2);
+    assert.equal(outbox.retrying, 1);
+    assert.equal(
+      new Date(outbox.oldestQueuedAt).getTime(),
+      waitingSince.getTime(),
+      'the oldest DUE one, not the oldest queued row'
+    );
+  });
+
   it('is null when nothing is waiting', async () => {
     const thread = await newConversation();
     await seedMessage(thread.id, { delivery_status: 'sent', external_id: 'EVO-CALM' });
@@ -560,7 +613,7 @@ describe('the route', () => {
       'accounts', 'inbox', 'lastInboundAt', 'lastOutboundAt', 'media', 'outbox'
     ]);
     assert.deepEqual(Object.keys(data.accounts).sort(), ['connected', 'disconnected', 'total']);
-    assert.deepEqual(Object.keys(data.outbox).sort(), ['failed24h', 'oldestQueuedAt', 'queued', 'sending']);
+    assert.deepEqual(Object.keys(data.outbox).sort(), ['failed24h', 'oldestQueuedAt', 'queued', 'retrying', 'sending']);
     assert.deepEqual(Object.keys(data.inbox).sort(), ['openConversations', 'unread']);
     assert.deepEqual(Object.keys(data.media).sort(), ['bytes', 'files', 'oldestAt']);
   });

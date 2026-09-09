@@ -88,6 +88,30 @@ const WA_MESSAGE_SOURCE_COLUMNS = [
   ['source', (t) => t.string('source', 16).notNullable().defaultTo('operator')]
 ];
 
+/**
+ * Shared by `wa_messages` and the 0020 upgrade.
+ *
+ * Three queries that already existed and had no index that fit them. See the
+ * 0018 step for what each one serves and why the index it had did not.
+ */
+const WA_MESSAGE_OUTBOX_INDEXES = [
+  ['conversation_id', 'id'],
+  ['tenant_id', 'created_at'],
+  ['delivery_status', 'next_attempt_at']
+];
+
+/**
+ * Shared by the 0023 upgrade.
+ *
+ * The runs' two existing indexes, re-fronted with `tenant_id`: a scoped query
+ * always carries the provider, so an index that does not lead with it is one
+ * the planner has to look past.
+ */
+const PROVISIONING_RUN_TENANT_INDEXES = [
+  [['tenant_id', 'device_id', 'status'], 'provisioning_runs_tenant_device_status_idx'],
+  [['tenant_id', 'status', 'next_attempt_at'], 'provisioning_runs_tenant_due_idx']
+];
+
 // Table definitions. Each is a factory so the builder can reach `db.fn.now()`,
 // and each is referenced by exactly one place per table so the initial schema
 // and the later upgrade steps can never drift apart.
@@ -475,6 +499,10 @@ const waMessagesTable = (db) => (t) => {
   t.index(['conversation_id', 'created_at']);
   // The outbox worker's only query.
   t.index(['delivery_status', 'created_at']);
+  // The three indexes of 0020 are NOT here. This factory runs in step 0001,
+  // where `tenant_id` (0012) and `next_attempt_at` (0020) do not exist yet, so
+  // indexing them would fail every fresh install. 0020 adds all three, and it
+  // runs on a fresh database too.
 };
 
 const waOptOutsTable = (db) => (t) => {
@@ -1256,6 +1284,358 @@ export const migrations = [
     },
     async up(db) {
       await createTableIfMissing(db, 'device_swaps', deviceSwapsTable(db));
+    }
+  },
+  {
+    /**
+     * The contract cadastre, per provider.
+     *
+     * `sgp_links` is what turns a device id into a subscriber: contract,
+     * document, name, plan, and the phone number the WhatsApp side resolves an
+     * inbound message against. Left deployment-wide it is the last place where
+     * one provider's operator can type a phone number and be handed another
+     * provider's subscriber — and, through the self-service bot, be read that
+     * subscriber's invoice without anyone having logged in anywhere.
+     *
+     * `device_id` was unique across the deployment, which was right while there
+     * was one GenieACS behind one panel. It becomes unique per provider here,
+     * for the same reason `customer_accounts` did in 0010: two providers
+     * reading one ACS see the same ids, and a deployment-wide unique would let
+     * whichever synced first own the row for good.
+     *
+     * The column is added here rather than in `sgpLinksTable` on purpose. That
+     * factory runs in step 0001, before `tenants` exists, so a foreign key
+     * written into it would fail every fresh install. `customer_accounts`
+     * carries its `tenant_id` the same way and for the same reason.
+     */
+    id: '0019_sgp_links_tenant',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return false;
+      if (!(await db.schema.hasTable('sgp_links'))) return false;
+      return db.schema.hasColumn('sgp_links', 'tenant_id');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('sgp_links'))) return;
+      if (await db.schema.hasColumn('sgp_links', 'tenant_id')) return;
+
+      // 0010 created the provider row; this only reads it. If it is somehow
+      // missing there is nothing to backfill to, and the step stops rather than
+      // inventing a second provider nobody asked for.
+      const tenant = await db('tenants').orderBy('id', 'asc').first();
+      if (!tenant) return;
+
+      // Nullable first: the table already has rows and the schema alone has no
+      // sensible default to give them.
+      await db.schema.alterTable('sgp_links', (t) => {
+        t.integer('tenant_id').unsigned();
+      });
+      await db('sgp_links').whereNull('tenant_id').update({ tenant_id: tenant.id });
+
+      // One rebuild on SQLite rather than several: tighten the column, point it
+      // at `tenants`, and move the device unique to be per-provider. The
+      // default is this install's own provider, so every insert written before
+      // the scoping work lands still produces a correct row.
+      await db.schema.alterTable('sgp_links', (t) => {
+        t.integer('tenant_id').unsigned().notNullable().defaultTo(tenant.id).alter();
+        t.foreign('tenant_id').references('id').inTable('tenants');
+        t.dropUnique(['device_id']);
+        t.unique(['tenant_id', 'device_id']);
+      });
+    }
+  },
+  {
+    /**
+     * What the outbox needs to survive an Evolution server that blinks, and
+     * what the two sweeps and the thread reader need to stay fast on the
+     * installation they were written for.
+     *
+     * `next_attempt_at` is the important one. Without it a failed send goes
+     * straight back to `queued` and the worker, which wakes every five seconds,
+     * picks it up again immediately: three attempts burn in fifteen seconds and
+     * the row is `failed` for good. An Evolution restart that takes twenty
+     * seconds therefore fails every message in the queue permanently — during a
+     * dunning campaign, thousands of them. `provisioning_runs` already carries
+     * this column and its due index; this is the same pattern, in the place
+     * that needed it more.
+     *
+     * The three indexes are queries that already exist and have no index that
+     * fits them:
+     *
+     * - `(conversation_id, id)` — the thread reader pages by `id` (keyset,
+     *   since the attachments wave) while the only index orders by
+     *   `created_at`, so opening a busy thread filters by index and then sorts.
+     * - `(tenant_id, created_at)` — the history sweep reads a provider's oldest
+     *   rows. The existing `(delivery_status, created_at)` cannot serve it: the
+     *   sweep's test on that column is `IS NULL OR NOT IN (...)`, which no
+     *   engine seeks on.
+     * - `(delivery_status, next_attempt_at)` — the outbox's own query, once it
+     *   has a due time to respect.
+     *
+     * Indexes are attempted one at a time and a duplicate is swallowed, like
+     * 0016: there is no portable way to ask whether an index exists, and
+     * guessing would be dishonest.
+     */
+    id: '0020_wa_outbox_backoff_and_indexes',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('wa_messages'))) return false;
+      return db.schema.hasColumn('wa_messages', 'next_attempt_at');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('wa_messages'))) return;
+
+      if (!(await db.schema.hasColumn('wa_messages', 'next_attempt_at'))) {
+        await db.schema.alterTable('wa_messages', (t) => {
+          // Nullable, and NULL means "due now". Rows written before this
+          // column existed are due, which is the only reading that does not
+          // strand a queue on upgrade.
+          t.timestamp('next_attempt_at');
+        });
+      }
+
+      for (const columns of WA_MESSAGE_OUTBOX_INDEXES) {
+        // eslint-disable-next-line no-await-in-loop -- DDL, and three of them
+        await db.schema.alterTable('wa_messages', (t) => t.index(columns)).catch(() => {});
+      }
+    }
+  },
+  {
+    /**
+     * The campaign queue, given the same patience the outbox got in 0020.
+     *
+     * `waBroadcastService.deliver` has the same shape of bug 0020 fixed one
+     * table over: `MAX_ATTEMPTS` is 3, a failed recipient goes straight back to
+     * 'pending', and the flush loop wakes every 60 s — so three attempts burn
+     * in about two minutes and the row is 'failed' for good.
+     *
+     * The failure it actually meets is NOT an Evolution server that is down.
+     * `deliver` only ENQUEUES: it writes a row to `wa_messages` and the outbox
+     * owns the transport, so a server restart is 0018's problem and is already
+     * survived. What reaches this catch is `no_account` — no number connected —
+     * a `no_public_url`, or a database that hiccupped. Those are configuration
+     * and infrastructure, which is precisely the kind of thing an operator
+     * fixes in the ten minutes after starting a campaign and noticing.
+     *
+     * Two minutes is not enough time for that, and the cost of running out is
+     * the whole campaign: every recipient in flight ends `failed`, and the
+     * operator's only recovery is the bulk requeue on the messages that were
+     * never created.
+     *
+     * Nullable, and NULL means due now, exactly as in 0020: every row written
+     * before this column existed is due, which is the only reading that does
+     * not strand a campaign that was already in flight during the upgrade.
+     *
+     * The index fronts `broadcast_id` because that is how `listPendingIds`
+     * asks — one campaign at a time, never the table.
+     */
+    id: '0021_wa_broadcast_recipient_backoff',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('wa_broadcast_recipients'))) return false;
+      return db.schema.hasColumn('wa_broadcast_recipients', 'next_attempt_at');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('wa_broadcast_recipients'))) return;
+
+      if (!(await db.schema.hasColumn('wa_broadcast_recipients', 'next_attempt_at'))) {
+        await db.schema.alterTable('wa_broadcast_recipients', (t) => {
+          t.timestamp('next_attempt_at');
+        });
+      }
+
+      await db.schema
+        .alterTable('wa_broadcast_recipients', (t) => t.index(['broadcast_id', 'status', 'next_attempt_at']))
+        .catch(() => {});
+    }
+  },
+  {
+    /**
+     * The installation dates, per provider — and the one table standing between
+     * the Customer ID sweep and a per-provider loop.
+     *
+     * `server.js` runs that sweep under `forSoleTenant`, and its comment names
+     * two blockers. One of them, `sgp_links`, stopped being true in 0019. This
+     * is the other: `CustomerService.ensureAccount` reads
+     * `DeviceProfile.getByDeviceId` when the Customer ID is derived from an
+     * installation date, and that read was deployment-wide — so with two
+     * providers it could mint provider B's identifier out of provider A's date.
+     *
+     * `device_id` UNIQUE is the same failure `sgp_links` had before 0019: two
+     * providers reading their own GenieACS see the same ids, and the write path
+     * decides insert-vs-update from that read, so the second provider would
+     * never get a row of its own — it would keep overwriting the first's.
+     */
+    id: '0022_device_profiles_tenant',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return false;
+      if (!(await db.schema.hasTable('device_profiles'))) return false;
+      return db.schema.hasColumn('device_profiles', 'tenant_id');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('device_profiles'))) return;
+      if (await db.schema.hasColumn('device_profiles', 'tenant_id')) return;
+      const tenant = await db('tenants').orderBy('id', 'asc').first();
+      if (!tenant) return;
+
+      await db.schema.alterTable('device_profiles', (t) => t.integer('tenant_id').unsigned());
+      await db('device_profiles').whereNull('tenant_id').update({ tenant_id: tenant.id });
+      await db.schema.alterTable('device_profiles', (t) => {
+        t.integer('tenant_id').unsigned().notNullable().defaultTo(tenant.id).alter();
+        t.foreign('tenant_id').references('id').inTable('tenants');
+        t.dropUnique(['device_id']);
+        t.unique(['tenant_id', 'device_id']);
+      });
+    }
+  },
+  {
+    /**
+     * Provisioning, per provider — the profiles and the runs together.
+     *
+     * They move in one step because `provisioning_runs.profile_id` points at
+     * `provisioning_profiles.id`: converting one alone would leave a foreign
+     * key that can reach across providers, which is the shape of leak the
+     * `mapping_edges` work in 0011 went out of its way to avoid.
+     *
+     * The profiles hold two AES-GCM secrets (the WiFi and CPE passwords an
+     * activation writes), and their `name` is UNIQUE deployment-wide — two ISPs
+     * both calling a profile "Padrão" is the expected case, not the exotic one.
+     *
+     * The runs are the sharper half. `ProvisioningRun.reapInterrupted` and
+     * `pruneOlderThan` carry NO identity column in their WHERE at all: the
+     * first fails every 'running' row older than a cutoff, the second deletes
+     * every settled row older than one. Run per provider as they are, each pass
+     * would do that to every other provider's history — which is why
+     * `schedulerService` still refuses to loop.
+     *
+     * Both indexes are re-fronted with `tenant_id`: a scoped query always
+     * carries it, so an index that does not lead with it is an index the
+     * planner has to look past.
+     */
+    id: '0023_provisioning_tenant',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return false;
+      for (const table of ['provisioning_profiles', 'provisioning_runs']) {
+        // eslint-disable-next-line no-await-in-loop -- two schema probes
+        if (!(await db.schema.hasTable(table))) return false;
+        // eslint-disable-next-line no-await-in-loop -- two schema probes
+        if (!(await db.schema.hasColumn(table, 'tenant_id'))) return false;
+      }
+      return true;
+    },
+    async up(db) {
+      const tenant = await db('tenants').orderBy('id', 'asc').first();
+      if (!tenant) return;
+
+      if (await db.schema.hasTable('provisioning_profiles')
+        && !(await db.schema.hasColumn('provisioning_profiles', 'tenant_id'))) {
+        await db.schema.alterTable('provisioning_profiles', (t) => t.integer('tenant_id').unsigned());
+        await db('provisioning_profiles').whereNull('tenant_id').update({ tenant_id: tenant.id });
+        await db.schema.alterTable('provisioning_profiles', (t) => {
+          t.integer('tenant_id').unsigned().notNullable().defaultTo(tenant.id).alter();
+          t.foreign('tenant_id').references('id').inTable('tenants');
+          t.dropUnique(['name']);
+          t.unique(['tenant_id', 'name']);
+        });
+      }
+
+      if (await db.schema.hasTable('provisioning_runs')
+        && !(await db.schema.hasColumn('provisioning_runs', 'tenant_id'))) {
+        await db.schema.alterTable('provisioning_runs', (t) => t.integer('tenant_id').unsigned());
+        await db('provisioning_runs').whereNull('tenant_id').update({ tenant_id: tenant.id });
+        await db.schema.alterTable('provisioning_runs', (t) => {
+          t.integer('tenant_id').unsigned().notNullable().defaultTo(tenant.id).alter();
+          t.foreign('tenant_id').references('id').inTable('tenants');
+        });
+        for (const [columns, name] of PROVISIONING_RUN_TENANT_INDEXES) {
+          // eslint-disable-next-line no-await-in-loop -- DDL, and two of them
+          await db.schema.alterTable('provisioning_runs', (t) => t.index(columns, name)).catch(() => {});
+        }
+      }
+    }
+  },
+  {
+    /**
+     * The ERP event log, per provider — and the silent-drop it was hiding.
+     *
+     * `sgp_events` is the PII-heaviest table the panel has: contract, document
+     * (CPF/CNPJ), login, device id and a redacted payload, one row per webhook
+     * or reconciliation event from one ISP's SGP.
+     *
+     * `dedupe_key` UNIQUE deployment-wide is worse than a collision error.
+     * `sgpEventService` builds it as `webhook:sha256(eventId)`, and SGP event
+     * ids are per-ERP sequential numbers — so provider B's event #12345 hashes
+     * to exactly what provider A's did. `SgpEvent.insertIfNew` reads that as a
+     * redelivery and answers 200 duplicate: the second provider's event
+     * disappears, with no error anywhere and nothing to notice.
+     *
+     * `pruneOlderThan` is the destructive one, with no identity column in its
+     * WHERE — it deletes every provider's settled history.
+     *
+     * NOTE, and it is not fixed by this column: the webhook that feeds this
+     * table is unauthenticated and mounted under the resolver, which always
+     * answers with the FIRST provider, so the HMAC can only ever be checked
+     * against provider #1's secret. Scoping the table without giving the
+     * request a way to name its provider moves the failure rather than ending
+     * it. That is the code half of this slice, not the schema half.
+     */
+    id: '0024_sgp_events_tenant',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return false;
+      if (!(await db.schema.hasTable('sgp_events'))) return false;
+      return db.schema.hasColumn('sgp_events', 'tenant_id');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('sgp_events'))) return;
+      if (await db.schema.hasColumn('sgp_events', 'tenant_id')) return;
+      const tenant = await db('tenants').orderBy('id', 'asc').first();
+      if (!tenant) return;
+
+      await db.schema.alterTable('sgp_events', (t) => t.integer('tenant_id').unsigned());
+      await db('sgp_events').whereNull('tenant_id').update({ tenant_id: tenant.id });
+      await db.schema.alterTable('sgp_events', (t) => {
+        t.integer('tenant_id').unsigned().notNullable().defaultTo(tenant.id).alter();
+        t.foreign('tenant_id').references('id').inTable('tenants');
+        t.dropUnique(['dedupe_key']);
+        t.unique(['tenant_id', 'dedupe_key']);
+      });
+    }
+  },
+  {
+    /**
+     * The map, per provider. The only one of these that needs a PRIMARY KEY.
+     *
+     * `map_settings` is a singleton keyed `id: 1`, so `where({ id: 1 })` was
+     * never an identity filter — it means "the only row". Provider B saving its
+     * map centre overwrote provider A's, and `reset()` put the deployment's one
+     * row back to defaults for everybody. There is nothing per-provider about
+     * a latitude: it is literally where one ISP's city is.
+     *
+     * This is the `0015` shape, not the `0019` one: the key becomes
+     * `(tenant_id, id)` so each provider keeps its own row 1, and `tdb` adds
+     * the provider to the WHERE that the model already writes.
+     *
+     * Deliberately NOT retyping or re-declaring `id` while changing the key —
+     * knex emits `drop not null` before a retype and Postgres refuses that on a
+     * column still in a primary key. 0015 documents the same trap.
+     */
+    id: '0025_map_settings_tenant',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return false;
+      if (!(await db.schema.hasTable('map_settings'))) return false;
+      return db.schema.hasColumn('map_settings', 'tenant_id');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('map_settings'))) return;
+      if (await db.schema.hasColumn('map_settings', 'tenant_id')) return;
+      const tenant = await db('tenants').orderBy('id', 'asc').first();
+      if (!tenant) return;
+
+      await db.schema.alterTable('map_settings', (t) => t.integer('tenant_id').unsigned());
+      await db('map_settings').whereNull('tenant_id').update({ tenant_id: tenant.id });
+      await db.schema.alterTable('map_settings', (t) => {
+        t.integer('tenant_id').unsigned().notNullable().defaultTo(tenant.id).alter();
+        t.dropPrimary();
+        t.primary(['tenant_id', 'id']);
+        t.foreign('tenant_id').references('id').inTable('tenants');
+      });
     }
   }
 ];

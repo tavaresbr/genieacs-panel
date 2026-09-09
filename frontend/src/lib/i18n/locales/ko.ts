@@ -1390,6 +1390,21 @@ const ko: Dictionary = {
   'whatsapp.error.noAccount': '발신할 수 있는 연결된 번호가 없습니다.',
   'whatsapp.error.noDestination': '이 연락처에는 전화번호나 WhatsApp 식별자가 없습니다.',
 
+  'settings.whatsapp.messageRetention': '대화 기록 보관 기간(일)',
+  'settings.whatsapp.messageRetentionHint': '0은 영구 보관이며 기본값입니다. 이 기간이 지나면 메시지는 패널에서 완전히 삭제됩니다. 첨부파일이 아직 디스크에 있는 메시지는 삭제되지 않습니다. 그것도 함께 지우려면 첨부파일 보관 기간도 설정하세요.',
+  'whatsapp.health.sweepDone': '첨부파일 {files}개를 삭제하여 {mb} MB를 확보했습니다',
+  'whatsapp.health.sweepNothing': '삭제할 만큼 오래된 것이 없습니다',
+  'whatsapp.health.sweepBusy': '이미 정리가 진행 중입니다',
+  'whatsapp.health.sweepFailed': '정리를 완료하지 못했습니다',
+  'whatsapp.inbox.resendFailedTitle': '전송 실패',
+  'whatsapp.inbox.retryingIn': '{when}에 다시 시도합니다',
+  'whatsapp.inbox.attemptsSpent': '{count}회 시도 후 중단했습니다',
+  'whatsapp.outbox.requeueAll': '실패한 것 다시 보내기',
+  'whatsapp.outbox.requeueAllConfirm': '최근 {hours}시간 동안 실패한 메시지를 모두 전송 대기열로 되돌립니다. 이미 보낸 메시지가 두 번 가지는 않습니다.',
+  'whatsapp.outbox.requeueAllDone': '메시지 {count}건을 대기열로 되돌렸습니다',
+  'whatsapp.outbox.requeueAllNone': '다시 보낼 실패 메시지가 없습니다',
+  'whatsapp.outbox.requeueFailed': '메시지를 대기열로 되돌리지 못했습니다',
+  'whatsapp.health.retrying': '그중 {count}건은 재시도 대기 중',
 }
 
 export default ko

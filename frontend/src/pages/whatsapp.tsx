@@ -19,6 +19,7 @@ import { TemplatesPanel } from '@/components/whatsapp/templates-panel'
 import { OptOutPanel } from '@/components/whatsapp/opt-out-panel'
 import { AlertsPanel } from '@/components/whatsapp/alerts-panel'
 import { HealthStrip } from '@/components/whatsapp/health-strip'
+import { useAuth } from '@/contexts/auth-context'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Polling
@@ -421,20 +422,45 @@ function InboxTab() {
   }, [submit])
 
   /**
-   * A failed message is out of the worker's reach for good — three attempts
-   * spent, `failed` is terminal. Resending queues the same words as a new row
-   * rather than resurrecting the old one, which keeps the record of what did
-   * not go out intact. A note is never offered this: it was never going out.
+   * Puts a failed message back in the queue — the SAME row, not a copy.
+   *
+   * This used to read `message.body` and call `submit`, which posted a new
+   * message: the failed row stayed on screen, the subscriber got the same
+   * notice twice, and a message whose content was an attachment could not be
+   * resent at all, because there was no body to read and the button returned
+   * without a word. `requeueMessage` moves the row itself back to `queued`, so
+   * the id, the file and the place in the thread survive.
+   *
+   * The row is replaced where it stands rather than prepended: it is the same
+   * message, and moving it to the foot of the thread would misdate it.
    */
   const resend = useCallback(async (message: WhatsAppMessage) => {
-    if (!message.body) return
     setResendingId(message.id)
     try {
-      await submit(message.body, false)
+      const res = await whatsappAPI.requeueMessage(message.id)
+      if (!alive.current) return
+      if (!res.success || !res.data) {
+        // The route's `message` and not only its `code`: unlike a send, whose
+        // text can be the Evolution server's own words, every refusal here is
+        // the panel's own sentence, already translated by `req.t`. "Only a
+        // message that failed can be sent again" is worth more to the operator
+        // who just lost a race with a colleague than "the request failed".
+        toast.error(
+          res.message || whatsappErrorMessage(t, res.code),
+          { title: t('whatsapp.inbox.resendFailedTitle') }
+        )
+        return
+      }
+      const requeued = res.data
+      setMessages((rows) => rows.map((row) => (row.id === requeued.id ? requeued : row)))
+    } catch {
+      if (alive.current) {
+        toast.error(t('api.requestFailed'), { title: t('whatsapp.inbox.resendFailedTitle') })
+      }
     } finally {
       if (alive.current) setResendingId(null)
     }
-  }, [submit])
+  }, [t, toast])
 
   const unreadTotal = conversations.reduce((sum, row) => sum + row.unreadCount, 0)
 
@@ -549,6 +575,164 @@ function InboxTab() {
   )
 }
 
+/**
+ * "Delete the old attachments now", under the health strip.
+ *
+ * `POST /whatsapp/media/sweep` has existed since the attachment retention
+ * landed and had no screen: the policy was set in Settings and then applied
+ * only by a six-hour timer, so an operator whose disk was full today had
+ * nothing to press. This is that button, and it takes no parameters — the
+ * window and the rules come from the saved settings, so pressing it can never
+ * remove more than the settings screen already says it will.
+ *
+ * It sits BESIDE the strip rather than inside it. The strip is a poll surface
+ * that refreshes itself every sixty seconds and renders nothing at all while
+ * it is loading or failing; a destructive action that disappears under the
+ * operator's cursor when a poll fails is not a button. Keeping it out here also
+ * keeps the strip's own rule intact: that component only ever counts.
+ *
+ * Admin-only, because the route is. A viewer who could press it would get a
+ * 403 and no way to tell that from the sweep having failed.
+ *
+ * The whole point of the reporting below is `skipped`. "0 files" is a real and
+ * common answer with at least four different causes, and an operator staring
+ * at a full disk reads an unexplained zero as a broken button — so retention
+ * being off, a pass already running, a failure, and genuinely nothing old
+ * enough each get their own sentence.
+ */
+function MediaSweepButton() {
+  const { t } = useTranslation()
+  const { user } = useAuth()
+  const toast = useToast()
+  const [sweeping, setSweeping] = useState(false)
+
+  if (user?.role !== 'admin') return null
+
+  const sweep = async () => {
+    setSweeping(true)
+    try {
+      const res = await whatsappAPI.sweepMedia()
+      if (!res.success || !res.data) {
+        toast.error(t('whatsapp.health.sweepFailed'))
+        return
+      }
+      const { skipped, files, mb } = res.data
+      // Retention off is the one answer that is not a failure and not a
+      // no-op worth apologising for: it is the configured state, and the
+      // message says where to change it.
+      if (skipped === 'disabled') {
+        toast.info(t('whatsapp.health.sweepOff'))
+        return
+      }
+      if (skipped === 'busy') {
+        toast.info(t('whatsapp.health.sweepBusy'))
+        return
+      }
+      // `failed`, `no_provider` and `unscoped` are three different bugs and one
+      // operator sentence. None of them is something the person at the panel
+      // can act on differently, and the server log already tells them apart for
+      // whoever can.
+      if (skipped) {
+        toast.error(t('whatsapp.health.sweepFailed'))
+        return
+      }
+      if (!files) {
+        toast.info(t('whatsapp.health.sweepNothing'))
+        return
+      }
+      toast.success(t('whatsapp.health.sweepDone', { files, mb }))
+    } catch {
+      toast.error(t('whatsapp.health.sweepFailed'))
+    } finally {
+      setSweeping(false)
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      className="modern-button-secondary"
+      disabled={sweeping}
+      onClick={() => void sweep()}
+    >
+      <Icon name="trash" size={17} />
+      {t('whatsapp.health.sweepNow')}
+    </button>
+  )
+}
+
+/**
+ * The window the bulk requeue asks for, and the one the route will give.
+ *
+ * The backend clamps `hours` to the same twenty-four, so this number is not a
+ * limit the screen enforces — it is the number the confirmation must not lie
+ * about. It is also the window the health strip counts as `failed24h`, which is
+ * the figure the operator is looking at when they reach for this button.
+ */
+const REQUEUE_WINDOW_HOURS = 24
+
+/**
+ * "Send the failed ones again", beside the sweep and under the health strip.
+ *
+ * This is where the button belongs because this is where the failure is
+ * reported: the strip above says `failed24h: 3200` after an Evolution restart
+ * ate a dunning run, and the answer to that number has to be within reach of
+ * it. Inside the inbox tab it would be a per-thread action, which is what the
+ * bubble's own resend already is; the campaign case never has a thread open.
+ *
+ * It is NOT destructive and still asks first, because it is bulk: an operator
+ * has to be told how wide the window is before three thousand messages go back
+ * on the wire. What it cannot do is duplicate anything — the route requeues the
+ * rows themselves, and only rows that failed — and the confirmation says so.
+ *
+ * Admin-only, because the route is. A viewer who could press it would get a 403
+ * with no way to tell that from a queue that refused to move.
+ */
+function RequeueFailedButton() {
+  const { t } = useTranslation()
+  const { user } = useAuth()
+  const toast = useToast()
+  const [requeuing, setRequeuing] = useState(false)
+
+  if (user?.role !== 'admin') return null
+
+  const requeueAll = async () => {
+    if (!window.confirm(t('whatsapp.outbox.requeueAllConfirm', { hours: REQUEUE_WINDOW_HOURS }))) return
+    setRequeuing(true)
+    try {
+      const res = await whatsappAPI.requeueFailed(REQUEUE_WINDOW_HOURS)
+      if (!res.success || !res.data) {
+        toast.error(t('whatsapp.outbox.requeueFailed'))
+        return
+      }
+      // Zero is a real answer with its own sentence. "Nothing failed in the
+      // last day" and "the button is broken" look identical otherwise, and the
+      // operator pressing this has just watched a campaign fall over.
+      if (!res.data.requeued) {
+        toast.info(t('whatsapp.outbox.requeueAllNone'))
+        return
+      }
+      toast.success(t('whatsapp.outbox.requeueAllDone', { count: res.data.requeued }))
+    } catch {
+      toast.error(t('whatsapp.outbox.requeueFailed'))
+    } finally {
+      setRequeuing(false)
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      className="modern-button-secondary"
+      disabled={requeuing}
+      onClick={() => void requeueAll()}
+    >
+      <Icon name="refresh" size={17} className={requeuing ? 'animate-spin' : ''} />
+      {t('whatsapp.outbox.requeueAll')}
+    </button>
+  )
+}
+
 /** The tabs, in the order an operator meets them. */
 const TABS = [
   ['inbox', 'whatsapp.inbox.title'],
@@ -597,6 +781,12 @@ export default function WhatsAppPage() {
           somebody opened Campaigns.
         */}
         <HealthStrip />
+        {/* One row of actions on the strip's own figures, in the order the
+            numbers above them read: the failed count first, the disk second. */}
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <RequeueFailedButton />
+          <MediaSweepButton />
+        </div>
 
         <div className="tab-rail" role="tablist" aria-label={t('sidebar.nav.whatsapp')}>
           {TABS.map(([id, labelKey]) => (

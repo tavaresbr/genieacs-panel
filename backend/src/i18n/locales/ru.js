@@ -516,4 +516,7 @@ export default {
   'whatsapp.bot.invoicePix': 'Код PIX для копирования: {value}',
   'whatsapp.bot.invoiceLink': 'Дубликат счёта: {value}',
   'whatsapp.bot.signalOkNoReading': 'Ваше подключение работает.',
+  'whatsapp.messageRequeued': 'Сообщение возвращено в очередь',
+  'whatsapp.messageNotRequeueable': 'Повторно отправить можно только сообщение, отправка которого не удалась.',
+  'whatsapp.messagesRequeued': 'Возвращено в очередь сообщений: {count}',
 };

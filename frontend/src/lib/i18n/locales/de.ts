@@ -1387,6 +1387,21 @@ const de: Dictionary = {
   'detail.provisioning.profileLine': 'Profil {profile} · Vertrag {contract}',
   'detail.provisioning.noProfile': 'Kein Profil hat gepasst',
   'detail.provisioning.never': 'Diese ONT wurde vom Panel noch nie provisioniert.',
+  'settings.whatsapp.messageRetention': 'Gesprächsverlauf aufbewahren für (Tage)',
+  'settings.whatsapp.messageRetentionHint': '0 bewahrt ihn für immer auf, das ist die Voreinstellung. Nach dieser Frist wird eine Nachricht endgültig aus dem Panel gelöscht. Eine Nachricht, deren Anhang noch auf der Festplatte liegt, wird nie gelöscht – soll auch sie verschwinden, setzen Sie zusätzlich eine Frist für Anhänge.',
+  'whatsapp.health.sweepDone': '{files} Anhang/Anhänge gelöscht, {mb} MB frei',
+  'whatsapp.health.sweepNothing': 'Nichts alt genug zum Löschen',
+  'whatsapp.health.sweepBusy': 'Es läuft bereits eine Bereinigung',
+  'whatsapp.health.sweepFailed': 'Die Bereinigung konnte nicht abgeschlossen werden',
+  'whatsapp.inbox.resendFailedTitle': 'Senden fehlgeschlagen',
+  'whatsapp.inbox.retryingIn': 'Nächster Versuch {when}',
+  'whatsapp.inbox.attemptsSpent': 'Nach {count} Versuchen aufgegeben',
+  'whatsapp.outbox.requeueAll': 'Fehlgeschlagene erneut senden',
+  'whatsapp.outbox.requeueAllConfirm': 'Stellt jede in den letzten {hours} h fehlgeschlagene Nachricht wieder in die Warteschlange. Bereits Gesendetes wird nicht doppelt gesendet.',
+  'whatsapp.outbox.requeueAllDone': '{count} Nachricht(en) wieder in der Warteschlange',
+  'whatsapp.outbox.requeueAllNone': 'Keine fehlgeschlagene Nachricht zum erneuten Senden',
+  'whatsapp.outbox.requeueFailed': 'Die Nachrichten konnten nicht wieder eingereiht werden',
+  'whatsapp.health.retrying': 'davon {count} mit geplantem neuen Versuch',
 }
 
 export default de

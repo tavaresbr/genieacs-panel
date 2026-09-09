@@ -41,6 +41,7 @@ class WhatsAppController {
         portalPublicUrl: body.portalPublicUrl,
         rateLimitPerMin: body.rateLimitPerMin,
         mediaRetentionDays: body.mediaRetentionDays,
+        messageRetentionDays: body.messageRetentionDays,
         managedUrl: body.managedUrl,
         // An absent key keeps the stored one; "" clears it.
         managedAdminKey: body.managedAdminKey === undefined ? undefined : body.managedAdminKey

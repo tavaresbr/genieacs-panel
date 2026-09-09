@@ -5,7 +5,7 @@ import SgpLink from '../models/SgpLink.js';
 import CustomerAccount from '../models/CustomerAccount.js';
 import { WaError } from './whatsappConfigService.js';
 import WaSendService from './waSendService.js';
-import { getDb } from '../config/database.js';
+import { tdb } from '../config/database.js';
 
 /** How many messages a thread hands back before the caller has to ask for more. */
 const PAGE = 100;
@@ -40,9 +40,12 @@ class WaConversationService {
     const digits = String(phone ?? '').replace(/\D/g, '');
     if (!digits) return { link: null, account: null, matchedOn: null };
 
-    const db = getDb();
-    const manual = await db('sgp_links').where({ phone_manual: digits }).first();
-    const link = manual || (await db('sgp_links').where({ phone_e164: digits }).first()) || null;
+    // Through `tdb`: a number that belongs to another provider's subscriber has
+    // to come back unknown here. Resolving it would hand this provider's
+    // operator — and, through the bot, whoever holds that phone — a contract,
+    // a name and a document from a cadastre they have no part in.
+    const manual = await tdb('sgp_links').where({ phone_manual: digits }).first();
+    const link = manual || (await tdb('sgp_links').where({ phone_e164: digits }).first()) || null;
     if (!link) return { link: null, account: null, matchedOn: null };
 
     const account = link.device_id ? await CustomerAccount.getByDeviceId(link.device_id) : null;
@@ -92,17 +95,16 @@ class WaConversationService {
   /**
    * The contracts whose subscriber name matches what the operator typed.
    *
-   * One batched query standing in for a join: `sgp_links` is not a scoped table
-   * (see `config/tenantScope.js`), so it is read through `getDb()` exactly like
-   * the client-name lookup below it and like `resolveSubscriber` above. Reading
-   * it unfiltered cannot widen the result: the conversations themselves come
-   * back through `tdb`, so a contract borrowed from another provider's link
-   * simply matches no thread in this one.
+   * One batched query standing in for a join, scoped like every other read of
+   * `sgp_links` since 0017. Two providers can now hold the same contract
+   * number, so an unfiltered search would not merely be untidy: it would let a
+   * name typed here match a contract that exists in both and pull this
+   * provider's threads up under the other provider's subscriber name.
    */
   static async contractsMatchingClientName(term) {
     const like = `%${WaConversation.likeTerm(term)}%`;
     if (like === '%%') return [];
-    const links = await getDb()('sgp_links').whereRaw('lower(client_name) like ?', [like]).select('contract');
+    const links = await tdb('sgp_links').whereRaw('lower(client_name) like ?', [like]).select('contract');
     return [...new Set(links.map((link) => link.contract).filter(Boolean))];
   }
 
@@ -132,7 +134,7 @@ class WaConversationService {
     const contracts = [...new Set(rows.map((r) => r.contract).filter(Boolean))];
     const names = new Map();
     if (contracts.length > 0) {
-      const links = await getDb()('sgp_links').whereIn('contract', contracts).select('contract', 'client_name');
+      const links = await tdb('sgp_links').whereIn('contract', contracts).select('contract', 'client_name');
       for (const link of links) names.set(link.contract, link.client_name);
     }
     const blocked = await WaOptOut.activePhones(rows.map((r) => r.wa_phone_e164));

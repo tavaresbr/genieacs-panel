@@ -1385,6 +1385,21 @@ const en = {
   'whatsapp.error.noSession': 'There is no live session to restart. Use Reconnect instead.',
   'whatsapp.error.noAccount': 'No connected number to send from.',
   'whatsapp.error.noDestination': 'This contact has no phone number or WhatsApp identifier.',
+  'settings.whatsapp.messageRetention': 'Keep conversation history for (days)',
+  'settings.whatsapp.messageRetentionHint': '0 keeps it forever, which is the default. Past that many days a message is deleted from the panel for good. A message whose attachment is still on disk is never deleted — set an attachment window too if those should go as well.',
+  'whatsapp.health.sweepDone': '{files} attachment(s) deleted, {mb} MB freed',
+  'whatsapp.health.sweepNothing': 'Nothing old enough to delete',
+  'whatsapp.health.sweepBusy': 'A sweep is already running',
+  'whatsapp.health.sweepFailed': 'The sweep could not finish',
+  'whatsapp.inbox.resendFailedTitle': 'Send failed',
+  'whatsapp.inbox.retryingIn': 'Trying again {when}',
+  'whatsapp.inbox.attemptsSpent': 'Gave up after {count} attempts',
+  'whatsapp.outbox.requeueAll': 'Send the failed ones again',
+  'whatsapp.outbox.requeueAllConfirm': 'This puts every message that failed in the last {hours} h back in the queue. Nothing that was sent is sent twice.',
+  'whatsapp.outbox.requeueAllDone': '{count} message(s) back in the queue',
+  'whatsapp.outbox.requeueAllNone': 'No failed message to send again',
+  'whatsapp.outbox.requeueFailed': 'Could not put the messages back in the queue',
+  'whatsapp.health.retrying': 'of those, {count} waiting on a retry',
 }
 
 export default en

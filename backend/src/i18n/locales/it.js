@@ -513,4 +513,7 @@ export default {
   'whatsapp.bot.invoicePix': 'PIX copia e incolla: {value}',
   'whatsapp.bot.invoiceLink': 'Copia della fattura: {value}',
   'whatsapp.bot.signalOkNoReading': 'La tua connessione è online.',
+  'whatsapp.messageRequeued': 'Messaggio rimesso in coda',
+  'whatsapp.messageNotRequeueable': 'Solo un messaggio non riuscito può essere inviato di nuovo.',
+  'whatsapp.messagesRequeued': '{count} messaggio/i rimesso/i in coda',
 };

@@ -4,7 +4,15 @@ import { getDb, tbatchInsert, tdb, tinsertReturningId } from '../config/database
 export const RECLAIM_MS = 5 * 60 * 1000;
 
 /** Attempts one recipient gets before the campaign gives up on it. */
-export const MAX_ATTEMPTS = 3;
+/**
+ * Same number as the outbox's, and for the same reason.
+ *
+ * Three was written when a failed recipient went straight back to 'pending' and
+ * the next tick took it a minute later: three attempts inside two minutes, and
+ * then the campaign was over. With a wait between them the count is what buys
+ * the window, and the window has to outlast a server restart.
+ */
+export const MAX_ATTEMPTS = 7;
 
 /**
  * A campaign and the people it is addressed to.
@@ -20,6 +28,25 @@ export const MAX_ATTEMPTS = 3;
  * responsibility reaches; `message_id` points at the row that carries the real
  * delivery state.
  */
+/**
+ * The 'pending' half of both queue reads: waiting, and actually due.
+ *
+ * NULL is due now. That is what every row written before `next_attempt_at`
+ * existed carries, and what a first attempt carries, so the NULL branch is the
+ * common case here rather than an edge one — a campaign in flight during the
+ * upgrade must not stall.
+ *
+ * Written once and used by `listPendingIds` and `claimRecipient` alike: they
+ * are the same eligibility test, and `claimRecipient` repeats it precisely so
+ * two overlapping ticks cannot both take a recipient. Two copies that drifted
+ * would put that guarantee quietly out of step.
+ */
+function due(q, now) {
+  return q.where((pending) => pending
+    .where({ status: 'pending' })
+    .where((wait) => wait.whereNull('next_attempt_at').orWhere('next_attempt_at', '<=', now)));
+}
+
 class WaBroadcast {
   static async getById(id) {
     return (await tdb('wa_broadcasts').where({ id }).first()) || null;
@@ -83,16 +110,17 @@ class WaBroadcast {
     const cutoff = new Date(Date.now() - RECLAIM_MS);
     return tdb('wa_broadcast_recipients')
       .where({ broadcast_id: broadcastId })
-      .where((q) => {
-        q.where({ status: 'pending' })
-          // A tick that died mid-send leaves a row in 'sending' forever.
-          // Retaking it is what makes a crash recoverable. The age is measured
-          // from `created_at` because this table has no claim timestamp of its
-          // own — which is safe here only because the window between a claim
-          // and its outcome is a single enqueue: a row that reached the outbox
-          // is already 'sent' by the time the next tick looks.
-          .orWhere((stale) => stale.where({ status: 'sending' }).where('created_at', '<', cutoff));
-      })
+      .where((q) => due(q, new Date())
+        // A tick that died mid-send leaves a row in 'sending' forever.
+        // Retaking it is what makes a crash recoverable. The age is measured
+        // from `created_at` because this table has no claim timestamp of its
+        // own — which is safe here only because the window between a claim
+        // and its outcome is a single enqueue: a row that reached the outbox
+        // is already 'sent' by the time the next tick looks.
+        //
+        // The due time is deliberately NOT consulted on this branch: a stale
+        // claim is a crash to recover from, not a wait somebody scheduled.
+        .orWhere((stale) => stale.where({ status: 'sending' }).where('created_at', '<', cutoff)))
       .orderBy('id')
       .limit(limit)
       .pluck('id');
@@ -109,10 +137,8 @@ class WaBroadcast {
     const cutoff = new Date(Date.now() - RECLAIM_MS);
     const changed = await tdb('wa_broadcast_recipients')
       .where({ id })
-      .where((q) => {
-        q.where({ status: 'pending' })
-          .orWhere((stale) => stale.where({ status: 'sending' }).where('created_at', '<', cutoff));
-      })
+      .where((q) => due(q, new Date())
+        .orWhere((stale) => stale.where({ status: 'sending' }).where('created_at', '<', cutoff)))
       .update({
         status: 'sending',
         attempts: getDb().raw('attempts + 1')

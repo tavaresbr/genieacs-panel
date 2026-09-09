@@ -518,4 +518,7 @@ export default {
   'whatsapp.mediaSweepFailed': '첨부 파일 정리에 실패했습니다',
   'whatsapp.healthLoaded': '연동 상태를 확인했습니다',
   'whatsapp.healthLoadFailed': '연동 상태를 확인할 수 없습니다',
+  'whatsapp.messageRequeued': '메시지를 전송 대기열로 되돌렸습니다',
+  'whatsapp.messageNotRequeueable': '전송에 실패한 메시지만 다시 보낼 수 있습니다.',
+  'whatsapp.messagesRequeued': '메시지 {count}건을 전송 대기열로 되돌렸습니다',
 };

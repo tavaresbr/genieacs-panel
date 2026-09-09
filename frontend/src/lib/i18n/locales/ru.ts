@@ -1391,6 +1391,21 @@ const ru: Dictionary = {
   'whatsapp.error.noSession': 'Нет активной сессии для перезапуска. Используйте «Переподключить».',
   'whatsapp.error.noAccount': 'Нет подключённого номера для отправки.',
   'whatsapp.error.noDestination': 'У этого контакта нет ни номера телефона, ни идентификатора WhatsApp.',
+  'settings.whatsapp.messageRetention': 'Хранить историю переписки (дней)',
+  'settings.whatsapp.messageRetentionHint': '0 — хранить всегда, это значение по умолчанию. По истечении срока сообщение удаляется из панели окончательно. Сообщение, вложение которого ещё лежит на диске, не удаляется никогда: чтобы ушло и оно, задайте также срок хранения вложений.',
+  'whatsapp.health.sweepDone': 'Удалено вложений: {files}, освобождено {mb} МБ',
+  'whatsapp.health.sweepNothing': 'Нет ничего достаточно старого для удаления',
+  'whatsapp.health.sweepBusy': 'Очистка уже выполняется',
+  'whatsapp.health.sweepFailed': 'Очистку не удалось завершить',
+  'whatsapp.inbox.resendFailedTitle': 'Не удалось отправить',
+  'whatsapp.inbox.retryingIn': 'Повтор {when}',
+  'whatsapp.inbox.attemptsSpent': 'Остановлено после {count} попыток',
+  'whatsapp.outbox.requeueAll': 'Отправить заново то, что не ушло',
+  'whatsapp.outbox.requeueAllConfirm': 'Вернёт в очередь все сообщения, отправка которых не удалась за последние {hours} ч. Уже отправленное не уйдёт дважды.',
+  'whatsapp.outbox.requeueAllDone': 'Возвращено в очередь: {count}',
+  'whatsapp.outbox.requeueAllNone': 'Нет неотправленных сообщений для повтора',
+  'whatsapp.outbox.requeueFailed': 'Не удалось вернуть сообщения в очередь',
+  'whatsapp.health.retrying': 'из них {count} ждут повторной попытки',
 }
 
 export default ru

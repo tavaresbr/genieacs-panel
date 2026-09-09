@@ -882,6 +882,8 @@ export interface WhatsAppConfig {
   portalPublicUrl: string
   /** Days a stored attachment is kept. 0 means forever, and is the default. */
   mediaRetentionDays: number
+  /** Days a message row is kept. 0 is forever, and is the default. */
+  messageRetentionDays: number
   rateLimitPerMin: number
   managedUrl: string
   managed: boolean
@@ -987,6 +989,12 @@ export interface WhatsAppHealth {
   outbox: {
     /** Waiting to go out. A number that only grows is the panel gone quiet. */
     queued: number
+    /**
+     * The slice of `queued` that is waiting out a retry rather than waiting for
+     * the worker. Counted separately because a healthy backoff and a stuck
+     * queue look identical from `queued` alone.
+     */
+    retrying: number
     sending: number
     /** Terminal failures in the last 24 hours. */
     failed24h: number
@@ -1050,6 +1058,14 @@ export interface WhatsAppMessage {
   deliveryStatus: 'queued' | 'sending' | 'sent' | 'delivered' | 'read' | 'failed' | null
   deliveryError: string | null
   attempts: number
+  /**
+   * When the outbox may try this row again, or null for "now".
+   *
+   * A failed send is not terminal on the first bounce any more: it waits, and
+   * the thread says so instead of showing a red mark the operator would read as
+   * final. Null on every row that is not waiting.
+   */
+  nextAttemptAt: string | null
   sentBy: number | null
   readAt: string | null
   createdAt: string | null
@@ -1224,6 +1240,33 @@ export const whatsappAPI = {
   // be the reason the panel is slow.
   getHealth: () =>
     apiClient.get<WhatsAppHealth>('/whatsapp/health'),
+
+  // The attachment sweep, on demand, for the operator who needs the disk back
+  // before the next pass six hours from now. It takes no parameters: the window
+  // and the rules come from the saved settings, so pressing the button can
+  // never delete more than the settings screen already says it will.
+  //
+  // `skipped` is the answer that matters. "0 files" means one of retention
+  // being off, nothing being old enough, or a pass already running — and those
+  // read identically unless the reason comes back with the count.
+  // Puts one failed message back in the queue, as ITSELF. The old screen-side
+  // "resend" read the row's body and sent a new message, which left the failed
+  // row behind, produced a duplicate for the subscriber, and did nothing at all
+  // when the content was an attachment and the body was empty.
+  requeueMessage: (id: number) =>
+    apiClient.post<WhatsAppMessage>(`/whatsapp/messages/${id}/requeue`, {}),
+
+  // Every message that failed inside the window, back in the queue, for the
+  // campaign case: an Evolution restart during a dunning run fails thousands,
+  // and requeuing them one at a time is not a recovery.
+  requeueFailed: (hours: number) =>
+    apiClient.post<{ requeued: number }>('/whatsapp/messages/requeue-failed', { hours }),
+
+  sweepMedia: () =>
+    apiClient.post<{ files: number; bytes: number; mb: number; skipped?: string }>(
+      '/whatsapp/media/sweep',
+      {}
+    ),
 
   // ── Attachments ──────────────────────────────────────────────────────
   // The raw file as the body, its name in a header. No multipart, and so no

@@ -512,4 +512,7 @@ export default {
   'whatsapp.bot.invoicePix': 'PIX copiar y pegar: {value}',
   'whatsapp.bot.invoiceLink': 'Segunda copia: {value}',
   'whatsapp.bot.signalOkNoReading': 'Tu conexión está en línea.',
+  'whatsapp.messageRequeued': 'Mensaje devuelto a la cola',
+  'whatsapp.messageNotRequeueable': 'Solo un mensaje que falló puede enviarse de nuevo.',
+  'whatsapp.messagesRequeued': '{count} mensaje(s) devuelto(s) a la cola',
 };

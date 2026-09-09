@@ -1383,6 +1383,21 @@ const es: Dictionary = {
   'whatsapp.error.noSession': 'No hay sesión activa para reiniciar. Usa Reconectar.',
   'whatsapp.error.noAccount': 'Ningún número conectado para enviar.',
   'whatsapp.error.noDestination': 'Este contacto no tiene teléfono ni identificador de WhatsApp.',
+  'settings.whatsapp.messageRetention': 'Guardar el historial de conversaciones (días)',
+  'settings.whatsapp.messageRetentionHint': '0 lo guarda para siempre, que es el valor por defecto. Pasados esos días el mensaje se borra del panel definitivamente. Un mensaje cuyo adjunto sigue en disco nunca se borra: si quiere que también se vaya, defina además el plazo de los adjuntos.',
+  'whatsapp.health.sweepDone': '{files} adjunto(s) eliminado(s), {mb} MB liberados',
+  'whatsapp.health.sweepNothing': 'No hay nada lo bastante antiguo para eliminar',
+  'whatsapp.health.sweepBusy': 'Ya hay una limpieza en curso',
+  'whatsapp.health.sweepFailed': 'La limpieza no pudo completarse',
+  'whatsapp.inbox.resendFailedTitle': 'Falló el envío',
+  'whatsapp.inbox.retryingIn': 'Lo intenta de nuevo {when}',
+  'whatsapp.inbox.attemptsSpent': 'Se rindió tras {count} intentos',
+  'whatsapp.outbox.requeueAll': 'Volver a enviar las que fallaron',
+  'whatsapp.outbox.requeueAllConfirm': 'Esto devuelve a la cola todo mensaje que falló en las últimas {hours} h. Nada de lo enviado se envía dos veces.',
+  'whatsapp.outbox.requeueAllDone': '{count} mensaje(s) de vuelta en la cola',
+  'whatsapp.outbox.requeueAllNone': 'No hay mensajes fallidos para reenviar',
+  'whatsapp.outbox.requeueFailed': 'No se pudieron devolver los mensajes a la cola',
+  'whatsapp.health.retrying': 'de esas, {count} esperando un nuevo intento',
 }
 
 export default es
