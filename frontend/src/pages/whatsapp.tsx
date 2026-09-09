@@ -18,6 +18,7 @@ import { CampaignsPanel } from '@/components/whatsapp/campaigns-panel'
 import { TemplatesPanel } from '@/components/whatsapp/templates-panel'
 import { OptOutPanel } from '@/components/whatsapp/opt-out-panel'
 import { AlertsPanel } from '@/components/whatsapp/alerts-panel'
+import { HealthStrip } from '@/components/whatsapp/health-strip'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Polling
@@ -587,6 +588,15 @@ export default function WhatsAppPage() {
             <p className="page-description">{t('sidebar.nav.whatsappDescription')}</p>
           </div>
         </header>
+
+        {/*
+          Above the rail, and outside the tab switch, on purpose. It is the
+          first thing an operator sees on this route, and it must keep
+          answering "is this working?" whichever tab they are working in —
+          mounted inside one of them, the integration would go dark the moment
+          somebody opened Campaigns.
+        */}
+        <HealthStrip />
 
         <div className="tab-rail" role="tablist" aria-label={t('sidebar.nav.whatsapp')}>
           {TABS.map(([id, labelKey]) => (

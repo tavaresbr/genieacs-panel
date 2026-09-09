@@ -1085,7 +1085,49 @@ antiga de ontem, é o painel calado sem ninguém saber. `lastInboundAt` é o par
 dele — fila vazia e nada entrando há dois dias não é calmaria, é webhook morto.
 
 **Barato de propósito.** É uma tela que faz poll; um agregado caro aqui vira o
-motivo de o painel estar lento.
+motivo de o painel estar lento. Como isso é cumprido, já que `wa_messages` é a
+maior tabela do painel:
+
+- Fila e falhas saem de `wa_messages.index(['delivery_status', 'created_at'])`
+  — o índice do próprio outbox worker — por IGUALDADE na primeira coluna.
+  `queued`, `sending` e `oldestQueuedAt` só tocam a fila, que é pequena por
+  definição (uma fila grande É o alarme); `failed24h` acrescenta a faixa em
+  `created_at`, a segunda coluna do índice, então a janela de 24 h é um seek e
+  não uma varredura de todas as falhas que o painel já teve.
+- `oldestQueuedAt` é `ORDER BY created_at LIMIT 1`, não `MIN()`: para no
+  primeiro registro e volta como valor de coluna, não como agregado — cada
+  engine tipa agregado sobre timestamp de um jeito.
+- `inbox` e `lastInboundAt` saem de `wa_conversations`, que tem uma linha por
+  CONVERSA em vez de uma por mensagem, e que já mantém `last_inbound_at` a cada
+  entrada. `inbox.unread` conta CONVERSAS com não lidas, não a soma dos
+  contadores: quem mandou trinta mensagens é uma conversa para abrir.
+- `lastOutboundAt` é o único número sem coluna própria, e por isso são três
+  consultas (`sent`, `delivered`, `read`) em vez de um `whereIn`: com `ORDER BY`
+  o `whereIn` atravessa três faixas disjuntas do índice, e a união delas é quase
+  a tabela inteira.
+- **Contagem vem como número, sempre.** As três engines discordam se `COUNT(*)`
+  volta número ou string — o Postgres devolve bigint que o driver entrega como
+  STRING. `waBotService` desviou disso puxando ids; uma leitura de saúde não
+  pode, então converte explicitamente. Sem isso `queued` chega como `"40"`,
+  `queued > 0` continua verdadeiro, e nada parece errado até uma comparação
+  ordenar lexicamente.
+
+**`media` é a única parte cara, e é cacheada por isso.** `files` e `oldestAt`
+até viriam do banco, mas `bytes` não: `wa_messages` guarda `attachment_path`,
+`attachment_type` e `attachment_name` e NÃO o tamanho, então o único lugar onde
+o total em bytes existe é o disco — um `stat` por arquivo. A leitura é guardada
+por provedor por cinco minutos; vencida, a anterior é devolvida na hora e a
+varredura roda atrás da resposta. Só a primeira leitura depois de subir espera o
+disco. Os arquivos ficam em `wa-media/<conversationId>/`, caminho que não carrega
+provedor nenhum, então os nomes de diretório são filtrados por `wa_conversations`
+antes de qualquer `stat` — sem isso o painel contaria as fotos do vizinho como
+suas. Apagar os antigos é da rota de varredura de mídia; esta leitura só conta.
+
+A tira que consome isso (`components/whatsapp/health-strip.tsx`) fica ACIMA da
+barra de abas, fora do switch de aba, e faz poll a 60 s — mais devagar que tudo
+nesta tela, com as mesmas quatro regras que o bloco de pareamento já provou:
+single-flight, tique pulado com a aba em segundo plano, backoff
+`2 ** falhas - 1` e todo timer dentro de um efeito que limpa no unmount.
 
 ---
 
@@ -1100,6 +1142,7 @@ Para achar o consumidor de uma rota sem varrer o `frontend/`:
 | `GET /accounts/:id/qr` · `GET /accounts/:id/status` | o bloco de pareamento do mesmo componente — os dois únicos pontos com polling |
 | `POST /accounts/:id/restart` · `POST /accounts/:id/disconnect` | ações do cartão; `disconnect` + `POST /accounts` é o "desparear e gerar novo QR" |
 | `POST /accounts/check-number` | ainda sem tela |
+| `GET /whatsapp/health` | `components/whatsapp/health-strip.tsx`, acima da barra de abas de `pages/whatsapp.tsx` |
 | conversas, modelos, opt-out, campanhas, cobrança, alertas | ondas 2 e 3, sem tela ainda |
 
 O polling do bloco de pareamento é **medido**, não escolhido: QR a cada 8 s por
