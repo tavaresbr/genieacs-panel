@@ -85,25 +85,29 @@ describe('the scoped table list', () => {
 
 describe('the scoped query builder', () => {
   // The transition behaviour, and what lets the conversion proceed a few tables
-  // at a time. `vendors` stands in for "not converted yet" — it has to be a
-  // table still absent from the allowlist, so this moves as the phase does. It
-  // took over from `device_profiles`, which is scoped as of 0022.
+  // at a time. `users` stands in for "not converted yet" — it has to be a table
+  // still absent from the allowlist, so this moves as the phase does. It took
+  // over from `vendors`, scoped as of 0026, which took over from
+  // `device_profiles`, scoped as of 0022.
   it('leaves a table that has not been converted unfiltered', async () => {
-    const rows = await tdb('vendors').select('name').limit(1);
+    const rows = await tdb('users').select('username').limit(1);
     assert.ok(Array.isArray(rows));
   });
 
   it('writes through tinsert without a provider while the table is pending', async () => {
-    await tinsert('vendors', { name: 'scope-probe-pending', parameter_prefix: 'x' });
-    const row = await getDb()('vendors').where({ name: 'scope-probe-pending' }).first();
-    assert.equal(row.parameter_prefix, 'x');
+    await tinsert('users', { username: 'scope-probe-pending', password: 'x' });
+    const row = await getDb()('users').where({ username: 'scope-probe-pending' }).first();
+    assert.equal(row.password, 'x');
   });
 
   it('returns the generated id', async () => {
-    // vendors is still pending, so this exercises the unscoped path.
+    // users is still pending, so this exercises the unscoped path.
     // mapping_nodes moved under scoping and now needs a provider — which is
     // what tenant-scoping.test.js covers.
-    const id = await tinsertReturningId('vendors', { name: 'scope-probe-vendor' });
+    const id = await tinsertReturningId('users', {
+      username: 'scope-probe-user',
+      password: 'x'
+    });
     assert.ok(Number(id) > 0);
   });
 });
