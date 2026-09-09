@@ -78,6 +78,20 @@ describe('sample collection', () => {
     assert.equal(Number(rows[0].uptime_seconds), 86_400);
   });
 
+  it('stores the inform truncated to whole seconds', async () => {
+    // The dedupe compares the reading against what came back from the database,
+    // and MySQL's `timestamp` has no sub-second precision. Storing a value with
+    // milliseconds there would round it, make the comparison unequal for the
+    // same inform, and write a duplicate row on every tick. Asserting the
+    // truncation is how that stays caught on SQLite too, where the column would
+    // otherwise keep the milliseconds and hide it.
+    fleet = [reading('ont-a', { informAt: Date.now() - 5 * 60_000 + 437 })];
+    await collect({});
+
+    const [row] = await getDb()('device_samples');
+    assert.equal(new Date(row.inform_at).getTime() % 1000, 0);
+  });
+
   it('stores nothing when the device has not informed since the last sample', async () => {
     const informAt = Date.now() - 5 * 60_000;
     fleet = [reading('ont-a', { informAt })];

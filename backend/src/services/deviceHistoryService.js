@@ -186,7 +186,16 @@ class DeviceHistoryService {
           summary.skipped += 1;
           continue;
         }
-        const informMs = timestampMs(device.lastInform);
+        // Truncated to whole seconds before it is either compared or stored.
+        //
+        // MySQL's `timestamp` has no sub-second precision, so a value carrying
+        // milliseconds is rounded on the way in. Comparing the untruncated
+        // reading against what came back then finds them unequal for the *same*
+        // inform, and the next pass stores the row again — a duplicate per
+        // device per tick, forever, on every MySQL install. Truncating here
+        // means the value compared is the value the column can hold, on all
+        // three engines.
+        const informMs = Math.floor(timestampMs(device.lastInform) / 1000) * 1000;
         if (!Number.isFinite(informMs) || informMs > now + HOUR_MS) {
           // Never informed, or a clock far enough ahead that the row would sort
           // into the future and sit at the end of every chart.
