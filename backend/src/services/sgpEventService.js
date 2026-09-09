@@ -41,6 +41,13 @@ class SgpEventService {
    * Stores an inbound webhook. The dedupe key prefers an id from the payload
    * and falls back to a hash of the body, so a redelivery is recognised even
    * when SGP sends no identifier.
+   *
+   * The key is only ever unique WITHIN a provider, and it has to be read that
+   * way: an SGP event id is a sequential number in one ISP's ERP, so two ISPs
+   * reach #12345 and hash it to the same string. `SgpEvent.insertIfNew` matches
+   * per provider over 0024's `(tenant_id, dedupe_key)` unique for that reason.
+   * The body-hash fallback collides the same way — two ISPs whose SGP posts the
+   * same minimal body would otherwise cancel each other out.
    */
   static async ingestWebhook(rawBody, parsedBody, config) {
     const normalized = SgpService.normalizeEvent(parsedBody, config.eventTypeMap);

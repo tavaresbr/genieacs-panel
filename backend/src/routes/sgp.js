@@ -6,7 +6,13 @@ import { sgpAdminLimiter, sgpSyncLimiter, sgpWebhookLimiter } from '../middlewar
 
 const router = express.Router();
 
-// Unauthenticated: the caller is SGP, and the shared secret is the credential.
+// Unauthenticated: the caller is SGP, and the shared secret is the credential
+// — and, since a delivery carries no session and every request under `/api`
+// resolves to the same provider until providers are reached by host, that
+// secret is also what says WHICH provider the delivery belongs to. The handler
+// therefore ignores the provider this request was scoped to and opens the
+// scope of the one whose secret verifies; `SgpEventController.receive`
+// documents what that does and does not let an unauthenticated caller learn.
 // Declared before the device routes so the matcher never treats `events` as a
 // device id.
 router.post('/events/webhook', sgpWebhookLimiter, SgpEventController.receive);
