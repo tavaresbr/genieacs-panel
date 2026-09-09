@@ -77,7 +77,16 @@ export const SCOPED_TABLES = new Set([
   // Where the operator's own plant is centred. A singleton keyed `id: 1`, so
   // its WHERE never was an identity filter — it meant "the only row", and the
   // second provider to save a map centre wrote over the first's.
-  'map_settings'
+  'map_settings',
+  // The equipment catalogue. Its content really is the same fact about firmware
+  // for every ISP, but the rows are edited on screen, so shared they made one
+  // operator's corrected detection pattern or parameter path silently change
+  // another's WiFi writes. The three move together because a mapping points at
+  // a vendor and the delete cascades down that foreign key — scoping the parent
+  // alone would leave a destructive write reaching across providers.
+  'vendors',
+  'wifi_security_mappings',
+  'wifi_security_config'
 ]);
 
 /** Tables that belong to the deployment rather than to any one provider. */
