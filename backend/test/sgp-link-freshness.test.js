@@ -12,6 +12,7 @@ const { default: CustomerPortalPasswordService } = await import(
 // Reached directly, with no request behind them, so nothing has resolved a
 // provider. The routes that call these are already inside one.
 const resolveDeviceContract = (...args) => asTenant(() => SgpService.resolveDeviceContract(...args));
+const upsertLink = (link) => asTenant(() => SgpLink.upsert(link));
 
 const APP = 'painel';
 const TOKEN = 'token-freshness';
@@ -83,7 +84,7 @@ after(async () => {
 describe('a cached SGP link', () => {
   it('is refused when it belongs to a different account than the device does now', async () => {
     const previousAccountId = await createAccount(DEVICE, 'antigo@isp', 'CSG-STALE01-234567');
-    await SgpLink.upsert({
+    await upsertLink({
       device_id: DEVICE,
       account_id: previousAccountId,
       contract: '1111',

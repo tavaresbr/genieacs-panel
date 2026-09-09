@@ -1128,6 +1128,63 @@ export const migrations = [
         await db.schema.alterTable('wa_conversations', (t) => t.index([column])).catch(() => {});
       }
     }
+  },
+  {
+    /**
+     * The contract cadastre, per provider.
+     *
+     * `sgp_links` is what turns a device id into a subscriber: contract,
+     * document, name, plan, and the phone number the WhatsApp side resolves an
+     * inbound message against. Left deployment-wide it is the last place where
+     * one provider's operator can type a phone number and be handed another
+     * provider's subscriber — and, through the self-service bot, be read that
+     * subscriber's invoice without anyone having logged in anywhere.
+     *
+     * `device_id` was unique across the deployment, which was right while there
+     * was one GenieACS behind one panel. It becomes unique per provider here,
+     * for the same reason `customer_accounts` did in 0010: two providers
+     * reading one ACS see the same ids, and a deployment-wide unique would let
+     * whichever synced first own the row for good.
+     *
+     * The column is added here rather than in `sgpLinksTable` on purpose. That
+     * factory runs in step 0001, before `tenants` exists, so a foreign key
+     * written into it would fail every fresh install. `customer_accounts`
+     * carries its `tenant_id` the same way and for the same reason.
+     */
+    id: '0017_sgp_links_tenant',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return false;
+      if (!(await db.schema.hasTable('sgp_links'))) return false;
+      return db.schema.hasColumn('sgp_links', 'tenant_id');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('sgp_links'))) return;
+      if (await db.schema.hasColumn('sgp_links', 'tenant_id')) return;
+
+      // 0010 created the provider row; this only reads it. If it is somehow
+      // missing there is nothing to backfill to, and the step stops rather than
+      // inventing a second provider nobody asked for.
+      const tenant = await db('tenants').orderBy('id', 'asc').first();
+      if (!tenant) return;
+
+      // Nullable first: the table already has rows and the schema alone has no
+      // sensible default to give them.
+      await db.schema.alterTable('sgp_links', (t) => {
+        t.integer('tenant_id').unsigned();
+      });
+      await db('sgp_links').whereNull('tenant_id').update({ tenant_id: tenant.id });
+
+      // One rebuild on SQLite rather than several: tighten the column, point it
+      // at `tenants`, and move the device unique to be per-provider. The
+      // default is this install's own provider, so every insert written before
+      // the scoping work lands still produces a correct row.
+      await db.schema.alterTable('sgp_links', (t) => {
+        t.integer('tenant_id').unsigned().notNullable().defaultTo(tenant.id).alter();
+        t.foreign('tenant_id').references('id').inTable('tenants');
+        t.dropUnique(['device_id']);
+        t.unique(['tenant_id', 'device_id']);
+      });
+    }
   }
 ];
 
