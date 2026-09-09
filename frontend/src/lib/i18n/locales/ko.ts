@@ -1135,6 +1135,8 @@ const ko: Dictionary = {
   'settings.whatsapp.rejectCallMessage': '수신 전화에 응답 메시지 발송',
   'settings.whatsapp.rateLimit': '분당 메시지 수',
   'settings.whatsapp.rateLimitHint': '캠페인과 알림이 함께 사용하는 발신 메시지 상한입니다.',
+  'settings.whatsapp.mediaRetention': '첨부 파일 보관 기간(일)',
+  'settings.whatsapp.mediaRetentionHint': '0은 무기한 보관이며 기본값입니다. 그 기간이 지나면 파일이 삭제되고 메시지에는 첨부가 더 이상 디스크에 없다고 표시됩니다. 대화의 글은 그대로 남습니다.',
   'whatsapp.accounts.title': '연결된 번호',
   'whatsapp.accounts.empty': '아직 연결된 번호가 없습니다.',
   'whatsapp.accounts.add': '번호 연결',
@@ -1171,6 +1173,18 @@ const ko: Dictionary = {
   'whatsapp.actions.disconnect': '연결 해제',
   'whatsapp.actions.delete': '삭제',
   'whatsapp.inbox.title': '대화',
+  'whatsapp.health.title': '작동 중인가요?',
+  'whatsapp.health.connected': '번호 {total}개 중 {connected}개 연결됨',
+  'whatsapp.health.noNumbers': '연결된 번호가 없습니다 — 주고받을 수 없습니다',
+  'whatsapp.health.queued': '{count}건 발송 대기 중',
+  'whatsapp.health.oldestQueued': '가장 오래된 것은 {when}부터',
+  'whatsapp.health.failed24h': '지난 24시간 동안 {count}건 실패',
+  'whatsapp.health.silent': '{when} 이후 아무것도 도착하지 않았습니다',
+  'whatsapp.health.neverAny': '아직 아무것도 도착하지 않았습니다',
+  'whatsapp.health.media': '디스크에 첨부 {files}개, {size}',
+  'whatsapp.health.sweepNow': '오래된 파일 지금 삭제',
+  'whatsapp.health.sweepOff': '첨부 파일은 무기한 보관됩니다. 오래된 파일을 지우려면 설정에서 보관 기간을 정하세요.',
+  'whatsapp.health.loadFailed': '연동 상태를 확인할 수 없습니다.',
   'whatsapp.inbox.subtitle': '연결된 번호로 수신된 모든 내용을 최신순으로 표시합니다.',
   'whatsapp.inbox.selectOne': '읽을 대화를 선택하십시오.',
   'whatsapp.inbox.close': '종료',
@@ -1348,6 +1362,7 @@ const ko: Dictionary = {
   'whatsapp.error.noSession': '재시작할 활성 세션이 없습니다. 대신 다시 연결을 사용하십시오.',
   'whatsapp.error.noAccount': '발신할 수 있는 연결된 번호가 없습니다.',
   'whatsapp.error.noDestination': '이 연락처에는 전화번호나 WhatsApp 식별자가 없습니다.',
+
 }
 
 export default ko

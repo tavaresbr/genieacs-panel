@@ -505,4 +505,9 @@ export default {
   'whatsapp.bot.invoicePix': 'PIX 복사 코드: {value}',
   'whatsapp.bot.invoiceLink': '재발행: {value}',
   'whatsapp.bot.signalOkNoReading': '인터넷이 정상 연결되어 있습니다.',
+
+  'whatsapp.mediaSwept': '파일 {files}개를 삭제하여 {mb} MB를 확보했습니다',
+  'whatsapp.mediaSweepFailed': '첨부 파일 정리에 실패했습니다',
+  'whatsapp.healthLoaded': '연동 상태를 확인했습니다',
+  'whatsapp.healthLoadFailed': '연동 상태를 확인할 수 없습니다',
 };

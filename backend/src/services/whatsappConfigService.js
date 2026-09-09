@@ -73,9 +73,29 @@ const DEFAULT_CONFIG = Object.freeze({
   // Per-minute ceiling for outbound messages, shared by the outbox worker and
   // any campaign that does not set its own.
   rateLimitPerMin: 20,
+  // How many days a stored attachment is kept before the sweeper deletes it.
+  //
+  // Zero means forever, and forever is the default because this setting arrived
+  // after installs already had files: deleting a provider's history because
+  // they upgraded would be the panel destroying data nobody asked it to touch.
+  mediaRetentionDays: 0,
   managedUrl: '',
   updatedAt: null
 });
+
+/**
+ * Days of retention, or zero for forever.
+ *
+ * Anything unreadable reads as zero — the safe direction here is the one that
+ * deletes nothing. A typo in a settings form must not be able to mean "sweep
+ * the archive tonight".
+ */
+function normalizeRetentionDays(value) {
+  const days = Math.trunc(Number(value));
+  if (!Number.isFinite(days) || days <= 0) return 0;
+  // Ten years. Past that the number is a mistake, not a policy.
+  return Math.min(days, 3650);
+}
 
 function encryptSecret(box, value) {
   return { v: 1, ...box.encrypt(value) };
@@ -125,6 +145,7 @@ class WhatsAppConfigService {
       rateLimitPerMin: Number(stored.rateLimitPerMin) > 0
         ? Math.min(Number(stored.rateLimitPerMin), 120)
         : DEFAULT_CONFIG.rateLimitPerMin,
+      mediaRetentionDays: normalizeRetentionDays(stored.mediaRetentionDays),
       managedUrl: normalizeEvoUrl(stored.managedUrl || ''),
       managedAdminKey: decryptSecret(adminKeyBox, stored.managedAdminKey),
       updatedAt: stored.updatedAt || null
@@ -169,6 +190,9 @@ class WhatsAppConfigService {
           'whatsapp.error.invalidPortalUrl',
           'invalid_portal_url'
         ),
+      mediaRetentionDays: patch.mediaRetentionDays === undefined
+        ? current.mediaRetentionDays
+        : normalizeRetentionDays(patch.mediaRetentionDays),
       rateLimitPerMin: patch.rateLimitPerMin === undefined
         ? current.rateLimitPerMin
         : Math.min(Math.max(Number(patch.rateLimitPerMin) || DEFAULT_CONFIG.rateLimitPerMin, 1), 120),

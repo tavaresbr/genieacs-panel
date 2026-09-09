@@ -1030,6 +1030,130 @@ Como ficou implementada, e as três coisas que o contrato não determinava:
 
 ---
 
+## Retenção de anexos — onda 7
+
+Nada nunca apaga um arquivo. Cada mídia que chega e cada uma que sai fica em
+`DATA_DIR` para sempre, sem cota, sem contagem e sem ninguém olhando. Num
+provedor com movimento isso cresce sozinho, e o disco que enche é o mesmo onde
+o SQLite escreve.
+
+`whatsappConfig.mediaRetentionDays` — **0 é para sempre, e é o padrão.** Esse
+padrão não é preguiça: a configuração chega depois de instalações que já têm
+arquivos, e apagar o histórico de um provedor porque ele atualizou o painel
+seria o painel destruindo dado que ninguém mandou tocar.
+
+### O que a varredura apaga, e o que ela nunca toca
+
+- Apaga o **arquivo** e limpa as colunas `attachment_*` da linha. A mensagem
+  continua no fio, com o texto intacto; o anexo passa a dizer que não está mais
+  em disco, que é a verdade e já tem tela.
+- **Nunca apaga linha de mensagem.** Histórico de conversa é o que um provedor
+  precisa quando o cliente contesta; disco é o que ele precisa quando enche.
+  São problemas diferentes e só um deles é resolvido aqui.
+- **Nunca apaga arquivo que uma mensagem ainda vai usar.** Uma linha `queued`
+  ou `sending` tem um envio pela frente: apagar o arquivo dela transforma um
+  envio pendente numa falha permanente. A idade da mensagem não importa — o que
+  importa é se ela já saiu.
+- Um arquivo em disco sem linha nenhuma apontando para ele é lixo de upload
+  abandonado e some pela mesma regra de idade.
+
+`POST /api/whatsapp/media/sweep` roda a varredura na hora, para quem precisa de
+disco agora. Responde `whatsapp.mediaSwept` com quantos arquivos e quantos MB.
+Com retenção em 0 ela não apaga nada e diz isso.
+
+### O que `waMediaSweeper` decidiu ao implementar isso
+
+Quatro escolhas que o contrato não fixava e que quem mexer nele precisa saber:
+
+- **O relógio é o `mtime` do arquivo**, para arquivo com linha e para órfão
+  igual. É o número que o próprio disco guarda, é o único que um órfão tem, e
+  para um arquivo com linha ele fica a segundos do `created_at` dela — os bytes
+  são gravados e só então a linha. Um relógio só, então arquivo e linha nunca
+  discordam sobre a idade.
+- **A passagem periódica é de 6 h**, nada parecido com os 5 s da fila de saída:
+  a janela é medida em dias, a varredura anda a árvore inteira de mídia
+  disputando o mesmo disco do SQLite, e é o único job da integração que apaga —
+  passar raro limita o que um bug ali leva antes de alguém ver. Não há passagem
+  no boot, de propósito; quem precisa de disco agora tem o botão.
+- **A varredura só anda `DATA_DIR/wa-media`**, nunca `DATA_DIR`. É a diferença
+  entre recuperar disco e apagar o `panel.sqlite`, que mora um nível acima.
+- **Roda em `forSoleTenant`**, como a varredura de alertas, e aqui o motivo é o
+  disco: é um sistema de arquivos de que nenhum provedor tem um canto. Uma
+  passagem por provedor não dividiria o trabalho, veria os arquivos do outro
+  como órfãos sem linha e apagaria todos. Quando o segundo provedor entrar, o
+  conserto é dar a cada um sua subpasta de mídia, e só então o laço por
+  provedor.
+
+---
+
+## Saúde da integração — `GET /api/whatsapp/health`
+
+Uma leitura só, que responde "isto está funcionando?". Hoje cada número dela só
+é descoberto abrindo conversa por conversa — ou seja, é descoberto pelo cliente
+reclamando.
+
+```ts
+{
+  accounts: { total, connected, disconnected }
+  outbox: { queued, sending, failed24h, oldestQueuedAt }
+  inbox: { unread, openConversations }
+  lastInboundAt: string | null
+  lastOutboundAt: string | null
+  media: { files, bytes, oldestAt }
+}
+```
+
+`oldestQueuedAt` é o número que importa: uma fila que só cresce, com a mais
+antiga de ontem, é o painel calado sem ninguém saber. `lastInboundAt` é o par
+dele — fila vazia e nada entrando há dois dias não é calmaria, é webhook morto.
+
+**Barato de propósito.** É uma tela que faz poll; um agregado caro aqui vira o
+motivo de o painel estar lento. Como isso é cumprido, já que `wa_messages` é a
+maior tabela do painel:
+
+- Fila e falhas saem de `wa_messages.index(['delivery_status', 'created_at'])`
+  — o índice do próprio outbox worker — por IGUALDADE na primeira coluna.
+  `queued`, `sending` e `oldestQueuedAt` só tocam a fila, que é pequena por
+  definição (uma fila grande É o alarme); `failed24h` acrescenta a faixa em
+  `created_at`, a segunda coluna do índice, então a janela de 24 h é um seek e
+  não uma varredura de todas as falhas que o painel já teve.
+- `oldestQueuedAt` é `ORDER BY created_at LIMIT 1`, não `MIN()`: para no
+  primeiro registro e volta como valor de coluna, não como agregado — cada
+  engine tipa agregado sobre timestamp de um jeito.
+- `inbox` e `lastInboundAt` saem de `wa_conversations`, que tem uma linha por
+  CONVERSA em vez de uma por mensagem, e que já mantém `last_inbound_at` a cada
+  entrada. `inbox.unread` conta CONVERSAS com não lidas, não a soma dos
+  contadores: quem mandou trinta mensagens é uma conversa para abrir.
+- `lastOutboundAt` é o único número sem coluna própria, e por isso são três
+  consultas (`sent`, `delivered`, `read`) em vez de um `whereIn`: com `ORDER BY`
+  o `whereIn` atravessa três faixas disjuntas do índice, e a união delas é quase
+  a tabela inteira.
+- **Contagem vem como número, sempre.** As três engines discordam se `COUNT(*)`
+  volta número ou string — o Postgres devolve bigint que o driver entrega como
+  STRING. `waBotService` desviou disso puxando ids; uma leitura de saúde não
+  pode, então converte explicitamente. Sem isso `queued` chega como `"40"`,
+  `queued > 0` continua verdadeiro, e nada parece errado até uma comparação
+  ordenar lexicamente.
+
+**`media` é a única parte cara, e é cacheada por isso.** `files` e `oldestAt`
+até viriam do banco, mas `bytes` não: `wa_messages` guarda `attachment_path`,
+`attachment_type` e `attachment_name` e NÃO o tamanho, então o único lugar onde
+o total em bytes existe é o disco — um `stat` por arquivo. A leitura é guardada
+por provedor por cinco minutos; vencida, a anterior é devolvida na hora e a
+varredura roda atrás da resposta. Só a primeira leitura depois de subir espera o
+disco. Os arquivos ficam em `wa-media/<conversationId>/`, caminho que não carrega
+provedor nenhum, então os nomes de diretório são filtrados por `wa_conversations`
+antes de qualquer `stat` — sem isso o painel contaria as fotos do vizinho como
+suas. Apagar os antigos é da rota de varredura de mídia; esta leitura só conta.
+
+A tira que consome isso (`components/whatsapp/health-strip.tsx`) fica ACIMA da
+barra de abas, fora do switch de aba, e faz poll a 60 s — mais devagar que tudo
+nesta tela, com as mesmas quatro regras que o bloco de pareamento já provou:
+single-flight, tique pulado com a aba em segundo plano, backoff
+`2 ** falhas - 1` e todo timer dentro de um efeito que limpa no unmount.
+
+---
+
 ## Telas — quem consome o quê
 
 Para achar o consumidor de uma rota sem varrer o `frontend/`:
@@ -1041,6 +1165,7 @@ Para achar o consumidor de uma rota sem varrer o `frontend/`:
 | `GET /accounts/:id/qr` · `GET /accounts/:id/status` | o bloco de pareamento do mesmo componente — os dois únicos pontos com polling |
 | `POST /accounts/:id/restart` · `POST /accounts/:id/disconnect` | ações do cartão; `disconnect` + `POST /accounts` é o "desparear e gerar novo QR" |
 | `POST /accounts/check-number` | ainda sem tela |
+| `GET /whatsapp/health` | `components/whatsapp/health-strip.tsx`, acima da barra de abas de `pages/whatsapp.tsx` |
 | conversas, modelos, opt-out, campanhas, cobrança, alertas | ondas 2 e 3, sem tela ainda |
 
 O polling do bloco de pareamento é **medido**, não escolhido: QR a cada 8 s por
