@@ -498,6 +498,10 @@ export default {
   'whatsapp.alerts.temperatureHigh': 'ONT {device}: {value} °C (предел {threshold})',
   'whatsapp.alerts.temperatureHighCleared': 'Температура ONT {device} вернулась к норме',
   'whatsapp.alerts.massOutage': 'Массовая авария: на узле {node} не в сети {count} ONT',
+  'whatsapp.mediaSwept': 'Удалено файлов: {files}, освобождено {mb} МБ',
+  'whatsapp.mediaSweepFailed': 'Не удалось выполнить очистку вложений',
+  'whatsapp.healthLoaded': 'Состояние интеграции получено',
+  'whatsapp.healthLoadFailed': 'Не удалось получить состояние интеграции',
   'whatsapp.alerts.massOutageCleared': 'Узел {node} восстановлен: устройства ONT снова отвечают',
   // WhatsApp — тексты ответов бота
   'whatsapp.bot.invoiceDigitableLine': 'Банковский код: {value}',
