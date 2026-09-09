@@ -1,6 +1,7 @@
 import WaMessage from '../models/WaMessage.js';
 import { resolveStoredAttachment, streamAttachment } from '../services/waMediaFile.js';
-import { createErrorResponse } from '../utils/helpers.js';
+import WaMediaSweeper from '../services/waMediaSweeper.js';
+import { createResponse, createErrorResponse } from '../utils/helpers.js';
 
 /**
  * The operator's half of the attachment story: `GET /api/whatsapp/messages/:id/media`.
@@ -45,6 +46,39 @@ class WhatsAppMediaController {
     } catch (error) {
       console.error('whatsapp.error.attachmentNotFound:', error);
       return res.status(500).json(createErrorResponse(req.t('common.internalError'), error.message));
+    }
+  }
+
+  /**
+   * `POST /api/whatsapp/media/sweep` — the sweep, now, for the operator who
+   * needs the disk back before the next pass six hours from now.
+   *
+   * It reports what it did in files and megabytes rather than answering 204,
+   * because "0 files, 0 MB" is a real and common answer — retention off,
+   * nothing old enough, everything still queued — and an operator staring at a
+   * full disk has to be able to tell that from a button that did nothing.
+   *
+   * The request says nothing about what to delete. The window comes from the
+   * saved settings and the rules from the sweeper; there is no parameter here
+   * to widen either, so a mistyped body cannot become a wider deletion than
+   * the one the operator configured and can see on the settings screen.
+   */
+  static async sweep(req, res) {
+    try {
+      const result = await WaMediaSweeper.tick();
+      return res.json(createResponse(
+        req.t('whatsapp.mediaSwept', { files: result.files, mb: result.mb }),
+        result
+      ));
+    } catch (error) {
+      // `tick` swallows its own failures, so reaching here is a bug rather than
+      // a bad file — which is exactly when the operator must not be told that
+      // something was cleaned up.
+      console.error('whatsapp.mediaSweepFailed:', error);
+      return res.status(500).json(createErrorResponse(
+        req.t('whatsapp.mediaSweepFailed'),
+        error.message
+      ));
     }
   }
 }

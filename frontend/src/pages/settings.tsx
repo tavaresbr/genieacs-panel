@@ -107,7 +107,11 @@ export default function Settings() {
     managedUrl: '',
     managedAdminKey: '',
     rejectCallMessage: '',
-    rateLimitPerMin: 20
+    rateLimitPerMin: 20,
+    // 0 is forever, and it is what an installation that never touches this
+    // field keeps. Anything else is a day count after which a stored
+    // attachment is deleted off the disk.
+    mediaRetentionDays: 0
   })
   const [waSaving, setWaSaving] = useState(false)
 
@@ -187,7 +191,12 @@ export default function Settings() {
         // The stored admin key never leaves the server; an empty field keeps it.
         managedAdminKey: '',
         rejectCallMessage: config.rejectCallMessage,
-        rateLimitPerMin: config.rateLimitPerMin
+        rateLimitPerMin: config.rateLimitPerMin,
+        // Defaulted here rather than trusted: a panel talking to a backend
+        // from before this field existed answers without it, and `undefined`
+        // in a number input makes it uncontrolled from that point on. The
+        // fallback is the same one the server keeps — forever.
+        mediaRetentionDays: config.mediaRetentionDays ?? 0
       })
     })()
     return () => { cancelled = true }
@@ -294,6 +303,7 @@ export default function Settings() {
         managedUrl: waForm.managedUrl,
         rejectCallMessage: waForm.rejectCallMessage,
         rateLimitPerMin: waForm.rateLimitPerMin,
+        mediaRetentionDays: waForm.mediaRetentionDays,
         // Same rule as the SGP token: only send a key the operator typed.
         // Omitting it keeps the stored one, so saving this form can never
         // revoke the integration by accident.
@@ -1458,6 +1468,29 @@ export default function Settings() {
                     }))}
                   />
                   <p className="field-hint">{t('settings.whatsapp.rateLimitHint')}</p>
+                </div>
+                <div>
+                  <label htmlFor="wa-media-retention" className="field-label">
+                    {t('settings.whatsapp.mediaRetention')}
+                  </label>
+                  <input
+                    id="wa-media-retention"
+                    type="number"
+                    min={0}
+                    max={3650}
+                    className="modern-input w-full"
+                    value={waForm.mediaRetentionDays}
+                    onChange={(event) => setWaForm((current) => ({
+                      ...current,
+                      // `|| 1` would be wrong here, unlike on the rate limit
+                      // above: 0 is a real and meaningful value on this field —
+                      // it is the one that deletes nothing — and an emptied box
+                      // has to land on it rather than on a day of retention
+                      // nobody typed.
+                      mediaRetentionDays: Math.max(0, Math.trunc(Number(event.target.value)) || 0)
+                    }))}
+                  />
+                  <p className="field-hint">{t('settings.whatsapp.mediaRetentionHint')}</p>
                 </div>
               </div>
 
