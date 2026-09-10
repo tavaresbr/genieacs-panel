@@ -27,6 +27,7 @@ import mapSettingsRoutes from './routes/mapSettings.js';
 import databaseRoutes from './routes/database.js';
 import userRoutes from './routes/users.js';
 import tenantRoutes from './routes/tenant.js';
+import exportRoutes from './routes/export.js';
 import customerPortalRoutes from './routes/customerPortal.js';
 import sgpRoutes from './routes/sgp.js';
 import whatsappRoutes from './routes/whatsapp.js';
@@ -220,6 +221,10 @@ if (IS_SELF_HOSTED) {
   app.use('/api/database', databaseRoutes);
 }
 app.use('/api/users', userRoutes);
+// One provider's whole database, as a file. Mounted in both editions, unlike
+// `/api/database` above: this one reads a single provider's rows through the
+// scoped builder, so it has nothing to say about anybody else's deployment.
+app.use('/api/export', exportRoutes);
 app.use('/api/sgp', sgpRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/whatsapp', whatsappMessageRoutes);

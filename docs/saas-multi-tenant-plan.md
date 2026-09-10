@@ -526,17 +526,72 @@ venda. Continua sendo trabalho de infraestrutura, não de código.
 
 ---
 
-### Fase 7 — Operação e as duas edições *(esforço: médio)*
+### Fase 7 — Operação e as duas edições *(os dois itens do checklist entregues)*
 
-- Flag `EDITION=saas|selfhosted` lida em `backend/src/app.js`, controlando: rotas de cadastro,
-  `backend/src/routes/database.js` (troca de banco), wizard de setup, permissão de faixas IP
-  privadas no conector, e o console de plataforma.
-- Self-hosted continua com `deploy/install.sh` + CLI `deploy/skygenpanel` + SQLite/MySQL.
-  SaaS usa o `Dockerfile` + Postgres gerenciado + migrations no CI.
-- Observabilidade: `tenant_id` em toda linha de log e em toda métrica; `audit_log` para ações
-  sensíveis (troca de senha de portal, alteração de conexão GenieACS, impersonation).
-- Backup e **procedimento de exportação/exclusão por tenant** — necessário para LGPD e para
-  cancelamento de contrato.
+Os dois que o checklist exigia saíram junto com a Fase 4, fora de ordem de propósito: são os
+que decidem se dá para **operar** com dezenas de provedores, não os que decidem se dois cabem
+no mesmo deploy.
+
+**`audit_log` (migration `0030`, escopada) — item 11.** Onze ações, todas coisas que o painel
+faz hoje e que **não deixam rastro no próprio dado**: revelar uma senha guardada não muda
+nada, e encerrar um vínculo ou rotacionar uma credencial destrói justamente a linha que diria
+o que havia antes.
+
+Três regras dão forma a tudo:
+
+- **Nunca o segredo.** Um log que guarda a senha revelada é uma segunda cópia de todas as
+  senhas do painel, numa tabela cujo acesso de leitura se distribui muito mais livremente que
+  o da tabela de contas — e que, ao contrário dela, ninguém cifrou. A linha diz que houve uma
+  revelação, de quem, por quem e de onde.
+- **Registrar não pode quebrar a ação.** `record` engole a própria falha: a revelação já
+  aconteceu, e devolver erro faria o operador repetir — uma segunda exposição causada pelo
+  log. O custo é honesto e está escrito no código: um deploy com escrita falhando continua
+  servindo ação sensível sem registro, e só o log do processo diz isso.
+- **O `metadata` é onde dado pessoal se acumula sem ninguém decidir coletar**, um `...body`
+  bem-intencionado de cada vez. Só escalares, poucos e curtos; chave que *soe* como segredo é
+  descartada — com uma exceção que não é brecha: um **booleano** sob essa chave passa, porque
+  booleano não é segredo. É o que deixa `tokenChanged: true` entrar e `token: '…'` não.
+
+A FK do ator é `ON DELETE SET NULL`, **nunca CASCADE**: em cascata, apagar uma pessoa apagaria
+o registro do que ela fez, e a ação mais digna de auditoria — alguém apagando o próprio
+rastro — seria a única que destrói a própria evidência. O `actor_label` é desnormalizado para
+a linha continuar legível depois.
+
+Não vem rota de leitura. Quem pode ler o log é outra concessão que a de escrevê-lo — um
+administrador pode encerrar um vínculo, então lê-lo revelando cada linha não decorre disso — e
+a resposta pertence ao plano de plataforma.
+
+**Exportação por provedor — item 12.** `GET /api/export`, `authenticateToken` +
+`requireRole(['admin'])`, NDJSON em stream com contrapressão. Percorre `SCHEMA_TABLES` — a
+mesma lista e a mesma ordem que o `dbManagementService` usa, então pai antes de filho, e uma
+tabela nova não pode ficar de fora. A leitura é paginada por chave (`where id > cursor`), não
+por `OFFSET`, e o gerador segura uma página de cada vez.
+
+A decisão central era o que fazer com as colunas cifradas, e a resposta é **ciphertext com a
+`key_version`, nada decifrado, em lugar nenhum**. Os dois motivos querem coisas diferentes e
+só um deles quer os segredos: **restaurar não quer texto claro** — o painel que recoloca o
+arquivo tem o mesmo segredo base, então o ciphertext volta idêntico, e decifrar significaria
+recifrar na entrada com o texto claro num arquivo no meio do caminho, de graça. E
+**portabilidade não precisa** — o que se deve ao provedor são os registros dele, e um segredo
+de autenticação guardado não é um. A leitura legítima da senha WiFi de um assinante (um
+operador ao telefone) já existe no painel, uma conta por vez, atrás de sessão.
+
+O flag `?decrypt=true` foi recusado de propósito: é uma opção que acaba sendo ligada, e ligada
+exatamente por quem está na ligação do "apaguei tudo" na pior hora.
+
+A `key_version` é o que faz do ciphertext uma resposta que funciona em vez de uma recusa, e é
+a parte que se perderia em silêncio: `secretBox.decrypt` reporta chave ausente devolvendo
+`null` — indistinguível de "não havia senha" — então ciphertext restaurado sem a versão não é
+erro, é uma frota de assinantes cujas senhas evaporaram.
+
+`users` sai projetado a `id, username, created_at, updated_at`. **Não** o hash: um login abre
+o painel em todo ISP para o qual a pessoa trabalha, então esse hash não é deste provedor para
+entregar. **Não** o `role`: é coluna do deploy e o painel deixou de acreditar nela — quem
+autoriza é o vínculo.
+
+**O que continua de pé nesta fase:** `tenant_id` em toda linha de log e em toda métrica, a
+rota de leitura do `audit_log` junto do plano de plataforma, o console de plataforma, e o
+procedimento de **exclusão** por provedor (a exportação é a metade que existe).
 
 ---
 
@@ -645,8 +700,11 @@ SSRF e a guarda de egresso **antes** de a URL virar dado do cliente, depois o co
 A ordem importava e se pagou: cada uma dessas fases só pôde ser testada de verdade porque a
 anterior já estava lá.
 
-**O que resta:** Fases 5 → 6 → 7 — planos e limites, o frontend, e a operação
-(`audit_log`, exportação por provedor).
+Depois vieram os dois itens de operação da Fase 7 que o checklist exigia — `audit_log` e
+exportação por provedor — porque são os que decidem se dá para operar com dezenas de
+provedores, não os que decidem se dois cabem no mesmo deploy.
+
+**O que resta:** Fases 5 → 6 — planos, limites e ciclo de assinatura, e o frontend.
 
 Vale repetir o que o plano dizia e que se confirmou: a Fase 1 saiu para os installs
 self-hosted como upgrade normal, e o código de tenancy rodou em produção real com um
@@ -656,7 +714,7 @@ edições de divergirem.
 
 ### Checklist antes de vender acesso ao segundo provedor
 
-Nada disso é negociável. **Dez dos doze estão cumpridos.**
+Nada disso é negociável. **Os doze estão cumpridos.**
 
 | | Item | Estado |
 | --- | --- | --- |
@@ -668,21 +726,20 @@ Nada disso é negociável. **Dez dos doze estão cumpridos.**
 | 6 | Credenciais ACS por provedor, cifradas, guarda de egresso, branch de URL absoluta removido | ✅ `tenant_genieacs_connections` + `GenieAcsEgress` + conector |
 | 7 | `/api/database` não montada na edição SaaS | ✅ |
 | 8 | Rate limit e concorrência de fetch ACS chaveados por provedor | ✅ `tenantIpKey` no limite, `withAcsSlot` no fetch |
-| 9 | Suíte de vazamento verde no CI e obrigatória para merge | ✅ 1101 testes, três dialetos |
+| 9 | Suíte de vazamento verde no CI e obrigatória para merge | ✅ 1150 testes, três dialetos |
 | 10 | `SECRET_BOX_KEY` separada do `JWT_SECRET`, com `key_version` | ✅ |
-| 11 | `audit_log` registrando ações sensíveis | ❌ Fase 7 |
-| 12 | Exportação por provedor funcionando (LGPD e "apaguei tudo, socorro") | ❌ Fase 7 |
+| 11 | `audit_log` registrando ações sensíveis | ✅ onze ações, sem nunca guardar o segredo |
+| 12 | Exportação por provedor funcionando (LGPD e "apaguei tudo, socorro") | ✅ `GET /api/export`, NDJSON em stream |
 
-Os dois que faltam são de **operação (11, 12)** — registro de ações sensíveis e exportação
-por provedor. Nenhum dos dois é do mecanismo de isolamento de dados, e nenhum dos dois
-impede o segundo provedor de existir; o que eles impedem é operar com dezenas deles sem
-saber quem leu o quê, e atender um pedido de LGPD sem escrever SQL à mão.
+Nenhum item do checklist está em aberto. Isso **não** quer dizer que o produto está pronto —
+faltam as Fases 5 e 6 inteiras, planos, limites e frontend — mas quer dizer que a lista de
+coisas que não se pode vender sem já não tem linha vermelha.
 
 ## Verificação
 
 ```bash
 npm run verify          # check backend + testes + lint + typecheck + build (raiz)
-cd backend && npm test  # 1101 testes, incluindo as suítes de tenancy
+cd backend && npm test  # 1150 testes, incluindo as suítes de tenancy
 ```
 
 A suíte roda nos três dialetos, e **isso não é zelo**: cada uma das armadilhas abaixo passou
