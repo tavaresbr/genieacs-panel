@@ -33,7 +33,7 @@ export function LanguageSwitcher({ variant = 'light', compact = false, className
       ) : (
         <span className="truncate text-xs font-semibold">{LOCALE_METADATA[locale].label}</span>
       )}
-      {!compact && <Icon name="chevron-down" size={14} className="ml-auto shrink-0 opacity-70" aria-hidden="true" />}
+      {!compact && <Icon name="chevron-down" size={14} className="ms-auto shrink-0 opacity-70" aria-hidden="true" />}
       <select
         value={locale}
         onChange={(event) => setLocale(event.target.value as Locale)}
