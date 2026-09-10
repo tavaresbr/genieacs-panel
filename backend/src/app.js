@@ -6,7 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { testConnection } from './config/database.js';
-import { IS_SELF_HOSTED } from './config/edition.js';
+import { IS_SAAS, IS_SELF_HOSTED } from './config/edition.js';
 import { TRUST_PROXY } from './config/proxy.js';
 import { attachLocale } from './middleware/locale.js';
 import { resolveTenant } from './middleware/tenantResolver.js';
@@ -25,6 +25,7 @@ import vendorRoutes from './routes/vendors.js';
 import mappingRoutes from './routes/mapping.js';
 import mapSettingsRoutes from './routes/mapSettings.js';
 import databaseRoutes from './routes/database.js';
+import platformRoutes from './routes/platform.js';
 import userRoutes from './routes/users.js';
 import customerPortalRoutes from './routes/customerPortal.js';
 import sgpRoutes from './routes/sgp.js';
@@ -203,6 +204,13 @@ app.use('/api/map-settings', mapSettingsRoutes);
 // only exists in the self-hosted edition.
 if (IS_SELF_HOSTED) {
   app.use('/api/database', databaseRoutes);
+}
+// The control plane is the other half of that same trade. On a self-hosted
+// install there is one provider and no plane above it, so these routes must not
+// merely refuse — they must not EXIST. A 403 would answer the question the
+// prober was asking, which is whether a control plane is there to find.
+if (IS_SAAS) {
+  app.use('/api/platform', platformRoutes);
 }
 app.use('/api/users', userRoutes);
 app.use('/api/sgp', sgpRoutes);
