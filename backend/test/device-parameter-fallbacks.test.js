@@ -6,6 +6,7 @@ import { asTenant, authHeaders, call, startTestServers, stopTestServers } from '
 const { default: Setting } = await import('../src/models/Setting.js');
 const {
   findPppoeUsername,
+  findRxPowerReading,
   normalizeRxPowerReading
 } = await import('../src/services/deviceParameterFallbacks.js');
 
@@ -172,6 +173,55 @@ describe('PPPoE login in the device tree', () => {
 
   it('reports nothing for a bridged ONT', () => {
     assert.equal(findPppoeUsername({ InternetGatewayDevice: { WANDevice: {} } }, readValue), null);
+  });
+});
+
+describe('an optical reading found by its own name', () => {
+  const readValue = (node) => (node && typeof node === 'object' && '_value' in node ? node._value : node);
+
+  it('finds the reading under a vendor object nobody catalogued', () => {
+    const item = {
+      InternetGatewayDevice: {
+        WANDevice: { 1: { X_ACME_Pon: { RxPower: param('-2417') } } }
+      }
+    };
+    assert.deepEqual(findRxPowerReading(item, readValue), {
+      value: -24.17,
+      path: 'InternetGatewayDevice.WANDevice.1.X_ACME_Pon.RxPower'
+    });
+  });
+
+  it('ignores the parameters that merely sound like the reading', () => {
+    const item = {
+      InternetGatewayDevice: {
+        WANDevice: {
+          1: {
+            X_ACME_Pon: {
+              TXPower: param('215'),
+              RXPowerThreshold: param('-2800'),
+              RXPowerAlarm: param('0')
+            }
+          }
+        }
+      }
+    };
+    assert.equal(findRxPowerReading(item, readValue), null);
+  });
+
+  it('reads the TR-181 optical interface', () => {
+    const item = { Device: { Optical: { Interface: { 1: { OpticalSignalLevel: param(-2417) } } } } };
+    assert.deepEqual(findRxPowerReading(item, readValue), {
+      value: -24.17,
+      path: 'Device.Optical.Interface.1.OpticalSignalLevel'
+    });
+  });
+
+  it('does not walk an unbounded document looking for one number', () => {
+    // A chain far deeper than any optical object sits at; the scan must stop
+    // rather than follow whatever shape a device document happens to have.
+    let deep = { RXPower: param('-2417') };
+    for (let level = 0; level < 12; level += 1) deep = { nested: deep };
+    assert.equal(findRxPowerReading({ InternetGatewayDevice: { WANDevice: { 1: deep } } }, readValue), null);
   });
 });
 
