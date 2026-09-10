@@ -1049,12 +1049,25 @@ export const SCHEMA_TABLES = [
  */
 const CUSTOMER_ACCOUNT_IDENTITY_COLUMNS = ['customer_id', 'device_id', 'identity_hash'];
 
-/** Se um índice com este nome existe na tabela, nos três dialetos. */
+/**
+ * Se um índice com este nome existe na tabela, nos três dialetos.
+ *
+ * No Postgres a pergunta é feita a `to_regclass`, qualificada pelo schema
+ * corrente, e não a `pg_indexes`. A view varre TODOS os schemas: num servidor
+ * onde outros processos criam e derrubam os seus ao mesmo tempo — a suíte de
+ * testes, um deploy paralelo — a varredura tropeça numa relação sendo apagada
+ * e morre com "could not open relation with OID". E sem filtrar pelo schema
+ * ela ainda responderia sim pelo índice do vizinho, deixando o nosso sem
+ * criar. `to_regclass` resolve um nome só, no schema em que este processo
+ * escreve, e devolve nulo em vez de erro quando não há nada com aquele nome.
+ */
 async function hasIndex(db, table, name) {
   const client = String(db.client.config.client);
   if (client === 'pg') {
-    const rows = await db('pg_indexes').where({ tablename: table, indexname: name });
-    return rows.length > 0;
+    const result = await db.raw(
+      "select to_regclass(format('%I.%I', current_schema(), ?)) as oid", [name]
+    );
+    return (result.rows?.[0]?.oid ?? null) !== null;
   }
   if (client.startsWith('mysql')) {
     const rows = await db.raw('SHOW INDEX FROM ?? WHERE Key_name = ?', [table, name]);
