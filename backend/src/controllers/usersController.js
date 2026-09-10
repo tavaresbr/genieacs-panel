@@ -4,6 +4,7 @@ import User from '../models/User.js';
 import TenantUser from '../models/TenantUser.js';
 import { createResponse, createErrorResponse, isValidEmail } from '../utils/helpers.js';
 import { ROLES, normalizeRole, roleHas } from '../config/permissions.js';
+import PlanLimitService from '../services/planLimitService.js';
 
 export { ROLES };
 
@@ -162,6 +163,18 @@ class UsersController {
       // Nome e e-mail conferidos juntos, contra o mesmo espaço de nomes: um
       // e-mail igual ao nome de outra pessoa (ou o contrário) tornaria o
       // identificador de login ambíguo, e `findByLogin` recusaria os dois.
+      // O teto do plano, conferido antes de criar a pessoa. Depois seria pior:
+      // `User.create` já teria tomado o nome de usuário no deploy inteiro, e
+      // desfazer é o caminho de exceção logo abaixo, não o normal.
+      const cabe = await PlanLimitService.canAddOperator();
+      if (!cabe.ok) {
+        return res.status(402).json({
+          success: false,
+          code: 'plan_limit_operators',
+          message: req.t('plan.operatorLimit', { limit: cabe.limit })
+        });
+      }
+
       const conflito = await User.loginConflict({ username, email });
       if (conflito === 'email_taken') {
         return res.status(409).json(createErrorResponse(req.t('auth.emailTaken')));

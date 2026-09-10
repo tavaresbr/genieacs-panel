@@ -891,6 +891,15 @@ const tenantSubscriptionsTable = (db) => (t) => {
   t.timestamp('trial_ends_at');
   // O fim do período pago corrente, para a tela dizer até quando vale.
   t.timestamp('current_period_end');
+  // O plano contratado. O catálogo e os tetos vivem em `config/plans.js`, e não
+  // aqui: um limite é decisão comercial que precisa de diff e de revisor, e num
+  // banco um dígito errado alarga o teto de todo mundo daquele plano em
+  // silêncio. Esta coluna guarda só QUAL plano, que é dado de cliente.
+  t.string('plan_code', 32).notNullable().defaultTo('unlimited');
+  // As exceções negociadas. Nulo significa "vale o do plano" — e não zero, que
+  // é um teto legítimo de quem contratou zero.
+  t.integer('max_operators').unsigned();
+  t.integer('max_subscriber_accounts').unsigned();
   // Por que está neste estado, escrito por quem mudou. Aparece para o ISP.
   t.string('status_reason', 255);
   t.timestamp('status_changed_at').defaultTo(db.fn.now());
@@ -935,8 +944,53 @@ const MEMBERSHIP_TABLES = [
  * deixou de descrever o conteúdo é a próxima pessoa colocando a tabela errada
  * nele.
  */
+const tenantBillingEventsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  // `payment` (entrou dinheiro, por um período) ou `status_change` (o estado
+  // comercial andou). Os dois na MESMA tabela de propósito: a pergunta que este
+  // livro responde é "o que aconteceu com este cliente", e essa história é
+  // pagou-atrasou-suspendemos-pagou. Separados em duas tabelas, ninguém
+  // consegue lê-la em ordem.
+  t.string('kind', 16).notNullable();
+  // De onde veio o fato. Hoje só `manual` — nós marcamos. Quando entrar um
+  // gateway, é esta coluna que distingue o que ele afirmou do que nós digitamos.
+  t.string('source', 32).notNullable().defaultTo('manual');
+  // O id do evento NO gateway, e a metade da idempotência.
+  //
+  // É a coluna que precisa existir desde já, mesmo sem gateway nenhum. Todo
+  // gateway reentrega webhook, e reentrega é a regra e não a exceção;
+  // acrescentar idempotência depois que o dinheiro já está passando significa
+  // reconciliar cobranças duplicadas à mão, com o cliente do outro lado. Nulo
+  // para o que é digitado por nós, e nulos não colidem num índice único nos
+  // três bancos — que é justamente o que permite a marca manual conviver aqui.
+  t.string('external_id', 128);
+  t.string('status_from', 16);
+  t.string('status_to', 16);
+  // Em centavos, inteiro. Nunca float: 0.1 + 0.2 não é 0.3, e num livro de
+  // dinheiro o erro não some, acumula.
+  t.integer('amount_cents');
+  t.string('currency', 3);
+  t.timestamp('period_start');
+  t.timestamp('period_end');
+  t.text('detail');
+  // Quando o fato aconteceu, que não é quando a linha foi escrita: um pagamento
+  // conciliado na segunda pode ser de sexta.
+  t.timestamp('occurred_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  t.unique(['source', 'external_id']);
+  // Como o console pergunta: o extrato deste provedor, do mais recente para o
+  // mais antigo. O `id` desempata dois fatos no mesmo instante.
+  t.index(['tenant_id', 'occurred_at', 'id'], 'tenant_billing_events_recent_idx');
+};
+
 const SUBSCRIPTION_TABLES = [
-  ['tenant_subscriptions', tenantSubscriptionsTable]
+  ['tenant_subscriptions', tenantSubscriptionsTable],
+  // Depois da assinatura na lista, e a ordem não é estética: o export e a
+  // exclusão percorrem `SCHEMA_TABLES` na ordem de criação, e as FKs pedem que
+  // o pai venha antes.
+  ['tenant_billing_events', tenantBillingEventsTable]
 ];
 
 const INITIAL_TABLES = [
@@ -2212,6 +2266,65 @@ export const migrations = [
         status_reason: 'Provedor existente no dia em que a assinatura passou a ser registrada',
         status_changed_at: new Date()
       })));
+    }
+  },
+  {
+    /**
+     * O plano, acrescentado a uma tabela que pode já existir.
+     *
+     * A 0035 é recente, então na maioria das instalações a tabela nasce já com
+     * estas colunas e este passo não faz nada. Ele existe para a minoria que
+     * subiu entre as duas — e a ordem importa: `hasColumn` antes de `alterTable`
+     * porque o SQLite reconstrói a tabela para acrescentar coluna, e reconstruir
+     * à toa é o tipo de coisa que só dá errado com dado dentro.
+     *
+     * `unlimited` como padrão pelo mesmo motivo do backfill da 0035: aplicar um
+     * teto retroativamente a quem já tem doze operadores não cobra nada de
+     * ninguém — só impede o ISP de contratar o décimo terceiro, num dia em que
+     * ele não mudou nada e não foi avisado.
+     */
+    id: '0036_tenant_subscription_plans',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenant_subscriptions'))) return false;
+      return db.schema.hasColumn('tenant_subscriptions', 'plan_code');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenant_subscriptions'))) return;
+      const faltando = [];
+      if (!(await db.schema.hasColumn('tenant_subscriptions', 'plan_code'))) {
+        faltando.push((t) => t.string('plan_code', 32).notNullable().defaultTo('unlimited'));
+      }
+      if (!(await db.schema.hasColumn('tenant_subscriptions', 'max_operators'))) {
+        faltando.push((t) => t.integer('max_operators').unsigned());
+      }
+      if (!(await db.schema.hasColumn('tenant_subscriptions', 'max_subscriber_accounts'))) {
+        faltando.push((t) => t.integer('max_subscriber_accounts').unsigned());
+      }
+      if (!faltando.length) return;
+      await db.schema.alterTable('tenant_subscriptions', (t) => {
+        for (const add of faltando) add(t);
+      });
+    }
+  },
+  {
+    /**
+     * O livro do que aconteceu comercialmente com cada provedor.
+     *
+     * Vale dizer por que ele não é o `platform_audit` nem o `audit_log`, já que
+     * os três guardam "algo mudou". A trilha registra o ATO e quem o praticou —
+     * é prestação de contas. Este registra o FATO comercial, e os dois divergem
+     * de verdade: o webhook de um gateway produz um pagamento sem nenhum humano
+     * por trás, e uma suspensão automática por atraso produz um fato sem ator.
+     * Quem pergunta "quem mexeu nisso?" lê a trilha; quem pergunta "até quando
+     * este cliente está pago?" lê aqui.
+     */
+    id: '0037_tenant_billing_events',
+    async isApplied(db) {
+      return db.schema.hasTable('tenant_billing_events');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      await createTableIfMissing(db, 'tenant_billing_events', tenantBillingEventsTable(db));
     }
   }
 ];

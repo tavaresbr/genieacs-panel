@@ -1,6 +1,8 @@
 import Tenant from '../models/Tenant.js';
 import PlatformAudit from '../models/PlatformAudit.js';
 import TenantSubscription from '../models/TenantSubscription.js';
+import TenantBillingEvent from '../models/TenantBillingEvent.js';
+import SubscriptionBillingService from '../services/subscriptionBillingService.js';
 import { SUBSCRIPTION_STATUSES } from '../config/subscription.js';
 import { SCHEMA_TABLES } from '../config/migrations.js';
 import { SCOPED_TABLES } from '../config/tenantScope.js';
@@ -340,6 +342,14 @@ class PlatformController {
         return res.status(404).json(createErrorResponse('Provider has no subscription'));
       }
 
+      // Duas escritas, e não uma repetida. A trilha registra o ATO e quem o
+      // praticou — prestação de contas. O extrato registra o FATO comercial, e
+      // é o que faz a história ficar legível em ordem: pagou, atrasou,
+      // suspendemos, pagou. Um webhook de gateway vai escrever no extrato sem
+      // ter ator nenhum para a trilha.
+      await SubscriptionBillingService.recordStatusChange({
+        tenantId: id, from: mudanca.from, to: mudanca.to, reason: motivo
+      });
       await PlatformAudit.fromRequest(req, {
         action: PlatformAudit.ACTIONS.SUBSCRIPTION_CHANGED,
         tenant,
@@ -368,6 +378,110 @@ class PlatformController {
       console.error('Update subscription error:', error);
       return res.status(500).json(
         createErrorResponse('Failed to update the subscription', error.message)
+      );
+    }
+  }
+
+  /**
+   * Marca pago: `POST /api/platform/tenants/:id/billing`.
+   *
+   * O caminho por onde um gateway vai entrar sem que nada aqui mude. Hoje quem
+   * chama somos nós, pelo console; amanhã é o webhook do Asaas, com o
+   * `externalId` dele — e é esse campo que impede uma reentrega de empurrar o
+   * período mais trinta dias.
+   */
+  static async recordPayment(req, res) {
+    try {
+      const id = Number(req.params?.id);
+      if (!Number.isInteger(id) || id <= 0) {
+        return res.status(400).json(createErrorResponse('Invalid provider id'));
+      }
+      const tenant = await Tenant.findById(id);
+      if (!tenant) {
+        return res.status(404).json(createErrorResponse('Provider not found'));
+      }
+
+      const centavos = req.body?.amountCents;
+      if (centavos !== undefined && centavos !== null) {
+        const n = Number(centavos);
+        // Zero é legítimo — uma cortesia, um período de teste estendido —, mas
+        // negativo não: um estorno é um fato próprio, não um pagamento com
+        // sinal trocado, e aceitá-lo aqui faria a soma do extrato mentir.
+        if (!Number.isInteger(n) || n < 0) {
+          return res.status(400).json(createErrorResponse('amountCents must be a non-negative integer'));
+        }
+      }
+      const provider = SubscriptionBillingService.providerFor(req.body?.source);
+      if (!provider) {
+        return res.status(400).json(createErrorResponse('Unknown billing provider'));
+      }
+
+      const resultado = await provider.applyPayment({
+        tenantId: id,
+        amountCents: centavos ?? null,
+        currency: String(req.body?.currency ?? 'BRL').slice(0, 3).toUpperCase(),
+        externalId: req.body?.externalId ? String(req.body.externalId).slice(0, 128) : null,
+        detail: req.body?.reason ? { reason: String(req.body.reason).slice(0, 255) } : null
+      });
+      if (!resultado.applied && !resultado.duplicate) {
+        return res.status(404).json(createErrorResponse('Provider has no subscription'));
+      }
+
+      await PlatformAudit.fromRequest(req, {
+        action: PlatformAudit.ACTIONS.SUBSCRIPTION_CHANGED,
+        tenant,
+        detail: {
+          payment: true,
+          duplicate: Boolean(resultado.duplicate),
+          amountCents: centavos ?? null
+        }
+      });
+
+      const counts = await Tenant.operatorCounts();
+      // 200 e não 201 numa reentrega: nada foi criado, e o gateway que reenviou
+      // precisa de uma resposta de sucesso para parar de tentar.
+      return res.status(resultado.duplicate ? 200 : 201).json(
+        createResponse(resultado.duplicate ? 'Payment already recorded' : 'Payment recorded', {
+          duplicate: Boolean(resultado.duplicate),
+          event: TenantBillingEvent.present(resultado.event),
+          tenant: present(
+            tenant,
+            counts.get(Number(id)) || 0,
+            await TenantSubscription.findByTenantId(id)
+          )
+        })
+      );
+    } catch (error) {
+      console.error('Record payment error:', error);
+      return res.status(500).json(
+        createErrorResponse('Failed to record the payment', error.message)
+      );
+    }
+  }
+
+  /** O extrato de um provedor: `GET /api/platform/tenants/:id/billing`. */
+  static async listBilling(req, res) {
+    try {
+      const id = Number(req.params?.id);
+      if (!Number.isInteger(id) || id <= 0) {
+        return res.status(400).json(createErrorResponse('Invalid provider id'));
+      }
+      if (!await Tenant.findById(id)) {
+        return res.status(404).json(createErrorResponse('Provider not found'));
+      }
+      // No escopo do provedor consultado, e não no do host do console: é a
+      // leitura escopada normal, e é o que faz o extrato de um não poder sair
+      // pela pergunta sobre o outro.
+      const eventos = await runInTenant(id, () => TenantBillingEvent.list({
+        limit: req.query?.limit
+      }));
+      return res.json(createResponse('Billing events retrieved', {
+        events: eventos.map((linha) => TenantBillingEvent.present(linha))
+      }));
+    } catch (error) {
+      console.error('List billing error:', error);
+      return res.status(500).json(
+        createErrorResponse('Failed to read the billing events', error.message)
       );
     }
   }

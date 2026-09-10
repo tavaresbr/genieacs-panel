@@ -578,4 +578,9 @@ export default {
 
   'subscription.readOnly': 'اشتراك هذا المزوّد متأخر السداد، لذا تبقى اللوحة للقراءة فقط حتى تسوية الفاتورة',
   'subscription.blocked': 'اشتراك هذا المزوّد غير نشط',
+
+  'plan.operatorLimit': 'تسمح هذه الباقة بـ {limit} مشغّلين؛ تواصل معنا لتوسيعها وإضافة مشغّل آخر',
+  'plan.subscriberAccountLimit': 'تسمح هذه الباقة بـ {limit} حساب مشترك، لذلك لم تُنشأ حسابات جديدة',
+  'plan.usageRetrieved': 'تم جلب استخدام الباقة',
+  'plan.usageFailed': 'تعذّر قراءة استخدام الباقة',
 };

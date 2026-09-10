@@ -2,6 +2,7 @@ import Tenant from '../models/Tenant.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import TenantExportService from '../services/tenantExportService.js';
 import AuditLog from '../models/AuditLog.js';
+import PlanLimitService from '../services/planLimitService.js';
 
 /**
  * What a provider will admit to before anybody has signed in.
@@ -44,6 +45,32 @@ class TenantController {
     } catch (error) {
       console.error('Tenant export error:', error);
       return res.status(500).json(createErrorResponse(req.t('tenant.exportFailed'), error.message));
+    }
+  }
+
+  /**
+   * `GET /api/tenant/usage` — o plano deste provedor e quanto dele já foi usado.
+   *
+   * Autenticada, ao contrário da `/public` logo abaixo, e a diferença é a mesma
+   * que separa 401 de 402 no portão comercial: quantos operadores um ISP tem e
+   * quanto do plano dele está gasto é assunto de dentro da casa. A `/public`
+   * existe porque a tela de login precisa do nome antes de haver quem
+   * autenticar; esta não tem essa desculpa.
+   *
+   * A contagem de ONTs NÃO está aqui. Ela vem do ACS do provedor, custa uma
+   * requisição de rede e é a única medida que pode falhar — misturá-la com três
+   * `COUNT` locais faria a tela inteira quebrar quando o ACS do cliente
+   * estivesse fora do ar. E, mais de fundo: ONT não é um limite, é uma medição
+   * (ver `config/plans.js`).
+   */
+  static async getUsage(req, res) {
+    try {
+      return res.json(createResponse(req.t('plan.usageRetrieved'), {
+        usage: await PlanLimitService.usage()
+      }));
+    } catch (error) {
+      console.error('Plan usage error:', error);
+      return res.status(500).json(createErrorResponse(req.t('plan.usageFailed'), error.message));
     }
   }
 

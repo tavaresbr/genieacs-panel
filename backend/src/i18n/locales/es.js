@@ -582,4 +582,9 @@ export default {
 
   'subscription.readOnly': 'La suscripción de este proveedor está vencida, así que el panel queda en solo lectura hasta que se abone la factura',
   'subscription.blocked': 'La suscripción de este proveedor no está activa',
+
+  'plan.operatorLimit': 'Este plan permite {limit} operadores; contáctanos para ampliarlo y agregar otro',
+  'plan.subscriberAccountLimit': 'Este plan permite {limit} cuentas de suscriptor, así que no se creó ninguna nueva',
+  'plan.usageRetrieved': 'Uso del plan obtenido',
+  'plan.usageFailed': 'No se pudo leer el uso del plan',
 };

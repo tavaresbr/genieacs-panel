@@ -585,4 +585,9 @@ export default {
 
   'subscription.readOnly': '該服務商的訂閱已逾期，在結清帳單之前面板為唯讀狀態',
   'subscription.blocked': '該服務商的訂閱未生效',
+
+  'plan.operatorLimit': '該方案允許 {limit} 個操作員；如需增加請聯絡我們',
+  'plan.subscriberAccountLimit': '該方案允許 {limit} 個用戶帳號，因此未建立新帳號',
+  'plan.usageRetrieved': '已取得方案用量',
+  'plan.usageFailed': '無法讀取方案用量',
 };

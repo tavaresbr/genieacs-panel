@@ -588,4 +588,9 @@ export default {
 
   'subscription.readOnly': '이 사업자의 구독이 연체되어 청구서가 정산될 때까지 패널은 읽기 전용입니다',
   'subscription.blocked': '이 사업자의 구독이 활성 상태가 아닙니다',
+
+  'plan.operatorLimit': '이 요금제는 운영자 {limit}명까지 허용합니다. 늘리려면 문의해 주세요',
+  'plan.subscriberAccountLimit': '이 요금제는 가입자 계정 {limit}개까지 허용하므로 새 계정이 생성되지 않았습니다',
+  'plan.usageRetrieved': '요금제 사용량을 가져왔습니다',
+  'plan.usageFailed': '요금제 사용량을 읽지 못했습니다',
 };

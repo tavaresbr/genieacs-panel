@@ -585,4 +585,9 @@ export default {
 
   'subscription.readOnly': '该服务商的订阅已逾期，在结清账单之前面板为只读状态',
   'subscription.blocked': '该服务商的订阅未生效',
+
+  'plan.operatorLimit': '该套餐允许 {limit} 个操作员；如需增加请联系我们',
+  'plan.subscriberAccountLimit': '该套餐允许 {limit} 个用户账户，因此未创建新账户',
+  'plan.usageRetrieved': '已获取套餐用量',
+  'plan.usageFailed': '无法读取套餐用量',
 };
