@@ -6,6 +6,7 @@ import TenantUser from '../models/TenantUser.js';
 import PlatformAdmin from '../models/PlatformAdmin.js';
 import { runInTenant } from '../config/tenantContext.js';
 import { roleHas } from '../config/permissions.js';
+import { subscriptionRefusal } from './subscriptionGate.js';
 
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
 const REFRESH_TOKEN_EXPIRES_IN = process.env.REFRESH_TOKEN_EXPIRES_IN || '7d';
@@ -222,7 +223,21 @@ async function authenticateToken(req, res, next) {
 
   req.user = session;
   req.tenantId = session.tenantId;
-  return runInTenant(session.tenantId, () => next());
+  return runInTenant(session.tenantId, async () => {
+    // A porta da assinatura mora AQUI, e não num `app.use` acima das rotas,
+    // para que o 401 venha sempre antes do 402. No lugar antigo um request sem
+    // token nenhum respondia diferente conforme a fatura do provedor, e a
+    // inadimplência de um ISP virava fato consultável por qualquer um que
+    // alcançasse o host. Ver o topo de `subscriptionGate.js`.
+    let recusa;
+    try {
+      recusa = await subscriptionRefusal(req);
+    } catch (error) {
+      return next(error);
+    }
+    if (recusa) return res.status(402).json(recusa);
+    return next();
+  });
 }
 
 /**

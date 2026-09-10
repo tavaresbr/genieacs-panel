@@ -19,16 +19,21 @@ import assert from 'node:assert/strict';
 process.env.EDITION = 'saas';
 
 const {
-  authHeaders, call, defaultTenantId, getDb, runInTenant, startTestServers, stopTestServers
+  authHeaders, call, defaultTenantId, getDb, insertReturningId, runInTenant,
+  startTestServers, stopTestServers
 } = await import('./helpers/harness.js');
 const { default: SubscriptionService, GATE_CODES } = await import('../src/services/subscriptionService.js');
 const { default: Subscription } = await import('../src/models/Subscription.js');
+const { default: CustomerPortalPasswordService } = await import(
+  '../src/services/customerPortalPasswordService.js'
+);
 
 let panelUrl;
 let portalUrl;
 let alfa;
 let ownerToken;
 let ownerId;
+const assinante = { customerId: 'CSG-PORTAL1-330011', password: null };
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -45,7 +50,34 @@ before(async () => {
   if (!(await getDb()('platform_admins').where({ user_id: ownerId }).first())) {
     await getDb()('platform_admins').insert({ user_id: ownerId });
   }
+
+  // Um assinante de verdade: sem ele, o portal só podia ser provado por uma
+  // tentativa de login anônima — que é justamente o que não pode mais revelar
+  // nada.
+  const { password, record } = await CustomerPortalPasswordService.createRecord();
+  assinante.password = password;
+  await insertReturningId('customer_accounts', {
+    customer_id: assinante.customerId,
+    device_id: 'ont-do-portal',
+    identity_hash: 'hash-do-portal'.padEnd(64, '0'),
+    software_id: 'V1.0.0',
+    pppoe_username: 'assinante-do-portao',
+    active: true,
+    ...record
+  });
 });
+
+/** Uma sessão do portal, em cookie, tirada com o provedor em dia. */
+async function sessaoDoPortal() {
+  await setState({ status: 'active' });
+  const resposta = await call(`${portalUrl}/api/customer/login`, {
+    method: 'POST',
+    body: { customerId: assinante.customerId, password: assinante.password }
+  });
+  const cookie = resposta.response.headers.getSetCookie()
+    .find((c) => c.startsWith('skygp_portal_session='));
+  return cookie ? cookie.split(';')[0] : null;
+}
 
 after(async () => {
   await stopTestServers();
@@ -143,12 +175,33 @@ describe('suspended and canceled: a wall', () => {
     });
 
     it(`${status}: takes the subscriber portal down too`, async () => {
+      // Provado com uma sessão de verdade, e não por uma tentativa de login
+      // anônima. O login em si não pode mais responder diferente conforme a
+      // fatura: o portal é a superfície mais pública que existe aqui, e um 402
+      // ali diria a qualquer assinante — e a qualquer estranho — que o ISP dele
+      // parou de pagar. O muro continua de pé; só fica um passo adiante.
+      const cookie = await sessaoDoPortal();
+      assert.ok(cookie, 'o assinante precisa conseguir entrar para o caso valer');
       await setState({ status });
-      const attempt = await call(`${portalUrl}/api/customer/login`, {
-        method: 'POST',
-        body: { customerId: 'NAO-EXISTE', password: 'ABCDEF' }
+      const bloqueado = await call(`${portalUrl}/api/customer/session`, {
+        headers: { Cookie: cookie }
       });
-      assert.equal(attempt.status, 402);
+      assert.equal(bloqueado.status, 402);
+    });
+
+    it(`${status}: e o login do portal não denuncia a fatura do provedor`, async () => {
+      await setState({ status: 'active' });
+      const emDia = await call(`${portalUrl}/api/customer/login`, {
+        method: 'POST', body: { customerId: 'NAO-EXISTE', password: 'ABCDEF' }
+      });
+      await setState({ status });
+      const bloqueado = await call(`${portalUrl}/api/customer/login`, {
+        method: 'POST', body: { customerId: 'NAO-EXISTE', password: 'ABCDEF' }
+      });
+      assert.equal(
+        bloqueado.status, emDia.status,
+        `em dia respondeu ${emDia.status} e ${status} respondeu ${bloqueado.status}`
+      );
     });
   }
 
@@ -210,5 +263,80 @@ describe('the cache', () => {
     assert.equal((await read()).status, 402);
     await runInTenant(alfa, () => SubscriptionService.setStatus({ status: 'active' }));
     assert.equal((await read()).status, 200);
+  });
+});
+
+/**
+ * A ordem 401-antes-de-402, que é o que separa "bloqueado" de "publicado".
+ *
+ * A porta responde antes da autenticação, o que é deliberado — o comentário
+ * dela diz que a tela de bloqueio precisa aparecer também para quem ainda nem
+ * entrou. O efeito colateral é que a resposta a um request SEM TOKEN passa a
+ * variar com a fatura do provedor: 401 num em dia, 402 num inadimplente. Isso
+ * é exatamente o que `tenantController.getPublicProfile` proíbe, com estas
+ * palavras: não distinguir "não existe" de "existe e está suspenso", «um fato
+ * sobre o negócio de outra pessoa que estaríamos publicando».
+ *
+ * Um estranho que alcance o host — e o host é público — varre e descobre quais
+ * ISPs estão atrasados. Com o corpo do 402 ainda por cima, descobre o plano.
+ */
+describe('a fatura de um provedor não é fato público', () => {
+  afterEach(async () => {
+    await setState({ status: 'active' });
+  });
+
+  for (const status of ['suspended', 'canceled']) {
+    it(`sem token, um provedor ${status} responde igual a um em dia`, async () => {
+      await setState({ status: 'active' });
+      const emDia = await call(`${panelUrl}/api/devices`);
+      await setState({ status });
+      const bloqueado = await call(`${panelUrl}/api/devices`);
+      assert.equal(emDia.status, 401, 'o caso de controle precisa ser 401');
+      assert.equal(
+        bloqueado.status, emDia.status,
+        `em dia respondeu ${emDia.status} e ${status} respondeu ${bloqueado.status}`
+      );
+    });
+  }
+
+  it('e um token qualquer não revela mais do que a ausência dele', async () => {
+    // Um sondador não precisa de token válido, só de algo com formato de
+    // token — então a resposta a um token inventado também não pode variar.
+    const forjado = { Authorization: 'Bearer nao-e-um-token' };
+    await setState({ status: 'active' });
+    const emDia = await call(`${panelUrl}/api/devices`, { headers: forjado });
+    await setState({ status: 'suspended' });
+    const bloqueado = await call(`${panelUrl}/api/devices`, { headers: forjado });
+    assert.equal(
+      bloqueado.status, emDia.status,
+      `em dia respondeu ${emDia.status} e suspenso ${bloqueado.status}`
+    );
+  });
+
+  it('nem o corpo entrega o plano a quem não entrou', async () => {
+    // O par que dá sentido aos de cima: mesmo que o código de status voltasse a
+    // divergir um dia, o CORPO não pode carregar a assinatura para um anônimo.
+    await setState({ status: 'suspended' });
+    const { body } = await call(`${panelUrl}/api/devices`);
+    assert.equal(body?.subscription, undefined, JSON.stringify(body));
+  });
+
+  it('mas quem ENTROU vê o bloqueio, que é como se sai dele', async () => {
+    // A metade que a correção não pode quebrar: o operador do provedor
+    // bloqueado precisa ver a placa do muro, com o código que a tela lê.
+    await setState({ status: 'suspended' });
+    const { status, body } = await call(`${panelUrl}/api/devices`, {
+      headers: authHeaders(ownerToken)
+    });
+    assert.equal(status, 402);
+    assert.equal(body.code, GATE_CODES.SUSPENDED);
+  });
+
+  it('e o login continua aberto num provedor bloqueado', async () => {
+    await setState({ status: 'suspended' });
+    const { status } = await call(`${panelUrl}/api/auth/login`, {
+      method: 'POST', body: { username: 'owner', password: 'owner-senha-1' }
+    });
+    assert.equal(status, 200, 'entrar é como o operador vê o aviso');
   });
 });

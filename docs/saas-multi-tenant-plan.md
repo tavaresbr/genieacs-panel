@@ -203,7 +203,7 @@ as quebraria em silêncio:
                       ┌─────────────────────────────────────┐
   *.painel.dominio ──▶│  tenantResolver (Host → tenant)     │
   *.portal.dominio ──▶│  auth (JWT com tenantId)            │
-                      │  requireActiveSubscription          │
+                      │  subscriptionGate (na autenticação) │
                       │  tenantStore.run({tenantId}, ...)   │  ← AsyncLocalStorage
                       └──────────────┬──────────────────────┘
                                      │
@@ -556,7 +556,7 @@ tem *o seu*); `subscriptions` é uma por provedor, escopada, com `plan_id` em RE
 com assinante se desativa, não se apaga; `billing_events` é o extrato, escopado, e é o que um
 gateway vai alimentar por webhook pelo mesmo caminho do botão de hoje.
 
-**A porta (`requireActiveSubscription`)**, logo atrás do resolvedor e só na edição SaaS. Cinco
+**A porta (`subscriptionGate`)**, chamada de dentro da autenticação e só na edição SaaS. Cinco
 estados, uma regra cada, toda a política em `SubscriptionService.decide`:
 
 | estado | passa? |
@@ -566,6 +566,28 @@ estados, uma regra cada, toda a política em `SubscriptionService.decide`:
 | `past_due` | **só para ler** (GET/HEAD/OPTIONS). O portal do assinante fica inteiro de pé — o assinante não é quem deve — e os webhooks do ERP continuam entrando: recusar o evento do SGP por fatura atrasada perderia dado de quem não deve nada |
 | `suspended` | 402 `subscription_suspended` |
 | `canceled` | 402 `subscription_canceled` |
+
+**Ela já ficou logo atrás do resolvedor, como `app.use`, e saiu de lá.** A razão de estar ali
+era boa — a tela de bloqueio deveria aparecer também para quem ainda nem entrou —, mas nessa
+posição a porta responde **antes do 401**: um `GET /api/devices` sem token nenhum devolvia 402
+num provedor inadimplente e 401 num em dia, e o corpo do 402 ainda trazia o plano. Qualquer um
+que alcance o host, e o host é público, varria e descobria quais ISPs estão atrasados na
+fatura — inclusive pelo login do **portal**, que é a superfície mais exposta que existe aqui.
+
+Isso é exatamente o que `tenantController.getPublicProfile` proíbe, com estas palavras: não
+distinguir "não existe" de "existe e está suspenso", «um fato sobre o negócio de outra pessoa
+que estaríamos publicando». A porta no lugar antigo violava a regra **de outro arquivo**, que é
+como uma regra assim costuma cair.
+
+Chamada de `authenticateToken` e de `authenticatePortalCustomer`, a ordem 401-antes-de-402
+passa a ser garantida por construção, e o operador do provedor bloqueado continua vendo a placa
+do muro: `/api/auth/*` está fora da porta, ele entra normalmente, e a primeira chamada
+autenticada devolve o 402. O que se perde é mostrar o muro a um visitante deslogado — que é
+precisamente a parte que vazava. Duas consequências registradas: a guarda `IS_SAAS` migrou para
+dentro da porta (era o `if` que a montava, e sem ela um painel self-hosted passaria a exigir
+assinatura de si mesmo), e os webhooks, que não têm sessão, passam a entrar sempre — recusar um
+evento do ERP perde dado de quem não deve nada, e um 402 numa entrega anônima seria o mesmo
+oráculo por outra porta.
 
 O 402 leva o `code` e a própria assinatura no corpo, para a tela de bloqueio não ter que
 perguntar de novo a uma rota que talvez também responda 402. O que fica **fora** da porta, com
@@ -990,7 +1012,7 @@ Original: Fase 0 → 1 → 2 → 3 → 8 → 4 → 5 → 6 → 7.
    e continuam em aberto: `mode` (`agent`/`tunnel`/`hosted`), `verify_tls` e
    `allow_private_ranges` por provedor — a credencial vive num blob em `app_state`, sem
    essas três colunas. O muro de escala, esse, fechou nas quatro peças.
-5. ~~**Fase 5**~~ ✅ planos, assinatura, `requireActiveSubscription`, limites nos quatro
+5. ~~**Fase 5**~~ ✅ planos, assinatura, `subscriptionGate`, limites nos quatro
    pontos de escrita, `billing_events` e o `ManualBillingProvider`. O gateway (Asaas) fica
    para quando houver contrato para cobrar.
 6. ~~**Fase 6**~~ ✅ contexto do provedor, nome em `tenants`, cadastro, onboarding, plano e

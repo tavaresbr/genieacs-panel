@@ -291,14 +291,35 @@ describe('a ordem das montagens em app.js', () => {
     ]);
   });
 
-  it('põe a porta da assinatura logo depois do resolvedor, nos dois listeners', () => {
-    const painel = indiceDe(/^app\.use\('\/api', resolveTenant\);/);
-    const portaPainel = indiceDe(/^\s*app\.use\('\/api', requireActiveSubscription\(\)\);/);
-    assert.ok(portaPainel > painel, 'a porta da assinatura não vem depois do resolvedor');
+  /**
+   * A porta da assinatura NÃO é montada aqui, e a ausência é a invariante.
+   *
+   * Ela já foi um `app.use('/api', …)` logo depois do resolvedor. Nessa
+   * posição responde antes do 401, e aí um request sem token nenhum devolve
+   * 402 num provedor inadimplente e 401 num em dia — a fatura de um ISP vira
+   * fato consultável por quem alcançar o host. Hoje é chamada de dentro de
+   * `authenticateToken` e de `authenticatePortalCustomer`, o que garante a
+   * ordem por construção.
+   *
+   * Este teste existe para o dia em que alguém a montar de volta "para a tela
+   * de bloqueio aparecer antes do login": aparece, e leva a fatura junto.
+   */
+  it('não monta a porta da assinatura acima das rotas, em listener nenhum', () => {
+    assert.ok(
+      !/app\.use\([^)]*requireActiveSubscription/.test(fonte),
+      'a porta da assinatura voltou para cima do 401 — ver subscriptionGate.js'
+    );
+    assert.ok(
+      !/subscriptionRefusal/.test(fonte),
+      'a porta da assinatura não se resolve em app.js; ela é chamada pela autenticação'
+    );
+  });
 
-    const portal = indiceDe(/^portalApp\.use\('\/api', resolveTenant\);/);
-    const portaPortal = indiceDe(/^\s*portalApp\.use\('\/api', requireActiveSubscription\(\{ portal: true \}\)\);/);
-    assert.ok(portal > 0 && portaPortal > portal, 'o portal não repete a mesma ordem');
+  it('e a autenticação é quem a chama, nos dois listeners', () => {
+    const painel = fs.readFileSync(path.join(RAIZ, 'src', 'middleware', 'auth.js'), 'utf8');
+    const portal = fs.readFileSync(path.join(RAIZ, 'src', 'middleware', 'portalAuth.js'), 'utf8');
+    assert.match(painel, /subscriptionRefusal\(req\)/, 'o painel deixou de consultar a porta');
+    assert.match(portal, /subscriptionRefusal\(req, \{ portal: true \}\)/, 'o portal deixou de consultar a porta');
   });
 
   it('não monta a troca de banco nem o console fora da sua edição', () => {
