@@ -160,6 +160,7 @@ export default {
   'database.connectionFailed': 'Échec de la connexion : {error}',
   'database.switched': 'La base de données a été changée et est désormais active.',
   'database.switchFailed': 'Échec du changement : {error}',
+  'database.switchNotSoleProvider': 'Le changement de base de données n’est possible que sur une installation à fournisseur unique',
 
   // Profils de fabricants
   'vendor.listRetrieved': 'Fabricants récupérés',
@@ -407,6 +408,7 @@ export default {
   'whatsapp.error.incompleteConfig': 'Saisissez l’URL publique du webhook avant d’activer l’intégration : c’est par elle que le serveur Evolution renvoie les QR codes, les messages et les accusés',
   'whatsapp.error.invalidWebhookUrl': 'L’URL du webhook est invalide',
   'whatsapp.error.invalidBaseUrl': 'L’URL du serveur Evolution n’est pas configurée',
+  'whatsapp.error.insecureBaseUrl': 'Le serveur Evolution doit utiliser https : sa clé voyage à chaque requête',
   'whatsapp.error.hostNotAllowed': 'Ce serveur Evolution ne figure pas dans la liste des serveurs autorisés',
   'whatsapp.error.blockedHost': 'Serveur Evolution refusé : {reason}',
   // WhatsApp — transport Evolution (vague 1)

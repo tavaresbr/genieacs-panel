@@ -114,7 +114,35 @@ function isSameConfig(left, right) {
   );
 }
 
+/**
+ * Refuses the switch on a deployment that serves more than one provider.
+ *
+ * `copyData` reads every table with no provider predicate and writes it to a
+ * host, user and password that came from the request body — so on a shared
+ * deployment one ISP's administrator could copy every OTHER ISP's subscribers,
+ * password hashes and encrypted secrets to a server of their choosing, and then
+ * repoint the panel at it. `app.js` withholds the route outside the
+ * self-hosted edition, and that gate is the right idea in the wrong shape: it
+ * reads `EDITION`, which defaults to `selfhosted` and which `install.sh` writes
+ * into every generated `.env`, so a deployment that grows into a second
+ * provider without anyone remembering to set `EDITION=saas` still has it live.
+ *
+ * The provider count is a fact the process can check for itself, which is what
+ * makes it worth having as well as the edition gate rather than instead of it.
+ * A single-ISP install — what this feature is for, and where the operator owns
+ * the data on both ends — is unaffected.
+ */
+async function assertSoleProvider() {
+  const [{ total } = {}] = await getDb()('tenants').count({ total: '*' });
+  if (Number(total) > 1) {
+    // Sem status nem code: este controller colapsa toda falha em 400 com a
+    // mensagem traduzida, e metadado que ninguém lê é metadado que mente.
+    throw new TranslatableError('database.switchNotSoleProvider');
+  }
+}
+
 export async function switchDatabase(rawConfig, { migrateData = false } = {}) {
+  await assertSoleProvider();
   const config = normalizeConfig(rawConfig);
   validateExternal(config);
 

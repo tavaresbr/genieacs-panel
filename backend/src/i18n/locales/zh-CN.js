@@ -160,6 +160,7 @@ export default {
   'database.connectionFailed': '连接失败：{error}',
   'database.switched': '数据库已切换并生效。',
   'database.switchFailed': '切换失败：{error}',
+  'database.switchNotSoleProvider': '只有单一服务商的安装才能切换数据库',
 
   // 厂商配置
   'vendor.listRetrieved': '已获取厂商列表',
@@ -410,6 +411,7 @@ export default {
   'whatsapp.error.publicUrlCredentials': '该地址不能携带用户名和密码',
   'whatsapp.error.invalidPortalUrl': '客户门户地址无效',
   'whatsapp.error.invalidBaseUrl': '尚未配置 Evolution 服务器地址',
+  'whatsapp.error.insecureBaseUrl': 'Evolution 服务器必须使用 https：它的密钥随每个请求一起发送',
   'whatsapp.error.hostNotAllowed': '该 Evolution 服务器不在允许列表中',
   'whatsapp.error.blockedHost': 'Evolution 服务器被拒绝：{reason}',
   // WhatsApp — Evolution 通信层（第一阶段）

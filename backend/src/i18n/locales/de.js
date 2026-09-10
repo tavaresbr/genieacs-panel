@@ -160,6 +160,7 @@ export default {
   'database.connectionFailed': 'Verbindung fehlgeschlagen: {error}',
   'database.switched': 'Die Datenbank wurde erfolgreich gewechselt und ist jetzt aktiv.',
   'database.switchFailed': 'Wechsel fehlgeschlagen: {error}',
+  'database.switchNotSoleProvider': 'Der Datenbankwechsel steht nur einer Installation mit einem einzigen Anbieter offen',
 
   // Herstellerprofile
   'vendor.listRetrieved': 'Hersteller erfolgreich abgerufen',
@@ -363,6 +364,7 @@ export default {
   'whatsapp.error.publicUrlCredentials': 'Die Adresse darf keinen Benutzernamen und kein Passwort enthalten',
   'whatsapp.error.invalidPortalUrl': 'Die URL des Kundenportals ist ungültig',
   'whatsapp.error.invalidBaseUrl': 'Die URL des Evolution-Servers ist nicht konfiguriert',
+  'whatsapp.error.insecureBaseUrl': 'Der Evolution-Server muss https: verwenden: sein Schlüssel wird bei jeder Anfrage mitgesendet',
   'whatsapp.error.hostNotAllowed': 'Dieser Evolution-Server steht nicht auf der zugelassenen Liste',
   'whatsapp.error.blockedHost': 'Evolution-Server abgelehnt: {reason}',
   // Provisionierung und SGP-Ereignisse

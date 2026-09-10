@@ -160,6 +160,7 @@ export default {
   'database.connectionFailed': '連線失敗：{error}',
   'database.switched': '資料庫已切換並生效。',
   'database.switchFailed': '切換失敗：{error}',
+  'database.switchNotSoleProvider': '只有單一服務商的安裝才能切換資料庫',
   // 廠商設定檔
   'vendor.listRetrieved': '已取得廠商清單',
   'vendor.listFailed': '無法取得廠商清單',
@@ -409,6 +410,7 @@ export default {
   'whatsapp.error.publicUrlCredentials': '該位址不能夾帶使用者名稱與密碼',
   'whatsapp.error.invalidPortalUrl': '客戶入口網站位址無效',
   'whatsapp.error.invalidBaseUrl': '尚未設定 Evolution 伺服器位址',
+  'whatsapp.error.insecureBaseUrl': 'Evolution 伺服器必須使用 https：它的金鑰隨每個請求一起傳送',
   'whatsapp.error.hostNotAllowed': '該 Evolution 伺服器不在允許清單中',
   'whatsapp.error.blockedHost': 'Evolution 伺服器遭拒：{reason}',
   // WhatsApp — Evolution 傳輸層（第一階段）
