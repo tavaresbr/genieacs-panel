@@ -93,6 +93,22 @@ export function tdb(table, trx = null) {
   // knex ignores `where` on an insert, so `tdb('x').insert(...)` would write an
   // unscoped row and look perfectly reasonable doing it. Closing that door here
   // is the difference between a mechanism and a convention.
+  //
+  // The guard has to survive CHAINING, which is the part that was missing: a
+  // knex builder returns itself from `where`, `whereIn` and the rest, so
+  // handing back the bare return value dropped the proxy and
+  // `tdb('x').where(...).insert(...)` wrote a row with no provider on it. The
+  // column's `defaultTo(tenant.id)` then absorbed it in silence, filing another
+  // ISP's row under provider #1 instead of raising. No call site does that
+  // today; the point of a mechanism is that none can start.
+  return guardInserts(query, table);
+}
+
+/**
+ * Wraps one builder so that `insert` refuses and every builder it hands back
+ * carries the same refusal.
+ */
+function guardInserts(query, table) {
   return new Proxy(query, {
     get(target, property, receiver) {
       if (property === 'insert') {
@@ -104,7 +120,15 @@ export function tdb(table, trx = null) {
         };
       }
       const value = Reflect.get(target, property, receiver);
-      return typeof value === 'function' ? value.bind(target) : value;
+      if (typeof value !== 'function') return value;
+      return (...args) => {
+        const result = value.apply(target, args);
+        // A knex builder returns ITSELF for chaining, and that is the case
+        // worth catching: give back the proxy instead so the next link is
+        // guarded too. Anything else — a promise from `then`, a string from
+        // `toString` — is the method's own answer and passes through untouched.
+        return result === target ? receiver : result;
+      };
     }
   });
 }
