@@ -7,8 +7,9 @@ service status, and open invoices next to the ONT, and the customer portal can
 show the subscriber their own open invoices and — optionally — request a trust
 unlock ("liberação em confiança").
 
-The panel only reads billing data and requests a trust unlock. It never creates,
-edits, or settles invoices in SGP.
+The panel only reads billing data, requests a trust unlock, and — when the
+operator turns it on — opens a support ticket. It never creates, edits, or
+settles invoices in SGP.
 
 ## What the panel calls
 
@@ -20,6 +21,7 @@ credentials plus one customer filter:
 | Contract lookup | `/api/ura/consultacliente/` | `cpfcnpj`, `contrato`, or `login` |
 | Open invoices | `/api/ura/titulos/` | `contrato` (or `cpfcnpj`), `limit`, `apenas_titulos_em_aberto` |
 | Trust unlock | `/api/ura/liberacao/` | `contrato` |
+| Open a ticket | `/api/ura/chamado/` | `contrato`, `conteudo`, `ocorrenciatipo`, optional `observacao` |
 
 Responses are read through a normalizing layer, so field spellings that differ
 between SGP releases (`linhadigitavel`, `linha_digitavel`, `linhaDigitavel`) and
@@ -62,10 +64,35 @@ invoices with their digitable line, PIX code, and second-copy link.
 
 - **Refresh from SGP** re-queries SGP and refreshes the cached link.
 - **Trust unlock** requests a trust unlock for the linked contract.
+- **Open a ticket** files a ticket in SGP against the linked contract, seeded
+  with the ONT id and its current optical reading. It appears only while ticket
+  opening is enabled in Settings.
 - **Unlink** removes the stored link so the ONT resolves again (or can be
   linked to a different contract).
 - When automatic resolution finds nothing, the card offers a manual link by
   contract number.
+
+### Opening a ticket
+
+Off by default, because unlike everything else here it **writes to the ERP**.
+Turn it on under *Settings → SGP*, where you also set the **Tipo de Ocorrência**
+id new tickets are filed under — that id comes from your own SGP catalogue
+(*Sistema → Ocorrências*). SGP's reference gives 5 as the default.
+
+The request carries only the fields SGP documents for this route: `contrato`,
+`conteudo`, `ocorrenciatipo`, and `observacao` when there is a note. Two nearby
+fields are deliberately not sent. `setor` belongs to
+`/api/ura/central/chamado/`, the subscriber-facing variant that authenticates
+with `cpfcnpj`+`senha` rather than `app`+`token`. `conteudolimpo` only
+suppresses SGP's default opening line, and the published references disagree on
+its spelling.
+
+The **response** shape is the one part of this route no reference documents. The
+panel reads it tolerantly: it looks for the protocol number under `chamado`,
+`protocolo`, `ocorrencia`, `os`, `ordemservico`, `id` and `numero`, and an
+unrecognised body is reported as a success without a number — because the ticket
+was still opened, and reporting a failure would have the operator open a second
+one by phone.
 
 Resolved links are cached in the `sgp_links` table, so day-to-day page loads do
 not re-query SGP; the whole fleet is refreshed in one batch instead — see
@@ -258,6 +285,7 @@ Operator endpoints (admin role required, `/api` on the panel port):
 | `POST` | `/api/sgp/devices/:deviceId/link` | Manually link a contract |
 | `DELETE` | `/api/sgp/devices/:deviceId/link` | Remove the link |
 | `POST` | `/api/sgp/devices/:deviceId/unlock` | Request a trust unlock |
+| `POST` | `/api/sgp/devices/:deviceId/ticket` | Open a ticket for the linked contract |
 | `GET` | `/api/sgp/events` | Stored events, filterable by status and type |
 | `GET` | `/api/sgp/events/:id` | One event, including its stored body |
 | `POST` | `/api/sgp/events/:id/retry` | Reprocess a failed event |

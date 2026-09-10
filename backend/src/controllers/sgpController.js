@@ -54,7 +54,9 @@ class SgpController {
         reconcileIntervalMinutes: body.reconcileIntervalMinutes,
         reconcileBatchSize: body.reconcileBatchSize,
         eventRetentionDays: body.eventRetentionDays,
-        eventTypeMap: body.eventTypeMap
+        eventTypeMap: body.eventTypeMap,
+        ticketEnabled: body.ticketEnabled,
+        ticketOccurrenceType: body.ticketOccurrenceType
         // `webhookSecret` is deliberately not accepted here: it is only ever
         // set through the rotate action, which shows it once.
       });
@@ -157,7 +159,10 @@ class SgpController {
       return res.json(createResponse(req.t('sgp.dataLoaded'), {
         link: SgpService.publicLink(link),
         invoices,
-        invoiceError
+        invoiceError,
+        // Carried with the data it gates, so the device page does not need a
+        // second request just to know whether to offer the button.
+        ticketEnabled: (await SgpService.getConfig()).ticketEnabled === true
       }));
     } catch (error) {
       return handleError(req, res, error, 'sgp.dataLoadFailed');
@@ -211,6 +216,35 @@ class SgpController {
       return res.json(createResponse(result.message, { contract }));
     } catch (error) {
       return handleError(req, res, error, 'sgp.unlockFailed');
+    }
+  }
+
+  /**
+   * Opens a ticket in the ERP for the subscriber holding this ONT.
+   *
+   * The contract is resolved the same way the trust unlock resolves it — the
+   * stored link first, a lookup only when there is none — so the operator names
+   * the equipment and never the contract number.
+   */
+  static async openTicket(req, res) {
+    try {
+      const deviceId = readDeviceId(req);
+      if (!deviceId) {
+        return res.status(400).json(createErrorResponse(req.t('sgp.deviceIdRequired')));
+      }
+      const body = req.body ?? {};
+      const link = await SgpLink.getByDeviceId(deviceId);
+      const contract = link?.contract
+        || (await SgpService.resolveDeviceContract(deviceId)).link.contract;
+      const result = await SgpService.openTicket({
+        contract,
+        content: body.content,
+        note: body.note,
+        occurrenceType: body.occurrenceType
+      });
+      return res.json(createResponse(result.message || req.t('sgp.ticketOpened'), result));
+    } catch (error) {
+      return handleError(req, res, error, 'sgp.ticketFailed');
     }
   }
 }

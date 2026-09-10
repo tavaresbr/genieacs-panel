@@ -653,6 +653,10 @@ export default function DeviceDetailPage() {
   const [sgpAvailable, setSgpAvailable] = useState(false)
   const [sgpContractInput, setSgpContractInput] = useState('')
   const [sgpUnlocking, setSgpUnlocking] = useState(false)
+  const [sgpTicketEnabled, setSgpTicketEnabled] = useState(false)
+  const [ticketOpen, setTicketOpen] = useState(false)
+  const [ticketText, setTicketText] = useState('')
+  const [ticketSending, setTicketSending] = useState(false)
 
 
   const handleOpenEditModal = (wan: WanConnection) => {
@@ -809,6 +813,7 @@ export default function DeviceDetailPage() {
         setSgpLink(res.data.link)
         setSgpInvoices(res.data.invoices || [])
         setSgpMessage(res.data.invoiceError)
+        setSgpTicketEnabled(res.data.ticketEnabled === true)
         return
       }
       setSgpLink(null)
@@ -867,6 +872,31 @@ export default function DeviceDetailPage() {
       toast[res.success ? 'success' : 'error'](res.message || t('detail.sgp.unlockSent'))
     } finally {
       setSgpUnlocking(false)
+    }
+  }
+
+  const handleOpenTicket = async () => {
+    const content = ticketText.trim()
+    if (!content) {
+      toast.error(t('detail.sgp.ticketContentRequired'))
+      return
+    }
+    setTicketSending(true)
+    try {
+      const res = await sgpAPI.openTicket(deviceId, { content })
+      if (!res.success) {
+        toast.error(res.message || t('detail.sgp.ticketFailed'))
+        return
+      }
+      // The protocol number is what the subscriber will quote back, so it is
+      // shown rather than a bare "done".
+      toast.success(res.data?.ticket
+        ? t('detail.sgp.ticketOpenedWithNumber', { number: res.data.ticket })
+        : res.message || t('detail.sgp.ticketOpened'))
+      setTicketOpen(false)
+      setTicketText('')
+    } finally {
+      setTicketSending(false)
     }
   }
 
@@ -1416,6 +1446,27 @@ export default function DeviceDetailPage() {
                         >
                           {sgpUnlocking ? t('detail.sgp.unlocking') : t('detail.sgp.unlock')}
                         </button>
+                        {sgpTicketEnabled && (
+                          <button
+                            type="button"
+                            className="modern-button-secondary"
+                            onClick={() => {
+                              // Seeded with the ONT and its current optical
+                              // reading — exactly what a ticket opened by phone
+                              // never carries, and what the field team needs.
+                              if (!ticketOpen && !ticketText) {
+                                setTicketText(t('detail.sgp.ticketDefaultText', {
+                                  device: deviceId,
+                                  rx: vp.rxpower?.value ?? '—'
+                                }))
+                              }
+                              setTicketOpen((open) => !open)
+                            }}
+                          >
+                            <Icon name="chat" size={16} className="mr-2" />
+                            {t('detail.sgp.ticket')}
+                          </button>
+                        )}
                         <button
                           type="button"
                           className="modern-button-secondary"
@@ -1427,6 +1478,42 @@ export default function DeviceDetailPage() {
                     )}
                   </div>
                 </div>
+
+                {sgpLink && sgpTicketEnabled && ticketOpen && (
+                  <div className="mt-4 rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-4">
+                    <label className="metric-label" htmlFor="sgp-ticket-text">
+                      {t('detail.sgp.ticketLabel')}
+                    </label>
+                    <textarea
+                      id="sgp-ticket-text"
+                      className="modern-input mt-2 min-h-24 w-full"
+                      value={ticketText}
+                      maxLength={4000}
+                      onChange={(event) => setTicketText(event.target.value)}
+                    />
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {t('detail.sgp.ticketHint', { contract: sgpLink.contract })}
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        className="modern-button"
+                        disabled={ticketSending || !ticketText.trim()}
+                        onClick={() => void handleOpenTicket()}
+                      >
+                        {ticketSending ? t('detail.sgp.ticketSending') : t('detail.sgp.ticketSend')}
+                      </button>
+                      <button
+                        type="button"
+                        className="modern-button-secondary"
+                        disabled={ticketSending}
+                        onClick={() => setTicketOpen(false)}
+                      >
+                        {t('common.cancel')}
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {sgpLink ? (
                   <>
