@@ -42,14 +42,14 @@ const SRC_URL = new URL('../src/', import.meta.url).href;
 // The first administrator of the hosted install: the one `setup` is contracted
 // to put on the roster, because a SaaS deployment whose roster is empty has
 // nobody who can create the second provider.
-const PLATAFORMA = { username: 'plataforma', password: 'plataforma-senha-1' };
+const PLATAFORMA = { username: 'plataforma', password: 'plataforma-senha-1', email: 'plataforma@exemplo.test' };
 // Administrator at the provider, and nothing more. She is the point of the
 // whole exercise: full authority over her own ISP, none at all over the
 // deployment that hosts it.
-const DONA = { username: 'dona', password: 'dona-senha-1' };
+const DONA = { username: 'dona', password: 'dona-senha-1', email: 'dona@exemplo.test' };
 // Granted the control plane and then taken off it, with the same token in hand
 // throughout.
-const PROMOVIDA = { username: 'promovida', password: 'promovida-senha-1' };
+const PROMOVIDA = { username: 'promovida', password: 'promovida-senha-1', email: 'promovida@exemplo.test' };
 
 let panelUrl;
 let probeUrl;
@@ -154,7 +154,7 @@ const SELF_HOSTED_INSTALL = `
     body: JSON.stringify(body)
   }).then((r) => r.json().then((json) => ({ status: r.status, body: json })));
 
-  const setup = await post('/api/auth/setup', { username, password });
+  const setup = await post('/api/auth/setup', { username, password, email: username + '@exemplo.test' });
   const rosterAfterSetup = await getDb()('platform_admins');
 
   await getDb()('platform_admins').insert({ user_id: setup.body.data.user.id });

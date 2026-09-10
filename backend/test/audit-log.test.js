@@ -37,7 +37,7 @@ before(async () => {
   ({ panelUrl } = await startTestServers());
   const setup = await call(`${panelUrl}/api/auth/setup`, {
     method: 'POST',
-    body: { username: 'a-dona', password: 'senha-da-dona-1' }
+    body: { username: 'a-dona', password: 'senha-da-dona-1', email: 'a-dona@exemplo.test' }
   });
   token = setup.body.data.token;
   tenantId = (await getDb()('tenants').orderBy('id', 'asc').first()).id;
@@ -125,7 +125,7 @@ describe('as ações que deixam registro', () => {
   it('criar operador, mudar papel e encerrar vínculo', async () => {
     const criado = await call(`${panelUrl}/api/users`, {
       method: 'POST', headers: comoOperador(),
-      body: { username: 'o-tecnico', password: 'senha-do-tecnico-1', role: 'tech' }
+      body: { username: 'o-tecnico', password: 'senha-do-tecnico-1', role: 'tech', email: 'o-tecnico@exemplo.test' }
     });
     assert.equal(criado.status, 201);
     const id = criado.body.data.user.id;
@@ -158,7 +158,7 @@ describe('as ações que deixam registro', () => {
 
     const aceite = await call(
       `${panelUrl}/api/invites/token/${criado.body.data.token}/accept`,
-      { method: 'POST', body: { username: 'quem-aceitou', password: 'senha-de-quem-aceitou-1' } }
+      { method: 'POST', body: { username: 'quem-aceitou', password: 'senha-de-quem-aceitou-1', email: 'quem-aceitou@exemplo.test' } }
     );
     assert.equal(aceite.status, 201, JSON.stringify(aceite.body));
 

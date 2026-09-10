@@ -559,4 +559,10 @@ export default {
   'audit.listFailed': 'Failed to read the audit trail',
 
   'tenant.exportFailed': 'Failed to export the provider data',
+
+  'auth.emailInvalid': 'A valid email address is required',
+  'auth.emailTaken': 'That email address is already taken',
+  'auth.emailUpdated': 'Login email updated',
+  'auth.emailChangeRequired': 'The current password and the new email address are required',
+  'auth.emailReadiness': 'Email readiness retrieved',
 };

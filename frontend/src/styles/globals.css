@@ -331,6 +331,20 @@
     color: hsl(var(--status-success));
     background: hsl(var(--status-success) / 0.07);
   }
+
+  .alert-warning {
+    @apply rounded-md border px-4 py-3 text-sm;
+    border-color: hsl(var(--status-warning) / 0.28);
+    color: hsl(var(--status-warning));
+    background: hsl(var(--status-warning) / 0.07);
+  }
+
+  .alert-info {
+    @apply rounded-md border px-4 py-3 text-sm;
+    border-color: hsl(var(--status-info) / 0.28);
+    color: hsl(var(--status-info));
+    background: hsl(var(--status-info) / 0.07);
+  }
 }
 
 @media (max-width: 767px) {

@@ -69,7 +69,7 @@ before(async () => {
   alfa = (await getDb()('tenants').orderBy('id', 'asc').first()).id;
 
   const setup = await call(`${panelUrl}/api/auth/setup`, {
-    method: 'POST', body: { username: 'a-plataforma', password: 'senha-da-plataforma-1' }
+    method: 'POST', body: { username: 'a-plataforma', password: 'senha-da-plataforma-1', email: 'a-plataforma@exemplo.test' }
   });
   assert.equal(setup.status, 201);
   token = setup.body.data.token;
