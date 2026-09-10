@@ -1,3 +1,5 @@
+import SubscriptionService, { PlanLimitError } from '../services/subscriptionService.js';
+import { planLimitResponse } from '../utils/planLimit.js';
 import bcrypt from 'bcryptjs';
 import TenantInvite from '../models/TenantInvite.js';
 import TenantUser from '../models/TenantUser.js';
@@ -9,7 +11,6 @@ import AuditLog from '../models/AuditLog.js';
 import { ROLES, normalizeRole, roleHas } from '../config/permissions.js';
 import { generateTokens } from '../middleware/auth.js';
 import { createResponse, createErrorResponse, isValidEmail } from '../utils/helpers.js';
-import PlanLimitService from '../services/planLimitService.js';
 
 const BCRYPT_ROUNDS = 12;
 
@@ -75,20 +76,6 @@ class InviteController {
         : Number(req.body.ttlMs);
       if (!Number.isFinite(ttlMs) || ttlMs < MIN_TTL_MS || ttlMs > MAX_TTL_MS) {
         return res.status(400).json(createErrorResponse(req.t('invite.ttlInvalid')));
-      }
-
-      // O convite é uma vaga prometida, então ele conta contra o teto no
-      // momento em que é criado — e os que já estão em aberto contam junto.
-      // Conferir só no aceite deixaria um administrador emitir vinte links num
-      // plano de três e descobrir o problema quando a vigésima pessoa já
-      // recebeu o dela.
-      const cabe = await PlanLimitService.canAddOperator();
-      if (!cabe.ok) {
-        return res.status(402).json({
-          success: false,
-          code: 'plan_limit_operators',
-          message: req.t('plan.operatorLimit', { limit: cabe.limit })
-        });
       }
 
       const { invite, token } = await TenantInvite.create({
@@ -251,19 +238,13 @@ class InviteController {
         return res.status(409).json(createErrorResponse(req.t('auth.usernameTaken')));
       }
 
-      // E de novo no aceite, porque o teto pode ter baixado, ou vínculos podem
-      // ter sido criados por outro caminho, entre a emissão e o clique.
-      //
-      // `countInvites: false` aqui e não por descuido: ESTE convite está entre
-      // os em aberto, e somá-lo recusaria o último convite de todo provedor
-      // exatamente no teto — o único que precisava passar.
-      const cabe = await PlanLimitService.canAddOperator({ countInvites: false });
-      if (!cabe.ok) {
-        return res.status(402).json({
-          success: false,
-          code: 'plan_limit_operators',
-          message: req.t('plan.operatorLimit', { limit: cabe.limit })
-        });
+      // O limite do plano, antes de abrir a transação: o convite continua de
+      // pé (não é consumido) e a pessoa pode voltar quando houver vaga.
+      try {
+        await SubscriptionService.assertCanAddOperator();
+      } catch (error) {
+        if (error instanceof PlanLimitError) return planLimitResponse(req, res, error);
+        throw error;
       }
 
       const trx = await getDb().transaction();

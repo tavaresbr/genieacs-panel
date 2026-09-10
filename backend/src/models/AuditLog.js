@@ -33,12 +33,15 @@ class AuditLog {
     INVITE_ACCEPTED: 'invite.accepted',
     INVITE_REVOKED: 'invite.revoked',
     TENANT_STATUS_CHANGED: 'tenant.status_changed',
-    // O eixo comercial, separado do administrativo acima. A linha nasce NO
-    // provedor pelo mesmo motivo da outra: quem vai perguntar "por que o painel
-    // ficou somente leitura" é o ISP, e a resposta tem que estar onde ele
-    // consegue olhar.
-    SUBSCRIPTION_CHANGED: 'tenant.subscription_changed',
     TENANT_EXPORTED: 'tenant.exported',
+    // A assinatura mudou de plano ou de estado. Gravada NO provedor, com
+    // `actorKind: 'platform'`, pelo mesmo motivo da suspensão: quem vai
+    // perguntar "por que meu painel ficou só leitura" é o ISP, e a resposta
+    // tem que estar onde ele olha.
+    SUBSCRIPTION_CHANGED: 'subscription.changed',
+    // O provedor mudou o próprio nome — o que aparece na barra lateral, na
+    // tela de login e na aba do navegador.
+    TENANT_RENAMED: 'tenant.renamed',
     LOGIN_EMAIL_CHANGED: 'login_email.changed'
   });
 

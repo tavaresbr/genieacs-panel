@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router'
 import { useTheme } from '@/contexts/theme-context'
 import { useAuth } from '@/contexts/auth-context'
+import { useTenant } from '@/contexts/tenant-context'
 import { useTranslation } from '@/contexts/language-context'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import { Icon } from '@/components/ui/icon'
@@ -30,6 +31,7 @@ const menuItems = [
   { href: '/network-map', labelKey: 'sidebar.nav.networkMap', descriptionKey: 'sidebar.nav.networkMapDescription', icon: 'map', permission: 'map.read' },
   { href: '/whatsapp', labelKey: 'sidebar.nav.whatsapp', descriptionKey: 'sidebar.nav.whatsappDescription', icon: 'chat', permission: 'whatsapp.read' },
   { href: '/settings', labelKey: 'sidebar.nav.settings', descriptionKey: 'sidebar.nav.settingsDescription', icon: 'settings', permission: 'settings.read' },
+  { href: '/plan', labelKey: 'sidebar.nav.plan', descriptionKey: 'sidebar.nav.planDescription', icon: 'settings', permission: 'settings.read', saasOnly: true },
   { href: '/platform', labelKey: 'sidebar.nav.platform', descriptionKey: 'sidebar.nav.platformDescription', icon: 'settings', permission: 'settings.read', platformOnly: true },
 ] as const
 
@@ -116,22 +118,18 @@ function SidebarContent({
   const { user, logout, can } = useAuth()
   const isPlatformAdmin = Boolean(user?.isPlatformAdmin)
   const visibleItems = menuItems.filter((item) => can(item.permission)
-    && (!('platformOnly' in item && item.platformOnly) || isPlatformAdmin))
+    && (!('platformOnly' in item && item.platformOnly) || isPlatformAdmin)
+    // `saasOnly`: a screen about a subscription has nothing to show on an
+    // install that has no subscription to speak of.
+    && (!('saasOnly' in item && item.saasOnly) || isSaas))
   const { t } = useTranslation()
   const displayName = user?.username || t('sidebar.defaultOperator')
   const initial = displayName.slice(0, 1).toUpperCase()
-  const [appName, setAppName] = useState('SkyGenPanel')
+  // The provider's name, from the row that IS the provider. It used to come
+  // from `settings.appName` through `localStorage` and a custom event — three
+  // places that agreed in none of them for the first second after a change.
+  const { name: appName, isSaas } = useTenant()
   const [showReleaseNotes, setShowReleaseNotes] = useState(false)
-
-  useEffect(() => {
-    const syncName = (event?: Event) => {
-      const detail = (event as CustomEvent<string> | undefined)?.detail
-      setAppName(detail || localStorage.getItem('appName') || 'SkyGenPanel')
-    }
-    syncName()
-    window.addEventListener('appNameChanged', syncName)
-    return () => window.removeEventListener('appNameChanged', syncName)
-  }, [])
 
   return (
     <>

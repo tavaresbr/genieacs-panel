@@ -872,43 +872,108 @@ const deviceSwapsTable = (db) => (t) => {
   t.index(['tenant_id', 'acknowledged_at'], 'device_swaps_open_idx');
 };
 
-const tenantSubscriptionsTable = (db) => (t) => {
+const DEVICE_SWAP_TABLES = [
+  ['device_swaps', deviceSwapsTable]
+];
+
+/**
+ * O catálogo de planos do SaaS: o que se vende, e até onde cada um vai.
+ *
+ * Do deploy, não de um provedor — é a tabela de preços, e a tabela de preços
+ * é uma só. Os limites são NULOS quando não há limite: o plano que a migração
+ * dá a todo provedor existente não restringe nada, porque um upgrade não pode
+ * ser o dia em que um ISP descobre que tem operador demais.
+ *
+ * `code` é o nome estável que o console e os testes usam; `name` é o que se
+ * mostra. Preço em centavos e moeda ao lado, porque o mercado é o brasileiro
+ * mas o código não precisa saber disso.
+ */
+const plansTable = (db) => (t) => {
   t.increments('id').primary();
-  // Uma linha por provedor, e é o `unique` que diz isso — não um comentário.
-  // Duas assinaturas para o mesmo provedor seria a pergunta "este está em dia?"
-  // com duas respostas, e o portão leria a que o banco devolvesse primeiro.
-  t.integer('tenant_id').unsigned().notNullable().unique()
-    .references('id').inTable('tenants').onDelete('CASCADE');
-  // O estado COMERCIAL, que é um eixo diferente de `tenants.status`.
-  //
-  // `tenants.status` é administrativo: suspenso ali significa congelado, e é
-  // pré-requisito da exclusão em duas etapas (onda 22) — "ninguém está
-  // trabalhando lá dentro". Misturar os dois faria toda inadimplência tornar o
-  // provedor elegível a ser apagado, o que é uma consequência que ninguém
-  // pediu para um boleto atrasado.
-  t.string('status', 16).notNullable().defaultTo('trial');
-  // Quando o teste acaba. Nulo em quem já é cliente pagante.
-  t.timestamp('trial_ends_at');
-  // O fim do período pago corrente, para a tela dizer até quando vale.
-  t.timestamp('current_period_end');
-  // O plano contratado. O catálogo e os tetos vivem em `config/plans.js`, e não
-  // aqui: um limite é decisão comercial que precisa de diff e de revisor, e num
-  // banco um dígito errado alarga o teto de todo mundo daquele plano em
-  // silêncio. Esta coluna guarda só QUAL plano, que é dado de cliente.
-  t.string('plan_code', 32).notNullable().defaultTo('unlimited');
-  // As exceções negociadas. Nulo significa "vale o do plano" — e não zero, que
-  // é um teto legítimo de quem contratou zero.
+  t.string('code', 32).notNullable().unique();
+  t.string('name', 128).notNullable();
   t.integer('max_operators').unsigned();
-  t.integer('max_subscriber_accounts').unsigned();
-  // Por que está neste estado, escrito por quem mudou. Aparece para o ISP.
-  t.string('status_reason', 255);
-  t.timestamp('status_changed_at').defaultTo(db.fn.now());
+  t.integer('max_subscribers').unsigned();
+  t.integer('max_devices').unsigned();
+  t.integer('price_cents').unsigned().notNullable().defaultTo(0);
+  t.string('currency', 3).notNullable().defaultTo('BRL');
+  // Dias de teste que um provedor novo ganha neste plano. Zero é "sem teste".
+  t.integer('trial_days').unsigned().notNullable().defaultTo(0);
+  // Um plano desativado não some — assinaturas ainda apontam para ele — mas
+  // deixa de ser oferecido a provedor novo.
+  t.boolean('active').notNullable().defaultTo(true);
   t.timestamp('created_at').defaultTo(db.fn.now());
   t.timestamp('updated_at').defaultTo(db.fn.now());
 };
 
-const DEVICE_SWAP_TABLES = [
-  ['device_swaps', deviceSwapsTable]
+/**
+ * A assinatura: em que plano um provedor está, e em que pé.
+ *
+ * Uma por provedor, e é o `unique` que garante. Escopada como tudo que é de
+ * um provedor — o próprio provedor lê a sua na tela de plano e uso — e é lida
+ * ANTES de qualquer rota pelo gate, que já está dentro do escopo que o
+ * resolvedor abriu.
+ *
+ * `status` é o ciclo inteiro: trial | active | past_due | suspended |
+ * canceled. `trial` e `active` passam; `past_due` passa só para ler;
+ * `suspended` e `canceled` respondem 402. A regra vive em
+ * `subscriptionService.js`, não aqui.
+ *
+ * `plan_id` é RESTRICT: apagar um plano com assinante é apagar o chão de
+ * alguém. Desativa-se o plano; não se apaga.
+ */
+const subscriptionsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable().unique()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.integer('plan_id').unsigned().notNullable()
+    .references('id').inTable('plans');
+  t.string('status', 16).notNullable().defaultTo('trial');
+  t.timestamp('trial_ends_at');
+  // Até quando o período pago vai. Nulo em trial e em quem nunca pagou.
+  t.timestamp('renews_at');
+  t.timestamp('canceled_at');
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  t.timestamp('updated_at').defaultTo(db.fn.now());
+};
+
+/**
+ * O que aconteceu com a assinatura, na ordem em que aconteceu: pagamento
+ * registrado, plano trocado, status mudado. É o extrato — e é o que um
+ * gateway vai alimentar por webhook quando existir, pelo mesmo caminho que o
+ * `ManualBillingProvider` usa hoje.
+ *
+ * Escopada: é dado financeiro do provedor, e sai no export dele.
+ */
+const billingEventsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.integer('subscription_id').unsigned()
+    .references('id').inTable('subscriptions').onDelete('SET NULL');
+  // payment.recorded | plan.changed | status.changed | trial.started
+  t.string('type', 32).notNullable();
+  t.integer('amount_cents');
+  t.string('currency', 3);
+  // Quem registrou: 'manual' hoje; o nome do gateway amanhã.
+  t.string('provider', 32).notNullable().defaultTo('manual');
+  // O id do pagamento no gateway, ou a referência que alguém digitou.
+  t.string('external_id', 128);
+  t.integer('created_by').unsigned().references('id').inTable('users').onDelete('SET NULL');
+  t.text('detail');
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  t.index(['tenant_id', 'created_at', 'id'], 'billing_events_recent_idx');
+};
+
+/**
+ * Criadas pelo 0034. `plans` não aponta para nada; `subscriptions` aponta para
+ * `tenants` e `plans`; `billing_events` para as duas e para `users`. Depois
+ * das tabelas de membership, portanto — e nessa ordem entre si.
+ */
+const BILLING_TABLES = [
+  ['plans', plansTable],
+  ['subscriptions', subscriptionsTable],
+  ['billing_events', billingEventsTable]
 ];
 
 const TENANCY_TABLES = [
@@ -929,68 +994,6 @@ const MEMBERSHIP_TABLES = [
   ['audit_log', auditLogTable],
   // Aponta para `users` e para mais nada — ver o comentário na fábrica.
   ['platform_audit', platformAuditTable]
-];
-
-/**
- * Criada depois de `tenants`, e num grupo próprio em vez de junto com ela.
- *
- * Não vai em `TENANCY_TABLES` porque aquele grupo roda no passo 0001, onde
- * `tenants` está sendo criada na mesma leva — uma FK para uma tabela que a
- * migration ainda está criando depende da ordem dentro do grupo, e depender de
- * ordem implícita é o tipo de coisa que só falha num dos três bancos.
- *
- * Também não vai em `MEMBERSHIP_TABLES`: aquele grupo existe por um motivo
- * específico (apontar para `users`), e esta não aponta. Um grupo cujo nome
- * deixou de descrever o conteúdo é a próxima pessoa colocando a tabela errada
- * nele.
- */
-const tenantBillingEventsTable = (db) => (t) => {
-  t.increments('id').primary();
-  t.integer('tenant_id').unsigned().notNullable()
-    .references('id').inTable('tenants').onDelete('CASCADE');
-  // `payment` (entrou dinheiro, por um período) ou `status_change` (o estado
-  // comercial andou). Os dois na MESMA tabela de propósito: a pergunta que este
-  // livro responde é "o que aconteceu com este cliente", e essa história é
-  // pagou-atrasou-suspendemos-pagou. Separados em duas tabelas, ninguém
-  // consegue lê-la em ordem.
-  t.string('kind', 16).notNullable();
-  // De onde veio o fato. Hoje só `manual` — nós marcamos. Quando entrar um
-  // gateway, é esta coluna que distingue o que ele afirmou do que nós digitamos.
-  t.string('source', 32).notNullable().defaultTo('manual');
-  // O id do evento NO gateway, e a metade da idempotência.
-  //
-  // É a coluna que precisa existir desde já, mesmo sem gateway nenhum. Todo
-  // gateway reentrega webhook, e reentrega é a regra e não a exceção;
-  // acrescentar idempotência depois que o dinheiro já está passando significa
-  // reconciliar cobranças duplicadas à mão, com o cliente do outro lado. Nulo
-  // para o que é digitado por nós, e nulos não colidem num índice único nos
-  // três bancos — que é justamente o que permite a marca manual conviver aqui.
-  t.string('external_id', 128);
-  t.string('status_from', 16);
-  t.string('status_to', 16);
-  // Em centavos, inteiro. Nunca float: 0.1 + 0.2 não é 0.3, e num livro de
-  // dinheiro o erro não some, acumula.
-  t.integer('amount_cents');
-  t.string('currency', 3);
-  t.timestamp('period_start');
-  t.timestamp('period_end');
-  t.text('detail');
-  // Quando o fato aconteceu, que não é quando a linha foi escrita: um pagamento
-  // conciliado na segunda pode ser de sexta.
-  t.timestamp('occurred_at').notNullable().defaultTo(db.fn.now());
-  t.timestamp('created_at').defaultTo(db.fn.now());
-  t.unique(['source', 'external_id']);
-  // Como o console pergunta: o extrato deste provedor, do mais recente para o
-  // mais antigo. O `id` desempata dois fatos no mesmo instante.
-  t.index(['tenant_id', 'occurred_at', 'id'], 'tenant_billing_events_recent_idx');
-};
-
-const SUBSCRIPTION_TABLES = [
-  ['tenant_subscriptions', tenantSubscriptionsTable],
-  // Depois da assinatura na lista, e a ordem não é estética: o export e a
-  // exclusão percorrem `SCHEMA_TABLES` na ordem de criação, e as FKs pedem que
-  // o pai venha antes.
-  ['tenant_billing_events', tenantBillingEventsTable]
 ];
 
 const INITIAL_TABLES = [
@@ -1022,11 +1025,11 @@ export const SCHEMA_TABLES = [
   ...TENANCY_TABLES,
   ...INITIAL_TABLES,
   ...MEMBERSHIP_TABLES,
-  ...SUBSCRIPTION_TABLES,
   ...PROVISIONING_TABLES,
   ...WHATSAPP_TABLES,
   ...DEVICE_HISTORY_TABLES,
-  ...DEVICE_SWAP_TABLES
+  ...DEVICE_SWAP_TABLES,
+  ...BILLING_TABLES
 ].map(([name]) => name);
 
 /**
@@ -2238,93 +2241,96 @@ export const migrations = [
   },
   {
     /**
-     * O estado comercial de cada provedor.
+     * Planos, assinaturas e o extrato — a Fase 5.
      *
-     * Nasce com uma linha `active` para todo provedor que JÁ existe, e não
-     * `trial`: quem já está no ar é cliente, e acordar um deploy com todo mundo
-     * em teste seria dar um prazo a quem já pagou — e, pior, um prazo que
-     * vence.
+     * O que a migração NÃO faz é tão importante quanto o que faz. Ela não põe
+     * ninguém em teste, não limita ninguém e não cobra ninguém: todo provedor
+     * que já existe recebe uma assinatura `active` num plano sem limite nenhum
+     * (`unlimited`), porque um upgrade não pode ser o dia em que um ISP em
+     * produção descobre que está bloqueado ou tem operador demais. Quem decide
+     * o plano de cada um é o console, depois, um por um.
      *
-     * Provedor novo nasce em `trial`, e isso é decidido em `PlatformController`
-     * e não aqui: a migration fala do que existe, o controller do que passa a
-     * existir.
+     * O plano `unlimited` é criado aqui e não em `seedDefaults` por isso: o
+     * backfill precisa dele antes de o seed rodar, e o seed — que dá `trial` a
+     * quem nasce depois — não pode confundir "existia antes desta migração" com
+     * "acabou de ser criado". A migração sabe a diferença; o seed não.
      */
-    id: '0035_tenant_subscriptions',
+    id: '0035_plans_and_subscriptions',
     async isApplied(db) {
-      return db.schema.hasTable('tenant_subscriptions');
+      for (const [name] of BILLING_TABLES) {
+        if (!(await db.schema.hasTable(name))) return false;
+      }
+      return true;
     },
     async up(db) {
       if (!(await db.schema.hasTable('tenants'))) return;
-      const nova = !(await db.schema.hasTable('tenant_subscriptions'));
-      await createTableIfMissing(db, 'tenant_subscriptions', tenantSubscriptionsTable(db));
-      if (!nova) return;
-      const tenants = await db('tenants').select('id');
-      if (!tenants.length) return;
-      await db('tenant_subscriptions').insert(tenants.map(({ id }) => ({
-        tenant_id: id,
-        status: 'active',
-        status_reason: 'Provedor existente no dia em que a assinatura passou a ser registrada',
-        status_changed_at: new Date()
-      })));
+      if (!(await db.schema.hasTable('users'))) return;
+      for (const [name, table] of BILLING_TABLES) {
+        await createTableIfMissing(db, name, table(db));
+      }
+
+      let unlimited = await db('plans').where({ code: 'unlimited' }).first();
+      if (!unlimited) {
+        await db('plans').insert({
+          code: 'unlimited',
+          name: 'Sem limites',
+          max_operators: null,
+          max_subscribers: null,
+          max_devices: null,
+          price_cents: 0,
+          currency: 'BRL',
+          trial_days: 0,
+          active: true
+        });
+        unlimited = await db('plans').where({ code: 'unlimited' }).first();
+      }
+
+      const tenants = await db('tenants').pluck('id');
+      const covered = new Set((await db('subscriptions').pluck('tenant_id')).map(Number));
+      const rows = tenants
+        .filter((id) => !covered.has(Number(id)))
+        .map((id) => ({ tenant_id: id, plan_id: unlimited.id, status: 'active' }));
+      if (rows.length > 0) await db('subscriptions').insert(rows);
     }
   },
   {
     /**
-     * O plano, acrescentado a uma tabela que pode já existir.
+     * O nome do provedor deixa de ser `settings.appName`.
      *
-     * A 0035 é recente, então na maioria das instalações a tabela nasce já com
-     * estas colunas e este passo não faz nada. Ele existe para a minoria que
-     * subiu entre as duas — e a ordem importa: `hasColumn` antes de `alterTable`
-     * porque o SQLite reconstrói a tabela para acrescentar coluna, e reconstruir
-     * à toa é o tipo de coisa que só dá errado com dado dentro.
+     * A barra lateral, a tela de login e a aba do navegador liam o nome de um
+     * setting que o operador editava — e `tenants.name`, que o console lista
+     * e o perfil público responde, dizia outra coisa. Um nome em dois lugares
+     * é um nome mostrado diferente em duas telas; a Fase 6 fica com a linha do
+     * provedor.
      *
-     * `unlimited` como padrão pelo mesmo motivo do backfill da 0035: aplicar um
-     * teto retroativamente a quem já tem doze operadores não cobra nada de
-     * ninguém — só impede o ISP de contratar o décimo terceiro, num dia em que
-     * ele não mudou nada e não foi avisado.
+     * A cópia é só de quem MUDOU o nome: um `appName` ainda no valor de fábrica
+     * não diz nada sobre o provedor, e copiá-lo por cima de um nome dado no
+     * console — que nasce com o setting de fábrica — trocaria "Provedor Beta"
+     * por "SkyGenPanel". O setting fica na tabela, por compatibilidade com o
+     * que ainda o lê; ninguém mais escreve nele pela tela.
      */
-    id: '0036_tenant_subscription_plans',
+    id: '0036_tenant_name_from_app_name',
     async isApplied(db) {
-      if (!(await db.schema.hasTable('tenant_subscriptions'))) return false;
-      return db.schema.hasColumn('tenant_subscriptions', 'plan_code');
-    },
-    async up(db) {
-      if (!(await db.schema.hasTable('tenant_subscriptions'))) return;
-      const faltando = [];
-      if (!(await db.schema.hasColumn('tenant_subscriptions', 'plan_code'))) {
-        faltando.push((t) => t.string('plan_code', 32).notNullable().defaultTo('unlimited'));
-      }
-      if (!(await db.schema.hasColumn('tenant_subscriptions', 'max_operators'))) {
-        faltando.push((t) => t.integer('max_operators').unsigned());
-      }
-      if (!(await db.schema.hasColumn('tenant_subscriptions', 'max_subscriber_accounts'))) {
-        faltando.push((t) => t.integer('max_subscriber_accounts').unsigned());
-      }
-      if (!faltando.length) return;
-      await db.schema.alterTable('tenant_subscriptions', (t) => {
-        for (const add of faltando) add(t);
-      });
-    }
-  },
-  {
-    /**
-     * O livro do que aconteceu comercialmente com cada provedor.
-     *
-     * Vale dizer por que ele não é o `platform_audit` nem o `audit_log`, já que
-     * os três guardam "algo mudou". A trilha registra o ATO e quem o praticou —
-     * é prestação de contas. Este registra o FATO comercial, e os dois divergem
-     * de verdade: o webhook de um gateway produz um pagamento sem nenhum humano
-     * por trás, e uma suspensão automática por atraso produz um fato sem ator.
-     * Quem pergunta "quem mexeu nisso?" lê a trilha; quem pergunta "até quando
-     * este cliente está pago?" lê aqui.
-     */
-    id: '0037_tenant_billing_events',
-    async isApplied(db) {
-      return db.schema.hasTable('tenant_billing_events');
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      const flag = await db('app_state').where({ key: 'tenant_name_migrated' }).first().catch(() => null);
+      return Boolean(flag);
     },
     async up(db) {
       if (!(await db.schema.hasTable('tenants'))) return;
-      await createTableIfMissing(db, 'tenant_billing_events', tenantBillingEventsTable(db));
+      if (!(await db.schema.hasTable('settings'))) return;
+      const rows = await db('settings').where({ key: 'appName' }).select('tenant_id', 'value');
+      for (const row of rows) {
+        const name = String(row.value ?? '').trim();
+        if (!name || name === 'SkyGenPanel') continue;
+        await db('tenants').where({ id: row.tenant_id }).whereNot({ name }).update({ name, updated_at: new Date() });
+      }
+      // The flag lives in `app_state` of the FIRST provider only, as the marker
+      // that this one-time copy happened; `app_state` has been per provider
+      // since 0014, so the row needs a tenant.
+      const first = await db('tenants').orderBy('id', 'asc').first();
+      if (first && !(await db('app_state').where({ tenant_id: first.id, key: 'tenant_name_migrated' }).first())) {
+        await db('app_state').insert({ tenant_id: first.id, key: 'tenant_name_migrated', value: '1' });
+      }
     }
   }
 ];

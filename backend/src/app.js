@@ -10,6 +10,7 @@ import { IS_SAAS, IS_SELF_HOSTED } from './config/edition.js';
 import { TRUST_PROXY } from './config/proxy.js';
 import { attachLocale } from './middleware/locale.js';
 import { resolveTenant } from './middleware/tenantResolver.js';
+import { requireActiveSubscription } from './middleware/subscriptionGate.js';
 import { DEFAULT_LOCALE, translate, translateError } from './i18n/index.js';
 import {
   apiLimiter,
@@ -19,6 +20,8 @@ import {
   portalLoginLimiter
 } from './middleware/rateLimit.js';
 import { authenticateToken, requirePermission } from './middleware/auth.js';
+import { log, requestLogger } from './utils/logger.js';
+import { httpMetrics } from './utils/metrics.js';
 
 import authRoutes from './routes/auth.js';
 import deviceRoutes from './routes/devices.js';
@@ -29,6 +32,7 @@ import mapSettingsRoutes from './routes/mapSettings.js';
 import databaseRoutes from './routes/database.js';
 import platformRoutes from './routes/platform.js';
 import platformMemberRoutes from './routes/platformMembers.js';
+import platformBillingRoutes from './routes/platformBilling.js';
 import userRoutes from './routes/users.js';
 import inviteRoutes from './routes/invites.js';
 import auditRoutes from './routes/audit.js';
@@ -221,10 +225,22 @@ app.get('/api/health', async (req, res) => {
   });
 });
 
+// Uma linha por requisição e um contador por provedor, ANTES do resolvedor:
+// uma requisição recusada por não nomear provedor também é um evento, e é
+// justamente o que se quer ver quando um DNS está errado.
+app.use('/api', requestLogger());
+app.use('/api', httpMetrics());
 app.use('/api', resolveTenant);
+// A porta da assinatura, logo atrás do resolvedor e só na edição SaaS. O que
+// ela deixa passar sem olhar (login, o nome do provedor, o console) está
+// listado nela, com o motivo de cada um.
+if (IS_SAAS) {
+  app.use('/api', requireActiveSubscription());
+}
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/refresh', authLimiter);
 app.use('/api/auth/setup', authLimiter);
+app.use('/api/auth/signup', authLimiter);
 
 // Below `resolveTenant`, which is what makes this route safe to leave open.
 // It answers with a provider's name to anybody who asks, so the question of
@@ -263,6 +279,8 @@ if (IS_SAAS) {
   // the split is only so two lanes could build them without sharing a file.
   app.use('/api/platform', platformRoutes);
   app.use('/api/platform', platformMemberRoutes);
+  // E a terceira: planos, assinaturas e pagamentos — a Fase 5.
+  app.use('/api/platform', platformBillingRoutes);
 }
 app.use('/api/users', userRoutes);
 app.use('/api/invites', inviteRoutes);
@@ -315,7 +333,7 @@ function serveFrontend(target, htmlFile) {
 // `next` is unused but required: Express only treats a four-argument function
 // as an error handler.
 export function errorHandler(err, req, res, next) {
-  console.error('Unhandled error:', err);
+  log.error('unhandled_error', { req: req.id ?? null, method: req.method, path: String(req.originalUrl || req.url || '').split('?')[0], err });
   // A failure raised before the locale middleware ran leaves `req.t` unset.
   const t = req.t || ((key) => translate(DEFAULT_LOCALE, key));
   if (err?.type === 'entity.parse.failed') {
@@ -367,7 +385,14 @@ portalApp.use('/api', portalIpLimiter);
 portalApp.get('/api/health', (req, res) => {
   res.json({ status: 'ok', service: 'customer-portal', version: APP_VERSION });
 });
+portalApp.use('/api', requestLogger());
+portalApp.use('/api', httpMetrics());
 portalApp.use('/api', resolveTenant);
+// O portal do assinante fica de pé em `past_due` — o assinante não é quem
+// deve. O que o derruba é `suspended` e `canceled`, que são decisões nossas.
+if (IS_SAAS) {
+  portalApp.use('/api', requireActiveSubscription({ portal: true }));
+}
 portalApp.use('/api/customer', customerPortalRoutes);
 portalApp.use('/api', (req, res) => {
   res.status(404).json({ success: false, message: req.t('common.routeNotFound') });

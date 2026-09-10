@@ -1,4 +1,5 @@
 import { IS_SAAS } from '../config/edition.js';
+import { recordAcsRequest } from '../utils/metrics.js';
 import { blockedAddressReason } from '../utils/net/blockedRanges.js';
 import { PinnedTransport } from '../utils/net/pinnedFetch.js';
 
@@ -172,23 +173,36 @@ export class GenieAcsEgress {
    */
   static async fetch(url, options = {}) {
     const { allowPrivateAddresses = false, rejectUnauthorized = true } = options;
-    const { parsed, hostname, port, addresses } = await this.resolveTarget(url, {
-      allowPrivateAddresses,
-      signal: options.signal
-    });
+    let target;
+    try {
+      target = await this.resolveTarget(url, { allowPrivateAddresses, signal: options.signal });
+    } catch (error) {
+      // Counted per provider, by what stopped it: a refusal is ours and a
+      // resolution failure is the network's, and the two are different pages.
+      recordAcsRequest({ outcome: error?.code === EGRESS_REFUSED ? 'refused' : 'error' });
+      throw error;
+    }
+    const { parsed, hostname, port, addresses } = target;
 
-    return PinnedTransport.request({
-      url: parsed,
-      hostname,
-      port,
-      addresses,
-      method: options.method || 'GET',
-      headers: options.headers,
-      body: options.body,
-      signal: options.signal,
-      rejectUnauthorized,
-      maxBytes: this.MAX_RESPONSE_BYTES
-    });
+    try {
+      const response = await PinnedTransport.request({
+        url: parsed,
+        hostname,
+        port,
+        addresses,
+        method: options.method || 'GET',
+        headers: options.headers,
+        body: options.body,
+        signal: options.signal,
+        rejectUnauthorized,
+        maxBytes: this.MAX_RESPONSE_BYTES
+      });
+      recordAcsRequest({ outcome: 'ok' });
+      return response;
+    } catch (error) {
+      recordAcsRequest({ outcome: 'error' });
+      throw error;
+    }
   }
 }
 

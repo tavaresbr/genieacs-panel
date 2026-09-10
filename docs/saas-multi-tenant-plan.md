@@ -543,156 +543,185 @@ peças:
 
 ---
 
-### Fase 5 — Planos, limites e ciclo de vida da assinatura *(esforço: médio)*
+### Fase 5 — Planos, limites e ciclo de vida da assinatura ✅ *(entregue; o gateway continua manual)*
 
-- ✅ **o portão comercial** — `tenant_subscriptions` (eixo próprio, migration 0035),
-  `config/subscription.js` (o vocabulário) e `middleware/requireActiveSubscription.js` (a
-  decisão). `trial` e `active` passam; `past_due` lê mas não escreve; `suspended`/`canceled`
-  respondem 402 com um código estável (`subscription_read_only` / `subscription_blocked`), e
-  **o portal do assinante continua de pé em `past_due`**.
+Três tabelas (migration `0035`), uma porta, quatro pontos de escrita e a metade comercial do
+console. O que a fase NÃO fez é tão importante quanto o que fez, e está escrito na migração:
+**nenhum provedor existente muda** — todos recebem `active` num plano `unlimited` sem limite
+algum, porque um upgrade não pode ser o dia em que um ISP em produção descobre que está
+bloqueado. Quem nasce depois, pelo console, nasce em `trial`.
 
-  Três coisas que o desenho original pedia e mudaram na execução:
+**Schema.** `plans` é do deploy (é a tabela de preços; um provedor assina *o* plano `pro`, não
+tem *o seu*); `subscriptions` é uma por provedor, escopada, com `plan_id` em RESTRICT — plano
+com assinante se desativa, não se apaga; `billing_events` é o extrato, escopado, e é o que um
+gateway vai alimentar por webhook pelo mesmo caminho do botão de hoje.
 
-  1. **NÃO fica «logo após o `tenantResolver`».** Ali ele responde antes do 401 — e aí um
-     `GET /api/devices` sem token nenhum devolve 402 num provedor inadimplente e 401 num
-     provedor em dia. Qualquer estranho passa a varrer hosts perguntando quais ISPs estão
-     atrasados. É a mesma regra que `tenantController.getPublicProfile` já escrevia («não
-     distinguir "não existe" de "existe e está suspenso"»), e o portão no lugar óbvio a
-     violaria de outro arquivo. Mora dentro de `authenticateToken` e de
-     `authenticatePortalCustomer`, o que faz a ordem 401-antes-de-402 ser garantida por
-     construção.
-  2. **A ausência de linha LIBERA**, e o motivo é assimetria de custo: fechar por engano
-     trava um cliente que pagou, fora do horário comercial, sem nada que ele possa fazer;
-     abrir por engano custa dinheiro, que é recuperável. Um estado desconhecido e um banco
-     que não responde caem do mesmo lado, pelo mesmo motivo.
-  3. **A exportação do próprio cadastro nunca é bloqueada**, nem em `canceled`. Recusá-la é
-     reter dado de terceiro como alavanca de cobrança — corta-se o serviço, mas o que o ISP
-     cadastrou continua sendo dele.
+**A porta (`requireActiveSubscription`)**, logo atrás do resolvedor e só na edição SaaS. Cinco
+estados, uma regra cada, toda a política em `SubscriptionService.decide`:
 
-  E um comentário desatualizado que isto obrigou a corrigir: `platformController.setStatus`
-  afirmava que «nada no caminho de login lê `tenants.status`». Lê —
-  `resolveTenantIdBySlug` devolve nulo para quem não está `active`, então suspender já
-  trancava painel e portal por 404 no SaaS. A frase só valia na instalação de um provedor
-  só, que é justamente onde aquela rota não existe. É por isso que a inadimplência não
-  escreve naquela coluna: ela tornaria o cliente elegível à exclusão em duas etapas e
-  derrubaria o portal dos assinantes dele junto.
-- ✅ **os limites nos pontos de escrita** — catálogo em `config/plans.js`, medição e decisão
-  em `services/planLimitService.js`, `plan_code` e as exceções negociadas em
-  `tenant_subscriptions` (migration 0036), e `GET /api/tenant/usage` para a tela de plano e
-  uso.
+| estado | passa? |
+| --- | --- |
+| `trial` | sim — e vira `past_due` sozinho quando o prazo vence, **calculado na leitura**, sem job: não há janela em que um teste vencido ainda passe porque o cron não rodou |
+| `active` | sim |
+| `past_due` | **só para ler** (GET/HEAD/OPTIONS). O portal do assinante fica inteiro de pé — o assinante não é quem deve — e os webhooks do ERP continuam entrando: recusar o evento do SGP por fatura atrasada perderia dado de quem não deve nada |
+| `suspended` | 402 `subscription_suspended` |
+| `canceled` | 402 `subscription_canceled` |
 
-  Catálogo em CÓDIGO e não em tabela: um limite é decisão comercial que precisa de diff e de
-  revisor, e num banco um dígito errado alarga o teto de todo mundo daquele plano em
-  silêncio. O que varia por cliente («este ISP negociou 40 operadores») não é o plano, é uma
-  exceção, e exceção mora na linha da assinatura.
+O 402 leva o `code` e a própria assinatura no corpo, para a tela de bloqueio não ter que
+perguntar de novo a uma rota que talvez também responda 402. O que fica **fora** da porta, com
+o motivo de cada um escrito nela: `/api/auth/*` (entrar é como se vê o aviso, e como um
+administrador da plataforma chega ao console), `/api/tenant/public` (o nome na tela),
+`/api/tenant/subscription` (a placa do muro) e `/api/platform/*` (o console vive *acima* das
+assinaturas; um provedor cancelado é justamente um que ele precisa alcançar).
 
-  Três coisas que a execução mudou:
+`subscriptions.status = 'suspended'` e `tenants.status = 'suspended'` são **duas chaves**, de
+propósito: a do provedor é operacional (para os jobs, recusa o webhook), a da assinatura é
+comercial (o que o operador vê ao entrar). Uma inadimplência não precisa parar o alerta de ONT
+caída, e uma parada operacional não é uma cobrança.
 
-  1. **O convite é o ponto por onde o teto escaparia.** Conferir só no cadastro direto deixa
-     um administrador emitir vinte links num plano de três: cada aceite, isolado, é o
-     primeiro a passar do teto, e chega quando quem emitiu já saiu da tela. Um convite em
-     aberto conta como vaga prometida, e o teto é conferido **de novo** no aceite — ali sem
-     somar o próprio convite, senão o último convite de todo provedor no teto seria recusado.
-  2. **A varredura de contas de assinante não pode falhar em silêncio.** Ela roda sem ninguém
-     olhando; parar de criar contas caladamente é o assinante ficar sem portal e ninguém
-     saber por quê. O que ela deixou de criar é registrado e aparece ao lado do teto que o
-     causou. E uma ONT que troca de titular passa mesmo no teto: aposenta uma conta e cria
-     outra, saldo zero de ativas. Por isso o teto conta ATIVAS e não linhas — contando
-     linhas, o provedor encostaria no limite a cada troca de titular sem ter vendido nada.
-  3. **O teto de ONTs não existe, e a ausência é a decisão.** Não há ponto de escrita para
-     uma ONT: ela aparece porque informou ao ACS do provedor, que é dele e não nosso — quando
-     a contagem passa, o equipamento já está lá. Fingir que é limite levaria a esconder ONTs
-     do painel (o ISP perde a visão da própria rede por causa da nossa fatura) ou a bloquear
-     a tela inteira. É **medição**: cobrar é o caminho, travar não é.
-- ✅ **o extrato comercial e a interface de cobrança** — `tenant_billing_events`
-  (migration 0037), `models/TenantBillingEvent.js`, `services/subscriptionBillingService.js`
-  com `ManualBillingProvider`, e `GET`/`POST /api/platform/tenants/:id/billing`. Quando o
-  gateway entrar, continua valendo **Asaas** (PIX + boleto + cartão, o padrão do mercado de
-  ISP brasileiro): ele implementa a mesma superfície e o webhook desemboca em `applyPayment`.
+**Limites**, nos pontos de escrita, sempre contados do banco e nunca do cache (o limite existe
+para o dia em que dois administradores criam ao mesmo tempo): criação de operador
+(`/api/users`), aceite de convite (o convite **não** é consumido pela recusa — a pessoa volta
+quando houver vaga), o console adicionando alguém (no escopo do provedor *alvo*, não do
+administrador), e a sincronização de aparelhos — que cria contas **até o limite** e deixa o
+resto para a próxima passada, sem lançar, porque a sincronização inteira não pode cair por
+causa da conta que não coube; um aparelho que já tem conta e trocou de assinante não conta
+contra o teto. Recusa é **402** com `code`, `limit` e `current`: quem pede *tem* permissão — é
+o plano que não comporta. A contagem de ONTs vem do GenieACS e vira `null` quando o ACS não
+responde, sem derrubar os outros dois números.
 
-  Quatro decisões que valem registro:
+**Cobrança.** `BillingProvider` é a interface; `ManualBillingProvider` é o que existe — nós
+marcamos pago. Um pagamento estende o período em 30 dias a partir do fim atual (pagou
+adiantado) ou de hoje (pagou atrasado) e volta o status a `active`. Um provedor `suspended`
+ou `canceled` **não** é reativado por pagamento: essas duas são decisões de gente, e é gente
+que as desfaz. O Asaas entra como `AsaasBillingProvider` com `recordPayment` chamado pelo
+webhook, e `billing_events.provider = 'asaas'`.
 
-  1. **Não se chama `billingService`.** «Billing» já significa a ponta oposta do dinheiro
-     aqui: `waBillingService` é o ISP cobrando os assinantes DELE, com fatura do SGP, PIX e
-     boleto. Dois arquivos com o mesmo nome significando as duas pontas é ambiguidade que
-     alguém resolve na madrugada, errado. A tabela entrou na família `tenant_*` pelo mesmo
-     motivo.
-  2. **`external_id` é a única parte que precisava existir antes de ser usada.** Todo
-     gateway reentrega webhook, e reentrega é a regra, não a exceção. Sem a coluna e o índice
-     único, cada reentrega empurraria o período pago mais trinta dias; acrescentar
-     idempotência depois que o dinheiro já está passando é reconciliar à mão, com o cliente
-     do outro lado. Nulos não colidem num índice único nos três bancos — que é o que deixa a
-     marca manual conviver com a idempotência do gateway.
-  3. **Pagamentos e mudanças de estado no mesmo livro.** A trilha (`platform_audit`,
-     `audit_log`) registra o ATO e quem o praticou — prestação de contas. Este registra o
-     FATO comercial, e os dois divergem de verdade: um webhook produz pagamento sem humano
-     por trás. Só os pagamentos não contariam a história; ela é pagou-atrasou-suspendemos-pagou.
-  4. **O fato é escrito ANTES de a assinatura se mover**, ao contrário da trilha, que vem
-     depois. Uma assinatura ativa sem o pagamento que a ativou é um cliente que ninguém sabe
-     por que está em dia — e, no fechamento do mês, dinheiro que não existe. E pagar
-     adiantado SOMA ao período já pago em vez de recomeçar de hoje: recomeçar cobra o cliente
-     pelo tempo que ele já tinha comprado.
-- Console de plataforma para nós: criar tenant, mudar plano, suspender, ver uso.
+**Console.** Planos (criar, editar limites/preço/teste, desativar; o `code` não muda — é o
+que o extrato nomeia), a assinatura de cada provedor (trocar plano e mudar estado são dois
+botões e duas linhas no extrato, de propósito: trocar o plano de quem está em `past_due` não
+pode reativá-lo por acidente), registrar pagamento, e uso contra limite. Cada mudança grava
+nas **duas** trilhas — `platform_audit` (o que nós fizemos) e o `audit_log` do provedor com
+`actorKind: 'platform'` (o que aconteceu com ele, onde ele consegue olhar).
+
+**Frontend, o mínimo que a fase exigia:** a coluna de plano e estado na lista do console, o
+painel de plano por provedor, e a casca do app ouvindo o 402 — faixa no alto para `past_due`
+(dá para ler), muro para `suspended`/`canceled` (com o nome do plano e a saída). A tela de
+"plano e uso" do próprio provedor continua da Fase 6; a rota que a alimenta já existe.
 
 ---
 
-### Fase 6 — Frontend *(esforço: médio-alto)*
+### Fase 6 — Frontend ✅ *(entregue; o convite por e-mail continua da Fase 2)*
+
+**O que entrou:**
 
 - `frontend/src/contexts/tenant-context.tsx`: carrega `/api/tenant/public` no boot e provê
-  branding + plano + limites.
-- Branding por tenant substitui o `settings.appName` global —
-  `frontend/src/components/brand-mark.tsx` passa a ler do contexto.
-- Telas novas: **cadastro/onboarding** (nome do provedor, escolha do subdomínio, conexão
-  GenieACS, convite da equipe), **configurações do provedor**, **equipe/usuários**,
-  **plano e uso**, **console de plataforma** (rota protegida por papel de plataforma;
-  não vale a pena um terceiro bundle Vite agora).
-- `frontend/src/pages/setup.tsx` (wizard de primeiro uso) fica **só na edição self-hosted**;
-  no SaaS o equivalente é o onboarding pós-cadastro.
-- A seção de troca de banco em `frontend/src/pages/settings.tsx` sai da edição SaaS.
-- i18n: são **11 idiomas** hoje, não três. Uma chave nova entra em todos, e o tipo em
-  `dictionary.ts` faz o `npm run typecheck` acusar a que faltar. O que o typecheck **não**
-  pega é a chave declarada **duas vezes** — o literal fica com a última, o conjunto de
-  chaves continua batendo e o teste de paridade passa. Isso aconteceu quatro vezes nesta
-  fase, sempre por dois branches acrescentando as mesmas chaves; em duas delas as cópias
-  divergiam na redação. É para isso que existe o teste "declara cada chave exatamente uma
-  vez" em `backend/test/i18n.test.js`, e ele varre as duas metades do app.
-- O backend já ganhou sua própria camada de i18n (`backend/src/i18n/`) e o
-  `customerPortalController` já responde por `req.t('portal.*')` — as mensagens novas de
-  limite de plano e de suspensão entram por lá, não hardcoded.
-- **Resíduos do upstream indonésio, ainda pendentes** (confirmados na `main` de hoje), e são
-  metadado e dado que o cliente final do provedor vê: o `<html lang="id">` em
-  **`frontend/index.html` e `frontend/portal.html`**, e o centro padrão do mapa em Jacarta
-  (`-6.2088, 106.8456`, `backend/src/config/seed.js`). O segundo já é **por provedor** desde
-  que `map_settings` foi escopada — falta só passar a defini-lo no onboarding em vez de
-  semear Jacarta.
+  `{ tenant, name, isSaas, refresh }`. A rota passou a responder também `edition` e
+  `panelBaseDomain`, que é o que a tela de login usa para decidir se mostra o link de
+  cadastro e o que o cadastro usa para montar o endereço do painel novo.
+- **Branding pelo contexto.** O nome do provedor deixou de ser `settings.appName` (um
+  ajuste global, guardado no `localStorage` e propagado por evento) e passou a ser
+  `tenants.name`, renomeado por `PATCH /api/tenant` (`settings.write`, auditado como
+  `tenant.renamed`). A sidebar, o login, o setup, o título da aba e o campo "nome" das
+  configurações leem e escrevem o contexto. A migration `0036_tenant_name_from_app_name`
+  leva o nome que cada provedor já tinha em `settings` para a linha dele.
+- **Cadastro** (`/signup`, `POST /api/auth/signup`): só na edição SaaS **e** só onde há
+  domínio-base para o provedor responder — fora disso a rota é 404 e a tela redireciona
+  para o login. Cria provedor + `owner` numa transação, semeia os padrões como o boot faz,
+  registra em `platform_audit` com `via: 'signup'`, e devolve o endereço do painel. Passa
+  pelo `authLimiter`. Slug reservado, tomado ou usuário tomado respondem 409 com mensagem
+  traduzida; o `slugProblem` que o console já usava saiu para `backend/src/utils/slug.js`
+  e serve aos dois.
+- **Onboarding** (`/onboarding`): três passos — nome e centro do mapa, GenieACS e credencial
+  NBI (com o teste de conexão), um primeiro colega como `tech`. É a mesma API das
+  configurações em outra ordem, não um segundo caminho de escrita. O `OnboardingGate` leva
+  para lá quem tem `settings.write` num provedor SaaS **sem** `genieAcsUrl`, uma vez; o
+  "pular" fica lembrado por provedor no navegador.
+- **Plano e uso** (`/plan`, `settings.read`, só no SaaS): a leitura de
+  `/api/tenant/subscription` que a Fase 5 deixou pronta — plano, estado, datas, as três
+  contagens contra os limites. Só leitura: mudar de plano continua com a plataforma.
+- A seção de troca de banco das configurações **não aparece** na edição SaaS.
+- **Resíduos do upstream indonésio resolvidos:** `<html lang="pt-BR">` nos dois HTMLs e o
+  centro padrão do mapa em Brasília (`-15.7942, -47.8822`), que o onboarding deixa trocar
+  no primeiro passo.
+- i18n: as 44 chaves novas entraram nos **13 idiomas** do frontend (árabe e hindi chegaram
+  pela `main` no meio da fase, e as chaves da Fase 5 e desta entraram neles junto) e as 8
+  mensagens novas nos 13 do backend; a paridade e a unicidade continuam cobertas por
+  `backend/test/i18n.test.js`. A lição registrada abaixo vale ainda.
+
+**O que ficou de fora, de propósito:**
+
+- Não há tela de **aceitar convite**: o convite por link existe na API (Fase 2), mas o
+  transporte de e-mail não, então o onboarding cria o colega direto em vez de convidá-lo.
+  Entra junto com o e-mail, na Fase 2.
+- O cadastro é servido **pelo host de um provedor existente** (o `default`, na prática),
+  não por um host apex da plataforma — o resolvedor só conhece subdomínios de provedor. Um
+  host de marketing é assunto de operação (Fase 7).
+- `frontend/src/pages/setup.tsx` continua existindo nas duas edições porque é o caminho
+  de "instalação sem nenhum usuário"; no SaaS ele nunca aparece porque o cadastro já nasce
+  com o `owner`.
+
+**Lição que fica:** o tipo em `dictionary.ts` faz o `npm run typecheck` acusar a chave que
+faltar, mas **não** pega a chave declarada **duas vezes** — o literal fica com a última, o
+conjunto de chaves continua batendo e o teste de paridade passa. Isso aconteceu quatro
+vezes, sempre por dois branches acrescentando as mesmas chaves; em duas delas as cópias
+divergiam na redação. É para isso que existe o teste "declara cada chave exatamente uma
+vez" em `backend/test/i18n.test.js`, e ele varre as duas metades do app.
 
 ---
 
-### Fase 7 — Operação e as duas edições *(esforço: médio)*
+### Fase 7 — Operação e as duas edições ✅ *(entregue; o runbook é `docs/saas-operations.md`)*
 
-- Flag `EDITION=saas|selfhosted` lida em `backend/src/app.js`, controlando: rotas de cadastro,
-  `backend/src/routes/database.js` (troca de banco), wizard de setup, permissão de faixas IP
-  privadas no conector, e o console de plataforma.
-- Self-hosted continua com `deploy/install.sh` + CLI `deploy/skygenpanel` + SQLite/MySQL.
-  SaaS usa o `Dockerfile` + Postgres gerenciado + migrations no CI.
-- Observabilidade: `tenant_id` em toda linha de log e em toda métrica. O **`audit_log` entrou
-  na onda 20** — senha de portal revelada e redefinida, URL e credencial do GenieACS, papéis,
-  vínculos, convites e suspensão de provedor. Falta a impersonação, que ainda não existe.
-- Backup e **procedimento de exportação/exclusão por tenant**. A **exclusão entrou na onda
-  22**: exige quatro coisas ao mesmo tempo — estar no plano de controle, o provedor estar
-  **suspenso** (o que faz dela um segundo passo, com um estado reversível no meio, e não um
-  clique), o slug digitado de volta exato, e não ser o último provedor do deployment —, e a
-  linha da trilha é gravada ANTES, com a contagem do que vai sumir: se ela não puder ser
-  gravada, não se apaga. A **exportação entrou na onda 21** (`GET /api/tenant/export`, capacidade `tenant.export`, auditada): todas as tabelas
-  escopadas na ordem de criação do schema — que é a ordem que as FKs pedem, e o que faz o
-  arquivo poder ser reinserido de cima para baixo —, sem nenhum segredo cifrado nem hash de
-  senha, com um manifesto que diz o que ficou de fora e por quê.
+**O que entrou:**
+
+- **`EDITION`** já decidia cadastro, troca de banco, faixas privadas do conector e o
+  console; continua decidindo. O assistente de instalação fica nas duas edições de
+  propósito: no SaaS ele é como o primeiro `owner` do `default` — e o primeiro
+  `platform_admins` — nasce num deploy vazio.
+- **Banco pelo ambiente.** `DATABASE_URL` (`postgres://…?schema=&sslmode=`, ou `mysql://`)
+  vence o `db-config.json` quando os dois existem: uma imagem contra um Postgres
+  gerenciado não pode ser apontada para o banco errado por um volume velho. O arquivo
+  continua sendo o mecanismo do self-hosted, onde a tela de troca de banco o escreve.
+- **Deploy do SaaS.** `deploy/docker-compose.saas.yml` (imagem + Postgres ao lado, para
+  homologação; em produção o `db` sai e a URL aponta para fora), `deploy/saas.env.example`
+  com cada variável comentada, `.dockerignore`, e o job `image` no CI, que constrói a
+  imagem e a sobe até `/api/health` responder — o `Dockerfile` não era exercitado em
+  lugar nenhum. As migrations rodam no boot e são idempotentes; deploy é `up -d --build`.
+- **O provedor em toda linha de log.** `backend/src/utils/logger.js`: uma linha por evento
+  (`text` logfmt ou `json`), `tenant=` lido do mesmo contexto que as queries leem, uma
+  linha `http` por requisição (método, caminho sem query, status, ms, host, `req=` que
+  volta em `X-Request-Id`), `/api/health` calado enquanto responde 200. Os ~250
+  `console.*` que já existiam **não foram reescritos**: o boot envolve os cinco métodos
+  do `console` uma vez, e cada linha antiga sai com `[tenant=N]` quando há contexto —
+  jobs de fundo inclusive, porque rodam por provedor.
+- **O provedor em toda métrica.** `backend/src/utils/metrics.js`: contadores em memória,
+  `tenant_id` em toda série, sem biblioteca. `http_requests_total` (provedor, método,
+  classe de status — o caminho **não** é rótulo), `http_request_duration_ms` (baldes
+  grossos por provedor) e `acs_requests_total` (provedor, `ok`/`refused`/`error`, contado
+  em `GenieAcsEgress.fetch`). `GET /api/platform/metrics` em formato Prometheus, atrás
+  do guarda do console **ou** de `METRICS_TOKEN` comparado em tempo constante — um
+  coletor não tem sessão.
+- **O host apex é a porta de entrada.** `painel.exemplo.com` (e `www.`) deixa de ser 404
+  para exatamente duas rotas: `GET /api/tenant/public` (que responde `slug: null` e a
+  edição) e `POST /api/auth/signup`. Nada de provedor nenhum é servido ali; nenhum
+  contexto de provedor é aberto, então uma query escopada que chegasse por engano falha
+  com a sentinela. O cadastro sai do host do provedor `default`, que era a porta de um
+  cliente servindo de porta da plataforma. A tela de login de um provedor aponta para
+  `https://<base>/signup`; no apex, `/login` leva ao cadastro.
+- **Backup e procedimento** no runbook: `pg_dump` diário com teste de restauração
+  mensal, snapshot do volume de anexos, os três segredos no cofre; por provedor,
+  exportação (`GET /api/tenant/export`) e exclusão em dois passos, já existentes;
+  suspensão, rotação de segredos e o que ainda não existe.
+
+**O que ficou de fora, de propósito:** rotação da `SECRET_BOX_KEY` com duas chaves vivas
+(o `key_version` já está gravado; falta o comando), impersonação, e-mail e o gateway —
+todos listados no runbook como "não existe ainda", para o plantão não procurar.
 
 ---
 
-### Fase 8 — Provar o isolamento *(a suíte existe; a lista de portas ainda não está toda coberta)*
+### Fase 8 — Provar o isolamento ✅ *(a lista de portas está contada; o RLS foi avaliado e fica para depois)*
 
-Nada vai para dois provedores reais antes disto passar. **Boa parte já passa.**
+Nada vai para dois provedores reais antes disto passar. **Passa.**
 
 #### O que existe
 
@@ -702,7 +731,7 @@ subsistema cada — `sgp-links`, `sgp-events`, `device-profiles`, `provisioning`
 `map-settings`, `vendor-catalogue`, `wifi-credentials`, `whatsapp-media`,
 `whatsapp-inbound`, `users`, `auth`, entre outras, mais `tenant-subdomain` e
 `tenant-id-sweep`, que provam o isolamento por host, e `role-reach`, que prova por HTTP o
-alcance de cada papel sobre uma amostra de 31 rotas. São 1403 testes no total, verdes nos
+alcance de cada papel sobre uma amostra de 31 rotas. São 1756 testes no total, verdes nos
 três dialetos no CI.
 
 O padrão em todas: **dois provedores com as chaves naturais deliberadamente colidindo** —
@@ -747,9 +776,99 @@ que varre `backend/src` atrás de handle cru numa tabela escopada, a exigência 
 tabela do schema esteja classificada como escopada ou compartilhada, e a marcação
 `tenant-scope-exempt` obrigatória para as poucas exceções legítimas.
 
-#### O que ainda falta
+#### A lista de portas, agora contada
 
-- **RLS no Postgres** como segunda linha, ainda não avaliado. É o único item que sobrou.
+O que faltava não era uma prova a mais: era **saber quantas portas existem** e exigir que
+nenhuma fique sem resposta. Uma suíte de vazamento prova que uma porta está fechada; nenhuma
+delas percebe a porta que ninguém lembrou de listar — e o vazamento que este projeto viu de
+perto não foi um controlador escrito errado, foi um controlador novo copiado do vizinho.
+
+`backend/test/route-coverage.test.js` lê o inventário das rotas dos dois listeners
+(`backend/test/helpers/routeInventory.js`, que analisa `app.js` e os arquivos de rota, porque
+o Express 5 guarda o prefixo de um roteador montado como função e não há o que ler de volta) e
+faz quatro contas:
+
+1. **Toda rota sem guarda de sessão está declarada, com o motivo escrito.** São 12 hoje: as
+   quatro de entrada, o cadastro, o perfil público, os dois do token de convite, os dois
+   webhooks, a mídia por token assinado e o login do portal. Uma rota nova sem sessão reprova
+   o CI.
+2. **Toda rota endereçada por parâmetro tem prova nomeada.** As 78 estão declaradas: 37 na
+   varredura, e 41 com o motivo escrito de por que a varredura não serve — id de aparelho no
+   GenieACS (20), chave natural que os dois provedores têm igual (7), anexo por token
+   assinado (2), token de convite (2) e o plano de controle (10). O teto de 41 **só pode
+   cair**: declarar motivo é mais fácil do que escrever caso, e sem o teto o caminho fácil
+   não custaria nada.
+3. **Nenhuma declaração sobrou de rota que sumiu**, dos dois lados — uma tabela que só cresce
+   vira decoração —, e todo arquivo de teste citado num motivo existe de verdade.
+4. **A ordem das montagens em `app.js`**: o resolvedor de provedor vem antes de todo roteador
+   (as duas exceções são as entregas de fora, e estão fixadas pelo nome), a porta da
+   assinatura vem logo depois dele nos dois listeners, e a troca de banco e o console
+   continuam cada um dentro da sua edição. Um roteador montado uma linha acima do resolvedor
+   atende sem provedor em escopo, que é exatamente o que o comentário do `/api/tenant` no
+   `app.js` descreve.
+
+A varredura de ids cresceu de 24 para **37 rotas** com as que faltavam: o mapa da planta
+(pontos e cabos, GET/PUT/DELETE), a revogação de convite, a caixa de entrada do WhatsApp
+(mensagens da conversa, fechar a conversa, escrever nela), o reenfileiramento de uma mensagem,
+o cadastro de segurança WiFi de um fabricante e a exclusão de uma conta do WhatsApp. A lista de
+casos saiu para `backend/test/helpers/idSweepCases.js` porque agora dois testes a leem — quem
+chama as rotas e quem confere que ela chama todas.
+
+Três coisas que a extensão obrigou a acertar, e que valem como registro:
+
+- **O id do vizinho tem que ser do vizinho.** Semeei os pontos do mapa com o mesmo `node_id`
+  nos dois provedores, e a varredura acusou o contrário do esperado: o "id do alfa" respondia
+  200 porque era também o id do beta. A colisão de chave natural é outra prova, e é da suíte
+  de vazamento; esta suíte precisa de um id que só um dos dois tenha.
+- **Nem toda recusa é 404.** `POST /api/whatsapp/messages/:id/requeue` responde 409 ao vizinho
+  — a rota não distingue "não existe" de "não dá para reenfileirar", e a leitura por baixo é
+  escopada. O caso ganhou um status esperado próprio em vez de um 404 forçado no controlador.
+- **Um motivo escrito é uma dívida.** A declaração de
+  `PUT /api/whatsapp/subscribers/:contract/phone` dizia "prova em `tenant-leak.test.js`" — e
+  não havia. O contrato é do SGP e os dois provedores podem ter o mesmo número; a prova entrou
+  junto: corrigir o telefone do contrato 4242 de um não pode mudar o do 4242 do outro, que é o
+  tipo de erro que só aparece no disparo de cobrança seguinte.
+
+#### RLS no Postgres: avaliado, e não adotado agora
+
+Era o último item em aberto. Medido num Postgres 16 de verdade, com política
+`USING (tenant_id = current_setting('app.tenant_id')::int)`:
+
+| O que se mediu | Resultado |
+| --- | --- |
+| Sem a variável marcada, lendo como papel comum | **0 linhas** — falha fechando, que é a direção certa |
+| `SET LOCAL` dentro de transação | escopa certo e some no commit |
+| INSERT com `tenant_id` de outro provedor | recusado pela política |
+| UPDATE atravessando provedor | 0 linhas tocadas |
+| Lendo como **dono** da tabela | **vê tudo** — sem `FORCE ROW LEVEL SECURITY` o dono passa por cima |
+
+E a medição que decide: com o pool do knex em uma conexão, uma "requisição" que marca
+`SET app.tenant_id = '1'` deixa a marca **na conexão**, e a requisição seguinte, que não
+marcou nada, lê `'1'`. Numa aplicação que emite consulta fora de transação — que é esta —
+a variável de sessão não é uma defesa, é um vazamento com outro nome: a próxima requisição a
+pegar aquela conexão emprestada herda o provedor da anterior.
+
+Então RLS só entra numa das duas formas, e as duas custam:
+
+1. **Transação por requisição**, abrindo com `SET LOCAL app.tenant_id`. É a forma correta e a
+   única segura com pool. Custa manter uma transação aberta pela vida inteira de cada
+   requisição — inclusive das que só leem, inclusive das que esperam o GenieACS responder.
+2. **Uma conexão por provedor**, o que troca o pool por N pools e amarra o número de
+   provedores ao número de conexões do banco.
+
+A decisão é **não adotar agora**, e o motivo é comparativo: as duas linhas que já existem —
+`tdb()` com o filtro obrigatório e a sentinela de SQL que lança em teste ao ver tabela
+escopada sem filtro — cobrem o mesmo erro (consulta sem provedor) no lugar onde ele é
+escrito, e não custam nada em produção. RLS pegaria o caso que elas não pegam: SQL cru rodando
+fora do processo, ou um bug do próprio knex. É defesa em profundidade real, e o preço dela
+hoje é uma mudança no modelo de transação de toda a aplicação.
+
+O que faria mudar de ideia, escrito para quem for reavaliar: o dia em que a aplicação já
+estiver dentro de uma transação por requisição por outro motivo, ou o dia em que houver um
+segundo processo (relatórios, exportação em lote) falando com o mesmo banco sem passar pelo
+`tdb()`. A receita fica pronta: papel de aplicação separado do dono das tabelas,
+`ALTER TABLE ... ENABLE ROW LEVEL SECURITY` (com `FORCE`, se o papel for o dono), a política
+acima em cada uma das tabelas escopadas, e `SET LOCAL` no `runInTenant`.
 
 #### Os três itens que dependiam do subdomínio — fechados
 
@@ -871,11 +990,17 @@ Original: Fase 0 → 1 → 2 → 3 → 8 → 4 → 5 → 6 → 7.
    e continuam em aberto: `mode` (`agent`/`tunnel`/`hosted`), `verify_tls` e
    `allow_private_ranges` por provedor — a credencial vive num blob em `app_state`, sem
    essas três colunas. O muro de escala, esse, fechou nas quatro peças.
-5. **Fase 5** (planos, assinatura, `requireActiveSubscription`, limites nos pontos de
-   escrita, `billing_events`) → o resto da **Fase 6** (onboarding, plano e uso, branding
-   pelo contexto, `<html lang>` e o centro do mapa) → o que sobrou da **2** (impersonação
-   auditada com audiência própria, transporte de e-mail do convite) e da **7** (exclusão
-   já entrou; `tenant_id` em log e métrica).
+5. ~~**Fase 5**~~ ✅ planos, assinatura, `requireActiveSubscription`, limites nos quatro
+   pontos de escrita, `billing_events` e o `ManualBillingProvider`. O gateway (Asaas) fica
+   para quando houver contrato para cobrar.
+6. ~~**Fase 6**~~ ✅ contexto do provedor, nome em `tenants`, cadastro, onboarding, plano e
+   uso, `<html lang>` e o centro do mapa.
+7. ~~**Fase 7**~~ ✅ `DATABASE_URL`, compose e imagem no CI, log e métrica com o provedor
+   em toda linha, host apex como porta de entrada, runbook.
+8. ~~**Fase 8**~~ ✅ a lista de portas contada e obrigatória no CI, a varredura de ids em 37
+   rotas, e o RLS avaliado com medição (não adotado agora, com o motivo e a receita
+   escritos). → O que sobra: o resto da **2** (impersonação auditada com audiência própria,
+   transporte de e-mail do convite e a tela de aceitar) e a rotação da `SECRET_BOX_KEY`.
 
 Vale repetir o que o plano dizia e que se confirmou: a Fase 1 saiu para os installs
 self-hosted como upgrade normal, e o código de tenancy rodou em produção real com um
@@ -899,16 +1024,16 @@ metade é da Fase 4.
 | 6 | Credenciais ACS por provedor, cifradas, guarda de egresso, branch de URL absoluta removido | ✅ credencial NBI por provedor (onda 19), egresso com pinning de DNS, branch de URL absoluta removido |
 | 7 | `/api/database` não montada na edição SaaS | ✅ |
 | 8 | Rate limit e concorrência de fetch ACS chaveados por provedor | ✅ `tenantIpKey` no limite; `withAcsSlot` no fetch — vaga por provedor e vaga global, nessa ordem |
-| 9 | Suíte de vazamento verde no CI e obrigatória para merge | ✅ 1403 testes, três dialetos |
+| 9 | Suíte de vazamento verde no CI e obrigatória para merge | ✅ 1756 testes, três dialetos |
 | 10 | `SECRET_BOX_KEY` separada do `JWT_SECRET`, com `key_version` | ✅ |
 | 11 | `audit_log` registrando ações sensíveis | ✅ onda 20 — senha de portal, GenieACS, papéis, vínculos, convites, suspensão |
 | 12 | Exportação por provedor funcionando (LGPD e "apaguei tudo, socorro") | ✅ exportação (onda 21) e exclusão (onda 22), com trilha que sobrevive ao provedor apagado |
 
-Nenhuma linha vermelha resta. Isso **não** quer dizer produto pronto — a Fase 5 inteira e
-boa parte da 6 estão por fazer — quer dizer que a lista do que não se pode vender sem já
-não tem item aberto. O que a fecha por último é o teto de concorrência de fetch ao ACS
-(`withAcsSlot`), a primeira das quatro peças do muro de escala da Fase 4 — as outras três
-entraram depois, e o muro está fechado.
+Nenhuma linha vermelha resta. Isso **não** quer dizer produto pronto — o gateway de
+cobrança, o transporte de e-mail do convite e a rotação da `SECRET_BOX_KEY` estão por fazer
+— quer dizer que a lista do que não se pode vender sem já não tem item aberto. O que a fecha
+por último é o teto de concorrência de fetch ao ACS (`withAcsSlot`), a primeira das quatro
+peças do muro de escala da Fase 4 — as outras três entraram depois, e o muro está fechado.
 
 A exclusão entrou na onda 22, e o que a destravou foi `platform_audit`: apagar um provedor
 tem que deixar registro, e registrar no `audit_log` DELE é inútil porque a trilha vai junto.
@@ -921,7 +1046,7 @@ também a tabela de que a impersonação da plataforma vai precisar.
 
 ```bash
 npm run verify          # check backend + testes + lint + typecheck + build (raiz)
-cd backend && npm test  # 1403 testes, incluindo as suítes de tenancy
+cd backend && npm test  # 1756 testes, incluindo as suítes de tenancy
 ```
 
 A suíte roda nos três dialetos, e **isso não é zelo**: cada uma das armadilhas abaixo passou

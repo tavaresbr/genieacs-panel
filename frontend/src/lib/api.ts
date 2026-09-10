@@ -16,6 +16,14 @@ export interface ApiResponse<T = any> {
    * without this the reason is lost inside a bare status code.
    */
   skipped?: Record<string, number>
+  /**
+   * Only on a 402 from the subscription gate: the provider's plan and state,
+   * so the screen that shows the wall can also show what is behind it.
+   */
+  subscription?: SubscriptionView | null
+  /** Only on a 402 for a plan limit: the ceiling and where the provider is. */
+  limit?: number
+  current?: number
 }
 
 class ApiClient {
@@ -72,6 +80,17 @@ class ApiClient {
         }
       }
 
+      // 402 é a assinatura, nunca a permissão: o operador TEM o papel, é o
+      // provedor que está em atraso, suspenso ou cancelado. O evento é o que
+      // deixa a casca do app mostrar o aviso sem que cada tela saiba disso.
+      if (response.status === 402 && typeof data.code === 'string' && data.code.startsWith('subscription_')) {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent<SubscriptionBlockedDetail>(SUBSCRIPTION_BLOCKED_EVENT, {
+            detail: { code: data.code, message: data.message || '', subscription: data.subscription ?? null }
+          }))
+        }
+      }
+
       if (!response.ok) {
         return {
           success: false,
@@ -89,6 +108,8 @@ class ApiClient {
           code: data.code,
           // Forwarded, not rebuilt away: see `skipped` above.
           ...(data.skipped ? { skipped: data.skipped } : {}),
+          ...(data.subscription !== undefined ? { subscription: data.subscription } : {}),
+          ...(typeof data.limit === 'number' ? { limit: data.limit, current: data.current } : {}),
         }
       }
 
@@ -247,6 +268,10 @@ export const authAPI = {
   logout: () =>
     apiClient.post('/auth/logout'),
 
+  /** SaaS only; answers 404 on a self-hosted install, where the route is not mounted. */
+  signup: (payload: { providerName: string; slug: string; username: string; email: string; password: string }) =>
+    apiClient.post<SignupResult>('/auth/signup', payload),
+
   refreshToken: (refreshToken: string) =>
     apiClient.post('/auth/refresh', { refreshToken }),
 
@@ -302,8 +327,19 @@ export type { OperatorRole }
  * slugs are real, and a slug is an ISP's name.
  */
 export interface PublicTenant {
-  slug: string
-  name: string
+  /** Null on the platform's own host, which names no provider and exists to sign one up. */
+  slug: string | null
+  name: string | null
+  /** Which product this deployment is: decides whether signup and the database switcher exist. */
+  edition: 'saas' | 'selfhosted'
+  /** The domain a provider's panel lives under, or null where providers are not reached by subdomain. */
+  panelBaseDomain: string | null
+}
+
+/** What signup answers: no token — the new provider's panel lives at another host. */
+export interface SignupResult {
+  tenant: { slug: string; name: string }
+  panelUrl: string | null
 }
 
 /**
@@ -321,6 +357,33 @@ export const publicTenantAPI = {
   current: () => apiClient.get<PublicTenant>('/tenant/public')
 }
 
+/** What the provider does to itself. */
+export const tenantAPI = {
+  /** The name on the sidebar, the login screen and the tab — what `settings.appName` used to be. */
+  rename: (name: string) =>
+    apiClient.requestWithBody<{ name: string; slug: string }>('PATCH', '/tenant', { name })
+}
+
+export const invitesAPI = {
+  /** Returns the token ONCE; the backend keeps only its hash. */
+  create: (payload: { role: OperatorRole; label?: string }) =>
+    apiClient.post<{ invite: { id: number; role: OperatorRole; label: string | null; expiresAt: string }; token: string }>('/invites', payload)
+}
+
+export type SubscriptionStatus = 'trial' | 'active' | 'past_due' | 'suspended' | 'canceled'
+
+/** The plan and the state a provider's subscription is in, as the console lists it. */
+export interface TenantSubscriptionSummary {
+  /** The state that VALUES today: an expired trial reads `past_due` here. */
+  status: SubscriptionStatus
+  storedStatus: SubscriptionStatus
+  planId: number
+  planCode: string | null
+  planName: string | null
+  trialEndsAt: string | null
+  renewsAt: string | null
+}
+
 /** One provider on the deployment, as the control plane sees it. */
 export interface Tenant {
   id: number
@@ -329,7 +392,77 @@ export interface Tenant {
   status: 'active' | 'suspended'
   /** How many people hold a membership here. */
   operators: number
+  /** Null only for a provider the seed has not yet given one — a boot fixes it. */
+  subscription: TenantSubscriptionSummary | null
   createdAt: string | null
+}
+
+/** Null means "no limit". */
+export interface PlanLimits {
+  operators: number | null
+  subscribers: number | null
+  devices: number | null
+}
+
+export interface Plan {
+  id: number
+  code: string
+  name: string
+  limits: PlanLimits
+  priceCents: number
+  currency: string
+  trialDays: number
+  active: boolean
+  createdAt: string | null
+  /** How many providers are on it — only from the console's list. */
+  subscribers?: number
+}
+
+/** What the provider itself (and the block screen) may see of its subscription. */
+export interface SubscriptionView {
+  status: SubscriptionStatus
+  storedStatus: SubscriptionStatus
+  reason: 'trial_expired' | null
+  plan: { code: string; name: string; limits: PlanLimits } | null
+  trialEndsAt: string | null
+  renewsAt: string | null
+  canceledAt: string | null
+}
+
+export interface SubscriptionUsage {
+  subscription: SubscriptionView | null
+  usage: { operators: number; subscribers: number; devices: number | null }
+  limits: PlanLimits
+  over: { operators: boolean; subscribers: boolean; devices: boolean }
+}
+
+export interface BillingEventView {
+  id: number
+  type: string
+  amountCents: number | null
+  currency: string | null
+  provider: string
+  externalId: string | null
+  detail: Record<string, unknown> | null
+  at: string
+}
+
+/** The codes a 402 carries. Stable: the block screen picks its wording by them. */
+export const SUBSCRIPTION_GATE_CODES = [
+  'subscription_past_due',
+  'subscription_trial_expired',
+  'subscription_suspended',
+  'subscription_canceled',
+  'subscription_missing'
+] as const
+export type SubscriptionGateCode = typeof SUBSCRIPTION_GATE_CODES[number]
+
+/** Fired on `window` whenever the API answers 402 for the subscription. */
+export const SUBSCRIPTION_BLOCKED_EVENT = 'skygp:subscription-blocked'
+export interface SubscriptionBlockedDetail {
+  code: SubscriptionGateCode
+  message: string
+  subscription: SubscriptionView | null
 }
 
 /** A person's membership at one provider, listed from the control plane. */
@@ -377,7 +510,50 @@ export const platformAPI = {
     apiClient.post<{ membership: TenantMembership }>(`/platform/tenants/${tenantId}/members`, payload),
 
   removeMembership: (tenantId: number, userId: number) =>
-    apiClient.delete<{ userId: number }>(`/platform/tenants/${tenantId}/members/${userId}`)
+    apiClient.delete<{ userId: number }>(`/platform/tenants/${tenantId}/members/${userId}`),
+
+  // ── A metade comercial: planos, assinatura, pagamento, uso ──────────
+  listPlans: () =>
+    apiClient.get<{ plans: Plan[] }>('/platform/plans'),
+
+  createPlan: (payload: {
+    code: string; name: string; maxOperators: number | null; maxSubscribers: number | null
+    maxDevices: number | null; priceCents: number; currency: string; trialDays: number; active?: boolean
+  }) =>
+    apiClient.post<{ plan: Plan }>('/platform/plans', payload),
+
+  updatePlan: (id: number, payload: Partial<{
+    name: string; maxOperators: number | null; maxSubscribers: number | null; maxDevices: number | null
+    priceCents: number; currency: string; trialDays: number; active: boolean
+  }>) =>
+    apiClient.requestWithBody<{ plan: Plan }>('PATCH', `/platform/plans/${id}`, payload),
+
+  getSubscription: (tenantId: number) =>
+    apiClient.get<{ subscription: SubscriptionView | null; planId: number | null; events: BillingEventView[] }>(
+      `/platform/tenants/${tenantId}/subscription`
+    ),
+
+  /** `planId` and/or `status`; each becomes its own line on the statement. */
+  updateSubscription: (tenantId: number, payload: {
+    planId?: number; status?: SubscriptionStatus; reason?: string; trialEndsAt?: string | null; renewsAt?: string | null
+  }) =>
+    apiClient.requestWithBody<{ subscription: SubscriptionView; planId: number | null }>(
+      'PUT', `/platform/tenants/${tenantId}/subscription`, payload
+    ),
+
+  /** We mark it paid. `reference` is the Pix id, the boleto number — whatever names the payment. */
+  recordPayment: (tenantId: number, payload: { amountCents: number; currency: string; reference?: string }) =>
+    apiClient.post<{ subscription: SubscriptionView }>(`/platform/tenants/${tenantId}/payments`, payload),
+
+  getUsage: (tenantId: number) =>
+    apiClient.get<SubscriptionUsage & { tenant: { id: number; slug: string; name: string } }>(
+      `/platform/tenants/${tenantId}/usage`
+    )
+}
+
+/** The provider's own plan, state and usage — the "plan and usage" screen, and what the block screen reads. */
+export const subscriptionAPI = {
+  current: () => apiClient.get<SubscriptionUsage>('/tenant/subscription')
 }
 
 export const usersAPI = {

@@ -438,7 +438,7 @@ describe('the provider a login screen sees', () => {
     const { body } = await callAs(
       'alfa.painel.exemplo.com', `${panelUrl}/api/tenant/public`
     );
-    assert.deepEqual(Object.keys(body.data).sort(), ['name', 'slug']);
+    assert.deepEqual(Object.keys(body.data).sort(), ['edition', 'name', 'panelBaseDomain', 'slug']);
     assert.deepEqual(Object.keys(body).sort(), ['data', 'message', 'success']);
   });
 
@@ -478,11 +478,21 @@ describe('the provider a login screen sees', () => {
     assert.deepEqual(suspended.body, missing.body);
   });
 
-  // Where subdomains are configured, a host that names no provider is a request
-  // that did not say whose login screen it wanted. Answering the first row here
-  // would brand the deployment's own name page with one arbitrary customer's.
-  it('refuses a host that names no provider at all', async () => {
-    const { status } = await callAs('painel.exemplo.com', `${panelUrl}/api/tenant/public`);
+  // Where subdomains are configured, a host that names no provider is the
+  // platform's own front door. It answers — that is where a new ISP signs up —
+  // but with NO provider: answering the first row here would brand the
+  // deployment's own name page with one arbitrary customer's.
+  it('answers the platform\'s own host with no provider in it', async () => {
+    const { status, body } = await callAs('painel.exemplo.com', `${panelUrl}/api/tenant/public`);
+    assert.equal(status, 200);
+    assert.equal(body.data.slug, null);
+    assert.equal(body.data.name, null);
+    assert.equal(body.data.panelBaseDomain, 'painel.exemplo.com');
+  });
+
+  // The portal's base is not a front door: nothing a stranger needs lives there.
+  it('refuses the portal\'s own base host', async () => {
+    const { status } = await callAs('portal.exemplo.com', `${panelUrl}/api/tenant/public`);
     assert.equal(status, 404);
   });
 });

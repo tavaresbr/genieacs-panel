@@ -81,16 +81,6 @@ export const SCOPED_TABLES = new Set([
   'device_sample_hours',
   // Which ONT replaced which, for one provider's subscriber.
   'device_swaps',
-  // O estado comercial do provedor. Uma linha por provedor, e escopada e não
-  // compartilhada porque a pergunta que o portão faz é sempre "a do provedor em
-  // escopo" — a cada requisição, antes de qualquer rota. Quem administra de
-  // fora pergunta por um provedor NOMEADO, e essas leituras carregam a marca de
-  // isenção em `models/TenantSubscription.js`.
-  'tenant_subscriptions',
-  // O livro comercial do provedor. Escopado pelo mesmo motivo da assinatura: a
-  // pergunta normal é sempre "o extrato deste", e quem administra de fora
-  // pergunta por um provedor NOMEADO, com a marca de isenção no model.
-  'tenant_billing_events',
   // Where the operator's own plant is centred. A singleton keyed `id: 1`, so
   // its WHERE never was an identity filter — it meant "the only row", and the
   // second provider to save a map centre wrote over the first's.
@@ -113,7 +103,12 @@ export const SCOPED_TABLES = new Set([
   // vínculo que ele oferece — e listá-los sem filtro entregaria a um provedor
   // quem o vizinho está tentando contratar. A busca pelo token é a exceção
   // declarada, e está em `TenantInvite.findByToken`, com o motivo escrito lá.
-  'tenant_invites'
+  'tenant_invites',
+  // A assinatura e o extrato de um provedor. Escopadas como o resto: a tela de
+  // plano e uso é do próprio provedor, e o extrato é dado financeiro dele — sai
+  // no export e some na exclusão, como tudo que é dele.
+  'subscriptions',
+  'billing_events'
 ]);
 
 /** Tables that belong to the deployment rather than to any one provider. */
@@ -142,7 +137,10 @@ export const SHARED_TABLES = new Set([
   // The control plane's roster. Above providers rather than inside one: a
   // provider's own administrator must not be able to mint providers or reach
   // into another's, so this cannot be a per-provider table by construction.
-  'platform_admins'
+  'platform_admins',
+  // A tabela de preços. É uma só para o deploy inteiro, e um provedor não
+  // edita o próprio plano — ele o lê, por `subscriptions.plan_id`.
+  'plans'
 ]);
 
 /** Tables still to be converted. Shrinks to empty as the phase progresses. */

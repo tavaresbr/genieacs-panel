@@ -2,7 +2,10 @@ import Tenant from '../models/Tenant.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import TenantExportService from '../services/tenantExportService.js';
 import AuditLog from '../models/AuditLog.js';
-import PlanLimitService from '../services/planLimitService.js';
+import SubscriptionService from '../services/subscriptionService.js';
+import DeviceService from '../services/deviceService.js';
+import { EDITION } from '../config/edition.js';
+import { panelBaseDomain } from '../middleware/tenantResolver.js';
 
 /**
  * What a provider will admit to before anybody has signed in.
@@ -12,7 +15,65 @@ import PlanLimitService from '../services/planLimitService.js';
  * something drawn from the `tenants` row. That makes it the enumeration surface
  * of the whole deployment, and everything below is written against that.
  */
+const NAME_MAX_LENGTH = 128;
+
 class TenantController {
+  /**
+   * `PATCH /api/tenant` — the provider renames itself.
+   *
+   * This is what `settings.appName` used to be: the name on the sidebar, the
+   * login screen and the browser tab. It moves onto the `tenants` row because
+   * that row is the provider — the console lists it, the public profile
+   * answers it, and a name kept in two places was a name shown differently on
+   * two screens. Audited on the provider's own trail: renaming is not
+   * sensitive, but it is the kind of change somebody asks "who did that" about.
+   */
+  static async rename(req, res) {
+    try {
+      const name = String(req.body?.name ?? '').trim();
+      if (name.length < 1 || name.length > NAME_MAX_LENGTH) {
+        return res.status(400).json(createErrorResponse(req.t('tenant.nameInvalid')));
+      }
+      const before = await Tenant.findById(req.tenantId);
+      if (!before) {
+        return res.status(404).json(createErrorResponse(req.t('common.notFound')));
+      }
+      await Tenant.rename(req.tenantId, name);
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.TENANT_RENAMED,
+        subjectType: 'tenant',
+        subjectId: req.tenantId,
+        detail: { from: before.name, to: name }
+      });
+      return res.json(createResponse(req.t('tenant.renamed'), { name, slug: before.slug }));
+    } catch (error) {
+      console.error('Rename tenant error:', error);
+      return res.status(500).json(createErrorResponse(req.t('tenant.renameFailed'), error.message));
+    }
+  }
+
+  /**
+   * `GET /api/tenant/subscription`: o plano, o estado e o uso — a tela de
+   * "plano e uso" do provedor, e a placa que a tela de bloqueio lê.
+   *
+   * A contagem de ONTs vem do GenieACS e pode falhar; ela vira `null` sem
+   * derrubar o resto (ver `SubscriptionService.usage`). Sem preço: o preço é
+   * do console.
+   */
+  static async getSubscription(req, res) {
+    try {
+      const usage = await SubscriptionService.usage({
+        countDevices: () => DeviceService.countDevicesFromGenieAcs()
+      });
+      return res.json(createResponse(req.t('subscription.retrieved'), usage));
+    } catch (error) {
+      console.error('Get subscription error:', error);
+      return res.status(500).json(
+        createErrorResponse(req.t('subscription.retrieveFailed'), error.message)
+      );
+    }
+  }
+
   /**
    * O cadastro inteiro deste provedor, num arquivo.
    *
@@ -45,32 +106,6 @@ class TenantController {
     } catch (error) {
       console.error('Tenant export error:', error);
       return res.status(500).json(createErrorResponse(req.t('tenant.exportFailed'), error.message));
-    }
-  }
-
-  /**
-   * `GET /api/tenant/usage` — o plano deste provedor e quanto dele já foi usado.
-   *
-   * Autenticada, ao contrário da `/public` logo abaixo, e a diferença é a mesma
-   * que separa 401 de 402 no portão comercial: quantos operadores um ISP tem e
-   * quanto do plano dele está gasto é assunto de dentro da casa. A `/public`
-   * existe porque a tela de login precisa do nome antes de haver quem
-   * autenticar; esta não tem essa desculpa.
-   *
-   * A contagem de ONTs NÃO está aqui. Ela vem do ACS do provedor, custa uma
-   * requisição de rede e é a única medida que pode falhar — misturá-la com três
-   * `COUNT` locais faria a tela inteira quebrar quando o ACS do cliente
-   * estivesse fora do ar. E, mais de fundo: ONT não é um limite, é uma medição
-   * (ver `config/plans.js`).
-   */
-  static async getUsage(req, res) {
-    try {
-      return res.json(createResponse(req.t('plan.usageRetrieved'), {
-        usage: await PlanLimitService.usage()
-      }));
-    } catch (error) {
-      console.error('Plan usage error:', error);
-      return res.status(500).json(createErrorResponse(req.t('plan.usageFailed'), error.message));
     }
   }
 
@@ -109,6 +144,18 @@ class TenantController {
    */
   static async getPublicProfile(req, res) {
     try {
+      // The platform's own host: no provider, but the two facts a stranger
+      // needs — that this is a SaaS, and where a provider's panel would live.
+      // The screen turns that into "sign up here".
+      if (req.platformHost) {
+        return res.json(createResponse(req.t('tenant.publicRetrieved'), {
+          slug: null,
+          name: null,
+          edition: EDITION,
+          panelBaseDomain: panelBaseDomain()
+        }));
+      }
+
       const tenant = await Tenant.findPublicById(req.tenantId);
 
       // The row the resolver blessed is gone — a provider deleted while the
@@ -141,9 +188,17 @@ class TenantController {
       // earns its place by being the stable key the client can cache branding
       // under, and by letting the screen say which provider it thinks it is
       // talking to when a proxy has rewritten the host underneath it.
+      // Two more facts a stranger may know, both about the DEPLOYMENT rather
+      // than about this provider. `edition` decides whether the screen offers
+      // signup and whether it shows the database switcher — the SaaS edition is
+      // not a secret, it is the product; every subdomain already says so.
+      // `panelBaseDomain` is what signup needs to promise an address, and it is
+      // the string in the caller's own address bar.
       return res.json(createResponse(req.t('tenant.publicRetrieved'), {
         name: tenant.name,
-        slug: tenant.slug
+        slug: tenant.slug,
+        edition: EDITION,
+        panelBaseDomain: panelBaseDomain()
       }));
     } catch (error) {
       console.error('Get public tenant profile error:', error);

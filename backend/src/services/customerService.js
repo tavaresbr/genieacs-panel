@@ -1,3 +1,4 @@
+import SubscriptionService from './subscriptionService.js';
 import crypto from 'node:crypto';
 import CustomerAccount from '../models/CustomerAccount.js';
 import SgpLink from '../models/SgpLink.js';
@@ -6,7 +7,6 @@ import DeviceSwapService from './deviceSwapService.js';
 import DeviceProfile from '../models/DeviceProfile.js';
 import Setting from '../models/Setting.js';
 import { TranslatableError } from '../i18n/index.js';
-import PlanLimitService from './planLimitService.js';
 
 const CUSTOMER_ID_PATTERN = /^[A-Z]{2,4}-[A-Z0-9]{7}-[A-Z0-9]{6}$/;
 const ID_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -289,38 +289,36 @@ class CustomerService {
         if (reported.length < 3) return false;
         return !this.isSameSubscriber(stored, reported);
       });
-      // O teto do plano, e só sobre as contas que ele de fato faz NASCER.
-      //
-      // `pending` tem duas populações. Um device sem conta nenhuma ganha uma
-      // conta ativa a mais — essa conta contra o teto. Um device cuja conta
-      // nomeia o assinante anterior aposenta a antiga e cria a nova, e o saldo
-      // de contas ATIVAS é zero: barrar essa seria deixar o assinante novo sem
-      // portal enquanto a linha do antigo, que já não vale, continua ocupando a
-      // vaga. Então essa passa sempre.
-      const novos = pending.filter((device) => !storedByDeviceId.get(String(device._id)));
-      const repontam = pending.filter((device) => storedByDeviceId.get(String(device._id)));
-      const cabem = await PlanLimitService.canAddSubscriberAccounts(novos.length);
-      const aCriar = [...repontam, ...novos.slice(0, cabem.allowed ?? novos.length)];
-      const barrados = novos.length - (cabem.allowed ?? novos.length);
-      // Registrado porque esta varredura roda sem ninguém olhando: parar de
-      // criar contas em silêncio é o assinante ficar sem portal e ninguém saber
-      // por quê. O número aparece na tela de plano e uso, ao lado do teto.
-      if (barrados > 0) {
-        console.warn(
-          `Plan limit reached: ${barrados} subscriber account(s) were not created `
-          + `(limit ${cabem.limit}).`
-        );
+      // O limite de assinantes do plano vale para contas NOVAS. Um aparelho que
+      // já tem conta e trocou de assinante (aposenta uma, cria outra) não
+      // aumenta o total, então não é contado contra o teto — contar seria
+      // recusar uma troca de ONT por causa do plano. O que não coube fica para
+      // a próxima passada, que pergunta de novo; nada aqui lança, porque a
+      // sincronização inteira não pode cair por causa da conta que não coube.
+      const remaining = await SubscriptionService.remainingSubscribers();
+      let allowed = pending;
+      if (remaining !== null) {
+        let budget = remaining;
+        allowed = pending.filter((device) => {
+          if (storedByDeviceId.has(String(device._id))) return true;
+          if (budget <= 0) return false;
+          budget -= 1;
+          return true;
+        });
+        if (allowed.length < pending.length) {
+          console.warn(
+            `Plan limit: ${pending.length - allowed.length} device(s) left without a subscriber account`
+          );
+        }
       }
-      await PlanLimitService.recordSubscriberAccountsSkipped(Math.max(0, barrados));
-
       // Keep database pressure bounded while avoiding a slow one-by-one sync
       // for larger GenieACS fleets.
-      for (let offset = 0; offset < aCriar.length; offset += 10) {
+      for (let offset = 0; offset < allowed.length; offset += 10) {
         await Promise.all(
-          aCriar.slice(offset, offset + 10).map((device) => this.ensureAccount(device))
+          allowed.slice(offset, offset + 10).map((device) => this.ensureAccount(device))
         );
       }
-      if (aCriar.length > 0) {
+      if (allowed.length > 0) {
         rows = await CustomerAccount.getIdsByDeviceIds(deviceIds);
       }
     }

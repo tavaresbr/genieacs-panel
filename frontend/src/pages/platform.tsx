@@ -1,8 +1,9 @@
 'use client'
 
 import { Fragment, useCallback, useEffect, useState } from 'react'
-import { platformAPI, type Tenant } from '@/lib/api'
+import { platformAPI, type Plan, type Tenant } from '@/lib/api'
 import { TenantMembers } from '@/components/platform/tenant-members'
+import { STATUS_LABEL_KEYS, TenantPlan, statusBadgeClass } from '@/components/platform/tenant-plan'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
@@ -20,9 +21,14 @@ export default function PlatformPage() {
   const [saving, setSaving] = useState(false)
   const [busyId, setBusyId] = useState<number | null>(null)
   const [expandedId, setExpandedId] = useState<number | null>(null)
+  // Which panel the expanded row shows: the team, or the plan and its statement.
+  const [expandedPanel, setExpandedPanel] = useState<'members' | 'plan'>('members')
+  const [plans, setPlans] = useState<Plan[]>([])
   const [form, setForm] = useState({ slug: '', name: '' })
 
   const loadTenants = useCallback(async () => {
+    const plansRes = await platformAPI.listPlans()
+    if (plansRes.success && plansRes.data) setPlans(plansRes.data.plans)
     setLoading(true)
     const res = await platformAPI.listTenants()
     if (res.success && res.data) {
@@ -157,6 +163,7 @@ export default function PlatformPage() {
                 <th>{t('platform.name')}</th>
                 <th>{t('platform.slug')}</th>
                 <th>{t('common.status')}</th>
+                <th>{t('platform.subscription.plan')}</th>
                 <th>{t('platform.members')}</th>
                 <th>{t('common.actions')}</th>
               </tr>
@@ -164,15 +171,15 @@ export default function PlatformPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="py-8 text-center text-muted-foreground">{t('common.loading')}</td>
+                  <td colSpan={6} className="py-8 text-center text-muted-foreground">{t('common.loading')}</td>
                 </tr>
               ) : error !== null ? (
                 <tr>
-                  <td colSpan={5} className="py-8 text-center text-destructive">{error || t('platform.loadFailed')}</td>
+                  <td colSpan={6} className="py-8 text-center text-destructive">{error || t('platform.loadFailed')}</td>
                 </tr>
               ) : tenants.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-8 text-center text-muted-foreground">{t('platform.empty')}</td>
+                  <td colSpan={6} className="py-8 text-center text-muted-foreground">{t('platform.empty')}</td>
                 </tr>
               ) : (
                 tenants.map((tenant) => {
@@ -188,6 +195,18 @@ export default function PlatformPage() {
                             {t(active ? 'platform.statusActive' : 'platform.statusSuspended')}
                           </span>
                         </td>
+                        <td className="text-sm">
+                          {tenant.subscription ? (
+                            <span className="flex flex-wrap items-center gap-2">
+                              <span>{tenant.subscription.planName ?? tenant.subscription.planCode ?? '—'}</span>
+                              <span className={statusBadgeClass(tenant.subscription.status)}>
+                                {t(STATUS_LABEL_KEYS[tenant.subscription.status])}
+                              </span>
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </td>
                         <td className="text-sm text-muted-foreground">
                           {t('platform.operators', { count: tenant.operators })}
                         </td>
@@ -195,11 +214,25 @@ export default function PlatformPage() {
                           <div className="flex flex-wrap items-center gap-2">
                             <button
                               type="button"
-                              onClick={() => setExpandedId((current) => (current === tenant.id ? null : tenant.id))}
+                              onClick={() => {
+                                setExpandedPanel('members')
+                                setExpandedId((current) => (current === tenant.id && expandedPanel === 'members' ? null : tenant.id))
+                              }}
                               className="modern-button-secondary"
-                              aria-expanded={expanded}
+                              aria-expanded={expanded && expandedPanel === 'members'}
                             >
                               {t('platform.members')}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setExpandedPanel('plan')
+                                setExpandedId((current) => (current === tenant.id && expandedPanel === 'plan' ? null : tenant.id))
+                              }}
+                              className="modern-button-secondary"
+                              aria-expanded={expanded && expandedPanel === 'plan'}
+                            >
+                              {t('platform.subscription.plan')}
                             </button>
                             <button
                               type="button"
@@ -215,8 +248,12 @@ export default function PlatformPage() {
                       </tr>
                       {expanded && (
                         <tr>
-                          <td colSpan={5}>
-                            <TenantMembers tenant={tenant} onMembershipChange={() => void loadTenants()} />
+                          <td colSpan={6}>
+                            {expandedPanel === 'members' ? (
+                              <TenantMembers tenant={tenant} onMembershipChange={() => void loadTenants()} />
+                            ) : (
+                              <TenantPlan tenant={tenant} plans={plans} onSubscriptionChange={() => void loadTenants()} />
+                            )}
                           </td>
                         </tr>
                       )}

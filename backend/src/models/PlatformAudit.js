@@ -17,19 +17,19 @@ class PlatformAudit {
     TENANT_CREATED: 'tenant.created',
     TENANT_STATUS_CHANGED: 'tenant.status_changed',
     TENANT_DELETED: 'tenant.deleted',
+    // A Fase 5: o que o plano de controle fez com a assinatura de um provedor.
+    PLAN_CREATED: 'plan.created',
+    PLAN_UPDATED: 'plan.updated',
+    SUBSCRIPTION_PLAN_CHANGED: 'subscription.plan_changed',
+    SUBSCRIPTION_STATUS_CHANGED: 'subscription.status_changed',
+    PAYMENT_RECORDED: 'subscription.payment_recorded',
     // Quem trabalha para qual provedor, decidido de fora dele. É a ação mais
     // forte que o plano de controle tem: um vínculo escrito aqui vira uma
     // sessão legítima DENTRO de um ISP, com o cadastro inteiro atrás dela. Sem
     // estas duas linhas, vincular-se a um ISP e depois sair não deixaria
     // rastro em trilha nenhuma.
     MEMBER_ADDED: 'tenant.member_added',
-    MEMBER_REMOVED: 'tenant.member_removed',
-    // O estado COMERCIAL, que é outro eixo. `tenant.status_changed` acima é o
-    // administrativo — congelar para poder apagar. Duas ações e não uma porque
-    // as duas colunas significam coisas diferentes, e uma trilha que as
-    // confundisse mostraria "suspenso" sem dizer se o provedor parou de pagar
-    // ou se alguém o preparou para exclusão.
-    SUBSCRIPTION_CHANGED: 'tenant.subscription_changed'
+    MEMBER_REMOVED: 'tenant.member_removed'
   });
 
   /**

@@ -18,14 +18,19 @@ const router = express.Router();
  */
 router.get('/public', TenantController.getPublicProfile);
 
-// Do lado autenticado da linha: o plano e quanto dele já foi gasto. Basta ler
-// as configurações — quem enxerga a tela de configurações enxerga o plano —, e
-// não `settings.write`, que faria só quem pode mudar coisas saber por que não
-// consegue mais cadastrar operador.
-router.get('/usage', authenticateToken, requirePermission('settings.read'), TenantController.getUsage);
-
 // E do outro lado da linha que o parágrafo acima descreve: tudo que este
 // provedor cadastrou, num arquivo. Autenticada e com capacidade própria.
 router.get('/export', authenticateToken, requirePermission('tenant.export'), TenantController.exportTenant);
+
+// O plano, o estado da assinatura e o uso contra o limite. Autenticada, e
+// com `settings.read` — é o mesmo lado da linha que as configurações: quem
+// pode ver a configuração do provedor pode ver em que plano ele está. Fica
+// FORA da porta da assinatura (`subscriptionGate.js` a lista), porque é o que
+// a tela de bloqueio mostra.
+router.get('/subscription', authenticateToken, requirePermission('settings.read'), TenantController.getSubscription);
+
+// O nome do provedor, escrito por quem administra. É o antigo `appName` das
+// configurações, agora na linha do provedor — ver o controlador.
+router.patch('/', authenticateToken, requirePermission('settings.write'), TenantController.rename);
 
 export default router;
