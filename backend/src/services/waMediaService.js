@@ -274,7 +274,14 @@ async function resolverBytes({ account, dados, mensagem, midia, chave }) {
       // do outro lado para não se perder; com 90 s o piso cai para menos de
       // 2,5 Mbps. Continua sendo um limite — o que não pode existir é a espera
       // sem fim, que é o que prendia o handler do webhook.
-      const res = await safeFetch(url, { headers: { Accept: '*/*' }, timeoutMs: 90_000 });
+      const res = await safeFetch(url, {
+        headers: { Accept: '*/*' },
+        timeoutMs: 90_000,
+        // O teto do transporte tem de ser o MESMO de `lerCorpoLimitado`, senão
+        // o padrão do guard — dimensionado para resposta de API — recusaria um
+        // vídeo legítimo antes de o teto de mídia sequer ser consultado.
+        maxBytes: MAX_MEDIA_BYTES
+      });
       if (res.ok) {
         const buf = await lerCorpoLimitado(res);
         if (buf) {
