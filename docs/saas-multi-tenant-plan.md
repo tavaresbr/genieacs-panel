@@ -474,11 +474,13 @@ passa a pedir o conector do tenant. Pontos exatos a refatorar em
 - Botão "testar conexão" já existe (`POST /api/settings/test-genieacs`) e passa a validar
   também credenciais e alcance.
 
-**Muro de escala que precisa ser resolvido nesta fase.** `refreshDashboardData` →
-`getDashboardDevices()` (`deviceService.js:288`) busca a **coleção inteira de dispositivos** do
-GenieACS, com TTL de 60s e um prewarm no boot (`server.js:37`). Um provedor com 20 mil ONTs já
-é um parse de vários MB por minuto; multiplicado por dezenas de tenants, um processo Node não
-sustenta. Antes do décimo tenant:
+**Muro de escala desta fase — ✅ fechado, nas quatro peças.** `refreshDashboardData` →
+`getDashboardDevices()` busca a **coleção inteira de dispositivos** do GenieACS. Um provedor
+com 20 mil ONTs já era um parse de vários MB por minuto; multiplicado por dezenas de tenants,
+um processo Node não sustentava, e o limite estimado era o décimo tenant.
+
+O que o derrubou não foi tornar a passagem mais rápida — foi **deixar de fazê-la**. As quatro
+peças:
 - ✅ **refresh agendado, com defasagem por provedor e cadência adaptativa** —
   `backend/src/services/dashboardSchedule.js` decide quem, quando e com que folga; o job vive
   em `SchedulerService.refreshDashboard`. Três decisões: a cadência segue a atenção (60s com
@@ -502,8 +504,34 @@ sustenta. Antes do décimo tenant:
   vale também para o **prewarm do boot**: subir o processo era buscar a coleção de
   dispositivos de TODO provedor da instalação, dormente ou não — o pior minuto do dia, e o
   único em que ninguém está olhando para reclamar;
-- ⚠️ **aberto** — avaliar uma tabela `devices_summary` para o dashboard ler do banco, não do
-  ACS. É a última das quatro peças do muro, e a única que ainda não tem decisão tomada.
+- ✅ **avaliada** a tabela `devices_summary` — e a decisão é **não construir agora**. Três
+  achados, na ordem em que mudam a conclusão:
+  1. **Sozinha, ela não economiza nada mensurável.** O que está em cache hoje é o *resumo*
+     (`buildDashboardSummary`), não a lista de dispositivos: `getDashboardData` devolve
+     `cache.data` e não recalcula nada por requisição. Ou seja, o custo por requisição já é
+     zero. Uma tabela acrescentaria N escritas de linha por ciclo para poupar um agregado que
+     ninguém recalcula.
+  2. **A alavanca é o refresh incremental; a tabela é pré-requisito dele, não substituto.** O
+     que continua caro é a varredura: ler a coleção inteira e fazer o parse de vários MB, por
+     provedor ativo, por ciclo. Isso só cai lendo **apenas quem informou desde o último
+     ciclo** — e aí os atributos de quem não informou precisam morar em algum lugar. Esse
+     lugar é a tabela. Construí-la sem o incremental é pagar o custo e não colher o ganho.
+  3. **O incremental tem um risco específico, que precisa ser desenhado e não presumido.**
+     `$gte` sobre `_lastInform` já é usado pelo filtro online/offline da lista de dispositivos
+     (`buildDeviceStatusQuery`), então o operador funciona nas instalações reais — o aviso em
+     `provisioningService.findCandidates` é mais cauteloso do que a evidência exige. Mas a
+     assimetria que ele aponta continua de pé, e é ela que importa aqui: na lista, um filtro
+     que devolve vazio é **visível** (o operador filtra "online", vê nada e reclama); num job
+     de fundo, um delta vazio é indistinguível de uma frota quieta, e o painel mostraria uma
+     foto congelada com cara de saudável. Um incremental honesto precisa, portanto, de uma
+     **reconciliação completa periódica** para limitar a deriva — e é isso que torna o desenho
+     não-trivial, não a tabela.
+
+  **Quando revisitar:** quando um único provedor, sozinho, tornar um ciclo caro. O que tirou a
+  urgência foi a peça anterior desta mesma lista: o multiplicador que assustava (*todo*
+  provedor, *todo* minuto) já não existe — dormentes não são varridos e ociosos são varridos a
+  cada 5 min. O custo que sobra é O(frota) por provedor ativo, e ele escala com o tamanho de
+  um cliente, não com o número deles.
 
 **Roadmap dos outros modos** (mesma interface, sem reescrever o `DeviceService`):
 - `agent`: agente instalado no provedor abre WebSocket **de saída** para o SaaS; o conector
@@ -703,10 +731,14 @@ decisões de desenho, e porque o primeiro **não se fecha, só se contém**.
    dado por provedor **antes** da guarda de egresso constrói um proxy de SSRF com tela de
    login. A ordem aqui não é negociável.
 5. ~~`JWT_SECRET` como chave de cifra de tudo~~ — ✅ fechado, `SECRET_BOX_KEY` + `key_version`.
-6. **O muro de escala do dashboard.** Inalterado e mais próximo: a coleção inteira de
-   dispositivos do ACS a cada 60s, agora **por provedor**, já que o prewarm roda em
-   `forEachTenant`. Escopar o job não reduziu o trabalho, dividiu-o — e multiplicou o número
-   de passagens pelo número de provedores. Chega por volta de 15–25 provedores.
+6. ~~**O muro de escala do dashboard**~~ — ✅ fechado, nas quatro peças. Escopar o job por
+   provedor tinha **multiplicado** o número de passagens em vez de reduzir o trabalho, e o
+   limite estimado era de 15–25 provedores. O que o afastou não foi otimizar a passagem, foi
+   deixar de fazê-la: dormentes não são varridos, ociosos são varridos a cada 5 min, o teto de
+   concorrência limita o que corre junto, e a defasagem por provedor tira o pico da virada de
+   minuto. O custo que resta é O(frota) por provedor **ativo** — escala com o tamanho de um
+   cliente, não com o número deles. A `devices_summary` foi avaliada e recusada por ora; o
+   porquê está na Fase 4.
 7. ~~A migration de rebuild no SQLite~~ — ✅ fechado, e coberto por teste que planta linhas
    antes de rodar as migrations.
 8. **A troca de `username` para e-mail** ainda não aconteceu e ainda quebra o login dos
@@ -763,7 +795,7 @@ Original: Fase 0 → 1 → 2 → 3 → 8 → 4 → 5 → 6 → 7.
    credencial NBI (onda 19) e o teto de concorrência. Do desenho original ficaram de fora,
    e continuam em aberto: `mode` (`agent`/`tunnel`/`hosted`), `verify_tls` e
    `allow_private_ranges` por provedor — a credencial vive num blob em `app_state`, sem
-   essas três colunas — e as três peças restantes do muro de escala.
+   essas três colunas. O muro de escala, esse, fechou nas quatro peças.
 5. **Fase 5** (planos, assinatura, `requireActiveSubscription`, limites nos pontos de
    escrita, `billing_events`) → o resto da **Fase 6** (onboarding, plano e uso, branding
    pelo contexto, `<html lang>` e o centro do mapa) → o que sobrou da **2** (impersonação
@@ -800,8 +832,8 @@ metade é da Fase 4.
 Nenhuma linha vermelha resta. Isso **não** quer dizer produto pronto — a Fase 5 inteira e
 boa parte da 6 estão por fazer — quer dizer que a lista do que não se pode vender sem já
 não tem item aberto. O que a fecha por último é o teto de concorrência de fetch ao ACS
-(`withAcsSlot`), que é a primeira das quatro peças do muro de escala da Fase 4; as outras
-três continuam registradas lá.
+(`withAcsSlot`), a primeira das quatro peças do muro de escala da Fase 4 — as outras três
+entraram depois, e o muro está fechado.
 
 A exclusão entrou na onda 22, e o que a destravou foi `platform_audit`: apagar um provedor
 tem que deixar registro, e registrar no `audit_log` DELE é inútil porque a trilha vai junto.
