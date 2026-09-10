@@ -554,4 +554,14 @@ export default {
   'audit.listFailed': 'Impossible de lire le journal d\'audit',
 
   'tenant.exportFailed': 'Impossible d\u2019exporter les données du fournisseur',
+
+  'subscription.pastDue': 'L\'abonnement est en retard de paiement. Le panneau est en lecture seule jusqu\'à l\'enregistrement du paiement.',
+  'subscription.trialExpired': 'La période d\'essai est terminée. Le panneau est en lecture seule jusqu\'à l\'activation d\'un forfait.',
+  'subscription.suspended': 'L\'abonnement de ce fournisseur est suspendu. Contactez la plateforme.',
+  'subscription.canceled': 'L\'abonnement de ce fournisseur a été annulé.',
+  'subscription.missing': 'Ce fournisseur n\'a pas d\'abonnement. Contactez la plateforme.',
+  'subscription.limitOperators': 'Votre forfait autorise {limit} opérateur(s) et vous en avez déjà {current}.',
+  'subscription.limitSubscribers': 'Votre forfait autorise {limit} compte(s) d\'abonné et vous en avez déjà {current}.',
+  'subscription.retrieved': 'Abonnement récupéré',
+  'subscription.retrieveFailed': 'Impossible de lire l\'abonnement',
 };

@@ -558,4 +558,14 @@ export default {
   'audit.listFailed': '无法读取审计日志',
 
   'tenant.exportFailed': '无法导出服务商数据',
+
+  'subscription.pastDue': '订阅已逾期。在记录付款之前，面板为只读。',
+  'subscription.trialExpired': '试用期已结束。在激活套餐之前，面板为只读。',
+  'subscription.suspended': '该运营商的订阅已暂停。请联系平台。',
+  'subscription.canceled': '该运营商的订阅已取消。',
+  'subscription.missing': '该运营商没有订阅。请联系平台。',
+  'subscription.limitOperators': '您的套餐允许 {limit} 名操作员，而您已有 {current} 名。',
+  'subscription.limitSubscribers': '您的套餐允许 {limit} 个用户账户，而您已有 {current} 个。',
+  'subscription.retrieved': '已获取订阅',
+  'subscription.retrieveFailed': '无法读取订阅',
 };

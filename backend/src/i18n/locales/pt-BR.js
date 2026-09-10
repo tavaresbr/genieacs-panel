@@ -555,4 +555,14 @@ export default {
   'audit.listFailed': 'Falha ao ler a trilha de auditoria',
 
   'tenant.exportFailed': 'Falha ao exportar os dados do provedor',
+
+  'subscription.pastDue': 'A assinatura está em atraso. O painel fica só para leitura até o pagamento ser registrado.',
+  'subscription.trialExpired': 'O período de teste acabou. O painel fica só para leitura até um plano ser ativado.',
+  'subscription.suspended': 'A assinatura deste provedor está suspensa. Fale com a plataforma.',
+  'subscription.canceled': 'A assinatura deste provedor foi cancelada.',
+  'subscription.missing': 'Este provedor não tem assinatura. Fale com a plataforma.',
+  'subscription.limitOperators': 'Seu plano permite {limit} operador(es) e você já tem {current}.',
+  'subscription.limitSubscribers': 'Seu plano permite {limit} conta(s) de assinante e você já tem {current}.',
+  'subscription.retrieved': 'Assinatura obtida',
+  'subscription.retrieveFailed': 'Não foi possível ler a assinatura',
 };

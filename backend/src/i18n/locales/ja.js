@@ -558,4 +558,14 @@ export default {
   'audit.listFailed': '監査ログを読み取れませんでした',
 
   'tenant.exportFailed': 'プロバイダーのデータをエクスポートできませんでした',
+
+  'subscription.pastDue': 'サブスクリプションの支払いが遅延しています。支払いが記録されるまでパネルは読み取り専用です。',
+  'subscription.trialExpired': 'トライアル期間が終了しました。プランが有効化されるまでパネルは読み取り専用です。',
+  'subscription.suspended': 'このプロバイダーのサブスクリプションは停止中です。プラットフォームにお問い合わせください。',
+  'subscription.canceled': 'このプロバイダーのサブスクリプションはキャンセルされました。',
+  'subscription.missing': 'このプロバイダーにはサブスクリプションがありません。プラットフォームにお問い合わせください。',
+  'subscription.limitOperators': 'ご利用のプランではオペレーターは {limit} 人までで、すでに {current} 人います。',
+  'subscription.limitSubscribers': 'ご利用のプランでは加入者アカウントは {limit} 件までで、すでに {current} 件あります。',
+  'subscription.retrieved': 'サブスクリプションを取得しました',
+  'subscription.retrieveFailed': 'サブスクリプションを読み取れませんでした',
 };

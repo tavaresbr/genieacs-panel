@@ -555,4 +555,14 @@ export default {
   'audit.listFailed': 'No se pudo leer el registro de auditoría',
 
   'tenant.exportFailed': 'No se pudieron exportar los datos del proveedor',
+
+  'subscription.pastDue': 'La suscripción está vencida. El panel es de solo lectura hasta que se registre el pago.',
+  'subscription.trialExpired': 'El período de prueba terminó. El panel es de solo lectura hasta que se active un plan.',
+  'subscription.suspended': 'La suscripción de este proveedor está suspendida. Contacte a la plataforma.',
+  'subscription.canceled': 'La suscripción de este proveedor fue cancelada.',
+  'subscription.missing': 'Este proveedor no tiene suscripción. Contacte a la plataforma.',
+  'subscription.limitOperators': 'Su plan permite {limit} operador(es) y ya tiene {current}.',
+  'subscription.limitSubscribers': 'Su plan permite {limit} cuenta(s) de abonado y ya tiene {current}.',
+  'subscription.retrieved': 'Suscripción obtenida',
+  'subscription.retrieveFailed': 'No se pudo leer la suscripción',
 };

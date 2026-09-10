@@ -28,6 +28,9 @@ const { default: WaAlertService } = await import('../src/services/waAlertService
 const { default: DeviceService } = await import('../src/services/deviceService.js');
 const { default: Setting } = await import('../src/models/Setting.js');
 const { default: AppState } = await import('../src/models/AppState.js');
+const { default: Subscription } = await import('../src/models/Subscription.js');
+const { default: BillingEvent } = await import('../src/models/BillingEvent.js');
+const { default: SubscriptionService } = await import('../src/services/subscriptionService.js');
 
 /**
  * The phase's actual proof.
@@ -532,5 +535,51 @@ describe('the caches a provider reads its own configuration from', () => {
 
     await runInTenant(beta, () => DeviceService.invalidateDashboard());
     assert.ok(alfaCache.expiresAt > Date.now(), 'and its entry is untouched by the other');
+  });
+});
+
+describe('the subscription and the statement', () => {
+
+  before(async () => {
+    const plan = await getDb()('plans').where({ code: 'unlimited' }).first();
+    await Subscription.upsertForTenant(alfa, { plan_id: plan.id, status: 'active' });
+    await Subscription.upsertForTenant(beta, { plan_id: plan.id, status: 'suspended' });
+    await runInTenant(alfa, () => BillingEvent.record({ type: 'payment.recorded', amountCents: 100, currency: 'BRL', externalId: 'PIX-ALFA' }));
+    await runInTenant(beta, () => BillingEvent.record({ type: 'payment.recorded', amountCents: 200, currency: 'BRL', externalId: 'PIX-BETA' }));
+    await SubscriptionService.invalidate(alfa);
+    await SubscriptionService.invalidate(beta);
+  });
+
+  // The state one provider is in must never be read as the other's: alfa is
+  // active and beta is suspended, and a gate that read the wrong row would
+  // lock the paying provider out — or let the suspended one in.
+  it('shows each provider only its own state', async () => {
+    const mine = await runInTenant(alfa, () => Subscription.current());
+    const theirs = await runInTenant(beta, () => Subscription.current());
+    assert.equal(Number(mine.tenant_id), Number(alfa));
+    assert.equal(Number(theirs.tenant_id), Number(beta));
+    assert.equal(mine.status, 'active');
+    assert.equal(theirs.status, 'suspended');
+
+    const gateForAlfa = await runInTenant(alfa, async () => SubscriptionService.decide((await SubscriptionService.current()).subscription));
+    const gateForBeta = await runInTenant(beta, async () => SubscriptionService.decide((await SubscriptionService.current()).subscription));
+    assert.equal(gateForAlfa.allowed, true);
+    assert.equal(gateForBeta.allowed, false);
+  });
+
+  // Financial data. One provider reading the other's statement is the number
+  // it pays and when — the kind of line a competitor would like to have.
+  it('shows each provider only its own statement', async () => {
+    const mine = await runInTenant(alfa, () => BillingEvent.listRecent());
+    const theirs = await runInTenant(beta, () => BillingEvent.listRecent());
+    assert.deepEqual(mine.map((e) => e.external_id), ['PIX-ALFA']);
+    assert.deepEqual(theirs.map((e) => e.external_id), ['PIX-BETA']);
+  });
+
+  it('a change made in one scope does not touch the other', async () => {
+    await runInTenant(beta, () => SubscriptionService.setStatus({ status: 'canceled' }));
+    const mine = await runInTenant(alfa, () => Subscription.current());
+    assert.equal(mine.status, 'active');
+    assert.equal(mine.canceled_at, null);
   });
 });

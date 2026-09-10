@@ -16,7 +16,13 @@ class PlatformAudit {
   static ACTIONS = Object.freeze({
     TENANT_CREATED: 'tenant.created',
     TENANT_STATUS_CHANGED: 'tenant.status_changed',
-    TENANT_DELETED: 'tenant.deleted'
+    TENANT_DELETED: 'tenant.deleted',
+    // A Fase 5: o que o plano de controle fez com a assinatura de um provedor.
+    PLAN_CREATED: 'plan.created',
+    PLAN_UPDATED: 'plan.updated',
+    SUBSCRIPTION_PLAN_CHANGED: 'subscription.plan_changed',
+    SUBSCRIPTION_STATUS_CHANGED: 'subscription.status_changed',
+    PAYMENT_RECORDED: 'subscription.payment_recorded'
   });
 
   /**

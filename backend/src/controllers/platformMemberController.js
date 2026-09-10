@@ -1,3 +1,6 @@
+import SubscriptionService, { PlanLimitError } from '../services/subscriptionService.js';
+import { planLimitResponse } from '../utils/planLimit.js';
+import { runInTenant } from '../config/tenantContext.js';
 import { getDb } from '../config/database.js';
 import TenantUser from '../models/TenantUser.js';
 import User from '../models/User.js';
@@ -163,6 +166,15 @@ class PlatformMemberController {
       // effect when they sign in and choose this provider, and revoking here
       // would sign them out of the ISP they are working at right now to tell
       // them about a job they have just been given.
+      // O limite é do provedor ALVO, não do provedor em que o administrador da
+      // plataforma está logado — daí abrir o escopo dele para perguntar.
+      try {
+        await runInTenant(tenantId, () => SubscriptionService.assertCanAddOperator());
+      } catch (error) {
+        if (error instanceof PlanLimitError) return planLimitResponse(req, res, error);
+        throw error;
+      }
+
       await TenantUser.create({ tenantId, userId: person.id, role });
 
       return res.status(201).json(createResponse('Membership created successfully', {

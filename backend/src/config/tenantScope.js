@@ -103,7 +103,12 @@ export const SCOPED_TABLES = new Set([
   // vínculo que ele oferece — e listá-los sem filtro entregaria a um provedor
   // quem o vizinho está tentando contratar. A busca pelo token é a exceção
   // declarada, e está em `TenantInvite.findByToken`, com o motivo escrito lá.
-  'tenant_invites'
+  'tenant_invites',
+  // A assinatura e o extrato de um provedor. Escopadas como o resto: a tela de
+  // plano e uso é do próprio provedor, e o extrato é dado financeiro dele — sai
+  // no export e some na exclusão, como tudo que é dele.
+  'subscriptions',
+  'billing_events'
 ]);
 
 /** Tables that belong to the deployment rather than to any one provider. */
@@ -132,7 +137,10 @@ export const SHARED_TABLES = new Set([
   // The control plane's roster. Above providers rather than inside one: a
   // provider's own administrator must not be able to mint providers or reach
   // into another's, so this cannot be a per-provider table by construction.
-  'platform_admins'
+  'platform_admins',
+  // A tabela de preços. É uma só para o deploy inteiro, e um provedor não
+  // edita o próprio plano — ele o lê, por `subscriptions.plan_id`.
+  'plans'
 ]);
 
 /** Tables still to be converted. Shrinks to empty as the phase progresses. */

@@ -558,4 +558,14 @@ export default {
   'audit.listFailed': 'Failed to read the audit trail',
 
   'tenant.exportFailed': 'Failed to export the provider data',
+
+  'subscription.pastDue': 'Your subscription is past due. The panel is read-only until the payment is recorded.',
+  'subscription.trialExpired': 'Your trial has ended. The panel is read-only until a plan is activated.',
+  'subscription.suspended': 'This provider\'s subscription is suspended. Contact the platform.',
+  'subscription.canceled': 'This provider\'s subscription has been canceled.',
+  'subscription.missing': 'This provider has no subscription. Contact the platform.',
+  'subscription.limitOperators': 'Your plan allows {limit} operator(s) and you already have {current}.',
+  'subscription.limitSubscribers': 'Your plan allows {limit} subscriber account(s) and you already have {current}.',
+  'subscription.retrieved': 'Subscription retrieved',
+  'subscription.retrieveFailed': 'Failed to read the subscription',
 };

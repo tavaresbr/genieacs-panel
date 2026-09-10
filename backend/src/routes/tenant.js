@@ -22,4 +22,11 @@ router.get('/public', TenantController.getPublicProfile);
 // provedor cadastrou, num arquivo. Autenticada e com capacidade própria.
 router.get('/export', authenticateToken, requirePermission('tenant.export'), TenantController.exportTenant);
 
+// O plano, o estado da assinatura e o uso contra o limite. Autenticada, e
+// com `settings.read` — é o mesmo lado da linha que as configurações: quem
+// pode ver a configuração do provedor pode ver em que plano ele está. Fica
+// FORA da porta da assinatura (`subscriptionGate.js` a lista), porque é o que
+// a tela de bloqueio mostra.
+router.get('/subscription', authenticateToken, requirePermission('settings.read'), TenantController.getSubscription);
+
 export default router;

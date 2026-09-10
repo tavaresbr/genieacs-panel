@@ -1,3 +1,5 @@
+import SubscriptionService, { PlanLimitError } from '../services/subscriptionService.js';
+import { planLimitResponse } from '../utils/planLimit.js';
 import bcrypt from 'bcryptjs';
 import TenantInvite from '../models/TenantInvite.js';
 import TenantUser from '../models/TenantUser.js';
@@ -210,6 +212,15 @@ class InviteController {
           return res.status(409).json(createErrorResponse(req.t('invite.alreadyMember')));
         }
         userId = existente.id;
+      }
+
+      // O limite do plano, antes de abrir a transação: o convite continua de
+      // pé (não é consumido) e a pessoa pode voltar quando houver vaga.
+      try {
+        await SubscriptionService.assertCanAddOperator();
+      } catch (error) {
+        if (error instanceof PlanLimitError) return planLimitResponse(req, res, error);
+        throw error;
       }
 
       const trx = await getDb().transaction();

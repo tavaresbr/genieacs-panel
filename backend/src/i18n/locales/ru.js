@@ -559,4 +559,14 @@ export default {
   'audit.listFailed': 'Не удалось прочитать журнал аудита',
 
   'tenant.exportFailed': 'Не удалось экспортировать данные провайдера',
+
+  'subscription.pastDue': 'Подписка просрочена. Панель доступна только для чтения, пока платёж не будет зарегистрирован.',
+  'subscription.trialExpired': 'Пробный период закончился. Панель доступна только для чтения, пока не будет активирован тариф.',
+  'subscription.suspended': 'Подписка этого провайдера приостановлена. Обратитесь к платформе.',
+  'subscription.canceled': 'Подписка этого провайдера отменена.',
+  'subscription.missing': 'У этого провайдера нет подписки. Обратитесь к платформе.',
+  'subscription.limitOperators': 'Ваш тариф допускает {limit} оператор(ов), а у вас уже {current}.',
+  'subscription.limitSubscribers': 'Ваш тариф допускает {limit} учётных записей абонентов, а у вас уже {current}.',
+  'subscription.retrieved': 'Подписка получена',
+  'subscription.retrieveFailed': 'Не удалось прочитать подписку',
 };

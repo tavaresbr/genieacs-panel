@@ -561,4 +561,14 @@ export default {
   'audit.listFailed': '감사 로그를 읽지 못했습니다',
 
   'tenant.exportFailed': '사업자 데이터를 내보내지 못했습니다',
+
+  'subscription.pastDue': '구독 결제가 연체되었습니다. 결제가 기록될 때까지 패널은 읽기 전용입니다.',
+  'subscription.trialExpired': '체험 기간이 끝났습니다. 요금제가 활성화될 때까지 패널은 읽기 전용입니다.',
+  'subscription.suspended': '이 사업자의 구독이 정지되었습니다. 플랫폼에 문의하세요.',
+  'subscription.canceled': '이 사업자의 구독이 취소되었습니다.',
+  'subscription.missing': '이 사업자에게는 구독이 없습니다. 플랫폼에 문의하세요.',
+  'subscription.limitOperators': '현재 요금제는 운영자 {limit}명까지 허용하며 이미 {current}명이 있습니다.',
+  'subscription.limitSubscribers': '현재 요금제는 가입자 계정 {limit}개까지 허용하며 이미 {current}개가 있습니다.',
+  'subscription.retrieved': '구독 정보를 가져왔습니다',
+  'subscription.retrieveFailed': '구독 정보를 읽지 못했습니다',
 };

@@ -1,4 +1,6 @@
 import Tenant from '../models/Tenant.js';
+import Subscription from '../models/Subscription.js';
+import SubscriptionService from '../services/subscriptionService.js';
 import PlatformAudit from '../models/PlatformAudit.js';
 import { SCHEMA_TABLES } from '../config/migrations.js';
 import { SCOPED_TABLES } from '../config/tenantScope.js';
@@ -87,16 +89,35 @@ function slugProblem(slug) {
   return null;
 }
 
-/** The provider as the console shows it: `operators` is how many people work there. */
-function present(tenant, operators) {
+/**
+ * The provider as the console shows it: `operators` is how many people work
+ * there, `subscription` is the plan and the state it is in (null only for a
+ * provider the 0034 backfill somehow missed, which the seed repairs at boot).
+ */
+function present(tenant, operators, subscription = null) {
   return {
     id: tenant.id,
     slug: tenant.slug,
     name: tenant.name,
     status: tenant.status,
     operators,
+    subscription: subscription ? {
+      status: SubscriptionService.effectiveStatus(subscription).status,
+      storedStatus: subscription.status,
+      planId: subscription.plan_id,
+      planCode: subscription.plan_code ?? null,
+      planName: subscription.plan_name ?? null,
+      trialEndsAt: subscription.trial_ends_at ?? null,
+      renewsAt: subscription.renews_at ?? null
+    } : null,
     createdAt: tenant.created_at ?? null
   };
+}
+
+/** One query for every provider's subscription, keyed by provider id. */
+async function subscriptionsByTenant() {
+  const rows = await Subscription.listWithPlans();
+  return new Map(rows.map((row) => [Number(row.tenant_id), row]));
 }
 
 class PlatformController {
@@ -104,8 +125,13 @@ class PlatformController {
     try {
       const tenants = await Tenant.list();
       const counts = await Tenant.operatorCounts();
+      const subscriptions = await subscriptionsByTenant();
       return res.json(createResponse('Tenants retrieved successfully', {
-        tenants: tenants.map((tenant) => present(tenant, counts.get(Number(tenant.id)) || 0))
+        tenants: tenants.map((tenant) => present(
+          tenant,
+          counts.get(Number(tenant.id)) || 0,
+          subscriptions.get(Number(tenant.id)) || null
+        ))
       }));
     } catch (error) {
       console.error('List tenants error:', error);
@@ -181,8 +207,9 @@ class PlatformController {
         action: PlatformAudit.ACTIONS.TENANT_CREATED,
         tenant: created
       });
+      const subscriptions = await subscriptionsByTenant();
       return res.status(201).json(createResponse('Tenant created successfully', {
-        tenant: present(created, 0)
+        tenant: present(created, 0, subscriptions.get(Number(id)) || null)
       }));
     } catch (error) {
       console.error('Create tenant error:', error);
@@ -243,8 +270,9 @@ class PlatformController {
       }));
       const updated = await Tenant.findById(id);
       const counts = await Tenant.operatorCounts();
+      const subscriptions = await subscriptionsByTenant();
       return res.json(createResponse('Tenant updated successfully', {
-        tenant: present(updated, counts.get(Number(id)) || 0)
+        tenant: present(updated, counts.get(Number(id)) || 0, subscriptions.get(Number(id)) || null)
       }));
     } catch (error) {
       console.error('Update tenant error:', error);

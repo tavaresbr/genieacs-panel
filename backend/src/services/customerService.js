@@ -1,3 +1,4 @@
+import SubscriptionService from './subscriptionService.js';
 import crypto from 'node:crypto';
 import CustomerAccount from '../models/CustomerAccount.js';
 import SgpLink from '../models/SgpLink.js';
@@ -288,14 +289,36 @@ class CustomerService {
         if (reported.length < 3) return false;
         return !this.isSameSubscriber(stored, reported);
       });
+      // O limite de assinantes do plano vale para contas NOVAS. Um aparelho que
+      // já tem conta e trocou de assinante (aposenta uma, cria outra) não
+      // aumenta o total, então não é contado contra o teto — contar seria
+      // recusar uma troca de ONT por causa do plano. O que não coube fica para
+      // a próxima passada, que pergunta de novo; nada aqui lança, porque a
+      // sincronização inteira não pode cair por causa da conta que não coube.
+      const remaining = await SubscriptionService.remainingSubscribers();
+      let allowed = pending;
+      if (remaining !== null) {
+        let budget = remaining;
+        allowed = pending.filter((device) => {
+          if (storedByDeviceId.has(String(device._id))) return true;
+          if (budget <= 0) return false;
+          budget -= 1;
+          return true;
+        });
+        if (allowed.length < pending.length) {
+          console.warn(
+            `Plan limit: ${pending.length - allowed.length} device(s) left without a subscriber account`
+          );
+        }
+      }
       // Keep database pressure bounded while avoiding a slow one-by-one sync
       // for larger GenieACS fleets.
-      for (let offset = 0; offset < pending.length; offset += 10) {
+      for (let offset = 0; offset < allowed.length; offset += 10) {
         await Promise.all(
-          pending.slice(offset, offset + 10).map((device) => this.ensureAccount(device))
+          allowed.slice(offset, offset + 10).map((device) => this.ensureAccount(device))
         );
       }
-      if (pending.length > 0) {
+      if (allowed.length > 0) {
         rows = await CustomerAccount.getIdsByDeviceIds(deviceIds);
       }
     }

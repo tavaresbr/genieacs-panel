@@ -2,6 +2,8 @@ import Tenant from '../models/Tenant.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import TenantExportService from '../services/tenantExportService.js';
 import AuditLog from '../models/AuditLog.js';
+import SubscriptionService from '../services/subscriptionService.js';
+import DeviceService from '../services/deviceService.js';
 
 /**
  * What a provider will admit to before anybody has signed in.
@@ -12,6 +14,28 @@ import AuditLog from '../models/AuditLog.js';
  * of the whole deployment, and everything below is written against that.
  */
 class TenantController {
+  /**
+   * `GET /api/tenant/subscription`: o plano, o estado e o uso — a tela de
+   * "plano e uso" do provedor, e a placa que a tela de bloqueio lê.
+   *
+   * A contagem de ONTs vem do GenieACS e pode falhar; ela vira `null` sem
+   * derrubar o resto (ver `SubscriptionService.usage`). Sem preço: o preço é
+   * do console.
+   */
+  static async getSubscription(req, res) {
+    try {
+      const usage = await SubscriptionService.usage({
+        countDevices: () => DeviceService.countDevicesFromGenieAcs()
+      });
+      return res.json(createResponse(req.t('subscription.retrieved'), usage));
+    } catch (error) {
+      console.error('Get subscription error:', error);
+      return res.status(500).json(
+        createErrorResponse(req.t('subscription.retrieveFailed'), error.message)
+      );
+    }
+  }
+
   /**
    * O cadastro inteiro deste provedor, num arquivo.
    *

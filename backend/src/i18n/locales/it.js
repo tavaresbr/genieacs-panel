@@ -556,4 +556,14 @@ export default {
   'audit.listFailed': 'Impossibile leggere il registro di controllo',
 
   'tenant.exportFailed': 'Impossibile esportare i dati del provider',
+
+  'subscription.pastDue': 'L\'abbonamento è scaduto. Il pannello è in sola lettura finché il pagamento non viene registrato.',
+  'subscription.trialExpired': 'Il periodo di prova è terminato. Il pannello è in sola lettura finché non viene attivato un piano.',
+  'subscription.suspended': 'L\'abbonamento di questo provider è sospeso. Contatta la piattaforma.',
+  'subscription.canceled': 'L\'abbonamento di questo provider è stato annullato.',
+  'subscription.missing': 'Questo provider non ha un abbonamento. Contatta la piattaforma.',
+  'subscription.limitOperators': 'Il tuo piano consente {limit} operatore/i e ne hai già {current}.',
+  'subscription.limitSubscribers': 'Il tuo piano consente {limit} account abbonato/i e ne hai già {current}.',
+  'subscription.retrieved': 'Abbonamento recuperato',
+  'subscription.retrieveFailed': 'Impossibile leggere l\'abbonamento',
 };

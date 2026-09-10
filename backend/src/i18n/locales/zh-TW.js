@@ -558,4 +558,14 @@ export default {
   'audit.listFailed': '無法讀取稽核日誌',
 
   'tenant.exportFailed': '無法匯出服務商資料',
+
+  'subscription.pastDue': '訂閱已逾期。在記錄付款之前，面板為唯讀。',
+  'subscription.trialExpired': '試用期已結束。在啟用方案之前，面板為唯讀。',
+  'subscription.suspended': '此業者的訂閱已暫停。請聯絡平台。',
+  'subscription.canceled': '此業者的訂閱已取消。',
+  'subscription.missing': '此業者沒有訂閱。請聯絡平台。',
+  'subscription.limitOperators': '您的方案允許 {limit} 位操作員，而您已有 {current} 位。',
+  'subscription.limitSubscribers': '您的方案允許 {limit} 個用戶帳戶，而您已有 {current} 個。',
+  'subscription.retrieved': '已取得訂閱',
+  'subscription.retrieveFailed': '無法讀取訂閱',
 };

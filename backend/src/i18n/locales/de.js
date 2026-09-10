@@ -559,4 +559,14 @@ export default {
   'audit.listFailed': 'Audit-Protokoll konnte nicht gelesen werden',
 
   'tenant.exportFailed': 'Anbieterdaten konnten nicht exportiert werden',
+
+  'subscription.pastDue': 'Das Abonnement ist überfällig. Das Panel ist schreibgeschützt, bis die Zahlung erfasst wurde.',
+  'subscription.trialExpired': 'Die Testphase ist beendet. Das Panel ist schreibgeschützt, bis ein Tarif aktiviert wird.',
+  'subscription.suspended': 'Das Abonnement dieses Anbieters ist ausgesetzt. Wenden Sie sich an die Plattform.',
+  'subscription.canceled': 'Das Abonnement dieses Anbieters wurde gekündigt.',
+  'subscription.missing': 'Dieser Anbieter hat kein Abonnement. Wenden Sie sich an die Plattform.',
+  'subscription.limitOperators': 'Ihr Tarif erlaubt {limit} Bediener und Sie haben bereits {current}.',
+  'subscription.limitSubscribers': 'Ihr Tarif erlaubt {limit} Teilnehmerkonten und Sie haben bereits {current}.',
+  'subscription.retrieved': 'Abonnement abgerufen',
+  'subscription.retrieveFailed': 'Abonnement konnte nicht gelesen werden',
 };

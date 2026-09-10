@@ -476,25 +476,75 @@ sustenta. Antes do décimo tenant:
 
 ---
 
-### Fase 5 — Planos, limites e ciclo de vida da assinatura *(esforço: médio)*
+### Fase 5 — Planos, limites e ciclo de vida da assinatura ✅ *(entregue; o gateway continua manual)*
 
-- Middleware `requireActiveSubscription` logo após o `tenantResolver`: `trial` e `active`
-  passam; `past_due` passa em modo somente-leitura; `suspended`/`canceled` retornam 402 com
-  código legível para o frontend mostrar a tela de bloqueio.
-  **O portal do assinante deve continuar de pé em `past_due`** — derrubar o autoatendimento
-  dos clientes finais do provedor por atraso de fatura é um tiro no pé comercial.
-- Limites verificados nos pontos de escrita: criação de operador (`teamController`), criação
-  de conta de assinante (`backend/src/services/customerService.js` → `syncDevices`), e
-  contagem de ONTs vinda do GenieACS (query de count no conector).
-- Tabela `billing_events` e uma interface `BillingProvider` já definidas agora, com
-  implementação `ManualBillingProvider` (nós marcamos pago). Quando o gateway entrar,
-  recomendo **Asaas** (Pix + boleto + cartão, é o padrão do mercado de ISP brasileiro) com
-  webhook chamando o mesmo `subscriptions.status`.
-- Console de plataforma para nós: criar tenant, mudar plano, suspender, ver uso.
+Três tabelas (migration `0034`), uma porta, quatro pontos de escrita e a metade comercial do
+console. O que a fase NÃO fez é tão importante quanto o que fez, e está escrito na migração:
+**nenhum provedor existente muda** — todos recebem `active` num plano `unlimited` sem limite
+algum, porque um upgrade não pode ser o dia em que um ISP em produção descobre que está
+bloqueado. Quem nasce depois, pelo console, nasce em `trial`.
+
+**Schema.** `plans` é do deploy (é a tabela de preços; um provedor assina *o* plano `pro`, não
+tem *o seu*); `subscriptions` é uma por provedor, escopada, com `plan_id` em RESTRICT — plano
+com assinante se desativa, não se apaga; `billing_events` é o extrato, escopado, e é o que um
+gateway vai alimentar por webhook pelo mesmo caminho do botão de hoje.
+
+**A porta (`requireActiveSubscription`)**, logo atrás do resolvedor e só na edição SaaS. Cinco
+estados, uma regra cada, toda a política em `SubscriptionService.decide`:
+
+| estado | passa? |
+| --- | --- |
+| `trial` | sim — e vira `past_due` sozinho quando o prazo vence, **calculado na leitura**, sem job: não há janela em que um teste vencido ainda passe porque o cron não rodou |
+| `active` | sim |
+| `past_due` | **só para ler** (GET/HEAD/OPTIONS). O portal do assinante fica inteiro de pé — o assinante não é quem deve — e os webhooks do ERP continuam entrando: recusar o evento do SGP por fatura atrasada perderia dado de quem não deve nada |
+| `suspended` | 402 `subscription_suspended` |
+| `canceled` | 402 `subscription_canceled` |
+
+O 402 leva o `code` e a própria assinatura no corpo, para a tela de bloqueio não ter que
+perguntar de novo a uma rota que talvez também responda 402. O que fica **fora** da porta, com
+o motivo de cada um escrito nela: `/api/auth/*` (entrar é como se vê o aviso, e como um
+administrador da plataforma chega ao console), `/api/tenant/public` (o nome na tela),
+`/api/tenant/subscription` (a placa do muro) e `/api/platform/*` (o console vive *acima* das
+assinaturas; um provedor cancelado é justamente um que ele precisa alcançar).
+
+`subscriptions.status = 'suspended'` e `tenants.status = 'suspended'` são **duas chaves**, de
+propósito: a do provedor é operacional (para os jobs, recusa o webhook), a da assinatura é
+comercial (o que o operador vê ao entrar). Uma inadimplência não precisa parar o alerta de ONT
+caída, e uma parada operacional não é uma cobrança.
+
+**Limites**, nos pontos de escrita, sempre contados do banco e nunca do cache (o limite existe
+para o dia em que dois administradores criam ao mesmo tempo): criação de operador
+(`/api/users`), aceite de convite (o convite **não** é consumido pela recusa — a pessoa volta
+quando houver vaga), o console adicionando alguém (no escopo do provedor *alvo*, não do
+administrador), e a sincronização de aparelhos — que cria contas **até o limite** e deixa o
+resto para a próxima passada, sem lançar, porque a sincronização inteira não pode cair por
+causa da conta que não coube; um aparelho que já tem conta e trocou de assinante não conta
+contra o teto. Recusa é **402** com `code`, `limit` e `current`: quem pede *tem* permissão — é
+o plano que não comporta. A contagem de ONTs vem do GenieACS e vira `null` quando o ACS não
+responde, sem derrubar os outros dois números.
+
+**Cobrança.** `BillingProvider` é a interface; `ManualBillingProvider` é o que existe — nós
+marcamos pago. Um pagamento estende o período em 30 dias a partir do fim atual (pagou
+adiantado) ou de hoje (pagou atrasado) e volta o status a `active`. Um provedor `suspended`
+ou `canceled` **não** é reativado por pagamento: essas duas são decisões de gente, e é gente
+que as desfaz. O Asaas entra como `AsaasBillingProvider` com `recordPayment` chamado pelo
+webhook, e `billing_events.provider = 'asaas'`.
+
+**Console.** Planos (criar, editar limites/preço/teste, desativar; o `code` não muda — é o
+que o extrato nomeia), a assinatura de cada provedor (trocar plano e mudar estado são dois
+botões e duas linhas no extrato, de propósito: trocar o plano de quem está em `past_due` não
+pode reativá-lo por acidente), registrar pagamento, e uso contra limite. Cada mudança grava
+nas **duas** trilhas — `platform_audit` (o que nós fizemos) e o `audit_log` do provedor com
+`actorKind: 'platform'` (o que aconteceu com ele, onde ele consegue olhar).
+
+**Frontend, o mínimo que a fase exigia:** a coluna de plano e estado na lista do console, o
+painel de plano por provedor, e a casca do app ouvindo o 402 — faixa no alto para `past_due`
+(dá para ler), muro para `suspended`/`canceled` (com o nome do plano e a saída). A tela de
+"plano e uso" do próprio provedor continua da Fase 6; a rota que a alimenta já existe.
 
 ---
 
-### Fase 6 — Frontend *(esforço: médio-alto)*
+### Fase 6 — Frontend *(esforço: médio; o console e os papéis já entraram)*
 
 - `frontend/src/contexts/tenant-context.tsx`: carrega `/api/tenant/public` no boot e provê
   branding + plano + limites.
@@ -560,7 +610,7 @@ subsistema cada — `sgp-links`, `sgp-events`, `device-profiles`, `provisioning`
 `map-settings`, `vendor-catalogue`, `wifi-credentials`, `whatsapp-media`,
 `whatsapp-inbound`, `users`, `auth`, entre outras, mais `tenant-subdomain` e
 `tenant-id-sweep`, que provam o isolamento por host, e `role-reach`, que prova por HTTP o
-alcance de cada papel sobre uma amostra de 31 rotas. São 1403 testes no total, verdes nos
+alcance de cada papel sobre uma amostra de 31 rotas. São 1513 testes no total, verdes nos
 três dialetos no CI.
 
 O padrão em todas: **dois provedores com as chaves naturais deliberadamente colidindo** —
@@ -722,11 +772,13 @@ Original: Fase 0 → 1 → 2 → 3 → 8 → 4 → 5 → 6 → 7.
    e continuam em aberto: `mode` (`agent`/`tunnel`/`hosted`), `verify_tls` e
    `allow_private_ranges` por provedor — a credencial vive num blob em `app_state`, sem
    essas três colunas — e as três peças restantes do muro de escala.
-5. **Fase 5** (planos, assinatura, `requireActiveSubscription`, limites nos pontos de
-   escrita, `billing_events`) → o resto da **Fase 6** (onboarding, plano e uso, branding
-   pelo contexto, `<html lang>` e o centro do mapa) → o que sobrou da **2** (impersonação
-   auditada com audiência própria, transporte de e-mail do convite) e da **7** (exclusão
-   já entrou; `tenant_id` em log e métrica).
+5. ~~**Fase 5**~~ ✅ planos, assinatura, `requireActiveSubscription`, limites nos quatro
+   pontos de escrita, `billing_events` e o `ManualBillingProvider`. O gateway (Asaas) fica
+   para quando houver contrato para cobrar.
+6. O resto da **Fase 6** (onboarding, a tela de plano e uso do provedor, branding pelo
+   contexto, `<html lang>` e o centro do mapa) → o que sobrou da **2** (impersonação auditada
+   com audiência própria, transporte de e-mail do convite) e da **7** (exclusão já entrou;
+   `tenant_id` em log e métrica).
 
 Vale repetir o que o plano dizia e que se confirmou: a Fase 1 saiu para os installs
 self-hosted como upgrade normal, e o código de tenancy rodou em produção real com um
@@ -750,7 +802,7 @@ metade é da Fase 4.
 | 6 | Credenciais ACS por provedor, cifradas, guarda de egresso, branch de URL absoluta removido | ✅ credencial NBI por provedor (onda 19), egresso com pinning de DNS, branch de URL absoluta removido |
 | 7 | `/api/database` não montada na edição SaaS | ✅ |
 | 8 | Rate limit e concorrência de fetch ACS chaveados por provedor | ✅ `tenantIpKey` no limite; `withAcsSlot` no fetch — vaga por provedor e vaga global, nessa ordem |
-| 9 | Suíte de vazamento verde no CI e obrigatória para merge | ✅ 1403 testes, três dialetos |
+| 9 | Suíte de vazamento verde no CI e obrigatória para merge | ✅ 1513 testes, três dialetos |
 | 10 | `SECRET_BOX_KEY` separada do `JWT_SECRET`, com `key_version` | ✅ |
 | 11 | `audit_log` registrando ações sensíveis | ✅ onda 20 — senha de portal, GenieACS, papéis, vínculos, convites, suspensão |
 | 12 | Exportação por provedor funcionando (LGPD e "apaguei tudo, socorro") | ✅ exportação (onda 21) e exclusão (onda 22), com trilha que sobrevive ao provedor apagado |
@@ -772,7 +824,7 @@ também a tabela de que a impersonação da plataforma vai precisar.
 
 ```bash
 npm run verify          # check backend + testes + lint + typecheck + build (raiz)
-cd backend && npm test  # 1403 testes, incluindo as suítes de tenancy
+cd backend && npm test  # 1513 testes, incluindo as suítes de tenancy
 ```
 
 A suíte roda nos três dialetos, e **isso não é zelo**: cada uma das armadilhas abaixo passou

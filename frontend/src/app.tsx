@@ -7,6 +7,7 @@ import { ToastProvider } from '@/components/ui/toast'
 import { LoadingProvider, RouteChangeLoader } from '@/components/ui/loading'
 import { BrandMark } from '@/components/brand-mark'
 import { LanguageProvider, useTranslation } from '@/contexts/language-context'
+import { SubscriptionNotice } from '@/components/subscription-notice'
 import type { Permission } from '@/lib/permissions'
 
 const DashboardPage = lazy(() => import('@/pages/dashboard'))
@@ -54,6 +55,9 @@ function ProtectedShell() {
     <div className="flex min-h-screen">
       <Sidebar />
       <main className="min-w-0 flex-1">
+        {/* A faixa ou o muro da assinatura. Fica na casca e não numa tela
+            porque a primeira requisição recusada pode vir de qualquer uma. */}
+        <SubscriptionNotice />
         <Suspense fallback={<PageFallback />}>
           <Outlet />
         </Suspense>
