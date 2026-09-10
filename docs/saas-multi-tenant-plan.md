@@ -439,7 +439,10 @@ passa a pedir o conector do tenant. Pontos exatos a refatorar em
   link-local, CGNAT e ULA IPv6**, e então conectar ao **IP resolvido e fixado** enviando o
   `Host` — só checar se o hostname "parece privado" não fecha DNS rebinding. Mais allowlist
   de portas e o timeout já existente (15s). Na edição self-hosted a faixa privada continua
-  liberada (é o caso normal lá) — daí o flag por edição.
+  liberada (é o caso normal lá) — daí o flag por edição. A allowlist (80, 443, 7557, 8080)
+  alarga-se por `GENIEACS_ALLOWED_PORTS`, e é variável de ambiente e não coluna de propósito:
+  é o **deployment** dizendo em quais portas a própria rede tolera ser sondada, decisão que
+  não cabe a quem sonda.
 - Em produção, rotear todo o egresso ACS por um proxy/NAT dedicado sem acesso à nossa VPC.
   Além de defesa em profundidade, dá ao provedor um IP fixo para colocar em allowlist — o que
   é argumento de venda.
@@ -453,7 +456,13 @@ GenieACS, com TTL de 60s e um prewarm no boot (`server.js:37`). Um provedor com 
 sustenta. Antes do décimo tenant:
 - tirar o refresh do caminho da requisição para um job agendado com **offset por tenant**
   (hash do id no minuto) e **TTL adaptativo** (60s com operador logado, 5 min ocioso);
-- teto de concorrência de fetch ACS global e por tenant;
+- ✅ **teto de concorrência de fetch ACS global e por provedor** —
+  `backend/src/services/genieacs/concurrency.js`. As sete chamadas ao ACS em
+  `deviceService.js` passam por `withAcsSlot`, que segura uma vaga do provedor e depois uma
+  global, sempre nessa ordem (duas travas em ordens opostas é o deadlock clássico). O teto por
+  provedor é o que isola; o global é o que limita sockets e heap. `GENIEACS_MAX_CONCURRENCY`
+  (32) e `GENIEACS_MAX_CONCURRENCY_PER_TENANT` (6). É a primeira das quatro peças do muro; as
+  outras três continuam abaixo;
 - não atualizar tenants suspensos nem sem login nas últimas 24h;
 - avaliar uma tabela `devices_summary` para o dashboard ler do banco, não do ACS.
 
@@ -707,9 +716,17 @@ Original: Fase 0 → 1 → 2 → 3 → 8 → 4 → 5 → 6 → 7.
    que é quebra de contrato e decisão de produto, não de código.
 3. ~~**Fechar a Fase 8**~~ ✅ com os três testes que passaram a ser possíveis e a sentinela
    de SQL. Sobrou avaliar **RLS no Postgres** como segunda linha.
-4. **Fase 4 — conector**, começando pelas três correções de SSRF e pela guarda de egresso,
-   **antes** de a URL virar dado do cliente.
-5. Fases 5 → 6 → 7.
+4. ~~**Fase 4 — conector.**~~ ✅ na ordem certa: as três correções de SSRF e a guarda de
+   egresso com IP fixado entraram **antes** de a URL virar dado do cliente; depois a
+   credencial NBI (onda 19) e o teto de concorrência. Do desenho original ficaram de fora,
+   e continuam em aberto: `mode` (`agent`/`tunnel`/`hosted`), `verify_tls` e
+   `allow_private_ranges` por provedor — a credencial vive num blob em `app_state`, sem
+   essas três colunas — e as três peças restantes do muro de escala.
+5. **Fase 5** (planos, assinatura, `requireActiveSubscription`, limites nos pontos de
+   escrita, `billing_events`) → o resto da **Fase 6** (onboarding, plano e uso, branding
+   pelo contexto, `<html lang>` e o centro do mapa) → o que sobrou da **2** (impersonação
+   auditada com audiência própria, transporte de e-mail do convite) e da **7** (exclusão
+   já entrou; `tenant_id` em log e métrica).
 
 Vale repetir o que o plano dizia e que se confirmou: a Fase 1 saiu para os installs
 self-hosted como upgrade normal, e o código de tenancy rodou em produção real com um
@@ -719,7 +736,7 @@ edições de divergirem.
 
 ### Checklist antes de vender acesso ao segundo provedor
 
-Nada disso é negociável. **Os doze estão cumpridos**, com uma ressalva no oitavo:
+Nada disso é negociável. **Os doze estão cumpridos.**
 o rate limit é por provedor, mas a concorrência de fetch ao ACS ainda não — e essa
 metade é da Fase 4.
 
@@ -732,14 +749,17 @@ metade é da Fase 4.
 | 5 | JWT do operador e do assinante carregam o provedor e são conferidos contra o host | ✅ os dois carregam; divergência com o host é 403 `tenant_mismatch` |
 | 6 | Credenciais ACS por provedor, cifradas, guarda de egresso, branch de URL absoluta removido | ✅ credencial NBI por provedor (onda 19), egresso com pinning de DNS, branch de URL absoluta removido |
 | 7 | `/api/database` não montada na edição SaaS | ✅ |
-| 8 | Rate limit e concorrência de fetch ACS chaveados por provedor | ⚠️ rate limit por provedor ✅; a concorrência de fetch ACS é Fase 4 |
+| 8 | Rate limit e concorrência de fetch ACS chaveados por provedor | ✅ `tenantIpKey` no limite; `withAcsSlot` no fetch — vaga por provedor e vaga global, nessa ordem |
 | 9 | Suíte de vazamento verde no CI e obrigatória para merge | ✅ 1403 testes, três dialetos |
 | 10 | `SECRET_BOX_KEY` separada do `JWT_SECRET`, com `key_version` | ✅ |
 | 11 | `audit_log` registrando ações sensíveis | ✅ onda 20 — senha de portal, GenieACS, papéis, vínculos, convites, suspensão |
 | 12 | Exportação por provedor funcionando (LGPD e "apaguei tudo, socorro") | ✅ exportação (onda 21) e exclusão (onda 22), com trilha que sobrevive ao provedor apagado |
 
-O que falta é a **concorrência de fetch ao ACS** (metade do 8), que é da Fase 4 e não do
-mecanismo de isolamento de dados — que é o que a Fase 1 entregou.
+Nenhuma linha vermelha resta. Isso **não** quer dizer produto pronto — a Fase 5 inteira e
+boa parte da 6 estão por fazer — quer dizer que a lista do que não se pode vender sem já
+não tem item aberto. O que a fecha por último é o teto de concorrência de fetch ao ACS
+(`withAcsSlot`), que é a primeira das quatro peças do muro de escala da Fase 4; as outras
+três continuam registradas lá.
 
 A exclusão entrou na onda 22, e o que a destravou foi `platform_audit`: apagar um provedor
 tem que deixar registro, e registrar no `audit_log` DELE é inútil porque a trilha vai junto.
