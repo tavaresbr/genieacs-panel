@@ -580,4 +580,7 @@ export default {
   'users.deleteSelf': 'Non puoi eliminare l’account con cui hai effettuato l’accesso',
   'users.deleted': 'Operatore eliminato',
   'users.deleteFailed': 'Impossibile eliminare l’operatore',
+
+  'subscription.readOnly': 'L\'abbonamento di questo provider è scaduto, quindi il pannello resta in sola lettura finché la fattura non viene saldata',
+  'subscription.blocked': 'L\'abbonamento di questo provider non è attivo',
 };

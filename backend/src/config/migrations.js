@@ -872,6 +872,32 @@ const deviceSwapsTable = (db) => (t) => {
   t.index(['tenant_id', 'acknowledged_at'], 'device_swaps_open_idx');
 };
 
+const tenantSubscriptionsTable = (db) => (t) => {
+  t.increments('id').primary();
+  // Uma linha por provedor, e é o `unique` que diz isso — não um comentário.
+  // Duas assinaturas para o mesmo provedor seria a pergunta "este está em dia?"
+  // com duas respostas, e o portão leria a que o banco devolvesse primeiro.
+  t.integer('tenant_id').unsigned().notNullable().unique()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  // O estado COMERCIAL, que é um eixo diferente de `tenants.status`.
+  //
+  // `tenants.status` é administrativo: suspenso ali significa congelado, e é
+  // pré-requisito da exclusão em duas etapas (onda 22) — "ninguém está
+  // trabalhando lá dentro". Misturar os dois faria toda inadimplência tornar o
+  // provedor elegível a ser apagado, o que é uma consequência que ninguém
+  // pediu para um boleto atrasado.
+  t.string('status', 16).notNullable().defaultTo('trial');
+  // Quando o teste acaba. Nulo em quem já é cliente pagante.
+  t.timestamp('trial_ends_at');
+  // O fim do período pago corrente, para a tela dizer até quando vale.
+  t.timestamp('current_period_end');
+  // Por que está neste estado, escrito por quem mudou. Aparece para o ISP.
+  t.string('status_reason', 255);
+  t.timestamp('status_changed_at').defaultTo(db.fn.now());
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  t.timestamp('updated_at').defaultTo(db.fn.now());
+};
+
 const DEVICE_SWAP_TABLES = [
   ['device_swaps', deviceSwapsTable]
 ];
@@ -894,6 +920,23 @@ const MEMBERSHIP_TABLES = [
   ['audit_log', auditLogTable],
   // Aponta para `users` e para mais nada — ver o comentário na fábrica.
   ['platform_audit', platformAuditTable]
+];
+
+/**
+ * Criada depois de `tenants`, e num grupo próprio em vez de junto com ela.
+ *
+ * Não vai em `TENANCY_TABLES` porque aquele grupo roda no passo 0001, onde
+ * `tenants` está sendo criada na mesma leva — uma FK para uma tabela que a
+ * migration ainda está criando depende da ordem dentro do grupo, e depender de
+ * ordem implícita é o tipo de coisa que só falha num dos três bancos.
+ *
+ * Também não vai em `MEMBERSHIP_TABLES`: aquele grupo existe por um motivo
+ * específico (apontar para `users`), e esta não aponta. Um grupo cujo nome
+ * deixou de descrever o conteúdo é a próxima pessoa colocando a tabela errada
+ * nele.
+ */
+const SUBSCRIPTION_TABLES = [
+  ['tenant_subscriptions', tenantSubscriptionsTable]
 ];
 
 const INITIAL_TABLES = [
@@ -925,6 +968,7 @@ export const SCHEMA_TABLES = [
   ...TENANCY_TABLES,
   ...INITIAL_TABLES,
   ...MEMBERSHIP_TABLES,
+  ...SUBSCRIPTION_TABLES,
   ...PROVISIONING_TABLES,
   ...WHATSAPP_TABLES,
   ...DEVICE_HISTORY_TABLES,
@@ -2136,6 +2180,38 @@ export const migrations = [
       await db.schema.alterTable('users', (t) => {
         t.string('email', 255).unique();
       });
+    }
+  },
+  {
+    /**
+     * O estado comercial de cada provedor.
+     *
+     * Nasce com uma linha `active` para todo provedor que JÁ existe, e não
+     * `trial`: quem já está no ar é cliente, e acordar um deploy com todo mundo
+     * em teste seria dar um prazo a quem já pagou — e, pior, um prazo que
+     * vence.
+     *
+     * Provedor novo nasce em `trial`, e isso é decidido em `PlatformController`
+     * e não aqui: a migration fala do que existe, o controller do que passa a
+     * existir.
+     */
+    id: '0035_tenant_subscriptions',
+    async isApplied(db) {
+      return db.schema.hasTable('tenant_subscriptions');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      const nova = !(await db.schema.hasTable('tenant_subscriptions'));
+      await createTableIfMissing(db, 'tenant_subscriptions', tenantSubscriptionsTable(db));
+      if (!nova) return;
+      const tenants = await db('tenants').select('id');
+      if (!tenants.length) return;
+      await db('tenant_subscriptions').insert(tenants.map(({ id }) => ({
+        tenant_id: id,
+        status: 'active',
+        status_reason: 'Provedor existente no dia em que a assinatura passou a ser registrada',
+        status_changed_at: new Date()
+      })));
     }
   }
 ];

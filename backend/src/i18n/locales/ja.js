@@ -582,4 +582,7 @@ export default {
   'users.deleteSelf': '現在ログイン中のアカウントは削除できません',
   'users.deleted': 'オペレーターを削除しました',
   'users.deleteFailed': 'オペレーターを削除できませんでした',
+
+  'subscription.readOnly': 'このプロバイダーの契約が支払い遅延のため、請求が精算されるまでパネルは読み取り専用です',
+  'subscription.blocked': 'このプロバイダーの契約は有効ではありません',
 };

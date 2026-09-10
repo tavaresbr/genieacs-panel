@@ -1,5 +1,7 @@
 import Tenant from '../models/Tenant.js';
 import PlatformAudit from '../models/PlatformAudit.js';
+import TenantSubscription from '../models/TenantSubscription.js';
+import { SUBSCRIPTION_STATUSES } from '../config/subscription.js';
 import { SCHEMA_TABLES } from '../config/migrations.js';
 import { SCOPED_TABLES } from '../config/tenantScope.js';
 import { forgetResolvedTenant } from '../middleware/tenantResolver.js';
@@ -88,12 +90,16 @@ function slugProblem(slug) {
 }
 
 /** The provider as the console shows it: `operators` is how many people work there. */
-function present(tenant, operators) {
+function present(tenant, operators, subscription = null) {
   return {
     id: tenant.id,
     slug: tenant.slug,
     name: tenant.name,
     status: tenant.status,
+    // O eixo comercial vem ao lado do administrativo, e não no lugar dele: as
+    // duas perguntas que o console precisa responder são "este provedor está
+    // congelado?" e "este provedor está pagando?", e são independentes.
+    subscription: TenantSubscription.present(subscription),
     operators,
     createdAt: tenant.created_at ?? null
   };
@@ -104,8 +110,13 @@ class PlatformController {
     try {
       const tenants = await Tenant.list();
       const counts = await Tenant.operatorCounts();
+      const assinaturas = await TenantSubscription.byTenantIds(tenants.map((t) => t.id));
       return res.json(createResponse('Tenants retrieved successfully', {
-        tenants: tenants.map((tenant) => present(tenant, counts.get(Number(tenant.id)) || 0))
+        tenants: tenants.map((tenant) => present(
+          tenant,
+          counts.get(Number(tenant.id)) || 0,
+          assinaturas.get(Number(tenant.id)) ?? null
+        ))
       }));
     } catch (error) {
       console.error('List tenants error:', error);
@@ -164,6 +175,15 @@ class PlatformController {
           // transaction yet, so seeding on another connection would not see it.
           await seedDefaults(trx);
         });
+        // Fora da transação de propósito: `TenantSubscription.createFor` usa a
+        // conexão padrão, e o provedor só existe para ela depois do commit.
+        // Pôr a criação lá dentro exigiria passar a transação por mais uma
+        // camada para ganhar nada — se esta escrita falhar, o provedor fica sem
+        // linha, e um provedor sem linha PASSA no portão. A falha erra para o
+        // lado de um cliente que trabalha, que é o lado certo (ver o portão).
+        await TenantSubscription.createFor(id, {
+          reason: 'Provedor criado pelo plano de controle'
+        });
       } catch (error) {
         // Two writers racing on the same slug both pass the check above and one
         // loses on the unique index. Reading the table back tells the two apart
@@ -182,7 +202,7 @@ class PlatformController {
         tenant: created
       });
       return res.status(201).json(createResponse('Tenant created successfully', {
-        tenant: present(created, 0)
+        tenant: present(created, 0, await TenantSubscription.findByTenantId(id))
       }));
     } catch (error) {
       console.error('Create tenant error:', error);
@@ -200,9 +220,22 @@ class PlatformController {
    * suspended provider, and the SGP webhook refuses a delivery for one. This
    * route does not invent that behaviour, it hands somebody the switch.
    *
-   * Suspending is deliberately not a lockout: nothing in the sign-in path reads
-   * this column, so a provider whose service has stopped can still be looked at
-   * and, more importantly, turned back on.
+   * Suspender TRANCA, e a frase que estava aqui dizia o contrário — «nada no
+   * caminho de login lê esta coluna». Lê: `resolveTenantIdBySlug` devolve nulo
+   * para quem não está `active`, o que faz o painel E o portal do provedor
+   * suspenso responderem 404. A frase só era verdadeira na instalação de um
+   * provedor só, onde a resolução cai em `resolveDefaultTenantId`, que
+   * realmente não olha o status — e é a instalação onde esta rota nem existe.
+   * O `forgetResolvedTenant()` logo abaixo é a prova de que o trancamento é
+   * real: ele existe porque, sem invalidar o cache, a suspensão só passaria a
+   * valer no próximo restart.
+   *
+   * É por isso que a inadimplência NÃO escreve aqui. `tenants.status` é o eixo
+   * administrativo — congelar para poder apagar, e apagar de vez —, e um boleto
+   * atrasado que caísse nesta coluna tornaria o cliente elegível à exclusão em
+   * duas etapas e derrubaria o portal dos assinantes dele junto. O eixo
+   * comercial é `tenant_subscriptions`, tem rota própria logo abaixo, e um
+   * portão que distingue ler de escrever.
    */
   static async setStatus(req, res) {
     try {
@@ -251,12 +284,90 @@ class PlatformController {
       const updated = await Tenant.findById(id);
       const counts = await Tenant.operatorCounts();
       return res.json(createResponse('Tenant updated successfully', {
-        tenant: present(updated, counts.get(Number(id)) || 0)
+        tenant: present(
+          updated,
+          counts.get(Number(id)) || 0,
+          await TenantSubscription.findByTenantId(id)
+        )
       }));
     } catch (error) {
       console.error('Update tenant error:', error);
       return res.status(500).json(
         createErrorResponse('Failed to update the provider', error.message)
+      );
+    }
+  }
+
+  /**
+   * Muda o estado COMERCIAL de um provedor.
+   *
+   * Irmã de `setStatus`, e separada dela porque as duas colunas significam
+   * coisas diferentes. `tenants.status` congela o provedor e é pré-requisito da
+   * exclusão; esta diz se a fatura está em dia. Uma rota só, com um campo
+   * `status` ambíguo, seria a próxima pessoa suspendendo comercialmente um
+   * cliente e, sem querer, tornando-o elegível para ser apagado.
+   *
+   * O que ela NÃO faz: invalidar o cache do resolvedor. Aquele cache guarda
+   * slug -> id e é o `tenants.status` que ele lê; o portão comercial consulta a
+   * tabela a cada requisição, então a mudança daqui vale na requisição
+   * seguinte, sem restart e sem invalidação.
+   */
+  static async setSubscriptionStatus(req, res) {
+    try {
+      const id = Number(req.params?.id);
+      if (!Number.isInteger(id) || id <= 0) {
+        return res.status(400).json(createErrorResponse('Invalid provider id'));
+      }
+      const status = req.body?.status;
+      if (!SUBSCRIPTION_STATUSES.includes(status)) {
+        return res.status(400).json(
+          createErrorResponse(`Status must be one of: ${SUBSCRIPTION_STATUSES.join(', ')}`)
+        );
+      }
+      const motivo = req.body?.reason === undefined || req.body?.reason === null
+        ? null
+        : String(req.body.reason).trim().slice(0, 255) || null;
+
+      const tenant = await Tenant.findById(id);
+      if (!tenant) {
+        return res.status(404).json(createErrorResponse('Provider not found'));
+      }
+
+      const mudanca = await TenantSubscription.setStatus(id, status, { reason: motivo });
+      // Sem linha não há o que mudar, e criar uma aqui seria esta rota
+      // inventando uma assinatura que ninguém contratou.
+      if (!mudanca) {
+        return res.status(404).json(createErrorResponse('Provider has no subscription'));
+      }
+
+      await PlatformAudit.fromRequest(req, {
+        action: PlatformAudit.ACTIONS.SUBSCRIPTION_CHANGED,
+        tenant,
+        detail: { from: mudanca.from, to: mudanca.to, reason: motivo }
+      });
+      // E a mesma linha DENTRO do provedor, pelo motivo de sempre: quem vai
+      // perguntar "por que meu painel ficou somente leitura" é o ISP, e a
+      // resposta tem que estar onde ele consegue olhar.
+      await runInTenant(id, () => AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.SUBSCRIPTION_CHANGED,
+        actorKind: 'platform',
+        subjectType: 'tenant',
+        subjectId: id,
+        detail: { from: mudanca.from, to: mudanca.to, reason: motivo }
+      }));
+
+      const counts = await Tenant.operatorCounts();
+      return res.json(createResponse('Subscription updated successfully', {
+        tenant: present(
+          tenant,
+          counts.get(Number(id)) || 0,
+          await TenantSubscription.findByTenantId(id)
+        )
+      }));
+    } catch (error) {
+      console.error('Update subscription error:', error);
+      return res.status(500).json(
+        createErrorResponse('Failed to update the subscription', error.message)
       );
     }
   }

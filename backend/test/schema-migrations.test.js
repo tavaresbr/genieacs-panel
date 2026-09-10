@@ -624,3 +624,60 @@ describe('making the SGP log and the provisioning trail per-provider', () => {
     }), 'provisioning_profiles');
   });
 });
+
+/**
+ * A assinatura de quem já estava no ar quando a tabela nasceu.
+ *
+ * O caminho que nenhum banco novo exercita: numa instalação que já existe, a
+ * 0035 cria a tabela vazia — e uma tabela vazia significa "ninguém tem
+ * assinatura". O portão libera quem não tem linha (de propósito, e está escrito
+ * lá), então o efeito seria invisível até alguém suspender um cliente e nada
+ * acontecer. O backfill é o que evita isso, e é a única parte desta migration
+ * que só roda uma vez.
+ *
+ * `active` e não `trial`: quem já está no ar é cliente. Acordar um deploy com
+ * todo mundo em teste seria dar um prazo a quem já pagou — e um prazo vence.
+ */
+describe('a assinatura de quem já existia', () => {
+  const db = createDatabase('tenant-subscriptions-backfill');
+  const SLUGS = ['alfa-antigo', 'beta-antigo'];
+
+  before(async () => {
+    // Todas as migrations até a da assinatura, para chegar nela com provedores
+    // no lugar — que é a situação que o backfill existe para atender.
+    for (const migration of migrations.filter((m) => m.id < '0035_tenant_subscriptions')) {
+      // eslint-disable-next-line no-await-in-loop -- a ordem é o teste
+      await migration.up(db);
+    }
+    await db('tenants').whereNotIn('slug', SLUGS).delete();
+    for (const [i, slug] of SLUGS.entries()) {
+      // eslint-disable-next-line no-await-in-loop -- dois provedores
+      if (!(await db('tenants').where({ slug }).first())) {
+        // eslint-disable-next-line no-await-in-loop -- idem
+        await db('tenants').insert({ slug, name: `Provedor ${i + 1}`, status: 'active' });
+      }
+    }
+    await migrations.find((m) => m.id === '0035_tenant_subscriptions').up(db);
+  });
+
+  it('dá uma linha ativa a cada provedor que já estava lá', async () => {
+    const linhas = await db('tenant_subscriptions').select('tenant_id', 'status');
+    const tenants = await db('tenants').select('id');
+    assert.equal(linhas.length, tenants.length, 'todo provedor precisa de uma linha');
+    assert.deepEqual([...new Set(linhas.map((l) => l.status))], ['active']);
+  });
+
+  it('e rodar de novo não duplica nem reescreve', async () => {
+    // Toda migration daqui é idempotente, e esta tem um insert em massa — que é
+    // exatamente a forma que duplica quando alguém roda as migrations duas
+    // vezes. O `unique` em `tenant_id` recusaria; o `isApplied` é o que faz nem
+    // chegar lá.
+    await db('tenant_subscriptions').where({}).update({ status: 'past_due' });
+    await migrations.find((m) => m.id === '0035_tenant_subscriptions').up(db);
+    const linhas = await db('tenant_subscriptions').select('tenant_id', 'status');
+    const tenants = await db('tenants').select('id');
+    assert.equal(linhas.length, tenants.length, 'a segunda passada duplicou linhas');
+    assert.deepEqual([...new Set(linhas.map((l) => l.status))], ['past_due'],
+      'a segunda passada reescreveu um estado que alguém tinha mudado');
+  });
+});

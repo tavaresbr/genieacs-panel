@@ -582,4 +582,7 @@ export default {
   'users.deleteSelf': 'You cannot delete the account you are signed in with',
   'users.deleted': 'Operator deleted',
   'users.deleteFailed': 'Failed to delete the operator',
+
+  'subscription.readOnly': 'This provider\'s subscription is past due, so the panel is read-only until the invoice is settled',
+  'subscription.blocked': 'This provider\'s subscription is not active',
 };

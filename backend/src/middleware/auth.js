@@ -6,6 +6,7 @@ import TenantUser from '../models/TenantUser.js';
 import PlatformAdmin from '../models/PlatformAdmin.js';
 import { runInTenant } from '../config/tenantContext.js';
 import { roleHas } from '../config/permissions.js';
+import { panelSubscriptionRefusal } from './requireActiveSubscription.js';
 
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
 const REFRESH_TOKEN_EXPIRES_IN = process.env.REFRESH_TOKEN_EXPIRES_IN || '7d';
@@ -222,7 +223,16 @@ async function authenticateToken(req, res, next) {
 
   req.user = session;
   req.tenantId = session.tenantId;
-  return runInTenant(session.tenantId, () => next());
+  return runInTenant(session.tenantId, async () => {
+    // O portão comercial mora AQUI, e não num `app.use` acima das rotas, para
+    // que o 401 venha sempre antes do 402: senão um request sem token nenhum
+    // responderia diferente num provedor inadimplente, e a fatura em atraso de
+    // um ISP viraria um fato consultável por qualquer um. Ver o comentário no
+    // topo de `requireActiveSubscription.js`.
+    const recusa = await panelSubscriptionRefusal(req);
+    if (recusa) return res.status(402).json(recusa);
+    return next();
+  });
 }
 
 /**

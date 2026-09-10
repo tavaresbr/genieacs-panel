@@ -583,4 +583,7 @@ export default {
   'users.deleteSelf': 'Sie können das Konto, mit dem Sie angemeldet sind, nicht löschen',
   'users.deleted': 'Operator gelöscht',
   'users.deleteFailed': 'Der Operator konnte nicht gelöscht werden',
+
+  'subscription.readOnly': 'Das Abonnement dieses Anbieters ist überfällig, daher ist das Panel bis zur Begleichung der Rechnung schreibgeschützt',
+  'subscription.blocked': 'Das Abonnement dieses Anbieters ist nicht aktiv',
 };

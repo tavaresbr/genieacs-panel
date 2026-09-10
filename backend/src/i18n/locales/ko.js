@@ -585,4 +585,7 @@ export default {
   'users.deleteSelf': '현재 로그인한 계정은 삭제할 수 없습니다',
   'users.deleted': '운영자를 삭제했습니다',
   'users.deleteFailed': '운영자를 삭제하지 못했습니다',
+
+  'subscription.readOnly': '이 사업자의 구독이 연체되어 청구서가 정산될 때까지 패널은 읽기 전용입니다',
+  'subscription.blocked': '이 사업자의 구독이 활성 상태가 아닙니다',
 };

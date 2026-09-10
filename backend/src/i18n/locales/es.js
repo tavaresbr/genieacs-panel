@@ -579,4 +579,7 @@ export default {
   'users.deleteSelf': 'No puede eliminar la cuenta con la que ha iniciado sesión',
   'users.deleted': 'Operador eliminado',
   'users.deleteFailed': 'No se pudo eliminar el operador',
+
+  'subscription.readOnly': 'La suscripción de este proveedor está vencida, así que el panel queda en solo lectura hasta que se abone la factura',
+  'subscription.blocked': 'La suscripción de este proveedor no está activa',
 };

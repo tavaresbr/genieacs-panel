@@ -25,6 +25,14 @@ const router = express.Router();
 router.get('/tenants', authenticateToken, requirePlatformAdmin, PlatformController.listTenants);
 router.post('/tenants', authenticateToken, requirePlatformAdmin, PlatformController.create);
 router.patch('/tenants/:id', authenticateToken, requirePlatformAdmin, PlatformController.setStatus);
+// O eixo comercial tem rota própria, e não um campo a mais no PATCH acima: um
+// `status` que às vezes congela o provedor e às vezes marca a fatura em atraso
+// é a ambiguidade que faz alguém suspender um cliente e, sem querer, torná-lo
+// elegível para exclusão.
+router.patch(
+  '/tenants/:id/subscription',
+  authenticateToken, requirePlatformAdmin, PlatformController.setSubscriptionStatus
+);
 router.delete('/tenants/:id', authenticateToken, requirePlatformAdmin, PlatformController.remove);
 
 // A trilha do plano de controle. Só leitura, como a do provedor e pelo mesmo

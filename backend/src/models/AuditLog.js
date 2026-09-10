@@ -33,6 +33,11 @@ class AuditLog {
     INVITE_ACCEPTED: 'invite.accepted',
     INVITE_REVOKED: 'invite.revoked',
     TENANT_STATUS_CHANGED: 'tenant.status_changed',
+    // O eixo comercial, separado do administrativo acima. A linha nasce NO
+    // provedor pelo mesmo motivo da outra: quem vai perguntar "por que o painel
+    // ficou somente leitura" é o ISP, e a resposta tem que estar onde ele
+    // consegue olhar.
+    SUBSCRIPTION_CHANGED: 'tenant.subscription_changed',
     TENANT_EXPORTED: 'tenant.exported',
     LOGIN_EMAIL_CHANGED: 'login_email.changed'
   });

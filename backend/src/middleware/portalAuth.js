@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import CustomerAccount from '../models/CustomerAccount.js';
 import { isRequestSecure } from '../config/proxy.js';
 import { DEVELOPMENT_FALLBACK, isProduction } from '../config/runtimeEnv.js';
+import { portalSubscriptionRefusal } from './requireActiveSubscription.js';
 
 export const PORTAL_COOKIE_NAME = 'skygp_portal_session';
 const PORTAL_SESSION_TTL_SECONDS = 30 * 60;
@@ -121,6 +122,11 @@ export async function authenticatePortalCustomer(req, res, next) {
       });
     }
     req.customer = account;
+    // Depois da sessão do assinante, pelo mesmo motivo do painel: quem não tem
+    // sessão recebe 401 e nunca aprende nada sobre a fatura do provedor. E
+    // `past_due` passa por aqui inteiro — ver o comentário no middleware.
+    const recusa = await portalSubscriptionRefusal(req);
+    if (recusa) return res.status(402).json(recusa);
     return next();
   } catch {
     return res.status(401).json({

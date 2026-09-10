@@ -81,6 +81,12 @@ export const SCOPED_TABLES = new Set([
   'device_sample_hours',
   // Which ONT replaced which, for one provider's subscriber.
   'device_swaps',
+  // O estado comercial do provedor. Uma linha por provedor, e escopada e não
+  // compartilhada porque a pergunta que o portão faz é sempre "a do provedor em
+  // escopo" — a cada requisição, antes de qualquer rota. Quem administra de
+  // fora pergunta por um provedor NOMEADO, e essas leituras carregam a marca de
+  // isenção em `models/TenantSubscription.js`.
+  'tenant_subscriptions',
   // Where the operator's own plant is centred. A singleton keyed `id: 1`, so
   // its WHERE never was an identity filter — it meant "the only row", and the
   // second provider to save a map centre wrote over the first's.

@@ -575,4 +575,7 @@ export default {
   'users.deleteSelf': 'لا يمكنك حذف الحساب الذي سجّلت الدخول به',
   'users.deleted': 'تم حذف المشغّل',
   'users.deleteFailed': 'تعذّر حذف المشغّل',
+
+  'subscription.readOnly': 'اشتراك هذا المزوّد متأخر السداد، لذا تبقى اللوحة للقراءة فقط حتى تسوية الفاتورة',
+  'subscription.blocked': 'اشتراك هذا المزوّد غير نشط',
 };

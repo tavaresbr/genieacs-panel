@@ -582,4 +582,7 @@ export default {
   'users.deleteSelf': '您不能刪除目前登入的帳戶',
   'users.deleted': '操作員已刪除',
   'users.deleteFailed': '無法刪除操作員',
+
+  'subscription.readOnly': '該服務商的訂閱已逾期，在結清帳單之前面板為唯讀狀態',
+  'subscription.blocked': '該服務商的訂閱未生效',
 };

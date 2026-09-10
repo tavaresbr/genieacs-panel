@@ -545,11 +545,37 @@ peças:
 
 ### Fase 5 — Planos, limites e ciclo de vida da assinatura *(esforço: médio)*
 
-- Middleware `requireActiveSubscription` logo após o `tenantResolver`: `trial` e `active`
-  passam; `past_due` passa em modo somente-leitura; `suspended`/`canceled` retornam 402 com
-  código legível para o frontend mostrar a tela de bloqueio.
-  **O portal do assinante deve continuar de pé em `past_due`** — derrubar o autoatendimento
-  dos clientes finais do provedor por atraso de fatura é um tiro no pé comercial.
+- ✅ **o portão comercial** — `tenant_subscriptions` (eixo próprio, migration 0035),
+  `config/subscription.js` (o vocabulário) e `middleware/requireActiveSubscription.js` (a
+  decisão). `trial` e `active` passam; `past_due` lê mas não escreve; `suspended`/`canceled`
+  respondem 402 com um código estável (`subscription_read_only` / `subscription_blocked`), e
+  **o portal do assinante continua de pé em `past_due`**.
+
+  Três coisas que o desenho original pedia e mudaram na execução:
+
+  1. **NÃO fica «logo após o `tenantResolver`».** Ali ele responde antes do 401 — e aí um
+     `GET /api/devices` sem token nenhum devolve 402 num provedor inadimplente e 401 num
+     provedor em dia. Qualquer estranho passa a varrer hosts perguntando quais ISPs estão
+     atrasados. É a mesma regra que `tenantController.getPublicProfile` já escrevia («não
+     distinguir "não existe" de "existe e está suspenso"»), e o portão no lugar óbvio a
+     violaria de outro arquivo. Mora dentro de `authenticateToken` e de
+     `authenticatePortalCustomer`, o que faz a ordem 401-antes-de-402 ser garantida por
+     construção.
+  2. **A ausência de linha LIBERA**, e o motivo é assimetria de custo: fechar por engano
+     trava um cliente que pagou, fora do horário comercial, sem nada que ele possa fazer;
+     abrir por engano custa dinheiro, que é recuperável. Um estado desconhecido e um banco
+     que não responde caem do mesmo lado, pelo mesmo motivo.
+  3. **A exportação do próprio cadastro nunca é bloqueada**, nem em `canceled`. Recusá-la é
+     reter dado de terceiro como alavanca de cobrança — corta-se o serviço, mas o que o ISP
+     cadastrou continua sendo dele.
+
+  E um comentário desatualizado que isto obrigou a corrigir: `platformController.setStatus`
+  afirmava que «nada no caminho de login lê `tenants.status`». Lê —
+  `resolveTenantIdBySlug` devolve nulo para quem não está `active`, então suspender já
+  trancava painel e portal por 404 no SaaS. A frase só valia na instalação de um provedor
+  só, que é justamente onde aquela rota não existe. É por isso que a inadimplência não
+  escreve naquela coluna: ela tornaria o cliente elegível à exclusão em duas etapas e
+  derrubaria o portal dos assinantes dele junto.
 - Limites verificados nos pontos de escrita: criação de operador (`teamController`), criação
   de conta de assinante (`backend/src/services/customerService.js` → `syncDevices`), e
   contagem de ONTs vinda do GenieACS (query de count no conector).

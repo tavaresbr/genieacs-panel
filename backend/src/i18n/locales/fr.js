@@ -578,4 +578,7 @@ export default {
   'users.deleteSelf': 'Vous ne pouvez pas supprimer le compte avec lequel vous êtes connecté',
   'users.deleted': 'Opérateur supprimé',
   'users.deleteFailed': 'Impossible de supprimer l’opérateur',
+
+  'subscription.readOnly': 'L\'abonnement de ce fournisseur est en retard de paiement, le panneau est donc en lecture seule jusqu\'au règlement de la facture',
+  'subscription.blocked': 'L\'abonnement de ce fournisseur n\'est pas actif',
 };

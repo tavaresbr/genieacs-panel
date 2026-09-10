@@ -581,4 +581,7 @@ export default {
   'users.deleteSelf': 'Você não pode excluir a conta com que está conectado',
   'users.deleted': 'Operador excluído',
   'users.deleteFailed': 'Não foi possível excluir o operador',
+
+  'subscription.readOnly': 'A assinatura deste provedor está em atraso, então o painel fica somente leitura até a fatura ser quitada',
+  'subscription.blocked': 'A assinatura deste provedor não está ativa',
 };

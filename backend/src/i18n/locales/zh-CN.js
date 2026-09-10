@@ -582,4 +582,7 @@ export default {
   'users.deleteSelf': '您不能删除当前登录的账户',
   'users.deleted': '操作员已删除',
   'users.deleteFailed': '无法删除操作员',
+
+  'subscription.readOnly': '该服务商的订阅已逾期，在结清账单之前面板为只读状态',
+  'subscription.blocked': '该服务商的订阅未生效',
 };

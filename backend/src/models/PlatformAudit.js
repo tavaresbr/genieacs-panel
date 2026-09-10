@@ -23,7 +23,13 @@ class PlatformAudit {
     // estas duas linhas, vincular-se a um ISP e depois sair não deixaria
     // rastro em trilha nenhuma.
     MEMBER_ADDED: 'tenant.member_added',
-    MEMBER_REMOVED: 'tenant.member_removed'
+    MEMBER_REMOVED: 'tenant.member_removed',
+    // O estado COMERCIAL, que é outro eixo. `tenant.status_changed` acima é o
+    // administrativo — congelar para poder apagar. Duas ações e não uma porque
+    // as duas colunas significam coisas diferentes, e uma trilha que as
+    // confundisse mostraria "suspenso" sem dizer se o provedor parou de pagar
+    // ou se alguém o preparou para exclusão.
+    SUBSCRIPTION_CHANGED: 'tenant.subscription_changed'
   });
 
   /**
