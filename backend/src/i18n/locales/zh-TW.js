@@ -6,9 +6,14 @@ export default {
   // 通訊與一般錯誤
   'common.internalError': '伺服器內部錯誤',
   'common.routeNotFound': '找不到該路由',
+  'common.notFound': '找不到',
   'common.originNotAllowed': '不允許該來源',
   'common.crossSiteBlocked': '跨網站要求已被封鎖',
   'common.invalidJson': '要求主體的 JSON 無效',
+
+  // 主機所指向的服務商，外部訪客可見的資訊
+  'tenant.publicRetrieved': '已取得服務商資訊',
+  'tenant.publicFailed': '取得服務商資訊失敗',
 
   // 身分驗證與授權
   'auth.tokenRequired': '需要驗證權杖',
@@ -118,6 +123,7 @@ export default {
   'settings.urlRequired': '需要提供位址',
   'settings.urlInvalid': '需要提供有效的 HTTP 或 HTTPS 位址',
   'settings.urlSchemeUnsupported': '僅支援 HTTP 與 HTTPS 位址',
+  'settings.urlEgressRefused': '面板不被允許連線到該位址',
   'settings.urlCredentialsUnsupported': '不支援在位址中夾帶憑證',
   'settings.connectionSuccess': '連線成功。',
   'settings.connectionUnexpectedFormat': '連線成功，但回應格式與預期不符',

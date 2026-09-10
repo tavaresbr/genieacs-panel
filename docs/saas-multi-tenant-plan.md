@@ -332,9 +332,16 @@ token nomeia; `/api/users` opera sobre os vínculos do provedor que pediu, e a g
 `token_version` na pessoa — trocar a senha derruba as sessões dela em todos os provedores,
 que é o certo.
 
-**Falta:**
+**Não é preciso, e vale dizer por quê:** o plano pedia um `membershipVersion` no
+token para revogar um vínculo sem derrubar as outras sessões da pessoa.
+`hydrateAuthenticatedUser` lê `tenant_users` **a cada requisição autenticada**, então a
+própria linha é a revogação — tirar alguém da equipe mata a sessão dela naquele provedor
+na requisição seguinte, e uma troca de papel morde na mesma hora. Um contador seria cópia
+em cache de um fato que já é lido fresco: estritamente mais fraco, e mais uma coisa para
+alguém esquecer de incrementar. Coberto por
+`backend/test/auth-tenancy.test.js`, "a session open when the membership ends".
 
-- `membershipVersion` para revogar um vínculo específico sem derrubar os outros.
+**Falta:**
 - Papéis reais substituindo a string `'admin'`: `owner` (dono, cobrança), `admin`,
   `tech` (opera ONTs, não mexe em configuração), `viewer`. `requireRole` vira
   `requirePermission` com um mapa papel→permissões.

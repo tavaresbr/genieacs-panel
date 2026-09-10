@@ -272,6 +272,31 @@ describe('somebody taken off a provider\'s team', () => {
   });
 });
 
+describe('a session open when the membership ends', () => {
+  /**
+   * The plan wanted a `membershipVersion` in the token so a single membership
+   * could be revoked without ending the person's other sessions. It is not
+   * needed, and this is the test that says why: `hydrateAuthenticatedUser`
+   * reads `tenant_users` on EVERY authenticated request, so the row itself is
+   * the revocation. A counter would be a cached copy of a fact already being
+   * read fresh — strictly weaker, and one more thing to forget to bump.
+   */
+  it('stops working on the next request, with no counter to bump', async () => {
+    const { status: signedIn, body } = await signIn(CONSULTORA, alfa);
+    assert.equal(signedIn, 200, 'a fixture that cannot sign in proves nothing');
+    const token = body.data.token;
+
+    const before = await acsSeenBy(token);
+    assert.equal(before.status, 200, 'the token has to work before it is revoked');
+
+    const user = await getDb()('users').where({ username: CONSULTORA.username }).first();
+    await TenantUser.remove(alfa, user.id);
+
+    const after = await acsSeenBy(token);
+    assert.equal(after.status, 403, 'the membership row is the revocation');
+  });
+});
+
 describe('somebody who works for nobody', () => {
   it('cannot sign in, and cannot tell that from a wrong password', async () => {
     const noMembership = await signIn(DESEMPREGADO);

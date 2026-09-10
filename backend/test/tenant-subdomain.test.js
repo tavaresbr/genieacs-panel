@@ -44,7 +44,11 @@ function callAs(host, url, { method = 'GET', headers = {}, body } = {}) {
       response.on('end', () => {
         let parsed = null;
         try { parsed = text ? JSON.parse(text) : null; } catch { parsed = text; }
-        resolve({ status: response.statusCode, body: parsed });
+        resolve({
+          status: response.statusCode,
+          body: parsed,
+          setCookie: (response.headers['set-cookie'] || [])[0] || null
+        });
       });
     });
     request.on('error', reject);
@@ -222,6 +226,151 @@ describe('the subscriber portal on a provider\'s host', () => {
   });
 });
 
+describe('a portal session replayed on another provider\'s host', () => {
+  let alfaCookie;
+  let alfaAccountId;
+
+  before(async () => {
+    const db = getDb();
+    const alfa = await db('tenants').where({ slug: 'alfa' }).first();
+    const { runInTenant } = await import('../src/config/tenantContext.js');
+    const { default: CustomerService } = await import('../src/services/customerService.js');
+    const { default: CustomerPortalPasswordService } = await import(
+      '../src/services/customerPortalPasswordService.js'
+    );
+
+    const account = await runInTenant(alfa.id, () => CustomerService.ensureAccount({
+      _id: 'ONT-DO-ALFA', softwareId: 'V1', pppoe: 'assinante-do-alfa'
+    }));
+    alfaAccountId = account.id;
+    const password = CustomerPortalPasswordService.reveal(account);
+
+    const login = await callAs('alfa.portal.exemplo.com', `${portalUrl}/api/customer/login`, {
+      method: 'POST',
+      body: { customerId: account.customer_id, password }
+    });
+    assert.equal(login.status, 200, 'o assinante do alfa precisa conseguir entrar');
+    alfaCookie = login.setCookie;
+    assert.ok(alfaCookie, 'o login tem que devolver o cookie de sessao');
+  });
+
+  // The cookie carries no `domain`, so the browser will not send it to another
+  // subdomain in the first place. This asserts what happens when something
+  // sends it anyway — a copied header, a client that is not a browser.
+  it('is not accepted on the other provider\'s portal', async () => {
+    const { status } = await callAs('beta.portal.exemplo.com', `${portalUrl}/api/customer/session`, {
+      headers: { Cookie: alfaCookie }
+    });
+    assert.equal(status, 401);
+  });
+
+  it('still works on its own provider\'s portal', async () => {
+    const { status } = await callAs('alfa.portal.exemplo.com', `${portalUrl}/api/customer/session`, {
+      headers: { Cookie: alfaCookie }
+    });
+    assert.equal(status, 200);
+  });
+
+  it('does not set a cookie domain, which is what keeps a browser from sending it at all', () => {
+    assert.ok(!/;\s*domain=/i.test(alfaCookie), alfaCookie);
+  });
+
+  /**
+   * The signed provider on its own, with the scoped read taken out of the way.
+   *
+   * The two tests above pass with or without `tenantId` in the payload, and
+   * that is not a flaw in them — it is what defence in depth looks like from
+   * the outside. `CustomerAccount.getById` reads through `tdb`, so under the
+   * other provider's scope it finds nothing and the session is refused either
+   * way, and no request can tell the two mechanisms apart.
+   *
+   * So this one puts the request where the scoped read WOULD succeed — running
+   * as alfa, where the account is — while the request claims to be beta's. That
+   * is precisely the future in which somebody adds a reader that forgets the
+   * filter, and it is the only shape in which the signed provider can be seen
+   * to do anything.
+   */
+  it('refuses a cookie whose provider is not the request\'s, even where the account is readable', async () => {
+    const db = getDb();
+    const alfa = await db('tenants').where({ slug: 'alfa' }).first();
+    const beta = await db('tenants').where({ slug: 'beta' }).first();
+    const { runInTenant } = await import('../src/config/tenantContext.js');
+    const { authenticatePortalCustomer, PORTAL_COOKIE_NAME } = await import(
+      '../src/middleware/portalAuth.js'
+    );
+
+    const token = alfaCookie.split(';')[0].slice(PORTAL_COOKIE_NAME.length + 1);
+    const req = {
+      headers: { cookie: `${PORTAL_COOKIE_NAME}=${token}` },
+      tenantId: beta.id,
+      t: (key) => key
+    };
+    let status = null;
+    const res = { status(code) { status = code; return this; }, json() { return this; } };
+    let passedThrough = false;
+
+    await runInTenant(alfa.id, () => authenticatePortalCustomer(req, res, () => {
+      passedThrough = true;
+    }));
+
+    assert.equal(passedThrough, false, 'a sessao de outro provedor nao pode passar');
+    assert.equal(status, 401);
+  });
+});
+
+describe('the slug cache', () => {
+  // A miss is not worth remembering, and remembering it is worse than useless:
+  // anyone who can reach the panel could grow the Map without bound by asking
+  // for one made-up subdomain after another. Providers are few; the hits are
+  // what the cache is for.
+  it('does not grow from slugs nobody has', async () => {
+    const { resolveTenantIdBySlug, forgetResolvedTenant } = await import(
+      '../src/middleware/tenantResolver.js'
+    );
+    forgetResolvedTenant();
+
+    // Warm a real one so the cache is not simply empty, which would make this
+    // pass whether or not misses are kept.
+    assert.ok(await resolveTenantIdBySlug('alfa'));
+    for (const guess of ['aa', 'ab', 'ac', 'ad', 'ae', 'af']) {
+      assert.equal(await resolveTenantIdBySlug(guess), null);
+    }
+
+    const db = getDb();
+    let queries = 0;
+    const count = () => { queries += 1; };
+    db.on('query', count);
+    try {
+      await resolveTenantIdBySlug('alfa');
+      assert.equal(queries, 0, 'o acerto tem que vir do cache');
+      await resolveTenantIdBySlug('aa');
+      assert.equal(queries, 1, 'o erro tem que ir ao banco de novo, e nao ficar guardado');
+    } finally {
+      db.off('query', count);
+    }
+  });
+});
+
+describe('the rate limit bucket', () => {
+  // The deployment this matters for is the one the code already describes:
+  // every client arrives through one tunnel, so one address is every caller.
+  // Keyed by address alone, one provider's traffic switches off everybody.
+  it('is not shared between two providers on the same address', async () => {
+    const { tenantIpKey } = await import('../src/middleware/rateLimit.js');
+    const asHost = (host) => tenantIpKey({ headers: { host }, ip: '203.0.113.7' });
+
+    assert.notEqual(asHost('alfa.painel.exemplo.com'), asHost('beta.painel.exemplo.com'));
+    assert.equal(asHost('alfa.painel.exemplo.com'), asHost('alfa.painel.exemplo.com:443'));
+  });
+
+  it('collapses to one bucket where no host names a provider', async () => {
+    const { tenantIpKey } = await import('../src/middleware/rateLimit.js');
+    const one = tenantIpKey({ headers: { host: '127.0.0.1:5890' }, ip: '203.0.113.7' });
+    const two = tenantIpKey({ headers: { host: 'painel.exemplo.com' }, ip: '203.0.113.7' });
+    assert.equal(one, two);
+  });
+});
+
 describe('the deployment without subdomains', () => {
   // Every other suite in this repo is this case, and they are what prove it:
   // no base domain, no host names a provider, and the first row answers. The
@@ -233,6 +382,107 @@ describe('the deployment without subdomains', () => {
       method: 'POST',
       body: { username: 'operador-alfa', password: 'senha-do-alfa-1' }
     });
+    assert.equal(status, 404);
+  });
+});
+
+/**
+ * The one route that answers a stranger with something out of `tenants`.
+ *
+ * It exists so the login screen can render the provider's own name before
+ * anybody has signed in, which makes it the enumeration surface of the whole
+ * deployment — a place where "this ISP is a customer of ours" is one request
+ * away. The assertions below are about what it refuses to say, not only about
+ * what it returns.
+ */
+describe('the provider a login screen sees', () => {
+  it('answers with the provider its host names', async () => {
+    const { status, body } = await callAs(
+      'alfa.painel.exemplo.com', `${panelUrl}/api/tenant/public`
+    );
+    assert.equal(status, 200);
+    assert.equal(body.data.name, 'Provedor Alfa');
+    assert.equal(body.data.slug, 'alfa');
+  });
+
+  // The failure this guards is the resolver reverting to the first row: with
+  // one provider in the fixture that mistake is invisible, and it is exactly
+  // the mistake that puts one ISP's name on another ISP's login screen.
+  it('answers with the OTHER provider on the other provider\'s host', async () => {
+    const { status, body } = await callAs(
+      'beta.painel.exemplo.com', `${panelUrl}/api/tenant/public`
+    );
+    assert.equal(status, 200);
+    assert.equal(body.data.name, 'Provedor Beta');
+  });
+
+  it('needs no token at all', async () => {
+    const { status } = await callAs(
+      'alfa.painel.exemplo.com', `${panelUrl}/api/tenant/public`
+    );
+    assert.equal(status, 200);
+  });
+
+  /**
+   * Pinned key by key, so nobody widens what a stranger sees without touching
+   * this line.
+   *
+   * `id` is the field this is really watching for. It is the stable primary key
+   * of a `tenants` row, the screen has no use for it, and once an
+   * unauthenticated response carries it, clients start sending it back — which
+   * is the shape of parameter that becomes an IDOR the day a route trusts it
+   * over the host. `status`, `created_at` and any future column are the same
+   * argument with a different name on it.
+   */
+  it('returns the public fields and nothing else', async () => {
+    const { body } = await callAs(
+      'alfa.painel.exemplo.com', `${panelUrl}/api/tenant/public`
+    );
+    assert.deepEqual(Object.keys(body.data).sort(), ['name', 'slug']);
+    assert.deepEqual(Object.keys(body).sort(), ['data', 'message', 'success']);
+  });
+
+  it('answers 404 for a host nobody has', async () => {
+    const { status } = await callAs(
+      'gama.painel.exemplo.com', `${panelUrl}/api/tenant/public`
+    );
+    assert.equal(status, 404);
+  });
+
+  it('answers 404 for a provider that is not active', async () => {
+    const { status } = await callAs(
+      'parada.painel.exemplo.com', `${panelUrl}/api/tenant/public`
+    );
+    assert.equal(status, 404);
+  });
+
+  /**
+   * The assertion the two above cannot make on their own.
+   *
+   * Two 404s prove nothing if their bodies differ: a message, a code, a
+   * `retryAfter`, anything that only the real-but-suspended provider can
+   * produce, and a prober sweeping candidate slugs can sort the deployment's
+   * customer list from the rest of the dictionary — and then tell which of
+   * those customers is switched off, which is a fact about somebody else's
+   * business we would be publishing. Compared whole, deliberately, so that a
+   * field added to either answer fails here.
+   */
+  it('says exactly the same thing about a suspended provider as about no provider', async () => {
+    const missing = await callAs(
+      'gama.painel.exemplo.com', `${panelUrl}/api/tenant/public`
+    );
+    const suspended = await callAs(
+      'parada.painel.exemplo.com', `${panelUrl}/api/tenant/public`
+    );
+    assert.equal(suspended.status, missing.status);
+    assert.deepEqual(suspended.body, missing.body);
+  });
+
+  // Where subdomains are configured, a host that names no provider is a request
+  // that did not say whose login screen it wanted. Answering the first row here
+  // would brand the deployment's own name page with one arbitrary customer's.
+  it('refuses a host that names no provider at all', async () => {
+    const { status } = await callAs('painel.exemplo.com', `${panelUrl}/api/tenant/public`);
     assert.equal(status, 404);
   });
 });

@@ -109,7 +109,12 @@ export async function resolveTenantIdBySlug(slug) {
   if (cachedBySlug.has(slug)) return cachedBySlug.get(slug);
   const row = await getDb()('tenants').where({ slug }).first();
   const id = row && row.status === 'active' ? row.id : null;
-  cachedBySlug.set(slug, id);
+  // Only an answer worth keeping is kept. Caching the misses too would mean
+  // anyone able to reach the panel can grow this Map without bound by asking
+  // for `a.painel`, `b.painel`, `c.painel` — a slug nobody has costs one query
+  // and is meant to cost nothing more. Providers are few and the hits are what
+  // this cache exists for.
+  if (id !== null) cachedBySlug.set(slug, id);
   return id;
 }
 

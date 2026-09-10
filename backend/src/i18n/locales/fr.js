@@ -6,9 +6,14 @@ export default {
   // Échecs de transport et erreurs génériques
   'common.internalError': 'Erreur interne du serveur',
   'common.routeNotFound': 'Route introuvable',
+  'common.notFound': 'Introuvable',
   'common.originNotAllowed': 'Origine non autorisée',
   'common.crossSiteBlocked': 'Requête intersite bloquée',
   'common.invalidJson': 'Corps de requête JSON invalide',
+
+  // Le fournisseur désigné par l'hôte, tel qu'un inconnu le voit
+  'tenant.publicRetrieved': 'Profil du fournisseur récupéré',
+  'tenant.publicFailed': 'Impossible de récupérer le profil du fournisseur',
 
   // Authentification et autorisation
   'auth.tokenRequired': 'Jeton d’authentification requis',
@@ -118,6 +123,7 @@ export default {
   'settings.urlRequired': 'L’URL est requise',
   'settings.urlInvalid': 'Une URL HTTP ou HTTPS valide est requise',
   'settings.urlSchemeUnsupported': 'Seules les URL HTTP et HTTPS sont prises en charge',
+  'settings.urlEgressRefused': 'Ce panneau ne peut pas se connecter à cette adresse',
   'settings.urlCredentialsUnsupported': 'Les identifiants dans l’URL ne sont pas pris en charge',
   'settings.connectionSuccess': 'Connexion réussie.',
   'settings.connectionUnexpectedFormat': 'Connexion réussie, mais le format de la réponse était inattendu',

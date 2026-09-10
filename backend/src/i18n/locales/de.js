@@ -6,9 +6,14 @@ export default {
   // Transport- und allgemeine Fehler
   'common.internalError': 'Interner Serverfehler',
   'common.routeNotFound': 'Route nicht gefunden',
+  'common.notFound': 'Nicht gefunden',
   'common.originNotAllowed': 'Origin ist nicht zulässig',
   'common.crossSiteBlocked': 'Websiteübergreifende Anfrage blockiert',
   'common.invalidJson': 'Ungültiger JSON-Anfragetext',
+
+  // Der vom Host benannte Anbieter, so wie ihn ein Fremder sieht
+  'tenant.publicRetrieved': 'Anbieterprofil abgerufen',
+  'tenant.publicFailed': 'Anbieterprofil konnte nicht abgerufen werden',
 
   // Authentifizierung und Autorisierung
   'auth.tokenRequired': 'Authentifizierungstoken erforderlich',
@@ -118,6 +123,7 @@ export default {
   'settings.urlRequired': 'Die URL ist erforderlich',
   'settings.urlInvalid': 'Eine gültige HTTP- oder HTTPS-URL ist erforderlich',
   'settings.urlSchemeUnsupported': 'Es werden nur HTTP- und HTTPS-URLs unterstützt',
+  'settings.urlEgressRefused': 'Das Panel darf sich nicht mit dieser Adresse verbinden',
   'settings.urlCredentialsUnsupported': 'Zugangsdaten in der URL werden nicht unterstützt',
   'settings.connectionSuccess': 'Verbindung erfolgreich.',
   'settings.connectionUnexpectedFormat': 'Verbindung erfolgreich, aber das Antwortformat war unerwartet',

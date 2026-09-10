@@ -187,3 +187,28 @@ describe('session revocation', () => {
     assert.equal(reused.status, 403);
   });
 });
+
+/**
+ * The same public route as in `tenant-subdomain.test.js`, on the deployment
+ * that has no subdomains — which is every self-hosted install.
+ *
+ * It belongs next to `setup-status` because it is the same kind of call: one of
+ * the two things the login screen asks before there is anybody to
+ * authenticate. This suite is where it matters that no host names a provider,
+ * so the answer comes from the installation's own row — the path a change that
+ * only ever considered the multi-tenant case would quietly break, on every
+ * install that exists today.
+ */
+describe('the provider a login screen sees, with no subdomains configured', () => {
+  it('answers with the installation\'s own provider', async () => {
+    const { status, body } = await call(`${panelUrl}/api/tenant/public`);
+    assert.equal(status, 200);
+    assert.ok(body.data.name, 'the screen needs a name to render');
+    assert.equal(body.data.slug, 'default');
+  });
+
+  it('returns the public fields and nothing else', async () => {
+    const { body } = await call(`${panelUrl}/api/tenant/public`);
+    assert.deepEqual(Object.keys(body.data).sort(), ['name', 'slug']);
+  });
+});
