@@ -558,4 +558,10 @@ export default {
   'audit.listFailed': '監査ログを読み取れませんでした',
 
   'tenant.exportFailed': 'プロバイダーのデータをエクスポートできませんでした',
+
+  'auth.emailInvalid': '有効なメールアドレスが必要です',
+  'auth.emailTaken': 'そのメールアドレスはすでに使われています',
+  'auth.emailUpdated': 'ログイン用メールアドレスを更新しました',
+  'auth.emailChangeRequired': '現在のパスワードと新しいメールアドレスが必要です',
+  'auth.emailReadiness': 'メールアドレスの登録状況を取得しました',
 };

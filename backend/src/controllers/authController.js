@@ -1,10 +1,12 @@
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
+import { acceptsIdentifier, LOGIN_REQUIRES_EMAIL } from '../config/login.js';
 import TenantUser from '../models/TenantUser.js';
 import PlatformAdmin from '../models/PlatformAdmin.js';
 import { IS_SAAS } from '../config/edition.js';
 import { generateTokens, resolveMembership, verifyToken } from '../middleware/auth.js';
-import { createResponse, createErrorResponse } from '../utils/helpers.js';
+import { createResponse, createErrorResponse, isValidEmail } from '../utils/helpers.js';
+import AuditLog from '../models/AuditLog.js';
 
 const DUMMY_PASSWORD_HASH = bcrypt.hashSync('skygenpanel-invalid-login-placeholder', 12);
 
@@ -93,18 +95,27 @@ class AuthController {
         );
       }
       
-      const user = await User.findByUsername(normalizedUsername);
-      
+      // Nome OU e-mail, numa consulta só. Os dois vivem no mesmo espaço de
+      // nomes (ver `User.findByLogin`), então este identificador nunca casa
+      // duas contas — e se casasse, a resposta é null e ninguém entra.
+      const user = await User.findByLogin(normalizedUsername);
+
       if (!user) {
         await bcrypt.compare(String(password), DUMMY_PASSWORD_HASH);
         return res.status(401).json(
           createErrorResponse(req.t('auth.invalidCredentials'))
         );
       }
-      
+
+      // Com `LOGIN_REQUIRES_EMAIL` ligado, o nome deixa de servir. A senha é
+      // conferida do mesmo jeito ANTES de recusar: parar aqui sem gastar o
+      // bcrypt faria o tempo de resposta contar quem tem e-mail cadastrado e
+      // quem não tem, para quem cronometrasse.
+      const identifierAccepted = acceptsIdentifier(normalizedUsername, user);
+
       const isMatch = await bcrypt.compare(password, user.password);
 
-      if (!isMatch) {
+      if (!isMatch || !identifierAccepted) {
         return res.status(401).json(
           createErrorResponse(req.t('auth.invalidCredentials'))
         );
@@ -200,6 +211,18 @@ class AuthController {
         );
       }
 
+      // Conta NOVA nasce com e-mail, sem exceção — e a primeira de todas menos
+      // ainda: é a única do install que não tem quem a conserte depois, porque
+      // é ela quem cadastra as outras. Contas sem endereço existem só como
+      // herança de antes desta versão.
+      const email = User.normalizeEmail(req.body?.email);
+      if (!email || !isValidEmail(email)) {
+        return res.status(400).json(createErrorResponse(req.t('auth.emailInvalid')));
+      }
+      if (await User.loginConflict({ username: normalizedUsername, email })) {
+        return res.status(409).json(createErrorResponse(req.t('auth.usernameTaken')));
+      }
+
       const hashedPassword = await bcrypt.hash(password, 12);
       // The person AND their membership, in one transaction. A first admin
       // without a membership would be a fresh install nobody can sign in to:
@@ -207,7 +230,8 @@ class AuthController {
       // because there is no provider to put the session in.
       const { id: userId, tenantId, role } = await User.createInitialAdmin({
         username: normalizedUsername,
-        password: hashedPassword
+        password: hashedPassword,
+        email
       });
       const user = { id: userId, username: normalizedUsername };
 
@@ -218,6 +242,7 @@ class AuthController {
           user: {
             id: userId,
             username: normalizedUsername,
+            email,
             role,
             tenantId,
             // Read back rather than assumed from the edition: setup is the one
@@ -446,6 +471,103 @@ class AuthController {
       );
     } catch (error) {
       console.error('Change username error:', error);
+      return res.status(500).json(
+        createErrorResponse(req.t('common.internalError'), error.message)
+      );
+    }
+  }
+
+  /**
+   * O e-mail de login da própria pessoa.
+   *
+   * É por aqui que quem já usa o painel migra: a coluna nasceu nula para todo
+   * mundo que existia antes dela, e nenhuma migração podia adivinhar o
+   * endereço. Enquanto houver conta sem e-mail, `LOGIN_REQUIRES_EMAIL` não pode
+   * ser virado — e é `GET /api/users` que mostra quem falta.
+   *
+   * Exige a senha atual, como qualquer mudança de credencial. O e-mail vai
+   * virar o identificador de login: quem alcançasse uma sessão aberta e
+   * trocasse o endereço sem provar a senha estaria trocando por onde se entra
+   * naquela conta.
+   *
+   * **Não verifica o endereço**, e vale dizer o que isso custa e o que não
+   * custa. Não custa nada hoje: cadastrar o e-mail de outra pessoa não abre a
+   * conta dela — a senha continua sendo exigida —, e o pior que se consegue é
+   * ocupar um endereço que não é seu, o que o índice único já impede de virar
+   * duas contas. O dia em que existir redefinição de senha por e-mail, isso
+   * muda inteiro: um endereço não verificado passa a ser um caminho para dentro
+   * da conta, e a verificação vira obrigatória ANTES daquele recurso, não
+   * depois. Fica escrito aqui porque é aqui que alguém vai olhar.
+   */
+  static async changeEmail(req, res) {
+    try {
+      const userId = req.user.userId;
+      const { currentPassword, email } = req.body ?? {};
+
+      if (!currentPassword || !email) {
+        return res.status(400).json(createErrorResponse(req.t('auth.emailChangeRequired')));
+      }
+      const normalizado = User.normalizeEmail(email);
+      if (!normalizado || !isValidEmail(normalizado)) {
+        return res.status(400).json(createErrorResponse(req.t('auth.emailInvalid')));
+      }
+
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json(createErrorResponse(req.t('auth.userNotFound')));
+      }
+      if (!await bcrypt.compare(String(currentPassword), user.password)) {
+        return res.status(401).json(createErrorResponse(req.t('auth.currentPasswordIncorrect')));
+      }
+
+      // Contra o espaço de nomes inteiro, ignorando a própria linha: salvar o
+      // endereço que já é o seu não pode responder "em uso".
+      if (await User.loginConflict({ email: normalizado, exceptId: userId })) {
+        return res.status(409).json(createErrorResponse(req.t('auth.emailTaken')));
+      }
+
+      await User.updateEmail(userId, normalizado);
+      // Auditado no provedor da sessão: trocar o e-mail é trocar por onde se
+      // entra nesta conta, e isso é da mesma família da troca de papel e da
+      // revelação de senha — coisas que alguém vai querer reconstruir depois.
+      // O endereço ANTIGO não entra: a trilha diz que mudou e para qual, que é
+      // o que responde "desde quando", sem virar um histórico de endereços de
+      // gente.
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.LOGIN_EMAIL_CHANGED,
+        subjectType: 'user',
+        subjectId: userId,
+        detail: { email: normalizado }
+      });
+
+      return res.json(createResponse(req.t('auth.emailUpdated'), { email: normalizado }));
+    } catch (error) {
+      console.error('Change email error:', error);
+      return res.status(500).json(
+        createErrorResponse(req.t('common.internalError'), error.message)
+      );
+    }
+  }
+
+  /**
+   * Se este deployment já pode exigir e-mail no login, e quem falta.
+   *
+   * Existe para que a decisão do passo 3 seja tomada olhando um número em vez
+   * de na esperança. Só quem administra a equipe vê — a lista de quem ainda não
+   * cadastrou endereço é a mesma informação da tela de operadores.
+   */
+  static async emailReadiness(req, res) {
+    try {
+      const total = await User.count();
+      const semEmail = await User.countWithoutEmail();
+      return res.json(createResponse(req.t('auth.emailReadiness'), {
+        loginRequiresEmail: LOGIN_REQUIRES_EMAIL,
+        total,
+        withoutEmail: semEmail,
+        ready: semEmail === 0
+      }));
+    } catch (error) {
+      console.error('Email readiness error:', error);
       return res.status(500).json(
         createErrorResponse(req.t('common.internalError'), error.message)
       );

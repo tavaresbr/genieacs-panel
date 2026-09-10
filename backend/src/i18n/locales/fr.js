@@ -554,4 +554,10 @@ export default {
   'audit.listFailed': 'Impossible de lire le journal d\'audit',
 
   'tenant.exportFailed': 'Impossible d\u2019exporter les données du fournisseur',
+
+  'auth.emailInvalid': 'Une adresse e-mail valide est requise',
+  'auth.emailTaken': 'Cette adresse e-mail est déjà utilisée',
+  'auth.emailUpdated': 'E-mail de connexion mis à jour',
+  'auth.emailChangeRequired': 'Le mot de passe actuel et la nouvelle adresse e-mail sont requis',
+  'auth.emailReadiness': 'État des e-mails récupéré',
 };

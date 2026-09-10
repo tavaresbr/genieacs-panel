@@ -555,4 +555,10 @@ export default {
   'audit.listFailed': 'Falha ao ler a trilha de auditoria',
 
   'tenant.exportFailed': 'Falha ao exportar os dados do provedor',
+
+  'auth.emailInvalid': 'É preciso um endereço de e-mail válido',
+  'auth.emailTaken': 'Esse endereço de e-mail já está em uso',
+  'auth.emailUpdated': 'E-mail de login atualizado',
+  'auth.emailChangeRequired': 'A senha atual e o novo endereço de e-mail são obrigatórios',
+  'auth.emailReadiness': 'Situação do e-mail carregada',
 };

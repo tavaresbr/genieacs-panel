@@ -555,4 +555,10 @@ export default {
   'audit.listFailed': 'No se pudo leer el registro de auditoría',
 
   'tenant.exportFailed': 'No se pudieron exportar los datos del proveedor',
+
+  'auth.emailInvalid': 'Se requiere una dirección de correo válida',
+  'auth.emailTaken': 'Esa dirección de correo ya está en uso',
+  'auth.emailUpdated': 'Correo de inicio de sesión actualizado',
+  'auth.emailChangeRequired': 'La contraseña actual y la nueva dirección de correo son obligatorias',
+  'auth.emailReadiness': 'Estado del correo obtenido',
 };

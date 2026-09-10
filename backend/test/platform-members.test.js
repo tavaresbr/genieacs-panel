@@ -54,9 +54,9 @@ let brunoToken;
 let brunoId;
 let biaId;
 
-const ALICE = { username: 'alice', password: 'alice-password-1' };
-const ANA = { username: 'ana', password: 'ana-password-1' };
-const BRUNO = { username: 'bruno', password: 'bruno-password-1' };
+const ALICE = { username: 'alice', password: 'alice-password-1', email: 'alice@exemplo.test' };
+const ANA = { username: 'ana', password: 'ana-password-1', email: 'ana@exemplo.test' };
+const BRUNO = { username: 'bruno', password: 'bruno-password-1', email: 'bruno@exemplo.test' };
 
 /** MySQL's TIMESTAMP keeps whole seconds, so seeded times carry none. */
 function wholeSecond(date = new Date()) {
@@ -132,7 +132,7 @@ before(async () => {
 
   const setup = await call(`${panelUrl}/api/auth/setup`, {
     method: 'POST',
-    body: { username: 'owner', password: 'owner-password-1' }
+    body: { username: 'owner', password: 'owner-password-1', email: 'owner@exemplo.test' }
   });
   assert.equal(setup.status, 201);
   ownerToken = setup.body.data.token;

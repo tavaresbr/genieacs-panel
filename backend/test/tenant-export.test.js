@@ -37,7 +37,7 @@ before(async () => {
   ({ panelUrl } = await startTestServers());
   const setup = await call(`${panelUrl}/api/auth/setup`, {
     method: 'POST',
-    body: { username: 'a-dona', password: 'senha-da-dona-1' }
+    body: { username: 'a-dona', password: 'senha-da-dona-1', email: 'a-dona@exemplo.test' }
   });
   token = setup.body.data.token;
 

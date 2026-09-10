@@ -12,13 +12,13 @@ import {
 let panelUrl;
 let adminToken;
 let viewerId;
-const VIEWER = { username: 'atendimento', password: 'viewer-password-1' };
+const VIEWER = { username: 'atendimento', password: 'viewer-password-1', email: 'atendimento@exemplo.test' };
 
 before(async () => {
   ({ panelUrl } = await startTestServers());
   const setup = await call(`${panelUrl}/api/auth/setup`, {
     method: 'POST',
-    body: { username: 'owner', password: 'owner-password-1' }
+    body: { username: 'owner', password: 'owner-password-1', email: 'owner@exemplo.test' }
   });
   adminToken = setup.body.data.token;
 
@@ -55,7 +55,7 @@ describe('operator management', () => {
     const { status } = await call(`${panelUrl}/api/users`, {
       method: 'POST',
       headers: authHeaders(adminToken),
-      body: { username: 'curto', password: 'short', role: 'viewer' }
+      body: { username: 'curto', password: 'short', role: 'viewer', email: 'curto@exemplo.test' }
     });
     assert.equal(status, 400);
   });
@@ -119,7 +119,7 @@ describe('what a read-only operator may do', () => {
     const { status } = await call(`${panelUrl}/api/users`, {
       method: 'POST',
       headers: authHeaders(viewerToken),
-      body: { username: 'escalation', password: 'escalation-1', role: 'admin' }
+      body: { username: 'escalation', password: 'escalation-1', role: 'admin', email: 'escalation@exemplo.test' }
     });
     assert.equal(status, 403);
   });

@@ -2,7 +2,7 @@ import AuditLog from '../models/AuditLog.js';
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 import TenantUser from '../models/TenantUser.js';
-import { createResponse, createErrorResponse } from '../utils/helpers.js';
+import { createResponse, createErrorResponse, isValidEmail } from '../utils/helpers.js';
 import { ROLES, normalizeRole, roleHas } from '../config/permissions.js';
 
 export { ROLES };
@@ -61,6 +61,10 @@ function present(member) {
   return {
     id: member.id,
     username: member.username,
+    // Mostrado para que a tela consiga responder "quem ainda não cadastrou o
+    // e-mail?", que é a pergunta que decide quando dá para exigir e-mail no
+    // login sem trancar ninguém do lado de fora.
+    email: member.email ?? null,
     role: presentRole(member.role),
     createdAt: member.created_at,
     updatedAt: member.updated_at
@@ -111,6 +115,10 @@ class UsersController {
       const username = normalizeUsername(req.body?.username);
       const password = String(req.body?.password ?? '');
       const role = presentRole(req.body?.role);
+      // Conta nova nasce com e-mail. Contas sem endereço existem só como
+      // herança de antes desta versão, e a tela de operadores mostra quais são
+      // — é assim que se sabe quando dá para virar `LOGIN_REQUIRES_EMAIL`.
+      const email = User.normalizeEmail(req.body?.email);
 
       // Mesma regra da promoção: quem não é `owner` não cunha um.
       if (role === 'owner' && presentRole(req.user.role) !== 'owner') {
@@ -128,6 +136,9 @@ class UsersController {
         return res.status(400).json(
           createErrorResponse('Password must be between 8 and 128 characters')
         );
+      }
+      if (!email || !isValidEmail(email)) {
+        return res.status(400).json(createErrorResponse('A valid email address is required'));
       }
       if (!ROLES.includes(req.body?.role)) {
         return res.status(400).json(
@@ -148,14 +159,22 @@ class UsersController {
       // credentials for another ISP's panel. Joining an existing person to a
       // second provider is a real act that needs that person's consent; it is
       // not the accidental outcome of guessing a username here.
-      if (await User.findByUsername(username)) {
+      // Nome e e-mail conferidos juntos, contra o mesmo espaço de nomes: um
+      // e-mail igual ao nome de outra pessoa (ou o contrário) tornaria o
+      // identificador de login ambíguo, e `findByLogin` recusaria os dois.
+      const conflito = await User.loginConflict({ username, email });
+      if (conflito === 'email_taken') {
+        return res.status(409).json(createErrorResponse('Email address already taken'));
+      }
+      if (conflito) {
         return res.status(409).json(createErrorResponse('Username already taken'));
       }
 
       const id = await User.create({
         username,
         password: await bcrypt.hash(password, BCRYPT_ROUNDS),
-        role
+        role,
+        email
       });
       try {
         await TenantUser.create({ tenantId, userId: id, role });
