@@ -18,7 +18,7 @@ import { useTenant } from '@/contexts/tenant-context'
  */
 export default function Signup() {
   const { t } = useTranslation()
-  const { tenant, name: hostName } = useTenant()
+  const { tenant, name: hostName, isPlatformHost } = useTenant()
   const base = tenant?.panelBaseDomain ?? null
   const [form, setForm] = useState({ providerName: '', slug: '', username: '', password: '', confirm: '' })
   const [loading, setLoading] = useState(false)
@@ -140,9 +140,13 @@ export default function Signup() {
             </>
           )}
         </div>
-        <p className="mt-5 text-center text-xs leading-5 text-muted-foreground">
-          <Link to="/login" className="underline">{t('signup.backToLogin')}</Link>
-        </p>
+        {/* The platform's own host has no login to go back to: whoever has a
+            panel signs in at that panel's address. */}
+        {!isPlatformHost && (
+          <p className="mt-5 text-center text-xs leading-5 text-muted-foreground">
+            <Link to="/login" className="underline">{t('signup.backToLogin')}</Link>
+          </p>
+        )}
       </div>
     </main>
   )

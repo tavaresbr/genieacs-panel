@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { useNavigate } from 'react-router'
 import { useAuth } from '@/contexts/auth-context'
 import { Icon } from '@/components/ui/icon'
 import { BrandMark } from '@/components/brand-mark'
@@ -146,9 +146,11 @@ export default function Login() {
           <p className="mt-5 text-center text-xs leading-5 text-muted-foreground">
             {t('login.helpText')}
           </p>
+          {/* Sign-up lives at the platform's front door, not at this provider's
+              address: a new ISP is nobody's customer yet. */}
           {tenant?.edition === 'saas' && tenant.panelBaseDomain && (
             <p className="mt-3 text-center text-sm">
-              <Link to="/signup" className="underline">{t('login.signupLink')}</Link>
+              <a href={`https://${tenant.panelBaseDomain}/signup`} className="underline">{t('login.signupLink')}</a>
             </p>
           )}
         </div>

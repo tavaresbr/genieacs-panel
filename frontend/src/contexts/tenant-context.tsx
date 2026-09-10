@@ -25,6 +25,8 @@ interface TenantContextValue {
   /** The name to show, never empty: the provider's, or the product's while it loads or when the host names nobody. */
   name: string
   isSaas: boolean
+  /** The platform's own front door: a SaaS host that names no provider. Only sign-up lives here. */
+  isPlatformHost: boolean
   /** Re-read after the provider renamed itself. */
   refresh: () => Promise<void>
 }
@@ -58,6 +60,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     loading,
     name,
     isSaas: tenant?.edition === 'saas',
+    isPlatformHost: tenant !== null && tenant.slug === null,
     refresh
   }), [tenant, loading, name, refresh])
 

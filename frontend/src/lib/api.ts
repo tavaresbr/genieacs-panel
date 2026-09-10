@@ -292,8 +292,9 @@ export type { OperatorRole }
  * slugs are real, and a slug is an ISP's name.
  */
 export interface PublicTenant {
-  slug: string
-  name: string
+  /** Null on the platform's own host, which names no provider and exists to sign one up. */
+  slug: string | null
+  name: string | null
   /** Which product this deployment is: decides whether signup and the database switcher exist. */
   edition: 'saas' | 'selfhosted'
   /** The domain a provider's panel lives under, or null where providers are not reached by subdomain. */

@@ -158,3 +158,63 @@ describe('renaming the provider', () => {
     assert.equal((await home('/api/tenant', { method: 'PATCH', headers: bearer(ownerToken), body: { name: 'x'.repeat(129) } })).status, 400);
   });
 });
+
+/**
+ * O host da própria plataforma: o domínio-base sem provedor na frente.
+ *
+ * Até aqui uma requisição ali era recusada, e o cadastro era servido pelo
+ * host do provedor da instalação — a porta de entrada da plataforma era a
+ * porta de um cliente. Agora o apex serve exatamente o que um estranho
+ * precisa, e nada que seja de um provedor.
+ */
+describe('the platform\'s own host', () => {
+  const apex = (path, options) => callAs('painel.test', `${panelUrl}${path}`, options);
+
+  it('describes the platform and names no provider', async () => {
+    const res = await apex('/api/tenant/public');
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body.data, { slug: null, name: null, edition: 'saas', panelBaseDomain: 'painel.test' });
+  });
+
+  it('answers the same on www', async () => {
+    const res = await callAs('www.painel.test', `${panelUrl}/api/tenant/public`);
+    assert.equal(res.status, 200);
+    assert.equal(res.body.data.slug, null);
+  });
+
+  it('serves nothing that belongs to a provider', async () => {
+    for (const [method, path, body] of [
+      ['POST', '/api/auth/login', { username: 'owner', password: 'owner-senha-1' }],
+      ['GET', '/api/auth/setup-status'],
+      ['GET', '/api/tenant/subscription'],
+      ['GET', '/api/devices'],
+      ['GET', '/api/settings']
+    ]) {
+      const res = await apex(path, { method, body, headers: bearer(ownerToken) });
+      assert.equal(res.status, 404, `${method} ${path} answered ${res.status}`);
+    }
+  });
+
+  it('signs a provider up and sends it to its own address', async () => {
+    const res = await apex('/api/auth/signup', {
+      method: 'POST',
+      body: { slug: 'porta', providerName: 'Porta Fibra', username: 'porta-dono', password: 'porta-senha-1' }
+    });
+    assert.equal(res.status, 201);
+    assert.equal(res.body.data.panelUrl, 'https://porta.painel.test');
+
+    const signIn = await callAs('porta.painel.test', `${panelUrl}/api/auth/login`, {
+      method: 'POST', body: { username: 'porta-dono', password: 'porta-senha-1' }
+    });
+    assert.equal(signIn.status, 200);
+    const me = await callAs('porta.painel.test', `${panelUrl}/api/tenant/public`, { headers: bearer(signIn.body.data.token) });
+    assert.equal(me.body.data.name, 'Porta Fibra');
+  });
+
+  it('is nothing at all where subdomains are not what names a provider', async () => {
+    // `painel.test` is the panel's base; the portal's base is unset here, so
+    // a deeper or unrelated host still names nobody.
+    const res = await callAs('outra.coisa.test', `${panelUrl}/api/tenant/public`);
+    assert.equal(res.status, 404);
+  });
+});

@@ -1,4 +1,5 @@
 import Tenant from '../models/Tenant.js';
+import { METRICS_CONTENT_TYPE, renderMetrics } from '../utils/metrics.js';
 import Subscription from '../models/Subscription.js';
 import SubscriptionService from '../services/subscriptionService.js';
 import PlatformAudit from '../models/PlatformAudit.js';
@@ -74,6 +75,16 @@ async function subscriptionsByTenant() {
 }
 
 class PlatformController {
+  /** `GET /api/platform/metrics` — the process's counters, per provider. */
+  static metrics(req, res) {
+    // `end`, not `send`: `send` rewrites the content type with its own charset
+    // ordering, and a scraper matches the exposition type byte for byte.
+    res.status(200);
+    res.setHeader('Content-Type', METRICS_CONTENT_TYPE);
+    res.setHeader('Cache-Control', 'no-store');
+    return res.end(renderMetrics());
+  }
+
   static async listTenants(req, res) {
     try {
       const tenants = await Tenant.list();

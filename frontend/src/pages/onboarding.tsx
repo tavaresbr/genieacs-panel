@@ -52,7 +52,7 @@ export default function Onboarding() {
   }, [])
 
   const finish = () => {
-    if (tenant) {
+    if (tenant?.slug) {
       try { localStorage.setItem(onboardingDismissKey(tenant.slug), '1') } catch {}
     }
     navigate('/dashboard', { replace: true })

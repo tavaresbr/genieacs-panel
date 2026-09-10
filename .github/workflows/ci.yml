@@ -103,6 +103,37 @@ jobs:
           TEST_DB_NAME: skygp_test
         run: npm test
 
+  image:
+    name: Container image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The image is what the SaaS edition runs from, and nothing else in
+      # this workflow builds it. Built and booted, never pushed: a registry
+      # is a deployment decision, and this job only proves the Dockerfile
+      # still produces a process that answers its own health check.
+      - name: Build
+        run: docker build --tag skygenpanel:ci .
+
+      - name: Boot and probe
+        run: |
+          docker run --detach --name panel --publish 127.0.0.1:5890:5890 \
+            --env EDITION=saas \
+            --env JWT_SECRET="$(openssl rand -hex 48)" \
+            --env PORTAL_JWT_SECRET="$(openssl rand -hex 48)" \
+            --env SECRET_BOX_KEY="$(openssl rand -hex 48)" \
+            skygenpanel:ci
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --show-error http://127.0.0.1:5890/api/health; then
+              echo; exit 0
+            fi
+            sleep 2
+          done
+          echo "The panel never answered /api/health"
+          docker logs panel
+          exit 1
+
   audit:
     name: Dependency audit
     runs-on: ubuntu-latest

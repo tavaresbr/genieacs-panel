@@ -20,6 +20,8 @@ import {
   portalLoginLimiter
 } from './middleware/rateLimit.js';
 import { authenticateToken, requirePermission } from './middleware/auth.js';
+import { log, requestLogger } from './utils/logger.js';
+import { httpMetrics } from './utils/metrics.js';
 
 import authRoutes from './routes/auth.js';
 import deviceRoutes from './routes/devices.js';
@@ -223,6 +225,11 @@ app.get('/api/health', async (req, res) => {
   });
 });
 
+// Uma linha por requisição e um contador por provedor, ANTES do resolvedor:
+// uma requisição recusada por não nomear provedor também é um evento, e é
+// justamente o que se quer ver quando um DNS está errado.
+app.use('/api', requestLogger());
+app.use('/api', httpMetrics());
 app.use('/api', resolveTenant);
 // A porta da assinatura, logo atrás do resolvedor e só na edição SaaS. O que
 // ela deixa passar sem olhar (login, o nome do provedor, o console) está
@@ -326,7 +333,7 @@ function serveFrontend(target, htmlFile) {
 // `next` is unused but required: Express only treats a four-argument function
 // as an error handler.
 export function errorHandler(err, req, res, next) {
-  console.error('Unhandled error:', err);
+  log.error('unhandled_error', { req: req.id ?? null, method: req.method, path: String(req.originalUrl || req.url || '').split('?')[0], err });
   // A failure raised before the locale middleware ran leaves `req.t` unset.
   const t = req.t || ((key) => translate(DEFAULT_LOCALE, key));
   if (err?.type === 'entity.parse.failed') {
@@ -378,6 +385,8 @@ portalApp.use('/api', portalIpLimiter);
 portalApp.get('/api/health', (req, res) => {
   res.json({ status: 'ok', service: 'customer-portal', version: APP_VERSION });
 });
+portalApp.use('/api', requestLogger());
+portalApp.use('/api', httpMetrics());
 portalApp.use('/api', resolveTenant);
 // O portal do assinante fica de pé em `past_due` — o assinante não é quem
 // deve. O que o derruba é `suspended` e `canceled`, que são decisões nossas.

@@ -66,7 +66,7 @@ function OnboardingGate({ children }: { children: React.ReactNode }) {
   const [needsOnboarding, setNeedsOnboarding] = useState<boolean | null>(isSaas ? null : false)
 
   useEffect(() => {
-    if (!isSaas || !tenant || !can('settings.write')) { setNeedsOnboarding(false); return }
+    if (!isSaas || !tenant?.slug || !can('settings.write')) { setNeedsOnboarding(false); return }
     let dismissed = false
     try { dismissed = localStorage.getItem(onboardingDismissKey(tenant.slug)) === '1' } catch {}
     if (dismissed) { setNeedsOnboarding(false); return }
@@ -153,9 +153,12 @@ function PlatformRoute() {
 
 function LoginRoute() {
   const { isAuthenticated, loading, needsSetup } = useAuth()
-  if (loading) return <AuthFallback />
+  const { isPlatformHost, loading: tenantLoading } = useTenant()
+  if (loading || tenantLoading) return <AuthFallback />
   if (needsSetup) return <Navigate to="/setup" replace />
   if (isAuthenticated) return <Navigate to="/dashboard" replace />
+  // The platform's own host has nobody to sign in as; what it has is sign-up.
+  if (isPlatformHost) return <Navigate to="/signup" replace />
   return <LoginPage />
 }
 

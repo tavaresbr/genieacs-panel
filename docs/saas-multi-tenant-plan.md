@@ -603,25 +603,52 @@ vez" em `backend/test/i18n.test.js`, e ele varre as duas metades do app.
 
 ---
 
-### Fase 7 — Operação e as duas edições *(esforço: médio)*
+### Fase 7 — Operação e as duas edições ✅ *(entregue; o runbook é `docs/saas-operations.md`)*
 
-- Flag `EDITION=saas|selfhosted` lida em `backend/src/app.js`, controlando: rotas de cadastro,
-  `backend/src/routes/database.js` (troca de banco), wizard de setup, permissão de faixas IP
-  privadas no conector, e o console de plataforma.
-- Self-hosted continua com `deploy/install.sh` + CLI `deploy/skygenpanel` + SQLite/MySQL.
-  SaaS usa o `Dockerfile` + Postgres gerenciado + migrations no CI.
-- Observabilidade: `tenant_id` em toda linha de log e em toda métrica. O **`audit_log` entrou
-  na onda 20** — senha de portal revelada e redefinida, URL e credencial do GenieACS, papéis,
-  vínculos, convites e suspensão de provedor. Falta a impersonação, que ainda não existe.
-- Backup e **procedimento de exportação/exclusão por tenant**. A **exclusão entrou na onda
-  22**: exige quatro coisas ao mesmo tempo — estar no plano de controle, o provedor estar
-  **suspenso** (o que faz dela um segundo passo, com um estado reversível no meio, e não um
-  clique), o slug digitado de volta exato, e não ser o último provedor do deployment —, e a
-  linha da trilha é gravada ANTES, com a contagem do que vai sumir: se ela não puder ser
-  gravada, não se apaga. A **exportação entrou na onda 21** (`GET /api/tenant/export`, capacidade `tenant.export`, auditada): todas as tabelas
-  escopadas na ordem de criação do schema — que é a ordem que as FKs pedem, e o que faz o
-  arquivo poder ser reinserido de cima para baixo —, sem nenhum segredo cifrado nem hash de
-  senha, com um manifesto que diz o que ficou de fora e por quê.
+**O que entrou:**
+
+- **`EDITION`** já decidia cadastro, troca de banco, faixas privadas do conector e o
+  console; continua decidindo. O assistente de instalação fica nas duas edições de
+  propósito: no SaaS ele é como o primeiro `owner` do `default` — e o primeiro
+  `platform_admins` — nasce num deploy vazio.
+- **Banco pelo ambiente.** `DATABASE_URL` (`postgres://…?schema=&sslmode=`, ou `mysql://`)
+  vence o `db-config.json` quando os dois existem: uma imagem contra um Postgres
+  gerenciado não pode ser apontada para o banco errado por um volume velho. O arquivo
+  continua sendo o mecanismo do self-hosted, onde a tela de troca de banco o escreve.
+- **Deploy do SaaS.** `deploy/docker-compose.saas.yml` (imagem + Postgres ao lado, para
+  homologação; em produção o `db` sai e a URL aponta para fora), `deploy/saas.env.example`
+  com cada variável comentada, `.dockerignore`, e o job `image` no CI, que constrói a
+  imagem e a sobe até `/api/health` responder — o `Dockerfile` não era exercitado em
+  lugar nenhum. As migrations rodam no boot e são idempotentes; deploy é `up -d --build`.
+- **O provedor em toda linha de log.** `backend/src/utils/logger.js`: uma linha por evento
+  (`text` logfmt ou `json`), `tenant=` lido do mesmo contexto que as queries leem, uma
+  linha `http` por requisição (método, caminho sem query, status, ms, host, `req=` que
+  volta em `X-Request-Id`), `/api/health` calado enquanto responde 200. Os ~250
+  `console.*` que já existiam **não foram reescritos**: o boot envolve os cinco métodos
+  do `console` uma vez, e cada linha antiga sai com `[tenant=N]` quando há contexto —
+  jobs de fundo inclusive, porque rodam por provedor.
+- **O provedor em toda métrica.** `backend/src/utils/metrics.js`: contadores em memória,
+  `tenant_id` em toda série, sem biblioteca. `http_requests_total` (provedor, método,
+  classe de status — o caminho **não** é rótulo), `http_request_duration_ms` (baldes
+  grossos por provedor) e `acs_requests_total` (provedor, `ok`/`refused`/`error`, contado
+  em `GenieAcsEgress.fetch`). `GET /api/platform/metrics` em formato Prometheus, atrás
+  do guarda do console **ou** de `METRICS_TOKEN` comparado em tempo constante — um
+  coletor não tem sessão.
+- **O host apex é a porta de entrada.** `painel.exemplo.com` (e `www.`) deixa de ser 404
+  para exatamente duas rotas: `GET /api/tenant/public` (que responde `slug: null` e a
+  edição) e `POST /api/auth/signup`. Nada de provedor nenhum é servido ali; nenhum
+  contexto de provedor é aberto, então uma query escopada que chegasse por engano falha
+  com a sentinela. O cadastro sai do host do provedor `default`, que era a porta de um
+  cliente servindo de porta da plataforma. A tela de login de um provedor aponta para
+  `https://<base>/signup`; no apex, `/login` leva ao cadastro.
+- **Backup e procedimento** no runbook: `pg_dump` diário com teste de restauração
+  mensal, snapshot do volume de anexos, os três segredos no cofre; por provedor,
+  exportação (`GET /api/tenant/export`) e exclusão em dois passos, já existentes;
+  suspensão, rotação de segredos e o que ainda não existe.
+
+**O que ficou de fora, de propósito:** rotação da `SECRET_BOX_KEY` com duas chaves vivas
+(o `key_version` já está gravado; falta o comando), impersonação, e-mail e o gateway —
+todos listados no runbook como "não existe ainda", para o plantão não procurar.
 
 ---
 
@@ -637,7 +664,7 @@ subsistema cada — `sgp-links`, `sgp-events`, `device-profiles`, `provisioning`
 `map-settings`, `vendor-catalogue`, `wifi-credentials`, `whatsapp-media`,
 `whatsapp-inbound`, `users`, `auth`, entre outras, mais `tenant-subdomain` e
 `tenant-id-sweep`, que provam o isolamento por host, e `role-reach`, que prova por HTTP o
-alcance de cada papel sobre uma amostra de 31 rotas. São 1600 testes no total, verdes nos
+alcance de cada papel sobre uma amostra de 31 rotas. São 1627 testes no total, verdes nos
 três dialetos no CI.
 
 O padrão em todas: **dois provedores com as chaves naturais deliberadamente colidindo** —
@@ -803,9 +830,11 @@ Original: Fase 0 → 1 → 2 → 3 → 8 → 4 → 5 → 6 → 7.
    pontos de escrita, `billing_events` e o `ManualBillingProvider`. O gateway (Asaas) fica
    para quando houver contrato para cobrar.
 6. ~~**Fase 6**~~ ✅ contexto do provedor, nome em `tenants`, cadastro, onboarding, plano e
-   uso, `<html lang>` e o centro do mapa. → O que sobrou da **2** (impersonação auditada com
-   audiência própria, transporte de e-mail do convite e a tela de aceitar) e da **7**
-   (exclusão já entrou; `tenant_id` em log e métrica, host apex da plataforma).
+   uso, `<html lang>` e o centro do mapa.
+7. ~~**Fase 7**~~ ✅ `DATABASE_URL`, compose e imagem no CI, log e métrica com o provedor
+   em toda linha, host apex como porta de entrada, runbook. → O que sobrou da **2**
+   (impersonação auditada com audiência própria, transporte de e-mail do convite e a tela
+   de aceitar) e a rotação da `SECRET_BOX_KEY`.
 
 Vale repetir o que o plano dizia e que se confirmou: a Fase 1 saiu para os installs
 self-hosted como upgrade normal, e o código de tenancy rodou em produção real com um
@@ -829,7 +858,7 @@ metade é da Fase 4.
 | 6 | Credenciais ACS por provedor, cifradas, guarda de egresso, branch de URL absoluta removido | ✅ credencial NBI por provedor (onda 19), egresso com pinning de DNS, branch de URL absoluta removido |
 | 7 | `/api/database` não montada na edição SaaS | ✅ |
 | 8 | Rate limit e concorrência de fetch ACS chaveados por provedor | ✅ `tenantIpKey` no limite; `withAcsSlot` no fetch — vaga por provedor e vaga global, nessa ordem |
-| 9 | Suíte de vazamento verde no CI e obrigatória para merge | ✅ 1600 testes, três dialetos |
+| 9 | Suíte de vazamento verde no CI e obrigatória para merge | ✅ 1627 testes, três dialetos |
 | 10 | `SECRET_BOX_KEY` separada do `JWT_SECRET`, com `key_version` | ✅ |
 | 11 | `audit_log` registrando ações sensíveis | ✅ onda 20 — senha de portal, GenieACS, papéis, vínculos, convites, suspensão |
 | 12 | Exportação por provedor funcionando (LGPD e "apaguei tudo, socorro") | ✅ exportação (onda 21) e exclusão (onda 22), com trilha que sobrevive ao provedor apagado |
@@ -851,7 +880,7 @@ também a tabela de que a impersonação da plataforma vai precisar.
 
 ```bash
 npm run verify          # check backend + testes + lint + typecheck + build (raiz)
-cd backend && npm test  # 1600 testes, incluindo as suítes de tenancy
+cd backend && npm test  # 1627 testes, incluindo as suítes de tenancy
 ```
 
 A suíte roda nos três dialetos, e **isso não é zelo**: cada uma das armadilhas abaixo passou

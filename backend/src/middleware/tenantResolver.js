@@ -113,6 +113,32 @@ export function usesTenantSubdomains() {
   return Boolean(PANEL_BASE_DOMAIN || PORTAL_BASE_DOMAIN);
 }
 
+/**
+ * The platform's own front door: the panel's base domain with no provider in
+ * front of it, and `www.` of the same.
+ *
+ * Until now a request there was refused, on the reasoning that a host naming
+ * nobody is a request that did not say who it is for. That is still the rule
+ * for anything that reads a provider's data. But an ISP that does not exist
+ * yet has no subdomain to arrive at, and making it sign up from SOME OTHER
+ * provider's host — which is what the first cut did — means the platform's
+ * front door is one of its customers' doors. So the apex serves exactly what
+ * a stranger needs and nothing else: the public profile, which says this is a
+ * SaaS and where providers live, and the sign-up. Only those two, listed here,
+ * and only where subdomains are configured at all.
+ */
+const PLATFORM_HOST_PATHS = new Set(['/api/tenant/public', '/api/auth/signup']);
+
+export function isPlatformHost(host) {
+  if (!PANEL_BASE_DOMAIN || !host) return false;
+  return host === PANEL_BASE_DOMAIN || host === `www.${PANEL_BASE_DOMAIN}`;
+}
+
+function servedOnPlatformHost(req) {
+  const path = String(req.originalUrl || req.url || '').split('?')[0];
+  return PLATFORM_HOST_PATHS.has(path);
+}
+
 /** The provider a slug names, or null. Inactive providers do not resolve. */
 export async function resolveTenantIdBySlug(slug) {
   if (!slug) return null;
@@ -137,7 +163,20 @@ export async function resolveTenantIdBySlug(slug) {
  * confirm which slugs exist, and the slug list is the customer list.
  */
 export function resolveTenant(req, res, next) {
-  const slug = tenantSlugFromHost(hostOf(req));
+  const host = hostOf(req);
+  const slug = tenantSlugFromHost(host);
+
+  // The front door. No provider is put in scope — there is none — so any
+  // scoped query reached from here fails loudly, which is the sentinel doing
+  // what it is for. The two routes served here touch only shared tables.
+  // Checked before the slug: `www.painel…` parses as provider `www`, which is
+  // a reserved slug precisely so that this branch is the one that answers.
+  if (isPlatformHost(host) && servedOnPlatformHost(req)) {
+    req.tenantId = null;
+    req.hostTenantId = null;
+    req.platformHost = true;
+    return next();
+  }
 
   // A deployment with subdomains has no default to fall back to: the host is
   // how a provider is named there, so a host that names none is a request that

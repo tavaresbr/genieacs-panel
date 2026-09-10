@@ -144,6 +144,18 @@ class TenantController {
    */
   static async getPublicProfile(req, res) {
     try {
+      // The platform's own host: no provider, but the two facts a stranger
+      // needs — that this is a SaaS, and where a provider's panel would live.
+      // The screen turns that into "sign up here".
+      if (req.platformHost) {
+        return res.json(createResponse(req.t('tenant.publicRetrieved'), {
+          slug: null,
+          name: null,
+          edition: EDITION,
+          panelBaseDomain: panelBaseDomain()
+        }));
+      }
+
       const tenant = await Tenant.findPublicById(req.tenantId);
 
       // The row the resolver blessed is gone — a provider deleted while the
