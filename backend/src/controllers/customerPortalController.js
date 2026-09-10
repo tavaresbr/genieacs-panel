@@ -1,4 +1,3 @@
-import AuditLog, { AUDIT_ACTIONS } from '../models/AuditLog.js';
 import CustomerAccount from '../models/CustomerAccount.js';
 import CustomerService from '../services/customerService.js';
 import CustomerPortalPasswordService from '../services/customerPortalPasswordService.js';
@@ -194,22 +193,6 @@ class CustomerPortalController {
           req.t('portal.wifiPasswordNotSaved'), null, 'wifi_password_not_saved'
         ));
       }
-      // The only line here written for somebody who is not staff, and it is
-      // the subscriber's own secret being read back — so the actor is the
-      // portal session, and the account it belongs to is both actor and
-      // target. What makes it worth a line is the pairing: an operator can
-      // reset a portal password from the panel and sign in with it, and this is
-      // the line that shows the WiFi key was pulled afterwards.
-      //
-      // Awaited and best-effort, like the panel's reveals: `record` never
-      // throws, so a log the database refuses cannot turn a subscriber's
-      // working password screen into a 500 on their own account.
-      await AuditLog.recordFromRequest(req, {
-        action: AUDIT_ACTIONS.WIFI_PASSWORD_REVEALED,
-        targetType: 'customer_account',
-        targetId: req.customer.customer_id,
-        metadata: { wifiIndex }
-      });
       return res.json(createResponse(req.t('portal.wifiPasswordReady'), { password }, 'wifi_password_ok'));
     } catch (error) {
       console.error('Customer portal WiFi password reveal error:', error);

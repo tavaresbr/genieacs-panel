@@ -629,7 +629,14 @@ export default function DeviceDetailPage() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
   const [rebooting, setRebooting] = useState(false)
-  const { user } = useAuth()
+  const { can } = useAuth()
+  // Revelar a senha do portal é `customers.secrets`, e mexer no CPE é
+  // `devices.write` — capacidades distintas na matriz porque quem reinicia uma
+  // ONT não precisa, por consequência, ler o segredo de um assinante. As duas
+  // estavam sob `role === 'admin'`, que fechava para o plantão o próprio
+  // trabalho dele.
+  const canReadSecrets = can('customers.secrets')
+  const canWriteDevice = can('devices.write')
   const { t, formatDateTime, intlLocale } = useTranslation()
   const toast = useToast()
   const loadingCtl = useLoading()
@@ -1363,7 +1370,7 @@ export default function DeviceDetailPage() {
               <p className="mt-1 text-xs leading-5 text-muted-foreground">
                 {t('detail.customer.hint')}
               </p>
-              {user?.role === 'admin' && device.customer?.customerId && (
+              {canReadSecrets && device.customer?.customerId && (
                 <div className="mt-5 border-t border-border pt-4">
                   <p className="field-label">{t('detail.portalPassword.label')}</p>
                   {portalPassword ? (
@@ -1685,7 +1692,7 @@ export default function DeviceDetailPage() {
                 <h2 className="section-heading">{t('detail.wan.title')}</h2>
                 <p className="section-description">{t('detail.wan.description')}</p>
               </div>
-              {user?.role === 'admin' && (
+              {canWriteDevice && (
                 <div className="grid gap-2 sm:grid-cols-[minmax(15rem,1fr)_8rem_auto]">
                   <div>
                     <label htmlFor="wan-container" className="field-label">{t('detail.wan.container')}</label>
@@ -1948,7 +1955,7 @@ export default function DeviceDetailPage() {
                         <dd className="font-mono font-semibold">{ssid.totalAssociations ?? 0}</dd>
                       </div>
                     </dl>
-                    {user?.role === 'admin' ? (
+                    {canWriteDevice ? (
                       <button type="button" onClick={() => setEditingWifi(ssid)} className="modern-button-secondary mt-5 w-full">
                         <Icon name="edit" size={17} /> {t('detail.wifi.edit', { index: ssid.index })}
                       </button>

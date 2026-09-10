@@ -303,6 +303,135 @@ const customerWifiCredentialsTable = (db) => (t) => {
  * A provider. One row today — the install itself — so that every table that
  * will be scoped has something real to point at before anything depends on it.
  */
+/**
+ * The SaaS control plane's roster. Deliberately just an identity: what a
+ * platform administrator may do is decided in code, not by a role string here,
+ * because there is exactly one such power and naming degrees of it would invite
+ * inventing more.
+ */
+const platformAdminsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('user_id').unsigned().notNullable().unique()
+    .references('id').inTable('users').onDelete('CASCADE');
+  t.timestamp('created_at').defaultTo(db.fn.now());
+};
+
+/**
+ * O convite: como uma pessoa entra na equipe de um provedor sem que o
+ * administrador escolha a senha dela.
+ *
+ * A onda 12 recusou, com razão, que o administrador de um provedor anexasse
+ * alguém que já existe no deploy: aquele request carrega uma SENHA, e há uma
+ * senha por pessoa, então "adicionar a maria" digitado aqui trocaria o login de
+ * uma estranha que trabalha para outro ISP, derrubaria as sessões dela em todo
+ * lugar e entregaria a este administrador credenciais válidas no painel do
+ * vizinho. O convite é a saída: quem administra oferece o vínculo, e é a pessoa
+ * convidada quem entra — com a conta que já tem, ou com uma que ela mesma cria.
+ *
+ * Guarda o HASH do token e nunca o token. O que vai no link é mostrado uma vez,
+ * na resposta da criação, e não pode ser recuperado depois — mesma disciplina
+ * do segredo do webhook do SGP e da senha do portal do assinante. Um convite é
+ * uma credencial: quem tem o link entra na equipe.
+ */
+/**
+ * A trilha das ações sensíveis: quem fez, o quê, sobre quem, e quando.
+ *
+ * Escopada por provedor como quase tudo aqui, e por um motivo além do óbvio: a
+ * trilha de um ISP diz quem são seus operadores, quantos assinantes ele tem e
+ * quando alguém revelou a senha de um deles. É dado tão dele quanto a lista de
+ * contratos.
+ *
+ * A coluna `detail` é a que mais precisa de disciplina. Nada de segredo entra
+ * ali — nem a senha revelada, nem a credencial da NBI, nem o token do convite.
+ * O que a trilha registra é que a senha foi revelada, não qual era: a primeira
+ * coisa é o que permite auditar, a segunda transformaria a auditoria no maior
+ * repositório de segredos em claro do produto. `audit-log.test.js` guarda isso
+ * com uma varredura sobre o que cada gravação de verdade produz.
+ */
+/**
+ * A trilha do plano de controle — acima dos provedores, não dentro de um.
+ *
+ * `audit_log` é escopada e responde "o que aconteceu no meu painel?". Esta
+ * responde outra coisa: o que quem opera o SaaS fez COM um provedor. Precisa
+ * ser uma tabela à parte por uma razão que não é organização: a exclusão de um
+ * provedor tem que deixar registro, e registrar isso na trilha DELE é inútil —
+ * ela vai junto.
+ *
+ * Daí `tenant_id` ser um inteiro simples e **não** uma chave estrangeira, com o
+ * slug e o nome desnormalizados ao lado. Uma FK aqui apagaria em cascata (ou
+ * impediria) exatamente a linha que existe para dizer que aquele provedor foi
+ * apagado, que é a única linha desta tabela que não pode faltar.
+ */
+const platformAuditTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('actor_user_id').unsigned().references('id').inTable('users').onDelete('SET NULL');
+  t.string('actor_username', 64);
+  t.string('action', 64).notNullable();
+  // Sem FK, de propósito. Ver acima.
+  t.integer('tenant_id').unsigned();
+  t.string('tenant_slug', 64);
+  t.string('tenant_name', 128);
+  t.text('detail');
+  t.string('ip', 64);
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  t.index(['created_at', 'id'], 'platform_audit_recent_idx');
+};
+
+const auditLogTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  // `SET NULL` e não `CASCADE`: a pessoa pode sair, e a linha que diz o que ela
+  // fez tem que continuar de pé. Uma trilha que some junto com quem a produziu
+  // não é trilha.
+  t.integer('actor_user_id').unsigned().references('id').inTable('users').onDelete('SET NULL');
+  // Desnormalizado pela mesma razão de `provisioning_runs.profile_name`: seis
+  // meses depois o nome ainda responde "quem foi", mesmo que a linha em `users`
+  // já não exista.
+  t.string('actor_username', 64);
+  // operator | platform | system. `platform` é quem opera o SaaS agindo sobre o
+  // provedor de fora; `system` é trabalho de fundo sem gente por trás.
+  t.string('actor_kind', 16).notNullable().defaultTo('operator');
+  t.string('action', 64).notNullable();
+  // Sobre o quê: 'customer_account', 'tenant_user', 'invite', 'settings'…
+  t.string('subject_type', 32);
+  t.string('subject_id', 128);
+  // JSON curto e SEM segredo. Ver o comentário acima.
+  t.text('detail');
+  t.string('ip', 64);
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  // Como a tela pergunta: as ações deste provedor, da mais recente para a mais
+  // antiga. `id` no fim desempata dentro do mesmo segundo, que é o que acontece
+  // quando uma ação grava duas linhas.
+  t.index(['tenant_id', 'created_at', 'id'], 'audit_log_recent_idx');
+  t.index(['tenant_id', 'action'], 'audit_log_action_idx');
+};
+
+const tenantInvitesTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  // sha256 do token. Único no deploy porque a busca acontece ANTES de haver
+  // provedor em escopo: quem abre o link só apresentou o token, e é o token que
+  // diz para qual provedor ele é. Único por provedor não serviria — a busca não
+  // tem provedor para filtrar.
+  t.string('token_hash', 64).notNullable().unique();
+  t.string('role', 32).notNullable();
+  // Só para quem administra se lembrar de quem convidou. Não é login, não é
+  // conferido contra nada, e não é para onde o convite é enviado: o painel não
+  // manda e-mail. Nulo é legítimo.
+  t.string('label', 255);
+  t.integer('created_by').unsigned().references('id').inTable('users').onDelete('SET NULL');
+  t.timestamp('expires_at').notNullable();
+  t.timestamp('accepted_at');
+  t.integer('accepted_user_id').unsigned().references('id').inTable('users').onDelete('SET NULL');
+  t.timestamp('revoked_at');
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  t.timestamp('updated_at').defaultTo(db.fn.now());
+  // Como a tela pergunta: os convites em aberto deste provedor.
+  t.index(['tenant_id', 'accepted_at'], 'tenant_invites_open_idx');
+};
+
 const tenantsTable = (db) => (t) => {
   t.increments('id').primary();
   // The subdomain the panel will be reached at once tenants are resolved by
@@ -738,138 +867,6 @@ const DEVICE_SWAP_TABLES = [
   ['device_swaps', deviceSwapsTable]
 ];
 
-/**
- * How the panel reaches ONE provider's GenieACS.
- *
- * Until now this was a single string in `settings` — `genieAcsUrl` — and no
- * credential travelled with it at all, because the NBI was assumed to sit on
- * the operator's own loopback. Hosted, neither half of that holds: the URL is
- * customer-supplied data, and an NBI that a customer points us at across the
- * internet has to be authenticated or anyone who finds it owns their fleet.
- *
- * `mode` exists now, with only `direct` implemented, because the shape of the
- * other three is what decides whether this table is right — `agent` (the ISP
- * dials out to us over a WebSocket), `tunnel` (WireGuard, so `direct` again but
- * into a private range) and `hosted` (the ACS is ours). All three reuse the
- * same row; adding them changes the transport, not the schema. A mode that is
- * not built is refused by name rather than silently treated as `direct`.
- *
- * `verify_tls` and `allow_private_ranges` are deliberately NOT settable by the
- * provider on the hosted edition: both are asks to weaken a guard that exists
- * because the provider's own input cannot be trusted, so letting the provider
- * turn them off would make the guard decorative. They are ours to set, per
- * customer, once we know what we are pointing at — which is exactly what
- * `tunnel` and `hosted` need. On self-hosted, `allow_private_ranges` says
- * nothing at all: there is no untrusted party, so the address classes are never
- * blocked there in the first place.
- */
-const tenantGenieacsConnectionsTable = (db) => (t) => {
-  t.increments('id').primary();
-  t.integer('tenant_id').unsigned().notNullable()
-    .references('id').inTable('tenants').onDelete('CASCADE');
-  // 'direct' | 'agent' | 'tunnel' | 'hosted'.
-  t.string('mode', 16).notNullable().defaultTo('direct');
-  // Empty means "not configured yet", which is what a brand new provider has
-  // and what every read has to survive: the panel boots, the dashboard says so,
-  // and nothing throws until someone actually asks for a device.
-  t.string('base_url', 255);
-  // 'none' | 'basic' | 'bearer'.
-  t.string('auth_type', 16).notNullable().defaultTo('none');
-  t.string('username', 128);
-  // The NBI password or bearer token, under `createSecretBox('genieacs-nbi')`.
-  // Its own context string, so a ciphertext from here can never be read back as
-  // an Evolution token or a subscriber's WiFi password.
-  t.text('secret_ciphertext');
-  t.string('secret_iv', 32);
-  t.string('secret_tag', 32);
-  t.integer('secret_key_version');
-  t.boolean('verify_tls').notNullable().defaultTo(true);
-  t.boolean('allow_private_ranges').notNullable().defaultTo(false);
-  // 'unknown' | 'ok' | 'error' — what the last reachability check concluded.
-  t.string('status', 16).notNullable().defaultTo('unknown');
-  t.timestamp('last_check_at');
-  // Why it failed, for the screen. Never the upstream body: that is written by
-  // whatever answers at a customer-named URL, and storing it would put a read
-  // oracle in the database instead of in the response.
-  t.string('last_error', 255);
-  t.timestamp('created_at').defaultTo(db.fn.now());
-  t.timestamp('updated_at').defaultTo(db.fn.now());
-  // One ACS per provider. Several would mean every call site has to say which,
-  // and nothing in the panel has a second one to name.
-  t.unique(['tenant_id']);
-};
-
-const GENIEACS_CONNECTION_TABLES = [
-  ['tenant_genieacs_connections', tenantGenieacsConnectionsTable]
-];
-
-/**
- * The record of who did the things that cannot be undone by looking at the
- * data afterwards.
- *
- * Two shapes of foreign key meet here, and getting them the same way round as
- * everywhere else in the schema would defeat the table.
- *
- * `tenant_id` is a real foreign key, because a line has to belong to exactly
- * one provider for the same reason every other scoped row does — and it is
- * left at the default RESTRICT, so a provider cannot be deleted out from under
- * its own history by accident. Erasing an ISP is the export-then-delete
- * procedure, done deliberately, not a cascade nobody watched.
- *
- * `actor_user_id` is ON DELETE SET NULL and NEVER CASCADE. A cascade here would
- * mean that deleting a person deletes the record of what that person did, so
- * the one action most worth auditing — somebody covering their tracks — would
- * be the action that erases its own evidence. SET NULL keeps the line; what
- * keeps it READABLE after the person is gone is `actor_label`, denormalized at
- * write time for the same reason `device_swaps` keeps `customer_id`.
- *
- * The target is denormalized all the way: no foreign key at all. An audit line
- * routinely outlives what it describes (the subscriber account whose password
- * was revealed, the membership that was ended — that row is deleted BY the
- * action being recorded), so a key pointing at it would be a key pointing at
- * nothing. Type plus identifier, as text, says what was touched without
- * depending on it still existing.
- *
- * No unique constraint anywhere: two identical reveals a minute apart are two
- * facts, and a dedupe key would silently collapse exactly the repetition an
- * auditor is looking for.
- */
-const auditLogTable = (db) => (t) => {
-  t.increments('id').primary();
-  t.integer('tenant_id').unsigned().notNullable()
-    .references('id').inTable('tenants');
-  // A value from `AUDIT_ACTIONS` in the model — a closed vocabulary, so the
-  // column is short on purpose: a free-text action name is how a log turns
-  // into prose nobody can query.
-  t.string('action', 64).notNullable();
-  // 'operator', 'subscriber' or 'system'. The panel and the portal both write
-  // here, and "who" means a different table in each.
-  t.string('actor_type', 16).notNullable();
-  t.integer('actor_user_id').unsigned()
-    .references('id').inTable('users').onDelete('SET NULL');
-  t.string('actor_label', 64);
-  t.string('target_type', 32);
-  t.string('target_id', 64);
-  // 45 characters is a full IPv6 literal with an embedded IPv4 tail. Stored
-  // because "which password was read from where" is most of the value of a
-  // reveal line, and it is already what the rate limiter keys on.
-  t.string('ip', 45);
-  // A small JSON object of scalars, filtered by the model. See `AuditLog` for
-  // what may go in it and why almost nothing may.
-  t.text('metadata');
-  t.timestamp('created_at').defaultTo(db.fn.now());
-  // How the log is read: one provider's lines, newest first, optionally
-  // narrowed to one kind of action. Nothing here is indexed by actor —
-  // appending is the hot path, and a third index taxes every write for a
-  // question that a filter over a provider's own lines already answers.
-  t.index(['tenant_id', 'created_at'], 'audit_log_tenant_time_idx');
-  t.index(['tenant_id', 'action'], 'audit_log_tenant_action_idx');
-};
-
-const AUDIT_TABLES = [
-  ['audit_log', auditLogTable]
-];
-
 const TENANCY_TABLES = [
   ['tenants', tenantsTable]
 ];
@@ -879,7 +876,15 @@ const TENANCY_TABLES = [
  * `users` — which step 0001 creates, long after `tenants` exists.
  */
 const MEMBERSHIP_TABLES = [
-  ['tenant_users', tenantUsersTable]
+  ['tenant_users', tenantUsersTable],
+  // Same reason as `tenant_users`: it references `users`, created by step 0001.
+  ['platform_admins', platformAdminsTable],
+  // Idem: aponta para `users` (quem convidou, quem aceitou) e para `tenants`.
+  ['tenant_invites', tenantInvitesTable],
+  // Idem: aponta para `users` (quem fez) e para `tenants`.
+  ['audit_log', auditLogTable],
+  // Aponta para `users` e para mais nada — ver o comentário na fábrica.
+  ['platform_audit', platformAuditTable]
 ];
 
 const INITIAL_TABLES = [
@@ -914,11 +919,7 @@ export const SCHEMA_TABLES = [
   ...PROVISIONING_TABLES,
   ...WHATSAPP_TABLES,
   ...DEVICE_HISTORY_TABLES,
-  ...DEVICE_SWAP_TABLES,
-  ...GENIEACS_CONNECTION_TABLES,
-  // Last, and it has to be: it points at both `tenants` and `users`, so it can
-  // only be created — and can only be inserted along — after both exist.
-  ...AUDIT_TABLES
+  ...DEVICE_SWAP_TABLES
 ].map(([name]) => name);
 
 /**
@@ -1983,98 +1984,125 @@ export const migrations = [
   },
   {
     /**
-     * Where the provider's GenieACS is, and how to authenticate to it.
+     * The control plane: who may create and suspend providers.
      *
-     * The base URL has been per-provider since 0014 — it is a `settings` row,
-     * and `settings` is scoped. What it has never had is a credential, or any
-     * say over the egress guard, and those are what turn "one operator's own
-     * loopback NBI" into "a URL a customer typed". So the connection stops
-     * being one string among the screen's settings and becomes a row of its
-     * own, with the fields that decide how the socket is opened.
+     * Twelve steps of per-provider isolation went in before this, and none of
+     * them could be used — nothing in the panel creates a second provider. The
+     * gap was not an oversight about screens, it was a missing authority: a
+     * provider's own administrator must NOT be able to mint providers or reach
+     * into another one's, so "who may" needed a plane above them before "how"
+     * could exist at all.
      *
-     * The backfill gives every existing provider a row carrying the URL it
-     * already had, in `direct` mode with no credential — which is exactly the
-     * behaviour it has today, so an upgrade changes nothing about how the
-     * panel reaches the ACS. `settings.genieAcsUrl` keeps its value and stays
-     * the field the settings screen edits until the frontend of phase 6 moves
-     * it; saving it writes through to `base_url` so the two cannot drift, and
-     * `GenieAcsConnection.current()` falls back to it when `base_url` is empty.
+     * The table is created EMPTY, and the migration grants nobody. A migration
+     * that handed the platform to the lowest-numbered administrator would be an
+     * upgrade quietly promoting somebody — and on the self-hosted edition,
+     * where there is one provider and no platform plane, promoting them to a
+     * role that should not exist there. Bootstrapping is explicit instead:
+     * `setup` grants it on a fresh SaaS install, and `scripts/grant-platform-admin.js`
+     * grants it on an install that already had users, run by whoever holds the
+     * server — which is exactly who should be deciding this.
      */
-    id: '0029_tenant_genieacs_connections',
+    id: '0029_platform_admins',
     async isApplied(db) {
-      if (!(await db.schema.hasTable('tenants'))) return false;
-      return db.schema.hasTable('tenant_genieacs_connections');
+      return db.schema.hasTable('platform_admins');
     },
     async up(db) {
-      if (!(await db.schema.hasTable('tenants'))) return;
-      await createTableIfMissing(
-        db,
-        'tenant_genieacs_connections',
-        tenantGenieacsConnectionsTable(db)
-      );
-
-      const tenants = await db('tenants').pluck('id');
-      if (tenants.length === 0) return;
-
-      // A provider with no `genieAcsUrl` row still gets a connection, because
-      // "not configured" is a state the panel has to be able to show, and an
-      // absent row would be indistinguishable from a provider created before
-      // this step.
-      const configured = new Map();
-      if (await db.schema.hasTable('settings')) {
-        const rows = await db('settings')
-          .where({ key: 'genieAcsUrl' })
-          .select('tenant_id', 'value');
-        for (const row of rows) {
-          if (row.value) configured.set(Number(row.tenant_id), row.value);
-        }
-      }
-
-      const already = new Set(
-        (await db('tenant_genieacs_connections').pluck('tenant_id')).map(Number)
-      );
-      const rows = tenants
-        .filter((id) => !already.has(Number(id)))
-        .map((id) => ({
-          tenant_id: id,
-          mode: 'direct',
-          base_url: configured.get(Number(id)) || null,
-          auth_type: 'none'
-        }));
-      if (rows.length > 0) await db('tenant_genieacs_connections').insert(rows);
+      if (!(await db.schema.hasTable('users'))) return;
+      await createTableIfMissing(db, 'platform_admins', platformAdminsTable(db));
     }
   },
   {
     /**
-     * The sensitive-action log. Item 11 of the checklist, and the first table
-     * whose rows are written for somebody who is not the panel.
+     * Dá um `owner` a cada provedor: o administrador mais antigo dali.
      *
-     * Nothing is backfilled and nothing could be: the log starts the day it is
-     * created, and inventing lines for actions nobody watched would be worse
-     * than an empty table — a log that appears to cover a period it does not
-     * is a log that will be trusted about that period.
+     * Os papéis passaram de dois (`admin`, `viewer`) para quatro (`owner`,
+     * `admin`, `tech`, `viewer`). A coluna já é `string(32)` sem constraint, de
+     * modo que os dois novos cabem sem tocar no schema — o que falta é ter
+     * alguém no papel de cima, porque a única coisa que só o `owner` pode fazer
+     * é promover e rebaixar outro `owner`, e sem nenhum `owner` essa porta fica
+     * trancada por dentro em todo install que já existe.
      *
-     * No reading route ships with this step. Who may read the log is its own
-     * permissions question (an administrator can end a membership, so an
-     * administrator reading every reveal line is a different grant from the one
-     * that lets them make one), and the answer belongs with the platform plane.
-     * Writing first is still worth doing on its own: the lines a reader will
-     * eventually want are the ones that had to be written before it existed.
+     * O mais antigo, e não "todos os admins": promover todo mundo faria de
+     * `owner` outro nome para `admin` e apagaria a distinção no mesmo passo que
+     * a cria. Quem tiver que ser promovido depois, um `owner` promove.
+     *
+     * Não tira capacidade de ninguém: `owner` e `admin` carregam exatamente as
+     * mesmas capacidades (ver `config/permissions.js`), então a pessoa promovida
+     * não ganha rota nenhuma que já não alcançasse, e as que ficaram `admin`
+     * não perdem nenhuma.
+     *
+     * Sem `isApplied`: não há nada para baselinar. Um install anterior ao
+     * runner não tem `tenant_users` — a tabela nasceu na 0028, que é do runner
+     * — então "já estava assim" não é estado possível aqui.
      */
-    id: '0030_audit_log',
+    id: '0030_tenant_owner_role',
+    async up(db) {
+      if (!(await db.schema.hasTable('tenant_users'))) return;
+
+      const tenants = await db('tenant_users').distinct('tenant_id').pluck('tenant_id');
+      for (const tenantId of tenants) {
+        // Se já houver `owner` ali, a migração não tem o que fazer: ou já rodou,
+        // ou alguém promovido depois já ocupa o papel, e nos dois casos escolher
+        // outro seria desfazer uma decisão que não é desta migração.
+        const existente = await db('tenant_users')
+          .where({ tenant_id: tenantId, role: 'owner' })
+          .first();
+        if (existente) continue;
+
+        const maisAntigo = await db('tenant_users')
+          .where({ tenant_id: tenantId, role: 'admin' })
+          .orderBy('id', 'asc')
+          .first();
+        // Provedor sem nenhum administrador fica sem `owner`, de propósito:
+        // inventar um a partir de um `viewer` daria a alguém um poder que
+        // ninguém lhe deu.
+        if (!maisAntigo) continue;
+
+        await db('tenant_users')
+          .where({ id: maisAntigo.id })
+          .update({ role: 'owner', updated_at: new Date() });
+      }
+    }
+  },
+  {
+    /**
+     * A tabela de convites. Criada aqui e não com as tabelas de tenancy porque
+     * aponta para `users` — que o passo 0001 cria, muito depois de `tenants`.
+     * Mesmo motivo de `tenant_users` e `platform_admins`.
+     */
+    id: '0031_tenant_invites',
     async isApplied(db) {
-      if (!(await db.schema.hasTable('tenants'))) return false;
+      return db.schema.hasTable('tenant_invites');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('users'))) return;
+      if (!(await db.schema.hasTable('tenants'))) return;
+      await createTableIfMissing(db, 'tenant_invites', tenantInvitesTable(db));
+    }
+  },
+  {
+    /** A trilha. Mesmo motivo das duas acima para nascer aqui: aponta para `users`. */
+    id: '0032_audit_log',
+    async isApplied(db) {
       return db.schema.hasTable('audit_log');
     },
     async up(db) {
-      // `users` and `tenants` are both pointed at, and an install old enough to
-      // be missing either is one the earlier steps have yet to reach.
       if (!(await db.schema.hasTable('users'))) return;
       if (!(await db.schema.hasTable('tenants'))) return;
       await createTableIfMissing(db, 'audit_log', auditLogTable(db));
     }
+  },
+  {
+    /** A trilha do plano de controle. Aponta para `users`, daí nascer aqui. */
+    id: '0033_platform_audit',
+    async isApplied(db) {
+      return db.schema.hasTable('platform_audit');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('users'))) return;
+      await createTableIfMissing(db, 'platform_audit', platformAuditTable(db));
+    }
   }
 ];
-
 
 export default migrations;

@@ -14,7 +14,9 @@ import AppState from '../models/AppState.js';
 import { DEFAULT_SETTINGS } from '../config/seed.js';
 import { TranslatableError } from '../i18n/index.js';
 import { currentTenantId } from '../config/tenantContext.js';
-import GenieAcsConnector from './genieacs/connector.js';
+import GenieAcsEgress from './genieacsEgress.js';
+import { withAcsSlot } from './genieacs/concurrency.js';
+import GenieAcsAuthService from './genieacsAuthService.js';
 
 const WAN_PARAMETER_CANDIDATES = Object.freeze({
   vlan: [
@@ -199,23 +201,27 @@ class DeviceService {
     return null;
   }
 
-  /**
-   * How this provider's GenieACS is reached.
-   *
-   * Every request goes through one of these rather than through the egress
-   * guard directly. The difference is what the connection carries and a bare
-   * URL cannot: the `Authorization` header, whether a private address is
-   * allowed for this provider, whether its certificate is verified, and the
-   * per-provider ceiling on requests in flight. A call site that reaches past
-   * this to `GenieAcsEgress` would be a request made as nobody, without a
-   * credential and outside the ceiling — which is why nothing here does.
-   */
-  static async connector() {
-    return GenieAcsConnector.forCurrentTenant();
+  static async getGenieAcsUrl() {
+    const settings = await Setting.getAll();
+    return settings.genieAcsUrl;
   }
 
   static async getGenieAcsRootUrl() {
-    return (await this.connector()).rootUrl;
+    const baseUrl = await this.getGenieAcsUrl();
+    if (!baseUrl) {
+      throw new Error('GenieACS URL not configured');
+    }
+    const url = new URL(baseUrl);
+    if (!['http:', 'https:'].includes(url.protocol)) {
+      throw new Error('GenieACS URL must use HTTP or HTTPS');
+    }
+    if (url.username || url.password) {
+      throw new Error('Credentials in the GenieACS URL are not supported');
+    }
+    url.pathname = '/';
+    url.search = '';
+    url.hash = '';
+    return url.toString().replace(/\/+$/, '');
   }
 
   static async getVirtualParameters() {
@@ -229,7 +235,7 @@ class DeviceService {
   }
 
   static async getDevicesBaseUrl() {
-    return (await this.connector()).devicesUrl;
+    return `${await this.getGenieAcsRootUrl()}/devices`;
   }
 
   /**
@@ -270,15 +276,20 @@ class DeviceService {
     if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(String(collection))) {
       throw new Error('Invalid GenieACS collection name');
     }
-    const connector = await this.connector();
-    const url = connector.collectionUrl(collection, query);
+    const root = await this.getGenieAcsRootUrl();
+    const url = new URL(`${root}/${collection}`);
+    Object.entries(query || {}).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        url.searchParams.set(key, String(value));
+      }
+    });
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const options = {
         method,
-        headers: { Accept: 'application/json' },
+        headers: await GenieAcsAuthService.nbiHeaders(),
         signal: controller.signal,
         redirect: 'manual'
       };
@@ -286,7 +297,7 @@ class DeviceService {
         options.headers['Content-Type'] = 'application/json';
         options.body = typeof body === 'string' ? body : JSON.stringify(body);
       }
-      const response = await connector.request(url, options);
+      const response = await withAcsSlot(async () => GenieAcsEgress.fetch(url, options));
       if (!response.ok) {
         throw await this.genieAcsError(`GenieACS ${collection} API`, response);
       }
@@ -304,8 +315,8 @@ class DeviceService {
    * and the base URL becomes provider-supplied data, so the endpoint is the
    * side of this that must not be able to choose the destination.
    */
-  static buildDeviceUrl(connector, endpoint = '', query = {}) {
-    const base = connector.devicesUrl;
+  static async buildGenieAcsUrl(endpoint = '', query = {}) {
+    const base = await this.getDevicesBaseUrl();
 
     let urlStr;
     if (!endpoint) {
@@ -327,8 +338,7 @@ class DeviceService {
 
   static async fetchFromGenieAcs(endpoint, query = {}, method = 'GET', body = null) {
     try {
-      const connector = await this.connector();
-      const url = this.buildDeviceUrl(connector, endpoint, query);
+      const url = await this.buildGenieAcsUrl(endpoint, query);
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000);
@@ -336,7 +346,7 @@ class DeviceService {
       try {
         const options = {
           method,
-          headers: { 'Accept': 'application/json' },
+          headers: await GenieAcsAuthService.nbiHeaders(),
           signal: controller.signal,
           redirect: 'manual'
         };
@@ -345,7 +355,7 @@ class DeviceService {
           options.body = typeof body === 'string' ? body : JSON.stringify(body);
         }
 
-        const response = await connector.request(url, options);
+        const response = await withAcsSlot(async () => GenieAcsEgress.fetch(url, options));
 
         clearTimeout(timeoutId);
 
@@ -455,17 +465,16 @@ class DeviceService {
   }
 
   static async fetchGenieAcsWithHeaders(query = {}) {
-    const connector = await this.connector();
-    const url = this.buildDeviceUrl(connector, '', query);
+    const url = await this.buildGenieAcsUrl('', query);
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15_000);
     try {
-      const response = await connector.request(url, {
+      const response = await withAcsSlot(async () => GenieAcsEgress.fetch(url, {
         method: 'GET',
-        headers: { Accept: 'application/json' },
+        headers: await GenieAcsAuthService.nbiHeaders(),
         signal: controller.signal,
         redirect: 'manual'
-      });
+      }));
       if (!response.ok) {
         throw await this.genieAcsError('GenieACS API', response);
       }
@@ -1356,22 +1365,20 @@ class DeviceService {
    * "applied" would mark a device provisioned that never received anything.
    */
   static async postProvisioningTask(deviceId, task) {
-    const connector = await this.connector();
-    const url = this.buildDeviceUrl(
-      connector,
+    const url = await this.buildGenieAcsUrl(
       `${encodeURIComponent(deviceId)}/tasks`,
       { connection_request: 1 }
     );
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
     try {
-      const response = await connector.request(url, {
+      const response = await withAcsSlot(async () => GenieAcsEgress.fetch(url, {
         method: 'POST',
-        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+        headers: await GenieAcsAuthService.nbiHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(task),
         signal: controller.signal,
         redirect: 'manual'
-      });
+      }));
       const text = await response.text().catch(() => '');
       if (!response.ok) {
         throw await this.genieAcsError('GenieACS API', response, text);
@@ -1432,12 +1439,17 @@ class DeviceService {
     if (!deviceId || !/^[A-Za-z0-9_]+$/.test(String(tag))) {
       throw new Error('Invalid device tag');
     }
-    const connector = await this.connector();
-    const url = `${connector.devicesUrl}/${encodeURIComponent(String(deviceId))}/tags/${encodeURIComponent(String(tag))}`;
+    const root = await this.getGenieAcsRootUrl();
+    const url = `${root}/devices/${encodeURIComponent(String(deviceId))}/tags/${encodeURIComponent(String(tag))}`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15_000);
     try {
-      const response = await connector.request(url, { method, signal: controller.signal });
+      const response = await withAcsSlot(async () => GenieAcsEgress.fetch(url, {
+        method,
+        headers: await GenieAcsAuthService.nbiHeaders(),
+        signal: controller.signal,
+        redirect: 'manual'
+      }));
       if (!response.ok && !(method === 'DELETE' && response.status === 404)) {
         throw await this.genieAcsError('GenieACS tag API', response);
       }
@@ -1498,16 +1510,18 @@ class DeviceService {
   }
 
   static async deleteDevice(deviceId) {
-    const connector = await this.connector();
-    const url = `${connector.devicesUrl}/${encodeURIComponent(deviceId)}`;
+    const base = await this.getDevicesBaseUrl();
+    const url = `${base}/${encodeURIComponent(deviceId)}`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
 
     try {
-      const response = await connector.request(url, {
+      const response = await withAcsSlot(async () => GenieAcsEgress.fetch(url, {
         method: 'DELETE',
-        signal: controller.signal
-      });
+        headers: await GenieAcsAuthService.nbiHeaders(),
+        signal: controller.signal,
+        redirect: 'manual'
+      }));
 
       if (!response.ok) {
         throw await this.genieAcsError('GenieACS delete API', response);
@@ -1926,12 +1940,17 @@ class DeviceService {
     if (!faultId || String(faultId).length > 512) {
       throw new Error('Invalid fault ID');
     }
-    const connector = await this.connector();
-    const url = `${connector.rootUrl}/faults/${encodeURIComponent(String(faultId))}`;
+    const root = await this.getGenieAcsRootUrl();
+    const url = `${root}/faults/${encodeURIComponent(String(faultId))}`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15_000);
     try {
-      const response = await connector.request(url, { method: 'DELETE', signal: controller.signal });
+      const response = await withAcsSlot(async () => GenieAcsEgress.fetch(url, {
+        method: 'DELETE',
+        headers: await GenieAcsAuthService.nbiHeaders(),
+        signal: controller.signal,
+        redirect: 'manual'
+      }));
       if (!response.ok && response.status !== 404) {
         throw await this.genieAcsError('GenieACS fault API', response);
       }

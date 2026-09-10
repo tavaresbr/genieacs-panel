@@ -1,16 +1,11 @@
+import AuditLog from '../models/AuditLog.js';
 import Setting from '../models/Setting.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { translateError } from '../i18n/index.js';
 import CustomerService from '../services/customerService.js';
 import DeviceService from '../services/deviceService.js';
-import { EGRESS_REFUSED } from '../services/genieacsEgress.js';
-import {
-  connectorForTestUrl,
-  syncBaseUrlFromSetting,
-  CONNECTOR_UNCONFIGURED
-} from '../services/genieacs/connector.js';
-import GenieAcsConnection from '../models/GenieAcsConnection.js';
-import AuditLog, { AUDIT_ACTIONS } from '../models/AuditLog.js';
+import GenieAcsEgress, { EGRESS_REFUSED } from '../services/genieacsEgress.js';
+import GenieAcsAuthService, { AUTH_TYPES } from '../services/genieacsAuthService.js';
 import CustomerAccount from '../models/CustomerAccount.js';
 
 const ALLOWED_SETTING_KEYS = new Set([
@@ -60,6 +55,78 @@ function validateSetting(key, value) {
 }
 
 class SettingsController {
+  /**
+   * A credencial da NBI daquele provedor, sem o segredo.
+   *
+   * Rota própria e não uma chave em `/api/settings`, por uma razão só: aquela
+   * rota devolve `Setting.getAll()` inteiro, então toda chave que entra lá está
+   * no fio no mesmo instante. Um segredo cifrado no banco e servido em claro no
+   * GET não é segredo — e a redação teria que ser lembrada por quem
+   * acrescentasse a próxima chave, que é o tipo de lembrança que falha.
+   */
+  static async getGenieAcsAuth(req, res) {
+    try {
+      return res.json(createResponse(
+        req.t('settings.listRetrieved'),
+        await GenieAcsAuthService.getPublicConfig()
+      ));
+    } catch (error) {
+      console.error('Get GenieACS auth error:', error);
+      return res.status(500).json(createErrorResponse(req.t('common.internalError'), error.message));
+    }
+  }
+
+  static async updateGenieAcsAuth(req, res) {
+    try {
+      const authType = req.body?.authType;
+      if (authType !== undefined && !AUTH_TYPES.includes(authType)) {
+        return res.status(400).json(
+          createErrorResponse(req.t('settings.validation.genieAcsAuthType'))
+        );
+      }
+      // `basic` sem usuário é configuração que não autentica ninguém e que a
+      // tela não teria como distinguir de "salvou certo": o header sai
+      // `Basic OnNlZ3JlZG8=`, com usuário vazio, e o ACS recusa sem dizer por
+      // quê. `bearer` não precisa de usuário — o token é a credencial inteira.
+      const proximo = {
+        ...req.body,
+        username: req.body?.username
+      };
+      const atual = await GenieAcsAuthService.getPublicConfig();
+      const tipoFinal = authType ?? atual.authType;
+      const usuarioFinal = proximo.username === undefined ? atual.username : String(proximo.username).trim();
+      if (tipoFinal === 'basic' && !usuarioFinal) {
+        return res.status(400).json(
+          createErrorResponse(req.t('settings.validation.genieAcsAuthUsername'))
+        );
+      }
+
+      const salvo = await GenieAcsAuthService.saveConfig({
+        authType,
+        username: proximo.username,
+        secret: req.body?.secret
+      });
+      // O segredo não entra na trilha; o que entra é que a credencial mudou,
+      // para qual tipo, e se passou a existir uma. É o suficiente para
+      // responder "desde quando o ACS parou de aceitar a gente" sem guardar a
+      // resposta de quem quiser se passar pelo painel.
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.GENIEACS_AUTH_CHANGED,
+        subjectType: 'settings',
+        subjectId: 'genieacs-auth',
+        detail: {
+          authType: salvo.authType,
+          username: salvo.username,
+          secretConfigured: salvo.secretConfigured
+        }
+      });
+      return res.json(createResponse(req.t('settings.updated'), salvo));
+    } catch (error) {
+      console.error('Update GenieACS auth error:', error);
+      return res.status(500).json(createErrorResponse(req.t('common.internalError'), error.message));
+    }
+  }
+
   static async getAllSettings(req, res) {
     try {
       const settings = await Setting.getAll();
@@ -122,7 +189,6 @@ class SettingsController {
       }
 
       await Setting.create(key, validated.value);
-      await SettingsController.saveGenieAcsBaseUrl(req, key, validated.value);
       return res.json(
         createResponse(req.t('settings.created'), { [key]: validated.value })
       );
@@ -158,7 +224,20 @@ class SettingsController {
         );
       }
 
-      await SettingsController.saveGenieAcsBaseUrl(req, key, validated.value);
+      // Só a URL do ACS, e não toda chave que passa por aqui: a trilha existe
+      // para as ações sensíveis, e virar log de toda edição de configuração a
+      // encheria de linhas sobre o nome do painel e os caminhos de parâmetro
+      // virtual — que é como uma trilha deixa de ser lida. Mudar para onde o
+      // painel fala é outra coisa: é para onde vão as credenciais dos
+      // assinantes daquele provedor.
+      if (key === 'genieAcsUrl') {
+        await AuditLog.fromRequest(req, {
+          action: AuditLog.ACTIONS.GENIEACS_URL_CHANGED,
+          subjectType: 'settings',
+          subjectId: key,
+          detail: { url: validated.value }
+        });
+      }
 
       return res.json(
         createResponse(req.t('settings.updated'), { [key]: validated.value })
@@ -245,30 +324,6 @@ class SettingsController {
     }
   }
 
-  /**
-   * The one settings key that is also a connection, and the one that earns a
-   * line in the audit log.
-   *
-   * The settings route is a generic key/value writer and auditing it wholesale
-   * would mean a policy per key, which is its own piece of work. This key is
-   * different in kind since 0029: it names the server that manages every ONT
-   * the provider has, and repointing it changes no row anybody could look at
-   * afterwards. The URL itself goes in the line — unlike the SGP base URL,
-   * which is withheld because it is the address a token is sent to; here the
-   * credential is a separate column and the address is what the reader needs.
-   */
-  static async saveGenieAcsBaseUrl(req, key, value) {
-    if (key !== 'genieAcsUrl') return;
-    await syncBaseUrlFromSetting(key, value);
-    // Best-effort by contract (see AuditLog.record) — the setting is written.
-    await AuditLog.recordFromRequest(req, {
-      action: AUDIT_ACTIONS.GENIEACS_CONFIG_CHANGED,
-      targetType: 'integration',
-      targetId: 'genieacs',
-      metadata: { baseUrl: String(value ?? '').slice(0, 120) }
-    });
-  }
-
   static async testGenieAcsConnection(req, res) {
     try {
       const { url } = req.body;
@@ -313,43 +368,36 @@ class SettingsController {
         // GenieACS call whose destination is named by the caller rather than by
         // stored settings. It goes through the same guard as every other, or
         // the "test connection" button is a probe for anything our network can
-        // reach that the configured URL is not allowed to be — and through the
-        // provider's connector, so that testing the address already configured
-        // also tests the credential it is reached with. `connectorForTestUrl`
-        // is what decides whether the credential travels; it does not, to an
-        // address that is not the one it belongs to.
-        const {
-          connector, credentialsSent, describesStoredConnection
-        } = await connectorForTestUrl(testUrl);
-        const record = (status, detail) => (
-          describesStoredConnection
-            ? GenieAcsConnection.recordCheck(status, detail)
-            : Promise.resolve(false)
-        );
-        const response = await connector.request(testUrl, {
+        // reach that the configured URL is not allowed to be.
+        // A credencial guardada só acompanha o teste quando o endereço testado
+        // é a MESMA origem que está salva.
+        //
+        // Não é zelo: a URL vem no corpo do request, então mandar a credencial
+        // para qualquer endereço faria deste botão um jeito de LER o segredo —
+        // aponte para um servidor seu, leia o header. Ele é gravado para nunca
+        // mais ser exibido, e um administrador recuperaria assim o que um
+        // antecessor configurou. Contra a mesma origem já salva não há o que
+        // extrair: o segredo já vai para lá a cada requisição do painel.
+        //
+        // O efeito colateral é honesto e vale dizer na tela: testar um endereço
+        // NOVO vai sem autenticação, e contra uma NBI que exige credencial isso
+        // responde 401. É a resposta certa — a configuração daquele endereço
+        // ainda não foi salva, então não há credencial dele para usar.
+        const salva = await DeviceService.getGenieAcsUrl().catch(() => null);
+        const mesmaOrigem = (() => {
+          try { return salva ? new URL(salva).origin === testUrl.origin : false; } catch { return false; }
+        })();
+        const response = await GenieAcsEgress.fetch(testUrl, {
           method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-          },
+          headers: mesmaOrigem
+            ? await GenieAcsAuthService.nbiHeaders()
+            : { Accept: 'application/json' },
           signal: controller.signal
         });
         
         clearTimeout(timeoutId);
         
         if (!response.ok) {
-          // 401/403 with the credential attached is a wrong credential, not an
-          // unreachable ACS, and the operator has to be able to tell those
-          // apart — the panel would otherwise report "GenieACS is down" for a
-          // password they can fix in the next field.
-          await record('error', `HTTP ${response.status}`);
-          if (credentialsSent && [401, 403].includes(response.status)) {
-            return res.status(502).json(
-              createErrorResponse(
-                req.t('settings.connectionStatus', { status: response.status }),
-                req.t('settings.connectionUnauthorized')
-              )
-            );
-          }
           return res.status(502).json(
             createErrorResponse(
               req.t('settings.connectionStatus', { status: response.status }),
@@ -361,7 +409,6 @@ class SettingsController {
         const data = await response.json();
         
         if (Array.isArray(data)) {
-          await record('ok');
           return res.json(
             createResponse(req.t('settings.connectionSuccess'), {
               deviceCount: data.length
@@ -377,9 +424,7 @@ class SettingsController {
         
         // A refused address is the operator's own misconfiguration, not an
         // upstream outage, so it answers 400 with the reason rather than 502.
-        await record('error', error.code || error.name || 'failed');
-
-        if (error.code === EGRESS_REFUSED || error.code === CONNECTOR_UNCONFIGURED) {
+        if (error.code === EGRESS_REFUSED) {
           return res.status(400).json(
             createErrorResponse(req.t('settings.urlEgressRefused'), error.message)
           );

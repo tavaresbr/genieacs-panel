@@ -129,7 +129,6 @@ export default {
   'settings.connectionFailed': 'Não foi possível conectar ao servidor GenieACS',
   'settings.connectionStatus': 'O servidor GenieACS respondeu com status {status}',
   'settings.connectionTestFailed': 'O teste de conexão falhou',
-  'settings.connectionUnauthorized': 'O GenieACS recusou as credenciais desta conexão',
   'settings.customerIdSyncDisabled': 'A geração automática de ID de cliente está desativada',
   'settings.customerIdSynced': 'IDs de cliente sincronizados com sucesso',
   'settings.customerIdSyncedPending': 'IDs de cliente sincronizados; {count} equipamento(s) ainda precisam de SoftwareID, PPPoE ou data de instalação',
@@ -158,6 +157,7 @@ export default {
   'database.connectionFailed': 'Falha na conexão: {error}',
   'database.switched': 'Banco de dados alterado com sucesso e já está ativo.',
   'database.switchFailed': 'Falha ao trocar o banco: {error}',
+  'database.switchNotSoleProvider': 'A troca de banco só existe em instalação com um provedor só',
 
   // Perfis de fabricante
   'vendor.listRetrieved': 'Fabricantes obtidos com sucesso',
@@ -408,6 +408,7 @@ export default {
   'whatsapp.error.publicUrlCredentials': 'O endereço não pode conter usuário e senha',
   'whatsapp.error.invalidPortalUrl': 'A URL do portal do cliente é inválida',
   'whatsapp.error.invalidBaseUrl': 'A URL do servidor Evolution não está configurada',
+  'whatsapp.error.insecureBaseUrl': 'O servidor Evolution precisa usar https: a chave dele viaja em toda requisição',
   'whatsapp.error.hostNotAllowed': 'Este servidor Evolution não está na lista autorizada',
   'whatsapp.error.blockedHost': 'Servidor Evolution recusado: {reason}',
   // WhatsApp — Evolution transport (wave 1)
@@ -527,4 +528,31 @@ export default {
   'whatsapp.messageRequeued': 'Mensagem devolvida à fila',
   'whatsapp.messageNotRequeueable': 'Só uma mensagem que falhou pode ser enviada de novo.',
   'whatsapp.messagesRequeued': '{count} mensagem(ns) devolvida(s) à fila',
+  'vendor.nameTaken': 'Já existe um fabricante com este nome',
+  'wifiConfig.productClassTaken': 'Já existe uma configuração para esta classe de produto, e só uma pode valer',
+
+  // Convites de equipe
+  'invite.listed': 'Convites em aberto carregados',
+  'invite.listFailed': 'Falha ao listar os convites',
+  'invite.created': 'Convite criado',
+  'invite.createFailed': 'Falha ao criar o convite',
+  'invite.roleInvalid': 'O papel tem que ser um destes: {roles}',
+  'invite.ttlInvalid': 'Um convite tem que valer entre 30 minutos e 30 dias',
+  'invite.ownerOnly': 'Só um dono pode convidar outro dono',
+  'invite.revoked': 'Convite revogado',
+  'invite.revokeFailed': 'Falha ao revogar o convite',
+  'invite.notFound': 'Este convite não vale mais',
+  'invite.previewed': 'Convite carregado',
+  'invite.previewFailed': 'Falha ao ler o convite',
+  'invite.accepted': 'Bem-vindo à equipe',
+  'invite.acceptFailed': 'Falha ao aceitar o convite',
+  'invite.alreadyMember': 'Você já trabalha para este provedor',
+
+  'settings.validation.genieAcsAuthType': 'O tipo de autenticação do GenieACS tem que ser none, basic ou bearer',
+  'settings.validation.genieAcsAuthUsername': 'A autenticação basic precisa de um usuário',
+
+  'audit.listed': 'Trilha de auditoria carregada',
+  'audit.listFailed': 'Falha ao ler a trilha de auditoria',
+
+  'tenant.exportFailed': 'Falha ao exportar os dados do provedor',
 };

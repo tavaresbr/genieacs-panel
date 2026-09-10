@@ -424,14 +424,29 @@ describe('the manual sweep button, with more than one provider', () => {
   });
 });
 
-describe('the sweep on an install with a single provider', () => {
-  // Beta stands down for these, which is the shape of every install that
-  // upgrades into this wave: one provider, and a tree with no `t<id>/` in it.
+/**
+ * Suspending the neighbour does NOT turn this into a single-provider install,
+ * and the sweep used to think it did.
+ *
+ * `includeLegacy` was decided from the count of ACTIVE providers, so the moment
+ * Beta was suspended — for non-payment, or an operator toggling a row — Alfa
+ * became "sole" and its next pass applied ALFA's retention to BETA's legacy
+ * files. Those files carry no row Alfa can see, so they were judged orphans and
+ * deleted by age alone, at the moment Beta was least able to notice. The row
+ * left behind still pointed at bytes that no longer existed, which is the one
+ * state this module says it exists to prevent.
+ *
+ * The genuinely-single-provider case is not tested here and cannot be: this
+ * file always holds two provider rows. `whatsapp-media-sweep.test.js` is the
+ * single-provider file and covers it, including the case where a second row
+ * appears and the legacy area stops being anyone's to sweep.
+ */
+describe('the sweep when the neighbour is suspended rather than absent', () => {
   beforeEach(async () => {
     await getDb()('tenants').where({ slug: 'beta' }).update({ status: 'suspended' });
   });
 
-  it('still reaches the legacy area, exactly as before the subtree existed', async () => {
+  it('leaves the legacy area alone, because a suspended provider still owns its files', async () => {
     await comRetencao(alfa, 30);
 
     const legadoComLinha = gravar(`wa-media/${conversaAlfa}/antiga.png`, 45);
@@ -444,15 +459,21 @@ describe('the sweep on an install with a single provider', () => {
 
     const result = await WaMediaSweeper.tick();
 
-    assert.equal(result.files, 3);
-    assert.equal(existe(legadoComLinha), false);
-    assert.equal(existe(legadoOrfao), false);
-    assert.equal(existe(novo), false, 'both areas are one provider\'s when there is only one');
+    // Só o que está no subtree do próprio Alfa, e nada do que a idade sozinha
+    // condenaria na área legada.
+    assert.equal(result.files, 1);
+    assert.equal(existe(novo), false, 'my own subtree is still mine to sweep');
+    assert.equal(existe(legadoComLinha), true, 'age alone must not decide in a shared area');
+    assert.equal(existe(legadoOrfao), true);
     assert.equal(existe(recente), true, 'the window still decides, not the area');
 
     const row = await runInTenant(alfa, () => WaMessage.getById(message.id));
     assert.ok(row, 'the message row survives — that part never changes');
-    assert.equal(row.attachment_path, null);
+    assert.equal(
+      row.attachment_path,
+      legadoComLinha,
+      'a row whose file was kept must keep pointing at it'
+    );
   });
 
   it('still refuses to delete what a queued message has to send, in either area', async () => {

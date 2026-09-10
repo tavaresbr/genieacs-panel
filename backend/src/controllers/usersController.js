@@ -1,10 +1,20 @@
+import AuditLog from '../models/AuditLog.js';
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 import TenantUser from '../models/TenantUser.js';
-import AuditLog, { AUDIT_ACTIONS } from '../models/AuditLog.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
+import { ROLES, normalizeRole, roleHas } from '../config/permissions.js';
 
-export const ROLES = Object.freeze(['admin', 'viewer']);
+export { ROLES };
+
+/**
+ * Os papéis que podem administrar a equipe — hoje `owner` e `admin`.
+ *
+ * Derivado da matriz e não escrito à mão: o dia em que `tech` puder mexer em
+ * operador, a guarda do "último administrador" acompanha sozinha. Escrito à
+ * mão, ela contaria de menos e deixaria o provedor sem ninguém no comando.
+ */
+const ADMINISTRADORES = ROLES.filter((role) => roleHas(role, 'operators.manage'));
 
 const BCRYPT_ROUNDS = 12;
 
@@ -29,13 +39,16 @@ function normalizeUsername(value) {
 }
 
 /**
- * Rows written before roles were manageable used the old default, and anything
- * that is not an administrator has read-only access. The backfilled memberships
- * carry that same old default, so the mapping applies to a membership role too.
+ * O papel tal como vale aqui.
+ *
+ * Linhas escritas antes de os papéis serem gerenciáveis carregam `'user'`, que
+ * era o default da coluna, e as memberships que a 0028 preencheu carregam o que
+ * a pessoa tinha em `users.role`. Qualquer coisa desconhecida cai em `viewer` —
+ * a direção segura, e a mesma leitura que este arquivo já fazia quando os
+ * papéis eram dois; o que mudou é que a regra agora mora em um lugar só, junto
+ * da matriz que decide o que cada papel alcança.
  */
-function presentRole(role) {
-  return role === 'admin' ? 'admin' : 'viewer';
-}
+const presentRole = normalizeRole;
 
 /**
  * The person, wearing the role they hold HERE.
@@ -55,16 +68,18 @@ function present(member) {
 }
 
 /**
- * Keeps the person's deployment-wide role usable while it is still what the
- * route guard reads, and drops their open sessions so a role change bites now.
+ * Espelha o papel na coluna antiga quando isso ainda é honesto, e derruba as
+ * sessões abertas para que a mudança valha agora.
  *
- * `users.role` is not the truth any more — the membership is — but until the
- * token carries the membership role, `requireRole` still reads the column, and
- * leaving it behind would let somebody demoted here keep administrator routes.
- * Mirroring is only honest while the person works for this provider alone: with
- * several memberships one column cannot hold both roles, and writing it would
- * let this provider change what that person may do at another one. So then the
- * column is left as it stands and only the sessions are revoked.
+ * `users.role` não é mais a verdade — a membership é, e a guarda de rota lê a
+ * capacidade do papel que o token carrega. A coluna sobrevive como fallback do
+ * token antigo, que não traz `tenantId`, e por isso continua valendo a pena
+ * mantê-la em dia: deixá-la para trás faria alguém rebaixado aqui continuar
+ * alcançando rota de administrador enquanto o token velho não expira. Espelhar
+ * só é honesto enquanto a pessoa trabalha para este provedor sozinho: com
+ * várias memberships uma coluna não guarda dois papéis, e escrevê-la deixaria
+ * este provedor mudar o que aquela pessoa pode fazer em outro. Aí a coluna fica
+ * como está e só as sessões caem.
  */
 async function applyRoleSideEffects(userId, role) {
   const memberships = await TenantUser.listForUser(userId);
@@ -96,6 +111,13 @@ class UsersController {
       const username = normalizeUsername(req.body?.username);
       const password = String(req.body?.password ?? '');
       const role = presentRole(req.body?.role);
+
+      // Mesma regra da promoção: quem não é `owner` não cunha um.
+      if (role === 'owner' && presentRole(req.user.role) !== 'owner') {
+        return res.status(403).json(
+          createErrorResponse('Only an owner can grant or revoke the owner role')
+        );
+      }
 
       if (username.length < 3 || username.length > 64) {
         return res.status(400).json(
@@ -146,24 +168,13 @@ class UsersController {
         throw error;
       }
 
-      // Who let this person in is the question the removal line cannot answer
-      // on its own, and the membership row that would have said so is the row a
-      // later removal deletes. Recorded by username rather than by id because
-      // the id means nothing to somebody reading the log a year later, and the
-      // person may by then work for nobody.
-      //
-      // Best-effort by contract (see AuditLog.record): the operator exists and
-      // has a working login by this point, and answering 500 would invite the
-      // administrator to create them again — which fails on the taken username
-      // and looks like a bug in creation rather than in logging.
-      await AuditLog.recordFromRequest(req, {
-        action: AUDIT_ACTIONS.OPERATOR_ADDED,
-        targetType: 'operator',
-        targetId: username,
-        metadata: { role }
-      });
-
       const created = await User.findById(id);
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.OPERATOR_CREATED,
+        subjectType: 'tenant_user',
+        subjectId: id,
+        detail: { username, role }
+      });
       return res.status(201).json(
         createResponse('Operator created successfully', {
           user: present({ ...created, role })
@@ -208,7 +219,23 @@ class UsersController {
             createErrorResponse(`Role must be one of: ${ROLES.join(', ')}`)
           );
         }
-        if (id === req.user.userId && nextRole !== 'admin') {
+        // Só um `owner` mexe no papel de `owner` — para dar e para tirar. Sem
+        // isto, um `admin` promoveria a si mesmo ao papel de cima com um PATCH,
+        // e a distinção entre os dois não existiria de fato. 403 e não 404: o
+        // operador alvo está na mesma equipe de quem pergunta, e a resposta não
+        // revela nada que quem trabalha ali já não veja na tela.
+        const mexeEmOwner = nextRole === 'owner' || presentRole(membership.role) === 'owner';
+        if (mexeEmOwner && presentRole(req.user.role) !== 'owner') {
+          return res.status(403).json(
+            createErrorResponse('Only an owner can grant or revoke the owner role')
+          );
+        }
+        // Rebaixar-se a si mesmo abaixo de quem administra a equipe é sair pela
+        // porta e deixar a chave dentro: a pessoa perde a própria tela de
+        // operadores no mesmo request. A condição é a CAPACIDADE e não o nome
+        // do papel — um `owner` virando `admin` continua administrando e passa
+        // direto, que é o que se quer.
+        if (id === req.user.userId && !roleHas(nextRole, 'operators.manage')) {
           return res.status(409).json(
             createErrorResponse('You cannot remove your own administrator role')
           );
@@ -220,30 +247,26 @@ class UsersController {
         // one's last could go while the count stayed positive on somebody
         // else's staff.
         //
-        // Unreachable through this route as it stands, and kept on purpose:
-        // `requireRole(['admin'])` means the caller is an administrator HERE,
-        // so a target who is a different administrator makes the count two.
-        // It is the invariant that matters, not the branch — the day a role
-        // short of administrator may manage the team, this is what stops the
-        // provider from being locked out, and nothing else would.
-        if (presentRole(membership.role) === 'admin' && nextRole !== 'admin'
-          && await TenantUser.countByRole(tenantId, 'admin') <= 1) {
+        // Inalcançável por esta rota como ela está, e mantido de propósito:
+        // `requirePermission('operators.manage')` garante que quem pede já
+        // administra AQUI, então um alvo que também administra faz a conta ser
+        // dois. É o invariante que importa, não o ramo — o dia em que `tech`
+        // puder mexer na equipe, é isto que impede o provedor de ficar trancado
+        // por fora, e nada mais impediria.
+        if (roleHas(membership.role, 'operators.manage')
+          && !roleHas(nextRole, 'operators.manage')
+          && await TenantUser.countByRoles(tenantId, ADMINISTRADORES) <= 1) {
           return res.status(409).json(
             createErrorResponse('The panel must keep at least one administrator')
           );
         }
         await TenantUser.setRole(tenantId, id, nextRole);
         await applyRoleSideEffects(id, nextRole);
-        // The row that held the previous role has just been overwritten, so
-        // this line is the only place the change survives — which is why both
-        // roles go in it. Best-effort by contract (see AuditLog.record): the
-        // role is already changed and the sessions already revoked, and a 500
-        // here would report a promotion that in fact took effect.
-        await AuditLog.recordFromRequest(req, {
-          action: AUDIT_ACTIONS.OPERATOR_ROLE_CHANGED,
-          targetType: 'operator',
-          targetId: user.username,
-          metadata: { from: presentRole(membership.role), to: presentRole(nextRole) }
+        await AuditLog.fromRequest(req, {
+          action: AuditLog.ACTIONS.OPERATOR_ROLE_CHANGED,
+          subjectType: 'tenant_user',
+          subjectId: id,
+          detail: { username: user.username, from: presentRole(membership.role), to: nextRole }
         });
       }
 
@@ -269,17 +292,6 @@ class UsersController {
         }
         // updatePassword also revokes the operator's existing sessions.
         await User.updatePassword(id, await bcrypt.hash(password, BCRYPT_ROUNDS));
-        // An administrator setting somebody else's password is how one account
-        // becomes another: whoever typed it can now sign in as that operator,
-        // and nothing in the data afterwards distinguishes the two. The
-        // password is not in the line, only the fact — see AuditLog. Awaited
-        // and best-effort like the rest: the person is already locked out of
-        // their old password by the time this runs.
-        await AuditLog.recordFromRequest(req, {
-          action: AUDIT_ACTIONS.OPERATOR_PASSWORD_SET,
-          targetType: 'operator',
-          targetId: user.username
-        });
       }
 
       const updated = await User.findById(id);
@@ -319,41 +331,36 @@ class UsersController {
       if (!membership) {
         return res.status(404).json(createErrorResponse('Operator not found'));
       }
+      // A mesma regra do PATCH, e ela precisa estar nos dois: encerrar o
+      // vínculo de um `owner` é estritamente pior que rebaixá-lo, e proteger só
+      // a promoção deixaria um `admin` conseguindo pela porta ao lado
+      // exatamente o que a outra recusa — tirar o dono do provedor de cena.
+      if (presentRole(membership.role) === 'owner' && presentRole(req.user.role) !== 'owner') {
+        return res.status(403).json(
+          createErrorResponse('Only an owner can grant or revoke the owner role')
+        );
+      }
       // Same invariant as the demotion above, and unreachable for the same
       // reason: the caller is an administrator here, so removing a different
       // one leaves at least themselves.
-      if (presentRole(membership.role) === 'admin'
-        && await TenantUser.countByRole(tenantId, 'admin') <= 1) {
+      if (roleHas(membership.role, 'operators.manage')
+        && await TenantUser.countByRoles(tenantId, ADMINISTRADORES) <= 1) {
         return res.status(409).json(
           createErrorResponse('The panel must keep at least one administrator')
         );
       }
 
-      // Read before the membership ends, because the line names the person and
-      // not their id: an id in a log is a lookup into a table that may no
-      // longer answer.
-      const person = await User.findById(id);
-
       await TenantUser.remove(tenantId, id);
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.OPERATOR_REMOVED,
+        subjectType: 'tenant_user',
+        subjectId: id,
+        detail: { role: presentRole(membership.role) }
+      });
       // Their open sessions were sessions here. Revocation lives on the person,
       // so this signs them out of their other providers too — the blunt end of
       // one `token_version` per person, and the safe direction of the two.
       await User.revokeSessions(id);
-      // The membership row is gone, so this is now the only record that the
-      // person ever worked here — and the reason `actor_user_id` must not
-      // cascade: the administrator who did this could later be removed
-      // themselves, and their removal must not take this line with it.
-      //
-      // After the removal rather than before, so a line never claims a removal
-      // that the delete then failed to make. Best-effort by contract (see
-      // AuditLog.record): the membership is already ended, and a 500 here would
-      // send the administrator back to delete somebody who is already gone.
-      await AuditLog.recordFromRequest(req, {
-        action: AUDIT_ACTIONS.OPERATOR_REMOVED,
-        targetType: 'operator',
-        targetId: person?.username ?? String(id),
-        metadata: { role: presentRole(membership.role) }
-      });
       return res.json(createResponse('Operator deleted successfully', { id }));
     } catch (error) {
       console.error('Delete user error:', error);

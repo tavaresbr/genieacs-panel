@@ -6,7 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { testConnection } from './config/database.js';
-import { IS_SELF_HOSTED } from './config/edition.js';
+import { IS_SAAS, IS_SELF_HOSTED } from './config/edition.js';
 import { TRUST_PROXY } from './config/proxy.js';
 import { attachLocale } from './middleware/locale.js';
 import { resolveTenant } from './middleware/tenantResolver.js';
@@ -18,7 +18,7 @@ import {
   portalIpLimiter,
   portalLoginLimiter
 } from './middleware/rateLimit.js';
-import { authenticateToken, requireRole } from './middleware/auth.js';
+import { authenticateToken, requirePermission } from './middleware/auth.js';
 
 import authRoutes from './routes/auth.js';
 import deviceRoutes from './routes/devices.js';
@@ -27,9 +27,12 @@ import vendorRoutes from './routes/vendors.js';
 import mappingRoutes from './routes/mapping.js';
 import mapSettingsRoutes from './routes/mapSettings.js';
 import databaseRoutes from './routes/database.js';
+import platformRoutes from './routes/platform.js';
+import platformMemberRoutes from './routes/platformMembers.js';
 import userRoutes from './routes/users.js';
+import inviteRoutes from './routes/invites.js';
+import auditRoutes from './routes/audit.js';
 import tenantRoutes from './routes/tenant.js';
-import exportRoutes from './routes/export.js';
 import customerPortalRoutes from './routes/customerPortal.js';
 import sgpRoutes from './routes/sgp.js';
 import whatsappRoutes from './routes/whatsapp.js';
@@ -154,8 +157,8 @@ app.use(WEBHOOK_PATH, express.raw({ type: '*/*', limit: '64kb' }));
 // the same way: its body is the file itself, and the global parser below is
 // sized for JSON — a 12 MB photo posted past this line would fail as a parse
 // error against a 1 MB ceiling rather than as anything the screen could
-// explain. The route itself is admin-only and lives with the other WhatsApp
-// routes; only the body parser has to be this early.
+// explain. The route itself exige `whatsapp.send` e vive com as outras rotas de
+// WhatsApp; só o parser do corpo precisa estar tão cedo.
 //
 // What has to come with it is everything that decides whether these 16 MB are
 // worth holding at all. `apiLimiter` and `authenticateToken` are both mounted
@@ -177,7 +180,12 @@ app.use(
   ATTACHMENT_PATH,
   attachmentUploadLimiter,
   authenticateToken,
-  requireRole(['admin']),
+  // A MESMA capacidade que a rota de upload em `whatsappMessages.js` exige.
+  // As duas guardam o mesmo caminho e têm que concordar: mais frouxa aqui
+  // deixaria alguém sem a capacidade gastar a banda e o disco do parser antes
+  // de tomar 403 da rota; mais apertada faria a rota responder 403 a quem pode,
+  // sem que nada perto dela dissesse por quê.
+  requirePermission('whatsapp.send'),
   attachmentRawBody
 );
 app.use(express.json({ limit: '1mb' }));
@@ -245,11 +253,20 @@ app.use('/api/map-settings', mapSettingsRoutes);
 if (IS_SELF_HOSTED) {
   app.use('/api/database', databaseRoutes);
 }
+// The control plane is the other half of that same trade. On a self-hosted
+// install there is one provider and no plane above it, so these routes must not
+// merely refuse — they must not EXIST. A 403 would answer the question the
+// prober was asking, which is whether a control plane is there to find.
+if (IS_SAAS) {
+  // Two routers on one prefix, split by what they administer: the registry of
+  // providers, and the people inside one. Both are gated by the same guard;
+  // the split is only so two lanes could build them without sharing a file.
+  app.use('/api/platform', platformRoutes);
+  app.use('/api/platform', platformMemberRoutes);
+}
 app.use('/api/users', userRoutes);
-// One provider's whole database, as a file. Mounted in both editions, unlike
-// `/api/database` above: this one reads a single provider's rows through the
-// scoped builder, so it has nothing to say about anybody else's deployment.
-app.use('/api/export', exportRoutes);
+app.use('/api/invites', inviteRoutes);
+app.use('/api/audit', auditRoutes);
 app.use('/api/sgp', sgpRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/whatsapp', whatsappMessageRoutes);

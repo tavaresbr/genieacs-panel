@@ -129,7 +129,6 @@ export default {
   'settings.connectionFailed': 'No se pudo conectar al servidor GenieACS',
   'settings.connectionStatus': 'El servidor GenieACS respondió con estado {status}',
   'settings.connectionTestFailed': 'La prueba de conexión falló',
-  'settings.connectionUnauthorized': 'GenieACS rechazó las credenciales de esta conexión',
   'settings.customerIdSyncDisabled': 'La generación automática de ID de cliente está desactivada',
   'settings.customerIdSynced': 'ID de cliente sincronizados correctamente',
   'settings.customerIdSyncedPending': 'ID de cliente sincronizados; {count} equipo(s) todavía necesitan SoftwareID, PPPoE o fecha de instalación',
@@ -158,6 +157,7 @@ export default {
   'database.connectionFailed': 'Falló la conexión: {error}',
   'database.switched': 'Base de datos cambiada correctamente y ya está activa.',
   'database.switchFailed': 'Falló el cambio: {error}',
+  'database.switchNotSoleProvider': 'Cambiar la base de datos solo está disponible en una instalación con un único proveedor',
 
   // Perfiles de fabricante
   'vendor.listRetrieved': 'Fabricantes obtenidos correctamente',
@@ -408,6 +408,7 @@ export default {
   'whatsapp.error.publicUrlCredentials': 'La dirección no puede contener usuario y contraseña',
   'whatsapp.error.invalidPortalUrl': 'La URL del portal del cliente no es válida',
   'whatsapp.error.invalidBaseUrl': 'La URL del servidor Evolution no está configurada',
+  'whatsapp.error.insecureBaseUrl': 'El servidor Evolution debe usar https: su clave viaja en cada solicitud',
   'whatsapp.error.hostNotAllowed': 'Este servidor Evolution no está en la lista autorizada',
   'whatsapp.error.blockedHost': 'Servidor Evolution rechazado: {reason}',
   // WhatsApp — Evolution transport (wave 1)
@@ -527,4 +528,31 @@ export default {
   'whatsapp.messageRequeued': 'Mensaje devuelto a la cola',
   'whatsapp.messageNotRequeueable': 'Solo un mensaje que falló puede enviarse de nuevo.',
   'whatsapp.messagesRequeued': '{count} mensaje(s) devuelto(s) a la cola',
+  'vendor.nameTaken': 'Ya existe un fabricante con este nombre',
+  'wifiConfig.productClassTaken': 'Ya existe una configuración para esta clase de producto, y solo una puede aplicarse',
+
+  // Invitaciones de equipo
+  'invite.listed': 'Invitaciones abiertas obtenidas',
+  'invite.listFailed': 'No se pudieron listar las invitaciones',
+  'invite.created': 'Invitación creada',
+  'invite.createFailed': 'No se pudo crear la invitación',
+  'invite.roleInvalid': 'El rol debe ser uno de: {roles}',
+  'invite.ttlInvalid': 'Una invitación debe durar entre 30 minutos y 30 días',
+  'invite.ownerOnly': 'Solo un propietario puede invitar a otro propietario',
+  'invite.revoked': 'Invitación revocada',
+  'invite.revokeFailed': 'No se pudo revocar la invitación',
+  'invite.notFound': 'Esta invitación ya no es válida',
+  'invite.previewed': 'Invitación obtenida',
+  'invite.previewFailed': 'No se pudo leer la invitación',
+  'invite.accepted': 'Bienvenido al equipo',
+  'invite.acceptFailed': 'No se pudo aceptar la invitación',
+  'invite.alreadyMember': 'Ya trabajas para este proveedor',
+
+  'settings.validation.genieAcsAuthType': 'El tipo de autenticación de GenieACS debe ser none, basic o bearer',
+  'settings.validation.genieAcsAuthUsername': 'La autenticación basic necesita un usuario',
+
+  'audit.listed': 'Registro de auditoría obtenido',
+  'audit.listFailed': 'No se pudo leer el registro de auditoría',
+
+  'tenant.exportFailed': 'No se pudieron exportar los datos del proveedor',
 };

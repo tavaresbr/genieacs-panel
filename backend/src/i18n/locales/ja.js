@@ -132,7 +132,6 @@ export default {
   'settings.connectionFailed': 'GenieACS サーバーに接続できませんでした',
   'settings.connectionStatus': 'GenieACS サーバーがステータス {status} を返しました',
   'settings.connectionTestFailed': '接続テストに失敗しました',
-  'settings.connectionUnauthorized': 'GenieACS がこの接続の認証情報を拒否しました',
   'settings.customerIdSyncDisabled': '顧客 ID の自動生成は無効です',
   'settings.customerIdSynced': '顧客 ID を同期しました',
   'settings.customerIdSyncedPending': '顧客 ID を同期しました。{count} 台の機器には、まだ SoftwareID、PPPoE、または設置日が必要です',
@@ -161,6 +160,7 @@ export default {
   'database.connectionFailed': '接続に失敗しました: {error}',
   'database.switched': 'データベースを切り替え、現在有効になりました。',
   'database.switchFailed': '切り替えに失敗しました: {error}',
+  'database.switchNotSoleProvider': 'データベースの切り替えは、事業者が 1 つだけのインストールでのみ行えます',
   // ベンダープロファイル
   'vendor.listRetrieved': 'ベンダーを取得しました',
   'vendor.listFailed': 'ベンダーを取得できませんでした',
@@ -410,6 +410,7 @@ export default {
   'whatsapp.error.publicUrlCredentials': 'このアドレスにユーザー名とパスワードを含めることはできません',
   'whatsapp.error.invalidPortalUrl': '顧客ポータルの URL が無効です',
   'whatsapp.error.invalidBaseUrl': 'Evolution サーバーの URL が設定されていません',
+  'whatsapp.error.insecureBaseUrl': 'Evolution サーバーは https を使う必要があります。鍵がリクエストごとに送られます',
   'whatsapp.error.hostNotAllowed': 'この Evolution サーバーは許可リストに含まれていません',
   'whatsapp.error.blockedHost': 'Evolution サーバーを拒否しました: {reason}',
   // WhatsApp — Evolution の通信 (第 1 段階)
@@ -530,4 +531,31 @@ export default {
   'whatsapp.messageRequeued': 'メッセージを送信待ちに戻しました',
   'whatsapp.messageNotRequeueable': '再送できるのは送信に失敗したメッセージだけです。',
   'whatsapp.messagesRequeued': '{count} 件のメッセージを送信待ちに戻しました',
+  'vendor.nameTaken': 'この名称のベンダーはすでに存在します',
+  'wifiConfig.productClassTaken': 'この製品クラスの設定はすでにあり、適用されるのは 1 つだけです',
+
+  // チーム招待
+  'invite.listed': '有効な招待を取得しました',
+  'invite.listFailed': '招待の一覧を取得できませんでした',
+  'invite.created': '招待を作成しました',
+  'invite.createFailed': '招待を作成できませんでした',
+  'invite.roleInvalid': 'ロールは次のいずれかにしてください: {roles}',
+  'invite.ttlInvalid': '招待の有効期間は30分から30日の間にしてください',
+  'invite.ownerOnly': 'オーナーを招待できるのはオーナーだけです',
+  'invite.revoked': '招待を取り消しました',
+  'invite.revokeFailed': '招待を取り消せませんでした',
+  'invite.notFound': 'この招待は無効です',
+  'invite.previewed': '招待を取得しました',
+  'invite.previewFailed': '招待を読み取れませんでした',
+  'invite.accepted': 'チームへようこそ',
+  'invite.acceptFailed': '招待を承諾できませんでした',
+  'invite.alreadyMember': 'すでにこのプロバイダーに所属しています',
+
+  'settings.validation.genieAcsAuthType': 'GenieACS の認証方式は none、basic、bearer のいずれかにしてください',
+  'settings.validation.genieAcsAuthUsername': 'basic 認証にはユーザー名が必要です',
+
+  'audit.listed': '監査ログを取得しました',
+  'audit.listFailed': '監査ログを読み取れませんでした',
+
+  'tenant.exportFailed': 'プロバイダーのデータをエクスポートできませんでした',
 };

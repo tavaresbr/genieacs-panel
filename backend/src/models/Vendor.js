@@ -56,6 +56,31 @@ function serialize(vendorData) {
  * provider's mappings with it. `tdb` supplies the provider half of that WHERE,
  * which turns both into no-ops on a row that belongs to someone else.
  */
+/**
+ * Whether this provider already has a vendor by that name.
+ *
+ * Cosmetic next to the product-class check — a vendor's name is not what
+ * `detectVendor` matches on, so a duplicate name breaks nothing by itself. It
+ * is refused because the list is how an operator finds the row they mean to
+ * edit, and two rows called "ZTE" make that a guess: they will correct one and
+ * watch the other keep winning on priority.
+ *
+ * Compared case-insensitively in JavaScript rather than in SQL: the three
+ * engines disagree about collations, and this runs once per write.
+ */
+async function nameTaken(name, exceptId = null) {
+  const wanted = String(name ?? '').trim().toLowerCase();
+  if (!wanted) return false;
+  // Coerced, because the id reaches the model straight from a route parameter
+  // and is therefore a STRING. Compared strictly, a row would fail to recognise
+  // itself and every edit that kept its own name would be refused as a
+  // duplicate of itself.
+  const self = Number(exceptId);
+  const rows = await tdb('vendors').select('id', 'name');
+  return rows.some((row) => String(row.name ?? '').trim().toLowerCase() === wanted
+    && !(Number.isFinite(self) && Number(row.id) === self));
+}
+
 class Vendor {
   static async getAll() {
     const rows = await tdb('vendors')
@@ -75,12 +100,21 @@ class Vendor {
     return parseRow(row);
   }
 
+  /** @returns {Promise<number|null>} the new id, or null when the name is taken. */
   static async create(vendorData) {
+    if (await nameTaken(vendorData?.name)) return null;
     const id = await tinsertReturningId('vendors', serialize(vendorData));
     return id;
   }
 
+  /** @returns {Promise<boolean|null>} null when the name is taken by another row. */
   static async update(id, vendorData) {
+    // Existence FIRST, duplicate second — see the note in `WifiSecurityConfig`:
+    // handed another provider's id, "not found" is the true answer and
+    // "duplicate" would describe a row the caller cannot see.
+    const mine = await tdb('vendors').where({ id }).first();
+    if (!mine) return false;
+    if (await nameTaken(vendorData?.name, id)) return null;
     const payload = serialize(vendorData);
     payload.updated_at = getDb().fn.now();
     const affected = await tdb('vendors').where({ id }).update(payload);

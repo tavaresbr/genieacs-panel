@@ -129,7 +129,6 @@ export default {
   'settings.connectionFailed': 'Non è stato possibile connettersi al server GenieACS',
   'settings.connectionStatus': 'Il server GenieACS ha risposto con stato {status}',
   'settings.connectionTestFailed': 'La prova di connessione non è riuscita',
-  'settings.connectionUnauthorized': 'GenieACS ha rifiutato le credenziali di questa connessione',
   'settings.customerIdSyncDisabled': 'La generazione automatica dell’ID cliente è disattivata',
   'settings.customerIdSynced': 'ID cliente sincronizzati correttamente',
 
@@ -159,6 +158,7 @@ export default {
   'database.connectionFailed': 'Connessione fallita: {error}',
   'database.switched': 'Database cambiato correttamente e ora è attivo.',
   'database.switchFailed': 'Cambio fallito: {error}',
+  'database.switchNotSoleProvider': 'Il cambio di database è disponibile solo su un’installazione con un solo provider',
 
   // Profili dei produttori
   'vendor.listRetrieved': 'Produttori ottenuti correttamente',
@@ -409,6 +409,7 @@ export default {
   'whatsapp.error.publicUrlCredentials': 'L’indirizzo non può contenere utente e password',
   'whatsapp.error.invalidPortalUrl': 'L’URL del portale clienti non è valido',
   'whatsapp.error.invalidBaseUrl': 'L’URL del server Evolution non è configurato',
+  'whatsapp.error.insecureBaseUrl': 'Il server Evolution deve usare https: la sua chiave viaggia a ogni richiesta',
   'whatsapp.error.hostNotAllowed': 'Questo server Evolution non è nella lista autorizzata',
   'whatsapp.error.blockedHost': 'Server Evolution rifiutato: {reason}',
   // WhatsApp — Evolution transport (wave 1)
@@ -528,4 +529,31 @@ export default {
   'whatsapp.messageRequeued': 'Messaggio rimesso in coda',
   'whatsapp.messageNotRequeueable': 'Solo un messaggio non riuscito può essere inviato di nuovo.',
   'whatsapp.messagesRequeued': '{count} messaggio/i rimesso/i in coda',
+  'vendor.nameTaken': 'Esiste già un produttore con questo nome',
+  'wifiConfig.productClassTaken': 'Esiste già una configurazione per questa classe di prodotto, e solo una può valere',
+
+  // Inviti al team
+  'invite.listed': 'Inviti aperti recuperati',
+  'invite.listFailed': 'Impossibile elencare gli inviti',
+  'invite.created': 'Invito creato',
+  'invite.createFailed': 'Impossibile creare l\'invito',
+  'invite.roleInvalid': 'Il ruolo deve essere uno di: {roles}',
+  'invite.ttlInvalid': 'Un invito deve durare tra 30 minuti e 30 giorni',
+  'invite.ownerOnly': 'Solo un proprietario può invitare un altro proprietario',
+  'invite.revoked': 'Invito revocato',
+  'invite.revokeFailed': 'Impossibile revocare l\'invito',
+  'invite.notFound': 'Questo invito non è più valido',
+  'invite.previewed': 'Invito recuperato',
+  'invite.previewFailed': 'Impossibile leggere l\'invito',
+  'invite.accepted': 'Benvenuto nel team',
+  'invite.acceptFailed': 'Impossibile accettare l\'invito',
+  'invite.alreadyMember': 'Lavori già per questo provider',
+
+  'settings.validation.genieAcsAuthType': 'Il tipo di autenticazione GenieACS deve essere none, basic o bearer',
+  'settings.validation.genieAcsAuthUsername': 'L\'autenticazione basic richiede un nome utente',
+
+  'audit.listed': 'Registro di controllo recuperato',
+  'audit.listFailed': 'Impossibile leggere il registro di controllo',
+
+  'tenant.exportFailed': 'Impossibile esportare i dati del provider',
 };

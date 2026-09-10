@@ -111,6 +111,46 @@ describe('safeFetch gives every outbound request a deadline', () => {
   });
 });
 
+/**
+ * TLS deixou de ser opcional para o servidor Evolution.
+ *
+ * O `http:` existia para um Evolution de laboratório na mesma LAN, e essa
+ * justificativa não sobrevive ao ssrfGuard: ele barra toda faixa privada, então
+ * um alvo `http://` é por construção um host PÚBLICO na internet aberta. Toda
+ * requisição de `send` leva credencial no header `apikey` — a chave global do
+ * servidor em create/list/delete, o token da instância no resto.
+ */
+describe('the Evolution client requires TLS', () => {
+  const comBase = (baseUrl) => new EvolutionClient({ baseUrl, allowedHosts: [] });
+
+  test('refuses a cleartext target before any request leaves', async () => {
+    let chamou = false;
+    globalThis.fetch = () => { chamou = true; return new Response('{}'); };
+
+    await assert.rejects(
+      () => comBase('http://evo.provedor.test').probe('/'),
+      (error) => error.code === 'insecure_base_url'
+    );
+    assert.equal(chamou, false, 'nada pode ir para a rede antes da recusa');
+  });
+
+  test('refuses it for the credentialed path too', async () => {
+    const cliente = new EvolutionClient({
+      baseUrl: 'http://evo.provedor.test',
+      allowedHosts: [],
+      adminKey: 'chave-global-do-servidor'
+    });
+    await assert.rejects(
+      () => cliente.assertTarget(),
+      (error) => error.code === 'insecure_base_url'
+    );
+  });
+
+  test('accepts https', async () => {
+    await comBase('https://evo.provedor.test').assertTarget();
+  });
+});
+
 describe('the Evolution client refuses to buffer an unbounded response', () => {
   const cliente = () => new EvolutionClient({ baseUrl: HOST_PUBLICO, allowedHosts: [] });
 

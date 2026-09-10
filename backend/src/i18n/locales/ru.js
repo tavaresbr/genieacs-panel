@@ -132,7 +132,6 @@ export default {
   'settings.connectionFailed': 'Не удалось подключиться к серверу GenieACS',
   'settings.connectionStatus': 'Сервер GenieACS вернул код состояния {status}',
   'settings.connectionTestFailed': 'Проверка подключения не удалась',
-  'settings.connectionUnauthorized': 'GenieACS отклонил учётные данные этого подключения',
   'settings.customerIdSyncDisabled': 'Автоматическое создание идентификаторов клиентов отключено',
   'settings.customerIdSynced': 'Идентификаторы клиентов синхронизированы',
   'settings.customerIdSyncedPending': 'Идентификаторы клиентов синхронизированы; для {count} устройств(а) всё ещё нужны SoftwareID, PPPoE или дата установки',
@@ -161,6 +160,7 @@ export default {
   'database.connectionFailed': 'Не удалось подключиться: {error}',
   'database.switched': 'База данных переключена и теперь активна.',
   'database.switchFailed': 'Не удалось переключить: {error}',
+  'database.switchNotSoleProvider': 'Смена базы данных доступна только в установке с одним провайдером',
 
   // Профили производителей
   'vendor.listRetrieved': 'Список производителей получен',
@@ -411,6 +411,7 @@ export default {
   'whatsapp.error.publicUrlCredentials': 'Адрес не может содержать имя пользователя и пароль',
   'whatsapp.error.invalidPortalUrl': 'Адрес портала абонента указан неверно',
   'whatsapp.error.invalidBaseUrl': 'Адрес сервера Evolution не настроен',
+  'whatsapp.error.insecureBaseUrl': 'Сервер Evolution должен использовать https: его ключ передаётся в каждом запросе',
   'whatsapp.error.hostNotAllowed': 'Этого сервера Evolution нет в списке разрешённых',
   'whatsapp.error.blockedHost': 'Сервер Evolution отклонён: {reason}',
   // WhatsApp — транспорт Evolution (этап 1)
@@ -531,4 +532,31 @@ export default {
   'whatsapp.messageRequeued': 'Сообщение возвращено в очередь',
   'whatsapp.messageNotRequeueable': 'Повторно отправить можно только сообщение, отправка которого не удалась.',
   'whatsapp.messagesRequeued': 'Возвращено в очередь сообщений: {count}',
+  'vendor.nameTaken': 'Производитель с таким названием уже есть',
+  'wifiConfig.productClassTaken': 'Для этого класса устройств настройка уже есть, а действовать может только одна',
+
+  // Приглашения в команду
+  'invite.listed': 'Открытые приглашения получены',
+  'invite.listFailed': 'Не удалось получить список приглашений',
+  'invite.created': 'Приглашение создано',
+  'invite.createFailed': 'Не удалось создать приглашение',
+  'invite.roleInvalid': 'Роль должна быть одной из: {roles}',
+  'invite.ttlInvalid': 'Приглашение должно действовать от 30 минут до 30 дней',
+  'invite.ownerOnly': 'Только владелец может пригласить другого владельца',
+  'invite.revoked': 'Приглашение отозвано',
+  'invite.revokeFailed': 'Не удалось отозвать приглашение',
+  'invite.notFound': 'Это приглашение больше недействительно',
+  'invite.previewed': 'Приглашение получено',
+  'invite.previewFailed': 'Не удалось прочитать приглашение',
+  'invite.accepted': 'Добро пожаловать в команду',
+  'invite.acceptFailed': 'Не удалось принять приглашение',
+  'invite.alreadyMember': 'Вы уже работаете у этого провайдера',
+
+  'settings.validation.genieAcsAuthType': 'Тип аутентификации GenieACS должен быть none, basic или bearer',
+  'settings.validation.genieAcsAuthUsername': 'Аутентификация basic требует имя пользователя',
+
+  'audit.listed': 'Журнал аудита получен',
+  'audit.listFailed': 'Не удалось прочитать журнал аудита',
+
+  'tenant.exportFailed': 'Не удалось экспортировать данные провайдера',
 };

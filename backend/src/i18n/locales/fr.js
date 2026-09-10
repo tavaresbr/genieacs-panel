@@ -132,7 +132,6 @@ export default {
   'settings.connectionFailed': 'Impossible de se connecter au serveur GenieACS',
   'settings.connectionStatus': 'Le serveur GenieACS a renvoyé le statut {status}',
   'settings.connectionTestFailed': 'Le test de connexion a échoué',
-  'settings.connectionUnauthorized': 'GenieACS a refusé les identifiants de cette connexion',
   'settings.customerIdSyncDisabled': 'La génération automatique de l’ID client est désactivée',
   'settings.customerIdSynced': 'ID clients synchronisés',
   'settings.customerIdSyncedPending': 'ID clients synchronisés ; {count} équipement(s) ont encore besoin d’un SoftwareID, d’un PPPoE ou d’une date d’installation',
@@ -161,6 +160,7 @@ export default {
   'database.connectionFailed': 'Échec de la connexion : {error}',
   'database.switched': 'La base de données a été changée et est désormais active.',
   'database.switchFailed': 'Échec du changement : {error}',
+  'database.switchNotSoleProvider': 'Le changement de base de données n’est possible que sur une installation à fournisseur unique',
 
   // Profils de fabricants
   'vendor.listRetrieved': 'Fabricants récupérés',
@@ -408,6 +408,7 @@ export default {
   'whatsapp.error.incompleteConfig': 'Saisissez l’URL publique du webhook avant d’activer l’intégration : c’est par elle que le serveur Evolution renvoie les QR codes, les messages et les accusés',
   'whatsapp.error.invalidWebhookUrl': 'L’URL du webhook est invalide',
   'whatsapp.error.invalidBaseUrl': 'L’URL du serveur Evolution n’est pas configurée',
+  'whatsapp.error.insecureBaseUrl': 'Le serveur Evolution doit utiliser https : sa clé voyage à chaque requête',
   'whatsapp.error.hostNotAllowed': 'Ce serveur Evolution ne figure pas dans la liste des serveurs autorisés',
   'whatsapp.error.blockedHost': 'Serveur Evolution refusé : {reason}',
   // WhatsApp — transport Evolution (vague 1)
@@ -526,4 +527,31 @@ export default {
   'whatsapp.messageRequeued': 'Message remis dans la file',
   'whatsapp.messageNotRequeueable': 'Seul un message en échec peut être renvoyé.',
   'whatsapp.messagesRequeued': '{count} message(s) remis dans la file',
+  'vendor.nameTaken': 'Un fabricant portant ce nom existe déjà',
+  'wifiConfig.productClassTaken': 'Une configuration existe déjà pour cette classe de produit, et une seule peut s’appliquer',
+
+  // Invitations d'équipe
+  'invite.listed': 'Invitations en cours récupérées',
+  'invite.listFailed': 'Impossible de lister les invitations',
+  'invite.created': 'Invitation créée',
+  'invite.createFailed': 'Impossible de créer l\'invitation',
+  'invite.roleInvalid': 'Le rôle doit être l\'un des suivants : {roles}',
+  'invite.ttlInvalid': 'Une invitation doit durer entre 30 minutes et 30 jours',
+  'invite.ownerOnly': 'Seul un propriétaire peut inviter un autre propriétaire',
+  'invite.revoked': 'Invitation révoquée',
+  'invite.revokeFailed': 'Impossible de révoquer l\'invitation',
+  'invite.notFound': 'Cette invitation n\'est plus valable',
+  'invite.previewed': 'Invitation récupérée',
+  'invite.previewFailed': 'Impossible de lire l\'invitation',
+  'invite.accepted': 'Bienvenue dans l\'équipe',
+  'invite.acceptFailed': 'Impossible d\'accepter l\'invitation',
+  'invite.alreadyMember': 'Vous travaillez déjà pour ce fournisseur',
+
+  'settings.validation.genieAcsAuthType': 'Le type d\'authentification GenieACS doit être none, basic ou bearer',
+  'settings.validation.genieAcsAuthUsername': 'L\'authentification basic exige un nom d\'utilisateur',
+
+  'audit.listed': 'Journal d\'audit récupéré',
+  'audit.listFailed': 'Impossible de lire le journal d\'audit',
+
+  'tenant.exportFailed': 'Impossible d\u2019exporter les données du fournisseur',
 };

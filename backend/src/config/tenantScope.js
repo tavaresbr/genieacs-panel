@@ -85,15 +85,6 @@ export const SCOPED_TABLES = new Set([
   // its WHERE never was an identity filter — it meant "the only row", and the
   // second provider to save a map centre wrote over the first's.
   'map_settings',
-  // Who revealed which subscriber's password, who ended whose membership, who
-  // changed the ERP credentials. Scoped rather than shared even though the log
-  // is the deployment's own bookkeeping, because a line names one provider's
-  // staff and one provider's subscribers: an operator reading the deployment's
-  // whole log would learn another ISP's team, its integration changes and the
-  // rhythm of its support desk. It is also the table where an unfiltered
-  // WRITE would be worst — a line filed under the wrong provider accuses the
-  // wrong people.
-  'audit_log',
   // The equipment catalogue. Its content really is the same fact about firmware
   // for every ISP, but the rows are edited on screen, so shared they made one
   // operator's corrected detection pattern or parameter path silently change
@@ -103,11 +94,16 @@ export const SCOPED_TABLES = new Set([
   'vendors',
   'wifi_security_mappings',
   'wifi_security_config',
-  // Where this provider's GenieACS is, and the credential for it. Scoped from
-  // the step that creates it: it holds an encrypted NBI password, and reading
-  // another provider's row would not leak a record about their subscribers, it
-  // would hand over the key to their whole fleet.
-  'tenant_genieacs_connections'
+  // A trilha das ações sensíveis. Escopada pelo motivo óbvio e por mais um: a
+  // trilha de um ISP diz quem são seus operadores, quantos assinantes ele tem e
+  // quando alguém revelou a senha de um deles.
+  'audit_log',
+  // Os convites em aberto de um provedor. Escopada e não compartilhada, ao
+  // contrário de `tenant_users`: um convite pertence a UM provedor — é o
+  // vínculo que ele oferece — e listá-los sem filtro entregaria a um provedor
+  // quem o vizinho está tentando contratar. A busca pelo token é a exceção
+  // declarada, e está em `TenantInvite.findByToken`, com o motivo escrito lá.
+  'tenant_invites'
 ]);
 
 /** Tables that belong to the deployment rather than to any one provider. */
@@ -127,7 +123,16 @@ export const SHARED_TABLES = new Set([
   // a scope exists, at login, to decide which scope to open — reading it
   // through the scope would be circular. `TenantUser` carries the rule that
   // every query against it must name a person or a provider.
-  'tenant_users'
+  'tenant_users',
+  // A trilha do plano de controle: o que quem opera o SaaS fez COM um
+  // provedor. Compartilhada porque é ACIMA dos provedores e porque a linha que
+  // registra a exclusão de um tem que sobreviver a ele — escopada, ela seria
+  // apagada exatamente junto com o que existe para registrar.
+  'platform_audit',
+  // The control plane's roster. Above providers rather than inside one: a
+  // provider's own administrator must not be able to mint providers or reach
+  // into another's, so this cannot be a per-provider table by construction.
+  'platform_admins'
 ]);
 
 /** Tables still to be converted. Shrinks to empty as the phase progresses. */

@@ -9,15 +9,28 @@ import { LanguageSwitcher } from '@/components/language-switcher'
 import { Icon } from '@/components/ui/icon'
 import { BrandMark } from '@/components/brand-mark'
 import { APP_RELEASE, ReleaseNotesModal } from '@/components/release-notes-modal'
+import { normalizeRole, ROLE_LABEL_KEYS } from '@/lib/permissions'
 
-// `adminOnly` mirrors the backend: those routes answer 403 for a viewer, so
-// showing them would only offer a dead end.
+// `permission` é a capacidade que a tela precisa para ABRIR, a mesma que guarda
+// a rota em `app.tsx`: um item que aparece e leva a um redirecionamento é pior
+// do que item nenhum. Era um `adminOnly` booleano, que com quatro papéis passou
+// a mentir nos dois sentidos — escondia do plantão o mapa e a caixa do
+// WhatsApp, que a matriz lhe dá, e teria escondido tudo de um `owner` por ele
+// não se chamar `admin`.
+//
+// `platformOnly` é um portão A MAIS, sobre um fato DIFERENTE, e a diferença é o
+// ponto: o plano de controle fica acima do administrador do provedor, e nenhuma
+// capacidade da matriz responde por ele. Fosse este item guardado só pela
+// capacidade, apareceria para quase todo administrador do painel e levaria a
+// rotas que respondem 404 para eles — e, numa instalação self-hosted, a rotas
+// que não estão montadas.
 const menuItems = [
-  { href: '/dashboard', labelKey: 'sidebar.nav.dashboard', descriptionKey: 'sidebar.nav.dashboardDescription', icon: 'dashboard', adminOnly: false },
-  { href: '/devices', labelKey: 'sidebar.nav.devices', descriptionKey: 'sidebar.nav.devicesDescription', icon: 'devices', adminOnly: false },
-  { href: '/network-map', labelKey: 'sidebar.nav.networkMap', descriptionKey: 'sidebar.nav.networkMapDescription', icon: 'map', adminOnly: true },
-  { href: '/whatsapp', labelKey: 'sidebar.nav.whatsapp', descriptionKey: 'sidebar.nav.whatsappDescription', icon: 'chat', adminOnly: true },
-  { href: '/settings', labelKey: 'sidebar.nav.settings', descriptionKey: 'sidebar.nav.settingsDescription', icon: 'settings', adminOnly: true },
+  { href: '/dashboard', labelKey: 'sidebar.nav.dashboard', descriptionKey: 'sidebar.nav.dashboardDescription', icon: 'dashboard', permission: 'devices.list' },
+  { href: '/devices', labelKey: 'sidebar.nav.devices', descriptionKey: 'sidebar.nav.devicesDescription', icon: 'devices', permission: 'devices.list' },
+  { href: '/network-map', labelKey: 'sidebar.nav.networkMap', descriptionKey: 'sidebar.nav.networkMapDescription', icon: 'map', permission: 'map.read' },
+  { href: '/whatsapp', labelKey: 'sidebar.nav.whatsapp', descriptionKey: 'sidebar.nav.whatsappDescription', icon: 'chat', permission: 'whatsapp.read' },
+  { href: '/settings', labelKey: 'sidebar.nav.settings', descriptionKey: 'sidebar.nav.settingsDescription', icon: 'settings', permission: 'settings.read' },
+  { href: '/platform', labelKey: 'sidebar.nav.platform', descriptionKey: 'sidebar.nav.platformDescription', icon: 'settings', permission: 'settings.read', platformOnly: true },
 ] as const
 
 export default function Sidebar() {
@@ -100,9 +113,10 @@ function SidebarContent({
   closeMobile?: () => void
 }) {
   const { isDarkMode, toggleDarkMode } = useTheme()
-  const { user, logout } = useAuth()
-  const isAdmin = user?.role === 'admin'
-  const visibleItems = menuItems.filter((item) => !item.adminOnly || isAdmin)
+  const { user, logout, can } = useAuth()
+  const isPlatformAdmin = Boolean(user?.isPlatformAdmin)
+  const visibleItems = menuItems.filter((item) => can(item.permission)
+    && (!('platformOnly' in item && item.platformOnly) || isPlatformAdmin))
   const { t } = useTranslation()
   const displayName = user?.username || t('sidebar.defaultOperator')
   const initial = displayName.slice(0, 1).toUpperCase()
@@ -197,7 +211,10 @@ function SidebarContent({
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-semibold text-white">{displayName}</div>
               <div className="text-[0.68rem] text-[#91a098]">
-                {t(isAdmin ? 'sidebar.administrator' : 'sidebar.viewer')}
+                {/* O papel escrito por extenso, com o mesmo vocabulário do
+                    seletor de operadores: dois rótulos aqui e quatro lá diriam
+                    a um `tech` que ele é "acesso somente leitura". */}
+                {t(ROLE_LABEL_KEYS[normalizeRole(user?.role)])}
               </div>
             </div>
           )}

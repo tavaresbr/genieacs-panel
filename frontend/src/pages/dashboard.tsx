@@ -135,10 +135,13 @@ export default function DashboardPage() {
   const [clearingFault, setClearingFault] = useState<string | null>(null)
   const [sgpOverview, setSgpOverview] = useState<SgpFleetOverview | null>(null)
   const faultsLoadedRef = useRef(false)
-  const { user } = useAuth()
+  const { user, can } = useAuth()
   const { t, formatDateTime, formatTime } = useTranslation()
   const toast = useToast()
-  const isAdmin = user?.role === 'admin'
+  // Duas capacidades e não uma: a matriz dá `devices.inspect` e `devices.write`
+  // ao plantão, e era `role === 'admin'` que escondia dele as duas.
+  const canInspect = can('devices.inspect')
+  const canWrite = can('devices.write')
 
   const loadDashboard = useCallback(async (force = false) => {
     setLoadError('')
@@ -324,7 +327,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {isAdmin && <DeviceSwapsCard />}
+        {canInspect && <DeviceSwapsCard />}
 
         <section className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {([
@@ -454,7 +457,7 @@ export default function DashboardPage() {
           {data.faultsError && <div className="border-b border-border bg-[hsl(var(--status-warning))]/10 px-5 py-3 text-sm">{data.faultsError}</div>}
           <div className="overflow-x-auto">
             <table className="modern-table">
-              <thead><tr><th>{t('dashboard.faults.time')}</th><th>{t('dashboard.faults.device')}</th><th>{t('dashboard.faults.channelCode')}</th><th>{t('dashboard.faults.message')}</th>{isAdmin && <th>{t('dashboard.faults.action')}</th>}</tr></thead>
+              <thead><tr><th>{t('dashboard.faults.time')}</th><th>{t('dashboard.faults.device')}</th><th>{t('dashboard.faults.channelCode')}</th><th>{t('dashboard.faults.message')}</th>{canWrite && <th>{t('dashboard.faults.action')}</th>}</tr></thead>
               <tbody>
                 {data.faults.slice(0, 25).map((fault) => (
                   <tr key={fault.id}>
@@ -462,10 +465,10 @@ export default function DashboardPage() {
                     <td className="max-w-60 break-all font-mono text-xs">{fault.deviceId || '—'}</td>
                     <td><span className="modern-badge-error">{fault.code}</span><small className="mt-1 block text-muted-foreground">{fault.channel}{fault.retries ? ` · ${t('dashboard.faults.retry', { count: fault.retries })}` : ''}</small></td>
                     <td className="min-w-72 max-w-xl text-sm">{fault.message}</td>
-                    {isAdmin && <td><button type="button" className="modern-button-secondary" disabled={clearingFault === fault.id} onClick={() => void clearFault(fault)}>{clearingFault === fault.id ? t('dashboard.faults.clearing') : t('dashboard.faults.clear')}</button></td>}
+                    {canWrite && <td><button type="button" className="modern-button-secondary" disabled={clearingFault === fault.id} onClick={() => void clearFault(fault)}>{clearingFault === fault.id ? t('dashboard.faults.clearing') : t('dashboard.faults.clear')}</button></td>}
                   </tr>
                 ))}
-                {!data.faults.length && <tr><td colSpan={isAdmin ? 5 : 4} className="py-12 text-center text-muted-foreground">{t('dashboard.faults.empty')}</td></tr>}
+                {!data.faults.length && <tr><td colSpan={canWrite ? 5 : 4} className="py-12 text-center text-muted-foreground">{t('dashboard.faults.empty')}</td></tr>}
               </tbody>
             </table>
           </div>

@@ -132,7 +132,6 @@ export default {
   'settings.connectionFailed': '無法連線至 GenieACS 服務',
   'settings.connectionStatus': 'GenieACS 服務回傳狀態碼 {status}',
   'settings.connectionTestFailed': '連線測試失敗',
-  'settings.connectionUnauthorized': 'GenieACS 拒絕了此連線的憑證',
   'settings.customerIdSyncDisabled': '客戶 ID 自動產生已關閉',
   'settings.customerIdSynced': '客戶 ID 已同步',
   'settings.customerIdSyncedPending': '客戶 ID 已同步；仍有 {count} 台設備缺少 SoftwareID、PPPoE 或安裝日期',
@@ -161,6 +160,7 @@ export default {
   'database.connectionFailed': '連線失敗：{error}',
   'database.switched': '資料庫已切換並生效。',
   'database.switchFailed': '切換失敗：{error}',
+  'database.switchNotSoleProvider': '只有單一服務商的安裝才能切換資料庫',
   // 廠商設定檔
   'vendor.listRetrieved': '已取得廠商清單',
   'vendor.listFailed': '無法取得廠商清單',
@@ -410,6 +410,7 @@ export default {
   'whatsapp.error.publicUrlCredentials': '該位址不能夾帶使用者名稱與密碼',
   'whatsapp.error.invalidPortalUrl': '客戶入口網站位址無效',
   'whatsapp.error.invalidBaseUrl': '尚未設定 Evolution 伺服器位址',
+  'whatsapp.error.insecureBaseUrl': 'Evolution 伺服器必須使用 https：它的金鑰隨每個請求一起傳送',
   'whatsapp.error.hostNotAllowed': '該 Evolution 伺服器不在允許清單中',
   'whatsapp.error.blockedHost': 'Evolution 伺服器遭拒：{reason}',
   // WhatsApp — Evolution 傳輸層（第一階段）
@@ -530,4 +531,31 @@ export default {
   'whatsapp.messageRequeued': '訊息已重新排入佇列',
   'whatsapp.messageNotRequeueable': '只有傳送失敗的訊息才能重新傳送。',
   'whatsapp.messagesRequeued': '已將 {count} 則訊息重新排入佇列',
+  'vendor.nameTaken': '同名廠商已存在',
+  'wifiConfig.productClassTaken': '該產品類別已有設定，且只有一筆會生效',
+
+  // 團隊邀請
+  'invite.listed': '已取得待處理的邀請',
+  'invite.listFailed': '無法列出邀請',
+  'invite.created': '邀請已建立',
+  'invite.createFailed': '無法建立邀請',
+  'invite.roleInvalid': '角色必須是以下之一：{roles}',
+  'invite.ttlInvalid': '邀請的有效期必須介於 30 分鐘到 30 天之間',
+  'invite.ownerOnly': '只有擁有者才能邀請另一位擁有者',
+  'invite.revoked': '邀請已撤銷',
+  'invite.revokeFailed': '無法撤銷邀請',
+  'invite.notFound': '此邀請已失效',
+  'invite.previewed': '已取得邀請',
+  'invite.previewFailed': '無法讀取邀請',
+  'invite.accepted': '歡迎加入團隊',
+  'invite.acceptFailed': '無法接受邀請',
+  'invite.alreadyMember': '您已經在為此服務商工作',
+
+  'settings.validation.genieAcsAuthType': 'GenieACS 驗證方式必須是 none、basic 或 bearer',
+  'settings.validation.genieAcsAuthUsername': 'basic 驗證需要使用者名稱',
+
+  'audit.listed': '已取得稽核日誌',
+  'audit.listFailed': '無法讀取稽核日誌',
+
+  'tenant.exportFailed': '無法匯出服務商資料',
 };

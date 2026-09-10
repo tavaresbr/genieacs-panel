@@ -1,6 +1,5 @@
 import { getDb } from '../config/database.js';
 import { runInTenant } from '../config/tenantContext.js';
-import AuditLog, { AUDIT_ACTIONS } from '../models/AuditLog.js';
 import SgpEvent, { publicEvent } from '../models/SgpEvent.js';
 import SgpEventService from '../services/sgpEventService.js';
 import SgpService, { SgpError, WEBHOOK_PATH } from '../services/sgpService.js';
@@ -229,18 +228,6 @@ class SgpEventController {
   static async rotateSecret(req, res) {
     try {
       const secret = await SgpService.rotateWebhookSecret();
-      // The secret that authenticates SGP's deliveries, and — until providers
-      // are reached by host — the thing that says WHICH provider a delivery
-      // belongs to. Rotating it silently breaks every delivery configured with
-      // the old one, so "when did this last change, and who did it" is the
-      // first question asked when events stop arriving. The new secret is shown
-      // once to the operator and is not in the line; see AuditLog. Awaited and
-      // best-effort: the old secret has already stopped working.
-      await AuditLog.recordFromRequest(req, {
-        action: AUDIT_ACTIONS.SGP_WEBHOOK_SECRET_ROTATED,
-        targetType: 'integration',
-        targetId: 'sgp'
-      });
       // Shown once, exactly like a regenerated portal password.
       return res.json(createResponse(req.t('sgp.events.secretRotated'), {
         secret,

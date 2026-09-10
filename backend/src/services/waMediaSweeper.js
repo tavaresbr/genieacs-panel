@@ -163,6 +163,18 @@ async function walk(dir, out = []) {
 }
 
 /**
+ * Whether this installation has exactly one provider, counting every status.
+ *
+ * The one question the legacy area's ownership turns on. Suspended, disabled or
+ * whatever else a provider's row says, it still owns the files it wrote, so a
+ * count filtered by status is the wrong count to ask here.
+ */
+async function soleProvider() {
+  const [{ total } = {}] = await getDb()('tenants').count({ total: '*' });
+  return Number(total) === 1;
+}
+
+/**
  * The legacy area: everything under `wa-media` that is not inside a `t<id>/`.
  *
  * These are the files written before this wave, when the path carried no
@@ -262,6 +274,18 @@ class WaMediaSweeper {
    * spot rather than widening it. A suspended provider is not visited, and its
    * files sit in a subtree nobody else's pass can see — so they are kept, which
    * is the right answer for a provider that may come back.
+   *
+   * That last sentence holds for `wa-media/t<id>/` and NOT for the legacy area,
+   * which is why `includeLegacy` is counted separately below. Deciding it from
+   * the ACTIVE count meant that suspending one provider made its neighbour
+   * "sole", and the neighbour's next pass applied ITS retention to the
+   * suspended provider's legacy files — files carrying no row of the sweeper's
+   * own, therefore judged orphans and deleted by age alone. A provider is least
+   * able to notice that at exactly the moment it is suspended.
+   *
+   * The question `includeLegacy` asks is whether anyone BUT me could own these
+   * bytes, which is about existence, not activity. So it counts every provider,
+   * whatever its status.
    */
   static async tick() {
     if (this.running) return { skipped: 'busy', files: 0, bytes: 0, mb: 0 };
@@ -273,7 +297,9 @@ class WaMediaSweeper {
         .select('id', 'slug');
 
       if (tenants.length === 0) return { skipped: 'no_provider', files: 0, bytes: 0, mb: 0 };
-      const sole = tenants.length === 1;
+      // Not `tenants.length`: that counts who gets a pass, and this decides
+      // who could own the legacy files. A suspended neighbour still owns its.
+      const sole = await soleProvider();
 
       let files = 0;
       let bytes = 0;
@@ -338,10 +364,7 @@ class WaMediaSweeper {
     if (this.running) return { skipped: 'busy', files: 0, bytes: 0, mb: 0 };
     this.running = true;
     try {
-      const [{ total } = {}] = await getDb()('tenants')
-        .where({ status: 'active' })
-        .count({ total: '*' });
-      return await this.sweep({ includeLegacy: Number(total) === 1 });
+      return await this.sweep({ includeLegacy: await soleProvider() });
     } catch (error) {
       // Only the provider count can land here; `sweep` never throws.
       console.warn(`WhatsApp media sweep failed: ${error.message}`);

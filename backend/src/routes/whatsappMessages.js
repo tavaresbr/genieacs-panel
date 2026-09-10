@@ -2,16 +2,17 @@ import express from 'express';
 import WhatsAppMessageController from '../controllers/whatsappMessageController.js';
 import WhatsAppAttachmentController from '../controllers/whatsappAttachmentController.js';
 import WhatsAppMediaController from '../controllers/whatsappMediaController.js';
-import { authenticateToken, requireRole } from '../middleware/auth.js';
+import { authenticateToken, requirePermission } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Admin-only, like everything else under /api/whatsapp: sending from the
-// provider's number is speaking as the provider.
+// Ler a caixa é `whatsapp.read` e responder é `whatsapp.send`: atender
+// assinante é justamente o trabalho do plantão. A linha entre as duas é que
+// mandar mensagem do número do provedor é falar COMO o provedor.
 router.get(
   '/conversations',
   authenticateToken,
-  requireRole(['admin']),
+  requirePermission('whatsapp.read'),
   WhatsAppMessageController.listConversations
 );
 
@@ -20,7 +21,7 @@ router.get(
 router.get(
   '/conversations/:id/messages',
   authenticateToken,
-  requireRole(['admin']),
+  requirePermission('whatsapp.read'),
   WhatsAppMessageController.listMessages
 );
 
@@ -29,14 +30,14 @@ router.get(
 router.post(
   '/conversations/:id/status',
   authenticateToken,
-  requireRole(['admin']),
+  requirePermission('whatsapp.send'),
   WhatsAppMessageController.setStatus
 );
 
 router.post(
   '/conversations/:id/messages',
   authenticateToken,
-  requireRole(['admin']),
+  requirePermission('whatsapp.send'),
   WhatsAppMessageController.send
 );
 
@@ -51,7 +52,7 @@ router.post(
 router.post(
   '/attachments',
   authenticateToken,
-  requireRole(['admin']),
+  requirePermission('whatsapp.send'),
   WhatsAppAttachmentController.upload
 );
 
@@ -63,7 +64,7 @@ router.post(
 router.get(
   '/messages/:id/media',
   authenticateToken,
-  requireRole(['admin']),
+  requirePermission('whatsapp.read'),
   WhatsAppMediaController.fetch
 );
 
@@ -81,7 +82,7 @@ router.get(
 router.post(
   '/messages/:id/requeue',
   authenticateToken,
-  requireRole(['admin']),
+  requirePermission('whatsapp.send'),
   WhatsAppMessageController.requeue
 );
 
@@ -94,19 +95,19 @@ router.post(
 router.post(
   '/messages/requeue-failed',
   authenticateToken,
-  requireRole(['admin']),
+  requirePermission('whatsapp.send'),
   WhatsAppMessageController.requeueFailed
 );
 
-// The attachment sweep, on demand. Admin-only like its neighbours, and for a
-// harder reason than they have: this is the one route in the integration that
-// deletes anything. What it deletes is fixed by the retention window in
+// A varredura de anexos, sob demanda. `whatsapp.config` e não `whatsapp.send`,
+// por um motivo mais duro que o das vizinhas: esta é a única rota da integração
+// que apaga alguma coisa. What it deletes is fixed by the retention window in
 // Settings — the request carries no parameters at all — so the button is
 // "apply the policy now", never "choose one".
 router.post(
   '/media/sweep',
   authenticateToken,
-  requireRole(['admin']),
+  requirePermission('whatsapp.config'),
   WhatsAppMediaController.sweep
 );
 

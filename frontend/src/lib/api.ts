@@ -75,7 +75,16 @@ class ApiClient {
       if (!response.ok) {
         return {
           success: false,
-          message: data.message || translate(getActiveLocale(), 'api.requestFailed'),
+          // `missing_permission` é o 403 de quem tem sessão boa e papel curto.
+          // A frase de reserva é a dele e não a genérica: sem isto, uma rota que
+          // recusasse sem corpo cairia em "a requisição falhou", que manda a
+          // pessoa tentar de novo para sempre falhar igual — e é vizinha do
+          // `invalid_token` logo acima, cujo caminho termina em tela de login.
+          // Nada aqui derruba a sessão, e é justamente esse o ponto.
+          message: data.message || translate(
+            getActiveLocale(),
+            data.code === 'missing_permission' ? 'api.missingPermission' : 'api.requestFailed'
+          ),
           error: data.error || translate(getActiveLocale(), 'api.unknownError'),
           code: data.code,
           // Forwarded, not rebuilt away: see `skipped` above.
@@ -246,6 +255,95 @@ export const authAPI = {
 // An operator and the signed-in user are the same record, so they share a type.
 export type Operator = User
 export type { OperatorRole }
+
+/**
+ * What the login screen may know before anybody has signed in.
+ *
+ * Deliberately two fields. This route is public by necessity — it exists to be
+ * read before there is a session — so it carries the provider's name and
+ * nothing that would help enumerate: a host that names no provider answers the
+ * same 404 as any other unresolvable one, and a suspended provider answers it
+ * too, because telling "suspended" from "never existed" tells a prober which
+ * slugs are real, and a slug is an ISP's name.
+ */
+export interface PublicTenant {
+  slug: string
+  name: string
+}
+
+/**
+ * The provider the browser's own address resolves to.
+ *
+ * No parameter: the answer comes from the `Host` the request already carries,
+ * which is the whole point — the address names the provider, so a caller
+ * cannot ask about one they did not arrive at.
+ *
+ * Answers 404 where the deployment has no base domain configured, which is
+ * every self-hosted install: the login screen then shows the panel's own name,
+ * exactly as it does today.
+ */
+export const publicTenantAPI = {
+  current: () => apiClient.get<PublicTenant>('/tenant/public')
+}
+
+/** One provider on the deployment, as the control plane sees it. */
+export interface Tenant {
+  id: number
+  slug: string
+  name: string
+  status: 'active' | 'suspended'
+  /** How many people hold a membership here. */
+  operators: number
+  createdAt: string | null
+}
+
+/** A person's membership at one provider, listed from the control plane. */
+export interface TenantMembership {
+  userId: number
+  username: string
+  role: OperatorRole
+}
+
+/**
+ * The SaaS control plane.
+ *
+ * These routes exist only where `EDITION=saas`; on a self-hosted install they
+ * are not mounted at all, so a call answers 404. That is deliberate — a 403
+ * would tell whoever asked that a control plane is there.
+ *
+ * Every one of them requires a platform administrator, which is a plane ABOVE a
+ * provider's own administrator: minting providers and reaching between them is
+ * exactly what a provider's admin must not be able to do.
+ */
+export const platformAPI = {
+  listTenants: () =>
+    apiClient.get<{ tenants: Tenant[] }>('/platform/tenants'),
+
+  createTenant: (payload: { slug: string; name: string }) =>
+    apiClient.post<{ tenant: Tenant }>('/platform/tenants', payload),
+
+  /**
+   * Suspends or reactivates. There is no delete: the scoped tables point at
+   * `tenants` without a cascade, so removing a provider that holds data would
+   * fail on a foreign key — and succeeding would be worse.
+   */
+  setTenantStatus: (id: number, status: 'active' | 'suspended') =>
+    apiClient.requestWithBody<{ tenant: Tenant }>('PATCH', `/platform/tenants/${id}`, { status }),
+
+  listMemberships: (tenantId: number) =>
+    apiClient.get<{ memberships: TenantMembership[] }>(`/platform/tenants/${tenantId}/members`),
+
+  /**
+   * Attaches a person who already exists to a provider. NEVER touches their
+   * password: wave 12 refused this to a provider's own administrator precisely
+   * because doing it with a password would reset a stranger's login.
+   */
+  addMembership: (tenantId: number, payload: { username: string; role: OperatorRole }) =>
+    apiClient.post<{ membership: TenantMembership }>(`/platform/tenants/${tenantId}/members`, payload),
+
+  removeMembership: (tenantId: number, userId: number) =>
+    apiClient.delete<{ userId: number }>(`/platform/tenants/${tenantId}/members/${userId}`)
+}
 
 export const usersAPI = {
   list: () =>
@@ -426,6 +524,36 @@ export const settingsAPI = {
 
   testGenieAcs: (url: string) =>
     apiClient.post('/settings/test-genieacs', { url }),
+
+  getGenieAcsAuth: () =>
+    apiClient.get<GenieAcsAuthConfig>('/settings/genieacs-auth'),
+
+  updateGenieAcsAuth: (payload: GenieAcsAuthPayload) =>
+    apiClient.put<GenieAcsAuthConfig>('/settings/genieacs-auth', payload),
+}
+
+export type GenieAcsAuthType = 'none' | 'basic' | 'bearer'
+
+/** O que o servidor conta sobre a credencial da NBI — nunca o segredo, só se existe um. */
+export interface GenieAcsAuthConfig {
+  authType: GenieAcsAuthType
+  username: string
+  secretConfigured: boolean
+  authTypes: GenieAcsAuthType[]
+}
+
+export interface GenieAcsAuthPayload {
+  authType?: GenieAcsAuthType
+  username?: string
+  /**
+   * Ausente MANTÉM o segredo guardado; string vazia APAGA.
+   *
+   * A tela não reexibe o segredo, então um formulário que salvasse o campo em
+   * branco como string vazia apagaria a credencial a cada salvamento. Quem
+   * chama tem que omitir a chave quando o operador não digitou nada — daí o
+   * tipo ser opcional em vez de `string`.
+   */
+  secret?: string
 }
 
 export interface SgpConfig {

@@ -2,7 +2,9 @@ import 'dotenv/config';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import TenantUser from '../models/TenantUser.js';
+import PlatformAdmin from '../models/PlatformAdmin.js';
 import { runInTenant } from '../config/tenantContext.js';
+import { roleHas } from '../config/permissions.js';
 
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
 const REFRESH_TOKEN_EXPIRES_IN = process.env.REFRESH_TOKEN_EXPIRES_IN || '7d';
@@ -35,7 +37,7 @@ const JWT_SECRET = (() => {
  *
  * The role written into the token is the MEMBERSHIP's, never `users.role`. The
  * same person can be an administrator at the ISP they own and an ordinary
- * operator at one they consult for, and `requireRole` reads what is here.
+ * operator at one they consult for, and `requirePermission` reads what is here.
  *
  * The refresh token carries `tenantId` as well, because it has to be able to
  * mint the same thing again: without it a refresh would have to guess the
@@ -277,18 +279,96 @@ async function authenticateTokenOptional(req, res, next) {
   return runInTenant(session.tenantId, () => next());
 }
 
-function requireRole(roles) {
+/**
+ * A guarda de rota, dita pelo que a rota FAZ.
+ *
+ * Substitui `requireRole(['admin'])` nas 91 rotas do painel. A diferença não é
+ * de estilo: com o papel escrito na rota, a política mora em 91 arquivos e
+ * acrescentar um papel obriga a reabrir os 91 e decidir de novo, um a um — e o
+ * esquecimento não aparece, a rota apenas continua exigindo `admin`. Com a
+ * capacidade escrita na rota, a política inteira é a matriz de
+ * `config/permissions.js`, que é uma coisa só para revisar.
+ *
+ * 403 e não 404 aqui, ao contrário do resto do painel: quem chegou até esta
+ * guarda passou por `authenticateToken`, tem sessão válida NESTE provedor, e o
+ * que falta é atribuição. "Você não pode isto" não conta a essa pessoa nada que
+ * ela já não saiba — ela sabe que a tela existe, é colega de quem a usa. O 404
+ * existe para não confirmar a EXISTÊNCIA de um registro a quem não deveria
+ * saber dele; não é o caso de uma rota fixa do produto.
+ */
+function requirePermission(permission) {
   return (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({ message: req.t('auth.required') });
     }
-
-    if (roles && !roles.includes(req.user.role)) {
-      return res.status(403).json({ message: req.t('auth.insufficientPermissions') });
+    if (!roleHas(req.user.role, permission)) {
+      return res.status(403).json({
+        message: req.t('auth.insufficientPermissions'),
+        code: 'missing_permission'
+      });
     }
-
-    next();
+    return next();
   };
+}
+
+/**
+ * Lets through only the people who hold the control plane.
+ *
+ * Runs after `authenticateToken`, so `req.user` is a session that has already
+ * been checked against the tables. What this adds is a different KIND of
+ * authority: `requirePermission` asks what somebody may do at the provider their token
+ * names, and the answer is never "may create providers" — an administrator at
+ * an ISP administers that ISP. Being admin at a provider must not reach the
+ * control plane, which is the whole point of a second roster.
+ *
+ * The roster is read from `platform_admins` on EVERY request, exactly as wave
+ * 12 re-reads the membership. The token is a claim about who signed in; it is
+ * never the authority. A grant withdrawn at 09:00 has to stop working at 09:00
+ * and not whenever the hour the token is good for happens to run out — and at
+ * this level, where the withdrawn grant may be the reason somebody was taken
+ * off it, waiting out an expiry is not a compromise worth making. There is no
+ * platform claim in the token for the same reason: a claim nobody trusts is
+ * one somebody eventually trusts by mistake.
+ *
+ * A caller who is not on the roster is answered 404, not 403, in the exact body
+ * `app.js` gives an unrouted `/api` path. The contract froze that reasoning one
+ * level up: the platform routes are mounted under `IS_SAAS`, and on a
+ * self-hosted install they do not answer 403 — they do not exist, because a 403
+ * tells whoever asked that the control plane is there. The same sentence
+ * decides this one. A 403 here would tell a provider's own administrator that
+ * the control plane exists on this deployment and that they are merely not on
+ * it, which is exactly the fact worth not confirming: it turns a shrug into a
+ * target and names the shape of account worth phishing for. With a 404, their
+ * token cannot tell a hosted deployment's control plane from a self-hosted
+ * install's not having one. It is also the answer wave 12 already settled on
+ * for the neighbouring question — an id with no membership at this provider is
+ * answered as nonexistent, never as forbidden.
+ *
+ * What this does NOT hide, and cannot: `authenticateToken` runs first, so an
+ * anonymous request to a mounted platform route still answers 401 where an
+ * unrouted path answers 404. Closing that is the mounting's business — the
+ * lanes that build these routes decide it — not the guard's.
+ */
+async function requirePlatformAdmin(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({ message: req.t('auth.required') });
+  }
+
+  let holdsIt;
+  try {
+    holdsIt = await PlatformAdmin.has(req.user.userId);
+  } catch (error) {
+    return next(error);
+  }
+
+  if (!holdsIt) {
+    return res.status(404).json({
+      success: false,
+      message: req.t('common.routeNotFound')
+    });
+  }
+
+  return next();
 }
 
 export {
@@ -297,5 +377,6 @@ export {
   resolveMembership,
   authenticateToken,
   authenticateTokenOptional,
-  requireRole
+  requirePermission,
+  requirePlatformAdmin
 };

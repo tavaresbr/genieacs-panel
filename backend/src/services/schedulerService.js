@@ -3,10 +3,12 @@ import ProvisioningService from './provisioningService.js';
 import SgpEventService from './sgpEventService.js';
 import SgpService from './sgpService.js';
 import { forEachTenant } from '../config/tenantJobs.js';
+import AuditLog from '../models/AuditLog.js';
 
 const STATE_KEY = 'scheduler_state';
 const BASE_INTERVAL_MS = 60_000;
 const PRUNE_INTERVAL_MS = 24 * 3600_000;
+const AUDIT_RETENTION_MS = 365 * 24 * 3600_000;
 
 /**
  * The panel's only background worker.
@@ -150,6 +152,14 @@ class SchedulerService {
       });
       await SgpEventService.prune().catch((error) => {
         console.warn(`Could not prune SGP events: ${error.message}`);
+      });
+      // A trilha de auditoria, um ano. Um ano e não "para sempre" porque a
+      // trilha guarda dado pessoal — qual assinante, qual contrato, qual
+      // operador — e guardar sem prazo é o que a LGPD chama de excesso; e não
+      // menos porque a pergunta que uma trilha responde ("quem mexeu nisso?")
+      // costuma chegar meses depois do fato, não dias.
+      await AuditLog.prune(new Date(Date.now() - AUDIT_RETENTION_MS)).catch((error) => {
+        console.warn(`Could not prune the audit log: ${error.message}`);
       });
     }
 

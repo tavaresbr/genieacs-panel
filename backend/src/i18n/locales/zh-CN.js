@@ -132,7 +132,6 @@ export default {
   'settings.connectionFailed': '无法连接到 GenieACS 服务',
   'settings.connectionStatus': 'GenieACS 服务返回状态码 {status}',
   'settings.connectionTestFailed': '连接测试失败',
-  'settings.connectionUnauthorized': 'GenieACS 拒绝了此连接的凭据',
   'settings.customerIdSyncDisabled': '客户 ID 自动生成已关闭',
   'settings.customerIdSynced': '客户 ID 已同步',
   'settings.customerIdSyncedPending': '客户 ID 已同步；仍有 {count} 台设备缺少 SoftwareID、PPPoE 或安装日期',
@@ -161,6 +160,7 @@ export default {
   'database.connectionFailed': '连接失败：{error}',
   'database.switched': '数据库已切换并生效。',
   'database.switchFailed': '切换失败：{error}',
+  'database.switchNotSoleProvider': '只有单一服务商的安装才能切换数据库',
 
   // 厂商配置
   'vendor.listRetrieved': '已获取厂商列表',
@@ -411,6 +411,7 @@ export default {
   'whatsapp.error.publicUrlCredentials': '该地址不能携带用户名和密码',
   'whatsapp.error.invalidPortalUrl': '客户门户地址无效',
   'whatsapp.error.invalidBaseUrl': '尚未配置 Evolution 服务器地址',
+  'whatsapp.error.insecureBaseUrl': 'Evolution 服务器必须使用 https：它的密钥随每个请求一起发送',
   'whatsapp.error.hostNotAllowed': '该 Evolution 服务器不在允许列表中',
   'whatsapp.error.blockedHost': 'Evolution 服务器被拒绝：{reason}',
   // WhatsApp — Evolution 通信层（第一阶段）
@@ -530,4 +531,31 @@ export default {
   'whatsapp.messageRequeued': '消息已重新排队',
   'whatsapp.messageNotRequeueable': '只有发送失败的消息才能重新发送。',
   'whatsapp.messagesRequeued': '已将 {count} 条消息重新排队',
+  'vendor.nameTaken': '同名厂商已存在',
+  'wifiConfig.productClassTaken': '该产品类别已有配置，且只有一条会生效',
+
+  // 团队邀请
+  'invite.listed': '已获取待处理的邀请',
+  'invite.listFailed': '无法列出邀请',
+  'invite.created': '邀请已创建',
+  'invite.createFailed': '无法创建邀请',
+  'invite.roleInvalid': '角色必须是以下之一：{roles}',
+  'invite.ttlInvalid': '邀请的有效期必须在 30 分钟到 30 天之间',
+  'invite.ownerOnly': '只有所有者才能邀请另一位所有者',
+  'invite.revoked': '邀请已撤销',
+  'invite.revokeFailed': '无法撤销邀请',
+  'invite.notFound': '此邀请已失效',
+  'invite.previewed': '已获取邀请',
+  'invite.previewFailed': '无法读取邀请',
+  'invite.accepted': '欢迎加入团队',
+  'invite.acceptFailed': '无法接受邀请',
+  'invite.alreadyMember': '您已经在为该服务商工作',
+
+  'settings.validation.genieAcsAuthType': 'GenieACS 认证方式必须是 none、basic 或 bearer',
+  'settings.validation.genieAcsAuthUsername': 'basic 认证需要用户名',
+
+  'audit.listed': '已获取审计日志',
+  'audit.listFailed': '无法读取审计日志',
+
+  'tenant.exportFailed': '无法导出服务商数据',
 };

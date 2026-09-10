@@ -602,11 +602,14 @@ function InboxTab() {
  */
 function MediaSweepButton() {
   const { t } = useTranslation()
-  const { user } = useAuth()
+  const { can } = useAuth()
   const toast = useToast()
   const [sweeping, setSweeping] = useState(false)
 
-  if (user?.role !== 'admin') return null
+  // `whatsapp.config` e não `whatsapp.send`, como a rota: esta é a única ação
+  // da integração que APAGA arquivo, e o plantão que responde a assinante não
+  // aplica política de retenção.
+  if (!can('whatsapp.config')) return null
 
   const sweep = async () => {
     setSweeping(true)
@@ -690,11 +693,13 @@ const REQUEUE_WINDOW_HOURS = 24
  */
 function RequeueFailedButton() {
   const { t } = useTranslation()
-  const { user } = useAuth()
+  const { can } = useAuth()
   const toast = useToast()
   const [requeuing, setRequeuing] = useState(false)
 
-  if (user?.role !== 'admin') return null
+  // Reenfileirar é reenviar, então é `whatsapp.send`, como a rota. Quem estava
+  // de plantão quando a campanha caiu é exatamente quem precisa deste botão.
+  if (!can('whatsapp.send')) return null
 
   const requeueAll = async () => {
     if (!window.confirm(t('whatsapp.outbox.requeueAllConfirm', { hours: REQUEUE_WINDOW_HOURS }))) return
@@ -733,14 +738,22 @@ function RequeueFailedButton() {
   )
 }
 
-/** The tabs, in the order an operator meets them. */
+/**
+ * As abas, na ordem em que o operador as encontra, cada uma com a capacidade
+ * que ela precisa para LER — que é o que decide se a aba aparece.
+ *
+ * Alertas é a única que sai da lista do plantão: as três rotas dela exigem
+ * `whatsapp.config`, então para um `tech` a aba abriria vazia e cada leitura
+ * responderia 403. As demais ele lê; o que ele não pode escrever é recusado
+ * pelo servidor com uma frase que diz isso.
+ */
 const TABS = [
-  ['inbox', 'whatsapp.inbox.title'],
-  ['billing', 'whatsapp.billing.title'],
-  ['campaigns', 'whatsapp.broadcast.title'],
-  ['templates', 'whatsapp.templates.title'],
-  ['optOut', 'whatsapp.optOut.title'],
-  ['alerts', 'whatsapp.alerts.title']
+  ['inbox', 'whatsapp.inbox.title', 'whatsapp.read'],
+  ['billing', 'whatsapp.billing.title', 'campaigns.read'],
+  ['campaigns', 'whatsapp.broadcast.title', 'campaigns.read'],
+  ['templates', 'whatsapp.templates.title', 'campaigns.read'],
+  ['optOut', 'whatsapp.optOut.title', 'campaigns.read'],
+  ['alerts', 'whatsapp.alerts.title', 'whatsapp.config']
 ] as const
 
 type TabId = (typeof TABS)[number][0]
@@ -760,7 +773,9 @@ type TabId = (typeof TABS)[number][0]
  */
 export default function WhatsAppPage() {
   const { t } = useTranslation()
+  const { can } = useAuth()
   const [tab, setTab] = useState<TabId>('inbox')
+  const visibleTabs = TABS.filter(([, , permission]) => can(permission))
 
   return (
     <div className="page-shell">
@@ -789,7 +804,7 @@ export default function WhatsAppPage() {
         </div>
 
         <div className="tab-rail" role="tablist" aria-label={t('sidebar.nav.whatsapp')}>
-          {TABS.map(([id, labelKey]) => (
+          {visibleTabs.map(([id, labelKey]) => (
             <button
               key={id}
               type="button"
@@ -809,7 +824,10 @@ export default function WhatsAppPage() {
         {tab === 'campaigns' && <CampaignsPanel />}
         {tab === 'templates' && <TemplatesPanel />}
         {tab === 'optOut' && <OptOutPanel />}
-        {tab === 'alerts' && <AlertsPanel />}
+        {/* Pela capacidade e não pela aba escolhida: o estado inicial é `inbox`,
+            mas um papel que perca `whatsapp.config` enquanto está em Alertas
+            continuaria montando um painel cujas requisições todas falham. */}
+        {tab === 'alerts' && can('whatsapp.config') && <AlertsPanel />}
       </div>
     </div>
   )

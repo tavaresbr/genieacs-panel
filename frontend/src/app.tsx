@@ -7,6 +7,7 @@ import { ToastProvider } from '@/components/ui/toast'
 import { LoadingProvider, RouteChangeLoader } from '@/components/ui/loading'
 import { BrandMark } from '@/components/brand-mark'
 import { LanguageProvider, useTranslation } from '@/contexts/language-context'
+import type { Permission } from '@/lib/permissions'
 
 const DashboardPage = lazy(() => import('@/pages/dashboard'))
 const DevicesPage = lazy(() => import('@/pages/devices'))
@@ -14,6 +15,7 @@ const DeviceDetailPage = lazy(() => import('@/pages/device-detail'))
 const NetworkMapPage = lazy(() => import('@/pages/network-map'))
 const SettingsPage = lazy(() => import('@/pages/settings'))
 const WhatsAppPage = lazy(() => import('@/pages/whatsapp'))
+const PlatformPage = lazy(() => import('@/pages/platform'))
 const LoginPage = lazy(() => import('@/pages/login'))
 const SetupPage = lazy(() => import('@/pages/setup'))
 
@@ -61,13 +63,36 @@ function ProtectedShell() {
 }
 
 /**
- * Routes whose API is administrator-only. A viewer that reaches one by typing
- * the URL is sent to the dashboard instead of a page where every request 403s.
+ * Uma rota guardada pela capacidade que a tela precisa para carregar.
+ *
+ * Guardava por `role === 'admin'`, o que com quatro papéis fecharia o mapa e a
+ * caixa do WhatsApp para o plantão, que é justamente quem trabalha ali. Quem
+ * não tem a capacidade é mandado ao painel em vez de a uma tela onde cada
+ * requisição responde 403 — e a capacidade escolhida é a da LEITURA que a tela
+ * faz ao abrir, não a da ação mais poderosa que ela oferece: quem só lê entra e
+ * vê; os botões de escrita se escondem sozinhos lá dentro.
  */
-function AdminRoute() {
+function PermissionRoute({ permission }: { permission: Permission }) {
+  const { can, loading } = useAuth()
+  if (loading) return <AuthFallback />
+  if (!can(permission)) return <Navigate to="/dashboard" replace />
+  return <Outlet />
+}
+
+/**
+ * The control plane, which is a level above a provider's own administrator.
+ *
+ * Tem a forma de `PermissionRoute` e guarda outro fato, de propósito: estas
+ * rotas existem só onde a instalação roda como SaaS, e só para quem está na
+ * lista da plataforma. Nenhuma capacidade da matriz responde por isso — nem a
+ * de um `owner`, que administra o provedor dele e nada acima —, e guardada por
+ * uma delas a tela apareceria para quase todo administrador do painel,
+ * apontando para rotas que respondem 404 a ele.
+ */
+function PlatformRoute() {
   const { user, loading } = useAuth()
   if (loading) return <AuthFallback />
-  if (user?.role !== 'admin') return <Navigate to="/dashboard" replace />
+  if (!user?.isPlatformAdmin) return <Navigate to="/dashboard" replace />
   return <Outlet />
 }
 
@@ -102,9 +127,16 @@ export default function App() {
                   <Route path="/dashboard" element={<DashboardPage />} />
                   <Route path="/devices" element={<DevicesPage />} />
                   <Route path="/devices/detail" element={<DeviceDetailPage />} />
-                  <Route element={<AdminRoute />}>
+                  <Route element={<PlatformRoute />}>
+                    <Route path="/platform" element={<PlatformPage />} />
+                  </Route>
+                  <Route element={<PermissionRoute permission="map.read" />}>
                     <Route path="/network-map" element={<NetworkMapPage />} />
+                  </Route>
+                  <Route element={<PermissionRoute permission="settings.read" />}>
                     <Route path="/settings" element={<SettingsPage />} />
+                  </Route>
+                  <Route element={<PermissionRoute permission="whatsapp.read" />}>
                     <Route path="/whatsapp" element={<WhatsAppPage />} />
                   </Route>
                   <Route path="*" element={<Navigate to="/dashboard" replace />} />
