@@ -44,8 +44,14 @@ export const PPPOE_FALLBACK_PATHS = Object.freeze([
 /**
  * Optical RX power as the ONT vendors expose it. GPON diagnostics never made
  * it into TR-098, so every vendor put the reading under its own extension
- * object and the list is simply the ones seen in the field; TR-181 finally
- * standardized it as `Device.Optical.Interface.{i}.OpticalSignalLevel`.
+ * object; TR-181 finally standardized it as
+ * `Device.Optical.Interface.{i}.OpticalSignalLevel`.
+ *
+ * This list is a fast path, not the strategy. Naming an object here means a
+ * projection can ask for it by name and a single request answers; the scan
+ * below is what actually makes the reading findable, because no list of
+ * vendor object names is ever complete. A path here that no ONT in the fleet
+ * has costs nothing but its own length in the query string.
  */
 export const RX_POWER_FALLBACK_PATHS = Object.freeze([
   // Nokia / Alcatel-Lucent (ALCL) G-series
@@ -119,6 +125,83 @@ export function normalizeRxPowerReading(value) {
   return null;
 }
 
+/**
+ * Names a vendor might have given the reading. Anchored on purpose: an ONT
+ * that also publishes `RXPowerThreshold` or `RXPowerAlarm` must not have a
+ * threshold read back to a technician as the signal on the fibre.
+ */
+const RX_POWER_NAMES =
+  /^(?:rx_?power|rx_?optical_?power|rx_?optical_?level|rx_?level|optical_?rx_?power|optical_?signal_?level)$/i;
+
+/**
+ * How much of a device document the scan is allowed to walk. A GenieACS
+ * document is operator data of unbounded shape, and a lookup that reads a
+ * column has no business touching every node of it.
+ */
+const SCAN_NODE_BUDGET = 400;
+const SCAN_MAX_DEPTH = 3;
+
+/** The named (non-index, non-metadata) children of a GenieACS object node. */
+function namedChildren(node) {
+  if (!node || typeof node !== 'object') return [];
+  return Object.entries(node).filter(
+    ([key, value]) => !key.startsWith('_') && value && typeof value === 'object'
+  );
+}
+
+/**
+ * Collects every parameter under `node` whose own name says it is an RX
+ * optical reading, as `{ path, node }`, walking no deeper and no wider than
+ * the budget above.
+ */
+function collectRxCandidates(node, prefix, depth, budget, found) {
+  if (depth > SCAN_MAX_DEPTH || budget.left <= 0) return;
+  for (const [key, child] of namedChildren(node)) {
+    if (budget.left-- <= 0) return;
+    const path = `${prefix}.${key}`;
+    if (RX_POWER_NAMES.test(key)) {
+      found.push({ path, node: child });
+      continue;
+    }
+    collectRxCandidates(child, path, depth + 1, budget, found);
+  }
+}
+
+/**
+ * Finds an optical RX reading by what the parameter is called rather than by
+ * where a particular vendor put it.
+ *
+ * The catalogue above can only list object names someone has already seen; a
+ * fleet running anything else reads N/A for every row with the value sitting
+ * right there in the document. Every vendor does agree on the leaf name,
+ * though — it is `RXPower` or a spelling of it — so the name is what this
+ * matches on, and the value still has to survive `normalizeRxPowerReading`
+ * before it is believed.
+ */
+export function findRxPowerReading(item, readValue) {
+  const candidates = [];
+  const budget = { left: SCAN_NODE_BUDGET };
+
+  for (const [wanKey, wanDevice] of indexedChildren(item?.InternetGatewayDevice?.WANDevice)) {
+    collectRxCandidates(
+      wanDevice,
+      `InternetGatewayDevice.WANDevice.${wanKey}`,
+      1,
+      budget,
+      candidates
+    );
+  }
+  for (const [key, iface] of indexedChildren(item?.Device?.Optical?.Interface)) {
+    collectRxCandidates(iface, `Device.Optical.Interface.${key}`, 1, budget, candidates);
+  }
+
+  for (const candidate of candidates) {
+    const value = normalizeRxPowerReading(readValue(candidate.node));
+    if (value !== null) return { value, path: candidate.path };
+  }
+  return null;
+}
+
 /** The numeric children of a GenieACS object node, in index order. */
 function indexedChildren(node) {
   if (!node || typeof node !== 'object') return [];
@@ -171,5 +254,6 @@ export default {
   PPPOE_FALLBACK_PATHS,
   RX_POWER_FALLBACK_PATHS,
   findPppoeUsername,
+  findRxPowerReading,
   normalizeRxPowerReading
 };
