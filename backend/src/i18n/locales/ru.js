@@ -160,6 +160,7 @@ export default {
   'database.connectionFailed': 'Не удалось подключиться: {error}',
   'database.switched': 'База данных переключена и теперь активна.',
   'database.switchFailed': 'Не удалось переключить: {error}',
+  'database.switchNotSoleProvider': 'Смена базы данных доступна только в установке с одним провайдером',
 
   // Профили производителей
   'vendor.listRetrieved': 'Список производителей получен',
@@ -410,6 +411,7 @@ export default {
   'whatsapp.error.publicUrlCredentials': 'Адрес не может содержать имя пользователя и пароль',
   'whatsapp.error.invalidPortalUrl': 'Адрес портала абонента указан неверно',
   'whatsapp.error.invalidBaseUrl': 'Адрес сервера Evolution не настроен',
+  'whatsapp.error.insecureBaseUrl': 'Сервер Evolution должен использовать https: его ключ передаётся в каждом запросе',
   'whatsapp.error.hostNotAllowed': 'Этого сервера Evolution нет в списке разрешённых',
   'whatsapp.error.blockedHost': 'Сервер Evolution отклонён: {reason}',
   // WhatsApp — транспорт Evolution (этап 1)

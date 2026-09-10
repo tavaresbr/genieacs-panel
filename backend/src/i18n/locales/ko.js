@@ -161,6 +161,7 @@ export default {
   'database.connectionFailed': '연결에 실패했습니다: {error}',
   'database.switched': '데이터베이스를 전환했으며 지금부터 적용됩니다.',
   'database.switchFailed': '전환에 실패했습니다: {error}',
+  'database.switchNotSoleProvider': '데이터베이스 전환은 사업자가 하나뿐인 설치에서만 가능합니다',
 
   // 제조사 프로필
   'vendor.listRetrieved': '제조사 목록을 조회했습니다',
@@ -411,6 +412,7 @@ export default {
   'whatsapp.error.publicUrlCredentials': '주소에는 사용자 이름과 비밀번호를 포함할 수 없습니다',
   'whatsapp.error.invalidPortalUrl': '고객 포털 URL이 올바르지 않습니다',
   'whatsapp.error.invalidBaseUrl': 'Evolution 서버 URL이 설정되지 않았습니다',
+  'whatsapp.error.insecureBaseUrl': 'Evolution 서버는 https를 써야 합니다. 요청마다 키가 함께 전송됩니다',
   'whatsapp.error.hostNotAllowed': '이 Evolution 서버는 허용 목록에 없습니다',
   'whatsapp.error.blockedHost': 'Evolution 서버가 거부되었습니다: {reason}',
   // WhatsApp — Evolution 전송 (1차)

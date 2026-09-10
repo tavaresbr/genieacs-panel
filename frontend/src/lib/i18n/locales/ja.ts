@@ -1335,6 +1335,7 @@ const ja: Dictionary = {
   'whatsapp.error.invalidWebhookUrl': 'Webhook の URL が無効です。',
   'whatsapp.error.invalidPortalUrl': '顧客ポータルの URL が無効です。',
   'whatsapp.error.invalidBaseUrl': 'Evolution サーバーの URL が無効です。',
+  'whatsapp.error.insecureBaseUrl': 'Evolution サーバーは https を使う必要があります。鍵がリクエストごとに送られます。',
   'whatsapp.error.hostNotAllowed': 'この Evolution サーバーは許可リストに含まれていません。',
   'whatsapp.error.blockedHost': 'このアドレスはインターネットから到達できないため、拒否されました。',
   'whatsapp.error.unauthorized': 'Evolution サーバーが認証情報を拒否しました。',

@@ -157,6 +157,7 @@ export default {
   'database.connectionFailed': 'Falló la conexión: {error}',
   'database.switched': 'Base de datos cambiada correctamente y ya está activa.',
   'database.switchFailed': 'Falló el cambio: {error}',
+  'database.switchNotSoleProvider': 'Cambiar la base de datos solo está disponible en una instalación con un único proveedor',
 
   // Perfiles de fabricante
   'vendor.listRetrieved': 'Fabricantes obtenidos correctamente',
@@ -407,6 +408,7 @@ export default {
   'whatsapp.error.publicUrlCredentials': 'La dirección no puede contener usuario y contraseña',
   'whatsapp.error.invalidPortalUrl': 'La URL del portal del cliente no es válida',
   'whatsapp.error.invalidBaseUrl': 'La URL del servidor Evolution no está configurada',
+  'whatsapp.error.insecureBaseUrl': 'El servidor Evolution debe usar https: su clave viaja en cada solicitud',
   'whatsapp.error.hostNotAllowed': 'Este servidor Evolution no está en la lista autorizada',
   'whatsapp.error.blockedHost': 'Servidor Evolution rechazado: {reason}',
   // WhatsApp — Evolution transport (wave 1)

@@ -67,6 +67,27 @@ export class EvolutionClient {
     if (!this.baseUrl) {
       throw new WaError('whatsapp.error.invalidBaseUrl', { code: 'invalid_base_url', status: 400 });
     }
+    // TLS is required, and the SSRF guard below is the reason it can be.
+    //
+    // `http:` was allowed for the sake of a lab Evolution on the same LAN, and
+    // that justification does not survive the guard: it blocks every private
+    // range, so an `http://` target is by construction a PUBLIC host on the
+    // open internet. Every request from `send` carries a credential in the
+    // `apikey` header — the server's global admin key on create, list and
+    // delete, the instance token everywhere else — so allowing `http:` meant
+    // those crossing the internet in the clear, where anyone on the path reads
+    // them and then owns the provider's WhatsApp.
+    //
+    // `probe` sends no credential, but it is refused here too rather than
+    // specially exempted: it probes the same base URL that every authenticated
+    // call will use, so letting it succeed would only move the refusal to a
+    // later step and make it harder to read.
+    if (!/^https:\/\//i.test(this.baseUrl)) {
+      throw new WaError('whatsapp.error.insecureBaseUrl', {
+        code: 'insecure_base_url',
+        status: 400
+      });
+    }
     if (!isHostAllowed(this.baseUrl, this.allowedHosts)) {
       throw new WaError('whatsapp.error.hostNotAllowed', { code: 'host_not_allowed', status: 400 });
     }

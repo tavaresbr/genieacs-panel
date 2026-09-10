@@ -1427,6 +1427,7 @@ const ko: Dictionary = {
   'whatsapp.error.rateLimited': '짧은 시간에 발송이 너무 많습니다. 잠시 기다리십시오.',
   'whatsapp.error.scanFailed': '알림 검사를 완료하지 못했습니다.',
   'whatsapp.error.invalidBaseUrl': 'Evolution 서버 URL이 올바르지 않습니다.',
+  'whatsapp.error.insecureBaseUrl': 'Evolution 서버는 https를 써야 합니다. 요청마다 키가 함께 전송됩니다.',
   'whatsapp.error.hostNotAllowed': '이 Evolution 서버는 허용 목록에 없습니다.',
   'whatsapp.error.blockedHost': '이 주소는 인터넷에서 접근할 수 없어 거부되었습니다.',
   'whatsapp.error.unauthorized': 'Evolution 서버가 자격 증명을 거부했습니다.',

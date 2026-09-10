@@ -1421,6 +1421,7 @@ const zhTW: Dictionary = {
   'whatsapp.error.rateLimited': '短時間內傳送過於頻繁，請稍候。',
   'whatsapp.error.scanFailed': '警示掃描未能完成。',
   'whatsapp.error.invalidBaseUrl': 'Evolution 伺服器位址無效。',
+  'whatsapp.error.insecureBaseUrl': 'Evolution 伺服器必須使用 https：它的金鑰隨每個請求一起傳送。',
   'whatsapp.error.hostNotAllowed': '該 Evolution 伺服器不在允許清單中。',
   'whatsapp.error.blockedHost': '該位址無法從網際網路存取，已被拒絕。',
   'whatsapp.error.unauthorized': 'Evolution 伺服器拒絕了該憑證。',

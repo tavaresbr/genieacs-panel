@@ -16,23 +16,57 @@ import crypto from 'node:crypto';
  * release used. Version 2 derives from the dedicated SECRET_BOX_KEY. An install
  * that sets SECRET_BOX_KEY writes version 2 and can still read version 1, which
  * is what makes JWT_SECRET rotatable.
+ *
+ * That covered NEW writes and not the rows already stored, because version 1's
+ * key is still derived from whatever JWT_SECRET currently is: rotating it left
+ * every not-yet-rewritten portal password, WiFi password and stored token
+ * unreadable, and quietly — `decrypt` answers null, and on the portal
+ * `hasSavedPassword` still reports true because it only tests that the
+ * ciphertext columns are filled. So it presented to the subscriber as data that
+ * had vanished rather than as a key that was missing.
+ *
+ * `JWT_SECRET_PREVIOUS` and `SECRET_BOX_KEY_PREVIOUS` are the read-side overlap
+ * that makes a rotation survivable: each version accepts more than one key, the
+ * first is what writes, and the rest are only ever tried on the way in. Set the
+ * old value there, rotate the live one, and every row stays readable until it
+ * is next written — which is what moves it onto the new key.
  */
 export const LEGACY_KEY_VERSION = 1;
 export const CURRENT_KEY_VERSION = 2;
 
 const DEVELOPMENT_FALLBACK = 'insecure-development-secret';
 
+/**
+ * Whether this process is serving real data.
+ *
+ * Both variables are honoured, and the second is the point: the guard used to
+ * read `APP_ENV` alone. Every supported install path sets it — `install.sh` and
+ * the Dockerfile both do — but an install started outside them with only
+ * `NODE_ENV=production` fell through to `DEVELOPMENT_FALLBACK` and encrypted
+ * the operator's stored secrets under a key anyone can compute from this
+ * repository. A guard that depends on which of two conventional variables an
+ * operator happened to use is a guard that fails open on the unlucky one.
+ */
+function isProduction() {
+  return process.env.APP_ENV === 'production' || process.env.NODE_ENV === 'production';
+}
+
 function readBaseSecrets() {
   const jwtSecret = process.env.JWT_SECRET;
   const dedicatedKey = process.env.SECRET_BOX_KEY;
 
-  if (!jwtSecret && !dedicatedKey && process.env.APP_ENV === 'production') {
+  if (!jwtSecret && !dedicatedKey && isProduction()) {
     throw new Error(
       'SECRET_BOX_KEY (or JWT_SECRET) must be set to protect stored customer secrets'
     );
   }
 
-  return { jwtSecret, dedicatedKey };
+  return {
+    jwtSecret,
+    dedicatedKey,
+    previousJwtSecret: process.env.JWT_SECRET_PREVIOUS,
+    previousDedicatedKey: process.env.SECRET_BOX_KEY_PREVIOUS
+  };
 }
 
 function deriveKey(baseSecret, context) {
@@ -40,12 +74,22 @@ function deriveKey(baseSecret, context) {
 }
 
 export function createSecretBox(context) {
-  const { jwtSecret, dedicatedKey } = readBaseSecrets();
+  const {
+    jwtSecret, dedicatedKey, previousJwtSecret, previousDedicatedKey
+  } = readBaseSecrets();
+
+  /** Each version holds its write key first, then any key kept only for reading. */
+  const keysFor = (live, previous) => [live, previous]
+    .filter(Boolean)
+    .map((secret) => deriveKey(secret, context));
 
   const keys = new Map();
-  keys.set(LEGACY_KEY_VERSION, deriveKey(jwtSecret || DEVELOPMENT_FALLBACK, context));
+  keys.set(
+    LEGACY_KEY_VERSION,
+    keysFor(jwtSecret || DEVELOPMENT_FALLBACK, previousJwtSecret)
+  );
   if (dedicatedKey) {
-    keys.set(CURRENT_KEY_VERSION, deriveKey(dedicatedKey, context));
+    keys.set(CURRENT_KEY_VERSION, keysFor(dedicatedKey, previousDedicatedKey));
   }
 
   const writeVersion = dedicatedKey ? CURRENT_KEY_VERSION : LEGACY_KEY_VERSION;
@@ -56,7 +100,7 @@ export function createSecretBox(context) {
 
     encrypt(plaintext) {
       const iv = crypto.randomBytes(12);
-      const cipher = crypto.createCipheriv('aes-256-gcm', keys.get(writeVersion), iv);
+      const cipher = crypto.createCipheriv('aes-256-gcm', keys.get(writeVersion)[0], iv);
       const ciphertext = Buffer.concat([
         cipher.update(String(plaintext), 'utf8'),
         cipher.final()
@@ -75,9 +119,9 @@ export function createSecretBox(context) {
       // Rows written before key versioning carry no version, and those were all
       // produced by version 1.
       const version = Number(row.password_key_version) || LEGACY_KEY_VERSION;
-      const key = keys.get(version);
+      const candidates = keys.get(version);
 
-      if (!key) {
+      if (!candidates) {
         // Returning null keeps the caller contract, but staying quiet about it
         // is how a misconfigured key looks identical to "no password stored".
         if (!warned.has(version)) {
@@ -90,20 +134,26 @@ export function createSecretBox(context) {
         return null;
       }
 
-      try {
-        const decipher = crypto.createDecipheriv(
-          'aes-256-gcm',
-          key,
-          Buffer.from(row.password_iv, 'base64')
-        );
-        decipher.setAuthTag(Buffer.from(row.password_tag, 'base64'));
-        return Buffer.concat([
-          decipher.update(Buffer.from(row.password_ciphertext, 'base64')),
-          decipher.final()
-        ]).toString('utf8');
-      } catch {
-        return null;
+      // The live key first, then whatever a rotation left behind. GCM
+      // authenticates, so a wrong key throws rather than returning plausible
+      // rubbish — which is what makes trying the next one safe.
+      for (const key of candidates) {
+        try {
+          const decipher = crypto.createDecipheriv(
+            'aes-256-gcm',
+            key,
+            Buffer.from(row.password_iv, 'base64')
+          );
+          decipher.setAuthTag(Buffer.from(row.password_tag, 'base64'));
+          return Buffer.concat([
+            decipher.update(Buffer.from(row.password_ciphertext, 'base64')),
+            decipher.final()
+          ]).toString('utf8');
+        } catch {
+          /* not this key; try the one a rotation kept for reading */
+        }
       }
+      return null;
     }
   };
 }

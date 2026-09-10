@@ -31,6 +31,17 @@ function installFakeDns() {
       if (port) {
         url.hostname = '127.0.0.1';
         url.port = String(port);
+        // O esquema desce junto com o socket, e pela mesma razão.
+        //
+        // O cliente exige `https:` porque a chave dele viaja em toda
+        // requisição, então o servidor tem de se ANUNCIAR como https para o
+        // caminho de código sob teste rodar inteiro — allowlist, guard,
+        // headers. Só que o dublê é HTTP puro, e falar TLS com ele exigiria um
+        // certificado auto-assinado mais `rejectUnauthorized: false`, que é
+        // exatamente o que este código nunca faz, nem em teste. Esta camada já
+        // mente sobre ONDE o socket vai; mentir também sobre o esquema é a
+        // mesma mentira, uma linha abaixo da que se quer testar.
+        if (url.protocol === 'https:') url.protocol = 'http:';
         target = url.toString();
       }
     } catch {
@@ -84,7 +95,7 @@ function startEvolution(flavor, ip) {
   return new Promise((resolve) => {
     server.listen(0, '127.0.0.1', () => {
       LOOPBACK_FOR.set(ip, server.address().port);
-      resolve({ state, server, baseUrl: `http://${ip}:${server.address().port}` });
+      resolve({ state, server, baseUrl: `https://${ip}:${server.address().port}` });
     });
   });
 }

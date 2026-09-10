@@ -172,6 +172,21 @@ Anything written before `SECRET_BOX_KEY` was configured remains tied to
 password, or re-saving a provisioning profile or WhatsApp instance, moves that
 secret onto the new key.
 
+For those rows, set `JWT_SECRET_PREVIOUS` to the old value before rotating
+`JWT_SECRET`. Each key version accepts more than one key: the live one writes,
+and the previous one is only ever tried on the way in, so every stored secret
+stays readable until it is next written. `SECRET_BOX_KEY_PREVIOUS` does the same
+for the dedicated key.
+
+```bash
+JWT_SECRET_PREVIOUS=<the value being replaced>
+JWT_SECRET=<the new value>
+```
+
+Drop `JWT_SECRET_PREVIOUS` once every secret has been rewritten. Leaving it set
+keeps the old key usable, which is the point during a rotation and not after
+one.
+
 ## Customer Portal Credentials
 
 Each customer account carries its own portal password. The Customer ID identifies

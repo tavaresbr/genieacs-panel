@@ -1,8 +1,7 @@
 import crypto from 'node:crypto';
 import AppState from '../models/AppState.js';
 import { createSecretBox } from '../utils/secretBox.js';
-import { normalizeEvoUrl, parseAllowedHosts, isHostAllowed } from '../utils/wa/evolutionPolicy.js';
-import { assertPublicUrl, SsrfBlockedError } from '../utils/wa/ssrfGuard.js';
+import { normalizeEvoUrl, parseAllowedHosts } from '../utils/wa/evolutionPolicy.js';
 import { TenantCache } from '../config/tenantCache.js';
 
 const CONFIG_KEY = 'whatsapp_evolution_config';
@@ -275,42 +274,6 @@ class WhatsAppConfigService {
     // Query and hash are stripped because the secret is appended as `?t=` later;
     // an existing query would make the token stop parsing as one.
     return `${url.origin}${url.pathname}`.replace(/\/+$/, '');
-  }
-
-  /**
-   * Validates a target Evolution server: allowed by the operator, and public.
-   *
-   * Called at the POINT OF USE, not only when an account is created. In the
-   * source system the allowlist was checked at creation and the row was
-   * writable afterwards, which made the check decorative.
-   */
-  static async assertTarget(baseUrl, config) {
-    const url = normalizeEvoUrl(baseUrl);
-    if (!url) {
-      throw new WaError('whatsapp.error.invalidBaseUrl', {
-        code: 'invalid_base_url',
-        status: 400
-      });
-    }
-    if (!isHostAllowed(url, config.allowedHosts)) {
-      throw new WaError('whatsapp.error.hostNotAllowed', {
-        code: 'host_not_allowed',
-        status: 400
-      });
-    }
-    try {
-      await assertPublicUrl(url);
-    } catch (error) {
-      if (error instanceof SsrfBlockedError) {
-        throw new WaError('whatsapp.error.blockedHost', {
-          code: 'blocked_host',
-          status: 400,
-          vars: { reason: error.message }
-        });
-      }
-      throw error;
-    }
-    return url;
   }
 
   // ── Per-account secrets ────────────────────────────────────────────

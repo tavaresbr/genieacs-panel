@@ -1429,6 +1429,7 @@ const ru: Dictionary = {
   'whatsapp.error.rateLimited': 'Слишком много отправок за короткое время; подождите немного.',
   'whatsapp.error.scanFailed': 'Не удалось завершить проверку оповещений.',
   'whatsapp.error.invalidBaseUrl': 'Адрес сервера Evolution указан неверно.',
+  'whatsapp.error.insecureBaseUrl': 'Сервер Evolution должен использовать https: его ключ передаётся в каждом запросе.',
   'whatsapp.error.hostNotAllowed': 'Этого сервера Evolution нет в списке разрешённых.',
   'whatsapp.error.blockedHost': 'Этот адрес недоступен из интернета и был отклонён.',
   'whatsapp.error.unauthorized': 'Сервер Evolution отклонил учётные данные.',

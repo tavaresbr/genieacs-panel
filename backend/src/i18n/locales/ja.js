@@ -160,6 +160,7 @@ export default {
   'database.connectionFailed': '接続に失敗しました: {error}',
   'database.switched': 'データベースを切り替え、現在有効になりました。',
   'database.switchFailed': '切り替えに失敗しました: {error}',
+  'database.switchNotSoleProvider': 'データベースの切り替えは、事業者が 1 つだけのインストールでのみ行えます',
   // ベンダープロファイル
   'vendor.listRetrieved': 'ベンダーを取得しました',
   'vendor.listFailed': 'ベンダーを取得できませんでした',
@@ -409,6 +410,7 @@ export default {
   'whatsapp.error.publicUrlCredentials': 'このアドレスにユーザー名とパスワードを含めることはできません',
   'whatsapp.error.invalidPortalUrl': '顧客ポータルの URL が無効です',
   'whatsapp.error.invalidBaseUrl': 'Evolution サーバーの URL が設定されていません',
+  'whatsapp.error.insecureBaseUrl': 'Evolution サーバーは https を使う必要があります。鍵がリクエストごとに送られます',
   'whatsapp.error.hostNotAllowed': 'この Evolution サーバーは許可リストに含まれていません',
   'whatsapp.error.blockedHost': 'Evolution サーバーを拒否しました: {reason}',
   // WhatsApp — Evolution の通信 (第 1 段階)

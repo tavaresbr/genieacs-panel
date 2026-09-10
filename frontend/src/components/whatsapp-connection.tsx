@@ -33,6 +33,7 @@ const ERROR_KEYS: Record<string, TranslationKey> = {
   invalid_webhook_url: 'whatsapp.error.invalidWebhookUrl',
   invalid_portal_url: 'whatsapp.error.invalidPortalUrl',
   invalid_base_url: 'whatsapp.error.invalidBaseUrl',
+  insecure_base_url: 'whatsapp.error.insecureBaseUrl',
   host_not_allowed: 'whatsapp.error.hostNotAllowed',
   blocked_host: 'whatsapp.error.blockedHost',
   unauthorized: 'whatsapp.error.unauthorized',
