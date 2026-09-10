@@ -318,6 +318,15 @@ class UsersController {
       if (!membership) {
         return res.status(404).json(createErrorResponse('Operator not found'));
       }
+      // A mesma regra do PATCH, e ela precisa estar nos dois: encerrar o
+      // vínculo de um `owner` é estritamente pior que rebaixá-lo, e proteger só
+      // a promoção deixaria um `admin` conseguindo pela porta ao lado
+      // exatamente o que a outra recusa — tirar o dono do provedor de cena.
+      if (presentRole(membership.role) === 'owner' && presentRole(req.user.role) !== 'owner') {
+        return res.status(403).json(
+          createErrorResponse('Only an owner can grant or revoke the owner role')
+        );
+      }
       // Same invariant as the demotion above, and unreachable for the same
       // reason: the caller is an administrator here, so removing a different
       // one leaves at least themselves.

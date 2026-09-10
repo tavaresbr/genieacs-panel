@@ -531,4 +531,21 @@ export default {
   'whatsapp.messagesRequeued': '已将 {count} 条消息重新排队',
   'vendor.nameTaken': '同名厂商已存在',
   'wifiConfig.productClassTaken': '该产品类别已有配置，且只有一条会生效',
+
+  // 团队邀请
+  'invite.listed': '已获取待处理的邀请',
+  'invite.listFailed': '无法列出邀请',
+  'invite.created': '邀请已创建',
+  'invite.createFailed': '无法创建邀请',
+  'invite.roleInvalid': '角色必须是以下之一：{roles}',
+  'invite.ttlInvalid': '邀请的有效期必须在 30 分钟到 30 天之间',
+  'invite.ownerOnly': '只有所有者才能邀请另一位所有者',
+  'invite.revoked': '邀请已撤销',
+  'invite.revokeFailed': '无法撤销邀请',
+  'invite.notFound': '此邀请已失效',
+  'invite.previewed': '已获取邀请',
+  'invite.previewFailed': '无法读取邀请',
+  'invite.accepted': '欢迎加入团队',
+  'invite.acceptFailed': '无法接受邀请',
+  'invite.alreadyMember': '您已经在为该服务商工作',
 };

@@ -528,4 +528,21 @@ export default {
   'whatsapp.messagesRequeued': '{count} mensagem(ns) devolvida(s) à fila',
   'vendor.nameTaken': 'Já existe um fabricante com este nome',
   'wifiConfig.productClassTaken': 'Já existe uma configuração para esta classe de produto, e só uma pode valer',
+
+  // Convites de equipe
+  'invite.listed': 'Convites em aberto carregados',
+  'invite.listFailed': 'Falha ao listar os convites',
+  'invite.created': 'Convite criado',
+  'invite.createFailed': 'Falha ao criar o convite',
+  'invite.roleInvalid': 'O papel tem que ser um destes: {roles}',
+  'invite.ttlInvalid': 'Um convite tem que valer entre 30 minutos e 30 dias',
+  'invite.ownerOnly': 'Só um dono pode convidar outro dono',
+  'invite.revoked': 'Convite revogado',
+  'invite.revokeFailed': 'Falha ao revogar o convite',
+  'invite.notFound': 'Este convite não vale mais',
+  'invite.previewed': 'Convite carregado',
+  'invite.previewFailed': 'Falha ao ler o convite',
+  'invite.accepted': 'Bem-vindo à equipe',
+  'invite.acceptFailed': 'Falha ao aceitar o convite',
+  'invite.alreadyMember': 'Você já trabalha para este provedor',
 };

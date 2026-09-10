@@ -531,4 +531,21 @@ export default {
   'whatsapp.messagesRequeued': '{count} 件のメッセージを送信待ちに戻しました',
   'vendor.nameTaken': 'この名称のベンダーはすでに存在します',
   'wifiConfig.productClassTaken': 'この製品クラスの設定はすでにあり、適用されるのは 1 つだけです',
+
+  // チーム招待
+  'invite.listed': '有効な招待を取得しました',
+  'invite.listFailed': '招待の一覧を取得できませんでした',
+  'invite.created': '招待を作成しました',
+  'invite.createFailed': '招待を作成できませんでした',
+  'invite.roleInvalid': 'ロールは次のいずれかにしてください: {roles}',
+  'invite.ttlInvalid': '招待の有効期間は30分から30日の間にしてください',
+  'invite.ownerOnly': 'オーナーを招待できるのはオーナーだけです',
+  'invite.revoked': '招待を取り消しました',
+  'invite.revokeFailed': '招待を取り消せませんでした',
+  'invite.notFound': 'この招待は無効です',
+  'invite.previewed': '招待を取得しました',
+  'invite.previewFailed': '招待を読み取れませんでした',
+  'invite.accepted': 'チームへようこそ',
+  'invite.acceptFailed': '招待を承諾できませんでした',
+  'invite.alreadyMember': 'すでにこのプロバイダーに所属しています',
 };

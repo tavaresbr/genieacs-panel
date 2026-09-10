@@ -316,6 +316,48 @@ const platformAdminsTable = (db) => (t) => {
   t.timestamp('created_at').defaultTo(db.fn.now());
 };
 
+/**
+ * O convite: como uma pessoa entra na equipe de um provedor sem que o
+ * administrador escolha a senha dela.
+ *
+ * A onda 12 recusou, com razão, que o administrador de um provedor anexasse
+ * alguém que já existe no deploy: aquele request carrega uma SENHA, e há uma
+ * senha por pessoa, então "adicionar a maria" digitado aqui trocaria o login de
+ * uma estranha que trabalha para outro ISP, derrubaria as sessões dela em todo
+ * lugar e entregaria a este administrador credenciais válidas no painel do
+ * vizinho. O convite é a saída: quem administra oferece o vínculo, e é a pessoa
+ * convidada quem entra — com a conta que já tem, ou com uma que ela mesma cria.
+ *
+ * Guarda o HASH do token e nunca o token. O que vai no link é mostrado uma vez,
+ * na resposta da criação, e não pode ser recuperado depois — mesma disciplina
+ * do segredo do webhook do SGP e da senha do portal do assinante. Um convite é
+ * uma credencial: quem tem o link entra na equipe.
+ */
+const tenantInvitesTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  // sha256 do token. Único no deploy porque a busca acontece ANTES de haver
+  // provedor em escopo: quem abre o link só apresentou o token, e é o token que
+  // diz para qual provedor ele é. Único por provedor não serviria — a busca não
+  // tem provedor para filtrar.
+  t.string('token_hash', 64).notNullable().unique();
+  t.string('role', 32).notNullable();
+  // Só para quem administra se lembrar de quem convidou. Não é login, não é
+  // conferido contra nada, e não é para onde o convite é enviado: o painel não
+  // manda e-mail. Nulo é legítimo.
+  t.string('label', 255);
+  t.integer('created_by').unsigned().references('id').inTable('users').onDelete('SET NULL');
+  t.timestamp('expires_at').notNullable();
+  t.timestamp('accepted_at');
+  t.integer('accepted_user_id').unsigned().references('id').inTable('users').onDelete('SET NULL');
+  t.timestamp('revoked_at');
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  t.timestamp('updated_at').defaultTo(db.fn.now());
+  // Como a tela pergunta: os convites em aberto deste provedor.
+  t.index(['tenant_id', 'accepted_at'], 'tenant_invites_open_idx');
+};
+
 const tenantsTable = (db) => (t) => {
   t.increments('id').primary();
   // The subdomain the panel will be reached at once tenants are resolved by
@@ -762,7 +804,9 @@ const TENANCY_TABLES = [
 const MEMBERSHIP_TABLES = [
   ['tenant_users', tenantUsersTable],
   // Same reason as `tenant_users`: it references `users`, created by step 0001.
-  ['platform_admins', platformAdminsTable]
+  ['platform_admins', platformAdminsTable],
+  // Idem: aponta para `users` (quem convidou, quem aceitou) e para `tenants`.
+  ['tenant_invites', tenantInvitesTable]
 ];
 
 const INITIAL_TABLES = [
@@ -1940,6 +1984,22 @@ export const migrations = [
           .where({ id: maisAntigo.id })
           .update({ role: 'owner', updated_at: new Date() });
       }
+    }
+  },
+  {
+    /**
+     * A tabela de convites. Criada aqui e não com as tabelas de tenancy porque
+     * aponta para `users` — que o passo 0001 cria, muito depois de `tenants`.
+     * Mesmo motivo de `tenant_users` e `platform_admins`.
+     */
+    id: '0031_tenant_invites',
+    async isApplied(db) {
+      return db.schema.hasTable('tenant_invites');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('users'))) return;
+      if (!(await db.schema.hasTable('tenants'))) return;
+      await createTableIfMissing(db, 'tenant_invites', tenantInvitesTable(db));
     }
   }
 ];

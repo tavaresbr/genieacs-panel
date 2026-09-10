@@ -80,6 +80,84 @@ describe('a leitura de um papel', () => {
   });
 });
 
+describe('a cópia da matriz que o frontend carrega', () => {
+  /**
+   * `frontend/src/lib/permissions.ts` repete esta matriz, e a repetição é
+   * deliberada: a tela precisa saber a resposta ANTES de perguntar, para não
+   * oferecer um botão cujo pedido sempre falharia, e o backend não expõe a
+   * matriz por rota nenhuma.
+   *
+   * O preço de uma cópia é a divergência, e ela é silenciosa das duas
+   * direções: uma capacidade a mais no frontend é botão que responde 403; uma a
+   * menos é botão que some para quem podia usá-lo. Nenhuma das duas quebra
+   * nada, então nenhuma aparece. Este teste é o que as torna vermelhas — lê os
+   * dois arquivos como texto, porque um `.ts` não é importável daqui, e compara
+   * o que cada um declara.
+   */
+  const FRONT = path.join(
+    path.dirname(fileURLToPath(import.meta.url)), '..', '..',
+    'frontend', 'src', 'lib', 'permissions.ts'
+  );
+
+  /**
+   * Os itens de um array literal nomeado, na ordem em que aparecem.
+   *
+   * A anotação de tipo entre o nome e o `=` é opcional no padrão porque o
+   * espelho escreve as duas formas — `export const PERMISSIONS = [` e
+   * `const VIEWER: Permission[] = [`. Casar só uma delas faria as asserções
+   * abaixo lerem lista vazia, que é a falha silenciosa que este bloco inteiro
+   * existe para não ter.
+   */
+  function listaDe(fonte, nome) {
+    const padrao = new RegExp(`${nome}\\s*(?::[^=]+)?=\\s*\\[`);
+    const achado = padrao.exec(fonte);
+    assert.ok(achado, `${nome} não encontrado no espelho do frontend`);
+    // A partir do FIM do casamento e não do começo: `const VIEWER: Permission[]`
+    // tem um `]` na própria anotação de tipo, e procurar o fechamento a partir
+    // do início pararia nele — devolvendo lista vazia, verde, sempre.
+    const inicio = achado.index + achado[0].length;
+    const fim = fonte.indexOf(']', inicio);
+    return [...fonte.slice(inicio, fim).matchAll(/'([^']+)'/g)].map(([, item]) => item);
+  }
+
+  const fonte = fs.readFileSync(FRONT, 'utf8');
+
+  it('declara as mesmas capacidades, na mesma ordem', () => {
+    assert.deepEqual(listaDe(fonte, 'export const PERMISSIONS'), [...PERMISSIONS]);
+  });
+
+  it('declara os mesmos papéis', () => {
+    assert.deepEqual(listaDe(fonte, 'export const OPERATOR_ROLES'), [...ROLES]);
+  });
+
+  it('dá a cada papel exatamente o mesmo conjunto', () => {
+    // Os três blocos do espelho são cumulativos como os daqui: TECH abre com
+    // `...VIEWER` e ADMIN com `...TECH`, então cada lista literal traz só o que
+    // aquele nível acrescenta — que é o que se compara.
+    const acrescenta = {
+      viewer: listaDe(fonte, 'const VIEWER'),
+      tech: listaDe(fonte, 'const TECH'),
+      admin: listaDe(fonte, 'const ADMIN')
+    };
+    const esperado = {
+      viewer: [...permissionsOf('viewer')],
+      tech: [...permissionsOf('tech')].filter((p) => !permissionsOf('viewer').has(p)),
+      admin: [...permissionsOf('admin')].filter((p) => !permissionsOf('tech').has(p))
+    };
+    for (const nivel of ['viewer', 'tech', 'admin']) {
+      assert.deepEqual(acrescenta[nivel].sort(), esperado[nivel].sort(), nivel);
+    }
+  });
+
+  it('e a leitura não passa por não achar nada', () => {
+    // Sem isto, uma mudança de forma no espelho — outro nome de constante, um
+    // `as const` no meio — faria as três asserções acima lerem listas vazias e
+    // ficarem verdes para sempre.
+    assert.ok(listaDe(fonte, 'export const PERMISSIONS').length >= 20);
+    assert.ok(listaDe(fonte, 'const ADMIN').length >= 5);
+  });
+});
+
 describe('as capacidades que as rotas citam', () => {
   const arquivos = fs.readdirSync(ROUTES_DIR).filter((nome) => nome.endsWith('.js'));
 

@@ -532,4 +532,21 @@ export default {
   'whatsapp.messagesRequeued': 'Возвращено в очередь сообщений: {count}',
   'vendor.nameTaken': 'Производитель с таким названием уже есть',
   'wifiConfig.productClassTaken': 'Для этого класса устройств настройка уже есть, а действовать может только одна',
+
+  // Приглашения в команду
+  'invite.listed': 'Открытые приглашения получены',
+  'invite.listFailed': 'Не удалось получить список приглашений',
+  'invite.created': 'Приглашение создано',
+  'invite.createFailed': 'Не удалось создать приглашение',
+  'invite.roleInvalid': 'Роль должна быть одной из: {roles}',
+  'invite.ttlInvalid': 'Приглашение должно действовать от 30 минут до 30 дней',
+  'invite.ownerOnly': 'Только владелец может пригласить другого владельца',
+  'invite.revoked': 'Приглашение отозвано',
+  'invite.revokeFailed': 'Не удалось отозвать приглашение',
+  'invite.notFound': 'Это приглашение больше недействительно',
+  'invite.previewed': 'Приглашение получено',
+  'invite.previewFailed': 'Не удалось прочитать приглашение',
+  'invite.accepted': 'Добро пожаловать в команду',
+  'invite.acceptFailed': 'Не удалось принять приглашение',
+  'invite.alreadyMember': 'Вы уже работаете у этого провайдера',
 };

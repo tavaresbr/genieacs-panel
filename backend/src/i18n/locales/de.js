@@ -532,4 +532,21 @@ export default {
   'whatsapp.messagesRequeued': '{count} Nachricht(en) wieder in die Warteschlange gestellt',
   'vendor.nameTaken': 'Ein Hersteller mit diesem Namen existiert bereits',
   'wifiConfig.productClassTaken': 'Für diese Produktklasse gibt es bereits eine Konfiguration, und nur eine kann greifen',
+
+  // Team-Einladungen
+  'invite.listed': 'Offene Einladungen abgerufen',
+  'invite.listFailed': 'Einladungen konnten nicht aufgelistet werden',
+  'invite.created': 'Einladung erstellt',
+  'invite.createFailed': 'Einladung konnte nicht erstellt werden',
+  'invite.roleInvalid': 'Die Rolle muss eine von diesen sein: {roles}',
+  'invite.ttlInvalid': 'Eine Einladung muss zwischen 30 Minuten und 30 Tagen gültig sein',
+  'invite.ownerOnly': 'Nur ein Inhaber kann einen weiteren Inhaber einladen',
+  'invite.revoked': 'Einladung widerrufen',
+  'invite.revokeFailed': 'Einladung konnte nicht widerrufen werden',
+  'invite.notFound': 'Diese Einladung ist nicht mehr gültig',
+  'invite.previewed': 'Einladung abgerufen',
+  'invite.previewFailed': 'Einladung konnte nicht gelesen werden',
+  'invite.accepted': 'Willkommen im Team',
+  'invite.acceptFailed': 'Einladung konnte nicht angenommen werden',
+  'invite.alreadyMember': 'Sie arbeiten bereits für diesen Anbieter',
 };

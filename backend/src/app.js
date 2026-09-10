@@ -30,6 +30,7 @@ import databaseRoutes from './routes/database.js';
 import platformRoutes from './routes/platform.js';
 import platformMemberRoutes from './routes/platformMembers.js';
 import userRoutes from './routes/users.js';
+import inviteRoutes from './routes/invites.js';
 import tenantRoutes from './routes/tenant.js';
 import customerPortalRoutes from './routes/customerPortal.js';
 import sgpRoutes from './routes/sgp.js';
@@ -263,6 +264,7 @@ if (IS_SAAS) {
   app.use('/api/platform', platformMemberRoutes);
 }
 app.use('/api/users', userRoutes);
+app.use('/api/invites', inviteRoutes);
 app.use('/api/sgp', sgpRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/whatsapp', whatsappMessageRoutes);

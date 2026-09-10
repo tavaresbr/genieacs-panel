@@ -529,4 +529,21 @@ export default {
   'whatsapp.messagesRequeued': '{count} messaggio/i rimesso/i in coda',
   'vendor.nameTaken': 'Esiste già un produttore con questo nome',
   'wifiConfig.productClassTaken': 'Esiste già una configurazione per questa classe di prodotto, e solo una può valere',
+
+  // Inviti al team
+  'invite.listed': 'Inviti aperti recuperati',
+  'invite.listFailed': 'Impossibile elencare gli inviti',
+  'invite.created': 'Invito creato',
+  'invite.createFailed': 'Impossibile creare l\'invito',
+  'invite.roleInvalid': 'Il ruolo deve essere uno di: {roles}',
+  'invite.ttlInvalid': 'Un invito deve durare tra 30 minuti e 30 giorni',
+  'invite.ownerOnly': 'Solo un proprietario può invitare un altro proprietario',
+  'invite.revoked': 'Invito revocato',
+  'invite.revokeFailed': 'Impossibile revocare l\'invito',
+  'invite.notFound': 'Questo invito non è più valido',
+  'invite.previewed': 'Invito recuperato',
+  'invite.previewFailed': 'Impossibile leggere l\'invito',
+  'invite.accepted': 'Benvenuto nel team',
+  'invite.acceptFailed': 'Impossibile accettare l\'invito',
+  'invite.alreadyMember': 'Lavori già per questo provider',
 };

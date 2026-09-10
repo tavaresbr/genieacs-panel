@@ -29,9 +29,15 @@ class User {
    * creates the membership straight after and deletes the person again if that
    * fails. Doing it here as well would insert the same row twice.
    */
-  static async create(userData) {
+  /**
+   * `trx` opcional porque o aceite de convite cria a pessoa, consome o convite
+   * e grava o vínculo como um ato só: se o convite já tiver sido usado entre um
+   * passo e outro, a pessoa criada não pode sobrar no deploy com o nome tomado
+   * e nenhum provedor a que pertencer.
+   */
+  static async create(userData, trx = null) {
     const { username, password, role = 'viewer' } = userData;
-    const id = await insertReturningId('users', { username, password, role });
+    const id = await insertReturningId('users', { username, password, role }, trx);
     return id;
   }
 

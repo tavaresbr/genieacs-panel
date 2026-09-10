@@ -93,7 +93,13 @@ export const SCOPED_TABLES = new Set([
   // alone would leave a destructive write reaching across providers.
   'vendors',
   'wifi_security_mappings',
-  'wifi_security_config'
+  'wifi_security_config',
+  // Os convites em aberto de um provedor. Escopada e não compartilhada, ao
+  // contrário de `tenant_users`: um convite pertence a UM provedor — é o
+  // vínculo que ele oferece — e listá-los sem filtro entregaria a um provedor
+  // quem o vizinho está tentando contratar. A busca pelo token é a exceção
+  // declarada, e está em `TenantInvite.findByToken`, com o motivo escrito lá.
+  'tenant_invites'
 ]);
 
 /** Tables that belong to the deployment rather than to any one provider. */

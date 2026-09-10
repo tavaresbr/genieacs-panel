@@ -85,8 +85,9 @@ class TenantUser {
     return Number(row?.total ?? 0);
   }
 
-  static async create({ tenantId, userId, role = 'user' }) {
-    const [id] = await getDb()('tenant_users')
+  /** `trx` opcional pelo mesmo motivo de `User.create` — ver o aceite de convite. */
+  static async create({ tenantId, userId, role = 'user' }, trx = null) {
+    const [id] = await (trx || getDb())('tenant_users')
       .insert({ tenant_id: tenantId, user_id: userId, role })
       .returning('id');
     return typeof id === 'object' && id !== null ? id.id : id;
