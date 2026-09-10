@@ -102,13 +102,20 @@ describe('switching the database on a shared deployment', () => {
   /**
    * O outro sentido, e é o que impede a correção de passar simplesmente
    * quebrando a funcionalidade: com um provedor só — a instalação para a qual
-   * este recurso existe — a troca segue seu caminho normal e falha adiante, ao
-   * tentar falar com o banco de destino.
+   * este recurso existe — a troca segue seu caminho normal e só para no passo
+   * seguinte.
+   *
+   * O passo seguinte aqui é a validação dos campos, de propósito. Chegar até a
+   * tentativa de conexão provaria o mesmo e abriria um socket para um host
+   * inexistente dentro da suíte, o que só acrescenta uma dependência de rede e
+   * um tempo de espera que ninguém controla. `validateExternal` roda logo
+   * depois do portão e antes de qualquer I/O: recusar POR ELA é exatamente a
+   * prova de que o portão deixou passar.
    */
-  it('lets a single-provider install through to the connection attempt', async () => {
+  it('lets a single-provider install through to the next step', async () => {
     await assert.rejects(
-      () => switchDatabase(alvo, { migrateData: true }),
-      (error) => error.translationKey !== 'database.switchNotSoleProvider'
+      () => switchDatabase({ client: 'mysql2', migrateData: true }, { migrateData: true }),
+      (error) => error.translationKey === 'database.missingMysqlFields'
     );
   });
 });
