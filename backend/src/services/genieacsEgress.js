@@ -12,8 +12,24 @@ import { IS_SAAS } from '../config/edition.js';
  * list the customer gets to sweep every service our network happens to run.
  * 7557 is the NBI's own default; 80 and 443 are what it looks like behind a
  * reverse proxy, and 8080 is the one every such proxy is actually put on.
+ *
+ * `GENIEACS_ALLOWED_PORTS` widens it, because four ports is a guess about other
+ * people's deployments and some ISP will have put its NBI behind a proxy on
+ * 8443. It is deliberately an environment variable and not a column: it is the
+ * DEPLOYMENT saying which ports its own network can tolerate being probed on,
+ * which is not a decision the probing party gets to make about itself.
  */
-const ALLOWED_PORTS = new Set([80, 443, 7557, 8080]);
+const DEFAULT_ALLOWED_PORTS = [80, 443, 7557, 8080];
+
+function configuredPorts() {
+  const extra = String(process.env.GENIEACS_ALLOWED_PORTS || '')
+    .split(',')
+    .map((part) => Number.parseInt(part.trim(), 10))
+    .filter((port) => Number.isInteger(port) && port > 0 && port <= 65535);
+  return new Set([...DEFAULT_ALLOWED_PORTS, ...extra]);
+}
+
+const ALLOWED_PORTS = configuredPorts();
 
 function ipv4Bytes(text) {
   return text.split('.').map((part) => Number.parseInt(part, 10));
@@ -207,7 +223,7 @@ export class GenieAcsEgress {
    * Everything decided before the socket opens: which port, which addresses,
    * and whether any of them disqualifies the request.
    */
-  static async resolveTarget(url) {
+  static async resolveTarget(url, { allowPrivateAddresses = false } = {}) {
     const parsed = url instanceof URL ? url : new URL(String(url));
 
     if (!['http:', 'https:'].includes(parsed.protocol)) {
@@ -215,9 +231,12 @@ export class GenieAcsEgress {
     }
 
     const port = parsed.port ? Number(parsed.port) : (parsed.protocol === 'https:' ? 443 : 80);
-    if (IS_SAAS && !ALLOWED_PORTS.has(port)) {
+    // Read through `this` rather than off the module constant, so that the list
+    // the class advertises is the list it enforces.
+    const allowed = this.ALLOWED_PORTS;
+    if (IS_SAAS && !allowed.has(port)) {
       throw refuse(
-        `GenieACS port ${port} is not allowed; use one of ${[...ALLOWED_PORTS].join(', ')}`
+        `GenieACS port ${port} is not allowed; use one of ${[...allowed].join(', ')}`
       );
     }
 
@@ -242,7 +261,11 @@ export class GenieAcsEgress {
       }
     }
 
-    if (IS_SAAS) {
+    // `allowPrivateAddresses` is the `tunnel` and `hosted` modes: the ACS really
+    // is on a private address there, reached over a link we set up. It is set
+    // by us per customer and is never reachable from the provider's own API,
+    // because a guard the guarded party can switch off is not a guard.
+    if (IS_SAAS && !allowPrivateAddresses) {
       // Every answer, not the first: a name that resolves to one public address
       // and one loopback address is a rebinding attempt that does not even need
       // a second lookup — the client would simply fail over to the other entry.
@@ -266,7 +289,10 @@ export class GenieAcsEgress {
    * call sites already passed; the timeouts they arm around it work unchanged.
    */
   static async fetch(url, options = {}) {
-    const { parsed, hostname, port, addresses } = await this.resolveTarget(url);
+    const { allowPrivateAddresses = false, rejectUnauthorized = true } = options;
+    const { parsed, hostname, port, addresses } = await this.resolveTarget(url, {
+      allowPrivateAddresses
+    });
 
     const transport = parsed.protocol === 'https:' ? https : http;
     const headers = headersToObject(options.headers);
@@ -287,6 +313,13 @@ export class GenieAcsEgress {
         method: options.method || 'GET',
         headers,
         signal: options.signal,
+        // Only meaningful over TLS, and only ever false because an operator
+        // told us their NBI carries a self-signed certificate. It costs the
+        // certificate's identity check and nothing else: the address was vetted
+        // and pinned above, so turning this off cannot redirect the connection
+        // somewhere new — it can only stop us noticing that the host we already
+        // decided to reach is presenting a name we did not verify.
+        ...(parsed.protocol === 'https:' ? { rejectUnauthorized } : {}),
         // The whole point. `hostname` above still drives the `Host` header and
         // the TLS server name; only the address the socket goes to is replaced,
         // with the one already vetted, so no second resolution can happen.

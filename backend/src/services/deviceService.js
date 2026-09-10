@@ -15,6 +15,7 @@ import { DEFAULT_SETTINGS } from '../config/seed.js';
 import { TranslatableError } from '../i18n/index.js';
 import { currentTenantId } from '../config/tenantContext.js';
 import GenieAcsEgress from './genieacsEgress.js';
+import { withAcsSlot } from './genieacs/concurrency.js';
 import GenieAcsAuthService from './genieacsAuthService.js';
 
 const WAN_PARAMETER_CANDIDATES = Object.freeze({
@@ -296,7 +297,7 @@ class DeviceService {
         options.headers['Content-Type'] = 'application/json';
         options.body = typeof body === 'string' ? body : JSON.stringify(body);
       }
-      const response = await GenieAcsEgress.fetch(url, options);
+      const response = await withAcsSlot(async () => GenieAcsEgress.fetch(url, options));
       if (!response.ok) {
         throw await this.genieAcsError(`GenieACS ${collection} API`, response);
       }
@@ -354,7 +355,7 @@ class DeviceService {
           options.body = typeof body === 'string' ? body : JSON.stringify(body);
         }
 
-        const response = await GenieAcsEgress.fetch(url, options);
+        const response = await withAcsSlot(async () => GenieAcsEgress.fetch(url, options));
 
         clearTimeout(timeoutId);
 
@@ -468,12 +469,12 @@ class DeviceService {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15_000);
     try {
-      const response = await GenieAcsEgress.fetch(url, {
+      const response = await withAcsSlot(async () => GenieAcsEgress.fetch(url, {
         method: 'GET',
         headers: await GenieAcsAuthService.nbiHeaders(),
         signal: controller.signal,
         redirect: 'manual'
-      });
+      }));
       if (!response.ok) {
         throw await this.genieAcsError('GenieACS API', response);
       }
@@ -1371,13 +1372,13 @@ class DeviceService {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
     try {
-      const response = await GenieAcsEgress.fetch(url, {
+      const response = await withAcsSlot(async () => GenieAcsEgress.fetch(url, {
         method: 'POST',
         headers: await GenieAcsAuthService.nbiHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(task),
         signal: controller.signal,
         redirect: 'manual'
-      });
+      }));
       const text = await response.text().catch(() => '');
       if (!response.ok) {
         throw await this.genieAcsError('GenieACS API', response, text);
@@ -1443,12 +1444,12 @@ class DeviceService {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15_000);
     try {
-      const response = await GenieAcsEgress.fetch(url, {
+      const response = await withAcsSlot(async () => GenieAcsEgress.fetch(url, {
         method,
         headers: await GenieAcsAuthService.nbiHeaders(),
         signal: controller.signal,
         redirect: 'manual'
-      });
+      }));
       if (!response.ok && !(method === 'DELETE' && response.status === 404)) {
         throw await this.genieAcsError('GenieACS tag API', response);
       }
@@ -1515,12 +1516,12 @@ class DeviceService {
     const timeoutId = setTimeout(() => controller.abort(), 15000);
 
     try {
-      const response = await GenieAcsEgress.fetch(url, {
+      const response = await withAcsSlot(async () => GenieAcsEgress.fetch(url, {
         method: 'DELETE',
         headers: await GenieAcsAuthService.nbiHeaders(),
         signal: controller.signal,
         redirect: 'manual'
-      });
+      }));
 
       if (!response.ok) {
         throw await this.genieAcsError('GenieACS delete API', response);
@@ -1944,12 +1945,12 @@ class DeviceService {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15_000);
     try {
-      const response = await GenieAcsEgress.fetch(url, {
+      const response = await withAcsSlot(async () => GenieAcsEgress.fetch(url, {
         method: 'DELETE',
         headers: await GenieAcsAuthService.nbiHeaders(),
         signal: controller.signal,
         redirect: 'manual'
-      });
+      }));
       if (!response.ok && response.status !== 404) {
         throw await this.genieAcsError('GenieACS fault API', response);
       }

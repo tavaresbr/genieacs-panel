@@ -9,11 +9,23 @@ import { EvolutionClient } from '../src/services/evolutionClient.js';
  *
  * Nada aqui abre socket: o `globalThis.fetch` é trocado por um dublê. O que se
  * testa é o que o painel EXIGE do outro lado — um prazo e um teto — e nenhum
- * dos dois depende de rede para ser verificado. Usar um host que não resolve é
- * de propósito: `resolvesToPrivate` devolve false quando o nome não resolve, e
- * o guard deixa passar, que é o que põe o dublê no caminho.
+ * dos dois depende de rede para ser verificado.
+ *
+ * Um literal de IP, e não um nome. Um nome fazia `resolvesToPrivate` consultar
+ * o DNS DE VERDADE (`dns.resolve4`/`resolve6`, que vão à rede), contando que
+ * ele não resolvesse. Numa máquina que devolve NXDOMAIN na hora isso passa
+ * despercebido; num runner cujo resolvedor é lento ou engole a consulta, cada
+ * chamada espera o próprio timeout — mais do que os 5 s do `setTimeout` abaixo,
+ * que é o que segura o loop de eventos. O loop drena e o `node:test` cancela os
+ * oito testes pendentes: `0 fail, 8 cancelled`, nunca uma asserção quebrada,
+ * que é o que torna essa falha difícil de ler.
+ *
+ * `resolvesToPrivate` retorna cedo para um literal (`parseIPv4(h) !== null`),
+ * então nenhuma consulta acontece. `203.0.113.10` é TEST-NET-3 e não cai em
+ * nenhuma faixa de `isPrivateIPv4`, então o guard continua deixando passar —
+ * que é o que põe o dublê no caminho.
  */
-const HOST_PUBLICO = 'https://evo.provedor.test';
+const HOST_PUBLICO = 'https://203.0.113.10';
 
 let fetchReal;
 
