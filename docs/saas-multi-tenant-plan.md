@@ -369,9 +369,14 @@ alguém esquecer de incrementar. Coberto por
 - **Plano de plataforma** (nós, operando o SaaS): audience separada
   `skygenpanel-platform`, rotas `/api/platform/*`, capaz de listar/suspender tenants e de
   fazer *impersonation* auditada. Nunca compartilha o mesmo token do operador.
-- **API de usuários**: escopada por provedor e com convite (onda 18). Falta só o
-  **transporte de e-mail**, que é decisão de produto: qual provedor de envio, credencial de
-  quem, por deploy ou por provedor.
+- **API de usuários**: escopada por provedor, com convite (onda 18) e com **login por
+  e-mail**. Nome e e-mail vivem no mesmo espaço de nomes — cadastrar um e-mail igual ao nome
+  de alguém, ou o contrário, é recusado —, o que é o que torna `findByLogin` inequívoco: o
+  `username` nunca proibiu `@`, então não dá para decidir pelo formato qual dos dois foi
+  digitado. **Não há verificação do endereço**, e isso é aceitável só enquanto não existir
+  redefinição de senha por e-mail: naquele dia a verificação passa a ser pré-requisito
+  daquele recurso. Falta o **transporte de e-mail**, que é decisão de produto: qual provedor
+  de envio, credencial de quem, por deploy ou por provedor.
 - **Portal do assinante**: a busca já é escopada (`getByCustomerId` passa por `tdb`), então
   O cookie é **host-only** (`portalCookieOptions` não define `domain`) e o payload assinado
   carrega `tenantId`, conferido contra o provedor da requisição em `portalAuth.js`. As duas
@@ -380,10 +385,30 @@ alguém esquecer de incrementar. Coberto por
   copiado à mão, ou por um cliente que não é navegador.
 - `rateLimit.js`: chavear por `${tenantId}:${ip}` para um provedor barulhento não derrubar
   o limite dos outros.
-**Quebra para os self-hosted atuais:** o login sai de `username` para `email`. Mitigação: a
-migration preenche `email = username` quando parecer e-mail e `username@local.invalid` caso
-contrário, e o endpoint de login aceita os dois formatos por uma release, com aviso de
-"confirme seu e-mail" na interface.
+**Quebra para os self-hosted atuais:** o login sai de `username` para `email`.
+
+A mitigação que este plano propunha — a migration preenchendo `email = username` quando
+parecesse e-mail e `username@local.invalid` caso contrário — **não foi seguida**, e vale
+dizer por quê, porque a ideia é sedutora: ela deixa a coluna `NOT NULL` de imediato e faz
+todo mundo "já ter" um endereço.
+
+Ela dá a cada conta existente um endereço que **ninguém controla**. Hoje isso não custa
+nada, porque só a senha abre a conta. No dia em que existir redefinição de senha por e-mail
+— e ela vai existir, é o que todo painel acaba tendo —, `fulano@local.invalid` é um domínio
+que qualquer um pode registrar, e cada conta pré-preenchida vira um caminho para dentro
+dela. Uma migração não tem como saber o endereço de ninguém, e inventar um é pior que
+deixar nulo, porque um nulo se vê e um endereço plausível não.
+
+**O que foi feito** (onda de login por e-mail): a coluna nasce **anulável e vazia**; toda
+conta NOVA exige e-mail; o login aceita nome ou e-mail; quem já usava cadastra o próprio
+endereço em `POST /api/auth/email`, provando a senha atual; e `LOGIN_REQUIRES_EMAIL=true`
+desliga o nome quando o install quiser. `GET /api/auth/email-readiness` diz quantas contas
+ainda ficariam de fora, para que virar a chave seja uma decisão e não uma aposta.
+
+Nome e e-mail vivem no **mesmo espaço de nomes**: cadastrar um e-mail igual ao nome de
+alguém, ou trocar o próprio nome para o e-mail de um colega, é recusado. Sem essa regra um
+identificador casaria duas contas — e a consequência não recai sobre quem fez, e sim sobre a
+vítima, que simplesmente deixa de conseguir entrar sem nada na tela explicando por quê.
 
 ---
 
@@ -701,10 +726,13 @@ Original: Fase 0 → 1 → 2 → 3 → 8 → 4 → 5 → 6 → 7.
    dependiam de host puderam enfim ser escritos.
 2. **O resto da Fase 2.** Cookie host-only, `tenantId` no payload do portal, rate limit por
    provedor, os **papéis reais** com `requirePermission` e o **convite** ✅ entraram. Falta a
-   audiência separada `skygenpanel-platform` com impersonação auditada — que precisa de
-   `audit_log`, hoje da Fase 7, porque impersonação sem trilha é justamente o que não se
-   constrói —, o **transporte de e-mail** do convite, e a troca de `username` para e-mail,
-   que é quebra de contrato e decisão de produto, não de código.
+   audiência separada `skygenpanel-platform` com impersonação auditada — `platform_audit`,
+   a peça que faltava, entrou na onda 22 —, e o **transporte de e-mail** do convite. A troca
+   de `username` para e-mail ✅ entrou, em três passos e sem dia de virada: a coluna é
+   anulável, toda conta nova nasce com e-mail, o login aceita os dois, e
+   `LOGIN_REQUIRES_EMAIL=true` desliga o nome quando o install decidir. O painel responde
+   quantas contas ainda ficariam de fora, para que essa decisão seja tomada olhando um
+   número em vez de na esperança.
 3. ~~**Fechar a Fase 8**~~ ✅ com os três testes que passaram a ser possíveis e a sentinela
    de SQL. Sobrou avaliar **RLS no Postgres** como segunda linha.
 4. **Fase 4 — conector**, começando pelas três correções de SSRF e pela guarda de egresso,

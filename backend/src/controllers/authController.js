@@ -456,9 +456,15 @@ class AuthController {
         );
       }
       
-      const existingUser = await User.findByUsername(normalizedUsername);
-      
-      if (existingUser) {
+      // Contra o espaço de nomes INTEIRO, e não só contra os nomes de usuário.
+      //
+      // Sem isto sobra um buraco que não é sobre quem troca, é sobre a vítima:
+      // trocar o próprio nome para o e-mail de um colega faria aquele endereço
+      // casar duas contas, e `findByLogin` recusa um identificador ambíguo —
+      // ou seja, o colega deixa de conseguir entrar, e nada na tela dele
+      // explica por quê. Negar acesso a outra pessoa não pode ser efeito
+      // colateral de renomear a si mesmo.
+      if (await User.loginConflict({ username: normalizedUsername, exceptId: userId })) {
         return res.status(409).json(
           createErrorResponse(req.t('auth.usernameTaken'))
         );

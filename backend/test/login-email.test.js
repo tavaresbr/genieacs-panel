@@ -189,6 +189,58 @@ describe('o espaço de nomes é um só', () => {
   });
 });
 
+describe('trocar o próprio nome de usuário', () => {
+  /**
+   * O buraco que a regra do espaço de nomes deixaria aberto se `changeUsername`
+   * conferisse só contra os nomes — e ele não é sobre quem troca, é sobre a
+   * vítima: trocar o próprio nome para o e-mail de um colega faria aquele
+   * endereço casar duas contas, e um identificador ambíguo é recusado. O colega
+   * simplesmente deixa de conseguir entrar, e nada na tela dele explica por quê.
+   */
+  let vitimaToken;
+
+  before(async () => {
+    const bcrypt = (await import('bcryptjs')).default;
+    const id = await runInTenant(tenantId, () => insertReturningId('users', {
+      username: 'vizinho-de-mesa',
+      password: bcrypt.hashSync('senha-do-vizinho-1', 4),
+      role: 'viewer',
+      email: 'vizinho@isp.exemplo'
+    }));
+    await runInTenant(tenantId, () => TenantUser.create({ tenantId, userId: id, role: 'viewer' }));
+    const login = await entrar('vizinho@isp.exemplo', 'senha-do-vizinho-1');
+    assert.equal(login.status, 200);
+    vitimaToken = login.body.data.token;
+  });
+
+  it('não deixa alguém tomar o e-mail de um colega como nome de usuário', async () => {
+    const { status } = await call(`${panelUrl}/api/auth/change-username`, {
+      method: 'POST', headers: authHeaders(token),
+      body: { currentUsername: 'a-dona', newUsername: 'vizinho@isp.exemplo' }
+    });
+    assert.equal(status, 409);
+
+    // E o colega continua entrando: é a asserção que diz o que estava em jogo.
+    assert.equal((await entrar('vizinho@isp.exemplo', 'senha-do-vizinho-1')).status, 200);
+    assert.ok(vitimaToken);
+  });
+
+  it('mas deixa trocar para um nome que não é de ninguém', async () => {
+    // O par obrigatório: sem ele, uma rota quebrada daria o mesmo 409.
+    const { status } = await call(`${panelUrl}/api/auth/change-username`, {
+      method: 'POST', headers: authHeaders(token),
+      body: { currentUsername: 'a-dona', newUsername: 'a-dona-renomeada' }
+    });
+    assert.equal(status, 200);
+    // Devolvido ao que era, porque os blocos abaixo contam com este nome.
+    const volta = await call(`${panelUrl}/api/auth/change-username`, {
+      method: 'POST', headers: authHeaders(token),
+      body: { currentUsername: 'a-dona-renomeada', newUsername: 'a-dona' }
+    });
+    assert.equal(volta.status, 200);
+  });
+});
+
 describe('quem já usava o painel', () => {
   let semEmailId;
   let semEmailToken;

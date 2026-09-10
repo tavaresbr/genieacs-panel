@@ -193,7 +193,11 @@ class InviteController {
       }
 
       const role = normalizeRole(invite.role);
-      const existente = await User.findByUsername(username);
+      // Nome OU e-mail, pelo mesmo motivo do plano de controle: quem já tem
+      // conta e já migrou vai digitar o endereço, não o nome antigo — e sem
+      // isto o convite tentaria criar uma segunda conta para ela e esbarraria
+      // no índice único, com uma mensagem que não explica nada.
+      const existente = await User.findByLogin(username);
       let userId;
 
       if (existente) {
