@@ -33,7 +33,22 @@ export const LEGACY_DEFAULT_SETTINGS = {
   vpUserPassword: 'VirtualParameters.userPassword'
 };
 
-export async function seedDefaults(db = getDb()) {
+/**
+ * Dá a cada provedor o que um provedor precisa para existir: settings, o
+ * centro do mapa, o catálogo de equipamentos e uma assinatura.
+ *
+ * `tenantIds` restringe a passagem a esses provedores. Sem ele, a instalação
+ * inteira — o que o boot quer. Com ele, o que o cadastro e o console querem:
+ * o provedor que acabou de nascer, e só. A passagem completa custa dezessete
+ * consultas POR provedor mesmo quando não há nada a inserir — medido: 24
+ * consultas com um provedor, 704 com 41, 3424 com 201 — e o cadastro é uma
+ * rota pública que a executava dentro da própria transação. Quanto mais
+ * clientes, mais caro ficava cada estranho apertando "cadastrar".
+ *
+ * O caminho continua sendo um só: é a mesma função, com a mesma sequência,
+ * sobre uma lista menor. O que muda é quantos provedores ela visita.
+ */
+export async function seedDefaults(db = getDb(), { tenantIds = null } = {}) {
   // Settings belong to a provider, so every provider gets the defaults — the
   // panel's name, its GenieACS, its VirtualParameter mapping.
   //
@@ -44,7 +59,9 @@ export async function seedDefaults(db = getDb()) {
   // and no context has been opened. Writing the column here also keeps this
   // file free of the scoping helpers, which it could not use anyway — it runs
   // at boot, before any request.
-  const tenants = await db('tenants').orderBy('id', 'asc');
+  const tenants = tenantIds
+    ? await db('tenants').whereIn('id', tenantIds).orderBy('id', 'asc')
+    : await db('tenants').orderBy('id', 'asc');
 
   for (const tenant of tenants) {
     for (const [key, value] of Object.entries(DEFAULT_SETTINGS)) {
@@ -193,12 +210,18 @@ async function seedVendorCatalogue(db, tenants) {
   const sizes = await catalogueSizes(db);
   const has = (tenant) => (sizes.get(Number(tenant.id)) || 0) > 0;
 
-  const source = tenants.find(has);
-  if (!source) return;
+  // A fonte é qualquer provedor da instalação que já tenha catálogo — não
+  // necessariamente um dos que estão sendo semeados. Quando a lista é só o
+  // provedor recém-nascido, a fonte está fora dela por definição.
+  const sourceId = [...sizes.entries()]
+    .filter(([, size]) => size > 0)
+    .map(([id]) => id)
+    .sort((a, b) => a - b)[0];
+  if (sourceId === undefined) return;
 
   for (const tenant of tenants) {
     if (has(tenant)) continue;
-    await copyCatalogue(db, source.id, tenant.id);
+    await copyCatalogue(db, sourceId, tenant.id);
   }
 }
 

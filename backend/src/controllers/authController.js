@@ -164,7 +164,10 @@ class AuthController {
       try {
         await getDb().transaction(async (trx) => {
           tenantId = await Tenant.create({ slug, name }, trx);
-          await seedDefaults(trx);
+          // Só o provedor que acabou de nascer. A passagem completa custa
+          // dezessete consultas por provedor existente, e esta é uma rota
+          // pública — ver `seedDefaults`.
+          await seedDefaults(trx, { tenantIds: [tenantId] });
           userId = await User.create({
             username,
             password: await bcrypt.hash(password, BCRYPT_ROUNDS),

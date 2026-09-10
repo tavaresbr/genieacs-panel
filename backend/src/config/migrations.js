@@ -963,6 +963,10 @@ const billingEventsTable = (db) => (t) => {
   t.text('detail');
   t.timestamp('created_at').defaultTo(db.fn.now());
   t.index(['tenant_id', 'created_at', 'id'], 'billing_events_recent_idx');
+  // A idempotência do pagamento. Todo gateway reentrega webhook; sem isto a
+  // segunda entrega de uma referência creditava outra vez. Nulos não colidem
+  // nos três bancos, então a marca manual sem referência segue livre.
+  t.unique(['tenant_id', 'external_id'], 'billing_events_external_uq');
 };
 
 /**
@@ -1044,6 +1048,23 @@ export const SCHEMA_TABLES = [
  * ONT swap inside one provider, and account theft across two.
  */
 const CUSTOMER_ACCOUNT_IDENTITY_COLUMNS = ['customer_id', 'device_id', 'identity_hash'];
+
+/** Se um índice com este nome existe na tabela, nos três dialetos. */
+async function hasIndex(db, table, name) {
+  const client = String(db.client.config.client);
+  if (client === 'pg') {
+    const rows = await db('pg_indexes').where({ tablename: table, indexname: name });
+    return rows.length > 0;
+  }
+  if (client.startsWith('mysql')) {
+    const rows = await db.raw('SHOW INDEX FROM ?? WHERE Key_name = ?', [table, name]);
+    return (Array.isArray(rows) ? rows[0] : rows).length > 0;
+  }
+  const rows = await db.raw(
+    "select name from sqlite_master where type = 'index' and tbl_name = ? and name = ?", [table, name]
+  );
+  return rows.length > 0;
+}
 
 async function createTableIfMissing(db, name, builder) {
   if (await db.schema.hasTable(name)) return;
@@ -2332,7 +2353,29 @@ export const migrations = [
         await db('app_state').insert({ tenant_id: first.id, key: 'tenant_name_migrated', value: '1' });
       }
     }
+  },
+  {
+    /**
+     * O índice único que faz `external_id` valer alguma coisa.
+     *
+     * O extrato (0037) nasceu com a coluna e com o comentário dizendo que o
+     * índice existia — e não existia. Uma referência de pagamento repetida
+     * era aceita sem erro e empurrava o período pago outra vez. A tabela
+     * nova já o traz em `billingEventsTable`; esta migração o dá a quem já
+     * tinha a tabela.
+     */
+    id: '0038_billing_events_external_id_unique',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('billing_events'))) return true;
+      return hasIndex(db, 'billing_events', 'billing_events_external_uq');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('billing_events'))) return;
+      if (await hasIndex(db, 'billing_events', 'billing_events_external_uq')) return;
+      await db.schema.alterTable('billing_events', (t) => {
+        t.unique(['tenant_id', 'external_id'], 'billing_events_external_uq');
+      });
+    }
   }
 ];
-
 export default migrations;
