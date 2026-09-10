@@ -311,10 +311,13 @@ export default function NetworkMap() {
   const [maxZoom, setMaxZoom] = useState(18)
   const [basemap, setBasemap] = useState<Basemap>('osm')
   const { isDarkMode } = useTheme()
-  const { user } = useAuth()
+  const { can } = useAuth()
   const { t, formatTime } = useTranslation()
   const toast = useToast()
-  const isAdmin = user?.role === 'admin'
+  // A tela abre com `map.read`, que o `viewer` tem; desenhar e apagar é
+  // `map.write`, que a matriz dá ao plantão. Era `role === 'admin'`, o que
+  // trancava o mapa para quem sobe em poste.
+  const canEditMap = can('map.write')
 
   const nodeTypeLabel = useCallback(
     (type: NodeType) => {
@@ -575,8 +578,8 @@ export default function NetworkMap() {
             <p className="page-description">{t('map.description')}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {isAdmin && <button type="button" className="modern-button" onClick={openNewNode}><Icon name="pin" size={17} />{t('map.addNode')}</button>}
-            {isAdmin && <button type="button" className="modern-button-secondary" onClick={openNewEdge}><Icon name="signal" size={17} />{t('map.drawCable')}</button>}
+            {canEditMap && <button type="button" className="modern-button" onClick={openNewNode}><Icon name="pin" size={17} />{t('map.addNode')}</button>}
+            {canEditMap && <button type="button" className="modern-button-secondary" onClick={openNewEdge}><Icon name="signal" size={17} />{t('map.drawCable')}</button>}
             <button type="button" className="modern-button-secondary" disabled={loading} onClick={() => void loadData(false)}>
               <Icon name="refresh" size={17} className={loading ? 'animate-spin' : ''} />{t('common.refresh')}
             </button>
@@ -685,8 +688,8 @@ export default function NetworkMap() {
               {selectedNode.notes && <div className="sm:col-span-2"><dt className="metric-label">{t('map.node.notes')}</dt><dd className="mt-1 whitespace-pre-wrap">{selectedNode.notes}</dd></div>}
             </dl>
             <div className="mt-6 flex flex-wrap justify-end gap-2">
-              {isAdmin && <button className="modern-button-secondary" onClick={() => { setEditingNode(true); setNodeEditor({ ...selectedNode }); setSelectedNode(null) }}><Icon name="edit" size={17} />{t('common.edit')}</button>}
-              {isAdmin && <button className="modern-button-secondary text-[hsl(var(--status-danger))]" onClick={() => void deleteNode(selectedNode)}><Icon name="trash" size={17} />{t('common.delete')}</button>}
+              {canEditMap && <button className="modern-button-secondary" onClick={() => { setEditingNode(true); setNodeEditor({ ...selectedNode }); setSelectedNode(null) }}><Icon name="edit" size={17} />{t('common.edit')}</button>}
+              {canEditMap && <button className="modern-button-secondary text-[hsl(var(--status-danger))]" onClick={() => void deleteNode(selectedNode)}><Icon name="trash" size={17} />{t('common.delete')}</button>}
               <button className="modern-button" onClick={() => setSelectedNode(null)}>{t('common.close')}</button>
             </div>
           </ModalShell>
@@ -701,8 +704,8 @@ export default function NetworkMap() {
               {selectedEdge.notes && <div className="sm:col-span-2"><dt className="metric-label">{t('map.node.notes')}</dt><dd className="mt-1 whitespace-pre-wrap">{selectedEdge.notes}</dd></div>}
             </dl>
             <div className="mt-6 flex flex-wrap justify-end gap-2">
-              {isAdmin && <button className="modern-button-secondary" onClick={() => { setEditingEdge(true); setEdgeEditor({ ...selectedEdge }); setSelectedEdge(null) }}><Icon name="edit" size={17} />{t('common.edit')}</button>}
-              {isAdmin && <button className="modern-button-secondary text-[hsl(var(--status-danger))]" onClick={() => void deleteEdge(selectedEdge)}><Icon name="trash" size={17} />{t('common.delete')}</button>}
+              {canEditMap && <button className="modern-button-secondary" onClick={() => { setEditingEdge(true); setEdgeEditor({ ...selectedEdge }); setSelectedEdge(null) }}><Icon name="edit" size={17} />{t('common.edit')}</button>}
+              {canEditMap && <button className="modern-button-secondary text-[hsl(var(--status-danger))]" onClick={() => void deleteEdge(selectedEdge)}><Icon name="trash" size={17} />{t('common.delete')}</button>}
               <button className="modern-button" onClick={() => setSelectedEdge(null)}>{t('common.close')}</button>
             </div>
           </ModalShell>

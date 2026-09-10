@@ -529,4 +529,31 @@ export default {
   'whatsapp.messageRequeued': 'Message put back in the queue',
   'whatsapp.messageNotRequeueable': 'Only a message that failed can be sent again.',
   'whatsapp.messagesRequeued': '{count} message(s) put back in the queue',
+  'vendor.nameTaken': 'A vendor with this name already exists',
+  'wifiConfig.productClassTaken': 'A config for this product class already exists, and only one can apply',
+
+  // Team invitations
+  'invite.listed': 'Open invitations retrieved',
+  'invite.listFailed': 'Failed to list the invitations',
+  'invite.created': 'Invitation created',
+  'invite.createFailed': 'Failed to create the invitation',
+  'invite.roleInvalid': 'Role must be one of: {roles}',
+  'invite.ttlInvalid': 'An invitation must last between 30 minutes and 30 days',
+  'invite.ownerOnly': 'Only an owner can invite another owner',
+  'invite.revoked': 'Invitation revoked',
+  'invite.revokeFailed': 'Failed to revoke the invitation',
+  'invite.notFound': 'This invitation is no longer valid',
+  'invite.previewed': 'Invitation retrieved',
+  'invite.previewFailed': 'Failed to read the invitation',
+  'invite.accepted': 'Welcome to the team',
+  'invite.acceptFailed': 'Failed to accept the invitation',
+  'invite.alreadyMember': 'You already work for this provider',
+
+  'settings.validation.genieAcsAuthType': 'The GenieACS authentication type must be none, basic or bearer',
+  'settings.validation.genieAcsAuthUsername': 'Basic authentication needs a username',
+
+  'audit.listed': 'Audit trail retrieved',
+  'audit.listFailed': 'Failed to read the audit trail',
+
+  'tenant.exportFailed': 'Failed to export the provider data',
 };

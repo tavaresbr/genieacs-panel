@@ -1,12 +1,33 @@
 // Authentication Types
 
-/** Administrators may change anything; viewers get read-only access. */
-export type OperatorRole = 'admin' | 'viewer'
+/**
+ * Os quatro papéis vivem em `@/lib/permissions`, junto da matriz que diz o que
+ * cada um alcança. Reexportado aqui porque este é o módulo onde o resto do
+ * painel já procura os tipos, e um papel escrito solto ao lado da matriz seria
+ * a primeira coisa a divergir dela.
+ */
+export type { OperatorRole } from '@/lib/permissions'
+import type { OperatorRole } from '@/lib/permissions'
 
 export interface User {
   id: number
   username: string
   role: OperatorRole
+  /**
+   * Whether this person is on the SaaS control plane's roster.
+   *
+   * NOT the same thing as being an administrator here: a provider's own
+   * administrator — `owner` included — is at the provider's level, and the
+   * control plane is above them, since minting providers and reaching between
+   * them is exactly what a provider's admin must not do.
+   * Gating the menu on `role` would put the link in front of most of the
+   * panel's admins, pointing at routes that answer 404 for them.
+   *
+   * Always false on a self-hosted install, where those routes are not mounted
+   * at all — so the screen hides itself without the browser having to know
+   * which edition it is talking to.
+   */
+  isPlatformAdmin?: boolean
   createdAt: string
   updatedAt: string
 }

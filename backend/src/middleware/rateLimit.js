@@ -102,6 +102,22 @@ export const portalLoginLimiter = limiter({
   message: limitMessage('rateLimit.portalLogin', 'rate_limited_login')
 });
 
+/**
+ * O convite, aberto sem sessão.
+ *
+ * Adivinhar não é a ameaça: são 32 bytes de `randomBytes`. O que este balde
+ * segura é o custo — duas rotas sem autenticação que consultam o banco a cada
+ * chamada, e a de aceitar ainda roda um bcrypt quando o nome existe. Chaveado
+ * por provedor e endereço como o resto, para que um ISP barulhento não feche a
+ * porta dos outros.
+ */
+export const inviteAcceptLimiter = limiter({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  keyGenerator: tenantIpKey,
+  message: limitMessage('rateLimit.requests', 'rate_limited')
+});
+
 /** Coarse per-address guard for the whole portal surface. */
 export const portalIpLimiter = limiter({
   windowMs: 60 * 1000,

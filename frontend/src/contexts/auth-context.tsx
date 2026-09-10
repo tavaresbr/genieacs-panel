@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import { apiClient, authAPI } from '@/lib/api'
 import { useNavigate } from 'react-router'
+import { roleHas, type Permission } from '@/lib/permissions'
 import type { User } from '@/types'
 
 interface AuthContextType {
@@ -10,6 +11,16 @@ interface AuthContextType {
   isAuthenticated: boolean
   loading: boolean
   needsSetup: boolean
+  /**
+   * O que a pessoa alcança, perguntado por capacidade e não por papel.
+   *
+   * Existe para que nenhuma tela volte a escrever `role === 'admin'`: com
+   * quatro papéis essa comparação esconde de um `owner` o que ele pode fazer e
+   * oferece a um `tech` o que ele não pode. A resposta vem da matriz espelhada
+   * em `@/lib/permissions`, que é a mesma do backend — e a do backend é a que
+   * decide, esta só evita oferecer o que seria recusado.
+   */
+  can: (permission: Permission) => boolean
   login: (username: string, password: string) => Promise<boolean>
   completeSetup: (username: string, password: string) => Promise<boolean>
   logout: () => void
@@ -138,7 +149,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     navigate('/login')
   }
 
-  const value = { user, isAuthenticated, loading, needsSetup, login, completeSetup, logout }
+  const can = (permission: Permission) => roleHas(user?.role, permission)
+
+  const value = { user, isAuthenticated, loading, needsSetup, can, login, completeSetup, logout }
 
   return (
     <AuthContext.Provider value={value}>

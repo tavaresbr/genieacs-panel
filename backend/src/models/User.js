@@ -1,5 +1,6 @@
 import { getDb, insertReturningId, tinsert } from '../config/database.js';
 import { currentTenantId } from '../config/tenantContext.js';
+import { IS_SAAS } from '../config/edition.js';
 
 class User {
   static async findByUsername(username) {
@@ -28,9 +29,15 @@ class User {
    * creates the membership straight after and deletes the person again if that
    * fails. Doing it here as well would insert the same row twice.
    */
-  static async create(userData) {
+  /**
+   * `trx` opcional porque o aceite de convite cria a pessoa, consome o convite
+   * e grava o vínculo como um ato só: se o convite já tiver sido usado entre um
+   * passo e outro, a pessoa criada não pode sobrar no deploy com o nome tomado
+   * e nenhum provedor a que pertencer.
+   */
+  static async create(userData, trx = null) {
     const { username, password, role = 'viewer' } = userData;
-    const id = await insertReturningId('users', { username, password, role });
+    const id = await insertReturningId('users', { username, password, role }, trx);
     return id;
   }
 
@@ -126,6 +133,23 @@ class User {
       }, trx);
 
       await trx('tenant_users').insert({ tenant_id: tenantId, user_id: id, role: 'admin' });
+
+      // On the hosted edition the first administrator also gets the control
+      // plane, because otherwise a SaaS deployment comes up with nobody able to
+      // create the SECOND provider — the whole install would be one ISP with a
+      // control plane no key opens. It is written in this transaction with the
+      // other two rows for the reason they are: a first admin without it is the
+      // failure nobody notices until the day they need a second provider.
+      //
+      // Never on self-hosted. There is one provider there and no control plane,
+      // so the grant would be a role that should not exist on that install, and
+      // an upgrade path that quietly promoted the local administrator to it is
+      // exactly what the migration refuses to do. The edition is read from the
+      // environment at import, so this is decided by how the install is
+      // configured and not by anything the request can say.
+      if (IS_SAAS) {
+        await trx('platform_admins').insert({ user_id: id });
+      }
 
       return { id, tenantId, role: 'admin' };
     });

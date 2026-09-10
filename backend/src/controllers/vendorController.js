@@ -58,7 +58,13 @@ class VendorController {
       }
 
       const vendorId = await Vendor.create(vendorData);
-      
+      // `null` is the model refusing a name this provider already uses. Told
+      // apart from a failure on purpose: nothing went wrong, the operator is
+      // being asked to pick a name they can find the row by later.
+      if (vendorId === null) {
+        return res.status(409).json(createErrorResponse(req.t('vendor.nameTaken')));
+      }
+
       return res.status(201).json(
         createResponse(req.t('vendor.created'), { id: vendorId })
       );
@@ -82,7 +88,10 @@ class VendorController {
       }
 
       const updated = await Vendor.update(id, vendorData);
-      
+
+      if (updated === null) {
+        return res.status(409).json(createErrorResponse(req.t('vendor.nameTaken')));
+      }
       if (!updated) {
         return res.status(404).json(
           createErrorResponse(req.t('vendor.notFound'))
@@ -328,7 +337,14 @@ class VendorController {
         security_types,
         password_param_path
       });
-      
+      // `null` is the model refusing a product class this provider already has
+      // a config for. Worth a real answer rather than a second row: the WiFi
+      // write path reads the FIRST match, so the row added here would never
+      // apply, and nothing on screen would say why the old one kept winning.
+      if (configId === null) {
+        return res.status(409).json(createErrorResponse(req.t('wifiConfig.productClassTaken')));
+      }
+
       return res.status(201).json(
         createResponse(req.t('wifiConfig.created'), { id: configId })
       );
@@ -362,7 +378,10 @@ class VendorController {
         security_types,
         password_param_path
       });
-      
+
+      if (updated === null) {
+        return res.status(409).json(createErrorResponse(req.t('wifiConfig.productClassTaken')));
+      }
       if (!updated) {
         return res.status(404).json(
           createErrorResponse(req.t('wifiConfig.notFound'))

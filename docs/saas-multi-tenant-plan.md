@@ -89,12 +89,15 @@ original não previa:
 
 #### O que ainda não foi feito
 
-- **Fase 3 (subdomínio) não começou.** `backend/src/middleware/tenantResolver.js` resolve
-  sempre o **primeiro** provedor da tabela. Está escrito para que a troca seja de uma função
-  só: tudo abaixo já lê o provedor do contexto.
+- **A Fase 3 entrou.** `backend/src/middleware/tenantResolver.js` lê o provedor do `Host`
+  quando o deployment configura `TENANT_BASE_DOMAIN`/`PORTAL_BASE_DOMAIN`, e cai no primeiro
+  provedor da tabela só quando não configura nenhum — que é todo install self-hosted. A
+  aposta do plano se confirmou: foi troca de uma função, porque tudo abaixo já lia o provedor
+  do contexto.
 - **A espinha da Fase 2 entrou** (o token carrega `tenantId` e o papel vem de `tenant_users`),
-  mas o convite por e-mail, os papéis `tech`/`owner`, o plano de plataforma e a troca de
-  `username` para e-mail **não**.
+  mas o convite por e-mail, os papéis `tech`/`owner` e a troca de `username` para e-mail
+  **não**. O plano de plataforma entrou na onda 13 (`platform_admins`, o console e o
+  `requirePlatformAdmin` que responde 404 com o corpo idêntico ao de rota inexistente).
 - **Fases 4 a 7 inteiras**: conector GenieACS plugável, planos e limites, frontend e operação.
 
 ### Decisões já tomadas
@@ -139,9 +142,13 @@ arquivo `LICENSE` e o aviso de copyright da SkydashNET devem ser mantidos no pro
   de conferir a membership contra a tabela. Token antigo, sem `tenantId`, continua valendo
   quando a pessoa tem um vínculo só — a transição não derruba o plantão.
 - **Resolução de provedor**: `backend/src/middleware/tenantResolver.js` roda antes das rotas
-  e abre um escopo **provisório** — hoje sempre o primeiro provedor da tabela. É o escopo do
-  que acontece sem sessão (login, setup, refresh, portal). A Fase 3 troca essa única função
-  pela leitura do `Host`.
+  e abre um escopo **provisório** lido do `Host`. É o escopo do que acontece sem sessão
+  (login, setup, refresh, portal); uma requisição autenticada é reescopada por
+  `authenticateToken` no provedor que o token nomeia, depois de conferir a membership. Onde o
+  deployment não configura domínio base — todo self-hosted — o escopo provisório é o primeiro
+  provedor da tabela, que ali é o único. Onde configura, host que não nomeia provedor é
+  recusado em vez de servido: cair no primeiro seria responder com os dados de um provedor a
+  quem não perguntou por nenhum.
 - **Integrações que guardam segredos**: SGP, provisionamento automático e WhatsApp via
   Evolution API. Todas cifram com `secretBox`, e desde a Fase 0 registram a versão da chave.
 - **Auth assinante**: cookie `skygp_portal_session`, `backend/src/middleware/portalAuth.js`.
@@ -341,21 +348,36 @@ em cache de um fato que já é lido fresco: estritamente mais fraco, e mais uma 
 alguém esquecer de incrementar. Coberto por
 `backend/test/auth-tenancy.test.js`, "a session open when the membership ends".
 
+**Entrou (ondas 17 e 18):**
+- ✅ **Papéis reais**: `owner`, `admin`, `tech`, `viewer`, e `requireRole` virou
+  `requirePermission` com **24 capacidades** numa matriz só
+  (`backend/src/config/permissions.js`). A regra que fixou o recorte: nenhuma rota fica
+  alcançável por quem não a alcança hoje — o `viewer` recebe exatamente o conjunto que
+  antes não pedia papel nenhum, e o `tech` é papel novo, então nenhum install perde acesso
+  na migração. `owner` e `admin` carregam as mesmas capacidades: a diferença é quem mexe no
+  papel de quem, e essa regra vive no controlador de operadores, nas TRÊS portas — promover,
+  rebaixar e encerrar o vínculo (a terceira ficou de fora na primeira escrita e foi achada
+  na revisão: um `admin` não podia rebaixar o dono, mas podia apagar a membership dele).
+- ✅ **Convite** (`tenant_invites`): quem administra oferece o vínculo, e quem entra é a
+  pessoa convidada — com a conta que já tem, provando quem é com a senha que já usa, ou com
+  uma nova cuja senha o administrador nunca vê. É o que a onda 12 não conseguia fazer.
+  **Por link e não por e-mail**: o painel não tem transporte de correio nenhum, e prometer
+  um envio que não acontece é pior que entregar o link na mão. O transporte entra depois,
+  sem mudar nada do que está feito.
+
 **Falta:**
-- Papéis reais substituindo a string `'admin'`: `owner` (dono, cobrança), `admin`,
-  `tech` (opera ONTs, não mexe em configuração), `viewer`. `requireRole` vira
-  `requirePermission` com um mapa papel→permissões.
 - **Plano de plataforma** (nós, operando o SaaS): audience separada
   `skygenpanel-platform`, rotas `/api/platform/*`, capaz de listar/suspender tenants e de
   fazer *impersonation* auditada. Nunca compartilha o mesmo token do operador.
-- **API de usuários**: já escopada por provedor. Falta o fluxo de **convite por e-mail**
-  (`tenant_invites`).
+- **API de usuários**: escopada por provedor e com convite (onda 18). Falta só o
+  **transporte de e-mail**, que é decisão de produto: qual provedor de envio, credencial de
+  quem, por deploy ou por provedor.
 - **Portal do assinante**: a busca já é escopada (`getByCustomerId` passa por `tdb`), então
-  o que falta é o cookie ser **host-only** (sem
-  `domain=.dominio`), para não vazar sessão entre subdomínios de provedores diferentes —
-  ajustar `portalCookieOptions` em `backend/src/middleware/portalAuth.js` — e incluir
-  `tenantId` no payload assinado. Ambos só passam a importar quando houver subdomínio, ou
-  seja, junto com a Fase 3.
+  O cookie é **host-only** (`portalCookieOptions` não define `domain`) e o payload assinado
+  carrega `tenantId`, conferido contra o provedor da requisição em `portalAuth.js`. As duas
+  coisas entraram juntas e são independentes de propósito: a primeira impede o navegador de
+  mandar o cookie ao subdomínio vizinho, a segunda recusa o cookie que chegar assim mesmo —
+  copiado à mão, ou por um cliente que não é navegador.
 - `rateLimit.js`: chavear por `${tenantId}:${ip}` para um provedor barulhento não derrubar
   o limite dos outros.
 **Quebra para os self-hosted atuais:** o login sai de `username` para `email`. Mitigação: a
@@ -402,7 +424,14 @@ passa a pedir o conector do tenant. Pontos exatos a refatorar em
 `settings` já escopado.
 
 **MVP — modo `direct`**, com endurecimento obrigatório (hoje inexistente):
-- Enviar `Authorization` (Basic/Bearer) — o código atual **não manda header nenhum**.
+- ✅ **Enviar `Authorization` (Basic/Bearer)** — entrou na onda 19
+  (`backend/src/services/genieacsAuthService.js`), com `none` como padrão para nenhum
+  install passar a mandar header de repente. Uma função só monta os headers das sete
+  chamadas ao ACS, e uma varredura estática falha quando a oitava nascer sem credencial —
+  a falha é silenciosa nas duas direções, e a rota que esquece é justamente a que ninguém
+  pensou em cobrir. O botão de testar conexão só leva a credencial para a MESMA origem já
+  salva: a URL vem no corpo do request, então mandá-la para qualquer endereço faria dele
+  um jeito de LER o segredo.
 - **Fechar os três buracos de SSRF já presentes** (achado 7): remover o branch de URL
   absoluta em `buildGenieAcsUrl` (:183), truncar/omitir o corpo do erro upstream devolvido ao
   cliente em `fetchGenieAcsCollection` (:158), e definir `redirect: 'manual'` rejeitando 3xx.
@@ -495,10 +524,18 @@ sustenta. Antes do décimo tenant:
   privadas no conector, e o console de plataforma.
 - Self-hosted continua com `deploy/install.sh` + CLI `deploy/skygenpanel` + SQLite/MySQL.
   SaaS usa o `Dockerfile` + Postgres gerenciado + migrations no CI.
-- Observabilidade: `tenant_id` em toda linha de log e em toda métrica; `audit_log` para ações
-  sensíveis (troca de senha de portal, alteração de conexão GenieACS, impersonation).
-- Backup e **procedimento de exportação/exclusão por tenant** — necessário para LGPD e para
-  cancelamento de contrato.
+- Observabilidade: `tenant_id` em toda linha de log e em toda métrica. O **`audit_log` entrou
+  na onda 20** — senha de portal revelada e redefinida, URL e credencial do GenieACS, papéis,
+  vínculos, convites e suspensão de provedor. Falta a impersonação, que ainda não existe.
+- Backup e **procedimento de exportação/exclusão por tenant**. A **exclusão entrou na onda
+  22**: exige quatro coisas ao mesmo tempo — estar no plano de controle, o provedor estar
+  **suspenso** (o que faz dela um segundo passo, com um estado reversível no meio, e não um
+  clique), o slug digitado de volta exato, e não ser o último provedor do deployment —, e a
+  linha da trilha é gravada ANTES, com a contagem do que vai sumir: se ela não puder ser
+  gravada, não se apaga. A **exportação entrou na onda 21** (`GET /api/tenant/export`, capacidade `tenant.export`, auditada): todas as tabelas
+  escopadas na ordem de criação do schema — que é a ordem que as FKs pedem, e o que faz o
+  arquivo poder ser reinserido de cima para baixo —, sem nenhum segredo cifrado nem hash de
+  senha, com um manifesto que diz o que ficou de fora e por quê.
 
 ---
 
@@ -512,8 +549,10 @@ A suíte não ficou num arquivo só, e ficou melhor assim: `backend/test/tenant-
 guarda os casos que atravessam recursos, e **14 suítes `*-tenancy`** cobrem uma tabela ou um
 subsistema cada — `sgp-links`, `sgp-events`, `device-profiles`, `provisioning`,
 `map-settings`, `vendor-catalogue`, `wifi-credentials`, `whatsapp-media`,
-`whatsapp-inbound`, `users`, `auth`, entre outras. São 937 testes no total, verdes nos três
-dialetos no CI.
+`whatsapp-inbound`, `users`, `auth`, entre outras, mais `tenant-subdomain` e
+`tenant-id-sweep`, que provam o isolamento por host, e `role-reach`, que prova por HTTP o
+alcance de cada papel sobre uma amostra de 31 rotas. São 1403 testes no total, verdes nos
+três dialetos no CI.
 
 O padrão em todas: **dois provedores com as chaves naturais deliberadamente colidindo** —
 mesmo `customer_id`, mesmo `device_id`, mesmo `identity_hash`, mesmo `dedupe_key`, mesmo
@@ -527,6 +566,31 @@ também a versão errada da própria disciplina: reverter *por coluna* em vez de
 migration* reverte a migration errada quando duas derrubam um único com o mesmo nome de
 coluna, e o teste "falha" provando nada.
 
+#### O "flake" da suíte, resolvido
+
+A suíte carregava havia meses um vermelho intermitente no CI, sempre num arquivo sem relação
+com o que estava sendo mudado, e sempre resolvido por re-rodar. Já tinham sido descartadas as
+suspeitas óbvias: interferência entre arquivos pelo banco (o harness cria um schema/database
+por arquivo), `describe` assíncrono (não existe nenhum) e esgotamento de conexões (medido: 5
+conexões de pico com e sem limite no pool). Rodando a suíte cinco vezes seguidas com o log
+inteiro guardado, **eram duas causas, nenhuma delas de infraestrutura**:
+
+1. **Um teste dependente do relógio.** `device-history` gravava uma leitura em
+   `Date.now() - 60_000` e afirmava que o rollup deixava a hora corrente em paz. Rodando no
+   primeiro minuto de uma hora, um minuto atrás é a hora ANTERIOR, que já fechou — o rollup a
+   agrupa e o teste falha. Um minuto em cada sessenta: ~1,7% das rodadas.
+2. **Uma porta fixa sem tratamento de erro.** `genieacs-egress` é o único arquivo da suíte que
+   precisa de porta fixa (a edição SaaS só deixa o egresso sair por 80, 443, 7557 e 8080, então
+   `listen(0)` daria uma porta que o próprio guarda recusaria). O `listen` não tinha
+   `once('error')`, então um `EADDRINUSE` deixava a Promise **nunca resolver**: o `before`
+   pendurava, o event loop esvaziava, e o runner cancelava o arquivo com "Promise resolution is
+   still pending but the event loop has already resolved" — mensagem que não nomeia porta,
+   arquivo nem causa. Era isso que produzia a cascata de "cancelled" que parecia aleatória.
+
+A lição que fica: **"cancelled" nunca é a falha, é o rastro dela.** A causa está no topo do log
+do job, num `before` — e um `before` que pendura em vez de falhar é o que torna esse topo
+inútil. Todo `listen` de porta fixa precisa de `once('error', reject)`.
+
 Os testes estruturais existem em `backend/test/tenant-scoping.test.js`: a guarda estática
 que varre `backend/src` atrás de handle cru numa tabela escopada, a exigência de que toda
 tabela do schema esteja classificada como escopada ou compartilhada, e a marcação
@@ -534,13 +598,44 @@ tabela do schema esteja classificada como escopada ou compartilhada, e a marcaç
 
 #### O que ainda falta
 
-- **Os itens 5, 6 e 2 da lista original** — cookie de portal de A replayado no host de B,
-  token de operador de A enviado ao host de B, e `GET /:id` com id de B respondendo 404 e
-  não 403 — dependem de existir subdomínio. São da Fase 3, não desta.
-- **A sentinela de SQL** em `APP_ENV=test` (`db.on('query')` lançando se o SQL tocar tabela
-  escopada sem `tenant_id` nos bindings), que transformaria toda a suíte legada em teste de
-  escopo de graça. É o item de melhor custo-benefício que sobrou.
-- **RLS no Postgres** como segunda linha, ainda não avaliado.
+- **RLS no Postgres** como segunda linha, ainda não avaliado. É o único item que sobrou.
+
+#### Os três itens que dependiam do subdomínio — fechados
+
+Os itens 5, 6 e 2 da lista original esperavam a Fase 3. Com ela no lugar, os três existem:
+
+- **Cookie de portal de A replayado no host de B** — `backend/test/tenant-subdomain.test.js`.
+  Três asserções, não uma: o cookie recusado no portal do outro provedor, o mesmo cookie
+  ainda válido no seu, e a ausência de `domain=` no `Set-Cookie` — que é o que impede o
+  navegador de mandá-lo para o subdomínio vizinho antes de qualquer verificação. A quarta
+  põe a requisição onde a leitura escopada *funcionaria* (rodando como A, com a requisição
+  dizendo ser de B) para que o provedor assinado no payload possa ser visto fazendo alguma
+  coisa: sem isso as duas primeiras passariam com ou sem `tenantId` assinado.
+- **Token de operador de A enviado ao host de B** — mesmo arquivo: 403 `tenant_mismatch`,
+  nas duas direções, com o controle de que o token funciona no host para o qual foi cunhado.
+  403 e não 404 aqui de propósito: quem manda o token já sabe que o provedor existe, porque
+  o host resolveu antes de a rota rodar.
+- **`GET /:id` com id de B respondendo 404 e não 403** —
+  `backend/test/tenant-id-sweep.test.js`, e varrido sobre **as 24 rotas do painel
+  endereçadas por id de linha**, não sobre uma. A prova anterior cobria duas
+  (`portal-password` e `users`); a diferença não é de quantidade, é que cada rota tem seu
+  próprio caminho até o banco e é a rota acrescentada depois — copiando o controlador
+  vizinho — que vaza. Cada caso roda duas vezes com o mesmo token, o mesmo host e o mesmo
+  corpo, mudando só o id: com o id do vizinho tem que dar 404 e a linha do vizinho tem que
+  continuar intacta; com o id próprio tem que dar qualquer coisa menos 404. Sem a segunda
+  metade o arquivo passaria inteiro com as rotas desmontadas — e passou, na primeira
+  rodada, em quatro casos cujo caminho eu tinha escrito errado.
+
+Tirando o `where` de `tdb()`, 22 dos 24 ficam vermelhos. Os dois que não são os de
+`/api/users/:id`, e estão certos: `users` é tabela do deploy, e quem responde 404 ali é a
+leitura do vínculo em `tenant_users`, outro mecanismo, com prova própria em
+`users-tenancy.test.js`.
+
+- **A sentinela de SQL** em `APP_ENV=test` entrou (`backend/src/config/sqlSentinel.js`):
+  toda query que toca tabela escopada sem filtro de provedor lança, com o `from:` do call
+  site no erro. Ela é a segunda linha e apareceu como tal — na reversão acima ela sozinha
+  derruba o seed antes de qualquer rota rodar, e foi preciso desarmá-la também para ver as
+  asserções falharem.
 
 ## Riscos principais
 
@@ -590,7 +685,7 @@ Os arquivos que concentram o trabalho **restante**, por tamanho atual:
 `backend/src/services/deviceService.js` (Fase 4 — conector e as três correções de SSRF),
 `frontend/src/pages/settings.tsx` (Fases 5/6/7),
 `frontend/src/pages/customer-portal.tsx` (Fase 2),
-`backend/src/middleware/tenantResolver.js` (Fase 3 — é uma função só).
+`backend/src/middleware/tenantResolver.js` (Fase 3 ✅ — foi uma função só).
 
 Os 27 models já estão convertidos; aquele trabalho, que era o volume da Fase 1, acabou.
 
@@ -601,13 +696,17 @@ Original: Fase 0 → 1 → 2 → 3 → 8 → 4 → 5 → 6 → 7.
 
 **Daqui em diante, e a ordem importa:**
 
-1. **Fase 3 — subdomínio.** É a menor peça restante e a que destrava mais coisa: sem ela,
-   os itens de vazamento que dependem de host (cookie replayado, token de A no host de B)
-   não podem sequer ser testados, e o portal continua resolvendo o primeiro provedor. O
-   `tenantResolver` foi escrito para que a troca seja de uma função.
-2. **O resto da Fase 2**, já com host: cookie host-only, `tenantId` no payload do portal,
-   rate limit por provedor, convite por e-mail.
-3. **Fechar a Fase 8** com os testes que passam a ser possíveis, e a sentinela de SQL.
+1. ~~**Fase 3 — subdomínio.**~~ ✅ Entrou, e destravou o que se esperava: o resolvedor lê o
+   host, o portal deixou de resolver o primeiro provedor, e os itens de vazamento que
+   dependiam de host puderam enfim ser escritos.
+2. **O resto da Fase 2.** Cookie host-only, `tenantId` no payload do portal, rate limit por
+   provedor, os **papéis reais** com `requirePermission` e o **convite** ✅ entraram. Falta a
+   audiência separada `skygenpanel-platform` com impersonação auditada — que precisa de
+   `audit_log`, hoje da Fase 7, porque impersonação sem trilha é justamente o que não se
+   constrói —, o **transporte de e-mail** do convite, e a troca de `username` para e-mail,
+   que é quebra de contrato e decisão de produto, não de código.
+3. ~~**Fechar a Fase 8**~~ ✅ com os três testes que passaram a ser possíveis e a sentinela
+   de SQL. Sobrou avaliar **RLS no Postgres** como segunda linha.
 4. **Fase 4 — conector**, começando pelas três correções de SSRF e pela guarda de egresso,
    **antes** de a URL virar dado do cliente.
 5. Fases 5 → 6 → 7.
@@ -620,32 +719,40 @@ edições de divergirem.
 
 ### Checklist antes de vender acesso ao segundo provedor
 
-Nada disso é negociável. **Sete dos doze estão cumpridos.**
+Nada disso é negociável. **Os doze estão cumpridos**, com uma ressalva no oitavo:
+o rate limit é por provedor, mas a concorrência de fetch ao ACS ainda não — e essa
+metade é da Fase 4.
 
 | | Item | Estado |
 | --- | --- | --- |
 | 1 | Toda tabela de provedor: `tenant_id NOT NULL`, FK, uniques começando por `tenant_id` | ✅ |
 | 2 | Nenhum código alcança tabela de provedor sem contexto (`currentTenantId()` lança, guarda estática no CI) | ✅ |
-| 3 | Login e sessão do portal escopados por provedor | ⚠️ a busca sim; o cookie e o payload não (Fases 2/3) |
+| 3 | Login e sessão do portal escopados por provedor | ✅ busca, cookie host-only e `tenantId` assinado no payload |
 | 4 | Caches em memória e `app_state.dashboard_snapshot` separados por provedor | ✅ |
-| 5 | JWT do operador e do assinante carregam o provedor e são conferidos contra o host | ⚠️ o do operador carrega; a conferência contra o host é Fase 3 |
-| 6 | Credenciais ACS por provedor, cifradas, guarda de egresso, branch de URL absoluta removido | ❌ Fase 4 |
+| 5 | JWT do operador e do assinante carregam o provedor e são conferidos contra o host | ✅ os dois carregam; divergência com o host é 403 `tenant_mismatch` |
+| 6 | Credenciais ACS por provedor, cifradas, guarda de egresso, branch de URL absoluta removido | ✅ credencial NBI por provedor (onda 19), egresso com pinning de DNS, branch de URL absoluta removido |
 | 7 | `/api/database` não montada na edição SaaS | ✅ |
-| 8 | Rate limit e concorrência de fetch ACS chaveados por provedor | ❌ Fases 2/4 |
-| 9 | Suíte de vazamento verde no CI e obrigatória para merge | ✅ 937 testes, três dialetos |
+| 8 | Rate limit e concorrência de fetch ACS chaveados por provedor | ⚠️ rate limit por provedor ✅; a concorrência de fetch ACS é Fase 4 |
+| 9 | Suíte de vazamento verde no CI e obrigatória para merge | ✅ 1403 testes, três dialetos |
 | 10 | `SECRET_BOX_KEY` separada do `JWT_SECRET`, com `key_version` | ✅ |
-| 11 | `audit_log` registrando ações sensíveis | ❌ Fase 7 |
-| 12 | Exportação por provedor funcionando (LGPD e "apaguei tudo, socorro") | ❌ Fase 7 |
+| 11 | `audit_log` registrando ações sensíveis | ✅ onda 20 — senha de portal, GenieACS, papéis, vínculos, convites, suspensão |
+| 12 | Exportação por provedor funcionando (LGPD e "apaguei tudo, socorro") | ✅ exportação (onda 21) e exclusão (onda 22), com trilha que sobrevive ao provedor apagado |
 
-Os cinco que faltam concentram-se em **subdomínio (3)**, **conector GenieACS (6, 8)** e
-**operação (11, 12)**. Nenhum deles é do mecanismo de isolamento de dados, que é o que a
-Fase 1 entregou.
+O que falta é a **concorrência de fetch ao ACS** (metade do 8), que é da Fase 4 e não do
+mecanismo de isolamento de dados — que é o que a Fase 1 entregou.
+
+A exclusão entrou na onda 22, e o que a destravou foi `platform_audit`: apagar um provedor
+tem que deixar registro, e registrar no `audit_log` DELE é inútil porque a trilha vai junto.
+A tabela é compartilhada, guarda `tenant_id` como inteiro simples com o slug e o nome
+desnormalizados, e **não tem chave estrangeira para `tenants`** — uma FK apagaria em cascata,
+ou impediria, exatamente a linha que existe para dizer que aquele provedor foi apagado. É
+também a tabela de que a impersonação da plataforma vai precisar.
 
 ## Verificação
 
 ```bash
 npm run verify          # check backend + testes + lint + typecheck + build (raiz)
-cd backend && npm test  # 937 testes, incluindo as 14 suítes de tenancy
+cd backend && npm test  # 1403 testes, incluindo as suítes de tenancy
 ```
 
 A suíte roda nos três dialetos, e **isso não é zelo**: cada uma das armadilhas abaixo passou
@@ -675,7 +782,8 @@ TEST_DB_CLIENT=pg TEST_DB_HOST=127.0.0.1 TEST_DB_PORT=5432 \
 - **`DELETE ... LIMIT` não existe no Postgres**, e `date_trunc`/`DATE_FORMAT`/`strftime` são
   três coisas diferentes. Bucketização vai em JavaScript.
 
-Validação end-to-end manual, quando a Fase 3 entrar:
+Validação end-to-end manual, agora possível — a automatizada equivalente está em
+`tenant-subdomain.test.js` e `tenant-id-sweep.test.js`:
 
 1. Subir com `EDITION=saas` e Postgres.
 2. Criar dois provedores (`alfa`, `beta`).
@@ -748,3 +856,140 @@ Hoje ele lista **todos os operadores do deploy** e aceita qualquer id global em
 O plano quer `users` chaveado por e-mail no lugar de `username`. Muda como todo
 operador entra no painel, não traz isolamento nenhum, e feito junto com a espinha
 de autenticação seriam duas mudanças arriscadas de uma vez. Passo próprio.
+
+---
+
+## Onda 13 — tornar a tenancy alcançável (decisões congeladas)
+
+Doze ondas isolaram o painel por provedor, e **nada no painel cria um segundo
+provedor**. Não é uma tela faltando: faltava uma autoridade. O administrador de
+um provedor não pode cunhar provedores nem alcançar outro, então "quem pode"
+precisava existir antes de "como".
+
+### Quem tem a chave
+
+`platform_admins` é criada **vazia**, e a migração não promove ninguém. Uma
+migração que entregasse o plano de controle ao administrador de menor id seria
+um upgrade promovendo alguém em silêncio — e na edição self-hosted, onde há um
+provedor e nenhum plano de controle, promovendo a um papel que nem deveria
+existir lá.
+
+O bootstrap é explícito, das duas formas que fazem sentido:
+
+- **Instalação nova em `EDITION=saas`**: o primeiro administrador criado pelo
+  `setup` também vira administrador de plataforma. Sem isso, uma instalação SaaS
+  nasce sem ninguém que possa criar o segundo provedor.
+- **Instalação que já tem usuários**: `scripts/grant-platform-admin.js`, rodado
+  por quem tem o servidor — que é exatamente quem deve estar decidindo isso. Há
+  precedente no repositório: `scripts/reset-password.js`.
+
+Com a tabela vazia, as rotas de plataforma são inúteis, e isso é o lado seguro
+de falhar.
+
+### As rotas são da edição SaaS
+
+Montadas sob `IS_SAAS`, do mesmo jeito que a troca de banco é montada sob
+`IS_SELF_HOSTED`. Numa instalação self-hosted elas não existem — não respondem
+403, **não existem**, porque um 403 conta a quem perguntou que o plano de
+controle está ali.
+
+### O que a API faz, e o que ela não faz
+
+- **Criar** provedor: `slug` e `name`. O slug é o subdomínio da Fase 3, único
+  desde a origem.
+- **Listar** e **suspender/reativar**. `tenants.status` já tem comportamento real
+  em todo o painel: `forEachTenant` só visita `active`, a varredura de mídia não
+  passa por suspenso, e o webhook do SGP não aceita entrega de suspenso. A rota
+  dá o controle de algo que já vale.
+- **NÃO apaga provedor.** As tabelas escopadas apontam para `tenants` sem
+  cascata, então apagar um provedor com dado falharia na chave estrangeira — e
+  se não falhasse seria pior. Suspender é a operação, e ela é reversível.
+
+### Provedor criado em tempo de execução nasce igual a um do boot
+
+`seedDefaults` roda no boot sobre todos os provedores: dá as configurações
+padrão e, desde a onda 11, copia o catálogo de equipamentos para quem não tem.
+Criar um provedor pela API **tem de passar pelo mesmo caminho**, ou o provedor
+novo nasce sem configuração e com detecção de equipamento inerte — que não falha
+alto, apenas não casa nada.
+
+### Vincular alguém a um provedor é do plano de controle
+
+A onda 12 recusou, de propósito, que o administrador de um provedor anexasse uma
+pessoa que já existe: a criação carrega senha, e anexar resetaria o login de um
+estranho e entregaria credenciais em outra ISP a partir de adivinhar um nome.
+
+Um administrador de plataforma é outro nível de confiança — ele já pode criar
+provedores. Então **é ele** quem vincula uma pessoa existente a um provedor, e
+essa operação **nunca toca a senha**: ela cria o vínculo e nada mais.
+
+---
+
+## Onda 14 — provedor por subdomínio (decisões congeladas)
+
+Hoje o token nomeia o provedor, mas o **endereço não**. Todo mundo chega pelo
+mesmo host e o resolvedor sempre responde o primeiro provedor. É o que falta
+para a tenancy valer na prática.
+
+### A compatibilidade vem antes de tudo
+
+**Sem domínio base configurado, nada muda.** Nenhum install self-hosted tem DNS
+curinga, e o comportamento atual — o provedor próprio do install — continua
+sendo a resposta. Essa garantia é absoluta: quem não configurar nada não pode
+notar diferença nenhuma. É por isso que o domínio base é opt-in por ambiente e
+não um padrão.
+
+### Como o host vira provedor
+
+- `PANEL_BASE_DOMAIN` e `PORTAL_BASE_DOMAIN`. Um host `alfa.painel.exemplo.com`
+  com base `painel.exemplo.com` resolve o slug `alfa`.
+- O slug é comparado como o DNS compara: sem diferenciar maiúsculas, e a porta
+  do `Host` é descartada.
+
+### O que acontece quando não resolve
+
+Com domínio base configurado e um host que não nomeia provedor nenhum — sem
+subdomínio, slug inexistente, ou **provedor suspenso** — a resposta é **404**,
+a mesma para os três casos.
+
+Distinguir "suspenso" de "nunca existiu" conta a quem perguntou quais slugs são
+reais, e um slug é o nome de uma ISP. É o mesmo raciocínio que a onda 13 usou
+para o plano de controle, e a onda 12 para uma linha que o chamador não pode
+ver.
+
+### Token que discorda do host: 403
+
+Uma sessão válida do provedor A apontada para o subdomínio de B é **recusada
+com 403**, não servida. Sem isso, trocar de provedor seria reusar o token em
+outro endereço — e todo o trabalho das ondas 10 a 13 seria contornável por
+edição de URL.
+
+403 e não 404 aqui, ao contrário do caso acima, e o motivo é que não há o que
+esconder: quem chegou até aqui já provou ter sessão, e o passo do host já teria
+respondido 404 se B não existisse. Um 403 nesse ponto não conta nada que a
+requisição anterior não tenha contado.
+
+### O cache do resolvedor precisa morrer
+
+O `cachedId` de hoje guarda **um** provedor num módulo. Com o host decidindo,
+isso passa de otimização a defeito: o primeiro host a chegar decidiria o
+provedor de todo mundo. O comentário atual do arquivo já avisa disso.
+
+### Marca na tela de login: só o nome
+
+`/api/tenant/public` devolve `slug` e `name` do provedor do host, e nada mais.
+Logo e cores exigem colunas que `tenants` não tem e um caminho de upload;
+ficam para uma onda própria, junto com `tenant_domains` e domínio próprio do
+provedor. O que resolve hoje é a tela de login dizer o nome certo em vez do
+nome do painel.
+
+A rota é pública por necessidade — ela existe para ser lida antes de haver
+sessão — então devolve exatamente esses dois campos e nada que sirva para
+enumerar: um host que não resolve responde o mesmo 404 de qualquer outro.
+
+### O que NÃO entra
+
+- DNS curinga e TLS curinga são infraestrutura do lado de quem opera, não código.
+- `CORS_ORIGINS` **não muda**: `isAllowedOrigin` já aceita uma origem cujo host
+  é o host da própria requisição, que é exatamente o caso do subdomínio.
+- Domínio próprio do provedor (`painel.provedor.com.br`) continua adiado.

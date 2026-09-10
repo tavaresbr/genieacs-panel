@@ -67,8 +67,27 @@ class TenantUser {
     return Number(row?.total ?? 0);
   }
 
-  static async create({ tenantId, userId, role = 'user' }) {
-    const [id] = await getDb()('tenant_users')
+  /**
+   * Quantas pessoas neste provedor têm um papel de uma lista.
+   *
+   * A guarda do "último administrador" precisa disto desde que os papéis
+   * viraram quatro: contando só `role: 'admin'`, um provedor cujo único
+   * administrador é o `owner` responderia zero e a guarda deixaria rebaixar
+   * quem ficou sozinho no comando. O que a guarda quer contar não é um nome de
+   * papel, é quantas pessoas ainda podem administrar a equipe.
+   */
+  static async countByRoles(tenantId, roles) {
+    if (!roles?.length) return 0;
+    const [row] = await getDb()('tenant_users')
+      .where({ tenant_id: tenantId })
+      .whereIn('role', roles)
+      .count({ total: '*' });
+    return Number(row?.total ?? 0);
+  }
+
+  /** `trx` opcional pelo mesmo motivo de `User.create` — ver o aceite de convite. */
+  static async create({ tenantId, userId, role = 'user' }, trx = null) {
+    const [id] = await (trx || getDb())('tenant_users')
       .insert({ tenant_id: tenantId, user_id: userId, role })
       .returning('id');
     return typeof id === 'object' && id !== null ? id.id : id;

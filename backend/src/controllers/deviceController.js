@@ -1,3 +1,4 @@
+import AuditLog from '../models/AuditLog.js';
 import DeviceService from '../services/deviceService.js';
 import DeviceHistoryService from '../services/deviceHistoryService.js';
 import CustomerService from '../services/customerService.js';
@@ -237,6 +238,16 @@ class DeviceController {
           'No readable portal password is stored. Generate a new one.'
         ));
       }
+      // A senha revelada NÃO entra na trilha, e é o ponto: registra-se que ela
+      // foi revelada, não qual era. O contrário faria da auditoria o maior
+      // repositório de segredos em claro do produto — e um que ninguém pensa em
+      // proteger, porque "é só log".
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.PORTAL_PASSWORD_REVEALED,
+        subjectType: 'customer_account',
+        subjectId: account.id,
+        detail: { customerId: account.customer_id, deviceId: account.device_id }
+      });
       return res.json(createResponse(req.t('device.portalPasswordRetrieved'), {
         customerId: account.customer_id,
         password,
@@ -259,6 +270,12 @@ class DeviceController {
         );
       }
       const password = await CustomerPortalPasswordService.reset(account.id);
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.PORTAL_PASSWORD_RESET,
+        subjectType: 'customer_account',
+        subjectId: account.id,
+        detail: { customerId: account.customer_id, deviceId: account.device_id }
+      });
       return res.json(createResponse(req.t('device.portalPasswordRegenerated'), {
         customerId: account.customer_id,
         password

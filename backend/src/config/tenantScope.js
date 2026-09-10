@@ -93,7 +93,17 @@ export const SCOPED_TABLES = new Set([
   // alone would leave a destructive write reaching across providers.
   'vendors',
   'wifi_security_mappings',
-  'wifi_security_config'
+  'wifi_security_config',
+  // A trilha das ações sensíveis. Escopada pelo motivo óbvio e por mais um: a
+  // trilha de um ISP diz quem são seus operadores, quantos assinantes ele tem e
+  // quando alguém revelou a senha de um deles.
+  'audit_log',
+  // Os convites em aberto de um provedor. Escopada e não compartilhada, ao
+  // contrário de `tenant_users`: um convite pertence a UM provedor — é o
+  // vínculo que ele oferece — e listá-los sem filtro entregaria a um provedor
+  // quem o vizinho está tentando contratar. A busca pelo token é a exceção
+  // declarada, e está em `TenantInvite.findByToken`, com o motivo escrito lá.
+  'tenant_invites'
 ]);
 
 /** Tables that belong to the deployment rather than to any one provider. */
@@ -113,7 +123,16 @@ export const SHARED_TABLES = new Set([
   // a scope exists, at login, to decide which scope to open — reading it
   // through the scope would be circular. `TenantUser` carries the rule that
   // every query against it must name a person or a provider.
-  'tenant_users'
+  'tenant_users',
+  // A trilha do plano de controle: o que quem opera o SaaS fez COM um
+  // provedor. Compartilhada porque é ACIMA dos provedores e porque a linha que
+  // registra a exclusão de um tem que sobreviver a ele — escopada, ela seria
+  // apagada exatamente junto com o que existe para registrar.
+  'platform_audit',
+  // The control plane's roster. Above providers rather than inside one: a
+  // provider's own administrator must not be able to mint providers or reach
+  // into another's, so this cannot be a per-provider table by construction.
+  'platform_admins'
 ]);
 
 /** Tables still to be converted. Shrinks to empty as the phase progresses. */

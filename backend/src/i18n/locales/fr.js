@@ -525,4 +525,31 @@ export default {
   'whatsapp.messageRequeued': 'Message remis dans la file',
   'whatsapp.messageNotRequeueable': 'Seul un message en échec peut être renvoyé.',
   'whatsapp.messagesRequeued': '{count} message(s) remis dans la file',
+  'vendor.nameTaken': 'Un fabricant portant ce nom existe déjà',
+  'wifiConfig.productClassTaken': 'Une configuration existe déjà pour cette classe de produit, et une seule peut s’appliquer',
+
+  // Invitations d'équipe
+  'invite.listed': 'Invitations en cours récupérées',
+  'invite.listFailed': 'Impossible de lister les invitations',
+  'invite.created': 'Invitation créée',
+  'invite.createFailed': 'Impossible de créer l\'invitation',
+  'invite.roleInvalid': 'Le rôle doit être l\'un des suivants : {roles}',
+  'invite.ttlInvalid': 'Une invitation doit durer entre 30 minutes et 30 jours',
+  'invite.ownerOnly': 'Seul un propriétaire peut inviter un autre propriétaire',
+  'invite.revoked': 'Invitation révoquée',
+  'invite.revokeFailed': 'Impossible de révoquer l\'invitation',
+  'invite.notFound': 'Cette invitation n\'est plus valable',
+  'invite.previewed': 'Invitation récupérée',
+  'invite.previewFailed': 'Impossible de lire l\'invitation',
+  'invite.accepted': 'Bienvenue dans l\'équipe',
+  'invite.acceptFailed': 'Impossible d\'accepter l\'invitation',
+  'invite.alreadyMember': 'Vous travaillez déjà pour ce fournisseur',
+
+  'settings.validation.genieAcsAuthType': 'Le type d\'authentification GenieACS doit être none, basic ou bearer',
+  'settings.validation.genieAcsAuthUsername': 'L\'authentification basic exige un nom d\'utilisateur',
+
+  'audit.listed': 'Journal d\'audit récupéré',
+  'audit.listFailed': 'Impossible de lire le journal d\'audit',
+
+  'tenant.exportFailed': 'Impossible d\u2019exporter les données du fournisseur',
 };

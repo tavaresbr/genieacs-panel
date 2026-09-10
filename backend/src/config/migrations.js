@@ -303,6 +303,135 @@ const customerWifiCredentialsTable = (db) => (t) => {
  * A provider. One row today — the install itself — so that every table that
  * will be scoped has something real to point at before anything depends on it.
  */
+/**
+ * The SaaS control plane's roster. Deliberately just an identity: what a
+ * platform administrator may do is decided in code, not by a role string here,
+ * because there is exactly one such power and naming degrees of it would invite
+ * inventing more.
+ */
+const platformAdminsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('user_id').unsigned().notNullable().unique()
+    .references('id').inTable('users').onDelete('CASCADE');
+  t.timestamp('created_at').defaultTo(db.fn.now());
+};
+
+/**
+ * O convite: como uma pessoa entra na equipe de um provedor sem que o
+ * administrador escolha a senha dela.
+ *
+ * A onda 12 recusou, com razão, que o administrador de um provedor anexasse
+ * alguém que já existe no deploy: aquele request carrega uma SENHA, e há uma
+ * senha por pessoa, então "adicionar a maria" digitado aqui trocaria o login de
+ * uma estranha que trabalha para outro ISP, derrubaria as sessões dela em todo
+ * lugar e entregaria a este administrador credenciais válidas no painel do
+ * vizinho. O convite é a saída: quem administra oferece o vínculo, e é a pessoa
+ * convidada quem entra — com a conta que já tem, ou com uma que ela mesma cria.
+ *
+ * Guarda o HASH do token e nunca o token. O que vai no link é mostrado uma vez,
+ * na resposta da criação, e não pode ser recuperado depois — mesma disciplina
+ * do segredo do webhook do SGP e da senha do portal do assinante. Um convite é
+ * uma credencial: quem tem o link entra na equipe.
+ */
+/**
+ * A trilha das ações sensíveis: quem fez, o quê, sobre quem, e quando.
+ *
+ * Escopada por provedor como quase tudo aqui, e por um motivo além do óbvio: a
+ * trilha de um ISP diz quem são seus operadores, quantos assinantes ele tem e
+ * quando alguém revelou a senha de um deles. É dado tão dele quanto a lista de
+ * contratos.
+ *
+ * A coluna `detail` é a que mais precisa de disciplina. Nada de segredo entra
+ * ali — nem a senha revelada, nem a credencial da NBI, nem o token do convite.
+ * O que a trilha registra é que a senha foi revelada, não qual era: a primeira
+ * coisa é o que permite auditar, a segunda transformaria a auditoria no maior
+ * repositório de segredos em claro do produto. `audit-log.test.js` guarda isso
+ * com uma varredura sobre o que cada gravação de verdade produz.
+ */
+/**
+ * A trilha do plano de controle — acima dos provedores, não dentro de um.
+ *
+ * `audit_log` é escopada e responde "o que aconteceu no meu painel?". Esta
+ * responde outra coisa: o que quem opera o SaaS fez COM um provedor. Precisa
+ * ser uma tabela à parte por uma razão que não é organização: a exclusão de um
+ * provedor tem que deixar registro, e registrar isso na trilha DELE é inútil —
+ * ela vai junto.
+ *
+ * Daí `tenant_id` ser um inteiro simples e **não** uma chave estrangeira, com o
+ * slug e o nome desnormalizados ao lado. Uma FK aqui apagaria em cascata (ou
+ * impediria) exatamente a linha que existe para dizer que aquele provedor foi
+ * apagado, que é a única linha desta tabela que não pode faltar.
+ */
+const platformAuditTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('actor_user_id').unsigned().references('id').inTable('users').onDelete('SET NULL');
+  t.string('actor_username', 64);
+  t.string('action', 64).notNullable();
+  // Sem FK, de propósito. Ver acima.
+  t.integer('tenant_id').unsigned();
+  t.string('tenant_slug', 64);
+  t.string('tenant_name', 128);
+  t.text('detail');
+  t.string('ip', 64);
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  t.index(['created_at', 'id'], 'platform_audit_recent_idx');
+};
+
+const auditLogTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  // `SET NULL` e não `CASCADE`: a pessoa pode sair, e a linha que diz o que ela
+  // fez tem que continuar de pé. Uma trilha que some junto com quem a produziu
+  // não é trilha.
+  t.integer('actor_user_id').unsigned().references('id').inTable('users').onDelete('SET NULL');
+  // Desnormalizado pela mesma razão de `provisioning_runs.profile_name`: seis
+  // meses depois o nome ainda responde "quem foi", mesmo que a linha em `users`
+  // já não exista.
+  t.string('actor_username', 64);
+  // operator | platform | system. `platform` é quem opera o SaaS agindo sobre o
+  // provedor de fora; `system` é trabalho de fundo sem gente por trás.
+  t.string('actor_kind', 16).notNullable().defaultTo('operator');
+  t.string('action', 64).notNullable();
+  // Sobre o quê: 'customer_account', 'tenant_user', 'invite', 'settings'…
+  t.string('subject_type', 32);
+  t.string('subject_id', 128);
+  // JSON curto e SEM segredo. Ver o comentário acima.
+  t.text('detail');
+  t.string('ip', 64);
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  // Como a tela pergunta: as ações deste provedor, da mais recente para a mais
+  // antiga. `id` no fim desempata dentro do mesmo segundo, que é o que acontece
+  // quando uma ação grava duas linhas.
+  t.index(['tenant_id', 'created_at', 'id'], 'audit_log_recent_idx');
+  t.index(['tenant_id', 'action'], 'audit_log_action_idx');
+};
+
+const tenantInvitesTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  // sha256 do token. Único no deploy porque a busca acontece ANTES de haver
+  // provedor em escopo: quem abre o link só apresentou o token, e é o token que
+  // diz para qual provedor ele é. Único por provedor não serviria — a busca não
+  // tem provedor para filtrar.
+  t.string('token_hash', 64).notNullable().unique();
+  t.string('role', 32).notNullable();
+  // Só para quem administra se lembrar de quem convidou. Não é login, não é
+  // conferido contra nada, e não é para onde o convite é enviado: o painel não
+  // manda e-mail. Nulo é legítimo.
+  t.string('label', 255);
+  t.integer('created_by').unsigned().references('id').inTable('users').onDelete('SET NULL');
+  t.timestamp('expires_at').notNullable();
+  t.timestamp('accepted_at');
+  t.integer('accepted_user_id').unsigned().references('id').inTable('users').onDelete('SET NULL');
+  t.timestamp('revoked_at');
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  t.timestamp('updated_at').defaultTo(db.fn.now());
+  // Como a tela pergunta: os convites em aberto deste provedor.
+  t.index(['tenant_id', 'accepted_at'], 'tenant_invites_open_idx');
+};
+
 const tenantsTable = (db) => (t) => {
   t.increments('id').primary();
   // The subdomain the panel will be reached at once tenants are resolved by
@@ -747,7 +876,15 @@ const TENANCY_TABLES = [
  * `users` — which step 0001 creates, long after `tenants` exists.
  */
 const MEMBERSHIP_TABLES = [
-  ['tenant_users', tenantUsersTable]
+  ['tenant_users', tenantUsersTable],
+  // Same reason as `tenant_users`: it references `users`, created by step 0001.
+  ['platform_admins', platformAdminsTable],
+  // Idem: aponta para `users` (quem convidou, quem aceitou) e para `tenants`.
+  ['tenant_invites', tenantInvitesTable],
+  // Idem: aponta para `users` (quem fez) e para `tenants`.
+  ['audit_log', auditLogTable],
+  // Aponta para `users` e para mais nada — ver o comentário na fábrica.
+  ['platform_audit', platformAuditTable]
 ];
 
 const INITIAL_TABLES = [
@@ -1843,6 +1980,127 @@ export const migrations = [
           role: user.role || 'user'
         }));
       if (rows.length > 0) await db('tenant_users').insert(rows);
+    }
+  },
+  {
+    /**
+     * The control plane: who may create and suspend providers.
+     *
+     * Twelve steps of per-provider isolation went in before this, and none of
+     * them could be used — nothing in the panel creates a second provider. The
+     * gap was not an oversight about screens, it was a missing authority: a
+     * provider's own administrator must NOT be able to mint providers or reach
+     * into another one's, so "who may" needed a plane above them before "how"
+     * could exist at all.
+     *
+     * The table is created EMPTY, and the migration grants nobody. A migration
+     * that handed the platform to the lowest-numbered administrator would be an
+     * upgrade quietly promoting somebody — and on the self-hosted edition,
+     * where there is one provider and no platform plane, promoting them to a
+     * role that should not exist there. Bootstrapping is explicit instead:
+     * `setup` grants it on a fresh SaaS install, and `scripts/grant-platform-admin.js`
+     * grants it on an install that already had users, run by whoever holds the
+     * server — which is exactly who should be deciding this.
+     */
+    id: '0029_platform_admins',
+    async isApplied(db) {
+      return db.schema.hasTable('platform_admins');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('users'))) return;
+      await createTableIfMissing(db, 'platform_admins', platformAdminsTable(db));
+    }
+  },
+  {
+    /**
+     * Dá um `owner` a cada provedor: o administrador mais antigo dali.
+     *
+     * Os papéis passaram de dois (`admin`, `viewer`) para quatro (`owner`,
+     * `admin`, `tech`, `viewer`). A coluna já é `string(32)` sem constraint, de
+     * modo que os dois novos cabem sem tocar no schema — o que falta é ter
+     * alguém no papel de cima, porque a única coisa que só o `owner` pode fazer
+     * é promover e rebaixar outro `owner`, e sem nenhum `owner` essa porta fica
+     * trancada por dentro em todo install que já existe.
+     *
+     * O mais antigo, e não "todos os admins": promover todo mundo faria de
+     * `owner` outro nome para `admin` e apagaria a distinção no mesmo passo que
+     * a cria. Quem tiver que ser promovido depois, um `owner` promove.
+     *
+     * Não tira capacidade de ninguém: `owner` e `admin` carregam exatamente as
+     * mesmas capacidades (ver `config/permissions.js`), então a pessoa promovida
+     * não ganha rota nenhuma que já não alcançasse, e as que ficaram `admin`
+     * não perdem nenhuma.
+     *
+     * Sem `isApplied`: não há nada para baselinar. Um install anterior ao
+     * runner não tem `tenant_users` — a tabela nasceu na 0028, que é do runner
+     * — então "já estava assim" não é estado possível aqui.
+     */
+    id: '0030_tenant_owner_role',
+    async up(db) {
+      if (!(await db.schema.hasTable('tenant_users'))) return;
+
+      const tenants = await db('tenant_users').distinct('tenant_id').pluck('tenant_id');
+      for (const tenantId of tenants) {
+        // Se já houver `owner` ali, a migração não tem o que fazer: ou já rodou,
+        // ou alguém promovido depois já ocupa o papel, e nos dois casos escolher
+        // outro seria desfazer uma decisão que não é desta migração.
+        const existente = await db('tenant_users')
+          .where({ tenant_id: tenantId, role: 'owner' })
+          .first();
+        if (existente) continue;
+
+        const maisAntigo = await db('tenant_users')
+          .where({ tenant_id: tenantId, role: 'admin' })
+          .orderBy('id', 'asc')
+          .first();
+        // Provedor sem nenhum administrador fica sem `owner`, de propósito:
+        // inventar um a partir de um `viewer` daria a alguém um poder que
+        // ninguém lhe deu.
+        if (!maisAntigo) continue;
+
+        await db('tenant_users')
+          .where({ id: maisAntigo.id })
+          .update({ role: 'owner', updated_at: new Date() });
+      }
+    }
+  },
+  {
+    /**
+     * A tabela de convites. Criada aqui e não com as tabelas de tenancy porque
+     * aponta para `users` — que o passo 0001 cria, muito depois de `tenants`.
+     * Mesmo motivo de `tenant_users` e `platform_admins`.
+     */
+    id: '0031_tenant_invites',
+    async isApplied(db) {
+      return db.schema.hasTable('tenant_invites');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('users'))) return;
+      if (!(await db.schema.hasTable('tenants'))) return;
+      await createTableIfMissing(db, 'tenant_invites', tenantInvitesTable(db));
+    }
+  },
+  {
+    /** A trilha. Mesmo motivo das duas acima para nascer aqui: aponta para `users`. */
+    id: '0032_audit_log',
+    async isApplied(db) {
+      return db.schema.hasTable('audit_log');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('users'))) return;
+      if (!(await db.schema.hasTable('tenants'))) return;
+      await createTableIfMissing(db, 'audit_log', auditLogTable(db));
+    }
+  },
+  {
+    /** A trilha do plano de controle. Aponta para `users`, daí nascer aqui. */
+    id: '0033_platform_audit',
+    async isApplied(db) {
+      return db.schema.hasTable('platform_audit');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('users'))) return;
+      await createTableIfMissing(db, 'platform_audit', platformAuditTable(db));
     }
   }
 ];

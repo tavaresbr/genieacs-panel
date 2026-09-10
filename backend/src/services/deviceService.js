@@ -15,6 +15,7 @@ import { DEFAULT_SETTINGS } from '../config/seed.js';
 import { TranslatableError } from '../i18n/index.js';
 import { currentTenantId } from '../config/tenantContext.js';
 import GenieAcsEgress from './genieacsEgress.js';
+import GenieAcsAuthService from './genieacsAuthService.js';
 
 const WAN_PARAMETER_CANDIDATES = Object.freeze({
   vlan: [
@@ -287,7 +288,7 @@ class DeviceService {
     try {
       const options = {
         method,
-        headers: { Accept: 'application/json' },
+        headers: await GenieAcsAuthService.nbiHeaders(),
         signal: controller.signal,
         redirect: 'manual'
       };
@@ -344,7 +345,7 @@ class DeviceService {
       try {
         const options = {
           method,
-          headers: { 'Accept': 'application/json' },
+          headers: await GenieAcsAuthService.nbiHeaders(),
           signal: controller.signal,
           redirect: 'manual'
         };
@@ -469,7 +470,7 @@ class DeviceService {
     try {
       const response = await GenieAcsEgress.fetch(url, {
         method: 'GET',
-        headers: { Accept: 'application/json' },
+        headers: await GenieAcsAuthService.nbiHeaders(),
         signal: controller.signal,
         redirect: 'manual'
       });
@@ -1372,7 +1373,7 @@ class DeviceService {
     try {
       const response = await GenieAcsEgress.fetch(url, {
         method: 'POST',
-        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+        headers: await GenieAcsAuthService.nbiHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(task),
         signal: controller.signal,
         redirect: 'manual'
@@ -1442,7 +1443,12 @@ class DeviceService {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15_000);
     try {
-      const response = await GenieAcsEgress.fetch(url, { method, signal: controller.signal, redirect: 'manual' });
+      const response = await GenieAcsEgress.fetch(url, {
+        method,
+        headers: await GenieAcsAuthService.nbiHeaders(),
+        signal: controller.signal,
+        redirect: 'manual'
+      });
       if (!response.ok && !(method === 'DELETE' && response.status === 404)) {
         throw await this.genieAcsError('GenieACS tag API', response);
       }
@@ -1511,6 +1517,7 @@ class DeviceService {
     try {
       const response = await GenieAcsEgress.fetch(url, {
         method: 'DELETE',
+        headers: await GenieAcsAuthService.nbiHeaders(),
         signal: controller.signal,
         redirect: 'manual'
       });
@@ -1937,7 +1944,12 @@ class DeviceService {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15_000);
     try {
-      const response = await GenieAcsEgress.fetch(url, { method: 'DELETE', signal: controller.signal, redirect: 'manual' });
+      const response = await GenieAcsEgress.fetch(url, {
+        method: 'DELETE',
+        headers: await GenieAcsAuthService.nbiHeaders(),
+        signal: controller.signal,
+        redirect: 'manual'
+      });
       if (!response.ok && response.status !== 404) {
         throw await this.genieAcsError('GenieACS fault API', response);
       }

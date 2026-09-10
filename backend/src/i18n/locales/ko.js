@@ -532,4 +532,31 @@ export default {
   'whatsapp.messageRequeued': '메시지를 전송 대기열로 되돌렸습니다',
   'whatsapp.messageNotRequeueable': '전송에 실패한 메시지만 다시 보낼 수 있습니다.',
   'whatsapp.messagesRequeued': '메시지 {count}건을 전송 대기열로 되돌렸습니다',
+  'vendor.nameTaken': '같은 이름의 제조사가 이미 있습니다',
+  'wifiConfig.productClassTaken': '이 제품 클래스의 설정이 이미 있으며, 적용되는 것은 하나뿐입니다',
+
+  // 팀 초대
+  'invite.listed': '진행 중인 초대를 가져왔습니다',
+  'invite.listFailed': '초대 목록을 가져오지 못했습니다',
+  'invite.created': '초대를 만들었습니다',
+  'invite.createFailed': '초대를 만들지 못했습니다',
+  'invite.roleInvalid': '역할은 다음 중 하나여야 합니다: {roles}',
+  'invite.ttlInvalid': '초대는 30분에서 30일 사이로 유효해야 합니다',
+  'invite.ownerOnly': '소유자만 다른 소유자를 초대할 수 있습니다',
+  'invite.revoked': '초대를 취소했습니다',
+  'invite.revokeFailed': '초대를 취소하지 못했습니다',
+  'invite.notFound': '이 초대는 더 이상 유효하지 않습니다',
+  'invite.previewed': '초대를 가져왔습니다',
+  'invite.previewFailed': '초대를 읽지 못했습니다',
+  'invite.accepted': '팀에 오신 것을 환영합니다',
+  'invite.acceptFailed': '초대를 수락하지 못했습니다',
+  'invite.alreadyMember': '이미 이 사업자 소속입니다',
+
+  'settings.validation.genieAcsAuthType': 'GenieACS 인증 방식은 none, basic, bearer 중 하나여야 합니다',
+  'settings.validation.genieAcsAuthUsername': 'basic 인증에는 사용자 이름이 필요합니다',
+
+  'audit.listed': '감사 로그를 가져왔습니다',
+  'audit.listFailed': '감사 로그를 읽지 못했습니다',
+
+  'tenant.exportFailed': '사업자 데이터를 내보내지 못했습니다',
 };
