@@ -378,6 +378,7 @@ export default {
   'sgp.error.urlInvalid': '유효한 SGP URL을 입력하십시오 (https://provider.sgp.net.br)',
   'sgp.error.urlScheme': 'SGP URL은 HTTP 또는 HTTPS를 사용해야 합니다',
   'sgp.error.urlCredentials': 'SGP URL에는 사용자나 비밀번호가 포함될 수 없습니다',
+  'sgp.error.blockedHost': 'SGP URL이 이 설치 환경에서 접근할 수 없는 주소를 가리킵니다',
   'sgp.error.pathsRelative': 'SGP API 경로는 /api/ura/titulos/ 처럼 상대 경로여야 합니다',
   'sgp.error.configIncomplete': '연동을 활성화하기 전에 SGP URL, 앱, 토큰을 입력하십시오',
   'sgp.error.notConfigured': 'SGP 연동이 설정되지 않았습니다',

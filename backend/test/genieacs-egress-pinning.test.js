@@ -158,6 +158,25 @@ describe('a self-hosted install reaches its own LAN', () => {
     });
   }
 
+  /**
+   * The two guards now share one table of blocked ranges, and that union is
+   * strictly wider than what either of them enforced alone — 192.0.0.0/16 and
+   * 6to4 came from the WhatsApp side, IPv6 multicast from this one, and the
+   * IPv4-translated form was missing from both. None of that may narrow what a
+   * self-hosted install can reach, because this edition does not consult the
+   * table at all. These are the newly-blocked classes, asserted from the side
+   * that must not have changed.
+   */
+  for (const address of ['192.0.2.5', 'ff02::1', '::ffff:0:7f00:1']) {
+    it(`is unaffected by the widened blocklist (${address})`, async () => {
+      GenieAcsEgress.lookup = async () => [{ address, family: address.includes(':') ? 6 : 4 }];
+
+      const target = await GenieAcsEgress.resolveTarget(`http://acs.lan.invalid:${port}/devices`);
+
+      assert.equal(target.addresses[0].address, address);
+    });
+  }
+
   // The NBI on a self-hosted box sits wherever the operator put it, and the
   // suite itself proves the point: its stub listens on an ephemeral port.
   it('accepts a port the SaaS allowlist would refuse', async () => {
