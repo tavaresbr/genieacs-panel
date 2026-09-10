@@ -1,5 +1,6 @@
 import knexFactory from 'knex';
 import { buildKnexConfig, isSqlite } from './dbConfig.js';
+import { installSqlSentinel } from './sqlSentinel.js';
 import { currentTenantId, TenantScopeError } from './tenantContext.js';
 import { isScoped } from './tenantScope.js';
 
@@ -9,7 +10,10 @@ let db;
 
 export function getDb() {
   if (!db) {
-    db = knexFactory(buildKnexConfig());
+    // Armed here rather than at the call sites so that every query reaches it,
+    // including the ones written before the helpers existed. Under any other
+    // APP_ENV this returns the handle untouched.
+    db = installSqlSentinel(knexFactory(buildKnexConfig()));
   }
   return db;
 }
