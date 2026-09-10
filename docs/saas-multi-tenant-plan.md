@@ -604,10 +604,34 @@ peças:
      a contagem passa, o equipamento já está lá. Fingir que é limite levaria a esconder ONTs
      do painel (o ISP perde a visão da própria rede por causa da nossa fatura) ou a bloquear
      a tela inteira. É **medição**: cobrar é o caminho, travar não é.
-- Tabela `billing_events` e uma interface `BillingProvider` já definidas agora, com
-  implementação `ManualBillingProvider` (nós marcamos pago). Quando o gateway entrar,
-  recomendo **Asaas** (Pix + boleto + cartão, é o padrão do mercado de ISP brasileiro) com
-  webhook chamando o mesmo `subscriptions.status`.
+- ✅ **o extrato comercial e a interface de cobrança** — `tenant_billing_events`
+  (migration 0037), `models/TenantBillingEvent.js`, `services/subscriptionBillingService.js`
+  com `ManualBillingProvider`, e `GET`/`POST /api/platform/tenants/:id/billing`. Quando o
+  gateway entrar, continua valendo **Asaas** (PIX + boleto + cartão, o padrão do mercado de
+  ISP brasileiro): ele implementa a mesma superfície e o webhook desemboca em `applyPayment`.
+
+  Quatro decisões que valem registro:
+
+  1. **Não se chama `billingService`.** «Billing» já significa a ponta oposta do dinheiro
+     aqui: `waBillingService` é o ISP cobrando os assinantes DELE, com fatura do SGP, PIX e
+     boleto. Dois arquivos com o mesmo nome significando as duas pontas é ambiguidade que
+     alguém resolve na madrugada, errado. A tabela entrou na família `tenant_*` pelo mesmo
+     motivo.
+  2. **`external_id` é a única parte que precisava existir antes de ser usada.** Todo
+     gateway reentrega webhook, e reentrega é a regra, não a exceção. Sem a coluna e o índice
+     único, cada reentrega empurraria o período pago mais trinta dias; acrescentar
+     idempotência depois que o dinheiro já está passando é reconciliar à mão, com o cliente
+     do outro lado. Nulos não colidem num índice único nos três bancos — que é o que deixa a
+     marca manual conviver com a idempotência do gateway.
+  3. **Pagamentos e mudanças de estado no mesmo livro.** A trilha (`platform_audit`,
+     `audit_log`) registra o ATO e quem o praticou — prestação de contas. Este registra o
+     FATO comercial, e os dois divergem de verdade: um webhook produz pagamento sem humano
+     por trás. Só os pagamentos não contariam a história; ela é pagou-atrasou-suspendemos-pagou.
+  4. **O fato é escrito ANTES de a assinatura se mover**, ao contrário da trilha, que vem
+     depois. Uma assinatura ativa sem o pagamento que a ativou é um cliente que ninguém sabe
+     por que está em dia — e, no fechamento do mês, dinheiro que não existe. E pagar
+     adiantado SOMA ao período já pago em vez de recomeçar de hoje: recomeçar cobra o cliente
+     pelo tempo que ele já tinha comprado.
 - Console de plataforma para nós: criar tenant, mudar plano, suspender, ver uso.
 
 ---

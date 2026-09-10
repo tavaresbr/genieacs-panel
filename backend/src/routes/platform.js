@@ -33,6 +33,16 @@ router.patch(
   '/tenants/:id/subscription',
   authenticateToken, requirePlatformAdmin, PlatformController.setSubscriptionStatus
 );
+// O extrato comercial e a marca de pago. O POST é o caminho por onde um
+// gateway entra sem que nada acima mude: hoje quem chama é o console, amanhã é
+// o webhook, com o \ dele.
+router.get('/tenants/:id/billing', authenticateToken, requirePlatformAdmin, PlatformController.listBilling);
+router.post('/tenants/:id/billing', authenticateToken, requirePlatformAdmin, PlatformController.recordPayment);
+// O extrato comercial e a marca de pago. O POST é o caminho por onde um
+// gateway entra sem que nada acima mude: hoje quem chama é o console, amanhã é
+// o webhook, com o id de evento dele.
+router.get('/tenants/:id/billing', authenticateToken, requirePlatformAdmin, PlatformController.listBilling);
+router.post('/tenants/:id/billing', authenticateToken, requirePlatformAdmin, PlatformController.recordPayment);
 router.delete('/tenants/:id', authenticateToken, requirePlatformAdmin, PlatformController.remove);
 
 // A trilha do plano de controle. Só leitura, como a do provedor e pelo mesmo

@@ -87,6 +87,10 @@ export const SCOPED_TABLES = new Set([
   // fora pergunta por um provedor NOMEADO, e essas leituras carregam a marca de
   // isenção em `models/TenantSubscription.js`.
   'tenant_subscriptions',
+  // O livro comercial do provedor. Escopado pelo mesmo motivo da assinatura: a
+  // pergunta normal é sempre "o extrato deste", e quem administra de fora
+  // pergunta por um provedor NOMEADO, com a marca de isenção no model.
+  'tenant_billing_events',
   // Where the operator's own plant is centred. A singleton keyed `id: 1`, so
   // its WHERE never was an identity filter — it meant "the only row", and the
   // second provider to save a map centre wrote over the first's.
