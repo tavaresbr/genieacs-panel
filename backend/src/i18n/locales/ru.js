@@ -377,6 +377,7 @@ export default {
   'sgp.error.urlInvalid': 'Укажите корректный адрес SGP (https://provider.sgp.net.br)',
   'sgp.error.urlScheme': 'Адрес SGP должен использовать HTTP или HTTPS',
   'sgp.error.urlCredentials': 'Адрес SGP не должен содержать пользователя или пароль',
+  'sgp.error.blockedHost': 'Адрес SGP указывает на адрес, недоступный для этой установки',
   'sgp.error.pathsRelative': 'Пути API SGP должны быть относительными, например /api/ura/titulos/',
   'sgp.error.configIncomplete': 'Укажите адрес, приложение и токен SGP, прежде чем включать интеграцию',
   'sgp.error.notConfigured': 'Интеграция с SGP не настроена',

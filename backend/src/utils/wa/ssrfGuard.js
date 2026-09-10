@@ -10,14 +10,29 @@
  *   - nome DNS público → IP interno (inclui rebinding)
  *   - qualquer redirect, quando o fetch usa o default `redirect: 'follow'`
  *
- * Portado de compra-venda `supabase/functions/_shared/ssrf-guard.ts`. A única
- * diferença de comportamento é para melhor: lá a resolução de DNS era
- * best-effort porque dependia de `Deno.resolveDns`; aqui o `node:dns/promises`
- * está sempre disponível, então a checagem de "nome público apontando para IP
- * interno" é efetiva.
+ * As faixas bloqueadas e o transporte não moram mais aqui: são
+ * `utils/net/blockedRanges.js` e `utils/net/pinnedFetch.js`, os mesmos que o
+ * `services/genieacsEgress.js` usa. Duas tabelas separadas eram duas tabelas
+ * DIFERENTES — esta entendia 6to4 e 192.0.0.0/16 e deixava passar multicast
+ * IPv6; a de lá tinha multicast e não tinha as outras duas — e nenhuma das duas
+ * reconhecia `::ffff:0:7f00:1`, que é 127.0.0.1 com um grupo zero a mais.
+ *
+ * Mais importante: a checagem e a conexão usavam RESOLVEDORES DIFERENTES. Aqui
+ * se validava com `dns.resolve4`/`resolve6` (o protocolo DNS) e depois se
+ * entregava o NOME ao `fetch`, que resolve por `getaddrinfo`. Tudo o que o
+ * resolvedor do sistema sabe e o DNS não — `/etc/hosts`, `extra_hosts:` do
+ * Compose, nome de contêiner, NSS, mDNS — passava como público e conectava como
+ * privado. Com `127.0.0.1 vm` em `/etc/hosts`, `http://vm/` era aprovado e
+ * chegava no loopback. Agora a resolução é `dns.lookup` (o mesmo
+ * `getaddrinfo`) e o endereço aprovado é o endereço conectado, fixado no
+ * socket — o que também fecha a janela de DNS rebinding entre uma coisa e
+ * outra.
  */
 
-import dns from 'node:dns/promises';
+import { blockedAddressReason } from '../net/blockedRanges.js';
+import { PinnedTransport, ResponseTooLargeError } from '../net/pinnedFetch.js';
+
+export { ResponseTooLargeError };
 
 /**
  * Converte um host IPv4 em qualquer notação aceita por resolvers (dotted quad,
@@ -49,66 +64,17 @@ export function parseIPv4(host) {
   return val >>> 0;
 }
 
+/** O inteiro de 32 bits, escrito como o dotted quad que a tabela classifica. */
+function dotted(v) {
+  return [(v >>> 24) & 0xff, (v >>> 16) & 0xff, (v >>> 8) & 0xff, v & 0xff].join('.');
+}
+
 export function isPrivateIPv4(v) {
-  const a = (v >>> 24) & 0xff;
-  const b = (v >>> 16) & 0xff;
-  if (a === 0) return true; //                           0.0.0.0/8
-  if (a === 10) return true; //                          10/8
-  if (a === 127) return true; //                         loopback
-  if (a === 169 && b === 254) return true; //            link-local (metadados da cloud)
-  if (a === 172 && b >= 16 && b <= 31) return true; //   172.16/12
-  if (a === 192 && b === 168) return true; //            192.168/16
-  if (a === 192 && b === 0) return true; //              192.0.0/24, 192.0.2/24
-  if (a === 100 && b >= 64 && b <= 127) return true; //  CGNAT 100.64/10
-  if (a >= 224) return true; //                          multicast + reservado
-  return false;
-}
-
-/** Dois hextetos como o IPv4 de 32 bits que eles soletram. */
-function hextetsToIPv4(hi, lo) {
-  return (((parseInt(hi, 16) << 16) | parseInt(lo, 16)) >>> 0);
-}
-
-/**
- * O IPv4 que um literal IPv6 carrega dentro de si, ou nada.
- *
- * Três formatos embutem um endereço IPv4, e os três precisam ser reconhecidos
- * na grafia que o `new URL()` PRODUZ, não na que uma pessoa escreve. O
- * serializador do WHATWG sempre emite hextetos: `::ffff:127.0.0.1` chega aqui
- * como `::ffff:7f00:1`. Casar só a forma decimal é casar nada do que vem de uma
- * URL analisada — era exatamente esse o furo.
- *
- * Devolve `undefined` quando não há IPv4 embutido, e `null` quando há um mas
- * ele não analisa. Quem chama trata os dois de forma diferente de propósito: um
- * endereço malformado que diz carregar um IPv4 é recusado, não liberado.
- */
-function embeddedIPv4(h) {
-  // 6to4 (2002::/16): o IPv4 são os dois hextetos logo depois do prefixo.
-  const sixToFour = h.match(/^2002:([0-9a-f]{1,4}):([0-9a-f]{1,4})(?::|$)/);
-  if (sixToFour) return hextetsToIPv4(sixToFour[1], sixToFour[2]);
-
-  // IPv4-mapped (::ffff:x), IPv4-compatible (::x) e NAT64 (64:ff9b::x).
-  const tail = h.match(/^(?:::(?:ffff:)?|64:ff9b::)(.+)$/);
-  if (!tail) return undefined;
-  const rest = tail[1];
-  if (/^\d+\.\d+\.\d+\.\d+$/.test(rest)) return parseIPv4(rest);
-  const pair = rest.match(/^([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
-  if (pair) return hextetsToIPv4(pair[1], pair[2]);
-  return undefined;
+  return blockedAddressReason(dotted(v)) !== null;
 }
 
 export function isPrivateIPv6(host) {
-  let h = String(host || '').toLowerCase().replace(/^\[|\]$/g, '');
-  const zone = h.indexOf('%');
-  if (zone >= 0) h = h.slice(0, zone);
-  if (h === '::1' || h === '::') return true;
-  if (/^f[cd]/.test(h)) return true; //    fc00::/7 (ULA)
-  if (/^fe[89ab]/.test(h)) return true; // fe80::/10 (link-local)
-  const embedded = embeddedIPv4(h);
-  if (embedded !== undefined) {
-    return embedded === null ? true : isPrivateIPv4(embedded);
-  }
-  return false;
+  return blockedAddressReason(host) !== null;
 }
 
 /**
@@ -131,9 +97,7 @@ export function isBlockedHost(host) {
  * host público apontando para IP privado.
  *
  * Um nome que não resolve devolve false: quem barra aí é o próprio fetch, e
- * tratar NXDOMAIN como "privado" só produziria uma mensagem de erro errada. O
- * TOCTOU de DNS rebinding permanece inerente a qualquer verificação
- * pré-conexão.
+ * tratar NXDOMAIN como "privado" só produziria uma mensagem de erro errada.
  */
 export async function resolvesToPrivate(host, signal) {
   const h = String(host || '').toLowerCase().replace(/\.$/, '');
@@ -142,32 +106,14 @@ export async function resolvesToPrivate(host, signal) {
   // terminar pelo próprio sinal logo em seguida.
   if (signal?.aborted) return false;
 
-  // Um resolver próprio por consulta, e não o `dns.resolve4` do módulo, porque
-  // este tem `cancel()` e aquele não tem: é o que permite ABANDONAR a consulta
-  // quando o prazo vence, em vez de apenas parar de esperar por ela e deixar
-  // uma pergunta pendurada no processo.
-  const resolver = new dns.Resolver();
-  // Um resolver novo lê a configuração do sistema, e não os servidores do
-  // resolver padrão: sem isto, um `dns.setServers()` em algum ponto do boot
-  // valeria para o resto do processo e silenciosamente não valeria aqui.
-  try {
-    const servidores = dns.getServers();
-    if (servidores.length > 0) resolver.setServers(servidores);
-  } catch {
-    /* lista inválida: fica com a do sistema, que é o que havia antes */
-  }
-  const cancelar = () => resolver.cancel();
-  signal?.addEventListener('abort', cancelar, { once: true });
-  try {
-    const [v4, v6] = await Promise.allSettled([resolver.resolve4(h), resolver.resolve6(h)]);
-    const addrs = [
-      ...(v4.status === 'fulfilled' ? v4.value : []),
-      ...(v6.status === 'fulfilled' ? v6.value : [])
-    ];
-    return addrs.some((ip) => isBlockedHost(ip));
-  } finally {
-    signal?.removeEventListener('abort', cancelar);
-  }
+  // `dns.lookup` — `getaddrinfo` — e não mais `resolve4`/`resolve6`, porque é
+  // o resolvedor que o socket usaria: era essa diferença que deixava
+  // `/etc/hosts` e afins passarem como públicos. O preço é que `getaddrinfo`
+  // não tem `cancel()`: o prazo abaixo faz esta função PARAR DE ESPERAR, mas a
+  // consulta em si segue pendurada no threadpool até o sistema desistir. Quem
+  // chamou é solto na hora, que é o que o prazo existe para garantir.
+  const addrs = await PinnedTransport.addressesFor(h, undefined, signal);
+  return addrs.some(({ address }) => blockedAddressReason(address) !== null);
 }
 
 export class SsrfBlockedError extends Error {
@@ -178,17 +124,20 @@ export class SsrfBlockedError extends Error {
 }
 
 /**
- * Valida uma URL antes de qualquer requisição server-side. Lança
- * SsrfBlockedError quando o destino não é público.
+ * A URL, mais os endereços que ela resolve — que são os endereços que o socket
+ * pode usar e nenhum outro.
  *
- * O `signal` é opcional e serve só para pôr a resolução de nome sob o mesmo
- * prazo da requisição que ela precede. Uma consulta cancelada não devolve
- * endereço nenhum, então esta função responde "não é privado" — e quem chama
- * termina pelo sinal, que é a razão verdadeira de a chamada acabar. Reportar
- * "host privado" por causa de um prazo vencido seria dizer ao operador uma
- * coisa que não aconteceu.
+ * `exigeEndereco` separa os dois usos. Quem só valida (`assertPublicUrl`, que o
+ * EvolutionClient chama antes de guardar uma configuração) trata "não resolve"
+ * como "não é privado": quem barra aí é a conexão, e chamar NXDOMAIN de host
+ * bloqueado só produziria uma mensagem errada. Quem vai CONECTAR precisa de
+ * pelo menos um endereço para fixar, e sem isso não há requisição.
+ *
+ * O `signal` põe a resolução de nome sob o mesmo prazo da requisição que ela
+ * precede. Uma consulta abandonada não devolve endereço nenhum, e é o sinal —
+ * não um "host privado" inventado — que encerra a chamada.
  */
-export async function assertPublicUrl(raw, signal) {
+async function vetUrl(raw, { exigeEndereco, signal }) {
   let u;
   try {
     u = raw instanceof URL ? raw : new URL(String(raw));
@@ -197,8 +146,35 @@ export async function assertPublicUrl(raw, signal) {
   }
   if (!['http:', 'https:'].includes(u.protocol)) throw new SsrfBlockedError('Unsupported protocol');
   if (isBlockedHost(u.hostname)) throw new SsrfBlockedError('Private host blocked');
-  if (await resolvesToPrivate(u.hostname, signal)) throw new SsrfBlockedError('Private host blocked');
-  return u;
+
+  const addresses = await PinnedTransport.vetTarget(u.hostname, {
+    signal,
+    refuse: () => new SsrfBlockedError('Private host blocked')
+  });
+  if (exigeEndereco) {
+    // O prazo pode ter vencido DENTRO da resolução acima, e aí o motivo de
+    // parar é ele. Sem esta linha, um nome que não respondeu a tempo sairia
+    // daqui como "não resolveu para endereço nenhum" — uma mensagem sobre o
+    // DNS para um problema que foi de relógio.
+    signal?.throwIfAborted();
+    if (addresses.length === 0) {
+      throw new SsrfBlockedError(`Host ${u.hostname} did not resolve to any address`);
+    }
+  }
+  return { url: u, addresses };
+}
+
+/**
+ * Valida uma URL antes de qualquer requisição server-side. Lança
+ * SsrfBlockedError quando o destino não é público.
+ *
+ * Com o prazo vencido durante a resolução, esta responde "não é privado" e
+ * quem chama termina pelo sinal: reportar "host privado" por causa de um
+ * relógio seria dizer ao operador uma coisa que não aconteceu.
+ */
+export async function assertPublicUrl(raw, signal) {
+  const { url } = await vetUrl(raw, { exigeEndereco: false, signal });
+  return url;
 }
 
 export const MAX_REDIRECTS = 3;
@@ -211,8 +187,8 @@ export const MAX_REDIRECTS = 3;
  * cabeçalhos, depois pinga um byte por minuto, e o handler do webhook que
  * aguarda esta função nunca devolve o socket. `waWebhookLimiter` conta chegadas,
  * não requisições simultâneas, então nada limitava quantas ficavam presas ao
- * mesmo tempo. O teto de 25 MB em `lerCorpoLimitado` limita o tamanho, não o
- * tempo — são coisas diferentes e cada uma precisa do seu limite.
+ * mesmo tempo. O teto de bytes abaixo limita o tamanho, não o tempo — são
+ * coisas diferentes e cada uma precisa do seu limite.
  *
  * Um prazo SÓ, criado antes do laço e compartilhado por todos os saltos, e não
  * um por salto: três saltos com 30 s cada seriam 90 s de espera, que é
@@ -226,29 +202,55 @@ export const MAX_REDIRECTS = 3;
 export const FETCH_TIMEOUT_MS = 30_000;
 
 /**
+ * Quanto de resposta cabe na memória do processo quando quem chama não diz.
+ * Dimensionado para resposta de API; quem baixa arquivo — `waMediaService` —
+ * passa o seu próprio teto.
+ */
+export const MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
+
+/**
  * Segue redirects manualmente, revalidando o host a CADA salto. Usar no lugar
  * de fetch() sempre que a URL de destino tiver origem no usuário.
  *
- * `init.timeoutMs` substitui o prazo padrão para quem baixa arquivo grande. O
- * `signal` de quem chama continua valendo: os dois são combinados, então o
- * cancelamento vem do que disparar primeiro, e o combinado governa tanto a
- * resolução de nome de cada salto quanto a requisição em si.
+ * `init.timeoutMs` substitui o prazo padrão para quem baixa arquivo grande, e
+ * `init.maxBytes` o teto de corpo. O `signal` de quem chama continua valendo:
+ * os dois são combinados, então o cancelamento vem do que disparar primeiro, e
+ * o combinado governa tanto a resolução de nome de cada salto quanto a
+ * requisição em si.
+ *
+ * Não vai por `fetch`: o endereço aprovado precisa ser o endereço conectado, e
+ * o `fetch` do Node não aceita resolvedor. Ver `utils/net/pinnedFetch.js`.
  */
 export async function safeFetch(start, init = {}, maxRedirects = MAX_REDIRECTS) {
-  const { timeoutMs = FETCH_TIMEOUT_MS, signal: callerSignal, ...rest } = init;
+  const {
+    timeoutMs = FETCH_TIMEOUT_MS,
+    maxBytes = MAX_RESPONSE_BYTES,
+    signal: callerSignal,
+    method,
+    headers,
+    body
+  } = init;
   const deadline = AbortSignal.timeout(timeoutMs);
   const signal = callerSignal ? AbortSignal.any([callerSignal, deadline]) : deadline;
 
   let current = start instanceof URL ? start : new URL(String(start));
   for (let hop = 0; hop <= maxRedirects; hop += 1) {
     // eslint-disable-next-line no-await-in-loop -- os saltos são sequenciais por natureza
-    await assertPublicUrl(current, signal);
+    const { url, addresses } = await vetUrl(current, { exigeEndereco: true, signal });
     // O prazo pode ter vencido DENTRO da resolução acima. Sem isto a decisão
-    // de encerrar ficaria por conta do `fetch`, que é justamente o passo que o
-    // prazo existe para não deixar começar.
+    // de encerrar ficaria por conta da requisição, que é justamente o passo que
+    // o prazo existe para não deixar começar.
     signal.throwIfAborted();
     // eslint-disable-next-line no-await-in-loop
-    const r = await fetch(current.toString(), { ...rest, signal, redirect: 'manual' });
+    const r = await PinnedTransport.request({
+      url,
+      addresses,
+      method,
+      headers,
+      body,
+      signal,
+      maxBytes
+    });
     if (r.status >= 300 && r.status < 400) {
       const loc = r.headers.get('location');
       if (!loc) return r;
@@ -258,7 +260,7 @@ export async function safeFetch(start, init = {}, maxRedirects = MAX_REDIRECTS) 
       } catch {
         /* corpo já descartado */
       }
-      current = new URL(loc, current);
+      current = new URL(loc, url);
       continue;
     }
     return r;

@@ -376,6 +376,7 @@ export default {
   'sgp.error.urlInvalid': 'أدخل عنوان SGP صالحًا (https://provider.sgp.net.br)',
   'sgp.error.urlScheme': 'يجب أن يستخدم عنوان SGP بروتوكول HTTP أو HTTPS',
   'sgp.error.urlCredentials': 'يجب ألّا يحتوي عنوان SGP على مستخدم أو كلمة مرور',
+  'sgp.error.blockedHost': 'يشير عنوان SGP إلى عنوان لا يُسمح لهذا التثبيت بالوصول إليه',
   'sgp.error.pathsRelative': 'يجب أن تكون مسارات واجهة SGP نسبية، مثل /api/ura/titulos/',
   'sgp.error.configIncomplete': 'أدخل عنوان SGP والتطبيق والرمز قبل تفعيل التكامل',
   'sgp.error.notConfigured': 'التكامل مع SGP غير مُعدّ',

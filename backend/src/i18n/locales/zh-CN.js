@@ -377,6 +377,7 @@ export default {
   'sgp.error.urlInvalid': '请输入有效的 SGP 地址（https://provider.sgp.net.br）',
   'sgp.error.urlScheme': 'SGP 地址需使用 HTTP 或 HTTPS',
   'sgp.error.urlCredentials': 'SGP 地址中不得包含用户名或密码',
+  'sgp.error.blockedHost': 'SGP 地址指向了本部署无法访问的地址',
   'sgp.error.pathsRelative': 'SGP 的 API 路径需为相对路径，例如 /api/ura/titulos/',
   'sgp.error.configIncomplete': '启用集成前，请填写 SGP 地址、应用和令牌',
   'sgp.error.notConfigured': 'SGP 集成尚未配置',
