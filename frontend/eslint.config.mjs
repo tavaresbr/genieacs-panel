@@ -9,7 +9,9 @@ export default [
     ignores: ['dist/**', 'node_modules/**']
   },
   {
-    files: ['src/**/*.{ts,tsx}'],
+    // `test` is linted with the same parser and rules as the code it guards: a
+    // test that only the runner understands is a test nobody reviews.
+    files: ['src/**/*.{ts,tsx}', 'test/**/*.{ts,tsx}'],
     languageOptions: {
       parser: tsParser,
       ecmaVersion: 'latest',
@@ -19,7 +21,7 @@ export default [
           jsx: true
         }
       },
-      globals: globals.browser
+      globals: { ...globals.browser, ...globals.node }
     },
     plugins: {
       '@typescript-eslint': tsPlugin,
