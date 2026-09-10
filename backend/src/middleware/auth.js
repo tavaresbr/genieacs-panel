@@ -210,9 +210,35 @@ async function authenticateToken(req, res, next) {
     });
   }
 
+  if (!tokenMatchesHost(req, session)) {
+    return res.status(403).json({
+      message: req.t('auth.sessionInvalid'),
+      code: 'tenant_mismatch'
+    });
+  }
+
   req.user = session;
   req.tenantId = session.tenantId;
   return runInTenant(session.tenantId, () => next());
+}
+
+/**
+ * Whether a token may be used on the host it arrived at.
+ *
+ * `req.hostTenantId` is set only when the host NAMED a provider, which is the
+ * only case where the two can disagree in the first place. A deployment
+ * without subdomains leaves it null and this is always true — the token is the
+ * sole authority there, as it has been.
+ *
+ * Without this check, a token minted at `alfa.painel.exemplo.com` still works
+ * against `beta.painel.exemplo.com`: the scope would come from the token, so
+ * the operator would not SEE beta's data — but the request would be served,
+ * and every rate limit, audit line and error message would be attributed to a
+ * provider the caller has no business naming.
+ */
+function tokenMatchesHost(req, session) {
+  if (!req.hostTenantId) return true;
+  return Number(req.hostTenantId) === Number(session.tenantId);
 }
 
 async function authenticateTokenOptional(req, res, next) {
@@ -237,6 +263,16 @@ async function authenticateTokenOptional(req, res, next) {
   // request carries on as an anonymous one, which is what this middleware is
   // for. A token that did resolve re-scopes exactly as the mandatory form does.
   if (!session) return next();
+  // A token for another provider's host is not an anonymous request, it is a
+  // wrong one. Refusing beats falling back to anonymous, which would answer
+  // with the host's data and look like it worked.
+  if (!tokenMatchesHost(req, session)) {
+    req.user = null;
+    return res.status(403).json({
+      message: req.t('auth.sessionInvalid'),
+      code: 'tenant_mismatch'
+    });
+  }
   req.tenantId = session.tenantId;
   return runInTenant(session.tenantId, () => next());
 }

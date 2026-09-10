@@ -80,7 +80,16 @@ class AuthController {
         );
       }
 
-      const membership = await membershipForLogin(user.id, tenantId);
+      // The host wins over the body. Where providers have subdomains, the
+      // address the person typed is the provider they mean, and letting a
+      // `tenantId` in the payload override it would mean the login screen of
+      // one ISP mints a session for another — refused a moment later by the
+      // host check in `authenticateToken`, but only after confirming to the
+      // caller that the credentials are good for SOMEBODY.
+      const membership = await membershipForLogin(
+        user.id,
+        req.hostTenantId ?? tenantId
+      );
 
       // Somebody who works for nobody cannot sign in — there is no provider to
       // put the session in, and a session with no provider is the unscoped read
