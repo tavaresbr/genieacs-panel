@@ -135,15 +135,39 @@ export function isBlockedHost(host) {
  * TOCTOU de DNS rebinding permanece inerente a qualquer verificação
  * pré-conexão.
  */
-export async function resolvesToPrivate(host) {
+export async function resolvesToPrivate(host, signal) {
   const h = String(host || '').toLowerCase().replace(/\.$/, '');
   if (!h || h.includes(':') || parseIPv4(h) !== null) return false; // já coberto por isBlockedHost
-  const [v4, v6] = await Promise.allSettled([dns.resolve4(h), dns.resolve6(h)]);
-  const addrs = [
-    ...(v4.status === 'fulfilled' ? v4.value : []),
-    ...(v6.status === 'fulfilled' ? v6.value : [])
-  ];
-  return addrs.some((ip) => isBlockedHost(ip));
+  // Já cancelado antes de começar: não há consulta a fazer, e quem chama vai
+  // terminar pelo próprio sinal logo em seguida.
+  if (signal?.aborted) return false;
+
+  // Um resolver próprio por consulta, e não o `dns.resolve4` do módulo, porque
+  // este tem `cancel()` e aquele não tem: é o que permite ABANDONAR a consulta
+  // quando o prazo vence, em vez de apenas parar de esperar por ela e deixar
+  // uma pergunta pendurada no processo.
+  const resolver = new dns.Resolver();
+  // Um resolver novo lê a configuração do sistema, e não os servidores do
+  // resolver padrão: sem isto, um `dns.setServers()` em algum ponto do boot
+  // valeria para o resto do processo e silenciosamente não valeria aqui.
+  try {
+    const servidores = dns.getServers();
+    if (servidores.length > 0) resolver.setServers(servidores);
+  } catch {
+    /* lista inválida: fica com a do sistema, que é o que havia antes */
+  }
+  const cancelar = () => resolver.cancel();
+  signal?.addEventListener('abort', cancelar, { once: true });
+  try {
+    const [v4, v6] = await Promise.allSettled([resolver.resolve4(h), resolver.resolve6(h)]);
+    const addrs = [
+      ...(v4.status === 'fulfilled' ? v4.value : []),
+      ...(v6.status === 'fulfilled' ? v6.value : [])
+    ];
+    return addrs.some((ip) => isBlockedHost(ip));
+  } finally {
+    signal?.removeEventListener('abort', cancelar);
+  }
 }
 
 export class SsrfBlockedError extends Error {
@@ -156,8 +180,15 @@ export class SsrfBlockedError extends Error {
 /**
  * Valida uma URL antes de qualquer requisição server-side. Lança
  * SsrfBlockedError quando o destino não é público.
+ *
+ * O `signal` é opcional e serve só para pôr a resolução de nome sob o mesmo
+ * prazo da requisição que ela precede. Uma consulta cancelada não devolve
+ * endereço nenhum, então esta função responde "não é privado" — e quem chama
+ * termina pelo sinal, que é a razão verdadeira de a chamada acabar. Reportar
+ * "host privado" por causa de um prazo vencido seria dizer ao operador uma
+ * coisa que não aconteceu.
  */
-export async function assertPublicUrl(raw) {
+export async function assertPublicUrl(raw, signal) {
   let u;
   try {
     u = raw instanceof URL ? raw : new URL(String(raw));
@@ -166,7 +197,7 @@ export async function assertPublicUrl(raw) {
   }
   if (!['http:', 'https:'].includes(u.protocol)) throw new SsrfBlockedError('Unsupported protocol');
   if (isBlockedHost(u.hostname)) throw new SsrfBlockedError('Private host blocked');
-  if (await resolvesToPrivate(u.hostname)) throw new SsrfBlockedError('Private host blocked');
+  if (await resolvesToPrivate(u.hostname, signal)) throw new SsrfBlockedError('Private host blocked');
   return u;
 }
 
@@ -186,6 +217,11 @@ export const MAX_REDIRECTS = 3;
  * Um prazo SÓ, criado antes do laço e compartilhado por todos os saltos, e não
  * um por salto: três saltos com 30 s cada seriam 90 s de espera, que é
  * justamente o que se quer evitar.
+ *
+ * E vale da resolução do nome ao último byte, não só do `fetch` em diante. A
+ * verificação anti-SSRF consulta o DNS antes de qualquer conexão, e um
+ * resolver que não responde prende quem chamou exatamente como um servidor que
+ * não responde — mesma espera, mesmo handler preso, um passo antes.
  */
 export const FETCH_TIMEOUT_MS = 30_000;
 
@@ -195,7 +231,8 @@ export const FETCH_TIMEOUT_MS = 30_000;
  *
  * `init.timeoutMs` substitui o prazo padrão para quem baixa arquivo grande. O
  * `signal` de quem chama continua valendo: os dois são combinados, então o
- * cancelamento vem do que disparar primeiro.
+ * cancelamento vem do que disparar primeiro, e o combinado governa tanto a
+ * resolução de nome de cada salto quanto a requisição em si.
  */
 export async function safeFetch(start, init = {}, maxRedirects = MAX_REDIRECTS) {
   const { timeoutMs = FETCH_TIMEOUT_MS, signal: callerSignal, ...rest } = init;
@@ -205,7 +242,11 @@ export async function safeFetch(start, init = {}, maxRedirects = MAX_REDIRECTS) 
   let current = start instanceof URL ? start : new URL(String(start));
   for (let hop = 0; hop <= maxRedirects; hop += 1) {
     // eslint-disable-next-line no-await-in-loop -- os saltos são sequenciais por natureza
-    await assertPublicUrl(current);
+    await assertPublicUrl(current, signal);
+    // O prazo pode ter vencido DENTRO da resolução acima. Sem isto a decisão
+    // de encerrar ficaria por conta do `fetch`, que é justamente o passo que o
+    // prazo existe para não deixar começar.
+    signal.throwIfAborted();
     // eslint-disable-next-line no-await-in-loop
     const r = await fetch(current.toString(), { ...rest, signal, redirect: 'manual' });
     if (r.status >= 300 && r.status < 400) {

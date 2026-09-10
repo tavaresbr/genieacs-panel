@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import dns from 'node:dns/promises';
+
 import { safeFetch } from '../src/utils/wa/ssrfGuard.js';
 import { EvolutionClient } from '../src/services/evolutionClient.js';
 
@@ -83,6 +85,57 @@ describe('safeFetch gives every outbound request a deadline', () => {
     assert.equal(resposta.status, 200);
     assert.equal(saltos, 3);
     assert.equal(sinais.size, 1, 'os saltos compartilham um prazo, não um por salto');
+  });
+
+  /**
+   * O prazo tem de valer da resolução do nome em diante, e não só do `fetch`.
+   *
+   * A verificação anti-SSRF consulta o DNS antes de abrir qualquer conexão, e
+   * um resolver que não responde prende quem chamou tanto quanto um servidor
+   * que não responde — mesma espera, mesmo handler preso, um passo antes. O
+   * dublê abaixo é um resolver que nunca responde e que só solta quem espera
+   * quando é cancelado, que é como o c-ares se comporta de verdade.
+   */
+  test('covers the name resolution, not just the request', async () => {
+    const originais = {
+      resolve4: dns.Resolver.prototype.resolve4,
+      resolve6: dns.Resolver.prototype.resolve6,
+      cancel: dns.Resolver.prototype.cancel
+    };
+    function pendurar() {
+      return new Promise((_resolve, reject) => {
+        (this._presos ??= []).push(() => {
+          reject(Object.assign(new Error('cancelled'), { code: 'ECANCELLED' }));
+        });
+      });
+    }
+    dns.Resolver.prototype.resolve4 = pendurar;
+    dns.Resolver.prototype.resolve6 = pendurar;
+    dns.Resolver.prototype.cancel = function cancel() {
+      for (const soltar of this._presos ?? []) soltar();
+    };
+
+    let chamouFetch = false;
+    globalThis.fetch = () => {
+      chamouFetch = true;
+      return new Response('ok', { status: 200 });
+    };
+
+    const segura = setTimeout(() => {}, 5_000);
+    try {
+      await assert.rejects(
+        () => safeFetch(`${HOST_PUBLICO}/midia.png`, { timeoutMs: 60 }),
+        // O prazo é o motivo de a chamada acabar. Uma consulta cancelada não
+        // devolve endereço nenhum, e chamar isso de "host privado" diria ao
+        // operador uma coisa que não aconteceu.
+        (error) => error.name === 'TimeoutError'
+      );
+    } finally {
+      clearTimeout(segura);
+      Object.assign(dns.Resolver.prototype, originais);
+    }
+
+    assert.equal(chamouFetch, false, 'a requisição não chegou a sair');
   });
 
   test("honours the caller's own signal alongside the deadline", async () => {
