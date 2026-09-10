@@ -12,6 +12,21 @@ const REQUEST_TIMEOUT_MS = 15_000;
 const ERROR_BODY_LIMIT = 500;
 
 /**
+ * The most of an Evolution response this client will hold in memory.
+ *
+ * `response.text()` buffers the whole body into one string with no ceiling, and
+ * `ERROR_BODY_LIMIT` truncates only at print time — by then the body is already
+ * resident, twice over once `JSON.parse` copies it. The 15 s timeout bounds how
+ * LONG a body may stream, which on a fast link is still hundreds of megabytes.
+ *
+ * A megabyte is far more than this API ever answers: the largest real response
+ * is an instance list, and a base64 QR is tens of kilobytes. Anything past this
+ * is a server that is broken or hostile, and either way there is nothing in the
+ * excess worth reading.
+ */
+const MAX_RESPONSE_BYTES = 1024 * 1024;
+
+/**
  * The HTTP half of the Evolution integration.
  *
  * `utils/wa/evolutionApi.js` decides *what* to ask — it is pure and returns
@@ -218,13 +233,48 @@ export class EvolutionClient {
  * there would hide the status code that actually explains the problem.
  */
 async function readBody(response) {
-  const text = await response.text().catch(() => '');
+  const text = await readCapped(response);
   if (!text) return null;
   try {
     return JSON.parse(text);
   } catch {
     return text;
   }
+}
+
+/**
+ * The body as text, giving up once it passes `MAX_RESPONSE_BYTES`.
+ *
+ * The declared length is checked first, so an honest oversized body costs
+ * nothing to refuse; the running total is what catches a server that declares
+ * no length, or lies about it. Over the cap returns empty rather than a
+ * truncated string: half a JSON document parses as nothing useful, and handing
+ * back a fragment would invite a caller to act on it.
+ */
+async function readCapped(response) {
+  const declared = Number(response.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > MAX_RESPONSE_BYTES) {
+    await response.body?.cancel().catch(() => {});
+    return '';
+  }
+  if (!response.body) return '';
+  const parts = [];
+  let total = 0;
+  try {
+    for await (const chunk of response.body) {
+      total += chunk.length;
+      if (total > MAX_RESPONSE_BYTES) {
+        await response.body.cancel().catch(() => {});
+        return '';
+      }
+      parts.push(Buffer.from(chunk));
+    }
+  } catch {
+    // A body that dies mid-stream is the same nothing as a body we refused:
+    // `readBody`'s callers already treat a null as "the server said nothing".
+    return '';
+  }
+  return total ? Buffer.concat(parts).toString('utf8') : '';
 }
 
 /** A short, printable form of whatever the server sent back. */

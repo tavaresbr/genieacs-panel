@@ -231,3 +231,24 @@ export const waMediaLimiter = limiter({
   keyGenerator: ipKey,
   message: { success: false, error: 'too many media fetches' }
 });
+
+/**
+ * The operator's attachment upload, limited BEFORE its body is read.
+ *
+ * This one is not about the route's own cost — it is about the 16 MB the raw
+ * parser is willing to hold. That parser is reserved on the path early, ahead
+ * of the shared `apiLimiter`, because the global JSON parser would otherwise
+ * claim the body first; the effect was that an anonymous caller could make the
+ * panel buffer 16 MB before anything had the chance to refuse the request.
+ *
+ * The key is the source address rather than the session, deliberately: it has
+ * to count a caller that has NO session, which is exactly the case worth
+ * refusing. The ceiling is sized for a human attaching files, not for a
+ * campaign — outbound campaign attachments are uploaded once and reused.
+ */
+export const attachmentUploadLimiter = limiter({
+  windowMs: 60 * 1000,
+  max: 60,
+  keyGenerator: ipKey,
+  message: limitMessage('rateLimit.requests', 'rate_limited')
+});
