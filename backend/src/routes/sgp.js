@@ -1,7 +1,7 @@
 import express from 'express';
 import SgpController from '../controllers/sgpController.js';
 import SgpEventController from '../controllers/sgpEventController.js';
-import { authenticateToken, requireRole } from '../middleware/auth.js';
+import { authenticateToken, requirePermission } from '../middleware/auth.js';
 import { sgpAdminLimiter, sgpSyncLimiter, sgpWebhookLimiter } from '../middleware/rateLimit.js';
 
 const router = express.Router();
@@ -17,24 +17,24 @@ const router = express.Router();
 // device id.
 router.post('/events/webhook', sgpWebhookLimiter, SgpEventController.receive);
 
-router.get('/events', authenticateToken, requireRole(['admin']), SgpEventController.list);
-router.get('/events/:id', authenticateToken, requireRole(['admin']), SgpEventController.get);
-router.post('/events/:id/retry', authenticateToken, requireRole(['admin']), SgpEventController.retry);
-router.post('/events/secret/rotate', authenticateToken, requireRole(['admin']), SgpEventController.rotateSecret);
-router.post('/reconcile', authenticateToken, requireRole(['admin']), sgpSyncLimiter, SgpEventController.reconcile);
+router.get('/events', authenticateToken, requirePermission('sgp.read'), SgpEventController.list);
+router.get('/events/:id', authenticateToken, requirePermission('sgp.read'), SgpEventController.get);
+router.post('/events/:id/retry', authenticateToken, requirePermission('sgp.act'), SgpEventController.retry);
+router.post('/events/secret/rotate', authenticateToken, requirePermission('sgp.config'), SgpEventController.rotateSecret);
+router.post('/reconcile', authenticateToken, requirePermission('sgp.act'), sgpSyncLimiter, SgpEventController.reconcile);
 
-router.get('/config', authenticateToken, requireRole(['admin']), SgpController.getConfig);
-router.put('/config', authenticateToken, requireRole(['admin']), SgpController.updateConfig);
-router.post('/test', authenticateToken, requireRole(['admin']), sgpAdminLimiter, SgpController.testConnection);
-router.get('/customers', authenticateToken, requireRole(['admin']), sgpAdminLimiter, SgpController.lookup);
-router.get('/links', authenticateToken, requireRole(['admin']), SgpController.listLinks);
-router.get('/overview', authenticateToken, requireRole(['admin']), SgpController.getOverview);
+router.get('/config', authenticateToken, requirePermission('sgp.config'), SgpController.getConfig);
+router.put('/config', authenticateToken, requirePermission('sgp.config'), SgpController.updateConfig);
+router.post('/test', authenticateToken, requirePermission('sgp.config'), sgpAdminLimiter, SgpController.testConnection);
+router.get('/customers', authenticateToken, requirePermission('sgp.read'), sgpAdminLimiter, SgpController.lookup);
+router.get('/links', authenticateToken, requirePermission('sgp.read'), SgpController.listLinks);
+router.get('/overview', authenticateToken, requirePermission('sgp.read'), SgpController.getOverview);
 // A fleet sync calls the provider once per ONT, so it gets its own budget.
-router.post('/sync', authenticateToken, requireRole(['admin']), sgpSyncLimiter, SgpController.syncFleet);
-router.get('/devices/:deviceId', authenticateToken, requireRole(['admin']), sgpAdminLimiter, SgpController.getDeviceIntegration);
-router.post('/devices/:deviceId/link', authenticateToken, requireRole(['admin']), sgpAdminLimiter, SgpController.linkDevice);
-router.delete('/devices/:deviceId/link', authenticateToken, requireRole(['admin']), sgpAdminLimiter, SgpController.unlinkDevice);
-router.post('/devices/:deviceId/unlock', authenticateToken, requireRole(['admin']), sgpAdminLimiter, SgpController.unlockDevice);
-router.post('/devices/:deviceId/ticket', authenticateToken, requireRole(['admin']), sgpAdminLimiter, SgpController.openTicket);
+router.post('/sync', authenticateToken, requirePermission('sgp.act'), sgpSyncLimiter, SgpController.syncFleet);
+router.get('/devices/:deviceId', authenticateToken, requirePermission('sgp.read'), sgpAdminLimiter, SgpController.getDeviceIntegration);
+router.post('/devices/:deviceId/link', authenticateToken, requirePermission('sgp.act'), sgpAdminLimiter, SgpController.linkDevice);
+router.delete('/devices/:deviceId/link', authenticateToken, requirePermission('sgp.act'), sgpAdminLimiter, SgpController.unlinkDevice);
+router.post('/devices/:deviceId/unlock', authenticateToken, requirePermission('sgp.act'), sgpAdminLimiter, SgpController.unlockDevice);
+router.post('/devices/:deviceId/ticket', authenticateToken, requirePermission('sgp.act'), sgpAdminLimiter, SgpController.openTicket);
 
 export default router;

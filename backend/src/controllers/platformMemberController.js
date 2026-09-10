@@ -2,6 +2,7 @@ import { getDb } from '../config/database.js';
 import TenantUser from '../models/TenantUser.js';
 import User from '../models/User.js';
 import { ROLES } from './usersController.js';
+import { normalizeRole, roleHas } from '../config/permissions.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 
 /**
@@ -32,14 +33,15 @@ import { createResponse, createErrorResponse } from '../utils/helpers.js';
  */
 
 /**
- * Rows written before roles were manageable used the old default, and anything
- * that is not an administrator has read-only access. `/api/users` maps the same
- * way; the control plane must not report a role the provider's own screen would
- * spell differently for the same row.
+ * O papel tal como vale. Mesma função que `/api/users` usa, e importada da
+ * matriz em vez de repetida: o plano de controle não pode reportar para uma
+ * linha um papel que a tela do próprio provedor soletra de outro jeito, e duas
+ * cópias da regra divergem no primeiro papel novo.
  */
-function presentRole(role) {
-  return role === 'admin' ? 'admin' : 'viewer';
-}
+const presentRole = normalizeRole;
+
+/** Os papéis que administram a equipe, derivados da matriz — ver `usersController`. */
+const ADMINISTRADORES = ROLES.filter((role) => roleHas(role, 'operators.manage'));
 
 /** The `TenantMembership` the panel's API contract asks for. */
 function present(member) {
@@ -235,8 +237,8 @@ class PlatformMemberController {
       // the deployment — as the guard did before `tenant_users` existed — would
       // be wrong in both directions at once, letting another ISP's admins
       // authorise emptying this one.
-      if (presentRole(membership.role) === 'admin'
-        && await TenantUser.countByRole(tenantId, 'admin') <= 1) {
+      if (roleHas(membership.role, 'operators.manage')
+        && await TenantUser.countByRoles(tenantId, ADMINISTRADORES) <= 1) {
         return res.status(409).json(
           createErrorResponse('A provider must keep at least one administrator')
         );

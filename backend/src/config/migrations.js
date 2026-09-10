@@ -1888,6 +1888,59 @@ export const migrations = [
       if (!(await db.schema.hasTable('users'))) return;
       await createTableIfMissing(db, 'platform_admins', platformAdminsTable(db));
     }
+  },
+  {
+    /**
+     * Dá um `owner` a cada provedor: o administrador mais antigo dali.
+     *
+     * Os papéis passaram de dois (`admin`, `viewer`) para quatro (`owner`,
+     * `admin`, `tech`, `viewer`). A coluna já é `string(32)` sem constraint, de
+     * modo que os dois novos cabem sem tocar no schema — o que falta é ter
+     * alguém no papel de cima, porque a única coisa que só o `owner` pode fazer
+     * é promover e rebaixar outro `owner`, e sem nenhum `owner` essa porta fica
+     * trancada por dentro em todo install que já existe.
+     *
+     * O mais antigo, e não "todos os admins": promover todo mundo faria de
+     * `owner` outro nome para `admin` e apagaria a distinção no mesmo passo que
+     * a cria. Quem tiver que ser promovido depois, um `owner` promove.
+     *
+     * Não tira capacidade de ninguém: `owner` e `admin` carregam exatamente as
+     * mesmas capacidades (ver `config/permissions.js`), então a pessoa promovida
+     * não ganha rota nenhuma que já não alcançasse, e as que ficaram `admin`
+     * não perdem nenhuma.
+     *
+     * Sem `isApplied`: não há nada para baselinar. Um install anterior ao
+     * runner não tem `tenant_users` — a tabela nasceu na 0028, que é do runner
+     * — então "já estava assim" não é estado possível aqui.
+     */
+    id: '0030_tenant_owner_role',
+    async up(db) {
+      if (!(await db.schema.hasTable('tenant_users'))) return;
+
+      const tenants = await db('tenant_users').distinct('tenant_id').pluck('tenant_id');
+      for (const tenantId of tenants) {
+        // Se já houver `owner` ali, a migração não tem o que fazer: ou já rodou,
+        // ou alguém promovido depois já ocupa o papel, e nos dois casos escolher
+        // outro seria desfazer uma decisão que não é desta migração.
+        const existente = await db('tenant_users')
+          .where({ tenant_id: tenantId, role: 'owner' })
+          .first();
+        if (existente) continue;
+
+        const maisAntigo = await db('tenant_users')
+          .where({ tenant_id: tenantId, role: 'admin' })
+          .orderBy('id', 'asc')
+          .first();
+        // Provedor sem nenhum administrador fica sem `owner`, de propósito:
+        // inventar um a partir de um `viewer` daria a alguém um poder que
+        // ninguém lhe deu.
+        if (!maisAntigo) continue;
+
+        await db('tenant_users')
+          .where({ id: maisAntigo.id })
+          .update({ role: 'owner', updated_at: new Date() });
+      }
+    }
   }
 ];
 

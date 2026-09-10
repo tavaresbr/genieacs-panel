@@ -4,6 +4,7 @@ import User from '../models/User.js';
 import TenantUser from '../models/TenantUser.js';
 import PlatformAdmin from '../models/PlatformAdmin.js';
 import { runInTenant } from '../config/tenantContext.js';
+import { roleHas } from '../config/permissions.js';
 
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
 const REFRESH_TOKEN_EXPIRES_IN = process.env.REFRESH_TOKEN_EXPIRES_IN || '7d';
@@ -36,7 +37,7 @@ const JWT_SECRET = (() => {
  *
  * The role written into the token is the MEMBERSHIP's, never `users.role`. The
  * same person can be an administrator at the ISP they own and an ordinary
- * operator at one they consult for, and `requireRole` reads what is here.
+ * operator at one they consult for, and `requirePermission` reads what is here.
  *
  * The refresh token carries `tenantId` as well, because it has to be able to
  * mint the same thing again: without it a refresh would have to guess the
@@ -278,17 +279,35 @@ async function authenticateTokenOptional(req, res, next) {
   return runInTenant(session.tenantId, () => next());
 }
 
-function requireRole(roles) {
+/**
+ * A guarda de rota, dita pelo que a rota FAZ.
+ *
+ * Substitui `requireRole(['admin'])` nas 91 rotas do painel. A diferença não é
+ * de estilo: com o papel escrito na rota, a política mora em 91 arquivos e
+ * acrescentar um papel obriga a reabrir os 91 e decidir de novo, um a um — e o
+ * esquecimento não aparece, a rota apenas continua exigindo `admin`. Com a
+ * capacidade escrita na rota, a política inteira é a matriz de
+ * `config/permissions.js`, que é uma coisa só para revisar.
+ *
+ * 403 e não 404 aqui, ao contrário do resto do painel: quem chegou até esta
+ * guarda passou por `authenticateToken`, tem sessão válida NESTE provedor, e o
+ * que falta é atribuição. "Você não pode isto" não conta a essa pessoa nada que
+ * ela já não saiba — ela sabe que a tela existe, é colega de quem a usa. O 404
+ * existe para não confirmar a EXISTÊNCIA de um registro a quem não deveria
+ * saber dele; não é o caso de uma rota fixa do produto.
+ */
+function requirePermission(permission) {
   return (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({ message: req.t('auth.required') });
     }
-
-    if (roles && !roles.includes(req.user.role)) {
-      return res.status(403).json({ message: req.t('auth.insufficientPermissions') });
+    if (!roleHas(req.user.role, permission)) {
+      return res.status(403).json({
+        message: req.t('auth.insufficientPermissions'),
+        code: 'missing_permission'
+      });
     }
-
-    next();
+    return next();
   };
 }
 
@@ -297,7 +316,7 @@ function requireRole(roles) {
  *
  * Runs after `authenticateToken`, so `req.user` is a session that has already
  * been checked against the tables. What this adds is a different KIND of
- * authority: `requireRole` asks what somebody is at the provider their token
+ * authority: `requirePermission` asks what somebody may do at the provider their token
  * names, and the answer is never "may create providers" — an administrator at
  * an ISP administers that ISP. Being admin at a provider must not reach the
  * control plane, which is the whole point of a second roster.
@@ -358,6 +377,6 @@ export {
   resolveMembership,
   authenticateToken,
   authenticateTokenOptional,
-  requireRole,
+  requirePermission,
   requirePlatformAdmin
 };

@@ -1,21 +1,21 @@
 import express from 'express';
 import SettingsController from '../controllers/settingsController.js';
-import { authenticateToken, requireRole } from '../middleware/auth.js';
+import { authenticateToken, requirePermission } from '../middleware/auth.js';
 
 const router = express.Router();
 
-router.get('/', authenticateToken, requireRole(['admin']), SettingsController.getAllSettings);
+router.get('/', authenticateToken, requirePermission('settings.read'), SettingsController.getAllSettings);
 
-router.get('/:key', authenticateToken, requireRole(['admin']), SettingsController.getSettingByKey);
+router.get('/:key', authenticateToken, requirePermission('settings.read'), SettingsController.getSettingByKey);
 
-router.post('/', authenticateToken, requireRole(['admin']), SettingsController.createSetting);
+router.post('/', authenticateToken, requirePermission('settings.write'), SettingsController.createSetting);
 
-router.post('/sync-customer-ids', authenticateToken, requireRole(['admin']), SettingsController.syncCustomerIds);
+router.post('/sync-customer-ids', authenticateToken, requirePermission('settings.write'), SettingsController.syncCustomerIds);
 
-router.put('/:key', authenticateToken, requireRole(['admin']), SettingsController.updateSetting);
+router.put('/:key', authenticateToken, requirePermission('settings.write'), SettingsController.updateSetting);
 
-router.delete('/:key', authenticateToken, requireRole(['admin']), SettingsController.deleteSetting);
+router.delete('/:key', authenticateToken, requirePermission('settings.write'), SettingsController.deleteSetting);
 
-router.post('/test-genieacs', authenticateToken, requireRole(['admin']), SettingsController.testGenieAcsConnection);
+router.post('/test-genieacs', authenticateToken, requirePermission('settings.write'), SettingsController.testGenieAcsConnection);
 
 export default router;
