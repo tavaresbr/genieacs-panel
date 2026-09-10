@@ -97,6 +97,11 @@ describe('safeFetch gives every outbound request a deadline', () => {
    * quando é cancelado, que é como o c-ares se comporta de verdade.
    */
   test('covers the name resolution, not just the request', async () => {
+    // Um NOME, e não a constante do arquivo. A fase de DNS é o assunto deste
+    // caso, e `resolvesToPrivate` volta cedo para um literal de IP — se o host
+    // daqui virar um literal, o dublê abaixo deixa de ser consultado e o teste
+    // passa a afirmar coisa nenhuma sem nunca ficar vermelho.
+    const HOST_COM_NOME = 'https://evo.provedor.test';
     const originais = {
       resolve4: dns.Resolver.prototype.resolve4,
       resolve6: dns.Resolver.prototype.resolve6,
@@ -124,7 +129,7 @@ describe('safeFetch gives every outbound request a deadline', () => {
     const segura = setTimeout(() => {}, 5_000);
     try {
       await assert.rejects(
-        () => safeFetch(`${HOST_PUBLICO}/midia.png`, { timeoutMs: 60 }),
+        () => safeFetch(`${HOST_COM_NOME}/midia.png`, { timeoutMs: 60 }),
         // O prazo é o motivo de a chamada acabar. Uma consulta cancelada não
         // devolve endereço nenhum, e chamar isso de "host privado" diria ao
         // operador uma coisa que não aconteceu.
