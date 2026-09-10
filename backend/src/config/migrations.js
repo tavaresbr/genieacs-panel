@@ -891,6 +891,15 @@ const tenantSubscriptionsTable = (db) => (t) => {
   t.timestamp('trial_ends_at');
   // O fim do período pago corrente, para a tela dizer até quando vale.
   t.timestamp('current_period_end');
+  // O plano contratado. O catálogo e os tetos vivem em `config/plans.js`, e não
+  // aqui: um limite é decisão comercial que precisa de diff e de revisor, e num
+  // banco um dígito errado alarga o teto de todo mundo daquele plano em
+  // silêncio. Esta coluna guarda só QUAL plano, que é dado de cliente.
+  t.string('plan_code', 32).notNullable().defaultTo('unlimited');
+  // As exceções negociadas. Nulo significa "vale o do plano" — e não zero, que
+  // é um teto legítimo de quem contratou zero.
+  t.integer('max_operators').unsigned();
+  t.integer('max_subscriber_accounts').unsigned();
   // Por que está neste estado, escrito por quem mudou. Aparece para o ISP.
   t.string('status_reason', 255);
   t.timestamp('status_changed_at').defaultTo(db.fn.now());
@@ -2212,6 +2221,44 @@ export const migrations = [
         status_reason: 'Provedor existente no dia em que a assinatura passou a ser registrada',
         status_changed_at: new Date()
       })));
+    }
+  },
+  {
+    /**
+     * O plano, acrescentado a uma tabela que pode já existir.
+     *
+     * A 0035 é recente, então na maioria das instalações a tabela nasce já com
+     * estas colunas e este passo não faz nada. Ele existe para a minoria que
+     * subiu entre as duas — e a ordem importa: `hasColumn` antes de `alterTable`
+     * porque o SQLite reconstrói a tabela para acrescentar coluna, e reconstruir
+     * à toa é o tipo de coisa que só dá errado com dado dentro.
+     *
+     * `unlimited` como padrão pelo mesmo motivo do backfill da 0035: aplicar um
+     * teto retroativamente a quem já tem doze operadores não cobra nada de
+     * ninguém — só impede o ISP de contratar o décimo terceiro, num dia em que
+     * ele não mudou nada e não foi avisado.
+     */
+    id: '0036_tenant_subscription_plans',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenant_subscriptions'))) return false;
+      return db.schema.hasColumn('tenant_subscriptions', 'plan_code');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenant_subscriptions'))) return;
+      const faltando = [];
+      if (!(await db.schema.hasColumn('tenant_subscriptions', 'plan_code'))) {
+        faltando.push((t) => t.string('plan_code', 32).notNullable().defaultTo('unlimited'));
+      }
+      if (!(await db.schema.hasColumn('tenant_subscriptions', 'max_operators'))) {
+        faltando.push((t) => t.integer('max_operators').unsigned());
+      }
+      if (!(await db.schema.hasColumn('tenant_subscriptions', 'max_subscriber_accounts'))) {
+        faltando.push((t) => t.integer('max_subscriber_accounts').unsigned());
+      }
+      if (!faltando.length) return;
+      await db.schema.alterTable('tenant_subscriptions', (t) => {
+        for (const add of faltando) add(t);
+      });
     }
   }
 ];

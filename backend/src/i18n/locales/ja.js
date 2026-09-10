@@ -585,4 +585,9 @@ export default {
 
   'subscription.readOnly': 'このプロバイダーの契約が支払い遅延のため、請求が精算されるまでパネルは読み取り専用です',
   'subscription.blocked': 'このプロバイダーの契約は有効ではありません',
+
+  'plan.operatorLimit': 'このプランでは運用者は{limit}人までです。追加するにはお問い合わせください',
+  'plan.subscriberAccountLimit': 'このプランでは加入者アカウントは{limit}件までのため、新規作成は行われませんでした',
+  'plan.usageRetrieved': 'プランの利用状況を取得しました',
+  'plan.usageFailed': 'プランの利用状況を読み取れませんでした',
 };

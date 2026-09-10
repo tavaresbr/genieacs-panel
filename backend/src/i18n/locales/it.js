@@ -583,4 +583,9 @@ export default {
 
   'subscription.readOnly': 'L\'abbonamento di questo provider è scaduto, quindi il pannello resta in sola lettura finché la fattura non viene saldata',
   'subscription.blocked': 'L\'abbonamento di questo provider non è attivo',
+
+  'plan.operatorLimit': 'Questo piano consente {limit} operatori; contattaci per ampliarlo e aggiungerne un altro',
+  'plan.subscriberAccountLimit': 'Questo piano consente {limit} account abbonato, quindi non ne è stato creato nessuno nuovo',
+  'plan.usageRetrieved': 'Utilizzo del piano recuperato',
+  'plan.usageFailed': 'Impossibile leggere l’utilizzo del piano',
 };

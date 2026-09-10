@@ -584,4 +584,9 @@ export default {
 
   'subscription.readOnly': 'A assinatura deste provedor está em atraso, então o painel fica somente leitura até a fatura ser quitada',
   'subscription.blocked': 'A assinatura deste provedor não está ativa',
+
+  'plan.operatorLimit': 'Este plano permite {limit} operadores; fale conosco para ampliar e cadastrar mais um',
+  'plan.subscriberAccountLimit': 'Este plano permite {limit} contas de assinante, então nenhuma nova foi criada',
+  'plan.usageRetrieved': 'Uso do plano obtido',
+  'plan.usageFailed': 'Não foi possível ler o uso do plano',
 };

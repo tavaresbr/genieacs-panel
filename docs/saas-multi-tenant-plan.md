@@ -576,9 +576,34 @@ peças:
   só, que é justamente onde aquela rota não existe. É por isso que a inadimplência não
   escreve naquela coluna: ela tornaria o cliente elegível à exclusão em duas etapas e
   derrubaria o portal dos assinantes dele junto.
-- Limites verificados nos pontos de escrita: criação de operador (`teamController`), criação
-  de conta de assinante (`backend/src/services/customerService.js` → `syncDevices`), e
-  contagem de ONTs vinda do GenieACS (query de count no conector).
+- ✅ **os limites nos pontos de escrita** — catálogo em `config/plans.js`, medição e decisão
+  em `services/planLimitService.js`, `plan_code` e as exceções negociadas em
+  `tenant_subscriptions` (migration 0036), e `GET /api/tenant/usage` para a tela de plano e
+  uso.
+
+  Catálogo em CÓDIGO e não em tabela: um limite é decisão comercial que precisa de diff e de
+  revisor, e num banco um dígito errado alarga o teto de todo mundo daquele plano em
+  silêncio. O que varia por cliente («este ISP negociou 40 operadores») não é o plano, é uma
+  exceção, e exceção mora na linha da assinatura.
+
+  Três coisas que a execução mudou:
+
+  1. **O convite é o ponto por onde o teto escaparia.** Conferir só no cadastro direto deixa
+     um administrador emitir vinte links num plano de três: cada aceite, isolado, é o
+     primeiro a passar do teto, e chega quando quem emitiu já saiu da tela. Um convite em
+     aberto conta como vaga prometida, e o teto é conferido **de novo** no aceite — ali sem
+     somar o próprio convite, senão o último convite de todo provedor no teto seria recusado.
+  2. **A varredura de contas de assinante não pode falhar em silêncio.** Ela roda sem ninguém
+     olhando; parar de criar contas caladamente é o assinante ficar sem portal e ninguém
+     saber por quê. O que ela deixou de criar é registrado e aparece ao lado do teto que o
+     causou. E uma ONT que troca de titular passa mesmo no teto: aposenta uma conta e cria
+     outra, saldo zero de ativas. Por isso o teto conta ATIVAS e não linhas — contando
+     linhas, o provedor encostaria no limite a cada troca de titular sem ter vendido nada.
+  3. **O teto de ONTs não existe, e a ausência é a decisão.** Não há ponto de escrita para
+     uma ONT: ela aparece porque informou ao ACS do provedor, que é dele e não nosso — quando
+     a contagem passa, o equipamento já está lá. Fingir que é limite levaria a esconder ONTs
+     do painel (o ISP perde a visão da própria rede por causa da nossa fatura) ou a bloquear
+     a tela inteira. É **medição**: cobrar é o caminho, travar não é.
 - Tabela `billing_events` e uma interface `BillingProvider` já definidas agora, com
   implementação `ManualBillingProvider` (nós marcamos pago). Quando o gateway entrar,
   recomendo **Asaas** (Pix + boleto + cartão, é o padrão do mercado de ISP brasileiro) com

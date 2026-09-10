@@ -586,4 +586,9 @@ export default {
 
   'subscription.readOnly': 'Das Abonnement dieses Anbieters ist überfällig, daher ist das Panel bis zur Begleichung der Rechnung schreibgeschützt',
   'subscription.blocked': 'Das Abonnement dieses Anbieters ist nicht aktiv',
+
+  'plan.operatorLimit': 'Dieser Tarif erlaubt {limit} Bediener; kontaktieren Sie uns, um ihn zu erweitern',
+  'plan.subscriberAccountLimit': 'Dieser Tarif erlaubt {limit} Teilnehmerkonten, daher wurden keine neuen angelegt',
+  'plan.usageRetrieved': 'Tarifnutzung abgerufen',
+  'plan.usageFailed': 'Tarifnutzung konnte nicht gelesen werden',
 };

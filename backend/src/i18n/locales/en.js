@@ -585,4 +585,9 @@ export default {
 
   'subscription.readOnly': 'This provider\'s subscription is past due, so the panel is read-only until the invoice is settled',
   'subscription.blocked': 'This provider\'s subscription is not active',
+
+  'plan.operatorLimit': 'This plan allows {limit} operators; ask us to raise it to add another',
+  'plan.subscriberAccountLimit': 'This plan allows {limit} subscriber accounts, so no new ones were created',
+  'plan.usageRetrieved': 'Plan usage retrieved',
+  'plan.usageFailed': 'Failed to read the plan usage',
 };

@@ -581,4 +581,9 @@ export default {
 
   'subscription.readOnly': 'L\'abonnement de ce fournisseur est en retard de paiement, le panneau est donc en lecture seule jusqu\'au règlement de la facture',
   'subscription.blocked': 'L\'abonnement de ce fournisseur n\'est pas actif',
+
+  'plan.operatorLimit': 'Ce forfait autorise {limit} opérateurs ; contactez-nous pour l\'étendre et en ajouter un autre',
+  'plan.subscriberAccountLimit': 'Ce forfait autorise {limit} comptes d\'abonné, aucun nouveau compte n\'a donc été créé',
+  'plan.usageRetrieved': 'Utilisation du forfait récupérée',
+  'plan.usageFailed': 'Impossible de lire l\'utilisation du forfait',
 };

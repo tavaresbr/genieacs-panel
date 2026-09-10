@@ -18,6 +18,12 @@ const router = express.Router();
  */
 router.get('/public', TenantController.getPublicProfile);
 
+// Do lado autenticado da linha: o plano e quanto dele já foi gasto. Basta ler
+// as configurações — quem enxerga a tela de configurações enxerga o plano —, e
+// não `settings.write`, que faria só quem pode mudar coisas saber por que não
+// consegue mais cadastrar operador.
+router.get('/usage', authenticateToken, requirePermission('settings.read'), TenantController.getUsage);
+
 // E do outro lado da linha que o parágrafo acima descreve: tudo que este
 // provedor cadastrou, num arquivo. Autenticada e com capacidade própria.
 router.get('/export', authenticateToken, requirePermission('tenant.export'), TenantController.exportTenant);
