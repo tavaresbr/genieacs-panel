@@ -113,7 +113,11 @@ export const SHARED_TABLES = new Set([
   // a scope exists, at login, to decide which scope to open — reading it
   // through the scope would be circular. `TenantUser` carries the rule that
   // every query against it must name a person or a provider.
-  'tenant_users'
+  'tenant_users',
+  // The control plane's roster. Above providers rather than inside one: a
+  // provider's own administrator must not be able to mint providers or reach
+  // into another's, so this cannot be a per-provider table by construction.
+  'platform_admins'
 ]);
 
 /** Tables still to be converted. Shrinks to empty as the phase progresses. */

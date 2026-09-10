@@ -303,6 +303,19 @@ const customerWifiCredentialsTable = (db) => (t) => {
  * A provider. One row today — the install itself — so that every table that
  * will be scoped has something real to point at before anything depends on it.
  */
+/**
+ * The SaaS control plane's roster. Deliberately just an identity: what a
+ * platform administrator may do is decided in code, not by a role string here,
+ * because there is exactly one such power and naming degrees of it would invite
+ * inventing more.
+ */
+const platformAdminsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('user_id').unsigned().notNullable().unique()
+    .references('id').inTable('users').onDelete('CASCADE');
+  t.timestamp('created_at').defaultTo(db.fn.now());
+};
+
 const tenantsTable = (db) => (t) => {
   t.increments('id').primary();
   // The subdomain the panel will be reached at once tenants are resolved by
@@ -747,7 +760,9 @@ const TENANCY_TABLES = [
  * `users` — which step 0001 creates, long after `tenants` exists.
  */
 const MEMBERSHIP_TABLES = [
-  ['tenant_users', tenantUsersTable]
+  ['tenant_users', tenantUsersTable],
+  // Same reason as `tenant_users`: it references `users`, created by step 0001.
+  ['platform_admins', platformAdminsTable]
 ];
 
 const INITIAL_TABLES = [
@@ -1843,6 +1858,35 @@ export const migrations = [
           role: user.role || 'user'
         }));
       if (rows.length > 0) await db('tenant_users').insert(rows);
+    }
+  },
+  {
+    /**
+     * The control plane: who may create and suspend providers.
+     *
+     * Twelve steps of per-provider isolation went in before this, and none of
+     * them could be used — nothing in the panel creates a second provider. The
+     * gap was not an oversight about screens, it was a missing authority: a
+     * provider's own administrator must NOT be able to mint providers or reach
+     * into another one's, so "who may" needed a plane above them before "how"
+     * could exist at all.
+     *
+     * The table is created EMPTY, and the migration grants nobody. A migration
+     * that handed the platform to the lowest-numbered administrator would be an
+     * upgrade quietly promoting somebody — and on the self-hosted edition,
+     * where there is one provider and no platform plane, promoting them to a
+     * role that should not exist there. Bootstrapping is explicit instead:
+     * `setup` grants it on a fresh SaaS install, and `scripts/grant-platform-admin.js`
+     * grants it on an install that already had users, run by whoever holds the
+     * server — which is exactly who should be deciding this.
+     */
+    id: '0029_platform_admins',
+    async isApplied(db) {
+      return db.schema.hasTable('platform_admins');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('users'))) return;
+      await createTableIfMissing(db, 'platform_admins', platformAdminsTable(db));
     }
   }
 ];

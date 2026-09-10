@@ -247,6 +247,65 @@ export const authAPI = {
 export type Operator = User
 export type { OperatorRole }
 
+/** One provider on the deployment, as the control plane sees it. */
+export interface Tenant {
+  id: number
+  slug: string
+  name: string
+  status: 'active' | 'suspended'
+  /** How many people hold a membership here. */
+  operators: number
+  createdAt: string | null
+}
+
+/** A person's membership at one provider, listed from the control plane. */
+export interface TenantMembership {
+  userId: number
+  username: string
+  role: OperatorRole
+}
+
+/**
+ * The SaaS control plane.
+ *
+ * These routes exist only where `EDITION=saas`; on a self-hosted install they
+ * are not mounted at all, so a call answers 404. That is deliberate — a 403
+ * would tell whoever asked that a control plane is there.
+ *
+ * Every one of them requires a platform administrator, which is a plane ABOVE a
+ * provider's own administrator: minting providers and reaching between them is
+ * exactly what a provider's admin must not be able to do.
+ */
+export const platformAPI = {
+  listTenants: () =>
+    apiClient.get<{ tenants: Tenant[] }>('/platform/tenants'),
+
+  createTenant: (payload: { slug: string; name: string }) =>
+    apiClient.post<{ tenant: Tenant }>('/platform/tenants', payload),
+
+  /**
+   * Suspends or reactivates. There is no delete: the scoped tables point at
+   * `tenants` without a cascade, so removing a provider that holds data would
+   * fail on a foreign key — and succeeding would be worse.
+   */
+  setTenantStatus: (id: number, status: 'active' | 'suspended') =>
+    apiClient.requestWithBody<{ tenant: Tenant }>('PATCH', `/platform/tenants/${id}`, { status }),
+
+  listMemberships: (tenantId: number) =>
+    apiClient.get<{ memberships: TenantMembership[] }>(`/platform/tenants/${tenantId}/members`),
+
+  /**
+   * Attaches a person who already exists to a provider. NEVER touches their
+   * password: wave 12 refused this to a provider's own administrator precisely
+   * because doing it with a password would reset a stranger's login.
+   */
+  addMembership: (tenantId: number, payload: { username: string; role: OperatorRole }) =>
+    apiClient.post<{ membership: TenantMembership }>(`/platform/tenants/${tenantId}/members`, payload),
+
+  removeMembership: (tenantId: number, userId: number) =>
+    apiClient.delete<{ userId: number }>(`/platform/tenants/${tenantId}/members/${userId}`)
+}
+
 export const usersAPI = {
   list: () =>
     apiClient.get<{ users: Operator[] }>('/users'),

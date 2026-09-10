@@ -736,3 +736,69 @@ Hoje ele lista **todos os operadores do deploy** e aceita qualquer id global em
 O plano quer `users` chaveado por e-mail no lugar de `username`. Muda como todo
 operador entra no painel, não traz isolamento nenhum, e feito junto com a espinha
 de autenticação seriam duas mudanças arriscadas de uma vez. Passo próprio.
+
+---
+
+## Onda 13 — tornar a tenancy alcançável (decisões congeladas)
+
+Doze ondas isolaram o painel por provedor, e **nada no painel cria um segundo
+provedor**. Não é uma tela faltando: faltava uma autoridade. O administrador de
+um provedor não pode cunhar provedores nem alcançar outro, então "quem pode"
+precisava existir antes de "como".
+
+### Quem tem a chave
+
+`platform_admins` é criada **vazia**, e a migração não promove ninguém. Uma
+migração que entregasse o plano de controle ao administrador de menor id seria
+um upgrade promovendo alguém em silêncio — e na edição self-hosted, onde há um
+provedor e nenhum plano de controle, promovendo a um papel que nem deveria
+existir lá.
+
+O bootstrap é explícito, das duas formas que fazem sentido:
+
+- **Instalação nova em `EDITION=saas`**: o primeiro administrador criado pelo
+  `setup` também vira administrador de plataforma. Sem isso, uma instalação SaaS
+  nasce sem ninguém que possa criar o segundo provedor.
+- **Instalação que já tem usuários**: `scripts/grant-platform-admin.js`, rodado
+  por quem tem o servidor — que é exatamente quem deve estar decidindo isso. Há
+  precedente no repositório: `scripts/reset-password.js`.
+
+Com a tabela vazia, as rotas de plataforma são inúteis, e isso é o lado seguro
+de falhar.
+
+### As rotas são da edição SaaS
+
+Montadas sob `IS_SAAS`, do mesmo jeito que a troca de banco é montada sob
+`IS_SELF_HOSTED`. Numa instalação self-hosted elas não existem — não respondem
+403, **não existem**, porque um 403 conta a quem perguntou que o plano de
+controle está ali.
+
+### O que a API faz, e o que ela não faz
+
+- **Criar** provedor: `slug` e `name`. O slug é o subdomínio da Fase 3, único
+  desde a origem.
+- **Listar** e **suspender/reativar**. `tenants.status` já tem comportamento real
+  em todo o painel: `forEachTenant` só visita `active`, a varredura de mídia não
+  passa por suspenso, e o webhook do SGP não aceita entrega de suspenso. A rota
+  dá o controle de algo que já vale.
+- **NÃO apaga provedor.** As tabelas escopadas apontam para `tenants` sem
+  cascata, então apagar um provedor com dado falharia na chave estrangeira — e
+  se não falhasse seria pior. Suspender é a operação, e ela é reversível.
+
+### Provedor criado em tempo de execução nasce igual a um do boot
+
+`seedDefaults` roda no boot sobre todos os provedores: dá as configurações
+padrão e, desde a onda 11, copia o catálogo de equipamentos para quem não tem.
+Criar um provedor pela API **tem de passar pelo mesmo caminho**, ou o provedor
+novo nasce sem configuração e com detecção de equipamento inerte — que não falha
+alto, apenas não casa nada.
+
+### Vincular alguém a um provedor é do plano de controle
+
+A onda 12 recusou, de propósito, que o administrador de um provedor anexasse uma
+pessoa que já existe: a criação carrega senha, e anexar resetaria o login de um
+estranho e entregaria credenciais em outra ISP a partir de adivinhar um nome.
+
+Um administrador de plataforma é outro nível de confiança — ele já pode criar
+provedores. Então **é ele** quem vincula uma pessoa existente a um provedor, e
+essa operação **nunca toca a senha**: ela cria o vínculo e nada mais.
