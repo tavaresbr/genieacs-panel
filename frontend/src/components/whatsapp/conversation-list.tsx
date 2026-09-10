@@ -94,7 +94,7 @@ export function ConversationList({ conversations, selectedId, onSelect, filtered
               type="button"
               onClick={() => onSelect(conversation)}
               aria-current={active ? 'true' : undefined}
-              className={`flex w-full flex-col gap-1.5 px-3 py-3 text-left transition-colors ${
+              className={`flex w-full flex-col gap-1.5 px-3 py-3 text-start transition-colors ${
                 active
                   ? 'bg-[hsl(var(--surface-subtle))] shadow-[inset_3px_0_0_0_hsl(var(--primary))]'
                   : 'hover:bg-[hsl(var(--surface-subtle))]'

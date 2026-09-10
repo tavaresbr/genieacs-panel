@@ -15,6 +15,7 @@ import { DEFAULT_SETTINGS } from '../config/seed.js';
 import { TranslatableError } from '../i18n/index.js';
 import { currentTenantId } from '../config/tenantContext.js';
 import GenieAcsEgress from './genieacsEgress.js';
+import { withAcsSlot } from './genieacs/concurrency.js';
 import GenieAcsAuthService from './genieacsAuthService.js';
 
 const WAN_PARAMETER_CANDIDATES = Object.freeze({
@@ -296,7 +297,7 @@ class DeviceService {
         options.headers['Content-Type'] = 'application/json';
         options.body = typeof body === 'string' ? body : JSON.stringify(body);
       }
-      const response = await GenieAcsEgress.fetch(url, options);
+      const response = await withAcsSlot(async () => GenieAcsEgress.fetch(url, options));
       if (!response.ok) {
         throw await this.genieAcsError(`GenieACS ${collection} API`, response);
       }
@@ -354,7 +355,7 @@ class DeviceService {
           options.body = typeof body === 'string' ? body : JSON.stringify(body);
         }
 
-        const response = await GenieAcsEgress.fetch(url, options);
+        const response = await withAcsSlot(async () => GenieAcsEgress.fetch(url, options));
 
         clearTimeout(timeoutId);
 
@@ -468,12 +469,12 @@ class DeviceService {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15_000);
     try {
-      const response = await GenieAcsEgress.fetch(url, {
+      const response = await withAcsSlot(async () => GenieAcsEgress.fetch(url, {
         method: 'GET',
         headers: await GenieAcsAuthService.nbiHeaders(),
         signal: controller.signal,
         redirect: 'manual'
-      });
+      }));
       if (!response.ok) {
         throw await this.genieAcsError('GenieACS API', response);
       }
@@ -536,17 +537,21 @@ class DeviceService {
       const paths = Array.isArray(state?.paths)
         ? state.paths.filter((path) => typeof path === 'string' && path)
         : [];
-      return { paths, checkedAt: Number(state?.checkedAt) || 0 };
+      return {
+        paths,
+        checkedAt: Number(state?.checkedAt) || 0,
+        eagerUntil: Number(state?.eagerUntil) || 0
+      };
     } catch {
       return null;
     }
   }
 
-  static async writeRxPowerState(paths) {
+  static async writeRxPowerState(paths, extra = {}) {
     try {
       await AppState.upsert(
         this.RX_POWER_PATH_KEY,
-        JSON.stringify({ paths, checkedAt: Date.now() })
+        JSON.stringify({ paths, checkedAt: Date.now(), ...extra })
       );
     } catch (error) {
       // Losing the note only costs another probe later; it must never cost
@@ -581,7 +586,8 @@ class DeviceService {
   static async ensureRxPowerPaths() {
     const state = await this.readRxPowerState();
     if (state?.paths.length) return state.paths;
-    if (state && Date.now() - state.checkedAt < this.RX_POWER_REPROBE_MS) return [];
+    const eager = state ? Date.now() < state.eagerUntil : false;
+    if (state && !eager && Date.now() - state.checkedAt < this.RX_POWER_REPROBE_MS) return [];
 
     const found = [];
     try {
@@ -594,7 +600,14 @@ class DeviceService {
         const reading = findRxPowerReading(row, (node) => this.readNodeValue(node));
         if (reading && !found.includes(reading.path)) found.push(reading.path);
       }
-      await this.writeRxPowerState(found.slice(0, this.RX_POWER_PATH_LIMIT));
+      await this.writeRxPowerState(
+        found.slice(0, this.RX_POWER_PATH_LIMIT),
+        // A summon's refresh only lands when the ONT next informs, which is
+        // usually after the page the operator is looking at has already
+        // loaded. Dropping the window on the first probe that came back empty
+        // would put the answer back behind the half-hour cooldown.
+        found.length === 0 && state?.eagerUntil ? { eagerUntil: state.eagerUntil } : {}
+      );
     } catch (error) {
       console.warn(`Unable to probe for the optical RX paths: ${error.message}`);
     }
@@ -1371,13 +1384,13 @@ class DeviceService {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
     try {
-      const response = await GenieAcsEgress.fetch(url, {
+      const response = await withAcsSlot(async () => GenieAcsEgress.fetch(url, {
         method: 'POST',
         headers: await GenieAcsAuthService.nbiHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(task),
         signal: controller.signal,
         redirect: 'manual'
-      });
+      }));
       const text = await response.text().catch(() => '');
       if (!response.ok) {
         throw await this.genieAcsError('GenieACS API', response, text);
@@ -1443,12 +1456,12 @@ class DeviceService {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15_000);
     try {
-      const response = await GenieAcsEgress.fetch(url, {
+      const response = await withAcsSlot(async () => GenieAcsEgress.fetch(url, {
         method,
         headers: await GenieAcsAuthService.nbiHeaders(),
         signal: controller.signal,
         redirect: 'manual'
-      });
+      }));
       if (!response.ok && !(method === 'DELETE' && response.status === 404)) {
         throw await this.genieAcsError('GenieACS tag API', response);
       }
@@ -1515,12 +1528,12 @@ class DeviceService {
     const timeoutId = setTimeout(() => controller.abort(), 15000);
 
     try {
-      const response = await GenieAcsEgress.fetch(url, {
+      const response = await withAcsSlot(async () => GenieAcsEgress.fetch(url, {
         method: 'DELETE',
         headers: await GenieAcsAuthService.nbiHeaders(),
         signal: controller.signal,
         redirect: 'manual'
-      });
+      }));
 
       if (!response.ok) {
         throw await this.genieAcsError('GenieACS delete API', response);
@@ -1536,6 +1549,96 @@ class DeviceService {
     return this.postTask(deviceId, { name: 'reboot' });
   }
 
+  /**
+   * Objects a summon asks the ONT to re-report.
+   *
+   * GenieACS only stores parameters it has been told to fetch, so a fleet
+   * whose provision script never asked for the GPON diagnostics has no
+   * optical reading in any document — and no amount of reading the document
+   * more cleverly will produce one. `refreshObject` on the parent is what
+   * makes the ONT enumerate its own children, vendor extensions included, so
+   * the reading is there from the next inform on.
+   */
+  static SUMMON_REFRESH_OBJECTS = Object.freeze({
+    InternetGatewayDevice: ['InternetGatewayDevice.WANDevice'],
+    Device: ['Device.Optical']
+  });
+
+  /** How long after a summon every listing looks again for the reading. */
+  static RX_POWER_EAGER_MS = 15 * 60 * 1000;
+
+  /**
+   * Which data model this device answers on, so a summon asks it only for
+   * objects its own tree could hold.
+   *
+   * Worth the extra read: nearly every ONT here speaks TR-098, and posting
+   * the TR-181 refresh to all of them would have each one refuse a task it
+   * was never going to accept. A refused task is a fault recorded against
+   * the device, and in GenieACS a device's faults are in the way of the
+   * tasks queued behind them — an operator's problem, days later, with no
+   * obvious connection to a bell someone pressed.
+   *
+   * A read that fails falls back to TR-098 alone rather than to asking for
+   * everything: guessing wide is what this exists to avoid.
+   */
+  static async detectSummonRoots(deviceId) {
+    try {
+      const rows = await this.fetchDeviceListPage(
+        JSON.stringify({ _id: deviceId }),
+        ['_id', 'InternetGatewayDevice.DeviceInfo', 'Device.DeviceInfo']
+      );
+      const roots = Object.keys(this.SUMMON_REFRESH_OBJECTS).filter((root) => rows[0]?.[root]);
+      if (roots.length > 0) return roots;
+    } catch (error) {
+      console.warn(`Unable to read the data model of ${deviceId}: ${error.message}`);
+    }
+    return ['InternetGatewayDevice'];
+  }
+
+  /**
+   * Asks the device to re-report each object, and reports which it accepted.
+   *
+   * Best effort even after the model check: an ONT can carry the root and
+   * still not implement the object. That is one branch of a tree not
+   * existing, not a summon that failed, and it must not cost the operator
+   * the inform they actually asked for.
+   */
+  static async refreshSummonObjects(deviceId) {
+    const roots = await this.detectSummonRoots(deviceId);
+    const objects = roots.flatMap((root) => this.SUMMON_REFRESH_OBJECTS[root] ?? []);
+
+    const refreshed = [];
+    for (const objectName of objects) {
+      try {
+        const result = await this.postTask(deviceId, { name: 'refreshObject', objectName });
+        if (result?.fault?.faultString) {
+          console.warn(`${deviceId} refused to refresh ${objectName}: ${result.fault.faultString}`);
+          continue;
+        }
+        refreshed.push(objectName);
+      } catch (error) {
+        console.warn(`Unable to refresh ${objectName} on ${deviceId}: ${error.message}`);
+      }
+    }
+    return refreshed;
+  }
+
+  /**
+   * Keeps every listing looking for the optical path for a while.
+   *
+   * A summon is the operator asking for a value the panel does not have yet,
+   * and the refresh it queues only lands when the ONT next informs — after
+   * the page they are looking at has loaded. Without this, a probe that ran
+   * one second too early would record "this fleet reports no optical" and sit
+   * on that answer for half an hour, hiding the very reading the summon was
+   * for.
+   */
+  static async expectFreshRxPower() {
+    const state = await this.readRxPowerState();
+    if (state?.paths.length) return;
+    await this.writeRxPowerState([], { eagerUntil: Date.now() + this.RX_POWER_EAGER_MS });
+  }
+
   static async summonDevice(deviceId, parameters = []) {
     if (!Array.isArray(parameters) || parameters.length > 100) {
       throw new Error('Parameters must be an array with at most 100 entries');
@@ -1543,6 +1646,8 @@ class DeviceService {
     if (parameters.some((parameter) => typeof parameter !== 'string' || parameter.length > 512)) {
       throw new Error('Every parameter path must be a string of at most 512 characters');
     }
+
+    const refreshed = await this.refreshSummonObjects(deviceId);
 
     const data = await this.postTask(deviceId, {
       name: 'getParameterValues',
@@ -1556,7 +1661,9 @@ class DeviceService {
       throw new Error(data.fault.faultString);
     }
 
-    return data;
+    if (refreshed.length > 0) await this.expectFreshRxPower();
+
+    return { ...(data && typeof data === 'object' ? data : {}), refreshed };
   }
 
   /**
@@ -1944,12 +2051,12 @@ class DeviceService {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15_000);
     try {
-      const response = await GenieAcsEgress.fetch(url, {
+      const response = await withAcsSlot(async () => GenieAcsEgress.fetch(url, {
         method: 'DELETE',
         headers: await GenieAcsAuthService.nbiHeaders(),
         signal: controller.signal,
         redirect: 'manual'
-      });
+      }));
       if (!response.ok && response.status !== 404) {
         throw await this.genieAcsError('GenieACS fault API', response);
       }

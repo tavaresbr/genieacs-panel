@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import dns from 'node:dns/promises';
+
 import { safeFetch } from '../src/utils/wa/ssrfGuard.js';
 import { EvolutionClient } from '../src/services/evolutionClient.js';
 
@@ -9,11 +11,23 @@ import { EvolutionClient } from '../src/services/evolutionClient.js';
  *
  * Nada aqui abre socket: o `globalThis.fetch` é trocado por um dublê. O que se
  * testa é o que o painel EXIGE do outro lado — um prazo e um teto — e nenhum
- * dos dois depende de rede para ser verificado. Usar um host que não resolve é
- * de propósito: `resolvesToPrivate` devolve false quando o nome não resolve, e
- * o guard deixa passar, que é o que põe o dublê no caminho.
+ * dos dois depende de rede para ser verificado.
+ *
+ * Um literal de IP, e não um nome. Um nome fazia `resolvesToPrivate` consultar
+ * o DNS DE VERDADE (`dns.resolve4`/`resolve6`, que vão à rede), contando que
+ * ele não resolvesse. Numa máquina que devolve NXDOMAIN na hora isso passa
+ * despercebido; num runner cujo resolvedor é lento ou engole a consulta, cada
+ * chamada espera o próprio timeout — mais do que os 5 s do `setTimeout` abaixo,
+ * que é o que segura o loop de eventos. O loop drena e o `node:test` cancela os
+ * oito testes pendentes: `0 fail, 8 cancelled`, nunca uma asserção quebrada,
+ * que é o que torna essa falha difícil de ler.
+ *
+ * `resolvesToPrivate` retorna cedo para um literal (`parseIPv4(h) !== null`),
+ * então nenhuma consulta acontece. `203.0.113.10` é TEST-NET-3 e não cai em
+ * nenhuma faixa de `isPrivateIPv4`, então o guard continua deixando passar —
+ * que é o que põe o dublê no caminho.
  */
-const HOST_PUBLICO = 'https://evo.provedor.test';
+const HOST_PUBLICO = 'https://203.0.113.10';
 
 let fetchReal;
 
@@ -83,6 +97,62 @@ describe('safeFetch gives every outbound request a deadline', () => {
     assert.equal(resposta.status, 200);
     assert.equal(saltos, 3);
     assert.equal(sinais.size, 1, 'os saltos compartilham um prazo, não um por salto');
+  });
+
+  /**
+   * O prazo tem de valer da resolução do nome em diante, e não só do `fetch`.
+   *
+   * A verificação anti-SSRF consulta o DNS antes de abrir qualquer conexão, e
+   * um resolver que não responde prende quem chamou tanto quanto um servidor
+   * que não responde — mesma espera, mesmo handler preso, um passo antes. O
+   * dublê abaixo é um resolver que nunca responde e que só solta quem espera
+   * quando é cancelado, que é como o c-ares se comporta de verdade.
+   */
+  test('covers the name resolution, not just the request', async () => {
+    // Um NOME, e não a constante do arquivo. A fase de DNS é o assunto deste
+    // caso, e `resolvesToPrivate` volta cedo para um literal de IP — se o host
+    // daqui virar um literal, o dublê abaixo deixa de ser consultado e o teste
+    // passa a afirmar coisa nenhuma sem nunca ficar vermelho.
+    const HOST_COM_NOME = 'https://evo.provedor.test';
+    const originais = {
+      resolve4: dns.Resolver.prototype.resolve4,
+      resolve6: dns.Resolver.prototype.resolve6,
+      cancel: dns.Resolver.prototype.cancel
+    };
+    function pendurar() {
+      return new Promise((_resolve, reject) => {
+        (this._presos ??= []).push(() => {
+          reject(Object.assign(new Error('cancelled'), { code: 'ECANCELLED' }));
+        });
+      });
+    }
+    dns.Resolver.prototype.resolve4 = pendurar;
+    dns.Resolver.prototype.resolve6 = pendurar;
+    dns.Resolver.prototype.cancel = function cancel() {
+      for (const soltar of this._presos ?? []) soltar();
+    };
+
+    let chamouFetch = false;
+    globalThis.fetch = () => {
+      chamouFetch = true;
+      return new Response('ok', { status: 200 });
+    };
+
+    const segura = setTimeout(() => {}, 5_000);
+    try {
+      await assert.rejects(
+        () => safeFetch(`${HOST_COM_NOME}/midia.png`, { timeoutMs: 60 }),
+        // O prazo é o motivo de a chamada acabar. Uma consulta cancelada não
+        // devolve endereço nenhum, e chamar isso de "host privado" diria ao
+        // operador uma coisa que não aconteceu.
+        (error) => error.name === 'TimeoutError'
+      );
+    } finally {
+      clearTimeout(segura);
+      Object.assign(dns.Resolver.prototype, originais);
+    }
+
+    assert.equal(chamouFetch, false, 'a requisição não chegou a sair');
   });
 
   test("honours the caller's own signal alongside the deadline", async () => {

@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
+import { DEVELOPMENT_FALLBACK, isProduction } from '../config/runtimeEnv.js';
 import TenantUser from '../models/TenantUser.js';
 import PlatformAdmin from '../models/PlatformAdmin.js';
 import { runInTenant } from '../config/tenantContext.js';
@@ -12,16 +13,16 @@ const REFRESH_TOKEN_EXPIRES_IN = process.env.REFRESH_TOKEN_EXPIRES_IN || '7d';
 const JWT_SECRET = (() => {
   const secret = process.env.JWT_SECRET;
   if (secret) {
-    if (process.env.APP_ENV === 'production' && secret.length < 32) {
+    if (isProduction() && secret.length < 32) {
       throw new Error('JWT_SECRET must be at least 32 characters in production');
     }
     return secret;
   }
-  if (process.env.APP_ENV === 'production') {
+  if (isProduction()) {
     throw new Error('JWT_SECRET must be set in production');
   }
   console.warn('JWT_SECRET not set; using insecure development fallback');
-  return 'insecure-development-secret';
+  return DEVELOPMENT_FALLBACK;
 })();
 
 /**

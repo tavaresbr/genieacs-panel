@@ -84,7 +84,7 @@ export function ProvisioningCard({ deviceId }: Props) {
             disabled={busy !== null}
             onClick={() => void runPreview()}
           >
-            <Icon name="refresh" size={16} className="mr-2" />
+            <Icon name="refresh" size={16} className="me-2" />
             {busy === 'preview' ? t('detail.provisioning.previewing') : t('detail.provisioning.preview')}
           </button>
           <button
@@ -164,8 +164,8 @@ export function ProvisioningCard({ deviceId }: Props) {
                   <tbody>
                     {preview.steps.flatMap((step) => step.parameters.map((parameter, index) => (
                       <tr key={`${step.step}-${parameter.path}-${index}`} className="border-t border-border">
-                        <td className="py-1 pr-3 text-muted-foreground">{step.step}</td>
-                        <td className="py-1 pr-3 font-mono">{parameter.path}</td>
+                        <td className="py-1 pe-3 text-muted-foreground">{step.step}</td>
+                        <td className="py-1 pe-3 font-mono">{parameter.path}</td>
                         <td className="py-1 font-mono">{String(parameter.value ?? '')}</td>
                       </tr>
                     )))}

@@ -35,7 +35,7 @@ export function LoadingProvider({ children }: { children: React.ReactNode }) {
     <LoadingContext.Provider value={value}>
       {children}
       {visible && (
-        <div className="fixed bottom-4 left-4 right-4 z-[2190] flex justify-center sm:left-auto sm:right-5" role="status" aria-live="polite">
+        <div className="fixed bottom-4 start-4 end-4 z-[2190] flex justify-center sm:start-auto sm:end-5" role="status" aria-live="polite">
           <div className="flex min-h-12 w-full items-center gap-3 rounded-md border border-border bg-card px-4 py-3 text-foreground shadow-lg sm:w-auto sm:min-w-64">
             <Spinner />
             <div>

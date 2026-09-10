@@ -1,4 +1,4 @@
-export const LOCALES = ['pt-BR', 'en', 'es', 'it', 'de', 'fr', 'ja', 'zh-CN', 'zh-TW', 'ko', 'ru'] as const
+export const LOCALES = ['pt-BR', 'en', 'es', 'it', 'de', 'fr', 'ja', 'zh-CN', 'zh-TW', 'ko', 'ru', 'ar'] as const
 
 export type Locale = (typeof LOCALES)[number]
 
@@ -17,6 +17,8 @@ export interface LocaleMetadata {
   flag: string
   /** Tag handed to `Intl` formatters. */
   intlLocale: string
+  /** Writing direction. Only right-to-left locales set this. */
+  direction?: 'rtl'
 }
 
 export const LOCALE_METADATA: Record<Locale, LocaleMetadata> = {
@@ -31,10 +33,16 @@ export const LOCALE_METADATA: Record<Locale, LocaleMetadata> = {
   'zh-TW': { label: '繁體中文', shortLabel: '繁', flag: '🇹🇼', intlLocale: 'zh-TW' },
   ko: { label: '한국어', shortLabel: 'KO', flag: '🇰🇷', intlLocale: 'ko-KR' },
   ru: { label: 'Русский', shortLabel: 'RU', flag: '🇷🇺', intlLocale: 'ru-RU' },
+  ar: { label: 'العربية', shortLabel: 'AR', flag: '🇸🇦', intlLocale: 'ar-SA', direction: 'rtl' },
 }
 
 export function isLocale(value: unknown): value is Locale {
   return typeof value === 'string' && (LOCALES as readonly string[]).includes(value)
+}
+
+/** Writing direction of a locale, for `<html dir>`. */
+export function getDirection(locale: Locale): 'ltr' | 'rtl' {
+  return LOCALE_METADATA[locale].direction ?? 'ltr'
 }
 
 /** Tags written in Traditional script: the explicit subtag, plus its regions. */
@@ -62,6 +70,7 @@ export function resolveLocale(tag: string | null | undefined): Locale | null {
   if (base === 'ja') return 'ja'
   if (base === 'ko') return 'ko'
   if (base === 'ru') return 'ru'
+  if (base === 'ar') return 'ar'
   // Traditional-script markers pick zh-TW; every other zh tag (zh, zh-Hans,
   // zh-SG…) gets Simplified.
   if (base === 'zh') return TRADITIONAL_CHINESE.test(normalized) ? 'zh-TW' : 'zh-CN'

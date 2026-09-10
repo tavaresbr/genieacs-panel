@@ -220,7 +220,7 @@ export function SgpEventsPanel({ config, onConfigChange }: Props) {
                   <p className="text-sm font-medium">
                     {event.type}
                     {event.rawType && event.rawType !== event.type && (
-                      <span className="ml-2 text-xs text-muted-foreground">({event.rawType})</span>
+                      <span className="ms-2 text-xs text-muted-foreground">({event.rawType})</span>
                     )}
                   </p>
                   <p className="text-xs text-muted-foreground">
