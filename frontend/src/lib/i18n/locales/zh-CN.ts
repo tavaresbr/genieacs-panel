@@ -1393,6 +1393,7 @@ const zhCN: Dictionary = {
   'whatsapp.error.rateLimited': '短时间内发送过于频繁，请稍候。',
   'whatsapp.error.scanFailed': '告警扫描未能完成。',
   'whatsapp.error.invalidBaseUrl': 'Evolution 服务器地址无效。',
+  'whatsapp.error.insecureBaseUrl': 'Evolution 服务器必须使用 https：它的密钥随每个请求一起发送。',
   'whatsapp.error.hostNotAllowed': '该 Evolution 服务器不在允许列表中。',
   'whatsapp.error.blockedHost': '该地址无法从公网访问，已被拒绝。',
   'whatsapp.error.unauthorized': 'Evolution 服务器拒绝了该凭据。',

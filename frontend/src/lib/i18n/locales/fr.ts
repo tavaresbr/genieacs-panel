@@ -1338,6 +1338,7 @@ const fr: Dictionary = {
   'whatsapp.error.incompleteConfig': 'Renseignez l’URL publique du webhook avant d’activer l’intégration.',
   'whatsapp.error.invalidWebhookUrl': 'L’URL du webhook est invalide.',
   'whatsapp.error.invalidBaseUrl': 'L’URL du serveur Evolution est invalide.',
+  'whatsapp.error.insecureBaseUrl': 'Le serveur Evolution doit utiliser https : sa clé voyage à chaque requête.',
   'whatsapp.error.hostNotAllowed': 'Ce serveur Evolution ne figure pas dans la liste des serveurs autorisés.',
   'whatsapp.error.blockedHost': 'Cette adresse n’est pas accessible depuis internet et a été refusée.',
   'whatsapp.error.unauthorized': 'Le serveur Evolution a refusé les identifiants.',

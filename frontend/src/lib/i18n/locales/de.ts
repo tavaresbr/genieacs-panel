@@ -1276,6 +1276,7 @@ const de: Dictionary = {
   'whatsapp.error.rateLimited': 'Zu viele Versendungen in kurzer Zeit; warte einen Moment.',
   'whatsapp.error.scanFailed': 'Der Warnungs-Scan konnte nicht abschließen.',
   'whatsapp.error.invalidBaseUrl': 'Die URL des Evolution-Servers ist ungültig.',
+  'whatsapp.error.insecureBaseUrl': 'Der Evolution-Server muss https verwenden: sein Schlüssel wird bei jeder Anfrage mitgesendet.',
   'whatsapp.error.hostNotAllowed': 'Dieser Evolution-Server steht nicht auf der zugelassenen Liste.',
   'whatsapp.error.blockedHost': 'Diese Adresse ist aus dem Internet nicht erreichbar und wurde abgelehnt.',
   'whatsapp.error.unauthorized': 'Der Evolution-Server hat die Zugangsdaten abgelehnt.',

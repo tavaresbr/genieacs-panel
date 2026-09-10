@@ -1395,6 +1395,7 @@ const en = {
   'whatsapp.error.rateLimited': 'Too many dispatches in a short time; wait a moment.',
   'whatsapp.error.scanFailed': 'The alert scan could not finish.',
   'whatsapp.error.invalidBaseUrl': 'The Evolution server URL is invalid.',
+  'whatsapp.error.insecureBaseUrl': 'The Evolution server must use https: its key travels with every request.',
   'whatsapp.error.hostNotAllowed': 'This Evolution server is not on the authorized list.',
   'whatsapp.error.blockedHost': 'This address is not reachable from the internet and was refused.',
   'whatsapp.error.unauthorized': 'The Evolution server refused the credentials.',
