@@ -2,46 +2,100 @@
 
 ## Contexto
 
-O SkyGenPanel hoje é **single-tenant por construção**: um install = um provedor. Vamos
-comercializá-lo como SaaS, onde cada cliente é um **provedor de internet (tenant)** com seus
-próprios operadores, seus próprios assinantes, seu próprio GenieACS e seu próprio plano.
+O SkyGenPanel nasceu **single-tenant por construção**: um install = um provedor. Estamos
+comercializando-o como SaaS, onde cada cliente é um **provedor de internet (tenant)** com
+seus próprios operadores, seus próprios assinantes, seu próprio GenieACS e seu próprio plano.
 
-Não existe hoje **nenhuma** noção de tenant no código — nenhuma coluna, nenhum middleware,
-nenhuma query filtrada por dono. Tudo é global: um `.env`, um banco, uma linha
-`settings.genieAcsUrl`, um blob `app_state.sgp_integration_config`, um `map_settings` com
-`id=1` fixo, e uma tabela `users` cujo `username` é único globalmente e cujo `role` só
-recebe `'admin'`. Não há nem API de gestão de usuários.
+Quando este documento foi escrito não existia **nenhuma** noção de tenant no código —
+nenhuma coluna, nenhum middleware, nenhuma query filtrada por dono. Tudo era global: um
+`.env`, um banco, uma linha `settings.genieAcsUrl`, um blob
+`app_state.sgp_integration_config`, um `map_settings` com `id=1` fixo, e uma tabela `users`
+cujo `username` era único globalmente.
 
-O objetivo é chegar a um deploy único capaz de atender dois provedores diferentes **sem
-qualquer possibilidade de um enxergar dados do outro**, com onboarding self-service,
-planos com limites e suspensão por inadimplência.
+**Isso mudou.** As linhas do banco pertencem a um provedor e as queries são filtradas por
+ele; o que falta para vender ao segundo provedor está listado no *Estado* abaixo e no
+*Checklist* no fim. O objetivo continua o mesmo: um deploy único capaz de atender dois
+provedores diferentes **sem qualquer possibilidade de um enxergar dados do outro**, com
+onboarding self-service, planos com limites e suspensão por inadimplência.
 
-### Estado: Fase 0 concluída
+> **Como ler este documento.** As Fases 0 e 1 estão marcadas ✅ e descrevem o que **existe**;
+> onde a entrega divergiu do plano, o texto conta a divergência em vez de a esconder. As
+> Fases 2 a 8 continuam sendo plano, e o que já entrou delas está marcado dentro de cada uma.
 
-As correções de segurança e a fundação de banco entraram
-([#12](https://github.com/tavaresbr/genieacs-panel/pull/12) e
-[#16](https://github.com/tavaresbr/genieacs-panel/pull/16)): flag `EDITION` com o seletor de
+### Estado: Fases 0 e 1 concluídas
+
+**Fase 0** (fundação e segurança) entrou pelos PRs
+[#12](https://github.com/tavaresbr/genieacs-panel/pull/12) e
+[#16](https://github.com/tavaresbr/genieacs-panel/pull/16): flag `EDITION` com o seletor de
 banco fora da edição hospedada, `SECRET_BOX_KEY` separada do `JWT_SECRET` com versão de chave
 por segredo, PostgreSQL, `insertReturningId`, e a suíte rodando nos três dialetos no CI.
 
-O runner de migrations foi construído em paralelo por outra frente e vive em
-`backend/src/config/migrations.js` — passos com id estável e `isApplied` para baselining —
-não no migrator do knex como este documento propunha originalmente.
+**Fase 1** (modelo de tenant e scoping estrutural) está **completa**. Foi entregue por duas
+frentes trabalhando em paralelo — uma em fatias numeradas de PR, outra em "ondas" — o que
+custou trabalho duplicado em `sgp_links` e três colisões de id de migration, mas chegou ao
+fim. Hoje, na `main`:
 
-**O alvo cresceu enquanto a Fase 0 era executada**: WhatsApp, provisionamento automático e
-gestão de usuários entraram. Os números abaixo são de um levantamento em `0127f49` e
-substituem os do primeiro rascunho.
+| | Primeiro rascunho | Levantamento em `0127f49` | **Hoje (`226088d`)** |
+| --- | --- | --- | --- |
+| Tabelas no schema | 13 | 24 | **29** |
+| Tabelas escopadas por provedor | 0 | 0 | **26** |
+| Tabelas deliberadamente compartilhadas | — | — | **3** (`tenants`, `users`, `tenant_users`) |
+| Tabelas pendentes | — | 24 | **0** |
+| Models | 13 | 20 | **27** |
+| `getDb()(...)` cru nos models | 65 | 121 | **18** |
+| Caches globais em memória | 3 | 5 | **0** |
 
-| | Primeiro rascunho | Hoje |
-| --- | --- | --- |
-| Tabelas | 13 | **24** |
-| Models | 13 | **20** |
-| Chamadas `getDb()(...)` nos models | 65 | **121** |
-| Caches globais em memória | 3 | **5** |
+Os 18 `getDb()` restantes nos models não são resíduo: 10 tocam `users` e 7 `tenant_users`,
+que são do deploy por decisão (ver *Onda 12* no fim), e 1 é o
+`WhatsAppAccount.getByName` — a busca que **descobre** de qual provedor é um webhook que
+chega sem sessão. Escopá-la exigiria já saber a resposta. Está marcada no código com
+`tenant-scope-exempt` e a guarda estática exige essa marcação.
 
-A Fase 2 encolheu na mesma proporção: a API de gestão de usuários que este plano listava como
-inexistente já existe, em `/api/users`, com papéis `viewer`/`admin` e revogação de sessão na
-troca de papel.
+#### O que existe hoje como mecanismo
+
+- **`backend/src/config/tenantContext.js`** — `AsyncLocalStorage` com `runInTenant()` e
+  `currentTenantId()`, que **lança** fora de escopo. Falhar fechado é o que expôs, mais de
+  uma vez, código novo de uma frente alcançando tabela que a outra acabara de escopar.
+- **`backend/src/config/database.js`** — `tdb()`, `tinsert()`, `tinsertReturningId()` e
+  `tbatchInsert()`. O `tdb()` devolve um Proxy que **lança se alguém chamar `.insert()`**
+  nele: knex ignora `where` em insert, então essa porta precisava ser fechada no mecanismo,
+  não na convenção.
+- **`backend/src/config/tenantScope.js`** — `SCOPED_TABLES` e `SHARED_TABLES`, com o
+  porquê de cada grupo escrito ao lado. `pendingTables()` hoje devolve vazio.
+- **`backend/src/config/tenantJobs.js`** — `forEachTenant()` (uma passagem por provedor) e
+  `forSoleTenant()` (roda uma vez e **recusa** quando existe um segundo provedor). Todo job
+  de fundo já migrou para `forEachTenant`; o `forSoleTenant` **não tem mais nenhum chamador**
+  e fica como mecanismo para o próximo job cuja query motriz ainda não seja escopada.
+- **`backend/src/config/tenantCache.js`** — `TenantCache`, uma entrada por provedor, com
+  `invalidate()` (este provedor) separado de `clear()` (todos).
+- **Guarda estática** em `backend/test/tenant-scoping.test.js`, que varre `backend/src` e
+  falha ao encontrar handle cru numa tabela escopada sem a marcação de isenção.
+
+#### O que a Fase 1 entregou além do previsto
+
+Escopar as tabelas expôs bugs que já estavam em produção com **um** provedor, e que o plano
+original não previa:
+
+- **Mensagem de WhatsApp entrante descartada em silêncio** por colisão de `external_id`.
+- **Opt-out de um provedor silenciando o número de outro** para a mesma pessoa.
+- **Evento SGP do segundo provedor descartado como duplicata** — `dedupe_key` era único no
+  deploy e `insertIfNew` lê antes de inserir, então o webhook era respondido com sucesso e o
+  evento nunca processado. Nada era registrado.
+- **Contrato de um provedor gravado na conversa de outro**: `resolveSubscriber` buscava o
+  vínculo pelo telefone em todo o deploy e `bindSubscriber` carimbava a thread com ele.
+- **A guarda do "último admin" contava o deploy inteiro** — errada nas duas direções ao mesmo
+  tempo.
+- Um endpoint `/api/health` que perdia o diagnóstico por estar atrás do resolvedor.
+
+#### O que ainda não foi feito
+
+- **Fase 3 (subdomínio) não começou.** `backend/src/middleware/tenantResolver.js` resolve
+  sempre o **primeiro** provedor da tabela. Está escrito para que a troca seja de uma função
+  só: tudo abaixo já lê o provedor do contexto.
+- **A espinha da Fase 2 entrou** (o token carrega `tenantId` e o papel vem de `tenant_users`),
+  mas o convite por e-mail, os papéis `tech`/`owner`, o plano de plataforma e a troca de
+  `username` para e-mail **não**.
+- **Fases 4 a 7 inteiras**: conector GenieACS plugável, planos e limites, frontend e operação.
 
 ### Decisões já tomadas
 
@@ -69,72 +123,72 @@ arquivo `LICENSE` e o aviso de copyright da SkydashNET devem ser mantidos no pro
 - **Banco**: SQLite padrão; MySQL e PostgreSQL suportados. A troca em runtime pela UI de
   Settings (`backend/src/services/dbManagementService.js`, `backend/src/routes/database.js`)
   existe **só na edição self-hosted** desde a Fase 0.
-- **Acesso a dados**: 20 classes estáticas finas em `backend/src/models/*.js`, todas sobre
-  um único `getDb()` (`backend/src/config/database.js`), mais o helper
-  `insertReturningId`. A boa notícia continua valendo: os pontos de inserção do filtro de
-  tenant são muitos (121) mas ficam todos num diretório.
-- **GenieACS**: URL única em `settings.genieAcsUrl`, resolvida em
-  `DeviceService.getGenieAcsRootUrl()` (`backend/src/services/deviceService.js:117`).
+- **Acesso a dados**: 27 classes estáticas finas em `backend/src/models/*.js`, hoje sobre
+  `tdb()`/`tinsert()` (`backend/src/config/database.js`). O `getDb()` cru sobrevive em 18
+  pontos, todos justificados: `users` e `tenant_users`, que são do deploy, e a busca que
+  descobre o provedor de um webhook. A aposta do plano original — de que os pontos de
+  inserção do filtro seriam muitos mas ficariam todos num diretório — se confirmou.
+- **GenieACS**: URL em `settings.genieAcsUrl` — que **já é por provedor**, porque
+  `settings` é escopada; o que falta é a tabela de conexões e o conector plugável da Fase 4.
+  Resolvida em `DeviceService.getGenieAcsRootUrl()`.
   **Nenhum header de autenticação é enviado** e credenciais na URL são explicitamente
   rejeitadas — assume-se NBI em loopback/rede privada.
-- **Auth operador**: JWT bearer, `backend/src/middleware/auth.js`, payload
-  `{userId, username, role, tokenVersion}`, `audience: 'skygenpanel-admin'`. Já existe
-  gestão de usuários em `/api/users`, com papéis `viewer`/`admin`.
+- **Auth operador**: JWT bearer, `backend/src/middleware/auth.js`. Desde a onda 12 o
+  payload carrega `tenantId` e o papel vem do **vínculo** em `tenant_users`, não de
+  `users.role`. `authenticateToken` reabre o escopo no provedor que o token nomeia, depois
+  de conferir a membership contra a tabela. Token antigo, sem `tenantId`, continua valendo
+  quando a pessoa tem um vínculo só — a transição não derruba o plantão.
+- **Resolução de provedor**: `backend/src/middleware/tenantResolver.js` roda antes das rotas
+  e abre um escopo **provisório** — hoje sempre o primeiro provedor da tabela. É o escopo do
+  que acontece sem sessão (login, setup, refresh, portal). A Fase 3 troca essa única função
+  pela leitura do `Host`.
 - **Integrações que guardam segredos**: SGP, provisionamento automático e WhatsApp via
   Evolution API. Todas cifram com `secretBox`, e desde a Fase 0 registram a versão da chave.
-- **Auth assinante**: cookie `skygp_portal_session`, `backend/src/middleware/portalAuth.js`,
-  login resolve **só por `customer_id`** (`customerPortalController.login:27`).
+- **Auth assinante**: cookie `skygp_portal_session`, `backend/src/middleware/portalAuth.js`.
+  O login resolve por `customer_id` através de `CustomerAccount.getByCustomerId`, que passa
+  por `tdb` — ou seja, já é escopado pelo provedor em contexto. Falta o cookie ser
+  **host-only** e o payload assinado carregar o provedor, ambos itens da Fase 2 que só
+  passam a importar quando houver subdomínio.
 
 ### Achados críticos para o multi-tenant
 
-1. **Cinco caches globais em memória** que hoje vazariam dados entre provedores:
-   - `DeviceService.dashboardCache` (`deviceService.js`) — objeto único, serviria o
-     dashboard do provedor A para o B. Persistido em `app_state.dashboard_snapshot`.
-   - `CustomerPortalController.overviewCache` (`customerPortalController.js`) — chaveado
-     só por `account.id`.
-   - `SgpService.configCache` (`sgpService.js`) — config SGP única, **com o token decifrado**.
-   - `ProvisioningService.configCache` (`provisioningService.js`).
-   - `WhatsAppConfigService.configCache` (`whatsappConfigService.js`) — inclui a chave admin
-     decifrada do Evolution.
+O levantamento original listou oito. **Seis estão fechados**; o registro fica porque cada um
+explica por que uma peça do mecanismo tem a forma que tem, e porque um deles pode voltar.
 
-   Os três `configCache` são o caso mais grave: além de servirem a configuração do provedor
-   errado, dois deles carregam segredo decifrado em memória.
-2. **Uniques globais** que se tornam colisão entre tenants: `users.username`,
-   `customer_accounts.customer_id` / `device_id` / `identity_hash`, `device_profiles.device_id`,
-   `sgp_links.device_id`, `mapping_nodes.node_id`, `mapping_edges.edge_id`.
-3. **Login do portal cruzaria tenants**: dois provedores com o mesmo `customer_id` gerado
-   (o prefixo `CSG` é só cosmético) autenticariam no lugar errado.
-4. **Sequestro de conta via `identity_hash`** — pior que a colisão acima.
-   `identity_hash = sha256(softwareId, pppoe_username)` (`customerService.js:41`) e
-   `CustomerService.ensureAccount` (`customerService.js:110`) faz
-   `getByIdentityHash(...)` → `CustomerAccount.touch(existente.id, deviceId)`, ou seja
-   **re-aponta a conta encontrada para o novo `device_id`**. Dois provedores rodando o mesmo
-   firmware Huawei com um assinante `cliente01` geram o mesmo hash — sem unique composta, o
-   sync do provedor B sequestra a conta do provedor A. Não é vazamento de leitura: é
-   corrupção de dados.
-5. **`dbManagementService.copyData` apaga o destino inteiro**
-   (`dbManagementService.js:78` — `trx(table).del()` em toda `COPY_TABLES` antes do insert).
-   Num deploy compartilhado, um admin de **um** provedor clicando "migrar para MySQL"
-   truncaria os dados de **todos**. Isso torna a remoção dessa rota da edição SaaS um item de
-   Fase 0, não de Fase 7.
-6. **`secretBox` deriva a chave do `JWT_SECRET`** (`backend/src/utils/secretBox.js:12`) e
-   `decrypt` **retorna `null` silenciosamente** em falha — rotacionar o `JWT_SECRET`
-   destruiria de forma irreversível e sem erro toda senha de portal, toda senha de WiFi
-   guardada e todo token SGP, de todos os tenants.
-7. **SSRF já presente no código atual**, três pontos concretos em
-   `backend/src/services/deviceService.js`:
-   `buildGenieAcsUrl` aceita `endpoint` absoluto e **ignora a base configurada**
-   (`if (/^https?:\/\//i.test(endpoint)) { urlStr = endpoint }`, :183);
-   `fetchGenieAcsCollection` devolve o **corpo do erro upstream ao cliente** (:158), o que é
-   um oráculo de leitura; e nenhum `redirect: 'manual'` é definido, então um host público
-   permitido pode redirecionar para `127.0.0.1`.
-8. **Obstáculos de schema para as uniques compostas**:
-   `mapping_edges.source/target` são FKs **string** apontando para `mapping_nodes.node_id`
-   (`schema.js:101-102`) — tornar `node_id` único só por `(tenant_id, node_id)` quebra essas
-   FKs; e `wifi_security_config.product_class` **não tem unique nenhuma** hoje
-   (`schema.js:69`), um bug latente de duplicata.
+| # | Achado | Estado |
+| --- | --- | --- |
+| 1 | Cinco caches globais em memória, três deles com segredo decifrado | ✅ fechado — `TenantCache` e `Map` por provedor |
+| 2 | Uniques globais virando colisão entre provedores | ✅ fechado — compostas, com teste de upgrade |
+| 3 | Login do portal cruzando provedores | ✅ fechado — a busca passa por `tdb` |
+| 4 | Sequestro de conta via `identity_hash` | ✅ fechado — `(tenant_id, identity_hash)` |
+| 5 | `/api/database` apagando o banco de todos | ✅ fechado — só na edição self-hosted |
+| 6 | `secretBox` derivando a chave do `JWT_SECRET` | ✅ fechado — `SECRET_BOX_KEY` + `key_version` |
+| 7 | **Três buracos de SSRF no `deviceService`** | ⚠️ **aberto** — Fase 4 |
+| 8 | Obstáculos de schema para as uniques compostas | ✅ fechado ao longo da Fase 1 |
 
----
+**O achado 7 continua exatamente como estava** e é o mais sério dos que restam, porque a
+Fase 4 vai transformar a URL do GenieACS em dado por provedor — ou seja, em entrada
+controlada pelo cliente. Em `backend/src/services/deviceService.js`: `buildGenieAcsUrl`
+aceita `endpoint` absoluto e **ignora a base configurada**; `fetchGenieAcsCollection`
+devolve o **corpo do erro upstream ao cliente**, o que é um oráculo de leitura; e não há
+`redirect: 'manual'`, então um host permitido pode redirecionar para `127.0.0.1`. Hoje o
+alcance disso é limitado porque a URL é do operador do próprio install. Deixar de ser não
+pode acontecer antes da guarda de egresso.
+
+#### Duas garantias que são de construção, não de constraint
+
+Estas duas valem registro porque **não** têm coluna que as sustente, e um `listAll()` novo
+as quebraria em silêncio:
+
+- **`customer_wifi_credentials`** era o exemplo original disso, e a decisão mudou: a tabela
+  **ganhou `tenant_id`** no `0027`. A garantia por construção foi trocada por uma coluna, e
+  foi a escolha certa — uma invariante que depende de ninguém escrever a query errada não é
+  uma invariante.
+- **`CustomerPortalController.overviewCache`** ainda é um `Map` chaveado só por
+  `account.id`. É seguro porque `account.id` é surrogate de `customer_accounts`, que é
+  escopada, então o id só chega ali por uma linha que o provedor em escopo já possui. É a
+  mesma garantia que a tabela acima acabou de abandonar — vale reavaliar quando alguém mexer
+  nesse controlador.
 
 ## Arquitetura alvo
 
@@ -183,214 +237,118 @@ e o GenieACS em rede privada; a edição SaaS desliga tudo isso.
   segredo, para que rotacionar o segredo de sessão deixe de destruir os dados cifrados.
 - **`EDITION`**, tirando o seletor de banco da edição hospedada.
 
-**Dois itens de segurança que precisam entrar já aqui, antes de existir um segundo tenant:**
+**Os dois itens de segurança que esta fase antecipou, e por quê:**
 
-- **Desmontar `/api/database` na edição SaaS.** Pelo achado 5 acima, essa rota apaga o banco
-  inteiro. Introduzir a flag `EDITION` (`backend/src/config/edition.js`) já na Fase 0 e usá-la
-  para não montar `backend/src/routes/database.js` no SaaS — assim nunca há uma janela em que
-  ela exista num deploy compartilhado.
-- **Separar `SECRET_BOX_KEY` do `JWT_SECRET`** em `backend/src/utils/secretBox.js`, com
-  fallback para o `JWT_SECRET` nos installs existentes, e adicionar `key_version` em todo
-  conjunto de colunas cifradas (`customer_accounts`, `customer_wifi_credentials`, e a nova
-  `tenant_genieacs_connections`). É uma coluna inteira hoje e uma retro-migration horrível
-  daqui a dois anos.
+- **`/api/database` desmontada na edição SaaS.** Pelo achado 5, essa rota apaga o banco
+  inteiro antes de copiar. A flag entrou aqui e não na Fase 7 justamente para nunca existir
+  uma janela em que a rota estivesse montada num deploy compartilhado. Hoje é um
+  `if (IS_SELF_HOSTED)` em `backend/src/app.js`.
+- **`SECRET_BOX_KEY` separada do `JWT_SECRET`**, com fallback para os installs existentes e
+  `key_version` em todo conjunto de colunas cifradas. Antecipado porque adicionar a coluna
+  depois seria uma retro-migration sobre dados já cifrados — impossível de fazer sem saber
+  qual chave cifrou o quê, que é exatamente a informação que a coluna guarda.
 
-- Arquivos: `backend/src/config/schema.js`, `backend/src/config/database.js`,
-  `backend/src/config/dbConfig.js`, `backend/src/utils/secretBox.js`,
-  `backend/src/app.js`, novo `backend/src/config/edition.js`, todos os `backend/src/models/*.js`.
-
-**Breaking para self-hosted?** Não, se a baseline for aplicada corretamente.
+**Breaking para self-hosted?** Não foi — a baseline adotou os installs existentes sem perda.
 
 ---
 
-### Fase 1 — Modelo de tenant e scoping estrutural *(esforço: alto — é o coração)*
+### Fase 1 — Modelo de tenant e scoping estrutural ✅ *(concluída)*
 
-#### Novas tabelas
+Era o coração do plano e foi. O que segue é **o que existe**, com as divergências em
+relação ao previsto ditas onde houve.
 
-| Tabela | Conteúdo |
-| --- | --- |
-| `tenants` | id, slug (UNIQUE, vira o subdomínio), nome, cnpj, status, branding (nome, logo, cores), created_at |
-| `tenant_users` | tenant_id, user_id, role (`owner`/`admin`/`tech`/`viewer`), status, UNIQUE(tenant_id,user_id) |
-| `tenant_invites` | tenant_id, email, role, token_hash, expires_at, accepted_at |
-| `plans` | code, nome, max_devices, max_operators, max_subscribers, features (json) |
-| `subscriptions` | tenant_id, plan_id, status, trial_ends_at, current_period_end |
-| `platform_admins` | user_id — plano de controle do SaaS (nós) |
-| `audit_log` | tenant_id, actor_user_id, ação, alvo, ip, payload, created_at |
-| `tenant_genieacs_connections` | ver Fase 4 |
+#### O que foi entregue
 
-#### `users` continua global, membership é a ponte
+- **`tenants`** e **`tenant_users`** existem. As outras tabelas que a Fase 1 previa
+  (`tenant_invites`, `plans`, `subscriptions`, `platform_admins`, `audit_log`,
+  `tenant_genieacs_connections`) **não** — elas pertencem às Fases 2, 4 e 5 e ficaram lá.
+- **26 das 29 tabelas ganharam `tenant_id NOT NULL`**, com FK para `tenants` e as uniques
+  refeitas em cima do par. As três de fora são `tenants`, `users` e `tenant_users`, e o
+  porquê está na *Onda 12*, no fim deste documento.
+- **Todas as uniques sobre valor que o painel não gera viraram compostas**:
+  `customer_accounts` (`customer_id`, `device_id`, `identity_hash`), `device_profiles` e
+  `sgp_links` (`device_id`), `sgp_events` (`dedupe_key`), `provisioning_profiles` e
+  `wa_templates` (`name`), `mapping_nodes`/`mapping_edges`, `map_settings` (que deixou de
+  ser singleton `id=1`). `settings` e `app_state` tiveram a PK trocada para
+  `(tenant_id, key)`.
+- **Catálogos** (`vendors`, `wifi_security_mappings`, `wifi_security_config`) foram pelo
+  caminho previsto: `tenant_id NOT NULL` com cópia por provedor, e **não** pelo
+  `tenant_id NULL` significando global. A invariante "toda linha de tabela de provedor tem
+  `tenant_id`" sobreviveu inteira, e é ela que faz a guarda estática ser uma regra e não uma
+  heurística.
+- **Os cinco caches globais** viraram por provedor, e apareceu um sexto pelo caminho
+  (`deviceHistoryService`). Quatro usam o `TenantCache`; o dashboard usa um `Map` porque
+  precisa guardar também a promessa da atualização em voo — sem isso, o segundo provedor
+  aguardava a atualização do primeiro e recebia o resultado dela.
+- **`dbManagementService.COPY_TABLES`** passou a ser derivada de `SCHEMA_TABLES`, com teste
+  que falha se deixar de cobrir o schema. Estava oito tabelas atrás quando foi escrita à mão.
 
-`users` vira **identidade** (email UNIQUE global, não mais `username`), e `tenant_users`
-liga a pessoa ao provedor com um papel. Isso permite que um consultor/revenda atenda vários
-provedores com um só login — cenário comum no mercado de ISP brasileiro.
+#### O mecanismo, como ficou
 
-#### Tabelas que ganham `tenant_id NOT NULL`
+Igual ao proposto em espírito, com três diferenças que valem registro:
 
-`customer_accounts`, `device_profiles`, `sgp_links`, `customer_wifi_credentials`
-(desnormalizado a partir de `account_id`, para o filtro ser direto), `mapping_nodes`,
-`mapping_edges`, `map_settings` (deixa de ser singleton `id=1`), `settings` (PK vira
-`(tenant_id, key)`), `app_state` (PK vira `(tenant_id, key)`).
+1. **`tdb()` devolve um Proxy que lança em `.insert()`.** O plano descrevia `tdb` e `tinsert`
+   como duas funções ao lado uma da outra; na prática, nada impedia alguém de escrever
+   `tdb('x').insert(...)` — knex ignora `where` em insert e a linha entraria sem provedor,
+   parecendo perfeitamente razoável. Fechar essa porta é a diferença entre um mecanismo e
+   uma convenção.
+2. **Não há tratamento especial de catálogo no `tdb`.** O `CATALOG_TABLES` com
+   `orWhereNull` do rascunho desapareceu junto com a decisão de copiar o catálogo por
+   provedor. Uma função, uma regra.
+3. **`forEachTenant` e `forSoleTenant`** não estavam no plano e foram o achado mais útil da
+   fase. Todo job de fundo perde o contexto de requisição, e a pergunta *"rodar uma vez por
+   provedor divide o trabalho ou o repete?"* tem resposta diferente por job — e errar para o
+   lado do "repete" significa, no caso do outbox de WhatsApp, **mandar a mesma mensagem N
+   vezes para o telefone de um assinante real**. O `forSoleTenant` roda uma vez e **recusa**
+   assim que existe um segundo provedor: uma fila que para é notada e consertada; uma fila
+   que envia tudo em dobro é notada pelo cliente.
 
-#### Uniques que viram compostos
+#### A migração do install existente
 
-`(tenant_id, customer_id)`, `(tenant_id, device_id)`, `(tenant_id, identity_hash)`,
-`(tenant_id, node_id)`, `(tenant_id, edge_id)`, `(tenant_id, device_id)` em `device_profiles`
-e `sgp_links`. Aproveitar para criar a unique que falta em
-`wifi_security_config`: `(tenant_id, product_class)`.
+Foi feita em ~19 passos de migration em vez de um, e essa foi a decisão mais importante da
+fase: **cada passo escopa um grupo pequeno de tabelas e entra sozinho**, com a tabela só
+entrando em `SCOPED_TABLES` no mesmo commit em que o model passa por `tdb`. Antes disso a
+tabela ficaria filtrada com escritas que não gravam `tenant_id`; depois, a conversão ficaria
+sem o teste que a prova.
 
-Duas consequências que não são opcionais:
+O `id` da migration é a chave do ledger, então **duas frentes não podem usar o mesmo
+número** — aconteceu três vezes e o conserto é renumerar, barato mas obrigatório.
 
-- **`mapping_edges` precisa trocar de FK.** Hoje `source` e `target` são strings referenciando
-  `mapping_nodes.node_id` (`schema.js:101-102`). Assim que `node_id` deixar de ser único
-  sozinho, essas FKs não têm mais alvo válido. Substituir por FK inteira para
-  `mapping_nodes.id` (mais limpo) ou por FK composta `(tenant_id, node_id)`.
-- **`identity_hash` não deve ser re-salgado com o tenant.** A unique composta já resolve a
-  colisão; re-salgar forçaria reescrever todas as linhas existentes sem ganho.
+**A armadilha do SQLite era real e apareceu como previsto**: trocar um único global obriga o
+knex a reconstruir a tabela, com os dados dentro. O que o plano *não* previa é que a suíte
+de tenancy nunca passa por esse caminho — todas partem de um banco que o runner já terminou.
+A cobertura dele vive em `backend/test/schema-migrations.test.js`, em blocos que rodam as
+migrations pré-tenancy, plantam linhas e só então deixam o `ensureSchema` correr.
 
-Regra geral a seguir em toda migration nova: **toda unique e todo índice de tabela de tenant
-começa por `tenant_id`** — a Fase 8 tem um teste que verifica isso por introspecção.
+Uma armadilha que o plano não previa, e que custou caro: **um byte NUL literal num arquivo
+fonte** faz o git classificá-lo como binário e descartar um dos lados num merge, em silêncio.
 
-#### Catálogos: cópia por tenant no provisionamento
+### Fase 2 — Autenticação, RBAC e gestão de equipe *(a espinha entrou; o resto não)*
 
-`vendors`, `wifi_security_mappings`, `wifi_security_config` recebem `tenant_id NOT NULL`, e
-o catálogo de fabricantes é **copiado para o tenant quando ele é criado**.
+**Já existe** (onda 12): o payload do JWT carrega `tenantId` e o papel do vínculo em
+`tenant_users`; `authenticateToken` lê a membership e reabre o escopo no provedor que o
+token nomeia; `/api/users` opera sobre os vínculos do provedor que pediu, e a guarda do
+"último admin" conta admins **daquele** provedor. A revogação continua sendo o
+`token_version` na pessoa — trocar a senha derruba as sessões dela em todos os provedores,
+que é o certo.
 
-A alternativa tentadora — `tenant_id NULL` significando "global", com override por tenant —
-é melhor de produto (corrigimos um path de parâmetro ZTE uma vez e todo mundo recebe), mas
-custa a invariante que sustenta todo o mecanismo anti-vazamento: *toda linha de toda tabela
-de tenant tem `tenant_id NOT NULL`*. Com a exceção do `NULL`, cada query escopada vira
-`WHERE (tenant_id = ? OR tenant_id IS NULL)` — exatamente o tipo de nuance que depois
-cresce um vazamento, e que quebra o teste estrutural da Fase 8.
+**Falta:**
 
-São ~30 linhas por tenant. O preço é que melhorias no catálogo chegam aos tenants existentes
-por migration de backfill ou por um botão "atualizar catálogo" no console de plataforma —
-aceitável. Reavaliar para o modelo global+override só depois que o console existir.
-
-#### Migração do install existente
-
-Migration de dados que cria `tenants` id=1 a partir do `settings.appName` atual, seta
-`tenant_id = 1` em tudo, move `genieAcsUrl` para `tenant_genieacs_connections`, cria a
-`subscription` e converte o admin atual em `owner`. Nenhum dado perdido.
-
-**Armadilha do SQLite — a parte mais arriscada da migration.** O SQLite não faz
-`DROP CONSTRAINT`; o knex emula `dropUnique` recriando a tabela. Como o pool liga
-`PRAGMA foreign_keys = ON` no `afterCreate` (`backend/src/config/dbConfig.js:63`), recriar
-`mapping_nodes` dispara o `ON DELETE CASCADE` e **apaga todas as arestas do mapa do cliente**.
-A migration precisa, só no dialeto SQLite:
-
-1. `PRAGMA foreign_keys = OFF` **fora de qualquer transação** (dentro de uma, o pragma é no-op);
-2. criar `*_new` com o schema alvo e `INSERT INTO ... SELECT ..., 1 AS tenant_id FROM antiga`;
-3. `DROP` + `ALTER TABLE ... RENAME`;
-4. `PRAGMA foreign_key_check`, e só então `PRAGMA foreign_keys = ON`.
-
-Postgres e MySQL seguem o caminho fácil de `ALTER TABLE`. Escrever com um switch em
-`knex.client.config.client` e **exercitar contra um dump real de um install 1.13 no CI**,
-não só contra um fixture sintético — `backend/test/migration.test.js` já tem o padrão
-(`startTestServers({ beforeSchema })`).
-
-#### Mecanismo anti-vazamento — o ponto mais importante do plano
-
-Confiar em lembrar de escrever `.where('tenant_id')` em 20 arquivos **não é aceitável**
-para um produto comercial. Proposta em três camadas:
-
-**(a) Contexto implícito por requisição** — `backend/src/config/tenantContext.js`:
-
-```js
-import { AsyncLocalStorage } from 'node:async_hooks'
-
-export const tenantStore = new AsyncLocalStorage()
-
-export function currentTenantId() {
-  const id = tenantStore.getStore()?.tenantId
-  if (!id) throw new Error('Operação sem tenant no contexto')  // falha fechado
-  return id
-}
-```
-
-**(b) Handle de banco já escopado** — em `backend/src/config/database.js`:
-
-```js
-const TENANT_TABLES = new Set([
-  'settings', 'app_state', 'map_settings', 'mapping_nodes', 'mapping_edges',
-  'customer_accounts', 'device_profiles', 'sgp_links', 'customer_wifi_credentials'
-])
-const CATALOG_TABLES = new Set(['vendors', 'wifi_security_mappings', 'wifi_security_config'])
-
-export function tdb(table) {
-  const q = getDb()(table)
-  if (TENANT_TABLES.has(table)) return q.where(`${table}.tenant_id`, currentTenantId())
-  if (CATALOG_TABLES.has(table)) {
-    const t = currentTenantId()
-    return q.where((b) => b.where(`${table}.tenant_id`, t).orWhereNull(`${table}.tenant_id`))
-  }
-  return q
-}
-
-export function tinsert(table, row) {           // injeta tenant_id em todo insert
-  return getDb()(table).insert(
-    Array.isArray(row)
-      ? row.map((r) => ({ ...r, tenant_id: currentTenantId() }))
-      : { ...row, tenant_id: currentTenantId() }
-  )
-}
-```
-
-Todos os models trocam `getDb()('tabela')` por `tdb('tabela')`. Como o `where` já vem
-aplicado, esquecer o filtro deixa de ser possível — e uma chamada fora de contexto
-**lança exceção** em vez de retornar dados de todo mundo.
-
-Escopo real dessa troca: **121 chamadas `getDb()(...)` em 20 arquivos de
-`backend/src/models/`**. O único acesso ao banco fora dali é
-`backend/src/services/dbManagementService.js`, que copia o painel inteiro entre bancos e
-portanto precisa ver todas as linhas — é a exceção legítima, e o guarda da letra (c) a lista
-nominalmente em vez de abrir uma brecha por diretório.
-
-**(c) Guardas automatizados**
-- Teste de análise estática (`backend/test/tenant-scoping.test.js`) que varre
-  `backend/src/models/` e `backend/src/services/` e **falha** se encontrar
-  `getDb()('<tabela de tenant>')`.
-- Regra ESLint `no-restricted-syntax` equivalente no lint do backend.
-- **RLS no Postgres** como segunda linha (recomendado, pode ficar na Fase 8): `SET LOCAL
-  app.tenant_id` por transação + policies por tabela. Custo: exige transação/conexão dedicada
-  por requisição — avaliar impacto no pool antes de ligar.
-
-#### Caches globais → por tenant (obrigatório nesta fase)
-
-- `DeviceService.dashboardCache` → `Map<tenantId, cache>`; `app_state.dashboard_snapshot`
-  já fica por tenant via PK composta.
-- `CustomerPortalController.overviewCache` → chave `${tenantId}:${accountId}`.
-- `SgpService.configCache` → `Map<tenantId, config>`, com `invalidateConfigCache(tenantId)`.
-
-#### `dbManagementService.COPY_TABLES`
-
-Resolvido na atualização deste documento: a lista passou a ser derivada de `SCHEMA_TABLES`,
-exportada por `migrations.js` na ordem de criação, com um teste que falha se ela deixar de
-cobrir o schema. Antes disso era escrita à mão e já tinha ficado **oito tabelas para trás** —
-uma troca de banco teria levado o painel sem nenhum dado de WhatsApp.
-
-A rota em si já saiu da edição SaaS na Fase 0.
-
----
-
-### Fase 2 — Autenticação, RBAC e gestão de equipe *(esforço: médio-alto)*
-
-- `backend/src/middleware/auth.js`: payload do JWT ganha `tenantId`, `role` (do
-  `tenant_users`, não mais de `users.role`) e `membershipVersion` para revogação.
-  `authenticateToken` passa a carregar a membership e a abrir o `tenantStore`.
+- `membershipVersion` para revogar um vínculo específico sem derrubar os outros.
 - Papéis reais substituindo a string `'admin'`: `owner` (dono, cobrança), `admin`,
   `tech` (opera ONTs, não mexe em configuração), `viewer`. `requireRole` vira
   `requirePermission` com um mapa papel→permissões.
 - **Plano de plataforma** (nós, operando o SaaS): audience separada
   `skygenpanel-platform`, rotas `/api/platform/*`, capaz de listar/suspender tenants e de
   fazer *impersonation* auditada. Nunca compartilha o mesmo token do operador.
-- **API de usuários**: já existe em `/api/users` (listar, criar, trocar papel, remover, com
-  revogação de sessão na troca). Falta escopá-la por tenant e acrescentar o fluxo de
-  convite por e-mail — bem menos do que este plano previa.
-- **Portal do assinante**: `CustomerAccount.getByCustomerId` passa a receber o tenant;
-  login resolve `(tenant_id, customer_id)`. O cookie precisa ser **host-only** (sem
-  `domain=.dominio`) para não vazar sessão entre subdomínios de provedores diferentes —
-  ajustar `portalCookieOptions` em `backend/src/middleware/portalAuth.js`, e incluir
-  `tenantId` no payload assinado.
+- **API de usuários**: já escopada por provedor. Falta o fluxo de **convite por e-mail**
+  (`tenant_invites`).
+- **Portal do assinante**: a busca já é escopada (`getByCustomerId` passa por `tdb`), então
+  o que falta é o cookie ser **host-only** (sem
+  `domain=.dominio`), para não vazar sessão entre subdomínios de provedores diferentes —
+  ajustar `portalCookieOptions` em `backend/src/middleware/portalAuth.js` — e incluir
+  `tenantId` no payload assinado. Ambos só passam a importar quando houver subdomínio, ou
+  seja, junto com a Fase 3.
 - `rateLimit.js`: chavear por `${tenantId}:${ip}` para um provedor barulhento não derrubar
   o limite dos outros.
 **Quebra para os self-hosted atuais:** o login sai de `username` para `email`. Mitigação: a
@@ -504,17 +462,22 @@ sustenta. Antes do décimo tenant:
 - `frontend/src/pages/setup.tsx` (wizard de primeiro uso) fica **só na edição self-hosted**;
   no SaaS o equivalente é o onboarding pós-cadastro.
 - A seção de troca de banco em `frontend/src/pages/settings.tsx` sai da edição SaaS.
-- i18n: as strings novas entram em `frontend/src/lib/i18n/locales/{pt-BR,en,es}.ts`, com
-  pt-BR como idioma primário; o tipo em `dictionary.ts` faz o `npm run typecheck` acusar
-  chave faltando nos outros dois.
+- i18n: são **11 idiomas** hoje, não três. Uma chave nova entra em todos, e o tipo em
+  `dictionary.ts` faz o `npm run typecheck` acusar a que faltar. O que o typecheck **não**
+  pega é a chave declarada **duas vezes** — o literal fica com a última, o conjunto de
+  chaves continua batendo e o teste de paridade passa. Isso aconteceu quatro vezes nesta
+  fase, sempre por dois branches acrescentando as mesmas chaves; em duas delas as cópias
+  divergiam na redação. É para isso que existe o teste "declara cada chave exatamente uma
+  vez" em `backend/test/i18n.test.js`, e ele varre as duas metades do app.
 - O backend já ganhou sua própria camada de i18n (`backend/src/i18n/`) e o
   `customerPortalController` já responde por `req.t('portal.*')` — as mensagens novas de
   limite de plano e de suspensão entram por lá, não hardcoded.
-- **Resíduos do upstream indonésio ainda pendentes**, e são metadado e dado que o cliente
-  final do provedor vê: o `<html lang="id">` em **`frontend/index.html` e
-  `frontend/portal.html`**, e o centro padrão do mapa em Jacarta
-  (`-6.2088, 106.8456`, `backend/src/config/seed.js:56`) — que no provisionamento passa a ser
-  definido por tenant no onboarding.
+- **Resíduos do upstream indonésio, ainda pendentes** (confirmados na `main` de hoje), e são
+  metadado e dado que o cliente final do provedor vê: o `<html lang="id">` em
+  **`frontend/index.html` e `frontend/portal.html`**, e o centro padrão do mapa em Jacarta
+  (`-6.2088, 106.8456`, `backend/src/config/seed.js`). O segundo já é **por provedor** desde
+  que `map_settings` foi escopada — falta só passar a defini-lo no onboarding em vez de
+  semear Jacarta.
 
 ---
 
@@ -532,155 +495,197 @@ sustenta. Antes do décimo tenant:
 
 ---
 
-### Fase 8 — Provar o isolamento *(esforço: médio — não é opcional)*
+### Fase 8 — Provar o isolamento *(a suíte existe; a lista de portas ainda não está toda coberta)*
 
-Nada vai para dois provedores reais antes disto passar.
+Nada vai para dois provedores reais antes disto passar. **Boa parte já passa.**
 
-**Suíte de vazamento** (`backend/test/tenant-isolation.test.js`), sobre o
-`backend/test/helpers/harness.js` existente: cria **dois tenants com chaves naturais
-deliberadamente colidindo** — mesmo `customer_id`, mesmo `device_id`, mesmo `identity_hash`,
-mesmo `node_id` nos dois — e então, para cada recurso:
+#### O que existe
 
-1. listagem como A nunca contém id de B;
-2. `GET /:id` com id de B, como A → **404, não 403** (403 confirma que o recurso existe);
-3. `PUT`/`DELETE` com id de B, como A → 404 e a linha de B intacta;
-4. login no portal de A com o `customer_id` **e a senha** de B → 401;
-5. cookie de sessão de A replayado no host do portal de B → 401;
-6. token de operador de A enviado ao host de B → 403;
-7. **regressão de cache**: A abre o dashboard, depois B — o payload de B tem que vir do ACS
-   de B, não do cache de A;
-8. **regressão de cache SGP**: A grava uma config SGP; B lê `/api/sgp/config` e não pode ver
-   nada de A.
+A suíte não ficou num arquivo só, e ficou melhor assim: `backend/test/tenant-leak.test.js`
+guarda os casos que atravessam recursos, e **14 suítes `*-tenancy`** cobrem uma tabela ou um
+subsistema cada — `sgp-links`, `sgp-events`, `device-profiles`, `provisioning`,
+`map-settings`, `vendor-catalogue`, `wifi-credentials`, `whatsapp-media`,
+`whatsapp-inbound`, `users`, `auth`, entre outras. São 937 testes no total, verdes nos três
+dialetos no CI.
 
-**Testes estruturais** — baratos e pegam classes inteiras de bug de uma vez:
+O padrão em todas: **dois provedores com as chaves naturais deliberadamente colidindo** —
+mesmo `customer_id`, mesmo `device_id`, mesmo `identity_hash`, mesmo `dedupe_key`, mesmo
+nome de perfil — e então a asserção de que nenhum enxerga ou altera a linha do outro.
 
-- introspecção após `migrate:latest`: **toda tabela** existe em `TENANT_TABLES ∪ GLOBAL_TABLES`
-  (uma migration que esquecer de classificar uma tabela nova falha o CI);
-- **toda tabela de tenant** tem `tenant_id NOT NULL`, FK para `tenants` e índice começando por
-  `tenant_id`;
-- **toda unique de tabela de tenant começa por `tenant_id`** — só esse teste teria pego as seis
-  uniques compostas da Fase 1;
-- **sentinela de SQL**: em `APP_ENV=test`, `db.on('query')` lança se o SQL tocar uma tabela de
-  tenant sem `tenant_id` nos bindings. Ligar para a **suíte inteira já existente**
-  (`auth.test.js`, `customer-portal.test.js`, `sgp.test.js`, `portal-password-admin.test.js`,
-  `rate-limit.test.js`), de modo que todo teste legado vira também teste de escopo.
+E uma disciplina que não estava no plano e passou a valer para toda fatia: **um teste de
+vazamento só conta depois de ter sido visto falhar**, com a sua tabela fora da allowlist.
+Ela pegou pelo menos dois testes que passavam pelo motivo errado — um porque a tabela ainda
+estava escopada naquela rodada, outro porque a falha do teste anterior o mascarava. E pegou
+também a versão errada da própria disciplina: reverter *por coluna* em vez de *por passo de
+migration* reverte a migration errada quando duas derrubam um único com o mesmo nome de
+coluna, e o teste "falha" provando nada.
 
-**Testes por model** (`backend/test/tenant-scoping.test.js`): para cada um dos 20 models,
-gravar em A e em B e conferir a leitura cruzada; e afirmar que **todo método público lança
-`TenantScopeError` fora de contexto de tenant**. Essa última asserção é o teste de melhor
-custo-benefício da suíte inteira.
+Os testes estruturais existem em `backend/test/tenant-scoping.test.js`: a guarda estática
+que varre `backend/src` atrás de handle cru numa tabela escopada, a exigência de que toda
+tabela do schema esteja classificada como escopada ou compartilhada, e a marcação
+`tenant-scope-exempt` obrigatória para as poucas exceções legítimas.
 
-`backend/test/helpers/harness.js` ganha `seedTenant({slug})` e `asTenant(tenantId, fn)`; o
-`Host` pode ser enviado no `fetch` porque os listeners sobem em 127.0.0.1.
+#### O que ainda falta
 
----
+- **Os itens 5, 6 e 2 da lista original** — cookie de portal de A replayado no host de B,
+  token de operador de A enviado ao host de B, e `GET /:id` com id de B respondendo 404 e
+  não 403 — dependem de existir subdomínio. São da Fase 3, não desta.
+- **A sentinela de SQL** em `APP_ENV=test` (`db.on('query')` lançando se o SQL tocar tabela
+  escopada sem `tenant_id` nos bindings), que transformaria toda a suíte legada em teste de
+  escopo de graça. É o item de melhor custo-benefício que sobrou.
+- **RLS no Postgres** como segunda linha, ainda não avaliado.
 
 ## Riscos principais
 
-1. **Uma leitura cruzada silenciosa.** E o caminho mais provável não é um `WHERE` esquecido —
-   é um cache estático ou um job de fundo que não herda contexto nenhum. Por isso o
-   `currentTenantId()` **lança** quando não há contexto, e por isso os testes 7 e 8 da Fase 8
-   existem. Um incidente desses encerra o negócio: provedores concorrentes conversam nos
-   mesmos grupos.
-2. **Sequestro de conta por `identity_hash`** (achado 4) — não é vazamento de leitura, é
-   corrupção: o sync de um provedor re-aponta a conta de outro. Resolvido pela unique composta
-   na Fase 1, mas é o motivo de essa migration não poder sair pela metade.
-3. **`/api/database` num deploy compartilhado** (achado 5) — um clique de um cliente apaga os
-   dados de todos. Por isso está na Fase 0 e não na 7.
-4. **Conectividade GenieACS é ao mesmo tempo a maior objeção de venda e a maior superfície de
-   ataque.** "Preciso abrir a 7557 pra internet?" perde negócios; e liberar URL arbitrária sem
-   a guarda de egresso com IP fixado constrói um proxy de SSRF com tela de login. Tratar o
-   agente conector como *quando*, não *se*.
-5. **`JWT_SECRET` é hoje a chave de cifra de todos os segredos** e a decifra falha em silêncio
-   (`decrypt` devolve `null`). Rotacionar o segredo — operação de rotina — destruiria de forma
-   irreversível senhas de portal, senhas de WiFi e tokens SGP de todos os tenants. Fase 0.
-6. **O muro de escala do dashboard** (`deviceService.js:288` + `server.js:37`): a coleção
-   inteira de dispositivos a cada 60s por tenant. Chega por volta de 15–25 tenants, ou seja,
-   exatamente quando o negócio começa a funcionar.
-7. **A migration de rebuild no SQLite** — seis tabelas com FK, o `PRAGMA foreign_keys` e dados
-   reais de cliente. Tem que ser exercitada contra um dump 1.13 real no CI.
-8. **A Fase 2 quebra o login dos self-hosted atuais** (username → e-mail). Precisa da janela de
-   compatibilidade e de uma nota de release clara.
-9. **LGPD** — passamos a ser **operador** de dados pessoais de assinantes de terceiros (nome,
-   CPF/CNPJ via `sgp_links.document`, endereço, credenciais PPPoE, senhas de WiFi recuperáveis
-   em claro), sendo o provedor o **controlador**. Contrato com cláusula de operador, política
-   de retenção/exclusão e compromisso de notificação de incidente precisam estar prontos
-   **antes do primeiro contrato**. Some-se a isso a emissão de **NFS-e** para vender B2B a
-   CNPJ — resolver com emissor terceiro, não construir.
-10. **Escopo escapando para hospedar o GenieACS.** É o melhor produto de longo prazo e a via
-    mais rápida para nunca lançar. Manter fora até depois da Fase 7.
+Dos dez originais, cinco foram fechados pela Fase 1. Ficam registrados porque explicam
+decisões de desenho, e porque o primeiro **não se fecha, só se contém**.
+
+1. **Uma leitura cruzada silenciosa.** Continua sendo o risco que encerra o negócio, e o
+   mecanismo o contém em vez de o eliminar: `currentTenantId()` lança fora de escopo, a
+   guarda estática recusa handle cru, e as 14 suítes de tenancy provam por tabela. O caminho
+   mais provável nunca foi um `WHERE` esquecido — foi cache estático e job de fundo, e foi
+   exatamente ali que os problemas apareceram. **Contido, não resolvido.**
+2. ~~Sequestro de conta por `identity_hash`~~ — ✅ fechado, unique composta.
+3. ~~`/api/database` num deploy compartilhado~~ — ✅ fechado, rota só na edição self-hosted.
+4. **Conectividade GenieACS** — inalterado, e é o maior risco que resta. É ao mesmo tempo a
+   maior objeção de venda ("preciso abrir a 7557 pra internet?") e a maior superfície de
+   ataque. Com os três buracos de SSRF do achado 7 ainda abertos, transformar a URL do ACS em
+   dado por provedor **antes** da guarda de egresso constrói um proxy de SSRF com tela de
+   login. A ordem aqui não é negociável.
+5. ~~`JWT_SECRET` como chave de cifra de tudo~~ — ✅ fechado, `SECRET_BOX_KEY` + `key_version`.
+6. **O muro de escala do dashboard.** Inalterado e mais próximo: a coleção inteira de
+   dispositivos do ACS a cada 60s, agora **por provedor**, já que o prewarm roda em
+   `forEachTenant`. Escopar o job não reduziu o trabalho, dividiu-o — e multiplicou o número
+   de passagens pelo número de provedores. Chega por volta de 15–25 provedores.
+7. ~~A migration de rebuild no SQLite~~ — ✅ fechado, e coberto por teste que planta linhas
+   antes de rodar as migrations.
+8. **A troca de `username` para e-mail** ainda não aconteceu e ainda quebra o login dos
+   self-hosted. Continua precisando da janela de compatibilidade e da nota de release.
+9. **LGPD** — inalterado, e agora concreto: o banco guarda CPF/CNPJ em `sgp_links.document`,
+   payload de eventos SGP com dado pessoal, credenciais PPPoE e senhas de WiFi recuperáveis
+   em claro, de assinantes de terceiros. Somos **operador**, o provedor é **controlador**.
+   Contrato com cláusula de operador, política de retenção e compromisso de notificação de
+   incidente precisam existir **antes do primeiro contrato**.
+10. **Escopo escapando para hospedar o GenieACS** — inalterado. Manter fora até depois da
+    Fase 7.
+
+**Um risco novo, aprendido na Fase 1: duas frentes trabalhando no mesmo alvo.** A fatia de
+SGP e provisionamento foi construída duas vezes, em paralelo, por duas sessões que não se
+viam. Uma delas foi descartada inteira. Custou também três colisões de id de migration e
+quatro consertos independentes do mesmo dicionário de idioma — em dois deles as cópias
+divergiam na redação, e qual o operador via era decidido pela ordem em que os merges caíram.
+O que barateia isso não é coordenação em tempo real, é **fatia pequena que entra rápido**:
+quanto menos tempo um PR fica aberto, menos tempo ele tem para colidir.
 
 ## Dimensionamento
 
-Os arquivos que concentram o trabalho, por tamanho atual:
-`backend/src/services/deviceService.js` (1583 linhas — Fase 4),
-`frontend/src/pages/settings.tsx` (1579 — Fases 5/6/7),
-`frontend/src/pages/device-detail.tsx` (1939 — pouco afetado),
-`frontend/src/pages/customer-portal.tsx` (964 — Fase 2),
-`backend/src/services/sgpService.js` (654 — cache e config por tenant).
-Os 20 models são pequenos e a troca para `tdb()` é mecânica, mas são 121 pontos.
+Os arquivos que concentram o trabalho **restante**, por tamanho atual:
+`backend/src/services/deviceService.js` (Fase 4 — conector e as três correções de SSRF),
+`frontend/src/pages/settings.tsx` (Fases 5/6/7),
+`frontend/src/pages/customer-portal.tsx` (Fase 2),
+`backend/src/middleware/tenantResolver.js` (Fase 3 — é uma função só).
+
+Os 27 models já estão convertidos; aquele trabalho, que era o volume da Fase 1, acabou.
 
 ## Ordem recomendada de entrega
 
-Fase 0 → 1 → 2 → 3 → 8 (isolamento provado) → 4 → 5 → 6 → 7.
+Original: Fase 0 → 1 → 2 → 3 → 8 → 4 → 5 → 6 → 7.
+**Percorrido:** 0 ✅ → 1 ✅ → 2 (espinha) → 8 (boa parte).
 
-Vale notar que a Fase 1 sai para os installs self-hosted existentes como um upgrade normal —
-e isso é proposital: o código de tenancy é testado em produção real, com um tenant só, antes
-de existir um segundo. Pela mesma razão as duas edições devem rodar **o mesmo caminho de
-código**: self-hosted é simplesmente um tenant único com plano ilimitado e resolução por host
-desligada. É o que impede as edições de divergirem.
+**Daqui em diante, e a ordem importa:**
+
+1. **Fase 3 — subdomínio.** É a menor peça restante e a que destrava mais coisa: sem ela,
+   os itens de vazamento que dependem de host (cookie replayado, token de A no host de B)
+   não podem sequer ser testados, e o portal continua resolvendo o primeiro provedor. O
+   `tenantResolver` foi escrito para que a troca seja de uma função.
+2. **O resto da Fase 2**, já com host: cookie host-only, `tenantId` no payload do portal,
+   rate limit por provedor, convite por e-mail.
+3. **Fechar a Fase 8** com os testes que passam a ser possíveis, e a sentinela de SQL.
+4. **Fase 4 — conector**, começando pelas três correções de SSRF e pela guarda de egresso,
+   **antes** de a URL virar dado do cliente.
+5. Fases 5 → 6 → 7.
+
+Vale repetir o que o plano dizia e que se confirmou: a Fase 1 saiu para os installs
+self-hosted como upgrade normal, e o código de tenancy rodou em produção real com um
+provedor só antes de existir um segundo. As duas edições rodam **o mesmo caminho de código**
+— self-hosted é um provedor único com resolução por host desligada. É o que impede as
+edições de divergirem.
 
 ### Checklist antes de vender acesso ao segundo provedor
 
-Nada disso é negociável:
+Nada disso é negociável. **Sete dos doze estão cumpridos.**
 
-1. Toda tabela de tenant: `tenant_id NOT NULL`, FK para `tenants`, toda unique e todo índice
-   começando por `tenant_id`.
-2. Nenhum código de aplicação alcança tabela de tenant sem contexto — `currentTenantId()`
-   lança, o ESLint bloqueia `getDb`, e o CI verifica os dois.
-3. Login e sessão do portal do assinante escopados por tenant.
-4. Os cinco caches em memória e o blob `app_state.dashboard_snapshot` separados por tenant.
-5. JWT do operador e do assinante carregam o tenant, e ambos são conferidos contra o host.
-6. Credenciais ACS por tenant, cifradas, com a guarda de egresso no lugar e o branch de URL
-   absoluta removido.
-7. `/api/database` não montada na edição SaaS.
-8. Rate limit e concorrência de fetch ACS chaveados por tenant.
-9. A suíte de vazamento verde no CI e obrigatória para merge.
-10. `SECRET_BOX_KEY` separada do `JWT_SECRET`, com `key_version` nas colunas cifradas.
-11. `audit_log` registrando revelação de senha de portal, troca de credencial ACS, remoção de
-    membro e impersonation de plataforma.
-12. Exportação por tenant funcionando — para o primeiro chamado de "apaguei tudo, socorro" e
-    para a portabilidade da LGPD.
+| | Item | Estado |
+| --- | --- | --- |
+| 1 | Toda tabela de provedor: `tenant_id NOT NULL`, FK, uniques começando por `tenant_id` | ✅ |
+| 2 | Nenhum código alcança tabela de provedor sem contexto (`currentTenantId()` lança, guarda estática no CI) | ✅ |
+| 3 | Login e sessão do portal escopados por provedor | ⚠️ a busca sim; o cookie e o payload não (Fases 2/3) |
+| 4 | Caches em memória e `app_state.dashboard_snapshot` separados por provedor | ✅ |
+| 5 | JWT do operador e do assinante carregam o provedor e são conferidos contra o host | ⚠️ o do operador carrega; a conferência contra o host é Fase 3 |
+| 6 | Credenciais ACS por provedor, cifradas, guarda de egresso, branch de URL absoluta removido | ❌ Fase 4 |
+| 7 | `/api/database` não montada na edição SaaS | ✅ |
+| 8 | Rate limit e concorrência de fetch ACS chaveados por provedor | ❌ Fases 2/4 |
+| 9 | Suíte de vazamento verde no CI e obrigatória para merge | ✅ 937 testes, três dialetos |
+| 10 | `SECRET_BOX_KEY` separada do `JWT_SECRET`, com `key_version` | ✅ |
+| 11 | `audit_log` registrando ações sensíveis | ❌ Fase 7 |
+| 12 | Exportação por provedor funcionando (LGPD e "apaguei tudo, socorro") | ❌ Fase 7 |
 
----
+Os cinco que faltam concentram-se em **subdomínio (3)**, **conector GenieACS (6, 8)** e
+**operação (11, 12)**. Nenhum deles é do mecanismo de isolamento de dados, que é o que a
+Fase 1 entregou.
 
 ## Verificação
 
 ```bash
-npm run verify          # check backend + testes + lint + typecheck + build (já existe na raiz)
-cd backend && npm test  # inclui a nova suíte de isolamento
+npm run verify          # check backend + testes + lint + typecheck + build (raiz)
+cd backend && npm test  # 937 testes, incluindo as 14 suítes de tenancy
 ```
 
-Validação end-to-end manual, após as fases 0–3:
+A suíte roda nos três dialetos, e **isso não é zelo**: cada uma das armadilhas abaixo passou
+em dois bancos e falhou no terceiro.
 
-1. Subir com `EDITION=saas` e Postgres; rodar `knex migrate:latest`.
-2. Criar dois tenants (`alfa`, `beta`) pelo console de plataforma.
-3. Em cada um, criar operador, contas de assinante com **o mesmo `customer_id`** nos dois,
-   e nós de mapa com o mesmo `node_id`.
-4. Logar em `alfa.dominio`, copiar o token, e chamar `beta.dominio` com ele → deve dar 403.
-5. Chamar todas as listagens em cada tenant → nenhum registro do outro pode aparecer.
-6. Logar no portal `portal.alfa.dominio` com o `customer_id` compartilhado → deve autenticar
-   a conta do `alfa` e nunca a do `beta`.
-7. Abrir o dashboard de `alfa`, depois o de `beta`, e conferir que os números diferem
-   (prova de que o cache foi separado).
-8. Suspender a assinatura de `beta` e confirmar 402 no painel com o portal ainda no ar.
+```bash
+cd backend
+TEST_DB_CLIENT=mysql2 TEST_DB_HOST=127.0.0.1 TEST_DB_PORT=3306 \
+  TEST_DB_USER=skygp TEST_DB_PASSWORD=skygp TEST_DB_NAME=skygp_test npm test
+TEST_DB_CLIENT=pg TEST_DB_HOST=127.0.0.1 TEST_DB_PORT=5432 \
+  TEST_DB_USER=skygp TEST_DB_PASSWORD=skygp TEST_DB_NAME=skygp_test npm test
+```
 
----
+**Diferenças de dialeto que já custaram caro nesta fase**, todas em migration:
 
-## Onda 12 — `users` como identidade, `tenant_users` como ponte (decisões congeladas)
+- **`onConflict` com o alvo errado é invisível no MySQL** e lança no SQLite e no Postgres.
+  O MySQL ignora o alvo do `ON DUPLICATE KEY`, então um `onConflict('device_id')` que
+  deveria ser `onConflict(['tenant_id','device_id'])` passa nos testes de MySQL enquanto
+  mescla sobre a linha do provedor errado.
+- **`.alter()` numa coluna que ainda está numa PK quebra no Postgres.** O knex emite
+  `drop not null` incondicionalmente antes do retipo, e o Postgres recusa. Pior: o knex fixa
+  a ordem — toda alteração de coluna sai antes de toda instrução de tabela —, então mover o
+  `dropPrimary()` para cima no código não ajuda.
+- **`timestamp` do MySQL não tem precisão de sub-segundo.** Um valor com milissegundos é
+  arredondado na entrada, e comparar o valor original com o que volta os encontra diferentes
+  — uma linha duplicada por passagem, para sempre, só naquele banco.
+- **`DELETE ... LIMIT` não existe no Postgres**, e `date_trunc`/`DATE_FORMAT`/`strftime` são
+  três coisas diferentes. Bucketização vai em JavaScript.
 
-A última tabela por converter, e a única que **não** ganha `tenant_id`. Estas
-decisões estão fechadas; quem implementar segue.
+Validação end-to-end manual, quando a Fase 3 entrar:
+
+1. Subir com `EDITION=saas` e Postgres.
+2. Criar dois provedores (`alfa`, `beta`).
+3. Em cada um, criar operador, contas de assinante com **o mesmo `customer_id`** nos dois, e
+   nós de mapa com o mesmo `node_id`.
+4. Logar em `alfa.dominio`, copiar o token, e chamar `beta.dominio` com ele → 403.
+5. Chamar todas as listagens em cada provedor → nenhum registro do outro.
+6. Logar no portal `portal.alfa.dominio` com o `customer_id` compartilhado → autentica a
+   conta do `alfa`, nunca a do `beta`.
+7. Abrir o dashboard de `alfa`, depois o de `beta` → os números diferem.
+8. Suspender a assinatura de `beta` → 402 no painel, portal ainda no ar.
+
+## Onda 12 — `users` como identidade, `tenant_users` como ponte ✅ *(implementada)*
+
+A última tabela por converter, e a única que **não** ganhou `tenant_id`. Entrou no
+`0028_tenant_users`. O que segue são as decisões como foram tomadas e por quê — é a parte do
+desenho que menos se explica sozinha lendo o código.
 
 ### Por que não `users.tenant_id`
 
