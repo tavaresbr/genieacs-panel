@@ -1,6 +1,12 @@
 import Setting from '../models/Setting.js';
 import CustomerAccount from '../models/CustomerAccount.js';
 import VendorService from './vendorService.js';
+import {
+  PPPOE_FALLBACK_PATHS,
+  RX_POWER_FALLBACK_PATHS,
+  findPppoeUsername,
+  normalizeRxPowerReading
+} from './deviceParameterFallbacks.js';
 import Vendor from '../models/Vendor.js';
 import WifiSecurityConfig from '../models/WifiSecurityConfig.js';
 import AppState from '../models/AppState.js';
@@ -72,11 +78,55 @@ class DeviceService {
   }
 
   static getParameterValue(obj, parameterPath) {
-    const current = this.getParameterNode(obj, parameterPath);
-    if (current && typeof current === 'object' && '_value' in current) {
-      return this.normalizeParameterValue(current._value);
+    return this.readNodeValue(this.getParameterNode(obj, parameterPath));
+  }
+
+  /** The display value of a node the caller already holds. */
+  static readNodeValue(node) {
+    if (node && typeof node === 'object' && '_value' in node) {
+      return this.normalizeParameterValue(node._value);
     }
-    return this.normalizeParameterValue(current);
+    return this.normalizeParameterValue(node);
+  }
+
+  /** A parameter GenieACS answers with an empty string has told us nothing. */
+  static hasReportedValue(value) {
+    return value !== null && value !== undefined && String(value).trim() !== '';
+  }
+
+  /**
+   * The subscriber login, and where it was read.
+   *
+   * The operator's VirtualParameter is authoritative and is tried first; the
+   * ONT's own WAN tree is consulted only when it answered with nothing, which
+   * is what a GenieACS without the panel's VirtualParameter scripts does for
+   * every device in the fleet.
+   */
+  static resolvePppoeUsername(item, virtualParams) {
+    const configured = this.getParameterValue(item, virtualParams.vpPppoeUsername);
+    if (this.hasReportedValue(configured)) {
+      return { value: configured, path: virtualParams.vpPppoeUsername };
+    }
+    const found = findPppoeUsername(item, (node) => this.readNodeValue(node));
+    return found || { value: null, path: virtualParams.vpPppoeUsername };
+  }
+
+  /**
+   * The optical RX power in dBm, and where it was read. Same order as the
+   * login: the configured VirtualParameter first, and its value untouched —
+   * only a vendor reading has to be normalized, because only there does the
+   * panel not know what unit it asked for.
+   */
+  static resolveRxPower(item, virtualParams) {
+    const configured = this.getParameterValue(item, virtualParams.vpRxPower);
+    if (this.hasReportedValue(configured)) {
+      return { value: configured, path: virtualParams.vpRxPower };
+    }
+    for (const path of RX_POWER_FALLBACK_PATHS) {
+      const normalized = normalizeRxPowerReading(this.getParameterValue(item, path));
+      if (normalized !== null) return { value: normalized, path };
+    }
+    return { value: null, path: virtualParams.vpRxPower };
   }
 
   static normalizeParameterValue(value) {
@@ -322,6 +372,11 @@ class DeviceService {
       virtualParams.vpRxPower,
       virtualParams.vpTemperature,
       virtualParams.vpActiveDevices,
+      // GenieACS returns only what a projection names, so the fallbacks have
+      // to be asked for even when the VirtualParameters do answer — whether
+      // they did is only known once the response is in hand.
+      ...PPPOE_FALLBACK_PATHS,
+      ...RX_POWER_FALLBACK_PATHS,
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.SSID',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.SSID',
@@ -503,6 +558,7 @@ class DeviceService {
       virtualParams.vpRxPower,
       virtualParams.vpTemperature,
       virtualParams.vpActiveDevices,
+      ...RX_POWER_FALLBACK_PATHS,
       '_lastInform',
       '_registered'
     ].filter(Boolean);
@@ -532,6 +588,7 @@ class DeviceService {
       '_lastInform',
       virtualParams.vpRxPower,
       virtualParams.vpTemperature,
+      ...RX_POWER_FALLBACK_PATHS,
       'InternetGatewayDevice.DeviceInfo.UpTime'
     ].filter(Boolean);
     const data = await this.fetchFromGenieAcs(
@@ -543,16 +600,16 @@ class DeviceService {
     return data.map((item) => ({
       deviceId: item._id || null,
       lastInform: item._lastInform ?? null,
-      rxPower: this.getParameterValue(item, virtualParams.vpRxPower),
+      rxPower: this.resolveRxPower(item, virtualParams).value,
       temperature: this.getParameterValue(item, virtualParams.vpTemperature),
       uptime: this.getParameterValue(item, 'InternetGatewayDevice.DeviceInfo.UpTime')
     }));
   }
 
   static processDeviceData(item, virtualParams) {
-    const pppsecret = this.getParameterValue(item, virtualParams.vpPppoeUsername);
+    const pppsecret = this.resolvePppoeUsername(item, virtualParams).value;
     const wanbridge = this.getParameterValue(item, virtualParams.vpWanBridge);
-    const rxpower = this.getParameterValue(item, virtualParams.vpRxPower);
+    const rxpower = this.resolveRxPower(item, virtualParams).value;
     const gettemp = this.getParameterValue(item, virtualParams.vpTemperature);
     const activedevices = this.getParameterValue(item, virtualParams.vpActiveDevices);
 
@@ -692,6 +749,10 @@ class DeviceService {
       'Device.Hosts.Host',
       'InternetGatewayDevice.WANDevice.1.WANEthernetInterfaceConfig.MACAddress',
       'InternetGatewayDevice.WANDevice',
+      // `InternetGatewayDevice.WANDevice` above already carries the TR-098
+      // fallbacks; these are the TR-181 ones, which sit outside it.
+      ...PPPOE_FALLBACK_PATHS.filter((path) => path.startsWith('Device.')),
+      ...RX_POWER_FALLBACK_PATHS.filter((path) => path.startsWith('Device.')),
       '_lastInform',
       '_lastBoot',
       '_registered'
@@ -769,18 +830,15 @@ class DeviceService {
     };
 
     const virtualParameters = {
-      pppoeUsername: {
-        path: virtualParams.vpPppoeUsername,
-        value: getVPValue(virtualParams.vpPppoeUsername)
-      },
+      // The path is the one the value was actually read at, not always the
+      // configured VirtualParameter: when a fallback answered, this is what
+      // tells support where the panel got it.
+      pppoeUsername: this.resolvePppoeUsername(item, virtualParams),
       wanBridge: {
         path: virtualParams.vpWanBridge,
         value: getVPValue(virtualParams.vpWanBridge)
       },
-      rxpower: {
-        path: virtualParams.vpRxPower,
-        value: getVPValue(virtualParams.vpRxPower)
-      },
+      rxpower: this.resolveRxPower(item, virtualParams),
       temperature: {
         path: virtualParams.vpTemperature,
         value: getVPValue(virtualParams.vpTemperature)
