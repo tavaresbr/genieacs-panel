@@ -524,6 +524,36 @@ export const settingsAPI = {
 
   testGenieAcs: (url: string) =>
     apiClient.post('/settings/test-genieacs', { url }),
+
+  getGenieAcsAuth: () =>
+    apiClient.get<GenieAcsAuthConfig>('/settings/genieacs-auth'),
+
+  updateGenieAcsAuth: (payload: GenieAcsAuthPayload) =>
+    apiClient.put<GenieAcsAuthConfig>('/settings/genieacs-auth', payload),
+}
+
+export type GenieAcsAuthType = 'none' | 'basic' | 'bearer'
+
+/** O que o servidor conta sobre a credencial da NBI — nunca o segredo, só se existe um. */
+export interface GenieAcsAuthConfig {
+  authType: GenieAcsAuthType
+  username: string
+  secretConfigured: boolean
+  authTypes: GenieAcsAuthType[]
+}
+
+export interface GenieAcsAuthPayload {
+  authType?: GenieAcsAuthType
+  username?: string
+  /**
+   * Ausente MANTÉM o segredo guardado; string vazia APAGA.
+   *
+   * A tela não reexibe o segredo, então um formulário que salvasse o campo em
+   * branco como string vazia apagaria a credencial a cada salvamento. Quem
+   * chama tem que omitir a chave quando o operador não digitou nada — daí o
+   * tipo ser opcional em vez de `string`.
+   */
+  secret?: string
 }
 
 export interface SgpConfig {

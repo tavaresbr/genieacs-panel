@@ -11,6 +11,9 @@ import {
   usersAPI,
   whatsappAPI,
   type DbConfigPayload,
+  type GenieAcsAuthConfig,
+  type GenieAcsAuthPayload,
+  type GenieAcsAuthType,
   type Operator,
   type OperatorRole,
   type SgpConfig,
@@ -60,6 +63,35 @@ const VIRTUAL_PARAMETER_FIELDS: {
   { key: 'vpUserPassword', labelKey: 'settings.vp.userPassword', hintKey: 'settings.vp.optionalHint' }
 ]
 
+/**
+ * Mapas em vez de nome de chave montado com template literal.
+ *
+ * `TranslationKey` é derivado de `en.ts`, então uma chave escrita por inteiro é
+ * conferida na compilação; uma montada com `as TranslationKey` só falharia em
+ * runtime, virando texto cru na tela do operador.
+ */
+const GENIE_AUTH_TYPE_LABELS: Record<GenieAcsAuthType, TranslationKey> = {
+  none: 'settings.genieAuth.typeNone',
+  basic: 'settings.genieAuth.typeBasic',
+  bearer: 'settings.genieAuth.typeBearer'
+}
+
+type GenieSecretState = 'pendingClear' | 'typed' | 'configured' | 'empty'
+
+const GENIE_SECRET_STATE_LABELS: Record<GenieSecretState, TranslationKey> = {
+  configured: 'settings.genieAuth.statusConfigured',
+  empty: 'settings.genieAuth.statusEmpty',
+  pendingClear: 'settings.genieAuth.statusPendingClear',
+  typed: 'settings.genieAuth.statusTyped'
+}
+
+const GENIE_SECRET_STATE_BADGES: Record<GenieSecretState, string> = {
+  configured: 'modern-badge-success',
+  empty: 'modern-badge',
+  pendingClear: 'modern-badge-warning',
+  typed: 'modern-badge-info'
+}
+
 export default function Settings() {
   const { t, formatDateTime } = useTranslation()
   const { user: currentUser } = useAuth()
@@ -75,6 +107,28 @@ export default function Settings() {
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('general')
   const [testResult, setTestResult] = useState<{success: boolean, message: string, deviceCount?: number} | null>(null)
+  const [genieAuthConfig, setGenieAuthConfig] = useState<GenieAcsAuthConfig | null>(null)
+  const [genieAuthForm, setGenieAuthForm] = useState<{
+    authType: GenieAcsAuthType
+    username: string
+    secret: string
+    /**
+     * O terceiro estado do campo de segredo, e o que evita o "salvei e apagou
+     * sem querer": apagar é uma intenção declarada, que fica visível na tela
+     * até o salvamento e pode ser desfeita antes dele. Sem ela, "campo em
+     * branco" teria de significar ao mesmo tempo manter e apagar.
+     */
+    secretPendingClear: boolean
+  }>({ authType: 'none', username: '', secret: '', secretPendingClear: false })
+  /**
+   * A URL do GenieACS como está SALVA, não como está no campo.
+   *
+   * O servidor só manda a credencial junto do teste de conexão quando a origem
+   * testada é a que ele tem guardada, e essa decisão ele não conta na resposta.
+   * Guardando aqui o valor salvo, a tela chega à mesma conclusão que ele e pode
+   * avisar antes do clique — enquanto ainda dá para salvar primeiro.
+   */
+  const [savedGenieAcsUrl, setSavedGenieAcsUrl] = useState('')
   const [dbForm, setDbForm] = useState<DbConfigPayload>({
     client: 'mysql2', host: 'localhost', port: 3306, user: '', password: '', database: '', migrateData: true
   })
@@ -128,8 +182,21 @@ export default function Settings() {
       const res = await settingsAPI.getAll()
       if (!cancelled && res.success && res.data) {
         setSettings(prev => ({ ...prev, ...(res.data as any) }))
+        setSavedGenieAcsUrl(String((res.data as any).genieAcsUrl ?? ''))
       }
       setTestResult(null)
+
+      const auth = await settingsAPI.getGenieAcsAuth()
+      if (!cancelled && auth.success && auth.data) {
+        setGenieAuthConfig(auth.data)
+        setGenieAuthForm({
+          authType: auth.data.authType,
+          username: auth.data.username,
+          // O segredo guardado nunca sai do servidor; campo em branco mantém.
+          secret: '',
+          secretPendingClear: false
+        })
+      }
     })()
     return () => { cancelled = true }
   }, [])
@@ -368,6 +435,43 @@ export default function Settings() {
     }
   }
 
+  /**
+   * Em qual dos quatro estados o campo de segredo está agora.
+   *
+   * Um campo de senha em branco é ambíguo por natureza — pode significar
+   * "mantenha" ou "apague" — e é dessa ambiguidade que nasce o salvamento que
+   * revoga a credencial sem ninguém pedir. Aqui ela é resolvida antes de virar
+   * texto na tela: cada estado tem um nome, e o rótulo abaixo do campo diz qual
+   * é. `typed` vem antes de `configured` porque o que o operador acabou de
+   * digitar manda no que está guardado.
+   */
+  const genieSecretState: GenieSecretState = (() => {
+    if (genieAuthForm.secretPendingClear) return 'pendingClear'
+    if (genieAuthForm.secret) return 'typed'
+    if (genieAuthConfig?.secretConfigured) return 'configured'
+    return 'empty'
+  })()
+
+  /**
+   * Se o teste de conexão vai sair SEM a credencial.
+   *
+   * Reproduz a regra do servidor: ele só anexa a credencial guardada quando a
+   * origem testada é a mesma que está salva em `genieAcsUrl`. Comparar origem
+   * (esquema + host + porta), e não a string inteira, é o que ele faz — caminho
+   * ou barra final no fim não mudam para onde a requisição vai.
+   */
+  const genieTestGoesAnonymous = (() => {
+    if (genieAuthForm.authType === 'none' && !genieAuthConfig?.secretConfigured) return false
+    if (!savedGenieAcsUrl) return true
+    try {
+      return new URL(savedGenieAcsUrl).origin !== new URL(settings.genieAcsUrl).origin
+    } catch {
+      // URL que não parseia não é a origem salva, então o teste vai sem nada —
+      // e o aviso, que é o assunto aqui, continua sendo o certo a mostrar.
+      return true
+    }
+  })()
+
   const handleTestConnection = async () => {
     setLoading(true)
     loadingCtl.show(t('settings.general.testingProgress'))
@@ -567,7 +671,27 @@ export default function Settings() {
     }
   }
 
+  /**
+   * Monta o `secret` do PUT a partir do estado do campo.
+   *
+   * É aqui que a regra do servidor vira código: omitir a chave mantém o que
+   * está guardado, string vazia apaga. Devolver `undefined` e deixar quem chama
+   * espalhar condicionalmente é o que garante que "não mexi no campo" nunca
+   * chegue ao servidor como "apague".
+   */
+  const genieAuthSecretPatch = (): string | undefined => {
+    if (genieAuthForm.secretPendingClear) return ''
+    return genieAuthForm.secret ? genieAuthForm.secret : undefined
+  }
+
   const handleSaveSettings = async () => {
+    // O servidor recusa `basic` sem usuário com 400, e com razão: o header
+    // sairia com usuário vazio e o ACS o recusaria sem dizer por quê. Barrar
+    // aqui evita a ida perdida e diz qual campo falta, que a resposta não diz.
+    if (genieAuthForm.authType === 'basic' && !genieAuthForm.username.trim()) {
+      toast.error(t('settings.genieAuth.usernameRequired'))
+      return
+    }
     setLoading(true)
     loadingCtl.show(t('settings.savingProgress'))
     let ok = true
@@ -586,6 +710,34 @@ export default function Settings() {
       }
       let successMessage = t('settings.saveSuccess')
       let errorMessage = t('settings.saveError')
+
+      if (ok) {
+        // A URL acabou de ser gravada, então é ela que o servidor vai comparar
+        // com o endereço testado daqui em diante — o aviso de teste anônimo
+        // some sozinho depois de salvar, que é o desfecho que ele pedia.
+        setSavedGenieAcsUrl(settings.genieAcsUrl)
+
+        const secret = genieAuthSecretPatch()
+        const payload: GenieAcsAuthPayload = {
+          authType: genieAuthForm.authType,
+          username: genieAuthForm.username.trim(),
+          ...(secret !== undefined ? { secret } : {})
+        }
+        const auth = await settingsAPI.updateGenieAcsAuth(payload)
+        if (auth.success && auth.data) {
+          setGenieAuthConfig(auth.data)
+          setGenieAuthForm({
+            authType: auth.data.authType,
+            username: auth.data.username,
+            secret: '',
+            secretPendingClear: false
+          })
+        } else {
+          ok = false
+          errorMessage = auth.message || t('settings.genieAuth.saveFailed')
+        }
+      }
+
       if (ok && settings.autoGenerateCustomerId === 'true') {
         const sync = await settingsAPI.syncCustomerIds()
         if (!sync.success) {
@@ -948,6 +1100,117 @@ export default function Settings() {
                     </button>
                   </div>
                   <p className="field-hint">{t('settings.general.urlHint', { path: '/devices' })}</p>
+                  {genieTestGoesAnonymous && (
+                    <p className="mt-2 rounded-md border border-[hsl(var(--warning)/0.35)] bg-[hsl(var(--warning)/0.08)] p-3 text-sm text-foreground">
+                      <Icon name="warning" size={16} className="mr-2 inline align-[-3px]" />
+                      {t('settings.genieAuth.anonymousTestWarning')}
+                    </p>
+                  )}
+                </div>
+
+                <div className="border-t border-border pt-4">
+                  <h3 className="font-semibold">{t('settings.genieAuth.title')}</h3>
+                  <p className="field-hint mt-1 mb-4">{t('settings.genieAuth.description')}</p>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label htmlFor="genieacs-auth-type" className="field-label">{t('settings.genieAuth.type')}</label>
+                      <select
+                        id="genieacs-auth-type"
+                        className="modern-input w-full sm:w-72"
+                        value={genieAuthForm.authType}
+                        onChange={(event) => setGenieAuthForm((current) => ({
+                          ...current,
+                          authType: event.target.value as GenieAcsAuthType
+                        }))}
+                      >
+                        {(genieAuthConfig?.authTypes ?? ['none', 'basic', 'bearer'])
+                          .filter((type) => GENIE_AUTH_TYPE_LABELS[type])
+                          .map((type) => (
+                            <option key={type} value={type}>{t(GENIE_AUTH_TYPE_LABELS[type])}</option>
+                          ))}
+                      </select>
+                      <p className="field-hint">{t('settings.genieAuth.typeHint')}</p>
+                    </div>
+
+                    {genieAuthForm.authType !== 'none' && (
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        {/* `bearer` não tem usuário: o token é a credencial inteira. */}
+                        {genieAuthForm.authType === 'basic' && (
+                          <div>
+                            <label htmlFor="genieacs-auth-username" className="field-label">
+                              {t('settings.genieAuth.username')}
+                            </label>
+                            <input
+                              id="genieacs-auth-username"
+                              type="text"
+                              className="modern-input w-full"
+                              value={genieAuthForm.username}
+                              onChange={(event) => setGenieAuthForm((current) => ({
+                                ...current,
+                                username: event.target.value
+                              }))}
+                            />
+                            <p className="field-hint">{t('settings.genieAuth.usernameHint')}</p>
+                          </div>
+                        )}
+
+                        <div>
+                          <label htmlFor="genieacs-auth-secret" className="field-label">
+                            {t(genieAuthForm.authType === 'basic'
+                              ? 'settings.genieAuth.password'
+                              : 'settings.genieAuth.token')}
+                          </label>
+                          <input
+                            id="genieacs-auth-secret"
+                            type="password"
+                            autoComplete="new-password"
+                            className="modern-input w-full"
+                            disabled={genieAuthForm.secretPendingClear}
+                            placeholder={t(genieAuthConfig?.secretConfigured
+                              ? 'settings.genieAuth.placeholderStored'
+                              : 'settings.genieAuth.placeholderEmpty')}
+                            value={genieAuthForm.secret}
+                            onChange={(event) => setGenieAuthForm((current) => ({
+                              ...current,
+                              secret: event.target.value
+                            }))}
+                          />
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <span className={GENIE_SECRET_STATE_BADGES[genieSecretState]}>
+                              {t(GENIE_SECRET_STATE_LABELS[genieSecretState])}
+                            </span>
+                            {/* Limpar é sempre um pedido explícito, nunca o efeito de deixar o campo em branco. */}
+                            {genieAuthForm.secretPendingClear ? (
+                              <button
+                                type="button"
+                                className="modern-button-secondary"
+                                onClick={() => setGenieAuthForm((current) => ({
+                                  ...current,
+                                  secretPendingClear: false
+                                }))}
+                              >
+                                {t('settings.genieAuth.undoClear')}
+                              </button>
+                            ) : genieAuthConfig?.secretConfigured && (
+                              <button
+                                type="button"
+                                className="modern-button-secondary"
+                                onClick={() => setGenieAuthForm((current) => ({
+                                  ...current,
+                                  secret: '',
+                                  secretPendingClear: true
+                                }))}
+                              >
+                                {t('settings.genieAuth.clear')}
+                              </button>
+                            )}
+                          </div>
+                          <p className="field-hint mt-2">{t('settings.genieAuth.secretHint')}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
