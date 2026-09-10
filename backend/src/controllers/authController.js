@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
-import { acceptsIdentifier, LOGIN_REQUIRES_EMAIL } from '../config/login.js';
+import { acceptsIdentifier, canHoldSession, LOGIN_REQUIRES_EMAIL } from '../config/login.js';
 import TenantUser from '../models/TenantUser.js';
 import PlatformAdmin from '../models/PlatformAdmin.js';
 import { IS_SAAS } from '../config/edition.js';
@@ -363,6 +363,17 @@ class AuthController {
       }
 
       if (Number(user.token_version || 0) !== Number(decoded.tokenVersion || 0)) {
+        return res.status(403).json(
+          createErrorResponse(req.t('auth.refreshSessionInvalid'))
+        );
+      }
+
+      // A chave `LOGIN_REQUIRES_EMAIL`, lida aqui também. Sem isto, virá-la só
+      // trancava quem ainda não tinha sessão: quem já estava dentro renovava
+      // por sete dias. Assim a chave passa a valer na próxima renovação — dentro
+      // da vida do token de acesso — e a pessoa cai na tela de login, onde a
+      // regra que a trancou é a mesma que ela vai ler.
+      if (!canHoldSession(user)) {
         return res.status(403).json(
           createErrorResponse(req.t('auth.refreshSessionInvalid'))
         );

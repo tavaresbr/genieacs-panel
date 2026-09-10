@@ -1,6 +1,8 @@
 import express from 'express';
 import AuthController from '../controllers/authController.js';
-import { requirePermission, authenticateToken } from '../middleware/auth.js';
+import { requirePermission, requirePlatformAdmin, authenticateToken } from '../middleware/auth.js';
+import { emailChangeLimiter } from '../middleware/rateLimit.js';
+import { IS_SAAS } from '../config/edition.js';
 
 const router = express.Router();
 
@@ -25,10 +27,25 @@ router.post('/change-username', authenticateToken, AuthController.changeUsername
 // de uma capacidade de administração deixaria de fora justamente quem precisa
 // (um `tech` sem e-mail não conseguiria cadastrar o seu, e o login por e-mail
 // nunca poderia ser exigido).
-router.post('/email', authenticateToken, AuthController.changeEmail);
+// Limitado por IP e provedor: o 409 daqui diz se um endereço tem conta em
+// algum provedor da plataforma — ver `emailChangeLimiter`.
+router.post('/email', emailChangeLimiter, authenticateToken, AuthController.changeEmail);
 
 // Quantas contas ainda estão sem e-mail — o número que diz se dá para virar
 // `LOGIN_REQUIRES_EMAIL` sem trancar ninguém do lado de fora.
-router.get('/email-readiness', authenticateToken, requirePermission('operators.read'), AuthController.emailReadiness);
+//
+// O número é da plataforma inteira, porque a chave é: uma variável de ambiente
+// do processo, não uma configuração por provedor. Então quem pode lê-lo é quem
+// pode virá-la. No self-hosted isso é quem administra a equipe; na edição SaaS
+// é o plano de controle — um administrador de provedor não decide a chave, e o
+// total de contas da plataforma não é dado do provedor dele. Quem ainda falta
+// na PRÓPRIA equipe ele vê em `GET /api/users`, que já mostra o e-mail de cada
+// membro.
+router.get(
+  '/email-readiness',
+  authenticateToken,
+  IS_SAAS ? requirePlatformAdmin : requirePermission('operators.read'),
+  AuthController.emailReadiness
+);
 
 export default router;

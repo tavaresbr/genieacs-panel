@@ -3,6 +3,7 @@ import TenantInvite from '../models/TenantInvite.js';
 import TenantUser from '../models/TenantUser.js';
 import Tenant from '../models/Tenant.js';
 import User from '../models/User.js';
+import { acceptsIdentifier } from '../config/login.js';
 import { getDb } from '../config/database.js';
 import AuditLog from '../models/AuditLog.js';
 import { ROLES, normalizeRole, roleHas } from '../config/permissions.js';
@@ -206,6 +207,13 @@ class InviteController {
         // qualquer pessoa do deploy e a anexaria a este provedor sem que ela
         // soubesse — e o papel viria junto.
         if (!await bcrypt.compare(password, existente.password)) {
+          return res.status(401).json(createErrorResponse(req.t('auth.invalidCredentials')));
+        }
+        // A mesma regra do `/login`, e DEPOIS da senha pelo mesmo motivo de lá:
+        // com `LOGIN_REQUIRES_EMAIL` ligado, uma conta sem e-mail não entra por
+        // caminho nenhum, e este é um caminho que emite sessão. Sem esta linha
+        // o convite era a porta dos fundos da chave.
+        if (!acceptsIdentifier(username, existente)) {
           return res.status(401).json(createErrorResponse(req.t('auth.invalidCredentials')));
         }
         // Já trabalha aqui: o convite não some e não vira erro. É o caso do

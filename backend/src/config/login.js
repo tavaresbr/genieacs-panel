@@ -23,17 +23,36 @@ import 'dotenv/config';
  * O painel tem como responder se já dá para virar: `GET /api/users` mostra
  * quem ainda está sem e-mail. Virar a chave antes disso é trancar essa gente
  * do lado de fora, e o passo 3 não tem volta pela tela — só pelo ambiente.
+ *
+ * A chave é conferida em cada um dos três caminhos que emitem sessão — o
+ * login, o aceite de convite por uma conta que já existe, e o refresh —
+ * porque um interruptor que só um deles lê não é um interruptor.
  */
 export const LOGIN_REQUIRES_EMAIL =
   String(process.env.LOGIN_REQUIRES_EMAIL || '').trim().toLowerCase() === 'true';
 
-/** Se um identificador de login serve neste deployment. */
-export function acceptsIdentifier(identifier, user) {
+/**
+ * Se esta conta pode ter sessão neste deployment.
+ *
+ * É a metade do passo 3 que não depende do que foi digitado: com a chave
+ * virada, uma conta sem e-mail não entra por nada — e "por nada" tem de valer
+ * nos TRÊS lugares que emitem sessão, não só no `/login`. Valia só lá: aceitar
+ * um convite com nome e senha de uma conta herdada emitia sessão com a chave
+ * ligada, e o refresh renovava por sete dias a sessão de quem a chave deveria
+ * ter trancado. Quem vira a chave para forçar a migração não forçava ninguém.
+ */
+export function canHoldSession(user) {
   if (!user) return false;
   if (!LOGIN_REQUIRES_EMAIL) return true;
-  // Com a chave virada, só o e-mail entra — e uma conta sem e-mail não entra
-  // por nada. É a definição do passo 3, e é o que o aviso acima descreve.
+  return Boolean(String(user.email ?? '').trim());
+}
+
+/** Se um identificador de login serve neste deployment, para esta conta. */
+export function acceptsIdentifier(identifier, user) {
+  if (!canHoldSession(user)) return false;
+  if (!LOGIN_REQUIRES_EMAIL) return true;
+  // Com a chave virada, só o e-mail entra: o nome deixa de servir mesmo para
+  // quem já cadastrou o endereço.
   const email = String(user.email ?? '').trim().toLowerCase();
-  if (!email) return false;
   return String(identifier ?? '').trim().toLowerCase() === email;
 }

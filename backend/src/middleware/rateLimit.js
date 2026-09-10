@@ -111,6 +111,36 @@ export const portalLoginLimiter = limiter({
  * por provedor e endereço como o resto, para que um ISP barulhento não feche a
  * porta dos outros.
  */
+/**
+ * `POST /api/auth/email`: o cadastro do próprio endereço de login.
+ *
+ * A ação é rara — cada pessoa faz uma vez — e a resposta 409 é um oráculo: a
+ * tabela `users` é uma só para a plataforma inteira, então "esse e-mail já está
+ * em uso" responde se um endereço tem conta em ALGUM provedor, e quem tem
+ * sessão em qualquer um deles pode perguntar. O oráculo é inerente à unicidade
+ * global, que é o que faz o e-mail servir de identificador de login; o que se
+ * tira dele é a escala. Dez por quarto de hora cobrem qualquer uso legítimo
+ * com folga e transformam uma enumeração num gotejo.
+ */
+export const emailChangeLimiter = limiter({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  keyGenerator: tenantIpKey,
+  message: limitMessage('rateLimit.requests', 'rate_limited')
+});
+
+/**
+ * `POST /api/users`: criar um operador. O mesmo oráculo do limitador acima, na
+ * mão de um administrador de provedor — e o mesmo remédio. Sessenta por quarto
+ * de hora é uma equipe inteira cadastrada numa sentada, e não é uma varredura.
+ */
+export const operatorCreateLimiter = limiter({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  keyGenerator: tenantIpKey,
+  message: limitMessage('rateLimit.requests', 'rate_limited')
+});
+
 export const inviteAcceptLimiter = limiter({
   windowMs: 15 * 60 * 1000,
   max: 30,

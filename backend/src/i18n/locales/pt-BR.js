@@ -562,4 +562,23 @@ export default {
   'auth.emailUpdated': 'E-mail de login atualizado',
   'auth.emailChangeRequired': 'A senha atual e o novo endereço de e-mail são obrigatórios',
   'auth.emailReadiness': 'Situação do e-mail carregada',
+  // A tela de operadores — `usersController`, o último controlador que ainda
+  // respondia em inglês fixo.
+  'users.listed': 'Operadores carregados',
+  'users.listFailed': 'Não foi possível listar os operadores',
+  'users.ownerOnly': 'Só um proprietário pode conceder ou revogar o papel de proprietário',
+  'users.roleInvalid': 'O papel deve ser um destes: {roles}',
+  'users.created': 'Operador criado',
+  'users.createFailed': 'Não foi possível criar o operador',
+  'users.invalidId': 'Id de operador inválido',
+  'users.notFound': 'Operador não encontrado',
+  'users.nothingToUpdate': 'Informe um papel, uma senha ou os dois',
+  'users.ownAdminRole': 'Você não pode remover o seu próprio papel de administrador',
+  'users.lastAdmin': 'O painel precisa manter pelo menos um administrador',
+  'users.passwordElsewhere': 'Este operador também trabalha em outro provedor; só ele pode trocar a própria senha',
+  'users.updated': 'Operador atualizado',
+  'users.updateFailed': 'Não foi possível atualizar o operador',
+  'users.deleteSelf': 'Você não pode excluir a conta com que está conectado',
+  'users.deleted': 'Operador excluído',
+  'users.deleteFailed': 'Não foi possível excluir o operador',
 };
