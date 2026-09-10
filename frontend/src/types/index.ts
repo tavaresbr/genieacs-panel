@@ -12,6 +12,18 @@ import type { OperatorRole } from '@/lib/permissions'
 export interface User {
   id: number
   username: string
+  /**
+   * O e-mail de login, que pode ser `null`.
+   *
+   * Nulo não é ausência de dado: é uma conta anterior a esta versão, criada
+   * quando a coluna não existia e nenhuma migração podia adivinhar o endereço.
+   * São essas contas que a tela de operadores precisa deixar visíveis, porque é
+   * o número delas que decide quando o login pode passar a exigir e-mail.
+   *
+   * Opcional porque nem toda resposta do backend traz o campo: `GET
+   * /api/auth/user` responde sem ele.
+   */
+  email?: string | null
   role: OperatorRole
   /**
    * Whether this person is on the SaaS control plane's roster.

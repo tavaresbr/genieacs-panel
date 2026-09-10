@@ -14,6 +14,7 @@ import {
   type GenieAcsAuthConfig,
   type GenieAcsAuthPayload,
   type GenieAcsAuthType,
+  type EmailReadiness,
   type Operator,
   type OperatorRole,
   type SgpConfig,
@@ -94,7 +95,7 @@ const GENIE_SECRET_STATE_BADGES: Record<GenieSecretState, string> = {
 
 export default function Settings() {
   const { t, formatDateTime } = useTranslation()
-  const { user: currentUser } = useAuth()
+  const { user: currentUser, can } = useAuth()
   const [settings, setSettings] = useState({
     appName: 'SkyGenPanel',
     genieAcsUrl: 'http://127.0.0.1:7557',
@@ -520,6 +521,41 @@ export default function Settings() {
     }
   }
 
+  /**
+   * O e-mail de login da própria pessoa.
+   *
+   * Fica ao lado da troca de senha porque é a mesma coisa: as duas mexem em
+   * como se entra nesta conta, e as duas exigem a senha atual por isso. É por
+   * aqui que quem já usava o painel antes desta versão cadastra o endereço que
+   * a conta nunca teve — e é o que faz o número de contas sem e-mail cair.
+   */
+  const [emailForm, setEmailForm] = useState<{ currentPassword: string; email: string }>({
+    currentPassword: '',
+    email: ''
+  })
+
+  const submitChangeEmail = async () => {
+    if (!emailForm.currentPassword || !emailForm.email.trim()) {
+      toast.error(t('settings.security.emailRequired'))
+      return
+    }
+    const res = await authAPI.changeEmail(emailForm.currentPassword, emailForm.email.trim())
+    if (res.success) {
+      toast.success(t('settings.security.emailUpdated', { email: res.data?.email ?? emailForm.email.trim() }))
+      setEmailForm({ currentPassword: '', email: '' })
+      // A conta acabou de deixar de ser uma das que faltam, e o aviso da
+      // transição está na mesma tela: sem recarregar, ele seguiria contando
+      // quem já cadastrou.
+      if (canReadOperators) {
+        await refreshEmailReadiness()
+        await fetchOperators()
+      }
+    } else {
+      // 401 (senha errada) e 409 (endereço de outra pessoa) chegam com a razão.
+      toast.error(res.message || t('settings.security.emailFailed'))
+    }
+  }
+
   const submitChangePassword = async () => {
     if (!passwordForm.newPassword || passwordForm.newPassword !== passwordForm.confirmNewPassword) {
       toast.error(t('settings.security.passwordMismatch'))
@@ -543,8 +579,9 @@ export default function Settings() {
   const [creatingOperator, setCreatingOperator] = useState(false)
   const [operatorSaving, setOperatorSaving] = useState(false)
   const [operatorBusyId, setOperatorBusyId] = useState<number | null>(null)
-  const [operatorForm, setOperatorForm] = useState<{ username: string; password: string; role: OperatorRole }>({
+  const [operatorForm, setOperatorForm] = useState<{ username: string; email: string; password: string; role: OperatorRole }>({
     username: '',
+    email: '',
     password: '',
     role: 'viewer'
   })
@@ -556,8 +593,24 @@ export default function Settings() {
   // um botão que sempre falharia — e não esconder o papel que a pessoa JÁ tem,
   // senão a linha de um `owner` apareceria com o papel errado no seletor.
   const isOwner = currentUser?.role === 'owner'
+  const canReadOperators = can('operators.read')
   const rolesFor = (current?: OperatorRole) =>
     OPERATOR_ROLES.filter((role) => role !== 'owner' || isOwner || role === current)
+
+  /**
+   * Quantas contas ainda entram sem e-mail.
+   *
+   * É o número que decide quando `LOGIN_REQUIRES_EMAIL` pode ser virado no
+   * servidor, e por isso ele mora ao lado da lista de operadores: é a mesma
+   * informação, contada. `null` enquanto não se sabe — inclusive para quem não
+   * tem `operators.read`, de quem a rota não é pedida.
+   */
+  const [emailReadiness, setEmailReadiness] = useState<EmailReadiness | null>(null)
+
+  const refreshEmailReadiness = async () => {
+    const res = await authAPI.emailReadiness()
+    setEmailReadiness(res.success && res.data ? res.data : null)
+  }
 
   const fetchOperators = async () => {
     setOperatorsLoading(true)
@@ -575,11 +628,15 @@ export default function Settings() {
   useEffect(() => {
     if (activeTab === 'security') {
       void fetchOperators()
+      // A rota da prontidão exige `operators.read` e responde 403 a quem não
+      // tem: pedi-la assim mesmo trocaria um painel ausente por um erro no
+      // console de todo `tech` e `viewer` que abrir esta aba.
+      if (canReadOperators) void refreshEmailReadiness()
     }
-  }, [activeTab])
+  }, [activeTab, canReadOperators])
 
   const resetOperatorForm = () => {
-    setOperatorForm({ username: '', password: '', role: 'viewer' })
+    setOperatorForm({ username: '', email: '', password: '', role: 'viewer' })
     setCreatingOperator(false)
   }
 
@@ -593,10 +650,19 @@ export default function Settings() {
       toast.error(t('settings.operators.passwordLength'))
       return
     }
+    const email = operatorForm.email.trim()
+    // Frouxa de propósito: quem decide o que é endereço é o servidor, e uma
+    // regra mais apertada aqui recusaria e-mail que ele aceitaria. O que se
+    // pega é o esquecimento e o erro de digitação óbvio, antes da ida perdida.
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast.error(t('settings.operators.emailInvalid'))
+      return
+    }
     setOperatorSaving(true)
     try {
       const res = await usersAPI.create({
         username,
+        email,
         password: operatorForm.password,
         role: operatorForm.role
       })
@@ -604,6 +670,8 @@ export default function Settings() {
         toast.success(t('settings.operators.created', { username }))
         resetOperatorForm()
         await fetchOperators()
+        // Uma conta a mais com endereço muda o número da transição.
+        if (canReadOperators) await refreshEmailReadiness()
       } else {
         // 400 and 409 carry the reason (duplicate username, invalid input).
         toast.error(res.message || t('settings.operators.createFailed'))
@@ -662,6 +730,8 @@ export default function Settings() {
       if (res.success) {
         setOperators((current) => current.filter((item) => item.id !== operator.id))
         toast.success(t('settings.operators.deleted', { username: operator.username }))
+        // Apagar uma conta sem e-mail é uma das formas de a transição acabar.
+        if (canReadOperators) await refreshEmailReadiness()
       } else {
         // Own account or last administrator: the backend explains why.
         toast.error(res.message || t('settings.operators.deleteFailed'))
@@ -1947,6 +2017,44 @@ export default function Settings() {
               </section>
 
               <section className="rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-4">
+                <h3 className="font-semibold text-foreground">{t('settings.security.changeEmail')}</h3>
+                <p className="mb-4 mt-1 text-sm text-muted-foreground">{t('settings.security.changeEmailHint')}</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1" htmlFor="login-email-current-password">
+                      {t('settings.security.currentPassword')}
+                    </label>
+                    <input
+                      id="login-email-current-password"
+                      type="password"
+                      autoComplete="current-password"
+                      value={emailForm.currentPassword}
+                      onChange={(e) => setEmailForm(f => ({ ...f, currentPassword: e.target.value }))}
+                      className="modern-input w-full"
+                      placeholder={t('settings.security.currentPassword').toLowerCase()}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1" htmlFor="login-email-address">
+                      {t('settings.security.newEmail')}
+                    </label>
+                    <input
+                      id="login-email-address"
+                      type="email"
+                      autoComplete="email"
+                      value={emailForm.email}
+                      onChange={(e) => setEmailForm(f => ({ ...f, email: e.target.value }))}
+                      className="modern-input w-full"
+                      placeholder={t('settings.security.emailPlaceholder')}
+                    />
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <button onClick={submitChangeEmail} className="modern-button">{t('settings.security.updateEmail')}</button>
+                </div>
+              </section>
+
+              <section className="rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <h3 className="font-semibold text-foreground">{t('settings.operators.title')}</h3>
@@ -1966,6 +2074,39 @@ export default function Settings() {
                   </button>
                 </div>
 
+                {/* O aviso da transição. Fica aqui porque a lista logo abaixo é
+                    a resposta longa da mesma pergunta: quem ainda entra sem
+                    e-mail. Não há botão para exigir e-mail no login — a chave é
+                    variável de ambiente do servidor justamente porque virá-la
+                    cedo demais tranca gente do lado de fora e não tem desfazer
+                    pela tela; oferecer um botão seria oferecer esse caminho. */}
+                {emailReadiness && (
+                  <div
+                    className={emailReadiness.withoutEmail > 0 ? 'alert-warning mb-6' : 'alert-info mb-6'}
+                    role="status"
+                  >
+                    <p className="font-medium">{t('settings.operators.emailReadinessTitle')}</p>
+                    <p className="mt-1">
+                      {emailReadiness.withoutEmail > 0
+                        ? t('settings.operators.emailReadinessPending', {
+                            withoutEmail: emailReadiness.withoutEmail,
+                            total: emailReadiness.total
+                          })
+                        : t('settings.operators.emailReadinessReady', { total: emailReadiness.total })}
+                    </p>
+                    <p className="mt-1">
+                      {emailReadiness.loginRequiresEmail
+                        ? t('settings.operators.emailReadinessEnforced')
+                        : t('settings.operators.emailReadinessEnv')}
+                    </p>
+                    {emailReadiness.loginRequiresEmail && emailReadiness.withoutEmail > 0 && (
+                      <p className="mt-1 font-medium">
+                        {t('settings.operators.emailReadinessLockedOut', { withoutEmail: emailReadiness.withoutEmail })}
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 {creatingOperator && (
                   <div className="mb-6 rounded-md border border-border bg-card p-4">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1984,6 +2125,21 @@ export default function Settings() {
                         <p className="field-hint">{t('settings.operators.usernameHint')}</p>
                       </div>
                       <div>
+                        <label htmlFor="operator-email" className="block text-sm font-medium mb-1">
+                          {t('settings.operators.email')}
+                        </label>
+                        <input
+                          id="operator-email"
+                          type="email"
+                          value={operatorForm.email}
+                          onChange={(e) => setOperatorForm(f => ({ ...f, email: e.target.value }))}
+                          className="modern-input w-full"
+                          autoComplete="off"
+                          placeholder={t('settings.operators.emailPlaceholder')}
+                        />
+                        <p className="field-hint">{t('settings.operators.emailHint')}</p>
+                      </div>
+                      <div>
                         <label htmlFor="operator-password" className="block text-sm font-medium mb-1">
                           {t('settings.operators.password')}
                         </label>
@@ -1998,7 +2154,12 @@ export default function Settings() {
                         />
                         <p className="field-hint">{t('settings.operators.passwordHint')}</p>
                       </div>
-                      <div>
+                    </div>
+                    {/* O papel saiu da grade de três porque o e-mail entrou
+                        nela: os resumos abaixo do seletor são texto para ler, e
+                        um terço de largura os espremia em uma palavra por
+                        linha. */}
+                    <div className="mt-4">
                         <label htmlFor="operator-role" className="block text-sm font-medium mb-1">
                           {t('settings.operators.role')}
                         </label>
@@ -2006,7 +2167,7 @@ export default function Settings() {
                           id="operator-role"
                           value={operatorForm.role}
                           onChange={(e) => setOperatorForm(f => ({ ...f, role: e.target.value as OperatorRole }))}
-                          className="modern-input w-full"
+                          className="modern-input w-full md:max-w-xs"
                         >
                           {rolesFor().map((role) => (
                             <option key={role} value={role}>{t(ROLE_LABEL_KEYS[role])}</option>
@@ -2024,7 +2185,6 @@ export default function Settings() {
                             </li>
                           ))}
                         </ul>
-                      </div>
                     </div>
                     <div className="flex items-center gap-2 mt-4">
                       <button onClick={() => void submitOperator()} disabled={operatorSaving} className="modern-button">
@@ -2040,6 +2200,7 @@ export default function Settings() {
                     <thead>
                       <tr>
                         <th>{t('settings.operators.username')}</th>
+                        <th>{t('settings.operators.email')}</th>
                         <th>{t('settings.operators.role')}</th>
                         <th>{t('settings.operators.createdAt')}</th>
                         <th>{t('common.actions')}</th>
@@ -2048,19 +2209,19 @@ export default function Settings() {
                     <tbody>
                       {operatorsLoading ? (
                         <tr>
-                          <td colSpan={4} className="text-center py-8 text-muted-foreground">
+                          <td colSpan={5} className="text-center py-8 text-muted-foreground">
                             {t('settings.operators.loading')}
                           </td>
                         </tr>
                       ) : operatorsError !== null ? (
                         <tr>
-                          <td colSpan={4} className="text-center py-8 text-destructive">
+                          <td colSpan={5} className="text-center py-8 text-destructive">
                             {operatorsError || t('settings.operators.loadFailed')}
                           </td>
                         </tr>
                       ) : operators.length === 0 ? (
                         <tr>
-                          <td colSpan={4} className="text-center py-8 text-muted-foreground">
+                          <td colSpan={5} className="text-center py-8 text-muted-foreground">
                             {t('settings.operators.empty')}
                           </td>
                         </tr>
@@ -2080,6 +2241,16 @@ export default function Settings() {
                                   {isSelf && (
                                     <span className="modern-badge ml-2">{t('settings.operators.you')}</span>
                                   )}
+                                </td>
+                                {/* Vazio é informação, e por isso não some
+                                    num travessão: uma conta sem endereço é uma
+                                    conta que `LOGIN_REQUIRES_EMAIL` trancaria
+                                    do lado de fora, e esta coluna é onde se vê
+                                    quem ainda falta. */}
+                                <td className="text-sm">
+                                  {operator.email
+                                    ? <span className="text-muted-foreground">{operator.email}</span>
+                                    : <span className="modern-badge">{t('settings.operators.emailMissing')}</span>}
                                 </td>
                                 <td>
                                   <select
@@ -2127,7 +2298,7 @@ export default function Settings() {
                               </tr>
                               {resetPasswordId === operator.id && (
                                 <tr>
-                                  <td colSpan={4}>
+                                  <td colSpan={5}>
                                     <div className="flex flex-col gap-2 py-2 sm:flex-row sm:items-center">
                                       <label className="text-sm font-medium" htmlFor={`operator-new-password-${operator.id}`}>
                                         {t('settings.operators.newPassword')}
