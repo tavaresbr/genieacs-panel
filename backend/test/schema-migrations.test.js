@@ -49,6 +49,10 @@ const ALL_IDS = migrations.map((migration) => migration.id);
 // schema as it stood just ahead of it. Comparing by id rather than naming one
 // migration means a new tenancy step does not need this test edited.
 const FIRST_TENANCY_MIGRATION = '0010_customer_accounts_tenant';
+// The connection step is named on its own, unlike the tenancy boundary above:
+// its suite is about what one migration's backfill does, so the id is the
+// subject rather than a moving marker.
+const GENIEACS_CONNECTION_MIGRATION = '0029_tenant_genieacs_connections';
 const LEGACY_USERNAME = 'legacy-admin';
 const LEGACY_APP_NAME = 'Legacy Panel';
 const LEGACY_STATE_KEY = 'sgp_integration_config';
@@ -622,5 +626,109 @@ describe('making the SGP log and the provisioning trail per-provider', () => {
     await assert.rejects(() => db('provisioning_profiles').insert({
       tenant_id: alfa.id, name: 'Padrao', priority: 1
     }), 'provisioning_profiles');
+  });
+});
+
+describe('giving every provider its own GenieACS connection', () => {
+  const db = createDatabase('genieacs-connection');
+  const ALFA_URL = 'http://acs.alfa.test:7557';
+  const BETA_URL = 'http://acs.beta.test:7557';
+  let alfa;
+  let beta;
+  let semAcs;
+
+  /**
+   * The upgrade path of 0029 — the only path where the backfill has anything
+   * to carry. A fresh database reaches this step with one provider and no
+   * `genieAcsUrl` row, so nothing else in this file would notice a backfill
+   * that read the URL once and gave it to everybody: the state that catches
+   * that is several providers, each already pointing at its OWN ACS.
+   *
+   * Named rather than compared by prefix like the tenancy block above, because
+   * this suite is about what one step does, not about where the phase begins.
+   */
+  before(async () => {
+    for (const migration of migrations.filter((m) => m.id < GENIEACS_CONNECTION_MIGRATION)) {
+      await migration.up(db);
+    }
+    alfa = (await db('tenants').orderBy('id', 'asc').first()).id;
+    beta = await insertReturningId('tenants', {
+      slug: 'beta', name: 'Provedor Beta', status: 'active'
+    }, db);
+    // A provider that was created but never pointed at an ACS. It exists here
+    // because "not configured" is the state a brand new provider is in, and it
+    // has to survive the upgrade as a row rather than as an absence.
+    semAcs = await insertReturningId('tenants', {
+      slug: 'gama', name: 'Provedor Gama', status: 'active'
+    }, db);
+    // Where each of them has had its ACS since 0014: a `settings` row, which
+    // has been per-provider since 0015.
+    await db('settings').insert([
+      { tenant_id: alfa, key: 'genieAcsUrl', value: ALFA_URL },
+      { tenant_id: beta, key: 'genieAcsUrl', value: BETA_URL }
+    ]);
+
+    await ensureSchema(db);
+  });
+
+  const connectionFor = (tenantId) => db('tenant_genieacs_connections')
+    .where({ tenant_id: tenantId })
+    .first();
+
+  // The failure this is here for: a backfill that reads `settings` without
+  // grouping by `tenant_id` finds one row for the key and writes that URL to
+  // every provider — so on the first restart after the upgrade, the second
+  // ISP's panel is managing the first ISP's fleet, and says nothing about it.
+  it('gives each provider the ACS it was already pointing at', async () => {
+    const theirs = await connectionFor(alfa);
+    const mine = await connectionFor(beta);
+
+    assert.equal(theirs.base_url, ALFA_URL);
+    assert.equal(mine.base_url, BETA_URL);
+    assert.notEqual(theirs.id, mine.id);
+  });
+
+  // Without a row the panel cannot tell a provider that predates this step
+  // from one that simply has not been configured, and the screen has to be
+  // able to render the second.
+  it('still gives a provider that never configured one a row', async () => {
+    const row = await connectionFor(semAcs);
+    assert.ok(row, 'expected a connection row for the unconfigured provider');
+    assert.ok(!row.base_url, 'and it should say "not configured", not guess a URL');
+  });
+
+  // An upgrade is allowed to move where the connection is stored. It is not
+  // allowed to change how the socket is opened: a backfilled row that arrived
+  // with `allow_private_ranges` on, or with TLS verification off, would have
+  // quietly widened the egress guard on every install in the field.
+  it('changes nothing about how the panel reaches the ACS', async () => {
+    for (const tenantId of [alfa, beta, semAcs]) {
+      // eslint-disable-next-line no-await-in-loop -- three probes
+      const row = await connectionFor(tenantId);
+      assert.equal(row.mode, 'direct', 'mode');
+      assert.equal(row.auth_type, 'none', 'auth_type');
+      assert.equal(Boolean(row.verify_tls), true, 'verify_tls');
+      assert.equal(Boolean(row.allow_private_ranges), false, 'allow_private_ranges');
+      assert.equal(row.secret_ciphertext ?? null, null, 'no credential is invented');
+    }
+  });
+
+  // The step and the ledger row it earns are two statements with nothing
+  // holding them together, so a process that dies in between comes back to a
+  // backfill that has already run and is about to be asked to run again. The
+  // ledger is not the guard here — it is the thing that was lost — so the step
+  // is asked directly, the way that boot would ask it. Without a check on what
+  // is already there it inserts a second row per provider, and the unique on
+  // `tenant_id` turns a retry into a panel that never comes back up.
+  it('can be asked to run a second time without duplicating a row', async () => {
+    const step = migrations.find((m) => m.id === GENIEACS_CONNECTION_MIGRATION);
+    await step.up(db);
+    // And an ordinary second boot, which goes through the ledger instead.
+    await ensureSchema(db);
+
+    const [{ n }] = await db('tenant_genieacs_connections').count({ n: '*' });
+    assert.equal(Number(n), 3, 'one row per provider, not one per run');
+    assert.equal((await connectionFor(alfa)).base_url, ALFA_URL);
+    assert.equal((await connectionFor(beta)).base_url, BETA_URL);
   });
 });

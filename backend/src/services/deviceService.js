@@ -13,7 +13,7 @@ import AppState from '../models/AppState.js';
 import { DEFAULT_SETTINGS } from '../config/seed.js';
 import { TranslatableError } from '../i18n/index.js';
 import { currentTenantId } from '../config/tenantContext.js';
-import GenieAcsEgress from './genieacsEgress.js';
+import GenieAcsConnector from './genieacs/connector.js';
 
 const WAN_PARAMETER_CANDIDATES = Object.freeze({
   vlan: [
@@ -187,27 +187,23 @@ class DeviceService {
     return null;
   }
 
-  static async getGenieAcsUrl() {
-    const settings = await Setting.getAll();
-    return settings.genieAcsUrl;
+  /**
+   * How this provider's GenieACS is reached.
+   *
+   * Every request goes through one of these rather than through the egress
+   * guard directly. The difference is what the connection carries and a bare
+   * URL cannot: the `Authorization` header, whether a private address is
+   * allowed for this provider, whether its certificate is verified, and the
+   * per-provider ceiling on requests in flight. A call site that reaches past
+   * this to `GenieAcsEgress` would be a request made as nobody, without a
+   * credential and outside the ceiling — which is why nothing here does.
+   */
+  static async connector() {
+    return GenieAcsConnector.forCurrentTenant();
   }
 
   static async getGenieAcsRootUrl() {
-    const baseUrl = await this.getGenieAcsUrl();
-    if (!baseUrl) {
-      throw new Error('GenieACS URL not configured');
-    }
-    const url = new URL(baseUrl);
-    if (!['http:', 'https:'].includes(url.protocol)) {
-      throw new Error('GenieACS URL must use HTTP or HTTPS');
-    }
-    if (url.username || url.password) {
-      throw new Error('Credentials in the GenieACS URL are not supported');
-    }
-    url.pathname = '/';
-    url.search = '';
-    url.hash = '';
-    return url.toString().replace(/\/+$/, '');
+    return (await this.connector()).rootUrl;
   }
 
   static async getVirtualParameters() {
@@ -221,7 +217,7 @@ class DeviceService {
   }
 
   static async getDevicesBaseUrl() {
-    return `${await this.getGenieAcsRootUrl()}/devices`;
+    return (await this.connector()).devicesUrl;
   }
 
   /**
@@ -262,13 +258,8 @@ class DeviceService {
     if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(String(collection))) {
       throw new Error('Invalid GenieACS collection name');
     }
-    const root = await this.getGenieAcsRootUrl();
-    const url = new URL(`${root}/${collection}`);
-    Object.entries(query || {}).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-        url.searchParams.set(key, String(value));
-      }
-    });
+    const connector = await this.connector();
+    const url = connector.collectionUrl(collection, query);
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -283,7 +274,7 @@ class DeviceService {
         options.headers['Content-Type'] = 'application/json';
         options.body = typeof body === 'string' ? body : JSON.stringify(body);
       }
-      const response = await GenieAcsEgress.fetch(url, options);
+      const response = await connector.request(url, options);
       if (!response.ok) {
         throw await this.genieAcsError(`GenieACS ${collection} API`, response);
       }
@@ -301,8 +292,8 @@ class DeviceService {
    * and the base URL becomes provider-supplied data, so the endpoint is the
    * side of this that must not be able to choose the destination.
    */
-  static async buildGenieAcsUrl(endpoint = '', query = {}) {
-    const base = await this.getDevicesBaseUrl();
+  static buildDeviceUrl(connector, endpoint = '', query = {}) {
+    const base = connector.devicesUrl;
 
     let urlStr;
     if (!endpoint) {
@@ -324,7 +315,8 @@ class DeviceService {
 
   static async fetchFromGenieAcs(endpoint, query = {}, method = 'GET', body = null) {
     try {
-      const url = await this.buildGenieAcsUrl(endpoint, query);
+      const connector = await this.connector();
+      const url = this.buildDeviceUrl(connector, endpoint, query);
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000);
@@ -341,7 +333,7 @@ class DeviceService {
           options.body = typeof body === 'string' ? body : JSON.stringify(body);
         }
 
-        const response = await GenieAcsEgress.fetch(url, options);
+        const response = await connector.request(url, options);
 
         clearTimeout(timeoutId);
 
@@ -450,11 +442,12 @@ class DeviceService {
   }
 
   static async fetchGenieAcsWithHeaders(query = {}) {
-    const url = await this.buildGenieAcsUrl('', query);
+    const connector = await this.connector();
+    const url = this.buildDeviceUrl(connector, '', query);
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15_000);
     try {
-      const response = await GenieAcsEgress.fetch(url, {
+      const response = await connector.request(url, {
         method: 'GET',
         headers: { Accept: 'application/json' },
         signal: controller.signal,
@@ -1228,14 +1221,16 @@ class DeviceService {
    * "applied" would mark a device provisioned that never received anything.
    */
   static async postProvisioningTask(deviceId, task) {
-    const url = await this.buildGenieAcsUrl(
+    const connector = await this.connector();
+    const url = this.buildDeviceUrl(
+      connector,
       `${encodeURIComponent(deviceId)}/tasks`,
       { connection_request: 1 }
     );
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
     try {
-      const response = await GenieAcsEgress.fetch(url, {
+      const response = await connector.request(url, {
         method: 'POST',
         headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
         body: JSON.stringify(task),
@@ -1302,12 +1297,12 @@ class DeviceService {
     if (!deviceId || !/^[A-Za-z0-9_]+$/.test(String(tag))) {
       throw new Error('Invalid device tag');
     }
-    const root = await this.getGenieAcsRootUrl();
-    const url = `${root}/devices/${encodeURIComponent(String(deviceId))}/tags/${encodeURIComponent(String(tag))}`;
+    const connector = await this.connector();
+    const url = `${connector.devicesUrl}/${encodeURIComponent(String(deviceId))}/tags/${encodeURIComponent(String(tag))}`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15_000);
     try {
-      const response = await GenieAcsEgress.fetch(url, { method, signal: controller.signal, redirect: 'manual' });
+      const response = await connector.request(url, { method, signal: controller.signal });
       if (!response.ok && !(method === 'DELETE' && response.status === 404)) {
         throw await this.genieAcsError('GenieACS tag API', response);
       }
@@ -1368,16 +1363,15 @@ class DeviceService {
   }
 
   static async deleteDevice(deviceId) {
-    const base = await this.getDevicesBaseUrl();
-    const url = `${base}/${encodeURIComponent(deviceId)}`;
+    const connector = await this.connector();
+    const url = `${connector.devicesUrl}/${encodeURIComponent(deviceId)}`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
 
     try {
-      const response = await GenieAcsEgress.fetch(url, {
+      const response = await connector.request(url, {
         method: 'DELETE',
-        signal: controller.signal,
-        redirect: 'manual'
+        signal: controller.signal
       });
 
       if (!response.ok) {
@@ -1797,12 +1791,12 @@ class DeviceService {
     if (!faultId || String(faultId).length > 512) {
       throw new Error('Invalid fault ID');
     }
-    const root = await this.getGenieAcsRootUrl();
-    const url = `${root}/faults/${encodeURIComponent(String(faultId))}`;
+    const connector = await this.connector();
+    const url = `${connector.rootUrl}/faults/${encodeURIComponent(String(faultId))}`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15_000);
     try {
-      const response = await GenieAcsEgress.fetch(url, { method: 'DELETE', signal: controller.signal, redirect: 'manual' });
+      const response = await connector.request(url, { method: 'DELETE', signal: controller.signal });
       if (!response.ok && response.status !== 404) {
         throw await this.genieAcsError('GenieACS fault API', response);
       }

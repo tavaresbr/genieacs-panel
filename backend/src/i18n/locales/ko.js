@@ -132,6 +132,7 @@ export default {
   'settings.connectionFailed': 'GenieACS 서버에 연결하지 못했습니다',
   'settings.connectionStatus': 'GenieACS 서버가 상태 코드 {status}을(를) 반환했습니다',
   'settings.connectionTestFailed': '연결 테스트에 실패했습니다',
+  'settings.connectionUnauthorized': 'GenieACS가 이 연결의 자격 증명을 거부했습니다',
 
   'settings.customerIdSyncDisabled': '고객 ID 자동 생성이 비활성화되어 있습니다',
   'settings.customerIdSynced': '고객 ID를 동기화했습니다',

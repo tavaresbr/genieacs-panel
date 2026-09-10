@@ -132,6 +132,7 @@ export default {
   'settings.connectionFailed': 'GenieACS サーバーに接続できませんでした',
   'settings.connectionStatus': 'GenieACS サーバーがステータス {status} を返しました',
   'settings.connectionTestFailed': '接続テストに失敗しました',
+  'settings.connectionUnauthorized': 'GenieACS がこの接続の認証情報を拒否しました',
   'settings.customerIdSyncDisabled': '顧客 ID の自動生成は無効です',
   'settings.customerIdSynced': '顧客 ID を同期しました',
   'settings.customerIdSyncedPending': '顧客 ID を同期しました。{count} 台の機器には、まだ SoftwareID、PPPoE、または設置日が必要です',

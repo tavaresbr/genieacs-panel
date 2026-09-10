@@ -129,6 +129,7 @@ export default {
   'settings.connectionFailed': 'Non è stato possibile connettersi al server GenieACS',
   'settings.connectionStatus': 'Il server GenieACS ha risposto con stato {status}',
   'settings.connectionTestFailed': 'La prova di connessione non è riuscita',
+  'settings.connectionUnauthorized': 'GenieACS ha rifiutato le credenziali di questa connessione',
   'settings.customerIdSyncDisabled': 'La generazione automatica dell’ID cliente è disattivata',
   'settings.customerIdSynced': 'ID cliente sincronizzati correttamente',
 

@@ -129,6 +129,7 @@ export default {
   'settings.connectionFailed': 'Não foi possível conectar ao servidor GenieACS',
   'settings.connectionStatus': 'O servidor GenieACS respondeu com status {status}',
   'settings.connectionTestFailed': 'O teste de conexão falhou',
+  'settings.connectionUnauthorized': 'O GenieACS recusou as credenciais desta conexão',
   'settings.customerIdSyncDisabled': 'A geração automática de ID de cliente está desativada',
   'settings.customerIdSynced': 'IDs de cliente sincronizados com sucesso',
   'settings.customerIdSyncedPending': 'IDs de cliente sincronizados; {count} equipamento(s) ainda precisam de SoftwareID, PPPoE ou data de instalação',

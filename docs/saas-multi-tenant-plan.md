@@ -128,11 +128,13 @@ arquivo `LICENSE` e o aviso de copyright da SkydashNET devem ser mantidos no pro
   pontos, todos justificados: `users` e `tenant_users`, que são do deploy, e a busca que
   descobre o provedor de um webhook. A aposta do plano original — de que os pontos de
   inserção do filtro seriam muitos mas ficariam todos num diretório — se confirmou.
-- **GenieACS**: URL em `settings.genieAcsUrl` — que **já é por provedor**, porque
-  `settings` é escopada; o que falta é a tabela de conexões e o conector plugável da Fase 4.
-  Resolvida em `DeviceService.getGenieAcsRootUrl()`.
-  **Nenhum header de autenticação é enviado** e credenciais na URL são explicitamente
-  rejeitadas — assume-se NBI em loopback/rede privada.
+- **GenieACS**: conexão em `tenant_genieacs_connections`, uma linha por provedor, resolvida
+  por `GenieAcsConnector.forCurrentTenant()`. Carrega o modo, a URL, o tipo de autenticação e
+  o segredo cifrado, e é ela que decide se a faixa privada é permitida e se o certificado é
+  verificado. O header `Authorization` (Basic/Bearer) **é enviado** desde a Fase 4;
+  credenciais dentro da URL continuam explicitamente rejeitadas, porque a URL é logada,
+  mostrada na tela e devolvida pela API de settings.
+  `settings.genieAcsUrl` sobrevive como o campo que a tela edita, escrevendo na linha.
 - **Auth operador**: JWT bearer, `backend/src/middleware/auth.js`. Desde a onda 12 o
   payload carrega `tenantId` e o papel vem do **vínculo** em `tenant_users`, não de
   `users.role`. `authenticateToken` reabre o escopo no provedor que o token nomeia, depois
@@ -152,8 +154,8 @@ arquivo `LICENSE` e o aviso de copyright da SkydashNET devem ser mantidos no pro
 
 ### Achados críticos para o multi-tenant
 
-O levantamento original listou oito. **Seis estão fechados**; o registro fica porque cada um
-explica por que uma peça do mecanismo tem a forma que tem, e porque um deles pode voltar.
+O levantamento original listou oito. **Os oito estão fechados**; o registro fica porque cada
+um explica por que uma peça do mecanismo tem a forma que tem, e porque alguns podem voltar.
 
 | # | Achado | Estado |
 | --- | --- | --- |
@@ -163,17 +165,20 @@ explica por que uma peça do mecanismo tem a forma que tem, e porque um deles po
 | 4 | Sequestro de conta via `identity_hash` | ✅ fechado — `(tenant_id, identity_hash)` |
 | 5 | `/api/database` apagando o banco de todos | ✅ fechado — só na edição self-hosted |
 | 6 | `secretBox` derivando a chave do `JWT_SECRET` | ✅ fechado — `SECRET_BOX_KEY` + `key_version` |
-| 7 | **Três buracos de SSRF no `deviceService`** | ⚠️ **aberto** — Fase 4 |
+| 7 | Três buracos de SSRF no `deviceService` | ✅ fechado — guarda de egresso com IP fixado |
 | 8 | Obstáculos de schema para as uniques compostas | ✅ fechado ao longo da Fase 1 |
 
-**O achado 7 continua exatamente como estava** e é o mais sério dos que restam, porque a
-Fase 4 vai transformar a URL do GenieACS em dado por provedor — ou seja, em entrada
-controlada pelo cliente. Em `backend/src/services/deviceService.js`: `buildGenieAcsUrl`
-aceita `endpoint` absoluto e **ignora a base configurada**; `fetchGenieAcsCollection`
-devolve o **corpo do erro upstream ao cliente**, o que é um oráculo de leitura; e não há
-`redirect: 'manual'`, então um host permitido pode redirecionar para `127.0.0.1`. Hoje o
-alcance disso é limitado porque a URL é do operador do próprio install. Deixar de ser não
-pode acontecer antes da guarda de egresso.
+**O achado 7 era o mais sério dos oito** e fechou em três partes, na ordem em que tinham de
+fechar. Os três buracos originais — `buildGenieAcsUrl` aceitando `endpoint` absoluto e
+ignorando a base configurada, `fetchGenieAcsCollection` devolvendo o corpo do erro upstream
+ao cliente (um oráculo de leitura), e a ausência de `redirect: 'manual'` — saíram primeiro.
+Depois veio `GenieAcsEgress`: resolução própria, bloqueio das faixas privadas na edição
+hospedada, allowlist de portas, e **conexão ao IP já verificado**, com o hostname ainda no
+`Host` e no SNI. Essa última parte não é zelo: um teste com dois servidores no mesmo porto e
+um resolvedor roteirizado mostrou o rebinding **executando** antes dela.
+
+Só então a URL virou dado por provedor, com credencial — que é o que o achado dizia que não
+podia vir antes. A ordem inversa teria aberto a porta e construído a fechadura depois.
 
 #### Duas garantias que são de construção, não de constraint
 
@@ -384,57 +389,90 @@ contrário, e o endpoint de login aceita os dois formatos por uma release, com a
 
 ---
 
-### Fase 4 — Conectividade GenieACS plugável *(esforço: alto — maior risco técnico)*
+### Fase 4 — Conectividade GenieACS plugável ✅ *(o modo `direct` concluído)*
 
-Como você quer suportar os quatro modos, o certo é abstrair antes de implementar o segundo.
+A abstração veio antes do segundo modo, como o plano pedia — e o que ela revelou é que três
+dos quatro modos são o mesmo transporte, não quatro transportes.
 
-Nova tabela `tenant_genieacs_connections`: `tenant_id`, `mode`
+**`tenant_genieacs_connections`** (migration `0029`, escopada): `tenant_id` único, `mode`
 (`direct`|`agent`|`tunnel`|`hosted`), `base_url`, `auth_type` (`none`|`basic`|`bearer`),
-`username`, segredo cifrado com `createSecretBox('genieacs-nbi')`, `verify_tls`,
-`allow_private_ranges` (só liberável por nós), `status`, `last_check_at`.
+`username`, o segredo cifrado com `createSecretBox('genieacs-nbi')` e sua `key_version`,
+`verify_tls`, `allow_private_ranges`, `status`, `last_check_at` e `last_error`. A migration
+dá a cada provedor existente uma linha com a URL que ele já tinha, em `direct` e sem
+credencial — ou seja, o upgrade não muda nada em como o painel alcança o ACS.
 
-Novo módulo `backend/src/services/genieacs/` com a interface
-`connector.fetch(collection, query, method, body)`; `DeviceService` deixa de montar URL e
-passa a pedir o conector do tenant. Pontos exatos a refatorar em
-`backend/src/services/deviceService.js`: `getGenieAcsUrl` (:112), `getGenieAcsRootUrl` (:117),
-`getDevicesBaseUrl` (:144), `fetchGenieAcsCollection` (:148), `buildGenieAcsUrl` (:189),
-`fetchFromGenieAcs` (:203) — mais `getVirtualParameters` (:133), que passa a ler do
-`settings` já escopado.
+**`backend/src/services/genieacs/`** com `GenieAcsConnector`. Os sete pontos que o plano
+listava em `deviceService.js` deixaram de montar URL e de falar com a guarda de egresso
+diretamente: pedem o conector do provedor, e ele acrescenta o que uma URL crua não carrega —
+o header, a decisão de TLS, a decisão de faixa privada e o teto de concorrência.
+`getGenieAcsUrl` sumiu; `getGenieAcsRootUrl` e `getDevicesBaseUrl` viraram uma linha cada
+sobre o conector; `buildGenieAcsUrl` virou `buildDeviceUrl(connector, …)`, síncrona, porque
+quem já tem o conector não deve resolvê-lo de novo.
 
-**MVP — modo `direct`**, com endurecimento obrigatório (hoje inexistente):
-- Enviar `Authorization` (Basic/Bearer) — o código atual **não manda header nenhum**.
-- **Fechar os três buracos de SSRF já presentes** (achado 7): remover o branch de URL
-  absoluta em `buildGenieAcsUrl` (:183), truncar/omitir o corpo do erro upstream devolvido ao
-  cliente em `fetchGenieAcsCollection` (:158), e definir `redirect: 'manual'` rejeitando 3xx.
-- **Guarda de egresso**: resolver o DNS nós mesmos, **bloquear faixas privadas, loopback,
-  link-local, CGNAT e ULA IPv6**, e então conectar ao **IP resolvido e fixado** enviando o
-  `Host` — só checar se o hostname "parece privado" não fecha DNS rebinding. Mais allowlist
-  de portas e o timeout já existente (15s). Na edição self-hosted a faixa privada continua
-  liberada (é o caso normal lá) — daí o flag por edição.
-- Em produção, rotear todo o egresso ACS por um proxy/NAT dedicado sem acesso à nossa VPC.
-  Além de defesa em profundidade, dá ao provedor um IP fixo para colocar em allowlist — o que
-  é argumento de venda.
-- Botão "testar conexão" já existe (`POST /api/settings/test-genieacs`) e passa a validar
-  também credenciais e alcance.
+Uma diferença deliberada em relação ao plano: a interface é `request(url, options)` +
+`collectionUrl(collection, query)`, não `fetch(collection, query, method, body)`. O conector
+responde **como alcançar**; decodificar a resposta e classificar a falha continua em
+`DeviceService.genieAcsError`, que é onde já estava. Juntar os dois criaria import circular
+e moveria a política de erro para longe de quem a usa.
 
-**Muro de escala que precisa ser resolvido nesta fase.** `refreshDashboardData` →
-`getDashboardDevices()` (`deviceService.js:288`) busca a **coleção inteira de dispositivos** do
-GenieACS, com TTL de 60s e um prewarm no boot (`server.js:37`). Um provedor com 20 mil ONTs já
-é um parse de vários MB por minuto; multiplicado por dezenas de tenants, um processo Node não
-sustenta. Antes do décimo tenant:
-- tirar o refresh do caminho da requisição para um job agendado com **offset por tenant**
-  (hash do id no minuto) e **TTL adaptativo** (60s com operador logado, 5 min ocioso);
-- teto de concorrência de fetch ACS global e por tenant;
-- não atualizar tenants suspensos nem sem login nas últimas 24h;
+**O header `Authorization`, que o painel nunca mandou.** Basic ou Bearer, montado a partir
+da linha do provedor. Era defensável enquanto o NBI ficava no loopback do próprio operador;
+hospedado, um NBI sem autenticação alcançável pelo nosso egresso é a frota inteira de um ISP
+disponível para quem mais o encontrar.
+
+**Onde o segredo NÃO vai.** O botão "testar conexão" recebe a URL no corpo — é o que ele
+serve para fazer — e por isso é a única chamada cuja destinação quem chama nomeia. Mandar a
+senha guardada para lá seria um jeito de lê-la em texto claro: aponte para um servidor seu e
+leia o header. A credencial só viaja quando a origem sob teste é a mesma a que ela pertence.
+`current()` também não devolve o segredo: quem precisa dele pede por nome, para que vazá-lo
+exija um ato deliberado e não um descuido.
+
+**`verify_tls` e `allow_private_ranges` não são do provedor.** São pedidos para enfraquecer
+uma guarda que existe porque a entrada do provedor não é confiável — uma guarda que o
+guardado desliga não é guarda. São nossas, por cliente, e são exatamente o que `tunnel` e
+`hosted` precisam. Na edição self-hosted `allow_private_ranges` não diz nada: lá não há parte
+não confiável, e as faixas nunca são bloqueadas.
+
+**Um modo sem transporte é recusado pelo nome.** `agent` é o ISP discando **para fora** até
+nós; não há nada escutando na `base_url`. Tratado como `direct`, ele alcançaria o que quer
+que responda ali e reportaria a diferença como indisponibilidade.
+
+**O teto de concorrência (item 8 do checklist).** `withAcsSlot` segura uma vaga do provedor
+e uma global, sempre nessa ordem — duas travas tomadas em ordens opostas é o jeito clássico
+de travar o processo. O teto por provedor é o que isola; o global é o que limita sockets e
+heap. Sem eles a falha não é um dashboard lento: é o painel inteiro atrás da frota de um
+provedor só, que é precisamente o vizinho barulhento que a edição hospedada não pode ter.
+Configuráveis por `GENIEACS_MAX_CONCURRENCY` (32) e `GENIEACS_MAX_CONCURRENCY_PER_TENANT` (6).
+
+**Duas fontes para um fato, por enquanto.** A URL vive na linha de conexão e ainda em
+`settings.genieAcsUrl`, que é o campo que a tela edita. A linha ganha quando tem valor;
+salvar o setting escreve na linha, para que as duas não divirjam — e divergir aqui é
+invisível: a tela mostra um ACS e o painel fala com outro. A Fase 6 aposenta o setting e isso
+vira uma leitura só.
+
+#### O que a Fase 4 deixou explicitamente para depois
+
+O **muro de escala** continua de pé, e o teto de concorrência é só a primeira das quatro
+peças. `refreshDashboardData` → `getDashboardDevices()` ainda busca a coleção inteira de
+dispositivos, com TTL de 60 s e prewarm no boot. Antes do décimo provedor faltam:
+
+- tirar o refresh do caminho da requisição para um job agendado com **offset por provedor**
+  (hash do id no minuto) e **TTL adaptativo** (60 s com operador logado, 5 min ocioso);
+- não atualizar provedores suspensos nem sem login nas últimas 24 h;
 - avaliar uma tabela `devices_summary` para o dashboard ler do banco, não do ACS.
 
-**Roadmap dos outros modos** (mesma interface, sem reescrever o `DeviceService`):
-- `agent`: agente instalado no provedor abre WebSocket **de saída** para o SaaS; o conector
-  multiplexa requisição/resposta por cima. Nada exposto na internet — é o modo mais seguro e
-  o que eu recomendaria como padrão comercial depois do MVP.
-- `tunnel`: WireGuard/Cloudflare Tunnel — reutiliza o conector `direct` com
-  `allow_private_ranges` ligado. Custo é operacional (setup manual por cliente), não de código.
-- `hosted`: nós provisionamos o GenieACS; o conector `direct` aponta para a nossa rede interna.
+**Roadmap dos outros modos**, agora atrás da mesma interface e sem tocar no `DeviceService`:
+
+- `agent`: agente no provedor abre WebSocket **de saída**; o conector multiplexa
+  requisição/resposta por cima. Nada exposto na internet — é o modo mais seguro e o que eu
+  recomendaria como padrão comercial depois do MVP. É o único que precisa de transporte novo.
+- `tunnel`: WireGuard/Cloudflare Tunnel — **já funciona**, é `direct` com
+  `allow_private_ranges` ligado. O custo é operacional (setup por cliente), não de código.
+- `hosted`: nós provisionamos o GenieACS; **já funciona** pelo mesmo caminho.
+
+**Em produção**, rotear o egresso ACS por um proxy/NAT dedicado sem acesso à nossa VPC.
+Defesa em profundidade, e dá ao provedor um IP fixo para colocar em allowlist — argumento de
+venda. Continua sendo trabalho de infraestrutura, não de código.
 
 ---
 
@@ -587,30 +625,28 @@ quanto menos tempo um PR fica aberto, menos tempo ele tem para colidir.
 ## Dimensionamento
 
 Os arquivos que concentram o trabalho **restante**, por tamanho atual:
-`backend/src/services/deviceService.js` (Fase 4 — conector e as três correções de SSRF),
-`frontend/src/pages/settings.tsx` (Fases 5/6/7),
-`frontend/src/pages/customer-portal.tsx` (Fase 2),
-`backend/src/middleware/tenantResolver.js` (Fase 3 — é uma função só).
+`frontend/src/pages/settings.tsx` (Fases 5/6/7) e o que a Fase 5 ainda não tem arquivo para
+citar — planos, assinaturas e o console da plataforma.
 
-Os 27 models já estão convertidos; aquele trabalho, que era o volume da Fase 1, acabou.
+Os 27 models já estão convertidos; aquele trabalho, que era o volume da Fase 1, acabou. O
+`deviceService.js`, que era o outro grande, saiu na Fase 4: as sete funções que montavam URL
+viraram chamadas ao conector.
 
 ## Ordem recomendada de entrega
 
 Original: Fase 0 → 1 → 2 → 3 → 8 → 4 → 5 → 6 → 7.
 **Percorrido:** 0 ✅ → 1 ✅ → 2 (espinha) → 8 (boa parte).
 
-**Daqui em diante, e a ordem importa:**
+**Percorrido desde então, na ordem em que foi feito:** Fase 3 (subdomínio) → resto da
+Fase 2 (cookie host-only, provedor no payload do portal, rate limit por provedor) → Fase 8
+(sentinela de SQL e os testes que o host tornou possíveis) → Fase 4 (as três correções de
+SSRF e a guarda de egresso **antes** de a URL virar dado do cliente, depois o conector).
 
-1. **Fase 3 — subdomínio.** É a menor peça restante e a que destrava mais coisa: sem ela,
-   os itens de vazamento que dependem de host (cookie replayado, token de A no host de B)
-   não podem sequer ser testados, e o portal continua resolvendo o primeiro provedor. O
-   `tenantResolver` foi escrito para que a troca seja de uma função.
-2. **O resto da Fase 2**, já com host: cookie host-only, `tenantId` no payload do portal,
-   rate limit por provedor, convite por e-mail.
-3. **Fechar a Fase 8** com os testes que passam a ser possíveis, e a sentinela de SQL.
-4. **Fase 4 — conector**, começando pelas três correções de SSRF e pela guarda de egresso,
-   **antes** de a URL virar dado do cliente.
-5. Fases 5 → 6 → 7.
+A ordem importava e se pagou: cada uma dessas fases só pôde ser testada de verdade porque a
+anterior já estava lá.
+
+**O que resta:** Fases 5 → 6 → 7 — planos e limites, o frontend, e a operação
+(`audit_log`, exportação por provedor).
 
 Vale repetir o que o plano dizia e que se confirmou: a Fase 1 saiu para os installs
 self-hosted como upgrade normal, e o código de tenancy rodou em produção real com um
@@ -620,32 +656,33 @@ edições de divergirem.
 
 ### Checklist antes de vender acesso ao segundo provedor
 
-Nada disso é negociável. **Sete dos doze estão cumpridos.**
+Nada disso é negociável. **Dez dos doze estão cumpridos.**
 
 | | Item | Estado |
 | --- | --- | --- |
 | 1 | Toda tabela de provedor: `tenant_id NOT NULL`, FK, uniques começando por `tenant_id` | ✅ |
 | 2 | Nenhum código alcança tabela de provedor sem contexto (`currentTenantId()` lança, guarda estática no CI) | ✅ |
-| 3 | Login e sessão do portal escopados por provedor | ⚠️ a busca sim; o cookie e o payload não (Fases 2/3) |
+| 3 | Login e sessão do portal escopados por provedor | ✅ a busca por `tdb`, o cookie host-only, o provedor no payload assinado |
 | 4 | Caches em memória e `app_state.dashboard_snapshot` separados por provedor | ✅ |
-| 5 | JWT do operador e do assinante carregam o provedor e são conferidos contra o host | ⚠️ o do operador carrega; a conferência contra o host é Fase 3 |
-| 6 | Credenciais ACS por provedor, cifradas, guarda de egresso, branch de URL absoluta removido | ❌ Fase 4 |
+| 5 | JWT do operador e do assinante carregam o provedor e são conferidos contra o host | ✅ `tokenMatchesHost` responde 403 `tenant_mismatch` |
+| 6 | Credenciais ACS por provedor, cifradas, guarda de egresso, branch de URL absoluta removido | ✅ `tenant_genieacs_connections` + `GenieAcsEgress` + conector |
 | 7 | `/api/database` não montada na edição SaaS | ✅ |
-| 8 | Rate limit e concorrência de fetch ACS chaveados por provedor | ❌ Fases 2/4 |
-| 9 | Suíte de vazamento verde no CI e obrigatória para merge | ✅ 937 testes, três dialetos |
+| 8 | Rate limit e concorrência de fetch ACS chaveados por provedor | ✅ `tenantIpKey` no limite, `withAcsSlot` no fetch |
+| 9 | Suíte de vazamento verde no CI e obrigatória para merge | ✅ 1101 testes, três dialetos |
 | 10 | `SECRET_BOX_KEY` separada do `JWT_SECRET`, com `key_version` | ✅ |
 | 11 | `audit_log` registrando ações sensíveis | ❌ Fase 7 |
 | 12 | Exportação por provedor funcionando (LGPD e "apaguei tudo, socorro") | ❌ Fase 7 |
 
-Os cinco que faltam concentram-se em **subdomínio (3)**, **conector GenieACS (6, 8)** e
-**operação (11, 12)**. Nenhum deles é do mecanismo de isolamento de dados, que é o que a
-Fase 1 entregou.
+Os dois que faltam são de **operação (11, 12)** — registro de ações sensíveis e exportação
+por provedor. Nenhum dos dois é do mecanismo de isolamento de dados, e nenhum dos dois
+impede o segundo provedor de existir; o que eles impedem é operar com dezenas deles sem
+saber quem leu o quê, e atender um pedido de LGPD sem escrever SQL à mão.
 
 ## Verificação
 
 ```bash
 npm run verify          # check backend + testes + lint + typecheck + build (raiz)
-cd backend && npm test  # 937 testes, incluindo as 14 suítes de tenancy
+cd backend && npm test  # 1101 testes, incluindo as suítes de tenancy
 ```
 
 A suíte roda nos três dialetos, e **isso não é zelo**: cada uma das armadilhas abaixo passou

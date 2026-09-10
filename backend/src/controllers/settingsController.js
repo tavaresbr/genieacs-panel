@@ -3,7 +3,13 @@ import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { translateError } from '../i18n/index.js';
 import CustomerService from '../services/customerService.js';
 import DeviceService from '../services/deviceService.js';
-import GenieAcsEgress, { EGRESS_REFUSED } from '../services/genieacsEgress.js';
+import { EGRESS_REFUSED } from '../services/genieacsEgress.js';
+import {
+  connectorForTestUrl,
+  syncBaseUrlFromSetting,
+  CONNECTOR_UNCONFIGURED
+} from '../services/genieacs/connector.js';
+import GenieAcsConnection from '../models/GenieAcsConnection.js';
 import CustomerAccount from '../models/CustomerAccount.js';
 
 const ALLOWED_SETTING_KEYS = new Set([
@@ -115,6 +121,7 @@ class SettingsController {
       }
 
       await Setting.create(key, validated.value);
+      await syncBaseUrlFromSetting(key, validated.value);
       return res.json(
         createResponse(req.t('settings.created'), { [key]: validated.value })
       );
@@ -149,6 +156,8 @@ class SettingsController {
           createErrorResponse(req.t('settings.notFound'))
         );
       }
+
+      await syncBaseUrlFromSetting(key, validated.value);
 
       return res.json(
         createResponse(req.t('settings.updated'), { [key]: validated.value })
@@ -279,8 +288,20 @@ class SettingsController {
         // GenieACS call whose destination is named by the caller rather than by
         // stored settings. It goes through the same guard as every other, or
         // the "test connection" button is a probe for anything our network can
-        // reach that the configured URL is not allowed to be.
-        const response = await GenieAcsEgress.fetch(testUrl, {
+        // reach that the configured URL is not allowed to be — and through the
+        // provider's connector, so that testing the address already configured
+        // also tests the credential it is reached with. `connectorForTestUrl`
+        // is what decides whether the credential travels; it does not, to an
+        // address that is not the one it belongs to.
+        const {
+          connector, credentialsSent, describesStoredConnection
+        } = await connectorForTestUrl(testUrl);
+        const record = (status, detail) => (
+          describesStoredConnection
+            ? GenieAcsConnection.recordCheck(status, detail)
+            : Promise.resolve(false)
+        );
+        const response = await connector.request(testUrl, {
           method: 'GET',
           headers: {
             'Accept': 'application/json',
@@ -291,6 +312,19 @@ class SettingsController {
         clearTimeout(timeoutId);
         
         if (!response.ok) {
+          // 401/403 with the credential attached is a wrong credential, not an
+          // unreachable ACS, and the operator has to be able to tell those
+          // apart — the panel would otherwise report "GenieACS is down" for a
+          // password they can fix in the next field.
+          await record('error', `HTTP ${response.status}`);
+          if (credentialsSent && [401, 403].includes(response.status)) {
+            return res.status(502).json(
+              createErrorResponse(
+                req.t('settings.connectionStatus', { status: response.status }),
+                req.t('settings.connectionUnauthorized')
+              )
+            );
+          }
           return res.status(502).json(
             createErrorResponse(
               req.t('settings.connectionStatus', { status: response.status }),
@@ -302,6 +336,7 @@ class SettingsController {
         const data = await response.json();
         
         if (Array.isArray(data)) {
+          await record('ok');
           return res.json(
             createResponse(req.t('settings.connectionSuccess'), {
               deviceCount: data.length
@@ -317,7 +352,9 @@ class SettingsController {
         
         // A refused address is the operator's own misconfiguration, not an
         // upstream outage, so it answers 400 with the reason rather than 502.
-        if (error.code === EGRESS_REFUSED) {
+        await record('error', error.code || error.name || 'failed');
+
+        if (error.code === EGRESS_REFUSED || error.code === CONNECTOR_UNCONFIGURED) {
           return res.status(400).json(
             createErrorResponse(req.t('settings.urlEgressRefused'), error.message)
           );

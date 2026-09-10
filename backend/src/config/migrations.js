@@ -738,6 +738,71 @@ const DEVICE_SWAP_TABLES = [
   ['device_swaps', deviceSwapsTable]
 ];
 
+/**
+ * How the panel reaches ONE provider's GenieACS.
+ *
+ * Until now this was a single string in `settings` — `genieAcsUrl` — and no
+ * credential travelled with it at all, because the NBI was assumed to sit on
+ * the operator's own loopback. Hosted, neither half of that holds: the URL is
+ * customer-supplied data, and an NBI that a customer points us at across the
+ * internet has to be authenticated or anyone who finds it owns their fleet.
+ *
+ * `mode` exists now, with only `direct` implemented, because the shape of the
+ * other three is what decides whether this table is right — `agent` (the ISP
+ * dials out to us over a WebSocket), `tunnel` (WireGuard, so `direct` again but
+ * into a private range) and `hosted` (the ACS is ours). All three reuse the
+ * same row; adding them changes the transport, not the schema. A mode that is
+ * not built is refused by name rather than silently treated as `direct`.
+ *
+ * `verify_tls` and `allow_private_ranges` are deliberately NOT settable by the
+ * provider on the hosted edition: both are asks to weaken a guard that exists
+ * because the provider's own input cannot be trusted, so letting the provider
+ * turn them off would make the guard decorative. They are ours to set, per
+ * customer, once we know what we are pointing at — which is exactly what
+ * `tunnel` and `hosted` need. On self-hosted, `allow_private_ranges` says
+ * nothing at all: there is no untrusted party, so the address classes are never
+ * blocked there in the first place.
+ */
+const tenantGenieacsConnectionsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  // 'direct' | 'agent' | 'tunnel' | 'hosted'.
+  t.string('mode', 16).notNullable().defaultTo('direct');
+  // Empty means "not configured yet", which is what a brand new provider has
+  // and what every read has to survive: the panel boots, the dashboard says so,
+  // and nothing throws until someone actually asks for a device.
+  t.string('base_url', 255);
+  // 'none' | 'basic' | 'bearer'.
+  t.string('auth_type', 16).notNullable().defaultTo('none');
+  t.string('username', 128);
+  // The NBI password or bearer token, under `createSecretBox('genieacs-nbi')`.
+  // Its own context string, so a ciphertext from here can never be read back as
+  // an Evolution token or a subscriber's WiFi password.
+  t.text('secret_ciphertext');
+  t.string('secret_iv', 32);
+  t.string('secret_tag', 32);
+  t.integer('secret_key_version');
+  t.boolean('verify_tls').notNullable().defaultTo(true);
+  t.boolean('allow_private_ranges').notNullable().defaultTo(false);
+  // 'unknown' | 'ok' | 'error' — what the last reachability check concluded.
+  t.string('status', 16).notNullable().defaultTo('unknown');
+  t.timestamp('last_check_at');
+  // Why it failed, for the screen. Never the upstream body: that is written by
+  // whatever answers at a customer-named URL, and storing it would put a read
+  // oracle in the database instead of in the response.
+  t.string('last_error', 255);
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  t.timestamp('updated_at').defaultTo(db.fn.now());
+  // One ACS per provider. Several would mean every call site has to say which,
+  // and nothing in the panel has a second one to name.
+  t.unique(['tenant_id']);
+};
+
+const GENIEACS_CONNECTION_TABLES = [
+  ['tenant_genieacs_connections', tenantGenieacsConnectionsTable]
+];
+
 const TENANCY_TABLES = [
   ['tenants', tenantsTable]
 ];
@@ -782,7 +847,8 @@ export const SCHEMA_TABLES = [
   ...PROVISIONING_TABLES,
   ...WHATSAPP_TABLES,
   ...DEVICE_HISTORY_TABLES,
-  ...DEVICE_SWAP_TABLES
+  ...DEVICE_SWAP_TABLES,
+  ...GENIEACS_CONNECTION_TABLES
 ].map(([name]) => name);
 
 /**
@@ -1844,7 +1910,71 @@ export const migrations = [
         }));
       if (rows.length > 0) await db('tenant_users').insert(rows);
     }
+  },
+  {
+    /**
+     * Where the provider's GenieACS is, and how to authenticate to it.
+     *
+     * The base URL has been per-provider since 0014 — it is a `settings` row,
+     * and `settings` is scoped. What it has never had is a credential, or any
+     * say over the egress guard, and those are what turn "one operator's own
+     * loopback NBI" into "a URL a customer typed". So the connection stops
+     * being one string among the screen's settings and becomes a row of its
+     * own, with the fields that decide how the socket is opened.
+     *
+     * The backfill gives every existing provider a row carrying the URL it
+     * already had, in `direct` mode with no credential — which is exactly the
+     * behaviour it has today, so an upgrade changes nothing about how the
+     * panel reaches the ACS. `settings.genieAcsUrl` keeps its value and stays
+     * the field the settings screen edits until the frontend of phase 6 moves
+     * it; saving it writes through to `base_url` so the two cannot drift, and
+     * `GenieAcsConnection.current()` falls back to it when `base_url` is empty.
+     */
+    id: '0029_tenant_genieacs_connections',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return false;
+      return db.schema.hasTable('tenant_genieacs_connections');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      await createTableIfMissing(
+        db,
+        'tenant_genieacs_connections',
+        tenantGenieacsConnectionsTable(db)
+      );
+
+      const tenants = await db('tenants').pluck('id');
+      if (tenants.length === 0) return;
+
+      // A provider with no `genieAcsUrl` row still gets a connection, because
+      // "not configured" is a state the panel has to be able to show, and an
+      // absent row would be indistinguishable from a provider created before
+      // this step.
+      const configured = new Map();
+      if (await db.schema.hasTable('settings')) {
+        const rows = await db('settings')
+          .where({ key: 'genieAcsUrl' })
+          .select('tenant_id', 'value');
+        for (const row of rows) {
+          if (row.value) configured.set(Number(row.tenant_id), row.value);
+        }
+      }
+
+      const already = new Set(
+        (await db('tenant_genieacs_connections').pluck('tenant_id')).map(Number)
+      );
+      const rows = tenants
+        .filter((id) => !already.has(Number(id)))
+        .map((id) => ({
+          tenant_id: id,
+          mode: 'direct',
+          base_url: configured.get(Number(id)) || null,
+          auth_type: 'none'
+        }));
+      if (rows.length > 0) await db('tenant_genieacs_connections').insert(rows);
+    }
   }
 ];
+
 
 export default migrations;

@@ -132,6 +132,7 @@ export default {
   'settings.connectionFailed': 'Не удалось подключиться к серверу GenieACS',
   'settings.connectionStatus': 'Сервер GenieACS вернул код состояния {status}',
   'settings.connectionTestFailed': 'Проверка подключения не удалась',
+  'settings.connectionUnauthorized': 'GenieACS отклонил учётные данные этого подключения',
   'settings.customerIdSyncDisabled': 'Автоматическое создание идентификаторов клиентов отключено',
   'settings.customerIdSynced': 'Идентификаторы клиентов синхронизированы',
   'settings.customerIdSyncedPending': 'Идентификаторы клиентов синхронизированы; для {count} устройств(а) всё ещё нужны SoftwareID, PPPoE или дата установки',

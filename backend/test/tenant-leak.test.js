@@ -28,6 +28,7 @@ const { default: WaAlertService } = await import('../src/services/waAlertService
 const { default: DeviceService } = await import('../src/services/deviceService.js');
 const { default: Setting } = await import('../src/models/Setting.js');
 const { default: AppState } = await import('../src/models/AppState.js');
+const { default: GenieAcsConnection } = await import('../src/models/GenieAcsConnection.js');
 
 /**
  * The phase's actual proof.
@@ -532,5 +533,96 @@ describe('the caches a provider reads its own configuration from', () => {
 
     await runInTenant(beta, () => DeviceService.invalidateDashboard());
     assert.ok(alfaCache.expiresAt > Date.now(), 'and its entry is untouched by the other');
+  });
+});
+
+describe('where each provider\'s ACS is, and the credential for it', () => {
+  const ALFA_URL = 'http://acs.alfa.test:7557';
+  const BETA_URL = 'http://acs.beta.test:7557';
+  const ALFA_SECRET = 'nbi-do-alfa-9f2a';
+  const BETA_SECRET = 'nbi-do-beta-4c7e';
+
+  /** The row as the database holds it, provider and all — never through a model. */
+  const rawConnection = (tenantId) => getDb()('tenant_genieacs_connections')
+    .where({ tenant_id: tenantId })
+    .first();
+
+  before(async () => {
+    for (const [tenant, baseUrl, username, secret] of [
+      [alfa, ALFA_URL, 'nbi-alfa', ALFA_SECRET],
+      [beta, BETA_URL, 'nbi-beta', BETA_SECRET]
+    ]) {
+      await runInTenant(tenant, () => GenieAcsConnection.save({
+        base_url: baseUrl, auth_type: 'basic', username, secret
+      }));
+    }
+  });
+
+  it('gives each provider a connection row of its own', async () => {
+    const rows = await getDb()('tenant_genieacs_connections');
+    assert.equal(rows.length, 2, 'the second save must add a row, not overwrite the first');
+    assert.equal((await rawConnection(alfa)).base_url, ALFA_URL);
+    assert.equal((await rawConnection(beta)).base_url, BETA_URL);
+  });
+
+  // Reading the wrong row here does not point the panel at a wrong screen: it
+  // points one ISP's provisioning, reboots and WiFi writes at another ISP's
+  // fleet, using that ISP's own NBI.
+  it('shows each provider only its own ACS', async () => {
+    const theirs = await runInTenant(alfa, () => GenieAcsConnection.current());
+    const mine = await runInTenant(beta, () => GenieAcsConnection.current());
+
+    assert.equal(theirs.base_url, ALFA_URL);
+    assert.equal(mine.base_url, BETA_URL);
+    assert.equal(theirs.username, 'nbi-alfa');
+    assert.equal(mine.username, 'nbi-beta');
+
+    for (const [tenant, expected] of [[alfa, alfa], [beta, beta]]) {
+      const row = await runInTenant(tenant, () => GenieAcsConnection.row());
+      assert.equal(Number(row.tenant_id), Number(expected));
+    }
+  });
+
+  // The one that matters. Everything else scoped so far leaks a record ABOUT
+  // somebody's subscribers; this column is the key to their whole fleet, so a
+  // cross-provider read is not an exposure, it is a handover.
+  it('does not hand one provider the other\'s NBI credential', async () => {
+    assert.equal(await runInTenant(alfa, () => GenieAcsConnection.secret()), ALFA_SECRET);
+    assert.equal(await runInTenant(beta, () => GenieAcsConnection.secret()), BETA_SECRET);
+
+    // Not the plaintext only: the ciphertext, IV and tag are enough to replay
+    // the credential anywhere the same key is loaded, so the stored columns
+    // themselves have to be out of reach.
+    const stored = await rawConnection(beta);
+    const reached = await runInTenant(alfa, () => GenieAcsConnection.row());
+    for (const column of ['secret_ciphertext', 'secret_iv', 'secret_tag']) {
+      assert.ok(stored[column], `expected the other provider's ${column} to be stored`);
+      assert.notEqual(reached[column], stored[column], column);
+    }
+  });
+
+  // `save` updates without naming a row — one provider per row is the whole
+  // where clause. Unscoped it would rewrite every provider's ACS at once, and
+  // an operator changing their own URL would silently re-point everyone else.
+  it('does not let one provider overwrite the other\'s connection', async () => {
+    await runInTenant(beta, () => GenieAcsConnection.save({
+      base_url: 'http://acs.beta.test:9999', secret: 'nbi-do-beta-rotacionado'
+    }));
+
+    const theirs = await runInTenant(alfa, () => GenieAcsConnection.current());
+    assert.equal(theirs.base_url, ALFA_URL, 'the other provider still knows where its ACS is');
+    assert.equal(await runInTenant(alfa, () => GenieAcsConnection.secret()), ALFA_SECRET,
+      'and its credential was not rotated out from under it');
+  });
+
+  // The reachability check writes through the same path, so an unscoped one
+  // would mark every provider's ACS unreachable because one of them is.
+  it('does not let one provider\'s failed check mark the other\'s ACS down', async () => {
+    await runInTenant(beta, () => GenieAcsConnection.recordCheck('error', 'connect ECONNREFUSED'));
+
+    const theirs = await runInTenant(alfa, () => GenieAcsConnection.current());
+    assert.equal(theirs.status, 'unknown');
+    assert.equal(theirs.last_error, null);
+    assert.equal((await runInTenant(beta, () => GenieAcsConnection.current())).status, 'error');
   });
 });

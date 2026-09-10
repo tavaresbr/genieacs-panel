@@ -67,7 +67,10 @@ afterEach(() => {
 
 describe('the endpoint cannot choose the host', () => {
   it('builds an absolute endpoint under the configured base instead of obeying it', async () => {
-    const url = await asTenant(() => DeviceService.buildGenieAcsUrl(`${internal.url}/latest/meta-data`));
+    const url = await asTenant(async () => DeviceService.buildDeviceUrl(
+      await DeviceService.connector(),
+      `${internal.url}/latest/meta-data`
+    ));
 
     assert.equal(url.origin, new URL(genie.url).origin);
     assert.ok(url.pathname.startsWith('/devices/'), `unexpected path: ${url.pathname}`);

@@ -93,7 +93,12 @@ export const SCOPED_TABLES = new Set([
   // alone would leave a destructive write reaching across providers.
   'vendors',
   'wifi_security_mappings',
-  'wifi_security_config'
+  'wifi_security_config',
+  // Where this provider's GenieACS is, and the credential for it. Scoped from
+  // the step that creates it: it holds an encrypted NBI password, and reading
+  // another provider's row would not leak a record about their subscribers, it
+  // would hand over the key to their whole fleet.
+  'tenant_genieacs_connections'
 ]);
 
 /** Tables that belong to the deployment rather than to any one provider. */

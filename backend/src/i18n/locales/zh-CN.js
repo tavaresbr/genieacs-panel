@@ -132,6 +132,7 @@ export default {
   'settings.connectionFailed': '无法连接到 GenieACS 服务',
   'settings.connectionStatus': 'GenieACS 服务返回状态码 {status}',
   'settings.connectionTestFailed': '连接测试失败',
+  'settings.connectionUnauthorized': 'GenieACS 拒绝了此连接的凭据',
   'settings.customerIdSyncDisabled': '客户 ID 自动生成已关闭',
   'settings.customerIdSynced': '客户 ID 已同步',
   'settings.customerIdSyncedPending': '客户 ID 已同步；仍有 {count} 台设备缺少 SoftwareID、PPPoE 或安装日期',
