@@ -1,6 +1,8 @@
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 import TenantUser from '../models/TenantUser.js';
+import PlatformAdmin from '../models/PlatformAdmin.js';
+import { IS_SAAS } from '../config/edition.js';
 import { generateTokens, resolveMembership, verifyToken } from '../middleware/auth.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 
@@ -39,6 +41,34 @@ async function membershipForLogin(userId, requestedTenantId) {
   }
   const memberships = await TenantUser.listForUser(userId);
   return memberships[0] || null;
+}
+
+/**
+ * Whether this session also holds the control plane.
+ *
+ * Reported to the panel so it can decide whether to show the providers screen
+ * at all. It has to be its own field because there is no role that implies it:
+ * a provider's own administrator is `admin` too, so gating the screen on the
+ * role would put a link in front of most of the panel's administrators pointing
+ * at routes that answer them as if they did not exist.
+ *
+ * Read from `platform_admins` at request time, exactly as `requirePlatformAdmin`
+ * reads it, and deliberately NOT carried in the token. It is a claim of record
+ * — what to draw — and never authority: the guard re-reads the table anyway, so
+ * a stale `true` here shows somebody a menu entry whose routes then refuse
+ * them, which is a wrong screen rather than a breach. Putting it in the token
+ * would make it look like the answer, and a claim nobody trusts is one somebody
+ * eventually trusts by mistake.
+ *
+ * Always false on self-hosted, where there is no control plane to hold. That
+ * lets the panel hide the screen without knowing which edition it is talking
+ * to, and it means a stray roster row — an install that ran the grant script
+ * and later moved to the self-hosted edition — cannot light up a menu whose
+ * routes are not mounted.
+ */
+async function holdsControlPlane(userId) {
+  if (!IS_SAAS) return false;
+  return PlatformAdmin.has(userId);
 }
 
 class AuthController {
@@ -108,6 +138,7 @@ class AuthController {
             // administrator they are not, here.
             role: membership.role,
             tenantId: Number(membership.tenant_id),
+            isPlatformAdmin: await holdsControlPlane(user.id),
             createdAt: user.created_at,
             updatedAt: user.updated_at
           },
@@ -175,7 +206,16 @@ class AuthController {
 
       return res.status(201).json(
         createResponse(req.t('auth.adminCreated'), {
-          user: { id: userId, username: normalizedUsername, role, tenantId },
+          user: {
+            id: userId,
+            username: normalizedUsername,
+            role,
+            tenantId,
+            // Read back rather than assumed from the edition: setup is the one
+            // place that WRITES the roster row, and the panel walks straight
+            // into the session from here without asking again.
+            isPlatformAdmin: await holdsControlPlane(userId)
+          },
           token: accessToken,
           refreshToken
         })
@@ -214,6 +254,7 @@ class AuthController {
           // not what this session is authorised with.
           role: req.user.role,
           tenantId: req.user.tenantId,
+          isPlatformAdmin: await holdsControlPlane(user.id),
           createdAt: user.created_at,
           updatedAt: user.updated_at
         })
