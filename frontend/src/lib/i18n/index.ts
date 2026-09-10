@@ -20,9 +20,11 @@ type LazyLocale = Exclude<Locale, 'en'>
 const loaded: Partial<Record<Locale, Dictionary>> = { en }
 
 const loaders: Record<LazyLocale, () => Promise<{ default: Dictionary }>> = {
+  ar: () => import('@/lib/i18n/locales/ar'),
   de: () => import('@/lib/i18n/locales/de'),
   es: () => import('@/lib/i18n/locales/es'),
   fr: () => import('@/lib/i18n/locales/fr'),
+  hi: () => import('@/lib/i18n/locales/hi'),
   it: () => import('@/lib/i18n/locales/it'),
   ja: () => import('@/lib/i18n/locales/ja'),
   ko: () => import('@/lib/i18n/locales/ko'),

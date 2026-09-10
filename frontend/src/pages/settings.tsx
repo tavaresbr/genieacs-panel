@@ -1122,7 +1122,7 @@ export default function Settings() {
                   <p className="field-hint">{t('settings.general.urlHint', { path: '/devices' })}</p>
                   {genieTestGoesAnonymous && (
                     <p className="mt-2 rounded-md border border-[hsl(var(--warning)/0.35)] bg-[hsl(var(--warning)/0.08)] p-3 text-sm text-foreground">
-                      <Icon name="warning" size={16} className="mr-2 inline align-[-3px]" />
+                      <Icon name="warning" size={16} className="me-2 inline align-[-3px]" />
                       {t('settings.genieAuth.anonymousTestWarning')}
                     </p>
                   )}
@@ -1241,10 +1241,10 @@ export default function Settings() {
                     : 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-800'
                 }`}>
                   <div className="flex items-center">
-                    <Icon name={testResult.success ? 'check' : 'x'} size={18} className="mr-2" />
+                    <Icon name={testResult.success ? 'check' : 'x'} size={18} className="me-2" />
                     <span className="font-medium">{testResult.message}</span>
                     {testResult.deviceCount && (
-                      <span className="ml-2 text-sm">
+                      <span className="ms-2 text-sm">
                         {t('settings.general.devicesFound', { count: testResult.deviceCount })}
                       </span>
                     )}
@@ -1597,7 +1597,7 @@ export default function Settings() {
                   : 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-800'
               }`}>
                 <div className="flex items-center">
-                  <Icon name={sgpTestResult.success ? 'check' : 'x'} size={18} className="mr-2" />
+                  <Icon name={sgpTestResult.success ? 'check' : 'x'} size={18} className="me-2" />
                   <span className="font-medium">{sgpTestResult.message}</span>
                 </div>
               </div>
@@ -1642,7 +1642,7 @@ export default function Settings() {
                   disabled={sgpSyncing}
                   className="modern-button-secondary mt-4"
                 >
-                  <Icon name="refresh" size={16} className={`mr-2 ${sgpSyncing ? 'animate-spin' : ''}`} />
+                  <Icon name="refresh" size={16} className={`me-2 ${sgpSyncing ? 'animate-spin' : ''}`} />
                   {sgpSyncing ? t('settings.sgp.syncing') : t('settings.sgp.syncAll')}
                 </button>
                 {sgpSyncSummary ? (
@@ -2098,7 +2098,7 @@ export default function Settings() {
                                 <td className="font-medium">
                                   {operator.username}
                                   {isSelf && (
-                                    <span className="modern-badge ml-2">{t('settings.operators.you')}</span>
+                                    <span className="modern-badge ms-2">{t('settings.operators.you')}</span>
                                   )}
                                 </td>
                                 <td>

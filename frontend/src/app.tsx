@@ -10,7 +10,7 @@ import { LanguageProvider, useTranslation } from '@/contexts/language-context'
 import { SubscriptionNotice } from '@/components/subscription-notice'
 import { TenantProvider, useTenant } from '@/contexts/tenant-context'
 import { settingsAPI } from '@/lib/api'
-import { onboardingDismissKey } from '@/pages/onboarding'
+import { onboardingDismissKey } from '@/lib/onboarding'
 import type { Permission } from '@/lib/permissions'
 
 const DashboardPage = lazy(() => import('@/pages/dashboard'))

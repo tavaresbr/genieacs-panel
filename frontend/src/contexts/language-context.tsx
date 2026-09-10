@@ -7,6 +7,7 @@ import {
   LOCALE_METADATA,
   LOCALES,
   detectLocale,
+  getDirection,
   isDictionaryLoaded,
   isLocale,
   loadDictionary,
@@ -85,9 +86,11 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     return () => { cancelled = true }
   }, [requestedLocale])
 
-  // Keep `<html lang>` and the non-React formatters in `lib/utils` in sync.
+  // Keep `<html lang>`, `<html dir>` and the non-React formatters in `lib/utils`
+  // in sync. The direction drives every logical Tailwind utility in the app.
   useEffect(() => {
     document.documentElement.lang = locale
+    document.documentElement.dir = getDirection(locale)
     setActiveLocale(locale)
   }, [locale])
 

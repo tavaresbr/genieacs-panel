@@ -7,6 +7,7 @@ import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import { useTenant } from '@/contexts/tenant-context'
+import { onboardingDismissKey } from '@/lib/onboarding'
 
 /**
  * The first minutes of a provider that just signed up: what it is called and
@@ -20,7 +21,6 @@ import { useTenant } from '@/contexts/tenant-context'
  * is remembered per provider in the browser: an operator who wants to set
  * things up from the settings page is not nagged into a wizard.
  */
-export const onboardingDismissKey = (slug: string) => `onboarding:dismissed:${slug}`
 
 type Step = 'identity' | 'acs' | 'team'
 const STEPS: Step[] = ['identity', 'acs', 'team']

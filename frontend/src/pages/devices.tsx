@@ -344,12 +344,12 @@ export default function DevicesPage() {
               <div>
                 <label htmlFor="device-search" className="field-label">{t('devices.filter.searchLabel')}</label>
                 <div className="relative">
-                  <Icon name="search" size={18} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <Icon name="search" size={18} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                   <input
                     id="device-search"
                     type="search"
                     placeholder={t('devices.filter.searchPlaceholder')}
-                    className="modern-input pl-10"
+                    className="modern-input ps-10"
                     value={searchInput}
                     onChange={(event) => setSearchInput(event.target.value)}
                   />
@@ -360,7 +360,7 @@ export default function DevicesPage() {
                 <div className="relative">
                   <select
                     id="device-status"
-                    className="modern-input appearance-none pr-10"
+                    className="modern-input appearance-none pe-10"
                     value={filterStatus}
                     onChange={(event) => {
                       setFilterStatus(event.target.value as DeviceStatusFilter)
@@ -371,21 +371,21 @@ export default function DevicesPage() {
                     <option value="online">{t('devices.filter.onlineOnly')}</option>
                     <option value="offline">{t('devices.filter.offlineOnly')}</option>
                   </select>
-                  <Icon name="chevron-down" size={17} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <Icon name="chevron-down" size={17} className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 </div>
               </div>
               {sgpAvailable && (
                 <div>
                   <label htmlFor="device-sgp" className="field-label">{t('devices.sgp.filterLabel')}</label>
                   <div className="relative">
-                    <select id="device-sgp" className="modern-input appearance-none pr-10" value={filterSgp} onChange={(event) => setFilterSgp(event.target.value as SgpFilter)}>
+                    <select id="device-sgp" className="modern-input appearance-none pe-10" value={filterSgp} onChange={(event) => setFilterSgp(event.target.value as SgpFilter)}>
                       <option value="all">{t('devices.sgp.filterAll')}</option>
                       <option value="active">{t('devices.sgp.filterActive')}</option>
                       <option value="blocked">{t('devices.sgp.filterBlocked')}</option>
                       <option value="cancelled">{t('devices.sgp.filterCancelled')}</option>
                       <option value="unlinked">{t('devices.sgp.filterUnlinked')}</option>
                     </select>
-                    <Icon name="chevron-down" size={17} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <Icon name="chevron-down" size={17} className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                   </div>
                 </div>
               )}

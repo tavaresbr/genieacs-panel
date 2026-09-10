@@ -376,6 +376,7 @@ export default {
   'sgp.error.urlInvalid': '有効な SGP の URL を入力してください (https://provider.sgp.net.br)',
   'sgp.error.urlScheme': 'SGP の URL は HTTP または HTTPS を使用してください',
   'sgp.error.urlCredentials': 'SGP の URL にユーザーやパスワードを含めないでください',
+  'sgp.error.blockedHost': 'SGP の URL は、このインストールから到達できないアドレスを指しています',
   'sgp.error.pathsRelative': 'SGP の API のパスは /api/ura/titulos/ のような相対パスで指定してください',
   'sgp.error.configIncomplete': '連携を有効にする前に、SGP の URL、アプリ、トークンを入力してください',
   'sgp.error.notConfigured': 'SGP 連携が設定されていません',

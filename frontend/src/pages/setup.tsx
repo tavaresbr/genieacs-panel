@@ -81,7 +81,7 @@ export default function Setup() {
                 <div className="text-[0.65rem] font-bold uppercase tracking-[0.13em] text-muted-foreground">{t('setup.firstRun')}</div>
               </div>
             </div>
-            <LanguageSwitcher className="ml-auto" />
+            <LanguageSwitcher className="ms-auto" />
           </div>
 
           <div className="auth-panel">

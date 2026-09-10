@@ -96,7 +96,7 @@ export default function Sidebar() {
           type="button"
           onClick={() => setIsCollapsed((value) => !value)}
           aria-label={isCollapsed ? t('sidebar.expandNavigation') : t('sidebar.collapseNavigation')}
-          className="absolute -right-3 top-[5.1rem] z-10 flex size-7 items-center justify-center rounded-full border border-[#3a4942] bg-[#202c27] text-[#cad3ce] shadow-sm transition-colors hover:bg-[#2b3933] hover:text-white"
+          className="absolute -end-3 top-[5.1rem] z-10 flex size-7 items-center justify-center rounded-full border border-[#3a4942] bg-[#202c27] text-[#cad3ce] shadow-sm transition-colors hover:bg-[#2b3933] hover:text-white"
         >
           <Icon name={isCollapsed ? 'chevron-right' : 'chevron-left'} size={15} />
         </button>

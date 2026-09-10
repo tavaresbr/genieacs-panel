@@ -68,7 +68,7 @@ export default function Login() {
                 <div className="text-[0.65rem] font-bold uppercase tracking-[0.13em] text-muted-foreground">{t('app.genieacsOperations')}</div>
               </div>
             </div>
-            <LanguageSwitcher className="ml-auto" />
+            <LanguageSwitcher className="ms-auto" />
           </div>
 
           <div className="auth-panel">
@@ -117,7 +117,7 @@ export default function Login() {
                     required
                     value={formData.password}
                     onChange={(event) => setFormData((value) => ({ ...value, password: event.target.value }))}
-                    className="modern-input pr-12"
+                    className="modern-input pe-12"
                     placeholder={t('login.passwordPlaceholder')}
                     aria-invalid={Boolean(error)}
                     aria-describedby={error ? 'login-error' : undefined}
@@ -125,7 +125,7 @@ export default function Login() {
                   <button
                     type="button"
                     onClick={() => setShowPassword((value) => !value)}
-                    className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-muted-foreground hover:text-foreground"
+                    className="absolute inset-y-0 end-0 flex w-11 items-center justify-center text-muted-foreground hover:text-foreground"
                     aria-label={showPassword ? t('login.hidePassword') : t('login.showPassword')}
                   >
                     <Icon name={showPassword ? 'eye-off' : 'eye'} size={19} />

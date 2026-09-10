@@ -481,7 +481,7 @@ export default function CustomerPortal() {
               <p className="text-lg font-bold">SkyGenPanel</p>
               <p className="text-sm text-muted-foreground">{t('portal.name')}</p>
             </div>
-            <LanguageSwitcher className="ml-auto shrink-0" />
+            <LanguageSwitcher className="ms-auto shrink-0" />
           </header>
           <section className="modern-card p-5 sm:p-7">
             <p className="page-kicker">{t('portal.login.kicker')}</p>
@@ -508,7 +508,7 @@ export default function CustomerPortal() {
                 <div className="relative">
                   <input
                     id="customer-password"
-                    className="modern-input pr-12 font-mono"
+                    className="modern-input pe-12 font-mono"
                     type={showLoginPassword ? 'text' : 'password'}
                     inputMode="text"
                     pattern="[A-Za-z0-9]{6,32}"
@@ -521,7 +521,7 @@ export default function CustomerPortal() {
                   />
                   <button
                     type="button"
-                    className="absolute right-1 top-1/2 inline-flex size-10 -translate-y-1/2 items-center justify-center rounded text-muted-foreground hover:bg-secondary"
+                    className="absolute end-1 top-1/2 inline-flex size-10 -translate-y-1/2 items-center justify-center rounded text-muted-foreground hover:bg-secondary"
                     onClick={() => setShowLoginPassword((visible) => !visible)}
                     aria-label={showLoginPassword ? t('portal.login.hidePassword') : t('portal.login.showPassword')}
                     aria-pressed={showLoginPassword}
@@ -753,7 +753,7 @@ export default function CustomerPortal() {
                               <div className="relative">
                                 <input
                                   id={`wifi-password-${network.index}`}
-                                  className="modern-input pr-12 font-mono"
+                                  className="modern-input pe-12 font-mono"
                                   type={showWifiPassword ? 'text' : 'password'}
                                   value={wifiEditor.password}
                                   minLength={wifiEditor.password ? 8 : undefined}
@@ -766,7 +766,7 @@ export default function CustomerPortal() {
                                 />
                                 <button
                                   type="button"
-                                  className="absolute right-1 top-1/2 inline-flex size-10 -translate-y-1/2 items-center justify-center rounded text-muted-foreground hover:bg-secondary"
+                                  className="absolute end-1 top-1/2 inline-flex size-10 -translate-y-1/2 items-center justify-center rounded text-muted-foreground hover:bg-secondary"
                                   onClick={() => setShowWifiPassword((visible) => !visible)}
                                   aria-label={showWifiPassword ? t('portal.wifi.hidePassword') : t('portal.wifi.showPassword')}
                                   aria-pressed={showWifiPassword}

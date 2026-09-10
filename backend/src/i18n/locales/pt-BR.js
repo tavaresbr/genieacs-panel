@@ -374,6 +374,7 @@ export default {
   'sgp.error.urlInvalid': 'Informe uma URL válida do SGP (https://provedor.sgp.net.br)',
   'sgp.error.urlScheme': 'A URL do SGP deve usar HTTP ou HTTPS',
   'sgp.error.urlCredentials': 'A URL do SGP não pode conter usuário ou senha',
+  'sgp.error.blockedHost': 'A URL do SGP aponta para um endereço que esta instalação não pode acessar',
   'sgp.error.pathsRelative': 'Os caminhos da API do SGP devem ser relativos, como /api/ura/titulos/',
   'sgp.error.configIncomplete': 'Informe URL, app e token do SGP antes de ativar a integração',
   'sgp.error.notConfigured': 'Integração com o SGP não está configurada',

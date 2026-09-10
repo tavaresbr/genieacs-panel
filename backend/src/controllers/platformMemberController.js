@@ -1,9 +1,11 @@
 import SubscriptionService, { PlanLimitError } from '../services/subscriptionService.js';
 import { planLimitResponse } from '../utils/planLimit.js';
-import { runInTenant } from '../config/tenantContext.js';
 import { getDb } from '../config/database.js';
 import TenantUser from '../models/TenantUser.js';
 import User from '../models/User.js';
+import AuditLog from '../models/AuditLog.js';
+import PlatformAudit from '../models/PlatformAudit.js';
+import { runInTenant } from '../config/tenantContext.js';
 import { ROLES } from './usersController.js';
 import { normalizeRole, roleHas } from '../config/permissions.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
@@ -33,6 +35,17 @@ import { createResponse, createErrorResponse } from '../utils/helpers.js';
  * all shared tables read through `getDb()` rather than `tdb`, so naming the
  * provider in the path is not fighting the scope — it is the only thing that
  * decides which provider these routes act on.
+ *
+ * E é por isso que attach e detach gravam DUAS trilhas, como a suspensão em
+ * `platformController.setStatus` já grava. Um vínculo escrito daqui vira uma
+ * sessão legítima dentro de um ISP — cadastro inteiro, senhas de portal,
+ * exportação — e escrever só em `platform_audit` deixaria a única cópia do
+ * registro na trilha de quem agiu, que é a trilha que o ISP não pode ler. A
+ * linha espelhada no `audit_log` DAQUELE provedor, com `actorKind: 'platform'`,
+ * é o que permite ao ISP ver que uma mão de fora mexeu na equipe dele. Nenhuma
+ * das duas é condição da ação: o vínculo já foi escrito quando elas falham, e
+ * derrubar a resposta ali só produziria uma segunda tentativa — a exceção que
+ * confere o retorno é a exclusão de provedor, onde a trilha é condição.
  */
 
 /**
@@ -125,7 +138,12 @@ class PlatformMemberController {
       if (!tenantId) {
         return res.status(400).json(createErrorResponse('Invalid provider id'));
       }
-      if (!(await findTenant(tenantId))) return tenantNotFound(res);
+      // A linha do provedor, e não só a confirmação de que ele existe: o slug e
+      // o nome vão para a trilha da plataforma junto com o id, como em toda
+      // linha daquela tabela, para que ela siga legível quando o provedor não
+      // existir mais.
+      const tenant = await findTenant(tenantId);
+      if (!tenant) return tenantNotFound(res);
 
       const username = String(req.body?.username ?? '').trim();
       const role = req.body?.role;
@@ -177,6 +195,27 @@ class PlatformMemberController {
 
       await TenantUser.create({ tenantId, userId: person.id, role });
 
+      // Quem agiu, em qual provedor, quem foi vinculado e com que papel. O
+      // `detail` não carrega nada da pessoa além do nome e do id: a senha não
+      // passa por esta rota e o hash não tem por que aparecer numa trilha.
+      await PlatformAudit.fromRequest(req, {
+        action: PlatformAudit.ACTIONS.MEMBER_ADDED,
+        tenant,
+        detail: { userId: person.id, username: person.username, role }
+      });
+      // A mesma ação, na trilha do provedor afetado — `runInTenant` porque
+      // `audit_log` é escopada e o escopo aberto por `authenticateToken` é o do
+      // provedor em que o administrador da plataforma trabalha, que não é este.
+      // A ação reaproveita o vocabulário que a tela de trilha do provedor já
+      // lê; o que diz que a mão veio de fora é `actorKind: 'platform'`.
+      await runInTenant(tenantId, () => AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.OPERATOR_CREATED,
+        actorKind: 'platform',
+        subjectType: 'tenant_user',
+        subjectId: person.id,
+        detail: { username: person.username, role }
+      }));
+
       return res.status(201).json(createResponse('Membership created successfully', {
         membership: present({ ...person, role })
       }));
@@ -207,7 +246,8 @@ class PlatformMemberController {
       if (!userId) {
         return res.status(400).json(createErrorResponse('Invalid operator id'));
       }
-      if (!(await findTenant(tenantId))) return tenantNotFound(res);
+      const tenant = await findTenant(tenantId);
+      if (!tenant) return tenantNotFound(res);
 
       const membership = await TenantUser.find(tenantId, userId);
       if (!membership) {
@@ -256,7 +296,30 @@ class PlatformMemberController {
         );
       }
 
+      // Lido ANTES da remoção porque é o nome que as duas trilhas vão registrar
+      // — o id sozinho não diz a ninguém quem saiu, e daqui a um ano pode não
+      // haver mais a quem perguntar. A pessoa sobrevive à remoção, então isto é
+      // conveniência de leitura e não uma corrida.
+      const person = await User.findById(userId);
+      const role = presentRole(membership.role);
+
       await TenantUser.remove(tenantId, userId);
+
+      await PlatformAudit.fromRequest(req, {
+        action: PlatformAudit.ACTIONS.MEMBER_REMOVED,
+        tenant,
+        detail: { userId, username: person?.username ?? null, role }
+      });
+      // E no provedor que perdeu a pessoa, pelo mesmo motivo da suspensão: quem
+      // vai perguntar "cadê o fulano da minha equipe" é o ISP, e a resposta tem
+      // que estar onde ele consegue olhar.
+      await runInTenant(tenantId, () => AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.OPERATOR_REMOVED,
+        actorKind: 'platform',
+        subjectType: 'tenant_user',
+        subjectId: userId,
+        detail: { username: person?.username ?? null, role }
+      }));
 
       // Deliberately no session revocation, which is where this parts company
       // with `/api/users`. `token_version` lives on the PERSON, so bumping it

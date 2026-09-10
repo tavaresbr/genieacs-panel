@@ -376,6 +376,7 @@ export default {
   'sgp.error.urlInvalid': '請輸入有效的 SGP 位址（https://provider.sgp.net.br）',
   'sgp.error.urlScheme': 'SGP 位址需使用 HTTP 或 HTTPS',
   'sgp.error.urlCredentials': 'SGP 位址中不得包含使用者名稱或密碼',
+  'sgp.error.blockedHost': 'SGP 位址指向本部署無法存取的位址',
   'sgp.error.pathsRelative': 'SGP 的 API 路徑需為相對路徑，例如 /api/ura/titulos/',
   'sgp.error.configIncomplete': '啟用整合前，請填寫 SGP 位址、應用程式與權杖',
   'sgp.error.notConfigured': 'SGP 整合尚未設定',

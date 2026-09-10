@@ -22,7 +22,14 @@ class PlatformAudit {
     PLAN_UPDATED: 'plan.updated',
     SUBSCRIPTION_PLAN_CHANGED: 'subscription.plan_changed',
     SUBSCRIPTION_STATUS_CHANGED: 'subscription.status_changed',
-    PAYMENT_RECORDED: 'subscription.payment_recorded'
+    PAYMENT_RECORDED: 'subscription.payment_recorded',
+    // Quem trabalha para qual provedor, decidido de fora dele. É a ação mais
+    // forte que o plano de controle tem: um vínculo escrito aqui vira uma
+    // sessão legítima DENTRO de um ISP, com o cadastro inteiro atrás dela. Sem
+    // estas duas linhas, vincular-se a um ISP e depois sair não deixaria
+    // rastro em trilha nenhuma.
+    MEMBER_ADDED: 'tenant.member_added',
+    MEMBER_REMOVED: 'tenant.member_removed'
   });
 
   /**
