@@ -15,6 +15,13 @@ FROM node:22-alpine AS backend-deps
 RUN apk add --no-cache python3 make g++
 WORKDIR /app/backend
 COPY backend/package*.json ./
+# O `postinstall` do backend roda `scripts/install-cli.js`, que instala a CLI
+# `skygenpanel` num install de produção e se recusa educadamente em qualquer
+# outro lugar — inclusive aqui. Ele precisa EXISTIR para poder se recusar: sem
+# esta linha o npm morre com "Cannot find module" antes de o script decidir
+# nada. Só o diretório de scripts, e antes do install, para a camada de
+# dependências continuar valendo por hash de package-lock.
+COPY backend/scripts ./scripts
 RUN npm ci --omit=dev
 
 FROM node:22-alpine AS runtime
