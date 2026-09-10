@@ -1363,6 +1363,7 @@ const zhCN: Dictionary = {
   'whatsapp.error.attachmentTooLarge': '文件超过 {max} MB。',
   'whatsapp.error.attachmentEmpty': '文件是空的.',
   'whatsapp.error.attachmentTypeNotAllowed': '这里不能发送这种类型的文件。',
+  'whatsapp.error.attachmentNotAllowed': '这里不能发送该附件。',
   'whatsapp.error.attachmentNotFound': '该附件已不在磁盘上。',
   'whatsapp.error.noPublicUrl': '发送附件前请先配置公开的 Webhook URL：Evolution 服务器从那里获取文件。',
   'whatsapp.error.conversationNotFound': '该会话已不存在。',

@@ -1369,6 +1369,7 @@ const ko: Dictionary = {
   'whatsapp.error.attachmentTooLarge': '파일이 {max} MB보다 큽니다.',
   'whatsapp.error.attachmentEmpty': '파일이 비어 있습니다.',
   'whatsapp.error.attachmentTypeNotAllowed': '이 종류의 파일은 여기에서 보낼 수 없습니다.',
+  'whatsapp.error.attachmentNotAllowed': '이 첨부 파일은 여기에서 보낼 수 없습니다.',
   'whatsapp.error.attachmentNotFound': '해당 첨부 파일이 디스크에 더 이상 없습니다.',
   'whatsapp.error.noPublicUrl': '첨부 파일을 보내기 전에 공개 웹훅 URL을 설정하십시오. Evolution 서버가 이 주소에서 파일을 가져옵니다.',
   'whatsapp.error.conversationNotFound': '이 대화는 더 이상 존재하지 않습니다.',

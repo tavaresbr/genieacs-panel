@@ -421,6 +421,7 @@ export default {
   'whatsapp.error.attachmentTooLarge': 'ファイルが {max} MB を超えています',
   'whatsapp.error.attachmentEmpty': 'ファイルが空です',
   'whatsapp.error.attachmentTypeNotAllowed': 'その種類のファイルはここからは送れません',
+  'whatsapp.error.attachmentNotAllowed': 'その添付ファイルはここからは送れません',
   'whatsapp.error.noPublicUrl': '添付を送る前に公開Webhook URLを設定してください。Evolutionサーバーはそこからファイルを取得します',
   'whatsapp.attachmentStored': 'ファイルを送信できます',
   'whatsapp.mediaSwept': '{files} 件のファイルを削除し、{mb} MB を解放しました',

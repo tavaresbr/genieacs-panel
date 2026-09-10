@@ -18,6 +18,7 @@ const { default: WhatsAppAccount } = await import('../src/models/WhatsAppAccount
 const { default: WaConversation } = await import('../src/models/WaConversation.js');
 const { default: WaMessage } = await import('../src/models/WaMessage.js');
 const { default: WaSendService } = await import('../src/services/waSendService.js');
+const { outDir } = await import('../src/services/waAttachmentService.js');
 const { default: WaOutboxWorker } = await import('../src/services/waOutboxWorker.js');
 const { sign, MEDIA_TOKEN_TTL_MS } = await import('../src/utils/wa/waMediaToken.js');
 
@@ -89,6 +90,17 @@ function gravar(relative, bytes) {
   fs.mkdirSync(path.dirname(destino), { recursive: true });
   fs.writeFileSync(destino, bytes);
   return relative;
+}
+
+/**
+ * Um anexo de SAÍDA, na pasta que a rota de upload realmente emite.
+ *
+ * O envio só aceita caminho dentro de `wa-media/t<id>/out`, e não por capricho:
+ * o valor chega do navegador, e sem confinar isso `DATA_DIR` inteiro — incluindo
+ * `db-config.json` e `panel.sqlite` — virava anexo enviável.
+ */
+async function gravarSaida(nome, bytes) {
+  return gravar(path.posix.join(await asTenant(() => outDir()), nome), bytes);
 }
 
 /** An inbound row carrying an attachment, exactly as `waMediaService` writes one. */
@@ -417,7 +429,7 @@ describe('the outbox hands Evolution an address it can actually fetch', () => {
   }
 
   it('sends an absolute signed URL, not the path on the panel disk', async () => {
-    const relativo = gravar(`wa-media/${conversationId}/saida.pdf`, PDF);
+    const relativo = await gravarSaida('saida.pdf', PDF);
     requests.length = 0;
     const { body } = await enfileirar({ url: relativo, type: 'application/pdf', name: 'saida.pdf' });
 
@@ -463,7 +475,7 @@ describe('the outbox hands Evolution an address it can actually fetch', () => {
    * deliver a link that opens nothing — which the customer discovers, not us.
    */
   it('refuses the send outright when no public URL is configured', async () => {
-    const relativo = gravar(`wa-media/${conversationId}/sem-origem.pdf`, PDF);
+    const relativo = await gravarSaida('sem-origem.pdf', PDF);
     const { body } = await enfileirar({ url: relativo, type: 'application/pdf', name: 'sem-origem.pdf' });
     const row = await asTenant(() => WaMessage.getById(body.data.id));
 
@@ -488,7 +500,7 @@ describe('the outbox hands Evolution an address it can actually fetch', () => {
   });
 
   it('records that refusal where the operator can read it', async () => {
-    const relativo = gravar(`wa-media/${conversationId}/sem-origem-2.pdf`, PDF);
+    const relativo = await gravarSaida('sem-origem-2.pdf', PDF);
     const { body } = await enfileirar({ url: relativo, type: 'application/pdf', name: 'x.pdf' });
     const row = await asTenant(() => WaMessage.getById(body.data.id));
 

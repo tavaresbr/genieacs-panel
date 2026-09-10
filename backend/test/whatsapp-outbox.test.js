@@ -9,6 +9,7 @@ const { default: WaConversation } = await import('../src/models/WaConversation.j
 const { default: WaMessage } = await import('../src/models/WaMessage.js');
 const { default: WaOptOut } = await import('../src/models/WaOptOut.js');
 const { default: WaOutboxWorker } = await import('../src/services/waOutboxWorker.js');
+const { outDir } = await import('../src/services/waAttachmentService.js');
 
 const SUPPORT = 'painel-suporte';
 const SUPPORT_TOKEN = 'token-suporte-111';
@@ -35,6 +36,16 @@ let backupId;
 let evoServer;
 let evoLocalUrl;
 let realFetch;
+/**
+ * A pasta de saída do provedor, preenchida no `before`.
+ *
+ * O envio só aceita caminho debaixo dela: o valor vem do navegador, e sem
+ * confinar isso qualquer arquivo em `DATA_DIR` virava anexo enviável. Estes
+ * testes escolhem endpoint pelo TIPO do anexo, então o arquivo não precisa
+ * existir — o caminho é que precisa ser um que a rota de upload emitiria.
+ */
+let saida;
+const anexoDeSaida = (nome, type) => ({ url: `${saida}/${nome}`, type, name: nome });
 
 /** What the stub answers with, per test. */
 const stub = {
@@ -178,6 +189,8 @@ before(async () => {
     ...WhatsAppConfigService.encryptWebhookToken('webhook-reserva')
   }));
   backupId = backup.id;
+
+  saida = await asTenant(() => outDir());
 });
 
 after(async () => {
@@ -321,16 +334,14 @@ describe('the outbox worker despatches', () => {
 });
 
 describe('audio is a voice bubble before it is a file', () => {
-  const audio = {
-    url: 'https://cdn.provedor.test/audios/1.ogg',
-    type: 'audio/ogg; codecs=opus',
-    name: 'recado.ogg'
-  };
+  // Uma função, não uma constante: `saida` só existe depois do `before`, e um
+  // objeto montado no registro do `describe` congelaria um caminho indefinido.
+  const audio = () => anexoDeSaida('recado.ogg', 'audio/ogg; codecs=opus');
 
   it('does NOT fall back after a 2xx — a retry would send it twice', async () => {
     await clearOutbox();
     const conversation = await newConversation();
-    const { body } = await post(conversation.id, { body: '', attachment: audio });
+    const { body } = await post(conversation.id, { body: '', attachment: audio() });
     requests.length = 0;
 
     await WaOutboxWorker.tick();
@@ -343,7 +354,7 @@ describe('audio is a voice bubble before it is a file', () => {
   it('falls back to sendMedia on a non-2xx', async () => {
     await clearOutbox();
     const conversation = await newConversation();
-    const { body } = await post(conversation.id, { body: 'segue o áudio', attachment: audio });
+    const { body } = await post(conversation.id, { body: 'segue o áudio', attachment: audio() });
     requests.length = 0;
     stub.audioStatus = 404;
 
@@ -360,7 +371,7 @@ describe('audio is a voice bubble before it is a file', () => {
         mediaCalls()[0].payload.media,
         new RegExp(`^https://painel\\.provedor\\.test/api/whatsapp-media/${body.data.id}\\?t=`)
       );
-      assert.equal(mediaCalls()[0].payload.fileName, audio.name);
+      assert.equal(mediaCalls()[0].payload.fileName, audio().name);
       const row = await asTenant(() => WaMessage.getById(body.data.id));
       assert.equal(row.delivery_status, 'sent');
       assert.ok(row.external_id, 'the id comes from the call that actually worked');
@@ -374,7 +385,7 @@ describe('audio is a voice bubble before it is a file', () => {
     const conversation = await newConversation();
     await post(conversation.id, {
       body: 'a fatura',
-      attachment: { url: 'https://cdn.provedor.test/f.pdf', type: 'application/pdf', name: 'f.pdf' }
+      attachment: anexoDeSaida('f.pdf', 'application/pdf')
     });
     requests.length = 0;
 

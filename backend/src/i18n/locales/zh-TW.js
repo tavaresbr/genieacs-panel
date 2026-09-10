@@ -421,6 +421,7 @@ export default {
   'whatsapp.error.attachmentTooLarge': '檔案超過 {max} MB',
   'whatsapp.error.attachmentEmpty': '檔案是空的',
   'whatsapp.error.attachmentTypeNotAllowed': '這裡不能傳送這種類型的檔案',
+  'whatsapp.error.attachmentNotAllowed': '這裡不能傳送該附件',
   'whatsapp.error.noPublicUrl': '傳送附件前請先設定公開的 Webhook URL：Evolution 伺服器從那裡取得檔案',
   'whatsapp.attachmentStored': '檔案已可傳送',
   'whatsapp.mediaSwept': '已刪除 {files} 個檔案，釋出 {mb} MB',
