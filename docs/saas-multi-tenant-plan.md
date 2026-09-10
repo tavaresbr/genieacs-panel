@@ -89,12 +89,15 @@ original não previa:
 
 #### O que ainda não foi feito
 
-- **Fase 3 (subdomínio) não começou.** `backend/src/middleware/tenantResolver.js` resolve
-  sempre o **primeiro** provedor da tabela. Está escrito para que a troca seja de uma função
-  só: tudo abaixo já lê o provedor do contexto.
+- **A Fase 3 entrou.** `backend/src/middleware/tenantResolver.js` lê o provedor do `Host`
+  quando o deployment configura `TENANT_BASE_DOMAIN`/`PORTAL_BASE_DOMAIN`, e cai no primeiro
+  provedor da tabela só quando não configura nenhum — que é todo install self-hosted. A
+  aposta do plano se confirmou: foi troca de uma função, porque tudo abaixo já lia o provedor
+  do contexto.
 - **A espinha da Fase 2 entrou** (o token carrega `tenantId` e o papel vem de `tenant_users`),
-  mas o convite por e-mail, os papéis `tech`/`owner`, o plano de plataforma e a troca de
-  `username` para e-mail **não**.
+  mas o convite por e-mail, os papéis `tech`/`owner` e a troca de `username` para e-mail
+  **não**. O plano de plataforma entrou na onda 13 (`platform_admins`, o console e o
+  `requirePlatformAdmin` que responde 404 com o corpo idêntico ao de rota inexistente).
 - **Fases 4 a 7 inteiras**: conector GenieACS plugável, planos e limites, frontend e operação.
 
 ### Decisões já tomadas
@@ -139,9 +142,13 @@ arquivo `LICENSE` e o aviso de copyright da SkydashNET devem ser mantidos no pro
   de conferir a membership contra a tabela. Token antigo, sem `tenantId`, continua valendo
   quando a pessoa tem um vínculo só — a transição não derruba o plantão.
 - **Resolução de provedor**: `backend/src/middleware/tenantResolver.js` roda antes das rotas
-  e abre um escopo **provisório** — hoje sempre o primeiro provedor da tabela. É o escopo do
-  que acontece sem sessão (login, setup, refresh, portal). A Fase 3 troca essa única função
-  pela leitura do `Host`.
+  e abre um escopo **provisório** lido do `Host`. É o escopo do que acontece sem sessão
+  (login, setup, refresh, portal); uma requisição autenticada é reescopada por
+  `authenticateToken` no provedor que o token nomeia, depois de conferir a membership. Onde o
+  deployment não configura domínio base — todo self-hosted — o escopo provisório é o primeiro
+  provedor da tabela, que ali é o único. Onde configura, host que não nomeia provedor é
+  recusado em vez de servido: cair no primeiro seria responder com os dados de um provedor a
+  quem não perguntou por nenhum.
 - **Integrações que guardam segredos**: SGP, provisionamento automático e WhatsApp via
   Evolution API. Todas cifram com `secretBox`, e desde a Fase 0 registram a versão da chave.
 - **Auth assinante**: cookie `skygp_portal_session`, `backend/src/middleware/portalAuth.js`.
@@ -351,11 +358,11 @@ alguém esquecer de incrementar. Coberto por
 - **API de usuários**: já escopada por provedor. Falta o fluxo de **convite por e-mail**
   (`tenant_invites`).
 - **Portal do assinante**: a busca já é escopada (`getByCustomerId` passa por `tdb`), então
-  o que falta é o cookie ser **host-only** (sem
-  `domain=.dominio`), para não vazar sessão entre subdomínios de provedores diferentes —
-  ajustar `portalCookieOptions` em `backend/src/middleware/portalAuth.js` — e incluir
-  `tenantId` no payload assinado. Ambos só passam a importar quando houver subdomínio, ou
-  seja, junto com a Fase 3.
+  O cookie é **host-only** (`portalCookieOptions` não define `domain`) e o payload assinado
+  carrega `tenantId`, conferido contra o provedor da requisição em `portalAuth.js`. As duas
+  coisas entraram juntas e são independentes de propósito: a primeira impede o navegador de
+  mandar o cookie ao subdomínio vizinho, a segunda recusa o cookie que chegar assim mesmo —
+  copiado à mão, ou por um cliente que não é navegador.
 - `rateLimit.js`: chavear por `${tenantId}:${ip}` para um provedor barulhento não derrubar
   o limite dos outros.
 **Quebra para os self-hosted atuais:** o login sai de `username` para `email`. Mitigação: a
@@ -512,8 +519,9 @@ A suíte não ficou num arquivo só, e ficou melhor assim: `backend/test/tenant-
 guarda os casos que atravessam recursos, e **14 suítes `*-tenancy`** cobrem uma tabela ou um
 subsistema cada — `sgp-links`, `sgp-events`, `device-profiles`, `provisioning`,
 `map-settings`, `vendor-catalogue`, `wifi-credentials`, `whatsapp-media`,
-`whatsapp-inbound`, `users`, `auth`, entre outras. São 937 testes no total, verdes nos três
-dialetos no CI.
+`whatsapp-inbound`, `users`, `auth`, entre outras, mais `tenant-subdomain` e
+`tenant-id-sweep`, que provam o isolamento por host. São 1188 testes no total, verdes nos
+três dialetos no CI.
 
 O padrão em todas: **dois provedores com as chaves naturais deliberadamente colidindo** —
 mesmo `customer_id`, mesmo `device_id`, mesmo `identity_hash`, mesmo `dedupe_key`, mesmo
@@ -534,13 +542,44 @@ tabela do schema esteja classificada como escopada ou compartilhada, e a marcaç
 
 #### O que ainda falta
 
-- **Os itens 5, 6 e 2 da lista original** — cookie de portal de A replayado no host de B,
-  token de operador de A enviado ao host de B, e `GET /:id` com id de B respondendo 404 e
-  não 403 — dependem de existir subdomínio. São da Fase 3, não desta.
-- **A sentinela de SQL** em `APP_ENV=test` (`db.on('query')` lançando se o SQL tocar tabela
-  escopada sem `tenant_id` nos bindings), que transformaria toda a suíte legada em teste de
-  escopo de graça. É o item de melhor custo-benefício que sobrou.
-- **RLS no Postgres** como segunda linha, ainda não avaliado.
+- **RLS no Postgres** como segunda linha, ainda não avaliado. É o único item que sobrou.
+
+#### Os três itens que dependiam do subdomínio — fechados
+
+Os itens 5, 6 e 2 da lista original esperavam a Fase 3. Com ela no lugar, os três existem:
+
+- **Cookie de portal de A replayado no host de B** — `backend/test/tenant-subdomain.test.js`.
+  Três asserções, não uma: o cookie recusado no portal do outro provedor, o mesmo cookie
+  ainda válido no seu, e a ausência de `domain=` no `Set-Cookie` — que é o que impede o
+  navegador de mandá-lo para o subdomínio vizinho antes de qualquer verificação. A quarta
+  põe a requisição onde a leitura escopada *funcionaria* (rodando como A, com a requisição
+  dizendo ser de B) para que o provedor assinado no payload possa ser visto fazendo alguma
+  coisa: sem isso as duas primeiras passariam com ou sem `tenantId` assinado.
+- **Token de operador de A enviado ao host de B** — mesmo arquivo: 403 `tenant_mismatch`,
+  nas duas direções, com o controle de que o token funciona no host para o qual foi cunhado.
+  403 e não 404 aqui de propósito: quem manda o token já sabe que o provedor existe, porque
+  o host resolveu antes de a rota rodar.
+- **`GET /:id` com id de B respondendo 404 e não 403** —
+  `backend/test/tenant-id-sweep.test.js`, e varrido sobre **as 24 rotas do painel
+  endereçadas por id de linha**, não sobre uma. A prova anterior cobria duas
+  (`portal-password` e `users`); a diferença não é de quantidade, é que cada rota tem seu
+  próprio caminho até o banco e é a rota acrescentada depois — copiando o controlador
+  vizinho — que vaza. Cada caso roda duas vezes com o mesmo token, o mesmo host e o mesmo
+  corpo, mudando só o id: com o id do vizinho tem que dar 404 e a linha do vizinho tem que
+  continuar intacta; com o id próprio tem que dar qualquer coisa menos 404. Sem a segunda
+  metade o arquivo passaria inteiro com as rotas desmontadas — e passou, na primeira
+  rodada, em quatro casos cujo caminho eu tinha escrito errado.
+
+Tirando o `where` de `tdb()`, 22 dos 24 ficam vermelhos. Os dois que não são os de
+`/api/users/:id`, e estão certos: `users` é tabela do deploy, e quem responde 404 ali é a
+leitura do vínculo em `tenant_users`, outro mecanismo, com prova própria em
+`users-tenancy.test.js`.
+
+- **A sentinela de SQL** em `APP_ENV=test` entrou (`backend/src/config/sqlSentinel.js`):
+  toda query que toca tabela escopada sem filtro de provedor lança, com o `from:` do call
+  site no erro. Ela é a segunda linha e apareceu como tal — na reversão acima ela sozinha
+  derruba o seed antes de qualquer rota rodar, e foi preciso desarmá-la também para ver as
+  asserções falharem.
 
 ## Riscos principais
 
@@ -590,7 +629,7 @@ Os arquivos que concentram o trabalho **restante**, por tamanho atual:
 `backend/src/services/deviceService.js` (Fase 4 — conector e as três correções de SSRF),
 `frontend/src/pages/settings.tsx` (Fases 5/6/7),
 `frontend/src/pages/customer-portal.tsx` (Fase 2),
-`backend/src/middleware/tenantResolver.js` (Fase 3 — é uma função só).
+`backend/src/middleware/tenantResolver.js` (Fase 3 ✅ — foi uma função só).
 
 Os 27 models já estão convertidos; aquele trabalho, que era o volume da Fase 1, acabou.
 
@@ -601,13 +640,16 @@ Original: Fase 0 → 1 → 2 → 3 → 8 → 4 → 5 → 6 → 7.
 
 **Daqui em diante, e a ordem importa:**
 
-1. **Fase 3 — subdomínio.** É a menor peça restante e a que destrava mais coisa: sem ela,
-   os itens de vazamento que dependem de host (cookie replayado, token de A no host de B)
-   não podem sequer ser testados, e o portal continua resolvendo o primeiro provedor. O
-   `tenantResolver` foi escrito para que a troca seja de uma função.
-2. **O resto da Fase 2**, já com host: cookie host-only, `tenantId` no payload do portal,
-   rate limit por provedor, convite por e-mail.
-3. **Fechar a Fase 8** com os testes que passam a ser possíveis, e a sentinela de SQL.
+1. ~~**Fase 3 — subdomínio.**~~ ✅ Entrou, e destravou o que se esperava: o resolvedor lê o
+   host, o portal deixou de resolver o primeiro provedor, e os itens de vazamento que
+   dependiam de host puderam enfim ser escritos.
+2. **O resto da Fase 2.** Cookie host-only, `tenantId` no payload do portal e rate limit por
+   provedor ✅ entraram. Falta o **convite por e-mail** (`tenant_invites`), os papéis reais
+   (`owner`/`admin`/`tech`/`viewer` com `requireRole` virando `requirePermission`), a
+   audiência separada `skygenpanel-platform` com impersonação auditada, e a troca de
+   `username` para e-mail — que é quebra de contrato e decisão de produto, não de código.
+3. ~~**Fechar a Fase 8**~~ ✅ com os três testes que passaram a ser possíveis e a sentinela
+   de SQL. Sobrou avaliar **RLS no Postgres** como segunda linha.
 4. **Fase 4 — conector**, começando pelas três correções de SSRF e pela guarda de egresso,
    **antes** de a URL virar dado do cliente.
 5. Fases 5 → 6 → 7.
@@ -620,32 +662,32 @@ edições de divergirem.
 
 ### Checklist antes de vender acesso ao segundo provedor
 
-Nada disso é negociável. **Sete dos doze estão cumpridos.**
+Nada disso é negociável. **Nove dos doze estão cumpridos.**
 
 | | Item | Estado |
 | --- | --- | --- |
 | 1 | Toda tabela de provedor: `tenant_id NOT NULL`, FK, uniques começando por `tenant_id` | ✅ |
 | 2 | Nenhum código alcança tabela de provedor sem contexto (`currentTenantId()` lança, guarda estática no CI) | ✅ |
-| 3 | Login e sessão do portal escopados por provedor | ⚠️ a busca sim; o cookie e o payload não (Fases 2/3) |
+| 3 | Login e sessão do portal escopados por provedor | ✅ busca, cookie host-only e `tenantId` assinado no payload |
 | 4 | Caches em memória e `app_state.dashboard_snapshot` separados por provedor | ✅ |
-| 5 | JWT do operador e do assinante carregam o provedor e são conferidos contra o host | ⚠️ o do operador carrega; a conferência contra o host é Fase 3 |
+| 5 | JWT do operador e do assinante carregam o provedor e são conferidos contra o host | ✅ os dois carregam; divergência com o host é 403 `tenant_mismatch` |
 | 6 | Credenciais ACS por provedor, cifradas, guarda de egresso, branch de URL absoluta removido | ❌ Fase 4 |
 | 7 | `/api/database` não montada na edição SaaS | ✅ |
-| 8 | Rate limit e concorrência de fetch ACS chaveados por provedor | ❌ Fases 2/4 |
-| 9 | Suíte de vazamento verde no CI e obrigatória para merge | ✅ 937 testes, três dialetos |
+| 8 | Rate limit e concorrência de fetch ACS chaveados por provedor | ⚠️ rate limit por provedor ✅; a concorrência de fetch ACS é Fase 4 |
+| 9 | Suíte de vazamento verde no CI e obrigatória para merge | ✅ 1188 testes, três dialetos |
 | 10 | `SECRET_BOX_KEY` separada do `JWT_SECRET`, com `key_version` | ✅ |
 | 11 | `audit_log` registrando ações sensíveis | ❌ Fase 7 |
 | 12 | Exportação por provedor funcionando (LGPD e "apaguei tudo, socorro") | ❌ Fase 7 |
 
-Os cinco que faltam concentram-se em **subdomínio (3)**, **conector GenieACS (6, 8)** e
-**operação (11, 12)**. Nenhum deles é do mecanismo de isolamento de dados, que é o que a
-Fase 1 entregou.
+Os três que faltam concentram-se em **conector GenieACS (6, e a metade de 8 que é a
+concorrência de fetch)** e **operação (11, 12)**. Nenhum deles é do mecanismo de isolamento
+de dados, que é o que a Fase 1 entregou.
 
 ## Verificação
 
 ```bash
 npm run verify          # check backend + testes + lint + typecheck + build (raiz)
-cd backend && npm test  # 937 testes, incluindo as 14 suítes de tenancy
+cd backend && npm test  # 1188 testes, incluindo as suítes de tenancy
 ```
 
 A suíte roda nos três dialetos, e **isso não é zelo**: cada uma das armadilhas abaixo passou
@@ -675,7 +717,8 @@ TEST_DB_CLIENT=pg TEST_DB_HOST=127.0.0.1 TEST_DB_PORT=5432 \
 - **`DELETE ... LIMIT` não existe no Postgres**, e `date_trunc`/`DATE_FORMAT`/`strftime` são
   três coisas diferentes. Bucketização vai em JavaScript.
 
-Validação end-to-end manual, quando a Fase 3 entrar:
+Validação end-to-end manual, agora possível — a automatizada equivalente está em
+`tenant-subdomain.test.js` e `tenant-id-sweep.test.js`:
 
 1. Subir com `EDITION=saas` e Postgres.
 2. Criar dois provedores (`alfa`, `beta`).
