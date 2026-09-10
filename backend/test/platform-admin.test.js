@@ -54,6 +54,9 @@ const PROMOVIDA = { username: 'promovida', password: 'promovida-senha-1' };
 let panelUrl;
 let probeUrl;
 let probeServer;
+let plataformaToken;
+let donaToken;
+let promovidaToken;
 const idOf = {};
 
 /**
@@ -124,16 +127,44 @@ function runInEdition(edition, source, args = []) {
   );
 }
 
-const SELF_HOSTED_SETUP = `
+/**
+ * A whole self-hosted install, over HTTP, against this suite's own database.
+ *
+ * It sets itself up and signs in through the real routes rather than calling
+ * the model, because two of the three things being proved are answers the
+ * CONTROLLER gives. The stray roster row in the middle is the interesting part:
+ * it is what an install that once ran the grant script and later moved to the
+ * self-hosted edition would still have on disk, and the session it reports must
+ * not offer a control plane whose routes are not mounted there.
+ */
+const SELF_HOSTED_INSTALL = `
+  const { app } = await import('${SRC_URL}app.js');
   const { getDb, closePool } = await import('${SRC_URL}config/database.js');
-  const { runInTenant } = await import('${SRC_URL}config/tenantContext.js');
-  const { default: User } = await import('${SRC_URL}models/User.js');
-  const tenant = await getDb()('tenants').orderBy('id', 'asc').first();
-  const created = await runInTenant(tenant.id, () => User.createInitialAdmin({
-    username: process.argv[1],
-    password: process.argv[2]
-  }));
-  console.log(JSON.stringify(created));
+
+  const [username, password] = process.argv.slice(1);
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise((resolve) => server.once('listening', resolve));
+  const base = 'http://127.0.0.1:' + server.address().port;
+  const post = (path, body, token) => fetch(base + path, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: 'Bearer ' + token } : {})
+    },
+    body: JSON.stringify(body)
+  }).then((r) => r.json().then((json) => ({ status: r.status, body: json })));
+
+  const setup = await post('/api/auth/setup', { username, password });
+  const rosterAfterSetup = await getDb()('platform_admins');
+
+  await getDb()('platform_admins').insert({ user_id: setup.body.data.user.id });
+  const login = await post('/api/auth/login', { username, password });
+  const session = await fetch(base + '/api/auth/user', {
+    headers: { Authorization: 'Bearer ' + login.body.data.token }
+  }).then((r) => r.json());
+
+  console.log(JSON.stringify({ setup, rosterAfterSetup, login, session }));
+  await new Promise((resolve) => server.close(resolve));
   await closePool();
 `;
 
@@ -158,19 +189,33 @@ after(async () => {
  * First, because it needs an install with no users at all — which is what the
  * harness has just finished creating and what every test below spends.
  */
-describe('setup on a self-hosted install', () => {
-  it('creates the first administrator and puts nobody on the roster', async () => {
-    const child = runInEdition('selfhosted', SELF_HOSTED_SETUP, ['local', 'local-senha-1']);
+describe('a self-hosted install', () => {
+  let ran;
+
+  before(() => {
+    const child = runInEdition('selfhosted', SELF_HOSTED_INSTALL, ['local', 'local-senha-1']);
     assert.equal(child.status, 0, child.stderr);
-    const created = JSON.parse(child.stdout.trim());
+    // The last line, not the whole output: `dotenv` announces itself on stdout
+    // when the application loads its configuration, and the child is a whole
+    // application.
+    ran = JSON.parse(child.stdout.trim().split('\n').pop());
+  });
 
-    const person = await getDb()('users').where({ id: created.id }).first();
-    assert.ok(person, 'the self-hosted install got no first administrator at all');
-    assert.equal(person.role, 'admin');
-
-    const roster = await getDb()('platform_admins');
-    assert.deepEqual(roster, [],
+  it('creates the first administrator and puts nobody on the roster', () => {
+    assert.equal(ran.setup.status, 201);
+    assert.equal(ran.setup.body.data.user.role, 'admin');
+    assert.deepEqual(ran.rosterAfterSetup, [],
       'a self-hosted install was handed a control plane it does not have');
+  });
+
+  // There is no control plane on this edition, so the panel is told there is
+  // nothing to draw — and told it without having to know which edition it is
+  // talking to. Asserted with a roster row deliberately present, so what is
+  // being proved is the edition and not merely an empty table.
+  it('reports no control plane even with a row in the table', () => {
+    assert.equal(ran.setup.body.data.user.isPlatformAdmin, false);
+    assert.equal(ran.login.body.data.user.isPlatformAdmin, false);
+    assert.equal(ran.session.data.isPlatformAdmin, false);
   });
 
   // Undone here rather than left behind: the hosted bootstrap below is a FRESH
@@ -201,14 +246,14 @@ describe('setup on a hosted install', () => {
       'a hosted install came up with nobody able to create the second provider');
     assert.equal(Number(roster[0].user_id), Number(idOf.plataforma));
     assert.equal(await PlatformAdmin.has(idOf.plataforma), true);
+
+    // And says so on the way out, so the panel walking straight into the
+    // session from setup already knows the providers screen is his to open.
+    assert.equal(body.data.user.isPlatformAdmin, true);
   });
 });
 
 describe('the guard', () => {
-  let plataformaToken;
-  let donaToken;
-  let promovidaToken;
-
   before(async () => {
     plataformaToken = (await signIn(PLATAFORMA)).body.data.token;
     await hire(DONA, 'admin', plataformaToken);
@@ -286,6 +331,52 @@ describe('the guard', () => {
       headers: authHeaders(promovidaToken)
     });
     assert.equal(stillSignedIn.status, 200);
+  });
+});
+
+/**
+ * What the session tells the panel about itself.
+ *
+ * The screen that manages providers cannot be gated on `role`: a provider's own
+ * administrator is `admin` too, so that gate would put the link in front of
+ * most of the panel's administrators and send them at routes that answer them
+ * as though nothing were there. So the session says it outright — and says it
+ * from the table, at request time, for the same reason the guard does.
+ */
+describe('what a session reports about the control plane', () => {
+  it('tells a platform administrator apart from a provider\'s administrator', async () => {
+    const platform = await call(`${panelUrl}/api/auth/user`, {
+      headers: authHeaders(plataformaToken)
+    });
+    const provider = await call(`${panelUrl}/api/auth/user`, {
+      headers: authHeaders(donaToken)
+    });
+
+    assert.equal(platform.body.data.isPlatformAdmin, true);
+    assert.equal(provider.body.data.isPlatformAdmin, false);
+    // Both are `admin`, which is exactly why the flag has to exist.
+    assert.equal(platform.body.data.role, provider.body.data.role);
+  });
+
+  it('says it on the login response too', async () => {
+    const { body } = await signIn(DONA);
+    assert.equal(body.data.user.isPlatformAdmin, false);
+  });
+
+  // Read at request time, never from the token: the same session that was told
+  // "no screen for you" is told otherwise on its next request, without signing
+  // in again — and the reverse, which is the one that matters.
+  it('follows the roster within the life of one token', async () => {
+    const reported = async () => (await call(`${panelUrl}/api/auth/user`, {
+      headers: authHeaders(promovidaToken)
+    })).body.data.isPlatformAdmin;
+
+    assert.equal(await reported(), false);
+    await PlatformAdmin.add(idOf.promovida);
+    assert.equal(await reported(), true);
+    await PlatformAdmin.remove(idOf.promovida);
+    assert.equal(await reported(), false,
+      'a withdrawn grant kept drawing the control plane until the token expired');
   });
 });
 
