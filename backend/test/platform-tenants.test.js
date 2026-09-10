@@ -280,12 +280,22 @@ describe('suspending and reactivating', () => {
     assert.equal(status, 404);
   });
 
-  // There is no delete on purpose: the scoped tables reference `tenants` without
-  // a cascade, so removing a provider that holds data would fail on a foreign
-  // key — and succeeding would take an ISP's whole panel with it.
-  it('offers no way to delete a provider', async () => {
-    const { status } = await platform(`/tenants/${outraId}`, { method: 'DELETE' });
-    assert.equal(status, 404);
+  /**
+   * Apagar existe desde a onda 22, e o que este caso fixa é que ele não
+   * acontece por acidente: um provedor ATIVO não sai, por mais autorizado que
+   * seja quem pede. Suspender primeiro é o que faz da exclusão dois passos com
+   * um estado reversível no meio — que era a objeção inteira à versão anterior
+   * deste teste, quando o DELETE não existia.
+   *
+   * As outras três condições — slug digitado de volta, não ser o último
+   * provedor, e a trilha gravada antes — estão em `platform-tenant-delete`.
+   */
+  it('não apaga um provedor que está ativo', async () => {
+    const { status } = await platform(`/tenants/${outraId}`, {
+      method: 'DELETE',
+      body: { confirmSlug: 'outra' }
+    });
+    assert.equal(status, 409);
     assert.ok(await getDb()('tenants').where({ id: outraId }).first());
   });
 });

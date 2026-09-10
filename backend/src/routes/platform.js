@@ -16,12 +16,20 @@ import { authenticateToken, requirePlatformAdmin } from '../middleware/auth.js';
  * deployment where nobody has been granted the role these routes exist and
  * refuse everyone. That is the safe side of failing.
  *
- * There is no DELETE for a provider. See the controller for why.
+ * O DELETE existe desde a onda 22 e exige quatro coisas ao mesmo tempo — ver
+ * o comentário no controlador, que explica por que a decisão anterior de não
+ * ter DELETE continua correta na forma como ela foi tomada.
  */
 const router = express.Router();
 
 router.get('/tenants', authenticateToken, requirePlatformAdmin, PlatformController.listTenants);
 router.post('/tenants', authenticateToken, requirePlatformAdmin, PlatformController.create);
 router.patch('/tenants/:id', authenticateToken, requirePlatformAdmin, PlatformController.setStatus);
+router.delete('/tenants/:id', authenticateToken, requirePlatformAdmin, PlatformController.remove);
+
+// A trilha do plano de controle. Só leitura, como a do provedor e pelo mesmo
+// motivo: se desse para apagar uma linha, a primeira coisa a fazer depois de
+// apagar um provedor seria apagar o registro disso.
+router.get('/audit', authenticateToken, requirePlatformAdmin, PlatformController.listAudit);
 
 export default router;

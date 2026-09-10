@@ -124,6 +124,11 @@ export const SHARED_TABLES = new Set([
   // through the scope would be circular. `TenantUser` carries the rule that
   // every query against it must name a person or a provider.
   'tenant_users',
+  // A trilha do plano de controle: o que quem opera o SaaS fez COM um
+  // provedor. Compartilhada porque é ACIMA dos provedores e porque a linha que
+  // registra a exclusão de um tem que sobreviver a ele — escopada, ela seria
+  // apagada exatamente junto com o que existe para registrar.
+  'platform_audit',
   // The control plane's roster. Above providers rather than inside one: a
   // provider's own administrator must not be able to mint providers or reach
   // into another's, so this cannot be a per-provider table by construction.

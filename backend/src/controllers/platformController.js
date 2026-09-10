@@ -1,4 +1,8 @@
 import Tenant from '../models/Tenant.js';
+import PlatformAudit from '../models/PlatformAudit.js';
+import { SCHEMA_TABLES } from '../config/migrations.js';
+import { SCOPED_TABLES } from '../config/tenantScope.js';
+import { forgetResolvedTenant } from '../middleware/tenantResolver.js';
 import AuditLog from '../models/AuditLog.js';
 import { runInTenant } from '../config/tenantContext.js';
 import { getDb } from '../config/database.js';
@@ -6,14 +10,27 @@ import { seedDefaults } from '../config/seed.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 
 /**
- * The provider registry: create, list, suspend, reactivate.
+ * The provider registry: create, list, suspend, reactivate — e, desde a onda
+ * 22, apagar.
  *
- * There is no delete, and that is a decision rather than an omission. The
- * scoped tables point at `tenants` WITHOUT a cascade, so removing a provider
- * that holds anything would fail on a foreign key — and the version that
- * succeeded would be worse, because it would take an ISP's devices, its
- * customers and its message history with it on one click. Suspending is the
- * operation, and unlike deleting it can be undone.
+ * A versão anterior deste comentário dizia que apagar não existia, e o
+ * argumento continua inteiro: apagar leva os aparelhos, os assinantes e o
+ * histórico de mensagens de um ISP junto, e um botão que faz isso num clique
+ * não deveria existir. O que mudou não foi o argumento, foi a exigência: LGPD
+ * dá ao titular o direito de sumir, e um contrato cancelado precisa de um fim.
+ *
+ * A conciliação está na forma da operação, não na sua ausência. Apagar exige
+ * **quatro** coisas ao mesmo tempo, e nenhuma delas acontece por acidente:
+ *
+ * 1. estar no plano de controle;
+ * 2. o provedor estar **suspenso** — o que faz da exclusão um segundo passo,
+ *    com um estado reversível no meio, e não um clique;
+ * 3. o slug digitado de volta, exato;
+ * 4. não ser o último provedor do deployment.
+ *
+ * E a linha da trilha da plataforma é gravada ANTES, com a contagem do que vai
+ * sumir: se ela não puder ser gravada, não se apaga. Apagar sem deixar rastro é
+ * a única forma de apagar que é indefensável.
  */
 
 /** The only two values `tenants.status` is allowed to take. */
@@ -160,6 +177,10 @@ class PlatformController {
       }
 
       const created = await Tenant.findById(id);
+      await PlatformAudit.fromRequest(req, {
+        action: PlatformAudit.ACTIONS.TENANT_CREATED,
+        tenant: created
+      });
       return res.status(201).json(createResponse('Tenant created successfully', {
         tenant: present(created, 0)
       }));
@@ -202,6 +223,11 @@ class PlatformController {
       }
 
       await Tenant.setStatus(id, status);
+      await PlatformAudit.fromRequest(req, {
+        action: PlatformAudit.ACTIONS.TENANT_STATUS_CHANGED,
+        tenant,
+        detail: { from: tenant.status, to: status }
+      });
       // A linha nasce NO provedor suspenso, não numa trilha da plataforma: quem
       // vai perguntar "por que meu painel parou" é o ISP, e a resposta tem que
       // estar onde ele consegue olhar. `actorKind: 'platform'` é o que diz que
@@ -224,6 +250,143 @@ class PlatformController {
       console.error('Update tenant error:', error);
       return res.status(500).json(
         createErrorResponse('Failed to update the provider', error.message)
+      );
+    }
+  }
+
+  /**
+   * Apaga um provedor e tudo o que é dele.
+   *
+   * As quatro condições estão no comentário do topo do arquivo. O que vale
+   * dizer aqui é a ORDEM, que é a única parte com risco técnico: as tabelas
+   * escopadas apontam para `tenants` sem cascata, então apagar de cima para
+   * baixo falha na primeira chave estrangeira. Apaga-se na ordem INVERSA à de
+   * criação do schema — a mesma lista que o export usa, lida de trás para
+   * frente — e só então a linha do provedor.
+   *
+   * Tudo numa transação: um provedor meio apagado é pior que um inteiro, porque
+   * o que sobra não aparece em tela nenhuma (a resolução por host já não o
+   * encontra) e continua ocupando os índices únicos por provedor.
+   */
+  static async remove(req, res) {
+    try {
+      const id = Number(req.params?.id);
+      if (!Number.isInteger(id) || id <= 0) {
+        return res.status(400).json(createErrorResponse('Invalid provider id'));
+      }
+      const tenant = await Tenant.findById(id);
+      if (!tenant) {
+        return res.status(404).json(createErrorResponse('Provider not found'));
+      }
+
+      // Suspender primeiro é o que transforma isto em dois passos com um
+      // estado reversível no meio. Um provedor ativo tem gente trabalhando
+      // nele agora.
+      if (tenant.status !== 'suspended') {
+        return res.status(409).json(createErrorResponse(
+          'Suspend the provider before deleting it'
+        ));
+      }
+      // O slug digitado de volta, exato — sem normalizar caixa nem espaço. É a
+      // confirmação inteira: normalizar aqui aceitaria um slug "quase certo",
+      // que é justamente o que um engano parece.
+      if (req.body?.confirmSlug !== tenant.slug) {
+        return res.status(409).json(createErrorResponse(
+          'Type the provider slug exactly to confirm the deletion'
+        ));
+      }
+      // O último provedor não sai: sem nenhum, `resolveDefaultTenantId` devolve
+      // null e o deployment inteiro passa a responder 503 — inclusive para quem
+      // acabou de apagar, que perde a rota para desfazer.
+      if ((await Tenant.list()).length <= 1) {
+        return res.status(409).json(createErrorResponse(
+          'The deployment must keep at least one provider'
+        ));
+      }
+
+      const db = getDb();
+      const escopadas = SCHEMA_TABLES.filter((tabela) => SCOPED_TABLES.has(tabela));
+      const contagem = {};
+      for (const tabela of escopadas) {
+        const [linha] = await db(tabela).where({ tenant_id: id }).count({ n: '*' });
+        contagem[tabela] = Number(linha?.n ?? 0);
+      }
+      const vinculos = await db('tenant_users').where({ tenant_id: id }).count({ n: '*' });
+      contagem.tenant_users = Number(vinculos[0]?.n ?? 0);
+
+      // ANTES de apagar, e conferido: aqui a trilha não é registro do que
+      // houve, é condição para que aconteça.
+      const registrada = await PlatformAudit.fromRequest(req, {
+        action: PlatformAudit.ACTIONS.TENANT_DELETED,
+        tenant,
+        detail: { rowCounts: contagem }
+      });
+      if (!registrada) {
+        return res.status(500).json(createErrorResponse(
+          'The deletion was not recorded, so it was not performed'
+        ));
+      }
+
+      await db.transaction(async (trx) => {
+        // De trás para frente: as filhas antes das mães, que é o inverso da
+        // ordem em que o schema as cria.
+        for (const tabela of [...escopadas].reverse()) {
+          await trx(tabela).where({ tenant_id: id }).del();
+        }
+        // `tenant_invites` já saiu no laço acima — ela é escopada, então está
+        // em `escopadas`. `tenant_users` NÃO está: ela é do deploy, porque uma
+        // linha ali é uma PESSOA que pode trabalhar para outro provedor. O que
+        // se apaga aqui é o vínculo dela com este, e nunca a pessoa.
+        await trx('tenant_users').where({ tenant_id: id }).del();
+        await trx('tenants').where({ id }).del();
+      });
+
+      // O resolvedor guarda o id por slug e o primeiro provedor da tabela. Sem
+      // isto, o processo continuaria resolvendo um provedor que não existe mais
+      // até reiniciar — e o host dele responderia com o escopo de um fantasma.
+      forgetResolvedTenant();
+
+      return res.json(createResponse('Provider deleted successfully', {
+        id, slug: tenant.slug, rowCounts: contagem
+      }));
+    } catch (error) {
+      console.error('Delete tenant error:', error);
+      return res.status(500).json(
+        createErrorResponse('Failed to delete the provider', error.message)
+      );
+    }
+  }
+
+  /** A trilha do plano de controle, da mais recente para a mais antiga. */
+  static async listAudit(req, res) {
+    try {
+      const linhas = await PlatformAudit.list({
+        limit: req.query?.limit,
+        before: req.query?.before || null
+      });
+      return res.json(createResponse('Platform audit retrieved', {
+        entries: linhas.map((linha) => ({
+          id: linha.id,
+          action: linha.action,
+          actor: { userId: linha.actor_user_id, username: linha.actor_username },
+          // Nome e slug vêm da linha e não de um join com `tenants`: o provedor
+          // da linha mais importante desta tabela não existe mais.
+          tenant: {
+            id: linha.tenant_id,
+            slug: linha.tenant_slug,
+            name: linha.tenant_name
+          },
+          detail: linha.detail ? JSON.parse(linha.detail) : null,
+          ip: linha.ip,
+          at: linha.created_at
+        })),
+        nextBefore: linhas.length ? linhas[linhas.length - 1].id : null,
+        actions: Object.values(PlatformAudit.ACTIONS)
+      }));
+    } catch (error) {
+      console.error('List platform audit error:', error);
+      return res.status(500).json(
+        createErrorResponse('Failed to read the platform audit', error.message)
       );
     }
   }

@@ -348,6 +348,35 @@ const platformAdminsTable = (db) => (t) => {
  * repositório de segredos em claro do produto. `audit-log.test.js` guarda isso
  * com uma varredura sobre o que cada gravação de verdade produz.
  */
+/**
+ * A trilha do plano de controle — acima dos provedores, não dentro de um.
+ *
+ * `audit_log` é escopada e responde "o que aconteceu no meu painel?". Esta
+ * responde outra coisa: o que quem opera o SaaS fez COM um provedor. Precisa
+ * ser uma tabela à parte por uma razão que não é organização: a exclusão de um
+ * provedor tem que deixar registro, e registrar isso na trilha DELE é inútil —
+ * ela vai junto.
+ *
+ * Daí `tenant_id` ser um inteiro simples e **não** uma chave estrangeira, com o
+ * slug e o nome desnormalizados ao lado. Uma FK aqui apagaria em cascata (ou
+ * impediria) exatamente a linha que existe para dizer que aquele provedor foi
+ * apagado, que é a única linha desta tabela que não pode faltar.
+ */
+const platformAuditTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('actor_user_id').unsigned().references('id').inTable('users').onDelete('SET NULL');
+  t.string('actor_username', 64);
+  t.string('action', 64).notNullable();
+  // Sem FK, de propósito. Ver acima.
+  t.integer('tenant_id').unsigned();
+  t.string('tenant_slug', 64);
+  t.string('tenant_name', 128);
+  t.text('detail');
+  t.string('ip', 64);
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  t.index(['created_at', 'id'], 'platform_audit_recent_idx');
+};
+
 const auditLogTable = (db) => (t) => {
   t.increments('id').primary();
   t.integer('tenant_id').unsigned().notNullable()
@@ -853,7 +882,9 @@ const MEMBERSHIP_TABLES = [
   // Idem: aponta para `users` (quem convidou, quem aceitou) e para `tenants`.
   ['tenant_invites', tenantInvitesTable],
   // Idem: aponta para `users` (quem fez) e para `tenants`.
-  ['audit_log', auditLogTable]
+  ['audit_log', auditLogTable],
+  // Aponta para `users` e para mais nada — ver o comentário na fábrica.
+  ['platform_audit', platformAuditTable]
 ];
 
 const INITIAL_TABLES = [
@@ -2059,6 +2090,17 @@ export const migrations = [
       if (!(await db.schema.hasTable('users'))) return;
       if (!(await db.schema.hasTable('tenants'))) return;
       await createTableIfMissing(db, 'audit_log', auditLogTable(db));
+    }
+  },
+  {
+    /** A trilha do plano de controle. Aponta para `users`, daí nascer aqui. */
+    id: '0033_platform_audit',
+    async isApplied(db) {
+      return db.schema.hasTable('platform_audit');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('users'))) return;
+      await createTableIfMissing(db, 'platform_audit', platformAuditTable(db));
     }
   }
 ];

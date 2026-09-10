@@ -527,12 +527,15 @@ sustenta. Antes do décimo tenant:
 - Observabilidade: `tenant_id` em toda linha de log e em toda métrica. O **`audit_log` entrou
   na onda 20** — senha de portal revelada e redefinida, URL e credencial do GenieACS, papéis,
   vínculos, convites e suspensão de provedor. Falta a impersonação, que ainda não existe.
-- Backup e **procedimento de exportação/exclusão por tenant**. A **exportação entrou na onda
-  21** (`GET /api/tenant/export`, capacidade `tenant.export`, auditada): todas as tabelas
+- Backup e **procedimento de exportação/exclusão por tenant**. A **exclusão entrou na onda
+  22**: exige quatro coisas ao mesmo tempo — estar no plano de controle, o provedor estar
+  **suspenso** (o que faz dela um segundo passo, com um estado reversível no meio, e não um
+  clique), o slug digitado de volta exato, e não ser o último provedor do deployment —, e a
+  linha da trilha é gravada ANTES, com a contagem do que vai sumir: se ela não puder ser
+  gravada, não se apaga. A **exportação entrou na onda 21** (`GET /api/tenant/export`, capacidade `tenant.export`, auditada): todas as tabelas
   escopadas na ordem de criação do schema — que é a ordem que as FKs pedem, e o que faz o
   arquivo poder ser reinserido de cima para baixo —, sem nenhum segredo cifrado nem hash de
-  senha, com um manifesto que diz o que ficou de fora e por quê. A **exclusão** ainda não:
-  ver a nota no checklist.
+  senha, com um manifesto que diz o que ficou de fora e por quê.
 
 ---
 
@@ -716,8 +719,9 @@ edições de divergirem.
 
 ### Checklist antes de vender acesso ao segundo provedor
 
-Nada disso é negociável. **Onze dos doze estão cumpridos**, e o que falta do
-décimo segundo é a exclusão, não a exportação.
+Nada disso é negociável. **Os doze estão cumpridos**, com uma ressalva no oitavo:
+o rate limit é por provedor, mas a concorrência de fetch ao ACS ainda não — e essa
+metade é da Fase 4.
 
 | | Item | Estado |
 | --- | --- | --- |
@@ -732,17 +736,17 @@ décimo segundo é a exclusão, não a exportação.
 | 9 | Suíte de vazamento verde no CI e obrigatória para merge | ✅ 1403 testes, três dialetos |
 | 10 | `SECRET_BOX_KEY` separada do `JWT_SECRET`, com `key_version` | ✅ |
 | 11 | `audit_log` registrando ações sensíveis | ✅ onda 20 — senha de portal, GenieACS, papéis, vínculos, convites, suspensão |
-| 12 | Exportação por provedor funcionando (LGPD e "apaguei tudo, socorro") | ⚠️ exportação ✅ (onda 21); a EXCLUSÃO por provedor falta, e depende de uma trilha acima dos provedores |
+| 12 | Exportação por provedor funcionando (LGPD e "apaguei tudo, socorro") | ✅ exportação (onda 21) e exclusão (onda 22), com trilha que sobrevive ao provedor apagado |
 
-O que falta é a **exclusão por provedor** (metade do 12) e a **concorrência de fetch ACS**
-(metade do 8). Nenhum dos dois é do mecanismo de isolamento de dados, que é o que a Fase 1
-entregou.
+O que falta é a **concorrência de fetch ao ACS** (metade do 8), que é da Fase 4 e não do
+mecanismo de isolamento de dados — que é o que a Fase 1 entregou.
 
-A exclusão está parada num ponto que vale registrar em vez de contornar: apagar um provedor
-tem que deixar registro, e registrar no `audit_log` DELE é inútil — a trilha vai junto. Um
-registro que sobreviva precisa morar acima dos provedores, que é a mesma tabela que a
-impersonação da plataforma vai precisar. As duas coisas entram juntas ou nenhuma entra
-direito.
+A exclusão entrou na onda 22, e o que a destravou foi `platform_audit`: apagar um provedor
+tem que deixar registro, e registrar no `audit_log` DELE é inútil porque a trilha vai junto.
+A tabela é compartilhada, guarda `tenant_id` como inteiro simples com o slug e o nome
+desnormalizados, e **não tem chave estrangeira para `tenants`** — uma FK apagaria em cascata,
+ou impediria, exatamente a linha que existe para dizer que aquele provedor foi apagado. É
+também a tabela de que a impersonação da plataforma vai precisar.
 
 ## Verificação
 
