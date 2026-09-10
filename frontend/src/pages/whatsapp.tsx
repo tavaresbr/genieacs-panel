@@ -502,7 +502,7 @@ function InboxTab() {
           </section>
         ) : (
           <section className="modern-card grid h-[calc(100vh-16rem)] min-h-[32rem] grid-cols-1 overflow-hidden lg:grid-cols-[minmax(17rem,22rem)_1fr]">
-            <div className="flex min-h-0 flex-col border-border lg:border-r">
+            <div className="flex min-h-0 flex-col border-border lg:border-e">
               <div className="space-y-2 border-b border-border px-3 py-3">
                 <input
                   type="search"

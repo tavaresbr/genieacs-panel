@@ -587,9 +587,9 @@ export default function NetworkMap() {
         </header>
 
         <section className="mb-4 grid grid-cols-2 overflow-hidden rounded-[var(--radius)] border border-border bg-card sm:grid-cols-4">
-          <div className="border-b border-r border-border p-4 sm:border-b-0"><p className="metric-label">{t('map.metric.nodes')}</p><p className="metric-value">{nodes.length}</p></div>
-          <div className="border-b border-border p-4 sm:border-b-0 sm:border-r"><p className="metric-label">{t('map.metric.cables')}</p><p className="metric-value">{edges.length}</p></div>
-          <div className="border-r border-border p-4"><p className="metric-label">{t('map.metric.oltOdc')}</p><p className="metric-value">{nodes.filter((n) => n.type === 'olt' || n.type === 'odc').length}</p></div>
+          <div className="border-b border-e border-border p-4 sm:border-b-0"><p className="metric-label">{t('map.metric.nodes')}</p><p className="metric-value">{nodes.length}</p></div>
+          <div className="border-b border-border p-4 sm:border-b-0 sm:border-e"><p className="metric-label">{t('map.metric.cables')}</p><p className="metric-value">{edges.length}</p></div>
+          <div className="border-e border-border p-4"><p className="metric-label">{t('map.metric.oltOdc')}</p><p className="metric-value">{nodes.filter((n) => n.type === 'olt' || n.type === 'odc').length}</p></div>
           <div className="p-4"><p className="metric-label">{t('map.metric.lastRefresh')}</p><p className="mt-2 font-mono text-sm font-semibold">{lastRefresh ? formatTime(lastRefresh) : '—'}</p></div>
         </section>
 
@@ -669,7 +669,7 @@ export default function NetworkMap() {
             </div>
           </section>
           {loading && (
-            <div className="pointer-events-none absolute right-3 top-3 z-[500] flex items-center gap-2 rounded-md border border-border bg-card/95 px-3 py-2 text-xs font-semibold shadow-sm">
+            <div className="pointer-events-none absolute end-3 top-3 z-[500] flex items-center gap-2 rounded-md border border-border bg-card/95 px-3 py-2 text-xs font-semibold shadow-sm">
               <Icon name="refresh" size={15} className="animate-spin" />
               {t('map.loadingTopology')}
             </div>

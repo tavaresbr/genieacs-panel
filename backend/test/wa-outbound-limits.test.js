@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { safeFetch } from '../src/utils/wa/ssrfGuard.js';
+import { PinnedTransport } from '../src/utils/net/pinnedFetch.js';
 import { EvolutionClient } from '../src/services/evolutionClient.js';
 
 /**
@@ -9,33 +10,63 @@ import { EvolutionClient } from '../src/services/evolutionClient.js';
  *
  * Nada aqui abre socket: o `globalThis.fetch` é trocado por um dublê. O que se
  * testa é o que o painel EXIGE do outro lado — um prazo e um teto — e nenhum
- * dos dois depende de rede para ser verificado. Usar um host que não resolve é
- * de propósito: `resolvesToPrivate` devolve false quando o nome não resolve, e
- * o guard deixa passar, que é o que põe o dublê no caminho.
+ * dos dois depende de rede para ser verificado.
+ *
+ * Um literal de IP, e não um nome. Um nome fazia `resolvesToPrivate` consultar
+ * o DNS DE VERDADE (`dns.resolve4`/`resolve6`, que vão à rede), contando que
+ * ele não resolvesse. Numa máquina que devolve NXDOMAIN na hora isso passa
+ * despercebido; num runner cujo resolvedor é lento ou engole a consulta, cada
+ * chamada espera o próprio timeout — mais do que os 5 s do `setTimeout` abaixo,
+ * que é o que segura o loop de eventos. O loop drena e o `node:test` cancela os
+ * oito testes pendentes: `0 fail, 8 cancelled`, nunca uma asserção quebrada,
+ * que é o que torna essa falha difícil de ler.
+ *
+ * `resolvesToPrivate` retorna cedo para um literal (`parseIPv4(h) !== null`),
+ * então nenhuma consulta acontece. `203.0.113.10` é TEST-NET-3 e não cai em
+ * nenhuma faixa de `isPrivateIPv4`, então o guard continua deixando passar —
+ * que é o que põe o dublê no caminho.
  */
-const HOST_PUBLICO = 'https://evo.provedor.test';
+const HOST_PUBLICO = 'https://203.0.113.10';
 
 let fetchReal;
+let requestReal;
 
 beforeEach(() => {
   fetchReal = globalThis.fetch;
+  requestReal = PinnedTransport.request;
 });
 
 afterEach(() => {
   globalThis.fetch = fetchReal;
+  PinnedTransport.request = requestReal;
 });
 
 describe('safeFetch gives every outbound request a deadline', () => {
   /**
-   * O `fetch` do Node não tem prazo nenhum por conta própria. Sem este, um host
-   * que aceita a conexão e nunca responde prende o handler do webhook que
-   * aguarda a busca — e `waWebhookLimiter` conta chegadas, não requisições
-   * simultâneas, então nada limitava quantas ficavam presas ao mesmo tempo.
+   * O dublê ficava em `globalThis.fetch`, e não fica mais: o `safeFetch` não
+   * passa mais por `fetch`. Ele não pode — o endereço aprovado tem de ser o
+   * endereço conectado, e o `fetch` do Node não aceita resolvedor. O transporte
+   * compartilhado (`utils/net/pinnedFetch.js`) é quem abre o socket, então é
+   * nele que o dublê entra.
+   *
+   * O que se testa continua sendo o mesmo, e é o que o `safeFetch` faz EM VOLTA
+   * do transporte: prazo único, sinal sempre presente, sinal do chamador
+   * respeitado. Nada aqui abre socket, e `203.0.113.10` continua sendo um
+   * literal — nenhuma consulta de nome acontece, em nenhum resolvedor.
    */
+  function dubla(responder) {
+    const chamadas = [];
+    PinnedTransport.request = (opcoes) => {
+      chamadas.push(opcoes);
+      return responder(opcoes, chamadas.length);
+    };
+    return chamadas;
+  }
+
   test('abandons a request that answers nothing at all', async () => {
-    globalThis.fetch = (_url, init) => new Promise((_resolve, reject) => {
-      init.signal.addEventListener('abort', () => reject(init.signal.reason));
-    });
+    dubla(({ signal }) => new Promise((_resolve, reject) => {
+      signal.addEventListener('abort', () => reject(signal.reason));
+    }));
 
     // O timer de `AbortSignal.timeout` é unref'd, e o dublê acima não abre
     // socket nenhum: sem algo segurando o loop de eventos o processo sairia
@@ -52,15 +83,11 @@ describe('safeFetch gives every outbound request a deadline', () => {
   });
 
   test('passes a signal even when the caller gives none', async () => {
-    let visto = null;
-    globalThis.fetch = (_url, init) => {
-      visto = init.signal;
-      return new Response('ok', { status: 200 });
-    };
+    const chamadas = dubla(() => new Response('ok', { status: 200 }));
 
     await safeFetch(`${HOST_PUBLICO}/midia.png`);
-    assert.ok(visto instanceof AbortSignal, 'toda saída tem de carregar um sinal');
-    assert.equal(visto.aborted, false);
+    assert.ok(chamadas[0].signal instanceof AbortSignal, 'toda saída tem de carregar um sinal');
+    assert.equal(chamadas[0].signal.aborted, false);
   });
 
   /**
@@ -69,33 +96,87 @@ describe('safeFetch gives every outbound request a deadline', () => {
    * limite existe para evitar.
    */
   test('spends one deadline across every redirect hop', async () => {
-    const sinais = new Set();
-    let saltos = 0;
-    globalThis.fetch = (_url, init) => {
-      sinais.add(init.signal);
-      saltos += 1;
-      return saltos < 3
-        ? new Response(null, { status: 302, headers: { location: `${HOST_PUBLICO}/${saltos}` } })
-        : new Response('chegou', { status: 200 });
-    };
+    const chamadas = dubla((_opcoes, salto) => (salto < 3
+      ? new Response(null, { status: 302, headers: { location: `${HOST_PUBLICO}/${salto}` } })
+      : new Response('chegou', { status: 200 })));
 
     const resposta = await safeFetch(`${HOST_PUBLICO}/inicio`);
     assert.equal(resposta.status, 200);
-    assert.equal(saltos, 3);
-    assert.equal(sinais.size, 1, 'os saltos compartilham um prazo, não um por salto');
+    assert.equal(chamadas.length, 3);
+    assert.equal(new Set(chamadas.map((c) => c.signal)).size, 1, 'os saltos compartilham um prazo, não um por salto');
+  });
+
+  /**
+   * O prazo tem de valer da resolução do nome em diante, e não só do `fetch`.
+   *
+   * A verificação anti-SSRF consulta o DNS antes de abrir qualquer conexão, e
+   * um resolver que não responde prende quem chamou tanto quanto um servidor
+   * que não responde — mesma espera, mesmo handler preso, um passo antes. O
+   * dublê abaixo é um resolver que nunca responde e que só solta quem espera
+   * quando é cancelado, que é como o c-ares se comporta de verdade.
+   */
+  test('covers the name resolution, not just the request', async () => {
+    // Um NOME, e não a constante do arquivo. A fase de resolução é o assunto
+    // deste caso, e um literal de IP é o seu próprio endereço — se o host daqui
+    // virar um literal, o dublê abaixo deixa de ser consultado e o teste passa
+    // a afirmar coisa nenhuma sem nunca ficar vermelho.
+    const HOST_COM_NOME = 'https://evo.provedor.test';
+    // O seam mudou de lugar junto com o resolvedor: quem consulta agora é
+    // `PinnedTransport.lookup`, que é `getaddrinfo` — o mesmo que o socket
+    // usaria, e a razão de a verificação ter deixado de mentir. O dublê é um
+    // resolvedor que nunca responde, que é o caso que o prazo tem de cobrir.
+    const lookupReal = PinnedTransport.lookup;
+    PinnedTransport.lookup = () => new Promise(() => {});
+
+    let abriuSocket = false;
+    PinnedTransport.request = () => {
+      abriuSocket = true;
+      return Promise.resolve(new Response('ok', { status: 200 }));
+    };
+
+    const segura = setTimeout(() => {}, 5_000);
+    try {
+      await assert.rejects(
+        () => safeFetch(`${HOST_COM_NOME}/midia.png`, { timeoutMs: 60 }),
+        // O prazo é o motivo de a chamada acabar. Uma consulta abandonada não
+        // devolve endereço nenhum, e chamar isso de "não resolveu" — ou pior,
+        // de "host privado" — diria ao operador uma coisa que não aconteceu.
+        (error) => error.name === 'TimeoutError'
+      );
+    } finally {
+      clearTimeout(segura);
+      PinnedTransport.lookup = lookupReal;
+    }
+
+    assert.equal(abriuSocket, false, 'a requisição não chegou a sair');
   });
 
   test("honours the caller's own signal alongside the deadline", async () => {
     const doChamador = new AbortController();
-    globalThis.fetch = (_url, init) => new Promise((_resolve, reject) => {
-      init.signal.addEventListener('abort', () => reject(init.signal.reason));
+    dubla(({ signal }) => new Promise((_resolve, reject) => {
+      signal.addEventListener('abort', () => reject(signal.reason));
       doChamador.abort(new Error('o chamador desistiu'));
-    });
+    }));
 
     await assert.rejects(
       () => safeFetch(`${HOST_PUBLICO}/midia.png`, { signal: doChamador.signal }),
       (error) => error.message === 'o chamador desistiu'
     );
+  });
+
+  /**
+   * O teto de corpo não mora mais em cada chamador: ele é um argumento do
+   * transporte compartilhado. Quem baixa anexo passa o seu (25 MiB); quem não
+   * diz nada recebe o padrão, dimensionado para resposta de API.
+   */
+  test('hands the transport a ceiling for the body, stated or default', async () => {
+    const chamadas = dubla(() => new Response('ok', { status: 200 }));
+
+    await safeFetch(`${HOST_PUBLICO}/midia.png`);
+    assert.equal(Number.isFinite(chamadas[0].maxBytes), true, 'toda saída tem de carregar um teto');
+
+    await safeFetch(`${HOST_PUBLICO}/video.mp4`, { maxBytes: 25 * 1024 * 1024 });
+    assert.equal(chamadas[1].maxBytes, 25 * 1024 * 1024);
   });
 });
 

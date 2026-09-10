@@ -223,6 +223,13 @@ class PlatformController {
       }
 
       await Tenant.setStatus(id, status);
+      // O resolvedor guarda slug -> id pela vida do processo e não relê o
+      // status, então sem isto uma suspensão só passa a valer no próximo
+      // restart: o painel e o portal do provedor suspenso seguem servindo e
+      // ainda autenticando gente nova, enquanto os jobs de fundo — que leem a
+      // coluna — param. Pior, a exclusão em duas etapas confia na suspensão
+      // para significar "ninguém está trabalhando lá dentro".
+      forgetResolvedTenant();
       await PlatformAudit.fromRequest(req, {
         action: PlatformAudit.ACTIONS.TENANT_STATUS_CHANGED,
         tenant,

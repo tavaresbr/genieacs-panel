@@ -202,6 +202,15 @@ describe('SGP configuration', () => {
     assert.equal(body.data.invoiceLimit, 8);
   });
 
+  /**
+   * This is also where the self-hosted half of the egress guard is pinned. The
+   * stub above listens on 127.0.0.1, and `SgpService.request` now goes through
+   * the same resolve-pin-and-cap transport the ACS path uses — which refuses
+   * loopback on the SaaS edition and does not on this one, because there the
+   * SGP really is on the operator's own LAN and the person who typed the URL
+   * owns the install. `egress-guard.test.js` holds the other half: the same
+   * probe, on the SaaS edition, refused with nothing reflected back.
+   */
   it('confirms credentials even when no sample customer is given', async () => {
     const { status, body } = await call(`${panelUrl}/api/sgp/test`, {
       method: 'POST',

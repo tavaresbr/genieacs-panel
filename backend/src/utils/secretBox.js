@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import crypto from 'node:crypto';
+import { DEVELOPMENT_FALLBACK, isProduction } from '../config/runtimeEnv.js';
 
 /**
  * Authenticated encryption for secrets that an operator must be able to read
@@ -34,22 +35,6 @@ import crypto from 'node:crypto';
 export const LEGACY_KEY_VERSION = 1;
 export const CURRENT_KEY_VERSION = 2;
 
-const DEVELOPMENT_FALLBACK = 'insecure-development-secret';
-
-/**
- * Whether this process is serving real data.
- *
- * Both variables are honoured, and the second is the point: the guard used to
- * read `APP_ENV` alone. Every supported install path sets it — `install.sh` and
- * the Dockerfile both do — but an install started outside them with only
- * `NODE_ENV=production` fell through to `DEVELOPMENT_FALLBACK` and encrypted
- * the operator's stored secrets under a key anyone can compute from this
- * repository. A guard that depends on which of two conventional variables an
- * operator happened to use is a guard that fails open on the unlucky one.
- */
-function isProduction() {
-  return process.env.APP_ENV === 'production' || process.env.NODE_ENV === 'production';
-}
 
 function readBaseSecrets() {
   const jwtSecret = process.env.JWT_SECRET;

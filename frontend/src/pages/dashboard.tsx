@@ -351,9 +351,9 @@ export default function DashboardPage() {
                 <p className="mt-8 text-sm leading-6 text-[#c8d4ce]">{t('dashboard.availability.description', { online: data.stats.online, total: data.stats.total })}</p>
               </div>
               <div className="grid grid-cols-2">
-                <div className="border-b border-r border-border p-5"><p className="metric-label">{t('dashboard.metric.opticalRisk')}</p><p className="metric-value text-[hsl(var(--status-warning))]">{signalRisk}</p></div>
+                <div className="border-b border-e border-border p-5"><p className="metric-label">{t('dashboard.metric.opticalRisk')}</p><p className="metric-value text-[hsl(var(--status-warning))]">{signalRisk}</p></div>
                 <div className="border-b border-border p-5"><p className="metric-label">{t('dashboard.metric.activeFaults')}</p><p className="metric-value text-[hsl(var(--status-danger))]">{data.faults.length}</p></div>
-                <div className="border-r border-border p-5"><p className="metric-label">{t('dashboard.metric.hotDevices')}</p><p className="metric-value">{data.temperatureDistribution.Hot || 0}</p></div>
+                <div className="border-e border-border p-5"><p className="metric-label">{t('dashboard.metric.hotDevices')}</p><p className="metric-value">{data.temperatureDistribution.Hot || 0}</p></div>
                 <div className="p-5"><p className="metric-label">{t('dashboard.metric.manyClients')}</p><p className="metric-value">{data.clientDistribution['16+'] || 0}</p></div>
               </div>
             </div>
@@ -375,7 +375,7 @@ export default function DashboardPage() {
                 <h2 className="section-heading">{t('dashboard.sgp.title')}</h2>
                 <p className="section-description">{t('dashboard.sgp.description')}</p>
               </div>
-              <p className="text-xs leading-5 text-muted-foreground sm:text-right">
+              <p className="text-xs leading-5 text-muted-foreground sm:text-end">
                 <span className="block">
                   {t('dashboard.sgp.linkedCount', { linked: sgpOverview.totals.linked, total: sgpOverview.totals.devices })}
                 </span>

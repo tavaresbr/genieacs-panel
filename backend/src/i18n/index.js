@@ -1,5 +1,7 @@
 import { DEFAULT_LOCALE, FALLBACK_LOCALE, LOCALES, negotiateLocale, resolveLocale } from './config.js';
+import ar from './locales/ar.js';
 import de from './locales/de.js';
+import hi from './locales/hi.js';
 import en from './locales/en.js';
 import fr from './locales/fr.js';
 import es from './locales/es.js';
@@ -24,7 +26,9 @@ export const dictionaries = {
   'zh-CN': zhCN,
   'zh-TW': zhTW,
   ko,
-  ru
+  ru,
+  ar,
+  hi
 };
 
 const PLACEHOLDER_PATTERN = /\{(\w+)\}/g;

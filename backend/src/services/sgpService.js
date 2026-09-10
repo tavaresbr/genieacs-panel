@@ -4,6 +4,8 @@ import CustomerAccount from '../models/CustomerAccount.js';
 import SgpLink from '../models/SgpLink.js';
 import DeviceService from './deviceService.js';
 import { createSecretBox } from '../utils/secretBox.js';
+import { PinnedTransport, RESPONSE_TOO_LARGE } from '../utils/net/pinnedFetch.js';
+import { IS_SAAS } from '../config/edition.js';
 import { normalizarTelefoneBr } from '../utils/wa/waDestino.js';
 import { TenantCache } from '../config/tenantCache.js';
 
@@ -11,6 +13,14 @@ const CONFIG_KEY = 'sgp_integration_config';
 const SYNC_STATE_KEY = 'sgp_sync_last_run';
 const CONFIG_CACHE_TTL_MS = 30_000;
 const REQUEST_TIMEOUT_MS = 15_000;
+/**
+ * How much of an SGP answer this process will hold in memory.
+ *
+ * There was no ceiling: `response.text()` on a raw `fetch` reads whatever the
+ * far end sends, and the far end is an address the operator typed. The biggest
+ * legitimate answer here is a contract's invoice list, which is kilobytes.
+ */
+const MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
 // A cached contract keeps plan, status and holder name frozen, so it is only
 // trusted for a day before the next read refreshes it from the SGP.
 const LINK_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -400,6 +410,69 @@ const DEFAULT_CONFIG = Object.freeze({
   eventTypeMap: {}
 });
 
+/**
+ * The one way this module reaches the SGP.
+ *
+ * `baseUrl` is request data: it arrives in the body of `POST /api/sgp/test`,
+ * behind the `sgp.config` permission that every provider admin holds — and on
+ * a multi-provider deployment that admin is a TENANT, not the host operator.
+ * It used to go straight into a bare `fetch` with no address check, no
+ * redirect policy and no ceiling on the body, and `SgpController.testConnection`
+ * hands the far end's own message back to the caller. Pointed at an internal
+ * service, the probe answered with that service's response body.
+ *
+ * So it goes through the shared transport instead, which resolves with the
+ * resolver the socket will use, refuses the address classes in
+ * `utils/net/blockedRanges.js`, connects only to the address it vetted, and
+ * stops reading at `MAX_RESPONSE_BYTES`. Nothing follows a redirect: a 3xx
+ * arrives as an ordinary not-ok answer, so an SGP that answers 302 towards
+ * somewhere else cannot move the request there.
+ *
+ * The address classes are refused on the SaaS edition only, for the same reason
+ * `genieacsEgress` does the same: a self-hosted install runs its SGP on the
+ * operator's own LAN, a private address is the normal case there, and the
+ * person who typed the URL owns the box. The pinning and the ceiling apply in
+ * both editions — one transport that behaves the same everywhere.
+ *
+ * Used by every SGP call, not just the probe: the portal's billing lookups and
+ * the reconcile job go through `SgpService.request` too.
+ */
+async function sgpFetch(url, { headers, body, signal }) {
+  let parsed;
+  try {
+    parsed = url instanceof URL ? url : new URL(String(url));
+  } catch {
+    throw new SgpError('sgp.error.urlInvalid', { code: 'invalid_base_url', status: 400 });
+  }
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw new SgpError('sgp.error.urlScheme', { code: 'invalid_base_url', status: 400 });
+  }
+
+  const hostname = parsed.hostname.replace(/^\[|\]$/g, '');
+  // The refusal names nothing it learned. `genieacsEgress` quotes the address
+  // it refused because its reader is the operator of the whole deployment;
+  // here the reader is one tenant of it, and "resolves to 10.0.0.5" would be
+  // the panel mapping its own private network on request.
+  const addresses = await PinnedTransport.vetTarget(hostname, {
+    allowPrivateAddresses: !IS_SAAS,
+    refuse: () => new SgpError('sgp.error.blockedHost', { code: 'blocked_host', status: 400 })
+  });
+  if (addresses.length === 0) {
+    throw new SgpError('sgp.error.unreachable', { code: 'unreachable', status: 502 });
+  }
+
+  return PinnedTransport.request({
+    url: parsed,
+    hostname,
+    addresses,
+    method: 'POST',
+    headers,
+    body,
+    signal,
+    maxBytes: MAX_RESPONSE_BYTES
+  });
+}
+
 const MIN_RECONCILE_INTERVAL_MINUTES = 5;
 
 class SgpService {
@@ -687,17 +760,27 @@ class SgpService {
     const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     let response;
     try {
-      response = await fetch(url, {
-        method: 'POST',
+      response = await sgpFetch(url, {
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify(body),
         signal: controller.signal
       });
     } catch (error) {
-      if (error.name === 'AbortError') {
+      // A refusal `sgpFetch` raised is already the right answer, and it is
+      // deliberately vague. Falling through to `unreachable` below would
+      // relabel it AND copy its text into `details`, which the controller
+      // reflects — the exact shape this guard exists to close.
+      if (error instanceof SgpError) throw error;
+      if (error.name === 'AbortError' || controller.signal.aborted) {
         throw new SgpError('sgp.error.timeout', {
           code: 'timeout',
           status: 504
+        });
+      }
+      if (error.code === RESPONSE_TOO_LARGE) {
+        throw new SgpError('sgp.error.invalidResponse', {
+          code: 'invalid_response',
+          status: 502
         });
       }
       throw new SgpError('sgp.error.unreachable', {
