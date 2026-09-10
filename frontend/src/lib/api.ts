@@ -436,7 +436,7 @@ export interface SgpConfig {
   portalBilling: boolean
   portalUnlock: boolean
   invoiceLimit: number
-  endpoints: { customer: string; invoices: string; unlock: string }
+  endpoints: { customer: string; invoices: string; unlock: string; ticket: string }
   tokenConfigured: boolean
   ready: boolean
   updatedAt: string | null
@@ -450,6 +450,16 @@ export interface SgpConfig {
   reconcileBatchSize: number
   eventRetentionDays: number
   eventTypeMap: Record<string, string>
+  ticketEnabled: boolean
+  /** The install's own Tipo de Ocorrência id; SGP documents 5 as the default. */
+  ticketOccurrenceType: number
+}
+
+export interface SgpTicket {
+  contract: string
+  /** Null when the install answers in a shape we do not recognise. */
+  ticket: string | null
+  message: string | null
 }
 
 export interface SgpEvent {
@@ -578,7 +588,12 @@ export const sgpAPI = {
   },
 
   getDeviceIntegration: (deviceId: string, options: { refresh?: boolean } = {}) =>
-    apiClient.get<{ link: SgpContractLink; invoices: SgpInvoice[]; invoiceError: string | null }>(
+    apiClient.get<{
+      link: SgpContractLink
+      invoices: SgpInvoice[]
+      invoiceError: string | null
+      ticketEnabled: boolean
+    }>(
       `/sgp/devices/${encodeURIComponent(deviceId)}${options.refresh ? '?refresh=1' : ''}`
     ),
 
@@ -590,6 +605,9 @@ export const sgpAPI = {
 
   requestTrustUnlock: (deviceId: string) =>
     apiClient.post<{ contract: string }>(`/sgp/devices/${encodeURIComponent(deviceId)}/unlock`),
+
+  openTicket: (deviceId: string, payload: { content: string; note?: string }) =>
+    apiClient.post<SgpTicket>(`/sgp/devices/${encodeURIComponent(deviceId)}/ticket`, payload),
 
   getLinks: () =>
     apiClient.get<{ links: SgpLinkRow[] }>('/sgp/links'),

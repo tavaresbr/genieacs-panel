@@ -54,6 +54,7 @@ SkyGenPanel is a management layer for GenieACS deployments. It combines an opera
 - SGP integration for subscriber contract, plan, and open-invoice data, with fleet-wide synchronization, contract-state filtering, and optional invoice display and trust unlock in the customer portal.
 - Automatic activation of a new ONT from its SGP contract, with per-step run history and a dry run before anything is written.
 - SGP event handling through a signed webhook and periodic contract reconciliation.
+- Support tickets opened in SGP from an ONT's page, seeded with the equipment and its current optical reading, off by default because it writes to the ERP.
 - Optical power, temperature and uptime recorded over time, charted on each ONT's page so a slow decline is legible before it becomes an outage.
 - ONT replacement detected from the subscriber's identity, with the SGP contract link carried onto the new equipment and the swap raised for the operator.
 - Automatic Linux dependency and Node.js installation during both first install and CLI updates.
