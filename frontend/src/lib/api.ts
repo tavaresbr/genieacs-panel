@@ -247,6 +247,36 @@ export const authAPI = {
 export type Operator = User
 export type { OperatorRole }
 
+/**
+ * What the login screen may know before anybody has signed in.
+ *
+ * Deliberately two fields. This route is public by necessity — it exists to be
+ * read before there is a session — so it carries the provider's name and
+ * nothing that would help enumerate: a host that names no provider answers the
+ * same 404 as any other unresolvable one, and a suspended provider answers it
+ * too, because telling "suspended" from "never existed" tells a prober which
+ * slugs are real, and a slug is an ISP's name.
+ */
+export interface PublicTenant {
+  slug: string
+  name: string
+}
+
+/**
+ * The provider the browser's own address resolves to.
+ *
+ * No parameter: the answer comes from the `Host` the request already carries,
+ * which is the whole point — the address names the provider, so a caller
+ * cannot ask about one they did not arrive at.
+ *
+ * Answers 404 where the deployment has no base domain configured, which is
+ * every self-hosted install: the login screen then shows the panel's own name,
+ * exactly as it does today.
+ */
+export const publicTenantAPI = {
+  current: () => apiClient.get<PublicTenant>('/tenant/public')
+}
+
 /** One provider on the deployment, as the control plane sees it. */
 export interface Tenant {
   id: number

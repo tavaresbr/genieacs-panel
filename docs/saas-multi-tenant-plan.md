@@ -802,3 +802,74 @@ estranho e entregaria credenciais em outra ISP a partir de adivinhar um nome.
 Um administrador de plataforma é outro nível de confiança — ele já pode criar
 provedores. Então **é ele** quem vincula uma pessoa existente a um provedor, e
 essa operação **nunca toca a senha**: ela cria o vínculo e nada mais.
+
+---
+
+## Onda 14 — provedor por subdomínio (decisões congeladas)
+
+Hoje o token nomeia o provedor, mas o **endereço não**. Todo mundo chega pelo
+mesmo host e o resolvedor sempre responde o primeiro provedor. É o que falta
+para a tenancy valer na prática.
+
+### A compatibilidade vem antes de tudo
+
+**Sem domínio base configurado, nada muda.** Nenhum install self-hosted tem DNS
+curinga, e o comportamento atual — o provedor próprio do install — continua
+sendo a resposta. Essa garantia é absoluta: quem não configurar nada não pode
+notar diferença nenhuma. É por isso que o domínio base é opt-in por ambiente e
+não um padrão.
+
+### Como o host vira provedor
+
+- `PANEL_BASE_DOMAIN` e `PORTAL_BASE_DOMAIN`. Um host `alfa.painel.exemplo.com`
+  com base `painel.exemplo.com` resolve o slug `alfa`.
+- O slug é comparado como o DNS compara: sem diferenciar maiúsculas, e a porta
+  do `Host` é descartada.
+
+### O que acontece quando não resolve
+
+Com domínio base configurado e um host que não nomeia provedor nenhum — sem
+subdomínio, slug inexistente, ou **provedor suspenso** — a resposta é **404**,
+a mesma para os três casos.
+
+Distinguir "suspenso" de "nunca existiu" conta a quem perguntou quais slugs são
+reais, e um slug é o nome de uma ISP. É o mesmo raciocínio que a onda 13 usou
+para o plano de controle, e a onda 12 para uma linha que o chamador não pode
+ver.
+
+### Token que discorda do host: 403
+
+Uma sessão válida do provedor A apontada para o subdomínio de B é **recusada
+com 403**, não servida. Sem isso, trocar de provedor seria reusar o token em
+outro endereço — e todo o trabalho das ondas 10 a 13 seria contornável por
+edição de URL.
+
+403 e não 404 aqui, ao contrário do caso acima, e o motivo é que não há o que
+esconder: quem chegou até aqui já provou ter sessão, e o passo do host já teria
+respondido 404 se B não existisse. Um 403 nesse ponto não conta nada que a
+requisição anterior não tenha contado.
+
+### O cache do resolvedor precisa morrer
+
+O `cachedId` de hoje guarda **um** provedor num módulo. Com o host decidindo,
+isso passa de otimização a defeito: o primeiro host a chegar decidiria o
+provedor de todo mundo. O comentário atual do arquivo já avisa disso.
+
+### Marca na tela de login: só o nome
+
+`/api/tenant/public` devolve `slug` e `name` do provedor do host, e nada mais.
+Logo e cores exigem colunas que `tenants` não tem e um caminho de upload;
+ficam para uma onda própria, junto com `tenant_domains` e domínio próprio do
+provedor. O que resolve hoje é a tela de login dizer o nome certo em vez do
+nome do painel.
+
+A rota é pública por necessidade — ela existe para ser lida antes de haver
+sessão — então devolve exatamente esses dois campos e nada que sirva para
+enumerar: um host que não resolve responde o mesmo 404 de qualquer outro.
+
+### O que NÃO entra
+
+- DNS curinga e TLS curinga são infraestrutura do lado de quem opera, não código.
+- `CORS_ORIGINS` **não muda**: `isAllowedOrigin` já aceita uma origem cujo host
+  é o host da própria requisição, que é exatamente o caso do subdomínio.
+- Domínio próprio do provedor (`painel.provedor.com.br`) continua adiado.
