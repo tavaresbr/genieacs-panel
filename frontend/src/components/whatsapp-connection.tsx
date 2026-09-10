@@ -23,6 +23,11 @@ const PURPOSES: WhatsAppPurpose[] = ['general', 'billing', 'support', 'sales', '
  * A code we do not know yet reads as the generic failure, never as raw text.
  */
 const ERROR_KEYS: Record<string, TranslationKey> = {
+  // Não é erro da integração, e está aqui por isso: cada chamada desta tela
+  // resolve o código por este mapa, e um `missing_permission` fora dele lia
+  // como "a requisição falhou" — a única frase que não diz à pessoa que o
+  // problema é o papel dela e que tentar de novo não resolve.
+  missing_permission: 'api.missingPermission',
   not_configured: 'whatsapp.error.notConfigured',
   incomplete_config: 'whatsapp.error.incompleteConfig',
   invalid_webhook_url: 'whatsapp.error.invalidWebhookUrl',

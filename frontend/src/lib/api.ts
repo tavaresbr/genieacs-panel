@@ -75,7 +75,16 @@ class ApiClient {
       if (!response.ok) {
         return {
           success: false,
-          message: data.message || translate(getActiveLocale(), 'api.requestFailed'),
+          // `missing_permission` é o 403 de quem tem sessão boa e papel curto.
+          // A frase de reserva é a dele e não a genérica: sem isto, uma rota que
+          // recusasse sem corpo cairia em "a requisição falhou", que manda a
+          // pessoa tentar de novo para sempre falhar igual — e é vizinha do
+          // `invalid_token` logo acima, cujo caminho termina em tela de login.
+          // Nada aqui derruba a sessão, e é justamente esse o ponto.
+          message: data.message || translate(
+            getActiveLocale(),
+            data.code === 'missing_permission' ? 'api.missingPermission' : 'api.requestFailed'
+          ),
           error: data.error || translate(getActiveLocale(), 'api.unknownError'),
           code: data.code,
           // Forwarded, not rebuilt away: see `skipped` above.

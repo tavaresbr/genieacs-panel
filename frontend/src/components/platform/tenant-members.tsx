@@ -5,6 +5,7 @@ import { platformAPI, type OperatorRole, type Tenant, type TenantMembership } fr
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
+import { OPERATOR_ROLES, ROLE_LABEL_KEYS } from '@/lib/permissions'
 
 interface Props {
   tenant: Tenant
@@ -84,8 +85,7 @@ export function TenantMembers({ tenant, onMembershipChange }: Props) {
     }
   }
 
-  const roleLabel = (role: OperatorRole) =>
-    t(role === 'admin' ? 'settings.operators.roleAdmin' : 'settings.operators.roleViewer')
+  const roleLabel = (role: OperatorRole) => t(ROLE_LABEL_KEYS[role])
 
   return (
     <div className="space-y-4 py-3">
@@ -143,8 +143,13 @@ export function TenantMembers({ tenant, onMembershipChange }: Props) {
             className="modern-input sm:w-40"
             aria-label={t('settings.operators.role')}
           >
-            <option value="admin">{t('settings.operators.roleAdmin')}</option>
-            <option value="viewer">{t('settings.operators.roleViewer')}</option>
+            {/* Os quatro, `owner` inclusive: a regra de que só um `owner`
+                promove outro vale entre colegas de um provedor, e o plano de
+                controle está acima dela — o `platformMemberController` aceita
+                qualquer um dos papéis aqui. */}
+            {OPERATOR_ROLES.map((role) => (
+              <option key={role} value={role}>{roleLabel(role)}</option>
+            ))}
           </select>
           <button
             type="button"

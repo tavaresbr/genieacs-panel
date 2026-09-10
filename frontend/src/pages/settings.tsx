@@ -27,6 +27,7 @@ import { WhatsAppConnection, whatsappErrorMessage } from '@/components/whatsapp-
 import { useAuth } from '@/contexts/auth-context'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
+import { OPERATOR_ROLES, ROLE_LABEL_KEYS, ROLE_SUMMARY_KEYS } from '@/lib/permissions'
 import type { Vendor as VendorType, WifiSecurityConfig as WifiSecurityConfigType } from '@/types'
 
 const INSTALLER_VIRTUAL_PARAMETERS = {
@@ -446,6 +447,14 @@ export default function Settings() {
   const [resetPasswordId, setResetPasswordId] = useState<number | null>(null)
   const [resetPasswordValue, setResetPasswordValue] = useState('')
 
+  // A tela não decide nada: quem recusa é o backend, que responde 403 a um
+  // `admin` que tente cunhar ou mexer num `owner`. O que ela faz é não oferecer
+  // um botão que sempre falharia — e não esconder o papel que a pessoa JÁ tem,
+  // senão a linha de um `owner` apareceria com o papel errado no seletor.
+  const isOwner = currentUser?.role === 'owner'
+  const rolesFor = (current?: OperatorRole) =>
+    OPERATOR_ROLES.filter((role) => role !== 'owner' || isOwner || role === current)
+
   const fetchOperators = async () => {
     setOperatorsLoading(true)
     const res = await usersAPI.list()
@@ -510,7 +519,7 @@ export default function Settings() {
         setOperators((current) => current.map((item) => (item.id === updated.id ? updated : item)))
         toast.success(t('settings.operators.roleUpdated', {
           username: updated.username,
-          role: t(updated.role === 'admin' ? 'settings.operators.roleAdmin' : 'settings.operators.roleViewer')
+          role: t(ROLE_LABEL_KEYS[updated.role])
         }))
       } else {
         // The backend refuses a demotion that would leave no administrator.
@@ -1736,10 +1745,22 @@ export default function Settings() {
                           onChange={(e) => setOperatorForm(f => ({ ...f, role: e.target.value as OperatorRole }))}
                           className="modern-input w-full"
                         >
-                          <option value="admin">{t('settings.operators.roleAdmin')}</option>
-                          <option value="viewer">{t('settings.operators.roleViewer')}</option>
+                          {rolesFor().map((role) => (
+                            <option key={role} value={role}>{t(ROLE_LABEL_KEYS[role])}</option>
+                          ))}
                         </select>
-                        <p className="field-hint">{t('settings.operators.roleHint')}</p>
+                        {/* Os quatro juntos, e não só o escolhido: a comparação
+                            é a decisão. Quem cria uma conta escolhe entre eles
+                            uma vez e não volta à tela para conferir. */}
+                        <ul className="mt-2 space-y-1">
+                          {rolesFor().map((role) => (
+                            <li key={role} className="field-hint">
+                              <span className="font-medium text-foreground">{t(ROLE_LABEL_KEYS[role])}</span>
+                              {' — '}
+                              {t(ROLE_SUMMARY_KEYS[role])}
+                            </li>
+                          ))}
+                        </ul>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 mt-4">
@@ -1783,6 +1804,11 @@ export default function Settings() {
                       ) : (
                         operators.map((operator) => {
                           const isSelf = currentUser?.id === operator.id
+                          // Mexer no papel de um `owner` é dele para dele: o
+                          // backend responde 403 a qualquer outro, para dar e
+                          // para tirar. O seletor fica travado em vez de sumir
+                          // porque o papel atual continua sendo informação.
+                          const lockedByOwner = operator.role === 'owner' && !isOwner
                           return (
                             <Fragment key={operator.id}>
                               <tr>
@@ -1795,14 +1821,20 @@ export default function Settings() {
                                 <td>
                                   <select
                                     value={operator.role}
-                                    disabled={operatorBusyId === operator.id}
+                                    disabled={operatorBusyId === operator.id || lockedByOwner}
                                     onChange={(e) => void changeOperatorRole(operator, e.target.value as OperatorRole)}
                                     className="modern-input w-40"
                                     aria-label={t('settings.operators.roleFor', { username: operator.username })}
                                   >
-                                    <option value="admin">{t('settings.operators.roleAdmin')}</option>
-                                    <option value="viewer">{t('settings.operators.roleViewer')}</option>
+                                    {rolesFor(operator.role).map((role) => (
+                                      <option key={role} value={role}>{t(ROLE_LABEL_KEYS[role])}</option>
+                                    ))}
                                   </select>
+                                  <p className="field-hint max-w-xs">
+                                    {lockedByOwner
+                                      ? t('settings.operators.ownerLocked')
+                                      : t(ROLE_SUMMARY_KEYS[operator.role])}
+                                  </p>
                                 </td>
                                 <td className="text-sm text-muted-foreground">{formatDateTime(operator.createdAt)}</td>
                                 <td>
