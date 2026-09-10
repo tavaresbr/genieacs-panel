@@ -6,6 +6,17 @@ RUN npm ci --include=dev
 COPY frontend/ ./
 RUN npm run build
 
+# The backend's dependencies are installed in a stage of their own because
+# `better-sqlite3` ships no prebuilt binary for Alpine's musl libc and has to
+# be compiled, and the compiler belongs in a stage the runtime image never
+# carries: python, make and g++ are a build-time need, not a thing to ship.
+FROM node:22-alpine AS backend-deps
+
+RUN apk add --no-cache python3 make g++
+WORKDIR /app/backend
+COPY backend/package*.json ./
+RUN npm ci --omit=dev
+
 FROM node:22-alpine AS runtime
 
 ENV APP_ENV=production \
@@ -15,8 +26,7 @@ ENV APP_ENV=production \
     DATA_DIR=/var/lib/skygenpanel
 
 WORKDIR /app/backend
-COPY backend/package*.json ./
-RUN npm ci --omit=dev
+COPY --from=backend-deps /app/backend/node_modules ./node_modules
 COPY backend/ ./
 COPY --from=frontend-build /app/frontend/dist /app/frontend/dist
 
