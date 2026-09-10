@@ -1428,6 +1428,8 @@ const it: Dictionary = {
   'platform.empty': 'Per ora un solo provider.',
   'platform.loadFailed': 'Impossibile leggere l’elenco dei provider.',
   'platform.saveFailed': 'Impossibile salvare.',
+  'sidebar.nav.platform': 'Provider',
+  'sidebar.nav.platformDescription': 'ISP e le loro squadre',
 }
 
 export default it

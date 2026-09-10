@@ -1422,6 +1422,8 @@ const zhCN: Dictionary = {
   'platform.empty': '目前只有一家服务商。',
   'platform.loadFailed': '无法读取服务商列表。',
   'platform.saveFailed': '无法保存。',
+  'sidebar.nav.platform': '服务商',
+  'sidebar.nav.platformDescription': 'ISP 及其团队',
 }
 
 export default zhCN

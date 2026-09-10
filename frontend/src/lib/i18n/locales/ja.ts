@@ -1422,6 +1422,8 @@ const ja: Dictionary = {
   'platform.empty': 'まだプロバイダは 1 つだけです。',
   'platform.loadFailed': 'プロバイダの一覧を取得できませんでした。',
   'platform.saveFailed': '保存できませんでした。',
+  'sidebar.nav.platform': 'プロバイダ',
+  'sidebar.nav.platformDescription': 'ISP とその担当者',
 }
 
 export default ja

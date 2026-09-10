@@ -14,6 +14,7 @@ const DeviceDetailPage = lazy(() => import('@/pages/device-detail'))
 const NetworkMapPage = lazy(() => import('@/pages/network-map'))
 const SettingsPage = lazy(() => import('@/pages/settings'))
 const WhatsAppPage = lazy(() => import('@/pages/whatsapp'))
+const PlatformPage = lazy(() => import('@/pages/platform'))
 const LoginPage = lazy(() => import('@/pages/login'))
 const SetupPage = lazy(() => import('@/pages/setup'))
 
@@ -71,6 +72,21 @@ function AdminRoute() {
   return <Outlet />
 }
 
+/**
+ * The control plane, which is a level above a provider's own administrator.
+ *
+ * Shaped like `AdminRoute` and gating on a different fact on purpose: these
+ * routes are mounted only where the deployment runs as SaaS, and only for
+ * people on the platform roster. `role === 'admin'` would send most of the
+ * panel's admins to a page whose every request answers 404.
+ */
+function PlatformRoute() {
+  const { user, loading } = useAuth()
+  if (loading) return <AuthFallback />
+  if (!user?.isPlatformAdmin) return <Navigate to="/dashboard" replace />
+  return <Outlet />
+}
+
 function LoginRoute() {
   const { isAuthenticated, loading, needsSetup } = useAuth()
   if (loading) return <AuthFallback />
@@ -102,6 +118,9 @@ export default function App() {
                   <Route path="/dashboard" element={<DashboardPage />} />
                   <Route path="/devices" element={<DevicesPage />} />
                   <Route path="/devices/detail" element={<DeviceDetailPage />} />
+                  <Route element={<PlatformRoute />}>
+                    <Route path="/platform" element={<PlatformPage />} />
+                  </Route>
                   <Route element={<AdminRoute />}>
                     <Route path="/network-map" element={<NetworkMapPage />} />
                     <Route path="/settings" element={<SettingsPage />} />

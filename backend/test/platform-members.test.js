@@ -468,7 +468,7 @@ describe("a provider's own administrator", () => {
     // Ana runs alfa. Bruno runs beta. Neither is on `platform_admins`, and the
     // whole point of the plane is that running an ISP does not put you on it.
     const list = await members(beta, anaToken);
-    assert.equal(list.status, 403, 'listing another provider staff');
+    assert.equal(list.status, 404, 'listing another provider staff');
 
     const attach = await call(
       `${platformUrl}/api/platform/tenants/${beta}/members`,
@@ -478,14 +478,14 @@ describe("a provider's own administrator", () => {
         body: { username: 'bia', role: 'admin' }
       }
     );
-    assert.equal(attach.status, 403, 'attaching');
+    assert.equal(attach.status, 404, 'attaching');
     assert.equal((await membershipOf(beta, biaId)).role, 'viewer', 'and nothing was written');
 
     const detach = await call(
       `${platformUrl}/api/platform/tenants/${beta}/members/${biaId}`,
       { method: 'DELETE', headers: authHeaders(anaToken) }
     );
-    assert.equal(detach.status, 403, 'detaching');
+    assert.equal(detach.status, 404, 'detaching');
     assert.ok(await membershipOf(beta, biaId), 'and nobody was removed');
   });
 
@@ -498,13 +498,13 @@ describe("a provider's own administrator", () => {
     // is the read that lets a provider's admin reach a provider they are an
     // admin of, and there is no version of that which stops at their own.
     const list = await members(beta, brunoToken);
-    assert.equal(list.status, 403);
+    assert.equal(list.status, 404);
 
     const detach = await call(
       `${platformUrl}/api/platform/tenants/${beta}/members/${biaId}`,
       { method: 'DELETE', headers: authHeaders(brunoToken) }
     );
-    assert.equal(detach.status, 403);
+    assert.equal(detach.status, 404);
     assert.ok(await membershipOf(beta, biaId));
 
     const attach = await call(
@@ -515,16 +515,28 @@ describe("a provider's own administrator", () => {
         body: { username: ALICE.username, role: 'viewer' }
       }
     );
-    assert.equal(attach.status, 403);
+    assert.equal(attach.status, 404);
     assert.equal(await membershipOf(beta, aliceId), undefined);
   });
 
   it('is refused before the request is even understood', async () => {
     // A provider id that does not exist, from a caller who is not on the plane:
-    // the answer must be the guard's, not the controller's 404. Otherwise the
+    // the answer must be the guard's, not the controller's. Otherwise the
     // routes tell anybody holding a session which provider ids are real.
-    const { status } = await members(98765, anaToken);
-    assert.equal(status, 403);
+    //
+    // The guard answers 404 — the same status the controller gives an unknown
+    // provider — so the STATUS no longer tells the two apart, and asserting on
+    // it would prove nothing. The body does: the guard returns exactly what an
+    // unrouted `/api` path returns, which is the point of it choosing 404 over
+    // 403 in the first place.
+    const real = await members(alfa, anaToken);
+    const invented = await members(98765, anaToken);
+    assert.equal(invented.status, 404);
+    assert.deepEqual(
+      invented.body,
+      real.body,
+      'a provider that exists and one that does not must answer identically to somebody off the plane'
+    );
   });
 
   it('and a request with no session at all is refused', async () => {

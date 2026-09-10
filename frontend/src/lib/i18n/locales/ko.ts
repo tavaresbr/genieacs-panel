@@ -1429,6 +1429,8 @@ const ko: Dictionary = {
   'platform.empty': '아직 사업자가 하나뿐입니다.',
   'platform.loadFailed': '사업자 목록을 읽지 못했습니다.',
   'platform.saveFailed': '저장하지 못했습니다.',
+  'sidebar.nav.platform': '사업자',
+  'sidebar.nav.platformDescription': 'ISP와 담당 팀',
 }
 
 export default ko

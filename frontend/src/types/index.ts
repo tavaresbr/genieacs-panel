@@ -7,6 +7,20 @@ export interface User {
   id: number
   username: string
   role: OperatorRole
+  /**
+   * Whether this person is on the SaaS control plane's roster.
+   *
+   * NOT the same thing as `role === 'admin'`: a provider's own administrator is
+   * an admin, and the control plane is a level above them — minting providers
+   * and reaching between them is exactly what a provider's admin must not do.
+   * Gating the menu on `role` would put the link in front of most of the
+   * panel's admins, pointing at routes that answer 404 for them.
+   *
+   * Always false on a self-hosted install, where those routes are not mounted
+   * at all — so the screen hides itself without the browser having to know
+   * which edition it is talking to.
+   */
+  isPlatformAdmin?: boolean
   createdAt: string
   updatedAt: string
 }

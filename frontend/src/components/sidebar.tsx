@@ -12,12 +12,19 @@ import { APP_RELEASE, ReleaseNotesModal } from '@/components/release-notes-modal
 
 // `adminOnly` mirrors the backend: those routes answer 403 for a viewer, so
 // showing them would only offer a dead end.
+//
+// `platformOnly` mirrors a DIFFERENT fact, and the difference is the whole
+// point: the control plane sits above a provider's own administrator, who is
+// also an `admin`. Gated on `adminOnly` this item would appear for nearly every
+// admin in the panel and lead to routes that answer 404 for them — and on a
+// self-hosted install, to routes that are not mounted at all.
 const menuItems = [
   { href: '/dashboard', labelKey: 'sidebar.nav.dashboard', descriptionKey: 'sidebar.nav.dashboardDescription', icon: 'dashboard', adminOnly: false },
   { href: '/devices', labelKey: 'sidebar.nav.devices', descriptionKey: 'sidebar.nav.devicesDescription', icon: 'devices', adminOnly: false },
   { href: '/network-map', labelKey: 'sidebar.nav.networkMap', descriptionKey: 'sidebar.nav.networkMapDescription', icon: 'map', adminOnly: true },
   { href: '/whatsapp', labelKey: 'sidebar.nav.whatsapp', descriptionKey: 'sidebar.nav.whatsappDescription', icon: 'chat', adminOnly: true },
   { href: '/settings', labelKey: 'sidebar.nav.settings', descriptionKey: 'sidebar.nav.settingsDescription', icon: 'settings', adminOnly: true },
+  { href: '/platform', labelKey: 'sidebar.nav.platform', descriptionKey: 'sidebar.nav.platformDescription', icon: 'settings', adminOnly: true, platformOnly: true },
 ] as const
 
 export default function Sidebar() {
@@ -102,7 +109,9 @@ function SidebarContent({
   const { isDarkMode, toggleDarkMode } = useTheme()
   const { user, logout } = useAuth()
   const isAdmin = user?.role === 'admin'
-  const visibleItems = menuItems.filter((item) => !item.adminOnly || isAdmin)
+  const isPlatformAdmin = Boolean(user?.isPlatformAdmin)
+  const visibleItems = menuItems.filter((item) => (!item.adminOnly || isAdmin)
+    && (!('platformOnly' in item && item.platformOnly) || isPlatformAdmin))
   const { t } = useTranslation()
   const displayName = user?.username || t('sidebar.defaultOperator')
   const initial = displayName.slice(0, 1).toUpperCase()

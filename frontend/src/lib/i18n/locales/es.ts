@@ -1422,6 +1422,8 @@ const es: Dictionary = {
   'platform.empty': 'Solo un proveedor por ahora.',
   'platform.loadFailed': 'No se pudo leer la lista de proveedores.',
   'platform.saveFailed': 'No se pudo guardar.',
+  'sidebar.nav.platform': 'Proveedores',
+  'sidebar.nav.platformDescription': 'ISPs y sus equipos',
 }
 
 export default es

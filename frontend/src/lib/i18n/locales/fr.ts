@@ -1422,6 +1422,8 @@ const fr: Dictionary = {
   'platform.empty': 'Un seul fournisseur pour l’instant.',
   'platform.loadFailed': 'Impossible de lire la liste des fournisseurs.',
   'platform.saveFailed': 'Enregistrement impossible.',
+  'sidebar.nav.platform': 'Fournisseurs',
+  'sidebar.nav.platformDescription': 'FAI et leurs équipes',
 }
 
 export default fr

@@ -1424,6 +1424,8 @@ const en = {
   'platform.empty': 'Only one provider so far.',
   'platform.loadFailed': 'Could not read the provider list.',
   'platform.saveFailed': 'Could not save.',
+  'sidebar.nav.platform': 'Providers',
+  'sidebar.nav.platformDescription': 'ISPs and their teams',
 }
 
 export default en

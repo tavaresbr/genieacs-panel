@@ -1423,6 +1423,8 @@ const zhTW: Dictionary = {
   'platform.empty': '目前只有一家服務商。',
   'platform.loadFailed': '無法讀取服務商清單。',
   'platform.saveFailed': '無法儲存。',
+  'sidebar.nav.platform': '服務商',
+  'sidebar.nav.platformDescription': 'ISP 及其團隊',
 }
 
 export default zhTW

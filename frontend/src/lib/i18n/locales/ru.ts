@@ -1430,6 +1430,8 @@ const ru: Dictionary = {
   'platform.empty': 'Пока только один провайдер.',
   'platform.loadFailed': 'Не удалось прочитать список провайдеров.',
   'platform.saveFailed': 'Не удалось сохранить.',
+  'sidebar.nav.platform': 'Провайдеры',
+  'sidebar.nav.platformDescription': 'Провайдеры и их команды',
 }
 
 export default ru

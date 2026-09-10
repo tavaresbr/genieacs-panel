@@ -1422,6 +1422,8 @@ const ptBR: Dictionary = {
   'platform.empty': 'Só um provedor até agora.',
   'platform.loadFailed': 'Não foi possível ler a lista de provedores.',
   'platform.saveFailed': 'Não foi possível salvar.',
+  'sidebar.nav.platform': 'Provedores',
+  'sidebar.nav.platformDescription': 'ISPs e suas equipes',
 }
 
 export default ptBR

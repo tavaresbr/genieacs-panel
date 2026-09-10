@@ -1426,6 +1426,8 @@ const de: Dictionary = {
   'platform.empty': 'Bisher nur ein Anbieter.',
   'platform.loadFailed': 'Die Anbieterliste konnte nicht gelesen werden.',
   'platform.saveFailed': 'Speichern nicht möglich.',
+  'sidebar.nav.platform': 'Anbieter',
+  'sidebar.nav.platformDescription': 'ISPs und ihre Teams',
 }
 
 export default de

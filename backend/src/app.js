@@ -26,6 +26,7 @@ import mappingRoutes from './routes/mapping.js';
 import mapSettingsRoutes from './routes/mapSettings.js';
 import databaseRoutes from './routes/database.js';
 import platformRoutes from './routes/platform.js';
+import platformMemberRoutes from './routes/platformMembers.js';
 import userRoutes from './routes/users.js';
 import customerPortalRoutes from './routes/customerPortal.js';
 import sgpRoutes from './routes/sgp.js';
@@ -210,7 +211,11 @@ if (IS_SELF_HOSTED) {
 // merely refuse — they must not EXIST. A 403 would answer the question the
 // prober was asking, which is whether a control plane is there to find.
 if (IS_SAAS) {
+  // Two routers on one prefix, split by what they administer: the registry of
+  // providers, and the people inside one. Both are gated by the same guard;
+  // the split is only so two lanes could build them without sharing a file.
   app.use('/api/platform', platformRoutes);
+  app.use('/api/platform', platformMemberRoutes);
 }
 app.use('/api/users', userRoutes);
 app.use('/api/sgp', sgpRoutes);
