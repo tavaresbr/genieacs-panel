@@ -603,4 +603,9 @@ export default {
   'auth.signupInvalid': '사업자 이름, 사용자 이름(3~64자), 비밀번호(8~128자)가 필요합니다',
   'auth.signupSlugTaken': '이 하위 도메인은 이미 사용 중입니다',
   'auth.signupUsernameTaken': '이 사용자 이름은 이미 사용 중입니다',
+  'auth.impersonationReadOnly': '읽기 전용 지원 세션입니다. 여기서는 아무것도 변경할 수 없습니다.',
+  'auth.impersonationTicketRequired': '가장 티켓이 필요합니다',
+  'auth.impersonationTicketInvalid': '이 가장 링크는 더 이상 유효하지 않습니다. 콘솔에서 새로 발급하세요.',
+  'auth.impersonationStarted': '지원 세션이 시작되었습니다',
+  'auth.impersonationFailed': '지원 세션을 시작할 수 없습니다',
 };

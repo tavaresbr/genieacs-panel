@@ -4,12 +4,44 @@ import User from '../models/User.js';
 import { DEVELOPMENT_FALLBACK, isProduction } from '../config/runtimeEnv.js';
 import TenantUser from '../models/TenantUser.js';
 import PlatformAdmin from '../models/PlatformAdmin.js';
+import Tenant from '../models/Tenant.js';
 import { runInTenant } from '../config/tenantContext.js';
 import { roleHas } from '../config/permissions.js';
 import { subscriptionRefusal } from './subscriptionGate.js';
 
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
 const REFRESH_TOKEN_EXPIRES_IN = process.env.REFRESH_TOKEN_EXPIRES_IN || '7d';
+
+/**
+ * As duas audiências do painel, e por que são duas.
+ *
+ * `skygenpanel-admin` é a sessão de quem trabalha para o provedor. Foi sempre
+ * a única, e continua sendo a única que uma senha produz.
+ *
+ * `skygenpanel-platform` é a personificação: quem opera o SaaS olhando o painel
+ * de um cliente para atendê-lo. Ela precisa ser um token DIFERENTE, e não uma
+ * bandeira dentro do mesmo, porque a diferença tem que sobreviver a um erro de
+ * leitura: um `if (decoded.impersonation)` esquecido em algum lugar trata a
+ * personificação como sessão comum, mas uma audiência errada não passa pelo
+ * `jwt.verify`. É a mesma razão de o portal do assinante ter a dele.
+ *
+ * O par não se mistura: um token de audiência de plataforma SEM a marca de
+ * personificação, ou um de audiência de painel COM ela, são os dois recusados.
+ * Cada audiência tem exatamente uma forma válida.
+ */
+const PANEL_AUDIENCE = 'skygenpanel-admin';
+const PLATFORM_AUDIENCE = 'skygenpanel-platform';
+
+/**
+ * Meia hora, fixa, e sem refresh.
+ *
+ * Não usa `JWT_EXPIRES_IN` de propósito: aquela é a duração do expediente de
+ * quem trabalha no painel, e um deploy pode legitimamente esticá-la para o dia
+ * inteiro. A personificação é um atendimento, não um expediente — e como não
+ * há refresh, continuar depois de vencida custa uma volta ao console, que é
+ * mais uma linha na trilha. O incômodo é o mecanismo.
+ */
+const IMPERSONATION_EXPIRES_IN = '30m';
 
 const JWT_SECRET = (() => {
   const secret = process.env.JWT_SECRET;
@@ -54,7 +86,7 @@ function generateTokens(user, membership) {
 
   const commonOptions = {
     issuer: 'skygenpanel',
-    audience: 'skygenpanel-admin'
+    audience: PANEL_AUDIENCE
   };
   const accessToken = jwt.sign(
     {
@@ -84,14 +116,49 @@ function generateTokens(user, membership) {
 
 function verifyToken(token) {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET, {
+    return jwt.verify(token, JWT_SECRET, {
       issuer: 'skygenpanel',
-      audience: 'skygenpanel-admin'
+      audience: [PANEL_AUDIENCE, PLATFORM_AUDIENCE]
     });
-    return decoded;
   } catch {
     return null;
   }
+}
+
+/**
+ * O token de uma personificação. Só o de acesso: não existe refresh.
+ *
+ * `role: 'viewer'` está escrito aqui e é reafirmado na hidratação, que não lê
+ * o papel do token. Os dois de propósito: o que está no token é o registro do
+ * que a sessão era, e o que a hidratação impõe é o que ela pode. Um token
+ * forjado com `role: 'owner'` — que exigiria a chave, mas ainda assim — não
+ * ganharia nada, porque o papel que a requisição usa não vem daqui.
+ *
+ * `tokenVersion` é o de quem PERSONIFICA, não o do provedor personificado: é a
+ * sessão dessa pessoa que está aberta, e trocar a senha dela tem que derrubá-la
+ * aqui como derruba em qualquer outro lugar.
+ */
+function generateImpersonationToken(platformUser, tenantId) {
+  const id = Number(tenantId);
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new Error('generateImpersonationToken needs the provider being impersonated');
+  }
+  return jwt.sign(
+    {
+      userId: platformUser.id,
+      username: platformUser.username,
+      tenantId: id,
+      role: 'viewer',
+      impersonation: true,
+      tokenVersion: Number(platformUser.token_version || 0)
+    },
+    JWT_SECRET,
+    {
+      issuer: 'skygenpanel',
+      audience: PLATFORM_AUDIENCE,
+      expiresIn: IMPERSONATION_EXPIRES_IN
+    }
+  );
 }
 
 /**
@@ -138,10 +205,21 @@ async function hydrateAuthenticatedUser(decoded) {
   if (!decoded || decoded.tokenType || !Number.isInteger(Number(decoded.userId))) {
     return null;
   }
+  // Cada audiência tem uma forma válida e só uma. Um token de plataforma sem a
+  // marca seria uma sessão comum entrando por uma porta que não confere
+  // membership; um token de painel com a marca seria uma personificação
+  // entrando por uma que não confere o cadastro da plataforma. As duas
+  // combinações cruzadas param aqui.
+  const impersonation = decoded.impersonation === true;
+  if (impersonation !== (decoded.aud === PLATFORM_AUDIENCE)) return null;
+
   const user = await User.findById(decoded.userId);
   if (!user || Number(user.token_version || 0) !== Number(decoded.tokenVersion || 0)) {
     return null;
   }
+
+  if (impersonation) return hydrateImpersonation(user, decoded);
+
   const membership = await resolveMembership(user.id, decoded.tenantId);
   if (!membership) return null;
 
@@ -151,6 +229,41 @@ async function hydrateAuthenticatedUser(decoded) {
     role: membership.role,
     tenantId: Number(membership.tenant_id),
     tokenVersion: Number(user.token_version || 0)
+  };
+}
+
+/**
+ * A sessão de quem está olhando o painel de um cliente.
+ *
+ * Não lê `tenant_users`, e não poderia: quem personifica não trabalha para o
+ * provedor: é justamente por não ter vínculo lá que a personificação existe. O
+ * que substitui a membership como autoridade são duas leituras frescas, a cada
+ * requisição, pelo mesmo motivo que a membership é lida fresca:
+ *
+ * - **o cadastro da plataforma**, porque tirar alguém de lá tem que encerrar o
+ *   que ela está olhando na requisição seguinte, e não quando o token vencer;
+ * - **a linha do provedor**, porque um provedor apagado no meio de um
+ *   atendimento não pode continuar sendo lido por um token que o nomeia.
+ *
+ * E o papel é imposto aqui, `viewer`, sem olhar o token. Ver `requireReadOnly`
+ * logo abaixo para o segundo muro.
+ */
+async function hydrateImpersonation(user, decoded) {
+  const tenantId = Number(decoded.tenantId);
+  if (!Number.isInteger(tenantId) || tenantId <= 0) return null;
+  if (!(await PlatformAdmin.has(user.id))) return null;
+  if (!(await Tenant.findById(tenantId))) return null;
+
+  return {
+    userId: user.id,
+    username: user.username,
+    role: 'viewer',
+    tenantId,
+    tokenVersion: Number(user.token_version || 0),
+    // O que a tela mostra na faixa, o que a trilha nomeia, e o que as guardas
+    // consultam. Presente só numa personificação: `req.user.impersonation` ser
+    // falsy é a definição de "sessão comum" em todo o resto do código.
+    impersonation: { platformUsername: user.username }
   };
 }
 
@@ -221,6 +334,9 @@ async function authenticateToken(req, res, next) {
     });
   }
 
+  const readOnly = impersonationRefusal(req, session);
+  if (readOnly) return res.status(403).json(readOnly);
+
   req.user = session;
   req.tenantId = session.tenantId;
   return runInTenant(session.tenantId, async () => {
@@ -257,6 +373,40 @@ async function authenticateToken(req, res, next) {
 function tokenMatchesHost(req, session) {
   if (!req.hostTenantId) return true;
   return Number(req.hostTenantId) === Number(session.tenantId);
+}
+
+/** Os métodos que não mudam nada. Tudo que não está aqui é escrita. */
+const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
+/**
+ * Personificar é OLHAR. A recusa da escrita, ou null.
+ *
+ * O papel `viewer` que a hidratação impõe já barraria quase tudo, porque quase
+ * toda rota de escrita pede uma capacidade que o `viewer` não tem. Quase não
+ * serve: a lista do que o `viewer` alcança muda quando alguém acrescenta uma
+ * capacidade a ele, e uma rota nova que esqueça o `requirePermission` não é
+ * barrada por papel nenhum. Este muro é por MÉTODO, acima de toda rota, e não
+ * depende de a matriz continuar sendo o que é hoje.
+ *
+ * E a razão de existir é anterior à segurança do dado: uma escrita feita numa
+ * personificação aparece no painel do cliente como coisa que o cliente fez.
+ * Um atendimento não pode produzir isso. Quando um cliente precisa que a gente
+ * mexa em algo, o caminho é ele pedir e alguém da equipe DELE fazer — ou o
+ * console, que age em nome da plataforma e assina como tal.
+ *
+ * O `POST /api/auth/logout` é o caso que mostra o muro trabalhando: ele
+ * incrementa o `token_version` da pessoa, e a pessoa aqui é quem personifica.
+ * Sem esta recusa, "sair" de uma personificação derrubaria as sessões dessa
+ * pessoa em todo o deploy.
+ */
+function impersonationRefusal(req, session) {
+  if (!session.impersonation) return null;
+  if (READ_METHODS.has(req.method)) return null;
+  return {
+    success: false,
+    message: req.t('auth.impersonationReadOnly'),
+    code: 'impersonation_read_only'
+  };
 }
 
 async function authenticateTokenOptional(req, res, next) {
@@ -370,6 +520,24 @@ async function requirePlatformAdmin(req, res, next) {
     return res.status(401).json({ message: req.t('auth.required') });
   }
 
+  // Uma personificação NÃO alcança o console, mesmo sendo de quem o alcança.
+  //
+  // Quem personifica está no cadastro da plataforma — a hidratação acabou de
+  // conferir isso —, então a checagem abaixo passaria. O que não pode passar é
+  // a requisição: ela foi re-escopada no provedor personificado, e uma rota do
+  // console rodando ali agiria sobre o cliente errado, com uma sessão que
+  // existe para olhar. A saída é a que já existia: voltar ao console com o
+  // token de lá, que é outro token, na outra audiência.
+  //
+  // 404 e não 403 pelo mesmo motivo do resto desta guarda: quem chegou aqui
+  // não aprende se o plano de controle existe.
+  if (req.user.impersonation) {
+    return res.status(404).json({
+      success: false,
+      message: req.t('common.routeNotFound')
+    });
+  }
+
   let holdsIt;
   try {
     holdsIt = await PlatformAdmin.has(req.user.userId);
@@ -389,6 +557,7 @@ async function requirePlatformAdmin(req, res, next) {
 
 export {
   generateTokens,
+  generateImpersonationToken,
   verifyToken,
   resolveMembership,
   authenticateToken,

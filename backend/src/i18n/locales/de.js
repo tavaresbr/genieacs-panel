@@ -601,4 +601,9 @@ export default {
   'auth.signupInvalid': 'Anbietername, Benutzername (3–64) und Passwort (8–128) sind erforderlich',
   'auth.signupSlugTaken': 'Diese Subdomain ist bereits vergeben',
   'auth.signupUsernameTaken': 'Dieser Benutzername ist bereits vergeben',
+  'auth.impersonationReadOnly': 'Dies ist eine Support-Sitzung mit Lesezugriff. Daraus lässt sich nichts ändern.',
+  'auth.impersonationTicketRequired': 'Das Identitätswechsel-Ticket ist erforderlich',
+  'auth.impersonationTicketInvalid': 'Dieser Identitätswechsel-Link gilt nicht mehr. Erzeugen Sie in der Konsole einen neuen.',
+  'auth.impersonationStarted': 'Support-Sitzung gestartet',
+  'auth.impersonationFailed': 'Die Support-Sitzung konnte nicht gestartet werden',
 };

@@ -52,6 +52,10 @@ router.delete('/tenants/:id', authenticateToken, requirePlatformAdmin, PlatformC
 // com o tamanho de cada um, então fica atrás do mesmo guarda que o resto do
 // console — ou de `METRICS_TOKEN`, que é como um coletor entra: um coletor
 // não tem sessão, e um JWT de uma hora não é coisa que se cole num scrape.
+// Olhar o painel de um cliente. O que a rota devolve é um bilhete de uso
+// único e um endereço, nunca uma sessão — ver o controlador.
+router.post('/tenants/:id/impersonate', authenticateToken, requirePlatformAdmin, PlatformController.impersonate);
+
 router.get('/metrics', allowMetricsScraper, PlatformController.metrics);
 
 // A trilha do plano de controle. Só leitura, como a do provedor e pelo mesmo

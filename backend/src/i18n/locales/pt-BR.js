@@ -599,4 +599,9 @@ export default {
   'auth.signupInvalid': 'Nome do provedor, usuário (3–64) e senha (8–128) são obrigatórios',
   'auth.signupSlugTaken': 'Este subdomínio já está em uso',
   'auth.signupUsernameTaken': 'Este nome de usuário já está em uso',
+  'auth.impersonationReadOnly': 'Esta é uma sessão de atendimento, só de leitura. Nada pode ser alterado por ela.',
+  'auth.impersonationTicketRequired': 'O bilhete de personificação é obrigatório',
+  'auth.impersonationTicketInvalid': 'Este link de personificação não vale mais. Gere outro pelo console.',
+  'auth.impersonationStarted': 'Sessão de atendimento iniciada',
+  'auth.impersonationFailed': 'Não foi possível iniciar a sessão de atendimento',
 };

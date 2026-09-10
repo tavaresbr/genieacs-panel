@@ -601,4 +601,9 @@ export default {
   'auth.signupInvalid': 'Требуются название провайдера, имя пользователя (3–64) и пароль (8–128)',
   'auth.signupSlugTaken': 'Этот поддомен уже занят',
   'auth.signupUsernameTaken': 'Это имя пользователя уже занято',
+  'auth.impersonationReadOnly': 'Это сеанс поддержки только для чтения. Изменить из него ничего нельзя.',
+  'auth.impersonationTicketRequired': 'Требуется билет олицетворения',
+  'auth.impersonationTicketInvalid': 'Эта ссылка олицетворения больше не действует. Создайте новую в консоли.',
+  'auth.impersonationStarted': 'Сеанс поддержки начат',
+  'auth.impersonationFailed': 'Не удалось начать сеанс поддержки',
 };

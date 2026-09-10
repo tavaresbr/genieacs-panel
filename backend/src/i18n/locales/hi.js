@@ -600,4 +600,9 @@ export default {
   'tenant.renamed': 'प्रदाता का नाम बदला गया',
   'tenant.renameFailed': 'प्रदाता का नाम नहीं बदला जा सका',
   'tenant.nameInvalid': 'प्रदाता का नाम 1 से 128 अक्षरों के बीच होना चाहिए',
+  'auth.impersonationReadOnly': 'यह केवल-पढ़ने वाला सहायता सत्र है। इससे कुछ भी बदला नहीं जा सकता।',
+  'auth.impersonationTicketRequired': 'इम्पर्सनेशन टिकट आवश्यक है',
+  'auth.impersonationTicketInvalid': 'यह इम्पर्सनेशन लिंक अब मान्य नहीं है। कंसोल से नया बनाएँ।',
+  'auth.impersonationStarted': 'सहायता सत्र शुरू हुआ',
+  'auth.impersonationFailed': 'सहायता सत्र शुरू नहीं किया जा सका',
 };

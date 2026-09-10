@@ -57,6 +57,7 @@ const PUBLICAS = new Map([
   ['POST /api/sgp/events/webhook', 'entrega do ERP, autenticada pelo segredo do webhook'],
   ['POST /api/whatsapp-webhook', 'entrega da Evolution, montada antes do resolvedor e autenticada pelo token da instância'],
   ['GET /api/whatsapp-media/:id', 'anexo servido por um token assinado que já nomeia o provedor; prova em whatsapp-media-tenancy.test.js'],
+  ['POST /api/auth/impersonate/redeem', 'o bilhete do console É a credencial: uso único, um minuto de vida, conferido por hash e contra o provedor do host'],
   ['POST /api/customer/login', 'a porta de entrada do assinante, no listener do portal']
 ]);
 
@@ -102,7 +103,7 @@ const POR_ID = new Map([
   ['PUT /api/settings/:key', 'idem, e a escrita de um não altera a do outro'],
   ['DELETE /api/settings/:key', 'idem, e o apagar de um não apaga a do outro'],
   ['GET /api/vendor-management/wifi-security-configs/by-product-class/:productClass', 'classe de produto do fabricante, igual nos dois; prova em vendor-catalogue-tenancy.test.js'],
-  ['GET /api/vendor-management/:vendorId/wifi-security', 'lista escopada; o fabricante do vizinho devolve nada, prova em vendor-catalogue-tenancy.test.js'],
+  ['GET /api/vendor-management/:vendorId/wifi-security', 'varredura'],
   ['PUT /api/whatsapp/subscribers/:contract/phone', 'o contrato é do SGP e os dois podem tê-lo; prova em tenant-leak.test.js'],
   ['GET /api/customer/wifi/:index/password', 'índice do rádio no aparelho, não linha; a sessão do portal é escopada, prova em tenant-subdomain.test.js'],
 
@@ -126,7 +127,8 @@ const POR_ID = new Map([
   ['GET /api/platform/tenants/:id/subscription', 'plano de controle; prova em platform-billing.test.js'],
   ['PUT /api/platform/tenants/:id/subscription', 'plano de controle; prova em platform-billing.test.js'],
   ['POST /api/platform/tenants/:id/payments', 'plano de controle; prova em platform-billing.test.js'],
-  ['GET /api/platform/tenants/:id/usage', 'plano de controle; prova em platform-billing.test.js']
+  ['GET /api/platform/tenants/:id/usage', 'plano de controle; prova em platform-billing.test.js'],
+  ['POST /api/platform/tenants/:id/impersonate', 'plano de controle; prova em impersonation.test.js — inclusive a de que a própria personificação não alcança esta rota']
 ]);
 
 // Todo caso da varredura entra aqui sozinho: a lista dela é a fonte, e repetir
@@ -175,6 +177,10 @@ describe('toda rota sem sessão', () => {
       .map(chave)
       .sort();
     assert.deepEqual(escritas, [
+      // O bilhete de personificação: escreve, sim — marca o bilhete como
+      // usado —, e é escrita no cadastro COMPARTILHADO, nunca no de um
+      // provedor. Quem a autoriza é o bilhete, cunhado pelo console.
+      'POST /api/auth/impersonate/redeem',
       'POST /api/auth/login',
       'POST /api/auth/refresh',
       'POST /api/auth/setup',
@@ -226,6 +232,27 @@ describe('a varredura de ids', () => {
     const atuais = new Set(rotas.map(chave));
     const fantasmas = casos.map((c) => c.label).filter((l) => !atuais.has(l));
     assert.deepEqual(fantasmas, [], 'caso da varredura sem rota correspondente');
+  });
+
+  /**
+   * A conta que faltava: uma rota pode DIZER que a varredura a cobre sem que
+   * exista caso nenhum para ela.
+   *
+   * A conta que já havia ia só no sentido fácil — caso sem rota. O outro
+   * sentido é o que dá para errar sem perceber: acrescentar a rota, escrever
+   * `'varredura'` ao lado dela e seguir em frente, com a declaração parecendo
+   * prova sem ser prova de nada. Nenhuma rota estava assim quando esta linha
+   * entrou, e é justamente por isso que ela entra agora: uma conta escrita
+   * enquanto o número está certo é uma conta que ninguém precisa acreditar.
+   */
+  it('cobre de fato toda rota que se declara varrida', () => {
+    const rotulos = new Set(casos.map((c) => c.label));
+    const prometidas = [...POR_ID.entries()]
+      .filter(([, motivo]) => motivo === 'varredura')
+      .map(([rota]) => rota)
+      .filter((rota) => !rotulos.has(rota));
+    assert.deepEqual(prometidas, [],
+      'rota declarada como varrida sem caso correspondente em tenant-id-sweep.test.js');
   });
 
   it('não tem dois casos com o mesmo rótulo', () => {

@@ -600,4 +600,9 @@ export default {
   'auth.signupInvalid': '需要运营商名称、用户名（3–64）和密码（8–128）',
   'auth.signupSlugTaken': '该子域名已被占用',
   'auth.signupUsernameTaken': '该用户名已被占用',
+  'auth.impersonationReadOnly': '这是只读的支持会话，无法从中修改任何内容。',
+  'auth.impersonationTicketRequired': '需要模拟凭据',
+  'auth.impersonationTicketInvalid': '此模拟链接已失效，请在控制台重新生成。',
+  'auth.impersonationStarted': '支持会话已开始',
+  'auth.impersonationFailed': '无法开始支持会话',
 };

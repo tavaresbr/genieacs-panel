@@ -148,6 +148,22 @@ export const inviteAcceptLimiter = limiter({
   message: limitMessage('rateLimit.requests', 'rate_limited')
 });
 
+/**
+ * O resgate do bilhete de personificação.
+ *
+ * Apertado porque é uma rota sem sessão que consulta o banco, e frouxo o
+ * bastante para o caso real: uma pessoa do plantão da plataforma atende alguns
+ * ISPs por hora, não alguns por segundo. O bilhete são 32 bytes e vale um
+ * minuto, então adivinhar não é o risco — o balde existe para a rota não virar
+ * bomba de tráfego.
+ */
+export const impersonationRedeemLimiter = limiter({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  keyGenerator: tenantIpKey,
+  message: limitMessage('rateLimit.requests', 'rate_limited')
+});
+
 /** Coarse per-address guard for the whole portal surface. */
 export const portalIpLimiter = limiter({
   windowMs: 60 * 1000,

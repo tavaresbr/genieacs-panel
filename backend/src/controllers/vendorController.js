@@ -148,8 +148,18 @@ class VendorController {
         );
       }
 
+      // O fabricante é conferido antes da lista, e não só filtrado por ela.
+      // Sem isto, o id de um fabricante do provedor vizinho respondia 200 com
+      // lista vazia — indistinguível de "este fabricante não tem mapeamento
+      // nenhum", que é uma resposta sobre um registro que não é de quem
+      // pergunta. 404 é o que a irmã desta rota (o POST no mesmo caminho) e o
+      // `GET /api/vendor-management/:id` já respondiam.
+      if (!(await Vendor.findById(vendorId))) {
+        return res.status(404).json(createErrorResponse(req.t('vendor.notFound')));
+      }
+
       const mappings = await WifiSecurityMapping.getByVendor(vendorId);
-      
+
       return res.json(
         createResponse(req.t('wifiMapping.listRetrieved'), mappings)
       );

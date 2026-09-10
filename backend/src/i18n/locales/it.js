@@ -598,4 +598,9 @@ export default {
   'auth.signupInvalid': 'Nome del provider, utente (3–64) e password (8–128) sono obbligatori',
   'auth.signupSlugTaken': 'Questo sottodominio è già in uso',
   'auth.signupUsernameTaken': 'Questo nome utente è già in uso',
+  'auth.impersonationReadOnly': 'Questa è una sessione di assistenza in sola lettura. Non è possibile modificare nulla.',
+  'auth.impersonationTicketRequired': 'Il ticket di impersonificazione è obbligatorio',
+  'auth.impersonationTicketInvalid': 'Questo link di impersonificazione non è più valido. Generane un altro dalla console.',
+  'auth.impersonationStarted': 'Sessione di assistenza avviata',
+  'auth.impersonationFailed': 'Impossibile avviare la sessione di assistenza',
 };

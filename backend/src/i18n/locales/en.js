@@ -600,4 +600,9 @@ export default {
   'auth.signupInvalid': 'Provider name, username (3–64) and password (8–128) are required',
   'auth.signupSlugTaken': 'This subdomain is already taken',
   'auth.signupUsernameTaken': 'This username is already taken',
+  'auth.impersonationReadOnly': 'This is a read-only support session. Nothing can be changed from it.',
+  'auth.impersonationTicketRequired': 'The impersonation ticket is required',
+  'auth.impersonationTicketInvalid': 'This impersonation link is no longer valid. Start a new one from the console.',
+  'auth.impersonationStarted': 'Support session started',
+  'auth.impersonationFailed': 'Failed to start the support session',
 };
