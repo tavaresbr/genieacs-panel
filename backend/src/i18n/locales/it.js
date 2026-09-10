@@ -546,4 +546,7 @@ export default {
   'invite.accepted': 'Benvenuto nel team',
   'invite.acceptFailed': 'Impossibile accettare l\'invito',
   'invite.alreadyMember': 'Lavori già per questo provider',
+
+  'settings.validation.genieAcsAuthType': 'Il tipo di autenticazione GenieACS deve essere none, basic o bearer',
+  'settings.validation.genieAcsAuthUsername': 'L\'autenticazione basic richiede un nome utente',
 };

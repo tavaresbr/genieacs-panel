@@ -548,4 +548,7 @@ export default {
   'invite.accepted': '歡迎加入團隊',
   'invite.acceptFailed': '無法接受邀請',
   'invite.alreadyMember': '您已經在為此服務商工作',
+
+  'settings.validation.genieAcsAuthType': 'GenieACS 驗證方式必須是 none、basic 或 bearer',
+  'settings.validation.genieAcsAuthUsername': 'basic 驗證需要使用者名稱',
 };

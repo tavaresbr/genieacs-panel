@@ -549,4 +549,7 @@ export default {
   'invite.accepted': 'Добро пожаловать в команду',
   'invite.acceptFailed': 'Не удалось принять приглашение',
   'invite.alreadyMember': 'Вы уже работаете у этого провайдера',
+
+  'settings.validation.genieAcsAuthType': 'Тип аутентификации GenieACS должен быть none, basic или bearer',
+  'settings.validation.genieAcsAuthUsername': 'Аутентификация basic требует имя пользователя',
 };

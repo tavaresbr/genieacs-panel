@@ -551,4 +551,7 @@ export default {
   'invite.accepted': '팀에 오신 것을 환영합니다',
   'invite.acceptFailed': '초대를 수락하지 못했습니다',
   'invite.alreadyMember': '이미 이 사업자 소속입니다',
+
+  'settings.validation.genieAcsAuthType': 'GenieACS 인증 방식은 none, basic, bearer 중 하나여야 합니다',
+  'settings.validation.genieAcsAuthUsername': 'basic 인증에는 사용자 이름이 필요합니다',
 };

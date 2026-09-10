@@ -548,4 +548,7 @@ export default {
   'invite.accepted': 'チームへようこそ',
   'invite.acceptFailed': '招待を承諾できませんでした',
   'invite.alreadyMember': 'すでにこのプロバイダーに所属しています',
+
+  'settings.validation.genieAcsAuthType': 'GenieACS の認証方式は none、basic、bearer のいずれかにしてください',
+  'settings.validation.genieAcsAuthUsername': 'basic 認証にはユーザー名が必要です',
 };
