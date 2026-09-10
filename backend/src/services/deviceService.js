@@ -173,6 +173,39 @@ class DeviceService {
     return `${await this.getGenieAcsRootUrl()}/devices`;
   }
 
+  /**
+   * The failure a GenieACS response should be reported as.
+   *
+   * The upstream body never reaches the caller. It is written by whatever host
+   * answers at the configured URL, so relaying it turns any failed request into
+   * a read oracle: point the base URL at an internal service and the panel
+   * hands its response straight back over the API. The status stays, because an
+   * operator has to tell a misconfiguration from an outage, and the body is
+   * logged here, truncated, where only the server can see it.
+   *
+   * A 3xx is called out on its own: every GenieACS fetch sets
+   * `redirect: 'manual'`, so a redirect arrives as a not-ok response and would
+   * otherwise read as an upstream bug rather than as what it is — an allowed
+   * host trying to walk the request somewhere we never agreed to reach.
+   *
+   * `knownBody` is for the one caller that already consumed the body; a second
+   * read of it yields nothing.
+   */
+  static async genieAcsError(label, response, knownBody = undefined) {
+    const body = knownBody === undefined
+      ? await response.text().catch(() => '')
+      : knownBody;
+    if (body) {
+      console.error(`${label} failed with status ${response.status}: ${String(body).slice(0, 200)}`);
+    }
+    if (response.status >= 300 && response.status < 400) {
+      return new Error(
+        `${label} answered with a redirect (status: ${response.status}); the configured GenieACS URL must serve the request itself`
+      );
+    }
+    return new Error(`${label} responded with status: ${response.status}`);
+  }
+
   static async fetchGenieAcsCollection(collection, query = {}, method = 'GET', body = null, timeoutMs = 15_000) {
     if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(String(collection))) {
       throw new Error('Invalid GenieACS collection name');
@@ -191,7 +224,8 @@ class DeviceService {
       const options = {
         method,
         headers: { Accept: 'application/json' },
-        signal: controller.signal
+        signal: controller.signal,
+        redirect: 'manual'
       };
       if (body !== null && body !== undefined) {
         options.headers['Content-Type'] = 'application/json';
@@ -199,8 +233,7 @@ class DeviceService {
       }
       const response = await fetch(url, options);
       if (!response.ok) {
-        const errorText = await response.text().catch(() => '');
-        throw new Error(`GenieACS ${collection} API responded with status: ${response.status}${errorText ? ` - ${errorText}` : ''}`);
+        throw await this.genieAcsError(`GenieACS ${collection} API`, response);
       }
       const text = await response.text();
       return text ? JSON.parse(text) : null;
@@ -209,13 +242,18 @@ class DeviceService {
     }
   }
 
+  /**
+   * Every request is built from the configured base, never from the endpoint.
+   * The endpoint used to be allowed to be an absolute URL, which meant any
+   * caller that let one through reached a host the operator never configured —
+   * and the base URL becomes provider-supplied data, so the endpoint is the
+   * side of this that must not be able to choose the destination.
+   */
   static async buildGenieAcsUrl(endpoint = '', query = {}) {
     const base = await this.getDevicesBaseUrl();
 
     let urlStr;
-    if (/^https?:\/\//i.test(endpoint)) {
-      urlStr = endpoint;
-    } else if (!endpoint) {
+    if (!endpoint) {
       urlStr = base;
     } else if (endpoint.startsWith('?')) {
       urlStr = `${base}${endpoint}`;
@@ -243,7 +281,8 @@ class DeviceService {
         const options = {
           method,
           headers: { 'Accept': 'application/json' },
-          signal: controller.signal
+          signal: controller.signal,
+          redirect: 'manual'
         };
         if (body !== null && body !== undefined) {
           options.headers['Content-Type'] = 'application/json';
@@ -255,8 +294,7 @@ class DeviceService {
         clearTimeout(timeoutId);
 
         if (!response.ok) {
-          const errorText = await response.text().catch(() => '');
-          throw new Error(`GenieACS API responded with status: ${response.status}${errorText ? ` - ${errorText}` : ''}`);
+          throw await this.genieAcsError('GenieACS API', response);
         }
 
         const text = await response.text();
@@ -362,11 +400,11 @@ class DeviceService {
       const response = await fetch(url, {
         method: 'GET',
         headers: { Accept: 'application/json' },
-        signal: controller.signal
+        signal: controller.signal,
+        redirect: 'manual'
       });
       if (!response.ok) {
-        const errorText = await response.text().catch(() => '');
-        throw new Error(`GenieACS API responded with status: ${response.status}${errorText ? ` - ${errorText}` : ''}`);
+        throw await this.genieAcsError('GenieACS API', response);
       }
       const text = await response.text();
       return { response, data: text ? JSON.parse(text) : null };
@@ -1141,11 +1179,12 @@ class DeviceService {
         method: 'POST',
         headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
         body: JSON.stringify(task),
-        signal: controller.signal
+        signal: controller.signal,
+        redirect: 'manual'
       });
       const text = await response.text().catch(() => '');
       if (!response.ok) {
-        throw new Error(`GenieACS API responded with status: ${response.status}${text ? ` - ${text}` : ''}`);
+        throw await this.genieAcsError('GenieACS API', response, text);
       }
       let body = null;
       try {
@@ -1208,10 +1247,9 @@ class DeviceService {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15_000);
     try {
-      const response = await fetch(url, { method, signal: controller.signal });
+      const response = await fetch(url, { method, signal: controller.signal, redirect: 'manual' });
       if (!response.ok && !(method === 'DELETE' && response.status === 404)) {
-        const errorText = await response.text().catch(() => '');
-        throw new Error(`GenieACS tag API responded with status: ${response.status}${errorText ? ` - ${errorText}` : ''}`);
+        throw await this.genieAcsError('GenieACS tag API', response);
       }
       return true;
     } finally {
@@ -1278,12 +1316,12 @@ class DeviceService {
     try {
       const response = await fetch(url, {
         method: 'DELETE',
-        signal: controller.signal
+        signal: controller.signal,
+        redirect: 'manual'
       });
 
       if (!response.ok) {
-        const errorText = await response.text().catch(() => '');
-        throw new Error(`GenieACS delete API error: ${response.status} - ${errorText}`);
+        throw await this.genieAcsError('GenieACS delete API', response);
       }
     } finally {
       clearTimeout(timeoutId);
@@ -1704,10 +1742,9 @@ class DeviceService {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15_000);
     try {
-      const response = await fetch(url, { method: 'DELETE', signal: controller.signal });
+      const response = await fetch(url, { method: 'DELETE', signal: controller.signal, redirect: 'manual' });
       if (!response.ok && response.status !== 404) {
-        const errorText = await response.text().catch(() => '');
-        throw new Error(`GenieACS fault API responded with status: ${response.status}${errorText ? ` - ${errorText}` : ''}`);
+        throw await this.genieAcsError('GenieACS fault API', response);
       }
       return true;
     } finally {
