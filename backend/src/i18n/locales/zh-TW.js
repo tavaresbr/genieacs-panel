@@ -554,4 +554,6 @@ export default {
 
   'audit.listed': '已取得稽核日誌',
   'audit.listFailed': '無法讀取稽核日誌',
+
+  'tenant.exportFailed': '無法匯出服務商資料',
 };

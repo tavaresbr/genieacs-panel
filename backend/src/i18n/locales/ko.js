@@ -557,4 +557,6 @@ export default {
 
   'audit.listed': '감사 로그를 가져왔습니다',
   'audit.listFailed': '감사 로그를 읽지 못했습니다',
+
+  'tenant.exportFailed': '사업자 데이터를 내보내지 못했습니다',
 };

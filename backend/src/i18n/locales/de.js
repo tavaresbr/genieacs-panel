@@ -555,4 +555,6 @@ export default {
 
   'audit.listed': 'Audit-Protokoll abgerufen',
   'audit.listFailed': 'Audit-Protokoll konnte nicht gelesen werden',
+
+  'tenant.exportFailed': 'Anbieterdaten konnten nicht exportiert werden',
 };

@@ -550,4 +550,6 @@ export default {
 
   'audit.listed': 'Journal d\'audit récupéré',
   'audit.listFailed': 'Impossible de lire le journal d\'audit',
+
+  'tenant.exportFailed': 'Impossible d\u2019exporter les données du fournisseur',
 };

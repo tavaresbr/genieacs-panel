@@ -551,4 +551,6 @@ export default {
 
   'audit.listed': 'Registro de auditoría obtenido',
   'audit.listFailed': 'No se pudo leer el registro de auditoría',
+
+  'tenant.exportFailed': 'No se pudieron exportar los datos del proveedor',
 };

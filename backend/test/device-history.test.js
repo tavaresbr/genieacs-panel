@@ -176,7 +176,23 @@ describe('hourly rollup', () => {
   });
 
   it('leaves the hour still in progress alone', async () => {
-    fleet = [reading('ont-a', { informAt: Date.now() - 60_000 })];
+    /**
+     * A leitura tem que cair na hora CORRENTE, e `Date.now() - 60_000` não
+     * garante isso: rodando no primeiro minuto de uma hora, um minuto atrás é a
+     * hora ANTERIOR, que já fechou — o rollup a agrupa, `buckets` vem 1, e o
+     * teste falha. É um em cada sessenta minutos, ou ~1,7% das rodadas, e foi
+     * uma das duas causas do "flake" que a suíte carregava havia meses: no CI
+     * ele aparecia como um arquivo vermelho sem relação com o que estava sendo
+     * mudado, e re-rodar resolvia — que é exatamente como um teste dependente
+     * do relógio se disfarça de infraestrutura.
+     *
+     * O piso é o começo da hora corrente. Resta a janela de o relógio virar
+     * ENTRE o `collect` e o `rollup` abaixo, que é de milissegundos e não dá
+     * para fechar sem injetar um relógio no serviço.
+     */
+    const agora = Date.now();
+    const inicioDaHora = Math.floor(agora / HOUR) * HOUR;
+    fleet = [reading('ont-a', { informAt: Math.max(inicioDaHora + 1000, agora - 60_000) })];
     await collect({});
     const summary = await rollup({});
     assert.equal(summary.buckets, 0);

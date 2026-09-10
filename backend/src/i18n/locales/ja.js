@@ -554,4 +554,6 @@ export default {
 
   'audit.listed': '監査ログを取得しました',
   'audit.listFailed': '監査ログを読み取れませんでした',
+
+  'tenant.exportFailed': 'プロバイダーのデータをエクスポートできませんでした',
 };

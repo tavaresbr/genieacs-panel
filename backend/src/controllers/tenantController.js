@@ -1,5 +1,7 @@
 import Tenant from '../models/Tenant.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
+import TenantExportService from '../services/tenantExportService.js';
+import AuditLog from '../models/AuditLog.js';
 
 /**
  * What a provider will admit to before anybody has signed in.
@@ -10,6 +12,41 @@ import { createResponse, createErrorResponse } from '../utils/helpers.js';
  * of the whole deployment, and everything below is written against that.
  */
 class TenantController {
+  /**
+   * O cadastro inteiro deste provedor, num arquivo.
+   *
+   * `Content-Disposition: attachment` com o slug e a data no nome: o arquivo
+   * costuma ir para um e-mail ou um chamado, e um `export.json` sem dono vira
+   * três arquivos iguais na pasta de quem recebeu.
+   *
+   * Auditado, e é uma das ações mais sensíveis que existem aqui — devolve todo
+   * o cadastro de assinantes de uma vez. Sem registro, um operador de saída
+   * baixaria a base inteira e nada no painel diria que isso aconteceu.
+   */
+  static async exportTenant(req, res) {
+    try {
+      const arquivo = await TenantExportService.build();
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.TENANT_EXPORTED,
+        subjectType: 'tenant',
+        subjectId: arquivo.manifest.tenant?.id ?? null,
+        detail: { rowCounts: arquivo.manifest.rowCounts }
+      });
+
+      const nome = [
+        'skygenpanel',
+        arquivo.manifest.tenant?.slug || 'export',
+        new Date().toISOString().slice(0, 10)
+      ].join('-');
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${nome}.json"`);
+      return res.send(JSON.stringify(arquivo, null, 2));
+    } catch (error) {
+      console.error('Tenant export error:', error);
+      return res.status(500).json(createErrorResponse(req.t('tenant.exportFailed'), error.message));
+    }
+  }
+
   /**
    * `GET /api/tenant/public`.
    *

@@ -555,4 +555,6 @@ export default {
 
   'audit.listed': 'Журнал аудита получен',
   'audit.listFailed': 'Не удалось прочитать журнал аудита',
+
+  'tenant.exportFailed': 'Не удалось экспортировать данные провайдера',
 };

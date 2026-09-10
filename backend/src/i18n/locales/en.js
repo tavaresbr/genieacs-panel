@@ -554,4 +554,6 @@ export default {
 
   'audit.listed': 'Audit trail retrieved',
   'audit.listFailed': 'Failed to read the audit trail',
+
+  'tenant.exportFailed': 'Failed to export the provider data',
 };

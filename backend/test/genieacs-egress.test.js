@@ -181,20 +181,55 @@ describe('only a handful of ports are reachable', () => {
 const internal = { server: null, port: null, hits: [] };
 
 describe('a request whose name turns private never leaves', () => {
+  /**
+   * Uma porta FIXA, e é o único servidor da suíte inteira que precisa disso: a
+   * edição SaaS só deixa o egresso sair por 80, 443, 7557 ou 8080, então
+   * `listen(0)` — o que todos os outros arquivos fazem — daria uma porta que o
+   * próprio guarda recusaria, e o teste passaria pelo motivo errado.
+   *
+   * Porta fixa colide, e a colisão custou meses. Sem o `once('error')` abaixo,
+   * um `EADDRINUSE` fazia esta Promise **nunca resolver**: o `before` ficava
+   * pendurado, o event loop esvaziava, e o `node --test` cancelava o arquivo
+   * inteiro com "Promise resolution is still pending but the event loop has
+   * already resolved" — mensagem que não nomeia porta, arquivo nem causa, e que
+   * no CI aparecia como um vermelho aleatório sem relação com o que estava
+   * sendo mudado. Era uma das duas causas do "flake" da suíte.
+   *
+   * As duas coisas juntas fecham o buraco: tenta cada porta permitida em vez de
+   * insistir numa, e falha DIZENDO o que houve quando nenhuma serve.
+   */
   before(async () => {
-    await new Promise((resolve) => {
-      internal.server = http.createServer((req, res) => {
-        internal.hits.push(req.url);
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end('[]');
-      });
-      internal.server.listen(ALLOWED_PORT, '127.0.0.1', resolve);
-    });
+    const candidatas = [ALLOWED_PORT, 8080];
+    let ultimoErro = null;
+    for (const porta of candidatas) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise((resolve, reject) => {
+          internal.server = http.createServer((req, res) => {
+            internal.hits.push(req.url);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end('[]');
+          });
+          internal.server.once('error', reject);
+          internal.server.listen(porta, '127.0.0.1', resolve);
+        });
+        ultimoErro = null;
+        break;
+      } catch (error) {
+        ultimoErro = error;
+        internal.server = null;
+      }
+    }
+    if (ultimoErro) {
+      throw new Error(
+        `nenhuma porta permitida disponível (${candidatas.join(', ')}): ${ultimoErro.message}`
+      );
+    }
     internal.port = internal.server.address().port;
   });
 
   after(async () => {
-    await new Promise((done) => internal.server.close(done));
+    if (internal.server) await new Promise((done) => internal.server.close(done));
   });
 
   afterEach(() => {

@@ -32,7 +32,8 @@ class AuditLog {
     INVITE_CREATED: 'invite.created',
     INVITE_ACCEPTED: 'invite.accepted',
     INVITE_REVOKED: 'invite.revoked',
-    TENANT_STATUS_CHANGED: 'tenant.status_changed'
+    TENANT_STATUS_CHANGED: 'tenant.status_changed',
+    TENANT_EXPORTED: 'tenant.exported'
   });
 
   /**

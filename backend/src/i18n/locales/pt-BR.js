@@ -551,4 +551,6 @@ export default {
 
   'audit.listed': 'Trilha de auditoria carregada',
   'audit.listFailed': 'Falha ao ler a trilha de auditoria',
+
+  'tenant.exportFailed': 'Falha ao exportar os dados do provedor',
 };

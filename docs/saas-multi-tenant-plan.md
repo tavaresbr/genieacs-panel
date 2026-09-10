@@ -524,10 +524,15 @@ sustenta. Antes do décimo tenant:
   privadas no conector, e o console de plataforma.
 - Self-hosted continua com `deploy/install.sh` + CLI `deploy/skygenpanel` + SQLite/MySQL.
   SaaS usa o `Dockerfile` + Postgres gerenciado + migrations no CI.
-- Observabilidade: `tenant_id` em toda linha de log e em toda métrica; `audit_log` para ações
-  sensíveis (troca de senha de portal, alteração de conexão GenieACS, impersonation).
-- Backup e **procedimento de exportação/exclusão por tenant** — necessário para LGPD e para
-  cancelamento de contrato.
+- Observabilidade: `tenant_id` em toda linha de log e em toda métrica. O **`audit_log` entrou
+  na onda 20** — senha de portal revelada e redefinida, URL e credencial do GenieACS, papéis,
+  vínculos, convites e suspensão de provedor. Falta a impersonação, que ainda não existe.
+- Backup e **procedimento de exportação/exclusão por tenant**. A **exportação entrou na onda
+  21** (`GET /api/tenant/export`, capacidade `tenant.export`, auditada): todas as tabelas
+  escopadas na ordem de criação do schema — que é a ordem que as FKs pedem, e o que faz o
+  arquivo poder ser reinserido de cima para baixo —, sem nenhum segredo cifrado nem hash de
+  senha, com um manifesto que diz o que ficou de fora e por quê. A **exclusão** ainda não:
+  ver a nota no checklist.
 
 ---
 
@@ -557,6 +562,31 @@ estava escopada naquela rodada, outro porque a falha do teste anterior o mascara
 também a versão errada da própria disciplina: reverter *por coluna* em vez de *por passo de
 migration* reverte a migration errada quando duas derrubam um único com o mesmo nome de
 coluna, e o teste "falha" provando nada.
+
+#### O "flake" da suíte, resolvido
+
+A suíte carregava havia meses um vermelho intermitente no CI, sempre num arquivo sem relação
+com o que estava sendo mudado, e sempre resolvido por re-rodar. Já tinham sido descartadas as
+suspeitas óbvias: interferência entre arquivos pelo banco (o harness cria um schema/database
+por arquivo), `describe` assíncrono (não existe nenhum) e esgotamento de conexões (medido: 5
+conexões de pico com e sem limite no pool). Rodando a suíte cinco vezes seguidas com o log
+inteiro guardado, **eram duas causas, nenhuma delas de infraestrutura**:
+
+1. **Um teste dependente do relógio.** `device-history` gravava uma leitura em
+   `Date.now() - 60_000` e afirmava que o rollup deixava a hora corrente em paz. Rodando no
+   primeiro minuto de uma hora, um minuto atrás é a hora ANTERIOR, que já fechou — o rollup a
+   agrupa e o teste falha. Um minuto em cada sessenta: ~1,7% das rodadas.
+2. **Uma porta fixa sem tratamento de erro.** `genieacs-egress` é o único arquivo da suíte que
+   precisa de porta fixa (a edição SaaS só deixa o egresso sair por 80, 443, 7557 e 8080, então
+   `listen(0)` daria uma porta que o próprio guarda recusaria). O `listen` não tinha
+   `once('error')`, então um `EADDRINUSE` deixava a Promise **nunca resolver**: o `before`
+   pendurava, o event loop esvaziava, e o runner cancelava o arquivo com "Promise resolution is
+   still pending but the event loop has already resolved" — mensagem que não nomeia porta,
+   arquivo nem causa. Era isso que produzia a cascata de "cancelled" que parecia aleatória.
+
+A lição que fica: **"cancelled" nunca é a falha, é o rastro dela.** A causa está no topo do log
+do job, num `before` — e um `before` que pendura em vez de falhar é o que torna esse topo
+inútil. Todo `listen` de porta fixa precisa de `once('error', reject)`.
 
 Os testes estruturais existem em `backend/test/tenant-scoping.test.js`: a guarda estática
 que varre `backend/src` atrás de handle cru numa tabela escopada, a exigência de que toda
@@ -686,7 +716,8 @@ edições de divergirem.
 
 ### Checklist antes de vender acesso ao segundo provedor
 
-Nada disso é negociável. **Dez dos doze estão cumpridos.**
+Nada disso é negociável. **Onze dos doze estão cumpridos**, e o que falta do
+décimo segundo é a exclusão, não a exportação.
 
 | | Item | Estado |
 | --- | --- | --- |
@@ -700,12 +731,18 @@ Nada disso é negociável. **Dez dos doze estão cumpridos.**
 | 8 | Rate limit e concorrência de fetch ACS chaveados por provedor | ⚠️ rate limit por provedor ✅; a concorrência de fetch ACS é Fase 4 |
 | 9 | Suíte de vazamento verde no CI e obrigatória para merge | ✅ 1403 testes, três dialetos |
 | 10 | `SECRET_BOX_KEY` separada do `JWT_SECRET`, com `key_version` | ✅ |
-| 11 | `audit_log` registrando ações sensíveis | ❌ Fase 7 |
-| 12 | Exportação por provedor funcionando (LGPD e "apaguei tudo, socorro") | ❌ Fase 7 |
+| 11 | `audit_log` registrando ações sensíveis | ✅ onda 20 — senha de portal, GenieACS, papéis, vínculos, convites, suspensão |
+| 12 | Exportação por provedor funcionando (LGPD e "apaguei tudo, socorro") | ⚠️ exportação ✅ (onda 21); a EXCLUSÃO por provedor falta, e depende de uma trilha acima dos provedores |
 
-Os dois que faltam são de **operação (11, 12)**, mais a metade do 8 que é a concorrência
-de fetch ACS. Nenhum deles é do mecanismo de isolamento de dados, que é o que a Fase 1
+O que falta é a **exclusão por provedor** (metade do 12) e a **concorrência de fetch ACS**
+(metade do 8). Nenhum dos dois é do mecanismo de isolamento de dados, que é o que a Fase 1
 entregou.
+
+A exclusão está parada num ponto que vale registrar em vez de contornar: apagar um provedor
+tem que deixar registro, e registrar no `audit_log` DELE é inútil — a trilha vai junto. Um
+registro que sobreviva precisa morar acima dos provedores, que é a mesma tabela que a
+impersonação da plataforma vai precisar. As duas coisas entram juntas ou nenhuma entra
+direito.
 
 ## Verificação
 

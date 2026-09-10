@@ -94,6 +94,10 @@ export const PERMISSIONS = Object.freeze([
   // trilha diz mais do que a equipe: quem revelou a senha de qual assinante, e
   // quando. Quem pode ver a lista de colegas não recebe isso de brinde.
   'audit.read',
+  // Levar o cadastro do provedor embora. Capacidade própria porque é a única
+  // rota que devolve TUDO de uma vez: quem administra a operação não recebe de
+  // brinde o direito de baixar o cadastro inteiro num arquivo.
+  'tenant.export',
   // Trocar o banco em runtime, que só existe na edição self-hosted.
   'database.manage'
 ]);
@@ -136,6 +140,7 @@ const ADMIN = [
   'operators.read',
   'operators.manage',
   'audit.read',
+  'tenant.export',
   'database.manage'
 ];
 

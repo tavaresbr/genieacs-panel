@@ -552,4 +552,6 @@ export default {
 
   'audit.listed': 'Registro di controllo recuperato',
   'audit.listFailed': 'Impossibile leggere il registro di controllo',
+
+  'tenant.exportFailed': 'Impossibile esportare i dati del provider',
 };

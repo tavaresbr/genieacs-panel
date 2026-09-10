@@ -1,5 +1,6 @@
 import express from 'express';
 import TenantController from '../controllers/tenantController.js';
+import { authenticateToken, requirePermission } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -16,5 +17,9 @@ const router = express.Router();
  * on. The word `public` in the path is the reminder.
  */
 router.get('/public', TenantController.getPublicProfile);
+
+// E do outro lado da linha que o parágrafo acima descreve: tudo que este
+// provedor cadastrou, num arquivo. Autenticada e com capacidade própria.
+router.get('/export', authenticateToken, requirePermission('tenant.export'), TenantController.exportTenant);
 
 export default router;
