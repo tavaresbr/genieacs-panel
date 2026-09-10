@@ -1,4 +1,4 @@
-export const LOCALES = ['pt-BR', 'en', 'es', 'it', 'de', 'fr', 'ja', 'zh-CN', 'zh-TW', 'ko', 'ru', 'ar'] as const
+export const LOCALES = ['pt-BR', 'en', 'es', 'it', 'de', 'fr', 'ja', 'zh-CN', 'zh-TW', 'ko', 'ru', 'ar', 'hi'] as const
 
 export type Locale = (typeof LOCALES)[number]
 
@@ -34,6 +34,7 @@ export const LOCALE_METADATA: Record<Locale, LocaleMetadata> = {
   ko: { label: '한국어', shortLabel: 'KO', flag: '🇰🇷', intlLocale: 'ko-KR' },
   ru: { label: 'Русский', shortLabel: 'RU', flag: '🇷🇺', intlLocale: 'ru-RU' },
   ar: { label: 'العربية', shortLabel: 'AR', flag: '🇸🇦', intlLocale: 'ar-SA', direction: 'rtl' },
+  hi: { label: 'हिन्दी', shortLabel: 'HI', flag: '🇮🇳', intlLocale: 'hi-IN' },
 }
 
 export function isLocale(value: unknown): value is Locale {
@@ -71,6 +72,7 @@ export function resolveLocale(tag: string | null | undefined): Locale | null {
   if (base === 'ko') return 'ko'
   if (base === 'ru') return 'ru'
   if (base === 'ar') return 'ar'
+  if (base === 'hi') return 'hi'
   // Traditional-script markers pick zh-TW; every other zh tag (zh, zh-Hans,
   // zh-SG…) gets Simplified.
   if (base === 'zh') return TRADITIONAL_CHINESE.test(normalized) ? 'zh-TW' : 'zh-CN'

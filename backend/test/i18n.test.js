@@ -94,6 +94,7 @@ describe('dictionaries', () => {
     assert.equal(translate('ko', 'common.routeNotFound'), '경로를 찾을 수 없습니다');
     assert.equal(translate('ru', 'common.routeNotFound'), 'Маршрут не найден');
     assert.equal(translate('ar', 'common.routeNotFound'), 'المسار غير موجود');
+    assert.equal(translate('hi', 'common.routeNotFound'), 'मार्ग नहीं मिला');
     assert.equal(translate('pt-BR', 'nonexistent.key'), 'nonexistent.key');
   });
 });
@@ -117,6 +118,7 @@ describe('locale negotiation', () => {
     assert.equal(resolveLocale('ko-KR'), 'ko');
     assert.equal(resolveLocale('ru-RU'), 'ru');
     assert.equal(resolveLocale('ar-EG'), 'ar');
+    assert.equal(resolveLocale('hi-IN'), 'hi');
     assert.equal(resolveLocale('nl'), null);
   });
 
@@ -138,6 +140,7 @@ describe('locale negotiation', () => {
     assert.equal(negotiateLocale('ko-KR'), 'ko');
     assert.equal(negotiateLocale('ru-RU'), 'ru');
     assert.equal(negotiateLocale('ar-SA'), 'ar');
+    assert.equal(negotiateLocale('hi-IN'), 'hi');
     assert.equal(negotiateLocale('nl-NL'), 'pt-BR');
     assert.equal(negotiateLocale(undefined), 'pt-BR');
     assert.equal(negotiateLocale('*'), 'pt-BR');
@@ -165,6 +168,7 @@ describe('translated responses', () => {
       ['ko', '경로를 찾을 수 없습니다'],
       ['ru', 'Маршрут не найден'],
       ['ar', 'المسار غير موجود'],
+      ['hi', 'मार्ग नहीं मिला'],
       ['nl;q=0.9, en;q=0.5', 'Route not found']
     ]) {
       const { body } = await call(`${panelUrl}/api/does-not-exist`, {
