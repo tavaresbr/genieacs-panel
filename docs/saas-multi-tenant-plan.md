@@ -716,9 +716,17 @@ Original: Fase 0 → 1 → 2 → 3 → 8 → 4 → 5 → 6 → 7.
    que é quebra de contrato e decisão de produto, não de código.
 3. ~~**Fechar a Fase 8**~~ ✅ com os três testes que passaram a ser possíveis e a sentinela
    de SQL. Sobrou avaliar **RLS no Postgres** como segunda linha.
-4. **Fase 4 — conector**, começando pelas três correções de SSRF e pela guarda de egresso,
-   **antes** de a URL virar dado do cliente.
-5. Fases 5 → 6 → 7.
+4. ~~**Fase 4 — conector.**~~ ✅ na ordem certa: as três correções de SSRF e a guarda de
+   egresso com IP fixado entraram **antes** de a URL virar dado do cliente; depois a
+   credencial NBI (onda 19) e o teto de concorrência. Do desenho original ficaram de fora,
+   e continuam em aberto: `mode` (`agent`/`tunnel`/`hosted`), `verify_tls` e
+   `allow_private_ranges` por provedor — a credencial vive num blob em `app_state`, sem
+   essas três colunas — e as três peças restantes do muro de escala.
+5. **Fase 5** (planos, assinatura, `requireActiveSubscription`, limites nos pontos de
+   escrita, `billing_events`) → o resto da **Fase 6** (onboarding, plano e uso, branding
+   pelo contexto, `<html lang>` e o centro do mapa) → o que sobrou da **2** (impersonação
+   auditada com audiência própria, transporte de e-mail do convite) e da **7** (exclusão
+   já entrou; `tenant_id` em log e métrica).
 
 Vale repetir o que o plano dizia e que se confirmou: a Fase 1 saiu para os installs
 self-hosted como upgrade normal, e o código de tenancy rodou em produção real com um
@@ -728,7 +736,7 @@ edições de divergirem.
 
 ### Checklist antes de vender acesso ao segundo provedor
 
-Nada disso é negociável. **Os doze estão cumpridos**, com uma ressalva no oitavo:
+Nada disso é negociável. **Os doze estão cumpridos.**
 o rate limit é por provedor, mas a concorrência de fetch ao ACS ainda não — e essa
 metade é da Fase 4.
 
@@ -747,8 +755,11 @@ metade é da Fase 4.
 | 11 | `audit_log` registrando ações sensíveis | ✅ onda 20 — senha de portal, GenieACS, papéis, vínculos, convites, suspensão |
 | 12 | Exportação por provedor funcionando (LGPD e "apaguei tudo, socorro") | ✅ exportação (onda 21) e exclusão (onda 22), com trilha que sobrevive ao provedor apagado |
 
-O que falta é a **concorrência de fetch ao ACS** (metade do 8), que é da Fase 4 e não do
-mecanismo de isolamento de dados — que é o que a Fase 1 entregou.
+Nenhuma linha vermelha resta. Isso **não** quer dizer produto pronto — a Fase 5 inteira e
+boa parte da 6 estão por fazer — quer dizer que a lista do que não se pode vender sem já
+não tem item aberto. O que a fecha por último é o teto de concorrência de fetch ao ACS
+(`withAcsSlot`), que é a primeira das quatro peças do muro de escala da Fase 4; as outras
+três continuam registradas lá.
 
 A exclusão entrou na onda 22, e o que a destravou foi `platform_audit`: apagar um provedor
 tem que deixar registro, e registrar no `audit_log` DELE é inútil porque a trilha vai junto.
