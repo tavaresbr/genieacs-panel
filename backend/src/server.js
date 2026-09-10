@@ -3,6 +3,7 @@ import { closePool, testConnection } from './config/database.js';
 import { ensureSchema } from './config/schema.js';
 import { seedDefaults } from './config/seed.js';
 import DeviceService from './services/deviceService.js';
+import { isDormant, lastPanelActivityAt } from './services/dashboardSchedule.js';
 import CustomerService from './services/customerService.js';
 import CustomerPortalPasswordService from './services/customerPortalPasswordService.js';
 import SchedulerService from './services/schedulerService.js';
@@ -56,10 +57,19 @@ export const startServer = async () => {
       // The prewarm qualifies now: the GenieACS it reads comes from
       // `settings.genieAcsUrl`, which is per provider, and the accounts it
       // joins against are too.
-      void forEachTenant(() => DeviceService.getDashboardData(false))
-        .catch((error) => {
-          console.warn(`Dashboard prewarm skipped: ${error.message}`);
-        });
+      //
+      // Só para quem tem alguém usando: o prewarm existe para o primeiro
+      // operador do dia não esperar pela frota inteira, e um provedor sem
+      // ninguém há 24h não tem esse primeiro operador. Sem a poda, subir o
+      // processo era buscar a coleção de dispositivos de TODO provedor da
+      // instalação, dormente ou não — o pior minuto do dia, e o único em que
+      // ninguém está olhando para reclamar.
+      void forEachTenant(async () => {
+        if (isDormant(await lastPanelActivityAt())) return null;
+        return DeviceService.getDashboardData(false);
+      }).catch((error) => {
+        console.warn(`Dashboard prewarm skipped: ${error.message}`);
+      });
       // The Customer ID sweep qualifies too, now that `device_profiles` is per
       // provider — it was the last table under here that was not, `sgp_links`
       // having moved earlier. Everything the sweep reaches is scoped: the

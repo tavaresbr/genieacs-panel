@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
-import { acceptsIdentifier, LOGIN_REQUIRES_EMAIL } from '../config/login.js';
+import { acceptsIdentifier, canHoldSession, LOGIN_REQUIRES_EMAIL } from '../config/login.js';
 import TenantUser from '../models/TenantUser.js';
 import PlatformAdmin from '../models/PlatformAdmin.js';
 import { IS_SAAS } from '../config/edition.js';
@@ -13,8 +13,26 @@ import { seedDefaults } from '../config/seed.js';
 import { slugProblem } from '../utils/slug.js';
 import { panelBaseDomain, usesTenantSubdomains } from '../middleware/tenantResolver.js';
 import AuditLog from '../models/AuditLog.js';
+import { runInTenant } from '../config/tenantContext.js';
+import { recordPanelActivity } from '../services/dashboardSchedule.js';
 
 const DUMMY_PASSWORD_HASH = bcrypt.hashSync('skygenpanel-invalid-login-placeholder', 12);
+
+/**
+ * Registra que este provedor tem gente usando o painel.
+ *
+ * É o que decide a cadência com que o painel dele é atualizado em segundo
+ * plano — ver `services/dashboardSchedule.js`. Fica no login e na renovação de
+ * token porque são os dois pontos em que se SABE que há alguém do outro lado, e
+ * porque a renovação é de hora em hora: a marca acompanha quem continua ali,
+ * sem uma escrita por requisição.
+ *
+ * O escopo é aberto pelo provedor do vínculo, e não herdado: no login por
+ * subdomínio o escopo da requisição é o do host, que é o mesmo — mas numa
+ * instalação sem resolução por host não há escopo nenhum, e é o vínculo que
+ * sabe em qual provedor a pessoa acabou de entrar.
+ */
+const marcarAtividade = (tenantId) => runInTenant(Number(tenantId), () => recordPanelActivity());
 
 /**
  * Which provider this sign-in is for.
@@ -261,6 +279,7 @@ class AuthController {
       }
 
       const { accessToken, refreshToken } = generateTokens(user, membership);
+      await marcarAtividade(membership.tenant_id);
 
       return res.json(
         createResponse(req.t('auth.loginSuccess'), {
@@ -464,6 +483,17 @@ class AuthController {
         );
       }
 
+      // A chave `LOGIN_REQUIRES_EMAIL`, lida aqui também. Sem isto, virá-la só
+      // trancava quem ainda não tinha sessão: quem já estava dentro renovava
+      // por sete dias. Assim a chave passa a valer na próxima renovação — dentro
+      // da vida do token de acesso — e a pessoa cai na tela de login, onde a
+      // regra que a trancou é a mesma que ela vai ler.
+      if (!canHoldSession(user)) {
+        return res.status(403).json(
+          createErrorResponse(req.t('auth.refreshSessionInvalid'))
+        );
+      }
+
       // The same provider the session was already running in, re-read from the
       // table so a membership ended since the refresh token was minted ends the
       // session at its next hour rather than at its next week. A refresh token
@@ -477,6 +507,7 @@ class AuthController {
       }
 
       const { accessToken, refreshToken: newRefreshToken } = generateTokens(user, membership);
+      await marcarAtividade(membership.tenant_id);
 
       return res.json(
         createResponse(req.t('auth.tokenRefreshed'), {

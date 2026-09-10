@@ -100,13 +100,13 @@ class UsersController {
   static async list(req, res) {
     try {
       const members = await TenantUser.listForTenant(tenantOf(req));
-      return res.json(createResponse('Users retrieved successfully', {
+      return res.json(createResponse(req.t('users.listed'), {
         users: members.map(present)
       }));
     } catch (error) {
       console.error('List users error:', error);
       return res.status(500).json(
-        createErrorResponse('Failed to list operators', error.message)
+        createErrorResponse(req.t('users.listFailed'), error.message)
       );
     }
   }
@@ -125,26 +125,26 @@ class UsersController {
       // Mesma regra da promoção: quem não é `owner` não cunha um.
       if (role === 'owner' && presentRole(req.user.role) !== 'owner') {
         return res.status(403).json(
-          createErrorResponse('Only an owner can grant or revoke the owner role')
+          createErrorResponse(req.t('users.ownerOnly'))
         );
       }
 
       if (username.length < 3 || username.length > 64) {
         return res.status(400).json(
-          createErrorResponse('Username must be between 3 and 64 characters')
+          createErrorResponse(req.t('auth.usernameLength'))
         );
       }
       if (password.length < 8 || password.length > 128) {
         return res.status(400).json(
-          createErrorResponse('Password must be between 8 and 128 characters')
+          createErrorResponse(req.t('auth.passwordLength'))
         );
       }
       if (!email || !isValidEmail(email)) {
-        return res.status(400).json(createErrorResponse('A valid email address is required'));
+        return res.status(400).json(createErrorResponse(req.t('auth.emailInvalid')));
       }
       if (!ROLES.includes(req.body?.role)) {
         return res.status(400).json(
-          createErrorResponse(`Role must be one of: ${ROLES.join(', ')}`)
+          createErrorResponse(req.t('users.roleInvalid', { roles: ROLES.join(', ') }))
         );
       }
 
@@ -166,10 +166,10 @@ class UsersController {
       // identificador de login ambíguo, e `findByLogin` recusaria os dois.
       const conflito = await User.loginConflict({ username, email });
       if (conflito === 'email_taken') {
-        return res.status(409).json(createErrorResponse('Email address already taken'));
+        return res.status(409).json(createErrorResponse(req.t('auth.emailTaken')));
       }
       if (conflito) {
-        return res.status(409).json(createErrorResponse('Username already taken'));
+        return res.status(409).json(createErrorResponse(req.t('auth.usernameTaken')));
       }
 
       // O limite do plano, conferido ANTES de escrever qualquer coisa: uma
@@ -206,14 +206,14 @@ class UsersController {
         detail: { username, role }
       });
       return res.status(201).json(
-        createResponse('Operator created successfully', {
+        createResponse(req.t('users.created'), {
           user: present({ ...created, role })
         })
       );
     } catch (error) {
       console.error('Create user error:', error);
       return res.status(500).json(
-        createErrorResponse('Failed to create the operator', error.message)
+        createErrorResponse(req.t('users.createFailed'), error.message)
       );
     }
   }
@@ -223,7 +223,7 @@ class UsersController {
       const tenantId = tenantOf(req);
       const id = Number(req.params?.id);
       if (!Number.isInteger(id)) {
-        return res.status(400).json(createErrorResponse('Invalid operator id'));
+        return res.status(400).json(createErrorResponse(req.t('users.invalidId')));
       }
 
       // Somebody who does not work here answers as nonexistent, never as
@@ -232,21 +232,21 @@ class UsersController {
       const membership = await TenantUser.find(tenantId, id);
       const user = membership ? await User.findById(id) : null;
       if (!membership || !user) {
-        return res.status(404).json(createErrorResponse('Operator not found'));
+        return res.status(404).json(createErrorResponse(req.t('users.notFound')));
       }
 
       const nextRole = req.body?.role;
       const nextPassword = req.body?.password;
       if (nextRole === undefined && nextPassword === undefined) {
         return res.status(400).json(
-          createErrorResponse('Provide a role, a password, or both')
+          createErrorResponse(req.t('users.nothingToUpdate'))
         );
       }
 
       if (nextRole !== undefined) {
         if (!ROLES.includes(nextRole)) {
           return res.status(400).json(
-            createErrorResponse(`Role must be one of: ${ROLES.join(', ')}`)
+            createErrorResponse(req.t('users.roleInvalid', { roles: ROLES.join(', ') }))
           );
         }
         // Só um `owner` mexe no papel de `owner` — para dar e para tirar. Sem
@@ -257,7 +257,7 @@ class UsersController {
         const mexeEmOwner = nextRole === 'owner' || presentRole(membership.role) === 'owner';
         if (mexeEmOwner && presentRole(req.user.role) !== 'owner') {
           return res.status(403).json(
-            createErrorResponse('Only an owner can grant or revoke the owner role')
+            createErrorResponse(req.t('users.ownerOnly'))
           );
         }
         // Rebaixar-se a si mesmo abaixo de quem administra a equipe é sair pela
@@ -267,7 +267,7 @@ class UsersController {
         // direto, que é o que se quer.
         if (id === req.user.userId && !roleHas(nextRole, 'operators.manage')) {
           return res.status(409).json(
-            createErrorResponse('You cannot remove your own administrator role')
+            createErrorResponse(req.t('users.ownAdminRole'))
           );
         }
         // Losing the last administrator would leave THIS provider unmanageable.
@@ -287,7 +287,7 @@ class UsersController {
           && !roleHas(nextRole, 'operators.manage')
           && await TenantUser.countByRoles(tenantId, ADMINISTRADORES) <= 1) {
           return res.status(409).json(
-            createErrorResponse('The panel must keep at least one administrator')
+            createErrorResponse(req.t('users.lastAdmin'))
           );
         }
         await TenantUser.setRole(tenantId, id, nextRole);
@@ -304,7 +304,7 @@ class UsersController {
         const password = String(nextPassword);
         if (password.length < 8 || password.length > 128) {
           return res.status(400).json(
-            createErrorResponse('Password must be between 8 and 128 characters')
+            createErrorResponse(req.t('auth.passwordLength'))
           );
         }
         // A person has one password, for every provider they work for. Setting
@@ -315,9 +315,7 @@ class UsersController {
         // to do.
         if ((await TenantUser.listForUser(id)).length > 1) {
           return res.status(409).json(
-            createErrorResponse(
-              'This operator also works for another provider; only they can change their password'
-            )
+            createErrorResponse(req.t('users.passwordElsewhere'))
           );
         }
         // updatePassword also revokes the operator's existing sessions.
@@ -326,13 +324,13 @@ class UsersController {
 
       const updated = await User.findById(id);
       const current = await TenantUser.find(tenantId, id);
-      return res.json(createResponse('Operator updated successfully', {
+      return res.json(createResponse(req.t('users.updated'), {
         user: present({ ...updated, role: current?.role })
       }));
     } catch (error) {
       console.error('Update user error:', error);
       return res.status(500).json(
-        createErrorResponse('Failed to update the operator', error.message)
+        createErrorResponse(req.t('users.updateFailed'), error.message)
       );
     }
   }
@@ -350,16 +348,16 @@ class UsersController {
       const tenantId = tenantOf(req);
       const id = Number(req.params?.id);
       if (!Number.isInteger(id)) {
-        return res.status(400).json(createErrorResponse('Invalid operator id'));
+        return res.status(400).json(createErrorResponse(req.t('users.invalidId')));
       }
       if (id === req.user.userId) {
         return res.status(409).json(
-          createErrorResponse('You cannot delete the account you are signed in with')
+          createErrorResponse(req.t('users.deleteSelf'))
         );
       }
       const membership = await TenantUser.find(tenantId, id);
       if (!membership) {
-        return res.status(404).json(createErrorResponse('Operator not found'));
+        return res.status(404).json(createErrorResponse(req.t('users.notFound')));
       }
       // A mesma regra do PATCH, e ela precisa estar nos dois: encerrar o
       // vínculo de um `owner` é estritamente pior que rebaixá-lo, e proteger só
@@ -367,7 +365,7 @@ class UsersController {
       // exatamente o que a outra recusa — tirar o dono do provedor de cena.
       if (presentRole(membership.role) === 'owner' && presentRole(req.user.role) !== 'owner') {
         return res.status(403).json(
-          createErrorResponse('Only an owner can grant or revoke the owner role')
+          createErrorResponse(req.t('users.ownerOnly'))
         );
       }
       // Same invariant as the demotion above, and unreachable for the same
@@ -376,7 +374,7 @@ class UsersController {
       if (roleHas(membership.role, 'operators.manage')
         && await TenantUser.countByRoles(tenantId, ADMINISTRADORES) <= 1) {
         return res.status(409).json(
-          createErrorResponse('The panel must keep at least one administrator')
+          createErrorResponse(req.t('users.lastAdmin'))
         );
       }
 
@@ -391,11 +389,11 @@ class UsersController {
       // so this signs them out of their other providers too — the blunt end of
       // one `token_version` per person, and the safe direction of the two.
       await User.revokeSessions(id);
-      return res.json(createResponse('Operator deleted successfully', { id }));
+      return res.json(createResponse(req.t('users.deleted'), { id }));
     } catch (error) {
       console.error('Delete user error:', error);
       return res.status(500).json(
-        createErrorResponse('Failed to delete the operator', error.message)
+        createErrorResponse(req.t('users.deleteFailed'), error.message)
       );
     }
   }
