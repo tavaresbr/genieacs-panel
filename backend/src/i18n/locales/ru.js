@@ -6,9 +6,14 @@ export default {
   // Транспорт и общие ошибки
   'common.internalError': 'Внутренняя ошибка сервера',
   'common.routeNotFound': 'Маршрут не найден',
+  'common.notFound': 'Не найдено',
   'common.originNotAllowed': 'Источник запроса не разрешён',
   'common.crossSiteBlocked': 'Межсайтовый запрос заблокирован',
   'common.invalidJson': 'Некорректное тело запроса JSON',
+
+  // Провайдер, который называет хост, — то, что видит посторонний
+  'tenant.publicRetrieved': 'Профиль провайдера получен',
+  'tenant.publicFailed': 'Не удалось получить профиль провайдера',
 
   // Аутентификация и авторизация
   'auth.tokenRequired': 'Требуется токен аутентификации',
@@ -118,6 +123,7 @@ export default {
   'settings.urlRequired': 'Требуется адрес URL',
   'settings.urlInvalid': 'Требуется корректный адрес HTTP или HTTPS',
   'settings.urlSchemeUnsupported': 'Поддерживаются только адреса HTTP и HTTPS',
+  'settings.urlEgressRefused': 'Панели не разрешено подключаться к этому адресу',
   'settings.urlCredentialsUnsupported': 'Учётные данные в адресе URL не поддерживаются',
   'settings.connectionSuccess': 'Подключение успешно.',
   'settings.connectionUnexpectedFormat': 'Подключение успешно, но формат ответа оказался неожиданным',

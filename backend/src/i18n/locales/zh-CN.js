@@ -6,9 +6,14 @@ export default {
   // 通信与通用错误
   'common.internalError': '服务器内部错误',
   'common.routeNotFound': '找不到该路由',
+  'common.notFound': '未找到',
   'common.originNotAllowed': '不允许该来源',
   'common.crossSiteBlocked': '跨站请求已被拦截',
   'common.invalidJson': '请求体的 JSON 无效',
+
+  // 主机所指向的服务商，外部访问者可见的信息
+  'tenant.publicRetrieved': '已获取服务商信息',
+  'tenant.publicFailed': '获取服务商信息失败',
 
   // 身份认证与授权
   'auth.tokenRequired': '需要认证令牌',
@@ -118,6 +123,7 @@ export default {
   'settings.urlRequired': '需要提供地址',
   'settings.urlInvalid': '需要提供有效的 HTTP 或 HTTPS 地址',
   'settings.urlSchemeUnsupported': '仅支持 HTTP 和 HTTPS 地址',
+  'settings.urlEgressRefused': '面板不被允许连接到该地址',
   'settings.urlCredentialsUnsupported': '不支持在地址中携带凭据',
   'settings.connectionSuccess': '连接成功。',
   'settings.connectionUnexpectedFormat': '连接成功，但响应格式与预期不符',

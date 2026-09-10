@@ -13,6 +13,7 @@ import AppState from '../models/AppState.js';
 import { DEFAULT_SETTINGS } from '../config/seed.js';
 import { TranslatableError } from '../i18n/index.js';
 import { currentTenantId } from '../config/tenantContext.js';
+import GenieAcsEgress from './genieacsEgress.js';
 
 const WAN_PARAMETER_CANDIDATES = Object.freeze({
   vlan: [
@@ -233,10 +234,11 @@ class DeviceService {
    * operator has to tell a misconfiguration from an outage, and the body is
    * logged here, truncated, where only the server can see it.
    *
-   * A 3xx is called out on its own: every GenieACS fetch sets
-   * `redirect: 'manual'`, so a redirect arrives as a not-ok response and would
-   * otherwise read as an upstream bug rather than as what it is — an allowed
-   * host trying to walk the request somewhere we never agreed to reach.
+   * A 3xx is called out on its own: `GenieAcsEgress` never follows a redirect,
+   * which is what `redirect: 'manual'` at the call sites asks for, so one
+   * arrives as a not-ok response and would otherwise read as an upstream bug
+   * rather than as what it is — an allowed host trying to walk the request
+   * somewhere we never agreed to reach.
    *
    * `knownBody` is for the one caller that already consumed the body; a second
    * read of it yields nothing.
@@ -281,7 +283,7 @@ class DeviceService {
         options.headers['Content-Type'] = 'application/json';
         options.body = typeof body === 'string' ? body : JSON.stringify(body);
       }
-      const response = await fetch(url, options);
+      const response = await GenieAcsEgress.fetch(url, options);
       if (!response.ok) {
         throw await this.genieAcsError(`GenieACS ${collection} API`, response);
       }
@@ -339,7 +341,7 @@ class DeviceService {
           options.body = typeof body === 'string' ? body : JSON.stringify(body);
         }
 
-        const response = await fetch(url, options);
+        const response = await GenieAcsEgress.fetch(url, options);
 
         clearTimeout(timeoutId);
 
@@ -452,7 +454,7 @@ class DeviceService {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15_000);
     try {
-      const response = await fetch(url, {
+      const response = await GenieAcsEgress.fetch(url, {
         method: 'GET',
         headers: { Accept: 'application/json' },
         signal: controller.signal,
@@ -1233,7 +1235,7 @@ class DeviceService {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
     try {
-      const response = await fetch(url, {
+      const response = await GenieAcsEgress.fetch(url, {
         method: 'POST',
         headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
         body: JSON.stringify(task),
@@ -1305,7 +1307,7 @@ class DeviceService {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15_000);
     try {
-      const response = await fetch(url, { method, signal: controller.signal, redirect: 'manual' });
+      const response = await GenieAcsEgress.fetch(url, { method, signal: controller.signal, redirect: 'manual' });
       if (!response.ok && !(method === 'DELETE' && response.status === 404)) {
         throw await this.genieAcsError('GenieACS tag API', response);
       }
@@ -1372,7 +1374,7 @@ class DeviceService {
     const timeoutId = setTimeout(() => controller.abort(), 15000);
 
     try {
-      const response = await fetch(url, {
+      const response = await GenieAcsEgress.fetch(url, {
         method: 'DELETE',
         signal: controller.signal,
         redirect: 'manual'
@@ -1800,7 +1802,7 @@ class DeviceService {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15_000);
     try {
-      const response = await fetch(url, { method: 'DELETE', signal: controller.signal, redirect: 'manual' });
+      const response = await GenieAcsEgress.fetch(url, { method: 'DELETE', signal: controller.signal, redirect: 'manual' });
       if (!response.ok && response.status !== 404) {
         throw await this.genieAcsError('GenieACS fault API', response);
       }

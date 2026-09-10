@@ -3,9 +3,14 @@ export default {
   // Fallimenti di trasporto e generici
   'common.internalError': 'Errore interno del server',
   'common.routeNotFound': 'Rotta non trovata',
+  'common.notFound': 'Non trovato',
   'common.originNotAllowed': 'Origine non consentita',
   'common.crossSiteBlocked': 'Richiesta cross-site bloccata',
   'common.invalidJson': 'Corpo della richiesta JSON non valido',
+
+  // Il provider indicato dall'host, come lo vede un estraneo
+  'tenant.publicRetrieved': 'Profilo del provider recuperato',
+  'tenant.publicFailed': 'Impossibile recuperare il profilo del provider',
 
   // Autenticazione e autorizzazione
   'auth.tokenRequired': 'Token di autenticazione obbligatorio',
@@ -115,6 +120,7 @@ export default {
   'settings.urlRequired': 'L’URL è obbligatorio',
   'settings.urlInvalid': 'È richiesto un URL HTTP o HTTPS valido',
   'settings.urlSchemeUnsupported': 'Sono supportati solo URL HTTP e HTTPS',
+  'settings.urlEgressRefused': 'Il pannello non è autorizzato a connettersi a questo indirizzo',
   'settings.urlCredentialsUnsupported': 'Le credenziali nell’URL non sono supportate',
   'settings.connectionSuccess': 'Connessione riuscita.',
   'settings.connectionUnexpectedFormat': 'Connessione riuscita, ma il formato della risposta era inatteso',

@@ -6,9 +6,14 @@ export default {
   // 전송 및 일반 오류
   'common.internalError': '내부 서버 오류',
   'common.routeNotFound': '경로를 찾을 수 없습니다',
+  'common.notFound': '찾을 수 없습니다',
   'common.originNotAllowed': '허용되지 않은 출처입니다',
   'common.crossSiteBlocked': '교차 사이트 요청이 차단되었습니다',
   'common.invalidJson': '요청 본문의 JSON이 올바르지 않습니다',
+
+  // 호스트가 가리키는 사업자 중 외부에 공개되는 정보
+  'tenant.publicRetrieved': '사업자 정보를 가져왔습니다',
+  'tenant.publicFailed': '사업자 정보를 가져오지 못했습니다',
 
   // 인증 및 권한
   'auth.tokenRequired': '인증 토큰이 필요합니다',
@@ -118,6 +123,7 @@ export default {
   'settings.urlRequired': 'URL이 필요합니다',
   'settings.urlInvalid': '유효한 HTTP 또는 HTTPS URL이 필요합니다',
   'settings.urlSchemeUnsupported': 'HTTP와 HTTPS URL만 지원합니다',
+  'settings.urlEgressRefused': '패널이 이 주소로 연결하는 것은 허용되지 않습니다',
   'settings.urlCredentialsUnsupported': 'URL에 포함된 자격 증명은 지원하지 않습니다',
   'settings.connectionSuccess': '연결에 성공했습니다.',
   'settings.connectionUnexpectedFormat': '연결에는 성공했지만 응답 형식이 예상과 다릅니다',

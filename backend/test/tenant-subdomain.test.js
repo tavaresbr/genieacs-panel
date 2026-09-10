@@ -318,6 +318,39 @@ describe('a portal session replayed on another provider\'s host', () => {
   });
 });
 
+describe('the slug cache', () => {
+  // A miss is not worth remembering, and remembering it is worse than useless:
+  // anyone who can reach the panel could grow the Map without bound by asking
+  // for one made-up subdomain after another. Providers are few; the hits are
+  // what the cache is for.
+  it('does not grow from slugs nobody has', async () => {
+    const { resolveTenantIdBySlug, forgetResolvedTenant } = await import(
+      '../src/middleware/tenantResolver.js'
+    );
+    forgetResolvedTenant();
+
+    // Warm a real one so the cache is not simply empty, which would make this
+    // pass whether or not misses are kept.
+    assert.ok(await resolveTenantIdBySlug('alfa'));
+    for (const guess of ['aa', 'ab', 'ac', 'ad', 'ae', 'af']) {
+      assert.equal(await resolveTenantIdBySlug(guess), null);
+    }
+
+    const db = getDb();
+    let queries = 0;
+    const count = () => { queries += 1; };
+    db.on('query', count);
+    try {
+      await resolveTenantIdBySlug('alfa');
+      assert.equal(queries, 0, 'o acerto tem que vir do cache');
+      await resolveTenantIdBySlug('aa');
+      assert.equal(queries, 1, 'o erro tem que ir ao banco de novo, e nao ficar guardado');
+    } finally {
+      db.off('query', count);
+    }
+  });
+});
+
 describe('the rate limit bucket', () => {
   // The deployment this matters for is the one the code already describes:
   // every client arrives through one tunnel, so one address is every caller.
@@ -349,6 +382,107 @@ describe('the deployment without subdomains', () => {
       method: 'POST',
       body: { username: 'operador-alfa', password: 'senha-do-alfa-1' }
     });
+    assert.equal(status, 404);
+  });
+});
+
+/**
+ * The one route that answers a stranger with something out of `tenants`.
+ *
+ * It exists so the login screen can render the provider's own name before
+ * anybody has signed in, which makes it the enumeration surface of the whole
+ * deployment — a place where "this ISP is a customer of ours" is one request
+ * away. The assertions below are about what it refuses to say, not only about
+ * what it returns.
+ */
+describe('the provider a login screen sees', () => {
+  it('answers with the provider its host names', async () => {
+    const { status, body } = await callAs(
+      'alfa.painel.exemplo.com', `${panelUrl}/api/tenant/public`
+    );
+    assert.equal(status, 200);
+    assert.equal(body.data.name, 'Provedor Alfa');
+    assert.equal(body.data.slug, 'alfa');
+  });
+
+  // The failure this guards is the resolver reverting to the first row: with
+  // one provider in the fixture that mistake is invisible, and it is exactly
+  // the mistake that puts one ISP's name on another ISP's login screen.
+  it('answers with the OTHER provider on the other provider\'s host', async () => {
+    const { status, body } = await callAs(
+      'beta.painel.exemplo.com', `${panelUrl}/api/tenant/public`
+    );
+    assert.equal(status, 200);
+    assert.equal(body.data.name, 'Provedor Beta');
+  });
+
+  it('needs no token at all', async () => {
+    const { status } = await callAs(
+      'alfa.painel.exemplo.com', `${panelUrl}/api/tenant/public`
+    );
+    assert.equal(status, 200);
+  });
+
+  /**
+   * Pinned key by key, so nobody widens what a stranger sees without touching
+   * this line.
+   *
+   * `id` is the field this is really watching for. It is the stable primary key
+   * of a `tenants` row, the screen has no use for it, and once an
+   * unauthenticated response carries it, clients start sending it back — which
+   * is the shape of parameter that becomes an IDOR the day a route trusts it
+   * over the host. `status`, `created_at` and any future column are the same
+   * argument with a different name on it.
+   */
+  it('returns the public fields and nothing else', async () => {
+    const { body } = await callAs(
+      'alfa.painel.exemplo.com', `${panelUrl}/api/tenant/public`
+    );
+    assert.deepEqual(Object.keys(body.data).sort(), ['name', 'slug']);
+    assert.deepEqual(Object.keys(body).sort(), ['data', 'message', 'success']);
+  });
+
+  it('answers 404 for a host nobody has', async () => {
+    const { status } = await callAs(
+      'gama.painel.exemplo.com', `${panelUrl}/api/tenant/public`
+    );
+    assert.equal(status, 404);
+  });
+
+  it('answers 404 for a provider that is not active', async () => {
+    const { status } = await callAs(
+      'parada.painel.exemplo.com', `${panelUrl}/api/tenant/public`
+    );
+    assert.equal(status, 404);
+  });
+
+  /**
+   * The assertion the two above cannot make on their own.
+   *
+   * Two 404s prove nothing if their bodies differ: a message, a code, a
+   * `retryAfter`, anything that only the real-but-suspended provider can
+   * produce, and a prober sweeping candidate slugs can sort the deployment's
+   * customer list from the rest of the dictionary — and then tell which of
+   * those customers is switched off, which is a fact about somebody else's
+   * business we would be publishing. Compared whole, deliberately, so that a
+   * field added to either answer fails here.
+   */
+  it('says exactly the same thing about a suspended provider as about no provider', async () => {
+    const missing = await callAs(
+      'gama.painel.exemplo.com', `${panelUrl}/api/tenant/public`
+    );
+    const suspended = await callAs(
+      'parada.painel.exemplo.com', `${panelUrl}/api/tenant/public`
+    );
+    assert.equal(suspended.status, missing.status);
+    assert.deepEqual(suspended.body, missing.body);
+  });
+
+  // Where subdomains are configured, a host that names no provider is a request
+  // that did not say whose login screen it wanted. Answering the first row here
+  // would brand the deployment's own name page with one arbitrary customer's.
+  it('refuses a host that names no provider at all', async () => {
+    const { status } = await callAs('painel.exemplo.com', `${panelUrl}/api/tenant/public`);
     assert.equal(status, 404);
   });
 });
