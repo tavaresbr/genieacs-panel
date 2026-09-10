@@ -375,6 +375,7 @@ export default {
   'sgp.error.urlInvalid': 'वैध SGP पता दर्ज करें (https://provider.sgp.net.br)',
   'sgp.error.urlScheme': 'SGP पता HTTP या HTTPS होना चाहिए',
   'sgp.error.urlCredentials': 'SGP पते में उपयोगकर्ता या पासवर्ड नहीं होना चाहिए',
+  'sgp.error.blockedHost': 'SGP पता ऐसे नेटवर्क पते की ओर इशारा करता है जिस तक इस इंस्टॉलेशन को पहुँचने की अनुमति नहीं है',
   'sgp.error.pathsRelative': 'SGP API पथ सापेक्ष होने चाहिए, जैसे /api/ura/titulos/',
   'sgp.error.configIncomplete': 'एकीकरण सक्षम करने से पहले SGP पता, ऐप और टोकन दर्ज करें',
   'sgp.error.notConfigured': 'SGP एकीकरण कॉन्फ़िगर नहीं है',
