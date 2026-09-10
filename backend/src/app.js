@@ -13,10 +13,12 @@ import { resolveTenant } from './middleware/tenantResolver.js';
 import { DEFAULT_LOCALE, translate, translateError } from './i18n/index.js';
 import {
   apiLimiter,
+  attachmentUploadLimiter,
   authLimiter,
   portalIpLimiter,
   portalLoginLimiter
 } from './middleware/rateLimit.js';
+import { authenticateToken, requireRole } from './middleware/auth.js';
 
 import authRoutes from './routes/auth.js';
 import deviceRoutes from './routes/devices.js';
@@ -153,7 +155,30 @@ app.use(WEBHOOK_PATH, express.raw({ type: '*/*', limit: '64kb' }));
 // error against a 1 MB ceiling rather than as anything the screen could
 // explain. The route itself is admin-only and lives with the other WhatsApp
 // routes; only the body parser has to be this early.
-app.use(ATTACHMENT_PATH, attachmentRawBody);
+//
+// What has to come with it is everything that decides whether these 16 MB are
+// worth holding at all. `apiLimiter` and `authenticateToken` are both mounted
+// further down, so until now an anonymous caller could make the panel buffer a
+// 16 MB body and only THEN be told to log in — nothing before this line refuses
+// anything, since `cors({ origin: true })` admits a request that sends no
+// Origin at all. The limiter and the session check are repeated on the route
+// itself; repeating them costs one extra read of a shared table per upload,
+// which is nothing against holding 16 MB per anonymous request.
+//
+// They stay on this path only, rather than being hoisted with `apiLimiter`:
+// the Evolution webhook and the signed media route are mounted below on purpose
+// and must keep their own, much higher, buckets.
+//
+// `attachLocale` is already above, so `req.t` exists for both refusals, and
+// `authenticateToken` reads only the `Authorization` header — it needs neither
+// the parsed body nor `resolveTenant`, which is why it can run this early.
+app.use(
+  ATTACHMENT_PATH,
+  attachmentUploadLimiter,
+  authenticateToken,
+  requireRole(['admin']),
+  attachmentRawBody
+);
 app.use(express.json({ limit: '1mb' }));
 
 // Mounted BEFORE the shared `apiLimiter` on purpose. The Evolution server is a

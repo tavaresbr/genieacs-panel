@@ -87,6 +87,43 @@ after(async () => {
 });
 
 describe('WhatsApp attachments — what the operator uploads', () => {
+  /**
+   * O parser cru fica reservado no caminho bem cedo, acima do `apiLimiter` e do
+   * `authenticateToken`, porque o parser global de JSON reclamaria o corpo
+   * antes. O efeito era que qualquer um, sem sessão nenhuma, fazia o painel
+   * segurar até 16 MB na memória e só DEPOIS ouvia que precisava se autenticar.
+   *
+   * O corpo tem de passar do teto do parser para o teste separar os dois
+   * mundos: abaixo dele os dois respondem 401 e nada se prova. Acima, quem
+   * responde diz quem chegou primeiro — 413 é o parser, e significa que os
+   * bytes foram lidos antes de alguém ter a chance de recusar.
+   */
+  it('refuses an unauthenticated oversized upload before reading its body', async () => {
+    const acimaDoTeto = Buffer.alloc(MAX_ATTACHMENT_BYTES + 1024, 0x41);
+    const response = await fetch(`${panelUrl}/api/whatsapp/attachments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'image/png', 'X-File-Name': 'anonimo.png' },
+      body: acimaDoTeto
+    });
+
+    assert.equal(response.status, 401);
+    const body = await response.json();
+    assert.notEqual(body.code, 'attachment_too_large', 'o parser cru não pode ter respondido');
+  });
+
+  /**
+   * O outro lado da mesma ordem: para quem TEM sessão o parser continua sendo
+   * quem recusa, com o código que a tela sabe explicar. Sem isto, a correção
+   * acima passaria igual se ela tivesse simplesmente quebrado o upload.
+   */
+  it('still answers an authenticated oversized upload from the parser', async () => {
+    const acimaDoTeto = Buffer.alloc(MAX_ATTACHMENT_BYTES + 1024, 0x41);
+    const { status, body } = await upload(acimaDoTeto, { type: 'image/png', name: 'grande.png' });
+
+    assert.equal(status, 413);
+    assert.equal(body.code, 'attachment_too_large');
+  });
+
   it('stores an accepted file under DATA_DIR, with the extension of its TYPE', async () => {
     // The name says `.txt` and the type says PNG. The type wins: the extension
     // is half of what a browser later decides to do with the file, and it is
