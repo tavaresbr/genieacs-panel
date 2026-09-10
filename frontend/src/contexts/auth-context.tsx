@@ -21,8 +21,9 @@ interface AuthContextType {
    * decide, esta só evita oferecer o que seria recusado.
    */
   can: (permission: Permission) => boolean
-  login: (username: string, password: string) => Promise<boolean>
-  completeSetup: (username: string, password: string) => Promise<boolean>
+  /** `identifier` é o nome de usuário OU o e-mail: a rota aceita os dois. */
+  login: (identifier: string, password: string) => Promise<boolean>
+  completeSetup: (username: string, password: string, email: string) => Promise<boolean>
   logout: () => void
 }
 
@@ -88,9 +89,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return () => window.removeEventListener('auth:unauthorized', handleUnauthorized)
   }, [navigate, needsSetup])
 
-  const login = async (username: string, password: string): Promise<boolean> => {
+  const login = async (identifier: string, password: string): Promise<boolean> => {
     try {
-      const res = await authAPI.login(username, password)
+      const res = await authAPI.login(identifier, password)
       if (res.success && res.data) {
         const { token, refreshToken, user } = res.data as {
           token: string
@@ -118,9 +119,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }
 
-  const completeSetup = async (username: string, password: string): Promise<boolean> => {
+  const completeSetup = async (username: string, password: string, email: string): Promise<boolean> => {
     try {
-      const res = await authAPI.setupAdmin(username, password)
+      const res = await authAPI.setupAdmin(username, password, email)
       if (res.success && res.data) {
         const { token, refreshToken, user } = res.data as {
           token: string
