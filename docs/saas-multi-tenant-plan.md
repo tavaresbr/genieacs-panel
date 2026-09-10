@@ -689,7 +689,7 @@ subsistema cada — `sgp-links`, `sgp-events`, `device-profiles`, `provisioning`
 `map-settings`, `vendor-catalogue`, `wifi-credentials`, `whatsapp-media`,
 `whatsapp-inbound`, `users`, `auth`, entre outras, mais `tenant-subdomain` e
 `tenant-id-sweep`, que provam o isolamento por host, e `role-reach`, que prova por HTTP o
-alcance de cada papel sobre uma amostra de 31 rotas. São 1658 testes no total, verdes nos
+alcance de cada papel sobre uma amostra de 31 rotas. São 1684 testes no total, verdes nos
 três dialetos no CI.
 
 O padrão em todas: **dois provedores com as chaves naturais deliberadamente colidindo** —
@@ -886,7 +886,7 @@ metade é da Fase 4.
 | 6 | Credenciais ACS por provedor, cifradas, guarda de egresso, branch de URL absoluta removido | ✅ credencial NBI por provedor (onda 19), egresso com pinning de DNS, branch de URL absoluta removido |
 | 7 | `/api/database` não montada na edição SaaS | ✅ |
 | 8 | Rate limit e concorrência de fetch ACS chaveados por provedor | ✅ `tenantIpKey` no limite; `withAcsSlot` no fetch — vaga por provedor e vaga global, nessa ordem |
-| 9 | Suíte de vazamento verde no CI e obrigatória para merge | ✅ 1658 testes, três dialetos |
+| 9 | Suíte de vazamento verde no CI e obrigatória para merge | ✅ 1684 testes, três dialetos |
 | 10 | `SECRET_BOX_KEY` separada do `JWT_SECRET`, com `key_version` | ✅ |
 | 11 | `audit_log` registrando ações sensíveis | ✅ onda 20 — senha de portal, GenieACS, papéis, vínculos, convites, suspensão |
 | 12 | Exportação por provedor funcionando (LGPD e "apaguei tudo, socorro") | ✅ exportação (onda 21) e exclusão (onda 22), com trilha que sobrevive ao provedor apagado |
@@ -908,7 +908,7 @@ também a tabela de que a impersonação da plataforma vai precisar.
 
 ```bash
 npm run verify          # check backend + testes + lint + typecheck + build (raiz)
-cd backend && npm test  # 1658 testes, incluindo as suítes de tenancy
+cd backend && npm test  # 1684 testes, incluindo as suítes de tenancy
 ```
 
 A suíte roda nos três dialetos, e **isso não é zelo**: cada uma das armadilhas abaixo passou
