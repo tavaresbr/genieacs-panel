@@ -29,4 +29,8 @@ router.get('/export', authenticateToken, requirePermission('tenant.export'), Ten
 // a tela de bloqueio mostra.
 router.get('/subscription', authenticateToken, requirePermission('settings.read'), TenantController.getSubscription);
 
+// O nome do provedor, escrito por quem administra. É o antigo `appName` das
+// configurações, agora na linha do provedor — ver o controlador.
+router.patch('/', authenticateToken, requirePermission('settings.write'), TenantController.rename);
+
 export default router;

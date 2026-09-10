@@ -544,35 +544,61 @@ painel de plano por provedor, e a casca do app ouvindo o 402 — faixa no alto p
 
 ---
 
-### Fase 6 — Frontend *(esforço: médio; o console e os papéis já entraram)*
+### Fase 6 — Frontend ✅ *(entregue; o convite por e-mail continua da Fase 2)*
+
+**O que entrou:**
 
 - `frontend/src/contexts/tenant-context.tsx`: carrega `/api/tenant/public` no boot e provê
-  branding + plano + limites.
-- Branding por tenant substitui o `settings.appName` global —
-  `frontend/src/components/brand-mark.tsx` passa a ler do contexto.
-- Telas novas: **cadastro/onboarding** (nome do provedor, escolha do subdomínio, conexão
-  GenieACS, convite da equipe), **configurações do provedor**, **equipe/usuários**,
-  **plano e uso**, **console de plataforma** (rota protegida por papel de plataforma;
-  não vale a pena um terceiro bundle Vite agora).
-- `frontend/src/pages/setup.tsx` (wizard de primeiro uso) fica **só na edição self-hosted**;
-  no SaaS o equivalente é o onboarding pós-cadastro.
-- A seção de troca de banco em `frontend/src/pages/settings.tsx` sai da edição SaaS.
-- i18n: são **11 idiomas** hoje, não três. Uma chave nova entra em todos, e o tipo em
-  `dictionary.ts` faz o `npm run typecheck` acusar a que faltar. O que o typecheck **não**
-  pega é a chave declarada **duas vezes** — o literal fica com a última, o conjunto de
-  chaves continua batendo e o teste de paridade passa. Isso aconteceu quatro vezes nesta
-  fase, sempre por dois branches acrescentando as mesmas chaves; em duas delas as cópias
-  divergiam na redação. É para isso que existe o teste "declara cada chave exatamente uma
-  vez" em `backend/test/i18n.test.js`, e ele varre as duas metades do app.
-- O backend já ganhou sua própria camada de i18n (`backend/src/i18n/`) e o
-  `customerPortalController` já responde por `req.t('portal.*')` — as mensagens novas de
-  limite de plano e de suspensão entram por lá, não hardcoded.
-- **Resíduos do upstream indonésio, ainda pendentes** (confirmados na `main` de hoje), e são
-  metadado e dado que o cliente final do provedor vê: o `<html lang="id">` em
-  **`frontend/index.html` e `frontend/portal.html`**, e o centro padrão do mapa em Jacarta
-  (`-6.2088, 106.8456`, `backend/src/config/seed.js`). O segundo já é **por provedor** desde
-  que `map_settings` foi escopada — falta só passar a defini-lo no onboarding em vez de
-  semear Jacarta.
+  `{ tenant, name, isSaas, refresh }`. A rota passou a responder também `edition` e
+  `panelBaseDomain`, que é o que a tela de login usa para decidir se mostra o link de
+  cadastro e o que o cadastro usa para montar o endereço do painel novo.
+- **Branding pelo contexto.** O nome do provedor deixou de ser `settings.appName` (um
+  ajuste global, guardado no `localStorage` e propagado por evento) e passou a ser
+  `tenants.name`, renomeado por `PATCH /api/tenant` (`settings.write`, auditado como
+  `tenant.renamed`). A sidebar, o login, o setup, o título da aba e o campo "nome" das
+  configurações leem e escrevem o contexto. A migration `0035_tenant_name_from_app_name`
+  leva o nome que cada provedor já tinha em `settings` para a linha dele.
+- **Cadastro** (`/signup`, `POST /api/auth/signup`): só na edição SaaS **e** só onde há
+  domínio-base para o provedor responder — fora disso a rota é 404 e a tela redireciona
+  para o login. Cria provedor + `owner` numa transação, semeia os padrões como o boot faz,
+  registra em `platform_audit` com `via: 'signup'`, e devolve o endereço do painel. Passa
+  pelo `authLimiter`. Slug reservado, tomado ou usuário tomado respondem 409 com mensagem
+  traduzida; o `slugProblem` que o console já usava saiu para `backend/src/utils/slug.js`
+  e serve aos dois.
+- **Onboarding** (`/onboarding`): três passos — nome e centro do mapa, GenieACS e credencial
+  NBI (com o teste de conexão), um primeiro colega como `tech`. É a mesma API das
+  configurações em outra ordem, não um segundo caminho de escrita. O `OnboardingGate` leva
+  para lá quem tem `settings.write` num provedor SaaS **sem** `genieAcsUrl`, uma vez; o
+  "pular" fica lembrado por provedor no navegador.
+- **Plano e uso** (`/plan`, `settings.read`, só no SaaS): a leitura de
+  `/api/tenant/subscription` que a Fase 5 deixou pronta — plano, estado, datas, as três
+  contagens contra os limites. Só leitura: mudar de plano continua com a plataforma.
+- A seção de troca de banco das configurações **não aparece** na edição SaaS.
+- **Resíduos do upstream indonésio resolvidos:** `<html lang="pt-BR">` nos dois HTMLs e o
+  centro padrão do mapa em Brasília (`-15.7942, -47.8822`), que o onboarding deixa trocar
+  no primeiro passo.
+- i18n: as 44 chaves novas entraram nos **11 idiomas** do frontend e as 8 mensagens novas
+  nos 11 do backend; a paridade e a unicidade continuam cobertas por
+  `backend/test/i18n.test.js`. A lição registrada abaixo vale ainda.
+
+**O que ficou de fora, de propósito:**
+
+- Não há tela de **aceitar convite**: o convite por link existe na API (Fase 2), mas o
+  transporte de e-mail não, então o onboarding cria o colega direto em vez de convidá-lo.
+  Entra junto com o e-mail, na Fase 2.
+- O cadastro é servido **pelo host de um provedor existente** (o `default`, na prática),
+  não por um host apex da plataforma — o resolvedor só conhece subdomínios de provedor. Um
+  host de marketing é assunto de operação (Fase 7).
+- `frontend/src/pages/setup.tsx` continua existindo nas duas edições porque é o caminho
+  de "instalação sem nenhum usuário"; no SaaS ele nunca aparece porque o cadastro já nasce
+  com o `owner`.
+
+**Lição que fica:** o tipo em `dictionary.ts` faz o `npm run typecheck` acusar a chave que
+faltar, mas **não** pega a chave declarada **duas vezes** — o literal fica com a última, o
+conjunto de chaves continua batendo e o teste de paridade passa. Isso aconteceu quatro
+vezes, sempre por dois branches acrescentando as mesmas chaves; em duas delas as cópias
+divergiam na redação. É para isso que existe o teste "declara cada chave exatamente uma
+vez" em `backend/test/i18n.test.js`, e ele varre as duas metades do app.
 
 ---
 
@@ -610,7 +636,7 @@ subsistema cada — `sgp-links`, `sgp-events`, `device-profiles`, `provisioning`
 `map-settings`, `vendor-catalogue`, `wifi-credentials`, `whatsapp-media`,
 `whatsapp-inbound`, `users`, `auth`, entre outras, mais `tenant-subdomain` e
 `tenant-id-sweep`, que provam o isolamento por host, e `role-reach`, que prova por HTTP o
-alcance de cada papel sobre uma amostra de 31 rotas. São 1513 testes no total, verdes nos
+alcance de cada papel sobre uma amostra de 31 rotas. São 1522 testes no total, verdes nos
 três dialetos no CI.
 
 O padrão em todas: **dois provedores com as chaves naturais deliberadamente colidindo** —
@@ -775,10 +801,10 @@ Original: Fase 0 → 1 → 2 → 3 → 8 → 4 → 5 → 6 → 7.
 5. ~~**Fase 5**~~ ✅ planos, assinatura, `requireActiveSubscription`, limites nos quatro
    pontos de escrita, `billing_events` e o `ManualBillingProvider`. O gateway (Asaas) fica
    para quando houver contrato para cobrar.
-6. O resto da **Fase 6** (onboarding, a tela de plano e uso do provedor, branding pelo
-   contexto, `<html lang>` e o centro do mapa) → o que sobrou da **2** (impersonação auditada
-   com audiência própria, transporte de e-mail do convite) e da **7** (exclusão já entrou;
-   `tenant_id` em log e métrica).
+6. ~~**Fase 6**~~ ✅ contexto do provedor, nome em `tenants`, cadastro, onboarding, plano e
+   uso, `<html lang>` e o centro do mapa. → O que sobrou da **2** (impersonação auditada com
+   audiência própria, transporte de e-mail do convite e a tela de aceitar) e da **7**
+   (exclusão já entrou; `tenant_id` em log e métrica, host apex da plataforma).
 
 Vale repetir o que o plano dizia e que se confirmou: a Fase 1 saiu para os installs
 self-hosted como upgrade normal, e o código de tenancy rodou em produção real com um
@@ -802,14 +828,14 @@ metade é da Fase 4.
 | 6 | Credenciais ACS por provedor, cifradas, guarda de egresso, branch de URL absoluta removido | ✅ credencial NBI por provedor (onda 19), egresso com pinning de DNS, branch de URL absoluta removido |
 | 7 | `/api/database` não montada na edição SaaS | ✅ |
 | 8 | Rate limit e concorrência de fetch ACS chaveados por provedor | ✅ `tenantIpKey` no limite; `withAcsSlot` no fetch — vaga por provedor e vaga global, nessa ordem |
-| 9 | Suíte de vazamento verde no CI e obrigatória para merge | ✅ 1513 testes, três dialetos |
+| 9 | Suíte de vazamento verde no CI e obrigatória para merge | ✅ 1522 testes, três dialetos |
 | 10 | `SECRET_BOX_KEY` separada do `JWT_SECRET`, com `key_version` | ✅ |
 | 11 | `audit_log` registrando ações sensíveis | ✅ onda 20 — senha de portal, GenieACS, papéis, vínculos, convites, suspensão |
 | 12 | Exportação por provedor funcionando (LGPD e "apaguei tudo, socorro") | ✅ exportação (onda 21) e exclusão (onda 22), com trilha que sobrevive ao provedor apagado |
 
-Nenhuma linha vermelha resta. Isso **não** quer dizer produto pronto — a Fase 5 inteira e
-boa parte da 6 estão por fazer — quer dizer que a lista do que não se pode vender sem já
-não tem item aberto. O que a fecha por último é o teto de concorrência de fetch ao ACS
+Nenhuma linha vermelha resta. Isso **não** quer dizer produto pronto — o gateway de
+cobrança, o e-mail do convite e a operação da Fase 7 estão por fazer — quer dizer que a
+lista do que não se pode vender sem já não tem item aberto. O que a fecha por último é o teto de concorrência de fetch ao ACS
 (`withAcsSlot`), que é a primeira das quatro peças do muro de escala da Fase 4; as outras
 três continuam registradas lá.
 
@@ -824,7 +850,7 @@ também a tabela de que a impersonação da plataforma vai precisar.
 
 ```bash
 npm run verify          # check backend + testes + lint + typecheck + build (raiz)
-cd backend && npm test  # 1513 testes, incluindo as suítes de tenancy
+cd backend && npm test  # 1522 testes, incluindo as suítes de tenancy
 ```
 
 A suíte roda nos três dialetos, e **isso não é zelo**: cada uma das armadilhas abaixo passou

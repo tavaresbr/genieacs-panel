@@ -262,6 +262,10 @@ export const authAPI = {
   logout: () =>
     apiClient.post('/auth/logout'),
 
+  /** SaaS only; answers 404 on a self-hosted install, where the route is not mounted. */
+  signup: (payload: { providerName: string; slug: string; username: string; password: string }) =>
+    apiClient.post<SignupResult>('/auth/signup', payload),
+
   refreshToken: (refreshToken: string) =>
     apiClient.post('/auth/refresh', { refreshToken }),
 
@@ -290,6 +294,16 @@ export type { OperatorRole }
 export interface PublicTenant {
   slug: string
   name: string
+  /** Which product this deployment is: decides whether signup and the database switcher exist. */
+  edition: 'saas' | 'selfhosted'
+  /** The domain a provider's panel lives under, or null where providers are not reached by subdomain. */
+  panelBaseDomain: string | null
+}
+
+/** What signup answers: no token — the new provider's panel lives at another host. */
+export interface SignupResult {
+  tenant: { slug: string; name: string }
+  panelUrl: string | null
 }
 
 /**
@@ -305,6 +319,19 @@ export interface PublicTenant {
  */
 export const publicTenantAPI = {
   current: () => apiClient.get<PublicTenant>('/tenant/public')
+}
+
+/** What the provider does to itself. */
+export const tenantAPI = {
+  /** The name on the sidebar, the login screen and the tab — what `settings.appName` used to be. */
+  rename: (name: string) =>
+    apiClient.requestWithBody<{ name: string; slug: string }>('PATCH', '/tenant', { name })
+}
+
+export const invitesAPI = {
+  /** Returns the token ONCE; the backend keeps only its hash. */
+  create: (payload: { role: OperatorRole; label?: string }) =>
+    apiClient.post<{ invite: { id: number; role: OperatorRole; label: string | null; expiresAt: string }; token: string }>('/invites', payload)
 }
 
 export type SubscriptionStatus = 'trial' | 'active' | 'past_due' | 'suspended' | 'canceled'

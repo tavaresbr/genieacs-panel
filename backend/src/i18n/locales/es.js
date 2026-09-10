@@ -565,4 +565,13 @@ export default {
   'subscription.limitSubscribers': 'Su plan permite {limit} cuenta(s) de abonado y ya tiene {current}.',
   'subscription.retrieved': 'Suscripción obtenida',
   'subscription.retrieveFailed': 'No se pudo leer la suscripción',
+
+  'tenant.renamed': 'Proveedor renombrado',
+  'tenant.renameFailed': 'No se pudo renombrar el proveedor',
+  'tenant.nameInvalid': 'El nombre del proveedor debe tener entre 1 y 128 caracteres',
+  'auth.signupCreated': 'Proveedor creado. Inicie sesión en su propia dirección.',
+  'auth.signupFailed': 'No se pudo crear el proveedor',
+  'auth.signupInvalid': 'Se requieren nombre del proveedor, usuario (3–64) y contraseña (8–128)',
+  'auth.signupSlugTaken': 'Este subdominio ya está en uso',
+  'auth.signupUsernameTaken': 'Este nombre de usuario ya está en uso',
 };

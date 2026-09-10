@@ -568,4 +568,13 @@ export default {
   'subscription.limitSubscribers': '您的套餐允许 {limit} 个用户账户，而您已有 {current} 个。',
   'subscription.retrieved': '已获取订阅',
   'subscription.retrieveFailed': '无法读取订阅',
+
+  'tenant.renamed': '运营商已重命名',
+  'tenant.renameFailed': '无法重命名运营商',
+  'tenant.nameInvalid': '运营商名称长度须为 1 到 128 个字符',
+  'auth.signupCreated': '运营商已创建。请在其专属地址登录。',
+  'auth.signupFailed': '无法创建运营商',
+  'auth.signupInvalid': '需要运营商名称、用户名（3–64）和密码（8–128）',
+  'auth.signupSlugTaken': '该子域名已被占用',
+  'auth.signupUsernameTaken': '该用户名已被占用',
 };

@@ -72,8 +72,11 @@ export async function seedDefaults(db = getDb()) {
       await db('map_settings').insert({
         tenant_id: tenant.id,
         id: 1,
-        center_lat: '-6.2088',
-        center_lng: '106.8456',
+        // Brasília, wide enough to show the whole country: the panel is sold
+        // to Brazilian ISPs, and the onboarding asks each one where its plant
+        // actually is. Jakarta was the upstream project's home, not ours.
+        center_lat: '-15.7942',
+        center_lng: '-47.8822',
         max_zoom_in: '18',
         max_zoom_out: '5',
         default_zoom: '13'

@@ -571,4 +571,13 @@ export default {
   'subscription.limitSubscribers': '현재 요금제는 가입자 계정 {limit}개까지 허용하며 이미 {current}개가 있습니다.',
   'subscription.retrieved': '구독 정보를 가져왔습니다',
   'subscription.retrieveFailed': '구독 정보를 읽지 못했습니다',
+
+  'tenant.renamed': '사업자 이름이 변경되었습니다',
+  'tenant.renameFailed': '사업자 이름을 변경하지 못했습니다',
+  'tenant.nameInvalid': '사업자 이름은 1~128자여야 합니다',
+  'auth.signupCreated': '사업자가 생성되었습니다. 전용 주소에서 로그인하세요.',
+  'auth.signupFailed': '사업자를 생성하지 못했습니다',
+  'auth.signupInvalid': '사업자 이름, 사용자 이름(3~64자), 비밀번호(8~128자)가 필요합니다',
+  'auth.signupSlugTaken': '이 하위 도메인은 이미 사용 중입니다',
+  'auth.signupUsernameTaken': '이 사용자 이름은 이미 사용 중입니다',
 };

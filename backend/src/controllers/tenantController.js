@@ -4,6 +4,8 @@ import TenantExportService from '../services/tenantExportService.js';
 import AuditLog from '../models/AuditLog.js';
 import SubscriptionService from '../services/subscriptionService.js';
 import DeviceService from '../services/deviceService.js';
+import { EDITION } from '../config/edition.js';
+import { panelBaseDomain } from '../middleware/tenantResolver.js';
 
 /**
  * What a provider will admit to before anybody has signed in.
@@ -13,7 +15,43 @@ import DeviceService from '../services/deviceService.js';
  * something drawn from the `tenants` row. That makes it the enumeration surface
  * of the whole deployment, and everything below is written against that.
  */
+const NAME_MAX_LENGTH = 128;
+
 class TenantController {
+  /**
+   * `PATCH /api/tenant` — the provider renames itself.
+   *
+   * This is what `settings.appName` used to be: the name on the sidebar, the
+   * login screen and the browser tab. It moves onto the `tenants` row because
+   * that row is the provider — the console lists it, the public profile
+   * answers it, and a name kept in two places was a name shown differently on
+   * two screens. Audited on the provider's own trail: renaming is not
+   * sensitive, but it is the kind of change somebody asks "who did that" about.
+   */
+  static async rename(req, res) {
+    try {
+      const name = String(req.body?.name ?? '').trim();
+      if (name.length < 1 || name.length > NAME_MAX_LENGTH) {
+        return res.status(400).json(createErrorResponse(req.t('tenant.nameInvalid')));
+      }
+      const before = await Tenant.findById(req.tenantId);
+      if (!before) {
+        return res.status(404).json(createErrorResponse(req.t('common.notFound')));
+      }
+      await Tenant.rename(req.tenantId, name);
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.TENANT_RENAMED,
+        subjectType: 'tenant',
+        subjectId: req.tenantId,
+        detail: { from: before.name, to: name }
+      });
+      return res.json(createResponse(req.t('tenant.renamed'), { name, slug: before.slug }));
+    } catch (error) {
+      console.error('Rename tenant error:', error);
+      return res.status(500).json(createErrorResponse(req.t('tenant.renameFailed'), error.message));
+    }
+  }
+
   /**
    * `GET /api/tenant/subscription`: o plano, o estado e o uso — a tela de
    * "plano e uso" do provedor, e a placa que a tela de bloqueio lê.
@@ -138,9 +176,17 @@ class TenantController {
       // earns its place by being the stable key the client can cache branding
       // under, and by letting the screen say which provider it thinks it is
       // talking to when a proxy has rewritten the host underneath it.
+      // Two more facts a stranger may know, both about the DEPLOYMENT rather
+      // than about this provider. `edition` decides whether the screen offers
+      // signup and whether it shows the database switcher — the SaaS edition is
+      // not a secret, it is the product; every subdomain already says so.
+      // `panelBaseDomain` is what signup needs to promise an address, and it is
+      // the string in the caller's own address bar.
       return res.json(createResponse(req.t('tenant.publicRetrieved'), {
         name: tenant.name,
-        slug: tenant.slug
+        slug: tenant.slug,
+        edition: EDITION,
+        panelBaseDomain: panelBaseDomain()
       }));
     } catch (error) {
       console.error('Get public tenant profile error:', error);

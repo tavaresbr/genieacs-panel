@@ -679,3 +679,47 @@ describe('giving every provider a subscription', () => {
     assert.equal(Number(p), 1);
   });
 });
+
+describe('the provider name leaving settings', () => {
+  const db = createDatabase('tenant-name');
+  const NAME_MIGRATION = '0035_tenant_name_from_app_name';
+  let alfa;
+  let beta;
+
+  /**
+   * The upgrade path of 0035. `settings.appName` was what the sidebar showed;
+   * `tenants.name` was what the console listed. The copy has to move the name
+   * an operator actually typed, and only that one: a provider minted by the
+   * console carries the factory `appName` and a real name of its own, and
+   * copying the factory string over it would rename "Provedor Beta" to
+   * "SkyGenPanel".
+   */
+  before(async () => {
+    for (const migration of migrations.filter((m) => m.id < NAME_MIGRATION)) {
+      await migration.up(db);
+    }
+    alfa = (await db('tenants').orderBy('id', 'asc').first()).id;
+    beta = await insertReturningId('tenants', { slug: 'beta', name: 'Provedor Beta', status: 'active' }, db);
+    await db('settings').where({ tenant_id: alfa, key: 'appName' }).del();
+    await db('settings').insert([
+      { tenant_id: alfa, key: 'appName', value: 'Fibra do Vale' },
+      { tenant_id: beta, key: 'appName', value: 'SkyGenPanel' }
+    ]);
+    await ensureSchema(db);
+  });
+
+  it('moves the name the operator typed onto the provider row', async () => {
+    assert.equal((await db('tenants').where({ id: alfa }).first()).name, 'Fibra do Vale');
+  });
+
+  it('leaves a provider whose setting is still the factory value alone', async () => {
+    assert.equal((await db('tenants').where({ id: beta }).first()).name, 'Provedor Beta');
+  });
+
+  it('runs only once', async () => {
+    await db('settings').where({ tenant_id: alfa, key: 'appName' }).update({ value: 'Outro Nome' });
+    await ensureSchema(db);
+    assert.equal((await db('tenants').where({ id: alfa }).first()).name, 'Fibra do Vale',
+      'after the copy, the setting no longer drives the name');
+  });
+});

@@ -569,4 +569,13 @@ export default {
   'subscription.limitSubscribers': 'Ihr Tarif erlaubt {limit} Teilnehmerkonten und Sie haben bereits {current}.',
   'subscription.retrieved': 'Abonnement abgerufen',
   'subscription.retrieveFailed': 'Abonnement konnte nicht gelesen werden',
+
+  'tenant.renamed': 'Anbieter umbenannt',
+  'tenant.renameFailed': 'Anbieter konnte nicht umbenannt werden',
+  'tenant.nameInvalid': 'Der Anbietername muss zwischen 1 und 128 Zeichen lang sein',
+  'auth.signupCreated': 'Anbieter erstellt. Melden Sie sich unter seiner eigenen Adresse an.',
+  'auth.signupFailed': 'Anbieter konnte nicht erstellt werden',
+  'auth.signupInvalid': 'Anbietername, Benutzername (3–64) und Passwort (8–128) sind erforderlich',
+  'auth.signupSlugTaken': 'Diese Subdomain ist bereits vergeben',
+  'auth.signupUsernameTaken': 'Dieser Benutzername ist bereits vergeben',
 };

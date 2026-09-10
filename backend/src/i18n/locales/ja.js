@@ -568,4 +568,13 @@ export default {
   'subscription.limitSubscribers': 'ご利用のプランでは加入者アカウントは {limit} 件までで、すでに {current} 件あります。',
   'subscription.retrieved': 'サブスクリプションを取得しました',
   'subscription.retrieveFailed': 'サブスクリプションを読み取れませんでした',
+
+  'tenant.renamed': 'プロバイダー名を変更しました',
+  'tenant.renameFailed': 'プロバイダー名を変更できませんでした',
+  'tenant.nameInvalid': 'プロバイダー名は1〜128文字で入力してください',
+  'auth.signupCreated': 'プロバイダーを作成しました。専用アドレスからサインインしてください。',
+  'auth.signupFailed': 'プロバイダーを作成できませんでした',
+  'auth.signupInvalid': 'プロバイダー名、ユーザー名（3〜64文字）、パスワード（8〜128文字）が必要です',
+  'auth.signupSlugTaken': 'このサブドメインは既に使用されています',
+  'auth.signupUsernameTaken': 'このユーザー名は既に使用されています',
 };

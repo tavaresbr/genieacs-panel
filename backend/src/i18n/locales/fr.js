@@ -564,4 +564,13 @@ export default {
   'subscription.limitSubscribers': 'Votre forfait autorise {limit} compte(s) d\'abonné et vous en avez déjà {current}.',
   'subscription.retrieved': 'Abonnement récupéré',
   'subscription.retrieveFailed': 'Impossible de lire l\'abonnement',
+
+  'tenant.renamed': 'Fournisseur renommé',
+  'tenant.renameFailed': 'Impossible de renommer le fournisseur',
+  'tenant.nameInvalid': 'Le nom du fournisseur doit compter entre 1 et 128 caractères',
+  'auth.signupCreated': 'Fournisseur créé. Connectez-vous à sa propre adresse.',
+  'auth.signupFailed': 'Impossible de créer le fournisseur',
+  'auth.signupInvalid': 'Le nom du fournisseur, l\'identifiant (3–64) et le mot de passe (8–128) sont requis',
+  'auth.signupSlugTaken': 'Ce sous-domaine est déjà pris',
+  'auth.signupUsernameTaken': 'Cet identifiant est déjà pris',
 };

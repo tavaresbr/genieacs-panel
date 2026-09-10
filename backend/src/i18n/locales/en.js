@@ -568,4 +568,13 @@ export default {
   'subscription.limitSubscribers': 'Your plan allows {limit} subscriber account(s) and you already have {current}.',
   'subscription.retrieved': 'Subscription retrieved',
   'subscription.retrieveFailed': 'Failed to read the subscription',
+
+  'tenant.renamed': 'Provider renamed',
+  'tenant.renameFailed': 'Failed to rename the provider',
+  'tenant.nameInvalid': 'The provider name must be between 1 and 128 characters',
+  'auth.signupCreated': 'Provider created. Sign in at its own address.',
+  'auth.signupFailed': 'Failed to create the provider',
+  'auth.signupInvalid': 'Provider name, username (3–64) and password (8–128) are required',
+  'auth.signupSlugTaken': 'This subdomain is already taken',
+  'auth.signupUsernameTaken': 'This username is already taken',
 };

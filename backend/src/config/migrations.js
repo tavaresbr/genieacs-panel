@@ -2257,6 +2257,46 @@ export const migrations = [
         .map((id) => ({ tenant_id: id, plan_id: unlimited.id, status: 'active' }));
       if (rows.length > 0) await db('subscriptions').insert(rows);
     }
+  },
+  {
+    /**
+     * O nome do provedor deixa de ser `settings.appName`.
+     *
+     * A barra lateral, a tela de login e a aba do navegador liam o nome de um
+     * setting que o operador editava — e `tenants.name`, que o console lista
+     * e o perfil público responde, dizia outra coisa. Um nome em dois lugares
+     * é um nome mostrado diferente em duas telas; a Fase 6 fica com a linha do
+     * provedor.
+     *
+     * A cópia é só de quem MUDOU o nome: um `appName` ainda no valor de fábrica
+     * não diz nada sobre o provedor, e copiá-lo por cima de um nome dado no
+     * console — que nasce com o setting de fábrica — trocaria "Provedor Beta"
+     * por "SkyGenPanel". O setting fica na tabela, por compatibilidade com o
+     * que ainda o lê; ninguém mais escreve nele pela tela.
+     */
+    id: '0035_tenant_name_from_app_name',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      const flag = await db('app_state').where({ key: 'tenant_name_migrated' }).first().catch(() => null);
+      return Boolean(flag);
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      if (!(await db.schema.hasTable('settings'))) return;
+      const rows = await db('settings').where({ key: 'appName' }).select('tenant_id', 'value');
+      for (const row of rows) {
+        const name = String(row.value ?? '').trim();
+        if (!name || name === 'SkyGenPanel') continue;
+        await db('tenants').where({ id: row.tenant_id }).whereNot({ name }).update({ name, updated_at: new Date() });
+      }
+      // The flag lives in `app_state` of the FIRST provider only, as the marker
+      // that this one-time copy happened; `app_state` has been per provider
+      // since 0014, so the row needs a tenant.
+      const first = await db('tenants').orderBy('id', 'asc').first();
+      if (first && !(await db('app_state').where({ tenant_id: first.id, key: 'tenant_name_migrated' }).first())) {
+        await db('app_state').insert({ tenant_id: first.id, key: 'tenant_name_migrated', value: '1' });
+      }
+    }
   }
 ];
 

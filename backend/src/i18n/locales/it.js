@@ -566,4 +566,13 @@ export default {
   'subscription.limitSubscribers': 'Il tuo piano consente {limit} account abbonato/i e ne hai già {current}.',
   'subscription.retrieved': 'Abbonamento recuperato',
   'subscription.retrieveFailed': 'Impossibile leggere l\'abbonamento',
+
+  'tenant.renamed': 'Provider rinominato',
+  'tenant.renameFailed': 'Impossibile rinominare il provider',
+  'tenant.nameInvalid': 'Il nome del provider deve avere tra 1 e 128 caratteri',
+  'auth.signupCreated': 'Provider creato. Accedi dal suo indirizzo.',
+  'auth.signupFailed': 'Impossibile creare il provider',
+  'auth.signupInvalid': 'Nome del provider, utente (3–64) e password (8–128) sono obbligatori',
+  'auth.signupSlugTaken': 'Questo sottodominio è già in uso',
+  'auth.signupUsernameTaken': 'Questo nome utente è già in uso',
 };

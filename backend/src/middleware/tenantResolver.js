@@ -98,6 +98,16 @@ export async function resolveDefaultTenantId() {
   return cachedDefaultId;
 }
 
+/**
+ * The panel's base domain, for whoever has to build a provider's address —
+ * the public profile (so the screen can offer signup) and signup itself (so
+ * it can tell the new ISP where their panel is). Null on a deployment without
+ * subdomains, where there is no such address to build.
+ */
+export function panelBaseDomain() {
+  return PANEL_BASE_DOMAIN;
+}
+
 /** Whether this deployment reaches providers by subdomain at all. */
 export function usesTenantSubdomains() {
   return Boolean(PANEL_BASE_DOMAIN || PORTAL_BASE_DOMAIN);

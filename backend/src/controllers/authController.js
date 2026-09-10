@@ -5,6 +5,12 @@ import PlatformAdmin from '../models/PlatformAdmin.js';
 import { IS_SAAS } from '../config/edition.js';
 import { generateTokens, resolveMembership, verifyToken } from '../middleware/auth.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
+import Tenant from '../models/Tenant.js';
+import PlatformAudit from '../models/PlatformAudit.js';
+import { getDb } from '../config/database.js';
+import { seedDefaults } from '../config/seed.js';
+import { slugProblem } from '../utils/slug.js';
+import { panelBaseDomain, usesTenantSubdomains } from '../middleware/tenantResolver.js';
 
 const DUMMY_PASSWORD_HASH = bcrypt.hashSync('skygenpanel-invalid-login-placeholder', 12);
 
@@ -71,7 +77,107 @@ async function holdsControlPlane(userId) {
   return PlatformAdmin.has(userId);
 }
 
+/**
+ * O que um provedor novo precisa para existir: nome, subdomínio, e a conta de
+ * quem vai administrá-lo. Reunido aqui porque é a única rota que cria as
+ * QUATRO coisas de uma vez — provedor, seed, pessoa e vínculo — e as quatro
+ * têm que nascer juntas ou não nascer.
+ */
+const SIGNUP_NAME_MAX = 128;
+const BCRYPT_ROUNDS = 12;
+
 class AuthController {
+  /**
+   * `POST /api/auth/signup` — um ISP se cadastra sozinho. Só na edição SaaS,
+   * e só onde há subdomínio: sem `TENANT_BASE_DOMAIN` não haveria endereço
+   * para entregar ao provedor novo, e o resolvedor responderia sempre com o
+   * primeiro da tabela.
+   *
+   * Passa pelo MESMO caminho que o console usa para cunhar um provedor —
+   * `Tenant.create` + `seedDefaults` na mesma transação — para que um ISP que
+   * se cadastrou sozinho seja indistinguível de um que nós criamos: mesmos
+   * settings, mesmo catálogo, mesma assinatura em `trial`. A pessoa nasce
+   * `owner` do provedor e de mais nada — nunca do plano de controle.
+   *
+   * Não devolve token, de propósito: o painel do provedor novo vive em outro
+   * host (`slug.painel…`), e um token guardado neste host não serviria lá —
+   * `tokenMatchesHost` o recusaria. Devolve o endereço, e a pessoa entra lá.
+   */
+  static async signup(req, res) {
+    try {
+      if (!usesTenantSubdomains()) {
+        return res.status(404).json(createErrorResponse(req.t('common.routeNotFound')));
+      }
+      const body = req.body ?? {};
+      const slug = String(body.slug ?? '');
+      const name = String(body.providerName ?? '').trim();
+      const username = String(body.username ?? '').trim();
+      const password = String(body.password ?? '');
+
+      const problem = slugProblem(slug);
+      if (problem) return res.status(400).json(createErrorResponse(problem));
+      if (name.length < 1 || name.length > SIGNUP_NAME_MAX) {
+        return res.status(400).json(createErrorResponse(req.t('auth.signupInvalid')));
+      }
+      if (username.length < 3 || username.length > 64 || password.length < 8 || password.length > 128) {
+        return res.status(400).json(createErrorResponse(req.t('auth.signupInvalid')));
+      }
+      // As duas colisões respondem 409 com palavras diferentes, porque as duas
+      // correções são diferentes: outro subdomínio, ou outro login.
+      if (await Tenant.findBySlug(slug)) {
+        return res.status(409).json(createErrorResponse(req.t('auth.signupSlugTaken')));
+      }
+      if (await User.findByUsername(username)) {
+        return res.status(409).json(createErrorResponse(req.t('auth.signupUsernameTaken')));
+      }
+
+      let tenantId;
+      let userId;
+      try {
+        await getDb().transaction(async (trx) => {
+          tenantId = await Tenant.create({ slug, name }, trx);
+          await seedDefaults(trx);
+          userId = await User.create({
+            username,
+            password: await bcrypt.hash(password, BCRYPT_ROUNDS),
+            role: 'owner'
+          }, trx);
+          await TenantUser.create({ tenantId, userId, role: 'owner' }, trx);
+        });
+      } catch (error) {
+        // Two signups racing on the same slug or the same login: the loser
+        // lands on a unique index and is told the same thing it would have
+        // been told a moment earlier.
+        if (await Tenant.findBySlug(slug)) {
+          return res.status(409).json(createErrorResponse(req.t('auth.signupSlugTaken')));
+        }
+        if (await User.findByUsername(username)) {
+          return res.status(409).json(createErrorResponse(req.t('auth.signupUsernameTaken')));
+        }
+        throw error;
+      }
+
+      const tenant = await Tenant.findById(tenantId);
+      // Na trilha da plataforma sem ator: ninguém nosso fez isto. `via` diz de
+      // onde veio, para a lista do console distinguir "criamos" de "entrou".
+      await PlatformAudit.record({
+        action: PlatformAudit.ACTIONS.TENANT_CREATED,
+        tenant,
+        detail: { via: 'signup', ownerUserId: userId },
+        ip: req.ip ?? null
+      });
+
+      const base = panelBaseDomain();
+      return res.status(201).json(createResponse(req.t('auth.signupCreated'), {
+        tenant: { slug: tenant.slug, name: tenant.name },
+        panelUrl: base ? `https://${tenant.slug}.${base}` : null
+      }));
+    } catch (error) {
+      console.error('Signup error:', error);
+      return res.status(500).json(createErrorResponse(req.t('auth.signupFailed'), error.message));
+    }
+  }
+
   static async login(req, res) {
     try {
       const { username, password, tenantId } = req.body;

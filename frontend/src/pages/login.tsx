@@ -1,12 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { useNavigate } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { useAuth } from '@/contexts/auth-context'
 import { Icon } from '@/components/ui/icon'
 import { BrandMark } from '@/components/brand-mark'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import { useTranslation } from '@/contexts/language-context'
+import { useTenant } from '@/contexts/tenant-context'
 
 export default function Login() {
   const [formData, setFormData] = useState({ username: '', password: '' })
@@ -16,6 +17,7 @@ export default function Login() {
   const navigate = useNavigate()
   const { login } = useAuth()
   const { t } = useTranslation()
+  const { name, tenant } = useTenant()
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -38,7 +40,7 @@ export default function Login() {
         <div className="flex items-center gap-3">
           <BrandMark className="size-11" />
           <div>
-            <div className="text-lg font-bold">SkyGenPanel</div>
+            <div className="text-lg font-bold">{name}</div>
             <div className="text-xs font-bold uppercase tracking-[0.14em] text-[#9aa9a2]">{t('app.genieacsOperations')}</div>
           </div>
         </div>
@@ -60,9 +62,9 @@ export default function Login() {
         <div className="w-full max-w-md">
           <div className="mb-8 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 lg:hidden">
-              <BrandMark className="size-10" title="SkyGenPanel" />
+              <BrandMark className="size-10" title={name} />
               <div>
-                <div className="font-bold">SkyGenPanel</div>
+                <div className="font-bold">{name}</div>
                 <div className="text-[0.65rem] font-bold uppercase tracking-[0.13em] text-muted-foreground">{t('app.genieacsOperations')}</div>
               </div>
             </div>
@@ -144,6 +146,11 @@ export default function Login() {
           <p className="mt-5 text-center text-xs leading-5 text-muted-foreground">
             {t('login.helpText')}
           </p>
+          {tenant?.edition === 'saas' && tenant.panelBaseDomain && (
+            <p className="mt-3 text-center text-sm">
+              <Link to="/signup" className="underline">{t('login.signupLink')}</Link>
+            </p>
+          )}
         </div>
       </main>
     </div>

@@ -6,6 +6,7 @@ import { Icon } from '@/components/ui/icon'
 import { BrandMark } from '@/components/brand-mark'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import { useTranslation } from '@/contexts/language-context'
+import { useTenant } from '@/contexts/tenant-context'
 
 export default function Setup() {
   const [formData, setFormData] = useState({ username: '', password: '', confirmPassword: '' })
@@ -13,6 +14,7 @@ export default function Setup() {
   const [error, setError] = useState('')
   const { completeSetup } = useAuth()
   const { t } = useTranslation()
+  const { name } = useTenant()
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -53,7 +55,7 @@ export default function Setup() {
         <div className="flex items-center gap-3">
           <BrandMark className="size-11" />
           <div>
-            <div className="text-lg font-bold">SkyGenPanel</div>
+            <div className="text-lg font-bold">{name}</div>
             <div className="text-xs font-bold uppercase tracking-[0.14em] text-[#9aa9a2]">{t('setup.firstRun')}</div>
           </div>
         </div>
@@ -73,9 +75,9 @@ export default function Setup() {
         <div className="w-full max-w-md">
           <div className="mb-8 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 lg:hidden">
-              <BrandMark className="size-10" title="SkyGenPanel" />
+              <BrandMark className="size-10" title={name} />
               <div>
-                <div className="font-bold">SkyGenPanel</div>
+                <div className="font-bold">{name}</div>
                 <div className="text-[0.65rem] font-bold uppercase tracking-[0.13em] text-muted-foreground">{t('setup.firstRun')}</div>
               </div>
             </div>

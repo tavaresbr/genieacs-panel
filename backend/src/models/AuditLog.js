@@ -38,7 +38,10 @@ class AuditLog {
     // `actorKind: 'platform'`, pelo mesmo motivo da suspensão: quem vai
     // perguntar "por que meu painel ficou só leitura" é o ISP, e a resposta
     // tem que estar onde ele olha.
-    SUBSCRIPTION_CHANGED: 'subscription.changed'
+    SUBSCRIPTION_CHANGED: 'subscription.changed',
+    // O provedor mudou o próprio nome — o que aparece na barra lateral, na
+    // tela de login e na aba do navegador.
+    TENANT_RENAMED: 'tenant.renamed'
   });
 
   /**

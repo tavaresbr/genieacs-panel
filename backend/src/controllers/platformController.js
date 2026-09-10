@@ -10,6 +10,9 @@ import { runInTenant } from '../config/tenantContext.js';
 import { getDb } from '../config/database.js';
 import { seedDefaults } from '../config/seed.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
+import { slugProblem } from '../utils/slug.js';
+
+const NAME_MAX_LENGTH = 128;
 
 /**
  * The provider registry: create, list, suspend, reactivate — e, desde a onda
@@ -38,56 +41,6 @@ import { createResponse, createErrorResponse } from '../utils/helpers.js';
 /** The only two values `tenants.status` is allowed to take. */
 export const TENANT_STATUSES = Object.freeze(['active', 'suspended']);
 
-/**
- * The slug is the subdomain the panel will be reached at, so the rule is DNS's
- * rule and not a taste in identifiers:
- *
- *   - lowercase ASCII letters, digits and hyphens only;
- *   - first and last character alphanumeric, so no leading or trailing hyphen;
- *   - 3 to 63 characters, 63 being the maximum length of a DNS label.
- *
- * Uppercase is REJECTED rather than lowered, and a stray space rejected rather
- * than trimmed, because whoever creates the provider is about to tell an ISP
- * the address of their panel. A slug that is silently rewritten means the
- * address they were given is not the address they typed, and they find that out
- * from a browser that cannot resolve it. Refusing costs one retry and says
- * exactly what is wrong.
- */
-const SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
-const SLUG_MIN_LENGTH = 3;
-const SLUG_MAX_LENGTH = 63;
-
-/**
- * Labels that cannot become a provider, because the deployment already answers
- * to them. Handing an ISP `www.panel.example` or `api.panel.example` would put
- * their panel where the marketing site or the API lives — a collision nobody
- * can fix afterwards without moving that ISP to a new address.
- */
-const RESERVED_SLUGS = new Set([
-  'www', 'api', 'app', 'admin', 'portal', 'mail', 'static', 'assets', 'cdn', 'status'
-]);
-
-const NAME_MAX_LENGTH = 128;
-
-/** What is wrong with this slug, or null when nothing is. */
-function slugProblem(slug) {
-  if (slug.length < SLUG_MIN_LENGTH || slug.length > SLUG_MAX_LENGTH) {
-    return `Slug must be between ${SLUG_MIN_LENGTH} and ${SLUG_MAX_LENGTH} characters`;
-  }
-  if (!SLUG_PATTERN.test(slug)) {
-    return 'Slug must be lowercase letters, digits and hyphens, starting and ending with a letter or digit';
-  }
-  // A hyphen in the third and fourth position is reserved by RFC 5891: `xn--`
-  // introduces a punycode label, and every other pair is held back for whatever
-  // comes next. A resolver is entitled to read such a label as encoded.
-  if (slug[2] === '-' && slug[3] === '-') {
-    return 'Slug must not carry a hyphen in both the third and fourth position';
-  }
-  if (RESERVED_SLUGS.has(slug)) {
-    return 'Slug is reserved by the deployment';
-  }
-  return null;
-}
 
 /**
  * The provider as the console shows it: `operators` is how many people work

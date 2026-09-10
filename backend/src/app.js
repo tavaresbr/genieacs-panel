@@ -233,6 +233,7 @@ if (IS_SAAS) {
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/refresh', authLimiter);
 app.use('/api/auth/setup', authLimiter);
+app.use('/api/auth/signup', authLimiter);
 
 // Below `resolveTenant`, which is what makes this route safe to leave open.
 // It answers with a provider's name to anybody who asks, so the question of

@@ -438,7 +438,7 @@ describe('the provider a login screen sees', () => {
     const { body } = await callAs(
       'alfa.painel.exemplo.com', `${panelUrl}/api/tenant/public`
     );
-    assert.deepEqual(Object.keys(body.data).sort(), ['name', 'slug']);
+    assert.deepEqual(Object.keys(body.data).sort(), ['edition', 'name', 'panelBaseDomain', 'slug']);
     assert.deepEqual(Object.keys(body).sort(), ['data', 'message', 'success']);
   });
 

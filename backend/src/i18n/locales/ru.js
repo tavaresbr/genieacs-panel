@@ -569,4 +569,13 @@ export default {
   'subscription.limitSubscribers': 'Ваш тариф допускает {limit} учётных записей абонентов, а у вас уже {current}.',
   'subscription.retrieved': 'Подписка получена',
   'subscription.retrieveFailed': 'Не удалось прочитать подписку',
+
+  'tenant.renamed': 'Провайдер переименован',
+  'tenant.renameFailed': 'Не удалось переименовать провайдера',
+  'tenant.nameInvalid': 'Название провайдера должно содержать от 1 до 128 символов',
+  'auth.signupCreated': 'Провайдер создан. Войдите по его собственному адресу.',
+  'auth.signupFailed': 'Не удалось создать провайдера',
+  'auth.signupInvalid': 'Требуются название провайдера, имя пользователя (3–64) и пароль (8–128)',
+  'auth.signupSlugTaken': 'Этот поддомен уже занят',
+  'auth.signupUsernameTaken': 'Это имя пользователя уже занято',
 };
