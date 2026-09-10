@@ -46,6 +46,7 @@ process.env.TENANT_BASE_DOMAIN = 'painel.exemplo.com';
 process.env.PORTAL_BASE_DOMAIN = 'portal.exemplo.com';
 
 const { getDb, startTestServers, stopTestServers } = await import('./helpers/harness.js');
+const { casos } = await import('./helpers/idSweepCases.js');
 const { runInTenant } = await import('../src/config/tenantContext.js');
 const { tinsertReturningId } = await import('../src/config/database.js');
 
@@ -213,6 +214,51 @@ async function semear(tenantId, slug) {
       description: 'WPA2 pessoal'
     });
 
+    // A planta de fibra. Um nome por provedor, e não o mesmo para os dois: a
+    // pergunta desta suíte é se o id do VIZINHO alcança a linha dele, e um id
+    // que os dois têm responderia 200 por ser o próprio, provando nada. Que os
+    // dois POSSAM nomear o mesmo poste é outra prova, e ela é do
+    // `tenant-scoping.test.js`, onde a planta de um sobrevive à reescrita do
+    // outro.
+    alvo.nodeA = `ODP-${slug}-01`;
+    alvo.nodeB = `ODP-${slug}-02`;
+    for (const [nodeId, nome] of [[alvo.nodeA, 'ODP da esquina'], [alvo.nodeB, 'ODP da praça']]) {
+      await semearLinha('mapping_nodes', {
+        node_id: nodeId, type: 'odp', name: `${nome} (${slug})`, latitude: -15.79, longitude: -47.88
+      });
+    }
+    alvo.edge = `CABO-${slug}-01`;
+    await semearLinha('mapping_edges', {
+      edge_id: alvo.edge, source: alvo.nodeA, target: alvo.nodeB, fiber_type: 'drop', distance: 30
+    });
+
+    alvo.invite = await semearLinha('tenant_invites', {
+      token_hash: `${slug}`.padEnd(64, '0').slice(0, 64),
+      role: 'tech',
+      label: `convite do ${slug}`,
+      expires_at: new Date(Date.now() + 3_600_000)
+    });
+
+    // A conversa e uma mensagem falha nela: a conversa carrega contrato e
+    // device id do assinante, e a mensagem é a linha que o reenfileiramento
+    // toca.
+    alvo.conversation = await semearLinha('wa_conversations', {
+      account_id: alvo.account,
+      wa_phone_e164: '5511911111111',
+      external_thread_id: `thread-${slug}`,
+      push_name: `Assinante do ${slug}`,
+      contract: '4242',
+      last_message_at: new Date()
+    });
+    alvo.failedMessage = await semearLinha('wa_messages', {
+      conversation_id: alvo.conversation,
+      direction: 'out',
+      external_id: `msg-${slug}-1`,
+      body: 'Segunda via em anexo',
+      delivery_status: 'failed',
+      attempts: 1
+    });
+
     return alvo;
   });
 }
@@ -267,241 +313,40 @@ after(async () => {
   await stopTestServers();
 });
 
-/**
- * Toda rota do painel endereçada por id de linha.
- *
- * Ficam de fora, com motivo: `/api/devices/:id/*`, cujo `:id` é o id do
- * aparelho no GenieACS e não uma linha daqui; `/api/whatsapp-media/:id`, que
- * corre antes do resolvedor e tem prova própria em
- * `whatsapp-media-tenancy.test.js`; e `/api/platform/tenants/:id`, que é do
- * plano de controle — está acima dos provedores, não dentro de um, e
- * `platform-tenants.test.js` cobre o 404 de quem não é administrador de
- * plataforma.
- */
-const casos = [
-  {
-    chave: 'user',
-    label: 'PATCH /api/users/:id',
-    method: 'PATCH',
-    path: (id) => `/api/users/${id}`,
-    body: { role: 'viewer' },
-    tabela: 'users'
-  },
-  {
-    chave: 'user',
-    label: 'DELETE /api/users/:id',
-    method: 'DELETE',
-    path: (id) => `/api/users/${id}`,
-    tabela: 'users'
-  },
-  {
-    chave: 'template',
-    label: 'PUT /api/whatsapp/templates/:id',
-    method: 'PUT',
-    path: (id) => `/api/whatsapp/templates/${id}`,
-    body: { name: 'segunda-via', body: 'Outro texto', category: 'cobranca' },
-    tabela: 'wa_templates'
-  },
-  {
-    chave: 'template',
-    label: 'DELETE /api/whatsapp/templates/:id',
-    method: 'DELETE',
-    path: (id) => `/api/whatsapp/templates/${id}`,
-    tabela: 'wa_templates'
-  },
-  {
-    chave: 'optOut',
-    label: 'DELETE /api/whatsapp/opt-outs/:id',
-    method: 'DELETE',
-    path: (id) => `/api/whatsapp/opt-outs/${id}`,
-    tabela: 'wa_opt_outs'
-  },
-  {
-    chave: 'broadcast',
-    label: 'POST /api/whatsapp/broadcasts/:id/status',
-    method: 'POST',
-    path: (id) => `/api/whatsapp/broadcasts/${id}/status`,
-    body: { status: 'canceled' },
-    tabela: 'wa_broadcasts'
-  },
-  {
-    chave: 'account',
-    label: 'GET /api/whatsapp/accounts/:id/qr',
-    method: 'GET',
-    path: (id) => `/api/whatsapp/accounts/${id}/qr`,
-    tabela: 'whatsapp_accounts',
-    // O beta chegaria à rede se o id resolvesse, e a porta 9 está fechada: o
-    // controle abaixo aceita o erro de transporte, e o que ele exige é que a
-    // resposta não seja `account_not_found`.
-    controleSoNaoAchou: true
-  },
-  {
-    chave: 'account',
-    label: 'GET /api/whatsapp/accounts/:id/status',
-    method: 'GET',
-    path: (id) => `/api/whatsapp/accounts/${id}/status`,
-    tabela: 'whatsapp_accounts',
-    controleSoNaoAchou: true
-  },
-  {
-    chave: 'account',
-    label: 'POST /api/whatsapp/accounts/:id/restart',
-    method: 'POST',
-    path: (id) => `/api/whatsapp/accounts/${id}/restart`,
-    tabela: 'whatsapp_accounts',
-    controleSoNaoAchou: true
-  },
-  {
-    chave: 'account',
-    label: 'POST /api/whatsapp/accounts/:id/disconnect',
-    method: 'POST',
-    path: (id) => `/api/whatsapp/accounts/${id}/disconnect`,
-    tabela: 'whatsapp_accounts',
-    controleSoNaoAchou: true
-  },
-  {
-    chave: 'account',
-    label: 'PATCH /api/whatsapp/accounts/:id',
-    method: 'PATCH',
-    path: (id) => `/api/whatsapp/accounts/${id}`,
-    body: { label: 'Renomeado pelo vizinho' },
-    tabela: 'whatsapp_accounts'
-  },
-  {
-    chave: 'event',
-    label: 'GET /api/sgp/events/:id',
-    method: 'GET',
-    path: (id) => `/api/sgp/events/${id}`,
-    tabela: 'sgp_events'
-  },
-  {
-    chave: 'event',
-    label: 'POST /api/sgp/events/:id/retry',
-    method: 'POST',
-    path: (id) => `/api/sgp/events/${id}/retry`,
-    tabela: 'sgp_events'
-  },
-  {
-    chave: 'profile',
-    label: 'PUT /api/provisioning/profiles/:id',
-    method: 'PUT',
-    path: (id) => `/api/provisioning/profiles/${id}`,
-    body: { name: 'perfil-padrao', priority: 20, enabled: true },
-    tabela: 'provisioning_profiles'
-  },
-  {
-    chave: 'profile',
-    label: 'DELETE /api/provisioning/profiles/:id',
-    method: 'DELETE',
-    path: (id) => `/api/provisioning/profiles/${id}`,
-    tabela: 'provisioning_profiles'
-  },
-  {
-    chave: 'swap',
-    label: 'POST /api/devices/swaps/:id/acknowledge',
-    method: 'POST',
-    path: (id) => `/api/devices/swaps/${id}/acknowledge`,
-    tabela: 'device_swaps'
-  },
-  {
-    chave: 'vendor',
-    label: 'GET /api/vendor-management/:id',
-    method: 'GET',
-    path: (id) => `/api/vendor-management/${id}`,
-    tabela: 'vendors'
-  },
-  {
-    chave: 'vendor',
-    label: 'PUT /api/vendor-management/:id',
-    method: 'PUT',
-    path: (id) => `/api/vendor-management/${id}`,
-    body: {
-      name: 'Fabricante Comum',
-      manufacturer_patterns: ['ACME'],
-      product_patterns: ['AC-1000'],
-      parameter_prefix: 'InternetGatewayDevice'
-    },
-    tabela: 'vendors'
-  },
-  {
-    chave: 'mapping',
-    label: 'PUT /api/vendor-management/wifi-security/:id',
-    method: 'PUT',
-    path: (id) => `/api/vendor-management/wifi-security/${id}`,
-    body: { raw_security_value: '11i', normalized_security: 'WPA3', description: 'trocado' },
-    tabela: 'wifi_security_mappings'
-  },
-  {
-    chave: 'mapping',
-    label: 'DELETE /api/vendor-management/wifi-security/:id',
-    method: 'DELETE',
-    path: (id) => `/api/vendor-management/wifi-security/${id}`,
-    tabela: 'wifi_security_mappings'
-  },
-  {
-    chave: 'wifiConfig',
-    label: 'GET /api/vendor-management/wifi-security-configs/:id',
-    method: 'GET',
-    path: (id) => `/api/vendor-management/wifi-security-configs/${id}`,
-    tabela: 'wifi_security_config'
-  },
-  {
-    chave: 'wifiConfig',
-    label: 'PUT /api/vendor-management/wifi-security-configs/:id',
-    method: 'PUT',
-    path: (id) => `/api/vendor-management/wifi-security-configs/${id}`,
-    body: {
-      product_class: 'AC-1000',
-      security_types: ['WPA2'],
-      password_param_path: 'WLANConfiguration.1.KeyPassphrase'
-    },
-    tabela: 'wifi_security_config'
-  },
-  {
-    chave: 'wifiConfig',
-    label: 'DELETE /api/vendor-management/wifi-security-configs/:id',
-    method: 'DELETE',
-    path: (id) => `/api/vendor-management/wifi-security-configs/${id}`,
-    tabela: 'wifi_security_config'
-  },
-  // O fabricante por último entre os do catálogo: apagá-lo leva os mapeamentos
-  // junto pela chave estrangeira, e os casos acima precisam da linha de pé.
-  {
-    chave: 'vendor',
-    label: 'DELETE /api/vendor-management/:id',
-    method: 'DELETE',
-    path: (id) => `/api/vendor-management/${id}`,
-    tabela: 'vendors'
-  }
-];
 
 /** A linha crua, com provedor e tudo — nunca por um modelo. */
-const cru = (tabela, id) => getDb()(tabela).where({ id }).first();
+const cru = (caso, id) => getDb()(caso.tabela).where({ [caso.coluna ?? 'id']: id }).first();
+
+/** O corpo do caso, que às vezes precisa de outros ids do mesmo provedor. */
+const corpo = (caso, semeados) => (
+  typeof caso.body === 'function' ? caso.body(semeados) : caso.body
+);
 
 describe('o operador do beta pedindo, no host do beta, o id do alfa', () => {
   for (const caso of casos) {
-    it(`${caso.label} responde 404`, async () => {
+    it(`${caso.label} responde ${caso.esperado ?? 404}`, async () => {
       const id = ids.alfa[caso.chave];
       assert.ok(id, `o seed do alfa precisa ter gravado ${caso.chave}`);
-      const antes = await cru(caso.tabela, id);
+      const antes = await cru(caso, id);
       assert.ok(antes, 'a linha do alfa tem que existir antes da chamada');
+      const esperado = caso.esperado ?? 404;
 
       const { status, body } = await callAs(PAINEL_BETA, `${panelUrl}${caso.path(id)}`, {
         method: caso.method,
         headers: { Authorization: `Bearer ${betaToken}` },
-        body: caso.body
+        body: corpo(caso, ids.alfa)
       });
 
       // As duas afirmações separadas de propósito: a primeira é o contrato, a
       // segunda é o que se perderia se alguém "consertasse" o 404 para 403 por
       // achar mais honesto.
-      assert.equal(status, 404, `${caso.label}: ${JSON.stringify(body)}`);
+      assert.equal(status, esperado, `${caso.label}: ${JSON.stringify(body)}`);
       assert.notEqual(status, 403);
 
       // E a linha do alfa tem que estar como estava. Um 404 devolvido DEPOIS de
       // escrever é o pior dos dois mundos, e é uma falha que nenhum código de
       // status revela.
-      assert.deepEqual(await cru(caso.tabela, id), antes,
+      assert.deepEqual(await cru(caso, id), antes,
         `${caso.label}: a linha do alfa foi tocada`);
     });
   }
@@ -518,25 +363,25 @@ describe('o operador do beta pedindo, no host do beta, o id do alfa', () => {
  */
 describe('a mesma pergunta com o id do próprio beta', () => {
   for (const caso of casos) {
-    it(`${caso.label} não responde 404`, async () => {
+    it(`${caso.label} não responde ${caso.esperado ?? 404}`, async () => {
       const id = ids.beta[caso.chave];
       assert.ok(id, `o seed do beta precisa ter gravado ${caso.chave}`);
 
       const { status, body } = await callAs(PAINEL_BETA, `${panelUrl}${caso.path(id)}`, {
         method: caso.method,
         headers: { Authorization: `Bearer ${betaToken}` },
-        body: caso.body
+        body: corpo(caso, ids.beta)
       });
 
       if (caso.controleSoNaoAchou) {
         // Estas alcançam a rede quando o id resolve, e a porta está fechada de
         // propósito. O que se exige é que a instância tenha sido ENCONTRADA:
         // qualquer falha de transporte serve, `account_not_found` não.
-        assert.notEqual(body?.code, 'account_not_found',
-          `${caso.label}: o beta não achou a própria instância`);
+        assert.notEqual(body?.code, caso.codigoDeNaoAchou ?? 'account_not_found',
+          `${caso.label}: o beta não achou a própria linha`);
         return;
       }
-      assert.notEqual(status, 404, `${caso.label}: ${JSON.stringify(body)}`);
+      assert.notEqual(status, caso.esperado ?? 404, `${caso.label}: ${JSON.stringify(body)}`);
     });
   }
 });

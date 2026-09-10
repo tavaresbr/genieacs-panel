@@ -677,9 +677,9 @@ todos listados no runbook como "não existe ainda", para o plantão não procura
 
 ---
 
-### Fase 8 — Provar o isolamento *(a suíte existe; a lista de portas ainda não está toda coberta)*
+### Fase 8 — Provar o isolamento ✅ *(a lista de portas está contada; o RLS foi avaliado e fica para depois)*
 
-Nada vai para dois provedores reais antes disto passar. **Boa parte já passa.**
+Nada vai para dois provedores reais antes disto passar. **Passa.**
 
 #### O que existe
 
@@ -689,7 +689,7 @@ subsistema cada — `sgp-links`, `sgp-events`, `device-profiles`, `provisioning`
 `map-settings`, `vendor-catalogue`, `wifi-credentials`, `whatsapp-media`,
 `whatsapp-inbound`, `users`, `auth`, entre outras, mais `tenant-subdomain` e
 `tenant-id-sweep`, que provam o isolamento por host, e `role-reach`, que prova por HTTP o
-alcance de cada papel sobre uma amostra de 31 rotas. São 1684 testes no total, verdes nos
+alcance de cada papel sobre uma amostra de 31 rotas. São 1727 testes no total, verdes nos
 três dialetos no CI.
 
 O padrão em todas: **dois provedores com as chaves naturais deliberadamente colidindo** —
@@ -734,9 +734,99 @@ que varre `backend/src` atrás de handle cru numa tabela escopada, a exigência 
 tabela do schema esteja classificada como escopada ou compartilhada, e a marcação
 `tenant-scope-exempt` obrigatória para as poucas exceções legítimas.
 
-#### O que ainda falta
+#### A lista de portas, agora contada
 
-- **RLS no Postgres** como segunda linha, ainda não avaliado. É o único item que sobrou.
+O que faltava não era uma prova a mais: era **saber quantas portas existem** e exigir que
+nenhuma fique sem resposta. Uma suíte de vazamento prova que uma porta está fechada; nenhuma
+delas percebe a porta que ninguém lembrou de listar — e o vazamento que este projeto viu de
+perto não foi um controlador escrito errado, foi um controlador novo copiado do vizinho.
+
+`backend/test/route-coverage.test.js` lê o inventário das rotas dos dois listeners
+(`backend/test/helpers/routeInventory.js`, que analisa `app.js` e os arquivos de rota, porque
+o Express 5 guarda o prefixo de um roteador montado como função e não há o que ler de volta) e
+faz quatro contas:
+
+1. **Toda rota sem guarda de sessão está declarada, com o motivo escrito.** São 12 hoje: as
+   quatro de entrada, o cadastro, o perfil público, os dois do token de convite, os dois
+   webhooks, a mídia por token assinado e o login do portal. Uma rota nova sem sessão reprova
+   o CI.
+2. **Toda rota endereçada por parâmetro tem prova nomeada.** As 78 estão declaradas: 37 na
+   varredura, e 41 com o motivo escrito de por que a varredura não serve — id de aparelho no
+   GenieACS (20), chave natural que os dois provedores têm igual (7), anexo por token
+   assinado (2), token de convite (2) e o plano de controle (10). O teto de 41 **só pode
+   cair**: declarar motivo é mais fácil do que escrever caso, e sem o teto o caminho fácil
+   não custaria nada.
+3. **Nenhuma declaração sobrou de rota que sumiu**, dos dois lados — uma tabela que só cresce
+   vira decoração —, e todo arquivo de teste citado num motivo existe de verdade.
+4. **A ordem das montagens em `app.js`**: o resolvedor de provedor vem antes de todo roteador
+   (as duas exceções são as entregas de fora, e estão fixadas pelo nome), a porta da
+   assinatura vem logo depois dele nos dois listeners, e a troca de banco e o console
+   continuam cada um dentro da sua edição. Um roteador montado uma linha acima do resolvedor
+   atende sem provedor em escopo, que é exatamente o que o comentário do `/api/tenant` no
+   `app.js` descreve.
+
+A varredura de ids cresceu de 24 para **37 rotas** com as que faltavam: o mapa da planta
+(pontos e cabos, GET/PUT/DELETE), a revogação de convite, a caixa de entrada do WhatsApp
+(mensagens da conversa, fechar a conversa, escrever nela), o reenfileiramento de uma mensagem,
+o cadastro de segurança WiFi de um fabricante e a exclusão de uma conta do WhatsApp. A lista de
+casos saiu para `backend/test/helpers/idSweepCases.js` porque agora dois testes a leem — quem
+chama as rotas e quem confere que ela chama todas.
+
+Três coisas que a extensão obrigou a acertar, e que valem como registro:
+
+- **O id do vizinho tem que ser do vizinho.** Semeei os pontos do mapa com o mesmo `node_id`
+  nos dois provedores, e a varredura acusou o contrário do esperado: o "id do alfa" respondia
+  200 porque era também o id do beta. A colisão de chave natural é outra prova, e é da suíte
+  de vazamento; esta suíte precisa de um id que só um dos dois tenha.
+- **Nem toda recusa é 404.** `POST /api/whatsapp/messages/:id/requeue` responde 409 ao vizinho
+  — a rota não distingue "não existe" de "não dá para reenfileirar", e a leitura por baixo é
+  escopada. O caso ganhou um status esperado próprio em vez de um 404 forçado no controlador.
+- **Um motivo escrito é uma dívida.** A declaração de
+  `PUT /api/whatsapp/subscribers/:contract/phone` dizia "prova em `tenant-leak.test.js`" — e
+  não havia. O contrato é do SGP e os dois provedores podem ter o mesmo número; a prova entrou
+  junto: corrigir o telefone do contrato 4242 de um não pode mudar o do 4242 do outro, que é o
+  tipo de erro que só aparece no disparo de cobrança seguinte.
+
+#### RLS no Postgres: avaliado, e não adotado agora
+
+Era o último item em aberto. Medido num Postgres 16 de verdade, com política
+`USING (tenant_id = current_setting('app.tenant_id')::int)`:
+
+| O que se mediu | Resultado |
+| --- | --- |
+| Sem a variável marcada, lendo como papel comum | **0 linhas** — falha fechando, que é a direção certa |
+| `SET LOCAL` dentro de transação | escopa certo e some no commit |
+| INSERT com `tenant_id` de outro provedor | recusado pela política |
+| UPDATE atravessando provedor | 0 linhas tocadas |
+| Lendo como **dono** da tabela | **vê tudo** — sem `FORCE ROW LEVEL SECURITY` o dono passa por cima |
+
+E a medição que decide: com o pool do knex em uma conexão, uma "requisição" que marca
+`SET app.tenant_id = '1'` deixa a marca **na conexão**, e a requisição seguinte, que não
+marcou nada, lê `'1'`. Numa aplicação que emite consulta fora de transação — que é esta —
+a variável de sessão não é uma defesa, é um vazamento com outro nome: a próxima requisição a
+pegar aquela conexão emprestada herda o provedor da anterior.
+
+Então RLS só entra numa das duas formas, e as duas custam:
+
+1. **Transação por requisição**, abrindo com `SET LOCAL app.tenant_id`. É a forma correta e a
+   única segura com pool. Custa manter uma transação aberta pela vida inteira de cada
+   requisição — inclusive das que só leem, inclusive das que esperam o GenieACS responder.
+2. **Uma conexão por provedor**, o que troca o pool por N pools e amarra o número de
+   provedores ao número de conexões do banco.
+
+A decisão é **não adotar agora**, e o motivo é comparativo: as duas linhas que já existem —
+`tdb()` com o filtro obrigatório e a sentinela de SQL que lança em teste ao ver tabela
+escopada sem filtro — cobrem o mesmo erro (consulta sem provedor) no lugar onde ele é
+escrito, e não custam nada em produção. RLS pegaria o caso que elas não pegam: SQL cru rodando
+fora do processo, ou um bug do próprio knex. É defesa em profundidade real, e o preço dela
+hoje é uma mudança no modelo de transação de toda a aplicação.
+
+O que faria mudar de ideia, escrito para quem for reavaliar: o dia em que a aplicação já
+estiver dentro de uma transação por requisição por outro motivo, ou o dia em que houver um
+segundo processo (relatórios, exportação em lote) falando com o mesmo banco sem passar pelo
+`tdb()`. A receita fica pronta: papel de aplicação separado do dono das tabelas,
+`ALTER TABLE ... ENABLE ROW LEVEL SECURITY` (com `FORCE`, se o papel for o dono), a política
+acima em cada uma das tabelas escopadas, e `SET LOCAL` no `runInTenant`.
 
 #### Os três itens que dependiam do subdomínio — fechados
 
@@ -860,9 +950,11 @@ Original: Fase 0 → 1 → 2 → 3 → 8 → 4 → 5 → 6 → 7.
 6. ~~**Fase 6**~~ ✅ contexto do provedor, nome em `tenants`, cadastro, onboarding, plano e
    uso, `<html lang>` e o centro do mapa.
 7. ~~**Fase 7**~~ ✅ `DATABASE_URL`, compose e imagem no CI, log e métrica com o provedor
-   em toda linha, host apex como porta de entrada, runbook. → O que sobrou da **2**
-   (impersonação auditada com audiência própria, transporte de e-mail do convite e a tela
-   de aceitar) e a rotação da `SECRET_BOX_KEY`.
+   em toda linha, host apex como porta de entrada, runbook.
+8. ~~**Fase 8**~~ ✅ a lista de portas contada e obrigatória no CI, a varredura de ids em 37
+   rotas, e o RLS avaliado com medição (não adotado agora, com o motivo e a receita
+   escritos). → O que sobra: o resto da **2** (impersonação auditada com audiência própria,
+   transporte de e-mail do convite e a tela de aceitar) e a rotação da `SECRET_BOX_KEY`.
 
 Vale repetir o que o plano dizia e que se confirmou: a Fase 1 saiu para os installs
 self-hosted como upgrade normal, e o código de tenancy rodou em produção real com um
@@ -886,7 +978,7 @@ metade é da Fase 4.
 | 6 | Credenciais ACS por provedor, cifradas, guarda de egresso, branch de URL absoluta removido | ✅ credencial NBI por provedor (onda 19), egresso com pinning de DNS, branch de URL absoluta removido |
 | 7 | `/api/database` não montada na edição SaaS | ✅ |
 | 8 | Rate limit e concorrência de fetch ACS chaveados por provedor | ✅ `tenantIpKey` no limite; `withAcsSlot` no fetch — vaga por provedor e vaga global, nessa ordem |
-| 9 | Suíte de vazamento verde no CI e obrigatória para merge | ✅ 1684 testes, três dialetos |
+| 9 | Suíte de vazamento verde no CI e obrigatória para merge | ✅ 1727 testes, três dialetos |
 | 10 | `SECRET_BOX_KEY` separada do `JWT_SECRET`, com `key_version` | ✅ |
 | 11 | `audit_log` registrando ações sensíveis | ✅ onda 20 — senha de portal, GenieACS, papéis, vínculos, convites, suspensão |
 | 12 | Exportação por provedor funcionando (LGPD e "apaguei tudo, socorro") | ✅ exportação (onda 21) e exclusão (onda 22), com trilha que sobrevive ao provedor apagado |
@@ -908,7 +1000,7 @@ também a tabela de que a impersonação da plataforma vai precisar.
 
 ```bash
 npm run verify          # check backend + testes + lint + typecheck + build (raiz)
-cd backend && npm test  # 1684 testes, incluindo as suítes de tenancy
+cd backend && npm test  # 1727 testes, incluindo as suítes de tenancy
 ```
 
 A suíte roda nos três dialetos, e **isso não é zelo**: cada uma das armadilhas abaixo passou

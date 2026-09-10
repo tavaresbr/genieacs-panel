@@ -23,6 +23,8 @@ const { default: WaAlertState } = await import('../src/models/WaAlertState.js');
 const { default: WaTemplate } = await import('../src/models/WaTemplate.js');
 const { default: WaBroadcast } = await import('../src/models/WaBroadcast.js');
 const { default: SgpService } = await import('../src/services/sgpService.js');
+const { default: SgpLink } = await import('../src/models/SgpLink.js');
+const { default: WaBillingService } = await import('../src/services/waBillingService.js');
 const { default: WhatsAppConfigService } = await import('../src/services/whatsappConfigService.js');
 const { default: WaAlertService } = await import('../src/services/waAlertService.js');
 const { default: DeviceService } = await import('../src/services/deviceService.js');
@@ -581,5 +583,59 @@ describe('the subscription and the statement', () => {
     const mine = await runInTenant(alfa, () => Subscription.current());
     assert.equal(mine.status, 'active');
     assert.equal(mine.canceled_at, null);
+  });
+});
+
+
+/**
+ * O contrato do SGP é do SGP, e dois provedores podem ter o mesmo número.
+ *
+ * A correção do telefone de um assinante é endereçada pelo contrato, não por um
+ * id daqui: `PUT /api/whatsapp/subscribers/:contract/phone` chega ao banco por
+ * `where({ contract })`. Se essa consulta não fosse escopada, corrigir o número
+ * do contrato 4242 mudaria o número do 4242 do vizinho — e o próximo disparo de
+ * cobrança dele iria para o telefone errado, que é o pior jeito de descobrir.
+ */
+describe('o mesmo contrato do ERP nos dois provedores', () => {
+  const CONTRATO = '4242';
+
+  before(async () => {
+    for (const [tenant, sufixo] of [[alfa, 'alfa'], [beta, 'beta']]) {
+      await runInTenant(tenant, () => getDb()('sgp_links').insert({
+        tenant_id: tenant,
+        device_id: `ONT-${sufixo.toUpperCase()}-4242`,
+        contract: CONTRATO,
+        client_name: `Assinante do ${sufixo}`,
+        state: 'active',
+        phone_manual: null
+      }));
+    }
+  });
+
+  it('deixa os dois manterem o vínculo do mesmo contrato', async () => {
+    for (const tenant of [alfa, beta]) {
+      const links = await runInTenant(tenant, () => SgpLink.getByContract(CONTRATO));
+      assert.equal(links.length, 1, 'cada provedor enxerga só o vínculo dele');
+    }
+  });
+
+  it('corrige o telefone de um sem tocar no do outro', async () => {
+    await runInTenant(alfa, () => WaBillingService.setSubscriberPhone(CONTRATO, '(11) 98888-0001'));
+
+    const doAlfa = await runInTenant(alfa, () => SgpLink.getByContract(CONTRATO));
+    assert.equal(doAlfa[0].phone_manual, '5511988880001');
+
+    const doBeta = await runInTenant(beta, () => SgpLink.getByContract(CONTRATO));
+    assert.equal(doBeta[0].phone_manual, null,
+      'a correção do alfa mudou o telefone do assinante do beta');
+  });
+
+  it('e cada um lê a correção do seu', async () => {
+    await runInTenant(beta, () => WaBillingService.setSubscriberPhone(CONTRATO, '(11) 97777-0002'));
+
+    const doAlfa = await runInTenant(alfa, () => SgpLink.getByContract(CONTRATO));
+    const doBeta = await runInTenant(beta, () => SgpLink.getByContract(CONTRATO));
+    assert.equal(doAlfa[0].phone_manual, '5511988880001');
+    assert.equal(doBeta[0].phone_manual, '5511977770002');
   });
 });
