@@ -1,5 +1,6 @@
 import express from 'express';
 import { getDb } from '../config/database.js';
+import { runUnscoped } from '../config/tenantContext.js';
 import { waMediaLimiter } from '../middleware/rateLimit.js';
 import { resolveStoredAttachment, streamAttachment } from '../services/waMediaFile.js';
 import { tokenFromQuery, verify } from '../utils/wa/waMediaToken.js';
@@ -44,7 +45,13 @@ router.get('/:id', waMediaLimiter, async (req, res) => {
     // read reaches precisely the row the panel itself already chose to publish,
     // and no other. Serving one message's bytes needs no provider filter
     // because the caller cannot name a message the panel did not name first.
-    const message = await getDb()('wa_messages').where({ id }).first();
+    //
+    // `runUnscoped` repeats that to the SQL sentinel, which judges the SQL and
+    // cannot read the paragraph above it.
+    const message = await runUnscoped(
+      'a signed media link names one message and only the panel can mint one',
+      () => getDb()('wa_messages').where({ id }).first()
+    );
     if (!message) return notFound();
 
     const resolved = await resolveStoredAttachment(message);

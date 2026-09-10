@@ -6,9 +6,14 @@ export default {
   // 通信与通用错误
   'common.internalError': '服务器内部错误',
   'common.routeNotFound': '找不到该路由',
+  'common.notFound': '未找到',
   'common.originNotAllowed': '不允许该来源',
   'common.crossSiteBlocked': '跨站请求已被拦截',
   'common.invalidJson': '请求体的 JSON 无效',
+
+  // 主机所指向的服务商，外部访问者可见的信息
+  'tenant.publicRetrieved': '已获取服务商信息',
+  'tenant.publicFailed': '获取服务商信息失败',
 
   // 身份认证与授权
   'auth.tokenRequired': '需要认证令牌',
@@ -118,6 +123,7 @@ export default {
   'settings.urlRequired': '需要提供地址',
   'settings.urlInvalid': '需要提供有效的 HTTP 或 HTTPS 地址',
   'settings.urlSchemeUnsupported': '仅支持 HTTP 和 HTTPS 地址',
+  'settings.urlEgressRefused': '面板不被允许连接到该地址',
   'settings.urlCredentialsUnsupported': '不支持在地址中携带凭据',
   'settings.connectionSuccess': '连接成功。',
   'settings.connectionUnexpectedFormat': '连接成功，但响应格式与预期不符',
@@ -357,6 +363,10 @@ export default {
   'sgp.linkRemoved': 'SGP 关联已取消',
   'sgp.unlinkFailed': '无法取消 SGP 关联',
   'sgp.unlockFailed': '无法申请信用开机',
+  'sgp.ticketOpened': '已在 SGP 中创建工单',
+  'sgp.ticketFailed': '在 SGP 中创建工单失败',
+  'sgp.error.ticketContentRequired': '请先说明发生了什么，再创建工单',
+  'sgp.error.ticketDisabled': 'SGP 工单创建已关闭。请在设置中开启。',
   'sgp.linksLoaded': '{count} 条 SGP 关联记录',
   'sgp.linksLoadFailed': '无法列出 SGP 关联记录',
   'sgp.syncDone': '同步完成：{total} 台 ONT 中有 {linked} 台已关联',
@@ -376,7 +386,7 @@ export default {
   'sgp.error.invalidResponse': 'SGP 返回的响应无效',
   'sgp.error.queryFailed': 'SGP 对该查询返回了错误',
   'sgp.error.identifierRequired': '请输入证件号、合同或 PPPoE 账号以查询 SGP',
-  'sgp.error.contractRequired': '信用开机需要提供 SGP 合同',
+  'sgp.error.contractRequired': '需要提供 SGP 合同',
   'sgp.error.deviceUnlinked': '该 ONT 尚未关联任何 SGP 合同。请手动关联，或检查 PPPoE 账号。',
   'sgp.error.noContractForDevice': '未找到该 ONT 对应的 SGP 合同',
   'sgp.error.contractNotFound': 'SGP 中找不到该合同',
@@ -422,6 +432,7 @@ export default {
   'whatsapp.error.attachmentTooLarge': '文件超过 {max} MB',
   'whatsapp.error.attachmentEmpty': '文件是空的',
   'whatsapp.error.attachmentTypeNotAllowed': '这里不能发送这种类型的文件',
+  'whatsapp.error.attachmentNotAllowed': '这里不能发送该附件',
   'whatsapp.error.noPublicUrl': '发送附件前请先配置公开的 Webhook URL：Evolution 服务器从那里获取文件',
   'whatsapp.attachmentStored': '文件已可发送',
   'whatsapp.mediaSwept': '已删除 {files} 个文件，释放 {mb} MB',

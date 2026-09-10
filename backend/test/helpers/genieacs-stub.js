@@ -89,9 +89,15 @@ export function buildDevice({
  * so a test can assert on what provisioning actually wrote, and `taskStatus`
  * lets a test simulate a CPE that only queues the task (202) rather than
  * applying it.
+ *
+ * `state.respond` is the escape hatch for tests about a hostile or broken NBI:
+ * set it to a function and it answers every request instead of the routes
+ * below, which is how a test makes this host reply 302 or leak a body. It is
+ * on `state` rather than a constructor argument only so a test can switch the
+ * behaviour on between requests.
  */
-export function startGenieAcsStub({ devices = [buildDevice()], taskStatus = 200 } = {}) {
-  const state = { devices, tasks: [], tags: [], taskStatus };
+export function startGenieAcsStub({ devices = [buildDevice()], taskStatus = 200, respond = null } = {}) {
+  const state = { devices, tasks: [], tags: [], taskStatus, respond, requests: [] };
 
   const server = http.createServer((req, res) => {
     let raw = '';
@@ -102,6 +108,9 @@ export function startGenieAcsStub({ devices = [buildDevice()], taskStatus = 200 
         res.writeHead(status, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(data ?? null));
       };
+      state.requests.push({ method: req.method, path: url.pathname, search: url.search });
+
+      if (state.respond) return state.respond({ req, res, url, body: raw, send });
 
       const taskMatch = url.pathname.match(/^\/devices\/([^/]+)\/tasks$/);
       if (taskMatch && req.method === 'POST') {

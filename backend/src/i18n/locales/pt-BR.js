@@ -3,9 +3,14 @@ export default {
   // Falhas de transporte e genéricas
   'common.internalError': 'Erro interno do servidor',
   'common.routeNotFound': 'Rota não encontrada',
+  'common.notFound': 'Não encontrado',
   'common.originNotAllowed': 'Origem não permitida',
   'common.crossSiteBlocked': 'Requisição entre sites bloqueada',
   'common.invalidJson': 'Corpo da requisição JSON inválido',
+
+  // O provedor que o host nomeia, como um estranho o vê
+  'tenant.publicRetrieved': 'Perfil do provedor obtido',
+  'tenant.publicFailed': 'Falha ao obter o perfil do provedor',
 
   // Autenticação e autorização
   'auth.tokenRequired': 'Token de autenticação obrigatório',
@@ -115,6 +120,7 @@ export default {
   'settings.urlRequired': 'A URL é obrigatória',
   'settings.urlInvalid': 'É necessária uma URL HTTP ou HTTPS válida',
   'settings.urlSchemeUnsupported': 'Somente URLs HTTP e HTTPS são aceitas',
+  'settings.urlEgressRefused': 'O painel não tem permissão para se conectar a esse endereço',
   'settings.urlCredentialsUnsupported': 'Credenciais na URL não são aceitas',
   'settings.connectionSuccess': 'Conexão bem-sucedida.',
   'settings.connectionUnexpectedFormat': 'Conexão bem-sucedida, mas o formato da resposta era inesperado',
@@ -354,6 +360,10 @@ export default {
   'sgp.linkRemoved': 'Vínculo com o SGP removido',
   'sgp.unlinkFailed': 'Falha ao remover o vínculo com o SGP',
   'sgp.unlockFailed': 'Falha ao solicitar a liberação em confiança',
+  'sgp.ticketOpened': 'Chamado aberto no SGP',
+  'sgp.ticketFailed': 'Falha ao abrir o chamado no SGP',
+  'sgp.error.ticketContentRequired': 'Descreva o que está acontecendo antes de abrir o chamado',
+  'sgp.error.ticketDisabled': 'A abertura de chamados no SGP está desligada. Ative em Ajustes.',
   'sgp.linksLoaded': '{count} vínculo(s) com o SGP',
   'sgp.linksLoadFailed': 'Falha ao listar os vínculos com o SGP',
   'sgp.syncDone': 'Sincronização concluída: {linked} de {total} ONT(s) vinculados',
@@ -373,7 +383,7 @@ export default {
   'sgp.error.invalidResponse': 'Resposta inválida do SGP',
   'sgp.error.queryFailed': 'O SGP retornou um erro para esta consulta',
   'sgp.error.identifierRequired': 'Informe CPF/CNPJ, contrato ou login PPPoE para consultar o SGP',
-  'sgp.error.contractRequired': 'Contrato do SGP é obrigatório para a liberação',
+  'sgp.error.contractRequired': 'Contrato do SGP é obrigatório',
   'sgp.error.deviceUnlinked': 'Este ONT ainda não tem contrato do SGP vinculado. Faça o vínculo manual ou verifique o login PPPoE.',
   'sgp.error.noContractForDevice': 'Nenhum contrato do SGP encontrado para este ONT',
   'sgp.error.contractNotFound': 'Contrato não encontrado no SGP',
@@ -419,6 +429,7 @@ export default {
   'whatsapp.error.attachmentTooLarge': 'O arquivo passa de {max} MB',
   'whatsapp.error.attachmentEmpty': 'O arquivo está vazio',
   'whatsapp.error.attachmentTypeNotAllowed': 'Esse tipo de arquivo não sai daqui',
+  'whatsapp.error.attachmentNotAllowed': 'Esse anexo não sai daqui',
   'whatsapp.error.noPublicUrl': 'Configure a URL pública do webhook antes de mandar anexo: é por ela que o servidor Evolution busca o arquivo',
   'whatsapp.attachmentStored': 'Arquivo pronto para enviar',
   'whatsapp.mediaSwept': '{files} arquivo(s) apagado(s), {mb} MB liberados',

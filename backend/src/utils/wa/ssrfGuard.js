@@ -64,6 +64,39 @@ export function isPrivateIPv4(v) {
   return false;
 }
 
+/** Dois hextetos como o IPv4 de 32 bits que eles soletram. */
+function hextetsToIPv4(hi, lo) {
+  return (((parseInt(hi, 16) << 16) | parseInt(lo, 16)) >>> 0);
+}
+
+/**
+ * O IPv4 que um literal IPv6 carrega dentro de si, ou nada.
+ *
+ * Três formatos embutem um endereço IPv4, e os três precisam ser reconhecidos
+ * na grafia que o `new URL()` PRODUZ, não na que uma pessoa escreve. O
+ * serializador do WHATWG sempre emite hextetos: `::ffff:127.0.0.1` chega aqui
+ * como `::ffff:7f00:1`. Casar só a forma decimal é casar nada do que vem de uma
+ * URL analisada — era exatamente esse o furo.
+ *
+ * Devolve `undefined` quando não há IPv4 embutido, e `null` quando há um mas
+ * ele não analisa. Quem chama trata os dois de forma diferente de propósito: um
+ * endereço malformado que diz carregar um IPv4 é recusado, não liberado.
+ */
+function embeddedIPv4(h) {
+  // 6to4 (2002::/16): o IPv4 são os dois hextetos logo depois do prefixo.
+  const sixToFour = h.match(/^2002:([0-9a-f]{1,4}):([0-9a-f]{1,4})(?::|$)/);
+  if (sixToFour) return hextetsToIPv4(sixToFour[1], sixToFour[2]);
+
+  // IPv4-mapped (::ffff:x), IPv4-compatible (::x) e NAT64 (64:ff9b::x).
+  const tail = h.match(/^(?:::(?:ffff:)?|64:ff9b::)(.+)$/);
+  if (!tail) return undefined;
+  const rest = tail[1];
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(rest)) return parseIPv4(rest);
+  const pair = rest.match(/^([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (pair) return hextetsToIPv4(pair[1], pair[2]);
+  return undefined;
+}
+
 export function isPrivateIPv6(host) {
   let h = String(host || '').toLowerCase().replace(/^\[|\]$/g, '');
   const zone = h.indexOf('%');
@@ -71,11 +104,9 @@ export function isPrivateIPv6(host) {
   if (h === '::1' || h === '::') return true;
   if (/^f[cd]/.test(h)) return true; //    fc00::/7 (ULA)
   if (/^fe[89ab]/.test(h)) return true; // fe80::/10 (link-local)
-  // IPv4-mapped / IPv4-compatible: ::ffff:127.0.0.1
-  const m = h.match(/^::(?:ffff:)?(\d+\.\d+\.\d+\.\d+)$/);
-  if (m) {
-    const v = parseIPv4(m[1]);
-    return v === null ? true : isPrivateIPv4(v);
+  const embedded = embeddedIPv4(h);
+  if (embedded !== undefined) {
+    return embedded === null ? true : isPrivateIPv4(embedded);
   }
   return false;
 }

@@ -1,7 +1,10 @@
+import path from 'node:path';
 import WaConversation from '../models/WaConversation.js';
 import WaMessage from '../models/WaMessage.js';
 import WhatsAppAccount from '../models/WhatsAppAccount.js';
 import WhatsAppConfigService, { WaError } from './whatsappConfigService.js';
+import { DATA_DIR } from '../config/paths.js';
+import { outDir } from './waAttachmentService.js';
 import { clientForAccount } from './evolutionClient.js';
 import {
   readSentId,
@@ -286,15 +289,52 @@ export function publicMediaUrl(webhookBaseUrl, messageId) {
   return `${origin}/api/whatsapp-media/${messageId}?t=${encodeURIComponent(signMediaToken(messageId))}`;
 }
 
+/**
+ * Confina um caminho vindo do request à pasta de saída DESTE provedor.
+ *
+ * O caminho chega do navegador, e a única coisa que ele deveria ser é o que a
+ * rota de upload acabou de devolver — `wa-media/t<id>/out/<ano>/<mês>/<uuid>`.
+ * Nada, entre aqui e `wa_messages.attachment_path`, verificava isso: o único
+ * confinamento do sistema era o `inside(ROOT, …)` de `waMediaFile.js`, com
+ * `ROOT = DATA_DIR`. E `DATA_DIR` é onde ficam `db-config.json`, com as
+ * credenciais do banco em texto claro, e o `panel.sqlite` inteiro.
+ *
+ * O raciocínio em `waMediaFile.js` — "o arquivo é o daquela linha que quem
+ * chamou já podia ler" — vale para a leitura e falha aqui, porque quem chama
+ * ESCREVE o caminho daquela linha. Por isso a checagem mora deste lado, no
+ * único caller que aceita anexo vindo de request: `waBroadcastService`,
+ * `waBotService` e `waAlertService` não passam nenhum.
+ *
+ * `path.resolve` colapsa `..` ANTES da comparação de prefixo, que é a única
+ * ordem que funciona, e um caminho absoluto guardado perde para o `resolve` e
+ * cai fora do prefixo do mesmo jeito.
+ */
+function confinarCaminho(relativo) {
+  const raiz = path.resolve(DATA_DIR, outDir());
+  const alvo = path.resolve(DATA_DIR, relativo);
+  if (alvo !== raiz && !alvo.startsWith(raiz + path.sep)) {
+    throw new WaError('whatsapp.error.attachmentNotAllowed', {
+      code: 'attachment_not_allowed',
+      status: 400
+    });
+  }
+  return alvo;
+}
+
 /** Accepts the request body's `attachment`, in either naming convention. */
 function normalizeAttachment(attachment) {
   if (!attachment || typeof attachment !== 'object') return null;
-  const path = String(attachment.url ?? attachment.path ?? '').trim();
-  if (!path) return null;
+  const caminho = String(attachment.url ?? attachment.path ?? '').trim();
+  if (!caminho) return null;
+  // Truncado ANTES de confinar, e não depois: o que a coluna vai guardar é o
+  // que precisa ter sido verificado. Cortar um caminho já aprovado devolveria
+  // à linha uma string que ninguém checou.
+  const guardado = caminho.slice(0, BODY_ATTACHMENT_PATH_LIMIT);
+  confinarCaminho(guardado);
   const type = String(attachment.type ?? attachment.mimetype ?? '').trim();
   const name = String(attachment.name ?? attachment.fileName ?? '').trim();
   return {
-    path: path.slice(0, BODY_ATTACHMENT_PATH_LIMIT),
+    path: guardado,
     type: type.slice(0, ATTACHMENT_TYPE_LIMIT) || null,
     name: name.slice(0, BODY_ATTACHMENT_PATH_LIMIT) || null
   };

@@ -1,4 +1,5 @@
 import { getDb, tdb, tinsertReturningId } from '../config/database.js';
+import { runUnscoped } from '../config/tenantContext.js';
 
 /**
  * WhatsApp numbers connected through the Evolution API.
@@ -28,9 +29,17 @@ class WhatsAppAccount {
    * exactly this reason, which is why one row can be found without a provider.
    *
    * tenant-scope-exempt: this lookup is how the provider is discovered.
+   *
+   * `runUnscoped` says the same thing to the SQL sentinel, which reads the SQL
+   * and not the comment above it. Declaring it here rather than teaching the
+   * sentinel to tolerate a query shape is what keeps the exemption exactly one
+   * lookup wide: the next unfiltered read of this table still fails.
    */
   static async getByName(name) {
-    return (await getDb()('whatsapp_accounts').where({ name }).first()) || null;
+    return runUnscoped(
+      'the Evolution webhook arrives with no session; this is what names the provider',
+      async () => (await getDb()('whatsapp_accounts').where({ name }).first()) || null
+    );
   }
 
   /**

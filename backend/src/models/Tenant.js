@@ -1,20 +1,57 @@
 import { getDb, insertReturningId } from '../config/database.js';
 
 /**
- * The providers themselves, read from the control plane.
+ * The provider rows themselves — read both from the control plane and, for the
+ * two public columns, by anybody who reached a provider's own address.
  *
- * Like `TenantUser`, and for the same reason, this is deliberately NOT read
- * through `tdb`: every other model asks "what does the provider in scope hold?"
- * while this one is asked ABOVE any single provider — it is the table the scope
- * is chosen FROM, so filtering it by the scope would make listing providers
- * return the one you are already in.
+ * Deliberately NOT read through `tdb`, and for a reason worth stating twice
+ * because it is the same one from two directions. `tenants` has no `tenant_id`:
+ * it IS the provider. `tdb` would hand back an unfiltered builder anyway, since
+ * it only filters tables it knows are scoped — so reaching for it here would
+ * LOOK like a scoped read while being nothing of the kind, which is worse than
+ * being plainly unscoped. And the registry half is asked ABOVE any one
+ * provider: filtering it by the scope would make listing providers return the
+ * one you are already in.
  *
- * That is safe here only because nothing reaches these methods without
- * `requirePlatformAdmin` in front of it. A provider's own administrator has no
- * route into this file, which is the whole point of the control plane being a
- * plane above.
+ * That is safe only because of what stands in front of each half. The registry
+ * methods are unreachable without `requirePlatformAdmin`; the public read
+ * carries its own column allowlist, below. Every method names the provider it
+ * wants, explicitly, in its arguments.
  */
 class Tenant {
+  /**
+   * The columns a stranger may see.
+   *
+   * Written out rather than taken as `select *` because this list is a
+   * security decision, not a convenience. Somebody will eventually add a column
+   * to `tenants` — a plan, a billing status, a contact address, a trial expiry
+   * — and with `select *` that column would be on the public internet the
+   * moment the migration ran, with no diff anywhere near this file to review.
+   * Enumerating them means a new column is private by default and becomes
+   * public only when a human writes its name here.
+   */
+  static PUBLIC_COLUMNS = ['name', 'slug'];
+
+  /**
+   * One provider's public identity, or null when no such row exists.
+   *
+   * Deliberately does NOT filter on `status`. It is tempting to make this
+   * refuse a suspended provider — but callers of this reach it only after the
+   * resolver has already accepted the request, and being stricter here than the
+   * rest of the API is itself the leak: a prober who gets 404 from this route
+   * and 401 from `/api/auth/login` on the same host has just learned that the
+   * provider exists and is switched off. Whatever policy governs a suspended
+   * provider has to be the resolver's, applied once, to every route at the same
+   * time.
+   */
+  static async findPublicById(id) {
+    if (!id) return null;
+    const row = await getDb()('tenants')
+      .where({ id })
+      .first(...Tenant.PUBLIC_COLUMNS);
+    return row || null;
+  }
+
   /** Every provider, oldest first — the order the console lists them in. */
   static async list() {
     return getDb()('tenants').orderBy('id', 'asc');

@@ -1,5 +1,6 @@
 import { getDb } from './database.js';
 import { migrations } from './migrations.js';
+import { runUnscoped } from './tenantContext.js';
 
 export const MIGRATIONS_TABLE = 'schema_migrations';
 
@@ -46,6 +47,18 @@ async function record(db, id) {
  * finished rather than skipped.
  */
 export async function ensureSchema(db = getDb()) {
+  return runUnscoped('the migration runner', () => migrate(db));
+}
+
+/**
+ * Declared unscoped rather than left contextless because a backfill's whole job
+ * is to touch rows that belong to a provider that does not exist yet: the step
+ * that creates the first `tenants` row reads `settings` to name it, and the
+ * SQLite rebuilds copy whole scoped tables into shadow tables. Every one of
+ * those is a query the SQL sentinel would otherwise refuse, and rightly — it is
+ * only the declaration here that tells it the crossing is deliberate.
+ */
+async function migrate(db) {
   const isNewLedger = await ensureMigrationsTable(db);
   const baseline = isNewLedger && (await db.schema.hasTable('users'));
   const applied = await appliedIds(db);

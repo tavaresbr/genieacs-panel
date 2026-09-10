@@ -27,8 +27,16 @@ const DIVERGENCE_LIMIT = 50;
 export const DEFAULT_ENDPOINTS = Object.freeze({
   customer: '/api/ura/consultacliente/',
   invoices: '/api/ura/titulos/',
-  unlock: '/api/ura/liberacao/'
+  unlock: '/api/ura/liberacao/',
+  ticket: '/api/ura/chamado/'
 });
+
+/**
+ * The Tipo de Ocorrência a ticket is filed under when the operator has not set
+ * one. 5 is the value SGP's own reference gives as the default; every install
+ * still has its own catalogue, which is why it is configurable.
+ */
+export const DEFAULT_TICKET_OCCURRENCE_TYPE = 5;
 
 export const LINK_MODES = Object.freeze(['pppoe', 'customer_id', 'manual']);
 
@@ -379,6 +387,8 @@ const DEFAULT_CONFIG = Object.freeze({
   portalBilling: true,
   portalUnlock: false,
   invoiceLimit: 6,
+  ticketEnabled: false,
+  ticketOccurrenceType: DEFAULT_TICKET_OCCURRENCE_TYPE,
   endpoints: DEFAULT_ENDPOINTS,
   webhookEnabled: false,
   webhookRequireTimestamp: false,
@@ -485,6 +495,10 @@ class SgpService {
       reconcileBatchSize: clampNumber(stored.reconcileBatchSize, 1, 200, 25),
       eventRetentionDays: clampNumber(stored.eventRetentionDays, 1, 365, 90),
       eventTypeMap: normalizeEventTypeMap(stored.eventTypeMap),
+      ticketEnabled: stored.ticketEnabled === true,
+      ticketOccurrenceType: clampNumber(
+        stored.ticketOccurrenceType, 1, 999999, DEFAULT_TICKET_OCCURRENCE_TYPE
+      ),
       updatedAt: stored.updatedAt || null
     };
     this.configCache.set(config);
@@ -559,6 +573,14 @@ class SgpService {
       eventTypeMap: patch.eventTypeMap === undefined
         ? current.eventTypeMap
         : normalizeEventTypeMap(patch.eventTypeMap),
+      ticketEnabled: patch.ticketEnabled === undefined
+        ? current.ticketEnabled
+        : patch.ticketEnabled === true,
+      // The upper bound is generous on purpose: this is an id in the install's
+      // own catalogue, not an enum we get to define.
+      ticketOccurrenceType: patch.ticketOccurrenceType === undefined
+        ? current.ticketOccurrenceType
+        : clampNumber(patch.ticketOccurrenceType, 1, 999999, DEFAULT_TICKET_OCCURRENCE_TYPE),
       endpoints: {
         customer: this.normalizeEndpoint(
           patch.endpoints?.customer ?? current.endpoints.customer, DEFAULT_ENDPOINTS.customer
@@ -568,6 +590,9 @@ class SgpService {
         ),
         unlock: this.normalizeEndpoint(
           patch.endpoints?.unlock ?? current.endpoints.unlock, DEFAULT_ENDPOINTS.unlock
+        ),
+        ticket: this.normalizeEndpoint(
+          patch.endpoints?.ticket ?? current.endpoints.ticket, DEFAULT_ENDPOINTS.ticket
         )
       },
       updatedAt: new Date().toISOString()
@@ -814,6 +839,76 @@ class SgpService {
     return {
       message: asText(pick(data, ['msg', 'mensagem', 'message']))
         || 'Liberação em confiança solicitada ao SGP'
+    };
+  }
+
+  /**
+   * Opens a support ticket (a "chamado", and the occurrence plus service order
+   * behind it) against a contract.
+   *
+   * The body carries only the fields SGP's own reference documents for this
+   * route: `contrato`, `conteudo`, `observacao` and `ocorrenciatipo`, with
+   * `app` and `token` added by `request`. Two nearby fields are deliberately
+   * absent. `setor` belongs to `/api/ura/central/chamado/`, the subscriber's
+   * self-service variant that authenticates with cpfcnpj+senha rather than
+   * app+token, so sending it here is at best a field the server ignores.
+   * `conteudolimpo` only suppresses SGP's default opening line, and the two
+   * references disagree on its spelling — a cosmetic field whose name cannot be
+   * settled is not worth the chance of being wrong.
+   *
+   * The response shape is the half that is not documented anywhere, which is
+   * exactly the half tolerant reading covers: whatever the install calls the
+   * protocol number, `pick` looks for it under the spellings the other three
+   * routes already use, and an unrecognised body is a success with a generic
+   * message rather than an error.
+   */
+  static async openTicket({ contract, content, note = null, occurrenceType = null }) {
+    const cleanContract = asText(contract);
+    if (!cleanContract) {
+      throw new SgpError('sgp.error.contractRequired', {
+        code: 'missing_contract',
+        status: 400
+      });
+    }
+
+    const cleanContent = asText(content);
+    if (!cleanContent) {
+      throw new SgpError('sgp.error.ticketContentRequired', {
+        code: 'missing_content',
+        status: 400
+      });
+    }
+
+    const config = this.requireReady(await this.getConfig());
+    if (!config.ticketEnabled) {
+      throw new SgpError('sgp.error.ticketDisabled', {
+        code: 'ticket_disabled',
+        status: 409
+      });
+    }
+
+    const payload = {
+      contrato: cleanContract,
+      // Trimmed rather than rejected: a technician's note running long is not a
+      // reason to refuse to open the ticket.
+      conteudo: cleanContent.slice(0, 4000),
+      ocorrenciatipo: Number(occurrenceType) > 0
+        ? Number(occurrenceType)
+        : config.ticketOccurrenceType
+    };
+    const cleanNote = asText(note);
+    if (cleanNote) payload.observacao = cleanNote.slice(0, 2000);
+
+    const data = await this.request('ticket', payload);
+    return {
+      contract: cleanContract,
+      ticket: asText(pick(data, [
+        'chamado', 'protocolo', 'ocorrencia', 'os', 'ordemservico', 'id', 'numero'
+      ])),
+      // Null rather than a hardcoded sentence when the ERP says nothing: the
+      // panel speaks eleven languages and the service has no request to
+      // translate against, so the caller supplies the wording.
+      message: asText(pick(data, ['msg', 'mensagem', 'message']))
     };
   }
 

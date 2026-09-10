@@ -3,6 +3,7 @@ import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { translateError } from '../i18n/index.js';
 import CustomerService from '../services/customerService.js';
 import DeviceService from '../services/deviceService.js';
+import GenieAcsEgress, { EGRESS_REFUSED } from '../services/genieacsEgress.js';
 import CustomerAccount from '../models/CustomerAccount.js';
 
 const ALLOWED_SETTING_KEYS = new Set([
@@ -274,7 +275,12 @@ class SettingsController {
       const timeoutId = setTimeout(() => controller.abort(), 10000);
       
       try {
-        const response = await fetch(testUrl, {
+        // The URL under test arrives in the request body, so this is the one
+        // GenieACS call whose destination is named by the caller rather than by
+        // stored settings. It goes through the same guard as every other, or
+        // the "test connection" button is a probe for anything our network can
+        // reach that the configured URL is not allowed to be.
+        const response = await GenieAcsEgress.fetch(testUrl, {
           method: 'GET',
           headers: {
             'Accept': 'application/json',
@@ -309,6 +315,14 @@ class SettingsController {
       } catch (error) {
         clearTimeout(timeoutId);
         
+        // A refused address is the operator's own misconfiguration, not an
+        // upstream outage, so it answers 400 with the reason rather than 502.
+        if (error.code === EGRESS_REFUSED) {
+          return res.status(400).json(
+            createErrorResponse(req.t('settings.urlEgressRefused'), error.message)
+          );
+        }
+
         if (error.name === 'AbortError' || error.type === 'request-timeout') {
           return res.status(504).json(
             createErrorResponse(req.t('settings.connectionTimeout'))

@@ -35,5 +35,6 @@ router.get('/devices/:deviceId', authenticateToken, requireRole(['admin']), sgpA
 router.post('/devices/:deviceId/link', authenticateToken, requireRole(['admin']), sgpAdminLimiter, SgpController.linkDevice);
 router.delete('/devices/:deviceId/link', authenticateToken, requireRole(['admin']), sgpAdminLimiter, SgpController.unlinkDevice);
 router.post('/devices/:deviceId/unlock', authenticateToken, requireRole(['admin']), sgpAdminLimiter, SgpController.unlockDevice);
+router.post('/devices/:deviceId/ticket', authenticateToken, requireRole(['admin']), sgpAdminLimiter, SgpController.openTicket);
 
 export default router;

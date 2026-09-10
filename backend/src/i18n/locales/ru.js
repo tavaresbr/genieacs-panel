@@ -6,9 +6,14 @@ export default {
   // Транспорт и общие ошибки
   'common.internalError': 'Внутренняя ошибка сервера',
   'common.routeNotFound': 'Маршрут не найден',
+  'common.notFound': 'Не найдено',
   'common.originNotAllowed': 'Источник запроса не разрешён',
   'common.crossSiteBlocked': 'Межсайтовый запрос заблокирован',
   'common.invalidJson': 'Некорректное тело запроса JSON',
+
+  // Провайдер, который называет хост, — то, что видит посторонний
+  'tenant.publicRetrieved': 'Профиль провайдера получен',
+  'tenant.publicFailed': 'Не удалось получить профиль провайдера',
 
   // Аутентификация и авторизация
   'auth.tokenRequired': 'Требуется токен аутентификации',
@@ -118,6 +123,7 @@ export default {
   'settings.urlRequired': 'Требуется адрес URL',
   'settings.urlInvalid': 'Требуется корректный адрес HTTP или HTTPS',
   'settings.urlSchemeUnsupported': 'Поддерживаются только адреса HTTP и HTTPS',
+  'settings.urlEgressRefused': 'Панели не разрешено подключаться к этому адресу',
   'settings.urlCredentialsUnsupported': 'Учётные данные в адресе URL не поддерживаются',
   'settings.connectionSuccess': 'Подключение успешно.',
   'settings.connectionUnexpectedFormat': 'Подключение успешно, но формат ответа оказался неожиданным',
@@ -357,6 +363,10 @@ export default {
   'sgp.linkRemoved': 'Связь с SGP удалена',
   'sgp.unlinkFailed': 'Не удалось удалить связь с SGP',
   'sgp.unlockFailed': 'Не удалось запросить разблокировку в кредит',
+  'sgp.ticketOpened': 'Заявка создана в SGP',
+  'sgp.ticketFailed': 'Не удалось создать заявку в SGP',
+  'sgp.error.ticketContentRequired': 'Опишите, что происходит, прежде чем создавать заявку',
+  'sgp.error.ticketDisabled': 'Создание заявок в SGP отключено. Включите его в настройках.',
   'sgp.linksLoaded': 'связей SGP: {count}',
   'sgp.linksLoadFailed': 'Не удалось получить список связей SGP',
   'sgp.syncDone': 'Синхронизация завершена: привязано {linked} из {total} ONT',
@@ -376,7 +386,7 @@ export default {
   'sgp.error.invalidResponse': 'Некорректный ответ от SGP',
   'sgp.error.queryFailed': 'SGP вернула ошибку на этот запрос',
   'sgp.error.identifierRequired': 'Для запроса в SGP укажите документ, договор или логин PPPoE',
-  'sgp.error.contractRequired': 'Для разблокировки требуется договор SGP',
+  'sgp.error.contractRequired': 'Требуется договор SGP',
   'sgp.error.deviceUnlinked': 'Этот ONT ещё не привязан к договору SGP. Привяжите его вручную или проверьте логин PPPoE.',
   'sgp.error.noContractForDevice': 'Для этого ONT договор SGP не найден',
   'sgp.error.contractNotFound': 'Договор в SGP не найден',
@@ -423,6 +433,7 @@ export default {
   'whatsapp.error.attachmentTooLarge': 'Файл больше {max} МБ',
   'whatsapp.error.attachmentEmpty': 'Файл пуст',
   'whatsapp.error.attachmentTypeNotAllowed': 'Файлы такого типа отсюда отправить нельзя',
+  'whatsapp.error.attachmentNotAllowed': 'Это вложение отсюда отправить нельзя',
   'whatsapp.error.noPublicUrl': 'Укажите публичный адрес webhook перед отправкой вложений: с этого адреса их забирает сервер Evolution',
   'whatsapp.attachmentStored': 'Файл готов к отправке',
   'whatsapp.mediaSwept': 'Удалено файлов: {files}, освобождено {mb} МБ',

@@ -28,6 +28,7 @@ import databaseRoutes from './routes/database.js';
 import platformRoutes from './routes/platform.js';
 import platformMemberRoutes from './routes/platformMembers.js';
 import userRoutes from './routes/users.js';
+import tenantRoutes from './routes/tenant.js';
 import customerPortalRoutes from './routes/customerPortal.js';
 import sgpRoutes from './routes/sgp.js';
 import whatsappRoutes from './routes/whatsapp.js';
@@ -192,6 +193,20 @@ app.use('/api', resolveTenant);
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/refresh', authLimiter);
 app.use('/api/auth/setup', authLimiter);
+
+// Below `resolveTenant`, which is what makes this route safe to leave open.
+// It answers with a provider's name to anybody who asks, so the question of
+// WHICH provider must never be the caller's to decide: the resolver has
+// already read it off the `Host` header by the time this line runs, and an
+// unknown or inactive host was refused up there with a 404 that says nothing
+// about which of the two it was. Mounted above it, this would become a route
+// that reads out the first row of `tenants` to the internet.
+//
+// No limiter of its own: `apiLimiter` above already covers everything under
+// `/api`, and the enumeration a tighter bucket here would be aimed at is
+// visible on every other path under `/api` too, so it is not this route's to
+// fix. The reasoning is in `tenantController.js`.
+app.use('/api/tenant', tenantRoutes);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/devices', deviceRoutes);

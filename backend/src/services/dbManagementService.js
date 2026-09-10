@@ -4,6 +4,7 @@ import { buildKnexConfig, readDbConfig, writeDbConfig } from '../config/dbConfig
 import { ensureSchema } from '../config/schema.js';
 import { SCHEMA_TABLES } from '../config/migrations.js';
 import { seedDefaults } from '../config/seed.js';
+import { runUnscoped } from '../config/tenantContext.js';
 import { TranslatableError } from '../i18n/index.js';
 
 // Every table the schema owns, straight from the migrations. Kept derived
@@ -60,7 +61,22 @@ export function getActiveConfig() {
   return safe;
 }
 
+/**
+ * Moves the whole panel to another database, every provider's rows included.
+ *
+ * tenant-scope-exempt: a copy that took only the provider in scope would put a
+ * deployment on a new database minus everybody else's data, which is the one
+ * outcome worse than refusing to copy at all. Declared unscoped so the SQL
+ * sentinel does not have to guess that from the shape of a `select *`.
+ */
 export async function copyData(source, target) {
+  return runUnscoped(
+    'copying the whole panel between databases',
+    () => copyEveryTable(source, target)
+  );
+}
+
+async function copyEveryTable(source, target) {
   const snapshots = new Map();
   for (const table of COPY_TABLES) {
     if (await source.schema.hasTable(table)) {

@@ -6,9 +6,14 @@ export default {
   // Transport and generic failures
   'common.internalError': 'Internal server error',
   'common.routeNotFound': 'Route not found',
+  'common.notFound': 'Not found',
   'common.originNotAllowed': 'Origin is not allowed',
   'common.crossSiteBlocked': 'Cross-site request blocked',
   'common.invalidJson': 'Invalid JSON request body',
+
+  // The provider a host names, as a stranger may see it
+  'tenant.publicRetrieved': 'Provider profile retrieved',
+  'tenant.publicFailed': 'Failed to get the provider profile',
 
   // Authentication and authorization
   'auth.tokenRequired': 'Authentication token required',
@@ -118,6 +123,7 @@ export default {
   'settings.urlRequired': 'The URL is required',
   'settings.urlInvalid': 'A valid HTTP or HTTPS URL is required',
   'settings.urlSchemeUnsupported': 'Only HTTP and HTTPS URLs are supported',
+  'settings.urlEgressRefused': 'This address is not one the panel is allowed to connect to',
   'settings.urlCredentialsUnsupported': 'Credentials in the URL are not supported',
   'settings.connectionSuccess': 'Connection successful.',
   'settings.connectionUnexpectedFormat': 'Connection successful, but the response format was unexpected',
@@ -357,6 +363,10 @@ export default {
   'sgp.linkRemoved': 'SGP link removed',
   'sgp.unlinkFailed': 'Failed to remove the SGP link',
   'sgp.unlockFailed': 'Failed to request the trust unlock',
+  'sgp.ticketOpened': 'Ticket opened in SGP',
+  'sgp.ticketFailed': 'Failed to open the ticket in SGP',
+  'sgp.error.ticketContentRequired': 'Describe what is happening before opening the ticket',
+  'sgp.error.ticketDisabled': 'Opening tickets in SGP is turned off. Enable it in Settings.',
   'sgp.linksLoaded': '{count} SGP link(s)',
   'sgp.linksLoadFailed': 'Failed to list the SGP links',
   'sgp.syncDone': 'Synchronization finished: {linked} of {total} ONT(s) linked',
@@ -376,7 +386,7 @@ export default {
   'sgp.error.invalidResponse': 'Invalid response from SGP',
   'sgp.error.queryFailed': 'SGP returned an error for this query',
   'sgp.error.identifierRequired': 'Enter a document, a contract, or a PPPoE login to query SGP',
-  'sgp.error.contractRequired': 'The SGP contract is required for the unlock',
+  'sgp.error.contractRequired': 'The SGP contract is required',
   'sgp.error.deviceUnlinked': 'This ONT has no SGP contract linked yet. Link it manually or check the PPPoE login.',
   'sgp.error.noContractForDevice': 'No SGP contract was found for this ONT',
   'sgp.error.contractNotFound': 'Contract not found in SGP',
@@ -422,6 +432,7 @@ export default {
   'whatsapp.error.attachmentTooLarge': 'The file is larger than {max} MB',
   'whatsapp.error.attachmentEmpty': 'The file is empty',
   'whatsapp.error.attachmentTypeNotAllowed': 'That kind of file cannot be sent from here',
+  'whatsapp.error.attachmentNotAllowed': 'That attachment cannot be sent from here',
   'whatsapp.error.noPublicUrl': 'Set the public webhook URL before sending attachments: it is the address the Evolution server fetches them from',
   'whatsapp.attachmentStored': 'File ready to send',
   'whatsapp.mediaSwept': '{files} file(s) deleted, {mb} MB freed',

@@ -6,9 +6,14 @@ export default {
   // 通信および一般的なエラー
   'common.internalError': 'サーバー内部エラー',
   'common.routeNotFound': 'ルートが見つかりません',
+  'common.notFound': '見つかりません',
   'common.originNotAllowed': 'この Origin は許可されていません',
   'common.crossSiteBlocked': 'クロスサイトリクエストをブロックしました',
   'common.invalidJson': 'リクエスト本文の JSON が無効です',
+
+  // ホストが指すプロバイダーの、部外者に見える情報
+  'tenant.publicRetrieved': 'プロバイダー情報を取得しました',
+  'tenant.publicFailed': 'プロバイダー情報の取得に失敗しました',
 
   // 認証と認可
   'auth.tokenRequired': '認証トークンが必要です',
@@ -118,6 +123,7 @@ export default {
   'settings.urlRequired': 'URL が必要です',
   'settings.urlInvalid': '有効な HTTP または HTTPS の URL が必要です',
   'settings.urlSchemeUnsupported': 'HTTP と HTTPS の URL のみ対応しています',
+  'settings.urlEgressRefused': 'このアドレスへの接続はパネルに許可されていません',
   'settings.urlCredentialsUnsupported': 'URL 内の認証情報には対応していません',
   'settings.connectionSuccess': '接続に成功しました。',
   'settings.connectionUnexpectedFormat': '接続には成功しましたが、応答の形式が想定と異なりました',
@@ -356,6 +362,10 @@ export default {
   'sgp.linkRemoved': 'SGP の紐づけを解除しました',
   'sgp.unlinkFailed': 'SGP の紐づけを解除できませんでした',
   'sgp.unlockFailed': '一時解除を要求できませんでした',
+  'sgp.ticketOpened': 'SGP に問い合わせを登録しました',
+  'sgp.ticketFailed': 'SGP への問い合わせの登録に失敗しました',
+  'sgp.error.ticketContentRequired': '問い合わせを登録する前に状況を記入してください',
+  'sgp.error.ticketDisabled': 'SGP への問い合わせ登録は無効です。設定で有効にしてください。',
   'sgp.linksLoaded': 'SGP の紐づけ {count} 件',
   'sgp.linksLoadFailed': 'SGP の紐づけを一覧できませんでした',
   'sgp.syncDone': '同期が完了しました: {total} 台中 {linked} 台の ONT を紐づけました',
@@ -375,7 +385,7 @@ export default {
   'sgp.error.invalidResponse': 'SGP からの応答が無効です',
   'sgp.error.queryFailed': 'この照会に対して SGP がエラーを返しました',
   'sgp.error.identifierRequired': 'SGP に照会するには、証明書番号、契約、PPPoE ログインのいずれかを入力してください',
-  'sgp.error.contractRequired': '一時解除には SGP の契約が必要です',
+  'sgp.error.contractRequired': 'SGP の契約が必要です',
   'sgp.error.deviceUnlinked': 'この ONT にはまだ SGP の契約が紐づいていません。手動で紐づけるか、PPPoE ログインを確認してください。',
   'sgp.error.noContractForDevice': 'この ONT に対応する SGP の契約が見つかりませんでした',
   'sgp.error.contractNotFound': 'SGP に契約が見つかりません',
@@ -421,6 +431,7 @@ export default {
   'whatsapp.error.attachmentTooLarge': 'ファイルが {max} MB を超えています',
   'whatsapp.error.attachmentEmpty': 'ファイルが空です',
   'whatsapp.error.attachmentTypeNotAllowed': 'その種類のファイルはここからは送れません',
+  'whatsapp.error.attachmentNotAllowed': 'その添付ファイルはここからは送れません',
   'whatsapp.error.noPublicUrl': '添付を送る前に公開Webhook URLを設定してください。Evolutionサーバーはそこからファイルを取得します',
   'whatsapp.attachmentStored': 'ファイルを送信できます',
   'whatsapp.mediaSwept': '{files} 件のファイルを削除し、{mb} MB を解放しました',

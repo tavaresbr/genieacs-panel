@@ -1,478 +1,262 @@
 {
-  "version": "1.15.0",
-  "build": 215,
-  "sourceCommit": "e0d3ff1b18ed",
-  "releasedAt": "2026-09-09",
-  "basedOnTag": "v1.14.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/v1.14.0...v1.15.0",
+  "version": "1.16.0",
+  "build": 278,
+  "sourceCommit": "a114a5758f9b",
+  "releasedAt": "2026-09-10",
+  "basedOnTag": "v1.15.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/v1.15.0...v1.16.0",
   "changes": [
     {
-      "shortHash": "7490fae",
-      "date": "2026-09-08",
-      "title": "Add provisioning and SGP event storage",
-      "category": "New"
-    },
-    {
-      "shortHash": "7b3e05f",
-      "date": "2026-09-08",
-      "title": "Deepen the multi-tenant plan with verified code findings",
+      "shortHash": "5077277",
+      "date": "2026-09-09",
+      "title": "I18n: traduzir para russo as chaves da onda 7",
       "category": "Maintenance"
     },
     {
-      "shortHash": "bdd16e7",
-      "date": "2026-09-08",
-      "title": "Drop the stale note about hardcoded portal messages",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "b4067b6",
-      "date": "2026-09-08",
-      "title": "Read the PPPoE password and normalize SGP events",
-      "category": "New"
-    },
-    {
-      "shortHash": "8a8d18a",
-      "date": "2026-09-08",
-      "title": "Add the write primitives provisioning composes",
-      "category": "New"
-    },
-    {
-      "shortHash": "4ca67f2",
-      "date": "2026-09-08",
-      "title": "Apply the SGP contract profile to a CPE",
-      "category": "New"
-    },
-    {
-      "shortHash": "756a29a",
-      "date": "2026-09-08",
-      "title": "Close the gaps found in the second codebase analysis",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "fb0d246",
-      "date": "2026-09-08",
-      "title": "Ingest SGP events by webhook and by reconciliation",
-      "category": "New"
-    },
-    {
-      "shortHash": "5241ad2",
-      "date": "2026-09-08",
-      "title": "Cover activation and SGP event handling",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "c7107e4",
-      "date": "2026-09-08",
-      "title": "Add Italian",
-      "category": "New"
-    },
-    {
-      "shortHash": "6f74052",
-      "date": "2026-09-08",
-      "title": "Add the activation and SGP event surfaces",
-      "category": "New"
-    },
-    {
-      "shortHash": "e9fc591",
-      "date": "2026-09-08",
-      "title": "Document activation and event handling",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "305c27f",
-      "date": "2026-09-08",
-      "title": "Merge branch 'main' and translate the new strings into Italian",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "011c107",
-      "date": "2026-09-08",
-      "title": "Name the migration that creates the tables",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "f16fdc1",
-      "date": "2026-09-08",
-      "title": "Add German as a fifth interface and API language",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "b76cace",
-      "date": "2026-09-08",
-      "title": "Lay the foundation for the Evolution API integration",
-      "category": "New"
-    },
-    {
-      "shortHash": "689efbe",
-      "date": "2026-09-08",
-      "title": "Make MySQL usable and JWT_SECRET rotatable",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "d10daa1",
-      "date": "2026-09-08",
-      "title": "Run the backend on PostgreSQL, and prove it in CI",
-      "category": "New"
-    },
-    {
-      "shortHash": "c7766dd",
-      "date": "2026-09-08",
-      "title": "Add the Evolution HTTP client and the wave 1 message keys",
-      "category": "New"
-    },
-    {
-      "shortHash": "9bc490c",
-      "date": "2026-09-08",
-      "title": "Derive the copied-table list from the schema, and refresh the plan",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "f7575b2",
-      "date": "2026-09-08",
-      "title": "Ignore the harness agent worktrees",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "314df6d",
-      "date": "2026-09-08",
-      "title": "The Evolution instance lifecycle",
-      "category": "New"
-    },
-    {
-      "shortHash": "efa7042",
-      "date": "2026-09-08",
-      "title": "Inbound handlers and the outbox worker",
-      "category": "New"
-    },
-    {
-      "shortHash": "4dbe6b7",
-      "date": "2026-09-08",
-      "title": "Make customer accounts belong to a provider",
-      "category": "New"
-    },
-    {
-      "shortHash": "2bc7817",
-      "date": "2026-09-08",
-      "title": "The dunning renderer, the SGP phone, and the wave 2 surface",
-      "category": "New"
-    },
-    {
-      "shortHash": "67c2e3c",
-      "date": "2026-09-08",
-      "title": "Conversation reads and the subscriber resolver",
-      "category": "New"
-    },
-    {
-      "shortHash": "6cf7f82",
-      "date": "2026-09-08",
-      "title": "Technical alerts, and the rules that keep them readable",
-      "category": "New"
-    },
-    {
-      "shortHash": "7090e0d",
-      "date": "2026-09-08",
-      "title": "Technical alerts, and the message bodies they were missing",
-      "category": "New"
-    },
-    {
-      "shortHash": "ab71cb7",
-      "date": "2026-09-08",
-      "title": "The billing cadence — templates, campaigns and the flush loop",
-      "category": "New"
-    },
-    {
-      "shortHash": "8a0dff5",
-      "date": "2026-09-08",
-      "title": "O bot de autoatendimento",
-      "category": "New"
-    },
-    {
-      "shortHash": "36fa2e1",
-      "date": "2026-09-08",
-      "title": "The settings tab, the number cards and the QR pairing",
-      "category": "New"
-    },
-    {
-      "shortHash": "e395bcb",
-      "date": "2026-09-08",
-      "title": "Add French as a sixth interface and API language",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "73eee6e",
-      "date": "2026-09-08",
-      "title": "The portal URL on the settings form, and a delete warning that says what to do",
-      "category": "New"
-    },
-    {
-      "shortHash": "22a813e",
-      "date": "2026-09-08",
-      "title": "The inbox route, and the vocabulary its screen will need",
-      "category": "New"
-    },
-    {
-      "shortHash": "bc24934",
-      "date": "2026-09-08",
-      "title": "The mechanism that scopes a query to one provider",
-      "category": "New"
-    },
-    {
-      "shortHash": "5ce9880",
-      "date": "2026-09-08",
-      "title": "I18n: French for everything this branch added",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "bf53a7b",
-      "date": "2026-09-08",
-      "title": "Scope the three tables that delete without a where clause",
-      "category": "New"
-    },
-    {
-      "shortHash": "fdc12b3",
-      "date": "2026-09-08",
-      "title": "Add Japanese as a seventh interface and API language",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "0b2c487",
-      "date": "2026-09-08",
-      "title": "The operator's inbox screen",
-      "category": "New"
-    },
-    {
-      "shortHash": "f69408c",
-      "date": "2026-09-08",
-      "title": "I18n: the vocabulary for the screens of wave 4",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "8a87dde",
-      "date": "2026-09-08",
-      "title": "The two refusals the inbox could provoke but not name",
-      "category": "New"
-    },
-    {
-      "shortHash": "061616f",
-      "date": "2026-09-08",
-      "title": "Make subscriber accounts answer only to their own provider",
-      "category": "New"
-    },
-    {
-      "shortHash": "f92c3b4",
-      "date": "2026-09-08",
-      "title": "The two screens where a campaign's text is decided",
-      "category": "New"
-    },
-    {
-      "shortHash": "a4009d8",
-      "date": "2026-09-08",
-      "title": "The alerts screen, where four thresholds are four different units",
-      "category": "New"
-    },
-    {
-      "shortHash": "088e951",
-      "date": "2026-09-08",
-      "title": "Give the WhatsApp inbox and send queue a provider",
-      "category": "New"
-    },
-    {
-      "shortHash": "4f77c28",
-      "date": "2026-09-08",
-      "title": "Three ways the alerts and the templates lied, and the codes that hid it",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "5a00cd0",
-      "date": "2026-09-08",
-      "title": "The alerts form was about to speak the campaign's sentence",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "f02b1f5",
-      "date": "2026-09-08",
-      "title": "The billing cadence and the campaigns list",
-      "category": "New"
-    },
-    {
-      "shortHash": "977ceda",
-      "date": "2026-09-08",
-      "title": "The reason a build refused, and a timestamp typed as a lie",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "1c3c5a8",
-      "date": "2026-09-08",
-      "title": "Campaigns and the alert cooldown belong to a provider",
-      "category": "New"
-    },
-    {
-      "shortHash": "4bf39f4",
-      "date": "2026-09-08",
-      "title": "One page, six tabs — the operator's whole WhatsApp surface",
-      "category": "New"
-    },
-    {
-      "shortHash": "030dff3",
-      "date": "2026-09-08",
-      "title": "Add Simplified Chinese as an eighth interface and API language",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "b57f2cf",
-      "date": "2026-09-08",
-      "title": "The shared ground for wave 5 — a message's origin, and the words for the rest",
-      "category": "New"
-    },
-    {
-      "shortHash": "d12dc3f",
-      "date": "2026-09-08",
-      "title": "The bot's ceiling counts the bot, and nothing else",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "3dd452a",
-      "date": "2026-09-08",
-      "title": "Closing a thread, and finding one",
-      "category": "New"
-    },
-    {
-      "shortHash": "e2867fb",
-      "date": "2026-09-08",
-      "title": "The dedupe belt was also mistaking a campaign for an answer",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "97137a2",
-      "date": "2026-09-08",
-      "title": "Let an operator correct a subscriber's number",
-      "category": "New"
-    },
-    {
-      "shortHash": "32d137c",
-      "date": "2026-09-08",
-      "title": "Add Traditional Chinese as a ninth interface and API language",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "3f3376f",
-      "date": "2026-09-08",
-      "title": "The panel could not serve itself from a path containing a dot",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "c542636",
-      "date": "2026-09-08",
-      "title": "Give the configuration pair a provider",
-      "category": "New"
-    },
-    {
-      "shortHash": "5c3f809",
-      "date": "2026-09-09",
-      "title": "The shared ground for wave 6 — attachments, and where each audience fetches them",
-      "category": "New"
-    },
-    {
-      "shortHash": "392c43a",
-      "date": "2026-09-09",
-      "title": "The operator's file — upload, allowlist, and a composer that carries it",
-      "category": "New"
-    },
-    {
-      "shortHash": "9c1062c",
-      "date": "2026-09-09",
-      "title": "One error map for everybody, and a file with nothing in it",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "2930786",
-      "date": "2026-09-09",
-      "title": "A stored attachment becomes one somebody can open",
-      "category": "New"
-    },
-    {
-      "shortHash": "d3e959e",
-      "date": "2026-09-09",
-      "title": "A real page back through a thread",
-      "category": "New"
-    },
-    {
-      "shortHash": "8f235a6",
-      "date": "2026-09-09",
-      "title": "The limiter next to its sibling, and a disk path the browser never needed",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "69e0f5b",
-      "date": "2026-09-09",
-      "title": "Add Korean and repair the Traditional Chinese drift",
-      "category": "New"
-    },
-    {
-      "shortHash": "af09eb2",
-      "date": "2026-09-09",
-      "title": "Twenty-one keys that were declared twice, and the check that would have caught them",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "c373702",
-      "date": "2026-09-09",
-      "title": "The shared ground for wave 7 — a retention window and one honest health read",
-      "category": "New"
-    },
-    {
-      "shortHash": "9151ccd",
-      "date": "2026-09-09",
-      "title": "Add Russian, and undo the zh-TW duplication two merges caused",
-      "category": "New"
-    },
-    {
-      "shortHash": "a0d9527",
-      "date": "2026-09-09",
-      "title": "Give each provider its own caches, and release the two jobs that can go",
-      "category": "New"
-    },
-    {
-      "shortHash": "640a71e",
-      "date": "2026-09-09",
-      "title": "The attachment sweep — the first thing here that deletes",
-      "category": "New"
-    },
-    {
-      "shortHash": "718bf28",
-      "date": "2026-09-09",
-      "title": "One read that answers \"is this working?\", and a strip that says it",
-      "category": "New"
-    },
-    {
-      "shortHash": "06ec4c3",
-      "date": "2026-09-09",
-      "title": "Wire the retention window the config was only pretending to have",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "21609c1",
-      "date": "2026-09-09",
-      "title": "The sweep tells the strip, and the strip stops scanning",
-      "category": "New"
-    },
-    {
-      "shortHash": "8efb5ca",
-      "date": "2026-09-09",
-      "title": "MySQL keeps whole seconds, and three health tests were asserting milliseconds",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "37f0b90",
+      "shortHash": "27500c9",
       "date": "2026-09-09",
       "title": "Complete the Russian dictionary",
       "category": "Fixed"
     },
     {
-      "shortHash": "e0d3ff1",
+      "shortHash": "b9125dc",
       "date": "2026-09-09",
-      "title": "Point the comparison links at this repository",
+      "title": "Record device signal and uptime over time",
+      "category": "New"
+    },
+    {
+      "shortHash": "af2aa4d",
+      "date": "2026-09-09",
+      "title": "Onda 8: contrato, configuração e traduções compartilhadas",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "928d790",
+      "date": "2026-09-09",
+      "title": "Chart a device's readings on its page",
+      "category": "New"
+    },
+    {
+      "shortHash": "1a8944c",
+      "date": "2026-09-09",
+      "title": "Onda 8: sgp_links por provedor",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "ff2af73",
+      "date": "2026-09-09",
+      "title": "Onda 8: retenção do histórico e o botão que a varredura nunca teve",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "dafb791",
+      "date": "2026-09-09",
+      "title": "Onda 8: subárvore de mídia por provedor, e a varredura por provedor",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "207e54c",
+      "date": "2026-09-09",
+      "title": "Onda 8: remover as duas chaves de backend sem consumidor",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "b2ffcf6",
+      "date": "2026-09-09",
+      "title": "Onda 8: o botão de limpeza varre só o provedor que o apertou",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "40551a2",
+      "date": "2026-09-09",
+      "title": "Onda 8: cobrir o upgrade de sgp_links num banco que já tem linhas",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "eb4d5ef",
+      "date": "2026-09-09",
+      "title": "Onda 9: base compartilhada — recuo, índices e o contrato",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "6f85f9b",
+      "date": "2026-09-09",
+      "title": "Truncate the inform to whole seconds before storing it",
       "category": "Fixed"
+    },
+    {
+      "shortHash": "a77ecb2",
+      "date": "2026-09-09",
+      "title": "Onda 9: a saúde tem de distinguir recuo de fila parada",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "d0df4bc",
+      "date": "2026-09-09",
+      "title": "Onda 9: reenviar é devolver a linha à fila",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "a84d687",
+      "date": "2026-09-09",
+      "title": "Toda mensagem recebida era arquivada no primeiro provedor",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "f5ba01b",
+      "date": "2026-09-09",
+      "title": "Carry a subscriber's SGP link onto the ONT that replaced theirs",
+      "category": "New"
+    },
+    {
+      "shortHash": "e27e36d",
+      "date": "2026-09-09",
+      "title": "Onda 9 (faixa A): a fila recua em vez de queimar as tentativas",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "39ce403",
+      "date": "2026-09-09",
+      "title": "Drop the Russian keys the last two merges each added",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "9b9d668",
+      "date": "2026-09-09",
+      "title": "Onda 9: a campanha também espera, e a costura do lote",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "afb21d6",
+      "date": "2026-09-09",
+      "title": "Add an in-repo QR encoder with golden vectors from an independent oracle",
+      "category": "New"
+    },
+    {
+      "shortHash": "68808c3",
+      "date": "2026-09-09",
+      "title": "Draw the Pix QR code and give Pix its own field",
+      "category": "New"
+    },
+    {
+      "shortHash": "07e569b",
+      "date": "2026-09-09",
+      "title": "Onda 10: as quatro migrações por provedor",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "1ccbe2e",
+      "date": "2026-09-09",
+      "title": "Onda 10: o mapa por provedor",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "e0f7b9e",
+      "date": "2026-09-09",
+      "title": "Onda 10: provisionamento por provedor",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "207f4c2",
+      "date": "2026-09-09",
+      "title": "Onda 10: o log de eventos do SGP por provedor, e a entrega que se identifica",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "5472e17",
+      "date": "2026-09-09",
+      "title": "Onda 10: as datas de instalação por provedor, e a varredura de Customer ID em laço",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "e607404",
+      "date": "2026-09-09",
+      "title": "Onda 10: o reaper de boot passa a rodar por provedor",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "ad3844f",
+      "date": "2026-09-09",
+      "title": "Onda 10: o agendador inteiro passa a rodar por provedor",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "76a0c01",
+      "date": "2026-09-09",
+      "title": "Onda 11: a migração do catálogo de equipamentos",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "ca3f0f2",
+      "date": "2026-09-09",
+      "title": "`whereLike` quebra no MySQL contra coluna utf8mb4",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "ea2bb6d",
+      "date": "2026-09-09",
+      "title": "Onda 11: as credenciais de WiFi do assinante, por provedor",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "f8a80fa",
+      "date": "2026-09-09",
+      "title": "Onda 11: o catálogo de equipamentos por provedor",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "9caa1cd",
+      "date": "2026-09-09",
+      "title": "Onda 11: validada nos três bancos antes de empurrar",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "2b2c9b1",
+      "date": "2026-09-09",
+      "title": "Onda 12: a ponte de vínculo, e o contrato do que o token carrega",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "eefcb15",
+      "date": "2026-09-09",
+      "title": "Onda 12: a espinha de autenticação — o token nomeia o provedor",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "cb04538",
+      "date": "2026-09-09",
+      "title": "Onda 12: /api/users passa a ser a equipe de um provedor",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "b6a7ff0",
+      "date": "2026-09-09",
+      "title": "Onda 12: fechar a brecha do vínculo encerrado, e reconciliar com a faixa B",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "b02f965",
+      "date": "2026-09-09",
+      "title": "Onda 12: dizer que a guarda do último admin não é alcançável pela rota",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "134a319",
+      "date": "2026-09-09",
+      "title": "Onda 12: `users` e `tenant_users` são do deploy, e agora está escrito",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "2fe76d1",
+      "date": "2026-09-09",
+      "title": "Cover the upgrade path of the last three tenancy steps",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "bb8b570",
+      "date": "2026-09-10",
+      "title": "Open a support ticket in the ERP from an ONT's page",
+      "category": "New"
     }
   ]
 }

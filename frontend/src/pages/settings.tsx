@@ -88,6 +88,8 @@ export default function Settings() {
     portalBilling: true,
     portalUnlock: false,
     invoiceLimit: 6,
+    ticketEnabled: false,
+    ticketOccurrenceType: 5,
     sample: ''
   })
   const [sgpSaving, setSgpSaving] = useState(false)
@@ -162,7 +164,9 @@ export default function Settings() {
           linkMode: config.linkMode,
           portalBilling: config.portalBilling,
           portalUnlock: config.portalUnlock,
-          invoiceLimit: config.invoiceLimit
+          invoiceLimit: config.invoiceLimit,
+          ticketEnabled: config.ticketEnabled,
+          ticketOccurrenceType: config.ticketOccurrenceType
         }))
         setSgpTestResult(null)
       }
@@ -248,7 +252,9 @@ export default function Settings() {
         linkMode: sgpForm.linkMode,
         portalBilling: sgpForm.portalBilling,
         portalUnlock: sgpForm.portalUnlock,
-        invoiceLimit: sgpForm.invoiceLimit
+        invoiceLimit: sgpForm.invoiceLimit,
+        ticketEnabled: sgpForm.ticketEnabled,
+        ticketOccurrenceType: sgpForm.ticketOccurrenceType
       })
       if (res.success && res.data) {
         setSgpConfig(res.data)
@@ -1240,7 +1246,43 @@ export default function Settings() {
                     </span>
                   </span>
                 </label>
+                <label className="flex cursor-pointer items-start gap-3">
+                  <input
+                    type="checkbox"
+                    className="mt-1 h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
+                    checked={sgpForm.ticketEnabled}
+                    onChange={(event) => setSgpForm((current) => ({ ...current, ticketEnabled: event.target.checked }))}
+                  />
+                  <span>
+                    <span className="block font-semibold">{t('settings.sgp.ticket')}</span>
+                    <span className="mt-1 block text-sm leading-6 text-muted-foreground">
+                      {t('settings.sgp.ticketHint')}
+                    </span>
+                  </span>
+                </label>
               </div>
+
+              {sgpForm.ticketEnabled && (
+                <div>
+                  <label htmlFor="sgp-occurrence-type" className="field-label">
+                    {t('settings.sgp.ticketOccurrenceType')}
+                  </label>
+                  <input
+                    id="sgp-occurrence-type"
+                    type="number"
+                    min={1}
+                    className="modern-input w-full"
+                    value={sgpForm.ticketOccurrenceType}
+                    onChange={(event) => setSgpForm((current) => ({
+                      ...current,
+                      ticketOccurrenceType: Number(event.target.value) || 1
+                    }))}
+                  />
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                    {t('settings.sgp.ticketOccurrenceTypeHint')}
+                  </p>
+                </div>
+              )}
 
               <div>
                 <label htmlFor="sgp-sample" className="field-label">{t('settings.sgp.sample')}</label>

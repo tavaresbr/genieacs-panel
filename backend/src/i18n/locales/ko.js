@@ -6,9 +6,14 @@ export default {
   // 전송 및 일반 오류
   'common.internalError': '내부 서버 오류',
   'common.routeNotFound': '경로를 찾을 수 없습니다',
+  'common.notFound': '찾을 수 없습니다',
   'common.originNotAllowed': '허용되지 않은 출처입니다',
   'common.crossSiteBlocked': '교차 사이트 요청이 차단되었습니다',
   'common.invalidJson': '요청 본문의 JSON이 올바르지 않습니다',
+
+  // 호스트가 가리키는 사업자 중 외부에 공개되는 정보
+  'tenant.publicRetrieved': '사업자 정보를 가져왔습니다',
+  'tenant.publicFailed': '사업자 정보를 가져오지 못했습니다',
 
   // 인증 및 권한
   'auth.tokenRequired': '인증 토큰이 필요합니다',
@@ -118,6 +123,7 @@ export default {
   'settings.urlRequired': 'URL이 필요합니다',
   'settings.urlInvalid': '유효한 HTTP 또는 HTTPS URL이 필요합니다',
   'settings.urlSchemeUnsupported': 'HTTP와 HTTPS URL만 지원합니다',
+  'settings.urlEgressRefused': '패널이 이 주소로 연결하는 것은 허용되지 않습니다',
   'settings.urlCredentialsUnsupported': 'URL에 포함된 자격 증명은 지원하지 않습니다',
   'settings.connectionSuccess': '연결에 성공했습니다.',
   'settings.connectionUnexpectedFormat': '연결에는 성공했지만 응답 형식이 예상과 다릅니다',
@@ -358,6 +364,10 @@ export default {
   'sgp.linkRemoved': 'SGP 연결을 해제했습니다',
   'sgp.unlinkFailed': 'SGP 연결을 해제하지 못했습니다',
   'sgp.unlockFailed': '신용 해제를 요청하지 못했습니다',
+  'sgp.ticketOpened': 'SGP에 접수했습니다',
+  'sgp.ticketFailed': 'SGP 접수에 실패했습니다',
+  'sgp.error.ticketContentRequired': '접수하기 전에 상황을 설명해 주세요',
+  'sgp.error.ticketDisabled': 'SGP 접수 기능이 꺼져 있습니다. 설정에서 켜세요.',
   'sgp.linksLoaded': 'SGP 연결 {count}건',
   'sgp.linksLoadFailed': 'SGP 연결 목록을 조회하지 못했습니다',
   'sgp.syncDone': '동기화를 완료했습니다: ONT {total}대 중 {linked}대 연결됨',
@@ -377,7 +387,7 @@ export default {
   'sgp.error.invalidResponse': 'SGP의 응답이 올바르지 않습니다',
   'sgp.error.queryFailed': 'SGP가 이 조회에 대해 오류를 반환했습니다',
   'sgp.error.identifierRequired': 'SGP를 조회하려면 증서 번호, 계약 또는 PPPoE 로그인을 입력하십시오',
-  'sgp.error.contractRequired': '해제하려면 SGP 계약이 필요합니다',
+  'sgp.error.contractRequired': 'SGP 계약이 필요합니다',
   'sgp.error.deviceUnlinked': '이 ONT에는 아직 SGP 계약이 연결되지 않았습니다. 수동으로 연결하거나 PPPoE 로그인을 확인하십시오.',
   'sgp.error.noContractForDevice': '이 ONT에 해당하는 SGP 계약을 찾지 못했습니다',
   'sgp.error.contractNotFound': 'SGP에서 계약을 찾을 수 없습니다',
@@ -424,6 +434,7 @@ export default {
   'whatsapp.error.attachmentTooLarge': '파일이 {max} MB보다 큽니다',
   'whatsapp.error.attachmentEmpty': '파일이 비어 있습니다',
   'whatsapp.error.attachmentTypeNotAllowed': '이 종류의 파일은 여기에서 보낼 수 없습니다',
+  'whatsapp.error.attachmentNotAllowed': '이 첨부 파일은 여기에서 보낼 수 없습니다',
   'whatsapp.error.noPublicUrl': '첨부 파일을 보내기 전에 공개 웹훅 URL을 설정하십시오. Evolution 서버가 이 주소에서 파일을 가져옵니다',
   'whatsapp.attachmentStored': '전송할 파일이 준비되었습니다',
   'whatsapp.accountConnecting': '인스턴스를 생성했습니다. QR 코드를 스캔해 완료하십시오',
