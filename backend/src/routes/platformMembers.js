@@ -1,0 +1,45 @@
+import express from 'express';
+import PlatformMemberController from '../controllers/platformMemberController.js';
+import { authenticateToken, requirePlatformAdmin } from '../middleware/auth.js';
+
+/**
+ * Who works for which provider, from the control plane.
+ *
+ * Mounted at `/api/platform`, alongside the router that mints and suspends
+ * providers, and only where `EDITION=saas`: on a self-hosted install these
+ * paths do not answer 403, they do not exist, because a 403 tells whoever asked
+ * that a control plane is there.
+ *
+ * Two guards, in this order and never one without the other.
+ * `authenticateToken` establishes WHO is asking — and, as a side effect, opens
+ * the scope of the provider that caller's own session belongs to, which is not
+ * the provider these routes act on; the controller takes that from the path.
+ * `requirePlatformAdmin` then establishes that they are above providers rather
+ * than inside one. A provider's own administrator passes the first and must
+ * fail the second: reaching into another ISP's staff list is exactly the power
+ * this plane exists to keep away from them.
+ */
+const router = express.Router();
+
+router.get(
+  '/tenants/:id/members',
+  authenticateToken,
+  requirePlatformAdmin,
+  PlatformMemberController.list
+);
+
+router.post(
+  '/tenants/:id/members',
+  authenticateToken,
+  requirePlatformAdmin,
+  PlatformMemberController.add
+);
+
+router.delete(
+  '/tenants/:id/members/:userId',
+  authenticateToken,
+  requirePlatformAdmin,
+  PlatformMemberController.remove
+);
+
+export default router;
