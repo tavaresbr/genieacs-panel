@@ -518,4 +518,6 @@ export default {
   'whatsapp.messageRequeued': 'Message put back in the queue',
   'whatsapp.messageNotRequeueable': 'Only a message that failed can be sent again.',
   'whatsapp.messagesRequeued': '{count} message(s) put back in the queue',
+  'vendor.nameTaken': 'A vendor with this name already exists',
+  'wifiConfig.productClassTaken': 'A config for this product class already exists, and only one can apply',
 };

@@ -519,4 +519,6 @@ export default {
   'whatsapp.messageRequeued': 'Сообщение возвращено в очередь',
   'whatsapp.messageNotRequeueable': 'Повторно отправить можно только сообщение, отправка которого не удалась.',
   'whatsapp.messagesRequeued': 'Возвращено в очередь сообщений: {count}',
+  'vendor.nameTaken': 'Производитель с таким названием уже есть',
+  'wifiConfig.productClassTaken': 'Для этого класса устройств настройка уже есть, а действовать может только одна',
 };

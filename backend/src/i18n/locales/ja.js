@@ -518,4 +518,6 @@ export default {
   'whatsapp.messageRequeued': 'メッセージを送信待ちに戻しました',
   'whatsapp.messageNotRequeueable': '再送できるのは送信に失敗したメッセージだけです。',
   'whatsapp.messagesRequeued': '{count} 件のメッセージを送信待ちに戻しました',
+  'vendor.nameTaken': 'この名称のベンダーはすでに存在します',
+  'wifiConfig.productClassTaken': 'この製品クラスの設定はすでにあり、適用されるのは 1 つだけです',
 };

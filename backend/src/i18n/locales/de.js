@@ -519,4 +519,6 @@ export default {
   'whatsapp.messageRequeued': 'Nachricht wieder in die Warteschlange gestellt',
   'whatsapp.messageNotRequeueable': 'Nur eine fehlgeschlagene Nachricht kann erneut gesendet werden.',
   'whatsapp.messagesRequeued': '{count} Nachricht(en) wieder in die Warteschlange gestellt',
+  'vendor.nameTaken': 'Ein Hersteller mit diesem Namen existiert bereits',
+  'wifiConfig.productClassTaken': 'Für diese Produktklasse gibt es bereits eine Konfiguration, und nur eine kann greifen',
 };

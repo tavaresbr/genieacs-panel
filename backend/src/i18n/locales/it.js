@@ -516,4 +516,6 @@ export default {
   'whatsapp.messageRequeued': 'Messaggio rimesso in coda',
   'whatsapp.messageNotRequeueable': 'Solo un messaggio non riuscito può essere inviato di nuovo.',
   'whatsapp.messagesRequeued': '{count} messaggio/i rimesso/i in coda',
+  'vendor.nameTaken': 'Esiste già un produttore con questo nome',
+  'wifiConfig.productClassTaken': 'Esiste già una configurazione per questa classe di prodotto, e solo una può valere',
 };

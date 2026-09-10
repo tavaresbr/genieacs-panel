@@ -518,4 +518,6 @@ export default {
   'whatsapp.messageRequeued': '消息已重新排队',
   'whatsapp.messageNotRequeueable': '只有发送失败的消息才能重新发送。',
   'whatsapp.messagesRequeued': '已将 {count} 条消息重新排队',
+  'vendor.nameTaken': '同名厂商已存在',
+  'wifiConfig.productClassTaken': '该产品类别已有配置，且只有一条会生效',
 };

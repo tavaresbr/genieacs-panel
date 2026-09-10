@@ -514,4 +514,6 @@ export default {
   'whatsapp.messageRequeued': 'Message remis dans la file',
   'whatsapp.messageNotRequeueable': 'Seul un message en échec peut être renvoyé.',
   'whatsapp.messagesRequeued': '{count} message(s) remis dans la file',
+  'vendor.nameTaken': 'Un fabricant portant ce nom existe déjà',
+  'wifiConfig.productClassTaken': 'Une configuration existe déjà pour cette classe de produit, et une seule peut s’appliquer',
 };

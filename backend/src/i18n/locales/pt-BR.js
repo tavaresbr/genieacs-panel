@@ -515,4 +515,6 @@ export default {
   'whatsapp.messageRequeued': 'Mensagem devolvida à fila',
   'whatsapp.messageNotRequeueable': 'Só uma mensagem que falhou pode ser enviada de novo.',
   'whatsapp.messagesRequeued': '{count} mensagem(ns) devolvida(s) à fila',
+  'vendor.nameTaken': 'Já existe um fabricante com este nome',
+  'wifiConfig.productClassTaken': 'Já existe uma configuração para esta classe de produto, e só uma pode valer',
 };

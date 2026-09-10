@@ -518,4 +518,6 @@ export default {
   'whatsapp.messageRequeued': '訊息已重新排入佇列',
   'whatsapp.messageNotRequeueable': '只有傳送失敗的訊息才能重新傳送。',
   'whatsapp.messagesRequeued': '已將 {count} 則訊息重新排入佇列',
+  'vendor.nameTaken': '同名廠商已存在',
+  'wifiConfig.productClassTaken': '該產品類別已有設定，且只有一筆會生效',
 };

@@ -521,4 +521,6 @@ export default {
   'whatsapp.messageRequeued': '메시지를 전송 대기열로 되돌렸습니다',
   'whatsapp.messageNotRequeueable': '전송에 실패한 메시지만 다시 보낼 수 있습니다.',
   'whatsapp.messagesRequeued': '메시지 {count}건을 전송 대기열로 되돌렸습니다',
+  'vendor.nameTaken': '같은 이름의 제조사가 이미 있습니다',
+  'wifiConfig.productClassTaken': '이 제품 클래스의 설정이 이미 있으며, 적용되는 것은 하나뿐입니다',
 };
