@@ -3,6 +3,61 @@
 SkyGenPanel follows [Semantic Versioning](https://semver.org/). Release versions
 are calculated from conventional commits since the previous `v*` Git tag.
 
+## [1.16.0] - 2026-09-10
+
+### New
+
+- Record device signal and uptime over time (`b9125dc`)
+- Chart a device's readings on its page (`928d790`)
+- Carry a subscriber's SGP link onto the ONT that replaced theirs (`f5ba01b`)
+- Add an in-repo QR encoder with golden vectors from an independent oracle (`afb21d6`)
+- Draw the Pix QR code and give Pix its own field (`68808c3`)
+- Open a support ticket in the ERP from an ONT's page (`bb8b570`)
+
+### Fixed
+
+- Complete the Russian dictionary (`27500c9`)
+- Truncate the inform to whole seconds before storing it (`6f85f9b`)
+- Drop the Russian keys the last two merges each added (`39ce403`)
+
+### Maintenance
+
+- I18n: traduzir para russo as chaves da onda 7 (`5077277`)
+- Onda 8: contrato, configuração e traduções compartilhadas (`af2aa4d`)
+- Onda 8: sgp_links por provedor (`1a8944c`)
+- Onda 8: retenção do histórico e o botão que a varredura nunca teve (`ff2af73`)
+- Onda 8: subárvore de mídia por provedor, e a varredura por provedor (`dafb791`)
+- Onda 8: remover as duas chaves de backend sem consumidor (`207e54c`)
+- Onda 8: o botão de limpeza varre só o provedor que o apertou (`b2ffcf6`)
+- Onda 8: cobrir o upgrade de sgp_links num banco que já tem linhas (`40551a2`)
+- Onda 9: base compartilhada — recuo, índices e o contrato (`eb4d5ef`)
+- Onda 9: a saúde tem de distinguir recuo de fila parada (`a77ecb2`)
+- Onda 9: reenviar é devolver a linha à fila (`d0df4bc`)
+- Toda mensagem recebida era arquivada no primeiro provedor (`a84d687`)
+- Onda 9 (faixa A): a fila recua em vez de queimar as tentativas (`e27e36d`)
+- Onda 9: a campanha também espera, e a costura do lote (`9b9d668`)
+- Onda 10: as quatro migrações por provedor (`07e569b`)
+- Onda 10: o mapa por provedor (`1ccbe2e`)
+- Onda 10: provisionamento por provedor (`e0f7b9e`)
+- Onda 10: o log de eventos do SGP por provedor, e a entrega que se identifica (`207f4c2`)
+- Onda 10: as datas de instalação por provedor, e a varredura de Customer ID em laço (`5472e17`)
+- Onda 10: o reaper de boot passa a rodar por provedor (`e607404`)
+- Onda 10: o agendador inteiro passa a rodar por provedor (`ad3844f`)
+- Onda 11: a migração do catálogo de equipamentos (`76a0c01`)
+- `whereLike` quebra no MySQL contra coluna utf8mb4 (`ca3f0f2`)
+- Onda 11: as credenciais de WiFi do assinante, por provedor (`ea2bb6d`)
+- Onda 11: o catálogo de equipamentos por provedor (`f8a80fa`)
+- Onda 11: validada nos três bancos antes de empurrar (`9caa1cd`)
+- Onda 12: a ponte de vínculo, e o contrato do que o token carrega (`2b2c9b1`)
+- Onda 12: a espinha de autenticação — o token nomeia o provedor (`eefcb15`)
+- Onda 12: /api/users passa a ser a equipe de um provedor (`cb04538`)
+- Onda 12: fechar a brecha do vínculo encerrado, e reconciliar com a faixa B (`b6a7ff0`)
+- Onda 12: dizer que a guarda do último admin não é alcançável pela rota (`b02f965`)
+- Onda 12: `users` e `tenant_users` são do deploy, e agora está escrito (`134a319`)
+- Cover the upgrade path of the last three tenancy steps (`2fe76d1`)
+
+[Full comparison](https://github.com/tavaresbr/genieacs-panel/compare/v1.15.0...v1.16.0)
+
 ## [1.15.0] - 2026-09-09
 
 ### New
