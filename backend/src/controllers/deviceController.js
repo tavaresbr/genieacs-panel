@@ -5,6 +5,7 @@ import CustomerPortalPasswordService from '../services/customerPortalPasswordSer
 import CustomerAccount from '../models/CustomerAccount.js';
 import DeviceProfile from '../models/DeviceProfile.js';
 import DeviceSwap, { publicSwap } from '../models/DeviceSwap.js';
+import AuditLog, { AUDIT_ACTIONS } from '../models/AuditLog.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { translateError } from '../i18n/index.js';
 
@@ -237,6 +238,22 @@ class DeviceController {
           'No readable portal password is stored. Generate a new one.'
         ));
       }
+      // Awaited, not fired and forgotten: the line has to be in the table
+      // before the password leaves the building, or a crash between the two
+      // hands out a secret nobody can prove was handed out. `record` swallows
+      // its own failures, so awaiting it cannot cost the operator the answer to
+      // a request that has already succeeded — see AuditLog.record for why a
+      // full disk must not become a 500 here.
+      //
+      // The password itself is not passed. `customerId` is what identifies the
+      // account to a human reading the log, and it is already the account's
+      // public name in this response.
+      await AuditLog.recordFromRequest(req, {
+        action: AUDIT_ACTIONS.PORTAL_PASSWORD_REVEALED,
+        targetType: 'customer_account',
+        targetId: account.customer_id,
+        metadata: { deviceId: req.params.deviceId }
+      });
       return res.json(createResponse(req.t('device.portalPasswordRetrieved'), {
         customerId: account.customer_id,
         password,
@@ -259,6 +276,20 @@ class DeviceController {
         );
       }
       const password = await CustomerPortalPasswordService.reset(account.id);
+      // A reset is a reveal with the old password thrown away: whoever called
+      // this now holds working credentials for a subscriber's portal, and the
+      // subscriber's own password has stopped working without them asking. The
+      // new password is not recorded for the same reason the revealed one is
+      // not — see AuditLog — and its failure is swallowed there because the
+      // subscriber's password has already been replaced by the time we get
+      // here. Failing the request would tell the operator to try again, which
+      // would rotate it a second time.
+      await AuditLog.recordFromRequest(req, {
+        action: AUDIT_ACTIONS.PORTAL_PASSWORD_RESET,
+        targetType: 'customer_account',
+        targetId: account.customer_id,
+        metadata: { deviceId: req.params.deviceId }
+      });
       return res.json(createResponse(req.t('device.portalPasswordRegenerated'), {
         customerId: account.customer_id,
         password

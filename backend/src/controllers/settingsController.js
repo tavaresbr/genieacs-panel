@@ -10,6 +10,7 @@ import {
   CONNECTOR_UNCONFIGURED
 } from '../services/genieacs/connector.js';
 import GenieAcsConnection from '../models/GenieAcsConnection.js';
+import AuditLog, { AUDIT_ACTIONS } from '../models/AuditLog.js';
 import CustomerAccount from '../models/CustomerAccount.js';
 
 const ALLOWED_SETTING_KEYS = new Set([
@@ -121,7 +122,7 @@ class SettingsController {
       }
 
       await Setting.create(key, validated.value);
-      await syncBaseUrlFromSetting(key, validated.value);
+      await SettingsController.saveGenieAcsBaseUrl(req, key, validated.value);
       return res.json(
         createResponse(req.t('settings.created'), { [key]: validated.value })
       );
@@ -157,7 +158,7 @@ class SettingsController {
         );
       }
 
-      await syncBaseUrlFromSetting(key, validated.value);
+      await SettingsController.saveGenieAcsBaseUrl(req, key, validated.value);
 
       return res.json(
         createResponse(req.t('settings.updated'), { [key]: validated.value })
@@ -242,6 +243,30 @@ class SettingsController {
         createErrorResponse(req.t('settings.deleteFailed'), error.message)
       );
     }
+  }
+
+  /**
+   * The one settings key that is also a connection, and the one that earns a
+   * line in the audit log.
+   *
+   * The settings route is a generic key/value writer and auditing it wholesale
+   * would mean a policy per key, which is its own piece of work. This key is
+   * different in kind since 0029: it names the server that manages every ONT
+   * the provider has, and repointing it changes no row anybody could look at
+   * afterwards. The URL itself goes in the line — unlike the SGP base URL,
+   * which is withheld because it is the address a token is sent to; here the
+   * credential is a separate column and the address is what the reader needs.
+   */
+  static async saveGenieAcsBaseUrl(req, key, value) {
+    if (key !== 'genieAcsUrl') return;
+    await syncBaseUrlFromSetting(key, value);
+    // Best-effort by contract (see AuditLog.record) — the setting is written.
+    await AuditLog.recordFromRequest(req, {
+      action: AUDIT_ACTIONS.GENIEACS_CONFIG_CHANGED,
+      targetType: 'integration',
+      targetId: 'genieacs',
+      metadata: { baseUrl: String(value ?? '').slice(0, 120) }
+    });
   }
 
   static async testGenieAcsConnection(req, res) {

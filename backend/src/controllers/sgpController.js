@@ -1,5 +1,6 @@
 import SgpService, { SgpError } from '../services/sgpService.js';
 import SgpLink from '../models/SgpLink.js';
+import AuditLog, { AUDIT_ACTIONS } from '../models/AuditLog.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { translateError } from '../i18n/index.js';
 
@@ -59,6 +60,26 @@ class SgpController {
         ticketOccurrenceType: body.ticketOccurrenceType
         // `webhookSecret` is deliberately not accepted here: it is only ever
         // set through the rotate action, which shows it once.
+      });
+      // The ERP credentials. The token reaches the system that holds every
+      // subscriber's contract, name and document, so a change to it — or to the
+      // address it is sent to — is worth a line even when the change was
+      // routine.
+      //
+      // Booleans only, and that is the whole point of them: `tokenChanged` says
+      // the credential moved without the log holding a second copy of it, and
+      // `baseUrl` stays out because an address the token is sent to is the
+      // other half of the credential. Best-effort by contract (see
+      // AuditLog.record) — the settings row is already written.
+      await AuditLog.recordFromRequest(req, {
+        action: AUDIT_ACTIONS.SGP_CONFIG_CHANGED,
+        targetType: 'integration',
+        targetId: 'sgp',
+        metadata: {
+          enabled: Boolean(config.enabled),
+          tokenChanged: body.token !== undefined,
+          baseUrlChanged: body.baseUrl !== undefined
+        }
       });
       return res.json(createResponse(req.t('sgp.configSaved'), config));
     } catch (error) {

@@ -85,6 +85,15 @@ export const SCOPED_TABLES = new Set([
   // its WHERE never was an identity filter — it meant "the only row", and the
   // second provider to save a map centre wrote over the first's.
   'map_settings',
+  // Who revealed which subscriber's password, who ended whose membership, who
+  // changed the ERP credentials. Scoped rather than shared even though the log
+  // is the deployment's own bookkeeping, because a line names one provider's
+  // staff and one provider's subscribers: an operator reading the deployment's
+  // whole log would learn another ISP's team, its integration changes and the
+  // rhythm of its support desk. It is also the table where an unfiltered
+  // WRITE would be worst — a line filed under the wrong provider accuses the
+  // wrong people.
+  'audit_log',
   // The equipment catalogue. Its content really is the same fact about firmware
   // for every ISP, but the rows are edited on screen, so shared they made one
   // operator's corrected detection pattern or parameter path silently change

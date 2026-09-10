@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 import TenantUser from '../models/TenantUser.js';
+import AuditLog, { AUDIT_ACTIONS } from '../models/AuditLog.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 
 export const ROLES = Object.freeze(['admin', 'viewer']);
@@ -145,6 +146,23 @@ class UsersController {
         throw error;
       }
 
+      // Who let this person in is the question the removal line cannot answer
+      // on its own, and the membership row that would have said so is the row a
+      // later removal deletes. Recorded by username rather than by id because
+      // the id means nothing to somebody reading the log a year later, and the
+      // person may by then work for nobody.
+      //
+      // Best-effort by contract (see AuditLog.record): the operator exists and
+      // has a working login by this point, and answering 500 would invite the
+      // administrator to create them again — which fails on the taken username
+      // and looks like a bug in creation rather than in logging.
+      await AuditLog.recordFromRequest(req, {
+        action: AUDIT_ACTIONS.OPERATOR_ADDED,
+        targetType: 'operator',
+        targetId: username,
+        metadata: { role }
+      });
+
       const created = await User.findById(id);
       return res.status(201).json(
         createResponse('Operator created successfully', {
@@ -216,6 +234,17 @@ class UsersController {
         }
         await TenantUser.setRole(tenantId, id, nextRole);
         await applyRoleSideEffects(id, nextRole);
+        // The row that held the previous role has just been overwritten, so
+        // this line is the only place the change survives — which is why both
+        // roles go in it. Best-effort by contract (see AuditLog.record): the
+        // role is already changed and the sessions already revoked, and a 500
+        // here would report a promotion that in fact took effect.
+        await AuditLog.recordFromRequest(req, {
+          action: AUDIT_ACTIONS.OPERATOR_ROLE_CHANGED,
+          targetType: 'operator',
+          targetId: user.username,
+          metadata: { from: presentRole(membership.role), to: presentRole(nextRole) }
+        });
       }
 
       if (nextPassword !== undefined) {
@@ -240,6 +269,17 @@ class UsersController {
         }
         // updatePassword also revokes the operator's existing sessions.
         await User.updatePassword(id, await bcrypt.hash(password, BCRYPT_ROUNDS));
+        // An administrator setting somebody else's password is how one account
+        // becomes another: whoever typed it can now sign in as that operator,
+        // and nothing in the data afterwards distinguishes the two. The
+        // password is not in the line, only the fact — see AuditLog. Awaited
+        // and best-effort like the rest: the person is already locked out of
+        // their old password by the time this runs.
+        await AuditLog.recordFromRequest(req, {
+          action: AUDIT_ACTIONS.OPERATOR_PASSWORD_SET,
+          targetType: 'operator',
+          targetId: user.username
+        });
       }
 
       const updated = await User.findById(id);
@@ -289,11 +329,31 @@ class UsersController {
         );
       }
 
+      // Read before the membership ends, because the line names the person and
+      // not their id: an id in a log is a lookup into a table that may no
+      // longer answer.
+      const person = await User.findById(id);
+
       await TenantUser.remove(tenantId, id);
       // Their open sessions were sessions here. Revocation lives on the person,
       // so this signs them out of their other providers too — the blunt end of
       // one `token_version` per person, and the safe direction of the two.
       await User.revokeSessions(id);
+      // The membership row is gone, so this is now the only record that the
+      // person ever worked here — and the reason `actor_user_id` must not
+      // cascade: the administrator who did this could later be removed
+      // themselves, and their removal must not take this line with it.
+      //
+      // After the removal rather than before, so a line never claims a removal
+      // that the delete then failed to make. Best-effort by contract (see
+      // AuditLog.record): the membership is already ended, and a 500 here would
+      // send the administrator back to delete somebody who is already gone.
+      await AuditLog.recordFromRequest(req, {
+        action: AUDIT_ACTIONS.OPERATOR_REMOVED,
+        targetType: 'operator',
+        targetId: person?.username ?? String(id),
+        metadata: { role: presentRole(membership.role) }
+      });
       return res.json(createResponse('Operator deleted successfully', { id }));
     } catch (error) {
       console.error('Delete user error:', error);

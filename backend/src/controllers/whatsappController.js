@@ -2,6 +2,7 @@ import WhatsAppConfigService, { WaError } from '../services/whatsappConfigServic
 import EvolutionInstanceService from '../services/evolutionInstanceService.js';
 import WaHealthService from '../services/waHealthService.js';
 import WhatsAppAccount from '../models/WhatsAppAccount.js';
+import AuditLog, { AUDIT_ACTIONS } from '../models/AuditLog.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { translateError } from '../i18n/index.js';
 
@@ -45,6 +46,22 @@ class WhatsAppController {
         managedUrl: body.managedUrl,
         // An absent key keeps the stored one; "" clears it.
         managedAdminKey: body.managedAdminKey === undefined ? undefined : body.managedAdminKey
+      });
+      // `managedAdminKey` opens the Evolution server that can message every
+      // subscriber whose number this panel holds, so a change to it is the
+      // WhatsApp half of the same question the SGP line answers. The key is not
+      // in the row — a boolean saying it moved is the fact worth keeping, and a
+      // copy of it here would be a second place to steal it from. Best-effort
+      // by contract (see AuditLog.record): the configuration is already saved.
+      await AuditLog.recordFromRequest(req, {
+        action: AUDIT_ACTIONS.WHATSAPP_CONFIG_CHANGED,
+        targetType: 'integration',
+        targetId: 'whatsapp',
+        metadata: {
+          enabled: Boolean(config.enabled),
+          adminKeyChanged: body.managedAdminKey !== undefined,
+          managedUrlChanged: body.managedUrl !== undefined
+        }
       });
       return res.json(createResponse(req.t('whatsapp.configSaved'), config));
     } catch (error) {

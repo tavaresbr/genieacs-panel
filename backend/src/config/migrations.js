@@ -803,6 +803,73 @@ const GENIEACS_CONNECTION_TABLES = [
   ['tenant_genieacs_connections', tenantGenieacsConnectionsTable]
 ];
 
+/**
+ * The record of who did the things that cannot be undone by looking at the
+ * data afterwards.
+ *
+ * Two shapes of foreign key meet here, and getting them the same way round as
+ * everywhere else in the schema would defeat the table.
+ *
+ * `tenant_id` is a real foreign key, because a line has to belong to exactly
+ * one provider for the same reason every other scoped row does — and it is
+ * left at the default RESTRICT, so a provider cannot be deleted out from under
+ * its own history by accident. Erasing an ISP is the export-then-delete
+ * procedure, done deliberately, not a cascade nobody watched.
+ *
+ * `actor_user_id` is ON DELETE SET NULL and NEVER CASCADE. A cascade here would
+ * mean that deleting a person deletes the record of what that person did, so
+ * the one action most worth auditing — somebody covering their tracks — would
+ * be the action that erases its own evidence. SET NULL keeps the line; what
+ * keeps it READABLE after the person is gone is `actor_label`, denormalized at
+ * write time for the same reason `device_swaps` keeps `customer_id`.
+ *
+ * The target is denormalized all the way: no foreign key at all. An audit line
+ * routinely outlives what it describes (the subscriber account whose password
+ * was revealed, the membership that was ended — that row is deleted BY the
+ * action being recorded), so a key pointing at it would be a key pointing at
+ * nothing. Type plus identifier, as text, says what was touched without
+ * depending on it still existing.
+ *
+ * No unique constraint anywhere: two identical reveals a minute apart are two
+ * facts, and a dedupe key would silently collapse exactly the repetition an
+ * auditor is looking for.
+ */
+const auditLogTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants');
+  // A value from `AUDIT_ACTIONS` in the model — a closed vocabulary, so the
+  // column is short on purpose: a free-text action name is how a log turns
+  // into prose nobody can query.
+  t.string('action', 64).notNullable();
+  // 'operator', 'subscriber' or 'system'. The panel and the portal both write
+  // here, and "who" means a different table in each.
+  t.string('actor_type', 16).notNullable();
+  t.integer('actor_user_id').unsigned()
+    .references('id').inTable('users').onDelete('SET NULL');
+  t.string('actor_label', 64);
+  t.string('target_type', 32);
+  t.string('target_id', 64);
+  // 45 characters is a full IPv6 literal with an embedded IPv4 tail. Stored
+  // because "which password was read from where" is most of the value of a
+  // reveal line, and it is already what the rate limiter keys on.
+  t.string('ip', 45);
+  // A small JSON object of scalars, filtered by the model. See `AuditLog` for
+  // what may go in it and why almost nothing may.
+  t.text('metadata');
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  // How the log is read: one provider's lines, newest first, optionally
+  // narrowed to one kind of action. Nothing here is indexed by actor —
+  // appending is the hot path, and a third index taxes every write for a
+  // question that a filter over a provider's own lines already answers.
+  t.index(['tenant_id', 'created_at'], 'audit_log_tenant_time_idx');
+  t.index(['tenant_id', 'action'], 'audit_log_tenant_action_idx');
+};
+
+const AUDIT_TABLES = [
+  ['audit_log', auditLogTable]
+];
+
 const TENANCY_TABLES = [
   ['tenants', tenantsTable]
 ];
@@ -848,7 +915,10 @@ export const SCHEMA_TABLES = [
   ...WHATSAPP_TABLES,
   ...DEVICE_HISTORY_TABLES,
   ...DEVICE_SWAP_TABLES,
-  ...GENIEACS_CONNECTION_TABLES
+  ...GENIEACS_CONNECTION_TABLES,
+  // Last, and it has to be: it points at both `tenants` and `users`, so it can
+  // only be created — and can only be inserted along — after both exist.
+  ...AUDIT_TABLES
 ].map(([name]) => name);
 
 /**
@@ -1972,6 +2042,36 @@ export const migrations = [
           auth_type: 'none'
         }));
       if (rows.length > 0) await db('tenant_genieacs_connections').insert(rows);
+    }
+  },
+  {
+    /**
+     * The sensitive-action log. Item 11 of the checklist, and the first table
+     * whose rows are written for somebody who is not the panel.
+     *
+     * Nothing is backfilled and nothing could be: the log starts the day it is
+     * created, and inventing lines for actions nobody watched would be worse
+     * than an empty table — a log that appears to cover a period it does not
+     * is a log that will be trusted about that period.
+     *
+     * No reading route ships with this step. Who may read the log is its own
+     * permissions question (an administrator can end a membership, so an
+     * administrator reading every reveal line is a different grant from the one
+     * that lets them make one), and the answer belongs with the platform plane.
+     * Writing first is still worth doing on its own: the lines a reader will
+     * eventually want are the ones that had to be written before it existed.
+     */
+    id: '0030_audit_log',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return false;
+      return db.schema.hasTable('audit_log');
+    },
+    async up(db) {
+      // `users` and `tenants` are both pointed at, and an install old enough to
+      // be missing either is one the earlier steps have yet to reach.
+      if (!(await db.schema.hasTable('users'))) return;
+      if (!(await db.schema.hasTable('tenants'))) return;
+      await createTableIfMissing(db, 'audit_log', auditLogTable(db));
     }
   }
 ];
