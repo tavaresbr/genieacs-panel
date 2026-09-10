@@ -105,7 +105,7 @@ export function TenantMembers({ tenant, onMembershipChange }: Props) {
             <li key={member.userId} className="flex items-center justify-between gap-3 px-3 py-2">
               <span className="min-w-0">
                 <span className="truncate text-sm font-medium">{member.username}</span>
-                <span className="modern-badge ml-2">{roleLabel(member.role)}</span>
+                <span className="modern-badge ms-2">{roleLabel(member.role)}</span>
               </span>
               <button
                 type="button"

@@ -295,10 +295,10 @@ export function ProvisioningTab() {
                 <p className="font-medium">
                   {profile.name}
                   {profile.isDefault && (
-                    <span className="modern-badge ml-2">{t('settings.provisioning.profileDefaultBadge')}</span>
+                    <span className="modern-badge ms-2">{t('settings.provisioning.profileDefaultBadge')}</span>
                   )}
                   {!profile.enabled && (
-                    <span className="modern-badge ml-2">{t('settings.provisioning.profileDisabledBadge')}</span>
+                    <span className="modern-badge ms-2">{t('settings.provisioning.profileDisabledBadge')}</span>
                   )}
                 </p>
                 <p className="text-xs text-muted-foreground">
@@ -527,24 +527,24 @@ export function ProvisioningTab() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-xs uppercase text-muted-foreground">
-                <th className="py-2 pr-4">{t('settings.provisioning.runDevice')}</th>
-                <th className="py-2 pr-4">{t('settings.provisioning.runStatus')}</th>
-                <th className="py-2 pr-4">{t('settings.provisioning.runProfile')}</th>
+              <tr className="text-start text-xs uppercase text-muted-foreground">
+                <th className="py-2 pe-4">{t('settings.provisioning.runDevice')}</th>
+                <th className="py-2 pe-4">{t('settings.provisioning.runStatus')}</th>
+                <th className="py-2 pe-4">{t('settings.provisioning.runProfile')}</th>
                 <th className="py-2">{t('settings.provisioning.runUpdated')}</th>
               </tr>
             </thead>
             <tbody>
               {runs.map((run) => (
                 <tr key={run.id} className="border-t border-border">
-                  <td className="py-2 pr-4 font-mono text-xs">{run.deviceId}</td>
-                  <td className="py-2 pr-4">
+                  <td className="py-2 pe-4 font-mono text-xs">{run.deviceId}</td>
+                  <td className="py-2 pe-4">
                     {run.status}
                     {(run.errorMessage ?? run.error) && (
                       <span className="block text-xs text-muted-foreground">{run.errorMessage ?? run.error}</span>
                     )}
                   </td>
-                  <td className="py-2 pr-4">{run.profileName ?? '—'}</td>
+                  <td className="py-2 pe-4">{run.profileName ?? '—'}</td>
                   <td className="py-2">{run.updatedAt ? formatDateTime(run.updatedAt) : '—'}</td>
                 </tr>
               ))}

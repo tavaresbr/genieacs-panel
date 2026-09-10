@@ -55,7 +55,7 @@ export function ReleaseNotesModal({ open, onClose }: { open: boolean; onClose: (
       <button type="button" className="absolute inset-0 cursor-default" onClick={onClose} aria-label={t('release.close')} />
       <section className="modern-card relative flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-b-none shadow-2xl sm:rounded-[var(--radius)]">
         <header className="relative overflow-hidden border-b border-border bg-[#173f35] px-5 py-6 text-[#f4f3ed] sm:px-7">
-          <div className="absolute -right-16 -top-24 size-64 rounded-full border-[42px] border-white/5" aria-hidden="true" />
+          <div className="absolute -end-16 -top-24 size-64 rounded-full border-[42px] border-white/5" aria-hidden="true" />
           <div className="relative flex items-start justify-between gap-5">
             <div className="flex min-w-0 items-start gap-4">
               <BrandMark className="size-11 shrink-0" />
