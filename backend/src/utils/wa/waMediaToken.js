@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import crypto from 'node:crypto';
+import { DEVELOPMENT_FALLBACK, isProduction } from '../../config/runtimeEnv.js';
 
 /**
  * The credential on `GET /api/whatsapp-media/:id`.
@@ -37,14 +38,12 @@ export const MEDIA_TOKEN_TTL_MS = 15 * 60 * 1000;
 
 const CONTEXT = 'wa-media';
 
-/** Same fallback as `secretBox`: a test box has no JWT_SECRET, production must. */
-const DEVELOPMENT_FALLBACK = 'insecure-development-secret';
 
 let cachedKey = null;
 let cachedFrom = null;
 
 function signingKey() {
-  if (!process.env.JWT_SECRET && process.env.APP_ENV === 'production') {
+  if (!process.env.JWT_SECRET && isProduction()) {
     throw new Error('JWT_SECRET must be set to sign WhatsApp media links');
   }
   const base = process.env.JWT_SECRET || DEVELOPMENT_FALLBACK;

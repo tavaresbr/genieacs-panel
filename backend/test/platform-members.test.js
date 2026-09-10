@@ -617,3 +617,174 @@ describe('the last administrator of a provider', () => {
     );
   });
 });
+
+describe('the trail a membership leaves', () => {
+  /**
+   * As duas mãos, e por que uma trilha só não bastava.
+   *
+   * Um vínculo escrito daqui vira uma sessão legítima DENTRO de um ISP — o
+   * cadastro inteiro, as senhas de portal, a exportação. Registrar isso só em
+   * `platform_audit` deixaria a única cópia do registro na trilha de quem agiu,
+   * que é justamente a trilha que o ISP não pode ler: vincular-se, entrar,
+   * levar tudo e desvincular-se não deixaria, para o provedor, nenhum rastro de
+   * que alguém esteve lá. Daí a linha espelhada no `audit_log` DAQUELE
+   * provedor, com `actor_kind: 'platform'` — a mesma forma que a suspensão de
+   * provedor já usa, e pelo mesmo motivo.
+   */
+  const trilhaDaPlataforma = (action) => getDb()('platform_audit')
+    .where({ action }).orderBy('id', 'asc');
+
+  const trilhaDoProvedor = (tenantId, action) => getDb()('audit_log')
+    .where({ tenant_id: tenantId, action }).orderBy('id', 'asc');
+
+  let anaNoBeta;
+
+  it('attaching writes one line in each trail', async () => {
+    const naPlataforma = (await trilhaDaPlataforma('tenant.member_added')).length;
+    const noBeta = (await trilhaDoProvedor(beta, 'operator.created')).length;
+    // O provedor do administrador da plataforma não é o provedor afetado, e a
+    // linha não pode nascer nele: alfa é o escopo que a sessão de quem chama
+    // abre, então é exatamente onde uma escrita distraída cairia.
+    const noAlfa = (await trilhaDoProvedor(alfa, 'operator.created')).length;
+
+    const { status } = await call(
+      `${platformUrl}/api/platform/tenants/${beta}/members`,
+      {
+        method: 'POST',
+        headers: authHeaders(ownerToken),
+        body: { username: ALICE.username, role: 'tech' }
+      }
+    );
+    assert.equal(status, 201);
+
+    const daPlataforma = await trilhaDaPlataforma('tenant.member_added');
+    assert.equal(daPlataforma.length, naPlataforma + 1);
+    const linha = daPlataforma[daPlataforma.length - 1];
+    // Quem agiu.
+    assert.equal(linha.actor_username, 'owner');
+    assert.equal(Number(linha.actor_user_id), Number(ownerId));
+    // Em qual provedor — com slug e nome na própria linha, como todas as
+    // outras desta tabela, para que ela siga legível se o provedor sumir.
+    assert.equal(Number(linha.tenant_id), Number(beta));
+    assert.equal(linha.tenant_slug, 'beta');
+    assert.equal(linha.tenant_name, 'Provedor Beta');
+    // Quem foi vinculado, e com que papel.
+    const detalhe = JSON.parse(linha.detail);
+    assert.equal(detalhe.username, 'alice');
+    assert.equal(detalhe.role, 'tech');
+    assert.equal(Number(detalhe.userId), Number(aliceId));
+
+    const doProvedor = await trilhaDoProvedor(beta, 'operator.created');
+    assert.equal(doProvedor.length, noBeta + 1, 'o ISP afetado também registra');
+    const espelhada = doProvedor[doProvedor.length - 1];
+    // A afirmação inteira desta linha: a mão veio de fora. Sem isto, a trilha
+    // do provedor mostraria um operador aparecendo na equipe sem que nenhum
+    // operador dele estivesse por trás — indistinguível de uma linha cujo ator
+    // se perdeu.
+    assert.equal(espelhada.actor_kind, 'platform');
+    assert.equal(espelhada.actor_username, 'owner');
+    assert.equal(Number(espelhada.actor_user_id), Number(ownerId));
+    assert.equal(espelhada.subject_type, 'tenant_user');
+    assert.equal(Number(espelhada.subject_id), Number(aliceId));
+    assert.equal(JSON.parse(espelhada.detail).role, 'tech');
+    assert.equal(JSON.parse(espelhada.detail).username, 'alice');
+
+    assert.equal(
+      (await trilhaDoProvedor(alfa, 'operator.created')).length,
+      noAlfa,
+      'e nada foi escrito no provedor em que quem chamou trabalha'
+    );
+  });
+
+  it('ending the membership writes one line in each trail too', async () => {
+    const naPlataforma = (await trilhaDaPlataforma('tenant.member_removed')).length;
+    const noBeta = (await trilhaDoProvedor(beta, 'operator.removed')).length;
+    const noAlfa = (await trilhaDoProvedor(alfa, 'operator.removed')).length;
+
+    const { status } = await call(
+      `${platformUrl}/api/platform/tenants/${beta}/members/${aliceId}`,
+      { method: 'DELETE', headers: authHeaders(ownerToken) }
+    );
+    assert.equal(status, 200);
+
+    const daPlataforma = await trilhaDaPlataforma('tenant.member_removed');
+    assert.equal(daPlataforma.length, naPlataforma + 1);
+    const linha = daPlataforma[daPlataforma.length - 1];
+    assert.equal(linha.actor_username, 'owner');
+    assert.equal(Number(linha.tenant_id), Number(beta));
+    assert.equal(linha.tenant_slug, 'beta');
+    const detalhe = JSON.parse(linha.detail);
+    // O papel que a pessoa TINHA, que é o que diz o tamanho do que foi
+    // desfeito; depois da remoção não há mais onde ler isso.
+    assert.equal(detalhe.role, 'tech');
+    assert.equal(detalhe.username, 'alice');
+    assert.equal(Number(detalhe.userId), Number(aliceId));
+
+    const doProvedor = await trilhaDoProvedor(beta, 'operator.removed');
+    assert.equal(doProvedor.length, noBeta + 1);
+    const espelhada = doProvedor[doProvedor.length - 1];
+    assert.equal(espelhada.actor_kind, 'platform');
+    assert.equal(espelhada.actor_username, 'owner');
+    assert.equal(Number(espelhada.subject_id), Number(aliceId));
+    assert.equal(JSON.parse(espelhada.detail).role, 'tech');
+
+    assert.equal((await trilhaDoProvedor(alfa, 'operator.removed')).length, noAlfa);
+  });
+
+  it('carries no secret into either trail', async () => {
+    // A pessoa vinculada tem uma senha, e o hash dela está a um join de
+    // distância de tudo que estas rotas leem. Nada disso entra na trilha: ela
+    // registra QUE o vínculo mudou, nunca com que credencial.
+    const hash = (await personOf(aliceId)).password;
+    const tudo = JSON.stringify([
+      await getDb()('platform_audit'),
+      await getDb()('audit_log')
+    ]);
+    assert.ok(!tudo.includes(hash));
+    assert.ok(!tudo.includes(ALICE.password));
+    assert.ok(!tudo.includes('$2'), 'nenhum hash bcrypt em trilha nenhuma');
+  });
+
+  it('shows up on the affected provider own audit screen', async () => {
+    // Ana administra beta desde o teste anterior deste arquivo, e é por ela que
+    // se pergunta: a rota que serve a tela de trilha do provedor é escopada,
+    // então uma linha que não estivesse no `audit_log` DELE não apareceria aqui
+    // por mais que estivesse gravada na plataforma.
+    const login = await call(`${panelUrl}/api/auth/login`, {
+      method: 'POST',
+      body: { ...ANA, tenantId: beta }
+    });
+    assert.equal(login.status, 200);
+    anaNoBeta = login.body.data.token;
+
+    const { status, body } = await call(`${panelUrl}/api/audit?limit=200`, {
+      headers: authHeaders(anaNoBeta)
+    });
+    assert.equal(status, 200);
+
+    const deFora = body.data.entries.filter((entry) => entry.actor.kind === 'platform');
+    const vinculo = deFora.find((entry) => entry.action === 'operator.created'
+      && Number(entry.subject.id) === Number(aliceId));
+    const fim = deFora.find((entry) => entry.action === 'operator.removed'
+      && Number(entry.subject.id) === Number(aliceId));
+    assert.ok(vinculo, 'o ISP vê que alguém de fora colocou uma pessoa na equipe dele');
+    assert.ok(fim, 'e que a tirou');
+    assert.equal(vinculo.actor.username, 'owner');
+    assert.equal(vinculo.detail.role, 'tech');
+    assert.equal(fim.actor.username, 'owner');
+  });
+
+  it('never shows another provider lines on that screen', async () => {
+    // A contraprova da anterior: alfa também recebeu ações de equipe neste
+    // arquivo, e a tela de beta não pode enxergá-las.
+    const { body } = await call(`${panelUrl}/api/audit?limit=200`, {
+      headers: authHeaders(anaNoBeta)
+    });
+    const idsDeBeta = new Set(
+      (await getDb()('audit_log').where({ tenant_id: beta })).map((linha) => Number(linha.id))
+    );
+    for (const entry of body.data.entries) {
+      assert.ok(idsDeBeta.has(Number(entry.id)), `linha ${entry.id} não é de beta`);
+    }
+  });
+});
