@@ -5,6 +5,7 @@ import {
   PPPOE_FALLBACK_PATHS,
   RX_POWER_FALLBACK_PATHS,
   findPppoeUsername,
+  findRxPowerReading,
   normalizeRxPowerReading
 } from './deviceParameterFallbacks.js';
 import Vendor from '../models/Vendor.js';
@@ -117,16 +118,27 @@ class DeviceService {
    * login: the configured VirtualParameter first, and its value untouched —
    * only a vendor reading has to be normalized, because only there does the
    * panel not know what unit it asked for.
+   *
+   * `learnedPaths` are the paths this installation was seen to publish the
+   * reading at (see `ensureRxPowerPaths`). They are tried before the
+   * catalogue because they are known to be right for this fleet rather than
+   * for some fleet.
    */
-  static resolveRxPower(item, virtualParams) {
+  static resolveRxPower(item, virtualParams, learnedPaths = []) {
     const configured = this.getParameterValue(item, virtualParams.vpRxPower);
     if (this.hasReportedValue(configured)) {
       return { value: configured, path: virtualParams.vpRxPower };
     }
-    for (const path of RX_POWER_FALLBACK_PATHS) {
+    for (const path of [...learnedPaths, ...RX_POWER_FALLBACK_PATHS]) {
+      if (!path) continue;
       const normalized = normalizeRxPowerReading(this.getParameterValue(item, path));
       if (normalized !== null) return { value: normalized, path };
     }
+    // Nothing the panel could name; fall back to reading the document for
+    // anything that calls itself an RX power. Only the detail page and the
+    // discovery probe project enough of the tree for this to find something.
+    const scanned = findRxPowerReading(item, (node) => this.readNodeValue(node));
+    if (scanned) return scanned;
     return { value: null, path: virtualParams.vpRxPower };
   }
 
@@ -400,7 +412,7 @@ class DeviceService {
     };
   }
 
-  static buildDeviceListProjection(virtualParams) {
+  static buildDeviceListProjection(virtualParams, learnedRxPaths = []) {
     return [
       '_id',
       '_deviceId._ProductClass',
@@ -417,6 +429,7 @@ class DeviceService {
       // they did is only known once the response is in hand.
       ...PPPOE_FALLBACK_PATHS,
       ...RX_POWER_FALLBACK_PATHS,
+      ...learnedRxPaths,
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.SSID',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.SSID',
@@ -491,6 +504,102 @@ class DeviceService {
     return Array.isArray(all) ? all.length : 0;
   }
 
+  /**
+   * Where this GenieACS was seen to publish optical RX, kept per provider
+   * because two providers run two fleets.
+   *
+   * Stored as `{ paths, checkedAt }`. A set rather than one path because an
+   * ISP's fleet is rarely one vendor, and each vendor named its own object;
+   * `checkedAt` with an empty set records a probe that found nothing, so a
+   * fleet that reports no optical at all is not probed again on every page.
+   */
+  static RX_POWER_PATH_KEY = 'rx_power_path';
+
+  /** How long a fruitless probe is trusted before the fleet is asked again. */
+  static RX_POWER_REPROBE_MS = 30 * 60 * 1000;
+
+  /** Device documents to sample when probing. Offline ONTs report nothing. */
+  static RX_POWER_PROBE_SAMPLE = 5;
+
+  /**
+   * Enough for a mixed fleet, few enough that a GenieACS that renames the
+   * object every firmware cannot grow the listing's projection without end.
+   */
+  static RX_POWER_PATH_LIMIT = 4;
+
+  static async readRxPowerState() {
+    try {
+      const raw = await AppState.get(this.RX_POWER_PATH_KEY);
+      if (!raw) return null;
+      const state = JSON.parse(raw);
+      const paths = Array.isArray(state?.paths)
+        ? state.paths.filter((path) => typeof path === 'string' && path)
+        : [];
+      return { paths, checkedAt: Number(state?.checkedAt) || 0 };
+    } catch {
+      return null;
+    }
+  }
+
+  static async writeRxPowerState(paths) {
+    try {
+      await AppState.upsert(
+        this.RX_POWER_PATH_KEY,
+        JSON.stringify({ paths, checkedAt: Date.now() })
+      );
+    } catch (error) {
+      // Losing the note only costs another probe later; it must never cost
+      // the operator the page they asked for.
+      console.warn(`Unable to record the optical RX paths: ${error.message}`);
+    }
+  }
+
+  /** Files a newly seen path, newest first, without growing without bound. */
+  static async rememberRxPowerPath(path, state = null) {
+    const known = (state ?? await this.readRxPowerState())?.paths ?? [];
+    if (known.includes(path)) return known;
+    const paths = [path, ...known].slice(0, this.RX_POWER_PATH_LIMIT);
+    await this.writeRxPowerState(paths);
+    return paths;
+  }
+
+  /**
+   * The paths this installation publishes optical RX at, probing for them
+   * once if the panel does not know yet.
+   *
+   * The listing cannot simply scan for the reading the way the detail page
+   * does: GenieACS returns only what a projection names, and projecting whole
+   * WAN subtrees for every row of every page to find one number is not a
+   * trade worth making. So the shape of the fleet is learned from a handful
+   * of documents, once, and from then on the listing asks for those paths by
+   * name and pays nothing.
+   *
+   * Never throws. A fleet whose optical path cannot be discovered is a column
+   * reading N/A, which is what it already reads; it is not a broken listing.
+   */
+  static async ensureRxPowerPaths() {
+    const state = await this.readRxPowerState();
+    if (state?.paths.length) return state.paths;
+    if (state && Date.now() - state.checkedAt < this.RX_POWER_REPROBE_MS) return [];
+
+    const found = [];
+    try {
+      const rows = await this.fetchDeviceListPage(
+        null,
+        ['_id', 'InternetGatewayDevice.WANDevice', 'Device.Optical'],
+        { limit: this.RX_POWER_PROBE_SAMPLE }
+      );
+      for (const row of rows) {
+        const reading = findRxPowerReading(row, (node) => this.readNodeValue(node));
+        if (reading && !found.includes(reading.path)) found.push(reading.path);
+      }
+      await this.writeRxPowerState(found.slice(0, this.RX_POWER_PATH_LIMIT));
+    } catch (error) {
+      console.warn(`Unable to probe for the optical RX paths: ${error.message}`);
+    }
+    return found;
+  }
+
   static async fetchDeviceListPage(queryParam, projection, { skip, limit } = {}) {
     const data = await this.fetchFromGenieAcs('', {
       ...(queryParam ? { query: queryParam } : {}),
@@ -525,7 +634,8 @@ class DeviceService {
   static async getDevicesPage(options = {}) {
     const { page, pageSize, search, status } = this.normalizeDeviceListQuery(options);
     const virtualParams = await this.getVirtualParameters();
-    const projection = this.buildDeviceListProjection(virtualParams);
+    const learnedRxPaths = await this.ensureRxPowerPaths();
+    const projection = this.buildDeviceListProjection(virtualParams, learnedRxPaths);
     const statusQuery = this.buildDeviceStatusQuery(status);
     const queryParam = statusQuery ? JSON.stringify(statusQuery) : null;
 
@@ -543,7 +653,9 @@ class DeviceService {
         ? await this.fetchDeviceListPage(queryParam, projection, { skip, limit })
         : [];
       return {
-        devices: rows.map((item) => this.processDeviceData(item, virtualParams)).reverse(),
+        devices: rows
+          .map((item) => this.processDeviceData(item, virtualParams, learnedRxPaths))
+          .reverse(),
         page: currentPage,
         pageSize,
         total,
@@ -553,7 +665,7 @@ class DeviceService {
 
     const rows = await this.fetchDeviceListPage(queryParam, projection);
     const candidates = rows
-      .map((item) => this.processDeviceData(item, virtualParams))
+      .map((item) => this.processDeviceData(item, virtualParams, learnedRxPaths))
       .reverse();
     const customerIds = await this.lookupCustomerIds(candidates.map((device) => device._id));
     const needle = search.toLowerCase();
@@ -646,10 +758,10 @@ class DeviceService {
     }));
   }
 
-  static processDeviceData(item, virtualParams) {
+  static processDeviceData(item, virtualParams, learnedRxPaths = []) {
     const pppsecret = this.resolvePppoeUsername(item, virtualParams).value;
     const wanbridge = this.getParameterValue(item, virtualParams.vpWanBridge);
-    const rxpower = this.resolveRxPower(item, virtualParams).value;
+    const rxpower = this.resolveRxPower(item, virtualParams, learnedRxPaths).value;
     const gettemp = this.getParameterValue(item, virtualParams.vpTemperature);
     const activedevices = this.getParameterValue(item, virtualParams.vpActiveDevices);
 
@@ -816,7 +928,30 @@ class DeviceService {
       throw new TranslatableError('device.notFound', null, { status: 404 });
     }
 
-    return await this.processDetailDeviceData(data[0], virtualParams);
+    const detail = await this.processDetailDeviceData(data[0], virtualParams);
+    // This page projects the whole WAN subtree, so it can find the reading by
+    // scanning where the listing can only ask for paths by name. When it does,
+    // the listing gets told: opening one ONT teaches the panel the fleet's
+    // optical path, which is the fallback for a probe that sampled five
+    // devices that happened to have nothing to report.
+    await this.noteRxPowerPath(detail.virtualParameters?.rxpower);
+    return detail;
+  }
+
+  /**
+   * Records the path a resolved reading came from, when it is a path the
+   * listing could ask GenieACS for. A VirtualParameter is not one of those —
+   * the listing already projects it — and neither is a reading that never
+   * resolved.
+   */
+  static async noteRxPowerPath(resolved) {
+    const path = resolved?.value === null || resolved?.value === undefined
+      ? null
+      : resolved?.path;
+    if (!path || path.startsWith('VirtualParameters.')) return;
+    const state = await this.readRxPowerState();
+    if (state?.paths.includes(path)) return;
+    await this.rememberRxPowerPath(path, state);
   }
 
   static async processDetailDeviceData(item, virtualParams) {
