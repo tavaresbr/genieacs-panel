@@ -7,8 +7,26 @@ import { IS_SAAS } from '../config/edition.js';
 import { generateTokens, resolveMembership, verifyToken } from '../middleware/auth.js';
 import { createResponse, createErrorResponse, isValidEmail } from '../utils/helpers.js';
 import AuditLog from '../models/AuditLog.js';
+import { runInTenant } from '../config/tenantContext.js';
+import { recordPanelActivity } from '../services/dashboardSchedule.js';
 
 const DUMMY_PASSWORD_HASH = bcrypt.hashSync('skygenpanel-invalid-login-placeholder', 12);
+
+/**
+ * Registra que este provedor tem gente usando o painel.
+ *
+ * É o que decide a cadência com que o painel dele é atualizado em segundo
+ * plano — ver `services/dashboardSchedule.js`. Fica no login e na renovação de
+ * token porque são os dois pontos em que se SABE que há alguém do outro lado, e
+ * porque a renovação é de hora em hora: a marca acompanha quem continua ali,
+ * sem uma escrita por requisição.
+ *
+ * O escopo é aberto pelo provedor do vínculo, e não herdado: no login por
+ * subdomínio o escopo da requisição é o do host, que é o mesmo — mas numa
+ * instalação sem resolução por host não há escopo nenhum, e é o vínculo que
+ * sabe em qual provedor a pessoa acabou de entrar.
+ */
+const marcarAtividade = (tenantId) => runInTenant(Number(tenantId), () => recordPanelActivity());
 
 /**
  * Which provider this sign-in is for.
@@ -146,6 +164,7 @@ class AuthController {
       }
 
       const { accessToken, refreshToken } = generateTokens(user, membership);
+      await marcarAtividade(membership.tenant_id);
 
       return res.json(
         createResponse(req.t('auth.loginSuccess'), {
@@ -362,6 +381,7 @@ class AuthController {
       }
 
       const { accessToken, refreshToken: newRefreshToken } = generateTokens(user, membership);
+      await marcarAtividade(membership.tenant_id);
 
       return res.json(
         createResponse(req.t('auth.tokenRefreshed'), {

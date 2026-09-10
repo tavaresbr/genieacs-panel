@@ -1,9 +1,14 @@
 import AppState from '../models/AppState.js';
+import DeviceService from './deviceService.js';
 import ProvisioningService from './provisioningService.js';
 import SgpEventService from './sgpEventService.js';
 import SgpService from './sgpService.js';
 import { forEachTenant } from '../config/tenantJobs.js';
+import { currentTenantId } from '../config/tenantContext.js';
 import AuditLog from '../models/AuditLog.js';
+import {
+  dueForRefresh, isDormant, lastPanelActivityAt, refreshTtlMs, tenantOffsetMs
+} from './dashboardSchedule.js';
 
 const STATE_KEY = 'scheduler_state';
 const BASE_INTERVAL_MS = 60_000;
@@ -77,6 +82,43 @@ class SchedulerService {
   }
 
   /**
+   * O painel deste provedor, se for a hora dele.
+   *
+   * Era buscado do caminho da requisição: quem abrisse a tela com o cache
+   * vencido pagava a busca da frota inteira do GenieACS. Aqui ela acontece
+   * antes de alguém pedir — e, o que importa mais, **só para quem tem alguém
+   * pedindo**. A regra de quem, quando e com que folga está inteira em
+   * `dashboardSchedule.js`; o que este método acrescenta é que uma falha do
+   * ACS de um provedor não derruba os outros jobs do tick dele.
+   */
+  static async refreshDashboard(state) {
+    const atividade = await lastPanelActivityAt();
+    // Ninguém entrou há um dia: não há tela aberta para manter quente, e o ACS
+    // que seria consultado é o do provedor, não o nosso.
+    if (isDormant(atividade)) return null;
+
+    const ttlMs = refreshTtlMs(atividade);
+    const due = dueForRefresh({
+      lastRunAt: Date.parse(state.lastDashboardAt ?? ''),
+      ttlMs,
+      offsetMs: tenantOffsetMs(currentTenantId(), ttlMs)
+    });
+    if (!due) return null;
+
+    try {
+      await DeviceService.refreshDashboardData({ ttlMs });
+    } catch (error) {
+      // Marca a tentativa mesmo assim: sem isso um ACS fora do ar vira uma
+      // tentativa por tick, que é o oposto do que este job existe para fazer.
+      await this.writeState({ lastDashboardAt: new Date().toISOString() });
+      console.warn(`Dashboard refresh failed: ${error.message}`);
+      return { refreshed: false, ttlMs };
+    }
+    await this.writeState({ lastDashboardAt: new Date().toISOString() });
+    return { refreshed: true, ttlMs };
+  }
+
+  /**
    * One pass over every job. Overlapping ticks collapse onto the running one.
    *
    * The scope is opened here, per tick, and not once around `start()`. A scope
@@ -114,8 +156,10 @@ class SchedulerService {
   }
 
   static async runJobs({ prune = false } = {}) {
-    const summary = { provisioning: null, events: null, reconcile: null };
+    const summary = { provisioning: null, events: null, reconcile: null, dashboard: null };
     const state = await this.readState();
+
+    summary.dashboard = await this.refreshDashboard(state);
 
     const provisioningConfig = await ProvisioningService.getConfig();
     if (
