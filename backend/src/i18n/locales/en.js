@@ -600,4 +600,7 @@ export default {
   'auth.signupInvalid': 'Provider name, username (3–64) and password (8–128) are required',
   'auth.signupSlugTaken': 'This subdomain is already taken',
   'auth.signupUsernameTaken': 'This username is already taken',
+
+  'impersonation.readOnly': 'This is a support session: it can read, not change anything',
+  'impersonation.noControlPlane': 'A support session cannot reach the control plane',
 };

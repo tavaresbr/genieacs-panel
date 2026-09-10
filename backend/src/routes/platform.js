@@ -45,6 +45,13 @@ function allowMetricsScraper(req, res, next) {
 router.get('/tenants', authenticateToken, requirePlatformAdmin, PlatformController.listTenants);
 router.post('/tenants', authenticateToken, requirePlatformAdmin, PlatformController.create);
 router.patch('/tenants/:id', authenticateToken, requirePlatformAdmin, PlatformController.setStatus);
+// Entrar no painel de um provedor para dar suporte. A rota é POST e não GET
+// porque emitir a sessão MUDA alguma coisa: escreve duas linhas de trilha, e é
+// só depois de as duas estarem gravadas que o token existe.
+router.post(
+  '/tenants/:id/impersonate',
+  authenticateToken, requirePlatformAdmin, PlatformController.impersonate
+);
 router.delete('/tenants/:id', authenticateToken, requirePlatformAdmin, PlatformController.remove);
 
 // O que o processo contou desde que subiu, no formato que o Prometheus lê,

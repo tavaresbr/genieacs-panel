@@ -600,4 +600,7 @@ export default {
   'tenant.renamed': 'प्रदाता का नाम बदला गया',
   'tenant.renameFailed': 'प्रदाता का नाम नहीं बदला जा सका',
   'tenant.nameInvalid': 'प्रदाता का नाम 1 से 128 अक्षरों के बीच होना चाहिए',
+
+  'impersonation.readOnly': 'यह एक सहायता सत्र है: यह केवल पढ़ सकता है, कुछ बदल नहीं सकता',
+  'impersonation.noControlPlane': 'सहायता सत्र नियंत्रण तल तक नहीं पहुँच सकता',
 };

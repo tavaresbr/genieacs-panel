@@ -29,7 +29,12 @@ class PlatformAudit {
     // estas duas linhas, vincular-se a um ISP e depois sair não deixaria
     // rastro em trilha nenhuma.
     MEMBER_ADDED: 'tenant.member_added',
-    MEMBER_REMOVED: 'tenant.member_removed'
+    MEMBER_REMOVED: 'tenant.member_removed',
+    // Entramos no painel de um provedor. Registrado nas DUAS trilhas: aqui
+    // porque é ato nosso e responde por nós, e na do provedor porque é ele
+    // quem precisa poder ver que aconteceu — uma trilha que só nós lemos não é
+    // auditoria, é confiança.
+    IMPERSONATION_STARTED: 'tenant.impersonation_started'
   });
 
   /**

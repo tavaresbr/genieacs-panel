@@ -6,6 +6,10 @@ import TenantUser from '../models/TenantUser.js';
 import PlatformAdmin from '../models/PlatformAdmin.js';
 import { runInTenant } from '../config/tenantContext.js';
 import { roleHas } from '../config/permissions.js';
+import {
+  IMPERSONATION_AUDIENCE, IMPERSONATION_CODES, IMPERSONATION_ROLE,
+  IMPERSONATION_TTL, isReadOnlyMethod
+} from '../config/impersonation.js';
 import { subscriptionRefusal } from './subscriptionGate.js';
 
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
@@ -82,11 +86,44 @@ function generateTokens(user, membership) {
   return { accessToken, refreshToken };
 }
 
-function verifyToken(token) {
+/**
+ * O token com que a plataforma entra no painel de um provedor.
+ *
+ * Só de acesso: não devolve refresh, e a ausência é a decisão — ver
+ * `config/impersonation.js`. A audiência é OUTRA, então este token não é
+ * aceito em lugar nenhum que espere uma sessão comum, e uma sessão comum não é
+ * aceita como impersonação: as duas confusões ficam impossíveis por
+ * construção, e não por um `if` que alguém pode esquecer.
+ *
+ * O payload nomeia quem da plataforma entrou, e não carrega `userId` de
+ * ninguém do provedor — não há operador de lá emprestando o crachá.
+ */
+function generateImpersonationToken({ actor, tenantId }) {
+  const alvo = Number(tenantId);
+  const quem = Number(actor?.userId);
+  if (!Number.isInteger(alvo) || alvo <= 0) throw new Error('Invalid tenant id');
+  if (!Number.isInteger(quem) || quem <= 0) throw new Error('Invalid platform actor');
+  return jwt.sign(
+    {
+      impersonatorId: quem,
+      impersonatorUsername: actor.username,
+      tenantId: alvo,
+      role: IMPERSONATION_ROLE
+    },
+    JWT_SECRET,
+    {
+      issuer: 'skygenpanel',
+      audience: IMPERSONATION_AUDIENCE,
+      expiresIn: IMPERSONATION_TTL
+    }
+  );
+}
+
+function verifyToken(token, audience = 'skygenpanel-admin') {
   try {
     const decoded = jwt.verify(token, JWT_SECRET, {
       issuer: 'skygenpanel',
-      audience: 'skygenpanel-admin'
+      audience
     });
     return decoded;
   } catch {
@@ -177,12 +214,92 @@ async function hydrateAuthenticatedUser(decoded) {
  * Evolution webhook, the signed media fetch) either run before the resolver or
  * open their own scope explicitly.
  */
+/**
+ * A sessão de impersonação, se o token for uma — ou `null`.
+ *
+ * Devolve `{ session }` quando vale, e `{ refusal }` quando o token é de
+ * impersonação mas a pessoa já não está no plano de controle. A releitura de
+ * `platform_admins` acontece AQUI, a cada requisição, e é o que faz tirar
+ * alguém da lista derrubar a sessão na requisição seguinte em vez de nos
+ * quinze minutos — quando o motivo de tirá-la pode ser o que ela está fazendo
+ * agora. Mesma regra de `requirePlatformAdmin`, pelo mesmo motivo, num lugar
+ * onde ela pesa mais.
+ */
+async function hydrateImpersonation(token) {
+  const decoded = verifyToken(token, IMPERSONATION_AUDIENCE);
+  if (!decoded) return null;
+  const tenantId = Number(decoded.tenantId);
+  const impersonatorId = Number(decoded.impersonatorId);
+  if (!Number.isInteger(tenantId) || !Number.isInteger(impersonatorId)) {
+    return { refusal: true };
+  }
+  if (!await PlatformAdmin.has(impersonatorId)) return { refusal: true };
+  return {
+    session: {
+      // Sem `userId`: não há operador do provedor por trás disto, e inventar um
+      // faria a trilha DELE registrar o que nós fizemos.
+      userId: null,
+      username: decoded.impersonatorUsername ?? null,
+      role: IMPERSONATION_ROLE,
+      tenantId,
+      // O que marca cada linha de trilha escrita daqui, e o que
+      // `requirePlatformAdmin` lê para recusar.
+      impersonation: { byUserId: impersonatorId, byUsername: decoded.impersonatorUsername ?? null }
+    }
+  };
+}
+
 async function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
     return res.status(401).json({ message: req.t('auth.tokenRequired') });
+  }
+
+  // A impersonação é tentada ANTES, e a audiência é o que a separa: um token
+  // comum não passa por aqui e um de impersonação não passa por baixo.
+  let personificacao;
+  try {
+    personificacao = await hydrateImpersonation(token);
+  } catch (error) {
+    return next(error);
+  }
+  if (personificacao?.refusal) {
+    return res.status(403).json({
+      message: req.t('auth.sessionInvalid'),
+      code: 'invalid_token'
+    });
+  }
+  if (personificacao?.session) {
+    const sessao = personificacao.session;
+    if (!tokenMatchesHost(req, sessao)) {
+      return res.status(403).json({
+        message: req.t('auth.sessionInvalid'),
+        code: 'tenant_mismatch'
+      });
+    }
+    // Só leitura, por cima do papel. Um `POST` que o `viewer` alcançasse ainda
+    // seria mudança na produção de um ISP feita por alguém de fora.
+    if (!isReadOnlyMethod(req.method)) {
+      return res.status(403).json({
+        success: false,
+        code: IMPERSONATION_CODES.READ_ONLY,
+        message: req.t('impersonation.readOnly')
+      });
+    }
+    req.user = sessao;
+    req.tenantId = sessao.tenantId;
+    return runInTenant(sessao.tenantId, async () => {
+      let recusa;
+      try {
+        recusa = await subscriptionRefusal(req);
+      } catch (error) {
+        return next(error);
+      }
+      if (recusa) return res.status(402).json(recusa);
+      return next();
+    });
   }
 
   const decoded = verifyToken(token);
@@ -370,6 +487,21 @@ async function requirePlatformAdmin(req, res, next) {
     return res.status(401).json({ message: req.t('auth.required') });
   }
 
+  // Uma sessão de impersonação NUNCA alcança o plano de controle, mesmo sendo
+  // de quem o detém. É a regra que impede a escalada em círculo: sem ela,
+  // quem entrou no painel de um ISP para dar suporte poderia, de dentro dele,
+  // criar provedor, suspender vizinho ou emitir outra impersonação — e cada
+  // uma dessas ações apareceria na trilha atribuída a uma sessão que existe
+  // para ser só de leitura. Quem precisa do console sai da impersonação e usa
+  // a própria sessão, que é onde o nome dele já está.
+  if (req.user.impersonation) {
+    return res.status(403).json({
+      success: false,
+      code: IMPERSONATION_CODES.NO_CONTROL_PLANE,
+      message: req.t('impersonation.noControlPlane')
+    });
+  }
+
   let holdsIt;
   try {
     holdsIt = await PlatformAdmin.has(req.user.userId);
@@ -389,6 +521,7 @@ async function requirePlatformAdmin(req, res, next) {
 
 export {
   generateTokens,
+  generateImpersonationToken,
   verifyToken,
   resolveMembership,
   authenticateToken,

@@ -12,6 +12,8 @@ import { getDb } from '../config/database.js';
 import { seedDefaults } from '../config/seed.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { slugProblem } from '../utils/slug.js';
+import { generateImpersonationToken } from '../middleware/auth.js';
+import { IMPERSONATION_TTL } from '../config/impersonation.js';
 
 const NAME_MAX_LENGTH = 128;
 
@@ -195,6 +197,91 @@ class PlatformController {
    * this column, so a provider whose service has stopped can still be looked at
    * and, more importantly, turned back on.
    */
+  /**
+   * `POST /api/platform/tenants/:id/impersonate` — entrar no painel de um ISP.
+   *
+   * A ordem aqui é a mesma da exclusão de provedor, e pelo mesmo motivo: as
+   * trilhas são escritas ANTES de o token existir, e o token só é devolvido se
+   * elas foram gravadas. Uma sessão de impersonação que ninguém registrou é
+   * exatamente o que este recurso não pode produzir — e escrever depois deixa
+   * a janela em que o acesso já foi concedido e o registro falhou.
+   *
+   * São DUAS trilhas, e nenhuma substitui a outra. A da plataforma responde por
+   * nós. A do provedor é como o ISP descobre, sozinho e sem pedir nada, que
+   * alguém de fora esteve no painel dele — uma trilha que só nós lemos não é
+   * auditoria, é confiança.
+   *
+   * O motivo é obrigatório. Não é burocracia: é o campo que transforma a linha
+   * "a plataforma entrou" em algo que o ISP consegue conferir contra o chamado
+   * que ele mesmo abriu.
+   */
+  static async impersonate(req, res) {
+    try {
+      const id = Number(req.params?.id);
+      if (!Number.isInteger(id) || id <= 0) {
+        return res.status(400).json(createErrorResponse('Invalid provider id'));
+      }
+      const motivo = String(req.body?.reason ?? '').trim().slice(0, 255);
+      if (motivo.length < 3) {
+        return res.status(400).json(createErrorResponse('A reason is required to impersonate'));
+      }
+
+      const tenant = await Tenant.findById(id);
+      if (!tenant) {
+        return res.status(404).json(createErrorResponse('Provider not found'));
+      }
+      // Provedor suspenso é o que ninguém deveria estar usando por dentro — é
+      // o estado que a exclusão em duas etapas exige justamente para
+      // significar "ninguém está trabalhando lá". Entrar nele contradiria isso.
+      if (tenant.status !== 'active') {
+        return res.status(409).json(createErrorResponse('The provider is not active'));
+      }
+
+      const detalhe = { reason: motivo, ttl: IMPERSONATION_TTL };
+      const naPlataforma = await PlatformAudit.fromRequest(req, {
+        action: PlatformAudit.ACTIONS.IMPERSONATION_STARTED,
+        tenant,
+        detail: detalhe
+      });
+      // O retorno é conferido, como na exclusão: sem registro, não se entra.
+      if (!naPlataforma) {
+        return res.status(503).json(
+          createErrorResponse('Could not record the impersonation; access refused')
+        );
+      }
+      const noProvedor = await runInTenant(id, () => AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.IMPERSONATION_STARTED,
+        actorKind: 'platform',
+        subjectType: 'tenant',
+        subjectId: id,
+        detail: detalhe
+      }));
+      if (!noProvedor) {
+        return res.status(503).json(
+          createErrorResponse('Could not record the impersonation; access refused')
+        );
+      }
+
+      const token = generateImpersonationToken({
+        actor: { userId: req.user.userId, username: req.user.username },
+        tenantId: id
+      });
+      return res.status(201).json(createResponse('Impersonation started', {
+        token,
+        expiresIn: IMPERSONATION_TTL,
+        tenant: { id: tenant.id, slug: tenant.slug, name: tenant.name },
+        // Dito na resposta para a tela não ter que saber de cor: esta sessão lê
+        // e não escreve, e não alcança o console.
+        readOnly: true
+      }));
+    } catch (error) {
+      console.error('Impersonate error:', error);
+      return res.status(500).json(
+        createErrorResponse('Failed to start the impersonation', error.message)
+      );
+    }
+  }
+
   static async setStatus(req, res) {
     try {
       const id = Number(req.params?.id);

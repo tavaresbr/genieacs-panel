@@ -33,6 +33,10 @@ class AuditLog {
     INVITE_ACCEPTED: 'invite.accepted',
     INVITE_REVOKED: 'invite.revoked',
     TENANT_STATUS_CHANGED: 'tenant.status_changed',
+    // A plataforma entrou no painel deste provedor. É a linha mais importante
+    // desta tabela para o ISP: é como ele descobre, sozinho e sem pedir nada a
+    // nós, que alguém de fora esteve aqui dentro e quando.
+    IMPERSONATION_STARTED: 'impersonation.started',
     TENANT_EXPORTED: 'tenant.exported',
     // A assinatura mudou de plano ou de estado. Gravada NO provedor, com
     // `actorKind: 'platform'`, pelo mesmo motivo da suspensão: quem vai
@@ -123,7 +127,15 @@ class AuditLog {
         ...entrada,
         actorUserId: req?.user?.userId ?? null,
         actorUsername: req?.user?.username ?? null,
-        actorKind: entrada.actorKind ?? (req?.user?.isPlatformAdmin ? 'platform' : 'operator'),
+        // `impersonation` vence `isPlatformAdmin`, e a ordem importa: quem
+        // entrou por impersonação É da plataforma, então sem esta linha as duas
+        // coisas ficariam indistinguíveis na trilha — e são muito diferentes.
+        // `platform` é alguém agindo do console, de fora; `impersonation` é
+        // alguém DENTRO do painel deste provedor, vendo o que os operadores
+        // dele veem. É esta a linha que o ISP precisa conseguir procurar.
+        actorKind: entrada.actorKind
+          ?? (req?.user?.impersonation ? 'impersonation'
+            : (req?.user?.isPlatformAdmin ? 'platform' : 'operator')),
         ip: req?.ip ?? null
       });
     } catch (error) {

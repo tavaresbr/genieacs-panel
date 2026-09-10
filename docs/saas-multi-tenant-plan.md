@@ -366,9 +366,44 @@ alguém esquecer de incrementar. Coberto por
   sem mudar nada do que está feito.
 
 **Falta:**
-- **Plano de plataforma** (nós, operando o SaaS): audience separada
-  `skygenpanel-platform`, rotas `/api/platform/*`, capaz de listar/suspender tenants e de
-  fazer *impersonation* auditada. Nunca compartilha o mesmo token do operador.
+- ✅ **Impersonação auditada** — `config/impersonation.js`, `POST
+  /api/platform/tenants/:id/impersonate`, prova em `impersonation.test.js`. Audiência
+  própria (`skygenpanel-impersonation`), então um token destes nunca é lido como sessão
+  comum nem o contrário: as duas confusões ficam impossíveis por construção e não por um
+  `if` que alguém esquece.
+
+  É o acesso mais perigoso do produto — entrar no painel de um ISP é alcançar o cadastro
+  inteiro de assinantes dele —, e abuso aqui não se previne, se limita e se mostra. Cinco
+  decisões:
+
+  1. **Não se toma a identidade de ninguém.** Não há "entrar como a Maria": emprestar o
+     crachá dela suja a trilha dela, e no dia em que ela contestar uma ação o registro não
+     distingue o que ela fez do que fizemos. A sessão é anônima do lado do provedor e
+     nominal do nosso.
+  2. **Entra como `viewer` e só lê.** O menor papel que já existe, em vez de um novo que
+     alguém pudesse conceder por engano na tela de operadores. Isso deixa de fora
+     `customers.secrets` de propósito: a rota que devolve a senha do portal de um assinante
+     é `GET`, então "só leitura" não a barraria — o que a barra é o papel. Ler a credencial
+     do cliente do nosso cliente não é suporte.
+  3. **Quinze minutos, sem refresh.** A ausência do refresh é a decisão: com ele, "o suporte
+     entrou um instante" vira uma semana. Precisar de mais é emitir de novo, e cada emissão
+     é uma linha nova nas duas trilhas.
+  4. **Nunca alcança o plano de controle**, mesmo sendo de quem o detém — é a regra que
+     impede a escalada em círculo: sem ela, quem entrou para dar suporte criaria provedor ou
+     suspenderia vizinho de dentro de uma sessão feita para só ler.
+  5. **`platform_admins` é relido a cada requisição.** Tirar a pessoa da lista derruba a
+     sessão na requisição seguinte, e não nos quinze minutos — quando o motivo de tirá-la
+     pode ser exatamente o que ela está fazendo.
+
+  As trilhas são escritas ANTES de o token existir e o retorno é conferido, como na exclusão
+  de provedor: sem registro, não se entra. E são **duas** — a da plataforma responde por nós;
+  a do provedor é como o ISP descobre, sozinho e sem pedir nada, que alguém de fora esteve no
+  painel dele. Uma trilha que só nós lemos não é auditoria, é confiança. O motivo é
+  obrigatório: é o que torna a linha conferível contra o chamado que o ISP abriu.
+
+  **Fica em aberto**, e é decisão de produto e não de código: `devices.inspect` (o aparelho
+  aberto, com o assinante atrás) está fora do que o suporte alcança. Alargar depois é fácil e
+  revisável; estreitar quando já houver gente contando com o acesso, não.
 - **API de usuários**: escopada por provedor, com convite (onda 18) e com **login por
   e-mail**. Nome e e-mail vivem no mesmo espaço de nomes — cadastrar um e-mail igual ao nome
   de alguém, ou o contrário, é recusado —, o que é o que torna `findByLogin` inequívoco: o

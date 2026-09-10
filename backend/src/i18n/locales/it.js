@@ -598,4 +598,7 @@ export default {
   'auth.signupInvalid': 'Nome del provider, utente (3–64) e password (8–128) sono obbligatori',
   'auth.signupSlugTaken': 'Questo sottodominio è già in uso',
   'auth.signupUsernameTaken': 'Questo nome utente è già in uso',
+
+  'impersonation.readOnly': 'Questa è una sessione di assistenza: può leggere, non modificare nulla',
+  'impersonation.noControlPlane': 'Una sessione di assistenza non raggiunge il piano di controllo',
 };

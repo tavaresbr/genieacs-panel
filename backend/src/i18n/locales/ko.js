@@ -603,4 +603,7 @@ export default {
   'auth.signupInvalid': '사업자 이름, 사용자 이름(3~64자), 비밀번호(8~128자)가 필요합니다',
   'auth.signupSlugTaken': '이 하위 도메인은 이미 사용 중입니다',
   'auth.signupUsernameTaken': '이 사용자 이름은 이미 사용 중입니다',
+
+  'impersonation.readOnly': '지원 세션입니다. 조회만 가능하며 변경할 수 없습니다',
+  'impersonation.noControlPlane': '지원 세션은 컨트롤 플레인에 접근할 수 없습니다',
 };

@@ -601,4 +601,7 @@ export default {
   'auth.signupInvalid': 'Anbietername, Benutzername (3–64) und Passwort (8–128) sind erforderlich',
   'auth.signupSlugTaken': 'Diese Subdomain ist bereits vergeben',
   'auth.signupUsernameTaken': 'Dieser Benutzername ist bereits vergeben',
+
+  'impersonation.readOnly': 'Dies ist eine Support-Sitzung: sie darf lesen, nichts ändern',
+  'impersonation.noControlPlane': 'Eine Support-Sitzung erreicht die Steuerungsebene nicht',
 };

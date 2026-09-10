@@ -122,6 +122,7 @@ const POR_ID = new Map([
   ['GET /api/platform/tenants/:id/members', 'plano de controle; prova em platform-members.test.js'],
   ['POST /api/platform/tenants/:id/members', 'plano de controle; prova em platform-members.test.js'],
   ['DELETE /api/platform/tenants/:id/members/:userId', 'plano de controle; prova em platform-members.test.js'],
+  ['POST /api/platform/tenants/:id/impersonate', 'plano de controle; o 404 de quem não é da plataforma e o token preso ao provedor estão em impersonation.test.js'],
   ['PATCH /api/platform/plans/:id', 'plano de controle; prova em platform-billing.test.js'],
   ['GET /api/platform/tenants/:id/subscription', 'plano de controle; prova em platform-billing.test.js'],
   ['PUT /api/platform/tenants/:id/subscription', 'plano de controle; prova em platform-billing.test.js'],
@@ -207,10 +208,20 @@ describe('toda rota endereçada por um parâmetro', () => {
   // baixar o teto junto com uma exceção nova é o pedágio de quem toma esse
   // caminho, e é o que faz alguém pensar duas vezes.
   //
-  // As 41 de hoje são, todas: id de aparelho no GenieACS (20), chave natural
+  // As 42 de hoje são, todas: id de aparelho no GenieACS (20), chave natural
   // que os dois provedores têm igual (7), anexo por token assinado (2), token
-  // de convite (2) e o plano de controle (10).
-  const TETO_DE_EXCECOES = 41;
+  // de convite (2) e o plano de controle (11).
+  //
+  // O número subiu de 41 para 42 com a impersonação, e vale dizer por que isso
+  // não é o caminho fácil que o parágrafo acima existe para encarecer. A
+  // varredura tem duas metades: o id do vizinho responde 404, e o id PRÓPRIO
+  // não responde 404. Uma rota do plano de controle falha a segunda por
+  // construção — quem não é da plataforma recebe 404 pedindo qualquer id,
+  // inclusive o do próprio provedor —, então não há caso a escrever ali, e é
+  // por isso que as outras dez já estavam nesta lista. A prova existe e é
+  // grande: `impersonation.test.js`, com o 404 de quem não é da plataforma e o
+  // token preso ao provedor que o emitiu.
+  const TETO_DE_EXCECOES = 42;
 
   it('deixa de fora só as que têm motivo, e não mais do que hoje', () => {
     const naoVarridas = comParametro

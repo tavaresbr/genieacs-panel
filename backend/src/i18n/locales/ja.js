@@ -600,4 +600,7 @@ export default {
   'auth.signupInvalid': 'プロバイダー名、ユーザー名（3〜64文字）、パスワード（8〜128文字）が必要です',
   'auth.signupSlugTaken': 'このサブドメインは既に使用されています',
   'auth.signupUsernameTaken': 'このユーザー名は既に使用されています',
+
+  'impersonation.readOnly': 'これはサポートセッションです。閲覧のみで、変更はできません',
+  'impersonation.noControlPlane': 'サポートセッションはコントロールプレーンに到達できません',
 };

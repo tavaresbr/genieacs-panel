@@ -600,4 +600,7 @@ export default {
   'auth.signupInvalid': '需要运营商名称、用户名（3–64）和密码（8–128）',
   'auth.signupSlugTaken': '该子域名已被占用',
   'auth.signupUsernameTaken': '该用户名已被占用',
+
+  'impersonation.readOnly': '这是一个支持会话：只能查看，不能修改',
+  'impersonation.noControlPlane': '支持会话无法访问控制平面',
 };

@@ -599,4 +599,7 @@ export default {
   'auth.signupInvalid': 'Nome do provedor, usuário (3–64) e senha (8–128) são obrigatórios',
   'auth.signupSlugTaken': 'Este subdomínio já está em uso',
   'auth.signupUsernameTaken': 'Este nome de usuário já está em uso',
+
+  'impersonation.readOnly': 'Esta é uma sessão de suporte: ela lê, e não altera nada',
+  'impersonation.noControlPlane': 'Uma sessão de suporte não alcança o plano de controle',
 };

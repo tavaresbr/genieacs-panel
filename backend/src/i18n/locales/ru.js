@@ -601,4 +601,7 @@ export default {
   'auth.signupInvalid': 'Требуются название провайдера, имя пользователя (3–64) и пароль (8–128)',
   'auth.signupSlugTaken': 'Этот поддомен уже занят',
   'auth.signupUsernameTaken': 'Это имя пользователя уже занято',
+
+  'impersonation.readOnly': 'Это сессия поддержки: она может читать, но не изменять',
+  'impersonation.noControlPlane': 'Сессия поддержки не имеет доступа к плоскости управления',
 };

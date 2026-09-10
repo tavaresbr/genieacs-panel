@@ -596,4 +596,7 @@ export default {
   'auth.signupInvalid': 'Le nom du fournisseur, l\'identifiant (3–64) et le mot de passe (8–128) sont requis',
   'auth.signupSlugTaken': 'Ce sous-domaine est déjà pris',
   'auth.signupUsernameTaken': 'Cet identifiant est déjà pris',
+
+  'impersonation.readOnly': 'Ceci est une session d\'assistance : elle peut lire, pas modifier',
+  'impersonation.noControlPlane': 'Une session d\'assistance n\'atteint pas le plan de contrôle',
 };

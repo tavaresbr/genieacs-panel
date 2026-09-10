@@ -592,4 +592,7 @@ export default {
   'tenant.renamed': 'تمت إعادة تسمية المزوّد',
   'tenant.renameFailed': 'تعذّرت إعادة تسمية المزوّد',
   'tenant.nameInvalid': 'يجب أن يكون اسم المزوّد بين 1 و128 حرفًا',
+
+  'impersonation.readOnly': 'هذه جلسة دعم: يمكنها القراءة فقط، دون تغيير أي شيء',
+  'impersonation.noControlPlane': 'جلسة الدعم لا تصل إلى مستوى التحكم',
 };

@@ -600,4 +600,7 @@ export default {
   'auth.signupInvalid': '需要業者名稱、使用者名稱（3–64）和密碼（8–128）',
   'auth.signupSlugTaken': '此子網域已被使用',
   'auth.signupUsernameTaken': '此使用者名稱已被使用',
+
+  'impersonation.readOnly': '這是一個支援工作階段：只能檢視，不能修改',
+  'impersonation.noControlPlane': '支援工作階段無法存取控制平面',
 };
