@@ -1,4 +1,5 @@
 import express from 'express';
+import { timingSafeEqual } from 'node:crypto';
 import PlatformController from '../controllers/platformController.js';
 import { authenticateToken, requirePlatformAdmin } from '../middleware/auth.js';
 
@@ -22,10 +23,36 @@ import { authenticateToken, requirePlatformAdmin } from '../middleware/auth.js';
  */
 const router = express.Router();
 
+/**
+ * Passes a scraper carrying `METRICS_TOKEN`; sends everybody else through the
+ * console's two guards. The token is compared in constant time and read per
+ * request, so rotating it is editing the environment and restarting. Unset,
+ * only a platform administrator's session reads the counters.
+ */
+function allowMetricsScraper(req, res, next) {
+  const expected = String(process.env.METRICS_TOKEN || '');
+  const offered = /^Bearer\s+(.+)$/i.exec(String(req.headers.authorization || ''))?.[1] ?? '';
+  if (expected.length >= 32 && offered.length === expected.length
+    && timingSafeEqual(Buffer.from(offered), Buffer.from(expected))) {
+    return next();
+  }
+  return authenticateToken(req, res, (error) => {
+    if (error) return next(error);
+    return requirePlatformAdmin(req, res, next);
+  });
+}
+
 router.get('/tenants', authenticateToken, requirePlatformAdmin, PlatformController.listTenants);
 router.post('/tenants', authenticateToken, requirePlatformAdmin, PlatformController.create);
 router.patch('/tenants/:id', authenticateToken, requirePlatformAdmin, PlatformController.setStatus);
 router.delete('/tenants/:id', authenticateToken, requirePlatformAdmin, PlatformController.remove);
+
+// O que o processo contou desde que subiu, no formato que o Prometheus lê,
+// com `tenant_id` em toda série. Contagem por provedor é a lista de clientes
+// com o tamanho de cada um, então fica atrás do mesmo guarda que o resto do
+// console — ou de `METRICS_TOKEN`, que é como um coletor entra: um coletor
+// não tem sessão, e um JWT de uma hora não é coisa que se cole num scrape.
+router.get('/metrics', allowMetricsScraper, PlatformController.metrics);
 
 // A trilha do plano de controle. Só leitura, como a do provedor e pelo mesmo
 // motivo: se desse para apagar uma linha, a primeira coisa a fazer depois de

@@ -19,7 +19,8 @@ import {
   type OperatorRole,
   type SgpConfig,
   type SgpSyncSummary,
-  type WhatsAppConfig
+  type WhatsAppConfig,
+  tenantAPI,
 } from '@/lib/api'
 import { useToast } from '@/components/ui/toast'
 import { useLoading } from '@/components/ui/loading'
@@ -29,6 +30,7 @@ import { ProvisioningTab } from '@/components/settings/provisioning-tab'
 import { SgpEventsPanel } from '@/components/settings/sgp-events-panel'
 import { WhatsAppConnection, whatsappErrorMessage } from '@/components/whatsapp-connection'
 import { useAuth } from '@/contexts/auth-context'
+import { useTenant } from '@/contexts/tenant-context'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
 import { OPERATOR_ROLES, ROLE_LABEL_KEYS, ROLE_SUMMARY_KEYS } from '@/lib/permissions'
@@ -96,8 +98,9 @@ const GENIE_SECRET_STATE_BADGES: Record<GenieSecretState, string> = {
 export default function Settings() {
   const { t, formatDateTime } = useTranslation()
   const { user: currentUser, can } = useAuth()
+  const { name: tenantName, isSaas, refresh: refreshTenant } = useTenant()
   const [settings, setSettings] = useState({
-    appName: 'SkyGenPanel',
+    appName: tenantName,
     genieAcsUrl: 'http://127.0.0.1:7557',
     autoGenerateCustomerId: 'false',
     customerIdPrefixMode: 'default',
@@ -177,12 +180,20 @@ export default function Settings() {
   })
   const [waSaving, setWaSaving] = useState(false)
 
+  // The context may resolve after the first render; keep the field in step.
+  useEffect(() => {
+    setSettings(prev => (prev.appName === tenantName ? prev : { ...prev, appName: tenantName }))
+  }, [tenantName])
+
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       const res = await settingsAPI.getAll()
       if (!cancelled && res.success && res.data) {
-        setSettings(prev => ({ ...prev, ...(res.data as any) }))
+        // `appName` is no longer read from settings: the provider's name lives
+        // on the `tenants` row and arrives through the tenant context.
+        const { appName: _legacyAppName, ...rest } = res.data as any
+        setSettings(prev => ({ ...prev, ...rest }))
         setSavedGenieAcsUrl(String((res.data as any).genieAcsUrl ?? ''))
       }
       setTestResult(null)
@@ -766,7 +777,18 @@ export default function Settings() {
     loadingCtl.show(t('settings.savingProgress'))
     let ok = true
     try {
-      const entries = Object.entries(settings).sort(([left], [right]) => {
+      // The provider's name is not a setting any more. It is renamed on its own
+      // row, audited, and the context re-reads it so the sidebar follows.
+      if (settings.appName.trim() !== tenantName) {
+        const renamed = await tenantAPI.rename(settings.appName.trim())
+        if (!renamed.success) {
+          ok = false
+          toast.error(renamed.message || t('settings.saveError'))
+          return
+        }
+        await refreshTenant()
+      }
+      const entries = Object.entries(settings).filter(([key]) => key !== 'appName').sort(([left], [right]) => {
         if (left === 'autoGenerateCustomerId') return 1
         if (right === 'autoGenerateCustomerId') return -1
         return 0
@@ -823,12 +845,6 @@ export default function Settings() {
         }
       }
       toast[ok ? 'success' : 'error'](ok ? successMessage : errorMessage)
-      if (ok) {
-        try {
-          localStorage.setItem('appName', settings.appName)
-          window.dispatchEvent(new CustomEvent('appNameChanged', { detail: settings.appName }))
-        } catch {}
-      }
     } finally {
       setLoading(false)
       loadingCtl.hide()
@@ -1115,15 +1131,19 @@ export default function Settings() {
             >
               {t('settings.tab.wifiSecurity')}
             </button>
-            <button
-              onClick={() => setActiveTab('database')}
-              className="tab-button"
-              data-active={activeTab === 'database'}
-              role="tab"
-              aria-selected={activeTab === 'database'}
-            >
-              {t('settings.tab.database')}
-            </button>
+            {/* Switching databases wipes the target; the SaaS edition does not
+                mount the route, so it does not show the tab either. */}
+            {!isSaas && (
+              <button
+                onClick={() => setActiveTab('database')}
+                className="tab-button"
+                data-active={activeTab === 'database'}
+                role="tab"
+                aria-selected={activeTab === 'database'}
+              >
+                {t('settings.tab.database')}
+              </button>
+            )}
           </div>
         </div>
 

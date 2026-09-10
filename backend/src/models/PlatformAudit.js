@@ -17,6 +17,12 @@ class PlatformAudit {
     TENANT_CREATED: 'tenant.created',
     TENANT_STATUS_CHANGED: 'tenant.status_changed',
     TENANT_DELETED: 'tenant.deleted',
+    // A Fase 5: o que o plano de controle fez com a assinatura de um provedor.
+    PLAN_CREATED: 'plan.created',
+    PLAN_UPDATED: 'plan.updated',
+    SUBSCRIPTION_PLAN_CHANGED: 'subscription.plan_changed',
+    SUBSCRIPTION_STATUS_CHANGED: 'subscription.status_changed',
+    PAYMENT_RECORDED: 'subscription.payment_recorded',
     // Quem trabalha para qual provedor, decidido de fora dele. É a ação mais
     // forte que o plano de controle tem: um vínculo escrito aqui vira uma
     // sessão legítima DENTRO de um ISP, com o cadastro inteiro atrás dela. Sem

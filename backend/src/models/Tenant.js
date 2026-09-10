@@ -98,6 +98,13 @@ class Tenant {
     return insertReturningId('tenants', { slug, name, status }, trx);
   }
 
+  static async rename(id, name) {
+    const changed = await getDb()('tenants')
+      .where({ id })
+      .update({ name, updated_at: new Date() });
+    return changed > 0;
+  }
+
   static async setStatus(id, status) {
     const changed = await getDb()('tenants')
       .where({ id })

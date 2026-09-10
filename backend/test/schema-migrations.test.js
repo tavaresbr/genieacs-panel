@@ -624,3 +624,102 @@ describe('making the SGP log and the provisioning trail per-provider', () => {
     }), 'provisioning_profiles');
   });
 });
+
+describe('giving every provider a subscription', () => {
+  const db = createDatabase('billing');
+  const BILLING_MIGRATION = '0035_plans_and_subscriptions';
+  let alfa;
+  let beta;
+
+  /**
+   * The upgrade path of 0034: an install with two providers and no notion of
+   * a plan. What has to come out the other side is a deployment where nothing
+   * changed for either of them — `active`, on a plan that limits nothing —
+   * because an upgrade cannot be the day an ISP in production discovers it is
+   * locked out or over some limit it never agreed to.
+   */
+  before(async () => {
+    for (const migration of migrations.filter((m) => m.id < BILLING_MIGRATION)) {
+      await migration.up(db);
+    }
+    alfa = (await db('tenants').orderBy('id', 'asc').first()).id;
+    beta = await insertReturningId('tenants', { slug: 'beta', name: 'Provedor Beta', status: 'active' }, db);
+    await ensureSchema(db);
+  });
+
+  it('creates the unlimited plan exactly once', async () => {
+    const plans = await db('plans').where({ code: 'unlimited' });
+    assert.equal(plans.length, 1);
+    assert.equal(plans[0].max_operators, null);
+    assert.equal(plans[0].max_subscribers, null);
+    assert.equal(plans[0].max_devices, null);
+  });
+
+  it('puts every existing provider on it, active, with no trial to expire', async () => {
+    for (const tenantId of [alfa, beta]) {
+      const row = await db('subscriptions').where({ tenant_id: tenantId }).first();
+      assert.ok(row, `provider ${tenantId} has no subscription`);
+      assert.equal(row.status, 'active');
+      assert.equal(row.trial_ends_at, null);
+      const plan = await db('plans').where({ id: row.plan_id }).first();
+      assert.equal(plan.code, 'unlimited');
+    }
+  });
+
+  it('can be asked to run a second time without duplicating a row', async () => {
+    // The step and its ledger row are two statements; a process that dies in
+    // between comes back to a backfill that has already run. Asked directly,
+    // the way that boot would ask it.
+    const step = migrations.find((m) => m.id === BILLING_MIGRATION);
+    await step.up(db);
+    await ensureSchema(db);
+    const [{ n }] = await db('subscriptions').count({ n: '*' });
+    assert.equal(Number(n), 2);
+    const [{ p }] = await db('plans').where({ code: 'unlimited' }).count({ p: '*' });
+    assert.equal(Number(p), 1);
+  });
+});
+
+describe('the provider name leaving settings', () => {
+  const db = createDatabase('tenant-name');
+  const NAME_MIGRATION = '0036_tenant_name_from_app_name';
+  let alfa;
+  let beta;
+
+  /**
+   * The upgrade path of 0035. `settings.appName` was what the sidebar showed;
+   * `tenants.name` was what the console listed. The copy has to move the name
+   * an operator actually typed, and only that one: a provider minted by the
+   * console carries the factory `appName` and a real name of its own, and
+   * copying the factory string over it would rename "Provedor Beta" to
+   * "SkyGenPanel".
+   */
+  before(async () => {
+    for (const migration of migrations.filter((m) => m.id < NAME_MIGRATION)) {
+      await migration.up(db);
+    }
+    alfa = (await db('tenants').orderBy('id', 'asc').first()).id;
+    beta = await insertReturningId('tenants', { slug: 'beta', name: 'Provedor Beta', status: 'active' }, db);
+    await db('settings').where({ tenant_id: alfa, key: 'appName' }).del();
+    await db('settings').insert([
+      { tenant_id: alfa, key: 'appName', value: 'Fibra do Vale' },
+      { tenant_id: beta, key: 'appName', value: 'SkyGenPanel' }
+    ]);
+    await ensureSchema(db);
+  });
+
+  it('moves the name the operator typed onto the provider row', async () => {
+    assert.equal((await db('tenants').where({ id: alfa }).first()).name, 'Fibra do Vale');
+  });
+
+  it('leaves a provider whose setting is still the factory value alone', async () => {
+    assert.equal((await db('tenants').where({ id: beta }).first()).name, 'Provedor Beta');
+  });
+
+  it('runs only once', async () => {
+    await db('settings').where({ tenant_id: alfa, key: 'appName' }).update({ value: 'Outro Nome' });
+    await ensureSchema(db);
+    assert.equal((await db('tenants').where({ id: alfa }).first()).name, 'Fibra do Vale',
+      'after the copy, the setting no longer drives the name');
+  });
+});

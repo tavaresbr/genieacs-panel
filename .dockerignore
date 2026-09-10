@@ -1,0 +1,15 @@
+.git
+.github
+node_modules
+*/node_modules
+backend/data
+backend/test
+backend/coverage
+frontend/dist
+docs/screenshots
+deploy
+scripts
+*.md
+!README.md
+.env
+*.env

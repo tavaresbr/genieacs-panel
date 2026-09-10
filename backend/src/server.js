@@ -14,6 +14,12 @@ import WaBroadcastService from './services/waBroadcastService.js';
 import WaMediaSweeper from './services/waMediaSweeper.js';
 import WaMessageSweeper from './services/waMessageSweeper.js';
 import { forEachTenant } from './config/tenantJobs.js';
+import { installTenantTaggedConsole } from './utils/logger.js';
+
+// Every `console.*` line written inside a request or a per-provider job
+// carries `[tenant=N]` from here on. Done at boot and not at import, so the
+// test suite reads its own output untouched.
+installTenantTaggedConsole();
 
 const PORT = Number(process.env.APP_PORT) || 5890;
 const PORTAL_PORT = process.env.PORTAL_PORT === '0'

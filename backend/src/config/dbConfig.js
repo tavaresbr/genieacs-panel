@@ -15,7 +15,65 @@ export function resolveClient(config = readDbConfig()) {
   return 'better-sqlite3';
 }
 
+/**
+ * The connection as an environment variable, for the deployment that has no
+ * disk worth keeping a file on.
+ *
+ * `db-config.json` is right for a self-hosted install: the operator switches
+ * databases from the settings screen, and the file is what remembers it. The
+ * hosted edition runs from an image against a managed Postgres, where the
+ * connection is a secret the platform injects and the settings screen does not
+ * exist. `DATABASE_URL` wins over the file when both are present, so an image
+ * cannot be pointed at the wrong database by a stale volume.
+ *
+ *   postgres://user:pass@host:5432/dbname?schema=panel&sslmode=require
+ *   mysql://user:pass@host:3306/dbname
+ *
+ * `schema` (Postgres only) is the search path, which is how one managed
+ * database can hold more than one panel. `sslmode=require` turns TLS on with
+ * verification; `sslmode=no-verify` keeps TLS and drops the check, for a
+ * provider whose certificate chain is not the machine's to trust.
+ */
+export function dbConfigFromEnv(url = process.env.DATABASE_URL) {
+  const raw = String(url ?? '').trim();
+  if (!raw) return null;
+  let parsed;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new Error('DATABASE_URL is not a valid URL');
+  }
+  const scheme = parsed.protocol.replace(/:$/, '').toLowerCase();
+  const client = POSTGRES_CLIENTS.has(scheme) ? 'pg' : MYSQL_CLIENTS.has(scheme) ? 'mysql2' : null;
+  if (!client) {
+    throw new Error(`DATABASE_URL must start with postgres:// or mysql://; received "${scheme}://"`);
+  }
+  const database = decodeURIComponent(parsed.pathname.replace(/^\//, ''));
+  if (!database) throw new Error('DATABASE_URL names no database');
+
+  const config = {
+    client,
+    host: parsed.hostname,
+    port: Number(parsed.port) || (client === 'pg' ? 5432 : 3306),
+    user: decodeURIComponent(parsed.username),
+    password: decodeURIComponent(parsed.password),
+    database
+  };
+  const schema = parsed.searchParams.get('schema');
+  if (client === 'pg' && schema) config.schema = schema;
+  const sslmode = String(parsed.searchParams.get('sslmode') || '').toLowerCase();
+  if (sslmode && sslmode !== 'disable') {
+    config.ssl = true;
+    config.sslRejectUnauthorized = sslmode !== 'no-verify';
+  }
+  const poolMax = Number(parsed.searchParams.get('pool'));
+  if (poolMax > 0) config.poolMax = poolMax;
+  return config;
+}
+
 export function readDbConfig() {
+  const fromEnv = dbConfigFromEnv();
+  if (fromEnv) return fromEnv;
   try {
     if (fs.existsSync(DB_CONFIG_PATH)) {
       const raw = fs.readFileSync(DB_CONFIG_PATH, 'utf8');

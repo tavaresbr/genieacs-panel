@@ -209,6 +209,6 @@ describe('the provider a login screen sees, with no subdomains configured', () =
 
   it('returns the public fields and nothing else', async () => {
     const { body } = await call(`${panelUrl}/api/tenant/public`);
-    assert.deepEqual(Object.keys(body.data).sort(), ['name', 'slug']);
+    assert.deepEqual(Object.keys(body.data).sort(), ['edition', 'name', 'panelBaseDomain', 'slug']);
   });
 });

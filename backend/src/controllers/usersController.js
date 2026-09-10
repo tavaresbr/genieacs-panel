@@ -1,4 +1,6 @@
 import AuditLog from '../models/AuditLog.js';
+import SubscriptionService, { PlanLimitError } from '../services/subscriptionService.js';
+import { planLimitResponse } from '../utils/planLimit.js';
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 import TenantUser from '../models/TenantUser.js';
@@ -168,6 +170,15 @@ class UsersController {
       }
       if (conflito) {
         return res.status(409).json(createErrorResponse(req.t('auth.usernameTaken')));
+      }
+
+      // O limite do plano, conferido ANTES de escrever qualquer coisa: uma
+      // pessoa criada e depois recusada seria um username tomado para sempre.
+      try {
+        await SubscriptionService.assertCanAddOperator();
+      } catch (error) {
+        if (error instanceof PlanLimitError) return planLimitResponse(req, res, error);
+        throw error;
       }
 
       const id = await User.create({

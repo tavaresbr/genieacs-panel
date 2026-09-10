@@ -401,8 +401,17 @@ docker run \
   -v skygenpanel-data:/var/lib/skygenpanel \
   -e DATA_DIR=/var/lib/skygenpanel \
   -e JWT_SECRET="$(openssl rand -hex 48)" \
+  -e PORTAL_JWT_SECRET="$(openssl rand -hex 48)" \
+  -e SECRET_BOX_KEY="$(openssl rand -hex 48)" \
   skygenpanel
 ```
+
+The image defaults to the self-hosted edition on SQLite. Point it at a server with
+`DATABASE_URL` (`postgres://user:pass@host:5432/db?schema=panel&sslmode=require`, or
+`mysql://…`), which takes precedence over `db-config.json`. The hosted edition —
+`EDITION=saas`, providers by subdomain, a managed Postgres, logs and metrics per provider —
+is set up and operated as described in [docs/saas-operations.md](docs/saas-operations.md);
+`deploy/docker-compose.saas.yml` is its starting point.
 
 ## License
 

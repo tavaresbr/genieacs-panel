@@ -72,8 +72,11 @@ export async function seedDefaults(db = getDb()) {
       await db('map_settings').insert({
         tenant_id: tenant.id,
         id: 1,
-        center_lat: '-6.2088',
-        center_lng: '106.8456',
+        // Brasília, wide enough to show the whole country: the panel is sold
+        // to Brazilian ISPs, and the onboarding asks each one where its plant
+        // actually is. Jakarta was the upstream project's home, not ours.
+        center_lat: '-15.7942',
+        center_lng: '-47.8822',
         max_zoom_in: '18',
         max_zoom_out: '5',
         default_zoom: '13'
@@ -82,6 +85,7 @@ export async function seedDefaults(db = getDb()) {
   }
 
   await seedVendorCatalogue(db, tenants);
+  await seedSubscriptions(db, tenants);
 }
 
 /** The equipment catalogue, in the order the foreign key requires. */
@@ -130,6 +134,61 @@ async function catalogueSizes(db) {
  * this safe at every boot, since the second boot finds the rows it wrote the
  * first time.
  */
+/**
+ * Todo provedor tem uma assinatura, e quem nasce depois da migração 0034 nasce
+ * em teste.
+ *
+ * A migração deu `active` sem limite a quem já existia — um upgrade não pode
+ * bloquear ninguém. Aqui é o contrário: um provedor cunhado pelo console, ou
+ * por qualquer caminho futuro, começa em `trial` no plano que oferece teste,
+ * com o prazo contado a partir de agora. É o seed e não o controlador que faz
+ * isso pelo mesmo motivo de os settings e o catálogo serem seed: só há um
+ * jeito de um provedor vir a existir, e é passando por aqui.
+ *
+ * Escrita crua, como o resto deste arquivo: roda no boot, sem escopo, e às
+ * vezes contra o banco de DESTINO de uma troca. `tenant_id` vai na mão.
+ */
+async function seedSubscriptions(db, tenants) {
+  if (!(await db.schema.hasTable('subscriptions'))) return;
+  const withTrial = await db('plans')
+    .where({ active: true })
+    .where('trial_days', '>', 0)
+    .orderBy('trial_days', 'desc')
+    .orderBy('id', 'asc')
+    .first();
+  const plan = withTrial
+    || await db('plans').where({ code: 'unlimited' }).first()
+    || await db('plans').where({ active: true }).orderBy('id', 'asc').first();
+  if (!plan) return;
+
+  const trialDays = Number(plan.trial_days) > 0 ? Number(plan.trial_days) : DEFAULT_TRIAL_DAYS;
+  for (const tenant of tenants) {
+    // tenant-scope-exempt: seed, sem escopo aberto; o provedor vai na mão.
+    const existing = await db('subscriptions').where({ tenant_id: tenant.id }).first();
+    if (existing) continue;
+    const trialEndsAt = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000);
+    // tenant-scope-exempt: idem.
+    await db('subscriptions').insert({
+      tenant_id: tenant.id,
+      plan_id: plan.id,
+      status: 'trial',
+      trial_ends_at: trialEndsAt
+    });
+    // tenant-scope-exempt: idem — e é a primeira linha do extrato deste provedor.
+    const subscription = await db('subscriptions').where({ tenant_id: tenant.id }).first();
+    await db('billing_events').insert({
+      tenant_id: tenant.id,
+      subscription_id: subscription?.id ?? null,
+      type: 'trial.started',
+      provider: 'manual',
+      detail: JSON.stringify({ planCode: plan.code, trialDays, trialEndsAt })
+    });
+  }
+}
+
+/** Quantos dias de teste um provedor novo ganha quando nenhum plano diz. */
+const DEFAULT_TRIAL_DAYS = 14;
+
 async function seedVendorCatalogue(db, tenants) {
   const sizes = await catalogueSizes(db);
   const has = (tenant) => (sizes.get(Number(tenant.id)) || 0) > 0;
