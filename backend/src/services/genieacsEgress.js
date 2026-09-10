@@ -111,8 +111,17 @@ export class GenieAcsEgress {
   /**
    * Everything decided before the socket opens: which port, which addresses,
    * and whether any of them disqualifies the request.
+   *
+   * `signal` is the caller's own deadline, and it has to reach the resolution
+   * and not only the request that follows it. A resolver that accepts the query
+   * and never answers holds the caller exactly as a server that never answers
+   * does — same wait, same handler pinned, one step earlier — and the deadline
+   * armed around `fetch` below cannot end a wait that happens before the socket
+   * is opened. It bounds the WAIT and not the query: `getaddrinfo` has no
+   * cancel, so an abort here stops holding the caller and leaves the lookup to
+   * finish into nothing.
    */
-  static async resolveTarget(url, { allowPrivateAddresses = false } = {}) {
+  static async resolveTarget(url, { allowPrivateAddresses = false, signal } = {}) {
     const parsed = url instanceof URL ? url : new URL(String(url));
 
     if (!['http:', 'https:'].includes(parsed.protocol)) {
@@ -139,10 +148,15 @@ export class GenieAcsEgress {
     // self-hosted edition every address is allowed for the same reason.
     const addresses = await PinnedTransport.vetTarget(hostname, {
       lookup: (name) => this.lookup(name),
+      signal,
       allowPrivateAddresses: allowPrivateAddresses || !IS_SAAS,
       refuse: (message) => refuse(`GenieACS host ${message}`)
     });
 
+    // The deadline may have expired INSIDE the resolution above. Without this,
+    // a name that did not answer in time would leave here as "resolved to no
+    // address" — a sentence about DNS for something that was about the clock.
+    signal?.throwIfAborted();
     if (addresses.length === 0) {
       throw new Error(`GenieACS host ${hostname} did not resolve to any address`);
     }
@@ -159,7 +173,8 @@ export class GenieAcsEgress {
   static async fetch(url, options = {}) {
     const { allowPrivateAddresses = false, rejectUnauthorized = true } = options;
     const { parsed, hostname, port, addresses } = await this.resolveTarget(url, {
-      allowPrivateAddresses
+      allowPrivateAddresses,
+      signal: options.signal
     });
 
     return PinnedTransport.request({

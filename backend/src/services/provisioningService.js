@@ -639,14 +639,15 @@ class ProvisioningService {
     let failed = false;
     for (const step of plan.steps) {
       const result = await this.runStep(plan, step);
-      steps.push({
+      const entry = {
         step: step.step,
         target: step.index ?? step.target ?? step.wanIndex ?? null,
         status: result.status,
         detail: result.detail,
         parameters: result.parameters,
         at: new Date().toISOString()
-      });
+      };
+      steps.push(entry);
       if (result.status === 'failed') {
         // Stop rather than press on: a half-written WAN is worse than a clean
         // retry, and everything already applied stays applied.
@@ -654,7 +655,12 @@ class ProvisioningService {
         break;
       }
       if (step.step === 'wifi' && ['applied', 'queued'].includes(result.status)) {
-        await this.rememberWifiPassword(plan, step);
+        // A execução não vira falha por causa disto: a ONT foi configurada e
+        // está no ar, e refazer tudo não traria de volta a senha. Mas a linha
+        // guarda que a senha não foi arquivada, porque no modo `random` essa
+        // era a única cópia e o assinante vai ligar perguntando por ela.
+        const guardada = await this.rememberWifiPassword(plan, step);
+        if (!guardada) entry.passwordStored = false;
       }
     }
 
@@ -803,30 +809,90 @@ class ProvisioningService {
     }
   }
 
+  /**
+   * Guarda no cofre a senha que acabou de ser escrita na ONT.
+   *
+   * No modo `random` esta é a ÚNICA cópia que existe: o painel a sorteou, o
+   * assinante nunca a viu, e o que não for guardado aqui está perdido — o
+   * assinante fica trancado fora do próprio WiFi e o operador não tem o que
+   * dizer a ele. Daí esta função ter deixado de ser silenciosa.
+   *
+   * O caminho que a perdia não era uma exceção, e é por isso que o `catch`
+   * abaixo nunca o pegou: `CustomerService.ensureAccount` devolve `null`, sem
+   * lançar, quando falta ao aparelho um dos três identificadores (o `_id`, a
+   * versão de software ou o login PPPoE). `ensurePortalAccount` roda antes dos
+   * passos justamente para que exista onde arquivar, mas devolvendo `null` em
+   * silêncio ela não criava conta nenhuma e ninguém ficava sabendo; aqui o
+   * `if (!account) return;` fechava a porta sem uma linha de log.
+   *
+   * Agora tenta uma vez mais criar a conta — que resolve o caso comum, o de a
+   * primeira tentativa ter falhado por algo passageiro — e, quando ainda assim
+   * não há onde guardar, diz isso alto e devolve `false`, que o chamador grava
+   * na linha da execução. Perder a senha continua sendo possível; perdê-la sem
+   * que ninguém saiba, não.
+   *
+   * @returns {Promise<boolean>} se a senha está guardada (ou não havia o que guardar)
+   */
   static async rememberWifiPassword(plan, step) {
-    if (!step.form.password) return;
+    if (!step.form.password) return true;
     try {
-      const account = await CustomerAccount.getByDeviceId(plan.deviceId);
-      if (!account) return;
+      const account = await CustomerAccount.getByDeviceId(plan.deviceId)
+        || await this.ensurePortalAccount(plan);
+      if (!account) {
+        console.error(
+          `Wi-Fi password for ${plan.deviceId} was written to the CPE but not stored: `
+          + 'the device has no portal account to file it against. '
+          + 'A random password is not recoverable from anywhere else.'
+        );
+        return false;
+      }
       await CustomerWifiCredentialService.save(
         account.id, step.index, step.form.ssid ?? '', step.form.password
       );
+      return true;
     } catch (error) {
-      console.warn(`Could not store the Wi-Fi password for ${plan.deviceId}: ${error.message}`);
+      console.error(`Could not store the Wi-Fi password for ${plan.deviceId}: ${error.message}`);
+      return false;
     }
   }
 
+  /**
+   * A conta do portal deste aparelho, criando-a se ainda não existir.
+   *
+   * Devolve a conta — ou `null` — em vez de não devolver nada, porque quem
+   * chama precisa saber: o passo de WiFi arquiva a senha gerada contra ela, e
+   * sem conta não há onde arquivar.
+   *
+   * `ensureAccount` responde `null` sem lançar quando falta ao aparelho um dos
+   * três identificadores que formam a identidade do assinante, e esse silêncio
+   * é o que fazia a senha sumir sem uma linha de log. O aviso abaixo nomeia o
+   * que faltou, que é a única coisa que o operador pode corrigir.
+   */
   static async ensurePortalAccount(plan) {
+    const softwareId = DeviceService.getParameterValue(
+      plan.device, 'InternetGatewayDevice.DeviceInfo.SoftwareVersion'
+    );
     try {
-      await CustomerService.ensureAccount({
+      const account = await CustomerService.ensureAccount({
         _id: plan.deviceId,
-        softwareId: DeviceService.getParameterValue(
-          plan.device, 'InternetGatewayDevice.DeviceInfo.SoftwareVersion'
-        ),
+        softwareId,
         pppoe: plan.login
       });
+      if (!account) {
+        const faltando = [
+          !plan.deviceId && 'device id',
+          !softwareId && 'software version',
+          !plan.login && 'PPPoE login'
+        ].filter(Boolean);
+        console.warn(
+          `No portal account for ${plan.deviceId}: the device is missing `
+          + `${faltando.join(' and ') || 'a usable identity'}.`
+        );
+      }
+      return account;
     } catch (error) {
       console.warn(`Could not create the portal account for ${plan.deviceId}: ${error.message}`);
+      return null;
     }
   }
 
