@@ -35,7 +35,7 @@ before(async () => {
   ({ panelUrl } = await startTestServers());
   const setup = await call(`${panelUrl}/api/auth/setup`, {
     method: 'POST',
-    body: { username: 'operador', password: 'senha-do-operador-1' }
+    body: { username: 'operador', password: 'senha-do-operador-1', email: 'operador@exemplo.test' }
   });
   token = setup.body.data.token;
   tenantId = (await getDb()('tenants').orderBy('id', 'asc').first()).id;

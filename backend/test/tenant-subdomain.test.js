@@ -75,7 +75,7 @@ before(async () => {
 
   const setup = await callAs('alfa.painel.exemplo.com', `${panelUrl}/api/auth/setup`, {
     method: 'POST',
-    body: { username: 'operador-alfa', password: 'senha-do-alfa-1' }
+    body: { username: 'operador-alfa', password: 'senha-do-alfa-1', email: 'operador-alfa@exemplo.test' }
   });
   alfaToken = setup.body?.data?.token;
 

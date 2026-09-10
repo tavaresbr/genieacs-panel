@@ -143,6 +143,15 @@ const tenantUsersTable = (db) => (t) => {
 const usersTable = (db) => (t) => {
   t.increments('id').primary();
   t.string('username', 64).notNullable().unique();
+  // O e-mail com que a pessoa entra. Nulo é legítimo e é o estado de toda conta
+  // que existia antes desta coluna: o login por nome continua valendo enquanto
+  // `LOGIN_REQUIRES_EMAIL` estiver desligado, que é o que permite a troca
+  // acontecer sem um dia de virada em que ninguém entra.
+  //
+  // 255 porque é o limite prático de um endereço; guardado sempre em minúsculas
+  // — ver `User.normalizeEmail` e o porquê de a comparação não poder depender
+  // da colação do banco.
+  t.string('email', 255).unique();
   t.string('password', 255).notNullable();
   t.string('role', 32).notNullable().defaultTo('user');
   addTokenVersion(t);
@@ -2101,6 +2110,32 @@ export const migrations = [
     async up(db) {
       if (!(await db.schema.hasTable('users'))) return;
       await createTableIfMissing(db, 'platform_audit', platformAuditTable(db));
+    }
+  },
+  {
+    /**
+     * O e-mail de login, acrescentado NULO.
+     *
+     * Nulo e não preenchido a partir de nada: não há de onde tirar o endereço
+     * de quem já usa o painel, e inventar um (`fulano@localhost`, o username
+     * com um domínio colado) daria a cada conta existente um endereço que
+     * ninguém controla — e que, no dia em que houver redefinição de senha por
+     * e-mail, seria o caminho para dentro dela.
+     *
+     * Por isso a coluna é anulável e o login por nome continua valendo: a
+     * transição é cada pessoa cadastrando o próprio endereço, e não uma
+     * migração adivinhando por elas.
+     */
+    id: '0034_users_email',
+    async isApplied(db) {
+      return db.schema.hasColumn('users', 'email');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('users'))) return;
+      if (await db.schema.hasColumn('users', 'email')) return;
+      await db.schema.alterTable('users', (t) => {
+        t.string('email', 255).unique();
+      });
     }
   }
 ];
