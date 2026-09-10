@@ -2100,13 +2100,21 @@ class DeviceService {
     }
   }
 
-  static async refreshDashboardData() {
+  /**
+   * @param {{ ttlMs?: number }} [opts] Por quanto tempo o resultado vale.
+   *   O padrão é a cadência de quem tem operador na tela; o job agendado passa
+   *   a cadência ociosa quando ninguém entrou na última hora. Sem este
+   *   parâmetro o prazo do cache seria sempre 60s, e uma requisição feita 61s
+   *   depois de uma atualização ociosa disparava, do caminho da requisição,
+   *   exatamente a busca que o job acabara de decidir que podia esperar.
+   */
+  static async refreshDashboardData({ ttlMs } = {}) {
     const cache = this.dashboardCacheFor();
     const devices = await this.getDashboardDevices();
     const previousFaults = Array.isArray(cache.data?.faults) ? cache.data.faults : [];
     const data = this.buildDashboardSummary(devices, previousFaults, cache.data?.faultsError || null);
     cache.data = data;
-    cache.expiresAt = Date.now() + this.dashboardCacheTtlMs;
+    cache.expiresAt = Date.now() + (Number.isFinite(ttlMs) && ttlMs > 0 ? ttlMs : this.dashboardCacheTtlMs);
     await this.persistDashboardCache();
     return data;
   }

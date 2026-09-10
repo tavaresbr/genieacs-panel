@@ -479,17 +479,31 @@ passa a pedir o conector do tenant. Pontos exatos a refatorar em
 GenieACS, com TTL de 60s e um prewarm no boot (`server.js:37`). Um provedor com 20 mil ONTs já
 é um parse de vários MB por minuto; multiplicado por dezenas de tenants, um processo Node não
 sustenta. Antes do décimo tenant:
-- tirar o refresh do caminho da requisição para um job agendado com **offset por tenant**
-  (hash do id no minuto) e **TTL adaptativo** (60s com operador logado, 5 min ocioso);
+- ✅ **refresh agendado, com defasagem por provedor e cadência adaptativa** —
+  `backend/src/services/dashboardSchedule.js` decide quem, quando e com que folga; o job vive
+  em `SchedulerService.refreshDashboard`. Três decisões: a cadência segue a atenção (60s com
+  operador da última hora, 5 min ocioso, e o prazo do cache acompanha — senão a primeira tela
+  aberta desfazia, do caminho da requisição, a decisão que o job tinha acabado de tomar); a
+  defasagem vem de um FNV-1a do id, então é estável entre reinícios e não precisa ser
+  guardada; e a conta de "está na hora" é de **janela com fase**, não de prazo decorrido —
+  com prazo, um provedor que atrasa dez segundos carrega o atraso e todos convergem de volta
+  para a mesma virada de minuto, que é o pico que a defasagem existe para evitar. A marca de
+  atenção é gravada no login e na renovação de token — os dois pontos em que se SABE que há
+  alguém do outro lado — com folga de 5 min, e nunca derruba um login;
 - ✅ **teto de concorrência de fetch ACS global e por provedor** —
   `backend/src/services/genieacs/concurrency.js`. As sete chamadas ao ACS em
   `deviceService.js` passam por `withAcsSlot`, que segura uma vaga do provedor e depois uma
   global, sempre nessa ordem (duas travas em ordens opostas é o deadlock clássico). O teto por
   provedor é o que isola; o global é o que limita sockets e heap. `GENIEACS_MAX_CONCURRENCY`
-  (32) e `GENIEACS_MAX_CONCURRENCY_PER_TENANT` (6). É a primeira das quatro peças do muro; as
-  outras três continuam abaixo;
-- não atualizar tenants suspensos nem sem login nas últimas 24h;
-- avaliar uma tabela `devices_summary` para o dashboard ler do banco, não do ACS.
+  (32) e `GENIEACS_MAX_CONCURRENCY_PER_TENANT` (6). Foi a primeira das quatro peças do muro;
+- ✅ **não atualizar tenants suspensos nem sem login nas últimas 24h** — suspensos já estavam
+  fora: `forEachTenant` visita só quem está `active`, e uma segunda checagem dizendo o mesmo
+  seria a que ficaria para trás. O que faltava era a dormência, agora em `isDormant`, e ela
+  vale também para o **prewarm do boot**: subir o processo era buscar a coleção de
+  dispositivos de TODO provedor da instalação, dormente ou não — o pior minuto do dia, e o
+  único em que ninguém está olhando para reclamar;
+- ⚠️ **aberto** — avaliar uma tabela `devices_summary` para o dashboard ler do banco, não do
+  ACS. É a última das quatro peças do muro, e a única que ainda não tem decisão tomada.
 
 **Roadmap dos outros modos** (mesma interface, sem reescrever o `DeviceService`):
 - `agent`: agente instalado no provedor abre WebSocket **de saída** para o SaaS; o conector
