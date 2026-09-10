@@ -562,7 +562,6 @@ export default {
 
   'tenant.exportFailed': 'प्रदाता का डेटा निर्यात नहीं किया जा सका',
 
-  'sgp.error.blockedHost': 'SGP का URL ऐसे पते की ओर इशारा करता है जिस तक यह इंस्टॉलेशन नहीं पहुँच सकता',
   'auth.emailInvalid': 'एक वैध ईमेल पता आवश्यक है',
   'auth.emailTaken': 'यह ईमेल पता पहले से उपयोग में है',
   'auth.emailUpdated': 'लॉगिन ईमेल अपडेट किया गया',

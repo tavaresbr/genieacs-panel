@@ -5,6 +5,7 @@ import { asTenant, authHeaders, call, startTestServers, stopTestServers } from '
 import { buildDevice, startGenieAcsStub } from './helpers/genieacs-stub.js';
 
 const { default: DeviceService } = await import('../src/services/deviceService.js');
+const { connectorFor } = await import('../src/services/genieacs/connector.js');
 
 // The marker never appears in anything the panel is allowed to say. A response
 // carrying it came from a host the operator did not configure, or from a body
@@ -67,7 +68,15 @@ afterEach(() => {
 
 describe('the endpoint cannot choose the host', () => {
   it('builds an absolute endpoint under the configured base instead of obeying it', async () => {
-    const url = await asTenant(() => DeviceService.buildGenieAcsUrl(`${internal.url}/latest/meta-data`));
+    // A afirmação é a mesma de antes; o que mudou foi de quem ela é. A Fase 4
+    // tirou de `DeviceService` a montagem de URL: ele devolve um caminho
+    // relativo (`devicePath`) e quem resolve o destino é o conector. Continua
+    // sendo a raiz configurada que decide o host, e um endpoint que se parece
+    // com URL absoluta continua caindo debaixo dela.
+    const connector = await asTenant(() => connectorFor());
+    const url = await asTenant(() => connector.urlFor(
+      DeviceService.devicePath(`${internal.url}/latest/meta-data`)
+    ));
 
     assert.equal(url.origin, new URL(genie.url).origin);
     assert.ok(url.pathname.startsWith('/devices/'), `unexpected path: ${url.pathname}`);

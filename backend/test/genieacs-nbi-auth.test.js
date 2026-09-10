@@ -59,7 +59,9 @@ describe('toda chamada à NBI passa pelo mesmo lugar', () => {
    * ninguém pensou em cobrir.
    */
   it('nenhuma chamada ao ACS monta os próprios headers', () => {
-    const fonte = fs.readFileSync(path.join(SRC, 'services', 'deviceService.js'), 'utf8');
+    const fonte = fs.readFileSync(
+      path.join(SRC, 'services', 'genieacs', 'direct.js'), 'utf8'
+    );
     const linhas = fonte.split('\n');
 
     const chamadas = [];
@@ -76,13 +78,56 @@ describe('toda chamada à NBI passa pelo mesmo lugar', () => {
       chamadas.push({ linha: i + 1, bloco });
     });
 
-    assert.ok(chamadas.length >= 7,
-      `só ${chamadas.length} chamadas encontradas — a varredura parou de casar`);
+    // Uma, e é o ponto da Fase 4: as sete chamadas de `deviceService` viraram
+    // uma, no conector. A varredura vale mais assim, não menos — antes ela
+    // precisava conferir sete lugares e podia perder o oitavo; agora o oitavo
+    // lugar simplesmente não existe, e o caso abaixo é quem garante isso.
+    assert.equal(chamadas.length, 1,
+      `esperava uma chamada no conector, achei ${chamadas.length}`);
 
     const semCredencial = chamadas
       .filter(({ bloco }) => !/GenieAcsAuthService\.nbiHeaders\(/.test(bloco))
-      .map(({ linha }) => `deviceService.js:${linha}`);
+      .map(({ linha }) => `direct.js:${linha}`);
     assert.deepEqual(semCredencial, []);
+  });
+
+  /**
+   * O que substituiu a varredura das sete: **nenhum outro arquivo fala com o
+   * ACS**.
+   *
+   * A garantia antiga era "cada uma das sete põe a credencial", e ela tinha um
+   * buraco por construção — a oitava chamada, escrita em qualquer lugar, nascia
+   * sem credencial e sem ninguém para notar. Esta é mais forte: só o conector
+   * alcança o egresso, então uma chamada nova ou passa por ele (e leva tudo:
+   * credencial, prazo, vaga de concorrência, pinagem de DNS) ou aparece aqui.
+   */
+  it('e nenhum arquivo fora do conector alcança o egresso do ACS', () => {
+    const permitidos = new Set([
+      path.join(SRC, 'services', 'genieacs', 'direct.js'),
+      // O próprio egresso, que é quem implementa o `fetch` pinado.
+      path.join(SRC, 'services', 'genieacsEgress.js'),
+      // O botão de testar conexão: o destino vem do corpo do request, então ele
+      // é o único ponto que legitimamente NÃO passa pela raiz configurada — e
+      // por isso mesmo é o que decide sozinho se leva a credencial, comparando
+      // a origem testada com a salva. Ver `settingsController`.
+      path.join(SRC, 'controllers', 'settingsController.js')
+    ]);
+
+    const infratores = [];
+    const varrer = (dir) => {
+      for (const entrada of fs.readdirSync(dir, { withFileTypes: true })) {
+        const caminho = path.join(dir, entrada.name);
+        if (entrada.isDirectory()) { varrer(caminho); continue; }
+        if (!entrada.name.endsWith('.js')) continue;
+        if (permitidos.has(caminho)) continue;
+        const fonte = fs.readFileSync(caminho, 'utf8');
+        if (/GenieAcsEgress\.fetch\(/.test(fonte)) {
+          infratores.push(path.relative(SRC, caminho));
+        }
+      }
+    };
+    varrer(SRC);
+    assert.deepEqual(infratores, []);
   });
 });
 

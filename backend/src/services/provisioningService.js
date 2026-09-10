@@ -867,9 +867,7 @@ class ProvisioningService {
       settings.vpPppoeUsername
     ].filter(Boolean);
 
-    const data = await DeviceService.fetchFromGenieAcs(
-      `?projection=${encodeURIComponent(projection.join(','))}`
-    );
+    const data = await DeviceService.fetchFromGenieAcs('', { projection: projection.join(',') });
     if (!Array.isArray(data)) return [];
 
     const now = Date.now();
