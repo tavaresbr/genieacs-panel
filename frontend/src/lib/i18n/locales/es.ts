@@ -1377,6 +1377,7 @@ const es: Dictionary = {
   'whatsapp.error.attachmentTooLarge': 'El archivo supera {max} MB.',
   'whatsapp.error.attachmentEmpty': 'El archivo está vacío.',
   'whatsapp.error.attachmentTypeNotAllowed': 'Ese tipo de archivo no se envía desde aquí.',
+  'whatsapp.error.attachmentNotAllowed': 'Ese adjunto no se puede enviar desde aquí.',
   'whatsapp.error.attachmentNotFound': 'Ese adjunto ya no está en disco.',
   'whatsapp.error.noPublicUrl': 'Configura la URL pública del webhook antes de enviar adjuntos: es por donde el servidor Evolution busca el archivo.',
   'whatsapp.error.conversationNotFound': 'Esta conversación ya no existe.',

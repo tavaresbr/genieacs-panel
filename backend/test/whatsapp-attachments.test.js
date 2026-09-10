@@ -226,6 +226,45 @@ describe('WhatsApp attachments — what the operator uploads', () => {
     assert.equal(fs.existsSync(path.join(DATA_DIR, row.attachment_path)), true);
   });
 
+  /**
+   * O caminho do anexo chega do navegador, e a única coisa que ele deveria ser
+   * é o que a rota de upload acabou de devolver. Sem confinar, `DATA_DIR`
+   * inteiro ficava legível: é lá que moram `db-config.json`, com as credenciais
+   * do banco em texto claro, e o `panel.sqlite`.
+   *
+   * `isNote: true` é o que deixava o ataque limpo — pula as checagens de
+   * destino e de conta, então não precisa de número de WhatsApp e nada chega a
+   * cliente nenhum.
+   */
+  it('refuses an attachment path the upload route never minted', async () => {
+    for (const caminho of [
+      'db-config.json',
+      'panel.sqlite',
+      'wa-media/t2/c9/de-outro-provedor.png',
+      'wa-media/t1/entrada/recebido.png',
+      '../../../etc/passwd'
+    ]) {
+      const recusada = await enviar({
+        isNote: true,
+        body: 'n',
+        attachment: { path: caminho, type: 'application/json', name: 'x.json' }
+      });
+      assert.equal(recusada.status, 400, caminho);
+      assert.equal(recusada.body.code, 'attachment_not_allowed', caminho);
+    }
+  });
+
+  it('refuses a path that climbs back out of the outbound folder', async () => {
+    const stored = await upload(PNG, { type: 'image/png', name: 'ok.png' });
+    // Começa dentro da pasta certa e sobe: é o caso que uma checagem de prefixo
+    // feita antes de resolver `..` deixaria passar.
+    const fuga = `${stored.body.data.path}/../../../../db-config.json`;
+    const recusada = await enviar({ isNote: true, body: 'n', attachment: { path: fuga } });
+
+    assert.equal(recusada.status, 400);
+    assert.equal(recusada.body.code, 'attachment_not_allowed');
+  });
+
   it('keeps an internal note a note when it carries a file', async () => {
     const stored = await upload(PNG, { type: 'image/png', name: 'interno.png' });
     const enviada = await enviar({

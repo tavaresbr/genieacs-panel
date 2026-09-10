@@ -1386,6 +1386,7 @@ const ja: Dictionary = {
   'whatsapp.error.attachmentTooLarge': 'ファイルが {max} MB を超えています。',
   'whatsapp.error.attachmentEmpty': 'ファイルが空です.',
   'whatsapp.error.attachmentTypeNotAllowed': 'その種類のファイルはここからは送れません。',
+  'whatsapp.error.attachmentNotAllowed': 'その添付ファイルはここからは送れません。',
   'whatsapp.error.attachmentNotFound': 'その添付ファイルはもうディスクにありません。',
   'whatsapp.error.noPublicUrl': '添付を送る前に公開Webhook URLを設定してください。Evolutionサーバーはそこからファイルを取得します。',
   'whatsapp.error.conversationNotFound': 'この会話はもう存在しません。',

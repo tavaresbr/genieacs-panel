@@ -427,6 +427,7 @@ export default {
   'whatsapp.error.attachmentTooLarge': 'Die Datei ist größer als {max} MB',
   'whatsapp.error.attachmentEmpty': 'Die Datei ist leer',
   'whatsapp.error.attachmentTypeNotAllowed': 'Diese Art von Datei kann von hier nicht gesendet werden',
+  'whatsapp.error.attachmentNotAllowed': 'Dieser Anhang kann von hier nicht gesendet werden',
   'whatsapp.error.noPublicUrl': 'Setze die öffentliche Webhook-URL, bevor du Anhänge sendest: von dort holt der Evolution-Server die Datei',
   'whatsapp.attachmentStored': 'Datei bereit zum Senden',
   'whatsapp.mediaSwept': '{files} Datei(en) gelöscht, {mb} MB frei',

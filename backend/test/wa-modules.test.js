@@ -2,7 +2,14 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { extractHost, parseAllowedHosts, hostMatchesPattern, isHostAllowed } from '../src/utils/wa/hostAllowlist.js';
-import { parseIPv4, isPrivateIPv4, isPrivateIPv6, isBlockedHost } from '../src/utils/wa/ssrfGuard.js';
+import {
+  parseIPv4,
+  isPrivateIPv4,
+  isPrivateIPv6,
+  isBlockedHost,
+  assertPublicUrl,
+  SsrfBlockedError
+} from '../src/utils/wa/ssrfGuard.js';
 import { normalizeEvoUrl } from '../src/utils/wa/evolutionPolicy.js';
 import { classificarJid, telefoneDoJid } from '../src/utils/wa/waJid.js';
 import { destinoWa, normalizarTelefoneBr } from '../src/utils/wa/waDestino.js';
@@ -83,6 +90,43 @@ describe('ssrf guard', () => {
     assert.equal(isPrivateIPv6('fe80::1'), true);
     assert.equal(isPrivateIPv6('::ffff:127.0.0.1'), true);
     assert.equal(isPrivateIPv6('2001:4860:4860::8888'), false);
+  });
+
+  /**
+   * A grafia que importa é a que o `new URL()` produz, não a que se escreve.
+   *
+   * O teste acima passa `::ffff:127.0.0.1` como string crua e sempre passou —
+   * mas nenhum host chega assim em produção: o serializador do WHATWG reescreve
+   * para hextetos antes de o guard ver. Por isso este teste vai por `new URL`,
+   * que é o único caminho que reproduz o que o `assertPublicUrl` recebe.
+   */
+  test('blocks embedded IPv4 in the spelling new URL() actually produces', () => {
+    const host = (u) => new URL(u).hostname;
+    for (const u of [
+      'http://[::ffff:127.0.0.1]/',          // -> [::ffff:7f00:1]
+      'http://[::ffff:169.254.169.254]/',    // metadados da cloud
+      'http://[::ffff:10.0.0.1]/',
+      'http://[::ffff:192.168.1.1]/',
+      'http://[::7f00:1]/',                  // IPv4-compatible
+      'http://[64:ff9b::169.254.169.254]/',  // NAT64
+      'http://[2002:a9fe:a9fe::]/'           // 6to4
+    ]) {
+      assert.equal(isBlockedHost(host(u)), true, u);
+    }
+    // Um IPv4 público embutido continua público.
+    assert.equal(isBlockedHost(host('http://[::ffff:203.0.113.7]/')), false);
+    assert.equal(isBlockedHost(host('http://[2001:4860:4860::8888]/')), false);
+  });
+
+  test('refuses an address that claims an IPv4 it cannot parse', () => {
+    assert.equal(isPrivateIPv6('::ffff:999.1.1.1'), true);
+  });
+
+  test('assertPublicUrl refuses a bracketed literal that maps to loopback', async () => {
+    await assert.rejects(
+      () => assertPublicUrl('http://[::ffff:127.0.0.1]:41999/'),
+      (error) => error instanceof SsrfBlockedError
+    );
   });
 
   test('blocks internal-sounding names, and the decimal form of loopback', () => {

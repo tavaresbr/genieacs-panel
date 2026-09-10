@@ -1385,6 +1385,7 @@ const ru: Dictionary = {
   'whatsapp.error.attachmentTooLarge': 'Файл больше {max} МБ.',
   'whatsapp.error.attachmentEmpty': 'Файл пуст.',
   'whatsapp.error.attachmentTypeNotAllowed': 'Файлы такого типа отсюда отправить нельзя.',
+  'whatsapp.error.attachmentNotAllowed': 'Это вложение отсюда отправить нельзя.',
   'whatsapp.error.attachmentNotFound': 'Этого вложения больше нет на диске.',
   'whatsapp.error.noPublicUrl': 'Укажите публичный адрес webhook перед отправкой вложений: с этого адреса их забирает сервер Evolution.',
   'whatsapp.error.conversationNotFound': 'Этого диалога больше не существует.',

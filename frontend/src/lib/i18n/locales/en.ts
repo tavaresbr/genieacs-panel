@@ -1379,6 +1379,7 @@ const en = {
   'whatsapp.error.attachmentTooLarge': 'The file is larger than {max} MB.',
   'whatsapp.error.attachmentEmpty': 'The file is empty.',
   'whatsapp.error.attachmentTypeNotAllowed': 'That kind of file cannot be sent from here.',
+  'whatsapp.error.attachmentNotAllowed': 'That attachment cannot be sent from here.',
   'whatsapp.error.attachmentNotFound': 'That attachment is no longer on disk.',
   'whatsapp.error.noPublicUrl': 'Set the public webhook URL before sending attachments: it is the address the Evolution server fetches them from.',
   'whatsapp.error.conversationNotFound': 'This conversation no longer exists.',

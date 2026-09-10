@@ -427,6 +427,7 @@ export default {
   'whatsapp.error.attachmentTooLarge': 'Файл больше {max} МБ',
   'whatsapp.error.attachmentEmpty': 'Файл пуст',
   'whatsapp.error.attachmentTypeNotAllowed': 'Файлы такого типа отсюда отправить нельзя',
+  'whatsapp.error.attachmentNotAllowed': 'Это вложение отсюда отправить нельзя',
   'whatsapp.error.noPublicUrl': 'Укажите публичный адрес webhook перед отправкой вложений: с этого адреса их забирает сервер Evolution',
   'whatsapp.attachmentStored': 'Файл готов к отправке',
   'whatsapp.mediaSwept': 'Удалено файлов: {files}, освобождено {mb} МБ',
