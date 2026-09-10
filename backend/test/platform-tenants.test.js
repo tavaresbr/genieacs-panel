@@ -40,10 +40,10 @@ const { forEachTenant } = await import('../src/config/tenantJobs.js');
 
 const run = promisify(execFile);
 
-const OWNER = { username: 'owner', password: 'owner-senha-1' };
+const OWNER = { username: 'owner', password: 'owner-senha-1', email: 'owner@exemplo.test' };
 // An administrator at the installation's own provider and nothing more. The
 // point of the control plane is that this is not enough.
-const COMUM = { username: 'comum', password: 'comum-senha-1' };
+const COMUM = { username: 'comum', password: 'comum-senha-1', email: 'comum@exemplo.test' };
 
 // One vendor, one security mapping, one product-class config: the smallest
 // catalogue that still proves the copy remaps the foreign key.

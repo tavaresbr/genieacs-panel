@@ -193,7 +193,7 @@ describe('aceitar', () => {
     assert.equal(previa.body.data.role, 'tech');
 
     const { status, body } = await callAs(ALFA, `${panelUrl}/api/invites/token/${token}/accept`, {
-      method: 'POST', body: { username: 'plantao-novo', password: 'senha-do-plantao-1' }
+      method: 'POST', body: { username: 'plantao-novo', password: 'senha-do-plantao-1', email: 'plantao-novo@exemplo.test' }
     });
     assert.equal(status, 201, JSON.stringify(body));
     assert.equal(body.data.user.role, 'tech');
@@ -215,7 +215,7 @@ describe('aceitar', () => {
     const { token } = await convidar(BETA, betaOwnerToken, { role: 'viewer' });
 
     const errada = await callAs(BETA, `${panelUrl}/api/invites/token/${token}/accept`, {
-      method: 'POST', body: { username: 'plantao-novo', password: 'chute-errado-1' }
+      method: 'POST', body: { username: 'plantao-novo', password: 'chute-errado-1', email: 'plantao-novo@exemplo.test' }
     });
     assert.equal(errada.status, 401, 'sem a senha, não entra');
     // E o convite continua de pé: uma tentativa errada não pode queimá-lo, ou
@@ -223,7 +223,7 @@ describe('aceitar', () => {
     assert.equal((await callAs(BETA, `${panelUrl}/api/invites/token/${token}`)).status, 200);
 
     const certa = await callAs(BETA, `${panelUrl}/api/invites/token/${token}/accept`, {
-      method: 'POST', body: { username: 'plantao-novo', password: 'senha-do-plantao-1' }
+      method: 'POST', body: { username: 'plantao-novo', password: 'senha-do-plantao-1', email: 'plantao-novo@exemplo.test' }
     });
     assert.equal(certa.status, 201, JSON.stringify(certa.body));
     assert.equal(Number(certa.body.data.user.tenantId), Number(beta));
@@ -240,7 +240,7 @@ describe('aceitar', () => {
   it('não anexa duas vezes', async () => {
     const { token } = await convidar(BETA, betaOwnerToken, { role: 'admin' });
     const { status } = await callAs(BETA, `${panelUrl}/api/invites/token/${token}/accept`, {
-      method: 'POST', body: { username: 'plantao-novo', password: 'senha-do-plantao-1' }
+      method: 'POST', body: { username: 'plantao-novo', password: 'senha-do-plantao-1', email: 'plantao-novo@exemplo.test' }
     });
     assert.equal(status, 409);
   });
@@ -267,10 +267,10 @@ describe('aceitar', () => {
     const { token } = await convidar(ALFA, alfaAdminToken);
     const respostas = await Promise.all([
       callAs(ALFA, `${panelUrl}/api/invites/token/${token}/accept`, {
-        method: 'POST', body: { username: 'corrida-um', password: 'senha-corrida-1' }
+        method: 'POST', body: { username: 'corrida-um', password: 'senha-corrida-1', email: 'corrida-um@exemplo.test' }
       }),
       callAs(ALFA, `${panelUrl}/api/invites/token/${token}/accept`, {
-        method: 'POST', body: { username: 'corrida-dois', password: 'senha-corrida-2' }
+        method: 'POST', body: { username: 'corrida-dois', password: 'senha-corrida-2', email: 'corrida-dois@exemplo.test' }
       })
     ]);
 
@@ -297,12 +297,12 @@ describe('aceitar', () => {
   it('não deixa a pessoa criada sobrar quando o convite já foi usado', async () => {
     const { token } = await convidar(ALFA, alfaAdminToken);
     const primeira = await callAs(ALFA, `${panelUrl}/api/invites/token/${token}/accept`, {
-      method: 'POST', body: { username: 'primeiro-a-clicar', password: 'senha-primeira-1' }
+      method: 'POST', body: { username: 'primeiro-a-clicar', password: 'senha-primeira-1', email: 'primeiro-a-clicar@exemplo.test' }
     });
     assert.equal(primeira.status, 201);
 
     const segunda = await callAs(ALFA, `${panelUrl}/api/invites/token/${token}/accept`, {
-      method: 'POST', body: { username: 'segundo-a-clicar', password: 'senha-segunda-1' }
+      method: 'POST', body: { username: 'segundo-a-clicar', password: 'senha-segunda-1', email: 'segundo-a-clicar@exemplo.test' }
     });
     assert.equal(segunda.status, 404);
 
@@ -328,7 +328,7 @@ describe('as cinco maneiras de um convite não servir', () => {
   async function registrar(nome, token, host = ALFA) {
     const previa = await callAs(host, `${panelUrl}/api/invites/token/${token}`);
     const aceite = await callAs(host, `${panelUrl}/api/invites/token/${token}/accept`, {
-      method: 'POST', body: { username: 'alguem-de-fora', password: 'senha-de-fora-1' }
+      method: 'POST', body: { username: 'alguem-de-fora', password: 'senha-de-fora-1', email: 'alguem-de-fora@exemplo.test' }
     });
     assert.equal(previa.status, 404, `${nome}: prévia`);
     assert.equal(aceite.status, 404, `${nome}: aceite`);
@@ -357,7 +357,7 @@ describe('as cinco maneiras de um convite não servir', () => {
   it('convite já aceito', async () => {
     const { token } = await convidar(ALFA, alfaAdminToken);
     const aceite = await callAs(ALFA, `${panelUrl}/api/invites/token/${token}/accept`, {
-      method: 'POST', body: { username: 'ja-aceitou', password: 'senha-aceita-1' }
+      method: 'POST', body: { username: 'ja-aceitou', password: 'senha-aceita-1', email: 'ja-aceitou@exemplo.test' }
     });
     assert.equal(aceite.status, 201);
     await registrar('aceito', token);

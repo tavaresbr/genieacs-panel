@@ -562,4 +562,10 @@ export default {
   'audit.listFailed': '감사 로그를 읽지 못했습니다',
 
   'tenant.exportFailed': '사업자 데이터를 내보내지 못했습니다',
+
+  'auth.emailInvalid': '유효한 이메일 주소가 필요합니다',
+  'auth.emailTaken': '이미 사용 중인 이메일 주소입니다',
+  'auth.emailUpdated': '로그인 이메일을 변경했습니다',
+  'auth.emailChangeRequired': '현재 비밀번호와 새 이메일 주소가 필요합니다',
+  'auth.emailReadiness': '이메일 등록 현황을 가져왔습니다',
 };

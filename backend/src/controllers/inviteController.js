@@ -7,7 +7,7 @@ import { getDb } from '../config/database.js';
 import AuditLog from '../models/AuditLog.js';
 import { ROLES, normalizeRole, roleHas } from '../config/permissions.js';
 import { generateTokens } from '../middleware/auth.js';
-import { createResponse, createErrorResponse } from '../utils/helpers.js';
+import { createResponse, createErrorResponse, isValidEmail } from '../utils/helpers.js';
 
 const BCRYPT_ROUNDS = 12;
 
@@ -184,6 +184,7 @@ class InviteController {
 
       const username = String(req.body?.username ?? '').trim();
       const password = String(req.body?.password ?? '');
+      const email = User.normalizeEmail(req.body?.email);
       if (username.length < 3 || username.length > 64) {
         return res.status(400).json(createErrorResponse(req.t('auth.usernameLength')));
       }
@@ -192,7 +193,11 @@ class InviteController {
       }
 
       const role = normalizeRole(invite.role);
-      const existente = await User.findByUsername(username);
+      // Nome OU e-mail, pelo mesmo motivo do plano de controle: quem já tem
+      // conta e já migrou vai digitar o endereço, não o nome antigo — e sem
+      // isto o convite tentaria criar uma segunda conta para ela e esbarraria
+      // no índice único, com uma mensagem que não explica nada.
+      const existente = await User.findByLogin(username);
       let userId;
 
       if (existente) {
@@ -212,13 +217,25 @@ class InviteController {
         userId = existente.id;
       }
 
+      // O e-mail só é exigido de quem está criando conta AQUI. Quem já tem
+      // conta entra com a que tem, e o endereço dela — cadastrado ou não — é
+      // assunto do perfil dela, não deste convite: pedi-lo agora faria o
+      // convite de um provedor mexer no login que a pessoa usa em outro.
+      if (!existente && (!email || !isValidEmail(email))) {
+        return res.status(400).json(createErrorResponse(req.t('auth.emailInvalid')));
+      }
+      if (!existente && await User.loginConflict({ username, email })) {
+        return res.status(409).json(createErrorResponse(req.t('auth.usernameTaken')));
+      }
+
       const trx = await getDb().transaction();
       try {
         if (!existente) {
           userId = await User.create({
             username,
             password: await bcrypt.hash(password, BCRYPT_ROUNDS),
-            role
+            role,
+            email
           }, trx);
         }
         // O consumo vai ANTES do vínculo e dentro da mesma transação. O UPDATE
@@ -265,6 +282,7 @@ class InviteController {
         user: {
           id: user.id,
           username: user.username,
+          email: user.email ?? null,
           role: membership.role,
           tenantId: Number(membership.tenant_id),
           isPlatformAdmin: false,

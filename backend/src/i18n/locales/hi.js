@@ -375,7 +375,7 @@ export default {
   'sgp.error.urlInvalid': 'वैध SGP पता दर्ज करें (https://provider.sgp.net.br)',
   'sgp.error.urlScheme': 'SGP पता HTTP या HTTPS होना चाहिए',
   'sgp.error.urlCredentials': 'SGP पते में उपयोगकर्ता या पासवर्ड नहीं होना चाहिए',
-  'sgp.error.blockedHost': 'SGP पता ऐसे नेटवर्क पते की ओर इशारा करता है जिस तक इस इंस्टॉलेशन को पहुँचने की अनुमति नहीं है',
+  'sgp.error.blockedHost': 'SGP पता ऐसे पते की ओर संकेत करता है जिस तक यह इंस्टॉलेशन नहीं पहुँच सकता',
   'sgp.error.pathsRelative': 'SGP API पथ सापेक्ष होने चाहिए, जैसे /api/ura/titulos/',
   'sgp.error.configIncomplete': 'एकीकरण सक्षम करने से पहले SGP पता, ऐप और टोकन दर्ज करें',
   'sgp.error.notConfigured': 'SGP एकीकरण कॉन्फ़िगर नहीं है',
@@ -561,4 +561,10 @@ export default {
   'audit.listFailed': 'ऑडिट ट्रेल नहीं पढ़ा जा सका',
 
   'tenant.exportFailed': 'प्रदाता का डेटा निर्यात नहीं किया जा सका',
+
+  'auth.emailInvalid': 'एक वैध ईमेल पता आवश्यक है',
+  'auth.emailTaken': 'यह ईमेल पता पहले से उपयोग में है',
+  'auth.emailUpdated': 'लॉगिन ईमेल अपडेट किया गया',
+  'auth.emailChangeRequired': 'वर्तमान पासवर्ड और नया ईमेल पता आवश्यक हैं',
+  'auth.emailReadiness': 'ईमेल की स्थिति प्राप्त की गई',
 };

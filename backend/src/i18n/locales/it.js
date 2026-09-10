@@ -557,4 +557,10 @@ export default {
   'audit.listFailed': 'Impossibile leggere il registro di controllo',
 
   'tenant.exportFailed': 'Impossibile esportare i dati del provider',
+
+  'auth.emailInvalid': 'È richiesto un indirizzo email valido',
+  'auth.emailTaken': 'Quell\'indirizzo email è già in uso',
+  'auth.emailUpdated': 'Email di accesso aggiornata',
+  'auth.emailChangeRequired': 'La password attuale e il nuovo indirizzo email sono obbligatori',
+  'auth.emailReadiness': 'Stato delle email recuperato',
 };

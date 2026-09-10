@@ -559,4 +559,10 @@ export default {
   'audit.listFailed': '无法读取审计日志',
 
   'tenant.exportFailed': '无法导出服务商数据',
+
+  'auth.emailInvalid': '需要有效的电子邮件地址',
+  'auth.emailTaken': '该电子邮件地址已被使用',
+  'auth.emailUpdated': '登录邮箱已更新',
+  'auth.emailChangeRequired': '需要当前密码和新的电子邮件地址',
+  'auth.emailReadiness': '已获取邮箱登记情况',
 };
