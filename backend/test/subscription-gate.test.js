@@ -37,7 +37,7 @@ before(async () => {
   alfa = await defaultTenantId();
   const setup = await call(`${panelUrl}/api/auth/setup`, {
     method: 'POST',
-    body: { username: 'owner', password: 'owner-senha-1' }
+    body: { username: 'owner', password: 'owner-senha-1', email: 'owner@exemplo.test' }
   });
   assert.equal(setup.status, 201);
   ownerToken = setup.body.data.token;
@@ -67,7 +67,7 @@ const read = () => call(`${panelUrl}/api/users`, { headers: authHeaders(ownerTok
 const write = () => call(`${panelUrl}/api/users`, {
   method: 'POST',
   headers: authHeaders(ownerToken),
-  body: { username: 'alguem', password: 'senha-de-alguem-1', role: 'viewer' }
+  body: { username: 'alguem', password: 'senha-de-alguem-1', role: 'viewer', email: 'alguem@exemplo.test' }
 });
 
 describe('the states that pass', () => {
@@ -173,7 +173,7 @@ describe('what stays open on a blocked provider', () => {
     await setState({ status: 'suspended' });
 
     const signIn = await call(`${panelUrl}/api/auth/login`, {
-      method: 'POST', body: { username: 'owner', password: 'owner-senha-1' }
+      method: 'POST', body: { username: 'owner', password: 'owner-senha-1', email: 'owner@exemplo.test' }
     });
     assert.equal(signIn.status, 200, 'entrar é como se vê o aviso');
 

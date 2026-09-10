@@ -560,6 +560,11 @@ export default {
 
   'tenant.exportFailed': '无法导出服务商数据',
 
+  'auth.emailInvalid': '需要有效的电子邮件地址',
+  'auth.emailTaken': '该电子邮件地址已被使用',
+  'auth.emailUpdated': '登录邮箱已更新',
+  'auth.emailChangeRequired': '需要当前密码和新的电子邮件地址',
+  'auth.emailReadiness': '已获取邮箱登记情况',
   'subscription.pastDue': '订阅已逾期。在记录付款之前，面板为只读。',
   'subscription.trialExpired': '试用期已结束。在激活套餐之前，面板为只读。',
   'subscription.suspended': '该运营商的订阅已暂停。请联系平台。',

@@ -44,6 +44,7 @@ class TenantUser {
       .select(
         'users.id',
         'users.username',
+        'users.email',
         'users.created_at',
         'users.updated_at',
         'tenant_users.role',

@@ -28,7 +28,7 @@ before(async () => {
   ({ panelUrl } = await startTestServers());
   alfa = await defaultTenantId();
   const setup = await call(`${panelUrl}/api/auth/setup`, {
-    method: 'POST', body: { username: 'owner', password: 'owner-senha-1' }
+    method: 'POST', body: { username: 'owner', password: 'owner-senha-1', email: 'owner@exemplo.test' }
   });
   assert.equal(setup.status, 201);
   ownerToken = setup.body.data.token;
@@ -58,7 +58,7 @@ afterEach(async () => {
 const hire = (username) => call(`${panelUrl}/api/users`, {
   method: 'POST',
   headers: authHeaders(ownerToken),
-  body: { username, password: `senha-${username}-123`, role: 'viewer' }
+  body: { username, password: `senha-${username}-123`, role: 'viewer', email: `${username}@exemplo.test` }
 });
 
 describe('operators', () => {
@@ -87,7 +87,7 @@ describe('operators', () => {
     const token = created.body.data.token;
 
     const accepted = await call(`${panelUrl}/api/invites/token/${token}/accept`, {
-      method: 'POST', body: { username: 'novato', password: 'senha-novato-123' }
+      method: 'POST', body: { username: 'novato', password: 'senha-novato-123', email: 'novato@exemplo.test' }
     });
     assert.equal(accepted.status, 402);
     assert.equal(accepted.body.code, 'plan_limit_operators');
@@ -98,7 +98,7 @@ describe('operators', () => {
     // With room again, the same link works.
     await onPlan(unlimited);
     const retried = await call(`${panelUrl}/api/invites/token/${token}/accept`, {
-      method: 'POST', body: { username: 'novato', password: 'senha-novato-123' }
+      method: 'POST', body: { username: 'novato', password: 'senha-novato-123', email: 'novato@exemplo.test' }
     });
     assert.equal(retried.status, 201);
   });

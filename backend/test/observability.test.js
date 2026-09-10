@@ -31,7 +31,7 @@ before(async () => {
   ({ panelUrl } = await startTestServers());
   tenantId = await defaultTenantId();
   const setup = await call(`${panelUrl}/api/auth/setup`, {
-    method: 'POST', body: { username: 'owner', password: 'owner-senha-1' }
+    method: 'POST', body: { username: 'owner', password: 'owner-senha-1', email: 'owner@exemplo.test' }
   });
   assert.equal(setup.status, 201);
   ownerToken = setup.body.data.token;
@@ -41,11 +41,11 @@ before(async () => {
   }
   const hire = await call(`${panelUrl}/api/users`, {
     method: 'POST', headers: authHeaders(ownerToken),
-    body: { username: 'comum', password: 'comum-senha-1', role: 'admin' }
+    body: { username: 'comum', password: 'comum-senha-1', role: 'admin', email: 'comum@exemplo.test' }
   });
   assert.equal(hire.status, 201);
   const signIn = await call(`${panelUrl}/api/auth/login`, {
-    method: 'POST', body: { username: 'comum', password: 'comum-senha-1' }
+    method: 'POST', body: { username: 'comum', password: 'comum-senha-1', email: 'comum@exemplo.test' }
   });
   commonToken = signIn.body.data.token;
   setLogSink((line) => lines.push(line));

@@ -558,6 +558,11 @@ export default {
 
   'tenant.exportFailed': 'Impossibile esportare i dati del provider',
 
+  'auth.emailInvalid': 'È richiesto un indirizzo email valido',
+  'auth.emailTaken': 'Quell\'indirizzo email è già in uso',
+  'auth.emailUpdated': 'Email di accesso aggiornata',
+  'auth.emailChangeRequired': 'La password attuale e il nuovo indirizzo email sono obbligatori',
+  'auth.emailReadiness': 'Stato delle email recuperato',
   'subscription.pastDue': 'L\'abbonamento è scaduto. Il pannello è in sola lettura finché il pagamento non viene registrato.',
   'subscription.trialExpired': 'Il periodo di prova è terminato. Il pannello è in sola lettura finché non viene attivato un piano.',
   'subscription.suspended': 'L\'abbonamento di questo provider è sospeso. Contatta la piattaforma.',

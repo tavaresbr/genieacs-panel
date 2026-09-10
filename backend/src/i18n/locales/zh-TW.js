@@ -560,6 +560,11 @@ export default {
 
   'tenant.exportFailed': '無法匯出服務商資料',
 
+  'auth.emailInvalid': '需要有效的電子郵件地址',
+  'auth.emailTaken': '該電子郵件地址已被使用',
+  'auth.emailUpdated': '登入電子郵件已更新',
+  'auth.emailChangeRequired': '需要目前的密碼和新的電子郵件地址',
+  'auth.emailReadiness': '已取得電子郵件登錄情況',
   'subscription.pastDue': '訂閱已逾期。在記錄付款之前，面板為唯讀。',
   'subscription.trialExpired': '試用期已結束。在啟用方案之前，面板為唯讀。',
   'subscription.suspended': '此業者的訂閱已暫停。請聯絡平台。',

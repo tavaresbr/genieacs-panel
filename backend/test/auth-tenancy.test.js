@@ -32,20 +32,20 @@ let beta;
 // One person, one login, administrator at both ISPs: the reseller arrangement
 // the plan refuses to close off, and the sharpest form of the leak test —
 // nothing but the token distinguishes the two requests.
-const CONSULTORA = { username: 'consultora', password: 'consultora-senha-1' };
+const CONSULTORA = { username: 'consultora', password: 'consultora-senha-1', email: 'consultora@exemplo.test' };
 // Ordinary operator at Alfa, administrator at Beta. The role is the
 // membership's, so the same password opens different doors at each.
-const PLANTONISTA = { username: 'plantonista', password: 'plantonista-senha-1' };
+const PLANTONISTA = { username: 'plantonista', password: 'plantonista-senha-1', email: 'plantonista@exemplo.test' };
 // A single membership: the person a token minted before this change belongs to.
-const SOZINHO = { username: 'sozinho', password: 'sozinho-senha-1' };
+const SOZINHO = { username: 'sozinho', password: 'sozinho-senha-1', email: 'sozinho@exemplo.test' };
 // Taken off Alfa's team and on nobody else's. The account is real and the
 // password is right, which is exactly what makes this the dangerous case.
-const DESEMPREGADO = { username: 'desempregado', password: 'desempregado-senha-1' };
+const DESEMPREGADO = { username: 'desempregado', password: 'desempregado-senha-1', email: 'desempregado@exemplo.test' };
 // Taken off Alfa's team and still on Beta's. Removal ends a membership, never
 // a person, so she has to keep the login she uses at her other ISP.
-const REMOVIDA = { username: 'removida', password: 'removida-senha-1' };
+const REMOVIDA = { username: 'removida', password: 'removida-senha-1', email: 'removida@exemplo.test' };
 // The night shift, signed in at both providers at once.
-const NOTURNO = { username: 'noturno', password: 'noturno-senha-1' };
+const NOTURNO = { username: 'noturno', password: 'noturno-senha-1', email: 'noturno@exemplo.test' };
 
 const ACS_ALFA = 'http://acs.alfa.test:7557';
 const ACS_BETA = 'http://acs.beta.test:7557';
@@ -104,7 +104,7 @@ describe('a fresh install', () => {
   it('creates the first administrator AND their membership', async () => {
     const { status, body } = await call(`${panelUrl}/api/auth/setup`, {
       method: 'POST',
-      body: { username: 'owner', password: 'owner-senha-1' }
+      body: { username: 'owner', password: 'owner-senha-1', email: 'owner@exemplo.test' }
     });
     assert.equal(status, 201);
     assert.equal(body.data.user.role, 'admin');

@@ -31,19 +31,23 @@ let carolId;
 let brunoId;
 let biaId;
 
-const CAROL = { username: 'carol', password: 'carol-password-1' };
-const BRUNO = { username: 'bruno', password: 'bruno-password-1' };
+const CAROL = { username: 'carol', password: 'carol-password-1', email: 'carol@exemplo.test' };
+const BRUNO = { username: 'bruno', password: 'bruno-password-1', email: 'bruno@exemplo.test' };
 
 /** MySQL's TIMESTAMP keeps whole seconds, so seeded times carry none. */
 function wholeSecond(date = new Date()) {
   return new Date(Math.floor(date.getTime() / 1000) * 1000);
 }
 
-async function seedPerson({ username, password, role }) {
+async function seedPerson({ username, password, role, email = null }) {
   return insertReturningId('users', {
     username,
     password: bcrypt.hashSync(password, 4),
-    role
+    role,
+    // O e-mail acompanha, senão a linha semeada não tem endereço nenhum e o
+    // caso que prova a colisão por e-mail passaria por não haver com o que
+    // colidir — verde, e provando o contrário do que diz.
+    email
   });
 }
 
@@ -62,7 +66,7 @@ before(async () => {
 
   const setup = await call(`${panelUrl}/api/auth/setup`, {
     method: 'POST',
-    body: { username: 'owner', password: 'owner-password-1' }
+    body: { username: 'owner', password: 'owner-password-1', email: 'owner@exemplo.test' }
   });
   assert.equal(setup.status, 201);
   ownerToken = setup.body.data.token;
@@ -84,7 +88,7 @@ before(async () => {
   const ana = await call(`${panelUrl}/api/users`, {
     method: 'POST',
     headers: authHeaders(ownerToken),
-    body: { username: 'ana', password: 'ana-password-1', role: 'admin' }
+    body: { username: 'ana', password: 'ana-password-1', role: 'admin', email: 'ana@exemplo.test' }
   });
   assert.equal(ana.status, 201);
   anaId = ana.body.data.user.id;
@@ -92,7 +96,7 @@ before(async () => {
   const alice = await call(`${panelUrl}/api/users`, {
     method: 'POST',
     headers: authHeaders(ownerToken),
-    body: { username: 'alice', password: 'alice-password-1', role: 'viewer' }
+    body: { username: 'alice', password: 'alice-password-1', role: 'viewer', email: 'alice@exemplo.test' }
   });
   assert.equal(alice.status, 201);
   aliceId = alice.body.data.user.id;
@@ -192,7 +196,16 @@ describe('somebody who works for another provider', () => {
     const { status } = await call(`${panelUrl}/api/users`, {
       method: 'POST',
       headers: authHeaders(ownerToken),
-      body: { username: BRUNO.username, password: 'guessed-a-username', role: 'admin' }
+      // Com um e-mail NOVO e válido de propósito: assim a recusa só pode vir
+      // do nome já existir, e não de faltar campo no corpo. Um 400 por e-mail
+      // ausente recusaria pelo motivo errado e o teste passaria sem provar
+      // nada sobre o atalho.
+      body: {
+        username: BRUNO.username,
+        password: 'guessed-a-username',
+        role: 'admin',
+        email: 'chute-do-alfa@exemplo.test'
+      }
     });
     // Refused, and refused with the same words a username taken here would get.
     // Creating carries a password, and there is one password per person: taking
@@ -201,6 +214,28 @@ describe('somebody who works for another provider', () => {
     const after = await personOf(brunoId);
     assert.equal(after.password, before.password);
     assert.equal(await membershipOf(alfa, brunoId), undefined);
+  });
+
+  it('nem digitando o e-mail dele, com um nome novo', async () => {
+    // O mesmo atalho pela outra porta, e ela nasceu junto com a coluna de
+    // e-mail: se só o nome fosse conferido, bastaria inventar um `username` e
+    // digitar o endereço do operador do vizinho para tomar a conta dele.
+    const before = await personOf(brunoId);
+    const { status } = await call(`${panelUrl}/api/users`, {
+      method: 'POST',
+      headers: authHeaders(ownerToken),
+      body: {
+        username: 'nome-que-ninguem-tem',
+        password: 'guessed-an-email',
+        role: 'admin',
+        email: BRUNO.email
+      }
+    });
+    assert.equal(status, 409);
+    const after = await personOf(brunoId);
+    assert.equal(after.password, before.password, 'a senha do operador do vizinho foi trocada');
+    assert.equal(await getDb()('users').where({ username: 'nome-que-ninguem-tem' }).first(), undefined,
+      'a conta não pode ser criada com o e-mail de outra pessoa');
   });
 
   it('is not found when the id belongs to nobody at all', async () => {

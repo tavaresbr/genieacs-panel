@@ -37,7 +37,7 @@ export default function Onboarding() {
   const [center, setCenter] = useState<{ lat: string; lng: string }>({ lat: '', lng: '' })
   const [acs, setAcs] = useState({ url: '', authType: 'none' as GenieAcsAuthType, username: '', secret: '' })
   const [testResult, setTestResult] = useState<string | null>(null)
-  const [colleague, setColleague] = useState({ username: '', password: '' })
+  const [colleague, setColleague] = useState({ username: '', email: '', password: '' })
 
   useEffect(() => {
     setName(currentName)
@@ -114,7 +114,7 @@ export default function Onboarding() {
     if (!colleague.username.trim()) { finish(); return }
     setBusy(true)
     try {
-      const res = await usersAPI.create({ username: colleague.username.trim(), password: colleague.password, role: 'tech' })
+      const res = await usersAPI.create({ username: colleague.username.trim(), email: colleague.email.trim(), password: colleague.password, role: 'tech' })
       if (!res.success) { toast.error(res.message || t('settings.saveError')); return }
       finish()
     } finally {
@@ -205,10 +205,14 @@ export default function Onboarding() {
 
           {step === 'team' && (
             <>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div>
                   <label htmlFor="ob-colleague" className="field-label">{t('settings.operators.username')}</label>
                   <input id="ob-colleague" className="modern-input w-full" autoComplete="off" value={colleague.username} onChange={(e) => setColleague((c) => ({ ...c, username: e.target.value }))} />
+                </div>
+                <div>
+                  <label htmlFor="ob-colleague-email" className="field-label">{t('settings.operators.email')}</label>
+                  <input id="ob-colleague-email" type="email" className="modern-input w-full" autoComplete="off" placeholder={t('settings.operators.emailPlaceholder')} value={colleague.email} onChange={(e) => setColleague((c) => ({ ...c, email: e.target.value }))} />
                 </div>
                 <div>
                   <label htmlFor="ob-colleague-pw" className="field-label">{t('login.password')}</label>
@@ -218,7 +222,7 @@ export default function Onboarding() {
               <p className="field-hint">{t('onboarding.team.hint')}</p>
               <div className="flex gap-2">
                 <button type="button" className="modern-button-secondary" disabled={busy} onClick={() => setStep('acs')}>{t('common.back')}</button>
-                <button type="button" className="modern-button" disabled={busy || (colleague.username.trim() !== '' && colleague.password.length < 8)} onClick={() => void saveColleague()}>
+                <button type="button" className="modern-button" disabled={busy || (colleague.username.trim() !== '' && (colleague.password.length < 8 || !colleague.email.includes('@')))} onClick={() => void saveColleague()}>
                   <Icon name="check" size={17} />
                   {colleague.username.trim() ? t('onboarding.team.addAndFinish') : t('onboarding.finish')}
                 </button>

@@ -143,6 +143,15 @@ const tenantUsersTable = (db) => (t) => {
 const usersTable = (db) => (t) => {
   t.increments('id').primary();
   t.string('username', 64).notNullable().unique();
+  // O e-mail com que a pessoa entra. Nulo é legítimo e é o estado de toda conta
+  // que existia antes desta coluna: o login por nome continua valendo enquanto
+  // `LOGIN_REQUIRES_EMAIL` estiver desligado, que é o que permite a troca
+  // acontecer sem um dia de virada em que ninguém entra.
+  //
+  // 255 porque é o limite prático de um endereço; guardado sempre em minúsculas
+  // — ver `User.normalizeEmail` e o porquê de a comparação não poder depender
+  // da colação do banco.
+  t.string('email', 255).unique();
   t.string('password', 255).notNullable();
   t.string('role', 32).notNullable().defaultTo('user');
   addTokenVersion(t);
@@ -2206,6 +2215,32 @@ export const migrations = [
   },
   {
     /**
+     * O e-mail de login, acrescentado NULO.
+     *
+     * Nulo e não preenchido a partir de nada: não há de onde tirar o endereço
+     * de quem já usa o painel, e inventar um (`fulano@localhost`, o username
+     * com um domínio colado) daria a cada conta existente um endereço que
+     * ninguém controla — e que, no dia em que houver redefinição de senha por
+     * e-mail, seria o caminho para dentro dela.
+     *
+     * Por isso a coluna é anulável e o login por nome continua valendo: a
+     * transição é cada pessoa cadastrando o próprio endereço, e não uma
+     * migração adivinhando por elas.
+     */
+    id: '0034_users_email',
+    async isApplied(db) {
+      return db.schema.hasColumn('users', 'email');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('users'))) return;
+      if (await db.schema.hasColumn('users', 'email')) return;
+      await db.schema.alterTable('users', (t) => {
+        t.string('email', 255).unique();
+      });
+    }
+  },
+  {
+    /**
      * Planos, assinaturas e o extrato — a Fase 5.
      *
      * O que a migração NÃO faz é tão importante quanto o que faz. Ela não põe
@@ -2220,7 +2255,7 @@ export const migrations = [
      * quem nasce depois — não pode confundir "existia antes desta migração" com
      * "acabou de ser criado". A migração sabe a diferença; o seed não.
      */
-    id: '0034_plans_and_subscriptions',
+    id: '0035_plans_and_subscriptions',
     async isApplied(db) {
       for (const [name] of BILLING_TABLES) {
         if (!(await db.schema.hasTable(name))) return false;
@@ -2274,7 +2309,7 @@ export const migrations = [
      * por "SkyGenPanel". O setting fica na tabela, por compatibilidade com o
      * que ainda o lê; ninguém mais escreve nele pela tela.
      */
-    id: '0035_tenant_name_from_app_name',
+    id: '0036_tenant_name_from_app_name',
     async isApplied(db) {
       if (!(await db.schema.hasTable('tenants'))) return true;
       const flag = await db('app_state').where({ key: 'tenant_name_migrated' }).first().catch(() => null);

@@ -557,6 +557,11 @@ export default {
 
   'tenant.exportFailed': 'No se pudieron exportar los datos del proveedor',
 
+  'auth.emailInvalid': 'Se requiere una dirección de correo válida',
+  'auth.emailTaken': 'Esa dirección de correo ya está en uso',
+  'auth.emailUpdated': 'Correo de inicio de sesión actualizado',
+  'auth.emailChangeRequired': 'La contraseña actual y la nueva dirección de correo son obligatorias',
+  'auth.emailReadiness': 'Estado del correo obtenido',
   'subscription.pastDue': 'La suscripción está vencida. El panel es de solo lectura hasta que se registre el pago.',
   'subscription.trialExpired': 'El período de prueba terminó. El panel es de solo lectura hasta que se active un plan.',
   'subscription.suspended': 'La suscripción de este proveedor está suspendida. Contacte a la plataforma.',

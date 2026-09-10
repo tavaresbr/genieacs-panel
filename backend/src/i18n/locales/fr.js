@@ -556,6 +556,11 @@ export default {
 
   'tenant.exportFailed': 'Impossible d\u2019exporter les données du fournisseur',
 
+  'auth.emailInvalid': 'Une adresse e-mail valide est requise',
+  'auth.emailTaken': 'Cette adresse e-mail est déjà utilisée',
+  'auth.emailUpdated': 'E-mail de connexion mis à jour',
+  'auth.emailChangeRequired': 'Le mot de passe actuel et la nouvelle adresse e-mail sont requis',
+  'auth.emailReadiness': 'État des e-mails récupéré',
   'subscription.pastDue': 'L\'abonnement est en retard de paiement. Le panneau est en lecture seule jusqu\'à l\'enregistrement du paiement.',
   'subscription.trialExpired': 'La période d\'essai est terminée. Le panneau est en lecture seule jusqu\'à l\'activation d\'un forfait.',
   'subscription.suspended': 'L\'abonnement de ce fournisseur est suspendu. Contactez la plateforme.',

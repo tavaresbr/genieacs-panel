@@ -64,7 +64,7 @@ function callAs(host, url, { method = 'GET', headers = {}, body } = {}) {
   });
 }
 
-const OWNER = { username: 'dona-da-plataforma', password: 'senha-da-plataforma-1' };
+const OWNER = { username: 'dona-da-plataforma', password: 'senha-da-plataforma-1', email: 'dona-da-plataforma@exemplo.test' };
 
 let panelUrl;
 let portalUrl;

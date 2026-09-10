@@ -560,6 +560,11 @@ export default {
 
   'tenant.exportFailed': 'Failed to export the provider data',
 
+  'auth.emailInvalid': 'A valid email address is required',
+  'auth.emailTaken': 'That email address is already taken',
+  'auth.emailUpdated': 'Login email updated',
+  'auth.emailChangeRequired': 'The current password and the new email address are required',
+  'auth.emailReadiness': 'Email readiness retrieved',
   'subscription.pastDue': 'Your subscription is past due. The panel is read-only until the payment is recorded.',
   'subscription.trialExpired': 'Your trial has ended. The panel is read-only until a plan is activated.',
   'subscription.suspended': 'This provider\'s subscription is suspended. Contact the platform.',

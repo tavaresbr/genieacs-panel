@@ -3,17 +3,118 @@ import { currentTenantId } from '../config/tenantContext.js';
 import { IS_SAAS } from '../config/edition.js';
 
 class User {
+  /**
+   * O endereço como a tabela o guarda: sem espaço nas pontas e em minúsculas.
+   *
+   * Normalizado na aplicação e não deixado para a colação do banco, de
+   * propósito. SQLite compara `VARCHAR` com sensibilidade a caixa, MySQL com a
+   * colação `_ci` não, e Postgres depende do que foi configurado — de modo que
+   * `Joao@ISP.com` e `joao@isp.com` seriam a mesma conta num banco e duas
+   * noutro. Duas contas para o mesmo endereço é o começo de uma tomada de
+   * conta, e "depende do banco" não é resposta para isso.
+   *
+   * O local-part de um e-mail é, pela RFC, sensível a caixa — mas nenhum
+   * provedor de verdade trata assim, e quem digita o próprio endereço com uma
+   * maiúscula a mais espera entrar. A escolha é deliberada e vale para os três
+   * bancos igualmente.
+   */
+  static normalizeEmail(email) {
+    const texto = String(email ?? '').trim().toLowerCase();
+    return texto || null;
+  }
+
   static async findByUsername(username) {
     return (await getDb()('users').where({ username }).first()) || null;
+  }
+
+  static async findByEmail(email) {
+    const normalizado = User.normalizeEmail(email);
+    if (!normalizado) return null;
+    return (await getDb()('users').where({ email: normalizado }).first()) || null;
+  }
+
+  /**
+   * A conta que um identificador de login nomeia — nome OU e-mail.
+   *
+   * Uma consulta só, com `orWhere`, e não "tenta por nome, senão por e-mail":
+   * o `username` não proíbe `@`, então não dá para decidir pelo formato qual
+   * dos dois foi digitado. Tentar em sequência daria duas idas ao banco e,
+   * pior, uma janela em que o mesmo texto acha contas diferentes conforme a
+   * ordem.
+   *
+   * **Nome e e-mail vivem no MESMO espaço de nomes**, e é o que torna esta
+   * consulta inequívoca: `assertLoginAvailable` recusa um e-mail igual ao nome
+   * de alguém e um nome igual ao e-mail de alguém. Sem essa regra, um
+   * identificador poderia casar duas linhas — e escolher uma das duas seria
+   * escolher em qual conta a senha vai ser conferida.
+   *
+   * A defesa em profundidade está no `limit(2)`: se duas linhas casarem apesar
+   * da regra (uma escrita direta no banco, uma linha anterior a esta versão),
+   * a resposta é null e ninguém entra. Falhar fechado é a única direção segura
+   * quando a pergunta "de quem é esta senha?" fica ambígua.
+   */
+  static async findByLogin(identifier) {
+    const texto = String(identifier ?? '').trim();
+    if (!texto) return null;
+    const email = User.normalizeEmail(texto);
+    const linhas = await getDb()('users')
+      .where({ username: texto })
+      .orWhere({ email })
+      .limit(2);
+    if (linhas.length !== 1) return null;
+    return linhas[0];
+  }
+
+  /**
+   * Confere que um nome e um e-mail estão livres, contando os dois como um
+   * espaço de nomes só.
+   *
+   * @returns {Promise<null|'username_taken'|'email_taken'>}
+   */
+  static async loginConflict({ username = null, email = null, exceptId = null }) {
+    const nome = username === null ? null : String(username).trim();
+    const endereco = User.normalizeEmail(email);
+    if (!nome && !endereco) return null;
+
+    let query = getDb()('users').select('id', 'username', 'email');
+    // `exceptId` coagido com `Number`: parâmetro de rota chega como string, e
+    // comparar `'7' !== 7` faria toda edição que mantém o próprio valor ser
+    // recusada como duplicata de si mesma. Já custou um defeito antes.
+    const ignorar = exceptId === null || exceptId === undefined ? null : Number(exceptId);
+    if (ignorar !== null && Number.isFinite(ignorar)) query = query.whereNot({ id: ignorar });
+
+    const candidatos = [nome, endereco].filter(Boolean);
+    const linhas = await query.where((q) => {
+      q.whereIn('username', candidatos).orWhereIn('email', candidatos);
+    });
+    if (!linhas.length) return null;
+
+    // Qual dos dois colidiu decide a mensagem, e a ordem importa: quem está
+    // cadastrando um e-mail precisa ouvir que o e-mail está tomado, mesmo que
+    // ele tenha batido no `username` de outra pessoa. "Nome de usuário em uso"
+    // para quem digitou um endereço é uma pista que não ajuda ninguém.
+    if (endereco && linhas.some((l) => l.email === endereco || l.username === endereco)) {
+      return 'email_taken';
+    }
+    return 'username_taken';
   }
 
   static async findById(id) {
     return (
       (await getDb()('users')
-        .select('id', 'username', 'role', 'password', 'token_version', 'created_at', 'updated_at')
+        .select('id', 'username', 'email', 'role', 'password', 'token_version', 'created_at', 'updated_at')
         .where({ id })
         .first()) || null
     );
+  }
+
+  /** Quantas contas ainda não têm e-mail — o número que decide o passo 3. */
+  static async countWithoutEmail() {
+    const row = await getDb()('users')
+      .where((q) => q.whereNull('email').orWhere('email', ''))
+      .count({ n: '*' })
+      .first();
+    return Number(row?.n || 0);
   }
 
   static async count() {
@@ -36,14 +137,24 @@ class User {
    * e nenhum provedor a que pertencer.
    */
   static async create(userData, trx = null) {
-    const { username, password, role = 'viewer' } = userData;
-    const id = await insertReturningId('users', { username, password, role }, trx);
+    const { username, password, role = 'viewer', email = null } = userData;
+    const id = await insertReturningId('users', {
+      username, password, role, email: User.normalizeEmail(email)
+    }, trx);
     return id;
+  }
+
+  /** Grava o endereço de login de alguém. Sempre normalizado. */
+  static async updateEmail(id, email) {
+    const changed = await getDb()('users')
+      .where({ id })
+      .update({ email: User.normalizeEmail(email), updated_at: new Date() });
+    return changed > 0;
   }
 
   static async list() {
     return getDb()('users')
-      .select('id', 'username', 'role', 'created_at', 'updated_at')
+      .select('id', 'username', 'email', 'role', 'created_at', 'updated_at')
       .orderBy('id', 'asc');
   }
 
@@ -91,7 +202,7 @@ class User {
    * under. Setup is per provider since 0014, which is the semantics we want.
    */
   static async createInitialAdmin(userData) {
-    const { username, password } = userData;
+    const { username, password, email = null } = userData;
     const db = getDb();
     const tenantId = currentTenantId();
 
@@ -129,6 +240,7 @@ class User {
       const id = await insertReturningId('users', {
         username,
         password,
+        email: User.normalizeEmail(email),
         role: 'admin'
       }, trx);
 

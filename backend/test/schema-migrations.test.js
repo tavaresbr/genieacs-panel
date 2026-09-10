@@ -627,7 +627,7 @@ describe('making the SGP log and the provisioning trail per-provider', () => {
 
 describe('giving every provider a subscription', () => {
   const db = createDatabase('billing');
-  const BILLING_MIGRATION = '0034_plans_and_subscriptions';
+  const BILLING_MIGRATION = '0035_plans_and_subscriptions';
   let alfa;
   let beta;
 
@@ -682,7 +682,7 @@ describe('giving every provider a subscription', () => {
 
 describe('the provider name leaving settings', () => {
   const db = createDatabase('tenant-name');
-  const NAME_MIGRATION = '0035_tenant_name_from_app_name';
+  const NAME_MIGRATION = '0036_tenant_name_from_app_name';
   let alfa;
   let beta;
 

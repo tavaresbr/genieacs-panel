@@ -58,12 +58,12 @@ const bearer = (token) => ({ Authorization: `Bearer ${token}` });
 
 before(async () => {
   ({ panelUrl } = await startTestServers());
-  const setup = await home('/api/auth/setup', { method: 'POST', body: { username: 'owner', password: 'owner-senha-1' } });
+  const setup = await home('/api/auth/setup', { method: 'POST', body: { username: 'owner', password: 'owner-senha-1', email: 'owner@exemplo.test' } });
   assert.equal(setup.status, 201);
   ownerToken = setup.body.data.token;
   const hire = await home('/api/users', {
     method: 'POST', headers: bearer(ownerToken),
-    body: { username: 'leitor', password: 'leitor-senha-1', role: 'viewer' }
+    body: { username: 'leitor', password: 'leitor-senha-1', role: 'viewer', email: 'leitor@exemplo.test' }
   });
   assert.equal(hire.status, 201);
   const signIn = await home('/api/auth/login', { method: 'POST', body: { username: 'leitor', password: 'leitor-senha-1' } });
@@ -84,7 +84,7 @@ describe('the public profile', () => {
 });
 
 describe('signing up', () => {
-  const good = { providerName: 'ISP Nova', slug: 'nova', username: 'dona', password: 'dona-senha-123' };
+  const good = { providerName: 'ISP Nova', slug: 'nova', username: 'dona', password: 'dona-senha-123', email: 'dona@exemplo.test' };
 
   it('mints a provider indistinguishable from one the console minted, with its owner and a trial', async () => {
     const res = await home('/api/auth/signup', { method: 'POST', body: good });
@@ -104,6 +104,8 @@ describe('signing up', () => {
     assert.equal(subscription.status, 'trial');
     // Owner of her provider — and of nothing above it.
     const person = await db('users').where({ username: 'dona' }).first();
+    // Born with an address, like every account since login-by-email.
+    assert.equal(person.email, 'dona@exemplo.test');
     const membership = await db('tenant_users').where({ tenant_id: tenant.id, user_id: person.id }).first();
     assert.equal(membership.role, 'owner');
     assert.equal(await db('platform_admins').where({ user_id: person.id }).first(), undefined,
@@ -113,9 +115,26 @@ describe('signing up', () => {
     assert.equal(audit.actor_user_id, null);
   });
 
+  it('refuses an owner without an e-mail, or with somebody else\'s', async () => {
+    const noEmail = await home('/api/auth/signup', {
+      method: 'POST', body: { ...good, slug: 'sem-email', username: 'sem-email', email: '' }
+    });
+    assert.equal(noEmail.status, 400);
+    const badEmail = await home('/api/auth/signup', {
+      method: 'POST', body: { ...good, slug: 'email-ruim', username: 'email-ruim', email: 'nao-e-um-endereco' }
+    });
+    assert.equal(badEmail.status, 400);
+    // The address of an existing account is a taken login: the namespace is one.
+    const taken = await home('/api/auth/signup', {
+      method: 'POST', body: { ...good, slug: 'email-tomado', username: 'outro-nome', email: 'owner@exemplo.test' }
+    });
+    assert.equal(taken.status, 409);
+    assert.equal(await getDb()('tenants').where({ slug: 'email-tomado' }).first(), undefined);
+  });
+
   it('and she can sign in at her own address, and nowhere else', async () => {
     const there = await callAs('nova.painel.test', `${panelUrl}/api/auth/login`, {
-      method: 'POST', body: { username: 'dona', password: 'dona-senha-123' }
+      method: 'POST', body: { username: 'dona', password: 'dona-senha-123', email: 'dona@exemplo.test' }
     });
     assert.equal(there.status, 200);
     const token = there.body.data.token;
@@ -198,13 +217,13 @@ describe('the platform\'s own host', () => {
   it('signs a provider up and sends it to its own address', async () => {
     const res = await apex('/api/auth/signup', {
       method: 'POST',
-      body: { slug: 'porta', providerName: 'Porta Fibra', username: 'porta-dono', password: 'porta-senha-1' }
+      body: { slug: 'porta', providerName: 'Porta Fibra', username: 'porta-dono', password: 'porta-senha-1', email: 'porta-dono@exemplo.test' }
     });
     assert.equal(res.status, 201);
     assert.equal(res.body.data.panelUrl, 'https://porta.painel.test');
 
     const signIn = await callAs('porta.painel.test', `${panelUrl}/api/auth/login`, {
-      method: 'POST', body: { username: 'porta-dono', password: 'porta-senha-1' }
+      method: 'POST', body: { username: 'porta-dono', password: 'porta-senha-1', email: 'porta-dono@exemplo.test' }
     });
     assert.equal(signIn.status, 200);
     const me = await callAs('porta.painel.test', `${panelUrl}/api/tenant/public`, { headers: bearer(signIn.body.data.token) });

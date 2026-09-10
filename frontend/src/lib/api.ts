@@ -250,11 +250,17 @@ export const authAPI = {
   getSetupStatus: () =>
     apiClient.get('/auth/setup-status'),
 
-  setupAdmin: (username: string, password: string) =>
-    apiClient.post('/auth/setup', { username, password }),
+  setupAdmin: (username: string, password: string, email: string) =>
+    apiClient.post('/auth/setup', { username, password, email }),
 
-  login: (username: string, password: string) =>
-    apiClient.post('/auth/login', { username, password }),
+  /**
+   * O identificador continua chegando como `username` porque é o nome do campo
+   * no corpo da rota — mas o que se manda é o que a pessoa digitou, nome OU
+   * e-mail. Renomear o parâmetro aqui faria a tela parecer mandar outra coisa
+   * do que manda.
+   */
+  login: (identifier: string, password: string) =>
+    apiClient.post('/auth/login', { username: identifier, password }),
 
   getCurrentUser: () =>
     apiClient.get('/auth/user'),
@@ -263,7 +269,7 @@ export const authAPI = {
     apiClient.post('/auth/logout'),
 
   /** SaaS only; answers 404 on a self-hosted install, where the route is not mounted. */
-  signup: (payload: { providerName: string; slug: string; username: string; password: string }) =>
+  signup: (payload: { providerName: string; slug: string; username: string; email: string; password: string }) =>
     apiClient.post<SignupResult>('/auth/signup', payload),
 
   refreshToken: (refreshToken: string) =>
@@ -274,6 +280,35 @@ export const authAPI = {
 
   changeUsername: (currentUsername: string, newUsername: string) =>
     apiClient.post('/auth/change-username', { currentUsername, newUsername }),
+
+  /**
+   * O e-mail de login da própria pessoa.
+   *
+   * Pede a senha atual pelo mesmo motivo que a troca de senha pede: o endereço
+   * é por onde se entra nesta conta, então trocá-lo a partir de uma sessão
+   * aberta sem provar a senha seria trocar a fechadura sem a chave.
+   */
+  changeEmail: (currentPassword: string, email: string) =>
+    apiClient.post<{ email: string }>('/auth/email', { currentPassword, email }),
+
+  emailReadiness: () =>
+    apiClient.get<EmailReadiness>('/auth/email-readiness'),
+}
+
+/**
+ * Se este deployment já poderia exigir e-mail no login, e quantos ficariam de
+ * fora se exigisse hoje.
+ *
+ * `loginRequiresEmail` é lido do ambiente do servidor (`LOGIN_REQUIRES_EMAIL`),
+ * e a tela só o reporta: a chave não tem volta pelo painel — ligá-la com
+ * `withoutEmail` acima de zero tranca essa gente do lado de fora —, então
+ * oferecê-la como botão seria oferecer um caminho sem retorno.
+ */
+export interface EmailReadiness {
+  loginRequiresEmail: boolean
+  total: number
+  withoutEmail: number
+  ready: boolean
 }
 
 // Operator accounts. Every route below is admin-only on the backend.
@@ -525,7 +560,11 @@ export const usersAPI = {
   list: () =>
     apiClient.get<{ users: Operator[] }>('/users'),
 
-  create: (payload: { username: string; password: string; role: OperatorRole }) =>
+  /**
+   * `email` é obrigatório: conta nova nasce com endereço, e é isso que faz o
+   * número de contas sem e-mail parar de crescer enquanto a transição dura.
+   */
+  create: (payload: { username: string; password: string; email: string; role: OperatorRole }) =>
     apiClient.post<{ user: Operator }>('/users', payload),
 
   /** Sends only what changes: a role, a new password, or both. */

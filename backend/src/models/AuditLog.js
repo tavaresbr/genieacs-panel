@@ -41,7 +41,8 @@ class AuditLog {
     SUBSCRIPTION_CHANGED: 'subscription.changed',
     // O provedor mudou o próprio nome — o que aparece na barra lateral, na
     // tela de login e na aba do navegador.
-    TENANT_RENAMED: 'tenant.renamed'
+    TENANT_RENAMED: 'tenant.renamed',
+    LOGIN_EMAIL_CHANGED: 'login_email.changed'
   });
 
   /**

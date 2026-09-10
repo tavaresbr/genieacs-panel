@@ -9,7 +9,7 @@ import { useTranslation } from '@/contexts/language-context'
 import { useTenant } from '@/contexts/tenant-context'
 
 export default function Setup() {
-  const [formData, setFormData] = useState({ username: '', password: '', confirmPassword: '' })
+  const [formData, setFormData] = useState({ username: '', email: '', password: '', confirmPassword: '' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const { completeSetup } = useAuth()
@@ -24,6 +24,14 @@ export default function Setup() {
       setError(t('setup.error.usernameTooShort'))
       return
     }
+    // Conferência frouxa de propósito, e só para pegar engano de digitação: o
+    // servidor é quem decide, e uma regra mais apertada aqui recusaria endereço
+    // válido que ele aceitaria — numa tela sem administrador acima para
+    // corrigir, porque esta conta é a primeira do install.
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      setError(t('setup.error.emailInvalid'))
+      return
+    }
     if (formData.password.length < 8) {
       setError(t('setup.error.passwordTooShort'))
       return
@@ -35,7 +43,7 @@ export default function Setup() {
 
     setLoading(true)
     try {
-      if (!await completeSetup(formData.username.trim(), formData.password)) {
+      if (!await completeSetup(formData.username.trim(), formData.password, formData.email.trim())) {
         setError(t('setup.error.createFailed'))
       }
     } catch {
@@ -107,6 +115,14 @@ export default function Setup() {
                   onChange={updateField} className="modern-input" placeholder="network-admin"
                   aria-invalid={Boolean(error)} aria-describedby={error ? 'setup-error' : 'username-hint'} />
                 <p id="username-hint" className="field-hint">{t('setup.usernameHint')}</p>
+              </div>
+
+              <div>
+                <label htmlFor="email" className="field-label">{t('setup.email')}</label>
+                <input id="email" name="email" type="email" autoComplete="email" required value={formData.email}
+                  onChange={updateField} className="modern-input" placeholder={t('setup.emailPlaceholder')}
+                  aria-invalid={Boolean(error)} aria-describedby={error ? 'setup-error' : 'email-hint'} />
+                <p id="email-hint" className="field-hint">{t('setup.emailHint')}</p>
               </div>
 
               <div>

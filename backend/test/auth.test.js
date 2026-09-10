@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { authHeaders, call, startTestServers, stopTestServers } from './helpers/harness.js';
 
 let panelUrl;
-const admin = { username: 'operator', password: 'initial-password-1' };
+const admin = { username: 'operator', password: 'initial-password-1', email: 'operator@exemplo.test' };
 let session;
 
 before(async () => {
@@ -24,7 +24,7 @@ describe('operator setup', () => {
   it('rejects a password shorter than eight characters', async () => {
     const { status } = await call(`${panelUrl}/api/auth/setup`, {
       method: 'POST',
-      body: { username: 'operator', password: 'short' }
+      body: { username: 'operator', password: 'short', email: 'operator@exemplo.test' }
     });
     assert.equal(status, 400);
   });
@@ -44,7 +44,7 @@ describe('operator setup', () => {
   it('refuses a second setup once an administrator exists', async () => {
     const { status } = await call(`${panelUrl}/api/auth/setup`, {
       method: 'POST',
-      body: { username: 'intruder', password: 'another-password-1' }
+      body: { username: 'intruder', password: 'another-password-1', email: 'intruder@exemplo.test' }
     });
     assert.equal(status, 409);
   });

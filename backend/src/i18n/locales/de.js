@@ -561,6 +561,11 @@ export default {
 
   'tenant.exportFailed': 'Anbieterdaten konnten nicht exportiert werden',
 
+  'auth.emailInvalid': 'Eine gültige E-Mail-Adresse ist erforderlich',
+  'auth.emailTaken': 'Diese E-Mail-Adresse ist bereits vergeben',
+  'auth.emailUpdated': 'Anmelde-E-Mail aktualisiert',
+  'auth.emailChangeRequired': 'Das aktuelle Passwort und die neue E-Mail-Adresse sind erforderlich',
+  'auth.emailReadiness': 'E-Mail-Status abgerufen',
   'subscription.pastDue': 'Das Abonnement ist überfällig. Das Panel ist schreibgeschützt, bis die Zahlung erfasst wurde.',
   'subscription.trialExpired': 'Die Testphase ist beendet. Das Panel ist schreibgeschützt, bis ein Tarif aktiviert wird.',
   'subscription.suspended': 'Das Abonnement dieses Anbieters ist ausgesetzt. Wenden Sie sich an die Plattform.',

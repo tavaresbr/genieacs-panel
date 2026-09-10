@@ -10,7 +10,9 @@ import { useTranslation } from '@/contexts/language-context'
 import { useTenant } from '@/contexts/tenant-context'
 
 export default function Login() {
-  const [formData, setFormData] = useState({ username: '', password: '' })
+  // `identifier` e não `username`: o campo aceita os dois, e chamar o estado
+  // de nome de usuário faria a próxima pessoa a ler achar que só o nome passa.
+  const [formData, setFormData] = useState({ identifier: '', password: '' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -24,7 +26,7 @@ export default function Login() {
     setLoading(true)
     setError('')
     try {
-      const ok = await login(formData.username, formData.password)
+      const ok = await login(formData.identifier, formData.password)
       if (ok) navigate('/dashboard')
       else setError(t('login.error.invalidCredentials'))
     } catch {
@@ -89,21 +91,27 @@ export default function Login() {
               )}
 
               <div>
-                <label htmlFor="username" className="field-label">{t('login.username')}</label>
+                <label htmlFor="identifier" className="field-label">{t('login.identifier')}</label>
+                {/* `text` e `username`, e deliberadamente não `email`: um
+                    `type="email"` faria o navegador recusar o nome de usuário
+                    que a maioria ainda digita, e `autoComplete="username"` é o
+                    único valor que o gerenciador de senhas preenche com
+                    qualquer um dos dois. */}
                 <input
-                  id="username"
-                  name="username"
+                  id="identifier"
+                  name="identifier"
                   type="text"
                   autoComplete="username"
                   required
                   autoFocus
-                  value={formData.username}
-                  onChange={(event) => setFormData((value) => ({ ...value, username: event.target.value }))}
+                  value={formData.identifier}
+                  onChange={(event) => setFormData((value) => ({ ...value, identifier: event.target.value }))}
                   className="modern-input"
-                  placeholder="admin"
+                  placeholder={t('login.identifierPlaceholder')}
                   aria-invalid={Boolean(error)}
-                  aria-describedby={error ? 'login-error' : undefined}
+                  aria-describedby={error ? 'login-error' : 'identifier-hint'}
                 />
+                <p id="identifier-hint" className="field-hint">{t('login.identifierHint')}</p>
               </div>
 
               <div>

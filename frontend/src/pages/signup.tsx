@@ -20,7 +20,7 @@ export default function Signup() {
   const { t } = useTranslation()
   const { tenant, name: hostName, isPlatformHost } = useTenant()
   const base = tenant?.panelBaseDomain ?? null
-  const [form, setForm] = useState({ providerName: '', slug: '', username: '', password: '', confirm: '' })
+  const [form, setForm] = useState({ providerName: '', slug: '', username: '', email: '', password: '', confirm: '' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState<SignupResult | null>(null)
@@ -38,12 +38,13 @@ export default function Signup() {
     if (form.providerName.trim().length < 1) return setError(t('signup.error.name'))
     if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(form.slug) || form.slug.length < 3) return setError(t('signup.error.slug'))
     if (form.username.trim().length < 3) return setError(t('setup.error.usernameTooShort'))
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) return setError(t('setup.error.emailInvalid'))
     if (form.password.length < 8) return setError(t('setup.error.passwordTooShort'))
     if (form.password !== form.confirm) return setError(t('setup.error.passwordMismatch'))
     setLoading(true)
     try {
       const res = await authAPI.signup({
-        providerName: form.providerName.trim(), slug: form.slug, username: form.username.trim(), password: form.password
+        providerName: form.providerName.trim(), slug: form.slug, username: form.username.trim(), email: form.email.trim(), password: form.password
       })
       if (res.success && res.data) setDone(res.data)
       else setError(res.message || t('signup.error.failed'))
@@ -122,6 +123,12 @@ export default function Signup() {
                   <label htmlFor="username" className="field-label">{t('signup.username')}</label>
                   <input id="username" className="modern-input" required autoComplete="username" value={form.username}
                     onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))} />
+                </div>
+                <div>
+                  <label htmlFor="email" className="field-label">{t('setup.email')}</label>
+                  <input id="email" type="email" className="modern-input" required autoComplete="email" placeholder={t('setup.emailPlaceholder')} value={form.email}
+                    onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
+                  <p className="field-hint">{t('setup.emailHint')}</p>
                 </div>
                 <div>
                   <label htmlFor="password" className="field-label">{t('login.password')}</label>

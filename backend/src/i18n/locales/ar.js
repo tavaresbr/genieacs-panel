@@ -552,6 +552,12 @@ export default {
   'audit.listed': 'تم جلب سجل التدقيق',
   'audit.listFailed': 'تعذّرت قراءة سجل التدقيق',
   'tenant.exportFailed': 'تعذّر تصدير بيانات المزوّد',
+
+  'auth.emailInvalid': 'مطلوب عنوان بريد إلكتروني صالح',
+  'auth.emailTaken': 'عنوان البريد الإلكتروني هذا مستخدم بالفعل',
+  'auth.emailUpdated': 'تم تحديث بريد تسجيل الدخول',
+  'auth.emailChangeRequired': 'كلمة المرور الحالية وعنوان البريد الإلكتروني الجديد مطلوبان',
+  'auth.emailReadiness': 'تم جلب حالة البريد الإلكتروني',
   'auth.signupCreated': 'تم إنشاء المزوّد. سجّل الدخول على عنوانه الخاص.',
   'auth.signupFailed': 'تعذّر إنشاء المزوّد',
   'auth.signupInvalid': 'اسم المزوّد واسم المستخدم (3–64) وكلمة المرور (8–128) مطلوبة',

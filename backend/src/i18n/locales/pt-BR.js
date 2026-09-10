@@ -557,6 +557,11 @@ export default {
 
   'tenant.exportFailed': 'Falha ao exportar os dados do provedor',
 
+  'auth.emailInvalid': 'É preciso um endereço de e-mail válido',
+  'auth.emailTaken': 'Esse endereço de e-mail já está em uso',
+  'auth.emailUpdated': 'E-mail de login atualizado',
+  'auth.emailChangeRequired': 'A senha atual e o novo endereço de e-mail são obrigatórios',
+  'auth.emailReadiness': 'Situação do e-mail carregada',
   'subscription.pastDue': 'A assinatura está em atraso. O painel fica só para leitura até o pagamento ser registrado.',
   'subscription.trialExpired': 'O período de teste acabou. O painel fica só para leitura até um plano ser ativado.',
   'subscription.suspended': 'A assinatura deste provedor está suspensa. Fale com a plataforma.',

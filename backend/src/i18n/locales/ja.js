@@ -560,6 +560,11 @@ export default {
 
   'tenant.exportFailed': 'プロバイダーのデータをエクスポートできませんでした',
 
+  'auth.emailInvalid': '有効なメールアドレスが必要です',
+  'auth.emailTaken': 'そのメールアドレスはすでに使われています',
+  'auth.emailUpdated': 'ログイン用メールアドレスを更新しました',
+  'auth.emailChangeRequired': '現在のパスワードと新しいメールアドレスが必要です',
+  'auth.emailReadiness': 'メールアドレスの登録状況を取得しました',
   'subscription.pastDue': 'サブスクリプションの支払いが遅延しています。支払いが記録されるまでパネルは読み取り専用です。',
   'subscription.trialExpired': 'トライアル期間が終了しました。プランが有効化されるまでパネルは読み取り専用です。',
   'subscription.suspended': 'このプロバイダーのサブスクリプションは停止中です。プラットフォームにお問い合わせください。',

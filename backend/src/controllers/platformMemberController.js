@@ -160,7 +160,10 @@ class PlatformMemberController {
         );
       }
 
-      const person = await User.findByUsername(username);
+      // Nome OU e-mail: o plano de controle anexa uma pessoa que já existe, e
+      // depois desta versão ela é conhecida pelo endereço tanto quanto pelo
+      // nome. Procurar só pelo nome faria a rota não achar quem já migrou.
+      const person = await User.findByLogin(username);
       if (!person) {
         return res.status(404).json(createErrorResponse('No such person on this deployment'));
       }

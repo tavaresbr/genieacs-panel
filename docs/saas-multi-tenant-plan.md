@@ -369,9 +369,14 @@ alguém esquecer de incrementar. Coberto por
 - **Plano de plataforma** (nós, operando o SaaS): audience separada
   `skygenpanel-platform`, rotas `/api/platform/*`, capaz de listar/suspender tenants e de
   fazer *impersonation* auditada. Nunca compartilha o mesmo token do operador.
-- **API de usuários**: escopada por provedor e com convite (onda 18). Falta só o
-  **transporte de e-mail**, que é decisão de produto: qual provedor de envio, credencial de
-  quem, por deploy ou por provedor.
+- **API de usuários**: escopada por provedor, com convite (onda 18) e com **login por
+  e-mail**. Nome e e-mail vivem no mesmo espaço de nomes — cadastrar um e-mail igual ao nome
+  de alguém, ou o contrário, é recusado —, o que é o que torna `findByLogin` inequívoco: o
+  `username` nunca proibiu `@`, então não dá para decidir pelo formato qual dos dois foi
+  digitado. **Não há verificação do endereço**, e isso é aceitável só enquanto não existir
+  redefinição de senha por e-mail: naquele dia a verificação passa a ser pré-requisito
+  daquele recurso. Falta o **transporte de e-mail**, que é decisão de produto: qual provedor
+  de envio, credencial de quem, por deploy ou por provedor.
 - **Portal do assinante**: a busca já é escopada (`getByCustomerId` passa por `tdb`), então
   O cookie é **host-only** (`portalCookieOptions` não define `domain`) e o payload assinado
   carrega `tenantId`, conferido contra o provedor da requisição em `portalAuth.js`. As duas
@@ -380,10 +385,30 @@ alguém esquecer de incrementar. Coberto por
   copiado à mão, ou por um cliente que não é navegador.
 - `rateLimit.js`: chavear por `${tenantId}:${ip}` para um provedor barulhento não derrubar
   o limite dos outros.
-**Quebra para os self-hosted atuais:** o login sai de `username` para `email`. Mitigação: a
-migration preenche `email = username` quando parecer e-mail e `username@local.invalid` caso
-contrário, e o endpoint de login aceita os dois formatos por uma release, com aviso de
-"confirme seu e-mail" na interface.
+**Quebra para os self-hosted atuais:** o login sai de `username` para `email`.
+
+A mitigação que este plano propunha — a migration preenchendo `email = username` quando
+parecesse e-mail e `username@local.invalid` caso contrário — **não foi seguida**, e vale
+dizer por quê, porque a ideia é sedutora: ela deixa a coluna `NOT NULL` de imediato e faz
+todo mundo "já ter" um endereço.
+
+Ela dá a cada conta existente um endereço que **ninguém controla**. Hoje isso não custa
+nada, porque só a senha abre a conta. No dia em que existir redefinição de senha por e-mail
+— e ela vai existir, é o que todo painel acaba tendo —, `fulano@local.invalid` é um domínio
+que qualquer um pode registrar, e cada conta pré-preenchida vira um caminho para dentro
+dela. Uma migração não tem como saber o endereço de ninguém, e inventar um é pior que
+deixar nulo, porque um nulo se vê e um endereço plausível não.
+
+**O que foi feito** (onda de login por e-mail): a coluna nasce **anulável e vazia**; toda
+conta NOVA exige e-mail; o login aceita nome ou e-mail; quem já usava cadastra o próprio
+endereço em `POST /api/auth/email`, provando a senha atual; e `LOGIN_REQUIRES_EMAIL=true`
+desliga o nome quando o install quiser. `GET /api/auth/email-readiness` diz quantas contas
+ainda ficariam de fora, para que virar a chave seja uma decisão e não uma aposta.
+
+Nome e e-mail vivem no **mesmo espaço de nomes**: cadastrar um e-mail igual ao nome de
+alguém, ou trocar o próprio nome para o e-mail de um colega, é recusado. Sem essa regra um
+identificador casaria duas contas — e a consequência não recai sobre quem fez, e sim sobre a
+vítima, que simplesmente deixa de conseguir entrar sem nada na tela explicando por quê.
 
 ---
 
@@ -478,7 +503,7 @@ sustenta. Antes do décimo tenant:
 
 ### Fase 5 — Planos, limites e ciclo de vida da assinatura ✅ *(entregue; o gateway continua manual)*
 
-Três tabelas (migration `0034`), uma porta, quatro pontos de escrita e a metade comercial do
+Três tabelas (migration `0035`), uma porta, quatro pontos de escrita e a metade comercial do
 console. O que a fase NÃO fez é tão importante quanto o que fez, e está escrito na migração:
 **nenhum provedor existente muda** — todos recebem `active` num plano `unlimited` sem limite
 algum, porque um upgrade não pode ser o dia em que um ISP em produção descobre que está
@@ -556,7 +581,7 @@ painel de plano por provedor, e a casca do app ouvindo o 402 — faixa no alto p
   ajuste global, guardado no `localStorage` e propagado por evento) e passou a ser
   `tenants.name`, renomeado por `PATCH /api/tenant` (`settings.write`, auditado como
   `tenant.renamed`). A sidebar, o login, o setup, o título da aba e o campo "nome" das
-  configurações leem e escrevem o contexto. A migration `0035_tenant_name_from_app_name`
+  configurações leem e escrevem o contexto. A migration `0036_tenant_name_from_app_name`
   leva o nome que cada provedor já tinha em `settings` para a linha dele.
 - **Cadastro** (`/signup`, `POST /api/auth/signup`): só na edição SaaS **e** só onde há
   domínio-base para o provedor responder — fora disso a rota é 404 e a tela redireciona
@@ -664,7 +689,7 @@ subsistema cada — `sgp-links`, `sgp-events`, `device-profiles`, `provisioning`
 `map-settings`, `vendor-catalogue`, `wifi-credentials`, `whatsapp-media`,
 `whatsapp-inbound`, `users`, `auth`, entre outras, mais `tenant-subdomain` e
 `tenant-id-sweep`, que provam o isolamento por host, e `role-reach`, que prova por HTTP o
-alcance de cada papel sobre uma amostra de 31 rotas. São 1627 testes no total, verdes nos
+alcance de cada papel sobre uma amostra de 31 rotas. São 1658 testes no total, verdes nos
 três dialetos no CI.
 
 O padrão em todas: **dois provedores com as chaves naturais deliberadamente colidindo** —
@@ -814,10 +839,13 @@ Original: Fase 0 → 1 → 2 → 3 → 8 → 4 → 5 → 6 → 7.
    dependiam de host puderam enfim ser escritos.
 2. **O resto da Fase 2.** Cookie host-only, `tenantId` no payload do portal, rate limit por
    provedor, os **papéis reais** com `requirePermission` e o **convite** ✅ entraram. Falta a
-   audiência separada `skygenpanel-platform` com impersonação auditada — que precisa de
-   `audit_log`, hoje da Fase 7, porque impersonação sem trilha é justamente o que não se
-   constrói —, o **transporte de e-mail** do convite, e a troca de `username` para e-mail,
-   que é quebra de contrato e decisão de produto, não de código.
+   audiência separada `skygenpanel-platform` com impersonação auditada — `platform_audit`,
+   a peça que faltava, entrou na onda 22 —, e o **transporte de e-mail** do convite. A troca
+   de `username` para e-mail ✅ entrou, em três passos e sem dia de virada: a coluna é
+   anulável, toda conta nova nasce com e-mail, o login aceita os dois, e
+   `LOGIN_REQUIRES_EMAIL=true` desliga o nome quando o install decidir. O painel responde
+   quantas contas ainda ficariam de fora, para que essa decisão seja tomada olhando um
+   número em vez de na esperança.
 3. ~~**Fechar a Fase 8**~~ ✅ com os três testes que passaram a ser possíveis e a sentinela
    de SQL. Sobrou avaliar **RLS no Postgres** como segunda linha.
 4. ~~**Fase 4 — conector.**~~ ✅ na ordem certa: as três correções de SSRF e a guarda de
@@ -858,7 +886,7 @@ metade é da Fase 4.
 | 6 | Credenciais ACS por provedor, cifradas, guarda de egresso, branch de URL absoluta removido | ✅ credencial NBI por provedor (onda 19), egresso com pinning de DNS, branch de URL absoluta removido |
 | 7 | `/api/database` não montada na edição SaaS | ✅ |
 | 8 | Rate limit e concorrência de fetch ACS chaveados por provedor | ✅ `tenantIpKey` no limite; `withAcsSlot` no fetch — vaga por provedor e vaga global, nessa ordem |
-| 9 | Suíte de vazamento verde no CI e obrigatória para merge | ✅ 1627 testes, três dialetos |
+| 9 | Suíte de vazamento verde no CI e obrigatória para merge | ✅ 1658 testes, três dialetos |
 | 10 | `SECRET_BOX_KEY` separada do `JWT_SECRET`, com `key_version` | ✅ |
 | 11 | `audit_log` registrando ações sensíveis | ✅ onda 20 — senha de portal, GenieACS, papéis, vínculos, convites, suspensão |
 | 12 | Exportação por provedor funcionando (LGPD e "apaguei tudo, socorro") | ✅ exportação (onda 21) e exclusão (onda 22), com trilha que sobrevive ao provedor apagado |
@@ -880,7 +908,7 @@ também a tabela de que a impersonação da plataforma vai precisar.
 
 ```bash
 npm run verify          # check backend + testes + lint + typecheck + build (raiz)
-cd backend && npm test  # 1627 testes, incluindo as suítes de tenancy
+cd backend && npm test  # 1658 testes, incluindo as suítes de tenancy
 ```
 
 A suíte roda nos três dialetos, e **isso não é zelo**: cada uma das armadilhas abaixo passou

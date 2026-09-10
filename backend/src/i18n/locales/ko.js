@@ -563,6 +563,11 @@ export default {
 
   'tenant.exportFailed': '사업자 데이터를 내보내지 못했습니다',
 
+  'auth.emailInvalid': '유효한 이메일 주소가 필요합니다',
+  'auth.emailTaken': '이미 사용 중인 이메일 주소입니다',
+  'auth.emailUpdated': '로그인 이메일을 변경했습니다',
+  'auth.emailChangeRequired': '현재 비밀번호와 새 이메일 주소가 필요합니다',
+  'auth.emailReadiness': '이메일 등록 현황을 가져왔습니다',
   'subscription.pastDue': '구독 결제가 연체되었습니다. 결제가 기록될 때까지 패널은 읽기 전용입니다.',
   'subscription.trialExpired': '체험 기간이 끝났습니다. 요금제가 활성화될 때까지 패널은 읽기 전용입니다.',
   'subscription.suspended': '이 사업자의 구독이 정지되었습니다. 플랫폼에 문의하세요.',

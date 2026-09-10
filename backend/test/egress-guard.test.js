@@ -400,7 +400,7 @@ describe('the SGP probe cannot be pointed into our own network', () => {
     ({ panelUrl } = await startTestServers());
     const setup = await call(`${panelUrl}/api/auth/setup`, {
       method: 'POST',
-      body: { username: 'operator', password: 'operator-password-1' }
+      body: { username: 'operator', password: 'operator-password-1', email: 'operator@exemplo.test' }
     });
     token = setup.body.data.token;
   });
