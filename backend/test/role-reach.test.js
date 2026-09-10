@@ -27,9 +27,9 @@ import assert from 'node:assert/strict';
  *
  * ## O que este arquivo NÃO afirma
  *
- * São **31 rotas**, não as 91. A amostra foi escolhida para que cada uma das
- * 24 capacidades apareça pelo menos uma vez, e a garantia de não-regressão que
- * o teste do `admin` dá vale **sobre estas 31** — não sobre o painel inteiro.
+ * São **32 rotas**, não as 91. A amostra foi escolhida para que cada uma das
+ * 25 capacidades apareça pelo menos uma vez, e a garantia de não-regressão que
+ * o teste do `admin` dá vale **sobre estas 32** — não sobre o painel inteiro.
  * Quem quiser a afirmação forte ("nenhuma das 91 rotas mudou de dono") precisa
  * de outra prova; a varredura estática de `permissions.test.js` é o que existe
  * hoje mais perto disso, e ela olha o nome da capacidade, não o alcance.
@@ -93,6 +93,7 @@ const QUEM_TEM = {
   'settings.write': ['owner', 'admin'],
   'operators.read': ['owner', 'admin'],
   'operators.manage': ['owner', 'admin'],
+  'audit.read': ['owner', 'admin'],
   'database.manage': ['owner', 'admin']
 };
 
@@ -354,6 +355,15 @@ const CASOS = [
     aceito: [200]
   },
   {
+    // A trilha de auditoria. Capacidade própria e não `operators.read`: ela diz
+    // mais do que a equipe — quem revelou a senha de qual assinante, e quando.
+    cap: 'audit.read',
+    label: 'GET /api/audit',
+    method: 'GET',
+    path: () => '/api/audit',
+    aceito: [200]
+  },
+  {
     /**
      * O alvo é um quinto operador semeado só para isto, e o corpo repete o
      * papel que ele já tem. Mexer num dos quatro que fazem as perguntas
@@ -536,7 +546,7 @@ describe('a matriz e a expectativa deste arquivo', () => {
      * silenciosamente para dentro do `viewer` sem ninguém notar.
      */
     const comRecusa = PERMISSIONS.filter((cap) => QUEM_TEM[cap].length < ROLES.length);
-    assert.equal(comRecusa.length, 21);
+    assert.equal(comRecusa.length, 22);
     for (const cap of comRecusa) {
       assert.ok(CASOS.some((caso) => caso.cap === cap), `${cap} sem rota para recusar`);
     }
@@ -546,7 +556,7 @@ describe('a matriz e a expectativa deste arquivo', () => {
     // O cabeçalho promete uma amostra de 31 rotas e a promessa de não-regressão
     // do `admin` vale sobre ELA. Uma rota apagada por um merge desajeitado
     // deixaria a promessa valendo sobre menos coisa, calada.
-    assert.equal(CASOS.length, 31);
+    assert.equal(CASOS.length, 32);
   });
 });
 
@@ -573,7 +583,7 @@ describe('quem não tem a capacidade toma 403', () => {
 
 /**
  * O par que dá sentido ao de cima, e a garantia de não-regressão do `admin`:
- * ele aparece aqui em TODAS as 31 rotas, porque a matriz lhe dá as 24
+ * ele aparece aqui em TODAS as 32 rotas, porque a matriz lhe dá as 25
  * capacidades. Nenhuma das rotas desta amostra saiu do alcance dele na onda 17.
  */
 describe('quem tem a capacidade passa pela guarda', () => {
@@ -613,9 +623,9 @@ describe('o alcance do viewer, sobre a amostra', () => {
 
   it('não alcança nada que mexa em aparelho, em gente ou em configuração', () => {
     // A amostra inteira menos as três acima, numa afirmação só: o que o
-    // `viewer` NÃO alcança é 21 das 24 capacidades.
+    // `viewer` NÃO alcança é 22 das 25 capacidades.
     const fechadas = PERMISSIONS.filter((cap) => !QUEM_TEM[cap].includes('viewer'));
-    assert.equal(fechadas.length, 21, fechadas.join(', '));
+    assert.equal(fechadas.length, 22, fechadas.join(', '));
   });
 });
 

@@ -1,3 +1,4 @@
+import AuditLog from '../models/AuditLog.js';
 import Setting from '../models/Setting.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { translateError } from '../i18n/index.js';
@@ -105,6 +106,20 @@ class SettingsController {
         username: proximo.username,
         secret: req.body?.secret
       });
+      // O segredo não entra na trilha; o que entra é que a credencial mudou,
+      // para qual tipo, e se passou a existir uma. É o suficiente para
+      // responder "desde quando o ACS parou de aceitar a gente" sem guardar a
+      // resposta de quem quiser se passar pelo painel.
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.GENIEACS_AUTH_CHANGED,
+        subjectType: 'settings',
+        subjectId: 'genieacs-auth',
+        detail: {
+          authType: salvo.authType,
+          username: salvo.username,
+          secretConfigured: salvo.secretConfigured
+        }
+      });
       return res.json(createResponse(req.t('settings.updated'), salvo));
     } catch (error) {
       console.error('Update GenieACS auth error:', error);
@@ -207,6 +222,21 @@ class SettingsController {
         return res.status(404).json(
           createErrorResponse(req.t('settings.notFound'))
         );
+      }
+
+      // Só a URL do ACS, e não toda chave que passa por aqui: a trilha existe
+      // para as ações sensíveis, e virar log de toda edição de configuração a
+      // encheria de linhas sobre o nome do painel e os caminhos de parâmetro
+      // virtual — que é como uma trilha deixa de ser lida. Mudar para onde o
+      // painel fala é outra coisa: é para onde vão as credenciais dos
+      // assinantes daquele provedor.
+      if (key === 'genieAcsUrl') {
+        await AuditLog.fromRequest(req, {
+          action: AuditLog.ACTIONS.GENIEACS_URL_CHANGED,
+          subjectType: 'settings',
+          subjectId: key,
+          detail: { url: validated.value }
+        });
       }
 
       return res.json(

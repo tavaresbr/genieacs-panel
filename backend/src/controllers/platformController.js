@@ -1,4 +1,6 @@
 import Tenant from '../models/Tenant.js';
+import AuditLog from '../models/AuditLog.js';
+import { runInTenant } from '../config/tenantContext.js';
 import { getDb } from '../config/database.js';
 import { seedDefaults } from '../config/seed.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
@@ -200,6 +202,19 @@ class PlatformController {
       }
 
       await Tenant.setStatus(id, status);
+      // A linha nasce NO provedor suspenso, não numa trilha da plataforma: quem
+      // vai perguntar "por que meu painel parou" é o ISP, e a resposta tem que
+      // estar onde ele consegue olhar. `actorKind: 'platform'` é o que diz que
+      // a mão veio de fora — sem isso a trilha mostraria a ação sem nenhum
+      // operador daquele provedor por trás, e não haveria como distinguir de
+      // uma linha com o ator perdido.
+      await runInTenant(id, () => AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.TENANT_STATUS_CHANGED,
+        actorKind: 'platform',
+        subjectType: 'tenant',
+        subjectId: id,
+        detail: { from: tenant.status, to: status }
+      }));
       const updated = await Tenant.findById(id);
       const counts = await Tenant.operatorCounts();
       return res.json(createResponse('Tenant updated successfully', {

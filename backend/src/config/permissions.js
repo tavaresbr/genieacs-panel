@@ -90,6 +90,10 @@ export const PERMISSIONS = Object.freeze([
   'settings.write',
   'operators.read',
   'operators.manage',
+  // Ler a trilha das ações sensíveis. Separada de `operators.read` porque a
+  // trilha diz mais do que a equipe: quem revelou a senha de qual assinante, e
+  // quando. Quem pode ver a lista de colegas não recebe isso de brinde.
+  'audit.read',
   // Trocar o banco em runtime, que só existe na edição self-hosted.
   'database.manage'
 ]);
@@ -131,6 +135,7 @@ const ADMIN = [
   'settings.write',
   'operators.read',
   'operators.manage',
+  'audit.read',
   'database.manage'
 ];
 

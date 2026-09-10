@@ -69,7 +69,16 @@ class GenieAcsAuthService {
   /** O que a tela pode ver: nunca o segredo, só se existe um. */
   static async getPublicConfig() {
     const { secret, ...resto } = await this.getConfig();
-    return { ...resto, secretConfigured: Boolean(secret), authTypes: AUTH_TYPES };
+    return {
+      ...resto,
+      secretConfigured: Boolean(secret),
+      authTypes: AUTH_TYPES,
+      // Vai na resposta porque a decisão é da tela, e sem este campo a tela não
+      // tem como tomá-la: ela não sabe em que edição o servidor roda. Estava
+      // faltando na primeira escrita — o método existia com um comentário
+      // prometendo um consumidor que não podia existir.
+      allowsAnonymous: GenieAcsAuthService.allowsAnonymous()
+    };
   }
 
   /**

@@ -552,4 +552,7 @@ export default {
 
   'settings.validation.genieAcsAuthType': 'Der GenieACS-Authentifizierungstyp muss none, basic oder bearer sein',
   'settings.validation.genieAcsAuthUsername': 'Basic-Authentifizierung braucht einen Benutzernamen',
+
+  'audit.listed': 'Audit-Protokoll abgerufen',
+  'audit.listFailed': 'Audit-Protokoll konnte nicht gelesen werden',
 };

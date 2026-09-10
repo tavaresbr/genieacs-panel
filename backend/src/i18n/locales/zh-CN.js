@@ -551,4 +551,7 @@ export default {
 
   'settings.validation.genieAcsAuthType': 'GenieACS 认证方式必须是 none、basic 或 bearer',
   'settings.validation.genieAcsAuthUsername': 'basic 认证需要用户名',
+
+  'audit.listed': '已获取审计日志',
+  'audit.listFailed': '无法读取审计日志',
 };

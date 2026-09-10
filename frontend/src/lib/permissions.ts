@@ -52,6 +52,7 @@ export const PERMISSIONS = [
   'settings.write',
   'operators.read',
   'operators.manage',
+  'audit.read',
   'database.manage'
 ] as const
 
@@ -92,6 +93,7 @@ const ADMIN: Permission[] = [
   'settings.write',
   'operators.read',
   'operators.manage',
+  'audit.read',
   'database.manage'
 ]
 

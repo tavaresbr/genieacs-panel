@@ -4,6 +4,7 @@ import TenantUser from '../models/TenantUser.js';
 import Tenant from '../models/Tenant.js';
 import User from '../models/User.js';
 import { getDb } from '../config/database.js';
+import AuditLog from '../models/AuditLog.js';
 import { ROLES, normalizeRole, roleHas } from '../config/permissions.js';
 import { generateTokens } from '../middleware/auth.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
@@ -81,6 +82,15 @@ class InviteController {
         ttlMs
       });
 
+      // O token NÃO entra na trilha. Ele é uma credencial: quem tem o link
+      // entra na equipe com o papel escrito nele, e guardá-lo aqui faria da
+      // trilha uma lista de convites utilizáveis.
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.INVITE_CREATED,
+        subjectType: 'invite',
+        subjectId: invite.id,
+        detail: { role, label: invite.label, expiresAt: invite.expires_at }
+      });
       return res.status(201).json(createResponse(req.t('invite.created'), {
         invite: publicInvite(invite),
         // Mostrado uma vez, como o segredo do webhook do SGP e a senha do portal
@@ -107,6 +117,11 @@ class InviteController {
       if (!await TenantInvite.revoke(id)) {
         return res.status(404).json(createErrorResponse(req.t('invite.notFound')));
       }
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.INVITE_REVOKED,
+        subjectType: 'invite',
+        subjectId: id
+      });
       return res.json(createResponse(req.t('invite.revoked'), { id }));
     } catch (error) {
       console.error('Revoke invite error:', error);
@@ -228,6 +243,22 @@ class InviteController {
       // que ela nunca viu, num endereço que ela acabou de conhecer.
       const user = await User.findById(userId);
       const membership = await TenantUser.find(invite.tenant_id, userId);
+
+      // Ator preenchido à mão, e não por `fromRequest`: quem aceita não tinha
+      // sessão quando o request chegou, então `req.user` está vazio. O ator é a
+      // pessoa que acabou de entrar — que é exatamente quem a trilha precisa
+      // nomear aqui. O escopo é o do host, e `usableInvite` já conferiu que ele
+      // é o do convite, então a linha nasce no provedor certo.
+      await AuditLog.record({
+        action: AuditLog.ACTIONS.INVITE_ACCEPTED,
+        actorUserId: userId,
+        actorUsername: user.username,
+        subjectType: 'invite',
+        subjectId: invite.id,
+        detail: { role, createdNewAccount: !existente },
+        ip: req.ip ?? null
+      });
+
       const { accessToken, refreshToken } = generateTokens(user, membership);
 
       return res.status(201).json(createResponse(req.t('invite.accepted'), {

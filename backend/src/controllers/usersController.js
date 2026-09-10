@@ -1,3 +1,4 @@
+import AuditLog from '../models/AuditLog.js';
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 import TenantUser from '../models/TenantUser.js';
@@ -168,6 +169,12 @@ class UsersController {
       }
 
       const created = await User.findById(id);
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.OPERATOR_CREATED,
+        subjectType: 'tenant_user',
+        subjectId: id,
+        detail: { username, role }
+      });
       return res.status(201).json(
         createResponse('Operator created successfully', {
           user: present({ ...created, role })
@@ -255,6 +262,12 @@ class UsersController {
         }
         await TenantUser.setRole(tenantId, id, nextRole);
         await applyRoleSideEffects(id, nextRole);
+        await AuditLog.fromRequest(req, {
+          action: AuditLog.ACTIONS.OPERATOR_ROLE_CHANGED,
+          subjectType: 'tenant_user',
+          subjectId: id,
+          detail: { username: user.username, from: presentRole(membership.role), to: nextRole }
+        });
       }
 
       if (nextPassword !== undefined) {
@@ -338,6 +351,12 @@ class UsersController {
       }
 
       await TenantUser.remove(tenantId, id);
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.OPERATOR_REMOVED,
+        subjectType: 'tenant_user',
+        subjectId: id,
+        detail: { role: presentRole(membership.role) }
+      });
       // Their open sessions were sessions here. Revocation lives on the person,
       // so this signs them out of their other providers too — the blunt end of
       // one `token_version` per person, and the safe direction of the two.

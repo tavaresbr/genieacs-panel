@@ -333,6 +333,51 @@ const platformAdminsTable = (db) => (t) => {
  * do segredo do webhook do SGP e da senha do portal do assinante. Um convite é
  * uma credencial: quem tem o link entra na equipe.
  */
+/**
+ * A trilha das ações sensíveis: quem fez, o quê, sobre quem, e quando.
+ *
+ * Escopada por provedor como quase tudo aqui, e por um motivo além do óbvio: a
+ * trilha de um ISP diz quem são seus operadores, quantos assinantes ele tem e
+ * quando alguém revelou a senha de um deles. É dado tão dele quanto a lista de
+ * contratos.
+ *
+ * A coluna `detail` é a que mais precisa de disciplina. Nada de segredo entra
+ * ali — nem a senha revelada, nem a credencial da NBI, nem o token do convite.
+ * O que a trilha registra é que a senha foi revelada, não qual era: a primeira
+ * coisa é o que permite auditar, a segunda transformaria a auditoria no maior
+ * repositório de segredos em claro do produto. `audit-log.test.js` guarda isso
+ * com uma varredura sobre o que cada gravação de verdade produz.
+ */
+const auditLogTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  // `SET NULL` e não `CASCADE`: a pessoa pode sair, e a linha que diz o que ela
+  // fez tem que continuar de pé. Uma trilha que some junto com quem a produziu
+  // não é trilha.
+  t.integer('actor_user_id').unsigned().references('id').inTable('users').onDelete('SET NULL');
+  // Desnormalizado pela mesma razão de `provisioning_runs.profile_name`: seis
+  // meses depois o nome ainda responde "quem foi", mesmo que a linha em `users`
+  // já não exista.
+  t.string('actor_username', 64);
+  // operator | platform | system. `platform` é quem opera o SaaS agindo sobre o
+  // provedor de fora; `system` é trabalho de fundo sem gente por trás.
+  t.string('actor_kind', 16).notNullable().defaultTo('operator');
+  t.string('action', 64).notNullable();
+  // Sobre o quê: 'customer_account', 'tenant_user', 'invite', 'settings'…
+  t.string('subject_type', 32);
+  t.string('subject_id', 128);
+  // JSON curto e SEM segredo. Ver o comentário acima.
+  t.text('detail');
+  t.string('ip', 64);
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  // Como a tela pergunta: as ações deste provedor, da mais recente para a mais
+  // antiga. `id` no fim desempata dentro do mesmo segundo, que é o que acontece
+  // quando uma ação grava duas linhas.
+  t.index(['tenant_id', 'created_at', 'id'], 'audit_log_recent_idx');
+  t.index(['tenant_id', 'action'], 'audit_log_action_idx');
+};
+
 const tenantInvitesTable = (db) => (t) => {
   t.increments('id').primary();
   t.integer('tenant_id').unsigned().notNullable()
@@ -806,7 +851,9 @@ const MEMBERSHIP_TABLES = [
   // Same reason as `tenant_users`: it references `users`, created by step 0001.
   ['platform_admins', platformAdminsTable],
   // Idem: aponta para `users` (quem convidou, quem aceitou) e para `tenants`.
-  ['tenant_invites', tenantInvitesTable]
+  ['tenant_invites', tenantInvitesTable],
+  // Idem: aponta para `users` (quem fez) e para `tenants`.
+  ['audit_log', auditLogTable]
 ];
 
 const INITIAL_TABLES = [
@@ -2000,6 +2047,18 @@ export const migrations = [
       if (!(await db.schema.hasTable('users'))) return;
       if (!(await db.schema.hasTable('tenants'))) return;
       await createTableIfMissing(db, 'tenant_invites', tenantInvitesTable(db));
+    }
+  },
+  {
+    /** A trilha. Mesmo motivo das duas acima para nascer aqui: aponta para `users`. */
+    id: '0032_audit_log',
+    async isApplied(db) {
+      return db.schema.hasTable('audit_log');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('users'))) return;
+      if (!(await db.schema.hasTable('tenants'))) return;
+      await createTableIfMissing(db, 'audit_log', auditLogTable(db));
     }
   }
 ];

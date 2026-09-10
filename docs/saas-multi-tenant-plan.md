@@ -348,15 +348,30 @@ em cache de um fato que já é lido fresco: estritamente mais fraco, e mais uma 
 alguém esquecer de incrementar. Coberto por
 `backend/test/auth-tenancy.test.js`, "a session open when the membership ends".
 
+**Entrou (ondas 17 e 18):**
+- ✅ **Papéis reais**: `owner`, `admin`, `tech`, `viewer`, e `requireRole` virou
+  `requirePermission` com **24 capacidades** numa matriz só
+  (`backend/src/config/permissions.js`). A regra que fixou o recorte: nenhuma rota fica
+  alcançável por quem não a alcança hoje — o `viewer` recebe exatamente o conjunto que
+  antes não pedia papel nenhum, e o `tech` é papel novo, então nenhum install perde acesso
+  na migração. `owner` e `admin` carregam as mesmas capacidades: a diferença é quem mexe no
+  papel de quem, e essa regra vive no controlador de operadores, nas TRÊS portas — promover,
+  rebaixar e encerrar o vínculo (a terceira ficou de fora na primeira escrita e foi achada
+  na revisão: um `admin` não podia rebaixar o dono, mas podia apagar a membership dele).
+- ✅ **Convite** (`tenant_invites`): quem administra oferece o vínculo, e quem entra é a
+  pessoa convidada — com a conta que já tem, provando quem é com a senha que já usa, ou com
+  uma nova cuja senha o administrador nunca vê. É o que a onda 12 não conseguia fazer.
+  **Por link e não por e-mail**: o painel não tem transporte de correio nenhum, e prometer
+  um envio que não acontece é pior que entregar o link na mão. O transporte entra depois,
+  sem mudar nada do que está feito.
+
 **Falta:**
-- Papéis reais substituindo a string `'admin'`: `owner` (dono, cobrança), `admin`,
-  `tech` (opera ONTs, não mexe em configuração), `viewer`. `requireRole` vira
-  `requirePermission` com um mapa papel→permissões.
 - **Plano de plataforma** (nós, operando o SaaS): audience separada
   `skygenpanel-platform`, rotas `/api/platform/*`, capaz de listar/suspender tenants e de
   fazer *impersonation* auditada. Nunca compartilha o mesmo token do operador.
-- **API de usuários**: já escopada por provedor. Falta o fluxo de **convite por e-mail**
-  (`tenant_invites`).
+- **API de usuários**: escopada por provedor e com convite (onda 18). Falta só o
+  **transporte de e-mail**, que é decisão de produto: qual provedor de envio, credencial de
+  quem, por deploy ou por provedor.
 - **Portal do assinante**: a busca já é escopada (`getByCustomerId` passa por `tdb`), então
   O cookie é **host-only** (`portalCookieOptions` não define `domain`) e o payload assinado
   carrega `tenantId`, conferido contra o provedor da requisição em `portalAuth.js`. As duas
@@ -409,7 +424,14 @@ passa a pedir o conector do tenant. Pontos exatos a refatorar em
 `settings` já escopado.
 
 **MVP — modo `direct`**, com endurecimento obrigatório (hoje inexistente):
-- Enviar `Authorization` (Basic/Bearer) — o código atual **não manda header nenhum**.
+- ✅ **Enviar `Authorization` (Basic/Bearer)** — entrou na onda 19
+  (`backend/src/services/genieacsAuthService.js`), com `none` como padrão para nenhum
+  install passar a mandar header de repente. Uma função só monta os headers das sete
+  chamadas ao ACS, e uma varredura estática falha quando a oitava nascer sem credencial —
+  a falha é silenciosa nas duas direções, e a rota que esquece é justamente a que ninguém
+  pensou em cobrir. O botão de testar conexão só leva a credencial para a MESMA origem já
+  salva: a URL vem no corpo do request, então mandá-la para qualquer endereço faria dele
+  um jeito de LER o segredo.
 - **Fechar os três buracos de SSRF já presentes** (achado 7): remover o branch de URL
   absoluta em `buildGenieAcsUrl` (:183), truncar/omitir o corpo do erro upstream devolvido ao
   cliente em `fetchGenieAcsCollection` (:158), e definir `redirect: 'manual'` rejeitando 3xx.
@@ -520,7 +542,8 @@ guarda os casos que atravessam recursos, e **14 suítes `*-tenancy`** cobrem uma
 subsistema cada — `sgp-links`, `sgp-events`, `device-profiles`, `provisioning`,
 `map-settings`, `vendor-catalogue`, `wifi-credentials`, `whatsapp-media`,
 `whatsapp-inbound`, `users`, `auth`, entre outras, mais `tenant-subdomain` e
-`tenant-id-sweep`, que provam o isolamento por host. São 1188 testes no total, verdes nos
+`tenant-id-sweep`, que provam o isolamento por host, e `role-reach`, que prova por HTTP o
+alcance de cada papel sobre uma amostra de 31 rotas. São 1403 testes no total, verdes nos
 três dialetos no CI.
 
 O padrão em todas: **dois provedores com as chaves naturais deliberadamente colidindo** —
@@ -643,11 +666,12 @@ Original: Fase 0 → 1 → 2 → 3 → 8 → 4 → 5 → 6 → 7.
 1. ~~**Fase 3 — subdomínio.**~~ ✅ Entrou, e destravou o que se esperava: o resolvedor lê o
    host, o portal deixou de resolver o primeiro provedor, e os itens de vazamento que
    dependiam de host puderam enfim ser escritos.
-2. **O resto da Fase 2.** Cookie host-only, `tenantId` no payload do portal e rate limit por
-   provedor ✅ entraram. Falta o **convite por e-mail** (`tenant_invites`), os papéis reais
-   (`owner`/`admin`/`tech`/`viewer` com `requireRole` virando `requirePermission`), a
-   audiência separada `skygenpanel-platform` com impersonação auditada, e a troca de
-   `username` para e-mail — que é quebra de contrato e decisão de produto, não de código.
+2. **O resto da Fase 2.** Cookie host-only, `tenantId` no payload do portal, rate limit por
+   provedor, os **papéis reais** com `requirePermission` e o **convite** ✅ entraram. Falta a
+   audiência separada `skygenpanel-platform` com impersonação auditada — que precisa de
+   `audit_log`, hoje da Fase 7, porque impersonação sem trilha é justamente o que não se
+   constrói —, o **transporte de e-mail** do convite, e a troca de `username` para e-mail,
+   que é quebra de contrato e decisão de produto, não de código.
 3. ~~**Fechar a Fase 8**~~ ✅ com os três testes que passaram a ser possíveis e a sentinela
    de SQL. Sobrou avaliar **RLS no Postgres** como segunda linha.
 4. **Fase 4 — conector**, começando pelas três correções de SSRF e pela guarda de egresso,
@@ -662,7 +686,7 @@ edições de divergirem.
 
 ### Checklist antes de vender acesso ao segundo provedor
 
-Nada disso é negociável. **Nove dos doze estão cumpridos.**
+Nada disso é negociável. **Dez dos doze estão cumpridos.**
 
 | | Item | Estado |
 | --- | --- | --- |
@@ -671,23 +695,23 @@ Nada disso é negociável. **Nove dos doze estão cumpridos.**
 | 3 | Login e sessão do portal escopados por provedor | ✅ busca, cookie host-only e `tenantId` assinado no payload |
 | 4 | Caches em memória e `app_state.dashboard_snapshot` separados por provedor | ✅ |
 | 5 | JWT do operador e do assinante carregam o provedor e são conferidos contra o host | ✅ os dois carregam; divergência com o host é 403 `tenant_mismatch` |
-| 6 | Credenciais ACS por provedor, cifradas, guarda de egresso, branch de URL absoluta removido | ❌ Fase 4 |
+| 6 | Credenciais ACS por provedor, cifradas, guarda de egresso, branch de URL absoluta removido | ✅ credencial NBI por provedor (onda 19), egresso com pinning de DNS, branch de URL absoluta removido |
 | 7 | `/api/database` não montada na edição SaaS | ✅ |
 | 8 | Rate limit e concorrência de fetch ACS chaveados por provedor | ⚠️ rate limit por provedor ✅; a concorrência de fetch ACS é Fase 4 |
-| 9 | Suíte de vazamento verde no CI e obrigatória para merge | ✅ 1188 testes, três dialetos |
+| 9 | Suíte de vazamento verde no CI e obrigatória para merge | ✅ 1403 testes, três dialetos |
 | 10 | `SECRET_BOX_KEY` separada do `JWT_SECRET`, com `key_version` | ✅ |
 | 11 | `audit_log` registrando ações sensíveis | ❌ Fase 7 |
 | 12 | Exportação por provedor funcionando (LGPD e "apaguei tudo, socorro") | ❌ Fase 7 |
 
-Os três que faltam concentram-se em **conector GenieACS (6, e a metade de 8 que é a
-concorrência de fetch)** e **operação (11, 12)**. Nenhum deles é do mecanismo de isolamento
-de dados, que é o que a Fase 1 entregou.
+Os dois que faltam são de **operação (11, 12)**, mais a metade do 8 que é a concorrência
+de fetch ACS. Nenhum deles é do mecanismo de isolamento de dados, que é o que a Fase 1
+entregou.
 
 ## Verificação
 
 ```bash
 npm run verify          # check backend + testes + lint + typecheck + build (raiz)
-cd backend && npm test  # 1188 testes, incluindo as suítes de tenancy
+cd backend && npm test  # 1403 testes, incluindo as suítes de tenancy
 ```
 
 A suíte roda nos três dialetos, e **isso não é zelo**: cada uma das armadilhas abaixo passou

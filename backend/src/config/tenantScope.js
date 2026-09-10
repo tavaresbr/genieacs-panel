@@ -94,6 +94,10 @@ export const SCOPED_TABLES = new Set([
   'vendors',
   'wifi_security_mappings',
   'wifi_security_config',
+  // A trilha das ações sensíveis. Escopada pelo motivo óbvio e por mais um: a
+  // trilha de um ISP diz quem são seus operadores, quantos assinantes ele tem e
+  // quando alguém revelou a senha de um deles.
+  'audit_log',
   // Os convites em aberto de um provedor. Escopada e não compartilhada, ao
   // contrário de `tenant_users`: um convite pertence a UM provedor — é o
   // vínculo que ele oferece — e listá-los sem filtro entregaria a um provedor

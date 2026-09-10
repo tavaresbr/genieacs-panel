@@ -548,4 +548,7 @@ export default {
 
   'settings.validation.genieAcsAuthType': 'O tipo de autenticação do GenieACS tem que ser none, basic ou bearer',
   'settings.validation.genieAcsAuthUsername': 'A autenticação basic precisa de um usuário',
+
+  'audit.listed': 'Trilha de auditoria carregada',
+  'audit.listFailed': 'Falha ao ler a trilha de auditoria',
 };

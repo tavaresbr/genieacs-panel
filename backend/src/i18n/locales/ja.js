@@ -551,4 +551,7 @@ export default {
 
   'settings.validation.genieAcsAuthType': 'GenieACS の認証方式は none、basic、bearer のいずれかにしてください',
   'settings.validation.genieAcsAuthUsername': 'basic 認証にはユーザー名が必要です',
+
+  'audit.listed': '監査ログを取得しました',
+  'audit.listFailed': '監査ログを読み取れませんでした',
 };

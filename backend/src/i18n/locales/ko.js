@@ -554,4 +554,7 @@ export default {
 
   'settings.validation.genieAcsAuthType': 'GenieACS 인증 방식은 none, basic, bearer 중 하나여야 합니다',
   'settings.validation.genieAcsAuthUsername': 'basic 인증에는 사용자 이름이 필요합니다',
+
+  'audit.listed': '감사 로그를 가져왔습니다',
+  'audit.listFailed': '감사 로그를 읽지 못했습니다',
 };

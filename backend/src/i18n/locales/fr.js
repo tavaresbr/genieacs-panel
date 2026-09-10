@@ -547,4 +547,7 @@ export default {
 
   'settings.validation.genieAcsAuthType': 'Le type d\'authentification GenieACS doit être none, basic ou bearer',
   'settings.validation.genieAcsAuthUsername': 'L\'authentification basic exige un nom d\'utilisateur',
+
+  'audit.listed': 'Journal d\'audit récupéré',
+  'audit.listFailed': 'Impossible de lire le journal d\'audit',
 };

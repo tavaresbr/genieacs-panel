@@ -165,6 +165,9 @@ describe('o segredo guardado', () => {
     // entre "não configurado" e "configurado, e eu não te mostro".
     assert.equal(body.data.secretConfigured, true);
     assert.equal(body.data.authType, 'bearer');
+    // A tela precisa saber em que edição o servidor roda para decidir se
+    // "sem autenticação" merece aviso — e não tem outro jeito de descobrir.
+    assert.equal(typeof body.data.allowsAnonymous, 'boolean');
   });
 
   it('não volta no GET de settings inteiro', async () => {

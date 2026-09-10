@@ -552,4 +552,7 @@ export default {
 
   'settings.validation.genieAcsAuthType': 'Тип аутентификации GenieACS должен быть none, basic или bearer',
   'settings.validation.genieAcsAuthUsername': 'Аутентификация basic требует имя пользователя',
+
+  'audit.listed': 'Журнал аудита получен',
+  'audit.listFailed': 'Не удалось прочитать журнал аудита',
 };
