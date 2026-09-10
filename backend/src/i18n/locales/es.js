@@ -602,4 +602,6 @@ export default {
   'auth.impersonationTicketInvalid': 'Este enlace de suplantación ya no es válido. Genere otro desde la consola.',
   'auth.impersonationStarted': 'Sesión de soporte iniciada',
   'auth.impersonationFailed': 'No se pudo iniciar la sesión de soporte',
+  'invite.mailSubject': 'Le han invitado a {provider}',
+  'invite.mailBody': 'Le invitaron a unirse al equipo de {provider}.\n\nAbra el enlace de abajo para aceptar. Sirve una sola vez y solo para usted:\n\n{link}\n\nSi no esperaba esta invitación, ignore este mensaje.',
 };

@@ -608,4 +608,6 @@ export default {
   'auth.impersonationTicketInvalid': '이 가장 링크는 더 이상 유효하지 않습니다. 콘솔에서 새로 발급하세요.',
   'auth.impersonationStarted': '지원 세션이 시작되었습니다',
   'auth.impersonationFailed': '지원 세션을 시작할 수 없습니다',
+  'invite.mailSubject': '{provider} 초대',
+  'invite.mailBody': '{provider} 팀에 초대되었습니다.\n\n아래 링크를 열어 수락하세요. 한 번만, 본인만 사용할 수 있습니다:\n\n{link}\n\n이 초대가 예상치 못한 것이라면 이 메시지를 무시하세요.',
 };

@@ -604,4 +604,6 @@ export default {
   'auth.impersonationTicketInvalid': 'Este link de personificação não vale mais. Gere outro pelo console.',
   'auth.impersonationStarted': 'Sessão de atendimento iniciada',
   'auth.impersonationFailed': 'Não foi possível iniciar a sessão de atendimento',
+  'invite.mailSubject': 'Você foi convidado para {provider}',
+  'invite.mailBody': 'Você foi convidado a entrar na equipe do {provider}.\n\nAbra o link abaixo para aceitar. Ele serve uma vez, e só para você:\n\n{link}\n\nSe você não esperava este convite, ignore esta mensagem.',
 };

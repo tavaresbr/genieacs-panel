@@ -603,4 +603,6 @@ export default {
   'auth.impersonationTicketInvalid': 'Questo link di impersonificazione non è più valido. Generane un altro dalla console.',
   'auth.impersonationStarted': 'Sessione di assistenza avviata',
   'auth.impersonationFailed': 'Impossibile avviare la sessione di assistenza',
+  'invite.mailSubject': 'Sei stato invitato a {provider}',
+  'invite.mailBody': 'Sei stato invitato a entrare nel team di {provider}.\n\nApri il link qui sotto per accettare. Vale una sola volta e solo per te:\n\n{link}\n\nSe non ti aspettavi questo invito, ignora questo messaggio.',
 };

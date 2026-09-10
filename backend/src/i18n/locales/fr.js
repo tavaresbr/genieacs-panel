@@ -601,4 +601,6 @@ export default {
   'auth.impersonationTicketInvalid': 'Ce lien d\'usurpation n\'est plus valide. Générez-en un autre depuis la console.',
   'auth.impersonationStarted': 'Session d\'assistance démarrée',
   'auth.impersonationFailed': 'Impossible de démarrer la session d\'assistance',
+  'invite.mailSubject': 'Vous êtes invité chez {provider}',
+  'invite.mailBody': 'Vous avez été invité à rejoindre l\'équipe de {provider}.\n\nOuvrez le lien ci-dessous pour accepter. Il ne sert qu\'une fois, et seulement pour vous :\n\n{link}\n\nSi vous n\'attendiez pas cette invitation, ignorez ce message.',
 };

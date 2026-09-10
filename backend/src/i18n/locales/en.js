@@ -605,4 +605,6 @@ export default {
   'auth.impersonationTicketInvalid': 'This impersonation link is no longer valid. Start a new one from the console.',
   'auth.impersonationStarted': 'Support session started',
   'auth.impersonationFailed': 'Failed to start the support session',
+  'invite.mailSubject': 'You have been invited to {provider}',
+  'invite.mailBody': 'You were invited to join the team at {provider}.\n\nOpen the link below to accept. It works once, and only for you:\n\n{link}\n\nIf you were not expecting this invitation, ignore this message.',
 };

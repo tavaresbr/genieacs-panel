@@ -606,4 +606,6 @@ export default {
   'auth.impersonationTicketInvalid': 'Эта ссылка олицетворения больше не действует. Создайте новую в консоли.',
   'auth.impersonationStarted': 'Сеанс поддержки начат',
   'auth.impersonationFailed': 'Не удалось начать сеанс поддержки',
+  'invite.mailSubject': 'Вас пригласили в {provider}',
+  'invite.mailBody': 'Вас пригласили в команду {provider}.\n\nОткройте ссылку ниже, чтобы принять. Она действует один раз и только для вас:\n\n{link}\n\nЕсли вы не ждали этого приглашения, проигнорируйте это сообщение.',
 };

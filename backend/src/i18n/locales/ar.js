@@ -597,4 +597,6 @@ export default {
   'auth.impersonationTicketInvalid': 'لم يعد رابط انتحال الهوية هذا صالحًا. أنشئ رابطًا جديدًا من وحدة التحكم.',
   'auth.impersonationStarted': 'بدأت جلسة الدعم',
   'auth.impersonationFailed': 'تعذّر بدء جلسة الدعم',
+  'invite.mailSubject': 'تمت دعوتك إلى {provider}',
+  'invite.mailBody': 'تمت دعوتك للانضمام إلى فريق {provider}.\n\nافتح الرابط أدناه للقبول. يصلح مرة واحدة، ولك وحدك:\n\n{link}\n\nإذا لم تكن تتوقع هذه الدعوة، فتجاهل هذه الرسالة.',
 };

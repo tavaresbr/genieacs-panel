@@ -605,4 +605,6 @@ export default {
   'auth.impersonationTicketInvalid': 'このなりすましリンクは無効になりました。コンソールから新しく発行してください。',
   'auth.impersonationStarted': 'サポートセッションを開始しました',
   'auth.impersonationFailed': 'サポートセッションを開始できませんでした',
+  'invite.mailSubject': '{provider} への招待',
+  'invite.mailBody': '{provider} のチームに招待されました。\n\n下のリンクを開いて承認してください。1回だけ、あなただけが使えます:\n\n{link}\n\nこの招待に心当たりがない場合は、このメッセージを無視してください。',
 };

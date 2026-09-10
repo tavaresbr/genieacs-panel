@@ -605,4 +605,6 @@ export default {
   'auth.impersonationTicketInvalid': '此模擬連結已失效，請在主控台重新產生。',
   'auth.impersonationStarted': '支援工作階段已開始',
   'auth.impersonationFailed': '無法開始支援工作階段',
+  'invite.mailSubject': '您受邀加入 {provider}',
+  'invite.mailBody': '您受邀加入 {provider} 的團隊。\n\n開啟下方連結接受邀請。它只能使用一次，且僅對您有效：\n\n{link}\n\n如果您並未預期收到此邀請，請忽略本郵件。',
 };

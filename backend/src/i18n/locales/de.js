@@ -606,4 +606,6 @@ export default {
   'auth.impersonationTicketInvalid': 'Dieser Identitätswechsel-Link gilt nicht mehr. Erzeugen Sie in der Konsole einen neuen.',
   'auth.impersonationStarted': 'Support-Sitzung gestartet',
   'auth.impersonationFailed': 'Die Support-Sitzung konnte nicht gestartet werden',
+  'invite.mailSubject': 'Sie wurden zu {provider} eingeladen',
+  'invite.mailBody': 'Sie wurden eingeladen, dem Team von {provider} beizutreten.\n\nÖffnen Sie den Link unten, um anzunehmen. Er gilt einmal und nur für Sie:\n\n{link}\n\nWenn Sie diese Einladung nicht erwartet haben, ignorieren Sie diese Nachricht.',
 };
