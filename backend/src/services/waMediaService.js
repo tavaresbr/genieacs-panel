@@ -267,7 +267,14 @@ async function resolverBytes({ account, dados, mensagem, midia, chave }) {
     try {
       // A URL vem de fora, então vai pelo guard: ele revalida o host a cada
       // redirect e barra endereço interno.
-      const res = await safeFetch(url, { headers: { Accept: '*/*' } });
+      //
+      // Prazo maior que o padrão do guard, e não por descuido: isto aqui baixa
+      // um ARQUIVO de até `MAX_MEDIA_BYTES`, enquanto o padrão é dimensionado
+      // para resposta de API. Com 30 s um vídeo de 25 MB exigiria quase 7 Mbps
+      // do outro lado para não se perder; com 90 s o piso cai para menos de
+      // 2,5 Mbps. Continua sendo um limite — o que não pode existir é a espera
+      // sem fim, que é o que prendia o handler do webhook.
+      const res = await safeFetch(url, { headers: { Accept: '*/*' }, timeoutMs: 90_000 });
       if (res.ok) {
         const buf = await lerCorpoLimitado(res);
         if (buf) {

@@ -173,16 +173,41 @@ export async function assertPublicUrl(raw) {
 export const MAX_REDIRECTS = 3;
 
 /**
+ * Quanto tempo uma busca inteira pode levar, do primeiro salto ao último byte.
+ *
+ * O `fetch` do Node não tem prazo nenhum por conta própria, e sem um destes o
+ * host de destino escolhe por quanto tempo prende quem chamou: manda os
+ * cabeçalhos, depois pinga um byte por minuto, e o handler do webhook que
+ * aguarda esta função nunca devolve o socket. `waWebhookLimiter` conta chegadas,
+ * não requisições simultâneas, então nada limitava quantas ficavam presas ao
+ * mesmo tempo. O teto de 25 MB em `lerCorpoLimitado` limita o tamanho, não o
+ * tempo — são coisas diferentes e cada uma precisa do seu limite.
+ *
+ * Um prazo SÓ, criado antes do laço e compartilhado por todos os saltos, e não
+ * um por salto: três saltos com 30 s cada seriam 90 s de espera, que é
+ * justamente o que se quer evitar.
+ */
+export const FETCH_TIMEOUT_MS = 30_000;
+
+/**
  * Segue redirects manualmente, revalidando o host a CADA salto. Usar no lugar
  * de fetch() sempre que a URL de destino tiver origem no usuário.
+ *
+ * `init.timeoutMs` substitui o prazo padrão para quem baixa arquivo grande. O
+ * `signal` de quem chama continua valendo: os dois são combinados, então o
+ * cancelamento vem do que disparar primeiro.
  */
 export async function safeFetch(start, init = {}, maxRedirects = MAX_REDIRECTS) {
+  const { timeoutMs = FETCH_TIMEOUT_MS, signal: callerSignal, ...rest } = init;
+  const deadline = AbortSignal.timeout(timeoutMs);
+  const signal = callerSignal ? AbortSignal.any([callerSignal, deadline]) : deadline;
+
   let current = start instanceof URL ? start : new URL(String(start));
   for (let hop = 0; hop <= maxRedirects; hop += 1) {
     // eslint-disable-next-line no-await-in-loop -- os saltos são sequenciais por natureza
     await assertPublicUrl(current);
     // eslint-disable-next-line no-await-in-loop
-    const r = await fetch(current.toString(), { ...init, redirect: 'manual' });
+    const r = await fetch(current.toString(), { ...rest, signal, redirect: 'manual' });
     if (r.status >= 300 && r.status < 400) {
       const loc = r.headers.get('location');
       if (!loc) return r;
