@@ -1,4 +1,5 @@
 import rateLimit from 'express-rate-limit';
+import { tenantSlugFromHost } from './tenantResolver.js';
 
 /**
  * Renders the limiter body in the language negotiated for the request. The
@@ -29,12 +30,42 @@ export function ipKey(req) {
 }
 
 /**
+ * The provider a request is addressed to, folded into the bucket key.
+ *
+ * The comment below on `accountKey` names the deployment this exists for: every
+ * client arrives through one reverse proxy or tunnel, so one address is every
+ * caller. On a deployment serving several ISPs that means ONE bucket for all of
+ * them, and a single provider's traffic switches off everybody's panel.
+ *
+ * The slug is read from the host rather than from `req.tenantId`, because the
+ * shared limiters are mounted ahead of the resolver — deliberately, so that a
+ * flood is refused before it can cost a database read. A deployment without
+ * subdomains yields the same empty discriminator for every request and keeps
+ * exactly the buckets it has today.
+ *
+ * The cost is real and worth stating: somebody hitting N providers' hosts from
+ * one address now gets N times the budget. That is the price of one provider
+ * not being able to exhaust another's, and on a deployment where every request
+ * shares a source address it is the cheaper of the two failures.
+ */
+function tenantScopeKey(req) {
+  return tenantSlugFromHost(String(req.headers.host ?? '').split(':')[0].toLowerCase()) || '-';
+}
+
+/** Per source address, but never shared between providers. */
+export function tenantIpKey(req) {
+  return `${tenantScopeKey(req)}|${ipKey(req)}`;
+}
+
+/**
  * Portal limits must be per customer, not per source address: the recommended
  * deployment puts every client behind one reverse proxy or Cloudflare Tunnel,
  * where a shared bucket lets a single visitor exhaust the quota for everyone.
  */
 function accountKey(req) {
-  return req.customer?.id ? `account:${req.customer.id}` : `ip:${ipKey(req)}`;
+  return req.customer?.id
+    ? `account:${req.customer.id}`
+    : `ip:${tenantIpKey(req)}`;
 }
 
 function limiter(options) {
@@ -44,14 +75,14 @@ function limiter(options) {
 export const apiLimiter = limiter({
   windowMs: 60 * 1000,
   max: 300,
-  keyGenerator: ipKey,
+  keyGenerator: tenantIpKey,
   message: limitMessage('rateLimit.requests', 'rate_limited')
 });
 
 export const authLimiter = limiter({
   windowMs: 15 * 60 * 1000,
   max: 20,
-  keyGenerator: ipKey,
+  keyGenerator: tenantIpKey,
   message: limitMessage('rateLimit.attempts', 'rate_limited_login')
 });
 
@@ -66,7 +97,7 @@ export const portalLoginLimiter = limiter({
   skipSuccessfulRequests: true,
   keyGenerator: (req) => {
     const customerId = String(req.body?.customerId ?? '').trim().toUpperCase().slice(0, 32);
-    return `${ipKey(req)}|${customerId || 'unknown'}`;
+    return `${tenantIpKey(req)}|${customerId || 'unknown'}`;
   },
   message: limitMessage('rateLimit.portalLogin', 'rate_limited_login')
 });
@@ -75,7 +106,7 @@ export const portalLoginLimiter = limiter({
 export const portalIpLimiter = limiter({
   windowMs: 60 * 1000,
   max: 600,
-  keyGenerator: ipKey,
+  keyGenerator: tenantIpKey,
   message: limitMessage('rateLimit.portalRequests', 'rate_limited')
 });
 

@@ -32,9 +32,24 @@ function parseCookies(header) {
   return cookies;
 }
 
+/**
+ * The provider travels in the payload, and that is belt as well as braces.
+ *
+ * The braces already hold: `CustomerAccount.getById` below reads through `tdb`,
+ * so a cookie minted on one provider's portal finds no account under the host
+ * it is replayed at and is refused. But that refusal lives in the SHAPE of a
+ * query rather than in the session, and a future reader that forgets the
+ * filter would turn a replayed cookie into a working one. Signing the provider
+ * makes the refusal a fact about the cookie instead.
+ */
 export function signPortalSession(account) {
   return jwt.sign(
-    { accountId: account.id, customerId: account.customer_id, tokenType: 'customer' },
+    {
+      accountId: account.id,
+      customerId: account.customer_id,
+      tenantId: Number(account.tenant_id),
+      tokenType: 'customer'
+    },
     portalSecret,
     {
       expiresIn: PORTAL_SESSION_TTL_SECONDS,
@@ -78,6 +93,18 @@ export async function authenticatePortalCustomer(req, res, next) {
       audience: 'skygenpanel-customer-portal'
     });
     if (decoded.tokenType !== 'customer' || !decoded.accountId) {
+      return res.status(401).json({
+        success: false,
+        message: req.t('portal.sessionInvalid'),
+        code: 'customer_session_invalid'
+      });
+    }
+    // A cookie that names a provider other than the host's is refused before
+    // the account is even read. Cookies minted before this field existed carry
+    // no `tenantId` and are left to the scoped read below, which is what kept
+    // them safe until now — a session in flight during an upgrade should not
+    // be thrown away.
+    if (decoded.tenantId !== undefined && Number(decoded.tenantId) !== Number(req.tenantId)) {
       return res.status(401).json({
         success: false,
         message: req.t('portal.sessionInvalid'),
