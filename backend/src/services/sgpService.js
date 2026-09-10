@@ -453,10 +453,28 @@ async function sgpFetch(url, { headers, body, signal }) {
   // it refused because its reader is the operator of the whole deployment;
   // here the reader is one tenant of it, and "resolves to 10.0.0.5" would be
   // the panel mapping its own private network on request.
+  // O `signal` vale para a RESOLUÇÃO também, e não só para a requisição abaixo.
+  // O prazo de 15 s é armado em `request` com um AbortController, mas ele só
+  // alcança o que já começou: um resolvedor que aceita a consulta e nunca
+  // responde prende quem chamou antes de existir socket para abortar, e a
+  // chamada passa dos 15 s sem que nada a encerre. É o mesmo prazo que o
+  // `safeFetch` já estende à resolução, pelo mesmo motivo — aqui pesa mais,
+  // porque na edição SaaS o `baseUrl` é escolhido pelo administrador do
+  // provedor, e as consultas de fatura do portal e o job de reconciliação
+  // passam por aqui.
+  //
+  // Ele limita a ESPERA, não a consulta: `getaddrinfo` não tem `cancel()`, então
+  // o aborto solta quem chamou e deixa a consulta terminar no vazio. Prender
+  // quem chamou é o dano que o prazo existe para evitar.
   const addresses = await PinnedTransport.vetTarget(hostname, {
+    signal,
     allowPrivateAddresses: !IS_SAAS,
     refuse: () => new SgpError('sgp.error.blockedHost', { code: 'blocked_host', status: 400 })
   });
+  // O prazo pode ter vencido DENTRO da resolução acima, e aí o motivo de parar é
+  // ele: sem esta linha um nome que não respondeu a tempo sairia daqui como
+  // `unreachable`, que é uma frase sobre a rede para um problema de relógio.
+  signal?.throwIfAborted();
   if (addresses.length === 0) {
     throw new SgpError('sgp.error.unreachable', { code: 'unreachable', status: 502 });
   }
@@ -477,6 +495,15 @@ const MIN_RECONCILE_INTERVAL_MINUTES = 5;
 
 class SgpService {
   static configCache = new TenantCache(CONFIG_CACHE_TTL_MS);
+
+  /**
+   * Quanto uma chamada ao SGP pode levar, da resolução do nome ao último byte.
+   *
+   * Campo de classe, e lido por `this`, pelo mesmo motivo que `ALLOWED_PORTS`
+   * em `genieacsEgress`: o limite que a classe anuncia é o limite que ela
+   * aplica, e um teste consegue provar o prazo sem esperar quinze segundos.
+   */
+  static REQUEST_TIMEOUT_MS = REQUEST_TIMEOUT_MS;
 
   /**
    * Forget the provider in scope — its own configuration changed.
@@ -757,7 +784,7 @@ class SgpService {
     const body = { app: config.app, token: config.token, ...payload };
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    const timeoutId = setTimeout(() => controller.abort(), this.REQUEST_TIMEOUT_MS);
     let response;
     try {
       response = await sgpFetch(url, {
@@ -1016,6 +1043,24 @@ class SgpService {
     };
   }
 
+  /**
+   * O contrato que uma PESSOA escolheu, ou nada.
+   *
+   * `pickContract` existe para responder "qual destes serve", e ali um palpite
+   * — o primeiro não bloqueado — é a resposta certa. Quando o número veio de
+   * alguém, o palpite é a pior resposta possível: o vínculo governa VLAN e
+   * PPPoE no provisionamento, e a troca não aparece em canto nenhum. A tela diz
+   * "contrato vinculado", e o número que ela mostra é outro.
+   *
+   * A regra não é nova neste arquivo: `syncAccount` já a aplica no vínculo
+   * manual, com o comentário que a explica — "o operador escolheu aquele
+   * contrato". O que faltava era aplicá-la nos dois outros lugares em que um
+   * número escolhido a mão passa por `pickContract`.
+   */
+  static exactContract(contracts, wanted) {
+    return contracts.find((entry) => entry.contract === String(wanted)) || null;
+  }
+
   static pickContract(contracts, preferredContract = null) {
     if (contracts.length === 0) return null;
     if (preferredContract) {
@@ -1057,7 +1102,8 @@ class SgpService {
     }
 
     const preferredContract = usable?.contract || null;
-    const filters = usable?.link_mode === 'manual' || config.linkMode === 'manual'
+    const manual = usable?.link_mode === 'manual' || config.linkMode === 'manual';
+    const filters = manual
       ? { contract: preferredContract }
       : config.linkMode === 'customer_id'
         ? { contract: account?.customer_id }
@@ -1069,7 +1115,14 @@ class SgpService {
     }
 
     const { contracts } = await this.lookupCustomer(filters, config);
-    const contract = this.pickContract(contracts, preferredContract);
+    // A consulta manual é FILTRADA pelo contrato, e o ERP responde com o
+    // cliente inteiro — todos os contratos dele. Deixar `pickContract` escolher
+    // aí re-aponta o vínculo que alguém fixou a mão para outro contrato do
+    // mesmo cliente, silenciosamente e a cada refresh, que é exatamente o que
+    // `syncAccount` se recusa a fazer três métodos abaixo.
+    const contract = manual
+      ? this.exactContract(contracts, preferredContract)
+      : this.pickContract(contracts, preferredContract);
     if (!contract) {
       // A stale cache is better than no answer, but only while it still
       // belongs to the subscriber holding the device.
@@ -1091,7 +1144,11 @@ class SgpService {
   static async linkDevice(deviceId, { contract, document }) {
     const config = this.requireReady(await this.getConfig());
     const { contracts } = await this.lookupCustomer({ contract, document }, config);
-    const selected = this.pickContract(contracts, contract);
+    // Com um contrato nas mãos, só ele serve. Sem ele — a busca foi por
+    // documento — a escolha é do painel, e aí `pickContract` é quem responde.
+    const selected = contract
+      ? this.exactContract(contracts, contract)
+      : this.pickContract(contracts);
     if (!selected) {
       throw new SgpError('sgp.error.contractNotFound', { code: 'not_found', status: 404 });
     }
