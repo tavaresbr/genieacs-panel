@@ -676,6 +676,36 @@ export default function DeviceDetailPage() {
     setEditingWan(null);
   }
 
+  // Declarado antes dos handlers que o chamam, e não depois deles: ver a
+  // regra `no-use-before-define` no eslint.config.
+  const fetchDeviceDetails = useCallback(async (isRefresh = false) => {
+    if (!isRefresh) {
+      setLoading(true);
+    }
+
+    try {
+      if (!deviceId) {
+        setDevice(null)
+        return
+      }
+      const res = await devicesAPI.getDevice(deviceId)
+      if (res.success && res.data) {
+        const nextDevice = res.data as ProcessedDeviceDetail
+        setDevice(nextDevice)
+        setInstallationDate(nextDevice.customer?.installationDate || '')
+        setWanContainer((current) => current || nextDevice.wanContainers?.[0]?.path || '')
+      } else {
+        toast.error(res.message || t('detail.loadFailed'))
+        setDevice(null)
+      }
+    } catch (error) {
+      console.error('Error fetching device details:', error)
+      toast.error(t('detail.networkError'))
+    } finally {
+      setLoading(false);
+    }
+  }, [deviceId, t, toast])
+
   const handleSaveWan = async (formData: WanFormState) => {
     if (!editingWan) return;
     if (formData.vlanEnabled) {
@@ -773,33 +803,6 @@ export default function DeviceDetailPage() {
     }
   }
 
-  const fetchDeviceDetails = useCallback(async (isRefresh = false) => {
-    if (!isRefresh) {
-      setLoading(true);
-    }
-
-    try {
-      if (!deviceId) {
-        setDevice(null)
-        return
-      }
-      const res = await devicesAPI.getDevice(deviceId)
-      if (res.success && res.data) {
-        const nextDevice = res.data as ProcessedDeviceDetail
-        setDevice(nextDevice)
-        setInstallationDate(nextDevice.customer?.installationDate || '')
-        setWanContainer((current) => current || nextDevice.wanContainers?.[0]?.path || '')
-      } else {
-        toast.error(res.message || t('detail.loadFailed'))
-        setDevice(null)
-      }
-    } catch (error) {
-      console.error('Error fetching device details:', error)
-      toast.error(t('detail.networkError'))
-    } finally {
-      setLoading(false);
-    }
-  }, [deviceId, t, toast])
 
   // An SGP due date is a plain YYYY-MM-DD; anchor it to local midnight so the
   // reader's locale, not UTC, decides the displayed day.

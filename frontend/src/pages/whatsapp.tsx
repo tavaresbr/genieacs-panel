@@ -201,6 +201,9 @@ function InboxTab() {
   useEffect(() => { loadThreadRef.current = loadThread }, [loadThread])
 
   // ── The list ───────────────────────────────────────────────────────────────
+  // Nasce vazia e é preenchida no efeito abaixo: `loadList` a lê no próprio
+  // corpo, então ela tem de existir antes dele.
+  const loadListRef = useRef<((initial: boolean) => Promise<void>) | null>(null)
   const loadList = useCallback(async (initial: boolean) => {
     if (listInFlight.current) {
       listOwed.current = true
@@ -249,12 +252,11 @@ function InboxTab() {
       if (initial) setLoadingList(false)
       if (listOwed.current) {
         listOwed.current = false
-        void loadListRef.current(false)
+        void loadListRef.current?.(false)
       }
     }
   }, [t])
 
-  const loadListRef = useRef(loadList)
   useEffect(() => { loadListRef.current = loadList }, [loadList])
 
   useEffect(() => { void loadList(true) }, [loadList])
@@ -269,7 +271,7 @@ function InboxTab() {
     // initial load that the effect above already fired.
     if (shown.search === next.search && shown.status === next.status) return
     filterRef.current = next
-    void loadListRef.current(false)
+    void loadListRef.current?.(false)
   }, [debouncedSearch, status])
 
   useEffect(() => {
@@ -368,7 +370,7 @@ function InboxTab() {
         return
       }
       if (selectedIdRef.current === id) setConversation(res.data)
-      void loadListRef.current(false)
+      void loadListRef.current?.(false)
     } catch {
       if (alive.current) toast.error(t('api.requestFailed'))
     } finally {

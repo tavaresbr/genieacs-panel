@@ -1,6 +1,15 @@
 import { getActiveLocale, translate } from '@/lib/i18n'
 import type { LoginResponse, OperatorRole, User } from '@/types'
 
+// Acima de `apiClient`, que o dispara: um `const` de módulo lido antes da
+// declaração é uma ReferenceError no primeiro 402.
+export const SUBSCRIPTION_BLOCKED_EVENT = 'skygp:subscription-blocked'
+export interface SubscriptionBlockedDetail {
+  code: SubscriptionGateCode
+  message: string
+  subscription: SubscriptionView | null
+}
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || ''
 
 export interface ApiResponse<T = any> {
@@ -495,12 +504,6 @@ export const SUBSCRIPTION_GATE_CODES = [
 export type SubscriptionGateCode = typeof SUBSCRIPTION_GATE_CODES[number]
 
 /** Fired on `window` whenever the API answers 402 for the subscription. */
-export const SUBSCRIPTION_BLOCKED_EVENT = 'skygp:subscription-blocked'
-export interface SubscriptionBlockedDetail {
-  code: SubscriptionGateCode
-  message: string
-  subscription: SubscriptionView | null
-}
 
 /** A person's membership at one provider, listed from the control plane. */
 export interface TenantMembership {

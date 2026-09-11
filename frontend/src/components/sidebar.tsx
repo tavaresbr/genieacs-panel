@@ -116,6 +116,17 @@ function SidebarContent({
 }) {
   const { isDarkMode, toggleDarkMode } = useTheme()
   const { user, logout, can } = useAuth()
+  // The provider's name, from the row that IS the provider. It used to come
+  // from `settings.appName` through `localStorage` and a custom event — three
+  // places that agreed in none of them for the first second after a change.
+  //
+  // Read BEFORE `visibleItems`, which is not a style choice: the filter below
+  // runs synchronously during render and reads `isSaas`. With this line after
+  // it, `isSaas` was in its temporal dead zone at that moment and every
+  // authenticated screen died in `SidebarContent` with "Cannot access 'isSaas'
+  // before initialization" — a black page, for every operator, on every
+  // route. `tsc` does not see it because the read happens inside a callback.
+  const { name: appName, isSaas } = useTenant()
   const isPlatformAdmin = Boolean(user?.isPlatformAdmin)
   const visibleItems = menuItems.filter((item) => can(item.permission)
     && (!('platformOnly' in item && item.platformOnly) || isPlatformAdmin)
@@ -125,10 +136,6 @@ function SidebarContent({
   const { t } = useTranslation()
   const displayName = user?.username || t('sidebar.defaultOperator')
   const initial = displayName.slice(0, 1).toUpperCase()
-  // The provider's name, from the row that IS the provider. It used to come
-  // from `settings.appName` through `localStorage` and a custom event — three
-  // places that agreed in none of them for the first second after a change.
-  const { name: appName, isSaas } = useTenant()
   const [showReleaseNotes, setShowReleaseNotes] = useState(false)
 
   return (
