@@ -173,6 +173,61 @@ describe("a provider's subscription", () => {
     assert.ok(Math.abs(stacked - (renewsAt + 30 * DAY)) < 5 * 60 * 1000, 'paid ahead extends from the current end');
   });
 
+  /**
+   * A mesma referência credita uma vez só.
+   *
+   * Todo gateway reentrega webhook. Antes disto a segunda entrega de uma
+   * referência era aceita sem erro, empurrava o período mais trinta dias e
+   * gravava um segundo evento: o extrato tinha a coluna `external_id` mas não
+   * o índice único que o seu comentário dizia existir, e ninguém lia a
+   * referência antes de creditar.
+   */
+  it('the same reference credits once: a redelivery answers what already exists', async () => {
+    const corpo = { amountCents: 19990, currency: 'BRL', reference: 'PIX-REENTREGA' };
+    const first = await platform(`/tenants/${beta}/payments`, { method: 'POST', body: corpo });
+    assert.equal(first.status, 201);
+    const renewsAt = first.body.data.subscription.renewsAt;
+    const trilhaAntes = (await getDb()('platform_audit').where({ tenant_id: beta })).length;
+
+    const again = await platform(`/tenants/${beta}/payments`, { method: 'POST', body: corpo });
+    assert.equal(again.status, 200, 'a reentrega não é um erro, e não é um pagamento novo');
+    assert.equal(again.body.data.duplicate, true);
+    assert.equal(again.body.data.subscription.renewsAt, renewsAt, 'nada pode ter sido creditado');
+
+    const events = await getDb()('billing_events').where({ tenant_id: beta, external_id: 'PIX-REENTREGA' });
+    assert.equal(events.length, 1, 'um pagamento, um evento');
+    assert.equal((await getDb()('platform_audit').where({ tenant_id: beta })).length, trilhaAntes,
+      'a trilha não pode dizer que houve um segundo pagamento');
+  });
+
+  /**
+   * A corrida: duas entregas iguais ao mesmo tempo passam as duas pela
+   * leitura da referência, e é o índice único quem decide. O dublê abaixo faz
+   * a leitura não ver nada, que é exatamente o que a segunda entrega vê
+   * quando a primeira ainda não foi confirmada.
+   */
+  it('and the unique index settles two identical deliveries that raced past the read', async () => {
+    const { default: BillingEvent } = await import('../src/models/BillingEvent.js');
+    const before = await runInTenant(beta, () => SubscriptionService.recordPayment({
+      amountCents: 100, externalId: 'PIX-CORRIDA'
+    }));
+    assert.equal(before.duplicate, false);
+
+    const leituraReal = BillingEvent.findByExternalId;
+    BillingEvent.findByExternalId = async () => null;
+    try {
+      const again = await runInTenant(beta, () => SubscriptionService.recordPayment({
+        amountCents: 100, externalId: 'PIX-CORRIDA'
+      }));
+      assert.equal(again.duplicate, true, 'o índice tem que ter recusado a segunda linha');
+      assert.equal(String(again.subscription.renews_at), String(before.subscription.renews_at),
+        'e a data não pode ter se movido: o evento vai antes dela, na mesma transação');
+    } finally {
+      BillingEvent.findByExternalId = leituraReal;
+    }
+    assert.equal((await getDb()('billing_events').where({ tenant_id: beta, external_id: 'PIX-CORRIDA' })).length, 1);
+  });
+
   it('rejects a payment that is not money', async () => {
     assert.equal((await platform(`/tenants/${beta}/payments`, { method: 'POST', body: { amountCents: 12.5 } })).status, 400);
     assert.equal((await platform(`/tenants/${beta}/payments`, { method: 'POST', body: { amountCents: 100, currency: 'reais' } })).status, 400);

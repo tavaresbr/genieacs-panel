@@ -206,20 +206,19 @@ class PlatformController {
       try {
         await getDb().transaction(async (trx) => {
           id = await Tenant.create({ slug, name }, trx);
-          // The whole-deployment pass, not a per-provider shortcut, and that is
-          // the point: this is the same call the boot path makes, so a provider
-          // minted at runtime is born through the code that mints one at boot
-          // rather than through a second implementation that would drift from
-          // it. It is idempotent — every provider that already has its settings
-          // and a catalogue is skipped — so the cost is a handful of reads and
-          // the guarantee is that there is only one way a provider comes into
-          // existence.
+          // The same call the boot path makes, so a provider minted at
+          // runtime is born through the code that mints one at boot rather
+          // than through a second implementation that would drift from it —
+          // but scoped to the one provider being minted. The whole-deployment
+          // pass was defended here as "a handful of reads"; measured, it is
+          // seventeen queries per EXISTING provider even when there is nothing
+          // to insert, and it ran inside this transaction. See `seedDefaults`.
           //
           // The transaction is passed rather than left to default to `getDb()`,
           // for the same reason `dbManagementService` passes the target of a
           // database switch: the new provider is not visible outside this
           // transaction yet, so seeding on another connection would not see it.
-          await seedDefaults(trx);
+          await seedDefaults(trx, { tenantIds: [id] });
         });
       } catch (error) {
         // Two writers racing on the same slug both pass the check above and one

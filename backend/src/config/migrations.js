@@ -997,6 +997,10 @@ const billingEventsTable = (db) => (t) => {
   t.text('detail');
   t.timestamp('created_at').defaultTo(db.fn.now());
   t.index(['tenant_id', 'created_at', 'id'], 'billing_events_recent_idx');
+  // A idempotência do pagamento. Todo gateway reentrega webhook; sem isto a
+  // segunda entrega de uma referência creditava outra vez. Nulos não colidem
+  // nos três bancos, então a marca manual sem referência segue livre.
+  t.unique(['tenant_id', 'external_id'], 'billing_events_external_uq');
 };
 
 /**
@@ -1081,6 +1085,38 @@ export const SCHEMA_TABLES = [
  * ONT swap inside one provider, and account theft across two.
  */
 const CUSTOMER_ACCOUNT_IDENTITY_COLUMNS = ['customer_id', 'device_id', 'identity_hash'];
+
+/**
+ * Se um índice com este nome existe na tabela, nos três dialetos.
+ *
+ * No Postgres a pergunta é feita a `to_regclass`, qualificada pelo schema
+ * corrente, e não a `pg_indexes`. A view varre TODOS os schemas: num servidor
+ * onde outros processos criam e derrubam os seus ao mesmo tempo — a suíte de
+ * testes, um deploy paralelo — a varredura tropeça numa relação sendo apagada
+ * e morre com "could not open relation with OID". E sem filtrar pelo schema
+ * ela ainda responderia sim pelo índice do vizinho, deixando o nosso sem
+ * criar. `to_regclass` resolve um nome só, no schema em que este processo
+ * escreve, e devolve nulo em vez de erro quando não há nada com aquele nome.
+ */
+async function hasIndex(db, table, name) {
+  const client = String(db.client.config.client);
+  if (client === 'pg') {
+    // `::text` porque `format()` recebe `VARIADIC "any"`, e um parâmetro sem
+    // tipo declarado ali é "could not determine data type of parameter $1".
+    const result = await db.raw(
+      "select to_regclass(format('%I.%I', current_schema(), ?::text)) as oid", [name]
+    );
+    return (result.rows?.[0]?.oid ?? null) !== null;
+  }
+  if (client.startsWith('mysql')) {
+    const rows = await db.raw('SHOW INDEX FROM ?? WHERE Key_name = ?', [table, name]);
+    return (Array.isArray(rows) ? rows[0] : rows).length > 0;
+  }
+  const rows = await db.raw(
+    "select name from sqlite_master where type = 'index' and tbl_name = ? and name = ?", [table, name]
+  );
+  return rows.length > 0;
+}
 
 async function createTableIfMissing(db, name, builder) {
   if (await db.schema.hasTable(name)) return;
@@ -2391,7 +2427,28 @@ export const migrations = [
       if (!(await db.schema.hasTable('users'))) return;
       await createTableIfMissing(db, 'impersonation_tickets', impersonationTicketsTable(db));
     }
+  },
+  {
+    /**
+     * O índice único que faz `external_id` valer alguma coisa.
+     *
+     * O extrato nasceu com a coluna e com o comentário dizendo que o índice
+     * existia — e não existia. Uma referência de pagamento repetida era aceita
+     * sem erro e empurrava o período pago outra vez. A tabela nova já o traz em
+     * `billingEventsTable`; esta migração o dá a quem já tinha a tabela.
+     */
+    id: '0038_billing_events_external_id_unique',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('billing_events'))) return true;
+      return hasIndex(db, 'billing_events', 'billing_events_external_uq');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('billing_events'))) return;
+      if (await hasIndex(db, 'billing_events', 'billing_events_external_uq')) return;
+      await db.schema.alterTable('billing_events', (t) => {
+        t.unique(['tenant_id', 'external_id'], 'billing_events_external_uq');
+      });
+    }
   }
 ];
-
 export default migrations;

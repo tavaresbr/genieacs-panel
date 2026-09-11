@@ -314,12 +314,21 @@ class PlatformBillingController {
       const before = await Subscription.forTenant(tenant.id);
       if (!before) return res.status(404).json(createErrorResponse('Subscription not found'));
 
-      const after = await runInTenant(tenant.id, () => manualBilling.recordPayment({
+      const { subscription: after, duplicate } = await runInTenant(tenant.id, () => manualBilling.recordPayment({
         amountCents: amount,
         currency,
         externalId,
         actorUserId: req.user?.userId ?? null
       }));
+      // Uma referência já vista não é um segundo pagamento: nada foi
+      // creditado, e uma segunda linha na trilha diria que foi.
+      if (duplicate) {
+        const state = await runInTenant(tenant.id, () => SubscriptionService.current());
+        return res.status(200).json(createResponse('Payment already recorded', {
+          subscription: SubscriptionService.present(state),
+          duplicate: true
+        }));
+      }
       await recordBoth(req, tenant, {
         platformAction: PlatformAudit.ACTIONS.PAYMENT_RECORDED,
         detail: {

@@ -17,10 +17,25 @@ export const BILLING_EVENT_TYPES = Object.freeze({
 });
 
 class BillingEvent {
+  /**
+   * O evento que uma referência externa já produziu, ou null.
+   *
+   * É a pergunta que torna um pagamento idempotente: todo gateway reentrega
+   * webhook, e a segunda entrega de `PIX-001` tem de encontrar a primeira em
+   * vez de creditar outra vez. O índice único em `(tenant_id, external_id)` é
+   * a última linha de defesa, para a corrida; esta leitura é a primeira, para
+   * o caso comum.
+   */
+  static async findByExternalId(externalId, trx = null) {
+    const id = externalId ? String(externalId).slice(0, 128) : null;
+    if (!id) return null;
+    return (await tdb('billing_events', trx).where({ external_id: id }).first()) || null;
+  }
+
   static async record({
     subscriptionId = null, type, amountCents = null, currency = null,
     provider = 'manual', externalId = null, createdBy = null, detail = null
-  }) {
+  }, trx = null) {
     await tinsert('billing_events', {
       subscription_id: subscriptionId,
       type,
@@ -30,7 +45,7 @@ class BillingEvent {
       external_id: externalId ? String(externalId).slice(0, 128) : null,
       created_by: createdBy,
       detail: detail === null || detail === undefined ? null : JSON.stringify(detail).slice(0, 4000)
-    });
+    }, trx);
     return true;
   }
 

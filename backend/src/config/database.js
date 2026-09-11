@@ -170,4 +170,14 @@ export function tinsertReturningId(table, row, trx = null) {
   return insertReturningId(table, withTenant(table, row), trx);
 }
 
+/**
+ * Se um erro é o banco recusando uma linha por índice único — nos três
+ * dialetos. Quem trata uma corrida entre dois escritores iguais precisa
+ * perguntar isto, e cada um perguntava com a própria lista de códigos.
+ */
+export function isUniqueViolation(error) {
+  const code = String(error?.code ?? '');
+  return code === 'SQLITE_CONSTRAINT_UNIQUE' || code === 'ER_DUP_ENTRY' || code === '23505';
+}
+
 export { isSqlite };

@@ -1,7 +1,7 @@
 import Plan from '../models/Plan.js';
 import Subscription, { SUBSCRIPTION_STATUSES } from '../models/Subscription.js';
 import BillingEvent, { BILLING_EVENT_TYPES } from '../models/BillingEvent.js';
-import { getDb, tdb } from '../config/database.js';
+import { getDb, tdb, isUniqueViolation } from '../config/database.js';
 import { TenantCache } from '../config/tenantCache.js';
 import { currentTenantId, runInTenant } from '../config/tenantContext.js';
 
@@ -297,6 +297,39 @@ class SubscriptionService {
    * dinheiro compra. Um provedor `suspended` ou `canceled` NÃO é reativado por
    * pagamento: essas duas são decisões de gente, e é gente que as desfaz.
    */
+  /**
+   * Um pagamento: registra o fato e, se a assinatura está viva, empurra o
+   * período pago.
+   *
+   * @returns {Promise<{ subscription: object, duplicate: boolean }>} a
+   *   assinatura depois do pagamento, e se esta chamada foi uma REENTREGA —
+   *   uma referência já vista, que não creditou nada.
+   *
+   * ## A mesma referência credita uma vez só
+   *
+   * Todo gateway reentrega webhook, e reentrega é a regra: sem isto, cada
+   * entrega repetida de `PIX-001` empurrava o período pago mais trinta dias.
+   * Medido antes da correção: a segunda entrega era aceita sem erro, a data
+   * saía de 10/10 para 09/11 e o extrato ganhava um segundo evento. O
+   * extrato tinha a coluna `external_id` mas não o índice único que o seu
+   * próprio comentário dizia existir, e ninguém lia a referência antes de
+   * creditar.
+   *
+   * Duas defesas, para dois casos. A leitura da referência é para o caso
+   * comum — a reentrega minutos depois — e responde a primeira gravação. O
+   * índice único `(tenant_id, external_id)` é para a corrida — duas entregas
+   * iguais ao mesmo tempo, que passam as duas pela leitura — e a segunda
+   * perde na inserção. Nulos não colidem nos três bancos, então a marca
+   * manual sem referência continua podendo repetir-se.
+   *
+   * ## O evento antes da data, numa transação
+   *
+   * A ordem antiga era assinatura primeiro, evento depois, sem transação. Com
+   * o índice no lugar, isso ainda creditaria: a reentrega empurrava os trinta
+   * dias e SÓ ENTÃO estourava na inserção — 500 para quem chamou, mês dado.
+   * O evento é o que a unicidade recusa, então é ele que vai primeiro, e a
+   * data só se move na mesma transação em que ele entrou.
+   */
   static async recordPayment({
     amountCents, currency = 'BRL', provider = 'manual', externalId = null,
     actorUserId = null, periodDays = PAID_PERIOD_DAYS, now = new Date()
@@ -307,6 +340,10 @@ class SubscriptionService {
     const amount = Number(amountCents);
     if (!Number.isInteger(amount) || amount < 0) throw new Error('Amount must be a non-negative integer of cents');
 
+    if (externalId && await BillingEvent.findByExternalId(externalId)) {
+      return { subscription: before, duplicate: true };
+    }
+
     const patch = {};
     const reactivates = before.status === 'trial' || before.status === 'active' || before.status === 'past_due';
     if (reactivates) {
@@ -316,21 +353,36 @@ class SubscriptionService {
       patch.status = 'active';
       patch.trial_ends_at = null;
     }
-    const subscription = Object.keys(patch).length
-      ? await Subscription.upsertForTenant(tenantId, patch)
-      : before;
-    await BillingEvent.record({
-      subscriptionId: subscription.id,
-      type: BILLING_EVENT_TYPES.PAYMENT_RECORDED,
-      amountCents: amount,
-      currency,
-      provider,
-      externalId,
-      createdBy: actorUserId,
-      detail: { statusBefore: before.status, statusAfter: subscription.status, renewsAt: subscription.renews_at ?? null }
-    });
-    cache.invalidate();
-    return subscription;
+    const statusAfter = patch.status ?? before.status;
+    const renewsAt = patch.renews_at ?? before.renews_at ?? null;
+
+    try {
+      const subscription = await getDb().transaction(async (trx) => {
+        await BillingEvent.record({
+          subscriptionId: before.id,
+          type: BILLING_EVENT_TYPES.PAYMENT_RECORDED,
+          amountCents: amount,
+          currency,
+          provider,
+          externalId,
+          createdBy: actorUserId,
+          detail: { statusBefore: before.status, statusAfter, renewsAt }
+        }, trx);
+        return Object.keys(patch).length
+          ? Subscription.upsertForTenant(tenantId, patch, trx)
+          : before;
+      });
+      return { subscription, duplicate: false };
+    } catch (error) {
+      // A corrida: a outra entrega igual chegou primeiro e já está gravada. A
+      // resposta certa é a mesma da leitura lá em cima — o que já existe.
+      if (externalId && isUniqueViolation(error)) {
+        return { subscription: await Subscription.forTenant(tenantId), duplicate: true };
+      }
+      throw error;
+    } finally {
+      cache.invalidate();
+    }
   }
 }
 
