@@ -70,6 +70,34 @@ export default function PlatformPage() {
     }
   }
 
+  /**
+   * Abre uma sessão de leitura no painel de um provedor.
+   *
+   * O que volta é um endereço com um bilhete no fragmento, e o que se faz com
+   * ele é ir para lá. `window.location.assign` e não `navigate`: num deploy com
+   * subdomínio esse endereço é OUTRO host, e o roteador do React não atravessa
+   * origin. Numa instalação sem subdomínio o endereço é relativo e o efeito é
+   * o mesmo.
+   *
+   * Confirma antes porque a ação deixa rastro nos dois lados — na nossa trilha
+   * e na do cliente — e porque entrar no painel de um cliente é coisa que se
+   * faz de propósito, nunca por um clique errado numa linha vizinha.
+   */
+  const impersonar = async (tenant: Tenant) => {
+    if (!window.confirm(t('platform.impersonateConfirm', { provider: tenant.name }))) return
+    setBusyId(tenant.id)
+    try {
+      const res = await platformAPI.impersonate(tenant.id)
+      if (!res.success || !res.data) {
+        toast.error(res.message || t('platform.impersonateFailed'))
+        return
+      }
+      window.location.assign(res.data.url)
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   const toggleStatus = async (tenant: Tenant) => {
     const next = tenant.status === 'active' ? 'suspended' : 'active'
     // Only suspending is asked about: it stops every background job for that
@@ -234,6 +262,20 @@ export default function PlatformPage() {
                             >
                               {t('platform.subscription.plan')}
                             </button>
+                            {/* Só de um provedor ativo: o painel de um suspenso
+                                está fora do ar para os operadores dele, e é
+                                isso que a personificação mostraria. */}
+                            {active && (
+                              <button
+                                type="button"
+                                onClick={() => void impersonar(tenant)}
+                                disabled={busyId === tenant.id}
+                                className="modern-button-secondary"
+                              >
+                                <Icon name="eye" size={17} />
+                                {t('platform.impersonate')}
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={() => void toggleStatus(tenant)}

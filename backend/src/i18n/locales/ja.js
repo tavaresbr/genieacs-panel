@@ -600,4 +600,11 @@ export default {
   'auth.signupInvalid': 'プロバイダー名、ユーザー名（3〜64文字）、パスワード（8〜128文字）が必要です',
   'auth.signupSlugTaken': 'このサブドメインは既に使用されています',
   'auth.signupUsernameTaken': 'このユーザー名は既に使用されています',
+  'auth.impersonationReadOnly': 'これは読み取り専用のサポートセッションです。ここからは何も変更できません。',
+  'auth.impersonationTicketRequired': 'なりすましチケットが必要です',
+  'auth.impersonationTicketInvalid': 'このなりすましリンクは無効になりました。コンソールから新しく発行してください。',
+  'auth.impersonationStarted': 'サポートセッションを開始しました',
+  'auth.impersonationFailed': 'サポートセッションを開始できませんでした',
+  'invite.mailSubject': '{provider} への招待',
+  'invite.mailBody': '{provider} のチームに招待されました。\n\n下のリンクを開いて承認してください。1回だけ、あなただけが使えます:\n\n{link}\n\nこの招待に心当たりがない場合は、このメッセージを無視してください。',
 };

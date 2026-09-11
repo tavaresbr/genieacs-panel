@@ -29,7 +29,13 @@ class PlatformAudit {
     // estas duas linhas, vincular-se a um ISP e depois sair não deixaria
     // rastro em trilha nenhuma.
     MEMBER_ADDED: 'tenant.member_added',
-    MEMBER_REMOVED: 'tenant.member_removed'
+    MEMBER_REMOVED: 'tenant.member_removed',
+    // Quem pediu para olhar o painel de qual cliente. Gravada na cunhagem do
+    // bilhete — antes de a sessão existir —, porque é o pedido que é o ato do
+    // plano de controle. Que a sessão tenha de fato começado é o que a trilha
+    // do provedor registra, e é lá que a pergunta "entraram no meu painel?"
+    // é feita.
+    TENANT_IMPERSONATED: 'tenant.impersonated'
   });
 
   /**

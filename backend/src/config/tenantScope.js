@@ -138,6 +138,12 @@ export const SHARED_TABLES = new Set([
   // provider's own administrator must not be able to mint providers or reach
   // into another's, so this cannot be a per-provider table by construction.
   'platform_admins',
+  // O bilhete de uso único que leva uma sessão de personificação do console ao
+  // host do provedor. Compartilhada porque é cunhada pelo plano de controle,
+  // ACIMA dos provedores, antes de qualquer escopo existir — e porque quem a
+  // resgata ainda não sabe de qual provedor ela é; descobrir isso é o que a
+  // leitura faz.
+  'impersonation_tickets',
   // A tabela de preços. É uma só para o deploy inteiro, e um provedor não
   // edita o próprio plano — ele o lê, por `subscriptions.plan_id`.
   'plans'

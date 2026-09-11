@@ -54,6 +54,12 @@ jobs:
           path: /tmp/backend-sqlite.tap
           retention-days: 7
 
+      # Vitest already prints only the failing tests, so this one needs no
+      # digest: what the backend's TAP stream buries, this reporter never
+      # writes down in the first place.
+      - name: Frontend tests
+        run: npm run test:frontend
+
       - name: Lint
         run: npm run lint
 

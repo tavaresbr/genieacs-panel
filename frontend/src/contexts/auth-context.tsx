@@ -24,6 +24,8 @@ interface AuthContextType {
   /** `identifier` é o nome de usuário OU o e-mail: a rota aceita os dois. */
   login: (identifier: string, password: string) => Promise<boolean>
   completeSetup: (username: string, password: string, email: string) => Promise<boolean>
+  /** Para quem chega com a sessão já pronta: o convite aceito e a personificação resgatada. */
+  adoptSession: (token: string, refreshToken: string | undefined, user: User) => void
   logout: () => void
 }
 
@@ -142,6 +144,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }
 
+  /**
+   * Adota uma sessão que outra tela já obteve.
+   *
+   * Duas telas chegam com token na mão em vez de com usuário e senha: quem
+   * aceita um convite e quem resgata um bilhete de personificação. As duas
+   * tinham que repetir o mesmo bloco do `login` — guardar o token, encher o
+   * contexto, navegar —, e repetir isso é como uma delas acaba esquecendo de
+   * uma parte.
+   *
+   * `refreshToken` é opcional porque a personificação não tem um, e passar
+   * `undefined` para `setTokens` MANTERIA o anterior. Por isso a limpeza vem
+   * antes: sem ela, um refresh token de operador sobreviveria por baixo de uma
+   * sessão de personificação e a renovaria como sessão comum.
+   */
+  const adoptSession = (token: string, refreshToken: string | undefined, next: User) => {
+    apiClient.clearTokens()
+    apiClient.setTokens(token, refreshToken)
+    setUser(next)
+    setIsAuthenticated(true)
+    setNeedsSetup(false)
+  }
+
   const logout = () => {
     void authAPI.logout()
     apiClient.clearTokens()
@@ -152,7 +176,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const can = (permission: Permission) => roleHas(user?.role, permission)
 
-  const value = { user, isAuthenticated, loading, needsSetup, can, login, completeSetup, logout }
+  const value = { user, isAuthenticated, loading, needsSetup, can, login, completeSetup, adoptSession, logout }
 
   return (
     <AuthContext.Provider value={value}>

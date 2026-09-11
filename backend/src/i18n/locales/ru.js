@@ -601,4 +601,11 @@ export default {
   'auth.signupInvalid': 'Требуются название провайдера, имя пользователя (3–64) и пароль (8–128)',
   'auth.signupSlugTaken': 'Этот поддомен уже занят',
   'auth.signupUsernameTaken': 'Это имя пользователя уже занято',
+  'auth.impersonationReadOnly': 'Это сеанс поддержки только для чтения. Изменить из него ничего нельзя.',
+  'auth.impersonationTicketRequired': 'Требуется билет олицетворения',
+  'auth.impersonationTicketInvalid': 'Эта ссылка олицетворения больше не действует. Создайте новую в консоли.',
+  'auth.impersonationStarted': 'Сеанс поддержки начат',
+  'auth.impersonationFailed': 'Не удалось начать сеанс поддержки',
+  'invite.mailSubject': 'Вас пригласили в {provider}',
+  'invite.mailBody': 'Вас пригласили в команду {provider}.\n\nОткройте ссылку ниже, чтобы принять. Она действует один раз и только для вас:\n\n{link}\n\nЕсли вы не ждали этого приглашения, проигнорируйте это сообщение.',
 };

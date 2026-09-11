@@ -40,6 +40,16 @@ export interface User {
    * which edition it is talking to.
    */
   isPlatformAdmin?: boolean
+  /**
+   * Presente só numa sessão de personificação: quem, do plano de controle,
+   * está olhando este painel.
+   *
+   * É o que a faixa no alto da tela lê. `isPlatformAdmin` vem `false` junto,
+   * de propósito e sem contradição: dentro de uma personificação o console
+   * responde 404, então acender o menu dele seria apontar para uma tela que
+   * não abre.
+   */
+  impersonation?: { platformUsername: string } | null
   createdAt: string
   updatedAt: string
 }

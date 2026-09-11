@@ -42,7 +42,12 @@ class AuditLog {
     // O provedor mudou o próprio nome — o que aparece na barra lateral, na
     // tela de login e na aba do navegador.
     TENANT_RENAMED: 'tenant.renamed',
-    LOGIN_EMAIL_CHANGED: 'login_email.changed'
+    LOGIN_EMAIL_CHANGED: 'login_email.changed',
+    // Alguém do plano de controle abriu uma sessão de leitura NESTE provedor.
+    // Gravada aqui, e não só na trilha da plataforma, porque quem tem direito
+    // de saber que entraram no painel dele é o dono do painel — e a trilha da
+    // plataforma é a nossa, ele não a lê.
+    PLATFORM_IMPERSONATED: 'platform.impersonated'
   });
 
   /**
