@@ -773,7 +773,7 @@ todos listados no runbook como "não existe ainda", para o plantão não procura
 
 ---
 
-### Fase 8 — Provar o isolamento ✅ *(a lista de portas está contada; o RLS foi avaliado e fica para depois)*
+### Fase 8 — Provar o isolamento ✅ *(a lista de portas está contada; o RLS entrou, desligado por padrão)*
 
 Nada vai para dois provedores reais antes disto passar. **Passa.**
 
@@ -883,7 +883,7 @@ Três coisas que a extensão obrigou a acertar, e que valem como registro:
   junto: corrigir o telefone do contrato 4242 de um não pode mudar o do 4242 do outro, que é o
   tipo de erro que só aparece no disparo de cobrança seguinte.
 
-#### RLS no Postgres: avaliado, e não adotado agora
+#### RLS no Postgres: implementado, desligado por padrão
 
 Era o último item em aberto. Medido num Postgres 16 de verdade, com política
 `USING (tenant_id = current_setting('app.tenant_id')::int)`:
@@ -910,7 +910,35 @@ Então RLS só entra numa das duas formas, e as duas custam:
 2. **Uma conexão por provedor**, o que troca o pool por N pools e amarra o número de
    provedores ao número de conexões do banco.
 
-A decisão é **não adotar agora**, e o motivo é comparativo: as duas linhas que já existem —
+**Atualização: implementado, e desligado por padrão** — `backend/src/config/rls.js`,
+`RLS_ENABLED=true`, prova em `backend/test/rls-postgres.test.js` (11 casos que só rodam no
+Postgres). Três coisas que a medição anterior não tinha visto:
+
+1. **Havia uma terceira forma**, e é a que entrou: transação por **consulta**, não por
+   requisição. Ela não sofre a objeção levantada contra a primeira — não segura transação
+   aberta enquanto a requisição espera o GenieACS. Custo medido: 0,258 → 0,649 ms por
+   consulta, **+152%**.
+2. **As duas formas mais baratas não funcionam, e pelo mesmo motivo**: o contexto do
+   `AsyncLocalStorage` **não sobrevive** à execução dentro do knex. Marcar a variável na
+   aquisição da conexão ou na execução da consulta foi tentado contra um Postgres de verdade
+   — o gancho roda, mas `store.getStore()` ali já não vê o provedor de quem pediu, porque o
+   pool resolve fora do contexto do chamador. É por isso que `tdb()` funciona: ele lê o
+   provedor na CONSTRUÇÃO, de forma síncrona. A marca do RLS tem que viajar igual.
+3. **A linha "lendo como dono: vê tudo" estava incompleta, e de um jeito perigoso.** Não é só
+   falta de `FORCE`: um **superusuário** (ou `BYPASSRLS`) ignora a política incondicionalmente,
+   `FORCE` inclusive. Foi o que aconteceu na primeira medição desta onda — políticas
+   aplicadas, nada reclamando, e cada provedor lendo as linhas de todos. Por isso o painel
+   agora **se recusa a subir** com `RLS_ENABLED=true` num papel que passa por cima: um
+   controle de segurança que responde "ligado" sem proteger é pior que nenhum, porque encerra
+   a conversa.
+
+Dois detalhes que custaram tentativa e valem para quem reescrever a política: ela usa `CASE`
+e não `OR`/`AND` porque o Postgres **não garante ordem de avaliação** nesses dois — o cast
+para `int` era avaliado mesmo com o outro lado já decidido, e a consulta morria com
+`invalid input syntax for type integer`. E o `WITH CHECK` repete o `USING` como
+documentação, não como proteção: omitido, o Postgres usa o `USING` também na escrita.
+
+A decisão de **manter desligado** segue de pé, e o motivo é comparativo: as duas linhas que já existem —
 `tdb()` com o filtro obrigatório e a sentinela de SQL que lança em teste ao ver tabela
 escopada sem filtro — cobrem o mesmo erro (consulta sem provedor) no lugar onde ele é
 escrito, e não custam nada em produção. RLS pegaria o caso que elas não pegam: SQL cru rodando
@@ -1037,7 +1065,9 @@ Original: Fase 0 → 1 → 2 → 3 → 8 → 4 → 5 → 6 → 7.
    quantas contas ainda ficariam de fora, para que essa decisão seja tomada olhando um
    número em vez de na esperança.
 3. ~~**Fechar a Fase 8**~~ ✅ com os três testes que passaram a ser possíveis e a sentinela
-   de SQL. Sobrou avaliar **RLS no Postgres** como segunda linha.
+   de SQL. O **RLS no Postgres** ✅ entrou como segunda linha, desligado por padrão: o
+   isolamento continua sendo `tdb()`, e o RLS é a rede embaixo dele, para o install que
+   aceitar pagar os 152% medidos por consulta.
 4. ~~**Fase 4 — conector.**~~ ✅ na ordem certa: as três correções de SSRF e a guarda de
    egresso com IP fixado entraram **antes** de a URL virar dado do cliente; depois a
    credencial NBI (onda 19) e o teto de concorrência. Do desenho original ficaram de fora,
@@ -1052,8 +1082,8 @@ Original: Fase 0 → 1 → 2 → 3 → 8 → 4 → 5 → 6 → 7.
 7. ~~**Fase 7**~~ ✅ `DATABASE_URL`, compose e imagem no CI, log e métrica com o provedor
    em toda linha, host apex como porta de entrada, runbook.
 8. ~~**Fase 8**~~ ✅ a lista de portas contada e obrigatória no CI, a varredura de ids em 37
-   rotas, e o RLS avaliado com medição (não adotado agora, com o motivo e a receita
-   escritos).
+   rotas, e o RLS avaliado com medição — e depois **implementado**, atrás de `RLS_ENABLED`,
+   com a recusa de subir num papel que passa por cima da política.
 9. ~~**O resto da Fase 2**~~ ✅ personificação auditada com audiência própria e bilhete de
    uso único, transporte de e-mail do convite, e as telas de convidar e de aceitar. → O que
    sobra: a rotação da `SECRET_BOX_KEY` com as duas chaves vivas, e a verificação do

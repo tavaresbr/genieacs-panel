@@ -1,5 +1,5 @@
 import { app, portalApp, APP_ENV } from './app.js';
-import { closePool, testConnection } from './config/database.js';
+import { closePool, getDb, testConnection } from './config/database.js';
 import { ensureSchema } from './config/schema.js';
 import { seedDefaults } from './config/seed.js';
 import DeviceService from './services/deviceService.js';
@@ -15,6 +15,9 @@ import WaMediaSweeper from './services/waMediaSweeper.js';
 import WaMessageSweeper from './services/waMessageSweeper.js';
 import { forEachTenant } from './config/tenantJobs.js';
 import { installTenantTaggedConsole } from './utils/logger.js';
+import { applyRowLevelSecurity, assertRoleEnforcesRls, rlsEnabled } from './config/rls.js';
+import { SCOPED_TABLES } from './config/tenantScope.js';
+import { buildKnexConfig } from './config/dbConfig.js';
 
 // Every `console.*` line written inside a request or a per-provider job
 // carries `[tenant=N]` from here on. Done at boot and not at import, so the
@@ -46,6 +49,19 @@ export const startServer = async () => {
 
     await ensureSchema();
     await seedDefaults();
+
+    // O RLS é aplicado no boot, e não por migration, porque ligá-lo é decisão
+    // de DEPLOY e não de schema: dois deploys do mesmo código podem querer
+    // respostas diferentes, e uma migration daria a mesma para os dois.
+    //
+    // A checagem do papel vem ANTES de aplicar. Um papel que passa por cima do
+    // RLS faria as políticas subirem sem proteger nada, e o deploy acreditaria
+    // estar protegido — que é pior do que não ter ligado.
+    if (rlsEnabled(buildKnexConfig().client)) {
+      await assertRoleEnforcesRls(getDb());
+      const tabelas = await applyRowLevelSecurity(getDb(), [...SCOPED_TABLES]);
+      console.log(`Row level security applied to ${tabelas.length} tables`);
+    }
 
     server = app.listen(PORT, HOST, () => {
       console.log(`Server running on ${HOST}:${PORT} (${APP_ENV})`);
