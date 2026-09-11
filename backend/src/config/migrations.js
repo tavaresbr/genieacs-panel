@@ -152,6 +152,14 @@ const usersTable = (db) => (t) => {
   // — ver `User.normalizeEmail` e o porquê de a comparação não poder depender
   // da colação do banco.
   t.string('email', 255).unique();
+  // Quando o endereço acima foi PROVADO — nulo enquanto não foi, que é o estado
+  // de toda conta anterior a esta coluna e de todo endereço recém-trocado.
+  // Cadastrar um endereço prova que se controla a CONTA (a senha atual é
+  // exigida); não prova que se controla o ENDEREÇO. A diferença não custava
+  // nada enquanto só a senha abria a conta, e passa a custar tudo com a
+  // redefinição por e-mail: um endereço errado guardado aqui é um caminho para
+  // dentro da conta. Por isso só endereço verificado recebe redefinição.
+  t.timestamp('email_verified_at');
   t.string('password', 255).notNullable();
   t.string('role', 32).notNullable().defaultTo('user');
   addTokenVersion(t);
@@ -357,6 +365,45 @@ const impersonationTicketsTable = (db) => (t) => {
   t.timestamp('redeemed_at');
   t.timestamp('created_at').defaultTo(db.fn.now());
   t.index(['expires_at'], 'impersonation_tickets_expiry_idx');
+};
+
+/**
+ * O bilhete que vai por e-mail: redefinição de senha e prova de endereço.
+ *
+ * Uma tabela para os dois, e não uma para cada, porque são o mesmo mecanismo —
+ * um valor opaco de uso único, guardado como hash, com prazo, entregue no
+ * fragmento de uma URL e resgatado no host do provedor. O que muda entre eles é
+ * só o que o resgate FAZ, e isso é código, não schema. `tenant_invites` e
+ * `impersonation_tickets` têm tabela própria porque carregam campos próprios
+ * (o papel oferecido, quem personifica); estes dois carregam exatamente os
+ * mesmos quatro fatos.
+ *
+ * `email` é o endereço para onde o bilhete foi — e é o que o resgate confere
+ * contra o endereço atual da conta. Sem essa coluna, um link de redefinição
+ * mandado para um endereço antigo continuaria valendo depois de a pessoa trocar
+ * de endereço, que é justamente o caminho que a troca deveria fechar. Para a
+ * prova de endereço ele é o próprio objeto: é este endereço que está sendo
+ * provado, e não o que a linha de `users` tiver quando alguém clicar.
+ *
+ * `tenant_id` é o host por onde o bilhete entra. Uma pessoa pode trabalhar para
+ * vários provedores, e o link aponta para um painel só; conferir o provedor no
+ * resgate é o que impede um link cunhado num host de ser gasto noutro.
+ */
+const authTicketsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.string('token_hash', 64).notNullable().unique();
+  // 'password_reset' | 'email_verification' — ver `AuthTicket.PURPOSES`.
+  t.string('purpose', 32).notNullable();
+  t.integer('user_id').unsigned().notNullable()
+    .references('id').inTable('users').onDelete('CASCADE');
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.string('email', 255).notNullable();
+  t.timestamp('expires_at').notNullable();
+  t.timestamp('redeemed_at');
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  t.index(['expires_at'], 'auth_tickets_expiry_idx');
+  t.index(['user_id', 'purpose'], 'auth_tickets_user_purpose_idx');
 };
 
 /**
@@ -1034,7 +1081,10 @@ const MEMBERSHIP_TABLES = [
   ['platform_audit', platformAuditTable],
   // Idem: aponta para `users` (quem personifica) e para `tenants` (quem é
   // personificado).
-  ['impersonation_tickets', impersonationTicketsTable]
+  ['impersonation_tickets', impersonationTicketsTable],
+  // Idem: aponta para `users` (de quem é o bilhete) e para `tenants` (por qual
+  // host ele entra).
+  ['auth_tickets', authTicketsTable]
 ];
 
 const INITIAL_TABLES = [
@@ -2448,6 +2498,44 @@ export const migrations = [
       await db.schema.alterTable('billing_events', (t) => {
         t.unique(['tenant_id', 'external_id'], 'billing_events_external_uq');
       });
+    }
+  },
+  {
+    /**
+     * A redefinição de senha por e-mail, e a verificação de endereço que ela
+     * torna obrigatória.
+     *
+     * O passo 0034 escreveu o aviso e este passo o cobra: o e-mail entrou nulo
+     * porque um endereço inventado "seria o caminho para dentro da conta no dia
+     * em que houver redefinição de senha por e-mail". É este dia. A partir
+     * daqui existe um caminho que entrega uma sessão a quem lê uma caixa de
+     * entrada, e a pergunta deixa de ser "esta conta tem endereço?" para ser
+     * "alguém provou que este endereço é dela?".
+     *
+     * `email_verified_at` entra NULA para todo mundo, inclusive para os
+     * endereços já cadastrados, e essa é a escolha que importa aqui. Dar-lhes
+     * um carimbo de verificado seria barato e seria mentira: eles foram
+     * gravados exigindo a senha atual, o que prova o controle da CONTA e não o
+     * do ENDEREÇO — um endereço digitado errado entraria verificado e
+     * apontaria a redefinição para a caixa de entrada de um estranho. O preço
+     * de não mentir é um clique: quem já usa o painel entra com a senha, pede a
+     * prova e confirma. Ninguém fica trancado do lado de fora, porque a
+     * verificação não é condição de login — só de redefinição.
+     */
+    id: '0039_auth_tickets_and_email_verified',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('auth_tickets'))) return false;
+      return db.schema.hasColumn('users', 'email_verified_at');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('users'))) return;
+      if (!(await db.schema.hasTable('tenants'))) return;
+      if (!(await db.schema.hasColumn('users', 'email_verified_at'))) {
+        await db.schema.alterTable('users', (t) => {
+          t.timestamp('email_verified_at');
+        });
+      }
+      await createTableIfMissing(db, 'auth_tickets', authTicketsTable(db));
     }
   }
 ];

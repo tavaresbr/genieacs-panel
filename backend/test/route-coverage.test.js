@@ -58,7 +58,10 @@ const PUBLICAS = new Map([
   ['POST /api/whatsapp-webhook', 'entrega da Evolution, montada antes do resolvedor e autenticada pelo token da instância'],
   ['GET /api/whatsapp-media/:id', 'anexo servido por um token assinado que já nomeia o provedor; prova em whatsapp-media-tenancy.test.js'],
   ['POST /api/auth/impersonate/redeem', 'o bilhete do console É a credencial: uso único, um minuto de vida, conferido por hash e contra o provedor do host'],
-  ['POST /api/customer/login', 'a porta de entrada do assinante, no listener do portal']
+  ['POST /api/customer/login', 'a porta de entrada do assinante, no listener do portal'],
+  ['POST /api/auth/password-reset', 'quem perdeu a senha não tem sessão; responde a MESMA coisa exista a conta ou não, e a prova está em password-reset.test.js'],
+  ['POST /api/auth/password-reset/confirm', 'o bilhete do e-mail É a credencial: uso único, meia hora, conferido por hash, contra o provedor do host e contra o endereço atual da conta'],
+  ['POST /api/auth/email/verify/confirm', 'idem, e é aberto do celular, onde não há sessão — pedir login para confirmar um link de e-mail é ensinar a equipe a cair em phishing']
 ]);
 
 /**
@@ -177,11 +180,20 @@ describe('toda rota sem sessão', () => {
       .map(chave)
       .sort();
     assert.deepEqual(escritas, [
+      // A confirmação do endereço: escreve o carimbo em `users`, que é cadastro
+      // compartilhado, e só na conta que o bilhete nomeia.
+      'POST /api/auth/email/verify/confirm',
       // O bilhete de personificação: escreve, sim — marca o bilhete como
       // usado —, e é escrita no cadastro COMPARTILHADO, nunca no de um
       // provedor. Quem a autoriza é o bilhete, cunhado pelo console.
       'POST /api/auth/impersonate/redeem',
       'POST /api/auth/login',
+      // As duas metades do "esqueci minha senha". A primeira escreve uma linha
+      // na trilha DO PROVEDOR do host — e só depois de conferir que a pessoa
+      // trabalha nele. A segunda escreve a senha em `users`, que é cadastro
+      // compartilhado, e só para a conta que o bilhete nomeia.
+      'POST /api/auth/password-reset',
+      'POST /api/auth/password-reset/confirm',
       'POST /api/auth/refresh',
       'POST /api/auth/setup',
       'POST /api/auth/signup',

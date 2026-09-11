@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import ImpersonationTicket from '../models/ImpersonationTicket.js';
+import AuthTicket from '../models/AuthTicket.js';
 import PlatformAdmin from '../models/PlatformAdmin.js';
 import User from '../models/User.js';
 import { acceptsIdentifier, canHoldSession, LOGIN_REQUIRES_EMAIL } from '../config/login.js';
@@ -16,8 +17,56 @@ import { panelBaseDomain, usesTenantSubdomains } from '../middleware/tenantResol
 import AuditLog from '../models/AuditLog.js';
 import { runInTenant } from '../config/tenantContext.js';
 import { recordPanelActivity } from '../services/dashboardSchedule.js';
+import { mailTransport, panelUrlFor } from '../services/mail/index.js';
 
 const DUMMY_PASSWORD_HASH = bcrypt.hashSync('skygenpanel-invalid-login-placeholder', 12);
+
+/**
+ * Cunha um bilhete e o manda por e-mail. `false` em toda saída ruim.
+ *
+ * Nunca lança e nunca é condição de nada — a mesma regra do convite, pelo
+ * mesmo motivo: quem chama já decidiu o que a resposta vai ser antes de saber
+ * se a mensagem saiu, e um SMTP fora do ar não pode virar um 500 numa rota que
+ * responde a mesma coisa de qualquer jeito.
+ *
+ * O endereço do link vem do domínio-base ou de `PUBLIC_BASE_URL`, nunca do
+ * `Host` da requisição. Aqui isso é mais grave do que no convite: o pedido de
+ * redefinição é PÚBLICO, então o cabeçalho é escolhido por qualquer um — e um
+ * link montado com ele mandaria à caixa de entrada de uma pessoa real um token
+ * verdadeiro apontando para o servidor de quem pediu. Sem endereço conhecido,
+ * não sai mensagem nenhuma.
+ *
+ * O texto é curto porque carrega uma CREDENCIAL. Vai nele o nome do provedor,
+ * até quando vale e o link — e nada que faça de uma caixa de entrada um lugar
+ * onde mora dado de provedor.
+ */
+async function enviarBilhete({ req, purpose, userId, tenantId, email, rota, assunto, corpo }) {
+  const transporte = mailTransport();
+  if (transporte.name === 'none') return false;
+
+  const tenant = await Tenant.findPublicById(tenantId);
+  const base = panelUrlFor(tenant);
+  if (!base) return false;
+
+  const { token } = await AuthTicket.create({ purpose, userId, tenantId, email });
+  const nome = tenant?.name || 'SkyGenPanel';
+  // Os dois prazos vão para o texto, e cada mensagem usa o que lhe cabe: meia
+  // hora se diz em minutos, um dia se diz em horas. Vindos do próprio
+  // `TTL_MS`, e não escritos na tradução, para que mexer no prazo não deixe
+  // treze idiomas prometendo outro.
+  const minutos = Math.round(AuthTicket.TTL_MS[purpose] / 60000);
+  const horas = Math.round(AuthTicket.TTL_MS[purpose] / 3600000);
+  return transporte.send({
+    to: email,
+    subject: req.t(assunto, { provider: nome }),
+    text: req.t(corpo, {
+      provider: nome,
+      link: `${base}${rota}#${token}`,
+      minutes: minutos,
+      hours: horas
+    })
+  });
+}
 
 /**
  * Registra que este provedor tem gente usando o painel.
@@ -378,6 +427,12 @@ class AuthController {
           user: {
             id: user.id,
             username: user.username,
+            // Os dois campos do e-mail vão aqui pela mesma razão que vão em
+            // `/api/auth/user`: é esta resposta que a tela guarda logo depois
+            // do login, e as duas precisam dizer a mesma coisa — senão o aviso
+            // de endereço não confirmado só apareceria depois de um F5.
+            email: user.email ?? null,
+            emailVerified: Boolean(user.email_verified_at),
             // The membership's role, not `users.role`: it is what the token
             // carries and what the panel is about to gate its screens on, so
             // the two disagreeing would show an operator the buttons of an
@@ -508,6 +563,12 @@ class AuthController {
         createResponse(req.t('auth.userRetrieved'), {
           id: user.id,
           username: user.username,
+          email: user.email ?? null,
+          // Se o endereço acima foi provado. A tela de conta lê isto para
+          // oferecer o botão que manda a prova — e é a mesma linha que decide
+          // se a redefinição de senha vai funcionar para esta pessoa no dia em
+          // que ela precisar, que é um dia em que ela não vai poder resolver.
+          emailVerified: Boolean(user.email_verified_at),
           // From the session rather than from the row, for the same reason the
           // login response reports it that way: this is the answer the panel
           // rebuilds its menus from after a page reload, and `users.role` is
@@ -779,6 +840,21 @@ class AuthController {
       }
 
       await User.updateEmail(userId, normalizado);
+      // O endereço novo entra NÃO provado — `updateEmail` limpa o carimbo — e a
+      // prova sai atrás. Ela nunca é condição da troca: um SMTP fora do ar
+      // deixaria a pessoa sem poder cadastrar o endereço com que ela entra, e
+      // trancar o login por causa do correio é trocar um problema por um pior.
+      // Quem não recebeu pede de novo na tela de conta.
+      const provaEnviada = await enviarBilhete({
+        req,
+        purpose: AuthTicket.PURPOSES.EMAIL_VERIFICATION,
+        userId,
+        tenantId: Number(req.tenantId),
+        email: normalizado,
+        rota: '/verify-email',
+        assunto: 'auth.emailVerifyMailSubject',
+        corpo: 'auth.emailVerifyMailBody'
+      });
       // Auditado no provedor da sessão: trocar o e-mail é trocar por onde se
       // entra nesta conta, e isso é da mesma família da troca de papel e da
       // revelação de senha — coisas que alguém vai querer reconstruir depois.
@@ -792,7 +868,11 @@ class AuthController {
         detail: { email: normalizado }
       });
 
-      return res.json(createResponse(req.t('auth.emailUpdated'), { email: normalizado }));
+      return res.json(createResponse(req.t('auth.emailUpdated'), {
+        email: normalizado,
+        verified: false,
+        verificationSent: provaEnviada
+      }));
     } catch (error) {
       console.error('Change email error:', error);
       return res.status(500).json(
@@ -820,6 +900,247 @@ class AuthController {
       }));
     } catch (error) {
       console.error('Email readiness error:', error);
+      return res.status(500).json(
+        createErrorResponse(req.t('common.internalError'), error.message)
+      );
+    }
+  }
+
+  /**
+   * "Esqueci minha senha": manda o link, ou não manda, e responde a mesma coisa.
+   *
+   * A resposta é IDÊNTICA em todos os casos — conta que não existe, conta sem
+   * endereço, endereço não provado, pessoa que não trabalha neste provedor,
+   * deploy sem SMTP. É a rota mais exposta do painel: pública, sem credencial
+   * nenhuma, e com um campo onde se digita o identificador de outra pessoa.
+   * Qualquer diferença de resposta a transforma num oráculo — "este e-mail tem
+   * conta aqui" é exatamente o que uma lista de alvos precisa saber, e num
+   * painel de ISP a pergunta seguinte é quem são os operadores do concorrente.
+   *
+   * Por isso não há 404 aqui, nem 409, nem mensagem diferente: há 200, sempre,
+   * dizendo que SE existir uma conta a mensagem foi mandada. Quem tem a conta
+   * recebe o link; quem está sondando recebe a mesma frase que receberia se
+   * tivesse acertado.
+   *
+   * As condições para de fato mandar, todas em silêncio:
+   *
+   * - a conta existe e pode ter sessão neste deploy (`canHoldSession`);
+   * - ela tem endereço, e o endereço foi PROVADO. Sem isso a redefinição
+   *   seria o caminho para dentro de uma conta cujo endereço foi digitado
+   *   errado uma vez — ver a migração 0039;
+   * - a pessoa trabalha NESTE provedor. O link aponta para este painel, e o
+   *   pedido chega pelo host dele; mandar a quem não é daqui usaria o nome
+   *   deste provedor para falar com alguém que não o conhece.
+   */
+  static async requestPasswordReset(req, res) {
+    // Montada uma vez e devolvida em cada saída, para que seja literalmente a
+    // mesma resposta e não duas frases que alguém possa deixar de sincronizar.
+    const responder = () => res.json(createResponse(req.t('auth.passwordResetRequested')));
+    try {
+      const identificador = String(req.body?.identifier ?? '').trim();
+      if (!identificador || identificador.length > 255) return responder();
+
+      const user = await User.findByLogin(identificador);
+      if (!user || !canHoldSession(user)) return responder();
+
+      const email = User.normalizeEmail(user.email);
+      if (!email || !user.email_verified_at) return responder();
+
+      if (!(await TenantUser.find(req.tenantId, user.id))) return responder();
+
+      // A trilha é do provedor e vem ANTES do envio, porque ela registra o
+      // pedido e não a entrega: um SMTP que recusa não apaga o fato de alguém
+      // ter pedido uma senha nova para esta conta.
+      await runInTenant(Number(req.tenantId), () => AuditLog.record({
+        action: AuditLog.ACTIONS.PASSWORD_RESET_REQUESTED,
+        actorUserId: user.id,
+        actorUsername: user.username,
+        subjectType: 'user',
+        subjectId: user.id,
+        ip: req.ip ?? null
+      }));
+
+      await enviarBilhete({
+        req,
+        purpose: AuthTicket.PURPOSES.PASSWORD_RESET,
+        userId: user.id,
+        tenantId: Number(req.tenantId),
+        email,
+        rota: '/reset-password',
+        assunto: 'auth.passwordResetMailSubject',
+        corpo: 'auth.passwordResetMailBody'
+      });
+
+      return responder();
+    } catch (error) {
+      // Até o erro responde igual. Um 500 que só acontece para identificador
+      // que existe é a mesma pista que as mensagens diferentes seriam.
+      console.error('Password reset request error:', error);
+      return responder();
+    }
+  }
+
+  /**
+   * O link aberto vira a senha nova. Não vira sessão.
+   *
+   * Não emitir token aqui é deliberado, e é a diferença entre "quem lê a caixa
+   * de entrada entra no painel" e "quem lê a caixa de entrada escolhe uma senha
+   * e depois entra com ela". A segunda custa uma tela a mais e faz a senha nova
+   * ser usada uma vez na frente de quem a escolheu — que é como se descobre,
+   * ali mesmo, que ela foi digitada errada. `updatePassword` ainda incrementa o
+   * `token_version`, então toda sessão antiga morre: se a redefinição foi de
+   * quem invadiu, ela derruba o invasor junto.
+   */
+  static async confirmPasswordReset(req, res) {
+    try {
+      const token = String(req.body?.token ?? '').trim();
+      const novaSenha = String(req.body?.password ?? '');
+
+      if (!token || !novaSenha) {
+        return res.status(400).json(createErrorResponse(req.t('auth.passwordResetRequired')));
+      }
+      if (novaSenha.length < 8 || novaSenha.length > 128) {
+        return res.status(400).json(createErrorResponse(req.t('auth.newPasswordLength')));
+      }
+
+      // Vencido, já usado, inexistente, de outro host e de um endereço que não
+      // é mais o da conta respondem todos a mesma coisa, pelo motivo de sempre.
+      const recusa = () => res.status(404).json(
+        createErrorResponse(req.t('auth.passwordResetInvalid'))
+      );
+
+      // O host entra no resgate, não depois dele: o bilhete foi cunhado no
+      // painel de um provedor e é lá que ele vale. Dentro da condição, a
+      // tentativa pela porta errada não casa linha nenhuma — não gasta o
+      // bilhete de quem o recebeu. Ver `AuthTicket.redeem`.
+      const ticket = await AuthTicket.redeem({
+        token,
+        purpose: AuthTicket.PURPOSES.PASSWORD_RESET,
+        tenantId: req.tenantId
+      });
+      if (!ticket) return recusa();
+
+      const user = await User.findById(ticket.user_id);
+      if (!user || !canHoldSession(user)) return recusa();
+
+      // O endereço da conta ainda é aquele para onde a mensagem foi? Se a
+      // pessoa trocou de endereço depois de pedir, o link antigo morre aqui —
+      // é o que faz a troca de endereço fechar o caminho que ela deveria
+      // fechar, em vez de deixar uma credencial viva na caixa antiga.
+      if (User.normalizeEmail(user.email) !== User.normalizeEmail(ticket.email)) return recusa();
+
+      await User.updatePassword(user.id, await bcrypt.hash(novaSenha, 12));
+
+      await runInTenant(Number(ticket.tenant_id), () => AuditLog.record({
+        action: AuditLog.ACTIONS.PASSWORD_RESET_COMPLETED,
+        actorUserId: user.id,
+        actorUsername: user.username,
+        subjectType: 'user',
+        subjectId: user.id,
+        detail: { ticketId: ticket.id },
+        ip: req.ip ?? null
+      }));
+
+      return res.json(createResponse(req.t('auth.passwordResetDone')));
+    } catch (error) {
+      console.error('Password reset confirm error:', error);
+      return res.status(500).json(
+        createErrorResponse(req.t('common.internalError'), error.message)
+      );
+    }
+  }
+
+  /**
+   * Pede a prova do próprio endereço. Autenticada, e por isso franca.
+   *
+   * Ao contrário do pedido de redefinição, aqui quem pergunta já provou quem é
+   * — então não há o que esconder e as respostas podem ser diferentes: sem
+   * endereço, já provado, sem transporte no deploy. Cada uma dessas é algo que
+   * a pessoa precisa ler para saber o que fazer.
+   */
+  static async requestEmailVerification(req, res) {
+    try {
+      const user = await User.findById(req.user.userId);
+      if (!user) {
+        return res.status(404).json(createErrorResponse(req.t('auth.userNotFound')));
+      }
+
+      const email = User.normalizeEmail(user.email);
+      if (!email) {
+        return res.status(400).json(createErrorResponse(req.t('auth.emailMissing')));
+      }
+      if (user.email_verified_at) {
+        return res.json(createResponse(req.t('auth.emailAlreadyVerified'), { verified: true }));
+      }
+
+      const enviado = await enviarBilhete({
+        req,
+        purpose: AuthTicket.PURPOSES.EMAIL_VERIFICATION,
+        userId: user.id,
+        tenantId: Number(req.tenantId),
+        email,
+        rota: '/verify-email',
+        assunto: 'auth.emailVerifyMailSubject',
+        corpo: 'auth.emailVerifyMailBody'
+      });
+      if (!enviado) {
+        return res.status(503).json(createErrorResponse(req.t('auth.emailVerifyUnavailable')));
+      }
+
+      return res.json(createResponse(req.t('auth.emailVerifySent'), { verified: false }));
+    } catch (error) {
+      console.error('Email verification request error:', error);
+      return res.status(500).json(
+        createErrorResponse(req.t('common.internalError'), error.message)
+      );
+    }
+  }
+
+  /**
+   * O link aberto carimba o endereço como provado.
+   *
+   * Pública de propósito: a mensagem costuma ser lida no celular, onde não há
+   * sessão do painel, e exigir login antes de confirmar transformaria uma
+   * confirmação num pedido de senha — que é exatamente a forma de um phishing.
+   * O bilhete é a credencial, vale uma vez e só carimba o endereço que ele
+   * nomeia.
+   */
+  static async confirmEmailVerification(req, res) {
+    try {
+      const token = String(req.body?.token ?? '').trim();
+      if (!token) {
+        return res.status(400).json(createErrorResponse(req.t('auth.emailVerifyRequired')));
+      }
+
+      const recusa = () => res.status(404).json(
+        createErrorResponse(req.t('auth.emailVerifyInvalid'))
+      );
+
+      const ticket = await AuthTicket.redeem({
+        token,
+        purpose: AuthTicket.PURPOSES.EMAIL_VERIFICATION,
+        tenantId: req.tenantId
+      });
+      if (!ticket) return recusa();
+
+      // `markEmailVerified` só carimba se o endereço da conta AINDA for este —
+      // ver o porquê lá. Um link de um endereço já trocado não carimba nada.
+      if (!(await User.markEmailVerified(ticket.user_id, ticket.email))) return recusa();
+
+      const user = await User.findById(ticket.user_id);
+      await runInTenant(Number(ticket.tenant_id), () => AuditLog.record({
+        action: AuditLog.ACTIONS.LOGIN_EMAIL_VERIFIED,
+        actorUserId: ticket.user_id,
+        actorUsername: user?.username ?? null,
+        subjectType: 'user',
+        subjectId: ticket.user_id,
+        detail: { email: ticket.email },
+        ip: req.ip ?? null
+      }));
+
+      return res.json(createResponse(req.t('auth.emailVerified'), { email: ticket.email }));
+    } catch (error) {
+      console.error('Email verification confirm error:', error);
       return res.status(500).json(
         createErrorResponse(req.t('common.internalError'), error.message)
       );

@@ -228,10 +228,32 @@ painel não inventa o próprio endereço a partir do que a requisição disser.
 Um SMTP fora do ar não quebra nada: o convite existe, a resposta diz `emailed: false` e o
 link está ali.
 
+### O que mais sai por e-mail
+
+**A redefinição de senha** (`/forgot-password` no painel de cada provedor). Quem pede
+recebe sempre a mesma resposta — exista a conta ou não —, porque a rota é pública e uma
+resposta que variasse diria a um estranho quais identificadores têm conta ali. O link vale
+trinta minutos, serve uma vez, só funciona no host onde foi cunhado e morre se o endereço da
+conta mudar antes de ele ser usado. Concluir derruba todas as sessões daquela conta.
+
+**A prova do endereço** (`/verify-email`). Um endereço cadastrado prova que alguém controla
+a CONTA — a senha atual é exigida —, não que controla o ENDEREÇO. A diferença não custava
+nada enquanto só a senha abria a conta e passa a custar tudo com a redefinição por e-mail:
+um endereço digitado errado seria um caminho para dentro. Por isso **só endereço verificado
+recebe redefinição**, e a verificação é desfeita a cada troca de endereço.
+
+Consequência prática do upgrade: **todo endereço já cadastrado entra como não verificado**.
+Ninguém fica trancado do lado de fora — a verificação não é condição de login, só de
+redefinição —, mas até cada pessoa confirmar o seu, "esqueci minha senha" não funciona para
+ela. A tela de conta mostra o aviso e o botão que manda a prova. Vale avisar a equipe na
+janela do upgrade, e sem SMTP configurado nenhum dos dois caminhos existe: nesse deploy a
+senha esquecida continua sendo resolvida por quem administra.
+
+Nenhuma das duas mensagens carrega dado de provedor — nome de operador, contagem de
+assinantes, nada. Uma caixa de entrada alheia não é lugar onde isso mora.
+
 ## 9. O que este documento não cobre, porque ainda não existe
 
 - Gateway de cobrança: hoje o `ManualBillingProvider` registra o pagamento pelo
   console. Asaas ou similar entra quando houver contrato para cobrar.
-- Verificação do endereço de e-mail. Hoje não custa nada, porque só a senha abre uma conta;
-  passa a ser pré-requisito no dia em que existir redefinição de senha por e-mail.
 - Rotação da `SECRET_BOX_KEY` com duas chaves vivas.

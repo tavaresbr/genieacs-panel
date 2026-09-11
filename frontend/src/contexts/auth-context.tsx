@@ -26,6 +26,15 @@ interface AuthContextType {
   completeSetup: (username: string, password: string, email: string) => Promise<boolean>
   /** Para quem chega com a sessão já pronta: o convite aceito e a personificação resgatada. */
   adoptSession: (token: string, refreshToken: string | undefined, user: User) => void
+  /**
+   * Relê a própria conta do backend.
+   *
+   * Existe porque o estado de verificação do e-mail muda por fora desta aba —
+   * a pessoa abre o link da mensagem no celular — e porque trocar o endereço o
+   * desfaz. Sem isto, a tela de conta continuaria mostrando o que era verdade
+   * quando a página carregou.
+   */
+  refreshUser: () => Promise<void>
   logout: () => void
 }
 
@@ -176,7 +185,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const can = (permission: Permission) => roleHas(user?.role, permission)
 
-  const value = { user, isAuthenticated, loading, needsSetup, can, login, completeSetup, adoptSession, logout }
+  const refreshUser = async () => {
+    if (!localStorage.getItem('token')) return
+    try {
+      const res = await authAPI.getCurrentUser()
+      if (res.success && res.data) setUser(res.data as User)
+    } catch {
+      // Uma releitura que falha deixa a tela com o que já tinha, que é o
+      // comportamento certo: não é ela que decide se a sessão ainda vale.
+    }
+  }
+
+  const value = {
+    user, isAuthenticated, loading, needsSetup, can, login, completeSetup,
+    adoptSession, refreshUser, logout
+  }
 
   return (
     <AuthContext.Provider value={value}>

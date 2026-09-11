@@ -349,6 +349,11 @@ class InviteController {
           id: user.id,
           username: user.username,
           email: user.email ?? null,
+          // Não provado: quem acabou de aceitar um convite escolheu o endereço
+          // agora e ninguém abriu nada nele. A tela de conta é que vai pedir a
+          // prova — e esta resposta não pode dizer outra coisa, porque é dela
+          // que a tela parte.
+          emailVerified: Boolean(user.email_verified_at),
           role: membership.role,
           tenantId: Number(membership.tenant_id),
           isPlatformAdmin: false,

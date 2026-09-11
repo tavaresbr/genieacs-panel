@@ -144,6 +144,13 @@ export const SHARED_TABLES = new Set([
   // resgata ainda não sabe de qual provedor ela é; descobrir isso é o que a
   // leitura faz.
   'impersonation_tickets',
+  // O bilhete que vai por e-mail: redefinição de senha e prova de endereço.
+  // Compartilhada porque quem a resgata não tem sessão nem provedor em escopo —
+  // apresentou um token, e é o token que diz de quem e de qual host ele é;
+  // filtrar por provedor aqui seria já saber a resposta. Cada leitura confere o
+  // provedor DEPOIS, contra o host da requisição, que é o que impede um link
+  // cunhado num painel de ser gasto noutro.
+  'auth_tickets',
   // A tabela de preços. É uma só para o deploy inteiro, e um provedor não
   // edita o próprio plano — ele o lê, por `subscriptions.plan_id`.
   'plans'
