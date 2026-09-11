@@ -309,8 +309,11 @@ describe('fleet synchronization', () => {
     firstRun = run.body.data;
   });
 
-  it('counts every account it examined', () => {
-    assert.equal(firstRun.total, FLEET.length);
+  // `FLEET.length + 1` is the orphan: an ONT GenieACS knows and no account
+  // covers. The sweep reaches it because the login it reports is identifier
+  // enough on its own — which is the whole point of the pppoe link mode.
+  it('counts every device it examined, account or not', () => {
+    assert.equal(firstRun.total, FLEET.length + 1);
     assert.equal(firstRun.created, 4);
     assert.equal(firstRun.updated, 1);
     assert.equal(firstRun.linked, 5);
@@ -327,7 +330,9 @@ describe('fleet synchronization', () => {
   });
 
   it('skips devices with no identifier and lookups that match no contract', () => {
-    assert.equal(firstRun.skipped, 3);
+    // Three as before, plus the orphan: SGP knows no contract for the login
+    // it reports, which is a skip and not a failure.
+    assert.equal(firstRun.skipped, 4);
   });
 
   it('counts a customer SGP does not know as skipped rather than failed', async () => {
@@ -370,7 +375,9 @@ describe('fleet synchronization', () => {
     assert.equal(body.data.created, 0);
     assert.equal(body.data.updated, 5);
     assert.equal(body.data.failed, 1);
-    assert.equal(body.data.skipped, 3);
+    // The orphan is skipped on every run, not just the first: SGP still knows
+    // no contract for the login it reports.
+    assert.equal(body.data.skipped, 4);
     assert.equal(body.data.linked, 5);
   });
 });
@@ -436,7 +443,7 @@ describe('fleet reconciliation overview', () => {
   });
 
   it('carries the last sync summary so the UI survives a reload', () => {
-    assert.equal(overview.lastSync.total, FLEET.length);
+    assert.equal(overview.lastSync.total, FLEET.length + 1);
     assert.equal(overview.lastSync.linked, 5);
     assert.ok(Date.parse(overview.lastSync.finishedAt));
   });

@@ -1200,7 +1200,11 @@ class DeviceService {
       '_id',
       '_lastInform',
       'InternetGatewayDevice.DeviceInfo.SoftwareVersion',
-      virtualParams.vpPppoeUsername
+      virtualParams.vpPppoeUsername,
+      // Same reason the listing projects them: an install whose
+      // VirtualParameters were never written answers with nothing, and the
+      // login was in the ONT's own tree the whole time.
+      ...PPPOE_FALLBACK_PATHS
     ].filter(Boolean);
     const data = await this.fetchFromGenieAcs('', { projection: projection.join(',') });
     if (!Array.isArray(data)) {
@@ -1213,8 +1217,28 @@ class DeviceService {
         item,
         'InternetGatewayDevice.DeviceInfo.SoftwareVersion'
       ),
-      pppoe: this.getParameterValue(item, virtualParams.vpPppoeUsername)
+      pppoe: this.resolvePppoeUsername(item, virtualParams).value
     }));
+  }
+
+  /**
+   * The PPPoE login one ONT reports, and nothing else.
+   *
+   * For a caller that holds a device id and needs the subscriber's login
+   * without the rest of the document — the SGP link above all, whose whole
+   * job is to match an ONT to a contract by that login. Null for a bridged
+   * ONT, or one that has not reported a login.
+   */
+  static async getReportedPppoe(deviceId) {
+    if (!deviceId) return null;
+    const virtualParams = await this.getVirtualParameters();
+    const rows = await this.fetchDeviceListPage(
+      JSON.stringify({ _id: deviceId }),
+      ['_id', virtualParams.vpPppoeUsername, ...PPPOE_FALLBACK_PATHS].filter(Boolean)
+    );
+    if (rows.length === 0) return null;
+    const login = this.resolvePppoeUsername(rows[0], virtualParams).value;
+    return typeof login === 'string' && login.trim() ? login.trim() : null;
   }
 
   static async getCustomerPortalOverview(deviceId) {
