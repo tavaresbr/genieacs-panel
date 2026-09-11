@@ -610,12 +610,13 @@ describe('the route', () => {
 
     const data = body.data;
     assert.deepEqual(Object.keys(data).sort(), [
-      'accounts', 'inbox', 'lastInboundAt', 'lastOutboundAt', 'media', 'outbox'
+      'accounts', 'inbox', 'lastInboundAt', 'lastOutboundAt', 'media', 'outbox', 'webhook'
     ]);
     assert.deepEqual(Object.keys(data.accounts).sort(), ['connected', 'disconnected', 'total']);
     assert.deepEqual(Object.keys(data.outbox).sort(), ['failed24h', 'oldestQueuedAt', 'queued', 'retrying', 'sending']);
     assert.deepEqual(Object.keys(data.inbox).sort(), ['openConversations', 'unread']);
     assert.deepEqual(Object.keys(data.media).sort(), ['bytes', 'files', 'oldestAt']);
+    assert.deepEqual(Object.keys(data.webhook).sort(), ['broken', 'refusedAt', 'unchecked']);
   });
 
   it('is admin-only, like everything else on this surface', async () => {

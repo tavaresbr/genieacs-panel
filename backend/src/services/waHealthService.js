@@ -157,7 +157,8 @@ class WaHealthService {
     const lastInboundAt = await this.lastInboundAt();
     const lastOutboundAt = await this.lastOutboundAt();
     const media = await this.mediaUsage();
-    return { accounts, outbox, inbox, lastInboundAt, lastOutboundAt, media };
+    const webhook = await this.webhook();
+    return { accounts, outbox, inbox, lastInboundAt, lastOutboundAt, media, webhook };
   }
 
   /**
@@ -184,6 +185,38 @@ class WaHealthService {
       if (row.status === 'connected') connected += many;
     }
     return { total, connected, disconnected: total - connected };
+  }
+
+  /**
+   * O estado do webhook, que é a metade que faltava de "nunca chegou nada".
+   *
+   * Sem isto a tira sabe dizer que nada chegou e não sabe dizer por quê, e as
+   * três causas — webhook ausente no servidor, webhook apontando para outro
+   * lugar, webhook certo que o Evolution não está chamando — aparecem como a
+   * mesma frase. Com elas separadas, cada uma leva a um conserto diferente.
+   *
+   * `broken` conta apenas o que uma conferência JÁ VIU quebrado. Uma conta
+   * nunca conferida não entra: dizer "quebrado" sobre o que não se olhou é
+   * pior do que não dizer nada, porque manda o operador consertar às cegas.
+   * `unchecked` é o que a tela usa para oferecer a conferência.
+   */
+  static async webhook() {
+    const rows = await tdb('whatsapp_accounts')
+      .select('webhook_verdict', 'webhook_refused_at');
+
+    let broken = 0;
+    let unchecked = 0;
+    let refusedAt = null;
+    for (const row of rows) {
+      const v = row.webhook_verdict || null;
+      if (!v || v === 'unreachable') unchecked += 1;
+      else if (v !== 'ok') broken += 1;
+      // A recusa mais recente de qualquer número: uma só basta para mudar a
+      // pergunta de "o Evolution está chamando?" para "por que ele leva 401?".
+      const quando = asIso(row.webhook_refused_at);
+      if (quando && (!refusedAt || quando > refusedAt)) refusedAt = quando;
+    }
+    return { broken, unchecked, refusedAt };
   }
 
   /**

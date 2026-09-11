@@ -1325,8 +1325,43 @@ export interface WhatsAppAccount {
   isDefault: boolean
   lastSeenAt: string | null
   lastError: string | null
+  /** O veredito da última conferência do webhook no servidor Evolution. */
+  webhookVerdict: WhatsAppWebhookVerdict | null
+  /** A URL que o servidor guarda, com o token REDIGIDO (`?t=***`). */
+  webhookServerUrl: string | null
+  webhookCheckedAt: string | null
+  /** Quando um evento chegou e levou 401, e por quê. */
+  webhookRefusedAt: string | null
+  webhookRefusedReason: 'bad_token' | 'no_credential' | null
   createdAt: string | null
   updatedAt: string | null
+}
+
+/**
+ * Cada jeito de o webhook estar quebrado, e um conserto para cada.
+ *
+ * Dois estados que se consertam do mesmo jeito seriam um só: `absent` e
+ * `token_mismatch` levam à mesma reescrita, mas quem lê "ausente" sabe que a
+ * instância já existia antes do painel, e quem lê "token" sabe que o painel já
+ * escreveu ali um dia — e isso muda para onde ir quando a reescrita não
+ * resolver.
+ */
+export type WhatsAppWebhookVerdict =
+  | 'ok'
+  | 'absent'
+  | 'url_mismatch'
+  | 'token_mismatch'
+  | 'disabled'
+  | 'by_events'
+  | 'events_missing'
+  | 'unreachable'
+
+export interface WhatsAppWebhookCheck {
+  account: WhatsAppAccount
+  verdict: WhatsAppWebhookVerdict | null
+  /** false no Evolution GO, que não tem rota que devolva o webhook. */
+  supported: boolean
+  serverUrl: string
 }
 
 /** `pending` with a null `qr` is a "not yet", not a failure — the GO client boots slowly. */
@@ -1421,6 +1456,18 @@ export interface WhatsAppHealth {
   lastInboundAt: string | null
   lastOutboundAt: string | null
   media: { files: number; bytes: number; oldestAt: string | null }
+  /**
+   * A metade que faltava de "nunca chegou nada".
+   *
+   * `broken` conta os números cuja última conferência encontrou o webhook
+   * divergente no servidor Evolution; `unchecked` conta os que nunca foram
+   * conferidos — e é por isso que os dois são separados: dizer "quebrado"
+   * sobre o que não se olhou manda o operador consertar às cegas.
+   * `refusedAt` é a última vez que um evento chegou e levou 401, que é o que
+   * distingue "o Evolution não está chamando" de "está chamando e sendo
+   * recusado".
+   */
+  webhook: { broken: number; unchecked: number; refusedAt: string | null }
 }
 
 export type WhatsAppAlertRule = 'ont_offline' | 'rx_power_low' | 'temperature_high' | 'mass_outage'
@@ -1515,6 +1562,18 @@ export const whatsappAPI = {
 
   restartAccount: (id: number) =>
     apiClient.post<{ account: WhatsAppAccount }>(`/whatsapp/accounts/${id}/restart`, {}),
+
+  /**
+   * O que o servidor Evolution diz que o webhook deste número é.
+   *
+   * GET confere e POST reescreve, e a diferença de permissão é deliberada:
+   * conferir é leitura e quem está de plantão pode; reescrever muda o servidor.
+   */
+  checkWebhook: (id: number) =>
+    apiClient.get<WhatsAppWebhookCheck>(`/whatsapp/accounts/${id}/webhook`),
+
+  reapplyWebhook: (id: number) =>
+    apiClient.post<WhatsAppWebhookCheck>(`/whatsapp/accounts/${id}/webhook`, {}),
 
   // The only way to force a new QR: a server holding a session resumes it
   // instead of issuing one.

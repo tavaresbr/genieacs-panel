@@ -533,3 +533,74 @@ describe('qr and connection', () => {
     assert.equal(body.skipped, 'unsupported_event');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// A recusa deixa rastro
+//
+// Um evento que chega e leva 401 e um evento que nunca chega são problemas com
+// consertos OPOSTOS — um é token divergente, o outro é o Evolution não estar
+// chamando — e na tela eram o mesmo "Nunca chegou nada". A trilha da recusa é
+// o que os separa.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('um evento que chega e é recusado', () => {
+  const recarregar = () => asTenant(() => WhatsAppAccount.getById(accountId));
+
+  async function limparRastro() {
+    await asTenant(() => WhatsAppAccount.update(accountId, {
+      webhook_refused_at: null,
+      webhook_refused_reason: null
+    }));
+  }
+
+  it('registra o token errado, em vez de sumir com a recusa', async () => {
+    await limparRastro();
+    const { status } = await call(`${panelUrl}/api/whatsapp-webhook?t=nao-e-o-token`, {
+      method: 'POST',
+      body: eventoV2({ id: 'RECUSADO-1', remoteJid: '559381110449@s.whatsapp.net', texto: 'oi' })
+    });
+    assert.equal(status, 401);
+
+    const conta = await recarregar();
+    assert.equal(conta.webhook_refused_reason, 'bad_token');
+    assert.ok(conta.webhook_refused_at);
+  });
+
+  it('distingue o servidor que não manda credencial nenhuma', async () => {
+    await limparRastro();
+    const { status } = await call(`${panelUrl}/api/whatsapp-webhook`, {
+      method: 'POST',
+      body: eventoV2({ id: 'RECUSADO-2', remoteJid: '559381110449@s.whatsapp.net', texto: 'oi' })
+    });
+    assert.equal(status, 401);
+    assert.equal((await recarregar()).webhook_refused_reason, 'no_credential');
+  });
+
+  it('não escreve de novo dentro do minuto, porque a rota é pública', async () => {
+    await limparRastro();
+    await call(`${panelUrl}/api/whatsapp-webhook?t=errado`, {
+      method: 'POST',
+      body: eventoV2({ id: 'RECUSADO-3', remoteJid: '559381110449@s.whatsapp.net', texto: 'oi' })
+    });
+    const primeira = (await recarregar()).webhook_refused_at;
+
+    // Quem souber o nome de uma instância não pode transformar a trilha num
+    // jeito de fazer o painel escrever no banco em laço.
+    await call(`${panelUrl}/api/whatsapp-webhook?t=errado-de-novo`, {
+      method: 'POST',
+      body: eventoV2({ id: 'RECUSADO-4', remoteJid: '559381110449@s.whatsapp.net', texto: 'oi' })
+    });
+    const segunda = (await recarregar()).webhook_refused_at;
+    assert.equal(new Date(segunda).getTime(), new Date(primeira).getTime());
+  });
+
+  it('a recusa é rastro e nunca muda a resposta nem o que foi gravado', async () => {
+    await limparRastro();
+    await call(`${panelUrl}/api/whatsapp-webhook?t=errado`, {
+      method: 'POST',
+      body: eventoV2({ id: 'NAO-GRAVADO', remoteJid: '559381110449@s.whatsapp.net', texto: 'oi' })
+    });
+    // O evento continua descartado: a trilha diz que ele bateu na porta, não
+    // que ele entrou.
+    assert.equal(await mensagemPorId('NAO-GRAVADO'), null);
+  });
+});

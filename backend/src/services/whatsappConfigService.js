@@ -339,6 +339,14 @@ class WhatsAppConfigService {
       isDefault: Boolean(row.is_default),
       lastSeenAt: row.last_seen_at || null,
       lastError: row.last_error || null,
+      // A conferência do webhook. `webhook_server_url` já está guardada com o
+      // token redigido — ver a coluna —, então ela pode sair daqui; a URL
+      // esperada NÃO sai, porque essa carrega o token inteiro.
+      webhookVerdict: row.webhook_verdict || null,
+      webhookServerUrl: row.webhook_server_url || null,
+      webhookCheckedAt: row.webhook_checked_at || null,
+      webhookRefusedAt: row.webhook_refused_at || null,
+      webhookRefusedReason: row.webhook_refused_reason || null,
       createdAt: row.created_at || null,
       updatedAt: row.updated_at || null
     };

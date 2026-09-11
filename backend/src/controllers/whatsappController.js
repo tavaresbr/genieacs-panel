@@ -123,6 +123,42 @@ class WhatsAppController {
     }
   }
 
+  /**
+   * O que o servidor Evolution diz que o webhook desta conta é.
+   *
+   * Leitura, e é por isso que exige só `whatsapp.read`: quem está de plantão
+   * olhando por que nada chega não devia precisar da permissão que cria e
+   * apaga número para descobrir a causa.
+   */
+  static async checkWebhook(req, res) {
+    try {
+      const resultado = await EvolutionInstanceService.inspectWebhook(req.params?.id);
+      return res.json(createResponse(req.t('whatsapp.webhookChecked'), {
+        account: WhatsAppConfigService.publicAccount(resultado.account),
+        verdict: resultado.verdict,
+        supported: resultado.supported,
+        serverUrl: resultado.serverUrl
+      }));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.accountActionFailed');
+    }
+  }
+
+  /** Reescreve o webhook no servidor, e confere lendo de volta. */
+  static async reapplyWebhook(req, res) {
+    try {
+      const resultado = await EvolutionInstanceService.reapplyWebhook(req.params?.id);
+      return res.json(createResponse(req.t('whatsapp.webhookReapplied'), {
+        account: WhatsAppConfigService.publicAccount(resultado.account),
+        verdict: resultado.verdict,
+        supported: resultado.supported,
+        serverUrl: resultado.serverUrl
+      }));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.accountActionFailed');
+    }
+  }
+
   static async disconnectAccount(req, res) {
     try {
       const { account } = await EvolutionInstanceService.disconnect(req.params?.id);

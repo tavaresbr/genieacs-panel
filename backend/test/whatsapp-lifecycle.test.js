@@ -70,7 +70,11 @@ function startEvolution(flavor, ip) {
     createdName: null,
     // v2 hands back a key of its own choosing; whatever it says wins over the
     // token the panel minted.
-    apiKey: `server-key-${flavor}`
+    apiKey: `server-key-${flavor}`,
+    // O webhook como o servidor o guarda. `null` é o estado de uma instância
+    // que já existia quando o painel a adotou: o create respondeu "already
+    // exists" e o webhook do payload nunca foi escrito.
+    webhook: null
   };
 
   const server = http.createServer((req, res) => {
@@ -113,6 +117,10 @@ function v2Routes(state, method, path, body) {
   if (method === 'POST' && path === '/instance/create') {
     state.createdName = body?.name || body?.instanceName || null;
     if (state.createStatus !== 200) return CONFLICT;
+    // O create é o ÚNICO lugar em que o webhook entrava, e é por isso que o
+    // ramo do conflito acima deixa `state.webhook` em null: é o estado real de
+    // uma instância adotada em vez de criada.
+    if (body?.webhook) state.webhook = { ...body.webhook };
     return {
       status: 200,
       data: {
@@ -145,6 +153,21 @@ function v2Routes(state, method, path, body) {
     return state.deleteStatus === 200
       ? { status: 200, data: { status: 'SUCCESS' } }
       : { status: 500, data: { error: 'internal error deleting instance' } };
+  }
+  if (method === 'GET' && path.startsWith('/webhook/find/')) {
+    // Instância sem webhook responde objeto vazio, e não 404: é o que o v2 faz,
+    // e é o que torna "ausente" um veredito e não um erro de transporte.
+    return { status: 200, data: state.webhook ? { webhook: state.webhook } : {} };
+  }
+  if (method === 'POST' && path.startsWith('/webhook/set/')) {
+    const w = body?.webhook && typeof body.webhook === 'object' ? body.webhook : body;
+    state.webhook = {
+      enabled: w?.enabled !== false,
+      url: String(w?.url ?? ''),
+      byEvents: Boolean(w?.byEvents),
+      events: Array.isArray(w?.events) ? [...w.events] : []
+    };
+    return { status: 200, data: { webhook: state.webhook } };
   }
   if (method === 'POST' && path.startsWith('/chat/whatsappNumbers/')) {
     return {
@@ -209,6 +232,8 @@ function goRoutes(state, method, path, body) {
 let v2;
 let go;
 let conflicting;
+/** Um v2 que já tinha a instância: é o caso em que o webhook nunca é escrito. */
+let adotado;
 
 function created(state) {
   return state.requests.find((r) => r.method === 'POST' && r.path === '/instance/create');
@@ -232,10 +257,11 @@ before(async () => {
   });
   token = setup.body.data.token;
 
-  [v2, go, conflicting] = await Promise.all([
+  [v2, go, conflicting, adotado] = await Promise.all([
     startEvolution('v2', '203.0.113.11'),
     startEvolution('go', '203.0.113.12'),
-    startEvolution('go', '203.0.113.13')
+    startEvolution('go', '203.0.113.13'),
+    startEvolution('v2', '203.0.113.14')
   ]);
 
   await call(`${panelUrl}/api/whatsapp/config`, {
@@ -247,7 +273,7 @@ before(async () => {
 
 after(async () => {
   globalThis.fetch = realFetch;
-  await Promise.all([v2, go, conflicting].map(
+  await Promise.all([v2, go, conflicting, adotado].map(
     (fake) => new Promise((resolve) => fake.server.close(resolve))
   ));
   await stopTestServers();
@@ -606,6 +632,145 @@ describe('what reaches the browser', () => {
       body: { baseUrl: v2.baseUrl }
     });
     assert.equal(status, 401);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Conferir o webhook depois da criação
+//
+// O que estes casos travam é a diferença entre "não chega nada" e "não chega
+// nada PORQUE". Até existirem, o painel mostrava um número conectado ao lado de
+// "Nunca chegou nada" e as três causas — webhook ausente, webhook apontando
+// para outro lugar, webhook certo que ninguém chama — eram a mesma tela.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('conferir o webhook no servidor', () => {
+  let conta;
+
+  it('diz ok quando o servidor tem o webhook que o create escreveu', async () => {
+    const criada = await createAccount(v2.baseUrl, { label: 'Conferência' });
+    conta = criada.body.data.account;
+
+    const { status, body } = await call(
+      `${panelUrl}/api/whatsapp/accounts/${conta.id}/webhook`,
+      { headers: authHeaders(token) }
+    );
+    assert.equal(status, 200);
+    assert.equal(body.data.verdict, 'ok');
+    assert.equal(body.data.supported, true);
+  });
+
+  it('devolve a URL do servidor com o token REDIGIDO', async () => {
+    const { body } = await call(
+      `${panelUrl}/api/whatsapp/accounts/${conta.id}/webhook`,
+      { headers: authHeaders(token) }
+    );
+    // O que sai daqui vai para a tela e para uma coluna do banco que fica ao
+    // lado da versão cifrada do mesmo segredo. Guardar a URL inteira seria
+    // guardar o token em claro na linha do cofre.
+    assert.ok(body.data.serverUrl.startsWith(`${WEBHOOK_BASE}?t=`));
+    assert.ok(body.data.serverUrl.endsWith('?t=***'));
+
+    const row = await asTenant(() => WhatsAppAccount.getById(conta.id));
+    const guardado = WhatsAppConfigService.decryptWebhookToken(row);
+    assert.ok(guardado);
+    assert.ok(!body.data.serverUrl.includes(guardado));
+    assert.ok(!String(row.webhook_server_url).includes(guardado));
+  });
+
+  it('guarda o veredito, para a tira de saúde não ir ao Evolution a cada volta', async () => {
+    const row = await asTenant(() => WhatsAppAccount.getById(conta.id));
+    assert.equal(row.webhook_verdict, 'ok');
+    assert.ok(row.webhook_checked_at);
+  });
+
+  it('acusa o webhook ausente de uma instância que o painel ADOTOU', async () => {
+    // O caso que motivou a onda inteira. O create responde "already exists", o
+    // painel recupera só o id — e o webhook do payload nunca é escrito. O
+    // número pareia, conecta, e não entrega nada. Antes disto, em lugar nenhum.
+    adotado.state.createStatus = 409;
+    const criada = await createAccount(adotado.baseUrl, { label: 'Adotada' });
+    assert.equal(criada.status, 201);
+    const id = criada.body.data.account.id;
+    assert.equal(adotado.state.webhook, null);
+
+    const { body } = await call(
+      `${panelUrl}/api/whatsapp/accounts/${id}/webhook`,
+      { headers: authHeaders(token) }
+    );
+    assert.equal(body.data.verdict, 'absent');
+    assert.equal(body.data.serverUrl, '');
+  });
+
+  it('reescreve o webhook, e confere lendo de volta', async () => {
+    const criada = await createAccount(adotado.baseUrl, { label: 'Consertada' });
+    const id = criada.body.data.account.id;
+    const antes = await asTenant(() => WhatsAppAccount.getById(id));
+    const tokenAntes = WhatsAppConfigService.decryptWebhookToken(antes);
+
+    const { status, body } = await call(
+      `${panelUrl}/api/whatsapp/accounts/${id}/webhook`,
+      { method: 'POST', headers: authHeaders(token) }
+    );
+    assert.equal(status, 200);
+    assert.equal(body.data.verdict, 'ok');
+
+    const escrito = adotado.state.requests.filter(
+      (r) => r.method === 'POST' && r.path.startsWith('/webhook/set/')
+    ).pop();
+    assert.ok(escrito);
+    // A lista de eventos vai junto: o v2 trata isto como substituição INTEIRA,
+    // e mandar só a URL deixaria um webhook configurado que não assina nada —
+    // o mesmo silêncio, com aparência de conserto.
+    assert.equal(escrito.body.webhook.byEvents, false);
+    assert.ok(escrito.body.webhook.events.includes('MESSAGES_UPSERT'));
+
+    // O token é o MESMO. Trocá-lo abriria uma janela em que o painel já espera
+    // o novo e o servidor ainda manda o antigo: todo evento dessa janela vira
+    // 401, que é a falha que este conserto existe para acabar.
+    const depois = await asTenant(() => WhatsAppAccount.getById(id));
+    assert.equal(WhatsAppConfigService.decryptWebhookToken(depois), tokenAntes);
+  });
+
+  it('acusa token_mismatch quando o servidor guarda outro token', async () => {
+    const criada = await createAccount(adotado.baseUrl, { label: 'Token velho' });
+    const id = criada.body.data.account.id;
+    await call(`${panelUrl}/api/whatsapp/accounts/${id}/webhook`, {
+      method: 'POST', headers: authHeaders(token)
+    });
+    // É o que acontece quando alguém reinstala o painel apontando para as
+    // mesmas instâncias: a URL continua certa e todo evento leva 401.
+    adotado.state.webhook.url = `${WEBHOOK_BASE}?t=de-outro-painel`;
+
+    const { body } = await call(
+      `${panelUrl}/api/whatsapp/accounts/${id}/webhook`,
+      { headers: authHeaders(token) }
+    );
+    assert.equal(body.data.verdict, 'token_mismatch');
+  });
+
+  it('acusa url_mismatch quando o webhook aponta para outro lugar', async () => {
+    const criada = await createAccount(adotado.baseUrl, { label: 'Outro destino' });
+    const id = criada.body.data.account.id;
+    await call(`${panelUrl}/api/whatsapp/accounts/${id}/webhook`, {
+      method: 'POST', headers: authHeaders(token)
+    });
+    adotado.state.webhook.url = 'https://n8n.exemplo.test/webhook/evolution?t=qualquer';
+
+    const { body } = await call(
+      `${panelUrl}/api/whatsapp/accounts/${id}/webhook`,
+      { headers: authHeaders(token) }
+    );
+    assert.equal(body.data.verdict, 'url_mismatch');
+  });
+
+  it('não inventa veredito para o GO, que não devolve o webhook', async () => {
+    const criada = await createAccount(go.baseUrl, { label: 'GO sem leitura' });
+    const { body } = await call(
+      `${panelUrl}/api/whatsapp/accounts/${criada.body.data.account.id}/webhook`,
+      { headers: authHeaders(token) }
+    );
+    assert.equal(body.data.supported, false);
+    assert.equal(body.data.verdict, null);
   });
 });
 
