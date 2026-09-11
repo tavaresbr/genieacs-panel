@@ -1,5 +1,5 @@
 import { getActiveLocale, translate } from '@/lib/i18n'
-import type { OperatorRole, User } from '@/types'
+import type { LoginResponse, OperatorRole, User } from '@/types'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || ''
 
@@ -272,6 +272,18 @@ export const authAPI = {
   signup: (payload: { providerName: string; slug: string; username: string; email: string; password: string }) =>
     apiClient.post<SignupResult>('/auth/signup', payload),
 
+  /**
+   * Troca o bilhete do console pela sessão de leitura, no host do provedor.
+   *
+   * Sem sessão anterior: quem personifica não tem conta neste provedor. Não
+   * vem refresh token — a sessão dura meia hora e continuar custa uma volta ao
+   * console, que é mais uma linha na trilha.
+   */
+  redeemImpersonation: (ticket: string) =>
+    apiClient.post<{ user: User; tenant: { slug: string; name: string }; token: string }>(
+      '/auth/impersonate/redeem', { ticket }
+    ),
+
   refreshToken: (refreshToken: string) =>
     apiClient.post('/auth/refresh', { refreshToken }),
 
@@ -364,10 +376,35 @@ export const tenantAPI = {
     apiClient.requestWithBody<{ name: string; slug: string }>('PATCH', '/tenant', { name })
 }
 
+/** O que quem abre um link de convite vê antes de decidir. */
+export interface InvitePreview {
+  tenant: { name: string; slug: string }
+  role: OperatorRole
+}
+
 export const invitesAPI = {
-  /** Returns the token ONCE; the backend keeps only its hash. */
-  create: (payload: { role: OperatorRole; label?: string }) =>
-    apiClient.post<{ invite: { id: number; role: OperatorRole; label: string | null; expiresAt: string }; token: string }>('/invites', payload)
+  /**
+   * Cria. Devolve o token UMA vez; o backend guarda só o hash dele.
+   *
+   * `email` é opcional e só muda uma coisa: com ele, o painel manda o link por
+   * e-mail se o deploy tiver transporte. `emailed` diz se foi — e `false` não é
+   * erro, é o caso normal de um deploy sem SMTP, onde quem convidou entrega o
+   * link como sempre entregou.
+   */
+  create: (payload: { role: OperatorRole; label?: string; email?: string }) =>
+    apiClient.post<{
+      invite: { id: number; role: OperatorRole; label: string | null; expiresAt: string }
+      token: string
+      emailed: boolean
+    }>('/invites', payload),
+
+  /** Quem convidou, para qual provedor e com qual papel. Sem sessão: o token é a credencial. */
+  preview: (token: string) =>
+    apiClient.get<InvitePreview>(`/invites/token/${encodeURIComponent(token)}`),
+
+  /** Aceita, com a conta que a pessoa já tem ou com uma nova. Devolve a sessão. */
+  accept: (token: string, payload: { username: string; password: string; email?: string }) =>
+    apiClient.post<LoginResponse>(`/invites/token/${encodeURIComponent(token)}/accept`, payload)
 }
 
 export type SubscriptionStatus = 'trial' | 'active' | 'past_due' | 'suspended' | 'canceled'
@@ -486,6 +523,20 @@ export interface TenantMembership {
 export const platformAPI = {
   listTenants: () =>
     apiClient.get<{ tenants: Tenant[] }>('/platform/tenants'),
+
+  /**
+   * Cunha um bilhete para olhar o painel de um provedor.
+   *
+   * Devolve um ENDEREÇO, não uma sessão: o bilhete vai no fragmento dele, que
+   * o navegador nunca manda a servidor nenhum, e quem o troca pelo token é a
+   * tela `/impersonate` no host do provedor.
+   */
+  impersonate: (id: number) =>
+    apiClient.post<{
+      tenant: { id: number; slug: string; name: string }
+      url: string
+      expiresInSeconds: number
+    }>(`/platform/tenants/${id}/impersonate`, {}),
 
   createTenant: (payload: { slug: string; name: string }) =>
     apiClient.post<{ tenant: Tenant }>('/platform/tenants', payload),

@@ -1,4 +1,6 @@
 import Tenant from '../models/Tenant.js';
+import ImpersonationTicket from '../models/ImpersonationTicket.js';
+import { panelBaseDomain } from '../middleware/tenantResolver.js';
 import { METRICS_CONTENT_TYPE, renderMetrics } from '../utils/metrics.js';
 import Subscription from '../models/Subscription.js';
 import SubscriptionService from '../services/subscriptionService.js';
@@ -75,6 +77,71 @@ async function subscriptionsByTenant() {
 }
 
 class PlatformController {
+  /**
+   * `POST /api/platform/tenants/:id/impersonate` — olhar o painel de um cliente.
+   *
+   * O que sai daqui é um BILHETE, não uma sessão. O console recebe um valor
+   * opaco de uso único e um endereço, e manda o navegador para lá com o
+   * bilhete no fragmento — a parte da URL que nunca chega a servidor nenhum. É
+   * o painel do provedor, no host dele, que troca o bilhete pelo token, e o
+   * token nasce e morre naquele origin. As alternativas todas são piores: um
+   * JWT no query string entra em log de proxy e em histórico; um cookie no
+   * domínio-pai desfaz a garantia host-only que a Fase 2 conquistou.
+   *
+   * A sessão que o bilhete vai produzir é de LEITURA, sempre — ver
+   * `impersonationRefusal` em `middleware/auth.js` para por que a escrita fica
+   * de fora, que é uma razão de produto antes de ser de segurança.
+   *
+   * Escrita aqui em `platform_audit`, que é a nossa trilha: registra quem
+   * pediu para olhar o painel de quem. Que a sessão tenha realmente começado
+   * é outra pergunta, e a resposta dela vive no `audit_log` DO PROVEDOR,
+   * escrita no resgate — porque quem faz essa pergunta é o ISP, e ele não lê a
+   * nossa trilha.
+   */
+  static async impersonate(req, res) {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id <= 0) {
+        return res.status(400).json(createErrorResponse('Invalid provider id'));
+      }
+      const tenant = await Tenant.findById(id);
+      if (!tenant) {
+        return res.status(404).json(createErrorResponse('Provider not found'));
+      }
+
+      const { token } = await ImpersonationTicket.create({
+        tenantId: tenant.id,
+        platformUserId: req.user.userId
+      });
+
+      await PlatformAudit.record({
+        action: PlatformAudit.ACTIONS.TENANT_IMPERSONATED,
+        actorUserId: req.user.userId,
+        actorUsername: req.user.username,
+        tenant,
+        ip: req.ip ?? null
+      });
+
+      // Sem domínio-base o console e o painel dividem o mesmo endereço, então
+      // o caminho relativo é o certo — e é o que a instalação self-hosted vê.
+      const base = panelBaseDomain();
+      const url = base
+        ? `https://${tenant.slug}.${base}/impersonate#${token}`
+        : `/impersonate#${token}`;
+
+      return res.json(createResponse('Impersonation ticket minted', {
+        tenant: { id: tenant.id, slug: tenant.slug, name: tenant.name },
+        url,
+        expiresInSeconds: Math.round(ImpersonationTicket.TTL_MS / 1000)
+      }));
+    } catch (error) {
+      console.error('Impersonate error:', error);
+      return res.status(500).json(
+        createErrorResponse('Failed to mint the impersonation ticket', error.message)
+      );
+    }
+  }
+
   /** `GET /api/platform/metrics` — the process's counters, per provider. */
   static metrics(req, res) {
     // `end`, not `send`: `send` rewrites the content type with its own charset

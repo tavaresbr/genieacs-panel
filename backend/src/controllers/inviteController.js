@@ -11,6 +11,7 @@ import AuditLog from '../models/AuditLog.js';
 import { ROLES, normalizeRole, roleHas } from '../config/permissions.js';
 import { generateTokens } from '../middleware/auth.js';
 import { createResponse, createErrorResponse, isValidEmail } from '../utils/helpers.js';
+import { mailTransport, panelUrlFor } from '../services/mail/index.js';
 
 const BCRYPT_ROUNDS = 12;
 
@@ -30,6 +31,36 @@ function publicInvite(invite) {
     expiresAt: invite.expires_at,
     createdAt: invite.created_at
   };
+}
+
+/**
+ * Manda o convite por e-mail, se houver para onde e por onde.
+ *
+ * Devolve `false` em vez de lançar em todas as saídas ruins — sem transporte,
+ * sem endereço externo conhecido, SMTP recusando —, porque nenhuma delas
+ * desfaz o convite. Quem convidou fica com o link na resposta.
+ *
+ * A mensagem é texto puro e curta de propósito. Ela carrega uma CREDENCIAL: o
+ * link é o que põe a pessoa na equipe. Não vai nela nada além de quem convida,
+ * qual é o papel, até quando vale e o link — nem nome de operador, nem contagem
+ * de assinantes, nem nada que faça de uma caixa de entrada alheia um lugar onde
+ * mora dado do provedor.
+ */
+async function enviarConvite({ req, email, token }) {
+  const transporte = mailTransport();
+  if (transporte.name === 'none') return false;
+
+  const tenant = await Tenant.findPublicById(req.tenantId);
+  const base = panelUrlFor(tenant);
+  if (!base) return false;
+
+  const nome = tenant?.name || 'SkyGenPanel';
+  const link = `${base}/invite#${token}`;
+  return transporte.send({
+    to: email,
+    subject: req.t('invite.mailSubject', { provider: nome }),
+    text: req.t('invite.mailBody', { provider: nome, link })
+  });
 }
 
 class InviteController {
@@ -78,6 +109,15 @@ class InviteController {
         return res.status(400).json(createErrorResponse(req.t('invite.ttlInvalid')));
       }
 
+      // O endereço é opcional, e é a única coisa que este endpoint faz de novo:
+      // com ele, o link vai por e-mail; sem ele, sai na resposta como sempre
+      // saiu. Um endereço inválido é recusado ANTES de o convite existir, para
+      // não deixar convite órfão de um erro de digitação.
+      const email = User.normalizeEmail(req.body?.email);
+      if (req.body?.email !== undefined && (!email || !isValidEmail(email))) {
+        return res.status(400).json(createErrorResponse(req.t('auth.emailInvalid')));
+      }
+
       const { invite, token } = await TenantInvite.create({
         role,
         label: req.body?.label,
@@ -94,12 +134,19 @@ class InviteController {
         subjectId: invite.id,
         detail: { role, label: invite.label, expiresAt: invite.expires_at }
       });
+      // O envio vem DEPOIS do convite existir e da trilha estar escrita, e o
+      // resultado dele não muda o status: o convite foi criado, e é isso que
+      // 201 diz. Um SMTP fora do ar devolve `emailed: false` com o link na
+      // mão, que é exatamente o que quem convidou faria de qualquer jeito.
+      const emailed = email ? await enviarConvite({ req, email, token }) : false;
+
       return res.status(201).json(createResponse(req.t('invite.created'), {
         invite: publicInvite(invite),
         // Mostrado uma vez, como o segredo do webhook do SGP e a senha do portal
         // do assinante: a tabela guarda o hash, então nem esta rota nem
         // nenhuma outra consegue dizer isto de novo.
-        token
+        token,
+        emailed
       }));
     } catch (error) {
       console.error('Create invite error:', error);

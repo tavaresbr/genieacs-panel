@@ -1,10 +1,11 @@
 import bcrypt from 'bcryptjs';
+import ImpersonationTicket from '../models/ImpersonationTicket.js';
+import PlatformAdmin from '../models/PlatformAdmin.js';
 import User from '../models/User.js';
 import { acceptsIdentifier, canHoldSession, LOGIN_REQUIRES_EMAIL } from '../config/login.js';
 import TenantUser from '../models/TenantUser.js';
-import PlatformAdmin from '../models/PlatformAdmin.js';
 import { IS_SAAS } from '../config/edition.js';
-import { generateTokens, resolveMembership, verifyToken } from '../middleware/auth.js';
+import { generateImpersonationToken, generateTokens, resolveMembership, verifyToken } from '../middleware/auth.js';
 import { createResponse, createErrorResponse, isValidEmail } from '../utils/helpers.js';
 import Tenant from '../models/Tenant.js';
 import PlatformAudit from '../models/PlatformAudit.js';
@@ -207,6 +208,94 @@ class AuthController {
     } catch (error) {
       console.error('Signup error:', error);
       return res.status(500).json(createErrorResponse(req.t('auth.signupFailed'), error.message));
+    }
+  }
+
+  /**
+   * `POST /api/auth/impersonate/redeem` — o bilhete vira a sessão de leitura.
+   *
+   * Roda no host do PROVEDOR, sem sessão, e é isso que a torna a peça certa: o
+   * token nasce no origin onde vai viver, e nunca atravessou uma URL. Quem
+   * chega aqui tem o bilhete que o console pôs no fragmento do endereço para
+   * onde mandou o navegador.
+   *
+   * Três conferências, e a terceira é a que existe por causa dos subdomínios:
+   *
+   * 1. o bilhete resgata (existe, não venceu, não foi usado) — as três falhas
+   *    respondem a mesma coisa, porque quem tem um bilhete ruim não tem por que
+   *    aprender qual delas é;
+   * 2. quem o cunhou continua no cadastro da plataforma, lido agora e não
+   *    quando o bilhete foi feito: tirar alguém de lá tem que invalidar o que
+   *    ela deixou pendurado;
+   * 3. o bilhete é DESTE host. Mesma regra do convite, e pelo mesmo motivo: um
+   *    bilhete do provedor A resgatado no endereço do provedor B produziria uma
+   *    sessão para A servida por uma porta que não é a dele.
+   *
+   * A trilha vai no `audit_log` do provedor personificado, e é aqui e não na
+   * cunhagem: o que o ISP quer poder perguntar é "entraram no meu painel?", e a
+   * resposta é a sessão ter começado, não alguém ter pedido um bilhete.
+   */
+  static async redeemImpersonation(req, res) {
+    try {
+      const ticketValue = String(req.body?.ticket ?? '').trim();
+      if (!ticketValue) {
+        return res.status(400).json(createErrorResponse(req.t('auth.impersonationTicketRequired')));
+      }
+
+      const recusa = () => res.status(404).json(
+        createErrorResponse(req.t('auth.impersonationTicketInvalid'))
+      );
+
+      const ticket = await ImpersonationTicket.redeem(ticketValue);
+      if (!ticket) return recusa();
+
+      const platformUser = await User.findById(ticket.platform_user_id);
+      if (!platformUser || !(await PlatformAdmin.has(platformUser.id))) return recusa();
+
+      // `req.tenantId` é o provedor que o host nomeia — o resolvedor já
+      // respondeu 404 para um host que não nomeia nenhum.
+      if (Number(ticket.tenant_id) !== Number(req.tenantId)) return recusa();
+
+      const tenant = await Tenant.findPublicById(ticket.tenant_id);
+      if (!tenant) return recusa();
+
+      await AuditLog.record({
+        action: AuditLog.ACTIONS.PLATFORM_IMPERSONATED,
+        actorUserId: platformUser.id,
+        actorUsername: platformUser.username,
+        actorKind: 'platform',
+        subjectType: 'tenant',
+        subjectId: ticket.tenant_id,
+        detail: { ticketId: ticket.id },
+        ip: req.ip ?? null
+      });
+
+      const token = generateImpersonationToken(platformUser, ticket.tenant_id);
+
+      return res.json(createResponse(req.t('auth.impersonationStarted'), {
+        user: {
+          id: platformUser.id,
+          username: platformUser.username,
+          email: platformUser.email ?? null,
+          role: 'viewer',
+          tenantId: Number(ticket.tenant_id),
+          // Falso de propósito, e não é contradição: dentro de uma
+          // personificação o console não é alcançável — `requirePlatformAdmin`
+          // recusa esta sessão. Dizer `true` acenderia um menu cujas rotas
+          // respondem 404 a ela.
+          isPlatformAdmin: false,
+          impersonation: { platformUsername: platformUser.username },
+          createdAt: platformUser.created_at,
+          updatedAt: platformUser.updated_at
+        },
+        tenant: { slug: tenant.slug, name: tenant.name },
+        token
+      }));
+    } catch (error) {
+      console.error('Redeem impersonation error:', error);
+      return res.status(500).json(
+        createErrorResponse(req.t('auth.impersonationFailed'), error.message)
+      );
     }
   }
 
@@ -425,7 +514,15 @@ class AuthController {
           // not what this session is authorised with.
           role: req.user.role,
           tenantId: req.user.tenantId,
-          isPlatformAdmin: await holdsControlPlane(user.id),
+          // Numa personificação isto é falso mesmo sendo a pessoa do cadastro
+          // da plataforma: dentro dela o console não é alcançável, e um `true`
+          // aqui acenderia um menu cujas rotas respondem 404 a esta sessão.
+          // Mesma resposta que o resgate deu; esta rota é a que a tela relê
+          // depois de um F5, e as duas têm que dizer a mesma coisa.
+          isPlatformAdmin: req.user.impersonation ? false : await holdsControlPlane(user.id),
+          // Presente só numa personificação, e é o que a faixa no alto da tela
+          // lê para dizer de quem é a sessão que está olhando.
+          impersonation: req.user.impersonation ?? null,
           createdAt: user.created_at,
           updatedAt: user.updated_at
         })

@@ -1,0 +1,389 @@
+import http from 'node:http';
+import { after, before, describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+
+/**
+ * Quem opera o SaaS olhando o painel de um cliente para atendê-lo.
+ *
+ * A personificação é a coisa mais poderosa que o plano de controle faz, e o que
+ * este arquivo guarda não é que ela funcione — é o cerco dela: que ninguém a
+ * cunhe sem estar no cadastro da plataforma, que ela não escreva nada, que não
+ * alcance o console de volta, que morra quando quem a abriu perde o cadastro ou
+ * troca a senha, e que o provedor personificado veja na PRÓPRIA trilha que
+ * entraram no painel dele.
+ *
+ * SaaS com subdomínio porque a peça central — o bilhete — existe justamente
+ * porque o console e o painel do cliente vivem em hosts diferentes. `Host` é
+ * header proibido no `fetch`, daí o `http.request` cru.
+ */
+process.env.EDITION = 'saas';
+process.env.TENANT_BASE_DOMAIN = 'painel.test';
+
+const { getDb, startTestServers, stopTestServers } = await import('./helpers/harness.js');
+const { runInTenant } = await import('../src/config/tenantContext.js');
+const { default: User } = await import('../src/models/User.js');
+const { default: TenantUser } = await import('../src/models/TenantUser.js');
+const { default: ImpersonationTicket } = await import('../src/models/ImpersonationTicket.js');
+
+function callAs(host, url, { method = 'GET', headers = {}, body } = {}) {
+  const target = new URL(url);
+  const payload = body === undefined ? null : JSON.stringify(body);
+  return new Promise((resolve, reject) => {
+    const request = http.request({
+      host: target.hostname,
+      port: target.port,
+      path: target.pathname + target.search,
+      method,
+      headers: {
+        Host: host,
+        'Content-Type': 'application/json',
+        ...(payload ? { 'Content-Length': Buffer.byteLength(payload) } : {}),
+        ...headers
+      }
+    }, (response) => {
+      const chunks = [];
+      response.on('data', (chunk) => chunks.push(chunk));
+      response.on('end', () => {
+        const text = Buffer.concat(chunks).toString('utf8');
+        let parsed = null;
+        try { parsed = text ? JSON.parse(text) : null; } catch { parsed = text; }
+        resolve({ status: response.statusCode, body: parsed });
+      });
+    });
+    request.on('error', reject);
+    if (payload) request.write(payload);
+    request.end();
+  });
+}
+
+let panelUrl;
+let alfa;
+let beta;
+let plataformaToken;
+let plataformaUserId;
+let betaAdminToken;
+
+const CASA = 'default.painel.test';
+const BETA = 'beta.painel.test';
+const bearer = (token) => ({ Authorization: `Bearer ${token}` });
+const naCasa = (path, options) => callAs(CASA, `${panelUrl}${path}`, options);
+const noBeta = (path, options) => callAs(BETA, `${panelUrl}${path}`, options);
+
+/** Cunha, resgata e devolve o token da sessão de personificação em `beta`. */
+async function personificar() {
+  const minted = await naCasa(`/api/platform/tenants/${beta}/impersonate`, {
+    method: 'POST', headers: bearer(plataformaToken)
+  });
+  assert.equal(minted.status, 200, JSON.stringify(minted.body));
+  const ticket = new URL(minted.body.data.url).hash.slice(1);
+  const redeemed = await noBeta('/api/auth/impersonate/redeem', {
+    method: 'POST', body: { ticket }
+  });
+  assert.equal(redeemed.status, 200, JSON.stringify(redeemed.body));
+  return redeemed.body.data.token;
+}
+
+before(async () => {
+  ({ panelUrl } = await startTestServers());
+  const db = getDb();
+
+  alfa = (await db('tenants').orderBy('id', 'asc').first()).id;
+  await db('tenants').insert({ slug: 'beta', name: 'Provedor Beta', status: 'active' });
+  beta = (await db('tenants').where({ slug: 'beta' }).first()).id;
+
+  // O primeiro administrador de um deploy SaaS entra em `platform_admins` pelo
+  // próprio caminho da instalação — é assim que o segundo provedor chega a
+  // existir. Aqui isso é o que dá a chave a quem vai personificar.
+  const setup = await naCasa('/api/auth/setup', {
+    method: 'POST',
+    body: { username: 'plataforma', password: 'senha-da-plataforma-1', email: 'plataforma@exemplo.test' }
+  });
+  assert.equal(setup.status, 201, JSON.stringify(setup.body));
+  plataformaToken = setup.body.data.token;
+  plataformaUserId = setup.body.data.user.id;
+  assert.ok(await db('platform_admins').where({ user_id: plataformaUserId }).first());
+
+  const bcrypt = (await import('bcryptjs')).default;
+  const betaAdminId = await runInTenant(beta, () => User.create({
+    username: 'admin-beta',
+    email: 'admin-beta@exemplo.test',
+    password: bcrypt.hashSync('senha-do-beta-1', 10),
+    role: 'admin'
+  }));
+  await runInTenant(beta, () => TenantUser.create({ tenantId: beta, userId: betaAdminId, role: 'admin' }));
+  const entrada = await noBeta('/api/auth/login', {
+    method: 'POST', body: { username: 'admin-beta', password: 'senha-do-beta-1' }
+  });
+  assert.equal(entrada.status, 200);
+  betaAdminToken = entrada.body.data.token;
+});
+
+after(async () => {
+  await stopTestServers();
+});
+
+describe('cunhar o bilhete', () => {
+  it('devolve um endereço no host do provedor, com o bilhete no fragmento', async () => {
+    const { status, body } = await naCasa(`/api/platform/tenants/${beta}/impersonate`, {
+      method: 'POST', headers: bearer(plataformaToken)
+    });
+    assert.equal(status, 200, JSON.stringify(body));
+    assert.equal(body.data.tenant.slug, 'beta');
+    assert.equal(body.data.expiresInSeconds, 60);
+
+    const url = new URL(body.data.url);
+    assert.equal(url.host, 'beta.painel.test');
+    assert.equal(url.pathname, '/impersonate');
+    // O bilhete vai no FRAGMENTO, que o navegador não manda a servidor nenhum.
+    // Se um dia alguém o mover para o query string, esta linha é a que cai.
+    assert.match(url.hash, /^#[0-9a-f]{64}$/);
+    assert.equal(url.search, '');
+
+    // E o que fica gravado é o hash, nunca o valor.
+    const bilhete = url.hash.slice(1);
+    const linha = await getDb()('impersonation_tickets')
+      .where({ token_hash: ImpersonationTicket.hash(bilhete) }).first();
+    assert.ok(linha, 'o bilhete tem que existir na tabela, pelo hash');
+    assert.equal(Number(linha.tenant_id), beta);
+    assert.equal(Number(linha.platform_user_id), plataformaUserId);
+    assert.equal(linha.redeemed_at, null);
+    assert.equal(
+      await getDb()('impersonation_tickets').where({ token_hash: bilhete }).first(),
+      undefined,
+      'o valor em claro não pode estar guardado'
+    );
+  });
+
+  it('deixa na trilha da plataforma quem pediu para olhar o painel de quem', async () => {
+    await naCasa(`/api/platform/tenants/${beta}/impersonate`, {
+      method: 'POST', headers: bearer(plataformaToken)
+    });
+    const linha = await getDb()('platform_audit')
+      .where({ action: 'tenant.impersonated', tenant_id: beta })
+      .orderBy('id', 'desc').first();
+    assert.ok(linha);
+    assert.equal(Number(linha.actor_user_id), plataformaUserId);
+    assert.equal(linha.tenant_slug, 'beta');
+  });
+
+  it('não é do administrador do provedor, por mais graduado que ele seja', async () => {
+    const { status } = await noBeta(`/api/platform/tenants/${beta}/impersonate`, {
+      method: 'POST', headers: bearer(betaAdminToken)
+    });
+    // 404 e não 403: o console não confirma a quem não é dele que ele existe.
+    assert.equal(status, 404);
+  });
+
+  it('recusa um provedor que não existe', async () => {
+    const { status } = await naCasa('/api/platform/tenants/999999/impersonate', {
+      method: 'POST', headers: bearer(plataformaToken)
+    });
+    assert.equal(status, 404);
+  });
+});
+
+describe('resgatar o bilhete', () => {
+  it('vira uma sessão de leitura e deixa na trilha DO PROVEDOR que entraram', async () => {
+    const minted = await naCasa(`/api/platform/tenants/${beta}/impersonate`, {
+      method: 'POST', headers: bearer(plataformaToken)
+    });
+    const ticket = new URL(minted.body.data.url).hash.slice(1);
+
+    const { status, body } = await noBeta('/api/auth/impersonate/redeem', {
+      method: 'POST', body: { ticket }
+    });
+    assert.equal(status, 200, JSON.stringify(body));
+    assert.equal(body.data.user.role, 'viewer');
+    assert.equal(body.data.user.tenantId, beta);
+    assert.equal(body.data.user.impersonation.platformUsername, 'plataforma');
+    // Falso mesmo sendo a pessoa do cadastro: dentro da personificação o
+    // console responde 404, e um `true` acenderia um menu que não abre.
+    assert.equal(body.data.user.isPlatformAdmin, false);
+    assert.equal(body.data.tenant.slug, 'beta');
+    assert.ok(body.data.token);
+    // Não existe refresh: continuar depois de meia hora custa uma volta ao
+    // console, que é mais uma linha na trilha.
+    assert.equal(body.data.refreshToken, undefined);
+
+    const linha = await runInTenant(beta, () => getDb()('audit_log')
+      .where({ tenant_id: beta, action: 'platform.impersonated' })
+      .orderBy('id', 'desc').first());
+    assert.ok(linha, 'o provedor tem que ver na trilha dele que entraram');
+    assert.equal(linha.actor_kind, 'platform');
+    assert.equal(linha.actor_username, 'plataforma');
+  });
+
+  it('serve uma vez só', async () => {
+    const minted = await naCasa(`/api/platform/tenants/${beta}/impersonate`, {
+      method: 'POST', headers: bearer(plataformaToken)
+    });
+    const ticket = new URL(minted.body.data.url).hash.slice(1);
+
+    assert.equal((await noBeta('/api/auth/impersonate/redeem', { method: 'POST', body: { ticket } })).status, 200);
+    assert.equal((await noBeta('/api/auth/impersonate/redeem', { method: 'POST', body: { ticket } })).status, 404);
+  });
+
+  it('não serve no host de outro provedor', async () => {
+    const minted = await naCasa(`/api/platform/tenants/${beta}/impersonate`, {
+      method: 'POST', headers: bearer(plataformaToken)
+    });
+    const ticket = new URL(minted.body.data.url).hash.slice(1);
+
+    // Mesmo bilhete, host da casa. Um bilhete do beta resgatado aqui produziria
+    // uma sessão para o beta servida por uma porta que não é a dele.
+    const { status } = await naCasa('/api/auth/impersonate/redeem', { method: 'POST', body: { ticket } });
+    assert.equal(status, 404);
+  });
+
+  it('não serve depois de vencer', async () => {
+    const { token } = await runInTenant(beta, () => ImpersonationTicket.create({
+      tenantId: beta, platformUserId: plataformaUserId, ttlMs: -1000
+    }));
+    const { status } = await noBeta('/api/auth/impersonate/redeem', { method: 'POST', body: { ticket: token } });
+    assert.equal(status, 404);
+  });
+
+  it('não serve se quem o cunhou saiu do cadastro da plataforma', async () => {
+    const minted = await naCasa(`/api/platform/tenants/${beta}/impersonate`, {
+      method: 'POST', headers: bearer(plataformaToken)
+    });
+    const ticket = new URL(minted.body.data.url).hash.slice(1);
+
+    await getDb()('platform_admins').where({ user_id: plataformaUserId }).del();
+    try {
+      const { status } = await noBeta('/api/auth/impersonate/redeem', { method: 'POST', body: { ticket } });
+      assert.equal(status, 404);
+    } finally {
+      await getDb()('platform_admins').insert({ user_id: plataformaUserId });
+    }
+  });
+
+  it('recusa um bilhete inventado, e um pedido sem bilhete', async () => {
+    assert.equal((await noBeta('/api/auth/impersonate/redeem', {
+      method: 'POST', body: { ticket: 'f'.repeat(64) }
+    })).status, 404);
+    assert.equal((await noBeta('/api/auth/impersonate/redeem', { method: 'POST', body: {} })).status, 400);
+  });
+});
+
+describe('a sessão de personificação', () => {
+  it('lê o painel do provedor', async () => {
+    const token = await personificar();
+    const { status, body } = await noBeta('/api/tenant/public', { headers: bearer(token) });
+    assert.equal(status, 200);
+    assert.equal(body.data.slug, 'beta');
+  });
+
+  it('se apresenta como personificação, e sem o console', async () => {
+    const token = await personificar();
+    const { status, body } = await noBeta('/api/auth/user', { headers: bearer(token) });
+    assert.equal(status, 200);
+    assert.equal(body.data.role, 'viewer');
+    assert.equal(body.data.tenantId, beta);
+    assert.equal(body.data.impersonation.platformUsername, 'plataforma');
+    assert.equal(body.data.isPlatformAdmin, false);
+  });
+
+  it('não escreve nada, em rota nenhuma', async () => {
+    const token = await personificar();
+    for (const [method, path, body] of [
+      ['PATCH', '/api/tenant', { name: 'Renomeado à revelia' }],
+      ['POST', '/api/users', { username: 'intruso', email: 'intruso@exemplo.test', password: 'senha-intrusa-1', role: 'admin' }],
+      ['PUT', '/api/settings/genieAcsUrl', { value: 'http://trocado.exemplo' }],
+      ['POST', '/api/invites', { role: 'admin' }],
+      ['DELETE', '/api/settings/genieAcsUrl']
+    ]) {
+      const res = await noBeta(path, { method, headers: bearer(token), body });
+      assert.equal(res.status, 403, `${method} ${path}: ${JSON.stringify(res.body)}`);
+      assert.equal(res.body.code, 'impersonation_read_only', `${method} ${path}`);
+    }
+    // E o nome do provedor continua o que era.
+    const { body } = await noBeta('/api/tenant/public');
+    assert.equal(body.data.name, 'Provedor Beta');
+  });
+
+  it('não desloga — que derrubaria as sessões de quem personifica, não as do cliente', async () => {
+    const token = await personificar();
+    const antes = await getDb()('users').where({ id: plataformaUserId }).first();
+    const { status, body } = await noBeta('/api/auth/logout', { method: 'POST', headers: bearer(token) });
+    assert.equal(status, 403);
+    assert.equal(body.code, 'impersonation_read_only');
+    const depois = await getDb()('users').where({ id: plataformaUserId }).first();
+    assert.equal(Number(depois.token_version), Number(antes.token_version),
+      'sair de uma personificação não pode revogar as sessões de quem personifica');
+  });
+
+  it('não alcança o console de volta, nem no host de onde ele é servido', async () => {
+    const token = await personificar();
+    // No host do beta: a rota do console existe, e esta sessão não a alcança.
+    assert.equal((await noBeta('/api/platform/tenants', { headers: bearer(token) })).status, 404);
+    // E no host da casa o token nem chega lá: ele nomeia o beta.
+    const naCasaComEle = await naCasa('/api/platform/tenants', { headers: bearer(token) });
+    assert.equal(naCasaComEle.status, 403);
+    assert.equal(naCasaComEle.body.code, 'tenant_mismatch');
+  });
+
+  it('não vale no host de outro provedor', async () => {
+    const token = await personificar();
+    // Numa rota COM sessão. A pública (`/api/tenant/public`) responde pelo
+    // host e ignora o cabeçalho — é o que ela faz para qualquer token, e não
+    // teria nada a dizer sobre este.
+    const { status, body } = await naCasa('/api/auth/user', { headers: bearer(token) });
+    assert.equal(status, 403);
+    assert.equal(body.code, 'tenant_mismatch');
+  });
+
+  it('morre quando quem a abriu sai do cadastro da plataforma', async () => {
+    const token = await personificar();
+    assert.equal((await noBeta('/api/auth/user', { headers: bearer(token) })).status, 200);
+
+    await getDb()('platform_admins').where({ user_id: plataformaUserId }).del();
+    try {
+      const { status } = await noBeta('/api/auth/user', { headers: bearer(token) });
+      assert.equal(status, 403, 'o cadastro é lido a cada requisição, não quando o token foi feito');
+    } finally {
+      await getDb()('platform_admins').insert({ user_id: plataformaUserId });
+    }
+  });
+
+  it('morre quando quem a abriu troca a senha', async () => {
+    const token = await personificar();
+    const antes = await getDb()('users').where({ id: plataformaUserId }).first();
+    await getDb()('users').where({ id: plataformaUserId })
+      .update({ token_version: Number(antes.token_version) + 1 });
+    try {
+      assert.equal((await noBeta('/api/auth/user', { headers: bearer(token) })).status, 403);
+    } finally {
+      await getDb()('users').where({ id: plataformaUserId })
+        .update({ token_version: Number(antes.token_version) });
+    }
+  });
+
+  it('não é aceita como refresh', async () => {
+    const token = await personificar();
+    const { status } = await noBeta('/api/auth/refresh', { method: 'POST', body: { refreshToken: token } });
+    assert.notEqual(status, 200);
+  });
+});
+
+describe('a limpeza dos bilhetes', () => {
+  it('apaga o que venceu sem uso e guarda por um dia o que foi usado', async () => {
+    const db = getDb();
+    await db('impersonation_tickets').del();
+
+    const vencido = await ImpersonationTicket.create({
+      tenantId: beta, platformUserId: plataformaUserId, ttlMs: -1000
+    });
+    const usadoAgora = await ImpersonationTicket.create({
+      tenantId: beta, platformUserId: plataformaUserId, ttlMs: -1000
+    });
+    await db('impersonation_tickets').where({ id: usadoAgora.id }).update({ redeemed_at: new Date() });
+    const vivo = await ImpersonationTicket.create({ tenantId: beta, platformUserId: plataformaUserId });
+
+    await ImpersonationTicket.prune();
+    const restam = (await db('impersonation_tickets').select('id')).map((r) => Number(r.id)).sort();
+    assert.deepEqual(restam, [usadoAgora.id, vivo.id].sort(),
+      'o vencido sem uso sai; o usado há pouco fica, porque é o que alguém vai consultar');
+    assert.equal(await db('impersonation_tickets').where({ id: vencido.id }).first(), undefined);
+  });
+});
