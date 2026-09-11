@@ -28,6 +28,9 @@ const PlanPage = lazy(() => import('@/pages/plan'))
 const OnboardingPage = lazy(() => import('@/pages/onboarding'))
 const InvitePage = lazy(() => import('@/pages/invite'))
 const ImpersonatePage = lazy(() => import('@/pages/impersonate'))
+const ForgotPasswordPage = lazy(() => import('@/pages/forgot-password'))
+const ResetPasswordPage = lazy(() => import('@/pages/reset-password'))
+const VerifyEmailPage = lazy(() => import('@/pages/verify-email'))
 
 function PageFallback() {
   const { t } = useTranslation()
@@ -194,6 +197,13 @@ export default function App() {
                     chega nelas ainda não tem sessão neste provedor. */}
                 <Route path="/invite" element={<Suspense fallback={<AuthFallback />}><InvitePage /></Suspense>} />
                 <Route path="/impersonate" element={<Suspense fallback={<AuthFallback />}><ImpersonatePage /></Suspense>} />
+                {/* As três que chegam de fora com um token no fragmento. Sem
+                    guarda de sessão, como o convite: quem perdeu a senha não
+                    tem uma, e quem confirma um endereço costuma estar no
+                    celular. */}
+                <Route path="/forgot-password" element={<Suspense fallback={<AuthFallback />}><ForgotPasswordPage /></Suspense>} />
+                <Route path="/reset-password" element={<Suspense fallback={<AuthFallback />}><ResetPasswordPage /></Suspense>} />
+                <Route path="/verify-email" element={<Suspense fallback={<AuthFallback />}><VerifyEmailPage /></Suspense>} />
                 <Route element={<ProtectedShell />}>
                   <Route index element={<Navigate to="/dashboard" replace />} />
                   <Route path="/dashboard" element={<DashboardPage />} />

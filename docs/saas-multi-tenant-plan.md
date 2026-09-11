@@ -431,6 +431,13 @@ que qualquer um pode registrar, e cada conta pré-preenchida vira um caminho par
 dela. Uma migração não tem como saber o endereço de ninguém, e inventar um é pior que
 deixar nulo, porque um nulo se vê e um endereço plausível não.
 
+**E o dia chegou** (migração `0039`): existe redefinição de senha por e-mail, e o alerta
+acima virou a regra que a acompanha — `email_verified_at`, nula para todo mundo, inclusive
+para os endereços já cadastrados. Só endereço PROVADO recebe redefinição, e cadastrar um
+endereço não é prová-lo: a senha atual prova o controle da conta, não o do endereço. Um
+carimbo de verificado dado de graça na migração seria exatamente o `fulano@local.invalid`
+por outro nome.
+
 **O que foi feito** (onda de login por e-mail): a coluna nasce **anulável e vazia**; toda
 conta NOVA exige e-mail; o login aceita nome ou e-mail; quem já usava cadastra o próprio
 endereço em `POST /api/auth/email`, provando a senha atual; e `LOGIN_REQUIRES_EMAIL=true`
@@ -1085,9 +1092,15 @@ Original: Fase 0 → 1 → 2 → 3 → 8 → 4 → 5 → 6 → 7.
    rotas, e o RLS avaliado com medição — e depois **implementado**, atrás de `RLS_ENABLED`,
    com a recusa de subir num papel que passa por cima da política.
 9. ~~**O resto da Fase 2**~~ ✅ personificação auditada com audiência própria e bilhete de
-   uso único, transporte de e-mail do convite, e as telas de convidar e de aceitar. → O que
-   sobra: a rotação da `SECRET_BOX_KEY` com as duas chaves vivas, e a verificação do
-   endereço de e-mail no dia em que existir redefinição de senha por ele.
+   uso único, transporte de e-mail do convite, e as telas de convidar e de aceitar.
+10. ~~**Redefinição de senha por e-mail**~~ ✅ e, junto com ela, a **verificação do endereço**
+    que ela torna obrigatória — porque a partir dela existe um caminho que entrega o
+    controle de uma conta a quem lê uma caixa de entrada. O pedido responde a mesma coisa
+    exista a conta ou não; o bilhete serve uma vez, no host onde foi cunhado, e morre se o
+    endereço mudar; concluir derruba toda sessão antiga. Todo endereço já cadastrado entra
+    como NÃO verificado, de propósito: eles foram gravados exigindo a senha atual, o que
+    prova o controle da conta e não o do endereço. → O que sobra: a rotação da
+    `SECRET_BOX_KEY` com as duas chaves vivas.
 
 Vale repetir o que o plano dizia e que se confirmou: a Fase 1 saiu para os installs
 self-hosted como upgrade normal, e o código de tenancy rodou em produção real com um

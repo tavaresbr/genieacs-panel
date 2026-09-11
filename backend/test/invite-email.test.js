@@ -1,4 +1,3 @@
-import net from 'node:net';
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -20,58 +19,8 @@ import assert from 'node:assert/strict';
 process.env.PUBLIC_BASE_URL = 'https://painel.exemplo.test';
 
 const { call, authHeaders, startTestServers, stopTestServers } = await import('./helpers/harness.js');
+const { smtpDeMentira, decodificarQuotedPrintable } = await import('./helpers/fakeSmtp.js');
 const { resetMailTransport, mailConfigured, panelUrlFor } = await import('../src/services/mail/index.js');
-
-/** Um SMTP que aceita tudo e guarda as mensagens. */
-function smtpDeMentira() {
-  const recebidas = [];
-  const server = net.createServer((socket) => {
-    let buffer = '';
-    let emDados = false;
-    let corrente = '';
-    socket.write('220 mentira ESMTP\r\n');
-    socket.on('data', (chunk) => {
-      buffer += chunk.toString('utf8');
-      let linha;
-      while ((linha = tomarLinha()) !== null) {
-        if (emDados) {
-          if (linha === '.') {
-            recebidas.push(corrente);
-            corrente = '';
-            emDados = false;
-            socket.write('250 OK\r\n');
-          } else {
-            corrente += `${linha}\n`;
-          }
-          continue;
-        }
-        const comando = linha.slice(0, 4).toUpperCase();
-        if (comando === 'EHLO' || comando === 'HELO') socket.write('250-mentira\r\n250 AUTH PLAIN LOGIN\r\n');
-        else if (comando === 'AUTH') socket.write('235 OK\r\n');
-        else if (comando === 'DATA') { emDados = true; socket.write('354 go\r\n'); }
-        else if (comando === 'QUIT') { socket.write('221 bye\r\n'); socket.end(); }
-        else socket.write('250 OK\r\n');
-      }
-    });
-    socket.on('error', () => {});
-
-    function tomarLinha() {
-      const fim = buffer.indexOf('\r\n');
-      if (fim === -1) return null;
-      const out = buffer.slice(0, fim);
-      buffer = buffer.slice(fim + 2);
-      return out;
-    }
-  });
-  return { server, recebidas };
-}
-
-/** Desfaz as quebras suaves e os `=XX` do quoted-printable. */
-function decodificarQuotedPrintable(texto) {
-  return texto
-    .replace(/=\n/g, '')
-    .replace(/=([0-9A-Fa-f]{2})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
-}
 
 let panelUrl;
 let token;

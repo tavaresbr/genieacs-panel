@@ -102,7 +102,10 @@ class User {
   static async findById(id) {
     return (
       (await getDb()('users')
-        .select('id', 'username', 'email', 'role', 'password', 'token_version', 'created_at', 'updated_at')
+        .select(
+          'id', 'username', 'email', 'email_verified_at', 'role', 'password',
+          'token_version', 'created_at', 'updated_at'
+        )
         .where({ id })
         .first()) || null
     );
@@ -144,11 +147,47 @@ class User {
     return id;
   }
 
-  /** Grava o endereço de login de alguém. Sempre normalizado. */
+  /**
+   * Grava o endereço de login de alguém. Sempre normalizado, sempre NÃO provado.
+   *
+   * `email_verified_at` volta a nulo em toda troca, e é a metade da verificação
+   * que não dá para esquecer em lugar nenhum: se a limpeza ficasse a cargo de
+   * quem chama, a primeira rota nova que gravasse um endereço por outro caminho
+   * herdaria o carimbo do endereço anterior — e um endereço que ninguém provou
+   * passaria a receber redefinição de senha porque o antigo tinha sido provado.
+   *
+   * Gravar o endereço mesmo sem prova é deliberado: é ele que abre o login por
+   * e-mail, e segurá-lo até a confirmação deixaria alguém que acabou de trocar
+   * sem o caminho de entrada que acabou de escolher. A prova não é condição de
+   * entrar — é condição de receber uma senha nova.
+   */
   static async updateEmail(id, email) {
     const changed = await getDb()('users')
       .where({ id })
-      .update({ email: User.normalizeEmail(email), updated_at: new Date() });
+      .update({
+        email: User.normalizeEmail(email),
+        email_verified_at: null,
+        updated_at: new Date()
+      });
+    return changed > 0;
+  }
+
+  /**
+   * Carimba o endereço como provado — e só se ainda for ESTE o endereço.
+   *
+   * A condição vai no `where` porque o bilhete e o clique são separados por até
+   * um dia, e nesse intervalo a pessoa pode ter trocado de endereço. Sem ela, o
+   * link antigo carimbaria como provado um endereço que ninguém provou: o
+   * bilhete diz `maria@antigo`, a conta já diz `maria@novo`, e o carimbo cairia
+   * sobre o novo. Devolve `false` quando não casa, e quem chama responde a
+   * mesma coisa que responderia a um bilhete ruim.
+   */
+  static async markEmailVerified(id, email) {
+    const normalizado = User.normalizeEmail(email);
+    if (!normalizado) return false;
+    const changed = await getDb()('users')
+      .where({ id, email: normalizado })
+      .update({ email_verified_at: new Date(), updated_at: new Date() });
     return changed > 0;
   }
 
