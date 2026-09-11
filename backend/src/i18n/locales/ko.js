@@ -450,6 +450,7 @@ export default {
   'whatsapp.disconnected': '번호 연결을 해제했습니다',
   'whatsapp.webhookChecked': '서버에서 웹훅을 확인했습니다',
   'whatsapp.webhookReapplied': '서버에서 웹훅을 다시 작성했습니다',
+  'whatsapp.webhookProbed': '웹훅 왕복을 확인했습니다',
   'whatsapp.numbersChecked': 'WhatsApp에서 번호를 확인했습니다',
   'whatsapp.messageQueued': '메시지를 발송 대기열에 추가했습니다',
   'whatsapp.messageSendFailed': '메시지를 대기열에 추가하지 못했습니다',

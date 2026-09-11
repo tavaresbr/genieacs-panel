@@ -118,6 +118,14 @@ export const casos = [
   },
   {
     chave: 'account',
+    label: 'POST /api/whatsapp/accounts/:id/webhook/probe',
+    method: 'POST',
+    path: (id) => `/api/whatsapp/accounts/${id}/webhook/probe`,
+    tabela: 'whatsapp_accounts',
+    controleSoNaoAchou: true
+  },
+  {
+    chave: 'account',
     label: 'PATCH /api/whatsapp/accounts/:id',
     method: 'PATCH',
     path: (id) => `/api/whatsapp/accounts/${id}`,

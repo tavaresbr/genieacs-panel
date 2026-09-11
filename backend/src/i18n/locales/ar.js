@@ -452,6 +452,7 @@ export default {
   'whatsapp.disconnected': 'فُصل الرقم',
   'whatsapp.webhookChecked': 'تم فحص الويب هوك على الخادم',
   'whatsapp.webhookReapplied': 'تمت إعادة كتابة الويب هوك على الخادم',
+  'whatsapp.webhookProbed': 'تم فحص رحلة الويب هوك',
   'whatsapp.numbersChecked': 'تم التحقّق من الأرقام في WhatsApp',
   'whatsapp.messageQueued': 'أُضيفت الرسالة إلى طابور الإرسال',
   'whatsapp.messageSendFailed': 'تعذّرت إضافة الرسالة إلى الطابور',

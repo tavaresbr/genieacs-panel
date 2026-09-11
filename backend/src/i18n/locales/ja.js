@@ -451,6 +451,7 @@ export default {
   'whatsapp.disconnected': '番号を切断しました',
   'whatsapp.webhookChecked': 'サーバー上の Webhook を確認しました',
   'whatsapp.webhookReapplied': 'サーバー上の Webhook を書き換えました',
+  'whatsapp.webhookProbed': 'Webhook の往復を確認しました',
   'whatsapp.numbersChecked': 'WhatsApp で番号を確認しました',
   'whatsapp.messageQueued': 'メッセージを送信キューに追加しました',
   'whatsapp.messageSendFailed': 'メッセージをキューに追加できませんでした',

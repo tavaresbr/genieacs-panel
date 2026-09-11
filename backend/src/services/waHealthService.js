@@ -195,6 +195,10 @@ class WaHealthService {
    * lugar, webhook certo que o Evolution não está chamando — aparecem como a
    * mesma frase. Com elas separadas, cada uma leva a um conserto diferente.
    *
+   * `unreachable` conta os números cuja VOLTA falhou — o endereço público não
+   * chega aqui —, e ele tem precedência sobre `broken` porque um webhook que
+   * não é entregável torna irrelevante o que está gravado no servidor.
+   *
    * `broken` conta apenas o que uma conferência JÁ VIU quebrado. Uma conta
    * nunca conferida não entra: dizer "quebrado" sobre o que não se olhou é
    * pior do que não dizer nada, porque manda o operador consertar às cegas.
@@ -202,12 +206,23 @@ class WaHealthService {
    */
   static async webhook() {
     const rows = await tdb('whatsapp_accounts')
-      .select('webhook_verdict', 'webhook_refused_at');
+      .select('webhook_verdict', 'webhook_probe_verdict', 'webhook_refused_at');
 
     let broken = 0;
     let unchecked = 0;
+    let unreachable = 0;
     let refusedAt = null;
     for (const row of rows) {
+      // A volta primeiro, e ela decide sozinha quando fala. É a leitura mais
+      // forte que o painel tem: o veredito de configuração compara o servidor
+      // com o que o painel ESPERA, e as duas pontas dessa comparação saem do
+      // mesmo `webhookBaseUrl` — com um endereço errado ela responde `ok`. A
+      // volta é a única que sabe que aquele endereço não chega aqui.
+      const p = row.webhook_probe_verdict || null;
+      if (p && p !== 'reached') {
+        unreachable += 1;
+        continue;
+      }
       const v = row.webhook_verdict || null;
       if (!v || v === 'unreachable') unchecked += 1;
       else if (v !== 'ok') broken += 1;
@@ -216,7 +231,7 @@ class WaHealthService {
       const quando = asIso(row.webhook_refused_at);
       if (quando && (!refusedAt || quando > refusedAt)) refusedAt = quando;
     }
-    return { broken, unchecked, refusedAt };
+    return { broken, unchecked, unreachable, refusedAt };
   }
 
   /**

@@ -451,6 +451,7 @@ export default {
   'whatsapp.disconnected': 'नंबर डिस्कनेक्ट हो गया',
   'whatsapp.webhookChecked': 'सर्वर पर वेबहुक जाँचा गया',
   'whatsapp.webhookReapplied': 'सर्वर पर वेबहुक फिर से लिखा गया',
+  'whatsapp.webhookProbed': 'वेबहुक की आवाजाही जाँची गई',
   'whatsapp.numbersChecked': 'नंबर WhatsApp पर जाँचे गए',
   'whatsapp.messageQueued': 'संदेश डिलीवरी के लिए कतार में है',
   'whatsapp.messageSendFailed': 'संदेश कतार में नहीं डाला जा सका',

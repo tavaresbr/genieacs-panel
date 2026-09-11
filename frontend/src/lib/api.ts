@@ -1361,6 +1361,17 @@ export interface WhatsAppAccount {
   /** A URL que o servidor guarda, com o token REDIGIDO (`?t=***`). */
   webhookServerUrl: string | null
   webhookCheckedAt: string | null
+  /**
+   * O resultado da VOLTA — o painel se chamando pela porta da frente.
+   *
+   * Separado de `webhookVerdict` porque responde outra pergunta. Aquele diz o
+   * que está gravado no servidor Evolution; este diz se uma entrada por aquele
+   * endereço chega até aqui. Os dois saem do mesmo `webhookBaseUrl`, então o
+   * primeiro responde `ok` para um endereço errado: as duas pontas da
+   * comparação dele são a mesma. Só a volta pega isso.
+   */
+  webhookProbeVerdict: WhatsAppProbeVerdict | null
+  webhookProbedAt: string | null
   /** Quando um evento chegou e levou 401, e por quê. */
   webhookRefusedAt: string | null
   webhookRefusedReason: 'bad_token' | 'no_credential' | null
@@ -1386,6 +1397,23 @@ export type WhatsAppWebhookVerdict =
   | 'by_events'
   | 'events_missing'
   | 'unreachable'
+
+/** O que a volta encontrou. Cada um é um conserto diferente. */
+export type WhatsAppProbeVerdict =
+  | 'reached'
+  | 'unauthorized'
+  | 'wrong_target'
+  | 'not_found'
+  | 'blocked'
+  | 'server_error'
+  | 'unreachable'
+
+export interface WhatsAppWebhookProbe {
+  account: WhatsAppAccount
+  verdict: WhatsAppProbeVerdict
+  /** O status HTTP que voltou, ou null quando nem chegou a haver resposta. */
+  status: number | null
+}
 
 export interface WhatsAppWebhookCheck {
   account: WhatsAppAccount
@@ -1498,7 +1526,17 @@ export interface WhatsAppHealth {
    * distingue "o Evolution não está chamando" de "está chamando e sendo
    * recusado".
    */
-  webhook: { broken: number; unchecked: number; refusedAt: string | null }
+  webhook: {
+    broken: number
+    unchecked: number
+    /**
+     * Números cuja VOLTA falhou: o endereço público não chega ao painel. Tem
+     * precedência sobre `broken` — um webhook que não é entregável torna
+     * irrelevante o que está gravado no servidor Evolution.
+     */
+    unreachable: number
+    refusedAt: string | null
+  }
 }
 
 export type WhatsAppAlertRule = 'ont_offline' | 'rx_power_low' | 'temperature_high' | 'mass_outage'
@@ -1605,6 +1643,14 @@ export const whatsappAPI = {
 
   reapplyWebhook: (id: number) =>
     apiClient.post<WhatsAppWebhookCheck>(`/whatsapp/accounts/${id}/webhook`, {}),
+
+  /**
+   * A volta: o painel manda uma sonda para o próprio endereço público e vê se
+   * ela chega. É a única leitura que responde "esse endereço funciona?" em vez
+   * de "o servidor tem o que mandamos?".
+   */
+  probeWebhook: (id: number) =>
+    apiClient.post<WhatsAppWebhookProbe>(`/whatsapp/accounts/${id}/webhook/probe`, {}),
 
   // The only way to force a new QR: a server holding a session resumes it
   // instead of issuing one.

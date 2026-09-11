@@ -453,6 +453,7 @@ export default {
   'whatsapp.disconnected': 'Nummer getrennt',
   'whatsapp.webhookChecked': 'Webhook auf dem Server geprüft',
   'whatsapp.webhookReapplied': 'Webhook auf dem Server neu geschrieben',
+  'whatsapp.webhookProbed': 'Webhook-Rundlauf geprüft',
   'whatsapp.numbersChecked': 'Nummern auf WhatsApp geprüft',
   'whatsapp.messageQueued': 'Nachricht zum Versand eingereiht',
   'whatsapp.messageSendFailed': 'Die Nachricht konnte nicht eingereiht werden',

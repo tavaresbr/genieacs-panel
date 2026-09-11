@@ -159,6 +159,27 @@ class WhatsAppController {
     }
   }
 
+  /**
+   * A volta: o painel se chama pela porta da frente.
+   *
+   * `whatsapp.config` e não `whatsapp.read`, ao contrário da conferência: esta
+   * FAZ o painel emitir uma requisição para um endereço escolhido por quem
+   * administra. É a mesma permissão que já decide para qual servidor Evolution
+   * o painel fala.
+   */
+  static async probeWebhook(req, res) {
+    try {
+      const resultado = await EvolutionInstanceService.probeWebhook(req.params?.id);
+      return res.json(createResponse(req.t('whatsapp.webhookProbed'), {
+        account: WhatsAppConfigService.publicAccount(resultado.account),
+        verdict: resultado.verdict,
+        status: resultado.status
+      }));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.accountActionFailed');
+    }
+  }
+
   static async disconnectAccount(req, res) {
     try {
       const { account } = await EvolutionInstanceService.disconnect(req.params?.id);

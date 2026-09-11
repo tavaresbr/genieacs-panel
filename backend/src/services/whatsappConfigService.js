@@ -345,6 +345,13 @@ class WhatsAppConfigService {
       webhookVerdict: row.webhook_verdict || null,
       webhookServerUrl: row.webhook_server_url || null,
       webhookCheckedAt: row.webhook_checked_at || null,
+      // A volta. Separada do veredito de configuração porque responde outra
+      // pergunta, e porque as duas se contradizendo é o que o operador precisa
+      // ver: `ok` aqui em cima com `wrong_target` aqui embaixo significa que o
+      // servidor tem exatamente o endereço que o painel mandou — e que aquele
+      // endereço não chega no painel.
+      webhookProbeVerdict: row.webhook_probe_verdict || null,
+      webhookProbedAt: row.webhook_probed_at || null,
       webhookRefusedAt: row.webhook_refused_at || null,
       webhookRefusedReason: row.webhook_refused_reason || null,
       createdAt: row.created_at || null,
