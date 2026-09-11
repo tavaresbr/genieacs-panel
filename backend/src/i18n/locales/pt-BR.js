@@ -425,6 +425,7 @@ export default {
   'whatsapp.error.accountNotFound': 'Este número de WhatsApp não está cadastrado no painel',
   'whatsapp.error.noSession': 'Não há sessão ativa para reiniciar. Desconecte e pareie novamente.',
   'whatsapp.error.webhookBaseMissing': 'Configure o endereço público do painel antes de conferir o webhook.',
+  'whatsapp.error.webhookUrlPath': 'O endereço do webhook precisa terminar em {{path}}.',
   'whatsapp.error.noAccount': 'Nenhum número conectado para enviar',
   'whatsapp.error.noDestination': 'Este contato não tem telefone nem identificador do WhatsApp',
   'whatsapp.error.optedOut': 'Este número pediu para não ser contatado',

@@ -1215,7 +1215,7 @@ const zhCN: Dictionary = {
   'settings.whatsapp.statusInactive': '集成未启用',
   'settings.whatsapp.enable': '启用 WhatsApp 集成',
   'settings.whatsapp.webhookUrl': '公网 Webhook 地址',
-  'settings.whatsapp.webhookUrlHint': 'Evolution 服务器访问本面板的地址，必须能从公网访问。面板无法推测您的隧道或反向代理的主机名。',
+  'settings.whatsapp.webhookUrlHint': 'Evolution 服务器通过哪里到达本面板 —— 填写完整地址，以 /api/whatsapp-webhook 结尾。只填主机时面板会自动补上路径。该地址必须可从互联网访问：面板无法猜测你的隧道或反向代理的主机名。',
   'settings.whatsapp.portalUrl': '客户门户地址',
   'settings.whatsapp.portalUrlHint': '用户从外部访问客户门户的地址。凡是需要密码的操作（查看 Wi-Fi 密钥、修改网络名称、重启 ONT），机器人都会发送此链接。留空时，机器人会转交人工，而不是发送一个打不开的链接。它与上面的地址不同：除非有反向代理统一入口，门户是运行在独立端口上的另一个应用。',
   'settings.whatsapp.allowedHosts': '允许的服务器',

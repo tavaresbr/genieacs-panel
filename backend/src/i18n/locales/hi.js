@@ -427,6 +427,7 @@ export default {
   'whatsapp.error.accountNotFound': 'यह WhatsApp नंबर पैनल में पंजीकृत नहीं है',
   'whatsapp.error.noSession': 'पुनः आरंभ करने के लिए कोई सक्रिय सत्र नहीं है। इसके बजाय डिस्कनेक्ट करके फिर से जोड़ें।',
   'whatsapp.error.webhookBaseMissing': 'वेबहुक जाँचने से पहले पैनल का सार्वजनिक पता सेट करें।',
+  'whatsapp.error.webhookUrlPath': 'वेबहुक का पता {{path}} पर समाप्त होना चाहिए।',
   'whatsapp.error.noAccount': 'भेजने के लिए कोई कनेक्टेड नंबर नहीं है',
   'whatsapp.error.noDestination': 'इस संपर्क का कोई फ़ोन नंबर या WhatsApp पहचानकर्ता नहीं है',
   'whatsapp.error.optedOut': 'इस नंबर ने संपर्क न करने का अनुरोध किया है',

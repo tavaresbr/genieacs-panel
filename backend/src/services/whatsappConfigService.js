@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import AppState from '../models/AppState.js';
+import { WA_WEBHOOK_PATH, withWebhookPath } from '../config/waWebhookPath.js';
 import { createSecretBox } from '../utils/secretBox.js';
 import { normalizeEvoUrl, parseAllowedHosts } from '../utils/wa/evolutionPolicy.js';
 import { TenantCache } from '../config/tenantCache.js';
@@ -239,8 +240,33 @@ class WhatsAppConfigService {
    * Plain http is accepted because a lab Evolution on the same LAN is a real
    * setup, but the host still goes through the SSRF literal check at use time.
    */
+  /**
+   * O endereço do webhook, com o caminho do painel garantido.
+   *
+   * Ao contrário da URL do portal, ESTE endereço não é só um host: é a rota
+   * exata que o servidor Evolution vai chamar. A tela pedia um host — rótulo
+   * "URL pública", exemplo `https://painel.exemplo.com`, ajuda falando de
+   * hostname — e o código usava o que fosse digitado como endereço completo.
+   * Quem seguia a tela gravava um endereço apontando para a RAIZ do painel: o
+   * POST cai no frontend, que responde 200 com HTML, e o Evolution registra
+   * entrega bem-sucedida enquanto nada chega. Aconteceu em produção.
+   *
+   * Agora a origem sozinha recebe o caminho, e um caminho que não seja o do
+   * painel é recusado com o sufixo na mensagem.
+   */
   static normalizeWebhookBaseUrl(raw) {
-    return this.normalizePublicUrl(raw, 'whatsapp.error.invalidWebhookUrl', 'invalid_webhook_url');
+    const limpo = this.normalizePublicUrl(raw, 'whatsapp.error.invalidWebhookUrl', 'invalid_webhook_url');
+    if (!limpo) return '';
+    const { origin, pathname } = new URL(limpo);
+    const resultado = withWebhookPath(origin, pathname);
+    if (resultado.erro) {
+      throw new WaError('whatsapp.error.webhookUrlPath', {
+        code: 'invalid_webhook_url',
+        status: 400,
+        vars: { path: WA_WEBHOOK_PATH }
+      });
+    }
+    return resultado.url;
   }
 
   /**

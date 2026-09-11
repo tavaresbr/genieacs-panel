@@ -429,6 +429,7 @@ export default {
   'whatsapp.error.accountNotFound': 'Diese WhatsApp-Nummer ist im Panel nicht registriert',
   'whatsapp.error.noSession': 'Es gibt keine aktive Sitzung zum Neustarten. Trenne die Verbindung und koppele neu.',
   'whatsapp.error.webhookBaseMissing': 'Legen Sie die öffentliche Adresse des Panels fest, bevor Sie den Webhook prüfen.',
+  'whatsapp.error.webhookUrlPath': 'Die Webhook-Adresse muss auf {{path}} enden.',
   'whatsapp.error.noAccount': 'Keine verbundene Nummer zum Senden',
   'whatsapp.error.noDestination': 'Dieser Kontakt hat weder Telefonnummer noch WhatsApp-Kennung',
   'whatsapp.error.optedOut': 'Diese Nummer hat gebeten, nicht kontaktiert zu werden',

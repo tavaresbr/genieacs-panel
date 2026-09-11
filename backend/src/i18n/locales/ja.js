@@ -427,6 +427,7 @@ export default {
   'whatsapp.error.accountNotFound': 'この WhatsApp の番号はパネルに登録されていません',
   'whatsapp.error.noSession': '再起動できる有効なセッションがありません。代わりに切断してから再度ペアリングしてください。',
   'whatsapp.error.webhookBaseMissing': 'Webhook を確認する前にパネルの公開アドレスを設定してください。',
+  'whatsapp.error.webhookUrlPath': 'Webhook のアドレスは {{path}} で終わる必要があります。',
   'whatsapp.error.noAccount': '送信元となる接続済みの番号がありません',
   'whatsapp.error.noDestination': 'この連絡先には電話番号も WhatsApp の識別子もありません',
   'whatsapp.error.optedOut': 'この番号は連絡を希望していません',

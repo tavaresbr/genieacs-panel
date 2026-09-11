@@ -1217,7 +1217,7 @@ const en = {
   'settings.whatsapp.statusInactive': 'Integration inactive',
   'settings.whatsapp.enable': 'Enable the WhatsApp integration',
   'settings.whatsapp.webhookUrl': 'Public webhook URL',
-  'settings.whatsapp.webhookUrlHint': 'Where the Evolution server reaches this panel. It must be reachable from the internet — the panel cannot guess the hostname of your tunnel or reverse proxy.',
+  'settings.whatsapp.webhookUrlHint': 'Where the Evolution server reaches this panel — the WHOLE address, ending in /api/whatsapp-webhook. Type only the host and the panel fills the path in. It must be reachable from the internet: the panel cannot guess the hostname of your tunnel or reverse proxy.',
   'settings.whatsapp.portalUrl': 'Customer portal URL',
   'settings.whatsapp.portalUrlHint': 'Where subscribers reach the customer portal from outside. The bot sends this link for anything that needs a password — the WiFi passphrase, changing the network name, rebooting the ONT. Leave it empty and the bot hands off to a person instead of sending a link that opens nothing. It is not the address above: the portal is a separate app on its own port unless a reverse proxy fronts both.',
   'settings.whatsapp.allowedHosts': 'Authorized servers',

@@ -1098,7 +1098,7 @@ const de: Dictionary = {
   'settings.whatsapp.statusInactive': 'Integration inaktiv',
   'settings.whatsapp.enable': 'WhatsApp-Integration aktivieren',
   'settings.whatsapp.webhookUrl': 'Öffentliche Webhook-URL',
-  'settings.whatsapp.webhookUrlHint': 'Über diese Adresse erreicht der Evolution-Server dieses Panel. Sie muss aus dem Internet erreichbar sein — das Panel kann den Hostnamen deines Tunnels oder Reverse-Proxys nicht erraten.',
+  'settings.whatsapp.webhookUrlHint': 'Wo der Evolution-Server dieses Panel erreicht — die GANZE Adresse, endend auf /api/whatsapp-webhook. Geben Sie nur den Host an, ergänzt das Panel den Pfad. Sie muss aus dem Internet erreichbar sein: Das Panel kann den Hostnamen Ihres Tunnels oder Reverse-Proxys nicht erraten.',
   'settings.whatsapp.portalUrl': 'URL des Kundenportals',
   'settings.whatsapp.portalUrlHint': 'Wo Teilnehmer das Kundenportal von außen erreichen. Diesen Link schickt der Bot für alles, was ein Passwort braucht — das WLAN-Passwort, den Netzwerknamen ändern, die ONT neu starten. Bleibt es leer, übergibt der Bot an einen Menschen, statt einen Link zu senden, der nichts öffnet. Es ist nicht die Adresse darüber: das Portal ist eine eigene App auf einem eigenen Port, sofern kein Reverse-Proxy beide hinter denselben Hostnamen stellt.',
   'settings.whatsapp.allowedHosts': 'Zugelassene Server',

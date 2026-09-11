@@ -1215,7 +1215,7 @@ const fr: Dictionary = {
   'settings.whatsapp.statusInactive': 'Intégration inactive',
   'settings.whatsapp.enable': 'Activer l’intégration WhatsApp',
   'settings.whatsapp.webhookUrl': 'URL publique du webhook',
-  'settings.whatsapp.webhookUrlHint': 'Adresse à laquelle le serveur Evolution joint ce panneau. Elle doit être accessible depuis internet — le panneau ne peut pas deviner le nom d’hôte de votre tunnel ou de votre reverse proxy.',
+  'settings.whatsapp.webhookUrlHint': "Par où le serveur Evolution atteint ce panneau — l'adresse ENTIÈRE, se terminant par /api/whatsapp-webhook. Si vous ne saisissez que l'hôte, le panneau complète le chemin. Elle doit être joignable depuis internet : le panneau ne peut pas deviner le nom d'hôte de votre tunnel ou proxy inverse.",
   'settings.whatsapp.allowedHosts': 'Serveurs autorisés',
   'settings.whatsapp.allowedHostsHint': 'Un par ligne. Laissez vide pour autoriser tout serveur public ; les adresses internes sont toujours bloquées. Utilisez *.domaine.com pour les sous-domaines.',
   'settings.whatsapp.managedUrl': 'URL du serveur géré',
