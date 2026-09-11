@@ -413,8 +413,21 @@ export default function Settings() {
         ...(waForm.managedAdminKey ? { managedAdminKey: waForm.managedAdminKey } : {})
       })
       if (res.success && res.data) {
-        setWaConfig(res.data)
-        setWaForm((current) => ({ ...current, managedAdminKey: '' }))
+        const salvo = res.data
+        setWaConfig(salvo)
+        // O formulário volta a mostrar o que ficou GRAVADO, e não o que foi
+        // digitado. O backend normaliza estes dois — o do webhook ganha
+        // `/api/whatsapp-webhook` quando só o host é digitado, e ambos perdem
+        // a barra final —, então deixar o campo com o texto de quem digitou
+        // esconde justamente a correção que acabou de acontecer. Quem salva
+        // "https://painel.exemplo.com" precisa VER o caminho aparecer, ou não
+        // tem como saber se o conserto pegou.
+        setWaForm((current) => ({
+          ...current,
+          webhookBaseUrl: salvo.webhookBaseUrl,
+          portalPublicUrl: salvo.portalPublicUrl,
+          managedAdminKey: ''
+        }))
         toast.success(res.message || t('common.success'))
         return
       }
