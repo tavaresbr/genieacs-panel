@@ -1219,7 +1219,7 @@ const ko: Dictionary = {
   'settings.whatsapp.statusInactive': '연동 비활성',
   'settings.whatsapp.enable': 'WhatsApp 연동 사용',
   'settings.whatsapp.webhookUrl': '공개 웹훅 URL',
-  'settings.whatsapp.webhookUrlHint': 'Evolution 서버가 이 패널에 접속하는 주소입니다. 인터넷에서 접근할 수 있어야 하며, 패널은 터널이나 리버스 프록시의 호스트 이름을 추측할 수 없습니다.',
+  'settings.whatsapp.webhookUrlHint': 'Evolution 서버가 이 패널에 도달하는 경로입니다. /api/whatsapp-webhook으로 끝나는 전체 주소를 입력하세요. 호스트만 입력하면 패널이 경로를 채웁니다. 인터넷에서 접근할 수 있어야 합니다: 패널은 터널이나 리버스 프록시의 호스트 이름을 추측할 수 없습니다.',
   'settings.whatsapp.portalUrl': '고객 포털 URL',
   'settings.whatsapp.portalUrlHint': '가입자가 외부에서 고객 포털에 접속하는 주소입니다. 봇은 Wi-Fi 암호, 네트워크 이름 변경, ONT 재시작처럼 비밀번호가 필요한 작업에 이 링크를 보냅니다. 비워 두면 봇은 아무것도 열리지 않는 링크를 보내는 대신 상담원에게 연결합니다. 위의 주소와는 다릅니다. 리버스 프록시가 둘 다 처리하지 않는 한 포털은 별도의 포트에서 동작하는 별개의 앱입니다.',
   'settings.whatsapp.allowedHosts': '허용된 서버',

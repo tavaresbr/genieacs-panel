@@ -429,6 +429,7 @@ export default {
   'whatsapp.error.accountNotFound': 'Этот номер WhatsApp не зарегистрирован в панели',
   'whatsapp.error.noSession': 'Нет активной сессии для перезапуска. Отключите номер и подключите его заново.',
   'whatsapp.error.webhookBaseMissing': 'Укажите публичный адрес панели, прежде чем проверять вебхук.',
+  'whatsapp.error.webhookUrlPath': 'Адрес вебхука должен заканчиваться на {{path}}.',
   'whatsapp.error.noAccount': 'Нет подключённого номера для отправки',
   'whatsapp.error.noDestination': 'У этого контакта нет ни номера телефона, ни идентификатора WhatsApp',
   'whatsapp.error.optedOut': 'Этот номер просил его не беспокоить',

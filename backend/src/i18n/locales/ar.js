@@ -428,6 +428,7 @@ export default {
   'whatsapp.error.accountNotFound': 'رقم WhatsApp هذا غير مسجّل في اللوحة',
   'whatsapp.error.noSession': 'لا توجد جلسة نشطة لإعادة تشغيلها. افصل الرقم وأعد ربطه بدلًا من ذلك.',
   'whatsapp.error.webhookBaseMissing': 'اضبط العنوان العام للوحة قبل فحص الويب هوك.',
+  'whatsapp.error.webhookUrlPath': 'يجب أن ينتهي عنوان الويب هوك بـ {{path}}.',
   'whatsapp.error.noAccount': 'لا يوجد رقم مرتبط للإرسال منه',
   'whatsapp.error.noDestination': 'لا يملك جهة الاتصال هذه رقم هاتف ولا معرّف WhatsApp',
   'whatsapp.error.optedOut': 'طلب هذا الرقم عدم التواصل معه',

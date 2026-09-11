@@ -427,6 +427,7 @@ export default {
   'whatsapp.error.accountNotFound': '該 WhatsApp 號碼未在面板中註冊',
   'whatsapp.error.noSession': '沒有可重新啟動的作用中工作階段。請改為中斷連線後重新配對。',
   'whatsapp.error.webhookBaseMissing': '請先設定面板的公開位址，再檢查 Webhook。',
+  'whatsapp.error.webhookUrlPath': 'Webhook 位址必須以 {{path}} 結尾。',
   'whatsapp.error.noAccount': '沒有可用於傳送的已接入號碼',
   'whatsapp.error.noDestination': '該聯絡人既沒有電話號碼也沒有 WhatsApp 識別碼',
   'whatsapp.error.optedOut': '該號碼要求不再接收聯絡',

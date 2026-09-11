@@ -1214,7 +1214,7 @@ const ja: Dictionary = {
   'settings.whatsapp.statusInactive': '連携は無効',
   'settings.whatsapp.enable': 'WhatsApp 連携を有効にする',
   'settings.whatsapp.webhookUrl': '公開 Webhook の URL',
-  'settings.whatsapp.webhookUrlHint': 'Evolution サーバーがこのパネルに接続するアドレスです。インターネットから到達できる必要があります。トンネルやリバースプロキシのホスト名をパネルが推測することはできません。',
+  'settings.whatsapp.webhookUrlHint': 'Evolution サーバーがこのパネルに到達する経路です。/api/whatsapp-webhook で終わるアドレス全体を入力してください。ホストだけを入力すればパネルがパスを補います。インターネットから到達可能である必要があります。パネルはトンネルやリバースプロキシのホスト名を推測できません。',
   'settings.whatsapp.portalUrl': '顧客ポータルの URL',
   'settings.whatsapp.portalUrlHint': '加入者が外部から顧客ポータルにアクセスするアドレスです。パスワードが必要な操作 (Wi-Fi のパスフレーズ、ネットワーク名の変更、ONT の再起動) では、ボットがこのリンクを送信します。空欄のままにすると、何も開けないリンクを送る代わりに、ボットは担当者に引き継ぎます。上のアドレスとは別のものです。リバースプロキシで両方をまとめていない限り、ポータルは独自のポートで動く別のアプリです。',
   'settings.whatsapp.allowedHosts': '許可するサーバー',

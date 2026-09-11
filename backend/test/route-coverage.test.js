@@ -317,15 +317,20 @@ describe('a ordem das montagens em app.js', () => {
     // Um roteador montado ACIMA desta linha atende sem provedor em escopo. É a
     // falha que o comentário do `/api/tenant` no próprio app.js descreve, e o
     // teste existe para que ela não volte por uma linha no lugar errado.
+    // A constante conta como montagem, e tem que contar: o prefixo do webhook
+    // virou `WA_WEBHOOK_PATH` para que o caminho atendido e o endereço público
+    // conferido saiam do mesmo lugar. Lendo só literais, um roteador montado
+    // por constante acima do resolvedor passaria despercebido — que é
+    // exatamente o ponto cego que este teste existe para não ter.
     const montagens = linhas
       .map((l, i) => ({ i, l }))
-      .filter(({ l }) => /^\s*app\.use\('\/api\/[^']*',\s*\w+Routes\);/.test(l));
+      .filter(({ l }) => /^\s*app\.use\((?:'\/api\/[^']*'|[A-Z][A-Z0-9_]*),\s*\w+Routes\);/.test(l));
     assert.ok(montagens.length > 10, 'poucas montagens encontradas');
     const acima = montagens.filter(({ i }) => i < resolvedor).map(({ l }) => l.trim());
     assert.deepEqual(acima, [
       // As duas exceções, e as duas são entregas de fora que trazem o provedor
       // no próprio corpo ou no token assinado.
-      "app.use('/api/whatsapp-webhook', whatsappWebhookRoutes);",
+      'app.use(WA_WEBHOOK_PATH, whatsappWebhookRoutes);',
       "app.use('/api/whatsapp-media', whatsappMediaRoutes);"
     ]);
   });

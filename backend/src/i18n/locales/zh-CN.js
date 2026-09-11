@@ -428,6 +428,7 @@ export default {
   'whatsapp.error.accountNotFound': '该 WhatsApp 号码未在面板中注册',
   'whatsapp.error.noSession': '没有可重启的活动会话。请改为断开连接后重新配对。',
   'whatsapp.error.webhookBaseMissing': '请先设置面板的公开地址，再检查 Webhook。',
+  'whatsapp.error.webhookUrlPath': 'Webhook 地址必须以 {{path}} 结尾。',
   'whatsapp.error.noAccount': '没有可用于发送的已接入号码',
   'whatsapp.error.noDestination': '该联系人既没有电话号码也没有 WhatsApp 标识',
   'whatsapp.error.optedOut': '该号码要求不再接收联系',

@@ -426,6 +426,7 @@ export default {
   'whatsapp.error.accountNotFound': 'Questo numero WhatsApp non è registrato nel pannello',
   'whatsapp.error.noSession': 'Non c’è una sessione attiva da riavviare. Disconnetti e associa di nuovo.',
   'whatsapp.error.webhookBaseMissing': "Imposta l'indirizzo pubblico del pannello prima di verificare il webhook.",
+  'whatsapp.error.webhookUrlPath': "L'indirizzo del webhook deve terminare con {{path}}.",
   'whatsapp.error.noAccount': 'Nessun numero collegato da cui inviare',
   'whatsapp.error.noDestination': 'Questo contatto non ha né telefono né identificatore WhatsApp',
   'whatsapp.error.optedOut': 'Questo numero ha chiesto di non essere contattato',

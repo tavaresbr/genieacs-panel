@@ -1813,11 +1813,19 @@ export default function Settings() {
                 <label htmlFor="wa-webhook-url" className="field-label">
                   {t('settings.whatsapp.webhookUrl')}
                 </label>
+                {/* O exemplo mostrava só a origem, e o código usava o que
+                    fosse digitado como endereço COMPLETO. Quem seguia o exemplo
+                    gravava um endereço apontando para a RAIZ do painel: o POST
+                    cai no frontend, que responde 200 com HTML, e o Evolution
+                    registra entrega bem-sucedida enquanto nada chega. O backend
+                    agora acrescenta o caminho quando falta; o exemplo mostra o
+                    endereço inteiro para que a tela e o código digam a mesma
+                    coisa. */}
                 <input
                   id="wa-webhook-url"
                   type="url"
                   className="modern-input w-full"
-                  placeholder="https://painel.exemplo.com"
+                  placeholder="https://painel.exemplo.com/api/whatsapp-webhook"
                   value={waForm.webhookBaseUrl}
                   onChange={(event) => setWaForm((current) => ({ ...current, webhookBaseUrl: event.target.value }))}
                 />

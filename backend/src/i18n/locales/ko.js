@@ -430,6 +430,7 @@ export default {
   'whatsapp.error.accountNotFound': '이 WhatsApp 번호는 패널에 등록되어 있지 않습니다',
   'whatsapp.error.noSession': '재시작할 활성 세션이 없습니다. 연결을 해제하고 다시 연결하십시오.',
   'whatsapp.error.webhookBaseMissing': '웹훅을 확인하기 전에 패널의 공개 주소를 설정하세요.',
+  'whatsapp.error.webhookUrlPath': '웹훅 주소는 {{path}}로 끝나야 합니다.',
   'whatsapp.error.noAccount': '발신할 수 있는 연결된 번호가 없습니다',
   'whatsapp.error.noDestination': '이 연락처에는 전화번호나 WhatsApp 식별자가 없습니다',
   'whatsapp.error.optedOut': '이 번호는 연락을 원하지 않는다고 요청했습니다',

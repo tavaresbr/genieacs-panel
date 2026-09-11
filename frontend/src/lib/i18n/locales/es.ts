@@ -1215,7 +1215,7 @@ const es: Dictionary = {
   'settings.whatsapp.statusInactive': 'Integración inactiva',
   'settings.whatsapp.enable': 'Activar la integración de WhatsApp',
   'settings.whatsapp.webhookUrl': 'URL pública del webhook',
-  'settings.whatsapp.webhookUrlHint': 'Por donde el servidor Evolution alcanza este panel. Debe ser accesible desde internet — el panel no puede adivinar el hostname de tu túnel o proxy inverso.',
+  'settings.whatsapp.webhookUrlHint': 'Por dónde el servidor Evolution alcanza este panel: la dirección COMPLETA, terminando en /api/whatsapp-webhook. Si escribe solo el host, el panel completa la ruta. Debe ser accesible desde internet: el panel no puede adivinar el hostname de su túnel o proxy inverso.',
   'settings.whatsapp.portalUrl': 'URL del portal del cliente',
   'settings.whatsapp.portalUrlHint': 'Por dónde el suscriptor alcanza el portal del cliente, desde fuera. Es el enlace que el bot envía para todo lo que exige contraseña — la clave del WiFi, cambiar el nombre de la red, reiniciar la ONU. Vacío, el bot pasa a un agente en vez de enviar un enlace que no abre. No es la dirección de arriba: el portal es otra aplicación, en otro puerto, salvo que un proxy inverso ponga ambos tras el mismo hostname.',
   'settings.whatsapp.allowedHosts': 'Servidores autorizados',

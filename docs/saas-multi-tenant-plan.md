@@ -1539,3 +1539,63 @@ ao lado de `PROBE_EVENT`, com o motivo escrito.
 - **Conferir o `webhookBaseUrl` na hora de salvar.** Seria a mesma volta num
   momento pior: a configuração ainda não tem conta nenhuma pareada, e o token
   que autentica a volta nasce com a instância.
+
+---
+
+## Onda 26 — a tela pedia um host e o código exigia um caminho ✅ *(implementada)*
+
+A volta da onda 25 respondeu, num painel em produção: **"o host está certo e o
+caminho não."** Ela funcionou — e o que ela encontrou não era erro de quem
+configurou.
+
+### A tela e o código pediam coisas diferentes
+
+O campo do webhook dizia, em três lugares, que queria um **host**:
+
+- rótulo: *"URL pública do webhook"*;
+- exemplo no campo: `https://painel.exemplo.com`, **sem caminho nenhum**;
+- ajuda: *"o painel não tem como adivinhar o hostname do seu túnel ou proxy
+  reverso"* — só sobre hostname.
+
+E o código usava o que fosse digitado como o endereço **completo**, acrescentando
+apenas `?t=`. A conferência era só de forma: absoluto, `http(s)`, sem credencial.
+
+Quem seguia a tela gravava um endereço apontando para a **raiz** do painel. O
+Evolution faz `POST` ali, o frontend responde **200 com HTML**, o servidor
+registra entrega bem-sucedida — e nada chega nunca. Nem o veredito de
+configuração pegava: as duas pontas da comparação dele saem desse mesmo campo.
+
+### O que entrou
+
+`config/waWebhookPath.js`, com uma constante e uma regra:
+
+- **só a origem** (o que a tela pede) recebe o caminho do painel e vira um
+  endereço que funciona;
+- um caminho que **já termina** no do painel passa intacto — é o que mantém de
+  pé quem serve o painel sob um prefixo (`/painel/api/whatsapp-webhook`);
+- qualquer outro caminho é **recusado**, com o sufixo escrito na mensagem.
+
+Recusar e não corrigir em silêncio: reescrever o que alguém digitou de propósito
+quebraria quem roteia um caminho próprio para cá, e a recusa com o sufixo na
+mensagem custa uma leitura.
+
+E `app.js` passou a montar a rota **pela constante**, não por um literal: o
+caminho atendido e o endereço conferido saem do mesmo lugar. A tela também foi
+corrigida — exemplo e ajuda agora mostram o endereço inteiro.
+
+### O inventário de rotas teve de aprender a constante
+
+Ele lê `app.js` como **texto** e só reconhecia literais. Trocar o literal pela
+constante o fez parar de ver a montagem do webhook — e um roteador que ele não
+vê é um roteador público que ele não conta, que é o oposto do que ele existe
+para fazer. Agora resolve a constante no módulo dela, e **lança** quando não
+consegue: sumir em silêncio é o modo de falha que não pode existir aqui.
+Conferido revertendo — uma montagem por constante acima do `resolveTenant`
+derruba o caso.
+
+### O que NÃO entra
+
+- **Reescrever o valor já gravado nos installs.** Ele é consertado quando o
+  operador edita e salva, e a volta é quem manda ele ir lá. Uma migração
+  mexendo em configuração de produção pelas costas de quem opera é mais do que
+  esta correção precisa.

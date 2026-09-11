@@ -95,6 +95,56 @@ describe('whatsapp configuration', () => {
     }
   });
 
+  /**
+   * O campo pedia um host e o código exigia um endereço completo.
+   *
+   * O rótulo dizia "URL pública", o exemplo mostrava `https://painel.exemplo.com`
+   * sem caminho nenhum, e a ajuda falava só de hostname. Quem seguia a tela
+   * gravava um endereço apontando para a RAIZ do painel: o POST do Evolution
+   * cai no frontend, que responde 200 com HTML, o servidor registra entrega
+   * bem-sucedida — e nada chega nunca. Aconteceu num painel em produção e só
+   * apareceu quando a volta respondeu "o host está certo e o caminho não".
+   */
+  it('completa o caminho do webhook quando só o host é digitado', async () => {
+    const salvar = (webhookBaseUrl) => call(`${panelUrl}/api/whatsapp/config`, {
+      method: 'PUT',
+      headers: authHeaders(token),
+      body: { webhookBaseUrl }
+    });
+
+    for (const digitado of ['https://painel.tr69.com.br', 'https://painel.tr69.com.br/']) {
+      const { status, body } = await salvar(digitado);
+      assert.equal(status, 200, digitado);
+      assert.equal(body.data.webhookBaseUrl, 'https://painel.tr69.com.br/api/whatsapp-webhook');
+    }
+  });
+
+  it('deixa passar o painel servido sob um prefixo', async () => {
+    // Quem serve o painel atrás de um proxy em `/painel` tem um endereço que
+    // já termina no caminho certo. Acrescentar outra vez o quebraria.
+    const { status, body } = await call(`${panelUrl}/api/whatsapp/config`, {
+      method: 'PUT',
+      headers: authHeaders(token),
+      body: { webhookBaseUrl: 'https://tr69.com.br/painel/api/whatsapp-webhook' }
+    });
+    assert.equal(status, 200);
+    assert.equal(body.data.webhookBaseUrl, 'https://tr69.com.br/painel/api/whatsapp-webhook');
+  });
+
+  it('RECUSA um caminho que não é o do painel, em vez de reescrevê-lo', async () => {
+    // `/api/whatsapp/webhook` com barra no lugar do hífen: o erro que dá 404 em
+    // toda entrega. Recusar com o sufixo na mensagem custa uma leitura;
+    // corrigir em silêncio quebraria quem roteia um caminho próprio para cá.
+    const { status, body } = await call(`${panelUrl}/api/whatsapp/config`, {
+      method: 'PUT',
+      headers: authHeaders(token),
+      body: { webhookBaseUrl: 'https://painel.tr69.com.br/api/whatsapp/webhook' }
+    });
+    assert.equal(status, 400);
+    assert.equal(body.code, 'invalid_webhook_url');
+    assert.match(body.message, /\/api\/whatsapp-webhook/);
+  });
+
   it('rejects a portal URL under its own code, so the form knows which field', async () => {
     for (const portalPublicUrl of ['ftp://p/portal', 'https://user:pass@p/portal', 'nao-e-url']) {
       const { status, body } = await call(`${panelUrl}/api/whatsapp/config`, {

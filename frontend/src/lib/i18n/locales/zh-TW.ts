@@ -1215,7 +1215,7 @@ const zhTW: Dictionary = {
   'settings.whatsapp.statusInactive': '整合未啟用',
   'settings.whatsapp.enable': '啟用 WhatsApp 整合',
   'settings.whatsapp.webhookUrl': '公開 Webhook 位址',
-  'settings.whatsapp.webhookUrlHint': 'Evolution 伺服器連線至本面板的位址，必須能從網際網路存取。面板無法推測您的通道或反向 Proxy 的主機名稱。',
+  'settings.whatsapp.webhookUrlHint': 'Evolution 伺服器透過哪裡抵達本面板 —— 請填寫完整位址，以 /api/whatsapp-webhook 結尾。只填主機時面板會自動補上路徑。該位址必須可從網際網路存取：面板無法猜測你的通道或反向代理的主機名稱。',
   'settings.whatsapp.portalUrl': '客戶入口網站位址',
   'settings.whatsapp.portalUrlHint': '用戶從外部存取客戶入口網站的位址。凡是需要密碼的操作（查看 Wi-Fi 金鑰、變更網路名稱、重新啟動 ONT），機器人都會傳送此連結。留空時，機器人會轉交專人處理，而不是傳送一個打不開的連結。它與上方的位址不同：除非有反向 Proxy 統一入口，入口網站是執行在獨立連接埠上的另一個應用程式。',
   'settings.whatsapp.allowedHosts': '允許的伺服器',

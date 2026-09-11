@@ -18,6 +18,36 @@ const SRC = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 
 
 const METHODS = ['get', 'post', 'put', 'patch', 'delete'];
 
+/**
+ * As constantes de caminho que `app.js` importa, resolvidas no módulo delas.
+ *
+ * Um prefixo de montagem pode ser uma constante em vez de um literal, e há um
+ * motivo para isso: o caminho do webhook é conferido contra o endereço público
+ * que o operador digita, e as duas pontas divergirem foi uma falha real — o
+ * painel atendia em `/api/whatsapp-webhook` e aceitava sem reclamar um endereço
+ * apontando para outro lugar. Ler só literais aqui obrigaria a repetir o
+ * caminho, que é exatamente o que a constante existe para evitar.
+ *
+ * @returns {Map<string, string>} nome da constante → valor
+ */
+function readPathConstants(text) {
+  const valores = new Map();
+  for (const m of text.matchAll(/^import \{([^}]+)\} from '(\.\/[\w/]+)\.js';/gm)) {
+    const nomes = m[1].split(',').map((n) => n.trim()).filter(Boolean);
+    let fonte;
+    try {
+      fonte = fs.readFileSync(path.join(SRC, `${m[2].slice(2)}.js`), 'utf8');
+    } catch {
+      continue;
+    }
+    for (const nome of nomes) {
+      const achado = new RegExp(`^export const ${nome} = '([^']*)';`, 'm').exec(fonte);
+      if (achado) valores.set(nome, achado[1]);
+    }
+  }
+  return valores;
+}
+
 /** `app.use('/api/x', yRoutes)` → [{ app, prefix, importName }]. */
 function readMounts() {
   const text = fs.readFileSync(path.join(SRC, 'app.js'), 'utf8');
@@ -25,11 +55,17 @@ function readMounts() {
   for (const m of text.matchAll(/^import (\w+) from '\.\/routes\/(\w+)\.js';/gm)) {
     imports.set(m[1], m[2]);
   }
+  const constantes = readPathConstants(text);
   const mounts = [];
-  for (const m of text.matchAll(/^\s*(app|portalApp)\.use\('(\/api[^']*)',\s*(\w+)\);/gm)) {
-    const file = imports.get(m[3]);
+  for (const m of text.matchAll(/^\s*(app|portalApp)\.use\((?:'(\/api[^']*)'|(\w+)),\s*(\w+)\);/gm)) {
+    const file = imports.get(m[4]);
     if (!file) continue;
-    mounts.push({ app: m[1], prefix: m[2], file });
+    const prefix = m[2] ?? constantes.get(m[3]);
+    // Uma constante que não resolveu some da lista, e some em silêncio — que é
+    // como uma rota pública deixaria de ser contada. Melhor quebrar aqui.
+    if (!prefix) throw new Error(`mount prefix ${m[3]} não resolveu em app.js`);
+    if (!prefix.startsWith('/api')) continue;
+    mounts.push({ app: m[1], prefix, file });
   }
   return mounts;
 }

@@ -43,6 +43,7 @@ import whatsappMessageRoutes from './routes/whatsappMessages.js';
 import whatsappAlertRoutes from './routes/whatsappAlerts.js';
 import whatsappBillingRoutes from './routes/whatsappBilling.js';
 import whatsappWebhookRoutes from './routes/whatsappWebhook.js';
+import { WA_WEBHOOK_PATH } from './config/waWebhookPath.js';
 import whatsappMediaRoutes from './routes/whatsappMedia.js';
 import { ATTACHMENT_PATH, attachmentRawBody } from './services/waAttachmentService.js';
 import provisioningRoutes from './routes/provisioning.js';
@@ -199,7 +200,11 @@ app.use(express.json({ limit: '1mb' }));
 // burst — a QR rotation every 20 s, one receipt per recipient per delivery
 // state — would trip a 300/min bucket sized for a human clicking around. It
 // declares its own, much higher, ceiling instead.
-app.use('/api/whatsapp-webhook', whatsappWebhookRoutes);
+// O caminho vem da constante e não de um literal aqui: `whatsappConfigService`
+// confere contra ele o endereço público que o operador digita, e as duas
+// pontas divergirem é justamente a falha que essa conferência existe para
+// impedir.
+app.use(WA_WEBHOOK_PATH, whatsappWebhookRoutes);
 
 // Same reasoning, same place in the stack: the Evolution server fetches a
 // media file to send it, carrying a signed, short-lived token in its own query
