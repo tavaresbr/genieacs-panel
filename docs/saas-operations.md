@@ -81,8 +81,20 @@ O CI constrói a imagem e a sobe até `/api/health` responder (job `image`), ent
 Um deploy novo tem um provedor (`default`) e ninguém dentro. Abra
 `https://default.painel.exemplo.com`, e o assistente de instalação cria o primeiro
 `owner`. Na edição SaaS esse primeiro usuário entra também em `platform_admins`: é a
-chave do console. Depois disso ninguém mais ganha o plano de controle sozinho — é
-inserção na tabela, de propósito.
+chave do console. Daí em diante, quem já está no cadastro concede a outros pela aba
+**Acesso à plataforma** do console — ninguém ganha o plano de controle sozinho, e a
+concessão fica na trilha com quem deu a quem.
+
+**Num install que começou self-hosted e virou SaaS**, `platform_admins` está vazia e
+nenhuma migração promove ninguém — de propósito: um upgrade não pode transformar o
+administrador local de um ISP em operador da plataforma. Aí a primeira chave é uma
+inserção na mão, uma vez:
+
+```sql
+INSERT INTO platform_admins (user_id) SELECT id FROM users WHERE username = 'quem-opera';
+```
+
+Depois disso o console se administra sozinho.
 
 ## 2. Ver: logs
 
@@ -185,6 +197,22 @@ provedor foi apagado" sobreviver ao provedor.
 A assinatura é outra chave: `suspended`/`canceled` na assinatura derruba o painel e o
 portal com 402 e mantém tudo no banco; `past_due` deixa ler. Um provedor inadimplente
 não precisa ter o alerta de ONT caída parado.
+
+### O console por dentro
+
+Quatro abas em `/platform`:
+
+- **Provedores** — criar, suspender, reativar, apagar, ver e mudar a equipe e a
+  assinatura de cada um, e abrir o painel de um cliente em modo leitura.
+- **Planos** — o catálogo: criar, editar preço, limites e período de teste, ativar e
+  desativar. **O código de um plano não muda depois de criado** (é por ele que as
+  assinaturas apontam), e mudar um plano só vale para quem assinar DEPOIS: a assinatura
+  guarda o plano, não uma cópia dos números dele. Desativar não apaga — some da lista de
+  escolha e continua valendo para quem já assina, que é como se para de vender um plano
+  sem mexer em contrato de ninguém. Por isso não há botão de excluir plano.
+- **Acesso à plataforma** — quem tem o plano de controle. O último não pode ser
+  removido: um cadastro vazio tranca todo mundo para fora e só SQL recupera.
+- **Trilha da plataforma** — o que a plataforma fez com cada provedor, paginado.
 
 ## 6. Trocar segredos
 
