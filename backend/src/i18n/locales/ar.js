@@ -617,5 +617,18 @@ export default {
   'auth.emailVerified': 'تم التحقق من عنوان البريد الإلكتروني',
   'auth.emailVerifyMailSubject': 'أكّد بريدك الإلكتروني في {provider}',
   'auth.emailVerifyMailBody': 'أكّد أن هذا العنوان يخصّك حتى تتمكن من إعادة تعيين كلمة مرورك في {provider} عند الحاجة.\n\nافتح الرابط أدناه. يعمل مرة واحدة وصالح لمدة {hours} ساعة:\n\n{link}\n\nإن لم تكن أنت من سجّل هذا العنوان، تجاهل هذه الرسالة.',
+  // سجل وحدة التحكم نفسها: من يملك مفتاح المملكة.
+  'platformAdmin.listed': 'تم جلب مسؤولي المنصة بنجاح',
+  'platformAdmin.listFailed': 'تعذر سرد مسؤولي المنصة',
+  'platformAdmin.identifierRequired': 'أدخل اسم المستخدم أو البريد الإلكتروني',
+  'platformAdmin.personNotFound': 'لا يوجد هذا الشخص في هذا التثبيت',
+  'platformAdmin.granted': 'تم منح مستوى التحكم',
+  'platformAdmin.alreadyGranted': 'هذا الشخص يملك مستوى التحكم بالفعل',
+  'platformAdmin.grantFailed': 'تعذر منح مستوى التحكم',
+  'platformAdmin.invalidId': 'معرّف الشخص غير صالح',
+  'platformAdmin.notAnAdmin': 'هذا الشخص لا يملك مستوى التحكم',
+  'platformAdmin.lastOne': 'يجب أن يحتفظ مستوى التحكم بمسؤول واحد على الأقل: إزالة الأخير تغلق وحدة التحكم في وجه الجميع إلى الأبد، ولا يمكن استعادتها إلا بالوصول المباشر إلى قاعدة البيانات. امنحه لشخص آخر أولاً.',
+  'platformAdmin.revoked': 'تم سحب مستوى التحكم',
+  'platformAdmin.revokeFailed': 'تعذر سحب مستوى التحكم',
 
 };

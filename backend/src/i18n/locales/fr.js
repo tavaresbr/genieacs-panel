@@ -621,5 +621,18 @@ export default {
   'auth.emailVerified': 'Adresse e-mail vérifiée',
   'auth.emailVerifyMailSubject': 'Confirmez votre e-mail sur {provider}',
   'auth.emailVerifyMailBody': 'Confirmez que cette adresse est bien la vôtre pour pouvoir réinitialiser votre mot de passe sur {provider} le jour où vous en aurez besoin.\n\nOuvrez le lien ci-dessous. Il sert une seule fois et reste valable {hours} heures :\n\n{link}\n\nSi vous n\'avez pas enregistré cette adresse, ignorez ce message.',
+  // Le registre de la console elle-même : qui détient la clé du royaume.
+  'platformAdmin.listed': 'Administrateurs de la plateforme récupérés avec succès',
+  'platformAdmin.listFailed': 'Échec de la récupération des administrateurs de la plateforme',
+  'platformAdmin.identifierRequired': 'Indiquez le nom d\'utilisateur ou l\'adresse e-mail',
+  'platformAdmin.personNotFound': 'Cette personne n\'existe pas sur cette installation',
+  'platformAdmin.granted': 'Plan de contrôle accordé',
+  'platformAdmin.alreadyGranted': 'Cette personne détient déjà le plan de contrôle',
+  'platformAdmin.grantFailed': 'Échec de l\'octroi du plan de contrôle',
+  'platformAdmin.invalidId': 'Identifiant de personne invalide',
+  'platformAdmin.notAnAdmin': 'Cette personne ne détient pas le plan de contrôle',
+  'platformAdmin.lastOne': 'Le plan de contrôle doit conserver au moins un administrateur : retirer le dernier verrouille tout le monde hors de la console pour toujours, et seul un accès direct à la base de données permet de revenir. Accordez-le d\'abord à quelqu\'un d\'autre.',
+  'platformAdmin.revoked': 'Plan de contrôle révoqué',
+  'platformAdmin.revokeFailed': 'Échec de la révocation du plan de contrôle',
 
 };

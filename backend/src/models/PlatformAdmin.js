@@ -10,11 +10,43 @@ import { getDb } from '../config/database.js';
  * which is not a question this level has an answer to. There is no `tenant_id`
  * on the table for the same reason.
  *
- * The surface is deliberately four methods wide — is this person one, add one,
- * remove one, list them. The roster is an authority, not a resource; anything
- * richer would be the control-plane API, which belongs to the routes built on
- * top of this rather than here.
+ * The surface is deliberately narrow — is this person one, add one, remove one,
+ * list them. The roster is an authority, not a resource; anything richer would
+ * be the control-plane API, which belongs to the routes built on top of this
+ * rather than here.
+ *
+ * A onda que abriu `/api/platform/admins` acrescentou dois métodos a essa
+ * lista, e vale escrever por que eles são daqui e não do controlador que os
+ * chama:
+ *
+ * - `find` porque a tela do console mostra a LINHA do cadastro — nome, endereço
+ *   e desde quando — e montá-la no controlador seria escrever lá o mesmo join
+ *   que `list` já escreve aqui. Duas cópias divergem no dia em que a coluna
+ *   mudar, e a que diverge é sempre a que ninguém está olhando.
+ * - `removeUnlessLast` porque "o cadastro nunca fica vazio" é invariante DA
+ *   TABELA, não regra de uma rota. Escrita como um `if` antes da remoção, ela
+ *   vira uma contagem e depois uma remoção, com um intervalo no meio onde cabe
+ *   a remoção do outro — e dois pedidos simultâneos tirando os dois últimos
+ *   passariam os dois. Ver o método para como a contagem e a remoção viram um
+ *   ato só.
  */
+
+/**
+ * O que o console mostra de quem está no cadastro.
+ *
+ * O endereço entra junto com o nome porque numa instalação com dezenas de
+ * operadores o nome sozinho não identifica ninguém — e é pelo endereço que a
+ * concessão costuma ser pedida, já que é por ele que a pessoa é conhecida
+ * desde que `users.email` existe. Nada além disso: a senha está a uma coluna de
+ * distância desta consulta e não tem por que atravessá-la.
+ */
+const COLUNAS = Object.freeze([
+  'users.id',
+  'users.username',
+  'users.email',
+  'platform_admins.created_at'
+]);
+
 class PlatformAdmin {
   /**
    * Whether this person holds the control plane, right now.
@@ -89,6 +121,72 @@ class PlatformAdmin {
   }
 
   /**
+   * A linha do cadastro de uma pessoa, ou null.
+   *
+   * `has` responde a mesma pergunta e continua sendo o que as guardas usam, de
+   * propósito: quem autoriza não deve ter em mãos uma linha de onde tirar mais
+   * nada. Esta é para a TELA — devolve daquela pessoa exatamente o que a lista
+   * devolveria dela, para que a resposta de uma concessão tenha a forma de um
+   * item da lista e o console não precise recarregá-la inteira para mostrar a
+   * linha que acabou de nascer.
+   */
+  static async find(userId) {
+    const id = Number(userId);
+    if (!Number.isInteger(id) || id <= 0) return null;
+    const row = await getDb()('platform_admins')
+      .join('users', 'users.id', 'platform_admins.user_id')
+      .where('platform_admins.user_id', id)
+      .first(COLUNAS);
+    return row || null;
+  }
+
+  /**
+   * Tira uma pessoa do cadastro, a não ser que ela seja a última.
+   * Devolve `'removed'`, `'absent'` ou `'last'`.
+   *
+   * Um cadastro vazio tranca todo mundo para fora do plano de controle **para
+   * sempre**: a guarda relê esta tabela a cada requisição, não há rota que
+   * conceda sem já estar nela, e a única volta é `INSERT` no banco por quem
+   * tiver o servidor. Por isso a recusa mora aqui embaixo e não na rota — quem
+   * chamar `remove` direto continua podendo esvaziar a tabela, e é justamente
+   * por isso que `remove` segue existindo: o script de manutenção, rodado por
+   * quem tem o servidor na mão, é o dono legítimo dessa saída.
+   *
+   * **A contagem e a remoção são um ato só**, e é isso que a transação com
+   * `forUpdate` compra. Escritas como duas — contar, decidir, remover — dois
+   * pedidos simultâneos tirando os dois últimos leem "somos dois" cada um antes
+   * de o outro apagar, e os dois passam. Nenhuma variante sem trava resolve
+   * isso, inclusive a tentadora `DELETE ... WHERE EXISTS (outro)`: sob MVCC a
+   * subconsulta de cada uma enxerga a linha que a outra ainda não confirmou, e
+   * as duas apagam do mesmo jeito.
+   *
+   * `forUpdate` sobre o cadastro inteiro — que tem dezenas de linhas, não
+   * milhões — trava as linhas existentes no Postgres e no MySQL: a segunda
+   * transação espera a primeira confirmar, relê o que sobrou e é ela quem
+   * recebe `'last'`. No SQLite o `FOR UPDATE` não existe e o knex o compila
+   * para nada; lá quem serializa é o lock de escritor do arquivo, e a perdedora
+   * falha com "database is locked" em vez de apagar. Errar para o lado do erro
+   * é aceitável; errar para o lado do cadastro vazio não é.
+   *
+   * O que `FOR UPDATE` não tranca é um `INSERT` concorrente — ele prende as
+   * linhas que existem, não as que vão nascer. Inofensivo na direção que
+   * importa: uma concessão em voo só pode fazer esta recusa ser conservadora
+   * demais, e quem a receber tenta de novo.
+   */
+  static async removeUnlessLast(userId) {
+    const id = Number(userId);
+    if (!Number.isInteger(id) || id <= 0) return 'absent';
+
+    return getDb().transaction(async (trx) => {
+      const cadastro = await trx('platform_admins').select('user_id').forUpdate();
+      if (!cadastro.some((linha) => Number(linha.user_id) === id)) return 'absent';
+      if (cadastro.length <= 1) return 'last';
+      await trx('platform_admins').where({ user_id: id }).del();
+      return 'removed';
+    });
+  }
+
+  /**
    * Everyone on the roster, with the person's name joined on.
    *
    * An unfiltered read of a whole table, which everywhere else in this codebase
@@ -101,11 +199,7 @@ class PlatformAdmin {
     return getDb()('platform_admins')
       .join('users', 'users.id', 'platform_admins.user_id')
       .orderBy('users.username', 'asc')
-      .select(
-        'users.id',
-        'users.username',
-        'platform_admins.created_at'
-      );
+      .select(COLUNAS);
   }
 }
 

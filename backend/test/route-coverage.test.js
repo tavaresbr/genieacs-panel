@@ -126,6 +126,11 @@ const POR_ID = new Map([
   ['GET /api/platform/tenants/:id/members', 'plano de controle; prova em platform-members.test.js'],
   ['POST /api/platform/tenants/:id/members', 'plano de controle; prova em platform-members.test.js'],
   ['DELETE /api/platform/tenants/:id/members/:userId', 'plano de controle; prova em platform-members.test.js'],
+  // O id aqui não é de linha de provedor nenhum: é o da PESSOA no cadastro do
+  // plano de controle, que é tabela compartilhada e não tem `tenant_id` para o
+  // vizinho alcançar. O que se prova é o mesmo das outras: quem não está no
+  // cadastro recebe 404 — e, junto, que o último não sai.
+  ['DELETE /api/platform/admins/:userId', 'plano de controle; prova em platform-admins.test.js'],
   ['PATCH /api/platform/plans/:id', 'plano de controle; prova em platform-billing.test.js'],
   ['GET /api/platform/tenants/:id/subscription', 'plano de controle; prova em platform-billing.test.js'],
   ['PUT /api/platform/tenants/:id/subscription', 'plano de controle; prova em platform-billing.test.js'],
@@ -220,15 +225,63 @@ describe('toda rota endereçada por um parâmetro', () => {
     assert.deepEqual(orfas, [], 'entrada em POR_ID sem rota correspondente');
   });
 
-  // Um teto, não uma meta: o número só pode cair. Declarar motivo é mais fácil
-  // do que escrever caso, e sem esta linha o caminho fácil não custa nada —
-  // baixar o teto junto com uma exceção nova é o pedágio de quem toma esse
-  // caminho, e é o que faz alguém pensar duas vezes.
+  // Um teto, não uma meta. Declarar motivo é mais fácil do que escrever caso, e
+  // sem esta linha o caminho fácil não custa nada — baixar o teto junto com uma
+  // exceção nova é o pedágio de quem toma esse caminho, e é o que faz alguém
+  // pensar duas vezes.
   //
-  // As 41 de hoje são, todas: id de aparelho no GenieACS (20), chave natural
+  // **O teto subiu de 41 para 42, e é a primeira vez.** Vale registrar por quê,
+  // porque a regra original dizia que o número só podia cair e isso deixou de
+  // ser verdade aqui. A rota nova é `DELETE /api/platform/admins/:userId`: o id
+  // é de uma PESSOA no cadastro do plano de controle, tabela compartilhada, sem
+  // `tenant_id` para o vizinho alcançar. O pedágio era escrever um caso na
+  // varredura, e a varredura prova vazamento ENTRE PROVEDORES — não há caso a
+  // escrever, porque não há provedor nenhum nesta rota. Pagar noutra moeda
+  // (converter uma exceção alheia) seria empurrar trabalho sem relação nenhuma
+  // para dentro desta mudança.
+  //
+  // O que fecha a porta que isso abriria está logo abaixo: as exceções do
+  // console passam a ser contadas à parte, e o número que de fato importa — o
+  // das rotas endereçadas por id de LINHA DE PROVEDOR — continua só podendo
+  // cair. Uma rota nova do console custa uma linha em `DO_CONSOLE`, onde
+  // qualquer um a vê; uma rota nova de provedor continua custando um caso.
+  //
+  // As 42 de hoje são, todas: id de aparelho no GenieACS (20), chave natural
   // que os dois provedores têm igual (7), anexo por token assinado (2), token
-  // de convite (2) e o plano de controle (10).
-  const TETO_DE_EXCECOES = 41;
+  // de convite (2) e o plano de controle (11).
+  const TETO_DE_EXCECOES = 42;
+
+  /**
+   * As exceções que são do plano de controle, nomeadas uma a uma.
+   *
+   * Estão aqui, e não numa contagem, para que acrescentar uma seja um ato
+   * visível: quem lê a lista vê exatamente quais rotas do console não passam
+   * pela varredura, e por que nenhuma delas poderia passar — todas são
+   * endereçadas por id de tabela compartilhada (`plans`, `users`,
+   * `platform_admins`) ou por id de provedor visto de CIMA, que é o único
+   * lugar do produto onde olhar o provedor pelo id é o trabalho e não o
+   * vazamento.
+   */
+  const DO_CONSOLE = new Set([
+    'DELETE /api/platform/tenants/:id',
+    'PATCH /api/platform/tenants/:id',
+    'POST /api/platform/tenants/:id/impersonate',
+    'GET /api/platform/tenants/:id/members',
+    'POST /api/platform/tenants/:id/members',
+    'DELETE /api/platform/tenants/:id/members/:userId',
+    'DELETE /api/platform/admins/:userId',
+    'PATCH /api/platform/plans/:id',
+    'GET /api/platform/tenants/:id/subscription',
+    'PUT /api/platform/tenants/:id/subscription',
+    'POST /api/platform/tenants/:id/payments',
+    'GET /api/platform/tenants/:id/usage'
+  ]);
+
+  // Este é o número que guarda o que a varredura existe para guardar, e ELE só
+  // pode cair. Uma rota nova endereçada por id de linha de provedor não tem
+  // como ser declarada sem alguém derrubar outra — que era a intenção desde o
+  // começo.
+  const TETO_FORA_DO_CONSOLE = 30;
 
   it('deixa de fora só as que têm motivo, e não mais do que hoje', () => {
     const naoVarridas = comParametro
@@ -236,6 +289,23 @@ describe('toda rota endereçada por um parâmetro', () => {
       .map(chave);
     assert.ok(naoVarridas.length <= TETO_DE_EXCECOES,
       `${naoVarridas.length} rotas com id fora da varredura, e o teto é ${TETO_DE_EXCECOES}:\n  ${naoVarridas.join('\n  ')}`);
+  });
+
+  it('e as que não são do console não passam do teto delas, que só cai', () => {
+    const foraDoConsole = comParametro
+      .filter((r) => POR_ID.get(chave(r)) !== 'varredura')
+      .map(chave)
+      .filter((k) => !DO_CONSOLE.has(k));
+    assert.ok(foraDoConsole.length <= TETO_FORA_DO_CONSOLE,
+      `${foraDoConsole.length} rotas de provedor com id fora da varredura, e o teto é `
+      + `${TETO_FORA_DO_CONSOLE}. Escreva o caso na varredura, ou derrube outra exceção `
+      + `para abrir espaço:\n  ${foraDoConsole.join('\n  ')}`);
+  });
+
+  it('e a lista do console não guarda rota que não existe mais', () => {
+    const atuais = new Set(comParametro.map(chave));
+    const orfas = [...DO_CONSOLE].filter((k) => !atuais.has(k));
+    assert.deepEqual(orfas, [], 'entrada em DO_CONSOLE sem rota correspondente');
   });
 });
 

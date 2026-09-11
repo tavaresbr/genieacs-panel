@@ -628,5 +628,18 @@ export default {
   'auth.emailVerified': '이메일 주소가 인증되었습니다',
   'auth.emailVerifyMailSubject': '{provider} 이메일 주소 확인',
   'auth.emailVerifyMailBody': '필요할 때 {provider}의 비밀번호를 재설정할 수 있도록 이 주소가 회원님의 것임을 확인해 주세요.\n\n아래 링크를 여세요. 링크는 한 번만 사용할 수 있으며 {hours}시간 동안 유효합니다:\n\n{link}\n\n이 주소를 등록한 적이 없다면 이 메일을 무시하세요.',
+  // 콘솔 자체의 명단: 왕국의 열쇠를 쥔 사람.
+  'platformAdmin.listed': '플랫폼 관리자를 가져왔습니다',
+  'platformAdmin.listFailed': '플랫폼 관리자 목록을 가져오지 못했습니다',
+  'platformAdmin.identifierRequired': '사용자 이름 또는 이메일 주소를 입력하세요',
+  'platformAdmin.personNotFound': '이 설치에는 해당 사용자가 없습니다',
+  'platformAdmin.granted': '컨트롤 플레인 권한을 부여했습니다',
+  'platformAdmin.alreadyGranted': '이 사용자는 이미 컨트롤 플레인 권한이 있습니다',
+  'platformAdmin.grantFailed': '컨트롤 플레인 권한 부여에 실패했습니다',
+  'platformAdmin.invalidId': '잘못된 사용자 ID입니다',
+  'platformAdmin.notAnAdmin': '이 사용자에게는 컨트롤 플레인 권한이 없습니다',
+  'platformAdmin.lastOne': '컨트롤 플레인에는 관리자가 최소 한 명은 있어야 합니다. 마지막 한 명을 제거하면 모두가 영구히 콘솔에서 차단되고 데이터베이스를 직접 손대야만 복구할 수 있습니다. 먼저 다른 사람에게 부여하세요.',
+  'platformAdmin.revoked': '컨트롤 플레인 권한을 회수했습니다',
+  'platformAdmin.revokeFailed': '컨트롤 플레인 권한 회수에 실패했습니다',
 
 };

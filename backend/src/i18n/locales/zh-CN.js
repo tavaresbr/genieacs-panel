@@ -625,5 +625,18 @@ export default {
   'auth.emailVerified': '邮箱地址已验证',
   'auth.emailVerifyMailSubject': '确认您在 {provider} 的邮箱',
   'auth.emailVerifyMailBody': '请确认此邮箱属于您，以便日后需要时可以重置您在 {provider} 的密码。\n\n打开下面的链接。该链接仅可使用一次，有效期 {hours} 小时：\n\n{link}\n\n如果不是您登记的此邮箱，请忽略此邮件。',
+  // 控制台自身的名册：谁握有王国的钥匙。
+  'platformAdmin.listed': '平台管理员获取成功',
+  'platformAdmin.listFailed': '无法列出平台管理员',
+  'platformAdmin.identifierRequired': '请填写用户名或电子邮箱',
+  'platformAdmin.personNotFound': '本部署中没有这个人',
+  'platformAdmin.granted': '已授予控制平面权限',
+  'platformAdmin.alreadyGranted': '此人已拥有控制平面权限',
+  'platformAdmin.grantFailed': '授予控制平面权限失败',
+  'platformAdmin.invalidId': '无效的用户 ID',
+  'platformAdmin.notAnAdmin': '此人没有控制平面权限',
+  'platformAdmin.lastOne': '控制平面必须至少保留一名管理员：移除最后一名会把所有人永久挡在控制台之外，只有直接操作数据库才能恢复。请先授予他人。',
+  'platformAdmin.revoked': '已撤销控制平面权限',
+  'platformAdmin.revokeFailed': '撤销控制平面权限失败',
 
 };

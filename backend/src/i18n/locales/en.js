@@ -625,5 +625,18 @@ export default {
   'auth.emailVerified': 'Email address verified',
   'auth.emailVerifyMailSubject': 'Confirm your email at {provider}',
   'auth.emailVerifyMailBody': 'Confirm that this address is yours so you can reset your password at {provider} when you need to.\n\nOpen the link below. It works once and is valid for {hours} hours:\n\n{link}\n\nIf you did not register this address, ignore this message.',
+  // The console's own roster: who holds the key to the kingdom.
+  'platformAdmin.listed': 'Platform administrators retrieved successfully',
+  'platformAdmin.listFailed': 'Failed to list the platform administrators',
+  'platformAdmin.identifierRequired': 'A username or an email address is required',
+  'platformAdmin.personNotFound': 'No such person on this deployment',
+  'platformAdmin.granted': 'Control plane granted',
+  'platformAdmin.alreadyGranted': 'This person already holds the control plane',
+  'platformAdmin.grantFailed': 'Failed to grant the control plane',
+  'platformAdmin.invalidId': 'Invalid person id',
+  'platformAdmin.notAnAdmin': 'This person does not hold the control plane',
+  'platformAdmin.lastOne': 'The control plane must keep at least one administrator: removing the last one locks everybody out of the console for good, and only direct database access brings it back. Grant it to somebody else first.',
+  'platformAdmin.revoked': 'Control plane revoked',
+  'platformAdmin.revokeFailed': 'Failed to revoke the control plane',
 
 };

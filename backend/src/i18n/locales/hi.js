@@ -625,5 +625,18 @@ export default {
   'auth.emailVerified': 'ईमेल पता सत्यापित हो गया',
   'auth.emailVerifyMailSubject': '{provider} पर अपना ईमेल पुष्ट करें',
   'auth.emailVerifyMailBody': 'पुष्टि करें कि यह पता आपका है, ताकि ज़रूरत पड़ने पर आप {provider} पर अपना पासवर्ड रीसेट कर सकें।\n\nनीचे दिया लिंक खोलें। यह एक बार काम करता है और {hours} घंटे तक मान्य है:\n\n{link}\n\nयदि यह पता आपने दर्ज नहीं किया, तो इस संदेश को अनदेखा करें।',
+  // कंसोल की अपनी सूची: राज्य की चाबी किसके पास है।
+  'platformAdmin.listed': 'प्लेटफ़ॉर्म प्रशासक प्राप्त हुए',
+  'platformAdmin.listFailed': 'प्लेटफ़ॉर्म प्रशासकों की सूची नहीं मिल सकी',
+  'platformAdmin.identifierRequired': 'उपयोगकर्ता नाम या ईमेल पता आवश्यक है',
+  'platformAdmin.personNotFound': 'इस इंस्टॉलेशन में ऐसा कोई व्यक्ति नहीं है',
+  'platformAdmin.granted': 'नियंत्रण तल प्रदान किया गया',
+  'platformAdmin.alreadyGranted': 'इस व्यक्ति के पास पहले से नियंत्रण तल है',
+  'platformAdmin.grantFailed': 'नियंत्रण तल देने में विफल',
+  'platformAdmin.invalidId': 'अमान्य व्यक्ति आईडी',
+  'platformAdmin.notAnAdmin': 'इस व्यक्ति के पास नियंत्रण तल नहीं है',
+  'platformAdmin.lastOne': 'नियंत्रण तल में कम से कम एक प्रशासक रहना चाहिए: अंतिम को हटाने पर सभी हमेशा के लिए कंसोल से बाहर हो जाते हैं, और केवल डेटाबेस तक सीधी पहुँच से ही वापसी संभव है। पहले किसी और को दें।',
+  'platformAdmin.revoked': 'नियंत्रण तल वापस लिया गया',
+  'platformAdmin.revokeFailed': 'नियंत्रण तल वापस लेने में विफल',
 
 };
