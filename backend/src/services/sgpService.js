@@ -164,6 +164,17 @@ function normalizeKey(key) {
     .replace(/[^a-z0-9]/g, '');
 }
 
+/**
+ * A PPPoE login as something to compare, not to display.
+ *
+ * The two sides are written by different systems — one is what the ONT
+ * reports, the other what the ERP stored — so case and stray spacing differ
+ * between them routinely and mean nothing.
+ */
+function normalizeLogin(value) {
+  return String(value ?? '').trim().toLowerCase();
+}
+
 // SGP field names differ between releases and between provider setups
 // (`linhadigitavel`, `linha_digitavel`, `linhaDigitavel`), so every read goes
 // through a normalized lookup instead of a fixed key.
@@ -1078,6 +1089,22 @@ class SgpService {
     return now - syncedAt >= LINK_CACHE_TTL_MS;
   }
 
+  /**
+   * The login the ONT reports, or null — never an error.
+   *
+   * A GenieACS that is unreachable must not turn "this ONT has no contract
+   * yet" into a failed page: the caller falls back to having no identifier,
+   * which is the state it was already handling.
+   */
+  static async reportedPppoeLogin(deviceId) {
+    try {
+      return await DeviceService.getReportedPppoe(deviceId);
+    } catch (error) {
+      console.warn(`Unable to read the reported PPPoE login of ${deviceId}: ${error.message}`);
+      return null;
+    }
+  }
+
   // Resolves the SGP contract bound to a panel device. A stored link always
   // wins; otherwise the configured link mode decides which identifier is sent
   // to the SGP lookup, and a successful match is cached in sgp_links.
@@ -1097,20 +1124,54 @@ class SgpService {
     }
 
     const usable = staleOwner ? null : stored;
-    if (usable && !refresh && !this.isLinkExpired(usable)) {
+    // Read off `usable`, not `stored`: a manual pin that belonged to the
+    // previous subscriber died with the link above, and this ONT is to be
+    // resolved afresh rather than reported as having no contract.
+    const manual = usable?.link_mode === 'manual' || config.linkMode === 'manual';
+
+    // The login the ONT itself reports, read only when it is the only
+    // identifier there is. The mode is called "the ONT's PPPoE login" and the
+    // panel has had it since the device listing learned to read it; making it
+    // wait for a customer account tied the SGP link to whether the operator
+    // wants generated Customer IDs, which is an unrelated decision about the
+    // subscriber portal. An account-backed device already carries a login, so
+    // this costs nothing there — and the portal, the one caller on a
+    // subscriber's critical path, always has an account.
+    const reportedLogin = !manual
+      && config.linkMode === 'pppoe'
+      && !normalizeLogin(account?.pppoe_username)
+      ? await this.reportedPppoeLogin(deviceId)
+      : null;
+
+    // The same protection where there is no account to compare. An ONT whose
+    // reported login no longer matches the contract on file is an ONT that
+    // changed hands, and the cached contract — with the invoices hanging off
+    // it — is the previous subscriber's. The row is left alone rather than
+    // deleted, so an operator's corrected phone survives being overwritten by
+    // the next successful lookup; it simply stops being an answer.
+    const staleLogin = Boolean(
+      usable
+      && !manual
+      && usable.account_id === null
+      && reportedLogin
+      && usable.login
+      && normalizeLogin(usable.login) !== normalizeLogin(reportedLogin)
+    );
+    const cacheable = Boolean(usable) && !staleLogin;
+
+    if (cacheable && !refresh && !this.isLinkExpired(usable)) {
       return { link: usable, account, source: 'cache' };
     }
 
-    const preferredContract = usable?.contract || null;
-    const manual = usable?.link_mode === 'manual' || config.linkMode === 'manual';
+    const preferredContract = cacheable ? usable.contract || null : null;
     const filters = manual
       ? { contract: preferredContract }
       : config.linkMode === 'customer_id'
         ? { contract: account?.customer_id }
-        : { login: account?.pppoe_username };
+        : { login: account?.pppoe_username || reportedLogin };
 
     if (!filters.contract && !filters.login) {
-      if (usable) return { link: usable, account, source: 'cache' };
+      if (cacheable) return { link: usable, account, source: 'cache' };
       throw new SgpError('sgp.error.deviceUnlinked', { code: 'unlinked', status: 404 });
     }
 
@@ -1126,7 +1187,7 @@ class SgpService {
     if (!contract) {
       // A stale cache is better than no answer, but only while it still
       // belongs to the subscriber holding the device.
-      if (usable) return { link: usable, account, source: 'cache' };
+      if (cacheable) return { link: usable, account, source: 'cache' };
       throw new SgpError('sgp.error.noContractForDevice', {
         code: 'not_found',
         status: 404
@@ -1239,7 +1300,48 @@ class SgpService {
     return stored ? 'updated' : 'created';
   }
 
-  // Fleet-wide refresh of every device that has a customer account.
+  /**
+   * Every device this run should try to link.
+   *
+   * The accounts, plus — in the mode that matches on the ONT's own login —
+   * the devices that have none. Without those the sweep only ever reaches
+   * devices some other feature happened to create an account for, and an
+   * operator who does not generate Customer IDs would see the contract column
+   * fill one ONT at a time, as someone opened each page.
+   *
+   * Shaped like accounts because that is all `syncAccount` reads: a device
+   * with no account carries a null id, which `contractToLinkRow` already
+   * stores — `sgp_links.account_id` has been nullable since the table existed.
+   */
+  static async syncTargets(config) {
+    const accounts = await CustomerAccount.getSyncTargets();
+    if (config.linkMode !== 'pppoe') return accounts;
+
+    let devices;
+    try {
+      devices = await DeviceService.getCustomerIdentityDevices();
+    } catch (error) {
+      // A sweep that reaches the accounts is worth more than no sweep.
+      console.warn(`SGP fleet sync could not read the ONT fleet: ${error.message}`);
+      return accounts;
+    }
+
+    const covered = new Set(accounts.map((account) => String(account.device_id)));
+    const extra = devices
+      .filter((device) => device._id
+        && !covered.has(String(device._id))
+        && normalizeLogin(device.pppoe))
+      .map((device) => ({
+        id: null,
+        device_id: device._id,
+        customer_id: null,
+        pppoe_username: device.pppoe
+      }));
+    return [...accounts, ...extra];
+  }
+
+  // Fleet-wide refresh of every device this install can identify — see
+  // `syncTargets` for which those are.
   // `linked` counts the devices that hold a link once the run is over, so it
   // also covers the ones whose refresh failed but whose cached link survived.
   // `skipped` covers devices with no identifier for the configured link mode
@@ -1248,12 +1350,12 @@ class SgpService {
   static async syncFleet() {
     const config = this.requireReady(await this.getConfig());
     const startedAt = new Date();
-    const accounts = await CustomerAccount.getSyncTargets();
+    const targets = await this.syncTargets(config);
     const stored = new Map(
       (await SgpLink.getAll()).map((link) => [link.device_id, link])
     );
     const summary = {
-      total: accounts.length,
+      total: targets.length,
       linked: 0,
       created: 0,
       updated: 0,
@@ -1263,8 +1365,8 @@ class SgpService {
 
     let cursor = 0;
     const worker = async () => {
-      while (cursor < accounts.length) {
-        const account = accounts[cursor];
+      while (cursor < targets.length) {
+        const account = targets[cursor];
         cursor += 1;
         const link = stored.get(account.device_id) || null;
         let outcome;
@@ -1282,7 +1384,7 @@ class SgpService {
       }
     };
     await Promise.all(Array.from(
-      { length: Math.min(SYNC_CONCURRENCY, accounts.length) },
+      { length: Math.min(SYNC_CONCURRENCY, targets.length) },
       () => worker()
     ));
 

@@ -106,6 +106,36 @@ describe('a cached SGP link', () => {
     assert.notEqual(link.client_name, 'Titular Anterior');
   });
 
+  /**
+   * A manual pin belongs to the subscriber it was made for. When the ONT
+   * changes hands the link above it is dropped, and what is left has to be
+   * resolved afresh for whoever holds the device now — not reported as having
+   * no contract because the dead pin left nothing to look up by.
+   */
+  it('re-resolves a manual link whose account changed, instead of going unlinked', async () => {
+    const device = `${DEVICE}-manual`;
+    const previousAccountId = await createAccount(device, 'antigo@isp', 'CSG-STALE02-234567');
+    await upsertLink({
+      device_id: device,
+      account_id: previousAccountId,
+      contract: '1111',
+      client_name: 'Titular Anterior',
+      document: '99999999999',
+      login: 'antigo@isp',
+      link_mode: 'manual'
+    });
+
+    await getDb()('customer_accounts').where({ id: previousAccountId }).update({
+      active: false, device_id: `retired:${previousAccountId}`, identity_hash: `retired:${previousAccountId}`
+    });
+    const newAccountId = await createAccount(device, 'outro@isp', 'CSG-FRESH02-234567');
+
+    const { link } = await resolveDeviceContract(device);
+    assert.equal(link.account_id, newAccountId);
+    assert.equal(link.contract, '9001');
+    assert.equal(link.link_mode, 'auto', 'the previous subscriber\'s pin does not survive them');
+  });
+
   it('is served from cache while it is still fresh', async () => {
     const before = lookups;
     await resolveDeviceContract(DEVICE);
