@@ -597,4 +597,11 @@ export default {
   'auth.signupInvalid': 'Se requieren nombre del proveedor, usuario (3–64) y contraseña (8–128)',
   'auth.signupSlugTaken': 'Este subdominio ya está en uso',
   'auth.signupUsernameTaken': 'Este nombre de usuario ya está en uso',
+  'auth.impersonationReadOnly': 'Esta es una sesión de soporte, solo de lectura. Nada puede modificarse desde ella.',
+  'auth.impersonationTicketRequired': 'El tique de suplantación es obligatorio',
+  'auth.impersonationTicketInvalid': 'Este enlace de suplantación ya no es válido. Genere otro desde la consola.',
+  'auth.impersonationStarted': 'Sesión de soporte iniciada',
+  'auth.impersonationFailed': 'No se pudo iniciar la sesión de soporte',
+  'invite.mailSubject': 'Le han invitado a {provider}',
+  'invite.mailBody': 'Le invitaron a unirse al equipo de {provider}.\n\nAbra el enlace de abajo para aceptar. Sirve una sola vez y solo para usted:\n\n{link}\n\nSi no esperaba esta invitación, ignore este mensaje.',
 };

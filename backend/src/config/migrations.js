@@ -326,6 +326,40 @@ const platformAdminsTable = (db) => (t) => {
 };
 
 /**
+ * O bilhete de personificação: como uma sessão do plano de controle chega ao
+ * navegador no endereço do provedor.
+ *
+ * O token da personificação NÃO viaja numa URL. Num deploy com subdomínio o
+ * console vive num host e o painel do provedor noutro, e as duas formas óbvias
+ * de atravessar essa fronteira são ruins: um JWT no query string entra em log
+ * de proxy, em histórico e em `Referer`; um cookie no domínio-pai desfaz
+ * justamente a garantia host-only que a Fase 2 conquistou. O bilhete é a
+ * terceira: um valor opaco de uso único, válido por um minuto, que o console
+ * põe no FRAGMENTO da URL — a parte que o navegador nunca manda ao servidor —
+ * e que a tela do provedor troca pelo token no host dela mesma.
+ *
+ * Guarda o hash e nunca o valor, como `tenant_invites` e pelo mesmo motivo: um
+ * bilhete é uma credencial enquanto vive. Compartilhada, não escopada, porque
+ * é cunhada ANTES de existir escopo — o plano de controle está acima dos
+ * provedores — e porque quem a lê para resgatar ainda não sabe de qual
+ * provedor ela é.
+ */
+const impersonationTicketsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.string('token_hash', 64).notNullable().unique();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  // Quem personifica. `CASCADE` porque um bilhete de alguém que deixou de
+  // existir não pode ser resgatado por ninguém.
+  t.integer('platform_user_id').unsigned().notNullable()
+    .references('id').inTable('users').onDelete('CASCADE');
+  t.timestamp('expires_at').notNullable();
+  t.timestamp('redeemed_at');
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  t.index(['expires_at'], 'impersonation_tickets_expiry_idx');
+};
+
+/**
  * O convite: como uma pessoa entra na equipe de um provedor sem que o
  * administrador escolha a senha dela.
  *
@@ -993,7 +1027,10 @@ const MEMBERSHIP_TABLES = [
   // Idem: aponta para `users` (quem fez) e para `tenants`.
   ['audit_log', auditLogTable],
   // Aponta para `users` e para mais nada — ver o comentário na fábrica.
-  ['platform_audit', platformAuditTable]
+  ['platform_audit', platformAuditTable],
+  // Idem: aponta para `users` (quem personifica) e para `tenants` (quem é
+  // personificado).
+  ['impersonation_tickets', impersonationTicketsTable]
 ];
 
 const INITIAL_TABLES = [
@@ -2331,6 +2368,28 @@ export const migrations = [
       if (first && !(await db('app_state').where({ tenant_id: first.id, key: 'tenant_name_migrated' }).first())) {
         await db('app_state').insert({ tenant_id: first.id, key: 'tenant_name_migrated', value: '1' });
       }
+    }
+  },
+  {
+    /**
+     * O bilhete de uso único que leva uma personificação do console ao painel
+     * do provedor. Ver a fábrica da tabela para o porquê de ele existir em vez
+     * de o token viajar na URL.
+     *
+     * Criada nas duas edições, e não só na SaaS. A tabela vazia não custa nada
+     * numa instalação de um ISP só, e uma migration que roda condicionalmente
+     * ao ambiente é uma migration cujo resultado depende de uma variável que
+     * alguém pode ter trocado — o schema deixa de ser o mesmo nos dois lados e
+     * o próximo passo tem que adivinhar em qual dos dois está.
+     */
+    id: '0037_impersonation_tickets',
+    async isApplied(db) {
+      return db.schema.hasTable('impersonation_tickets');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      if (!(await db.schema.hasTable('users'))) return;
+      await createTableIfMissing(db, 'impersonation_tickets', impersonationTicketsTable(db));
     }
   }
 ];

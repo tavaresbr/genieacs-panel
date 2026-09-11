@@ -34,6 +34,7 @@ import { useTenant } from '@/contexts/tenant-context'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
 import { OPERATOR_ROLES, ROLE_LABEL_KEYS, ROLE_SUMMARY_KEYS } from '@/lib/permissions'
+import { InvitePanel } from '@/components/settings/invite-panel'
 import type { Vendor as VendorType, WifiSecurityConfig as WifiSecurityConfigType } from '@/types'
 
 const INSTALLER_VIRTUAL_PARAMETERS = {
@@ -605,6 +606,7 @@ export default function Settings() {
   // senão a linha de um `owner` apareceria com o papel errado no seletor.
   const isOwner = currentUser?.role === 'owner'
   const canReadOperators = can('operators.read')
+  const canManageOperators = can('operators.manage')
   const rolesFor = (current?: OperatorRole) =>
     OPERATOR_ROLES.filter((role) => role !== 'owner' || isOwner || role === current)
 
@@ -2093,6 +2095,12 @@ export default function Settings() {
                     {t(creatingOperator ? 'common.cancel' : 'settings.operators.add')}
                   </button>
                 </div>
+
+                {/* Convidar, que é a alternativa a escolher a senha de outra
+                    pessoa — e o único caminho para quem já tem conta noutro
+                    provedor. Fica acima da lista porque é uma decisão de quem
+                    administra, não um detalhe de uma linha dela. */}
+                {canManageOperators && <InvitePanel roles={rolesFor()} />}
 
                 {/* O aviso da transição. Fica aqui porque a lista logo abaixo é
                     a resposta longa da mesma pergunta: quem ainda entra sem

@@ -600,4 +600,11 @@ export default {
   'auth.signupInvalid': '需要業者名稱、使用者名稱（3–64）和密碼（8–128）',
   'auth.signupSlugTaken': '此子網域已被使用',
   'auth.signupUsernameTaken': '此使用者名稱已被使用',
+  'auth.impersonationReadOnly': '這是唯讀的支援工作階段，無法從中修改任何內容。',
+  'auth.impersonationTicketRequired': '需要模擬憑證',
+  'auth.impersonationTicketInvalid': '此模擬連結已失效，請在主控台重新產生。',
+  'auth.impersonationStarted': '支援工作階段已開始',
+  'auth.impersonationFailed': '無法開始支援工作階段',
+  'invite.mailSubject': '您受邀加入 {provider}',
+  'invite.mailBody': '您受邀加入 {provider} 的團隊。\n\n開啟下方連結接受邀請。它只能使用一次，且僅對您有效：\n\n{link}\n\n如果您並未預期收到此邀請，請忽略本郵件。',
 };

@@ -36,6 +36,8 @@ Todas estão em `deploy/saas.env.example`, com comentário. As que não podem fa
 - `TRUST_PROXY=1`: o proxy na frente é o único salto confiável. É o que dá a cada
   provedor o seu balde de rate limit e marca os cookies do portal como `Secure`.
 - `METRICS_TOKEN` (opcional, ≥ 32 caracteres): quem coleta `/api/platform/metrics`.
+- `SMTP_URL` e `MAIL_FROM` (opcionais): por onde sai o convite de equipe. Sem as duas não
+  há envio, e o link continua saindo na tela — ver §8.
 
 ### DNS e proxy
 
@@ -194,10 +196,42 @@ não precisa ter o alerta de ONT caída parado.
   ainda não tem comando.
 - `METRICS_TOKEN`: trocar, reiniciar, atualizar o coletor.
 
-## 7. O que este documento não cobre, porque ainda não existe
+## 7. Entrar no painel de um cliente
+
+O console tem, em cada provedor ativo, um botão que abre uma **sessão de atendimento**: o
+painel daquele ISP, como os operadores dele o veem.
+
+- **Só leitura.** Toda escrita é recusada com 403 `impersonation_read_only`, em qualquer
+  rota. Quando um cliente precisa que alguém mexa em alguma coisa, quem mexe é a equipe
+  dele — ou o console, que age em nome da plataforma e assina como tal.
+- **Meia hora, sem renovação.** Continuar é voltar ao console e abrir outra.
+- **Registrada dos dois lados.** Na nossa trilha (`platform_audit`, ação
+  `tenant.impersonated`) e na trilha DO PROVEDOR (`audit_log`, ação
+  `platform.impersonated`), que é onde ele vai olhar quando perguntar se entraram no painel
+  dele. Conte com isso: o cliente pode ver, e é para poder.
+- **Acaba sozinha** se quem a abriu sair de `platform_admins` ou trocar a senha.
+- Uma faixa vermelha fica no alto de toda tela enquanto ela dura. "Sair" joga o token fora.
+
+Um provedor **suspenso** não é personificável: o painel dele está fora do ar para os
+operadores dele, e é isso que a sessão mostraria.
+
+## 8. E-mail
+
+Opcional, e o painel funciona sem. Com `SMTP_URL` e `MAIL_FROM` configurados, o convite de
+equipe vai por e-mail quando quem convida informa um endereço; sem eles, o link sai na tela
+para ser entregue como sempre foi.
+
+O link precisa de um endereço absoluto. Com `TENANT_BASE_DOMAIN`, ele é derivado do slug de
+cada provedor. Sem subdomínios, é `PUBLIC_BASE_URL` — e sem ela não há envio, porque o
+painel não inventa o próprio endereço a partir do que a requisição disser.
+
+Um SMTP fora do ar não quebra nada: o convite existe, a resposta diz `emailed: false` e o
+link está ali.
+
+## 9. O que este documento não cobre, porque ainda não existe
 
 - Gateway de cobrança: hoje o `ManualBillingProvider` registra o pagamento pelo
   console. Asaas ou similar entra quando houver contrato para cobrar.
-- E-mail: o convite de equipe é por link, e o cadastro não confirma endereço nenhum.
-- Impersonação auditada de um provedor pelo plano de controle.
+- Verificação do endereço de e-mail. Hoje não custa nada, porque só a senha abre uma conta;
+  passa a ser pré-requisito no dia em que existir redefinição de senha por e-mail.
 - Rotação da `SECRET_BOX_KEY` com duas chaves vivas.

@@ -24,6 +24,7 @@
     "jsonwebtoken": "^9.0.2",
     "knex": "^3.3.0",
     "mysql2": "^3.6.5",
+    "nodemailer": "^10.0.3",
     "pg": "^8.23.0"
   },
   "engines": {

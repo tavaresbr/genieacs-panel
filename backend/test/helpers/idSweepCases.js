@@ -213,6 +213,19 @@ export const casos = [
     path: (id) => `/api/vendor-management/wifi-security-configs/${id}`,
     tabela: 'wifi_security_config'
   },
+  // A leitura do caminho `/:vendorId/wifi-security`. O POST irmão já estava na
+  // varredura; esta respondia 200 com lista VAZIA para o fabricante do
+  // vizinho — indistinguível de "este fabricante não tem mapeamento nenhum",
+  // que é uma resposta sobre um registro de outro provedor. Passou a responder
+  // 404, como o POST no mesmo caminho e como `GET /api/vendor-management/:id`
+  // já respondiam, e com isso sai das exceções e entra aqui.
+  {
+    chave: 'vendor',
+    label: 'GET /api/vendor-management/:vendorId/wifi-security',
+    method: 'GET',
+    path: (id) => `/api/vendor-management/${id}/wifi-security`,
+    tabela: 'vendors'
+  },
   // O fabricante por último entre os do catálogo: apagá-lo leva os mapeamentos
   // junto pela chave estrangeira, e os casos acima precisam da linha de pé.
   {

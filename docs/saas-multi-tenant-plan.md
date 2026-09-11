@@ -330,7 +330,7 @@ migrations pré-tenancy, plantam linhas e só então deixam o `ensureSchema` cor
 Uma armadilha que o plano não previa, e que custou caro: **um byte NUL literal num arquivo
 fonte** faz o git classificá-lo como binário e descartar um dos lados num merge, em silêncio.
 
-### Fase 2 — Autenticação, RBAC e gestão de equipe *(a espinha entrou; o resto não)*
+### Fase 2 — Autenticação, RBAC e gestão de equipe ✅ *(concluída)*
 
 **Já existe** (onda 12): o payload do JWT carrega `tenantId` e o papel do vínculo em
 `tenant_users`; `authenticateToken` lê a membership e reabre o escopo no provedor que o
@@ -365,26 +365,58 @@ alguém esquecer de incrementar. Coberto por
   um envio que não acontece é pior que entregar o link na mão. O transporte entra depois,
   sem mudar nada do que está feito.
 
-**Falta:**
-- **Plano de plataforma** (nós, operando o SaaS): audience separada
-  `skygenpanel-platform`, rotas `/api/platform/*`, capaz de listar/suspender tenants e de
-  fazer *impersonation* auditada. Nunca compartilha o mesmo token do operador.
-- **API de usuários**: escopada por provedor, com convite (onda 18) e com **login por
-  e-mail**. Nome e e-mail vivem no mesmo espaço de nomes — cadastrar um e-mail igual ao nome
-  de alguém, ou o contrário, é recusado —, o que é o que torna `findByLogin` inequívoco: o
-  `username` nunca proibiu `@`, então não dá para decidir pelo formato qual dos dois foi
-  digitado. **Não há verificação do endereço**, e isso é aceitável só enquanto não existir
-  redefinição de senha por e-mail: naquele dia a verificação passa a ser pré-requisito
-  daquele recurso. Falta o **transporte de e-mail**, que é decisão de produto: qual provedor
-  de envio, credencial de quem, por deploy ou por provedor.
-- **Portal do assinante**: a busca já é escopada (`getByCustomerId` passa por `tdb`), então
-  O cookie é **host-only** (`portalCookieOptions` não define `domain`) e o payload assinado
-  carrega `tenantId`, conferido contra o provedor da requisição em `portalAuth.js`. As duas
-  coisas entraram juntas e são independentes de propósito: a primeira impede o navegador de
-  mandar o cookie ao subdomínio vizinho, a segunda recusa o cookie que chegar assim mesmo —
-  copiado à mão, ou por um cliente que não é navegador.
-- `rateLimit.js`: chavear por `${tenantId}:${ip}` para um provedor barulhento não derrubar
-  o limite dos outros.
+**Entrou (o fecho da fase):**
+
+- ✅ **Personificação auditada, com audiência própria.** Quem opera o SaaS abre uma sessão
+  no painel de um cliente para atendê-lo. O token é OUTRO — audiência
+  `skygenpanel-platform` —, e ser outro é o ponto: um `if` esquecido em algum lugar trata a
+  personificação como sessão comum, mas uma audiência errada não passa pelo `jwt.verify`.
+  Cada audiência tem uma forma válida e só uma; o par cruzado é recusado. Meia hora, fixa,
+  e sem refresh: continuar custa uma volta ao console, que é mais uma linha na trilha.
+  - **Ela lê e não escreve.** O papel `viewer` imposto na hidratação já barraria quase
+    tudo, e quase não basta: a matriz pode crescer, e uma rota nova que esqueça o
+    `requirePermission` não é barrada por papel nenhum. O muro é por MÉTODO, acima de toda
+    rota. O motivo é de produto antes de ser de segurança — uma escrita feita numa
+    personificação aparece no painel do cliente como coisa que o cliente fez.
+    `POST /api/auth/logout` é o caso que mostra o muro trabalhando: ele incrementa o
+    `token_version` da pessoa, e a pessoa ali é quem personifica.
+  - **O console não é alcançável de dentro dela**, mesmo sendo de quem o alcança: a
+    requisição está re-escopada no provedor personificado, e uma rota do console rodando
+    ali agiria sobre o cliente errado.
+  - **O bilhete**, que é como a sessão chega ao navegador no host certo. Um JWT no query
+    string entra em log de proxy e em histórico; um cookie no domínio-pai desfaz a garantia
+    host-only desta mesma fase. O console cunha um valor opaco de uso único, um minuto,
+    guardado como hash, e o entrega no FRAGMENTO da URL — a parte que nenhum navegador
+    manda ao servidor. A tela no host do provedor o troca pelo token, que nasce no origin
+    onde vai viver.
+  - **Duas trilhas, duas perguntas**: `platform_audit` registra quem pediu para olhar o
+    painel de quem, na cunhagem; o `audit_log` DO PROVEDOR registra que a sessão começou,
+    no resgate. A segunda é a que um ISP faz, e ele não lê a nossa.
+  - Morre sozinha quando quem a abriu sai do cadastro da plataforma ou troca a senha: as
+    duas coisas são lidas a cada requisição, não quando o token foi feito.
+- ✅ **Transporte de e-mail**, e com ele o convite deixa de depender de alguém copiar um
+  link. Configurado por deploy (`SMTP_URL`, `MAIL_FROM`) e não por provedor: a mensagem vem
+  do painel, e um SMTP por provedor seria uma credencial de terceiro guardada por nós para
+  mandar mensagem em nome deles. O envio **nunca é condição de nada** — o endereço é
+  conferido antes de o convite existir, o envio vem depois da trilha, e um SMTP fora do ar
+  responde `emailed: false` com o link na mão.
+  - O link dentro da mensagem precisa de endereço absoluto, e o backend só sabe um quando
+    alguém lhe disse qual é: o domínio-base, ou `PUBLIC_BASE_URL`. O que ele **não** usa é
+    o `Host` da requisição — quem cria o convite escolhe esse cabeçalho, e poderia fazer o
+    painel mandar a um colega um link com o token verdadeiro apontando para um servidor
+    dele.
+  - A mensagem carrega quem convida, qual papel, até quando vale e o link. Nada além: uma
+    caixa de entrada alheia não é lugar onde mora dado de provedor.
+- ✅ **A tela de aceitar**, que faltava para o link que a API já dava, e **a tela de
+  convidar**, que não existia — a API do convite estava sem interface desde a onda 18, de
+  modo que quem administrava só tinha o formulário que escolhe a senha do outro. O token
+  vai no fragmento nas duas pontas, pelo mesmo motivo do bilhete.
+
+**O que continua faltando, e é de outra fase:** a rotação da `SECRET_BOX_KEY` com as duas
+chaves vivas (o `key_version` já está gravado; falta o comando), e a **verificação do
+endereço de e-mail**, que passa a ser pré-requisito no dia em que existir redefinição de
+senha por e-mail — e não antes, pelo motivo escrito logo abaixo.
+
 **Quebra para os self-hosted atuais:** o login sai de `username` para `email`.
 
 A mitigação que este plano propunha — a migration preenchendo `email = username` quando
@@ -753,7 +785,7 @@ subsistema cada — `sgp-links`, `sgp-events`, `device-profiles`, `provisioning`
 `map-settings`, `vendor-catalogue`, `wifi-credentials`, `whatsapp-media`,
 `whatsapp-inbound`, `users`, `auth`, entre outras, mais `tenant-subdomain` e
 `tenant-id-sweep`, que provam o isolamento por host, e `role-reach`, que prova por HTTP o
-alcance de cada papel sobre uma amostra de 31 rotas. São 1756 testes no total, verdes nos
+alcance de cada papel sobre uma amostra de 31 rotas. São 1797 testes no total, verdes nos
 três dialetos no CI.
 
 O padrão em todas: **dois provedores com as chaves naturais deliberadamente colidindo** —
@@ -1021,8 +1053,11 @@ Original: Fase 0 → 1 → 2 → 3 → 8 → 4 → 5 → 6 → 7.
    em toda linha, host apex como porta de entrada, runbook.
 8. ~~**Fase 8**~~ ✅ a lista de portas contada e obrigatória no CI, a varredura de ids em 37
    rotas, e o RLS avaliado com medição (não adotado agora, com o motivo e a receita
-   escritos). → O que sobra: o resto da **2** (impersonação auditada com audiência própria,
-   transporte de e-mail do convite e a tela de aceitar) e a rotação da `SECRET_BOX_KEY`.
+   escritos).
+9. ~~**O resto da Fase 2**~~ ✅ personificação auditada com audiência própria e bilhete de
+   uso único, transporte de e-mail do convite, e as telas de convidar e de aceitar. → O que
+   sobra: a rotação da `SECRET_BOX_KEY` com as duas chaves vivas, e a verificação do
+   endereço de e-mail no dia em que existir redefinição de senha por ele.
 
 Vale repetir o que o plano dizia e que se confirmou: a Fase 1 saiu para os installs
 self-hosted como upgrade normal, e o código de tenancy rodou em produção real com um
@@ -1046,7 +1081,7 @@ metade é da Fase 4.
 | 6 | Credenciais ACS por provedor, cifradas, guarda de egresso, branch de URL absoluta removido | ✅ credencial NBI por provedor (onda 19), egresso com pinning de DNS, branch de URL absoluta removido |
 | 7 | `/api/database` não montada na edição SaaS | ✅ |
 | 8 | Rate limit e concorrência de fetch ACS chaveados por provedor | ✅ `tenantIpKey` no limite; `withAcsSlot` no fetch — vaga por provedor e vaga global, nessa ordem |
-| 9 | Suíte de vazamento verde no CI e obrigatória para merge | ✅ 1756 testes, três dialetos |
+| 9 | Suíte de vazamento verde no CI e obrigatória para merge | ✅ 1797 testes, três dialetos |
 | 10 | `SECRET_BOX_KEY` separada do `JWT_SECRET`, com `key_version` | ✅ |
 | 11 | `audit_log` registrando ações sensíveis | ✅ onda 20 — senha de portal, GenieACS, papéis, vínculos, convites, suspensão |
 | 12 | Exportação por provedor funcionando (LGPD e "apaguei tudo, socorro") | ✅ exportação (onda 21) e exclusão (onda 22), com trilha que sobrevive ao provedor apagado |
@@ -1068,7 +1103,7 @@ também a tabela de que a impersonação da plataforma vai precisar.
 
 ```bash
 npm run verify          # check backend + testes + lint + typecheck + build (raiz)
-cd backend && npm test  # 1756 testes, incluindo as suítes de tenancy
+cd backend && npm test  # 1797 testes, incluindo as suítes de tenancy
 ```
 
 A suíte roda nos três dialetos, e **isso não é zelo**: cada uma das armadilhas abaixo passou

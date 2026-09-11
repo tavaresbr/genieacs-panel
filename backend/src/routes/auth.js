@@ -2,7 +2,7 @@ import express from 'express';
 import { IS_SAAS } from '../config/edition.js';
 import AuthController from '../controllers/authController.js';
 import { requirePermission, requirePlatformAdmin, authenticateToken } from '../middleware/auth.js';
-import { emailChangeLimiter } from '../middleware/rateLimit.js';
+import { emailChangeLimiter, impersonationRedeemLimiter } from '../middleware/rateLimit.js';
 
 const router = express.Router();
 
@@ -15,6 +15,11 @@ router.post('/setup', AuthController.setupAdmin);
 if (IS_SAAS) router.post('/signup', AuthController.signup);
 
 router.post('/login', AuthController.login);
+
+// O bilhete que o console cunhou vira a sessão de leitura, no host do provedor
+// e sem sessão anterior — quem personifica não tem conta aqui. O bilhete É a
+// credencial, de uso único e válido por um minuto; ver o controlador.
+router.post('/impersonate/redeem', impersonationRedeemLimiter, AuthController.redeemImpersonation);
 
 router.get('/user', authenticateToken, AuthController.getCurrentUser);
 

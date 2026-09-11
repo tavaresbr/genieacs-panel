@@ -8,6 +8,7 @@ import { LoadingProvider, RouteChangeLoader } from '@/components/ui/loading'
 import { BrandMark } from '@/components/brand-mark'
 import { LanguageProvider, useTranslation } from '@/contexts/language-context'
 import { SubscriptionNotice } from '@/components/subscription-notice'
+import { ImpersonationBanner } from '@/components/impersonation-banner'
 import { TenantProvider, useTenant } from '@/contexts/tenant-context'
 import { settingsAPI } from '@/lib/api'
 import { onboardingDismissKey } from '@/lib/onboarding'
@@ -25,6 +26,8 @@ const SetupPage = lazy(() => import('@/pages/setup'))
 const SignupPage = lazy(() => import('@/pages/signup'))
 const PlanPage = lazy(() => import('@/pages/plan'))
 const OnboardingPage = lazy(() => import('@/pages/onboarding'))
+const InvitePage = lazy(() => import('@/pages/invite'))
+const ImpersonatePage = lazy(() => import('@/pages/impersonate'))
 
 function PageFallback() {
   const { t } = useTranslation()
@@ -96,6 +99,9 @@ function ProtectedShell() {
       <main className="min-w-0 flex-1">
         {/* A faixa ou o muro da assinatura. Fica na casca e não numa tela
             porque a primeira requisição recusada pode vir de qualquer uma. */}
+        {/* Antes de tudo: quem está personificando tem que saber disso em toda
+            tela, e a faixa da assinatura fala do provedor, não da sessão. */}
+        <ImpersonationBanner />
         <SubscriptionNotice />
         <Suspense fallback={<PageFallback />}>
           <OnboardingGate>
@@ -182,6 +188,12 @@ export default function App() {
                 <Route path="/login" element={<Suspense fallback={<AuthFallback />}><LoginRoute /></Suspense>} />
                 <Route path="/setup" element={<Suspense fallback={<AuthFallback />}><SetupRoute /></Suspense>} />
                 <Route path="/signup" element={<Suspense fallback={<AuthFallback />}><SignupRoute /></Suspense>} />
+                {/* As duas portas que se abrem com uma credencial no fragmento
+                    da URL, e não com usuário e senha: o convite e o bilhete de
+                    personificação. Fora da casca protegida de propósito — quem
+                    chega nelas ainda não tem sessão neste provedor. */}
+                <Route path="/invite" element={<Suspense fallback={<AuthFallback />}><InvitePage /></Suspense>} />
+                <Route path="/impersonate" element={<Suspense fallback={<AuthFallback />}><ImpersonatePage /></Suspense>} />
                 <Route element={<ProtectedShell />}>
                   <Route index element={<Navigate to="/dashboard" replace />} />
                   <Route path="/dashboard" element={<DashboardPage />} />
