@@ -2,7 +2,12 @@ import express from 'express';
 import { IS_SAAS } from '../config/edition.js';
 import AuthController from '../controllers/authController.js';
 import { requirePermission, requirePlatformAdmin, authenticateToken } from '../middleware/auth.js';
-import { emailChangeLimiter, impersonationRedeemLimiter } from '../middleware/rateLimit.js';
+import {
+  authTicketRedeemLimiter,
+  emailChangeLimiter,
+  impersonationRedeemLimiter,
+  passwordResetLimiter
+} from '../middleware/rateLimit.js';
 
 const router = express.Router();
 
@@ -20,6 +25,23 @@ router.post('/login', AuthController.login);
 // e sem sessão anterior — quem personifica não tem conta aqui. O bilhete É a
 // credencial, de uso único e válido por um minuto; ver o controlador.
 router.post('/impersonate/redeem', impersonationRedeemLimiter, AuthController.redeemImpersonation);
+
+// "Esqueci minha senha", as duas metades. Públicas as duas, e é o que elas
+// PRECISAM ser: quem perdeu a senha não tem sessão, e a segunda é aberta do
+// celular, onde não há sessão do painel — exigir login para confirmar um link
+// mandado por e-mail é ensinar a equipe a digitar a senha depois de clicar num
+// link, que é a forma exata de um phishing.
+//
+// A primeira responde SEMPRE a mesma coisa, exista a conta ou não; ver o
+// controlador. A segunda não emite sessão: ela troca a senha e manda para o
+// login.
+router.post('/password-reset', passwordResetLimiter, AuthController.requestPasswordReset);
+router.post('/password-reset/confirm', authTicketRedeemLimiter, AuthController.confirmPasswordReset);
+
+// A prova do endereço. Pedir exige sessão — é o próprio endereço de quem pede;
+// confirmar não, pelo mesmo motivo da redefinição.
+router.post('/email/verify', emailChangeLimiter, authenticateToken, AuthController.requestEmailVerification);
+router.post('/email/verify/confirm', authTicketRedeemLimiter, AuthController.confirmEmailVerification);
 
 router.get('/user', authenticateToken, AuthController.getCurrentUser);
 

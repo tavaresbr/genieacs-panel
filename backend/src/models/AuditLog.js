@@ -43,6 +43,20 @@ class AuditLog {
     // tela de login e na aba do navegador.
     TENANT_RENAMED: 'tenant.renamed',
     LOGIN_EMAIL_CHANGED: 'login_email.changed',
+    // O endereço de login foi PROVADO — alguém abriu o que foi mandado para
+    // ele. É o que separa "esta conta tem um endereço" de "este endereço é
+    // desta pessoa", e é a linha que a redefinição de senha exige antes de
+    // mandar qualquer coisa.
+    LOGIN_EMAIL_VERIFIED: 'login_email.verified',
+    // Pediram uma senha nova para esta conta. Registrada mesmo quando ninguém
+    // completa: para quem é dono da conta, "alguém pediu para redefinir minha
+    // senha" é o aviso, e ele só serve se estiver escrito no momento do pedido.
+    PASSWORD_RESET_REQUESTED: 'password_reset.requested',
+    // E a senha de fato mudou por esse caminho. Duas linhas e não uma porque
+    // respondem a perguntas diferentes, e a distância entre elas é a informação:
+    // um pedido sem conclusão é ruído, um pedido concluído que ninguém fez é
+    // uma invasão.
+    PASSWORD_RESET_COMPLETED: 'password_reset.completed',
     // Alguém do plano de controle abriu uma sessão de leitura NESTE provedor.
     // Gravada aqui, e não só na trilha da plataforma, porque quem tem direito
     // de saber que entraram no painel dele é o dono do painel — e a trilha da

@@ -24,6 +24,18 @@ export interface User {
    * /api/auth/user` responde sem ele.
    */
   email?: string | null
+  /**
+   * Se o endereço acima foi PROVADO — alguém abriu o que foi mandado para ele.
+   *
+   * Cadastrar um endereço prova que se controla a conta, não que se controla o
+   * endereço, e a diferença é o que decide se a redefinição de senha por e-mail
+   * vai funcionar para esta pessoa no dia em que ela precisar — um dia em que
+   * ela, por definição, não vai poder resolver. Daí a tela de conta insistir
+   * enquanto isto for falso.
+   *
+   * Opcional pelo mesmo motivo de `email`: nem toda resposta traz o campo.
+   */
+  emailVerified?: boolean
   role: OperatorRole
   /**
    * Whether this person is on the SaaS control plane's roster.

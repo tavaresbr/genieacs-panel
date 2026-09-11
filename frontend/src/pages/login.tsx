@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useNavigate } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { useAuth } from '@/contexts/auth-context'
 import { Icon } from '@/components/ui/icon'
 import { BrandMark } from '@/components/brand-mark'
@@ -115,7 +115,15 @@ export default function Login() {
               </div>
 
               <div>
-                <label htmlFor="password" className="field-label">{t('login.password')}</label>
+                <div className="flex items-baseline justify-between gap-3">
+                  <label htmlFor="password" className="field-label">{t('login.password')}</label>
+                  {/* Ao lado do campo, que é onde a pessoa está quando descobre
+                      que não lembra. A tela do outro lado responde a mesma
+                      coisa para todo mundo — ver `forgot-password.tsx`. */}
+                  <Link to="/forgot-password" className="text-xs text-muted-foreground underline hover:text-foreground">
+                    {t('login.forgotPassword')}
+                  </Link>
+                </div>
                 <div className="relative">
                   <input
                     id="password"

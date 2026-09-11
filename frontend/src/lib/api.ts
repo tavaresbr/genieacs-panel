@@ -310,7 +310,38 @@ export const authAPI = {
    * aberta sem provar a senha seria trocar a fechadura sem a chave.
    */
   changeEmail: (currentPassword: string, email: string) =>
-    apiClient.post<{ email: string }>('/auth/email', { currentPassword, email }),
+    apiClient.post<{ email: string; verified: boolean; verificationSent: boolean }>(
+      '/auth/email', { currentPassword, email }
+    ),
+
+  /**
+   * Pede a prova do próprio endereço — a mensagem com o link de confirmação.
+   *
+   * Exige sessão porque é o endereço de quem pede. A resposta pode ser 503
+   * quando o deploy não tem transporte de correio configurado, e a tela diz
+   * isso em vez de fingir que mandou.
+   */
+  requestEmailVerification: () =>
+    apiClient.post<{ verified: boolean }>('/auth/email/verify', {}),
+
+  /** O link aberto: carimba o endereço. Sem sessão, de propósito. */
+  confirmEmailVerification: (token: string) =>
+    apiClient.post<{ email: string }>('/auth/email/verify/confirm', { token }),
+
+  /**
+   * "Esqueci minha senha".
+   *
+   * Responde SEMPRE a mesma coisa, exista a conta ou não — é a rota mais
+   * exposta do painel, e uma resposta que variasse diria a um estranho quais
+   * identificadores têm conta aqui. A tela não tem, e não deve ter, como
+   * distinguir os dois casos.
+   */
+  requestPasswordReset: (identifier: string) =>
+    apiClient.post('/auth/password-reset', { identifier }),
+
+  /** O link aberto: escolhe a senha nova. Não devolve sessão. */
+  confirmPasswordReset: (token: string, password: string) =>
+    apiClient.post('/auth/password-reset/confirm', { token, password }),
 
   emailReadiness: () =>
     apiClient.get<EmailReadiness>('/auth/email-readiness'),

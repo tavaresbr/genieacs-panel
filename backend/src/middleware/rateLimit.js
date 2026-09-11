@@ -164,6 +164,41 @@ export const impersonationRedeemLimiter = limiter({
   message: limitMessage('rateLimit.requests', 'rate_limited')
 });
 
+/**
+ * "Esqueci minha senha": o pedido, que é público e manda e-mail.
+ *
+ * Apertado por dois motivos que se somam. O primeiro é que cada pedido aceito
+ * dispara uma mensagem para o endereço de uma pessoa real, escolhido por quem
+ * digita: sem balde, a rota é um canhão de spam apontado para a caixa de
+ * entrada de qualquer operador cujo identificador alguém conheça — e o
+ * remetente é o nosso domínio, então o preço é a reputação do correio do
+ * painel. O segundo é a enumeração: a resposta é idêntica em todos os casos,
+ * mas o TEMPO nunca é exatamente idêntico, e quem pode repetir o pedido dez mil
+ * vezes mede a diferença. Cinco por quarto de hora e por par (provedor, IP)
+ * cobrem quem errou a senha e tentou de novo, e não cobrem uma varredura.
+ */
+export const passwordResetLimiter = limiter({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  keyGenerator: tenantIpKey,
+  message: limitMessage('rateLimit.requests', 'rate_limited')
+});
+
+/**
+ * O resgate dos dois bilhetes que chegam por e-mail.
+ *
+ * Frouxo em relação ao pedido de propósito: aqui não se manda mensagem nenhuma
+ * e não há o que enumerar — só um token de 32 bytes que existe ou não existe. O
+ * balde é contra a rota virar bomba de tráfego, e a folga é para o caso real de
+ * um cliente de e-mail que pré-abre links e de alguém que clica duas vezes.
+ */
+export const authTicketRedeemLimiter = limiter({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  keyGenerator: tenantIpKey,
+  message: limitMessage('rateLimit.requests', 'rate_limited')
+});
+
 /** Coarse per-address guard for the whole portal surface. */
 export const portalIpLimiter = limiter({
   windowMs: 60 * 1000,

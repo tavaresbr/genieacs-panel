@@ -98,7 +98,7 @@ const GENIE_SECRET_STATE_BADGES: Record<GenieSecretState, string> = {
 
 export default function Settings() {
   const { t, formatDateTime } = useTranslation()
-  const { user: currentUser, can } = useAuth()
+  const { user: currentUser, can, refreshUser } = useAuth()
   const { name: tenantName, isSaas, refresh: refreshTenant } = useTenant()
   // Lidos aqui em cima, antes de qualquer handler que os feche: um `const`
   // do componente lido dentro de um callback ANTES da linha que o declara é
@@ -553,6 +553,33 @@ export default function Settings() {
     email: ''
   })
 
+  /**
+   * A prova do endereço, pedida de novo.
+   *
+   * A conta pode ter um endereço e ele não estar provado — é o estado de toda
+   * conta anterior a esta versão e de todo endereço recém-trocado. Enquanto
+   * estiver assim, a redefinição de senha por e-mail não funciona para esta
+   * pessoa, e o dia em que ela vai descobrir isso é o dia em que ela não vai
+   * poder resolver. Daí o aviso ficar visível, e não escondido num menu.
+   */
+  const [sendingProof, setSendingProof] = useState(false)
+
+  const submitEmailVerification = async () => {
+    setSendingProof(true)
+    try {
+      const res = await authAPI.requestEmailVerification()
+      if (res.success) {
+        toast.success(res.message || t('settings.security.emailVerifySent'))
+        return
+      }
+      // 503 quando o deploy não tem transporte de correio: a mensagem do
+      // backend diz isso, e é melhor que qualquer coisa que a tela invente.
+      toast.error(res.message || t('settings.security.emailVerifyFailed'))
+    } finally {
+      setSendingProof(false)
+    }
+  }
+
   const submitChangeEmail = async () => {
     if (!emailForm.currentPassword || !emailForm.email.trim()) {
       toast.error(t('settings.security.emailRequired'))
@@ -562,6 +589,10 @@ export default function Settings() {
     if (res.success) {
       toast.success(t('settings.security.emailUpdated', { email: res.data?.email ?? emailForm.email.trim() }))
       setEmailForm({ currentPassword: '', email: '' })
+      // O endereço novo nasce não provado, e a prova saiu atrás dele. As duas
+      // coisas mudam o que esta tela mostra, então ela relê a conta.
+      await refreshUser()
+      if (res.data?.verificationSent) toast.success(t('settings.security.emailVerifySent'))
       // A conta acabou de deixar de ser uma das que faltam, e o aviso da
       // transição está na mesma tela: sem recarregar, ele seguiria contando
       // quem já cadastrou.
@@ -2078,6 +2109,35 @@ export default function Settings() {
                 <div className="mt-4">
                   <button onClick={submitChangeEmail} className="modern-button">{t('settings.security.updateEmail')}</button>
                 </div>
+
+                {/* O estado da prova, logo abaixo do formulário que a desfaz. */}
+                {currentUser?.email && (
+                  currentUser.emailVerified ? (
+                    <p className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
+                      <Icon name="check" size={17} className="shrink-0" />
+                      {t('settings.security.emailVerified', { email: currentUser.email })}
+                    </p>
+                  ) : (
+                    <div className="mt-4 rounded-md border border-border bg-background p-3">
+                      <p className="flex items-start gap-2 text-sm text-foreground">
+                        <Icon name="warning" size={17} className="mt-0.5 shrink-0" />
+                        <span>{t('settings.security.emailUnverified', { email: currentUser.email })}</span>
+                      </p>
+                      <p className="mt-1 ps-6 text-sm text-muted-foreground">
+                        {t('settings.security.emailUnverifiedHint')}
+                      </p>
+                      <div className="mt-3 ps-6">
+                        <button
+                          onClick={() => void submitEmailVerification()}
+                          disabled={sendingProof}
+                          className="modern-button-secondary"
+                        >
+                          {sendingProof ? t('common.saving') : t('settings.security.sendEmailProof')}
+                        </button>
+                      </div>
+                    </div>
+                  )
+                )}
               </section>
 
               <section className="rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-4">
