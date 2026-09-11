@@ -7,13 +7,11 @@ import { asTenant, authHeaders, call, getDb, startTestServers, stopTestServers }
 const { default: AppState } = await import('../src/models/AppState.js');
 import { buildDevice, startGenieAcsStub } from './helpers/genieacs-stub.js';
 
-const { default: SgpEventService } = await import('../src/services/sgpEventService.js');
 const { default: SgpService } = await import('../src/services/sgpService.js');
 
-// Reached directly, with no request behind them, so nothing has resolved a
-// provider. The routes that call these are already inside one.
+// Reached directly, with no request behind it, so nothing has resolved a
+// provider. The routes that call this are already inside one.
 const resolveDeviceContract = (...args) => asTenant(() => SgpService.resolveDeviceContract(...args));
-const processPending = (...args) => asTenant(() => SgpEventService.processPending(...args));
 
 const DEVICE_ID = 'stub-device-1';
 const PPPOE = 'joao@provedor';
@@ -84,6 +82,27 @@ async function postWebhook(body, headers = {}) {
   });
   const text = await response.text();
   return { status: response.status, body: text ? JSON.parse(text) : null };
+}
+
+/**
+ * Waits for the pass the webhook route starts to finish with one event.
+ *
+ * The route answers 202 and then processes pending events in the background,
+ * so a test that runs `processPending` itself races that pass: both read the
+ * same pending row, and each refreshes the link from SGP before acting on it.
+ * A cancellation can then interleave as refresh, unlink, refresh, unlink, and a
+ * read between the second refresh and the second unlink finds a link that is
+ * about to go away. Waiting for the route's own pass leaves exactly one
+ * processor, which is also how the event is handled outside a test.
+ */
+async function settled(eventId, { timeoutMs = 10000 } = {}) {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const event = await getDb()('sgp_events').where({ id: eventId }).first();
+    if (event && event.status !== 'pending') return event;
+    assert.ok(Date.now() < deadline, `event ${eventId} was still pending after ${timeoutMs}ms`);
+    await new Promise((resolve) => { setTimeout(resolve, 25); });
+  }
 }
 
 before(async () => {
@@ -255,8 +274,9 @@ describe('event dispatch', () => {
       last_synced_at: new Date('2000-01-01T00:00:00Z')
     });
     const body = JSON.stringify({ id: 'evt-pay', evento: 'pagamento_confirmado', contrato: '4321' });
-    await postWebhook(body, { 'X-SGP-Signature': sign(body) });
-    await processPending({});
+    const { body: accepted } = await postWebhook(body, { 'X-SGP-Signature': sign(body) });
+    const event = await settled(accepted.id);
+    assert.equal(event.status, 'processed', event.error);
 
     const link = await getDb()('sgp_links').where({ device_id: DEVICE_ID }).first();
     assert.equal(link.status_label, 'Ativo');
@@ -264,8 +284,9 @@ describe('event dispatch', () => {
 
   it('unlinks the CPE when the contract is cancelled', async () => {
     const body = JSON.stringify({ id: 'evt-cancel', evento: 'cancelado', contrato: '4321' });
-    await postWebhook(body, { 'X-SGP-Signature': sign(body) });
-    await processPending({});
+    const { body: accepted } = await postWebhook(body, { 'X-SGP-Signature': sign(body) });
+    const event = await settled(accepted.id);
+    assert.equal(event.status, 'processed', event.error);
 
     const link = await getDb()('sgp_links').where({ device_id: DEVICE_ID }).first();
     assert.equal(link, undefined);

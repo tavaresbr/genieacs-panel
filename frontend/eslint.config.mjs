@@ -36,7 +36,14 @@ export default [
       '@typescript-eslint/no-require-imports': 'off',
       'react-hooks/set-state-in-effect': 'off',
       'no-undef': 'off',
-      'no-empty': 'off'
+      'no-empty': 'off',
+      // A `const` read inside a callback that runs during render — a filter, a
+      // map — is in its temporal dead zone if the declaration comes later in
+      // the component, and `tsc` does not see it because the read is in a
+      // nested function. It produced a black page for every authenticated
+      // route once. `variables: true` is what makes the rule look through the
+      // nested function; without it, that case is exactly the one it ignores.
+      '@typescript-eslint/no-use-before-define': ['error', { functions: false, classes: false, variables: true }]
     }
   }
 ];

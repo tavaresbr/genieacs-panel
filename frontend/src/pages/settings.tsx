@@ -100,6 +100,16 @@ export default function Settings() {
   const { t, formatDateTime } = useTranslation()
   const { user: currentUser, can } = useAuth()
   const { name: tenantName, isSaas, refresh: refreshTenant } = useTenant()
+  // Lidos aqui em cima, antes de qualquer handler que os feche: um `const`
+  // do componente lido dentro de um callback ANTES da linha que o declara é
+  // uma ReferenceError se o callback rodar durante a renderização, e a regra
+  // de lint não distingue o callback que roda depois do que roda agora — por
+  // isso ela exige a ordem, e a ordem custa nada.
+  const toast = useToast()
+  const loadingCtl = useLoading()
+  const isOwner = currentUser?.role === 'owner'
+  const canReadOperators = can('operators.read')
+  const canManageOperators = can('operators.manage')
   const [settings, setSettings] = useState({
     appName: tenantName,
     genieAcsUrl: 'http://127.0.0.1:7557',
@@ -510,9 +520,6 @@ export default function Settings() {
     }
   }
 
-  const toast = useToast()
-  const loadingCtl = useLoading()
-
   const [usernameForm, setUsernameForm] = useState<{ currentUsername: string; newUsername: string }>({
     currentUsername: '',
     newUsername: ''
@@ -604,9 +611,6 @@ export default function Settings() {
   // `admin` que tente cunhar ou mexer num `owner`. O que ela faz é não oferecer
   // um botão que sempre falharia — e não esconder o papel que a pessoa JÁ tem,
   // senão a linha de um `owner` apareceria com o papel errado no seletor.
-  const isOwner = currentUser?.role === 'owner'
-  const canReadOperators = can('operators.read')
-  const canManageOperators = can('operators.manage')
   const rolesFor = (current?: OperatorRole) =>
     OPERATOR_ROLES.filter((role) => role !== 'owner' || isOwner || role === current)
 
@@ -620,12 +624,12 @@ export default function Settings() {
    */
   const [emailReadiness, setEmailReadiness] = useState<EmailReadiness | null>(null)
 
-  const refreshEmailReadiness = async () => {
+  async function refreshEmailReadiness() {
     const res = await authAPI.emailReadiness()
     setEmailReadiness(res.success && res.data ? res.data : null)
   }
 
-  const fetchOperators = async () => {
+  async function fetchOperators() {
     setOperatorsLoading(true)
     const res = await usersAPI.list()
     if (res.success && res.data) {
