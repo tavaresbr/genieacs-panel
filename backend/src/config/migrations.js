@@ -1064,8 +1064,10 @@ const CUSTOMER_ACCOUNT_IDENTITY_COLUMNS = ['customer_id', 'device_id', 'identity
 async function hasIndex(db, table, name) {
   const client = String(db.client.config.client);
   if (client === 'pg') {
+    // `::text` porque `format()` recebe `VARIADIC "any"`, e um parâmetro sem
+    // tipo declarado ali é "could not determine data type of parameter $1".
     const result = await db.raw(
-      "select to_regclass(format('%I.%I', current_schema(), ?)) as oid", [name]
+      "select to_regclass(format('%I.%I', current_schema(), ?::text)) as oid", [name]
     );
     return (result.rows?.[0]?.oid ?? null) !== null;
   }
