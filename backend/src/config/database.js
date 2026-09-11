@@ -1,6 +1,7 @@
 import knexFactory from 'knex';
 import { buildKnexConfig, isSqlite } from './dbConfig.js';
 import { installSqlSentinel } from './sqlSentinel.js';
+import { installRls } from './rls.js';
 import { currentTenantId, TenantScopeError } from './tenantContext.js';
 import { isScoped } from './tenantScope.js';
 
@@ -13,7 +14,13 @@ export function getDb() {
     // Armed here rather than at the call sites so that every query reaches it,
     // including the ones written before the helpers existed. Under any other
     // APP_ENV this returns the handle untouched.
-    db = installSqlSentinel(knexFactory(buildKnexConfig()));
+    const config = buildKnexConfig();
+    // A ordem importa: a sentinela observa o SQL que sai, e o envoltório do RLS
+    // acrescenta uma transação por consulta. Envolvendo por fora, a sentinela
+    // continua vendo exatamente o mesmo SQL que veria sem RLS — do contrário
+    // toda leitura escopada passaria a chegar nela dentro de uma transação e a
+    // guarda mudaria de comportamento por causa de uma opção de deploy.
+    db = installRls(installSqlSentinel(knexFactory(config)), { client: config.client });
   }
   return db;
 }
