@@ -10,6 +10,41 @@ import { waWebhookLimiter } from '../middleware/rateLimit.js';
 const router = express.Router();
 
 /**
+ * Quanto tempo entre dois registros de recusa da MESMA conta.
+ *
+ * A recusa precisa ficar visível — é ela que separa "o Evolution não está
+ * chamando" de "está chamando e levando 401", dois problemas com consertos
+ * opostos que hoje aparecem na tela como o mesmo "Nunca chegou nada". Mas esta
+ * rota é pública, e gravar a cada recusa daria a quem souber o nome de uma
+ * instância um jeito de fazer o painel escrever no banco em laço.
+ *
+ * Um minuto é curto o bastante para que a primeira recusa apareça enquanto o
+ * operador ainda está olhando, e longo o bastante para que um servidor
+ * reentregando em loop custe uma escrita por minuto.
+ */
+const REFUSAL_THROTTLE_MS = 60_000;
+
+/**
+ * Registra que um evento chegou e foi recusado.
+ *
+ * Nunca lança e nunca altera a resposta: isto é observabilidade pendurada num
+ * caminho de recusa, e uma falha aqui não pode virar o motivo de um 500 numa
+ * requisição que já estava decidida.
+ */
+async function registrarRecusa(account, reason) {
+  try {
+    const anterior = account.webhook_refused_at ? new Date(account.webhook_refused_at).getTime() : 0;
+    if (Number.isFinite(anterior) && Date.now() - anterior < REFUSAL_THROTTLE_MS) return;
+    await runInTenant(account.tenant_id, () => WhatsAppAccount.update(account.id, {
+      webhook_refused_at: new Date(),
+      webhook_refused_reason: reason
+    }));
+  } catch (error) {
+    console.error('[wa] could not record webhook refusal:', error.message);
+  }
+}
+
+/**
  * Inbound events from the Evolution server.
  *
  * This route is PUBLIC — it is mounted before `authenticateToken`, because the
@@ -41,7 +76,13 @@ router.post('/', waWebhookLimiter, async (req, res) => {
       credencial: credencialDoPedido(req.headers, body)
     }
   );
-  if (!autorizado) return res.status(401).json({ success: false, error: 'unauthorized' });
+  if (!autorizado) {
+    // Antes da resposta e sem await no caminho crítico não daria: a escrita é
+    // barata e estrangulada, e o servidor do outro lado está esperando de
+    // qualquer forma. O que importa é que ela não altere o que se responde.
+    await registrarRecusa(account, tokenDaQuery(req.query) ? 'bad_token' : 'no_credential');
+    return res.status(401).json({ success: false, error: 'unauthorized' });
+  }
 
   const evento = canonicalizarEvento(body.event ?? body.Event ?? '');
 

@@ -26,6 +26,11 @@ router.post('/accounts/check-number', authenticateToken, requirePermission('what
 router.get('/accounts/:id/qr', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.getQr);
 router.get('/accounts/:id/status', authenticateToken, requirePermission('whatsapp.read'), WhatsAppController.getStatus);
 router.post('/accounts/:id/restart', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.restartAccount);
+// Conferir é leitura e pede `whatsapp.read`; reescrever muda o servidor e pede
+// `whatsapp.config`. Quem está de plantão descobre a causa sem ter a permissão
+// que também cria e apaga número.
+router.get('/accounts/:id/webhook', authenticateToken, requirePermission('whatsapp.read'), WhatsAppController.checkWebhook);
+router.post('/accounts/:id/webhook', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.reapplyWebhook);
 router.post('/accounts/:id/disconnect', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.disconnectAccount);
 router.patch('/accounts/:id', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.updateAccount);
 router.delete('/accounts/:id', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.deleteAccount);

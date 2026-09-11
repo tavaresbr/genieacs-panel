@@ -32,7 +32,12 @@ import {
   readSentId,
   readInstances,
   readNumberChecks,
-  webhookUrlWithToken
+  readWebhook,
+  redigirToken,
+  setWebhookRequest,
+  webhookUrlWithToken,
+  webhookVerdict,
+  WEBHOOK_VERDICTS
 } from '../src/utils/wa/evolutionApi.js';
 
 describe('host allowlist', () => {
@@ -434,5 +439,86 @@ describe('evolution api translation', () => {
   test('the webhook secret goes in the query, and an existing query is dropped', () => {
     assert.equal(webhookUrlWithToken('https://p/hook', 'a b'), 'https://p/hook?t=a%20b');
     assert.equal(webhookUrlWithToken('https://p/hook?x=1#f', 'tok'), 'https://p/hook?t=tok');
+  });
+});
+
+describe('webhook verdict', () => {
+  const ESPERADO = 'https://painel.provedor.com.br/api/whatsapp-webhook?t=segredo';
+  const completo = {
+    enabled: true,
+    byEvents: false,
+    url: ESPERADO,
+    events: ['QRCODE_UPDATED', 'CONNECTION_UPDATE', 'MESSAGES_UPSERT', 'MESSAGES_UPDATE']
+  };
+  const veredito = (patch) => webhookVerdict({ ...completo, ...patch }, ESPERADO).verdict;
+
+  test('nada a consertar quando o servidor tem exatamente o que escrevemos', () => {
+    assert.equal(veredito({}), WEBHOOK_VERDICTS.OK);
+  });
+
+  test('a barra final e o `+` na query não inventam divergência', () => {
+    // O Evolution e os proxies na frente dele já reescreveram a URL das duas
+    // formas. Um veredito que muda por causa disso manda o operador consertar
+    // o que não está quebrado, que é o mais caro dos dois erros possíveis aqui.
+    assert.equal(veredito({ url: `${ESPERADO}/` }), WEBHOOK_VERDICTS.OK);
+    assert.equal(veredito({ url: 'https://painel.provedor.com.br/api/whatsapp-webhook/?t=segredo' }), WEBHOOK_VERDICTS.OK);
+  });
+
+  test('cada jeito de estar quebrado tem o SEU veredito', () => {
+    assert.equal(veredito({ url: '' }), WEBHOOK_VERDICTS.ABSENT);
+    assert.equal(veredito({ enabled: false }), WEBHOOK_VERDICTS.DISABLED);
+    assert.equal(veredito({ url: 'https://n8n.exemplo.test/hook?t=segredo' }), WEBHOOK_VERDICTS.URL_MISMATCH);
+    assert.equal(veredito({ url: `${ESPERADO}-outro` }), WEBHOOK_VERDICTS.TOKEN_MISMATCH);
+    assert.equal(veredito({ byEvents: true }), WEBHOOK_VERDICTS.BY_EVENTS);
+    assert.equal(veredito({ events: ['CONNECTION_UPDATE'] }), WEBHOOK_VERDICTS.EVENTS_MISSING);
+  });
+
+  test('campo ausente conta como ligado, e lista vazia não acusa falta', () => {
+    // Versões antigas do v2 não devolvem `enabled` nem `events`. Tratá-las como
+    // desligadas ou sem assinatura seria acusar um servidor são.
+    const antigo = readWebhook({ webhook: { url: ESPERADO } });
+    assert.equal(antigo.enabled, true);
+    assert.deepEqual(antigo.events, []);
+    assert.equal(webhookVerdict(antigo, ESPERADO).verdict, WEBHOOK_VERDICTS.OK);
+  });
+
+  test('o token nunca sai inteiro, venha a URL de onde vier', () => {
+    // Cada caso traz o SEU segredo, e cada um é procurado na saída. A primeira
+    // escrita disto foi `!inclui('segredo') || !inclui('SEGREDO')`, que é
+    // verdadeira para qualquer texto — uma asserção que não pode falhar não é
+    // prova de nada, e esta é justamente a que guarda um segredo.
+    const casos = [
+      [ESPERADO, 'segredo'],
+      [`${ESPERADO}&x=1`, 'segredo'],
+      ['http://p/h?T=SEGREDO', 'SEGREDO'],
+      ['http://p/h?a=1&t=outro#frag', 'outro']
+    ];
+    for (const [url, segredo] of casos) {
+      const saida = redigirToken(url);
+      assert.ok(!saida.includes(segredo), `${url} vazou ${segredo} em ${saida}`);
+      assert.ok(saida.includes('***'), `${url} não foi redigida: ${saida}`);
+    }
+    assert.equal(redigirToken(ESPERADO), 'https://painel.provedor.com.br/api/whatsapp-webhook?t=***');
+    assert.ok(!webhookVerdict(completo, ESPERADO).serverUrl.includes('segredo'));
+  });
+
+  test('a reescrita do v2 leva a lista de eventos junto, e byEvents desligado', () => {
+    // O v2 trata isto como substituição INTEIRA: mandar só a URL deixaria um
+    // webhook configurado que não assina nada — o mesmo silêncio, com
+    // aparência de conserto.
+    const pedido = setWebhookRequest('v2', 'painel-01', ESPERADO);
+    assert.equal(pedido.path, '/webhook/set/painel-01');
+    assert.equal(pedido.key, 'instance');
+    assert.equal(pedido.body.webhook.byEvents, false);
+    assert.ok(pedido.body.webhook.events.includes('MESSAGES_UPSERT'));
+    // Os dois formatos, porque as versões do v2 leem em lugares diferentes.
+    assert.equal(pedido.body.webhook_by_events, false);
+    assert.ok(pedido.body.events.includes('MESSAGES_UPSERT'));
+  });
+
+  test('no GO a reescrita é o connect, que é quem grava instance.Webhook', () => {
+    const pedido = setWebhookRequest('go', 'painel-01', ESPERADO);
+    assert.equal(pedido.path, '/instance/connect');
+    assert.equal(pedido.body.webhookUrl, ESPERADO);
   });
 });

@@ -213,6 +213,42 @@ function notesFor(
     })
   }
 
+  // 4b. Por que nada chega. A nota acima diz QUE o silêncio existe; esta diz de
+  //     onde ele vem, e é a diferença entre um operador que abre um chamado e
+  //     um que conserta em dois minutos.
+  //
+  //     A ordem é a da certeza. Uma recusa registrada é o fato mais forte que
+  //     o painel tem — o Evolution ESTÁ chamando, e está levando 401 —, e ela
+  //     vale mesmo quando alguma coisa já chegou um dia, porque é sempre a
+  //     causa de o que chega ter parado. Um veredito divergente vem depois:
+  //     ele é o que uma conferência viu. "Nunca conferido" é o mais fraco dos
+  //     três e por isso só aparece quando o silêncio já é notícia: oferecer a
+  //     conferência a quem está recebendo mensagens normalmente seria ruído.
+  if (health.webhook.refusedAt) {
+    notes.push({
+      key: 'webhook-refused',
+      tone: 'alarm',
+      icon: 'x',
+      text: t('whatsapp.health.webhookRefused', {
+        when: formatRelativeTime(health.webhook.refusedAt)
+      })
+    })
+  } else if (health.webhook.broken > 0) {
+    notes.push({
+      key: 'webhook-broken',
+      tone: 'alarm',
+      icon: 'x',
+      text: t('whatsapp.health.webhookBroken', { count: formatNumber(health.webhook.broken) })
+    })
+  } else if (health.webhook.unchecked > 0 && anyConnected && health.lastInboundAt === null) {
+    notes.push({
+      key: 'webhook-unchecked',
+      tone: 'warn',
+      icon: 'alert',
+      text: t('whatsapp.health.webhookUnchecked', { count: formatNumber(health.webhook.unchecked) })
+    })
+  }
+
   // 5. What is on disk. Always the quietest thing here — it is a fact about
   //    storage, not about whether anything works, and the sweeper that deletes
   //    it is somebody else's route. This strip only counts.

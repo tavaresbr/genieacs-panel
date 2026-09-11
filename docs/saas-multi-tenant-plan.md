@@ -1387,3 +1387,75 @@ enumerar: um host que não resolve responde o mesmo 404 de qualquer outro.
 - `CORS_ORIGINS` **não muda**: `isAllowedOrigin` já aceita uma origem cujo host
   é o host da própria requisição, que é exatamente o caso do subdomínio.
 - Domínio próprio do provedor (`painel.provedor.com.br`) continua adiado.
+
+---
+
+## Onda 24 — o webhook do Evolution deixa de ser suposto ✅ *(implementada)*
+
+O sintoma que abriu esta onda é uma tela: **"1 de 1 números conectados"** ao lado
+de **"Nunca chegou nada"**. O painel conversava com o servidor Evolution sem
+problema — era ele quem perguntava o estado da conexão e recebia resposta — e
+nada voltava no sentido contrário.
+
+### A causa: a URL era escrita uma vez e nunca mais lida
+
+O webhook entrava **dentro do corpo do `POST /instance/create`** e acabava ali.
+Não havia rota que o lesse de volta nem que o reescrevesse. Três caminhos
+comuns deixavam o servidor e o painel divergindo, e nenhum deles dava erro em
+lugar nenhum:
+
+1. **A instância já existia no servidor.** O create responde *"already exists"*,
+   `createAccount` cai no ramo que só recupera o id pela listagem — e o webhook
+   do payload **nunca é escrito**. O número pareia, conecta e não entrega nada.
+   É o caminho de quem aponta o painel para um Evolution que já estava rodando,
+   que é o caso comum de quem já usava a API antes.
+2. **Alguém mexeu no webhook pela interface do Evolution.**
+3. **O `webhookBaseUrl` do painel mudou depois do pareamento** — mudança que não
+   alcança instância nenhuma já criada.
+
+### O que entrou
+
+- `findWebhookRequest` / `setWebhookRequest` e o veredito **puro**
+  `webhookVerdict`, em `utils/wa/evolutionApi.js`. Puro porque é a regra que
+  decide o que o operador lê na tela, e uma regra dessas tem que poder ser
+  travada em teste sem servidor nenhum.
+- `inspectWebhook` e `reapplyWebhook` no serviço, com as rotas
+  `GET`/`POST /api/whatsapp/accounts/:id/webhook`. **Conferir é leitura**
+  (`whatsapp.read`) e **reescrever muda o servidor** (`whatsapp.config`): quem
+  está de plantão descobre a causa sem ter a permissão que também cria e apaga
+  número.
+- A **trilha da recusa**: um evento que chega e leva 401 grava
+  `webhook_refused_at` e o motivo. É o que separa *"o Evolution não está
+  chamando"* de *"está chamando e sendo recusado"* — dois problemas com
+  consertos opostos que, sem isto, eram a mesma frase vermelha na tela.
+
+### Três decisões que valem escrever
+
+**Um veredito por conserto.** `absent`, `url_mismatch`, `token_mismatch`,
+`disabled`, `by_events`, `events_missing`, `unreachable`. Dois estados que se
+consertam do mesmo jeito seriam um só — `absent` e `token_mismatch` levam à
+mesma reescrita, mas quem lê "ausente" sabe que a instância já existia antes do
+painel, e quem lê "token" sabe que o painel já escreveu ali um dia. Isso muda
+para onde ir quando a reescrita **não** resolver.
+
+**O conserto NÃO troca o token.** Trocá-lo abriria uma janela em que o painel já
+espera o token novo e o servidor ainda manda o antigo: todo evento dessa janela
+vira 401 — exatamente a falha que o conserto existe para acabar. Token novo só
+quando não há nenhum guardado.
+
+**Campo ausente conta como certo.** Versões antigas do v2 não devolvem `enabled`
+nem `events`. Tratá-las como desligadas ou sem assinatura acusaria um servidor
+são, e esse é o mais caro dos dois erros possíveis aqui: ele manda o operador
+consertar o que não está quebrado, e o veredito perde o crédito no dia em que
+estiver certo.
+
+### O que NÃO entra
+
+- **O Evolution GO fica sem conferência.** Lá o webhook vive em
+  `instance.Webhook` e não existe rota que o devolva. O conserto (reescrever
+  pelo `connect`) continua disponível e é idempotente; o que não se faz é
+  responder `ok` sem ter lido — seria a mesma confiança cega que criou o
+  problema. A tela diz `supported: false` em vez de inventar veredito.
+- **Conferência automática no boot ou por relógio.** Ela custa uma volta ao
+  servidor Evolution por número, e a tira de saúde já oferece a conferência
+  exatamente quando ela importa: número conectado e nada tendo chegado nunca.

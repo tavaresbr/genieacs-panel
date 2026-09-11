@@ -14,9 +14,14 @@ import {
   readNumberChecks,
   readQr,
   readStatus,
+  readWebhook,
   reconnectRequest,
+  setWebhookRequest,
   statusRequest,
-  webhookUrlWithToken
+  findWebhookRequest,
+  webhookUrlWithToken,
+  webhookVerdict,
+  WEBHOOK_VERDICTS
 } from '../utils/wa/evolutionApi.js';
 
 /** How much of a server message is kept in `last_error` / `serverError`. */
@@ -340,6 +345,135 @@ class EvolutionInstanceService {
       patch.qr_updated_at = null;
     }
     return { account: await WhatsAppAccount.update(account.id, patch), state };
+  }
+
+
+  /**
+   * A URL de webhook que o painel escreveria para esta conta HOJE.
+   *
+   * Reconstruída do `webhookBaseUrl` atual e do token guardado, e não lida de
+   * lugar nenhum: é justamente por o painel nunca ter guardado a URL que
+   * escreveu que a divergência com o servidor podia durar para sempre.
+   */
+  static expectedWebhookUrl(account, config) {
+    const token = WhatsAppConfigService.decryptWebhookToken(account);
+    if (!config.webhookBaseUrl || !token) return '';
+    return webhookUrlWithToken(config.webhookBaseUrl, token);
+  }
+
+  /**
+   * Pergunta ao servidor qual webhook ele tem, e compara com o que deveria ser.
+   *
+   * É a resposta para a pergunta que o painel não sabia responder: "o número
+   * está conectado e não chega nada — de quem é a culpa?". Sem esta leitura, o
+   * webhook ausente, o webhook apontando para outro lugar e o webhook certo que
+   * ninguém está chamando são o mesmo silêncio.
+   *
+   * NÃO consome a falha de rede como veredito errado: um servidor fora do ar
+   * responde `unreachable` e não `absent`. A diferença importa porque `absent`
+   * manda o operador reescrever o webhook, e reescrever contra um servidor
+   * mudo não conserta nada — só troca o token e, se a reescrita falhar no meio,
+   * deixa o painel esperando um token que o servidor não tem.
+   */
+  static async inspectWebhook(id) {
+    const config = await this.requireConfig();
+    const account = await this.loadAccount(id);
+    const esperado = this.expectedWebhookUrl(account, config);
+
+    // O GO não tem rota que devolva o webhook: ele vive em `instance.Webhook` e
+    // só o connect escreve. Lá a conferência não existe, e dizer o contrário
+    // seria inventar um veredito — o conserto (reescrever) continua disponível
+    // e é idempotente.
+    const pedido = findWebhookRequest(account.flavor, account.name);
+    if (!pedido) {
+      return { account, verdict: null, supported: false, serverUrl: '', expectedUrl: esperado };
+    }
+    if (!esperado) {
+      // Sem `webhookBaseUrl` configurado não há com o que comparar, e o
+      // problema é aqui, não lá.
+      throw new WaError('whatsapp.error.webhookBaseMissing', {
+        code: 'webhook_base_missing',
+        status: 409
+      });
+    }
+
+    const client = this.clientFor(account, config);
+    let resultado;
+    try {
+      resultado = await client.send(pedido);
+    } catch {
+      resultado = null;
+    }
+    if (!resultado?.ok) {
+      const registrado = await this.recordWebhookCheck(account, {
+        verdict: WEBHOOK_VERDICTS.UNREACHABLE,
+        serverUrl: ''
+      });
+      return {
+        account: registrado,
+        verdict: WEBHOOK_VERDICTS.UNREACHABLE,
+        supported: true,
+        serverUrl: '',
+        expectedUrl: esperado
+      };
+    }
+
+    const { verdict, serverUrl } = webhookVerdict(readWebhook(resultado.data), esperado);
+    const registrado = await this.recordWebhookCheck(account, { verdict, serverUrl });
+    return { account: registrado, verdict, supported: true, serverUrl, expectedUrl: esperado };
+  }
+
+  /**
+   * Reescreve o webhook no servidor e confere o resultado lendo de volta.
+   *
+   * O token é o MESMO, e isso é decisão e não economia. Trocá-lo a cada
+   * conserto deixaria uma janela em que o painel já espera o token novo e o
+   * servidor ainda manda o antigo — todo evento dessa janela vira 401, que é
+   * exatamente a falha que este conserto existe para acabar. O token só é novo
+   * quando não há nenhum guardado.
+   *
+   * A leitura de volta é o que separa "mandei" de "está valendo": um v2 que
+   * aceita o POST e ignora metade do payload responde 200 do mesmo jeito.
+   */
+  static async reapplyWebhook(id) {
+    const config = await this.requireConfig({ requireWebhook: true });
+    let account = await this.loadAccount(id);
+
+    let token = WhatsAppConfigService.decryptWebhookToken(account);
+    if (!token) {
+      token = randomToken();
+      account = await WhatsAppAccount.update(
+        account.id,
+        WhatsAppConfigService.encryptWebhookToken(token)
+      );
+    }
+    const url = webhookUrlWithToken(config.webhookBaseUrl, token);
+
+    const client = this.clientFor(account, config);
+    await client.sendOrThrow(setWebhookRequest(account.flavor, account.name, url));
+
+    // O GO não devolve o webhook, então ali o conserto é a própria escrita e o
+    // veredito fica sem conferência — dizer `ok` sem ter lido seria a mesma
+    // confiança cega que criou este problema.
+    const conferencia = findWebhookRequest(account.flavor, account.name)
+      ? await this.inspectWebhook(account.id)
+      : { account, verdict: null, supported: false, serverUrl: '', expectedUrl: url };
+    return { ...conferencia, expectedUrl: url };
+  }
+
+  /**
+   * Guarda o veredito da última conferência.
+   *
+   * Guardado, e não só devolvido, porque a tela que mais precisa dele — a tira
+   * de saúde, que é onde o operador olha quando desconfia — roda a cada minuto
+   * e não pode ir ao servidor Evolution a cada volta.
+   */
+  static async recordWebhookCheck(account, { verdict, serverUrl }) {
+    return WhatsAppAccount.update(account.id, {
+      webhook_verdict: verdict,
+      webhook_server_url: serverUrl || null,
+      webhook_checked_at: new Date()
+    });
   }
 
   /** Reconnect (GO) / restart (v2), for a session that exists but went quiet. */

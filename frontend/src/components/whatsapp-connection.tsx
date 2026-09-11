@@ -12,6 +12,7 @@ import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
+import { formatRelativeTime } from '@/lib/utils'
 
 const PURPOSES: WhatsAppPurpose[] = ['general', 'billing', 'support', 'sales', 'alerts']
 
@@ -711,6 +712,35 @@ export function WhatsAppConnection({ config }: Props) {
                   </p>
                 )}
 
+                {/* O webhook como o servidor Evolution o guarda.
+                    Fica ao lado do estado da conexão porque é a OUTRA metade
+                    da mesma pergunta: um número conectado é o painel falando
+                    com o WhatsApp, e o webhook é o WhatsApp falando com o
+                    painel. Sem esta linha, "conectado" e "nada chega" eram
+                    dois fatos sem relação visível na tela. */}
+                {account.webhookVerdict && account.webhookVerdict !== 'ok' && (
+                  <p className="mt-2 text-xs text-[hsl(var(--status-danger))]">
+                    {t(`whatsapp.webhook.verdict.${account.webhookVerdict}`)}
+                    {account.webhookServerUrl && (
+                      <span className="ml-2 break-all font-mono text-muted-foreground">
+                        {account.webhookServerUrl}
+                      </span>
+                    )}
+                  </p>
+                )}
+                {account.webhookRefusedAt && (
+                  /* Um evento chegou e levou 401. É o fato mais forte que o
+                     painel tem sobre o webhook — prova que o Evolution ESTÁ
+                     chamando — e por isso aparece mesmo quando o veredito
+                     acima diz `ok`: os dois se contradizendo é exatamente o
+                     que o operador precisa ver. */
+                  <p className="mt-1 text-xs text-[hsl(var(--status-danger))]">
+                    {t(`whatsapp.webhook.refused.${account.webhookRefusedReason || 'bad_token'}`)}
+                    {' — '}
+                    {formatRelativeTime(account.webhookRefusedAt)}
+                  </p>
+                )}
+
                 {editing === account.id ? (
                   <div className="mt-3 grid gap-4 sm:grid-cols-2">
                     <div>
@@ -779,6 +809,28 @@ export function WhatsAppConnection({ config }: Props) {
                         onClick={() => void act(account, () => whatsappAPI.restartAccount(account.id))}
                       >
                         {t('whatsapp.actions.reconnect')}
+                      </button>
+                    )}
+                    {/* Conferir sempre, reescrever só quando há o que
+                        consertar. Um botão que reescreve um webhook correto
+                        não conserta nada e conversa com o servidor à toa —
+                        e, pior, ensina o operador a apertá-lo por reflexo. */}
+                    <button
+                      type="button"
+                      className="modern-button-secondary"
+                      disabled={busy}
+                      onClick={() => void act(account, () => whatsappAPI.checkWebhook(account.id))}
+                    >
+                      {t('whatsapp.actions.checkWebhook')}
+                    </button>
+                    {account.webhookVerdict && account.webhookVerdict !== 'ok' && (
+                      <button
+                        type="button"
+                        className="modern-button-secondary"
+                        disabled={busy}
+                        onClick={() => void act(account, () => whatsappAPI.reapplyWebhook(account.id))}
+                      >
+                        {t('whatsapp.actions.reapplyWebhook')}
                       </button>
                     )}
                     {account.status === 'connected' && (

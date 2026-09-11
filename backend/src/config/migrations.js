@@ -668,6 +668,22 @@ const whatsappAccountsTable = (db) => (t) => {
   t.text('webhook_token_ciphertext');
   t.string('webhook_token_iv', 32);
   t.string('webhook_token_tag', 32);
+  // O que o servidor Evolution respondeu quando lhe perguntamos qual webhook
+  // ele tem. Até existirem, a URL era escrita uma vez no create e nunca mais
+  // conferida — e as três formas de ela divergir (instância que já existia,
+  // webhook editado à mão, `webhookBaseUrl` trocado depois do pareamento)
+  // produziam o mesmo silêncio que um webhook certo nunca chamado.
+  t.string('webhook_verdict', 32);
+  // A URL do servidor COM O TOKEN REDIGIDO. Guardar a URL inteira seria
+  // guardar, em claro e na linha ao lado, o segredo que as três colunas
+  // acima existem para cifrar.
+  t.string('webhook_server_url', 255);
+  t.timestamp('webhook_checked_at');
+  // Chegou e foi recusado. É o que distingue "o Evolution não está chamando"
+  // de "está chamando e levando 401" — dois problemas com consertos opostos
+  // que, sem isto, aparecem na tela como o mesmo "Nunca chegou nada".
+  t.timestamp('webhook_refused_at');
+  t.string('webhook_refused_reason', 32);
   t.timestamp('created_at').defaultTo(db.fn.now());
   t.timestamp('updated_at').defaultTo(db.fn.now());
 };
@@ -2536,6 +2552,38 @@ export const migrations = [
         });
       }
       await createTableIfMissing(db, 'auth_tickets', authTicketsTable(db));
+    }
+  },
+  {
+    /**
+     * As colunas que deixam o webhook ser conferido em vez de suposto.
+     *
+     * A URL do webhook era escrita uma única vez, dentro do corpo do create, e
+     * nunca mais lida. Quando ela divergia do que o painel espera — instância
+     * que já existia no servidor e caiu no ramo "already exists", webhook
+     * editado pela interface do Evolution, `webhookBaseUrl` trocado depois do
+     * pareamento — não havia onde isso aparecesse. O painel mostrava o número
+     * conectado e nada chegando, que é indistinguível de um webhook correto
+     * que ninguém está chamando.
+     */
+    id: '0040_whatsapp_webhook_check',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('whatsapp_accounts'))) return true;
+      return db.schema.hasColumn('whatsapp_accounts', 'webhook_verdict');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('whatsapp_accounts'))) return;
+      const faltando = await missingColumns(db, 'whatsapp_accounts', [
+        ['webhook_verdict', (t) => t.string('webhook_verdict', 32)],
+        ['webhook_server_url', (t) => t.string('webhook_server_url', 255)],
+        ['webhook_checked_at', (t) => t.timestamp('webhook_checked_at')],
+        ['webhook_refused_at', (t) => t.timestamp('webhook_refused_at')],
+        ['webhook_refused_reason', (t) => t.string('webhook_refused_reason', 32)]
+      ]);
+      if (!faltando.length) return;
+      await db.schema.alterTable('whatsapp_accounts', (t) => {
+        for (const add of faltando) add(t);
+      });
     }
   }
 ];

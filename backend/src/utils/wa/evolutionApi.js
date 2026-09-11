@@ -527,3 +527,185 @@ export function webhookUrlWithToken(baseUrl, token) {
   const clean = String(baseUrl || '').replace(/[?#].*$/, '');
   return `${clean}?t=${enc(token)}`;
 }
+
+// ────────────────────────────────────────────────────────────────────
+// Conferir o webhook depois da criação
+//
+// Até aqui a URL do webhook era escrita UMA vez, no corpo do create, e nunca
+// mais lida. Três caminhos comuns deixam o servidor e o painel divergindo, e
+// nenhum deles dá erro em lugar nenhum:
+//
+//   - a instância JÁ EXISTIA no servidor. O create responde "already exists",
+//     `createAccount` cai no ramo que só descobre o id, e o webhook nunca é
+//     escrito. O número pareia, conecta, e não entrega nada.
+//   - alguém mexeu no webhook pela interface do Evolution.
+//   - o `webhookBaseUrl` do painel mudou depois do pareamento — mudança que
+//     não alcança as instâncias já criadas.
+//
+// O sintoma dos três é o mesmo e é mudo: "1 de 1 números conectados" ao lado
+// de "Nunca chegou nada". Sem ler de volta o que o servidor tem, não há como
+// distinguir isso de um webhook certo que não está sendo chamado.
+// ────────────────────────────────────────────────────────────────────
+
+/**
+ * O que o servidor diz que o webhook desta instância é.
+ *
+ * Só o v2 responde: no GO o webhook vive em `instance.Webhook` e não há rota
+ * que o devolva — lá a conferência é a própria reescrita, que é idempotente.
+ *
+ * @returns {EvoRequest|null} null no GO
+ */
+export function findWebhookRequest(flavor, name) {
+  if (flavor === 'go') return null;
+  return { path: `/webhook/find/${enc(name)}`, method: 'GET', key: 'instance' };
+}
+
+/**
+ * Reescreve o webhook de uma instância que já existe.
+ *
+ * O payload repete o do create de propósito, campo a campo: versões do v2
+ * tratam PUT/POST aqui como substituição INTEIRA, então mandar só a URL apaga
+ * a lista de eventos e deixa um webhook configurado que não assina nada — o
+ * mesmo silêncio, com aparência de conserto.
+ *
+ * `byEvents` continua false pelo motivo escrito no create: com ele o servidor
+ * acrescenta o nome do evento ao FIM da URL, depois da query, e o `?t=` deixa
+ * de ser lido como query — que é como o webhook se autentica.
+ *
+ * @returns {EvoRequest|null} null no GO, onde quem reescreve é o connect
+ */
+export function setWebhookRequest(flavor, name, webhookUrl) {
+  if (flavor === 'go') return connectRequest(flavor, webhookUrl);
+  return {
+    path: `/webhook/set/${enc(name)}`,
+    method: 'POST',
+    key: 'instance',
+    // Os dois formatos: o v2 novo espera tudo sob `webhook`, o anterior espera
+    // os campos na raiz. Propriedade desconhecida é tolerada pelos dois, então
+    // mandar os dois é o que torna esta chamada independente da versão.
+    body: {
+      webhook: {
+        enabled: true,
+        url: webhookUrl,
+        byEvents: false,
+        base64: true,
+        events: V2_WEBHOOK_EVENTS
+      },
+      enabled: true,
+      url: webhookUrl,
+      webhook_by_events: false,
+      webhook_base64: true,
+      events: V2_WEBHOOK_EVENTS
+    }
+  };
+}
+
+/**
+ * O webhook como o servidor o guarda, nos formatos que as versões do v2 usam.
+ *
+ * @returns {{ url: string, enabled: boolean, byEvents: boolean, events: string[] }}
+ */
+export function readWebhook(data) {
+  const d = unwrap(data);
+  const w = d.webhook && typeof d.webhook === 'object' ? d.webhook : d;
+  const eventos = Array.isArray(w.events) ? w.events : [];
+  return {
+    url: String(w.url ?? w.webhookUrl ?? w.Webhook ?? ''),
+    // Ausente conta como LIGADO: versões antigas não devolvem o campo, e
+    // tratá-las como desligadas produziria um veredito errado — o mais caro
+    // dos dois, porque manda o operador consertar o que não está quebrado.
+    enabled: w.enabled === undefined ? true : Boolean(w.enabled),
+    byEvents: Boolean(w.byEvents ?? w.webhook_by_events ?? w.webhookByEvents),
+    events: eventos.map((e) => String(e).toUpperCase())
+  };
+}
+
+/**
+ * Os vereditos, do pior para o melhor. Cada um tem UM conserto, e é isso que
+ * os separa: dois estados que se consertam do mesmo jeito seriam um só.
+ */
+export const WEBHOOK_VERDICTS = Object.freeze({
+  /** O servidor não tem webhook nenhum. Instância que já existia, quase sempre. */
+  ABSENT: 'absent',
+  /** Tem webhook, mas apontando para outro lugar. */
+  URL_MISMATCH: 'url_mismatch',
+  /** A URL é a nossa, o token não. Todo evento bate na porta e leva 401. */
+  TOKEN_MISMATCH: 'token_mismatch',
+  /** Configurado e DESLIGADO. */
+  DISABLED: 'disabled',
+  /** `byEvents` ligado: o nome do evento vai para o fim da URL e mata o `?t=`. */
+  BY_EVENTS: 'by_events',
+  /** Assina menos eventos do que precisamos. Chega parte, e some parte. */
+  EVENTS_MISSING: 'events_missing',
+  /** Não deu para perguntar ao servidor. */
+  UNREACHABLE: 'unreachable',
+  /** Nada a consertar aqui. */
+  OK: 'ok'
+});
+
+/**
+ * Compara o que o servidor tem com o que o painel espera.
+ *
+ * Puro de propósito, como o resto deste módulo: é a regra que decide o que o
+ * operador vai ler na tela, e uma regra dessas tem que poder ser travada em
+ * teste sem servidor nenhum.
+ *
+ * A ordem das checagens é a ordem do conserto, e não a da gravidade: um
+ * webhook ausente e um com token errado consertam-se com a MESMA chamada, mas
+ * o operador que lê "ausente" sabe que a instância já existia antes do painel,
+ * e o que lê "token" sabe que o painel já escreveu ali um dia. As duas frases
+ * levam a lugares diferentes quando o conserto não resolve.
+ *
+ * @param {{ url: string, enabled: boolean, byEvents: boolean, events: string[] }} servidor
+ * @param {string} esperado a URL completa que o painel escreveria hoje
+ * @returns {{ verdict: string, serverUrl: string }}
+ */
+export function webhookVerdict(servidor, esperado) {
+  const s = servidor ?? { url: '', enabled: true, byEvents: false, events: [] };
+  // Redigido SEMPRE, e antes de qualquer retorno: esta URL carrega o token do
+  // webhook e vai para a tela, para o log e para uma coluna do banco que fica
+  // ao lado da versão cifrada dele. Guardar a URL inteira seria guardar o
+  // segredo em claro do lado do cofre.
+  const serverUrl = redigirToken(s.url);
+  const v = (verdict) => ({ verdict, serverUrl });
+
+  if (!s.url) return v(WEBHOOK_VERDICTS.ABSENT);
+  if (!s.enabled) return v(WEBHOOK_VERDICTS.DISABLED);
+
+  const nosso = partesDaUrl(esperado);
+  const dele = partesDaUrl(s.url);
+  if (!nosso.base || dele.base !== nosso.base) return v(WEBHOOK_VERDICTS.URL_MISMATCH);
+  if (dele.token !== nosso.token) return v(WEBHOOK_VERDICTS.TOKEN_MISMATCH);
+
+  // Depois da URL, porque byEvents só importa quando a URL já é a nossa: é
+  // dela que ele estraga a query.
+  if (s.byEvents) return v(WEBHOOK_VERDICTS.BY_EVENTS);
+
+  // Lista vazia é o servidor que não devolve o campo, não um servidor sem
+  // assinatura nenhuma — a mesma leniência do `enabled`, pelo mesmo motivo.
+  if (s.events.length && V2_WEBHOOK_EVENTS.some((e) => !s.events.includes(e))) {
+    return v(WEBHOOK_VERDICTS.EVENTS_MISSING);
+  }
+  return v(WEBHOOK_VERDICTS.OK);
+}
+
+/** A URL sem o token, e o token. Uma URL ilegível vira base vazia, que nunca casa. */
+function partesDaUrl(url) {
+  const texto = String(url || '');
+  if (!texto) return { base: '', token: '' };
+  const corte = texto.indexOf('?');
+  const base = (corte === -1 ? texto : texto.slice(0, corte)).replace(/\/+$/, '');
+  let token = '';
+  if (corte !== -1) {
+    // Sem `new URL`: a URL vem do servidor e pode não ser absoluta. O que
+    // interessa é um parâmetro só, e lê-lo à mão não lança.
+    const t = /(?:^|&)t=([^&#]*)/.exec(texto.slice(corte + 1));
+    if (t) token = decodeURIComponent(t[1].replace(/\+/g, ' ')).replace(/\/+$/, '');
+  }
+  return { base, token };
+}
+
+/** A URL como ela pode ser mostrada: tudo, menos o segredo. */
+export function redigirToken(url) {
+  return String(url || '').replace(/([?&]t=)[^&#]*/i, '$1***').slice(0, 255);
+}
