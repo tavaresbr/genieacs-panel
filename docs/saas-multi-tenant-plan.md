@@ -1459,3 +1459,83 @@ estiver certo.
 - **Conferência automática no boot ou por relógio.** Ela custa uma volta ao
   servidor Evolution por número, e a tira de saúde já oferece a conferência
   exatamente quando ela importa: número conectado e nada tendo chegado nunca.
+
+---
+
+## Onda 25 — a volta, que é a leitura que faltava ✅ *(implementada)*
+
+A onda 24 deu ao painel como perguntar ao servidor Evolution qual webhook ele
+guarda. **O operador conferiu, o veredito respondeu `ok`, e nada chegou mesmo
+assim.** O buraco estava no que aquele `ok` significa.
+
+### Um diagnóstico que confirma como são uma instalação quebrada
+
+`webhookVerdict` compara o que o servidor guarda com o que o painel **espera** —
+e as duas pontas dessa comparação saem do mesmo `webhookBaseUrl`. Esse campo é
+digitado à mão e conferido só na **forma**: absoluto, `http(s)`, sem credencial.
+Ninguém confere que o caminho é o que o painel atende (`/api/whatsapp-webhook`),
+nem que o endereço chega ao painel.
+
+Com um endereço errado os dois lados concordam, porque são a mesma coisa. Três
+jeitos de errar aquele campo, todos silenciosos e todos aprovados pela
+comparação:
+
+1. **Sem caminho nenhum** (`https://painel.exemplo.com`). O POST cai na raiz, o
+   painel devolve o HTML do frontend com 200, e o Evolution registra entrega
+   bem-sucedida. **O pior dos três**, porque tudo parece certo nas duas pontas.
+2. **Caminho parecido e errado** (`/api/whatsapp/webhook`). 404 em toda entrega.
+3. **O endereço certo atrás de um proxy** que recusa POST de fora.
+
+Foi o erro de desenho da onda anterior, e ele é do tipo que encerra a conversa:
+um controle que responde "ligado" sem proteger é pior que nenhum.
+
+### O que entrou
+
+**O painel se chama pela porta da frente.** `POST
+/api/whatsapp/accounts/:id/webhook/probe` manda uma sonda para o próprio
+endereço público — a URL completa, **com o token** — e lê a volta.
+
+**O nonce é o que faz isso ser prova.** Sem ele, "200" seria a resposta tanto do
+webhook quanto da página de login do frontend, que é o caso 1. O painel sorteia
+16 bytes, manda, e só aceita a volta se o **mesmo valor** voltar. Uma página
+HTML não contém o nonce; o webhook autenticado devolve-o.
+
+**E ele volta só DEPOIS da autorização**, o que faz a volta provar duas coisas
+de uma vez: que o endereço chega aqui, e que o token guardado é o que esta rota
+aceita. `unauthorized` na volta tem um significado exato e útil — *este endereço
+leva a outro painel*.
+
+Sete vereditos, e cada um é um conserto diferente: `reached`, `wrong_target`,
+`not_found`, `blocked`, `unauthorized`, `server_error`, `unreachable`.
+
+### Três decisões
+
+**Vai por `safeFetch`, não por `fetch`.** O endereço é digitado por quem
+administra, e o mesmo guarda que protege a busca ao servidor Evolution vale
+aqui — host revalidado a cada redirecionamento, prazo e teto de corpo. Sem ele,
+o campo do webhook viraria um jeito de fazer o painel bater em endereço interno
+e contar o resultado. A rota pede `whatsapp.config` pelo mesmo motivo: é a
+permissão que já decide para qual servidor o painel fala.
+
+**A falha de transporte não vira exceção.** O operador pediu um diagnóstico, e
+"não deu para chegar" **é** o diagnóstico. Lançar trocaria a resposta útil por
+um 502 genérico.
+
+**A sonda não grava nada.** Uma linha no banco seria uma conversa falsa na caixa
+do operador, e o diagnóstico passaria a sujar o que veio diagnosticar.
+
+### Um erro que quase passou
+
+`canonicalizarEvento` troca ponto por sublinhado, então comparar o evento
+recebido com `'panel.probe'` **nunca casa**: a sonda cairia no caminho dos
+eventos de verdade e a volta responderia `wrong_target` contra o próprio webhook
+são — o diagnóstico mentindo sobre si mesmo. Daí `PROBE_EVENT_CANONICAL` existir
+ao lado de `PROBE_EVENT`, com o motivo escrito.
+
+### O que NÃO entra
+
+- **Sonda automática.** Ela emite uma requisição de saída por número. Fica no
+  botão e na tira de saúde, que já a oferece quando importa.
+- **Conferir o `webhookBaseUrl` na hora de salvar.** Seria a mesma volta num
+  momento pior: a configuração ainda não tem conta nenhuma pareada, e o token
+  que autentica a volta nasce com a instância.

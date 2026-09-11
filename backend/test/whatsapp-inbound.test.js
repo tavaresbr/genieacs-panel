@@ -604,3 +604,58 @@ describe('um evento que chega e é recusado', () => {
     assert.equal(await mensagemPorId('NAO-GRAVADO'), null);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// A outra metade da volta: o que esta rota responde à sonda
+//
+// A volta só vale como prova por responder DEPOIS da autorização. É isso que
+// faz um `reached` significar duas coisas de uma vez — que o endereço chega
+// aqui, e que o token guardado é o que esta rota aceita.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('a sonda do próprio painel', () => {
+  const sonda = (nonce) => ({
+    event: 'panel.probe',
+    instance: INSTANCE,
+    probe: { nonce }
+  });
+
+  it('devolve o nonce quando o token confere', async () => {
+    const nonce = 'a1b2c3d4e5f60718293a4b5c6d7e8f90';
+    const { status, body } = await call(`${panelUrl}/api/whatsapp-webhook?t=${WEBHOOK_TOKEN}`, {
+      method: 'POST',
+      body: sonda(nonce)
+    });
+    assert.equal(status, 200);
+    assert.equal(body.pong, nonce);
+  });
+
+  it('NÃO devolve o nonce com o token errado', async () => {
+    const nonce = 'b1b2c3d4e5f60718293a4b5c6d7e8f90';
+    const { status, body } = await call(`${panelUrl}/api/whatsapp-webhook?t=errado`, {
+      method: 'POST',
+      body: sonda(nonce)
+    });
+    // Se o eco viesse antes da autorização, a volta diria `reached` sobre um
+    // token divergente — exatamente a falha que ela existe para achar.
+    assert.equal(status, 401);
+    assert.equal(body.pong, undefined);
+  });
+
+  it('não grava nada: um diagnóstico não suja a caixa que veio diagnosticar', async () => {
+    const antes = await conversas().count({ total: '*' });
+    await call(`${panelUrl}/api/whatsapp-webhook?t=${WEBHOOK_TOKEN}`, {
+      method: 'POST',
+      body: sonda('c1b2c3d4e5f60718293a4b5c6d7e8f90')
+    });
+    const depois = await conversas().count({ total: '*' });
+    assert.deepEqual(depois, antes);
+  });
+
+  it('não ecoa lixo: o corpo da sonda não escolhe o tamanho da resposta', async () => {
+    const { body } = await call(`${panelUrl}/api/whatsapp-webhook?t=${WEBHOOK_TOKEN}`, {
+      method: 'POST',
+      body: sonda('x'.repeat(5000))
+    });
+    assert.equal(body.pong, '');
+  });
+});

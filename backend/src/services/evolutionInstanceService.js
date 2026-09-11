@@ -2,6 +2,8 @@ import crypto from 'node:crypto';
 import WhatsAppAccount from '../models/WhatsAppAccount.js';
 import WhatsAppConfigService, { PURPOSES, WaError, randomToken } from './whatsappConfigService.js';
 import { EvolutionClient, clientForAccount } from './evolutionClient.js';
+import { safeFetch } from '../utils/wa/ssrfGuard.js';
+import { mintNonce, probeBody, probeVerdict } from '../utils/wa/waWebhookProbe.js';
 import {
   checkNumbersRequest,
   connectRequest,
@@ -26,6 +28,34 @@ import {
 
 /** How much of a server message is kept in `last_error` / `serverError`. */
 const FAILURE_TEXT_LIMIT = 300;
+
+/**
+ * Prazo da volta do webhook.
+ *
+ * Bem mais curto que os 30 s do padrão, e de propósito: quem apertou o botão
+ * está olhando a tela. Um endereço que leva meio minuto para responder já é o
+ * diagnóstico — e o operador prefere saber disso em cinco segundos.
+ */
+const PROBE_TIMEOUT_MS = 5_000;
+
+/** O que se procura na volta cabe em 32 caracteres; o resto é destino errado. */
+const PROBE_MAX_BYTES = 64 * 1024;
+
+/**
+ * Ponto de injeção para o teste, como `setMediaFetcher` no serviço de mídia.
+ *
+ * A volta só é prova se ela puder ser exercida de verdade, e o caso que mais
+ * importa — 200 devolvendo o HTML do frontend em vez do webhook — não existe
+ * sem um destino que responda exatamente isso. `safeFetch` recusa loopback, e
+ * corretamente: é o guarda que impede o campo do webhook de virar um jeito de
+ * fazer o painel bater em endereço interno. A costura fica aqui, e não lá.
+ */
+let buscarNaVolta = safeFetch;
+
+export function setProbeFetcher(fn) {
+  buscarNaVolta = typeof fn === 'function' ? fn : safeFetch;
+  return buscarNaVolta;
+}
 
 /** One check request is one round trip to WhatsApp, so it stays bounded. */
 const MAX_NUMBER_CHECK = 100;
@@ -474,6 +504,63 @@ class EvolutionInstanceService {
       webhook_server_url: serverUrl || null,
       webhook_checked_at: new Date()
     });
+  }
+
+
+  /**
+   * A volta completa: o painel se chama pela porta da frente.
+   *
+   * `inspectWebhook` compara o que o servidor guarda com o que o painel espera,
+   * e as DUAS pontas dessa comparação saem do mesmo `webhookBaseUrl`. Quando
+   * esse endereço está errado — e ele é digitado à mão, conferido só na forma —
+   * os dois lados concordam, o veredito responde `ok`, e nada chega mesmo
+   * assim. Esta é a única conferência que pergunta o que importa: **uma entrada
+   * por este endereço chega até aqui?**
+   *
+   * Vai por `safeFetch` e não por `fetch`: o endereço é digitado por quem
+   * administra, e o mesmo guarda que protege a busca ao servidor Evolution vale
+   * aqui — revalidando o host a cada redirecionamento, com prazo e teto de
+   * corpo. Sem isso, o campo do webhook viraria um jeito de fazer o painel
+   * bater em endereço interno e contar o resultado.
+   */
+  static async probeWebhook(id) {
+    const config = await this.requireConfig({ requireWebhook: true });
+    const account = await this.loadAccount(id);
+    const url = this.expectedWebhookUrl(account, config);
+    if (!url) {
+      throw new WaError('whatsapp.error.webhookBaseMissing', {
+        code: 'webhook_base_missing',
+        status: 409
+      });
+    }
+
+    const nonce = mintNonce();
+    let resposta = { status: null, corpo: '', falhou: true };
+    try {
+      const r = await buscarNaVolta(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(probeBody(account.name, nonce)),
+        timeoutMs: PROBE_TIMEOUT_MS,
+        maxBytes: PROBE_MAX_BYTES
+      });
+      // Só o começo do corpo. O que se procura nele é um valor de 32 caracteres
+      // que o painel acabou de sortear, e ler uma página inteira para achá-lo
+      // só aumenta o que um destino errado consegue fazer o painel carregar.
+      resposta = { status: r.status, corpo: String(await r.text()).slice(0, 2048), falhou: false };
+    } catch {
+      // Qualquer falha de transporte é `unreachable` e não exceção: o operador
+      // pediu um diagnóstico, e "não deu para chegar" É o diagnóstico. Lançar
+      // aqui trocaria a resposta útil por um 502 genérico.
+      resposta = { status: null, corpo: '', falhou: true };
+    }
+
+    const verdict = probeVerdict(resposta, nonce);
+    const atualizada = await WhatsAppAccount.update(account.id, {
+      webhook_probe_verdict: verdict,
+      webhook_probed_at: new Date()
+    });
+    return { account: atualizada, verdict, status: resposta.status };
   }
 
   /** Reconnect (GO) / restart (v2), for a session that exists but went quiet. */

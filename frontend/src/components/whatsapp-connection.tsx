@@ -728,6 +728,22 @@ export function WhatsAppConnection({ config }: Props) {
                     )}
                   </p>
                 )}
+                {account.webhookProbeVerdict && account.webhookProbeVerdict !== 'reached' && (
+                  /* A volta. Fica ABAIXO do veredito de configuração porque é
+                     a leitura mais forte das duas: aquele diz o que está
+                     gravado, este diz o que acontece. Os dois se contradizendo
+                     — `ok` em cima, `wrong_target` aqui — é exatamente o caso
+                     que a comparação sozinha não pegava, e é o que o operador
+                     precisa ler. */
+                  <p className="mt-1 text-xs text-[hsl(var(--status-danger))]">
+                    {t(`whatsapp.webhook.probe.${account.webhookProbeVerdict}`)}
+                  </p>
+                )}
+                {account.webhookProbeVerdict === 'reached' && (
+                  <p className="mt-1 text-xs text-[hsl(var(--status-success))]">
+                    {t('whatsapp.webhook.probe.reached')}
+                  </p>
+                )}
                 {account.webhookRefusedAt && (
                   /* Um evento chegou e levou 401. É o fato mais forte que o
                      painel tem sobre o webhook — prova que o Evolution ESTÁ
@@ -822,6 +838,17 @@ export function WhatsAppConnection({ config }: Props) {
                       onClick={() => void act(account, () => whatsappAPI.checkWebhook(account.id))}
                     >
                       {t('whatsapp.actions.checkWebhook')}
+                    </button>
+                    {/* Sempre disponível, e não só quando algo parece errado:
+                        é justamente quando TUDO parece certo que ela tem algo
+                        a dizer. */}
+                    <button
+                      type="button"
+                      className="modern-button-secondary"
+                      disabled={busy}
+                      onClick={() => void act(account, () => whatsappAPI.probeWebhook(account.id))}
+                    >
+                      {t('whatsapp.actions.probeWebhook')}
                     </button>
                     {account.webhookVerdict && account.webhookVerdict !== 'ok' && (
                       <button

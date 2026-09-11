@@ -449,6 +449,7 @@ export default {
   'whatsapp.disconnected': 'Numéro déconnecté',
   'whatsapp.webhookChecked': 'Webhook vérifié sur le serveur',
   'whatsapp.webhookReapplied': 'Webhook réécrit sur le serveur',
+  'whatsapp.webhookProbed': 'Aller-retour du webhook vérifié',
   'whatsapp.numbersChecked': 'Numéros vérifiés sur WhatsApp',
   'whatsapp.messageQueued': 'Message mis en file d’attente pour envoi',
   'whatsapp.messageSendFailed': 'Le message n’a pas pu être mis en file d’attente',

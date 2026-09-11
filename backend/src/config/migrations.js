@@ -679,6 +679,14 @@ const whatsappAccountsTable = (db) => (t) => {
   // acima existem para cifrar.
   t.string('webhook_server_url', 255);
   t.timestamp('webhook_checked_at');
+  // A VOLTA: o painel se chamou pela porta da frente e contou o que aconteceu.
+  // Distinto do veredito acima porque responde outra pergunta — aquele diz o
+  // que está GRAVADO no servidor, este diz se uma entrada por aquele endereço
+  // CHEGA até aqui. Os dois saem do mesmo `webhookBaseUrl`, digitado à mão e
+  // conferido só na forma, então o de cima responde `ok` para um endereço
+  // errado: as duas pontas da comparação dele concordam porque são a mesma.
+  t.string('webhook_probe_verdict', 32);
+  t.timestamp('webhook_probed_at');
   // Chegou e foi recusado. É o que distingue "o Evolution não está chamando"
   // de "está chamando e levando 401" — dois problemas com consertos opostos
   // que, sem isto, aparecem na tela como o mesmo "Nunca chegou nada".
@@ -2579,6 +2587,43 @@ export const migrations = [
         ['webhook_checked_at', (t) => t.timestamp('webhook_checked_at')],
         ['webhook_refused_at', (t) => t.timestamp('webhook_refused_at')],
         ['webhook_refused_reason', (t) => t.string('webhook_refused_reason', 32)]
+      ]);
+      if (!faltando.length) return;
+      await db.schema.alterTable('whatsapp_accounts', (t) => {
+        for (const add of faltando) add(t);
+      });
+    }
+  },
+  {
+    /**
+     * A volta, que é a leitura que faltava.
+     *
+     * A 0040 deu ao painel como perguntar ao servidor Evolution qual webhook
+     * ele guarda. O que ela não podia responder é se aquele endereço FUNCIONA:
+     * as duas pontas da comparação — o que o servidor tem e o que o painel
+     * espera — saem do mesmo `webhookBaseUrl`, que é digitado à mão e conferido
+     * só na forma (absoluto, http(s), sem credencial). Com um endereço errado
+     * os dois lados concordam e o veredito responde `ok` sobre uma instalação
+     * que não entrega nada.
+     *
+     * Três jeitos de errar aquele campo, todos silenciosos e todos aprovados
+     * pela comparação: sem caminho nenhum (o POST cai na raiz e o painel
+     * devolve o HTML do frontend com 200), com caminho parecido e errado (404
+     * em toda entrega), e o certo atrás de um proxy que recusa POST de fora.
+     *
+     * Um diagnóstico que confirma como são uma instalação quebrada é pior que
+     * nenhum: ele encerra a conversa. Daí estas duas colunas.
+     */
+    id: '0041_whatsapp_webhook_probe',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('whatsapp_accounts'))) return true;
+      return db.schema.hasColumn('whatsapp_accounts', 'webhook_probe_verdict');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('whatsapp_accounts'))) return;
+      const faltando = await missingColumns(db, 'whatsapp_accounts', [
+        ['webhook_probe_verdict', (t) => t.string('webhook_probe_verdict', 32)],
+        ['webhook_probed_at', (t) => t.timestamp('webhook_probed_at')]
       ]);
       if (!faltando.length) return;
       await db.schema.alterTable('whatsapp_accounts', (t) => {

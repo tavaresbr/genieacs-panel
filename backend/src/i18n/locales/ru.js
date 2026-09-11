@@ -453,6 +453,7 @@ export default {
   'whatsapp.disconnected': 'Номер отключён',
   'whatsapp.webhookChecked': 'Вебхук проверен на сервере',
   'whatsapp.webhookReapplied': 'Вебхук перезаписан на сервере',
+  'whatsapp.webhookProbed': 'Обратный вызов вебхука проверен',
   'whatsapp.numbersChecked': 'Номера проверены в WhatsApp',
   'whatsapp.messageQueued': 'Сообщение поставлено в очередь на отправку',
   'whatsapp.messageSendFailed': 'Не удалось поставить сообщение в очередь',

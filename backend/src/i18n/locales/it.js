@@ -450,6 +450,7 @@ export default {
   'whatsapp.disconnected': 'Numero disconnesso',
   'whatsapp.webhookChecked': 'Webhook verificato sul server',
   'whatsapp.webhookReapplied': 'Webhook riscritto sul server',
+  'whatsapp.webhookProbed': 'Andata e ritorno del webhook verificato',
   'whatsapp.numbersChecked': 'Numeri verificati su WhatsApp',
   'whatsapp.messageQueued': 'Messaggio in coda per l’invio',
   'whatsapp.messageSendFailed': 'Non è stato possibile mettere in coda il messaggio',

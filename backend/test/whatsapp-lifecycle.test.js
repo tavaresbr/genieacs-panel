@@ -5,6 +5,7 @@ import { asTenant, authHeaders, call, startTestServers, stopTestServers } from '
 
 const { default: WhatsAppConfigService } = await import('../src/services/whatsappConfigService.js');
 const { default: WhatsAppAccount } = await import('../src/models/WhatsAppAccount.js');
+const { setProbeFetcher } = await import('../src/services/evolutionInstanceService.js');
 
 const WEBHOOK_BASE = 'https://painel.provedor.com.br/api/whatsapp-webhook';
 
@@ -771,6 +772,103 @@ describe('conferir o webhook no servidor', () => {
     );
     assert.equal(body.data.supported, false);
     assert.equal(body.data.verdict, null);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// A volta completa
+//
+// O que estes casos travam é o limite da conferência anterior. `inspectWebhook`
+// compara o que o servidor guarda com o que o painel espera, e as DUAS pontas
+// dessa comparação saem do mesmo `webhookBaseUrl` — digitado à mão, conferido
+// só na forma. Com um endereço errado os dois lados concordam e o veredito
+// responde `ok` sobre uma instalação que não entrega nada.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('a volta do webhook', () => {
+  let id;
+
+  before(async () => {
+    const criada = await createAccount(v2.baseUrl, { label: 'Volta' });
+    id = criada.body.data.account.id;
+  });
+
+  after(() => setProbeFetcher(null));
+
+  const sondar = () => call(
+    `${panelUrl}/api/whatsapp/accounts/${id}/webhook/probe`,
+    { method: 'POST', headers: authHeaders(token) }
+  );
+
+  /** Um destino que responde o que se mandar. Guarda o que recebeu. */
+  function destino(resposta) {
+    const visto = { url: null, body: null };
+    setProbeFetcher(async (url, init) => {
+      visto.url = String(url);
+      visto.body = JSON.parse(String(init?.body ?? '{}'));
+      if (resposta instanceof Error) throw resposta;
+      return { status: resposta.status, text: async () => resposta.corpo };
+    });
+    return visto;
+  }
+
+  it('manda a sonda para a URL COM o token, e não para a base', async () => {
+    const visto = destino({ status: 200, corpo: '{}' });
+    await sondar();
+    // Sem o token a volta não provaria nada sobre autenticação, que é metade
+    // do que ela existe para provar.
+    assert.ok(visto.url.includes('?t='));
+    assert.ok(visto.url.startsWith(WEBHOOK_BASE));
+    assert.equal(visto.body.event, 'panel.probe');
+    assert.ok(/^[a-f0-9]{32}$/.test(visto.body.probe.nonce));
+  });
+
+  it('só diz `reached` quando o nonce que ela sorteou volta', async () => {
+    let sorteado = null;
+    setProbeFetcher(async (url, init) => {
+      sorteado = JSON.parse(String(init.body)).probe.nonce;
+      return { status: 200, text: async () => JSON.stringify({ success: true, pong: sorteado }) };
+    });
+    const { body } = await sondar();
+    assert.equal(body.data.verdict, 'reached');
+    assert.ok(sorteado);
+  });
+
+  it('PEGA o caso que a conferência estática aprova: 200 que não é o webhook', async () => {
+    // O `webhookBaseUrl` sem caminho nenhum. O POST cai na raiz do painel, o
+    // frontend responde 200 com HTML, e o servidor Evolution registra entrega
+    // bem-sucedida. A comparação com o que o servidor guarda diz `ok` — os dois
+    // lados dela saem deste mesmo endereço errado. Só a volta pega.
+    destino({ status: 200, corpo: '<!doctype html><title>Painel</title><div id="root"></div>' });
+    const { body } = await sondar();
+    assert.equal(body.data.verdict, 'wrong_target');
+  });
+
+  it('separa caminho errado, proxy barrando e servidor mudo', async () => {
+    destino({ status: 404, corpo: 'Cannot POST /api/whatsapp/webhook' });
+    assert.equal((await sondar()).body.data.verdict, 'not_found');
+
+    destino({ status: 403, corpo: 'Forbidden' });
+    assert.equal((await sondar()).body.data.verdict, 'blocked');
+
+    destino(new Error('getaddrinfo ENOTFOUND painel.provedor.com.br'));
+    assert.equal((await sondar()).body.data.verdict, 'unreachable');
+  });
+
+  it('um 401 na volta é o endereço levando a OUTRO painel', async () => {
+    // O painel manda o token DELE. Se quem atende recusa, quem atende não é
+    // este painel — e isso é diagnóstico, não erro de transporte.
+    destino({ status: 401, corpo: '{"success":false,"error":"unauthorized"}' });
+    assert.equal((await sondar()).body.data.verdict, 'unauthorized');
+  });
+
+  it('guarda o veredito, e a falha de transporte não vira exceção', async () => {
+    destino(new Error('socket hang up'));
+    const { status, body } = await sondar();
+    // O operador pediu um diagnóstico, e "não deu para chegar" É o diagnóstico.
+    assert.equal(status, 200);
+    assert.equal(body.data.verdict, 'unreachable');
+    assert.equal(body.data.account.webhookProbeVerdict, 'unreachable');
+    assert.ok(body.data.account.webhookProbedAt);
   });
 });
 

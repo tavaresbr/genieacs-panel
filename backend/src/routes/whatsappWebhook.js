@@ -5,6 +5,7 @@ import WhatsAppConfigService from '../services/whatsappConfigService.js';
 import WaInboundService from '../services/waInboundService.js';
 import { canonicalizarEvento } from '../utils/wa/waEventos.js';
 import { pedidoAutorizado, tokenDaQuery, credencialDoPedido } from '../utils/wa/waWebhookAuth.js';
+import { PROBE_EVENT_CANONICAL, nonceOfRequest } from '../utils/wa/waWebhookProbe.js';
 import { waWebhookLimiter } from '../middleware/rateLimit.js';
 
 const router = express.Router();
@@ -85,6 +86,18 @@ router.post('/', waWebhookLimiter, async (req, res) => {
   }
 
   const evento = canonicalizarEvento(body.event ?? body.Event ?? '');
+
+  // A sonda do próprio painel, e só ela chega até aqui autenticada sem ser
+  // evento de servidor nenhum. Responde DEPOIS da autorização de propósito: é
+  // isso que faz a volta provar as duas coisas de uma vez — que este endereço
+  // chega até aqui, e que o token guardado é o que esta rota aceita.
+  //
+  // Não grava nada e não toca no serviço de entrada. Uma sonda que deixasse
+  // linha no banco seria uma conversa falsa na caixa do operador, e o
+  // diagnóstico passaria a sujar o que veio diagnosticar.
+  if (evento === PROBE_EVENT_CANONICAL) {
+    return res.json({ success: true, event: PROBE_EVENT_CANONICAL, pong: nonceOfRequest(body) });
+  }
 
   try {
     // The provider comes from the account the instance name resolved to, not

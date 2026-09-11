@@ -224,7 +224,19 @@ function notesFor(
   //     ele é o que uma conferência viu. "Nunca conferido" é o mais fraco dos
   //     três e por isso só aparece quando o silêncio já é notícia: oferecer a
   //     conferência a quem está recebendo mensagens normalmente seria ruído.
-  if (health.webhook.refusedAt) {
+  if (health.webhook.unreachable > 0) {
+    // Primeiro de todos, e acima até da recusa: uma recusa prova que o
+    // Evolution chega aqui, e esta diz que o endereço nem chega. Não há
+    // conserto a fazer no token de um webhook que não é entregável.
+    notes.push({
+      key: 'webhook-unreachable',
+      tone: 'alarm',
+      icon: 'x',
+      text: t('whatsapp.health.webhookUnreachable', {
+        count: formatNumber(health.webhook.unreachable)
+      })
+    })
+  } else if (health.webhook.refusedAt) {
     notes.push({
       key: 'webhook-refused',
       tone: 'alarm',

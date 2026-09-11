@@ -31,6 +31,10 @@ router.post('/accounts/:id/restart', authenticateToken, requirePermission('whats
 // que também cria e apaga número.
 router.get('/accounts/:id/webhook', authenticateToken, requirePermission('whatsapp.read'), WhatsAppController.checkWebhook);
 router.post('/accounts/:id/webhook', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.reapplyWebhook);
+// A volta completa. `whatsapp.config` porque ela FAZ o painel emitir uma
+// requisição para um endereço que quem administra escolheu — a mesma permissão
+// que já decide para qual servidor Evolution o painel fala.
+router.post('/accounts/:id/webhook/probe', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.probeWebhook);
 router.post('/accounts/:id/disconnect', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.disconnectAccount);
 router.patch('/accounts/:id', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.updateAccount);
 router.delete('/accounts/:id', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.deleteAccount);
