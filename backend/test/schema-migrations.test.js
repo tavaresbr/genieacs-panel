@@ -683,7 +683,7 @@ describe('giving every provider a subscription', () => {
 
 describe('o cadastro fiscal chegando a uma base que já tem provedores', () => {
   const db = createDatabase('billing-profile');
-  const FISCAL_MIGRATION = '0042_tenant_billing_profile';
+  const FISCAL_MIGRATION = '0043_tenant_billing_profile';
   let alfa;
   let beta;
 
@@ -696,8 +696,13 @@ describe('o cadastro fiscal chegando a uma base que já tem provedores', () => {
    * O risco real desta migração não é o schema: é o passo ser pulado em
    * silêncio. O runner compara ids (`schema.js:67`), então um id repetido num
    * banco que já rodou o homônimo seria marcado como aplicado sem rodar, e o
-   * painel subiria contra um schema sem as colunas. É por isso que o id é
-   * `0042` e não `0040`, que já está tomado pelo webhook do WhatsApp.
+   * painel subiria contra um schema sem as colunas.
+   *
+   * Aconteceu duas vezes nesta fatia, e as duas foram pegas: `0040` já estava
+   * tomado pelo webhook do WhatsApp quando o passo foi escrito, e `0042` foi
+   * tomado pela garra da campanha enquanto a fatia estava em revisão. O caso
+   * abaixo é o que transformou o segundo num conflito de merge em vez de num
+   * passo pulado num banco de produção.
    */
   before(async () => {
     for (const migration of migrations.filter((m) => m.id < FISCAL_MIGRATION)) {

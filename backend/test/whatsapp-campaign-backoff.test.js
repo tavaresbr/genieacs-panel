@@ -5,6 +5,7 @@ import { asTenant, insertReturningId, startTestServers, stopTestServers } from '
 const { default: WaBroadcast, MAX_ATTEMPTS } = await import('../src/models/WaBroadcast.js');
 const { default: WaBroadcastService } = await import('../src/services/waBroadcastService.js');
 const { retryDelayMs, retryScheduleMs } = await import('../src/services/waOutboxWorker.js');
+const { default: WaSendService } = await import('../src/services/waSendService.js');
 
 /**
  * How long a campaign waits before giving up on a recipient.
@@ -129,5 +130,137 @@ describe('what a campaign does with a number that is not connected', () => {
       null,
       'a terminal row has nothing left to wait for, and a leftover time would outlive its reason'
     );
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// A garra, que por muito tempo não garrou nada
+//
+// `claimRecipient` promete no docstring que o `UPDATE` condicional impede dois
+// ticks sobrepostos de contatarem o mesmo assinante. A promessa era vazia: a
+// janela de retomada media idade por `created_at` — o instante em que a
+// campanha foi MONTADA. Como o operador revisa o rascunho antes de disparar,
+// toda campanha real já nasce com mais de cinco minutos, então a condição
+// "garra morta" casava no mesmo instante da garra.
+//
+// O dano chega no cliente do cliente: o assinante recebe a mesma cobrança duas
+// vezes.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('dois ticks disputando o mesmo destinatário', () => {
+  it('só um garra, mesmo numa campanha montada há horas', async () => {
+    // A campanha montada muito antes do disparo é o caso NORMAL, não a exceção:
+    // é o que acontece sempre que alguém revisa antes de enviar.
+    const id = await seedRecipient({
+      created_at: wholeSecond(Date.now() - 6 * 60 * 60 * 1000)
+    });
+
+    const primeiro = await asTenant(() => WaBroadcast.claimRecipient(id));
+    const segundo = await asTenant(() => WaBroadcast.claimRecipient(id));
+
+    assert.ok(primeiro, 'o primeiro tick tinha que garrar');
+    assert.equal(segundo, null, 'o segundo tick garrou o mesmo assinante — ele recebe duas vezes');
+  });
+
+  it('a garra fica registrada, e é dela que a idade é medida', async () => {
+    const id = await seedRecipient({
+      created_at: wholeSecond(Date.now() - 6 * 60 * 60 * 1000)
+    });
+    await asTenant(() => WaBroadcast.claimRecipient(id));
+
+    const linha = await recipient(id);
+    assert.equal(linha.status, 'sending');
+    assert.ok(linha.claimed_at, 'sem `claimed_at` a retomada volta a medir por `created_at`');
+    // Recém-garrada, não pode aparecer para o tick seguinte.
+    assert.ok(!(await pendingIds()).includes(id));
+  });
+
+  it('uma garra ABANDONADA continua sendo retomada — a queda tem que ser recuperável', async () => {
+    // O outro lado da moeda: fechar a janela não pode deixar uma linha presa em
+    // 'sending' para sempre quando o tick que a pegou morreu no meio.
+    const id = await seedRecipient({
+      status: 'sending',
+      claimed_at: wholeSecond(Date.now() - 10 * 60 * 1000)
+    });
+
+    assert.ok((await pendingIds()).includes(id), 'garra morta tem que voltar para a fila');
+    assert.ok(await asTenant(() => WaBroadcast.claimRecipient(id)));
+  });
+
+  it('linha antiga, de antes da coluna existir, não é retomada por engano', async () => {
+    // `claimed_at` nulo em 'sending' nunca casa a retomada. É o certo: sem
+    // instante de garra não há como saber se ela foi abandonada, e supor que
+    // sim é exatamente o defeito que esta onda corrigiu.
+    const id = await seedRecipient({
+      status: 'sending',
+      claimed_at: null,
+      created_at: wholeSecond(Date.now() - 6 * 60 * 60 * 1000)
+    });
+    assert.ok(!(await pendingIds()).includes(id));
+    assert.equal(await asTenant(() => WaBroadcast.claimRecipient(id)), null);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// O ponto de não-retorno
+//
+// `WaSendService.enqueue` é o instante em que o assinante passa a VAI receber.
+// Enquanto a escrita de bookkeeping dividia o `catch` do envio, um banco que
+// soluçasse depois dela — lock timeout, `SQLITE_BUSY` — devolvia o destinatário
+// a 'pending'. O tick seguinte o reenfileirava, e a mensagem já enfileirada
+// saía do mesmo jeito: a mesma cobrança até sete vezes por causa de uma falha
+// que não tinha nada a ver com o envio.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('falha DEPOIS de a mensagem entrar na fila', () => {
+  let accountId;
+
+  before(async () => {
+    // Uma conta de verdade: `WaConversation.ensure` tem chave estrangeira para
+    // ela, e sem a linha o `deliver` cai antes de chegar ao enqueue — que é
+    // justamente o ponto que este caso existe para exercitar.
+    accountId = await asTenant(() => insertReturningId('whatsapp_accounts', {
+      name: 'campanha-teste',
+      base_url: 'https://evo.exemplo.test',
+      status: 'connected',
+      flavor: 'v2'
+    }));
+  });
+
+  it('não devolve o destinatário para a fila', async () => {
+    const id = await seedRecipient();
+    const enqueueReal = WaSendService.enqueue;
+    const updateReal = WaBroadcast.updateRecipient;
+    let enfileirou = 0;
+
+    // O enqueue dá certo: a mensagem está na fila e o assinante vai receber.
+    WaSendService.enqueue = async () => {
+      enfileirou += 1;
+      return { id: 4242 };
+    };
+    // E SÓ a escrita de conclusão falha, que é o soluço de banco. As outras
+    // continuam funcionando, senão o próprio caminho de erro quebraria e o
+    // caso deixaria de medir o que quer medir.
+    WaBroadcast.updateRecipient = async (recipientId, patch) => {
+      if (patch?.status === 'sent') throw new Error('SQLITE_BUSY: database is locked');
+      return updateReal.call(WaBroadcast, recipientId, patch);
+    };
+
+    let resultado;
+    try {
+      resultado = await asTenant(() => WaBroadcastService.deliver(id, { id: accountId }));
+    } finally {
+      WaSendService.enqueue = enqueueReal;
+      WaBroadcast.updateRecipient = updateReal;
+    }
+
+    assert.equal(enfileirou, 1, 'o caso não chegou ao enqueue; não mede nada');
+    // 'retry' aqui significaria reenvio — o assinante recebendo de novo o que
+    // já foi enfileirado.
+    assert.equal(resultado, 'sent');
+
+    // A linha fica em 'sending', que é o estado honesto: enfileirada, sem
+    // bookkeeping. A retomada por `claimed_at` cuida dela em cinco minutos se
+    // de fato ninguém a concluiu.
+    assert.equal((await recipient(id)).status, 'sending');
+    assert.ok(!(await pendingIds()).includes(id), 'voltou para a fila: vai reenviar');
   });
 });

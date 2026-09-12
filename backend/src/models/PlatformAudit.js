@@ -16,6 +16,11 @@ class PlatformAudit {
   static ACTIONS = Object.freeze({
     TENANT_CREATED: 'tenant.created',
     TENANT_STATUS_CHANGED: 'tenant.status_changed',
+    // O nome ou o SUBDOMÍNIO de um provedor foram corrigidos. Uma ação para os
+    // dois campos, com o que mudou nomeado no detalhe: a pergunta que se faz
+    // desta linha é "quem mexeu no cadastro deste provedor", e separar em duas
+    // ações obrigaria a fazê-la duas vezes.
+    TENANT_IDENTITY_CHANGED: 'tenant.identity_changed',
     TENANT_DELETED: 'tenant.deleted',
     // A Fase 5: o que o plano de controle fez com a assinatura de um provedor.
     PLAN_CREATED: 'plan.created',

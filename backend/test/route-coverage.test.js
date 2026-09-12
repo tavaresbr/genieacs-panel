@@ -52,8 +52,8 @@ const PUBLICAS = new Map([
   ['POST /api/auth/signup', 'um ISP se cadastra; só na edição SaaS e só onde há domínio-base'],
   ['POST /api/auth/login', 'a porta de entrada'],
   ['POST /api/auth/refresh', 'renova a sessão com o refresh token, que é a credencial aqui'],
-  ['GET /api/invites/token/:token', 'o token do convite É a credencial, e é conferido por hash'],
-  ['POST /api/invites/token/:token/accept', 'idem, e a senha da pessoa é conferida quando a conta já existe'],
+  ['POST /api/invites/token/preview', 'o token do convite É a credencial, vai no corpo e é conferido por hash'],
+  ['POST /api/invites/token/accept', 'idem, e a senha da pessoa é conferida quando a conta já existe'],
   ['POST /api/sgp/events/webhook', 'entrega do ERP, autenticada pelo segredo do webhook'],
   ['POST /api/whatsapp-webhook', 'entrega da Evolution, montada antes do resolvedor e autenticada pelo token da instância'],
   ['GET /api/whatsapp-media/:id', 'anexo servido por um token assinado que já nomeia o provedor; prova em whatsapp-media-tenancy.test.js'],
@@ -113,10 +113,6 @@ const POR_ID = new Map([
   // --- Anexo servido por token assinado.
   ['GET /api/whatsapp/messages/:id/media', 'prova própria em whatsapp-media-tenancy.test.js, que pede a mídia da mensagem do vizinho'],
   ['GET /api/whatsapp-media/:id', 'idem, pelo token assinado, antes do resolvedor'],
-
-  // --- O convite: o token é o segredo, não um id de linha.
-  ['GET /api/invites/token/:token', 'o token é a credencial e nomeia o provedor; prova em tenant-invites.test.js'],
-  ['POST /api/invites/token/:token/accept', 'idem'],
 
   // --- O plano de controle está ACIMA dos provedores: aqui o id de outro
   // provedor é o trabalho da rota, não um vazamento. O que se prova nessas é
@@ -203,7 +199,13 @@ describe('toda rota sem sessão', () => {
       'POST /api/auth/setup',
       'POST /api/auth/signup',
       'POST /api/customer/login',
-      'POST /api/invites/token/:token/accept',
+      'POST /api/invites/token/accept',
+      // A prévia do convite NÃO escreve nada: ela é POST só porque o token
+      // saiu do caminho e foi para o corpo, para não acabar no log do
+      // servidor, que grava o caminho inteiro. Aparece nesta lista porque a
+      // lista pergunta pelo MÉTODO, que é o recorte certo para ela — e a
+      // exceção fica escrita aqui em vez de a pergunta ser afrouxada.
+      'POST /api/invites/token/preview',
       'POST /api/sgp/events/webhook',
       'POST /api/whatsapp-webhook'
     ]);
@@ -249,7 +251,11 @@ describe('toda rota endereçada por um parâmetro', () => {
   // As 42 de hoje são, todas: id de aparelho no GenieACS (20), chave natural
   // que os dois provedores têm igual (7), anexo por token assinado (2), token
   // de convite (2) e o plano de controle (11).
-  const TETO_DE_EXCECOES = 42;
+  // Caiu de 42 para 40 quando o token do convite saiu do CAMINHO e foi para o
+  // corpo: as duas rotas deixaram de ser endereçadas por parâmetro, então
+  // saíram do alcance desta conta em vez de precisarem de exceção. O número só
+  // pode cair.
+  const TETO_DE_EXCECOES = 40;
 
   /**
    * As exceções que são do plano de controle, nomeadas uma a uma.

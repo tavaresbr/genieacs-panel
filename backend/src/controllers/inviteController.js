@@ -379,8 +379,24 @@ class InviteController {
    * sessão no host errado. Como todas as outras recusas daqui, responde null e
    * vira o mesmo 404.
    */
+  /**
+   * O convite que o pedido nomeia, se ele ainda valer.
+   *
+   * O token vem do CORPO e não do caminho, como no resgate de personificação e
+   * na confirmação de redefinição de senha. O motivo é o `requestLogger`: ele
+   * corta a query string — e o comentário de lá diz por quê, "a query é onde
+   * quem chama põe um token" — mas grava o caminho inteiro. Com o token no
+   * caminho, ele ia para o log do painel, para o `errorHandler` e para
+   * qualquer access log de proxy na frente, em toda consulta e todo aceite.
+   *
+   * E este token É a credencial: quem o tem entra na equipe do provedor com o
+   * papel escrito nele, até `owner`, por até trinta dias. O resto do sistema o
+   * trata como tal — hash na tabela, token fora da trilha, link entregue no
+   * FRAGMENTO da URL justamente para não chegar a servidor nenhum — e a
+   * chamada de API desfazia tudo isso num parâmetro de rota.
+   */
   static async usableInvite(req) {
-    const invite = await TenantInvite.findByToken(req.params?.token);
+    const invite = await TenantInvite.findByToken(req.body?.token);
     if (!TenantInvite.isOpen(invite)) return null;
     if (Number(invite.tenant_id) !== Number(req.tenantId)) return null;
     return invite;

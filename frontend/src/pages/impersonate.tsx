@@ -41,7 +41,11 @@ export default function Impersonate() {
     void authAPI.redeemImpersonation(ticket).then((res) => {
       if (res.success && res.data) {
         // Sem refresh token: a sessão dura meia hora e não se renova sozinha.
-        adoptSession(res.data.token, undefined, res.data.user)
+        // `tabOnly`: a sessão fica só nesta aba. O console abriu o painel
+        // numa aba nova e continua atrás — numa instalação de host único as
+        // duas dividem o `localStorage`, e sem isto esta aba trocaria a sessão
+        // do console pela do provedor.
+        adoptSession(res.data.token, undefined, res.data.user, { tabOnly: true })
         navigate('/dashboard', { replace: true })
         return
       }

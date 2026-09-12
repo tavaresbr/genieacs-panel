@@ -5,6 +5,7 @@ import { platformAPI, type Plan, type Tenant } from '@/lib/api'
 import { PlanCatalog } from '@/components/platform/plan-catalog'
 import { PlatformAdmins } from '@/components/platform/platform-admins'
 import { PlatformAudit } from '@/components/platform/platform-audit'
+import { TenantData } from '@/components/platform/tenant-data'
 import { TenantMembers } from '@/components/platform/tenant-members'
 import { STATUS_LABEL_KEYS, TenantPlan, statusBadgeClass } from '@/components/platform/tenant-plan'
 import { Icon } from '@/components/ui/icon'
@@ -24,8 +25,9 @@ export default function PlatformPage() {
   const [saving, setSaving] = useState(false)
   const [busyId, setBusyId] = useState<number | null>(null)
   const [expandedId, setExpandedId] = useState<number | null>(null)
-  // Which panel the expanded row shows: the team, or the plan and its statement.
-  const [expandedPanel, setExpandedPanel] = useState<'members' | 'plan'>('members')
+  // Which panel the expanded row shows: the registry data, the team, or the
+  // plan and its statement.
+  const [expandedPanel, setExpandedPanel] = useState<'members' | 'plan' | 'data'>('members')
   const [plans, setPlans] = useState<Plan[]>([])
   const [form, setForm] = useState({ slug: '', name: '' })
   /**
@@ -57,6 +59,21 @@ export default function PlatformPage() {
     void loadTenants()
   }, [loadTenants])
 
+  /**
+   * Abre o painel pedido na linha pedida, e fecha quando já era esse o painel
+   * aberto ali.
+   *
+   * Escrito uma vez porque são três botões agora. O estado é lido FORA do
+   * atualizador de propósito: `painel` é o que se quer e `expandedPanel` é o que
+   * está, e comparar um com o outro dentro do atualizador leria o valor já
+   * trocado.
+   */
+  const abrirPainel = (id: number, painel: 'members' | 'plan' | 'data') => {
+    const fechando = expandedId === id && expandedPanel === painel
+    setExpandedPanel(painel)
+    setExpandedId(fechando ? null : id)
+  }
+
   const resetForm = () => {
     setForm({ slug: '', name: '' })
     setCreating(false)
@@ -83,13 +100,31 @@ export default function PlatformPage() {
   }
 
   /**
-   * Abre uma sessão de leitura no painel de um provedor.
+   * Abre uma sessão de leitura no painel de um provedor, em OUTRA ABA.
    *
    * O que volta é um endereço com um bilhete no fragmento, e o que se faz com
-   * ele é ir para lá. `window.location.assign` e não `navigate`: num deploy com
-   * subdomínio esse endereço é OUTRO host, e o roteador do React não atravessa
-   * origin. Numa instalação sem subdomínio o endereço é relativo e o efeito é
-   * o mesmo.
+   * ele é ir para lá. Em outra aba porque quem olha o painel de um cliente
+   * está no meio de um atendimento: voltar para a lista de provedores depois
+   * custava um login novo no console, e a aba de trás guarda o lugar.
+   *
+   * A aba é aberta ANTES da chamada, ainda dentro do clique. Um `window.open`
+   * depois do `await` chega sem gesto do usuário e o navegador o trata como
+   * pop-up — o Safari bloqueia sempre, os outros às vezes. Ela nasce em branco
+   * e recebe o endereço quando o bilhete volta; se o bilhete falhar, fecha.
+   *
+   * Sem `noopener`: com ele o navegador devolve `null` em vez da janela, e sem
+   * a referência não há como levá-la ao endereço. O destino é o nosso próprio
+   * `/impersonate`, não uma página de terceiro, então o que `noopener` protege
+   * aqui não está em jogo.
+   *
+   * Vale para os dois tipos de instalação, com subdomínio por provedor ou num
+   * host só. Nesta última o painel divide o origin com o console, e é por isso
+   * que a sessão de personificação vive no `sessionStorage` — ver `tabOnly` em
+   * `adoptSession`: sem isso a aba nova trocaria a sessão do console pela do
+   * provedor e quebraria em silêncio a aba que se queria preservar.
+   *
+   * Uma única saída volta a navegar aqui mesmo: pop-up bloqueado, porque ir
+   * para o painel nesta aba é melhor que não ir.
    *
    * Confirma antes porque a ação deixa rastro nos dois lados — na nossa trilha
    * e na do cliente — e porque entrar no painel de um cliente é coisa que se
@@ -97,14 +132,24 @@ export default function PlatformPage() {
    */
   const impersonar = async (tenant: Tenant) => {
     if (!window.confirm(t('platform.impersonateConfirm', { provider: tenant.name }))) return
+    const aba = window.open('', '_blank')
     setBusyId(tenant.id)
     try {
       const res = await platformAPI.impersonate(tenant.id)
       if (!res.success || !res.data) {
+        aba?.close()
         toast.error(res.message || t('platform.impersonateFailed'))
         return
       }
-      window.location.assign(res.data.url)
+      const url = res.data.url
+      if (aba) {
+        // `replace` e não `assign`: a aba nova não tem histórico que valha, e o
+        // `about:blank` no lugar dela deixaria um "voltar" que não volta.
+        aba.location.replace(url)
+        aba.focus()
+        return
+      }
+      window.location.assign(url)
     } finally {
       setBusyId(null)
     }
@@ -315,12 +360,21 @@ export default function PlatformPage() {
                         </td>
                         <td>
                           <div className="flex flex-wrap items-center gap-2">
+                            {/* Primeiro do grupo: é o que responde "o que está
+                                cadastrado aqui", e é a pergunta que se faz da
+                                linha antes de mexer em equipe ou em plano. */}
                             <button
                               type="button"
-                              onClick={() => {
-                                setExpandedPanel('members')
-                                setExpandedId((current) => (current === tenant.id && expandedPanel === 'members' ? null : tenant.id))
-                              }}
+                              onClick={() => abrirPainel(tenant.id, 'data')}
+                              className="modern-button-secondary"
+                              aria-expanded={expanded && expandedPanel === 'data'}
+                            >
+                              <Icon name="edit" size={17} />
+                              {t('platform.data.edit')}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => abrirPainel(tenant.id, 'members')}
                               className="modern-button-secondary"
                               aria-expanded={expanded && expandedPanel === 'members'}
                             >
@@ -328,10 +382,7 @@ export default function PlatformPage() {
                             </button>
                             <button
                               type="button"
-                              onClick={() => {
-                                setExpandedPanel('plan')
-                                setExpandedId((current) => (current === tenant.id && expandedPanel === 'plan' ? null : tenant.id))
-                              }}
+                              onClick={() => abrirPainel(tenant.id, 'plan')}
                               className="modern-button-secondary"
                               aria-expanded={expanded && expandedPanel === 'plan'}
                             >
@@ -382,7 +433,9 @@ export default function PlatformPage() {
                       {expanded && (
                         <tr>
                           <td colSpan={6}>
-                            {expandedPanel === 'members' ? (
+                            {expandedPanel === 'data' ? (
+                              <TenantData tenant={tenant} onTenantChange={() => void loadTenants()} />
+                            ) : expandedPanel === 'members' ? (
                               <TenantMembers tenant={tenant} onMembershipChange={() => void loadTenants()} />
                             ) : (
                               <TenantPlan tenant={tenant} plans={plans} onSubscriptionChange={() => void loadTenants()} />

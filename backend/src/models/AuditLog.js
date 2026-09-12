@@ -48,6 +48,12 @@ class AuditLog {
     // O provedor mudou o próprio nome — o que aparece na barra lateral, na
     // tela de login e na aba do navegador.
     TENANT_RENAMED: 'tenant.renamed',
+    // E o endereço em que o painel dele responde mudou — feito de fora, pelo
+    // plano de controle, porque o slug é o subdomínio e só o console o troca.
+    // Ação própria e não `TENANT_RENAMED`: a frase "provedor renomeado" não
+    // descreve um endereço que mudou, e é a frase que o ISP vai ler na trilha
+    // dele quando o painel parar de responder no lugar de sempre.
+    TENANT_SLUG_CHANGED: 'tenant.slug_changed',
     LOGIN_EMAIL_CHANGED: 'login_email.changed',
     // O endereço de login foi PROVADO — alguém abriu o que foi mandado para
     // ele. É o que separa "esta conta tem um endereço" de "este endereço é

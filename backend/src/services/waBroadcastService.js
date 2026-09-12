@@ -54,6 +54,9 @@ const TRANSITIONS = Object.freeze({
 class WaBroadcastService {
   static timer = null;
 
+  /** Uma passagem por vez. Ver `start()` para o motivo. */
+  static ticking = false;
+
   static async list() {
     const rows = await WaBroadcast.list();
     return rows.map((row) => this.publicBroadcast(row));
@@ -104,11 +107,28 @@ class WaBroadcastService {
   static start() {
     if (this.timer) return this.timer;
     this.timer = setInterval(() => {
+      // Uma passagem por vez, como `SchedulerService`, `WaMediaSweeper` e
+      // `WaMessageSweeper` já faziam e só esta não fazia.
+      //
+      // Um tick percorre os provedores em série e, por campanha, até 120
+      // destinatários, cada um custando várias idas ao banco. Passar de
+      // sessenta segundos não é hipótese remota — bastam alguns provedores com
+      // campanha aberta, ou um SQLite com um escritor só. Sem esta guarda, o
+      // tick seguinte começava em cima do anterior, e dois ticks disputando o
+      // mesmo destinatário é exatamente a corrida que a garra por `claimed_at`
+      // passou a barrar. As duas defesas são independentes de propósito: esta
+      // evita a disputa, a outra a decide quando ela acontecer mesmo assim.
+      if (this.ticking) return;
+      this.ticking = true;
       // `tick` swallows its own failures; this catch exists only so a bug in
       // that promise chain cannot become an unhandled rejection.
-      void this.tick().catch((error) => {
-        console.warn(`WhatsApp broadcast tick failed: ${error.message}`);
-      });
+      void this.tick()
+        .catch((error) => {
+          console.warn(`WhatsApp broadcast tick failed: ${error.message}`);
+        })
+        .finally(() => {
+          this.ticking = false;
+        });
     }, TICK_INTERVAL_MS);
     this.timer.unref();
     return this.timer;
@@ -117,6 +137,9 @@ class WaBroadcastService {
   static stop() {
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
+    // A bandeira acompanha o timer: parar e recomeçar com ela presa deixaria o
+    // laço mudo para sempre.
+    this.ticking = false;
   }
 
   /**
@@ -266,12 +289,32 @@ class WaBroadcastService {
         // three replies and went quiet on the person it had just charged.
         source: 'campaign'
       });
-      await WaBroadcast.updateRecipient(recipient.id, {
-        status: 'sent',
-        message_id: message.id,
-        error_msg: null,
-        sent_at: new Date()
-      });
+
+      // ── Ponto de não-retorno ────────────────────────────────────────────
+      // A linha acima já pôs a mensagem na fila; daqui em diante o assinante
+      // VAI receber. Por isso a escrita de bookkeeping tem o seu próprio
+      // `try`: enquanto ela dividia o `catch` de baixo, um banco que soluçasse
+      // — lock timeout, `SQLITE_BUSY` — devolvia o destinatário a 'pending', o
+      // tick seguinte o reenfileirava, e a mensagem já enfileirada saía do
+      // mesmo jeito. O assinante recebia a mesma cobrança até sete vezes por
+      // causa de uma falha que não tinha nada a ver com o envio.
+      //
+      // Falhar aqui não é motivo para reenviar. É motivo para registrar e
+      // seguir: a linha fica em 'sending', e a retomada por `claimed_at`
+      // cuidará dela daqui a cinco minutos se de fato ninguém a concluiu.
+      try {
+        await WaBroadcast.updateRecipient(recipient.id, {
+          status: 'sent',
+          message_id: message.id,
+          error_msg: null,
+          sent_at: new Date()
+        });
+      } catch (error) {
+        console.error(
+          `[wa] campanha: mensagem ${message.id} enfileirada e bookkeeping falhou `
+          + `para o destinatário ${recipient.id}: ${error.message}`
+        );
+      }
       return 'sent';
     } catch (error) {
       // `claimRecipient` incremented the counter, so this is the number of the
