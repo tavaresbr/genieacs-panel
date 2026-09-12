@@ -148,7 +148,14 @@ class AuditLog {
         ...entrada,
         actorUserId: req?.user?.userId ?? null,
         actorUsername: req?.user?.username ?? null,
-        actorKind: entrada.actorKind ?? (req?.user?.isPlatformAdmin ? 'platform' : 'operator'),
+        // `req.user` é o que a hidratação devolve, e lá não existe
+        // `isPlatformAdmin` — quem tem a chave do console é lido fresco por
+        // `requirePlatformAdmin`, não carregado na sessão. O default era, por
+        // isso, sempre 'operator'; só não apareceu porque todo caminho do
+        // console passa `actorKind` na mão. O que a sessão tem é a marca de
+        // personificação, e é ela que diz que quem agiu veio do plano de
+        // controle.
+        actorKind: entrada.actorKind ?? (req?.user?.impersonation ? 'platform' : 'operator'),
         ip: req?.ip ?? null
       });
     } catch (error) {
