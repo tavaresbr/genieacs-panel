@@ -1,6 +1,7 @@
 import { app, portalApp, APP_ENV } from './app.js';
 import { closePool, getDb, testConnection } from './config/database.js';
 import { ensureSchema } from './config/schema.js';
+import { refreshDeploymentSharing } from './services/genieacsEgress.js';
 import { seedDefaults } from './config/seed.js';
 import DeviceService from './services/deviceService.js';
 import { isDormant, lastPanelActivityAt } from './services/dashboardSchedule.js';
@@ -49,6 +50,13 @@ export const startServer = async () => {
 
     await ensureSchema();
     await seedDefaults();
+
+    // A guarda de egresso do ACS pergunta a uma variável de memória se este
+    // deployment serve mais de um provedor; sem esta linha ela só aprenderia na
+    // primeira passada do agendador, e um deploy SaaS sem `EDITION=saas` no
+    // `.env` passaria esse primeiro minuto com a tabela de faixas privadas e a
+    // allowlist de portas desligadas. Ver `genieacsEgress.js`.
+    await refreshDeploymentSharing();
 
     // O RLS é aplicado no boot, e não por migration, porque ligá-lo é decisão
     // de DEPLOY e não de schema: dois deploys do mesmo código podem querer

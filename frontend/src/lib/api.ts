@@ -784,9 +784,14 @@ export const platformAPI = {
     apiClient.post<{ tenant: Tenant }>('/platform/tenants', payload),
 
   /**
-   * Suspends or reactivates. There is no delete: the scoped tables point at
-   * `tenants` without a cascade, so removing a provider that holds data would
-   * fail on a foreign key — and succeeding would be worse.
+   * Suspends or reactivates.
+   *
+   * Este comentário dizia "não existe exclusão", e isso deixou de ser verdade
+   * quando `deleteTenant` entrou logo abaixo. O que continua verdade é o motivo
+   * pelo qual a exclusão é em DUAS etapas: as tabelas escopadas apontam para
+   * `tenants` sem cascata, então apagar um provedor que ainda tem dado
+   * estouraria numa chave estrangeira — e suspender primeiro é o que garante
+   * que ninguém esteja trabalhando lá dentro enquanto se apaga.
    */
   setTenantStatus: (id: number, status: 'active' | 'suspended') =>
     apiClient.requestWithBody<{ tenant: Tenant }>('PATCH', `/platform/tenants/${id}`, { status }),
