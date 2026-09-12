@@ -385,7 +385,47 @@ coisa aqui que não se verifica sem uma conta no gateway: ele está lido de uma 
 teste pelo painel do gateway e confira no log do processo: `nothing to do with event "…"`
 significa que o corpo chegou e não foi reconhecido.
 
-**O que continua manual:** emitir a cobrança. A cobrança se cria hoje no painel do
-gateway; o que o painel faz sozinho é receber a notícia e creditar. Periodicidade em
-`plans` (hoje o período pago é 30 dias cravados), a régua de emissão e o link de pagamento
-no e-mail de vencimento são a metade que falta.
+### Emitir a cobrança
+
+A outra metade, e ela também deixou de ser manual. Duas variáveis a mais no `.env`:
+
+- **`ASAAS_API_KEY`** — a chave com que o painel CHAMA o gateway. Não é a mesma coisa que
+  `BILLING_WEBHOOK_TOKEN`: aquela autentica a entrega que chega, esta autentica a chamada
+  que sai, e elas viajam em cabeçalhos diferentes (`asaas-access-token` na entrada,
+  `access_token` na saída). Trocá-las dá 401 numa direção só — a que só se exercita
+  cobrando de verdade.
+- **`ASAAS_BASE_URL`** — só para apontar o ambiente de testes
+  (`https://api-sandbox.asaas.com/v3`, com uma chave de sandbox). Em produção o default
+  serve.
+
+Sem a chave, nada é emitido e todo provedor segue na cobrança manual — e o job diz isso
+(`gateway_not_configured`) em vez de queimar tentativas.
+
+**Quando sai.** O job roda dentro da mesma passada por provedor do aviso de vencimento,
+cinco dias antes do prazo (`LEAD_DAYS`). O valor é o `price_cents` do plano, o período é o
+`period_days` dele, e o vencimento é o fim do período — **exceto** para quem já está
+vencido, que recebe três dias a contar de hoje: um gateway recusa cobrança que nasce
+vencida, e sem isso a população que mais precisa ser cobrada seria a única a nunca ser.
+
+**Uma cobrança por período, garantida pelo banco.** `billing_charges` tem único
+`(tenant_id, period_end)`, e a linha nasce ANTES da chamada ao gateway — é o bilhete que
+ganha a corrida entre duas passadas. O gateway não oferece chave de idempotência, então a
+guarda é nossa. A chave se renova sozinha: um pagamento empurra `renews_at`, o período
+seguinte tem outra chave, e ninguém precisa limpar nada.
+
+**Quando falha.** A linha fica com `status: failed`, o motivo do gateway em `last_error` e
+uma espera de uma hora antes da próxima tentativa — sem ela, uma resposta perdida viraria
+cinco cobranças de verdade em cinco minutos. Depois de cinco tentativas o job desiste e a
+linha fica para alguém ler: a centésima tentativa recusa igual, e o que resolve é uma
+pessoa olhar o `last_error`.
+
+**O que o provedor recebe.** O aviso de vencimento passa a levar o link de pagamento
+quando há cobrança emitida, e o endereço do painel quando não há. O primeiro aviso de um
+ciclo ainda sai com o endereço do painel — a cobrança dele nasce na mesma passada, logo
+depois — e é o preço de o aviso não depender do gateway estar de pé.
+
+**O que continua fora:** a cobrança em moeda que não seja BRL (o gateway não tem campo de
+moeda, e o cliente recusa em voz alta em vez de cobrar reais com etiqueta de dólar);
+cancelar no gateway a cobrança de um provedor apagado; e conferir o valor pago contra o
+preço do plano — um pagamento de qualquer valor ainda compra o período inteiro, que é
+como o botão manual sempre funcionou.

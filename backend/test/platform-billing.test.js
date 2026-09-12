@@ -83,6 +83,9 @@ describe('plans', () => {
     assert.equal(created.status, 201);
     proId = created.body.data.plan.id;
     assert.equal(created.body.data.plan.currency, 'BRL');
+    // Quem cria sem dizer o período recebe o default da COLUNA, e não um 30
+    // repetido no controlador: a segunda cópia de um default é a que diverge.
+    assert.equal(created.body.data.plan.periodDays, 30);
     assert.deepEqual(created.body.data.plan.limits, { operators: 5, subscribers: 500, devices: null });
 
     assert.equal((await platform('/plans', { method: 'POST', body: { code: 'Pro!', name: 'x' } })).status, 400);
@@ -166,11 +169,57 @@ describe("a provider's subscription", () => {
     assert.equal(first.status, 201);
     assert.equal(first.body.data.subscription.status, 'active');
     const renewsAt = new Date(first.body.data.subscription.renewsAt).getTime();
+    // Trinta porque é o `period_days` do plano do beta, e não porque é um
+    // número dentro do serviço: desde a 0046 o prazo sai do catálogo.
     assert.ok(Math.abs(renewsAt - (Date.now() + 30 * DAY)) < 5 * 60 * 1000);
 
     const second = await platform(`/tenants/${beta}/payments`, { method: 'POST', body: { amountCents: 19990, currency: 'BRL' } });
     const stacked = new Date(second.body.data.subscription.renewsAt).getTime();
     assert.ok(Math.abs(stacked - (renewsAt + 30 * DAY)) < 5 * 60 * 1000, 'paid ahead extends from the current end');
+  });
+
+  /**
+   * O prazo sai do plano, e é isto que faz existir plano anual.
+   *
+   * Antes da migração 0046 o período pago era um `30` dentro de
+   * `subscriptionService`: o catálogo sabia dizer por quanto vende e não por
+   * quanto tempo. Um ISP que pagasse doze meses de uma vez recebia trinta dias.
+   */
+  it('um plano anual credita trezentos e sessenta e cinco dias, e não trinta', async () => {
+    // Provedor próprio: o beta já pagou duas vezes nos casos acima, e pagar
+    // adiantado estende a partir do fim atual — o que é o comportamento certo e
+    // tornaria esta conta sobre a data absoluta ilegível.
+    const criado = await platform('/tenants', {
+      method: 'POST', body: { slug: 'anualista', name: 'Provedor Anualista' }
+    });
+    assert.equal(criado.status, 201);
+    const anualista = criado.body.data.tenant.id;
+
+    const anual = await platform('/plans', {
+      method: 'POST',
+      body: { code: 'anual', name: 'Anual', priceCents: 199900, currency: 'BRL', periodDays: 365 }
+    });
+    assert.equal(anual.status, 201, JSON.stringify(anual.body));
+    assert.equal(anual.body.data.plan.periodDays, 365);
+
+    await platform(`/tenants/${anualista}/subscription`, {
+      method: 'PUT', body: { planId: anual.body.data.plan.id, status: 'past_due' }
+    });
+    const pago = await platform(`/tenants/${anualista}/payments`, {
+      method: 'POST', body: { amountCents: 199900, currency: 'BRL', externalId: 'PIX-ANUAL' }
+    });
+    assert.equal(pago.status, 201);
+    const renova = new Date(pago.body.data.subscription.renewsAt).getTime();
+    assert.ok(Math.abs(renova - (Date.now() + 365 * DAY)) < 5 * 60 * 1000,
+      `o pagamento comprou ${Math.round((renova - Date.now()) / DAY)} dias`);
+  });
+
+  it('e período zero é recusado: seria uma assinatura que vence ao ser paga', async () => {
+    const res = await platform('/plans', {
+      method: 'POST', body: { code: 'instantaneo', name: 'Zero', periodDays: 0 }
+    });
+    assert.equal(res.status, 400);
+    assert.match(res.body.message, /periodDays/);
   });
 
   /**

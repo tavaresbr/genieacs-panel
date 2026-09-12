@@ -152,7 +152,7 @@ async function catalogueSizes(db) {
  * first time.
  */
 /**
- * Todo provedor tem uma assinatura, e quem nasce depois da migração 0034 nasce
+ * Todo provedor tem uma assinatura, e quem nasce depois da migração 0035 nasce
  * em teste.
  *
  * A migração deu `active` sem limite a quem já existia — um upgrade não pode

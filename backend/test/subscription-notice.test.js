@@ -77,6 +77,10 @@ const ultima = () => decodificarQuotedPrintable(recebidas[recebidas.length - 1])
 beforeEach(async () => {
   recebidas.length = 0;
   await semEmailDeCobranca();
+  // A cobrança emitida decide o link da mensagem, então ela é estado que
+  // atravessa casos: sem esta limpeza, o caso que prova o endereço do painel
+  // veria a cobrança que o caso anterior criou.
+  await getDb()('billing_charges').del();
 });
 
 describe('quando o aviso sai', () => {
@@ -249,5 +253,71 @@ describe('sem transporte de e-mail', () => {
       process.env.SMTP_URL = antes;
       resetMailTransport();
     }
+  });
+});
+
+describe('o aviso leva o link de pagar, quando há cobrança emitida', () => {
+  /**
+   * É por causa disto que a cobrança ganhou tabela.
+   *
+   * Um aviso que diz "vence em três dias" e não diz ONDE pagar transfere ao
+   * cliente o trabalho de achar o boleto — e ele vai achar abrindo um chamado,
+   * que é o custo que este aviso existe para evitar.
+   */
+  it('o link da cobrança em aberto entra na mensagem', async () => {
+    const { default: BillingCharge } = await import('../src/models/BillingCharge.js');
+    await comAssinatura({ status: 'active', renews_at: new Date(Date.now() + 2 * DIA) });
+    await runInTenant(alfa, async () => {
+      const id = await BillingCharge.open({
+        periodEnd: '2026-12-31', amountCents: 19990, currency: 'BRL', provider: 'asaas'
+      });
+      await BillingCharge.markIssued(id, {
+        gatewayChargeId: 'pay_do_aviso',
+        invoiceUrl: 'https://gateway.exemplo.test/i/pay_do_aviso'
+      });
+    });
+
+    assert.equal((await avisar(new Date())).sent, true);
+    assert.match(ultima(), /gateway\.exemplo\.test\/i\/pay_do_aviso/,
+      'o aviso saiu sem dizer onde pagar');
+  });
+
+  /**
+   * E sem cobrança emitida continua levando o endereço do painel, que é o que
+   * este aviso sempre mandou: provedor sem gateway, plano de graça, ou cobrança
+   * que ainda não foi gerada.
+   */
+  it('e sem cobrança, o endereço do painel, como sempre', async () => {
+    await comAssinatura({ status: 'active', renews_at: new Date(Date.now() + 3 * DIA) });
+    assert.equal((await avisar(new Date())).sent, true);
+    const corpo = ultima();
+    assert.equal(corpo.includes('gateway.exemplo.test'), false);
+  });
+});
+
+describe('a janela do aviso acompanha o período do plano', () => {
+  /**
+   * Sete dias é a medida certa de um plano mensal e é pouco para um anual: a
+   * fatura é doze vezes maior e passa por aprovação de alguém que não é quem
+   * opera o painel. Sem esta conta, quem vende plano anual avisa o cliente com
+   * uma semana de antecedência sobre um contrato de um ano.
+   */
+  it('sete dias no mensal, trinta no anual', () => {
+    assert.equal(SubscriptionService.warnWindowDays({ period_days: 30 }), 7);
+    assert.equal(SubscriptionService.warnWindowDays({ period_days: 365 }), 30);
+    // E nada entre os dois surpreende: um doze avos, com piso e teto.
+    assert.equal(SubscriptionService.warnWindowDays({ period_days: 90 }), 8);
+    // Sem plano em mãos, o piso — que é o comportamento de antes desta conta.
+    assert.equal(SubscriptionService.warnWindowDays(null), 7);
+  });
+
+  it('e é ela que decide se há aviso a dar', () => {
+    const daquiA = (dias) => new Date(Date.now() + dias * 86_400_000);
+    const anual = { period_days: 365 };
+    const assinatura = { status: 'active', renews_at: daquiA(20), expiry_warned_for: null };
+
+    // Vinte dias: dentro da janela do anual, fora da janela do mensal.
+    assert.ok(SubscriptionService.pendingExpiryNotice(assinatura, new Date(), anual));
+    assert.equal(SubscriptionService.pendingExpiryNotice(assinatura, new Date(), { period_days: 30 }), null);
   });
 });
