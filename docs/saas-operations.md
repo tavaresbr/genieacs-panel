@@ -326,11 +326,66 @@ assinantes, nada. Uma caixa de entrada alheia não é lugar onde isso mora.
 
 ## 9. O que este documento não cobre, porque ainda não existe
 
-- Gateway de cobrança: hoje o `ManualBillingProvider` registra o pagamento pelo
-  console. Asaas ou similar entra quando houver contrato para cobrar.
+- Gateway de cobrança, **a metade que emite**. A metade que RECEBE já existe: ver
+  a seção 10.
 - O **comando de re-cifra** da rotação da `SECRET_BOX_KEY`. As duas chaves vivas
   já existem e já funcionam: pôr a chave antiga em `SECRET_BOX_KEY_PREVIOUS` faz
   o painel LER o que foi cifrado com ela e ESCREVER só com a nova. O que não
   existe é o passo que percorre as linhas antigas e as reescreve — sem ele, uma
   linha só migra quando alguém a edita, e a chave antiga tem que continuar no
   `.env` indefinidamente.
+
+## 10. Receber pagamento sozinho
+
+Até aqui o pagamento de um provedor era um botão no console: alguém conferindo extrato e
+marcando à mão. Com dez clientes passa; com cinquenta é uma pessoa por dia, e é uma pessoa
+que erra.
+
+`POST /api/billing-webhook` recebe a entrega do gateway e credita a assinatura. Três coisas
+para ligar:
+
+1. **`BILLING_WEBHOOK_TOKEN` no `.env` do deploy.** É a credencial que o gateway devolve
+   no cabeçalho `asaas-access-token` de toda entrega, e é do **deploy** e não de um
+   provedor: há uma conta no gateway e ela é nossa. Sem a variável configurada a rota
+   responde **404** — uma rota que mexe em dinheiro não pode ficar aberta porque alguém
+   esqueceu uma linha.
+2. **O endereço, no painel do gateway:** `https://<apex>/api/billing-webhook`. A rota é
+   montada acima do resolvedor de provedor de propósito: o apex não nomeia provedor
+   nenhum, e resolvida por host a entrega levaria 404 antes do controlador.
+3. **A correlação, no console**, aba *Gateway* de cada provedor: o nome do gateway
+   (`asaas`) e o id do cliente lá dentro (`cus_…`). É por ela que a entrega volta ao
+   provedor certo. Enquanto ela não existir, o pagamento vira uma linha de log dizendo
+   `no provider for payment …` e a cobrança segue manual. **Só o console escreve** esses
+   dois campos: um provedor que pudesse escrever o próprio id apontaria para o cliente de
+   outro e receberia o crédito alheio.
+
+O caminho de volta tem duas chaves, nesta ordem: a nossa própria referência
+(`externalReference` no formato `tenant:<id>`, quando fomos nós que criamos a cobrança) e o
+id do cliente no gateway (para a cobrança emitida lá dentro, à mão — que é como os
+primeiros contratos vão ser cobrados). Provedor suspenso ou apagado não resolve por
+nenhuma das duas.
+
+**A disciplina de status, que é o que impede uma fila de reentrega infinita:** 401 uniforme
+para credencial que não presta, 404 para deploy sem gateway ligado, 500 só para falha
+genuína deste lado — e **200 para tudo que se escolhe não fazer**: reentrega, evento que
+não é dinheiro entrando, pagamento que não resolve provedor nenhum. Um não-2xx faz o
+gateway reentregar em laço para sempre.
+
+**A mesma referência credita uma vez só**, e a chave é o id do **pagamento**, não o do
+evento. O gateway manda dois eventos para um pagamento de cartão — `PAYMENT_CONFIRMED`
+quando a operadora aprova e `PAYMENT_RECEIVED` quando o dinheiro cai, trinta dias depois.
+Os dois falam do mesmo `payment.id`, então o segundo responde `duplicate` e não empurra a
+data. Com a chave no id do evento, todo cartão ganharia dois períodos e ninguém perceberia
+por meses.
+
+**O que conferir antes da primeira cobrança de verdade.** O formato do corpo é a única
+coisa aqui que não se verifica sem uma conta no gateway: ele está lido de uma função pura
+(`AsaasBillingProvider.interpretar`) e falha FECHANDO — um campo que mudou de nome devolve
+"não faço nada" e ninguém é creditado, em vez de creditar errado. Mande uma entrega de
+teste pelo painel do gateway e confira no log do processo: `nothing to do with event "…"`
+significa que o corpo chegou e não foi reconhecido.
+
+**O que continua manual:** emitir a cobrança. A cobrança se cria hoje no painel do
+gateway; o que o painel faz sozinho é receber a notícia e creditar. Periodicidade em
+`plans` (hoje o período pago é 30 dias cravados), a régua de emissão e o link de pagamento
+no e-mail de vencimento são a metade que falta.

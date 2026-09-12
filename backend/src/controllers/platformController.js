@@ -61,6 +61,8 @@ function present(tenant, operators, subscription = null) {
     // isso, de propósito: um dado que o cliente mantém é um dado que ele
     // corrige sozinho quando muda de endereço.
     billing: Tenant.presentBilling(tenant),
+    // A correlação com o gateway, que o console escreve e o webhook lê.
+    gateway: Tenant.presentGateway(tenant),
     operators,
     subscription: subscription ? {
       status: SubscriptionService.effectiveStatus(subscription).status,
@@ -273,14 +275,93 @@ class PlatformController {
     const corpo = req.body ?? {};
     const tem = (chave) => Object.prototype.hasOwnProperty.call(corpo, chave);
     const identidade = tem('name') || tem('slug');
-    if (identidade && tem('status')) {
+    const gateway = tem('gateway');
+    if ([identidade, gateway, tem('status')].filter(Boolean).length > 1) {
       return res.status(400).json(createErrorResponse(
-        'Send either the status or the name and slug, not both'
+        'Send the status, the name and slug, or the gateway — one at a time'
       ));
     }
+    if (gateway) return PlatformController.setGateway(req, res);
     return identidade
       ? PlatformController.updateIdentity(req, res)
       : PlatformController.setStatus(req, res);
+  }
+
+  /**
+   * Liga (ou desliga) um provedor do gateway de pagamento.
+   *
+   * No console e não na tela do provedor, ao contrário do cadastro fiscal: o
+   * fiscal é dado que o cliente mantém e corrige sozinho quando muda de
+   * endereço; isto é a correlação que decide **de quem é o dinheiro que entra
+   * pelo webhook**. Um provedor que pudesse escrever o próprio
+   * `billing_customer_ref` poderia apontá-lo para o cliente de gateway de
+   * outro e receber o crédito do pagamento alheio.
+   *
+   * Sem validar o formato do id do cliente: ele é opaco e é do gateway, e
+   * inventar aqui uma regra sobre a forma dele é a segunda cópia de uma regra
+   * que não é nossa. O que se valida é o tamanho, porque a coluna tem um.
+   */
+  static async setGateway(req, res) {
+    try {
+      const id = Number(req.params?.id);
+      if (!Number.isInteger(id) || id <= 0) {
+        return res.status(400).json(createErrorResponse('Invalid provider id'));
+      }
+      const tenant = await Tenant.findById(id);
+      if (!tenant) {
+        return res.status(404).json(createErrorResponse('Provider not found'));
+      }
+
+      const enviado = req.body?.gateway ?? {};
+      const nome = enviado.gateway === undefined ? undefined : String(enviado.gateway ?? '').trim();
+      const ref = enviado.customerRef === undefined
+        ? undefined
+        : String(enviado.customerRef ?? '').trim();
+
+      if (nome !== undefined && nome.length > 32) {
+        return res.status(400).json(createErrorResponse('Gateway name is too long'));
+      }
+      if (ref !== undefined && ref.length > 128) {
+        return res.status(400).json(createErrorResponse('Gateway customer reference is too long'));
+      }
+      // Um id de cliente sem gateway não diz nada: é uma correlação pela metade,
+      // e o webhook procura pelos dois juntos. Recusar aqui é mais barato do que
+      // um pagamento que não resolve provedor nenhum e vira linha de log.
+      const gatewayFinal = nome === undefined ? (tenant.billing_gateway ?? '') : nome;
+      const refFinal = ref === undefined ? (tenant.billing_customer_ref ?? '') : ref;
+      if (Boolean(gatewayFinal) !== Boolean(refFinal)) {
+        return res.status(400).json(createErrorResponse(
+          'Set the gateway and the customer reference together, or clear both'
+        ));
+      }
+
+      const patch = {};
+      if (nome !== undefined) patch.billing_gateway = nome;
+      if (ref !== undefined) patch.billing_customer_ref = ref;
+      await Tenant.updateGateway(id, patch);
+
+      const registrada = await PlatformAudit.fromRequest(req, {
+        action: PlatformAudit.ACTIONS.TENANT_GATEWAY_CHANGED,
+        tenant,
+        // O nome do gateway, sim; o id do cliente, não. Ele é a chave que
+        // decide para quem vai o crédito de um pagamento, e a trilha da
+        // plataforma é lida por mais gente do que o console.
+        detail: { gateway: gatewayFinal || null, linked: Boolean(refFinal) }
+      });
+      if (!registrada) {
+        console.warn(`Provider ${id} gateway changed without a platform trail line`);
+      }
+
+      const atual = await Tenant.findById(id);
+      return res.json(createResponse('Gateway updated', {
+        id, gateway: Tenant.presentGateway(atual)
+      }));
+    } catch (error) {
+      console.error('Set tenant gateway error:', error);
+      return res.status(500).json(
+        createErrorResponse('Failed to update the gateway', error.message)
+      );
+    }
   }
 
   /**

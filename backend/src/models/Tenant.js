@@ -59,6 +59,48 @@ class Tenant {
     'billing_phone'
   ];
 
+  /**
+   * Quem este provedor é dentro do gateway de pagamento.
+   *
+   * Separadas de `BILLING_COLUMNS` de propósito, ainda que morem na mesma
+   * tabela: aquelas são o cadastro FISCAL, que o próprio provedor preenche na
+   * tela de plano dele (`PATCH /api/tenant`), e estas são a correlação com um
+   * sistema nosso, que só o console da plataforma escreve. Um provedor não pode
+   * dizer de quem é o dinheiro que entra — misturar as duas listas daria a ele
+   * exatamente isso, por uma rota que já existe e já é dele.
+   *
+   * Fora de `PUBLIC_COLUMNS`, como todo o resto: o id de um cliente num gateway
+   * é o tipo de coisa que não aparece numa resposta pública por esquecimento.
+   */
+  static GATEWAY_COLUMNS = ['billing_gateway', 'billing_customer_ref'];
+
+  /** A correlação com o gateway, em camelCase, para o console. */
+  static presentGateway(row) {
+    if (!row) return null;
+    return {
+      gateway: row.billing_gateway ?? null,
+      customerRef: row.billing_customer_ref ?? null
+    };
+  }
+
+  /**
+   * Grava a correlação. Mesma regra de `updateBilling`: ausente não toca,
+   * presente e vazio apaga — que é como se desliga um provedor do gateway sem
+   * mexer no cadastro fiscal dele.
+   */
+  static async updateGateway(id, patch) {
+    const update = {};
+    for (const coluna of Tenant.GATEWAY_COLUMNS) {
+      if (!(coluna in patch)) continue;
+      const valor = patch[coluna];
+      update[coluna] = valor === null || valor === '' ? null : valor;
+    }
+    if (!Object.keys(update).length) return false;
+    update.updated_at = new Date();
+    const changed = await getDb()('tenants').where({ id }).update(update);
+    return changed > 0;
+  }
+
   /** O cadastro fiscal de uma linha já lida, em camelCase, para a tela. */
   static presentBilling(row) {
     if (!row) return null;

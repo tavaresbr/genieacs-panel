@@ -6,6 +6,7 @@ import { PlanCatalog } from '@/components/platform/plan-catalog'
 import { PlatformAdmins } from '@/components/platform/platform-admins'
 import { PlatformAudit } from '@/components/platform/platform-audit'
 import { TenantData } from '@/components/platform/tenant-data'
+import { TenantGateway } from '@/components/platform/tenant-gateway'
 import { TenantMembers } from '@/components/platform/tenant-members'
 import { STATUS_LABEL_KEYS, TenantPlan, statusBadgeClass } from '@/components/platform/tenant-plan'
 import { Icon } from '@/components/ui/icon'
@@ -27,7 +28,7 @@ export default function PlatformPage() {
   const [expandedId, setExpandedId] = useState<number | null>(null)
   // Which panel the expanded row shows: the registry data, the team, or the
   // plan and its statement.
-  const [expandedPanel, setExpandedPanel] = useState<'members' | 'plan' | 'data'>('members')
+  const [expandedPanel, setExpandedPanel] = useState<'members' | 'plan' | 'data' | 'gateway'>('members')
   const [plans, setPlans] = useState<Plan[]>([])
   const [form, setForm] = useState({ slug: '', name: '' })
   /**
@@ -68,7 +69,7 @@ export default function PlatformPage() {
    * está, e comparar um com o outro dentro do atualizador leria o valor já
    * trocado.
    */
-  const abrirPainel = (id: number, painel: 'members' | 'plan' | 'data') => {
+  const abrirPainel = (id: number, painel: 'members' | 'plan' | 'data' | 'gateway') => {
     const fechando = expandedId === id && expandedPanel === painel
     setExpandedPanel(painel)
     setExpandedId(fechando ? null : id)
@@ -388,6 +389,19 @@ export default function PlatformPage() {
                             >
                               {t('platform.subscription.plan')}
                             </button>
+                            {/* A correlação com o gateway mora aqui e não na
+                                aba de plano: plano é o que o cliente comprou,
+                                isto é quem ele é num sistema de fora — e quem
+                                mexe num não está necessariamente mexendo no
+                                outro. */}
+                            <button
+                              type="button"
+                              onClick={() => abrirPainel(tenant.id, 'gateway')}
+                              className="modern-button-secondary"
+                              aria-expanded={expanded && expandedPanel === 'gateway'}
+                            >
+                              {t('platform.gateway.tab')}
+                            </button>
                             {/* Só de um provedor ativo: o painel de um suspenso
                                 está fora do ar para os operadores dele, e é
                                 isso que a personificação mostraria. */}
@@ -437,6 +451,8 @@ export default function PlatformPage() {
                               <TenantData tenant={tenant} onTenantChange={() => void loadTenants()} />
                             ) : expandedPanel === 'members' ? (
                               <TenantMembers tenant={tenant} onMembershipChange={() => void loadTenants()} />
+                            ) : expandedPanel === 'gateway' ? (
+                              <TenantGateway tenant={tenant} onTenantChange={() => void loadTenants()} />
                             ) : (
                               <TenantPlan tenant={tenant} plans={plans} onSubscriptionChange={() => void loadTenants()} />
                             )}

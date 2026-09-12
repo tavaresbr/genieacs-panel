@@ -749,7 +749,21 @@ export interface Tenant {
   operators: number
   /** Null only for a provider the seed has not yet given one — a boot fixes it. */
   subscription: TenantSubscriptionSummary | null
+  /**
+   * Quem este provedor é dentro do gateway de pagamento — a correlação que o
+   * webhook lê para saber de quem é o dinheiro que entrou. Escrita só pelo
+   * console: um provedor que pudesse apontar o próprio `customerRef` para o
+   * cliente de outro receberia o crédito do pagamento alheio.
+   */
+  gateway: TenantGateway | null
   createdAt: string | null
+}
+
+export interface TenantGateway {
+  /** O nome do provider (`asaas`), ou nulo quando a cobrança é manual. */
+  gateway: string | null
+  /** O id do cliente no gateway. Os dois andam juntos: meia correlação não resolve nada. */
+  customerRef: string | null
 }
 
 /** Null means "no limit". */
@@ -933,6 +947,20 @@ export const platformAPI = {
    */
   updateTenant: (id: number, payload: { name?: string; slug?: string }) =>
     apiClient.requestWithBody<{ tenant: Tenant }>('PATCH', `/platform/tenants/${id}`, payload),
+
+  /**
+   * Liga (ou desliga) o provedor do gateway de pagamento.
+   *
+   * Mesma rota do nome e do status, e a rota recusa as três intenções no mesmo
+   * corpo — mandar uma de cada vez é o que impede um salvamento de tela mexer em
+   * algo que ninguém tinha a intenção de mexer. Os dois campos vazios juntos
+   * desligam; um só vazio é recusado, porque meia correlação não resolve
+   * provedor nenhum no webhook.
+   */
+  setTenantGateway: (id: number, gateway: { gateway: string; customerRef: string }) =>
+    apiClient.requestWithBody<{ id: number; gateway: TenantGateway }>(
+      'PATCH', `/platform/tenants/${id}`, { gateway }
+    ),
 
   listMemberships: (tenantId: number) =>
     apiClient.get<{ memberships: TenantMembership[] }>(`/platform/tenants/${tenantId}/members`),
