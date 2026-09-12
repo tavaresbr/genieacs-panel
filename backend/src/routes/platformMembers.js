@@ -35,6 +35,18 @@ router.post(
   PlatformMemberController.add
 );
 
+/**
+ * Convidar quem ainda NÃO tem login. É o par da rota acima, e a razão de ele
+ * existir está no controlador: sem ele, um provedor recém-criado não tinha
+ * caminho nenhum para a primeira conta.
+ */
+router.post(
+  '/tenants/:id/invites',
+  authenticateToken,
+  requirePlatformAdmin,
+  PlatformMemberController.invite
+);
+
 router.delete(
   '/tenants/:id/members/:userId',
   authenticateToken,

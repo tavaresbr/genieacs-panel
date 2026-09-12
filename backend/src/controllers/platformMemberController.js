@@ -8,7 +8,15 @@ import PlatformAudit from '../models/PlatformAudit.js';
 import { runInTenant } from '../config/tenantContext.js';
 import { ROLES } from './usersController.js';
 import { normalizeRole, roleHas } from '../config/permissions.js';
-import { createResponse, createErrorResponse } from '../utils/helpers.js';
+import TenantInvite from '../models/TenantInvite.js';
+import {
+  MAX_TTL_MS,
+  MIN_TTL_MS,
+  inviteLink,
+  publicInvite,
+  sendInvite
+} from '../services/inviteDelivery.js';
+import { createResponse, createErrorResponse, isValidEmail } from '../utils/helpers.js';
 
 /**
  * Who works for a provider, decided from the control plane.
@@ -121,6 +129,125 @@ class PlatformMemberController {
   }
 
   /**
+   * Convida a primeira pessoa de um provedor — ou qualquer pessoa que ainda não
+   * tenha login neste deploy.
+   *
+   * Isto era um beco sem saída, e o beco tinha quatro paredes. Um provedor
+   * recém-criado pelo console não tinha equipe, e nenhum caminho levava a
+   * primeira conta até ele: `add` (abaixo) só vincula quem JÁ existe e não tem
+   * campo de senha, por desenho; o `/setup` no host do provedor novo responde
+   * "já concluído", porque ele conta a tabela `users`, que é do deploy inteiro;
+   * `POST /api/invites` é escopado e exige uma sessão DENTRO do provedor que
+   * ainda não tem ninguém para abrir sessão; e a personificação é só de
+   * leitura. O ISP recebia um painel que ninguém conseguia abrir.
+   *
+   * O convite é a saída certa, e não um formulário de senha aqui. A pessoa
+   * escolhe a própria senha ao aceitar — o plano de controle nunca a conhece,
+   * que é a mesma linha que `add` traça ao não ter campo de senha. E o link é um
+   * segredo com validade, não um endereço aberto: consertar o `/setup` para
+   * contar por provedor também resolveria o beco, mas deixaria
+   * `provedor.painel.exemplo.com/setup` aberto a quem chegasse primeiro num
+   * endereço fácil de adivinhar, e quem chegasse primeiro viraria dono.
+   *
+   * O papel não tem a trava de `inviteController`, onde um `admin` não cunha um
+   * `owner`. Aqui é o contrário por necessidade: é ESTE plano que entrega o
+   * provedor ao primeiro dono dele, e um convite de `owner` é exatamente o que
+   * a criação de um provedor precisa emitir.
+   *
+   * Duas trilhas, como todo write deste arquivo: a nossa registra que a
+   * plataforma cunhou um convite para aquele provedor, e a DELE registra o
+   * convite com `actorKind: 'platform'` — a mesma ação que a tela de trilha do
+   * provedor já lê, para que o ISP veja que a mão veio de fora.
+   */
+  static async invite(req, res) {
+    try {
+      const tenantId = parseId(req.params?.id);
+      if (!tenantId) {
+        return res.status(400).json(createErrorResponse('Invalid provider id'));
+      }
+      // A linha inteira: o slug e o nome vão para a trilha, e o slug é o que
+      // monta o endereço em que o convite é aceito.
+      const tenant = await findTenant(tenantId);
+      if (!tenant) return tenantNotFound(res);
+
+      const role = req.body?.role;
+      if (!ROLES.includes(role)) {
+        return res.status(400).json(
+          createErrorResponse(`Role must be one of: ${ROLES.join(', ')}`)
+        );
+      }
+
+      const ttlMs = req.body?.ttlMs === undefined
+        ? TenantInvite.DEFAULT_TTL_MS
+        : Number(req.body.ttlMs);
+      if (!Number.isFinite(ttlMs) || ttlMs < MIN_TTL_MS || ttlMs > MAX_TTL_MS) {
+        return res.status(400).json(
+          createErrorResponse('An invitation must be valid for between 30 minutes and 30 days')
+        );
+      }
+
+      // O endereço é opcional e só decide se o link TAMBÉM vai por e-mail. Um
+      // endereço inválido é recusado ANTES de o convite existir, para não deixar
+      // convite órfão de um erro de digitação.
+      const email = User.normalizeEmail(req.body?.email);
+      if (req.body?.email !== undefined && (!email || !isValidEmail(email))) {
+        return res.status(400).json(createErrorResponse('Invalid e-mail address'));
+      }
+
+      // `tenant_invites` é escopada e o escopo aberto por `authenticateToken` é
+      // o do provedor em que o administrador da plataforma trabalha — que não é
+      // este. Sem `runInTenant` o convite nasceria no provedor errado e poria
+      // um estranho na equipe de quem cunhou.
+      const { invite, token } = await runInTenant(tenantId, () => TenantInvite.create({
+        role,
+        label: req.body?.label,
+        createdBy: req.user?.userId ?? null,
+        ttlMs
+      }));
+
+      // O token NÃO entra em trilha nenhuma. Ele é a credencial: quem tem o
+      // link entra na equipe com o papel escrito nele, e guardá-lo faria da
+      // trilha uma lista de convites utilizáveis.
+      await PlatformAudit.fromRequest(req, {
+        action: PlatformAudit.ACTIONS.MEMBER_INVITED,
+        tenant,
+        detail: { inviteId: invite.id, role, expiresAt: invite.expires_at }
+      });
+      await runInTenant(tenantId, () => AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.INVITE_CREATED,
+        actorKind: 'platform',
+        subjectType: 'invite',
+        subjectId: invite.id,
+        detail: { role, expiresAt: invite.expires_at }
+      }));
+
+      // O envio vem DEPOIS de o convite existir e da trilha estar escrita, e o
+      // resultado dele não muda o status: o convite foi criado, e é isso que o
+      // 201 diz. Um deploy sem SMTP devolve `emailed: false` com o link na mão,
+      // que é como quem convidou entregaria de qualquer jeito.
+      const emailed = email ? await sendInvite({ req, tenant, email, token }) : false;
+
+      return res.status(201).json(createResponse('Invitation created', {
+        invite: publicInvite(invite),
+        // Uma vez só: a tabela guarda o hash, então nem esta rota nem nenhuma
+        // outra consegue dizer isto de novo.
+        token,
+        // Montado aqui, e não pela tela: o convite é aceito no host do PROVEDOR
+        // e o console vive em outro endereço, então é a única parte do link que
+        // o navegador de quem convidou não tem como saber. `null` num deploy sem
+        // domínio-base configurado.
+        url: inviteLink(tenant, token),
+        emailed
+      }));
+    } catch (error) {
+      console.error('Invite to provider error:', error);
+      return res.status(500).json(
+        createErrorResponse('Failed to create the invitation', error.message)
+      );
+    }
+  }
+
+  /**
    * Attaches a person who already exists to a provider.
    *
    * The person must already exist. Creating one is `/api/users`' job, at a
@@ -165,7 +292,13 @@ class PlatformMemberController {
       // nome. Procurar só pelo nome faria a rota não achar quem já migrou.
       const person = await User.findByLogin(username);
       if (!person) {
-        return res.status(404).json(createErrorResponse('No such person on this deployment'));
+        // Com `code`, e não só com a frase: esta é a recusa que a tela precisa
+        // TRADUZIR e transformar em instrução — quem não existe no deploy entra
+        // pelo convite, que é a rota ao lado —, e ler isso de uma frase em
+        // inglês do plano de controle seria adivinhação por texto.
+        return res.status(404).json(
+          createErrorResponse('No such person on this deployment', null, 'person_not_found')
+        );
       }
       // Refused rather than written twice. `tenant_users` is unique on
       // (tenant_id, user_id), so the second insert would fail on the

@@ -844,6 +844,27 @@ export const platformAPI = {
       expiresInSeconds: number
     }>(`/platform/tenants/${id}/impersonate`, {}),
 
+  /**
+   * Convida quem ainda NÃO tem login para um provedor.
+   *
+   * O par de `addMembership`, e a diferença é quem existe: aquela vincula uma
+   * pessoa que já tem conta, esta cunha o convite em que a pessoa cria a dela e
+   * escolhe a própria senha. É o caminho da PRIMEIRA conta de um provedor
+   * recém-criado, que antes não tinha nenhum.
+   *
+   * `url` vem montado pelo servidor e não é montado aqui: o convite é aceito no
+   * host do provedor convidado, e o console vive em outro endereço — é a única
+   * parte do link que esta aba não tem como saber. Vem `null` num deploy sem
+   * domínio-base, e aí o que se entrega é o token.
+   */
+  inviteMember: (tenantId: number, payload: { role: OperatorRole; email?: string }) =>
+    apiClient.post<{
+      invite: { id: number; role: OperatorRole; label: string | null; expiresAt: string }
+      token: string
+      url: string | null
+      emailed: boolean
+    }>(`/platform/tenants/${tenantId}/invites`, payload),
+
   createTenant: (payload: { slug: string; name: string }) =>
     apiClient.post<{ tenant: Tenant }>('/platform/tenants', payload),
 
