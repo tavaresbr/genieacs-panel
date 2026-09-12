@@ -333,6 +333,134 @@ describe('attaching a person who already exists', () => {
   });
 });
 
+/**
+ * Convidar quem ainda NÃO tem login, que é o caminho da PRIMEIRA conta de um
+ * provedor.
+ *
+ * O que este bloco fixa é um beco sem saída que existia inteiro: um provedor
+ * recém-criado pelo console não tinha equipe, e nenhuma porta levava a primeira
+ * conta até ele — `add` só vincula quem já existe, o `/setup` no host do
+ * provedor novo responde "já concluído" porque conta a tabela `users` do deploy
+ * inteiro, `POST /api/invites` exige uma sessão dentro do provedor que ainda não
+ * tem ninguém, e a personificação é só de leitura. O ISP recebia um painel que
+ * ninguém abria.
+ *
+ * O caso que prova o conserto é o de ponta a ponta: cunhar aqui e ACEITAR pela
+ * rota pública, provando que a pessoa nasce com a senha que ela mesma escolheu
+ * e com vínculo no provedor certo — beta, e nunca alfa, que é o provedor de
+ * quem convidou.
+ */
+describe('convidando quem ainda não tem login', () => {
+  const convidar = (tenantId, token, body) => call(
+    `${platformUrl}/api/platform/tenants/${tenantId}/invites`,
+    { method: 'POST', headers: authHeaders(token), body }
+  );
+
+  const convitesDe = (tenantId) => getDb()('tenant_invites')
+    .where({ tenant_id: tenantId })
+    .orderBy('id', 'desc');
+
+  it('cunha o convite no provedor NOMEADO, não no de quem convidou', async () => {
+    const { status, body } = await convidar(beta, ownerToken, { role: 'owner' });
+    assert.equal(status, 201);
+    assert.ok(body.data.token, 'o convite voltou sem token, e o token é o convite');
+    assert.equal(body.data.invite.role, 'owner');
+
+    const [convite] = await convitesDe(beta);
+    assert.ok(convite, 'o convite não nasceu em beta');
+    assert.equal(Number(convite.tenant_id), beta);
+    // O token guardado é o HASH: quem lê a tabela não consegue usar o convite.
+    assert.notEqual(convite.token_hash, body.data.token);
+    assert.equal((await convitesDe(alfa)).length, 0,
+      'o convite nasceu no provedor de quem convidou, que é o erro que `runInTenant` existe para impedir');
+  });
+
+  // O ACEITE não é provado aqui: `usableInvite` exige que o convite seja aberto
+  // no host do provedor, e este arquivo roda sem domínio-base de propósito. O
+  // caminho inteiro — console cunha, pessoa aceita no endereço do provedor,
+  // entra e trabalha — está em `platform-invite-onboarding.test.js`.
+  it('monta o link no endereço do provedor convidado', async () => {
+    // `TENANT_BASE_DOMAIN` é lido no carregamento do módulo e este arquivo roda
+    // sem ele de propósito — é `PUBLIC_BASE_URL`, lido a cada chamada, que dá o
+    // endereço absoluto aqui sem mexer na resolução por host do resto da suíte.
+    const antes = process.env.PUBLIC_BASE_URL;
+    process.env.PUBLIC_BASE_URL = 'https://painel.exemplo.test';
+    try {
+      const { status, body } = await convidar(beta, ownerToken, { role: 'admin' });
+      assert.equal(status, 201);
+      assert.equal(body.data.url, `https://painel.exemplo.test/invite#${body.data.token}`);
+    } finally {
+      if (antes === undefined) delete process.env.PUBLIC_BASE_URL;
+      else process.env.PUBLIC_BASE_URL = antes;
+    }
+  });
+
+  it('e devolve `url` nula quando o deploy não tem endereço absoluto', async () => {
+    const { status, body } = await convidar(beta, ownerToken, { role: 'tech' });
+    assert.equal(status, 201);
+    assert.equal(body.data.url, null, 'inventou um endereço que o deploy não declarou');
+    assert.ok(body.data.token, 'sem endereço, o token é o que sobra para entregar');
+  });
+
+  it('recusa um papel que a matriz não conhece, e uma validade fora da régua', async () => {
+    const antes = (await convitesDe(beta)).length;
+    for (const body of [
+      { role: 'sysadmin' },
+      { role: undefined },
+      { role: 'owner', ttlMs: 1000 },
+      { role: 'owner', ttlMs: 365 * 24 * 60 * 60 * 1000 },
+      { role: 'owner', ttlMs: 'sete dias' },
+      { role: 'owner', email: 'nao-e-endereco' }
+    ]) {
+      const { status } = await convidar(beta, ownerToken, body);
+      assert.equal(status, 400, `${JSON.stringify(body)} tinha que ser recusado`);
+    }
+    assert.equal((await convitesDe(beta)).length, antes,
+      'um pedido recusado deixou convite para trás');
+  });
+
+  it('responde 404 para um provedor que não existe', async () => {
+    const { status } = await convidar(999999, ownerToken, { role: 'owner' });
+    assert.equal(status, 404);
+  });
+
+  it('e o administrador de um provedor não convida para o vizinho', async () => {
+    const antes = (await convitesDe(beta)).length;
+    const { status } = await convidar(beta, anaToken, { role: 'owner' });
+    assert.ok(status >= 400 && status < 500, `respondeu ${status} a quem não é da plataforma`);
+    assert.equal((await convitesDe(beta)).length, antes,
+      'quem não é da plataforma cunhou um convite para outro provedor');
+  });
+
+  it('deixa a linha nas duas trilhas', async () => {
+    const { status, body } = await convidar(beta, ownerToken, { role: 'admin' });
+    assert.equal(status, 201);
+    const inviteId = body.data.invite.id;
+
+    const nossa = await getDb()('platform_audit')
+      .where({ action: 'tenant.member_invited' })
+      .orderBy('id', 'desc')
+      .first();
+    assert.ok(nossa, 'a plataforma cunhou um convite e não registrou');
+    assert.equal(Number(nossa.tenant_id), beta);
+    assert.equal(nossa.actor_username, 'owner');
+    const detalhe = JSON.parse(nossa.detail);
+    assert.equal(detalhe.inviteId, inviteId);
+    assert.equal(detalhe.role, 'admin');
+    // O token é uma credencial: não entra em trilha nenhuma.
+    assert.ok(!nossa.detail.includes(body.data.token), 'o token vazou para a trilha');
+
+    const dele = await getDb()('audit_log')
+      .where({ tenant_id: beta, action: 'invite.created' })
+      .orderBy('id', 'desc')
+      .first();
+    assert.ok(dele, 'o ISP não tem na trilha dele que um convite foi cunhado para a equipe dele');
+    assert.equal(dele.actor_kind, 'platform', 'a mão veio de fora e a trilha dele não diz isso');
+    assert.equal(dele.subject_id, String(inviteId));
+    assert.ok(!String(dele.detail).includes(body.data.token), 'o token vazou para a trilha do provedor');
+  });
+});
+
 describe('ending a membership', () => {
   let broadcastId;
   let optOutId;
