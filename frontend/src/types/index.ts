@@ -36,7 +36,14 @@ export interface User {
    * Opcional pelo mesmo motivo de `email`: nem toda resposta traz o campo.
    */
   emailVerified?: boolean
-  role: OperatorRole
+  /**
+   * O papel NO PROVEDOR desta sessão — e `null` quando ela não tem provedor.
+   *
+   * A sessão do console é esse caso: ela não trabalha em provedor nenhum, então
+   * não há papel a reportar. Nulo e não um papel de reserva, porque um papel de
+   * reserva é o que uma tela acaba consultando como se valesse.
+   */
+  role: OperatorRole | null
   /**
    * Whether this person is on the SaaS control plane's roster.
    *
@@ -52,6 +59,16 @@ export interface User {
    * which edition it is talking to.
    */
   isPlatformAdmin?: boolean
+  /**
+   * Presente só na sessão do console: esta sessão é DA PLATAFORMA e não de um
+   * provedor.
+   *
+   * Separado de `isPlatformAdmin`, que responde outra pergunta — quem tem a
+   * chave do console também trabalha em provedores, e ali a sessão é comum. É
+   * isto, e não um `tenantId` nulo, que diz à casca qual árvore de telas montar:
+   * deduzir de uma ausência é a dedução que um dia alguém faz errado.
+   */
+  platform?: boolean
   /**
    * Presente só numa sessão de personificação: quem, do plano de controle,
    * está olhando este painel.

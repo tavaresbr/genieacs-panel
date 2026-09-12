@@ -105,6 +105,9 @@ const es: Dictionary = {
   'login.kicker': 'Acceso de operador',
   'login.title': 'Iniciar sesión en el panel',
   'login.subtitle': 'Usa la cuenta de administrador de SkyGenPanel para abrir los datos de los equipos.',
+  'login.platform.kicker': 'Acceso de la plataforma',
+  'login.platform.title': 'Entrar en la consola',
+  'login.platform.subtitle': 'Use la cuenta que tiene la llave de la consola. Esta dirección no es el panel de ningún proveedor.',
   'login.identifier': 'Usuario o correo electrónico',
   'login.identifierPlaceholder': 'admin o tu@tuisp.com',
   'login.identifierHint': 'Sirven los dos: el usuario de siempre sigue entrando.',
@@ -115,6 +118,8 @@ const es: Dictionary = {
   'login.submit': 'Iniciar sesión',
   'login.submitting': 'Verificando cuenta…',
   'login.helpText': 'Si el acceso es denegado, contacta al administrador del panel para restablecer las credenciales.',
+  'login.platform.helpText': 'La contraseña de una cuenta de plataforma se restablece en el servidor, con scripts/reset-password.js.',
+  'console.header': 'Plataforma',
   'login.error.invalidCredentials': 'El usuario o correo y la contraseña no coinciden. Revisa las credenciales.',
   'login.error.unreachable': 'El panel no pudo contactar al servidor. Revisa la conexión e inténtalo de nuevo.',
 

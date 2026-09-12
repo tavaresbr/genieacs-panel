@@ -105,6 +105,9 @@ const ja: Dictionary = {
   'login.kicker': 'オペレーターアクセス',
   'login.title': 'パネルにログイン',
   'login.subtitle': 'SkyGenPanel の管理者アカウントで機器データを開きます。',
+  'login.platform.kicker': 'プラットフォームのアクセス',
+  'login.platform.title': 'コンソールにログイン',
+  'login.platform.subtitle': 'コンソールの鍵を持つアカウントでログインしてください。このアドレスはどのプロバイダーのパネルでもありません。',
   'login.identifier': 'ユーザー名またはメールアドレス',
   'login.identifierPlaceholder': 'admin または you@yourisp.com',
   'login.identifierHint': 'どちらでも構いません。これまでのユーザー名でも引き続きサインインできます。',
@@ -115,6 +118,8 @@ const ja: Dictionary = {
   'login.submit': 'ログイン',
   'login.submitting': 'アカウントを確認しています…',
   'login.helpText': 'アクセスを拒否された場合は、パネル管理者に連絡して認証情報をリセットしてもらってください。',
+  'login.platform.helpText': 'プラットフォームアカウントのパスワードは、サーバー上で scripts/reset-password.js により再設定します。',
+  'console.header': 'プラットフォーム',
   'login.error.invalidCredentials': 'ユーザー名またはメールアドレスとパスワードが一致しません。認証情報を確認してください。',
   'login.error.unreachable': 'パネルからサーバーに接続できませんでした。接続を確認して再試行してください。',
 

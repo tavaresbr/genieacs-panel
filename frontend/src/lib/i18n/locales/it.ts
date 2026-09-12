@@ -105,6 +105,9 @@ const it: Dictionary = {
   'login.kicker': 'Accesso operatore',
   'login.title': 'Accedi al pannello',
   'login.subtitle': 'Usa il tuo account amministratore di SkyGenPanel per aprire i dati degli apparati.',
+  'login.platform.kicker': 'Accesso della piattaforma',
+  'login.platform.title': 'Accedi alla console',
+  'login.platform.subtitle': 'Usa l\'account che ha la chiave della console. Questo indirizzo non è il pannello di nessun provider.',
   'login.identifier': 'Nome utente o e-mail',
   'login.identifierPlaceholder': 'admin o tu@tuoisp.com',
   'login.identifierHint': 'Vanno bene entrambi: il nome utente di sempre continua a funzionare.',
@@ -115,6 +118,8 @@ const it: Dictionary = {
   'login.submit': 'Accedi',
   'login.submitting': 'Verifica dell’account…',
   'login.helpText': 'Se l’accesso viene negato, contatta l’amministratore del pannello per reimpostare le credenziali.',
+  'login.platform.helpText': 'La password di un account di piattaforma si reimposta sul server, con scripts/reset-password.js.',
+  'console.header': 'Piattaforma',
   'login.error.invalidCredentials': 'Nome utente o e-mail e password non corrispondono. Controlla le credenziali.',
   'login.error.unreachable': 'Il pannello non è riuscito a contattare il server. Controlla la connessione e riprova.',
 

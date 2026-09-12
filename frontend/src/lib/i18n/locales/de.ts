@@ -105,6 +105,9 @@ const de: Dictionary = {
   'login.kicker': 'Operator-Zugang',
   'login.title': 'Am Panel anmelden',
   'login.subtitle': 'Melden Sie sich mit Ihrem SkyGenPanel-Administratorkonto an, um die Gerätedaten zu öffnen.',
+  'login.platform.kicker': 'Plattformzugang',
+  'login.platform.title': 'Am Konsole anmelden',
+  'login.platform.subtitle': 'Verwenden Sie das Konto mit dem Konsolenschlüssel. Diese Adresse ist das Panel keines Anbieters.',
   'login.identifier': 'Benutzername oder E-Mail',
   'login.identifierPlaceholder': 'admin oder sie@ihrisp.com',
   'login.identifierHint': 'Beides funktioniert – der gewohnte Benutzername meldet Sie weiterhin an.',
@@ -115,6 +118,8 @@ const de: Dictionary = {
   'login.submit': 'Anmelden',
   'login.submitting': 'Konto wird geprüft…',
   'login.helpText': 'Wenn der Zugriff verweigert wird, wenden Sie sich an den Panel-Administrator, um die Zugangsdaten zurückzusetzen.',
+  'login.platform.helpText': 'Das Passwort eines Plattformkontos wird auf dem Server zurückgesetzt, mit scripts/reset-password.js.',
+  'console.header': 'Plattform',
   'login.error.invalidCredentials': 'Benutzername oder E-Mail und Passwort stimmen nicht. Prüfen Sie die Zugangsdaten.',
   'login.error.unreachable': 'Das Panel konnte den Server nicht erreichen. Prüfen Sie die Verbindung und versuchen Sie es erneut.',
 

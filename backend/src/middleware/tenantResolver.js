@@ -207,6 +207,31 @@ function servedOnPlatformHost(req) {
   return PLATFORM_HOST_PREFIXES.some((prefix) => path.startsWith(prefix));
 }
 
+/**
+ * O console só responde no endereço da plataforma — onde há um.
+ *
+ * Montado acima dos roteadores de `/api/platform`, e o efeito é que num deploy
+ * com subdomínio por provedor aquelas rotas deixam de existir no host de um
+ * cliente. Ganho que não é de estilo: o 404 de `requirePlatformAdmin` existe
+ * para que o administrador de um provedor não descubra que há um plano de
+ * controle, e até aqui essa propriedade dependia de uma guarda lembrar de
+ * responder 404 em vez de 403. Agora ela vale por CONSTRUÇÃO — o 404 vem do
+ * roteador, idêntico ao de um caminho que não existe, que é o que ele é.
+ *
+ * Num deploy sem domínio-base nada muda: lá o console divide o endereço com o
+ * painel porque não há outro endereço, e tirá-lo dali seria tirá-lo de todo
+ * lugar.
+ */
+export function platformHostOnly(req, res, next) {
+  if (usesTenantSubdomains() && !req.platformHost) {
+    return res.status(404).json({
+      success: false,
+      message: req.t ? req.t('common.routeNotFound') : 'Not found'
+    });
+  }
+  return next();
+}
+
 /** The provider a slug names, or null. Inactive providers do not resolve. */
 export async function resolveTenantIdBySlug(slug) {
   if (!slug) return null;

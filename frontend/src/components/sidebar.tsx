@@ -127,8 +127,17 @@ function SidebarContent({
   // authenticated screen died in `SidebarContent` with "Cannot access 'isSaas'
   // before initialization" — a black page, for every operator, on every
   // route. `tsc` does not see it because the read happens inside a callback.
-  const { name: appName, isSaas } = useTenant()
+  const { name: appName, isSaas, tenant } = useTenant()
   const isPlatformAdmin = Boolean(user?.isPlatformAdmin)
+  /**
+   * O console vive no endereço da plataforma, que é OUTRO host.
+   *
+   * Onde há domínio-base, este item deixa de ser uma rota desta casca e passa a
+   * ser um link para fora — para `https://<base>/platform`. Um `Link` do
+   * roteador não atravessa origin, e continuar apontando para `/platform` aqui
+   * levaria a uma tela cujas requisições o próprio endereço recusa.
+   */
+  const consoleForaDaqui = tenant?.panelBaseDomain ? `https://${tenant.panelBaseDomain}/platform` : null
   const visibleItems = menuItems.filter((item) => can(item.permission)
     && (!('platformOnly' in item && item.platformOnly) || isPlatformAdmin)
     // `saasOnly`: a screen about a subscription has nothing to show on an
@@ -159,31 +168,46 @@ function SidebarContent({
           {visibleItems.map((item) => {
             const active = isActive(item.href)
             const label = t(item.labelKey)
+            // O console é o único item que pode morar noutro endereço; os
+            // demais são sempre desta casca.
+            const foraDaqui = 'platformOnly' in item && item.platformOnly ? consoleForaDaqui : null
+            const classe = `group flex min-h-12 items-center rounded-md transition-colors ${
+              isCollapsed ? 'justify-center px-2' : 'gap-3 px-3'
+            } ${
+              active
+                ? 'bg-[#eef0e8] text-[#173f35]'
+                : 'text-[#c9d2cd] hover:bg-white/7 hover:text-white'
+            }`
+            const conteudo = (
+              <>
+                <Icon name={item.icon} size={20} className="shrink-0" />
+                {!isCollapsed && (
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold leading-tight">{label}</span>
+                    <span className={`mt-0.5 block truncate text-[0.68rem] ${active ? 'text-[#52665d]' : 'text-[#839189]'}`}>
+                      {t(item.descriptionKey)}
+                    </span>
+                  </span>
+                )}
+              </>
+            )
             return (
               <li key={item.href}>
-                <Link
-                  to={item.href}
-                  onClick={closeMobile}
-                  title={isCollapsed ? label : undefined}
-                  aria-current={active ? 'page' : undefined}
-                  className={`group flex min-h-12 items-center rounded-md transition-colors ${
-                    isCollapsed ? 'justify-center px-2' : 'gap-3 px-3'
-                  } ${
-                    active
-                      ? 'bg-[#eef0e8] text-[#173f35]'
-                      : 'text-[#c9d2cd] hover:bg-white/7 hover:text-white'
-                  }`}
-                >
-                  <Icon name={item.icon} size={20} className="shrink-0" />
-                  {!isCollapsed && (
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-semibold leading-tight">{label}</span>
-                      <span className={`mt-0.5 block truncate text-[0.68rem] ${active ? 'text-[#52665d]' : 'text-[#839189]'}`}>
-                        {t(item.descriptionKey)}
-                      </span>
-                    </span>
-                  )}
-                </Link>
+                {foraDaqui ? (
+                  <a href={foraDaqui} onClick={closeMobile} title={isCollapsed ? label : undefined} className={classe}>
+                    {conteudo}
+                  </a>
+                ) : (
+                  <Link
+                    to={item.href}
+                    onClick={closeMobile}
+                    title={isCollapsed ? label : undefined}
+                    aria-current={active ? 'page' : undefined}
+                    className={classe}
+                  >
+                    {conteudo}
+                  </Link>
+                )}
               </li>
             )
           })}

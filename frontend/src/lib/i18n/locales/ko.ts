@@ -105,6 +105,9 @@ const ko: Dictionary = {
   'login.kicker': '운영자 접근',
   'login.title': '패널 로그인',
   'login.subtitle': 'SkyGenPanel 관리자 계정으로 장비 데이터를 확인하십시오.',
+  'login.platform.kicker': '플랫폼 접근',
+  'login.platform.title': '콘솔 로그인',
+  'login.platform.subtitle': '콘솔 열쇠를 가진 계정으로 로그인하세요. 이 주소는 어느 사업자의 패널도 아닙니다.',
   'login.identifier': '사용자 이름 또는 이메일',
   'login.identifierPlaceholder': 'admin 또는 you@yourisp.com',
   'login.identifierHint': '둘 다 사용할 수 있습니다. 기존 사용자 이름으로도 계속 로그인됩니다.',
@@ -115,6 +118,8 @@ const ko: Dictionary = {
   'login.submit': '로그인',
   'login.submitting': '계정을 확인하는 중…',
   'login.helpText': '접근이 거부되면 패널 관리자에게 문의하여 인증 정보를 재설정하십시오.',
+  'login.platform.helpText': '플랫폼 계정의 비밀번호는 서버에서 scripts/reset-password.js 로 재설정합니다.',
+  'console.header': '플랫폼',
   'login.error.invalidCredentials': '사용자 이름 또는 이메일과 비밀번호가 일치하지 않습니다. 인증 정보를 확인하십시오.',
   'login.error.unreachable': '패널이 서버에 연결하지 못했습니다. 연결 상태를 확인한 후 다시 시도하십시오.',
 

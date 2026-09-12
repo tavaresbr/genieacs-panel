@@ -107,6 +107,9 @@ const en = {
   'login.kicker': 'Operator access',
   'login.title': 'Sign in to the panel',
   'login.subtitle': 'Use your SkyGenPanel administrator account to open device data.',
+  'login.platform.kicker': 'Platform access',
+  'login.platform.title': 'Sign in to the console',
+  'login.platform.subtitle': 'Use the account that holds the console\'s key. This address is no provider\'s panel.',
   'login.identifier': 'Username or email',
   'login.identifierPlaceholder': 'admin or you@yourisp.com',
   'login.identifierHint': 'Either one works — the username you have always used still signs you in.',
@@ -117,6 +120,8 @@ const en = {
   'login.submit': 'Sign in',
   'login.submitting': 'Verifying account…',
   'login.helpText': 'If access is denied, contact the panel administrator to reset your credentials.',
+  'login.platform.helpText': 'A platform account\'s password is reset on the server, with scripts/reset-password.js.',
+  'console.header': 'Platform',
   'login.error.invalidCredentials': 'The username or email and the password do not match. Check the credentials.',
   'login.error.unreachable': 'The panel could not reach the server. Check the connection and try again.',
 
