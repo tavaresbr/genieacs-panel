@@ -430,11 +430,12 @@ alguém esquecer de incrementar. Coberto por
   modo que quem administrava só tinha o formulário que escolhe a senha do outro. O token
   vai no fragmento nas duas pontas, pelo mesmo motivo do bilhete.
 
-**O que continua faltando, e é de outra fase:** só o **comando de re-cifra** da rotação da
-`SECRET_BOX_KEY`. As duas chaves vivas já existem — `SECRET_BOX_KEY_PREVIOUS` e
-`JWT_SECRET_PREVIOUS` são lidas na entrada e nunca na escrita
-(`backend/src/utils/secretBox.js`) —, e o `key_version` já está gravado em cada linha; o que
-não existe é o passo que reescreve as linhas antigas na chave nova. A **verificação do
+**Nada continua faltando aqui.** O **comando de re-cifra** da rotação da `SECRET_BOX_KEY`
+era o último item desta lista e existe: `skygenpanel rotate-key`
+(`backend/src/services/secretRotationService.js`). As duas chaves vivas já existiam —
+`SECRET_BOX_KEY_PREVIOUS` e `JWT_SECRET_PREVIOUS` são lidas na entrada e nunca na escrita
+(`backend/src/utils/secretBox.js`) —, e o que faltava era o passo que reescreve as linhas
+antigas na chave nova. A **verificação do
 endereço de e-mail** entrou junto com a redefinição de senha por e-mail, que era o dia em
 que ela passava a ser pré-requisito — ver o item 10 dos riscos.
 
@@ -804,11 +805,11 @@ vez" em `backend/test/i18n.test.js`, e ele varre as duas metades do app.
   segredo lido como nulo, e a impressão digital é o que transforma essa descoberta num
   aviso antes do restore em vez de um susto durante.
 
-**O que ficou de fora, de propósito:** o **comando de re-cifra** da rotação da
-`SECRET_BOX_KEY` e a metade do **gateway de cobrança** que EMITE a cobrança — a que
-recebe o pagamento e credita a assinatura existe, por webhook (runbook, seção 10). A personificação e o transporte de e-mail
-entraram no fecho da Fase 2, e o runbook já os documenta como existentes — o que continua
-listado lá como "não existe ainda" são esses dois, para o plantão não procurar.
+**O que ficou de fora, de propósito:** a metade do **gateway de cobrança** que EMITE a
+cobrança — a que recebe o pagamento e credita a assinatura existe, por webhook (runbook,
+seção 10). A personificação e o transporte de e-mail entraram no fecho da Fase 2, e o
+runbook já os documenta como existentes. O **comando de re-cifra** também saiu desta lista:
+`skygenpanel rotate-key` existe, e o runbook o documenta na seção de trocar segredos.
 
 ---
 
@@ -1196,8 +1197,7 @@ Nada disso é negociável. **Os doze estão cumpridos.**
 | 12 | Exportação por provedor funcionando (LGPD e "apaguei tudo, socorro") | ✅ exportação (onda 21) e exclusão (onda 22), com trilha que sobrevive ao provedor apagado |
 
 Nenhuma linha vermelha resta. Isso **não** quer dizer produto pronto — a **emissão** da
-cobrança (o gateway já credita o que recebe) e o **comando de re-cifra** da rotação da
-`SECRET_BOX_KEY` estão por fazer —
+cobrança está por fazer (o gateway já credita o que recebe) —
 quer dizer que a lista do que não se pode vender sem já não tem item aberto. O transporte de
 e-mail do convite, que esta frase listava até hoje, entrou no fecho da Fase 2.
 

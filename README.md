@@ -123,6 +123,7 @@ Both listeners bind to `127.0.0.1` by default. This is suitable for a reverse pr
 | `skygenpanel reset-password <user> [password]` | Reset an operator password; prompts securely when the password is omitted |
 | `skygenpanel backup` | Take a backup now: database, WhatsApp attachments, and the fingerprint of the encryption keys |
 | `skygenpanel backup verify` | Report how old the newest backup is and whether the keys still match the ones it was taken with |
+| `skygenpanel rotate-key [--dry-run]` | Rewrite every stored secret with the live `SECRET_BOX_KEY`; `--dry-run` counts them per key version without writing |
 
 The installer also schedules `skygenpanel-backup.timer` to run daily at 03:17 (with a
 randomized delay, and `Persistent=true` so a machine that was off catches up instead of
@@ -201,8 +202,38 @@ JWT_SECRET_PREVIOUS=<the value being replaced>
 JWT_SECRET=<the new value>
 ```
 
-Drop `JWT_SECRET_PREVIOUS` once every secret has been rewritten. Leaving it set
-keeps the old key usable, which is the point during a rotation and not after
+### Finishing a rotation
+
+`skygenpanel rotate-key` is the step that rewrites the secrets already stored,
+so a rotation stops depending on anyone re-saving each one by hand. Run it with
+both keys present — the new one live, the old one in `*_PREVIOUS` — and it moves
+every stored secret onto the live key:
+
+```bash
+skygenpanel rotate-key --dry-run   # counts what is stored, per key version
+skygenpanel rotate-key
+```
+
+It refuses rather than guesses: a secret it cannot decrypt with any key this
+process has stops the run and nothing is rewritten. That case means the key that
+wrote it is missing from the environment, and finding that out before the old
+key is discarded is the whole point.
+
+Two things it does NOT make safe, which is why they are written here:
+
+- **The backups.** Every backup records a fingerprint of `SECRET_BOX_KEY` and
+  `JWT_SECRET`, and `skygenpanel backup verify` refuses a restore whose key no
+  longer matches. The default retention keeps thirty daily and fifty-two weekly
+  copies — about a year, all taken with the old key. Rewriting the live database
+  does nothing for them: **file the previous key with those dumps** before
+  removing it from `.env`.
+- **Version 1 rows**, which derive from `JWT_SECRET` rather than
+  `SECRET_BOX_KEY`. Keep `JWT_SECRET_PREVIOUS` set while the command runs, or it
+  will refuse on the first one it meets.
+
+Drop `JWT_SECRET_PREVIOUS` and `SECRET_BOX_KEY_PREVIOUS` once the command has
+run AND the backups taken before it have aged out of retention. Leaving them set
+keeps the old keys usable, which is the point during a rotation and not after
 one.
 
 ## Customer Portal Credentials
