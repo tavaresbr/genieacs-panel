@@ -187,6 +187,24 @@ async function semear(tenantId, slug) {
       name: 'perfil-padrao', priority: 10, enabled: true
     });
 
+    /**
+     * A conta de assinante, com os valores COLIDINDO entre os dois provedores —
+     * que é a doutrina deste arquivo, e aqui ela é mais do que doutrina: o
+     * `identity_hash` é `sha256(software_id \0 pppoe_username)`, derivação
+     * determinística do login PPPoE. Dois ISPs com o mesmo firmware e um
+     * assinante de mesmo login produzem o MESMO hash, e é exatamente o
+     * sequestro de conta que `tenantScope.js` nomeia. Se o índice único voltar
+     * a valer para o deploy inteiro, é este seed que estoura.
+     */
+    alvo.customerAccount = await semearLinha('customer_accounts', {
+      customer_id: 'CSG-COMUM-000001',
+      device_id: 'ONT-COMUM-0001',
+      identity_hash: 'f'.repeat(64),
+      software_id: 'V1.0',
+      pppoe_username: 'assinante-comum',
+      active: true
+    });
+
     alvo.swap = await semearLinha('device_swaps', {
       previous_device_id: 'ONT-ANTIGA-0001',
       device_id: 'ONT-NOVA-0001',

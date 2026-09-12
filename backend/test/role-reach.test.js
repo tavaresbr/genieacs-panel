@@ -27,9 +27,9 @@ import assert from 'node:assert/strict';
  *
  * ## O que este arquivo NÃO afirma
  *
- * São **33 rotas**, não as 91. A amostra foi escolhida para que cada uma das
- * 26 capacidades apareça pelo menos uma vez, e a garantia de não-regressão que
- * o teste do `admin` dá vale **sobre estas 33** — não sobre o painel inteiro.
+ * São **35 rotas**, não as 91. A amostra foi escolhida para que cada uma das
+ * 28 capacidades apareça pelo menos uma vez, e a garantia de não-regressão que
+ * o teste do `admin` dá vale **sobre estas 35** — não sobre o painel inteiro.
  * Quem quiser a afirmação forte ("nenhuma das 91 rotas mudou de dono") precisa
  * de outra prova; a varredura estática de `permissions.test.js` é o que existe
  * hoje mais perto disso, e ela olha o nome da capacidade, não o alcance.
@@ -95,6 +95,8 @@ const QUEM_TEM = {
   'operators.manage': ['owner', 'admin'],
   'audit.read': ['owner', 'admin'],
   'tenant.export': ['owner', 'admin'],
+  'customers.dossier': ['owner', 'admin'],
+  'customers.erase': ['owner', 'admin'],
   'database.manage': ['owner', 'admin']
 };
 
@@ -387,6 +389,33 @@ const CASOS = [
     aceito: [200]
   },
   {
+    // O dossiê de UM assinante. Capacidade própria e não `customers.secrets`:
+    // revelar uma senha para destravar um atendimento e produzir o dossiê
+    // consolidado de uma pessoa são atos de altura diferente, e o segundo não é
+    // do plantão das três da manhã.
+    cap: 'customers.dossier',
+    label: 'GET /api/customers/:accountId/export',
+    method: 'GET',
+    path: () => `/api/customers/${ids.conta}/export`,
+    aceito: [200]
+  },
+  {
+    /**
+     * A exclusão, sem o corpo de confirmação — de propósito.
+     *
+     * O 409 é a resposta honesta de quem passou pela guarda de capacidade E
+     * achou a conta: a confirmação por `customer_id` digitado é conferida
+     * DEPOIS do 404. Mandar a confirmação certa apagaria o assinante que os
+     * outros casos deste arquivo endereçam, e a segunda chamada (a do outro
+     * papel que tem a capacidade) rodaria contra uma conta que já não existe.
+     */
+    cap: 'customers.erase',
+    label: 'DELETE /api/customers/:accountId',
+    method: 'DELETE',
+    path: () => `/api/customers/${ids.conta}`,
+    aceito: [409]
+  },
+  {
     cap: 'database.manage',
     label: 'GET /api/database/config',
     method: 'GET',
@@ -491,7 +520,7 @@ before(async () => {
     // O assinante atrás da ONT. Sem esta linha `portal-password` responde 404
     // por não achar a conta, e um 404 é justamente o que este arquivo não pode
     // confundir com alcance.
-    await semear('customer_accounts', {
+    ids.conta = await semear('customer_accounts', {
       customer_id: 'CLI0001', device_id: DEVICE_ID,
       identity_hash: 'f'.repeat(64), software_id: 'V1.0.0',
       pppoe_username: 'joao@provedor', active: true
@@ -538,7 +567,7 @@ describe('a matriz e a expectativa deste arquivo', () => {
     }
   });
 
-  it('cobre as 24 capacidades', () => {
+  it('cobre as 28 capacidades', () => {
     // Uma capacidade fora da amostra é uma rota sem prova de alcance nenhuma.
     const deFora = PERMISSIONS.filter((cap) => !QUEM_TEM[cap]);
     assert.deepEqual(deFora, [], `capacidades sem caso: ${deFora.join(', ')}`);
@@ -548,25 +577,25 @@ describe('a matriz e a expectativa deste arquivo', () => {
 
   it('tem par de recusa para toda capacidade que algum papel não tem', () => {
     /**
-     * A afirmação central do arquivo, conferida sobre a própria amostra: 21 das
-     * 24 capacidades têm alguém do lado de fora, e cada uma delas precisa de
+     * A afirmação central do arquivo, conferida sobre a própria amostra: 25 das
+     * 28 capacidades têm alguém do lado de fora, e cada uma delas precisa de
      * pelo menos uma rota onde essa recusa é exercitada. As 3 restantes são as
      * do `viewer`, que TODO papel tem — para elas não existe par de recusa a
      * escrever, e dizer o número aqui é o que impede que uma capacidade caia
      * silenciosamente para dentro do `viewer` sem ninguém notar.
      */
     const comRecusa = PERMISSIONS.filter((cap) => QUEM_TEM[cap].length < ROLES.length);
-    assert.equal(comRecusa.length, 23);
+    assert.equal(comRecusa.length, 25);
     for (const cap of comRecusa) {
       assert.ok(CASOS.some((caso) => caso.cap === cap), `${cap} sem rota para recusar`);
     }
   });
 
   it('não encolhe sem que alguém diga', () => {
-    // O cabeçalho promete uma amostra de 31 rotas e a promessa de não-regressão
+    // O cabeçalho promete uma amostra de 35 rotas e a promessa de não-regressão
     // do `admin` vale sobre ELA. Uma rota apagada por um merge desajeitado
     // deixaria a promessa valendo sobre menos coisa, calada.
-    assert.equal(CASOS.length, 33);
+    assert.equal(CASOS.length, 35);
   });
 });
 
@@ -633,9 +662,9 @@ describe('o alcance do viewer, sobre a amostra', () => {
 
   it('não alcança nada que mexa em aparelho, em gente ou em configuração', () => {
     // A amostra inteira menos as três acima, numa afirmação só: o que o
-    // `viewer` NÃO alcança é 23 das 26 capacidades.
+    // `viewer` NÃO alcança é 25 das 28 capacidades.
     const fechadas = PERMISSIONS.filter((cap) => !QUEM_TEM[cap].includes('viewer'));
-    assert.equal(fechadas.length, 23, fechadas.join(', '));
+    assert.equal(fechadas.length, 25, fechadas.join(', '));
   });
 });
 

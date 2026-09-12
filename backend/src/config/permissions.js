@@ -98,6 +98,17 @@ export const PERMISSIONS = Object.freeze([
   // rota que devolve TUDO de uma vez: quem administra a operação não recebe de
   // brinde o direito de baixar o cadastro inteiro num arquivo.
   'tenant.export',
+  // Baixar o dossiê de UM assinante — o direito de acesso da LGPD, do lado de
+  // quem tem que atendê-lo. Capacidade própria pelo mesmo motivo de
+  // `tenant.export` e por mais um: quem atende o balcão precisa ver a ficha do
+  // assinante o dia inteiro (`devices.list`), e não precisa poder baixar a vida
+  // dele num arquivo por consequência.
+  'customers.dossier',
+  // E apagá-la — o direito de eliminação. Separada da de cima ainda que hoje as
+  // duas caiam nos mesmos papéis: entregar a tarefa de atender pedidos da LGPD
+  // não pode ser a mesma coisa que entregar o poder de destruir, e uma delas
+  // não tem volta. Um nome a mais hoje é o que permite a decisão amanhã.
+  'customers.erase',
   // Trocar o banco em runtime, que só existe na edição self-hosted.
   'database.manage'
 ]);
@@ -141,6 +152,8 @@ const ADMIN = [
   'operators.manage',
   'audit.read',
   'tenant.export',
+  'customers.dossier',
+  'customers.erase',
   'database.manage'
 ];
 

@@ -56,6 +56,7 @@ const PUBLICAS = new Map([
   ['POST /api/invites/token/accept', 'idem, e a senha da pessoa é conferida quando a conta já existe'],
   ['POST /api/sgp/events/webhook', 'entrega do ERP, autenticada pelo segredo do webhook'],
   ['POST /api/whatsapp-webhook', 'entrega da Evolution, montada antes do resolvedor e autenticada pelo token da instância'],
+  ['POST /api/billing-webhook', 'entrega do gateway de pagamento, montada antes do resolvedor e autenticada pelo token do deploy'],
   ['GET /api/whatsapp-media/:id', 'anexo servido por um token assinado que já nomeia o provedor; prova em whatsapp-media-tenancy.test.js'],
   ['POST /api/auth/impersonate/redeem', 'o bilhete do console É a credencial: uso único, um minuto de vida, conferido por hash e contra o provedor do host'],
   ['POST /api/customer/login', 'a porta de entrada do assinante, no listener do portal'],
@@ -199,6 +200,13 @@ describe('toda rota sem sessão', () => {
       'POST /api/auth/refresh',
       'POST /api/auth/setup',
       'POST /api/auth/signup',
+      // A entrega do gateway é a terceira escrita pública que não vem de um
+      // navegador. Escreve no extrato e na assinatura de UM provedor, e o
+      // provedor sai do corpo — nunca do host, que não o nomeia. O que a separa
+      // das outras duas é que esta mexe em dinheiro: a credencial é do deploy,
+      // a rota não existe sem ela configurada, e a mesma referência credita uma
+      // vez só.
+      'POST /api/billing-webhook',
       'POST /api/customer/login',
       'POST /api/invites/token/accept',
       // A prévia do convite NÃO escreve nada: ela é POST só porque o token
@@ -413,9 +421,14 @@ describe('a ordem das montagens em app.js', () => {
     assert.ok(montagens.length > 10, 'poucas montagens encontradas');
     const acima = montagens.filter(({ i }) => i < resolvedor).map(({ l }) => l.trim());
     assert.deepEqual(acima, [
-      // As duas exceções, e as duas são entregas de fora que trazem o provedor
+      // As três exceções, e as três são entregas de fora que trazem o provedor
       // no próprio corpo ou no token assinado.
       'app.use(WA_WEBHOOK_PATH, whatsappWebhookRoutes);',
+      // A do gateway chega no endereço que a plataforma digitou no painel DELE
+      // — o apex —, e o apex não nomeia provedor nenhum: resolvida por host,
+      // ela levaria 404 antes do controlador e o pagamento de um cliente
+      // ficaria na fila de reentrega do gateway até alguém reparar.
+      'app.use(BILLING_WEBHOOK_PATH, billingWebhookRoutes);',
       "app.use('/api/whatsapp-media', whatsappMediaRoutes);"
     ]);
   });

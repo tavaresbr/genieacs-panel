@@ -22,6 +22,13 @@ class PlatformAudit {
     // ações obrigaria a fazê-la duas vezes.
     TENANT_IDENTITY_CHANGED: 'tenant.identity_changed',
     TENANT_DELETED: 'tenant.deleted',
+    // Um provedor foi ligado (ou desligado) do gateway de pagamento. Ação
+    // própria e não `TENANT_IDENTITY_CHANGED`: a pergunta que se faz desta
+    // linha é "desde quando este cliente paga sozinho, e quem o ligou", e ela é
+    // a que se faz quando um pagamento cai no provedor errado. O detalhe diz o
+    // gateway e SE há vínculo — nunca o id do cliente, que é a chave que decide
+    // para quem vai o crédito.
+    TENANT_GATEWAY_CHANGED: 'tenant.gateway_changed',
     // A Fase 5: o que o plano de controle fez com a assinatura de um provedor.
     PLAN_CREATED: 'plan.created',
     PLAN_UPDATED: 'plan.updated',

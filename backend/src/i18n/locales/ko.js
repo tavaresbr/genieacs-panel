@@ -656,4 +656,10 @@ export default {
   'subscription.notice.renewalSoonBody': '{provider}의 결제 기간이 {date}에 끝납니다. {days}일 남았습니다.\n\n끝나도 패널은 계속 볼 수 있지만 변경은 받지 않습니다. 그 전에 결제하시면 아무것도 멈추지 않습니다.\n\n{link}',
   'subscription.notice.renewalExpiredSubject': '{provider} 구독이 {date}에 만료되었습니다',
   'subscription.notice.renewalExpiredBody': '{provider}의 결제 기간이 {date}에 끝났습니다.\n\n패널은 계속 볼 수 있고 팀과 가입자 모두 그대로 보이지만, 변경은 받지 않습니다. 결제가 등록되는 즉시 정상으로 돌아갑니다.\n\n{link}',
+  'customers.invalidId': '가입자 ID가 올바르지 않습니다',
+  'customers.exportFailed': '가입자 데이터를 내보내지 못했습니다',
+  'customers.confirmMismatch': '확인하려면 고객 ID를 표시된 그대로 입력하세요',
+  'customers.eraseNotLogged': '삭제가 감사 기록에 남지 않아 실행되지 않았습니다',
+  'customers.eraseFailed': '가입자 데이터를 삭제하지 못했습니다',
+  'customers.erased': '가입자 데이터를 삭제했습니다',
 };

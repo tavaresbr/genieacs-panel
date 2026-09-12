@@ -21,6 +21,31 @@
  */
 export const casos = [
   {
+    // O dossiê LGPD de um assinante. A rota mais perigosa da lista: devolve
+    // tudo o que existe sobre uma pessoa, e apontá-la para o id do vizinho
+    // entregaria o dossiê de um assinante de outro ISP.
+    chave: 'customerAccount',
+    label: 'GET /api/customers/:accountId/export',
+    method: 'GET',
+    path: (id) => `/api/customers/${id}/export`,
+    tabela: 'customer_accounts'
+  },
+  {
+    // E a exclusão do mesmo assinante. O id do vizinho tem que dar 404 antes de
+    // qualquer validação de corpo: um 409 dizendo "aposente a conta primeiro"
+    // já teria confirmado que a linha existe.
+    //
+    // No controle, o id do próprio beta dá 409 e não 404 — a conta semeada está
+    // ativa, e a rota exige aposentar antes. É o controle que se quer: um 409
+    // só se chega DEPOIS de a conta ter sido encontrada, e a varredura não
+    // destrói a linha que usa.
+    chave: 'customerAccount',
+    label: 'DELETE /api/customers/:accountId',
+    method: 'DELETE',
+    path: (id) => `/api/customers/${id}`,
+    tabela: 'customer_accounts'
+  },
+  {
     chave: 'user',
     label: 'PATCH /api/users/:id',
     method: 'PATCH',

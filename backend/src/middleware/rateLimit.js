@@ -278,6 +278,23 @@ export const sgpWebhookLimiter = limiter({
 });
 
 /**
+ * A entrega do gateway de pagamento, no mesmo desenho do webhook do SGP: rota
+ * pública, balde próprio.
+ *
+ * Mais apertado que o do SGP de propósito. O ERP de um provedor manda um evento
+ * por mudança de contrato e um deploy grande tem muitos contratos; o gateway
+ * manda um punhado de eventos por PAGAMENTO, e há uma assinatura por provedor
+ * por mês. Trinta por minuto cobre uma reentrega em massa depois de uma queda
+ * nossa e continua sendo um teto que um atacante não atravessa de graça.
+ */
+export const billingWebhookLimiter = limiter({
+  windowMs: 60 * 1000,
+  max: 30,
+  keyGenerator: ipKey,
+  message: limitMessage('rateLimit.requests')
+});
+
+/**
  * Provisioning actions write to a subscriber's CPE and each one waits on a
  * connection request, so they are limited per operator on top of the shared
  * API limit rather than by source address.

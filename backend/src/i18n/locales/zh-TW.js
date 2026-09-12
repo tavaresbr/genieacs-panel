@@ -653,4 +653,10 @@ export default {
   'subscription.notice.renewalSoonBody': '{provider} 的付費週期將於 {date} 結束，還有 {days} 天。\n\n結束後面板仍可檢視，但不再接受變更。在該日期前完成付款，一切照常。\n\n{link}',
   'subscription.notice.renewalExpiredSubject': '{provider} 的訂閱已於 {date} 到期',
   'subscription.notice.renewalExpiredBody': '{provider} 的付費週期已於 {date} 結束。\n\n面板仍可檢視——您的團隊與用戶都還看得到全部內容——但不再接受變更。付款登記後即恢復正常。\n\n{link}',
+  'customers.invalidId': '用戶編號無效',
+  'customers.exportFailed': '無法匯出該用戶的資料',
+  'customers.confirmMismatch': '請完全依照顯示輸入客戶 ID 以確認',
+  'customers.eraseNotLogged': '刪除未記入稽核軌跡，因此未執行',
+  'customers.eraseFailed': '刪除用戶資料失敗',
+  'customers.erased': '用戶資料已刪除',
 };

@@ -653,4 +653,10 @@ export default {
   'subscription.notice.renewalSoonBody': 'The paid period for {provider} ends on {date} — {days} day(s) from now.\n\nWhen it ends the panel stays readable but stops accepting changes. Send the payment before that date and nothing stops.\n\n{link}',
   'subscription.notice.renewalExpiredSubject': 'The {provider} subscription expired on {date}',
   'subscription.notice.renewalExpiredBody': 'The paid period for {provider} ended on {date}.\n\nThe panel is still readable — your team and your subscribers keep seeing everything — but it no longer accepts changes. As soon as the payment is registered it goes back to normal.\n\n{link}',
+  'customers.invalidId': 'Invalid subscriber id',
+  'customers.exportFailed': 'Failed to export the subscriber data',
+  'customers.confirmMismatch': 'Type the Customer ID exactly as shown to confirm',
+  'customers.eraseNotLogged': 'The erasure was not recorded in the trail, so it was not performed',
+  'customers.eraseFailed': 'Failed to erase the subscriber data',
+  'customers.erased': 'Subscriber data erased',
 };

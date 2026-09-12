@@ -36,6 +36,7 @@ const {
 } = await import('./helpers/harness.js');
 
 const { DEFAULT_SETTINGS } = await import('../src/config/seed.js');
+const { default: Tenant } = await import('../src/models/Tenant.js');
 const { forEachTenant } = await import('../src/config/tenantJobs.js');
 
 const run = promisify(execFile);
@@ -462,6 +463,114 @@ describe('editando os dados de um provedor', () => {
   it('responde 404 para um provedor que não existe', async () => {
     const { status } = await editar(999999, { name: 'Fantasma' });
     assert.equal(status, 404);
+  });
+});
+
+describe('ligando um provedor ao gateway de pagamento', () => {
+  /**
+   * A correlação que o webhook de cobrança lê para saber de quem é o dinheiro.
+   *
+   * No console e não na tela do provedor, ao contrário do cadastro fiscal —
+   * e é a diferença que este bloco existe para fixar. O fiscal é dado que o
+   * cliente mantém; isto decide para quem vai o crédito de um pagamento.
+   */
+  let alvo;
+
+  before(async () => {
+    const criado = await createTenant({ slug: 'paga-sozinho', name: 'Provedor Que Paga' });
+    assert.equal(criado.status, 201);
+    alvo = criado.body.data.tenant.id;
+  });
+
+  const ligar = (gateway) => platform(`/tenants/${alvo}`, { method: 'PATCH', body: { gateway } });
+
+  it('grava o gateway e o id do cliente, e o console passa a mostrá-los', async () => {
+    const res = await ligar({ gateway: 'asaas', customerRef: 'cus_000123' });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.deepEqual(res.body.data.gateway, { gateway: 'asaas', customerRef: 'cus_000123' });
+
+    const lista = await platform('/tenants');
+    const linha = lista.body.data.tenants.find((t) => t.id === alvo);
+    assert.deepEqual(linha.gateway, { gateway: 'asaas', customerRef: 'cus_000123' });
+  });
+
+  it('e deixa na trilha da plataforma o gateway, mas nunca o id do cliente', async () => {
+    const linha = await getDb()('platform_audit')
+      .where({ action: 'tenant.gateway_changed' }).orderBy('id', 'desc').first();
+    assert.ok(linha, 'ligar um cliente ao gateway tem que deixar registro');
+    assert.equal(String(linha.tenant_id), String(alvo));
+    // A chave que decide para quem vai o crédito não entra numa trilha que é
+    // lida por mais gente do que o console.
+    assert.equal(JSON.stringify(linha).includes('cus_000123'), false);
+    assert.equal(JSON.parse(linha.detail).gateway, 'asaas');
+    assert.equal(JSON.parse(linha.detail).linked, true);
+  });
+
+  /**
+   * Meia correlação não resolve provedor nenhum: o webhook procura os dois
+   * juntos. Recusar aqui é mais barato do que um pagamento que cai em log.
+   */
+  it('recusa metade da correlação, dos dois lados', async () => {
+    const semRef = await platform(`/tenants/${alvo}`, {
+      method: 'PATCH', body: { gateway: { customerRef: '' } }
+    });
+    assert.equal(semRef.status, 400);
+    const semGateway = await platform(`/tenants/${alvo}`, {
+      method: 'PATCH', body: { gateway: { gateway: '' } }
+    });
+    assert.equal(semGateway.status, 400);
+  });
+
+  it('e desliga quando os dois são limpos juntos', async () => {
+    const res = await ligar({ gateway: '', customerRef: '' });
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body.data.gateway, { gateway: null, customerRef: null });
+  });
+
+  /**
+   * O ponto de tudo isto: um provedor que pudesse escrever o próprio
+   * `billing_customer_ref` poderia apontá-lo para o cliente de gateway de
+   * outro e receber o crédito do pagamento alheio. A rota pela qual ele edita
+   * o cadastro fiscal existe e é dele — e não pode alcançar estas duas colunas.
+   */
+  it('e o próprio provedor não alcança essas colunas pela rota de cadastro fiscal', async () => {
+    const antes = await getDb()('tenants').where({ id: alfa }).first();
+    const res = await call(`${panelUrl}/api/tenant`, {
+      method: 'PATCH',
+      headers: authHeaders(ownerToken),
+      body: {
+        billing: {
+          legalName: 'Provedor Alfa LTDA',
+          gateway: 'asaas',
+          customerRef: 'cus_do_vizinho',
+          billing_gateway: 'asaas',
+          billing_customer_ref: 'cus_do_vizinho'
+        }
+      }
+    });
+    assert.equal(res.status, 200, 'o cadastro fiscal em si continua sendo dele');
+    const depois = await getDb()('tenants').where({ id: alfa }).first();
+    assert.equal(depois.billing_legal_name, 'Provedor Alfa LTDA');
+    assert.equal(depois.billing_gateway, antes.billing_gateway ?? null);
+    assert.equal(depois.billing_customer_ref, antes.billing_customer_ref ?? null);
+  });
+
+  /**
+   * A prova direta, e ela existe porque a de cima não basta.
+   *
+   * A rota de cadastro fiscal tem DOIS cadeados: a lista de campos escrita à
+   * mão no controlador (`CAMPOS_FATURAMENTO`) e `Tenant.BILLING_COLUMNS` no
+   * modelo. Pôr as colunas do gateway em `BILLING_COLUMNS` não faz o teste de
+   * rota acima falhar — o cadeado do controlador segura sozinho —, e um teste
+   * que não vê essa mudança deixaria a segunda porta encostada para quem
+   * mexesse no controlador depois. Aqui a afirmação é sobre as listas.
+   */
+  it('e nenhuma delas está na lista que a rota do provedor pode escrever', () => {
+    for (const coluna of Tenant.GATEWAY_COLUMNS) {
+      assert.equal(Tenant.BILLING_COLUMNS.includes(coluna), false,
+        `${coluna} virou campo do cadastro fiscal: o provedor passa a escrever de quem é o dinheiro`);
+      assert.equal(Tenant.PUBLIC_COLUMNS.includes(coluna), false, coluna);
+    }
   });
 });
 

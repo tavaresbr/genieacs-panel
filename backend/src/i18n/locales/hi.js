@@ -653,4 +653,10 @@ export default {
   'subscription.notice.renewalSoonBody': '{provider} की भुगतान अवधि {date} को समाप्त होगी — अब से {days} दिन में।\n\nउसके बाद पैनल पढ़ा तो जा सकेगा, पर बदलाव स्वीकार नहीं करेगा। उस तारीख से पहले भुगतान भेजें और कुछ नहीं रुकेगा।\n\n{link}',
   'subscription.notice.renewalExpiredSubject': '{provider} की सदस्यता {date} को समाप्त हो गई',
   'subscription.notice.renewalExpiredBody': '{provider} की भुगतान अवधि {date} को समाप्त हो गई।\n\nपैनल अब भी पढ़ा जा सकता है — आपकी टीम और आपके ग्राहक सब कुछ देखते रहेंगे — पर बदलाव स्वीकार नहीं होंगे। भुगतान दर्ज होते ही सब सामान्य हो जाएगा।\n\n{link}',
+  'customers.invalidId': 'ग्राहक आईडी अमान्य है',
+  'customers.exportFailed': 'ग्राहक का डेटा निर्यात नहीं किया जा सका',
+  'customers.confirmMismatch': 'पुष्टि के लिए ग्राहक आईडी ठीक वैसे ही लिखें जैसे दिख रही है',
+  'customers.eraseNotLogged': 'मिटाना ऑडिट ट्रेल में दर्ज नहीं हुआ, इसलिए किया नहीं गया',
+  'customers.eraseFailed': 'ग्राहक डेटा मिटाने में विफल',
+  'customers.erased': 'ग्राहक डेटा मिटा दिया गया',
 };

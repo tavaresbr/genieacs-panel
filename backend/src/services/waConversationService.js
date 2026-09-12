@@ -61,12 +61,23 @@ class WaConversationService {
    */
   static async bindSubscriber(conversation) {
     if (!conversation || conversation.contract) return conversation;
-    const { link } = await this.resolveSubscriber(conversation.wa_phone_e164);
+    const { link, account } = await this.resolveSubscriber(conversation.wa_phone_e164);
     if (!link) return conversation;
     return WaConversation.update(conversation.id, {
       contract: link.contract,
       device_id: link.device_id,
-      customer_account_id: conversation.customer_account_id ?? null
+      // `account?.id`, e não o próprio valor de volta.
+      //
+      // Esta linha gravava `conversation.customer_account_id ?? null`, que é
+      // sempre nulo: `WaConversation.ensure` não preenche a coluna no insert, e
+      // este era o único outro lugar do produto que a mencionava. A coluna
+      // existe desde que a caixa de entrada nasceu, com chave estrangeira e
+      // tudo, e nunca teve um valor — o `resolveSubscriber` logo acima já
+      // devolvia a conta e ela era descartada aqui.
+      //
+      // Descoberto ao procurar, para a exportação de dados por assinante, qual
+      // coluna liga uma conversa a um titular. Era esta, e ela estava morta.
+      customer_account_id: conversation.customer_account_id ?? account?.id ?? null
     });
   }
 

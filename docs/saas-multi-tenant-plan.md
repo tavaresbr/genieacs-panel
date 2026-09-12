@@ -113,7 +113,7 @@ original não previa:
 | Isolamento | **Banco compartilhado + `tenant_id`** (pool model) |
 | GenieACS | **Todos os modos**: URL+credenciais, agente conector, VPN/túnel e hospedagem própria → conector **plugável**, MVP com modo direto |
 | Domínio | **Subdomínio por tenant** (`provedor.dominio` / `portal.provedor.dominio`) |
-| Cobrança | **Planos e limites no código agora; gateway de pagamento depois** |
+| Cobrança | **Planos e limites no código agora; gateway de pagamento depois** — hoje o webhook do gateway já credita a assinatura sozinho; emitir a cobrança continua manual |
 
 ### Licença
 
@@ -603,7 +603,7 @@ peças:
 
 ---
 
-### Fase 5 — Planos, limites e ciclo de vida da assinatura ✅ *(entregue; o gateway continua manual)*
+### Fase 5 — Planos, limites e ciclo de vida da assinatura ✅ *(entregue; o gateway recebe, e ainda não emite)*
 
 Três tabelas (migration `0035`), uma porta, quatro pontos de escrita e a metade comercial do
 console. O que a fase NÃO fez é tão importante quanto o que fez, e está escrito na migração:
@@ -614,7 +614,8 @@ bloqueado. Quem nasce depois, pelo console, nasce em `trial`.
 **Schema.** `plans` é do deploy (é a tabela de preços; um provedor assina *o* plano `pro`, não
 tem *o seu*); `subscriptions` é uma por provedor, escopada, com `plan_id` em RESTRICT — plano
 com assinante se desativa, não se apaga; `billing_events` é o extrato, escopado, e é o que um
-gateway vai alimentar por webhook pelo mesmo caminho do botão de hoje.
+gateway alimenta por webhook pelo mesmo caminho do botão de hoje — e passou a alimentar
+de verdade: `POST /api/billing-webhook`, migração `0045`, `AsaasBillingProvider`.
 
 **A porta (`subscriptionGate`)**, chamada de dentro da autenticação e só na edição SaaS. Cinco
 estados, uma regra cada, toda a política em `SubscriptionService.decide`:
@@ -794,8 +795,18 @@ vez" em `backend/test/i18n.test.js`, e ele varre as duas metades do app.
   exportação (`GET /api/tenant/export`) e exclusão em dois passos, já existentes;
   suspensão, rotação de segredos e o que ainda não existe.
 
+  **E agendado, não só escrito:** o install passou a instalar e ligar
+  `skygenpanel-backup.timer` — diário, `Persistent=true` para a máquina desligada
+  recuperar o dia, com o dump do dialeto que o install realmente usa, o `tar.gz` dos
+  anexos e um manifesto. O `.env` fica de fora; o que vai junto é a **impressão digital**
+  de `SECRET_BOX_KEY` e `JWT_SECRET`, porque `secretBox.decrypt` devolve `null` em vez de
+  levantar — um restore com a chave errada sobe um painel que responde 200 com todo
+  segredo lido como nulo, e a impressão digital é o que transforma essa descoberta num
+  aviso antes do restore em vez de um susto durante.
+
 **O que ficou de fora, de propósito:** o **comando de re-cifra** da rotação da
-`SECRET_BOX_KEY` e o **gateway de cobrança**. A personificação e o transporte de e-mail
+`SECRET_BOX_KEY` e a metade do **gateway de cobrança** que EMITE a cobrança — a que
+recebe o pagamento e credita a assinatura existe, por webhook (runbook, seção 10). A personificação e o transporte de e-mail
 entraram no fecho da Fase 2, e o runbook já os documenta como existentes — o que continua
 listado lá como "não existe ainda" são esses dois, para o plantão não procurar.
 
@@ -1064,11 +1075,26 @@ decisões de desenho, e porque o primeiro **não se fecha, só se contém**.
    anulável, o login aceita nome **ou** e-mail, e `LOGIN_REQUIRES_EMAIL=true` desliga o nome
    quando o install decidir. `GET /api/auth/email-readiness` diz quantas contas ficariam de
    fora antes de alguém virar a chave. A nota de release continua valendo para quem virar.
-9. **LGPD** — inalterado, e agora concreto: o banco guarda CPF/CNPJ em `sgp_links.document`,
-   payload de eventos SGP com dado pessoal, credenciais PPPoE e senhas de WiFi recuperáveis
-   em claro, de assinantes de terceiros. Somos **operador**, o provedor é **controlador**.
-   Contrato com cláusula de operador, política de retenção e compromisso de notificação de
-   incidente precisam existir **antes do primeiro contrato**.
+9. **LGPD** — **metade fechada.** O banco guarda CPF/CNPJ em `sgp_links.document`, payload
+   de eventos SGP com dado pessoal, credenciais PPPoE e senhas de WiFi recuperáveis em
+   claro, de assinantes de terceiros. Somos **operador**, o provedor é **controlador**.
+
+   O que passou a existir: o provedor tem os dois direitos do titular **por assinante**, na
+   ficha do aparelho. `GET /api/customers/:accountId/export` (capacidade
+   `customers.dossier`) monta o dossiê de uma pessoa reunindo o que está espalhado por
+   dezessete tabelas — inclusive a telemetria da ONT anterior, que só existe sob o id
+   trocado —, sem segredo nenhum, e diz no manifesto o que **não** está no arquivo.
+   `DELETE /api/customers/:accountId` (capacidade `customers.erase`, separada) destrói os
+   segredos e o que é conteúdo do titular, e esvazia sem destruir o que é registro do ISP:
+   contrato, nó do mapa e trilha ficam, com a pessoa retirada deles. As duas rotas
+   perguntam ao banco pela mesma função, para que a exclusão nunca alcance menos do que o
+   export acabou de mostrar. Ambas auditadas; na exclusão a trilha é **condição**.
+
+   O que continua faltando, e não é código: contrato com cláusula de operador, política de
+   retenção escrita e compromisso de notificação de incidente — **antes do primeiro
+   contrato**. Mais duas coisas que o código não consegue cumprir sozinho e que a tela diz
+   em voz alta: o CPF no ERP do ISP não é nosso para apagar, e uma exclusão sem
+   cancelamento do serviço se desfaz na sincronização seguinte.
 10. **Escopo escapando para hospedar o GenieACS** — inalterado. Manter fora até depois da
     Fase 7.
 
@@ -1122,8 +1148,10 @@ Original: Fase 0 → 1 → 2 → 3 → 8 → 4 → 5 → 6 → 7.
    `allow_private_ranges` por provedor — a credencial vive num blob em `app_state`, sem
    essas três colunas. O muro de escala, esse, fechou nas quatro peças.
 5. ~~**Fase 5**~~ ✅ planos, assinatura, `subscriptionGate`, limites nos quatro
-   pontos de escrita, `billing_events` e o `ManualBillingProvider`. O gateway (Asaas) fica
-   para quando houver contrato para cobrar.
+   pontos de escrita, `billing_events` e o `ManualBillingProvider`. O gateway (Asaas)
+   entrou pela metade que recebe: o webhook credita a assinatura sozinho, com a
+   correlação em `tenants` e a credencial no ambiente. Emitir a cobrança continua manual,
+   e é a metade que falta.
 6. ~~**Fase 6**~~ ✅ contexto do provedor, nome em `tenants`, cadastro, onboarding, plano e
    uso, `<html lang>` e o centro do mapa.
 7. ~~**Fase 7**~~ ✅ `DATABASE_URL`, compose e imagem no CI, log e métrica com o provedor
@@ -1167,8 +1195,9 @@ Nada disso é negociável. **Os doze estão cumpridos.**
 | 11 | `audit_log` registrando ações sensíveis | ✅ onda 20 — senha de portal, GenieACS, papéis, vínculos, convites, suspensão |
 | 12 | Exportação por provedor funcionando (LGPD e "apaguei tudo, socorro") | ✅ exportação (onda 21) e exclusão (onda 22), com trilha que sobrevive ao provedor apagado |
 
-Nenhuma linha vermelha resta. Isso **não** quer dizer produto pronto — o **gateway de
-cobrança** e o **comando de re-cifra** da rotação da `SECRET_BOX_KEY` estão por fazer —
+Nenhuma linha vermelha resta. Isso **não** quer dizer produto pronto — a **emissão** da
+cobrança (o gateway já credita o que recebe) e o **comando de re-cifra** da rotação da
+`SECRET_BOX_KEY` estão por fazer —
 quer dizer que a lista do que não se pode vender sem já não tem item aberto. O transporte de
 e-mail do convite, que esta frase listava até hoje, entrou no fecho da Fase 2.
 

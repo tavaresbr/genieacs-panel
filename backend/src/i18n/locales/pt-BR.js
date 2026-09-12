@@ -652,4 +652,10 @@ export default {
   'subscription.notice.renewalSoonBody': 'O período pago do {provider} termina em {date} — daqui a {days} dia(s).\n\nQuando terminar, o painel continua podendo ser lido, mas para de aceitar alterações. Mande o pagamento antes dessa data e nada para.\n\n{link}',
   'subscription.notice.renewalExpiredSubject': 'A assinatura do {provider} venceu em {date}',
   'subscription.notice.renewalExpiredBody': 'O período pago do {provider} terminou em {date}.\n\nO painel continua podendo ser lido — sua equipe e seus assinantes seguem vendo tudo —, mas não aceita mais alterações. Assim que o pagamento for registrado, tudo volta ao normal.\n\n{link}',
+  'customers.invalidId': 'Id de assinante inválido',
+  'customers.exportFailed': 'Falha ao exportar os dados do assinante',
+  'customers.confirmMismatch': 'Digite o ID do Cliente exatamente como aparece para confirmar',
+  'customers.eraseNotLogged': 'A exclusão não foi registrada na trilha, então não foi feita',
+  'customers.eraseFailed': 'Falha ao apagar os dados do assinante',
+  'customers.erased': 'Dados do assinante apagados',
 };

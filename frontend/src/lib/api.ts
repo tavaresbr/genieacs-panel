@@ -600,6 +600,51 @@ export const tenantAPI = {
   export: () => apiClient.getBlob('/tenant/export')
 }
 
+/** O que a exclusão de um assinante devolve: o recibo do que deixou de existir. */
+export interface CustomerErasureReceipt {
+  accountId: number
+  customerId: string | null
+  /** Quantas linhas em cada tabela — contagens, nunca conteúdo. */
+  rowCounts: Record<string, number>
+  /** Quantos arquivos de anexo saíram do disco. */
+  attachments: number
+  /**
+   * A conta estava ativa quando foi apagada? Se estava, a ONT continua na
+   * planta e a próxima sincronização recria a conta com um `customer_id` novo —
+   * a exclusão se desfaz sozinha em um minuto se o serviço não for cancelado.
+   */
+  wasActive: boolean
+}
+
+/**
+ * Os dois direitos do titular, exercidos pelo ISP em nome dele: ver e apagar.
+ *
+ * As duas rotas endereçam a conta pelo id da LINHA (`accountId`), que a tela do
+ * aparelho recebe em `device.customer.accountId` — e não pelo "ID do Cliente"
+ * impresso, que é o que o assinante conhece e por isso o pior endereço possível
+ * para um ato sem volta.
+ */
+export const customerAPI = {
+  /**
+   * O dossiê de um assinante, num arquivo.
+   *
+   * Por `getBlob` e não por `get` pelo mesmo motivo do export do provedor: a
+   * rota responde com `Content-Disposition: attachment` e o JSON no corpo, sem
+   * o envelope da API.
+   */
+  export: (accountId: number) => apiClient.getBlob(`/customers/${accountId}/export`),
+
+  /**
+   * Apaga. O `confirmCustomerId` tem que ser o "ID do Cliente" digitado exato —
+   * o servidor não normaliza caixa nem espaço, porque um id "quase certo" é
+   * precisamente o que um engano parece.
+   */
+  erase: (accountId: number, confirmCustomerId: string) =>
+    apiClient.requestWithBody<CustomerErasureReceipt>(
+      'DELETE', `/customers/${accountId}`, { confirmCustomerId }
+    )
+}
+
 /** Uma linha da trilha, como a tela a recebe. */
 export interface AuditEntry {
   id: number
@@ -704,7 +749,21 @@ export interface Tenant {
   operators: number
   /** Null only for a provider the seed has not yet given one — a boot fixes it. */
   subscription: TenantSubscriptionSummary | null
+  /**
+   * Quem este provedor é dentro do gateway de pagamento — a correlação que o
+   * webhook lê para saber de quem é o dinheiro que entrou. Escrita só pelo
+   * console: um provedor que pudesse apontar o próprio `customerRef` para o
+   * cliente de outro receberia o crédito do pagamento alheio.
+   */
+  gateway: TenantGateway | null
   createdAt: string | null
+}
+
+export interface TenantGateway {
+  /** O nome do provider (`asaas`), ou nulo quando a cobrança é manual. */
+  gateway: string | null
+  /** O id do cliente no gateway. Os dois andam juntos: meia correlação não resolve nada. */
+  customerRef: string | null
 }
 
 /** Null means "no limit". */
@@ -888,6 +947,20 @@ export const platformAPI = {
    */
   updateTenant: (id: number, payload: { name?: string; slug?: string }) =>
     apiClient.requestWithBody<{ tenant: Tenant }>('PATCH', `/platform/tenants/${id}`, payload),
+
+  /**
+   * Liga (ou desliga) o provedor do gateway de pagamento.
+   *
+   * Mesma rota do nome e do status, e a rota recusa as três intenções no mesmo
+   * corpo — mandar uma de cada vez é o que impede um salvamento de tela mexer em
+   * algo que ninguém tinha a intenção de mexer. Os dois campos vazios juntos
+   * desligam; um só vazio é recusado, porque meia correlação não resolve
+   * provedor nenhum no webhook.
+   */
+  setTenantGateway: (id: number, gateway: { gateway: string; customerRef: string }) =>
+    apiClient.requestWithBody<{ id: number; gateway: TenantGateway }>(
+      'PATCH', `/platform/tenants/${id}`, { gateway }
+    ),
 
   listMemberships: (tenantId: number) =>
     apiClient.get<{ memberships: TenantMembership[] }>(`/platform/tenants/${tenantId}/members`),

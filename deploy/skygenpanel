@@ -9,6 +9,7 @@ SERVICE_NAME="skygenpanel"
 ENV_FILE="${INSTALL_DIR}/backend/.env"
 REPO_BRANCH="${SKYGP_BRANCH:-main}"
 CLI_PATH="${SKYGP_CLI_PATH:-/usr/local/bin/skygenpanel}"
+BACKUP_CLI_PATH="${SKYGP_BACKUP_CLI_PATH:-/usr/local/bin/skygenpanel-backup}"
 NODE_MAJOR_MIN=22
 NODE_MINOR_MIN=22
 
@@ -131,6 +132,20 @@ cmd_update() {
   install -m 0755 "$INSTALL_DIR/deploy/skygenpanel" "$cli_temp"
   mv -f -- "$cli_temp" "$CLI_PATH"
   trap - EXIT
+  # The backup script and its units travel with the CLI, and for the same
+  # reason: `git reset --hard` above restores every tracked file in the
+  # checkout, so anything installed OUTSIDE it — /usr/local/bin, /etc/systemd —
+  # keeps whatever version it had until something copies the new one. A backup
+  # script frozen at the version of the day it was installed is exactly the kind
+  # of thing nobody notices until the restore.
+  if [ -f "$INSTALL_DIR/deploy/skygenpanel-backup" ]; then
+    install -m 0755 "$INSTALL_DIR/deploy/skygenpanel-backup" "$BACKUP_CLI_PATH"
+    install -m 0644 "$INSTALL_DIR/deploy/skygenpanel-backup.service" /etc/systemd/system/
+    install -m 0644 "$INSTALL_DIR/deploy/skygenpanel-backup.timer" /etc/systemd/system/
+    systemctl daemon-reload
+    systemctl enable --now skygenpanel-backup.timer >/dev/null 2>&1 \
+      || warn "Could not enable the backup timer."
+  fi
   log "Updating backend dependencies"
   ( cd "$INSTALL_DIR/backend" && npm ci --omit=dev )
   log "Rebuilding frontend"
@@ -202,6 +217,17 @@ cmd_reset_password() {
   ( cd "$INSTALL_DIR/backend" && RESET_PASSWORD="$pass" node scripts/reset-password.js "$user" )
 }
 
+# Delegated rather than reimplemented: the timer runs the same script with the
+# same arguments, so an operator who types this by hand and the machine that
+# runs it at 03:17 are doing exactly the same thing. Two copies of "how a backup
+# is taken" would be two answers on the day they disagree.
+cmd_backup() {
+  local verbo="${1:-run}"
+  [ -x "$BACKUP_CLI_PATH" ] \
+    || die "Backup script not installed at $BACKUP_CLI_PATH. Run 'skygenpanel update'."
+  "$BACKUP_CLI_PATH" "$verbo"
+}
+
 usage() {
   cat <<EOF
 skygenpanel — manage the SkyGenPanel service
@@ -217,6 +243,7 @@ Commands:
   version                     Show installed version and Git revision
   logs [N]                    Follow the last N log lines (default 100)
   reset-password <u> [p]      Reset password (prompts securely when omitted)
+  backup [verify]             Take a backup now, or report the newest one
   help                        Show this help
 EOF
 }
@@ -232,6 +259,7 @@ case "${1:-help}" in
   version|-v|--version) cmd_version ;;
   logs)            cmd_logs "${2:-100}" ;;
   reset-password)  cmd_reset_password "${2:-}" "${3:-}" ;;
+  backup)          cmd_backup "${2:-run}" ;;
   help|-h|--help)  usage ;;
   *)               warn "Unknown command: $1"; usage; exit 1 ;;
 esac

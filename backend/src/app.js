@@ -24,6 +24,7 @@ import { httpMetrics } from './utils/metrics.js';
 
 import authRoutes from './routes/auth.js';
 import deviceRoutes from './routes/devices.js';
+import customerRoutes from './routes/customers.js';
 import settingsRoutes from './routes/settings.js';
 import vendorRoutes from './routes/vendors.js';
 import mappingRoutes from './routes/mapping.js';
@@ -44,6 +45,8 @@ import whatsappMessageRoutes from './routes/whatsappMessages.js';
 import whatsappAlertRoutes from './routes/whatsappAlerts.js';
 import whatsappBillingRoutes from './routes/whatsappBilling.js';
 import whatsappWebhookRoutes from './routes/whatsappWebhook.js';
+import billingWebhookRoutes from './routes/billingWebhook.js';
+import { BILLING_WEBHOOK_PATH } from './config/billingWebhookPath.js';
 import { WA_WEBHOOK_PATH } from './config/waWebhookPath.js';
 import whatsappMediaRoutes from './routes/whatsappMedia.js';
 import { ATTACHMENT_PATH, attachmentRawBody } from './services/waAttachmentService.js';
@@ -213,6 +216,17 @@ app.use(express.json({ limit: '1mb' }));
 // impedir.
 app.use(WA_WEBHOOK_PATH, whatsappWebhookRoutes);
 
+// Mesma razão, mesmo lugar na pilha, e mais uma que é só desta: a entrega do
+// gateway de pagamento chega no endereço que a plataforma digitou no painel
+// DELE — o apex, na prática —, e o apex não nomeia provedor nenhum. Resolvida
+// por host ela levaria 404 antes de chegar ao controlador, e o pagamento de um
+// cliente ficaria na fila de reentrega do gateway até alguém reparar.
+//
+// Nada de provedor entra em escopo aqui, então qualquer consulta escopada que
+// o caminho alcançasse falharia com a sentinela — que é a guarda que se quer.
+// O provedor sai do CORPO, e o `runInTenant` do controlador é o que credita.
+app.use(BILLING_WEBHOOK_PATH, billingWebhookRoutes);
+
 // Same reasoning, same place in the stack: the Evolution server fetches a
 // media file to send it, carrying a signed, short-lived token in its own query
 // string rather than a session. It is mounted before `apiLimiter` because a
@@ -263,6 +277,7 @@ app.use('/api/tenant', tenantRoutes);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/devices', deviceRoutes);
+app.use('/api/customers', customerRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/vendor-management', vendorRoutes);
 app.use('/api/mapping-data', mappingRoutes);

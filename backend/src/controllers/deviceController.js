@@ -197,6 +197,14 @@ class DeviceController {
         createResponse(req.t('device.detailRetrieved'), {
           ...deviceDetail,
           customer: {
+            // O id da LINHA, ao lado do id impresso. As duas rotas do dossiê
+            // (`/api/customers/:accountId/...`) endereçam a conta por ele, e a
+            // tela do aparelho é onde o operador está quando um assinante liga
+            // pedindo os dados dele. Sem isto a tela teria que descobrir o id
+            // por uma segunda rota, ou as rotas teriam que endereçar pelo
+            // `customer_id` impresso — que é dado que o assinante conhece e por
+            // isso o pior endereço possível para um ato sem volta.
+            accountId: account?.id ?? null,
             customerId: account?.customer_id || null,
             installationDate: profile?.installation_date || null,
             generated: Boolean(account),

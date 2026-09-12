@@ -121,6 +121,24 @@ Both listeners bind to `127.0.0.1` by default. This is suitable for a reverse pr
 | `skygenpanel status` | Show service and endpoint status |
 | `skygenpanel logs [N]` | Follow the latest log lines; defaults to 100 |
 | `skygenpanel reset-password <user> [password]` | Reset an operator password; prompts securely when the password is omitted |
+| `skygenpanel backup` | Take a backup now: database, WhatsApp attachments, and the fingerprint of the encryption keys |
+| `skygenpanel backup verify` | Report how old the newest backup is and whether the keys still match the ones it was taken with |
+
+The installer also schedules `skygenpanel-backup.timer` to run daily at 03:17 (with a
+randomized delay, and `Persistent=true` so a machine that was off catches up instead of
+skipping the day). Copies land in `/var/backups/skygenpanel` — thirty daily, plus the
+Sunday one of each of the last fifty-two weeks. Override the destination and the counts
+with `SKYGP_BACKUP_DIR`, `SKYGP_BACKUP_KEEP_DAILY` and `SKYGP_BACKUP_KEEP_WEEKLY`.
+
+A backup does not include `backend/.env`. It records a **fingerprint** of `SECRET_BOX_KEY`
+and `JWT_SECRET` instead, because those two are what decrypt every stored secret: restore
+the database with the wrong ones and the panel boots, answers 200, and every portal
+password, WiFi password and API token reads back as null. Keep the keys in your own vault,
+and let `skygenpanel backup verify` tell you whether the ones on the machine still match
+the ones your newest backup was taken with. `SKYGP_BACKUP_INCLUDE_SECRETS=1` puts the
+`.env` in the backup directory in the clear — only do that if the destination is itself
+encrypted, since the backup would then carry the master key and the database password
+alongside the data.
 
 ## Cloudflare Tunnel
 

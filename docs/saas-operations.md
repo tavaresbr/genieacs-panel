@@ -168,6 +168,41 @@ pg_dump "$DATABASE_URL" --format=custom --file="skygp-$(date -u +%F).dump"
 createdb skygp_restore && pg_restore --dbname=skygp_restore --no-owner skygp-2026-09-10.dump
 ```
 
+### O que o painel agenda sozinho
+
+A tabela acima descreve a edição hospedada, onde o Postgres é gerenciado e o snapshot é do
+provedor. Para o **self-hosted** — que é o install do ISP, em SQLite, na máquina dele — o
+`deploy/install.sh` instala e liga `skygenpanel-backup.timer`, diário às 03:17 com atraso
+aleatório e `Persistent=true`. Timer e não cron por causa do `Persistent`: máquina
+desligada às 3h roda o backup ao ligar, em vez de pular o dia em silêncio; e um `oneshot`
+que falha fica `failed` e aparece em `systemctl --failed`, enquanto um cron que falha manda
+um e-mail que ninguém lê.
+
+Cada passada escreve um diretório em `/var/backups/skygenpanel` com o dump do banco (o
+dialeto que o install usa, descoberto por `backend/scripts/backup-target.js`, que é o
+único lugar que conhece a precedência `DATABASE_URL` > `db-config.json` > SQLite), o
+`tar.gz` de `wa-media`, o `db-config.json`, e um `manifest.json` com tamanhos, `sha256`, a
+versão do painel e **em que migração o dump foi tirado**. Retenção: 30 diárias mais o
+domingo de cada uma das últimas 52 semanas.
+
+**O `.env` não entra no backup.** O que entra é a impressão digital de `SECRET_BOX_KEY` e
+de `JWT_SECRET` — os doze primeiros hex de um SHA-256 salgado com o nome da variável, nunca
+o valor. A razão é o modo de falha de `secretBox.decrypt`, que devolve `null` em vez de
+levantar: restaurar o banco com a chave errada sobe um painel que responde 200 e em que
+toda senha de portal, senha de WiFi e token de API volta nula — o operador vê "o dado
+sumiu" quando o que falta é a chave. `skygenpanel backup verify` compara as impressões do
+backup mais novo com as do `.env` vivo e recusa em voz alta quando divergem, que é a hora
+certa de descobrir isso: antes do restore, e não durante.
+
+`SKYGP_BACKUP_INCLUDE_SECRETS=1` inclui o `.env` em claro, e o script avisa. Só vale se o
+destino já for cifrado: o backup passa a carregar a chave mestra e a senha do banco ao lado
+do dado, o que troca "perdi o dado" por "vazou o painel inteiro".
+
+Duas decisões continuam sendo de quem opera, e o painel não as toma: **para onde a cópia
+sai da máquina** (nada disto é backup enquanto vive no mesmo disco) e **instalar
+`postgresql-client` ou `mariadb-client`** quando o install não usa SQLite — o script morre
+dizendo qual pacote falta, em vez de escrever um arquivo vazio e sair zero.
+
 Restauração de verdade: parar o painel, restaurar, subir. As migrations no boot
 reconhecem o schema restaurado pelo `schema_migrations` e não refazem nada. Se o dump
 for de uma versão mais antiga do painel, o boot aplica o que falta — é o caminho de
@@ -178,6 +213,15 @@ upgrade normal.
 estrangeiras pedem, sem segredo cifrado e sem hash de senha, com um manifesto dizendo o
 que ficou de fora. É o que se entrega numa solicitação da LGPD e o que se guarda antes de
 apagar um provedor.
+
+**Por assinante**, na ficha do aparelho, o provedor atende o titular dele sem passar por
+nós: `GET /api/customers/:accountId/export` (capacidade `customers.dossier`) monta o
+dossiê de uma pessoa, e `DELETE /api/customers/:accountId` (capacidade `customers.erase`,
+com o "ID do Cliente" digitado de volta) apaga. As duas ficam em `audit_log`; na exclusão
+a linha da trilha é gravada **antes** e é condição para que ela aconteça. Dois avisos para
+o plantão, porque chegam como chamado: o CPF que o SGP do ISP guarda não sai daqui, e uma
+exclusão feita sem o serviço ter sido cancelado se desfaz na próxima `syncFleet` — a ONT
+continua informando e a conta renasce com um ID do Cliente novo.
 
 ## 5. Desfazer: suspender, apagar
 
@@ -282,11 +326,66 @@ assinantes, nada. Uma caixa de entrada alheia não é lugar onde isso mora.
 
 ## 9. O que este documento não cobre, porque ainda não existe
 
-- Gateway de cobrança: hoje o `ManualBillingProvider` registra o pagamento pelo
-  console. Asaas ou similar entra quando houver contrato para cobrar.
+- Gateway de cobrança, **a metade que emite**. A metade que RECEBE já existe: ver
+  a seção 10.
 - O **comando de re-cifra** da rotação da `SECRET_BOX_KEY`. As duas chaves vivas
   já existem e já funcionam: pôr a chave antiga em `SECRET_BOX_KEY_PREVIOUS` faz
   o painel LER o que foi cifrado com ela e ESCREVER só com a nova. O que não
   existe é o passo que percorre as linhas antigas e as reescreve — sem ele, uma
   linha só migra quando alguém a edita, e a chave antiga tem que continuar no
   `.env` indefinidamente.
+
+## 10. Receber pagamento sozinho
+
+Até aqui o pagamento de um provedor era um botão no console: alguém conferindo extrato e
+marcando à mão. Com dez clientes passa; com cinquenta é uma pessoa por dia, e é uma pessoa
+que erra.
+
+`POST /api/billing-webhook` recebe a entrega do gateway e credita a assinatura. Três coisas
+para ligar:
+
+1. **`BILLING_WEBHOOK_TOKEN` no `.env` do deploy.** É a credencial que o gateway devolve
+   no cabeçalho `asaas-access-token` de toda entrega, e é do **deploy** e não de um
+   provedor: há uma conta no gateway e ela é nossa. Sem a variável configurada a rota
+   responde **404** — uma rota que mexe em dinheiro não pode ficar aberta porque alguém
+   esqueceu uma linha.
+2. **O endereço, no painel do gateway:** `https://<apex>/api/billing-webhook`. A rota é
+   montada acima do resolvedor de provedor de propósito: o apex não nomeia provedor
+   nenhum, e resolvida por host a entrega levaria 404 antes do controlador.
+3. **A correlação, no console**, aba *Gateway* de cada provedor: o nome do gateway
+   (`asaas`) e o id do cliente lá dentro (`cus_…`). É por ela que a entrega volta ao
+   provedor certo. Enquanto ela não existir, o pagamento vira uma linha de log dizendo
+   `no provider for payment …` e a cobrança segue manual. **Só o console escreve** esses
+   dois campos: um provedor que pudesse escrever o próprio id apontaria para o cliente de
+   outro e receberia o crédito alheio.
+
+O caminho de volta tem duas chaves, nesta ordem: a nossa própria referência
+(`externalReference` no formato `tenant:<id>`, quando fomos nós que criamos a cobrança) e o
+id do cliente no gateway (para a cobrança emitida lá dentro, à mão — que é como os
+primeiros contratos vão ser cobrados). Provedor suspenso ou apagado não resolve por
+nenhuma das duas.
+
+**A disciplina de status, que é o que impede uma fila de reentrega infinita:** 401 uniforme
+para credencial que não presta, 404 para deploy sem gateway ligado, 500 só para falha
+genuína deste lado — e **200 para tudo que se escolhe não fazer**: reentrega, evento que
+não é dinheiro entrando, pagamento que não resolve provedor nenhum. Um não-2xx faz o
+gateway reentregar em laço para sempre.
+
+**A mesma referência credita uma vez só**, e a chave é o id do **pagamento**, não o do
+evento. O gateway manda dois eventos para um pagamento de cartão — `PAYMENT_CONFIRMED`
+quando a operadora aprova e `PAYMENT_RECEIVED` quando o dinheiro cai, trinta dias depois.
+Os dois falam do mesmo `payment.id`, então o segundo responde `duplicate` e não empurra a
+data. Com a chave no id do evento, todo cartão ganharia dois períodos e ninguém perceberia
+por meses.
+
+**O que conferir antes da primeira cobrança de verdade.** O formato do corpo é a única
+coisa aqui que não se verifica sem uma conta no gateway: ele está lido de uma função pura
+(`AsaasBillingProvider.interpretar`) e falha FECHANDO — um campo que mudou de nome devolve
+"não faço nada" e ninguém é creditado, em vez de creditar errado. Mande uma entrega de
+teste pelo painel do gateway e confira no log do processo: `nothing to do with event "…"`
+significa que o corpo chegou e não foi reconhecido.
+
+**O que continua manual:** emitir a cobrança. A cobrança se cria hoje no painel do
+gateway; o que o painel faz sozinho é receber a notícia e creditar. Periodicidade em
+`plans` (hoje o período pago é 30 dias cravados), a régua de emissão e o link de pagamento
+no e-mail de vencimento são a metade que falta.

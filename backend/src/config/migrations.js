@@ -557,6 +557,30 @@ const TENANT_BILLING_COLUMNS = [
   ['billing_phone', (t) => t.string('billing_phone', 32)]
 ];
 
+/**
+ * Quem este provedor é DENTRO do gateway de pagamento.
+ *
+ * Em `tenants`, que é tabela compartilhada, e não numa tabela escopada nova —
+ * e a razão é o webhook. A entrega do gateway chega sem provedor nenhum em
+ * escopo (ela não sabe o que é um provedor; sabe um id de cliente), e é ela que
+ * precisa fazer o caminho de volta. Numa tabela escopada essa leitura teria que
+ * ser `runUnscoped`, com a razão escrita, para atravessar a sentinela — um
+ * `runUnscoped` por entrega de webhook, numa rota pública, para ler uma
+ * correlação que não é dado de provedor nenhum e sim de como ele aparece num
+ * sistema de fora. Em `tenants` a leitura é direta e a sentinela não tem nada a
+ * dizer sobre ela, que é o estado certo.
+ *
+ * `billing_gateway` guarda o nome do provider (`asaas`), e não um booleano:
+ * `billing_events.provider` já é uma string pelo mesmo motivo, e o dia em que
+ * houver dois gateways a coluna já responde qual.
+ */
+const TENANT_GATEWAY_COLUMNS = [
+  ['billing_gateway', (t) => t.string('billing_gateway', 32)],
+  // O id do cliente no gateway. É por ele que a entrega volta ao provedor
+  // quando o pagamento não carrega a nossa própria referência.
+  ['billing_customer_ref', (t) => t.string('billing_customer_ref', 128)]
+];
+
 const tenantsTable = (db) => (t) => {
   t.increments('id').primary();
   // The subdomain the panel will be reached at once tenants are resolved by
@@ -565,8 +589,13 @@ const tenantsTable = (db) => (t) => {
   t.string('name', 128).notNullable();
   t.string('status', 16).notNullable().defaultTo('active');
   for (const [, add] of TENANT_BILLING_COLUMNS) add(t);
+  for (const [, add] of TENANT_GATEWAY_COLUMNS) add(t);
   t.timestamp('created_at').defaultTo(db.fn.now());
   t.timestamp('updated_at').defaultTo(db.fn.now());
+  // O caminho de volta do webhook: gateway + id do cliente → provedor. É a
+  // única leitura no caminho quente de uma rota pública, e sem índice ela é um
+  // scan da tabela de clientes a cada entrega.
+  t.index(['billing_gateway', 'billing_customer_ref'], 'tenants_gateway_customer_idx');
 };
 
 const provisioningProfilesTable = (db) => (t) => {
@@ -2776,6 +2805,44 @@ export const migrations = [
       await db.schema.alterTable('subscriptions', (t) => {
         t.timestamp('expiry_warned_for');
       });
+    }
+  },
+  {
+    /**
+     * Quem cada provedor é dentro do gateway de pagamento.
+     *
+     * O extrato já nasceu preparado para isto — `billing_events.provider` e
+     * `external_id` existem desde o começo, e o índice único
+     * `(tenant_id, external_id)` da 0038 foi criado explicitamente para a
+     * reentrega de webhook. O que faltava era o caminho de volta: dado um
+     * pagamento no gateway, de qual provedor ele é.
+     *
+     * Em `tenants` e não numa tabela nova: ver o comentário de
+     * `TENANT_GATEWAY_COLUMNS`. Nulas para quem já existe, que é o certo —
+     * ninguém está ligado a gateway nenhum, e a cobrança segue manual até
+     * alguém preencher.
+     */
+    id: '0045_tenant_billing_gateway',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      return db.schema.hasColumn('tenants', 'billing_gateway');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      const faltando = await missingColumns(db, 'tenants', TENANT_GATEWAY_COLUMNS);
+      if (faltando.length) {
+        await db.schema.alterTable('tenants', (t) => {
+          for (const add of faltando) add(t);
+        });
+      }
+      // O índice à parte das colunas: numa base que já tem as colunas por
+      // outro caminho, o passo ainda precisa poder criar o índice — e o
+      // `alterTable` acima não teria rodado.
+      if (!(await hasIndex(db, 'tenants', 'tenants_gateway_customer_idx'))) {
+        await db.schema.alterTable('tenants', (t) => {
+          t.index(['billing_gateway', 'billing_customer_ref'], 'tenants_gateway_customer_idx');
+        });
+      }
     }
   }
 ];
