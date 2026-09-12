@@ -42,7 +42,8 @@ import {
   EyeSlashIcon,
   DocumentDuplicateIcon,
   LockOpenIcon,
-  BanknotesIcon
+  BanknotesIcon,
+  ClipboardDocumentListIcon
 } from '@heroicons/react/24/outline'
 
 const ICONS: Record<string, React.ComponentType<React.SVGProps<SVGSVGElement>>> = {
@@ -86,6 +87,7 @@ const ICONS: Record<string, React.ComponentType<React.SVGProps<SVGSVGElement>>> 
   copy: DocumentDuplicateIcon,
   unlock: LockOpenIcon,
   invoice: BanknotesIcon,
+  trail: ClipboardDocumentListIcon,
   eye: EyeIcon,
   chat: ChatBubbleLeftRightIcon,
   'eye-off': EyeSlashIcon

@@ -42,9 +42,17 @@ class AuditController {
       });
       return res.json(createResponse(req.t('audit.listed'), {
         entries: rows.map(publicEntry),
-        // O cursor da próxima página. Nulo quando a página veio incompleta, que
-        // é como quem chama sabe que chegou ao fim sem precisar de mais uma
-        // ida ao banco só para descobrir isso.
+        // O cursor da próxima página: o id da última linha desta.
+        //
+        // Nulo só quando a página veio VAZIA — e não quando veio incompleta,
+        // que é o que este comentário afirmava e o código nunca fez. Quem
+        // chama descobre o fim por página incompleta (`entries.length <
+        // limit`), que é o sinal correto e o que a tela usa. Fazer o cursor
+        // cumprir a promessa antiga exigiria este controlador conhecer o limite
+        // já ajustado, que é calculado dentro de `AuditLog.list` — ou seja,
+        // duplicar a regra de ajuste aqui, ou mudar a forma de retorno do
+        // modelo. Nenhuma das duas se paga por uma ida a mais ao banco na
+        // última página; um comentário falso, sim, se cobra da próxima pessoa.
         nextBefore: rows.length ? rows[rows.length - 1].id : null,
         actions: Object.values(AuditLog.ACTIONS)
       }));

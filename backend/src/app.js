@@ -150,7 +150,13 @@ app.use((req, res, next) => {
 
 app.use(cors({
   origin: true,
-  methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
+  methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  // Sem isto o navegador esconde o cabeçalho de quem é servido de outra origem,
+  // e esconde em silêncio: o download acontece, com o nome errado. É o único
+  // cabeçalho que o painel precisa LER de uma resposta, e ele existe para que o
+  // servidor continue sendo o único autor do nome do arquivo exportado —
+  // remontar a regra no frontend seria a segunda cópia, e a segunda diverge.
+  exposedHeaders: ['Content-Disposition']
 }));
 // The webhook signature covers the exact bytes SGP signed, so this route has
 // to see the raw body. Mounting `express.raw` on the path before the global

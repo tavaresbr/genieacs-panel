@@ -34,6 +34,7 @@ import { useTenant } from '@/contexts/tenant-context'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
 import { OPERATOR_ROLES, ROLE_LABEL_KEYS, ROLE_SUMMARY_KEYS } from '@/lib/permissions'
+import { exportFileName } from '@/lib/utils'
 import { InvitePanel } from '@/components/settings/invite-panel'
 import type { Vendor as VendorType, WifiSecurityConfig as WifiSecurityConfigType } from '@/types'
 
@@ -99,7 +100,7 @@ const GENIE_SECRET_STATE_BADGES: Record<GenieSecretState, string> = {
 export default function Settings() {
   const { t, formatDateTime } = useTranslation()
   const { user: currentUser, can, refreshUser } = useAuth()
-  const { name: tenantName, isSaas, refresh: refreshTenant } = useTenant()
+  const { name: tenantName, isSaas, tenant, refresh: refreshTenant } = useTenant()
   // Lidos aqui em cima, antes de qualquer handler que os feche: um `const`
   // do componente lido dentro de um callback ANTES da linha que o declara é
   // uma ReferenceError se o callback rodar durante a renderização, e a regra
@@ -110,6 +111,7 @@ export default function Settings() {
   const isOwner = currentUser?.role === 'owner'
   const canReadOperators = can('operators.read')
   const canManageOperators = can('operators.manage')
+  const canExportTenant = can('tenant.export')
   const [settings, setSettings] = useState({
     appName: tenantName,
     genieAcsUrl: 'http://127.0.0.1:7557',
@@ -120,6 +122,7 @@ export default function Settings() {
     ...INSTALLER_VIRTUAL_PARAMETERS
   })
   const [loading, setLoading] = useState(false)
+  const [exportando, setExportando] = useState(false)
   const [activeTab, setActiveTab] = useState('general')
   const [testResult, setTestResult] = useState<{success: boolean, message: string, deviceCount?: number} | null>(null)
   const [genieAuthConfig, setGenieAuthConfig] = useState<GenieAcsAuthConfig | null>(null)
@@ -542,6 +545,39 @@ export default function Settings() {
     newPassword: '',
     confirmNewPassword: ''
   })
+
+  /**
+   * Baixa todo o cadastro deste provedor.
+   *
+   * A rota devolve arquivo e não envelope, então vai por `getBlob`. O nome vem
+   * do servidor no `Content-Disposition`; `exportFileName` é a reserva para o
+   * deploy que serve o painel de outra origem sem expor o cabeçalho.
+   *
+   * A URL do blob é revogada logo depois do clique, e não no desmonte: aqui ela
+   * serve a um download de uso único, ao contrário do anexo de conversa, onde
+   * uma `<img>` continua apontando para ela.
+   */
+  const exportarDados = async () => {
+    setExportando(true)
+    try {
+      const res = await tenantAPI.export()
+      if (!res.success || !res.blob) {
+        toast.error(res.message || t('settings.export.failed'))
+        return
+      }
+      const url = URL.createObjectURL(res.blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = res.filename || exportFileName(tenant?.slug)
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+      toast.success(t('settings.export.done'))
+    } finally {
+      setExportando(false)
+    }
+  }
 
   const submitChangeUsername = async () => {
     const res = await authAPI.changeUsername(usernameForm.currentUsername, usernameForm.newUsername)
@@ -2451,6 +2487,28 @@ export default function Settings() {
                   </table>
                 </div>
               </section>
+
+              {/* Portabilidade: o cadastro inteiro deste provedor, num arquivo.
+                  Fica aqui, e não na tela da trilha, porque a capacidade de
+                  quem baixa é `tenant.export` e não `audit.read` — hoje as duas
+                  andam com os mesmos papéis, e amarrá-las na interface criaria
+                  uma dependência que a matriz não tem. */}
+              {canExportTenant && (
+                <section className="rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-4">
+                  <h3 className="font-semibold text-foreground">{t('settings.export.title')}</h3>
+                  <p className="mb-4 mt-1 text-sm text-muted-foreground">{t('settings.export.description')}</p>
+                  <button
+                    type="button"
+                    className="modern-button"
+                    onClick={() => void exportarDados()}
+                    disabled={exportando}
+                  >
+                    <Icon name="database" size={17} />
+                    {exportando ? t('settings.export.running') : t('settings.export.action')}
+                  </button>
+                  <p className="field-hint mt-3">{t('settings.export.hint')}</p>
+                </section>
+              )}
             </div>
           </div>
         )}
