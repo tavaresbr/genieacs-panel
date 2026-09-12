@@ -83,13 +83,32 @@ export default function PlatformPage() {
   }
 
   /**
-   * Abre uma sessão de leitura no painel de um provedor.
+   * Abre uma sessão de leitura no painel de um provedor, em OUTRA ABA.
    *
    * O que volta é um endereço com um bilhete no fragmento, e o que se faz com
-   * ele é ir para lá. `window.location.assign` e não `navigate`: num deploy com
-   * subdomínio esse endereço é OUTRO host, e o roteador do React não atravessa
-   * origin. Numa instalação sem subdomínio o endereço é relativo e o efeito é
-   * o mesmo.
+   * ele é ir para lá. Em outra aba porque quem olha o painel de um cliente
+   * está no meio de um atendimento: voltar para a lista de provedores depois
+   * custava um login novo no console, e a aba de trás guarda o lugar.
+   *
+   * A aba é aberta ANTES da chamada, ainda dentro do clique. Um `window.open`
+   * depois do `await` chega sem gesto do usuário e o navegador o trata como
+   * pop-up — o Safari bloqueia sempre, os outros às vezes. Ela nasce em branco
+   * e recebe o endereço quando o bilhete volta; se o bilhete falhar, fecha.
+   *
+   * Sem `noopener`: com ele o navegador devolve `null` em vez da janela, e sem
+   * a referência não há como levá-la ao endereço. O destino é o nosso próprio
+   * `/impersonate`, não uma página de terceiro, então o que `noopener` protege
+   * aqui não está em jogo.
+   *
+   * Duas saídas escapam da aba nova, e as duas caem no comportamento antigo —
+   * navegar aqui mesmo:
+   *
+   * - **Sem domínio-base** (self-hosted) o endereço é relativo, então o painel
+   *   vive no MESMO origin que o console. O token mora no `localStorage`, que é
+   *   compartilhado entre as abas de um origin: a aba nova trocaria o token do
+   *   console pelo do provedor e a aba de trás — a que se queria preservar —
+   *   ficaria quebrada em silêncio.
+   * - **Pop-up bloqueado**: melhor ir para o painel nesta aba do que não ir.
    *
    * Confirma antes porque a ação deixa rastro nos dois lados — na nossa trilha
    * e na do cliente — e porque entrar no painel de um cliente é coisa que se
@@ -97,14 +116,26 @@ export default function PlatformPage() {
    */
   const impersonar = async (tenant: Tenant) => {
     if (!window.confirm(t('platform.impersonateConfirm', { provider: tenant.name }))) return
+    const aba = window.open('', '_blank')
     setBusyId(tenant.id)
     try {
       const res = await platformAPI.impersonate(tenant.id)
       if (!res.success || !res.data) {
+        aba?.close()
         toast.error(res.message || t('platform.impersonateFailed'))
         return
       }
-      window.location.assign(res.data.url)
+      const url = res.data.url
+      const outroOrigin = new URL(url, window.location.href).origin !== window.location.origin
+      if (aba && outroOrigin) {
+        // `replace` e não `assign`: a aba nova não tem histórico que valha, e o
+        // `about:blank` no lugar dela deixaria um "voltar" que não volta.
+        aba.location.replace(url)
+        aba.focus()
+        return
+      }
+      aba?.close()
+      window.location.assign(url)
     } finally {
       setBusyId(null)
     }
