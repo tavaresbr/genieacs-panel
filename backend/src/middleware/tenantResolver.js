@@ -143,12 +143,33 @@ export function hostMatchesTenant(req, tenantId) {
  * for anything that reads a provider's data. But an ISP that does not exist
  * yet has no subdomain to arrive at, and making it sign up from SOME OTHER
  * provider's host — which is what the first cut did — means the platform's
- * front door is one of its customers' doors. So the apex serves exactly what
- * a stranger needs and nothing else: the public profile, which says this is a
- * SaaS and where providers live, and the sign-up. Only those two, listed here,
- * and only where subdomains are configured at all.
+ * front door is one of its customers' doors. So the apex serves what a
+ * stranger needs — the public profile, which says this is a SaaS and where
+ * providers live, and the sign-up — plus what the platform's own console
+ * needs, and nothing else. Only what is listed here, and only where
+ * subdomains are configured at all.
+ *
+ * Two lists because the two shapes of path are different in kind:
+ *
+ * - **exact**, for the handful of named endpoints. A path either is one of
+ *   them or is not, and the list reads as the surface it describes.
+ * - **by prefix**, for `/api/platform/`, which is some twenty paths with an
+ *   `:id` in the middle. Spelled out one by one it would be a second copy of
+ *   the route table, drifting from the first the day someone adds a route.
+ *
+ * A prefix is the wider claim, so it is only ever a whole namespace that
+ * belongs to the platform by construction — never `/api/auth/` (where
+ * password reset and e-mail verification write to a provider's audit trail
+ * and would fail unscoped here) and never anything reading provider data.
  */
 const PLATFORM_HOST_PATHS = new Set(['/api/tenant/public', '/api/auth/signup']);
+
+/**
+ * The control plane's own namespace. It names the provider in the path and
+ * opens the scope it needs with an explicit `runInTenant`, so it is the one
+ * family of routes that has no business being resolved by host.
+ */
+const PLATFORM_HOST_PREFIXES = ['/api/platform/'];
 
 export function isPlatformHost(host) {
   if (!PANEL_BASE_DOMAIN || !host) return false;
@@ -157,7 +178,8 @@ export function isPlatformHost(host) {
 
 function servedOnPlatformHost(req) {
   const path = String(req.originalUrl || req.url || '').split('?')[0];
-  return PLATFORM_HOST_PATHS.has(path);
+  if (PLATFORM_HOST_PATHS.has(path)) return true;
+  return PLATFORM_HOST_PREFIXES.some((prefix) => path.startsWith(prefix));
 }
 
 /** The provider a slug names, or null. Inactive providers do not resolve. */

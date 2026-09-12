@@ -398,6 +398,43 @@ describe('cada prova nomeada em uma declaração', () => {
   });
 });
 
+/**
+ * A superfície do endereço da plataforma, lida da fonte.
+ *
+ * O ápice não pertence a provedor nenhum: `resolveTenant` o deixa passar SEM
+ * escopo, então qualquer coisa servida ali que leia dado de provedor estoura
+ * no sentinela — ou, pior, serve o provedor que o token nomear pelo endereço
+ * da plataforma. A allowlist é o que separa uma coisa da outra, e ela cresce
+ * por descuido: alguém acrescenta um caminho para uma tela funcionar no ápice
+ * e o escopo não é a primeira coisa em que pensa.
+ *
+ * Daí um teste de FONTE e não de comportamento: o que se quer fixar não é o
+ * que cada caminho responde, é o que a lista tem direito de conter. Um prefixo
+ * é a permissão mais larga, então a regra é mais estreita: só famílias que
+ * nomeiam o provedor no próprio caminho.
+ */
+describe('a allowlist do endereço da plataforma', () => {
+  const fonte = fs.readFileSync(path.join(RAIZ, 'src', 'middleware', 'tenantResolver.js'), 'utf8');
+  const listaDe = (nome) => {
+    const bloco = new RegExp(`const ${nome} = [^;]+;`).exec(fonte);
+    assert.ok(bloco, `${nome} não encontrada em tenantResolver.js`);
+    return [...bloco[0].matchAll(/'([^']+)'/g)].map((m) => m[1]);
+  };
+
+  it('serve por caminho exato só o perfil público e o cadastro', () => {
+    assert.deepEqual(listaDe('PLATFORM_HOST_PATHS').sort(), [
+      '/api/auth/signup',
+      '/api/tenant/public'
+    ]);
+  });
+
+  it('serve por prefixo só a família do plano de controle', () => {
+    // `/api/auth/` nunca: a redefinição de senha e a verificação de e-mail
+    // gravam na trilha DO PROVEDOR, e no ápice não há escopo em que gravar.
+    assert.deepEqual(listaDe('PLATFORM_HOST_PREFIXES'), ['/api/platform/']);
+  });
+});
+
 describe('a ordem das montagens em app.js', () => {
   const fonte = fs.readFileSync(path.join(RAIZ, 'src', 'app.js'), 'utf8');
   const linhas = fonte.split('\n');
