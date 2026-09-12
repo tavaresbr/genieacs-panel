@@ -5,10 +5,11 @@ import { DEVELOPMENT_FALLBACK, isProduction } from '../config/runtimeEnv.js';
 import TenantUser from '../models/TenantUser.js';
 import PlatformAdmin from '../models/PlatformAdmin.js';
 import Tenant from '../models/Tenant.js';
-import { runInTenant } from '../config/tenantContext.js';
+import { runInTenant, runUnscoped } from '../config/tenantContext.js';
 import { roleHas } from '../config/permissions.js';
 import { subscriptionRefusal } from './subscriptionGate.js';
 import { hostMatchesTenant } from './tenantResolver.js';
+import { canHoldSession } from '../config/login.js';
 
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
 const REFRESH_TOKEN_EXPIRES_IN = process.env.REFRESH_TOKEN_EXPIRES_IN || '7d';
@@ -32,6 +33,16 @@ const REFRESH_TOKEN_EXPIRES_IN = process.env.REFRESH_TOKEN_EXPIRES_IN || '7d';
  */
 const PANEL_AUDIENCE = 'skygenpanel-admin';
 const PLATFORM_AUDIENCE = 'skygenpanel-platform';
+/**
+ * A terceira: a sessão do CONSOLE, que não pertence a provedor nenhum.
+ *
+ * Audiência própria e não uma marca dentro da do painel, pelo argumento que
+ * este arquivo já fez duas vezes: um `if` esquecido trata uma forma como a
+ * outra, e uma audiência errada não passa pelo `jwt.verify`. E não pode ser a
+ * `skygenpanel-platform`, que já é a personificação — aquela NOMEIA um
+ * provedor e é só leitura; esta não nomeia nenhum e age em nome da plataforma.
+ */
+const CONSOLE_AUDIENCE = 'skygenpanel-console';
 
 /**
  * Meia hora, fixa, e sem refresh.
@@ -119,7 +130,7 @@ function verifyToken(token) {
   try {
     return jwt.verify(token, JWT_SECRET, {
       issuer: 'skygenpanel',
-      audience: [PANEL_AUDIENCE, PLATFORM_AUDIENCE]
+      audience: [PANEL_AUDIENCE, PLATFORM_AUDIENCE, CONSOLE_AUDIENCE]
     });
   } catch {
     return null;
@@ -160,6 +171,57 @@ function generateImpersonationToken(platformUser, tenantId) {
       expiresIn: IMPERSONATION_EXPIRES_IN
     }
   );
+}
+
+/**
+ * O par de tokens do console: a sessão que NÃO pertence a provedor nenhum.
+ *
+ * Sem `tenantId` e sem `role`, e a ausência é estrutural em vez de uma
+ * bandeira: não existe valor para alguém ler errado. Uma rota que tente usar
+ * esta sessão como se fosse de painel não encontra provedor para escopar —
+ * `authenticateToken` a roda em `runUnscoped`, e ali toda leitura escopada
+ * estoura em vez de servir o provedor de menor id.
+ *
+ * O que ela carrega de autoridade é NADA: `platform: true` é a forma da
+ * sessão, não a permissão. Quem tem a chave do console é lido fresco de
+ * `platform_admins` na hidratação e outra vez em `requirePlatformAdmin`, a cada
+ * requisição — pelo motivo que este arquivo já escreveu: uma concessão retirada
+ * às 09:00 tem que parar de valer às 09:00, e não quando o token vencer.
+ *
+ * COM refresh, ao contrário da personificação. A diferença não é de rigor, é do
+ * que cada uma é: personificar é um atendimento de meia hora, e o incômodo de
+ * refazê-lo é o mecanismo; o console é onde alguém passa a tarde revisando
+ * provedores e faturamento, e expulsá-lo de hora em hora não protege nada — a
+ * alternativa, um token de acesso longo, é que seria pior.
+ */
+function generateConsoleTokens(user) {
+  const commonOptions = {
+    issuer: 'skygenpanel',
+    audience: CONSOLE_AUDIENCE
+  };
+  const accessToken = jwt.sign(
+    {
+      userId: user.id,
+      username: user.username,
+      platform: true,
+      tokenVersion: Number(user.token_version || 0)
+    },
+    JWT_SECRET,
+    { ...commonOptions, expiresIn: JWT_EXPIRES_IN }
+  );
+
+  const refreshToken = jwt.sign(
+    {
+      userId: user.id,
+      platform: true,
+      tokenType: 'refresh',
+      tokenVersion: Number(user.token_version || 0)
+    },
+    JWT_SECRET,
+    { ...commonOptions, expiresIn: REFRESH_TOKEN_EXPIRES_IN }
+  );
+
+  return { accessToken, refreshToken };
 }
 
 /**
@@ -206,20 +268,40 @@ async function hydrateAuthenticatedUser(decoded) {
   if (!decoded || decoded.tokenType || !Number.isInteger(Number(decoded.userId))) {
     return null;
   }
-  // Cada audiência tem uma forma válida e só uma. Um token de plataforma sem a
-  // marca seria uma sessão comum entrando por uma porta que não confere
-  // membership; um token de painel com a marca seria uma personificação
-  // entrando por uma que não confere o cadastro da plataforma. As duas
-  // combinações cruzadas param aqui.
-  const impersonation = decoded.impersonation === true;
-  if (impersonation !== (decoded.aud === PLATFORM_AUDIENCE)) return null;
+  // Cada audiência tem uma forma válida e só uma, e a conferência é exaustiva:
+  // uma audiência que este `switch` não conheça não vira sessão. Era um par de
+  // `if`s enquanto havia duas audiências; com três, um encadeado deixaria a
+  // quarta passar no dia em que alguém a acrescentasse sem mexer aqui.
+  //
+  // As formas cruzadas são o que isto barra: um token de plataforma sem a marca
+  // de personificação seria uma sessão comum entrando por uma porta que não
+  // confere membership; um de painel COM a marca seria uma personificação
+  // entrando por uma que não confere o cadastro da plataforma; e um de console
+  // que trouxesse `tenantId` seria uma sessão sem provedor pedindo para ser
+  // escopada em um.
+  const forma = (() => {
+    switch (decoded.aud) {
+      case PANEL_AUDIENCE:
+        return decoded.impersonation || decoded.platform ? null : 'painel';
+      case PLATFORM_AUDIENCE:
+        return decoded.impersonation === true && !decoded.platform ? 'personificacao' : null;
+      case CONSOLE_AUDIENCE:
+        return decoded.platform === true && !decoded.impersonation && decoded.tenantId === undefined
+          ? 'console'
+          : null;
+      default:
+        return null;
+    }
+  })();
+  if (!forma) return null;
 
   const user = await User.findById(decoded.userId);
   if (!user || Number(user.token_version || 0) !== Number(decoded.tokenVersion || 0)) {
     return null;
   }
 
-  if (impersonation) return hydrateImpersonation(user, decoded);
+  if (forma === 'personificacao') return hydrateImpersonation(user, decoded);
+  if (forma === 'console') return hydrateConsole(user);
 
   const membership = await resolveMembership(user.id, decoded.tenantId);
   if (!membership) return null;
@@ -229,6 +311,37 @@ async function hydrateAuthenticatedUser(decoded) {
     username: user.username,
     role: membership.role,
     tenantId: Number(membership.tenant_id),
+    tokenVersion: Number(user.token_version || 0)
+  };
+}
+
+/**
+ * A sessão do console, montada agora e não acreditada do token.
+ *
+ * Duas leituras frescas, e as duas por requisição:
+ *
+ * - **o cadastro da plataforma**, que é a única autoridade desta sessão. Isto é
+ *   redundante com `requirePlatformAdmin`, e a redundância é de propósito:
+ *   `/api/auth/user` não está atrás daquela guarda, e sem esta leitura a sessão
+ *   continuaria se apresentando como válida a quem já foi tirado do cadastro.
+ * - **a chave `LOGIN_REQUIRES_EMAIL`**, pelo mesmo motivo que o refresh a lê:
+ *   um interruptor que só um dos caminhos de sessão obedece não é interruptor.
+ *
+ * `tenantId: null` e `role: null` explícitos. Não é descuido: é a resposta
+ * honesta de uma sessão que não trabalha em provedor nenhum, e é o que faz
+ * `requirePermission` recusá-la em vez de consultar a matriz com um papel
+ * inventado.
+ */
+async function hydrateConsole(user) {
+  if (!(await PlatformAdmin.has(user.id))) return null;
+  if (!canHoldSession(user)) return null;
+
+  return {
+    userId: user.id,
+    username: user.username,
+    role: null,
+    tenantId: null,
+    platform: true,
     tokenVersion: Number(user.token_version || 0)
   };
 }
@@ -352,6 +465,16 @@ async function authenticateToken(req, res, next) {
 
   req.user = session;
   req.tenantId = session.tenantId;
+
+  // A sessão do console não entra em provedor nenhum, e é isso que a faz
+  // segura: `runUnscoped` deixa o contexto ABERTO e declarado, então uma rota
+  // do console que esqueça o `runInTenant` estoura alto — hoje ela escreveria
+  // em silêncio no provedor de quem operou o console. O portão da assinatura
+  // fica fora por construção: a plataforma não assina nada, e
+  // `SubscriptionService` lê por `tdb`.
+  if (session.platform) {
+    return runUnscoped('platform console session', () => next(), { actor: session });
+  }
   // O autor entra no escopo junto com o provedor. Sem ele, uma escrita fundo
   // num serviço não tem como dizer quem a provocou nem como saber que está
   // dentro de uma personificação — e as duas coisas fazem falta em
@@ -480,6 +603,18 @@ function requirePermission(permission) {
     if (!req.user) {
       return res.status(401).json({ message: req.t('auth.required') });
     }
+    // A sessão do console não tem provedor, então não tem papel, então não tem
+    // o que consultar nesta matriz: ela responde "o que esta pessoa pode no
+    // provedor DELA". Recusa explícita e não confiança em `roleHas(null, …)`
+    // devolver false — depender disso é depender de a matriz nunca tratar a
+    // ausência como permissiva. O console age pelas rotas dele, atrás de
+    // `requirePlatformAdmin`, que é outra pergunta.
+    if (req.user.platform) {
+      return res.status(403).json({
+        message: req.t('auth.insufficientPermissions'),
+        code: 'missing_permission'
+      });
+    }
     if (!roleHas(req.user.role, permission)) {
       return res.status(403).json({
         message: req.t('auth.insufficientPermissions'),
@@ -571,6 +706,8 @@ async function requirePlatformAdmin(req, res, next) {
 export {
   generateTokens,
   generateImpersonationToken,
+  generateConsoleTokens,
+  CONSOLE_AUDIENCE,
   verifyToken,
   resolveMembership,
   authenticateToken,

@@ -428,6 +428,39 @@ describe('a allowlist do endereço da plataforma', () => {
     ]);
   });
 
+  it('acrescenta a porta do console, e só ela', () => {
+    assert.deepEqual(listaDe('CONSOLE_HOST_PATHS').sort(), [
+      '/api/auth/change-password',
+      '/api/auth/login',
+      '/api/auth/logout',
+      '/api/auth/refresh',
+      '/api/auth/setup-status',
+      '/api/auth/user'
+    ]);
+  });
+
+  /**
+   * O que NÃO pode entrar, e o teste é sobre a razão: estes caminhos gravam na
+   * trilha DO PROVEDOR ou montam endereço a partir de `req.tenantId`, e no
+   * ápice não há provedor em escopo — a leitura escopada estouraria. Quem
+   * precisar de redefinição de senha para uma conta de plataforma usa
+   * `scripts/reset-password.js`, que roda sem escopo.
+   */
+  it('não serve os caminhos que escrevem na trilha de um provedor', () => {
+    const lista = [...listaDe('PLATFORM_HOST_PATHS'), ...listaDe('CONSOLE_HOST_PATHS')];
+    for (const proibido of [
+      '/api/auth/password-reset',
+      '/api/auth/password-reset/confirm',
+      '/api/auth/email',
+      '/api/auth/email/verify',
+      '/api/auth/email/verify/confirm',
+      '/api/auth/setup',
+      '/api/auth/impersonate/redeem'
+    ]) {
+      assert.ok(!lista.includes(proibido), `${proibido} entrou na allowlist do ápice`);
+    }
+  });
+
   it('serve por prefixo só a família do plano de controle', () => {
     // `/api/auth/` nunca: a redefinição de senha e a verificação de e-mail
     // gravam na trilha DO PROVEDOR, e no ápice não há escopo em que gravar.

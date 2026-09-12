@@ -48,9 +48,12 @@ export function runInTenant(tenantId, fn, { actor = null } = {}) {
  * is required and appears in the error if scoped code is reached anyway, so an
  * escape hatch cannot be opened silently or by accident.
  */
-export function runUnscoped(reason, fn) {
+export function runUnscoped(reason, fn, { actor = null } = {}) {
   if (!reason) throw new TenantScopeError('runUnscoped needs a reason');
-  return store.run({ tenantId: null, unscoped: reason }, fn);
+  // `actor` pelo mesmo motivo que em `runInTenant`, e agora com um caso real: a
+  // sessão do console roda aqui, e quem opera a plataforma é autor de tudo o
+  // que ela faz. Trabalho de fundo continua sem autor, que é o certo.
+  return store.run({ tenantId: null, unscoped: reason, actor }, fn);
 }
 
 /**
