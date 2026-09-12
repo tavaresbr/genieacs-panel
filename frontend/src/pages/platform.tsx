@@ -5,6 +5,7 @@ import { platformAPI, type Plan, type Tenant } from '@/lib/api'
 import { PlanCatalog } from '@/components/platform/plan-catalog'
 import { PlatformAdmins } from '@/components/platform/platform-admins'
 import { PlatformAudit } from '@/components/platform/platform-audit'
+import { TenantData } from '@/components/platform/tenant-data'
 import { TenantMembers } from '@/components/platform/tenant-members'
 import { STATUS_LABEL_KEYS, TenantPlan, statusBadgeClass } from '@/components/platform/tenant-plan'
 import { Icon } from '@/components/ui/icon'
@@ -24,8 +25,9 @@ export default function PlatformPage() {
   const [saving, setSaving] = useState(false)
   const [busyId, setBusyId] = useState<number | null>(null)
   const [expandedId, setExpandedId] = useState<number | null>(null)
-  // Which panel the expanded row shows: the team, or the plan and its statement.
-  const [expandedPanel, setExpandedPanel] = useState<'members' | 'plan'>('members')
+  // Which panel the expanded row shows: the registry data, the team, or the
+  // plan and its statement.
+  const [expandedPanel, setExpandedPanel] = useState<'members' | 'plan' | 'data'>('members')
   const [plans, setPlans] = useState<Plan[]>([])
   const [form, setForm] = useState({ slug: '', name: '' })
   /**
@@ -56,6 +58,21 @@ export default function PlatformPage() {
   useEffect(() => {
     void loadTenants()
   }, [loadTenants])
+
+  /**
+   * Abre o painel pedido na linha pedida, e fecha quando já era esse o painel
+   * aberto ali.
+   *
+   * Escrito uma vez porque são três botões agora. O estado é lido FORA do
+   * atualizador de propósito: `painel` é o que se quer e `expandedPanel` é o que
+   * está, e comparar um com o outro dentro do atualizador leria o valor já
+   * trocado.
+   */
+  const abrirPainel = (id: number, painel: 'members' | 'plan' | 'data') => {
+    const fechando = expandedId === id && expandedPanel === painel
+    setExpandedPanel(painel)
+    setExpandedId(fechando ? null : id)
+  }
 
   const resetForm = () => {
     setForm({ slug: '', name: '' })
@@ -346,12 +363,21 @@ export default function PlatformPage() {
                         </td>
                         <td>
                           <div className="flex flex-wrap items-center gap-2">
+                            {/* Primeiro do grupo: é o que responde "o que está
+                                cadastrado aqui", e é a pergunta que se faz da
+                                linha antes de mexer em equipe ou em plano. */}
                             <button
                               type="button"
-                              onClick={() => {
-                                setExpandedPanel('members')
-                                setExpandedId((current) => (current === tenant.id && expandedPanel === 'members' ? null : tenant.id))
-                              }}
+                              onClick={() => abrirPainel(tenant.id, 'data')}
+                              className="modern-button-secondary"
+                              aria-expanded={expanded && expandedPanel === 'data'}
+                            >
+                              <Icon name="edit" size={17} />
+                              {t('platform.data.edit')}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => abrirPainel(tenant.id, 'members')}
                               className="modern-button-secondary"
                               aria-expanded={expanded && expandedPanel === 'members'}
                             >
@@ -359,10 +385,7 @@ export default function PlatformPage() {
                             </button>
                             <button
                               type="button"
-                              onClick={() => {
-                                setExpandedPanel('plan')
-                                setExpandedId((current) => (current === tenant.id && expandedPanel === 'plan' ? null : tenant.id))
-                              }}
+                              onClick={() => abrirPainel(tenant.id, 'plan')}
                               className="modern-button-secondary"
                               aria-expanded={expanded && expandedPanel === 'plan'}
                             >
@@ -413,7 +436,9 @@ export default function PlatformPage() {
                       {expanded && (
                         <tr>
                           <td colSpan={6}>
-                            {expandedPanel === 'members' ? (
+                            {expandedPanel === 'data' ? (
+                              <TenantData tenant={tenant} onTenantChange={() => void loadTenants()} />
+                            ) : expandedPanel === 'members' ? (
                               <TenantMembers tenant={tenant} onMembershipChange={() => void loadTenants()} />
                             ) : (
                               <TenantPlan tenant={tenant} plans={plans} onSubscriptionChange={() => void loadTenants()} />

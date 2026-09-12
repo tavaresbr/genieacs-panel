@@ -300,13 +300,179 @@ describe('suspending and reactivating', () => {
   });
 });
 
+/**
+ * Corrigir o cadastro de um provedor que já existe.
+ *
+ * Duas metades com pesos diferentes. O nome é texto: corrige-se e pronto. O
+ * slug é o SUBDOMÍNIO — trocá-lo muda o endereço em que o painel daquele ISP
+ * responde, e é aí que estão as três coisas que só se provam aqui: que o
+ * endereço antigo para de resolver na hora (o resolvedor guarda slug -> id pela
+ * vida do processo, então esquecer a invalidação deixaria o painel servindo em
+ * dois endereços), que o slug de outro provedor é recusado enquanto o PRÓPRIO
+ * slug reenviado não é, e que as duas trilhas ficam escritas — a nossa e a DELE,
+ * porque quem pergunta "por que o nosso endereço mudou" é o ISP e ele não lê a
+ * nossa.
+ */
+describe('editando os dados de um provedor', () => {
+  let editavelId;
+  let resolveTenantIdBySlug;
+  let forgetResolvedTenant;
+
+  const editar = (id, body) => platform(`/tenants/${id}`, { method: 'PATCH', body });
+  const linha = (id) => getDb()('tenants').where({ id }).first();
+  const trilhaDaPlataforma = (action) => getDb()('platform_audit').where({ action }).orderBy('id', 'desc');
+  const trilhaDoProvedor = (id, action) => getDb()('audit_log')
+    .where({ tenant_id: id, action })
+    .orderBy('id', 'desc');
+
+  before(async () => {
+    ({ resolveTenantIdBySlug, forgetResolvedTenant } = await import(
+      '../src/middleware/tenantResolver.js'
+    ));
+    const { status, body } = await createTenant({ slug: 'editavel', name: 'Editável ISP' });
+    assert.equal(status, 201);
+    editavelId = body.data.tenant.id;
+  });
+
+  it('corrige o nome sem tocar no endereço', async () => {
+    const { status, body } = await editar(editavelId, { name: '  Editável Telecom  ' });
+    assert.equal(status, 200);
+    assert.equal(body.data.tenant.name, 'Editável Telecom', 'o nome não voltou aparado');
+    assert.equal(body.data.tenant.slug, 'editavel');
+
+    const row = await linha(editavelId);
+    assert.equal(row.name, 'Editável Telecom');
+    assert.equal(row.slug, 'editavel', 'um salvamento de nome mexeu no subdomínio');
+
+    const [nossa] = await trilhaDaPlataforma('tenant.identity_changed');
+    assert.ok(nossa, 'a correção do nome não deixou linha na trilha da plataforma');
+    const detalhe = JSON.parse(nossa.detail);
+    assert.deepEqual(detalhe, { name: { from: 'Editável ISP', to: 'Editável Telecom' } },
+      'o detalhe tem que trazer só o campo que mudou');
+    assert.equal(nossa.tenant_slug, 'editavel');
+
+    const [dele] = await trilhaDoProvedor(editavelId, 'tenant.renamed');
+    assert.ok(dele, 'a correção não apareceu na trilha do próprio provedor');
+    assert.equal(dele.actor_kind, 'platform', 'a mão veio de fora e a trilha dele não diz isso');
+    assert.deepEqual(JSON.parse(dele.detail), { from: 'Editável ISP', to: 'Editável Telecom' });
+  });
+
+  /**
+   * O caso que paga a fatia. Sem `forgetResolvedTenant()` o endereço ANTIGO
+   * continua resolvendo para este provedor até o próximo restart — o painel
+   * servindo em dois endereços, um deles livre para ser dado a outro ISP.
+   */
+  it('troca o endereço, e o antigo para de resolver na hora', async () => {
+    forgetResolvedTenant();
+    assert.equal(await resolveTenantIdBySlug('editavel'), editavelId,
+      'o endereço de partida não resolvia nem antes da troca');
+
+    const { status, body } = await editar(editavelId, { slug: 'editada' });
+    assert.equal(status, 200);
+    assert.equal(body.data.tenant.slug, 'editada');
+    assert.equal((await linha(editavelId)).slug, 'editada');
+
+    assert.equal(await resolveTenantIdBySlug('editavel'), null,
+      'o endereço antigo continua resolvendo: o cache do resolvedor não foi esvaziado');
+    assert.equal(await resolveTenantIdBySlug('editada'), editavelId,
+      'o endereço novo não resolve');
+
+    const [nossa] = await trilhaDaPlataforma('tenant.identity_changed');
+    assert.deepEqual(JSON.parse(nossa.detail), { slug: { from: 'editavel', to: 'editada' } });
+    // O retrato vai com a linha antiga: a pergunta é "o que foi feito com o
+    // provedor que eu conhecia como `editavel`".
+    assert.equal(nossa.tenant_slug, 'editavel');
+
+    const [dele] = await trilhaDoProvedor(editavelId, 'tenant.slug_changed');
+    assert.ok(dele, 'o ISP não tem na trilha dele por que o endereço mudou');
+    assert.equal(dele.actor_kind, 'platform');
+    assert.deepEqual(JSON.parse(dele.detail), { from: 'editavel', to: 'editada' });
+  });
+
+  it('recusa o endereço que outro provedor já tem', async () => {
+    const { status } = await editar(editavelId, { slug: 'novaisp' });
+    assert.equal(status, 409);
+    assert.equal((await linha(editavelId)).slug, 'editada', 'a recusa ainda mexeu na linha');
+  });
+
+  /**
+   * O contrário do de cima, e é o que a exclusão pelo id em `findBySlug` existe
+   * para permitir: a tela manda o slug atual de volta junto do nome novo, e isso
+   * não é conflito com ninguém — é o próprio provedor.
+   */
+  it('aceita o próprio endereço reenviado junto de um nome novo', async () => {
+    const { status, body } = await editar(editavelId, { slug: 'editada', name: 'Editada ISP' });
+    assert.equal(status, 200);
+    assert.equal(body.data.tenant.name, 'Editada ISP');
+    assert.equal(body.data.tenant.slug, 'editada');
+  });
+
+  it('não grava nada quando nada mudou', async () => {
+    const antes = (await trilhaDaPlataforma('tenant.identity_changed')).length;
+    const { status } = await editar(editavelId, { name: 'Editada ISP', slug: 'editada' });
+    assert.equal(status, 200);
+    assert.equal((await trilhaDaPlataforma('tenant.identity_changed')).length, antes,
+      'um salvamento que não mudou nada deixou linha de trilha');
+  });
+
+  // A mesma tabela da criação: o slug é um hostname, e cada um destes é um
+  // endereço que não resolve ou que resolve em outro lugar.
+  it('recusa um endereço que não é um hostname, em vez de consertá-lo em silêncio', async () => {
+    const refused = [
+      ['', 'vazio'],
+      ['ab', 'menor que três caracteres'],
+      ['a'.repeat(64), 'maior que um label de DNS'],
+      ['Editada', 'maiúscula'],
+      ['editada isp', 'um espaço'],
+      ['editada_isp', 'um sublinhado'],
+      ['-editada', 'hífen à frente'],
+      ['editada-', 'hífen no fim'],
+      ['ed--itada', 'a posição reservada do punycode'],
+      ['www', 'um label a que o deployment já responde'],
+      ['editada.isp', 'um ponto, que é um segundo label']
+    ];
+    for (const [slug, porque] of refused) {
+      const { status } = await editar(editavelId, { slug });
+      assert.equal(status, 400, `${JSON.stringify(slug)} (${porque}) tinha que ser recusado`);
+    }
+    assert.equal((await linha(editavelId)).slug, 'editada');
+  });
+
+  it('recusa um nome vazio ou maior que o campo', async () => {
+    for (const name of ['   ', 'x'.repeat(129)]) {
+      const { status } = await editar(editavelId, { name });
+      assert.equal(status, 400, `${JSON.stringify(name.slice(0, 12))} tinha que ser recusado`);
+    }
+    assert.equal((await linha(editavelId)).name, 'Editada ISP');
+  });
+
+  /**
+   * As duas intenções do PATCH não andam juntas: elas gravam trilhas
+   * diferentes, só uma invalida o cache do resolvedor e só uma muda o endereço
+   * que o ISP já recebeu, então a linha da trilha ficaria ambígua.
+   */
+  it('recusa o estado e o cadastro no mesmo corpo', async () => {
+    const { status } = await editar(editavelId, { status: 'suspended', name: 'Nem Isto' });
+    assert.equal(status, 400);
+    const row = await linha(editavelId);
+    assert.equal(row.status, 'active', 'o estado mudou num pedido recusado');
+    assert.equal(row.name, 'Editada ISP', 'o nome mudou num pedido recusado');
+  });
+
+  it('responde 404 para um provedor que não existe', async () => {
+    const { status } = await editar(999999, { name: 'Fantasma' });
+    assert.equal(status, 404);
+  });
+});
+
 describe('who may reach the registry', () => {
   it('refuses somebody who is merely an administrator at their own provider', async () => {
     const before = (await getDb()('tenants')).length;
     for (const [method, path, body] of [
       ['GET', '/api/platform/tenants', undefined],
       ['POST', '/api/platform/tenants', { slug: 'invasora', name: 'Invasora' }],
-      ['PATCH', `/api/platform/tenants/${alfa}`, { status: 'suspended' }]
+      ['PATCH', `/api/platform/tenants/${alfa}`, { status: 'suspended' }],
+      ['PATCH', `/api/platform/tenants/${alfa}`, { name: 'Invasora', slug: 'invasora' }]
     ]) {
       const { status } = await call(`${panelUrl}${path}`, {
         method,
@@ -320,6 +486,8 @@ describe('who may reach the registry', () => {
     assert.equal((await getDb()('tenants')).length, before);
     const alfaRow = await getDb()('tenants').where({ id: alfa }).first();
     assert.equal(alfaRow.status, 'active', 'an ordinary administrator suspended a provider');
+    assert.notEqual(alfaRow.name, 'Invasora', 'an ordinary administrator renamed a provider');
+    assert.notEqual(alfaRow.slug, 'invasora', 'an ordinary administrator re-addressed a provider');
   });
 
   it('refuses a caller with no session at all', async () => {

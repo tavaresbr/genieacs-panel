@@ -105,6 +105,33 @@ class Tenant {
     return changed > 0;
   }
 
+  /**
+   * O nome e o endereço de um provedor, numa escrita só.
+   *
+   * Uma instrução e não `rename` seguido de um `setSlug` porque as duas colunas
+   * mudam juntas ou não mudam: uma falha entre as duas deixaria o provedor com
+   * o nome novo no endereço velho — e uma linha de trilha descrevendo uma
+   * mudança que aconteceu pela metade.
+   *
+   * `rename` fica: é o que o próprio provedor usa para se renomear, e aquele
+   * caminho não tem endereço para mexer.
+   *
+   * O slug chega já validado, porque a regra do endereço mora em `utils/slug.js`
+   * e é compartilhada com o cadastro próprio. O que decide uma CORRIDA entre
+   * dois pedidos, por outro lado, não é validação nenhuma: é o índice único — e
+   * quem chama relê a tabela para distinguir a corrida de um erro de verdade,
+   * como na criação.
+   */
+  static async updateIdentity(id, { name, slug }) {
+    const patch = { updated_at: new Date() };
+    if (name !== undefined) patch.name = name;
+    if (slug !== undefined) patch.slug = slug;
+    const changed = await getDb()('tenants')
+      .where({ id })
+      .update(patch);
+    return changed > 0;
+  }
+
   static async setStatus(id, status) {
     const changed = await getDb()('tenants')
       .where({ id })
