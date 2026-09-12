@@ -54,9 +54,21 @@ O proxy termina TLS (certificado curinga para cada base) e encaminha **preservan
 `Host` que diz ao painel qual provedor está falando; um proxy que o reescreve entrega
 todo mundo no mesmo lugar, e o resolvedor responde 404 para todos.
 
-O apex `painel.exemplo.com` (e `www.`) é a **porta de entrada da plataforma**: só
-responde `GET /api/tenant/public` e `POST /api/auth/signup`, e a tela ali é o cadastro.
-Nada de nenhum provedor é servido nesse host. O apex do portal não serve nada.
+O apex `painel.exemplo.com` (e `www.`) é **o endereço da plataforma**, e é onde o
+console vive. Ele não pertence a provedor nenhum, e serve exatamente isto:
+
+| Caminho | Para quê |
+|---|---|
+| `GET /api/tenant/public` | dizer que aqui é a plataforma, e onde os provedores vivem |
+| `POST /api/auth/signup` | o ISP que ainda não existe se cadastrar |
+| `/api/platform/*` | o console: provedores, planos, assinaturas, cadastro do console |
+| `/api/auth/login`, `/user`, `/logout`, `/refresh`, `/change-password`, `/setup-status` | a sessão do console |
+
+**Nada de nenhum provedor é servido nesse host** — `/api/devices`, `/api/settings`,
+`/api/users`, a redefinição de senha e o resgate de personificação respondem 404 ali, e
+um token de provedor que chegue no apex é recusado com `tenant_mismatch`. O contrário
+também vale: onde há domínio-base, `/api/platform/*` **não existe** no host de um
+provedor. O apex do portal não serve nada.
 
 ### Compose
 
@@ -78,23 +90,62 @@ O CI constrói a imagem e a sobe até `/api/health` responder (job `image`), ent
 
 ### Primeiro acesso
 
-Um deploy novo tem um provedor (`default`) e ninguém dentro. Abra
-`https://default.painel.exemplo.com`, e o assistente de instalação cria o primeiro
-`owner`. Na edição SaaS esse primeiro usuário entra também em `platform_admins`: é a
-chave do console. Daí em diante, quem já está no cadastro concede a outros pela aba
-**Acesso à plataforma** do console — ninguém ganha o plano de controle sozinho, e a
-concessão fica na trilha com quem deu a quem.
+A primeira conta da plataforma nasce **no servidor**, e não por uma tela:
+
+```bash
+PLATFORM_ADMIN_PASSWORD='...' \
+  node backend/scripts/grant-platform-admin.js quem-opera \
+    --create --email quem-opera@exemplo.com
+```
+
+Ela não tem vínculo com provedor nenhum — que é o ponto: quem opera a plataforma não
+trabalha em nenhum ISP. Entre em `https://painel.exemplo.com` com ela e crie o primeiro
+provedor pelo console. Daí em diante, quem já está no cadastro concede a outros pela aba
+**Acesso à plataforma** — ninguém ganha o plano de controle sozinho, e a concessão fica
+na trilha com quem deu a quem.
+
+Duas consequências de a conta não ter provedor, e as duas são desejadas: ela **não entra
+em `slug.painel.exemplo.com`** (o login de lá recusa quem não tem vínculo) e a senha
+dela se recupera com `node backend/scripts/reset-password.js`, porque o endereço da
+plataforma não serve a redefinição por e-mail — aquela grava na trilha de um provedor.
+
+É script e não rota de propósito: quem pode rodá-lo é quem tem o servidor, que é
+exatamente quem deveria decidir quem cunha provedores. Uma tela de criação no apex seria
+pública, criando a conta de maior privilégio do deploy, trancada só por "ainda não
+existe ninguém" — e num SaaS onde ISPs se cadastram sozinhos esse contador não fica em
+zero.
+
+**O provedor `default`** que a migração cria num banco novo é um provedor comum: pode
+ser renomeado, suspenso e apagado pelo console como qualquer outro. Onde há domínio-base
+ele pode inclusive ser o último a sair — um SaaS sem clientes é um estado coerente, e o
+console continua de pé porque não pertence a provedor nenhum.
 
 **Num install que começou self-hosted e virou SaaS**, `platform_admins` está vazia e
 nenhuma migração promove ninguém — de propósito: um upgrade não pode transformar o
-administrador local de um ISP em operador da plataforma. Aí a primeira chave é uma
-inserção na mão, uma vez:
+administrador local de um ISP em operador da plataforma. Aí a conta já existe e só falta
+a chave:
 
-```sql
-INSERT INTO platform_admins (user_id) SELECT id FROM users WHERE username = 'quem-opera';
+```bash
+node backend/scripts/grant-platform-admin.js quem-opera
 ```
 
-Depois disso o console se administra sozinho.
+Nesse caso a conta continua sendo membro do ISP dela, o que é legítimo: a mesma pessoa
+opera a plataforma e trabalha no provedor. A diferença entre os dois modos é essa.
+
+### As três sessões
+
+Três audiências de token, e cada uma vale num lugar só. Confundi-las é o erro que este
+desenho existe para tornar impossível:
+
+| Sessão | Audiência | Nomeia provedor? | Papel | Onde vale |
+|---|---|---|---|---|
+| Painel | `skygenpanel-admin` | sim | o do vínculo | `slug.painel…` daquele provedor |
+| Console | `skygenpanel-console` | **não** | nenhum | só o apex |
+| Personificação | `skygenpanel-platform` | sim | `viewer` imposto | só o host do provedor personificado |
+
+A do console roda **sem escopo de provedor**: qualquer leitura escopada que escape para
+ela estoura alto em vez de servir o provedor errado. A de personificação é só leitura,
+barrada por método acima de toda rota, e não alcança o console de volta.
 
 ## 2. Ver: logs
 
@@ -232,11 +283,14 @@ provedor foi apagado" sobreviver ao provedor.
 1. **Suspender** (`PATCH /api/platform/tenants/:id`): o provedor para de resolver na
    hora — todo host dele responde 404, os jobs de fundo pulam ele, os tokens existentes
    deixam de servir. Reversível.
-2. **Apagar** (`DELETE /api/platform/tenants/:id`): exige quatro coisas ao mesmo tempo —
-   estar no plano de controle, o provedor estar **suspenso** (o que faz da exclusão um
-   segundo passo, com um estado reversível no meio), o slug digitado de volta, e não ser o
-   último provedor. A linha da trilha é gravada **antes**, com a contagem do que vai
-   sumir; se ela não puder ser gravada, nada é apagado.
+2. **Apagar** (`DELETE /api/platform/tenants/:id`): exige estar no plano de controle, o
+   provedor estar **suspenso** (o que faz da exclusão um segundo passo, com um estado
+   reversível no meio) e o slug digitado de volta, exato. A linha da trilha é gravada
+   **antes**, com a contagem do que vai sumir; se ela não puder ser gravada, nada é
+   apagado. Numa instalação **sem** domínio-base há uma quarta condição — não ser o
+   último provedor —, porque lá é ele que a resolução por padrão devolve, e sem nenhum o
+   deployment inteiro responde 503. Onde o host nomeia o provedor essa condição não
+   existe: o console vive no apex e continua de pé com zero clientes.
 
 A assinatura é outra chave: `suspended`/`canceled` na assinatura derruba o painel e o
 portal com 402 e mantém tudo no banco; `past_due` deixa ler. Um provedor inadimplente
@@ -244,7 +298,8 @@ não precisa ter o alerta de ONT caída parado.
 
 ### O console por dentro
 
-Quatro abas em `/platform`:
+Em `https://painel.exemplo.com/platform` — o endereço da plataforma, não o de um
+provedor. Quatro abas:
 
 - **Provedores** — criar, suspender, reativar, apagar, ver e mudar a equipe e a
   assinatura de cada um, e abrir o painel de um cliente em modo leitura.
