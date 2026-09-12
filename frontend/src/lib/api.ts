@@ -1137,6 +1137,13 @@ export interface DeviceSwap {
   repeatCount: number
   occurredAt: string | null
   acknowledgedAt: string | null
+  /**
+   * Quem dispensou o aviso, pelo nome. `null` para a troca que ninguém
+   * dispensou ainda e para o operador que já saiu da equipe do provedor — o
+   * backend resolve o nome contra a equipe atual, nunca contra o cadastro
+   * global de pessoas.
+   */
+  acknowledgedBy: string | null
 }
 
 export interface DeviceSwapList {

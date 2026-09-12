@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useState, useEffect } from 'react'
+import { Fragment, useState, useEffect, useRef } from 'react'
 import {
   apiClient,
   vendorsAPI,
@@ -227,6 +227,24 @@ export default function Settings() {
     return () => { cancelled = true }
   }, [])
 
+  /**
+   * As abas cujo formulário já foi preenchido com o que o servidor tem.
+   *
+   * A busca preguiçosa por aba é deliberada — só se pergunta ao servidor o que
+   * a aba aberta precisa. O que não era deliberado é ela acontecer DE NOVO a
+   * cada reentrada: o componente não desmonta ao trocar de aba, então o efeito
+   * disparava outra vez e `setSgpForm`/`setWaForm` sobrescreviam o formulário
+   * com o valor gravado. Quem digitasse a URL nova do SGP, fosse à aba do
+   * WhatsApp conferir um número e voltasse, encontrava o campo de volta no
+   * valor antigo — sem aviso e sem diferença visual, porque um campo que
+   * voltou parece um campo que nunca mudou.
+   *
+   * Perder o digitado é pior que mostrar valor um pouco velho: o salvamento
+   * ainda fala com o servidor, e a tela já mostra o gravado ao lado do digitado
+   * quando os dois divergem.
+   */
+  const abasCarregadas = useRef(new Set<string>())
+
   useEffect(() => {
     if (activeTab !== 'database') return
     let cancelled = false
@@ -248,7 +266,11 @@ export default function Settings() {
       if (res.success && res.data) {
         const config = res.data
         setSgpConfig(config)
-        setSgpForm((current) => ({
+        // `sgpConfig` é o "gravado" que a tela mostra ao lado do digitado, e
+        // esse SIM tem que acompanhar o servidor a cada visita.
+        const primeiraVez = !abasCarregadas.current.has('sgp')
+        abasCarregadas.current.add('sgp')
+        if (primeiraVez) setSgpForm((current) => ({
           ...current,
           enabled: config.enabled,
           baseUrl: config.baseUrl,
@@ -262,7 +284,7 @@ export default function Settings() {
           ticketEnabled: config.ticketEnabled,
           ticketOccurrenceType: config.ticketOccurrenceType
         }))
-        setSgpTestResult(null)
+        if (primeiraVez) setSgpTestResult(null)
       }
 
       // The fleet block only exists while the integration answers; the overview
@@ -284,6 +306,8 @@ export default function Settings() {
       if (cancelled || !res.success || !res.data) return
       const config = res.data
       setWaConfig(config)
+      if (abasCarregadas.current.has('whatsapp')) return
+      abasCarregadas.current.add('whatsapp')
       setWaForm({
         enabled: config.enabled,
         webhookBaseUrl: config.webhookBaseUrl,

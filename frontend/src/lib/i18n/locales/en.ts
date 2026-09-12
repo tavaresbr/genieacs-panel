@@ -820,6 +820,8 @@ const en = {
   'swaps.deviceDescription': 'Every replacement this ONT took part in.',
   'swaps.contract': 'contract {contract}',
   'swaps.flapping': 'Unstable pair · {count}×',
+  'swaps.acknowledgedBy': 'Dismissed by {user} · {when}',
+  'swaps.acknowledgedAt': 'Dismissed · {when}',
   'swaps.acknowledge': 'Acknowledge',
   'swaps.link.moved': 'SGP link moved to the new ONT',
   'swaps.link.cleared': 'Old SGP link dropped; the new ONT already had one',

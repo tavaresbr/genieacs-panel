@@ -795,6 +795,8 @@ const hi: Dictionary = {
   'swaps.deviceDescription': 'इस ONT से जुड़ी हर अदला-बदली।',
   'swaps.contract': 'अनुबंध {contract}',
   'swaps.flapping': 'अस्थिर जोड़ी · {count}×',
+  'swaps.acknowledgedBy': '{user} ने खारिज किया · {when}',
+  'swaps.acknowledgedAt': 'खारिज किया · {when}',
   'swaps.acknowledge': 'स्वीकार करें',
   'swaps.link.moved': 'SGP लिंक नए ONT पर चला गया',
   'swaps.link.cleared': 'पुराना SGP लिंक हटा दिया गया; नए ONT का लिंक पहले से था',

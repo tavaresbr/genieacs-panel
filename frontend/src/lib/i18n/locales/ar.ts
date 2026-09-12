@@ -795,6 +795,8 @@ const ar: Dictionary = {
   'swaps.deviceDescription': 'كل عمليات الاستبدال التي شارك فيها هذا الجهاز.',
   'swaps.contract': 'العقد {contract}',
   'swaps.flapping': 'زوج غير مستقر · {count}×',
+  'swaps.acknowledgedBy': 'تم الصرف بواسطة {user} · {when}',
+  'swaps.acknowledgedAt': 'تم الصرف · {when}',
   'swaps.acknowledge': 'إقرار',
   'swaps.link.moved': 'نُقل ارتباط SGP إلى الجهاز الجديد',
   'swaps.link.cleared': 'أُلغي ارتباط SGP القديم؛ فالجهاز الجديد كان مرتبطًا بالفعل',

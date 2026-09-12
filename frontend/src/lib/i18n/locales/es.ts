@@ -818,6 +818,8 @@ const es: Dictionary = {
   'swaps.deviceDescription': 'Todos los reemplazos en los que participó esta ONT.',
   'swaps.contract': 'contrato {contract}',
   'swaps.flapping': 'Par inestable · {count}×',
+  'swaps.acknowledgedBy': 'Descartado por {user} · {when}',
+  'swaps.acknowledgedAt': 'Descartado · {when}',
   'swaps.acknowledge': 'Confirmar',
   'swaps.link.moved': 'Vínculo del SGP movido a la ONT nueva',
   'swaps.link.cleared': 'Vínculo antiguo eliminado; la ONT nueva ya tenía el suyo',

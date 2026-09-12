@@ -249,3 +249,65 @@ describe('the operator API', () => {
     assert.equal(status, 401);
   });
 });
+
+/**
+ * Quem dispensou o aviso.
+ *
+ * A coluna existe desde que a tabela existe e gravava `null` em toda dispensa:
+ * o controlador lia `req.user?.id`, e a sessão expõe `userId`. O encadeamento
+ * opcional transformou o erro de digitação em silêncio — nenhuma exceção,
+ * nenhum aviso, só uma coluna vazia. O teste antigo desta rota afirmava
+ * `acknowledgedAt` e passava direto pelo lado vazio.
+ *
+ * Importa porque é o aviso que, ignorado, precede a aposentadoria da conta do
+ * assinante anterior — a escrita destrutiva que o `audit_log` passou a
+ * registrar. Sem esta coluna, a pergunta "quem deixou isso acontecer?" morre
+ * um passo antes da trilha.
+ */
+describe('quem dispensou a troca', () => {
+  let swapId;
+
+  beforeEach(async () => {
+    await ensure(inform('ont-old'));
+    await ensure(inform('ont-new'));
+    [{ id: swapId }] = await openSwaps();
+  });
+
+  const dispensar = () => call(`${panelUrl}/api/devices/swaps/${swapId}/acknowledge`, {
+    method: 'POST',
+    headers: authHeaders(token)
+  });
+
+  it('grava o id do operador, e não null', async () => {
+    const operador = await getDb()('users').where({ username: 'operator' }).first();
+    const { status } = await dispensar();
+    assert.equal(status, 200);
+
+    const linha = await getDb()('device_swaps').where({ id: swapId }).first();
+    assert.equal(
+      Number(linha.acknowledged_by), Number(operador.id),
+      'a dispensa tem que nomear quem a fez'
+    );
+  });
+
+  it('e a tela recebe o NOME, não o id', async () => {
+    const dispensada = await dispensar();
+    assert.equal(dispensada.body.data.acknowledgedBy, 'operator');
+
+    // O histórico do aparelho é onde a troca já dispensada continua aparecendo,
+    // e onde, sem o nome, ela é visualmente idêntica a uma aberta.
+    const { body } = await call(
+      `${panelUrl}/api/devices/ont-new/swaps`,
+      { headers: authHeaders(token) }
+    );
+    assert.equal(body.data.swaps[0].acknowledgedBy, 'operator');
+  });
+
+  it('e a troca que ninguém dispensou não inventa nome nenhum', async () => {
+    const { body } = await call(
+      `${panelUrl}/api/devices/ont-new/swaps`,
+      { headers: authHeaders(token) }
+    );
+    assert.equal(body.data.swaps[0].acknowledgedBy, null);
+  });
+});

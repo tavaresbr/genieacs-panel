@@ -818,6 +818,8 @@ const zhTW: Dictionary = {
   'swaps.deviceDescription': '這台 ONT 參與過的所有更換紀錄。',
   'swaps.contract': '合約 {contract}',
   'swaps.flapping': '不穩定配對 · {count} 次',
+  'swaps.acknowledgedBy': '由 {user} 處理 · {when}',
+  'swaps.acknowledgedAt': '已處理 · {when}',
   'swaps.acknowledge': '標記為已確認',
   'swaps.link.moved': 'SGP 綁定已移至新的 ONT',
   'swaps.link.cleared': '已刪除舊綁定；新的 ONT 本來就有自己的綁定',

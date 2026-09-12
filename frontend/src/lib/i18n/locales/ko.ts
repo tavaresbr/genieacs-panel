@@ -819,6 +819,8 @@ const ko: Dictionary = {
   'swaps.deviceDescription': '이 ONT가 관련된 모든 교체 기록입니다.',
   'swaps.contract': '계약 {contract}',
   'swaps.flapping': '불안정한 쌍 · {count}회',
+  'swaps.acknowledgedBy': '{user} 확인함 · {when}',
+  'swaps.acknowledgedAt': '확인함 · {when}',
   'swaps.acknowledge': '확인',
   'swaps.link.moved': 'SGP 연결을 새 ONT로 옮겼습니다',
   'swaps.link.cleared': '이전 연결을 삭제했습니다. 새 ONT에는 이미 연결이 있었습니다',

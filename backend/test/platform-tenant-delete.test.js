@@ -1,5 +1,7 @@
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 
 /**
  * Apagar um provedor.
@@ -27,6 +29,17 @@ const {
   authHeaders, call, getDb, insertReturningId, runInTenant, startTestServers, stopTestServers
 } = await import('./helpers/harness.js');
 const { forgetResolvedTenant } = await import('../src/middleware/tenantResolver.js');
+const { tenantMediaRoot } = await import('../src/services/waMediaService.js');
+
+/** Existe no disco? A pergunta que `fs` só responde por exceção. */
+async function existe(caminho) {
+  try {
+    await fs.stat(caminho);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 let panelUrl;
 let token;
@@ -264,5 +277,46 @@ describe('quem pode apagar', () => {
     // não está nele.
     assert.equal(status, 404);
     assert.ok(await getDb()('tenants').where({ id }).first());
+  });
+});
+
+/**
+ * O que a exclusão apagava eram LINHAS, e os anexos do WhatsApp não são linhas.
+ *
+ * Os bytes moram em `DATA_DIR/wa-media/t<id>/` — fotos e documentos que os
+ * assinantes mandaram. A transação percorria as tabelas escopadas e não falava
+ * com o disco em ponto nenhum, e o único varredor que alcançaria aqueles
+ * arquivos filtra por provedor `active`: depois da exclusão não há mais linha
+ * em `tenants` para casar, então nada nunca mais os visitava. Órfão permanente.
+ */
+describe('a exclusão também leva o disco', () => {
+  let id;
+  let subtree;
+
+  before(async () => {
+    id = await provedorComDados('leva-o-disco', 'Leva o Disco');
+    subtree = tenantMediaRoot(id);
+    await fs.mkdir(path.join(subtree, '2026-09'), { recursive: true });
+    await fs.writeFile(path.join(subtree, '2026-09', 'documento.pdf'), 'o CPF de alguém');
+    // O controle precisa existir para poder sobreviver.
+    await fs.mkdir(tenantMediaRoot(alfa), { recursive: true });
+    await suspender(id);
+  });
+
+  it('remove a subárvore de mídia do provedor', async () => {
+    assert.ok(await existe(subtree), 'o fixture precisa ter arquivo para apagar');
+
+    const { status, body } = await platform(`/tenants/${id}`, {
+      method: 'DELETE', body: { confirmSlug: 'leva-o-disco' }
+    });
+    assert.equal(status, 200, JSON.stringify(body));
+
+    assert.equal(await existe(subtree), false, 'os anexos do provedor continuaram no disco');
+  });
+
+  it('e não encosta na subárvore de outro provedor', async () => {
+    // O controle: um `rm` na raiz de `wa-media` levaria tudo, e a asserção
+    // acima continuaria verde.
+    assert.ok(await existe(tenantMediaRoot(alfa)), 'a mídia do outro provedor sumiu junto');
   });
 });

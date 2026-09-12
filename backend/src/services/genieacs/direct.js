@@ -93,26 +93,46 @@ class DirectConnector {
     timeoutMs = DEFAULT_TIMEOUT_MS
   } = {}) {
     const url = await this.urlFor(endpoint, query);
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const options = {
-        method,
-        headers: await GenieAcsAuthService.nbiHeaders(headers),
-        signal: controller.signal,
-        // Nunca seguir 3xx: um host autorizado que responde com redirecionamento
-        // está tentando levar a requisição a um lugar que ninguém autorizou, e
-        // seguir seria desfazer a guarda de egresso depois de ela ter passado.
-        redirect: 'manual'
-      };
-      if (body !== null && body !== undefined) {
-        options.headers['Content-Type'] = 'application/json';
-        options.body = typeof body === 'string' ? body : JSON.stringify(body);
+
+    // O prazo E a credencial ficam DEPOIS de a vaga sair, dentro do callback.
+    //
+    // Antes ele era armado aqui em cima, e a vaga só era pedida no `withAcsSlot`
+    // lá embaixo — mas a fila de concorrência espera sem prazo nenhum. Com seis
+    // vagas por provedor e uma varredura de frota segurando as suas por
+    // segundos, a sétima requisição gastava os 15 s inteiros ESPERANDO e era
+    // abortada sem nunca ter aberto socket. Nada distingue esse aborto de um
+    // ACS mudo, então o operador lia "o ACS não respondeu" sobre um ACS que
+    // ninguém tinha perguntado nada.
+    //
+    // O prazo mede o que ele diz medir: a requisição.
+    //
+    // A credencial desceu junto pelo mesmo motivo, e agora importa mais: com a
+    // espera na fila podendo ser longa, lê-la antes de entrar na fila seria
+    // usar o valor de quando a requisição foi ENFILEIRADA. Ela é lida quando a
+    // requisição vai sair — e continua vindo de `nbiHeaders`, que é o único
+    // lugar que a monta.
+    return withAcsSlot(async () => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const options = {
+          method,
+          headers: await GenieAcsAuthService.nbiHeaders(headers),
+          signal: controller.signal,
+          // Nunca seguir 3xx: um host autorizado que responde com redirecionamento
+          // está tentando levar a requisição a um lugar que ninguém autorizou, e
+          // seguir seria desfazer a guarda de egresso depois de ela ter passado.
+          redirect: 'manual'
+        };
+        if (body !== null && body !== undefined) {
+          options.headers['Content-Type'] = 'application/json';
+          options.body = typeof body === 'string' ? body : JSON.stringify(body);
+        }
+        return await GenieAcsEgress.fetch(url, options);
+      } finally {
+        clearTimeout(timeoutId);
       }
-      return await withAcsSlot(async () => GenieAcsEgress.fetch(url, options));
-    } finally {
-      clearTimeout(timeoutId);
-    }
+    });
   }
 
   /**
