@@ -207,12 +207,12 @@ describe('o que a sessão do console alcança', () => {
   });
 
   it('não alcança as rotas do console pelo host de um provedor', async () => {
-    // O caso que mais importa dos dois lados: ali as rotas do console EXISTEM
-    // (é onde elas eram alcançadas até agora), então a recusa tem que ser do
-    // endereço, não da ausência de rota.
-    const { status, body } = await naCasa('/api/platform/tenants', { headers: bearer(consoleToken) });
-    assert.equal(status, 403);
-    assert.equal(body.code, 'tenant_mismatch');
+    // 404 e não 403: onde há domínio-base, o console não é MONTADO no host de
+    // um provedor, então ali estas rotas não existem para ninguém — nem para
+    // quem tem a chave. É a recusa mais forte das duas, e a que faz o 404 que
+    // esconde a existência do plano de controle valer por construção.
+    const { status } = await naCasa('/api/platform/tenants', { headers: bearer(consoleToken) });
+    assert.equal(status, 404);
   });
 
   it('não alcança rota de provedor nem no ápice', async () => {

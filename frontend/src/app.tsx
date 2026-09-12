@@ -158,7 +158,12 @@ function PermissionRoute({ permission }: { permission: Permission }) {
  */
 function PlatformRoute() {
   const { user, loading } = useAuth()
-  if (loading) return <AuthFallback />
+  const { tenant, loading: tenantLoading } = useTenant()
+  if (loading || tenantLoading) return <AuthFallback />
+  // Onde há domínio-base o console mudou de endereço, e as rotas dele não são
+  // servidas neste host: a tela abriria e cada requisição dela responderia 404.
+  // O caminho para lá é o link da barra lateral, que aponta para fora.
+  if (tenant?.panelBaseDomain) return <Navigate to="/dashboard" replace />
   if (!user?.isPlatformAdmin) return <Navigate to="/dashboard" replace />
   return <Outlet />
 }

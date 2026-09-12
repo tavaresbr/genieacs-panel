@@ -64,15 +64,23 @@ let plataformaUserId;
 let betaAdminToken;
 let betaAdminUserId;
 
+/**
+ * O console vive no ENDEREÇO DA PLATAFORMA — o ápice —, e não mais no host de
+ * um provedor. `CASA` continua existindo porque é onde a instalação faz o setup
+ * e onde mora o provedor da casa; o que mudou é de onde os bilhetes são
+ * cunhados.
+ */
+const APEX = 'painel.test';
 const CASA = 'default.painel.test';
 const BETA = 'beta.painel.test';
 const bearer = (token) => ({ Authorization: `Bearer ${token}` });
 const naCasa = (path, options) => callAs(CASA, `${panelUrl}${path}`, options);
+const noConsole = (path, options) => callAs(APEX, `${panelUrl}${path}`, options);
 const noBeta = (path, options) => callAs(BETA, `${panelUrl}${path}`, options);
 
 /** Cunha, resgata e devolve o token da sessão de personificação em `beta`. */
 async function personificar() {
-  const minted = await naCasa(`/api/platform/tenants/${beta}/impersonate`, {
+  const minted = await noConsole(`/api/platform/tenants/${beta}/impersonate`, {
     method: 'POST', headers: bearer(plataformaToken)
   });
   assert.equal(minted.status, 200, JSON.stringify(minted.body));
@@ -100,8 +108,16 @@ before(async () => {
     body: { username: 'plataforma', password: 'senha-da-plataforma-1', email: 'plataforma@exemplo.test' }
   });
   assert.equal(setup.status, 201, JSON.stringify(setup.body));
-  plataformaToken = setup.body.data.token;
   plataformaUserId = setup.body.data.user.id;
+  // A sessão que opera o console é a DO CONSOLE, emitida no ápice: a do setup
+  // nomeia o provedor da casa, e com ela o console não responde mais.
+  const consoleEntrada = await noConsole('/api/auth/login', {
+    method: 'POST',
+    body: { username: 'plataforma', password: 'senha-da-plataforma-1' }
+  });
+  assert.equal(consoleEntrada.status, 200, JSON.stringify(consoleEntrada.body));
+  assert.equal(consoleEntrada.body.data.user.tenantId, null);
+  plataformaToken = consoleEntrada.body.data.token;
   assert.ok(await db('platform_admins').where({ user_id: plataformaUserId }).first());
 
   // O beta precisa de assinatura ativa, senão o portão comercial responde 402
@@ -138,7 +154,7 @@ after(async () => {
 
 describe('cunhar o bilhete', () => {
   it('devolve um endereço no host do provedor, com o bilhete no fragmento', async () => {
-    const { status, body } = await naCasa(`/api/platform/tenants/${beta}/impersonate`, {
+    const { status, body } = await noConsole(`/api/platform/tenants/${beta}/impersonate`, {
       method: 'POST', headers: bearer(plataformaToken)
     });
     assert.equal(status, 200, JSON.stringify(body));
@@ -169,7 +185,7 @@ describe('cunhar o bilhete', () => {
   });
 
   it('deixa na trilha da plataforma quem pediu para olhar o painel de quem', async () => {
-    await naCasa(`/api/platform/tenants/${beta}/impersonate`, {
+    await noConsole(`/api/platform/tenants/${beta}/impersonate`, {
       method: 'POST', headers: bearer(plataformaToken)
     });
     const linha = await getDb()('platform_audit')
@@ -189,7 +205,7 @@ describe('cunhar o bilhete', () => {
   });
 
   it('recusa um provedor que não existe', async () => {
-    const { status } = await naCasa('/api/platform/tenants/999999/impersonate', {
+    const { status } = await noConsole('/api/platform/tenants/999999/impersonate', {
       method: 'POST', headers: bearer(plataformaToken)
     });
     assert.equal(status, 404);
@@ -198,7 +214,7 @@ describe('cunhar o bilhete', () => {
 
 describe('resgatar o bilhete', () => {
   it('vira uma sessão de leitura e deixa na trilha DO PROVEDOR que entraram', async () => {
-    const minted = await naCasa(`/api/platform/tenants/${beta}/impersonate`, {
+    const minted = await noConsole(`/api/platform/tenants/${beta}/impersonate`, {
       method: 'POST', headers: bearer(plataformaToken)
     });
     const ticket = new URL(minted.body.data.url).hash.slice(1);
@@ -228,7 +244,7 @@ describe('resgatar o bilhete', () => {
   });
 
   it('serve uma vez só', async () => {
-    const minted = await naCasa(`/api/platform/tenants/${beta}/impersonate`, {
+    const minted = await noConsole(`/api/platform/tenants/${beta}/impersonate`, {
       method: 'POST', headers: bearer(plataformaToken)
     });
     const ticket = new URL(minted.body.data.url).hash.slice(1);
@@ -238,7 +254,7 @@ describe('resgatar o bilhete', () => {
   });
 
   it('não serve no host de outro provedor', async () => {
-    const minted = await naCasa(`/api/platform/tenants/${beta}/impersonate`, {
+    const minted = await noConsole(`/api/platform/tenants/${beta}/impersonate`, {
       method: 'POST', headers: bearer(plataformaToken)
     });
     const ticket = new URL(minted.body.data.url).hash.slice(1);
@@ -258,7 +274,7 @@ describe('resgatar o bilhete', () => {
   });
 
   it('não serve se quem o cunhou saiu do cadastro da plataforma', async () => {
-    const minted = await naCasa(`/api/platform/tenants/${beta}/impersonate`, {
+    const minted = await noConsole(`/api/platform/tenants/${beta}/impersonate`, {
       method: 'POST', headers: bearer(plataformaToken)
     });
     const ticket = new URL(minted.body.data.url).hash.slice(1);
@@ -412,14 +428,17 @@ describe('a sessão de personificação', () => {
       'sair de uma personificação não pode revogar as sessões de quem personifica');
   });
 
-  it('não alcança o console de volta, nem no host de onde ele é servido', async () => {
+  it('não alcança o console de volta, em host nenhum', async () => {
     const token = await personificar();
-    // No host do beta: a rota do console existe, e esta sessão não a alcança.
+    // Em host de provedor o console não está — nem no do beta, nem no da casa,
+    // onde ele era servido até ontem. 404 de rota inexistente, para todo mundo.
     assert.equal((await noBeta('/api/platform/tenants', { headers: bearer(token) })).status, 404);
-    // E no host da casa o token nem chega lá: ele nomeia o beta.
-    const naCasaComEle = await naCasa('/api/platform/tenants', { headers: bearer(token) });
-    assert.equal(naCasaComEle.status, 403);
-    assert.equal(naCasaComEle.body.code, 'tenant_mismatch');
+    assert.equal((await naCasa('/api/platform/tenants', { headers: bearer(token) })).status, 404);
+    // E no endereço onde ele está, esta sessão é recusada pelo endereço: ela
+    // nomeia um provedor, e ali isso é o que não vale.
+    const noConsoleComEle = await noConsole('/api/platform/tenants', { headers: bearer(token) });
+    assert.equal(noConsoleComEle.status, 403);
+    assert.equal(noConsoleComEle.body.code, 'tenant_mismatch');
   });
 
   it('não vale no host de outro provedor', async () => {
