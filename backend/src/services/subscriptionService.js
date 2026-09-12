@@ -48,7 +48,27 @@ const CACHE_TTL_MS = 15_000;
 const cache = new TenantCache(CACHE_TTL_MS);
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * O período pago de quem não tem período no plano.
+ *
+ * Deixou de ser A verdade e virou a reserva: o prazo agora sai de
+ * `plans.period_days` (migração 0046), do mesmo jeito que os dias de teste
+ * sempre saíram de `plans.trial_days`. Trinta continua aqui porque é o que toda
+ * assinatura deste deploy comprou até hoje — a reserva tem que dizer a verdade
+ * sobre o passado, e não um número escolhido agora.
+ *
+ * Vale para o plano que a coluna ainda não alcançou e para a assinatura cujo
+ * plano sumiu debaixo dela. Nos dois casos a alternativa seria não creditar
+ * período nenhum, que transforma um dado faltando em um cliente bloqueado.
+ */
 const PAID_PERIOD_DAYS = 30;
+
+/** Os dias que um pagamento compra neste plano, ou a reserva. */
+function periodoDoPlano(plano) {
+  const dias = Number(plano?.period_days);
+  return Number.isFinite(dias) && dias > 0 ? Math.floor(dias) : PAID_PERIOD_DAYS;
+}
 
 export class PlanLimitError extends Error {
   constructor(code, { limit, current, resource }) {
@@ -69,7 +89,6 @@ function asDate(value) {
 
 class SubscriptionService {
   static cache = cache;
-  static PAID_PERIOD_DAYS = PAID_PERIOD_DAYS;
 
   /**
    * O estado que VALE, que nem sempre é o da coluna: um prazo que venceu é
@@ -118,15 +137,35 @@ class SubscriptionService {
    * teste, `renews_at` depois que pagou. `suspended` e `canceled` não têm prazo
    * nenhum — já estão parados, e avisar quem já foi bloqueado é ruído.
    *
-   * A janela é de `WARN_WINDOW_DAYS` dias ANTES e vale também depois de vencer:
-   * quem passou do prazo sem ver o aviso precisa receber um, e é justamente o
-   * caso em que o painel já está recusando escrita. A marca `expiry_warned_for`
-   * guarda o prazo avisado, então um segundo aviso só sai quando o prazo MUDA —
-   * e um pagamento que empurra `renews_at` recomeça o ciclo sozinho.
+   * A janela vale também depois de vencer: quem passou do prazo sem ver o aviso
+   * precisa receber um, e é justamente o caso em que o painel já está recusando
+   * escrita. A marca `expiry_warned_for` guarda o prazo avisado, então um
+   * segundo aviso só sai quando o prazo MUDA — e um pagamento que empurra
+   * `renews_at` recomeça o ciclo sozinho.
+   *
+   * **A janela acompanha o período**, desde que o período passou a ser do plano
+   * (migração 0046). Sete dias é a medida certa de um plano mensal e é pouco
+   * para um anual: a fatura é doze vezes maior, passa por aprovação de alguém
+   * que não é quem opera o painel, e uma semana não é tempo de conseguir isso.
+   * Um doze avos do período, com piso de uma semana e teto de um mês — trinta
+   * dias vira sete, trezentos e sessenta e cinco vira trinta, e nada entre os
+   * dois surpreende. O teto existe porque avisar com dois meses de antecedência
+   * não é aviso, é ruído que se esquece antes de vencer.
    */
   static WARN_WINDOW_DAYS = 7;
 
-  static pendingExpiryNotice(subscription, now = new Date()) {
+  static WARN_WINDOW_MAX_DAYS = 30;
+
+  /** Quantos dias antes do prazo o aviso sai, neste plano. */
+  static warnWindowDays(plano) {
+    const periodo = periodoDoPlano(plano);
+    return Math.min(
+      this.WARN_WINDOW_MAX_DAYS,
+      Math.max(this.WARN_WINDOW_DAYS, Math.ceil(periodo / 12))
+    );
+  }
+
+  static pendingExpiryNotice(subscription, now = new Date(), plano = null) {
     if (!subscription) return null;
     const stored = STATUSES.includes(subscription.status) ? subscription.status : 'suspended';
     if (stored !== 'trial' && stored !== 'active' && stored !== 'past_due') return null;
@@ -138,7 +177,11 @@ class SubscriptionService {
       : asDate(subscription.renews_at) ?? asDate(subscription.trial_ends_at);
     if (!prazo) return null;
 
-    const janela = now.getTime() + this.WARN_WINDOW_DAYS * DAY_MS;
+    // Sem plano em mãos, a janela é a do piso: quem chama sem passá-lo recebe o
+    // comportamento de antes, que é o certo para o teste — `trial_days` já é do
+    // plano e o prazo de teste não escala com o período pago.
+    const dias = stored === 'trial' ? this.WARN_WINDOW_DAYS : this.warnWindowDays(plano);
+    const janela = now.getTime() + dias * DAY_MS;
     if (prazo.getTime() > janela) return null;
 
     const avisado = asDate(subscription.expiry_warned_for);
@@ -405,7 +448,7 @@ class SubscriptionService {
    */
   static async recordPayment({
     amountCents, currency = 'BRL', provider = 'manual', externalId = null,
-    actorUserId = null, periodDays = PAID_PERIOD_DAYS, now = new Date()
+    actorUserId = null, periodDays = null, now = new Date()
   }) {
     const tenantId = currentTenantId();
     const before = await Subscription.forTenant(tenantId);
@@ -417,12 +460,25 @@ class SubscriptionService {
       return { subscription: before, duplicate: true };
     }
 
+    // O plano, lido agora e não do cache.
+    //
+    // `this.current()` traria o plano junto e de graça, e é exatamente o que
+    // NÃO serve aqui: aquele cache tem quinze segundos de validade, e uma
+    // leitura de quinze segundos atrás não pode decidir por quanto tempo um
+    // pagamento vale. Uma consulta a mais por pagamento, e um pagamento é raro.
+    //
+    // `periodDays` explícito ainda vence o plano: é a saída para um ajuste
+    // manual ou uma migração de contrato, e quem o passa está dizendo que sabe
+    // mais que o catálogo naquele caso.
+    const plano = before.plan_id ? await Plan.findById(before.plan_id) : null;
+    const dias = periodDays ?? periodoDoPlano(plano);
+
     const patch = {};
     const reactivates = before.status === 'trial' || before.status === 'active' || before.status === 'past_due';
     if (reactivates) {
       const currentEnd = asDate(before.renews_at);
       const base = currentEnd && currentEnd.getTime() > now.getTime() ? currentEnd : now;
-      patch.renews_at = new Date(base.getTime() + periodDays * DAY_MS);
+      patch.renews_at = new Date(base.getTime() + dias * DAY_MS);
       patch.status = 'active';
       patch.trial_ends_at = null;
     }

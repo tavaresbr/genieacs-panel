@@ -781,6 +781,14 @@ export interface Plan {
   priceCents: number
   currency: string
   trialDays: number
+  /**
+   * Quanto tempo um pagamento compra, em dias. Trinta é mensal, 365 é anual.
+   *
+   * Existe desde a migração 0046. Antes, o período pago era um número dentro do
+   * serviço de assinatura: o catálogo sabia por quanto vende e não por quanto
+   * tempo, e um ISP que pagasse o ano inteiro recebia trinta dias.
+   */
+  periodDays: number
   active: boolean
   createdAt: string | null
   /** How many providers are on it — only from the console's list. */
@@ -982,13 +990,14 @@ export const platformAPI = {
 
   createPlan: (payload: {
     code: string; name: string; maxOperators: number | null; maxSubscribers: number | null
-    maxDevices: number | null; priceCents: number; currency: string; trialDays: number; active?: boolean
+    maxDevices: number | null; priceCents: number; currency: string; trialDays: number
+    periodDays?: number; active?: boolean
   }) =>
     apiClient.post<{ plan: Plan }>('/platform/plans', payload),
 
   updatePlan: (id: number, payload: Partial<{
     name: string; maxOperators: number | null; maxSubscribers: number | null; maxDevices: number | null
-    priceCents: number; currency: string; trialDays: number; active: boolean
+    priceCents: number; currency: string; trialDays: number; periodDays: number; active: boolean
   }>) =>
     apiClient.requestWithBody<{ plan: Plan }>('PATCH', `/platform/plans/${id}`, payload),
 
