@@ -649,4 +649,10 @@ export default {
   'subscription.notice.renewalSoonBody': "La période payée de {provider} se termine le {date} — dans {days} jour(s).\n\nEnsuite, le panneau restera consultable mais n'acceptera plus de modifications. Envoyez le paiement avant cette date et rien ne s'arrête.\n\n{link}",
   'subscription.notice.renewalExpiredSubject': "L'abonnement {provider} a expiré le {date}",
   'subscription.notice.renewalExpiredBody': "La période payée de {provider} s'est terminée le {date}.\n\nLe panneau reste consultable — votre équipe et vos abonnés voient toujours tout — mais n'accepte plus de modifications. Dès que le paiement est enregistré, tout revient à la normale.\n\n{link}",
+  'customers.invalidId': "Identifiant d'abonné invalide",
+  'customers.exportFailed': "Impossible d'exporter les données de l'abonné",
+  'customers.confirmMismatch': 'Saisissez l\'ID client exactement tel qu\'il apparaît pour confirmer',
+  'customers.eraseNotLogged': 'L\'effacement n\'a pas été enregistré dans le journal, il n\'a donc pas eu lieu',
+  'customers.eraseFailed': 'Échec de l\'effacement des données de l\'abonné',
+  'customers.erased': 'Données de l\'abonné effacées',
 };

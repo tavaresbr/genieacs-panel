@@ -40,6 +40,24 @@ class AuditLog {
     // Guardar os valores faria dela uma segunda cópia do cadastro, com
     // retenção maior que a do original.
     TENANT_BILLING_CHANGED: 'tenant.billing_changed',
+    // O dossiê de UM assinante saiu daqui. Ação própria e não `tenant.exported`
+    // porque a frase que o ISP lê na trilha dele tem que descrever o que
+    // aconteceu, e "provedor exportado" não descreve os dados de uma pessoa.
+    // O `detail` guarda contagens, nunca conteúdo: a trilha está DENTRO do
+    // export do provedor e é podada por idade, então um detalhe com dado
+    // pessoal seria uma segunda cópia do dossiê, com retenção própria.
+    CUSTOMER_DATA_EXPORTED: 'customer_data.exported',
+    // E o dossiê de UM assinante deixou de existir. Duas ações e não uma com
+    // um campo `scope`, pelo mesmo motivo que `password_reset.requested` e
+    // `.completed` são duas: a tela filtra pelo nome da ação, e "quem apagou um
+    // assinante este mês" é a pergunta que alguém vai fazer sozinha.
+    //
+    // Esta é a única linha da trilha que sobrevive ao seu próprio assunto: a
+    // exclusão esvazia a conta e não toca em `audit_log`, então o `subject_id`
+    // daqui passa a apontar para uma linha onde não há mais ninguém. É o estado
+    // certo — continua dizendo que a conta 412 foi apagada, no dia tal, por
+    // fulano, e já não há como saber quem era 412.
+    CUSTOMER_DATA_ERASED: 'customer_data.erased',
     // A assinatura mudou de plano ou de estado. Gravada NO provedor, com
     // `actorKind: 'platform'`, pelo mesmo motivo da suspensão: quem vai
     // perguntar "por que meu painel ficou só leitura" é o ISP, e a resposta

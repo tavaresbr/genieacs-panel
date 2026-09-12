@@ -653,4 +653,10 @@ export default {
   'subscription.notice.renewalSoonBody': '{provider} 的付费周期将于 {date} 结束，还有 {days} 天。\n\n结束后面板仍可查看，但不再接受修改。在该日期前完成付款，一切照常。\n\n{link}',
   'subscription.notice.renewalExpiredSubject': '{provider} 的订阅已于 {date} 到期',
   'subscription.notice.renewalExpiredBody': '{provider} 的付费周期已于 {date} 结束。\n\n面板仍可查看——您的团队和用户都还能看到全部内容——但不再接受修改。付款登记后即恢复正常。\n\n{link}',
+  'customers.invalidId': '用户编号无效',
+  'customers.exportFailed': '无法导出该用户的数据',
+  'customers.confirmMismatch': '请完全按照显示输入客户 ID 以确认',
+  'customers.eraseNotLogged': '删除未记入审计轨迹，因此未执行',
+  'customers.eraseFailed': '删除用户数据失败',
+  'customers.erased': '用户数据已删除',
 };

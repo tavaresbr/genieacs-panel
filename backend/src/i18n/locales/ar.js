@@ -645,4 +645,10 @@ export default {
   'subscription.notice.renewalSoonBody': 'تنتهي الفترة المدفوعة لـ {provider} في {date} — بعد {days} يوم/أيام.\n\nبعدها تبقى اللوحة قابلة للقراءة لكنها تتوقف عن قبول التغييرات. أرسل الدفعة قبل ذلك التاريخ ولن يتوقف شيء.\n\n{link}',
   'subscription.notice.renewalExpiredSubject': 'انتهى اشتراك {provider} في {date}',
   'subscription.notice.renewalExpiredBody': 'انتهت الفترة المدفوعة لـ {provider} في {date}.\n\nاللوحة ما زالت قابلة للقراءة — فريقك ومشتركوك يرون كل شيء — لكنها لم تعد تقبل التغييرات. بمجرد تسجيل الدفعة يعود كل شيء كما كان.\n\n{link}',
+  'customers.invalidId': 'معرّف المشترك غير صالح',
+  'customers.exportFailed': 'تعذّر تصدير بيانات المشترك',
+  'customers.confirmMismatch': 'اكتب معرّف العميل كما يظهر تمامًا للتأكيد',
+  'customers.eraseNotLogged': 'لم يُسجَّل الحذف في سجل التدقيق، لذلك لم يُنفَّذ',
+  'customers.eraseFailed': 'تعذّر حذف بيانات المشترك',
+  'customers.erased': 'تم حذف بيانات المشترك',
 };

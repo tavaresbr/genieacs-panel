@@ -179,6 +179,15 @@ estrangeiras pedem, sem segredo cifrado e sem hash de senha, com um manifesto di
 que ficou de fora. É o que se entrega numa solicitação da LGPD e o que se guarda antes de
 apagar um provedor.
 
+**Por assinante**, na ficha do aparelho, o provedor atende o titular dele sem passar por
+nós: `GET /api/customers/:accountId/export` (capacidade `customers.dossier`) monta o
+dossiê de uma pessoa, e `DELETE /api/customers/:accountId` (capacidade `customers.erase`,
+com o "ID do Cliente" digitado de volta) apaga. As duas ficam em `audit_log`; na exclusão
+a linha da trilha é gravada **antes** e é condição para que ela aconteça. Dois avisos para
+o plantão, porque chegam como chamado: o CPF que o SGP do ISP guarda não sai daqui, e uma
+exclusão feita sem o serviço ter sido cancelado se desfaz na próxima `syncFleet` — a ONT
+continua informando e a conta renasce com um ID do Cliente novo.
+
 ## 5. Desfazer: suspender, apagar
 
 Ambos no console (`/platform`), ambos gravados em `platform_audit`, que é compartilhada e

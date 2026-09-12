@@ -650,4 +650,10 @@ export default {
   'subscription.notice.renewalSoonBody': 'El período pagado de {provider} termina el {date} — dentro de {days} día(s).\n\nCuando termine, el panel se seguirá pudiendo leer, pero dejará de aceptar cambios. Envía el pago antes de esa fecha y nada se detiene.\n\n{link}',
   'subscription.notice.renewalExpiredSubject': 'La suscripción de {provider} venció el {date}',
   'subscription.notice.renewalExpiredBody': 'El período pagado de {provider} terminó el {date}.\n\nEl panel se sigue pudiendo leer — tu equipo y tus abonados siguen viéndolo todo —, pero ya no acepta cambios. En cuanto se registre el pago, todo vuelve a la normalidad.\n\n{link}',
+  'customers.invalidId': 'Id de abonado no válido',
+  'customers.exportFailed': 'No se pudieron exportar los datos del abonado',
+  'customers.confirmMismatch': 'Escriba el ID de Cliente exactamente como aparece para confirmar',
+  'customers.eraseNotLogged': 'El borrado no se registró en el historial, por lo que no se realizó',
+  'customers.eraseFailed': 'No se pudieron borrar los datos del suscriptor',
+  'customers.erased': 'Datos del suscriptor borrados',
 };

@@ -651,4 +651,10 @@ export default {
   'subscription.notice.renewalSoonBody': 'Il periodo pagato di {provider} termina il {date} — fra {days} giorno/i.\n\nQuando finirà, il pannello resterà leggibile ma smetterà di accettare modifiche. Invia il pagamento prima di quella data e non si ferma nulla.\n\n{link}',
   'subscription.notice.renewalExpiredSubject': "L'abbonamento di {provider} è scaduto il {date}",
   'subscription.notice.renewalExpiredBody': 'Il periodo pagato di {provider} è terminato il {date}.\n\nIl pannello resta leggibile — il tuo team e i tuoi abbonati continuano a vedere tutto — ma non accetta più modifiche. Appena il pagamento sarà registrato, tutto torna come prima.\n\n{link}',
+  'customers.invalidId': 'Id abbonato non valido',
+  'customers.exportFailed': "Impossibile esportare i dati dell'abbonato",
+  'customers.confirmMismatch': 'Digita l\'ID cliente esattamente come appare per confermare',
+  'customers.eraseNotLogged': 'La cancellazione non è stata registrata nel registro, quindi non è stata eseguita',
+  'customers.eraseFailed': 'Impossibile cancellare i dati dell\'abbonato',
+  'customers.erased': 'Dati dell\'abbonato cancellati',
 };

@@ -1064,11 +1064,26 @@ decisões de desenho, e porque o primeiro **não se fecha, só se contém**.
    anulável, o login aceita nome **ou** e-mail, e `LOGIN_REQUIRES_EMAIL=true` desliga o nome
    quando o install decidir. `GET /api/auth/email-readiness` diz quantas contas ficariam de
    fora antes de alguém virar a chave. A nota de release continua valendo para quem virar.
-9. **LGPD** — inalterado, e agora concreto: o banco guarda CPF/CNPJ em `sgp_links.document`,
-   payload de eventos SGP com dado pessoal, credenciais PPPoE e senhas de WiFi recuperáveis
-   em claro, de assinantes de terceiros. Somos **operador**, o provedor é **controlador**.
-   Contrato com cláusula de operador, política de retenção e compromisso de notificação de
-   incidente precisam existir **antes do primeiro contrato**.
+9. **LGPD** — **metade fechada.** O banco guarda CPF/CNPJ em `sgp_links.document`, payload
+   de eventos SGP com dado pessoal, credenciais PPPoE e senhas de WiFi recuperáveis em
+   claro, de assinantes de terceiros. Somos **operador**, o provedor é **controlador**.
+
+   O que passou a existir: o provedor tem os dois direitos do titular **por assinante**, na
+   ficha do aparelho. `GET /api/customers/:accountId/export` (capacidade
+   `customers.dossier`) monta o dossiê de uma pessoa reunindo o que está espalhado por
+   dezessete tabelas — inclusive a telemetria da ONT anterior, que só existe sob o id
+   trocado —, sem segredo nenhum, e diz no manifesto o que **não** está no arquivo.
+   `DELETE /api/customers/:accountId` (capacidade `customers.erase`, separada) destrói os
+   segredos e o que é conteúdo do titular, e esvazia sem destruir o que é registro do ISP:
+   contrato, nó do mapa e trilha ficam, com a pessoa retirada deles. As duas rotas
+   perguntam ao banco pela mesma função, para que a exclusão nunca alcance menos do que o
+   export acabou de mostrar. Ambas auditadas; na exclusão a trilha é **condição**.
+
+   O que continua faltando, e não é código: contrato com cláusula de operador, política de
+   retenção escrita e compromisso de notificação de incidente — **antes do primeiro
+   contrato**. Mais duas coisas que o código não consegue cumprir sozinho e que a tela diz
+   em voz alta: o CPF no ERP do ISP não é nosso para apagar, e uma exclusão sem
+   cancelamento do serviço se desfaz na sincronização seguinte.
 10. **Escopo escapando para hospedar o GenieACS** — inalterado. Manter fora até depois da
     Fase 7.
 

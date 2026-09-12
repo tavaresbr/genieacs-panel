@@ -653,4 +653,10 @@ export default {
   'subscription.notice.renewalSoonBody': '{provider} のお支払い済み期間は {date}（あと {days} 日）で終了します。\n\n終了後もパネルの閲覧はできますが、変更は受け付けなくなります。その日までにお支払いいただければ、何も止まりません。\n\n{link}',
   'subscription.notice.renewalExpiredSubject': '{provider} のご契約が {date} に期限切れになりました',
   'subscription.notice.renewalExpiredBody': '{provider} のお支払い済み期間が {date} に終了しました。\n\nパネルの閲覧は引き続き可能で、担当者もご契約者も今までどおり見られますが、変更は受け付けません。お支払いが登録され次第、元どおりになります。\n\n{link}',
+  'customers.invalidId': '契約者 ID が正しくありません',
+  'customers.exportFailed': '契約者データを書き出せませんでした',
+  'customers.confirmMismatch': '確認のため、顧客 ID を表示どおりに正確に入力してください',
+  'customers.eraseNotLogged': '削除が監査証跡に記録されなかったため、実行されませんでした',
+  'customers.eraseFailed': '加入者データの削除に失敗しました',
+  'customers.erased': '加入者データを削除しました',
 };

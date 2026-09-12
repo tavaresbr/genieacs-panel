@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { filenameFromDisposition } from '@/lib/api'
-import { exportFileName } from '@/lib/utils'
+import { exportFileName, subscriberFileName } from '@/lib/utils'
 
 /**
  * Quem nomeia o arquivo exportado é o servidor, no `Content-Disposition`. Estas
@@ -62,5 +62,18 @@ describe('o nome de reserva', () => {
   it('e aguenta o host que não nomeia provedor nenhum', () => {
     expect(exportFileName(null, new Date('2026-01-02T00:00:00Z')))
       .toBe('skygenpanel-export-2026-01-02.json')
+  })
+})
+
+describe('o nome de reserva do dossiê de um assinante', () => {
+  it('leva o ID do Cliente e a data, com prefixo que diz de que arquivo se trata', () => {
+    expect(subscriberFileName('CSG-1234567-890123', new Date('2026-09-12T23:30:00Z')))
+      .toBe('assinante-CSG-1234567-890123-2026-09-12.json')
+  })
+
+  /** Mesma razão de cima, e aqui o valor vem do cadastro do ISP e não do slug. */
+  it('nunca produz uma barra', () => {
+    expect(subscriberFileName('CSG/1234')).not.toContain('/')
+    expect(subscriberFileName(null)).not.toContain('/')
   })
 })

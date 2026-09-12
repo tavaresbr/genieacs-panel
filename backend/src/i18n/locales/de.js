@@ -654,4 +654,10 @@ export default {
   'subscription.notice.renewalSoonBody': 'Der bezahlte Zeitraum für {provider} endet am {date} — in {days} Tag(en).\n\nDanach bleibt das Panel lesbar, nimmt aber keine Änderungen mehr an. Senden Sie die Zahlung vor diesem Datum, dann stoppt nichts.\n\n{link}',
   'subscription.notice.renewalExpiredSubject': 'Das {provider}-Abonnement lief am {date} ab',
   'subscription.notice.renewalExpiredBody': 'Der bezahlte Zeitraum für {provider} endete am {date}.\n\nDas Panel bleibt lesbar — Ihr Team und Ihre Teilnehmer sehen weiterhin alles —, nimmt aber keine Änderungen mehr an. Sobald die Zahlung erfasst ist, läuft alles wieder normal.\n\n{link}',
+  'customers.invalidId': 'Ungültige Teilnehmer-ID',
+  'customers.exportFailed': 'Die Teilnehmerdaten konnten nicht exportiert werden',
+  'customers.confirmMismatch': 'Geben Sie die Kunden-ID genau wie angezeigt ein, um zu bestätigen',
+  'customers.eraseNotLogged': 'Die Löschung wurde nicht protokolliert und daher nicht ausgeführt',
+  'customers.eraseFailed': 'Teilnehmerdaten konnten nicht gelöscht werden',
+  'customers.erased': 'Teilnehmerdaten gelöscht',
 };

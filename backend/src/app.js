@@ -24,6 +24,7 @@ import { httpMetrics } from './utils/metrics.js';
 
 import authRoutes from './routes/auth.js';
 import deviceRoutes from './routes/devices.js';
+import customerRoutes from './routes/customers.js';
 import settingsRoutes from './routes/settings.js';
 import vendorRoutes from './routes/vendors.js';
 import mappingRoutes from './routes/mapping.js';
@@ -263,6 +264,7 @@ app.use('/api/tenant', tenantRoutes);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/devices', deviceRoutes);
+app.use('/api/customers', customerRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/vendor-management', vendorRoutes);
 app.use('/api/mapping-data', mappingRoutes);

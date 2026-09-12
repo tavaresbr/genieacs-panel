@@ -600,6 +600,51 @@ export const tenantAPI = {
   export: () => apiClient.getBlob('/tenant/export')
 }
 
+/** O que a exclusão de um assinante devolve: o recibo do que deixou de existir. */
+export interface CustomerErasureReceipt {
+  accountId: number
+  customerId: string | null
+  /** Quantas linhas em cada tabela — contagens, nunca conteúdo. */
+  rowCounts: Record<string, number>
+  /** Quantos arquivos de anexo saíram do disco. */
+  attachments: number
+  /**
+   * A conta estava ativa quando foi apagada? Se estava, a ONT continua na
+   * planta e a próxima sincronização recria a conta com um `customer_id` novo —
+   * a exclusão se desfaz sozinha em um minuto se o serviço não for cancelado.
+   */
+  wasActive: boolean
+}
+
+/**
+ * Os dois direitos do titular, exercidos pelo ISP em nome dele: ver e apagar.
+ *
+ * As duas rotas endereçam a conta pelo id da LINHA (`accountId`), que a tela do
+ * aparelho recebe em `device.customer.accountId` — e não pelo "ID do Cliente"
+ * impresso, que é o que o assinante conhece e por isso o pior endereço possível
+ * para um ato sem volta.
+ */
+export const customerAPI = {
+  /**
+   * O dossiê de um assinante, num arquivo.
+   *
+   * Por `getBlob` e não por `get` pelo mesmo motivo do export do provedor: a
+   * rota responde com `Content-Disposition: attachment` e o JSON no corpo, sem
+   * o envelope da API.
+   */
+  export: (accountId: number) => apiClient.getBlob(`/customers/${accountId}/export`),
+
+  /**
+   * Apaga. O `confirmCustomerId` tem que ser o "ID do Cliente" digitado exato —
+   * o servidor não normaliza caixa nem espaço, porque um id "quase certo" é
+   * precisamente o que um engano parece.
+   */
+  erase: (accountId: number, confirmCustomerId: string) =>
+    apiClient.requestWithBody<CustomerErasureReceipt>(
+      'DELETE', `/customers/${accountId}`, { confirmCustomerId }
+    )
+}
+
 /** Uma linha da trilha, como a tela a recebe. */
 export interface AuditEntry {
   id: number

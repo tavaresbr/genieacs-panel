@@ -150,3 +150,17 @@ export function exportFileName(slug: string | null | undefined, when: Date = new
   const quem = (slug || 'export').replace(/[^a-zA-Z0-9._-]/g, '-')
   return `skygenpanel-${quem}-${when.toISOString().slice(0, 10)}.json`
 }
+
+/**
+ * O nome de reserva do dossiê de UM assinante.
+ *
+ * Mesma regra e mesmo motivo do `exportFileName` acima, com um prefixo que diz
+ * de que arquivo se trata: quem atende dez pedidos num dia precisa distinguir o
+ * cadastro do provedor do dossiê de uma pessoa sem abrir os dois.
+ */
+export function subscriberFileName(
+  customerId: string | null | undefined, when: Date = new Date()
+): string {
+  const quem = (customerId || 'export').replace(/[^a-zA-Z0-9._-]/g, '-')
+  return `assinante-${quem}-${when.toISOString().slice(0, 10)}.json`
+}
