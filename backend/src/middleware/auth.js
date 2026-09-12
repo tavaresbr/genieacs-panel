@@ -352,6 +352,11 @@ async function authenticateToken(req, res, next) {
 
   req.user = session;
   req.tenantId = session.tenantId;
+  // O autor entra no escopo junto com o provedor. Sem ele, uma escrita fundo
+  // num serviço não tem como dizer quem a provocou nem como saber que está
+  // dentro de uma personificação — e as duas coisas fazem falta em
+  // `CustomerService`, que aposenta conta de assinante e apaga vínculo de ERP a
+  // partir de um GET.
   return runInTenant(session.tenantId, async () => {
     // A porta da assinatura mora AQUI, e não num `app.use` acima das rotas,
     // para que o 401 venha sempre antes do 402. No lugar antigo um request sem
@@ -366,7 +371,7 @@ async function authenticateToken(req, res, next) {
     }
     if (recusa) return res.status(402).json(recusa);
     return next();
-  });
+  }, { actor: session });
 }
 
 /**

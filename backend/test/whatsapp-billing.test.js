@@ -157,7 +157,7 @@ function startSgpStub() {
  * test in the file would start failing for a reason it is not about.
  */
 function buildCampaign(body) {
-  WaBillingService.buildWindow = [];
+  WaBillingService.buildWindows.clear();
   return call(`${panelUrl}/api/whatsapp/billing/campaign`, {
     method: 'POST',
     headers: authHeaders(token),
@@ -455,7 +455,7 @@ describe('building a campaign', () => {
   });
 
   it('answers 429 after three builds in five minutes', async () => {
-    WaBillingService.buildWindow = [];
+    WaBillingService.buildWindows.clear();
     const payload = {
       method: 'POST',
       headers: authHeaders(token),
@@ -470,7 +470,7 @@ describe('building a campaign', () => {
     const fourth = await call(url, payload);
     assert.equal(fourth.status, 429);
     assert.equal(fourth.body.code, 'rate_limited');
-    WaBillingService.buildWindow = [];
+    WaBillingService.buildWindows.clear();
   });
 });
 

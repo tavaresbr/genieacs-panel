@@ -23,13 +23,21 @@ export class TenantScopeError extends Error {
   }
 }
 
-/** Runs `fn` with `tenantId` as the provider in scope. */
-export function runInTenant(tenantId, fn) {
+/**
+ * Runs `fn` with `tenantId` as the provider in scope.
+ *
+ * `actor` é opcional e carrega QUEM está agindo — o mesmo objeto de sessão que
+ * `req.user` recebe. Ele existe pelo motivo que o `tenantId` existe: há escrita
+ * fundo no serviço que precisa saber quem a provocou, e passá-la chamada por
+ * chamada é a forma que se esquece. Trabalho de fundo não tem autor, e ali ele
+ * fica nulo — que é a resposta certa, não um valor de reserva.
+ */
+export function runInTenant(tenantId, fn, { actor = null } = {}) {
   const id = Number(tenantId);
   if (!Number.isInteger(id) || id <= 0) {
     throw new TenantScopeError(`runInTenant needs a provider id; received ${tenantId}`);
   }
-  return store.run({ tenantId: id }, fn);
+  return store.run({ tenantId: id, actor }, fn);
 }
 
 /**
@@ -43,6 +51,17 @@ export function runInTenant(tenantId, fn) {
 export function runUnscoped(reason, fn) {
   if (!reason) throw new TenantScopeError('runUnscoped needs a reason');
   return store.run({ tenantId: null, unscoped: reason }, fn);
+}
+
+/**
+ * Quem está agindo, ou `null` quando não há ninguém.
+ *
+ * `null` é a resposta honesta para trabalho de fundo — o varredor, a fila, o
+ * webhook — e não deve ser confundida com "não sei": quem lê isto e precisa de
+ * um autor deve tratar a ausência, nunca inventar um.
+ */
+export function currentActor() {
+  return store.getStore()?.actor ?? null;
 }
 
 export function currentContext() {

@@ -62,6 +62,7 @@ let beta;
 let plataformaToken;
 let plataformaUserId;
 let betaAdminToken;
+let betaAdminUserId;
 
 const CASA = 'default.painel.test';
 const BETA = 'beta.painel.test';
@@ -103,6 +104,18 @@ before(async () => {
   plataformaUserId = setup.body.data.user.id;
   assert.ok(await db('platform_admins').where({ user_id: plataformaUserId }).first());
 
+  // O beta precisa de assinatura ativa, senão o portão comercial responde 402
+  // antes de qualquer rota e os casos abaixo mediriam o 402 em vez do que
+  // querem medir. Foi assim que um caso desta suíte já passou vazio uma vez:
+  // `assert.notEqual(status, 401)` aceita 402 de bom grado.
+  const { default: Subscription } = await import('../src/models/Subscription.js');
+  const { default: SubscriptionService } = await import('../src/services/subscriptionService.js');
+  const plano = await db('plans').orderBy('id', 'asc').first();
+  await runInTenant(beta, () => Subscription.upsertForTenant(beta, {
+    plan_id: plano?.id ?? null, status: 'active'
+  }));
+  await runInTenant(beta, () => SubscriptionService.invalidate(beta));
+
   const bcrypt = (await import('bcryptjs')).default;
   const betaAdminId = await runInTenant(beta, () => User.create({
     username: 'admin-beta',
@@ -111,6 +124,7 @@ before(async () => {
     role: 'admin'
   }));
   await runInTenant(beta, () => TenantUser.create({ tenantId: beta, userId: betaAdminId, role: 'admin' }));
+  betaAdminUserId = betaAdminId;
   const entrada = await noBeta('/api/auth/login', {
     method: 'POST', body: { username: 'admin-beta', password: 'senha-do-beta-1' }
   });
@@ -300,6 +314,91 @@ describe('a sessão de personificação', () => {
     // E o nome do provedor continua o que era.
     const { body } = await noBeta('/api/tenant/public');
     assert.equal(body.data.name, 'Provedor Beta');
+  });
+
+  // ───────────────────────────────────────────────────────────────────────
+  // O muro é por MÉTODO, e um GET atravessava
+  //
+  // O caso acima só exercita PATCH/POST/PUT/DELETE, e foi esse recorte que
+  // deixou passar o pior: `GET /api/devices` ESCREVE. Ele chama
+  // `CustomerService.decorateDevices` → `syncDevices` → `ensureAccount`, que
+  // cria conta de portal, cunha senha, e no ramo do assinante trocado APOSENTA
+  // a conta anterior e apaga o vínculo do ERP.
+  //
+  // O `viewer` imposto na hidratação tem `devices.list`, e GET passa pelo muro.
+  // Então quem do plantão da plataforma abrisse o painel de um cliente e
+  // clicasse na lista de aparelhos podia fazer um assinante daquele cliente
+  // perder o Customer ID, a senha do portal e o vínculo com o ERP — sem uma
+  // linha na trilha dizendo quem fez.
+  //
+  // A prova é no nível do serviço, e não por HTTP: a rota real precisa de um
+  // GenieACS de pé, e o que se quer medir aqui é a guarda, não o ACS. A sessão
+  // que a rota montaria é montada à mão, com a mesma forma que
+  // `hydrateImpersonation` produz.
+  // ───────────────────────────────────────────────────────────────────────
+  const SESSAO_PERSONIFICANDO = () => ({
+    userId: plataformaUserId, username: 'plataforma', role: 'viewer',
+    impersonation: { platformUsername: 'plataforma' }
+  });
+  const SESSAO_DO_PROVEDOR = () => ({
+    userId: betaAdminUserId, username: 'admin-beta', role: 'admin'
+  });
+
+  it('a reconciliação NÃO acontece durante uma personificação', async () => {
+    const { default: CustomerService } = await import('../src/services/customerService.js');
+    const { runInTenant } = await import('../src/config/tenantContext.js');
+    const aparelho = (pppoe) => ({ _id: 'ONT-PERSONIFICADA', softwareId: 'V1.0', pppoe });
+
+    await runInTenant(beta, () => CustomerService.ensureAccount(aparelho('ana')));
+    const antes = await getDb()('customer_accounts').where({ device_id: 'ONT-PERSONIFICADA' }).first();
+    assert.ok(antes, 'a conta de partida não foi criada');
+
+    // O mesmo aparelho passa a reportar outro login: é o ramo que aposenta.
+    await runInTenant(
+      beta,
+      () => CustomerService.syncDevices([aparelho('carla')], { enabled: true }),
+      { actor: SESSAO_PERSONIFICANDO() }
+    );
+
+    const depois = await getDb()('customer_accounts').where({ id: antes.id }).first();
+    assert.equal(Number(depois.active), 1, 'a conta do assinante foi aposentada por quem estava só olhando');
+    assert.equal(depois.customer_id, antes.customer_id, 'o Customer ID mudou durante uma personificação');
+    assert.equal(depois.password_ciphertext, antes.password_ciphertext, 'a senha do portal foi recunhada');
+    // E nenhuma conta nova apareceu no lugar.
+    assert.equal(
+      (await getDb()('customer_accounts').where({ device_id: 'ONT-PERSONIFICADA' })).length, 1
+    );
+  });
+
+  it('e o operador do próprio provedor continua reconciliando, agora com trilha', async () => {
+    const { default: CustomerService } = await import('../src/services/customerService.js');
+    const { runInTenant } = await import('../src/config/tenantContext.js');
+    const aparelho = (pppoe) => ({ _id: 'ONT-COM-TRILHA', softwareId: 'V1.0', pppoe });
+
+    await runInTenant(beta, () => CustomerService.ensureAccount(aparelho('bruno')));
+    const antes = await getDb()('customer_accounts').where({ device_id: 'ONT-COM-TRILHA' }).first();
+
+    // A aposentadoria NÃO foi adiada para ninguém: para quem é do provedor ela
+    // continua acontecendo na hora, que é o que impede a conta do assinante
+    // ANTERIOR de continuar apontando para o aparelho do novo.
+    await runInTenant(
+      beta,
+      () => CustomerService.syncDevices([aparelho('carla')], { enabled: true }),
+      { actor: SESSAO_DO_PROVEDOR() }
+    );
+
+    const aposentada = await getDb()('customer_accounts').where({ id: antes.id }).first();
+    assert.equal(Number(aposentada.active), 0, 'a troca de assinante parou de aposentar');
+
+    // E deixa rastro, com o autor. Antes era só um `console.warn`, que é log de
+    // processo e some — o ISP não tinha onde olhar.
+    const linha = await getDb()('audit_log')
+      .where({ action: 'subscriber_account.retired', tenant_id: beta })
+      .orderBy('id', 'desc')
+      .first();
+    assert.ok(linha, 'a aposentadoria não deixou linha na trilha');
+    assert.equal(linha.subject_id, String(antes.customer_id));
+    assert.equal(linha.actor_username, 'admin-beta', 'a trilha não diz quem fez');
   });
 
   it('não desloga — que derrubaria as sessões de quem personifica, não as do cliente', async () => {

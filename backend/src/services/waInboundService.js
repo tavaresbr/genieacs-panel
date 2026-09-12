@@ -10,6 +10,9 @@ import { lerRecibo } from '../utils/wa/waRecibo.js';
 import { pedeSaida } from '../utils/wa/waOptOutTexto.js';
 import WaMediaService from './waMediaService.js';
 import WaBotService from './waBotService.js';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { DATA_DIR } from '../config/paths.js';
 
 /**
  * Os quatro tratadores do webhook de entrada.
@@ -303,6 +306,7 @@ async function gravarMensagem(account, item) {
 
   let messageId;
   try {
+
     // `tinsertReturningId`, nunca `insertReturningId`: `wa_messages` é tabela
     // escopada, e só a variante com `t` carimba o `tenant_id` da linha. A crua
     // deixa a coluna cair no DEFAULT que a migração 0012 pôs — o provedor #1 —
@@ -315,7 +319,19 @@ async function gravarMensagem(account, item) {
     // O índice único de `external_id` É a deduplicação. Uma violação aqui
     // significa que o evento chegou duas vezes — que é sucesso, não falha:
     // devolver erro faria o servidor reenviar o mesmo evento em laço.
-    if (await WaMessage.getByExternalId(externalId)) return { handled: true, duplicate: true };
+    if (await WaMessage.getByExternalId(externalId)) {
+      // O evento chegou duas vezes. Os bytes desta passagem não têm linha que
+      // os aponte — a primeira já gravou os dela —, então saem daqui.
+      await descartarAnexoOrfao(anexo);
+      return { handled: true, duplicate: true };
+    }
+    // Qualquer outro erro: a linha não existe e o arquivo também não deve
+    // existir. Ele foi escrito ANTES do insert porque o caminho dele é uma
+    // coluna da linha, e essa ordem deixava bytes sem dono no caminho de erro.
+    // Não eram poucos para sempre: o varredor de mídia só apaga o que está
+    // ligado a uma linha, e a retenção padrão é 0 — nunca apaga —, então numa
+    // instalação padrão esses arquivos ficavam no disco para sempre.
+    await descartarAnexoOrfao(anexo);
     throw error;
   }
 
@@ -364,6 +380,50 @@ async function gravarMensagem(account, item) {
   return { handled: true, conversationId: conversation.id, direction: linha.direction };
 }
 
+/**
+ * Quanto tempo o lote inteiro pode levar.
+ *
+ * O teto de CINQUENTA itens limita o tamanho, não o tempo — são coisas
+ * diferentes e cada uma precisa do seu limite, exatamente como `ssrfGuard` já
+ * diz sobre o prazo de um salto contra o teto de bytes.
+ *
+ * Cada item pode baixar mídia: `safeFetch` com 90 s, e se ele falhar ainda há
+ * uma segunda tentativa pelo servidor, com 15 s. Cinquenta itens em série, no
+ * pior caso, são cerca de 87 minutos com o handler do Express preso. E
+ * `waWebhookLimiter` conta CHEGADAS, não requisições simultâneas: nada limitava
+ * quantos handlers ficavam presos ao mesmo tempo.
+ *
+ * O desfecho é pior que lento. O Evolution estoura o prazo dele, lê a não
+ * resposta como falha e REENTREGA o mesmo lote — multiplicando os handlers
+ * presos até acabarem os sockets. Um storage lento do outro lado, ou um payload
+ * forjado com cinquenta mídias apontando para um host que arrasta, chegam lá.
+ *
+ * Dois minutos é folgado para um lote honesto — a sincronização real do Baileys
+ * traz texto, e mídia é a exceção — e curto o bastante para a reentrega do
+ * Evolution encontrar o handler livre em vez de somar outro.
+ */
+const ORCAMENTO_LOTE_MS = 120_000;
+
+/**
+ * Apaga os bytes de um anexo que não chegou a ter linha.
+ *
+ * Nunca lança e nunca altera o desfecho de quem chama: isto é limpeza pendurada
+ * num caminho que já deu errado, e uma falha aqui não pode virar o motivo de um
+ * 500 — nem esconder o erro de verdade que está subindo.
+ */
+async function descartarAnexoOrfao(anexo) {
+  const relativo = anexo?.attachment_path;
+  if (!relativo) return;
+  try {
+    await fs.unlink(path.join(DATA_DIR, relativo));
+  } catch (error) {
+    // ENOENT é o caso comum e não é problema: significa que não havia nada.
+    if (error?.code !== 'ENOENT') {
+      console.warn(`[wa] anexo órfão ficou no disco (${relativo}): ${error.message}`);
+    }
+  }
+}
+
 async function tratarMensagens(account, body) {
   const data = body?.data;
   // O v2 manda um objeto; algumas versões mandam o lote do Baileys.
@@ -377,8 +437,21 @@ async function tratarMensagens(account, body) {
   if (itens.length === 1) return gravarMensagem(account, itens[0]);
 
   let gravadas = 0;
+  let abandonados = 0;
   const pulados = [];
+  const prazo = Date.now() + ORCAMENTO_LOTE_MS;
   for (const item of itens) {
+    // O orçamento é conferido ANTES de cada item, não durante: interromper uma
+    // gravação pela metade deixaria arquivo sem linha. Parar na borda entre
+    // dois itens é o único ponto em que abandonar não custa nada.
+    if (Date.now() >= prazo) {
+      abandonados = itens.length - (gravadas + pulados.length);
+      console.warn(
+        `[wa] lote de ${itens.length} passou de ${ORCAMENTO_LOTE_MS}ms; `
+        + `${abandonados} item(ns) não processado(s)`
+      );
+      break;
+    }
     // Sequencial de propósito: `WaConversation.ensure` é um get-or-create sem
     // transação, e um lote do mesmo contato em paralelo criaria duas conversas.
     // eslint-disable-next-line no-await-in-loop
@@ -386,7 +459,14 @@ async function tratarMensagens(account, body) {
     if (r.handled) gravadas += 1;
     else pulados.push(r.skipped);
   }
-  return { handled: gravadas > 0, stored: gravadas, skipped: pulados.length ? pulados.join(',') : undefined };
+  return {
+    handled: gravadas > 0,
+    stored: gravadas,
+    skipped: pulados.length ? pulados.join(',') : undefined,
+    // Sai no corpo da resposta porque é a única observabilidade deste caminho:
+    // sem isto, um lote cortado pela metade e um lote inteiro respondem igual.
+    ...(abandonados > 0 ? { dropped: abandonados } : {})
+  };
 }
 
 // ────────────────────────────────────────────────────────────────────

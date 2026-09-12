@@ -659,3 +659,107 @@ describe('a sonda do próprio painel', () => {
     assert.equal(body.pong, '');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Dois limites que o lote não tinha
+// ─────────────────────────────────────────────────────────────────────────────
+describe('o lote e o que ele deixa para trás', () => {
+  it('o anexo NÃO fica no disco quando a linha não chega a existir', async () => {
+    // Os bytes são gravados ANTES do insert, porque o caminho deles é uma
+    // coluna da linha. Quando o insert falha por qualquer motivo que não seja
+    // duplicidade, a linha não existe e os bytes ficavam sem dono.
+    //
+    // E não eram poucos para sempre: o varredor de mídia só apaga o que está
+    // ligado a uma linha, e a retenção padrão é 0 — nunca apaga. Numa
+    // instalação padrão esses arquivos ficavam no disco para sempre.
+    //
+    // O caso do evento REPETIDO não vaza, e vale dizer por quê: ele produz o
+    // mesmo nome de arquivo — mesmo `externalId`, mesma conversa —, então a
+    // segunda passagem sobrescreve a primeira em vez de deixar um segundo
+    // arquivo. A limpeza cobre os dois ramos mesmo assim, porque depender
+    // dessa coincidência de nome é depender de algo que ninguém prometeu.
+    const { default: WaMediaService } = await import('../src/services/waMediaService.js');
+    const real = WaMediaService.armazenar;
+    let gravadoEm = null;
+
+    // Envolve o armazenamento só para saber ONDE o arquivo foi parar.
+    WaMediaService.armazenar = async (args) => {
+      const r = await real.call(WaMediaService, args);
+      if (r?.attachment_path) gravadoEm = path.join(DATA_DIR, r.attachment_path);
+      return r;
+    };
+    // E o insert falha com um erro que NÃO é violação de unicidade.
+    const db = getDb();
+    const insertReal = db.client.query.bind(db.client);
+    let derrubar = true;
+    db.client.query = (connection, obj) => {
+      // O dialeto cita identificador de jeitos diferentes — crase no SQLite e
+      // no MySQL, aspas duplas no Postgres —, então a peneira olha a forma e
+      // não a pontuação.
+      if (derrubar && /^insert into ["`]?wa_messages["`]?/i.test(String(obj?.sql || ''))) {
+        derrubar = false;
+        return Promise.reject(new Error('disco cheio'));
+      }
+      return insertReal(connection, obj);
+    };
+
+    try {
+      await hook(eventoV2({
+        id: 'V2-MIDIA-SEM-LINHA',
+        remoteJid: '5593977774444@s.whatsapp.net',
+        message: {
+          imageMessage: { mimetype: 'image/png', caption: 'sem linha' },
+          base64: PNG_BASE64
+        }
+      }));
+    } catch {
+      /* o webhook responde 500; o que importa é o disco */
+    } finally {
+      WaMediaService.armazenar = real;
+      db.client.query = insertReal;
+    }
+
+    assert.ok(gravadoEm, 'o anexo nem chegou a ser gravado; o caso não mede nada');
+    assert.equal(await mensagemPorId('V2-MIDIA-SEM-LINHA'), null, 'a linha não devia existir');
+    assert.equal(fs.existsSync(gravadoEm), false, 'os bytes ficaram no disco sem dono');
+  });
+
+  it('um lote que estoura o orçamento para na borda, sem deixar gravação pela metade', async () => {
+    // Cada item pode gastar 90 s baixando mídia, e o teto de cinquenta limita o
+    // TAMANHO do lote, não o tempo. Cinquenta em série chegam a ~87 minutos com
+    // o handler preso — e o Evolution, ao estourar o prazo dele, reentrega o
+    // mesmo lote e multiplica os handlers presos.
+    const real = Date.now;
+    let agora = real.call(Date);
+    // O relógio anda 60 s a cada consulta: o orçamento (120 s) estoura na
+    // terceira conferência, que acontece ANTES do terceiro item.
+    Date.now = () => { agora += 60_000; return agora; };
+    try {
+      const { status, body } = await call(`${panelUrl}/api/whatsapp-webhook?t=${WEBHOOK_TOKEN}`, {
+        method: 'POST',
+        body: {
+          event: 'messages.upsert',
+          instance: INSTANCE,
+          data: ['A', 'B', 'C', 'D'].map((sufixo) => ({
+            key: { remoteJid: '5593966665555@s.whatsapp.net', fromMe: false, id: `LOTE-${sufixo}` },
+            pushName: 'Cliente',
+            message: { conversation: `item ${sufixo}` },
+            messageType: 'conversation',
+            messageTimestamp: 1739990000
+          }))
+        }
+      });
+      assert.equal(status, 200);
+      // O corpo CONTA o que ficou de fora: sem isso, um lote cortado pela
+      // metade e um lote inteiro respondem exatamente a mesma coisa.
+      assert.ok(body.dropped > 0, 'o orçamento não cortou nada');
+      assert.ok(body.stored > 0, 'nem sequer o primeiro item entrou');
+    } finally {
+      Date.now = real;
+    }
+
+    // O corte é na BORDA entre dois itens: o que entrou, entrou inteiro.
+    assert.ok(await mensagemPorId('LOTE-A'));
+    assert.equal(await mensagemPorId('LOTE-D'), null);
+  });
+});

@@ -33,6 +33,13 @@ class AuditLog {
     INVITE_ACCEPTED: 'invite.accepted',
     INVITE_REVOKED: 'invite.revoked',
     TENANT_STATUS_CHANGED: 'tenant.status_changed',
+    // A conta de portal do assinante ANTERIOR de uma ONT foi encerrada, porque
+    // o aparelho passou a reportar outro login PPPoE. É destrutivo — o Customer
+    // ID muda, a senha do portal é recunhada e o vínculo com o ERP é apagado —
+    // e por muito tempo produziu só um `console.warn`, que é log de processo e
+    // some. O ISP que perguntasse "por que meu assinante perdeu o acesso" não
+    // tinha onde olhar.
+    SUBSCRIBER_ACCOUNT_RETIRED: 'subscriber_account.retired',
     TENANT_EXPORTED: 'tenant.exported',
     // O cadastro fiscal do provedor mudou — razão social, CNPJ, endereço,
     // contato de cobrança. Registra QUAIS campos, nunca os valores: a trilha
