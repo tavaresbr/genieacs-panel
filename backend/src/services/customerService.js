@@ -6,6 +6,8 @@ import CustomerPortalPasswordService from './customerPortalPasswordService.js';
 import DeviceSwapService from './deviceSwapService.js';
 import DeviceProfile from '../models/DeviceProfile.js';
 import Setting from '../models/Setting.js';
+import AuditLog from '../models/AuditLog.js';
+import { currentActor } from '../config/tenantContext.js';
 import { TranslatableError } from '../i18n/index.js';
 
 const CUSTOMER_ID_PATTERN = /^[A-Z]{2,4}-[A-Z0-9]{7}-[A-Z0-9]{6}$/;
@@ -140,6 +142,33 @@ class CustomerService {
       `Device ${previousDeviceId} now reports PPPoE "${incomingPppoe}" instead of `
       + `"${account.pppoe_username}"; retiring customer account ${account.customer_id}.`
     );
+
+    // A linha da trilha vem ANTES da escrita, como na exclusão de provedor: uma
+    // aposentadoria sem registro é a que ninguém consegue explicar depois.
+    //
+    // E ela faltava. Isto apaga o Customer ID de um assinante, a senha do
+    // portal dele e o vínculo com o ERP, e por muito tempo produziu só um
+    // `console.warn` — que não é trilha, é log do processo, e some. O ISP que
+    // perguntasse "por que o meu assinante perdeu o acesso" não tinha onde
+    // olhar.
+    const autor = currentActor();
+    await AuditLog.record({
+      action: AuditLog.ACTIONS.SUBSCRIBER_ACCOUNT_RETIRED,
+      actorUserId: autor?.userId ?? null,
+      actorUsername: autor?.username ?? null,
+      // Trabalho de fundo — a fila, o varredor — chega aqui sem autor, e
+      // `system` é a resposta honesta para isso. Inventar um operador seria
+      // pior que não ter nenhum.
+      actorKind: autor ? 'operator' : 'system',
+      subjectType: 'customer_account',
+      subjectId: String(account.customer_id),
+      detail: {
+        deviceId: previousDeviceId,
+        pppoeAnterior: account.pppoe_username,
+        pppoeNovo: incomingPppoe
+      }
+    });
+
     await CustomerAccount.retire(account.id);
     try {
       await SgpLink.deleteByDeviceId(previousDeviceId);
@@ -307,6 +336,37 @@ class CustomerService {
   }
 
   static async syncDevices(devices, { enabled } = {}) {
+    // ── A personificação não reconcilia ────────────────────────────────────
+    //
+    // Esta função é chamada de `GET /api/devices`, e ela ESCREVE: cria conta de
+    // portal, cunha senha, e no ramo do assinante trocado aposenta a conta
+    // anterior e apaga o vínculo do ERP. O muro da personificação é por MÉTODO
+    // (`auth.js`), e GET passa; o papel `viewer` imposto na hidratação tem
+    // `devices.list`. Então quem do plantão da plataforma abria o painel de um
+    // cliente e clicava na lista de aparelhos podia fazer um assinante daquele
+    // cliente perder o Customer ID, a senha do portal e o vínculo com o ERP.
+    //
+    // É exatamente o que o docstring de `impersonationRefusal` promete que não
+    // acontece: "uma escrita feita numa personificação aparece no painel do
+    // cliente como coisa que o cliente fez. Um atendimento não pode produzir
+    // isso."
+    //
+    // O conserto reusa o caminho que já existe e já é testado: com
+    // `shouldGenerate` falso esta função só LÊ o que está guardado e devolve o
+    // mapa. O plantão vê a frota como ela está, e não mexe em nada. A
+    // reconciliação acontece na próxima visita de um operador do próprio
+    // provedor, que é de quem ela sempre foi.
+    //
+    // Note que isto NÃO adia a aposentadoria para ninguém mais: para o operador
+    // do provedor ela continua acontecendo na hora, que é o que impede a conta
+    // do assinante ANTERIOR de continuar apontando para o aparelho do novo.
+    if (currentActor()?.impersonation) {
+      const rows = await CustomerAccount.getIdsByDeviceIds(
+        devices.map((device) => String(device?._id || '')).filter(Boolean)
+      );
+      return new Map(rows.map((row) => [row.device_id, row.customer_id]));
+    }
+
     const shouldGenerate = enabled ?? await this.isAutoGenerationEnabled();
     const deviceIds = devices.map((device) => String(device?._id || '')).filter(Boolean);
     let rows = await CustomerAccount.getIdsByDeviceIds(deviceIds);
