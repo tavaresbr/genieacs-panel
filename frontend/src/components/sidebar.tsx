@@ -31,6 +31,7 @@ const menuItems = [
   { href: '/network-map', labelKey: 'sidebar.nav.networkMap', descriptionKey: 'sidebar.nav.networkMapDescription', icon: 'map', permission: 'map.read' },
   { href: '/whatsapp', labelKey: 'sidebar.nav.whatsapp', descriptionKey: 'sidebar.nav.whatsappDescription', icon: 'chat', permission: 'whatsapp.read' },
   { href: '/settings', labelKey: 'sidebar.nav.settings', descriptionKey: 'sidebar.nav.settingsDescription', icon: 'settings', permission: 'settings.read' },
+  { href: '/audit', labelKey: 'sidebar.nav.audit', descriptionKey: 'sidebar.nav.auditDescription', icon: 'trail', permission: 'audit.read' },
   { href: '/plan', labelKey: 'sidebar.nav.plan', descriptionKey: 'sidebar.nav.planDescription', icon: 'settings', permission: 'settings.read', saasOnly: true },
   { href: '/platform', labelKey: 'sidebar.nav.platform', descriptionKey: 'sidebar.nav.platformDescription', icon: 'settings', permission: 'settings.read', platformOnly: true },
 ] as const

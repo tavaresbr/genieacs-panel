@@ -19,6 +19,7 @@ const DevicesPage = lazy(() => import('@/pages/devices'))
 const DeviceDetailPage = lazy(() => import('@/pages/device-detail'))
 const NetworkMapPage = lazy(() => import('@/pages/network-map'))
 const SettingsPage = lazy(() => import('@/pages/settings'))
+const AuditPage = lazy(() => import('@/pages/audit'))
 const WhatsAppPage = lazy(() => import('@/pages/whatsapp'))
 const PlatformPage = lazy(() => import('@/pages/platform'))
 const LoginPage = lazy(() => import('@/pages/login'))
@@ -214,6 +215,13 @@ export default function App() {
                   </Route>
                   <Route element={<PermissionRoute permission="map.read" />}>
                     <Route path="/network-map" element={<NetworkMapPage />} />
+                  </Route>
+                  {/* A trilha do provedor. A capacidade é a da leitura que a
+                      tela faz ao abrir, e é a mesma do item no menu — item que
+                      aparece e leva a um redirecionamento é pior que item
+                      nenhum. */}
+                  <Route element={<PermissionRoute permission="audit.read" />}>
+                    <Route path="/audit" element={<AuditPage />} />
                   </Route>
                   <Route element={<PermissionRoute permission="settings.read" />}>
                     <Route path="/settings" element={<SettingsPage />} />

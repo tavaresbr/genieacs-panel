@@ -133,3 +133,20 @@ export function formatDate(isoString: string | undefined | null): string {
     return translate(getActiveLocale(), 'common.invalidDate');
   }
 }
+
+/**
+ * O nome de reserva do arquivo de exportação.
+ *
+ * O nome bom vem do servidor, no `Content-Disposition` — é ele quem sabe o slug
+ * do provedor e é ele quem deve continuar sendo o único autor da regra. Esta
+ * função existe para o caso em que o cabeçalho não chega: painel servido de
+ * outra origem por um backend que ainda não o expõe. Sem ela o navegador salva
+ * `tenant-export` ou, pior, um nome derivado da URL de blob.
+ *
+ * A data é ISO e não localizada de propósito: `toLocaleDateString()` devolve
+ * `12/09/2026` em pt-BR, e barra dentro de nome de arquivo é caminho.
+ */
+export function exportFileName(slug: string | null | undefined, when: Date = new Date()): string {
+  const quem = (slug || 'export').replace(/[^a-zA-Z0-9._-]/g, '-')
+  return `skygenpanel-${quem}-${when.toISOString().slice(0, 10)}.json`
+}

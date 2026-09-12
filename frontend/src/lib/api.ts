@@ -35,6 +35,29 @@ export interface ApiResponse<T = any> {
   current?: number
 }
 
+/**
+ * O nome do arquivo que o servidor mandou, se ele mandou.
+ *
+ * Lê `filename="..."` e também o `filename*=UTF-8''...` do RFC 5987, nessa
+ * ordem de preferência, porque é o segundo que carrega acento sem quebrar. O
+ * que volta é só o nome: qualquer barra é jogada fora, para que um cabeçalho
+ * malformado não vire caminho no disco de quem baixa.
+ */
+export function filenameFromDisposition(header: string | null): string | undefined {
+  if (!header) return undefined
+  const estendido = /filename\*\s*=\s*UTF-8''([^;]+)/i.exec(header)
+  const simples = /filename\s*=\s*"([^"]*)"|filename\s*=\s*([^;]+)/i.exec(header)
+  let nome: string | undefined
+  if (estendido) {
+    try { nome = decodeURIComponent(estendido[1]) } catch { nome = estendido[1] }
+  } else if (simples) {
+    nome = (simples[1] ?? simples[2] ?? '').trim()
+  }
+  if (!nome) return undefined
+  const limpo = nome.split(/[\\/]/).pop()?.trim()
+  return limpo || undefined
+}
+
 class ApiClient {
   private baseURL: string
   private token: string | null = null
@@ -200,8 +223,20 @@ class ApiClient {
    * A binary response. `request` reads JSON or text, so a file fetched through
    * it would arrive mangled and silently — hence its own path, with the same
    * Authorization header and the same locale.
+   *
+   * O que ela NÃO podia continuar deixando de fazer, e por isso os três blocos
+   * abaixo: esta função era um `fetch` cru, e tudo que `request` resolve para a
+   * API inteira — renovar o token expirado, acender o aviso de assinatura no
+   * 402, devolver uma frase em vez de um código — simplesmente não acontecia
+   * aqui. Enquanto o único caminho por ela foi baixar um anexo de conversa, o
+   * preço era um botão que não fazia nada de vez em quando. Com a exportação
+   * do cadastro inteiro do provedor passando pelo mesmo cano, "não fez nada"
+   * vira "o provedor acha que não pode exportar os próprios dados".
    */
-  async getBlob(endpoint: string): Promise<{ success: boolean; blob?: Blob; code?: string }> {
+  async getBlob(
+    endpoint: string,
+    retryAfterRefresh = true
+  ): Promise<{ success: boolean; blob?: Blob; filename?: string; code?: string; message?: string }> {
     const headers: Record<string, string> = { 'Accept-Language': getActiveLocale() }
     if (this.token) headers['Authorization'] = `Bearer ${this.token}`
     try {
@@ -209,11 +244,45 @@ class ApiClient {
       if (!response.ok) {
         const contentType = response.headers.get('content-type') || ''
         const data = contentType.includes('application/json') ? await response.json() : {}
-        return { success: false, code: data.code }
+
+        // A sessão expirou no meio: mesma renovação que `request` faz, e pelo
+        // mesmo motivo — sem ela o download simplesmente não acontece, sem erro
+        // visível, e a pessoa clica de novo.
+        if (response.status === 403 && data.code === 'invalid_token' && retryAfterRefresh) {
+          const refreshed = await this.refreshAccessToken()
+          if (refreshed) return this.getBlob(endpoint, false)
+        }
+
+        // O 402 da assinatura é da casca do app, não desta chamada: quem mostra
+        // a tela de bloqueio é quem ouve este evento.
+        if (response.status === 402 && typeof data.code === 'string' && data.code.startsWith('subscription_')) {
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent<SubscriptionBlockedDetail>(SUBSCRIPTION_BLOCKED_EVENT, {
+              detail: { code: data.code, message: data.message || '', subscription: data.subscription ?? null }
+            }))
+          }
+        }
+
+        return {
+          success: false,
+          code: data.code,
+          message: data.message || translate(
+            getActiveLocale(),
+            data.code === 'missing_permission' ? 'api.missingPermission' : 'api.requestFailed'
+          )
+        }
       }
-      return { success: true, blob: await response.blob() }
+      return {
+        success: true,
+        blob: await response.blob(),
+        // O nome vem do servidor, que é quem o monta (`Content-Disposition`).
+        // Remontá-lo aqui seria a segunda cópia da regra, e a segunda cópia é a
+        // que diverge. Pode vir vazio quando o painel é servido de outra origem
+        // e o deploy não expõe o cabeçalho — daí a reserva de quem chama.
+        filename: filenameFromDisposition(response.headers.get('content-disposition'))
+      }
     } catch {
-      return { success: false }
+      return { success: false, message: translate(getActiveLocale(), 'api.requestFailed') }
     }
   }
 
@@ -413,7 +482,65 @@ export const publicTenantAPI = {
 export const tenantAPI = {
   /** The name on the sidebar, the login screen and the tab — what `settings.appName` used to be. */
   rename: (name: string) =>
-    apiClient.requestWithBody<{ name: string; slug: string }>('PATCH', '/tenant', { name })
+    apiClient.requestWithBody<{ name: string; slug: string }>('PATCH', '/tenant', { name }),
+
+  /**
+   * Todo o cadastro deste provedor, num arquivo.
+   *
+   * Não é envelope de API: a rota responde com `Content-Disposition: attachment`
+   * e o JSON inteiro no corpo, então vai por `getBlob` e não por `get`. Demora
+   * na proporção do histórico do provedor — são trinta tabelas lidas em série,
+   * sem teto —, o que é por que quem chama precisa de um estado de espera de
+   * verdade e não de um `await` escondido atrás de um clique.
+   */
+  export: () => apiClient.getBlob('/tenant/export')
+}
+
+/** Uma linha da trilha, como a tela a recebe. */
+export interface AuditEntry {
+  id: number
+  action: string
+  actor: {
+    /** Nulo quando a pessoa saiu do deploy: o nome fica, que é a razão de ele ser desnormalizado. */
+    userId: number | null
+    username: string | null
+    kind: 'operator' | 'platform' | 'system'
+  }
+  subject: { type: string | null; id: string | null }
+  /** Já parseado pelo backend, ou nulo — inclusive quando o JSON gravado não voltou inteiro. */
+  detail: Record<string, unknown> | null
+  ip: string | null
+  /**
+   * Cru do driver: `Date` no PostgreSQL e no MariaDB, número ou string no
+   * SQLite. Quem mostra usa `formatDateTime`, que aceita os três.
+   */
+  at: string | number | null
+}
+
+export interface AuditPage {
+  entries: AuditEntry[]
+  nextBefore: number | null
+  /** As ações que o backend conhece, em toda resposta: é a lista do filtro. */
+  actions: string[]
+}
+
+/**
+ * A trilha deste provedor. Só leitura, e é a rota inteira.
+ *
+ * O filtro por ação vai no servidor, e não sobre o que já foi carregado: a
+ * rota aceita `?action=` com índice por trás (`tenant_id`, `action`), e filtrar
+ * no cliente mostraria "nada encontrado" para uma ação que existe três páginas
+ * adiante.
+ */
+export const auditAPI = {
+  list: (params: { action?: string | null; limit?: number; before?: number | null } = {}) => {
+    const query = new URLSearchParams()
+    if (params.action) query.set('action', params.action)
+    if (params.limit) query.set('limit', String(params.limit))
+    if (params.before) query.set('before', String(params.before))
+    const suffix = query.toString()
+    return apiClient.get<AuditPage>(`/audit${suffix ? `?${suffix}` : ''}`)
+  }
 }
 
 /** O que quem abre um link de convite vê antes de decidir. */
