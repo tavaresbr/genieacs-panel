@@ -843,6 +843,18 @@ const waBroadcastRecipientsTable = (db) => (t) => {
   t.string('status', 16).notNullable().defaultTo('pending');
   t.string('error_msg', 500);
   t.integer('attempts').notNullable().defaultTo(0);
+  // Quando ESTA linha foi garrada, e não quando a campanha foi montada.
+  //
+  // A distinção é a diferença entre a trava funcionar e não funcionar. A janela
+  // de retomada media idade a partir de `created_at`, que é gravado quando o
+  // operador MONTA a campanha — e como ele revisa o rascunho antes de disparar,
+  // toda campanha real já nasce com mais de cinco minutos. O ramo "garra morta"
+  // casava no mesmo instante da garra, e o `UPDATE` condicional que deveria
+  // impedir dois ticks de contatarem o mesmo assinante não impedia nada.
+  //
+  // É a mesma coluna que `wa_messages` tem, pelo mesmo motivo: lá a janela
+  // sempre funcionou porque sempre foi medida da garra.
+  t.timestamp('claimed_at');
   t.timestamp('sent_at');
   t.timestamp('created_at').defaultTo(db.fn.now());
   t.index(['broadcast_id', 'status']);
@@ -2628,6 +2640,34 @@ export const migrations = [
       if (!faltando.length) return;
       await db.schema.alterTable('whatsapp_accounts', (t) => {
         for (const add of faltando) add(t);
+      });
+    }
+  },
+  {
+    /**
+     * A coluna de garra que a campanha nunca teve.
+     *
+     * `listPendingIds` e `claimRecipient` retomavam qualquer linha em 'sending'
+     * mais velha que cinco minutos — medindo a idade por `created_at`, que é
+     * quando a campanha foi MONTADA, não quando o destinatário foi garrado. Numa
+     * campanha real, montada e revisada antes de disparar, esse corte já estava
+     * no passado quando o primeiro envio começou: a condição de retomada casava
+     * junto com a garra, e dois ticks sobrepostos contatavam o mesmo assinante.
+     *
+     * Entra NULA para as linhas existentes, e isso é seguro: uma linha sem garra
+     * registrada nunca satisfaz `claimed_at < corte`, então ela só é alcançável
+     * pelo ramo 'pending' — que é o certo para uma linha que ninguém pegou.
+     */
+    id: '0042_broadcast_recipient_claimed_at',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('wa_broadcast_recipients'))) return true;
+      return db.schema.hasColumn('wa_broadcast_recipients', 'claimed_at');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('wa_broadcast_recipients'))) return;
+      if (await db.schema.hasColumn('wa_broadcast_recipients', 'claimed_at')) return;
+      await db.schema.alterTable('wa_broadcast_recipients', (t) => {
+        t.timestamp('claimed_at');
       });
     }
   }

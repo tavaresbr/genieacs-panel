@@ -41,6 +41,28 @@ export const MAX_ATTEMPTS = 7;
  * two overlapping ticks cannot both take a recipient. Two copies that drifted
  * would put that guarantee quietly out of step.
  */
+/**
+ * A linha que um tick anterior garrou e nunca concluiu.
+ *
+ * Um tick que morreu no meio do envio deixa a linha em 'sending' para sempre;
+ * retomá-la é o que torna uma queda recuperável. A idade sai de `claimed_at`, o
+ * instante da garra — e NÃO de `created_at`, que é quando a campanha foi
+ * montada e não diz nada sobre quem a está enviando agora.
+ *
+ * `claimed_at` nulo nunca casa, o que é o certo: linha antiga, de antes da
+ * coluna existir, ou linha que ninguém garrou, só é alcançável pelo ramo
+ * 'pending'.
+ *
+ * O prazo de envio NÃO é consultado neste ramo, de propósito: uma garra
+ * abandonada é queda a recuperar, não espera que alguém agendou.
+ */
+function reclaimable(q) {
+  return q
+    .where({ status: 'sending' })
+    .whereNotNull('claimed_at')
+    .where('claimed_at', '<', new Date(Date.now() - RECLAIM_MS));
+}
+
 function due(q, now) {
   return q.where((pending) => pending
     .where({ status: 'pending' })
@@ -107,20 +129,9 @@ class WaBroadcast {
 
   /** Ids the flush loop should try next for one campaign, oldest first. */
   static async listPendingIds(broadcastId, limit) {
-    const cutoff = new Date(Date.now() - RECLAIM_MS);
     return tdb('wa_broadcast_recipients')
       .where({ broadcast_id: broadcastId })
-      .where((q) => due(q, new Date())
-        // A tick that died mid-send leaves a row in 'sending' forever.
-        // Retaking it is what makes a crash recoverable. The age is measured
-        // from `created_at` because this table has no claim timestamp of its
-        // own — which is safe here only because the window between a claim
-        // and its outcome is a single enqueue: a row that reached the outbox
-        // is already 'sent' by the time the next tick looks.
-        //
-        // The due time is deliberately NOT consulted on this branch: a stale
-        // claim is a crash to recover from, not a wait somebody scheduled.
-        .orWhere((stale) => stale.where({ status: 'sending' }).where('created_at', '<', cutoff)))
+      .where((q) => due(q, new Date()).orWhere((stale) => reclaimable(stale)))
       .orderBy('id')
       .limit(limit)
       .pluck('id');
@@ -129,18 +140,25 @@ class WaBroadcast {
   /**
    * Takes ownership of one recipient, or reports that someone else already has.
    *
-   * A conditional UPDATE checked by affected-row count, exactly like
-   * `WaMessage.claim()`: SQLite has no `SKIP LOCKED`, and the repeated WHERE is
-   * what stops two overlapping ticks from both contacting the same subscriber.
+   * Um `UPDATE` condicional conferido pela contagem de linhas afetadas,
+   * exatamente como `WaMessage.claim()`: o SQLite não tem `SKIP LOCKED`, e
+   * repetir o WHERE é o que impede dois ticks sobrepostos de contatarem o mesmo
+   * assinante.
+   *
+   * Isso só passou a ser verdade quando `claimed_at` existiu. Antes, a condição
+   * de retomada media idade por `created_at` — o instante em que a campanha foi
+   * MONTADA —, e numa campanha revisada antes de disparar esse corte já estava
+   * no passado: o ramo "garra morta" casava junto com a garra, e a trava era
+   * vazia. Gravar `claimed_at` aqui é o que fecha a janela.
    */
   static async claimRecipient(id) {
-    const cutoff = new Date(Date.now() - RECLAIM_MS);
+    const now = new Date();
     const changed = await tdb('wa_broadcast_recipients')
       .where({ id })
-      .where((q) => due(q, new Date())
-        .orWhere((stale) => stale.where({ status: 'sending' }).where('created_at', '<', cutoff)))
+      .where((q) => due(q, now).orWhere((stale) => reclaimable(stale)))
       .update({
         status: 'sending',
+        claimed_at: now,
         attempts: getDb().raw('attempts + 1')
       });
     return changed > 0 ? this.getRecipient(id) : null;
