@@ -105,6 +105,9 @@ const zhCN: Dictionary = {
   'login.kicker': '运维人员访问',
   'login.title': '登录面板',
   'login.subtitle': '使用您的 SkyGenPanel 管理员账号查看设备数据。',
+  'login.platform.kicker': '平台访问',
+  'login.platform.title': '登录控制台',
+  'login.platform.subtitle': '请使用持有控制台钥匙的账户。此地址不属于任何运营商的面板。',
   'login.identifier': '用户名或邮箱',
   'login.identifierPlaceholder': 'admin 或 you@yourisp.com',
   'login.identifierHint': '两者都可以：一直使用的用户名依然能登录。',
@@ -115,6 +118,8 @@ const zhCN: Dictionary = {
   'login.submit': '登录',
   'login.submitting': '正在验证账号…',
   'login.helpText': '如果访问被拒绝，请联系面板管理员重置您的凭据。',
+  'login.platform.helpText': '平台账户的密码在服务器上用 scripts/reset-password.js 重置。',
+  'console.header': '平台',
   'login.error.invalidCredentials': '用户名或邮箱与密码不匹配。请检查凭据。',
   'login.error.unreachable': '面板无法连接到服务器。请检查网络连接后重试。',
 

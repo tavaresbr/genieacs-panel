@@ -105,6 +105,9 @@ const zhTW: Dictionary = {
   'login.kicker': '維運人員存取',
   'login.title': '登入面板',
   'login.subtitle': '請使用您的 SkyGenPanel 管理員帳號檢視設備資料。',
+  'login.platform.kicker': '平台存取',
+  'login.platform.title': '登入主控台',
+  'login.platform.subtitle': '請使用持有主控台鑰匙的帳戶。此位址不屬於任何業者的面板。',
   'login.identifier': '使用者名稱或電子郵件',
   'login.identifierPlaceholder': 'admin 或 you@yourisp.com',
   'login.identifierHint': '兩者皆可：一直使用的使用者名稱仍然可以登入。',
@@ -115,6 +118,8 @@ const zhTW: Dictionary = {
   'login.submit': '登入',
   'login.submitting': '正在驗證帳號…',
   'login.helpText': '若存取遭到拒絕，請聯絡面板管理員重設您的憑證。',
+  'login.platform.helpText': '平台帳戶的密碼在伺服器上用 scripts/reset-password.js 重設。',
+  'console.header': '平台',
   'login.error.invalidCredentials': '使用者名稱或電子郵件與密碼不符。請確認憑證。',
   'login.error.unreachable': '面板無法連線至伺服器。請檢查網路連線後重試。',
 

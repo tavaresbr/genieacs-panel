@@ -24,6 +24,16 @@ interface TenantContextValue {
   loading: boolean
   /** The name to show, never empty: the provider's, or the product's while it loads or when the host names nobody. */
   name: string
+  /**
+   * O nome do PROVEDOR, ou `null` quando o endereço não nomeia nenhum.
+   *
+   * Ao lado de `name`, que nunca é vazio: aquele serve para preencher um título
+   * e cai no nome do produto quando não há provedor; este serve para quem
+   * precisa saber se há um — e ali "SkyGenPanel" não é uma resposta, é um
+   * marcador de ausência que uma tela acabaria mostrando como se fosse o nome
+   * de alguém.
+   */
+  providerName: string | null
   isSaas: boolean
   /** The platform's own front door: a SaaS host that names no provider. Only sign-up lives here. */
   isPlatformHost: boolean
@@ -59,6 +69,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     tenant,
     loading,
     name,
+    providerName: tenant?.name ?? null,
     isSaas: tenant?.edition === 'saas',
     isPlatformHost: tenant !== null && tenant.slug === null,
     refresh
