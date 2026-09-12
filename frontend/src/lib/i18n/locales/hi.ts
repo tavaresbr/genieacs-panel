@@ -1596,6 +1596,8 @@ const hi: Dictionary = {
   'platform.subscription.payment': 'भुगतान दर्ज करें',
   'platform.subscription.amount': 'राशि (जैसे 199.90)',
   'platform.subscription.amountInvalid': 'मान्य राशि दर्ज करें।',
+  'platform.subscription.paymentRecorded': 'भुगतान दर्ज किया गया',
+  'platform.subscription.paymentDuplicate': 'यह संदर्भ पहले से दर्ज था; दोबारा कुछ जमा नहीं हुआ',
   'platform.subscription.reference': 'संदर्भ (Pix आईडी, बोलेटो संख्या)',
   'platform.subscription.recordPayment': 'भुगतान हुआ चिह्नित करें',
   'platform.subscription.paymentHint': 'भुगतान अवधि 30 दिन बढ़ाता है और सदस्यता को सक्रिय करता है। निलंबित या रद्द ISP भुगतान से पुनः सक्रिय नहीं होता।',

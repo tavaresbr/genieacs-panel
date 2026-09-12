@@ -1541,6 +1541,8 @@ const ru: Dictionary = {
   'platform.subscription.payment': 'Зарегистрировать платёж',
   'platform.subscription.amount': 'Сумма (например, 199,90)',
   'platform.subscription.amountInvalid': 'Введите корректную сумму.',
+  'platform.subscription.paymentRecorded': 'Платёж записан',
+  'platform.subscription.paymentDuplicate': 'Эта ссылка уже была записана; повторно ничего не зачислено',
   'platform.subscription.reference': 'Ссылка (id Pix, номер boleto)',
   'platform.subscription.recordPayment': 'Отметить как оплачено',
   'platform.subscription.paymentHint': 'Продлевает оплаченный период на 30 дней и делает подписку активной. Приостановленный или отменённый провайдер платежом не активируется.',

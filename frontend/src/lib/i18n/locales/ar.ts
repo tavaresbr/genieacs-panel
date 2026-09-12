@@ -1597,6 +1597,8 @@ const ar: Dictionary = {
   'platform.subscription.payment': 'تسجيل دفعة',
   'platform.subscription.amount': 'المبلغ (مثل 199.90)',
   'platform.subscription.amountInvalid': 'أدخل مبلغًا صالحًا.',
+  'platform.subscription.paymentRecorded': 'تم تسجيل الدفعة',
+  'platform.subscription.paymentDuplicate': 'هذا المرجع مُسجَّل بالفعل؛ لم يُضف شيء مرة أخرى',
   'platform.subscription.reference': 'المرجع (معرّف Pix، رقم الفاتورة)',
   'platform.subscription.recordPayment': 'تعليم كمدفوع',
   'platform.subscription.paymentHint': 'تمدّد الفترة المدفوعة 30 يومًا وتجعل الاشتراك نشطًا. المزوّد الموقوف أو الملغى لا يُعاد تفعيله بدفعة.',

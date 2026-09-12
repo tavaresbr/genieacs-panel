@@ -860,7 +860,12 @@ export const platformAPI = {
 
   /** We mark it paid. `reference` is the Pix id, the boleto number — whatever names the payment. */
   recordPayment: (tenantId: number, payload: { amountCents: number; currency: string; reference?: string }) =>
-    apiClient.post<{ subscription: SubscriptionView }>(`/platform/tenants/${tenantId}/payments`, payload),
+    // `duplicate` é o que distingue "creditei" de "esta referência já estava
+    // creditada". O backend sempre respondeu os dois com 200 — e sem este campo
+    // no tipo, a tela não tinha como contar a diferença.
+    apiClient.post<{ subscription: SubscriptionView; duplicate?: boolean }>(
+      `/platform/tenants/${tenantId}/payments`, payload
+    ),
 
   getUsage: (tenantId: number) =>
     apiClient.get<SubscriptionUsage & { tenant: { id: number; slug: string; name: string } }>(

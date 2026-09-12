@@ -1535,6 +1535,8 @@ const en = {
   'platform.subscription.payment': 'Record a payment',
   'platform.subscription.amount': 'Amount (e.g. 199.90)',
   'platform.subscription.amountInvalid': 'Enter a valid amount.',
+  'platform.subscription.paymentRecorded': 'Payment recorded',
+  'platform.subscription.paymentDuplicate': 'This reference was already recorded; nothing was credited again',
   'platform.subscription.reference': 'Reference (Pix id, boleto number)',
   'platform.subscription.recordPayment': 'Mark as paid',
   'platform.subscription.paymentHint': 'Extends the paid period by 30 days and sets the subscription to active. A suspended or canceled provider is not reactivated by a payment.',

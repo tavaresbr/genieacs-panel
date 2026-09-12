@@ -1537,6 +1537,8 @@ const de: Dictionary = {
   'platform.subscription.payment': 'Zahlung erfassen',
   'platform.subscription.amount': 'Betrag (z. B. 199,90)',
   'platform.subscription.amountInvalid': 'Geben Sie einen gültigen Betrag ein.',
+  'platform.subscription.paymentRecorded': 'Zahlung erfasst',
+  'platform.subscription.paymentDuplicate': 'Diese Referenz war bereits erfasst; es wurde nichts erneut gutgeschrieben',
   'platform.subscription.reference': 'Referenz (Pix-ID, Boleto-Nummer)',
   'platform.subscription.recordPayment': 'Als bezahlt markieren',
   'platform.subscription.paymentHint': 'Verlängert den bezahlten Zeitraum um 30 Tage und setzt das Abonnement auf aktiv. Ein ausgesetzter oder gekündigter Anbieter wird durch eine Zahlung nicht reaktiviert.',

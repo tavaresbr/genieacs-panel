@@ -149,6 +149,23 @@ class CustomerService {
     return account;
   }
 
+  /**
+   * A conta de portal de um aparelho, criando-a quando ainda não existe.
+   *
+   * ESTE é o ponto por onde toda criação passa, e por isso é aqui que o teto de
+   * assinantes do plano é conferido. Ele já era conferido em `syncDevices`, que
+   * orça a página inteira de uma vez — mas `syncDevices` não é o único
+   * chamador: `deviceController` chama daqui de duas rotas e o provisionamento
+   * de uma terceira, e nenhuma das três perguntava pelo teto. Um provedor no
+   * limite continuava criando conta indefinidamente; bastava abrir a tela de um
+   * aparelho que ainda não tivesse uma, ou provisionar uma ONT.
+   *
+   * É o mesmo desenho que o limite de OPERADORES já usa e que sempre funcionou:
+   * a pergunta mora no ponto de criação, não em cada chamador.
+   *
+   * O orçamento de `syncDevices` continua onde está, e não é redundante: ele
+   * evita N contagens numa página de frota. Esta é a que decide.
+   */
   static async ensureAccount(device) {
     const deviceId = normalizeIdentityValue(device?._id);
     const softwareId = normalizeIdentityValue(device?.softwareId);
@@ -185,6 +202,26 @@ class CustomerService {
       const moved = await this.touchIdentity(existingByPppoe, deviceId, softwareId, identityHash);
       await this.noteSwap(existingByPppoe, deviceId, 'pppoe');
       return moved;
+    }
+
+    // Daqui para baixo é conta NOVA — os três ramos acima devolveram uma que já
+    // existia. Sem vaga, nada é criado, e a chamada devolve `null` como já faz
+    // quando o aparelho não tem identidade suficiente: quem chama trata a
+    // ausência de conta, e derrubar a requisição por causa do plano seria
+    // transformar um teto comercial em erro de operação.
+    //
+    // A troca de assinante passa por aqui e NÃO é barrada, sem precisar de
+    // caso especial: `retireAccount`, alguns ramos acima, desativa a conta
+    // antiga, e `subscriberCount` conta só as vivas — a vaga já está livre
+    // quando esta pergunta é feita. Uma bandeira "aposentou" chegou a ser
+    // escrita aqui e foi removida: nenhum teste conseguia distingui-la, porque
+    // ela não decidia nada.
+    const remaining = await SubscriptionService.remainingSubscribers();
+    if (remaining !== null && remaining <= 0) {
+      console.warn(
+        `Plan limit: no subscriber slot left; device ${deviceId} stays without an account`
+      );
+      return null;
     }
 
     const generationSettings = await this.getGenerationSettings();

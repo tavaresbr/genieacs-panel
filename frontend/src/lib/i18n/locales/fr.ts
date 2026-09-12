@@ -1533,6 +1533,8 @@ const fr: Dictionary = {
   'platform.subscription.payment': 'Enregistrer un paiement',
   'platform.subscription.amount': 'Montant (ex. 199,90)',
   'platform.subscription.amountInvalid': 'Saisissez un montant valide.',
+  'platform.subscription.paymentRecorded': 'Paiement enregistré',
+  'platform.subscription.paymentDuplicate': 'Cette référence était déjà enregistrée ; rien n’a été crédité à nouveau',
   'platform.subscription.reference': 'Référence (id Pix, numéro de boleto)',
   'platform.subscription.recordPayment': 'Marquer comme payé',
   'platform.subscription.paymentHint': 'Prolonge la période payée de 30 jours et rend l\'abonnement actif. Un fournisseur suspendu ou annulé n\'est pas réactivé par un paiement.',

@@ -1540,6 +1540,8 @@ const ko: Dictionary = {
   'platform.subscription.payment': '결제 기록',
   'platform.subscription.amount': '금액(예: 199.90)',
   'platform.subscription.amountInvalid': '올바른 금액을 입력하세요.',
+  'platform.subscription.paymentRecorded': '결제를 기록했습니다',
+  'platform.subscription.paymentDuplicate': '이 참조번호는 이미 기록되어 있어 다시 반영되지 않았습니다',
   'platform.subscription.reference': '참조(Pix ID, boleto 번호)',
   'platform.subscription.recordPayment': '결제 완료로 표시',
   'platform.subscription.paymentHint': '유료 기간을 30일 연장하고 구독을 활성 상태로 만듭니다. 정지되거나 취소된 사업자는 결제로 다시 활성화되지 않습니다.',

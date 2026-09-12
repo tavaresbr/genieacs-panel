@@ -1534,6 +1534,8 @@ const zhTW: Dictionary = {
   'platform.subscription.payment': '記錄付款',
   'platform.subscription.amount': '金額（例如 199.90）',
   'platform.subscription.amountInvalid': '請輸入有效金額。',
+  'platform.subscription.paymentRecorded': '已記錄付款',
+  'platform.subscription.paymentDuplicate': '該參考號已記錄，未再次入帳',
   'platform.subscription.reference': '參考號（Pix ID、boleto 編號）',
   'platform.subscription.recordPayment': '標記為已付',
   'platform.subscription.paymentHint': '將已付費期間延長 30 天並使訂閱生效。已暫停或已取消的業者不會因付款而重新啟用。',

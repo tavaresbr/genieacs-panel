@@ -1539,6 +1539,8 @@ const it: Dictionary = {
   'platform.subscription.payment': 'Registra un pagamento',
   'platform.subscription.amount': 'Importo (es. 199,90)',
   'platform.subscription.amountInvalid': 'Inserisci un importo valido.',
+  'platform.subscription.paymentRecorded': 'Pagamento registrato',
+  'platform.subscription.paymentDuplicate': 'Questo riferimento era già registrato; non è stato accreditato di nuovo',
   'platform.subscription.reference': 'Riferimento (id Pix, numero boleto)',
   'platform.subscription.recordPayment': 'Segna come pagato',
   'platform.subscription.paymentHint': 'Estende il periodo pagato di 30 giorni e rende attivo l\'abbonamento. Un provider sospeso o annullato non viene riattivato da un pagamento.',

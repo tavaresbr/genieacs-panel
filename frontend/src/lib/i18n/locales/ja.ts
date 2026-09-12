@@ -1533,6 +1533,8 @@ const ja: Dictionary = {
   'platform.subscription.payment': '支払いを記録',
   'platform.subscription.amount': '金額（例: 199.90）',
   'platform.subscription.amountInvalid': '有効な金額を入力してください。',
+  'platform.subscription.paymentRecorded': '支払いを記録しました',
+  'platform.subscription.paymentDuplicate': 'この参照番号は記録済みです。再度の入金はありません',
   'platform.subscription.reference': '参照（Pix ID、boleto 番号）',
   'platform.subscription.recordPayment': '支払済みにする',
   'platform.subscription.paymentHint': '有料期間を30日延長し、サブスクリプションを有効にします。停止中またはキャンセル済みのプロバイダーは支払いでは再開されません。',

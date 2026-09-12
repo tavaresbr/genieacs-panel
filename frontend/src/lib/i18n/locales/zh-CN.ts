@@ -1533,6 +1533,8 @@ const zhCN: Dictionary = {
   'platform.subscription.payment': '记录付款',
   'platform.subscription.amount': '金额（例如 199.90）',
   'platform.subscription.amountInvalid': '请输入有效金额。',
+  'platform.subscription.paymentRecorded': '已记录付款',
+  'platform.subscription.paymentDuplicate': '该参考号已记录，未再次入账',
   'platform.subscription.reference': '参考号（Pix ID、boleto 编号）',
   'platform.subscription.recordPayment': '标记为已付',
   'platform.subscription.paymentHint': '将已付费期限延长 30 天并使订阅生效。已暂停或已取消的运营商不会因付款而重新激活。',

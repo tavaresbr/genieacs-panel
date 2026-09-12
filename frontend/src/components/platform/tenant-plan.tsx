@@ -11,6 +11,7 @@ import {
   type Tenant
 } from '@/lib/api'
 import { useToast } from '@/components/ui/toast'
+import { parseAmountToCents } from '@/lib/utils'
 import { useTranslation } from '@/contexts/language-context'
 
 interface Props {
@@ -147,8 +148,10 @@ export function TenantPlan({ tenant, plans, onSubscriptionChange }: Props) {
 
   const savePayment = async () => {
     // Digitado em reais com vírgula ou ponto; guardado em centavos, inteiro.
-    const parsed = Math.round(Number(String(amount).replace(',', '.')) * 100)
-    if (!Number.isInteger(parsed) || parsed < 0) {
+    // `parseAmountToCents` recusa o ambíguo em vez de adivinhar — ver o porquê
+    // lá, que envolve "1.234" ter virado 123 centavos em silêncio.
+    const parsed = parseAmountToCents(amount)
+    if (parsed === null) {
       toast.error(t('platform.subscription.amountInvalid'))
       return
     }
@@ -164,6 +167,17 @@ export function TenantPlan({ tenant, plans, onSubscriptionChange }: Props) {
         setReference('')
         await load()
         onSubscriptionChange()
+        // O backend recusa a referência repetida corretamente — 200, nada
+        // creditado, `duplicate: true` — e a tela não dizia nada. Sem aviso
+        // nenhum, reenviar uma referência produzia exatamente a mesma cena de
+        // um pagamento aceito: campos limpos, extrato recarregado. Quem
+        // administra concluía que estendeu o período pago e não estendeu.
+        //
+        // Os dois casos passam a ter cada um a sua frase. É dinheiro: a
+        // diferença entre "creditei" e "isto já estava creditado" não pode
+        // depender de o operador reparar que o extrato não cresceu.
+        if (res.data?.duplicate) toast.info(t('platform.subscription.paymentDuplicate'))
+        else toast.success(t('platform.subscription.paymentRecorded'))
       } else {
         toast.error(res.message || t('platform.saveFailed'))
       }
