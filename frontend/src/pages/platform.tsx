@@ -100,15 +100,14 @@ export default function PlatformPage() {
    * `/impersonate`, não uma página de terceiro, então o que `noopener` protege
    * aqui não está em jogo.
    *
-   * Duas saídas escapam da aba nova, e as duas caem no comportamento antigo —
-   * navegar aqui mesmo:
+   * Vale para os dois tipos de instalação, com subdomínio por provedor ou num
+   * host só. Nesta última o painel divide o origin com o console, e é por isso
+   * que a sessão de personificação vive no `sessionStorage` — ver `tabOnly` em
+   * `adoptSession`: sem isso a aba nova trocaria a sessão do console pela do
+   * provedor e quebraria em silêncio a aba que se queria preservar.
    *
-   * - **Sem domínio-base** (self-hosted) o endereço é relativo, então o painel
-   *   vive no MESMO origin que o console. O token mora no `localStorage`, que é
-   *   compartilhado entre as abas de um origin: a aba nova trocaria o token do
-   *   console pelo do provedor e a aba de trás — a que se queria preservar —
-   *   ficaria quebrada em silêncio.
-   * - **Pop-up bloqueado**: melhor ir para o painel nesta aba do que não ir.
+   * Uma única saída volta a navegar aqui mesmo: pop-up bloqueado, porque ir
+   * para o painel nesta aba é melhor que não ir.
    *
    * Confirma antes porque a ação deixa rastro nos dois lados — na nossa trilha
    * e na do cliente — e porque entrar no painel de um cliente é coisa que se
@@ -126,15 +125,13 @@ export default function PlatformPage() {
         return
       }
       const url = res.data.url
-      const outroOrigin = new URL(url, window.location.href).origin !== window.location.origin
-      if (aba && outroOrigin) {
+      if (aba) {
         // `replace` e não `assign`: a aba nova não tem histórico que valha, e o
         // `about:blank` no lugar dela deixaria um "voltar" que não volta.
         aba.location.replace(url)
         aba.focus()
         return
       }
-      aba?.close()
       window.location.assign(url)
     } finally {
       setBusyId(null)

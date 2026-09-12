@@ -1,7 +1,7 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect } from 'react'
-import { apiClient, authAPI } from '@/lib/api'
+import { createContext, useContext, useState, useEffect, useRef } from 'react'
+import { apiClient, authAPI, storedSession } from '@/lib/api'
 import { useNavigate } from 'react-router'
 import { roleHas, type Permission } from '@/lib/permissions'
 import type { User } from '@/types'
@@ -25,7 +25,12 @@ interface AuthContextType {
   login: (identifier: string, password: string) => Promise<boolean>
   completeSetup: (username: string, password: string, email: string) => Promise<boolean>
   /** Para quem chega com a sessão já pronta: o convite aceito e a personificação resgatada. */
-  adoptSession: (token: string, refreshToken: string | undefined, user: User) => void
+  adoptSession: (
+    token: string,
+    refreshToken: string | undefined,
+    user: User,
+    options?: { tabOnly?: boolean }
+  ) => void
   /**
    * Relê a própria conta do backend.
    *
@@ -46,6 +51,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true)
   const [needsSetup, setNeedsSetup] = useState(false)
   const navigate = useNavigate()
+  // Ver a checagem de boot: marca que outra tela já pôs uma sessão no lugar.
+  const adotada = useRef(false)
 
   useEffect(() => {
     const checkAuthStatus = async () => {
@@ -63,10 +70,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       setNeedsSetup(false)
-      const token = localStorage.getItem('token')
+      // Uma tela pode ter adotado uma sessão enquanto a verificação acima
+      // voltava — é o que a personificação faz, e ela chega com o bilhete já
+      // na mão. Quem adotou manda: o que esta verificação leu fala de um token
+      // que não é mais o desta aba.
+      if (adotada.current) { setLoading(false); return }
+      const { token } = storedSession()
       if (token) {
         try {
           const res = await authAPI.getCurrentUser()
+          if (adotada.current) { setLoading(false); return }
           if (res.success && res.data) {
             setUser(res.data as User)
             setIsAuthenticated(true)
@@ -166,10 +179,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
    * `undefined` para `setTokens` MANTERIA o anterior. Por isso a limpeza vem
    * antes: sem ela, um refresh token de operador sobreviveria por baixo de uma
    * sessão de personificação e a renovaria como sessão comum.
+   *
+   * `tabOnly` é a personificação: a sessão fica só nesta aba, sem tocar no que
+   * o navegador já guardava. O console abre o painel do provedor numa aba nova
+   * e, numa instalação de host único, as duas dividem o mesmo `localStorage` —
+   * sem isso a aba nova trocaria a sessão do console pela do provedor e
+   * quebraria em silêncio a aba que se queria preservar.
    */
-  const adoptSession = (token: string, refreshToken: string | undefined, next: User) => {
-    apiClient.clearTokens()
-    apiClient.setTokens(token, refreshToken)
+  const adoptSession = (
+    token: string,
+    refreshToken: string | undefined,
+    next: User,
+    options?: { tabOnly?: boolean }
+  ) => {
+    adotada.current = true
+    if (options?.tabOnly) {
+      apiClient.setTabTokens(token)
+    } else {
+      apiClient.clearTokens()
+      apiClient.setTokens(token, refreshToken)
+    }
     setUser(next)
     setIsAuthenticated(true)
     setNeedsSetup(false)
@@ -186,7 +215,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const can = (permission: Permission) => roleHas(user?.role, permission)
 
   const refreshUser = async () => {
-    if (!localStorage.getItem('token')) return
+    if (!storedSession().token) return
     try {
       const res = await authAPI.getCurrentUser()
       if (res.success && res.data) setUser(res.data as User)

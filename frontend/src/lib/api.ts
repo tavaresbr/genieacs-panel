@@ -58,16 +58,48 @@ export function filenameFromDisposition(header: string | null): string | undefin
   return limpo || undefined
 }
 
+/**
+ * A sessão guardada neste navegador, e em qual das duas gavetas ela está.
+ *
+ * `sessionStorage` é POR ABA; `localStorage` é do navegador inteiro. Uma
+ * sessão de personificação mora na primeira: ela nasce e morre na aba que o
+ * console abriu, e é isso que deixa o console seguir aberto atrás com a
+ * própria sessão intacta — inclusive numa instalação de host único, onde o
+ * painel do provedor divide o origin com ele.
+ *
+ * A gaveta da aba ganha da outra porque é a mais específica: numa aba de
+ * personificação as duas estão cheias, e quem manda ali é o bilhete que abriu
+ * a aba, não a sessão que o navegador já tinha.
+ *
+ * Sem refresh token junto do token de aba, nunca: a personificação não tem um,
+ * e devolver o do operador — que está na outra gaveta — renovaria a sessão de
+ * leitura como se fosse comum.
+ */
+export function storedSession(): { token: string | null; refreshToken: string | null; tabScoped: boolean } {
+  if (typeof window === 'undefined') return { token: null, refreshToken: null, tabScoped: false }
+  const daAba = sessionStorage.getItem('token')
+  if (daAba) return { token: daAba, refreshToken: null, tabScoped: true }
+  return {
+    token: localStorage.getItem('token'),
+    refreshToken: localStorage.getItem('refreshToken'),
+    tabScoped: false
+  }
+}
+
 class ApiClient {
   private baseURL: string
   private token: string | null = null
   private refreshToken: string | null = null
   private refreshPromise: Promise<boolean> | null = null
+  /** Se a sessão desta aba é só dela — ver `storedSession`. */
+  private tabScoped = false
 
   constructor(baseURL: string) {
     this.baseURL = baseURL
-    this.token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
-    this.refreshToken = typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null
+    const guardada = storedSession()
+    this.token = guardada.token
+    this.refreshToken = guardada.refreshToken
+    this.tabScoped = guardada.tabScoped
   }
 
   private async request<T>(
@@ -303,19 +335,49 @@ class ApiClient {
       this.refreshToken = refreshToken
     }
     if (typeof window !== 'undefined') {
-      localStorage.setItem('token', token)
+      // Na gaveta do escopo que esta aba já tem: um refresh de sessão de
+      // personificação não pode vazar para o `localStorage` do navegador.
+      const gaveta = this.tabScoped ? sessionStorage : localStorage
+      gaveta.setItem('token', token)
       if (refreshToken !== undefined) {
-        localStorage.setItem('refreshToken', refreshToken)
+        gaveta.setItem('refreshToken', refreshToken)
       }
     }
   }
 
-  clearTokens() {
-    this.token = null
+  /**
+   * Adota uma sessão que vive SÓ nesta aba.
+   *
+   * É o que a personificação usa. Não passa por `clearTokens` de propósito:
+   * ali a limpeza apagaria o `localStorage`, que numa instalação de host único
+   * é o mesmo do console — a aba de trás perderia a sessão justamente por
+   * causa da aba nova. O refresh token é zerado aqui, que era o serviço que a
+   * limpeza prestava.
+   */
+  setTabTokens(token: string) {
+    this.tabScoped = true
+    this.token = token
     this.refreshToken = null
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('token')
-      localStorage.removeItem('refreshToken')
+      sessionStorage.setItem('token', token)
+      sessionStorage.removeItem('refreshToken')
+    }
+  }
+
+  clearTokens() {
+    // Uma sessão de aba se apaga só da gaveta da aba: sair da personificação —
+    // ou ela expirar — não pode derrubar a sessão do console na aba de trás.
+    const eraDaAba = this.tabScoped
+    this.token = null
+    this.refreshToken = null
+    this.tabScoped = false
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('token')
+      sessionStorage.removeItem('refreshToken')
+      if (!eraDaAba) {
+        localStorage.removeItem('token')
+        localStorage.removeItem('refreshToken')
+      }
       window.dispatchEvent(new Event('auth:unauthorized'))
     }
   }
