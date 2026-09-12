@@ -201,13 +201,28 @@ describe('the platform\'s own host', () => {
     assert.equal(res.body.data.slug, null);
   });
 
+  /**
+   * A lista cresceu quando o ápice passou a ser a porta do console: o que sai
+   * dela é o que é da PLATAFORMA — o login, a releitura da sessão, o refresh, a
+   * troca de senha —, e o que fica é o que é de um PROVEDOR. A fronteira é essa
+   * frase, não o número de linhas.
+   */
   it('serves nothing that belongs to a provider', async () => {
     for (const [method, path, body] of [
-      ['POST', '/api/auth/login', { username: 'owner', password: 'owner-senha-1' }],
-      ['GET', '/api/auth/setup-status'],
       ['GET', '/api/tenant/subscription'],
       ['GET', '/api/devices'],
-      ['GET', '/api/settings']
+      ['GET', '/api/settings'],
+      ['GET', '/api/users'],
+      ['GET', '/api/audit'],
+      ['GET', '/api/invites'],
+      ['GET', '/api/tenant/export'],
+      // Nenhuma destas: as três gravam na trilha DO PROVEDOR ou montam
+      // endereço a partir do provedor do host, e aqui não há provedor.
+      ['POST', '/api/auth/password-reset', { identifier: 'owner@exemplo.test' }],
+      ['POST', '/api/auth/email', { email: 'outro@exemplo.test', currentPassword: 'owner-senha-1' }],
+      ['POST', '/api/auth/setup', { username: 'x', password: 'senha-longa-1', email: 'x@exemplo.test' }],
+      // O bilhete de personificação se gasta no host do provedor, nunca aqui.
+      ['POST', '/api/auth/impersonate/redeem', { ticket: 'qualquer-coisa' }]
     ]) {
       const res = await apex(path, { method, body, headers: bearer(ownerToken) });
       assert.equal(res.status, 404, `${method} ${path} answered ${res.status}`);
@@ -241,6 +256,27 @@ describe('the platform\'s own host', () => {
    * ser servido pelo endereço da plataforma assim que uma rota autenticada
    * respondesse ali. Era latente enquanto o ápice só servia rota anônima.
    */
+  /**
+   * O ápice é a porta do console, e a porta existe mesmo para quem não tem a
+   * chave — o que ela não faz é dizer quem tem. O cerco completo dessa sessão
+   * vive em `platform-console-host.test.js`; aqui só se fixa que a superfície
+   * do ápice inclui essas rotas, que é o que esta descrição é sobre.
+   */
+  it('serves the console\'s own door', async () => {
+    // `owner` é o primeiro usuário do deploy, que sob SaaS nasce com a chave.
+    const entrada = await apex('/api/auth/login', {
+      method: 'POST', body: { username: 'owner', password: 'owner-senha-1' }
+    });
+    assert.equal(entrada.status, 200, JSON.stringify(entrada.body));
+    assert.equal(entrada.body.data.user.tenantId, null, 'a sessão do console não nomeia provedor');
+    assert.equal(entrada.body.data.user.platform, true);
+
+    // E o estado da instalação, que é fato do deploy e não de um provedor.
+    const setupStatus = await apex('/api/auth/setup-status');
+    assert.equal(setupStatus.status, 200);
+    assert.equal(setupStatus.body.data.needsSetup, false);
+  });
+
   describe('a sessão de provedor no endereço da plataforma', () => {
     it('é recusada na família do console, e não por falta de cadastro', async () => {
       // `ownerToken` é do primeiro usuário do deploy, que sob SaaS nasce no

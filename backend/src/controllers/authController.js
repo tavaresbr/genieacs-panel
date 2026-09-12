@@ -6,7 +6,7 @@ import User from '../models/User.js';
 import { acceptsIdentifier, canHoldSession, LOGIN_REQUIRES_EMAIL } from '../config/login.js';
 import TenantUser from '../models/TenantUser.js';
 import { IS_SAAS } from '../config/edition.js';
-import { generateImpersonationToken, generateTokens, resolveMembership, verifyToken } from '../middleware/auth.js';
+import { CONSOLE_AUDIENCE, generateConsoleTokens, generateImpersonationToken, generateTokens, resolveMembership, verifyToken } from '../middleware/auth.js';
 import { createResponse, createErrorResponse, isValidEmail } from '../utils/helpers.js';
 import Tenant from '../models/Tenant.js';
 import PlatformAudit from '../models/PlatformAudit.js';
@@ -443,6 +443,51 @@ class AuthController {
         );
       }
 
+      // O login do CONSOLE, no endereço da própria plataforma.
+      //
+      // Entra aqui, ANTES da linha de baixo, e a ordem é a decisão: ali o
+      // provedor sai de `req.hostTenantId ?? tenantId`, e no ápice o primeiro é
+      // nulo — o `tenantId` do CORPO escolheria um provedor a partir do host
+      // que não nomeia nenhum.
+      //
+      // Quem não está no cadastro da plataforma recebe 401 com o corpo idêntico
+      // ao de senha errada. Distinguir transformaria este login num oráculo que
+      // responde "este login é de quem opera a plataforma" — a lista mais curta
+      // e mais valiosa do deploy, e a lista de alvos de um phishing bem-feito.
+      // A leitura do cadastro vem DEPOIS do bcrypt de propósito: invertida, o
+      // tempo de resposta separaria "conta existe, fora do cadastro" de "conta
+      // não existe" para quem cronometrasse.
+      if (req.platformHost) {
+        if (!canHoldSession(user) || !(await PlatformAdmin.has(user.id))) {
+          return res.status(401).json(
+            createErrorResponse(req.t('auth.invalidCredentials'))
+          );
+        }
+        const consoleTokens = generateConsoleTokens(user);
+        // Sem `marcarAtividade`: aquilo marca atividade DE UM PROVEDOR, e esta
+        // sessão não tem um.
+        return res.json(
+          createResponse(req.t('auth.loginSuccess'), {
+            user: {
+              id: user.id,
+              username: user.username,
+              email: user.email ?? null,
+              emailVerified: Boolean(user.email_verified_at),
+              // Sem papel e sem provedor, como a sessão. `platform: true` para
+              // a tela não ter que deduzir isso de um `tenantId` nulo.
+              role: null,
+              tenantId: null,
+              platform: true,
+              isPlatformAdmin: true,
+              createdAt: user.created_at,
+              updatedAt: user.updated_at
+            },
+            token: consoleTokens.accessToken,
+            refreshToken: consoleTokens.refreshToken
+          })
+        );
+      }
+
       // The host wins over the body. Where providers have subdomains, the
       // address the person typed is the provider they mean, and letting a
       // `tenantId` in the payload override it would mean the login screen of
@@ -623,12 +668,21 @@ class AuthController {
           // not what this session is authorised with.
           role: req.user.role,
           tenantId: req.user.tenantId,
+          // Presente só na sessão do console, e é o que diz à tela que esta
+          // sessão não tem provedor — em vez de ela deduzir isso de um
+          // `tenantId` nulo, que é a dedução que um dia alguém faz errado.
+          platform: req.user.platform ? true : undefined,
           // Numa personificação isto é falso mesmo sendo a pessoa do cadastro
           // da plataforma: dentro dela o console não é alcançável, e um `true`
           // aqui acenderia um menu cujas rotas respondem 404 a esta sessão.
           // Mesma resposta que o resgate deu; esta rota é a que a tela relê
           // depois de um F5, e as duas têm que dizer a mesma coisa.
-          isPlatformAdmin: req.user.impersonation ? false : await holdsControlPlane(user.id),
+          isPlatformAdmin: req.user.impersonation
+            ? false
+            // A sessão do console só existe porque a hidratação acabou de ler o
+            // cadastro: reler aqui responderia a mesma coisa com uma consulta a
+            // mais.
+            : (req.user.platform ? true : await holdsControlPlane(user.id)),
           // Presente só numa personificação, e é o que a faixa no alto da tela
           // lê para dizer de quem é a sessão que está olhando.
           impersonation: req.user.impersonation ?? null,
@@ -700,6 +754,29 @@ class AuthController {
       if (!canHoldSession(user)) {
         return res.status(403).json(
           createErrorResponse(req.t('auth.refreshSessionInvalid'))
+        );
+      }
+
+      // O refresh do console, reconhecido pela AUDIÊNCIA e não por um campo:
+      // um token de painel não pode renovar como console nem o contrário, e a
+      // audiência é a única parte que o `jwt.verify` já provou.
+      //
+      // Relê o cadastro da plataforma, como a hidratação faz: o refresh prova
+      // presença, nunca estende autoridade. E só serve no ápice — fora dele
+      // esta sessão não vale, então renová-la ali seria emitir um token para um
+      // endereço onde ele é recusado.
+      if (decoded.aud === CONSOLE_AUDIENCE) {
+        if (!req.platformHost || !(await PlatformAdmin.has(user.id))) {
+          return res.status(403).json(
+            createErrorResponse(req.t('auth.refreshSessionInvalid'))
+          );
+        }
+        const renovado = generateConsoleTokens(user);
+        return res.json(
+          createResponse(req.t('auth.tokenRefreshed'), {
+            token: renovado.accessToken,
+            refreshToken: renovado.refreshToken
+          })
         );
       }
 

@@ -1,5 +1,6 @@
 import { getDb } from '../config/database.js';
 import { runInTenant } from '../config/tenantContext.js';
+import { IS_SAAS } from '../config/edition.js';
 
 /**
  * Puts a provider into scope before anything under `/api` runs.
@@ -162,14 +163,38 @@ export function hostMatchesTenant(req, tenantId) {
  * password reset and e-mail verification write to a provider's audit trail
  * and would fail unscoped here) and never anything reading provider data.
  */
-const PLATFORM_HOST_PATHS = new Set(['/api/tenant/public', '/api/auth/signup']);
+const CONSOLE_HOST_PATHS = [
+  // O que a sessão do console precisa. Cada um foi conferido por não tocar em
+  // `tdb`: no ápice não há provedor em escopo, e uma leitura escopada aqui
+  // estoura. É a conferência que qualquer caminho novo nesta lista precisa
+  // passar.
+  '/api/auth/setup-status',
+  '/api/auth/login',
+  '/api/auth/user',
+  '/api/auth/logout',
+  '/api/auth/refresh',
+  // Sem esta, quem opera a plataforma e não trabalha em provedor nenhum não
+  // troca a própria senha em lugar nenhum.
+  '/api/auth/change-password'
+];
+
+const PLATFORM_HOST_PATHS = new Set([
+  // O que um estranho precisa.
+  '/api/tenant/public',
+  '/api/auth/signup',
+  // E o console, só onde ele existe: num install self-hosted as rotas dele não
+  // são montadas, não há cadastro de plataforma, e o ápice não tem por que
+  // servir a porta de uma coisa que não está lá. Assim a superfície do ápice
+  // continua exatamente tão estreita quanto era para quem não é SaaS.
+  ...(IS_SAAS ? CONSOLE_HOST_PATHS : [])
+]);
 
 /**
  * The control plane's own namespace. It names the provider in the path and
  * opens the scope it needs with an explicit `runInTenant`, so it is the one
  * family of routes that has no business being resolved by host.
  */
-const PLATFORM_HOST_PREFIXES = ['/api/platform/'];
+const PLATFORM_HOST_PREFIXES = IS_SAAS ? ['/api/platform/'] : [];
 
 export function isPlatformHost(host) {
   if (!PANEL_BASE_DOMAIN || !host) return false;
