@@ -6,6 +6,7 @@ import WhatsAppAccount from '../models/WhatsAppAccount.js';
 import WaTemplateService from './waTemplateService.js';
 import WhatsAppConfigService, { WaError } from './whatsappConfigService.js';
 import { normalizarTelefoneBr } from '../utils/wa/waDestino.js';
+import { currentTenantId } from '../config/tenantContext.js';
 import {
   comoDataBr,
   diasEntre,
@@ -59,13 +60,24 @@ const sleep = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
  */
 class WaBillingService {
   /**
-   * Timestamps of the campaign builds started in the last window.
+   * Os instantes das montagens de campanha na última janela, POR PROVEDOR.
    *
-   * A class field rather than a middleware, the same shape `waOutboxWorker`
-   * uses for its ceiling: what is being limited is the cost to the provider's
-   * ERP (one round trip per recipient), not the request rate of a browser.
+   * Um campo de classe em vez de um middleware, a mesma forma que o
+   * `waOutboxWorker` usa para o teto dele: o que se limita é o custo para o
+   * ERP do provedor (uma ida e volta por destinatário), não a taxa de
+   * requisições de um navegador.
+   *
+   * A chave por provedor é o conserto. Era um array só, compartilhado pelo
+   * processo inteiro: o provedor A montava três campanhas e os provedores B, C
+   * e D levavam 429 por cinco minutos sem terem feito nada. Negação de serviço
+   * cruzada, trivial de disparar, num painel que vende isolamento.
+   *
+   * É exatamente a classe de defeito que `config/tenantCache.js` documenta como
+   * já corrigida em quatro serviços — "deixou de estar certo no momento em que
+   * a configuração passou a ser por provedor". Este teto ficou de fora daquela
+   * passagem.
    */
-  static buildWindow = [];
+  static buildWindows = new Map();
 
   /**
    * Subscribers the billing cadence could contact.
@@ -350,12 +362,24 @@ class WaBillingService {
   // ── The build ceiling ──────────────────────────────────────────────
 
   static reserveBuild() {
+    const tenantId = currentTenantId();
     const cutoff = Date.now() - BUILD_WINDOW_MS;
-    this.buildWindow = this.buildWindow.filter((at) => at > cutoff);
-    if (this.buildWindow.length >= MAX_BUILDS_PER_WINDOW) {
+    const janela = (this.buildWindows.get(tenantId) || []).filter((at) => at > cutoff);
+
+    if (janela.length >= MAX_BUILDS_PER_WINDOW) {
+      // A janela podada volta para o mapa mesmo na recusa: sem isso, um
+      // provedor que insiste mantém entradas velhas vivas para sempre.
+      this.buildWindows.set(tenantId, janela);
       throw new WaError('whatsapp.error.rateLimited', { code: 'rate_limited', status: 429 });
     }
-    this.buildWindow.push(Date.now());
+
+    janela.push(Date.now());
+    this.buildWindows.set(tenantId, janela);
+  }
+
+  /** Esquece a janela de um provedor. Existe para o teste, e para o `stop`. */
+  static resetBuildWindow(tenantId = currentTenantId()) {
+    this.buildWindows.delete(tenantId);
   }
 }
 

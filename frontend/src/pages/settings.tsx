@@ -351,8 +351,14 @@ export default function Settings() {
         ticketOccurrenceType: sgpForm.ticketOccurrenceType
       })
       if (res.success && res.data) {
-        setSgpConfig(res.data)
-        setSgpForm((current) => ({ ...current, token: '' }))
+        const salvo = res.data
+        setSgpConfig(salvo)
+        // `baseUrl` volta do servidor NORMALIZADA: `normalizeBaseUrl` força o
+        // esquema, apaga query e fragmento, e corta a barra final. Sem devolvê-la
+        // ao campo, quem salva `sgp.exemplo.com/api/?x=1` vê o texto intacto,
+        // acha que o painel guardou aquilo, e a integração fala com outro
+        // endereço. Mesmo defeito que o campo do webhook tinha.
+        setSgpForm((current) => ({ ...current, baseUrl: salvo.baseUrl, token: '' }))
       }
       toast[res.success ? 'success' : 'error'](
         res.message || t(res.success ? 'settings.sgp.saved' : 'settings.sgp.saveFailed')
@@ -429,6 +435,15 @@ export default function Settings() {
           ...current,
           webhookBaseUrl: salvo.webhookBaseUrl,
           portalPublicUrl: salvo.portalPublicUrl,
+          // Os outros três que o backend também reescreve, e que a primeira
+          // passagem deste conserto deixou de fora: `managedUrl` perde a barra
+          // final E o sufixo `/manager` — o caso mais provável de todos, porque
+          // o operador cola a URL do Evolution Manager; `allowedHosts` vira
+          // minúsculo, perde esquema e caminho e é deduplicada; e a mensagem de
+          // recusa de chamada é cortada em 300.
+          managedUrl: salvo.managedUrl,
+          allowedHosts: salvo.allowedHosts.join('\n'),
+          rejectCallMessage: salvo.rejectCallMessage,
           managedAdminKey: ''
         }))
         toast.success(res.message || t('common.success'))
@@ -939,6 +954,8 @@ export default function Settings() {
 
   const [vendorList, setVendorList] = useState<VendorType[]>([])
   const [vendorsLoading, setVendorsLoading] = useState(false)
+  /** Não conseguiu carregar — que é diferente de não haver nada cadastrado. */
+  const [vendorsError, setVendorsError] = useState<string | null>(null)
   const [creatingVendor, setCreatingVendor] = useState(false)
   const [editingVendor, setEditingVendor] = useState<VendorType | null>(null)
 
@@ -977,6 +994,13 @@ export default function Settings() {
     const res = await vendorsAPI.getAll()
     if (res.success && Array.isArray(res.data)) {
       setVendorList(res.data as unknown as VendorType[])
+      setVendorsError(null)
+    } else {
+      // Sem isto a tela caía no ramo "nenhum fabricante cadastrado" — afirmando
+      // um fato quando na verdade não sabe. Com o backend fora do ar ou um 403,
+      // o operador via a tabela vazia e recadastrava o que já existe. A mesma
+      // página já fazia certo em `fetchOperators`.
+      setVendorsError(res.message || null)
     }
     setVendorsLoading(false)
   }
@@ -1054,6 +1078,8 @@ export default function Settings() {
   }
 
   const [wifiConfigs, setWifiConfigs] = useState<WifiSecurityConfigType[]>([])
+  /** Não conseguiu carregar — que é diferente de não haver nada cadastrado. */
+  const [wifiConfigError, setWifiConfigError] = useState<string | null>(null)
   const [wifiConfigLoading, setWifiConfigLoading] = useState(false)
   const [creatingConfig, setCreatingConfig] = useState(false)
   const [configForm, setConfigForm] = useState<{ product_class: string; security_types: string; password_param_path: string }>({
@@ -1068,6 +1094,9 @@ export default function Settings() {
     const res = await vendorsAPI.getAllWifiSecurityConfigs()
     if (res.success && Array.isArray(res.data)) {
       setWifiConfigs(res.data as unknown as WifiSecurityConfigType[])
+      setWifiConfigError(null)
+    } else {
+      setWifiConfigError(res.message || null)
     }
     setWifiConfigLoading(false)
   }
@@ -2710,6 +2739,15 @@ export default function Settings() {
                           <p className="mt-2 text-gray-500 dark:text-gray-400">{t('settings.vendors.loading')}</p>
                         </td>
                       </tr>
+                    ) : vendorsError !== null ? (
+                      /* "Não deu para carregar" e "não há nada cadastrado" são
+                         fatos diferentes, e a tela afirmava o segundo quando o
+                         verdadeiro era o primeiro. */
+                      <tr>
+                        <td colSpan={6} className="text-center py-8 text-[hsl(var(--status-danger))]">
+                          {vendorsError || t('settings.vendors.loadFailed')}
+                        </td>
+                      </tr>
                     ) : vendorList.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="text-center py-8 text-gray-500 dark:text-gray-400">
@@ -2854,6 +2892,12 @@ export default function Settings() {
                     {wifiConfigLoading ? (
                       <tr>
                         <td colSpan={4} className="text-center py-8 text-gray-500 dark:text-gray-400">{t('settings.wifi.loading')}</td>
+                      </tr>
+                    ) : wifiConfigError !== null ? (
+                      <tr>
+                        <td colSpan={4} className="text-center py-8 text-[hsl(var(--status-danger))]">
+                          {wifiConfigError || t('settings.wifi.loadFailed')}
+                        </td>
                       </tr>
                     ) : wifiConfigs.length === 0 ? (
                       <tr>
