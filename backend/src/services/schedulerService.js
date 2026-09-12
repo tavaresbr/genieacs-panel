@@ -9,6 +9,7 @@ import AuditLog from '../models/AuditLog.js';
 import AuthTicket from '../models/AuthTicket.js';
 import ImpersonationTicket from '../models/ImpersonationTicket.js';
 import { refreshDeploymentSharing } from './genieacsEgress.js';
+import SubscriptionNoticeService from './subscriptionNoticeService.js';
 import {
   dueForRefresh, isDormant, lastPanelActivityAt, refreshTtlMs, tenantOffsetMs
 } from './dashboardSchedule.js';
@@ -156,7 +157,7 @@ class SchedulerService {
     // `.env` e ficava larga para sempre quando ninguém pôs.
     this.tickPromise = refreshDeploymentSharing()
       .catch(() => {})
-      .then(() => forEachTenant((tenant) => this.runJobs({ prune }), {
+      .then(() => forEachTenant((tenant) => this.runJobs({ prune, tenant }), {
         onError: (error, tenant) => {
           console.warn(`Scheduler tick failed for provider ${tenant.slug}: ${error.message}`);
         }
@@ -192,11 +193,33 @@ class SchedulerService {
     });
   }
 
-  static async runJobs({ prune = false } = {}) {
-    const summary = { provisioning: null, events: null, reconcile: null, dashboard: null };
+  static async runJobs({ prune = false, tenant = null } = {}) {
+    const summary = {
+      provisioning: null, events: null, reconcile: null, dashboard: null, subscriptionNotice: null
+    };
     const state = await this.readState();
 
     summary.dashboard = await this.refreshDashboard(state);
+
+    // O aviso de vencimento roda DENTRO do laço por provedor, e não numa
+    // passada global sobre `subscriptions`, porque ele precisa do provedor em
+    // escopo de qualquer jeito: a assinatura, o nome, o endereço de cobrança e
+    // a equipe saem todos de leituras escopadas. Uma passada global leria a
+    // tabela inteira e depois reabriria o escopo uma vez por linha, que é o
+    // mesmo trabalho com um passo a mais.
+    //
+    // Não tem cadência própria: `pendingExpiryNotice` já responde "nada a
+    // fazer" a partir da marca no banco, e um relógio em `app_state` seria uma
+    // segunda memória dizendo a mesma coisa — com a chance de discordar.
+    // O provedor vem do laço e não de uma releitura: `forEachTenant` já entrega
+    // a linha inteira de `tenants` — com nome, slug e `billing_email` —, e
+    // buscá-la de novo aqui seria uma consulta por provedor por minuto para
+    // reler o que já estava na mão.
+    summary.subscriptionNotice = await SubscriptionNoticeService.notifyCurrent({ tenant })
+      .catch((error) => {
+        console.warn(`Could not send the subscription notice: ${error.message}`);
+        return { sent: false, reason: 'error' };
+      });
 
     const provisioningConfig = await ProvisioningService.getConfig();
     if (

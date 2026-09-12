@@ -527,7 +527,7 @@ const tenantInvitesTable = (db) => (t) => {
  * ele e para mandar a cobrança a alguém que a pague.
  *
  * Uma fábrica separada porque estas colunas entram por dois caminhos — a tabela
- * nova e o passo 0042 — e a regra da casa é que cada coluna tenha um lugar só,
+ * nova e o passo 0043 — e a regra da casa é que cada coluna tenha um lugar só,
  * para que o schema inicial e o degrau de upgrade não possam divergir.
  *
  * Todas nulas, e isso não é preguiça: nenhum provedor que já existe tem estes
@@ -1086,6 +1086,15 @@ const subscriptionsTable = (db) => (t) => {
   // Até quando o período pago vai. Nulo em trial e em quem nunca pagou.
   t.timestamp('renews_at');
   t.timestamp('canceled_at');
+  // QUAL prazo já foi avisado — o valor da data avisada, não a hora do aviso.
+  //
+  // Guardar "quando avisei" obrigaria a apagar a marca toda vez que o prazo
+  // mudasse, e esquecer de apagar em um dos caminhos deixaria um provedor sem
+  // aviso para sempre. Guardando o prazo em si, a comparação é direta: avisa
+  // quando o prazo que vence não é o que já foi avisado. Um pagamento empurra
+  // `renews_at`, a marca deixa de casar sozinha, e o ciclo recomeça sem
+  // ninguém precisar limpar nada.
+  t.timestamp('expiry_warned_for');
   t.timestamp('created_at').defaultTo(db.fn.now());
   t.timestamp('updated_at').defaultTo(db.fn.now());
 };
@@ -2738,6 +2747,34 @@ export const migrations = [
       if (!faltando.length) return;
       await db.schema.alterTable('tenants', (t) => {
         for (const add of faltando) add(t);
+      });
+    }
+  },
+  {
+    /**
+     * A marca do prazo já avisado.
+     *
+     * Desde que o período pago passou a vencer de verdade, o provedor descobria
+     * o vencimento tomando 402 ao salvar — o painel sabia a data e não dizia
+     * nada. O aviso precisa de uma memória, ou ele vira uma mensagem por
+     * passada do agendador, que é a maneira mais rápida de treinar alguém a
+     * ignorar o aviso que importa.
+     *
+     * Guarda O PRAZO avisado e não a hora do aviso: assim um pagamento que
+     * empurra `renews_at` faz a marca deixar de casar sozinha, e o ciclo
+     * recomeça sem nenhum caminho precisar lembrar de limpar nada. Nula para
+     * quem já existe, que é o certo — ninguém foi avisado ainda.
+     */
+    id: '0044_subscription_expiry_warned_for',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('subscriptions'))) return true;
+      return db.schema.hasColumn('subscriptions', 'expiry_warned_for');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('subscriptions'))) return;
+      if (await db.schema.hasColumn('subscriptions', 'expiry_warned_for')) return;
+      await db.schema.alterTable('subscriptions', (t) => {
+        t.timestamp('expiry_warned_for');
       });
     }
   }

@@ -645,4 +645,12 @@ export default {
   'tenant.billingTaxIdInvalid': 'यह संख्या मान्य CNPJ या CPF नहीं है',
   'tenant.billingPostalCodeInvalid': 'पिन कोड आठ अंकों का होना चाहिए',
   'tenant.billingEmailInvalid': 'बिलिंग ई-मेल पता अमान्य है',
+  'subscription.notice.trialSoonSubject': '{provider} का ट्रायल {date} को समाप्त होगा',
+  'subscription.notice.trialSoonBody': '{provider} का ट्रायल {date} को समाप्त होगा — अब से {days} दिन में।\n\nउसके बाद पैनल पढ़ा तो जा सकेगा, पर बदलाव स्वीकार नहीं करेगा। काम जारी रखने के लिए उस तारीख से पहले हमसे बात करें।\n\n{link}',
+  'subscription.notice.trialExpiredSubject': '{provider} का ट्रायल {date} को समाप्त हो गया',
+  'subscription.notice.trialExpiredBody': '{provider} का ट्रायल {date} को समाप्त हो गया।\n\nपैनल अब भी पढ़ा जा सकता है — आपकी टीम और आपके ग्राहक सब कुछ देखते रहेंगे — पर बदलाव स्वीकार नहीं होंगे। लिखना फिर चालू कराने के लिए हमसे बात करें।\n\n{link}',
+  'subscription.notice.renewalSoonSubject': '{provider} की सदस्यता {date} को समाप्त हो रही है',
+  'subscription.notice.renewalSoonBody': '{provider} की भुगतान अवधि {date} को समाप्त होगी — अब से {days} दिन में।\n\nउसके बाद पैनल पढ़ा तो जा सकेगा, पर बदलाव स्वीकार नहीं करेगा। उस तारीख से पहले भुगतान भेजें और कुछ नहीं रुकेगा।\n\n{link}',
+  'subscription.notice.renewalExpiredSubject': '{provider} की सदस्यता {date} को समाप्त हो गई',
+  'subscription.notice.renewalExpiredBody': '{provider} की भुगतान अवधि {date} को समाप्त हो गई।\n\nपैनल अब भी पढ़ा जा सकता है — आपकी टीम और आपके ग्राहक सब कुछ देखते रहेंगे — पर बदलाव स्वीकार नहीं होंगे। भुगतान दर्ज होते ही सब सामान्य हो जाएगा।\n\n{link}',
 };

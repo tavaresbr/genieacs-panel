@@ -643,4 +643,12 @@ export default {
   'tenant.billingTaxIdInvalid': 'Il documento non è un CNPJ né un CPF valido',
   'tenant.billingPostalCodeInvalid': 'Il codice postale deve avere otto cifre',
   'tenant.billingEmailInvalid': "L'e-mail di fatturazione non è valida",
+  'subscription.notice.trialSoonSubject': 'La tua prova di {provider} termina il {date}',
+  'subscription.notice.trialSoonBody': 'La prova di {provider} termina il {date} — fra {days} giorno/i.\n\nQuando finirà, il pannello resterà leggibile ma smetterà di accettare modifiche. Per continuare a lavorare, parlane con noi prima di quella data.\n\n{link}',
+  'subscription.notice.trialExpiredSubject': 'La prova di {provider} è terminata il {date}',
+  'subscription.notice.trialExpiredBody': 'La prova di {provider} è terminata il {date}.\n\nIl pannello resta leggibile — il tuo team e i tuoi abbonati continuano a vedere tutto — ma non accetta più modifiche. Parlane con noi per riattivare la scrittura.\n\n{link}',
+  'subscription.notice.renewalSoonSubject': "L'abbonamento di {provider} scade il {date}",
+  'subscription.notice.renewalSoonBody': 'Il periodo pagato di {provider} termina il {date} — fra {days} giorno/i.\n\nQuando finirà, il pannello resterà leggibile ma smetterà di accettare modifiche. Invia il pagamento prima di quella data e non si ferma nulla.\n\n{link}',
+  'subscription.notice.renewalExpiredSubject': "L'abbonamento di {provider} è scaduto il {date}",
+  'subscription.notice.renewalExpiredBody': 'Il periodo pagato di {provider} è terminato il {date}.\n\nIl pannello resta leggibile — il tuo team e i tuoi abbonati continuano a vedere tutto — ma non accetta più modifiche. Appena il pagamento sarà registrato, tutto torna come prima.\n\n{link}',
 };

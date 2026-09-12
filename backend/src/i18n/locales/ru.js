@@ -646,4 +646,12 @@ export default {
   'tenant.billingTaxIdInvalid': 'Номер не является действительным CNPJ или CPF',
   'tenant.billingPostalCodeInvalid': 'Почтовый индекс должен содержать восемь цифр',
   'tenant.billingEmailInvalid': 'Адрес электронной почты для счетов недействителен',
+  'subscription.notice.trialSoonSubject': 'Ваш пробный период {provider} заканчивается {date}',
+  'subscription.notice.trialSoonBody': 'Пробный период {provider} заканчивается {date} — через {days} дн.\n\nПосле этого панель останется доступной для чтения, но перестанет принимать изменения. Чтобы работа не останавливалась, свяжитесь с нами до этой даты.\n\n{link}',
+  'subscription.notice.trialExpiredSubject': 'Пробный период {provider} закончился {date}',
+  'subscription.notice.trialExpiredBody': 'Пробный период {provider} закончился {date}.\n\nПанель по-прежнему доступна для чтения — ваша команда и ваши абоненты всё видят, — но изменения больше не принимаются. Свяжитесь с нами, чтобы снова включить запись.\n\n{link}',
+  'subscription.notice.renewalSoonSubject': 'Подписка {provider} истекает {date}',
+  'subscription.notice.renewalSoonBody': 'Оплаченный период {provider} заканчивается {date} — через {days} дн.\n\nПосле этого панель останется доступной для чтения, но перестанет принимать изменения. Отправьте оплату до этой даты, и ничего не остановится.\n\n{link}',
+  'subscription.notice.renewalExpiredSubject': 'Подписка {provider} истекла {date}',
+  'subscription.notice.renewalExpiredBody': 'Оплаченный период {provider} закончился {date}.\n\nПанель по-прежнему доступна для чтения — ваша команда и ваши абоненты всё видят, — но изменения больше не принимаются. Как только оплата будет зарегистрирована, всё вернётся к норме.\n\n{link}',
 };

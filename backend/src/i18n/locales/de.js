@@ -646,4 +646,12 @@ export default {
   'tenant.billingTaxIdInvalid': 'Die Steuernummer ist weder eine gültige CNPJ noch eine gültige CPF',
   'tenant.billingPostalCodeInvalid': 'Die Postleitzahl muss acht Ziffern haben',
   'tenant.billingEmailInvalid': 'Die Rechnungs-E-Mail-Adresse ist ungültig',
+  'subscription.notice.trialSoonSubject': 'Ihre {provider}-Testphase endet am {date}',
+  'subscription.notice.trialSoonBody': 'Die Testphase für {provider} endet am {date} — in {days} Tag(en).\n\nDanach bleibt das Panel lesbar, nimmt aber keine Änderungen mehr an. Sprechen Sie vor diesem Datum mit uns, damit die Arbeit weitergeht.\n\n{link}',
+  'subscription.notice.trialExpiredSubject': 'Die {provider}-Testphase endete am {date}',
+  'subscription.notice.trialExpiredBody': 'Die Testphase für {provider} endete am {date}.\n\nDas Panel bleibt lesbar — Ihr Team und Ihre Teilnehmer sehen weiterhin alles —, nimmt aber keine Änderungen mehr an. Sprechen Sie mit uns, um das Schreiben wieder zu aktivieren.\n\n{link}',
+  'subscription.notice.renewalSoonSubject': 'Das {provider}-Abonnement läuft am {date} ab',
+  'subscription.notice.renewalSoonBody': 'Der bezahlte Zeitraum für {provider} endet am {date} — in {days} Tag(en).\n\nDanach bleibt das Panel lesbar, nimmt aber keine Änderungen mehr an. Senden Sie die Zahlung vor diesem Datum, dann stoppt nichts.\n\n{link}',
+  'subscription.notice.renewalExpiredSubject': 'Das {provider}-Abonnement lief am {date} ab',
+  'subscription.notice.renewalExpiredBody': 'Der bezahlte Zeitraum für {provider} endete am {date}.\n\nDas Panel bleibt lesbar — Ihr Team und Ihre Teilnehmer sehen weiterhin alles —, nimmt aber keine Änderungen mehr an. Sobald die Zahlung erfasst ist, läuft alles wieder normal.\n\n{link}',
 };

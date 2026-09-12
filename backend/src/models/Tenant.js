@@ -34,7 +34,7 @@ class Tenant {
 
   /**
    * O cadastro fiscal, e é o parágrafo acima cobrado na prática: estas doze
-   * colunas existem desde a migração 0042 e NENHUMA delas está em
+   * colunas existem desde a migração 0043 e NENHUMA delas está em
    * `PUBLIC_COLUMNS`. O CNPJ e o endereço de um ISP não são segredo de estado,
    * mas também não são coisa que a tela de login de um provedor deva servir a
    * quem passar pelo host — e a lista pública é o que garante isso sem depender
