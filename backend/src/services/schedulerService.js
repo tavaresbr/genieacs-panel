@@ -6,6 +6,8 @@ import SgpService from './sgpService.js';
 import { forEachTenant } from '../config/tenantJobs.js';
 import { currentTenantId } from '../config/tenantContext.js';
 import AuditLog from '../models/AuditLog.js';
+import AuthTicket from '../models/AuthTicket.js';
+import ImpersonationTicket from '../models/ImpersonationTicket.js';
 import {
   dueForRefresh, isDormant, lastPanelActivityAt, refreshTtlMs, tenantOffsetMs
 } from './dashboardSchedule.js';
@@ -149,10 +151,36 @@ class SchedulerService {
       onError: (error, tenant) => {
         console.warn(`Scheduler tick failed for provider ${tenant.slug}: ${error.message}`);
       }
-    }).finally(() => {
-      this.tickPromise = null;
-    });
+    })
+      .then(() => (prune ? this.pruneTickets() : undefined))
+      .finally(() => {
+        this.tickPromise = null;
+      });
     return this.tickPromise;
+  }
+
+  /**
+   * As duas tabelas de bilhete, podadas FORA do laço por provedor.
+   *
+   * Fora, e não dentro, porque nenhuma das duas é escopada: um `forEachTenant`
+   * as apagaria inteiras uma vez por provedor, e num deploy com trinta ISPs
+   * isso é trinta varreduras idênticas por dia. Além disso o laço só visita
+   * provedor `active` (`forEachTenant` filtra por `tenants.status`), então um
+   * provedor suspenso nunca teria os bilhetes dele podados.
+   *
+   * Os dois `prune` existiam, testados, sem UM chamador — e o comentário de
+   * `AuthTicket.create` já dizia "a poda os leva embora depois, pela idade",
+   * o que era falso. Com o cadastro passando a cunhar um bilhete de
+   * verificação, a falta deixou de ser teórica: a rota é pública, e toda
+   * pessoa que apertar "cadastrar" deixa uma linha que nada apagaria.
+   */
+  static async pruneTickets() {
+    await AuthTicket.prune().catch((error) => {
+      console.warn(`Could not prune auth tickets: ${error.message}`);
+    });
+    await ImpersonationTicket.prune().catch((error) => {
+      console.warn(`Could not prune impersonation tickets: ${error.message}`);
+    });
   }
 
   static async runJobs({ prune = false } = {}) {

@@ -1802,6 +1802,8 @@ const ar: Dictionary = {
   'billing.saved': 'تم الحفظ.',
   'billing.saveFailed': 'تعذّر حفظ بيانات الفوترة',
   'billing.readOnly': 'لا يعدّل هذا إلا من يستطيع تغيير الإعدادات.',
+
+  'signup.checkInbox': 'أرسلنا رابطًا إلى {email}. افتحه لإثبات العنوان — فهو طريق العودة الوحيد إن ضاعت كلمة المرور.',
 }
 
 export default ar

@@ -461,6 +461,12 @@ export interface PublicTenant {
 export interface SignupResult {
   tenant: { slug: string; name: string }
   panelUrl: string | null
+  /**
+   * Se a prova do endereço saiu. `false` não é erro: é um deploy sem SMTP, e
+   * o cadastro acontece igual — o que muda é a tela mandar a pessoa olhar a
+   * caixa de entrada ou não prometer o que não vai chegar.
+   */
+  emailed: boolean
 }
 
 /**

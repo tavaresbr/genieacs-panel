@@ -77,6 +77,13 @@ export default function Signup() {
               <p className="page-kicker">{t('signup.doneKicker')}</p>
               <h1 className="text-2xl font-bold text-foreground">{t('signup.doneTitle', { name: done.tenant.name })}</h1>
               <p className="text-sm leading-6 text-muted-foreground">{t('signup.doneText')}</p>
+              {/* A prova do endereço saiu agora, e a pessoa precisa saber que
+                  ela existe antes de fechar esta aba. Quando o deploy não tem
+                  SMTP a tela não promete nada: dizer "confira seu e-mail" para
+                  quem nunca vai receber é pior do que não dizer. */}
+              {done.emailed && (
+                <p className="alert-info text-sm leading-6">{t('signup.checkInbox', { email: form.email })}</p>
+              )}
               {done.panelUrl && (
                 <a href={done.panelUrl} className="modern-button w-full">
                   <Icon name="external" size={17} />

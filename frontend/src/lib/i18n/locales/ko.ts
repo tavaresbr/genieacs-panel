@@ -1800,6 +1800,8 @@ const ko: Dictionary = {
   'billing.saved': '저장했습니다.',
   'billing.saveFailed': '청구 정보를 저장하지 못했습니다',
   'billing.readOnly': '설정을 변경할 수 있는 사람만 수정할 수 있습니다.',
+
+  'signup.checkInbox': '{email}로 링크를 보냈습니다. 열어서 주소를 확인하세요. 비밀번호를 잃어버렸을 때 돌아올 수 있는 유일한 길입니다.',
 }
 
 export default ko

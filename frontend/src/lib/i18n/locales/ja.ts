@@ -1793,6 +1793,8 @@ const ja: Dictionary = {
   'billing.saved': '保存しました。',
   'billing.saveFailed': '請求情報を保存できませんでした',
   'billing.readOnly': '設定を変更できる方のみ編集できます。',
+
+  'signup.checkInbox': '{email} にリンクを送りました。開いてアドレスを確認してください。パスワードを忘れたときに戻れる唯一の道です。',
 }
 
 export default ja

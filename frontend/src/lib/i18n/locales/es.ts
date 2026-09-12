@@ -1793,6 +1793,8 @@ const es: Dictionary = {
   'billing.saved': 'Guardado.',
   'billing.saveFailed': 'No se pudieron guardar los datos de facturación',
   'billing.readOnly': 'Solo quien puede cambiar los ajustes edita esto.',
+
+  'signup.checkInbox': 'Enviamos un enlace a {email}. Ábrelo para comprobar la dirección: es la única vuelta si algún día pierdes la contraseña.',
 }
 
 export default es

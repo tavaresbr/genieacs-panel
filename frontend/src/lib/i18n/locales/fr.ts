@@ -1793,6 +1793,8 @@ const fr: Dictionary = {
   'billing.saved': 'Enregistré.',
   'billing.saveFailed': 'Impossible d\'enregistrer les données de facturation',
   'billing.readOnly': 'Seule une personne pouvant modifier les réglages peut éditer ceci.',
+
+  'signup.checkInbox': "Nous avons envoyé un lien à {email}. Ouvrez-le pour prouver l'adresse : c'est par là que l'on revient si le mot de passe est perdu.",
 }
 
 export default fr

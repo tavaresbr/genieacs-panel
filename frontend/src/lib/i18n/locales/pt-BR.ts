@@ -1793,6 +1793,8 @@ const ptBR: Dictionary = {
   'billing.saved': 'Salvo.',
   'billing.saveFailed': 'Não foi possível salvar os dados de faturamento',
   'billing.readOnly': 'Só quem pode alterar as configurações edita isto.',
+
+  'signup.checkInbox': 'Mandamos um link para {email}. Abra para provar o endereço — é por ele que se volta, no dia em que a senha se perder.',
 }
 
 export default ptBR

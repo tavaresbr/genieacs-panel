@@ -1799,6 +1799,8 @@ const it: Dictionary = {
   'billing.saved': 'Salvato.',
   'billing.saveFailed': 'Impossibile salvare i dati di fatturazione',
   'billing.readOnly': 'Solo chi può modificare le impostazioni può cambiarlo.',
+
+  'signup.checkInbox': 'Abbiamo inviato un link a {email}. Aprilo per confermare l\'indirizzo: è da lì che si rientra se un giorno perdi la password.',
 }
 
 export default it

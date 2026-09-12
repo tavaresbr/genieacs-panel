@@ -1795,6 +1795,8 @@ const en = {
   'billing.saved': 'Saved.',
   'billing.saveFailed': 'The billing details could not be saved',
   'billing.readOnly': 'Only someone who can change settings may edit this.',
+
+  'signup.checkInbox': 'We sent a link to {email}. Open it to prove the address — it is the only way back in if you ever lose the password.',
 }
 
 export default en

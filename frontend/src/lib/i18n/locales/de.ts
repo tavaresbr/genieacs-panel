@@ -1797,6 +1797,8 @@ const de: Dictionary = {
   'billing.saved': 'Gespeichert.',
   'billing.saveFailed': 'Die Rechnungsdaten konnten nicht gespeichert werden',
   'billing.readOnly': 'Nur wer Einstellungen ändern darf, bearbeitet dies.',
+
+  'signup.checkInbox': 'Wir haben einen Link an {email} geschickt. Öffnen Sie ihn, um die Adresse zu bestätigen — sie ist der einzige Weg zurück, falls das Passwort verloren geht.',
 }
 
 export default de

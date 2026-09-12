@@ -1793,6 +1793,8 @@ const zhCN: Dictionary = {
   'billing.saved': '已保存。',
   'billing.saveFailed': '无法保存开票信息',
   'billing.readOnly': '只有能修改设置的人才能编辑。',
+
+  'signup.checkInbox': '我们已向 {email} 发送了链接。请打开它验证邮箱——万一忘记密码，这是唯一的回路。',
 }
 
 export default zhCN

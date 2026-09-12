@@ -1801,6 +1801,8 @@ const hi: Dictionary = {
   'billing.saved': 'सहेजा गया।',
   'billing.saveFailed': 'बिलिंग विवरण सहेजे नहीं जा सके',
   'billing.readOnly': 'इसे केवल वही बदल सकता है जो सेटिंग्स बदल सकता है।',
+
+  'signup.checkInbox': 'हमने {email} पर एक लिंक भेजा है। पता प्रमाणित करने के लिए उसे खोलें — पासवर्ड खो जाने पर वापसी का यही एकमात्र रास्ता है।',
 }
 
 export default hi

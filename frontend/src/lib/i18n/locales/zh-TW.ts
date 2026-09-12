@@ -1794,6 +1794,8 @@ const zhTW: Dictionary = {
   'billing.saved': '已儲存。',
   'billing.saveFailed': '無法儲存開立發票的資料',
   'billing.readOnly': '只有能變更設定的人才能編輯。',
+
+  'signup.checkInbox': '我們已寄送連結到 {email}。請開啟以驗證信箱——萬一忘記密碼，這是唯一的回路。',
 }
 
 export default zhTW
