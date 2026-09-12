@@ -3,6 +3,7 @@ import WaSendService from './waSendService.js';
 import WhatsAppConfigService from './whatsappConfigService.js';
 import { isPermanentFailure } from './waSendFailure.js';
 import { forEachTenant } from '../config/tenantJobs.js';
+import { isUniqueViolation } from '../config/database.js';
 
 /** How often a pass runs. Short, because a reply typed by a human is waiting. */
 const TICK_INTERVAL_MS = 5_000;
@@ -210,11 +211,43 @@ class WaOutboxWorker {
 
     try {
       const { externalId } = await WaSendService.dispatch(message);
-      await WaMessage.update(message.id, {
-        external_id: externalId,
-        delivery_status: 'sent',
-        delivery_error: null
-      });
+
+      // ── Ponto de não-retorno ────────────────────────────────────────────
+      // A linha acima já entregou ao Evolution: o destinatário VAI receber.
+      // Daqui em diante nenhuma falha pode voltar para `recordFailure`, que
+      // devolve a linha para 'queued' e faz o próximo laço mandar de novo.
+      //
+      // E há uma falha real esperando aqui. O painel assina `MESSAGES_UPSERT`,
+      // e o Evolution ecoa a mensagem que ACABOU de sair como evento de
+      // entrada; `gravarMensagem` a grava como linha 'out' com este mesmo
+      // `external_id`. Entre o `dispatch` retornar e a escrita abaixo commitar
+      // existe uma janela em que o eco chega primeiro e insere. Aí esta escrita
+      // viola o índice único `(tenant_id, external_id)` — e, antes desta
+      // guarda, o `catch` de fora lia isso como "não enviou" e reenviava.
+      //
+      // Violação de unicidade aqui significa exatamente o contrário de falha:
+      // significa que a outra ponta já registrou o que nós mandamos.
+      try {
+        await WaMessage.update(message.id, {
+          external_id: externalId,
+          delivery_status: 'sent',
+          delivery_error: null
+        });
+      } catch (error) {
+        if (!isUniqueViolation(error)) throw error;
+        // O `external_id` fica com o eco, que é quem o registrou primeiro, e
+        // esta linha sai da fila pelo estado. O que NÃO pode acontecer é ela
+        // continuar 'queued': `listSendable` a pegaria e o cliente receberia
+        // duas vezes.
+        await WaMessage.update(message.id, {
+          delivery_status: 'sent',
+          delivery_error: null
+        });
+        console.warn(
+          `[wa] mensagem ${message.id}: o eco de entrada gravou ${externalId} antes `
+          + 'da confirmação de saída; a linha sai da fila sem reenvio'
+        );
+      }
       // 'sent' is as far as the sender can see. The webhook upgrades the row to
       // delivered and read when the receipts arrive.
       return 'sent';
