@@ -377,16 +377,33 @@ async function authenticateToken(req, res, next) {
 /**
  * Whether a token may be used on the host it arrived at.
  *
- * The rule itself lives in `hostMatchesTenant` — the host only disagrees with a
- * credential where it NAMED a provider — and this is the token's caller of it.
+ * Três casos, e a ordem entre eles é a regra:
  *
- * Without this check, a token minted at `alfa.painel.exemplo.com` still works
- * against `beta.painel.exemplo.com`: the scope would come from the token, so
- * the operator would not SEE beta's data — but the request would be served,
- * and every rate limit, audit line and error message would be attributed to a
- * provider the caller has no business naming.
+ * 1. **No host da própria plataforma**, só uma sessão da plataforma serve. O
+ *    ápice não pertence a provedor nenhum, então `req.hostTenantId` é nulo ali
+ *    e `hostMatchesTenant` diria "não há com o que discordar" — verdade
+ *    enquanto o ápice servia duas rotas anônimas, e um replay no minuto em que
+ *    ele passa a servir rota autenticada: o escopo viria do token e o painel de
+ *    um provedor seria servido pelo endereço da plataforma. Esta linha entra
+ *    ANTES de existir sessão de plataforma alguma, de propósito: hoje ela
+ *    recusa todo token no ápice, que é exatamente o que se quer até o console
+ *    ter sessão própria.
+ * 2. **Uma sessão da plataforma fora do ápice** não serve. Ela não nomeia
+ *    provedor, então não há escopo em que ela possa ler nada num host de
+ *    provedor; recusar aqui é dizer isso uma vez, em vez de deixar cada leitura
+ *    escopada descobrir sozinha.
+ * 3. **O resto** é a regra compartilhada de `hostMatchesTenant`: o host só
+ *    discorda de uma credencial onde ele NOMEOU um provedor.
+ *
+ * Sem o caso 3, um token cunhado em `alfa.painel.exemplo.com` funcionaria
+ * contra `beta.painel.exemplo.com`: o escopo viria do token, então o operador
+ * não VERIA o dado do beta — mas a requisição seria servida, e todo rate limit,
+ * linha de trilha e mensagem de erro ficaria atribuída a um provedor que quem
+ * chamou não tem por que nomear.
  */
 function tokenMatchesHost(req, session) {
+  if (req.platformHost) return Boolean(session.platform);
+  if (session.platform) return false;
   return hostMatchesTenant(req, session.tenantId);
 }
 

@@ -230,6 +230,60 @@ describe('the platform\'s own host', () => {
     assert.equal(me.body.data.name, 'Porta Fibra');
   });
 
+  /**
+   * O ápice passou a rotear a família do console — é o mecanismo de que a
+   * mudança do console para cá depende. O que este bloco fixa é que abrir o
+   * caminho não abriu a porta: uma sessão que NOMEIA um provedor não vale no
+   * endereço da plataforma, que não pertence a provedor nenhum.
+   *
+   * Sem isso, `req.hostTenantId` ser nulo no ápice fazia a conferência de host
+   * dizer "não há com o que discordar", e o painel de um provedor passaria a
+   * ser servido pelo endereço da plataforma assim que uma rota autenticada
+   * respondesse ali. Era latente enquanto o ápice só servia rota anônima.
+   */
+  describe('a sessão de provedor no endereço da plataforma', () => {
+    it('é recusada na família do console, e não por falta de cadastro', async () => {
+      // `ownerToken` é do primeiro usuário do deploy, que sob SaaS nasce no
+      // cadastro da plataforma: se a recusa viesse de `requirePlatformAdmin`,
+      // este token passaria. Ela vem antes, do host.
+      const res = await apex('/api/platform/tenants', { headers: bearer(ownerToken) });
+      assert.equal(res.status, 403, JSON.stringify(res.body));
+      assert.equal(res.body.code, 'tenant_mismatch');
+    });
+
+    it('continua valendo no host do próprio provedor', async () => {
+      const res = await home('/api/platform/tenants', { headers: bearer(ownerToken) });
+      assert.equal(res.status, 200, JSON.stringify(res.body));
+    });
+
+    it('recusa um token de operador comum do mesmo jeito', async () => {
+      const res = await apex('/api/platform/tenants', { headers: bearer(viewerToken) });
+      assert.equal(res.status, 403);
+      assert.equal(res.body.code, 'tenant_mismatch');
+    });
+
+    /**
+     * Sem token a família do console responde 401 no ápice, onde antes o
+     * resolvedor respondia 404. É a única resposta que esta mudança altera, e
+     * ela revela só o que o próprio ápice já diz em voz alta no perfil
+     * público: que aqui é a plataforma, e não um provedor. O 404 que esconde a
+     * existência do plano de controle é o do host de um PROVEDOR, e continua
+     * de pé — a asserção logo abaixo é o que o prova.
+     */
+    it('pede credencial em vez de fingir que o caminho não existe', async () => {
+      const res = await apex('/api/platform/tenants');
+      assert.equal(res.status, 401);
+    });
+
+    it('não muda o 404 que esconde o console do host de um provedor', async () => {
+      // `viewerToken` é operador do provedor da casa e não está no cadastro da
+      // plataforma: no host DELE a resposta é 404, nunca 403, para que ninguém
+      // descubra por aí que existe um plano de controle.
+      const res = await home('/api/platform/tenants', { headers: bearer(viewerToken) });
+      assert.equal(res.status, 404);
+    });
+  });
+
   it('is nothing at all where subdomains are not what names a provider', async () => {
     // `painel.test` is the panel's base; the portal's base is unset here, so
     // a deeper or unrelated host still names nobody.
