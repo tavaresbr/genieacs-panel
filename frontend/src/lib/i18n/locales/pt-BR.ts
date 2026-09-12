@@ -803,6 +803,8 @@ const ptBR: Dictionary = {
   'swaps.deviceDescription': 'Todas as trocas de que este ONT participou.',
   'swaps.contract': 'contrato {contract}',
   'swaps.flapping': 'Par instável · {count}×',
+  'swaps.acknowledgedBy': 'Dispensado por {user} · {when}',
+  'swaps.acknowledgedAt': 'Dispensado · {when}',
   'swaps.acknowledge': 'Confirmar',
   'swaps.link.moved': 'Vínculo do SGP movido para o ONT novo',
   'swaps.link.cleared': 'Vínculo antigo removido; o ONT novo já tinha o seu',

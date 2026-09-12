@@ -164,8 +164,13 @@ class CustomerService {
       subjectId: String(account.customer_id),
       detail: {
         deviceId: previousDeviceId,
-        pppoeAnterior: account.pppoe_username,
-        pppoeNovo: incomingPppoe
+        // `from`/`to` em inglês como o resto do backend: a tela da trilha
+        // imprime a CHAVE crua ao lado do valor, de propósito, para nunca
+        // despejar JSON numa célula — então `pppoeAnterior` aparecia em
+        // português ao lado de `deviceId`, na mesma linha. O par antes/depois
+        // já tem precedente em `usersController` (`{ username, from, to }`).
+        pppoeFrom: account.pppoe_username,
+        pppoeTo: incomingPppoe
       }
     });
 

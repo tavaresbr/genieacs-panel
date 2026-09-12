@@ -2,8 +2,16 @@ import { tdb, tinsertReturningId } from '../config/database.js';
 import { timestampMs } from '../utils/helpers.js';
 
 /** Row view for the API. */
-export function publicSwap(swap) {
+/**
+ * @param {object} swap a linha
+ * @param {Map<number, string>} [acknowledgers] id do operador → nome, resolvido
+ *   por quem chama contra a equipe DESTE provedor. Ausente, ou sem o id, o
+ *   nome sai `null` — que é a resposta honesta para o operador que já saiu e
+ *   para a linha que ninguém dispensou ainda.
+ */
+export function publicSwap(swap, acknowledgers = null) {
   if (!swap) return null;
+  const quemDispensou = Number(swap.acknowledged_by);
   return {
     id: swap.id,
     customerId: swap.customer_id,
@@ -18,6 +26,11 @@ export function publicSwap(swap) {
     occurredAt: swap.occurred_at ? new Date(timestampMs(swap.occurred_at)).toISOString() : null,
     acknowledgedAt: swap.acknowledged_at
       ? new Date(timestampMs(swap.acknowledged_at)).toISOString()
+      : null,
+    // O NOME, nunca o id: um id de operador não diz nada a quem lê a tela, e
+    // sair daqui como número o exporia a quem só precisa saber quem foi.
+    acknowledgedBy: Number.isInteger(quemDispensou) && quemDispensou > 0
+      ? acknowledgers?.get(quemDispensou) ?? null
       : null
   };
 }

@@ -6,8 +6,36 @@ import CustomerPortalPasswordService from '../services/customerPortalPasswordSer
 import CustomerAccount from '../models/CustomerAccount.js';
 import DeviceProfile from '../models/DeviceProfile.js';
 import DeviceSwap, { publicSwap } from '../models/DeviceSwap.js';
+import TenantUser from '../models/TenantUser.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { translateError } from '../i18n/index.js';
+
+/**
+ * O nome de quem dispensou cada troca, por id de operador.
+ *
+ * `acknowledged_by` guarda só o id, e `users` é tabela COMPARTILHADA de
+ * propósito — uma pessoa atende vários ISPs, e `config/tenantScope.js` avisa
+ * que nada no esquema impede o id de um operador de outro provedor de aparecer
+ * numa linha daqui. Por isso o nome sai de `TenantUser.listForTenant`, que só
+ * enxerga quem trabalha NESTE provedor: um id que não esteja lá volta sem nome,
+ * em vez de ser resolvido contra o cadastro global de pessoas.
+ *
+ * Uma consulta para a lista inteira, não uma por linha: a lista de trocas de um
+ * aparelho chega a 100 e a da frota a 200.
+ */
+async function swapAcknowledgers(req, swaps) {
+  const ids = new Set(
+    swaps
+      .map((swap) => Number(swap?.acknowledged_by))
+      .filter((id) => Number.isInteger(id) && id > 0)
+  );
+  if (ids.size === 0) return new Map();
+  const equipe = await TenantUser.listForTenant(req.tenantId);
+  return new Map(
+    equipe.filter((membro) => ids.has(Number(membro.id)))
+      .map((membro) => [Number(membro.id), membro.username])
+  );
+}
 
 class DeviceController {
   static async getDashboard(req, res) {
@@ -61,8 +89,12 @@ class DeviceController {
   static async getSwaps(req, res) {
     try {
       const rows = await DeviceSwap.listOpen(req.query?.limit);
+      // A seta em vez de `rows.map(publicSwap)`: o `map` passa o ÍNDICE no
+      // segundo argumento, que aqui é o mapa de nomes.
       return res.json(createResponse(req.t('device.swaps.retrieved'), {
-        swaps: rows.map(publicSwap),
+        // Esta lista é só das trocas ainda não dispensadas, então
+        // `acknowledged_by` é nulo em todas — nenhum nome a resolver.
+        swaps: rows.map((row) => publicSwap(row)),
         open: rows.length
       }));
     } catch (error) {
@@ -81,8 +113,11 @@ class DeviceController {
         return res.status(400).json(createErrorResponse(req.t('device.history.deviceIdRequired')));
       }
       const rows = await DeviceSwap.listForDevice(deviceId, req.query?.limit);
+      // Aqui entram as já dispensadas, e é a tela onde "quem olhou isso" faz
+      // falta: sem o nome, uma troca dispensada é idêntica a uma aberta.
+      const nomes = await swapAcknowledgers(req, rows);
       return res.json(createResponse(req.t('device.swaps.retrieved'), {
-        swaps: rows.map(publicSwap)
+        swaps: rows.map((row) => publicSwap(row, nomes))
       }));
     } catch (error) {
       console.error('Get device swaps error:', error);
@@ -102,8 +137,16 @@ class DeviceController {
       if (!existing) {
         return res.status(404).json(createErrorResponse(req.t('device.swaps.notFound')));
       }
-      const swap = await DeviceSwap.acknowledge(id, req.user?.id ?? null);
-      return res.json(createResponse(req.t('device.swaps.acknowledged'), publicSwap(swap)));
+      // `userId`, não `id`: a sessão nunca teve `id` (`middleware/auth.js`, o
+      // objeto devolvido por `hydrateSession`). Esta linha dizia `req.user?.id`
+      // e o encadeamento opcional transformou o erro de digitação em silêncio —
+      // `acknowledged_by` gravava `null` desde que a coluna existe, que é a
+      // única que responde quem dispensou o aviso de troca de ONT.
+      const swap = await DeviceSwap.acknowledge(id, req.user?.userId ?? null);
+      return res.json(createResponse(
+        req.t('device.swaps.acknowledged'),
+        publicSwap(swap, await swapAcknowledgers(req, [swap]))
+      ));
     } catch (error) {
       console.error('Acknowledge device swap error:', error);
       return res.status(500).json(

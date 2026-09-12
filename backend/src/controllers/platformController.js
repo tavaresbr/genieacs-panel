@@ -1,3 +1,4 @@
+import fs from 'node:fs/promises';
 import Tenant from '../models/Tenant.js';
 import ImpersonationTicket from '../models/ImpersonationTicket.js';
 import { panelBaseDomain } from '../middleware/tenantResolver.js';
@@ -14,6 +15,7 @@ import { getDb } from '../config/database.js';
 import { seedDefaults } from '../config/seed.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { slugProblem } from '../utils/slug.js';
+import { tenantMediaRoot } from '../services/waMediaService.js';
 
 const NAME_MAX_LENGTH = 128;
 
@@ -452,9 +454,17 @@ class PlatformController {
    * suspended provider, and the SGP webhook refuses a delivery for one. This
    * route does not invent that behaviour, it hands somebody the switch.
    *
-   * Suspending is deliberately not a lockout: nothing in the sign-in path reads
-   * this column, so a provider whose service has stopped can still be looked at
-   * and, more importantly, turned back on.
+   * Suspending IS a lockout, and this paragraph used to say the opposite —
+   * "nothing in the sign-in path reads this column". `resolveTenant` reads it
+   * (`middleware/tenantResolver.js`) and answers 404 for the whole host: the
+   * panel, the subscriber portal, signed in or not. The old sentence described
+   * a design that stopped being true, and it is a sentence about access
+   * control, so whoever read it while touching suspension decided wrong.
+   *
+   * Turning a provider back on is done from HERE, on the control plane's own
+   * host, which is why it still works. And the paragraph below depends on the
+   * lockout being real: the two-step deletion trusts suspension to mean nobody
+   * is working in there.
    */
   static async setStatus(req, res) {
     try {
@@ -600,6 +610,25 @@ class PlatformController {
         await trx('tenant_users').where({ tenant_id: id }).del();
         await trx('tenants').where({ id }).del();
       });
+
+      // O laço acima apaga LINHAS, e os anexos do WhatsApp não são linhas: os
+      // bytes moram em `DATA_DIR/wa-media/t<id>/`. Sem isto eles ficavam para
+      // sempre — o único varredor que os alcançaria filtra por provedor
+      // `active`, e a partir daqui não há mais linha em `tenants` para casar.
+      // São fotos e documentos que assinantes mandaram.
+      //
+      // DEPOIS da transação, nunca dentro: um `rm` não desfaz com `rollback`.
+      // E falha de disco não vira 500, porque o provedor JÁ foi excluído e a
+      // trilha já registrou — dizer "falhou" aqui seria mentir sobre o que
+      // aconteceu. O que sobra é um aviso e um caminho para alguém limpar.
+      const midia = tenantMediaRoot(id);
+      try {
+        await fs.rm(midia, { recursive: true, force: true });
+      } catch (error) {
+        console.warn(
+          `[platform] provedor ${id} excluído, mas ${midia} não pôde ser removido: ${error.message}`
+        );
+      }
 
       // O resolvedor guarda o id por slug e o primeiro provedor da tabela. Sem
       // isto, o processo continuaria resolvendo um provedor que não existe mais

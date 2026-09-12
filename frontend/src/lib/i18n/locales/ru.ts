@@ -807,6 +807,8 @@ const ru: Dictionary = {
   'swaps.deviceDescription': 'Все замены, в которых участвовала эта ONT.',
   'swaps.contract': 'договор {contract}',
   'swaps.flapping': 'Нестабильная пара · {count}×',
+  'swaps.acknowledgedBy': 'Отмечено: {user} · {when}',
+  'swaps.acknowledgedAt': 'Отмечено · {when}',
   'swaps.acknowledge': 'Подтвердить',
   'swaps.link.moved': 'Привязка SGP перенесена на новую ONT',
   'swaps.link.cleared': 'Старая привязка удалена: у новой ONT уже была своя',

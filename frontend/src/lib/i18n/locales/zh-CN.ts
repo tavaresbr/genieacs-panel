@@ -803,6 +803,8 @@ const zhCN: Dictionary = {
   'swaps.deviceDescription': '这台 ONT 参与过的所有更换记录。',
   'swaps.contract': '合同 {contract}',
   'swaps.flapping': '不稳定配对 · {count} 次',
+  'swaps.acknowledgedBy': '由 {user} 处理 · {when}',
+  'swaps.acknowledgedAt': '已处理 · {when}',
   'swaps.acknowledge': '标记为已确认',
   'swaps.link.moved': 'SGP 绑定已迁移到新 ONT',
   'swaps.link.cleared': '已删除旧绑定；新 ONT 本来就有自己的绑定',

@@ -112,6 +112,21 @@ export function DeviceSwapsCard({ deviceId }: DeviceSwapsCardProps) {
                     {t('swaps.flapping', { count: swap.repeatCount })}
                   </span>
                 )}
+                {/* Na página do aparelho o botão de dispensar não aparece, e
+                    sem isto uma troca já dispensada era idêntica a uma aberta:
+                    nada na tela dizia que alguém já tinha olhado aquilo. O nome
+                    pode faltar — operador que saiu da equipe —, e aí a etiqueta
+                    diz só que foi dispensada, que continua sendo a informação. */}
+                {swap.acknowledgedAt && (
+                  <span className="rounded-full border border-border px-2 py-0.5 text-muted-foreground">
+                    {swap.acknowledgedBy
+                      ? t('swaps.acknowledgedBy', {
+                        user: swap.acknowledgedBy,
+                        when: formatDateTime(swap.acknowledgedAt)
+                      })
+                      : t('swaps.acknowledgedAt', { when: formatDateTime(swap.acknowledgedAt) })}
+                  </span>
+                )}
               </p>
             </div>
 

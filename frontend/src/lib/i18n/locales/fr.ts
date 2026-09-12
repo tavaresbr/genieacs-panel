@@ -803,6 +803,8 @@ const fr: Dictionary = {
   'swaps.deviceDescription': 'Tous les remplacements auxquels cette ONT a participé.',
   'swaps.contract': 'contrat {contract}',
   'swaps.flapping': 'Paire instable · {count}×',
+  'swaps.acknowledgedBy': 'Écarté par {user} · {when}',
+  'swaps.acknowledgedAt': 'Écarté · {when}',
   'swaps.acknowledge': 'Confirmer',
   'swaps.link.moved': 'Lien SGP déplacé vers la nouvelle ONT',
   'swaps.link.cleared': 'Ancien lien supprimé : la nouvelle ONT avait déjà le sien',

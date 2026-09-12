@@ -62,6 +62,25 @@ export function tenantMediaDir(tenantId = currentTenantId()) {
   return path.posix.join(MEDIA_DIR, `t${id}`);
 }
 
+/**
+ * A mesma subárvore em caminho ABSOLUTO, conferida contra a raiz de `wa-media`.
+ *
+ * Mora aqui, e não no varredor, porque quem apaga um provedor precisa dela sem
+ * ter escopo aberto: a exclusão roda no plano de controle e o provedor está
+ * deixando de existir. A conferência só pode falhar por defeito — o único
+ * insumo é um id — e é exatamente por isso que vale mantê-la: a falha que ela
+ * pega é um `rm` em outro lugar do volume.
+ */
+export function tenantMediaRoot(tenantId = currentTenantId()) {
+  const raiz = path.resolve(DATA_DIR);
+  const midia = path.resolve(raiz, MEDIA_DIR);
+  const absoluto = path.resolve(raiz, tenantMediaDir(tenantId));
+  if (absoluto !== midia && !absoluto.startsWith(midia + path.sep)) {
+    throw new Error(`media subtree ${absoluto} falls outside ${midia}`);
+  }
+  return absoluto;
+}
+
 /** O id de provedor que um nome de diretório de primeiro nível carrega, ou null. */
 export function tenantIdFromDir(name) {
   const match = TENANT_DIR.exec(String(name || ''));

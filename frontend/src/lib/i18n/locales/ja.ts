@@ -803,6 +803,8 @@ const ja: Dictionary = {
   'swaps.deviceDescription': 'このONTが関わったすべての交換です。',
   'swaps.contract': '契約 {contract}',
   'swaps.flapping': '不安定なペア · {count}回',
+  'swaps.acknowledgedBy': '{user} が確認済 · {when}',
+  'swaps.acknowledgedAt': '確認済 · {when}',
   'swaps.acknowledge': '確認済みにする',
   'swaps.link.moved': 'SGPの紐付けを新しいONTへ移しました',
   'swaps.link.cleared': '古い紐付けを削除しました（新しいONTには既に紐付けがありました）',
