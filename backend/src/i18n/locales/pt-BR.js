@@ -640,4 +640,8 @@ export default {
   'platformAdmin.revoked': 'Plano de controle revogado',
   'platformAdmin.revokeFailed': 'Falha ao revogar o plano de controle',
 
+  'tenant.billingInvalid': 'Os dados de faturamento são inválidos',
+  'tenant.billingTaxIdInvalid': 'O documento não é um CNPJ nem um CPF válido',
+  'tenant.billingPostalCodeInvalid': 'O CEP deve ter oito dígitos',
+  'tenant.billingEmailInvalid': 'O e-mail de cobrança é inválido',
 };

@@ -284,4 +284,9 @@ assinantes, nada. Uma caixa de entrada alheia não é lugar onde isso mora.
 
 - Gateway de cobrança: hoje o `ManualBillingProvider` registra o pagamento pelo
   console. Asaas ou similar entra quando houver contrato para cobrar.
-- Rotação da `SECRET_BOX_KEY` com duas chaves vivas.
+- O **comando de re-cifra** da rotação da `SECRET_BOX_KEY`. As duas chaves vivas
+  já existem e já funcionam: pôr a chave antiga em `SECRET_BOX_KEY_PREVIOUS` faz
+  o painel LER o que foi cifrado com ela e ESCREVER só com a nova. O que não
+  existe é o passo que percorre as linhas antigas e as reescreve — sem ele, uma
+  linha só migra quando alguém a edita, e a chave antiga tem que continuar no
+  `.env` indefinidamente.

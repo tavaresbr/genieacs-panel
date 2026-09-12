@@ -1776,6 +1776,34 @@ const zhTW: Dictionary = {
   'settings.export.hint': '檔案中不含任何密碼或已儲存的機密。這次下載本身會記入稽核紀錄。',
   'settings.export.done': '檔案已準備好。',
   'settings.export.failed': '無法產生匯出檔案',
+
+  'platform.subscription.renewalExpiredNote': '付費週期已結束，面板目前僅能檢視。',
+  'platform.subscription.renewsExpired': '已於 {date} 到期',
+  'plan.paidThroughExpired': '到期於',
+
+  'audit.action.tenantBillingChanged': '修改了開立發票的資料',
+  'billing.title': '開立發票的資料',
+  'billing.description': '開立發票所需的資料，以及帳單的寄送地址。請在第一次開立前填寫；這裡不填也不影響面板使用。',
+  'billing.legalName': '公司全名',
+  'billing.taxId': 'CNPJ 或 CPF',
+  'billing.taxIdHint': '僅填數字，標點會被忽略。',
+  'billing.stateRegistration': '州稅登記號',
+  'billing.stateRegistrationHint': '沒有就留空，或填寫 ISENTO。',
+  'billing.postalCode': '郵遞區號',
+  'billing.addressLine': '街道',
+  'billing.addressNumber': '門牌號',
+  'billing.addressExtra': '附加資訊',
+  'billing.district': '行政區',
+  'billing.city': '城市',
+  'billing.state': '州',
+  'billing.email': '帳單電子郵件',
+  'billing.emailHint': '發票寄往的信箱，通常與登入信箱不同。',
+  'billing.phone': '帳單電話',
+  'billing.saved': '已儲存。',
+  'billing.saveFailed': '無法儲存開立發票的資料',
+  'billing.readOnly': '只有能變更設定的人才能編輯。',
+
+  'signup.checkInbox': '我們已寄送連結到 {email}。請開啟以驗證信箱——萬一忘記密碼，這是唯一的回路。',
 }
 
 export default zhTW

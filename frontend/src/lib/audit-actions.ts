@@ -35,6 +35,7 @@ export const AUDIT_ACTION_LABEL_KEYS: Record<string, TranslationKey> = {
   'invite.revoked': 'audit.action.inviteRevoked',
   'tenant.status_changed': 'audit.action.tenantStatusChanged',
   'tenant.exported': 'audit.action.tenantExported',
+  'tenant.billing_changed': 'audit.action.tenantBillingChanged',
   'subscription.changed': 'audit.action.subscriptionChanged',
   'tenant.renamed': 'audit.action.tenantRenamed',
   'tenant.slug_changed': 'audit.action.tenantSlugChanged',

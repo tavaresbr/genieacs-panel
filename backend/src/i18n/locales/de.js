@@ -642,4 +642,8 @@ export default {
   'platformAdmin.revoked': 'Steuerungsebene entzogen',
   'platformAdmin.revokeFailed': 'Steuerungsebene konnte nicht entzogen werden',
 
+  'tenant.billingInvalid': 'Die Rechnungsdaten sind ungültig',
+  'tenant.billingTaxIdInvalid': 'Die Steuernummer ist weder eine gültige CNPJ noch eine gültige CPF',
+  'tenant.billingPostalCodeInvalid': 'Die Postleitzahl muss acht Ziffern haben',
+  'tenant.billingEmailInvalid': 'Die Rechnungs-E-Mail-Adresse ist ungültig',
 };

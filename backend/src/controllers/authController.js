@@ -249,10 +249,41 @@ class AuthController {
         ip: req.ip ?? null
       });
 
+      // A prova do endereço, mandada agora e não um dia depois.
+      //
+      // Este é o único e-mail que se tem do dono de um provedor novo, e é por
+      // ele que vai a cobrança, o aviso de vencimento e a redefinição de senha
+      // — que, desde a fatia dos bilhetes, só sai para endereço PROVADO. Um
+      // cadastro que nasce sem provar nada é um cliente que, no dia em que
+      // esquecer a senha, não tem por onde voltar.
+      //
+      // Melhor esforço, e nunca condição: `enviarBilhete` devolve `false` num
+      // deploy sem SMTP e o cadastro segue igual. Travar o nascimento do
+      // provedor por causa do transporte de e-mail transformaria uma
+      // configuração opcional — `SMTP_URL` é opcional, e está escrito no
+      // runbook — em requisito de funcionamento. O que muda é a resposta
+      // DIZER se foi: a tela sabe se manda a pessoa olhar a caixa de entrada
+      // ou se pede a prova depois, de dentro do painel.
+      //
+      // O provedor vai explícito, e tem que ir: no apex `req.tenantId` é nulo,
+      // e num host de provedor é o do provedor ERRADO — o que hospeda a tela
+      // de cadastro, não o que acabou de nascer.
+      const provado = await enviarBilhete({
+        req,
+        purpose: AuthTicket.PURPOSES.EMAIL_VERIFICATION,
+        userId,
+        tenantId,
+        email,
+        rota: '/verify-email',
+        assunto: 'auth.emailVerifyMailSubject',
+        corpo: 'auth.emailVerifyMailBody'
+      });
+
       const base = panelBaseDomain();
       return res.status(201).json(createResponse(req.t('auth.signupCreated'), {
         tenant: { slug: tenant.slug, name: tenant.name },
-        panelUrl: base ? `https://${tenant.slug}.${base}` : null
+        panelUrl: base ? `https://${tenant.slug}.${base}` : null,
+        emailed: provado
       }));
     } catch (error) {
       console.error('Signup error:', error);

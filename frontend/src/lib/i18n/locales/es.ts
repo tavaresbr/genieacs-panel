@@ -1775,6 +1775,34 @@ const es: Dictionary = {
   'settings.export.hint': 'Ninguna contraseña ni secreto almacenado va en el archivo. La descarga queda registrada en el registro de auditoría.',
   'settings.export.done': 'El archivo está listo.',
   'settings.export.failed': 'No se pudo generar la exportación',
+
+  'platform.subscription.renewalExpiredNote': 'El período pagado venció; el panel está solo para lectura.',
+  'platform.subscription.renewsExpired': 'Venció el {date}',
+  'plan.paidThroughExpired': 'Venció el',
+
+  'audit.action.tenantBillingChanged': 'Datos de facturación modificados',
+  'billing.title': 'Datos de facturación',
+  'billing.description': 'Lo que exige la factura y adónde va el cobro. Complétalo antes de la primera factura; nada de esto bloquea el panel.',
+  'billing.legalName': 'Razón social',
+  'billing.taxId': 'CNPJ o CPF',
+  'billing.taxIdHint': 'Solo los números; la puntuación se ignora.',
+  'billing.stateRegistration': 'Inscripción estatal',
+  'billing.stateRegistrationHint': 'Déjalo en blanco, o escribe ISENTO, si no hay.',
+  'billing.postalCode': 'Código postal',
+  'billing.addressLine': 'Calle',
+  'billing.addressNumber': 'Número',
+  'billing.addressExtra': 'Complemento',
+  'billing.district': 'Barrio',
+  'billing.city': 'Ciudad',
+  'billing.state': 'Estado',
+  'billing.email': 'Correo de cobro',
+  'billing.emailHint': 'Adónde va la factura. Casi nunca es el mismo correo con el que entras.',
+  'billing.phone': 'Teléfono de cobro',
+  'billing.saved': 'Guardado.',
+  'billing.saveFailed': 'No se pudieron guardar los datos de facturación',
+  'billing.readOnly': 'Solo quien puede cambiar los ajustes edita esto.',
+
+  'signup.checkInbox': 'Enviamos un enlace a {email}. Ábrelo para comprobar la dirección: es la única vuelta si algún día pierdes la contraseña.',
 }
 
 export default es

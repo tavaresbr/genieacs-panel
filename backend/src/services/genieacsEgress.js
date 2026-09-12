@@ -24,6 +24,85 @@ export { blockedAddressReason };
  * DEPLOYMENT saying which ports its own network can tolerate being probed on,
  * which is not a decision the probing party gets to make about itself.
  */
+/**
+ * Este deployment serve mais de um provedor?
+ *
+ * A guarda de egresso inteira — a tabela de faixas privadas e a allowlist de
+ * portas — dependia só de `IS_SAAS`, e `EDITION` tem default `selfhosted`. Um
+ * deploy SaaS que suba sem essa variável rodava com as duas DESLIGADAS, e nada
+ * no processo percebia: o painel funciona, os testes passam, e a única
+ * diferença é que o endereço de metadados da nuvem volta a ser destino válido,
+ * salvável em `genieAcsUrl` por qualquer administrador de provedor.
+ *
+ * O repositório já tinha reconhecido exatamente esse modo de falha no outro
+ * portão — `assertSoleProvider` em `dbManagementService.js`, cujo comentário
+ * diz que ler `EDITION` "é a ideia certa na forma errada" — e a correção nunca
+ * foi trazida para cá. É a mesma: a contagem de provedores é um fato que o
+ * processo confere sozinho, e vale TER JUNTO do portão da edição, não no lugar
+ * dele.
+ *
+ * ## Por que a pergunta é síncrona, e a contagem mora fora dela
+ *
+ * A primeira versão disto consultava o banco DENTRO de `resolveTarget`, que é
+ * o caminho de toda requisição ao ACS. Custou caro e ensinou rápido: uma suíte
+ * que exercita a resolução de nomes sem banco nenhum parou de terminar, porque
+ * a consulta ficava esperando uma conexão que não vinha. Guarda de segurança
+ * que pendura o caminho quente numa consulta é guarda que alguém vai desligar.
+ *
+ * Então a leitura é de memória e a escrita é de fora: `refreshDeploymentSharing`
+ * roda no boot e de novo a cada passada do agendador, que já é de minuto em
+ * minuto. O pior caso é um provedor número dois nascer e a guarda continuar
+ * larga por até uma passada — contra o estado anterior, em que ela ficava larga
+ * para sempre.
+ *
+ * "Compartilhado" é grudento: uma vez que o processo viu dois provedores, não
+ * desaprende. Reabrir a guarda porque um provedor foi apagado seria trocar
+ * segurança por uma consulta, e a única coisa que a releitura poderia fazer é
+ * afrouxar. E a contagem que falha não afrouxa nada: ela simplesmente não muda
+ * o que já se sabe.
+ */
+let compartilhadoGrudento = false;
+
+export function deploymentIsShared() {
+  return IS_SAAS || compartilhadoGrudento;
+}
+
+/**
+ * Confere a tabela e fecha a guarda se houver mais de um provedor.
+ *
+ * O módulo de banco entra por import DINÂMICO, e isso não é estilo: importá-lo
+ * no topo deste arquivo faz `config/database.js` ser carregado por todo mundo
+ * que carrega a guarda de egresso — inclusive por suítes que a importam ANTES
+ * do harness. E `config/database.js` lê `DATA_DIR` no carregamento: importado
+ * cedo demais, ele se liga ao SQLite de desenvolvimento em vez do temporário do
+ * teste. Descoberto do jeito certo e pelo preço certo: um `POST /auth/setup`
+ * respondeu 409 num banco recém-criado, porque o banco não era o recém-criado.
+ */
+export async function refreshDeploymentSharing() {
+  if (deploymentIsShared()) return true;
+  try {
+    const { getDb } = await import('../config/database.js');
+    const { runUnscoped } = await import('../config/tenantContext.js');
+    // `runUnscoped` porque a pergunta é sobre o registro de provedores, que
+    // está ACIMA de qualquer provedor — e a sentinela recusaria o handle cru.
+    const [{ total } = {}] = await runUnscoped(
+      'counting providers to decide whether the egress guard applies',
+      () => getDb()('tenants').count({ total: '*' })
+    );
+    if (Number(total) > 1) compartilhadoGrudento = true;
+  } catch (error) {
+    // Sem banco não se aprende nada, e não saber não pode virar bloqueio: o
+    // que vale continua sendo o que já se sabia.
+    console.warn(`Could not count providers for the egress guard: ${error.message}`);
+  }
+  return deploymentIsShared();
+}
+
+/** Só para os testes: desfaz o que o processo aprendeu. */
+export function resetDeploymentSharing() {
+  compartilhadoGrudento = false;
+}
+
 const DEFAULT_ALLOWED_PORTS = [80, 443, 7557, 8080];
 
 function configuredPorts() {
@@ -133,7 +212,9 @@ export class GenieAcsEgress {
     // Read through `this` rather than off the module constant, so that the list
     // the class advertises is the list it enforces.
     const allowed = this.ALLOWED_PORTS;
-    if (IS_SAAS && !allowed.has(port)) {
+    // `IS_SAAS` OU mais de um provedor na tabela: ver `deploymentIsShared`.
+    const protegido = deploymentIsShared();
+    if (protegido && !allowed.has(port)) {
       throw refuse(
         `GenieACS port ${port} is not allowed; use one of ${[...allowed].join(', ')}`
       );
@@ -150,7 +231,7 @@ export class GenieAcsEgress {
     const addresses = await PinnedTransport.vetTarget(hostname, {
       lookup: (name) => this.lookup(name),
       signal,
-      allowPrivateAddresses: allowPrivateAddresses || !IS_SAAS,
+      allowPrivateAddresses: allowPrivateAddresses || !protegido,
       refuse: (message) => refuse(`GenieACS host ${message}`)
     });
 

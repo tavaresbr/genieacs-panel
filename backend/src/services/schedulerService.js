@@ -6,6 +6,9 @@ import SgpService from './sgpService.js';
 import { forEachTenant } from '../config/tenantJobs.js';
 import { currentTenantId } from '../config/tenantContext.js';
 import AuditLog from '../models/AuditLog.js';
+import AuthTicket from '../models/AuthTicket.js';
+import ImpersonationTicket from '../models/ImpersonationTicket.js';
+import { refreshDeploymentSharing } from './genieacsEgress.js';
 import {
   dueForRefresh, isDormant, lastPanelActivityAt, refreshTtlMs, tenantOffsetMs
 } from './dashboardSchedule.js';
@@ -145,14 +148,48 @@ class SchedulerService {
     if (this.tickPromise) return this.tickPromise;
     const prune = Date.now() - this.lastPruneAt >= PRUNE_INTERVAL_MS;
     if (prune) this.lastPruneAt = Date.now();
-    this.tickPromise = forEachTenant((tenant) => this.runJobs({ prune }), {
-      onError: (error, tenant) => {
-        console.warn(`Scheduler tick failed for provider ${tenant.slug}: ${error.message}`);
-      }
-    }).finally(() => {
-      this.tickPromise = null;
-    });
+    // Antes do laço, e a cada passada: a guarda de egresso pergunta "este
+    // deployment serve mais de um provedor?" a uma variável de memória, e é
+    // aqui que essa variável aprende. Uma passada por minuto é o atraso máximo
+    // entre o provedor número dois nascer e a guarda apertar — contra o estado
+    // anterior, em que ela dependia de alguém ter posto `EDITION=saas` no
+    // `.env` e ficava larga para sempre quando ninguém pôs.
+    this.tickPromise = refreshDeploymentSharing()
+      .catch(() => {})
+      .then(() => forEachTenant((tenant) => this.runJobs({ prune }), {
+        onError: (error, tenant) => {
+          console.warn(`Scheduler tick failed for provider ${tenant.slug}: ${error.message}`);
+        }
+      }))
+      .then(() => (prune ? this.pruneTickets() : undefined))
+      .finally(() => {
+        this.tickPromise = null;
+      });
     return this.tickPromise;
+  }
+
+  /**
+   * As duas tabelas de bilhete, podadas FORA do laço por provedor.
+   *
+   * Fora, e não dentro, porque nenhuma das duas é escopada: um `forEachTenant`
+   * as apagaria inteiras uma vez por provedor, e num deploy com trinta ISPs
+   * isso é trinta varreduras idênticas por dia. Além disso o laço só visita
+   * provedor `active` (`forEachTenant` filtra por `tenants.status`), então um
+   * provedor suspenso nunca teria os bilhetes dele podados.
+   *
+   * Os dois `prune` existiam, testados, sem UM chamador — e o comentário de
+   * `AuthTicket.create` já dizia "a poda os leva embora depois, pela idade",
+   * o que era falso. Com o cadastro passando a cunhar um bilhete de
+   * verificação, a falta deixou de ser teórica: a rota é pública, e toda
+   * pessoa que apertar "cadastrar" deixa uma linha que nada apagaria.
+   */
+  static async pruneTickets() {
+    await AuthTicket.prune().catch((error) => {
+      console.warn(`Could not prune auth tickets: ${error.message}`);
+    });
+    await ImpersonationTicket.prune().catch((error) => {
+      console.warn(`Could not prune impersonation tickets: ${error.message}`);
+    });
   }
 
   static async runJobs({ prune = false } = {}) {

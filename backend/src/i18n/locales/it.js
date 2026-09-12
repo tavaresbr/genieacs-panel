@@ -639,4 +639,8 @@ export default {
   'platformAdmin.revoked': 'Piano di controllo revocato',
   'platformAdmin.revokeFailed': 'Impossibile revocare il piano di controllo',
 
+  'tenant.billingInvalid': 'I dati di fatturazione non sono validi',
+  'tenant.billingTaxIdInvalid': 'Il documento non è un CNPJ né un CPF valido',
+  'tenant.billingPostalCodeInvalid': 'Il codice postale deve avere otto cifre',
+  'tenant.billingEmailInvalid': "L'e-mail di fatturazione non è valida",
 };

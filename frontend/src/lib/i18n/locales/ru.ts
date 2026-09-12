@@ -1783,6 +1783,34 @@ const ru: Dictionary = {
   'settings.export.hint': 'Ни один пароль и ни один сохранённый секрет в файл не попадает. Сама выгрузка записывается в журнал аудита.',
   'settings.export.done': 'Файл готов.',
   'settings.export.failed': 'Не удалось сформировать выгрузку',
+
+  'platform.subscription.renewalExpiredNote': 'Оплаченный период закончился; панель работает только на чтение.',
+  'platform.subscription.renewsExpired': 'Истёк {date}',
+  'plan.paidThroughExpired': 'Истёк',
+
+  'audit.action.tenantBillingChanged': 'Платёжные данные изменены',
+  'billing.title': 'Платёжные данные',
+  'billing.description': 'То, что требуется для счёта, и куда его отправлять. Заполните до первого счёта; ничто здесь не блокирует панель.',
+  'billing.legalName': 'Юридическое название',
+  'billing.taxId': 'CNPJ или CPF',
+  'billing.taxIdHint': 'Только цифры; знаки препинания игнорируются.',
+  'billing.stateRegistration': 'Региональная регистрация',
+  'billing.stateRegistrationHint': 'Оставьте пустым или напишите ISENTO, если её нет.',
+  'billing.postalCode': 'Почтовый индекс',
+  'billing.addressLine': 'Улица',
+  'billing.addressNumber': 'Номер',
+  'billing.addressExtra': 'Дополнение',
+  'billing.district': 'Район',
+  'billing.city': 'Город',
+  'billing.state': 'Штат',
+  'billing.email': 'E-mail для счетов',
+  'billing.emailHint': 'Куда уходит счёт. Редко тот же адрес, с которым вы входите.',
+  'billing.phone': 'Телефон для счетов',
+  'billing.saved': 'Сохранено.',
+  'billing.saveFailed': 'Не удалось сохранить платёжные данные',
+  'billing.readOnly': 'Редактировать может только тот, кто меняет настройки.',
+
+  'signup.checkInbox': 'Мы отправили ссылку на {email}. Откройте её, чтобы подтвердить адрес — это единственный путь назад, если пароль потеряется.',
 }
 
 export default ru

@@ -1779,6 +1779,34 @@ const de: Dictionary = {
   'settings.export.hint': 'Kein Passwort und kein gespeichertes Geheimnis landet in der Datei. Der Download selbst wird im Audit-Protokoll festgehalten.',
   'settings.export.done': 'Die Datei ist fertig.',
   'settings.export.failed': 'Der Export konnte nicht erstellt werden',
+
+  'platform.subscription.renewalExpiredNote': 'Der bezahlte Zeitraum ist abgelaufen; das Panel ist schreibgeschützt.',
+  'platform.subscription.renewsExpired': 'Abgelaufen am {date}',
+  'plan.paidThroughExpired': 'Abgelaufen am',
+
+  'audit.action.tenantBillingChanged': 'Rechnungsdaten geändert',
+  'billing.title': 'Rechnungsdaten',
+  'billing.description': 'Was eine Rechnung braucht und wohin die Forderung geht. Vor der ersten Rechnung ausfüllen; nichts davon sperrt das Panel.',
+  'billing.legalName': 'Firmenname',
+  'billing.taxId': 'CNPJ oder CPF',
+  'billing.taxIdHint': 'Nur Ziffern; Satzzeichen werden ignoriert.',
+  'billing.stateRegistration': 'Landessteuernummer',
+  'billing.stateRegistrationHint': 'Leer lassen oder ISENTO schreiben, wenn keine vorhanden ist.',
+  'billing.postalCode': 'Postleitzahl',
+  'billing.addressLine': 'Straße',
+  'billing.addressNumber': 'Nummer',
+  'billing.addressExtra': 'Zusatz',
+  'billing.district': 'Stadtteil',
+  'billing.city': 'Stadt',
+  'billing.state': 'Bundesstaat',
+  'billing.email': 'Rechnungs-E-Mail',
+  'billing.emailHint': 'Wohin die Rechnung geht. Selten dieselbe Adresse, mit der Sie sich anmelden.',
+  'billing.phone': 'Rechnungstelefon',
+  'billing.saved': 'Gespeichert.',
+  'billing.saveFailed': 'Die Rechnungsdaten konnten nicht gespeichert werden',
+  'billing.readOnly': 'Nur wer Einstellungen ändern darf, bearbeitet dies.',
+
+  'signup.checkInbox': 'Wir haben einen Link an {email} geschickt. Öffnen Sie ihn, um die Adresse zu bestätigen — sie ist der einzige Weg zurück, falls das Passwort verloren geht.',
 }
 
 export default de

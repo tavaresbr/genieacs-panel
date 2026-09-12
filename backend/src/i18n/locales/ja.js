@@ -641,4 +641,8 @@ export default {
   'platformAdmin.revoked': 'コントロールプレーンを取り消しました',
   'platformAdmin.revokeFailed': 'コントロールプレーンの取り消しに失敗しました',
 
+  'tenant.billingInvalid': '請求情報が正しくありません',
+  'tenant.billingTaxIdInvalid': '番号が有効な CNPJ または CPF ではありません',
+  'tenant.billingPostalCodeInvalid': '郵便番号は 8 桁である必要があります',
+  'tenant.billingEmailInvalid': '請求用のメールアドレスが正しくありません',
 };

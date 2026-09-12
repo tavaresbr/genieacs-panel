@@ -1775,6 +1775,34 @@ const ja: Dictionary = {
   'settings.export.hint': 'パスワードや保存された機密情報はファイルに含まれません。ダウンロードそのものが監査ログに記録されます。',
   'settings.export.done': 'ファイルの準備ができました。',
   'settings.export.failed': 'エクスポートを作成できませんでした',
+
+  'platform.subscription.renewalExpiredNote': '支払い期間が終了しました。パネルは閲覧のみになります。',
+  'platform.subscription.renewsExpired': '{date} に期限切れ',
+  'plan.paidThroughExpired': '期限切れ',
+
+  'audit.action.tenantBillingChanged': '請求情報を変更',
+  'billing.title': '請求情報',
+  'billing.description': '請求書に必要な情報と、請求書の送付先です。最初の請求の前にご記入ください。ここは入力しなくてもパネルは使えます。',
+  'billing.legalName': '法人名',
+  'billing.taxId': 'CNPJ または CPF',
+  'billing.taxIdHint': '数字のみ。記号は無視されます。',
+  'billing.stateRegistration': '州登録番号',
+  'billing.stateRegistrationHint': 'ない場合は空欄のまま、または ISENTO と記入してください。',
+  'billing.postalCode': '郵便番号',
+  'billing.addressLine': '住所',
+  'billing.addressNumber': '番地',
+  'billing.addressExtra': '建物名など',
+  'billing.district': '地区',
+  'billing.city': '市区町村',
+  'billing.state': '州',
+  'billing.email': '請求用メールアドレス',
+  'billing.emailHint': '請求書の送付先です。ログインに使うアドレスとは異なることがほとんどです。',
+  'billing.phone': '請求用電話番号',
+  'billing.saved': '保存しました。',
+  'billing.saveFailed': '請求情報を保存できませんでした',
+  'billing.readOnly': '設定を変更できる方のみ編集できます。',
+
+  'signup.checkInbox': '{email} にリンクを送りました。開いてアドレスを確認してください。パスワードを忘れたときに戻れる唯一の道です。',
 }
 
 export default ja

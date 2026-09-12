@@ -641,4 +641,8 @@ export default {
   'platformAdmin.revoked': 'नियंत्रण तल वापस लिया गया',
   'platformAdmin.revokeFailed': 'नियंत्रण तल वापस लेने में विफल',
 
+  'tenant.billingInvalid': 'बिलिंग विवरण अमान्य हैं',
+  'tenant.billingTaxIdInvalid': 'यह संख्या मान्य CNPJ या CPF नहीं है',
+  'tenant.billingPostalCodeInvalid': 'पिन कोड आठ अंकों का होना चाहिए',
+  'tenant.billingEmailInvalid': 'बिलिंग ई-मेल पता अमान्य है',
 };

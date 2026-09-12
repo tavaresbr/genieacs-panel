@@ -633,4 +633,8 @@ export default {
   'platformAdmin.revoked': 'تم سحب مستوى التحكم',
   'platformAdmin.revokeFailed': 'تعذر سحب مستوى التحكم',
 
+  'tenant.billingInvalid': 'بيانات الفوترة غير صالحة',
+  'tenant.billingTaxIdInvalid': 'الرقم ليس CNPJ ولا CPF صالحًا',
+  'tenant.billingPostalCodeInvalid': 'يجب أن يتكوّن الرمز البريدي من ثمانية أرقام',
+  'tenant.billingEmailInvalid': 'عنوان البريد الإلكتروني للفوترة غير صالح',
 };

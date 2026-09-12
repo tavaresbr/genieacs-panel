@@ -1783,6 +1783,34 @@ const hi: Dictionary = {
   'settings.export.hint': 'कोई पासवर्ड या संग्रहित गोपनीय जानकारी फ़ाइल में नहीं जाती। डाउनलोड स्वयं ऑडिट लॉग में दर्ज होता है।',
   'settings.export.done': 'फ़ाइल तैयार है।',
   'settings.export.failed': 'निर्यात तैयार नहीं किया जा सका',
+
+  'platform.subscription.renewalExpiredNote': 'भुगतान अवधि समाप्त हो गई; पैनल अभी केवल पढ़ने के लिए है।',
+  'platform.subscription.renewsExpired': '{date} को समाप्त',
+  'plan.paidThroughExpired': 'समाप्त हुआ',
+
+  'audit.action.tenantBillingChanged': 'बिलिंग विवरण बदले गए',
+  'billing.title': 'बिलिंग विवरण',
+  'billing.description': 'चालान के लिए ज़रूरी जानकारी, और बिल कहाँ भेजा जाए। पहले चालान से पहले भर लें; यहाँ कुछ भी पैनल को नहीं रोकता।',
+  'billing.legalName': 'कानूनी नाम',
+  'billing.taxId': 'CNPJ या CPF',
+  'billing.taxIdHint': 'केवल अंक; विराम चिह्न अनदेखे किए जाते हैं।',
+  'billing.stateRegistration': 'राज्य पंजीकरण',
+  'billing.stateRegistrationHint': 'न हो तो खाली छोड़ें, या ISENTO लिखें।',
+  'billing.postalCode': 'पिन कोड',
+  'billing.addressLine': 'सड़क',
+  'billing.addressNumber': 'नंबर',
+  'billing.addressExtra': 'अतिरिक्त विवरण',
+  'billing.district': 'मोहल्ला',
+  'billing.city': 'शहर',
+  'billing.state': 'राज्य',
+  'billing.email': 'बिलिंग ई-मेल',
+  'billing.emailHint': 'चालान यहाँ जाता है। प्रायः यह वह पता नहीं होता जिससे आप लॉगिन करते हैं।',
+  'billing.phone': 'बिलिंग फ़ोन',
+  'billing.saved': 'सहेजा गया।',
+  'billing.saveFailed': 'बिलिंग विवरण सहेजे नहीं जा सके',
+  'billing.readOnly': 'इसे केवल वही बदल सकता है जो सेटिंग्स बदल सकता है।',
+
+  'signup.checkInbox': 'हमने {email} पर एक लिंक भेजा है। पता प्रमाणित करने के लिए उसे खोलें — पासवर्ड खो जाने पर वापसी का यही एकमात्र रास्ता है।',
 }
 
 export default hi

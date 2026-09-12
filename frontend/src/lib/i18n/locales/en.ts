@@ -1777,6 +1777,34 @@ const en = {
   'settings.export.hint': 'No password and no stored secret goes in the file. The download itself is recorded in the audit trail.',
   'settings.export.done': 'The file is ready.',
   'settings.export.failed': 'The export could not be generated',
+
+  'platform.subscription.renewalExpiredNote': 'The paid period has ended; the panel is read-only.',
+  'platform.subscription.renewsExpired': 'Expired on {date}',
+  'plan.paidThroughExpired': 'Expired on',
+
+  'audit.action.tenantBillingChanged': 'Billing details changed',
+  'billing.title': 'Billing details',
+  'billing.description': 'What an invoice needs, and where the charge should be sent. Fill it in before the first invoice; nothing here blocks the panel.',
+  'billing.legalName': 'Legal name',
+  'billing.taxId': 'Tax number (CNPJ/CPF)',
+  'billing.taxIdHint': 'Digits only; punctuation is ignored.',
+  'billing.stateRegistration': 'State registration',
+  'billing.stateRegistrationHint': 'Leave blank, or write ISENTO, if there is none.',
+  'billing.postalCode': 'Postal code',
+  'billing.addressLine': 'Street',
+  'billing.addressNumber': 'Number',
+  'billing.addressExtra': 'Complement',
+  'billing.district': 'District',
+  'billing.city': 'City',
+  'billing.state': 'State',
+  'billing.email': 'Billing e-mail',
+  'billing.emailHint': 'Where the invoice goes. Often not the same address you sign in with.',
+  'billing.phone': 'Billing phone',
+  'billing.saved': 'Saved.',
+  'billing.saveFailed': 'The billing details could not be saved',
+  'billing.readOnly': 'Only someone who can change settings may edit this.',
+
+  'signup.checkInbox': 'We sent a link to {email}. Open it to prove the address — it is the only way back in if you ever lose the password.',
 }
 
 export default en
