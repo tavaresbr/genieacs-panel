@@ -157,8 +157,8 @@ describe('as ações que deixam registro', () => {
     assert.equal((await trilha({ action: 'invite.created' })).length, 1);
 
     const aceite = await call(
-      `${panelUrl}/api/invites/token/${criado.body.data.token}/accept`,
-      { method: 'POST', body: { username: 'quem-aceitou', password: 'senha-de-quem-aceitou-1', email: 'quem-aceitou@exemplo.test' } }
+      `${panelUrl}/api/invites/token/accept`,
+      { method: 'POST', body: { token: criado.body.data.token, username: 'quem-aceitou', password: 'senha-de-quem-aceitou-1', email: 'quem-aceitou@exemplo.test' } }
     );
     assert.equal(aceite.status, 201, JSON.stringify(aceite.body));
 

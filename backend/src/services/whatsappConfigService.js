@@ -359,7 +359,20 @@ class WhatsAppConfigService {
       flavor: row.flavor,
       baseUrl: row.base_url,
       status: row.status,
-      qrCode: row.qr_code || null,
+      // O QR NÃO sai daqui.
+      //
+      // Este serializador serve `GET /accounts` e `/accounts/:id/status`, que
+      // pedem `whatsapp.read` — e a rota dedicada ao QR pede `whatsapp.config`,
+      // de propósito. Deixar o código aqui desfazia essa decisão: um `tech`,
+      // que tem `read` e não tem `config`, fazia polling na listagem durante
+      // uma reconexão, lia o QR e pareava o próprio celular ao número do
+      // provedor — passando a receber a caixa de entrada dos assinantes e a
+      // falar COMO o provedor.
+      //
+      // `qrUpdatedAt` fica: é carimbo de tempo, não credencial, e é o que
+      // deixa a tela mostrar a idade real do código em vez de sessenta
+      // segundos cheios por um instante.
+
       qrUpdatedAt: row.qr_updated_at || null,
       phoneE164: row.phone_e164 || null,
       isDefault: Boolean(row.is_default),

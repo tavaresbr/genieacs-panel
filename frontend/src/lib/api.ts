@@ -567,11 +567,13 @@ export const invitesAPI = {
 
   /** Quem convidou, para qual provedor e com qual papel. Sem sessão: o token é a credencial. */
   preview: (token: string) =>
-    apiClient.get<InvitePreview>(`/invites/token/${encodeURIComponent(token)}`),
+    // POST apesar de ser consulta: o token vai no CORPO para não acabar no log
+    // do servidor, que grava o caminho inteiro. Ver `usableInvite` no backend.
+    apiClient.post<InvitePreview>('/invites/token/preview', { token }),
 
   /** Aceita, com a conta que a pessoa já tem ou com uma nova. Devolve a sessão. */
   accept: (token: string, payload: { username: string; password: string; email?: string }) =>
-    apiClient.post<LoginResponse>(`/invites/token/${encodeURIComponent(token)}/accept`, payload)
+    apiClient.post<LoginResponse>('/invites/token/accept', { ...payload, token })
 }
 
 export type SubscriptionStatus = 'trial' | 'active' | 'past_due' | 'suspended' | 'canceled'
@@ -1546,8 +1548,13 @@ export interface WhatsAppAccount {
   flavor: 'go' | 'v2'
   baseUrl: string
   status: WhatsAppStatus
-  /** Data URI, refreshed by the server while pairing. Never a stable value. */
-  qrCode: string | null
+  /**
+   * O QR não vem mais no objeto da conta.
+   *
+   * Ele é credencial de pareamento e sai SÓ pela rota dedicada, que exige
+   * `whatsapp.config`. Vinha neste serializador, que serve rotas de
+   * `whatsapp.read`, e isso punha o código ao alcance de um `tech`.
+   */
   qrUpdatedAt: string | null
   phoneE164: string | null
   isDefault: boolean

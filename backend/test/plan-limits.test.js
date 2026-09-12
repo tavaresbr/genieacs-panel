@@ -86,8 +86,8 @@ describe('operators', () => {
     assert.equal(created.status, 201);
     const token = created.body.data.token;
 
-    const accepted = await call(`${panelUrl}/api/invites/token/${token}/accept`, {
-      method: 'POST', body: { username: 'novato', password: 'senha-novato-123', email: 'novato@exemplo.test' }
+    const accepted = await call(`${panelUrl}/api/invites/token/accept`, {
+      method: 'POST', body: { token: token, username: 'novato', password: 'senha-novato-123', email: 'novato@exemplo.test' }
     });
     assert.equal(accepted.status, 402);
     assert.equal(accepted.body.code, 'plan_limit_operators');
@@ -97,8 +97,8 @@ describe('operators', () => {
 
     // With room again, the same link works.
     await onPlan(unlimited);
-    const retried = await call(`${panelUrl}/api/invites/token/${token}/accept`, {
-      method: 'POST', body: { username: 'novato', password: 'senha-novato-123', email: 'novato@exemplo.test' }
+    const retried = await call(`${panelUrl}/api/invites/token/accept`, {
+      method: 'POST', body: { token: token, username: 'novato', password: 'senha-novato-123', email: 'novato@exemplo.test' }
     });
     assert.equal(retried.status, 201);
   });
