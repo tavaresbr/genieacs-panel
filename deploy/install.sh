@@ -14,6 +14,10 @@ SERVICE_USER="${SKYGP_USER:-skygenpanel}"
 APP_PORT="${SKYGP_PORT:-5890}"
 PORTAL_PORT="${SKYGP_PORTAL_PORT:-5891}"
 CLI_PATH="/usr/local/bin/skygenpanel"
+BACKUP_CLI_PATH="/usr/local/bin/skygenpanel-backup"
+# Outside INSTALL_DIR and outside DATA_DIR, for the same reason those two must
+# be disjoint: a backup that lives inside what it copies grows on top of itself.
+BACKUP_DIR="${SKYGP_BACKUP_DIR:-/var/backups/skygenpanel}"
 NODE_MAJOR_MIN=22
 NODE_MINOR_MIN=22
 NODE_RELEASE_LINE=22
@@ -356,9 +360,23 @@ EOF
 log "Installing CLI at ${CLI_PATH}"
 install -m 0755 "$INSTALL_DIR/deploy/skygenpanel" "$CLI_PATH"
 
+# --- backup -----------------------------------------------------------------
+# A timer and not a cron line, and installed here rather than left to the
+# runbook: a backup nobody scheduled is a backup that exists only in a document.
+# The destination is deliberately outside both INSTALL_DIR and DATA_DIR — see
+# the refusal in the script itself.
+log "Installing backup timer (daily, ${BACKUP_DIR})"
+install -m 0755 "$INSTALL_DIR/deploy/skygenpanel-backup" "$BACKUP_CLI_PATH"
+install -m 0644 "$INSTALL_DIR/deploy/skygenpanel-backup.service" /etc/systemd/system/
+install -m 0644 "$INSTALL_DIR/deploy/skygenpanel-backup.timer" /etc/systemd/system/
+mkdir -p "$BACKUP_DIR"
+chmod 700 "$BACKUP_DIR"
+
 # --- start ------------------------------------------------------------------
 systemctl daemon-reload
 systemctl enable "$SERVICE_NAME" >/dev/null 2>&1 || true
+systemctl enable --now skygenpanel-backup.timer >/dev/null 2>&1 \
+  || warn "Could not enable the backup timer; run 'systemctl enable --now skygenpanel-backup.timer'."
 systemctl restart "$SERVICE_NAME"
 
 ready=false

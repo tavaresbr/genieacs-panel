@@ -168,6 +168,41 @@ pg_dump "$DATABASE_URL" --format=custom --file="skygp-$(date -u +%F).dump"
 createdb skygp_restore && pg_restore --dbname=skygp_restore --no-owner skygp-2026-09-10.dump
 ```
 
+### O que o painel agenda sozinho
+
+A tabela acima descreve a edição hospedada, onde o Postgres é gerenciado e o snapshot é do
+provedor. Para o **self-hosted** — que é o install do ISP, em SQLite, na máquina dele — o
+`deploy/install.sh` instala e liga `skygenpanel-backup.timer`, diário às 03:17 com atraso
+aleatório e `Persistent=true`. Timer e não cron por causa do `Persistent`: máquina
+desligada às 3h roda o backup ao ligar, em vez de pular o dia em silêncio; e um `oneshot`
+que falha fica `failed` e aparece em `systemctl --failed`, enquanto um cron que falha manda
+um e-mail que ninguém lê.
+
+Cada passada escreve um diretório em `/var/backups/skygenpanel` com o dump do banco (o
+dialeto que o install usa, descoberto por `backend/scripts/backup-target.js`, que é o
+único lugar que conhece a precedência `DATABASE_URL` > `db-config.json` > SQLite), o
+`tar.gz` de `wa-media`, o `db-config.json`, e um `manifest.json` com tamanhos, `sha256`, a
+versão do painel e **em que migração o dump foi tirado**. Retenção: 30 diárias mais o
+domingo de cada uma das últimas 52 semanas.
+
+**O `.env` não entra no backup.** O que entra é a impressão digital de `SECRET_BOX_KEY` e
+de `JWT_SECRET` — os doze primeiros hex de um SHA-256 salgado com o nome da variável, nunca
+o valor. A razão é o modo de falha de `secretBox.decrypt`, que devolve `null` em vez de
+levantar: restaurar o banco com a chave errada sobe um painel que responde 200 e em que
+toda senha de portal, senha de WiFi e token de API volta nula — o operador vê "o dado
+sumiu" quando o que falta é a chave. `skygenpanel backup verify` compara as impressões do
+backup mais novo com as do `.env` vivo e recusa em voz alta quando divergem, que é a hora
+certa de descobrir isso: antes do restore, e não durante.
+
+`SKYGP_BACKUP_INCLUDE_SECRETS=1` inclui o `.env` em claro, e o script avisa. Só vale se o
+destino já for cifrado: o backup passa a carregar a chave mestra e a senha do banco ao lado
+do dado, o que troca "perdi o dado" por "vazou o painel inteiro".
+
+Duas decisões continuam sendo de quem opera, e o painel não as toma: **para onde a cópia
+sai da máquina** (nada disto é backup enquanto vive no mesmo disco) e **instalar
+`postgresql-client` ou `mariadb-client`** quando o install não usa SQLite — o script morre
+dizendo qual pacote falta, em vez de escrever um arquivo vazio e sair zero.
+
 Restauração de verdade: parar o painel, restaurar, subir. As migrations no boot
 reconhecem o schema restaurado pelo `schema_migrations` e não refazem nada. Se o dump
 for de uma versão mais antiga do painel, o boot aplica o que falta — é o caminho de

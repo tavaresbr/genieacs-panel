@@ -794,6 +794,15 @@ vez" em `backend/test/i18n.test.js`, e ele varre as duas metades do app.
   exportação (`GET /api/tenant/export`) e exclusão em dois passos, já existentes;
   suspensão, rotação de segredos e o que ainda não existe.
 
+  **E agendado, não só escrito:** o install passou a instalar e ligar
+  `skygenpanel-backup.timer` — diário, `Persistent=true` para a máquina desligada
+  recuperar o dia, com o dump do dialeto que o install realmente usa, o `tar.gz` dos
+  anexos e um manifesto. O `.env` fica de fora; o que vai junto é a **impressão digital**
+  de `SECRET_BOX_KEY` e `JWT_SECRET`, porque `secretBox.decrypt` devolve `null` em vez de
+  levantar — um restore com a chave errada sobe um painel que responde 200 com todo
+  segredo lido como nulo, e a impressão digital é o que transforma essa descoberta num
+  aviso antes do restore em vez de um susto durante.
+
 **O que ficou de fora, de propósito:** o **comando de re-cifra** da rotação da
 `SECRET_BOX_KEY` e o **gateway de cobrança**. A personificação e o transporte de e-mail
 entraram no fecho da Fase 2, e o runbook já os documenta como existentes — o que continua
