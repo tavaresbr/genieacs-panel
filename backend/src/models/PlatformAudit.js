@@ -33,6 +33,12 @@ class PlatformAudit {
     // sessão legítima DENTRO de um ISP, com o cadastro inteiro atrás dela. Sem
     // estas duas linhas, vincular-se a um ISP e depois sair não deixaria
     // rastro em trilha nenhuma.
+    // E quem CONVIDOU alguém que ainda não tem login para um provedor — o
+    // caminho que dá a primeira conta a um provedor recém-criado. Linha própria
+    // e não `MEMBER_ADDED`: no convite ninguém entrou na equipe ainda, e o que
+    // aconteceu foi a cunhagem de uma credencial com validade. Quem aceitou, e
+    // quando, é a trilha DO PROVEDOR que registra.
+    MEMBER_INVITED: 'tenant.member_invited',
     MEMBER_ADDED: 'tenant.member_added',
     MEMBER_REMOVED: 'tenant.member_removed',
     // Quem pediu para olhar o painel de qual cliente. Gravada na cunhagem do

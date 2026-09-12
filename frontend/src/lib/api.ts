@@ -889,6 +889,27 @@ export const platformAPI = {
       expiresInSeconds: number
     }>(`/platform/tenants/${id}/impersonate`, {}),
 
+  /**
+   * Convida quem ainda NÃO tem login para um provedor.
+   *
+   * O par de `addMembership`, e a diferença é quem existe: aquela vincula uma
+   * pessoa que já tem conta, esta cunha o convite em que a pessoa cria a dela e
+   * escolhe a própria senha. É o caminho da PRIMEIRA conta de um provedor
+   * recém-criado, que antes não tinha nenhum.
+   *
+   * `url` vem montado pelo servidor e não é montado aqui: o convite é aceito no
+   * host do provedor convidado, e o console vive em outro endereço — é a única
+   * parte do link que esta aba não tem como saber. Vem `null` num deploy sem
+   * domínio-base, e aí o que se entrega é o token.
+   */
+  inviteMember: (tenantId: number, payload: { role: OperatorRole; email?: string }) =>
+    apiClient.post<{
+      invite: { id: number; role: OperatorRole; label: string | null; expiresAt: string }
+      token: string
+      url: string | null
+      emailed: boolean
+    }>(`/platform/tenants/${tenantId}/invites`, payload),
+
   createTenant: (payload: { slug: string; name: string }) =>
     apiClient.post<{ tenant: Tenant }>('/platform/tenants', payload),
 
@@ -958,7 +979,12 @@ export const platformAPI = {
 
   /** We mark it paid. `reference` is the Pix id, the boleto number — whatever names the payment. */
   recordPayment: (tenantId: number, payload: { amountCents: number; currency: string; reference?: string }) =>
-    apiClient.post<{ subscription: SubscriptionView }>(`/platform/tenants/${tenantId}/payments`, payload),
+    // `duplicate` é o que distingue "creditei" de "esta referência já estava
+    // creditada". O backend sempre respondeu os dois com 200 — e sem este campo
+    // no tipo, a tela não tinha como contar a diferença.
+    apiClient.post<{ subscription: SubscriptionView; duplicate?: boolean }>(
+      `/platform/tenants/${tenantId}/payments`, payload
+    ),
 
   getUsage: (tenantId: number) =>
     apiClient.get<SubscriptionUsage & { tenant: { id: number; slug: string; name: string } }>(

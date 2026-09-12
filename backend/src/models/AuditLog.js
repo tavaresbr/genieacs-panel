@@ -33,6 +33,13 @@ class AuditLog {
     INVITE_ACCEPTED: 'invite.accepted',
     INVITE_REVOKED: 'invite.revoked',
     TENANT_STATUS_CHANGED: 'tenant.status_changed',
+    // A conta de portal do assinante ANTERIOR de uma ONT foi encerrada, porque
+    // o aparelho passou a reportar outro login PPPoE. É destrutivo — o Customer
+    // ID muda, a senha do portal é recunhada e o vínculo com o ERP é apagado —
+    // e por muito tempo produziu só um `console.warn`, que é log de processo e
+    // some. O ISP que perguntasse "por que meu assinante perdeu o acesso" não
+    // tinha onde olhar.
+    SUBSCRIBER_ACCOUNT_RETIRED: 'subscriber_account.retired',
     TENANT_EXPORTED: 'tenant.exported',
     // O cadastro fiscal do provedor mudou — razão social, CNPJ, endereço,
     // contato de cobrança. Registra QUAIS campos, nunca os valores: a trilha
@@ -172,7 +179,14 @@ class AuditLog {
         ...entrada,
         actorUserId: req?.user?.userId ?? null,
         actorUsername: req?.user?.username ?? null,
-        actorKind: entrada.actorKind ?? (req?.user?.isPlatformAdmin ? 'platform' : 'operator'),
+        // `req.user` é o que a hidratação devolve, e lá não existe
+        // `isPlatformAdmin` — quem tem a chave do console é lido fresco por
+        // `requirePlatformAdmin`, não carregado na sessão. O default era, por
+        // isso, sempre 'operator'; só não apareceu porque todo caminho do
+        // console passa `actorKind` na mão. O que a sessão tem é a marca de
+        // personificação, e é ela que diz que quem agiu veio do plano de
+        // controle.
+        actorKind: entrada.actorKind ?? (req?.user?.impersonation ? 'platform' : 'operator'),
         ip: req?.ip ?? null
       });
     } catch (error) {

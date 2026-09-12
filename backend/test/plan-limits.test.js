@@ -144,6 +144,47 @@ describe('subscriber accounts', () => {
     assert.equal(live.pppoe_username, 'carla');
   });
 
+  // ───────────────────────────────────────────────────────────────────────
+  // O teto valia só na varredura de frota
+  //
+  // `syncDevices` orça a página inteira e respeitava o limite. Mas quem cria
+  // conta de verdade é `ensureAccount`, e ele era chamado DIRETO, sem passar
+  // por orçamento nenhum, de três lugares: a tela de detalhe de um aparelho, a
+  // gravação da data de instalação, e o provisionamento. Um provedor no teto
+  // continuava criando conta indefinidamente — bastava abrir a tela de um
+  // aparelho que ainda não tivesse uma.
+  //
+  // `max_subscribers` é o que o plano VENDE. O limite de operadores, no mesmo
+  // sistema, sempre esteve nos três pontos certos; era só este que vazava.
+  // ───────────────────────────────────────────────────────────────────────
+  it('vale também quando `ensureAccount` é chamado direto', async () => {
+    await onPlan(unlimited);
+    await runInTenant(alfa, () => CustomerService.ensureAccount(device('ONT-A', 'ana')));
+    assert.equal((await getDb()('customer_accounts').where({ tenant_id: alfa })).length, 1);
+
+    await onPlan(tight); // max_subscribers: 1, e a vaga já está ocupada
+
+    // O caminho que as três rotas usam. Sem o teto aqui, ele criava.
+    const recusada = await runInTenant(alfa, () => CustomerService.ensureAccount(device('ONT-B', 'bruno')));
+    assert.equal(recusada, null, 'criou conta acima do teto do plano');
+    assert.equal((await getDb()('customer_accounts').where({ tenant_id: alfa })).length, 1);
+  });
+
+  it('e uma troca de assinante continua passando, porque a vaga já foi liberada', async () => {
+    // O outro lado: recusar isto seria recusar uma troca de ONT por causa do
+    // plano, que não é o que o limite vende. E passa sem caso especial nenhum:
+    // `retireAccount` desativa a conta antiga antes, e a contagem só olha as
+    // vivas — quando a pergunta do teto é feita, a vaga já está livre.
+    await onPlan(unlimited);
+    await runInTenant(alfa, () => CustomerService.ensureAccount(device('ONT-A', 'ana')));
+    await onPlan(tight);
+
+    const nova = await runInTenant(alfa, () => CustomerService.ensureAccount(device('ONT-A', 'carla')));
+    assert.ok(nova, 'a troca de assinante foi recusada pelo teto');
+    const viva = await runInTenant(alfa, () => CustomerAccount.getByDeviceId('ONT-A'));
+    assert.equal(viva.pppoe_username, 'carla');
+  });
+
   it('only live accounts occupy a seat', async () => {
     await onPlan(unlimited);
     await runInTenant(alfa, () => CustomerService.syncDevices([device('ONT-A', 'ana')], { enabled: true }));

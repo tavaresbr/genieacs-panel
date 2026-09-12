@@ -13,7 +13,7 @@ import PlatformAudit from '../models/PlatformAudit.js';
 import { getDb } from '../config/database.js';
 import { seedDefaults } from '../config/seed.js';
 import { slugProblem } from '../utils/slug.js';
-import { panelBaseDomain, usesTenantSubdomains } from '../middleware/tenantResolver.js';
+import { hostMatchesTenant, panelBaseDomain, usesTenantSubdomains } from '../middleware/tenantResolver.js';
 import AuditLog from '../models/AuditLog.js';
 import { runInTenant } from '../config/tenantContext.js';
 import { recordPanelActivity } from '../services/dashboardSchedule.js';
@@ -332,14 +332,24 @@ class AuthController {
       const platformUser = await User.findById(ticket.platform_user_id);
       if (!platformUser || !(await PlatformAdmin.has(platformUser.id))) return recusa();
 
-      // `req.tenantId` é o provedor que o host nomeia — o resolvedor já
-      // respondeu 404 para um host que não nomeia nenhum.
-      if (Number(ticket.tenant_id) !== Number(req.tenantId)) return recusa();
+      // Contra o provedor que o HOST NOMEIA, pela mesma regra e pela mesma
+      // função que o replay de token usa — `hostMatchesTenant`. Era `req.tenantId`,
+      // que numa instalação sem domínio-base é o PRIMEIRO provedor da tabela e
+      // não uma porta: ali um bilhete de qualquer outro provedor era recusado
+      // como se fosse forjado, e a personificação simplesmente não funcionava
+      // fora do primeiro. Onde nenhum host nomeia provedor não existe porta
+      // errada onde gastar o bilhete, que é a única coisa que esta conferência
+      // tem para impedir.
+      if (!hostMatchesTenant(req, ticket.tenant_id)) return recusa();
 
       const tenant = await Tenant.findPublicById(ticket.tenant_id);
       if (!tenant) return recusa();
 
-      await AuditLog.record({
+      // `runInTenant` do provedor DO BILHETE, e não o escopo em que o request
+      // entrou: sem domínio-base esse escopo é o primeiro provedor, e a linha
+      // "entraram no meu painel" ficaria arquivada no ISP errado — exatamente
+      // a pergunta que esta trilha existe para responder.
+      await runInTenant(Number(ticket.tenant_id), () => AuditLog.record({
         action: AuditLog.ACTIONS.PLATFORM_IMPERSONATED,
         actorUserId: platformUser.id,
         actorUsername: platformUser.username,
@@ -348,7 +358,7 @@ class AuthController {
         subjectId: ticket.tenant_id,
         detail: { ticketId: ticket.id },
         ip: req.ip ?? null
-      });
+      }));
 
       const token = generateImpersonationToken(platformUser, ticket.tenant_id);
 
@@ -364,7 +374,14 @@ class AuthController {
           // recusa esta sessão. Dizer `true` acenderia um menu cujas rotas
           // respondem 404 a ela.
           isPlatformAdmin: false,
-          impersonation: { platformUsername: platformUser.username },
+          // Mesma forma que `hydrateImpersonation` devolve, porque esta
+          // resposta e o `/api/auth/user` de depois de um F5 alimentam a mesma
+          // faixa e têm que dizer a mesma coisa.
+          impersonation: {
+            platformUsername: platformUser.username,
+            tenantName: tenant.name,
+            tenantSlug: tenant.slug
+          },
           createdAt: platformUser.created_at,
           updatedAt: platformUser.updated_at
         },

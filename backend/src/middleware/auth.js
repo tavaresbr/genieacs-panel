@@ -8,6 +8,7 @@ import Tenant from '../models/Tenant.js';
 import { runInTenant } from '../config/tenantContext.js';
 import { roleHas } from '../config/permissions.js';
 import { subscriptionRefusal } from './subscriptionGate.js';
+import { hostMatchesTenant } from './tenantResolver.js';
 
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
 const REFRESH_TOKEN_EXPIRES_IN = process.env.REFRESH_TOKEN_EXPIRES_IN || '7d';
@@ -252,7 +253,8 @@ async function hydrateImpersonation(user, decoded) {
   const tenantId = Number(decoded.tenantId);
   if (!Number.isInteger(tenantId) || tenantId <= 0) return null;
   if (!(await PlatformAdmin.has(user.id))) return null;
-  if (!(await Tenant.findById(tenantId))) return null;
+  const tenant = await Tenant.findById(tenantId);
+  if (!tenant) return null;
 
   return {
     userId: user.id,
@@ -263,7 +265,18 @@ async function hydrateImpersonation(user, decoded) {
     // O que a tela mostra na faixa, o que a trilha nomeia, e o que as guardas
     // consultam. Presente só numa personificação: `req.user.impersonation` ser
     // falsy é a definição de "sessão comum" em todo o resto do código.
-    impersonation: { platformUsername: user.username }
+    //
+    // O nome do provedor vem DAQUI e não do perfil público, que é resolvido
+    // pelo host: numa instalação de host único o host nomeia sempre o primeiro
+    // provedor, e a faixa diria "você está olhando o painel de X" enquanto a
+    // sessão está em Y. Uma faixa que existe para dizer em qual painel se está
+    // errar o nome é pior do que não dizer. A linha do provedor já está lida
+    // aqui logo acima — era só não jogá-la fora.
+    impersonation: {
+      platformUsername: user.username,
+      tenantName: tenant.name,
+      tenantSlug: tenant.slug
+    }
   };
 }
 
@@ -339,6 +352,11 @@ async function authenticateToken(req, res, next) {
 
   req.user = session;
   req.tenantId = session.tenantId;
+  // O autor entra no escopo junto com o provedor. Sem ele, uma escrita fundo
+  // num serviço não tem como dizer quem a provocou nem como saber que está
+  // dentro de uma personificação — e as duas coisas fazem falta em
+  // `CustomerService`, que aposenta conta de assinante e apaga vínculo de ERP a
+  // partir de um GET.
   return runInTenant(session.tenantId, async () => {
     // A porta da assinatura mora AQUI, e não num `app.use` acima das rotas,
     // para que o 401 venha sempre antes do 402. No lugar antigo um request sem
@@ -353,16 +371,14 @@ async function authenticateToken(req, res, next) {
     }
     if (recusa) return res.status(402).json(recusa);
     return next();
-  });
+  }, { actor: session });
 }
 
 /**
  * Whether a token may be used on the host it arrived at.
  *
- * `req.hostTenantId` is set only when the host NAMED a provider, which is the
- * only case where the two can disagree in the first place. A deployment
- * without subdomains leaves it null and this is always true — the token is the
- * sole authority there, as it has been.
+ * The rule itself lives in `hostMatchesTenant` — the host only disagrees with a
+ * credential where it NAMED a provider — and this is the token's caller of it.
  *
  * Without this check, a token minted at `alfa.painel.exemplo.com` still works
  * against `beta.painel.exemplo.com`: the scope would come from the token, so
@@ -371,8 +387,7 @@ async function authenticateToken(req, res, next) {
  * provider the caller has no business naming.
  */
 function tokenMatchesHost(req, session) {
-  if (!req.hostTenantId) return true;
-  return Number(req.hostTenantId) === Number(session.tenantId);
+  return hostMatchesTenant(req, session.tenantId);
 }
 
 /** Os métodos que não mudam nada. Tudo que não está aqui é escrita. */

@@ -11,57 +11,14 @@ import AuditLog from '../models/AuditLog.js';
 import { ROLES, normalizeRole, roleHas } from '../config/permissions.js';
 import { generateTokens } from '../middleware/auth.js';
 import { createResponse, createErrorResponse, isValidEmail } from '../utils/helpers.js';
-import { mailTransport, panelUrlFor } from '../services/mail/index.js';
+import {
+  MAX_TTL_MS,
+  MIN_TTL_MS,
+  publicInvite,
+  sendInvite
+} from '../services/inviteDelivery.js';
 
 const BCRYPT_ROUNDS = 12;
-
-/** Meia hora a trinta dias. Fora disso é engano de quem digitou, não escolha. */
-const MIN_TTL_MS = 30 * 60 * 1000;
-const MAX_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-
-/**
- * O que a tela de equipe pode ver de um convite. Nunca o token: ele não está
- * guardado, e se estivesse continuaria fora daqui.
- */
-function publicInvite(invite) {
-  return {
-    id: invite.id,
-    role: normalizeRole(invite.role),
-    label: invite.label,
-    expiresAt: invite.expires_at,
-    createdAt: invite.created_at
-  };
-}
-
-/**
- * Manda o convite por e-mail, se houver para onde e por onde.
- *
- * Devolve `false` em vez de lançar em todas as saídas ruins — sem transporte,
- * sem endereço externo conhecido, SMTP recusando —, porque nenhuma delas
- * desfaz o convite. Quem convidou fica com o link na resposta.
- *
- * A mensagem é texto puro e curta de propósito. Ela carrega uma CREDENCIAL: o
- * link é o que põe a pessoa na equipe. Não vai nela nada além de quem convida,
- * qual é o papel, até quando vale e o link — nem nome de operador, nem contagem
- * de assinantes, nem nada que faça de uma caixa de entrada alheia um lugar onde
- * mora dado do provedor.
- */
-async function enviarConvite({ req, email, token }) {
-  const transporte = mailTransport();
-  if (transporte.name === 'none') return false;
-
-  const tenant = await Tenant.findPublicById(req.tenantId);
-  const base = panelUrlFor(tenant);
-  if (!base) return false;
-
-  const nome = tenant?.name || 'SkyGenPanel';
-  const link = `${base}/invite#${token}`;
-  return transporte.send({
-    to: email,
-    subject: req.t('invite.mailSubject', { provider: nome }),
-    text: req.t('invite.mailBody', { provider: nome, link })
-  });
-}
 
 class InviteController {
   /** Os convites em aberto deste provedor. */
@@ -138,7 +95,8 @@ class InviteController {
       // resultado dele não muda o status: o convite foi criado, e é isso que
       // 201 diz. Um SMTP fora do ar devolve `emailed: false` com o link na
       // mão, que é exatamente o que quem convidou faria de qualquer jeito.
-      const emailed = email ? await enviarConvite({ req, email, token }) : false;
+      const tenant = await Tenant.findPublicById(req.tenantId);
+      const emailed = email ? await sendInvite({ req, tenant, email, token }) : false;
 
       return res.status(201).json(createResponse(req.t('invite.created'), {
         invite: publicInvite(invite),
@@ -403,5 +361,4 @@ class InviteController {
   }
 }
 
-export { publicInvite };
 export default InviteController;

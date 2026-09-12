@@ -40,7 +40,11 @@ export function ImpersonationBanner() {
       <span className="font-semibold">{t('impersonate.bannerTitle')}</span>
       <span className="text-destructive/90">
         {t('impersonate.bannerText', {
-          provider: name,
+          // O nome da SESSÃO na frente do nome do endereço: numa instalação de
+          // host único o endereço nomeia o primeiro provedor, e esta faixa
+          // diria o nome de um painel que não é o que está na tela. O `name`
+          // continua como reserva, para uma sessão aberta antes desta mudança.
+          provider: user.impersonation.tenantName || name,
           operator: user.impersonation.platformUsername
         })}
       </span>

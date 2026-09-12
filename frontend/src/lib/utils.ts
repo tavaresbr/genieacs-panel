@@ -164,3 +164,53 @@ export function subscriberFileName(
   const quem = (customerId || 'export').replace(/[^a-zA-Z0-9._-]/g, '-')
   return `assinante-${quem}-${when.toISOString().slice(0, 10)}.json`
 }
+
+/**
+ * Um valor em reais, como alguém digita, para centavos inteiros.
+ *
+ * A escrita anterior era `Number(String(v).replace(',', '.')) * 100`, e o
+ * `replace` com string troca só a PRIMEIRA ocorrência. `"1.234,56"` virava
+ * `"1.234.56"` → `NaN` → recusado, o que ao menos é visível. Mas `"1.234"` —
+ * mil duzentos e trinta e quatro reais, sem centavos — virava `1.234` e era
+ * aceito em silêncio como **123 centavos**. Um pagamento de R$ 1.234,00 entrava
+ * no extrato como R$ 1,23.
+ *
+ * A regra aqui:
+ *
+ *   - com vírgula, ela é o decimal e os pontos são separador de milhar;
+ *   - sem vírgula, o ponto é o decimal — `199.90` é o que sai de um teclado
+ *     numérico e precisa continuar funcionando;
+ *   - **exceto** quando há exatamente três dígitos depois do ponto e nenhuma
+ *     vírgula: `"1.234"` é genuinamente ambíguo, e adivinhar aqui é escolher
+ *     entre errar por mil para cima ou para baixo. Recusar devolve a decisão a
+ *     quem sabe, ao custo de uma redigitação.
+ *
+ * @returns centavos inteiros, ou `null` quando não dá para ler sem adivinhar
+ */
+export function parseAmountToCents(digitado: string): number | null {
+  const texto = String(digitado ?? '').trim();
+  if (!texto) return null;
+  // Um formato por vez: dois separadores decimais não é engano de digitação
+  // que valha interpretar.
+  if ((texto.match(/,/g) || []).length > 1) return null;
+  if (!/^[\d.,\s]+$/.test(texto)) return null;
+
+  const semEspaco = texto.replace(/\s/g, '');
+  let normalizado;
+  if (semEspaco.includes(',')) {
+    normalizado = semEspaco.replace(/\./g, '').replace(',', '.');
+  } else {
+    if (/^\d+\.\d{3}$/.test(semEspaco)) return null;
+    if ((semEspaco.match(/\./g) || []).length > 1) {
+      normalizado = semEspaco.replace(/\./g, '');
+    } else {
+      normalizado = semEspaco;
+    }
+  }
+
+  const reais = Number(normalizado);
+  if (!Number.isFinite(reais) || reais < 0) return null;
+  // Arredondar sobre o produto em vez de sobre a string cuida do 0.1+0.2 dos
+  // binários de ponto flutuante.
+  return Math.round(reais * 100);
+}

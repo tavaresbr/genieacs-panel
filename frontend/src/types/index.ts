@@ -61,7 +61,19 @@ export interface User {
    * responde 404, então acender o menu dele seria apontar para uma tela que
    * não abre.
    */
-  impersonation?: { platformUsername: string } | null
+  impersonation?: {
+    platformUsername: string
+    /**
+     * O provedor que está sendo olhado, pelo NOME que a sessão carrega.
+     *
+     * Não vem do perfil público porque aquele é resolvido pelo endereço, e numa
+     * instalação de host único o endereço nomeia sempre o primeiro provedor —
+     * a faixa diria o nome errado justamente na tela onde ela existe para dizer
+     * o certo. Opcional porque uma sessão aberta antes desta mudança não o traz.
+     */
+    tenantName?: string
+    tenantSlug?: string
+  } | null
   createdAt: string
   updatedAt: string
 }

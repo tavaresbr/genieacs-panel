@@ -114,6 +114,27 @@ export function usesTenantSubdomains() {
 }
 
 /**
+ * Whether the host this request arrived at may act for `tenantId`.
+ *
+ * `req.hostTenantId` is set only when the host NAMED a provider, which is the
+ * only case where the two can disagree in the first place. Where the host names
+ * nobody — every deployment without subdomains — there is a single door, and
+ * this is always true: what names the provider there is the credential, not the
+ * address.
+ *
+ * Exported, and the only copy, because there are two callers and they were
+ * drifting. `tokenMatchesHost` had it right; the impersonation redeem compared
+ * against `req.tenantId`, which on a deployment without subdomains is the FIRST
+ * provider (see `resolveDefaultTenantId`) — so a ticket for any other provider
+ * was refused as if it were forged. A rule implemented twice is a rule that is
+ * wrong in one of the two places.
+ */
+export function hostMatchesTenant(req, tenantId) {
+  if (!req.hostTenantId) return true;
+  return Number(req.hostTenantId) === Number(tenantId);
+}
+
+/**
  * The platform's own front door: the panel's base domain with no provider in
  * front of it, and `www.` of the same.
  *
