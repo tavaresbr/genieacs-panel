@@ -1,5 +1,5 @@
 import { tdb } from '../config/database.js';
-import { forEachTenant } from '../config/tenantJobs.js';
+import { forEveryTenant } from '../config/tenantJobs.js';
 import WhatsAppConfigService from './whatsappConfigService.js';
 
 /**
@@ -129,9 +129,9 @@ class WaMessageSweeper {
   }
 
   /**
-   * One wake-up, once per active provider, each inside its own scope.
+   * One wake-up, once per provider, each inside its own scope.
    *
-   * `forEachTenant` and not `forSoleTenant`, which is the whole difference
+   * `forEveryTenant` and not `forSoleTenant`, which is the whole difference
    * between this job and the media sweep next to it. That one walks a
    * filesystem no provider owns a corner of, so a second pass would see the
    * first provider's files as orphans and delete every one of them. This one
@@ -140,26 +140,31 @@ class WaMessageSweeper {
    * the work — and each provider's own retention window, which is its own
    * setting, is the one applied to its own rows.
    *
-   * One provider failing does not stop the others; that is `forEachTenant`'s
+   * One provider failing does not stop the others; that is `forEveryTenant`'s
    * contract and it is the right one here, because a broken configuration at
    * one ISP must not quietly stop the history sweep for every other ISP on the
    * deployment.
    *
    * @returns {Promise<Array<{ messages: number, skipped?: string }>>} one entry
-   *   per active provider, in id order. No provider at all is an empty array —
+   *   per provider, in id order. No provider at all is an empty array —
    *   there is no sole-tenant precondition to refuse, so this job has no
    *   `no_provider` or `unscoped` answer of its own.
    */
   static async tick() {
     try {
-      return await forEachTenant(() => this.sweep(), {
+      // `forEveryTenant`, e não `forEachTenant`: a pergunta aqui é "de quem eu
+      // ainda guardo conversa?", não "quem está trabalhando?". Um provedor
+      // suspenso não deve receber envio nem alerta, e continua sendo o titular
+      // do histórico de mensagens dos assinantes dele — que sem visita ficava
+      // sem prazo nenhum, para sempre.
+      return await forEveryTenant(() => this.sweep(), {
         onError: (error, tenant) => {
           console.warn(`WhatsApp history sweep failed for provider ${tenant.slug}: ${error.message}`);
         }
       });
     } catch (error) {
       // Only the read of the provider list itself can land here — `sweep` never
-      // throws and `forEachTenant` catches each provider separately.
+      // throws and `forEveryTenant` catches each provider separately.
       console.warn(`WhatsApp history sweep failed: ${error.message}`);
       return [];
     }

@@ -2,7 +2,7 @@ import AppState from '../models/AppState.js';
 import DeviceSample from '../models/DeviceSample.js';
 import DeviceSampleHour from '../models/DeviceSampleHour.js';
 import DeviceService from './deviceService.js';
-import { forEachTenant } from '../config/tenantJobs.js';
+import { forEveryTenant } from '../config/tenantJobs.js';
 import { TenantCache } from '../config/tenantCache.js';
 import { timestampMs } from '../utils/helpers.js';
 
@@ -130,7 +130,13 @@ class DeviceHistoryService {
    * not repeat it.
    */
   static async tick() {
-    return forEachTenant(() => this.passForTenant(), {
+    // `forEveryTenant`: a passada de um provedor suspenso é só a PODA — ver
+    // `passForTenant`. Sem isso, `device_samples` e `device_sample_hours` dele
+    // não tinham prazo nenhum, e a retenção padrão de 14 e 90 dias valia só
+    // para quem estava ativo.
+    return forEveryTenant((tenant) => this.passForTenant(Date.now(), {
+      retentionOnly: tenant.status !== 'active'
+    }), {
       onError: (error) => console.warn(`Device history pass failed: ${error.message}`)
     });
   }
@@ -144,16 +150,26 @@ class DeviceHistoryService {
     await AppState.upsert(key, new Date(at).toISOString());
   }
 
-  static async passForTenant(now = Date.now()) {
+  /**
+   * @param {object} [opts]
+   * @param {boolean} [opts.retentionOnly] Só a poda, sem coletar nem consolidar.
+   *   É o que um provedor SUSPENSO recebe: `collect` fala com o GenieACS dele, e
+   *   perguntar à rede de quem está suspenso seria trabalho de verdade
+   *   acontecendo lá dentro. Apagar o que passou do prazo não é — é o contrário,
+   *   é parar de guardar. A consolidação some junto porque só existe para
+   *   alimentar o que a coleta traz.
+   */
+  static async passForTenant(now = Date.now(), { retentionOnly = false } = {}) {
     const config = await this.getConfig();
     const summary = { collected: null, rolled: null, pruned: null };
     if (!config.enabled) return summary;
 
-    if (now - (await this.readStamp(LAST_SAMPLE_KEY)) >= config.intervalSeconds * 1000) {
+    if (!retentionOnly
+      && now - (await this.readStamp(LAST_SAMPLE_KEY)) >= config.intervalSeconds * 1000) {
       summary.collected = await this.collect({ now });
       await this.writeStamp(LAST_SAMPLE_KEY, now);
     }
-    if (now - (await this.readStamp(LAST_ROLLUP_KEY)) >= HOUR_MS) {
+    if (!retentionOnly && now - (await this.readStamp(LAST_ROLLUP_KEY)) >= HOUR_MS) {
       summary.rolled = await this.rollup({ now });
       await this.writeStamp(LAST_ROLLUP_KEY, now);
     }

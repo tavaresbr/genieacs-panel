@@ -5,6 +5,7 @@ import {
 } from './helpers/harness.js';
 
 const { default: AuditLog } = await import('../src/models/AuditLog.js');
+const { default: SchedulerService } = await import('../src/services/schedulerService.js');
 const { default: User } = await import('../src/models/User.js');
 const { default: TenantUser } = await import('../src/models/TenantUser.js');
 const { default: CustomerService } = await import('../src/services/customerService.js');
@@ -336,5 +337,35 @@ describe('a poda', () => {
     assert.equal(apagadas, 1);
     assert.equal((await trilha()).length, antes - 1);
     assert.equal((await trilha({ action: 'acao.velha' })).length, 0);
+  });
+
+  /**
+   * E a trilha do provedor SUSPENSO também tem prazo.
+   *
+   * A poda morava dentro do laço de provedores ativos, e essa era a
+   * consequência que ninguém tinha escrito: a trilha de um suspenso não ficava
+   * com prazo maior, ficava sem prazo NENHUM. Ela guarda quem são os operadores
+   * dele, quantos assinantes tem e quando alguém revelou a senha de um deles —
+   * e como não existe prazo de suspensão nem exclusão automática, "sem prazo"
+   * é literal.
+   *
+   * Agora a poda tem laço próprio, que visita todo provedor.
+   */
+  it('e alcança o provedor suspenso, cuja trilha não tinha prazo nenhum', async () => {
+    const antigo = new Date(Date.now() - 400 * 24 * 60 * 60 * 1000);
+    await runInTenant(tenantId, () => AuditLog.record({ action: 'acao.do.suspenso' }));
+    await getDb()('audit_log').where({ action: 'acao.do.suspenso' }).update({ created_at: antigo });
+    await getDb()('tenants').where({ id: tenantId }).update({ status: 'suspended' });
+
+    try {
+      SchedulerService.lastPruneAt = 0;
+      await SchedulerService.retentionPass();
+      assert.equal(
+        (await trilha({ action: 'acao.do.suspenso' })).length, 0,
+        'a trilha do suspenso continuou sem prazo'
+      );
+    } finally {
+      await getDb()('tenants').where({ id: tenantId }).update({ status: 'active' });
+    }
   });
 });
