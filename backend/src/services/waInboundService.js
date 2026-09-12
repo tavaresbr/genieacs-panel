@@ -276,6 +276,20 @@ async function gravarMensagem(account, item) {
 
   const texto = cortar(textoDaMensagem(mensagem), MAX.body);
 
+  // 5a. O eco de uma mensagem que saiu DAQUI adota a linha que já existe.
+  //
+  // Antes do anexo de propósito: o eco de uma mídia que o painel mandou traria
+  // os mesmos bytes de volta, e baixá-los seria uma segunda cópia no disco de
+  // um arquivo que já está lá, apontado pela linha que estamos adotando.
+  if (fromMe) {
+    const adotada = await WaMessage.adoptEcho({
+      conversationId: conversation.id,
+      body: texto || null,
+      externalId
+    });
+    if (adotada) return { handled: true, adopted: true, messageId: adotada };
+  }
+
   // 6. O anexo. Nunca levanta: sem bytes a mensagem entra sem anexo.
   const anexo = await WaMediaService.armazenar({
     account,
