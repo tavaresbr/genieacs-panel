@@ -121,7 +121,15 @@ class TenantExportService {
       manifest: {
         formatVersion: TenantExportService.FORMAT_VERSION,
         generatedAt: new Date().toISOString(),
-        tenant: provedor ? { id: provedor.id, slug: provedor.slug, name: provedor.name } : null,
+        // O cadastro fiscal vai junto, e não é detalhe: a exportação é o que o
+        // provedor leva quando sai, e o que ele cadastrou sobre si mesmo é a
+        // primeira coisa que ele espera encontrar lá dentro. `tenants` não é
+        // tabela escopada e por isso não entra pelo laço acima — sem esta
+        // linha, o único dado do arquivo que fala do dono do arquivo seria o
+        // nome.
+        tenant: provedor
+          ? { id: provedor.id, slug: provedor.slug, name: provedor.name, billing: Tenant.presentBilling(provedor) }
+          : null,
         tables: TenantExportService.tabelas(),
         rowCounts: contagem,
         // Dito no próprio arquivo e não só na documentação: quem abrir isto

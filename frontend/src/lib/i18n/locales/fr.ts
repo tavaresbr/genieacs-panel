@@ -1779,6 +1779,34 @@ const fr: Dictionary = {
   'settings.export.hint': 'Aucun mot de passe ni secret stocké ne figure dans le fichier. Le téléchargement lui-même est inscrit au journal d\'audit.',
   'settings.export.done': 'Le fichier est prêt.',
   'settings.export.failed': 'Impossible de générer l\'export',
+
+  'platform.subscription.renewalExpiredNote': 'La période payée est terminée ; le panneau est en lecture seule.',
+  'platform.subscription.renewsExpired': 'Expiré le {date}',
+  'plan.paidThroughExpired': 'Expiré le',
+
+  'audit.action.tenantBillingChanged': 'Données de facturation modifiées',
+  'billing.title': 'Données de facturation',
+  'billing.description': "Ce que la facture exige et où envoyer le paiement. À remplir avant la première facture ; rien ici ne bloque le panneau.",
+  'billing.legalName': 'Raison sociale',
+  'billing.taxId': 'CNPJ ou CPF',
+  'billing.taxIdHint': 'Chiffres uniquement ; la ponctuation est ignorée.',
+  'billing.stateRegistration': "Immatriculation d'État",
+  'billing.stateRegistrationHint': "Laissez vide, ou écrivez ISENTO, s'il n'y en a pas.",
+  'billing.postalCode': 'Code postal',
+  'billing.addressLine': 'Rue',
+  'billing.addressNumber': 'Numéro',
+  'billing.addressExtra': 'Complément',
+  'billing.district': 'Quartier',
+  'billing.city': 'Ville',
+  'billing.state': 'État',
+  'billing.email': 'E-mail de facturation',
+  'billing.emailHint': "Où part la facture. Rarement la même adresse que celle de connexion.",
+  'billing.phone': 'Téléphone de facturation',
+  'billing.saved': 'Enregistré.',
+  'billing.saveFailed': 'Impossible d\'enregistrer les données de facturation',
+  'billing.readOnly': 'Seule une personne pouvant modifier les réglages peut éditer ceci.',
+
+  'signup.checkInbox': "Nous avons envoyé un lien à {email}. Ouvrez-le pour prouver l'adresse : c'est par là que l'on revient si le mot de passe est perdu.",
 }
 
 export default fr

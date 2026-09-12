@@ -637,4 +637,8 @@ export default {
   'platformAdmin.revoked': 'Plan de contrôle révoqué',
   'platformAdmin.revokeFailed': 'Échec de la révocation du plan de contrôle',
 
+  'tenant.billingInvalid': 'Les données de facturation sont invalides',
+  'tenant.billingTaxIdInvalid': "Le numéro fiscal n'est ni un CNPJ ni un CPF valide",
+  'tenant.billingPostalCodeInvalid': 'Le code postal doit comporter huit chiffres',
+  'tenant.billingEmailInvalid': "L'adresse e-mail de facturation est invalide",
 };

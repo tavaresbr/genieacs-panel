@@ -12,9 +12,10 @@ tipo de falha que não tem aparência.
 Estado: **Ondas 0 a 3 implementadas no backend** — ciclo de vida das instâncias,
 webhook de entrada, envio, modelos, não perturbe, cobrança, campanhas, alertas
 técnicos, caixa de entrada e bot de autoatendimento. Cada seção abaixo é o
-contrato da parte que ela nomeia. Nada aqui está pendente: o que falta da
-integração é tela, não rota — a caixa de entrada do operador ainda não tem
-front-end.
+contrato da parte que ela nomeia. Nada aqui está pendente, nem rota nem tela: a
+caixa de entrada do operador tem front-end desde `frontend/src/pages/whatsapp.tsx`,
+com a lista de conversas, o fio aberto e o compositor em
+`frontend/src/components/whatsapp/`.
 
 ---
 
@@ -30,8 +31,16 @@ Todas as rotas do painel respondem no envelope do projeto:
 `code` só aparece em erro e é a chave de máquina — a tela traduz por
 `whatsapp.error.*` e nunca mostra o corpo cru da resposta do servidor Evolution.
 
-Todas exigem `authenticateToken` + `requireRole(['admin'])`, exceto o webhook,
-que é público e tem credencial própria.
+Todas exigem `authenticateToken` + `requirePermission`, com a capacidade que
+cada rota nomeia — `whatsapp.read` para ler, `whatsapp.send` para responder e
+arquivar, `whatsapp.config` para mexer na instância e no webhook. A exceção é o
+webhook de entrada, que é público e tem credencial própria.
+
+> `requireRole(['admin'])`, que este contrato citava em cinco lugares, **não
+> existe mais**: os quatro papéis substituíram o booleano de administrador, e a
+> guarda passou a ser por capacidade (`backend/src/middleware/auth.js`). Um
+> contrato congelado que cita um middleware removido é pior do que um contrato
+> vago, porque outras frentes programam contra ele.
 
 ---
 
@@ -312,7 +321,7 @@ digitando "sair" no próprio celular não pode descadastrar o cliente dele.
 
 ## Envio — `POST /api/whatsapp/conversations/:id/messages`
 
-Onda 1. `authenticateToken` + `requireRole(['admin'])`.
+Onda 1. `authenticateToken` + `requirePermission('whatsapp.send')`.
 
 ```ts
 // corpo
@@ -515,8 +524,10 @@ conexão está de pé, e isso o painel sabe. Responde
 
 ## ✅ Onda 2 — modelos, não perturbe, cobrança e campanhas (implementado)
 
-Tudo abaixo é `authenticateToken` + `requireRole(['admin'])`, montado em
-`routes/whatsappBilling.js`.
+Tudo abaixo é `authenticateToken` + `requirePermission`, montado em
+`routes/whatsappBilling.js`: `campaigns.read` para ler e `campaigns.manage` para
+escrever — capacidades próprias, e não as de `whatsapp.*`, porque campanha e
+caixa de entrada são trabalhos de gente diferente.
 
 | `code` | Significado | HTTP | Chave i18n |
 | --- | --- | --- | --- |
@@ -960,8 +971,10 @@ que importa aqui.
 ### 1. O operador, com sessão
 
 `GET /api/whatsapp/messages/:id/media` — `authenticateToken` +
-`requireRole(['admin'])`, escopado por provedor como todo o resto. Devolve o
-arquivo gravado.
+`requirePermission('whatsapp.read')`, escopado por provedor como todo o resto.
+Devolve o arquivo gravado. Não confundir com `/api/whatsapp-media/:id`, que
+serve o MESMO arquivo ao servidor Evolution com uma credencial assinada na
+query em vez de sessão, porque é outro público.
 
 - O caminho vem **do banco**, nunca da requisição, e é resolvido com
   `path.resolve` contra `DATA_DIR`: um `attachment_path` que escape da pasta é
@@ -1011,7 +1024,7 @@ upload para uma tela só; é a mesma escolha que o webhook do SGP já faz.
 
 Como ficou implementada, e as três coisas que o contrato não determinava:
 
-- `authenticateToken` + `requireRole(['admin'])`, na rota de `whatsappMessages`
+- `authenticateToken` + `requirePermission('whatsapp.send')`, na rota de `whatsappMessages`
   — a mesma que grava a mensagem que vai apontar para o arquivo. Responde
   **201** com `whatsapp.attachmentStored`.
 - O `express.raw` é montado em `app.js` **antes** do `express.json({ limit:

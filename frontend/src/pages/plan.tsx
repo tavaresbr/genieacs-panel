@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { subscriptionAPI, type SubscriptionUsage } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
+import { BillingProfile } from '@/components/billing-profile'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
 
@@ -32,6 +33,13 @@ function formatDate(value: string | null | undefined) {
   return Number.isNaN(date.getTime()) ? null : date.toLocaleDateString()
 }
 
+/** A data de renovação já passou? Nulo e data inválida não venceram. */
+function expirou(value: string | null | undefined) {
+  if (!value) return false
+  const date = new Date(value)
+  return !Number.isNaN(date.getTime()) && date.getTime() <= Date.now()
+}
+
 export default function PlanPage() {
   const { t } = useTranslation()
   const [data, setData] = useState<SubscriptionUsage | null>(null)
@@ -55,6 +63,7 @@ export default function PlanPage() {
   }, [load])
 
   const subscription = data?.subscription ?? null
+  const venceu = expirou(subscription?.renewsAt)
 
   const meter = (used: number | null, limit: number | null) => {
     if (used === null) return { text: t('platform.subscription.uncounted'), pct: 0 }
@@ -94,6 +103,9 @@ export default function PlanPage() {
                 {subscription.reason === 'trial_expired' && (
                   <span className="text-muted-foreground">{t('platform.subscription.trialExpiredNote')}</span>
                 )}
+                {subscription.reason === 'renewal_expired' && (
+                  <span className="text-muted-foreground">{t('platform.subscription.renewalExpiredNote')}</span>
+                )}
               </div>
               <dl className="mt-4 space-y-2 text-sm">
                 {subscription.storedStatus === 'trial' && formatDate(subscription.trialEndsAt) && (
@@ -104,7 +116,13 @@ export default function PlanPage() {
                 )}
                 {formatDate(subscription.renewsAt) && (
                   <div className="flex justify-between gap-3">
-                    <dt className="text-muted-foreground">{t('plan.paidThrough')}</dt>
+                    {/* "Pago até 12/03" com hoje em 12/09 era o painel publicando
+                        ao cliente uma data que ele mesmo não respeitava. Agora
+                        que o período vencido bloqueia a escrita, a etiqueta tem
+                        que dizer qual dos dois lados da data se está. */}
+                    <dt className="text-muted-foreground">
+                      {venceu ? t('plan.paidThroughExpired') : t('plan.paidThrough')}
+                    </dt>
                     <dd className="font-medium">{formatDate(subscription.renewsAt)}</dd>
                   </div>
                 )}
@@ -142,6 +160,18 @@ export default function PlanPage() {
                 <p className="mt-4 text-sm text-destructive">{t('plan.overHint')}</p>
               )}
             </section>
+          </div>
+        )}
+
+        {/* Abaixo do plano, e não numa aba das configurações: é a mesma
+            conversa — em que plano estou, até quando paguei, e para quem vai a
+            nota. */}
+        {data && (
+          <div className="mt-6">
+            <BillingProfile
+              billing={data.billing}
+              onSaved={(billing) => setData((atual) => (atual ? { ...atual, billing } : atual))}
+            />
           </div>
         )}
       </div>

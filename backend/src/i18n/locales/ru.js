@@ -642,4 +642,8 @@ export default {
   'platformAdmin.revoked': 'Управляющий доступ отозван',
   'platformAdmin.revokeFailed': 'Не удалось отозвать управляющий доступ',
 
+  'tenant.billingInvalid': 'Платёжные данные недействительны',
+  'tenant.billingTaxIdInvalid': 'Номер не является действительным CNPJ или CPF',
+  'tenant.billingPostalCodeInvalid': 'Почтовый индекс должен содержать восемь цифр',
+  'tenant.billingEmailInvalid': 'Адрес электронной почты для счетов недействителен',
 };

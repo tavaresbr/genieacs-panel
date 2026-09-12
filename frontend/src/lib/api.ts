@@ -523,6 +523,12 @@ export interface PublicTenant {
 export interface SignupResult {
   tenant: { slug: string; name: string }
   panelUrl: string | null
+  /**
+   * Se a prova do endereço saiu. `false` não é erro: é um deploy sem SMTP, e
+   * o cadastro acontece igual — o que muda é a tela mandar a pessoa olhar a
+   * caixa de entrada ou não prometer o que não vai chegar.
+   */
+  emailed: boolean
 }
 
 /**
@@ -540,11 +546,47 @@ export const publicTenantAPI = {
   current: () => apiClient.get<PublicTenant>('/tenant/public')
 }
 
+/**
+ * O cadastro fiscal do provedor: o que uma nota fiscal exige e o endereço que
+ * recebe a cobrança.
+ *
+ * Todo campo é opcional — nenhum provedor que já existe tem estes dados, e um
+ * ISP se cadastra antes de ter o contador por perto. Campo ausente não é
+ * tocado; campo presente e vazio apaga. `taxId` e `postalCode` voltam só com
+ * dígitos, porque é assim que o banco os guarda.
+ */
+export interface TenantBilling {
+  legalName: string | null
+  taxId: string | null
+  stateRegistration: string | null
+  postalCode: string | null
+  addressLine: string | null
+  addressNumber: string | null
+  addressExtra: string | null
+  district: string | null
+  city: string | null
+  state: string | null
+  email: string | null
+  phone: string | null
+}
+
 /** What the provider does to itself. */
 export const tenantAPI = {
   /** The name on the sidebar, the login screen and the tab — what `settings.appName` used to be. */
   rename: (name: string) =>
-    apiClient.requestWithBody<{ name: string; slug: string }>('PATCH', '/tenant', { name }),
+    apiClient.requestWithBody<{ name: string; slug: string; billing: TenantBilling }>(
+      'PATCH', '/tenant', { name }
+    ),
+
+  /**
+   * Grava o cadastro fiscal. Manda só o que mudou: a rota distingue campo
+   * ausente (não mexe) de campo vazio (apaga), e mandar o formulário inteiro a
+   * cada salvamento jogaria fora essa diferença.
+   */
+  updateBilling: (billing: Partial<TenantBilling>) =>
+    apiClient.requestWithBody<{ name: string; slug: string; billing: TenantBilling }>(
+      'PATCH', '/tenant', { billing }
+    ),
 
   /**
    * Todo o cadastro deste provedor, num arquivo.
@@ -723,7 +765,11 @@ export interface PlatformAdminView {
 export interface SubscriptionView {
   status: SubscriptionStatus
   storedStatus: SubscriptionStatus
-  reason: 'trial_expired' | null
+  /**
+   * Por que o estado que vale difere do gravado. São os dois prazos que vencem
+   * sozinhos: o teste e o período pago. Nulo quando a coluna é a verdade.
+   */
+  reason: 'trial_expired' | 'renewal_expired' | null
   plan: { code: string; name: string; limits: PlanLimits } | null
   trialEndsAt: string | null
   renewsAt: string | null
@@ -732,6 +778,8 @@ export interface SubscriptionView {
 
 export interface SubscriptionUsage {
   subscription: SubscriptionView | null
+  /** O cadastro fiscal viaja com o plano porque é a mesma tela. */
+  billing: TenantBilling | null
   usage: { operators: number; subscribers: number; devices: number | null }
   limits: PlanLimits
   over: { operators: boolean; subscribers: boolean; devices: boolean }
@@ -800,9 +848,14 @@ export const platformAPI = {
     apiClient.post<{ tenant: Tenant }>('/platform/tenants', payload),
 
   /**
-   * Suspends or reactivates. There is no delete: the scoped tables point at
-   * `tenants` without a cascade, so removing a provider that holds data would
-   * fail on a foreign key — and succeeding would be worse.
+   * Suspends or reactivates.
+   *
+   * Este comentário dizia "não existe exclusão", e isso deixou de ser verdade
+   * quando `deleteTenant` entrou logo abaixo. O que continua verdade é o motivo
+   * pelo qual a exclusão é em DUAS etapas: as tabelas escopadas apontam para
+   * `tenants` sem cascata, então apagar um provedor que ainda tem dado
+   * estouraria numa chave estrangeira — e suspender primeiro é o que garante
+   * que ninguém esteja trabalhando lá dentro enquanto se apaga.
    */
   setTenantStatus: (id: number, status: 'active' | 'suspended') =>
     apiClient.requestWithBody<{ tenant: Tenant }>('PATCH', `/platform/tenants/${id}`, { status }),

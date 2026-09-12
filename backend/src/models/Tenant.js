@@ -33,6 +33,66 @@ class Tenant {
   static PUBLIC_COLUMNS = ['name', 'slug'];
 
   /**
+   * O cadastro fiscal, e é o parágrafo acima cobrado na prática: estas doze
+   * colunas existem desde a migração 0042 e NENHUMA delas está em
+   * `PUBLIC_COLUMNS`. O CNPJ e o endereço de um ISP não são segredo de estado,
+   * mas também não são coisa que a tela de login de um provedor deva servir a
+   * quem passar pelo host — e a lista pública é o que garante isso sem depender
+   * de ninguém lembrar.
+   *
+   * Enumeradas aqui, e não derivadas do banco, pelo mesmo motivo: quem
+   * acrescentar uma coluna a `tenants` amanhã não a vê aparecer sozinha numa
+   * resposta de API.
+   */
+  static BILLING_COLUMNS = [
+    'billing_legal_name',
+    'billing_tax_id',
+    'billing_state_registration',
+    'billing_postal_code',
+    'billing_address_line',
+    'billing_address_number',
+    'billing_address_extra',
+    'billing_district',
+    'billing_city',
+    'billing_state',
+    'billing_email',
+    'billing_phone'
+  ];
+
+  /** O cadastro fiscal de uma linha já lida, em camelCase, para a tela. */
+  static presentBilling(row) {
+    if (!row) return null;
+    const saida = {};
+    for (const coluna of Tenant.BILLING_COLUMNS) {
+      const chave = coluna.replace(/^billing_/, '').replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+      saida[chave] = row[coluna] ?? null;
+    }
+    return saida;
+  }
+
+  /**
+   * Grava o cadastro fiscal. Recebe já normalizado e validado pelo chamador —
+   * o modelo não sabe o que é um CNPJ, e não deve saber.
+   *
+   * Campo ausente do objeto não é tocado; campo presente e vazio vira nulo, que
+   * é como se apaga um dado que foi preenchido por engano. A diferença entre os
+   * dois é a razão de este método não aceitar um objeto completo montado com
+   * defaults.
+   */
+  static async updateBilling(id, patch) {
+    const update = {};
+    for (const coluna of Tenant.BILLING_COLUMNS) {
+      if (!(coluna in patch)) continue;
+      const valor = patch[coluna];
+      update[coluna] = valor === null || valor === '' ? null : valor;
+    }
+    if (!Object.keys(update).length) return false;
+    update.updated_at = new Date();
+    const changed = await getDb()('tenants').where({ id }).update(update);
+    return changed > 0;
+  }
+
+  /**
    * One provider's public identity, or null when no such row exists.
    *
    * Deliberately does NOT filter on `status`. It is tempting to make this

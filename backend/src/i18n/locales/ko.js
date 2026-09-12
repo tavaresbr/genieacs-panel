@@ -644,4 +644,8 @@ export default {
   'platformAdmin.revoked': '컨트롤 플레인 권한을 회수했습니다',
   'platformAdmin.revokeFailed': '컨트롤 플레인 권한 회수에 실패했습니다',
 
+  'tenant.billingInvalid': '청구 정보가 올바르지 않습니다',
+  'tenant.billingTaxIdInvalid': '유효한 CNPJ 또는 CPF가 아닙니다',
+  'tenant.billingPostalCodeInvalid': '우편번호는 여덟 자리여야 합니다',
+  'tenant.billingEmailInvalid': '청구용 이메일 주소가 올바르지 않습니다',
 };

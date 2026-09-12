@@ -1786,6 +1786,34 @@ const ko: Dictionary = {
   'settings.export.hint': '비밀번호나 저장된 비밀 정보는 파일에 담기지 않습니다. 내려받기 자체가 감사 기록에 남습니다.',
   'settings.export.done': '파일이 준비되었습니다.',
   'settings.export.failed': '내보내기를 생성하지 못했습니다',
+
+  'platform.subscription.renewalExpiredNote': '결제 기간이 끝났습니다. 패널은 읽기 전용입니다.',
+  'platform.subscription.renewsExpired': '{date}에 만료됨',
+  'plan.paidThroughExpired': '만료일',
+
+  'audit.action.tenantBillingChanged': '청구 정보 변경',
+  'billing.title': '청구 정보',
+  'billing.description': '세금계산서에 필요한 정보와 청구서를 받을 곳입니다. 첫 청구 전에 입력하세요. 비워 두어도 패널 사용에는 지장이 없습니다.',
+  'billing.legalName': '법인명',
+  'billing.taxId': 'CNPJ 또는 CPF',
+  'billing.taxIdHint': '숫자만 입력하세요. 기호는 무시됩니다.',
+  'billing.stateRegistration': '주 등록번호',
+  'billing.stateRegistrationHint': '없으면 비워 두거나 ISENTO라고 적으세요.',
+  'billing.postalCode': '우편번호',
+  'billing.addressLine': '도로명',
+  'billing.addressNumber': '번지',
+  'billing.addressExtra': '상세 주소',
+  'billing.district': '구·동',
+  'billing.city': '도시',
+  'billing.state': '주',
+  'billing.email': '청구용 이메일',
+  'billing.emailHint': '청구서가 가는 주소입니다. 로그인 주소와 다른 경우가 대부분입니다.',
+  'billing.phone': '청구용 전화번호',
+  'billing.saved': '저장했습니다.',
+  'billing.saveFailed': '청구 정보를 저장하지 못했습니다',
+  'billing.readOnly': '설정을 변경할 수 있는 사람만 수정할 수 있습니다.',
+
+  'signup.checkInbox': '{email}로 링크를 보냈습니다. 열어서 주소를 확인하세요. 비밀번호를 잃어버렸을 때 돌아올 수 있는 유일한 길입니다.',
 }
 
 export default ko

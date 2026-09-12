@@ -522,6 +522,41 @@ const tenantInvitesTable = (db) => (t) => {
   t.index(['tenant_id', 'accepted_at'], 'tenant_invites_open_idx');
 };
 
+/**
+ * O cadastro fiscal do provedor: o que é preciso para emitir uma nota contra
+ * ele e para mandar a cobrança a alguém que a pague.
+ *
+ * Uma fábrica separada porque estas colunas entram por dois caminhos — a tabela
+ * nova e o passo 0042 — e a regra da casa é que cada coluna tenha um lugar só,
+ * para que o schema inicial e o degrau de upgrade não possam divergir.
+ *
+ * Todas nulas, e isso não é preguiça: nenhum provedor que já existe tem estes
+ * dados, e um provedor novo se cadastra antes de tê-los à mão. O momento de
+ * cobrar o preenchimento é o da primeira fatura, não o do INSERT.
+ *
+ * `billing_tax_id` guarda só dígitos — CNPJ com catorze, CPF com onze, que é o
+ * caso do MEI. A formatação é da tela; o banco guarda o que se compara.
+ */
+const TENANT_BILLING_COLUMNS = [
+  ['billing_legal_name', (t) => t.string('billing_legal_name', 160)],
+  ['billing_tax_id', (t) => t.string('billing_tax_id', 20)],
+  // Inscrição estadual. Opcional e às vezes a palavra "ISENTO": o ISP presta
+  // serviço de comunicação, que é tributado pelo estado, e a nota costuma
+  // pedir — mas quem não tem não pode ser impedido de se cadastrar por isso.
+  ['billing_state_registration', (t) => t.string('billing_state_registration', 32)],
+  ['billing_postal_code', (t) => t.string('billing_postal_code', 8)],
+  ['billing_address_line', (t) => t.string('billing_address_line', 160)],
+  ['billing_address_number', (t) => t.string('billing_address_number', 16)],
+  ['billing_address_extra', (t) => t.string('billing_address_extra', 80)],
+  ['billing_district', (t) => t.string('billing_district', 80)],
+  ['billing_city', (t) => t.string('billing_city', 80)],
+  ['billing_state', (t) => t.string('billing_state', 2)],
+  // O contato financeiro, que quase nunca é quem administra o painel. Sem ele a
+  // cobrança vai para o e-mail de login do dono, que é onde ela se perde.
+  ['billing_email', (t) => t.string('billing_email', 160)],
+  ['billing_phone', (t) => t.string('billing_phone', 32)]
+];
+
 const tenantsTable = (db) => (t) => {
   t.increments('id').primary();
   // The subdomain the panel will be reached at once tenants are resolved by
@@ -529,6 +564,7 @@ const tenantsTable = (db) => (t) => {
   t.string('slug', 64).notNullable().unique();
   t.string('name', 128).notNullable();
   t.string('status', 16).notNullable().defaultTo('active');
+  for (const [, add] of TENANT_BILLING_COLUMNS) add(t);
   t.timestamp('created_at').defaultTo(db.fn.now());
   t.timestamp('updated_at').defaultTo(db.fn.now());
 };
@@ -2668,6 +2704,40 @@ export const migrations = [
       if (await db.schema.hasColumn('wa_broadcast_recipients', 'claimed_at')) return;
       await db.schema.alterTable('wa_broadcast_recipients', (t) => {
         t.timestamp('claimed_at');
+      });
+    }
+  },
+  {
+    /**
+     * O cadastro fiscal do provedor.
+     *
+     * `tenants` nasceu com slug, nome e situação — o bastante para resolver um
+     * host e para ligar e desligar um cliente, e nada além. Com dezenas de ISPs
+     * pagando, falta o que uma nota fiscal exige: razão social, CNPJ, endereço
+     * e um contato que receba a cobrança. Sem essas colunas não se fatura nem
+     * se emite, e o cadastro de um provedor não serve de contrato.
+     *
+     * Nulas todas, porque nenhum provedor que já existe as tem — e porque um
+     * ISP se cadastra antes de ter o contador por perto. A primeira fatura é
+     * que cobra o preenchimento, não o INSERT.
+     *
+     * Nasceu `0042` e virou `0043` na integração: a garra da campanha chegou ao
+     * `main` com o mesmo número enquanto esta fatia estava em revisão. O teste
+     * que recusa id repetido — escrito nesta mesma fatia, por causa da `0040` —
+     * é o que transformou isso num conflito de merge em vez de num passo pulado
+     * em silêncio num banco de produção.
+     */
+    id: '0043_tenant_billing_profile',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      return db.schema.hasColumn('tenants', 'billing_tax_id');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      const faltando = await missingColumns(db, 'tenants', TENANT_BILLING_COLUMNS);
+      if (!faltando.length) return;
+      await db.schema.alterTable('tenants', (t) => {
+        for (const add of faltando) add(t);
       });
     }
   }

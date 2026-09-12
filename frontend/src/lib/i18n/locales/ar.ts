@@ -1788,6 +1788,34 @@ const ar: Dictionary = {
   'settings.export.hint': 'لا تُدرج أي كلمة مرور ولا أي سر مخزّن في الملف. وعملية التنزيل نفسها تُسجَّل في سجل التدقيق.',
   'settings.export.done': 'الملف جاهز.',
   'settings.export.failed': 'تعذّر إنشاء ملف التصدير',
+
+  'platform.subscription.renewalExpiredNote': 'انتهت الفترة المدفوعة؛ اللوحة للقراءة فقط.',
+  'platform.subscription.renewsExpired': 'انتهت في {date}',
+  'plan.paidThroughExpired': 'انتهت في',
+
+  'audit.action.tenantBillingChanged': 'تم تغيير بيانات الفوترة',
+  'billing.title': 'بيانات الفوترة',
+  'billing.description': 'ما تتطلبه الفاتورة، وإلى أين تُرسل. املأه قبل أول فاتورة؛ لا شيء هنا يوقف اللوحة.',
+  'billing.legalName': 'الاسم القانوني',
+  'billing.taxId': 'CNPJ أو CPF',
+  'billing.taxIdHint': 'أرقام فقط؛ تُتجاهل علامات الترقيم.',
+  'billing.stateRegistration': 'التسجيل في الولاية',
+  'billing.stateRegistrationHint': 'اتركه فارغًا، أو اكتب ISENTO، إن لم يوجد.',
+  'billing.postalCode': 'الرمز البريدي',
+  'billing.addressLine': 'الشارع',
+  'billing.addressNumber': 'الرقم',
+  'billing.addressExtra': 'تفاصيل إضافية',
+  'billing.district': 'الحي',
+  'billing.city': 'المدينة',
+  'billing.state': 'الولاية',
+  'billing.email': 'بريد الفوترة',
+  'billing.emailHint': 'إلى أين تذهب الفاتورة. نادرًا ما يكون نفس بريد تسجيل الدخول.',
+  'billing.phone': 'هاتف الفوترة',
+  'billing.saved': 'تم الحفظ.',
+  'billing.saveFailed': 'تعذّر حفظ بيانات الفوترة',
+  'billing.readOnly': 'لا يعدّل هذا إلا من يستطيع تغيير الإعدادات.',
+
+  'signup.checkInbox': 'أرسلنا رابطًا إلى {email}. افتحه لإثبات العنوان — فهو طريق العودة الوحيد إن ضاعت كلمة المرور.',
 }
 
 export default ar

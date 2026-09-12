@@ -32,6 +32,13 @@ export const STATUS_LABEL_KEYS = {
   canceled: 'platform.subscription.canceled'
 } as const
 
+/** A data de renovação já passou? Nulo e data inválida não venceram. */
+function expirou(value: string | null | undefined) {
+  if (!value) return false
+  const date = new Date(value)
+  return !Number.isNaN(date.getTime()) && date.getTime() <= Date.now()
+}
+
 export function statusBadgeClass(status: SubscriptionStatus | null | undefined) {
   if (status === 'active' || status === 'trial') return 'modern-badge-success'
   if (status === 'past_due') return 'modern-badge-warning'
@@ -206,6 +213,9 @@ export function TenantPlan({ tenant, plans, onSubscriptionChange }: Props) {
           {subscription.reason === 'trial_expired' && (
             <span className="text-muted-foreground">{t('platform.subscription.trialExpiredNote')}</span>
           )}
+          {subscription.reason === 'renewal_expired' && (
+            <span className="text-muted-foreground">{t('platform.subscription.renewalExpiredNote')}</span>
+          )}
           {subscription.trialEndsAt && subscription.storedStatus === 'trial' && (
             <span className="text-muted-foreground">
               {t('platform.subscription.trialEnds', { date: formatDate(subscription.trialEndsAt) })}
@@ -213,7 +223,12 @@ export function TenantPlan({ tenant, plans, onSubscriptionChange }: Props) {
           )}
           {subscription.renewsAt && (
             <span className="text-muted-foreground">
-              {t('platform.subscription.renews', { date: formatDate(subscription.renewsAt) })}
+              {t(
+                expirou(subscription.renewsAt)
+                  ? 'platform.subscription.renewsExpired'
+                  : 'platform.subscription.renews',
+                { date: formatDate(subscription.renewsAt) }
+              )}
             </span>
           )}
         </div>

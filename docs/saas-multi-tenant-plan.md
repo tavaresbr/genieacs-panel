@@ -87,18 +87,24 @@ original não previa:
   tempo.
 - Um endpoint `/api/health` que perdia o diagnóstico por estar atrás do resolvedor.
 
-#### O que ainda não foi feito
+#### O que faltava aqui, e o que entrou desde então
 
 - **A Fase 3 entrou.** `backend/src/middleware/tenantResolver.js` lê o provedor do `Host`
   quando o deployment configura `TENANT_BASE_DOMAIN`/`PORTAL_BASE_DOMAIN`, e cai no primeiro
   provedor da tabela só quando não configura nenhum — que é todo install self-hosted. A
   aposta do plano se confirmou: foi troca de uma função, porque tudo abaixo já lia o provedor
   do contexto.
-- **A espinha da Fase 2 entrou** (o token carrega `tenantId` e o papel vem de `tenant_users`),
-  mas o convite por e-mail, os papéis `tech`/`owner` e a troca de `username` para e-mail
-  **não**. O plano de plataforma entrou na onda 13 (`platform_admins`, o console e o
-  `requirePlatformAdmin` que responde 404 com o corpo idêntico ao de rota inexistente).
-- **Fases 4 a 7 inteiras**: conector GenieACS plugável, planos e limites, frontend e operação.
+- **A Fase 2 está completa.** A espinha (token com `tenantId`, papel vindo de `tenant_users`)
+  entrou na onda 12; os quatro papéis com `requirePermission` e o convite por e-mail, depois;
+  a personificação com audiência própria e o transporte de e-mail, no fecho da fase. A troca
+  de `username` para e-mail entrou em três passos, sem dia de virada
+  (`backend/src/config/login.js`). O plano de plataforma entrou na onda 13
+  (`platform_admins`, o console e o `requirePlatformAdmin` que responde 404 com o corpo
+  idêntico ao de rota inexistente).
+- **Fases 5, 6 e 7 entregues.** Da **Fase 4** entrou o modo `direct` inteiro — fronteira do
+  conector, credencial NBI, as três correções de SSRF, a guarda de egresso e o teto de
+  concorrência. Continuam em aberto só os outros três modos (`agent`/`tunnel`/`hosted`) e as
+  colunas por provedor que eles exigiriam.
 
 ### Decisões já tomadas
 
@@ -132,10 +138,13 @@ arquivo `LICENSE` e o aviso de copyright da SkydashNET devem ser mantidos no pro
   descobre o provedor de um webhook. A aposta do plano original — de que os pontos de
   inserção do filtro seriam muitos mas ficariam todos num diretório — se confirmou.
 - **GenieACS**: URL em `settings.genieAcsUrl` — que **já é por provedor**, porque
-  `settings` é escopada; o que falta é a tabela de conexões e o conector plugável da Fase 4.
-  Resolvida em `DeviceService.getGenieAcsRootUrl()`.
-  **Nenhum header de autenticação é enviado** e credenciais na URL são explicitamente
-  rejeitadas — assume-se NBI em loopback/rede privada.
+  `settings` é escopada. O conector plugável existe desde a Fase 4 e é a fronteira por onde
+  todo acesso ao ACS passa (`backend/src/services/genieacs/connector.js`), hoje com um modo
+  só. A tabela `tenant_genieacs_connections` foi **deliberadamente não construída** enquanto
+  `mode` só puder valer `direct`: o porquê está escrito no cabeçalho daquele arquivo, e é o
+  mesmo argumento de não criar coluna que nenhum código lê. A credencial NBI por provedor
+  existe, cifrada (`backend/src/services/genieacsAuthService.js`) — o parágrafo antigo dizia
+  que nenhum header de autenticação era enviado, e isso deixou de ser verdade na Fase 4.
 - **Auth operador**: JWT bearer, `backend/src/middleware/auth.js`. Desde a onda 12 o
   payload carrega `tenantId` e o papel vem do **vínculo** em `tenant_users`, não de
   `users.role`. `authenticateToken` reabre o escopo no provedor que o token nomeia, depois
@@ -153,9 +162,10 @@ arquivo `LICENSE` e o aviso de copyright da SkydashNET devem ser mantidos no pro
   Evolution API. Todas cifram com `secretBox`, e desde a Fase 0 registram a versão da chave.
 - **Auth assinante**: cookie `skygp_portal_session`, `backend/src/middleware/portalAuth.js`.
   O login resolve por `customer_id` através de `CustomerAccount.getByCustomerId`, que passa
-  por `tdb` — ou seja, já é escopado pelo provedor em contexto. Falta o cookie ser
-  **host-only** e o payload assinado carregar o provedor, ambos itens da Fase 2 que só
-  passam a importar quando houver subdomínio.
+  por `tdb` — ou seja, já é escopado pelo provedor em contexto. O cookie **é host-only**:
+  `portalCookieOptions` não emite `domain=`, então o navegador não o manda para o vizinho. E
+  o payload assinado carrega `tenantId`, conferido contra o host antes de a conta ser lida —
+  uma divergência é recusada. Prova em `backend/test/tenant-subdomain.test.js`.
 
 ### Achados críticos para o multi-tenant
 
@@ -170,17 +180,25 @@ explica por que uma peça do mecanismo tem a forma que tem, e porque um deles po
 | 4 | Sequestro de conta via `identity_hash` | ✅ fechado — `(tenant_id, identity_hash)` |
 | 5 | `/api/database` apagando o banco de todos | ✅ fechado — só na edição self-hosted |
 | 6 | `secretBox` derivando a chave do `JWT_SECRET` | ✅ fechado — `SECRET_BOX_KEY` + `key_version` |
-| 7 | **Três buracos de SSRF no `deviceService`** | ⚠️ **aberto** — Fase 4 |
+| 7 | **Três buracos de SSRF no `deviceService`** | ✅ fechado na Fase 4 — branch de URL absoluta removido, corpo do erro truncado, redirect não seguido, mais a guarda de egresso com IP fixado |
 | 8 | Obstáculos de schema para as uniques compostas | ✅ fechado ao longo da Fase 1 |
 
-**O achado 7 continua exatamente como estava** e é o mais sério dos que restam, porque a
-Fase 4 vai transformar a URL do GenieACS em dado por provedor — ou seja, em entrada
-controlada pelo cliente. Em `backend/src/services/deviceService.js`: `buildGenieAcsUrl`
-aceita `endpoint` absoluto e **ignora a base configurada**; `fetchGenieAcsCollection`
-devolve o **corpo do erro upstream ao cliente**, o que é um oráculo de leitura; e não há
-`redirect: 'manual'`, então um host permitido pode redirecionar para `127.0.0.1`. Hoje o
-alcance disso é limitado porque a URL é do operador do próprio install. Deixar de ser não
-pode acontecer antes da guarda de egresso.
+**O achado 7 foi fechado ANTES de a URL do ACS virar dado do cliente**, que era a ordem
+não-negociável deste plano. `buildGenieAcsUrl` não existe mais: o endpoint é concatenado sob
+a raiz configurada por `DirectConnector.urlFor`
+(`backend/src/services/genieacs/direct.js`), que zera caminho, busca e fragmento da raiz e
+recusa esquema fora de http(s). O corpo do erro upstream não volta mais ao cliente — vai
+truncado para o log do processo, e o `Error` carrega só o status
+(`backend/src/services/deviceService.js`). E nenhum redirecionamento é seguido, por
+construção: o transporte com IP fixado usa `node:http`/`node:https`, que não seguem 3xx, e o
+pino de DNS entrega ao socket os endereços já vetados, sem segunda resolução
+(`backend/src/services/genieacsEgress.js`, `backend/src/utils/pinnedFetch.js`). As provas
+estão em `backend/test/genieacs-ssrf.test.js`.
+
+**O que sobrou dessa frente foi achado e fechado na leitura que limpou este documento:** a
+guarda de egresso pendia só de `EDITION`, cujo default é `selfhosted`, então um deploy SaaS
+sem essa linha no `.env` rodava com a tabela de faixas privadas **e** a allowlist de portas
+desligadas. Hoje ela pergunta também à contagem de provedores. Ver o risco 4.
 
 #### Duas garantias que são de construção, não de constraint
 
@@ -412,10 +430,13 @@ alguém esquecer de incrementar. Coberto por
   modo que quem administrava só tinha o formulário que escolhe a senha do outro. O token
   vai no fragmento nas duas pontas, pelo mesmo motivo do bilhete.
 
-**O que continua faltando, e é de outra fase:** a rotação da `SECRET_BOX_KEY` com as duas
-chaves vivas (o `key_version` já está gravado; falta o comando), e a **verificação do
-endereço de e-mail**, que passa a ser pré-requisito no dia em que existir redefinição de
-senha por e-mail — e não antes, pelo motivo escrito logo abaixo.
+**O que continua faltando, e é de outra fase:** só o **comando de re-cifra** da rotação da
+`SECRET_BOX_KEY`. As duas chaves vivas já existem — `SECRET_BOX_KEY_PREVIOUS` e
+`JWT_SECRET_PREVIOUS` são lidas na entrada e nunca na escrita
+(`backend/src/utils/secretBox.js`) —, e o `key_version` já está gravado em cada linha; o que
+não existe é o passo que reescreve as linhas antigas na chave nova. A **verificação do
+endereço de e-mail** entrou junto com a redefinição de senha por e-mail, que era o dia em
+que ela passava a ser pré-requisito — ver o item 10 dos riscos.
 
 **Quebra para os self-hosted atuais:** o login sai de `username` para `email`.
 
@@ -451,7 +472,7 @@ vítima, que simplesmente deixa de conseguir entrar sem nada na tela explicando 
 
 ---
 
-### Fase 3 — Resolução de tenant por subdomínio *(esforço: baixo-médio)*
+### Fase 3 — Resolução de tenant por subdomínio ✅ *(entregue; foi uma função só)*
 
 - Novo `backend/src/middleware/tenantResolver.js`, montado em `backend/src/app.js`
   **antes das rotas**, nos dois apps (`app` e `portalApp`):
@@ -470,7 +491,7 @@ vítima, que simplesmente deixa de conseguir entrar sem nada na tela explicando 
 
 ---
 
-### Fase 4 — Conectividade GenieACS plugável *(esforço: alto — maior risco técnico)*
+### Fase 4 — Conectividade GenieACS plugável ✅ *(entregue no modo `direct`; os outros três modos continuam em aberto)*
 
 Como você quer suportar os quatro modos, o certo é abstrair antes de implementar o segundo.
 
@@ -672,7 +693,7 @@ painel de plano por provedor, e a casca do app ouvindo o 402 — faixa no alto p
 
 ---
 
-### Fase 6 — Frontend ✅ *(entregue; o convite por e-mail continua da Fase 2)*
+### Fase 6 — Frontend ✅ *(entregue)*
 
 **O que entrou:**
 
@@ -712,12 +733,11 @@ painel de plano por provedor, e a casca do app ouvindo o 402 — faixa no alto p
 
 **O que ficou de fora, de propósito:**
 
-- Não há tela de **aceitar convite**: o convite por link existe na API (Fase 2), mas o
-  transporte de e-mail não, então o onboarding cria o colega direto em vez de convidá-lo.
-  Entra junto com o e-mail, na Fase 2.
-- O cadastro é servido **pelo host de um provedor existente** (o `default`, na prática),
-  não por um host apex da plataforma — o resolvedor só conhece subdomínios de provedor. Um
-  host de marketing é assunto de operação (Fase 7).
+- Os dois itens que ficavam aqui — a tela de **aceitar convite** e o cadastro servido pelo
+  host de um provedor — entraram depois: a tela no fecho da Fase 2
+  (`frontend/src/pages/invite.tsx`, com o token no fragmento) e o **apex como porta de
+  entrada** na Fase 7 (`PLATFORM_HOST_PATHS` em `backend/src/middleware/tenantResolver.js`,
+  que reconhece também o `www.`).
 - `frontend/src/pages/setup.tsx` continua existindo nas duas edições porque é o caminho
   de "instalação sem nenhum usuário"; no SaaS ele nunca aparece porque o cadastro já nasce
   com o `owner`.
@@ -774,9 +794,10 @@ vez" em `backend/test/i18n.test.js`, e ele varre as duas metades do app.
   exportação (`GET /api/tenant/export`) e exclusão em dois passos, já existentes;
   suspensão, rotação de segredos e o que ainda não existe.
 
-**O que ficou de fora, de propósito:** rotação da `SECRET_BOX_KEY` com duas chaves vivas
-(o `key_version` já está gravado; falta o comando), impersonação, e-mail e o gateway —
-todos listados no runbook como "não existe ainda", para o plantão não procurar.
+**O que ficou de fora, de propósito:** o **comando de re-cifra** da rotação da
+`SECRET_BOX_KEY` e o **gateway de cobrança**. A personificação e o transporte de e-mail
+entraram no fecho da Fase 2, e o runbook já os documenta como existentes — o que continua
+listado lá como "não existe ainda" são esses dois, para o plantão não procurar.
 
 ---
 
@@ -1008,11 +1029,26 @@ decisões de desenho, e porque o primeiro **não se fecha, só se contém**.
    exatamente ali que os problemas apareceram. **Contido, não resolvido.**
 2. ~~Sequestro de conta por `identity_hash`~~ — ✅ fechado, unique composta.
 3. ~~`/api/database` num deploy compartilhado~~ — ✅ fechado, rota só na edição self-hosted.
-4. **Conectividade GenieACS** — inalterado, e é o maior risco que resta. É ao mesmo tempo a
-   maior objeção de venda ("preciso abrir a 7557 pra internet?") e a maior superfície de
-   ataque. Com os três buracos de SSRF do achado 7 ainda abertos, transformar a URL do ACS em
-   dado por provedor **antes** da guarda de egresso constrói um proxy de SSRF com tela de
-   login. A ordem aqui não é negociável.
+4. **Conectividade GenieACS** — continua sendo a maior objeção de venda ("preciso abrir a
+   7557 pra internet?"), mas **deixou de ser a maior superfície aberta**: os três buracos de
+   SSRF do achado 7 foram fechados e a guarda de egresso com IP fixado entrou **antes** de a
+   URL virar dado do cliente, que era a ordem não-negociável. O que resta do risco é de
+   produto — só o modo `direct` existe, e ele exige que o ACS do provedor esteja alcançável.
+
+   **Uma ponta de segurança foi achada na leitura que limpou este documento, e fechada junto
+   com ela:** a guarda de egresso inteira — a tabela de faixas privadas e a allowlist de
+   portas — era aplicada só quando `EDITION=saas`, e o default de `EDITION` é `selfhosted`.
+   Um deploy SaaS que subisse sem essa variável rodava com as duas desligadas, e nada no
+   processo percebia: o painel funciona, os testes passam, e a única diferença é que um
+   endereço de metadados de nuvem volta a ser destino válido, salvável por qualquer admin de
+   provedor. O repositório já tinha reconhecido esse modo de falha no outro portão —
+   `assertSoleProvider()` em `backend/src/services/dbManagementService.js` decide pela
+   **contagem de provedores**, não pelo `.env` — e a correção não tinha sido trazida para cá.
+   Agora foi: `deploymentIsShared()` em `backend/src/services/genieacsEgress.js` aplica a
+   guarda quando `IS_SAAS` **ou** quando há mais de um provedor na tabela, com o "sim"
+   grudento — uma vez que o processo viu dois, não desaprende — e falhando fechado se a
+   contagem estourar. Prova em `backend/test/egress-guard-shared-deploy.test.js`, escrita
+   com a variável AUSENTE, que é onde ela importa.
 5. ~~`JWT_SECRET` como chave de cifra de tudo~~ — ✅ fechado, `SECRET_BOX_KEY` + `key_version`.
 6. ~~**O muro de escala do dashboard**~~ — ✅ fechado, nas quatro peças. Escopar o job por
    provedor tinha **multiplicado** o número de passagens em vez de reduzir o trabalho, e o
@@ -1024,8 +1060,10 @@ decisões de desenho, e porque o primeiro **não se fecha, só se contém**.
    porquê está na Fase 4.
 7. ~~A migration de rebuild no SQLite~~ — ✅ fechado, e coberto por teste que planta linhas
    antes de rodar as migrations.
-8. **A troca de `username` para e-mail** ainda não aconteceu e ainda quebra o login dos
-   self-hosted. Continua precisando da janela de compatibilidade e da nota de release.
+8. ~~**A troca de `username` para e-mail**~~ — ✅ fechada sem dia de virada: a coluna é
+   anulável, o login aceita nome **ou** e-mail, e `LOGIN_REQUIRES_EMAIL=true` desliga o nome
+   quando o install decidir. `GET /api/auth/email-readiness` diz quantas contas ficariam de
+   fora antes de alguém virar a chave. A nota de release continua valendo para quem virar.
 9. **LGPD** — inalterado, e agora concreto: o banco guarda CPF/CNPJ em `sgp_links.document`,
    payload de eventos SGP com dado pessoal, credenciais PPPoE e senhas de WiFi recuperáveis
    em claro, de assinantes de terceiros. Somos **operador**, o provedor é **controlador**.
@@ -1062,10 +1100,12 @@ Original: Fase 0 → 1 → 2 → 3 → 8 → 4 → 5 → 6 → 7.
 1. ~~**Fase 3 — subdomínio.**~~ ✅ Entrou, e destravou o que se esperava: o resolvedor lê o
    host, o portal deixou de resolver o primeiro provedor, e os itens de vazamento que
    dependiam de host puderam enfim ser escritos.
-2. **O resto da Fase 2.** Cookie host-only, `tenantId` no payload do portal, rate limit por
-   provedor, os **papéis reais** com `requirePermission` e o **convite** ✅ entraram. Falta a
-   audiência separada `skygenpanel-platform` com impersonação auditada — `platform_audit`,
-   a peça que faltava, entrou na onda 22 —, e o **transporte de e-mail** do convite. A troca
+2. ~~**O resto da Fase 2.**~~ ✅ Nada falta. Cookie host-only, `tenantId` no payload do
+   portal, rate limit por provedor, os **papéis reais** com `requirePermission` e o
+   **convite** entraram; a audiência separada `skygenpanel-platform` com personificação
+   auditada entrou na onda 22, junto de `platform_audit`; e o **transporte de e-mail** do
+   convite entrou no fecho da fase, com o `NullMailTransport` como caminho de produção de
+   todo deploy sem SMTP. A troca
    de `username` para e-mail ✅ entrou, em três passos e sem dia de virada: a coluna é
    anulável, toda conta nova nasce com e-mail, o login aceita os dois, e
    `LOGIN_REQUIRES_EMAIL=true` desliga o nome quando o install decidir. O painel responde
@@ -1111,8 +1151,6 @@ edições de divergirem.
 ### Checklist antes de vender acesso ao segundo provedor
 
 Nada disso é negociável. **Os doze estão cumpridos.**
-o rate limit é por provedor, mas a concorrência de fetch ao ACS ainda não — e essa
-metade é da Fase 4.
 
 | | Item | Estado |
 | --- | --- | --- |
@@ -1129,18 +1167,18 @@ metade é da Fase 4.
 | 11 | `audit_log` registrando ações sensíveis | ✅ onda 20 — senha de portal, GenieACS, papéis, vínculos, convites, suspensão |
 | 12 | Exportação por provedor funcionando (LGPD e "apaguei tudo, socorro") | ✅ exportação (onda 21) e exclusão (onda 22), com trilha que sobrevive ao provedor apagado |
 
-Nenhuma linha vermelha resta. Isso **não** quer dizer produto pronto — o gateway de
-cobrança, o transporte de e-mail do convite e a rotação da `SECRET_BOX_KEY` estão por fazer
-— quer dizer que a lista do que não se pode vender sem já não tem item aberto. O que a fecha
-por último é o teto de concorrência de fetch ao ACS (`withAcsSlot`), a primeira das quatro
-peças do muro de escala da Fase 4 — as outras três entraram depois, e o muro está fechado.
+Nenhuma linha vermelha resta. Isso **não** quer dizer produto pronto — o **gateway de
+cobrança** e o **comando de re-cifra** da rotação da `SECRET_BOX_KEY` estão por fazer —
+quer dizer que a lista do que não se pode vender sem já não tem item aberto. O transporte de
+e-mail do convite, que esta frase listava até hoje, entrou no fecho da Fase 2.
 
 A exclusão entrou na onda 22, e o que a destravou foi `platform_audit`: apagar um provedor
 tem que deixar registro, e registrar no `audit_log` DELE é inútil porque a trilha vai junto.
 A tabela é compartilhada, guarda `tenant_id` como inteiro simples com o slug e o nome
 desnormalizados, e **não tem chave estrangeira para `tenants`** — uma FK apagaria em cascata,
 ou impediria, exatamente a linha que existe para dizer que aquele provedor foi apagado. É
-também a tabela de que a impersonação da plataforma vai precisar.
+também a tabela onde a personificação registra a cunhagem do bilhete — quem pediu para
+olhar o painel de quem —, enquanto o `audit_log` do provedor registra o resgate.
 
 ## Verificação
 
