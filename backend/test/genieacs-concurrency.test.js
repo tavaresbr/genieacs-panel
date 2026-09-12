@@ -5,6 +5,9 @@ const { getDb, runInTenant, startTestServers, stopTestServers } = await import('
 const {
   GLOBAL_LIMIT, TENANT_LIMIT, inFlightForTenant, resetAcsConcurrency, withAcsSlot
 } = await import('../src/services/genieacs/concurrency.js');
+const { default: GenieAcsDirect } = await import('../src/services/genieacs/direct.js');
+const { default: GenieAcsEgress } = await import('../src/services/genieacsEgress.js');
+const { default: Setting } = await import('../src/models/Setting.js');
 
 /**
  * The ceiling on ACS requests in flight — item 8 of the checklist.
@@ -96,5 +99,62 @@ describe('the ceiling on ACS requests in flight', () => {
     // cap. The tenant context already throws here; this pins that the ceiling
     // does not soften it.
     await assert.rejects(() => withAcsSlot(async () => 'ran'));
+  });
+});
+
+/**
+ * O prazo mede a requisição, e não a espera por uma vaga.
+ *
+ * O `AbortController` era armado no topo de `DirectConnector.request` e a vaga
+ * só era pedida no fim, no `withAcsSlot` — mas a fila de concorrência espera
+ * sem prazo nenhum. Com seis vagas por provedor e uma varredura de frota
+ * segurando as suas por segundos, a sétima requisição gastava os 15 s inteiros
+ * ESPERANDO e morria sem nunca ter aberto socket.
+ *
+ * E morria de forma indistinguível: nada no caminho separa um `AbortError` de
+ * fila de um ACS mudo, então o operador lia "o ACS não respondeu" sobre um ACS
+ * a quem ninguém tinha perguntado nada.
+ */
+describe('o prazo não corre na fila', () => {
+  it('a requisição que esperou vaga sai com o prazo inteiro', async () => {
+    await runInTenant(alfa, () => Setting.upsert('genieAcsUrl', 'http://acs.exemplo.test:7557'));
+
+    const fetchReal = GenieAcsEgress.fetch;
+    let abortadaAoChegar = null;
+    GenieAcsEgress.fetch = async (_url, options) => {
+      // A asserção inteira está aqui: se o prazo tivesse sido armado antes da
+      // vaga, ele teria estourado durante a espera e o sinal chegaria abortado.
+      abortadaAoChegar = options.signal.aborted;
+      return new Response('[]', { status: 200 });
+    };
+
+    let liberar;
+    const presas = new Promise((resolve) => { liberar = resolve; });
+    const ocupando = Array.from({ length: TENANT_LIMIT }, () =>
+      runInTenant(alfa, () => withAcsSlot(() => presas)));
+
+    try {
+      // Todas as vagas tomadas antes de a requisição sob teste pedir a dela.
+      await new Promise((resolve) => setImmediate(resolve));
+      assert.equal(await runInTenant(alfa, () => inFlightForTenant()), TENANT_LIMIT);
+
+      const PRAZO_MS = 40;
+      const pedido = runInTenant(alfa, () => GenieAcsDirect.request('devices', { timeoutMs: PRAZO_MS }));
+
+      // Esperar MAIS que o prazo com a fila cheia: é a janela em que o prazo
+      // antigo era consumido sem que nada tivesse acontecido.
+      await new Promise((resolve) => setTimeout(resolve, PRAZO_MS * 4));
+      assert.equal(abortadaAoChegar, null, 'a requisição não deveria ter saído ainda');
+
+      liberar();
+      const resposta = await pedido;
+
+      assert.equal(abortadaAoChegar, false, 'o prazo foi gasto na fila');
+      assert.equal(resposta.status, 200);
+    } finally {
+      liberar();
+      GenieAcsEgress.fetch = fetchReal;
+      await Promise.all(ocupando);
+    }
   });
 });

@@ -212,3 +212,34 @@ describe('the provider a login screen sees, with no subdomains configured', () =
     assert.deepEqual(Object.keys(body.data).sort(), ['edition', 'name', 'panelBaseDomain', 'slug']);
   });
 });
+
+/**
+ * Os muros da sessão valem para TODA forma de estabelecer sessão.
+ *
+ * Existia uma segunda porta — `authenticateTokenOptional`, a forma "sessão se
+ * houver" — que nenhuma rota usava e que não aplicava nenhum dos três muros que
+ * a forma obrigatória aplica: a recusa de escrita dentro de uma personificação,
+ * a recusa por assinatura, e o ator no escopo do provedor.
+ *
+ * Código morto exportado não é inerte: parece revisado. A primeira rota que a
+ * adotasse — o caso natural é uma página semipública que mostra mais para quem
+ * está logado — nasceria servindo provedor inadimplente e aceitando escrita
+ * dentro de um atendimento, sem que ninguém tivesse decidido isso.
+ *
+ * Este teste é o que impede a porta de voltar sem os muros.
+ */
+describe('não existe uma segunda porta de sessão', () => {
+  it('o middleware não exporta uma forma opcional sem os muros', async () => {
+    const auth = await import('../src/middleware/auth.js');
+    assert.equal(
+      auth.authenticateTokenOptional, undefined,
+      'uma forma opcional de sessão precisa aplicar impersonationRefusal, '
+      + 'subscriptionRefusal e o ator no escopo — como a obrigatória faz'
+    );
+  });
+
+  it('e a forma obrigatória continua sendo a que as rotas usam', async () => {
+    const auth = await import('../src/middleware/auth.js');
+    assert.equal(typeof auth.authenticateToken, 'function');
+  });
+});

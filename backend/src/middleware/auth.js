@@ -424,41 +424,22 @@ function impersonationRefusal(req, session) {
   };
 }
 
-async function authenticateTokenOptional(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    req.user = null;
-    return next();
-  }
-
-  const decoded = verifyToken(token);
-  let session;
-  try {
-    session = decoded ? await hydrateAuthenticatedUser(decoded) : null;
-  } catch (error) {
-    return next(error);
-  }
-
-  req.user = session;
-  // A token that did not resolve leaves the provisional scope in place: the
-  // request carries on as an anonymous one, which is what this middleware is
-  // for. A token that did resolve re-scopes exactly as the mandatory form does.
-  if (!session) return next();
-  // A token for another provider's host is not an anonymous request, it is a
-  // wrong one. Refusing beats falling back to anonymous, which would answer
-  // with the host's data and look like it worked.
-  if (!tokenMatchesHost(req, session)) {
-    req.user = null;
-    return res.status(403).json({
-      message: req.t('auth.sessionInvalid'),
-      code: 'tenant_mismatch'
-    });
-  }
-  req.tenantId = session.tenantId;
-  return runInTenant(session.tenantId, () => next());
-}
+/**
+ * Aqui morava `authenticateTokenOptional` — a forma "sessão se houver", para a
+ * rota que enriquece a resposta de quem está logado e ainda serve quem não
+ * está.
+ *
+ * Removida sem substituto porque ela NUNCA foi usada: rota nenhuma a importava,
+ * e o que ela era de fato é uma armadilha com cara de coisa revisada. Faltavam
+ * nela os três muros que a forma obrigatória aplica logo acima — a recusa de
+ * escrita numa personificação, a recusa por assinatura, e o ator no escopo do
+ * provedor. A primeira rota que a adotasse nasceria servindo provedor
+ * inadimplente e aceitando escrita dentro de um atendimento, sem que ninguém
+ * tivesse decidido isso.
+ *
+ * Quem precisar dela um dia escreve a versão com os muros, que é o trabalho que
+ * a existência dela escondia.
+ */
 
 /**
  * A guarda de rota, dita pelo que a rota FAZ.
@@ -576,7 +557,6 @@ export {
   verifyToken,
   resolveMembership,
   authenticateToken,
-  authenticateTokenOptional,
   requirePermission,
   requirePlatformAdmin
 };

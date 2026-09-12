@@ -1,7 +1,7 @@
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { asTenant, authHeaders, call, getDb, startTestServers, stopTestServers } from './helpers/harness.js';
+import { asTenant, authHeaders, call, getDb, runInTenant, startTestServers, stopTestServers } from './helpers/harness.js';
 
 const { default: WhatsAppConfigService } = await import('../src/services/whatsappConfigService.js');
 const { default: WhatsAppAccount } = await import('../src/models/WhatsAppAccount.js');
@@ -592,5 +592,68 @@ describe('o eco de entrada grava antes da confirmação de saída', () => {
     // E o segundo laço confirma: não sobrou nada para reenviar.
     await WaOutboxWorker.tick();
     assert.equal(sendTextCalls().length, 1);
+  });
+});
+
+/**
+ * O teto de envio é de cada provedor, e não do processo.
+ *
+ * Era um array só, num campo de classe compartilhado, enquanto o teto vem de
+ * configuração POR PROVEDOR. E `forEachTenant` visita em série por id
+ * crescente: o provedor de menor id gastava o minuto inteiro e os seguintes
+ * levavam `rate_limited` sem ter enviado nada. Negação de serviço cruzada num
+ * painel que vende isolamento.
+ *
+ * A prova precisa de DOIS provedores. Com um só, a janela compartilhada dá a
+ * resposta certa por acidente — que é exatamente por que isto passou tanto
+ * tempo despercebido.
+ */
+describe('o teto por minuto é de cada provedor', () => {
+  let outro;
+
+  before(async () => {
+    await getDb()('tenants').insert({ slug: 'vizinho', name: 'Provedor Vizinho', status: 'active' });
+    outro = (await getDb()('tenants').where({ slug: 'vizinho' }).first()).id;
+  });
+
+  it('o que um gasta não sai da cota do outro', async () => {
+    WaOutboxWorker.stop();
+    const TETO = 3;
+
+    // O primeiro provedor gasta o minuto inteiro.
+    await asTenant(() => {
+      for (let i = 0; i < TETO; i += 1) {
+        assert.equal(WaOutboxWorker.reserve(TETO), true, `reserva ${i + 1}`);
+      }
+      assert.equal(WaOutboxWorker.reserve(TETO), false, 'o minuto dele acabou');
+      assert.equal(WaOutboxWorker.budget(TETO), 0);
+    });
+
+    // O segundo não tem nada a ver com isso.
+    await runInTenant(outro, () => {
+      assert.equal(
+        WaOutboxWorker.budget(TETO), TETO,
+        'o vizinho começou o minuto já sem cota'
+      );
+      assert.equal(WaOutboxWorker.reserve(TETO), true);
+    });
+
+    // E gastar a cota do vizinho não devolve nada ao primeiro.
+    await asTenant(() => {
+      assert.equal(WaOutboxWorker.budget(TETO), 0);
+    });
+
+    WaOutboxWorker.stop();
+  });
+
+  it('e `stop` limpa o minuto de todo mundo', async () => {
+    const TETO = 2;
+    await asTenant(() => WaOutboxWorker.reserve(TETO));
+    await runInTenant(outro, () => WaOutboxWorker.reserve(TETO));
+
+    WaOutboxWorker.stop();
+
+    await asTenant(() => assert.equal(WaOutboxWorker.budget(TETO), TETO));
+    await runInTenant(outro, () => assert.equal(WaOutboxWorker.budget(TETO), TETO));
   });
 });

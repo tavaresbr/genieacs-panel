@@ -3,6 +3,7 @@ import WaSendService from './waSendService.js';
 import WhatsAppConfigService from './whatsappConfigService.js';
 import { isPermanentFailure } from './waSendFailure.js';
 import { forEachTenant } from '../config/tenantJobs.js';
+import { currentTenantId } from '../config/tenantContext.js';
 import { isUniqueViolation } from '../config/database.js';
 
 /** How often a pass runs. Short, because a reply typed by a human is waiting. */
@@ -96,8 +97,21 @@ export function retryScheduleMs(maxAttempts = MAX_ATTEMPTS) {
 class WaOutboxWorker {
   static timer = null;
 
-  /** Timestamps of the sends attempted in the last minute, for the ceiling. */
-  static window = [];
+  /**
+   * Os instantes dos envios tentados no último minuto, POR PROVEDOR.
+   *
+   * Era um array só, compartilhado pelo processo inteiro, enquanto o teto vem
+   * de configuração POR PROVEDOR (`whatsappConfigService`). E o laço de
+   * `forEachTenant` visita os provedores em série por id crescente: o de menor
+   * id gastava a janela inteira e os seguintes levavam `rate_limited` sem ter
+   * enviado uma única mensagem. Isolamento que o painel vende.
+   *
+   * É a mesma classe de defeito que `config/tenantCache.js` documenta como já
+   * corrigida em outros serviços, e o `waBillingService` já a consertou do lado
+   * dele — o comentário de lá cita ESTE teto pelo nome, como o que "ficou de
+   * fora daquela passagem". Ficou até aqui.
+   */
+  static windows = new Map();
 
   static start() {
     if (this.timer) return this.timer;
@@ -118,7 +132,7 @@ class WaOutboxWorker {
     // The window goes with it: the process is shutting down, and a worker
     // restarted inside one process should start from a clean minute rather
     // than inherit a budget spent by a previous life.
-    this.window = [];
+    this.windows.clear();
   }
 
   /**
@@ -129,10 +143,12 @@ class WaOutboxWorker {
    * provider rather than splitting them. Now that the queue carries a provider,
    * the loop divides the work, which is what it was always meant to do.
    *
-   * The per-minute send budget is still one window for the process, so a busy
-   * provider can still spend another's minute. That is a fairness problem, not
-   * a correctness one, and it belongs with the per-provider scheduling in a
-   * later phase.
+   * O teto de envio por minuto é por provedor desde que `windows` virou um
+   * mapa; o que continua fora é a PERSISTÊNCIA dele. A janela vive só em
+   * memória e `stop` a limpa, então um restart de processo devolve o minuto
+   * cheio — e um deploy no meio de uma campanha pode estourar o teto que o
+   * WhatsApp impõe. Isso pede um lugar para guardar o contador, e é trabalho
+   * de outra onda.
    *
    * @returns {Promise<{ sent: number, failed: number, skipped: string|null }>}
    */
@@ -292,24 +308,36 @@ class WaOutboxWorker {
 
   // ── The per-minute ceiling ─────────────────────────────────────────
   //
-  // One window for the whole worker, not one per account: what WhatsApp reacts
-  // to is the provider's traffic, and a limit applied per number would multiply
-  // by however many numbers happen to be connected.
+  // Uma janela por PROVEDOR, e não por número conectado: o que o WhatsApp
+  // reage é ao tráfego do provedor, e um limite por número multiplicaria pelo
+  // tanto de números que por acaso estivessem pareados. Por provedor porque o
+  // teto é configurado por provedor e porque a cota de um não é do outro.
+
+  /** A janela do provedor em escopo, já podada. */
+  static janela() {
+    const tenantId = currentTenantId();
+    const cutoff = Date.now() - WINDOW_MS;
+    const janela = (this.windows.get(tenantId) || []).filter((at) => at > cutoff);
+    // A janela podada volta para o mapa mesmo quando nada é reservado: sem
+    // isso, um provedor parado manteria instantes velhos vivos para sempre.
+    this.windows.set(tenantId, janela);
+    return janela;
+  }
 
   static prune() {
-    const cutoff = Date.now() - WINDOW_MS;
-    while (this.window.length > 0 && this.window[0] <= cutoff) this.window.shift();
+    this.janela();
   }
 
   static budget(rateLimitPerMin) {
-    this.prune();
-    return Math.max(0, Number(rateLimitPerMin || 0) - this.window.length);
+    return Math.max(0, Number(rateLimitPerMin || 0) - this.janela().length);
   }
 
   /** Takes one slot, or reports that the minute is spent. */
   static reserve(rateLimitPerMin) {
-    if (this.budget(rateLimitPerMin) <= 0) return false;
-    this.window.push(Date.now());
+    const janela = this.janela();
+    if (Number(rateLimitPerMin || 0) - janela.length <= 0) return false;
+    janela.push(Date.now());
+    this.windows.set(currentTenantId(), janela);
     return true;
   }
 }
