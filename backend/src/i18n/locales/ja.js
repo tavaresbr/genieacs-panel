@@ -645,4 +645,12 @@ export default {
   'tenant.billingTaxIdInvalid': '番号が有効な CNPJ または CPF ではありません',
   'tenant.billingPostalCodeInvalid': '郵便番号は 8 桁である必要があります',
   'tenant.billingEmailInvalid': '請求用のメールアドレスが正しくありません',
+  'subscription.notice.trialSoonSubject': '{provider} の試用期間は {date} に終了します',
+  'subscription.notice.trialSoonBody': '{provider} の試用期間は {date}（あと {days} 日）で終了します。\n\n終了後もパネルの閲覧はできますが、変更は受け付けなくなります。作業を続けるには、その日までにご連絡ください。\n\n{link}',
+  'subscription.notice.trialExpiredSubject': '{provider} の試用期間が {date} に終了しました',
+  'subscription.notice.trialExpiredBody': '{provider} の試用期間が {date} に終了しました。\n\nパネルの閲覧は引き続き可能で、担当者もご契約者も今までどおり見られますが、変更は受け付けません。書き込みを再開するにはご連絡ください。\n\n{link}',
+  'subscription.notice.renewalSoonSubject': '{provider} のご契約は {date} が期限です',
+  'subscription.notice.renewalSoonBody': '{provider} のお支払い済み期間は {date}（あと {days} 日）で終了します。\n\n終了後もパネルの閲覧はできますが、変更は受け付けなくなります。その日までにお支払いいただければ、何も止まりません。\n\n{link}',
+  'subscription.notice.renewalExpiredSubject': '{provider} のご契約が {date} に期限切れになりました',
+  'subscription.notice.renewalExpiredBody': '{provider} のお支払い済み期間が {date} に終了しました。\n\nパネルの閲覧は引き続き可能で、担当者もご契約者も今までどおり見られますが、変更は受け付けません。お支払いが登録され次第、元どおりになります。\n\n{link}',
 };

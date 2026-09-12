@@ -112,6 +112,53 @@ class SubscriptionService {
   }
 
   /**
+   * O prazo que está para vencer e ainda não foi avisado, ou nulo.
+   *
+   * Um provedor tem no máximo um prazo vivo: `trial_ends_at` enquanto está em
+   * teste, `renews_at` depois que pagou. `suspended` e `canceled` não têm prazo
+   * nenhum — já estão parados, e avisar quem já foi bloqueado é ruído.
+   *
+   * A janela é de `WARN_WINDOW_DAYS` dias ANTES e vale também depois de vencer:
+   * quem passou do prazo sem ver o aviso precisa receber um, e é justamente o
+   * caso em que o painel já está recusando escrita. A marca `expiry_warned_for`
+   * guarda o prazo avisado, então um segundo aviso só sai quando o prazo MUDA —
+   * e um pagamento que empurra `renews_at` recomeça o ciclo sozinho.
+   */
+  static WARN_WINDOW_DAYS = 7;
+
+  static pendingExpiryNotice(subscription, now = new Date()) {
+    if (!subscription) return null;
+    const stored = STATUSES.includes(subscription.status) ? subscription.status : 'suspended';
+    if (stored !== 'trial' && stored !== 'active' && stored !== 'past_due') return null;
+
+    // `past_due` é estado gravado à mão pelo console; o prazo dele é o que
+    // houver. Em `trial` o prazo é o do teste, em `active` o do período pago.
+    const prazo = stored === 'trial'
+      ? asDate(subscription.trial_ends_at)
+      : asDate(subscription.renews_at) ?? asDate(subscription.trial_ends_at);
+    if (!prazo) return null;
+
+    const janela = now.getTime() + this.WARN_WINDOW_DAYS * DAY_MS;
+    if (prazo.getTime() > janela) return null;
+
+    const avisado = asDate(subscription.expiry_warned_for);
+    if (avisado && avisado.getTime() === prazo.getTime()) return null;
+
+    return {
+      kind: stored === 'trial' ? 'trial' : 'renewal',
+      deadline: prazo,
+      expired: prazo.getTime() <= now.getTime()
+    };
+  }
+
+  /** Anota que o aviso daquele prazo saiu. Idempotente por construção. */
+  static async markExpiryWarned(deadline) {
+    const tenantId = currentTenantId();
+    await Subscription.upsertForTenant(tenantId, { expiry_warned_for: asDate(deadline) });
+    cache.invalidate();
+  }
+
+  /**
    * O que o gate responde para uma requisição, dado o estado.
    *
    * `write` é o método não ser de leitura. `webhook` é uma entrega de fora —

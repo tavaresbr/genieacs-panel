@@ -641,4 +641,12 @@ export default {
   'tenant.billingTaxIdInvalid': "Le numéro fiscal n'est ni un CNPJ ni un CPF valide",
   'tenant.billingPostalCodeInvalid': 'Le code postal doit comporter huit chiffres',
   'tenant.billingEmailInvalid': "L'adresse e-mail de facturation est invalide",
+  'subscription.notice.trialSoonSubject': "Votre essai {provider} se termine le {date}",
+  'subscription.notice.trialSoonBody': "L'essai de {provider} se termine le {date} — dans {days} jour(s).\n\nEnsuite, le panneau restera consultable mais n'acceptera plus de modifications. Pour continuer à travailler, parlez-nous avant cette date.\n\n{link}",
+  'subscription.notice.trialExpiredSubject': "L'essai {provider} s'est terminé le {date}",
+  'subscription.notice.trialExpiredBody': "L'essai de {provider} s'est terminé le {date}.\n\nLe panneau reste consultable — votre équipe et vos abonnés voient toujours tout — mais n'accepte plus de modifications. Parlez-nous pour réactiver l'écriture.\n\n{link}",
+  'subscription.notice.renewalSoonSubject': "L'abonnement {provider} arrive à échéance le {date}",
+  'subscription.notice.renewalSoonBody': "La période payée de {provider} se termine le {date} — dans {days} jour(s).\n\nEnsuite, le panneau restera consultable mais n'acceptera plus de modifications. Envoyez le paiement avant cette date et rien ne s'arrête.\n\n{link}",
+  'subscription.notice.renewalExpiredSubject': "L'abonnement {provider} a expiré le {date}",
+  'subscription.notice.renewalExpiredBody': "La période payée de {provider} s'est terminée le {date}.\n\nLe panneau reste consultable — votre équipe et vos abonnés voient toujours tout — mais n'accepte plus de modifications. Dès que le paiement est enregistré, tout revient à la normale.\n\n{link}",
 };

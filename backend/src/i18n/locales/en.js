@@ -645,4 +645,12 @@ export default {
   'tenant.billingTaxIdInvalid': 'The tax number is not a valid CNPJ or CPF',
   'tenant.billingPostalCodeInvalid': 'The postal code must have eight digits',
   'tenant.billingEmailInvalid': 'The billing e-mail address is invalid',
+  'subscription.notice.trialSoonSubject': 'Your {provider} trial ends on {date}',
+  'subscription.notice.trialSoonBody': 'The trial for {provider} ends on {date} — {days} day(s) from now.\n\nWhen it ends the panel stays readable but stops accepting changes. To keep it working, talk to us before that date.\n\n{link}',
+  'subscription.notice.trialExpiredSubject': 'The {provider} trial ended on {date}',
+  'subscription.notice.trialExpiredBody': 'The trial for {provider} ended on {date}.\n\nThe panel is still readable — your team and your subscribers keep seeing everything — but it no longer accepts changes. Talk to us to turn writing back on.\n\n{link}',
+  'subscription.notice.renewalSoonSubject': 'The {provider} subscription is due on {date}',
+  'subscription.notice.renewalSoonBody': 'The paid period for {provider} ends on {date} — {days} day(s) from now.\n\nWhen it ends the panel stays readable but stops accepting changes. Send the payment before that date and nothing stops.\n\n{link}',
+  'subscription.notice.renewalExpiredSubject': 'The {provider} subscription expired on {date}',
+  'subscription.notice.renewalExpiredBody': 'The paid period for {provider} ended on {date}.\n\nThe panel is still readable — your team and your subscribers keep seeing everything — but it no longer accepts changes. As soon as the payment is registered it goes back to normal.\n\n{link}',
 };

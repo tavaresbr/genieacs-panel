@@ -637,4 +637,12 @@ export default {
   'tenant.billingTaxIdInvalid': 'الرقم ليس CNPJ ولا CPF صالحًا',
   'tenant.billingPostalCodeInvalid': 'يجب أن يتكوّن الرمز البريدي من ثمانية أرقام',
   'tenant.billingEmailInvalid': 'عنوان البريد الإلكتروني للفوترة غير صالح',
+  'subscription.notice.trialSoonSubject': 'تنتهي تجربتك لـ {provider} في {date}',
+  'subscription.notice.trialSoonBody': 'تنتهي تجربة {provider} في {date} — بعد {days} يوم/أيام.\n\nبعدها تبقى اللوحة قابلة للقراءة لكنها تتوقف عن قبول التغييرات. للاستمرار في العمل، تواصل معنا قبل ذلك التاريخ.\n\n{link}',
+  'subscription.notice.trialExpiredSubject': 'انتهت تجربة {provider} في {date}',
+  'subscription.notice.trialExpiredBody': 'انتهت تجربة {provider} في {date}.\n\nاللوحة ما زالت قابلة للقراءة — فريقك ومشتركوك يرون كل شيء — لكنها لم تعد تقبل التغييرات. تواصل معنا لإعادة تفعيل الكتابة.\n\n{link}',
+  'subscription.notice.renewalSoonSubject': 'ينتهي اشتراك {provider} في {date}',
+  'subscription.notice.renewalSoonBody': 'تنتهي الفترة المدفوعة لـ {provider} في {date} — بعد {days} يوم/أيام.\n\nبعدها تبقى اللوحة قابلة للقراءة لكنها تتوقف عن قبول التغييرات. أرسل الدفعة قبل ذلك التاريخ ولن يتوقف شيء.\n\n{link}',
+  'subscription.notice.renewalExpiredSubject': 'انتهى اشتراك {provider} في {date}',
+  'subscription.notice.renewalExpiredBody': 'انتهت الفترة المدفوعة لـ {provider} في {date}.\n\nاللوحة ما زالت قابلة للقراءة — فريقك ومشتركوك يرون كل شيء — لكنها لم تعد تقبل التغييرات. بمجرد تسجيل الدفعة يعود كل شيء كما كان.\n\n{link}',
 };

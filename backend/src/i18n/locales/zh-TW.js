@@ -645,4 +645,12 @@ export default {
   'tenant.billingTaxIdInvalid': '該號碼不是有效的 CNPJ 或 CPF',
   'tenant.billingPostalCodeInvalid': '郵遞區號必須為八位數字',
   'tenant.billingEmailInvalid': '帳單電子郵件位址無效',
+  'subscription.notice.trialSoonSubject': '{provider} 的試用將於 {date} 結束',
+  'subscription.notice.trialSoonBody': '{provider} 的試用將於 {date} 結束，還有 {days} 天。\n\n結束後面板仍可檢視，但不再接受變更。若要繼續使用，請在該日期前與我們聯繫。\n\n{link}',
+  'subscription.notice.trialExpiredSubject': '{provider} 的試用已於 {date} 結束',
+  'subscription.notice.trialExpiredBody': '{provider} 的試用已於 {date} 結束。\n\n面板仍可檢視——您的團隊與用戶都還看得到全部內容——但不再接受變更。請與我們聯繫以恢復寫入。\n\n{link}',
+  'subscription.notice.renewalSoonSubject': '{provider} 的訂閱將於 {date} 到期',
+  'subscription.notice.renewalSoonBody': '{provider} 的付費週期將於 {date} 結束，還有 {days} 天。\n\n結束後面板仍可檢視，但不再接受變更。在該日期前完成付款，一切照常。\n\n{link}',
+  'subscription.notice.renewalExpiredSubject': '{provider} 的訂閱已於 {date} 到期',
+  'subscription.notice.renewalExpiredBody': '{provider} 的付費週期已於 {date} 結束。\n\n面板仍可檢視——您的團隊與用戶都還看得到全部內容——但不再接受變更。付款登記後即恢復正常。\n\n{link}',
 };

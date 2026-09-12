@@ -644,4 +644,12 @@ export default {
   'tenant.billingTaxIdInvalid': 'O documento não é um CNPJ nem um CPF válido',
   'tenant.billingPostalCodeInvalid': 'O CEP deve ter oito dígitos',
   'tenant.billingEmailInvalid': 'O e-mail de cobrança é inválido',
+  'subscription.notice.trialSoonSubject': 'Seu teste do {provider} termina em {date}',
+  'subscription.notice.trialSoonBody': 'O teste do {provider} termina em {date} — daqui a {days} dia(s).\n\nQuando terminar, o painel continua podendo ser lido, mas para de aceitar alterações. Para continuar trabalhando, fale com a gente antes dessa data.\n\n{link}',
+  'subscription.notice.trialExpiredSubject': 'O teste do {provider} terminou em {date}',
+  'subscription.notice.trialExpiredBody': 'O teste do {provider} terminou em {date}.\n\nO painel continua podendo ser lido — sua equipe e seus assinantes seguem vendo tudo —, mas não aceita mais alterações. Fale com a gente para religar a escrita.\n\n{link}',
+  'subscription.notice.renewalSoonSubject': 'A assinatura do {provider} vence em {date}',
+  'subscription.notice.renewalSoonBody': 'O período pago do {provider} termina em {date} — daqui a {days} dia(s).\n\nQuando terminar, o painel continua podendo ser lido, mas para de aceitar alterações. Mande o pagamento antes dessa data e nada para.\n\n{link}',
+  'subscription.notice.renewalExpiredSubject': 'A assinatura do {provider} venceu em {date}',
+  'subscription.notice.renewalExpiredBody': 'O período pago do {provider} terminou em {date}.\n\nO painel continua podendo ser lido — sua equipe e seus assinantes seguem vendo tudo —, mas não aceita mais alterações. Assim que o pagamento for registrado, tudo volta ao normal.\n\n{link}',
 };

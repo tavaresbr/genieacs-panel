@@ -758,6 +758,42 @@ describe('o cadastro fiscal chegando a uma base que já tem provedores', () => {
   });
 });
 
+describe('a marca do prazo já avisado', () => {
+  const db = createDatabase('expiry-warned');
+  const AVISO_MIGRATION = '0044_subscription_expiry_warned_for';
+
+  /**
+   * O caminho de upgrade da 0044. A coluna nasce nula, e nula é o certo:
+   * ninguém foi avisado ainda. O risco desta migração não é o schema — é um
+   * default não-nulo que faria todo provedor parecer já avisado do prazo que
+   * ele tem agora, e o primeiro aviso nunca sairia.
+   */
+  before(async () => {
+    for (const migration of migrations.filter((m) => m.id < AVISO_MIGRATION)) {
+      await migration.up(db);
+    }
+    await ensureSchema(db);
+  });
+
+  it('acrescenta a coluna', async () => {
+    assert.equal(await db.schema.hasColumn('subscriptions', 'expiry_warned_for'), true);
+  });
+
+  it('e ela nasce nula para toda assinatura que já existia', async () => {
+    const linhas = await db('subscriptions');
+    for (const linha of linhas) {
+      assert.equal(linha.expiry_warned_for ?? null, null);
+    }
+  });
+
+  it('e pode ser pedida de novo sem estourar', async () => {
+    const step = migrations.find((m) => m.id === AVISO_MIGRATION);
+    await step.up(db);
+    await ensureSchema(db);
+    assert.equal(await db.schema.hasColumn('subscriptions', 'expiry_warned_for'), true);
+  });
+});
+
 describe('the provider name leaving settings', () => {
   const db = createDatabase('tenant-name');
   const NAME_MIGRATION = '0036_tenant_name_from_app_name';

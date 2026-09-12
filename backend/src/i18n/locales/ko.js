@@ -648,4 +648,12 @@ export default {
   'tenant.billingTaxIdInvalid': '유효한 CNPJ 또는 CPF가 아닙니다',
   'tenant.billingPostalCodeInvalid': '우편번호는 여덟 자리여야 합니다',
   'tenant.billingEmailInvalid': '청구용 이메일 주소가 올바르지 않습니다',
+  'subscription.notice.trialSoonSubject': '{provider} 체험이 {date}에 끝납니다',
+  'subscription.notice.trialSoonBody': '{provider} 체험이 {date}에 끝납니다. {days}일 남았습니다.\n\n끝나도 패널은 계속 볼 수 있지만 변경은 받지 않습니다. 계속 사용하시려면 그 전에 연락해 주세요.\n\n{link}',
+  'subscription.notice.trialExpiredSubject': '{provider} 체험이 {date}에 끝났습니다',
+  'subscription.notice.trialExpiredBody': '{provider} 체험이 {date}에 끝났습니다.\n\n패널은 계속 볼 수 있고 팀과 가입자 모두 그대로 보이지만, 변경은 받지 않습니다. 쓰기를 다시 켜려면 연락해 주세요.\n\n{link}',
+  'subscription.notice.renewalSoonSubject': '{provider} 구독이 {date}에 만료됩니다',
+  'subscription.notice.renewalSoonBody': '{provider}의 결제 기간이 {date}에 끝납니다. {days}일 남았습니다.\n\n끝나도 패널은 계속 볼 수 있지만 변경은 받지 않습니다. 그 전에 결제하시면 아무것도 멈추지 않습니다.\n\n{link}',
+  'subscription.notice.renewalExpiredSubject': '{provider} 구독이 {date}에 만료되었습니다',
+  'subscription.notice.renewalExpiredBody': '{provider}의 결제 기간이 {date}에 끝났습니다.\n\n패널은 계속 볼 수 있고 팀과 가입자 모두 그대로 보이지만, 변경은 받지 않습니다. 결제가 등록되는 즉시 정상으로 돌아갑니다.\n\n{link}',
 };
