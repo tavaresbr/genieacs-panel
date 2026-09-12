@@ -317,13 +317,23 @@ function serveFrontend(target, htmlFile) {
       return res.status(503).send(req.t('common.buildUnavailable'));
     }
     res.setHeader('Cache-Control', 'no-cache');
-    // `dotfiles: 'allow'` is about the path this file is AT, not about serving
-    // dotfiles to anyone. `send` refuses any absolute path containing a segment
-    // that starts with a dot, so an install under `/opt/.apps/panel` — or a git
-    // worktree under `.claude/` — answered 404 for every page while its own
-    // assets loaded fine. The static middleware above still denies dotfiles in
-    // the REQUEST path, which is the rule that protects anything.
-    return res.sendFile(htmlPath, { dotfiles: 'allow' });
+    // Com `root`, e não com um caminho absoluto.
+    //
+    // `send` aplica a regra de dotfiles ao caminho que ele RESOLVE. Passando o
+    // absoluto, a regra cai sobre a instalação inteira: sob `/opt/.apps/panel`
+    // — ou numa worktree do git sob `.claude/` — toda página respondia 404
+    // enquanto os próprios assets carregavam, porque o `express.static` acima
+    // tem root e portanto só examina o caminho da REQUISIÇÃO. Sintoma
+    // desconcertante: `/index.html` 200 e `/` 404.
+    //
+    // Desligar a regra (`dotfiles: 'allow'`) resolvia e era seguro só porque
+    // os dois chamadores passam literais. Com `root` ela continua LIGADA,
+    // examinando apenas o nome do arquivo, e a resolução fica confinada ao
+    // diretório do build — medido: uma travessia responde 403 em vez de
+    // resolver. Nada vindo da requisição chega aqui hoje, então nenhum teste
+    // distingue as duas formas; a diferença é entre estar seguro por causa de
+    // quem chama e estar seguro por construção.
+    return res.sendFile(htmlFile, { root: FRONTEND_DIR, dotfiles: 'deny' });
   });
   return true;
 }
