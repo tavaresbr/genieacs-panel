@@ -105,6 +105,9 @@ const ar: Dictionary = {
   'login.kicker': 'دخول المشغّل',
   'login.title': 'تسجيل الدخول إلى اللوحة',
   'login.subtitle': 'استخدم حساب مدير SkyGenPanel للاطّلاع على بيانات الأجهزة.',
+  'login.platform.kicker': 'الوصول إلى المنصة',
+  'login.platform.title': 'تسجيل الدخول إلى وحدة التحكم',
+  'login.platform.subtitle': 'استخدم الحساب الذي يملك مفتاح وحدة التحكم. هذا العنوان ليس لوحة أي مزوّد.',
   'login.password': 'كلمة المرور',
   'login.passwordPlaceholder': 'أدخل كلمة المرور',
   'login.showPassword': 'إظهار كلمة المرور',
@@ -112,6 +115,8 @@ const ar: Dictionary = {
   'login.submit': 'تسجيل الدخول',
   'login.submitting': 'جارٍ التحقق من الحساب…',
   'login.helpText': 'إذا رُفض الدخول، تواصل مع مدير اللوحة لإعادة تعيين بيانات الاعتماد.',
+  'login.platform.helpText': 'تُعاد تعيين كلمة مرور حساب المنصة على الخادم، عبر scripts/reset-password.js.',
+  'console.header': 'المنصة',
   'login.error.invalidCredentials': 'اسم المستخدم أو كلمة المرور غير مطابقة. تحقّق من بيانات اعتماد المدير.',
   'login.error.unreachable': 'تعذّر على اللوحة الوصول إلى الخادم. تحقّق من الاتصال وأعد المحاولة.',
 

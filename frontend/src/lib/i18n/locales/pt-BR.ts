@@ -105,6 +105,9 @@ const ptBR: Dictionary = {
   'login.kicker': 'Acesso do operador',
   'login.title': 'Entrar no painel',
   'login.subtitle': 'Use a conta de administrador do SkyGenPanel para abrir os dados dos equipamentos.',
+  'login.platform.kicker': 'Acesso da plataforma',
+  'login.platform.title': 'Entrar no console',
+  'login.platform.subtitle': 'Use a conta que tem a chave do console. Este endereço não é o painel de nenhum provedor.',
   'login.identifier': 'Usuário ou e-mail',
   'login.identifierPlaceholder': 'admin ou voce@seuprovedor.com',
   'login.identifierHint': 'Os dois servem — o nome de usuário de sempre continua entrando.',
@@ -115,6 +118,8 @@ const ptBR: Dictionary = {
   'login.submit': 'Entrar',
   'login.submitting': 'Verificando conta…',
   'login.helpText': 'Se o acesso for negado, fale com o administrador do painel para redefinir as credenciais.',
+  'login.platform.helpText': 'A senha de uma conta de plataforma se redefine pelo servidor, com scripts/reset-password.js.',
+  'console.header': 'Plataforma',
   'login.error.invalidCredentials': 'Usuário ou e-mail e senha não conferem. Verifique as credenciais.',
   'login.error.unreachable': 'O painel não conseguiu contatar o servidor. Verifique a conexão e tente novamente.',
 

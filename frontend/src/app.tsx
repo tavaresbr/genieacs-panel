@@ -9,10 +9,12 @@ import { BrandMark } from '@/components/brand-mark'
 import { LanguageProvider, useTranslation } from '@/contexts/language-context'
 import { SubscriptionNotice } from '@/components/subscription-notice'
 import { ImpersonationBanner } from '@/components/impersonation-banner'
+import { ConsoleHeader } from '@/components/console-header'
 import { TenantProvider, useTenant } from '@/contexts/tenant-context'
 import { settingsAPI } from '@/lib/api'
 import { onboardingDismissKey } from '@/lib/onboarding'
 import type { Permission } from '@/lib/permissions'
+import { sessionKind, shellFor } from '@/lib/shell'
 
 const DashboardPage = lazy(() => import('@/pages/dashboard'))
 const DevicesPage = lazy(() => import('@/pages/devices'))
@@ -167,9 +169,51 @@ function LoginRoute() {
   if (loading || tenantLoading) return <AuthFallback />
   if (needsSetup) return <Navigate to="/setup" replace />
   if (isAuthenticated) return <Navigate to="/dashboard" replace />
-  // The platform's own host has nobody to sign in as; what it has is sign-up.
-  if (isPlatformHost) return <Navigate to="/signup" replace />
   return <LoginPage />
+}
+
+/**
+ * A porta do console, no endereço da plataforma.
+ *
+ * Era um desvio para `/signup`, na época em que o ápice só servia o cadastro e
+ * não havia ninguém para entrar ali. Agora há: a sessão do console, que não
+ * nomeia provedor nenhum.
+ *
+ * `needsSetup` NÃO desvia aqui, ao contrário da porta do painel. A rota de
+ * setup não é servida neste endereço — ela cria o primeiro operador de um
+ * provedor —, então o desvio seria um laço. O primeiro administrador da
+ * plataforma nasce pelo script, e é isso que a tela diz.
+ */
+function ConsoleLoginRoute() {
+  const { isAuthenticated, loading, user } = useAuth()
+  if (loading) return <AuthFallback />
+  if (isAuthenticated && user?.platform) return <Navigate to="/platform" replace />
+  return <LoginPage variant="platform" />
+}
+
+/**
+ * A casca do console: sem barra lateral, sem aviso de assinatura, sem portão de
+ * onboarding.
+ *
+ * Os três falam de UM provedor — a operação dele, a fatura dele, a configuração
+ * inicial dele — e aqui não há um. `OnboardingGate`, em particular, chama
+ * `settingsAPI.getAll()`, que neste endereço responde 404.
+ */
+function ConsoleShell() {
+  const { isAuthenticated, loading, user } = useAuth()
+  if (loading) return <AuthFallback />
+  if (!isAuthenticated || !user?.platform) return <Navigate to="/login" replace />
+
+  return (
+    <div className="min-h-screen">
+      <ConsoleHeader />
+      <main>
+        <Suspense fallback={<PageFallback />}>
+          <Outlet />
+        </Suspense>
+      </main>
+    </div>
+  )
 }
 
 function SetupRoute() {
@@ -179,15 +223,46 @@ function SetupRoute() {
   return <SetupPage />
 }
 
-export default function App() {
+/**
+ * As rotas do console: a árvore inteira do endereço da plataforma.
+ *
+ * Curta de propósito. Fora dela ficam o setup (cria operador de provedor), o
+ * convite, o resgate de personificação, a redefinição de senha e a confirmação
+ * de e-mail — todas são de um provedor e nenhuma é servida neste endereço.
+ * `/signup` fica porque o ápice é a porta de entrada das duas pessoas que
+ * chegam sem conta: o ISP que ainda não existe e quem opera a plataforma.
+ */
+function ConsoleRoutes() {
   return (
-    <AuthProvider>
-      <TenantProvider>
-      <LanguageProvider>
-        <ThemeProvider>
-          <LoadingProvider>
-            <ToastProvider>
-              <RouteChangeLoader />
+    <Routes>
+      <Route path="/login" element={<Suspense fallback={<AuthFallback />}><ConsoleLoginRoute /></Suspense>} />
+      <Route path="/signup" element={<Suspense fallback={<AuthFallback />}><SignupRoute /></Suspense>} />
+      <Route element={<ConsoleShell />}>
+        <Route path="/platform" element={<PlatformPage />} />
+        <Route path="*" element={<Navigate to="/platform" replace />} />
+      </Route>
+    </Routes>
+  )
+}
+
+/**
+ * Qual das duas árvores montar. A regra mora em `@/lib/shell`, testada lá.
+ *
+ * Um componente e não um `if` dentro da casca: cada condicional em volta de um
+ * pedaço de painel seria uma chance de ele renderizar onde não há painel, e a
+ * lista dessas peças cresce sozinha conforme alguém acrescenta um aviso à
+ * casca comum.
+ */
+function AppRoutes() {
+  const { isPlatformHost, loading: tenantLoading } = useTenant()
+  const { user, loading } = useAuth()
+  if (loading || tenantLoading) return <AuthFallback />
+  const casca = shellFor({ platformHost: isPlatformHost, session: sessionKind(user) })
+  return casca === 'console' ? <ConsoleRoutes /> : <ProviderRoutes />
+}
+
+function ProviderRoutes() {
+  return (
               <Routes>
                 <Route path="/login" element={<Suspense fallback={<AuthFallback />}><LoginRoute /></Suspense>} />
                 <Route path="/setup" element={<Suspense fallback={<AuthFallback />}><SetupRoute /></Suspense>} />
@@ -236,6 +311,19 @@ export default function App() {
                   <Route path="*" element={<Navigate to="/dashboard" replace />} />
                 </Route>
               </Routes>
+  )
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <TenantProvider>
+      <LanguageProvider>
+        <ThemeProvider>
+          <LoadingProvider>
+            <ToastProvider>
+              <RouteChangeLoader />
+              <AppRoutes />
             </ToastProvider>
           </LoadingProvider>
         </ThemeProvider>

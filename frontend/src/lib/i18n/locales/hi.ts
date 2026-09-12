@@ -105,6 +105,9 @@ const hi: Dictionary = {
   'login.kicker': 'ऑपरेटर पहुँच',
   'login.title': 'पैनल में साइन इन करें',
   'login.subtitle': 'उपकरण डेटा खोलने के लिए अपने SkyGenPanel प्रशासक खाते का उपयोग करें।',
+  'login.platform.kicker': 'प्लेटफ़ॉर्म पहुँच',
+  'login.platform.title': 'कंसोल में प्रवेश करें',
+  'login.platform.subtitle': 'उस खाते का उपयोग करें जिसके पास कंसोल की कुंजी है। यह पता किसी प्रदाता का पैनल नहीं है।',
   'login.password': 'पासवर्ड',
   'login.passwordPlaceholder': 'अपना पासवर्ड दर्ज करें',
   'login.showPassword': 'पासवर्ड दिखाएँ',
@@ -112,6 +115,8 @@ const hi: Dictionary = {
   'login.submit': 'साइन इन करें',
   'login.submitting': 'खाता सत्यापित किया जा रहा है…',
   'login.helpText': 'यदि पहुँच अस्वीकृत हो, तो अपने क्रेडेंशियल रीसेट कराने के लिए पैनल प्रशासक से संपर्क करें।',
+  'login.platform.helpText': 'प्लेटफ़ॉर्म खाते का पासवर्ड सर्वर पर scripts/reset-password.js से रीसेट किया जाता है।',
+  'console.header': 'प्लेटफ़ॉर्म',
   'login.error.invalidCredentials': 'उपयोगकर्ता नाम या पासवर्ड मेल नहीं खाता। प्रशासक क्रेडेंशियल जाँचें।',
   'login.error.unreachable': 'पैनल सर्वर तक नहीं पहुँच सका। कनेक्शन जाँचें और फिर कोशिश करें।',
 

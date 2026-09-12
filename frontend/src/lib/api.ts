@@ -495,8 +495,12 @@ export interface EmailReadiness {
 }
 
 // Operator accounts. Every route below is admin-only on the backend.
-// An operator and the signed-in user are the same record, so they share a type.
-export type Operator = User
+// An operator and the signed-in user are the same record, e daí o tipo comum —
+// com uma diferença que o tipo agora diz: um operador SEMPRE tem papel, porque
+// ele é uma linha de `tenant_users`, enquanto a sessão pode não ter (a do
+// console não trabalha em provedor nenhum). Sem este estreitamento, toda tela
+// que lista operadores teria que tratar um nulo que não acontece ali.
+export type Operator = User & { role: OperatorRole }
 export type { OperatorRole }
 
 /**
