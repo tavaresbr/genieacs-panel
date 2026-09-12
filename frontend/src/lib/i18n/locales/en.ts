@@ -1773,6 +1773,28 @@ const en = {
   'platform.subscription.renewalExpiredNote': 'The paid period has ended; the panel is read-only.',
   'platform.subscription.renewsExpired': 'Expired on {date}',
   'plan.paidThroughExpired': 'Expired on',
+
+  'audit.action.tenantBillingChanged': 'Billing details changed',
+  'billing.title': 'Billing details',
+  'billing.description': 'What an invoice needs, and where the charge should be sent. Fill it in before the first invoice; nothing here blocks the panel.',
+  'billing.legalName': 'Legal name',
+  'billing.taxId': 'Tax number (CNPJ/CPF)',
+  'billing.taxIdHint': 'Digits only; punctuation is ignored.',
+  'billing.stateRegistration': 'State registration',
+  'billing.stateRegistrationHint': 'Leave blank, or write ISENTO, if there is none.',
+  'billing.postalCode': 'Postal code',
+  'billing.addressLine': 'Street',
+  'billing.addressNumber': 'Number',
+  'billing.addressExtra': 'Complement',
+  'billing.district': 'District',
+  'billing.city': 'City',
+  'billing.state': 'State',
+  'billing.email': 'Billing e-mail',
+  'billing.emailHint': 'Where the invoice goes. Often not the same address you sign in with.',
+  'billing.phone': 'Billing phone',
+  'billing.saved': 'Saved.',
+  'billing.saveFailed': 'The billing details could not be saved',
+  'billing.readOnly': 'Only someone who can change settings may edit this.',
 }
 
 export default en

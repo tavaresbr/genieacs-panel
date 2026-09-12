@@ -34,6 +34,12 @@ class AuditLog {
     INVITE_REVOKED: 'invite.revoked',
     TENANT_STATUS_CHANGED: 'tenant.status_changed',
     TENANT_EXPORTED: 'tenant.exported',
+    // O cadastro fiscal do provedor mudou — razão social, CNPJ, endereço,
+    // contato de cobrança. Registra QUAIS campos, nunca os valores: a trilha
+    // responde "quem mexeu no meu cadastro", e para isso o nome do campo basta.
+    // Guardar os valores faria dela uma segunda cópia do cadastro, com
+    // retenção maior que a do original.
+    TENANT_BILLING_CHANGED: 'tenant.billing_changed',
     // A assinatura mudou de plano ou de estado. Gravada NO provedor, com
     // `actorKind: 'platform'`, pelo mesmo motivo da suspensão: quem vai
     // perguntar "por que meu painel ficou só leitura" é o ISP, e a resposta

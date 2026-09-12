@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { subscriptionAPI, type SubscriptionUsage } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
+import { BillingProfile } from '@/components/billing-profile'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
 
@@ -159,6 +160,18 @@ export default function PlanPage() {
                 <p className="mt-4 text-sm text-destructive">{t('plan.overHint')}</p>
               )}
             </section>
+          </div>
+        )}
+
+        {/* Abaixo do plano, e não numa aba das configurações: é a mesma
+            conversa — em que plano estou, até quando paguei, e para quem vai a
+            nota. */}
+        {data && (
+          <div className="mt-6">
+            <BillingProfile
+              billing={data.billing}
+              onSaved={(billing) => setData((atual) => (atual ? { ...atual, billing } : atual))}
+            />
           </div>
         )}
       </div>

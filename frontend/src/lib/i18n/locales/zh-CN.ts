@@ -1771,6 +1771,28 @@ const zhCN: Dictionary = {
   'platform.subscription.renewalExpiredNote': '付费周期已结束，面板目前只能查看。',
   'platform.subscription.renewsExpired': '已于 {date} 到期',
   'plan.paidThroughExpired': '到期于',
+
+  'audit.action.tenantBillingChanged': '修改了开票信息',
+  'billing.title': '开票信息',
+  'billing.description': '开具发票所需的信息，以及账单的寄送地址。请在首次开票前填写；这里不填也不会影响面板使用。',
+  'billing.legalName': '公司全称',
+  'billing.taxId': 'CNPJ 或 CPF',
+  'billing.taxIdHint': '仅填数字，标点会被忽略。',
+  'billing.stateRegistration': '州税登记号',
+  'billing.stateRegistrationHint': '没有就留空，或填写 ISENTO。',
+  'billing.postalCode': '邮政编码',
+  'billing.addressLine': '街道',
+  'billing.addressNumber': '门牌号',
+  'billing.addressExtra': '附加信息',
+  'billing.district': '城区',
+  'billing.city': '城市',
+  'billing.state': '州',
+  'billing.email': '账单邮箱',
+  'billing.emailHint': '发票寄往的邮箱，通常与登录邮箱不同。',
+  'billing.phone': '账单电话',
+  'billing.saved': '已保存。',
+  'billing.saveFailed': '无法保存开票信息',
+  'billing.readOnly': '只有能修改设置的人才能编辑。',
 }
 
 export default zhCN

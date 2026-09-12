@@ -1777,6 +1777,28 @@ const it: Dictionary = {
   'platform.subscription.renewalExpiredNote': 'Il periodo pagato è scaduto; il pannello è in sola lettura.',
   'platform.subscription.renewsExpired': 'Scaduto il {date}',
   'plan.paidThroughExpired': 'Scaduto il',
+
+  'audit.action.tenantBillingChanged': 'Dati di fatturazione modificati',
+  'billing.title': 'Dati di fatturazione',
+  'billing.description': 'Ciò che la fattura richiede e dove va inviato il pagamento. Compilalo prima della prima fattura; nulla qui blocca il pannello.',
+  'billing.legalName': 'Ragione sociale',
+  'billing.taxId': 'CNPJ o CPF',
+  'billing.taxIdHint': 'Solo cifre; la punteggiatura viene ignorata.',
+  'billing.stateRegistration': 'Registrazione statale',
+  'billing.stateRegistrationHint': 'Lascia vuoto, o scrivi ISENTO, se non esiste.',
+  'billing.postalCode': 'CAP',
+  'billing.addressLine': 'Via',
+  'billing.addressNumber': 'Numero',
+  'billing.addressExtra': 'Interno',
+  'billing.district': 'Quartiere',
+  'billing.city': 'Città',
+  'billing.state': 'Stato',
+  'billing.email': 'E-mail di fatturazione',
+  'billing.emailHint': 'Dove arriva la fattura. Quasi mai lo stesso indirizzo con cui accedi.',
+  'billing.phone': 'Telefono di fatturazione',
+  'billing.saved': 'Salvato.',
+  'billing.saveFailed': 'Impossibile salvare i dati di fatturazione',
+  'billing.readOnly': 'Solo chi può modificare le impostazioni può cambiarlo.',
 }
 
 export default it

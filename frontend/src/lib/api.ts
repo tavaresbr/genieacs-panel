@@ -478,11 +478,47 @@ export const publicTenantAPI = {
   current: () => apiClient.get<PublicTenant>('/tenant/public')
 }
 
+/**
+ * O cadastro fiscal do provedor: o que uma nota fiscal exige e o endereço que
+ * recebe a cobrança.
+ *
+ * Todo campo é opcional — nenhum provedor que já existe tem estes dados, e um
+ * ISP se cadastra antes de ter o contador por perto. Campo ausente não é
+ * tocado; campo presente e vazio apaga. `taxId` e `postalCode` voltam só com
+ * dígitos, porque é assim que o banco os guarda.
+ */
+export interface TenantBilling {
+  legalName: string | null
+  taxId: string | null
+  stateRegistration: string | null
+  postalCode: string | null
+  addressLine: string | null
+  addressNumber: string | null
+  addressExtra: string | null
+  district: string | null
+  city: string | null
+  state: string | null
+  email: string | null
+  phone: string | null
+}
+
 /** What the provider does to itself. */
 export const tenantAPI = {
   /** The name on the sidebar, the login screen and the tab — what `settings.appName` used to be. */
   rename: (name: string) =>
-    apiClient.requestWithBody<{ name: string; slug: string }>('PATCH', '/tenant', { name }),
+    apiClient.requestWithBody<{ name: string; slug: string; billing: TenantBilling }>(
+      'PATCH', '/tenant', { name }
+    ),
+
+  /**
+   * Grava o cadastro fiscal. Manda só o que mudou: a rota distingue campo
+   * ausente (não mexe) de campo vazio (apaga), e mandar o formulário inteiro a
+   * cada salvamento jogaria fora essa diferença.
+   */
+  updateBilling: (billing: Partial<TenantBilling>) =>
+    apiClient.requestWithBody<{ name: string; slug: string; billing: TenantBilling }>(
+      'PATCH', '/tenant', { billing }
+    ),
 
   /**
    * Todo o cadastro deste provedor, num arquivo.
@@ -672,6 +708,8 @@ export interface SubscriptionView {
 
 export interface SubscriptionUsage {
   subscription: SubscriptionView | null
+  /** O cadastro fiscal viaja com o plano porque é a mesma tela. */
+  billing: TenantBilling | null
   usage: { operators: number; subscribers: number; devices: number | null }
   limits: PlanLimits
   over: { operators: boolean; subscribers: boolean; devices: boolean }

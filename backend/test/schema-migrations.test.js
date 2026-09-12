@@ -9,6 +9,7 @@ import { getDb, insertReturningId, startTestServers, stopTestServers } from './h
 const { ensureSchema, MIGRATIONS_TABLE } = await import('../src/config/schema.js');
 const { migrations, SCHEMA_TABLES } = await import('../src/config/migrations.js');
 const { buildKnexConfig } = await import('../src/config/dbConfig.js');
+const { default: Tenant } = await import('../src/models/Tenant.js');
 
 /** Every table the application expects once the runner is done. */
 const APP_TABLES = [
@@ -677,6 +678,78 @@ describe('giving every provider a subscription', () => {
     assert.equal(Number(n), 2);
     const [{ p }] = await db('plans').where({ code: 'unlimited' }).count({ p: '*' });
     assert.equal(Number(p), 1);
+  });
+});
+
+describe('o cadastro fiscal chegando a uma base que já tem provedores', () => {
+  const db = createDatabase('billing-profile');
+  const FISCAL_MIGRATION = '0042_tenant_billing_profile';
+  let alfa;
+  let beta;
+
+  /**
+   * O caminho de upgrade da 0042 — e o que ele tem que garantir é que NADA
+   * mude para quem já está lá. As doze colunas nascem nulas, ninguém é
+   * obrigado a preencher nada para continuar entrando no painel, e os dois
+   * provedores que já existiam continuam com nome, slug e situação intactos.
+   *
+   * O risco real desta migração não é o schema: é o passo ser pulado em
+   * silêncio. O runner compara ids (`schema.js:67`), então um id repetido num
+   * banco que já rodou o homônimo seria marcado como aplicado sem rodar, e o
+   * painel subiria contra um schema sem as colunas. É por isso que o id é
+   * `0042` e não `0040`, que já está tomado pelo webhook do WhatsApp.
+   */
+  before(async () => {
+    for (const migration of migrations.filter((m) => m.id < FISCAL_MIGRATION)) {
+      await migration.up(db);
+    }
+    alfa = (await db('tenants').orderBy('id', 'asc').first()).id;
+    beta = await insertReturningId(
+      'tenants', { slug: 'beta', name: 'Provedor Beta', status: 'active' }, db
+    );
+    await ensureSchema(db);
+  });
+
+  it('acrescenta as doze colunas', async () => {
+    for (const coluna of Tenant.BILLING_COLUMNS) {
+      assert.equal(await db.schema.hasColumn('tenants', coluna), true, `falta ${coluna}`);
+    }
+  });
+
+  it('e todas nascem nulas para quem já existia', async () => {
+    for (const tenantId of [alfa, beta]) {
+      const row = await db('tenants').where({ id: tenantId }).first();
+      for (const coluna of Tenant.BILLING_COLUMNS) {
+        assert.equal(row[coluna] ?? null, null, `${coluna} do provedor ${tenantId} nasceu preenchida`);
+      }
+    }
+  });
+
+  it('sem tocar em nada do que já estava escrito', async () => {
+    const row = await db('tenants').where({ id: beta }).first();
+    assert.equal(row.slug, 'beta');
+    assert.equal(row.name, 'Provedor Beta');
+    assert.equal(row.status, 'active');
+  });
+
+  it('e pode ser pedida de novo sem estourar', async () => {
+    // O passo e a linha do ledger são duas escritas; um processo que morre
+    // entre as duas volta a um passo que já rodou. Pedido direto, do jeito que
+    // o boot pediria.
+    const step = migrations.find((m) => m.id === FISCAL_MIGRATION);
+    await step.up(db);
+    await ensureSchema(db);
+    assert.equal(await db.schema.hasColumn('tenants', 'billing_tax_id'), true);
+  });
+
+  /**
+   * A armadilha que quase aconteceu: `0040` já estava tomado. Um id repetido
+   * não dá erro — o runner pula o passo e grava que aplicou.
+   */
+  it('e nenhum id do ledger se repete', () => {
+    const ids = migrations.map((m) => m.id);
+    assert.equal(new Set(ids).size, ids.length);
+    assert.deepEqual([...ids].sort(), ids, 'os ids têm que estar em ordem crescente');
   });
 });
 

@@ -641,4 +641,8 @@ export default {
   'platformAdmin.revoked': '已撤销控制平面权限',
   'platformAdmin.revokeFailed': '撤销控制平面权限失败',
 
+  'tenant.billingInvalid': '开票信息无效',
+  'tenant.billingTaxIdInvalid': '该号码不是有效的 CNPJ 或 CPF',
+  'tenant.billingPostalCodeInvalid': '邮政编码必须为八位数字',
+  'tenant.billingEmailInvalid': '账单邮箱地址无效',
 };

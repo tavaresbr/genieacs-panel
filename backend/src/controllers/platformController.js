@@ -56,6 +56,11 @@ function present(tenant, operators, subscription = null) {
     slug: tenant.slug,
     name: tenant.name,
     status: tenant.status,
+    // O console vê o cadastro fiscal porque é quem fatura. Quem o EDITA é o
+    // próprio provedor, pela tela de plano — o console não tem formulário para
+    // isso, de propósito: um dado que o cliente mantém é um dado que ele
+    // corrige sozinho quando muda de endereço.
+    billing: Tenant.presentBilling(tenant),
     operators,
     subscription: subscription ? {
       status: SubscriptionService.effectiveStatus(subscription).status,

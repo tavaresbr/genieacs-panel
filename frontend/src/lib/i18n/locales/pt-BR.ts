@@ -1771,6 +1771,28 @@ const ptBR: Dictionary = {
   'platform.subscription.renewalExpiredNote': 'O período pago venceu; o painel está só para leitura.',
   'platform.subscription.renewsExpired': 'Venceu em {date}',
   'plan.paidThroughExpired': 'Venceu em',
+
+  'audit.action.tenantBillingChanged': 'Dados de faturamento alterados',
+  'billing.title': 'Dados de faturamento',
+  'billing.description': 'O que a nota fiscal exige, e para onde vai a cobrança. Preencha antes da primeira fatura; nada aqui bloqueia o painel.',
+  'billing.legalName': 'Razão social',
+  'billing.taxId': 'CNPJ ou CPF',
+  'billing.taxIdHint': 'Só os números; a pontuação é ignorada.',
+  'billing.stateRegistration': 'Inscrição estadual',
+  'billing.stateRegistrationHint': 'Deixe em branco, ou escreva ISENTO, se não houver.',
+  'billing.postalCode': 'CEP',
+  'billing.addressLine': 'Logradouro',
+  'billing.addressNumber': 'Número',
+  'billing.addressExtra': 'Complemento',
+  'billing.district': 'Bairro',
+  'billing.city': 'Cidade',
+  'billing.state': 'UF',
+  'billing.email': 'E-mail de cobrança',
+  'billing.emailHint': 'Para onde vai a fatura. Quase nunca é o mesmo endereço com que você entra.',
+  'billing.phone': 'Telefone de cobrança',
+  'billing.saved': 'Salvo.',
+  'billing.saveFailed': 'Não foi possível salvar os dados de faturamento',
+  'billing.readOnly': 'Só quem pode alterar as configurações edita isto.',
 }
 
 export default ptBR

@@ -641,4 +641,8 @@ export default {
   'platformAdmin.revoked': 'Control plane revoked',
   'platformAdmin.revokeFailed': 'Failed to revoke the control plane',
 
+  'tenant.billingInvalid': 'The billing details are invalid',
+  'tenant.billingTaxIdInvalid': 'The tax number is not a valid CNPJ or CPF',
+  'tenant.billingPostalCodeInvalid': 'The postal code must have eight digits',
+  'tenant.billingEmailInvalid': 'The billing e-mail address is invalid',
 };

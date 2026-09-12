@@ -1,11 +1,77 @@
 import Tenant from '../models/Tenant.js';
-import { createResponse, createErrorResponse } from '../utils/helpers.js';
+import { createResponse, createErrorResponse, isValidEmail } from '../utils/helpers.js';
 import TenantExportService from '../services/tenantExportService.js';
 import AuditLog from '../models/AuditLog.js';
 import SubscriptionService from '../services/subscriptionService.js';
 import DeviceService from '../services/deviceService.js';
 import { EDITION } from '../config/edition.js';
 import { panelBaseDomain } from '../middleware/tenantResolver.js';
+import { normalizeTaxId, isValidTaxId } from '../utils/taxId.js';
+
+/**
+ * O cadastro fiscal vindo do corpo, normalizado — ou o motivo de recusa.
+ *
+ * Recebe camelCase da tela e devolve as colunas do banco. Campo ausente não é
+ * tocado; campo presente e vazio vira nulo, que é como se apaga o que foi
+ * preenchido por engano. Essa diferença é o contrato inteiro desta função, e é
+ * por isso que ela não monta um objeto completo com defaults.
+ *
+ * O CNPJ (ou CPF, do MEI) é o único campo conferido além do tamanho, e é por
+ * onde a nota fiscal falha: um dígito trocado só aparece no dia da emissão,
+ * quando quem conserta já é o financeiro e não quem digitou.
+ */
+const CAMPOS_FATURAMENTO = [
+  ['legalName', 'billing_legal_name', 160],
+  ['taxId', 'billing_tax_id', 20],
+  ['stateRegistration', 'billing_state_registration', 32],
+  ['postalCode', 'billing_postal_code', 8],
+  ['addressLine', 'billing_address_line', 160],
+  ['addressNumber', 'billing_address_number', 16],
+  ['addressExtra', 'billing_address_extra', 80],
+  ['district', 'billing_district', 80],
+  ['city', 'billing_city', 80],
+  ['state', 'billing_state', 2],
+  ['email', 'billing_email', 160],
+  ['phone', 'billing_phone', 32]
+];
+
+function billingPatch(entrada) {
+  if (typeof entrada !== 'object' || Array.isArray(entrada)) {
+    return { error: 'tenant.billingInvalid' };
+  }
+  const patch = {};
+  for (const [chave, coluna, limite] of CAMPOS_FATURAMENTO) {
+    if (!(chave in entrada)) continue;
+    const bruto = entrada[chave];
+    if (bruto === null || bruto === undefined || String(bruto).trim() === '') {
+      patch[coluna] = null;
+      continue;
+    }
+    let valor = String(bruto).trim();
+
+    // Os três que o banco guarda sem enfeite, porque é assim que se comparam.
+    if (coluna === 'billing_tax_id' || coluna === 'billing_postal_code') {
+      valor = normalizeTaxId(valor);
+    }
+    if (coluna === 'billing_state') valor = valor.toUpperCase();
+
+    if (valor.length > limite) return { error: 'tenant.billingInvalid' };
+    if (coluna === 'billing_tax_id' && !isValidTaxId(valor)) {
+      return { error: 'tenant.billingTaxIdInvalid' };
+    }
+    if (coluna === 'billing_postal_code' && valor.length !== 8) {
+      return { error: 'tenant.billingPostalCodeInvalid' };
+    }
+    if (coluna === 'billing_state' && !/^[A-Z]{2}$/.test(valor)) {
+      return { error: 'tenant.billingInvalid' };
+    }
+    if (coluna === 'billing_email' && !isValidEmail(valor)) {
+      return { error: 'tenant.billingEmailInvalid' };
+    }
+    patch[coluna] = valor;
+  }
+  return { patch };
+}
 
 /**
  * What a provider will admit to before anybody has signed in.
@@ -30,22 +96,61 @@ class TenantController {
    */
   static async rename(req, res) {
     try {
-      const name = String(req.body?.name ?? '').trim();
-      if (name.length < 1 || name.length > NAME_MAX_LENGTH) {
+      const temNome = req.body?.name !== undefined;
+      const temFaturamento = req.body?.billing !== undefined && req.body.billing !== null;
+      if (!temNome && !temFaturamento) {
         return res.status(400).json(createErrorResponse(req.t('tenant.nameInvalid')));
       }
+
+      const name = String(req.body?.name ?? '').trim();
+      if (temNome && (name.length < 1 || name.length > NAME_MAX_LENGTH)) {
+        return res.status(400).json(createErrorResponse(req.t('tenant.nameInvalid')));
+      }
+
+      let faturamento = null;
+      if (temFaturamento) {
+        const analise = billingPatch(req.body.billing);
+        if (analise.error) {
+          return res.status(400).json(createErrorResponse(req.t(analise.error)));
+        }
+        faturamento = analise.patch;
+      }
+
       const before = await Tenant.findById(req.tenantId);
       if (!before) {
         return res.status(404).json(createErrorResponse(req.t('common.notFound')));
       }
-      await Tenant.rename(req.tenantId, name);
-      await AuditLog.fromRequest(req, {
-        action: AuditLog.ACTIONS.TENANT_RENAMED,
-        subjectType: 'tenant',
-        subjectId: req.tenantId,
-        detail: { from: before.name, to: name }
-      });
-      return res.json(createResponse(req.t('tenant.renamed'), { name, slug: before.slug }));
+
+      if (temNome) {
+        await Tenant.rename(req.tenantId, name);
+        await AuditLog.fromRequest(req, {
+          action: AuditLog.ACTIONS.TENANT_RENAMED,
+          subjectType: 'tenant',
+          subjectId: req.tenantId,
+          detail: { from: before.name, to: name }
+        });
+      }
+
+      if (faturamento && Object.keys(faturamento).length) {
+        await Tenant.updateBilling(req.tenantId, faturamento);
+        // Os campos, nunca os valores. A trilha existe para responder "quem
+        // mexeu no meu cadastro fiscal", e para isso o nome do campo basta —
+        // repetir o CNPJ e o endereço em cada linha faria da trilha uma
+        // segunda cópia do cadastro, com retenção maior que a dele.
+        await AuditLog.fromRequest(req, {
+          action: AuditLog.ACTIONS.TENANT_BILLING_CHANGED,
+          subjectType: 'tenant',
+          subjectId: req.tenantId,
+          detail: { fields: Object.keys(faturamento).sort() }
+        });
+      }
+
+      const depois = await Tenant.findById(req.tenantId);
+      return res.json(createResponse(req.t('tenant.renamed'), {
+        name: depois?.name ?? before.name,
+        slug: before.slug,
+        billing: Tenant.presentBilling(depois)
+      }));
     } catch (error) {
       console.error('Rename tenant error:', error);
       return res.status(500).json(createErrorResponse(req.t('tenant.renameFailed'), error.message));
@@ -65,7 +170,15 @@ class TenantController {
       const usage = await SubscriptionService.usage({
         countDevices: () => DeviceService.countDevicesFromGenieAcs()
       });
-      return res.json(createResponse(req.t('subscription.retrieved'), usage));
+      // O cadastro fiscal viaja aqui e não numa rota própria porque é a mesma
+      // tela: "plano e uso" é onde o provedor olha a parte comercial dele, e
+      // uma porta a mais no inventário custa mais do que quatro campos a mais
+      // num corpo que esta tela já busca.
+      const provedor = await Tenant.findById(req.tenantId);
+      return res.json(createResponse(req.t('subscription.retrieved'), {
+        ...usage,
+        billing: Tenant.presentBilling(provedor)
+      }));
     } catch (error) {
       console.error('Get subscription error:', error);
       return res.status(500).json(
