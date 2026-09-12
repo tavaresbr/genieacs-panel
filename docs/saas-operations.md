@@ -54,9 +54,17 @@ O proxy termina TLS (certificado curinga para cada base) e encaminha **preservan
 `Host` que diz ao painel qual provedor está falando; um proxy que o reescreve entrega
 todo mundo no mesmo lugar, e o resolvedor responde 404 para todos.
 
-O apex `painel.exemplo.com` (e `www.`) é a **porta de entrada da plataforma**: só
-responde `GET /api/tenant/public` e `POST /api/auth/signup`, e a tela ali é o cadastro.
-Nada de nenhum provedor é servido nesse host. O apex do portal não serve nada.
+`deploy/proxy/nginx-saas.conf.example` é esse proxy pronto para nginx — os quatro
+blocos, o `default_server` que recusa host desconhecido, e as armadilhas anotadas onde
+elas mordem (o curinga não cobre o apex; `http2 on;` não existe antes do nginx 1.25.1;
+as linhas `listen [::]` exigem IPv6).
+
+O apex `painel.exemplo.com` (e `www.`) é a **porta de entrada da plataforma** e o
+endereço do **console**: ali respondem o cadastro (`GET /api/tenant/public`,
+`POST /api/auth/signup`), `/api/platform/*` e as rotas de sessão que o console usa.
+Nada de nenhum provedor é servido nesse host — e o inverso também vale, desde que há
+subdomínios: `/api/platform/*` é 404 no host de um provedor, por construção. O apex do
+portal não serve nada.
 
 ### Compose
 
@@ -95,6 +103,86 @@ INSERT INTO platform_admins (user_id) SELECT id FROM users WHERE username = 'que
 ```
 
 Depois disso o console se administra sozinho.
+
+### Ligar os subdomínios num deploy que já está no ar
+
+A seção acima descreve um deploy novo. Um que **já serve um host só** — o painel
+respondendo em `painel.exemplo.com` sem subdomínio nenhum — chega aqui por outro
+caminho, e três coisas mudam debaixo dele ao mesmo tempo. Vale ler antes de mexer.
+
+**O que a mudança faz, e ninguém avisa depois:**
+
+1. **Ligar uma das duas variáveis liga a resolução por host para TUDO**, inclusive o
+   portal do assinante na 5891 (`usesTenantSubdomains`). Sem `PORTAL_BASE_DOMAIN` e sem
+   o DNS dele, **o portal sai do ar**. Os dois entram na mesma janela, ou nenhum.
+2. **O apex e os painéis se separam.** O console CONTINUA no apex — é lá que ele passa
+   a morar exclusivamente —, mas o apex deixa de servir o painel do provedor que dividia
+   aquele endereço com ele. Quem opera a plataforma e também trabalha num ISP passa a
+   usar dois endereços: `painel.exemplo.com/platform` para o console e
+   `<slug>.painel.exemplo.com` para o painel daquele provedor. `/api/platform/*` vira
+   404 no host de provedor, e os dados de provedor viram 404 no apex.
+3. **A sessão passa a valer só no host onde nasceu.** Um token cunhado em
+   `alfa.painel…` apresentado em `beta.painel…` é 403 `tenant_mismatch`. É o
+   comportamento desejado, e é novo para quem vinha de um host só: cada aba aberta antes
+   da mudança entra de novo no endereço que passou a ser o dela.
+
+**A ordem:**
+
+```bash
+# 1. DNS — quatro registros, dois curinga. Confira a propagação antes de seguir:
+#    dig +short qualquer-coisa.painel.exemplo.com
+#
+#    painel.exemplo.com      A     → IP do proxy
+#    *.painel.exemplo.com    CNAME → painel.exemplo.com
+#    portal.exemplo.com      A     → IP do proxy
+#    *.portal.exemplo.com    CNAME → painel.exemplo.com
+
+# 2. Certificados. Curinga só sai por desafio DNS, e o apex tem que estar no MESMO
+#    certificado: `*.painel.exemplo.com` não casa com `painel.exemplo.com`.
+certbot certonly --dns-<provedor> --dns-<provedor>-credentials /etc/letsencrypt/dns.ini \
+  -d painel.exemplo.com -d '*.painel.exemplo.com' -d www.painel.exemplo.com
+certbot certonly --dns-<provedor> --dns-<provedor>-credentials /etc/letsencrypt/dns.ini \
+  -d portal.exemplo.com -d '*.portal.exemplo.com'
+certbot renew --dry-run
+
+# 3. Proxy.
+sed -e 's/painel\.exemplo\.com/painel.SEUDOMINIO/g' \
+    -e 's/portal\.exemplo\.com/portal.SEUDOMINIO/g' \
+    deploy/proxy/nginx-saas.conf.example | sudo tee /etc/nginx/sites-available/skygenpanel.conf
+sudo ln -sf /etc/nginx/sites-available/skygenpanel.conf /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+
+# 4. Variáveis, e reiniciar: o resolvedor lê o domínio-base no IMPORT, então editar
+#    o .env sem reiniciar não muda nada.
+#      TENANT_BASE_DOMAIN=painel.exemplo.com
+#      PORTAL_BASE_DOMAIN=portal.exemplo.com
+#      CORS_ORIGINS=https://painel.exemplo.com   # só o apex: origem do mesmo host já passa
+#      TRUST_PROXY=1
+```
+
+**Conferir**, nesta ordem — a primeira que falhar diz qual passo ficou pela metade:
+
+```bash
+curl -s  https://painel.exemplo.com/api/tenant/public           # {"slug":null,…} = porta de entrada
+curl -s  https://alfa.painel.exemplo.com/api/tenant/public      # {"slug":"alfa",…}
+curl -s  https://naoexiste.painel.exemplo.com/api/tenant/public # 404, e não o painel de alguém
+curl -sI https://alfa.portal.exemplo.com/ | head -1             # o portal de pé
+curl -s  https://painel.exemplo.com/api/health                  # responde em qualquer host
+
+# e o recorte do console, que é o que mais surpreende quem migra:
+curl -so /dev/null -w '%{http_code}\n' https://painel.exemplo.com/api/platform/tenants       # 401: existe, pede sessão
+curl -so /dev/null -w '%{http_code}\n' https://alfa.painel.exemplo.com/api/platform/tenants  # 404: não existe ali
+curl -so /dev/null -w '%{http_code}\n' https://painel.exemplo.com/api/devices                # 404: o apex não serve provedor
+```
+
+A prova de que o endereço passou a existir de verdade: no console, **Equipe** de um
+provedor → **Criar convite**. O link tem que sair como
+`https://<slug>.painel.exemplo.com/invite#…`; enquanto sair só o token, o painel ainda
+não enxerga o domínio-base (variável não aplicada, ou processo não reiniciado).
+
+**Voltar atrás** é tirar `TENANT_BASE_DOMAIN` e `PORTAL_BASE_DOMAIN` e reiniciar: o
+apex volta a servir o painel do primeiro provedor, como antes. Nenhum dado muda de
+lugar em nenhuma das duas direções — o que muda é só por qual nome cada um atende.
 
 ## 2. Ver: logs
 
