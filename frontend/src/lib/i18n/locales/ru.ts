@@ -105,6 +105,9 @@ const ru: Dictionary = {
   'login.kicker': 'Доступ оператора',
   'login.title': 'Вход в панель',
   'login.subtitle': 'Используйте учётную запись администратора SkyGenPanel для доступа к данным устройств.',
+  'login.platform.kicker': 'Доступ платформы',
+  'login.platform.title': 'Войти в консоль',
+  'login.platform.subtitle': 'Используйте учётную запись с ключом консоли. Этот адрес не является панелью ни одного провайдера.',
   'login.identifier': 'Имя пользователя или эл. почта',
   'login.identifierPlaceholder': 'admin или you@yourisp.com',
   'login.identifierHint': 'Подходит и то и другое — привычное имя пользователя по-прежнему работает.',
@@ -115,6 +118,8 @@ const ru: Dictionary = {
   'login.submit': 'Войти',
   'login.submitting': 'Проверка учётной записи…',
   'login.helpText': 'Если в доступе отказано, обратитесь к администратору панели для сброса учётных данных.',
+  'login.platform.helpText': 'Пароль учётной записи платформы сбрасывается на сервере, с помощью scripts/reset-password.js.',
+  'console.header': 'Платформа',
   'login.error.invalidCredentials': 'Имя пользователя или адрес эл. почты и пароль не совпадают. Проверьте учётные данные.',
   'login.error.unreachable': 'Панель не смогла связаться с сервером. Проверьте соединение и повторите попытку.',
 

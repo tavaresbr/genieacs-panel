@@ -9,7 +9,17 @@ import { LanguageSwitcher } from '@/components/language-switcher'
 import { useTranslation } from '@/contexts/language-context'
 import { useTenant } from '@/contexts/tenant-context'
 
-export default function Login() {
+/**
+ * A mesma tela serve as duas portas, e a variante é o que muda entre elas.
+ *
+ * Tela única e não duas porque o formulário é o mesmo — identificador, senha,
+ * erro, idioma — e duplicá-lo faria as duas divergirem na primeira correção que
+ * alguém aplicasse só numa. O que a variante `platform` muda é o que o endereço
+ * da plataforma não tem: o desvio de "esqueci a senha", cuja rota não é servida
+ * ali, e o texto, que fala do console e não do painel de um provedor.
+ */
+export default function Login({ variant = 'provider' }: { variant?: 'provider' | 'platform' }) {
+  const doConsole = variant === 'platform'
   // `identifier` e não `username`: o campo aceita os dois, e chamar o estado
   // de nome de usuário faria a próxima pessoa a ler achar que só o nome passa.
   const [formData, setFormData] = useState({ identifier: '', password: '' })
@@ -27,7 +37,7 @@ export default function Login() {
     setError('')
     try {
       const ok = await login(formData.identifier, formData.password)
-      if (ok) navigate('/dashboard')
+      if (ok) navigate(doConsole ? '/platform' : '/dashboard')
       else setError(t('login.error.invalidCredentials'))
     } catch {
       setError(t('login.error.unreachable'))
@@ -75,10 +85,10 @@ export default function Login() {
 
           <div className="auth-panel">
             <div className="mb-7">
-              <p className="page-kicker">{t('login.kicker')}</p>
-              <h1 className="text-2xl font-bold text-foreground">{t('login.title')}</h1>
+              <p className="page-kicker">{t(doConsole ? 'login.platform.kicker' : 'login.kicker')}</p>
+              <h1 className="text-2xl font-bold text-foreground">{t(doConsole ? 'login.platform.title' : 'login.title')}</h1>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                {t('login.subtitle')}
+                {t(doConsole ? 'login.platform.subtitle' : 'login.subtitle')}
               </p>
             </div>
 
@@ -120,9 +130,15 @@ export default function Login() {
                   {/* Ao lado do campo, que é onde a pessoa está quando descobre
                       que não lembra. A tela do outro lado responde a mesma
                       coisa para todo mundo — ver `forgot-password.tsx`. */}
-                  <Link to="/forgot-password" className="text-xs text-muted-foreground underline hover:text-foreground">
-                    {t('login.forgotPassword')}
-                  </Link>
+                  {/* No endereço da plataforma esta rota não é servida — a
+                      redefinição por e-mail grava na trilha de um provedor, e
+                      ali não há um. Para uma conta de plataforma o caminho é
+                      `scripts/reset-password.js`, que roda sem escopo. */}
+                  {!doConsole && (
+                    <Link to="/forgot-password" className="text-xs text-muted-foreground underline hover:text-foreground">
+                      {t('login.forgotPassword')}
+                    </Link>
+                  )}
                 </div>
                 <div className="relative">
                   <input
@@ -160,11 +176,18 @@ export default function Login() {
             </form>
           </div>
           <p className="mt-5 text-center text-xs leading-5 text-muted-foreground">
-            {t('login.helpText')}
+            {t(doConsole ? 'login.platform.helpText' : 'login.helpText')}
           </p>
           {/* Sign-up lives at the platform's front door, not at this provider's
               address: a new ISP is nobody's customer yet. */}
-          {tenant?.edition === 'saas' && tenant.panelBaseDomain && (
+          {doConsole ? (
+            // Aqui o cadastro é uma rota desta mesma casca: o ápice é a porta
+            // de entrada das duas pessoas sem conta — o ISP que ainda não
+            // existe e quem opera a plataforma.
+            <p className="mt-3 text-center text-sm">
+              <Link to="/signup" className="underline">{t('login.signupLink')}</Link>
+            </p>
+          ) : tenant?.edition === 'saas' && tenant.panelBaseDomain && (
             <p className="mt-3 text-center text-sm">
               <a href={`https://${tenant.panelBaseDomain}/signup`} className="underline">{t('login.signupLink')}</a>
             </p>
