@@ -9,7 +9,7 @@ import { testConnection } from './config/database.js';
 import { IS_SAAS, IS_SELF_HOSTED } from './config/edition.js';
 import { TRUST_PROXY } from './config/proxy.js';
 import { attachLocale } from './middleware/locale.js';
-import { resolveTenant } from './middleware/tenantResolver.js';
+import { platformHostOnly, resolveTenant } from './middleware/tenantResolver.js';
 import { DEFAULT_LOCALE, translate, translateError } from './i18n/index.js';
 import {
   apiLimiter,
@@ -294,6 +294,10 @@ if (IS_SELF_HOSTED) {
 // merely refuse — they must not EXIST. A 403 would answer the question the
 // prober was asking, which is whether a control plane is there to find.
 if (IS_SAAS) {
+  // E só no endereço da própria plataforma, onde há um: ver `platformHostOnly`.
+  // Acima dos quatro roteadores, para que no host de um provedor estas rotas
+  // não existam em vez de recusarem.
+  app.use('/api/platform', platformHostOnly);
   // Two routers on one prefix, split by what they administer: the registry of
   // providers, and the people inside one. Both are gated by the same guard;
   // the split is only so two lanes could build them without sharing a file.

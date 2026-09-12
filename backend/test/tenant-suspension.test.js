@@ -69,12 +69,15 @@ const OWNER = { username: 'dona-da-plataforma', password: 'senha-da-plataforma-1
 let panelUrl;
 let portalUrl;
 let ownerToken;
+let consoleToken;
 let betaId;
 
+// O console responde no endereço da PLATAFORMA — o ápice —, e com a sessão de
+// lá: a do setup nomeia o provedor alfa, e o console não é servido no host dele.
 const platform = (path, options = {}) => callAs(
-  'alfa.painel.exemplo.com',
+  'painel.exemplo.com',
   `${panelUrl}/api/platform${path}`,
-  { ...options, headers: { Authorization: `Bearer ${ownerToken}`, ...(options.headers || {}) } }
+  { ...options, headers: { Authorization: `Bearer ${consoleToken}`, ...(options.headers || {}) } }
 );
 
 const setStatus = (id, status) => platform(`/tenants/${id}`, { method: 'PATCH', body: { status } });
@@ -92,6 +95,11 @@ before(async () => {
   });
   assert.equal(setup.status, 201, 'não deu para criar o primeiro administrador');
   ownerToken = setup.body.data.token;
+  const consoleEntrada = await callAs('painel.exemplo.com', `${panelUrl}/api/auth/login`, {
+    method: 'POST', body: { username: OWNER.username, password: OWNER.password }
+  });
+  assert.equal(consoleEntrada.status, 200, JSON.stringify(consoleEntrada.body));
+  consoleToken = consoleEntrada.body.data.token;
 
   // Escrito direto na tabela: `platform_admins` nasce vazia e a rota que
   // concede o papel é de outra faixa. O que está sob teste é o que o console
