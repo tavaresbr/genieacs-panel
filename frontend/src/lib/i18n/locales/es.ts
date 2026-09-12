@@ -1772,6 +1772,7 @@ const es: Dictionary = {
   'audit.action.passwordResetRequested': 'Restablecimiento de contraseña solicitado',
   'audit.action.passwordResetCompleted': 'Restablecimiento de contraseña completado',
   'audit.action.platformImpersonated': 'La plataforma abrió una sesión de solo lectura',
+  'audit.action.subscriberAccountRetired': 'Cuenta de abonado retirada',
   'settings.export.title': 'Tus datos',
   'settings.export.description': 'Descarga todo lo que este proveedor tiene registrado — abonados, equipos, conversaciones y ajustes — en un único archivo JSON.',
   'settings.export.action': 'Descargar mis datos',

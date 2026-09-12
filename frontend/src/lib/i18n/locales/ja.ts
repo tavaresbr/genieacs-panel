@@ -1772,6 +1772,7 @@ const ja: Dictionary = {
   'audit.action.passwordResetRequested': 'パスワード再設定をリクエスト',
   'audit.action.passwordResetCompleted': 'パスワード再設定が完了',
   'audit.action.platformImpersonated': 'プラットフォームが閲覧専用セッションを開始',
+  'audit.action.subscriberAccountRetired': '加入者アカウントを無効化',
   'settings.export.title': 'あなたのデータ',
   'settings.export.description': 'このプロバイダーに登録されているすべて（加入者、機器、会話、設定）を 1 つの JSON ファイルでダウンロードします。',
   'settings.export.action': 'データをダウンロード',

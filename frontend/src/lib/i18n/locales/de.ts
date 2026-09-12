@@ -1776,6 +1776,7 @@ const de: Dictionary = {
   'audit.action.passwordResetRequested': 'Passwortzurücksetzung angefordert',
   'audit.action.passwordResetCompleted': 'Passwortzurücksetzung abgeschlossen',
   'audit.action.platformImpersonated': 'Die Plattform hat eine Lesesitzung geöffnet',
+  'audit.action.subscriberAccountRetired': 'Teilnehmerkonto stillgelegt',
   'settings.export.title': 'Ihre Daten',
   'settings.export.description': 'Laden Sie alles herunter, was dieser Anbieter gespeichert hat — Teilnehmer, Geräte, Unterhaltungen und Einstellungen — in einer einzigen JSON-Datei.',
   'settings.export.action': 'Meine Daten herunterladen',

@@ -1780,6 +1780,7 @@ const hi: Dictionary = {
   'audit.action.passwordResetRequested': 'पासवर्ड रीसेट का अनुरोध किया गया',
   'audit.action.passwordResetCompleted': 'पासवर्ड रीसेट पूरा हुआ',
   'audit.action.platformImpersonated': 'प्लेटफ़ॉर्म ने केवल-पढ़ने का सत्र खोला',
+  'audit.action.subscriberAccountRetired': 'ग्राहक खाता निष्क्रिय किया गया',
   'settings.export.title': 'आपका डेटा',
   'settings.export.description': 'इस प्रदाता के पास दर्ज सब कुछ — ग्राहक, उपकरण, बातचीत और सेटिंग्स — एक ही JSON फ़ाइल में डाउनलोड करें।',
   'settings.export.action': 'मेरा डेटा डाउनलोड करें',

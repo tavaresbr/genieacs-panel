@@ -1772,6 +1772,7 @@ const zhCN: Dictionary = {
   'audit.action.passwordResetRequested': '请求了重置密码',
   'audit.action.passwordResetCompleted': '完成了重置密码',
   'audit.action.platformImpersonated': '平台开启了只读会话',
+  'audit.action.subscriberAccountRetired': '已停用订户账户',
   'settings.export.title': '你的数据',
   'settings.export.description': '将该服务商登记的全部内容——用户、设备、会话和设置——下载为一个 JSON 文件。',
   'settings.export.action': '下载我的数据',

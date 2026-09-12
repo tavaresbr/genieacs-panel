@@ -43,7 +43,8 @@ export const AUDIT_ACTION_LABEL_KEYS: Record<string, TranslationKey> = {
   'login_email.verified': 'audit.action.loginEmailVerified',
   'password_reset.requested': 'audit.action.passwordResetRequested',
   'password_reset.completed': 'audit.action.passwordResetCompleted',
-  'platform.impersonated': 'audit.action.platformImpersonated'
+  'platform.impersonated': 'audit.action.platformImpersonated',
+  'subscriber_account.retired': 'audit.action.subscriberAccountRetired'
 }
 
 /** A chave da frase, ou `null` para a ação que este frontend não conhece. */

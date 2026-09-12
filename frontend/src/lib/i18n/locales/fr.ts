@@ -1772,6 +1772,7 @@ const fr: Dictionary = {
   'audit.action.passwordResetRequested': 'Réinitialisation du mot de passe demandée',
   'audit.action.passwordResetCompleted': 'Réinitialisation du mot de passe terminée',
   'audit.action.platformImpersonated': 'La plateforme a ouvert une session en lecture seule',
+  'audit.action.subscriberAccountRetired': 'Compte d’abonné retiré',
   'settings.export.title': 'Vos données',
   'settings.export.description': 'Téléchargez tout ce que ce fournisseur a enregistré — abonnés, équipements, conversations et réglages — dans un seul fichier JSON.',
   'settings.export.action': 'Télécharger mes données',

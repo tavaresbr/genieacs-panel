@@ -1780,6 +1780,7 @@ const ru: Dictionary = {
   'audit.action.passwordResetRequested': 'Запрошен сброс пароля',
   'audit.action.passwordResetCompleted': 'Сброс пароля завершён',
   'audit.action.platformImpersonated': 'Платформа открыла сеанс только для чтения',
+  'audit.action.subscriberAccountRetired': 'Учётная запись абонента выведена из обращения',
   'settings.export.title': 'Ваши данные',
   'settings.export.description': 'Скачайте всё, что зарегистрировано у этого провайдера, — абонентов, устройства, переписку и настройки — одним файлом JSON.',
   'settings.export.action': 'Скачать мои данные',

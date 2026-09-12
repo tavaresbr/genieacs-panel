@@ -1781,6 +1781,7 @@ const ar: Dictionary = {
   'audit.action.passwordResetRequested': 'تم طلب إعادة تعيين كلمة المرور',
   'audit.action.passwordResetCompleted': 'اكتملت إعادة تعيين كلمة المرور',
   'audit.action.platformImpersonated': 'فتحت المنصة جلسة للقراءة فقط',
+  'audit.action.subscriberAccountRetired': 'تم سحب حساب المشترك',
   'settings.export.title': 'بياناتك',
   'settings.export.description': 'نزّل كل ما هو مسجل لدى هذا المزود — المشتركين والأجهزة والمحادثات والإعدادات — في ملف JSON واحد.',
   'settings.export.action': 'تنزيل بياناتي',

@@ -1772,6 +1772,7 @@ const ptBR: Dictionary = {
   'audit.action.passwordResetRequested': 'Redefinição de senha solicitada',
   'audit.action.passwordResetCompleted': 'Redefinição de senha concluída',
   'audit.action.platformImpersonated': 'Plataforma abriu uma sessão de leitura',
+  'audit.action.subscriberAccountRetired': 'Conta de assinante aposentada',
   'settings.export.title': 'Seus dados',
   'settings.export.description': 'Baixe tudo o que este provedor tem cadastrado — assinantes, aparelhos, conversas e configurações — num único arquivo JSON.',
   'settings.export.action': 'Baixar meus dados',

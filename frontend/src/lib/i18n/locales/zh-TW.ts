@@ -1773,6 +1773,7 @@ const zhTW: Dictionary = {
   'audit.action.passwordResetRequested': '要求了重設密碼',
   'audit.action.passwordResetCompleted': '完成了重設密碼',
   'audit.action.platformImpersonated': '平台開啟了唯讀工作階段',
+  'audit.action.subscriberAccountRetired': '已停用訂戶帳號',
   'settings.export.title': '你的資料',
   'settings.export.description': '將此服務商登錄的所有內容——用戶、設備、對話與設定——下載為單一 JSON 檔案。',
   'settings.export.action': '下載我的資料',

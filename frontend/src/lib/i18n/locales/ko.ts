@@ -1779,6 +1779,7 @@ const ko: Dictionary = {
   'audit.action.passwordResetRequested': '비밀번호 재설정 요청됨',
   'audit.action.passwordResetCompleted': '비밀번호 재설정 완료',
   'audit.action.platformImpersonated': '플랫폼이 읽기 전용 세션을 열었습니다',
+  'audit.action.subscriberAccountRetired': '가입자 계정 비활성화',
   'settings.export.title': '내 데이터',
   'settings.export.description': '이 사업자에 등록된 모든 것 — 가입자, 장비, 대화, 설정 — 을 하나의 JSON 파일로 내려받습니다.',
   'settings.export.action': '내 데이터 내려받기',

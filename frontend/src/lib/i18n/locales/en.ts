@@ -1774,6 +1774,7 @@ const en = {
   'audit.action.passwordResetRequested': 'Password reset requested',
   'audit.action.passwordResetCompleted': 'Password reset completed',
   'audit.action.platformImpersonated': 'Platform opened a read-only session',
+  'audit.action.subscriberAccountRetired': 'Subscriber account retired',
   'settings.export.title': 'Your data',
   'settings.export.description': 'Download everything this provider has on record — subscribers, devices, conversations and settings — as a single JSON file.',
   'settings.export.action': 'Download my data',
