@@ -1775,6 +1775,10 @@ const hi: Dictionary = {
   'settings.export.hint': 'कोई पासवर्ड या संग्रहित गोपनीय जानकारी फ़ाइल में नहीं जाती। डाउनलोड स्वयं ऑडिट लॉग में दर्ज होता है।',
   'settings.export.done': 'फ़ाइल तैयार है।',
   'settings.export.failed': 'निर्यात तैयार नहीं किया जा सका',
+
+  'platform.subscription.renewalExpiredNote': 'भुगतान अवधि समाप्त हो गई; पैनल अभी केवल पढ़ने के लिए है।',
+  'platform.subscription.renewsExpired': '{date} को समाप्त',
+  'plan.paidThroughExpired': 'समाप्त हुआ',
 }
 
 export default hi

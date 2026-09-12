@@ -659,7 +659,11 @@ export interface PlatformAdminView {
 export interface SubscriptionView {
   status: SubscriptionStatus
   storedStatus: SubscriptionStatus
-  reason: 'trial_expired' | null
+  /**
+   * Por que o estado que vale difere do gravado. São os dois prazos que vencem
+   * sozinhos: o teste e o período pago. Nulo quando a coluna é a verdade.
+   */
+  reason: 'trial_expired' | 'renewal_expired' | null
   plan: { code: string; name: string; limits: PlanLimits } | null
   trialEndsAt: string | null
   renewsAt: string | null

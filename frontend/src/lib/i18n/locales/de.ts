@@ -1771,6 +1771,10 @@ const de: Dictionary = {
   'settings.export.hint': 'Kein Passwort und kein gespeichertes Geheimnis landet in der Datei. Der Download selbst wird im Audit-Protokoll festgehalten.',
   'settings.export.done': 'Die Datei ist fertig.',
   'settings.export.failed': 'Der Export konnte nicht erstellt werden',
+
+  'platform.subscription.renewalExpiredNote': 'Der bezahlte Zeitraum ist abgelaufen; das Panel ist schreibgeschützt.',
+  'platform.subscription.renewsExpired': 'Abgelaufen am {date}',
+  'plan.paidThroughExpired': 'Abgelaufen am',
 }
 
 export default de

@@ -1774,6 +1774,10 @@ const ko: Dictionary = {
   'settings.export.hint': '비밀번호나 저장된 비밀 정보는 파일에 담기지 않습니다. 내려받기 자체가 감사 기록에 남습니다.',
   'settings.export.done': '파일이 준비되었습니다.',
   'settings.export.failed': '내보내기를 생성하지 못했습니다',
+
+  'platform.subscription.renewalExpiredNote': '결제 기간이 끝났습니다. 패널은 읽기 전용입니다.',
+  'platform.subscription.renewsExpired': '{date}에 만료됨',
+  'plan.paidThroughExpired': '만료일',
 }
 
 export default ko

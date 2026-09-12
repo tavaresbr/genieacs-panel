@@ -1769,6 +1769,10 @@ const en = {
   'settings.export.hint': 'No password and no stored secret goes in the file. The download itself is recorded in the audit trail.',
   'settings.export.done': 'The file is ready.',
   'settings.export.failed': 'The export could not be generated',
+
+  'platform.subscription.renewalExpiredNote': 'The paid period has ended; the panel is read-only.',
+  'platform.subscription.renewsExpired': 'Expired on {date}',
+  'plan.paidThroughExpired': 'Expired on',
 }
 
 export default en

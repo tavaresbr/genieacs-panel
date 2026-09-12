@@ -1767,6 +1767,10 @@ const ptBR: Dictionary = {
   'settings.export.hint': 'Nenhuma senha e nenhum segredo guardado vai no arquivo. O próprio download fica registrado na trilha de auditoria.',
   'settings.export.done': 'O arquivo está pronto.',
   'settings.export.failed': 'Não foi possível gerar a exportação',
+
+  'platform.subscription.renewalExpiredNote': 'O período pago venceu; o painel está só para leitura.',
+  'platform.subscription.renewsExpired': 'Venceu em {date}',
+  'plan.paidThroughExpired': 'Venceu em',
 }
 
 export default ptBR

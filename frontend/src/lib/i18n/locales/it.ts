@@ -1773,6 +1773,10 @@ const it: Dictionary = {
   'settings.export.hint': 'Nessuna password e nessun segreto memorizzato finisce nel file. Il download stesso viene registrato nel registro di audit.',
   'settings.export.done': 'Il file è pronto.',
   'settings.export.failed': 'Impossibile generare l\'esportazione',
+
+  'platform.subscription.renewalExpiredNote': 'Il periodo pagato è scaduto; il pannello è in sola lettura.',
+  'platform.subscription.renewsExpired': 'Scaduto il {date}',
+  'plan.paidThroughExpired': 'Scaduto il',
 }
 
 export default it

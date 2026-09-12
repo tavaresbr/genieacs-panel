@@ -1767,6 +1767,10 @@ const ja: Dictionary = {
   'settings.export.hint': 'パスワードや保存された機密情報はファイルに含まれません。ダウンロードそのものが監査ログに記録されます。',
   'settings.export.done': 'ファイルの準備ができました。',
   'settings.export.failed': 'エクスポートを作成できませんでした',
+
+  'platform.subscription.renewalExpiredNote': '支払い期間が終了しました。パネルは閲覧のみになります。',
+  'platform.subscription.renewsExpired': '{date} に期限切れ',
+  'plan.paidThroughExpired': '期限切れ',
 }
 
 export default ja

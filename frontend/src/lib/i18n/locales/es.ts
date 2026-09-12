@@ -1767,6 +1767,10 @@ const es: Dictionary = {
   'settings.export.hint': 'Ninguna contraseña ni secreto almacenado va en el archivo. La descarga queda registrada en el registro de auditoría.',
   'settings.export.done': 'El archivo está listo.',
   'settings.export.failed': 'No se pudo generar la exportación',
+
+  'platform.subscription.renewalExpiredNote': 'El período pagado venció; el panel está solo para lectura.',
+  'platform.subscription.renewsExpired': 'Venció el {date}',
+  'plan.paidThroughExpired': 'Venció el',
 }
 
 export default es

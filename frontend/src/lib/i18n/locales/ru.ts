@@ -1775,6 +1775,10 @@ const ru: Dictionary = {
   'settings.export.hint': 'Ни один пароль и ни один сохранённый секрет в файл не попадает. Сама выгрузка записывается в журнал аудита.',
   'settings.export.done': 'Файл готов.',
   'settings.export.failed': 'Не удалось сформировать выгрузку',
+
+  'platform.subscription.renewalExpiredNote': 'Оплаченный период закончился; панель работает только на чтение.',
+  'platform.subscription.renewsExpired': 'Истёк {date}',
+  'plan.paidThroughExpired': 'Истёк',
 }
 
 export default ru

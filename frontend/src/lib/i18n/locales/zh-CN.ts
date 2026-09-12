@@ -1767,6 +1767,10 @@ const zhCN: Dictionary = {
   'settings.export.hint': '文件中不包含任何密码或已保存的密钥。此次下载本身会记入审计日志。',
   'settings.export.done': '文件已准备好。',
   'settings.export.failed': '无法生成导出文件',
+
+  'platform.subscription.renewalExpiredNote': '付费周期已结束，面板目前只能查看。',
+  'platform.subscription.renewsExpired': '已于 {date} 到期',
+  'plan.paidThroughExpired': '到期于',
 }
 
 export default zhCN

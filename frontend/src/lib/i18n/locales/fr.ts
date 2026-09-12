@@ -1767,6 +1767,10 @@ const fr: Dictionary = {
   'settings.export.hint': 'Aucun mot de passe ni secret stocké ne figure dans le fichier. Le téléchargement lui-même est inscrit au journal d\'audit.',
   'settings.export.done': 'Le fichier est prêt.',
   'settings.export.failed': 'Impossible de générer l\'export',
+
+  'platform.subscription.renewalExpiredNote': 'La période payée est terminée ; le panneau est en lecture seule.',
+  'platform.subscription.renewsExpired': 'Expiré le {date}',
+  'plan.paidThroughExpired': 'Expiré le',
 }
 
 export default fr

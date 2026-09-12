@@ -1768,6 +1768,10 @@ const zhTW: Dictionary = {
   'settings.export.hint': '檔案中不含任何密碼或已儲存的機密。這次下載本身會記入稽核紀錄。',
   'settings.export.done': '檔案已準備好。',
   'settings.export.failed': '無法產生匯出檔案',
+
+  'platform.subscription.renewalExpiredNote': '付費週期已結束，面板目前僅能檢視。',
+  'platform.subscription.renewsExpired': '已於 {date} 到期',
+  'plan.paidThroughExpired': '到期於',
 }
 
 export default zhTW

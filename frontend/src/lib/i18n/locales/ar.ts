@@ -1776,6 +1776,10 @@ const ar: Dictionary = {
   'settings.export.hint': 'لا تُدرج أي كلمة مرور ولا أي سر مخزّن في الملف. وعملية التنزيل نفسها تُسجَّل في سجل التدقيق.',
   'settings.export.done': 'الملف جاهز.',
   'settings.export.failed': 'تعذّر إنشاء ملف التصدير',
+
+  'platform.subscription.renewalExpiredNote': 'انتهت الفترة المدفوعة؛ اللوحة للقراءة فقط.',
+  'platform.subscription.renewsExpired': 'انتهت في {date}',
+  'plan.paidThroughExpired': 'انتهت في',
 }
 
 export default ar
