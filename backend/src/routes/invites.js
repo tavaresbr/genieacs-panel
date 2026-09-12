@@ -24,7 +24,11 @@ router.delete('/:id', authenticateToken, requirePermission('operators.manage'), 
 // Limitadas por IP e mais apertado que o balde geral da API: o token são 32
 // bytes, então adivinhar é impossível, mas um endpoint sem sessão que consulta
 // o banco a cada chamada é bomba de tráfego se ninguém o segurar.
-router.get('/token/:token', inviteAcceptLimiter, InviteController.preview);
-router.post('/token/:token/accept', inviteAcceptLimiter, InviteController.accept);
+//
+// O token vai no CORPO, o que faz a consulta ser POST apesar de não mudar
+// nada: é o preço de não deixar a credencial no caminho, que o `requestLogger`
+// grava inteiro. Ver `usableInvite` para o resto do motivo.
+router.post('/token/preview', inviteAcceptLimiter, InviteController.preview);
+router.post('/token/accept', inviteAcceptLimiter, InviteController.accept);
 
 export default router;

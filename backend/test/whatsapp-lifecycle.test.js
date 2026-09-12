@@ -282,10 +282,13 @@ after(async () => {
 
 describe('creating an instance on an Evolution v2 server', () => {
   let account;
+  /** A resposta inteira da criação: o QR vive nela, não dentro da conta. */
+  let criada;
 
   it('detects the flavour by probe before building any payload', async () => {
     const { status, body } = await createAccount(v2.baseUrl, { label: 'Suporte', purpose: 'support' });
     assert.equal(status, 201);
+    criada = { body };
     account = body.data.account;
     assert.equal(account.flavor, 'v2');
     assert.equal(account.purpose, 'support');
@@ -317,7 +320,11 @@ describe('creating an instance on an Evolution v2 server', () => {
 
   it('returns the QR the create already carried, without a second round trip', () => {
     assert.equal(v2.state.requests.filter((r) => r.path.startsWith('/instance/connect/')).length, 0);
-    assert.equal(account.qrCode, 'data:image/png;base64,V2QR');
+    // O QR vem no campo próprio da resposta, NÃO dentro da conta: ele é
+    // credencial de pareamento e saiu do serializador compartilhado, que serve
+    // rotas de `whatsapp.read`.
+    assert.equal(criada.body.data.qr, 'data:image/png;base64,V2QR');
+    assert.equal(account.qrCode, undefined, 'o QR não pode voltar dentro da conta');
     assert.ok(account.qrUpdatedAt);
   });
 
@@ -358,7 +365,7 @@ describe('creating an instance on an Evolution GO server', () => {
 
   it('asks for the QR separately, because the create had none', () => {
     assert.ok(go.state.requests.some((r) => r.path === '/instance/qr'));
-    assert.equal(account.qrCode, 'data:image/png;base64,GOQR');
+    assert.equal(account.qrCode, undefined, 'o QR não pode voltar dentro da conta');
   });
 
   it('gives each number its own webhook secret', async () => {
@@ -449,7 +456,7 @@ describe('reading the connection state', () => {
     assert.equal(body.data.state, 'connected');
     assert.equal(body.data.account.status, 'connected');
     // The QR is spent once the pairing lands.
-    assert.equal(body.data.account.qrCode, null);
+    assert.equal(body.data.account.qrCode, undefined);
     assert.ok(body.data.account.lastSeenAt);
   });
 
@@ -501,7 +508,7 @@ describe('restart and disconnect', () => {
     );
     assert.equal(status, 200);
     assert.equal(body.data.account.status, 'disconnected');
-    assert.equal(body.data.account.qrCode, null);
+    assert.equal(body.data.account.qrCode, undefined);
   });
 });
 
@@ -869,6 +876,52 @@ describe('a volta do webhook', () => {
     assert.equal(body.data.verdict, 'unreachable');
     assert.equal(body.data.account.webhookProbeVerdict, 'unreachable');
     assert.ok(body.data.account.webhookProbedAt);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// O QR é credencial de pareamento, e a permissão tem que refletir isso
+//
+// A rota dedicada ao QR pede `whatsapp.config`, de propósito. Mas o
+// serializador compartilhado o incluía, e ele serve `GET /accounts` e
+// `/accounts/:id/status` — as duas com `whatsapp.read`. Um `tech`, que tem
+// `read` e não tem `config`, fazia polling na listagem durante uma reconexão,
+// lia o QR e pareava o próprio celular ao número do provedor: passava a
+// receber a caixa de entrada dos assinantes e a falar COMO o provedor.
+//
+// Parear é estritamente pior que `whatsapp.send`, e estava atrás da permissão
+// mais fraca das duas.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('por onde o QR sai', () => {
+  it('não sai na listagem nem no estado, que são rotas de leitura', async () => {
+    const criacao = await createAccount(v2.baseUrl, { label: 'QR fechado' });
+    const id = criacao.body.data.account.id;
+
+    const lista = await call(`${panelUrl}/api/whatsapp/accounts`, { headers: authHeaders(token) });
+    assert.equal(lista.status, 200);
+    for (const conta of lista.body.data) {
+      assert.equal(conta.qrCode, undefined, 'o QR voltou na listagem');
+    }
+
+    const estado = await call(`${panelUrl}/api/whatsapp/accounts/${id}/status`, {
+      headers: authHeaders(token)
+    });
+    assert.equal(estado.status, 200);
+    assert.equal(estado.body.data.account.qrCode, undefined, 'o QR voltou no estado');
+  });
+
+  it('sai só pela rota dedicada, e num campo próprio', async () => {
+    const criacao = await createAccount(v2.baseUrl, { label: 'QR pela rota' });
+    const id = criacao.body.data.account.id;
+
+    const { status, body } = await call(`${panelUrl}/api/whatsapp/accounts/${id}/qr`, {
+      headers: authHeaders(token)
+    });
+    assert.equal(status, 200);
+    // O campo próprio da resposta, que é o que a tela lê — e que só chega a
+    // quem tem `whatsapp.config`.
+    assert.ok(String(body.data.qr).startsWith('data:image/png;base64,'));
+    assert.equal(body.data.account.qrCode, undefined);
   });
 });
 

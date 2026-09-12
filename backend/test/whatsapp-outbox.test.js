@@ -544,3 +544,53 @@ describe('the per-minute ceiling', () => {
     }
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// A corrida com o eco de saída
+//
+// O painel assina `MESSAGES_UPSERT`, e o Evolution ecoa a mensagem que ACABOU
+// de sair como evento de entrada; o webhook a grava como linha 'out' com o
+// mesmo `external_id`. Entre o `dispatch` retornar e a confirmação de saída
+// commitar existe uma janela em que o eco chega primeiro e insere.
+//
+// Antes desta guarda, a escrita violava o índice único `(tenant_id,
+// external_id)`, o `catch` lia isso como "não enviou", a linha voltava para
+// 'queued' com `external_id` ainda nulo — e o cliente recebia de novo.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('o eco de entrada grava antes da confirmação de saída', () => {
+  it('não reenvia: a linha sai da fila em vez de voltar para ela', async () => {
+    await clearOutbox();
+    const conversation = await newConversation();
+    const { body } = await post(conversation.id, { body: 'uma vez só, por favor' });
+    requests.length = 0;
+
+    // O eco: uma linha 'out' com o id que o servidor VAI devolver, inserida
+    // antes de a confirmação de saída chegar. É exatamente o que
+    // `gravarMensagem` faz quando o webhook chega primeiro.
+    // `nextId` é o id JÁ usado; o próximo envio produzirá o seguinte. É esse
+    // que o eco precisa carregar para colidir com a confirmação de saída.
+    const externalId = `EVO-${stub.nextId + 1}`;
+    await asTenant(() => getDb()('wa_messages').insert({
+      tenant_id: 1,
+      conversation_id: conversation.id,
+      direction: 'out',
+      body: 'uma vez só, por favor',
+      external_id: externalId,
+      delivery_status: 'sent'
+    }));
+
+    await WaOutboxWorker.tick();
+
+    // A prova que importa: uma chamada de envio, não duas.
+    assert.equal(sendTextCalls().length, 1, 'reenviou — o cliente recebeu duas vezes');
+
+    const row = await asTenant(() => WaMessage.getById(body.data.id));
+    // 'queued' aqui significa que o próximo laço pegaria a linha de novo.
+    assert.equal(row.delivery_status, 'sent');
+    assert.equal(row.delivery_error, null);
+
+    // E o segundo laço confirma: não sobrou nada para reenviar.
+    await WaOutboxWorker.tick();
+    assert.equal(sendTextCalls().length, 1);
+  });
+});

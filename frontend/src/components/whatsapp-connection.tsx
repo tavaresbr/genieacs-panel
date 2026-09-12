@@ -136,9 +136,9 @@ const QR_LIFETIME_S = 60
 const QR_REFRESH_AT_S = 5
 const MAX_FAILURES = 3
 
-/** When the code on the row was issued, or null when there is no code. */
-function seedQrAt(account: WhatsAppAccount): number | null {
-  if (!account.qrCode) return null
+/** When the code in hand was issued, or null when there is no code. */
+function seedQrAt(account: WhatsAppAccount, seedQr: string | null): number | null {
+  if (!seedQr) return null
   const stamped = account.qrUpdatedAt ? Date.parse(account.qrUpdatedAt) : Number.NaN
   return Number.isNaN(stamped) ? Date.now() : stamped
 }
@@ -149,6 +149,16 @@ function secondsLeft(since: number): number {
 
 interface QrPairingProps {
   account: WhatsAppAccount
+  /**
+   * O código que a criação da conta acabou de devolver, quando houve uma.
+   *
+   * Vem por aqui e não no objeto da conta porque o QR é credencial de
+   * pareamento: ele saiu do serializador compartilhado, que serve rotas de
+   * `whatsapp.read`, e agora só a rota dedicada — `whatsapp.config` — o
+   * entrega. Sem semente, este bloco simplesmente busca o primeiro código no
+   * seu próprio laço, que é o que ele já fazia para todos os seguintes.
+   */
+  seedQr?: string | null
   busy: boolean
   onAccount: (account: WhatsAppAccount) => void
   onForceNew: (account: WhatsAppAccount) => void
@@ -160,16 +170,16 @@ interface QrPairingProps {
  * flips between tabs constantly, and an interval that survives the card would
  * keep hitting the Evolution server from a screen nobody is on.
  */
-function QrPairing({ account, busy, onAccount, onForceNew }: QrPairingProps) {
+function QrPairing({ account, seedQr = null, busy, onAccount, onForceNew }: QrPairingProps) {
   const { t } = useTranslation()
   const toast = useToast()
 
-  const [qr, setQr] = useState<string | null>(account.qrCode)
+  const [qr, setQr] = useState<string | null>(seedQr)
   // Both seeded from the server's own timestamp, so a card rebuilt from a stale
   // listing shows the code's real age instead of a fresh sixty for a second.
-  const [qrAt, setQrAt] = useState<number | null>(() => seedQrAt(account))
+  const [qrAt, setQrAt] = useState<number | null>(() => seedQrAt(account, seedQr))
   const [remaining, setRemaining] = useState(() => {
-    const stamped = seedQrAt(account)
+    const stamped = seedQrAt(account, seedQr)
     return stamped === null ? QR_LIFETIME_S : secondsLeft(stamped)
   })
   const [silent, setSilent] = useState(false)
@@ -407,6 +417,15 @@ export function WhatsAppConnection({ config }: Props) {
   const toast = useToast()
 
   const [accounts, setAccounts] = useState<WhatsAppAccount[]>([])
+  /**
+   * O QR que a criação de cada número devolveu, por id.
+   *
+   * Fica aqui e não dentro da conta porque o servidor não o manda mais junto:
+   * ele é credencial de pareamento e só a rota dedicada o entrega. Isto é só a
+   * semente do primeiro código; os seguintes o próprio bloco de pareamento
+   * busca.
+   */
+  const [qrSeeds, setQrSeeds] = useState<Record<number, string>>({})
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<number | null>(null)
   const [creating, setCreating] = useState(false)
@@ -458,7 +477,11 @@ export function WhatsAppConnection({ config }: Props) {
         toast.error(whatsappErrorMessage(t, res.code))
         return
       }
-      const created = { ...res.data.account, qrCode: res.data.qr ?? res.data.account.qrCode }
+      // O QR da criação é guardado à parte, e não no objeto da conta: ele não
+      // vem mais do servidor dentro dela.
+      const created = res.data.account
+      const qrDaCriacao = res.data.qr
+      if (qrDaCriacao) setQrSeeds((current) => ({ ...current, [created.id]: qrDaCriacao }))
       setAccounts((current) => [...current, created])
       setAdding(false)
       setForm({ label: '', purpose: 'general', baseUrl: '', adminKey: '' })
@@ -917,6 +940,7 @@ export function WhatsAppConnection({ config }: Props) {
                 {pairing && (
                   <QrPairing
                     account={account}
+                    seedQr={qrSeeds[account.id] ?? null}
                     busy={busy}
                     onAccount={mergeAccount}
                     onForceNew={(row) => void forceNew(row)}
