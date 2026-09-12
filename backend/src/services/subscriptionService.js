@@ -14,7 +14,9 @@ import { currentTenantId, runInTenant } from '../config/tenantContext.js';
  *   trial      passa. Vira `past_due` sozinho quando `trial_ends_at` vence —
  *              sem job, sem cron: é calculado na leitura, então não há janela
  *              em que um teste vencido ainda passe porque o job não rodou.
- *   active     passa.
+ *   active     passa — até `renews_at` vencer, e aí vira `past_due` pela mesma
+ *              mecânica e pelo mesmo motivo. `renews_at` nulo é assinatura sem
+ *              ciclo e não vence; ver `effectiveStatus`.
  *   past_due   passa SÓ PARA LER. Operador atrasado continua vendo a frota e
  *              o assinante continua com o portal de pé; o que para é escrever.
  *              Derrubar o autoatendimento dos clientes finais de um ISP por
@@ -70,8 +72,26 @@ class SubscriptionService {
   static PAID_PERIOD_DAYS = PAID_PERIOD_DAYS;
 
   /**
-   * O estado que VALE, que nem sempre é o da coluna: um `trial` cujo prazo
-   * venceu é `past_due`, e é `past_due` desde o segundo em que venceu.
+   * O estado que VALE, que nem sempre é o da coluna: um prazo que venceu é
+   * `past_due`, e é `past_due` desde o segundo em que venceu.
+   *
+   * São dois prazos, e por muito tempo só um deles era lido. O teste vencia
+   * sozinho; o período PAGO não vencia nunca. `renews_at` era escrito por
+   * `recordPayment`, exibido na tela do provedor, no console e no extrato — e
+   * nenhuma decisão o consultava. O efeito não era um incômodo operacional: um
+   * provedor que pagou UMA vez ficava `active` para sempre, e ninguém percebia,
+   * porque a tela mostrava a data certa. Receita saindo em silêncio é pior do
+   * que receita saindo com barulho.
+   *
+   * ## `renews_at` nulo não vence
+   *
+   * E isso não é descuido, é a regra. A coluna quer dizer "o período pago
+   * termina aqui"; sem data, não há período — é a assinatura que nunca foi
+   * posta num ciclo. São três populações reais: o provedor que o console pôs
+   * num plano sem nunca registrar pagamento (`setPlan` grava `active` e mais
+   * nada), a instalação self-hosted, e todo provedor que já está no banco hoje.
+   * Tratar nulo como vencido transformaria esta linha, que conserta uma perda
+   * de receita, numa parada geral no primeiro deploy.
    */
   static effectiveStatus(subscription, now = new Date()) {
     if (!subscription) return { status: null, reason: 'missing' };
@@ -80,6 +100,12 @@ class SubscriptionService {
       const ends = asDate(subscription.trial_ends_at);
       if (ends && ends.getTime() <= now.getTime()) {
         return { status: 'past_due', reason: 'trial_expired' };
+      }
+    }
+    if (stored === 'active') {
+      const ends = asDate(subscription.renews_at);
+      if (ends && ends.getTime() <= now.getTime()) {
+        return { status: 'past_due', reason: 'renewal_expired' };
       }
     }
     return { status: stored, reason: null };

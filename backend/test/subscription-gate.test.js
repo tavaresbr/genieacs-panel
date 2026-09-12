@@ -96,31 +96,47 @@ afterEach(async () => {
 });
 
 const read = () => call(`${panelUrl}/api/users`, { headers: authHeaders(ownerToken) });
-const write = () => call(`${panelUrl}/api/users`, {
+/**
+ * A escrita guardada pela porta. O nome é parâmetro e não constante porque um
+ * caso que ESPERA 402 não limpa nada atrás de si: no dia em que ele passar a
+ * receber 201 — que é exatamente o dia em que a porta quebrou —, um nome fixo
+ * faria os casos seguintes falharem por colisão de usuário, e o relatório
+ * apontaria para os inocentes. Foi o que uma reversão mostrou.
+ */
+const write = (username = 'alguem') => call(`${panelUrl}/api/users`, {
   method: 'POST',
   headers: authHeaders(ownerToken),
-  body: { username: 'alguem', password: 'senha-de-alguem-1', role: 'viewer', email: 'alguem@exemplo.test' }
+  body: {
+    username,
+    password: `senha-de-${username}-1`,
+    role: 'viewer',
+    email: `${username}@exemplo.test`
+  }
 });
+
+/** Apaga o operador que um caso criou, para o próximo achar o banco como deixou. */
+async function apagarOperador(resposta) {
+  const id = resposta?.body?.data?.user?.id;
+  if (!id) return;
+  await getDb()('tenant_users').where({ user_id: id }).del();
+  await getDb()('users').where({ id }).del();
+}
 
 describe('the states that pass', () => {
   it('active: reads and writes', async () => {
     await setState({ status: 'active' });
     assert.equal((await read()).status, 200);
-    const created = await write();
+    const created = await write('ativo-escreve');
     assert.equal(created.status, 201);
-    await getDb()('tenant_users').where({ user_id: created.body.data.user.id }).del();
-    await getDb()('users').where({ id: created.body.data.user.id }).del();
+    await apagarOperador(created);
   });
 
   it('trial, while it lasts: reads and writes', async () => {
     await setState({ status: 'trial', trial_ends_at: new Date(Date.now() + 3 * DAY) });
     assert.equal((await read()).status, 200);
-    const attempt = await write();
+    const attempt = await write('teste-corrente');
     assert.notEqual(attempt.status, 402);
-    if (attempt.status === 201) {
-      await getDb()('tenant_users').where({ user_id: attempt.body.data.user.id }).del();
-      await getDb()('users').where({ id: attempt.body.data.user.id }).del();
-    }
+    await apagarOperador(attempt);
   });
 });
 
@@ -145,6 +161,60 @@ describe('past due: look, but do not touch', () => {
     assert.equal(refused.body.code, GATE_CODES.TRIAL_EXPIRED);
     assert.equal(refused.body.subscription.status, 'past_due');
     assert.equal(refused.body.subscription.storedStatus, 'trial');
+  });
+
+  /**
+   * O irmão do de cima, e o que ele guarda é receita e não prazo: até esta
+   * fatia, `renews_at` era escrito pelo pagamento, mostrado em quatro telas e
+   * lido por decisão nenhuma. Quem pagou uma vez ficava `active` para sempre,
+   * em silêncio, com a data certa na tela.
+   */
+  it('um período pago que venceu é past_due, pela mesma mecânica do teste', async () => {
+    await setState({ status: 'active', renews_at: new Date(Date.now() - 1000) });
+    assert.equal((await read()).status, 200);
+    const refused = await write('periodo-vencido');
+    assert.equal(refused.status, 402);
+    // PAST_DUE e não TRIAL_EXPIRED: quem venceu aqui pagou e parou de pagar,
+    // e a tela de bloqueio escolhe a frase por este código.
+    assert.equal(refused.body.code, GATE_CODES.PAST_DUE);
+    assert.equal(refused.body.subscription.status, 'past_due');
+    assert.equal(refused.body.subscription.storedStatus, 'active');
+  });
+
+  it('e enquanto ele não venceu, escreve normalmente', async () => {
+    await setState({ status: 'active', renews_at: new Date(Date.now() + 3 * DAY) });
+    assert.equal((await read()).status, 200);
+    const created = await write('dentro-do-periodo');
+    assert.equal(created.status, 201);
+    await apagarOperador(created);
+  });
+
+  /**
+   * A linha que separa consertar uma perda de receita de derrubar todo mundo.
+   *
+   * `renews_at` nulo é assinatura que nunca foi posta num ciclo — o provedor
+   * que o console pôs num plano sem registrar pagamento, a instalação
+   * self-hosted, e todo provedor que já está no banco. Se nulo vencesse, o
+   * primeiro deploy desta mudança seria uma parada geral.
+   */
+  it('mas uma assinatura sem data de renovação não vence nunca', async () => {
+    await setState({ status: 'active', renews_at: null });
+    assert.equal((await read()).status, 200);
+    const created = await write('sem-ciclo');
+    assert.equal(created.status, 201);
+    await apagarOperador(created);
+  });
+
+  /**
+   * Vencer não reescreve a coluna, e isso importa: o caminho de volta é o
+   * pagamento, que estende `renews_at` a partir de hoje e devolve `active`. Um
+   * job que gravasse `past_due` teria que ter um segundo caminho para desfazer.
+   */
+  it('e vencer não muda o que está gravado — só o que vale', async () => {
+    await setState({ status: 'active', renews_at: new Date(Date.now() - 1000) });
+    await write('nao-deve-nascer');
+    const gravado = await getDb()('subscriptions').where({ tenant_id: alfa }).first();
+    assert.equal(gravado.status, 'active');
   });
 
   it('lets an inbound webhook through: the ERP event is not the operator writing', async () => {
