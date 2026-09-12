@@ -37,6 +37,7 @@ export const AUDIT_ACTION_LABEL_KEYS: Record<string, TranslationKey> = {
   'tenant.exported': 'audit.action.tenantExported',
   'subscription.changed': 'audit.action.subscriptionChanged',
   'tenant.renamed': 'audit.action.tenantRenamed',
+  'tenant.slug_changed': 'audit.action.tenantSlugChanged',
   'login_email.changed': 'audit.action.loginEmailChanged',
   'login_email.verified': 'audit.action.loginEmailVerified',
   'password_reset.requested': 'audit.action.passwordResetRequested',

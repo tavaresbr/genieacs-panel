@@ -20,6 +20,10 @@ import { authenticateToken, requirePlatformAdmin } from '../middleware/auth.js';
  * O DELETE existe desde a onda 22 e exige quatro coisas ao mesmo tempo — ver
  * o comentário no controlador, que explica por que a decisão anterior de não
  * ter DELETE continua correta na forma como ela foi tomada.
+ *
+ * O PATCH de `/tenants/:id` carrega DUAS intenções — a chave de ciclo de vida
+ * (`status`) e a correção do cadastro (`name`, `slug`) —, e recusa as duas no
+ * mesmo corpo. O porquê está no despachante, em `PlatformController.update`.
  */
 const router = express.Router();
 
@@ -44,7 +48,7 @@ function allowMetricsScraper(req, res, next) {
 
 router.get('/tenants', authenticateToken, requirePlatformAdmin, PlatformController.listTenants);
 router.post('/tenants', authenticateToken, requirePlatformAdmin, PlatformController.create);
-router.patch('/tenants/:id', authenticateToken, requirePlatformAdmin, PlatformController.setStatus);
+router.patch('/tenants/:id', authenticateToken, requirePlatformAdmin, PlatformController.update);
 router.delete('/tenants/:id', authenticateToken, requirePlatformAdmin, PlatformController.remove);
 
 // O que o processo contou desde que subiu, no formato que o Prometheus lê,

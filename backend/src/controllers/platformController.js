@@ -18,8 +18,8 @@ import { slugProblem } from '../utils/slug.js';
 const NAME_MAX_LENGTH = 128;
 
 /**
- * The provider registry: create, list, suspend, reactivate — e, desde a onda
- * 22, apagar.
+ * The provider registry: create, list, corrigir o cadastro, suspend, reactivate
+ * — e, desde a onda 22, apagar.
  *
  * A versão anterior deste comentário dizia que apagar não existia, e o
  * argumento continua inteiro: apagar leva os aparelhos, os assinantes e o
@@ -245,6 +245,196 @@ class PlatformController {
       console.error('Create tenant error:', error);
       return res.status(500).json(
         createErrorResponse('Failed to create the provider', error.message)
+      );
+    }
+  }
+
+  /**
+   * `PATCH /api/platform/tenants/:id` — duas intenções, uma rota.
+   *
+   * `status` é a chave de ciclo de vida do provedor; `name` e `slug` são
+   * correção de cadastro. Mandar as duas coisas no mesmo corpo é RECUSADO, e
+   * não atendido: elas gravam linhas de trilha diferentes, só uma delas
+   * invalida o cache do resolvedor, e só uma delas muda o endereço que o ISP
+   * já recebeu. Atender as duas juntas tornaria ambíguo qual delas a linha da
+   * trilha descreve — e é a mesma razão pela qual plano e estado da assinatura
+   * são dois salvamentos separados na tela.
+   *
+   * A presença é testada por chave própria, e não por valor: `{ status: null }`
+   * tem que continuar caindo no caminho do status e voltando 400, em vez de
+   * virar uma edição de identidade que não traz campo nenhum.
+   */
+  static async update(req, res) {
+    const corpo = req.body ?? {};
+    const tem = (chave) => Object.prototype.hasOwnProperty.call(corpo, chave);
+    const identidade = tem('name') || tem('slug');
+    if (identidade && tem('status')) {
+      return res.status(400).json(createErrorResponse(
+        'Send either the status or the name and slug, not both'
+      ));
+    }
+    return identidade
+      ? PlatformController.updateIdentity(req, res)
+      : PlatformController.setStatus(req, res);
+  }
+
+  /**
+   * Corrige o nome e o subdomínio de um provedor já cadastrado.
+   *
+   * Antes disto, um nome digitado errado ou um subdomínio escolhido antes de o
+   * ISP fechar a marca eram definitivos: a única saída era apagar e recriar, o
+   * que leva os assinantes, os aparelhos e as conversas junto.
+   *
+   * O campo que não vem no corpo NÃO é mexido, e o que vem igual ao que já está
+   * gravado não é escrito: um provedor pode ter só o nome corrigido, e um
+   * salvamento que não mudou nada volta 200 sem linha de trilha e sem esvaziar
+   * cache nenhum.
+   *
+   * Trocar o slug é a metade com consequência fora deste arquivo, e as três
+   * estão nos comentários abaixo: o índice único decide corridas, o resolvedor
+   * guarda o endereço antigo, e a trilha do PRÓPRIO provedor é onde o ISP vai
+   * procurar a explicação.
+   */
+  static async updateIdentity(req, res) {
+    try {
+      const id = Number(req.params?.id);
+      if (!Number.isInteger(id) || id <= 0) {
+        return res.status(400).json(createErrorResponse('Invalid provider id'));
+      }
+
+      const corpo = req.body ?? {};
+      const mandouNome = Object.prototype.hasOwnProperty.call(corpo, 'name');
+      const mandouSlug = Object.prototype.hasOwnProperty.call(corpo, 'slug');
+
+      // O slug é lido exatamente como veio — sem `trim()` e sem `toLowerCase()`
+      // —, pela mesma razão da criação: quem edita está prestes a dar o endereço
+      // do painel a um ISP, e um endereço reescrito em silêncio não é o que a
+      // pessoa digitou. O nome, sim: espaço nas pontas de um nome não muda
+      // endereço nenhum.
+      const name = mandouNome ? String(corpo.name ?? '').trim() : null;
+      const slug = mandouSlug ? String(corpo.slug ?? '') : null;
+
+      if (mandouNome && (name.length < 1 || name.length > NAME_MAX_LENGTH)) {
+        return res.status(400).json(
+          createErrorResponse(`Name must be between 1 and ${NAME_MAX_LENGTH} characters`)
+        );
+      }
+      if (mandouSlug) {
+        const problem = slugProblem(slug);
+        if (problem) {
+          return res.status(400).json(createErrorResponse(problem));
+        }
+      }
+
+      const tenant = await Tenant.findById(id);
+      if (!tenant) {
+        return res.status(404).json(createErrorResponse('Provider not found'));
+      }
+
+      const nomeNovo = mandouNome ? name : tenant.name;
+      const slugNovo = mandouSlug ? slug : tenant.slug;
+      const mudouNome = nomeNovo !== tenant.name;
+      const mudouSlug = slugNovo !== tenant.slug;
+
+      const responder = async (row) => {
+        const counts = await Tenant.operatorCounts();
+        const subscriptions = await subscriptionsByTenant();
+        return res.json(createResponse('Tenant updated successfully', {
+          tenant: present(row, counts.get(Number(id)) || 0, subscriptions.get(Number(id)) || null)
+        }));
+      };
+
+      // Nada mudou: 200 e mais nada. Uma linha de trilha dizendo "de X para X"
+      // é ruído numa tabela que existe para ser lida, e esvaziar o cache do
+      // resolvedor por um pedido que não mexeu em endereço nenhum é um custo
+      // sem troco.
+      if (!mudouNome && !mudouSlug) {
+        return responder(tenant);
+      }
+
+      // O 409 é só quando a linha achada é de OUTRO provedor. `findBySlug`
+      // compara pelo slug em minúsculas e acha esta mesma linha, então sem a
+      // exclusão pelo id um salvamento que só troca o nome — e devolve o slug
+      // atual junto, como a tela faz — responderia conflito consigo mesmo.
+      if (mudouSlug) {
+        const rival = await Tenant.findBySlug(slugNovo);
+        if (rival && Number(rival.id) !== id) {
+          return res.status(409).json(createErrorResponse('Slug already taken'));
+        }
+      }
+
+      try {
+        await Tenant.updateIdentity(id, {
+          name: mudouNome ? nomeNovo : undefined,
+          slug: mudouSlug ? slugNovo : undefined
+        });
+      } catch (error) {
+        // A mesma corrida da criação, vista do outro lado: dois pedidos
+        // re-endereçando dois provedores para o mesmo slug passam os dois pela
+        // conferência acima e um perde no índice único. Reler a tabela separa
+        // isso de um erro de verdade sem ter que reconhecer a violação de
+        // restrição em três bancos diferentes.
+        const rival = await Tenant.findBySlug(slugNovo);
+        if (rival && Number(rival.id) !== id) {
+          return res.status(409).json(createErrorResponse('Slug already taken'));
+        }
+        throw error;
+      }
+
+      // Só quando o endereço mudou — e aí obrigatoriamente. O resolvedor guarda
+      // slug -> id pela vida do processo, então sem isto o endereço ANTIGO
+      // seguiria resolvendo para este provedor até o próximo restart, o que é
+      // pior que a suspensão sem invalidação: o endereço mudou de propósito, e
+      // o velho ficaria servindo o painel de quem já não mora lá enquanto está
+      // livre para ser dado a outro. Trocar o nome não mexe em nada guardado, e
+      // por isso não passa por aqui.
+      //
+      // A limitação é a que `setStatus` já documenta: o cache é por processo,
+      // então num deploy com mais de uma instância as outras só acompanham no
+      // restart delas.
+      if (mudouSlug) forgetResolvedTenant();
+
+      const detail = {};
+      if (mudouNome) detail.name = { from: tenant.name, to: nomeNovo };
+      if (mudouSlug) detail.slug = { from: tenant.slug, to: slugNovo };
+
+      // O retrato vai com a linha ANTIGA, como na mudança de estado: a pergunta
+      // que esta linha responde é "o que foi feito com o provedor que eu
+      // conhecia como X", e para onde ele foi está no detalhe.
+      await PlatformAudit.fromRequest(req, {
+        action: PlatformAudit.ACTIONS.TENANT_IDENTITY_CHANGED,
+        tenant,
+        detail
+      });
+
+      // E na trilha DELE, pelo mesmo motivo da suspensão: quem vai perguntar
+      // "quem mudou o nosso nome" ou "por que o nosso endereço mudou" é o ISP,
+      // e ele não lê a nossa trilha. Duas ações e não uma porque são dois fatos
+      // diferentes, e a frase de um não descreve o outro.
+      if (mudouNome) {
+        await runInTenant(id, () => AuditLog.fromRequest(req, {
+          action: AuditLog.ACTIONS.TENANT_RENAMED,
+          actorKind: 'platform',
+          subjectType: 'tenant',
+          subjectId: id,
+          detail: detail.name
+        }));
+      }
+      if (mudouSlug) {
+        await runInTenant(id, () => AuditLog.fromRequest(req, {
+          action: AuditLog.ACTIONS.TENANT_SLUG_CHANGED,
+          actorKind: 'platform',
+          subjectType: 'tenant',
+          subjectId: id,
+          detail: detail.slug
+        }));
+      }
+
+      return responder(await Tenant.findById(id));
+    } catch (error) {
+      console.error('Update tenant identity error:', error);
+      return res.status(500).json(
+        createErrorResponse('Failed to update the provider', error.message)
       );
     }
   }

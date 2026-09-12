@@ -805,6 +805,14 @@ export const platformAPI = {
   setTenantStatus: (id: number, status: 'active' | 'suspended') =>
     apiClient.requestWithBody<{ tenant: Tenant }>('PATCH', `/platform/tenants/${id}`, { status }),
 
+  /**
+   * Corrige o cadastro: o nome, o subdomínio, ou os dois. Manda só o que mudou,
+   * e nunca junto com o status — a rota recusa as duas intenções no mesmo
+   * corpo, porque só uma delas muda o endereço que o ISP já recebeu.
+   */
+  updateTenant: (id: number, payload: { name?: string; slug?: string }) =>
+    apiClient.requestWithBody<{ tenant: Tenant }>('PATCH', `/platform/tenants/${id}`, payload),
+
   listMemberships: (tenantId: number) =>
     apiClient.get<{ memberships: TenantMembership[] }>(`/platform/tenants/${tenantId}/members`),
 
