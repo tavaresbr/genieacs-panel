@@ -35,7 +35,18 @@ class PlatformAudit {
     // plano de controle. Que a sessão tenha de fato começado é o que a trilha
     // do provedor registra, e é lá que a pergunta "entraram no meu painel?"
     // é feita.
-    TENANT_IMPERSONATED: 'tenant.impersonated'
+    TENANT_IMPERSONATED: 'tenant.impersonated',
+    // Quem deu a chave do reino a quem. São as duas únicas ações desta tabela
+    // que não falam de um provedor — `tenant_id` sai nulo nelas de propósito,
+    // porque o cadastro do plano de controle está ACIMA de qualquer provedor e
+    // apontar uma delas para um seria inventar um recorte que não existe.
+    //
+    // E são as duas que mais importam: quem está neste cadastro cria e apaga
+    // provedores, muda o que cada um paga e abre sessão de leitura no painel de
+    // qualquer cliente. Sem estas linhas, a promoção que precede tudo isso
+    // seria o único passo sem rastro da cadeia inteira.
+    PLATFORM_ADMIN_GRANTED: 'platform_admin.granted',
+    PLATFORM_ADMIN_REVOKED: 'platform_admin.revoked'
   });
 
   /**

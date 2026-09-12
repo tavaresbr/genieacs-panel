@@ -495,6 +495,39 @@ export interface Plan {
   subscribers?: number
 }
 
+/** Uma linha da trilha do plano de controle. */
+export interface PlatformAuditEntry {
+  id: number
+  action: string
+  actor: { userId: number | null; username: string | null }
+  /**
+   * Nome e slug vêm da própria linha, não de um join.
+   *
+   * É o que permite ler a trilha de um provedor que não existe mais — e a linha
+   * mais importante desta tabela é exatamente essa.
+   */
+  tenant: { id: number | null; slug: string | null; name: string | null }
+  detail: Record<string, unknown> | null
+  ip: string | null
+  at: string | null
+}
+
+export interface PlatformAuditPage {
+  entries: PlatformAuditEntry[]
+  /** O id da última linha desta página; vira o `before` da próxima. */
+  nextBefore: number | null
+  /** Todas as ações que a trilha conhece — alimenta o filtro. */
+  actions: string[]
+}
+
+/** Quem tem o plano de controle. */
+export interface PlatformAdminView {
+  userId: number
+  username: string
+  email: string | null
+  grantedAt: string | null
+}
+
 /** What the provider itself (and the block screen) may see of its subscription. */
 export interface SubscriptionView {
   status: SubscriptionStatus
@@ -633,7 +666,44 @@ export const platformAPI = {
   getUsage: (tenantId: number) =>
     apiClient.get<SubscriptionUsage & { tenant: { id: number; slug: string; name: string } }>(
       `/platform/tenants/${tenantId}/usage`
-    )
+    ),
+
+  /**
+   * Apaga um provedor e tudo o que é dele.
+   *
+   * A rota existe desde a onda 22 e não tinha botão. Não tem volta: leva
+   * assinantes, equipamentos, conversas e a trilha DELE junto — o que sobrevive
+   * é a linha em `platform_audit` dizendo que isto aconteceu, que é
+   * compartilhada de propósito, justamente para não ser apagada com o que
+   * registra.
+   */
+  deleteTenant: (id: number) =>
+    apiClient.delete<{ tenant: { id: number; slug: string; name: string } }>(`/platform/tenants/${id}`),
+
+  /**
+   * A trilha do plano de controle: o que quem opera o SaaS fez COM um provedor.
+   *
+   * Paginada por `before` e não por página numerada, porque a tabela cresce pela
+   * frente: um "página 2" calculado por deslocamento pula ou repete linhas
+   * quando algo é escrito entre um pedido e o outro.
+   */
+  listAudit: (params: { limit?: number; before?: number | null } = {}) => {
+    const query = new URLSearchParams()
+    if (params.limit) query.set('limit', String(params.limit))
+    if (params.before) query.set('before', String(params.before))
+    const suffix = query.toString()
+    return apiClient.get<PlatformAuditPage>(`/platform/audit${suffix ? `?${suffix}` : ''}`)
+  },
+
+  /** O cadastro do próprio console: quem tem a chave do plano de controle. */
+  listAdmins: () =>
+    apiClient.get<{ admins: PlatformAdminView[] }>('/platform/admins'),
+
+  addAdmin: (payload: { username: string }) =>
+    apiClient.post<{ admin: PlatformAdminView }>('/platform/admins', payload),
+
+  removeAdmin: (userId: number) =>
+    apiClient.delete<{ userId: number }>(`/platform/admins/${userId}`)
 }
 
 /** The provider's own plan, state and usage — the "plan and usage" screen, and what the block screen reads. */

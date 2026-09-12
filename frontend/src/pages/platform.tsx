@@ -2,6 +2,9 @@
 
 import { Fragment, useCallback, useEffect, useState } from 'react'
 import { platformAPI, type Plan, type Tenant } from '@/lib/api'
+import { PlanCatalog } from '@/components/platform/plan-catalog'
+import { PlatformAdmins } from '@/components/platform/platform-admins'
+import { PlatformAudit } from '@/components/platform/platform-audit'
 import { TenantMembers } from '@/components/platform/tenant-members'
 import { STATUS_LABEL_KEYS, TenantPlan, statusBadgeClass } from '@/components/platform/tenant-plan'
 import { Icon } from '@/components/ui/icon'
@@ -25,6 +28,15 @@ export default function PlatformPage() {
   const [expandedPanel, setExpandedPanel] = useState<'members' | 'plan'>('members')
   const [plans, setPlans] = useState<Plan[]>([])
   const [form, setForm] = useState({ slug: '', name: '' })
+  /**
+   * Qual metade do console está na tela.
+   *
+   * Abas e não quatro telas porque as quatro respondem à mesma pergunta —
+   * "como está a plataforma" — e porque o catálogo de planos só faz sentido ao
+   * lado de quem os assina. Provedores é o padrão: é o que se abre para fazer
+   * alguma coisa; as outras três são consulta ou manutenção rara.
+   */
+  const [aba, setAba] = useState<'tenants' | 'plans' | 'admins' | 'audit'>('tenants')
 
   const loadTenants = useCallback(async () => {
     const plansRes = await platformAPI.listPlans()
@@ -98,6 +110,41 @@ export default function PlatformPage() {
     }
   }
 
+  /**
+   * Apaga um provedor e tudo o que é dele.
+   *
+   * A confirmação pede o SLUG digitado, e não um "tem certeza?". A diferença
+   * importa: um `confirm` é um Enter distraído, e isto não tem volta — leva os
+   * assinantes, os equipamentos, as conversas e a trilha DELE. Digitar o nome
+   * obriga a pessoa a olhar qual linha ela está prestes a apagar, que é
+   * exatamente o erro que a tela precisa impedir.
+   *
+   * A comparação é frouxa de propósito (espaços e caixa), porque o que se quer
+   * provar é atenção, não datilografia.
+   */
+  const apagar = async (tenant: Tenant) => {
+    const digitado = window.prompt(t('platform.deletePrompt', { slug: tenant.slug, provider: tenant.name }))
+    if (digitado === null) return
+    if (digitado.trim().toLowerCase() !== tenant.slug.toLowerCase()) {
+      toast.error(t('platform.deleteMismatch'))
+      return
+    }
+    setBusyId(tenant.id)
+    try {
+      const res = await platformAPI.deleteTenant(tenant.id)
+      if (!res.success) {
+        toast.error(res.message || t('platform.deleteFailed'))
+        return
+      }
+      toast.success(t('platform.deleted', { provider: tenant.name }))
+      // A linha expandida pode ser justamente a que sumiu.
+      setExpandedId(null)
+      await loadTenants()
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   const toggleStatus = async (tenant: Tenant) => {
     const next = tenant.status === 'active' ? 'suspended' : 'active'
     // Only suspending is asked about: it stops every background job for that
@@ -127,23 +174,50 @@ export default function PlatformPage() {
             <h1 className="page-title">{t('platform.title')}</h1>
             <p className="page-description">{t('platform.subtitle')}</p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => (creating ? resetForm() : setCreating(true))}
-              className="modern-button"
-            >
-              <Icon name="building" size={17} />
-              {t(creating ? 'common.cancel' : 'platform.newTenant')}
-            </button>
-            <button type="button" className="modern-button-secondary" disabled={loading} onClick={() => void loadTenants()}>
-              <Icon name="refresh" size={17} className={loading ? 'animate-spin' : ''} />
-              {t('common.refresh')}
-            </button>
-          </div>
+          {/* Os dois botões são da aba de provedores; nas outras eles
+              agiriam sobre o que não está na tela. */}
+          {aba === 'tenants' && (
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => (creating ? resetForm() : setCreating(true))}
+                className="modern-button"
+              >
+                <Icon name="building" size={17} />
+                {t(creating ? 'common.cancel' : 'platform.newTenant')}
+              </button>
+              <button type="button" className="modern-button-secondary" disabled={loading} onClick={() => void loadTenants()}>
+                <Icon name="refresh" size={17} className={loading ? 'animate-spin' : ''} />
+                {t('common.refresh')}
+              </button>
+            </div>
+          )}
         </header>
 
-        {creating && (
+        <nav className="mb-6 flex flex-wrap gap-2" aria-label={t('platform.title')}>
+          {([
+            ['tenants', 'platform.tabs.tenants'],
+            ['plans', 'platform.tabs.plans'],
+            ['admins', 'platform.tabs.admins'],
+            ['audit', 'platform.tabs.audit']
+          ] as const).map(([chave, rotulo]) => (
+            <button
+              key={chave}
+              type="button"
+              onClick={() => setAba(chave)}
+              aria-current={aba === chave ? 'page' : undefined}
+              className={aba === chave ? 'modern-button' : 'modern-button-secondary'}
+            >
+              {t(rotulo)}
+            </button>
+          ))}
+        </nav>
+
+        {aba === 'plans' && <PlanCatalog plans={plans} onChange={() => void loadTenants()} />}
+        {aba === 'admins' && <PlatformAdmins />}
+        {aba === 'audit' && <PlatformAudit />}
+
+        {aba === 'tenants' && creating && (
           <div className="modern-card mb-6 p-5 sm:p-6">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
@@ -184,6 +258,7 @@ export default function PlatformPage() {
           </div>
         )}
 
+        {aba === 'tenants' && (
         <div className="modern-card overflow-x-auto">
           <table className="modern-table">
             <thead>
@@ -285,6 +360,22 @@ export default function PlatformPage() {
                               <Icon name="power" size={17} />
                               {t(active ? 'platform.suspend' : 'platform.reactivate')}
                             </button>
+                            {/* Só de um provedor SUSPENSO: apagar é o fim de
+                                uma conversa que começou com a suspensão, e
+                                exigir os dois passos dá ao cliente a janela
+                                entre "seu painel parou" e "seus dados foram
+                                embora". */}
+                            {!active && (
+                              <button
+                                type="button"
+                                onClick={() => void apagar(tenant)}
+                                disabled={busyId === tenant.id}
+                                className="modern-button-secondary text-destructive"
+                              >
+                                <Icon name="trash" size={17} />
+                                {t('platform.delete')}
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -306,6 +397,7 @@ export default function PlatformPage() {
             </tbody>
           </table>
         </div>
+        )}
       </div>
     </div>
   )

@@ -627,5 +627,18 @@ export default {
   'auth.emailVerified': 'メールアドレスを確認しました',
   'auth.emailVerifyMailSubject': '{provider} のメールアドレスの確認',
   'auth.emailVerifyMailBody': '必要になったときに {provider} のパスワードを再設定できるよう、このアドレスがあなたのものであることを確認してください。\n\n下のリンクを開いてください。リンクは一度だけ有効で、{hours} 時間使用できます:\n\n{link}\n\nこのアドレスを登録した覚えがない場合は、このメールを無視してください。',
+  // コンソール自身の名簿: 王国の鍵を持つのは誰か。
+  'platformAdmin.listed': 'プラットフォーム管理者を取得しました',
+  'platformAdmin.listFailed': 'プラットフォーム管理者の一覧を取得できませんでした',
+  'platformAdmin.identifierRequired': 'ユーザー名またはメールアドレスを入力してください',
+  'platformAdmin.personNotFound': 'この配置にその人物は存在しません',
+  'platformAdmin.granted': 'コントロールプレーンを付与しました',
+  'platformAdmin.alreadyGranted': 'この人物はすでにコントロールプレーンを持っています',
+  'platformAdmin.grantFailed': 'コントロールプレーンの付与に失敗しました',
+  'platformAdmin.invalidId': 'ユーザー ID が不正です',
+  'platformAdmin.notAnAdmin': 'この人物はコントロールプレーンを持っていません',
+  'platformAdmin.lastOne': 'コントロールプレーンには少なくとも 1 人の管理者が必要です。最後の 1 人を外すと全員が永久にコンソールから締め出され、データベースを直接操作しないと戻せません。先に別の人へ付与してください。',
+  'platformAdmin.revoked': 'コントロールプレーンを取り消しました',
+  'platformAdmin.revokeFailed': 'コントロールプレーンの取り消しに失敗しました',
 
 };

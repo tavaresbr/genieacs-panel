@@ -625,5 +625,18 @@ export default {
   'auth.emailVerified': 'Indirizzo email verificato',
   'auth.emailVerifyMailSubject': 'Conferma la tua email su {provider}',
   'auth.emailVerifyMailBody': 'Conferma che questo indirizzo è tuo per poter reimpostare la password su {provider} quando ti servirà.\n\nApri il link qui sotto. Vale una volta sola e per {hours} ore:\n\n{link}\n\nSe non hai registrato tu questo indirizzo, ignora questo messaggio.',
+  // L'elenco della console stessa: chi ha la chiave del regno.
+  'platformAdmin.listed': 'Amministratori della piattaforma recuperati con successo',
+  'platformAdmin.listFailed': 'Impossibile elencare gli amministratori della piattaforma',
+  'platformAdmin.identifierRequired': 'Indica il nome utente o l\'indirizzo e-mail',
+  'platformAdmin.personNotFound': 'Questa persona non esiste in questa installazione',
+  'platformAdmin.granted': 'Piano di controllo concesso',
+  'platformAdmin.alreadyGranted': 'Questa persona ha già il piano di controllo',
+  'platformAdmin.grantFailed': 'Impossibile concedere il piano di controllo',
+  'platformAdmin.invalidId': 'Id persona non valido',
+  'platformAdmin.notAnAdmin': 'Questa persona non ha il piano di controllo',
+  'platformAdmin.lastOne': 'Il piano di controllo deve mantenere almeno un amministratore: rimuovere l\'ultimo blocca tutti fuori dalla console per sempre e solo l\'accesso diretto al database può ripristinarlo. Concedilo prima a qualcun altro.',
+  'platformAdmin.revoked': 'Piano di controllo revocato',
+  'platformAdmin.revokeFailed': 'Impossibile revocare il piano di controllo',
 
 };

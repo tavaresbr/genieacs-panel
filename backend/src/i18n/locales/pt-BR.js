@@ -626,5 +626,18 @@ export default {
   'auth.emailVerified': 'Endereço de e-mail verificado',
   'auth.emailVerifyMailSubject': 'Confirme seu e-mail no {provider}',
   'auth.emailVerifyMailBody': 'Confirme que este endereço é seu para poder redefinir a sua senha no {provider} quando precisar.\n\nAbra o link abaixo. Ele serve uma vez e vale por {hours} horas:\n\n{link}\n\nSe não foi você quem cadastrou este endereço, ignore esta mensagem.',
+  // O cadastro do próprio console: quem tem a chave do reino.
+  'platformAdmin.listed': 'Administradores da plataforma obtidos com sucesso',
+  'platformAdmin.listFailed': 'Falha ao listar os administradores da plataforma',
+  'platformAdmin.identifierRequired': 'Informe o nome de usuário ou o e-mail',
+  'platformAdmin.personNotFound': 'Não existe essa pessoa nesta instalação',
+  'platformAdmin.granted': 'Plano de controle concedido',
+  'platformAdmin.alreadyGranted': 'Esta pessoa já tem o plano de controle',
+  'platformAdmin.grantFailed': 'Falha ao conceder o plano de controle',
+  'platformAdmin.invalidId': 'Id de pessoa inválido',
+  'platformAdmin.notAnAdmin': 'Esta pessoa não tem o plano de controle',
+  'platformAdmin.lastOne': 'O plano de controle precisa manter pelo menos um administrador: remover o último tranca todo mundo para fora do console para sempre, e só o acesso direto ao banco recupera. Conceda a outra pessoa antes.',
+  'platformAdmin.revoked': 'Plano de controle revogado',
+  'platformAdmin.revokeFailed': 'Falha ao revogar o plano de controle',
 
 };

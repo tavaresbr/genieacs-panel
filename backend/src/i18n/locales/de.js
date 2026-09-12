@@ -628,5 +628,18 @@ export default {
   'auth.emailVerified': 'E-Mail-Adresse bestätigt',
   'auth.emailVerifyMailSubject': 'Bestätigen Sie Ihre E-Mail bei {provider}',
   'auth.emailVerifyMailBody': 'Bestätigen Sie, dass diese Adresse Ihnen gehört, damit Sie Ihr Passwort bei {provider} zurücksetzen können, wenn Sie es brauchen.\n\nÖffnen Sie den Link unten. Er funktioniert einmal und ist {hours} Stunden gültig:\n\n{link}\n\nWenn Sie diese Adresse nicht hinterlegt haben, ignorieren Sie diese Nachricht.',
+  // Das Verzeichnis der Konsole selbst: wer den Schlüssel zum Königreich hat.
+  'platformAdmin.listed': 'Plattformadministratoren erfolgreich abgerufen',
+  'platformAdmin.listFailed': 'Plattformadministratoren konnten nicht aufgelistet werden',
+  'platformAdmin.identifierRequired': 'Benutzername oder E-Mail-Adresse ist erforderlich',
+  'platformAdmin.personNotFound': 'Diese Person existiert in dieser Installation nicht',
+  'platformAdmin.granted': 'Steuerungsebene erteilt',
+  'platformAdmin.alreadyGranted': 'Diese Person hat die Steuerungsebene bereits',
+  'platformAdmin.grantFailed': 'Steuerungsebene konnte nicht erteilt werden',
+  'platformAdmin.invalidId': 'Ungültige Personen-ID',
+  'platformAdmin.notAnAdmin': 'Diese Person hat die Steuerungsebene nicht',
+  'platformAdmin.lastOne': 'Die Steuerungsebene muss mindestens einen Administrator behalten: Wird der letzte entfernt, sperrt das alle dauerhaft aus der Konsole aus, und nur ein direkter Datenbankzugriff stellt sie wieder her. Erteilen Sie sie zuerst jemand anderem.',
+  'platformAdmin.revoked': 'Steuerungsebene entzogen',
+  'platformAdmin.revokeFailed': 'Steuerungsebene konnte nicht entzogen werden',
 
 };

@@ -627,5 +627,18 @@ export default {
   'auth.emailVerified': '電子郵件地址已驗證',
   'auth.emailVerifyMailSubject': '確認您在 {provider} 的電子郵件',
   'auth.emailVerifyMailBody': '請確認此地址屬於您，以便日後需要時可以重設您在 {provider} 的密碼。\n\n開啟下方連結。此連結僅能使用一次，有效期 {hours} 小時：\n\n{link}\n\n若此地址並非您所登記，請忽略此訊息。',
+  // 主控台自身的名冊：誰握有王國的鑰匙。
+  'platformAdmin.listed': '平台管理員取得成功',
+  'platformAdmin.listFailed': '無法列出平台管理員',
+  'platformAdmin.identifierRequired': '請填寫使用者名稱或電子郵件',
+  'platformAdmin.personNotFound': '本部署中沒有這個人',
+  'platformAdmin.granted': '已授予控制平面權限',
+  'platformAdmin.alreadyGranted': '此人已擁有控制平面權限',
+  'platformAdmin.grantFailed': '授予控制平面權限失敗',
+  'platformAdmin.invalidId': '無效的使用者 ID',
+  'platformAdmin.notAnAdmin': '此人沒有控制平面權限',
+  'platformAdmin.lastOne': '控制平面必須至少保留一位管理員：移除最後一位會讓所有人永遠被擋在主控台之外，只有直接操作資料庫才能復原。請先授予其他人。',
+  'platformAdmin.revoked': '已撤銷控制平面權限',
+  'platformAdmin.revokeFailed': '撤銷控制平面權限失敗',
 
 };

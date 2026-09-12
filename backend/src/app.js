@@ -31,6 +31,7 @@ import mapSettingsRoutes from './routes/mapSettings.js';
 import databaseRoutes from './routes/database.js';
 import platformRoutes from './routes/platform.js';
 import platformMemberRoutes from './routes/platformMembers.js';
+import platformAdminRoutes from './routes/platformAdmins.js';
 import platformBillingRoutes from './routes/platformBilling.js';
 import userRoutes from './routes/users.js';
 import inviteRoutes from './routes/invites.js';
@@ -277,6 +278,10 @@ if (IS_SAAS) {
   // the split is only so two lanes could build them without sharing a file.
   app.use('/api/platform', platformRoutes);
   app.use('/api/platform', platformMemberRoutes);
+  // E o cadastro do próprio console: quem tem a chave dele. Montado aqui
+  // dentro como os outros, e não fora, porque um plano de controle que não
+  // existe não tem a quem conceder.
+  app.use('/api/platform', platformAdminRoutes);
   // E a terceira: planos, assinaturas e pagamentos — a Fase 5.
   app.use('/api/platform', platformBillingRoutes);
 }

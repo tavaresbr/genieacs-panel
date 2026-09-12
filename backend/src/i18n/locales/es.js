@@ -624,5 +624,18 @@ export default {
   'auth.emailVerified': 'Dirección de correo verificada',
   'auth.emailVerifyMailSubject': 'Confirma tu correo en {provider}',
   'auth.emailVerifyMailBody': 'Confirma que esta dirección es tuya para poder restablecer tu contraseña en {provider} cuando lo necesites.\n\nAbre el enlace de abajo. Sirve una vez y es válido durante {hours} horas:\n\n{link}\n\nSi no registraste esta dirección, ignora este mensaje.',
+  // El registro de la propia consola: quién tiene la llave del reino.
+  'platformAdmin.listed': 'Administradores de la plataforma obtenidos correctamente',
+  'platformAdmin.listFailed': 'No se pudieron listar los administradores de la plataforma',
+  'platformAdmin.identifierRequired': 'Indica el nombre de usuario o el correo electrónico',
+  'platformAdmin.personNotFound': 'No existe esa persona en esta instalación',
+  'platformAdmin.granted': 'Plano de control concedido',
+  'platformAdmin.alreadyGranted': 'Esta persona ya tiene el plano de control',
+  'platformAdmin.grantFailed': 'No se pudo conceder el plano de control',
+  'platformAdmin.invalidId': 'Id de persona no válido',
+  'platformAdmin.notAnAdmin': 'Esta persona no tiene el plano de control',
+  'platformAdmin.lastOne': 'El plano de control debe conservar al menos un administrador: quitar el último deja a todos fuera de la consola para siempre y solo se recupera con acceso directo a la base de datos. Concédeselo antes a otra persona.',
+  'platformAdmin.revoked': 'Plano de control revocado',
+  'platformAdmin.revokeFailed': 'No se pudo revocar el plano de control',
 
 };
