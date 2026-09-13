@@ -432,6 +432,60 @@ describe('the grant script', () => {
     assert.equal((await rosterFor(DONA.username)).length, 0);
   });
 
+  /**
+   * `--create`: a conta de plataforma que não pertence a provedor nenhum.
+   *
+   * É o que desfaz a contradição de origem — até aqui a primeira chave nascia
+   * no `/setup`, que cria o primeiro operador de UM provedor e o põe no
+   * cadastro de quebra, fazendo da conta-raiz da plataforma um membro do
+   * provedor `default`.
+   */
+  describe('--create', () => {
+    const NOVA = { username: 'so-plataforma', email: 'so-plataforma@exemplo.test' };
+    const criar = (args, senha) => spawnSync(process.execPath, [script, ...args], {
+      env: { ...process.env, PLATFORM_ADMIN_PASSWORD: senha ?? '' },
+      encoding: 'utf8'
+    });
+
+    it('cria a conta com a chave e SEM vínculo com provedor nenhum', async () => {
+      const run = criar([NOVA.username, '--create', '--email', NOVA.email], 'senha-da-plataforma-1');
+      assert.equal(run.status, 0, run.stderr);
+      assert.match(run.stdout, /created/i);
+
+      const user = await getDb()('users').where({ username: NOVA.username }).first();
+      assert.ok(user, 'a conta não foi criada');
+      assert.equal((await rosterFor(NOVA.username)).length, 1, 'a conta não entrou no cadastro');
+      // O ponto inteiro do modo: nenhuma linha em `tenant_users`.
+      assert.deepEqual(await getDb()('tenant_users').where({ user_id: user.id }), []);
+    });
+
+    // Sem vínculo, o login de um host de provedor não tem provedor em que a
+    // pôr — e recusa com o mesmo 401 de senha errada, como sempre fez.
+    it('e essa conta não entra no painel de provedor nenhum', async () => {
+      const { status } = await signIn({ username: NOVA.username, password: 'senha-da-plataforma-1' });
+      assert.equal(status, 401);
+    });
+
+    it('recusa um nome que já existe, e não escreve nada', async () => {
+      const antes = await getDb()('users').count({ n: '*' }).first();
+      const run = criar([NOVA.username, '--create', '--email', 'outro@exemplo.test'], 'senha-da-plataforma-1');
+      assert.equal(run.status, 1);
+      assert.deepEqual(await getDb()('users').count({ n: '*' }).first(), antes);
+    });
+
+    it('recusa sem e-mail e com senha curta, que são as duas pernas da conta', async () => {
+      const semEmail = criar(['outra-conta', '--create'], 'senha-da-plataforma-1');
+      assert.equal(semEmail.status, 1);
+      assert.match(semEmail.stderr, /email/i);
+
+      const senhaCurta = criar(['outra-conta', '--create', '--email', 'outra@exemplo.test'], 'curta');
+      assert.equal(senhaCurta.status, 1);
+      assert.match(senhaCurta.stderr, /password/i);
+
+      assert.equal(await getDb()('users').where({ username: 'outra-conta' }).first(), undefined);
+    });
+  });
+
   it('refuses a name that belongs to nobody, and writes nothing', async () => {
     const before_ = await getDb()('platform_admins');
     const run = grant('ninguem');

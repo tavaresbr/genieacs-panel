@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import Tenant from '../models/Tenant.js';
 import { providerFor, PROVEDORES } from '../services/billing/registry.js';
 import ImpersonationTicket from '../models/ImpersonationTicket.js';
-import { panelBaseDomain } from '../middleware/tenantResolver.js';
+import { panelBaseDomain, usesTenantSubdomains } from '../middleware/tenantResolver.js';
 import { METRICS_CONTENT_TYPE, renderMetrics } from '../utils/metrics.js';
 import Subscription from '../models/Subscription.js';
 import SubscriptionService from '../services/subscriptionService.js';
@@ -659,10 +659,20 @@ class PlatformController {
           'Type the provider slug exactly to confirm the deletion'
         ));
       }
-      // O último provedor não sai: sem nenhum, `resolveDefaultTenantId` devolve
-      // null e o deployment inteiro passa a responder 503 — inclusive para quem
-      // acabou de apagar, que perde a rota para desfazer.
-      if ((await Tenant.list()).length <= 1) {
+      // O último provedor não sai — onde ele é o que sustenta o deployment.
+      //
+      // A regra existe por uma razão só, e ela é de resolução: sem nenhum
+      // provedor, `resolveDefaultTenantId` devolve null e o deployment inteiro
+      // passa a responder 503, inclusive para quem acabou de apagar, que perde
+      // a rota para desfazer. Isso vale onde o host NÃO nomeia provedor.
+      //
+      // Onde há domínio-base nada disso se aplica: o provedor vem do host,
+      // `resolveDefaultTenantId` nunca é chamado, e o console vive no endereço
+      // da plataforma — que continua de pé. Um SaaS com zero provedores é um
+      // estado coerente: é um SaaS que ainda não tem clientes, ou que acabou de
+      // perder o último. Proibir apagar ali seria obrigar todo deploy a manter
+      // para sempre o provedor `default` que a migração criou sozinha.
+      if (!usesTenantSubdomains() && (await Tenant.list()).length <= 1) {
         return res.status(409).json(createErrorResponse(
           'The deployment must keep at least one provider'
         ));
