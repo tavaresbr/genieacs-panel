@@ -32,6 +32,7 @@ const { default: Setting } = await import('../src/models/Setting.js');
 const { default: AppState } = await import('../src/models/AppState.js');
 const { default: Subscription } = await import('../src/models/Subscription.js');
 const { default: BillingEvent } = await import('../src/models/BillingEvent.js');
+const { default: BillingCharge } = await import('../src/models/BillingCharge.js');
 const { default: SubscriptionService } = await import('../src/services/subscriptionService.js');
 
 /**
@@ -583,6 +584,42 @@ describe('the subscription and the statement', () => {
     const mine = await runInTenant(alfa, () => Subscription.current());
     assert.equal(mine.status, 'active');
     assert.equal(mine.canceled_at, null);
+  });
+
+  /**
+   * A cobrança emitida carrega um LINK DE PAGAMENTO, e é isso que a torna pior
+   * que o extrato se vazar: o extrato do vizinho diz quanto ele paga; o link do
+   * vizinho é um endereço onde se paga a conta dele. As duas cobranças abaixo
+   * têm de propósito o mesmo `period_end` — a chave única é por provedor, e um
+   * único global faria a segunda inserção falhar em vez de coexistir.
+   */
+  it('shows each provider only its own charge, link and all', async () => {
+    const MESMO_PERIODO = '2026-10-31';
+    const aberta = async (tenantId, sufixo) => runInTenant(tenantId, async () => {
+      const id = await BillingCharge.open({
+        periodEnd: MESMO_PERIODO, amountCents: 19990, currency: 'BRL', provider: 'asaas'
+      });
+      await BillingCharge.markIssued(id, {
+        gatewayChargeId: `pay_${sufixo}`,
+        invoiceUrl: `https://gateway.exemplo.test/i/pay_${sufixo}`
+      });
+    });
+    await aberta(alfa, 'alfa');
+    await aberta(beta, 'beta');
+
+    const minha = await runInTenant(alfa, () => BillingCharge.currentOpen());
+    const dele = await runInTenant(beta, () => BillingCharge.currentOpen());
+    assert.equal(minha.gateway_charge_id, 'pay_alfa');
+    assert.equal(dele.gateway_charge_id, 'pay_beta');
+    assert.ok(!minha.invoice_url.includes('beta'), 'o link de pagamento do vizinho');
+
+    // E a busca pelo id do gateway — o caminho que o webhook usa para quitar —
+    // não alcança a cobrança do vizinho nem quando o id é o dele.
+    assert.equal(await runInTenant(alfa, () => BillingCharge.byGatewayId('pay_beta')), null);
+
+    // Nem a listagem de períodos anteriores, que é o que cancela cobrança velha.
+    const antigasDoAlfa = await runInTenant(alfa, () => BillingCharge.openBefore('2026-12-01'));
+    assert.deepEqual(antigasDoAlfa.map((c) => c.gateway_charge_id), ['pay_alfa']);
   });
 });
 

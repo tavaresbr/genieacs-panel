@@ -35,7 +35,7 @@ class Plan {
 
   /**
    * O plano que um provedor novo recebe: o ativo com mais dias de teste, e na
-   * falta de qualquer um com teste, o `unlimited` que a migração 0034 garante.
+   * falta de qualquer um com teste, o `unlimited` que a migração 0035 garante.
    * Escolhido por regra e não por coluna "default" porque uma coluna dessas é
    * uma segunda coisa para manter em dia — e ninguém lembra de mudar o default
    * quando cria o plano novo.

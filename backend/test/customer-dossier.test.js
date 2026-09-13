@@ -134,6 +134,25 @@ describe('o dossiê reúne o que está espalhado', () => {
     assert.ok(arquivo.manifest.omittedTables.settings);
     assert.ok(arquivo.manifest.omittedTables.billing_events);
   });
+
+  /**
+   * E nomeia TODAS elas.
+   *
+   * Afirmar duas chaves deixava o manifesto mentir por omissão no dia em que
+   * uma tabela escopada nova entrasse: ela não estaria nos dados (não é do
+   * assinante) nem na lista do que ficou de fora, e quem lesse o arquivo não
+   * teria como saber que ela existe. A conta é sobre o conjunto: toda tabela
+   * escopada está ou nos dados, ou declarada com o motivo escrito.
+   */
+  it('e nenhuma tabela escopada fica fora das duas listas', async () => {
+    const { SCOPED_TABLES } = await import('../src/config/tenantScope.js');
+    const arquivo = await dossie();
+    const nosDados = new Set(Object.keys(arquivo.data));
+    const declaradas = new Set(Object.keys(arquivo.manifest.omittedTables));
+    const orfas = [...SCOPED_TABLES].filter((t) => !nosDados.has(t) && !declaradas.has(t));
+    assert.deepEqual(orfas, [],
+      `tabelas escopadas que o manifesto não menciona: ${orfas.join(', ')}`);
+  });
 });
 
 describe('nada do vizinho', () => {

@@ -14,6 +14,15 @@ export class ManualBillingProvider extends BillingProvider {
     return 'manual';
   }
 
+  /**
+   * Não emite, e é o que "manual" quer dizer: alguém recebeu o dinheiro por
+   * fora e veio marcar. Não há a quem pedir cobrança, e um `createCharge` aqui
+   * seria uma função que finge.
+   */
+  get canIssue() {
+    return false;
+  }
+
   async recordPayment({ amountCents, currency, externalId = null, actorUserId = null, now }) {
     return SubscriptionService.recordPayment({
       amountCents,

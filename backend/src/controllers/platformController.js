@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import Tenant from '../models/Tenant.js';
+import { providerFor, PROVEDORES } from '../services/billing/registry.js';
 import ImpersonationTicket from '../models/ImpersonationTicket.js';
 import { panelBaseDomain, usesTenantSubdomains } from '../middleware/tenantResolver.js';
 import { METRICS_CONTENT_TYPE, renderMetrics } from '../utils/metrics.js';
@@ -322,6 +323,18 @@ class PlatformController {
 
       if (nome !== undefined && nome.length > 32) {
         return res.status(400).json(createErrorResponse('Gateway name is too long'));
+      }
+      // E tem que ser um gateway que existe. Um `asas` digitado errado passaria
+      // pelo tamanho, e o job de emissão responderia `not_linked` para sempre —
+      // sem ruído nenhum, porque "não está ligado" é uma resposta legítima. O
+      // cliente ficaria sem cobrança e ninguém saberia por quê.
+      if (nome) {
+        const conhecido = providerFor(nome);
+        if (!conhecido) {
+          return res.status(400).json(createErrorResponse(
+            `Unknown billing gateway "${nome}"; known: ${[...PROVEDORES.keys()].join(', ')}`
+          ));
+        }
       }
       if (ref !== undefined && ref.length > 128) {
         return res.status(400).json(createErrorResponse('Gateway customer reference is too long'));

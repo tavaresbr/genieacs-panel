@@ -37,6 +37,19 @@ function parseLimit(value) {
   return { ok: true, value: n };
 }
 
+/**
+ * O período pago: inteiro ≥ 1. Parser próprio e não `parseLimit`, porque
+ * `parseLimit` aceita zero — e zero aqui é uma assinatura que vence no instante
+ * em que é paga, que não é um plano, é um bug esperando um cliente. Ausente ou
+ * vazio é "não mexer"; quem cria sem dizer nada recebe o default da coluna.
+ */
+function parsePeriodDays(value) {
+  if (value === null || value === undefined || value === '') return { ok: true, value: null };
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 1) return { ok: false };
+  return { ok: true, value: n };
+}
+
 function presentPlan(plan) {
   return {
     id: plan.id,
@@ -46,6 +59,9 @@ function presentPlan(plan) {
     priceCents: Number(plan.price_cents ?? 0),
     currency: plan.currency,
     trialDays: Number(plan.trial_days ?? 0),
+    // Quanto tempo um pagamento compra. Sem isto a tela nunca vê o campo, e um
+    // plano anual seria criável só por SQL.
+    periodDays: Number(plan.period_days ?? 30),
     active: Boolean(plan.active),
     createdAt: plan.created_at ?? null
   };
@@ -123,8 +139,15 @@ class PlatformBillingController {
       if (!price.ok || !trial.ok) {
         return res.status(400).json(createErrorResponse('priceCents and trialDays must be non-negative integers'));
       }
+      const periodo = parsePeriodDays(body.periodDays);
+      if (!periodo.ok) {
+        return res.status(400).json(createErrorResponse('periodDays must be an integer of at least 1'));
+      }
       row.price_cents = price.value ?? 0;
       row.trial_days = trial.value ?? 0;
+      // Ausente fica com o default da coluna, e não com um 30 repetido aqui: a
+      // segunda cópia de um default é a que diverge quando a primeira muda.
+      if (periodo.value !== null) row.period_days = periodo.value;
       row.currency = String(body.currency ?? 'BRL').toUpperCase().slice(0, 3);
       row.active = body.active === undefined ? true : Boolean(body.active);
 
@@ -176,6 +199,15 @@ class PlatformBillingController {
           return res.status(400).json(createErrorResponse(`${key} must be a non-negative integer or null`));
         }
         patch[column] = (column === 'price_cents' || column === 'trial_days') ? (parsed.value ?? 0) : parsed.value;
+      }
+      if (body.periodDays !== undefined) {
+        const periodo = parsePeriodDays(body.periodDays);
+        // Vazio não apaga: a coluna é NOT NULL, e um campo em branco na tela
+        // significa "não mudei isto" e nunca "esta assinatura não tem prazo".
+        if (!periodo.ok) {
+          return res.status(400).json(createErrorResponse('periodDays must be an integer of at least 1'));
+        }
+        if (periodo.value !== null) patch.period_days = periodo.value;
       }
       if (body.currency !== undefined) patch.currency = String(body.currency).toUpperCase().slice(0, 3);
       if (body.active !== undefined) patch.active = Boolean(body.active);
