@@ -350,10 +350,16 @@ Quatro abas em `/platform`:
 
 - `JWT_SECRET` / `PORTAL_JWT_SECRET`: trocar e reiniciar. Toda sessão cai; nenhum dado
   se perde.
-- `SECRET_BOX_KEY`: **não** trocar sem plano. O que ela cifra (credencial NBI de cada
-  provedor, senha de portal) fica ilegível. O `key_version` gravado junto de cada valor
-  existe para a rotação com as duas chaves vivas, que é trabalho de uma onda própria e
-  ainda não tem comando.
+- `SECRET_BOX_KEY`: trocar **com as duas chaves vivas e rodando `rotate-key`**. A nova em
+  `SECRET_BOX_KEY`, a anterior em `SECRET_BOX_KEY_PREVIOUS`, e então
+  `skygenpanel rotate-key` — que reescreve todo segredo guardado com a chave viva. Sem
+  esse passo, uma linha só migra quando alguém a edita, e limpar a chave anterior do
+  `.env` torna ilegível o que não migrou. O comando recusa em vez de adivinhar: um
+  segredo que nenhuma chave do processo abre para a execução inteira, e nada é reescrito.
+  `--dry-run` conta antes, por versão.
+  **A chave anterior continua necessária para os BACKUPS** tirados antes da troca — a
+  retenção guarda perto de um ano deles, e `backup verify` recusa um restore cuja chave
+  não bate. Arquive a chave antiga junto com os dumps antes de tirá-la do `.env`.
 - `METRICS_TOKEN`: trocar, reiniciar, atualizar o coletor.
 
 ## 7. Entrar no painel de um cliente
@@ -416,12 +422,6 @@ assinantes, nada. Uma caixa de entrada alheia não é lugar onde isso mora.
 
 - Gateway de cobrança, **a metade que emite**. A metade que RECEBE já existe: ver
   a seção 10.
-- O **comando de re-cifra** da rotação da `SECRET_BOX_KEY`. As duas chaves vivas
-  já existem e já funcionam: pôr a chave antiga em `SECRET_BOX_KEY_PREVIOUS` faz
-  o painel LER o que foi cifrado com ela e ESCREVER só com a nova. O que não
-  existe é o passo que percorre as linhas antigas e as reescreve — sem ele, uma
-  linha só migra quando alguém a edita, e a chave antiga tem que continuar no
-  `.env` indefinidamente.
 
 ## 10. Receber pagamento sozinho
 

@@ -66,3 +66,44 @@ export async function forEachTenant(job, { onError } = {}) {
   }
   return results;
 }
+
+/**
+ * O mesmo laço, mas visitando TODO provedor — inclusive o suspenso.
+ *
+ * Existe para uma pergunta só, e é uma pergunta diferente da que `forEachTenant`
+ * responde. Aquele pergunta "quem está trabalhando?", e `active` é a resposta
+ * certa: o suspenso não deve ter mensagem enviada, alerta disparado nem ERP
+ * reconciliado. Este pergunta **"de quem eu ainda guardo dado?"** — e aí o
+ * status não decide nada. Um provedor suspenso continua sendo o titular de CPF,
+ * contrato, PPPoE e conversa inteira de assinante.
+ *
+ * O que havia antes era pior do que parece: `forEachTenant` roda a retenção, e
+ * a retenção é o que dá PRAZO ao dado. Sem visita, o suspenso não ficava
+ * "congelado" — ficava guardando para sempre, inclusive a trilha, que num
+ * provedor ativo tem prazo de um ano. E não existe prazo de suspensão nem
+ * exclusão automática, então "para sempre" é literal.
+ *
+ * O precedente já estava no repositório, a uma função de distância:
+ * `waMediaSweeper.soleProvider()` conta provedores **de todo status**, de
+ * propósito, porque a pergunta dele também é de existência e não de atividade.
+ *
+ * Uma coisa fica dita: a exclusão em duas etapas trata a suspensão como
+ * "ninguém está trabalhando lá dentro" (`platformController`), e uma poda é,
+ * por definição, trabalho acontecendo lá dentro. A premissa continua valendo
+ * para o que importa a ela — nenhuma sessão, nenhum envio, nenhuma escrita
+ * vinda de fora —, mas deixou de ser literal, e quem mexer naquele caminho
+ * precisa saber disto.
+ */
+export async function forEveryTenant(job, { onError } = {}) {
+  const tenants = await getDb()('tenants').orderBy('id', 'asc');
+  const results = [];
+  for (const tenant of tenants) {
+    try {
+      results.push(await runInTenant(tenant.id, () => job(tenant)));
+    } catch (error) {
+      if (onError) onError(error, tenant);
+      else console.warn(`Retention pass failed for provider ${tenant.slug}: ${error.message}`);
+    }
+  }
+  return results;
+}

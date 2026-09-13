@@ -1508,6 +1508,8 @@ const hi: Dictionary = {
   'platform.operators': '{count} ऑपरेटर',
   'platform.statusActive': 'सक्रिय',
   'platform.statusSuspended': 'निलंबित',
+  'platform.suspendedSince': '{when} से',
+  'platform.suspendedSinceUnknown': 'कब से: पता नहीं',
   'platform.suspend': 'निलंबित करें',
   'platform.reactivate': 'फिर से सक्रिय करें',
   'platform.suspendConfirm': 'निलंबित सेवा प्रदाता का हर पृष्ठभूमि कार्य रुक जाता है — न भेजना, न सफ़ाई, न ERP को कुछ पहुँचाना — और वहाँ कोई साइन इन नहीं कर सकता। कुछ भी हटाया नहीं जाता, और इसे फिर से सक्रिय किया जा सकता है।',

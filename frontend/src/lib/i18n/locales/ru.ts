@@ -1535,6 +1535,8 @@ const ru: Dictionary = {
   'platform.operators': 'Операторов: {count}',
   'platform.statusActive': 'Активен',
   'platform.statusSuspended': 'Приостановлен',
+  'platform.suspendedSince': 'С {when}',
+  'platform.suspendedSinceUnknown': 'С какого момента: неизвестно',
   'platform.suspend': 'Приостановить',
   'platform.reactivate': 'Возобновить',
   'platform.suspendConfirm': 'Приостановленный провайдер останавливает всю фоновую работу — ничего не отправляется, не очищается, не принимается от ERP — и войти туда нельзя. Ничего не удаляется, и это обратимо.',

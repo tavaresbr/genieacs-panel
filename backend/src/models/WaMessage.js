@@ -63,6 +63,51 @@ class WaMessage {
   }
 
   /**
+   * A linha de saída que este eco É, se ela já existe aqui.
+   *
+   * O servidor ecoa toda mensagem que sai como evento de entrada. Quando o eco
+   * de uma mensagem que o PAINEL mandou chega antes de a confirmação de saída
+   * gravar o `external_id`, o eco não tinha como se reconhecer — a única
+   * deduplicação de entrada é por `external_id`, e a linha do operador ainda
+   * está com ele nulo, que é a premissa exata da corrida. Então o eco inseria
+   * uma linha nova, e a conversa ficava com DUAS bolhas iguais: a do operador,
+   * congelada em "enviada" para sempre, e a do eco, que recebe os recibos.
+   *
+   * Para quem lê a tela, isso é o cliente ter recebido a mensagem duas vezes —
+   * o oposto do que o tratamento de unicidade no worker existe para evitar.
+   *
+   * Adotar em vez de inserir resolve as três pontas de uma vez: uma bolha só, o
+   * `external_id` na linha que o operador vê, e o recibo passando a encontrá-la.
+   *
+   * A mais ANTIGA primeiro, que é a ordem de envio: com dois textos iguais
+   * seguidos, casar pelo fim trocaria os dois ids entre si.
+   *
+   * @returns {Promise<number|null>} o id adotado, ou null para inserir normal.
+   */
+  static async adoptEcho({ conversationId, body, externalId }) {
+    const candidata = await tdb('wa_messages')
+      .where({ conversation_id: conversationId, direction: 'out', is_note: false })
+      .whereNull('external_id')
+      // Uma linha ainda `queued` não saiu: o eco dela não existe. Estas duas são
+      // os estados em que o despacho já aconteceu.
+      .whereIn('delivery_status', ['sending', 'sent'])
+      .where((q) => (body === null ? q.whereNull('body') : q.where({ body })))
+      .orderBy('id', 'asc')
+      .first();
+    if (!candidata) return null;
+
+    // O `whereNull` de novo, e não é redundante: entre a leitura acima e esta
+    // escrita, a confirmação de saída pode ter gravado o `external_id`. Aí esta
+    // atualização casa zero linhas, quem chamou insere, e o índice único decide
+    // — que é o mesmo desenho da garra do outbox.
+    const mudou = await tdb('wa_messages')
+      .where({ id: candidata.id })
+      .whereNull('external_id')
+      .update({ external_id: externalId, updated_at: new Date() });
+    return mudou > 0 ? candidata.id : null;
+  }
+
+  /**
    * One page of a thread, newest first.
    *
    * `before` is a keyset cursor — the id of the oldest row the caller already

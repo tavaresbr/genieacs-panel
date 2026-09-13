@@ -76,7 +76,12 @@ function present(tenant, operators, subscription = null) {
       trialEndsAt: subscription.trial_ends_at ?? null,
       renewsAt: subscription.renews_at ?? null
     } : null,
-    createdAt: tenant.created_at ?? null
+    createdAt: tenant.created_at ?? null,
+    // Desde quando está suspenso — e `null` é resposta, não ausência: ou o
+    // provedor está ativo, ou foi suspenso antes de a coluna existir e a trilha
+    // não guardou. A tela distingue os dois pelo `status`, e não inventa data
+    // para nenhum dos casos.
+    suspendedAt: tenant.suspended_at ?? null
   };
 }
 

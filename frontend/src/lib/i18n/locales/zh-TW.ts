@@ -1528,6 +1528,8 @@ const zhTW: Dictionary = {
   'platform.operators': '{count} 名操作員',
   'platform.statusActive': '啟用',
   'platform.statusSuspended': '已暫停',
+  'platform.suspendedSince': '自 {when}',
+  'platform.suspendedSinceUnknown': '起始時間不明',
   'platform.suspend': '暫停',
   'platform.reactivate': '重新啟用',
   'platform.suspendConfirm': '暫停的服務商會停止所有背景工作——不再傳送、不再清理、不再接收 ERP 投遞——且無人可以登入。不會刪除任何資料，可以隨時恢復。',

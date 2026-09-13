@@ -234,10 +234,35 @@ class Tenant {
     return changed > 0;
   }
 
+  /**
+   * O status, e a data que anda com ele.
+   *
+   * `suspended_at` é escrita AQUI e não no controlador porque este é o ponto
+   * único por onde toda mudança de status passa — é o que garante que a data e
+   * o status não possam divergir. No controlador, a garantia dependeria de
+   * quem chama lembrar.
+   *
+   * O `COALESCE` é o detalhe que importa: suspender quem JÁ está suspenso não
+   * pode reiniciar o relógio. Sem ele, "parado há oito meses" vira "parado há
+   * um minuto" porque alguém clicou duas vezes, ou porque uma automação
+   * reafirmou o estado — e o número menor não parece errado, que é o que torna
+   * esse defeito invisível. Feito na própria escrita, e não lendo a linha
+   * antes, porque uma instrução só não tem corrida no meio.
+   *
+   * Reativar zera a coluna, então uma suspensão futura começa a contar do zero.
+   */
   static async setStatus(id, status) {
-    const changed = await getDb()('tenants')
+    const db = getDb();
+    const agora = new Date();
+    const changed = await db('tenants')
       .where({ id })
-      .update({ status, updated_at: new Date() });
+      .update({
+        status,
+        updated_at: agora,
+        suspended_at: status === 'suspended'
+          ? db.raw('COALESCE(suspended_at, ?)', [agora])
+          : null
+      });
     return changed > 0;
   }
 }
