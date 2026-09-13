@@ -282,6 +282,55 @@ describe('suspending and reactivating', () => {
   });
 
   /**
+   * Desde quando.
+   *
+   * `tenants` tinha só `created_at` e `updated_at`, e o segundo é sobrescrito
+   * por qualquer renomeação ou edição de cadastro — então ninguém respondia
+   * "há quanto tempo este provedor está parado?". Com dois estados só, sem
+   * prazo de suspensão e sem exclusão automática, a diferença entre uma semana
+   * e dois anos guardando CPF, contrato e a conversa dos assinantes não
+   * aparecia em lugar nenhum.
+   */
+  describe('desde quando está suspenso', () => {
+    const linha = () => getDb()('tenants').where({ id: outraId }).first();
+
+    const mudar = (status) => platform(`/tenants/${outraId}`, {
+      method: 'PATCH', body: { status }
+    });
+
+    it('grava a data ao suspender e a devolve ao console', async () => {
+      const { body } = await mudar('suspended');
+      assert.ok(body.data.tenant.suspendedAt, 'o console não recebeu a data');
+      assert.ok((await linha()).suspended_at, 'a coluna ficou vazia');
+    });
+
+    it('e NÃO reinicia o relógio quando a suspensão é reafirmada', async () => {
+      // O caso que o COALESCE existe para atender. Sem ele o defeito é
+      // invisível: a tela só mostra um número menor, e um número menor não
+      // parece errado.
+      const antes = (await linha()).suspended_at;
+      await new Promise((resolve) => { setTimeout(resolve, 1100); });
+
+      await mudar('suspended');
+
+      const depois = (await linha()).suspended_at;
+      assert.equal(
+        new Date(depois).getTime(), new Date(antes).getTime(),
+        'clicar duas vezes em suspender rejuvenesceu o provedor'
+      );
+    });
+
+    it('reativar zera, e a suspensão seguinte conta do zero', async () => {
+      await mudar('active');
+      assert.equal((await linha()).suspended_at, null, 'a data sobreviveu à reativação');
+
+      await mudar('suspended');
+      assert.ok((await linha()).suspended_at, 'a suspensão seguinte não começou a contar');
+      await mudar('active');
+    });
+  });
+
+  /**
    * Apagar existe desde a onda 22, e o que este caso fixa é que ele não
    * acontece por acidente: um provedor ATIVO não sai, por mais autorizado que
    * seja quem pede. Suspender primeiro é o que faz da exclusão dois passos com

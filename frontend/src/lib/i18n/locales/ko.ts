@@ -1534,6 +1534,8 @@ const ko: Dictionary = {
   'platform.operators': '운영자 {count}명',
   'platform.statusActive': '활성',
   'platform.statusSuspended': '중지됨',
+  'platform.suspendedSince': '{when}부터',
+  'platform.suspendedSinceUnknown': '언제부터인지 알 수 없음',
   'platform.suspend': '중지',
   'platform.reactivate': '다시 활성화',
   'platform.suspendConfirm': '중지된 사업자는 모든 백그라운드 작업을 멈춥니다. 발송도, 정리도, ERP 수신도 하지 않으며 아무도 로그인할 수 없습니다. 데이터는 삭제되지 않고 다시 활성화할 수 있습니다.',

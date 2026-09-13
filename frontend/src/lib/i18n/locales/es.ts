@@ -1527,6 +1527,8 @@ const es: Dictionary = {
   'platform.operators': '{count} operador(es)',
   'platform.statusActive': 'Activo',
   'platform.statusSuspended': 'Suspendido',
+  'platform.suspendedSince': 'Desde {when}',
+  'platform.suspendedSinceUnknown': 'Desde cuándo: se desconoce',
   'platform.suspend': 'Suspender',
   'platform.reactivate': 'Reactivar',
   'platform.suspendConfirm': 'Un proveedor suspendido detiene todo el trabajo en segundo plano — no envía, no limpia, no recibe entregas del ERP — y nadie puede entrar. No se borra nada y se puede reactivar.',
