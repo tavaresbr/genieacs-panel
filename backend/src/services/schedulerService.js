@@ -10,6 +10,7 @@ import AuthTicket from '../models/AuthTicket.js';
 import ImpersonationTicket from '../models/ImpersonationTicket.js';
 import { refreshDeploymentSharing } from './genieacsEgress.js';
 import SubscriptionNoticeService from './subscriptionNoticeService.js';
+import ChargeIssuingService from './chargeIssuingService.js';
 import {
   dueForRefresh, isDormant, lastPanelActivityAt, refreshTtlMs, tenantOffsetMs
 } from './dashboardSchedule.js';
@@ -224,6 +225,29 @@ class SchedulerService {
       .catch((error) => {
         console.warn(`Could not send the subscription notice: ${error.message}`);
         return { sent: false, reason: 'error' };
+      });
+
+    // A emissão, logo depois do aviso e pelas mesmas razões — provedor em
+    // escopo, sem cadência própria, com o `tenant` vindo do laço.
+    //
+    // Depois e não antes, e a ordem importa: o aviso conta os dias até o prazo,
+    // e a emissão, quando acontece, é o que dá ao provedor o link para pagar.
+    // Emitir primeiro faria o aviso da MESMA passada já sair com a cobrança
+    // recém-criada em mãos — o que é melhor, e é exatamente por isso que não se
+    // faz aqui: a emissão fala com um sistema de fora e pode demorar ou falhar,
+    // e um aviso que depende dela vira um aviso que não sai quando o gateway
+    // está fora do ar.
+    //
+    // O custo dessa escolha é real e vale dizer: o PRIMEIRO aviso de um ciclo
+    // sai com o endereço do painel, e não com o link de pagamento, porque a
+    // cobrança dele nasce depois. Os seguintes levam o link — e a marca
+    // `expiry_warned_for` faz o primeiro ser também o único, então na prática
+    // o link chega no aviso de um prazo que mudou. É o preço de o aviso não
+    // depender do gateway, e é mais barato que o contrário.
+    summary.chargeIssued = await ChargeIssuingService.issueCurrent({ tenant })
+      .catch((error) => {
+        console.warn(`Could not issue the subscription charge: ${error.message}`);
+        return { issued: false, reason: 'error' };
       });
 
     const provisioningConfig = await ProvisioningService.getConfig();

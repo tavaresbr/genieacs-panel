@@ -108,7 +108,12 @@ export const SCOPED_TABLES = new Set([
   // plano e uso é do próprio provedor, e o extrato é dado financeiro dele — sai
   // no export e some na exclusão, como tudo que é dele.
   'subscriptions',
-  'billing_events'
+  'billing_events',
+  // A cobrança que o painel emitiu para este provedor. Escopada pelo mesmo
+  // motivo das duas acima, e com uma consequência a mais: ela carrega o link de
+  // pagamento, que é endereço para o dinheiro de UM provedor. Uma listagem sem
+  // filtro entregaria a um ISP o boleto do vizinho.
+  'billing_charges'
 ]);
 
 /** Tables that belong to the deployment rather than to any one provider. */

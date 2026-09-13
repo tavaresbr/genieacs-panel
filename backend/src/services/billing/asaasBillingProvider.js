@@ -1,5 +1,6 @@
 import { BillingProvider } from './billingProvider.js';
 import SubscriptionService from '../subscriptionService.js';
+import { createCharge as criarCobranca, apiKey } from './asaasClient.js';
 
 /**
  * O Asaas, que era o nome escrito no comentário da interface desde que ela
@@ -48,6 +49,32 @@ function paraCentavos(valor) {
 export class AsaasBillingProvider extends BillingProvider {
   get name() {
     return 'asaas';
+  }
+
+  /** Este emite: é a metade que este arquivo ganhou depois da que recebe. */
+  get canIssue() {
+    return true;
+  }
+
+  /**
+   * Se este deploy tem como falar com o gateway.
+   *
+   * Separado de `canIssue` porque são perguntas diferentes: uma é sobre o
+   * provider ("você sabe emitir?"), a outra é sobre a instalação ("você tem a
+   * chave?"). Juntá-las faria um deploy sem chave parecer um provider que não
+   * emite, e o job não teria como dizer qual dos dois problemas contar.
+   */
+  isConfigured() {
+    return Boolean(apiKey());
+  }
+
+  /**
+   * Cria a cobrança no gateway. Delegação, como `recordPayment`: a política de
+   * quando e por quanto é do job, o transporte é do cliente, e aqui fica só a
+   * costura entre os dois.
+   */
+  async createCharge(cobranca) {
+    return criarCobranca(cobranca);
   }
 
   /**

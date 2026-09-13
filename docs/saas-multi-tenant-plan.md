@@ -113,7 +113,7 @@ original não previa:
 | Isolamento | **Banco compartilhado + `tenant_id`** (pool model) |
 | GenieACS | **Todos os modos**: URL+credenciais, agente conector, VPN/túnel e hospedagem própria → conector **plugável**, MVP com modo direto |
 | Domínio | **Subdomínio por tenant** (`provedor.dominio` / `portal.provedor.dominio`) |
-| Cobrança | **Planos e limites no código agora; gateway de pagamento depois** — hoje o webhook do gateway já credita a assinatura sozinho; emitir a cobrança continua manual |
+| Cobrança | **Planos e limites no código agora; gateway de pagamento depois** — fechado: o painel emite a cobrança e credita o pagamento sozinho, com periodicidade por plano |
 
 ### Licença
 
@@ -604,7 +604,7 @@ peças:
 
 ---
 
-### Fase 5 — Planos, limites e ciclo de vida da assinatura ✅ *(entregue; o gateway recebe, e ainda não emite)*
+### Fase 5 — Planos, limites e ciclo de vida da assinatura ✅ *(entregue; o gateway emite e recebe)*
 
 Três tabelas (migration `0035`), uma porta, quatro pontos de escrita e a metade comercial do
 console. O que a fase NÃO fez é tão importante quanto o que fez, e está escrito na migração:
@@ -805,11 +805,12 @@ vez" em `backend/test/i18n.test.js`, e ele varre as duas metades do app.
   segredo lido como nulo, e a impressão digital é o que transforma essa descoberta num
   aviso antes do restore em vez de um susto durante.
 
-**O que ficou de fora, de propósito:** a metade do **gateway de cobrança** que EMITE a
-cobrança — a que recebe o pagamento e credita a assinatura existe, por webhook (runbook,
-seção 10). A personificação e o transporte de e-mail entraram no fecho da Fase 2, e o
-runbook já os documenta como existentes. O **comando de re-cifra** também saiu desta lista:
-`skygenpanel rotate-key` existe, e o runbook o documenta na seção de trocar segredos.
+**Esta lista ficou vazia.** Os dois últimos itens saíram na mesma semana, por caminhos
+independentes: o **gateway de cobrança** passou a ter as duas metades — o painel emite
+(migração 0047, `billing_charges`) e credita por webhook (runbook, seção 10) — e o **comando
+de re-cifra** da rotação da `SECRET_BOX_KEY` existe como `skygenpanel rotate-key`, documentado
+no runbook na seção de trocar segredos. A personificação e o transporte de e-mail já tinham
+entrado no fecho da Fase 2.
 
 ---
 
@@ -1196,8 +1197,9 @@ Nada disso é negociável. **Os doze estão cumpridos.**
 | 11 | `audit_log` registrando ações sensíveis | ✅ onda 20 — senha de portal, GenieACS, papéis, vínculos, convites, suspensão |
 | 12 | Exportação por provedor funcionando (LGPD e "apaguei tudo, socorro") | ✅ exportação (onda 21) e exclusão (onda 22), com trilha que sobrevive ao provedor apagado |
 
-Nenhuma linha vermelha resta. Isso **não** quer dizer produto pronto — a **emissão** da
-cobrança está por fazer (o gateway já credita o que recebe) —
+Nenhuma linha vermelha resta, e os dois itens que esta frase listava como pendentes — a
+emissão da cobrança e o comando de re-cifra da `SECRET_BOX_KEY` — entraram. Isso **não** quer
+dizer produto pronto;
 quer dizer que a lista do que não se pode vender sem já não tem item aberto. O transporte de
 e-mail do convite, que esta frase listava até hoje, entrou no fecho da Fase 2.
 

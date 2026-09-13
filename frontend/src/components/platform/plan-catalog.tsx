@@ -22,12 +22,14 @@ interface Rascunho {
   price: string
   currency: string
   trialDays: string
+  /** Quanto tempo um pagamento compra. Trinta é mensal, 365 é anual. */
+  periodDays: string
   active: boolean
 }
 
 const VAZIO: Rascunho = {
   code: '', name: '', maxOperators: '', maxSubscribers: '', maxDevices: '',
-  price: '', currency: 'BRL', trialDays: '14', active: true
+  price: '', currency: 'BRL', trialDays: '14', periodDays: '30', active: true
 }
 
 /**
@@ -63,6 +65,7 @@ function paraRascunho(plan: Plan): Rascunho {
     price: (plan.priceCents / 100).toFixed(2),
     currency: plan.currency,
     trialDays: String(plan.trialDays),
+    periodDays: String(plan.periodDays),
     active: plan.active
   }
 }
@@ -140,6 +143,9 @@ export function PlanCatalog({ plans, onChange }: Props) {
       priceCents: centavos(rascunho.price),
       currency: rascunho.currency.trim().toUpperCase() || 'BRL',
       trialDays: Math.max(0, Math.floor(Number(rascunho.trialDays) || 0)),
+      // Piso 1 e não 0: período zero é uma assinatura que vence no instante em
+      // que é paga. O backend recusa; a tela não deixa chegar lá.
+      periodDays: Math.max(1, Math.floor(Number(rascunho.periodDays) || 30)),
       active: rascunho.active
     }
 
@@ -223,7 +229,7 @@ export function PlanCatalog({ plans, onChange }: Props) {
       </div>
       <p className="field-hint">{t('platform.plans.limitHint')}</p>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div>
           <label className="field-label" htmlFor="plan-price">{t('platform.plans.price')}</label>
           <input
@@ -248,6 +254,18 @@ export function PlanCatalog({ plans, onChange }: Props) {
             value={rascunho.trialDays}
             onChange={(e) => setRascunho((r) => ({ ...r, trialDays: e.target.value }))}
           />
+        </div>
+        <div>
+          {/* O preço já dizia por quanto se vende; este diz por quanto TEMPO. Os
+              dois juntos são o plano — sem este campo, "R$ 1.999" não distingue
+              um plano caro de um plano anual. */}
+          <label className="field-label" htmlFor="plan-period">{t('platform.plans.periodDays')}</label>
+          <input
+            id="plan-period" type="number" min={1} className="modern-input w-full"
+            value={rascunho.periodDays}
+            onChange={(e) => setRascunho((r) => ({ ...r, periodDays: e.target.value }))}
+          />
+          <p className="field-hint">{t('platform.plans.periodDaysHint')}</p>
         </div>
       </div>
 
@@ -304,7 +322,10 @@ export function PlanCatalog({ plans, onChange }: Props) {
                   </span>
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {dinheiro(plan.priceCents, plan.currency)}
+                  {t('platform.plans.summaryPrice', {
+                    price: dinheiro(plan.priceCents, plan.currency),
+                    days: plan.periodDays
+                  })}
                   {' · '}
                   {t('platform.plans.summaryLimits', {
                     operators: plan.limits.operators ?? '∞',

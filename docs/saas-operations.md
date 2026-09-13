@@ -54,9 +54,17 @@ O proxy termina TLS (certificado curinga para cada base) e encaminha **preservan
 `Host` que diz ao painel qual provedor está falando; um proxy que o reescreve entrega
 todo mundo no mesmo lugar, e o resolvedor responde 404 para todos.
 
-O apex `painel.exemplo.com` (e `www.`) é a **porta de entrada da plataforma**: só
-responde `GET /api/tenant/public` e `POST /api/auth/signup`, e a tela ali é o cadastro.
-Nada de nenhum provedor é servido nesse host. O apex do portal não serve nada.
+`deploy/proxy/nginx-saas.conf.example` é esse proxy pronto para nginx — os quatro
+blocos, o `default_server` que recusa host desconhecido, e as armadilhas anotadas onde
+elas mordem (o curinga não cobre o apex; `http2 on;` não existe antes do nginx 1.25.1;
+as linhas `listen [::]` exigem IPv6).
+
+O apex `painel.exemplo.com` (e `www.`) é a **porta de entrada da plataforma** e o
+endereço do **console**: ali respondem o cadastro (`GET /api/tenant/public`,
+`POST /api/auth/signup`), `/api/platform/*` e as rotas de sessão que o console usa.
+Nada de nenhum provedor é servido nesse host — e o inverso também vale, desde que há
+subdomínios: `/api/platform/*` é 404 no host de um provedor, por construção. O apex do
+portal não serve nada.
 
 ### Compose
 
@@ -95,6 +103,86 @@ INSERT INTO platform_admins (user_id) SELECT id FROM users WHERE username = 'que
 ```
 
 Depois disso o console se administra sozinho.
+
+### Ligar os subdomínios num deploy que já está no ar
+
+A seção acima descreve um deploy novo. Um que **já serve um host só** — o painel
+respondendo em `painel.exemplo.com` sem subdomínio nenhum — chega aqui por outro
+caminho, e três coisas mudam debaixo dele ao mesmo tempo. Vale ler antes de mexer.
+
+**O que a mudança faz, e ninguém avisa depois:**
+
+1. **Ligar uma das duas variáveis liga a resolução por host para TUDO**, inclusive o
+   portal do assinante na 5891 (`usesTenantSubdomains`). Sem `PORTAL_BASE_DOMAIN` e sem
+   o DNS dele, **o portal sai do ar**. Os dois entram na mesma janela, ou nenhum.
+2. **O apex e os painéis se separam.** O console CONTINUA no apex — é lá que ele passa
+   a morar exclusivamente —, mas o apex deixa de servir o painel do provedor que dividia
+   aquele endereço com ele. Quem opera a plataforma e também trabalha num ISP passa a
+   usar dois endereços: `painel.exemplo.com/platform` para o console e
+   `<slug>.painel.exemplo.com` para o painel daquele provedor. `/api/platform/*` vira
+   404 no host de provedor, e os dados de provedor viram 404 no apex.
+3. **A sessão passa a valer só no host onde nasceu.** Um token cunhado em
+   `alfa.painel…` apresentado em `beta.painel…` é 403 `tenant_mismatch`. É o
+   comportamento desejado, e é novo para quem vinha de um host só: cada aba aberta antes
+   da mudança entra de novo no endereço que passou a ser o dela.
+
+**A ordem:**
+
+```bash
+# 1. DNS — quatro registros, dois curinga. Confira a propagação antes de seguir:
+#    dig +short qualquer-coisa.painel.exemplo.com
+#
+#    painel.exemplo.com      A     → IP do proxy
+#    *.painel.exemplo.com    CNAME → painel.exemplo.com
+#    portal.exemplo.com      A     → IP do proxy
+#    *.portal.exemplo.com    CNAME → painel.exemplo.com
+
+# 2. Certificados. Curinga só sai por desafio DNS, e o apex tem que estar no MESMO
+#    certificado: `*.painel.exemplo.com` não casa com `painel.exemplo.com`.
+certbot certonly --dns-<provedor> --dns-<provedor>-credentials /etc/letsencrypt/dns.ini \
+  -d painel.exemplo.com -d '*.painel.exemplo.com' -d www.painel.exemplo.com
+certbot certonly --dns-<provedor> --dns-<provedor>-credentials /etc/letsencrypt/dns.ini \
+  -d portal.exemplo.com -d '*.portal.exemplo.com'
+certbot renew --dry-run
+
+# 3. Proxy.
+sed -e 's/painel\.exemplo\.com/painel.SEUDOMINIO/g' \
+    -e 's/portal\.exemplo\.com/portal.SEUDOMINIO/g' \
+    deploy/proxy/nginx-saas.conf.example | sudo tee /etc/nginx/sites-available/skygenpanel.conf
+sudo ln -sf /etc/nginx/sites-available/skygenpanel.conf /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+
+# 4. Variáveis, e reiniciar: o resolvedor lê o domínio-base no IMPORT, então editar
+#    o .env sem reiniciar não muda nada.
+#      TENANT_BASE_DOMAIN=painel.exemplo.com
+#      PORTAL_BASE_DOMAIN=portal.exemplo.com
+#      CORS_ORIGINS=https://painel.exemplo.com   # só o apex: origem do mesmo host já passa
+#      TRUST_PROXY=1
+```
+
+**Conferir**, nesta ordem — a primeira que falhar diz qual passo ficou pela metade:
+
+```bash
+curl -s  https://painel.exemplo.com/api/tenant/public           # {"slug":null,…} = porta de entrada
+curl -s  https://alfa.painel.exemplo.com/api/tenant/public      # {"slug":"alfa",…}
+curl -s  https://naoexiste.painel.exemplo.com/api/tenant/public # 404, e não o painel de alguém
+curl -sI https://alfa.portal.exemplo.com/ | head -1             # o portal de pé
+curl -s  https://painel.exemplo.com/api/health                  # responde em qualquer host
+
+# e o recorte do console, que é o que mais surpreende quem migra:
+curl -so /dev/null -w '%{http_code}\n' https://painel.exemplo.com/api/platform/tenants       # 401: existe, pede sessão
+curl -so /dev/null -w '%{http_code}\n' https://alfa.painel.exemplo.com/api/platform/tenants  # 404: não existe ali
+curl -so /dev/null -w '%{http_code}\n' https://painel.exemplo.com/api/devices                # 404: o apex não serve provedor
+```
+
+A prova de que o endereço passou a existir de verdade: no console, **Equipe** de um
+provedor → **Criar convite**. O link tem que sair como
+`https://<slug>.painel.exemplo.com/invite#…`; enquanto sair só o token, o painel ainda
+não enxerga o domínio-base (variável não aplicada, ou processo não reiniciado).
+
+**Voltar atrás** é tirar `TENANT_BASE_DOMAIN` e `PORTAL_BASE_DOMAIN` e reiniciar: o
+apex volta a servir o painel do primeiro provedor, como antes. Nenhum dado muda de
+lugar em nenhuma das duas direções — o que muda é só por qual nome cada um atende.
 
 ## 2. Ver: logs
 
@@ -385,7 +473,47 @@ coisa aqui que não se verifica sem uma conta no gateway: ele está lido de uma 
 teste pelo painel do gateway e confira no log do processo: `nothing to do with event "…"`
 significa que o corpo chegou e não foi reconhecido.
 
-**O que continua manual:** emitir a cobrança. A cobrança se cria hoje no painel do
-gateway; o que o painel faz sozinho é receber a notícia e creditar. Periodicidade em
-`plans` (hoje o período pago é 30 dias cravados), a régua de emissão e o link de pagamento
-no e-mail de vencimento são a metade que falta.
+### Emitir a cobrança
+
+A outra metade, e ela também deixou de ser manual. Duas variáveis a mais no `.env`:
+
+- **`ASAAS_API_KEY`** — a chave com que o painel CHAMA o gateway. Não é a mesma coisa que
+  `BILLING_WEBHOOK_TOKEN`: aquela autentica a entrega que chega, esta autentica a chamada
+  que sai, e elas viajam em cabeçalhos diferentes (`asaas-access-token` na entrada,
+  `access_token` na saída). Trocá-las dá 401 numa direção só — a que só se exercita
+  cobrando de verdade.
+- **`ASAAS_BASE_URL`** — só para apontar o ambiente de testes
+  (`https://api-sandbox.asaas.com/v3`, com uma chave de sandbox). Em produção o default
+  serve.
+
+Sem a chave, nada é emitido e todo provedor segue na cobrança manual — e o job diz isso
+(`gateway_not_configured`) em vez de queimar tentativas.
+
+**Quando sai.** O job roda dentro da mesma passada por provedor do aviso de vencimento,
+cinco dias antes do prazo (`LEAD_DAYS`). O valor é o `price_cents` do plano, o período é o
+`period_days` dele, e o vencimento é o fim do período — **exceto** para quem já está
+vencido, que recebe três dias a contar de hoje: um gateway recusa cobrança que nasce
+vencida, e sem isso a população que mais precisa ser cobrada seria a única a nunca ser.
+
+**Uma cobrança por período, garantida pelo banco.** `billing_charges` tem único
+`(tenant_id, period_end)`, e a linha nasce ANTES da chamada ao gateway — é o bilhete que
+ganha a corrida entre duas passadas. O gateway não oferece chave de idempotência, então a
+guarda é nossa. A chave se renova sozinha: um pagamento empurra `renews_at`, o período
+seguinte tem outra chave, e ninguém precisa limpar nada.
+
+**Quando falha.** A linha fica com `status: failed`, o motivo do gateway em `last_error` e
+uma espera de uma hora antes da próxima tentativa — sem ela, uma resposta perdida viraria
+cinco cobranças de verdade em cinco minutos. Depois de cinco tentativas o job desiste e a
+linha fica para alguém ler: a centésima tentativa recusa igual, e o que resolve é uma
+pessoa olhar o `last_error`.
+
+**O que o provedor recebe.** O aviso de vencimento passa a levar o link de pagamento
+quando há cobrança emitida, e o endereço do painel quando não há. O primeiro aviso de um
+ciclo ainda sai com o endereço do painel — a cobrança dele nasce na mesma passada, logo
+depois — e é o preço de o aviso não depender do gateway estar de pé.
+
+**O que continua fora:** a cobrança em moeda que não seja BRL (o gateway não tem campo de
+moeda, e o cliente recusa em voz alta em vez de cobrar reais com etiqueta de dólar);
+cancelar no gateway a cobrança de um provedor apagado; e conferir o valor pago contra o
+preço do plano — um pagamento de qualquer valor ainda compra o período inteiro, que é
+como o botão manual sempre funcionou.

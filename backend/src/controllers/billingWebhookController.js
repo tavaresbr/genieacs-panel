@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { getDb } from '../config/database.js';
 import { runInTenant } from '../config/tenantContext.js';
 import { asaasBilling, AsaasBillingProvider } from '../services/billing/asaasBillingProvider.js';
+import BillingCharge from '../models/BillingCharge.js';
 
 /**
  * A entrega do gateway de pagamento: o provedor pagou, e o painel volta a
@@ -75,7 +76,11 @@ function credenciaisIguais(a, b) {
 export async function resolveTenantDaEntrega({ reference, customerRef }, gateway = 'asaas') {
   const db = getDb();
 
-  const daReferencia = String(reference ?? '').match(/^tenant:(\d+)$/);
+  // `tenant:<id>` ou `tenant:<id>:<período>`. O sufixo é o que a emissão
+  // acrescenta para que a referência diga QUAL cobrança e não só de quem — e a
+  // forma antiga continua valendo, porque uma cobrança criada à mão no painel
+  // do gateway não tem período nenhum a declarar.
+  const daReferencia = String(reference ?? '').match(/^tenant:(\d+)(?::|$)/);
   if (daReferencia) {
     const linha = await db('tenants').where({ id: Number(daReferencia[1]) }).first();
     // `active` e não qualquer status: creditar um provedor apagado ou suspenso
@@ -91,6 +96,18 @@ export async function resolveTenantDaEntrega({ reference, customerRef }, gateway
     if (linha && linha.status === 'active') return linha.id;
   }
   return null;
+}
+
+/** Marca como paga a cobrança que o gateway nomeia. Nunca derruba o crédito. */
+async function marcarCobrancaPaga(gatewayChargeId) {
+  try {
+    const cobranca = await BillingCharge.byGatewayId(gatewayChargeId);
+    if (cobranca && cobranca.status !== 'paid') {
+      await BillingCharge.update(cobranca.id, { status: 'paid' });
+    }
+  } catch (error) {
+    console.warn(`Billing webhook: could not settle the charge: ${error.message}`);
+  }
 }
 
 class BillingWebhookController {
@@ -139,12 +156,24 @@ class BillingWebhookController {
       // Daqui para baixo, como o provedor que pagou. É o escopo que diz de quem
       // é o dinheiro — `recordPayment` não recebe `tenantId` justamente para
       // que ninguém credite o provedor errado passando o id errado.
-      const { duplicate } = await runInTenant(tenantId, () => asaasBilling.recordPayment({
-        amountCents: leitura.amountCents,
-        currency: 'BRL',
-        externalId: leitura.externalId,
-        actorUserId: null
-      }));
+      const { duplicate } = await runInTenant(tenantId, async () => {
+        const resultado = await asaasBilling.recordPayment({
+          amountCents: leitura.amountCents,
+          currency: 'BRL',
+          externalId: leitura.externalId,
+          actorUserId: null
+        });
+        // E a cobrança que o painel emitiu para isto, se houver, deixa de estar
+        // em aberto. Fecha o par: a emissão gravou o id do gateway, o pagamento
+        // chega com o mesmo id, e é assim que "o que está em aberto" para de
+        // incluir o que já foi pago.
+        //
+        // Depois do crédito, e sem poder derrubá-lo: uma falha aqui deixa uma
+        // cobrança `pending` que foi paga — feio, visível e corrigível. O caso
+        // oposto seria dinheiro recebido e não creditado.
+        await marcarCobrancaPaga(leitura.externalId);
+        return resultado;
+      });
       return res.json({ success: true, code: duplicate ? 'duplicate' : 'recorded' });
     } catch (error) {
       // Aqui sim: falhou deste lado, e reentregar resolve.

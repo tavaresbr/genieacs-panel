@@ -47,6 +47,7 @@ let panelUrl;
 let alfa;
 let inove;
 let donoToken;
+let consoleToken;
 
 /**
  * Uma requisição com o `Host` escolhido.
@@ -87,10 +88,17 @@ function callAs(host, path, { method = 'GET', headers = {}, body } = {}) {
 
 const ALFA_HOST = 'alfa.painel.exemplo.com';
 const INOVE_HOST = 'inove.painel.exemplo.com';
+/** O endereço da plataforma, que é onde o console responde. */
+const APEX_HOST = 'painel.exemplo.com';
 
 const comoDono = (path, options = {}) => callAs(ALFA_HOST, path, {
   ...options,
   headers: { Authorization: `Bearer ${donoToken}`, ...(options.headers || {}) }
+});
+
+const noConsole = (path, options = {}) => callAs(APEX_HOST, path, {
+  ...options,
+  headers: { Authorization: `Bearer ${consoleToken}`, ...(options.headers || {}) }
 });
 
 before(async () => {
@@ -117,7 +125,15 @@ before(async () => {
     await db('platform_admins').insert({ user_id: donoId });
   }
 
-  const criado = await comoDono('/api/platform/tenants', {
+  // O console responde no ENDEREÇO DA PLATAFORMA, e com a sessão de lá: a do
+  // setup nomeia o provedor alfa, e com ela o console não responde mais.
+  const consoleEntrada = await callAs(APEX_HOST, '/api/auth/login', {
+    method: 'POST', body: { username: DONO.username, password: DONO.password }
+  });
+  assert.equal(consoleEntrada.status, 200, JSON.stringify(consoleEntrada.body));
+  consoleToken = consoleEntrada.body.data.token;
+
+  const criado = await noConsole('/api/platform/tenants', {
     method: 'POST',
     body: { slug: 'inove', name: 'inove' }
   });
@@ -132,7 +148,7 @@ after(async () => {
 
 describe('um provedor recém-criado, antes do convite', () => {
   it('não tem ninguém, e vincular quem não existe é recusado com um código que a tela lê', async () => {
-    const { status, body } = await comoDono(`/api/platform/tenants/${inove}/members`, {
+    const { status, body } = await noConsole(`/api/platform/tenants/${inove}/members`, {
       method: 'POST',
       body: { username: SUPORTE.email, role: 'owner' }
     });
@@ -185,7 +201,7 @@ describe('o convite cunhado pelo console', () => {
   let token;
 
   it('aponta para o endereço do provedor convidado', async () => {
-    const { status, body } = await comoDono(`/api/platform/tenants/${inove}/invites`, {
+    const { status, body } = await noConsole(`/api/platform/tenants/${inove}/invites`, {
       method: 'POST',
       body: { role: 'owner' }
     });
@@ -250,7 +266,7 @@ describe('o convite cunhado pelo console', () => {
   });
 
   it('e o console passa a contar o operador na linha daquele provedor', async () => {
-    const { status, body } = await comoDono('/api/platform/tenants');
+    const { status, body } = await noConsole('/api/platform/tenants');
     assert.equal(status, 200);
     const linha = body.data.tenants.find((t) => t.id === inove);
     assert.equal(linha.operators, 1, 'a linha do provedor continua dizendo que ninguém trabalha lá');

@@ -1081,6 +1081,21 @@ const plansTable = (db) => (t) => {
   t.string('currency', 3).notNullable().defaultTo('BRL');
   // Dias de teste que um provedor novo ganha neste plano. Zero é "sem teste".
   t.integer('trial_days').unsigned().notNullable().defaultTo(0);
+  /**
+   * Quanto tempo um pagamento compra. Ao lado de `trial_days` porque é o mesmo
+   * tipo de coisa: um prazo que é do PLANO e não do código.
+   *
+   * Até aqui o período pago era um `30` dentro de `subscriptionService`, e o
+   * catálogo sabia dizer por quanto vende e não por quanto tempo. Era a metade
+   * que faltava para existir plano anual — e plano anual é a diferença entre
+   * cobrar um ISP doze vezes e cobrá-lo uma.
+   *
+   * Inteiro em dias, e não um enum `mensal|anual`: é a forma que `trial_days`
+   * já tem, casa com a aritmética de `renews_at`, e não obriga ninguém a
+   * decidir hoje o nome do ciclo de 90 dias que alguém vai querer vender.
+   * "Mensal" e "anual" são como a tela chama 30 e 365, e isso é da tela.
+   */
+  t.integer('period_days').unsigned().notNullable().defaultTo(30);
   // Um plano desativado não some — assinaturas ainda apontam para ele — mas
   // deixa de ser oferecido a provedor novo.
   t.boolean('active').notNullable().defaultTo(true);
@@ -1161,14 +1176,100 @@ const billingEventsTable = (db) => (t) => {
 };
 
 /**
- * Criadas pelo 0034. `plans` não aponta para nada; `subscriptions` aponta para
+ * Criadas pelo 0035. `plans` não aponta para nada; `subscriptions` aponta para
  * `tenants` e `plans`; `billing_events` para as duas e para `users`. Depois
  * das tabelas de membership, portanto — e nessa ordem entre si.
  */
+/**
+ * A cobrança que o painel EMITIU, e por que ela não cabe no extrato.
+ *
+ * `billing_events` é livro-caixa: só nasce linha, nunca muda, e é isso que o
+ * comentário dela diz ser. Uma cobrança emitida tem o contrário disso — nasce
+ * pendente, vira paga, vencida ou cancelada — e estado mutável num livro-caixa
+ * ou vira UPDATE numa tabela que não tem `updated_at`, ou vira "dobre o extrato
+ * até descobrir o estado atual", que é um `fold` em JS sem índice.
+ *
+ * Mas a razão que decide não é essa; é uma armadilha concreta. No gateway a
+ * cobrança **é** o pagamento: o `pay_…` que a emissão receberia de volta é o
+ * mesmo que o webhook traz depois em `payment.id`. Gravar a emissão em
+ * `billing_events.external_id` faria a leitura de idempotência de
+ * `recordPayment` encontrar a linha da EMISSÃO e responder `duplicate` — sem
+ * creditar. O cliente paga, a rota responde 200, o extrato mostra um evento que
+ * de fato aconteceu, e ninguém percebe que o período não andou. Tabela separada
+ * é o que torna essa colisão impossível em vez de evitada por convenção.
+ *
+ * A idempotência da emissão é `(tenant_id, period_end)`: **uma cobrança por
+ * período, garantida pelo banco**. E ela se renova sozinha pelo mesmo motivo
+ * que `expiry_warned_for` se renova — um pagamento empurra `renews_at`, o
+ * período seguinte tem outra chave, e o ciclo recomeça sem nenhum caminho
+ * precisar lembrar de limpar nada.
+ */
+const billingChargesTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.integer('subscription_id').unsigned()
+    .references('id').inTable('subscriptions').onDelete('SET NULL');
+  /**
+   * O fim do período que esta cobrança compra, como data ISO — e é a chave.
+   *
+   * String de dez caracteres e não timestamp, de propósito. A chave entra num
+   * índice único e é comparada por igualdade, e timestamp não sobrevive a isso
+   * nos três bancos: o MySQL trunca para segundos por default, e dois processos
+   * que calculam "o mesmo" prazo podem gravar valores que o índice considera
+   * diferentes. Um período é coisa de dia; a hora exata está em `due_date` e em
+   * `created_at`, onde ela é informação e não chave.
+   */
+  t.string('period_end', 10).notNullable();
+  // Quanto, e em que moeda — copiados do plano na hora da emissão e NÃO lidos
+  // dele depois. Um plano que muda de preço não reescreve o que já foi cobrado.
+  t.integer('amount_cents').unsigned().notNullable();
+  t.string('currency', 3).notNullable().defaultTo('BRL');
+  // Qual gateway emitiu. Mesma coluna e mesma razão de `billing_events.provider`.
+  t.string('provider', 32).notNullable();
+  // O id da cobrança no gateway. Nulo entre gravar a linha e a chamada voltar —
+  // que é justamente a janela em que uma falha precisa ser reconhecível.
+  t.string('gateway_charge_id', 128);
+  // pending | paid | canceled | failed
+  t.string('status', 16).notNullable().defaultTo('pending');
+  t.date('due_date');
+  /**
+   * A página do gateway onde o provedor paga — e é por causa dela que a
+   * cobrança precisa de tabela: sem esta coluna o aviso de vencimento continua
+   * sem ter de onde tirar um link.
+   *
+   * Uma coluna e não duas. A emissão pede `billingType: UNDEFINED`, que devolve
+   * uma página onde quem paga escolhe entre Pix e boleto — então um endereço
+   * responde pelos dois meios. O copia-e-cola do Pix é outra chamada ao
+   * gateway, e uma coluna que nenhuma chamada preenche é exatamente a dívida
+   * que este repositório já encontrou quatro vezes.
+   */
+  t.string('invoice_url', 512);
+  t.integer('attempts').notNullable().defaultTo(0);
+  /**
+   * Quando se pode tentar de novo.
+   *
+   * O agendador passa a cada minuto, e sem esta coluna uma resposta perdida no
+   * meio viraria cinco cobranças de verdade em cinco minutos na mão de um
+   * cliente pagante. `attempts` conta; esta coluna espaça — e são duas coisas
+   * diferentes, porque o teto sozinho só decide quando desistir.
+   */
+  t.timestamp('next_attempt_at');
+  t.string('last_error', 500);
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  t.timestamp('updated_at').defaultTo(db.fn.now());
+  t.unique(['tenant_id', 'period_end'], 'billing_charges_period_uq');
+  // "O que está em aberto", que é a pergunta que o console faz.
+  t.index(['tenant_id', 'status'], 'billing_charges_status_idx');
+};
+
 const BILLING_TABLES = [
   ['plans', plansTable],
   ['subscriptions', subscriptionsTable],
-  ['billing_events', billingEventsTable]
+  ['billing_events', billingEventsTable],
+  // Depois de `subscriptions`: a ordem desta lista é a ordem das chaves
+  // estrangeiras, e é ela que o export e a exclusão de provedor percorrem.
+  ['billing_charges', billingChargesTable]
 ];
 
 const TENANCY_TABLES = [
@@ -2843,6 +2944,56 @@ export const migrations = [
           t.index(['billing_gateway', 'billing_customer_ref'], 'tenants_gateway_customer_idx');
         });
       }
+    }
+  },
+  {
+    /**
+     * Quanto tempo um pagamento compra, por plano.
+     *
+     * O período pago era um `30` dentro do serviço de assinatura. O catálogo
+     * tinha preço, moeda e dias de TESTE por plano, e não tinha o prazo do
+     * período PAGO — a assimetria que impedia existir plano anual.
+     *
+     * `defaultTo(30)` e não nulo: é o que toda assinatura deste deploy já
+     * comprou desde sempre, então a coluna nasce dizendo a verdade sobre o
+     * passado em vez de deixar todo plano existente sem período no dia do
+     * upgrade.
+     */
+    id: '0046_plan_period_days',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('plans'))) return true;
+      return db.schema.hasColumn('plans', 'period_days');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('plans'))) return;
+      if (await db.schema.hasColumn('plans', 'period_days')) return;
+      await db.schema.alterTable('plans', (t) => {
+        t.integer('period_days').unsigned().notNullable().defaultTo(30);
+      });
+    }
+  },
+  {
+    /**
+     * A cobrança emitida, que até aqui só existia no painel do gateway.
+     *
+     * O porquê de ser tabela e não um tipo novo em `billing_events` está na
+     * fábrica `billingChargesTable`, e o resumo é: no gateway a cobrança é o
+     * pagamento, então a emissão e o crédito disputariam a mesma
+     * `(tenant_id, external_id)` — e quem perderia a disputa seria o crédito,
+     * em silêncio.
+     *
+     * Nasce vazia. Nenhum provedor tem cobrança emitida porque nada emitia;
+     * a primeira linha sai do job, na primeira passada depois que alguém ligar
+     * o provedor ao gateway.
+     */
+    id: '0047_billing_charges',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      return db.schema.hasTable('billing_charges');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      await createTableIfMissing(db, 'billing_charges', billingChargesTable(db));
     }
   }
 ];

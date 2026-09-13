@@ -5,6 +5,7 @@ import Tenant from '../models/Tenant.js';
 import TenantUser from '../models/TenantUser.js';
 import { mailTransport, panelUrlFor } from './mail/index.js';
 import SubscriptionService from './subscriptionService.js';
+import BillingCharge from '../models/BillingCharge.js';
 
 /**
  * O aviso que chega ANTES do bloqueio.
@@ -72,8 +73,10 @@ class SubscriptionNoticeService {
     const transporte = mailTransport();
     if (transporte.name === 'none') return { sent: false, reason: 'no_transport' };
 
-    const { subscription } = await SubscriptionService.current();
-    const pendente = SubscriptionService.pendingExpiryNotice(subscription, now);
+    // O plano junto, porque é dele que sai a janela do aviso: num plano anual
+    // sete dias não é aviso, é notificação de que já era.
+    const { subscription, plan } = await SubscriptionService.current();
+    const pendente = SubscriptionService.pendingExpiryNotice(subscription, now, plan);
     if (!pendente) return { sent: false, reason: 'nothing_due' };
 
     // O agendador já tem a linha do provedor na mão (`forEachTenant` a entrega
@@ -85,13 +88,25 @@ class SubscriptionNoticeService {
     if (!para.length) return { sent: false, reason: 'no_recipient' };
 
     const dias = Math.max(0, Math.ceil((pendente.deadline.getTime() - now.getTime()) / 86_400_000));
+
+    // A cobrança em aberto, se o painel já emitiu uma.
+    //
+    // É por causa dela que a cobrança ganhou tabela: um aviso que diz "vence em
+    // três dias" e não diz onde pagar transfere para o cliente o trabalho de
+    // achar o boleto — e ele vai achar abrindo um chamado. Quando não há
+    // cobrança emitida (provedor não ligado a gateway, plano de graça, cobrança
+    // ainda não gerada), o link continua sendo o do painel, que é o que este
+    // aviso sempre mandou.
+    const cobranca = await BillingCharge.currentOpen().catch(() => null);
+    const paraPagar = cobranca?.invoice_url || null;
+
     const vars = {
       provider: tenant.name || 'SkyGenPanel',
       // A data vai em ISO e curta: o idioma do destinatário é desconhecido, e
       // `12/09` é ambíguo entre metade do mundo e a outra metade.
       date: pendente.deadline.toISOString().slice(0, 10),
       days: dias,
-      link: panelUrlFor(tenant) || ''
+      link: paraPagar || panelUrlFor(tenant) || ''
     };
     const sufixo = pendente.expired ? 'Expired' : 'Soon';
     const chave = `subscription.notice.${pendente.kind}${sufixo}`;

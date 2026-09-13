@@ -287,9 +287,13 @@ describe('the platform\'s own host', () => {
       assert.equal(res.body.code, 'tenant_mismatch');
     });
 
-    it('continua valendo no host do próprio provedor', async () => {
+    it('não encontra o console no host do próprio provedor, que é onde ele morava', async () => {
+      // 404 de rota inexistente: onde há domínio-base o console não é montado
+      // em host de provedor. A sessão daqui continua servindo para o painel —
+      // é o console que mudou de endereço, não ela.
       const res = await home('/api/platform/tenants', { headers: bearer(ownerToken) });
-      assert.equal(res.status, 200, JSON.stringify(res.body));
+      assert.equal(res.status, 404);
+      assert.equal((await home('/api/users', { headers: bearer(ownerToken) })).status, 200);
     });
 
     it('recusa um token de operador comum do mesmo jeito', async () => {
@@ -312,9 +316,9 @@ describe('the platform\'s own host', () => {
     });
 
     it('não muda o 404 que esconde o console do host de um provedor', async () => {
-      // `viewerToken` é operador do provedor da casa e não está no cadastro da
-      // plataforma: no host DELE a resposta é 404, nunca 403, para que ninguém
-      // descubra por aí que existe um plano de controle.
+      // Continua 404 para um operador comum no host dele — e agora por
+      // construção, não por guarda: a rota não está montada ali. O que a
+      // guarda decidia, o roteador decide.
       const res = await home('/api/platform/tenants', { headers: bearer(viewerToken) });
       assert.equal(res.status, 404);
     });
