@@ -137,7 +137,8 @@ export function isDormant(atividadeEm, agora = Date.now()) {
  * entre as chamadas. Duas rodadas coladas caem na mesma janela quase sempre, e
  * o "quase" é uma reprovação a cada ~(intervalo/janela) execuções. Um teste que
  * afirme "a segunda rodada não devia nem tentar" precisa parar o relógio —
- * `mock.timers.enable({ apis: ['Date'] })` — em vez de contar com a sorte.
+ * `mock.timers.enable({ apis: ['Date'], now: Date.now() })` — em vez de contar
+ * com a sorte.
  */
 export function dueForRefresh({ lastRunAt, ttlMs, offsetMs, now = Date.now() }) {
   if (!Number.isFinite(ttlMs) || ttlMs <= 0) return true;

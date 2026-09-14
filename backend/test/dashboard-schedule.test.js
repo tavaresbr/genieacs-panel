@@ -148,11 +148,17 @@ describe('a cadência segue a atenção', () => {
  * `apis: ['Date']` congela só `Date.now`: `setTimeout` continua real, que é o
  * que estes testes precisam para fazer HTTP de verdade contra o servidor local
  * e contra a porta fechada.
+ *
+ * E `now` é obrigatório aqui, apesar de opcional na API: sem ele o relógio
+ * congela em ZERO, e a rodada grava `lastDashboardAt` em 1970 — que o SQLite e
+ * o Postgres aceitam e o MySQL recusa, porque um `TIMESTAMP` dele começa em
+ * 1970-01-01 00:00:01 UTC. Parar o relógio é o ponto; pará-lo antes do início
+ * do tempo é outro bug.
  */
 describe('a rodada seguinte espera a janela', () => {
   it('duas rodadas seguidas consultam o ACS uma vez só', async () => {
     await atividadeEm(Date.now());
-    mock.timers.enable({ apis: ['Date'] });
+    mock.timers.enable({ apis: ['Date'], now: Date.now() });
     try {
       await runInTenant(tenantId, () => SchedulerService.runJobs({}));
       await runInTenant(tenantId, () => SchedulerService.runJobs({}));
@@ -167,7 +173,7 @@ describe('a rodada seguinte espera a janela', () => {
     // com ACS inalcançável é justamente o que mais consulta.
     await atividadeEm(Date.now());
     await runInTenant(tenantId, () => Setting.upsert('genieAcsUrl', 'http://127.0.0.1:1'));
-    mock.timers.enable({ apis: ['Date'] });
+    mock.timers.enable({ apis: ['Date'], now: Date.now() });
     try {
       const primeira = await runInTenant(tenantId, () => SchedulerService.runJobs({}));
       assert.equal(primeira.dashboard?.refreshed, false);
