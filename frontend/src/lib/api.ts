@@ -33,6 +33,14 @@ export interface ApiResponse<T = any> {
   /** Only on a 402 for a plan limit: the ceiling and where the provider is. */
   limit?: number
   current?: number
+  /**
+   * Só no 409 de valor curto: quanto foi cobrado e quanto veio, em centavos.
+   * Pelo mesmo motivo de `limit`/`current` logo acima — a tela precisa dizer
+   * QUANTO falta, e quanto foi pedido é conta do servidor: refazê-la aqui
+   * seria a segunda cópia da regra, que é a que diverge.
+   */
+  expectedCents?: number
+  paidCents?: number
 }
 
 /**
@@ -174,6 +182,12 @@ class ApiClient {
           ...(data.skipped ? { skipped: data.skipped } : {}),
           ...(data.subscription !== undefined ? { subscription: data.subscription } : {}),
           ...(typeof data.limit === 'number' ? { limit: data.limit, current: data.current } : {}),
+          // O 409 de valor curto, pelo mesmo desenho do 402 acima: a tela tem
+          // que dizer QUANTO falta, e a conta é do servidor — refazê-la aqui
+          // seria a segunda cópia de "quanto foi pedido", que é a que diverge.
+          ...(typeof data.expectedCents === 'number'
+            ? { expectedCents: data.expectedCents, paidCents: data.paidCents }
+            : {}),
         }
       }
 
@@ -1028,7 +1042,10 @@ export const platformAPI = {
     ),
 
   /** We mark it paid. `reference` is the Pix id, the boleto number — whatever names the payment. */
-  recordPayment: (tenantId: number, payload: { amountCents: number; currency: string; reference?: string }) =>
+  recordPayment: (
+    tenantId: number,
+    payload: { amountCents: number; currency: string; reference?: string; allowUnderpayment?: boolean }
+  ) =>
     // `duplicate` é o que distingue "creditei" de "esta referência já estava
     // creditada". O backend sempre respondeu os dois com 200 — e sem este campo
     // no tipo, a tela não tinha como contar a diferença.

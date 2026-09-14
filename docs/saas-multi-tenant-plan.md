@@ -692,6 +692,14 @@ provedor `suspended` ou `canceled` **não** é reativado por pagamento: essas du
 decisões de gente, e é gente que as desfaz. O webhook chama `recordPayment` e grava
 `billing_events.provider = 'asaas'`.
 
+**E o valor decide.** Um pagamento só estende o período quando cobre o que foi pedido — a
+cobrança que o painel emitiu, quando ela existe, e o `price_cents` do plano quando não.
+Pagar a mais credita (boleto atrasado chega com juros); pagar a menos entra no extrato
+com a diferença dentro e **não** move `renews_at`. Plano de preço zero não confere nada,
+que é o caso de todo provedor herdado. Até esta fatia o número que o pagamento carregava
+era enfeite: qualquer valor comprava o período inteiro, e a única pista de que algo estava
+errado era a conta bancária não bater.
+
 **Console.** Planos (criar, editar limites/preço/teste, desativar; o `code` não muda — é o
 que o extrato nomeia), a assinatura de cada provedor (trocar plano e mudar estado são dois
 botões e duas linhas no extrato, de propósito: trocar o plano de quem está em `past_due` não

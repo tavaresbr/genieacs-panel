@@ -346,12 +346,45 @@ class PlatformBillingController {
       const before = await Subscription.forTenant(tenant.id);
       if (!before) return res.status(404).json(createErrorResponse('Subscription not found'));
 
-      const { subscription: after, duplicate } = await runInTenant(tenant.id, () => manualBilling.recordPayment({
-        amountCents: amount,
-        currency,
-        externalId,
-        actorUserId: req.user?.userId ?? null
-      }));
+      // O botão do console leva a mesma conferência que o webhook, e a razão é
+      // que o erro aqui é mais provável, não menos: quem digita "1999" achando
+      // que digitou "19990" não tem nada que o corrija, enquanto o gateway pelo
+      // menos manda o valor que ele mesmo cobrou.
+      //
+      // `allowUnderpayment` é a saída, e é explícita como o `periodDays`: quem
+      // a passa está dizendo que sabe mais que o catálogo naquele caso — um
+      // acordo, uma entrada, um valor negociado fora do plano. O que ela não
+      // pode ser é o padrão, porque aí a conferência não existe.
+      const allowUnderpayment = body.allowUnderpayment === true;
+      const { subscription: after, duplicate, underpaid, expectedCents } = await runInTenant(
+        tenant.id,
+        () => manualBilling.recordPayment({
+          amountCents: amount,
+          currency,
+          externalId,
+          allowUnderpayment,
+          actorUserId: req.user?.userId ?? null
+        })
+      );
+
+      // 409 e não 400: o pedido está bem formado e o valor é um valor possível
+      // — o que não bate é com quanto se pediu, que é um conflito de estado.
+      // Os dois números vão no corpo porque a tela precisa dizer QUANTO falta,
+      // e porque repetir a conta no frontend seria a segunda cópia da regra.
+      if (underpaid) {
+        // Os dois números no TOPO do corpo, e não dentro de `data`: o cliente
+        // de API encaminha campo nomeado num erro, não o `data` inteiro — é o
+        // mesmo desenho do 402 de limite de plano, que manda `limit` e
+        // `current` assim. A tela precisa dizer quanto falta, e refazer a conta
+        // no frontend seria a segunda cópia da regra.
+        return res.status(409).json({
+          ...createErrorResponse('The amount is short of what was charged'),
+          code: 'underpaid',
+          paidCents: amount,
+          expectedCents,
+          currency
+        });
+      }
       // Uma referência já vista não é um segundo pagamento: nada foi
       // creditado, e uma segunda linha na trilha diria que foi.
       if (duplicate) {
@@ -369,7 +402,13 @@ class PlatformBillingController {
           reference: externalId,
           statusBefore: before.status,
           statusAfter: after.status,
-          renewsAt: after.renews_at ?? null
+          renewsAt: after.renews_at ?? null,
+          // Só aparece quando alguém passou por cima da conferência. A trilha
+          // da plataforma é onde se responde "quem deu desconto a quem", e uma
+          // linha idêntica à de um pagamento cheio não responderia.
+          ...(allowUnderpayment && expectedCents !== null && amount < expectedCents
+            ? { underpaymentAccepted: true, expectedCents }
+            : {})
         }
       });
       const state = await runInTenant(tenant.id, () => SubscriptionService.current());

@@ -156,7 +156,7 @@ class BillingWebhookController {
       // Daqui para baixo, como o provedor que pagou. É o escopo que diz de quem
       // é o dinheiro — `recordPayment` não recebe `tenantId` justamente para
       // que ninguém credite o provedor errado passando o id errado.
-      const { duplicate } = await runInTenant(tenantId, async () => {
+      const { duplicate, underpaid, expectedCents, paidCents } = await runInTenant(tenantId, async () => {
         const resultado = await asaasBilling.recordPayment({
           amountCents: leitura.amountCents,
           currency: 'BRL',
@@ -171,10 +171,45 @@ class BillingWebhookController {
         // Depois do crédito, e sem poder derrubá-lo: uma falha aqui deixa uma
         // cobrança `pending` que foi paga — feio, visível e corrigível. O caso
         // oposto seria dinheiro recebido e não creditado.
-        await marcarCobrancaPaga(leitura.externalId);
+        //
+        // E só quando o valor fecha. Uma cobrança paga pela metade continua
+        // `pending` porque é isso que ela é: em aberto. Marcá-la paga aqui
+        // apagaria da lista de contas a receber exatamente a linha que alguém
+        // precisa olhar — e o período, que não andou, ficaria sem explicação
+        // em lugar nenhum.
+        // Nem quando o valor é curto, nem numa reentrega.
+        //
+        // O curto é o óbvio: uma cobrança paga pela metade continua `pending`
+        // porque é isso que ela é. A reentrega é a armadilha — `recordPayment`
+        // volta cedo por `duplicate` e não reavalia o valor, então `underpaid`
+        // vem indefinido ali; sem esta segunda condição, a SEGUNDA entrega de
+        // um pagamento curto quitaria a cobrança que a primeira deixou em
+        // aberto, e o gateway reentrega por desenho. Não é preciso reavaliar
+        // nada: a primeira entrega já fez a coisa certa, e repeti-la é no
+        // máximo um no-op.
+        if (!resultado.duplicate && !resultado.underpaid) {
+          await marcarCobrancaPaga(leitura.externalId);
+        }
         return resultado;
       });
-      return res.json({ success: true, code: duplicate ? 'duplicate' : 'recorded' });
+
+      if (underpaid) {
+        // No log do processo, e não só no extrato: é a única coisa nesta rota
+        // que representa dinheiro a menos do que o combinado, e quem procura
+        // "por que o fulano não renovou" procura aqui primeiro.
+        console.warn(
+          `Billing webhook: payment ${leitura.externalId} for provider ${tenantId} paid `
+          + `${paidCents} of ${expectedCents} cents — recorded, period NOT extended`
+        );
+      }
+
+      // 200 nos três: o dinheiro chegou e foi registrado, e o que o gateway
+      // precisa saber é que não há o que reentregar. A diferença entre eles é
+      // para o log do gateway e para quem lê esta rota, não para a fila dele.
+      return res.json({
+        success: true,
+        code: duplicate ? 'duplicate' : underpaid ? 'underpaid' : 'recorded'
+      });
     } catch (error) {
       // Aqui sim: falhou deste lado, e reentregar resolve.
       console.error(`Billing webhook failed for provider ${tenantId}:`, error.message);

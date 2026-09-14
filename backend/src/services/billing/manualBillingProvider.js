@@ -23,12 +23,13 @@ export class ManualBillingProvider extends BillingProvider {
     return false;
   }
 
-  async recordPayment({ amountCents, currency, externalId = null, actorUserId = null, now }) {
+  async recordPayment({ amountCents, currency, externalId = null, actorUserId = null, allowUnderpayment = false, now }) {
     return SubscriptionService.recordPayment({
       amountCents,
       currency,
       provider: this.name,
       externalId,
+      allowUnderpayment,
       actorUserId,
       ...(now ? { now } : {})
     });
