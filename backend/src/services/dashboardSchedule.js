@@ -132,6 +132,13 @@ export function isDormant(atividadeEm, agora = Date.now()) {
  * acabam convergindo para a mesma virada — que é o pico que a defasagem existe
  * para evitar. Fatiando o tempo em janelas com fase própria, cada provedor tem
  * a sua borda, e um atraso não move a borda seguinte.
+ *
+ * A consequência para quem escreve teste: a borda é do RELÓGIO, não do intervalo
+ * entre as chamadas. Duas rodadas coladas caem na mesma janela quase sempre, e
+ * o "quase" é uma reprovação a cada ~(intervalo/janela) execuções. Um teste que
+ * afirme "a segunda rodada não devia nem tentar" precisa parar o relógio —
+ * `mock.timers.enable({ apis: ['Date'], now: Date.now() })` — em vez de contar
+ * com a sorte.
  */
 export function dueForRefresh({ lastRunAt, ttlMs, offsetMs, now = Date.now() }) {
   if (!Number.isFinite(ttlMs) || ttlMs <= 0) return true;

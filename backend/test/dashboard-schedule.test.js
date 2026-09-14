@@ -1,4 +1,4 @@
-import { after, before, beforeEach, describe, it } from 'node:test';
+import { after, before, beforeEach, describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 
@@ -134,12 +134,38 @@ describe('a cadência segue a atenção', () => {
   });
 });
 
+/**
+ * Os dois testes abaixo afirmam "duas rodadas dentro da MESMA janela", e por
+ * isso param o relógio antes de rodar.
+ *
+ * `dueForRefresh` corta o tempo em janelas absolutas, cada provedor com a sua
+ * borda. Duas rodadas coladas caem na mesma janela quase sempre — mas "quase"
+ * aqui é ≈ (intervalo entre as duas chamadas)/60s de chance de a borda passar
+ * entre elas, e nesse caso a segunda rodada é LEGITIMAMENTE devida: o teste
+ * reprovava o código certo, e só de vez em quando. Foi assim que o
+ * `Backend on postgres` caiu num PR que não tocava em uma linha de aplicação.
+ *
+ * `apis: ['Date']` congela só `Date.now`: `setTimeout` continua real, que é o
+ * que estes testes precisam para fazer HTTP de verdade contra o servidor local
+ * e contra a porta fechada.
+ *
+ * E `now` é obrigatório aqui, apesar de opcional na API: sem ele o relógio
+ * congela em ZERO, e a rodada grava `lastDashboardAt` em 1970 — que o SQLite e
+ * o Postgres aceitam e o MySQL recusa, porque um `TIMESTAMP` dele começa em
+ * 1970-01-01 00:00:01 UTC. Parar o relógio é o ponto; pará-lo antes do início
+ * do tempo é outro bug.
+ */
 describe('a rodada seguinte espera a janela', () => {
   it('duas rodadas seguidas consultam o ACS uma vez só', async () => {
     await atividadeEm(Date.now());
-    await runInTenant(tenantId, () => SchedulerService.runJobs({}));
-    await runInTenant(tenantId, () => SchedulerService.runJobs({}));
-    assert.equal(buscas, 1, 'a segunda rodada caiu na mesma janela e não devia repetir');
+    mock.timers.enable({ apis: ['Date'], now: Date.now() });
+    try {
+      await runInTenant(tenantId, () => SchedulerService.runJobs({}));
+      await runInTenant(tenantId, () => SchedulerService.runJobs({}));
+      assert.equal(buscas, 1, 'a segunda rodada caiu na mesma janela e não devia repetir');
+    } finally {
+      mock.timers.reset();
+    }
   });
 
   it('e um ACS fora do ar não vira uma tentativa por rodada', async () => {
@@ -147,12 +173,16 @@ describe('a rodada seguinte espera a janela', () => {
     // com ACS inalcançável é justamente o que mais consulta.
     await atividadeEm(Date.now());
     await runInTenant(tenantId, () => Setting.upsert('genieAcsUrl', 'http://127.0.0.1:1'));
+    mock.timers.enable({ apis: ['Date'], now: Date.now() });
     try {
       const primeira = await runInTenant(tenantId, () => SchedulerService.runJobs({}));
       assert.equal(primeira.dashboard?.refreshed, false);
       const segunda = await runInTenant(tenantId, () => SchedulerService.runJobs({}));
       assert.equal(segunda.dashboard, null, 'a segunda rodada não devia nem tentar');
     } finally {
+      // Antes da restauração da URL: um relógio congelado que vazasse para o
+      // teste seguinte custaria muito mais caro do que a falha daqui.
+      mock.timers.reset();
       await runInTenant(tenantId, () => Setting.upsert(
         'genieAcsUrl', `http://127.0.0.1:${servidor.address().port}`
       ));
