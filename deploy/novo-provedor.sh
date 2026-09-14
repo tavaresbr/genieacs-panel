@@ -37,8 +37,14 @@ readonly AQUI="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 readonly MODELO="$AQUI/proxy/nginx-tenant.conf.template"
 
 BASE=""
-ENV_FILE="$AQUI/saas.env"
+ENV_FILE=""
 WEBROOT="/var/www/certbot"
+
+# Os dois arranjos de instalação guardam as variáveis em lugares diferentes, e
+# quem roda este script não tem por que saber em qual está: o compose lê
+# `deploy/saas.env`, e o CLI (`skygenpanel`, /opt/skygenpanel) lê
+# `backend/.env`. Procurados nesta ordem, e `--env-file` vence os dois.
+readonly ENV_CANDIDATOS=("$AQUI/saas.env" "$(realpath -m -- "$AQUI/../backend/.env")")
 EMAIL=""
 ENSAIO=0
 SLUG=""
@@ -54,7 +60,8 @@ Emite o certificado de <slug>.<base> e instala o bloco do nginx que o serve.
 
 Opções:
   --base <domínio>    Domínio-base. Padrão: TENANT_BASE_DOMAIN do arquivo de ambiente.
-  --env-file <path>   De onde ler TENANT_BASE_DOMAIN. Padrão: $ENV_FILE
+  --env-file <path>   De onde ler TENANT_BASE_DOMAIN. Padrão: o primeiro que existir
+                      entre ${ENV_CANDIDATOS[0]} e ${ENV_CANDIDATOS[1]}
   --webroot <path>    Raiz do desafio ACME. Padrão: $WEBROOT
   --email <endereço>  E-mail da conta do Let's Encrypt, no primeiro uso.
   --dry-run           Ensaia contra o staging do Let's Encrypt e NÃO instala nada.
@@ -114,8 +121,15 @@ fi
 
 # --- O domínio-base vem do deploy, não de dentro do script ------------------
 if [ -z "$BASE" ]; then
-  if [ ! -f "$ENV_FILE" ]; then
-    erro "não achei $ENV_FILE; use --base <domínio> ou --env-file <path>"
+  if [ -z "$ENV_FILE" ]; then
+    for candidato in "${ENV_CANDIDATOS[@]}"; do
+      [ -f "$candidato" ] && { ENV_FILE="$candidato"; break; }
+    done
+  fi
+  if [ -z "$ENV_FILE" ] || [ ! -f "$ENV_FILE" ]; then
+    erro "não achei o arquivo de ambiente. Procurei em:"
+    for candidato in "${ENV_CANDIDATOS[@]}"; do erro "    $candidato"; done
+    erro "Use --base <domínio> ou --env-file <path>."
     exit 1
   fi
   BASE="$(grep -E '^[[:space:]]*TENANT_BASE_DOMAIN[[:space:]]*=' "$ENV_FILE" \

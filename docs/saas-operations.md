@@ -90,7 +90,9 @@ E, para cada provedor novo, um comando:
 sudo ./deploy/novo-provedor.sh inove
 ```
 
-Ele lê `TENANT_BASE_DOMAIN` de `deploy/saas.env`, confere que `inove.painel.exemplo.com`
+Ele lê `TENANT_BASE_DOMAIN` do arquivo de ambiente do deploy — `deploy/saas.env` no
+compose, `backend/.env` na instalação pelo CLI `skygenpanel`, procurados nessa ordem e
+sobrepostos por `--env-file` — confere que `inove.painel.exemplo.com`
 resolve para o mesmo IP da base **antes** de chamar o certbot (uma emissão contra um nome
 que não resolve queima uma das cinco tentativas por hora que o Let's Encrypt concede, e o
 erro dele não diz que o problema era o DNS), emite, renderiza
