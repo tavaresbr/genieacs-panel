@@ -366,8 +366,13 @@ Ambos no console (`/platform`), ambos gravados em `platform_audit`, que é compa
 provedor foi apagado" sobreviver ao provedor.
 
 1. **Suspender** (`PATCH /api/platform/tenants/:id`): o provedor para de resolver na
-   hora — todo host dele responde 404, os jobs de fundo pulam ele, os tokens existentes
-   deixam de servir. Reversível.
+   hora — todo host dele responde 404, os tokens existentes deixam de servir, e os jobs de
+   **trabalho** pulam ele: envio, alerta, reconciliação com o ERP, painel, aviso de
+   vencimento e emissão da cobrança. Os de **retenção** não pulam, e isso é de propósito:
+   trilha, execuções de provisionamento, eventos do ERP, histórico de WhatsApp com os
+   anexos e amostras de sinal continuam sendo apagados pela idade. Suspender muda quem
+   trabalha, não o que guardamos de alguém — e como não existe prazo de suspensão, deixar
+   a retenção de fora queria dizer guardar para sempre. Reversível.
 2. **Apagar** (`DELETE /api/platform/tenants/:id`): exige estar no plano de controle, o
    provedor estar **suspenso** (o que faz da exclusão um segundo passo, com um estado
    reversível no meio) e o slug digitado de volta, exato. A linha da trilha é gravada
@@ -408,7 +413,11 @@ provedor. Quatro abas:
   esse passo, uma linha só migra quando alguém a edita, e limpar a chave anterior do
   `.env` torna ilegível o que não migrou. O comando recusa em vez de adivinhar: um
   segredo que nenhuma chave do processo abre para a execução inteira, e nada é reescrito.
-  `--dry-run` conta antes, por versão.
+  `--dry-run` conta antes, por versão. **A CLI `skygenpanel` é do install self-hosted** —
+  a tabela das edições, no topo deste documento, a põe nessa coluna. Num deploy SaaS o
+  comando é o mesmo script, por dentro do contêiner: `docker compose -f
+  deploy/docker-compose.saas.yml exec panel node scripts/rotate-secret-key.js`, com ou sem
+  `--dry-run`. A CLI não faz mais do que isso (`deploy/skygenpanel:232`).
   **A chave anterior continua necessária para os BACKUPS** tirados antes da troca — a
   retenção guarda perto de um ano deles, e `backup verify` recusa um restore cuja chave
   não bate. Arquive a chave antiga junto com os dumps antes de tirá-la do `.env`.
@@ -472,8 +481,13 @@ assinantes, nada. Uma caixa de entrada alheia não é lugar onde isso mora.
 
 ## 9. O que este documento não cobre, porque ainda não existe
 
-- Gateway de cobrança, **a metade que emite**. A metade que RECEBE já existe: ver
-  a seção 10.
+Nada — e vale dizer em voz alta, porque esta seção passou meses com dois itens. Os dois
+saíram: a metade do gateway que **emite** a cobrança está na seção 10, e o **comando de
+re-cifra** da `SECRET_BOX_KEY` está na seção 6.
+
+O que continua fora está escrito onde é útil, junto do mecanismo, e não numa lista à
+parte que ninguém revisa: a cobrança em moeda que não seja BRL e a conferência do valor
+pago contra o preço do plano estão no fim da seção 10.
 
 ## 10. Receber pagamento sozinho
 

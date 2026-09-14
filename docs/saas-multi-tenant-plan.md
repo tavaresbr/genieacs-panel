@@ -62,10 +62,19 @@ chega sem sessão. Escopá-la exigiria já saber a resposta. Está marcada no c�
   não na convenção.
 - **`backend/src/config/tenantScope.js`** — `SCOPED_TABLES` e `SHARED_TABLES`, com o
   porquê de cada grupo escrito ao lado. `pendingTables()` hoje devolve vazio.
-- **`backend/src/config/tenantJobs.js`** — `forEachTenant()` (uma passagem por provedor) e
-  `forSoleTenant()` (roda uma vez e **recusa** quando existe um segundo provedor). Todo job
-  de fundo já migrou para `forEachTenant`; o `forSoleTenant` **não tem mais nenhum chamador**
-  e fica como mecanismo para o próximo job cuja query motriz ainda não seja escopada.
+- **`backend/src/config/tenantJobs.js`** — `forEachTenant()` (uma passagem por provedor
+  **ativo**), `forEveryTenant()` (uma passagem por provedor de **todo** status) e
+  `forSoleTenant()` (roda uma vez e **recusa** quando existe um segundo provedor). A
+  diferença entre os dois primeiros é a pergunta que cada job faz. *"Quem está
+  trabalhando?"* — envio, alerta, reconciliação, painel, cobrança — responde `active`.
+  *"De quem eu ainda guardo dado?"* — os jobs de retenção — não olha status: sem prazo de
+  suspensão e sem exclusão automática, não visitar o suspenso quer dizer guardar a trilha,
+  a conversa e os anexos dele para sempre. A varredura de anexos responde à mesma pergunta
+  com laço próprio sobre `tenants`, e não com `forEveryTenant`, porque ela precisa da
+  contagem de quem **poderia** ser dono dos arquivos legados — outra pergunta, que o
+  arquivo explica ao lado. O `forSoleTenant` **não tem mais nenhum
+  chamador** e fica como mecanismo para o próximo job cuja query motriz ainda não seja
+  escopada.
 - **`backend/src/config/tenantCache.js`** — `TenantCache`, uma entrada por provedor, com
   `invalidate()` (este provedor) separado de `clear()` (todos).
 - **Guarda estática** em `backend/test/tenant-scoping.test.js`, que varre `backend/src` e
@@ -674,12 +683,14 @@ contra o teto. Recusa é **402** com `code`, `limit` e `current`: quem pede *tem
 o plano que não comporta. A contagem de ONTs vem do GenieACS e vira `null` quando o ACS não
 responde, sem derrubar os outros dois números.
 
-**Cobrança.** `BillingProvider` é a interface; `ManualBillingProvider` é o que existe — nós
-marcamos pago. Um pagamento estende o período em 30 dias a partir do fim atual (pagou
-adiantado) ou de hoje (pagou atrasado) e volta o status a `active`. Um provedor `suspended`
-ou `canceled` **não** é reativado por pagamento: essas duas são decisões de gente, e é gente
-que as desfaz. O Asaas entra como `AsaasBillingProvider` com `recordPayment` chamado pelo
-webhook, e `billing_events.provider = 'asaas'`.
+**Cobrança.** `BillingProvider` é a interface, e hoje tem duas implementações: o
+`ManualBillingProvider`, que é nós marcarmos pago, e o do Asaas, que emite a cobrança e
+recebe o pagamento. Um pagamento estende o período pelos dias do plano
+(`plans.period_days`, com 30 de reserva para o plano que a coluna não alcançou) a partir do
+fim atual (pagou adiantado) ou de hoje (pagou atrasado) e volta o status a `active`. Um
+provedor `suspended` ou `canceled` **não** é reativado por pagamento: essas duas são
+decisões de gente, e é gente que as desfaz. O webhook chama `recordPayment` e grava
+`billing_events.provider = 'asaas'`.
 
 **Console.** Planos (criar, editar limites/preço/teste, desativar; o `code` não muda — é o
 que o extrato nomeia), a assinatura de cada provedor (trocar plano e mudar estado são dois
@@ -1361,9 +1372,11 @@ controle está ali.
 - **Criar** provedor: `slug` e `name`. O slug é o subdomínio da Fase 3, único
   desde a origem.
 - **Listar** e **suspender/reativar**. `tenants.status` já tem comportamento real
-  em todo o painel: `forEachTenant` só visita `active`, a varredura de mídia não
-  passa por suspenso, e o webhook do SGP não aceita entrega de suspenso. A rota
-  dá o controle de algo que já vale.
+  em todo o painel: `forEachTenant` só visita `active` — é por ele que passam envio,
+  alerta, reconciliação e cobrança — e o webhook do SGP não aceita entrega de suspenso.
+  A retenção é a exceção, e de propósito: ela alcança todo provedor, o suspenso incluído,
+  porque suspender muda quem trabalha e não o que se guarda de alguém. A rota dá o controle
+  de algo que já vale.
 - **NÃO apaga provedor.** As tabelas escopadas apontam para `tenants` sem
   cascata, então apagar um provedor com dado falharia na chave estrangeira — e
   se não falhasse seria pior. Suspender é a operação, e ela é reversível.
