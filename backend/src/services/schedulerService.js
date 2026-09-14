@@ -3,7 +3,7 @@ import DeviceService from './deviceService.js';
 import ProvisioningService from './provisioningService.js';
 import SgpEventService from './sgpEventService.js';
 import SgpService from './sgpService.js';
-import { forEachTenant } from '../config/tenantJobs.js';
+import { forEachTenant, forEveryTenant } from '../config/tenantJobs.js';
 import { currentTenantId } from '../config/tenantContext.js';
 import AuditLog from '../models/AuditLog.js';
 import AuthTicket from '../models/AuthTicket.js';
@@ -140,11 +140,15 @@ class SchedulerService {
    * One provider failing does not stop the others: a broken ERP integration at
    * one ISP must not be why every other ISP's queue stops draining.
    *
-   * The daily prune is decided ONCE per tick, above the loop, and handed down.
-   * `lastPruneAt` is a counter on this class rather than a row, so inside the
-   * loop the first provider would set it and every provider after it would
-   * skip its own prune — for that whole day, every day. The cadence is the
-   * deployment's; the rows each pass deletes are the provider's.
+   * The daily prune is decided ONCE per tick, above the loop. `lastPruneAt` is
+   * a counter on this class rather than a row, so decided INSIDE a loop the
+   * first provider would set it and every provider after it would skip its own
+   * prune — for that whole day, every day. The cadence is the deployment's; the
+   * rows each pass deletes are the provider's.
+   *
+   * E a poda roda no laço DELA, `retentionPass`, que visita todo provedor —
+   * este aqui visita só os ativos, porque envio, alerta e reconciliação não são
+   * para quem está suspenso. Guardar dado dele sem prazo também não era.
    */
   static async tick() {
     if (this.tickPromise) return this.tickPromise;
@@ -158,11 +162,12 @@ class SchedulerService {
     // `.env` e ficava larga para sempre quando ninguém pôs.
     this.tickPromise = refreshDeploymentSharing()
       .catch(() => {})
-      .then(() => forEachTenant((tenant) => this.runJobs({ prune, tenant }), {
+      .then(() => forEachTenant((tenant) => this.runJobs({ tenant }), {
         onError: (error, tenant) => {
           console.warn(`Scheduler tick failed for provider ${tenant.slug}: ${error.message}`);
         }
       }))
+      .then(() => (prune ? this.retentionPass() : undefined))
       .then(() => (prune ? this.pruneTickets() : undefined))
       .finally(() => {
         this.tickPromise = null;
@@ -194,7 +199,7 @@ class SchedulerService {
     });
   }
 
-  static async runJobs({ prune = false, tenant = null } = {}) {
+  static async runJobs({ tenant = null } = {}) {
     const summary = {
       provisioning: null, events: null, reconcile: null, dashboard: null, subscriptionNotice: null
     };
@@ -270,11 +275,33 @@ class SchedulerService {
       }
     }
 
-    if (prune) {
-      // Both tables grow with every activation and every delivery, so a busy
-      // install would otherwise fill its database. Whether today is a prune day
-      // was decided by `tick`; what gets deleted is this provider's own, by its
-      // own retention setting.
+    return summary;
+  }
+
+  /**
+   * A retenção, uma vez por provedor — TODOS eles, suspenso incluído.
+   *
+   * Este bloco morava dentro de `runJobs`, no laço de provedores ativos, ao
+   * lado de trabalho que fala com o ERP e com o GenieACS. Ficar lá tinha uma
+   * consequência que ninguém escreveu: provedor suspenso não é visitado, então
+   * a trilha dele — que num ativo tem prazo de um ano, e guarda qual assinante,
+   * qual contrato e quem revelou a senha de quem — não tinha prazo NENHUM. E
+   * como não existe prazo de suspensão nem exclusão automática, "nenhum" é
+   * literal.
+   *
+   * Separado por isso: são duas perguntas diferentes. `runJobs` responde "quem
+   * está trabalhando?", e `active` continua sendo a resposta certa lá — o
+   * suspenso não deve ter fila drenada nem ERP reconciliado. Esta responde "de
+   * quem eu ainda guardo dado?", e aí o status não decide nada.
+   *
+   * Nenhum dos três fala com rede. Os três LANÇAM, e por isso cada um leva o
+   * seu `.catch`: uma poda que falha não pode levar as outras duas junto.
+   */
+  static async retentionPass() {
+    await forEveryTenant(async () => {
+      // As duas tabelas crescem a cada ativação e a cada entrega, então uma
+      // instalação movimentada encheria o banco. O dia foi decidido por `tick`;
+      // o que sai é o deste provedor, pela retenção dele.
       await ProvisioningService.prune().catch((error) => {
         console.warn(`Could not prune provisioning runs: ${error.message}`);
       });
@@ -289,9 +316,11 @@ class SchedulerService {
       await AuditLog.prune(new Date(Date.now() - AUDIT_RETENTION_MS)).catch((error) => {
         console.warn(`Could not prune the audit log: ${error.message}`);
       });
-    }
-
-    return summary;
+    }, {
+      onError: (error, tenant) => {
+        console.warn(`Retention pass failed for provider ${tenant.slug}: ${error.message}`);
+      }
+    });
   }
 }
 

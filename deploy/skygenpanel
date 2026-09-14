@@ -217,6 +217,21 @@ cmd_reset_password() {
   ( cd "$INSTALL_DIR/backend" && RESET_PASSWORD="$pass" node scripts/reset-password.js "$user" )
 }
 
+# A chave entra por VARIÁVEL DE AMBIENTE, nunca por argumento: argv aparece em
+# `ps` para qualquer usuário da máquina e fica no histórico do shell. É a mesma
+# regra de `reset-password` acima, e aqui pesa mais — o segredo é a chave mestra
+# que abre senha de portal, senha de WiFi e todo token de integração.
+cmd_rotate_key() {
+  need_root
+  validate_install_dir
+  local modo="${1:-}"
+  case "$modo" in
+    ''|--dry-run) ;;
+    *) die "Usage: skygenpanel rotate-key [--dry-run]" ;;
+  esac
+  ( cd "$INSTALL_DIR/backend" && node scripts/rotate-secret-key.js $modo )
+}
+
 # Delegated rather than reimplemented: the timer runs the same script with the
 # same arguments, so an operator who types this by hand and the machine that
 # runs it at 03:17 are doing exactly the same thing. Two copies of "how a backup
@@ -244,6 +259,7 @@ Commands:
   logs [N]                    Follow the last N log lines (default 100)
   reset-password <u> [p]      Reset password (prompts securely when omitted)
   backup [verify]             Take a backup now, or report the newest one
+  rotate-key [--dry-run]      Rewrite stored secrets with the live SECRET_BOX_KEY
   help                        Show this help
 EOF
 }
@@ -260,6 +276,7 @@ case "${1:-help}" in
   logs)            cmd_logs "${2:-100}" ;;
   reset-password)  cmd_reset_password "${2:-}" "${3:-}" ;;
   backup)          cmd_backup "${2:-run}" ;;
+  rotate-key)      cmd_rotate_key "${2:-}" ;;
   help|-h|--help)  usage ;;
   *)               warn "Unknown command: $1"; usage; exit 1 ;;
 esac

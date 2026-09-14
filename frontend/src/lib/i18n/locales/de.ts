@@ -1531,6 +1531,8 @@ const de: Dictionary = {
   'platform.operators': '{count} Bediener',
   'platform.statusActive': 'Aktiv',
   'platform.statusSuspended': 'Gesperrt',
+  'platform.suspendedSince': 'Seit {when}',
+  'platform.suspendedSinceUnknown': 'Seit wann: unbekannt',
   'platform.suspend': 'Sperren',
   'platform.reactivate': 'Wieder aktivieren',
   'platform.suspendConfirm': 'Ein gesperrter Anbieter stoppt jede Hintergrundarbeit – kein Versand, keine Bereinigung, keine ERP-Zustellung – und niemand kann sich dort anmelden. Nichts wird gelöscht, und es lässt sich rückgängig machen.',

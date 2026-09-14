@@ -1529,6 +1529,8 @@ const en = {
   'platform.operators': '{count} operator(s)',
   'platform.statusActive': 'Active',
   'platform.statusSuspended': 'Suspended',
+  'platform.suspendedSince': 'Since {when}',
+  'platform.suspendedSinceUnknown': 'Since when: unknown',
   'platform.suspend': 'Suspend',
   'platform.reactivate': 'Reactivate',
   'platform.suspendConfirm': 'A suspended provider stops all background work — no sending, no sweeps, no ERP deliveries — and nobody can sign in there. Nothing is deleted, and it can be reactivated.',

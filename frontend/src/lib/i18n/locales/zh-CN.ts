@@ -1527,6 +1527,8 @@ const zhCN: Dictionary = {
   'platform.operators': '{count} 名操作员',
   'platform.statusActive': '启用',
   'platform.statusSuspended': '已暂停',
+  'platform.suspendedSince': '自 {when}',
+  'platform.suspendedSinceUnknown': '起始时间未知',
   'platform.suspend': '暂停',
   'platform.reactivate': '重新启用',
   'platform.suspendConfirm': '暂停的服务商会停止所有后台工作——不再发送、不再清理、不再接收 ERP 投递——并且无人可以登录。不会删除任何数据，可以随时恢复。',

@@ -1527,6 +1527,8 @@ const ptBR: Dictionary = {
   'platform.operators': '{count} operador(es)',
   'platform.statusActive': 'Ativo',
   'platform.statusSuspended': 'Suspenso',
+  'platform.suspendedSince': 'Desde {when}',
+  'platform.suspendedSinceUnknown': 'Desde quando: não se sabe',
   'platform.suspend': 'Suspender',
   'platform.reactivate': 'Reativar',
   'platform.suspendConfirm': 'Provedor suspenso para todo trabalho de fundo — não envia, não varre, não recebe entrega do ERP — e ninguém entra nele. Nada é apagado, e dá para reativar.',

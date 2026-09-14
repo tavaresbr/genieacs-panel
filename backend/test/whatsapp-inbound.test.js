@@ -763,3 +763,97 @@ describe('o lote e o que ele deixa para trás', () => {
     assert.equal(await mensagemPorId('LOTE-D'), null);
   });
 });
+
+/**
+ * O eco de uma mensagem que saiu DAQUI não vira uma segunda bolha.
+ *
+ * O servidor ecoa toda mensagem enviada como evento de entrada. Enquanto a
+ * confirmação de saída não grava o `external_id` na linha do operador, o eco
+ * não tinha como se reconhecer — a única deduplicação de entrada é por
+ * `external_id`, e a linha do operador está justamente com ele nulo. Então o
+ * eco inseria linha nova, e a conversa ficava com DUAS bolhas iguais.
+ *
+ * Para quem lê a tela isso é o cliente ter recebido a mensagem duas vezes: o
+ * oposto exato do que o tratamento de unicidade no worker existe para evitar.
+ * E a linha do operador, sem `external_id`, ficava fora do alcance de todo
+ * recibo — congelada em "enviada" para sempre.
+ */
+describe('o eco de uma mensagem nossa adota a linha que já existe', () => {
+  /** Um número por caso: os três compartilhariam a mesma conversa. */
+  const REMOTE = (n) => `55119888800${n}@s.whatsapp.net`;
+
+  /** A linha que o painel escreve ao enviar, no instante ANTES da confirmação. */
+  async function linhaDeSaida(conversationId, body) {
+    await asTenant(() => getDb()('wa_messages').insert({
+      tenant_id: 1,
+      conversation_id: conversationId,
+      direction: 'out',
+      body,
+      external_id: null,
+      delivery_status: 'sent',
+      is_note: false,
+      created_at: new Date(),
+      updated_at: new Date()
+    }));
+  }
+
+  /**
+   * Abre a conversa com uma mensagem de entrada, como o cliente faria.
+   *
+   * O bot de autoatendimento responde a ela e escreve uma linha 'out' própria —
+   * por isso toda asserção abaixo é pelo CORPO da mensagem sob teste, e não por
+   * "quantas saídas esta conversa tem".
+   */
+  async function conversaAberta(id, remoteJid) {
+    await hook(eventoV2({ id, remoteJid, texto: 'oi' }));
+    return (await conversaDaMensagem(id)).id;
+  }
+
+  const saidasCom = (conversationId, body) =>
+    mensagens().where({ conversation_id: conversationId, direction: 'out', body });
+
+  it('uma bolha, não duas — e o external_id fica na linha do operador', async () => {
+    const conversationId = await conversaAberta('CLIENTE-1', REMOTE(1));
+    await linhaDeSaida(conversationId, 'segue o boleto');
+
+    await hook(eventoV2({
+      id: 'ECO-1', remoteJid: REMOTE(1), fromMe: true, texto: 'segue o boleto'
+    }));
+
+    const saidas = await saidasCom(conversationId, 'segue o boleto');
+    assert.equal(saidas.length, 1, 'o eco inseriu uma segunda bolha');
+    assert.equal(saidas[0].external_id, 'ECO-1', 'a linha do operador ficou sem o id');
+  });
+
+  it('e por isso o recibo encontra a linha do operador', async () => {
+    const conversationId = await conversaAberta('CLIENTE-2', REMOTE(2));
+    await linhaDeSaida(conversationId, 'já está a caminho');
+    await hook(eventoV2({
+      id: 'ECO-2', remoteJid: REMOTE(2), fromMe: true, texto: 'já está a caminho'
+    }));
+
+    await hook({
+      event: 'messages.update',
+      instance: INSTANCE,
+      data: { keyId: 'ECO-2', key: { id: 'ECO-2', remoteJid: REMOTE(2), fromMe: true }, status: 'READ' }
+    });
+
+    const [saida] = await saidasCom(conversationId, 'já está a caminho');
+    assert.equal(saida.delivery_status, 'read', 'o recibo não alcançou a linha do operador');
+  });
+
+  it('mas o eco de uma mensagem mandada do CELULAR continua entrando', async () => {
+    // O controle. Sem nada para adotar, o eco é a única notícia que o painel
+    // tem de que o provedor respondeu por fora — e some se a adoção for ampla
+    // demais.
+    const conversationId = await conversaAberta('CLIENTE-3', REMOTE(3));
+
+    await hook(eventoV2({
+      id: 'ECO-3', remoteJid: REMOTE(3), fromMe: true, texto: 'respondi pelo celular'
+    }));
+
+    const saidas = await saidasCom(conversationId, 'respondi pelo celular');
+    assert.equal(saidas.length, 1, 'o eco do celular deixou de entrar');
+    assert.equal(saidas[0].external_id, 'ECO-3');
+  });
+});

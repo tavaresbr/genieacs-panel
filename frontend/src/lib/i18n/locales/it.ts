@@ -1533,6 +1533,8 @@ const it: Dictionary = {
   'platform.operators': '{count} operatore/i',
   'platform.statusActive': 'Attivo',
   'platform.statusSuspended': 'Sospeso',
+  'platform.suspendedSince': 'Da {when}',
+  'platform.suspendedSinceUnknown': 'Da quando: sconosciuto',
   'platform.suspend': 'Sospendi',
   'platform.reactivate': 'Riattiva',
   'platform.suspendConfirm': 'Un provider sospeso interrompe ogni lavoro in background — non invia, non ripulisce, non riceve consegne dall’ERP — e nessuno può accedervi. Nulla viene eliminato e si può riattivare.',

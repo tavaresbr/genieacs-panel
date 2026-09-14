@@ -1527,6 +1527,8 @@ const ja: Dictionary = {
   'platform.operators': 'オペレーター {count} 名',
   'platform.statusActive': '有効',
   'platform.statusSuspended': '停止中',
+  'platform.suspendedSince': '{when}から',
+  'platform.suspendedSinceUnknown': 'いつからか不明',
   'platform.suspend': '停止する',
   'platform.reactivate': '再開する',
   'platform.suspendConfirm': '停止したプロバイダは背後の処理をすべて止めます。送信も、整理も、ERP からの受信も行われず、誰もログインできません。データは削除されず、再開できます。',

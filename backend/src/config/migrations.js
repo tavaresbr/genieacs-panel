@@ -2995,6 +2995,120 @@ export const migrations = [
       if (!(await db.schema.hasTable('tenants'))) return;
       await createTableIfMissing(db, 'billing_charges', billingChargesTable(db));
     }
+  },
+  {
+    /**
+     * Desde quando o provedor está suspenso.
+     *
+     * `tenants` tinha só `created_at` e `updated_at`, e `updated_at` é
+     * sobrescrito por qualquer renomeação ou edição de cadastro — então ninguém
+     * conseguia responder "há quanto tempo este provedor está parado?". A
+     * pergunta não é acadêmica: só existem dois estados, sem prazo e sem
+     * exclusão automática, então um provedor suspenso pode estar parado há uma
+     * semana ou há dois anos, guardando CPF, contrato e a conversa inteira dos
+     * assinantes dele, e o console mostrava os dois casos igual.
+     *
+     * Nasce NULA para todo mundo, e o passo seguinte a preenche a partir da
+     * trilha. Nulo continua sendo uma resposta possível depois disso — é o que
+     * a tela mostra como "não se sabe", para o provedor suspenso antes de a
+     * trilha existir.
+     */
+    id: '0048_tenant_suspended_at',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      return db.schema.hasColumn('tenants', 'suspended_at');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      const faltando = await missingColumns(db, 'tenants', [
+        ['suspended_at', (t) => t.timestamp('suspended_at')]
+      ]);
+      if (faltando.length) {
+        await db.schema.alterTable('tenants', (t) => {
+          for (const add of faltando) add(t);
+        });
+      }
+    }
+  },
+  {
+    /**
+     * A data de suspensão de quem já estava suspenso, lida da trilha.
+     *
+     * Separada do passo que cria a coluna porque faz outra coisa: aquele mexe
+     * no esquema, este lê dado e escreve linha. Juntos, uma falha aqui faria a
+     * coluna parecer não existir e o passo inteiro rodar de novo.
+     *
+     * `platform_audit` registra toda mudança de status com `{ from, to }` no
+     * `detail`, e é compartilhada e sem FK para `tenants` — de propósito, para
+     * sobreviver à exclusão do provedor. Então a data real está lá.
+     *
+     * O `detail` é TEXT com JSON dentro, e consultar JSON dentro de texto tem
+     * sintaxe diferente nos três dialetos. Como mudança de status é rara, a
+     * leitura vem crua e o filtro acontece em JS — o que funciona igual em
+     * SQLite, MySQL e Postgres sem uma linha de SQL específico.
+     *
+     * Quem não tem registro fica NULO. Não inventar data é a parte que importa:
+     * `updated_at` daria um número plausível e errado, e errado sem avisar.
+     */
+    id: '0049_tenant_suspended_at_backfill',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      if (!(await db.schema.hasColumn('tenants', 'suspended_at'))) return false;
+      // Já rodou se nenhum suspenso está sem data — que é também o estado de
+      // uma instalação sem provedor suspenso nenhum.
+      const [{ total }] = await db('tenants')
+        .where({ status: 'suspended' })
+        .whereNull('suspended_at')
+        .count({ total: '*' });
+      return Number(total) === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasColumn('tenants', 'suspended_at'))) return;
+      if (!(await db.schema.hasTable('platform_audit'))) return;
+
+      const pendentes = await db('tenants')
+        .where({ status: 'suspended' })
+        .whereNull('suspended_at')
+        .pluck('id');
+      if (pendentes.length === 0) return;
+
+      const linhas = await db('platform_audit')
+        .whereIn('tenant_id', pendentes)
+        .where({ action: 'tenant.status_changed' })
+        .orderBy('created_at', 'desc')
+        .orderBy('id', 'desc')
+        .select('tenant_id', 'detail', 'created_at');
+
+      // A PRIMEIRA mudança de status de cada provedor decide, e só ela — as
+      // linhas vêm da mais recente para a mais antiga.
+      //
+      // Decidir pela mais recente que TERMINOU em suspenso seria pior que não
+      // decidir: um provedor suspenso, reativado, e suspenso de novo sem que a
+      // última vez tenha deixado registro receberia a data da suspensão ANTIGA,
+      // que é uma mentira precisa — a tela mostraria "parado há dois anos"
+      // sobre quem parou semana passada. Se a mudança mais recente terminou em
+      // ativo, a suspensão de agora veio depois dela e não está na trilha:
+      // nulo é a resposta honesta.
+      const decidido = new Map();
+      for (const linha of linhas) {
+        const id = Number(linha.tenant_id);
+        if (decidido.has(id)) continue;
+        let detalhe;
+        try {
+          detalhe = JSON.parse(linha.detail);
+        } catch {
+          // JSON quebrado não é resposta, e também não impede a próxima linha
+          // de ser a resposta: só esta é descartada.
+          continue;
+        }
+        decidido.set(id, detalhe?.to === 'suspended' ? linha.created_at : null);
+      }
+
+      for (const [id, quando] of decidido) {
+        if (!quando) continue;
+        await db('tenants').where({ id }).update({ suspended_at: quando });
+      }
+    }
   }
 ];
 export default migrations;

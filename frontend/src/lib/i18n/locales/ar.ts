@@ -1509,6 +1509,8 @@ const ar: Dictionary = {
   'platform.operators': '{count} مشغّلًا',
   'platform.statusActive': 'نشط',
   'platform.statusSuspended': 'موقوف',
+  'platform.suspendedSince': 'منذ {when}',
+  'platform.suspendedSinceUnknown': 'منذ متى: غير معروف',
   'platform.suspend': 'إيقاف',
   'platform.reactivate': 'إعادة التنشيط',
   'platform.suspendConfirm': 'المزوّد الموقوف تتوقّف عنده كل المهام الخلفية — لا إرسال ولا تنظيف ولا تسليم إلى نظام ERP — ولا يستطيع أحد تسجيل الدخول لديه. ولا يُحذف شيء، ويمكن إعادة تنشيطه.',

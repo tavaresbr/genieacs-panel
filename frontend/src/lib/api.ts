@@ -761,6 +761,15 @@ export interface Tenant {
    */
   gateway: TenantGateway | null
   createdAt: string | null
+  /**
+   * Desde quando está suspenso.
+   *
+   * Nulo tem DOIS significados aqui, e o `status` os separa: num provedor ativo
+   * é "não está suspenso"; num suspenso é "foi suspenso antes de esta coluna
+   * existir e a trilha da plataforma não guardou". A tela diz que não sabe, em
+   * vez de inventar uma data — `updated_at` daria um número plausível e errado.
+   */
+  suspendedAt: string | null
 }
 
 export interface TenantGateway {

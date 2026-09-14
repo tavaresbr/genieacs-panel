@@ -12,6 +12,7 @@ import { STATUS_LABEL_KEYS, TenantPlan, statusBadgeClass } from '@/components/pl
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
+import { formatRelativeTime } from '@/lib/utils'
 
 export default function PlatformPage() {
   const { t } = useTranslation()
@@ -343,6 +344,20 @@ export default function PlatformPage() {
                           <span className={active ? 'modern-badge-success' : 'modern-badge-warning'}>
                             {t(active ? 'platform.statusActive' : 'platform.statusSuspended')}
                           </span>
+                          {/* Desde quando, e só para o suspenso: num ativo a
+                              informação não existe. "Suspenso" sozinho não
+                              distingue quem parou semana passada de quem está
+                              parado há dois anos guardando CPF e contrato dos
+                              assinantes — e era essa a diferença invisível. */}
+                          {!active && (
+                            <span className="mt-1 block text-xs text-muted-foreground">
+                              {tenant.suspendedAt
+                                ? t('platform.suspendedSince', {
+                                  when: formatRelativeTime(tenant.suspendedAt)
+                                })
+                                : t('platform.suspendedSinceUnknown')}
+                            </span>
+                          )}
                         </td>
                         <td className="text-sm">
                           {tenant.subscription ? (

@@ -837,3 +837,106 @@ describe('the provider name leaving settings', () => {
       'after the copy, the setting no longer drives the name');
   });
 });
+
+/**
+ * A data de suspensão de quem já estava suspenso, lida da trilha.
+ *
+ * A coluna nasce nula para todo mundo, e provedores suspensos antes dela
+ * existirem não teriam data nenhuma — "parado desde sempre", que não é uma
+ * resposta. `platform_audit` registra toda mudança de status com `{ from, to }`
+ * no `detail`, e é compartilhada e sem FK para `tenants` de propósito, para
+ * sobreviver à exclusão do provedor: a data real está lá.
+ *
+ * Os dois lados no mesmo bloco de propósito. Inventar data é tão errado quanto
+ * não achar a que existe — `updated_at` daria um número plausível para todo
+ * mundo, e plausível e errado é pior que vazio.
+ */
+describe('o backfill da data de suspensão', () => {
+  const db = createDatabase('suspended-at-backfill');
+  const PASSO = '0049_tenant_suspended_at_backfill';
+  let comTrilha;
+  let semTrilha;
+  let reativado;
+  const quandoFoi = new Date('2026-03-01T12:00:00Z');
+
+  const linha = (id) => db('tenants').where({ id }).first();
+
+  before(async () => {
+    await ensureSchema(db);
+
+    comTrilha = await insertReturningId('tenants',
+      { slug: 'com-trilha', name: 'Com Trilha', status: 'suspended' }, db);
+    semTrilha = await insertReturningId('tenants',
+      { slug: 'sem-trilha', name: 'Sem Trilha', status: 'suspended' }, db);
+    reativado = await insertReturningId('tenants',
+      { slug: 'reativado', name: 'Reativado', status: 'suspended' }, db);
+
+    await db('platform_audit').insert([
+      {
+        action: 'tenant.status_changed',
+        tenant_id: comTrilha,
+        tenant_slug: 'com-trilha',
+        detail: JSON.stringify({ from: 'active', to: 'suspended' }),
+        created_at: quandoFoi
+      },
+      // Ruído que o filtro tem que ignorar: outra ação, no mesmo provedor.
+      {
+        action: 'tenant.renamed',
+        tenant_id: comTrilha,
+        tenant_slug: 'com-trilha',
+        detail: JSON.stringify({ to: 'Outro Nome' }),
+        created_at: new Date('2026-06-01T12:00:00Z')
+      },
+      // Este foi suspenso, reativado, e suspenso de novo SEM registro da
+      // última vez. A linha mais recente termina em `active`, então a resposta
+      // honesta é não saber — e não a data da suspensão antiga.
+      {
+        action: 'tenant.status_changed',
+        tenant_id: reativado,
+        tenant_slug: 'reativado',
+        detail: JSON.stringify({ from: 'active', to: 'suspended' }),
+        created_at: new Date('2026-01-01T12:00:00Z')
+      },
+      {
+        action: 'tenant.status_changed',
+        tenant_id: reativado,
+        tenant_slug: 'reativado',
+        detail: JSON.stringify({ from: 'suspended', to: 'active' }),
+        created_at: new Date('2026-02-01T12:00:00Z')
+      }
+    ]);
+
+    // A coluna existe e está nula: é o estado em que o passo encontra uma
+    // instalação que acabou de subir a migração anterior.
+    await db('tenants').update({ suspended_at: null });
+    await migrations.find((m) => m.id === PASSO).up(db);
+  });
+
+  it('acha na trilha a data em que o provedor foi suspenso', async () => {
+    const achada = (await linha(comTrilha)).suspended_at;
+    assert.ok(achada, 'não achou a data que estava na trilha');
+    assert.equal(new Date(achada).getTime(), quandoFoi.getTime());
+  });
+
+  it('e deixa NULO quem a trilha não sabe, em vez de inventar', async () => {
+    assert.equal((await linha(semTrilha)).suspended_at, null);
+  });
+
+  it('e não usa uma suspensão antiga que já tinha sido desfeita', async () => {
+    // A mudança mais recente deste terminou em `active`. A suspensão atual veio
+    // depois e não deixou registro: a data velha seria uma mentira precisa.
+    assert.equal((await linha(reativado)).suspended_at, null);
+  });
+
+  it('não encosta em provedor ativo', async () => {
+    const ativo = await db('tenants').where({ status: 'active' }).first();
+    assert.equal(ativo.suspended_at, null);
+  });
+
+  it('roda de novo sem estragar o que já achou', async () => {
+    await migrations.find((m) => m.id === PASSO).up(db);
+    assert.equal(
+      new Date((await linha(comTrilha)).suspended_at).getTime(), quandoFoi.getTime()
+    );
+  });
+});

@@ -251,8 +251,15 @@ class WaOutboxWorker {
         });
       } catch (error) {
         if (!isUniqueViolation(error)) throw error;
-        // O `external_id` fica com o eco, que é quem o registrou primeiro, e
-        // esta linha sai da fila pelo estado. O que NÃO pode acontecer é ela
+        // Rede de segurança, e não mais o caminho comum: desde que o eco ADOTA
+        // esta linha em vez de inserir outra (`WaMessage.adoptEcho`), o caso
+        // normal é a adoção já ter gravado ESTE mesmo `external_id` nesta mesma
+        // linha — e aí a escrita acima é idempotente e nem chega aqui.
+        //
+        // Chega aqui o que a adoção não alcança: um eco que casou outra linha
+        // (dois textos iguais em sequência), ou um `external_id` que já existe
+        // por outro motivo. O `external_id` fica com quem o registrou primeiro,
+        // e esta linha sai da fila pelo estado. O que NÃO pode acontecer é ela
         // continuar 'queued': `listSendable` a pegaria e o cliente receberia
         // duas vezes.
         await WaMessage.update(message.id, {

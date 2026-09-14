@@ -310,7 +310,7 @@ describe('one provider at a time', () => {
     assert.ok(await existe(vizinha.id));
   });
 
-  it('sweeps every active provider on one tick', async () => {
+  it('sweeps every provider on one tick', async () => {
     await comRetencao(30, alfa);
     await comRetencao(30, beta);
     const minha = await mensagem({ ageDays: 90, tenantId: alfa });
@@ -324,6 +324,28 @@ describe('one provider at a time', () => {
     assert.equal(results.reduce((total, one) => total + one.messages, 0), 2);
     assert.equal(await existe(minha.id), false);
     assert.equal(await existe(vizinha.id), false);
+  });
+
+  /**
+   * O suspenso também, e esta é a decisão que mudou.
+   *
+   * A varredura visitava só `active`, e como não existe prazo de suspensão nem
+   * exclusão automática, não visitar queria dizer guardar para sempre — a
+   * conversa inteira de cada assinante, sem prazo nenhum, num provedor que o
+   * ISP nem atende mais. A retenção que ele configurou passa a valer estando
+   * suspenso ou não: suspender muda quem trabalha, não o que guardamos dele.
+   */
+  it('e o provedor suspenso também é varrido', async () => {
+    await comRetencao(30, beta);
+    const dele = await mensagem({ ageDays: 90, tenantId: beta });
+    await getDb()('tenants').where({ id: beta }).update({ status: 'suspended' });
+
+    try {
+      await WaMessageSweeper.tick();
+      assert.equal(await existe(dele.id), false, 'o suspenso continuou guardando para sempre');
+    } finally {
+      await getDb()('tenants').where({ id: beta }).update({ status: 'active' });
+    }
   });
 });
 

@@ -270,34 +270,45 @@ class WaMediaSweeper {
    * unknown origin is left alone: deleting it would be guessing with somebody
    * else's customer photos.
    *
-   * Only ACTIVE providers get a pass, and that is what closes wave 7's blind
-   * spot rather than widening it. A suspended provider is not visited, and its
-   * files sit in a subtree nobody else's pass can see — so they are kept, which
-   * is the right answer for a provider that may come back.
+   * Todos os provedores recebem passada, inclusive o suspenso — e este
+   * parágrafo dizia o contrário até agora. Ele afirmava que um suspenso não é
+   * visitado e que seus arquivos "são mantidos, que é a resposta certa para um
+   * provedor que pode voltar". Era uma decisão de produto defensável, e foi
+   * revista: sem prazo de suspensão, sem `suspended_at` e sem exclusão
+   * automática, "mantidos" nunca quis dizer guardados até a volta — quis dizer
+   * guardados para sempre, foto e documento de assinante incluídos. A retenção
+   * que o provedor configurou passa a valer sempre. Suspender muda quem
+   * trabalha, não o que guardamos dele.
    *
-   * That last sentence holds for `wa-media/t<id>/` and NOT for the legacy area,
-   * which is why `includeLegacy` is counted separately below. Deciding it from
-   * the ACTIVE count meant that suspending one provider made its neighbour
-   * "sole", and the neighbour's next pass applied ITS retention to the
-   * suspended provider's legacy files — files carrying no row of the sweeper's
-   * own, therefore judged orphans and deleted by age alone. A provider is least
-   * able to notice that at exactly the moment it is suspended.
+   * O que NÃO mudou é o que mantinha a correção anterior de pé: cada passada só
+   * toca `wa-media/t<id>/` do provedor em escopo, confinado contra a raiz.
    *
-   * The question `includeLegacy` asks is whether anyone BUT me could own these
-   * bytes, which is about existence, not activity. So it counts every provider,
-   * whatever its status.
+   * `includeLegacy` continua contado à parte, e por um motivo que sobrevive à
+   * mudança. Decidi-lo pela contagem de ATIVOS fazia com que suspender um
+   * provedor tornasse o vizinho "sole", e a passada do vizinho aplicava a
+   * retenção DELE aos arquivos legados do suspenso — arquivos sem linha própria,
+   * logo julgados órfãos e apagados só pela idade. Um provedor é menos capaz de
+   * notar isso exatamente no momento em que é suspenso.
+   *
+   * A pergunta que `includeLegacy` faz é se alguém ALÉM de mim poderia ser dono
+   * destes bytes, que é sobre existência e não sobre atividade. Por isso conta
+   * todo provedor, qualquer que seja o status — o que agora coincide com quem
+   * recebe passada, e continua sendo outra pergunta.
    */
   static async tick() {
     if (this.running) return { skipped: 'busy', files: 0, bytes: 0, mb: 0 };
     this.running = true;
     try {
       const tenants = await getDb()('tenants')
-        .where({ status: 'active' })
         .orderBy('id', 'asc')
         .select('id', 'slug');
 
       if (tenants.length === 0) return { skipped: 'no_provider', files: 0, bytes: 0, mb: 0 };
-      // Not `tenants.length`: that counts who gets a pass, and this decides
+      // `soleProvider()` e não `tenants.length`: agora as duas contagens
+      // coincidem, e continuam sendo perguntas diferentes — uma é quem recebe
+      // passada, a outra é quem PODERIA ser dono dos arquivos legados. Derivar
+      // a segunda da primeira foi o defeito que este arquivo já consertou uma
+      // vez, e ele voltaria no dia em que as duas divergissem de novo.
       // who could own the legacy files. A suspended neighbour still owns its.
       const sole = await soleProvider();
 

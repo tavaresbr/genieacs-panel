@@ -353,13 +353,17 @@ describe('the sweep, once there is more than one provider', () => {
   });
 
   /**
-   * Wave 7 wrote this blind spot down in a comment: a provider whose `tenants`
-   * row is not `active` is invisible to the scoped read, so its files looked
-   * like orphans to whoever swept. The subtree closes it from both ends — a
-   * suspended provider gets no pass of its own, and its files sit where no
-   * other provider's pass can see them.
+   * A onda 7 escreveu este ponto cego num comentário: um provedor cuja linha em
+   * `tenants` não é `active` era invisível à leitura escopada, e seus arquivos
+   * pareciam órfãos para quem varresse. A subárvore por provedor fechou isso: o
+   * arquivo do suspenso mora onde a passada de NINGUÉM MAIS enxerga.
+   *
+   * Essa metade continua valendo, e é o que este caso cobra. O que mudou é a
+   * outra: o suspenso agora recebe passada própria, então o que decide se o
+   * arquivo dele fica é a RETENÇÃO DELE — aqui desligada, como em todo caso
+   * deste arquivo — e não o status. O caso seguinte é o outro lado.
    */
-  it('leaves a suspended provider\'s files alone rather than reading them as orphans', async () => {
+  it('não lê o arquivo do suspenso como órfão do vizinho', async () => {
     await comRetencao(alfa, 1);
     const dele = gravar(`wa-media/t${beta}/${conversaBeta}/suspensa.png`, 400);
     await getDb()('tenants').where({ slug: 'beta' }).update({ status: 'suspended' });
@@ -367,7 +371,30 @@ describe('the sweep, once there is more than one provider', () => {
     const result = await WaMediaSweeper.tick();
 
     assert.equal(result.files, 0);
-    assert.equal(existe(dele), true, 'suspended is not deleted, and it is not an orphan either');
+    assert.equal(existe(dele), true, 'a retenção do vizinho alcançou o arquivo do suspenso');
+  });
+
+  /**
+   * O outro lado, e a decisão que mudou.
+   *
+   * Antes, o suspenso não recebia passada — e como não existe prazo de
+   * suspensão nem exclusão automática, "não recebe passada" queria dizer
+   * guardado para sempre, foto e documento de assinante incluídos. A retenção
+   * que o provedor configurou passa a valer estando ele suspenso ou não.
+   */
+  it('e aplica a retenção DO suspenso aos arquivos dele', async () => {
+    await comRetencao(beta, 1);
+    const dele = gravar(`wa-media/t${beta}/${conversaBeta}/velha.png`, 400);
+    const meu = gravar(`wa-media/t${alfa}/${conversaAlfa}/minha.png`, 400);
+    await getDb()('tenants').where({ slug: 'beta' }).update({ status: 'suspended' });
+
+    const result = await WaMediaSweeper.tick();
+
+    assert.equal(existe(dele), false, 'o suspenso continuou guardando para sempre');
+    assert.equal(result.files, 1);
+    // O controle: a retenção do alfa está desligada, e a passada do suspenso
+    // não é desculpa para alcançar o arquivo dele.
+    assert.equal(existe(meu), true, 'a passada encostou no arquivo do vizinho');
   });
 });
 

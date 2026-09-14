@@ -1527,6 +1527,8 @@ const fr: Dictionary = {
   'platform.operators': '{count} opérateur(s)',
   'platform.statusActive': 'Actif',
   'platform.statusSuspended': 'Suspendu',
+  'platform.suspendedSince': 'Depuis {when}',
+  'platform.suspendedSinceUnknown': 'Depuis quand : inconnu',
   'platform.suspend': 'Suspendre',
   'platform.reactivate': 'Réactiver',
   'platform.suspendConfirm': 'Un fournisseur suspendu arrête tout travail de fond — plus d’envoi, plus de purge, plus de livraison de l’ERP — et personne ne peut s’y connecter. Rien n’est supprimé, et c’est réversible.',
