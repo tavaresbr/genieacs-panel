@@ -1,0 +1,64 @@
+#
+# O bloco de UM provedor. Renderizado por `deploy/novo-provedor.sh`, que troca
+# `__HOST__` pelo endereço do provedor e instala o resultado em
+# /etc/nginx/sites-available/skygenpanel-<slug>.conf.
+#
+# Existe porque nem todo deploy pode ter certificado curinga: curinga só se
+# emite por desafio DNS, que precisa de API no provedor de DNS para renovar
+# sozinho. Onde não há essa API — Registro.br, por exemplo — a saída é um
+# certificado por provedor, emitido por HTTP-01, e então cada provedor precisa
+# do seu `server`, porque o nginx escolhe o certificado pelo `server_name`.
+#
+# Onde HÁ curinga, este arquivo não é usado: um único bloco `*.painel…` atende
+# todos, e é o que `nginx-saas.conf.example` descreve.
+#
+# O `proxy_set_header Host $host` é o arquivo inteiro: é o `Host` que diz ao
+# painel QUAL PROVEDOR está falando. Um proxy que o reescreve entrega todo
+# mundo no mesmo lugar e o resolvedor responde 404 para todos.
+#
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name __HOST__;
+
+    ssl_certificate     /etc/letsencrypt/live/__HOST__/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/__HOST__/privkey.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+
+    # O painel não recebe upload: o maior corpo que ele aceita é 1 MB
+    # (`express.json`), e a mídia do WhatsApp ele busca, não recebe.
+    client_max_body_size 2m;
+
+    location / {
+        proxy_pass http://127.0.0.1:5890;
+
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # `TRUST_PROXY=1` no painel confia em UM salto: este. É o que dá a cada
+        # provedor o seu balde de rate limit.
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_read_timeout 120s;
+    }
+}
+
+# O `:80` deste provedor só existe para o redirecionamento; o desafio do ACME
+# é servido pelo bloco `:80` curinga de `nginx-saas.conf.example`, que já
+# responde por qualquer nome sob a base.
+server {
+    listen 80;
+    listen [::]:80;
+    server_name __HOST__;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}

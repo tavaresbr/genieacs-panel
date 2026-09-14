@@ -462,7 +462,9 @@ The image defaults to the self-hosted edition on SQLite. Point it at a server wi
 `mysql://…`), which takes precedence over `db-config.json`. The hosted edition —
 `EDITION=saas`, providers by subdomain, a managed Postgres, logs and metrics per provider —
 is set up and operated as described in [docs/saas-operations.md](docs/saas-operations.md);
-`deploy/docker-compose.saas.yml` is its starting point.
+`deploy/docker-compose.saas.yml` is its starting point. Where the DNS provider offers no API
+— so no automatically renewed wildcard certificate — `deploy/novo-provedor.sh <slug>` issues
+one certificate per provider and installs its nginx block.
 
 ## License
 

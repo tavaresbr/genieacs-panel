@@ -49,15 +49,64 @@ painel.exemplo.com       A/AAAA  → proxy
 *.portal.exemplo.com     CNAME   → painel.exemplo.com
 ```
 
-O proxy termina TLS (certificado curinga para cada base) e encaminha **preservando o
-`Host`**: `*.painel…` e `painel…` para a porta 5890, `*.portal…` para a 5891. É o
-`Host` que diz ao painel qual provedor está falando; um proxy que o reescreve entrega
-todo mundo no mesmo lugar, e o resolvedor responde 404 para todos.
+O proxy termina TLS e encaminha **preservando o `Host`**: `*.painel…` e `painel…` para
+a porta 5890, `*.portal…` para a 5891. É o `Host` que diz ao painel qual provedor está
+falando; um proxy que o reescreve entrega todo mundo no mesmo lugar, e o resolvedor
+responde 404 para todos.
 
 `deploy/proxy/nginx-saas.conf.example` é esse proxy pronto para nginx — os quatro
 blocos, o `default_server` que recusa host desconhecido, e as armadilhas anotadas onde
 elas mordem (o curinga não cobre o apex; `http2 on;` não existe antes do nginx 1.25.1;
 as linhas `listen [::]` exigem IPv6).
+
+#### O certificado: um curinga, ou um por provedor
+
+Quem decide é o **DNS**, não o gosto: um certificado curinga só sai por desafio DNS-01,
+que precisa de API no provedor de DNS para renovar sozinho a cada 60 dias.
+
+| | Com API no DNS (Cloudflare, Route 53, …) | Sem API no DNS (Registro.br e afins) |
+| --- | --- | --- |
+| Certificado | um curinga por base | um por provedor, por HTTP-01 |
+| Emissão | `certbot certonly --dns-<provedor> -d painel… -d '*.painel…'` | `deploy/novo-provedor.sh <slug>` |
+| Blocos do nginx | os de `nginx-saas.conf.example` atendem todos | mais um bloco por provedor |
+| Provedor novo | nada a fazer | um comando no servidor |
+
+Não emita um curinga que você vá renovar à mão: a renovação esquecida derruba **todos os
+provedores ao mesmo tempo**, e o dia em que isso acontece é o dia em que ninguém lembra
+que existia um prazo. Um certificado por provedor renova sozinho pelo `certbot.timer` e
+falha, no pior caso, um provedor de cada vez.
+
+**Sem API no DNS**, o arranjo fica assim. Um registro curinga só de DNS (grátis em
+qualquer provedor, cadastrado uma vez):
+
+```
+painel.exemplo.com       A  → servidor
+*.painel.exemplo.com     A  → servidor
+```
+
+E, para cada provedor novo, um comando:
+
+```bash
+sudo ./deploy/novo-provedor.sh inove
+```
+
+Ele lê `TENANT_BASE_DOMAIN` de `deploy/saas.env`, confere que `inove.painel.exemplo.com`
+resolve para o mesmo IP da base **antes** de chamar o certbot (uma emissão contra um nome
+que não resolve queima uma das cinco tentativas por hora que o Let's Encrypt concede, e o
+erro dele não diz que o problema era o DNS), emite, renderiza
+`deploy/proxy/nginx-tenant.conf.template` em `sites-available`, testa e recarrega. Se o
+`nginx -t` falhar, ele **desativa o bloco novo antes de qualquer reload** — um
+`sites-enabled` quebrado derruba todos os provedores, não só o que entrou. Rodar duas
+vezes com o mesmo slug não custa uma emissão, e `--dry-run` ensaia contra o *staging*.
+
+O script cuida do endereço; **criar o provedor continua sendo pelo console**.
+
+#### Se o servidor é uma instância Oracle Cloud
+
+Dois lugares fecham a porta 80/443, e é preciso abrir os dois: a **Security List** (ou o
+NSG) da VCN e o **iptables local** — as imagens Ubuntu e Oracle Linux da Oracle já vêm
+com regras de INPUT que recusam tudo menos SSH. Security List aberta e `curl` de fora
+dando timeout é sempre o segundo.
 
 O apex `painel.exemplo.com` (e `www.`) é **o endereço da plataforma**, e é onde o
 console vive. Ele não pertence a provedor nenhum, e serve exatamente isto:
