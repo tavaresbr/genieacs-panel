@@ -165,6 +165,8 @@ Environment configuration lives in `backend/.env`; see [`backend/.env.example`](
 | `PORTAL_JWT_SECRET` | Optional independent customer-session secret |
 | `SECRET_BOX_KEY` | Encrypts the secrets an operator can read back (portal and WiFi passwords, SGP and WhatsApp tokens); falls back to `JWT_SECRET` when unset |
 | `EDITION` | `selfhosted` (default) or `saas`; the hosted edition withdraws the runtime database switcher |
+| `TENANT_BASE_DOMAIN` | Hosted edition: the domain each provider's panel hangs off (`alfa.painel.example.com`). Its apex is the platform console, which belongs to no provider. Unset means one host for everything |
+| `PORTAL_BASE_DOMAIN` | Hosted edition: the same for the subscriber portal |
 | `CORS_ORIGINS` | Explicitly allowed browser origins |
 | `DATA_DIR` | Optional persistent application data directory |
 | `TRUST_PROXY` | Number of trusted proxy hops in front of the panel; `1` for the default reverse-proxy or Cloudflare Tunnel deployment, `0` when the listeners are exposed directly |
