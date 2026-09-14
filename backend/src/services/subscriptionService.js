@@ -1,6 +1,7 @@
 import Plan from '../models/Plan.js';
 import Subscription, { SUBSCRIPTION_STATUSES } from '../models/Subscription.js';
 import BillingEvent, { BILLING_EVENT_TYPES } from '../models/BillingEvent.js';
+import BillingCharge from '../models/BillingCharge.js';
 import { getDb, tdb, isUniqueViolation } from '../config/database.js';
 import { TenantCache } from '../config/tenantCache.js';
 import { currentTenantId, runInTenant } from '../config/tenantContext.js';
@@ -68,6 +69,46 @@ const PAID_PERIOD_DAYS = 30;
 function periodoDoPlano(plano) {
   const dias = Number(plano?.period_days);
   return Number.isFinite(dias) && dias > 0 ? Math.floor(dias) : PAID_PERIOD_DAYS;
+}
+
+/**
+ * Quanto foi pedido por este pagamento, e em que moeda — ou nada, quando não
+ * dá para dizer.
+ *
+ * Duas fontes, nesta ordem, e a ordem é a diferença entre uma conferência e um
+ * palpite:
+ *
+ *   1. **A cobrança que o painel emitiu**, achada pelo id do gateway. É o valor
+ *      que nós pedimos, congelado no instante em que pedimos. O plano pode ter
+ *      mudado de preço depois — e se mudou, quem pagou pagou o que viu.
+ *   2. **O preço do plano.** É a única resposta para a cobrança criada à mão no
+ *      painel do gateway, que é como os primeiros contratos são cobrados, e
+ *      para o botão do console.
+ *
+ * Devolve nulo quando não há referência (plano sem preço: todo provedor
+ * herdado está no `unlimited`, que custa zero — ali nada foi pedido e qualquer
+ * valor é um presente, não um pagamento a menos) e quando a moeda do pagamento
+ * não é a da referência: comparar centavos de moedas diferentes não é uma
+ * conferência frouxa, é uma conta errada.
+ */
+async function valorPedido({ externalId, plano, currency }) {
+  const moedaPaga = String(currency || '').toUpperCase();
+
+  const cobranca = externalId ? await BillingCharge.byGatewayId(externalId) : null;
+  if (cobranca) {
+    const valor = Number(cobranca.amount_cents);
+    if (Number.isFinite(valor) && valor > 0) {
+      const moeda = String(cobranca.currency || '').toUpperCase();
+      if (moeda && moeda !== moedaPaga) return { cents: null, motivo: 'currency_mismatch', fonte: 'charge' };
+      return { cents: Math.floor(valor), motivo: null, fonte: 'charge' };
+    }
+  }
+
+  const preco = Number(plano?.price_cents);
+  if (!Number.isFinite(preco) || preco <= 0) return { cents: null, motivo: 'nothing_asked', fonte: null };
+  const moedaPlano = String(plano?.currency || '').toUpperCase();
+  if (moedaPlano && moedaPlano !== moedaPaga) return { cents: null, motivo: 'currency_mismatch', fonte: 'plan' };
+  return { cents: Math.floor(preco), motivo: null, fonte: 'plan' };
 }
 
 export class PlanLimitError extends Error {
@@ -448,7 +489,7 @@ class SubscriptionService {
    */
   static async recordPayment({
     amountCents, currency = 'BRL', provider = 'manual', externalId = null,
-    actorUserId = null, periodDays = null, now = new Date()
+    actorUserId = null, periodDays = null, allowUnderpayment = false, now = new Date()
   }) {
     const tenantId = currentTenantId();
     const before = await Subscription.forTenant(tenantId);
@@ -473,8 +514,40 @@ class SubscriptionService {
     const plano = before.plan_id ? await Plan.findById(before.plan_id) : null;
     const dias = periodDays ?? periodoDoPlano(plano);
 
+    // A conferência do valor, que é o que separa "recebi dinheiro" de "esta
+    // conta está paga".
+    //
+    // Sem ela, um centavo comprava o mesmo período que a fatura inteira: o
+    // pagamento virava um interruptor, e o número que ele carrega era enfeite
+    // de extrato. Não é um caso de laboratório — a cobrança dos primeiros
+    // contratos é criada à mão no painel do gateway, e um valor digitado com um
+    // zero a menos passaria como mês pago para sempre, sem uma linha de log.
+    //
+    // Pagar A MAIS credita: um boleto quitado depois do vencimento chega com
+    // juros, e recusar o período de quem pagou mais do que devia seria o
+    // absurdo simétrico.
+    //
+    // Pagar A MENOS não credita, e o dinheiro **não some**: o evento é gravado
+    // com a diferença dentro, porque ele de fato aconteceu e o extrato é o que
+    // responde "quanto este provedor já nos mandou". O que não anda é
+    // `renews_at` — e `past_due` deixa ler e para de deixar escrever, que é
+    // onde alguém que pagou a menos deve ficar: visível, avisado e recuperável,
+    // não trancado do lado de fora.
+    const pedido = await valorPedido({ externalId, plano, currency });
+    const faltou = pedido.cents !== null && amount < pedido.cents;
+    const underpaid = faltou && !allowUnderpayment;
+    if (pedido.motivo === 'currency_mismatch') {
+      // Nem credita errado nem bloqueia por uma condição que quem recebeu o
+      // pagamento não tem como consertar: diz em voz alta e segue.
+      console.warn(
+        `Payment ${externalId ?? '(no reference)'} arrived in ${String(currency).toUpperCase()} `
+        + `and the ${pedido.fonte} is priced in another currency: the amount was not checked`
+      );
+    }
+
     const patch = {};
-    const reactivates = before.status === 'trial' || before.status === 'active' || before.status === 'past_due';
+    const reactivates = !underpaid
+      && (before.status === 'trial' || before.status === 'active' || before.status === 'past_due');
     if (reactivates) {
       const currentEnd = asDate(before.renews_at);
       const base = currentEnd && currentEnd.getTime() > now.getTime() ? currentEnd : now;
@@ -495,13 +568,30 @@ class SubscriptionService {
           provider,
           externalId,
           createdBy: actorUserId,
-          detail: { statusBefore: before.status, statusAfter, renewsAt }
+          detail: {
+            statusBefore: before.status,
+            statusAfter,
+            renewsAt,
+            // O que foi pedido viaja com o evento porque o extrato é o único
+            // lugar onde alguém reconstrói, meses depois, por que aquele
+            // pagamento não esticou o período.
+            expectedCents: pedido.cents,
+            ...(pedido.motivo ? { amountCheck: pedido.motivo } : {}),
+            ...(underpaid ? { underpaid: true, shortfallCents: pedido.cents - amount } : {}),
+            ...(faltou && allowUnderpayment ? { underpaymentAccepted: true } : {})
+          }
         }, trx);
         return Object.keys(patch).length
           ? Subscription.upsertForTenant(tenantId, patch, trx)
           : before;
       });
-      return { subscription, duplicate: false };
+      return {
+        subscription,
+        duplicate: false,
+        underpaid,
+        expectedCents: pedido.cents,
+        paidCents: amount
+      };
     } catch (error) {
       // A corrida: a outra entrega igual chegou primeiro e já está gravada. A
       // resposta certa é a mesma da leitura lá em cima — o que já existe.

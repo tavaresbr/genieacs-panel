@@ -153,7 +153,19 @@ export function TenantPlan({ tenant, plans, onSubscriptionChange }: Props) {
     }
   }
 
-  const savePayment = async () => {
+  /**
+   * O 409 que o backend devolve quando o valor não fecha, guardado para a tela
+   * poder dizer QUANTO falta e oferecer o caminho de insistir.
+   *
+   * Não é um toast: um toast some, e o que vem depois dele é uma decisão sobre
+   * dinheiro. Fica na tela até alguém resolver.
+   */
+  const [underpayment, setUnderpayment] = useState<{ paid: number; expected: number } | null>(null)
+
+  /** Uma fonte só para a moeda: o envio e o aviso têm que dizer a mesma coisa. */
+  const moedaDoPlano = plans.find((p) => p.id === planId)?.currency || 'BRL'
+
+  const savePayment = async (force = false) => {
     // Digitado em reais com vírgula ou ponto; guardado em centavos, inteiro.
     // `parseAmountToCents` recusa o ambíguo em vez de adivinhar — ver o porquê
     // lá, que envolve "1.234" ter virado 123 centavos em silêncio.
@@ -166,12 +178,21 @@ export function TenantPlan({ tenant, plans, onSubscriptionChange }: Props) {
     try {
       const res = await platformAPI.recordPayment(tenantId, {
         amountCents: parsed,
-        currency: plans.find((p) => p.id === planId)?.currency || 'BRL',
-        reference: reference.trim() || undefined
+        currency: moedaDoPlano,
+        reference: reference.trim() || undefined,
+        ...(force ? { allowUnderpayment: true } : {})
       })
+      // O valor não fecha com o que foi cobrado. Os dois números vêm do
+      // servidor de propósito — quanto foi pedido é conta dele, e refazê-la
+      // aqui seria a segunda cópia da regra.
+      if (!res.success && res.code === 'underpaid' && typeof res.expectedCents === 'number') {
+        setUnderpayment({ paid: res.paidCents ?? parsed, expected: res.expectedCents })
+        return
+      }
       if (res.success) {
         setAmount('')
         setReference('')
+        setUnderpayment(null)
         await load()
         onSubscriptionChange()
         // O backend recusa a referência repetida corretamente — 200, nada
@@ -311,6 +332,34 @@ export function TenantPlan({ tenant, plans, onSubscriptionChange }: Props) {
             aria-label={t('platform.subscription.reference')}
             maxLength={128}
           />
+          {underpayment !== null && (
+            <div className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2">
+              <p className="text-sm text-foreground">
+                {t('platform.subscription.underpaid')
+                  .replace('{paid}', formatMoney(underpayment.paid, moedaDoPlano))
+                  .replace('{expected}', formatMoney(underpayment.expected, moedaDoPlano))}
+              </p>
+              <p className="field-hint">{t('platform.subscription.underpaidHint')}</p>
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => void savePayment(true)}
+                  disabled={saving !== null}
+                  className="modern-button-secondary"
+                >
+                  {t('platform.subscription.underpaidConfirm')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUnderpayment(null)}
+                  disabled={saving !== null}
+                  className="modern-button-secondary"
+                >
+                  {t('platform.subscription.underpaidCancel')}
+                </button>
+              </div>
+            </div>
+          )}
           <button
             type="button"
             onClick={() => void savePayment()}

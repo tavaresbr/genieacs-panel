@@ -127,12 +127,13 @@ export class AsaasBillingProvider extends BillingProvider {
     };
   }
 
-  async recordPayment({ amountCents, currency, externalId = null, actorUserId = null, now }) {
+  async recordPayment({ amountCents, currency, externalId = null, actorUserId = null, allowUnderpayment = false, now }) {
     return SubscriptionService.recordPayment({
       amountCents,
       currency,
       provider: this.name,
       externalId,
+      allowUnderpayment,
       // Nulo, e não um usuário: quem registrou foi o gateway. O console grava
       // quem apertou o botão; aqui não houve botão nenhum.
       actorUserId,

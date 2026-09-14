@@ -6,6 +6,7 @@ import { call, getDb, runInTenant, startTestServers, stopTestServers } from './h
 const { AsaasBillingProvider } = await import('../src/services/billing/asaasBillingProvider.js');
 const { default: Subscription } = await import('../src/models/Subscription.js');
 const { default: Plan } = await import('../src/models/Plan.js');
+const { default: BillingCharge } = await import('../src/models/BillingCharge.js');
 
 /**
  * O dinheiro entrando sozinho.
@@ -277,5 +278,133 @@ describe('o que a rota ignora, e responde 200 assim mesmo', () => {
     } finally {
       await db('tenants').where({ id: alfa }).update({ status: 'active' });
     }
+  });
+});
+
+describe('o valor, que até aqui era enfeite do extrato', () => {
+  /**
+   * O buraco: um pagamento era um interruptor. Qualquer número ligava o período
+   * inteiro, e a cobrança dos primeiros contratos é criada À MÃO no painel do
+   * gateway — um valor digitado com um zero a menos passaria como mês pago para
+   * sempre, e a única pista seria a conta bancária não bater.
+   */
+  const comPlanoPago = async (precoCents) => {
+    // `plans` é compartilhada e o catálogo sobrevive ao `beforeEach`, que só
+    // limpa assinatura e extrato. Reusar o plano do preço pedido é o que
+    // mantém cada caso independente sem inventar um código por caso.
+    const codigo = `pago-${precoCents}`;
+    const existente = await getDb()('plans').where({ code: codigo }).first();
+    const plano = existente || await runInTenant(alfa, () => Plan.create({
+      code: codigo, name: 'Pago', price_cents: precoCents, currency: 'BRL'
+    }));
+    await runInTenant(alfa, () => Subscription.upsertForTenant(alfa, { plan_id: plano.id }));
+    return plano;
+  };
+
+  it('paga menos que o plano: registra o dinheiro e NÃO estende o período', async () => {
+    await comPlanoPago(19990);
+    const antes = await assinaturaDe(alfa);
+
+    // R$19,99 contra um plano de R$199,90 — o zero que faltou.
+    const res = await entregar(pagamento({ id: 'pay_curto', value: 19.99 }));
+
+    // 200, e não erro: o dinheiro chegou e foi registrado, e um não-2xx faria o
+    // gateway reentregar em laço para sempre um pagamento que já está gravado.
+    assert.equal(res.status, 200);
+    assert.equal(res.body.code, 'underpaid');
+
+    const depois = await assinaturaDe(alfa);
+    assert.equal(String(depois.renews_at), String(antes.renews_at),
+      'um décimo do preço comprou o período inteiro');
+    assert.equal(depois.status, 'past_due');
+
+    const evento = await runInTenant(alfa, () => getDb()('billing_events')
+      .where({ tenant_id: alfa, external_id: 'pay_curto' }).first());
+    assert.ok(evento, 'o dinheiro sumiu: nem creditou nem ficou no extrato');
+    assert.equal(Number(evento.amount_cents), 1999);
+    assert.equal(JSON.parse(evento.detail).shortfallCents, 19990 - 1999);
+  });
+
+  /**
+   * O caso que decide qual das duas referências manda.
+   *
+   * A cobrança que o painel emitiu congela o valor no instante em que pediu. Se
+   * o preço do plano subiu depois, quem pagou pagou o que viu — e conferir
+   * contra o preço de hoje recusaria um pagamento correto. A cobrança vence o
+   * catálogo, e é por isso que ela é procurada primeiro.
+   */
+  it('a cobrança emitida manda sobre o preço do plano', async () => {
+    await comPlanoPago(19990);
+    await runInTenant(alfa, () => BillingCharge.open({
+      periodEnd: '2026-02-01', amountCents: 9990, currency: 'BRL', provider: 'asaas'
+    }));
+    const cobranca = await runInTenant(alfa, () => getDb()('billing_charges')
+      .where({ tenant_id: alfa }).orderBy('id', 'desc').first());
+    await runInTenant(alfa, () => BillingCharge.markIssued(cobranca.id, { gatewayChargeId: 'pay_emitida' }));
+
+    // Paga os R$99,90 que a cobrança pediu — metade do preço de tabela.
+    const res = await entregar(pagamento({ id: 'pay_emitida', value: 99.9 }));
+    assert.equal(res.body.code, 'recorded', 'a cobrança que nós emitimos foi recusada pelo preço de tabela');
+    assert.equal((await assinaturaDe(alfa)).status, 'active');
+
+    const quitada = await runInTenant(alfa, () => getDb()('billing_charges')
+      .where({ id: cobranca.id }).first());
+    assert.equal(quitada.status, 'paid');
+  });
+
+  it('uma cobrança paga pela metade continua em aberto', async () => {
+    await comPlanoPago(19990);
+    await runInTenant(alfa, () => BillingCharge.open({
+      periodEnd: '2026-03-01', amountCents: 19990, currency: 'BRL', provider: 'asaas'
+    }));
+    const cobranca = await runInTenant(alfa, () => getDb()('billing_charges')
+      .where({ tenant_id: alfa }).orderBy('id', 'desc').first());
+    await runInTenant(alfa, () => BillingCharge.markIssued(cobranca.id, { gatewayChargeId: 'pay_metade' }));
+
+    await entregar(pagamento({ id: 'pay_metade', value: 100 }));
+
+    const ainda = await runInTenant(alfa, () => getDb()('billing_charges')
+      .where({ id: cobranca.id }).first());
+    // Marcá-la paga apagaria da lista de contas a receber exatamente a linha
+    // que alguém precisa olhar — e o período, que não andou, ficaria sem
+    // explicação em lugar nenhum.
+    assert.equal(ainda.status, 'pending', 'a cobrança foi dada como quitada com metade do valor');
+  });
+
+  /**
+   * A armadilha da reentrega, que quase passou.
+   *
+   * O gateway reentrega por desenho, e `recordPayment` volta cedo por
+   * `duplicate` sem reavaliar o valor — então o veredito de "pagou pouco" não
+   * existe na segunda passada. Sem tratar isso, a PRIMEIRA entrega deixava a
+   * cobrança em aberto e a SEGUNDA a quitava: o mecanismo inteiro desligado por
+   * um reenvio, e desligado em silêncio.
+   */
+  it('a reentrega de um pagamento curto não quita a cobrança', async () => {
+    await comPlanoPago(19990);
+    await runInTenant(alfa, () => BillingCharge.open({
+      periodEnd: '2026-04-01', amountCents: 19990, currency: 'BRL', provider: 'asaas'
+    }));
+    const cobranca = await runInTenant(alfa, () => getDb()('billing_charges')
+      .where({ tenant_id: alfa }).orderBy('id', 'desc').first());
+    await runInTenant(alfa, () => BillingCharge.markIssued(cobranca.id, { gatewayChargeId: 'pay_reentrega' }));
+
+    const primeira = await entregar(pagamento({ id: 'pay_reentrega', value: 100 }));
+    assert.equal(primeira.body.code, 'underpaid');
+
+    const segunda = await entregar(pagamento({ id: 'pay_reentrega', value: 100 }));
+    assert.equal(segunda.body.code, 'duplicate');
+
+    const ainda = await runInTenant(alfa, () => getDb()('billing_charges')
+      .where({ id: cobranca.id }).first());
+    assert.equal(ainda.status, 'pending', 'a reentrega quitou a cobrança que a primeira deixou em aberto');
+    assert.equal((await assinaturaDe(alfa)).status, 'past_due');
+  });
+
+  it('pagar a mais credita — boleto atrasado chega com juros', async () => {
+    await comPlanoPago(19990);
+    const res = await entregar(pagamento({ id: 'pay_juros', value: 205 }));
+    assert.equal(res.body.code, 'recorded');
+    assert.equal((await assinaturaDe(alfa)).status, 'active');
   });
 });

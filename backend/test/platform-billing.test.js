@@ -214,6 +214,117 @@ describe("a provider's subscription", () => {
       `o pagamento comprou ${Math.round((renova - Date.now()) / DAY)} dias`);
   });
 
+  /**
+   * O buraco que esta suíte não pegava: o VALOR era enfeite.
+   *
+   * Até aqui um pagamento era um interruptor — qualquer número ligava o
+   * período inteiro. Um centavo contra uma fatura de R$199,90 comprava o mesmo
+   * mês que os R$199,90, e nada em lugar nenhum dizia isso: a tela mostrava o
+   * período estendido, o extrato mostrava um pagamento que de fato aconteceu,
+   * e a diferença ficava só na conta bancária.
+   */
+  it('um pagamento a menos que o plano é registrado e NÃO estende o período', async () => {
+    const caloteiro = (await platform('/tenants', {
+      method: 'POST', body: { slug: 'curto', name: 'Provedor Curto' }
+    })).body.data.tenant.id;
+
+    const plano = (await platform('/plans', {
+      method: 'POST', body: { code: 'mensal-curto', name: 'Mensal', priceCents: 19990, currency: 'BRL' }
+    })).body.data.plan;
+
+    await platform(`/tenants/${caloteiro}/subscription`, {
+      method: 'PUT', body: { planId: plano.id, status: 'past_due' }
+    });
+    const antes = await getDb()('subscriptions').where({ tenant_id: caloteiro }).first();
+
+    const curto = await platform(`/tenants/${caloteiro}/payments`, {
+      method: 'POST', body: { amountCents: 1999, currency: 'BRL', reference: 'PIX-CURTO' }
+    });
+
+    // 409 e não 400: o corpo está correto, o que não fecha é a conta.
+    assert.equal(curto.status, 409, JSON.stringify(curto.body));
+    assert.equal(curto.body.code, 'underpaid');
+    // Os dois números no corpo, porque é a tela que vai dizer quanto falta e
+    // refazer a conta no frontend seria a segunda cópia da regra.
+    assert.equal(curto.body.expectedCents, 19990);
+    assert.equal(curto.body.paidCents, 1999);
+
+    const depois = await getDb()('subscriptions').where({ tenant_id: caloteiro }).first();
+    assert.equal(String(depois.renews_at ?? ''), String(antes.renews_at ?? ''),
+      'o período andou com um pagamento de um décimo do preço');
+    assert.equal(depois.status, 'past_due', 'o provedor foi reativado pagando a menos');
+
+    // E o dinheiro NÃO sumiu: o extrato é o que responde "quanto este provedor
+    // já nos mandou", e ele mandou. O que não aconteceu foi a conta fechar.
+    const evento = await runInTenant(caloteiro, () => getDb()('billing_events')
+      .where({ tenant_id: caloteiro, external_id: 'PIX-CURTO' }).first());
+    assert.ok(evento, 'o pagamento a menos não foi registrado em lugar nenhum');
+    assert.equal(Number(evento.amount_cents), 1999);
+    const detalhe = JSON.parse(evento.detail);
+    assert.equal(detalhe.underpaid, true);
+    assert.equal(detalhe.shortfallCents, 19990 - 1999);
+  });
+
+  it('pagar a MAIS credita — um boleto atrasado chega com juros', async () => {
+    const pontual = (await platform('/tenants', {
+      method: 'POST', body: { slug: 'juros', name: 'Provedor Juros' }
+    })).body.data.tenant.id;
+    const plano = (await platform('/plans', {
+      method: 'POST', body: { code: 'mensal-juros', name: 'Mensal', priceCents: 19990, currency: 'BRL' }
+    })).body.data.plan;
+    await platform(`/tenants/${pontual}/subscription`, {
+      method: 'PUT', body: { planId: plano.id, status: 'past_due' }
+    });
+
+    const pago = await platform(`/tenants/${pontual}/payments`, {
+      method: 'POST', body: { amountCents: 20500, currency: 'BRL', reference: 'PIX-JUROS' }
+    });
+    assert.equal(pago.status, 201, JSON.stringify(pago.body));
+    assert.equal(pago.body.data.subscription.status, 'active');
+  });
+
+  it('quem sabe mais que o catálogo passa por cima, e a trilha registra quem foi', async () => {
+    const acordo = (await platform('/tenants', {
+      method: 'POST', body: { slug: 'acordo', name: 'Provedor Acordo' }
+    })).body.data.tenant.id;
+    const plano = (await platform('/plans', {
+      method: 'POST', body: { code: 'mensal-acordo', name: 'Mensal', priceCents: 19990, currency: 'BRL' }
+    })).body.data.plan;
+    await platform(`/tenants/${acordo}/subscription`, {
+      method: 'PUT', body: { planId: plano.id, status: 'past_due' }
+    });
+
+    const forcado = await platform(`/tenants/${acordo}/payments`, {
+      method: 'POST',
+      body: { amountCents: 9990, currency: 'BRL', reference: 'PIX-ACORDO', allowUnderpayment: true }
+    });
+    assert.equal(forcado.status, 201, JSON.stringify(forcado.body));
+    assert.equal(forcado.body.data.subscription.status, 'active');
+
+    // A trilha da plataforma é onde se responde "quem deu desconto a quem", e
+    // uma linha idêntica à de um pagamento cheio não responderia.
+    const linha = await getDb()('platform_audit')
+      .where({ tenant_id: acordo }).orderBy('id', 'desc').first();
+    const detalhe = JSON.parse(linha.detail);
+    assert.equal(detalhe.underpaymentAccepted, true);
+    assert.equal(detalhe.expectedCents, 19990);
+  });
+
+  it('plano sem preço não confere nada — é o caso de todo provedor herdado', async () => {
+    // `unlimited` custa zero: ninguém pediu nada, e um pagamento ali é um
+    // presente e não uma conta paga pela metade. Se a conferência disparasse
+    // aqui, a migração que põe todo provedor existente no `unlimited` teria
+    // quebrado o pagamento de todos eles de uma vez.
+    const herdado = await getDb()('subscriptions').where({ tenant_id: alfa }).first();
+    const plano = await getDb()('plans').where({ id: herdado.plan_id }).first();
+    assert.equal(Number(plano.price_cents), 0, 'o plano do provedor da instalação deixou de ser grátis');
+
+    const pago = await platform(`/tenants/${alfa}/payments`, {
+      method: 'POST', body: { amountCents: 1, currency: 'BRL', reference: 'PIX-HERDADO' }
+    });
+    assert.equal(pago.status, 201, JSON.stringify(pago.body));
+  });
+
   it('e período zero é recusado: seria uma assinatura que vence ao ser paga', async () => {
     const res = await platform('/plans', {
       method: 'POST', body: { code: 'instantaneo', name: 'Zero', periodDays: 0 }

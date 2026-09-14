@@ -486,8 +486,8 @@ saíram: a metade do gateway que **emite** a cobrança está na seção 10, e o 
 re-cifra** da `SECRET_BOX_KEY` está na seção 6.
 
 O que continua fora está escrito onde é útil, junto do mecanismo, e não numa lista à
-parte que ninguém revisa: a cobrança em moeda que não seja BRL e a conferência do valor
-pago contra o preço do plano estão no fim da seção 10.
+parte que ninguém revisa: a cobrança em moeda que não seja BRL e a soma de pagamentos
+parciais estão no fim da seção 10.
 
 ## 10. Receber pagamento sozinho
 
@@ -578,8 +578,36 @@ quando há cobrança emitida, e o endereço do painel quando não há. O primeir
 ciclo ainda sai com o endereço do painel — a cobrança dele nasce na mesma passada, logo
 depois — e é o preço de o aviso não depender do gateway estar de pé.
 
+**O valor é conferido.** Até aqui o pagamento era um interruptor: qualquer número ligava o
+período inteiro, e R$0,01 contra uma fatura de R$199,90 comprava o mesmo mês. Agora se
+compara com o que foi pedido — **a cobrança que o painel emitiu**, quando ela existe, e o
+**preço do plano** quando não (a cobrança criada à mão no painel do gateway, e o botão do
+console). A cobrança vence o catálogo de propósito: ela congela o valor no instante em que
+pedimos, e se o preço do plano subiu depois, quem pagou pagou o que viu.
+
+- **Pagou a mais:** credita. Boleto atrasado chega com juros, e recusar quem pagou mais do
+  que devia seria o absurdo simétrico.
+- **Pagou a menos:** o dinheiro **entra no extrato** — ele de fato chegou — e o período
+  **não anda**. O provedor fica em `past_due`, que deixa ler e para de deixar escrever:
+  visível, avisado e recuperável, em vez de trancado do lado de fora. No log sai
+  `paid N of M cents — recorded, period NOT extended`, e a cobrança continua `pending`,
+  porque é isso que ela é.
+- **Plano de preço zero:** nada foi pedido, nada é conferido. É o caso de todo provedor
+  herdado, que está no `unlimited`.
+- **Moedas diferentes** entre o pagamento e a referência: não dá para comparar centavos de
+  moedas diferentes, então não se compara — e o log diz que não comparou, em vez de a
+  conferência falhar em silêncio.
+
+No console, um valor curto volta **409** com os dois números, e a tela oferece registrar
+mesmo assim: é a saída para um acordo ou uma entrada negociada. Quem a usa fica na trilha
+da plataforma com `underpaymentAccepted`, porque "quem deu desconto a quem" é uma pergunta
+que alguém vai fazer.
+
 **O que continua fora:** a cobrança em moeda que não seja BRL (o gateway não tem campo de
 moeda, e o cliente recusa em voz alta em vez de cobrar reais com etiqueta de dólar);
-cancelar no gateway a cobrança de um provedor apagado; e conferir o valor pago contra o
-preço do plano — um pagamento de qualquer valor ainda compra o período inteiro, que é
-como o botão manual sempre funcionou.
+cancelar no gateway a cobrança de um provedor apagado; e **somar pagamentos parciais** —
+dois pagamentos que juntos fecham a conta continuam sem creditar, e cada um deles aparece
+no extrato para alguém resolver com o botão do console. Não foi construído porque depende
+de o gateway aceitar pagamento divergente, o que não dá para conferir sem uma conta lá
+dentro, e um mecanismo construído sobre uma suposição sobre dinheiro é pior que a falta
+dele.
