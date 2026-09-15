@@ -101,6 +101,14 @@ erro dele não diz que o problema era o DNS), emite, renderiza
 `sites-enabled` quebrado derruba todos os provedores, não só o que entrou. Rodar duas
 vezes com o mesmo slug não custa uma emissão, e `--dry-run` ensaia contra o *staging*.
 
+Ele **não exige preparo nenhum do nginx** — nem bloco curinga na porta 80, nem webroot já
+servido, nem o plugin `python3-certbot-nginx`. O impasse é circular (o certificado precisa
+da porta 80 respondendo pelo nome; o bloco que responde pelo nome referencia o certificado
+que ainda não existe), e o script o quebra instalando primeiro um bloco `:80` sozinho — que
+passa no `nginx -t` por não ter diretiva `ssl_*` —, emitindo, e só então pondo o bloco
+completo por cima. Se a emissão falhar, esse bloco HTTP é removido e o nginx volta ao estado
+anterior: um nome que redireciona para um HTTPS sem certificado é pior do que nome nenhum.
+
 O script cuida do endereço; **criar o provedor continua sendo pelo console**.
 
 #### Se o servidor é uma instância Oracle Cloud

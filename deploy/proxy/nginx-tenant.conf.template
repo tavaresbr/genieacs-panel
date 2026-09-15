@@ -46,9 +46,10 @@ server {
     }
 }
 
-# O `:80` deste provedor só existe para o redirecionamento; o desafio do ACME
-# é servido pelo bloco `:80` curinga de `nginx-saas.conf.example`, que já
-# responde por qualquer nome sob a base.
+# O `:80` deste provedor serve o desafio do ACME e redireciona o resto. É o
+# mesmo bloco que `novo-provedor.sh` instala sozinho ANTES de emitir — ali
+# sozinho, para o desafio ter por onde chegar; aqui ao lado do `:443`, que só
+# pode existir depois que o certificado saiu. Uma fonte de verdade, duas etapas.
 server {
     listen 80;
     listen [::]:80;
