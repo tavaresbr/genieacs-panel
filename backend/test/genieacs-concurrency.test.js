@@ -138,12 +138,21 @@ describe('o prazo não corre na fila', () => {
       await new Promise((resolve) => setImmediate(resolve));
       assert.equal(await runInTenant(alfa, () => inFlightForTenant()), TENANT_LIMIT);
 
-      const PRAZO_MS = 40;
+      // O prazo precisa cobrir o que roda DENTRO da janela cronometrada, e não
+      // só a chamada ao ACS: `direct.js` arma o timer, lê a credencial da NBI
+      // (`nbiHeaders` → `getConfig`, que no cache frio vai ao banco) e só então
+      // chama o egresso. Com 40 ms, uma ida ao banco num runner carregado
+      // estourava o prazo e o teste reprovava o código certo — foi o que
+      // derrubou o `Backend on mysql` num PR que não tocava em aplicação.
+      // Margem grande não afrouxa nada: a espera abaixo continua sendo o dobro
+      // do prazo, então o bug antigo (timer armado antes da vaga) continua
+      // sendo pego.
+      const PRAZO_MS = 1000;
       const pedido = runInTenant(alfa, () => GenieAcsDirect.request('devices', { timeoutMs: PRAZO_MS }));
 
       // Esperar MAIS que o prazo com a fila cheia: é a janela em que o prazo
       // antigo era consumido sem que nada tivesse acontecido.
-      await new Promise((resolve) => setTimeout(resolve, PRAZO_MS * 4));
+      await new Promise((resolve) => setTimeout(resolve, PRAZO_MS * 2));
       assert.equal(abortadaAoChegar, null, 'a requisição não deveria ter saído ainda');
 
       liberar();

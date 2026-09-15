@@ -198,6 +198,57 @@ if [ -n "$ips_base" ] && [ -z "$(comm -12 <(printf '%s\n' "$ips_host") <(printf 
 fi
 printf '    %s -> %s\n' "$HOST" "$(printf '%s ' $ips_host)"
 
+# --- O impasse do primeiro certificado --------------------------------------
+#
+# O certificado precisa da porta 80 respondendo PELO NOME, e o bloco que
+# responde pelo nome referencia um certificado que ainda não existe. A saída é
+# instalar em duas etapas: primeiro um bloco `:80` sozinho — que passa no
+# `nginx -t` porque não tem nenhuma diretiva `ssl_*` —, depois a emissão, e só
+# então o bloco completo por cima.
+#
+# Assim o script não exige preparo nenhum do nginx: nem bloco curinga na 80, nem
+# webroot já servido, nem o plugin `python3-certbot-nginx`. É o que separa
+# "funciona na configuração de exemplo" de "funciona no servidor que existe".
+
+bloco_http() {
+  cat <<BLOCO
+# Etapa 1 de $PROGRAMA: o bloco que serve o desafio do ACME para $HOST.
+# Substituído pelo bloco completo assim que o certificado sai.
+server {
+    listen 80;
+    listen [::]:80;
+    server_name $HOST;
+
+    location /.well-known/acme-challenge/ {
+        root $WEBROOT;
+    }
+
+    location / {
+        return 301 https://\$host\$request_uri;
+    }
+}
+BLOCO
+}
+
+# `nginx -t` vermelho é sempre a mesma resposta, nas duas etapas: o link sai de
+# `sites-enabled` ANTES de qualquer reload, porque um `sites-enabled` quebrado
+# derruba todos os provedores, não só o que entrou.
+recarrega_ou_desfaz() {
+  if ! nginx -t; then
+    rm -f "$LINK"
+    erro "nginx -t falhou ($1); o bloco de $HOST foi desativado e nada foi recarregado."
+    erro "O arquivo ficou em $CONF para inspeção."
+    exit 1
+  fi
+  systemctl reload nginx
+}
+
+# --- Ensaio: as duas etapas, sem tocar em nada ------------------------------
+if [ "$ENSAIO" -eq 1 ]; then
+  passo "Ensaio, etapa 1: o bloco HTTP que entraria em $CONF antes da emissão"
+  bloco_http
+fi
+
 # --- Certificado ------------------------------------------------------------
 mkdir -p "$WEBROOT"
 
@@ -214,18 +265,33 @@ fi
 if [ -d "$VIVO" ] && [ "$ENSAIO" -eq 0 ]; then
   passo "Certificado de $HOST já existe — pulando a emissão"
 else
+  if [ "$ENSAIO" -eq 0 ]; then
+    passo "Instalando o bloco HTTP de $HOST, para o desafio do ACME chegar"
+    bloco_http > "$CONF"
+    ln -sfn "$CONF" "$LINK"
+    recarrega_ou_desfaz "etapa HTTP"
+  fi
+
   passo "Emitindo o certificado de $HOST"
   if ! certbot "${certbot_args[@]}"; then
-    erro "o certbot falhou. As duas causas comuns:"
+    if [ "$ENSAIO" -eq 0 ]; then
+      # Um bloco que redireciona para um HTTPS sem certificado é pior do que
+      # nome nenhum: responde e quebra, em vez de não existir.
+      rm -f "$LINK"
+      nginx -t && systemctl reload nginx || true
+      erro "o bloco HTTP de $HOST foi removido; o nginx voltou ao estado anterior."
+    fi
+    erro "o certbot falhou. As causas comuns:"
     erro "  - a porta 80 não chega neste servidor (Security List/NSG da VCN, ou iptables local);"
-    erro "  - o bloco :80 do nginx não serve $WEBROOT em /.well-known/acme-challenge/."
+    erro "  - o DNS de $HOST aponta para outro lugar;"
+    erro "  - o limite do Let's Encrypt (5 falhas por hora) já foi atingido."
     exit 1
   fi
 fi
 
-# --- Bloco do nginx ---------------------------------------------------------
+# --- Bloco completo ---------------------------------------------------------
 if [ "$ENSAIO" -eq 1 ]; then
-  passo "Ensaio: o bloco que SERIA instalado em $CONF"
+  passo "Ensaio, etapa 2: o bloco completo que SERIA instalado em $CONF"
   sed "s/__HOST__/$HOST/g" "$MODELO"
   printf '\nEnsaio concluído. Nada foi instalado.\n'
   exit 0
@@ -234,17 +300,7 @@ fi
 passo "Instalando $CONF"
 sed "s/__HOST__/$HOST/g" "$MODELO" > "$CONF"
 ln -sfn "$CONF" "$LINK"
-
-# Um sites-enabled quebrado derruba TODOS os provedores no próximo reload, e
-# não só este. Se o teste falhar, o link sai antes de qualquer reload.
-if ! nginx -t; then
-  rm -f "$LINK"
-  erro "nginx -t falhou; o bloco de $HOST foi desativado e nada foi recarregado."
-  erro "O arquivo ficou em $CONF para inspeção."
-  exit 1
-fi
-
-systemctl reload nginx
+recarrega_ou_desfaz "bloco completo"
 
 cat <<FIM
 
