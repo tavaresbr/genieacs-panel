@@ -97,7 +97,7 @@ done
 # criado sem endereço.
 readonly SLUG_MIN=3
 readonly SLUG_MAX=63
-readonly RESERVADOS=" www api app admin portal mail static assets cdn status "
+readonly RESERVADOS=" www api app admin portal mail static assets cdn status plataforma platform "
 
 problema_no_slug() {
   local s="$1"
