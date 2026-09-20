@@ -281,3 +281,98 @@ describe('o convite cunhado pelo console', () => {
     assert.equal((await getDb()('users').where({ username: 'outra-pessoa' })).length, 0);
   });
 });
+
+/**
+ * A outra porta: a conta criada PELO console, com link de primeira senha.
+ *
+ * O convite serve o ISP que vai se administrar. Esta serve o provedor
+ * ADMINISTRADO — aquele que a plataforma opera em nome do cliente —, e a
+ * diferença aparece inteira aqui: a conta já nasce com nome, endereço e papel
+ * decididos por quem opera o console, e o que a pessoa faz é só escolher a
+ * senha. Que ela escolhe no endereço DELA, numa tela que já existia para a
+ * redefinição comum.
+ */
+describe('a conta criada pelo console, com link de primeira senha', () => {
+  const GERENTE = { username: 'gerente-inove', email: 'gerente@inove.exemplo.test' };
+  const SENHA = 'senha-escolhida-por-ela-1';
+  let link;
+  let bilhete;
+
+  it('nasce com vínculo no provedor e devolve o link no endereço dele', async () => {
+    const { status, body } = await noConsole(`/api/platform/tenants/${inove}/operators`, {
+      method: 'POST',
+      body: { ...GERENTE, role: 'admin' }
+    });
+    assert.equal(status, 201, `a conta não foi criada: ${JSON.stringify(body?.message)}`);
+    bilhete = body.data.token;
+    link = body.data.url;
+    assert.equal(link, `https://inove.painel.exemplo.com/reset-password#${bilhete}`,
+      'o link tem que abrir no endereço do provedor, não no do console');
+
+    const pessoa = await getDb()('users').where({ username: GERENTE.username }).first();
+    assert.ok(pessoa, 'a conta não existe');
+    assert.equal(body.data.membership.userId, pessoa.id);
+    const vinculo = await getDb()('tenant_users')
+      .where({ tenant_id: inove, user_id: pessoa.id })
+      .first();
+    assert.ok(vinculo, 'a conta nasceu sem vínculo');
+    assert.equal(vinculo.role, 'admin');
+  });
+
+  it('e a conta não entra em lugar nenhum antes de o link ser usado', async () => {
+    // Não há senha a tentar: a que está gravada é aleatória e ninguém a viu. O
+    // que se prova aqui é que o link é o ÚNICO caminho — inclusive contra os
+    // palpites que alguém daria olhando o cadastro.
+    for (const tentativa of [GERENTE.username, GERENTE.email, 'senha-escolhida-por-ela-1']) {
+      const { status } = await callAs(INOVE_HOST, '/api/auth/login', {
+        method: 'POST',
+        body: { username: GERENTE.username, password: tentativa }
+      });
+      assert.ok(status >= 400, `entrou com ${JSON.stringify(tentativa)}`);
+    }
+  });
+
+  it('o link vale no endereço do provedor, e só lá', async () => {
+    // No apex a rota nem existe: `/api/auth/password-reset/*` não está na lista
+    // do endereço da plataforma, e o bilhete é resgatado pelo provedor do host.
+    const noApex = await callAs(APEX_HOST, '/api/auth/password-reset/confirm', {
+      method: 'POST',
+      body: { token: bilhete, password: SENHA }
+    });
+    assert.ok(noApex.status >= 400, `o apex aceitou o bilhete: ${noApex.status}`);
+
+    const noProvedor = await callAs(INOVE_HOST, '/api/auth/password-reset/confirm', {
+      method: 'POST',
+      body: { token: bilhete, password: SENHA }
+    });
+    assert.equal(noProvedor.status, 200, JSON.stringify(noProvedor.body));
+  });
+
+  it('e aí a pessoa entra no painel dela, com a senha que ela escolheu', async () => {
+    const entrada = await callAs(INOVE_HOST, '/api/auth/login', {
+      method: 'POST',
+      body: { username: GERENTE.username, password: SENHA }
+    });
+    assert.equal(entrada.status, 200, 'a senha escolhida no link não abre o painel');
+
+    // E o bilhete morre no primeiro uso: um link que continua valendo é uma
+    // credencial esquecida numa caixa de entrada.
+    const denovo = await callAs(INOVE_HOST, '/api/auth/password-reset/confirm', {
+      method: 'POST',
+      body: { token: bilhete, password: 'outra-senha-qualquer-1' }
+    });
+    assert.ok(denovo.status >= 400, 'o link serviu duas vezes');
+    const ainda = await callAs(INOVE_HOST, '/api/auth/login', {
+      method: 'POST',
+      body: { username: GERENTE.username, password: SENHA }
+    });
+    assert.equal(ainda.status, 200, 'a segunda tentativa trocou a senha mesmo recusando');
+  });
+
+  it('e o console passa a contar os dois operadores do provedor', async () => {
+    const { status, body } = await noConsole('/api/platform/tenants');
+    assert.equal(status, 200);
+    const linha = body.data.tenants.find((t) => t.id === inove);
+    assert.equal(linha.operators, 2, 'a linha do provedor não conta quem foi criado pelo console');
+  });
+});

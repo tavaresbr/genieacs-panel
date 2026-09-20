@@ -621,6 +621,8 @@ export default {
   'auth.passwordResetDone': 'पासवर्ड रीसेट हो गया। नए पासवर्ड से साइन इन करें',
   'auth.passwordResetMailSubject': '{provider} पर अपना पासवर्ड रीसेट करें',
   'auth.passwordResetMailBody': 'किसी ने {provider} पर आपके खाते के लिए नया पासवर्ड माँगा है।\n\nनया पासवर्ड चुनने के लिए नीचे दिया लिंक खोलें। यह एक बार काम करता है और {minutes} मिनट तक मान्य है:\n\n{link}\n\nयदि यह आपने नहीं किया, तो इस संदेश को अनदेखा करें: आपका पासवर्ड वही है।',
+  'platform.operatorMailSubject': '{provider} तक आपकी पहुँच',
+  'platform.operatorMailBody': 'आपके लिए {provider} के पैनल तक पहुँच बनाई गई है।\n\nअपना पासवर्ड चुनने के लिए नीचे दिया लिंक खोलें। यह एक बार काम करता है और {days} दिनों तक वैध है:\n\n{link}\n\nउसके बाद आप उसी पासवर्ड से लॉग इन करते हैं।',
   'auth.emailMissing': 'इस खाते में अभी तक कोई ईमेल पता दर्ज नहीं है',
   'auth.emailAlreadyVerified': 'यह ईमेल पता पहले ही सत्यापित हो चुका है',
   'auth.emailVerifySent': 'हमने आपके पते पर एक संदेश भेजा है। पुष्टि के लिए उसमें दिया लिंक खोलें',

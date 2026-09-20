@@ -622,6 +622,8 @@ export default {
   'auth.passwordResetDone': 'Passwort zurückgesetzt. Melden Sie sich mit dem neuen Passwort an',
   'auth.passwordResetMailSubject': 'Passwort bei {provider} zurücksetzen',
   'auth.passwordResetMailBody': 'Jemand hat ein neues Passwort für Ihr Konto bei {provider} angefordert.\n\nÖffnen Sie den Link unten, um eines zu wählen. Er funktioniert einmal und ist {minutes} Minuten gültig:\n\n{link}\n\nWaren Sie das nicht, ignorieren Sie diese Nachricht: Ihr Passwort bleibt unverändert.',
+  'platform.operatorMailSubject': 'Ihr Zugang zu {provider}',
+  'platform.operatorMailBody': 'Für Sie wurde ein Zugang zum Panel von {provider} angelegt.\n\nÖffnen Sie den Link unten, um Ihr Passwort zu wählen. Er gilt einmal und {days} Tage lang:\n\n{link}\n\nDanach melden Sie sich mit diesem Passwort an.',
   'auth.emailMissing': 'Für dieses Konto ist noch keine E-Mail-Adresse hinterlegt',
   'auth.emailAlreadyVerified': 'Diese E-Mail-Adresse wurde bereits bestätigt',
   'auth.emailVerifySent': 'Wir haben eine Nachricht an Ihre Adresse gesendet. Öffnen Sie den Link darin zur Bestätigung',

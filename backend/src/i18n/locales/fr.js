@@ -617,6 +617,8 @@ export default {
   'auth.passwordResetDone': 'Mot de passe réinitialisé. Connectez-vous avec le nouveau mot de passe',
   'auth.passwordResetMailSubject': 'Réinitialiser votre mot de passe sur {provider}',
   'auth.passwordResetMailBody': 'Quelqu\'un a demandé un nouveau mot de passe pour votre compte sur {provider}.\n\nOuvrez le lien ci-dessous pour en choisir un. Il sert une seule fois et reste valable {minutes} minutes :\n\n{link}\n\nSi ce n\'était pas vous, ignorez ce message : votre mot de passe reste inchangé.',
+  'platform.operatorMailSubject': 'Votre accès à {provider}',
+  'platform.operatorMailBody': 'Un accès au panneau de {provider} a été créé pour vous.\n\nOuvrez le lien ci-dessous pour choisir votre mot de passe. Il sert une fois et vaut {days} jours :\n\n{link}\n\nEnsuite, c\'est avec ce mot de passe que vous vous connectez.',
   'auth.emailMissing': 'Ce compte n\'a pas encore d\'adresse e-mail enregistrée',
   'auth.emailAlreadyVerified': 'Cette adresse e-mail a déjà été vérifiée',
   'auth.emailVerifySent': 'Nous avons envoyé un message à votre adresse. Ouvrez le lien pour confirmer',

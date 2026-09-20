@@ -621,6 +621,8 @@ export default {
   'auth.passwordResetDone': '密碼已重設。請以新密碼登入',
   'auth.passwordResetMailSubject': '重設您在 {provider} 的密碼',
   'auth.passwordResetMailBody': '有人為您在 {provider} 的帳號申請了新密碼。\n\n開啟下方連結以設定新密碼。此連結僅能使用一次，有效期 {minutes} 分鐘：\n\n{link}\n\n若非您本人操作，請忽略此訊息：您的密碼並未變更。',
+  'platform.operatorMailSubject': '您在 {provider} 的存取權限',
+  'platform.operatorMailBody': '已為您建立 {provider} 面板的存取權限。\n\n開啟下面的連結設定您的密碼。它只能使用一次，有效期為 {days} 天：\n\n{link}\n\n之後就用該密碼登入。',
   'auth.emailMissing': '此帳號尚未登記電子郵件地址',
   'auth.emailAlreadyVerified': '此電子郵件地址已完成驗證',
   'auth.emailVerifySent': '我們已寄送一封郵件至您的地址。請開啟其中的連結以確認',

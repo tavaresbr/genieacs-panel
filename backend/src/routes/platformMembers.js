@@ -36,6 +36,18 @@ router.post(
 );
 
 /**
+ * Criar a conta direto, para um provedor administrado — com link de primeira
+ * senha ou com a senha digitada por quem opera o console. As três portas desta
+ * tela e a diferença entre elas estão no controlador.
+ */
+router.post(
+  '/tenants/:id/operators',
+  authenticateToken,
+  requirePlatformAdmin,
+  PlatformMemberController.createOperator
+);
+
+/**
  * Convidar quem ainda NÃO tem login. É o par da rota acima, e a razão de ele
  * existir está no controlador: sem ele, um provedor recém-criado não tinha
  * caminho nenhum para a primeira conta.

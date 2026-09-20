@@ -1060,6 +1060,25 @@ export const platformAPI = {
    * parte do link que esta aba não tem como saber. Vem `null` num deploy sem
    * domínio-base, e aí o que se entrega é o token.
    */
+  /**
+   * Cria a conta direto, para um provedor administrado.
+   *
+   * A terceira porta da tela de equipe, e a diferença está em `password`: sem
+   * ela, a conta nasce com uma senha que ninguém conhece e a resposta traz um
+   * link de uso único para a pessoa escolher a dela; com ela, quem opera o
+   * console escolheu a senha inicial e é ela que vale.
+   */
+  createOperator: (
+    tenantId: number,
+    payload: { username: string; email: string; role: OperatorRole; password?: string }
+  ) =>
+    apiClient.post<{
+      membership: TenantMembership
+      url: string | null
+      token: string | null
+      emailed: boolean
+    }>(`/platform/tenants/${tenantId}/operators`, payload),
+
   inviteMember: (tenantId: number, payload: { role: OperatorRole; email?: string }) =>
     apiClient.post<{
       invite: { id: number; role: OperatorRole; label: string | null; expiresAt: string }

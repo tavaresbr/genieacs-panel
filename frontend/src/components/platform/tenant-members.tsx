@@ -34,6 +34,14 @@ export function TenantMembers({ tenant, onMembershipChange }: Props) {
   // O convite cunhado, mostrado UMA vez: o banco guarda só o hash do token, e
   // nem esta tela nem nenhuma outra consegue dizê-lo de novo.
   const [cunhado, setCunhado] = useState<{ link: string | null; token: string; emailed: boolean } | null>(null)
+  const [conta, setConta] = useState<{ username: string; email: string; role: OperatorRole; password: string }>(
+    { username: '', email: '', role: 'admin', password: '' }
+  )
+  // `false` é o padrão de propósito: no caminho do link, a senha inicial não
+  // passa por quem opera o console.
+  const [senhaDigitada, setSenhaDigitada] = useState(false)
+  const [criando, setCriando] = useState(false)
+  const [criada, setCriada] = useState<{ username: string; link: string | null; token: string | null; emailed: boolean } | null>(null)
 
   const tenantId = tenant.id
 
@@ -110,6 +118,60 @@ export function TenantMembers({ tenant, onMembershipChange }: Props) {
     }
   }
 
+  /**
+   * Cria a conta de um operador para um provedor administrado.
+   *
+   * Duas entregas, e o que muda entre elas é quem conhece a senha: sem senha
+   * digitada, a resposta traz um link de uso único e a pessoa escolhe a dela;
+   * com senha, quem opera o console escolheu — e a confirmação diz isso na
+   * cara, porque é uma escolha, não um detalhe.
+   */
+  const criarConta = async () => {
+    const username = conta.username.trim()
+    const email = conta.email.trim()
+    const password = conta.password
+    if (!username || !email) return
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast.error(t('settings.operators.emailInvalid'))
+      return
+    }
+    if (senhaDigitada) {
+      if (password.length < 8) {
+        toast.error(t('platform.operator.passwordShort'))
+        return
+      }
+      if (!window.confirm(t('platform.operator.passwordConfirm', { username }))) return
+    }
+
+    setCriando(true)
+    try {
+      const res = await platformAPI.createOperator(tenantId, {
+        username,
+        email,
+        role: conta.role,
+        ...(senhaDigitada ? { password } : {})
+      })
+      if (!res.success || !res.data) {
+        // 409 com código diz QUAL dos dois está tomado; o resto vem do backend.
+        if (res.code === 'username_taken') toast.error(t('platform.operator.usernameTaken'))
+        else if (res.code === 'email_taken') toast.error(t('platform.operator.emailTaken'))
+        else toast.error(res.message || t('platform.saveFailed'))
+        return
+      }
+      setCriada({
+        username,
+        link: res.data.url,
+        token: res.data.token,
+        emailed: res.data.emailed
+      })
+      setConta({ username: '', email: '', role: conta.role, password: '' })
+      await loadMembers()
+      onMembershipChange()
+    } finally {
+      setCriando(false)
+    }
+  }
+
   const copiar = async (texto: string) => {
     try {
       await navigator.clipboard.writeText(texto)
@@ -173,9 +235,138 @@ export function TenantMembers({ tenant, onMembershipChange }: Props) {
         </ul>
       )}
 
-      {/* Primeiro o convite, e não o vínculo: num provedor recém-criado não
-          existe ninguém para vincular, e era esse o beco sem saída — a tela
-          oferecia só a porta que não abre. */}
+      {/* A conta criada aqui mesmo, primeiro: é o caminho de um provedor
+          ADMINISTRADO, em que quem opera o console monta a equipe. O convite
+          vem depois, para o ISP que vai se administrar, e o vínculo por último,
+          para quem já tem login. */}
+      <div className="rounded-md border border-border bg-card p-3">
+        <h4 className="text-sm font-semibold text-foreground">{t('platform.operator.title')}</h4>
+        <p className="mb-2 mt-1 text-sm text-muted-foreground">{t('platform.operator.description')}</p>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div>
+            <label htmlFor={`platform-operator-username-${tenantId}`} className="block text-sm font-medium mb-1">
+              {t('settings.operators.username')}
+            </label>
+            <input
+              id={`platform-operator-username-${tenantId}`}
+              value={conta.username}
+              onChange={(e) => setConta((c) => ({ ...c, username: e.target.value }))}
+              className="modern-input w-full"
+              autoComplete="off"
+            />
+          </div>
+          <div>
+            <label htmlFor={`platform-operator-email-${tenantId}`} className="block text-sm font-medium mb-1">
+              {t('settings.operators.email')}
+            </label>
+            <input
+              id={`platform-operator-email-${tenantId}`}
+              type="email"
+              value={conta.email}
+              onChange={(e) => setConta((c) => ({ ...c, email: e.target.value }))}
+              className="modern-input w-full"
+              placeholder={t('settings.operators.emailPlaceholder')}
+              autoComplete="off"
+            />
+          </div>
+          <div>
+            <label htmlFor={`platform-operator-role-${tenantId}`} className="block text-sm font-medium mb-1">
+              {t('settings.operators.role')}
+            </label>
+            <select
+              id={`platform-operator-role-${tenantId}`}
+              value={conta.role}
+              onChange={(e) => setConta((c) => ({ ...c, role: e.target.value as OperatorRole }))}
+              className="modern-input w-full"
+            >
+              {OPERATOR_ROLES.map((role) => (
+                <option key={role} value={role}>{roleLabel(role)}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <label className="mt-3 flex items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="mt-1"
+            checked={senhaDigitada}
+            onChange={(e) => setSenhaDigitada(e.target.checked)}
+          />
+          <span>
+            <span className="font-medium text-foreground">{t('platform.operator.setPassword')}</span>
+            <span className="block text-muted-foreground">{t('platform.operator.setPasswordHint')}</span>
+          </span>
+        </label>
+
+        {senhaDigitada && (
+          <div className="mt-3 sm:w-72">
+            <label htmlFor={`platform-operator-password-${tenantId}`} className="block text-sm font-medium mb-1">
+              {t('settings.operators.password')}
+            </label>
+            <input
+              id={`platform-operator-password-${tenantId}`}
+              type="password"
+              value={conta.password}
+              onChange={(e) => setConta((c) => ({ ...c, password: e.target.value }))}
+              className="modern-input w-full"
+              autoComplete="new-password"
+            />
+            <p className="field-hint">{t('platform.operator.passwordWarning')}</p>
+          </div>
+        )}
+
+        <div className="mt-3">
+          <button
+            type="button"
+            onClick={() => void criarConta()}
+            disabled={criando || conta.username.trim() === '' || conta.email.trim() === ''}
+            className="modern-button"
+          >
+            {criando ? t('common.saving') : t('platform.operator.create')}
+          </button>
+        </div>
+
+        {criada && (
+          <div className="mt-3 rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-3">
+            <p className="text-sm font-medium text-foreground">
+              {t('platform.operator.created', { username: criada.username })}
+            </p>
+            {criada.token === null ? (
+              <p className="mt-1 text-sm text-muted-foreground">{t('platform.operator.createdWithPassword')}</p>
+            ) : (
+              <>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {t(criada.emailed ? 'platform.operator.linkEmailed' : 'platform.operator.linkHere')}
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">{t('invite.onceOnly')}</p>
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                  <input
+                    className="modern-input flex-1 font-mono text-xs"
+                    readOnly
+                    value={criada.link ?? criada.token}
+                  />
+                  <button
+                    type="button"
+                    className="modern-button-secondary shrink-0"
+                    onClick={() => void copiar(criada.link ?? criada.token ?? '')}
+                  >
+                    <Icon name="copy" size={17} />
+                    {t('common.copy')}
+                  </button>
+                </div>
+                {criada.link === null && (
+                  <p className="field-hint">{t('platform.inviteNoAddress')}</p>
+                )}
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* O convite, para o ISP que vai se administrar: quem aceita escolhe o
+          próprio nome de usuário, e não só a senha. */}
       <div className="rounded-md border border-border bg-card p-3">
         <h4 className="text-sm font-semibold text-foreground">{t('platform.inviteMember')}</h4>
         <p className="mb-2 mt-1 text-sm text-muted-foreground">{t('platform.inviteMemberHint')}</p>

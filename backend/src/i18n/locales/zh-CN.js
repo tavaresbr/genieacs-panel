@@ -621,6 +621,8 @@ export default {
   'auth.passwordResetDone': '密码已重置。请使用新密码登录',
   'auth.passwordResetMailSubject': '重置您在 {provider} 的密码',
   'auth.passwordResetMailBody': '有人为您在 {provider} 的账号申请了新密码。\n\n打开下面的链接以设置新密码。该链接仅可使用一次，有效期 {minutes} 分钟：\n\n{link}\n\n如果这不是您本人操作，请忽略此邮件：您的密码没有改变。',
+  'platform.operatorMailSubject': '您在 {provider} 的访问权限',
+  'platform.operatorMailBody': '已为您创建 {provider} 面板的访问权限。\n\n打开下面的链接设置您的密码。它只能使用一次，有效期为 {days} 天：\n\n{link}\n\n此后就用该密码登录。',
   'auth.emailMissing': '此账号尚未登记邮箱地址',
   'auth.emailAlreadyVerified': '此邮箱地址已通过验证',
   'auth.emailVerifySent': '我们已向您的邮箱发送了一封邮件。请打开其中的链接进行确认',

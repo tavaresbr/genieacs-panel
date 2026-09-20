@@ -619,6 +619,8 @@ export default {
   'auth.passwordResetDone': 'Password reimpostata. Accedi con la nuova password',
   'auth.passwordResetMailSubject': 'Reimposta la tua password su {provider}',
   'auth.passwordResetMailBody': 'Qualcuno ha richiesto una nuova password per il tuo account su {provider}.\n\nApri il link qui sotto per sceglierne una. Vale una volta sola e per {minutes} minuti:\n\n{link}\n\nSe non sei stato tu, ignora questo messaggio: la tua password non è cambiata.',
+  'platform.operatorMailSubject': 'Il suo accesso a {provider}',
+  'platform.operatorMailBody': 'È stato creato per lei un accesso al pannello di {provider}.\n\nApra il link qui sotto per scegliere la sua password. Vale una volta sola e per {days} giorni:\n\n{link}\n\nDa quel momento è con quella password che entra.',
   'auth.emailMissing': 'Questo account non ha ancora un indirizzo email registrato',
   'auth.emailAlreadyVerified': 'Questo indirizzo email è già stato verificato',
   'auth.emailVerifySent': 'Abbiamo inviato un messaggio al tuo indirizzo. Apri il link per confermare',

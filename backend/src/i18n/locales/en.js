@@ -621,6 +621,8 @@ export default {
   'auth.passwordResetDone': 'Password reset. Sign in with the new password',
   'auth.passwordResetMailSubject': 'Reset your password at {provider}',
   'auth.passwordResetMailBody': 'Someone asked for a new password for your account at {provider}.\n\nOpen the link below to choose one. It works once and is valid for {minutes} minutes:\n\n{link}\n\nIf this was not you, ignore this message: your password has not changed.',
+  'platform.operatorMailSubject': 'Your access to {provider}',
+  'platform.operatorMailBody': 'Access to {provider}\'s panel has been created for you.\n\nOpen the link below to choose your password. It works once and is valid for {days} days:\n\n{link}\n\nFrom then on, that password is how you sign in.',
   'auth.emailMissing': 'This account has no email address on file yet',
   'auth.emailAlreadyVerified': 'This email address has already been verified',
   'auth.emailVerifySent': 'We sent a message to your address. Open the link in it to confirm',

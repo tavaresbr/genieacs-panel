@@ -46,6 +46,12 @@ class PlatformAudit {
     // aconteceu foi a cunhagem de uma credencial com validade. Quem aceitou, e
     // quando, é a trilha DO PROVEDOR que registra.
     MEMBER_INVITED: 'tenant.member_invited',
+    // E quem CRIOU uma conta dentro de um provedor a partir do console, para um
+    // provedor administrado. Linha própria e não `MEMBER_ADDED`: ali a pessoa
+    // já existia e ganhou mais um vínculo; aqui a conta nasceu agora, e o
+    // detalhe registra se a senha inicial foi digitada por quem operou o
+    // console ou se só a própria pessoa a conheceu.
+    OPERATOR_CREATED: 'tenant.operator_created',
     MEMBER_ADDED: 'tenant.member_added',
     MEMBER_REMOVED: 'tenant.member_removed',
     // Quem pediu para olhar o painel de qual cliente. Gravada na cunhagem do
