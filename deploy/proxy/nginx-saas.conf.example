@@ -6,6 +6,19 @@
 #   um proxy com TLS". Este arquivo é esse proxy, escrito uma vez para não ser
 #   reinventado a cada deploy.
 #
+# QUANDO ELE SERVE
+#
+#   Este arquivo pressupõe CERTIFICADO CURINGA: os blocos `*.painel…` e
+#   `*.portal…` apontam para um certificado que cobre todos os provedores de uma
+#   vez. Onde não há curinga — DNS sem API, e portanto sem desafio DNS-01 que
+#   renove sozinho —, instalar este arquivo derruba o `nginx -t` INTEIRO, e não
+#   só o bloco: um `ssl_certificate` apontando para arquivo que não existe é erro
+#   de configuração, e o nginx recusa o arquivo todo.
+#
+#   Ali o arranjo é outro: `deploy/novo-provedor.sh <slug>` emite um certificado
+#   por provedor, por HTTP-01, e instala o bloco dele a partir de
+#   `nginx-tenant.conf.template`. Ver docs/saas-operations.md §1.
+#
 # COMO USAR
 #
 #   sed -e 's/painel\.exemplo\.com/painel.SEUDOMINIO/g' \

@@ -23,7 +23,10 @@ Todas estão em `deploy/saas.env.example`, com comentário. As que não podem fa
 
 - `EDITION=saas`.
 - `TENANT_BASE_DOMAIN` e `PORTAL_BASE_DOMAIN`: `alfa.painel.exemplo.com` é o painel do
-  provedor `alfa`; `alfa.portal.exemplo.com` é o portal do assinante dele.
+  provedor `alfa`; `alfa.portal.exemplo.com` é o portal do assinante dele. Ligar só o
+  do painel é legítimo — sem `PORTAL_BASE_DOMAIN` a 5891 apenas deixa de ter endereço,
+  e o painel não é afetado. O console mostra as duas em **Saúde do deploy**, e um
+  travessão ali é estado, não falha.
 - `DATABASE_URL`: `postgres://user:pass@host:5432/db?schema=painel&sslmode=require`.
   Vence o `db-config.json` quando os dois existem, para uma imagem nunca ser apontada
   para o banco errado por um volume velho. `schema` é o `search_path`, que é como um
@@ -266,6 +269,44 @@ sudo nginx -t && sudo systemctl reload nginx
 #      CORS_ORIGINS=https://painel.exemplo.com   # só o apex: origem do mesmo host já passa
 #      TRUST_PROXY=1
 ```
+
+**Sem certificado curinga** — DNS sem API, que é a situação de boa parte dos domínios
+`.com.br` — os passos 2 e 3 acima não servem, e não é questão de preferência: não há
+`--dns-<provedor>` para chamar, e `nginx-saas.conf.example` não pode ser instalado,
+porque os blocos `*.painel…` e `*.portal…` dele apontam para certificados que não
+existem. O nginx recusa o **arquivo inteiro** nesse caso, não só o bloco:
+
+```
+[emerg] cannot load certificate "/etc/letsencrypt/live/portal.exemplo.com/fullchain.pem":
+        … No such file or directory
+nginx: configuration file … test failed
+```
+
+No lugar deles, um certificado por provedor — e aí a ordem passa a importar:
+
+```bash
+# 2'. Um curinga só de DNS (grátis em qualquer provedor, cadastrado uma vez) poupa
+#     criar um registro por provedor novo. Só de DNS: o certificado continua sendo um
+#     por provedor.
+#       painel.exemplo.com     A → servidor
+#       *.painel.exemplo.com   A → servidor
+
+# 3'. Um comando por provedor QUE JÁ EXISTE, e ANTES do restart do passo 4.
+sudo ./deploy/novo-provedor.sh alfa
+sudo ./deploy/novo-provedor.sh beta
+```
+
+Nada mais a instalar: o bloco do apex já existe — é o host único de hoje —, e o de cada
+provedor entrou com o comando acima.
+
+**Essa ordem é a única coisa desta migração que, invertida, tira gente do ar.** Assim
+que `TENANT_BASE_DOMAIN` entra e o processo reinicia, o painel de cada provedor passa a
+responder *só* em `<slug>.<base>`; um provedor cujo certificado ainda não saiu atende
+com erro de TLS, que é pior do que não atender — o navegador culpa o painel, não a
+migração. Emitir antes não custa nada, porque o script é idempotente e confere o DNS
+sozinho; emitir depois custa uma janela de indisponibilidade por provedor.
+
+De um provedor novo em diante é um comando só, no dia em que ele é criado no console.
 
 **Conferir**, nesta ordem — a primeira que falhar diz qual passo ficou pela metade:
 
