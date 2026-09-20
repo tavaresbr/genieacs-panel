@@ -595,6 +595,8 @@ export default {
   'subscription.missing': 'このプロバイダーにはサブスクリプションがありません。プラットフォームにお問い合わせください。',
   'subscription.limitOperators': 'ご利用のプランではオペレーターは {limit} 人までで、すでに {current} 人います。',
   'subscription.limitSubscribers': 'ご利用のプランでは加入者アカウントは {limit} 件までで、すでに {current} 件あります。',
+  'charges.retrieved': '請求を取得しました',
+  'charges.retrieveFailed': '請求を読み取れませんでした',
   'subscription.retrieved': 'サブスクリプションを取得しました',
   'subscription.retrieveFailed': 'サブスクリプションを読み取れませんでした',
 

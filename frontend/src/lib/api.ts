@@ -924,6 +924,24 @@ export interface SubscriptionUsage {
   over: { operators: boolean; subscribers: boolean; devices: boolean }
 }
 
+/**
+ * Uma cobrança emitida a este provedor, como ele a vê.
+ *
+ * `invoiceUrl` é a página do gateway onde se paga, e vem nula quando não há o
+ * que pagar — cobrança quitada ou cancelada. O backend decide isso; a tela só
+ * mostra o botão quando o endereço veio.
+ */
+export interface TenantChargeView {
+  id: number
+  periodEnd: string
+  amountCents: number
+  currency: string
+  status: 'pending' | 'paid' | 'canceled' | 'failed'
+  dueDate: string | null
+  invoiceUrl: string | null
+  createdAt: string | null
+}
+
 export interface BillingEventView {
   id: number
   type: string
@@ -1143,7 +1161,16 @@ export const platformAPI = {
 
 /** The provider's own plan, state and usage — the "plan and usage" screen, and what the block screen reads. */
 export const subscriptionAPI = {
-  current: () => apiClient.get<SubscriptionUsage>('/tenant/subscription')
+  current: () => apiClient.get<SubscriptionUsage>('/tenant/subscription'),
+
+  /**
+   * As cobranças emitidas, com o link de pagamento das que estão em aberto.
+   *
+   * Como `/tenant/subscription`, responde a um provedor BLOQUEADO — é a rota
+   * que dá a saída do muro do 402, e por isso a tela de bloqueio também a
+   * chama.
+   */
+  charges: () => apiClient.get<{ charges: TenantChargeView[] }>('/tenant/charges')
 }
 
 export const usersAPI = {

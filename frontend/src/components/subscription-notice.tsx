@@ -11,6 +11,7 @@ import type { TranslationKey } from '@/lib/i18n'
 import { useAuth } from '@/contexts/auth-context'
 import { useTranslation } from '@/contexts/language-context'
 import { BrandMark } from '@/components/brand-mark'
+import { cobrancaEmAberto } from '@/components/tenant-charges'
 
 /**
  * O que o operador vê quando a assinatura do provedor não deixa passar.
@@ -42,6 +43,7 @@ export function SubscriptionNotice() {
   const { logout, user } = useAuth()
   const [blocked, setBlocked] = useState<SubscriptionBlockedDetail | null>(null)
   const [planName, setPlanName] = useState<string | null>(null)
+  const [paymentUrl, setPaymentUrl] = useState<string | null>(null)
 
   useEffect(() => {
     const onBlocked = (event: Event) => {
@@ -54,6 +56,13 @@ export function SubscriptionNotice() {
           if (res.success && res.data?.subscription?.plan) setPlanName(res.data.subscription.plan.name)
         })
       }
+      // E onde se paga, pela mesma razão que o nome do plano vem: o muro é a
+      // única tela que este operador alcança, então é nele que a saída tem que
+      // estar. A rota está fora da porta da assinatura de propósito; sem isso
+      // esta chamada responderia o mesmo 402 que trouxe o muro.
+      void subscriptionAPI.charges().then((res) => {
+        if (res.success && res.data) setPaymentUrl(cobrancaEmAberto(res.data.charges)?.invoiceUrl ?? null)
+      })
     }
     window.addEventListener(SUBSCRIPTION_BLOCKED_EVENT, onBlocked)
     return () => window.removeEventListener(SUBSCRIPTION_BLOCKED_EVENT, onBlocked)
@@ -70,6 +79,11 @@ export function SubscriptionNotice() {
         <strong className="mr-2">{t('subscription.readOnlyTitle')}</strong>
         {message}
         {planName && <span className="ml-2 opacity-80">({planName})</span>}
+        {paymentUrl && (
+          <a href={paymentUrl} target="_blank" rel="noopener noreferrer" className="ml-3 font-semibold underline">
+            {t('charges.pay')}
+          </a>
+        )}
         <button type="button" className="ml-3 underline" onClick={() => setBlocked(null)}>
           {t('common.close')}
         </button>
@@ -92,11 +106,21 @@ export function SubscriptionNotice() {
         {/* O administrador da plataforma chega ao console por aqui mesmo:
             `/api/platform/*` fica fora da porta. Para todo mundo mais, sair é
             a única ação que faz sentido num painel que não responde. */}
-        <div className="flex justify-center gap-2">
+        <div className="flex flex-wrap justify-center gap-2">
+          {/* A saída do muro, quando ela existe. Primeiro na fila porque é a
+              única ação aqui que desfaz o bloqueio — sair e abrir o console não
+              desfazem. */}
+          {paymentUrl && (
+            <a href={paymentUrl} target="_blank" rel="noopener noreferrer" className="modern-button">
+              {t('charges.pay')}
+            </a>
+          )}
           {user?.isPlatformAdmin && (
             <a href="/platform" className="modern-button-secondary">{t('platform.title')}</a>
           )}
-          <button type="button" className="modern-button" onClick={logout}>{t('sidebar.signOut')}</button>
+          <button type="button" className={paymentUrl ? 'modern-button-secondary' : 'modern-button'} onClick={logout}>
+            {t('sidebar.signOut')}
+          </button>
         </div>
       </div>
     </div>

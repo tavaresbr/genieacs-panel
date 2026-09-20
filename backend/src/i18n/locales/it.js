@@ -593,6 +593,8 @@ export default {
   'subscription.missing': 'Questo provider non ha un abbonamento. Contatta la piattaforma.',
   'subscription.limitOperators': 'Il tuo piano consente {limit} operatore/i e ne hai già {current}.',
   'subscription.limitSubscribers': 'Il tuo piano consente {limit} account abbonato/i e ne hai già {current}.',
+  'charges.retrieved': 'Addebiti recuperati',
+  'charges.retrieveFailed': 'Impossibile leggere gli addebiti',
   'subscription.retrieved': 'Abbonamento recuperato',
   'subscription.retrieveFailed': 'Impossibile leggere l\'abbonamento',
 

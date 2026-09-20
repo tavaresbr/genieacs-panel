@@ -12,6 +12,7 @@ import {
 } from '@/lib/api'
 import { useToast } from '@/components/ui/toast'
 import { parseAmountToCents } from '@/lib/utils'
+import { formatMoney } from '@/lib/money'
 import { useTranslation } from '@/contexts/language-context'
 
 interface Props {
@@ -49,15 +50,6 @@ function formatDate(value: string | null | undefined) {
   if (!value) return '—'
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString()
-}
-
-function formatMoney(cents: number | null | undefined, currency: string | null | undefined) {
-  if (cents === null || cents === undefined) return '—'
-  try {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency: currency || 'BRL' }).format(cents / 100)
-  } catch {
-    return `${(cents / 100).toFixed(2)} ${currency ?? ''}`
-  }
 }
 
 /**

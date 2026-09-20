@@ -121,6 +121,37 @@ class BillingCharge {
     const teto = Math.min(200, Math.max(1, Number(limit) || 50));
     return tdb('billing_charges').orderBy('id', 'desc').limit(teto);
   }
+
+  /**
+   * Uma cobrança como o PROVEDOR pode vê-la.
+   *
+   * A lista de colunas é curta de propósito, e o que ficou de fora é a parte
+   * interessante: `gateway_charge_id` (o id dela na Asaas, que é correlação
+   * nossa com o gateway e não endereço de pagamento), `attempts` e
+   * `next_attempt_at` (o backoff da emissão, que é mecânica nossa) e
+   * `last_error` — texto cru que o gateway devolveu, o único aqui que pode
+   * carregar detalhe da NOSSA conta na Asaas para dentro da tela de um cliente.
+   *
+   * O que sobra é o que o provedor precisa para pagar e para conferir o que
+   * pagou: de que período é, quanto, até quando, em que pé está, e onde se
+   * paga.
+   */
+  static present(row) {
+    if (!row) return null;
+    return {
+      id: row.id,
+      periodEnd: row.period_end,
+      amountCents: Number(row.amount_cents),
+      currency: row.currency,
+      status: row.status,
+      dueDate: row.due_date ?? null,
+      // Só de cobrança que ainda se paga. Um link de cobrança já quitada é um
+      // botão que leva a uma página do gateway dizendo que não há o que pagar —
+      // e, pior, convida a pagar de novo.
+      invoiceUrl: row.status === 'pending' || row.status === 'failed' ? (row.invoice_url ?? null) : null,
+      createdAt: row.created_at ?? null
+    };
+  }
 }
 
 export default BillingCharge;

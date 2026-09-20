@@ -598,6 +598,8 @@ export default {
   'subscription.missing': '이 사업자에게는 구독이 없습니다. 플랫폼에 문의하세요.',
   'subscription.limitOperators': '현재 요금제는 운영자 {limit}명까지 허용하며 이미 {current}명이 있습니다.',
   'subscription.limitSubscribers': '현재 요금제는 가입자 계정 {limit}개까지 허용하며 이미 {current}개가 있습니다.',
+  'charges.retrieved': '청구 내역을 가져왔습니다',
+  'charges.retrieveFailed': '청구 내역을 읽지 못했습니다',
   'subscription.retrieved': '구독 정보를 가져왔습니다',
   'subscription.retrieveFailed': '구독 정보를 읽지 못했습니다',
 

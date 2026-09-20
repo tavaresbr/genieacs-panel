@@ -594,6 +594,8 @@ export default {
   'subscription.missing': 'Este provedor não tem assinatura. Fale com a plataforma.',
   'subscription.limitOperators': 'Seu plano permite {limit} operador(es) e você já tem {current}.',
   'subscription.limitSubscribers': 'Seu plano permite {limit} conta(s) de assinante e você já tem {current}.',
+  'charges.retrieved': 'Cobranças obtidas',
+  'charges.retrieveFailed': 'Não foi possível ler as cobranças',
   'subscription.retrieved': 'Assinatura obtida',
   'subscription.retrieveFailed': 'Não foi possível ler a assinatura',
 

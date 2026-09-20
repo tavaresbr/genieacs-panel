@@ -592,6 +592,8 @@ export default {
   'subscription.missing': 'Este proveedor no tiene suscripción. Contacte a la plataforma.',
   'subscription.limitOperators': 'Su plan permite {limit} operador(es) y ya tiene {current}.',
   'subscription.limitSubscribers': 'Su plan permite {limit} cuenta(s) de abonado y ya tiene {current}.',
+  'charges.retrieved': 'Cobros obtenidos',
+  'charges.retrieveFailed': 'No se pudieron leer los cobros',
   'subscription.retrieved': 'Suscripción obtenida',
   'subscription.retrieveFailed': 'No se pudo leer la suscripción',
 

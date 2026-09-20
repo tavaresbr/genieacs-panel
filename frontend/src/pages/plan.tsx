@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { subscriptionAPI, type SubscriptionUsage } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
 import { BillingProfile } from '@/components/billing-profile'
+import { TenantCharges } from '@/components/tenant-charges'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
 
@@ -162,6 +163,16 @@ export default function PlanPage() {
             </section>
           </div>
         )}
+
+        {/* As cobranças vêm ANTES do cadastro fiscal e depois do plano, que é a
+            ordem da pergunta: em que plano estou, o que me foi cobrado, e para
+            quem vai a nota. Fora do `else` do estado de carga acima de
+            propósito: o bloco tem a própria carga, então um provedor sem
+            assinatura — que é um dos que mais precisa pagar — continua vendo o
+            que deve. */}
+        <div className="mt-6">
+          <TenantCharges />
+        </div>
 
         {/* Abaixo do plano, e não numa aba das configurações: é a mesma
             conversa — em que plano estou, até quando paguei, e para quem vai a
