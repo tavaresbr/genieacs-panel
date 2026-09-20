@@ -25,6 +25,7 @@ export default {
   'auth.credentialsRequired': 'Username and password are required',
   'auth.invalidCredentials': 'Invalid username or password',
   'auth.loginSuccess': 'Login successful',
+  'auth.chooseDestination': 'Choose where to sign in',
   'auth.logoutSuccess': 'Logout successful',
   'auth.setupStatusRetrieved': 'Setup status retrieved',
   'auth.setupStatusFailed': 'Failed to get the setup status',

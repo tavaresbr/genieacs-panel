@@ -41,6 +41,12 @@ export interface ApiResponse<T = any> {
    */
   expectedCents?: number
   paidCents?: number
+  /**
+   * Só no 409 do login: para onde esta conta pode entrar. Existe quando o
+   * endereço não nomeia provedor e a pessoa trabalha em mais de um — a senha
+   * está certa e falta escolher, que é conflito de estado e não credencial.
+   */
+  destinations?: LoginDestinations
 }
 
 /**
@@ -188,6 +194,9 @@ class ApiClient {
           ...(typeof data.expectedCents === 'number'
             ? { expectedCents: data.expectedCents, paidCents: data.paidCents }
             : {}),
+          // O 409 do login, pelo mesmo desenho: a tela precisa da LISTA para
+          // perguntar em qual provedor entrar, e ela só existe no servidor.
+          ...(data.destinations ? { destinations: data.destinations } : {}),
         }
       }
 
@@ -400,6 +409,31 @@ class ApiClient {
 export const apiClient = new ApiClient(API_BASE_URL)
 
 // Authentication API
+/** Um provedor que esta conta pode abrir, como o login os devolve. */
+export interface LoginTenantOption {
+  id: number
+  name: string
+  slug: string
+  status: string
+}
+
+/**
+ * A resposta de "em qual deles?".
+ *
+ * Só existe onde o endereço não nomeia provedor: com subdomínio por provedor o
+ * host já respondeu, e o login nunca pergunta.
+ */
+export interface LoginDestinations {
+  tenants: LoginTenantOption[]
+  console: boolean
+}
+
+/** O que a tela escolheu, e reenvia. */
+export interface LoginDestination {
+  tenantId?: number
+  console?: boolean
+}
+
 export const authAPI = {
   getSetupStatus: () =>
     apiClient.get('/auth/setup-status'),
@@ -413,8 +447,13 @@ export const authAPI = {
    * e-mail. Renomear o parâmetro aqui faria a tela parecer mandar outra coisa
    * do que manda.
    */
-  login: (identifier: string, password: string) =>
-    apiClient.post('/auth/login', { username: identifier, password }),
+  login: (identifier: string, password: string, destino?: LoginDestination) =>
+    apiClient.post('/auth/login', {
+      username: identifier,
+      password,
+      ...(destino?.tenantId ? { tenantId: destino.tenantId } : {}),
+      ...(destino?.console ? { destination: 'console' } : {})
+    }),
 
   getCurrentUser: () =>
     apiClient.get('/auth/user'),
@@ -535,6 +574,12 @@ export interface PublicTenant {
   edition: 'saas' | 'selfhosted'
   /** The domain a provider's panel lives under, or null where providers are not reached by subdomain. */
   panelBaseDomain: string | null
+  /**
+   * Whether this address is shared by every provider — a SaaS with no base
+   * domain, where the separation comes from the login instead of the host.
+   * The screen uses it to NOT wear one ISP's brand on everybody's door.
+   */
+  shared?: boolean
 }
 
 /** What signup answers: no token — the new provider's panel lives at another host. */

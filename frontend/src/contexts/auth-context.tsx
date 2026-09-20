@@ -1,7 +1,10 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, useRef } from 'react'
+import type { LoginDestination, LoginDestinations } from '@/lib/api'
+import { sessionKind } from '@/lib/shell'
 import { apiClient, authAPI, storedSession } from '@/lib/api'
+import { destinosDaResposta } from '@/lib/login-destinations'
 import { useNavigate } from 'react-router'
 import { roleHas, type Permission } from '@/lib/permissions'
 import type { User } from '@/types'
@@ -22,7 +25,14 @@ interface AuthContextType {
    */
   can: (permission: Permission) => boolean
   /** `identifier` é o nome de usuário OU o e-mail: a rota aceita os dois. */
-  login: (identifier: string, password: string) => Promise<boolean>
+  /**
+   * Devolve `true` quando entrou, `false` quando a credencial não serve, e os
+   * DESTINOS quando o servidor pediu para escolher — o que só acontece onde o
+   * endereço não nomeia provedor e a pessoa trabalha em mais de um.
+   */
+  login: (
+    identifier: string, password: string, destino?: LoginDestination
+  ) => Promise<boolean | LoginDestinations>
   completeSetup: (username: string, password: string, email: string) => Promise<boolean>
   /** Para quem chega com a sessão já pronta: o convite aceito e a personificação resgatada. */
   adoptSession: (
@@ -113,9 +123,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return () => window.removeEventListener('auth:unauthorized', handleUnauthorized)
   }, [navigate, needsSetup])
 
-  const login = async (identifier: string, password: string): Promise<boolean> => {
+  const login = async (
+    identifier: string, password: string, destino?: LoginDestination
+  ): Promise<boolean | LoginDestinations> => {
     try {
-      const res = await authAPI.login(identifier, password)
+      const res = await authAPI.login(identifier, password, destino)
+      // "Em qual deles?" não é falha de credencial: a senha está certa e falta
+      // escolher. Devolver os destinos em vez de `false` é o que deixa a tela
+      // perguntar em vez de dizer que a senha está errada.
+      const escolher = destinosDaResposta(res)
+      if (escolher) return escolher
       if (res.success && res.data) {
         const { token, refreshToken, user } = res.data as {
           token: string
@@ -127,7 +144,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setUser(user)
         setIsAuthenticated(true)
 
-        navigate('/dashboard')
+        // A sessão de console não tem painel de provedor para onde ir.
+        navigate(sessionKind(user) === 'console' ? '/platform' : '/dashboard')
         return true
       } else {
         apiClient.clearTokens()

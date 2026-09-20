@@ -23,6 +23,7 @@ export default {
   'auth.credentialsRequired': 'اسم المستخدم وكلمة المرور مطلوبان',
   'auth.invalidCredentials': 'اسم المستخدم أو كلمة المرور غير صحيحة',
   'auth.loginSuccess': 'تم تسجيل الدخول',
+  'auth.chooseDestination': 'اختر مكان تسجيل الدخول',
   'auth.logoutSuccess': 'تم تسجيل الخروج',
   'auth.setupStatusRetrieved': 'تم جلب حالة الإعداد الأولي',
   'auth.setupStatusFailed': 'تعذّر جلب حالة الإعداد الأولي',

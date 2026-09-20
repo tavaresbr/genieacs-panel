@@ -23,6 +23,7 @@ export default {
   'auth.credentialsRequired': 'उपयोगकर्ता नाम और पासवर्ड आवश्यक हैं',
   'auth.invalidCredentials': 'उपयोगकर्ता नाम या पासवर्ड अमान्य है',
   'auth.loginSuccess': 'लॉगिन सफल',
+  'auth.chooseDestination': 'साइन इन करने की जगह चुनें',
   'auth.logoutSuccess': 'लॉगआउट सफल',
   'auth.setupStatusRetrieved': 'सेटअप स्थिति प्राप्त हुई',
   'auth.setupStatusFailed': 'सेटअप स्थिति प्राप्त नहीं हो सकी',

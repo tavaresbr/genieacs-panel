@@ -25,6 +25,7 @@ export default {
   'auth.credentialsRequired': '需要填写用户名和密码',
   'auth.invalidCredentials': '用户名或密码无效',
   'auth.loginSuccess': '登录成功',
+  'auth.chooseDestination': '请选择登录位置',
   'auth.logoutSuccess': '已退出登录',
   'auth.setupStatusRetrieved': '已获取配置状态',
   'auth.setupStatusFailed': '无法获取配置状态',

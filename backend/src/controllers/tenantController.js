@@ -5,7 +5,7 @@ import AuditLog from '../models/AuditLog.js';
 import SubscriptionService from '../services/subscriptionService.js';
 import DeviceService from '../services/deviceService.js';
 import { EDITION } from '../config/edition.js';
-import { panelBaseDomain } from '../middleware/tenantResolver.js';
+import { panelBaseDomain, usesTenantSubdomains } from '../middleware/tenantResolver.js';
 import { normalizeTaxId, isValidTaxId } from '../utils/taxId.js';
 
 /**
@@ -307,9 +307,27 @@ class TenantController {
       // not a secret, it is the product; every subdomain already says so.
       // `panelBaseDomain` is what signup needs to promise an address, and it is
       // the string in the caller's own address bar.
+      // A porta COMPARTILHADA não veste ninguém.
+      //
+      // Num SaaS sem domínio-base todos os provedores entram pelo mesmo
+      // endereço, e o que o resolvedor devolve aqui é o PRIMEIRO da tabela, por
+      // fallback — não o provedor de quem está olhando, porque ninguém olhou
+      // ainda. Mandar o nome dele punha a marca de um ISP na porta de todos os
+      // outros: a equipe do segundo provedor via o nome do primeiro ao digitar
+      // a senha.
+      //
+      // Só o NOME cai. O `slug` continua indo, e essa distinção é o ponto: a
+      // tela deduz "aqui é a plataforma" de `slug === null`, então anulá-lo
+      // trocaria o painel de todo mundo pela casca do console. Sem nome, a tela
+      // cai sozinha no nome do produto.
+      const compartilhado = EDITION === 'saas'
+        && !usesTenantSubdomains()
+        && (await Tenant.count()) > 1;
+
       return res.json(createResponse(req.t('tenant.publicRetrieved'), {
-        name: tenant.name,
+        name: compartilhado ? null : tenant.name,
         slug: tenant.slug,
+        shared: compartilhado,
         edition: EDITION,
         panelBaseDomain: panelBaseDomain()
       }));

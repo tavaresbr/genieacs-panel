@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { Link } from 'react-router'
+import type { LoginDestination, LoginDestinations } from '@/lib/api'
 import { useAuth } from '@/contexts/auth-context'
 import { Icon } from '@/components/ui/icon'
 import { BrandMark } from '@/components/brand-mark'
@@ -26,24 +27,47 @@ export default function Login({ variant = 'provider' }: { variant?: 'provider' |
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const navigate = useNavigate()
+  /**
+   * O segundo passo, quando ele existe.
+   *
+   * Nulo quase sempre: só aparece onde o endereço não nomeia provedor e a
+   * pessoa trabalha em mais de um. A senha já foi conferida quando isto deixa
+   * de ser nulo — o servidor perguntou DEPOIS do bcrypt, e por isso a lista não
+   * diz nada a quem não tem a senha.
+   */
+  const [destinos, setDestinos] = useState<LoginDestinations | null>(null)
   const { login } = useAuth()
   const { t } = useTranslation()
   const { name, tenant } = useTenant()
 
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault()
+  /**
+   * Entrar, e — quando o servidor pedir — perguntar onde.
+   *
+   * Um destino nomeado é reenvio do MESMO login: a senha volta com ele. Guardar
+   * um token intermediário para "já conferi a senha" seria uma credencial a
+   * mais viva na tela, e a rota já sabe conferir.
+   */
+  const entrar = async (destino?: LoginDestination) => {
     setLoading(true)
     setError('')
     try {
-      const ok = await login(formData.identifier, formData.password)
-      if (ok) navigate(doConsole ? '/platform' : '/dashboard')
-      else setError(t('login.error.invalidCredentials'))
+      const resultado = await login(formData.identifier, formData.password, destino)
+      if (resultado === true) return
+      if (resultado === false) {
+        setError(t('login.error.invalidCredentials'))
+        return
+      }
+      setDestinos(resultado)
     } catch {
       setError(t('login.error.unreachable'))
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault()
+    await entrar()
   }
 
   return (
@@ -86,12 +110,64 @@ export default function Login({ variant = 'provider' }: { variant?: 'provider' |
           <div className="auth-panel">
             <div className="mb-7">
               <p className="page-kicker">{t(doConsole ? 'login.platform.kicker' : 'login.kicker')}</p>
-              <h1 className="text-2xl font-bold text-foreground">{t(doConsole ? 'login.platform.title' : 'login.title')}</h1>
+              <h1 className="text-2xl font-bold text-foreground">
+                {destinos ? t('login.destination.title') : t(doConsole ? 'login.platform.title' : 'login.title')}
+              </h1>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                {t(doConsole ? 'login.platform.subtitle' : 'login.subtitle')}
+                {destinos
+                  ? t('login.destination.subtitle')
+                  : t(doConsole ? 'login.platform.subtitle' : 'login.subtitle')}
               </p>
             </div>
 
+            {destinos ? (
+              /* O segundo passo. A senha já foi conferida — o servidor só
+                 perguntou depois do bcrypt —, então aqui não há campo, só
+                 escolha. */
+              <div className="space-y-3">
+                {error && (
+                  <div id="login-error" className="alert-error flex gap-2.5" role="alert">
+                    <Icon name="warning" size={19} className="mt-0.5 shrink-0" />
+                    <span>{error}</span>
+                  </div>
+                )}
+                {destinos.tenants.map((provedor) => (
+                  <button
+                    key={provedor.id}
+                    type="button"
+                    disabled={loading}
+                    onClick={() => void entrar({ tenantId: provedor.id })}
+                    className="modern-button w-full justify-between"
+                  >
+                    <span>{provedor.name}</span>
+                    {/* Suspenso continua na lista: quem trabalha lá entra e
+                        encontra a tela que explica. Esconder o destino trocaria
+                        a explicação por um erro de credencial. */}
+                    {provedor.status !== 'active' && (
+                      <span className="text-xs opacity-80">{t('login.destination.suspended')}</span>
+                    )}
+                  </button>
+                ))}
+                {destinos.console && (
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => void entrar({ console: true })}
+                    className="modern-button w-full"
+                  >
+                    {t('login.destination.console')}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => { setDestinos(null); setError('') }}
+                  className="w-full text-center text-sm underline text-muted-foreground"
+                >
+                  {t('login.destination.back')}
+                </button>
+              </div>
+            ) : (
             <form className="space-y-5" onSubmit={handleSubmit} noValidate>
               {error && (
                 <div id="login-error" className="alert-error flex gap-2.5" role="alert">
@@ -174,6 +250,7 @@ export default function Login({ variant = 'provider' }: { variant?: 'provider' |
                 ) : t('login.submit')}
               </button>
             </form>
+            )}
           </div>
           <p className="mt-5 text-center text-xs leading-5 text-muted-foreground">
             {t(doConsole ? 'login.platform.helpText' : 'login.helpText')}
