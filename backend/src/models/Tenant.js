@@ -154,20 +154,65 @@ class Tenant {
     return row || null;
   }
 
+  /**
+   * Se a linha é um CLIENTE (`provider`) ou é a própria plataforma
+   * (`platform`).
+   *
+   * A plataforma precisa de uma linha em `tenants` porque o schema exige dono
+   * para coisas que ela também tem — a caixa de WhatsApp com que ela atende os
+   * provedores, antes de qualquer outra. O que esta coluna faz é impedir que
+   * essa linha seja CONFUNDIDA com um cliente: ela não é listada como provedor,
+   * não é cobrada e não conta na pergunta que decide a marca da tela de login.
+   *
+   * O que ela NÃO muda, de propósito: `forEachTenant` continua visitando. É
+   * exatamente por isso que a fila de envio e os alertas da caixa da plataforma
+   * funcionam sem uma linha de código nova.
+   */
+  static KINDS = Object.freeze(['provider', 'platform']);
+
   /** Every provider, oldest first — the order the console lists them in. */
   static async list() {
-    return getDb()('tenants').orderBy('id', 'asc');
+    return Tenant.providers();
   }
 
   /**
-   * Quantos provedores existem.
+   * Os CLIENTES, que é o que "provedor" quer dizer em toda tela que lista.
+   *
+   * `list()` delega aqui e não o contrário: quem escrever uma listagem nova vai
+   * chamar `list`, e o padrão dela tem que ser o seguro. Quem precisa da linha
+   * da plataforma junto pede `every()` e diz por quê.
+   */
+  static async providers() {
+    return getDb()('tenants').where({ kind: 'provider' }).orderBy('id', 'asc');
+  }
+
+  /**
+   * Toda linha, a da plataforma incluída. Um chamador só, hoje: a rotação de
+   * segredos, que precisa alcançar o que está guardado em qualquer lugar.
+   */
+  static async every() {
+    return getDb()('tenants').orderBy('id', 'asc');
+  }
+
+  /** A linha da plataforma, se este deploy tiver uma. */
+  static async platform() {
+    return (await getDb()('tenants').where({ kind: 'platform' }).first()) || null;
+  }
+
+  /**
+   * Quantos CLIENTES existem.
    *
    * Um `COUNT` e não um `list().length`: quem pergunta é o perfil público — a
    * tela de login, a rota mais batida do deploy —, e ali a resposta é "um ou
    * mais de um", não a lista.
+   *
+   * E conta só `provider` porque é disso que a pergunta trata: com mais de um
+   * cliente no mesmo endereço, a tela de login para de vestir a marca do
+   * primeiro. A caixa da plataforma não é um provedor compartilhando a porta —
+   * contá-la faria um deploy de um único ISP perder o nome dele na tela.
    */
   static async count() {
-    const row = await getDb()('tenants').count({ total: '*' }).first();
+    const row = await getDb()('tenants').where({ kind: 'provider' }).count({ total: '*' }).first();
     return Number(row?.total ?? 0);
   }
 
@@ -208,8 +253,9 @@ class Tenant {
    * Writes the row and returns its id. Seeding is NOT done here: it belongs to
    * the caller, which owns the transaction that has to cover both.
    */
-  static async create({ slug, name, status = 'active' }, trx = null) {
-    return insertReturningId('tenants', { slug, name, status }, trx);
+  static async create({ slug, name, status = 'active', kind = 'provider' }, trx = null) {
+    if (!Tenant.KINDS.includes(kind)) throw new Error(`Unknown tenant kind: ${kind}`);
+    return insertReturningId('tenants', { slug, name, status, kind }, trx);
   }
 
   static async rename(id, name) {

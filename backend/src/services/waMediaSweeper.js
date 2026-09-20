@@ -170,7 +170,11 @@ async function walk(dir, out = []) {
  * count filtered by status is the wrong count to ask here.
  */
 async function soleProvider() {
-  const [{ total } = {}] = await getDb()('tenants').count({ total: '*' });
+  // `kind: 'provider'`: a linha da plataforma é dona da caixa com que atendemos
+  // os ISPs, não um segundo ISP. Contá-la faria uma instalação de um provedor
+  // só parar de reconhecer os arquivos legados como dele, e eles ficariam sem
+  // dono para sempre — que é o oposto do que esta pergunta existe para decidir.
+  const [{ total } = {}] = await getDb()('tenants').where({ kind: 'provider' }).count({ total: '*' });
   return Number(total) === 1;
 }
 

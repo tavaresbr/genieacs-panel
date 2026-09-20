@@ -93,7 +93,11 @@ export function forgetResolvedTenant() {
  */
 export async function resolveDefaultTenantId() {
   if (cachedDefaultId !== null) return cachedDefaultId;
-  const row = await getDb()('tenants').orderBy('id', 'asc').first();
+  // `kind: 'provider'`, porque o que esta função responde é "de quem é o painel
+  // deste endereço" — e a linha da plataforma não é o painel de ninguém. Sem o
+  // filtro, um deploy que apagasse os provedores e ficasse só com ela passaria
+  // a servir a caixa interna a toda requisição, em vez do 503 que diz a verdade.
+  const row = await getDb()('tenants').where({ kind: 'provider' }).orderBy('id', 'asc').first();
   if (!row) return null;
   cachedDefaultId = row.id;
   return cachedDefaultId;

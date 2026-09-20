@@ -831,6 +831,22 @@ export interface Tenant {
   suspendedAt: string | null
 }
 
+/**
+ * A caixa da plataforma: a linha em `tenants` com `kind = 'platform'`.
+ *
+ * Existe para a plataforma poder ter o que o schema exige que tenha dono — o
+ * WhatsApp com que ela atende os provedores. Viaja separada da lista de
+ * clientes, e sem plano nem cadastro fiscal, porque não é cobrada.
+ *
+ * `null` num deploy que ainda não rodou `scripts/create-platform-tenant.js`.
+ */
+export interface PlatformBox {
+  id: number
+  slug: string
+  name: string
+  operators: number
+}
+
 export interface TenantGateway {
   /** O nome do provider (`asaas`), ou nulo quando a cobrança é manual. */
   gateway: string | null
@@ -985,7 +1001,7 @@ export interface TenantMembership {
  */
 export const platformAPI = {
   listTenants: () =>
-    apiClient.get<{ tenants: Tenant[] }>('/platform/tenants'),
+    apiClient.get<{ tenants: Tenant[]; platformBox: PlatformBox | null }>('/platform/tenants'),
 
   /**
    * Cunha um bilhete para olhar o painel de um provedor.

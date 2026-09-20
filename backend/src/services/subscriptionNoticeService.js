@@ -83,6 +83,10 @@ class SubscriptionNoticeService {
     // inteira); quem chama sem ela paga a leitura.
     const tenant = doLaco ?? await Tenant.findById(currentTenantId());
     if (!tenant) return { sent: false, reason: 'tenant_gone' };
+    // Pelo mesmo motivo da emissão: a plataforma não é cliente dela mesma, e um
+    // e-mail nosso avisando a nós que a nossa assinatura vence é ruído que
+    // parece defeito.
+    if (tenant.kind === 'platform') return { sent: false, reason: 'platform_tenant' };
 
     const para = await this.recipients(tenant);
     if (!para.length) return { sent: false, reason: 'no_recipient' };

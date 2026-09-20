@@ -588,6 +588,22 @@ const tenantsTable = (db) => (t) => {
   t.string('slug', 64).notNullable().unique();
   t.string('name', 128).notNullable();
   t.string('status', 16).notNullable().defaultTo('active');
+  /**
+   * `provider` ou `platform`: se esta linha é um CLIENTE ou se é a própria
+   * plataforma, que precisa de um provedor só para ser dona das coisas que o
+   * schema exige que tenham dono — o WhatsApp, antes de tudo.
+   *
+   * Coluna e não um slug reservado que o código reconheça. A distinção é
+   * consultada em SQL (a lista do console, a emissão de cobrança) e tem que ser
+   * afirmável num teste; um `slug === 'plataforma'` espalhado por quatro
+   * arquivos seria a mesma regra escrita quatro vezes, e a quinta ficaria para
+   * trás.
+   *
+   * `status` continua valendo igual nas duas: um provedor de plataforma
+   * suspenso deixa de ser visitado pelos jobs, como qualquer outro. As duas
+   * colunas respondem perguntas diferentes.
+   */
+  t.string('kind', 16).notNullable().defaultTo('provider');
   for (const [, add] of TENANT_BILLING_COLUMNS) add(t);
   for (const [, add] of TENANT_GATEWAY_COLUMNS) add(t);
   t.timestamp('created_at').defaultTo(db.fn.now());
@@ -3108,6 +3124,39 @@ export const migrations = [
         if (!quando) continue;
         await db('tenants').where({ id }).update({ suspended_at: quando });
       }
+    }
+  },
+  {
+    /**
+     * Se a linha em `tenants` é um cliente ou é a própria plataforma.
+     *
+     * Toda tabela de WhatsApp tem `tenant_id` NOT NULL com chave estrangeira
+     * para `tenants`, e a sessão do console nasce sem provedor de propósito —
+     * então o console não tem como ter caixa de mensagem nenhuma. Dar à
+     * plataforma uma LINHA resolve isso sem tocar em nada daquele subsistema: o
+     * webhook do Evolution já descobre o dono pelo nome da instância, e
+     * `forEachTenant` já drena a fila de quem existe.
+     *
+     * O que a coluna compra é o outro lado: a plataforma não pode ser tratada
+     * como CLIENTE. Sem ela, a caixa apareceria na lista de provedores do
+     * console, receberia cobrança e aviso de vencimento, e entraria na contagem
+     * que decide se a tela de login esconde o nome do provedor.
+     *
+     * Todo mundo que já existe nasce `provider`, que é o default da coluna:
+     * uma instalação em produção não pode descobrir num update que uma das
+     * linhas dela mudou de natureza.
+     */
+    id: '0050_tenant_kind',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      return db.schema.hasColumn('tenants', 'kind');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      if (await db.schema.hasColumn('tenants', 'kind')) return;
+      await db.schema.alterTable('tenants', (t) => {
+        t.string('kind', 16).notNullable().defaultTo('provider');
+      });
     }
   }
 ];

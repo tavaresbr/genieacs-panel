@@ -205,7 +205,7 @@ class SecretRotationService {
       resumo.versoes[versao] = (resumo.versoes[versao] ?? 0) + 1;
     };
 
-    for (const tenant of await Tenant.list()) {
+    for (const tenant of await Tenant.every()) {
       // eslint-disable-next-line no-await-in-loop -- em série de propósito: o
       // relatório precisa ser determinístico e o volume é pequeno.
       await runInTenant(tenant.id, async () => {

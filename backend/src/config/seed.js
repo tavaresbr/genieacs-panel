@@ -179,10 +179,38 @@ async function seedSubscriptions(db, tenants) {
   if (!plan) return;
 
   const trialDays = Number(plan.trial_days) > 0 ? Number(plan.trial_days) : DEFAULT_TRIAL_DAYS;
+  /**
+   * A linha da plataforma não entra em teste.
+   *
+   * Um teste vence, e um teste vencido vira `past_due`, que deixa a casa em
+   * modo de leitura — na caixa com que a plataforma atende os provedores, isso
+   * é parar de responder aos clientes num dia que ninguém marcou. Ela nasce
+   * como os provedores herdados nasceram na migração 0035: `unlimited` e
+   * `active`, com `renews_at` nulo, que é o valor que nunca vence.
+   *
+   * O plano sem limite é o mesmo `unlimited` que já existe, e não um plano novo
+   * escondido: a tabela de preços é uma só, e inventar uma linha ali faria a
+   * plataforma aparecer no catálogo que ela vende.
+   */
+  const semLimite = await db('plans').where({ code: 'unlimited' }).first();
+
   for (const tenant of tenants) {
     // tenant-scope-exempt: seed, sem escopo aberto; o provedor vai na mão.
     const existing = await db('subscriptions').where({ tenant_id: tenant.id }).first();
     if (existing) continue;
+
+    if (tenant.kind === 'platform' && semLimite) {
+      // tenant-scope-exempt: idem.
+      await db('subscriptions').insert({
+        tenant_id: tenant.id,
+        plan_id: semLimite.id,
+        status: 'active',
+        trial_ends_at: null,
+        renews_at: null
+      });
+      continue;
+    }
+
     const trialEndsAt = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000);
     // tenant-scope-exempt: idem.
     await db('subscriptions').insert({

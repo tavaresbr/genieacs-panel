@@ -1,8 +1,9 @@
 'use client'
 
 import { Fragment, useCallback, useEffect, useState } from 'react'
-import { platformAPI, type Plan, type Tenant } from '@/lib/api'
+import { platformAPI, type Plan, type PlatformBox, type Tenant } from '@/lib/api'
 import { PlanCatalog } from '@/components/platform/plan-catalog'
+import { PlatformBoxCard } from '@/components/platform/platform-box'
 import { PlatformAdmins } from '@/components/platform/platform-admins'
 import { PlatformAudit } from '@/components/platform/platform-audit'
 import { TenantData } from '@/components/platform/tenant-data'
@@ -31,6 +32,8 @@ export default function PlatformPage() {
   // plan and its statement.
   const [expandedPanel, setExpandedPanel] = useState<'members' | 'plan' | 'data' | 'gateway'>('members')
   const [plans, setPlans] = useState<Plan[]>([])
+  /** A caixa da plataforma, que vem ao lado da lista e não dentro dela. */
+  const [platformBox, setPlatformBox] = useState<PlatformBox | null>(null)
   const [form, setForm] = useState({ slug: '', name: '' })
   /**
    * Qual metade do console está na tela.
@@ -49,9 +52,11 @@ export default function PlatformPage() {
     const res = await platformAPI.listTenants()
     if (res.success && res.data) {
       setTenants(res.data.tenants)
+      setPlatformBox(res.data.platformBox)
       setError(null)
     } else {
       setTenants([])
+      setPlatformBox(null)
       setError(res.message || '')
     }
     setLoading(false)
@@ -263,6 +268,8 @@ export default function PlatformPage() {
         {aba === 'plans' && <PlanCatalog plans={plans} onChange={() => void loadTenants()} />}
         {aba === 'admins' && <PlatformAdmins />}
         {aba === 'audit' && <PlatformAudit />}
+
+        {aba === 'tenants' && <PlatformBoxCard box={platformBox} />}
 
         {aba === 'tenants' && creating && (
           <div className="modern-card mb-6 p-5 sm:p-6">
