@@ -41,6 +41,11 @@ import { IS_SAAS } from '../config/edition.js';
  *   /api/tenant/public   O nome do provedor na tela de login e de bloqueio.
  *   /api/tenant/subscription  O que a tela de bloqueio mostra: estado, plano,
  *                        até quando. Sem isto o 402 seria um muro sem placa.
+ *   /api/tenant/charges  E onde se paga. A isenção anterior dá a placa; esta dá
+ *                        a saída: quem está bloqueado é precisamente quem
+ *                        precisa do link da cobrança em aberto, e sem ela a
+ *                        rota responderia 402 a quem está tentando pagar. Só
+ *                        leitura, e só do provedor em escopo.
  *   /api/platform/*      O plano de controle vive ACIMA das assinaturas; um
  *                        provedor cancelado é justamente um que o console
  *                        precisa alcançar.
@@ -58,7 +63,7 @@ import { IS_SAAS } from '../config/edition.js';
  * fosse montada ela deixaria tudo passar.
  */
 const EXEMPT_PREFIXES = ['/api/auth/', '/api/platform/', '/api/health'];
-const EXEMPT_PATHS = new Set(['/api/tenant/public', '/api/tenant/subscription', '/api/auth']);
+const EXEMPT_PATHS = new Set(['/api/tenant/public', '/api/tenant/subscription', '/api/tenant/charges', '/api/auth']);
 // Os caminhos EXATOS das entregas de fora. `/api/sgp/events` sem o
 // `/webhook` é a listagem autenticada e o retry — escrita de operador, que em
 // `past_due` tem que ser recusada como qualquer outra. O do Evolution está

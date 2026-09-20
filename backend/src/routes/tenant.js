@@ -29,6 +29,12 @@ router.get('/export', authenticateToken, requirePermission('tenant.export'), Ten
 // a tela de bloqueio mostra.
 router.get('/subscription', authenticateToken, requirePermission('settings.read'), TenantController.getSubscription);
 
+// As cobranças emitidas a este provedor, com o link de pagamento de cada uma
+// que ainda está em aberto. Mesma capacidade e mesmo lado da linha que
+// `/subscription`, e também fora da porta da assinatura — quem está bloqueado é
+// exatamente quem precisa desta lista.
+router.get('/charges', authenticateToken, requirePermission('settings.read'), TenantController.listCharges);
+
 // O nome do provedor, escrito por quem administra. É o antigo `appName` das
 // configurações, agora na linha do provedor — ver o controlador.
 router.patch('/', authenticateToken, requirePermission('settings.write'), TenantController.rename);

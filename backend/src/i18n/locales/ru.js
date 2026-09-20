@@ -596,6 +596,8 @@ export default {
   'subscription.missing': 'У этого провайдера нет подписки. Обратитесь к платформе.',
   'subscription.limitOperators': 'Ваш тариф допускает {limit} оператор(ов), а у вас уже {current}.',
   'subscription.limitSubscribers': 'Ваш тариф допускает {limit} учётных записей абонентов, а у вас уже {current}.',
+  'charges.retrieved': 'Счета получены',
+  'charges.retrieveFailed': 'Не удалось прочитать счета',
   'subscription.retrieved': 'Подписка получена',
   'subscription.retrieveFailed': 'Не удалось прочитать подписку',
 

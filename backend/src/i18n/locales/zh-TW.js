@@ -595,6 +595,8 @@ export default {
   'subscription.missing': '此業者沒有訂閱。請聯絡平台。',
   'subscription.limitOperators': '您的方案允許 {limit} 位操作員，而您已有 {current} 位。',
   'subscription.limitSubscribers': '您的方案允許 {limit} 個用戶帳戶，而您已有 {current} 個。',
+  'charges.retrieved': '已取得帳單',
+  'charges.retrieveFailed': '無法讀取帳單',
   'subscription.retrieved': '已取得訂閱',
   'subscription.retrieveFailed': '無法讀取訂閱',
 

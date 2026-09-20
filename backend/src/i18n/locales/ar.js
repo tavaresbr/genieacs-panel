@@ -586,6 +586,8 @@ export default {
   'auth.signupInvalid': 'اسم المزوّد واسم المستخدم (3–64) وكلمة المرور (8–128) مطلوبة',
   'auth.signupSlugTaken': 'هذا النطاق الفرعي مستخدم بالفعل',
   'auth.signupUsernameTaken': 'اسم المستخدم هذا مستخدم بالفعل',
+  'charges.retrieved': 'تم جلب الفواتير',
+  'charges.retrieveFailed': 'تعذر قراءة الفواتير',
   'subscription.retrieved': 'تم جلب الاشتراك',
   'subscription.retrieveFailed': 'تعذّرت قراءة الاشتراك',
   'subscription.missing': 'ليس لهذا المزوّد اشتراك. تواصل مع المنصة.',

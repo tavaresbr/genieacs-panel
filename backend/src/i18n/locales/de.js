@@ -596,6 +596,8 @@ export default {
   'subscription.missing': 'Dieser Anbieter hat kein Abonnement. Wenden Sie sich an die Plattform.',
   'subscription.limitOperators': 'Ihr Tarif erlaubt {limit} Bediener und Sie haben bereits {current}.',
   'subscription.limitSubscribers': 'Ihr Tarif erlaubt {limit} Teilnehmerkonten und Sie haben bereits {current}.',
+  'charges.retrieved': 'Rechnungen abgerufen',
+  'charges.retrieveFailed': 'Rechnungen konnten nicht gelesen werden',
   'subscription.retrieved': 'Abonnement abgerufen',
   'subscription.retrieveFailed': 'Abonnement konnte nicht gelesen werden',
 

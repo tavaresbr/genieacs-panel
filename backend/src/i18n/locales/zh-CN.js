@@ -595,6 +595,8 @@ export default {
   'subscription.missing': '该运营商没有订阅。请联系平台。',
   'subscription.limitOperators': '您的套餐允许 {limit} 名操作员，而您已有 {current} 名。',
   'subscription.limitSubscribers': '您的套餐允许 {limit} 个用户账户，而您已有 {current} 个。',
+  'charges.retrieved': '已获取账单',
+  'charges.retrieveFailed': '无法读取账单',
   'subscription.retrieved': '已获取订阅',
   'subscription.retrieveFailed': '无法读取订阅',
 

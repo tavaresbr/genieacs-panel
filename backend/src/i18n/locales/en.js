@@ -595,6 +595,8 @@ export default {
   'subscription.missing': 'This provider has no subscription. Contact the platform.',
   'subscription.limitOperators': 'Your plan allows {limit} operator(s) and you already have {current}.',
   'subscription.limitSubscribers': 'Your plan allows {limit} subscriber account(s) and you already have {current}.',
+  'charges.retrieved': 'Charges retrieved',
+  'charges.retrieveFailed': 'Failed to read the charges',
   'subscription.retrieved': 'Subscription retrieved',
   'subscription.retrieveFailed': 'Failed to read the subscription',
 

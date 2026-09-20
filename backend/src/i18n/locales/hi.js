@@ -594,6 +594,8 @@ export default {
   'auth.signupInvalid': 'प्रदाता का नाम, उपयोगकर्ता नाम (3–64) और पासवर्ड (8–128) आवश्यक हैं',
   'auth.signupSlugTaken': 'यह सबडोमेन पहले से लिया जा चुका है',
   'auth.signupUsernameTaken': 'यह उपयोगकर्ता नाम पहले से लिया जा चुका है',
+  'charges.retrieved': 'शुल्क प्राप्त हुए',
+  'charges.retrieveFailed': 'शुल्क नहीं पढ़े जा सके',
   'subscription.retrieved': 'सदस्यता प्राप्त हुई',
   'subscription.retrieveFailed': 'सदस्यता पढ़ी नहीं जा सकी',
   'subscription.missing': 'इस ISP की कोई सदस्यता नहीं है। प्लेटफ़ॉर्म से संपर्क करें।',

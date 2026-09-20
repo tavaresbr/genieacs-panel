@@ -591,6 +591,8 @@ export default {
   'subscription.missing': 'Ce fournisseur n\'a pas d\'abonnement. Contactez la plateforme.',
   'subscription.limitOperators': 'Votre forfait autorise {limit} opérateur(s) et vous en avez déjà {current}.',
   'subscription.limitSubscribers': 'Votre forfait autorise {limit} compte(s) d\'abonné et vous en avez déjà {current}.',
+  'charges.retrieved': 'Factures récupérées',
+  'charges.retrieveFailed': 'Impossible de lire les factures',
   'subscription.retrieved': 'Abonnement récupéré',
   'subscription.retrieveFailed': 'Impossible de lire l\'abonnement',
 

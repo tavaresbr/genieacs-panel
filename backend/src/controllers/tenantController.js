@@ -3,6 +3,7 @@ import { createResponse, createErrorResponse, isValidEmail } from '../utils/help
 import TenantExportService from '../services/tenantExportService.js';
 import AuditLog from '../models/AuditLog.js';
 import SubscriptionService from '../services/subscriptionService.js';
+import BillingCharge from '../models/BillingCharge.js';
 import DeviceService from '../services/deviceService.js';
 import { EDITION } from '../config/edition.js';
 import { panelBaseDomain, usesTenantSubdomains } from '../middleware/tenantResolver.js';
@@ -183,6 +184,33 @@ class TenantController {
       console.error('Get subscription error:', error);
       return res.status(500).json(
         createErrorResponse(req.t('subscription.retrieveFailed'), error.message)
+      );
+    }
+  }
+
+  /**
+   * `GET /api/tenant/charges`: as cobranças que o painel emitiu a este
+   * provedor — de que período, quanto, até quando, e onde se paga.
+   *
+   * A tabela existe desde a emissão automática e guarda `invoice_url`, a
+   * página do gateway onde se paga. Até aqui esse endereço só saía pelo e-mail
+   * de aviso (`subscriptionNoticeService`): quem perdeu o e-mail via o muro do
+   * 402 e não tinha, em tela nenhuma, onde pagar.
+   *
+   * `settings.read`, a mesma de `/subscription`: quem pode ver em que plano o
+   * provedor está pode ver o que foi cobrado por ele. E, como aquela, fica
+   * FORA da porta da assinatura — ver o comentário em `subscriptionGate.js`.
+   */
+  static async listCharges(req, res) {
+    try {
+      const cobrancas = await BillingCharge.listRecent({ limit: 24 });
+      return res.json(createResponse(req.t('charges.retrieved'), {
+        charges: cobrancas.map((linha) => BillingCharge.present(linha))
+      }));
+    } catch (error) {
+      console.error('List charges error:', error);
+      return res.status(500).json(
+        createErrorResponse(req.t('charges.retrieveFailed'), error.message)
       );
     }
   }
