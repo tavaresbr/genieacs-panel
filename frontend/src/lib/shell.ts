@@ -83,3 +83,43 @@ export function wearingPlatformHat(
   if (panelBaseDomain || !isPlatformAdmin) return false
   return pathname === '/platform' || pathname.startsWith('/platform/')
 }
+
+/**
+ * Este provedor ainda precisa passar pelo onboarding de GenieACS?
+ *
+ * O portão existe porque um painel sem o endereço da NBI não mostra
+ * equipamento nenhum, e a tela vazia não diz o que falta. Mas ele perguntava
+ * uma coisa só — o campo está vazio? — e isso deixou de bastar quando a
+ * plataforma ganhou o próprio provedor: a caixa com que ela atende os ISPs não
+ * gerencia ONT alguma, e mesmo assim era mandada configurar um ACS.
+ *
+ * As quatro entradas, e o que cada uma responde:
+ *
+ * 1. **`isSaas`** — na edição self-hosted não há onboarding; quem instalou já
+ *    sabe o endereço do próprio ACS.
+ * 2. **`kind`** — `platform` NUNCA passa por aqui. Não é "já configurou", é
+ *    "não há o que configurar", e a diferença importa: com `genieAcsUrl` vazio
+ *    para sempre, qualquer regra baseada só no campo a empurraria para sempre.
+ * 3. **`genieAcsUrl`** — a pergunta original, e continua sendo a que decide
+ *    para um provedor de verdade.
+ * 4. **`dismissed`** — quem clicou em "Pular por enquanto". Fica no navegador,
+ *    por provedor, e é escolha de quem opera.
+ */
+export interface OnboardingInput {
+  /** Edição hospedada? Só nela existe onboarding. */
+  isSaas: boolean
+  /** `provider` ou `platform` — de `/api/tenant/public`. */
+  kind: string | null | undefined
+  /** O endereço da NBI já gravado, se houver. */
+  genieAcsUrl: string | null | undefined
+  /** Se quem opera já pediu para pular, neste navegador. */
+  dismissed: boolean
+}
+
+export function needsGenieAcsOnboarding(
+  { isSaas, kind, genieAcsUrl, dismissed }: OnboardingInput
+): boolean {
+  if (!isSaas || dismissed) return false
+  if (kind === 'platform') return false
+  return String(genieAcsUrl ?? '').trim() === ''
+}

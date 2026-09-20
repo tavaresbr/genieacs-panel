@@ -575,6 +575,15 @@ export interface PublicTenant {
   /** The domain a provider's panel lives under, or null where providers are not reached by subdomain. */
   panelBaseDomain: string | null
   /**
+   * `provider` ou `platform`: se este endereço é o painel de um CLIENTE ou a
+   * caixa interna da plataforma.
+   *
+   * A tela usa para uma coisa só — a caixa interna não gerencia equipamento
+   * nenhum, então não é empurrada para o onboarding de GenieACS. Não é fato
+   * sobre um cliente; é sobre qual dos endereços do próprio deploy se abriu.
+   */
+  kind: 'provider' | 'platform'
+  /**
    * Whether this address is shared by every provider — a SaaS with no base
    * domain, where the separation comes from the login instead of the host.
    * The screen uses it to NOT wear one ISP's brand on everybody's door.
@@ -851,6 +860,8 @@ export interface DeploymentInfo {
     portalBaseDomain: string | null
     publicBaseUrl: string | null
     tenantSubdomains: boolean
+    /** O molde do endereço de ACS que o onboarding sugere, com `{slug}`/`{id}` crus. */
+    genieAcsTemplate: string | null
   }
   configured: {
     mail: boolean
@@ -1444,6 +1455,20 @@ export const settingsAPI = {
 
   updateGenieAcsAuth: (payload: GenieAcsAuthPayload) =>
     apiClient.put<GenieAcsAuthConfig>('/settings/genieacs-auth', payload),
+
+  /**
+   * O endereço de GenieACS que o deploy sugere a este provedor, ou `null`.
+   *
+   * `null` é resposta e não falha: um deploy que não hospeda ACS nenhum não
+   * configura o template, e a tela se comporta como se comportava antes.
+   */
+  genieAcsSuggestion: () =>
+    apiClient.get<GenieAcsSuggestion>('/settings/genieacs-suggestion'),
+}
+
+/** O que a rota de sugestão devolve. Nunca um endereço que o painel recusaria ao salvar. */
+export interface GenieAcsSuggestion {
+  suggestion: string | null
 }
 
 export type GenieAcsAuthType = 'none' | 'basic' | 'bearer'

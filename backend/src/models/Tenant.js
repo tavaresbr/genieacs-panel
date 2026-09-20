@@ -29,8 +29,15 @@ class Tenant {
    * moment the migration ran, with no diff anywhere near this file to review.
    * Enumerating them means a new column is private by default and becomes
    * public only when a human writes its name here.
+   *
+   * `kind` é o terceiro, e passou por essa peneira: ele NÃO é fato sobre um
+   * cliente, é fato sobre qual dos endereços do próprio deploy se está olhando.
+   * O nome e o slug, que já saem aqui, já dizem o mesmo a quem chegou — e o que
+   * ele compra é a tela saber que a caixa interna da plataforma não gerencia
+   * equipamento nenhum, e por isso não deve ser empurrada para o onboarding de
+   * GenieACS.
    */
-  static PUBLIC_COLUMNS = ['name', 'slug'];
+  static PUBLIC_COLUMNS = ['name', 'slug', 'kind'];
 
   /**
    * O cadastro fiscal, e é o parágrafo acima cobrado na prática: estas doze

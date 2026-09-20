@@ -439,6 +439,13 @@ describe('the provider a login screen sees', () => {
    * mesmo endereço, que é fato do deploy, da mesma família de `edition` e
    * `panelBaseDomain`, e que a tela precisa para não vestir a marca de um ISP
    * na porta de todos. Aqui, com domínio-base, ele é sempre `false`.
+   *
+   * `kind` entrou pela mesma porta e com a mesma cobrança: ele não diz nada
+   * sobre o NEGÓCIO deste provedor — diz qual dos endereços do próprio deploy
+   * se está olhando, o de um ISP ou o da caixa com que a plataforma atende os
+   * ISPs. O nome e o slug, que já saem aqui, já dizem isso a quem souber ler;
+   * o campo apenas para de exigir que se saiba. Sem ele, o onboarding manda a
+   * caixa da plataforma configurar um GenieACS que ela não tem por que ter.
    */
   it('returns the public fields and nothing else', async () => {
     const { body } = await callAs(
@@ -446,8 +453,9 @@ describe('the provider a login screen sees', () => {
     );
     assert.deepEqual(
       Object.keys(body.data).sort(),
-      ['edition', 'name', 'panelBaseDomain', 'shared', 'slug']
+      ['edition', 'kind', 'name', 'panelBaseDomain', 'shared', 'slug']
     );
+    assert.equal(body.data.kind, 'provider');
     assert.equal(body.data.shared, false);
     assert.deepEqual(Object.keys(body).sort(), ['data', 'message', 'success']);
   });

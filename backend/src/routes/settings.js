@@ -6,6 +6,18 @@ const router = express.Router();
 
 router.get('/', authenticateToken, requirePermission('settings.read'), SettingsController.getAllSettings);
 
+// O endereço de GenieACS que o deploy sugere a ESTE provedor, quando ele
+// hospeda uma instância por provedor. `settings.write` e não `settings.read`:
+// a resposta só serve a quem pode gravar o campo que ela preenche, e quem não
+// pode não tem por que aprender o padrão de endereçamento interno do deploy.
+//
+// ANTES de `/:key`, que é um parâmetro e engoliria qualquer nome literal posto
+// depois dele. É a mesma razão de `/genieacs-auth` estar abaixo e ainda assim
+// acima do `/:key`, e o erro aqui nem daria bug visível: cairia em
+// `getSettingByKey` procurando uma chave chamada "genieacs-suggestion", que
+// não existe — um 404 com a mensagem errada.
+router.get('/genieacs-suggestion', authenticateToken, requirePermission('settings.write'), SettingsController.getGenieAcsSuggestion);
+
 // A credencial com que o painel se apresenta à NBI. Leitura em `settings.read`
 // porque a resposta não traz o segredo — só o tipo, o usuário e se existe um —
 // e quem administra precisa ver o que está configurado sem poder mudá-lo.

@@ -355,6 +355,12 @@ class TenantController {
       return res.json(createResponse(req.t('tenant.publicRetrieved'), {
         name: compartilhado ? null : tenant.name,
         slug: tenant.slug,
+        // `provider` ou `platform`. A tela precisa dele por uma razão só: a
+        // caixa interna da plataforma não gerencia equipamento nenhum, e sem
+        // isto o portão de onboarding a empurra para configurar um GenieACS
+        // que ela nunca vai ter. Ver a justificativa em `Tenant.PUBLIC_COLUMNS`
+        // para por que um fato do deploy pode sair numa rota aberta.
+        kind: tenant.kind ?? 'provider',
         shared: compartilhado,
         edition: EDITION,
         panelBaseDomain: panelBaseDomain()
