@@ -62,6 +62,12 @@ router.post('/tenants/:id/impersonate', authenticateToken, requirePlatformAdmin,
 
 router.get('/metrics', allowMetricsScraper, PlatformController.metrics);
 
+// Os fatos do deploy: edição, dialeto do banco, endereços, e o que está ou não
+// configurado. Só leitura, e configurado sim/não em vez do valor — ver o
+// controlador. Atrás dos dois guardas como o resto: não é segredo, mas é o
+// inventário do deploy, e inventário é meio caminho de um reconhecimento.
+router.get('/deployment', authenticateToken, requirePlatformAdmin, PlatformController.deployment);
+
 // A trilha do plano de controle. Só leitura, como a do provedor e pelo mesmo
 // motivo: se desse para apagar uma linha, a primeira coisa a fazer depois de
 // apagar um provedor seria apagar o registro disso.

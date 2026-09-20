@@ -4,6 +4,7 @@ import { Fragment, useCallback, useEffect, useState } from 'react'
 import { platformAPI, type Plan, type PlatformBox, type Tenant } from '@/lib/api'
 import { PlanCatalog } from '@/components/platform/plan-catalog'
 import { PlatformBoxCard } from '@/components/platform/platform-box'
+import { DeploymentHealth } from '@/components/platform/deployment-health'
 import { PlatformAdmins } from '@/components/platform/platform-admins'
 import { PlatformAudit } from '@/components/platform/platform-audit'
 import { TenantData } from '@/components/platform/tenant-data'
@@ -43,7 +44,7 @@ export default function PlatformPage() {
    * lado de quem os assina. Provedores é o padrão: é o que se abre para fazer
    * alguma coisa; as outras três são consulta ou manutenção rara.
    */
-  const [aba, setAba] = useState<'tenants' | 'plans' | 'admins' | 'audit'>('tenants')
+  const [aba, setAba] = useState<'tenants' | 'plans' | 'admins' | 'audit' | 'deployment'>('tenants')
 
   const loadTenants = useCallback(async () => {
     const plansRes = await platformAPI.listPlans()
@@ -251,7 +252,11 @@ export default function PlatformPage() {
             ['tenants', 'platform.tabs.tenants'],
             ['plans', 'platform.tabs.plans'],
             ['admins', 'platform.tabs.admins'],
-            ['audit', 'platform.tabs.audit']
+            ['audit', 'platform.tabs.audit'],
+            // Por último porque é a de consulta mais rara das cinco: não se
+            // abre o console para olhar variável de ambiente, abre-se quando
+            // alguma coisa não chegou e ninguém sabe por quê.
+            ['deployment', 'platform.tabs.deployment']
           ] as const).map(([chave, rotulo]) => (
             <button
               key={chave}
@@ -268,6 +273,7 @@ export default function PlatformPage() {
         {aba === 'plans' && <PlanCatalog plans={plans} onChange={() => void loadTenants()} />}
         {aba === 'admins' && <PlatformAdmins />}
         {aba === 'audit' && <PlatformAudit />}
+        {aba === 'deployment' && <DeploymentHealth />}
 
         {aba === 'tenants' && <PlatformBoxCard box={platformBox} />}
 
