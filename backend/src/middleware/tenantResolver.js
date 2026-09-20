@@ -113,6 +113,18 @@ export function panelBaseDomain() {
   return PANEL_BASE_DOMAIN;
 }
 
+/**
+ * O domínio-base do portal do assinante, ou nulo.
+ *
+ * Irmão de `panelBaseDomain`, e existe pelo mesmo motivo que ele: os dois são
+ * lidos uma vez no boot, de variáveis de ambiente diferentes, e quem precisa
+ * saber "por que o portal não resolve" não tem como olhar `process.env` de
+ * dentro de um controlador sem repetir a normalização que este arquivo já fez.
+ */
+export function portalBaseDomain() {
+  return PORTAL_BASE_DOMAIN;
+}
+
 /** Whether this deployment reaches providers by subdomain at all. */
 export function usesTenantSubdomains() {
   return Boolean(PANEL_BASE_DOMAIN || PORTAL_BASE_DOMAIN);

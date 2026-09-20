@@ -2,7 +2,12 @@ import fs from 'node:fs/promises';
 import Tenant from '../models/Tenant.js';
 import { providerFor, PROVEDORES } from '../services/billing/registry.js';
 import ImpersonationTicket from '../models/ImpersonationTicket.js';
-import { panelBaseDomain, usesTenantSubdomains } from '../middleware/tenantResolver.js';
+import { panelBaseDomain, portalBaseDomain, usesTenantSubdomains } from '../middleware/tenantResolver.js';
+import { EDITION } from '../config/edition.js';
+import { resolveClient } from '../config/dbConfig.js';
+import { rlsEnabled } from '../config/rls.js';
+import { mailConfigured } from '../services/mail/index.js';
+import { asaasBilling } from '../services/billing/asaasBillingProvider.js';
 import { METRICS_CONTENT_TYPE, renderMetrics } from '../utils/metrics.js';
 import Subscription from '../models/Subscription.js';
 import SubscriptionService from '../services/subscriptionService.js';
@@ -155,6 +160,85 @@ class PlatformController {
         createErrorResponse('Failed to mint the impersonation ticket', error.message)
       );
     }
+  }
+
+  /**
+   * `GET /api/platform/deployment` — os fatos do DEPLOY, que não são de
+   * provedor nenhum e até agora só se descobriam por ssh.
+   *
+   * É a metade da Configuração que faltava no console. As dez abas de
+   * Configuração do painel são de um ISP — o ACS dele, o ERP dele, a conexão
+   * de WhatsApp dele. Isto aqui é a outra metade: em que edição o processo
+   * está, contra que banco, em que endereços atende, e o que está ou não
+   * configurado. É o que responde "por que o convite não chegou" sem ninguém
+   * abrir um terminal.
+   *
+   * **Só leitura, e configurado sim/não em vez do valor.** A distinção é a
+   * regra inteira desta rota e está escrita em `presentConfigured` abaixo: um
+   * administrador de plataforma tem toda a confiança do sistema e ainda assim
+   * não precisa ler a chave da Asaas numa tela de navegador — ela não muda
+   * nada que ele possa fazer, e passa a existir no histórico do navegador, no
+   * cache do proxy e na captura de tela do chamado.
+   *
+   * Os ENDEREÇOS vão inteiros, e não é inconsistência: `panelBaseDomain` já sai
+   * em `/api/tenant/public`, que é aberta, e um endereço é público por
+   * construção — é para onde as pessoas apontam o navegador.
+   */
+  static deployment(req, res) {
+    const client = resolveClient();
+    return res.json(createResponse('Deployment retrieved successfully', {
+      edition: EDITION,
+      database: {
+        // O dialeto, e só. Host, usuário e nome do banco ficam de fora: a
+        // pergunta que esta tela responde é "estou em SQLite ou em Postgres?",
+        // e o resto é topologia de infraestrutura que a tela não usa.
+        client,
+        // De onde veio a conexão. Um deploy apontado para o banco errado é
+        // quase sempre `DATABASE_URL` ganhando de um `db-config.json` esquecido
+        // no volume — e sem esta linha as duas situações são idênticas na tela.
+        source: process.env.DATABASE_URL ? 'env' : 'file'
+      },
+      addressing: {
+        panelBaseDomain: panelBaseDomain(),
+        portalBaseDomain: portalBaseDomain(),
+        publicBaseUrl: String(process.env.PUBLIC_BASE_URL || '').trim() || null,
+        tenantSubdomains: usesTenantSubdomains()
+      },
+      configured: PlatformController.presentConfigured(client)
+    }));
+  }
+
+  /**
+   * O que está configurado, como booleano — nunca o valor.
+   *
+   * Cada linha aqui é uma variável de ambiente cuja ausência causa um sintoma
+   * que não se parece com "falta configurar":
+   *
+   * - **mail**: sem SMTP o convite não é enviado, o link volta na resposta da
+   *   API, e quem convidou acha que o e-mail sumiu no spam do colega.
+   * - **metricsToken**: sem ele o coletor de métricas recebe 401 e o painel
+   *   simplesmente não aparece no Prometheus.
+   * - **billingWebhookToken**: sem ele a rota do webhook responde **404** de
+   *   propósito — uma rota que move dinheiro não fica aberta porque alguém
+   *   esqueceu uma variável. O sintoma é "o Asaas diz que entregou e o painel
+   *   não creditou".
+   * - **billingGateway**: sem a chave da API nada é emitido e todo provedor
+   *   fica em cobrança manual, silenciosamente.
+   * - **rls**: a segunda linha de isolamento, que só vale em Postgres. Ler
+   *   `false` num deploy que ligou `RLS_ENABLED=true` e está em SQLite é a
+   *   resposta certa, e é a que ninguém tem hoje.
+   */
+  static presentConfigured(client = resolveClient()) {
+    return {
+      mail: mailConfigured(),
+      // 32 é o piso que `allowMetricsScraper` exige para sequer comparar: um
+      // token mais curto está configurado e não funciona, que é pior do que
+      // ausente. A tela precisa dizer a verdade sobre o que vai acontecer.
+      metricsToken: String(process.env.METRICS_TOKEN || '').length >= 32,
+      billingWebhookToken: Boolean(String(process.env.BILLING_WEBHOOK_TOKEN || '').trim()),
+      billingGateway: asaasBilling.isConfigured(),
+      rls: rlsEnabled(client)
+    };
   }
 
   /** `GET /api/platform/metrics` — the process's counters, per provider. */

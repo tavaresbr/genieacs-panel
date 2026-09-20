@@ -832,6 +832,36 @@ export interface Tenant {
 }
 
 /**
+ * Os fatos do DEPLOY, que não são de provedor nenhum.
+ *
+ * Tudo em `configured` é booleano de propósito: a tela diz se a variável está
+ * posta, nunca o que ela vale. Endereço não é segredo e vai inteiro — é para
+ * onde as pessoas apontam o navegador.
+ */
+export interface DeploymentInfo {
+  edition: 'saas' | 'selfhosted'
+  database: {
+    /** O dialeto em uso. Host, usuário e nome do banco ficam fora de propósito. */
+    client: 'better-sqlite3' | 'mysql2' | 'pg'
+    /** De onde veio a conexão: `DATABASE_URL` ou `db-config.json`. */
+    source: 'env' | 'file'
+  }
+  addressing: {
+    panelBaseDomain: string | null
+    portalBaseDomain: string | null
+    publicBaseUrl: string | null
+    tenantSubdomains: boolean
+  }
+  configured: {
+    mail: boolean
+    metricsToken: boolean
+    billingWebhookToken: boolean
+    billingGateway: boolean
+    rls: boolean
+  }
+}
+
+/**
  * A caixa da plataforma: a linha em `tenants` com `kind = 'platform'`.
  *
  * Existe para a plataforma poder ter o que o schema exige que tenha dono — o
@@ -1163,6 +1193,16 @@ export const platformAPI = {
     const suffix = query.toString()
     return apiClient.get<PlatformAuditPage>(`/platform/audit${suffix ? `?${suffix}` : ''}`)
   },
+
+  /**
+   * Os fatos do deploy — edição, banco, endereços, o que está configurado.
+   *
+   * Só leitura, e sem escrita nenhuma do outro lado: o que esta tela mostra
+   * mora em variáveis de ambiente, e variável de ambiente se muda no servidor
+   * e reiniciando. Um formulário aqui prometeria o que a rota não entrega.
+   */
+  deployment: () =>
+    apiClient.get<DeploymentInfo>('/platform/deployment'),
 
   /** O cadastro do próprio console: quem tem a chave do plano de controle. */
   listAdmins: () =>
