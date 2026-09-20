@@ -52,6 +52,7 @@ const zhTW: Dictionary = {
   'sidebar.expandNavigation': '展開導覽',
   'sidebar.collapseNavigation': '收合導覽',
   'sidebar.sectionLabel': '監控與管理',
+  'sidebar.backToPanel': '返回面板',
   'sidebar.nav.dashboard': '維運',
   'sidebar.nav.dashboardDescription': '設備整體狀況',
   'sidebar.nav.devices': '設備清單',

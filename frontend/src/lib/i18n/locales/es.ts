@@ -52,6 +52,7 @@ const es: Dictionary = {
   'sidebar.expandNavigation': 'Expandir navegación',
   'sidebar.collapseNavigation': 'Contraer navegación',
   'sidebar.sectionLabel': 'Monitorear y gestionar',
+  'sidebar.backToPanel': 'Volver al panel',
   'sidebar.nav.dashboard': 'Operación',
   'sidebar.nav.dashboardDescription': 'Salud de la red',
   'sidebar.nav.devices': 'Inventario de equipos',

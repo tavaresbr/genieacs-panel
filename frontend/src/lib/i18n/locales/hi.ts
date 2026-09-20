@@ -52,6 +52,7 @@ const hi: Dictionary = {
   'sidebar.expandNavigation': 'नेविगेशन विस्तृत करें',
   'sidebar.collapseNavigation': 'नेविगेशन समेटें',
   'sidebar.sectionLabel': 'निगरानी और प्रबंधन',
+  'sidebar.backToPanel': 'पैनल पर वापस जाएँ',
   'sidebar.nav.dashboard': 'संचालन',
   'sidebar.nav.dashboardDescription': 'नेटवर्क की स्थिति',
   'sidebar.nav.devices': 'उपकरण सूची',

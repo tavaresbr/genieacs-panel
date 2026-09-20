@@ -52,6 +52,7 @@ const ptBR: Dictionary = {
   'sidebar.expandNavigation': 'Expandir navegação',
   'sidebar.collapseNavigation': 'Recolher navegação',
   'sidebar.sectionLabel': 'Monitorar e gerenciar',
+  'sidebar.backToPanel': 'Voltar ao painel',
   'sidebar.nav.dashboard': 'Operação',
   'sidebar.nav.dashboardDescription': 'Saúde da rede',
   'sidebar.nav.devices': 'Inventário de equipamentos',
