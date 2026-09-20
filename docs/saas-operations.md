@@ -380,6 +380,13 @@ dialeto que o install usa, descoberto por `backend/scripts/backup-target.js`, qu
 versão do painel e **em que migração o dump foi tirado**. Retenção: 30 diárias mais o
 domingo de cada uma das últimas 52 semanas.
 
+**Num deploy em SQLite**, o banco é aberto em modo **WAL** — leitura e escrita deixam de se
+trancar, e uma colisão de lock espera cinco segundos em vez de virar "database is locked" na
+hora. Duas consequências operacionais: aparecem os arquivos `-wal` e `-shm` ao lado do banco,
+e o `DATA_DIR` **não pode estar em NFS**, onde o WAL não funciona. O backup continua correto
+sem nada a mudar, porque `backup-sqlite.js` usa a API `backup()` do próprio SQLite — que é
+segura com WAL — e nunca um `cp` do arquivo vivo.
+
 **O `.env` não entra no backup.** O que entra é a impressão digital de `SECRET_BOX_KEY` e
 de `JWT_SECRET` — os doze primeiros hex de um SHA-256 salgado com o nome da variável, nunca
 o valor. A razão é o modo de falha de `secretBox.decrypt`, que devolve `null` em vez de
