@@ -146,6 +146,17 @@ class ChargeIssuingService {
     const tenant = doLaco ?? await Tenant.findById(currentTenantId());
     if (!tenant) return { issued: false, reason: 'tenant_gone' };
 
+    // A plataforma não se cobra. A linha dela em `tenants` existe para ser dona
+    // do que o schema exige que tenha dono — a caixa de WhatsApp com que ela
+    // atende os provedores —, e não para ser cliente.
+    //
+    // Explícito e não por acidente: as guardas abaixo já a poupariam hoje (não
+    // está ligada a gateway nenhum e está no plano de graça), mas as duas são
+    // configuração, e configuração muda. Uma correlação com o gateway colada na
+    // linha errada pelo console faria o painel emitir cobrança contra nós
+    // mesmos, e o `kind` é o único fato aqui que não depende de ninguém lembrar.
+    if (tenant.kind === 'platform') return { issued: false, reason: 'platform_tenant' };
+
     // Sem gateway ligado não há a quem pedir. É também o que faz este job ser
     // inócuo num install self-hosted, sem precisar perguntar pela edição: lá
     // ninguém liga provedor a gateway nenhum.

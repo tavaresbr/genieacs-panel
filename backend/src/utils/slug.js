@@ -27,7 +27,12 @@ const SLUG_MAX_LENGTH = 63;
  * can fix afterwards without moving that ISP to a new address.
  */
 export const RESERVED_SLUGS = new Set([
-  'www', 'api', 'app', 'admin', 'portal', 'mail', 'static', 'assets', 'cdn', 'status'
+  'www', 'api', 'app', 'admin', 'portal', 'mail', 'static', 'assets', 'cdn', 'status',
+  // O endereço da caixa interna da plataforma (`tenants.kind = 'platform'`).
+  // Reservado nos dois idiomas em que alguém a nomearia, porque o estrago é o
+  // mesmo dos de cima: um ISP cadastrado aqui pousaria no endereço de onde nós
+  // atendemos os ISPs.
+  'plataforma', 'platform'
 ]);
 
 /** What is wrong with this slug, or null when nothing is. */

@@ -169,15 +169,29 @@ class PlatformController {
 
   static async listTenants(req, res) {
     try {
+      // `Tenant.list()` devolve os CLIENTES. A caixa da plataforma sai daqui e
+      // viaja à parte, em `platformBox`, porque é outra coisa: misturá-la na
+      // lista a faria aparecer com plano, estado de assinatura e botão de
+      // suspender, que é exatamente a confusão que o `kind` existe para
+      // desfazer — e o primeiro efeito seria alguém suspender a própria caixa
+      // achando que estava mexendo num cliente.
       const tenants = await Tenant.list();
       const counts = await Tenant.operatorCounts();
       const subscriptions = await subscriptionsByTenant();
+      const caixa = await Tenant.platform();
       return res.json(createResponse('Tenants retrieved successfully', {
         tenants: tenants.map((tenant) => present(
           tenant,
           counts.get(Number(tenant.id)) || 0,
           subscriptions.get(Number(tenant.id)) || null
-        ))
+        )),
+        // Três campos e nada mais: o console precisa do nome para escrever na
+        // tela e do slug para montar o endereço onde há domínio-base. Plano,
+        // cadastro fiscal e gateway não vêm porque não há o que fazer com eles
+        // — ela não é cobrada.
+        platformBox: caixa
+          ? { id: caixa.id, slug: caixa.slug, name: caixa.name, operators: counts.get(Number(caixa.id)) || 0 }
+          : null
       }));
     } catch (error) {
       console.error('List tenants error:', error);
