@@ -149,7 +149,39 @@ export function buildKnexConfig(config = readDbConfig()) {
     connection: { filename: config.filename || SQLITE_PATH },
     useNullAsDefault: true,
     pool: {
+      /**
+       * O que toda conexão SQLite precisa antes da primeira consulta.
+       *
+       * O padrão do SQLite é o journal `delete`, em que um leitor tranca um
+       * escritor e um escritor tranca os leitores — o arquivo inteiro, não a
+       * linha. E cada conexão do `better-sqlite3` é um handle próprio sobre o
+       * mesmo arquivo: o pool do knex abre até dez, elas colidem de verdade
+       * dentro do processo, e o `skygenpanel-backup` é um segundo processo
+       * abrindo o mesmo banco. Sem `busy_timeout`, essa colisão não espera —
+       * vira `SQLITE_BUSY` na hora, que chega ao operador como "database is
+       * locked" sem nada por perto que explique.
+       *
+       * `journal_mode` é PERSISTENTE: mora no cabeçalho do arquivo, então
+       * aplicá-lo por conexão é no-op depois da primeira. Fica aqui mesmo
+       * assim, porque é aqui que a conexão nasce e porque um arquivo novo —
+       * install novo, banco de teste — precisa dele igual. Já o `busy_timeout`
+       * é por conexão, e por isso NÃO pode sair daqui.
+       *
+       * Cinco segundos é escolha, não número redondo: o `better-sqlite3` é
+       * síncrono, então esperar por um lock trava o event loop inteiro e não só
+       * a consulta. É margem para o `backup()`, que copia página a página e é o
+       * único concorrente entre processos, e é curto o bastante para um lock
+       * preso não virar um servidor mudo por meio minuto.
+       *
+       * O que deliberadamente NÃO está aqui: `synchronous = NORMAL`, que
+       * costuma acompanhar o WAL e troca durabilidade por velocidade — decisão
+       * de operação, não padrão; e `pool.max = 1`, que mataria a contenção e
+       * abriria deadlock, porque uma transação seguraria a única conexão
+       * enquanto qualquer consulta fora dela esperaria para sempre.
+       */
       afterCreate(conn, done) {
+        conn.pragma('journal_mode = WAL');
+        conn.pragma('busy_timeout = 5000');
         conn.pragma('foreign_keys = ON');
         done(null, conn);
       }
