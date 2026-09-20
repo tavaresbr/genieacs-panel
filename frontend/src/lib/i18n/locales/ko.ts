@@ -52,6 +52,7 @@ const ko: Dictionary = {
   'sidebar.expandNavigation': '탐색 메뉴 펼치기',
   'sidebar.collapseNavigation': '탐색 메뉴 접기',
   'sidebar.sectionLabel': '모니터링 및 관리',
+  'sidebar.backToPanel': '패널로 돌아가기',
   'sidebar.nav.dashboard': '운영',
   'sidebar.nav.dashboardDescription': '장비 전반 상태',
   'sidebar.nav.devices': '장비 목록',

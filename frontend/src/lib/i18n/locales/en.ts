@@ -54,6 +54,7 @@ const en = {
   'sidebar.expandNavigation': 'Expand navigation',
   'sidebar.collapseNavigation': 'Collapse navigation',
   'sidebar.sectionLabel': 'Monitor & manage',
+  'sidebar.backToPanel': 'Back to the panel',
   'sidebar.nav.dashboard': 'Operations',
   'sidebar.nav.dashboardDescription': 'Fleet health',
   'sidebar.nav.devices': 'Device Inventory',

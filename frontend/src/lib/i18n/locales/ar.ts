@@ -52,6 +52,7 @@ const ar: Dictionary = {
   'sidebar.expandNavigation': 'توسيع قائمة التنقل',
   'sidebar.collapseNavigation': 'طيّ قائمة التنقل',
   'sidebar.sectionLabel': 'المراقبة والإدارة',
+  'sidebar.backToPanel': 'العودة إلى اللوحة',
   'sidebar.nav.dashboard': 'العمليات',
   'sidebar.nav.dashboardDescription': 'حالة الشبكة',
   'sidebar.nav.devices': 'سجل الأجهزة',

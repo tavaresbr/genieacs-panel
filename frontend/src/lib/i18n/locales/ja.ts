@@ -52,6 +52,7 @@ const ja: Dictionary = {
   'sidebar.expandNavigation': 'ナビゲーションを展開',
   'sidebar.collapseNavigation': 'ナビゲーションを折りたたむ',
   'sidebar.sectionLabel': '監視と管理',
+  'sidebar.backToPanel': 'パネルに戻る',
   'sidebar.nav.dashboard': '運用',
   'sidebar.nav.dashboardDescription': '設備全体の状態',
   'sidebar.nav.devices': '機器一覧',

@@ -52,6 +52,7 @@ const fr: Dictionary = {
   'sidebar.expandNavigation': 'Déplier la navigation',
   'sidebar.collapseNavigation': 'Replier la navigation',
   'sidebar.sectionLabel': 'Superviser et gérer',
+  'sidebar.backToPanel': 'Retour au panneau',
   'sidebar.nav.dashboard': 'Exploitation',
   'sidebar.nav.dashboardDescription': 'Santé du parc',
   'sidebar.nav.devices': 'Inventaire des équipements',

@@ -52,6 +52,7 @@ const zhCN: Dictionary = {
   'sidebar.expandNavigation': '展开导航',
   'sidebar.collapseNavigation': '收起导航',
   'sidebar.sectionLabel': '监控与管理',
+  'sidebar.backToPanel': '返回面板',
   'sidebar.nav.dashboard': '运维',
   'sidebar.nav.dashboardDescription': '设备总体状况',
   'sidebar.nav.devices': '设备清单',

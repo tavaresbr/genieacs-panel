@@ -42,3 +42,44 @@ export function sessionKind(user: { platform?: boolean } | null | undefined): 'c
   if (!user) return null
   return user.platform ? 'console' : 'provider'
 }
+
+/**
+ * A casca de um provedor está, NESTE INSTANTE, mostrando a tela da plataforma?
+ *
+ * É a terceira situação que o arquivo acima não cobria. `shellFor` decide qual
+ * ÁRVORE montar, e num deploy de host único a resposta para um administrador de
+ * plataforma que também opera um ISP é "a do provedor" — a sessão dele é de
+ * provedor. Só que dentro dessa árvore existe uma rota, `/platform`, que não
+ * fala de provedor nenhum: fala do deploy inteiro.
+ *
+ * Enquanto ela está aberta, a barra lateral escreve o nome de um ISP ao lado de
+ * uma tela que lista todos. Não é cosmético: é dali que se clica em
+ * "Configuração" achando que se mexe na plataforma e se mexe na ISP.
+ *
+ * Três entradas, e as duas últimas são as MESMAS que `PlatformRoute` usa para
+ * decidir se serve esta tela. Repetidas aqui de propósito: cada uma das duas
+ * termina num redirecionamento, e redirecionamento leva um render — sem elas a
+ * barra piscaria "Plataforma" antes de voltar ao nome do provedor.
+ *
+ * 1. **O caminho.** `/platform` e o que estiver abaixo dele, nada mais. O
+ *    prefixo é comparado com a barra junto (`/platform/`) de propósito: sem
+ *    isso, uma rota futura chamada `/platformas` vestiria o chapéu errado.
+ * 2. **Não haver domínio-base.** Onde ele existe, o console mudou de endereço e
+ *    ESTA casca não serve `/platform`.
+ * 3. **Ser administrador de plataforma.** Quem não é nunca chega à tela.
+ */
+export interface PlatformHatInput {
+  /** O caminho aberto agora. */
+  pathname: string
+  /** O domínio-base do painel, ou nulo num deploy de host único. */
+  panelBaseDomain: string | null | undefined
+  /** Se quem está olhando tem a chave do plano de controle. */
+  isPlatformAdmin: boolean
+}
+
+export function wearingPlatformHat(
+  { pathname, panelBaseDomain, isPlatformAdmin }: PlatformHatInput
+): boolean {
+  if (panelBaseDomain || !isPlatformAdmin) return false
+  return pathname === '/platform' || pathname.startsWith('/platform/')
+}

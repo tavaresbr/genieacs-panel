@@ -52,6 +52,7 @@ const de: Dictionary = {
   'sidebar.expandNavigation': 'Navigation ausklappen',
   'sidebar.collapseNavigation': 'Navigation einklappen',
   'sidebar.sectionLabel': 'Überwachen und verwalten',
+  'sidebar.backToPanel': 'Zurück zum Panel',
   'sidebar.nav.dashboard': 'Betrieb',
   'sidebar.nav.dashboardDescription': 'Zustand des Bestands',
   'sidebar.nav.devices': 'Geräteinventar',

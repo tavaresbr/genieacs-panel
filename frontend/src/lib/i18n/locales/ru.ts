@@ -52,6 +52,7 @@ const ru: Dictionary = {
   'sidebar.expandNavigation': 'Развернуть навигацию',
   'sidebar.collapseNavigation': 'Свернуть навигацию',
   'sidebar.sectionLabel': 'Мониторинг и управление',
+  'sidebar.backToPanel': 'Вернуться в панель',
   'sidebar.nav.dashboard': 'Операции',
   'sidebar.nav.dashboardDescription': 'Состояние сети',
   'sidebar.nav.devices': 'Реестр устройств',

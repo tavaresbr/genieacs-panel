@@ -11,6 +11,7 @@ import { Icon } from '@/components/ui/icon'
 import { BrandMark } from '@/components/brand-mark'
 import { APP_RELEASE, ReleaseNotesModal } from '@/components/release-notes-modal'
 import { normalizeRole, ROLE_LABEL_KEYS } from '@/lib/permissions'
+import { wearingPlatformHat } from '@/lib/shell'
 
 // `permission` é a capacidade que a tela precisa para ABRIR, a mesma que guarda
 // a rota em `app.tsx`: um item que aparece e leva a um redirecionamento é pior
@@ -138,6 +139,18 @@ function SidebarContent({
    * levaria a uma tela cujas requisições o próprio endereço recusa.
    */
   const consoleForaDaqui = tenant?.panelBaseDomain ? `https://${tenant.panelBaseDomain}/platform` : null
+  /**
+   * O chapéu que esta barra está usando agora — ver `wearingPlatformHat`.
+   *
+   * `useLocation` aqui e não o `isActive` que vem de fora: aquele responde "é
+   * esta a rota ativa?" item a item, e a pergunta desta linha é outra, sobre a
+   * tela inteira. Dá no mesmo hoje; misturar as duas faria o próximo a mexer
+   * num dos lados mover o outro sem querer.
+   */
+  const { pathname } = useLocation()
+  const naPlataforma = wearingPlatformHat({
+    pathname, panelBaseDomain: tenant?.panelBaseDomain, isPlatformAdmin
+  })
   const visibleItems = menuItems.filter((item) => can(item.permission)
     && (!('platformOnly' in item && item.platformOnly) || isPlatformAdmin)
     // `saasOnly`: a screen about a subscription has nothing to show on an
@@ -150,12 +163,23 @@ function SidebarContent({
 
   return (
     <>
+      {/* O cabeçalho diz de quem é a casa que está aberta.
+          Na tela da plataforma isso é a PLATAFORMA, e o mesmo texto que o
+          console usa no endereço dele (`console.header`) — dois nomes para a
+          mesma coisa seriam duas coisas para quem lê. */}
       <div className={`flex h-[4.75rem] items-center border-b border-white/10 ${isCollapsed ? 'justify-center px-2' : 'px-4'}`}>
-        <Link to="/dashboard" onClick={closeMobile} className="flex min-w-0 items-center gap-3" title={isCollapsed ? appName : undefined}>
+        <Link
+          to={naPlataforma ? '/platform' : '/dashboard'}
+          onClick={closeMobile}
+          className="flex min-w-0 items-center gap-3"
+          title={isCollapsed ? (naPlataforma ? t('console.header') : appName) : undefined}
+        >
           <BrandMark className="size-10 shrink-0" />
           {!isCollapsed && (
             <div className="min-w-0">
-              <div className="truncate text-[0.95rem] font-bold leading-tight text-white">{appName}</div>
+              <div className="truncate text-[0.95rem] font-bold leading-tight text-white">
+                {naPlataforma ? t('console.header') : appName}
+              </div>
               <div className="mt-0.5 text-[0.63rem] font-bold uppercase tracking-[0.14em] text-[#9aa9a2]">{t('app.tagline')}</div>
             </div>
           )}
@@ -163,9 +187,38 @@ function SidebarContent({
       </div>
 
       <nav className={`min-h-0 flex-1 overflow-y-auto py-5 ${isCollapsed ? 'px-2.5' : 'px-3'}`} aria-label={t('sidebar.primaryNavigation')}>
-        {!isCollapsed && <div className="mb-2 px-3 text-[0.62rem] font-bold uppercase tracking-[0.16em] text-[#829188]">{t('sidebar.sectionLabel')}</div>}
+        {/* O rótulo da seção some na plataforma: ele encabeça a lista de
+            operação de UM provedor, e ali embaixo não há lista — há a saída. */}
+        {!isCollapsed && !naPlataforma && (
+          <div className="mb-2 px-3 text-[0.62rem] font-bold uppercase tracking-[0.16em] text-[#829188]">{t('sidebar.sectionLabel')}</div>
+        )}
         <ul className="space-y-1">
-          {visibleItems.map((item) => {
+          {naPlataforma ? (
+            /* Os sete itens do provedor recolhem para um.
+               Eles continuariam funcionando — são da mesma casca —, e é esse o
+               problema: ler o nome de um ISP no alto e clicar em "Configuração"
+               daqui é mexer naquele ISP achando que se mexe na plataforma. O
+               nome dele vai para a linha de baixo, onde diz PARA ONDE se volta
+               em vez de dizer onde se está. */
+            <li>
+              <Link
+                to="/dashboard"
+                onClick={closeMobile}
+                title={isCollapsed ? `${t('sidebar.backToPanel')} — ${appName}` : undefined}
+                className={`group flex min-h-12 items-center rounded-md text-[#c9d2cd] transition-colors hover:bg-white/7 hover:text-white ${
+                  isCollapsed ? 'justify-center px-2' : 'gap-3 px-3'
+                }`}
+              >
+                <Icon name="chevron-left" size={20} className="shrink-0" />
+                {!isCollapsed && (
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold leading-tight">{t('sidebar.backToPanel')}</span>
+                    <span className="mt-0.5 block truncate text-[0.68rem] text-[#839189]">{appName}</span>
+                  </span>
+                )}
+              </Link>
+            </li>
+          ) : visibleItems.map((item) => {
             const active = isActive(item.href)
             const label = t(item.labelKey)
             // O console é o único item que pode morar noutro endereço; os
