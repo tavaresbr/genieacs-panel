@@ -19,6 +19,17 @@ import { normalizeRole } from '../config/permissions.js';
  * dessa regra porque é ele quem entrega o provedor ao primeiro dono.
  */
 
+/**
+ * O prazo de um link de PRIMEIRA SENHA, cunhado pelo console.
+ *
+ * Sete dias, como o convite, e não os trinta minutos da redefinição comum. Os
+ * dois prazos medem coisas diferentes: quem pediu para redefinir está parado na
+ * tela esperando o e-mail, enquanto quem recebe um acesso recém-criado o recebe
+ * de quem o criou — por telefone, por mensagem, no meio do dia de trabalho — e
+ * abre quando puder. Meia hora aqui só produziria um segundo pedido.
+ */
+export const PASSWORD_SETUP_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
 /** Meia hora a trinta dias. Fora disso é engano de quem digitou, não escolha. */
 export const MIN_TTL_MS = 30 * 60 * 1000;
 export const MAX_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -54,6 +65,43 @@ export function publicInvite(invite) {
 export function inviteLink(tenant, token) {
   const base = panelUrlFor(tenant);
   return base ? `${base}/invite#${token}` : null;
+}
+
+/**
+ * O endereço em que a pessoa escolhe a primeira senha, ou `null` sem
+ * domínio-base.
+ *
+ * Mesma forma do convite — host do provedor, token no fragmento — e de
+ * propósito: é a mesma tela `/reset-password` que a redefinição comum usa, e o
+ * bilhete é o mesmo `auth_tickets` com o mesmo resgate de uso único preso ao
+ * host. O que muda é só quem cunha e por quanto tempo vale.
+ */
+export function passwordSetupLink(tenant, token) {
+  const base = panelUrlFor(tenant);
+  return base ? `${base}/reset-password#${token}` : null;
+}
+
+/**
+ * Manda o link da primeira senha, se houver para onde e por onde.
+ *
+ * Mensagem própria, e não a da redefinição: aquela começa com "alguém pediu uma
+ * senha nova para a sua conta", que para quem está recebendo um acesso pela
+ * primeira vez é uma frase sobre uma conta que ela não sabe que tem.
+ */
+export async function sendPasswordSetup({ req, tenant, email, token }) {
+  const transporte = mailTransport();
+  if (transporte.name === 'none') return false;
+
+  const link = passwordSetupLink(tenant, token);
+  if (!link) return false;
+
+  const nome = tenant?.name || 'SkyGenPanel';
+  const dias = Math.round(PASSWORD_SETUP_TTL_MS / (24 * 60 * 60 * 1000));
+  return transporte.send({
+    to: email,
+    subject: req.t('platform.operatorMailSubject', { provider: nome }),
+    text: req.t('platform.operatorMailBody', { provider: nome, link, days: dias })
+  });
 }
 
 /**

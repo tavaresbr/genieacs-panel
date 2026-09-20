@@ -624,6 +624,8 @@ export default {
   'auth.passwordResetDone': '비밀번호를 재설정했습니다. 새 비밀번호로 로그인하세요',
   'auth.passwordResetMailSubject': '{provider} 비밀번호 재설정',
   'auth.passwordResetMailBody': '{provider}의 회원님 계정에 대해 새 비밀번호가 요청되었습니다.\n\n아래 링크를 열어 새 비밀번호를 설정하세요. 링크는 한 번만 사용할 수 있으며 {minutes}분 동안 유효합니다:\n\n{link}\n\n본인이 아니라면 이 메일을 무시하세요. 비밀번호는 변경되지 않았습니다.',
+  'platform.operatorMailSubject': '{provider} 접속 정보',
+  'platform.operatorMailBody': '{provider} 화면에 대한 접속 권한이 생성되었습니다.\n\n아래 링크를 열어 비밀번호를 정하세요. 한 번만 사용할 수 있으며 {days}일 동안 유효합니다.\n\n{link}\n\n그 다음부터는 이 비밀번호로 로그인합니다.',
   'auth.emailMissing': '이 계정에는 아직 등록된 이메일 주소가 없습니다',
   'auth.emailAlreadyVerified': '이 이메일 주소는 이미 인증되었습니다',
   'auth.emailVerifySent': '회원님 주소로 메일을 보냈습니다. 메일의 링크를 열어 확인하세요',

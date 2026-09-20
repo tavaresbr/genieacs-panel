@@ -618,6 +618,8 @@ export default {
   'auth.passwordResetDone': 'Contraseña restablecida. Inicia sesión con la nueva contraseña',
   'auth.passwordResetMailSubject': 'Restablecer tu contraseña en {provider}',
   'auth.passwordResetMailBody': 'Alguien solicitó una nueva contraseña para tu cuenta en {provider}.\n\nAbre el enlace de abajo para elegir una. Sirve una vez y es válido durante {minutes} minutos:\n\n{link}\n\nSi no fuiste tú, ignora este mensaje: tu contraseña sigue igual.',
+  'platform.operatorMailSubject': 'Su acceso a {provider}',
+  'platform.operatorMailBody': 'Se creó un acceso al panel de {provider} para usted.\n\nAbra el enlace de abajo para elegir su contraseña. Sirve una vez y vale por {days} días:\n\n{link}\n\nA partir de ahí, con esa contraseña usted entra.',
   'auth.emailMissing': 'Esta cuenta todavía no tiene una dirección de correo registrada',
   'auth.emailAlreadyVerified': 'Esta dirección de correo ya fue verificada',
   'auth.emailVerifySent': 'Enviamos un mensaje a tu dirección. Abre el enlace para confirmar',

@@ -620,6 +620,8 @@ export default {
   'auth.passwordResetDone': 'Senha redefinida. Entre com a nova senha',
   'auth.passwordResetMailSubject': 'Redefinir sua senha no {provider}',
   'auth.passwordResetMailBody': 'Alguém pediu uma senha nova para a sua conta no {provider}.\n\nAbra o link abaixo para escolher uma. Ele serve uma vez e vale por {minutes} minutos:\n\n{link}\n\nSe não foi você, ignore esta mensagem: sua senha continua a mesma.',
+  'platform.operatorMailSubject': 'Seu acesso ao {provider}',
+  'platform.operatorMailBody': 'Um acesso ao painel do {provider} foi criado para você.\n\nAbra o link abaixo para escolher a sua senha. Ele serve uma vez e vale por {days} dias:\n\n{link}\n\nDepois disso, é com essa senha que você entra.',
   'auth.emailMissing': 'Esta conta ainda não tem um endereço de e-mail cadastrado',
   'auth.emailAlreadyVerified': 'Este endereço de e-mail já foi verificado',
   'auth.emailVerifySent': 'Mandamos uma mensagem para o seu endereço. Abra o link dela para confirmar',

@@ -9,12 +9,18 @@ import { runInTenant } from '../config/tenantContext.js';
 import { ROLES } from './usersController.js';
 import { normalizeRole, roleHas } from '../config/permissions.js';
 import TenantInvite from '../models/TenantInvite.js';
+import AuthTicket from '../models/AuthTicket.js';
+import bcrypt from 'bcryptjs';
+import crypto from 'node:crypto';
 import {
   MAX_TTL_MS,
   MIN_TTL_MS,
+  PASSWORD_SETUP_TTL_MS,
   inviteLink,
+  passwordSetupLink,
   publicInvite,
-  sendInvite
+  sendInvite,
+  sendPasswordSetup
 } from '../services/inviteDelivery.js';
 import { createResponse, createErrorResponse, isValidEmail } from '../utils/helpers.js';
 
@@ -62,6 +68,9 @@ import { createResponse, createErrorResponse, isValidEmail } from '../utils/help
  * linha um papel que a tela do próprio provedor soletra de outro jeito, e duas
  * cópias da regra divergem no primeiro papel novo.
  */
+/** O mesmo custo de `/api/users` e do aceite do convite. */
+const BCRYPT_ROUNDS = 12;
+
 const presentRole = normalizeRole;
 
 /** Os papéis que administram a equipe, derivados da matriz — ver `usersController`. */
@@ -243,6 +252,156 @@ class PlatformMemberController {
       console.error('Invite to provider error:', error);
       return res.status(500).json(
         createErrorResponse('Failed to create the invitation', error.message)
+      );
+    }
+  }
+
+  /**
+   * Cria um operador NOVO dentro de um provedor, do console.
+   *
+   * É a terceira porta desta tela, e ela existe porque as outras duas não
+   * servem a um provedor ADMINISTRADO — aquele que a plataforma opera em nome
+   * do ISP. `add` exige alguém que já tenha login; o convite exige que a pessoa
+   * do outro lado escolha nome de usuário e senha, o que é atrito quando quem
+   * vai operar o painel é a própria plataforma, ou quando o ISP só quer receber
+   * um acesso pronto.
+   *
+   * Duas entregas, e a diferença entre elas é quem conhece a senha:
+   *
+   * - **link** (padrão): a conta nasce com uma senha aleatória que ninguém vê —
+   *   nem quem a criou — e a pessoa escolhe a dela abrindo um bilhete de uso
+   *   único no endereço do provedor. É o mesmo `auth_tickets` da redefinição
+   *   comum, com o mesmo resgate preso ao host; o que muda é quem cunha e o
+   *   prazo (ver `PASSWORD_SETUP_TTL_MS`).
+   * - **senha digitada**: quem opera o console escolhe a senha e a entrega. É o
+   *   que o cabeçalho deste arquivo recusa para `add`, e a recusa continua
+   *   valendo lá: uma senha naquela rota RESETARIA o login de um estranho que
+   *   já existe e trabalha noutro lugar. Aqui a conta está sendo criada agora e
+   *   ainda não é de ninguém, então o que se perde é outra coisa, menor e
+   *   assumida: a plataforma conhece a senha inicial daquela conta até a pessoa
+   *   trocá-la. Quem escolhe é quem opera, e o padrão da tela é o link.
+   *
+   * O que esta rota NUNCA faz é tocar em conta que já existe: `loginConflict`
+   * recusa nome e endereço já usados com 409, e é isso que a separa de `add`.
+   */
+  static async createOperator(req, res) {
+    try {
+      const tenantId = parseId(req.params?.id);
+      if (!tenantId) {
+        return res.status(400).json(createErrorResponse('Invalid provider id'));
+      }
+      const tenant = await findTenant(tenantId);
+      if (!tenant) return tenantNotFound(res);
+
+      const username = String(req.body?.username ?? '').trim();
+      const email = User.normalizeEmail(req.body?.email);
+      const role = req.body?.role;
+      // A senha é opcional: sem ela, o caminho é o link. Lida como veio, sem
+      // `trim()` — espaço nas pontas de uma senha é senha.
+      const mandouSenha = req.body?.password !== undefined && req.body?.password !== null;
+      const password = mandouSenha ? String(req.body.password) : null;
+
+      if (username.length < 3 || username.length > 64) {
+        return res.status(400).json(
+          createErrorResponse('Username must be between 3 and 64 characters')
+        );
+      }
+      // Obrigatório, como em `/api/users`: é por ele que a pessoa recebe o link
+      // e é por ele que ela recupera a conta depois.
+      if (!email || !isValidEmail(email)) {
+        return res.status(400).json(createErrorResponse('Invalid e-mail address'));
+      }
+      if (!ROLES.includes(role)) {
+        return res.status(400).json(
+          createErrorResponse(`Role must be one of: ${ROLES.join(', ')}`)
+        );
+      }
+      if (mandouSenha && (password.length < 8 || password.length > 128)) {
+        return res.status(400).json(
+          createErrorResponse('Password must be between 8 and 128 characters')
+        );
+      }
+
+      const conflito = await User.loginConflict({ username, email });
+      if (conflito) {
+        // O código vai junto para a tela dizer QUAL dos dois está tomado sem
+        // ter que reconhecer a frase do plano de controle, que é em inglês.
+        return res.status(409).json(createErrorResponse(
+          conflito === 'email_taken' ? 'E-mail already taken' : 'Username already taken',
+          null,
+          conflito
+        ));
+      }
+
+      // O limite é do provedor ALVO, não do provedor em que quem opera o
+      // console trabalha — daí abrir o escopo dele para perguntar.
+      try {
+        await runInTenant(tenantId, () => SubscriptionService.assertCanAddOperator());
+      } catch (error) {
+        if (error instanceof PlanLimitError) return planLimitResponse(req, res, error);
+        throw error;
+      }
+
+      // Sem senha digitada, a coluna — que é `NOT NULL` — recebe 32 bytes
+      // aleatórios. Não é uma senha vazia nem uma senha padrão: é uma senha que
+      // ninguém sabe, nem quem acabou de criar a conta, e que só sai do caminho
+      // quando a pessoa resgata o bilhete.
+      const segredo = mandouSenha ? password : crypto.randomBytes(32).toString('hex');
+      const hash = await bcrypt.hash(segredo, BCRYPT_ROUNDS);
+
+      // A pessoa e o vínculo numa transação só: uma pessoa sem vínculo não
+      // entra em lugar nenhum e não aparece em tela nenhuma — é lixo que só o
+      // banco enxerga.
+      const userId = await getDb().transaction(async (trx) => {
+        const id = await User.create({ username, password: hash, role, email }, trx);
+        await TenantUser.create({ tenantId, userId: id, role }, trx);
+        return id;
+      });
+
+      // O bilhete vem DEPOIS de a conta existir, e só no caminho do link.
+      let token = null;
+      if (!mandouSenha) {
+        ({ token } = await AuthTicket.create({
+          purpose: AuthTicket.PURPOSES.PASSWORD_RESET,
+          userId,
+          tenantId,
+          email,
+          ttlMs: PASSWORD_SETUP_TTL_MS
+        }));
+      }
+
+      // As duas trilhas, como todo write deste arquivo. `mode` fica no detalhe
+      // porque a pergunta "quem conheceu a senha inicial desta conta" tem que
+      // ter resposta — e a resposta é esta linha.
+      const detail = { userId, username, role, mode: mandouSenha ? 'password' : 'link' };
+      await PlatformAudit.fromRequest(req, {
+        action: PlatformAudit.ACTIONS.OPERATOR_CREATED,
+        tenant,
+        detail
+      });
+      await runInTenant(tenantId, () => AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.OPERATOR_CREATED,
+        actorKind: 'platform',
+        subjectType: 'tenant_user',
+        subjectId: userId,
+        detail
+      }));
+
+      const emailed = token ? await sendPasswordSetup({ req, tenant, email, token }) : false;
+
+      return res.status(201).json(createResponse('Operator created', {
+        membership: present({ id: userId, username, role }),
+        // Mostrado uma vez, como o token do convite: o banco guarda só o hash.
+        // `null` quando a senha foi digitada — ali não há o que entregar além
+        // dela mesma.
+        url: token ? passwordSetupLink(tenant, token) : null,
+        token,
+        emailed
+      }));
+    } catch (error) {
+      console.error('Create operator error:', error);
+      return res.status(500).json(
+        createErrorResponse('Failed to create the operator', error.message)
       );
     }
   }

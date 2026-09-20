@@ -916,3 +916,186 @@ describe('the trail a membership leaves', () => {
     }
   });
 });
+
+/**
+ * Este bloco fica por ÚLTIMO de propósito: ele cria contas — administradores
+ * inclusive — dentro de beta, e as suítes acima contam quantos administradores
+ * o provedor tem e qual foi a última linha de cada trilha. Rodando antes, ele
+ * mudaria o mundo que elas descrevem.
+ */
+/**
+ * Criar a conta direto, que é a terceira porta da tela de equipe.
+ *
+ * `add` exige quem já tem login; o convite exige que a pessoa do outro lado
+ * escolha nome e senha. Esta serve o provedor ADMINISTRADO: a conta nasce
+ * pronta, e a senha ou vem de um link de uso único (padrão, e ninguém além da
+ * pessoa a conhece) ou é digitada por quem opera o console.
+ *
+ * O que estes casos fixam: a conta nasce com vínculo no provedor NOMEADO, o
+ * bilhete do link é um `auth_tickets` de verdade guardado como hash, a senha
+ * digitada é a que fica valendo, e nenhum caminho aqui encosta numa conta que
+ * já existe — que é a linha que separa esta rota de `add`.
+ */
+describe('criando um operador para um provedor administrado', () => {
+  const NOVO = { username: 'operador-beta', email: 'operador-beta@exemplo.test' };
+
+  const criar = (tenantId, token, body) => call(
+    `${platformUrl}/api/platform/tenants/${tenantId}/operators`,
+    { method: 'POST', headers: authHeaders(token), body }
+  );
+
+  const bilhetesDe = (userId) => getDb()('auth_tickets')
+    .where({ user_id: userId, purpose: 'password_reset' })
+    .orderBy('id', 'desc');
+
+  it('cria a conta e o vínculo no provedor nomeado, e devolve o link uma vez', async () => {
+    const pessoasAntes = await personCount();
+    const { status, body } = await criar(beta, ownerToken, { ...NOVO, role: 'admin' });
+    assert.equal(status, 201, JSON.stringify(body));
+    assert.equal(await personCount(), pessoasAntes + 1);
+
+    const pessoa = await getDb()('users').where({ username: NOVO.username }).first();
+    assert.ok(pessoa, 'a conta não foi criada');
+    assert.equal(pessoa.email, NOVO.email);
+    assert.equal(body.data.membership.userId, pessoa.id);
+    assert.equal(body.data.membership.role, 'admin');
+
+    const vinculo = await membershipOf(beta, pessoa.id);
+    assert.ok(vinculo, 'a conta nasceu sem vínculo');
+    assert.equal(vinculo.role, 'admin');
+    assert.equal(await membershipCount(alfa, pessoa.id), 0,
+      'a conta entrou também no provedor de quem operou o console');
+
+    // O bilhete existe, é de uso único e está guardado como HASH.
+    assert.ok(body.data.token, 'o link voltou sem bilhete');
+    const [bilhete] = await bilhetesDe(pessoa.id);
+    assert.ok(bilhete, 'nenhum bilhete de senha foi cunhado');
+    assert.equal(Number(bilhete.tenant_id), beta);
+    assert.notEqual(bilhete.token_hash, body.data.token);
+    assert.equal(bilhete.redeemed_at, null);
+    // Sete dias, e não os trinta minutos da redefinição comum.
+    const dias = (new Date(bilhete.expires_at).getTime() - Date.now()) / (24 * 60 * 60 * 1000);
+    assert.ok(dias > 6 && dias < 8, `o prazo do bilhete é de ${dias} dias`);
+  });
+
+  /**
+   * A senha da conta criada por link é aleatória e ninguém a conhece — nem quem
+   * a criou. É o que dá sentido ao link: sem ele, a conta não entra em lugar
+   * nenhum.
+   */
+  it('e a senha que fica gravada não é nada que quem operou o console escolheu', async () => {
+    const pessoa = await getDb()('users').where({ username: NOVO.username }).first();
+    for (const tentativa of ['', 'password', NOVO.username, NOVO.email, 'operador-beta-1']) {
+      assert.equal(await bcrypt.compare(tentativa, pessoa.password), false,
+        `a senha gravada é ${JSON.stringify(tentativa)}`);
+    }
+  });
+
+  it('aceita a senha digitada, e é ela que fica valendo', async () => {
+    const corpo = {
+      username: 'suporte-beta',
+      email: 'suporte-beta@exemplo.test',
+      role: 'tech',
+      password: 'senha-do-suporte-1'
+    };
+    const { status, body } = await criar(beta, ownerToken, corpo);
+    assert.equal(status, 201, JSON.stringify(body));
+    // Sem link: não há bilhete a entregar quando a senha já foi escolhida.
+    assert.equal(body.data.url, null);
+    assert.equal(body.data.token, null);
+
+    const pessoa = await getDb()('users').where({ username: corpo.username }).first();
+    assert.ok(await bcrypt.compare(corpo.password, pessoa.password),
+      'a senha gravada não é a que foi digitada');
+    assert.equal((await bilhetesDe(pessoa.id)).length, 0, 'cunhou bilhete sem precisar');
+    assert.ok(await membershipOf(beta, pessoa.id));
+  });
+
+  /**
+   * A conta usada aqui é a da ANA, criada pela API do provedor e portanto com
+   * endereço — `seedPerson` grava sem e-mail, e um caso escrito contra uma
+   * conta semeada provaria só que o endereço dela não existe.
+   */
+  it('recusa um nome ou um endereço que já existem, sem tocar na conta de ninguém', async () => {
+    const antes = await personOf(anaId);
+    const nome = await criar(beta, ownerToken, {
+      username: ANA.username, email: 'outro-endereco@exemplo.test', role: 'admin'
+    });
+    assert.equal(nome.status, 409, JSON.stringify(nome.body));
+    assert.equal(nome.body.code, 'username_taken');
+
+    const endereco = await criar(beta, ownerToken, {
+      username: 'nome-livre', email: ANA.email, role: 'admin'
+    });
+    assert.equal(endereco.status, 409, JSON.stringify(endereco.body));
+    assert.equal(endereco.body.code, 'email_taken');
+
+    // A conta de quem já existe fica exatamente como estava — é a linha que
+    // separa esta rota de um "criar" que na verdade sobrescreve.
+    const depois = await personOf(anaId);
+    assert.equal(depois.password, antes.password, 'a senha de uma conta existente foi tocada');
+    assert.equal(depois.username, antes.username);
+    assert.equal(depois.email, antes.email);
+    assert.equal((await getDb()('users').where({ username: 'nome-livre' })).length, 0);
+  });
+
+  it('recusa o que não é conta: nome curto, endereço inválido, papel de fora, senha curta', async () => {
+    const pessoasAntes = await personCount();
+    for (const corpo of [
+      { username: 'ab', email: 'valido@exemplo.test', role: 'admin' },
+      { username: 'x'.repeat(65), email: 'valido@exemplo.test', role: 'admin' },
+      { username: 'nome-ok', email: 'nao-e-endereco', role: 'admin' },
+      { username: 'nome-ok', email: undefined, role: 'admin' },
+      { username: 'nome-ok', email: 'valido@exemplo.test', role: 'sysadmin' },
+      { username: 'nome-ok', email: 'valido@exemplo.test', role: undefined },
+      { username: 'nome-ok', email: 'valido@exemplo.test', role: 'admin', password: 'curta' }
+    ]) {
+      const { status } = await criar(beta, ownerToken, corpo);
+      assert.equal(status, 400, `${JSON.stringify(corpo)} tinha que ser recusado`);
+    }
+    assert.equal(await personCount(), pessoasAntes, 'um pedido recusado criou gente');
+  });
+
+  it('responde 404 para um provedor que não existe', async () => {
+    const { status } = await criar(999999, ownerToken, {
+      username: 'fantasma', email: 'fantasma@exemplo.test', role: 'admin'
+    });
+    assert.equal(status, 404);
+  });
+
+  it('e o administrador de um provedor não cria conta no vizinho', async () => {
+    const pessoasAntes = await personCount();
+    const { status } = await criar(beta, anaToken, {
+      username: 'invasora', email: 'invasora@exemplo.test', role: 'owner'
+    });
+    assert.ok(status >= 400 && status < 500, `respondeu ${status}`);
+    assert.equal(await personCount(), pessoasAntes);
+  });
+
+  it('deixa a linha nas duas trilhas, com o modo da senha no detalhe', async () => {
+    const { status, body } = await criar(beta, ownerToken, {
+      username: 'auditada', email: 'auditada@exemplo.test', role: 'viewer'
+    });
+    assert.equal(status, 201);
+    const userId = body.data.membership.userId;
+
+    const nossa = await getDb()('platform_audit')
+      .where({ action: 'tenant.operator_created' })
+      .orderBy('id', 'desc')
+      .first();
+    assert.ok(nossa, 'o console criou uma conta e não registrou');
+    assert.equal(Number(nossa.tenant_id), beta);
+    const detalhe = JSON.parse(nossa.detail);
+    assert.equal(detalhe.userId, userId);
+    assert.equal(detalhe.mode, 'link', 'o modo da senha tem que estar na trilha');
+    assert.ok(!String(nossa.detail).includes(body.data.token), 'o bilhete vazou para a trilha');
+
+    const dele = await getDb()('audit_log')
+      .where({ tenant_id: beta, action: 'operator.created' })
+      .orderBy('id', 'desc')
+      .first();
+    assert.ok(dele, 'o ISP não tem na trilha dele que uma conta foi criada na equipe');
+    assert.equal(dele.actor_kind, 'platform');
+    assert.equal(dele.subject_id, String(userId));
+  });
+});

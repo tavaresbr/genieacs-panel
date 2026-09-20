@@ -613,6 +613,8 @@ export default {
   'auth.passwordResetDone': 'تمت إعادة تعيين كلمة المرور. سجّل الدخول بكلمة المرور الجديدة',
   'auth.passwordResetMailSubject': 'إعادة تعيين كلمة المرور في {provider}',
   'auth.passwordResetMailBody': 'طلب أحدهم كلمة مرور جديدة لحسابك في {provider}.\n\nافتح الرابط أدناه لاختيار كلمة مرور. يعمل الرابط مرة واحدة وصالح لمدة {minutes} دقيقة:\n\n{link}\n\nإن لم تكن أنت، تجاهل هذه الرسالة: كلمة مرورك لم تتغيّر.',
+  'platform.operatorMailSubject': 'وصولك إلى {provider}',
+  'platform.operatorMailBody': 'تم إنشاء وصول إلى لوحة {provider} من أجلك.\n\nافتح الرابط أدناه لاختيار كلمة المرور الخاصة بك. يعمل مرة واحدة وصالح لمدة {days} أيام:\n\n{link}\n\nبعد ذلك تدخل بهذه الكلمة.',
   'auth.emailMissing': 'لا يوجد بعد عنوان بريد إلكتروني مسجّل لهذا الحساب',
   'auth.emailAlreadyVerified': 'تم التحقق من عنوان البريد الإلكتروني هذا بالفعل',
   'auth.emailVerifySent': 'أرسلنا رسالة إلى عنوانك. افتح الرابط الموجود فيها للتأكيد',

@@ -621,6 +621,8 @@ export default {
   'auth.passwordResetDone': 'パスワードを再設定しました。新しいパスワードでログインしてください',
   'auth.passwordResetMailSubject': '{provider} のパスワード再設定',
   'auth.passwordResetMailBody': '{provider} のあなたのアカウントについて、新しいパスワードの発行がリクエストされました。\n\n下のリンクを開いて設定してください。リンクは一度だけ有効で、{minutes} 分間使用できます:\n\n{link}\n\n心当たりがない場合はこのメールを無視してください。パスワードは変更されていません。',
+  'platform.operatorMailSubject': '{provider} へのアクセス',
+  'platform.operatorMailBody': '{provider} の画面へのアクセスが作成されました。\n\n下のリンクを開いてパスワードを決めてください。一度だけ使え、有効期間は {days} 日です。\n\n{link}\n\n以後はそのパスワードでログインします。',
   'auth.emailMissing': 'このアカウントにはまだメールアドレスが登録されていません',
   'auth.emailAlreadyVerified': 'このメールアドレスはすでに確認済みです',
   'auth.emailVerifySent': 'あなたのアドレスにメールを送信しました。記載のリンクを開いて確認してください',

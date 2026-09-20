@@ -123,6 +123,7 @@ const POR_ID = new Map([
   ['GET /api/platform/tenants/:id/members', 'plano de controle; prova em platform-members.test.js'],
   ['POST /api/platform/tenants/:id/members', 'plano de controle; prova em platform-members.test.js'],
   ['POST /api/platform/tenants/:id/invites', 'plano de controle; prova em platform-members.test.js'],
+  ['POST /api/platform/tenants/:id/operators', 'plano de controle; prova em platform-members.test.js'],
   ['DELETE /api/platform/tenants/:id/members/:userId', 'plano de controle; prova em platform-members.test.js'],
   // O id aqui não é de linha de provedor nenhum: é o da PESSOA no cadastro do
   // plano de controle, que é tabela compartilhada e não tem `tenant_id` para o
@@ -265,13 +266,13 @@ describe('toda rota endereçada por um parâmetro', () => {
   // saíram do alcance desta conta em vez de precisarem de exceção. O número só
   // pode cair.
   //
-  // E subiu de 40 para 41 com `POST /api/platform/tenants/:id/invites`, que é
-  // do console e por isso custa uma linha em `DO_CONSOLE` e mais uma aqui — o
-  // pedágio que este bloco define para uma rota nova do plano de controle. As
-  // 41 de agora: aparelho (20), chave natural (7), anexo por token (2) e o
-  // console (12). O número que de fato importa, `TETO_FORA_DO_CONSOLE`, não se
-  // move.
-  const TETO_DE_EXCECOES = 41;
+  // E subiu de 40 para 41 com `POST /api/platform/tenants/:id/invites`, e de 41
+  // para 42 com `POST /api/platform/tenants/:id/operators` — as duas do
+  // console, e cada uma pagando o mesmo pedágio: uma linha em `DO_CONSOLE` e
+  // mais uma aqui. As 42 de agora: aparelho (20), chave natural (7), anexo por
+  // token (2) e o console (13). O número que de fato importa,
+  // `TETO_FORA_DO_CONSOLE`, não se move.
+  const TETO_DE_EXCECOES = 42;
 
   /**
    * As exceções que são do plano de controle, nomeadas uma a uma.
@@ -291,6 +292,7 @@ describe('toda rota endereçada por um parâmetro', () => {
     'GET /api/platform/tenants/:id/members',
     'POST /api/platform/tenants/:id/members',
     'POST /api/platform/tenants/:id/invites',
+    'POST /api/platform/tenants/:id/operators',
     'DELETE /api/platform/tenants/:id/members/:userId',
     'DELETE /api/platform/admins/:userId',
     'PATCH /api/platform/plans/:id',
