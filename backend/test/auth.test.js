@@ -207,12 +207,25 @@ describe('the provider a login screen sees, with no subdomains configured', () =
     assert.equal(body.data.slug, 'default');
   });
 
+  /**
+   * A lista é fechada de propósito: esta rota é ABERTA, então todo campo novo
+   * aqui é publicado sem sessão, e a forma de decidir isso é ter que mexer
+   * nesta linha.
+   *
+   * `kind` entrou pela mesma porta e com a mesma cobrança: ele não diz nada
+   * sobre o NEGÓCIO deste provedor — diz qual dos endereços do próprio deploy
+   * se está olhando, o de um ISP ou o da caixa com que a plataforma atende os
+   * ISPs. O nome e o slug, que já saem aqui, já dizem isso a quem souber ler;
+   * o campo apenas para de exigir que se saiba. Sem ele, o onboarding manda a
+   * caixa da plataforma configurar um GenieACS que ela não tem por que ter.
+   */
   it('returns the public fields and nothing else', async () => {
     const { body } = await call(`${panelUrl}/api/tenant/public`);
     assert.deepEqual(
       Object.keys(body.data).sort(),
-      ['edition', 'name', 'panelBaseDomain', 'shared', 'slug']
+      ['edition', 'kind', 'name', 'panelBaseDomain', 'shared', 'slug']
     );
+    assert.equal(body.data.kind, 'provider');
   });
 });
 

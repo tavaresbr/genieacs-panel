@@ -14,7 +14,7 @@ import { TenantProvider, useTenant } from '@/contexts/tenant-context'
 import { settingsAPI } from '@/lib/api'
 import { onboardingDismissKey } from '@/lib/onboarding'
 import type { Permission } from '@/lib/permissions'
-import { sessionKind, shellFor } from '@/lib/shell'
+import { needsGenieAcsOnboarding, sessionKind, shellFor } from '@/lib/shell'
 
 const DashboardPage = lazy(() => import('@/pages/dashboard'))
 const DevicesPage = lazy(() => import('@/pages/devices'))
@@ -76,6 +76,11 @@ function OnboardingGate({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!isSaas || !tenant?.slug || !can('settings.write')) { setNeedsOnboarding(false); return }
+    // A caixa da plataforma sai daqui ANTES da leitura das configurações: ela
+    // nunca vai ter um GenieACS, então perguntar pelo campo seria perguntar uma
+    // coisa cuja resposta é "vazio" para sempre — e empurrá-la para o
+    // onboarding para sempre junto.
+    if (tenant.kind === 'platform') { setNeedsOnboarding(false); return }
     let dismissed = false
     try { dismissed = localStorage.getItem(onboardingDismissKey(tenant.slug)) === '1' } catch {}
     if (dismissed) { setNeedsOnboarding(false); return }
@@ -83,7 +88,11 @@ function OnboardingGate({ children }: { children: React.ReactNode }) {
     void settingsAPI.getAll().then((res) => {
       if (cancelled) return
       const url = res.success && res.data ? String((res.data as { genieAcsUrl?: string }).genieAcsUrl ?? '') : ''
-      setNeedsOnboarding(res.success ? url.trim() === '' : false)
+      // A decisão mora em `needsGenieAcsOnboarding`, testada sem DOM: uma regra
+      // escrita dentro de um `useEffect` é uma regra que ninguém verifica.
+      setNeedsOnboarding(res.success && needsGenieAcsOnboarding({
+        isSaas, kind: tenant.kind, genieAcsUrl: url, dismissed
+      }))
     })
     return () => { cancelled = true }
   }, [isSaas, tenant, can])

@@ -37,6 +37,8 @@ export default function Onboarding() {
   const [center, setCenter] = useState<{ lat: string; lng: string }>({ lat: '', lng: '' })
   const [acs, setAcs] = useState({ url: '', authType: 'none' as GenieAcsAuthType, username: '', secret: '' })
   const [testResult, setTestResult] = useState<string | null>(null)
+  /** O endereço que a plataforma sugere para este provedor, se houver um. */
+  const [suggested, setSuggested] = useState<string | null>(null)
   const [colleague, setColleague] = useState({ username: '', email: '', password: '' })
 
   useEffect(() => {
@@ -48,6 +50,27 @@ export default function Onboarding() {
       const map = await mapSettingsAPI.get()
       const data = map.data as { center_lat?: string; center_lng?: string } | undefined
       if (map.success && data) setCenter({ lat: String(data.center_lat ?? ''), lng: String(data.center_lng ?? '') })
+    })()
+  }, [])
+
+  /**
+   * A sugestão de endereço do ACS, quando o deploy hospeda um por provedor.
+   *
+   * Preenche o campo, e não só mostra ao lado: quem chega aqui quer avançar, e
+   * um valor que precisa ser copiado à mão é um valor que vai ser digitado
+   * errado. Continua editável — é sugestão, não imposição.
+   *
+   * Só preenche o campo VAZIO. Este efeito roda uma vez, mas um `setAcs` que
+   * sobrescrevesse o que já está lá seria a forma de apagar o que o operador
+   * acabou de digitar, no dia em que alguém acrescentar uma dependência aqui.
+   */
+  useEffect(() => {
+    void (async () => {
+      const res = await settingsAPI.genieAcsSuggestion()
+      const sugerido = res.success ? (res.data?.suggestion ?? null) : null
+      if (!sugerido) return
+      setSuggested(sugerido)
+      setAcs((a) => (a.url.trim() === '' ? { ...a, url: sugerido } : a))
     })()
   }, [])
 
@@ -170,6 +193,12 @@ export default function Onboarding() {
                     {t('settings.general.testConnection')}
                   </button>
                 </div>
+                {/* De onde veio o valor. Sem esta linha, o campo aparece
+                    preenchido e ninguém sabe se foi o painel ou um resto de
+                    sessão anterior — e a primeira reação é apagar. */}
+                {suggested && acs.url === suggested && (
+                  <p className="field-hint">{t('onboarding.acsSuggested')}</p>
+                )}
                 {testResult && <p className="field-hint">{testResult}</p>}
               </div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

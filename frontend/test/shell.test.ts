@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { sessionKind, shellFor, wearingPlatformHat } from '@/lib/shell'
+import { needsGenieAcsOnboarding, sessionKind, shellFor, wearingPlatformHat } from '@/lib/shell'
 
 /**
  * Qual casca o navegador monta, nas quatro combinações que existem.
@@ -103,5 +103,70 @@ describe('o chapéu que a barra lateral está usando', () => {
     expect(wearingPlatformHat({
       pathname: '/platform', panelBaseDomain: undefined, isPlatformAdmin: true
     })).toBe(true)
+  })
+})
+
+/**
+ * Quem é empurrado para o onboarding, e quem nunca.
+ *
+ * A regra mora fora do componente pelo mesmo motivo de `wearingPlatformHat`:
+ * `frontend/test/` roda em node puro, sem DOM, e uma regra dentro do JSX só se
+ * mede montando a árvore inteira.
+ */
+describe('quem precisa passar pelo onboarding', () => {
+  const provedor = { isSaas: true, kind: 'provider', dismissed: false }
+
+  it('um provedor novo, sem ACS configurado', () => {
+    expect(needsGenieAcsOnboarding({ ...provedor, genieAcsUrl: null })).toBe(true)
+    expect(needsGenieAcsOnboarding({ ...provedor, genieAcsUrl: '' })).toBe(true)
+    // Espaço em branco é campo vazio: é o que sobra de um "Salvar" com a tecla
+    // de espaço encostada, e um painel apontado para " " não gerencia nada.
+    expect(needsGenieAcsOnboarding({ ...provedor, genieAcsUrl: '   ' })).toBe(true)
+  })
+
+  it('e não quem já configurou', () => {
+    expect(needsGenieAcsOnboarding({ ...provedor, genieAcsUrl: 'http://acs.exemplo.test:7557' }))
+      .toBe(false)
+  })
+
+  it('e não quem já dispensou', () => {
+    expect(needsGenieAcsOnboarding({ ...provedor, genieAcsUrl: null, dismissed: true })).toBe(false)
+  })
+
+  /**
+   * O caso que esta função foi extraída para consertar.
+   *
+   * A caixa da plataforma é uma linha em `tenants` para dar dono ao WhatsApp
+   * com que a plataforma atende os provedores. Ela não gerencia ONT nenhuma, e
+   * mesmo assim a regra antiga — SaaS, sem `genieAcsUrl` — a mandava configurar
+   * um ACS, todo login, para sempre: não há endereço que ela pudesse preencher
+   * que fizesse aquela tela parar de aparecer.
+   */
+  it('e a caixa da plataforma NUNCA, com ACS ou sem', () => {
+    expect(needsGenieAcsOnboarding({ isSaas: true, kind: 'platform', genieAcsUrl: null, dismissed: false }))
+      .toBe(false)
+    expect(needsGenieAcsOnboarding({
+      isSaas: true, kind: 'platform', genieAcsUrl: 'http://acs.exemplo.test:7557', dismissed: false
+    })).toBe(false)
+  })
+
+  /**
+   * Num install de um provedor só o onboarding nunca existiu: quem instalou o
+   * painel no próprio servidor já sabe onde o ACS dele está, e a tela de
+   * Configuração é o caminho.
+   */
+  it('e ninguém num install de um provedor só', () => {
+    expect(needsGenieAcsOnboarding({ isSaas: false, kind: 'provider', genieAcsUrl: null, dismissed: false }))
+      .toBe(false)
+  })
+
+  /**
+   * `kind` chega de uma rota, então chega depois do primeiro render. Antes
+   * disso ele é `undefined`, e tratar `undefined` como plataforma faria todo
+   * provedor novo pular o onboarding no render em que ele mais importa.
+   */
+  it('e um kind ainda não carregado vale como provedor', () => {
+    expect(needsGenieAcsOnboarding({ isSaas: true, kind: undefined, genieAcsUrl: null, dismissed: false }))
+      .toBe(true)
   })
 })

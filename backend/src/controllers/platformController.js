@@ -202,7 +202,14 @@ class PlatformController {
         panelBaseDomain: panelBaseDomain(),
         portalBaseDomain: portalBaseDomain(),
         publicBaseUrl: String(process.env.PUBLIC_BASE_URL || '').trim() || null,
-        tenantSubdomains: usesTenantSubdomains()
+        tenantSubdomains: usesTenantSubdomains(),
+        // O molde do endereço de GenieACS que o onboarding sugere a cada
+        // provedor novo. Inteiro e não booleano, pelo mesmo motivo dos três
+        // acima: é endereço, não segredo — e ler `{slug}` aqui é a única forma
+        // de conferir que a variável foi lida como se pretendia. Um template
+        // com a porta errada devolve sugestão nenhuma, em silêncio; esta linha
+        // é onde isso deixa de ser invisível.
+        genieAcsTemplate: String(process.env.GENIEACS_URL_TEMPLATE || '').trim() || null
       },
       configured: PlatformController.presentConfigured(client)
     }));

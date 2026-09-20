@@ -109,9 +109,18 @@ export function DeploymentHealth() {
           <Linha rotulo="TENANT_BASE_DOMAIN">{endereco(info.addressing.panelBaseDomain)}</Linha>
           <Linha rotulo="PORTAL_BASE_DOMAIN">{endereco(info.addressing.portalBaseDomain)}</Linha>
           <Linha rotulo="PUBLIC_BASE_URL">{endereco(info.addressing.publicBaseUrl)}</Linha>
+          {/* Inteiro, e não "configurado sim/não": é o molde de um endereço, e
+              um molde só se confere lendo. Um `{slug}` que não aparece aqui é
+              a explicação de por que o onboarding não sugere nada. */}
+          <Linha rotulo="GENIEACS_URL_TEMPLATE">
+            <span className="font-mono text-xs">{endereco(info.addressing.genieAcsTemplate)}</span>
+          </Linha>
         </dl>
         <p className="field-hint mt-4">
           {t(info.addressing.tenantSubdomains ? 'deployment.bySubdomain' : 'deployment.byLogin')}
+        </p>
+        <p className="field-hint mt-2">
+          {t(info.addressing.genieAcsTemplate ? 'deployment.acsTemplateOn' : 'deployment.acsTemplateOff')}
         </p>
       </section>
 

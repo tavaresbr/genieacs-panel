@@ -6,6 +6,9 @@ import CustomerService from '../services/customerService.js';
 import DeviceService from '../services/deviceService.js';
 import GenieAcsEgress, { EGRESS_REFUSED } from '../services/genieacsEgress.js';
 import GenieAcsAuthService, { AUTH_TYPES } from '../services/genieacsAuthService.js';
+import Tenant from '../models/Tenant.js';
+import { suggestGenieAcsUrl } from '../services/genieacsSuggestion.js';
+import { currentTenantId } from '../config/tenantContext.js';
 import CustomerAccount from '../models/CustomerAccount.js';
 
 const ALLOWED_SETTING_KEYS = new Set([
@@ -55,6 +58,35 @@ function validateSetting(key, value) {
 }
 
 class SettingsController {
+  /**
+   * `GET /api/settings/genieacs-suggestion` — o endereço de ACS que a
+   * plataforma sugere a ESTE provedor, ou nada.
+   *
+   * Serve o passo 2 do onboarding, onde hoje se digita a NBI do zero. A
+   * sugestão sai de `GENIEACS_URL_TEMPLATE` com `{slug}` e `{id}` do provedor em
+   * escopo — um endereço por provedor, porque um ACS compartilhado entre dois
+   * mostraria a frota de um ao outro (ver `genieacsSuggestion.js`).
+   *
+   * `settings.write` e não `settings.read`: quem não pode gravar a URL não tem
+   * o que fazer com a sugestão dela, e a capacidade que guarda a tela é a que
+   * guarda a rota.
+   *
+   * `null` não é erro — é "este deploy não configurou template", que é o estado
+   * de todo install que não hospeda ACS nenhum. A tela se comporta como sempre.
+   */
+  static async getGenieAcsSuggestion(req, res) {
+    try {
+      const tenant = await Tenant.findById(currentTenantId());
+      return res.json(createResponse(
+        req.t('settings.listRetrieved'),
+        { suggestion: suggestGenieAcsUrl(tenant) }
+      ));
+    } catch (error) {
+      console.error('GenieACS suggestion error:', error);
+      return res.status(500).json(createErrorResponse(req.t('common.internalError'), error.message));
+    }
+  }
+
   /**
    * A credencial da NBI daquele provedor, sem o segredo.
    *
