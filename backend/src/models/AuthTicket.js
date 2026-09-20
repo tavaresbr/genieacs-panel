@@ -120,8 +120,17 @@ class AuthTicket {
     if (!token) return null;
     const hash = AuthTicket.hash(token);
     const now = new Date();
+    // `tenantId` nulo NÃO filtra por provedor, e a justificativa é a de
+    // `hostMatchesTenant`, palavra por palavra: quem passa nulo é um deploy
+    // onde nenhum host nomeia provedor, e onde nenhum host nomeia provedor não
+    // existe porta errada. Onde o host NOMEIA, o filtro continua obrigatório —
+    // é ele que impede gastar o bilhete de A na porta de B, e é por estar
+    // DENTRO do update atômico que a tentativa pela porta errada não casa linha
+    // nenhuma e não queima o bilhete de quem o recebeu.
+    const alvo = { token_hash: hash, purpose };
+    if (tenantId !== null && tenantId !== undefined) alvo.tenant_id = Number(tenantId);
     const changed = await getDb()('auth_tickets')
-      .where({ token_hash: hash, purpose, tenant_id: Number(tenantId) })
+      .where(alvo)
       .whereNull('redeemed_at')
       .where('expires_at', '>', now)
       .update({ redeemed_at: now });

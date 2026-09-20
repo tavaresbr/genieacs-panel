@@ -46,7 +46,17 @@ async function enviarBilhete({ req, purpose, userId, tenantId, email, rota, assu
 
   const tenant = await Tenant.findPublicById(tenantId);
   const base = panelUrlFor(tenant);
-  if (!base) return false;
+  if (!base) {
+    // Sem isto a falha é muda: a rota responde 200 — tem que responder, senão
+    // vira oráculo —, nenhuma mensagem sai, e não há onde ler o porquê. Num
+    // deploy de host único o endereço do painel não se deduz de subdomínio
+    // nenhum, e `PUBLIC_BASE_URL` é a única fonte que resta.
+    console.warn(
+      `Cannot send ${purpose} ticket: no panel URL for tenant ${tenantId}. ` +
+      'Set PUBLIC_BASE_URL (deployments without TENANT_BASE_DOMAIN) or TENANT_BASE_DOMAIN.'
+    );
+    return false;
+  }
 
   const { token } = await AuthTicket.create({ purpose, userId, tenantId, email });
   const nome = tenant?.name || 'SkyGenPanel';
@@ -1071,12 +1081,21 @@ class AuthController {
       const email = User.normalizeEmail(user.email);
       if (!email || !user.email_verified_at) return responder();
 
-      if (!(await TenantUser.find(req.tenantId, user.id))) return responder();
+      // Qual provedor. Com host nomeando um, é ele — a regra de sempre, e a
+      // razão está no comentário acima: o link aponta para o painel dele. Sem
+      // host que nomeie (deploy de host único), o provedor é o da PESSOA:
+      // `req.tenantId` ali é o primeiro da tabela por fallback, e conferir
+      // contra ele fazia a redefinição não existir para quem trabalha em
+      // qualquer outro provedor — em silêncio, porque esta rota responde igual
+      // sempre. Mesmo helper do login, para as duas regras não divergirem.
+      const membership = await membershipForLogin(user.id, req.hostTenantId);
+      if (!membership) return responder();
+      const tenantDoPedido = Number(membership.tenant_id);
 
       // A trilha é do provedor e vem ANTES do envio, porque ela registra o
       // pedido e não a entrega: um SMTP que recusa não apaga o fato de alguém
       // ter pedido uma senha nova para esta conta.
-      await runInTenant(Number(req.tenantId), () => AuditLog.record({
+      await runInTenant(tenantDoPedido, () => AuditLog.record({
         action: AuditLog.ACTIONS.PASSWORD_RESET_REQUESTED,
         actorUserId: user.id,
         actorUsername: user.username,
@@ -1089,7 +1108,7 @@ class AuthController {
         req,
         purpose: AuthTicket.PURPOSES.PASSWORD_RESET,
         userId: user.id,
-        tenantId: Number(req.tenantId),
+        tenantId: tenantDoPedido,
         email,
         rota: '/reset-password',
         assunto: 'auth.passwordResetMailSubject',
@@ -1141,7 +1160,11 @@ class AuthController {
       const ticket = await AuthTicket.redeem({
         token,
         purpose: AuthTicket.PURPOSES.PASSWORD_RESET,
-        tenantId: req.tenantId
+        // `hostTenantId` e não `tenantId`: o segundo é o primeiro provedor da
+        // tabela onde nenhum host nomeia um, e filtrar por ele matava todo
+        // bilhete cunhado para outro provedor. Nulo aqui quer dizer "não há
+        // porta errada" — ver `AuthTicket.redeem`.
+        tenantId: req.hostTenantId ?? null
       });
       if (!ticket) return recusa();
 
@@ -1244,7 +1267,8 @@ class AuthController {
       const ticket = await AuthTicket.redeem({
         token,
         purpose: AuthTicket.PURPOSES.EMAIL_VERIFICATION,
-        tenantId: req.tenantId
+        // Mesmo motivo do resgate da senha, logo acima.
+        tenantId: req.hostTenantId ?? null
       });
       if (!ticket) return recusa();
 
