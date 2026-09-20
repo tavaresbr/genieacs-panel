@@ -23,6 +23,32 @@ class TenantUser {
   }
 
   /**
+   * O mesmo, com o nome e o slug do provedor ao lado.
+   *
+   * Existe para a tela de login poder PERGUNTAR em qual provedor entrar: uma
+   * lista de ids não é escolha que alguém consiga fazer, e buscar o nome de
+   * cada um numa consulta por vínculo seria o laço que este `join` evita.
+   *
+   * Sem filtro por `status`: provedor suspenso continua na lista, e de
+   * propósito — quem trabalha só nele entra e encontra o portão da assinatura,
+   * que é a tela que explica o que houve. Esconder o destino trocaria essa
+   * explicação por um 401 mentiroso.
+   */
+  static async listForUserWithTenant(userId) {
+    return getDb()('tenant_users')
+      .join('tenants', 'tenants.id', 'tenant_users.tenant_id')
+      .where('tenant_users.user_id', userId)
+      .orderBy('tenant_users.id', 'asc')
+      .select(
+        'tenants.id as id',
+        'tenants.name as name',
+        'tenants.slug as slug',
+        'tenants.status as status',
+        'tenant_users.role as role'
+      );
+  }
+
+  /**
    * This person's membership at this provider, or null.
    *
    * The authorisation primitive: null here means the person does not work for

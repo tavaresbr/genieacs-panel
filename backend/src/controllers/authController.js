@@ -158,6 +158,53 @@ async function holdsControlPlane(userId) {
 }
 
 /**
+ * Para onde esta pessoa pode entrar, quando o endereço não decide.
+ *
+ * Num deploy com subdomínio por provedor o host responde isto sozinho, e nada
+ * aqui roda. Sem domínio-base — todos os provedores no mesmo endereço, a
+ * separação vindo do login — a pergunta é legítima e pode ter mais de uma
+ * resposta: os provedores em que a pessoa trabalha, mais o console se ela
+ * opera a plataforma.
+ *
+ * Quem tem um destino só não é perguntado. Quem tem vários era mandado, em
+ * silêncio, para o vínculo mais antigo — o que é uma regra defensável e uma
+ * escolha invisível, e invisível é o problema: um consultor que atende dois
+ * ISPs não tinha como pedir o outro.
+ */
+async function destinosDoLogin(user) {
+  const tenants = await TenantUser.listForUserWithTenant(user.id);
+  const console = IS_SAAS && (await PlatformAdmin.has(user.id));
+  return { tenants, console, total: tenants.length + (console ? 1 : 0) };
+}
+
+/** A resposta de quem entrou no console: sem provedor e sem papel, como a sessão. */
+function respostaDoConsole(req, res, user) {
+  const consoleTokens = generateConsoleTokens(user);
+  // Sem `marcarAtividade`: aquilo marca atividade DE UM PROVEDOR, e esta
+  // sessão não tem um.
+  return res.json(
+    createResponse(req.t('auth.loginSuccess'), {
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email ?? null,
+        emailVerified: Boolean(user.email_verified_at),
+        // Sem papel e sem provedor, como a sessão. `platform: true` para a tela
+        // não ter que deduzir isso de um `tenantId` nulo.
+        role: null,
+        tenantId: null,
+        platform: true,
+        isPlatformAdmin: true,
+        createdAt: user.created_at,
+        updatedAt: user.updated_at
+      },
+      token: consoleTokens.accessToken,
+      refreshToken: consoleTokens.refreshToken
+    })
+  );
+}
+
+/**
  * O que um provedor novo precisa para existir: nome, subdomínio, e a conta de
  * quem vai administrá-lo. Reunido aqui porque é a única rota que cria as
  * QUATRO coisas de uma vez — provedor, seed, pessoa e vínculo — e as quatro
@@ -408,7 +455,7 @@ class AuthController {
 
   static async login(req, res) {
     try {
-      const { username, password, tenantId } = req.body;
+      const { username, password, tenantId, destination } = req.body;
 
       if (!username || !password) {
         return res.status(400).json(
@@ -473,29 +520,66 @@ class AuthController {
             createErrorResponse(req.t('auth.invalidCredentials'))
           );
         }
-        const consoleTokens = generateConsoleTokens(user);
-        // Sem `marcarAtividade`: aquilo marca atividade DE UM PROVEDOR, e esta
-        // sessão não tem um.
-        return res.json(
-          createResponse(req.t('auth.loginSuccess'), {
-            user: {
-              id: user.id,
-              username: user.username,
-              email: user.email ?? null,
-              emailVerified: Boolean(user.email_verified_at),
-              // Sem papel e sem provedor, como a sessão. `platform: true` para
-              // a tela não ter que deduzir isso de um `tenantId` nulo.
-              role: null,
-              tenantId: null,
-              platform: true,
-              isPlatformAdmin: true,
-              createdAt: user.created_at,
-              updatedAt: user.updated_at
-            },
-            token: consoleTokens.accessToken,
-            refreshToken: consoleTokens.refreshToken
-          })
-        );
+        return respostaDoConsole(req, res, user);
+      }
+
+      // O console PEDIDO, num deploy que não tem endereço de plataforma.
+      //
+      // Onde há domínio-base o console tem porta própria e é ela que decide —
+      // por isso `usesTenantSubdomains()` aqui: aceitar o pedido lá abriria, no
+      // host de um provedor, a sessão que `tokenMatchesHost` recusa um instante
+      // depois. A recusa é a de sempre, idêntica à de senha errada, porque
+      // distinguir diria quem está no cadastro da plataforma.
+      if (destination === 'console' && !usesTenantSubdomains()) {
+        if (!IS_SAAS || !canHoldSession(user) || !(await PlatformAdmin.has(user.id))) {
+          return res.status(401).json(
+            createErrorResponse(req.t('auth.invalidCredentials'))
+          );
+        }
+        return respostaDoConsole(req, res, user);
+      }
+
+      // Com mais de um PROVEDOR e ninguém nomeado, PERGUNTA.
+      //
+      // A pergunta é sobre ambiguidade de verdade — a pessoa trabalha em dois
+      // ISPs e o endereço não diz qual —, e só isso. O console NÃO provoca a
+      // pergunta, embora vá na lista quando ela acontece: quem opera a
+      // plataforma quase sempre também trabalha num provedor, e fazer disso um
+      // seletor em todo login poria uma escolha na frente de quem só quer o
+      // painel de sempre. Para o console há o caminho explícito acima, que a
+      // tela oferece ao lado do formulário.
+      //
+      // Depois do `bcrypt`, nunca antes: quem erra a senha recebe o 401 de
+      // sempre, sem lista. Quem acerta já poderia entrar em cada um desses
+      // provedores, então nomeá-los não entrega nada que a senha já não
+      // entregasse. `409` e não `200` para que um cliente antigo, que só sabe
+      // ler `token`, falhe em vez de seguir achando que entrou.
+      const nomeado = req.hostTenantId ?? tenantId;
+      if (nomeado === undefined || nomeado === null || nomeado === '') {
+        const destinos = await destinosDoLogin(user);
+        if (destinos.tenants.length > 1) {
+          // Os destinos no TOPO do corpo, e não dentro de `data`: o cliente de
+          // API encaminha campo nomeado num erro e descarta o `data` inteiro —
+          // é o mesmo desenho do 409 de valor curto e do 402 de limite de
+          // plano. O `code` é o que a tela liga ao segundo passo, sem depender
+          // da frase traduzida.
+          return res.status(409).json({
+            ...createErrorResponse(req.t('auth.chooseDestination')),
+            code: 'choose_destination',
+            destinations: {
+              tenants: destinos.tenants.map((d) => ({
+                id: Number(d.id), name: d.name, slug: d.slug, status: d.status
+              })),
+              console: destinos.console
+            }
+          });
+        }
+        // Quem só tem o console — opera a plataforma e não trabalha em provedor
+        // nenhum — entra nele sem ser perguntado: é o único destino que existe,
+        // e a alternativa seria o 401 de "trabalha para ninguém".
+        if (destinos.tenants.length === 0 && destinos.console) {
+          return respostaDoConsole(req, res, user);
+        }
       }
 
       // The host wins over the body. Where providers have subdomains, the
@@ -504,10 +588,7 @@ class AuthController {
       // one ISP mints a session for another — refused a moment later by the
       // host check in `authenticateToken`, but only after confirming to the
       // caller that the credentials are good for SOMEBODY.
-      const membership = await membershipForLogin(
-        user.id,
-        req.hostTenantId ?? tenantId
-      );
+      const membership = await membershipForLogin(user.id, nomeado);
 
       // Somebody who works for nobody cannot sign in — there is no provider to
       // put the session in, and a session with no provider is the unscoped read

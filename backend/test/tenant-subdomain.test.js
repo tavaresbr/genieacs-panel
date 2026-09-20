@@ -433,12 +433,22 @@ describe('the provider a login screen sees', () => {
    * is the shape of parameter that becomes an IDOR the day a route trusts it
    * over the host. `status`, `created_at` and any future column are the same
    * argument with a different name on it.
+   *
+   * `shared` entrou com justificativa, que é o que esta linha cobra: ele não
+   * diz nada SOBRE ESTE PROVEDOR — diz que o deploy põe todos os provedores no
+   * mesmo endereço, que é fato do deploy, da mesma família de `edition` e
+   * `panelBaseDomain`, e que a tela precisa para não vestir a marca de um ISP
+   * na porta de todos. Aqui, com domínio-base, ele é sempre `false`.
    */
   it('returns the public fields and nothing else', async () => {
     const { body } = await callAs(
       'alfa.painel.exemplo.com', `${panelUrl}/api/tenant/public`
     );
-    assert.deepEqual(Object.keys(body.data).sort(), ['edition', 'name', 'panelBaseDomain', 'slug']);
+    assert.deepEqual(
+      Object.keys(body.data).sort(),
+      ['edition', 'name', 'panelBaseDomain', 'shared', 'slug']
+    );
+    assert.equal(body.data.shared, false);
     assert.deepEqual(Object.keys(body).sort(), ['data', 'message', 'success']);
   });
 

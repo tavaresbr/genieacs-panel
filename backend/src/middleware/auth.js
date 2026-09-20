@@ -8,7 +8,7 @@ import Tenant from '../models/Tenant.js';
 import { runInTenant, runUnscoped } from '../config/tenantContext.js';
 import { roleHas } from '../config/permissions.js';
 import { subscriptionRefusal } from './subscriptionGate.js';
-import { hostMatchesTenant } from './tenantResolver.js';
+import { hostMatchesTenant, usesTenantSubdomains } from './tenantResolver.js';
 import { canHoldSession } from '../config/login.js';
 
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
@@ -526,7 +526,12 @@ async function authenticateToken(req, res, next) {
  */
 function tokenMatchesHost(req, session) {
   if (req.platformHost) return Boolean(session.platform);
-  if (session.platform) return false;
+  // Sessão de console fora do endereço da plataforma: recusada onde esse
+  // endereço EXISTE. Num deploy sem domínio-base não existe host de plataforma
+  // nenhum — o console divide o único endereço com os painéis, exatamente como
+  // `platformHostOnly` já reconhece ao virar no-op ali. As duas guardas leem a
+  // mesma função para não poderem discordar.
+  if (session.platform) return !usesTenantSubdomains();
   return hostMatchesTenant(req, session.tenantId);
 }
 

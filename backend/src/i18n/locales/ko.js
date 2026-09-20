@@ -25,6 +25,7 @@ export default {
   'auth.credentialsRequired': '사용자 이름과 비밀번호가 필요합니다',
   'auth.invalidCredentials': '사용자 이름 또는 비밀번호가 올바르지 않습니다',
   'auth.loginSuccess': '로그인했습니다',
+  'auth.chooseDestination': '로그인할 곳을 선택하세요',
   'auth.logoutSuccess': '로그아웃했습니다',
   'auth.setupStatusRetrieved': '초기 설정 상태를 조회했습니다',
   'auth.setupStatusFailed': '초기 설정 상태를 조회하지 못했습니다',

@@ -25,6 +25,7 @@ export default {
   'auth.credentialsRequired': '需要填寫使用者名稱與密碼',
   'auth.invalidCredentials': '使用者名稱或密碼無效',
   'auth.loginSuccess': '登入成功',
+  'auth.chooseDestination': '請選擇登入位置',
   'auth.logoutSuccess': '已登出',
   'auth.setupStatusRetrieved': '已取得設定狀態',
   'auth.setupStatusFailed': '無法取得設定狀態',

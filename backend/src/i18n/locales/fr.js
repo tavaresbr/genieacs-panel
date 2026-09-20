@@ -25,6 +25,7 @@ export default {
   'auth.credentialsRequired': 'Le nom d’utilisateur et le mot de passe sont requis',
   'auth.invalidCredentials': 'Nom d’utilisateur ou mot de passe invalide',
   'auth.loginSuccess': 'Connexion réussie',
+  'auth.chooseDestination': 'Choisissez où vous connecter',
   'auth.logoutSuccess': 'Déconnexion réussie',
   'auth.setupStatusRetrieved': 'État de la configuration récupéré',
   'auth.setupStatusFailed': 'Impossible d’obtenir l’état de la configuration',

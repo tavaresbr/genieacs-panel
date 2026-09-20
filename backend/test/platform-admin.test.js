@@ -459,11 +459,27 @@ describe('the grant script', () => {
       assert.deepEqual(await getDb()('tenant_users').where({ user_id: user.id }), []);
     });
 
-    // Sem vínculo, o login de um host de provedor não tem provedor em que a
-    // pôr — e recusa com o mesmo 401 de senha errada, como sempre fez.
-    it('e essa conta não entra no painel de provedor nenhum', async () => {
-      const { status } = await signIn({ username: NOVA.username, password: 'senha-da-plataforma-1' });
-      assert.equal(status, 401);
+    /**
+     * Sem vínculo, não há painel de provedor em que pôr esta sessão — e é isso
+     * que o modo `--create` quer: a conta-raiz não é membro de ISP nenhum.
+     *
+     * O que ela recebe aqui é a sessão de CONSOLE. Num deploy sem domínio-base
+     * este é o único endereço que existe, e antes esta conta simplesmente não
+     * entrava em lugar nenhum: o console só era cunhado sob `req.platformHost`,
+     * que é falso quando não há host de plataforma. O runbook mandava criar a
+     * conta pelo script e entrar com ela, e nesse arranjo isso não acontecia.
+     *
+     * A sessão não nomeia provedor e não tem papel — é o que `tdb()` precisa
+     * para estourar alto se um controlador do console esquecer o escopo.
+     */
+    it('e essa conta entra no console, que é o único lugar dela', async () => {
+      const { status, body } = await signIn({
+        username: NOVA.username, password: 'senha-da-plataforma-1'
+      });
+      assert.equal(status, 200, JSON.stringify(body));
+      assert.equal(body.data.user.tenantId, null);
+      assert.equal(body.data.user.role, null);
+      assert.equal(body.data.user.platform, true);
     });
 
     it('recusa um nome que já existe, e não escreve nada', async () => {

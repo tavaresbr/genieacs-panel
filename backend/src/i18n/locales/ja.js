@@ -25,6 +25,7 @@ export default {
   'auth.credentialsRequired': 'ユーザー名とパスワードが必要です',
   'auth.invalidCredentials': 'ユーザー名またはパスワードが無効です',
   'auth.loginSuccess': 'ログインしました',
+  'auth.chooseDestination': 'サインイン先を選択してください',
   'auth.logoutSuccess': 'ログアウトしました',
   'auth.setupStatusRetrieved': 'セットアップの状態を取得しました',
   'auth.setupStatusFailed': 'セットアップの状態を取得できませんでした',

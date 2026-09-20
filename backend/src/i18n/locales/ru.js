@@ -25,6 +25,7 @@ export default {
   'auth.credentialsRequired': 'Требуются имя пользователя и пароль',
   'auth.invalidCredentials': 'Неверное имя пользователя или пароль',
   'auth.loginSuccess': 'Вход выполнен',
+  'auth.chooseDestination': 'Выберите, куда войти',
   'auth.logoutSuccess': 'Выход выполнен',
   'auth.setupStatusRetrieved': 'Состояние первоначальной настройки получено',
   'auth.setupStatusFailed': 'Не удалось получить состояние первоначальной настройки',

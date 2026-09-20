@@ -159,6 +159,18 @@ class Tenant {
     return getDb()('tenants').orderBy('id', 'asc');
   }
 
+  /**
+   * Quantos provedores existem.
+   *
+   * Um `COUNT` e não um `list().length`: quem pergunta é o perfil público — a
+   * tela de login, a rota mais batida do deploy —, e ali a resposta é "um ou
+   * mais de um", não a lista.
+   */
+  static async count() {
+    const row = await getDb()('tenants').count({ total: '*' }).first();
+    return Number(row?.total ?? 0);
+  }
+
   static async findById(id) {
     return (await getDb()('tenants').where({ id }).first()) || null;
   }

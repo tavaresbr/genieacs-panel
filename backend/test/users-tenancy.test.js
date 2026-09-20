@@ -385,7 +385,13 @@ describe('a person who works for two providers', () => {
     assert.equal(status, 409);
     assert.equal((await personOf(carolId)).password, before.password);
 
-    const login = await call(`${panelUrl}/api/auth/login`, { method: 'POST', body: CAROL });
+    // O provedor vai nomeado porque Carol trabalha em dois, e num deploy sem
+    // domínio-base o login PERGUNTA em vez de escolher por ela. O que esta
+    // prova mede é a senha dela continuar sendo a dela — não a ambiguidade,
+    // que tem arquivo próprio.
+    const login = await call(`${panelUrl}/api/auth/login`, {
+      method: 'POST', body: { ...CAROL, tenantId: alfa }
+    });
     assert.equal(login.status, 200, 'she can still sign in with the password she chose');
   });
 

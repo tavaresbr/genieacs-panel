@@ -22,6 +22,7 @@ export default {
   'auth.credentialsRequired': 'El usuario y la contraseña son obligatorios',
   'auth.invalidCredentials': 'Usuario o contraseña inválidos',
   'auth.loginSuccess': 'Sesión iniciada correctamente',
+  'auth.chooseDestination': 'Elige dónde iniciar sesión',
   'auth.logoutSuccess': 'Sesión cerrada correctamente',
   'auth.setupStatusRetrieved': 'Estado de la configuración inicial obtenido',
   'auth.setupStatusFailed': 'No se pudo obtener el estado de la configuración inicial',
