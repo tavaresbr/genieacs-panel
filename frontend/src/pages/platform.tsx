@@ -5,6 +5,7 @@ import { platformAPI, type Plan, type PlatformBox, type Tenant } from '@/lib/api
 import { PlanCatalog } from '@/components/platform/plan-catalog'
 import { PlatformBoxCard } from '@/components/platform/platform-box'
 import { DeploymentHealth } from '@/components/platform/deployment-health'
+import { DefaultCatalogueTab } from '@/components/platform/default-catalogue'
 import { PlatformAdmins } from '@/components/platform/platform-admins'
 import { PlatformAudit } from '@/components/platform/platform-audit'
 import { TenantData } from '@/components/platform/tenant-data'
@@ -44,7 +45,7 @@ export default function PlatformPage() {
    * lado de quem os assina. Provedores é o padrão: é o que se abre para fazer
    * alguma coisa; as outras três são consulta ou manutenção rara.
    */
-  const [aba, setAba] = useState<'tenants' | 'plans' | 'admins' | 'audit' | 'deployment'>('tenants')
+  const [aba, setAba] = useState<'tenants' | 'plans' | 'admins' | 'audit' | 'deployment' | 'catalogue'>('tenants')
 
   const loadTenants = useCallback(async () => {
     const plansRes = await platformAPI.listPlans()
@@ -253,10 +254,12 @@ export default function PlatformPage() {
             ['plans', 'platform.tabs.plans'],
             ['admins', 'platform.tabs.admins'],
             ['audit', 'platform.tabs.audit'],
-            // Por último porque é a de consulta mais rara das cinco: não se
-            // abre o console para olhar variável de ambiente, abre-se quando
-            // alguma coisa não chegou e ninguém sabe por quê.
-            ['deployment', 'platform.tabs.deployment']
+            // As duas últimas são as de consulta mais rara: não se abre o
+            // console para olhar variável de ambiente nem catálogo de
+            // fabricante, abre-se quando alguma coisa não chegou ou um
+            // provedor não está reconhecendo os aparelhos dele.
+            ['deployment', 'platform.tabs.deployment'],
+            ['catalogue', 'platform.tabs.catalogue']
           ] as const).map(([chave, rotulo]) => (
             <button
               key={chave}
@@ -274,6 +277,7 @@ export default function PlatformPage() {
         {aba === 'admins' && <PlatformAdmins />}
         {aba === 'audit' && <PlatformAudit />}
         {aba === 'deployment' && <DeploymentHealth />}
+        {aba === 'catalogue' && <DefaultCatalogueTab />}
 
         {aba === 'tenants' && <PlatformBoxCard box={platformBox} />}
 

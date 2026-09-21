@@ -114,7 +114,7 @@ const CATALOGUE_TABLES = ['vendors', 'wifi_security_mappings', 'wifi_security_co
  * Grouped rather than counted per provider, so this stays three queries at
  * every boot however many providers the deployment grows to.
  */
-async function catalogueSizes(db) {
+export async function catalogueSizes(db) {
   const sizes = new Map();
   for (const table of CATALOGUE_TABLES) {
     const rows = await db(table).select('tenant_id').count({ n: '*' }).groupBy('tenant_id');
@@ -126,31 +126,6 @@ async function catalogueSizes(db) {
   return sizes;
 }
 
-/**
- * Gives a provider with no equipment catalogue a copy of one that has it.
- *
- * 0026 made `vendors`, `wifi_security_mappings` and `wifi_security_config`
- * per-provider, and nothing seeds them: the catalogue is built by the operator
- * through `/api/vendor-management`. So the provider created after that step
- * starts empty, and empty is the worst possible failure here because it is
- * silent — detection matches no vendor, the WiFi write finds no parameter path
- * and falls back to guessing, and the panel merely looks wrong.
- *
- * WHAT IT COPIES FROM: the lowest-numbered provider that has a catalogue. That
- * is the installation's own — the one 0026 stamped every pre-existing row onto,
- * so it holds the catalogue this deployment has actually been running against,
- * corrections included. Ordering by id makes the choice the same at every boot
- * and on all three engines; "has a catalogue" rather than "is the first
- * provider" is what keeps this working on a deployment whose first provider was
- * removed or was itself created empty. When nobody has one there is nothing to
- * copy and nothing to do, which is the state of a brand-new install.
- *
- * The copy runs only for a provider whose three tables are ALL empty. Deleting
- * a vendor is an edit like any other, so anything left standing means an
- * operator has been here and the catalogue is theirs; that is also what makes
- * this safe at every boot, since the second boot finds the rows it wrote the
- * first time.
- */
 /**
  * Todo provedor tem uma assinatura, e quem nasce depois da migração 0035 nasce
  * em teste.
@@ -234,21 +209,93 @@ async function seedSubscriptions(db, tenants) {
 /** Quantos dias de teste um provedor novo ganha quando nenhum plano diz. */
 const DEFAULT_TRIAL_DAYS = 14;
 
-async function seedVendorCatalogue(db, tenants) {
-  const sizes = await catalogueSizes(db);
-  const has = (tenant) => (sizes.get(Number(tenant.id)) || 0) > 0;
+/**
+ * De QUEM o provedor novo herda o catálogo, e por quê.
+ *
+ * Exportada porque o console mostra esta mesma resposta na aba Catálogo padrão.
+ * Duas leituras da mesma regra que discordam é o defeito que só aparece no dia
+ * do boot, longe da tela que prometeu outra coisa.
+ *
+ * **A caixa da plataforma ganha, quando tem catálogo.** É o que faz o catálogo
+ * padrão ser uma decisão de quem opera o deploy. Antes disto a fonte era o
+ * provedor de MENOR ID que tivesse um — o que fazia do primeiro ISP a
+ * referência de todos os próximos sem ninguém ter decidido isso, e ele edita
+ * ou apaga o dele à vontade, porque é dele.
+ *
+ * **Sem caixa, a regra antiga, intacta:** o provedor de menor id que tenha
+ * catálogo. É o que mantém funcionando todo install self-hosted e todo deploy
+ * hospedado que nunca rodou `scripts/create-platform-tenant.js` — ali não há
+ * plataforma nenhuma para decidir, e a instalação é a única referência que
+ * existe. Ordenar por id mantém a escolha igual em todo boot e nos três
+ * dialetos; "tem catálogo" em vez de "é o primeiro provedor" é o que a mantém
+ * funcionando num deploy cujo primeiro provedor foi removido.
+ *
+ * Lê a caixa do `db` RECEBIDO e não por `Tenant.platform()`, que usa `getDb()`:
+ * este arquivo roda também contra o banco de DESTINO de uma troca, onde
+ * `getDb()` ainda é a origem. É a mesma razão de todo o resto daqui ler pelo
+ * parâmetro.
+ */
+export async function catalogueSource(db, sizes = null) {
+  const tamanhos = sizes ?? await catalogueSizes(db);
+  const tem = (id) => (tamanhos.get(Number(id)) || 0) > 0;
+
+  // `orderBy` pelo mesmo motivo que o recuo abaixo o tem: o script de criação é
+  // idempotente e só faz uma caixa, mas um `first()` sem ordem escolhe o que o
+  // dialeto quiser se um dia houver duas — e a escolha mudaria entre boots.
+  const caixa = await db('tenants').where({ kind: 'platform' }).orderBy('id', 'asc').first();
+  if (caixa && tem(caixa.id)) return { id: Number(caixa.id), kind: 'platform' };
 
   // A fonte é qualquer provedor da instalação que já tenha catálogo — não
   // necessariamente um dos que estão sendo semeados. Quando a lista é só o
   // provedor recém-nascido, a fonte está fora dela por definição.
-  const sourceId = [...sizes.entries()]
+  const sourceId = [...tamanhos.entries()]
     .filter(([, size]) => size > 0)
     .map(([id]) => id)
     .sort((a, b) => a - b)[0];
-  if (sourceId === undefined) return;
+  if (sourceId === undefined) return { id: null, kind: 'none' };
+  return { id: sourceId, kind: 'provider' };
+}
+
+/**
+ * Gives a provider with no equipment catalogue a copy of one that has it.
+ *
+ * 0026 made `vendors`, `wifi_security_mappings` and `wifi_security_config`
+ * per-provider, and nothing seeds them: the catalogue is built by the operator
+ * through `/api/vendor-management`. So the provider created after that step
+ * starts empty, and empty is the worst possible failure here because it is
+ * silent — detection matches no vendor, the WiFi write finds no parameter path
+ * and falls back to guessing, and the panel merely looks wrong.
+ *
+ * DE ONDE ELE COPIA: `catalogueSource`, logo acima, e o porquê está lá.
+ *
+ * The copy runs only for a provider whose three tables are ALL empty. Deleting
+ * a vendor is an edit like any other, so anything left standing means an
+ * operator has been here and the catalogue is theirs; that is also what makes
+ * this safe at every boot, since the second boot finds the rows it wrote the
+ * first time.
+ *
+ * "Vazio" é a SOMA das três tabelas e não tabela a tabela (`catalogueSizes`).
+ * A consequência aparece na fonte: uma caixa de plataforma com zero fabricantes
+ * e uma linha sobrando em `wifi_security_config` ainda conta como "tem
+ * catálogo", e os provedores novos nascem então sem fabricante nenhum. É a
+ * mesma regra de sempre, e desfazê-la seria restaurar o que um operador apagou
+ * de propósito; o que ela precisa é APARECER, e aparece na aba Catálogo padrão
+ * do console.
+ */
+async function seedVendorCatalogue(db, tenants) {
+  const sizes = await catalogueSizes(db);
+  const has = (tenant) => (sizes.get(Number(tenant.id)) || 0) > 0;
+
+  const { id: sourceId } = await catalogueSource(db, sizes);
+  if (sourceId === null) return;
 
   for (const tenant of tenants) {
     if (has(tenant)) continue;
+    // A CAIXA também recebe, enquanto estiver vazia, e é de propósito: é assim
+    // que ela nasce com o catálogo que o deploy já roda, sem ninguém redigitar
+    // nada. É o único momento em que o primeiro ISP ainda é a referência —
+    // uma vez, no dia em que a caixa é criada. Depois disso a fonte é ela, e
+    // este laço nunca mais a visita, porque ela deixou de estar vazia.
     await copyCatalogue(db, sourceId, tenant.id);
   }
 }

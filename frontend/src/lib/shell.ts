@@ -123,3 +123,29 @@ export function needsGenieAcsOnboarding(
   if (kind === 'platform') return false
   return String(genieAcsUrl ?? '').trim() === ''
 }
+
+/**
+ * O endereço de uma tela DENTRO do painel da caixa da plataforma, ou `null`.
+ *
+ * `null` não é falha: num deploy de host único não há subdomínio por provedor,
+ * e ali se chega à caixa pelo seletor de destino do login — o mesmo caminho de
+ * qualquer provedor. As telas que chamam isto mostram a instrução em vez de um
+ * link, e é por isso que a ausência precisa ser um valor e não uma exceção.
+ *
+ * Existe como função porque duas telas do console precisam do mesmo endereço
+ * com caminhos diferentes — a caixa de WhatsApp e o catálogo padrão. Montar a
+ * string na mão nas duas é como a segunda fica sem a barra, ou com duas.
+ */
+export function platformBoxUrl(
+  { slug, panelBaseDomain, path }: {
+    slug: string | null | undefined
+    panelBaseDomain: string | null | undefined
+    path: string
+  }
+): string | null {
+  const nome = String(slug ?? '').trim()
+  const base = String(panelBaseDomain ?? '').trim()
+  if (!nome || !base) return null
+  const caminho = path.startsWith('/') ? path : `/${path}`
+  return `https://${nome}.${base}${caminho}`
+}

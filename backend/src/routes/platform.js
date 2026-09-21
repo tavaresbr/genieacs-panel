@@ -68,6 +68,12 @@ router.get('/metrics', allowMetricsScraper, PlatformController.metrics);
 // inventário do deploy, e inventário é meio caminho de um reconhecimento.
 router.get('/deployment', authenticateToken, requirePlatformAdmin, PlatformController.deployment);
 
+// De onde o próximo provedor herda o catálogo de equipamentos, e quem hoje não
+// tem nenhum. Só leitura: editar o catálogo padrão é editar o da CAIXA da
+// plataforma, nas telas de Configuração que já existem — a mesma decisão que a
+// Parte 1 tomou para o WhatsApp, e pelo mesmo motivo.
+router.get('/catalogue', authenticateToken, requirePlatformAdmin, PlatformController.catalogue);
+
 // A trilha do plano de controle. Só leitura, como a do provedor e pelo mesmo
 // motivo: se desse para apagar uma linha, a primeira coisa a fazer depois de
 // apagar um provedor seria apagar o registro disso.

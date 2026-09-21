@@ -4,6 +4,7 @@ import type { PlatformBox as PlatformBoxData } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
 import { useTenant } from '@/contexts/tenant-context'
 import { useTranslation } from '@/contexts/language-context'
+import { platformBoxUrl } from '@/lib/shell'
 
 /**
  * A caixa da plataforma, na aba de Provedores e fora da lista deles.
@@ -42,7 +43,7 @@ export function PlatformBoxCard({ box }: { box: PlatformBoxData | null }) {
     )
   }
 
-  const endereco = base ? `https://${box.slug}.${base}/whatsapp` : null
+  const endereco = platformBoxUrl({ slug: box.slug, panelBaseDomain: base, path: '/whatsapp' })
 
   return (
     <section className="modern-card mb-6 p-5 sm:p-6">

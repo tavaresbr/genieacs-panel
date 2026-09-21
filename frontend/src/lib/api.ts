@@ -847,6 +847,28 @@ export interface Tenant {
  * posta, nunca o que ela vale. Endereço não é segredo e vai inteiro — é para
  * onde as pessoas apontam o navegador.
  */
+/** De onde o próximo provedor herda o catálogo de equipamentos, e quem hoje não tem nenhum. */
+export interface DefaultCatalogue {
+  /** `platform` = a caixa manda; `provider` = recuo para a instalação; `none` = não há catálogo nenhum. */
+  source: 'platform' | 'provider' | 'none'
+  sourceTenant: CatalogueTenant | null
+  /** A caixa da plataforma, quando o deploy tem uma. `null` pede o script de criação. */
+  box: CatalogueTenant | null
+  defaults: {
+    rows: number
+    vendors: number
+    vendorNames: Array<{ name: string; enabled: boolean }>
+  }
+  /** Os provedores e quantas linhas de catálogo cada um tem. `rows: 0` é quem nasce cego. */
+  providers: Array<{ id: number; name: string; slug: string; rows: number }>
+}
+
+export interface CatalogueTenant {
+  id: number
+  name: string | null
+  slug: string | null
+}
+
 export interface DeploymentInfo {
   edition: 'saas' | 'selfhosted'
   database: {
@@ -1233,6 +1255,15 @@ export const platformAPI = {
    */
   deployment: () =>
     apiClient.get<DeploymentInfo>('/platform/deployment'),
+
+  /**
+   * O catálogo de equipamentos que um provedor novo herda, e quem está sem um.
+   *
+   * Só leitura: editar o catálogo padrão é editar o da caixa da plataforma, nas
+   * telas de Configuração que já existem.
+   */
+  catalogue: () =>
+    apiClient.get<DefaultCatalogue>('/platform/catalogue'),
 
   /** O cadastro do próprio console: quem tem a chave do plano de controle. */
   listAdmins: () =>
