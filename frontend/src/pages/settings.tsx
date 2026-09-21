@@ -30,7 +30,7 @@ import { LanguageSwitcher } from '@/components/language-switcher'
 import { ProvisioningTab } from '@/components/settings/provisioning-tab'
 import { SgpEventsPanel } from '@/components/settings/sgp-events-panel'
 import { WhatsAppConnection, whatsappErrorMessage } from '@/components/whatsapp-connection'
-import { TEST_TONE_CLASS, testNotes, testPassed } from '@/lib/whatsapp-test'
+import { TEST_TONE_CLASS, testNotes, testOutcome } from '@/lib/whatsapp-test'
 import { useAuth } from '@/contexts/auth-context'
 import { useTenant } from '@/contexts/tenant-context'
 import { useTranslation } from '@/contexts/language-context'
@@ -2132,10 +2132,14 @@ export default function Settings() {
               <div className="mt-4 rounded-md border border-border p-4">
                 <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   <Icon
-                    name={waTestError || !testPassed(waTestResult) ? 'warning' : 'check'}
-                    className={waTestError || !testPassed(waTestResult)
-                      ? 'h-4 w-4 text-[hsl(var(--status-danger))]'
-                      : 'h-4 w-4 text-[hsl(var(--status-success))]'}
+                    name={waTestError || testOutcome(waTestResult) !== 'passed' ? 'warning' : 'check'}
+                    className={
+                      waTestError || testOutcome(waTestResult) === 'failed'
+                        ? 'h-4 w-4 text-[hsl(var(--status-danger))]'
+                        : testOutcome(waTestResult) === 'warned'
+                          ? 'h-4 w-4 text-[hsl(var(--status-warning))]'
+                          : 'h-4 w-4 text-[hsl(var(--status-success))]'
+                    }
                   />
                   {t('settings.whatsapp.test.title')}
                 </p>
@@ -2144,10 +2148,18 @@ export default function Settings() {
                   <p className="mt-2 text-sm text-[hsl(var(--status-danger))]">{waTestError}</p>
                 ) : (
                   <>
+                    {/* Três estados e não dois: "está tudo certo" com um passo
+                        pulado afirma o que este botão existe para não afirmar,
+                        e "há passos que não passaram" sobre uma instância órfã
+                        manda procurar defeito que pode não existir. */}
                     <p className="mt-2 text-sm font-medium">
-                      {testPassed(waTestResult)
-                        ? t('settings.whatsapp.test.allPassed')
-                        : t('settings.whatsapp.test.someFailed')}
+                      {t(
+                        testOutcome(waTestResult) === 'passed'
+                          ? 'settings.whatsapp.test.allPassed'
+                          : testOutcome(waTestResult) === 'warned'
+                            ? 'settings.whatsapp.test.someWarned'
+                            : 'settings.whatsapp.test.someFailed'
+                      )}
                     </p>
                     {/* Uma linha por passo, e não um ✓/✗ único: o valor inteiro
                         deste botão está em dizer QUAL dos seis falhou. */}

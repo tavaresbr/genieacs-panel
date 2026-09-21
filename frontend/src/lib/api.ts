@@ -2092,7 +2092,7 @@ export interface WhatsAppWebhookProbe {
 
 /** Os seis passos do diagnóstico da configuração, na ordem em que a tela os mostra. */
 export type WhatsAppTestStep =
-  | 'config' | 'webhookPath' | 'server' | 'license' | 'adminKey' | 'roundTrip'
+  | 'config' | 'webhookPath' | 'server' | 'license' | 'adminKey' | 'instances' | 'roundTrip'
 
 /**
  * Um passo e o que se apurou dele.

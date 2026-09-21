@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { testNotes, testPassed, toneOf } from '@/lib/whatsapp-test'
+import { testNotes, testOutcome, testPassed, toneOf } from '@/lib/whatsapp-test'
 import type { WhatsAppConfigTest } from '@/lib/api'
 import en from '@/lib/i18n/locales/en'
 import type { TranslationKey, TranslationVars } from '@/lib/i18n/dictionary'
@@ -26,6 +26,7 @@ const TUDO_CERTO = resultado([
   { passo: 'server', veredito: 'ok', detalhe: 'v2' },
   { passo: 'license', veredito: 'ok' },
   { passo: 'adminKey', veredito: 'ok', detalhe: 3 },
+  { passo: 'instances', veredito: 'ok', detalhe: 3 },
   { passo: 'roundTrip', veredito: 'reached' }
 ])
 
@@ -77,9 +78,9 @@ describe('"está tudo certo" é uma afirmação, não um resumo', () => {
 describe('as frases', () => {
   it('cada passo tem nome e frase, e o detalhe entra no texto', () => {
     const notas = testNotes(TUDO_CERTO, t)
-    expect(notas).toHaveLength(6)
+    expect(notas).toHaveLength(7)
     expect(notas.map((n) => n.key)).toEqual(
-      ['config', 'webhookPath', 'server', 'license', 'adminKey', 'roundTrip']
+      ['config', 'webhookPath', 'server', 'license', 'adminKey', 'instances', 'roundTrip']
     )
     for (const nota of notas) {
       expect(nota.label).not.toBe(nota.key)
@@ -135,7 +136,10 @@ describe('as frases', () => {
       { passo: 'roundTrip', veredito: 'unauthorized' },
       { passo: 'roundTrip', veredito: 'blocked' },
       { passo: 'roundTrip', veredito: 'server_error' },
-      { passo: 'roundTrip', veredito: 'unreachable' }
+      { passo: 'roundTrip', veredito: 'unreachable' },
+      { passo: 'instances', veredito: 'orphans', detalhe: 2 },
+      { passo: 'instances', veredito: 'missing', detalhe: 1 },
+      { passo: 'instances', veredito: 'both' }
     ]
     for (const passo of todos) {
       const [nota] = testNotes(resultado([passo]), t)
@@ -143,5 +147,47 @@ describe('as frases', () => {
       expect(nota.text.trim().length).toBeGreaterThan(0)
       expect(nota.text, `${passo.passo}.${passo.veredito}`).not.toContain('{detail}')
     }
+  })
+})
+
+describe('o descompasso entre o painel e o servidor', () => {
+  const comInstancias = (veredito: string, detalhe?: number) => resultado(
+    TUDO_CERTO.passos.map((p) => (p.passo === 'instances' ? { passo: 'instances' as const, veredito, detalhe } : p))
+  )
+
+  it('instância órfã é AVISO, não falha', () => {
+    // O servidor pode legitimamente hospedar instância de outro sistema, e o
+    // painel não quebra por causa dela. Pintar de vermelho mandaria o operador
+    // consertar o que talvez esteja certo.
+    expect(toneOf('instances', 'orphans')).toBe('warn')
+    expect(testOutcome(comInstancias('orphans', 2))).toBe('warned')
+  })
+
+  it('número do painel sem instância no servidor é FALHA', () => {
+    // O painel mostra o número como conectado e ele não envia nem recebe nada.
+    // É o oposto da órfã: aqui alguém está contando com uma coisa que não
+    // existe.
+    expect(toneOf('instances', 'missing')).toBe('alarm')
+    expect(testOutcome(comInstancias('missing', 1))).toBe('failed')
+  })
+
+  it('e os dois ao mesmo tempo contam como falha', () => {
+    expect(toneOf('instances', 'both')).toBe('alarm')
+    expect(testOutcome(comInstancias('both'))).toBe('failed')
+  })
+
+  it('o resumo tem três estados, não dois', () => {
+    // Dois mentiriam nas duas pontas: "está tudo certo" com um passo pulado
+    // afirma o que o botão existe para não afirmar, e "há passos que não
+    // passaram" sobre uma órfã manda procurar defeito que pode não existir.
+    expect(testOutcome(TUDO_CERTO)).toBe('passed')
+    expect(testOutcome(comInstancias('skipped'))).toBe('warned')
+    expect(testPassed(comInstancias('orphans', 2))).toBe(false)
+  })
+
+  it('e a frase da órfã explica o webhook antigo, que é a consequência real', () => {
+    const [nota] = testNotes(resultado([{ passo: 'instances', veredito: 'orphans', detalhe: 2 }]), t)
+    expect(nota.text).toContain('2')
+    expect(nota.text.toLowerCase()).toContain('webhook')
   })
 })
