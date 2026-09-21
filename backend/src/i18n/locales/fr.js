@@ -452,6 +452,8 @@ export default {
   'whatsapp.webhookChecked': 'Webhook vérifié sur le serveur',
   'whatsapp.webhookReapplied': 'Webhook réécrit sur le serveur',
   'whatsapp.webhookProbed': 'Aller-retour du webhook vérifié',
+  "whatsapp.configTested": "Diagnostic de l'intégration exécuté",
+  "whatsapp.configTestFailed": "Impossible d'exécuter le diagnostic de l'intégration",
   'whatsapp.numbersChecked': 'Numéros vérifiés sur WhatsApp',
   'whatsapp.messageQueued': 'Message mis en file d’attente pour envoi',
   'whatsapp.messageSendFailed': 'Le message n’a pas pu être mis en file d’attente',

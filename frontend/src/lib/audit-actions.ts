@@ -46,7 +46,8 @@ export const AUDIT_ACTION_LABEL_KEYS: Record<string, TranslationKey> = {
   'password_reset.requested': 'audit.action.passwordResetRequested',
   'password_reset.completed': 'audit.action.passwordResetCompleted',
   'platform.impersonated': 'audit.action.platformImpersonated',
-  'subscriber_account.retired': 'audit.action.subscriberAccountRetired'
+  'subscriber_account.retired': 'audit.action.subscriberAccountRetired',
+  'whatsapp.config_tested': 'audit.action.whatsappConfigTested'
 }
 
 /** A chave da frase, ou `null` para a ação que este frontend não conhece. */

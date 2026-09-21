@@ -33,6 +33,13 @@ class AuditLog {
     INVITE_ACCEPTED: 'invite.accepted',
     INVITE_REVOKED: 'invite.revoked',
     TENANT_STATUS_CHANGED: 'tenant.status_changed',
+    // O operador rodou o diagnóstico da integração de WhatsApp. Fica na trilha
+    // porque ele faz o painel emitir requisições de saída para endereços que
+    // quem administra escolheu — inclusive contra a própria URL pública —, e é
+    // a única ação dessa família alcançável com zero números conectados, isto é,
+    // a mais fácil de disparar. O `detail` guarda o veredito de cada passo e o
+    // endereço do webhook já redigido; nunca a chave admin nem token nenhum.
+    WHATSAPP_CONFIG_TESTED: 'whatsapp.config_tested',
     // A conta de portal do assinante ANTERIOR de uma ONT foi encerrada, porque
     // o aparelho passou a reportar outro login PPPoE. É destrutivo — o Customer
     // ID muda, a senha do portal é recunhada e o vínculo com o ERP é apagado —

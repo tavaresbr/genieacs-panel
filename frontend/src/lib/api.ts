@@ -2090,6 +2090,29 @@ export interface WhatsAppWebhookProbe {
   status: number | null
 }
 
+/** Os seis passos do diagnóstico da configuração, na ordem em que a tela os mostra. */
+export type WhatsAppTestStep =
+  | 'config' | 'webhookPath' | 'server' | 'license' | 'adminKey' | 'roundTrip'
+
+/**
+ * Um passo e o que se apurou dele.
+ *
+ * `veredito` é aberto de propósito: o backend pode ganhar um veredito novo
+ * antes deste frontend, e a tela tem que mostrar alguma coisa em vez de sumir
+ * com a linha. `skipped` quer dizer "não dá para dizer" — um passo que dependia
+ * de outro que não passou —, e nunca ✗.
+ */
+export interface WhatsAppTestStepResult {
+  passo: WhatsAppTestStep
+  veredito: string
+  /** O sabor do servidor, a URL do manager, a contagem de instâncias: varia por passo. */
+  detalhe?: string | number | null
+}
+
+export interface WhatsAppConfigTest {
+  passos: WhatsAppTestStepResult[]
+}
+
 export interface WhatsAppWebhookCheck {
   account: WhatsAppAccount
   verdict: WhatsAppWebhookVerdict | null
@@ -2286,6 +2309,16 @@ export const whatsappAPI = {
   // never returns it either way.
   updateConfig: (config: Partial<Omit<WhatsAppConfig, 'allowedHosts'>> & { allowedHosts?: string | string[]; managedAdminKey?: string }) =>
     apiClient.put<WhatsAppConfig>('/whatsapp/config', config),
+
+  /**
+   * O diagnóstico da configuração, que roda com zero números conectados.
+   *
+   * Sem corpo: ele testa o que está SALVO, não o que está digitado na tela. A
+   * chave admin nunca volta ao navegador, então mandar o formulário aqui
+   * testaria uma configuração sem chave — que é o oposto de um diagnóstico.
+   */
+  testConfig: () =>
+    apiClient.post<WhatsAppConfigTest>('/whatsapp/test', {}),
 
   // ── Connected numbers ────────────────────────────────────────────────
   listAccounts: () =>

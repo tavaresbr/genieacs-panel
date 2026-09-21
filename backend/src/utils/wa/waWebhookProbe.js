@@ -63,9 +63,21 @@ export function mintNonce() {
   return crypto.randomBytes(16).toString('hex');
 }
 
-/** O corpo da sonda, no mesmo formato que um evento de verdade. */
-export function probeBody(instance, nonce) {
-  return { event: PROBE_EVENT, instance, probe: { nonce } };
+/**
+ * O corpo da sonda, no mesmo formato que um evento de verdade.
+ *
+ * O `ticket` é opcional e existe só para a sonda de CONFIGURAÇÃO, que roda sem
+ * conta nenhuma: sem ele a rota procuraria a instância pelo nome, não acharia,
+ * e responderia 401 — que `probeVerdict` traduz como "o endereço leva a outro
+ * painel". Ver `waProbeTicket.js` para o que esse bilhete autoriza, que é
+ * exatamente uma coisa.
+ *
+ * A sonda POR CONTA continua sem bilhete, de propósito: ela é autenticada pelo
+ * token da própria conta, e é isso que a faz provar as duas coisas de uma vez.
+ */
+export function probeBody(instance, nonce, ticket = null) {
+  const probe = ticket ? { nonce, ticket } : { nonce };
+  return { event: PROBE_EVENT, instance, probe };
 }
 
 /** O nonce que veio no corpo de uma requisição, se houver. */
@@ -76,6 +88,21 @@ export function nonceOfRequest(body) {
   // Limitado no tamanho porque ele volta na resposta: sem teto, o corpo da
   // sonda escolheria o tamanho do que esta rota pública devolve.
   return /^[a-f0-9]{8,64}$/i.test(texto) ? texto : '';
+}
+
+/**
+ * O bilhete que veio no corpo, se houver.
+ *
+ * Mesmo teto de tamanho do nonce e pelo mesmo motivo — este valor é comparado
+ * contra uma assinatura, e `verify` já recusa acima de 256, mas cortar aqui
+ * também mantém a leitura do corpo barata. O alfabeto é o que `sign` produz:
+ * dígitos, um ponto e hexadecimal.
+ */
+export function ticketOfRequest(body) {
+  const probe = body?.probe;
+  const ticket = probe && typeof probe === 'object' ? probe.ticket : null;
+  const texto = String(ticket ?? '');
+  return /^[0-9]{1,15}\.[a-f0-9]{64}$/i.test(texto) ? texto : '';
 }
 
 /**

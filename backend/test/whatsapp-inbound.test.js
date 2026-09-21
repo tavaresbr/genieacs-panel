@@ -10,6 +10,8 @@ const { default: WaMessage } = await import('../src/models/WaMessage.js');
 const { default: WaOptOut } = await import('../src/models/WaOptOut.js');
 const { setMediaFetcher } = await import('../src/services/waMediaService.js');
 const { DATA_DIR } = await import('../src/config/paths.js');
+const { mintNonce } = await import('../src/utils/wa/waWebhookProbe.js');
+const { sign: signProbeTicket, PROBE_TICKET_TTL_MS } = await import('../src/utils/wa/waProbeTicket.js');
 
 const INSTANCE = 'painel-entrada';
 const INSTANCE_TOKEN = 'token-instancia-entrada';
@@ -657,6 +659,101 @@ describe('a sonda do próprio painel', () => {
       body: sonda('x'.repeat(5000))
     });
     assert.equal(body.pong, '');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// A sonda de CONFIGURAÇÃO, que roda com zero números conectados
+//
+// Sem conta não há nome de instância nem token, e a busca pelo nome responde
+// 401 — que `probeVerdict` traduz como "o endereço leva a OUTRO painel". Um
+// diagnóstico afirmando a coisa errada com confiança, justamente no caso em
+// que ele é a única fonte de informação. O bilhete existe para isso, e o que
+// ele autoriza é uma coisa só: devolver o nonce que o chamador mandou.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('a sonda de configuração, pelo bilhete', () => {
+  const NOME_SINTETICO = 'panel-config-test';
+
+  const sondaComBilhete = (nonce, ticket) => ({
+    event: 'panel.probe',
+    instance: NOME_SINTETICO,
+    probe: { nonce, ticket }
+  });
+
+  it('devolve o nonce sem token de instância e sem instância nenhuma', async () => {
+    const nonce = mintNonce();
+    // Sem `?t=` na URL: é o ponto inteiro. E o nome da instância não existe no
+    // banco — se a rota o procurasse antes, isto seria 401.
+    const { status, body } = await call(`${panelUrl}/api/whatsapp-webhook`, {
+      method: 'POST',
+      body: sondaComBilhete(nonce, signProbeTicket(nonce))
+    });
+    assert.equal(status, 200);
+    assert.equal(body.pong, nonce);
+  });
+
+  it('recusa o bilhete cunhado para OUTRO nonce', async () => {
+    // O bilhete assina o nonce. Sem esse laço, um bilhete válido capturado uma
+    // vez daria eco a qualquer valor, e a volta deixaria de ser prova.
+    const nonce = mintNonce();
+    const { status, body } = await call(`${panelUrl}/api/whatsapp-webhook`, {
+      method: 'POST',
+      body: sondaComBilhete(nonce, signProbeTicket(mintNonce()))
+    });
+    assert.equal(status, 401);
+    assert.equal(body.pong, undefined);
+  });
+
+  it('recusa o bilhete vencido', async () => {
+    const nonce = mintNonce();
+    const vencido = signProbeTicket(nonce, Date.now() - PROBE_TICKET_TTL_MS - 1000);
+    const { status } = await call(`${panelUrl}/api/whatsapp-webhook`, {
+      method: 'POST',
+      body: sondaComBilhete(nonce, vencido)
+    });
+    assert.equal(status, 401);
+  });
+
+  it('recusa o bilhete inventado, no formato certo', async () => {
+    // Formato válido e assinatura falsa: é o que um estranho consegue montar
+    // sem a chave do deploy, e é o caso que decide se isto é credencial ou
+    // decoração.
+    const nonce = mintNonce();
+    const forjado = `${Math.floor(Date.now() / 1000) + 60}.${'a'.repeat(64)}`;
+    const { status } = await call(`${panelUrl}/api/whatsapp-webhook`, {
+      method: 'POST',
+      body: sondaComBilhete(nonce, forjado)
+    });
+    assert.equal(status, 401);
+  });
+
+  it('não grava nada, nem abre conversa para o nome sintético', async () => {
+    const antes = await conversas().count({ total: '*' });
+    const nonce = mintNonce();
+    await call(`${panelUrl}/api/whatsapp-webhook`, {
+      method: 'POST',
+      body: sondaComBilhete(nonce, signProbeTicket(nonce))
+    });
+    const depois = await conversas().count({ total: '*' });
+    assert.deepEqual(depois, antes);
+  });
+
+  it('e o bilhete NÃO abre caminho para evento de verdade', async () => {
+    // O que o bilhete autoriza é o eco, e só. Um evento real carregando um
+    // bilhete válido tem que morrer aqui, sem tocar no serviço de entrada —
+    // senão a credencial estreita viraria uma porta larga.
+    const antes = await mensagens().count({ total: '*' });
+    const nonce = mintNonce();
+    const { status, body } = await call(`${panelUrl}/api/whatsapp-webhook`, {
+      method: 'POST',
+      body: {
+        ...eventoV2({ id: 'EVT-COM-BILHETE', remoteJid: '5511999990000@s.whatsapp.net', texto: 'oi' }),
+        probe: { nonce, ticket: signProbeTicket(nonce) }
+      }
+    });
+    assert.equal(status, 200);
+    assert.equal(body.pong, nonce, 'o bilhete devia ter encerrado a requisição no eco');
+    assert.deepEqual(await mensagens().count({ total: '*' }), antes, 'o evento entrou mesmo assim');
   });
 });
 

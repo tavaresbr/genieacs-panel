@@ -4,6 +4,8 @@ import WhatsAppConfigService, { PURPOSES, WaError, randomToken } from './whatsap
 import { EvolutionClient, clientForAccount } from './evolutionClient.js';
 import { safeFetch } from '../utils/wa/ssrfGuard.js';
 import { mintNonce, probeBody, probeVerdict } from '../utils/wa/waWebhookProbe.js';
+import { sign as signProbeTicket } from '../utils/wa/waProbeTicket.js';
+import { WA_WEBHOOK_PATH } from '../config/waWebhookPath.js';
 import {
   checkNumbersRequest,
   connectRequest,
@@ -23,7 +25,10 @@ import {
   findWebhookRequest,
   webhookUrlWithToken,
   webhookVerdict,
-  WEBHOOK_VERDICTS
+  WEBHOOK_VERDICTS,
+  readLicenseBlock,
+  redigirToken,
+  flavorFromProbes
 } from '../utils/wa/evolutionApi.js';
 
 /** How much of a server message is kept in `last_error` / `serverError`. */
@@ -40,6 +45,33 @@ const PROBE_TIMEOUT_MS = 5_000;
 
 /** O que se procura na volta cabe em 32 caracteres; o resto é destino errado. */
 const PROBE_MAX_BYTES = 64 * 1024;
+
+/**
+ * O rótulo que a sonda de CONFIGURAÇÃO leva no lugar do nome da instância.
+ *
+ * Com o bilhete assinado a rota responde antes de procurar o nome, então este
+ * valor não seleciona nada. Ele é explícito — e deliberadamente fora do formato
+ * de `mintName()` — para que ninguém lendo um log do painel ou do proxy confunda
+ * a sonda com uma instância de verdade.
+ */
+const CONFIG_PROBE_INSTANCE = 'panel-config-test';
+
+/**
+ * As duas sondas trazem assinatura de um Evolution?
+ *
+ * `flavorFromProbes` responde 'v2' quando nada é conclusivo, e está certo para
+ * quem vai criar instância: errar para 'v2' contra um GO devolve um 404
+ * legível. Para DIAGNOSTICAR, esse mesmo palpite viraria "é um servidor v2"
+ * sobre um proxy que respondeu 502 — a afirmação mais cara possível, porque
+ * manda o operador conferir a chave admin de um servidor que não existe.
+ */
+function ehEvolution(serverOk, raiz) {
+  const go = serverOk?.ok && serverOk.data && typeof serverOk.data === 'object'
+    && serverOk.data.status === 'ok';
+  const v2 = raiz?.ok && raiz.data && typeof raiz.data === 'object'
+    && typeof raiz.data.version === 'string';
+  return Boolean(go || v2);
+}
 
 /**
  * Ponto de injeção para o teste, como `setMediaFetcher` no serviço de mídia.
@@ -561,6 +593,231 @@ class EvolutionInstanceService {
       webhook_probed_at: new Date()
     });
     return { account: atualizada, verdict, status: resposta.status };
+  }
+
+
+  /**
+   * As seis perguntas que a tela de configuração não sabia responder.
+   *
+   * POR QUE ISTO EXISTE, e por que não bastava o que já havia
+   * ---------------------------------------------------------
+   * A sonda por conta e a leitura do webhook no servidor já existem, já têm
+   * rota e já estão na tela. Só que TODAS são por número conectado — e o
+   * operador que acabou de preencher esta aba tem zero números. Ele configura
+   * servidor, chave admin e webhook, salva, e não tem como saber se acertou até
+   * conseguir parear um número, que é justamente o passo que depende de ter
+   * acertado. A tela mostra "Integração ativa", que diz só que há um registro
+   * no banco.
+   *
+   * O QUE ELA NÃO FAZ, de propósito
+   * -------------------------------
+   * Não escreve nada no servidor Evolution: não cria instância, não reescreve
+   * webhook, não apaga nada. É diagnóstico, e consertar continua sendo editar o
+   * campo e salvar. E roda contra a configuração SALVA, não contra o que está
+   * digitado na tela — a chave admin nunca volta ao navegador, então testar o
+   * digitado exigiria retypá-la a cada clique.
+   *
+   * O QUE ELA PROVA A MENOS que a sonda por conta, e a tela diz
+   * ----------------------------------------------------------
+   * A volta aqui não carrega token de conta nenhuma (não há conta), então ela
+   * prova que o endereço chega a este painel e NÃO que o token de uma conta
+   * futura será aceito. E prova isso do ponto de rede do PAINEL: um firewall
+   * que solte o painel e barre o servidor Evolution passa neste teste.
+   *
+   * A DEPENDÊNCIA ENTRE OS PASSOS é o que impede o resultado de mentir
+   * -----------------------------------------------------------------
+   * Passo bloqueado recebe `skipped`, nunca ✗ — afirmar que a chave admin está
+   * errada quando o servidor sequer respondeu é a forma de erro que esta
+   * sessão inteira vem perseguindo. E a volta depende só de 1 e 2, não de 3:
+   * servidor fora do ar com webhook certo é um estado real, e calar sobre a
+   * volta ali perderia a informação que o operador foi buscar.
+   */
+  static async testConfig() {
+    const passos = [];
+    const add = (passo, veredito, detalhe = null) => {
+      passos.push(detalhe === null ? { passo, veredito } : { passo, veredito, detalhe });
+      return veredito;
+    };
+
+    // ── 1. a configuração está completa ──────────────────────────────────
+    let config = null;
+    try {
+      config = await WhatsAppConfigService.getConfig();
+    } catch {
+      config = null;
+    }
+    if (!config || !config.enabled) {
+      add('config', 'disabled');
+      for (const passo of ['webhookPath', 'server', 'license', 'adminKey', 'roundTrip']) {
+        add(passo, 'skipped');
+      }
+      return { passos };
+    }
+
+    const alvo = this.resolveTarget(config, {});
+    // Três faltas distintas e uma só linha de resultado: a primeira que
+    // aparecer é a que o operador tem que resolver, e listar as três de uma vez
+    // só faria ele consertar a terceira e voltar aqui pela primeira.
+    const faltando = !config.webhookBaseUrl
+      ? 'webhook_missing'
+      : !alvo.baseUrl
+        ? 'server_missing'
+        : !alvo.adminKey
+          ? 'admin_key_missing'
+          : 'ok';
+    add('config', faltando);
+
+    // ── 2. o caminho do webhook é o que este painel atende ───────────────
+    //
+    // Hoje `normalizeWebhookBaseUrl` garante isso na gravação. A conferência
+    // continua valendo para a linha gravada ANTES dessa garantia existir — que
+    // é exatamente o painel em produção onde o defeito apareceu, e onde o
+    // endereço guardado aponta para a raiz.
+    const caminhoOk = config.webhookBaseUrl
+      ? this.#webhookPathVerdict(config.webhookBaseUrl)
+      : 'skipped';
+    add('webhookPath', caminhoOk, config.webhookBaseUrl ? redigirToken(config.webhookBaseUrl) : null);
+
+    // ── 6 (executado aqui, exibido no fim): a volta ──────────────────────
+    //
+    // Sai na frente dos passos de servidor porque não depende deles, e porque
+    // é a única que fala com o mundo pelo lado de FORA do painel.
+    const voltaVeredito = caminhoOk === 'ok'
+      ? await this.#probeConfigWebhook(config.webhookBaseUrl)
+      : 'skipped';
+
+    // ── 3. alcanço o servidor, e ele é v2 ou GO ──────────────────────────
+    let client = null;
+    let flavor = null;
+    let servidorOk = false;
+    let licenca = null;
+    if (faltando === 'webhook_missing' || !alvo.baseUrl) {
+      add('server', 'skipped');
+    } else {
+      client = new EvolutionClient({
+        baseUrl: alvo.baseUrl,
+        allowedHosts: config.allowedHosts,
+        adminKey: alvo.adminKey
+      });
+      try {
+        // As duas sondas lidas CRUAS, e não por `detectFlavor()`. Aquele engole
+        // a falha e cai para 'v2' — certo para criar instância, porque o 404 de
+        // um v2 contra um GO é legível; errado para diagnosticar, porque
+        // transformaria "não respondeu" em "é um v2".
+        const [serverOk, raiz] = await Promise.all([client.probe('/server/ok'), client.probe('/')]);
+
+        // A licença vem antes do sabor, e não depois: uma distribuição
+        // licenciada recusa TODA rota com o mesmo 503, raiz inclusive. Lida
+        // depois, ela apareceria como "não parece um servidor Evolution" — o
+        // diagnóstico errado, e o único dos dois que o operador não consegue
+        // agir em cima.
+        licenca = readLicenseBlock(raiz.status, raiz.data)
+          || readLicenseBlock(serverOk.status, serverOk.data);
+
+        if (serverOk.status === 0 && raiz.status === 0) {
+          add('server', 'unreachable');
+        } else if (licenca) {
+          // Respondeu, e o que respondeu foi a recusa da licença. Isso conta
+          // como servidor alcançado: o passo seguinte é que dirá o que há.
+          servidorOk = true;
+          flavor = 'v2';
+          add('server', 'ok', null);
+        } else if (ehEvolution(serverOk, raiz)) {
+          flavor = flavorFromProbes(serverOk, raiz);
+          servidorOk = true;
+          add('server', 'ok', flavor);
+        } else {
+          // Alguma coisa atendeu e não se parece com nenhum dos dois sabores.
+          // Um proxy, o painel de outro serviço, uma página de erro. Afirmar
+          // qualquer coisa sobre licença ou chave admin daqui seria inventar.
+          add('server', 'unknown_flavor', raiz.status || serverOk.status || null);
+        }
+      } catch (error) {
+        // `assertTarget` recusa antes de abrir socket: URL inválida, http
+        // simples, host fora da lista de autorizados, endereço interno. Cada
+        // uma tem conserto próprio, então cada uma tem veredito próprio.
+        add('server', error instanceof WaError ? String(error.code || 'unreachable') : 'unreachable');
+      }
+    }
+
+    // ── 4 e 5: uma chamada só, dois vereditos ────────────────────────────
+    //
+    // `send` levanta `license_required` antes de olhar o 401, então a licença
+    // sai da mesma tentativa que testa a chave. A leitura da raiz acima é o que
+    // cobre o caso sem chave admin salva, em que esta chamada nem acontece.
+    if (!servidorOk) {
+      add('license', 'skipped');
+      add('adminKey', 'skipped');
+    } else if (licenca) {
+      add('license', 'required', licenca.registerUrl);
+      add('adminKey', 'skipped');
+    } else if (!alvo.adminKey) {
+      add('license', 'ok');
+      add('adminKey', 'skipped');
+    } else {
+      try {
+        const listed = await client.send(listInstancesRequest(flavor));
+        add('license', 'ok');
+        if (listed.ok) add('adminKey', 'ok', readInstances(flavor, listed.data).length);
+        else add('adminKey', 'http_error', listed.status);
+      } catch (error) {
+        const code = error instanceof WaError ? String(error.code || '') : '';
+        if (code === 'license_required') {
+          add('license', 'required', error.details ?? null);
+          add('adminKey', 'skipped');
+        } else {
+          // Chegou ao servidor no passo 3, então o que falhou aqui é da
+          // credencial ou da rota — nunca "o servidor está fora do ar", que
+          // acabou de ser desmentido.
+          add('license', 'ok');
+          add('adminKey', code === 'unauthorized' ? 'unauthorized' : code || 'unreachable');
+        }
+      }
+    }
+
+    add('roundTrip', voltaVeredito);
+    return { passos };
+  }
+
+  /** O caminho gravado atende a este painel? */
+  static #webhookPathVerdict(webhookBaseUrl) {
+    let pathname;
+    try {
+      ({ pathname } = new URL(webhookBaseUrl));
+    } catch {
+      return 'invalid_url';
+    }
+    return pathname.replace(/\/+$/, '').endsWith(WA_WEBHOOK_PATH) ? 'ok' : 'path_wrong';
+  }
+
+  /**
+   * A volta, sem conta nenhuma.
+   *
+   * O nome da instância é uma constante explícita e não um valor no formato de
+   * `mintName()`: com o bilhete a rota responde antes de procurar o nome, e
+   * quem ler um log não pode confundir a sonda com instância de verdade.
+   *
+   * Vai por `buscarNaVolta` (`safeFetch`) como a sonda por conta, e pelo mesmo
+   * motivo: o endereço é digitado por quem administra, e sem o guarda o campo
+   * do webhook viraria um jeito de fazer o painel bater em endereço interno e
+   * contar o resultado.
+   */
+  static async #probeConfigWebhook(webhookBaseUrl) {
+    const nonce = mintNonce();
+    let resposta = { status: null, corpo: '', falhou: true };
+    try {
+      const r = await buscarNaVolta(webhookBaseUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(probeBody(CONFIG_PROBE_INSTANCE, nonce, signProbeTicket(nonce))),
+        timeoutMs: PROBE_TIMEOUT_MS,
+        maxBytes: PROBE_MAX_BYTES
+      });
+      resposta = { status: r.status, corpo: String(await r.text()).slice(0, 2048), falhou: false };
+    } catch {
+      resposta = { status: null, corpo: '', falhou: true };
+    }
+    return probeVerdict(resposta, nonce);
   }
 
   /** Reconnect (GO) / restart (v2), for a session that exists but went quiet. */

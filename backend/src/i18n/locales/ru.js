@@ -456,6 +456,8 @@ export default {
   'whatsapp.webhookChecked': 'Вебхук проверен на сервере',
   'whatsapp.webhookReapplied': 'Вебхук перезаписан на сервере',
   'whatsapp.webhookProbed': 'Обратный вызов вебхука проверен',
+  'whatsapp.configTested': 'Диагностика интеграции выполнена',
+  'whatsapp.configTestFailed': 'Не удалось выполнить диагностику интеграции',
   'whatsapp.numbersChecked': 'Номера проверены в WhatsApp',
   'whatsapp.messageQueued': 'Сообщение поставлено в очередь на отправку',
   'whatsapp.messageSendFailed': 'Не удалось поставить сообщение в очередь',

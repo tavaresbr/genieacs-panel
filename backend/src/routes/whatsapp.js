@@ -1,6 +1,7 @@
 import express from 'express';
 import WhatsAppController from '../controllers/whatsappController.js';
 import { authenticateToken, requirePermission } from '../middleware/auth.js';
+import { whatsappTestLimiter } from '../middleware/rateLimit.js';
 
 const router = express.Router();
 
@@ -13,6 +14,14 @@ const router = express.Router();
 router.get('/config', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.getConfig);
 router.put('/config', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.updateConfig);
 router.get('/accounts', authenticateToken, requirePermission('whatsapp.read'), WhatsAppController.listAccounts);
+
+// O diagnóstico da configuração, e a única rota deste roteador com limitador.
+//
+// `whatsapp.config` pelo mesmo motivo que a sonda por conta: ela FAZ o painel
+// emitir requisições para endereços que quem administra escolheu, e o resultado
+// revela estado do servidor. `POST` e não `GET` porque age e escreve na trilha.
+// O precedente é o vizinho na mesma tela, `POST /api/sgp/test`.
+router.post('/test', authenticateToken, requirePermission('whatsapp.config'), whatsappTestLimiter, WhatsAppController.testConfig);
 
 // The one read that answers "is this working?". A screen polls it, so it is
 // declared with the other reads and stays as cheap as they are.

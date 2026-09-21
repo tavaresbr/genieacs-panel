@@ -20,6 +20,7 @@ import {
   type SgpConfig,
   type SgpSyncSummary,
   type WhatsAppConfig,
+  type WhatsAppConfigTest,
   tenantAPI,
 } from '@/lib/api'
 import { useToast } from '@/components/ui/toast'
@@ -29,6 +30,7 @@ import { LanguageSwitcher } from '@/components/language-switcher'
 import { ProvisioningTab } from '@/components/settings/provisioning-tab'
 import { SgpEventsPanel } from '@/components/settings/sgp-events-panel'
 import { WhatsAppConnection, whatsappErrorMessage } from '@/components/whatsapp-connection'
+import { TEST_TONE_CLASS, testNotes, testPassed } from '@/lib/whatsapp-test'
 import { useAuth } from '@/contexts/auth-context'
 import { useTenant } from '@/contexts/tenant-context'
 import { useTranslation } from '@/contexts/language-context'
@@ -193,6 +195,12 @@ export default function Settings() {
     messageRetentionDays: 0
   })
   const [waSaving, setWaSaving] = useState(false)
+  const [waTesting, setWaTesting] = useState(false)
+  // `null` = nunca testado; o resultado guarda os seis passos. A tela nunca
+  // reduz isso a um ✓/✗ único: o valor inteiro do botão está em dizer QUAL dos
+  // seis falhou.
+  const [waTestResult, setWaTestResult] = useState<WhatsAppConfigTest | null>(null)
+  const [waTestError, setWaTestError] = useState<string | null>(null)
 
   // The context may resolve after the first render; keep the field in step.
   useEffect(() => {
@@ -423,6 +431,31 @@ export default function Settings() {
       toast[res.success ? 'success' : 'error'](res.message || t('settings.sgp.tokenCleared'))
     } finally {
       setSgpSaving(false)
+    }
+  }
+
+  /**
+   * O diagnóstico, que roda com zero números conectados.
+   *
+   * Sem corpo de propósito: ele testa o que está SALVO. A chave admin nunca
+   * volta ao navegador, então mandar o formulário daqui testaria uma
+   * configuração sem chave — e a tela diz isso ao lado do botão, senão o
+   * operador edita um campo, clica e lê um veredito sobre o valor antigo.
+   */
+  const handleWhatsappTest = async () => {
+    setWaTesting(true)
+    setWaTestResult(null)
+    setWaTestError(null)
+    try {
+      const res = await whatsappAPI.testConfig()
+      if (res.success && res.data) {
+        setWaTestResult(res.data)
+      } else {
+        setWaTestError(whatsappErrorMessage(t, res.code))
+        toast.error(whatsappErrorMessage(t, res.code))
+      }
+    } finally {
+      setWaTesting(false)
     }
   }
 
@@ -2095,7 +2128,61 @@ export default function Settings() {
               </div>
             </div>
 
+            {(waTestResult || waTestError) && (
+              <div className="mt-4 rounded-md border border-border p-4">
+                <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <Icon
+                    name={waTestError || !testPassed(waTestResult) ? 'warning' : 'check'}
+                    className={waTestError || !testPassed(waTestResult)
+                      ? 'h-4 w-4 text-[hsl(var(--status-danger))]'
+                      : 'h-4 w-4 text-[hsl(var(--status-success))]'}
+                  />
+                  {t('settings.whatsapp.test.title')}
+                </p>
+
+                {waTestError ? (
+                  <p className="mt-2 text-sm text-[hsl(var(--status-danger))]">{waTestError}</p>
+                ) : (
+                  <>
+                    <p className="mt-2 text-sm font-medium">
+                      {testPassed(waTestResult)
+                        ? t('settings.whatsapp.test.allPassed')
+                        : t('settings.whatsapp.test.someFailed')}
+                    </p>
+                    {/* Uma linha por passo, e não um ✓/✗ único: o valor inteiro
+                        deste botão está em dizer QUAL dos seis falhou. */}
+                    <ul className="mt-3 space-y-2" role="list">
+                      {testNotes(waTestResult, t).map((note) => (
+                        <li
+                          key={note.key}
+                          className={`flex items-start gap-2 rounded-md border px-3 py-2 text-xs leading-5 ${TEST_TONE_CLASS[note.tone]}`}
+                        >
+                          <Icon name={note.icon} className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                          <span className="min-w-0">
+                            <span className="font-semibold">{note.label}: </span>
+                            <span className="break-words">{note.text}</span>
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                    {/* As duas ressalvas ficam no resultado, não num tooltip: um
+                        diagnóstico que deixa o operador achar que provou mais do
+                        que provou é o defeito que este botão existe para acabar. */}
+                    <p className="field-hint mt-3">{t('settings.whatsapp.test.fromPanel')}</p>
+                  </>
+                )}
+              </div>
+            )}
+
             <div className="mt-6 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => void handleWhatsappTest()}
+                disabled={waTesting}
+                className="modern-button-secondary"
+              >
+                {waTesting ? t('settings.whatsapp.test.testing') : t('settings.whatsapp.test.button')}
+              </button>
               <button
                 type="button"
                 onClick={() => void handleWhatsappSave()}
@@ -2105,6 +2192,7 @@ export default function Settings() {
                 {waSaving ? t('common.saving') : t('common.save')}
               </button>
             </div>
+            <p className="field-hint mt-2">{t('settings.whatsapp.test.savedOnly')}</p>
 
             <WhatsAppConnection config={waConfig} />
           </div>

@@ -455,6 +455,8 @@ export default {
   'whatsapp.webhookChecked': 'Webhook checked on the server',
   'whatsapp.webhookReapplied': 'Webhook rewritten on the server',
   'whatsapp.webhookProbed': 'Webhook round trip checked',
+  'whatsapp.configTested': 'Integration diagnostic run',
+  'whatsapp.configTestFailed': 'Could not run the integration diagnostic',
   'whatsapp.numbersChecked': 'Numbers checked on WhatsApp',
   'whatsapp.messageQueued': 'Message queued for delivery',
   'whatsapp.messageSendFailed': 'The message could not be queued',

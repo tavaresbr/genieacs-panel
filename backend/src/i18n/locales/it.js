@@ -453,6 +453,8 @@ export default {
   'whatsapp.webhookChecked': 'Webhook verificato sul server',
   'whatsapp.webhookReapplied': 'Webhook riscritto sul server',
   'whatsapp.webhookProbed': 'Andata e ritorno del webhook verificato',
+  "whatsapp.configTested": "Diagnostica dell'integrazione eseguita",
+  "whatsapp.configTestFailed": "Impossibile eseguire la diagnostica dell'integrazione",
   'whatsapp.numbersChecked': 'Numeri verificati su WhatsApp',
   'whatsapp.messageQueued': 'Messaggio in coda per l’invio',
   'whatsapp.messageSendFailed': 'Non è stato possibile mettere in coda il messaggio',
