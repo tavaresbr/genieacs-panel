@@ -5,7 +5,8 @@ import WhatsAppConfigService from '../services/whatsappConfigService.js';
 import WaInboundService from '../services/waInboundService.js';
 import { canonicalizarEvento } from '../utils/wa/waEventos.js';
 import { pedidoAutorizado, tokenDaQuery, credencialDoPedido } from '../utils/wa/waWebhookAuth.js';
-import { PROBE_EVENT_CANONICAL, nonceOfRequest } from '../utils/wa/waWebhookProbe.js';
+import { PROBE_EVENT_CANONICAL, nonceOfRequest, ticketOfRequest } from '../utils/wa/waWebhookProbe.js';
+import { verify as verifyProbeTicket } from '../utils/wa/waProbeTicket.js';
 import { waWebhookLimiter } from '../middleware/rateLimit.js';
 
 const router = express.Router();
@@ -49,8 +50,18 @@ async function registrarRecusa(account, reason) {
  * Inbound events from the Evolution server.
  *
  * This route is PUBLIC — it is mounted before `authenticateToken`, because the
- * caller is a server, not a browser session. Its only credential is the token
- * in the query string, and the check is fail-closed: no credential means 401.
+ * caller is a server, not a browser session. The check is fail-closed: no
+ * credential means 401.
+ *
+ * DUAS credenciais chegam aqui, e é preciso dizer as duas porque um comentário
+ * que descreve só uma vira mentira na primeira leitura de quem for mexer:
+ *
+ *   1. o token da instância, na query — é o que todo evento de verdade carrega,
+ *      e o que autoriza tudo o que esta rota faz de fato;
+ *   2. o bilhete da sonda de CONFIGURAÇÃO (`waProbeTicket.js`), assinado pelo
+ *      próprio painel, que autoriza uma única coisa: devolver o nonce que o
+ *      chamador acabou de mandar. Existe porque a sonda de configuração roda
+ *      com zero números conectados, quando não há instância nem token.
  *
  * It answers 200 for anything it recognises but does not act on. That is not
  * laziness: both servers retry on non-2xx, and retrying an event we have
@@ -59,6 +70,26 @@ async function registrarRecusa(account, reason) {
  */
 router.post('/', waWebhookLimiter, async (req, res) => {
   const body = req.body ?? {};
+
+  // A sonda de configuração, e ela vem ANTES de tudo de propósito.
+  //
+  // A busca da instância logo abaixo responde 401 para nome desconhecido — de
+  // propósito, para não revelar quais instâncias existem. Com zero contas, uma
+  // sonda de configuração cairia sempre ali, e `probeVerdict` traduz 401 como
+  // "o endereço leva a OUTRO painel": o diagnóstico afirmaria, com confiança, a
+  // coisa errada, justamente no caso em que ele é a única fonte de informação.
+  //
+  // O que passa por aqui não lê linha, não escreve linha e não resolve
+  // provedor. Devolve o nonce e encerra. O limitador acima já correu.
+  const bilhete = ticketOfRequest(body);
+  if (bilhete) {
+    const nonce = nonceOfRequest(body);
+    if (!verifyProbeTicket(nonce, bilhete)) {
+      return res.status(401).json({ success: false, error: 'unauthorized' });
+    }
+    return res.json({ success: true, event: PROBE_EVENT_CANONICAL, pong: nonce });
+  }
+
   const instance = String(body.instance ?? body.instanceName ?? '').trim();
   if (!instance) return res.status(400).json({ success: false, error: 'missing instance' });
 

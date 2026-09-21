@@ -55,7 +55,7 @@ const PUBLICAS = new Map([
   ['POST /api/invites/token/preview', 'o token do convite É a credencial, vai no corpo e é conferido por hash'],
   ['POST /api/invites/token/accept', 'idem, e a senha da pessoa é conferida quando a conta já existe'],
   ['POST /api/sgp/events/webhook', 'entrega do ERP, autenticada pelo segredo do webhook'],
-  ['POST /api/whatsapp-webhook', 'entrega da Evolution, montada antes do resolvedor e autenticada pelo token da instância'],
+  ['POST /api/whatsapp-webhook', 'entrega da Evolution, montada antes do resolvedor; duas credenciais, o token da instância e o bilhete da sonda de configuração, que só devolve o nonce recebido'],
   ['POST /api/billing-webhook', 'entrega do gateway de pagamento, montada antes do resolvedor e autenticada pelo token do deploy'],
   ['GET /api/whatsapp-media/:id', 'anexo servido por um token assinado que já nomeia o provedor; prova em whatsapp-media-tenancy.test.js'],
   ['POST /api/auth/impersonate/redeem', 'o bilhete do console É a credencial: uso único, um minuto de vida, conferido por hash e contra o provedor do host'],
