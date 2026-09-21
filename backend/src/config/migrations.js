@@ -18,6 +18,55 @@
  * before it reaches anyone's database.
  */
 
+import { withWebhookPath } from './waWebhookPath.js';
+
+/** A chave do blob de configuração do Evolution em `app_state`. */
+const EVOLUTION_CONFIG_KEY = 'whatsapp_evolution_config';
+
+/**
+ * O blob reescrito com o caminho do painel no `webhookBaseUrl`, ou `null`
+ * quando não há nada a fazer.
+ *
+ * `null` cobre quatro casos distintos, e todos eles querem dizer "não toque":
+ * o valor não é JSON, não há endereço gravado, o endereço já termina no caminho
+ * do painel, ou o caminho é OUTRO e foi digitado de propósito. O último é o que
+ * exige cuidado — quem serve o painel sob um prefixo próprio quebraria se esta
+ * migração reescrevesse o que ele configurou —, e quem o distingue é
+ * `withWebhookPath`, a mesma função que a gravação usa. Não há segunda cópia
+ * da regra aqui, porque duas cópias divergem.
+ *
+ * Endereço com query ou fragmento também fica intacto: este passo conserta a
+ * FALTA de caminho, e reconstruir a URL a partir de origem e caminho descartaria
+ * o resto sem que ninguém tivesse pedido.
+ */
+function caminhoDoWebhookCorrigido(valor) {
+  let blob;
+  try {
+    blob = JSON.parse(valor);
+  } catch {
+    return null;
+  }
+  if (!blob || typeof blob !== 'object') return null;
+
+  const atual = typeof blob.webhookBaseUrl === 'string' ? blob.webhookBaseUrl.trim() : '';
+  if (!atual) return null;
+
+  let url;
+  try {
+    url = new URL(atual);
+  } catch {
+    // Endereço inválido não é problema deste passo: a gravação já o recusa, e
+    // adivinhar o que quem digitou queria dizer é pior que deixar como está.
+    return null;
+  }
+  if (url.search || url.hash) return null;
+
+  const resultado = withWebhookPath(url.origin, url.pathname);
+  if (resultado.erro || resultado.url === atual) return null;
+
+  return JSON.stringify({ ...blob, webhookBaseUrl: resultado.url });
+}
+
 /** Portal credential columns, shared by the initial table and the 0003 upgrade. */
 const CUSTOMER_PASSWORD_COLUMNS = [
   ['password_hash', (t) => t.string('password_hash', 255)],
@@ -3157,6 +3206,67 @@ export const migrations = [
       await db.schema.alterTable('tenants', (t) => {
         t.string('kind', 16).notNullable().defaultTo('provider');
       });
+    }
+  },
+  {
+    /**
+     * O endereço do webhook das instalações anteriores à garantia do caminho.
+     *
+     * POR QUE ISTO EXISTE
+     * -------------------
+     * `normalizeWebhookBaseUrl` passou a completar o caminho do painel quando
+     * quem configura digita só o host — que é o que a tela pede. Mas ela roda na
+     * GRAVAÇÃO, e nada alcançou as linhas que já estavam no banco. Uma
+     * instalação que configurou o WhatsApp antes daquela correção continua com
+     * `https://painel.exemplo.com` gravado, e o sintoma é mudo: o servidor
+     * Evolution faz POST na raiz, o frontend responde 200 com HTML, o servidor
+     * registra entrega bem-sucedida, e nada chega nunca.
+     *
+     * Aconteceu num painel em produção e só apareceu quando o diagnóstico da
+     * configuração foi rodado à mão. Depender de alguém abrir a aba e clicar em
+     * Salvar é depender de alguém suspeitar primeiro — e a forma do defeito é
+     * exatamente não dar motivo para suspeitar.
+     *
+     * O QUE ELA NÃO FAZ
+     * -----------------
+     * Um caminho que NÃO seja o do painel fica intacto, nunca reescrito. Quem
+     * serve o painel sob um prefixo próprio (`/painel/api/whatsapp-webhook`)
+     * digitou aquilo de propósito, e `withWebhookPath` já distingue os dois
+     * casos — é ela que decide aqui, e não uma regra reescrita nesta migração,
+     * porque duas cópias da mesma regra divergem.
+     *
+     * E ela não alcança o webhook gravado DENTRO das instâncias que já existem
+     * no servidor Evolution: aquele valor é escrito no create e em lugar nenhum
+     * depois. Consertar o painel conserta os números pareados daqui em diante;
+     * os antigos pedem `POST /accounts/:id/webhook`, que já existe e é uma ação
+     * de quem administra, não de uma migração.
+     */
+    id: '0051_whatsapp_webhook_path_backfill',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('app_state'))) return true;
+      const linhas = await db('app_state')
+        .where({ key: EVOLUTION_CONFIG_KEY })
+        .select('value');
+      // Já rodou quando nenhuma linha está no formato antigo — que é também o
+      // estado de uma instalação que nunca configurou o WhatsApp.
+      return linhas.every((linha) => caminhoDoWebhookCorrigido(linha.value) === null);
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('app_state'))) return;
+      const linhas = await db('app_state')
+        .where({ key: EVOLUTION_CONFIG_KEY })
+        .select('tenant_id', 'key', 'value');
+
+      for (const linha of linhas) {
+        const corrigido = caminhoDoWebhookCorrigido(linha.value);
+        if (corrigido === null) continue;
+        // `app_state` não tem `id`: a chave primária é composta. Atualizar por
+        // um `id` inexistente é o erro de SQL que `tenantExportService` já
+        // documenta — aqui a linha é endereçada pelo par.
+        await db('app_state')
+          .where({ tenant_id: linha.tenant_id, key: linha.key })
+          .update({ value: corrigido });
+      }
     }
   }
 ];
