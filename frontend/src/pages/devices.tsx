@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import {
   devicesAPI,
   sgpAPI,
@@ -10,6 +10,14 @@ import {
   type SgpContractState,
   type SgpLinkRow,
 } from '@/lib/api'
+import {
+  filtersToQuery,
+  pageFromQuery,
+  sgpFromQuery,
+  statusFromQuery,
+  type DeviceStatusFilter,
+  type SgpFilter,
+} from '@/lib/device-filters'
 import { useLoading } from '@/components/ui/loading'
 import { useToast } from '@/components/ui/toast'
 import { Icon } from '@/components/ui/icon'
@@ -21,14 +29,6 @@ interface ProcessedDevice extends Device {
   isOnline: boolean
   brand: string
 }
-
-type DeviceStatusFilter = 'all' | 'online' | 'offline'
-
-/**
- * The contract filter has no counterpart in the devices API, so it narrows the
- * page the server returned instead of the whole inventory.
- */
-type SgpFilter = 'all' | SgpContractState | 'unlinked'
 
 /** Matches the backend default; the API caps anything above 100 anyway. */
 const PAGE_SIZE = 25
@@ -49,16 +49,23 @@ const SGP_STATE_LABEL_KEYS = {
 } as const
 
 export default function DevicesPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  // Lido UMA vez, na montagem. Depois daqui quem manda é o estado da tela, e a
+  // URL o acompanha — ler a query a cada render faria o endereço e os
+  // seletores brigarem pelo mesmo valor a cada tecla digitada.
   const [devices, setDevices] = useState<Device[]>([])
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [paging, setPaging] = useState({ page: 1, pageSize: PAGE_SIZE, total: 0, totalPages: 0 })
   const [loading, setLoading] = useState(true)
   const [initialLoad, setInitialLoad] = useState(true)
-  const [searchInput, setSearchInput] = useState('')
-  const [searchTerm, setSearchTerm] = useState('')
-  const [filterStatus, setFilterStatus] = useState<DeviceStatusFilter>('all')
-  const [page, setPage] = useState(1)
-  const [filterSgp, setFilterSgp] = useState<SgpFilter>('all')
+  const [searchInput, setSearchInput] = useState(() => searchParams.get('search') ?? '')
+  const [searchTerm, setSearchTerm] = useState(() => searchParams.get('search') ?? '')
+  const [filterStatus, setFilterStatus] = useState<DeviceStatusFilter>(
+    () => statusFromQuery(searchParams.get('status'))
+  )
+  const [page, setPage] = useState(() => pageFromQuery(searchParams.get('page')))
+  const [filterSgp, setFilterSgp] = useState<SgpFilter>(() => sgpFromQuery(searchParams.get('sgp')))
   const [sgpLinks, setSgpLinks] = useState<Map<string, SgpLinkRow>>(new Map())
   const [sgpAvailable, setSgpAvailable] = useState(false)
   const [loadError, setLoadError] = useState('')
@@ -67,6 +74,25 @@ export default function DevicesPage() {
   const loadingCtl = useLoading()
   const toast = useToast()
   const { t } = useTranslation()
+
+  /**
+   * A URL acompanha os filtros.
+   *
+   * `searchTerm` e não `searchInput`: aquele já passou pelo debounce, então a
+   * barra de endereço muda uma vez por busca e não uma vez por tecla. E
+   * `replace` em vez de `push` pelo mesmo motivo — trocar um filtro não deve
+   * empilhar uma entrada no histórico que o botão voltar tenha que desfazer
+   * uma a uma.
+   *
+   * O default some da URL: `/devices` é a lista inteira, e um endereço cheio de
+   * `status=all&page=1` só faz o link ficar feio de mandar para o plantão.
+   */
+  useEffect(() => {
+    setSearchParams(
+      filtersToQuery({ search: searchTerm, status: filterStatus, sgp: filterSgp, page }),
+      { replace: true }
+    )
+  }, [searchTerm, filterStatus, filterSgp, page, setSearchParams])
 
   const getSignalStrengthInfo = (rxPowerStr: any) => {
     const rxpower = parseFloat(String(rxPowerStr));
