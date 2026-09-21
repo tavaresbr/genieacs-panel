@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import { needsGenieAcsOnboarding, sessionKind, shellFor, wearingPlatformHat } from '@/lib/shell'
+import {
+  needsGenieAcsOnboarding, platformBoxUrl, sessionKind, shellFor, wearingPlatformHat
+} from '@/lib/shell'
 
 /**
  * Qual casca o navegador monta, nas quatro combinações que existem.
@@ -168,5 +170,50 @@ describe('quem precisa passar pelo onboarding', () => {
   it('e um kind ainda não carregado vale como provedor', () => {
     expect(needsGenieAcsOnboarding({ isSaas: true, kind: undefined, genieAcsUrl: null, dismissed: false }))
       .toBe(true)
+  })
+})
+
+/**
+ * O endereço de uma tela dentro do painel da caixa da plataforma.
+ *
+ * Duas telas do console precisam dele com caminhos diferentes — a caixa de
+ * WhatsApp e o catálogo padrão —, e montar a string na mão nas duas é como a
+ * segunda fica sem a barra, ou com duas.
+ */
+describe('o endereço da caixa da plataforma', () => {
+  it('é o subdomínio dela, com o caminho pedido', () => {
+    expect(platformBoxUrl({
+      slug: 'plataforma', panelBaseDomain: 'painel.exemplo.com', path: '/settings'
+    })).toBe('https://plataforma.painel.exemplo.com/settings')
+  })
+
+  /**
+   * `null` é resposta, não falha: num deploy de host único não HÁ subdomínio
+   * por provedor, e chega-se à caixa pelo seletor de destino do login. É o que
+   * faz a tela mostrar a instrução em vez de um link que não resolve.
+   */
+  it('e não existe onde não há domínio-base', () => {
+    expect(platformBoxUrl({ slug: 'plataforma', panelBaseDomain: null, path: '/settings' }))
+      .toBeNull()
+    expect(platformBoxUrl({ slug: 'plataforma', panelBaseDomain: '', path: '/settings' }))
+      .toBeNull()
+    expect(platformBoxUrl({ slug: 'plataforma', panelBaseDomain: undefined, path: '/settings' }))
+      .toBeNull()
+  })
+
+  /** Sem caixa não há endereço — e o slug chega `undefined` antes da rota responder. */
+  it('e nem onde não há caixa', () => {
+    expect(platformBoxUrl({ slug: null, panelBaseDomain: 'painel.exemplo.com', path: '/x' }))
+      .toBeNull()
+    expect(platformBoxUrl({ slug: undefined, panelBaseDomain: 'painel.exemplo.com', path: '/x' }))
+      .toBeNull()
+  })
+
+  it('e o caminho entra com uma barra, tenha ele vindo com ou sem', () => {
+    const base = { slug: 'plataforma', panelBaseDomain: 'painel.exemplo.com' }
+    expect(platformBoxUrl({ ...base, path: 'whatsapp' }))
+      .toBe('https://plataforma.painel.exemplo.com/whatsapp')
+    expect(platformBoxUrl({ ...base, path: '/whatsapp' }))
+      .toBe('https://plataforma.painel.exemplo.com/whatsapp')
   })
 })

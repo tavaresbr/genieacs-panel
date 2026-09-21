@@ -18,7 +18,8 @@ import { forgetResolvedTenant } from '../middleware/tenantResolver.js';
 import AuditLog from '../models/AuditLog.js';
 import { runInTenant } from '../config/tenantContext.js';
 import { getDb } from '../config/database.js';
-import { seedDefaults } from '../config/seed.js';
+import { catalogueSizes, catalogueSource, seedDefaults } from '../config/seed.js';
+import Vendor from '../models/Vendor.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { slugProblem } from '../utils/slug.js';
 import { tenantMediaRoot } from '../services/waMediaService.js';
@@ -246,6 +247,79 @@ class PlatformController {
       billingGateway: asaasBilling.isConfigured(),
       rls: rlsEnabled(client)
     };
+  }
+
+  /**
+   * `GET /api/platform/catalogue` — de onde o próximo provedor herda o
+   * catálogo de equipamentos, e quem hoje não tem nenhum.
+   *
+   * A tela existe porque a resposta não estava em lugar nenhum. O catálogo é o
+   * que faz `VendorService.detectVendor` reconhecer o aparelho, e dele saem os
+   * caminhos de parâmetro que o painel ESCREVE no CPE: sem ele, a troca de
+   * senha de WiFi cai numa lista de caminhos adivinhados — inclusive quando
+   * quem troca é o assinante pelo portal — e o provisionamento para de escrever
+   * VLAN, service list e LAN binding. A falha é silenciosa: a tela só fica
+   * errada, e ninguém liga isso a "o provedor nasceu sem catálogo".
+   *
+   * Só leitura, e de propósito: editar o catálogo padrão é editar o catálogo da
+   * CAIXA da plataforma, nas telas que já existem e funcionam. Esta aba diz
+   * qual catálogo está valendo e quem diverge — que é o fato que só o console
+   * sabe, porque nenhum provedor enxerga os outros.
+   */
+  static async catalogue(req, res) {
+    try {
+      const db = getDb();
+      const tamanhos = await catalogueSizes(db);
+      const fonte = await catalogueSource(db, tamanhos);
+      const caixa = await Tenant.platform();
+
+      // Os NOMES dos fabricantes saem pelo model, dentro do provedor da fonte.
+      // Alcançar a tabela pelo handle cru seria mais curto e é exatamente o que
+      // a sentinela estática de escopo existe para pegar: tabela escopada lida
+      // fora de escopo passa a depender de o autor ter lembrado do `where`.
+      // (Escrever aqui o nome da tabela ao lado daquela chamada faria a própria
+      // sentinela acusar este comentário — ela lê o arquivo, não a intenção.)
+      const fabricantes = fonte.id === null
+        ? []
+        : await runInTenant(fonte.id, () => Vendor.getAll());
+
+      const contar = (id) => Number(tamanhos.get(Number(id)) || 0);
+      const provedores = await Tenant.providers();
+
+      return res.json(createResponse('Catalogue retrieved successfully', {
+        source: fonte.kind,
+        sourceTenant: fonte.id === null ? null : PlatformController.presentCatalogueTenant(
+          fonte.kind === 'platform' ? caixa : provedores.find((t) => Number(t.id) === fonte.id),
+          fonte.id
+        ),
+        box: caixa ? PlatformController.presentCatalogueTenant(caixa, caixa.id) : null,
+        defaults: {
+          rows: contar(fonte.id),
+          vendors: fabricantes.length,
+          // Só o nome e se está ligado. O resto de uma linha de `vendors` são
+          // caminhos de parâmetro TR-069, que não cabem numa lista e não são o
+          // que esta tela responde.
+          vendorNames: fabricantes.map((v) => ({ name: v.name, enabled: Boolean(v.enabled) }))
+        },
+        providers: provedores.map((t) => ({
+          id: Number(t.id),
+          name: t.name,
+          slug: t.slug,
+          rows: contar(t.id)
+        }))
+      }));
+    } catch (error) {
+      console.error('Platform catalogue error:', error);
+      return res.status(500).json(
+        createErrorResponse('Failed to read the default catalogue', error.message)
+      );
+    }
+  }
+
+  /** Nome, slug e id — o bastante para a tela nomear um provedor e ligar nele. */
+  static presentCatalogueTenant(tenant, fallbackId) {
+    if (!tenant) return { id: Number(fallbackId), name: null, slug: null };
+    return { id: Number(tenant.id), name: tenant.name, slug: tenant.slug };
   }
 
   /** `GET /api/platform/metrics` — the process's counters, per provider. */
