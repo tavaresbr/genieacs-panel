@@ -251,6 +251,26 @@ describe('device to contract resolution', () => {
     assert.equal(row.contract, '4321');
   });
 
+  /**
+   * A tela do aparelho DEPENDE deste campo desde que passou a pintar o selo de
+   * situação por ele. Antes, ela re-derivava o estado com `/ativo/i` sobre o
+   * rótulo — e "Inativo" contém "ativo", então contrato inativo saía verde.
+   *
+   * O campo já existia em `publicLink`; o que não existia era um teste que o
+   * prendesse. Dependência sem teste é a que se perde no próximo refactor, e
+   * esta se perderia em silêncio: a tela voltaria a pintar tudo de neutro, que
+   * é para onde `sgpBadge` erra quando o estado não vem.
+   */
+  it('carries the derived contract state the device screen colours by', async () => {
+    const { body } = await call(`${panelUrl}/api/sgp/devices/${DEVICE_ID}`, {
+      headers: authHeaders(token)
+    });
+    assert.ok(
+      ['active', 'blocked', 'cancelled', 'unknown'].includes(body.data.link.state),
+      `state inesperado: ${body.data.link.state}`
+    );
+  });
+
   it('normalizes invoice amounts, dates and field spellings', async () => {
     const { body } = await call(`${panelUrl}/api/sgp/devices/${DEVICE_ID}`, {
       headers: authHeaders(token)

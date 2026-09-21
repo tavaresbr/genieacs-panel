@@ -6,6 +6,7 @@ import { useToast } from '@/components/ui/toast'
 import { useLoading } from '@/components/ui/loading'
 import { devicesAPI, sgpAPI, type SgpContractLink, type SgpInvoice } from '@/lib/api'
 import { formatDate } from '@/lib/utils'
+import { sgpBadge } from '@/lib/sgp'
 import { Icon } from '@/components/ui/icon'
 import { ProvisioningCard } from '@/components/provisioning-card'
 import { DeviceHistoryCard } from '@/components/device-history-card'
@@ -815,6 +816,11 @@ export default function DeviceDetailPage() {
       : '—'
   )
 
+  /* O selo de situação, calculado uma vez e usado nos dois lugares que o
+     mostram: a faixa do topo e o bloco do SGP. Aguenta `sgpLink` nulo, então
+     não precisa de guarda em volta. */
+  const selo = sgpBadge(sgpLink)
+
   const loadSgpData = useCallback(async (refresh = false) => {
     if (!deviceId) return
     setSgpLoading(true)
@@ -1235,6 +1241,43 @@ export default function DeviceDetailPage() {
           </div>
         </header>
 
+        {/* A faixa do cliente.
+            FORA do switch de abas, de propósito: o bloco do SGP mora dentro da
+            Visão geral, então hoje o nome do assinante some ao clicar em WiFi
+            ou em Clientes. Quem está no telefone precisa saber com quem fala em
+            qualquer aba.
+
+            Repete o que o bloco de baixo mostra, e não o substitui: lá ficam as
+            faturas, o chamado e o desvincular. Aqui é só quem é o cliente. */}
+        {sgpAvailable && sgpLink && (
+          <div className="mb-6 rounded-[var(--radius)] border border-border bg-card p-4">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="min-w-0">
+                <p className="metric-label">{t('detail.sgp.client')}</p>
+                <p className="mt-1 truncate font-semibold" title={sgpLink.clientName || undefined}>
+                  {sgpLink.clientName || '—'}
+                </p>
+              </div>
+              <div className="min-w-0">
+                <p className="metric-label">{t('detail.sgp.contract')}</p>
+                <p className="mt-1 font-mono font-semibold">{sgpLink.contract}</p>
+              </div>
+              <div className="min-w-0">
+                <p className="metric-label">{t('detail.sgp.plan')}</p>
+                <p className="mt-1 truncate font-semibold" title={sgpLink.plan || undefined}>
+                  {sgpLink.plan || '—'}
+                </p>
+              </div>
+              <div className="min-w-0">
+                <p className="metric-label">{t('detail.sgp.status')}</p>
+                <p className="mt-1">
+                  <span className={selo.className}>{selo.text ?? t(selo.fallbackKey)}</span>
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Device Info Cards */}
         <div className="mb-6 grid grid-cols-2 overflow-hidden rounded-[var(--radius)] border border-border bg-card lg:grid-cols-4">
           <div className="border-b border-e border-border p-4 lg:border-b-0">
@@ -1552,8 +1595,11 @@ export default function DeviceDetailPage() {
                       <div>
                         <p className="metric-label">{t('detail.sgp.status')}</p>
                         <p className="mt-1">
-                          <span className={/ativo/i.test(sgpLink.statusLabel || '') ? 'modern-badge-success' : 'modern-badge'}>
-                            {sgpLink.statusLabel || sgpLink.status || t('detail.sgp.statusUnknown')}
+                          {/* O MESMO selo da faixa lá de cima. A mesma tela dando
+                              duas respostas sobre o mesmo contrato é o defeito
+                              que só aparece quando alguém compara. */}
+                          <span className={selo.className}>
+                            {selo.text ?? t(selo.fallbackKey)}
                           </span>
                         </p>
                       </div>

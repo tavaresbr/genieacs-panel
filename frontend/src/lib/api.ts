@@ -1585,6 +1585,16 @@ export interface SgpContractLink {
   plan: string | null
   status: string | null
   statusLabel: string | null
+  /**
+   * A situação classificada pelo servidor — `deriveContractState`, que testa
+   * cancelamento ANTES de "ativo" porque "Inativo" contém "ativo".
+   *
+   * Já vinha no payload desde sempre (`publicLink`); faltava estar declarado
+   * aqui, e por isso a tela do aparelho re-derivava na mão com um regex que
+   * pintava contrato inativo de verde. A cor do selo sai daqui, nunca do
+   * rótulo — ver `lib/sgp.ts`.
+   */
+  state: SgpContractState
   login: string | null
   blocked: boolean | null
   linkMode: 'auto' | 'manual'
