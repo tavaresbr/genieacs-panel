@@ -252,6 +252,20 @@ function notesFor(
       icon: 'x',
       text: t('whatsapp.health.webhookBroken', { count: formatNumber(health.webhook.broken) })
     })
+  } else if (health.webhook.unverifiable > 0) {
+    // Entre "quebrado" e "nunca conferido", e é o degrau que faltava: foi
+    // conferido, a URL e o token conferem, e a lista de eventos veio vazia. Um
+    // v2 antigo não devolve o campo e está são; um webhook sem assinatura
+    // nenhuma cala do mesmo jeito. Aviso, porque acusar o primeiro é o erro
+    // mais caro — e o conserto dos dois é o mesmo botão.
+    notes.push({
+      key: 'webhook-unverifiable',
+      tone: 'warn',
+      icon: 'alert',
+      text: t('whatsapp.health.webhookUnverifiable', {
+        count: formatNumber(health.webhook.unverifiable)
+      })
+    })
   } else if (health.webhook.unchecked > 0 && anyConnected && health.lastInboundAt === null) {
     notes.push({
       key: 'webhook-unchecked',
