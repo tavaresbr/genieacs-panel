@@ -637,6 +637,22 @@ export const WEBHOOK_VERDICTS = Object.freeze({
   BY_EVENTS: 'by_events',
   /** Assina menos eventos do que precisamos. Chega parte, e some parte. */
   EVENTS_MISSING: 'events_missing',
+  /**
+   * A URL e o token estão certos, e a LISTA DE EVENTOS não deu para conferir.
+   *
+   * Separado do `ok` depois de um painel em produção ficar com "Nunca chegou
+   * nada" ao lado de um webhook que a tela declarava saudável. Uma lista vazia
+   * pode ser um servidor v2 antigo que não devolve o campo — e pode ser um
+   * webhook que não assina evento nenhum. Os dois chegam aqui como `[]`, e o
+   * painel não tem como distingui-los.
+   *
+   * Chamar isso de `ok` é responder por uma coisa que não foi olhada, e o preço
+   * é alto em dois lugares: a tira de saúde para de oferecer a conferência, e o
+   * botão de reaplicar — que é o conserto dos dois casos, porque reescreve o
+   * payload inteiro — some da tela, porque ele só aparece quando o veredito não
+   * é `ok`. O operador fica sem sintoma e sem caminho.
+   */
+  EVENTS_UNKNOWN: 'events_unknown',
   /** Não deu para perguntar ao servidor. */
   UNREACHABLE: 'unreachable',
   /** Nada a consertar aqui. */
@@ -681,9 +697,15 @@ export function webhookVerdict(servidor, esperado) {
   // dela que ele estraga a query.
   if (s.byEvents) return v(WEBHOOK_VERDICTS.BY_EVENTS);
 
-  // Lista vazia é o servidor que não devolve o campo, não um servidor sem
-  // assinatura nenhuma — a mesma leniência do `enabled`, pelo mesmo motivo.
-  if (s.events.length && V2_WEBHOOK_EVENTS.some((e) => !s.events.includes(e))) {
+  // Lista vazia NÃO é acusação — pode ser um v2 antigo que não devolve o campo
+  // —, e também não é absolvição: pode ser um webhook que não assina nada.
+  // Antes isto caía em `ok` pela mesma leniência do `enabled`, e a diferença
+  // entre os dois campos é o que desfez essa comparação: `enabled` ausente tem
+  // um default óbvio e seguro (ligado, senão nada teria funcionado nunca);
+  // `events` ausente não tem — e o silêncio de um webhook sem assinatura é
+  // idêntico ao de um webhook que o servidor simplesmente não descreve.
+  if (!s.events.length) return v(WEBHOOK_VERDICTS.EVENTS_UNKNOWN);
+  if (V2_WEBHOOK_EVENTS.some((e) => !s.events.includes(e))) {
     return v(WEBHOOK_VERDICTS.EVENTS_MISSING);
   }
   return v(WEBHOOK_VERDICTS.OK);

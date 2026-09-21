@@ -2071,6 +2071,11 @@ export type WhatsAppWebhookVerdict =
   | 'disabled'
   | 'by_events'
   | 'events_missing'
+  // A URL e o token conferem, e a lista de eventos veio vazia. Não é `ok`:
+  // vazia pode ser um v2 antigo que não devolve o campo, ou um webhook que não
+  // assina nada, e o painel não distingue os dois. Chamar de `ok` tirava da
+  // tela o único botão que conserta os dois.
+  | 'events_unknown'
   | 'unreachable'
 
 /** O que a volta encontrou. Cada um é um conserto diferente. */
@@ -2227,6 +2232,14 @@ export interface WhatsAppHealth {
   webhook: {
     broken: number
     unchecked: number
+    /**
+     * A URL e o token conferem, e a lista de eventos veio vazia — que pode ser
+     * um v2 antigo que não devolve o campo, ou um webhook que não assina nada.
+     * Aviso e não falha: acusar um servidor possivelmente são é o erro mais
+     * caro aqui, e chamar de `ok` era calar sobre a única coisa que restava
+     * para olhar.
+     */
+    unverifiable: number
     /**
      * Números cuja VOLTA falhou: o endereço público não chega ao painel. Tem
      * precedência sobre `broken` — um webhook que não é entregável torna

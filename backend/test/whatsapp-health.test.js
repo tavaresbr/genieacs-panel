@@ -600,6 +600,73 @@ describe('the media reading', () => {
   });
 });
 
+/**
+ * O degrau entre "quebrado" e "nunca conferido".
+ *
+ * Nasceu de um painel em produção com "Nunca chegou nada" ao lado de um webhook
+ * que a tela declarava saudável: a URL e o token conferiam, a lista de eventos
+ * veio vazia, e isso lia como `ok`. A tira ficava muda e o botão de reaplicar —
+ * que é o conserto — some da tela quando o veredito é `ok`. Sem sintoma e sem
+ * caminho.
+ */
+describe('o webhook conferido que não dá para conferir inteiro', () => {
+  const comVeredito = (verdict) => asTenant(
+    () => WhatsAppAccount.update(mainAccountId, { webhook_verdict: verdict })
+  );
+
+  const limpar = () => asTenant(() => WhatsAppAccount.update(mainAccountId, {
+    webhook_verdict: null, webhook_probe_verdict: null, webhook_refused_at: null
+  }));
+
+  it('`events_unknown` conta em `unverifiable`, e NÃO em `broken`', async () => {
+    // Acusar um servidor possivelmente são é o erro mais caro aqui: um v2
+    // antigo que não devolve o campo está perfeitamente bem.
+    await comVeredito('events_unknown');
+    const { webhook } = await health();
+    assert.equal(webhook.unverifiable, 1);
+    assert.equal(webhook.broken, 0);
+    await limpar();
+  });
+
+  it('e nem em `unchecked`: ele FOI conferido', async () => {
+    // A diferença que a tela lê: "nunca conferido" oferece a conferência,
+    // "não dá para conferir a lista" oferece a reescrita. Dizer que nunca se
+    // olhou uma conta que foi olhada é a mentira que este degrau desfaz.
+    await comVeredito('events_unknown');
+    assert.equal((await health()).webhook.unchecked, 0);
+    await limpar();
+  });
+
+  it('um veredito realmente quebrado continua em `broken`', async () => {
+    await comVeredito('url_mismatch');
+    const { webhook } = await health();
+    assert.equal(webhook.broken, 1);
+    assert.equal(webhook.unverifiable, 0);
+    await limpar();
+  });
+
+  it('e `ok` não conta em lugar nenhum', async () => {
+    await comVeredito('ok');
+    const { webhook } = await health();
+    assert.equal(webhook.broken, 0);
+    assert.equal(webhook.unverifiable, 0);
+    assert.equal(webhook.unchecked, 0);
+    await limpar();
+  });
+
+  it('a volta que falhou continua tendo precedência sobre tudo', async () => {
+    // Um webhook que não é entregável torna irrelevante o que está gravado no
+    // servidor — inclusive a dúvida sobre a lista de eventos.
+    await asTenant(() => WhatsAppAccount.update(mainAccountId, {
+      webhook_verdict: 'events_unknown', webhook_probe_verdict: 'wrong_target'
+    }));
+    const { webhook } = await health();
+    assert.equal(webhook.unreachable, 1);
+    assert.equal(webhook.unverifiable, 0);
+    await limpar();
+  });
+});
+
 describe('the route', () => {
   it('answers the frozen shape', async () => {
     const { status, body } = await call(`${panelUrl}/api/whatsapp/health`, {
@@ -616,7 +683,10 @@ describe('the route', () => {
     assert.deepEqual(Object.keys(data.outbox).sort(), ['failed24h', 'oldestQueuedAt', 'queued', 'retrying', 'sending']);
     assert.deepEqual(Object.keys(data.inbox).sort(), ['openConversations', 'unread']);
     assert.deepEqual(Object.keys(data.media).sort(), ['bytes', 'files', 'oldestAt']);
-    assert.deepEqual(Object.keys(data.webhook).sort(), ['broken', 'refusedAt', 'unchecked', 'unreachable']);
+    assert.deepEqual(
+      Object.keys(data.webhook).sort(),
+      ['broken', 'refusedAt', 'unchecked', 'unreachable', 'unverifiable']
+    );
   });
 
   it('is admin-only, like everything else on this surface', async () => {

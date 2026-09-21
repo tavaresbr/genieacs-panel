@@ -4,6 +4,7 @@ import { tdb } from '../config/database.js';
 import { currentTenantId, runInTenant } from '../config/tenantContext.js';
 import { DATA_DIR } from '../config/paths.js';
 import { MEDIA_DIR, tenantIdFromDir, tenantMediaDir } from './waMediaService.js';
+import { WEBHOOK_VERDICTS } from '../utils/wa/evolutionApi.js';
 
 /**
  * One read that answers "is this working?".
@@ -203,6 +204,14 @@ class WaHealthService {
    * nunca conferida não entra: dizer "quebrado" sobre o que não se olhou é
    * pior do que não dizer nada, porque manda o operador consertar às cegas.
    * `unchecked` é o que a tela usa para oferecer a conferência.
+   *
+   * `unverifiable` é o meio-termo que faltava, e ele nasceu de um painel em
+   * produção com "Nunca chegou nada" ao lado de um webhook que a tela declarava
+   * saudável: a URL e o token conferem, e a lista de eventos veio vazia — o que
+   * pode ser um v2 antigo que não devolve o campo, ou um webhook que não assina
+   * nada. Contá-lo como `broken` acusaria um servidor possivelmente são; contá-lo
+   * como `ok`, que era o que acontecia, calava sobre a única coisa que restava
+   * para olhar. É aviso, e o conserto dos dois casos é o mesmo: reaplicar.
    */
   static async webhook() {
     const rows = await tdb('whatsapp_accounts')
@@ -210,6 +219,7 @@ class WaHealthService {
 
     let broken = 0;
     let unchecked = 0;
+    let unverifiable = 0;
     let unreachable = 0;
     let refusedAt = null;
     for (const row of rows) {
@@ -224,14 +234,15 @@ class WaHealthService {
         continue;
       }
       const v = row.webhook_verdict || null;
-      if (!v || v === 'unreachable') unchecked += 1;
-      else if (v !== 'ok') broken += 1;
+      if (!v || v === WEBHOOK_VERDICTS.UNREACHABLE) unchecked += 1;
+      else if (v === WEBHOOK_VERDICTS.EVENTS_UNKNOWN) unverifiable += 1;
+      else if (v !== WEBHOOK_VERDICTS.OK) broken += 1;
       // A recusa mais recente de qualquer número: uma só basta para mudar a
       // pergunta de "o Evolution está chamando?" para "por que ele leva 401?".
       const quando = asIso(row.webhook_refused_at);
       if (quando && (!refusedAt || quando > refusedAt)) refusedAt = quando;
     }
-    return { broken, unchecked, unreachable, refusedAt };
+    return { broken, unchecked, unverifiable, unreachable, refusedAt };
   }
 
   /**

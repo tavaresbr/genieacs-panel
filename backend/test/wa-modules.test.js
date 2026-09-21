@@ -473,13 +473,44 @@ describe('webhook verdict', () => {
     assert.equal(veredito({ events: ['CONNECTION_UPDATE'] }), WEBHOOK_VERDICTS.EVENTS_MISSING);
   });
 
-  test('campo ausente conta como ligado, e lista vazia não acusa falta', () => {
-    // Versões antigas do v2 não devolvem `enabled` nem `events`. Tratá-las como
-    // desligadas ou sem assinatura seria acusar um servidor são.
+  test('`enabled` ausente conta como ligado, e a lista vazia NÃO conta como ok', () => {
+    // Este caso mudou, e a decisão mudou junto — não o contrário.
+    //
+    // Ele afirmava que lista vazia lê como `ok`, pela mesma leniência do
+    // `enabled`. A comparação entre os dois campos não se sustenta: `enabled`
+    // ausente tem um default óbvio e seguro (ligado, senão nada teria
+    // funcionado nunca), e `events` ausente não tem nenhum — o silêncio de um
+    // webhook que não assina nada é idêntico ao de um webhook que o servidor
+    // simplesmente não descreve.
+    //
+    // O preço de chamar isso de `ok` apareceu num painel em produção: "Nunca
+    // chegou nada" ao lado de um webhook declarado saudável, com a tira de
+    // saúde muda e o botão de reaplicar fora da tela, porque ele só aparece
+    // quando o veredito não é `ok`. Sem sintoma e sem caminho.
     const antigo = readWebhook({ webhook: { url: ESPERADO } });
     assert.equal(antigo.enabled, true);
     assert.deepEqual(antigo.events, []);
-    assert.equal(webhookVerdict(antigo, ESPERADO).verdict, WEBHOOK_VERDICTS.OK);
+    assert.equal(webhookVerdict(antigo, ESPERADO).verdict, WEBHOOK_VERDICTS.EVENTS_UNKNOWN);
+  });
+
+  test('e `events_unknown` não é acusação: o que está errado tem precedência', () => {
+    // A ordem importa. Um webhook com a URL de outro serviço E lista vazia é
+    // `url_mismatch`, não "não dá para conferir os eventos" — senão o veredito
+    // mais fraco esconderia o mais forte, e o operador iria reaplicar quando o
+    // problema era outro.
+    assert.equal(
+      veredito({ url: 'https://n8n.exemplo.test/hook?t=segredo', events: [] }),
+      WEBHOOK_VERDICTS.URL_MISMATCH
+    );
+    assert.equal(veredito({ enabled: false, events: [] }), WEBHOOK_VERDICTS.DISABLED);
+    assert.equal(veredito({ byEvents: true, events: [] }), WEBHOOK_VERDICTS.BY_EVENTS);
+  });
+
+  test('a lista completa continua sendo `ok`, e a incompleta continua `events_missing`', () => {
+    // O degrau novo fica ENTRE os dois: vazia não é falta, e falta não é vazia.
+    assert.equal(veredito({}), WEBHOOK_VERDICTS.OK);
+    assert.equal(veredito({ events: ['CONNECTION_UPDATE'] }), WEBHOOK_VERDICTS.EVENTS_MISSING);
+    assert.equal(veredito({ events: [] }), WEBHOOK_VERDICTS.EVENTS_UNKNOWN);
   });
 
   test('o token nunca sai inteiro, venha a URL de onde vier', () => {

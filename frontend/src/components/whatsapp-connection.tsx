@@ -742,7 +742,13 @@ export function WhatsAppConnection({ config }: Props) {
                     painel. Sem esta linha, "conectado" e "nada chega" eram
                     dois fatos sem relação visível na tela. */}
                 {account.webhookVerdict && account.webhookVerdict !== 'ok' && (
-                  <p className="mt-2 text-xs text-[hsl(var(--status-danger))]">
+                  /* Amarelo para `events_unknown` e vermelho para o resto: ali
+                     o painel não viu nada quebrado, viu que não consegue
+                     conferir a lista de eventos. Pintar de vermelho um servidor
+                     possivelmente são é o erro mais caro deste cartão. */
+                  <p className={`mt-2 text-xs ${account.webhookVerdict === 'events_unknown'
+                    ? 'text-[hsl(var(--status-warning))]'
+                    : 'text-[hsl(var(--status-danger))]'}`}>
                     {t(`whatsapp.webhook.verdict.${account.webhookVerdict}`)}
                     {account.webhookServerUrl && (
                       <span className="ml-2 break-all font-mono text-muted-foreground">
