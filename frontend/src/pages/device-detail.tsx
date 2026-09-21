@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { useToast } from '@/components/ui/toast'
 import { useLoading } from '@/components/ui/loading'
@@ -894,6 +894,24 @@ export default function DeviceDetailPage() {
     }
   }
 
+  /**
+   * O formulário do chamado, para o botão do TOPO poder levar até ele.
+   *
+   * Ele mora dentro do bloco do SGP, lá embaixo. Sem isto, clicar em "Abrir
+   * chamado" no cabeçalho abriria um campo de texto fora da tela e a impressão
+   * seria a de um botão que não faz nada.
+   */
+  const ticketFormRef = useRef<HTMLDivElement | null>(null)
+
+  /* `nearest` e não `center`: quem clicou no botão do bloco já está olhando
+     para o formulário, e ali isto não rola nada. Quem clicou no do cabeçalho é
+     levado até ele. A mesma chamada serve aos dois sem saber de qual veio. */
+  useEffect(() => {
+    if (ticketOpen) {
+      ticketFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }
+  }, [ticketOpen])
+
   const handleOpenTicket = async () => {
     const content = ticketText.trim()
     if (!content) {
@@ -1194,6 +1212,32 @@ export default function DeviceDetailPage() {
   const primaryWAN = (device.wan && device.wan.length > 0) ? device.wan[0] : null
   const signalInfo = getSignalStrengthInfo(vp.rxpower?.value);
 
+  /**
+   * Abre (ou fecha) o formulário do chamado. Um só caminho para os dois botões
+   * que o acionam — o do cabeçalho e o do bloco —, senão o texto semeado passa
+   * a depender de por onde se clicou.
+   *
+   * Mora AQUI, depois de `vp`, e não junto do resto dos manipuladores: o texto
+   * semeado lê a potência óptica, que só existe a partir desta linha.
+   */
+  const toggleTicket = () => {
+    // Semeado com a ONT e a leitura óptica do momento: exatamente o que um
+    // chamado aberto por telefone nunca carrega, e o que a equipe de campo
+    // precisa.
+    if (!ticketOpen && !ticketText) {
+      setTicketText(t('detail.sgp.ticketDefaultText', {
+        device: deviceId,
+        rx: vp.rxpower?.value ?? '—'
+      }))
+    }
+    // O formulário mora DENTRO da aba Visão geral. O botão do cabeçalho está
+    // visível nas cinco abas, então sem esta linha clicar nele estando em WiFi
+    // ou em Clientes abriria um campo que não é renderizado — nada na tela, e
+    // a impressão de um botão quebrado.
+    if (!ticketOpen) setActiveTab('overview')
+    setTicketOpen((open) => !open)
+  }
+
   return (
     <div className="page-shell">
       <div className="page-frame">
@@ -1238,6 +1282,37 @@ export default function DeviceDetailPage() {
             >
               <Icon name="bell" size={16} /> {t('detail.requestInform')}
             </button>
+            {/* As duas ações do CONTRATO, repetidas aqui em cima — o mesmo que a
+                faixa do cliente faz com os dados dele, e pela mesma razão: quem
+                está no telefone age antes de rolar a página. Continuam também no
+                bloco do SGP, que é onde moram as faturas e o desvincular.
+
+                Secundárias das duas vezes, embora no bloco a liberação seja a
+                primária: aqui o botão verde já é o "Solicitar Inform", e dois
+                primários lado a lado não dizem qual é o principal. */}
+            {sgpAvailable && sgpLink && (
+              <>
+                <button
+                  type="button"
+                  className="modern-button-secondary"
+                  disabled={sgpUnlocking}
+                  onClick={() => void handleSgpUnlock()}
+                >
+                  <Icon name="unlock" size={16} />
+                  {sgpUnlocking ? t('detail.sgp.unlocking') : t('detail.sgp.unlock')}
+                </button>
+                {sgpTicketEnabled && (
+                  <button
+                    type="button"
+                    className="modern-button-secondary"
+                    onClick={toggleTicket}
+                  >
+                    <Icon name="chat" size={16} />
+                    {t('detail.sgp.ticket')}
+                  </button>
+                )}
+              </>
+            )}
           </div>
         </header>
 
@@ -1512,18 +1587,7 @@ export default function DeviceDetailPage() {
                           <button
                             type="button"
                             className="modern-button-secondary"
-                            onClick={() => {
-                              // Seeded with the ONT and its current optical
-                              // reading — exactly what a ticket opened by phone
-                              // never carries, and what the field team needs.
-                              if (!ticketOpen && !ticketText) {
-                                setTicketText(t('detail.sgp.ticketDefaultText', {
-                                  device: deviceId,
-                                  rx: vp.rxpower?.value ?? '—'
-                                }))
-                              }
-                              setTicketOpen((open) => !open)
-                            }}
+                            onClick={toggleTicket}
                           >
                             <Icon name="chat" size={16} className="me-2" />
                             {t('detail.sgp.ticket')}
@@ -1542,7 +1606,10 @@ export default function DeviceDetailPage() {
                 </div>
 
                 {sgpLink && sgpTicketEnabled && ticketOpen && (
-                  <div className="mt-4 rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-4">
+                  <div
+                    ref={ticketFormRef}
+                    className="mt-4 rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-4"
+                  >
                     <label className="metric-label" htmlFor="sgp-ticket-text">
                       {t('detail.sgp.ticketLabel')}
                     </label>
