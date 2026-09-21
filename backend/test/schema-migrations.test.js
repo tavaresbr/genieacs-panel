@@ -940,3 +940,151 @@ describe('o backfill da data de suspensão', () => {
     );
   });
 });
+
+/**
+ * O endereço do webhook gravado antes de a garantia do caminho existir.
+ *
+ * O defeito apareceu num painel em produção: `webhookBaseUrl` guardado como
+ * `https://painel.exemplo.com`, sem caminho. O servidor Evolution faz POST na
+ * raiz, o frontend responde 200 com HTML, o servidor registra entrega
+ * bem-sucedida, e nada chega nunca. `normalizeWebhookBaseUrl` passou a
+ * completar o caminho, mas só na GRAVAÇÃO — e depender de alguém abrir a aba e
+ * clicar em Salvar é depender de alguém suspeitar primeiro.
+ *
+ * Os dois lados no mesmo lugar, porque reescrever demais custa mais caro que
+ * não reescrever: quem serve o painel sob um prefixo próprio digitou aquele
+ * caminho de propósito, e esta migração não pode passar por cima dele.
+ */
+describe('o caminho do webhook nas linhas que já estavam gravadas', () => {
+  const db = createDatabase('webhook-path-backfill');
+  const PASSO = '0051_whatsapp_webhook_path_backfill';
+  const CHAVE = 'whatsapp_evolution_config';
+  let alfa;
+
+  const blobDe = async (tenantId) => JSON.parse(
+    (await db('app_state').where({ tenant_id: tenantId, key: CHAVE }).first()).value
+  );
+
+  const gravar = async (tenantId, blob) => db('app_state').insert({
+    tenant_id: tenantId, key: CHAVE, value: JSON.stringify(blob)
+  });
+
+  let semCaminho;
+  let comBarra;
+  let jaCerto;
+  let caminhoProprio;
+  let semEndereco;
+  let quebrado;
+
+  before(async () => {
+    for (const migration of migrations.filter((m) => m.id < PASSO)) {
+      await migration.up(db);
+    }
+    alfa = (await db('tenants').orderBy('id', 'asc').first()).id;
+
+    const novoProvedor = async (slug) => insertReturningId(
+      'tenants', { slug, name: slug, status: 'active' }, db
+    );
+    semCaminho = alfa;
+    comBarra = await novoProvedor('com-barra');
+    jaCerto = await novoProvedor('ja-certo');
+    caminhoProprio = await novoProvedor('caminho-proprio');
+    semEndereco = await novoProvedor('sem-endereco');
+    quebrado = await novoProvedor('quebrado');
+
+    // O caso de produção: só o host, e mais campos ao lado que não podem ser
+    // perdidos na reescrita — inclusive o segredo cifrado.
+    await gravar(semCaminho, {
+      enabled: true,
+      webhookBaseUrl: 'https://painel.exemplo.test',
+      allowedHosts: ['evo.exemplo.test'],
+      managedAdminKey: { v: 1, ciphertext: 'cifra', iv: 'iv', tag: 'tag', key_version: 2 },
+      rateLimitPerMin: 20
+    });
+    await gravar(comBarra, { enabled: true, webhookBaseUrl: 'https://painel.exemplo.test/' });
+    await gravar(jaCerto, {
+      enabled: true, webhookBaseUrl: 'https://painel.exemplo.test/api/whatsapp-webhook'
+    });
+    // Quem roteia um caminho próprio para o painel. Reescrever isto quebra a
+    // instalação dele, e é o erro mais caro que este passo pode cometer.
+    await gravar(caminhoProprio, {
+      enabled: true, webhookBaseUrl: 'https://painel.exemplo.test/painel/api/whatsapp-webhook'
+    });
+    await gravar(semEndereco, { enabled: false, webhookBaseUrl: '' });
+    await db('app_state').insert({ tenant_id: quebrado, key: CHAVE, value: 'isto não é json' });
+
+    await ensureSchema(db);
+  });
+
+  it('completa o caminho de quem gravou só o host', async () => {
+    const blob = await blobDe(semCaminho);
+    assert.equal(blob.webhookBaseUrl, 'https://painel.exemplo.test/api/whatsapp-webhook');
+  });
+
+  it('e o resto do blob sobrevive intacto, o segredo cifrado inclusive', async () => {
+    // A reescrita é um JSON.parse seguido de um JSON.stringify. Perder a chave
+    // admin cifrada aqui seria destruir um segredo sem erro e sem volta.
+    const blob = await blobDe(semCaminho);
+    assert.equal(blob.enabled, true);
+    assert.equal(blob.rateLimitPerMin, 20);
+    assert.deepEqual(blob.allowedHosts, ['evo.exemplo.test']);
+    assert.deepEqual(blob.managedAdminKey, {
+      v: 1, ciphertext: 'cifra', iv: 'iv', tag: 'tag', key_version: 2
+    });
+  });
+
+  it('a barra sozinha também conta como "sem caminho"', async () => {
+    assert.equal(
+      (await blobDe(comBarra)).webhookBaseUrl, 'https://painel.exemplo.test/api/whatsapp-webhook'
+    );
+  });
+
+  it('NÃO reescreve o caminho próprio de quem serve o painel sob um prefixo', async () => {
+    // O caso que decide se este passo é seguro. Um `endsWith` ingênuo diria que
+    // `/painel/api/whatsapp-webhook` já termina certo — e diz, e é por isso que
+    // ele passa intacto. O que não pode acontecer é ele virar
+    // `/api/whatsapp-webhook` e o roteamento do operador parar de casar.
+    assert.equal(
+      (await blobDe(caminhoProprio)).webhookBaseUrl,
+      'https://painel.exemplo.test/painel/api/whatsapp-webhook'
+    );
+  });
+
+  it('não inventa endereço para quem não tem nenhum', async () => {
+    assert.equal((await blobDe(semEndereco)).webhookBaseUrl, '');
+  });
+
+  it('e um valor que não é JSON não derruba o passo nem é tocado', async () => {
+    const linha = await db('app_state').where({ tenant_id: quebrado, key: CHAVE }).first();
+    assert.equal(linha.value, 'isto não é json');
+  });
+
+  it('quem já estava certo não é reescrito', async () => {
+    assert.equal(
+      (await blobDe(jaCerto)).webhookBaseUrl, 'https://painel.exemplo.test/api/whatsapp-webhook'
+    );
+  });
+
+  it('e rodar de novo não muda mais nada', async () => {
+    // Idempotência pedida do jeito que o boot pediria: o passo direto, e
+    // depois o runner inteiro.
+    const step = migrations.find((m) => m.id === PASSO);
+    await step.up(db);
+    await ensureSchema(db);
+    assert.equal(
+      (await blobDe(semCaminho)).webhookBaseUrl, 'https://painel.exemplo.test/api/whatsapp-webhook'
+    );
+    assert.equal(
+      (await blobDe(caminhoProprio)).webhookBaseUrl,
+      'https://painel.exemplo.test/painel/api/whatsapp-webhook'
+    );
+  });
+
+  it('e `isApplied` responde que sim depois de rodar', async () => {
+    // É o que impede o passo de rodar de novo num banco que já o tem — e, num
+    // banco antigo sendo baselined, o que impede de marcá-lo como aplicado sem
+    // ter rodado.
+    const step = migrations.find((m) => m.id === PASSO);
+    assert.equal(await step.isApplied(db), true);
+  });
+});

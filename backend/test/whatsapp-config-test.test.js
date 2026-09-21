@@ -1,11 +1,12 @@
 import { after, before, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { asTenant, authHeaders, call, startTestServers, stopTestServers } from './helpers/harness.js';
+import { asTenant, authHeaders, call, getDb, startTestServers, stopTestServers } from './helpers/harness.js';
 
 const { default: WhatsAppConfigService } = await import('../src/services/whatsappConfigService.js');
 const { setProbeFetcher } = await import('../src/services/evolutionInstanceService.js');
 const { whatsappTestLimiter } = await import('../src/middleware/rateLimit.js');
+const { default: WhatsAppAccount } = await import('../src/models/WhatsAppAccount.js');
 
 /**
  * O diagnóstico que roda com ZERO números conectados.
@@ -153,6 +154,7 @@ beforeEach(async () => {
   stub.listBody = [{ name: 'instancia-existente', connectionStatus: 'open' }];
   stub.adminKeyVisto = null;
   volta.modo = 'painel';
+  await getDb()('whatsapp_accounts').del();
   // O teto é de seis por minuto, e a suíte faz mais que isso. Zerado por caso
   // em vez de afrouxado no produto: o limitador existe porque um clique aqui
   // faz o painel emitir quatro requisições para endereços de terceiros, e
@@ -334,5 +336,84 @@ describe('as recusas que acontecem antes de abrir socket', () => {
     await asTenant(() => WhatsAppConfigService.saveConfig({ managedUrl: 'http://evo.provedor.test' }));
     const { body } = await testar();
     assert.equal(veredito(body, 'server'), 'insecure_base_url');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// O descompasso entre o que o painel gerencia e o que está no servidor
+//
+// "Instâncias no servidor: 2" ao lado de "Nenhum número conectado ainda" é
+// informação, e dependia de alguém reparar no número. Foi assim que um painel
+// em produção descobriu ter duas instâncias órfãs carregando um webhook antigo.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('o painel e o servidor comparados', () => {
+  /** Uma linha de conta, do jeito que o pareamento a deixa. */
+  const conta = (nome) => asTenant(() => WhatsAppAccount.create({
+    name: nome,
+    purpose: 'support',
+    flavor: 'v2',
+    base_url: EVO_BASE,
+    status: 'connected',
+    ...WhatsAppConfigService.encryptInstanceToken(`token-${nome}`),
+    ...WhatsAppConfigService.encryptWebhookToken(`webhook-${nome}`)
+  }));
+
+  it('batendo dos dois lados, o passo passa', async () => {
+    stub.listBody = [{ name: 'painel-um', connectionStatus: 'open' }];
+    await conta('painel-um');
+    const { body } = await testar();
+    assert.equal(veredito(body, 'instances'), 'ok');
+    assert.equal(detalhe(body, 'instances'), 1);
+  });
+
+  it('instância no servidor sem linha aqui é ÓRFÃ, e vem com a contagem', async () => {
+    // O caso do painel em produção: duas instâncias no servidor e nenhuma
+    // conta no painel. Hoje isso aparecia só como um número na linha da chave
+    // admin, que ninguém tem motivo para conferir.
+    stub.listBody = [
+      { name: 'sobra-um', connectionStatus: 'open' },
+      { name: 'sobra-dois', connectionStatus: 'close' }
+    ];
+    const { body } = await testar();
+    assert.equal(veredito(body, 'instances'), 'orphans');
+    assert.equal(detalhe(body, 'instances'), 2);
+  });
+
+  it('linha aqui sem instância lá é FALTANDO — o número que parece conectado', async () => {
+    stub.listBody = [];
+    await conta('painel-fantasma');
+    const { body } = await testar();
+    assert.equal(veredito(body, 'instances'), 'missing');
+    assert.equal(detalhe(body, 'instances'), 1);
+  });
+
+  it('os dois ao mesmo tempo têm veredito próprio', async () => {
+    stub.listBody = [{ name: 'so-no-servidor', connectionStatus: 'open' }];
+    await conta('so-no-painel');
+    const { body } = await testar();
+    assert.equal(veredito(body, 'instances'), 'both');
+  });
+
+  it('e NENHUM nome de instância sai na resposta', async () => {
+    // Só contagens. Quem roda este teste já tem a chave admin global do
+    // servidor e pode listar tudo com um curl, então a contagem não concede
+    // nada — mas imprimir na tela o nome da instância de um vizinho é outra
+    // coisa, e o diagnóstico não precisa disso.
+    stub.listBody = [{ name: 'nome-que-nao-pode-vazar', connectionStatus: 'open' }];
+    const { body } = await testar();
+    assert.ok(
+      !JSON.stringify(body).includes('nome-que-nao-pode-vazar'),
+      'o nome da instância apareceu na resposta'
+    );
+  });
+
+  it('sem chave admin aceita, o passo não afirma nada', async () => {
+    stub.listStatus = 401;
+    stub.listBody = { message: 'Unauthorized' };
+    await conta('painel-um');
+    const { body } = await testar();
+    assert.equal(veredito(body, 'adminKey'), 'unauthorized');
+    assert.equal(veredito(body, 'instances'), 'skipped',
+      'comparou contra uma listagem que o servidor recusou');
   });
 });

@@ -740,11 +740,12 @@ class EvolutionInstanceService {
       }
     }
 
-    // ── 4 e 5: uma chamada só, dois vereditos ────────────────────────────
+    // ── 4, 5 e 7: uma chamada só, três vereditos ─────────────────────────
     //
     // `send` levanta `license_required` antes de olhar o 401, então a licença
     // sai da mesma tentativa que testa a chave. A leitura da raiz acima é o que
     // cobre o caso sem chave admin salva, em que esta chamada nem acontece.
+    let nomesNoServidor = null;
     if (!servidorOk) {
       add('license', 'skipped');
       add('adminKey', 'skipped');
@@ -758,8 +759,13 @@ class EvolutionInstanceService {
       try {
         const listed = await client.send(listInstancesRequest(flavor));
         add('license', 'ok');
-        if (listed.ok) add('adminKey', 'ok', readInstances(flavor, listed.data).length);
-        else add('adminKey', 'http_error', listed.status);
+        if (listed.ok) {
+          const instancias = readInstances(flavor, listed.data);
+          nomesNoServidor = new Set(instancias.map((i) => i.name));
+          add('adminKey', 'ok', instancias.length);
+        } else {
+          add('adminKey', 'http_error', listed.status);
+        }
       } catch (error) {
         const code = error instanceof WaError ? String(error.code || '') : '';
         if (code === 'license_required') {
@@ -773,6 +779,39 @@ class EvolutionInstanceService {
           add('adminKey', code === 'unauthorized' ? 'unauthorized' : code || 'unreachable');
         }
       }
+    }
+
+    // ── 7. os dois lados batem? ──────────────────────────────────────────
+    //
+    // "Instâncias no servidor: 2" ao lado de "Nenhum número conectado ainda" é
+    // informação, e hoje ela depende de alguém reparar no número. Foi assim que
+    // um painel em produção descobriu ter duas instâncias órfãs carregando um
+    // webhook antigo — o valor é escrito no create e em lugar nenhum depois,
+    // então consertar a configuração do painel não alcança as que já existem.
+    //
+    // As duas metades têm consequências opostas e merecem frases próprias:
+    //
+    //   - **órfã**: instância no servidor sem linha aqui. Não quebra nada que o
+    //     painel faça, mas ocupa o servidor e pode guardar webhook velho.
+    //     É AVISO, não falha: o servidor pode legitimamente hospedar instância
+    //     de outro sistema.
+    //   - **faltando**: linha aqui sem instância lá. O painel mostra o número
+    //     como conectado e ele não envia nem recebe nada. Isso é falha.
+    //
+    // Só CONTAGENS saem daqui, nunca nomes. Quem roda este teste já tem a chave
+    // admin global do servidor e pode listar tudo com um curl — então a
+    // contagem não concede nada —, mas imprimir na tela o nome da instância de
+    // um vizinho é outra coisa, e não é necessária para o diagnóstico.
+    if (!nomesNoServidor) {
+      add('instances', 'skipped');
+    } else {
+      const doPainel = (await WhatsAppAccount.getAll()).map((linha) => linha.name);
+      const orfas = [...nomesNoServidor].filter((nome) => !doPainel.includes(nome)).length;
+      const faltando = doPainel.filter((nome) => !nomesNoServidor.has(nome)).length;
+      if (orfas && faltando) add('instances', 'both');
+      else if (faltando) add('instances', 'missing', faltando);
+      else if (orfas) add('instances', 'orphans', orfas);
+      else add('instances', 'ok', doPainel.length);
     }
 
     add('roundTrip', voltaVeredito);

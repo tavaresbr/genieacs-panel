@@ -55,6 +55,7 @@ const LABEL: Record<string, TranslationKey> = {
   server: 'settings.whatsapp.test.step.server',
   license: 'settings.whatsapp.test.step.license',
   adminKey: 'settings.whatsapp.test.step.adminKey',
+  instances: 'settings.whatsapp.test.step.instances',
   roundTrip: 'settings.whatsapp.test.step.roundTrip'
 }
 
@@ -98,6 +99,12 @@ const PHRASE: Record<string, TranslationKey> = {
   'adminKey.unreachable': 'settings.whatsapp.test.server.unreachable',
   'adminKey.skipped': 'settings.whatsapp.test.skipped',
 
+  'instances.ok': 'settings.whatsapp.test.instances.ok',
+  'instances.orphans': 'settings.whatsapp.test.instances.orphans',
+  'instances.missing': 'settings.whatsapp.test.instances.missing',
+  'instances.both': 'settings.whatsapp.test.instances.both',
+  'instances.skipped': 'settings.whatsapp.test.skipped',
+
   'roundTrip.reached': 'settings.whatsapp.test.roundTrip.reached',
   'roundTrip.wrong_target': 'settings.whatsapp.test.roundTrip.wrongTarget',
   'roundTrip.not_found': 'settings.whatsapp.test.roundTrip.notFound',
@@ -110,8 +117,19 @@ const PHRASE: Record<string, TranslationKey> = {
 
 /** Os vereditos que significam "deu certo". Todo o resto é problema ou dúvida. */
 const APROVADOS = new Set([
-  'config.ok', 'webhookPath.ok', 'server.ok', 'license.ok', 'adminKey.ok', 'roundTrip.reached'
+  'config.ok', 'webhookPath.ok', 'server.ok', 'license.ok', 'adminKey.ok',
+  'instances.ok', 'roundTrip.reached'
 ])
+
+/**
+ * O que é digno de nota sem ser defeito.
+ *
+ * Uma instância no servidor que o painel não gerencia não quebra nada que o
+ * painel faça — o servidor pode legitimamente hospedar instância de outro
+ * sistema. Ela merece ser vista, e não merece o vermelho que manda o operador
+ * consertar o que talvez esteja certo.
+ */
+const AVISOS = new Set(['instances.orphans'])
 
 /**
  * Grave, dúvida ou tudo bem.
@@ -122,7 +140,7 @@ const APROVADOS = new Set([
  */
 export function toneOf(passo: string, veredito: string): TestTone {
   if (APROVADOS.has(`${passo}.${veredito}`)) return 'calm'
-  if (veredito === 'skipped') return 'warn'
+  if (veredito === 'skipped' || AVISOS.has(`${passo}.${veredito}`)) return 'warn'
   return 'alarm'
 }
 
@@ -149,13 +167,24 @@ export function testNotes(resultado: WhatsAppConfigTest | null, t: Translate): T
 }
 
 /**
- * Passou tudo?
+ * O resumo, em três estados e não em dois.
  *
- * Um `skipped` NÃO conta como aprovado. A tela que dissesse "está tudo certo"
- * com a volta pulada afirmaria exatamente o que o botão existe para não
- * afirmar.
+ * `failed` quando algum passo é grave; `warned` quando nenhum é grave mas algum
+ * é dúvida ou ressalva; `passed` só quando todos são aprovados.
+ *
+ * Os três existem porque dois mentiriam nas duas pontas: "está tudo certo" com
+ * a volta pulada afirma exatamente o que este botão existe para não afirmar, e
+ * "há passos que não passaram" sobre uma instância órfã manda o operador
+ * procurar um defeito que pode não existir.
  */
+export function testOutcome(resultado: WhatsAppConfigTest | null): 'passed' | 'warned' | 'failed' {
+  if (!resultado?.passos?.length) return 'failed'
+  const tons = resultado.passos.map((step) => toneOf(step.passo, step.veredito))
+  if (tons.includes('alarm')) return 'failed'
+  return tons.includes('warn') ? 'warned' : 'passed'
+}
+
+/** Todos os passos aprovados, sem ressalva nenhuma. */
 export function testPassed(resultado: WhatsAppConfigTest | null): boolean {
-  if (!resultado?.passos?.length) return false
-  return resultado.passos.every((step) => APROVADOS.has(`${step.passo}.${step.veredito}`))
+  return testOutcome(resultado) === 'passed'
 }
