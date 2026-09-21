@@ -4,6 +4,7 @@ import WaHealthService from '../services/waHealthService.js';
 import WhatsAppAccount from '../models/WhatsAppAccount.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { translateError } from '../i18n/index.js';
+import AuditLog from '../models/AuditLog.js';
 
 export function handleError(req, res, error, fallbackKey) {
   if (error instanceof WaError) {
@@ -177,6 +178,33 @@ class WhatsAppController {
       }));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.accountActionFailed');
+    }
+  }
+
+  /**
+   * O diagnóstico da configuração, que roda com zero números conectados.
+   *
+   * A trilha grava os VEREDITOS, nunca a chave admin nem token nenhum. O
+   * endereço do webhook passa pelo mesmo redator que o serviço já usa, e ele
+   * está no resultado — a linha da trilha é o registro de que o painel emitiu
+   * requisições para endereços escolhidos por quem administra, e sem o endereço
+   * ela não registra o que interessa.
+   */
+  static async testConfig(req, res) {
+    try {
+      const resultado = await EvolutionInstanceService.testConfig();
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.WHATSAPP_CONFIG_TESTED,
+        subjectType: 'whatsapp',
+        subjectId: 'config',
+        detail: {
+          ...Object.fromEntries(resultado.passos.map(({ passo, veredito }) => [passo, veredito])),
+          webhook: resultado.passos.find((p) => p.passo === 'webhookPath')?.detalhe ?? null
+        }
+      });
+      return res.json(createResponse(req.t('whatsapp.configTested'), resultado));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.configTestFailed');
     }
   }
 

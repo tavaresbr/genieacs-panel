@@ -453,6 +453,8 @@ export default {
   'whatsapp.webhookChecked': '서버에서 웹훅을 확인했습니다',
   'whatsapp.webhookReapplied': '서버에서 웹훅을 다시 작성했습니다',
   'whatsapp.webhookProbed': '웹훅 왕복을 확인했습니다',
+  'whatsapp.configTested': '연동 진단을 실행했습니다',
+  'whatsapp.configTestFailed': '연동 진단을 실행하지 못했습니다',
   'whatsapp.numbersChecked': 'WhatsApp에서 번호를 확인했습니다',
   'whatsapp.messageQueued': '메시지를 발송 대기열에 추가했습니다',
   'whatsapp.messageSendFailed': '메시지를 대기열에 추가하지 못했습니다',

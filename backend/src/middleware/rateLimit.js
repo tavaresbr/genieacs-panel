@@ -257,6 +257,26 @@ export const sgpAdminLimiter = limiter({
   message: limitMessage('rateLimit.sgpAdmin', 'rate_limited_sgp')
 });
 
+/**
+ * O teste da configuração do WhatsApp.
+ *
+ * Um clique aqui faz o painel emitir até quatro requisições de saída — duas
+ * sondas ao servidor Evolution, uma listagem autenticada e a volta contra a
+ * própria URL pública —, e todas para endereços que quem administra escolheu.
+ * Seis por minuto cobre com folga alguém consertando um campo e testando de
+ * novo, e é pouco o bastante para que este botão não vire um jeito de usar o
+ * painel para bater em terceiros em rajada.
+ *
+ * O roteador de WhatsApp não tinha limitador nenhum; esta é a primeira rota
+ * dele que precisa de um, e pelo motivo acima.
+ */
+export const whatsappTestLimiter = limiter({
+  windowMs: 60 * 1000,
+  max: 6,
+  keyGenerator: (req) => (req.user?.userId ? `user:${req.user.userId}` : `ip:${ipKey(req)}`),
+  message: limitMessage('rateLimit.requests', 'rate_limited')
+});
+
 /** A fleet sync calls the provider once per ONT, so it is rarer still. */
 export const sgpSyncLimiter = limiter({
   windowMs: 60 * 60 * 1000,

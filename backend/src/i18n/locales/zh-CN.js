@@ -455,6 +455,8 @@ export default {
   'whatsapp.webhookChecked': '已在服务器上检查 Webhook',
   'whatsapp.webhookReapplied': '已在服务器上重写 Webhook',
   'whatsapp.webhookProbed': '已检查 Webhook 往返',
+  'whatsapp.configTested': '已运行集成诊断',
+  'whatsapp.configTestFailed': '无法运行集成诊断',
   'whatsapp.numbersChecked': '已在 WhatsApp 上查询号码',
   'whatsapp.messageQueued': '消息已加入发送队列',
   'whatsapp.messageSendFailed': '无法将消息加入队列',
