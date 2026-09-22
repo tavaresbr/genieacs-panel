@@ -891,7 +891,32 @@ class SgpService {
     return payload;
   }
 
-  static async lookupCustomer(filters, configOverride = null, { includeSecrets = false } = {}) {
+  /**
+   * Asks the SGP for a customer, and asks again with the login in lower case
+   * when the first answer found nothing.
+   *
+   * The ONT and the RADIUS disagree about case and neither cares: an ONT
+   * configured with `TA100.021` authenticates against a cadastre holding
+   * `ta100.021`, so the subscriber is online. The SGP lookup matches the
+   * login exactly, though, and answered "no contract" for every such ONT —
+   * which left it without an SGP link for no reason the operator could see.
+   */
+  static async lookupCustomer(filters, configOverride = null, options = {}) {
+    const login = asText(filters?.login);
+    const lowered = login ? login.toLowerCase() : null;
+    if (!login || lowered === login) {
+      return this.lookupCustomerOnce(filters, configOverride, options);
+    }
+    try {
+      const result = await this.lookupCustomerOnce(filters, configOverride, options);
+      if (result.contracts.length > 0) return result;
+    } catch (error) {
+      if (!isNotFound(error)) throw error;
+    }
+    return this.lookupCustomerOnce({ ...filters, login: lowered }, configOverride, options);
+  }
+
+  static async lookupCustomerOnce(filters, configOverride = null, { includeSecrets = false } = {}) {
     const data = await this.request(
       'customer',
       this.buildLookupPayload(filters),
