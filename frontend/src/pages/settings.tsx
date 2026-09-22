@@ -31,6 +31,7 @@ import { ProvisioningTab } from '@/components/settings/provisioning-tab'
 import { SgpEventsPanel } from '@/components/settings/sgp-events-panel'
 import { WhatsAppConnection, whatsappErrorMessage } from '@/components/whatsapp-connection'
 import { TEST_TONE_CLASS, testNotes, testOutcome } from '@/lib/whatsapp-test'
+import { auditRetentionError } from '@/lib/settings-validation'
 import { useAuth } from '@/contexts/auth-context'
 import { useTenant } from '@/contexts/tenant-context'
 import { useTranslation } from '@/contexts/language-context'
@@ -121,6 +122,10 @@ export default function Settings() {
     customerIdPrefixMode: 'default',
     customerIdCompanyPrefix: 'CSG',
     customerIdSuffixMode: 'random',
+    // Por quantos dias a trilha é guardada. O valor real chega do servidor na
+    // carga; este é só o que a tela mostra antes dela, e é o mesmo padrão que
+    // o agendador usa quando não há nada salvo.
+    auditRetentionDays: '365',
     ...INSTALLER_VIRTUAL_PARAMETERS
   })
   const [loading, setLoading] = useState(false)
@@ -931,6 +936,15 @@ export default function Settings() {
       toast.error(t('settings.genieAuth.usernameRequired'))
       return
     }
+    // Mesma ideia, para o primeiro campo numérico livre deste laço: o salvar
+    // percorre as chaves e para na primeira recusa com uma mensagem genérica,
+    // sem dizer qual campo. Enquanto todo campo vinha de um seletor isso nunca
+    // apareceu.
+    const prazoRuim = auditRetentionError(settings.auditRetentionDays)
+    if (prazoRuim) {
+      toast.error(t(prazoRuim))
+      return
+    }
     setLoading(true)
     loadingCtl.show(t('settings.savingProgress'))
     let ok = true
@@ -951,15 +965,20 @@ export default function Settings() {
         if (right === 'autoGenerateCustomerId') return -1
         return 0
       })
+      let successMessage = t('settings.saveSuccess')
+      let errorMessage = t('settings.saveError')
       for (const [key, value] of entries) {
         const res = await settingsAPI.update(key, String(value))
         if (!res.success) {
           ok = false
+          // A recusa do servidor diz QUAL regra falhou; descartá-la deixava o
+          // operador com "não foi possível salvar" e nenhum caminho. Rede de
+          // segurança da conferência acima, para o dia em que as duas
+          // discordarem.
+          errorMessage = res.message || errorMessage
           break
         }
       }
-      let successMessage = t('settings.saveSuccess')
-      let errorMessage = t('settings.saveError')
 
       if (ok) {
         // A URL acabou de ser gravada, então é ela que o servidor vai comparar
@@ -1473,6 +1492,40 @@ export default function Settings() {
                       </div>
                     )}
                   </div>
+                </div>
+              </div>
+
+              {/* O prazo da trilha.
+                  Aqui e não na aba "Acesso da conta": aquela é sobre a conta de
+                  QUEM ESTÁ USANDO o painel — trocar o próprio usuário, a
+                  própria senha — e tem botões de salvar próprios. Este é
+                  política do provedor, gravado pelo mesmo Salvar que grava o
+                  resto desta aba.
+
+                  Os dois limites da ajuda não são enfeite: o servidor recusa
+                  fora deles, e dizer os números aqui é o que evita a ida
+                  perdida. */}
+              <div className="mt-6 border-t border-border pt-6">
+                <h3 className="font-semibold">{t('settings.audit.title')}</h3>
+                <p className="field-hint mb-4 mt-1">{t('settings.audit.description')}</p>
+                <div className="max-w-xs">
+                  <label htmlFor="audit-retention" className="field-label">
+                    {t('settings.audit.retention')}
+                  </label>
+                  <input
+                    id="audit-retention"
+                    type="number"
+                    min={30}
+                    max={3650}
+                    step={1}
+                    className="modern-input w-full"
+                    value={settings.auditRetentionDays}
+                    onChange={(event) => setSettings((current) => ({
+                      ...current,
+                      auditRetentionDays: event.target.value
+                    }))}
+                  />
+                  <p className="field-hint">{t('settings.audit.retentionHint')}</p>
                 </div>
               </div>
 

@@ -15,7 +15,21 @@ export const DEFAULT_SETTINGS = {
   vpSuperAdmin: 'VirtualParameters.LoginSuperUser',
   vpSuperPassword: 'VirtualParameters.LoginSuperPass',
   vpUserAdmin: '',
-  vpUserPassword: ''
+  vpUserPassword: '',
+  // Por quantos dias a trilha de auditoria é guardada.
+  //
+  // Semeada e não só lida com um padrão, porque a tela grava por
+  // `PUT /api/settings/:key`, que ATUALIZA e responde 404 quando não há linha.
+  // Sem semente, o campo existiria e não salvaria — e o provedor concluiria
+  // que a tela está quebrada, que é pior do que não ter o campo.
+  //
+  // A semente alcança quem já existe: `seedDefaults` roda a cada boot e
+  // insere toda chave que falta, provedor a provedor. Não precisa de migração.
+  //
+  // O leitor em `schedulerService` continua com o mesmo padrão e os mesmos
+  // limites, e continua sendo a última linha: ele alcança valor escrito direto
+  // no banco, e um deploy que nunca rodou o seed.
+  auditRetentionDays: '365'
 };
 
 // Values shipped by older SkyGenPanel releases. Only these exact values are
