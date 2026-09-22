@@ -387,7 +387,7 @@ class DeviceService {
     };
   }
 
-  static buildDeviceListProjection(virtualParams, learnedRxPaths = []) {
+  static buildDeviceListProjection(virtualParams, learnedRxPaths = [], learnedPppoePaths = []) {
     return [
       '_id',
       '_deviceId._ProductClass',
@@ -403,6 +403,7 @@ class DeviceService {
       // to be asked for even when the VirtualParameters do answer — whether
       // they did is only known once the response is in hand.
       ...PPPOE_FALLBACK_PATHS,
+      ...learnedPppoePaths,
       ...RX_POWER_FALLBACK_PATHS,
       ...learnedRxPaths,
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID',
@@ -560,6 +561,48 @@ class DeviceService {
   }
 
   /**
+   * Where this GenieACS was seen to publish the PPPoE login outside the
+   * catalogue in `PPPOE_FALLBACK_PATHS`.
+   *
+   * The catalogue names WAN connections 1–2 because a listing cannot project
+   * whole WAN subtrees for every row. An ONT whose Internet service sits on a
+   * higher index — ZTE's F-series puts TR-069, VoIP and Internet on separate
+   * connection objects — read "Não informado" everywhere, and with no login
+   * the SGP link never formed. The path is found once, on one device's full
+   * tree, and from then on the listing and the fleet sync ask for it by name.
+   */
+  static PPPOE_PATH_KEY = 'pppoe_path';
+
+  /** Same bound as the RX paths, for the same reason. */
+  static PPPOE_PATH_LIMIT = 4;
+
+  static async readPppoePaths() {
+    try {
+      const raw = await AppState.get(this.PPPOE_PATH_KEY);
+      if (!raw) return [];
+      const paths = JSON.parse(raw)?.paths;
+      return Array.isArray(paths) ? paths.filter((path) => typeof path === 'string' && path) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  /** Files a login path the catalogue does not already ask for. Never throws. */
+  static async rememberPppoePath(path) {
+    if (!path || PPPOE_FALLBACK_PATHS.includes(path)) return;
+    try {
+      const known = await this.readPppoePaths();
+      if (known.includes(path)) return;
+      await AppState.upsert(
+        this.PPPOE_PATH_KEY,
+        JSON.stringify({ paths: [path, ...known].slice(0, this.PPPOE_PATH_LIMIT) })
+      );
+    } catch (error) {
+      console.warn(`Unable to record the PPPoE login path: ${error.message}`);
+    }
+  }
+
+  /**
    * Where this GenieACS was seen to publish optical RX, kept per provider
    * because two providers run two fleets.
    *
@@ -707,7 +750,11 @@ class DeviceService {
     const { page, pageSize, search, status, focus } = this.normalizeDeviceListQuery(options);
     const virtualParams = await this.getVirtualParameters();
     const learnedRxPaths = await this.ensureRxPowerPaths();
-    const projection = this.buildDeviceListProjection(virtualParams, learnedRxPaths);
+    const projection = this.buildDeviceListProjection(
+      virtualParams,
+      learnedRxPaths,
+      await this.readPppoePaths()
+    );
     const listQuery = this.buildDeviceListQuery(status, focus);
     const queryParam = listQuery ? JSON.stringify(listQuery) : null;
     const passagemLocal = Boolean(search) || this.focusNeedsLocalPass(focus);
@@ -1099,11 +1146,18 @@ class DeviceService {
         null
     };
 
+    const pppoeUsername = this.resolvePppoeUsername(item, virtualParams);
+    // The detail page projects the whole WAN tree, so it is where an ONT
+    // model's login path is most often seen first.
+    if (pppoeUsername.value && pppoeUsername.path !== virtualParams.vpPppoeUsername) {
+      await this.rememberPppoePath(pppoeUsername.path);
+    }
+
     const virtualParameters = {
       // The path is the one the value was actually read at, not always the
       // configured VirtualParameter: when a fallback answered, this is what
       // tells support where the panel got it.
-      pppoeUsername: this.resolvePppoeUsername(item, virtualParams),
+      pppoeUsername,
       wanBridge: {
         path: virtualParams.vpWanBridge,
         value: getVPValue(virtualParams.vpWanBridge)
@@ -1346,7 +1400,8 @@ class DeviceService {
       // Same reason the listing projects them: an install whose
       // VirtualParameters were never written answers with nothing, and the
       // login was in the ONT's own tree the whole time.
-      ...PPPOE_FALLBACK_PATHS
+      ...PPPOE_FALLBACK_PATHS,
+      ...await this.readPppoePaths()
     ].filter(Boolean);
     const data = await this.fetchFromGenieAcs('', { projection: projection.join(',') });
     if (!Array.isArray(data)) {
@@ -1374,13 +1429,30 @@ class DeviceService {
   static async getReportedPppoe(deviceId) {
     if (!deviceId) return null;
     const virtualParams = await this.getVirtualParameters();
+    const query = JSON.stringify({ _id: deviceId });
     const rows = await this.fetchDeviceListPage(
-      JSON.stringify({ _id: deviceId }),
-      ['_id', virtualParams.vpPppoeUsername, ...PPPOE_FALLBACK_PATHS].filter(Boolean)
+      query,
+      [
+        '_id',
+        virtualParams.vpPppoeUsername,
+        ...PPPOE_FALLBACK_PATHS,
+        ...await this.readPppoePaths()
+      ].filter(Boolean)
     );
     if (rows.length === 0) return null;
     const login = this.resolvePppoeUsername(rows[0], virtualParams).value;
-    return typeof login === 'string' && login.trim() ? login.trim() : null;
+    if (typeof login === 'string' && login.trim()) return login.trim();
+
+    // Nothing at the paths the panel knows. One device's whole WAN tree is a
+    // cheap read, and the path it turns up is kept for the listing.
+    const [full] = await this.fetchDeviceListPage(
+      query,
+      ['_id', 'InternetGatewayDevice.WANDevice', 'Device.PPP.Interface']
+    );
+    const found = full ? findPppoeUsername(full, (node) => this.readNodeValue(node)) : null;
+    if (!found) return null;
+    await this.rememberPppoePath(found.path);
+    return found.value;
   }
 
   static async getCustomerPortalOverview(deviceId) {
