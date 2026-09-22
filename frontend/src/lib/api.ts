@@ -1321,6 +1321,7 @@ export interface DeviceListParams {
   pageSize?: number
   search?: string
   status?: 'all' | 'online' | 'offline'
+  focus?: 'all' | 'new24h' | 'weak-signal' | 'hot' | 'many-clients'
 }
 
 export interface DeviceListResponse<T> {
@@ -1386,6 +1387,7 @@ export const devicesAPI = {
     if (params.pageSize !== undefined) query.set('pageSize', String(params.pageSize))
     if (params.search) query.set('search', params.search)
     if (params.status && params.status !== 'all') query.set('status', params.status)
+    if (params.focus && params.focus !== 'all') query.set('focus', params.focus)
     const search = query.toString()
     return apiClient.get(`/devices${search ? `?${search}` : ''}`)
   },

@@ -329,17 +329,17 @@ export default function DashboardPage() {
 
         {canInspect && <DeviceSwapsCard />}
 
-        {/* Cada número leva à lista que ele conta — quando essa lista existe.
-            `new24h` NÃO é link, e é de propósito: a API de equipamentos filtra
-            por busca e por online/offline, e nada mais. Um link que abrisse a
-            lista inteira sob o rótulo "3 novos em 24h" seria pior que texto
-            parado: o operador contaria 29 e concluiria que o número mente. */}
+        {/* Cada número leva à lista que ele conta, e agora todos levam: a API
+            de equipamentos passou a cumprir os recortes do painel, então o
+            clique em "3 novos em 24h" abre três linhas. As faixas são as
+            mesmas dos dois lados porque são o mesmo código — se o número e a
+            lista discordassem, o link seria pior que texto parado. */}
         <section className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {([
             ['dashboard.stat.total', data.stats.total, 'server', 'text-foreground', '/devices'],
             ['dashboard.stat.online', data.stats.online, 'check', 'text-[hsl(var(--status-success))]', '/devices?status=online'],
             ['dashboard.stat.offline', data.stats.offline, 'warning', 'text-[hsl(var(--status-danger))]', '/devices?status=offline'],
-            ['dashboard.stat.new24h', data.stats.new24h, 'bell', 'text-primary', null],
+            ['dashboard.stat.new24h', data.stats.new24h, 'bell', 'text-primary', '/devices?focus=new24h'],
           ] as const).map(([labelKey, value, icon, color, to]) => {
             const corpo = (
               <>
@@ -369,14 +369,14 @@ export default function DashboardPage() {
                 <p className="mt-8 text-sm leading-6 text-[#c8d4ce]">{t('dashboard.availability.description', { online: data.stats.online, total: data.stats.total })}</p>
               </div>
               <div className="grid grid-cols-2">
-                <div className="border-b border-e border-border p-5"><p className="metric-label">{t('dashboard.metric.opticalRisk')}</p><p className="metric-value text-[hsl(var(--status-warning))]">{signalRisk}</p></div>
-                {/* Mesmo destino da linha da fila: a tabela de falhas está
-                    nesta página. Os três vizinhos deste bloco — risco óptico,
-                    quentes e 16+ clientes — continuam texto parado, porque a
-                    lista de equipamentos não sabe filtrar por nenhum deles. */}
+                <Link to="/devices?focus=weak-signal" className="block border-b border-e border-border p-5 transition-colors hover:text-primary"><p className="metric-label">{t('dashboard.metric.opticalRisk')}</p><p className="metric-value text-[hsl(var(--status-warning))]">{signalRisk}</p></Link>
+                {/* As falhas continuam apontando para dentro desta página: a
+                    tabela delas está logo abaixo, e não há lista de
+                    equipamentos que responda por elas. Os três vizinhos agora
+                    apontam para o recorte que cada um conta. */}
                 <a href="#dashboard-faults" className="block border-b border-border p-5 transition-colors hover:text-primary"><p className="metric-label">{t('dashboard.metric.activeFaults')}</p><p className="metric-value text-[hsl(var(--status-danger))]">{data.faults.length}</p></a>
-                <div className="border-e border-border p-5"><p className="metric-label">{t('dashboard.metric.hotDevices')}</p><p className="metric-value">{data.temperatureDistribution.Hot || 0}</p></div>
-                <div className="p-5"><p className="metric-label">{t('dashboard.metric.manyClients')}</p><p className="metric-value">{data.clientDistribution['16+'] || 0}</p></div>
+                <Link to="/devices?focus=hot" className="block border-e border-border p-5 transition-colors hover:text-primary"><p className="metric-label">{t('dashboard.metric.hotDevices')}</p><p className="metric-value">{data.temperatureDistribution.Hot || 0}</p></Link>
+                <Link to="/devices?focus=many-clients" className="block p-5 transition-colors hover:text-primary"><p className="metric-label">{t('dashboard.metric.manyClients')}</p><p className="metric-value">{data.clientDistribution['16+'] || 0}</p></Link>
               </div>
             </div>
           </div>
@@ -390,13 +390,12 @@ export default function DashboardPage() {
                   está logo abaixo, nesta mesma página. O destino honesto é
                   ela, e não `/devices`. */}
               <a href="#dashboard-faults" className="flex min-h-16 items-center justify-between py-3 hover:text-primary"><span><strong className="block text-sm">{t('dashboard.queue.faults')}</strong><small className="text-muted-foreground">{t('dashboard.queue.faultsHint')}</small></span><span className="data-value text-[hsl(var(--status-danger))]">{data.faults.length}</span></a>
-              {/* DEIXOU de ser link, e é uma remoção deliberada. Ele levava a
-                  `/devices` sem filtro, e não há filtro de RX na API para pôr
-                  ali — então o clique prometia "estes com sinal fraco" e
-                  entregava o inventário inteiro. Texto parado diz menos e não
-                  mente; o link volta no dia em que a lista souber filtrar por
-                  faixa de RX. */}
-              <div className="flex min-h-16 items-center justify-between py-3"><span><strong className="block text-sm">{t('dashboard.queue.weakSignal')}</strong><small className="text-muted-foreground">{t('dashboard.queue.weakSignalHint')}</small></span><span className="data-value text-[hsl(var(--status-warning))]">{signalRisk}</span></div>
+              {/* Voltou a ser link, e só porque o recorte existe: `focus=weak-signal`
+                  devolve as faixas Poor e Danger, que são as duas que este
+                  número soma. Ele tinha DEIXADO de ser link no dia em que
+                  levava a `/devices` sem filtro — prometia "estes com sinal
+                  fraco" e entregava o inventário inteiro. */}
+              <Link to="/devices?focus=weak-signal" className="flex min-h-16 items-center justify-between py-3 hover:text-primary"><span><strong className="block text-sm">{t('dashboard.queue.weakSignal')}</strong><small className="text-muted-foreground">{t('dashboard.queue.weakSignalHint')}</small></span><span className="data-value text-[hsl(var(--status-warning))]">{signalRisk}</span></Link>
             </div>
           </div>
         </section>
