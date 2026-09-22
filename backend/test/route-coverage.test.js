@@ -134,7 +134,13 @@ const POR_ID = new Map([
   ['PUT /api/platform/tenants/:id/subscription', 'plano de controle; prova em platform-billing.test.js'],
   ['POST /api/platform/tenants/:id/payments', 'plano de controle; prova em platform-billing.test.js'],
   ['GET /api/platform/tenants/:id/usage', 'plano de controle; prova em platform-billing.test.js'],
-  ['POST /api/platform/tenants/:id/impersonate', 'plano de controle; prova em impersonation.test.js — inclusive a de que a própria personificação não alcança esta rota']
+  ['POST /api/platform/tenants/:id/impersonate', 'plano de controle; prova em impersonation.test.js — inclusive a de que a própria personificação não alcança esta rota'],
+  // A exportação vista de cima. O id é de um PROVEDOR, e olhá-lo pelo id é o
+  // trabalho do console — mas esta é a rota do console que mais se parece com
+  // um vazamento, então a prova é mais forte que "404 para id desconhecido":
+  // `platform-tenant-export.test.js` exige que o arquivo de um provedor traga
+  // as linhas DELE e nenhuma do vizinho.
+  ['GET /api/platform/tenants/:id/export', 'plano de controle; prova em platform-tenant-export.test.js — inclusive a de que o arquivo de um não traz linha do outro']
 ]);
 
 // Todo caso da varredura entra aqui sozinho: a lista dela é a fonte, e repetir
@@ -271,7 +277,16 @@ describe('toda rota endereçada por um parâmetro', () => {
   // mais uma aqui. As 42 de agora: aparelho (20), chave natural (7), anexo por
   // token (2) e o console (13). O número que de fato importa,
   // `TETO_FORA_DO_CONSOLE`, não se move.
-  const TETO_DE_EXCECOES = 42;
+  // E de 42 para 43 com `GET /api/platform/tenants/:id/export`, pagando o mesmo
+  // pedágio das duas acima: uma linha em `DO_CONSOLE` e mais uma aqui. Ela é a
+  // rota do console que mais se parece com o que a varredura persegue — um id
+  // de provedor na URL devolvendo as linhas daquele provedor —, e por isso a
+  // prova dela não é só o 404: o teste exige que o arquivo de um traga as
+  // linhas dele e nenhuma do vizinho, que é a varredura feita à mão para o
+  // único caso em que devolver a linha do outro seria o trabalho e não o
+  // vazamento. As 43 de agora: aparelho (20), chave natural (7), anexo por
+  // token (2) e o console (14). `TETO_FORA_DO_CONSOLE` não se move.
+  const TETO_DE_EXCECOES = 43;
 
   /**
    * As exceções que são do plano de controle, nomeadas uma a uma.
@@ -298,7 +313,8 @@ describe('toda rota endereçada por um parâmetro', () => {
     'GET /api/platform/tenants/:id/subscription',
     'PUT /api/platform/tenants/:id/subscription',
     'POST /api/platform/tenants/:id/payments',
-    'GET /api/platform/tenants/:id/usage'
+    'GET /api/platform/tenants/:id/usage',
+    'GET /api/platform/tenants/:id/export'
   ]);
 
   // Este é o número que guarda o que a varredura existe para guardar, e ELE só

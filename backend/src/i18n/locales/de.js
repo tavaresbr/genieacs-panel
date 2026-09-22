@@ -61,6 +61,7 @@ export default {
   'rateLimit.portalUnlock': 'Limit für Anfragen zur Vertrauensfreigabe erreicht. Versuchen Sie es später erneut.',
   'rateLimit.portalPasswordAdmin': 'Zu viele Anfragen für Portal-Passwörter, bitte langsamer',
   'rateLimit.sgpAdmin': 'Zu viele SGP-Anfragen, bitte langsamer',
+  'rateLimit.platformExport': 'Zu viele Exporte, bitte langsamer',
   'rateLimit.sgpSync': 'Zu viele Flottensynchronisierungen. Versuchen Sie es später erneut.',
 
   // Geräte

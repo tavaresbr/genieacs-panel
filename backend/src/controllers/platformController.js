@@ -11,6 +11,7 @@ import { asaasBilling } from '../services/billing/asaasBillingProvider.js';
 import { METRICS_CONTENT_TYPE, renderMetrics } from '../utils/metrics.js';
 import Subscription from '../models/Subscription.js';
 import SubscriptionService from '../services/subscriptionService.js';
+import TenantExportService from '../services/tenantExportService.js';
 import PlatformAudit from '../models/PlatformAudit.js';
 import { SCHEMA_TABLES } from '../config/migrations.js';
 import { SCOPED_TABLES } from '../config/tenantScope.js';
@@ -816,6 +817,92 @@ class PlatformController {
    * o que sobra não aparece em tela nenhuma (a resolução por host já não o
    * encontra) e continua ocupando os índices únicos por provedor.
    */
+  /**
+   * `GET /api/platform/tenants/:id/export` — o cadastro de um provedor, daqui
+   * de cima.
+   *
+   * POR QUE ESTA ROTA PRECISA EXISTIR
+   * ---------------------------------
+   * O provedor já tem a dele (`GET /api/tenant/export`), e enquanto ele está
+   * ativo é por lá que ele baixa o que é dele. O buraco é o suspenso: o
+   * resolvedor devolve 404 no HOST inteiro de quem não está ativo
+   * (`tenantResolver.js`), e a exclusão EXIGE suspensão antes. Então a ordem
+   * obrigatória era: suspende — e o provedor perde o acesso ao painel e à
+   * própria exportação — e só aí pode apagar. **A janela para o ISP levar os
+   * dados dele fechava antes de a exclusão ser permitida**, e o que sai junto é
+   * o cadastro dos assinantes dele.
+   *
+   * Vale nos dois estados, e não só no suspenso. Um recorte "só suspenso" faria
+   * o console exigir suspender para exportar — isto é, derrubar o painel de um
+   * cliente para poder ajudá-lo —, que é o oposto do que esta rota existe para
+   * consertar.
+   *
+   * GET COM ESCRITA, E POR QUÊ ESTÁ CERTO AQUI
+   * ------------------------------------------
+   * Ela escreve duas linhas de trilha. O achado central da varredura desta
+   * sessão foi um `GET` que escrevia — mas o que estava errado lá era o que ele
+   * escrevia: aposentava conta e apagava vínculo de ERP. Registrar a própria
+   * leitura é a exceção que a exportação do provedor já faz, no mesmo formato,
+   * e ela é o que separa "um arquivo saiu daqui" de "ninguém sabe".
+   *
+   * AS DUAS TRILHAS
+   * ---------------
+   * A da plataforma é CONDIÇÃO, no molde da exclusão: se não gravou, não envia.
+   * Uma cópia dos assinantes de um cliente saindo sem registro é exatamente o
+   * que não pode acontecer em silêncio, e o arquivo já está pronto na memória —
+   * recusar aqui não desfaz nada, só não entrega.
+   *
+   * A do PROVEDOR é o outro lado, e é best-effort: quem pergunta "alguém baixou
+   * a nossa base?" é o ISP, e ele não lê a nossa trilha. `actorKind: 'platform'`
+   * diz de onde veio, como já fazem a renomeação e a troca de subdomínio.
+   */
+  static async exportTenant(req, res) {
+    try {
+      const id = Number(req.params?.id);
+      if (!Number.isInteger(id) || id <= 0) {
+        return res.status(400).json(createErrorResponse('Invalid provider id'));
+      }
+      const tenant = await Tenant.findById(id);
+      if (!tenant) {
+        return res.status(404).json(createErrorResponse('Provider not found'));
+      }
+
+      // O serviço lê `currentTenantId()`, então o provedor entra em escopo aqui
+      // — o mesmo `runInTenant` que as outras ações do console usam para tocar
+      // a linha de um cliente. É por isso que a exportação daqui e a do próprio
+      // provedor produzem o MESMO arquivo: é o mesmo código, sem um segundo
+      // caminho para divergir.
+      const arquivo = await runInTenant(id, () => TenantExportService.build());
+
+      const registrada = await PlatformAudit.fromRequest(req, {
+        action: PlatformAudit.ACTIONS.TENANT_EXPORTED,
+        tenant,
+        detail: { status: tenant.status, rowCounts: arquivo.manifest.rowCounts }
+      });
+      if (!registrada) {
+        return res.status(500).json(createErrorResponse(
+          'The export was not recorded, so it was not delivered'
+        ));
+      }
+
+      await runInTenant(id, () => AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.TENANT_EXPORTED,
+        actorKind: 'platform',
+        subjectType: 'tenant',
+        subjectId: id,
+        detail: { rowCounts: arquivo.manifest.rowCounts }
+      }));
+
+      const nome = ['skygenpanel', tenant.slug || 'export', new Date().toISOString().slice(0, 10)].join('-');
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${nome}.json"`);
+      return res.send(JSON.stringify(arquivo, null, 2));
+    } catch (error) {
+      console.error('Platform tenant export error:', error);
+      return res.status(500).json(createErrorResponse('Could not export the provider', error.message));
+    }
+  }
+
   static async remove(req, res) {
     try {
       const id = Number(req.params?.id);

@@ -2,6 +2,7 @@ import express from 'express';
 import { timingSafeEqual } from 'node:crypto';
 import PlatformController from '../controllers/platformController.js';
 import { authenticateToken, requirePlatformAdmin } from '../middleware/auth.js';
+import { platformExportLimiter } from '../middleware/rateLimit.js';
 
 /**
  * The SaaS control plane.
@@ -59,6 +60,18 @@ router.delete('/tenants/:id', authenticateToken, requirePlatformAdmin, PlatformC
 // Olhar o painel de um cliente. O que a rota devolve é um bilhete de uso
 // único e um endereço, nunca uma sessão — ver o controlador.
 router.post('/tenants/:id/impersonate', authenticateToken, requirePlatformAdmin, PlatformController.impersonate);
+
+// O cadastro de um provedor num arquivo, daqui de cima.
+//
+// A do provedor (`GET /api/tenant/export`) continua sendo a porta dele. Esta
+// existe para o estado em que aquela não alcança: suspenso, o host inteiro do
+// provedor responde 404 — e a exclusão exige suspender antes. Sem esta rota, a
+// janela para o ISP levar os próprios dados fechava antes de a exclusão ser
+// permitida.
+//
+// Com limitador próprio, ao contrário do resto deste arquivo: uma chamada lê
+// toda tabela escopada de um provedor, e é a leitura mais cara do painel.
+router.get('/tenants/:id/export', authenticateToken, requirePlatformAdmin, platformExportLimiter, PlatformController.exportTenant);
 
 router.get('/metrics', allowMetricsScraper, PlatformController.metrics);
 

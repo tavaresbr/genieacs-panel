@@ -15,7 +15,7 @@ import { STATUS_LABEL_KEYS, TenantPlan, statusBadgeClass } from '@/components/pl
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
-import { formatRelativeTime } from '@/lib/utils'
+import { exportFileName, formatRelativeTime } from '@/lib/utils'
 
 export default function PlatformPage() {
   const { t } = useTranslation()
@@ -159,6 +159,41 @@ export default function PlatformPage() {
         return
       }
       window.location.assign(url)
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  /**
+   * Baixa o cadastro inteiro de um provedor.
+   *
+   * Fica ao lado de suspender e apagar, e não escondido numa aba, porque é o
+   * passo que vem ANTES do apagar. A ordem obrigatória do console é suspender e
+   * só então excluir — e suspenso o provedor perde o acesso ao painel dele,
+   * inclusive à exportação própria. Este botão é a janela que aquela ordem
+   * fechava, e por isso ele aparece nos dois estados.
+   *
+   * Sem confirmação: é leitura, e o que ela produz fica no computador de quem
+   * clicou. O que ela tem de sério é o registro, e esse o servidor grava nas
+   * duas trilhas — a da plataforma e a do próprio provedor.
+   */
+  const exportar = async (tenant: Tenant) => {
+    setBusyId(tenant.id)
+    try {
+      const res = await platformAPI.exportTenant(tenant.id)
+      if (!res.success || !res.blob) {
+        toast.error(res.message || t('platform.exportFailed'))
+        return
+      }
+      const url = URL.createObjectURL(res.blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = res.filename || exportFileName(tenant.slug)
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+      toast.success(t('platform.exported', { provider: tenant.name }))
     } finally {
       setBusyId(null)
     }
@@ -457,11 +492,26 @@ export default function PlatformPage() {
                               <Icon name="power" size={17} />
                               {t(active ? 'platform.suspend' : 'platform.reactivate')}
                             </button>
+                            {/* Nos DOIS estados, e é o ponto: suspenso, o
+                                provedor não alcança a exportação dele — e
+                                suspender é o que a exclusão exige antes. Vem
+                                ANTES do apagar porque é a ordem em que se
+                                usa. */}
+                            <button
+                              type="button"
+                              onClick={() => void exportar(tenant)}
+                              disabled={busyId === tenant.id}
+                              className="modern-button-secondary"
+                            >
+                              <Icon name="database" size={17} />
+                              {t('platform.export')}
+                            </button>
                             {/* Só de um provedor SUSPENSO: apagar é o fim de
                                 uma conversa que começou com a suspensão, e
                                 exigir os dois passos dá ao cliente a janela
                                 entre "seu painel parou" e "seus dados foram
-                                embora". */}
+                                embora" — janela que agora tem porta, no botão
+                                acima. */}
                             {!active && (
                               <button
                                 type="button"

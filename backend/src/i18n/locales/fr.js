@@ -61,6 +61,7 @@ export default {
   'rateLimit.portalUnlock': 'Limite de demandes de déblocage de confiance atteinte. Réessayez plus tard.',
   'rateLimit.portalPasswordAdmin': 'Trop de demandes de mots de passe de portail, veuillez ralentir',
   'rateLimit.sgpAdmin': 'Trop de requêtes SGP, veuillez ralentir',
+  'rateLimit.platformExport': 'Trop d\'exportations, veuillez ralentir',
   'rateLimit.sgpSync': 'Trop de synchronisations de flotte. Réessayez plus tard.',
 
   // Équipements

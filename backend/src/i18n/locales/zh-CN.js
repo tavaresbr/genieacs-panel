@@ -61,6 +61,7 @@ export default {
   'rateLimit.portalUnlock': '信用开机申请已达上限。请稍后重试。',
   'rateLimit.portalPasswordAdmin': '门户密码请求过于频繁，请放慢速度',
   'rateLimit.sgpAdmin': 'SGP 请求过于频繁，请放慢速度',
+  'rateLimit.platformExport': '导出过于频繁，请放慢速度',
   'rateLimit.sgpSync': '设备同步过于频繁。请稍后重试。',
 
   // 设备

@@ -58,6 +58,7 @@ export default {
   'rateLimit.portalUnlock': 'Se alcanzó el límite de solicitudes de liberación. Inténtalo más tarde.',
   'rateLimit.portalPasswordAdmin': 'Demasiadas solicitudes de contraseña del portal, reduce el ritmo',
   'rateLimit.sgpAdmin': 'Demasiadas solicitudes al SGP, reduzca el ritmo',
+  'rateLimit.platformExport': 'Demasiadas exportaciones, reduzca el ritmo',
   'rateLimit.sgpSync': 'Demasiadas sincronizaciones de la red. Inténtelo de nuevo más tarde.',
 
   // Equipos
