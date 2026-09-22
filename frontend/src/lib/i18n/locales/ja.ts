@@ -1378,6 +1378,7 @@ const ja: Dictionary = {
   'whatsapp.health.webhookUnchecked': 'Webhook は未確認です（{count}）',
   "whatsapp.health.webhookUnverifiable": "イベント一覧を確認できない Webhook（{count}）",
   'whatsapp.health.media': 'ディスク上に添付 {files} 件、{size}',
+  "whatsapp.health.mediaForever": "ディスク上の添付 {files} 件、{size} · 削除期限なし",
   'whatsapp.health.sweepNow': '古いものを今すぐ削除',
   'whatsapp.health.sweepOff': '添付は無期限で保存されます。古いものを削除するには設定で保存期間を決めてください。',
   'whatsapp.health.loadFailed': '連携の状態を読み取れませんでした。',
@@ -1562,6 +1563,7 @@ const ja: Dictionary = {
 
   'settings.whatsapp.messageRetention': '会話履歴の保存期間（日）',
   'settings.whatsapp.messageRetentionHint': '0 は無期限で、これが既定値です。この日数を過ぎたメッセージはパネルから完全に削除されます。添付ファイルがまだディスクにあるメッセージは削除されません。それも消したい場合は添付ファイルの保存期間も設定してください。',
+  "settings.whatsapp.retentionForeverWarning": "0 のとき、このパネルは WhatsApp のデータを一切削除しません。会話の本文、写真、加入者が送った書類が無期限に残ります — システムで期限のないデータはこれだけで、テレメトリ、ERP のイベント、プロビジョニング、監査証跡にはすべて期限があります。期限を決めることが、保持する個人データとディスクの増え方を縛ります。",
   'whatsapp.health.sweepDone': '添付ファイル {files} 件を削除し、{mb} MB を解放しました',
   'whatsapp.health.sweepNothing': '削除できるほど古いものはありません',
   'whatsapp.health.sweepBusy': 'すでに整理が実行中です',

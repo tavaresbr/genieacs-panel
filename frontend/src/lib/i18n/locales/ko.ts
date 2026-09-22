@@ -1384,6 +1384,7 @@ const ko: Dictionary = {
   'whatsapp.health.webhookUnchecked': '웹훅을 확인한 적이 없습니다({count})',
   "whatsapp.health.webhookUnverifiable": "이벤트 목록을 확인할 수 없는 웹훅 ({count})",
   'whatsapp.health.media': '디스크에 첨부 {files}개, {size}',
+  "whatsapp.health.mediaForever": "디스크의 첨부 {files}개, {size} · 삭제 기한 없음",
   'whatsapp.health.sweepNow': '오래된 파일 지금 삭제',
   'whatsapp.health.sweepOff': '첨부 파일은 무기한 보관됩니다. 오래된 파일을 지우려면 설정에서 보관 기간을 정하세요.',
   'whatsapp.health.loadFailed': '연동 상태를 확인할 수 없습니다.',
@@ -1569,6 +1570,7 @@ const ko: Dictionary = {
 
   'settings.whatsapp.messageRetention': '대화 기록 보관 기간(일)',
   'settings.whatsapp.messageRetentionHint': '0은 영구 보관이며 기본값입니다. 이 기간이 지나면 메시지는 패널에서 완전히 삭제됩니다. 첨부파일이 아직 디스크에 있는 메시지는 삭제되지 않습니다. 그것도 함께 지우려면 첨부파일 보관 기간도 설정하세요.',
+  "settings.whatsapp.retentionForeverWarning": "0이면 이 패널은 WhatsApp에서 아무것도 삭제하지 않습니다. 대화 본문, 사진, 가입자가 보낸 서류가 무기한 보관됩니다 — 시스템에서 기한이 없는 데이터는 이것뿐이며, 텔레메트리·ERP 이벤트·프로비저닝·감사 추적에는 모두 기한이 있습니다. 기한을 정하는 것이 보관하는 개인정보의 범위와 디스크 증가를 제한합니다.",
   'whatsapp.health.sweepDone': '첨부파일 {files}개를 삭제하여 {mb} MB를 확보했습니다',
   'whatsapp.health.sweepNothing': '삭제할 만큼 오래된 것이 없습니다',
   'whatsapp.health.sweepBusy': '이미 정리가 진행 중입니다',

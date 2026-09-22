@@ -2229,6 +2229,14 @@ export interface WhatsAppHealth {
   lastOutboundAt: string | null
   media: { files: number; bytes: number; oldestAt: string | null }
   /**
+   * Por quanto tempo o que está guardado fica guardado. `0` é para sempre.
+   *
+   * Viaja ao lado de `media` porque as duas metades da frase só significam
+   * alguma coisa juntas: "9,4 KB" é irrelevante e "9,4 KB para sempre" é uma
+   * decisão.
+   */
+  retention: { mediaDays: number; messageDays: number }
+  /**
    * A metade que faltava de "nunca chegou nada".
    *
    * `broken` conta os números cuja última conferência encontrou o webhook

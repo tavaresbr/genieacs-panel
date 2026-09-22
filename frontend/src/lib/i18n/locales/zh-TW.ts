@@ -1379,6 +1379,7 @@ const zhTW: Dictionary = {
   'whatsapp.health.webhookUnchecked': 'Webhook 從未檢查（{count}）',
   "whatsapp.health.webhookUnverifiable": "事件清單無法核對的 Webhook（{count}）",
   'whatsapp.health.media': '磁碟上有 {files} 個附件，{size}',
+  "whatsapp.health.mediaForever": "磁碟上 {files} 個附件，{size} · 無刪除期限",
   'whatsapp.health.sweepNow': '立即刪除舊檔案',
   'whatsapp.health.sweepOff': '附件會永久保留。要刪除舊檔案，請在設定中設定保留期限。',
   'whatsapp.health.loadFailed': '無法讀取整合運作狀態。',
@@ -1563,6 +1564,7 @@ const zhTW: Dictionary = {
 
   'settings.whatsapp.messageRetention': '對話記錄保留天數',
   'settings.whatsapp.messageRetentionHint': '0 表示永久保留，這是預設值。超過該天數後，訊息會從面板中徹底刪除。附件仍在磁碟上的訊息永遠不會被刪除——若希望它也一併清除，請同時設定附件的保留天數。',
+  "settings.whatsapp.retentionForeverWarning": "設為 0 時，本面板永遠不會刪除任何 WhatsApp 資料。對話內文、照片和用戶傳來的檔案將無限期保留 —— 這是系統中唯一沒有期限的資料：遙測、ERP 事件、開通和稽核軌跡都自帶期限。設定期限，才能約束你保存的個人資料以及磁碟的成長。",
   'whatsapp.health.sweepDone': '已刪除 {files} 個附件，釋放 {mb} MB',
   'whatsapp.health.sweepNothing': '沒有足夠舊的內容可以刪除',
   'whatsapp.health.sweepBusy': '已有一次清理正在進行',
