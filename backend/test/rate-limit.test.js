@@ -45,10 +45,34 @@ describe('ipKey', () => {
   });
 
   it('collapses a full IPv6 address to its /64 prefix', () => {
-    assert.equal(
-      ipKey({ ip: '2001:0db8:0000:0001:aaaa:bbbb:cccc:dddd' }),
-      '2001:0db8:0000:0001'
-    );
+    assert.equal(ipKey({ ip: '2001:0db8:0000:0001:aaaa:bbbb:cccc:dddd' }), '2001:db8:0:1::/64');
+  });
+
+  /**
+   * O caso que faltava, e é ele que o balde existe para atender.
+   *
+   * O teste acima usava o endereço escrito POR EXTENSO, que é como quase nenhum
+   * endereço IPv6 aparece na vida real — e era a única forma que a conta à mão
+   * acertava. Na forma comprimida ela devolvia o endereço inteiro, então trocar
+   * o último grupo dava um balde novo: o limite protegia contra quem não estava
+   * tentando contorná-lo.
+   */
+  it('gives two addresses of the same /64 the same bucket, compressed or not', () => {
+    const chave = ipKey({ ip: '2001:db8:0:1::1' });
+    assert.equal(ipKey({ ip: '2001:db8:0:1::2' }), chave);
+    assert.equal(ipKey({ ip: '2001:db8:0:1:aaaa:bbbb:cccc:dddd' }), chave);
+    assert.equal(ipKey({ ip: '2001:0db8:0000:0001:0000:0000:0000:0001' }), chave);
+  });
+
+  it('and keeps a different /64 in a different bucket', () => {
+    assert.notEqual(ipKey({ ip: '2001:db8:0:2::1' }), ipKey({ ip: '2001:db8:0:1::1' }));
+  });
+
+  it('falls back to one bucket when there is no address to separate by', () => {
+    assert.equal(ipKey({}), 'unknown');
+    // A zona nomeia a interface de quem recebe, não o cliente: `fe80::1%eth0`
+    // e `fe80::1%eth1` são o mesmo vizinho chegando por duas placas.
+    assert.equal(ipKey({ ip: 'fe80::1%eth0' }), ipKey({ ip: 'fe80::1%eth1' }));
   });
 });
 

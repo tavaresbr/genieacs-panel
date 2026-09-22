@@ -1,4 +1,4 @@
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { tenantSlugFromHost } from './tenantResolver.js';
 
 /**
@@ -15,18 +15,34 @@ const JSON_HEADERS = {
   legacyHeaders: false
 };
 
+/** O prefixo que um cliente IPv6 recebe, e portanto o que ele não pode trocar. */
+const IPV6_SUBNET = 64;
+
 /**
- * A single IPv6 host owns a whole prefix, so limiting per address is trivially
- * bypassable. Collapse IPv6 clients to their /64 and leave IPv4 untouched.
+ * A chave de balde a partir do endereço: o /64 do cliente IPv6, o IPv4 inteiro.
+ *
+ * Um host IPv6 é dono de um prefixo inteiro, então limitar por endereço é
+ * contornável trocando o último grupo. Colapsar era a intenção desde sempre; o
+ * que mudou é que agora funciona.
+ *
+ * A conta era feita à mão e só acertava o endereço ESCRITO POR EXTENSO. A forma
+ * comprimida — `2001:db8:0:1::1`, que é como praticamente todo endereço IPv6
+ * aparece — caía num atalho que devolvia o endereço inteiro, e daí `::1` e
+ * `::2` do mesmo /64 viravam dois baldes. O balde protegia contra quem não
+ * estava tentando.
+ *
+ * Quem faz a conta agora é o `ipKeyGenerator` da própria biblioteca, que expande
+ * antes de mascarar e ainda desembrulha o IPv4 mapeado (`::ffff:a.b.c.d`). O
+ * padrão dela é /56; aqui fica /64, que é o que este painel escolheu e o que a
+ * frase acima sempre disse. A zona (`%eth0`) sai antes, porque ela descreve a
+ * interface local e não o cliente.
+ *
+ * Nada de IP — `'unknown'` quando não há endereço — atravessa sem ser tocado, e
+ * vira um balde só, que é o certo: sem endereço não há de quem separar.
  */
 export function ipKey(req) {
-  const address = req.ip || req.socket?.remoteAddress || 'unknown';
-  const normalized = String(address).replace(/^::ffff:/, '');
-  if (!normalized.includes(':')) return normalized;
-  const [withoutZone] = normalized.split('%');
-  const groups = withoutZone.split(':');
-  if (withoutZone.includes('::')) return withoutZone;
-  return groups.slice(0, 4).join(':');
+  const address = String(req.ip || req.socket?.remoteAddress || 'unknown').split('%')[0];
+  return ipKeyGenerator(address, IPV6_SUBNET);
 }
 
 /**
