@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { getDb, runInTenant, startTestServers, stopTestServers } from './helpers/harness.js';
 
 const { default: Vendor } = await import('../src/models/Vendor.js');
-const { default: WifiSecurityMapping } = await import('../src/models/WifiSecurityMapping.js');
 const { default: WifiSecurityConfig } = await import('../src/models/WifiSecurityConfig.js');
 const { default: VendorService } = await import('../src/services/vendorService.js');
 const { seedDefaults } = await import('../src/config/seed.js');
@@ -18,13 +17,17 @@ const { seedDefaults } = await import('../src/config/seed.js');
  * path is exactly what the panel is for — which is why these tables became
  * per-provider even though their content is a fact about firmware.
  *
- * Three failures are being proved out, and they are not the same one. Reads
+ * Two failures are being proved out, and they are not the same one. Reads
  * leaking is the mild one. `Vendor.update` and `Vendor.delete`, and the two
  * deletes below them, take a bare id off the URL, so unscoped they edit and
- * remove another provider's rows. And `vendors` is the parent of
- * `wifi_security_mappings` with ON DELETE CASCADE, so one provider's vendor
- * delete used to take another's mappings down with it — a destructive write
- * whose blast radius the deleting operator could not even see.
+ * remove another provider's rows.
+ *
+ * Havia uma terceira, e ela some junto com a tabela: `vendors` era pai de
+ * `wifi_security_mappings` com ON DELETE CASCADE, então apagar um fabricante
+ * levava os mapeamentos de OUTRO provedor — uma escrita destrutiva cujo alcance
+ * quem apagava não conseguia nem ver. A 0052 derrubou aquela tabela, que nunca
+ * teve leitor em runtime, e com ela o único caminho de cascata entre provedores
+ * que o catálogo tinha.
  */
 let alfa;
 let beta;
@@ -46,7 +49,6 @@ const vendorRow = (overrides = {}) => ({
 
 /** The rows as the database holds them, provider column and all — never through a model. */
 const rawVendors = (where) => getDb()('vendors').where(where);
-const rawMappings = (where) => getDb()('wifi_security_mappings').where(where);
 const rawConfigs = (where) => getDb()('wifi_security_config').where(where);
 
 const count = async (query) => {
@@ -148,74 +150,6 @@ describe('two providers cataloguing the same equipment', () => {
   });
 });
 
-describe('the cascade under a vendor delete', () => {
-  let alfaVendor;
-  let betaVendor;
-
-  before(async () => {
-    alfaVendor = await runInTenant(alfa, () => Vendor.create(vendorRow({ name: 'Huawei' })));
-    betaVendor = await runInTenant(beta, () => Vendor.create(vendorRow({ name: 'Huawei' })));
-
-    for (const [tenant, vendorId] of [[alfa, alfaVendor], [beta, betaVendor]]) {
-      await runInTenant(tenant, async () => {
-        await WifiSecurityMapping.create({
-          vendor_id: vendorId,
-          raw_security_value: 'WPA2PSK',
-          normalized_security: 'WPA2'
-        });
-        await WifiSecurityMapping.create({
-          vendor_id: vendorId,
-          raw_security_value: 'WPAand11i',
-          normalized_security: 'WPA/WPA2'
-        });
-      });
-    }
-  });
-
-  it('shows a provider only the mappings of its own vendor', async () => {
-    const mine = await runInTenant(alfa, () => WifiSecurityMapping.getByVendor(alfaVendor));
-    // The vendor id arrives from the request, so asking for the other
-    // provider's has to come back empty rather than resolving through the
-    // foreign key.
-    const theirs = await runInTenant(alfa, () => WifiSecurityMapping.getByVendor(betaVendor));
-
-    assert.equal(mine.length, 2);
-    assert.deepEqual(theirs, []);
-  });
-
-  it('leaves the other provider\'s mapping standing through a delete and an update', async () => {
-    const theirMapping = await rawMappings({ vendor_id: betaVendor })
-      .orderBy('id', 'asc')
-      .first();
-
-    assert.equal(
-      await runInTenant(alfa, () => WifiSecurityMapping.delete(theirMapping.id)),
-      false
-    );
-    assert.equal(
-      await runInTenant(alfa, () => WifiSecurityMapping.update(theirMapping.id, {
-        raw_security_value: 'SEQUESTRADO',
-        normalized_security: 'NONE'
-      })),
-      false
-    );
-
-    const survivor = await rawMappings({ id: theirMapping.id }).first();
-    assert.equal(survivor.raw_security_value, theirMapping.raw_security_value);
-  });
-
-  // The one the migration names: deleting a vendor takes its mappings with it
-  // down the foreign key, and the deleting operator never sees how far that
-  // reaches.
-  it('removes only the deleting provider\'s mappings', async () => {
-    assert.equal(await runInTenant(alfa, () => Vendor.delete(alfaVendor)), true);
-
-    assert.equal(await count(rawMappings({ vendor_id: alfaVendor })), 0);
-    assert.equal(await count(rawMappings({ vendor_id: betaVendor })), 2);
-    assert.equal(await count(rawVendors({ id: betaVendor })), 1);
-  });
-});
-
 describe('the WiFi parameter path per product class', () => {
   let alfaConfig;
   let betaConfig;
@@ -300,22 +234,11 @@ describe('the catalogue a brand-new provider is given at boot', () => {
 
   const catalogueOf = async (tenantId) => ({
     vendors: await rawVendors({ tenant_id: tenantId }).orderBy('id', 'asc'),
-    mappings: await rawMappings({ tenant_id: tenantId }).orderBy('id', 'asc'),
     configs: await rawConfigs({ tenant_id: tenantId }).orderBy('id', 'asc')
   });
 
   before(async () => {
     const db = getDb();
-    // The source catalogue has to carry a mapping, or the remap the copy
-    // performs is never exercised — the suite above ends by deleting the vendor
-    // whose mappings it made.
-    const [survivor] = await rawVendors({ tenant_id: alfa }).orderBy('id', 'asc');
-    await runInTenant(alfa, () => WifiSecurityMapping.create({
-      vendor_id: survivor.id,
-      raw_security_value: 'WPA2PSK',
-      normalized_security: 'WPA2'
-    }));
-
     alfaBefore = await catalogueOf(alfa);
     betaBefore = await catalogueOf(beta);
     await db('tenants').insert({ slug: 'gama', name: 'Provedor Gama', status: 'active' });
@@ -338,21 +261,6 @@ describe('the catalogue a brand-new provider is given at boot', () => {
       alfaBefore.configs.map((row) => row.password_param_path)
     );
     assert.ok(copied.vendors.length > 0);
-  });
-
-  it('points the copied mappings at the copied vendors', async () => {
-    const copied = await catalogueOf(gama);
-    const ownVendorIds = new Set(copied.vendors.map((row) => row.id));
-
-    assert.ok(copied.mappings.length > 0);
-    assert.equal(copied.mappings.length, alfaBefore.mappings.length);
-    for (const mapping of copied.mappings) {
-      // The whole reason the copy cannot be a plain INSERT ... SELECT: carrying
-      // the source's `vendor_id` across would hang this provider's mappings off
-      // another provider's vendor, which is the cross-provider foreign key the
-      // migration exists to close.
-      assert.ok(ownVendorIds.has(mapping.vendor_id));
-    }
   });
 
   it('leaves the provider it copied from exactly as it was', async () => {

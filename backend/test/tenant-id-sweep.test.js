@@ -225,13 +225,6 @@ async function semear(tenantId, slug) {
       password_param_path: 'WLANConfiguration.1.KeyPassphrase'
     });
 
-    alvo.mapping = await semearLinha('wifi_security_mappings', {
-      vendor_id: alvo.vendor,
-      raw_security_value: '11i',
-      normalized_security: 'WPA2',
-      description: 'WPA2 pessoal'
-    });
-
     // A planta de fibra. Um nome por provedor, e não o mesmo para os dois: a
     // pergunta desta suíte é se o id do VIZINHO alcança a linha dele, e um id
     // que os dois têm responderia 200 por ser o próprio, provando nada. Que os

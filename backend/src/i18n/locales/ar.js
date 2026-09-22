@@ -190,18 +190,7 @@ export default {
   'wifiConfig.updateFailed': 'تعذّر تحديث إعداد أمان Wi-Fi',
   'wifiConfig.deleted': 'تم حذف إعداد أمان Wi-Fi',
   'wifiConfig.deleteFailed': 'تعذّر حذف إعداد أمان Wi-Fi',
-  'wifiMapping.idRequired': 'معرّف التعيين مطلوب',
-  'wifiMapping.fieldsRequired': 'الحقول vendor_id وraw_security_value وnormalized_security مطلوبة',
-  'wifiMapping.notFound': 'تعيين أمان Wi-Fi غير موجود',
-  'wifiMapping.listRetrieved': 'تم جلب قائمة تعيينات أمان Wi-Fi',
 
-  'wifiMapping.listFailed': 'تعذّر جلب قائمة تعيينات أمان Wi-Fi',
-  'wifiMapping.created': 'تم إنشاء تعيين أمان Wi-Fi',
-  'wifiMapping.createFailed': 'تعذّر إنشاء تعيين أمان Wi-Fi',
-  'wifiMapping.updated': 'تم تحديث تعيين أمان Wi-Fi',
-  'wifiMapping.updateFailed': 'تعذّر تحديث تعيين أمان Wi-Fi',
-  'wifiMapping.deleted': 'تم حذف تعيين أمان Wi-Fi',
-  'wifiMapping.deleteFailed': 'تعذّر حذف تعيين أمان Wi-Fi',
 
   // طوبولوجيا الشبكة
   'mapping.nodesRetrieved': 'تم جلب عقد الخريطة',

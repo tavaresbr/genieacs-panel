@@ -17,7 +17,6 @@ const APP_TABLES = [
   'settings',
   'app_state',
   'vendors',
-  'wifi_security_mappings',
   'wifi_security_config',
   'mapping_nodes',
   'mapping_edges',
@@ -118,6 +117,84 @@ after(async () => {
   await Promise.all(scratchPools.splice(0).map((db) => db.destroy()));
   fs.rmSync(scratchDir, { recursive: true, force: true });
   await stopTestServers();
+});
+
+/**
+ * A 0052 derruba `wifi_security_mappings`, e é o único passo destes que
+ * DESCARTA dado de alguém. O que este bloco afirma não é que a tabela some —
+ * isso é trivial —, é que ela some **sozinha**: o resto do catálogo do provedor
+ * fica de pé, com as linhas que tinha.
+ *
+ * A instalação antiga é montada à mão e o marcador da 0052 é apagado do
+ * registro, que é a forma honesta de simular "um deploy que ainda tem a
+ * tabela": rodar o `ensureSchema` de novo é literalmente o que acontece no
+ * boot depois do update.
+ */
+describe('derrubando a tabela que nunca teve leitor', () => {
+  const db = createDatabase('drop-wifi-mappings');
+  let vendorId;
+
+  before(async () => {
+    await ensureSchema(db);
+
+    const tenant = await db('tenants').orderBy('id', 'asc').first();
+    vendorId = await insertReturningId('vendors', {
+      tenant_id: tenant.id,
+      name: 'ZTE',
+      manufacturer_patterns: JSON.stringify(['zte']),
+      product_patterns: JSON.stringify(['f670']),
+      wifi_password_path: 'PreSharedKey.1.KeyPassphrase',
+      priority: 20,
+      enabled: true
+    }, db);
+    await db('wifi_security_config').insert({
+      tenant_id: tenant.id,
+      product_class: 'F670L',
+      security_types: 'WPA2',
+      password_param_path: 'PreSharedKey.1.KeyPassphrase'
+    });
+
+    // A tabela como a instalação antiga a tem, com uma linha dentro.
+    await db.schema.createTable('wifi_security_mappings', (t) => {
+      t.increments('id').primary();
+      t.integer('vendor_id').unsigned().notNullable()
+        .references('id').inTable('vendors').onDelete('CASCADE');
+      t.string('raw_security_value', 128).notNullable();
+      t.string('normalized_security', 128).notNullable();
+      t.integer('tenant_id').unsigned().notNullable();
+    });
+    await db('wifi_security_mappings').insert({
+      tenant_id: tenant.id,
+      vendor_id: vendorId,
+      raw_security_value: '11i',
+      normalized_security: 'WPA2'
+    });
+
+    await db(MIGRATIONS_TABLE).where({ id: '0052_drop_wifi_security_mappings' }).del();
+    await ensureSchema(db);
+  });
+
+  it('a tabela deixa de existir', async () => {
+    assert.equal(await db.schema.hasTable('wifi_security_mappings'), false);
+  });
+
+  it('e o resto do catálogo do provedor fica de pé, com as linhas que tinha', async () => {
+    // É a afirmação que dá sentido à migration: um DROP que leva junto o
+    // fabricante ou a política de WiFi tiraria do painel os caminhos de
+    // parâmetro que ele ESCREVE no aparelho — e isso falha em silêncio.
+    const vendors = await db('vendors').select('id', 'name');
+    assert.equal(vendors.length, 1);
+    assert.equal(vendors[0].name, 'ZTE');
+    assert.equal(Number(vendors[0].id), Number(vendorId));
+
+    const configs = await db('wifi_security_config').select('product_class');
+    assert.equal(configs.length, 1);
+    assert.equal(configs[0].product_class, 'F670L');
+  });
+
+  it('e o passo fica registrado, então o boot seguinte não tenta de novo', async () => {
+    assert.ok((await appliedIds(db)).includes('0052_drop_wifi_security_mappings'));
+  });
 });
 
 describe('migrating a fresh database', () => {
@@ -393,7 +470,6 @@ describe('the schema table list', () => {
   it('lists parents before the tables that reference them', () => {
     const position = (table) => SCHEMA_TABLES.indexOf(table);
     for (const [child, parent] of [
-      ['wifi_security_mappings', 'vendors'],
       ['mapping_edges', 'mapping_nodes'],
       ['sgp_links', 'customer_accounts'],
       ['customer_wifi_credentials', 'customer_accounts'],

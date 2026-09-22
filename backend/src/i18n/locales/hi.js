@@ -190,17 +190,6 @@ export default {
   'wifiConfig.updateFailed': 'Wi-Fi सुरक्षा कॉन्फ़िगरेशन अपडेट नहीं हो सका',
   'wifiConfig.deleted': 'Wi-Fi सुरक्षा कॉन्फ़िगरेशन हटा दिया गया',
   'wifiConfig.deleteFailed': 'Wi-Fi सुरक्षा कॉन्फ़िगरेशन हटाया नहीं जा सका',
-  'wifiMapping.idRequired': 'मैपिंग आईडी आवश्यक है',
-  'wifiMapping.fieldsRequired': 'vendor_id, raw_security_value और normalized_security आवश्यक हैं',
-  'wifiMapping.notFound': 'Wi-Fi सुरक्षा मैपिंग नहीं मिली',
-  'wifiMapping.listRetrieved': 'Wi-Fi सुरक्षा मैपिंग सूची प्राप्त हुई',
-  'wifiMapping.listFailed': 'Wi-Fi सुरक्षा मैपिंग सूची प्राप्त नहीं हो सकी',
-  'wifiMapping.created': 'Wi-Fi सुरक्षा मैपिंग बन गई',
-  'wifiMapping.createFailed': 'Wi-Fi सुरक्षा मैपिंग नहीं बनाई जा सकी',
-  'wifiMapping.updated': 'Wi-Fi सुरक्षा मैपिंग अपडेट हुई',
-  'wifiMapping.updateFailed': 'Wi-Fi सुरक्षा मैपिंग अपडेट नहीं हो सकी',
-  'wifiMapping.deleted': 'Wi-Fi सुरक्षा मैपिंग हटा दी गई',
-  'wifiMapping.deleteFailed': 'Wi-Fi सुरक्षा मैपिंग हटाई नहीं जा सकी',
 
   // नेटवर्क टोपोलॉजी
   'mapping.nodesRetrieved': 'मानचित्र नोड प्राप्त हुए',

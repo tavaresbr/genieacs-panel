@@ -191,17 +191,6 @@ export default {
   'wifiConfig.updateFailed': 'Wi-Fi セキュリティの設定を更新できませんでした',
   'wifiConfig.deleted': 'Wi-Fi セキュリティの設定を削除しました',
   'wifiConfig.deleteFailed': 'Wi-Fi セキュリティの設定を削除できませんでした',
-  'wifiMapping.idRequired': '対応付けの ID が必要です',
-  'wifiMapping.fieldsRequired': 'vendor_id、raw_security_value、normalized_security が必要です',
-  'wifiMapping.notFound': 'Wi-Fi セキュリティの対応付けが見つかりません',
-  'wifiMapping.listRetrieved': 'Wi-Fi セキュリティの対応付けを取得しました',
-  'wifiMapping.listFailed': 'Wi-Fi セキュリティの対応付けを取得できませんでした',
-  'wifiMapping.created': 'Wi-Fi セキュリティの対応付けを作成しました',
-  'wifiMapping.createFailed': 'Wi-Fi セキュリティの対応付けを作成できませんでした',
-  'wifiMapping.updated': 'Wi-Fi セキュリティの対応付けを更新しました',
-  'wifiMapping.updateFailed': 'Wi-Fi セキュリティの対応付けを更新できませんでした',
-  'wifiMapping.deleted': 'Wi-Fi セキュリティの対応付けを削除しました',
-  'wifiMapping.deleteFailed': 'Wi-Fi セキュリティの対応付けを削除できませんでした',
 
   // ネットワーク構成
   'mapping.nodesRetrieved': '構成のノードを取得しました',

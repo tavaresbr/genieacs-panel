@@ -192,17 +192,6 @@ export default {
   'wifiConfig.updateFailed': '无法更新 Wi-Fi 安全配置',
   'wifiConfig.deleted': 'Wi-Fi 安全配置已删除',
   'wifiConfig.deleteFailed': '无法删除 Wi-Fi 安全配置',
-  'wifiMapping.idRequired': '需要提供映射 ID',
-  'wifiMapping.fieldsRequired': '需要提供 vendor_id、raw_security_value 和 normalized_security',
-  'wifiMapping.notFound': '找不到该 Wi-Fi 安全映射',
-  'wifiMapping.listRetrieved': '已获取 Wi-Fi 安全映射列表',
-  'wifiMapping.listFailed': '无法获取 Wi-Fi 安全映射列表',
-  'wifiMapping.created': 'Wi-Fi 安全映射已创建',
-  'wifiMapping.createFailed': '无法创建 Wi-Fi 安全映射',
-  'wifiMapping.updated': 'Wi-Fi 安全映射已更新',
-  'wifiMapping.updateFailed': '无法更新 Wi-Fi 安全映射',
-  'wifiMapping.deleted': 'Wi-Fi 安全映射已删除',
-  'wifiMapping.deleteFailed': '无法删除 Wi-Fi 安全映射',
 
   // 网络拓扑
   'mapping.nodesRetrieved': '已获取拓扑节点',

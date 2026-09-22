@@ -190,17 +190,6 @@ export default {
   'wifiConfig.updateFailed': 'Non è stato possibile aggiornare la configurazione di sicurezza WiFi',
   'wifiConfig.deleted': 'Configurazione di sicurezza WiFi eliminata correttamente',
   'wifiConfig.deleteFailed': 'Non è stato possibile eliminare la configurazione di sicurezza WiFi',
-  'wifiMapping.idRequired': 'L’ID della mappatura è obbligatorio',
-  'wifiMapping.fieldsRequired': 'I campi vendor_id, raw_security_value e normalized_security sono obbligatori',
-  'wifiMapping.notFound': 'Mappatura di sicurezza WiFi non trovata',
-  'wifiMapping.listRetrieved': 'Mappature di sicurezza WiFi ottenute correttamente',
-  'wifiMapping.listFailed': 'Non è stato possibile ottenere le mappature di sicurezza WiFi',
-  'wifiMapping.created': 'Mappatura di sicurezza WiFi creata correttamente',
-  'wifiMapping.createFailed': 'Non è stato possibile creare la mappatura di sicurezza WiFi',
-  'wifiMapping.updated': 'Mappatura di sicurezza WiFi aggiornata correttamente',
-  'wifiMapping.updateFailed': 'Non è stato possibile aggiornare la mappatura di sicurezza WiFi',
-  'wifiMapping.deleted': 'Mappatura di sicurezza WiFi eliminata correttamente',
-  'wifiMapping.deleteFailed': 'Non è stato possibile eliminare la mappatura di sicurezza WiFi',
 
   // Topologia di rete
   'mapping.nodesRetrieved': 'Nodi della mappa ottenuti correttamente',

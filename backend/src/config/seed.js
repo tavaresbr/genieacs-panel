@@ -105,13 +105,13 @@ export async function seedDefaults(db = getDb(), { tenantIds = null } = {}) {
   await seedSubscriptions(db, tenants);
 }
 
-/** The equipment catalogue, in the order the foreign key requires. */
-const CATALOGUE_TABLES = ['vendors', 'wifi_security_mappings', 'wifi_security_config'];
+/** As tabelas do catálogo de equipamentos. */
+const CATALOGUE_TABLES = ['vendors', 'wifi_security_config'];
 
 /**
- * How many catalogue rows each provider has, across all three tables.
+ * How many catalogue rows each provider has, across both tables.
  *
- * Grouped rather than counted per provider, so this stays three queries at
+ * Grouped rather than counted per provider, so this stays two queries at
  * every boot however many providers the deployment grows to.
  */
 export async function catalogueSizes(db) {
@@ -259,8 +259,7 @@ export async function catalogueSource(db, sizes = null) {
 /**
  * Gives a provider with no equipment catalogue a copy of one that has it.
  *
- * 0026 made `vendors`, `wifi_security_mappings` and `wifi_security_config`
- * per-provider, and nothing seeds them: the catalogue is built by the operator
+ * 0026 made `vendors` and `wifi_security_config` per-provider, and nothing seeds them: the catalogue is built by the operator
  * through `/api/vendor-management`. So the provider created after that step
  * starts empty, and empty is the worst possible failure here because it is
  * silent — detection matches no vendor, the WiFi write finds no parameter path
@@ -274,7 +273,7 @@ export async function catalogueSource(db, sizes = null) {
  * this safe at every boot, since the second boot finds the rows it wrote the
  * first time.
  *
- * "Vazio" é a SOMA das três tabelas e não tabela a tabela (`catalogueSizes`).
+ * "Vazio" é a SOMA das duas tabelas e não tabela a tabela (`catalogueSizes`).
  * A consequência aparece na fonte: uma caixa de plataforma com zero fabricantes
  * e uma linha sobrando em `wifi_security_config` ainda conta como "tem
  * catálogo", e os provedores novos nascem então sem fabricante nenhum. É a
@@ -303,37 +302,22 @@ async function seedVendorCatalogue(db, tenants) {
 /**
  * Copies one provider's catalogue onto another.
  *
- * Vendors go first and their new ids are remembered, because a mapping points
- * at `vendors.id` and the copies have ids of their own — carrying the source's
- * `vendor_id` across would attach the new provider's mappings to the source
- * provider's vendors, which is the cross-provider foreign key 0026 exists to
- * prevent. The identity and the timestamps are dropped rather than copied: the
- * new rows are new, and their `created_at` should say so.
+ * A identidade e os carimbos de tempo são descartados em vez de copiados: as
+ * linhas novas são novas, e o `created_at` delas tem que dizer isso.
+ *
+ * A cópia é OPACA — pega as colunas que houver e troca o provedor. Já não foi:
+ * `wifi_security_mappings` apontava para `vendors.id`, então os ids novos dos
+ * fabricantes precisavam ser lembrados num `Map` e remapeados, ou os
+ * mapeamentos do provedor novo ficariam pendurados nos fabricantes do provedor
+ * de origem — a chave estrangeira entre provedores que a 0026 existe para
+ * impedir. A 0052 derrubou aquela tabela, que nunca teve leitor, e com ela foi
+ * embora a única parte desta função que precisava entender o que copiava.
  */
 async function copyCatalogue(db, sourceId, targetId) {
-  const vendorIds = new Map();
-
   const vendors = await db('vendors').where({ tenant_id: sourceId }).orderBy('id', 'asc');
   for (const vendor of vendors) {
     const { id, tenant_id, created_at, updated_at, ...columns } = vendor;
-    vendorIds.set(
-      id,
-      await insertReturningId('vendors', { ...columns, tenant_id: targetId }, db)
-    );
-  }
-
-  const mappings = await db('wifi_security_mappings')
-    .where({ tenant_id: sourceId })
-    .orderBy('id', 'asc');
-  for (const mapping of mappings) {
-    const { id, tenant_id, created_at, updated_at, vendor_id, ...columns } = mapping;
-    const copiedVendorId = vendorIds.get(vendor_id);
-    // A mapping whose vendor was not copied would be one pointing outside the
-    // source provider — impossible through the models, and not something to
-    // reproduce in the target if a hand-edited database has it anyway.
-    if (copiedVendorId === undefined) continue;
-    await db('wifi_security_mappings')
-      .insert({ ...columns, tenant_id: targetId, vendor_id: copiedVendorId });
+    await insertReturningId('vendors', { ...columns, tenant_id: targetId }, db);
   }
 
   const configs = await db('wifi_security_config')

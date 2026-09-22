@@ -245,16 +245,6 @@ export interface VendorParameter {
   updated_at: string
 }
 
-export interface WifiSecurityMapping {
-  id: number
-  vendor_id: number
-  raw_security_value: string
-  normalized_security: string
-  description?: string
-  created_at: string
-  updated_at: string
-}
-
 export interface WifiSecurityConfig {
   id: number
   product_class: string

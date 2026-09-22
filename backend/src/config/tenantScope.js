@@ -88,11 +88,11 @@ export const SCOPED_TABLES = new Set([
   // The equipment catalogue. Its content really is the same fact about firmware
   // for every ISP, but the rows are edited on screen, so shared they made one
   // operator's corrected detection pattern or parameter path silently change
-  // another's WiFi writes. The three move together because a mapping points at
-  // a vendor and the delete cascades down that foreign key — scoping the parent
-  // alone would leave a destructive write reaching across providers.
+  // another's WiFi writes. (Eram três: `wifi_security_mappings` andava junto
+  // porque apontava para `vendors` com ON DELETE CASCADE, e escopar só o pai
+  // deixaria uma escrita destrutiva alcançando outro provedor. A 0052 derrubou
+  // aquela tabela, que nunca teve leitor.)
   'vendors',
-  'wifi_security_mappings',
   'wifi_security_config',
   // A trilha das ações sensíveis. Escopada pelo motivo óbvio e por mais um: a
   // trilha de um ISP diz quem são seus operadores, quantos assinantes ele tem e

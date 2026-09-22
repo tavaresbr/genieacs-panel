@@ -59,7 +59,6 @@ const vendorsDe = (tenantId) =>
 
 const apagarCatalogo = async (tenantId) => {
   const db = getDb();
-  await db('wifi_security_mappings').where({ tenant_id: tenantId }).del();
   await db('vendors').where({ tenant_id: tenantId }).del();
   await db('wifi_security_config').where({ tenant_id: tenantId }).del();
 };

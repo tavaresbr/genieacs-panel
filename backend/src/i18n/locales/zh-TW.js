@@ -191,17 +191,6 @@ export default {
   'wifiConfig.updateFailed': '無法更新 Wi-Fi 安全性設定',
   'wifiConfig.deleted': 'Wi-Fi 安全性設定已刪除',
   'wifiConfig.deleteFailed': '無法刪除 Wi-Fi 安全性設定',
-  'wifiMapping.idRequired': '需要提供對應 ID',
-  'wifiMapping.fieldsRequired': '需要提供 vendor_id、raw_security_value 與 normalized_security',
-  'wifiMapping.notFound': '找不到該 Wi-Fi 安全性對應',
-  'wifiMapping.listRetrieved': '已取得 Wi-Fi 安全性對應清單',
-  'wifiMapping.listFailed': '無法取得 Wi-Fi 安全性對應清單',
-  'wifiMapping.created': 'Wi-Fi 安全性對應已建立',
-  'wifiMapping.createFailed': '無法建立 Wi-Fi 安全性對應',
-  'wifiMapping.updated': 'Wi-Fi 安全性對應已更新',
-  'wifiMapping.updateFailed': '無法更新 Wi-Fi 安全性對應',
-  'wifiMapping.deleted': 'Wi-Fi 安全性對應已刪除',
-  'wifiMapping.deleteFailed': '無法刪除 Wi-Fi 安全性對應',
 
   // 網路拓撲
   'mapping.nodesRetrieved': '已取得拓撲節點',

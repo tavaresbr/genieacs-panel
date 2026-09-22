@@ -192,17 +192,6 @@ export default {
   'wifiConfig.updateFailed': 'Не удалось обновить конфигурацию безопасности Wi-Fi',
   'wifiConfig.deleted': 'Конфигурация безопасности Wi-Fi удалена',
   'wifiConfig.deleteFailed': 'Не удалось удалить конфигурацию безопасности Wi-Fi',
-  'wifiMapping.idRequired': 'Требуется идентификатор соответствия',
-  'wifiMapping.fieldsRequired': 'Требуются vendor_id, raw_security_value и normalized_security',
-  'wifiMapping.notFound': 'Соответствие безопасности Wi-Fi не найдено',
-  'wifiMapping.listRetrieved': 'Список соответствий безопасности Wi-Fi получен',
-  'wifiMapping.listFailed': 'Не удалось получить список соответствий безопасности Wi-Fi',
-  'wifiMapping.created': 'Соответствие безопасности Wi-Fi создано',
-  'wifiMapping.createFailed': 'Не удалось создать соответствие безопасности Wi-Fi',
-  'wifiMapping.updated': 'Соответствие безопасности Wi-Fi обновлено',
-  'wifiMapping.updateFailed': 'Не удалось обновить соответствие безопасности Wi-Fi',
-  'wifiMapping.deleted': 'Соответствие безопасности Wi-Fi удалено',
-  'wifiMapping.deleteFailed': 'Не удалось удалить соответствие безопасности Wi-Fi',
 
   // Топология сети
   'mapping.nodesRetrieved': 'Узлы карты получены',
