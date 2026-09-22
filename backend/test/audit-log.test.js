@@ -7,6 +7,7 @@ import {
 const { default: AuditLog } = await import('../src/models/AuditLog.js');
 const { default: SchedulerService } = await import('../src/services/schedulerService.js');
 const { default: Setting } = await import('../src/models/Setting.js');
+const { seedDefaults } = await import('../src/config/seed.js');
 const { default: User } = await import('../src/models/User.js');
 const { default: TenantUser } = await import('../src/models/TenantUser.js');
 const { default: CustomerService } = await import('../src/services/customerService.js');
@@ -386,6 +387,27 @@ describe('o prazo da trilha, agora configurável', () => {
   it('sem configuração, continua um ano', async () => {
     await limpar();
     assert.equal(await runInTenant(tenantId, () => SchedulerService.auditRetentionDays()), 365);
+  });
+
+  it('a chave nasce semeada, senão a tela não conseguiria salvá-la', async () => {
+    // `PUT /api/settings/:key` ATUALIZA e responde 404 quando não há linha —
+    // criar é `POST /`. Sem semente o campo existiria na tela e não salvaria, e
+    // o provedor concluiria que a tela está quebrada.
+    //
+    // `seedDefaults` roda a cada boot e insere toda chave que falta, provedor a
+    // provedor, então quem já existe recebe a linha sem migração nenhuma.
+    await limpar();
+    await seedDefaults(getDb());
+    const linha = await runInTenant(tenantId, () => Setting.getByKey('auditRetentionDays'));
+    assert.equal(linha, '365', 'a chave não foi semeada');
+
+    // E a tela grava por essa rota, que agora encontra o que atualizar.
+    const { status } = await call(`${panelUrl}/api/settings/auditRetentionDays`, {
+      method: 'PUT', headers: authHeaders(token), body: { value: '180' }
+    });
+    assert.equal(status, 200);
+    assert.equal(await runInTenant(tenantId, () => SchedulerService.auditRetentionDays()), 180);
+    await limpar();
   });
 
   it('o prazo salvo é o que a poda usa', async () => {
