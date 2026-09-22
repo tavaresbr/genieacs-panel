@@ -329,18 +329,36 @@ export default function DashboardPage() {
 
         {canInspect && <DeviceSwapsCard />}
 
+        {/* Cada número leva à lista que ele conta — quando essa lista existe.
+            `new24h` NÃO é link, e é de propósito: a API de equipamentos filtra
+            por busca e por online/offline, e nada mais. Um link que abrisse a
+            lista inteira sob o rótulo "3 novos em 24h" seria pior que texto
+            parado: o operador contaria 29 e concluiria que o número mente. */}
         <section className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {([
-            ['dashboard.stat.total', data.stats.total, 'server', 'text-foreground'],
-            ['dashboard.stat.online', data.stats.online, 'check', 'text-[hsl(var(--status-success))]'],
-            ['dashboard.stat.offline', data.stats.offline, 'warning', 'text-[hsl(var(--status-danger))]'],
-            ['dashboard.stat.new24h', data.stats.new24h, 'bell', 'text-primary'],
-          ] as const).map(([labelKey, value, icon, color]) => (
-            <div key={labelKey} className="modern-card p-5">
-              <div className="flex items-start justify-between"><p className="metric-label">{t(labelKey)}</p><Icon name={icon} size={19} className="text-muted-foreground" /></div>
-              <p className={`metric-value mt-4 ${color}`}>{value}</p>
-            </div>
-          ))}
+            ['dashboard.stat.total', data.stats.total, 'server', 'text-foreground', '/devices'],
+            ['dashboard.stat.online', data.stats.online, 'check', 'text-[hsl(var(--status-success))]', '/devices?status=online'],
+            ['dashboard.stat.offline', data.stats.offline, 'warning', 'text-[hsl(var(--status-danger))]', '/devices?status=offline'],
+            ['dashboard.stat.new24h', data.stats.new24h, 'bell', 'text-primary', null],
+          ] as const).map(([labelKey, value, icon, color, to]) => {
+            const corpo = (
+              <>
+                <div className="flex items-start justify-between"><p className="metric-label">{t(labelKey)}</p><Icon name={icon} size={19} className="text-muted-foreground" /></div>
+                <p className={`metric-value mt-4 ${color}`}>{value}</p>
+              </>
+            )
+            return to
+              ? (
+                <Link
+                  key={labelKey}
+                  to={to}
+                  className="modern-card block p-5 transition-colors hover:border-primary focus-visible:border-primary"
+                >
+                  {corpo}
+                </Link>
+              )
+              : <div key={labelKey} className="modern-card p-5">{corpo}</div>
+          })}
         </section>
 
         <section className="mb-5 grid gap-4 lg:grid-cols-[1.35fr_0.65fr]">
@@ -352,7 +370,11 @@ export default function DashboardPage() {
               </div>
               <div className="grid grid-cols-2">
                 <div className="border-b border-e border-border p-5"><p className="metric-label">{t('dashboard.metric.opticalRisk')}</p><p className="metric-value text-[hsl(var(--status-warning))]">{signalRisk}</p></div>
-                <div className="border-b border-border p-5"><p className="metric-label">{t('dashboard.metric.activeFaults')}</p><p className="metric-value text-[hsl(var(--status-danger))]">{data.faults.length}</p></div>
+                {/* Mesmo destino da linha da fila: a tabela de falhas está
+                    nesta página. Os três vizinhos deste bloco — risco óptico,
+                    quentes e 16+ clientes — continuam texto parado, porque a
+                    lista de equipamentos não sabe filtrar por nenhum deles. */}
+                <a href="#dashboard-faults" className="block border-b border-border p-5 transition-colors hover:text-primary"><p className="metric-label">{t('dashboard.metric.activeFaults')}</p><p className="metric-value text-[hsl(var(--status-danger))]">{data.faults.length}</p></a>
                 <div className="border-e border-border p-5"><p className="metric-label">{t('dashboard.metric.hotDevices')}</p><p className="metric-value">{data.temperatureDistribution.Hot || 0}</p></div>
                 <div className="p-5"><p className="metric-label">{t('dashboard.metric.manyClients')}</p><p className="metric-value">{data.clientDistribution['16+'] || 0}</p></div>
               </div>
@@ -361,9 +383,20 @@ export default function DashboardPage() {
           <div className="modern-card p-5">
             <div className="flex items-start justify-between"><div><h2 className="section-heading">{t('dashboard.queue.title')}</h2><p className="section-description">{t('dashboard.queue.description')}</p></div><Icon name="bell" /></div>
             <div className="mt-5 divide-y divide-border">
-              <Link to="/devices" className="flex min-h-16 items-center justify-between py-3 hover:text-primary"><span><strong className="block text-sm">{t('dashboard.queue.offline')}</strong><small className="text-muted-foreground">{t('dashboard.queue.offlineHint')}</small></span><span className="data-value text-[hsl(var(--status-danger))]">{data.stats.offline}</span></Link>
-              <div className="flex min-h-16 items-center justify-between py-3"><span><strong className="block text-sm">{t('dashboard.queue.faults')}</strong><small className="text-muted-foreground">{t('dashboard.queue.faultsHint')}</small></span><span className="data-value text-[hsl(var(--status-danger))]">{data.faults.length}</span></div>
-              <Link to="/devices" className="flex min-h-16 items-center justify-between py-3 hover:text-primary"><span><strong className="block text-sm">{t('dashboard.queue.weakSignal')}</strong><small className="text-muted-foreground">{t('dashboard.queue.weakSignalHint')}</small></span><span className="data-value text-[hsl(var(--status-warning))]">{signalRisk}</span></Link>
+              {/* Levava para `/devices` sem filtro: clicar em "7 offline" abria
+                  os 29. O recorte agora vai na URL. */}
+              <Link to="/devices?status=offline" className="flex min-h-16 items-center justify-between py-3 hover:text-primary"><span><strong className="block text-sm">{t('dashboard.queue.offline')}</strong><small className="text-muted-foreground">{t('dashboard.queue.offlineHint')}</small></span><span className="data-value text-[hsl(var(--status-danger))]">{data.stats.offline}</span></Link>
+              {/* As falhas não são uma lista de equipamentos: a tabela delas
+                  está logo abaixo, nesta mesma página. O destino honesto é
+                  ela, e não `/devices`. */}
+              <a href="#dashboard-faults" className="flex min-h-16 items-center justify-between py-3 hover:text-primary"><span><strong className="block text-sm">{t('dashboard.queue.faults')}</strong><small className="text-muted-foreground">{t('dashboard.queue.faultsHint')}</small></span><span className="data-value text-[hsl(var(--status-danger))]">{data.faults.length}</span></a>
+              {/* DEIXOU de ser link, e é uma remoção deliberada. Ele levava a
+                  `/devices` sem filtro, e não há filtro de RX na API para pôr
+                  ali — então o clique prometia "estes com sinal fraco" e
+                  entregava o inventário inteiro. Texto parado diz menos e não
+                  mente; o link volta no dia em que a lista souber filtrar por
+                  faixa de RX. */}
+              <div className="flex min-h-16 items-center justify-between py-3"><span><strong className="block text-sm">{t('dashboard.queue.weakSignal')}</strong><small className="text-muted-foreground">{t('dashboard.queue.weakSignalHint')}</small></span><span className="data-value text-[hsl(var(--status-warning))]">{signalRisk}</span></div>
             </div>
           </div>
         </section>
@@ -444,7 +477,7 @@ export default function DashboardPage() {
           <div className="modern-card p-5 xl:col-span-3"><h2 className="section-heading">{t('dashboard.chart.products.title')}</h2><p className="section-description mb-3">{t('dashboard.chart.products.description')}</p>{productData.length ? <BarChart data={productData} /> : <p className="empty-state-copy py-16 text-center">{t('dashboard.chart.products.empty')}</p>}</div>
         </section>
 
-        <section className="modern-card overflow-hidden">
+        <section id="dashboard-faults" className="modern-card overflow-hidden scroll-mt-4">
           <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-5 py-4">
             <div><h2 className="section-heading">{t('dashboard.faults.title')}</h2><p className="section-description">{t('dashboard.faults.description')}</p></div>
             <div className="flex items-center gap-2">
