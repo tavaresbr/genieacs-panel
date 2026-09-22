@@ -5,6 +5,7 @@ import { asTenant, authHeaders, call, getDb, startTestServers, stopTestServers }
 const { default: CustomerService } = await import('../src/services/customerService.js');
 const { default: DeviceSwap } = await import('../src/models/DeviceSwap.js');
 const { default: SgpLink } = await import('../src/models/SgpLink.js');
+const { default: DeviceSwapService } = await import('../src/services/deviceSwapService.js');
 
 const PPPOE = 'subscriber-1@isp';
 
@@ -186,6 +187,54 @@ describe('two ONTs trading one login', () => {
     assert.equal((await openSwaps()).length, 0);
 
     await ensure(inform('ont-old'));
+    await ensure(inform('ont-new'));
+
+    const reopened = await asTenant(() => DeviceSwap.getById(forward.id));
+    assert.equal(reopened.acknowledged_at, null);
+  });
+
+  it('dismissing one direction of an unstable pair dismisses both', async () => {
+    await ensure(inform('ont-old'));
+    await ensure(inform('ont-new'));
+    await ensure(inform('ont-old'));
+    assert.equal((await openSwaps()).length, 2);
+
+    const forward = await asTenant(() => DeviceSwap.getPair('ont-old', 'ont-new'));
+    await asTenant(() => DeviceSwap.acknowledge(forward.id));
+
+    assert.equal((await openSwaps()).length, 0);
+  });
+
+  it('keeps an unstable pair dismissed while it goes on trading the login', async () => {
+    // The ONTs stay powered on and keep alternating every few minutes. The
+    // operator already confirmed the pair is unstable; bringing the warning
+    // back on each inform made "Confirmar" look like it did nothing.
+    await ensure(inform('ont-old'));
+    await ensure(inform('ont-new'));
+    await ensure(inform('ont-old'));
+    const forward = await asTenant(() => DeviceSwap.getPair('ont-old', 'ont-new'));
+    await asTenant(() => DeviceSwap.acknowledge(forward.id));
+
+    await ensure(inform('ont-new'));
+    await ensure(inform('ont-old'));
+    await ensure(inform('ont-new'));
+
+    assert.equal((await openSwaps()).length, 0);
+    const after = await asTenant(() => DeviceSwap.getById(forward.id));
+    assert.equal(Number(after.repeat_count), 3, 'the repeats are still counted');
+  });
+
+  it('reopens a dismissed unstable pair that went quiet and then swapped again', async () => {
+    await ensure(inform('ont-old'));
+    await ensure(inform('ont-new'));
+    await ensure(inform('ont-old'));
+    const forward = await asTenant(() => DeviceSwap.getPair('ont-old', 'ont-new'));
+    await asTenant(() => DeviceSwap.acknowledge(forward.id));
+
+    // Nothing for longer than the flap window: the next swap is news again.
+    const longAgo = new Date(Date.now() - DeviceSwapService.flapWindowMs() - 60_000);
+    await getDb()('device_swaps').update({ occurred_at: longAgo });
+
     await ensure(inform('ont-new'));
 
     const reopened = await asTenant(() => DeviceSwap.getById(forward.id));
