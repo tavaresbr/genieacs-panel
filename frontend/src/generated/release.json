@@ -1,262 +1,1000 @@
 {
-  "version": "1.16.0",
-  "build": 278,
-  "sourceCommit": "a114a5758f9b",
-  "releasedAt": "2026-09-10",
-  "basedOnTag": "v1.15.0",
-  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/v1.15.0...v1.16.0",
+  "version": "1.17.0",
+  "build": 566,
+  "sourceCommit": "0599a6994a94",
+  "releasedAt": "2026-09-22",
+  "basedOnTag": "v1.16.0",
+  "compareUrl": "https://github.com/tavaresbr/genieacs-panel/compare/v1.16.0...v1.17.0",
   "changes": [
     {
-      "shortHash": "5077277",
+      "shortHash": "7f42926",
       "date": "2026-09-09",
-      "title": "I18n: traduzir para russo as chaves da onda 7",
+      "title": "Atualizar o plano de SaaS multi-tenant contra o que existe",
       "category": "Maintenance"
     },
     {
-      "shortHash": "27500c9",
-      "date": "2026-09-09",
-      "title": "Complete the Russian dictionary",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "b9125dc",
-      "date": "2026-09-09",
-      "title": "Record device signal and uptime over time",
-      "category": "New"
-    },
-    {
-      "shortHash": "af2aa4d",
-      "date": "2026-09-09",
-      "title": "Onda 8: contrato, configuração e traduções compartilhadas",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "928d790",
-      "date": "2026-09-09",
-      "title": "Chart a device's readings on its page",
-      "category": "New"
-    },
-    {
-      "shortHash": "1a8944c",
-      "date": "2026-09-09",
-      "title": "Onda 8: sgp_links por provedor",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "ff2af73",
-      "date": "2026-09-09",
-      "title": "Onda 8: retenção do histórico e o botão que a varredura nunca teve",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "dafb791",
-      "date": "2026-09-09",
-      "title": "Onda 8: subárvore de mídia por provedor, e a varredura por provedor",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "207e54c",
-      "date": "2026-09-09",
-      "title": "Onda 8: remover as duas chaves de backend sem consumidor",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "b2ffcf6",
-      "date": "2026-09-09",
-      "title": "Onda 8: o botão de limpeza varre só o provedor que o apertou",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "40551a2",
-      "date": "2026-09-09",
-      "title": "Onda 8: cobrir o upgrade de sgp_links num banco que já tem linhas",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "eb4d5ef",
-      "date": "2026-09-09",
-      "title": "Onda 9: base compartilhada — recuo, índices e o contrato",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "6f85f9b",
-      "date": "2026-09-09",
-      "title": "Truncate the inform to whole seconds before storing it",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "a77ecb2",
-      "date": "2026-09-09",
-      "title": "Onda 9: a saúde tem de distinguir recuo de fila parada",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "d0df4bc",
-      "date": "2026-09-09",
-      "title": "Onda 9: reenviar é devolver a linha à fila",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "a84d687",
-      "date": "2026-09-09",
-      "title": "Toda mensagem recebida era arquivada no primeiro provedor",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "f5ba01b",
-      "date": "2026-09-09",
-      "title": "Carry a subscriber's SGP link onto the ONT that replaced theirs",
-      "category": "New"
-    },
-    {
-      "shortHash": "e27e36d",
-      "date": "2026-09-09",
-      "title": "Onda 9 (faixa A): a fila recua em vez de queimar as tentativas",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "39ce403",
-      "date": "2026-09-09",
-      "title": "Drop the Russian keys the last two merges each added",
-      "category": "Fixed"
-    },
-    {
-      "shortHash": "9b9d668",
-      "date": "2026-09-09",
-      "title": "Onda 9: a campanha também espera, e a costura do lote",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "afb21d6",
-      "date": "2026-09-09",
-      "title": "Add an in-repo QR encoder with golden vectors from an independent oracle",
-      "category": "New"
-    },
-    {
-      "shortHash": "68808c3",
-      "date": "2026-09-09",
-      "title": "Draw the Pix QR code and give Pix its own field",
-      "category": "New"
-    },
-    {
-      "shortHash": "07e569b",
-      "date": "2026-09-09",
-      "title": "Onda 10: as quatro migrações por provedor",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "1ccbe2e",
-      "date": "2026-09-09",
-      "title": "Onda 10: o mapa por provedor",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "e0f7b9e",
-      "date": "2026-09-09",
-      "title": "Onda 10: provisionamento por provedor",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "207f4c2",
-      "date": "2026-09-09",
-      "title": "Onda 10: o log de eventos do SGP por provedor, e a entrega que se identifica",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "5472e17",
-      "date": "2026-09-09",
-      "title": "Onda 10: as datas de instalação por provedor, e a varredura de Customer ID em laço",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "e607404",
-      "date": "2026-09-09",
-      "title": "Onda 10: o reaper de boot passa a rodar por provedor",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "ad3844f",
-      "date": "2026-09-09",
-      "title": "Onda 10: o agendador inteiro passa a rodar por provedor",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "76a0c01",
-      "date": "2026-09-09",
-      "title": "Onda 11: a migração do catálogo de equipamentos",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "ca3f0f2",
-      "date": "2026-09-09",
-      "title": "`whereLike` quebra no MySQL contra coluna utf8mb4",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "ea2bb6d",
-      "date": "2026-09-09",
-      "title": "Onda 11: as credenciais de WiFi do assinante, por provedor",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "f8a80fa",
-      "date": "2026-09-09",
-      "title": "Onda 11: o catálogo de equipamentos por provedor",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "9caa1cd",
-      "date": "2026-09-09",
-      "title": "Onda 11: validada nos três bancos antes de empurrar",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "2b2c9b1",
-      "date": "2026-09-09",
-      "title": "Onda 12: a ponte de vínculo, e o contrato do que o token carrega",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "eefcb15",
-      "date": "2026-09-09",
-      "title": "Onda 12: a espinha de autenticação — o token nomeia o provedor",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "cb04538",
-      "date": "2026-09-09",
-      "title": "Onda 12: /api/users passa a ser a equipe de um provedor",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "b6a7ff0",
-      "date": "2026-09-09",
-      "title": "Onda 12: fechar a brecha do vínculo encerrado, e reconciliar com a faixa B",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "b02f965",
-      "date": "2026-09-09",
-      "title": "Onda 12: dizer que a guarda do último admin não é alcançável pela rota",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "134a319",
-      "date": "2026-09-09",
-      "title": "Onda 12: `users` e `tenant_users` são do deploy, e agora está escrito",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "2fe76d1",
-      "date": "2026-09-09",
-      "title": "Cover the upgrade path of the last three tenancy steps",
-      "category": "Maintenance"
-    },
-    {
-      "shortHash": "bb8b570",
+      "shortHash": "eea5421",
       "date": "2026-09-10",
-      "title": "Open a support ticket in the ERP from an ONT's page",
+      "title": "Onda 13: o plano de controle, e o contrato de quem tem a chave",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "bd1d13c",
+      "date": "2026-09-10",
+      "title": "Resolve the provider from the host, and refuse a token replayed on another's",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "b31543b",
+      "date": "2026-09-10",
+      "title": "Close the three SSRF holes before the ACS URL becomes customer data",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "46f4258",
+      "date": "2026-09-10",
+      "title": "Onda 13: a tela do plano de controle, e a navegação que ela ainda não tem",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "262139e",
+      "date": "2026-09-10",
+      "title": "Onda 13: recusar catálogo duplicado dentro de um provedor",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "f5ed5ee",
+      "date": "2026-09-10",
+      "title": "Read the subscriber and the optical RX off the ONT itself",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "a157a76",
+      "date": "2026-09-10",
+      "title": "Block IPv4-mapped IPv6 in the SSRF guard",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "b6dda33",
+      "date": "2026-09-10",
+      "title": "Confine a request-supplied attachment path to the provider's outbox",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "33a17ed",
+      "date": "2026-09-10",
+      "title": "Onda 13: vincular alguém a um provedor, do plano de controle",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "c9c960b",
+      "date": "2026-09-10",
+      "title": "Onda 13: quem tem a chave do plano de controle",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "b0bbcbf",
+      "date": "2026-09-10",
+      "title": "Onda 13: o registro de provedores, e nascer igual a um do boot",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "f78e174",
+      "date": "2026-09-10",
+      "title": "Finish the session half of Phase 2, now that a host names a provider",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "2374450",
+      "date": "2026-09-10",
+      "title": "Show the membership row is already the revocation, instead of adding a counter",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "c07043c",
+      "date": "2026-09-10",
+      "title": "Arm a SQL sentinel under APP_ENV=test, so every test is a scoping test",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "518b0fc",
+      "date": "2026-09-10",
+      "title": "Onda 13: a sessão diz se a pessoa tem a chave",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "e39b51f",
+      "date": "2026-09-10",
+      "title": "Onda 13: as costuras entre as quatro faixas",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "9a31863",
+      "date": "2026-09-10",
+      "title": "Pin the resolved IP for GenieACS, and let the login screen learn the name",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "9d0a617",
+      "date": "2026-09-10",
+      "title": "Give every safeFetch a deadline",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "c3624df",
+      "date": "2026-09-10",
+      "title": "Cap the Evolution response body before it is buffered",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "875ac72",
+      "date": "2026-09-10",
+      "title": "Authenticate an attachment upload before buffering its body",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "d3db129",
+      "date": "2026-09-10",
+      "title": "Onda 14: o contrato do provedor por subdomínio",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "c8297c8",
+      "date": "2026-09-10",
+      "title": "Find the optical reading by its name, not by a guessed path",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "1b851af",
+      "date": "2026-09-10",
+      "title": "Count every provider, not the active ones, before sweeping the legacy area",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "0253f6b",
+      "date": "2026-09-10",
+      "title": "Refuse a database switch once a second provider exists",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "3f09a7b",
+      "date": "2026-09-10",
+      "title": "Require TLS for the Evolution server",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "67cd4c7",
+      "date": "2026-09-10",
+      "title": "Honour NODE_ENV in the secret-box guard, and give a rotation a read window",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "60c2b89",
+      "date": "2026-09-10",
+      "title": "Keep the tenant insert guard across a chained builder",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "fb58445",
+      "date": "2026-09-10",
+      "title": "Delete the unreachable copy of the Evolution target check",
+      "category": "Changed"
+    },
+    {
+      "shortHash": "546bfc2",
+      "date": "2026-09-10",
+      "title": "Give each provider its own GenieACS, with a credential and a ceiling",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "5e10de4",
+      "date": "2026-09-10",
+      "title": "Onda 16: o portão da Fase 8 — 404 e não 403, varrido sobre as 24 rotas por id",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "b136a5b",
+      "date": "2026-09-10",
+      "title": "Prove the switch guard let a lone provider through without opening a socket",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "c1e1043",
+      "date": "2026-09-10",
+      "title": "Record the handful of actions that leave no trace in the data",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "a530c85",
+      "date": "2026-09-10",
+      "title": "Hand a provider its own data back, without handing over its secrets",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "2b5ddf7",
+      "date": "2026-09-10",
+      "title": "Onda 17 (backend): papéis reais, e a guarda dizendo o que a rota faz",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "3e21b17",
+      "date": "2026-09-10",
+      "title": "Stop the outbound-limit tests from depending on the machine's resolver",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "9742d03",
+      "date": "2026-09-10",
+      "title": "Onda 17 (frontend): quatro papéis na tela, e a guarda perguntando o que a pessoa alcança",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "f4d6d65",
+      "date": "2026-09-10",
+      "title": "Onda 18: o convite, e o buraco que a onda 17 deixou no papel de owner",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "9baa307",
+      "date": "2026-09-10",
+      "title": "Onda 17 (teste): o alcance de cada papel, provado por HTTP",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "46a82e1",
+      "date": "2026-09-10",
+      "title": "Onda 19 (backend): a credencial com que o painel se apresenta à NBI",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "6d2e789",
+      "date": "2026-09-10",
+      "title": "Onda 19 (frontend): a credencial da NBI na tela, e o campo de segredo sem ambiguidade",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "3b1a821",
+      "date": "2026-09-10",
+      "title": "Onda 20: a trilha das ações sensíveis",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "aa738da",
+      "date": "2026-09-10",
+      "title": "Onda 21: levar o cadastro embora, e o \"flake\" da suíte finalmente diagnosticado",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "a92da4e",
+      "date": "2026-09-10",
+      "title": "Onda 22: apagar um provedor, com um registro que sobrevive a ele",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "413dd6a",
+      "date": "2026-09-10",
+      "title": "Let the bell ask the ONT for the optical object itself",
       "category": "New"
+    },
+    {
+      "shortHash": "e76ddac",
+      "date": "2026-09-10",
+      "title": "The checklist has no open line left, and say what the order of delivery became",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "d9a84be",
+      "date": "2026-09-10",
+      "title": "Put the name resolution under the request deadline",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "327b2a6",
+      "date": "2026-09-10",
+      "title": "Add Arabic, and make the layout direction-aware",
+      "category": "New"
+    },
+    {
+      "shortHash": "912188c",
+      "date": "2026-09-10",
+      "title": "Pin the DNS case to a name, so an IP literal cannot mute it",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "7d2d51f",
+      "date": "2026-09-10",
+      "title": "Login por e-mail (backend), em três passos e sem dia de virada",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "afd3c21",
+      "date": "2026-09-10",
+      "title": "Decide \"is this production?\" in one place, and honour both variables",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "5a93d35",
+      "date": "2026-09-10",
+      "title": "Make suspending a provider take effect without a restart",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "e887306",
+      "date": "2026-09-10",
+      "title": "Record who was put into an ISP's team, and who took them out",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "c01c3fd",
+      "date": "2026-09-10",
+      "title": "Fecha o espaço de nomes nas três portas que faltavam",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "4918578",
+      "date": "2026-09-10",
+      "title": "Login por e-mail (painel), sem dia de virada na tela",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "bb7c250",
+      "date": "2026-09-10",
+      "title": "Add Hindi to the panel, the portal and the API",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "0d11989",
+      "date": "2026-09-10",
+      "title": "Fase 5: planos, limites e o ciclo de vida da assinatura",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "f284343",
+      "date": "2026-09-10",
+      "title": "Close both SSRF holes, on one table and one pinned transport",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "352597f",
+      "date": "2026-09-10",
+      "title": "Add the Hindi string for the blocked-host SGP error",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "4750a99",
+      "date": "2026-09-10",
+      "title": "Give Hindi the key that landed while it was being written",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "676aca6",
+      "date": "2026-09-10",
+      "title": "Print which tests failed, and keep the stream that says so",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "1dbf9e8",
+      "date": "2026-09-10",
+      "title": "Frontend do login por e-mail, e o merge com a main que o CI já testava",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "02ae65f",
+      "date": "2026-09-10",
+      "title": "Translate the SGP blocked-host refusal into Hindi",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "e09e577",
+      "date": "2026-09-10",
+      "title": "Fase 6: the provider's own frontend — name, sign-up, onboarding, plan",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "2a1f2a8",
+      "date": "2026-09-10",
+      "title": "Segundo merge com a main, e a lacuna de i18n que era dela",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "e39a7a4",
+      "date": "2026-09-10",
+      "title": "Drop the duplicate Hindi blocked-host key",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "69d57b2",
+      "date": "2026-09-10",
+      "title": "Put the clock, the operator's choice and the generated password back in charge",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "f8e2596",
+      "date": "2026-09-10",
+      "title": "Fase 4: o conector do GenieACS, e o fim das sete cópias",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "cfadc49",
+      "date": "2026-09-10",
+      "title": "Fase 7: operate the hosted edition — logs and metrics per provider, front door, deploy",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "43d4058",
+      "date": "2026-09-10",
+      "title": "Fase 4: o painel deixa de ser atualizado para quem não está olhando",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "958dae3",
+      "date": "2026-09-10",
+      "title": "Avalia a devices_summary e fecha o muro de escala",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "34ea59d",
+      "date": "2026-09-10",
+      "title": "Compile the backend's native dependency in its own image stage",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "12252a5",
+      "date": "2026-09-10",
+      "title": "Make the email switch one switch, and the operators screen speak every language",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "38518c5",
+      "date": "2026-09-10",
+      "title": "Give the new switch cases their own file, and the old one its tests back",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "7e7908d",
+      "date": "2026-09-10",
+      "title": "Fase 8: count the doors, and answer for every one of them",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "1151b26",
+      "date": "2026-09-10",
+      "title": "Give the backend's postinstall the file it needs to decline",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "116e277",
+      "date": "2026-09-10",
+      "title": "Fase 5: o portão comercial, e onde ele NÃO pode ficar",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "76982ca",
+      "date": "2026-09-10",
+      "title": "Fase 5: os limites, e o convite por onde eles escapariam",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "943ed3b",
+      "date": "2026-09-10",
+      "title": "Fase 5: o extrato comercial, e a coluna que precede o gateway",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "bf5d6a0",
+      "date": "2026-09-10",
+      "title": "A porta da assinatura sai de cima do 401",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "2c174fb",
+      "date": "2026-09-10",
+      "title": "Impersonation, with its own audience and a ticket to carry it across hosts",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "556552b",
+      "date": "2026-09-10",
+      "title": "Send the invite by email, where a deployment has somewhere to send it",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "e4c93ac",
+      "date": "2026-09-10",
+      "title": "Credit a payment reference once, and seed only the provider being born",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "35459df",
+      "date": "2026-09-10",
+      "title": "Ask Postgres for the index by name, not by scanning every schema",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "eab6a93",
+      "date": "2026-09-10",
+      "title": "Give the frontend a test runner, and the first tests worth having",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "d1a0654",
+      "date": "2026-09-11",
+      "title": "The screens the invite and the impersonation were missing",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "9cb7dad",
+      "date": "2026-09-11",
+      "title": "Tell Postgres the parameter is text",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "f693f33",
+      "date": "2026-09-11",
+      "title": "RLS no Postgres: implementado, e desligado por padrão",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "0952fb4",
+      "date": "2026-09-11",
+      "title": "Read the provider before filtering the menu by it, and never show a black page again",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "6a23298",
+      "date": "2026-09-11",
+      "title": "Let the webhook's own pass settle an SGP event before the test reads the link",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "e347d7b",
+      "date": "2026-09-11",
+      "title": "Link by the login the ONT reports, not the one an account holds",
+      "category": "Fixed"
+    },
+    {
+      "shortHash": "d6bd503",
+      "date": "2026-09-11",
+      "title": "Redefinir a senha por e-mail, e provar o endereço antes de mandar",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "4192351",
+      "date": "2026-09-11",
+      "title": "O webhook do Evolution deixa de ser suposto",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "30761f4",
+      "date": "2026-09-11",
+      "title": "A volta: o painel se chama pela porta da frente",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "c3d63eb",
+      "date": "2026-09-11",
+      "title": "Gerenciar planos, acesso e a trilha pelo console — as telas que faltavam",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "62565c7",
+      "date": "2026-09-11",
+      "title": "Console da plataforma em russo, chinês e japonês",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "faebc44",
+      "date": "2026-09-11",
+      "title": "Console da plataforma em espanhol, francês, alemão e italiano",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "29811d9",
+      "date": "2026-09-11",
+      "title": "Console da plataforma em coreano, árabe e híndi — os treze fechados",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "e8cccf0",
+      "date": "2026-09-11",
+      "title": "A tela pedia um host e o código exigia um caminho",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "d470a90",
+      "date": "2026-09-11",
+      "title": "O cadastro do console se administra pela tela, e o último não sai",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "dc73f94",
+      "date": "2026-09-11",
+      "title": "O campo mostra o que ficou gravado, não o que foi digitado",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "621363a",
+      "date": "2026-09-12",
+      "title": "O fallback do SPA resolve sob root, e não por caminho absoluto",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "b9c7ba6",
+      "date": "2026-09-12",
+      "title": "A trilha do provedor ganha tela, e os dados do provedor ganham botão",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "eab385b",
+      "date": "2026-09-12",
+      "title": "O painel do provedor abre em outra aba, e o console fica onde estava",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "0067d7f",
+      "date": "2026-09-12",
+      "title": "O período pago vence, como o teste já vencia",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "d8da7f9",
+      "date": "2026-09-12",
+      "title": "E a tela para de prometer o que o painel já não cumpre",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "117a930",
+      "date": "2026-09-12",
+      "title": "A personificação abre sempre em outra aba, e a sessão dela é só da aba",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "c733bda",
+      "date": "2026-09-12",
+      "title": "O provedor ganha cadastro fiscal, e ele sai junto quando o provedor sai",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "51d27b3",
+      "date": "2026-09-12",
+      "title": "O cadastro manda a prova do endereço, e a poda deixa de ser promessa",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "c08224e",
+      "date": "2026-09-12",
+      "title": "O cadastro de um provedor deixa de ser definitivo",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "5866a8d",
+      "date": "2026-09-12",
+      "title": "A campanha parava de garrar no dia em que alguém revisava o rascunho",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "8922e4e",
+      "date": "2026-09-12",
+      "title": "O eco do próprio envio era lido como falha, e a mensagem saía de novo",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "d4a4749",
+      "date": "2026-09-12",
+      "title": "Duas credenciais que saíam por onde não deviam",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "c4a7883",
+      "date": "2026-09-12",
+      "title": "O teto de assinantes valia só na varredura, e o pagamento repetido não se via",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "97b9de5",
+      "date": "2026-09-12",
+      "title": "Os documentos param de mentir, e a guarda de egresso para de depender do .env",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "25d0202",
+      "date": "2026-09-12",
+      "title": "Um provedor bloqueava os outros, e a tela mentia em três lugares",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "1b8b284",
+      "date": "2026-09-12",
+      "title": "O lote do webhook não tinha prazo, e o anexo sem linha ficava no disco",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "79d4dc5",
+      "date": "2026-09-12",
+      "title": "A personificação vale para qualquer provedor, e não só para o primeiro",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "da5cd2f",
+      "date": "2026-09-12",
+      "title": "Um provedor novo passa a ter como receber a primeira conta",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "98ec89b",
+      "date": "2026-09-12",
+      "title": "O GET que aposentava conta de assinante sem trilha e sob personificação",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "691d95b",
+      "date": "2026-09-12",
+      "title": "O painel avisa antes de bloquear",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "6e1d8da",
+      "date": "2026-09-12",
+      "title": "A ação nova da trilha não tinha frase, e o portão local não olhava o frontend",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "6d757d5",
+      "date": "2026-09-12",
+      "title": "O endereço da plataforma roteia o console, e recusa sessão de provedor",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "0df18dc",
+      "date": "2026-09-12",
+      "title": "O assinante ganha os dois direitos que a LGPD lhe dá",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "a16c864",
+      "date": "2026-09-12",
+      "title": "A trilha e a exclusão passam a dizer quem, e a exclusão passa a levar o disco",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "272d860",
+      "date": "2026-09-12",
+      "title": "O prazo corria na fila, o teto era do processo, e havia uma porta sem muro",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "c2f136a",
+      "date": "2026-09-12",
+      "title": "O backup deixa de ser um parágrafo do runbook",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "890db55",
+      "date": "2026-09-12",
+      "title": "O pagamento de um provedor deixa de ser um botão",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "a730cf4",
+      "date": "2026-09-12",
+      "title": "A sessão do console existe, e ela não pertence a provedor nenhum",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "5fe7471",
+      "date": "2026-09-12",
+      "title": "O console ganha casca própria, e o painel de um provedor não a empresta",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "ce25127",
+      "date": "2026-09-12",
+      "title": "O eco da nossa própria mensagem virava uma segunda bolha na conversa",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "7e78cc6",
+      "date": "2026-09-12",
+      "title": "O console deixa de ser servido no host de um provedor",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "4b80c84",
+      "date": "2026-09-12",
+      "title": "A retenção passa a valer para provedor suspenso, que guardava para sempre",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "c6feb69",
+      "date": "2026-09-12",
+      "title": "A rotação da SECRET_BOX_KEY passa a ter a metade que faltava",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "39f8068",
+      "date": "2026-09-12",
+      "title": "O painel passa a pedir o dinheiro, e não só a recebê-lo",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "1db6a92",
+      "date": "2026-09-12",
+      "title": "O proxy que o SaaS exige deixa de ser exercício do leitor",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "416d5a4",
+      "date": "2026-09-12",
+      "title": "A conta que opera a plataforma não é membro de provedor nenhum",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "288e127",
+      "date": "2026-09-13",
+      "title": "Desde quando o provedor está suspenso, que ninguém conseguia responder",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "4fa5cb3",
+      "date": "2026-09-14",
+      "title": "Os dois documentos voltam a dizer a verdade sobre o que existe",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "8c3da7d",
+      "date": "2026-09-14",
+      "title": "O valor pago deixa de ser enfeite do extrato",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "2721dd7",
+      "date": "2026-09-14",
+      "title": "O endereço de um provedor novo, em um comando",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "09ae84b",
+      "date": "2026-09-14",
+      "title": "Dois testes da cadência paravam de correr contra o relógio",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "fd35c76",
+      "date": "2026-09-14",
+      "title": "O relógio parado tem de parar no presente, não em 1970",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "2ea605d",
+      "date": "2026-09-14",
+      "title": "O script achava o arquivo de ambiente de um só dos dois deploys",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "55128ed",
+      "date": "2026-09-15",
+      "title": "O script deixa de exigir um nginx já preparado para o desafio",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "cdca88d",
+      "date": "2026-09-15",
+      "title": "O prazo do teste da fila tinha 40 ms para uma ida ao banco",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "abdb3ea",
+      "date": "2026-09-20",
+      "title": "No host único, o que é anônimo apontava para o primeiro provedor",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "e576d48",
+      "date": "2026-09-20",
+      "title": "O login pergunta onde entrar, e a porta não veste o primeiro provedor",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "b0fb165",
+      "date": "2026-09-20",
+      "title": "O SQLite sai do modo em que um leitor tranca um escritor",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "73d5e98",
+      "date": "2026-09-20",
+      "title": "O provedor bloqueado passa a ter onde pagar",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "848403e",
+      "date": "2026-09-20",
+      "title": "A plataforma ganha o próprio provedor",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "8b4902e",
+      "date": "2026-09-20",
+      "title": "A barra lateral diz qual chapéu se está usando",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "b37fea5",
+      "date": "2026-09-20",
+      "title": "O console passa a mostrar a saúde do deploy",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "fa7b6aa",
+      "date": "2026-09-20",
+      "title": "O console passa a criar a conta de um provedor administrado",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "a9edb5b",
+      "date": "2026-09-20",
+      "title": "O onboarding sugere o GenieACS do provedor",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "d195034",
+      "date": "2026-09-20",
+      "title": "O runbook da migração ganha o caminho de quem não tem curinga",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "880eed1",
+      "date": "2026-09-21",
+      "title": "O catálogo padrão de equipamentos é o da plataforma",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "d640274",
+      "date": "2026-09-21",
+      "title": "A sonda de configuração ganha credencial própria, senão ela mentiria",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "912c962",
+      "date": "2026-09-21",
+      "title": "Testar a integração com o Evolution, com zero números conectados",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "38abcf5",
+      "date": "2026-09-21",
+      "title": "O caminho do webhook nas linhas gravadas antes da garantia existir",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "1599d6d",
+      "date": "2026-09-21",
+      "title": "O diagnóstico passa a dizer quando os dois lados não batem",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "ff7a116",
+      "date": "2026-09-21",
+      "title": "O webhook que a tela dizia saudável e não entregava nada",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "7cfc5c3",
+      "date": "2026-09-21",
+      "title": "A faixa do cliente no topo da tela do aparelho",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "03655f6",
+      "date": "2026-09-21",
+      "title": "Liberação em confiança e Abrir chamado também no topo",
+      "category": "Maintenance"
+    },
+    {
+      "shortHash": "f397f01",
+      "date": "2026-09-21",
+      "title": "Os números do painel levam à lista que eles contam",
+      "category": "Maintenance"
     }
   ]
 }
