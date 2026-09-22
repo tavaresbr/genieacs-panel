@@ -59,6 +59,7 @@ export default {
   'rateLimit.portalUnlock': 'بلغت حدّ طلبات فكّ الحجب الائتماني. أعد المحاولة لاحقًا.',
   'rateLimit.portalPasswordAdmin': 'طلبات كلمة مرور البوابة كثيرة جدًا، يُرجى التمهّل',
   'rateLimit.sgpAdmin': 'طلبات SGP كثيرة جدًا، يُرجى التمهّل',
+  'rateLimit.platformExport': 'عمليات تصدير كثيرة جدًا، يُرجى التمهّل',
   'rateLimit.sgpSync': 'عمليات مزامنة شاملة كثيرة جدًا. أعد المحاولة لاحقًا.',
 
   // الأجهزة

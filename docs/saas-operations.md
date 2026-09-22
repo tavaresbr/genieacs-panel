@@ -457,6 +457,15 @@ estrangeiras pedem, sem segredo cifrado e sem hash de senha, com um manifesto di
 que ficou de fora. É o que se entrega numa solicitação da LGPD e o que se guarda antes de
 apagar um provedor.
 
+E **pelo console**, `GET /api/platform/tenants/:id/export` (plano de controle, com teto de
+seis por minuto) produz o mesmo arquivo, pelo mesmo serviço, para qualquer provedor —
+inclusive suspenso. Esse "inclusive" é o motivo de a rota existir: suspender devolve 404
+no host inteiro do provedor, e a exclusão exige suspensão antes, então a janela para o ISP
+levar os próprios dados fechava antes de a exclusão ser permitida. A exportação daqui
+grava em `platform_audit` **antes** de entregar — sem a linha, o arquivo não sai — e
+também na trilha DO provedor, marcada como vinda do console, porque quem pergunta "alguém
+baixou a nossa base?" é o ISP e ele não lê a nossa trilha.
+
 **Por assinante**, na ficha do aparelho, o provedor atende o titular dele sem passar por
 nós: `GET /api/customers/:accountId/export` (capacidade `customers.dossier`) monta o
 dossiê de uma pessoa, e `DELETE /api/customers/:accountId` (capacidade `customers.erase`,

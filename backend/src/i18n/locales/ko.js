@@ -61,6 +61,7 @@ export default {
   'rateLimit.portalUnlock': '신용 해제 요청 한도에 도달했습니다. 나중에 다시 시도하십시오.',
   'rateLimit.portalPasswordAdmin': '포털 비밀번호 요청이 너무 많습니다. 잠시 후 다시 시도하십시오',
   'rateLimit.sgpAdmin': 'SGP 요청이 너무 많습니다. 잠시 후 다시 시도하십시오',
+  'rateLimit.platformExport': '내보내기 요청이 너무 많습니다. 잠시 후 다시 시도하십시오',
   'rateLimit.sgpSync': '전체 동기화 요청이 너무 많습니다. 나중에 다시 시도하십시오.',
 
   // 장비

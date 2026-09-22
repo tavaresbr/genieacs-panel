@@ -22,6 +22,12 @@ class PlatformAudit {
     // ações obrigaria a fazê-la duas vezes.
     TENANT_IDENTITY_CHANGED: 'tenant.identity_changed',
     TENANT_DELETED: 'tenant.deleted',
+    // Quem baixou o cadastro inteiro de qual provedor, pelo console. Linha
+    // própria e obrigatória: é a única ação daqui que tira do deployment uma
+    // cópia dos assinantes de um cliente — CPF, contrato, telefone e as
+    // conversas — e a leva para o computador de quem operou. A exclusão apaga e
+    // deixa rastro; esta COPIA, e sem registro não deixaria nenhum.
+    TENANT_EXPORTED: 'tenant.exported',
     // Um provedor foi ligado (ou desligado) do gateway de pagamento. Ação
     // própria e não `TENANT_IDENTITY_CHANGED`: a pergunta que se faz desta
     // linha é "desde quando este cliente paga sozinho, e quem o ligou", e ela é

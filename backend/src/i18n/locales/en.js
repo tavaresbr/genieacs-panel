@@ -61,6 +61,7 @@ export default {
   'rateLimit.portalUnlock': 'Trust-unlock request limit reached. Try again later.',
   'rateLimit.portalPasswordAdmin': 'Too many portal password requests, please slow down',
   'rateLimit.sgpAdmin': 'Too many SGP requests, please slow down',
+  'rateLimit.platformExport': 'Too many exports, please slow down',
   'rateLimit.sgpSync': 'Too many fleet synchronizations. Try again later.',
 
   // Devices

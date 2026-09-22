@@ -59,6 +59,7 @@ export default {
   'rateLimit.portalUnlock': 'भरोसे पर अनब्लॉक के अनुरोधों की सीमा पूरी हुई। बाद में फिर कोशिश करें।',
   'rateLimit.portalPasswordAdmin': 'बहुत अधिक पोर्टल पासवर्ड अनुरोध, कृपया धीरे चलें',
   'rateLimit.sgpAdmin': 'बहुत अधिक SGP अनुरोध, कृपया धीरे चलें',
+  'rateLimit.platformExport': 'बहुत अधिक निर्यात, कृपया धीरे चलें',
   'rateLimit.sgpSync': 'बहुत अधिक पूर्ण समन्वयन। बाद में फिर कोशिश करें।',
 
   // उपकरण

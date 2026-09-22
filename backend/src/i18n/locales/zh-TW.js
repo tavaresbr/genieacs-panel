@@ -61,6 +61,7 @@ export default {
   'rateLimit.portalUnlock': '信用復機申請已達上限。請稍後重試。',
   'rateLimit.portalPasswordAdmin': '入口網站密碼要求過於頻繁，請放慢速度',
   'rateLimit.sgpAdmin': 'SGP 要求過於頻繁，請放慢速度',
+  'rateLimit.platformExport': '匯出過於頻繁，請放慢速度',
   'rateLimit.sgpSync': '設備同步過於頻繁。請稍後重試。',
 
   // 設備

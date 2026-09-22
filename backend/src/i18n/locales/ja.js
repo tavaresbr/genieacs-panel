@@ -61,6 +61,7 @@ export default {
   'rateLimit.portalUnlock': '一時解除の要求が上限に達しました。しばらくしてから再試行してください。',
   'rateLimit.portalPasswordAdmin': 'ポータルのパスワードの要求が多すぎます。間隔を空けてください',
   'rateLimit.sgpAdmin': 'SGP へのリクエストが多すぎます。間隔を空けてください',
+  'rateLimit.platformExport': 'エクスポートが多すぎます。間隔を空けてください',
   'rateLimit.sgpSync': '設備の同期が多すぎます。しばらくしてから再試行してください。',
 
   // 機器

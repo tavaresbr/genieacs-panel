@@ -58,6 +58,7 @@ export default {
   'rateLimit.portalUnlock': 'Limite di richieste di sblocco raggiunto. Riprova più tardi.',
   'rateLimit.portalPasswordAdmin': 'Troppe richieste della password del portale, rallenta',
   'rateLimit.sgpAdmin': 'Troppe richieste al SGP, rallenta',
+  'rateLimit.platformExport': 'Troppe esportazioni, rallenta',
   'rateLimit.sgpSync': 'Troppe sincronizzazioni della rete. Riprova più tardi.',
 
   // Apparati

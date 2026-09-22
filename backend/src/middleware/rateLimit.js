@@ -274,6 +274,27 @@ export const sgpAdminLimiter = limiter({
 });
 
 /**
+ * Baixar o cadastro inteiro de um provedor, pelo console.
+ *
+ * Uma chamada lê TODA tabela escopada daquele provedor e monta o arquivo em
+ * memória — é a leitura mais cara que o painel tem, e a única que cresce com o
+ * tamanho do cliente em vez de com o tamanho da página. Um laço sobre a lista
+ * de provedores, feito por engano ou por script, tira o banco do ar para todo
+ * mundo enquanto roda.
+ *
+ * Seis por minuto: quem exporta um cliente para ajudá-lo não chega perto
+ * disso, e quem está varrendo a base toda esbarra na segunda dúzia. Chaveado
+ * por sessão e não por endereço, porque quem opera o console é uma pessoa
+ * identificada — e porque todo o console costuma sair do mesmo escritório.
+ */
+export const platformExportLimiter = limiter({
+  windowMs: 60 * 1000,
+  max: 6,
+  keyGenerator: (req) => (req.user?.userId ? `user:${req.user.userId}` : `ip:${ipKey(req)}`),
+  message: limitMessage('rateLimit.platformExport', 'rate_limited_export')
+});
+
+/**
  * Enfileirar mensagem, uma por chamada.
  *
  * O `apiLimiter` já cobre tudo sob `/api`, então isto não é uma porta aberta

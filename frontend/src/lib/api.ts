@@ -1081,6 +1081,15 @@ export const platformAPI = {
     }>(`/platform/tenants/${id}/impersonate`, {}),
 
   /**
+   * O cadastro de um provedor num arquivo, visto do console.
+   *
+   * `getBlob` e não `get`: a rota devolve o arquivo com `Content-Disposition`,
+   * sem o envelope da API — a mesma forma da exportação que o provedor faz de
+   * dentro do painel dele, porque é o mesmo serviço do outro lado.
+   */
+  exportTenant: (id: number) => apiClient.getBlob(`/platform/tenants/${id}/export`),
+
+  /**
    * Convida quem ainda NÃO tem login para um provedor.
    *
    * O par de `addMembership`, e a diferença é quem existe: aquela vincula uma
