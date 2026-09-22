@@ -3,6 +3,7 @@ import WhatsAppMessageController from '../controllers/whatsappMessageController.
 import WhatsAppAttachmentController from '../controllers/whatsappAttachmentController.js';
 import WhatsAppMediaController from '../controllers/whatsappMediaController.js';
 import { authenticateToken, requirePermission } from '../middleware/auth.js';
+import { whatsappBulkRequeueLimiter, whatsappSendLimiter } from '../middleware/rateLimit.js';
 
 const router = express.Router();
 
@@ -38,6 +39,7 @@ router.post(
   '/conversations/:id/messages',
   authenticateToken,
   requirePermission('whatsapp.send'),
+  whatsappSendLimiter,
   WhatsAppMessageController.send
 );
 
@@ -83,6 +85,7 @@ router.post(
   '/messages/:id/requeue',
   authenticateToken,
   requirePermission('whatsapp.send'),
+  whatsappSendLimiter,
   WhatsAppMessageController.requeue
 );
 
@@ -92,10 +95,13 @@ router.post(
 //
 // The path has one segment where the route above has two, so no id can be
 // mistaken for it and it needs no ordering trick to stay reachable.
+// Teto próprio, e muito mais apertado que o da vizinha: aquela enfileira uma
+// linha, esta pode enfileirar milhares.
 router.post(
   '/messages/requeue-failed',
   authenticateToken,
   requirePermission('whatsapp.send'),
+  whatsappBulkRequeueLimiter,
   WhatsAppMessageController.requeueFailed
 );
 

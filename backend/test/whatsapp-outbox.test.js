@@ -9,6 +9,7 @@ const { default: WaConversation } = await import('../src/models/WaConversation.j
 const { default: WaMessage } = await import('../src/models/WaMessage.js');
 const { default: WaOptOut } = await import('../src/models/WaOptOut.js');
 const { default: WaOutboxWorker } = await import('../src/services/waOutboxWorker.js');
+const { whatsappBulkRequeueLimiter, whatsappSendLimiter } = await import('../src/middleware/rateLimit.js');
 const { outDir } = await import('../src/services/waAttachmentService.js');
 
 const SUPPORT = 'painel-suporte';
@@ -31,6 +32,7 @@ const EVO_BASE = 'https://evo.provedor.test';
 
 let panelUrl;
 let token;
+let userId;
 let supportId;
 let backupId;
 let evoServer;
@@ -158,6 +160,7 @@ before(async () => {
     body: { username: 'operator', password: 'operator-password-1', email: 'operator@exemplo.test' }
   });
   token = setup.body.data.token;
+  userId = setup.body.data.user.id;
 
   await asTenant(() => WhatsAppConfigService.saveConfig({
     enabled: true,
@@ -655,5 +658,61 @@ describe('o teto por minuto é de cada provedor', () => {
 
     await asTenant(() => assert.equal(WaOutboxWorker.budget(TETO), TETO));
     await runInTenant(outro, () => assert.equal(WaOutboxWorker.budget(TETO), TETO));
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// O teto do ENFILEIRAMENTO, que é outro do teto da entrega
+//
+// O worker estrangula a ENTREGA pelo teto por minuto que o provedor configura.
+// O enfileiramento não tinha teto próprio: só o `apiLimiter` genérico, 300 por
+// minuto, e 300 linhas na fila por sessão é uma fila que o operador vê crescer
+// sem entender por quê.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('o teto de quem enfileira', () => {
+  before(() => {
+    whatsappSendLimiter.resetKey(`user:${userId}`);
+    whatsappBulkRequeueLimiter.resetKey(`user:${userId}`);
+  });
+
+  after(() => {
+    whatsappSendLimiter.resetKey(`user:${userId}`);
+    whatsappBulkRequeueLimiter.resetKey(`user:${userId}`);
+  });
+
+  it('o reenfileiramento EM BLOCO tem teto muito mais apertado que o envio', async () => {
+    // Os dois atos diferem em três ordens de grandeza: um enfileira uma linha,
+    // o outro pode enfileirar milhares. O mesmo teto seria frouxo para um ou
+    // apertado para o outro.
+    //
+    // Doze e não quatro: a rota recebe a JANELA, então "a última hora" e "as
+    // últimas seis" são pedidos diferentes e o operador que não sabe de quando
+    // é a queda tenta várias. Quatro pegava a suíte de `requeue-failed`, que
+    // exercita exatamente isso — e o que pega uma suíte pega um operador.
+    const bulk = () => call(`${panelUrl}/api/whatsapp/messages/requeue-failed`, {
+      method: 'POST', headers: authHeaders(token), body: {}
+    });
+    for (let i = 0; i < 12; i += 1) {
+      assert.notEqual((await bulk()).status, 429, `a tentativa ${i + 1} devia caber no minuto`);
+    }
+    const { status, body } = await bulk();
+    assert.equal(status, 429);
+    assert.equal(body.code, 'rate_limited');
+    whatsappBulkRequeueLimiter.resetKey(`user:${userId}`);
+  });
+
+  it('e o envio de uma linha cabe muito acima de qualquer humano', async () => {
+    // Sessenta é o ponto onde um limite destes tem que ficar: invisível para
+    // quem trabalha, presente para quem não está trabalhando. Aqui se confere
+    // o lado de baixo — que o plantão não esbarra nele.
+    const conversation = await newConversation();
+    for (let i = 0; i < 10; i += 1) {
+      assert.notEqual(
+        (await post(conversation.id, { body: `mensagem ${i}` })).status, 429,
+        'o teto pegou um operador atendendo normalmente'
+      );
+    }
+    whatsappSendLimiter.resetKey(`user:${userId}`);
+    await clearOutbox();
   });
 });

@@ -258,6 +258,53 @@ export const sgpAdminLimiter = limiter({
 });
 
 /**
+ * Enfileirar mensagem, uma por chamada.
+ *
+ * O `apiLimiter` já cobre tudo sob `/api`, então isto não é uma porta aberta
+ * que se fecha — é um teto mais justo para um ato que cria trabalho de saída.
+ * A ENTREGA é estrangulada pelo worker, pelo teto por minuto que o provedor
+ * configura; o enfileiramento não era, e 300 linhas por minuto por sessão
+ * viram uma fila que o operador vê crescer sem entender por quê.
+ *
+ * Sessenta é muito acima de qualquer humano atendendo pela caixa de entrada e
+ * muito abaixo do teto genérico, que é exatamente onde um limite destes tem
+ * que ficar: invisível para quem trabalha, presente para quem não está
+ * trabalhando.
+ */
+export const whatsappSendLimiter = limiter({
+  windowMs: 60 * 1000,
+  max: 60,
+  keyGenerator: (req) => (req.user?.userId ? `user:${req.user.userId}` : `ip:${ipKey(req)}`),
+  message: limitMessage('rateLimit.requests', 'rate_limited')
+});
+
+/**
+ * Reenfileirar TODAS as falhas de uma janela.
+ *
+ * Teto próprio e muito mais apertado que o da vizinha porque os dois atos
+ * diferem em três ordens de grandeza: aquela enfileira uma linha, esta pode
+ * enfileirar milhares — um restart do Evolution no meio de uma régua de
+ * cobrança falha a régua inteira, e é para isso que ela existe.
+ *
+ * Doze por minuto, e não quatro, porque a rota RECEBE a janela: "as falhas da
+ * última hora" e "as das últimas seis" são dois pedidos diferentes, e o
+ * operador que não sabe de quando é a queda tenta várias. A primeira versão
+ * deste teto usava quatro, com o raciocínio de que a segunda chamada do minuto
+ * já não teria o que fazer — o que só vale para a MESMA janela. Quem pegou foi
+ * a suíte de `requeue-failed`, que exercita justamente as janelas.
+ *
+ * Ainda é vinte e cinco vezes mais apertado que o teto genérico, que é o ponto:
+ * a chamada repetida é uma varredura sobre `wa_messages`, e mil por minuto é
+ * carga de banco sem nada em troca.
+ */
+export const whatsappBulkRequeueLimiter = limiter({
+  windowMs: 60 * 1000,
+  max: 12,
+  keyGenerator: (req) => (req.user?.userId ? `user:${req.user.userId}` : `ip:${ipKey(req)}`),
+  message: limitMessage('rateLimit.requests', 'rate_limited')
+});
+
+/**
  * O teste da configuração do WhatsApp.
  *
  * Um clique aqui faz o painel emitir até quatro requisições de saída — duas
