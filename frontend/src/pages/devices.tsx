@@ -12,9 +12,11 @@ import {
 } from '@/lib/api'
 import {
   filtersToQuery,
+  focusFromQuery,
   pageFromQuery,
   sgpFromQuery,
   statusFromQuery,
+  type DeviceFocusFilter,
   type DeviceStatusFilter,
   type SgpFilter,
 } from '@/lib/device-filters'
@@ -66,6 +68,9 @@ export default function DevicesPage() {
   )
   const [page, setPage] = useState(() => pageFromQuery(searchParams.get('page')))
   const [filterSgp, setFilterSgp] = useState<SgpFilter>(() => sgpFromQuery(searchParams.get('sgp')))
+  const [filterFocus, setFilterFocus] = useState<DeviceFocusFilter>(
+    () => focusFromQuery(searchParams.get('focus'))
+  )
   const [sgpLinks, setSgpLinks] = useState<Map<string, SgpLinkRow>>(new Map())
   const [sgpAvailable, setSgpAvailable] = useState(false)
   const [loadError, setLoadError] = useState('')
@@ -89,10 +94,16 @@ export default function DevicesPage() {
    */
   useEffect(() => {
     setSearchParams(
-      filtersToQuery({ search: searchTerm, status: filterStatus, sgp: filterSgp, page }),
+      filtersToQuery({
+        search: searchTerm,
+        status: filterStatus,
+        sgp: filterSgp,
+        focus: filterFocus,
+        page
+      }),
       { replace: true }
     )
-  }, [searchTerm, filterStatus, filterSgp, page, setSearchParams])
+  }, [searchTerm, filterStatus, filterSgp, filterFocus, page, setSearchParams])
 
   const getSignalStrengthInfo = (rxPowerStr: any) => {
     const rxpower = parseFloat(String(rxPowerStr));
@@ -206,7 +217,8 @@ export default function DevicesPage() {
           page,
           pageSize: PAGE_SIZE,
           search: searchTerm,
-          status: filterStatus
+          status: filterStatus,
+          focus: filterFocus
         })
 
         if (cancelled) return
@@ -240,7 +252,7 @@ export default function DevicesPage() {
     fetchDevices()
 
     return () => { cancelled = true }
-  }, [page, searchTerm, filterStatus, refreshNonce, t])
+  }, [page, searchTerm, filterStatus, filterFocus, refreshNonce, t])
 
   const processedDevices = useMemo<ProcessedDevice[]>(() => {
     const now = new Date()
@@ -278,9 +290,9 @@ export default function DevicesPage() {
     return () => { cancelled = true }
   }, [refreshNonce])
 
-  // Search and status are resolved by the API; only the contract state, which
-  // the devices endpoint knows nothing about, is narrowed here — and only
-  // across the rows of the page that came back.
+  // Search, status and the dashboard slice are resolved by the API; only the
+  // contract state, which the devices endpoint knows nothing about, is narrowed
+  // here — and only across the rows of the page that came back.
   const visibleDevices = useMemo<ProcessedDevice[]>(() => {
     if (!sgpAvailable || filterSgp === 'all') return processedDevices
     return processedDevices.filter((device) => {
@@ -294,6 +306,7 @@ export default function DevicesPage() {
     setSearchTerm('')
     setFilterStatus('all')
     setFilterSgp('all')
+    setFilterFocus('all')
     setPage(1)
   }
 
@@ -308,7 +321,10 @@ export default function DevicesPage() {
     )
   }
 
-  const hasFilters = Boolean(searchInput) || filterStatus !== 'all' || filterSgp !== 'all'
+  const hasFilters = Boolean(searchInput)
+    || filterStatus !== 'all'
+    || filterSgp !== 'all'
+    || filterFocus !== 'all'
   const rangeFrom = paging.total === 0 ? 0 : (paging.page - 1) * paging.pageSize + 1
   const rangeTo = (paging.page - 1) * paging.pageSize + processedDevices.length
   // The contract filter hides rows of the current page, so the server range
@@ -366,7 +382,7 @@ export default function DevicesPage() {
           </section>
         ) : (
           <>
-            <section className={`mb-4 grid gap-3 rounded-[var(--radius)] border border-border bg-card p-3 lg:items-end ${sgpAvailable ? 'lg:grid-cols-[minmax(16rem,1fr)_12rem_13rem_auto]' : 'lg:grid-cols-[minmax(18rem,1fr)_13rem_auto]'}`}>
+            <section className={`mb-4 grid gap-3 rounded-[var(--radius)] border border-border bg-card p-3 lg:items-end ${sgpAvailable ? 'lg:grid-cols-[minmax(14rem,1fr)_11rem_12rem_13rem_auto]' : 'lg:grid-cols-[minmax(16rem,1fr)_12rem_13rem_auto]'}`}>
               <div>
                 <label htmlFor="device-search" className="field-label">{t('devices.filter.searchLabel')}</label>
                 <div className="relative">
@@ -396,6 +412,31 @@ export default function DevicesPage() {
                     <option value="all">{t('devices.filter.all')}</option>
                     <option value="online">{t('devices.filter.onlineOnly')}</option>
                     <option value="offline">{t('devices.filter.offlineOnly')}</option>
+                  </select>
+                  <Icon name="chevron-down" size={17} className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                </div>
+              </div>
+              {/* Os recortes que o painel aponta. Cada opção daqui é um número
+                  daquela tela, e é o servidor quem os cumpre — por isso trocar
+                  aqui volta para a página 1, como o status: o recorte muda a
+                  lista inteira, não as linhas desta página. */}
+              <div>
+                <label htmlFor="device-focus" className="field-label">{t('devices.filter.focusLabel')}</label>
+                <div className="relative">
+                  <select
+                    id="device-focus"
+                    className="modern-input appearance-none pe-10"
+                    value={filterFocus}
+                    onChange={(event) => {
+                      setFilterFocus(event.target.value as DeviceFocusFilter)
+                      setPage(1)
+                    }}
+                  >
+                    <option value="all">{t('devices.filter.focusAll')}</option>
+                    <option value="new24h">{t('devices.filter.focusNew24h')}</option>
+                    <option value="weak-signal">{t('devices.filter.focusWeakSignal')}</option>
+                    <option value="hot">{t('devices.filter.focusHot')}</option>
+                    <option value="many-clients">{t('devices.filter.focusManyClients')}</option>
                   </select>
                   <Icon name="chevron-down" size={17} className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 </div>

@@ -25,19 +25,38 @@
 export type DeviceStatusFilter = 'all' | 'online' | 'offline'
 export type SgpFilter = 'all' | 'active' | 'blocked' | 'cancelled' | 'unknown' | 'unlinked'
 
+/**
+ * O recorte que o painel aponta: cada valor é UM número daquela tela.
+ *
+ * Vocabulário fechado e igual ao do servidor. Aqui vale a mesma regra do
+ * `status`: o que a URL traz e esta lista não conhece vira "todos" e não chega
+ * à API — `?focus=banana` morre neste arquivo.
+ */
+export type DeviceFocusFilter = 'all' | 'new24h' | 'weak-signal' | 'hot' | 'many-clients'
+
 const STATUS_FILTERS: readonly DeviceStatusFilter[] = ['all', 'online', 'offline']
 const SGP_FILTERS: readonly SgpFilter[] = [
   'all', 'active', 'blocked', 'cancelled', 'unknown', 'unlinked'
+]
+const FOCUS_FILTERS: readonly DeviceFocusFilter[] = [
+  'all', 'new24h', 'weak-signal', 'hot', 'many-clients'
 ]
 
 export interface DeviceFilters {
   search: string
   status: DeviceStatusFilter
   sgp: SgpFilter
+  focus: DeviceFocusFilter
   page: number
 }
 
-export const NO_FILTERS: DeviceFilters = { search: '', status: 'all', sgp: 'all', page: 1 }
+export const NO_FILTERS: DeviceFilters = {
+  search: '',
+  status: 'all',
+  sgp: 'all',
+  focus: 'all',
+  page: 1
+}
 
 export function statusFromQuery(raw: string | null | undefined): DeviceStatusFilter {
   return STATUS_FILTERS.includes(raw as DeviceStatusFilter) ? (raw as DeviceStatusFilter) : 'all'
@@ -45,6 +64,10 @@ export function statusFromQuery(raw: string | null | undefined): DeviceStatusFil
 
 export function sgpFromQuery(raw: string | null | undefined): SgpFilter {
   return SGP_FILTERS.includes(raw as SgpFilter) ? (raw as SgpFilter) : 'all'
+}
+
+export function focusFromQuery(raw: string | null | undefined): DeviceFocusFilter {
+  return FOCUS_FILTERS.includes(raw as DeviceFocusFilter) ? (raw as DeviceFocusFilter) : 'all'
 }
 
 /**
@@ -65,6 +88,7 @@ export function filtersFromQuery(params: URLSearchParams): DeviceFilters {
     search: params.get('search') ?? '',
     status: statusFromQuery(params.get('status')),
     sgp: sgpFromQuery(params.get('sgp')),
+    focus: focusFromQuery(params.get('focus')),
     page: pageFromQuery(params.get('page'))
   }
 }
@@ -81,6 +105,7 @@ export function filtersToQuery(filters: DeviceFilters): URLSearchParams {
   if (filters.search) query.set('search', filters.search)
   if (filters.status !== 'all') query.set('status', filters.status)
   if (filters.sgp !== 'all') query.set('sgp', filters.sgp)
+  if (filters.focus !== 'all') query.set('focus', filters.focus)
   if (filters.page > 1) query.set('page', String(filters.page))
   return query
 }

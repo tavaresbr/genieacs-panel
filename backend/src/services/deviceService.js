@@ -346,6 +346,25 @@ class DeviceService {
 
   static DEVICE_SEARCH_MAX_LENGTH = 128;
 
+  /** A janela do "novos em 24h" do painel, e por isso a mesma constante dele. */
+  static NEW_DEVICE_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+  /**
+   * Os recortes que o painel aponta — UM parâmetro, vocabulário fechado.
+   *
+   * Cada valor daqui é um número que o painel mostra, e por isso é um número
+   * que o operador pode conferir: ele clica em "4 quentes" e conta quatro
+   * linhas. Quatro eixos combináveis dariam `hot` + `many-clients` numa mesma
+   * URL, e a contagem dessa lista não aparece em tela nenhuma — filtro que
+   * ninguém consegue conferir é como o painel já mentiu antes.
+   *
+   * `new24h` é o único que o GenieACS resolve sozinho (`_registered` é campo
+   * dele); os outros três saem de parâmetros TR-069 que cada fabricante põe
+   * num caminho diferente, e a lista já os normaliza de um jeito que uma
+   * consulta ao NBI não tem como repetir.
+   */
+  static DEVICE_FOCUS_FILTERS = ['new24h', 'weak-signal', 'hot', 'many-clients'];
+
   /**
    * Every listing parameter arrives from the browser, so each one is coerced and
    * clamped here instead of being trusted. `page` is only bounded from below:
@@ -355,6 +374,7 @@ class DeviceService {
     const rawPage = Number.parseInt(String(query.page ?? ''), 10);
     const rawPageSize = Number.parseInt(String(query.pageSize ?? ''), 10);
     const rawStatus = String(query.status ?? 'all').trim().toLowerCase();
+    const rawFocus = String(query.focus ?? 'all').trim().toLowerCase();
 
     return {
       page: Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1,
@@ -362,7 +382,8 @@ class DeviceService {
         ? Math.min(rawPageSize, this.DEVICE_PAGE_SIZE_MAX)
         : this.DEVICE_PAGE_SIZE_DEFAULT,
       search: String(query.search ?? '').trim().slice(0, this.DEVICE_SEARCH_MAX_LENGTH),
-      status: ['online', 'offline'].includes(rawStatus) ? rawStatus : 'all'
+      status: ['online', 'offline'].includes(rawStatus) ? rawStatus : 'all',
+      focus: this.DEVICE_FOCUS_FILTERS.includes(rawFocus) ? rawFocus : 'all'
     };
   }
 
@@ -410,10 +431,99 @@ class DeviceService {
       : { _lastInform: { $lt: cutoff } };
   }
 
+  /**
+   * A consulta que o GenieACS resolve: janela de inform e janela de cadastro.
+   *
+   * Duas condições sobre campos que são DELE, então as duas descem juntas e a
+   * paginação continua no NBI. O teto do cadastro não é enfeite: o painel conta
+   * `agora - cadastro >= 0`, e um ACS com o relógio adiantado grava data no
+   * futuro. Sem o `$lte` a lista traria linhas que o número não contou.
+   */
+  static buildDeviceListQuery(status, focus, now = Date.now()) {
+    const query = { ...(this.buildDeviceStatusQuery(status, now) || {}) };
+    if (focus === 'new24h') {
+      query._registered = {
+        $gte: new Date(now - this.NEW_DEVICE_WINDOW_MS).toISOString(),
+        $lte: new Date(now).toISOString()
+      };
+    }
+    return Object.keys(query).length > 0 ? query : null;
+  }
+
+  /**
+   * Se o recorte precisa da passagem local — a mesma que a busca já faz.
+   *
+   * RX, temperatura e clientes vêm de parâmetros TR-069 que o painel resolve
+   * com caminho configurado, catálogo de alternativas e caminho APRENDIDO
+   * desta instalação, normalizando a leitura no meio do caminho. Mandar isso
+   * para o NBI seria reescrever essa resolução em sintaxe de consulta, sobre
+   * valores cujo tipo o GenieACS guardou como o aparelho mandou.
+   */
+  static focusNeedsLocalPass(focus) {
+    return focus !== 'all' && focus !== 'new24h';
+  }
+
+  /** Se o aparelho está no recorte pedido, pelas faixas que o painel conta. */
+  static deviceMatchesFocus(device, focus) {
+    if (focus === 'weak-signal') {
+      const faixa = this.rxBucket(device?.rxpower);
+      return faixa === 'Poor' || faixa === 'Danger';
+    }
+    if (focus === 'hot') return this.temperatureBucket(device?.temperature) === 'Hot';
+    if (focus === 'many-clients') return this.clientBucket(device?.activedevices) === '16+';
+    // `new24h` já veio recortado pela consulta, e qualquer outro valor virou
+    // 'all' na normalização — nenhum dos dois tem o que decidir aqui.
+    return true;
+  }
+
   static isDeviceOnline(device, now = Date.now()) {
     const lastInform = device?._lastInform ? new Date(device._lastInform).getTime() : Number.NaN;
     const ageMs = now - lastInform;
     return Number.isFinite(ageMs) && ageMs >= 0 && ageMs < this.ONLINE_WINDOW_MS;
+  }
+
+  /**
+   * As faixas que o painel CONTA e que a lista RECORTA — escritas uma vez só.
+   *
+   * Os números do painel viraram links, e o que torna um desses links honesto
+   * não é o filtro existir: é a lista devolver exatamente as linhas que o
+   * número contou. Dois limiares iguais em dois arquivos concordam no dia em
+   * que são escritos e divergem na primeira vez que alguém mexe num deles — e
+   * o sintoma é o pior que este painel tem: o operador clica em "7 com sinal
+   * fraco", conta 6 linhas, e conclui que o número mente.
+   *
+   * As chaves devolvidas são as do payload do painel (`Excellent`, `Hot`,
+   * `16+`, …), porque o frontend traduz a faixa pelo nome dela.
+   *
+   * Leitura ausente é `Unknown` nas três, e `hasReportedValue` é quem decide —
+   * o mesmo predicado que o resto do serviço usa. Sem ele, `Number('')` é zero:
+   * uma temperatura vazia virava `Normal` e um RX vazio virava `Excellent`,
+   * isto é, o painel afirmava saúde sobre um aparelho que não respondeu nada.
+   */
+  static rxBucket(value) {
+    const rx = Number(value);
+    if (!this.hasReportedValue(value) || !Number.isFinite(rx)) return 'Unknown';
+    if (rx >= -21.99) return 'Excellent';
+    if (rx >= -24.99) return 'Good';
+    if (rx >= -26.99) return 'Poor';
+    return 'Danger';
+  }
+
+  static temperatureBucket(value) {
+    const temperature = Number(value);
+    if (!this.hasReportedValue(value) || !Number.isFinite(temperature)) return 'Unknown';
+    if (temperature < 50) return 'Normal';
+    if (temperature < 70) return 'Warm';
+    return 'Hot';
+  }
+
+  static clientBucket(value) {
+    const clients = Number(value);
+    if (!this.hasReportedValue(value) || !Number.isFinite(clients)) return 'Unknown';
+    if (clients <= 0) return '0';
+    if (clients <= 5) return '1–5';
+    if (clients <= 15) return '6–15';
+    return '16+';
   }
 
   static async fetchGenieAcsWithHeaders(query = {}) {
@@ -587,16 +697,22 @@ class DeviceService {
    * Paging is pushed to GenieACS whenever nothing has to be filtered locally;
    * a free-text search always matches against the panel's own Customer IDs, so
    * that path fetches the (status-filtered) match set and pages it here.
+   *
+   * Um recorte de RX, temperatura ou clientes toma o mesmo caminho da busca, e
+   * pelo mesmo motivo: quem sabe a resposta é o painel, não o NBI. O custo é o
+   * mesmo que a busca já paga — uma leitura da frota por página — e é o preço
+   * de a contagem bater com o número que mandou o operador para cá.
    */
   static async getDevicesPage(options = {}) {
-    const { page, pageSize, search, status } = this.normalizeDeviceListQuery(options);
+    const { page, pageSize, search, status, focus } = this.normalizeDeviceListQuery(options);
     const virtualParams = await this.getVirtualParameters();
     const learnedRxPaths = await this.ensureRxPowerPaths();
     const projection = this.buildDeviceListProjection(virtualParams, learnedRxPaths);
-    const statusQuery = this.buildDeviceStatusQuery(status);
-    const queryParam = statusQuery ? JSON.stringify(statusQuery) : null;
+    const listQuery = this.buildDeviceListQuery(status, focus);
+    const queryParam = listQuery ? JSON.stringify(listQuery) : null;
+    const passagemLocal = Boolean(search) || this.focusNeedsLocalPass(focus);
 
-    if (!search) {
+    if (!passagemLocal) {
       const total = await this.countDevicesFromGenieAcs(queryParam);
       const totalPages = Math.ceil(total / pageSize);
       const currentPage = totalPages > 0 ? Math.min(page, totalPages) : 1;
@@ -621,15 +737,21 @@ class DeviceService {
     }
 
     const rows = await this.fetchDeviceListPage(queryParam, projection);
-    const candidates = rows
+    let matches = rows
       .map((item) => this.processDeviceData(item, virtualParams, learnedRxPaths))
-      .reverse();
-    const customerIds = await this.lookupCustomerIds(candidates.map((device) => device._id));
-    const needle = search.toLowerCase();
-    const matches = candidates.filter((device) => this.deviceMatchesSearch(
-      { ...device, customerId: customerIds.get(String(device._id)) || null },
-      needle
-    ));
+      .reverse()
+      .filter((device) => this.deviceMatchesFocus(device, focus));
+
+    if (search) {
+      // O Customer ID é do painel, não do GenieACS, e por isso a busca é a
+      // única que precisa dele — sobre o que o recorte já deixou passar.
+      const customerIds = await this.lookupCustomerIds(matches.map((device) => device._id));
+      const needle = search.toLowerCase();
+      matches = matches.filter((device) => this.deviceMatchesSearch(
+        { ...device, customerId: customerIds.get(String(device._id)) || null },
+        needle
+      ));
+    }
 
     const total = matches.length;
     const totalPages = Math.ceil(total / pageSize);
@@ -658,8 +780,27 @@ class DeviceService {
     return found;
   }
 
+  /**
+   * A frota como o painel a conta — pelos MESMOS caminhos que a lista lê.
+   *
+   * Os caminhos aprendidos entram aqui de propósito, e a falta deles era um
+   * defeito calado: numa instalação que publica o RX óptico num caminho fora
+   * do catálogo, a lista mostrava o valor (ela projeta o aprendido) e o painel
+   * contava `Unknown`, porque o que não é projetado não volta. Duas telas, a
+   * mesma frota, respostas diferentes — e o painel errava para baixo, isto é,
+   * escondia risco óptico. Agora o número e a lista que ele abre leem igual.
+   *
+   * LÊ o que foi aprendido, e não `ensureRxPowerPaths` — a sonda fica onde ela
+   * é paga, que é a listagem. Esta função é o muro de escala do painel: ela
+   * busca a coleção inteira, a cada minuto, vezes o número de provedores, e
+   * quem a chama é o agendador. Uma segunda requisição de saída aqui é uma
+   * requisição por provedor que ninguém pediu. O preço é que uma instalação
+   * onde ninguém abriu a lista de equipamentos ainda conta `Unknown` — até a
+   * primeira listagem, e não para sempre, que era o estado anterior.
+   */
   static async getDashboardDevices() {
     const virtualParams = await this.getVirtualParameters();
+    const learnedRxPaths = (await this.readRxPowerState())?.paths ?? [];
     const projection = [
       '_id',
       '_deviceId._ProductClass',
@@ -668,6 +809,7 @@ class DeviceService {
       virtualParams.vpTemperature,
       virtualParams.vpActiveDevices,
       ...RX_POWER_FALLBACK_PATHS,
+      ...learnedRxPaths,
       '_lastInform',
       '_registered'
     ].filter(Boolean);
@@ -675,7 +817,7 @@ class DeviceService {
     if (!Array.isArray(data)) {
       throw new Error('Invalid GenieACS dashboard response');
     }
-    return data.map((item) => this.processDeviceData(item, virtualParams));
+    return data.map((item) => this.processDeviceData(item, virtualParams, learnedRxPaths));
   }
 
   /**
@@ -2024,7 +2166,14 @@ class DeviceService {
       }
 
       const registeredMs = device._registered ? new Date(device._registered).getTime() : Number.NaN;
-      if (Number.isFinite(registeredMs) && now - registeredMs >= 0 && now - registeredMs < dayMs) {
+      // A mesma janela que `focus=new24h` recorta, pelo mesmo motivo das
+      // faixas: o número e a lista que ele abre têm que responder a mesma
+      // pergunta. Data no futuro fica de fora nos dois lados.
+      if (
+        Number.isFinite(registeredMs) &&
+        now - registeredMs >= 0 &&
+        now - registeredMs < this.NEW_DEVICE_WINDOW_MS
+      ) {
         stats.new24h += 1;
       }
       if (Number.isFinite(registeredMs)) {
@@ -2038,41 +2187,11 @@ class DeviceService {
       productClasses.set(productClass, (productClasses.get(productClass) || 0) + 1);
       manufacturers.set(manufacturer, (manufacturers.get(manufacturer) || 0) + 1);
 
-      const rxPower = Number(device.rxpower);
-      if (device.rxpower === null || device.rxpower === undefined || !Number.isFinite(rxPower)) {
-        rxDistribution.Unknown += 1;
-      } else if (rxPower >= -21.99) {
-        rxDistribution.Excellent += 1;
-      } else if (rxPower >= -24.99) {
-        rxDistribution.Good += 1;
-      } else if (rxPower >= -26.99) {
-        rxDistribution.Poor += 1;
-      } else {
-        rxDistribution.Danger += 1;
-      }
-
-      const temperature = Number(device.temperature);
-      if (device.temperature === null || device.temperature === undefined || !Number.isFinite(temperature)) {
-        temperatureDistribution.Unknown += 1;
-      } else if (temperature < 50) {
-        temperatureDistribution.Normal += 1;
-      } else if (temperature < 70) {
-        temperatureDistribution.Warm += 1;
-      } else {
-        temperatureDistribution.Hot += 1;
-      }
-
-      const clients = Number(device.activedevices);
-      if (
-        device.activedevices === null ||
-        device.activedevices === undefined ||
-        device.activedevices === '' ||
-        !Number.isFinite(clients)
-      ) clientDistribution.Unknown += 1;
-      else if (clients <= 0) clientDistribution['0'] += 1;
-      else if (clients <= 5) clientDistribution['1–5'] += 1;
-      else if (clients <= 15) clientDistribution['6–15'] += 1;
-      else clientDistribution['16+'] += 1;
+      // As mesmas faixas que a lista recorta, e por isso lidas de lá: o link
+      // do painel promete "estes", e quem responde por "estes" é o filtro.
+      rxDistribution[this.rxBucket(device.rxpower)] += 1;
+      temperatureDistribution[this.temperatureBucket(device.temperature)] += 1;
+      clientDistribution[this.clientBucket(device.activedevices)] += 1;
     }
 
     const topEntries = (map, limit) => Array.from(map.entries())

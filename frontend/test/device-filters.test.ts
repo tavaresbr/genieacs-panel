@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   filtersFromQuery,
   filtersToQuery,
+  focusFromQuery,
   NO_FILTERS,
   pageFromQuery,
   sgpFromQuery,
@@ -30,8 +31,16 @@ describe('a query lida', () => {
 
   it('e o recorte inteiro, quando há mais de um', () => {
     expect(filtersFromQuery(q('search=ONT-9&status=offline&sgp=blocked&page=3'))).toEqual({
-      search: 'ONT-9', status: 'offline', sgp: 'blocked', page: 3
+      search: 'ONT-9', status: 'offline', sgp: 'blocked', focus: 'all', page: 3
     })
+  })
+
+  it('traz o recorte que cada número do painel aponta', () => {
+    // Um por número daquela tela. O que abre `focus=hot` é o que a tela conta
+    // em "equipamentos quentes" — o valor tem que chegar inteiro até aqui.
+    for (const recorte of ['new24h', 'weak-signal', 'hot', 'many-clients'] as const) {
+      expect(filtersFromQuery(q(`focus=${recorte}`))).toEqual({ ...NO_FILTERS, focus: recorte })
+    }
   })
 
   it('uma query vazia é a lista inteira', () => {
@@ -46,7 +55,11 @@ describe('o que vem de fora nunca chega à API', () => {
     // não conhece.
     expect(statusFromQuery('banana')).toBe('all')
     expect(sgpFromQuery('banana')).toBe('all')
-    expect(filtersFromQuery(q('status=banana&sgp=banana'))).toEqual(NO_FILTERS)
+    expect(focusFromQuery('banana')).toBe('all')
+    // Nem o que parece certo: o servidor conhece `weak-signal`, e nada mais.
+    expect(focusFromQuery('weakSignal')).toBe('all')
+    expect(focusFromQuery('WEAK-SIGNAL')).toBe('all')
+    expect(filtersFromQuery(q('status=banana&sgp=banana&focus=banana'))).toEqual(NO_FILTERS)
   })
 
   it('nulo, vazio e ausente também', () => {
@@ -54,6 +67,9 @@ describe('o que vem de fora nunca chega à API', () => {
     expect(statusFromQuery('')).toBe('all')
     expect(statusFromQuery(undefined)).toBe('all')
     expect(sgpFromQuery(null)).toBe('all')
+    expect(focusFromQuery(null)).toBe('all')
+    expect(focusFromQuery('')).toBe('all')
+    expect(focusFromQuery(undefined)).toBe('all')
   })
 
   it('a página recusa os três jeitos de um número não ser um número', () => {
@@ -78,6 +94,10 @@ describe('a query escrita', () => {
   it('e o que não é default aparece', () => {
     expect(filtersToQuery({ ...NO_FILTERS, status: 'offline' }).toString()).toBe('status=offline')
     expect(filtersToQuery({ ...NO_FILTERS, page: 4 }).toString()).toBe('page=4')
+    // O hífen do valor não pode virar `%2D` nem outra coisa: é este texto que
+    // o servidor compara com a lista fechada dele.
+    expect(filtersToQuery({ ...NO_FILTERS, focus: 'weak-signal' }).toString())
+      .toBe('focus=weak-signal')
   })
 
   it('a ida e a volta dão o mesmo recorte', () => {
@@ -86,9 +106,10 @@ describe('a query escrita', () => {
     // plantão poderia abrir outra coisa.
     const casos: DeviceFilters[] = [
       NO_FILTERS,
-      { search: 'ONT-9', status: 'offline', sgp: 'unlinked', page: 2 },
-      { search: '', status: 'online', sgp: 'all', page: 1 },
-      { search: 'a b&c=d', status: 'all', sgp: 'cancelled', page: 11 }
+      { search: 'ONT-9', status: 'offline', sgp: 'unlinked', focus: 'all', page: 2 },
+      { search: '', status: 'online', sgp: 'all', focus: 'hot', page: 1 },
+      { search: 'a b&c=d', status: 'all', sgp: 'cancelled', focus: 'many-clients', page: 11 },
+      { search: '', status: 'offline', sgp: 'all', focus: 'weak-signal', page: 2 }
     ]
     for (const caso of casos) {
       expect(filtersFromQuery(filtersToQuery(caso)), JSON.stringify(caso)).toEqual(caso)

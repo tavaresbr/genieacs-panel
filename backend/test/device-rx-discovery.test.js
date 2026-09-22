@@ -208,6 +208,41 @@ describe('an optical path no catalogue lists', () => {
     );
   });
 
+  /**
+   * O painel contava `Unknown` onde a lista mostrava o valor.
+   *
+   * A frota deste arquivo é a que expõe o defeito: o RX está num caminho que
+   * catálogo nenhum lista, então só é legível por quem o APRENDEU. A lista
+   * projeta o aprendido; o painel não projetava — e o que não é projetado não
+   * volta. As duas telas liam a mesma frota e respondiam coisas diferentes, e
+   * o painel errava para baixo: escondia risco óptico.
+   *
+   * Agora o número e a lista que ele abre têm que dar o mesmo, que é o que
+   * torna o link honesto.
+   */
+  it('is counted by the dashboard too, and the slice agrees with the number', async () => {
+    await asTenant(() => getDb()('app_state').where({ key: 'rx_power_path' }).del());
+    const arriscado = ont(11);
+    arriscado.InternetGatewayDevice.WANDevice[1]['X_TAV-COM_PonOptical'].RXPower = param('-2650');
+    genieAcs.fleet = [arriscado];
+
+    const [device] = await listDevices();
+    assert.equal(device.rxpower, -26.5, 'a lista lê o caminho aprendido');
+
+    const painel = await call(`${panelUrl}/api/devices/dashboard?refresh=1`, {
+      headers: authHeaders(token)
+    });
+    assert.equal(painel.status, 200);
+    assert.equal(painel.body.data.rxDistribution.Poor, 1);
+    assert.equal(painel.body.data.rxDistribution.Unknown, 0, 'o painel não pode dizer que não sabe');
+
+    const recorte = await call(`${panelUrl}/api/devices?focus=weak-signal`, {
+      headers: authHeaders(token)
+    });
+    assert.equal(recorte.body.data.total, 1);
+    assert.deepEqual(recorte.body.data.devices.map((row) => row._id), ['ONT-11']);
+  });
+
   it('never mistakes a threshold or the transmit power for the signal', async () => {
     await asTenant(() => getDb()('app_state').where({ key: 'rx_power_path' }).del());
     genieAcs.fleet = [ont(4)];
