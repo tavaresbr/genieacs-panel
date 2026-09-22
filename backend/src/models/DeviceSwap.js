@@ -75,9 +75,17 @@ class DeviceSwap {
    * `acknowledged_at` is cleared: a swap the operator dismissed and that then
    * repeated is news again, and it is the repeat that says the pair is unstable
    * rather than a one-off install.
+   *
+   * Except while a pair the operator already dismissed AS UNSTABLE keeps
+   * trading the login inside the flap window: that is the very thing they
+   * confirmed, and reopening it on every inform put the warning back on the
+   * dashboard minutes after each dismissal, for as long as both ONTs stayed
+   * powered on. Once the pair goes quiet past the window, `row.flapping` is
+   * false and the next swap reopens it as before.
    */
   static async repeat(existing, row) {
     const now = new Date();
+    const stillDismissed = Boolean(existing.acknowledged_at && existing.flapping && row.flapping);
     await tdb('device_swaps').where({ id: existing.id }).update({
       matched_by: row.matched_by,
       link_action: row.link_action,
@@ -87,16 +95,23 @@ class DeviceSwap {
       account_id: row.account_id ?? existing.account_id,
       repeat_count: Number(existing.repeat_count ?? 1) + 1,
       occurred_at: row.occurred_at ?? now,
-      acknowledged_at: null,
-      acknowledged_by: null,
+      ...(stillDismissed ? {} : { acknowledged_at: null, acknowledged_by: null }),
       updated_at: now
     });
     return { created: false, swap: await this.getById(existing.id) };
   }
 
-  /** Marks a pair unstable without touching anything else about it. */
+  /**
+   * Marks a pair unstable. A swap dismissed as a one-off that turns out to be
+   * two ONTs trading a login is news, so the dismissal goes with it.
+   */
   static async markFlapping(id) {
-    await tdb('device_swaps').where({ id }).update({ flapping: true, updated_at: new Date() });
+    await tdb('device_swaps').where({ id }).update({
+      flapping: true,
+      acknowledged_at: null,
+      acknowledged_by: null,
+      updated_at: new Date()
+    });
   }
 
   static async listOpen(limit = 25) {
@@ -122,11 +137,23 @@ class DeviceSwap {
     return Number(row?.total ?? 0);
   }
 
+  /**
+   * Dismisses a swap. On an unstable pair both directions are one story, so
+   * both rows are dismissed — otherwise the other half stays on the dashboard
+   * and reopens nothing but confusion.
+   */
   static async acknowledge(id, userId = null) {
-    await tdb('device_swaps').where({ id }).update({
-      acknowledged_at: new Date(),
+    const swap = await this.getById(id);
+    const ids = [id];
+    if (swap?.flapping) {
+      const reverse = await this.getPair(swap.device_id, swap.previous_device_id);
+      if (reverse) ids.push(reverse.id);
+    }
+    const now = new Date();
+    await tdb('device_swaps').whereIn('id', ids).update({
+      acknowledged_at: now,
       acknowledged_by: userId,
-      updated_at: new Date()
+      updated_at: now
     });
     return this.getById(id);
   }

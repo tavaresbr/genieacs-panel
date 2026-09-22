@@ -48,11 +48,19 @@ export function DeviceSwapsCard({ deviceId }: DeviceSwapsCardProps) {
     void load()
   }, [load])
 
-  const acknowledge = async (id: number) => {
+  const acknowledge = async (target: DeviceSwap) => {
+    const { id } = target
     setBusyId(id)
     try {
       const res = await devicesAPI.acknowledgeSwap(id)
-      if (res.success) setSwaps((current) => current.filter((swap) => swap.id !== id))
+      // Num par instável o servidor dispensa as duas direções de uma vez, então
+      // a linha inversa sai da lista junto — senão sobraria meio aviso na tela.
+      const isReverse = (swap: DeviceSwap) => target.flapping
+        && swap.previousDeviceId === target.deviceId
+        && swap.deviceId === target.previousDeviceId
+      if (res.success) {
+        setSwaps((current) => current.filter((swap) => swap.id !== id && !isReverse(swap)))
+      }
     } finally {
       setBusyId(null)
     }
@@ -135,7 +143,7 @@ export function DeviceSwapsCard({ deviceId }: DeviceSwapsCardProps) {
                 type="button"
                 className="modern-button-secondary"
                 disabled={busyId === swap.id}
-                onClick={() => void acknowledge(swap.id)}
+                onClick={() => void acknowledge(swap)}
               >
                 <Icon name="check" size={16} />
                 {t('swaps.acknowledge')}
