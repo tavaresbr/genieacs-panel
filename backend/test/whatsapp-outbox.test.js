@@ -1,4 +1,4 @@
-import { after, before, describe, it } from 'node:test';
+import { after, before, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { asTenant, authHeaders, call, getDb, runInTenant, startTestServers, stopTestServers } from './helpers/harness.js';
@@ -9,6 +9,7 @@ const { default: WaConversation } = await import('../src/models/WaConversation.j
 const { default: WaMessage } = await import('../src/models/WaMessage.js');
 const { default: WaOptOut } = await import('../src/models/WaOptOut.js');
 const { default: WaOutboxWorker } = await import('../src/services/waOutboxWorker.js');
+const { default: AppState } = await import('../src/models/AppState.js');
 const { whatsappBulkRequeueLimiter, whatsappSendLimiter } = await import('../src/middleware/rateLimit.js');
 const { outDir } = await import('../src/services/waAttachmentService.js');
 
@@ -127,8 +128,18 @@ async function newConversation({ accountId = supportId, phone = null, lid = null
  * without this a pass would drain someone else's message and the count would
  * measure the wrong thing.
  */
+/**
+ * Zera a fila E o minuto gasto — os dois, agora que o minuto é gravado.
+ *
+ * `WaOutboxWorker.stop()` sozinho já não devolve o minuto: ele larga a cópia em
+ * memória, e a primeira passagem seguinte lê de volta o que ficou no banco. É
+ * o ponto desta onda, e é por isso que um teste que quer medir um minuto limpo
+ * tem que apagar o que foi gravado.
+ */
 async function clearOutbox() {
   await getDb()('wa_messages').where({ delivery_status: 'queued' }).del();
+  await getDb()('app_state').where({ key: WaOutboxWorker.WINDOW_KEY }).del();
+  WaOutboxWorker.stop();
   requests.length = 0;
 }
 
@@ -619,45 +630,146 @@ describe('o teto por minuto é de cada provedor', () => {
     outro = (await getDb()('tenants').where({ slug: 'vizinho' }).first()).id;
   });
 
-  it('o que um gasta não sai da cota do outro', async () => {
+  /** Um processo novo: nada em memória, e o banco é tudo o que sobrou. */
+  async function reiniciar() {
     WaOutboxWorker.stop();
+  }
+
+  const esquecerJanelas = () => getDb()('app_state')
+    .where({ key: WaOutboxWorker.WINDOW_KEY }).del();
+
+  beforeEach(async () => {
+    await esquecerJanelas();
+    await reiniciar();
+  });
+
+  it('o que um gasta não sai da cota do outro', async () => {
     const TETO = 3;
 
     // O primeiro provedor gasta o minuto inteiro.
-    await asTenant(() => {
+    await asTenant(async () => {
       for (let i = 0; i < TETO; i += 1) {
-        assert.equal(WaOutboxWorker.reserve(TETO), true, `reserva ${i + 1}`);
+        // eslint-disable-next-line no-await-in-loop -- cada reserva é gravada
+        assert.equal(await WaOutboxWorker.reserve(TETO), true, `reserva ${i + 1}`);
       }
-      assert.equal(WaOutboxWorker.reserve(TETO), false, 'o minuto dele acabou');
+      assert.equal(await WaOutboxWorker.reserve(TETO), false, 'o minuto dele acabou');
       assert.equal(WaOutboxWorker.budget(TETO), 0);
     });
 
     // O segundo não tem nada a ver com isso.
-    await runInTenant(outro, () => {
+    await runInTenant(outro, async () => {
       assert.equal(
         WaOutboxWorker.budget(TETO), TETO,
         'o vizinho começou o minuto já sem cota'
       );
-      assert.equal(WaOutboxWorker.reserve(TETO), true);
+      assert.equal(await WaOutboxWorker.reserve(TETO), true);
     });
 
     // E gastar a cota do vizinho não devolve nada ao primeiro.
     await asTenant(() => {
       assert.equal(WaOutboxWorker.budget(TETO), 0);
     });
-
-    WaOutboxWorker.stop();
   });
 
-  it('e `stop` limpa o minuto de todo mundo', async () => {
+  /**
+   * O minuto atravessa o processo — é esta onda inteira num caso.
+   *
+   * Antes, a janela vivia só em memória e `stop` a largava: um deploy no meio
+   * de uma campanha devolvia o minuto cheio, e o teto que o painel promete
+   * seguir é o que o WhatsApp impõe, que não reinicia junto com a gente.
+   */
+  it('o minuto gasto sobrevive ao processo', async () => {
+    const TETO = 3;
+
+    await asTenant(async () => {
+      for (let i = 0; i < TETO; i += 1) {
+        // eslint-disable-next-line no-await-in-loop -- cada reserva é gravada
+        await WaOutboxWorker.reserve(TETO);
+      }
+    });
+
+    await reiniciar();
+
+    await asTenant(async () => {
+      await WaOutboxWorker.hydrate();
+      assert.equal(WaOutboxWorker.budget(TETO), 0, 'o restart devolveu o minuto cheio');
+      assert.equal(await WaOutboxWorker.reserve(TETO), false);
+    });
+
+    // E o do vizinho continua sendo dele: o que foi gravado é por provedor.
+    await runInTenant(outro, async () => {
+      await WaOutboxWorker.hydrate();
+      assert.equal(WaOutboxWorker.budget(TETO), TETO);
+    });
+  });
+
+  it('mas o que sobrevive é o minuto, não a vaga', async () => {
     const TETO = 2;
-    await asTenant(() => WaOutboxWorker.reserve(TETO));
-    await runInTenant(outro, () => WaOutboxWorker.reserve(TETO));
+    // Instantes gravados por um processo que morreu há mais de um minuto. Eles
+    // não podem segurar ninguém: a janela é rolante, e um painel que ficou uma
+    // hora fora do ar não deve dois minutos a ninguém quando volta.
+    await asTenant(() => AppState.upsert(
+      WaOutboxWorker.WINDOW_KEY,
+      JSON.stringify([Date.now() - 61_000, Date.now() - 3_600_000])
+    ));
 
-    WaOutboxWorker.stop();
+    await asTenant(async () => {
+      await WaOutboxWorker.hydrate();
+      assert.equal(WaOutboxWorker.budget(TETO), TETO);
+    });
+  });
 
-    await asTenant(() => assert.equal(WaOutboxWorker.budget(TETO), TETO));
-    await runInTenant(outro, () => assert.equal(WaOutboxWorker.budget(TETO), TETO));
+  it('e um instante no futuro não segura vaga', async () => {
+    const TETO = 2;
+    // Relógio que andou para trás. Sem o corte, a vaga ficaria presa até o
+    // relógio alcançar o instante gravado.
+    await asTenant(() => AppState.upsert(
+      WaOutboxWorker.WINDOW_KEY,
+      JSON.stringify([Date.now() + 10 * 60_000, Date.now() + 60_000])
+    ));
+
+    await asTenant(async () => {
+      await WaOutboxWorker.hydrate();
+      assert.equal(WaOutboxWorker.budget(TETO), TETO);
+    });
+  });
+
+  it('janela ilegível é janela vazia, e não um envio parado', async () => {
+    const TETO = 2;
+    for (const lixo of ['não é json', '{"não":"uma lista"}', 'null', '[["nem número"]]']) {
+      // eslint-disable-next-line no-await-in-loop -- um estado gravado por vez
+      await asTenant(() => AppState.upsert(WaOutboxWorker.WINDOW_KEY, lixo));
+      await reiniciar();
+      // eslint-disable-next-line no-await-in-loop -- idem
+      await asTenant(async () => {
+        await WaOutboxWorker.hydrate();
+        assert.equal(WaOutboxWorker.budget(TETO), TETO, `parou o envio com ${lixo}`);
+      });
+    }
+  });
+
+  it('e a leitura é uma por provedor por processo, não uma por passagem', async () => {
+    // Esta função roda a cada cinco segundos, vezes o número de provedores. Uma
+    // consulta a mais POR PASSAGEM é uma por provedor que ninguém pediu — a
+    // conta que o painel já pagou caro de aprender na tela inicial.
+    const TETO = 2;
+    let leituras = 0;
+    const original = AppState.get;
+    AppState.get = async (key) => {
+      if (key === WaOutboxWorker.WINDOW_KEY) leituras += 1;
+      return original.call(AppState, key);
+    };
+    try {
+      await asTenant(async () => {
+        await WaOutboxWorker.hydrate();
+        await WaOutboxWorker.hydrate();
+        await WaOutboxWorker.hydrate();
+        assert.equal(WaOutboxWorker.budget(TETO), TETO);
+      });
+      assert.equal(leituras, 1);
+    } finally {
+      AppState.get = original;
+    }
   });
 });
 

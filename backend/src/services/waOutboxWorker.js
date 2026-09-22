@@ -1,3 +1,4 @@
+import AppState from '../models/AppState.js';
 import WaMessage from '../models/WaMessage.js';
 import WaSendService from './waSendService.js';
 import WhatsAppConfigService from './whatsappConfigService.js';
@@ -113,6 +114,21 @@ class WaOutboxWorker {
    */
   static windows = new Map();
 
+  /**
+   * Quais provedores já tiveram a janela lida do banco NESTE processo.
+   *
+   * A leitura é uma por provedor por processo, e não uma por passagem: esta
+   * função roda a cada cinco segundos, vezes o número de provedores, e uma
+   * consulta a mais por passagem é uma consulta por provedor que ninguém pediu
+   * — a mesma conta que o painel já pagou caro de aprender. Depois da primeira
+   * leitura quem manda é a memória, porque é este processo que escreve cada
+   * reserva.
+   */
+  static hydrated = new Set();
+
+  /** Onde a janela do provedor fica entre um processo e o seguinte. */
+  static WINDOW_KEY = 'wa_outbox_window';
+
   static start() {
     if (this.timer) return this.timer;
     this.timer = setInterval(() => {
@@ -129,10 +145,11 @@ class WaOutboxWorker {
   static stop() {
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
-    // The window goes with it: the process is shutting down, and a worker
-    // restarted inside one process should start from a clean minute rather
-    // than inherit a budget spent by a previous life.
+    // Só a cópia em memória. O minuto gasto continua gravado, e a primeira
+    // passagem depois de subir o lê de volta — que é a diferença entre o teto
+    // valer e o teto ser um enfeite que todo deploy zera.
     this.windows.clear();
+    this.hydrated.clear();
   }
 
   /**
@@ -143,12 +160,11 @@ class WaOutboxWorker {
    * provider rather than splitting them. Now that the queue carries a provider,
    * the loop divides the work, which is what it was always meant to do.
    *
-   * O teto de envio por minuto é por provedor desde que `windows` virou um
-   * mapa; o que continua fora é a PERSISTÊNCIA dele. A janela vive só em
-   * memória e `stop` a limpa, então um restart de processo devolve o minuto
-   * cheio — e um deploy no meio de uma campanha pode estourar o teto que o
-   * WhatsApp impõe. Isso pede um lugar para guardar o contador, e é trabalho
-   * de outra onda.
+   * O teto de envio por minuto é por provedor, e agora sobrevive ao processo:
+   * a janela é lida do banco na primeira passagem de cada provedor e gravada a
+   * cada reserva. Antes disso ela vivia só em memória, e um deploy no meio de
+   * uma campanha devolvia o minuto cheio — o teto que o painel promete seguir
+   * é o que o WhatsApp impõe, e ele não reinicia junto com o nosso processo.
    *
    * @returns {Promise<{ sent: number, failed: number, skipped: string|null }>}
    */
@@ -180,6 +196,8 @@ class WaOutboxWorker {
         return summary;
       }
 
+      await this.hydrate();
+
       const budget = this.budget(config.rateLimitPerMin);
       if (budget <= 0) {
         summary.skipped = 'rate_limited';
@@ -192,7 +210,8 @@ class WaOutboxWorker {
         // message another pass had already taken is a rounding error; a slot
         // taken after the send would let two overlapping passes both decide
         // they were under the ceiling.
-        if (!this.reserve(config.rateLimitPerMin)) {
+        // eslint-disable-next-line no-await-in-loop -- a reserva é gravada antes do envio, e é isso que a faz valer depois de um restart
+        if (!await this.reserve(config.rateLimitPerMin)) {
           summary.skipped = 'rate_limited';
           break;
         }
@@ -339,13 +358,69 @@ class WaOutboxWorker {
     return Math.max(0, Number(rateLimitPerMin || 0) - this.janela().length);
   }
 
-  /** Takes one slot, or reports that the minute is spent. */
-  static reserve(rateLimitPerMin) {
+  /**
+   * Toma uma vaga, ou diz que o minuto acabou — e GRAVA a vaga tomada.
+   *
+   * A gravação é por reserva, e não uma por passagem no fim do laço, porque o
+   * que se perde num processo morto no meio da passagem é vaga que o WhatsApp
+   * já viu. Custa um upsert de uma linha ao lado de uma chamada HTTP e de dois
+   * `UPDATE`s que o envio já faz, e o teto é de 120 por minuto: o piso desse
+   * custo é conhecido e pequeno.
+   *
+   * Falha de gravação não impede o envio. Perder a durabilidade de uma vaga é
+   * o estado de ontem; recusar a mensagem por causa disso seria uma conversa
+   * parada por causa da contabilidade dela.
+   */
+  static async reserve(rateLimitPerMin) {
     const janela = this.janela();
     if (Number(rateLimitPerMin || 0) - janela.length <= 0) return false;
     janela.push(Date.now());
     this.windows.set(currentTenantId(), janela);
+    try {
+      await AppState.upsert(this.WINDOW_KEY, JSON.stringify(janela));
+    } catch (error) {
+      console.warn(`WhatsApp outbox window not stored: ${error.message}`);
+    }
     return true;
+  }
+
+  /**
+   * Traz do banco o minuto que o processo anterior gastou.
+   *
+   * Uma vez por provedor por processo. A idade quem corta é `janela()`, que é
+   * onde a janela rolante é definida — repetir o corte aqui seria a mesma regra
+   * escrita em dois lugares, e é assim que duas regras iguais viram duas regras
+   * diferentes. O que ESTA função corta é o que `janela()` não veria: instante
+   * no FUTURO, de um relógio que andou para trás, que ficaria segurando vaga
+   * até o relógio alcançá-lo.
+   *
+   * O que vem do banco SUBSTITUI o que estiver em memória, e não se soma a ele:
+   * toda reserva é gravada, então o gravado é superconjunto do lembrado, e
+   * somar contaria a mesma vaga duas vezes.
+   *
+   * Nunca lança. Uma janela ilegível vira janela vazia, que é exatamente o
+   * comportamento de antes desta onda — o pior que ela causa é o minuto cheio
+   * que o restart dava de qualquer jeito.
+   */
+  static async hydrate() {
+    const tenantId = currentTenantId();
+    if (this.hydrated.has(tenantId)) return;
+    this.hydrated.add(tenantId);
+
+    const agora = Date.now();
+    let instantes = [];
+    try {
+      const bruto = await AppState.get(this.WINDOW_KEY);
+      const lido = bruto ? JSON.parse(bruto) : null;
+      if (Array.isArray(lido)) {
+        instantes = lido
+          .map((at) => Number(at))
+          .filter((at) => Number.isFinite(at) && at <= agora);
+      }
+    } catch (error) {
+      console.warn(`WhatsApp outbox window unreadable: ${error.message}`);
+    }
+    this.windows.set(tenantId, instantes);
   }
 }
 

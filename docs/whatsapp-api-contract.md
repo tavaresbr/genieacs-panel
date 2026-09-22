@@ -397,9 +397,12 @@ no shutdown. `wa_messages` **é** a fila; não existe tabela paralela.
   mensagem. Claim nulo = outra passada já pegou a linha — silêncio, não erro. É
   isso que torna duas passadas simultâneas seguras, e por isso nada aqui
   serializa os ticks.
-- Teto de `rateLimitPerMin` envios por minuto corrido, **uma janela para o
-  worker inteiro** — o que o WhatsApp observa é o tráfego do provedor, e um
-  limite por número multiplicaria pelo número de instâncias conectadas.
+- Teto de `rateLimitPerMin` envios por minuto corrido, **uma janela por
+  provedor** — o que o WhatsApp observa é o tráfego do provedor, e um limite por
+  número multiplicaria pelo número de instâncias conectadas. A janela é gravada
+  em `app_state` a cada vaga tomada e lida de volta na primeira passagem de cada
+  provedor: o teto é o que o WhatsApp impõe, e ele não reinicia junto com o
+  processo do painel.
 - Roteamento: a conta da conversa primeiro (quem escreveu para o suporte tem de
   ser respondido pelo suporte); só se ela não estiver `connected` cai para
   `WhatsAppAccount.getForPurpose()`, **no mesmo purpose**.
