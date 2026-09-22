@@ -195,9 +195,10 @@ describe('a self-hosted install', () => {
   before(() => {
     const child = runInEdition('selfhosted', SELF_HOSTED_INSTALL, ['local', 'local-senha-1']);
     assert.equal(child.status, 0, child.stderr);
-    // The last line, not the whole output: `dotenv` announces itself on stdout
-    // when the application loads its configuration, and the child is a whole
-    // application.
+    // A última linha, não a saída inteira: o filho é uma aplicação completa e
+    // escreve o que uma aplicação escreve ao subir. O anúncio do `dotenv` não
+    // está mais entre isso — ele passou a sair na stderr no `dotenv` 18 —, mas
+    // a razão de ler só a última linha continua sendo o resto.
     ran = JSON.parse(child.stdout.trim().split('\n').pop());
   });
 
