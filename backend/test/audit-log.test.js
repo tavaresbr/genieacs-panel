@@ -6,6 +6,7 @@ import {
 
 const { default: AuditLog } = await import('../src/models/AuditLog.js');
 const { default: SchedulerService } = await import('../src/services/schedulerService.js');
+const { default: Setting } = await import('../src/models/Setting.js');
 const { default: User } = await import('../src/models/User.js');
 const { default: TenantUser } = await import('../src/models/TenantUser.js');
 const { default: CustomerService } = await import('../src/services/customerService.js');
@@ -367,5 +368,99 @@ describe('a poda', () => {
     } finally {
       await getDb()('tenants').where({ id: tenantId }).update({ status: 'active' });
     }
+  });
+});
+
+/**
+ * O prazo da trilha deixou de ser uma constante.
+ *
+ * Um ano era o padrão e continua sendo — o que era ruim é ser a única resposta.
+ * Um ISP em disputa judicial precisa de mais; um que resolveu guardar menos
+ * dado pessoal precisa de menos; e as duas mudanças exigiam editar o agendador
+ * e subir deploy. Política de guarda é decisão de quem responde pelos dados.
+ */
+describe('o prazo da trilha, agora configurável', () => {
+  const definir = (valor) => runInTenant(tenantId, () => Setting.upsert('auditRetentionDays', valor));
+  const limpar = () => getDb()('settings').where({ key: 'auditRetentionDays' }).del();
+
+  it('sem configuração, continua um ano', async () => {
+    await limpar();
+    assert.equal(await runInTenant(tenantId, () => SchedulerService.auditRetentionDays()), 365);
+  });
+
+  it('o prazo salvo é o que a poda usa', async () => {
+    // O caso que prova a mudança inteira: uma linha de 100 dias sobrevive ao
+    // padrão de 365 e morre com o prazo de 60.
+    await limpar();
+    const cemDias = new Date(Date.now() - 100 * 24 * 60 * 60 * 1000);
+    await runInTenant(tenantId, () => AuditLog.record({ action: 'acao.de.cem.dias' }));
+    await getDb()('audit_log').where({ action: 'acao.de.cem.dias' }).update({ created_at: cemDias });
+
+    SchedulerService.lastPruneAt = 0;
+    await SchedulerService.retentionPass();
+    assert.equal(
+      (await trilha({ action: 'acao.de.cem.dias' })).length, 1,
+      'o padrão de um ano devia ter mantido uma linha de cem dias'
+    );
+
+    await definir('60');
+    try {
+      SchedulerService.lastPruneAt = 0;
+      await SchedulerService.retentionPass();
+      assert.equal((await trilha({ action: 'acao.de.cem.dias' })).length, 0);
+    } finally {
+      await limpar();
+    }
+  });
+
+  it('valor inválido cai no padrão em vez de parar a poda', async () => {
+    // Uma poda parada é a tabela crescendo em silêncio, que é pior que o prazo
+    // errado. Letra num campo não pode ser o motivo.
+    // `-5` e `0` entram nesta lista e não na do limite: um número negativo
+    // não é intenção de guardar menos, é lixo — e preso no mínimo ele
+    // pareceria uma escolha de 30 dias que ninguém fez.
+    // `'12abc'` está aqui e não entre os limites por um motivo que custou uma
+    // correção: `parseInt` o lê como 12, que é inteiro positivo e viraria 30
+    // pelo mínimo — um prazo que ninguém escolheu, nascido de um campo
+    // digitado errado. E `'0'` porque no resto deste sistema zero quer dizer
+    // "para sempre", que é o oposto de um prazo curto.
+    for (const lixo of ['abc', '', '12abc', '-5', '0', ' ', '1e3']) {
+      await definir(lixo);
+      assert.equal(
+        await runInTenant(tenantId, () => SchedulerService.auditRetentionDays()), 365,
+        `o valor ${JSON.stringify(lixo)} não caiu no padrão`
+      );
+    }
+    await limpar();
+  });
+
+  it('e fora dos limites é preso, nunca obedecido', async () => {
+    // Abaixo de 30 dias a trilha deixa de responder à pergunta que a
+    // justifica; acima de 10 anos ela vira o arquivo de dado pessoal que o
+    // prazo existe para evitar.
+    await definir('1');
+    assert.equal(await runInTenant(tenantId, () => SchedulerService.auditRetentionDays()), 30);
+    await definir('99999');
+    assert.equal(await runInTenant(tenantId, () => SchedulerService.auditRetentionDays()), 3650);
+    await limpar();
+  });
+
+  it('a rota recusa o que os limites recusam, e aceita o que eles aceitam', async () => {
+    // A linha precisa existir: `PUT /:key` atualiza e 404 quando não há o que
+    // atualizar — criar é `POST /`. A validação roda ANTES da leitura, então
+    // as recusas abaixo valem com ou sem linha; a aceitação é que precisa de
+    // uma.
+    await definir('365');
+    const salvar = (value) => call(`${panelUrl}/api/settings/auditRetentionDays`, {
+      method: 'PUT', headers: authHeaders(token), body: { value }
+    });
+    assert.equal((await salvar('10')).status, 400);
+    assert.equal((await salvar('4000')).status, 400);
+    assert.equal((await salvar('abc')).status, 400);
+    // `30.5` é inteiro para `parseInt` e não é o que foi digitado — a
+    // comparação com o texto original é o que o recusa.
+    assert.equal((await salvar('30.5')).status, 400);
+    assert.equal((await salvar('180')).status, 200);
+    await limpar();
   });
 });

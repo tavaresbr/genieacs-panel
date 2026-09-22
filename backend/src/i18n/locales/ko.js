@@ -145,6 +145,7 @@ export default {
   'settings.validation.companyPrefix': '회사 ID는 2자에서 4자 사이의 영문자여야 합니다',
   'settings.validation.suffixMode': '고객 ID 접미사 모드는 random 또는 installation_date여야 합니다',
   'settings.validation.appName': '애플리케이션 이름은 1자에서 80자 사이여야 합니다',
+  "settings.validation.auditRetentionDays": "감사 추적 보존 기간은 30일에서 3650일 사이의 정수여야 합니다",
 
   // 지도 설정
   'mapSettings.retrieved': '지도 설정을 조회했습니다',

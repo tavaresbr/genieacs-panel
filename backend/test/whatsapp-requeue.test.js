@@ -13,6 +13,7 @@ const { default: WhatsAppConfigService } = await import('../src/services/whatsap
 const { default: WhatsAppAccount } = await import('../src/models/WhatsAppAccount.js');
 const { default: WaConversation } = await import('../src/models/WaConversation.js');
 const { default: WaMessage } = await import('../src/models/WaMessage.js');
+const { whatsappBulkRequeueLimiter } = await import('../src/middleware/rateLimit.js');
 
 /**
  * Resending is putting the row back in the queue, not writing another one.
@@ -42,6 +43,7 @@ const wholeSecond = (ms) => new Date(Math.floor(ms / 1000) * 1000);
 
 let panelUrl;
 let token;
+let userId;
 let alfa;
 let beta;
 let alfaAccountId;
@@ -122,6 +124,7 @@ before(async () => {
     body: { username: 'operator', password: 'operator-password-1', email: 'operator@exemplo.test' }
   });
   token = setup.body.data.token;
+  userId = setup.body.data.user.id;
 
   const db = getDb();
   alfa = (await db('tenants').orderBy('id', 'asc').first()).id;
@@ -306,6 +309,12 @@ describe('one failed message, back in the queue as itself', () => {
 });
 
 describe('the bulk requeue after a campaign fell over', () => {
+  // O teto desta rota é de 12 por minuto, e este bloco a exercita mais vezes
+  // que isso de propósito: ele varre as janelas. Zerado por caso para que a
+  // suíte prove o comportamento da rota e não o do limitador — que tem prova
+  // própria em `whatsapp-outbox.test.js`.
+  beforeEach(() => whatsappBulkRequeueLimiter.resetKey(`user:${userId}`));
+
   it('takes this provider\'s failures and never the neighbour\'s', async () => {
     const mine = [await failed(), await failed(), await failed()];
     const theirs = [

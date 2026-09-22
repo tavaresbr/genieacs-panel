@@ -278,14 +278,24 @@ function notesFor(
   // 5. What is on disk. Always the quietest thing here — it is a fact about
   //    storage, not about whether anything works, and the sweeper that deletes
   //    it is somebody else's route. This strip only counts.
+  //    O prazo vai JUNTO da contagem, e não numa pilha própria. "9,4 KB" é
+  //    irrelevante e "9,4 KB, sem prazo de exclusão" é uma decisão — as duas
+  //    metades só dizem alguma coisa juntas. E fica `calm`: guardar para sempre
+  //    é escolha legítima do provedor, e uma pilha amarela que aparece todo dia
+  //    para sempre é a que ensina o operador a parar de ler a tira.
   notes.push({
     key: 'media',
     tone: 'calm',
     icon: 'database',
-    text: t('whatsapp.health.media', {
-      files: formatNumber(health.media.files),
-      size: formatBytes(health.media.bytes, formatNumber)
-    })
+    text: health.retention.mediaDays > 0
+      ? t('whatsapp.health.media', {
+        files: formatNumber(health.media.files),
+        size: formatBytes(health.media.bytes, formatNumber)
+      })
+      : t('whatsapp.health.mediaForever', {
+        files: formatNumber(health.media.files),
+        size: formatBytes(health.media.bytes, formatNumber)
+      })
   })
 
   return notes

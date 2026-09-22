@@ -144,6 +144,7 @@ export default {
   'settings.validation.companyPrefix': '会社 ID は 2〜4 文字の英字で入力してください',
   'settings.validation.suffixMode': '顧客 ID の接尾辞モードは random または installation_date で指定してください',
   'settings.validation.appName': 'アプリケーション名は 1〜80 文字で入力してください',
+  "settings.validation.auditRetentionDays": "監査証跡の保存期間は 30 から 3650 日までの整数でなければなりません",
 
   // 地図の設定
   'mapSettings.retrieved': '地図の設定を取得しました',

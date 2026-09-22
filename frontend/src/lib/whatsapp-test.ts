@@ -81,6 +81,7 @@ const PHRASE: Record<string, TranslationKey> = {
   'webhookPath.skipped': 'settings.whatsapp.test.skipped',
 
   'server.ok': 'settings.whatsapp.test.server.ok',
+  'server.answered': 'settings.whatsapp.test.server.answered',
   'server.unreachable': 'settings.whatsapp.test.server.unreachable',
   'server.unknown_flavor': 'settings.whatsapp.test.server.unknownFlavor',
   'server.host_not_allowed': 'settings.whatsapp.test.server.hostNotAllowed',
@@ -120,6 +121,10 @@ const APROVADOS = new Set([
   'config.ok', 'webhookPath.ok', 'server.ok', 'license.ok', 'adminKey.ok',
   'instances.ok', 'roundTrip.reached'
 ])
+
+// `server.answered` fica FORA dos aprovados de propósito: ele só acontece
+// quando a licença bloqueou, e a linha seguinte é sempre um ✗. Contá-lo como
+// aprovado faria a tela somar um verde a um diagnóstico que já falhou.
 
 /**
  * O que é digno de nota sem ser defeito.

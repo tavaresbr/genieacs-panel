@@ -144,6 +144,7 @@ export default {
   'settings.validation.companyPrefix': 'Die Firmen-ID muss 2 bis 4 Buchstaben enthalten',
   'settings.validation.suffixMode': 'Der Suffixmodus der Kunden-ID muss random oder installation_date sein',
   'settings.validation.appName': 'Der Anwendungsname muss zwischen 1 und 80 Zeichen lang sein',
+  "settings.validation.auditRetentionDays": "Die Aufbewahrungsfrist des Prüfpfads muss eine ganze Zahl von Tagen zwischen 30 und 3650 sein",
 
   // Karteneinstellungen
   'mapSettings.retrieved': 'Karteneinstellungen erfolgreich abgerufen',

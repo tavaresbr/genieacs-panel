@@ -5,6 +5,7 @@ import { currentTenantId, runInTenant } from '../config/tenantContext.js';
 import { DATA_DIR } from '../config/paths.js';
 import { MEDIA_DIR, tenantIdFromDir, tenantMediaDir } from './waMediaService.js';
 import { WEBHOOK_VERDICTS } from '../utils/wa/evolutionApi.js';
+import WhatsAppConfigService from './whatsappConfigService.js';
 
 /**
  * One read that answers "is this working?".
@@ -159,7 +160,30 @@ class WaHealthService {
     const lastOutboundAt = await this.lastOutboundAt();
     const media = await this.mediaUsage();
     const webhook = await this.webhook();
-    return { accounts, outbox, inbox, lastInboundAt, lastOutboundAt, media, webhook };
+    const retention = await this.retention();
+    return { accounts, outbox, inbox, lastInboundAt, lastOutboundAt, media, retention, webhook };
+  }
+
+  /**
+   * Os dois prazos de guarda, ao lado da contagem do que já está guardado.
+   *
+   * Aqui porque é aqui que a contagem está. `media.bytes` diz quanto ocupa e
+   * não dizia por quanto tempo — e as duas metades dessa frase só significam
+   * alguma coisa juntas: "9,4 KB" é irrelevante e "9,4 KB para sempre" é uma
+   * decisão. Todo o resto do sistema nasce com prazo (telemetria 14/90, eventos
+   * do ERP 90, provisionamento 90, trilha 365); estes dois são os únicos que
+   * nascem em zero, que quer dizer nunca apagar — e é onde ficam o texto das
+   * conversas, as fotos e os documentos que o assinante mandou.
+   *
+   * Da configuração em cache do provedor, então não custa consulta: a tira roda
+   * a cada minuto e este número muda quando alguém salva a aba.
+   */
+  static async retention() {
+    const config = await WhatsAppConfigService.getConfig();
+    return {
+      mediaDays: Number(config.mediaRetentionDays) || 0,
+      messageDays: Number(config.messageRetentionDays) || 0
+    };
   }
 
   /**

@@ -142,6 +142,7 @@ export default {
   'settings.validation.companyPrefix': 'कंपनी कोड में 2 से 4 अक्षर होने चाहिए',
   'settings.validation.suffixMode': 'ग्राहक आईडी प्रत्यय मोड random या installation_date होना चाहिए',
   'settings.validation.appName': 'ऐप्लिकेशन का नाम 1 से 80 अक्षरों के बीच होना चाहिए',
+  "settings.validation.auditRetentionDays": "ऑडिट ट्रेल की अवधि 30 से 3650 दिनों के बीच पूर्ण संख्या होनी चाहिए",
 
   // मानचित्र सेटिंग्स
   'mapSettings.retrieved': 'मानचित्र सेटिंग्स प्राप्त हुईं',

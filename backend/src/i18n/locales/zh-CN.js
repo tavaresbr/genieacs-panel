@@ -144,6 +144,7 @@ export default {
   'settings.validation.companyPrefix': '公司代号需为 2 至 4 个字母',
   'settings.validation.suffixMode': '客户 ID 的后缀模式需为 random 或 installation_date',
   'settings.validation.appName': '应用名称需为 1 至 80 个字符',
+  "settings.validation.auditRetentionDays": "审计轨迹的保留期限必须是 30 到 3650 之间的整数天",
 
   // 地图设置
   'mapSettings.retrieved': '已获取地图设置',

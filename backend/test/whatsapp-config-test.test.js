@@ -269,6 +269,11 @@ describe('a licença é reconhecida como licença', () => {
     assert.equal(veredito(body, 'adminKey'), 'skipped');
     assert.notEqual(veredito(body, 'server'), 'unknown_flavor',
       'licença lida depois do sabor vira "não parece um Evolution" — o diagnóstico que não dá para agir em cima');
+    // E NÃO `ok`: aquele veredito promete o sabor no detalhe, e aqui não há
+    // sabor a dar. Dito como `ok` com detalhe vazio, a tela mostrava
+    // "Respondeu ()." — um parêntese aberto e fechado sobre nada.
+    assert.equal(veredito(body, 'server'), 'answered');
+    assert.equal(detalhe(body, 'server'), null, 'o passo levou um detalhe que não existe');
   });
 });
 

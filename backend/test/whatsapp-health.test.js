@@ -667,6 +667,47 @@ describe('o webhook conferido que não dá para conferir inteiro', () => {
   });
 });
 
+/**
+ * O prazo de guarda, ao lado da contagem do que já está guardado.
+ *
+ * `media.bytes` dizia quanto ocupa e não dizia por quanto tempo, e as duas
+ * metades dessa frase só significam alguma coisa juntas: "9,4 KB" é irrelevante
+ * e "9,4 KB para sempre" é uma decisão. Estes dois prazos são os ÚNICOS do
+ * sistema que nascem em zero — telemetria, eventos do ERP, provisionamento e
+ * trilha todos nascem com prazo —, e é onde ficam o texto das conversas, as
+ * fotos e os documentos do assinante.
+ */
+describe('os prazos de guarda viajam com a contagem', () => {
+  it('zero é o padrão, e zero quer dizer para sempre', async () => {
+    const { retention } = await health();
+    assert.equal(retention.mediaDays, 0);
+    assert.equal(retention.messageDays, 0);
+  });
+
+  it('e o que o provedor salvou é o que a tira lê', async () => {
+    await asTenant(() => WhatsAppConfigService.saveConfig({
+      mediaRetentionDays: 90, messageRetentionDays: 365
+    }));
+    const { retention } = await health();
+    assert.equal(retention.mediaDays, 90);
+    assert.equal(retention.messageDays, 365);
+    await asTenant(() => WhatsAppConfigService.saveConfig({
+      mediaRetentionDays: 0, messageRetentionDays: 0
+    }));
+  });
+
+  it('e é do provedor em escopo, não do vizinho', async () => {
+    // A configuração mora em `app_state`, que é escopada. Um prazo lido fora
+    // do escopo mostraria ao provedor o prazo de outro — e, pior, o faria
+    // acreditar que tem prazo quando não tem.
+    await runInTenant(beta, () => WhatsAppConfigService.saveConfig({ mediaRetentionDays: 7 }));
+    assert.equal((await health()).retention.mediaDays, 0, 'leu o prazo do vizinho');
+    assert.equal(
+      (await runInTenant(beta, () => WaHealthService.read())).retention.mediaDays, 7
+    );
+  });
+});
+
 describe('the route', () => {
   it('answers the frozen shape', async () => {
     const { status, body } = await call(`${panelUrl}/api/whatsapp/health`, {
@@ -677,12 +718,13 @@ describe('the route', () => {
 
     const data = body.data;
     assert.deepEqual(Object.keys(data).sort(), [
-      'accounts', 'inbox', 'lastInboundAt', 'lastOutboundAt', 'media', 'outbox', 'webhook'
+      'accounts', 'inbox', 'lastInboundAt', 'lastOutboundAt', 'media', 'outbox', 'retention', 'webhook'
     ]);
     assert.deepEqual(Object.keys(data.accounts).sort(), ['connected', 'disconnected', 'total']);
     assert.deepEqual(Object.keys(data.outbox).sort(), ['failed24h', 'oldestQueuedAt', 'queued', 'retrying', 'sending']);
     assert.deepEqual(Object.keys(data.inbox).sort(), ['openConversations', 'unread']);
     assert.deepEqual(Object.keys(data.media).sort(), ['bytes', 'files', 'oldestAt']);
+    assert.deepEqual(Object.keys(data.retention).sort(), ['mediaDays', 'messageDays']);
     assert.deepEqual(
       Object.keys(data.webhook).sort(),
       ['broken', 'refusedAt', 'unchecked', 'unreachable', 'unverifiable']

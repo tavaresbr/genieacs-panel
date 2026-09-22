@@ -2110,6 +2110,21 @@ export default function Settings() {
                 </div>
               </div>
 
+              {/* O aviso só aparece quando algum dos dois é zero, e some no dia
+                  em que o operador define um prazo. As duas ajudas acima
+                  DESCREVEM o zero ("guarda para sempre, que é o padrão") e não
+                  dizem o que ele custa — e o custo é específico: destes dois
+                  prazos, e só destes, o padrão é nunca apagar. Telemetria,
+                  eventos do ERP, provisionamento e trilha todos nascem com
+                  prazo. Aqui é onde ficam o texto das conversas, as fotos e os
+                  documentos que o assinante mandou. */}
+              {(waForm.mediaRetentionDays === 0 || waForm.messageRetentionDays === 0) && (
+                <div className="mt-4 flex items-start gap-2 rounded-md border border-[hsl(var(--status-warning)/0.4)] bg-[hsl(var(--status-warning)/0.08)] p-4">
+                  <Icon name="info" size={18} className="mt-0.5 shrink-0 text-[hsl(var(--status-warning))]" />
+                  <p className="text-sm leading-6">{t('settings.whatsapp.retentionForeverWarning')}</p>
+                </div>
+              )}
+
               <div className="space-y-3 rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-4">
                 <label className="flex cursor-pointer items-start gap-3">
                   <input

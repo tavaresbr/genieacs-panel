@@ -141,6 +141,7 @@ export default {
   'settings.validation.companyPrefix': 'O ID da empresa deve conter de 2 a 4 letras',
   'settings.validation.suffixMode': 'O modo de sufixo do ID de cliente deve ser random ou installation_date',
   'settings.validation.appName': 'O nome do aplicativo deve ter entre 1 e 80 caracteres',
+  "settings.validation.auditRetentionDays": "O prazo da trilha deve ser um número inteiro de dias entre 30 e 3650",
 
   // Configurações do mapa
   'mapSettings.retrieved': 'Configurações do mapa obtidas com sucesso',

@@ -141,6 +141,7 @@ export default {
   'settings.validation.companyPrefix': 'El ID de la empresa debe contener de 2 a 4 letras',
   'settings.validation.suffixMode': 'El modo de sufijo del ID de cliente debe ser random o installation_date',
   'settings.validation.appName': 'El nombre de la aplicación debe tener entre 1 y 80 caracteres',
+  "settings.validation.auditRetentionDays": "El plazo de la pista de auditoría debe ser un número entero de días entre 30 y 3650",
 
   // Configuración del mapa
   'mapSettings.retrieved': 'Configuración del mapa obtenida correctamente',

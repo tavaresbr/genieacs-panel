@@ -144,6 +144,7 @@ export default {
   'settings.validation.companyPrefix': 'Код компании должен содержать от 2 до 4 букв',
   'settings.validation.suffixMode': 'Режим суффикса идентификатора клиента должен быть random или installation_date',
   'settings.validation.appName': 'Название приложения должно содержать от 1 до 80 символов',
+  "settings.validation.auditRetentionDays": "Срок хранения журнала аудита должен быть целым числом дней от 30 до 3650",
 
   // Настройки карты
   'mapSettings.retrieved': 'Настройки карты получены',
