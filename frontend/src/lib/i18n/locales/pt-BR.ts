@@ -1274,6 +1274,7 @@ const ptBR: Dictionary = {
   "settings.whatsapp.test.webhookPath.wrong": "O endereço salvo não termina em /api/whatsapp-webhook: {detail}. O servidor entrega numa página que não é o webhook.",
   "settings.whatsapp.test.webhookPath.invalid": "O endereço salvo não é uma URL válida: {detail}",
   "settings.whatsapp.test.server.ok": "Respondeu ({detail}).",
+  "settings.whatsapp.test.server.answered": "Respondeu. Qual sabor, não dá para dizer: a licença recusa até a raiz.",
   "settings.whatsapp.test.server.unreachable": "Não deu para chegar: DNS, prazo ou conexão recusada.",
   "settings.whatsapp.test.server.unknownFlavor": "Alguma coisa atendeu ({detail}) e não se parece com um servidor Evolution.",
   "settings.whatsapp.test.server.hostNotAllowed": "O host não está na lista de servidores autorizados.",

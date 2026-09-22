@@ -1273,6 +1273,7 @@ const ja: Dictionary = {
   "settings.whatsapp.test.webhookPath.wrong": "保存されたアドレスが /api/whatsapp-webhook で終わっていません: {detail}。サーバーは Webhook ではないページに配信します。",
   "settings.whatsapp.test.webhookPath.invalid": "保存されたアドレスが有効な URL ではありません: {detail}",
   "settings.whatsapp.test.server.ok": "応答しました（{detail}）。",
+  "settings.whatsapp.test.server.answered": "応答しました。どちらの種類かは判断できません：ライセンスがルートさえ拒否します。",
   "settings.whatsapp.test.server.unreachable": "到達できません：DNS、タイムアウト、または接続拒否。",
   "settings.whatsapp.test.server.unknownFlavor": "何かが応答しました（{detail}）が、Evolution サーバーには見えません。",
   "settings.whatsapp.test.server.hostNotAllowed": "ホストが許可サーバーの一覧にありません。",

@@ -1254,6 +1254,7 @@ const hi: Dictionary = {
   "settings.whatsapp.test.webhookPath.wrong": "सहेजा गया पता /api/whatsapp-webhook पर समाप्त नहीं होता: {detail}। सर्वर ऐसे पृष्ठ पर पहुँचाता है जो वेबहुक नहीं है।",
   "settings.whatsapp.test.webhookPath.invalid": "सहेजा गया पता मान्य URL नहीं है: {detail}",
   "settings.whatsapp.test.server.ok": "उत्तर दिया ({detail})।",
+  "settings.whatsapp.test.server.answered": "उत्तर दिया। कौन-सा संस्करण है, यह नहीं कहा जा सकता: लाइसेंस जड़ तक को अस्वीकार करता है।",
   "settings.whatsapp.test.server.unreachable": "पहुँच नहीं सके: DNS, समय-सीमा या कनेक्शन अस्वीकृत।",
   "settings.whatsapp.test.server.unknownFlavor": "कुछ ने उत्तर दिया ({detail}) और वह Evolution सर्वर जैसा नहीं लगता।",
   "settings.whatsapp.test.server.hostNotAllowed": "यह होस्ट अधिकृत सर्वरों की सूची में नहीं है।",

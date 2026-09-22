@@ -1157,6 +1157,7 @@ const de: Dictionary = {
   "settings.whatsapp.test.webhookPath.wrong": "Die gespeicherte Adresse endet nicht auf /api/whatsapp-webhook: {detail}. Der Server liefert an eine Seite, die nicht der Webhook ist.",
   "settings.whatsapp.test.webhookPath.invalid": "Die gespeicherte Adresse ist keine gültige URL: {detail}",
   "settings.whatsapp.test.server.ok": "Hat geantwortet ({detail}).",
+  "settings.whatsapp.test.server.answered": "Er hat geantwortet. Welche Variante, lässt sich nicht sagen: die Lizenz verweigert sogar die Wurzel.",
   "settings.whatsapp.test.server.unreachable": "Nicht erreichbar: DNS, Zeitüberschreitung oder Verbindung abgelehnt.",
   "settings.whatsapp.test.server.unknownFlavor": "Etwas hat geantwortet ({detail}) und sieht nicht nach einem Evolution-Server aus.",
   "settings.whatsapp.test.server.hostNotAllowed": "Der Host steht nicht in der Liste der erlaubten Server.",

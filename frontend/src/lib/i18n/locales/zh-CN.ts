@@ -1274,6 +1274,7 @@ const zhCN: Dictionary = {
   "settings.whatsapp.test.webhookPath.wrong": "保存的地址没有以 /api/whatsapp-webhook 结尾：{detail}。服务器会投递到一个并非 Webhook 的页面。",
   "settings.whatsapp.test.webhookPath.invalid": "保存的地址不是有效的 URL：{detail}",
   "settings.whatsapp.test.server.ok": "已响应（{detail}）。",
+  "settings.whatsapp.test.server.answered": "它响应了。但无法判断是哪一种：许可证连根路径都拒绝。",
   "settings.whatsapp.test.server.unreachable": "无法抵达：DNS、超时或连接被拒绝。",
   "settings.whatsapp.test.server.unknownFlavor": "有东西响应了（{detail}），但它看起来不像 Evolution 服务器。",
   "settings.whatsapp.test.server.hostNotAllowed": "该主机不在已授权服务器列表中。",

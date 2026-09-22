@@ -717,11 +717,14 @@ class EvolutionInstanceService {
         if (serverOk.status === 0 && raiz.status === 0) {
           add('server', 'unreachable');
         } else if (licenca) {
-          // Respondeu, e o que respondeu foi a recusa da licença. Isso conta
-          // como servidor alcançado: o passo seguinte é que dirá o que há.
+          // Respondeu, e o que respondeu foi a recusa da licença. Conta como
+          // servidor alcançado — o passo seguinte dirá o que há —, mas NÃO
+          // como `ok`: aquele veredito promete o sabor no detalhe, e aqui não
+          // há sabor a dar, porque a licença recusa até a raiz. Dito como `ok`
+          // com detalhe vazio, a tela mostrava "Respondeu ().".
           servidorOk = true;
           flavor = 'v2';
-          add('server', 'ok', null);
+          add('server', 'answered');
         } else if (ehEvolution(serverOk, raiz)) {
           flavor = flavorFromProbes(serverOk, raiz);
           servidorOk = true;

@@ -1274,6 +1274,7 @@ const zhTW: Dictionary = {
   "settings.whatsapp.test.webhookPath.wrong": "儲存的位址沒有以 /api/whatsapp-webhook 結尾：{detail}。伺服器會投遞到一個並非 Webhook 的頁面。",
   "settings.whatsapp.test.webhookPath.invalid": "儲存的位址不是有效的 URL：{detail}",
   "settings.whatsapp.test.server.ok": "已回應（{detail}）。",
+  "settings.whatsapp.test.server.answered": "它回應了。但無法判斷是哪一種：授權連根路徑都拒絕。",
   "settings.whatsapp.test.server.unreachable": "無法抵達：DNS、逾時或連線遭拒。",
   "settings.whatsapp.test.server.unknownFlavor": "有東西回應了（{detail}），但它看起來不像 Evolution 伺服器。",
   "settings.whatsapp.test.server.hostNotAllowed": "該主機不在已授權伺服器清單中。",

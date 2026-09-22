@@ -1254,6 +1254,7 @@ const ar: Dictionary = {
   "settings.whatsapp.test.webhookPath.wrong": "العنوان المحفوظ لا ينتهي بـ /api/whatsapp-webhook: {detail}. يسلّم الخادم إلى صفحة ليست الويب هوك.",
   "settings.whatsapp.test.webhookPath.invalid": "العنوان المحفوظ ليس رابطًا صالحًا: {detail}",
   "settings.whatsapp.test.server.ok": "استجاب ({detail}).",
+  "settings.whatsapp.test.server.answered": "استجاب. ولا يمكن تحديد أي إصدار: يرفض الترخيص حتى الجذر.",
   "settings.whatsapp.test.server.unreachable": "تعذّر الوصول: DNS أو انتهاء المهلة أو رفض الاتصال.",
   "settings.whatsapp.test.server.unknownFlavor": "استجاب شيء ما ({detail}) ولا يبدو خادم Evolution.",
   "settings.whatsapp.test.server.hostNotAllowed": "المضيف ليس ضمن قائمة الخوادم المسموح بها.",

@@ -1276,6 +1276,7 @@ const en = {
   "settings.whatsapp.test.webhookPath.wrong": "The saved address does not end in /api/whatsapp-webhook: {detail}. The server delivers to a page that is not the webhook.",
   "settings.whatsapp.test.webhookPath.invalid": "The saved address is not a valid URL: {detail}",
   "settings.whatsapp.test.server.ok": "Answered ({detail}).",
+  "settings.whatsapp.test.server.answered": "It answered. Which flavour cannot be said: the licence refuses even the root.",
   "settings.whatsapp.test.server.unreachable": "Could not get there: DNS, timeout or connection refused.",
   "settings.whatsapp.test.server.unknownFlavor": "Something answered ({detail}) and it does not look like an Evolution server.",
   "settings.whatsapp.test.server.hostNotAllowed": "The host is not in the allowed servers list.",

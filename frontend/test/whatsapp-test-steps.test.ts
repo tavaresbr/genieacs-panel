@@ -191,3 +191,18 @@ describe('o descompasso entre o painel e o servidor', () => {
     expect(nota.text.toLowerCase()).toContain('webhook')
   })
 })
+
+describe('o servidor que respondeu sem dizer o sabor', () => {
+  it('`answered` tem frase própria e não deixa parêntese vazio', () => {
+    // A licença recusa até a raiz, então não há sabor a pôr no detalhe. Dito
+    // como `ok` — que promete o sabor — a tela mostrava "Respondeu ().".
+    const [nota] = testNotes(resultado([{ passo: 'server', veredito: 'answered' }]), t)
+    expect(nota.text).not.toBe('answered')
+    expect(nota.text).not.toContain('()')
+    expect(nota.text.trim().length).toBeGreaterThan(0)
+  })
+
+  it('e não conta como aprovado: a linha seguinte é sempre a licença falhando', () => {
+    expect(toneOf('server', 'answered')).toBe('alarm')
+  })
+})

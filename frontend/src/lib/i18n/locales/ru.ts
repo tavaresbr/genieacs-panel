@@ -1280,6 +1280,7 @@ const ru: Dictionary = {
   "settings.whatsapp.test.webhookPath.wrong": "Сохранённый адрес не заканчивается на /api/whatsapp-webhook: {detail}. Сервер доставляет на страницу, которая не является вебхуком.",
   "settings.whatsapp.test.webhookPath.invalid": "Сохранённый адрес не является корректным URL: {detail}",
   "settings.whatsapp.test.server.ok": "Ответил ({detail}).",
+  "settings.whatsapp.test.server.answered": "Ответил. Какая именно сборка — сказать нельзя: лицензия отклоняет даже корень.",
   "settings.whatsapp.test.server.unreachable": "Не удалось достучаться: DNS, таймаут или отказ в соединении.",
   "settings.whatsapp.test.server.unknownFlavor": "Что-то ответило ({detail}), и это не похоже на сервер Evolution.",
   "settings.whatsapp.test.server.hostNotAllowed": "Хост отсутствует в списке разрешённых серверов.",

@@ -1278,6 +1278,7 @@ const ko: Dictionary = {
   "settings.whatsapp.test.webhookPath.wrong": "저장된 주소가 /api/whatsapp-webhook 으로 끝나지 않습니다: {detail}. 서버가 웹훅이 아닌 페이지로 전달합니다.",
   "settings.whatsapp.test.webhookPath.invalid": "저장된 주소가 올바른 URL이 아닙니다: {detail}",
   "settings.whatsapp.test.server.ok": "응답했습니다({detail}).",
+  "settings.whatsapp.test.server.answered": "응답했습니다. 어느 계열인지는 알 수 없습니다: 라이선스가 루트조차 거부합니다.",
   "settings.whatsapp.test.server.unreachable": "도달할 수 없음: DNS, 시간 초과 또는 연결 거부.",
   "settings.whatsapp.test.server.unknownFlavor": "무언가 응답했지만({detail}) Evolution 서버로 보이지 않습니다.",
   "settings.whatsapp.test.server.hostNotAllowed": "호스트가 허용된 서버 목록에 없습니다.",
