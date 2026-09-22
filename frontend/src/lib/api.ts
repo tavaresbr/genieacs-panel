@@ -1892,19 +1892,6 @@ export const vendorsAPI = {
   delete: (id: number) =>
     apiClient.delete(`/vendor-management/${id}`),
 
-  // WiFi security mappings per vendor
-  getWifiSecurityMappings: (vendorId: number) =>
-    apiClient.get(`/vendor-management/${vendorId}/wifi-security`),
-
-  createWifiSecurityMapping: (vendorId: number, mappingData: any) =>
-    apiClient.post(`/vendor-management/${vendorId}/wifi-security`, mappingData),
-
-  updateWifiSecurityMapping: (id: number, mappingData: any) =>
-    apiClient.put(`/vendor-management/wifi-security/${id}`, mappingData),
-
-  deleteWifiSecurityMapping: (id: number) =>
-    apiClient.delete(`/vendor-management/wifi-security/${id}`),
-
   // WiFi security configs (by product class)
   getAllWifiSecurityConfigs: () =>
     apiClient.get('/vendor-management/wifi-security-configs'),

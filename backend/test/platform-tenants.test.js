@@ -109,13 +109,7 @@ before(async () => {
   // install nobody has one: `vendors` is built by the operator through
   // `/api/vendor-management`, so with the table empty everywhere the copy would
   // have nothing to copy and would pass this suite by doing nothing at all.
-  const vendorId = await insertReturningId('vendors', { ...VENDOR, tenant_id: alfa });
-  await getDb()('wifi_security_mappings').insert({
-    tenant_id: alfa,
-    vendor_id: vendorId,
-    raw_security_value: '11i',
-    normalized_security: 'WPA2-PSK'
-  });
+  await insertReturningId('vendors', { ...VENDOR, tenant_id: alfa });
   await getDb()('wifi_security_config').insert({
     tenant_id: alfa,
     product_class: 'ONU-T1',
@@ -175,16 +169,10 @@ describe('creating a provider', () => {
     assert.equal(vendors[0].name, VENDOR.name);
     assert.equal(vendors[0].wifi_password_path, VENDOR.wifi_password_path);
 
-    const mappings = await getDb()('wifi_security_mappings').where({ tenant_id: novaId });
-    assert.equal(mappings.length, 1);
-    assert.equal(mappings[0].normalized_security, 'WPA2-PSK');
-    // The copy has to point at the NEW provider's vendor. Carrying the source's
-    // `vendor_id` across would attach this provider's mappings to another
-    // provider's vendors, which is the cross-provider foreign key wave 11 exists
-    // to prevent.
-    assert.equal(Number(mappings[0].vendor_id), Number(vendors[0].id));
+    // A cópia é do provedor NOVO, e não uma segunda leitura das linhas do
+    // antigo: ids diferentes para o mesmo fabricante.
     const source = await getDb()('vendors').where({ tenant_id: alfa }).first();
-    assert.notEqual(Number(mappings[0].vendor_id), Number(source.id));
+    assert.notEqual(Number(vendors[0].id), Number(source.id));
 
     const configs = await getDb()('wifi_security_config').where({ tenant_id: novaId });
     assert.equal(configs.length, 1);

@@ -192,17 +192,6 @@ export default {
   'wifiConfig.updateFailed': 'Failed to update the WiFi security config',
   'wifiConfig.deleted': 'WiFi security config deleted successfully',
   'wifiConfig.deleteFailed': 'Failed to delete the WiFi security config',
-  'wifiMapping.idRequired': 'The mapping ID is required',
-  'wifiMapping.fieldsRequired': 'The vendor_id, raw_security_value, and normalized_security are required',
-  'wifiMapping.notFound': 'WiFi security mapping not found',
-  'wifiMapping.listRetrieved': 'WiFi security mappings retrieved successfully',
-  'wifiMapping.listFailed': 'Failed to get the WiFi security mappings',
-  'wifiMapping.created': 'WiFi security mapping created successfully',
-  'wifiMapping.createFailed': 'Failed to create the WiFi security mapping',
-  'wifiMapping.updated': 'WiFi security mapping updated successfully',
-  'wifiMapping.updateFailed': 'Failed to update the WiFi security mapping',
-  'wifiMapping.deleted': 'WiFi security mapping deleted successfully',
-  'wifiMapping.deleteFailed': 'Failed to delete the WiFi security mapping',
 
   // Network topology
   'mapping.nodesRetrieved': 'Mapping nodes retrieved successfully',

@@ -192,17 +192,6 @@ export default {
   'wifiConfig.updateFailed': 'Impossible de mettre à jour la configuration de sécurité Wi-Fi',
   'wifiConfig.deleted': 'Configuration de sécurité Wi-Fi supprimée',
   'wifiConfig.deleteFailed': 'Impossible de supprimer la configuration de sécurité Wi-Fi',
-  'wifiMapping.idRequired': 'L’ID de la correspondance est requis',
-  'wifiMapping.fieldsRequired': 'Les champs vendor_id, raw_security_value et normalized_security sont requis',
-  'wifiMapping.notFound': 'Correspondance de sécurité Wi-Fi introuvable',
-  'wifiMapping.listRetrieved': 'Correspondances de sécurité Wi-Fi récupérées',
-  'wifiMapping.listFailed': 'Impossible d’obtenir les correspondances de sécurité Wi-Fi',
-  'wifiMapping.created': 'Correspondance de sécurité Wi-Fi créée',
-  'wifiMapping.createFailed': 'Impossible de créer la correspondance de sécurité Wi-Fi',
-  'wifiMapping.updated': 'Correspondance de sécurité Wi-Fi mise à jour',
-  'wifiMapping.updateFailed': 'Impossible de mettre à jour la correspondance de sécurité Wi-Fi',
-  'wifiMapping.deleted': 'Correspondance de sécurité Wi-Fi supprimée',
-  'wifiMapping.deleteFailed': 'Impossible de supprimer la correspondance de sécurité Wi-Fi',
 
   // Topologie du réseau
   'mapping.nodesRetrieved': 'Nœuds de la carte récupérés',

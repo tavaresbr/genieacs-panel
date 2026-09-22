@@ -189,17 +189,6 @@ export default {
   'wifiConfig.updateFailed': 'No se pudo actualizar la configuración de seguridad WiFi',
   'wifiConfig.deleted': 'Configuración de seguridad WiFi eliminada correctamente',
   'wifiConfig.deleteFailed': 'No se pudo eliminar la configuración de seguridad WiFi',
-  'wifiMapping.idRequired': 'El ID del mapeo es obligatorio',
-  'wifiMapping.fieldsRequired': 'Los campos vendor_id, raw_security_value y normalized_security son obligatorios',
-  'wifiMapping.notFound': 'Mapeo de seguridad WiFi no encontrado',
-  'wifiMapping.listRetrieved': 'Mapeos de seguridad WiFi obtenidos correctamente',
-  'wifiMapping.listFailed': 'No se pudieron obtener los mapeos de seguridad WiFi',
-  'wifiMapping.created': 'Mapeo de seguridad WiFi creado correctamente',
-  'wifiMapping.createFailed': 'No se pudo crear el mapeo de seguridad WiFi',
-  'wifiMapping.updated': 'Mapeo de seguridad WiFi actualizado correctamente',
-  'wifiMapping.updateFailed': 'No se pudo actualizar el mapeo de seguridad WiFi',
-  'wifiMapping.deleted': 'Mapeo de seguridad WiFi eliminado correctamente',
-  'wifiMapping.deleteFailed': 'No se pudo eliminar el mapeo de seguridad WiFi',
 
   // Topología de red
   'mapping.nodesRetrieved': 'Nodos del mapa obtenidos correctamente',

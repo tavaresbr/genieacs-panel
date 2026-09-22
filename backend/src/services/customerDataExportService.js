@@ -53,7 +53,6 @@ const SEM_DADO_DE_ASSINANTE = Object.freeze({
   settings: 'configuração do provedor',
   app_state: 'relógios dos jobs do provedor',
   vendors: 'catálogo de fabricantes',
-  wifi_security_mappings: 'catálogo de segurança WiFi',
   wifi_security_config: 'política de WiFi do provedor',
   map_settings: 'preferências do mapa',
   tenant_invites: 'convites da equipe do provedor',

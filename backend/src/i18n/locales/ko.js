@@ -193,17 +193,6 @@ export default {
   'wifiConfig.updateFailed': 'Wi-Fi 보안 설정을 업데이트하지 못했습니다',
   'wifiConfig.deleted': 'Wi-Fi 보안 설정을 삭제했습니다',
   'wifiConfig.deleteFailed': 'Wi-Fi 보안 설정을 삭제하지 못했습니다',
-  'wifiMapping.idRequired': '매핑 ID가 필요합니다',
-  'wifiMapping.fieldsRequired': 'vendor_id, raw_security_value, normalized_security가 필요합니다',
-  'wifiMapping.notFound': 'Wi-Fi 보안 매핑을 찾을 수 없습니다',
-  'wifiMapping.listRetrieved': 'Wi-Fi 보안 매핑 목록을 조회했습니다',
-  'wifiMapping.listFailed': 'Wi-Fi 보안 매핑 목록을 조회하지 못했습니다',
-  'wifiMapping.created': 'Wi-Fi 보안 매핑을 생성했습니다',
-  'wifiMapping.createFailed': 'Wi-Fi 보안 매핑을 생성하지 못했습니다',
-  'wifiMapping.updated': 'Wi-Fi 보안 매핑을 업데이트했습니다',
-  'wifiMapping.updateFailed': 'Wi-Fi 보안 매핑을 업데이트하지 못했습니다',
-  'wifiMapping.deleted': 'Wi-Fi 보안 매핑을 삭제했습니다',
-  'wifiMapping.deleteFailed': 'Wi-Fi 보안 매핑을 삭제하지 못했습니다',
 
   // 네트워크 토폴로지
   'mapping.nodesRetrieved': '매핑 노드를 조회했습니다',

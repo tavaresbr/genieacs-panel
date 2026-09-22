@@ -90,7 +90,6 @@ describe('o que entra no arquivo', () => {
     const ordem = TenantExportService.tabelas();
     assert.ok(ordem.indexOf('customer_accounts') < ordem.indexOf('customer_wifi_credentials'));
     assert.ok(ordem.indexOf('wa_conversations') < ordem.indexOf('wa_messages'));
-    assert.ok(ordem.indexOf('vendors') < ordem.indexOf('wifi_security_mappings'));
   });
 
   it('inclui as linhas deste provedor', async () => {

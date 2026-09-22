@@ -305,7 +305,7 @@ relação ao previsto ditas onde houve.
   `wa_templates` (`name`), `mapping_nodes`/`mapping_edges`, `map_settings` (que deixou de
   ser singleton `id=1`). `settings` e `app_state` tiveram a PK trocada para
   `(tenant_id, key)`.
-- **Catálogos** (`vendors`, `wifi_security_mappings`, `wifi_security_config`) foram pelo
+- **Catálogos** (`vendors`, `wifi_security_config`) foram pelo
   caminho previsto: `tenant_id NOT NULL` com cópia por provedor, e **não** pelo
   `tenant_id NULL` significando global. A invariante "toda linha de tabela de provedor tem
   `tenant_id`" sobreviveu inteira, e é ela que faz a guarda estática ser uma regra e não uma

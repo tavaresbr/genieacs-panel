@@ -162,10 +162,14 @@ const PROVISIONING_RUN_TENANT_INDEXES = [
 ];
 
 /**
- * Shared by the 0026 upgrade. In dependency order: `wifi_security_mappings`
- * points at `vendors`, so the parent is converted first.
+ * Shared by the 0026 upgrade.
+ *
+ * Eram três: `wifi_security_mappings` apontava para `vendors`, e a ordem aqui
+ * existia para converter o pai primeiro. A 0052 derrubou a tabela do meio — as
+ * duas que sobraram não têm chave estrangeira entre si, e a ordem virou só
+ * hábito.
  */
-const VENDOR_CATALOGUE_TABLES = ['vendors', 'wifi_security_mappings', 'wifi_security_config'];
+const VENDOR_CATALOGUE_TABLES = ['vendors', 'wifi_security_config'];
 
 // Table definitions. Each is a factory so the builder can reach `db.fn.now()`,
 // and each is referenced by exactly one place per table so the initial schema
@@ -236,21 +240,6 @@ const vendorsTable = (db) => (t) => {
   t.string('firewall_level_path', 255);
   t.integer('priority').notNullable().defaultTo(10);
   t.boolean('enabled').notNullable().defaultTo(true);
-  t.text('description');
-  t.timestamp('created_at').defaultTo(db.fn.now());
-  t.timestamp('updated_at').defaultTo(db.fn.now());
-};
-
-const wifiSecurityMappingsTable = (db) => (t) => {
-  t.increments('id').primary();
-  // `unsigned` is what makes this match vendors.id: increments() is
-  // `int unsigned` on MySQL, and MySQL refuses a foreign key between a signed
-  // and an unsigned column (errno 150 / ER_FK_INCOMPATIBLE_COLUMNS), which
-  // aborts the whole schema. The other foreign keys here already carry it.
-  t.integer('vendor_id').unsigned().notNullable()
-    .references('id').inTable('vendors').onDelete('CASCADE');
-  t.string('raw_security_value', 128).notNullable();
-  t.string('normalized_security', 128).notNullable();
   t.text('description');
   t.timestamp('created_at').defaultTo(db.fn.now());
   t.timestamp('updated_at').defaultTo(db.fn.now());
@@ -1033,9 +1022,8 @@ const WHATSAPP_TABLES = [
 
 /**
  * The tables of the initial schema, in creation order. Foreign keys dictate it:
- * `vendors` before `wifi_security_mappings`, `mapping_nodes` before
- * `mapping_edges`, and `customer_accounts` before `sgp_links` and
- * `customer_wifi_credentials`.
+ * `mapping_nodes` before `mapping_edges`, and `customer_accounts` before
+ * `sgp_links` and `customer_wifi_credentials`.
  */
 const deviceSamplesTable = (db) => (t) => {
   t.increments('id').primary();
@@ -1368,7 +1356,6 @@ const INITIAL_TABLES = [
   ['settings', keyValueTable],
   ['app_state', keyValueTable],
   ['vendors', vendorsTable],
-  ['wifi_security_mappings', wifiSecurityMappingsTable],
   ['wifi_security_config', wifiSecurityConfigTable],
   ['mapping_nodes', mappingNodesTable],
   ['mapping_edges', mappingEdgesTable],
@@ -2340,6 +2327,11 @@ export const migrations = [
      * at `vendors.id`: converting one alone leaves a foreign key that can reach
      * across providers.
      *
+     * (Passaram a ser DUAS: a 0052 derrubou `wifi_security_mappings`, que nunca
+     * teve leitor. O parágrafo acima fica porque descreve o que este passo fez
+     * no dia em que rodou — e porque a chave estrangeira que ele cita é a razão
+     * de a cópia de catálogo ter precisado remapear `vendor_id` até então.)
+     *
      * NO new unique is added here. The plan wants `(tenant_id, name)` on
      * vendors and `(tenant_id, product_class)` on the config, and both would be
      * NEW constraints rather than conversions of existing ones — a migration
@@ -2356,9 +2348,9 @@ export const migrations = [
     async isApplied(db) {
       if (!(await db.schema.hasTable('tenants'))) return false;
       for (const table of VENDOR_CATALOGUE_TABLES) {
-        // eslint-disable-next-line no-await-in-loop -- three schema probes
+        // eslint-disable-next-line no-await-in-loop -- duas sondas de schema
         if (!(await db.schema.hasTable(table))) return false;
-        // eslint-disable-next-line no-await-in-loop -- three schema probes
+        // eslint-disable-next-line no-await-in-loop -- duas sondas de schema
         if (!(await db.schema.hasColumn(table, 'tenant_id'))) return false;
       }
       return true;
@@ -2368,15 +2360,15 @@ export const migrations = [
       if (!tenant) return;
 
       for (const table of VENDOR_CATALOGUE_TABLES) {
-        // eslint-disable-next-line no-await-in-loop -- DDL, three tables
+        // eslint-disable-next-line no-await-in-loop -- DDL, duas tabelas
         if (!(await db.schema.hasTable(table))) continue;
-        // eslint-disable-next-line no-await-in-loop -- DDL, three tables
+        // eslint-disable-next-line no-await-in-loop -- DDL, duas tabelas
         if (await db.schema.hasColumn(table, 'tenant_id')) continue;
-        // eslint-disable-next-line no-await-in-loop -- DDL, three tables
+        // eslint-disable-next-line no-await-in-loop -- DDL, duas tabelas
         await db.schema.alterTable(table, (t) => t.integer('tenant_id').unsigned());
-        // eslint-disable-next-line no-await-in-loop -- DDL, three tables
+        // eslint-disable-next-line no-await-in-loop -- DDL, duas tabelas
         await db(table).whereNull('tenant_id').update({ tenant_id: tenant.id });
-        // eslint-disable-next-line no-await-in-loop -- DDL, three tables
+        // eslint-disable-next-line no-await-in-loop -- DDL, duas tabelas
         await db.schema.alterTable(table, (t) => {
           t.integer('tenant_id').unsigned().notNullable().defaultTo(tenant.id).alter();
           t.foreign('tenant_id').references('id').inTable('tenants');
@@ -3267,6 +3259,65 @@ export const migrations = [
           .where({ tenant_id: linha.tenant_id, key: linha.key })
           .update({ value: corrigido });
       }
+    }
+  },
+  {
+    /**
+     * Derruba `wifi_security_mappings`, que nunca foi ligada.
+     *
+     * POR QUE ISTO EXISTE
+     *
+     * A tabela guardaria, por fabricante, a tradução do valor cru de segurança
+     * de WiFi que a ONT relata (`11i`, `WPAand11i`) para um nome legível
+     * (`WPA2`). A função que a leria — `normalizeWiFiSecurity`, um SELECT por
+     * `vendor_id` e `raw_security_value` — existiu no serviço de fabricantes
+     * desde o commit mais antigo deste repositório e **nunca teve um chamador
+     * sequer**; foi apagada no refactor de banco de dois dialetos. Não é
+     * funcionalidade que parou de ser usada: é uma remoção feita pela metade, e
+     * a metade que sobrou foi a tabela.
+     *
+     * POR QUE NÃO TERMINAR EM VEZ DE APAGAR
+     *
+     * O encaixe existe: o painel LÊ `BeaconType` e mostra o valor cru na tela
+     * do aparelho. Mas ele também ESCREVE o valor cru de volta. Traduzir só a
+     * exibição faria o operador ver "WPA2", editar, e o painel gravar "WPA2"
+     * numa chave que espera "11i" — terminar exige o dicionário nos DOIS
+     * sentidos, que é um projeto. Cru na leitura e cru na escrita é coerente;
+     * ligada pela metade, a tabela quebraria essa coerência.
+     *
+     * O QUE ISTO LIBERA
+     *
+     * Ela era a única tabela do catálogo com chave estrangeira para `vendors`,
+     * e por isso a única razão de `copyCatalogue` remapear `vendor_id` ao dar
+     * catálogo a um provedor novo — o trecho mais delicado do seed. Sem ela, a
+     * cópia passa a ser opaca nas duas tabelas restantes.
+     *
+     * A CONTAGEM ANTES DO DROP
+     *
+     * Não é diagnóstico: é o registro de quanto se descartou. Como nunca houve
+     * tela que escrevesse na tabela, o esperado é zero — e foi zero no deploy
+     * que motivou esta migration. Um número diferente de zero numa instalação
+     * qualquer precisa aparecer em algum lugar, senão ninguém consegue
+     * investigar depois.
+     */
+    id: '0052_drop_wifi_security_mappings',
+    async isApplied(db) {
+      return !(await db.schema.hasTable('wifi_security_mappings'));
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('wifi_security_mappings'))) return;
+
+      const [linha] = await db('wifi_security_mappings').count({ n: '*' });
+      const total = Number(linha?.n || 0);
+      if (total > 0) {
+        console.warn(
+          `0052_drop_wifi_security_mappings: descartando ${total} linha(s) de uma tabela `
+          + 'que nenhum código lê. Ver o comentário desta migration.'
+        );
+      }
+
+      // Filha da chave estrangeira, então não há dependente a derrubar antes.
+      await db.schema.dropTable('wifi_security_mappings');
     }
   }
 ];

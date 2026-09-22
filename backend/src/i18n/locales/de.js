@@ -192,17 +192,6 @@ export default {
   'wifiConfig.updateFailed': 'Die WLAN-Sicherheitskonfiguration konnte nicht aktualisiert werden',
   'wifiConfig.deleted': 'WLAN-Sicherheitskonfiguration erfolgreich gelöscht',
   'wifiConfig.deleteFailed': 'Die WLAN-Sicherheitskonfiguration konnte nicht gelöscht werden',
-  'wifiMapping.idRequired': 'Die Zuordnungs-ID ist erforderlich',
-  'wifiMapping.fieldsRequired': 'Die Felder vendor_id, raw_security_value und normalized_security sind erforderlich',
-  'wifiMapping.notFound': 'WLAN-Sicherheitszuordnung nicht gefunden',
-  'wifiMapping.listRetrieved': 'WLAN-Sicherheitszuordnungen erfolgreich abgerufen',
-  'wifiMapping.listFailed': 'Die WLAN-Sicherheitszuordnungen konnten nicht abgerufen werden',
-  'wifiMapping.created': 'WLAN-Sicherheitszuordnung erfolgreich erstellt',
-  'wifiMapping.createFailed': 'Die WLAN-Sicherheitszuordnung konnte nicht erstellt werden',
-  'wifiMapping.updated': 'WLAN-Sicherheitszuordnung erfolgreich aktualisiert',
-  'wifiMapping.updateFailed': 'Die WLAN-Sicherheitszuordnung konnte nicht aktualisiert werden',
-  'wifiMapping.deleted': 'WLAN-Sicherheitszuordnung erfolgreich gelöscht',
-  'wifiMapping.deleteFailed': 'Die WLAN-Sicherheitszuordnung konnte nicht gelöscht werden',
 
   // Netzwerktopologie
   'mapping.nodesRetrieved': 'Mapping-Knoten erfolgreich abgerufen',

@@ -51,10 +51,14 @@ function serialize(vendorData) {
  * detection patterns and parameter paths one ISP corrects are that ISP's
  * decision and nobody else's. `update` and `delete` are the reason this model
  * could not stay deployment-wide any longer: both take an id off the URL and
- * nothing else, and `vendors` is the parent of `wifi_security_mappings` with
- * ON DELETE CASCADE — so one operator removing a vendor took another
- * provider's mappings with it. `tdb` supplies the provider half of that WHERE,
- * which turns both into no-ops on a row that belongs to someone else.
+ * nothing else, so unscoped they edit and remove another provider's rows.
+ * `tdb` supplies the provider half of that WHERE, which turns both into
+ * no-ops on a row that belongs to someone else.
+ *
+ * (O argumento original era mais forte ainda: `vendors` era pai de
+ * `wifi_security_mappings` com ON DELETE CASCADE, então apagar um fabricante
+ * levava junto os mapeamentos de OUTRO provedor. A 0052 derrubou aquela
+ * tabela; a razão de escopar este model não dependia dela.)
  */
 /**
  * Whether this provider already has a vendor by that name.
