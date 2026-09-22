@@ -26,7 +26,13 @@ const ALLOWED_SETTING_KEYS = new Set([
   'vpSuperAdmin',
   'vpSuperPassword',
   'vpUserAdmin',
-  'vpUserPassword'
+  'vpUserPassword',
+  // Por quantos dias a trilha de auditoria é guardada. Era uma constante no
+  // agendador: um ano para todo mundo, sem tela e sem como saber que existia.
+  // Um ISP em disputa precisa de mais, e um que resolveu guardar menos dado
+  // pessoal precisa de menos — política de guarda é decisão de quem responde
+  // pelos dados, não constante de código.
+  'auditRetentionDays'
 ]);
 
 // Validation runs without a request, so it reports translation keys and the
@@ -53,6 +59,16 @@ function validateSetting(key, value) {
   }
   if (key === 'appName' && (normalized.trim().length < 1 || normalized.length > 80)) {
     return { errorKey: 'settings.validation.appName' };
+  }
+  if (key === 'auditRetentionDays') {
+    // Os limites existem pelos dois lados, e por razões opostas: abaixo de 30
+    // dias a trilha deixa de responder à pergunta que a justifica ("quem mexeu
+    // nisso?", que chega meses depois), e acima de 10 anos ela vira o arquivo
+    // de dado pessoal que o prazo existe para evitar.
+    const dias = Number.parseInt(normalized, 10);
+    if (!Number.isInteger(dias) || String(dias) !== normalized.trim() || dias < 30 || dias > 3650) {
+      return { errorKey: 'settings.validation.auditRetentionDays' };
+    }
   }
   return { value: normalized };
 }

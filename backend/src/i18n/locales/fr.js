@@ -144,6 +144,7 @@ export default {
   'settings.validation.companyPrefix': 'L’ID de la société doit contenir de 2 à 4 lettres',
   'settings.validation.suffixMode': 'Le mode de suffixe de l’ID client doit être random ou installation_date',
   'settings.validation.appName': 'Le nom de l’application doit comporter entre 1 et 80 caractères',
+  "settings.validation.auditRetentionDays": "La durée de conservation de la piste d'audit doit être un nombre entier de jours entre 30 et 3650",
 
   // Paramètres de la carte
   'mapSettings.retrieved': 'Paramètres de la carte récupérés',

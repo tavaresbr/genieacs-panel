@@ -6,6 +6,7 @@ import SgpService from './sgpService.js';
 import { forEachTenant, forEveryTenant } from '../config/tenantJobs.js';
 import { currentTenantId } from '../config/tenantContext.js';
 import AuditLog from '../models/AuditLog.js';
+import Setting from '../models/Setting.js';
 import AuthTicket from '../models/AuthTicket.js';
 import ImpersonationTicket from '../models/ImpersonationTicket.js';
 import { refreshDeploymentSharing } from './genieacsEgress.js';
@@ -18,7 +19,27 @@ import {
 const STATE_KEY = 'scheduler_state';
 const BASE_INTERVAL_MS = 60_000;
 const PRUNE_INTERVAL_MS = 24 * 3600_000;
-const AUDIT_RETENTION_MS = 365 * 24 * 3600_000;
+/**
+ * O prazo da trilha, e por que ele deixou de ser uma constante.
+ *
+ * Um ano e não "para sempre" porque a trilha guarda dado pessoal — qual
+ * assinante, qual contrato, qual operador — e guardar sem prazo é o que a LGPD
+ * chama de excesso; e não menos porque a pergunta que uma trilha responde
+ * ("quem mexeu nisso?") costuma chegar meses depois do fato, não dias.
+ *
+ * Isso segue sendo o PADRÃO, e continua bom. O que era ruim é ser a única
+ * resposta: um ISP em disputa judicial precisa de mais, e um que resolveu
+ * guardar menos dado pessoal precisa de menos, e as duas mudanças exigiam
+ * editar este arquivo e subir deploy. Política de guarda não é constante de
+ * código — é decisão de quem responde pelos dados.
+ *
+ * Os limites existem pelos dois lados. Abaixo de 30 dias a trilha deixa de
+ * responder à pergunta que a justifica; acima de 10 anos ela vira o arquivo
+ * pessoal que o prazo existe para evitar.
+ */
+const AUDIT_RETENTION_DEFAULT_DAYS = 365;
+const AUDIT_RETENTION_MIN_DAYS = 30;
+const AUDIT_RETENTION_MAX_DAYS = 3650;
 
 /**
  * The panel's only background worker.
@@ -297,6 +318,38 @@ class SchedulerService {
    * Nenhum dos três fala com rede. Os três LANÇAM, e por isso cada um leva o
    * seu `.catch`: uma poda que falha não pode levar as outras duas junto.
    */
+  /**
+   * O prazo da trilha deste provedor, em dias.
+   *
+   * Lido a cada passada e não guardado em memória: a poda roda uma vez por dia,
+   * então uma consulta a mais não se mede — e um valor memorizado significaria
+   * que mudar o prazo na tela só vale depois do próximo restart, que é
+   * exatamente o tipo de surpresa que faz alguém achar que a tela não salvou.
+   *
+   * Valor inválido, ausente ou fora dos limites cai no padrão em vez de
+   * levantar: a poda não pode parar porque alguém digitou letra num campo — e
+   * uma poda parada é a tabela crescendo em silêncio, que é pior que o prazo
+   * errado.
+   */
+  static async auditRetentionDays() {
+    const bruto = String(await Setting.getByKey('auditRetentionDays').catch(() => null) ?? '').trim();
+    // Só dígitos, e o texto inteiro. `Number.parseInt` aceita `'12abc'` e
+    // devolve 12 — e 12 é um inteiro positivo, então passaria pelo teste de
+    // tipo e viraria 30 pelo mínimo. Um prazo de 30 dias que ninguém escolheu,
+    // nascido de um campo digitado errado, é pior que o padrão.
+    //
+    // A regra é a mesma do validador da rota, e a repetição aqui é deliberada:
+    // este leitor é a última linha, e alcança valor escrito direto no banco ou
+    // por uma versão anterior, que nunca passou por aquele validador.
+    if (!/^[0-9]+$/.test(bruto)) return AUDIT_RETENTION_DEFAULT_DAYS;
+    const n = Number.parseInt(bruto, 10);
+    // Zero não é intenção de guardar menos, é ausência de valor — e no resto
+    // deste sistema zero quer dizer "para sempre", que é exatamente o oposto
+    // do que um prazo preso em 30 dias faria.
+    if (n === 0) return AUDIT_RETENTION_DEFAULT_DAYS;
+    return Math.min(Math.max(n, AUDIT_RETENTION_MIN_DAYS), AUDIT_RETENTION_MAX_DAYS);
+  }
+
   static async retentionPass() {
     await forEveryTenant(async () => {
       // As duas tabelas crescem a cada ativação e a cada entrega, então uma
@@ -308,12 +361,11 @@ class SchedulerService {
       await SgpEventService.prune().catch((error) => {
         console.warn(`Could not prune SGP events: ${error.message}`);
       });
-      // A trilha de auditoria, um ano. Um ano e não "para sempre" porque a
-      // trilha guarda dado pessoal — qual assinante, qual contrato, qual
-      // operador — e guardar sem prazo é o que a LGPD chama de excesso; e não
-      // menos porque a pergunta que uma trilha responde ("quem mexeu nisso?")
-      // costuma chegar meses depois do fato, não dias.
-      await AuditLog.prune(new Date(Date.now() - AUDIT_RETENTION_MS)).catch((error) => {
+      // A trilha de auditoria, pelo prazo DESTE provedor. Ver
+      // `auditRetentionDays`: o padrão continua sendo um ano, e agora é padrão
+      // e não sentença.
+      const dias = await this.auditRetentionDays();
+      await AuditLog.prune(new Date(Date.now() - dias * 24 * 3600_000)).catch((error) => {
         console.warn(`Could not prune the audit log: ${error.message}`);
       });
     }, {

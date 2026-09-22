@@ -144,6 +144,7 @@ export default {
   'settings.validation.companyPrefix': 'The company ID must contain 2 to 4 letters',
   'settings.validation.suffixMode': 'The customer ID suffix mode must be random or installation_date',
   'settings.validation.appName': 'The application name must be between 1 and 80 characters',
+  "settings.validation.auditRetentionDays": "The audit trail retention must be a whole number of days between 30 and 3650",
 
   // Map settings
   'mapSettings.retrieved': 'Map settings retrieved successfully',

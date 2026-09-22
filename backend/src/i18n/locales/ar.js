@@ -142,6 +142,7 @@ export default {
   'settings.validation.companyPrefix': 'يجب أن يتكوّن رمز الشركة من حرفين إلى ٤ أحرف',
   'settings.validation.suffixMode': 'يجب أن يكون وضع لاحقة معرّف العميل random أو installation_date',
   'settings.validation.appName': 'يجب أن يتراوح اسم التطبيق بين حرف واحد و٨٠ حرفًا',
+  "settings.validation.auditRetentionDays": "يجب أن تكون مدة حفظ سجل التدقيق عددًا صحيحًا من الأيام بين 30 و3650",
 
   // إعدادات الخريطة
   'mapSettings.retrieved': 'تم جلب إعدادات الخريطة',

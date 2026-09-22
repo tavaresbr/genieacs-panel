@@ -142,6 +142,7 @@ export default {
   'settings.validation.companyPrefix': 'L’ID dell’azienda deve contenere da 2 a 4 lettere',
   'settings.validation.suffixMode': 'La modalità di suffisso dell’ID cliente deve essere random o installation_date',
   'settings.validation.appName': 'Il nome dell’applicazione deve avere da 1 a 80 caratteri',
+  "settings.validation.auditRetentionDays": "Il periodo di conservazione del registro di controllo deve essere un numero intero di giorni tra 30 e 3650",
 
   // Impostazioni della mappa
   'mapSettings.retrieved': 'Impostazioni della mappa ottenute correttamente',
