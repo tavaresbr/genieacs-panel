@@ -57,6 +57,8 @@ const hi: Dictionary = {
   'sidebar.nav.dashboardDescription': 'नेटवर्क की स्थिति',
   'sidebar.nav.devices': 'उपकरण सूची',
   'sidebar.nav.devicesDescription': 'ONT और CPE',
+  'sidebar.nav.contacts': 'संपर्क',
+  'sidebar.nav.contactsDescription': 'SGP ग्राहक',
   'sidebar.nav.networkMap': 'नेटवर्क टोपोलॉजी',
   'sidebar.nav.networkMapDescription': 'भौतिक नोड',
   'sidebar.nav.settings': 'कॉन्फ़िगरेशन',

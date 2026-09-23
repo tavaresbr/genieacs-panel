@@ -23,6 +23,7 @@ const NetworkMapPage = lazy(() => import('@/pages/network-map'))
 const SettingsPage = lazy(() => import('@/pages/settings'))
 const AuditPage = lazy(() => import('@/pages/audit'))
 const WhatsAppPage = lazy(() => import('@/pages/whatsapp'))
+const ContactsPage = lazy(() => import('@/pages/contacts'))
 const PlatformPage = lazy(() => import('@/pages/platform'))
 const LoginPage = lazy(() => import('@/pages/login'))
 const SetupPage = lazy(() => import('@/pages/setup'))
@@ -321,6 +322,7 @@ function ProviderRoutes() {
                   </Route>
                   <Route element={<PermissionRoute permission="whatsapp.read" />}>
                     <Route path="/whatsapp" element={<WhatsAppPage />} />
+                    <Route path="/contacts" element={<ContactsPage />} />
                   </Route>
                   <Route path="*" element={<Navigate to="/dashboard" replace />} />
                 </Route>

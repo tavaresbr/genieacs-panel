@@ -57,6 +57,8 @@ const ko: Dictionary = {
   'sidebar.nav.dashboardDescription': '장비 전반 상태',
   'sidebar.nav.devices': '장비 목록',
   'sidebar.nav.devicesDescription': 'ONT 및 CPE',
+  'sidebar.nav.contacts': '연락처',
+  'sidebar.nav.contactsDescription': 'SGP 가입자',
   'sidebar.nav.networkMap': '네트워크 토폴로지',
   'sidebar.nav.networkMapDescription': '물리 노드',
   'sidebar.nav.settings': '설정',

@@ -57,6 +57,8 @@ const de: Dictionary = {
   'sidebar.nav.dashboardDescription': 'Zustand des Bestands',
   'sidebar.nav.devices': 'Geräteinventar',
   'sidebar.nav.devicesDescription': 'ONT und CPE',
+  'sidebar.nav.contacts': 'Kontakte',
+  'sidebar.nav.contactsDescription': 'SGP-Abonnenten',
   'sidebar.nav.networkMap': 'Netztopologie',
   'sidebar.nav.networkMapDescription': 'Physische Knoten',
   'sidebar.nav.settings': 'Konfiguration',

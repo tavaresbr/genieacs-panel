@@ -57,6 +57,8 @@ const ru: Dictionary = {
   'sidebar.nav.dashboardDescription': 'Состояние сети',
   'sidebar.nav.devices': 'Реестр устройств',
   'sidebar.nav.devicesDescription': 'ONT и CPE',
+  'sidebar.nav.contacts': 'Контакты',
+  'sidebar.nav.contactsDescription': 'Абоненты SGP',
   'sidebar.nav.networkMap': 'Топология сети',
   'sidebar.nav.networkMapDescription': 'Физические узлы',
   'sidebar.nav.settings': 'Настройка',

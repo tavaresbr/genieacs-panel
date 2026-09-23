@@ -57,6 +57,8 @@ const es: Dictionary = {
   'sidebar.nav.dashboardDescription': 'Salud de la red',
   'sidebar.nav.devices': 'Inventario de equipos',
   'sidebar.nav.devicesDescription': 'ONT y CPE',
+  'sidebar.nav.contacts': 'Contactos',
+  'sidebar.nav.contactsDescription': 'Suscriptores del SGP',
   'sidebar.nav.networkMap': 'Topología de red',
   'sidebar.nav.networkMapDescription': 'Nodos físicos',
   'sidebar.nav.settings': 'Configuración',

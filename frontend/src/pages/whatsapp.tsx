@@ -23,6 +23,7 @@ import { AlertsPanel } from '@/components/whatsapp/alerts-panel'
 import { ContactsPanel } from '@/components/whatsapp/contacts-panel'
 import { HealthStrip } from '@/components/whatsapp/health-strip'
 import { useAuth } from '@/contexts/auth-context'
+import { useLocation } from 'react-router'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Polling
@@ -897,7 +898,12 @@ export default function WhatsAppPage() {
   const [tab, setTab] = useState<TabId>('inbox')
   // The thread Contacts handed over, and a counter that remounts the inbox for
   // each hand-over so it opens that thread even when it was already on screen.
-  const [handOver, setHandOver] = useState<{ conversation: WhatsAppConversation; seq: number } | null>(null)
+  // The Contacts page (its own menu entry) hands one over through the route.
+  const location = useLocation()
+  const routed = (location.state as { conversation?: WhatsAppConversation } | null)?.conversation ?? null
+  const [handOver, setHandOver] = useState<{ conversation: WhatsAppConversation; seq: number } | null>(
+    routed ? { conversation: routed, seq: 1 } : null
+  )
   const visibleTabs = TABS.filter(([, , permission]) => can(permission))
 
   return (

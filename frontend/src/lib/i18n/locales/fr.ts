@@ -57,6 +57,8 @@ const fr: Dictionary = {
   'sidebar.nav.dashboardDescription': 'Santé du parc',
   'sidebar.nav.devices': 'Inventaire des équipements',
   'sidebar.nav.devicesDescription': 'ONT et CPE',
+  'sidebar.nav.contacts': 'Contacts',
+  'sidebar.nav.contactsDescription': 'Abonnés du SGP',
   'sidebar.nav.networkMap': 'Topologie du réseau',
   'sidebar.nav.networkMapDescription': 'Nœuds physiques',
   'sidebar.nav.settings': 'Configuration',

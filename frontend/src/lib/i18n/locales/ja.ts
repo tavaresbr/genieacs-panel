@@ -57,6 +57,8 @@ const ja: Dictionary = {
   'sidebar.nav.dashboardDescription': '設備全体の状態',
   'sidebar.nav.devices': '機器一覧',
   'sidebar.nav.devicesDescription': 'ONT と CPE',
+  'sidebar.nav.contacts': '連絡先',
+  'sidebar.nav.contactsDescription': 'SGP の加入者',
   'sidebar.nav.networkMap': 'ネットワーク構成',
   'sidebar.nav.networkMapDescription': '物理ノード',
   'sidebar.nav.settings': '設定',

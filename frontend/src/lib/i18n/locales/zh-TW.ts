@@ -57,6 +57,8 @@ const zhTW: Dictionary = {
   'sidebar.nav.dashboardDescription': '設備整體狀況',
   'sidebar.nav.devices': '設備清單',
   'sidebar.nav.devicesDescription': 'ONT 與 CPE',
+  'sidebar.nav.contacts': '聯絡人',
+  'sidebar.nav.contactsDescription': 'SGP 用戶',
   'sidebar.nav.networkMap': '網路拓撲',
   'sidebar.nav.networkMapDescription': '實體節點',
   'sidebar.nav.settings': '設定',

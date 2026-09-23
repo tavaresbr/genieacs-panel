@@ -57,6 +57,8 @@ const ptBR: Dictionary = {
   'sidebar.nav.dashboardDescription': 'Saúde da rede',
   'sidebar.nav.devices': 'Inventário de equipamentos',
   'sidebar.nav.devicesDescription': 'ONT e CPE',
+  'sidebar.nav.contacts': 'Contatos',
+  'sidebar.nav.contactsDescription': 'Assinantes do SGP',
   'sidebar.nav.networkMap': 'Topologia da rede',
   'sidebar.nav.networkMapDescription': 'Pontos físicos',
   'sidebar.nav.settings': 'Configuração',
