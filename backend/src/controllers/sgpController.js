@@ -119,7 +119,11 @@ class SgpController {
 
   static async getContactsSync(req, res) {
     try {
-      return res.json(createResponse(req.t('sgp.contactsSyncLoaded'), await SgpContactSyncService.getLastRun()));
+      const status = await SgpContactSyncService.getStatus();
+      const lastError = status.lastError
+        ? { at: status.lastError.at, code: status.lastError.code, message: translateError(req.t, status.lastError) }
+        : null;
+      return res.json(createResponse(req.t('sgp.contactsSyncLoaded'), { ...status, lastError }));
     } catch (error) {
       return handleError(req, res, error, 'sgp.contactsSyncFailed');
     }
@@ -127,8 +131,8 @@ class SgpController {
 
   static async syncContacts(req, res) {
     try {
-      const result = await SgpContactSyncService.syncAll();
-      return res.json(createResponse(req.t('sgp.contactsSynced', { count: result.total }), result));
+      await SgpContactSyncService.start();
+      return res.status(202).json(createResponse(req.t('sgp.contactsSyncStarted'), { running: true }));
     } catch (error) {
       return handleError(req, res, error, 'sgp.contactsSyncFailed');
     }

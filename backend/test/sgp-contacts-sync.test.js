@@ -27,6 +27,10 @@ const LIST_PATH = '/api/ura/clientes/';
 const BROKEN_PATH = '/api/ura/clientes-sem-pagina/';
 /** Answers an empty list when asked without a filter. */
 const EMPTY_PATH = '/api/ura/clientes-vazio/';
+/** Ignores `limit` and answers with the whole base at once. */
+const ALL_PATH = '/api/ura/clientes-tudo/';
+/** Takes longer than the listing deadline to answer. */
+const SLOW_PATH = '/api/ura/clientes-lento/';
 /** Refuses outright without a filter, the way an URA call does. */
 const FILTER_PATH = '/api/ura/clientes-com-filtro/';
 const INSTANCE = 'painel-sync-contatos';
@@ -65,7 +69,21 @@ let sgpServer;
 let lastListPayload = null;
 
 const auth = () => ({ headers: authHeaders(token) });
-const sincronizar = () => call(`${panelUrl}/api/sgp/contacts/sync`, { method: 'POST', ...auth() });
+const situacao = () => call(`${panelUrl}/api/sgp/contacts/sync`, auth());
+/**
+ * O botão: o POST só dispara (202) e a tela pergunta até terminar. Devolve o
+ * último resultado no formato de uma resposta, para os testes lerem como antes.
+ */
+async function sincronizar() {
+  const start = await call(`${panelUrl}/api/sgp/contacts/sync`, { method: 'POST', ...auth() });
+  if (start.status !== 202) return start;
+  for (let i = 0; i < 400; i += 1) {
+    const res = await situacao();
+    if (!res.body.data.running) return { status: 200, body: { data: res.body.data.lastRun, lastError: res.body.data.lastError } };
+    await new Promise((resolve) => { setTimeout(resolve, 25); });
+  }
+  throw new Error('a sincronização não terminou');
+}
 // Direto no serviço: a rota tem o limitador da sincronização de frota, que é o
 // certo em produção e acaba com o orçamento de um arquivo de testes.
 const sincronizarDireto = () => asTenant(() => SgpContactSyncService.syncAll());
@@ -92,6 +110,11 @@ function startSgpStub() {
         const offset = Number(payload.offset) || 0;
         const limit = Number(payload.limit) || 10;
         return send({ status: 1, clientes: clientes.slice(offset, offset + limit) });
+      }
+      if (req.url.startsWith(ALL_PATH)) return send({ status: 1, clientes });
+      if (req.url.startsWith(SLOW_PATH)) {
+        setTimeout(() => send({ status: 1, clientes: [] }), 400);
+        return undefined;
       }
       if (req.url.startsWith(EMPTY_PATH)) return send({ status: 1, clientes: [] });
       if (req.url.startsWith(FILTER_PATH)) return send({ status: 0, msg: 'Informe ao menos um filtro' });
@@ -261,9 +284,11 @@ describe('a sincronização completa', () => {
   });
 
   it('diz quando foi a última', async () => {
-    const res = await call(`${panelUrl}/api/sgp/contacts/sync`, auth());
+    const res = await situacao();
     assert.equal(res.status, 200);
-    assert.equal(res.body.data.total, 24);
+    assert.equal(res.body.data.running, false);
+    assert.equal(res.body.data.lastRun.total, 24);
+    assert.equal(res.body.data.lastError, null);
   });
 });
 
@@ -367,6 +392,38 @@ describe('um SGP que não lista sem filtro', () => {
     assert.equal(res.body.code, 'sgp_rejected');
     assert.match(res.body.message, /Informe ao menos um filtro/);
     await assert.rejects(sincronizarDireto(), (error) => error.code === 'sgp_rejected');
+  });
+
+  it('pelo botão, a recusa fica guardada para a tela mostrar', async () => {
+    await configurar({ endpoints: { customerList: FILTER_PATH } });
+    const res = await sincronizar();
+    assert.equal(res.body.lastError.code, 'sgp_rejected');
+    assert.match(res.body.lastError.message, /Informe ao menos um filtro/);
+  });
+});
+
+describe('um SGP que manda a base inteira de uma vez', () => {
+  it('grava todos numa chamada só e não chama de parcial', async () => {
+    await configurar({ endpoints: { customerList: ALL_PATH } });
+    const res = await sincronizarDireto();
+    assert.equal(res.pages, 1);
+    assert.equal(res.partial, false);
+    assert.equal(res.note, 'all_at_once');
+    assert.equal(res.total, 24);
+  });
+
+  it('uma listagem lenta estoura o prazo dela, com a frase dela', async () => {
+    await configurar({ endpoints: { customerList: SLOW_PATH } });
+    const prazoReal = SgpService.LIST_TIMEOUT_MS;
+    SgpService.LIST_TIMEOUT_MS = 100;
+    try {
+      const res = await testar();
+      assert.equal(res.status, 504);
+      assert.equal(res.body.code, 'timeout');
+      assert.match(res.body.message, /listagem de clientes|client listing/i);
+    } finally {
+      SgpService.LIST_TIMEOUT_MS = prazoReal;
+    }
   });
 });
 

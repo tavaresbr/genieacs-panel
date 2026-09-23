@@ -5,12 +5,15 @@ import {
   sgpAPI,
   type SgpConfig,
   type SgpContactsSyncResult,
+  type SgpContactsSyncStatus,
   type SgpContactsTestResult
 } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import { useAuth } from '@/contexts/auth-context'
+
+const SYNC_POLL_MS = 3000
 
 /** Where the section sits, so the WhatsApp tab and the contacts screen can link to it. */
 export const SGP_CONTACTS_ANCHOR = 'sgp-contacts-sync'
@@ -30,7 +33,7 @@ export function SgpContactsShortcut({ onOpen }: { onOpen: () => void }) {
   useEffect(() => {
     let alive = true
     void sgpAPI.getContactsSync().then((res) => {
-      if (alive && res.success) setLastRun(res.data ?? null)
+      if (alive && res.success) setLastRun(res.data?.lastRun ?? null)
     })
     return () => { alive = false }
   }, [])
@@ -88,6 +91,7 @@ export function SgpContactsSyncPanel({ config, onConfigChange }: Props) {
   const [syncing, setSyncing] = useState(false)
   const [test, setTest] = useState<SgpContactsTestResult | null>(null)
   const [lastRun, setLastRun] = useState<SgpContactsSyncResult | null>(null)
+  const [lastError, setLastError] = useState<SgpContactsSyncStatus['lastError']>(null)
 
   const canConfigure = can('sgp.config')
   const canSync = can('sgp.act')
@@ -109,12 +113,36 @@ export function SgpContactsSyncPanel({ config, onConfigChange }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [configKey])
 
-  const loadLastRun = useCallback(async () => {
+  const loadStatus = useCallback(async () => {
     const res = await sgpAPI.getContactsSync()
-    if (res.success) setLastRun(res.data ?? null)
+    if (!res.success || !res.data) return null
+    setLastRun(res.data.lastRun)
+    setLastError(res.data.lastError)
+    return res.data
   }, [])
 
-  useEffect(() => { void loadLastRun() }, [loadLastRun])
+  // A sync already running when the screen opens (the timer's, or one started
+  // before a reload) is followed like one started here.
+  useEffect(() => {
+    void loadStatus().then((status) => { if (status?.running) setSyncing(true) })
+  }, [loadStatus])
+
+  // The sync runs in the background: while it does, the screen asks how it
+  // went every few seconds instead of holding one request open past the proxy.
+  useEffect(() => {
+    if (!syncing) return undefined
+    const timer = window.setInterval(() => {
+      void loadStatus().then((status) => {
+        if (!status || status.running) return
+        setSyncing(false)
+        const failed = status.lastError
+          && (!status.lastRun || status.lastError.at > status.lastRun.finishedAt)
+        if (failed) toast.error(status.lastError?.message || t('settings.sgp.contacts.syncFailed'))
+        else toast.success(t('settings.sgp.contacts.syncDone'))
+      })
+    }, SYNC_POLL_MS)
+    return () => window.clearInterval(timer)
+  }, [syncing, loadStatus, toast, t])
 
   const save = async () => {
     setSaving(true)
@@ -156,16 +184,10 @@ export function SgpContactsSyncPanel({ config, onConfigChange }: Props) {
 
   const runSync = async () => {
     setSyncing(true)
-    try {
-      const res = await sgpAPI.syncContacts()
-      if (!res.success || !res.data) {
-        toast.error(res.message || t('settings.sgp.contacts.syncFailed'))
-        return
-      }
-      setLastRun(res.data)
-      toast.success(res.message || t('settings.sgp.contacts.syncDone'))
-    } finally {
+    const res = await sgpAPI.syncContacts()
+    if (!res.success) {
       setSyncing(false)
+      toast.error(res.message || t('settings.sgp.contacts.syncFailed'))
     }
   }
 
@@ -368,6 +390,9 @@ export function SgpContactsSyncPanel({ config, onConfigChange }: Props) {
               seconds: (lastRun.durationMs / 1000).toFixed(1)
             })}
           </p>
+          {lastRun.note === 'all_at_once' && (
+            <p className="mt-2 text-xs text-muted-foreground">{t('settings.sgp.contacts.allAtOnce')}</p>
+          )}
           {lastRun.partial && (
             <p className="mt-2 flex items-start gap-2 text-xs text-[hsl(var(--status-warning))]">
               <Icon name="warning" size={14} />
@@ -381,6 +406,15 @@ export function SgpContactsSyncPanel({ config, onConfigChange }: Props) {
         </>
       ) : (
         <p className="mt-4 text-sm text-muted-foreground">{t('settings.sgp.syncNever')}</p>
+      )}
+      {syncing && (
+        <p className="mt-2 text-xs text-muted-foreground" role="status">{t('settings.sgp.contacts.running')}</p>
+      )}
+      {!syncing && lastError && (!lastRun || lastError.at > lastRun.finishedAt) && (
+        <p className="mt-2 flex items-start gap-2 text-xs text-destructive" role="alert" data-testid="sgp-contacts-last-error">
+          <Icon name="warning" size={14} />
+          {t('settings.sgp.contacts.lastError', { time: formatDateTime(lastError.at), message: lastError.message })}
+        </p>
       )}
     </div>
   )

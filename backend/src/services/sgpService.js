@@ -22,6 +22,14 @@ const REQUEST_TIMEOUT_MS = 15_000;
  * legitimate answer here is a contract's invoice list, which is kilobytes.
  */
 const MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
+/**
+ * The client listing is the one call that is not about a single client. An
+ * SGP that ignores `offset`/`limit` builds its whole base into one answer,
+ * which takes far longer than an URA lookup and weighs far more. 90 s keeps
+ * the settings screen's test button under the proxy's 120 s.
+ */
+const LIST_TIMEOUT_MS = 90_000;
+const LIST_MAX_BYTES = 64 * 1024 * 1024;
 // A cached contract keeps plan, status and holder name frozen, so it is only
 // trusted for a day before the next read refreshes it from the SGP.
 const LINK_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -598,7 +606,7 @@ const DEFAULT_CONFIG = Object.freeze({
  * Used by every SGP call, not just the probe: the portal's billing lookups and
  * the reconcile job go through `SgpService.request` too.
  */
-async function sgpFetch(url, { headers, body, signal }) {
+async function sgpFetch(url, { headers, body, signal, maxBytes = MAX_RESPONSE_BYTES }) {
   let parsed;
   try {
     parsed = url instanceof URL ? url : new URL(String(url));
@@ -648,7 +656,7 @@ async function sgpFetch(url, { headers, body, signal }) {
     headers,
     body,
     signal,
-    maxBytes: MAX_RESPONSE_BYTES
+    maxBytes
   });
 }
 
@@ -665,6 +673,7 @@ class SgpService {
    * aplica, e um teste consegue provar o prazo sem esperar quinze segundos.
    */
   static REQUEST_TIMEOUT_MS = REQUEST_TIMEOUT_MS;
+  static LIST_TIMEOUT_MS = LIST_TIMEOUT_MS;
 
   /**
    * Forget the provider in scope — its own configuration changed.
@@ -973,7 +982,11 @@ class SgpService {
     return secret;
   }
 
-  static async request(endpointKey, payload = {}, configOverride = null) {
+  /**
+   * @param {object} [limits] - `listing: true` for the client listing: its own
+   *   deadline and body ceiling, and errors that say it was the listing.
+   */
+  static async request(endpointKey, payload = {}, configOverride = null, { listing = false } = {}) {
     const config = this.requireReady(configOverride || await this.getConfig());
 
     const endpoint = config.endpoints[endpointKey] || DEFAULT_ENDPOINTS[endpointKey];
@@ -981,13 +994,15 @@ class SgpService {
     const body = { app: config.app, token: config.token, ...payload };
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), this.REQUEST_TIMEOUT_MS);
+    const timeoutMs = listing ? this.LIST_TIMEOUT_MS : this.REQUEST_TIMEOUT_MS;
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     let response;
     try {
       response = await sgpFetch(url, {
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify(body),
-        signal: controller.signal
+        signal: controller.signal,
+        maxBytes: listing ? LIST_MAX_BYTES : MAX_RESPONSE_BYTES
       });
     } catch (error) {
       // A refusal `sgpFetch` raised is already the right answer, and it is
@@ -996,13 +1011,14 @@ class SgpService {
       // reflects — the exact shape this guard exists to close.
       if (error instanceof SgpError) throw error;
       if (error.name === 'AbortError' || controller.signal.aborted) {
-        throw new SgpError('sgp.error.timeout', {
+        throw new SgpError(listing ? 'sgp.error.contactsListTimeout' : 'sgp.error.timeout', {
+          vars: listing ? { seconds: Math.round(timeoutMs / 1000) } : undefined,
           code: 'timeout',
           status: 504
         });
       }
       if (error.code === RESPONSE_TOO_LARGE) {
-        throw new SgpError('sgp.error.invalidResponse', {
+        throw new SgpError(listing ? 'sgp.error.contactsListTooLarge' : 'sgp.error.invalidResponse', {
           code: 'invalid_response',
           status: 502
         });
@@ -1327,7 +1343,7 @@ class SgpService {
     const data = await this.request('customerList', {
       [config.contactsOffsetParam]: position,
       [config.contactsLimitParam]: size
-    }, config);
+    }, config, { listing: true });
     const entries = firstArray(data, ['clientes', 'contratos', 'dados', 'data', 'results', 'items']);
     return {
       rows: entries.flatMap((entry) => normalizeCustomer(entry)),
@@ -1349,7 +1365,7 @@ class SgpService {
     const config = this.requireReady(await this.getConfig());
     if (!config.endpoints.customerList) return [];
     try {
-      const data = await this.request('customerList', { cpfcnpj: digits }, config);
+      const data = await this.request('customerList', { cpfcnpj: digits }, config, { listing: true });
       return firstArray(data, ['clientes', 'contratos', 'dados', 'data', 'results', 'items'])
         .flatMap((entry) => normalizeCustomer(entry))
         // Only the client asked for: an install that ignores the filter and
