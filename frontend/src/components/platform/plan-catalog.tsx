@@ -5,6 +5,7 @@ import { platformAPI, type Plan } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
+import { parseAmountToCents } from '@/lib/utils'
 
 interface Props {
   plans: Plan[]
@@ -47,12 +48,6 @@ function limite(texto: string): number | null {
   if (!cru) return null
   const numero = Number(cru)
   return Number.isFinite(numero) && numero >= 0 ? Math.floor(numero) : null
-}
-
-/** `'89,90'` e `'89.90'` viram 8990. O banco guarda centavos, nunca fração. */
-function centavos(texto: string): number {
-  const numero = Number(texto.trim().replace(',', '.'))
-  return Number.isFinite(numero) && numero >= 0 ? Math.round(numero * 100) : 0
 }
 
 function paraRascunho(plan: Plan): Rascunho {
@@ -134,13 +129,23 @@ export function PlanCatalog({ plans, onChange }: Props) {
       toast.error(t('platform.plans.codeInvalid'))
       return
     }
+    // O preço passa pela MESMA leitura que o pagamento já usa, e recusa o que
+    // ela recusa. Aqui havia uma cópia antiga dela, com o `replace` que troca
+    // só a primeira vírgula: "1.234,56" virava NaN e o `: 0` do fim fazia do
+    // NaN um plano de GRAÇA, sem erro nenhum na tela; "1.234" virava R$ 1,23.
+    // E o campo vazio também valia zero. Plano gratuito agora se digita: "0".
+    const precoCentavos = parseAmountToCents(rascunho.price)
+    if (precoCentavos === null) {
+      toast.error(t('platform.plans.priceInvalid'))
+      return
+    }
 
     const comum = {
       name: nome,
       maxOperators: limite(rascunho.maxOperators),
       maxSubscribers: limite(rascunho.maxSubscribers),
       maxDevices: limite(rascunho.maxDevices),
-      priceCents: centavos(rascunho.price),
+      priceCents: precoCentavos,
       currency: rascunho.currency.trim().toUpperCase() || 'BRL',
       trialDays: Math.max(0, Math.floor(Number(rascunho.trialDays) || 0)),
       // Piso 1 e não 0: período zero é uma assinatura que vence no instante em

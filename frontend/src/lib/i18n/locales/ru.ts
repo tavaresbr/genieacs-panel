@@ -1974,6 +1974,7 @@ const ru: Dictionary = {
   'platform.plans.unlimited': 'без лимита',
   'platform.plans.limitHint': 'Пустое поле — без лимита. Ноль — это лимит в ноль, он блокирует всё.',
   'platform.plans.price': 'Цена',
+  'platform.plans.priceInvalid': 'Укажите цену с запятой перед копейками — 1.234,00 или 89,90. Для бесплатного тарифа введите 0.',
   'platform.plans.currency': 'Валюта',
   'platform.plans.trialDays': 'Дней пробного периода',
   'platform.plans.active': 'Активен',

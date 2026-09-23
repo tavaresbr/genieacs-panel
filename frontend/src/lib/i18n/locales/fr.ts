@@ -1966,6 +1966,7 @@ const fr: Dictionary = {
   'platform.plans.unlimited': 'sans limite',
   'platform.plans.limitHint': 'Un champ vide veut dire aucune limite. Zéro est une limite de zéro, qui bloque tout.',
   'platform.plans.price': 'Prix',
+  'platform.plans.priceInvalid': 'Saisissez le prix avec une virgule avant les centimes — 1.234,00 ou 89,90. Pour un forfait gratuit, tapez 0.',
   'platform.plans.currency': 'Devise',
   'platform.plans.trialDays': 'Jours d’essai',
   'platform.plans.active': 'Actif',

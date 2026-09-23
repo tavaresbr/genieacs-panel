@@ -16,6 +16,7 @@ import { CustomerLgpd } from '@/components/customer-lgpd'
 import { useWifiStatusFilter, WifiStatusFilterControl } from '@/components/wifi-status-filter'
 import { filterWifiByStatus } from '@/lib/wifi-filter'
 import { useTranslation } from '@/contexts/language-context'
+import { RX_BAND_STYLE, rxBand } from '@/lib/rx-signal'
 
 interface WanBindingData {
   lan: string[];
@@ -1053,43 +1054,11 @@ export default function DeviceDetailPage() {
     }
   }
 
+  // A faixa sai de `lib/rx-signal` — ver `pages/devices.tsx`, que tinha a
+  // mesma cópia.
   const getSignalStrengthInfo = (rxPowerStr: string | number | null | undefined) => {
-    const rxpower = parseFloat(String(rxPowerStr));
-
-    if (isNaN(rxpower)) {
-      return {
-        color: 'text-gray-500 dark:text-gray-400',
-        label: t('common.na'),
-        badgeClass: 'modern-badge'
-      };
-    }
-
-    if (rxpower >= -21.99) {
-      return {
-        color: 'text-green-600 dark:text-green-400',
-        label: t('devices.signal.excellent'),
-        badgeClass: 'modern-badge-success'
-      };
-    }
-    if (rxpower >= -24.99) {
-      return {
-        color: 'text-blue-600 dark:text-blue-400',
-        label: t('devices.signal.good'),
-        badgeClass: 'modern-badge-info'
-      };
-    }
-    if (rxpower >= -26.99) {
-      return {
-        color: 'text-yellow-600 dark:text-yellow-400',
-        label: t('devices.signal.poor'),
-        badgeClass: 'modern-badge-warning'
-      };
-    }
-    return {
-      color: 'text-red-600 dark:text-red-400',
-      label: t('devices.signal.danger'),
-      badgeClass: 'modern-badge-error'
-    };
+    const estilo = RX_BAND_STYLE[rxBand(rxPowerStr)]
+    return { color: estilo.color, label: t(estilo.labelKey), badgeClass: estilo.badgeClass }
   }
 
   const getStatusBadge = (status: string | undefined) => {

@@ -111,21 +111,6 @@ export function getStatusColor(status: string): string {
   }
 }
 
-export function getSignalStrengthColor(rxpower: number | null | undefined): string {
-  if (rxpower === null || rxpower === undefined) {
-    return 'text-gray-500'
-  }
-
-  if (rxpower >= -25) {
-    return 'text-green-600'
-  } else if (rxpower >= -50) {
-    return 'text-yellow-600'
-  } else if (rxpower >= -75) {
-    return 'text-orange-600'
-  } else {
-    return 'text-red-600'
-  }
-}
 
 export function debounce<T extends (...args: any[]) => any>(
   func: T,

@@ -6,7 +6,6 @@ import {
   formatDate,
   formatNumber,
   formatRelativeTime,
-  getSignalStrengthColor,
   getStatusColor
 } from '@/lib/utils'
 import en from '@/lib/i18n/locales/en'
@@ -37,32 +36,6 @@ describe('abbreviating a count', () => {
    */
   it('does not abbreviate a negative', () => {
     expect(formatNumber(-1500)).toBe('-1500')
-  })
-})
-
-describe('the colour of an optical reading', () => {
-  /**
-   * These thresholds are what an operator reads at a glance to decide whether
-   * to send someone to a pole. The boundaries are inclusive on the good side,
-   * which is the part worth pinning: -25 is still green, -25.1 is not.
-   */
-  it('follows the thresholds, boundary included', () => {
-    expect(getSignalStrengthColor(-10)).toContain('green')
-    expect(getSignalStrengthColor(-25)).toContain('green')
-    expect(getSignalStrengthColor(-25.1)).toContain('yellow')
-    expect(getSignalStrengthColor(-50)).toContain('yellow')
-    expect(getSignalStrengthColor(-50.1)).toContain('orange')
-    expect(getSignalStrengthColor(-75)).toContain('orange')
-    expect(getSignalStrengthColor(-75.1)).toContain('red')
-  })
-
-  /**
-   * No reading is not a bad reading. Painting an absent value red would send a
-   * technician after an ONT that never reported its power at all.
-   */
-  it('paints an absent reading grey, not red', () => {
-    expect(getSignalStrengthColor(null)).toBe('text-gray-500')
-    expect(getSignalStrengthColor(undefined)).toBe('text-gray-500')
   })
 })
 

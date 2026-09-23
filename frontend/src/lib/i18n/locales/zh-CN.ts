@@ -1966,6 +1966,7 @@ const zhCN: Dictionary = {
   'platform.plans.unlimited': '不限',
   'platform.plans.limitHint': '留空表示不限。填 0 表示上限为零，会阻止一切。',
   'platform.plans.price': '价格',
+  'platform.plans.priceInvalid': '请在分位前用逗号输入价格 — 1.234,00 或 89,90。免费套餐请输入 0。',
   'platform.plans.currency': '货币',
   'platform.plans.trialDays': '试用天数',
   'platform.plans.active': '已启用',
