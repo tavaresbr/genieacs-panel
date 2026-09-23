@@ -16,35 +16,84 @@ export function formatNumber(num: number): string {
   return num.toString()
 }
 
+/** Os degraus, em segundos, e o último degrau que cada um cobre. */
+const MINUTO = 60
+const HORA = 60 * MINUTO
+const DIA = 24 * HORA
+const SEMANA = 7 * DIA
 
-export function formatRelativeTime(dateString: string): string {
+/**
+ * Meses INTEIROS entre duas datas, contados como uma pessoa conta.
+ *
+ * Pelo calendário e não por média de dias: 30,44 dias por mês diria "há 12
+ * meses" para 360 dias, e quem olha a data sabe que não faz um ano. A conta é a
+ * diferença de meses menos um quando o dia do mês ainda não chegou — que é o
+ * mesmo "ainda não fez" de um aniversário.
+ *
+ * 31/01 → 28/02 dá ZERO meses, e é o certo: ainda não fez um mês, e a faixa de
+ * semanas responde melhor (4 semanas).
+ */
+function mesesInteiros(de: Date, ate: Date): number {
+  const meses = (ate.getFullYear() - de.getFullYear()) * 12 + (ate.getMonth() - de.getMonth())
+  return ate.getDate() < de.getDate() ? meses - 1 : meses
+}
+
+/**
+ * A faixa em que a idade cai — o degrau, e não o texto.
+ *
+ * Devolve `null` quando a data não é data: `formatRelativeTime` cai então no
+ * mesmo `formatDate` de antes, que tem a frase de data inválida.
+ */
+function faixaDeIdade(dateString: string, now: Date): { valor: number; unidade: 'second' | 'minute' | 'hour' | 'day' | 'week' | 'month' | 'year' } | null {
   const date = new Date(dateString)
-  const now = new Date()
-  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
+  if (Number.isNaN(date.getTime())) return null
 
-  if (diffInSeconds < 60) {
-    return translate(getActiveLocale(), 'common.justNow')
-  }
+  const segundos = Math.floor((now.getTime() - date.getTime()) / 1000)
+
+  // O primeiro degrau é o que segura o relógio fora de hora, e não um corte à
+  // parte: um instante no FUTURO dá segundos negativos, cai aqui, e a tela diz
+  // "agora mesmo" em vez de "daqui a três dias". Um `Math.max(0, …)` acima
+  // seria a mesma regra escrita duas vezes — e quem a lesse aqui não saberia
+  // qual das duas decide.
+  if (segundos < MINUTO) return { valor: segundos, unidade: 'second' }
+  if (segundos < HORA) return { valor: Math.floor(segundos / MINUTO), unidade: 'minute' }
+  if (segundos < DIA) return { valor: Math.floor(segundos / HORA), unidade: 'hour' }
+  if (segundos < SEMANA) return { valor: Math.floor(segundos / DIA), unidade: 'day' }
+
+  const meses = mesesInteiros(date, now)
+  if (meses < 1) return { valor: Math.floor(segundos / SEMANA), unidade: 'week' }
+  if (meses < 12) return { valor: meses, unidade: 'month' }
+  // Piso e não arredondamento: 23 meses vira "1 ano". Exagerar a idade de um
+  // provedor suspenso empurra para apagar os dados dele mais cedo, e entre os
+  // dois erros esse é o que não tem volta.
+  return { valor: Math.floor(meses / 12), unidade: 'year' }
+}
+
+/**
+ * Há quanto tempo, na unidade em que a pergunta é feita.
+ *
+ * Quem lê "parado desde 12/01/2026" faz a conta de cabeça; quem lê "parado há
+ * oito meses" já tem a resposta. A função parava na sétima semana e caía para a
+ * DATA — ela respondia QUANDO a uma pergunta que é HÁ QUANTO TEMPO.
+ *
+ * `Intl.RelativeTimeFormat` devolve a frase inteira e já flexionada em cada
+ * idioma: "há 3 dias", "vor 3 Tagen", "قبل ٣ أيام". É por isso que a frase em
+ * volta NÃO pode trazer preposição própria — e é aí que estava o outro defeito
+ * desta onda: `'Nada chegou desde {when}'` renderizava **"Nada chegou desde há
+ * 3 dias"**, e isso está na tela desde que a tira de saúde existe. Quem usa
+ * esta função escreve a frase em volta sem "desde", "since" ou "seit".
+ *
+ * `now` é parâmetro com padrão, no molde do `exportFileName` logo abaixo: sem
+ * ele o relógio fica dentro da função e não há como testar faixa nenhuma.
+ */
+export function formatRelativeTime(dateString: string, now: Date = new Date()): string {
+  const faixa = faixaDeIdade(dateString, now)
+  if (!faixa) return formatDate(dateString)
+  if (faixa.unidade === 'second') return translate(getActiveLocale(), 'common.justNow')
 
   // Intl handles the plural rules of every supported locale.
   const relative = new Intl.RelativeTimeFormat(getIntlLocale(), { numeric: 'always' })
-
-  const diffInMinutes = Math.floor(diffInSeconds / 60)
-  if (diffInMinutes < 60) {
-    return relative.format(-diffInMinutes, 'minute')
-  }
-
-  const diffInHours = Math.floor(diffInMinutes / 60)
-  if (diffInHours < 24) {
-    return relative.format(-diffInHours, 'hour')
-  }
-
-  const diffInDays = Math.floor(diffInHours / 24)
-  if (diffInDays < 7) {
-    return relative.format(-diffInDays, 'day')
-  }
-
-  return formatDate(dateString)
+  return relative.format(-faixa.valor, faixa.unidade)
 }
 
 export function getStatusColor(status: string): string {
