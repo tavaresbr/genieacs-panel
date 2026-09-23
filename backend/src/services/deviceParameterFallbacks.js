@@ -54,7 +54,9 @@ export const PPPOE_FALLBACK_PATHS = Object.freeze([
  * has costs nothing but its own length in the query string.
  */
 export const RX_POWER_FALLBACK_PATHS = Object.freeze([
-  // Nokia / Alcatel-Lucent (ALCL) G-series
+  // Nokia / Alcatel-Lucent (ALCL) G-series. The G-0425G / G-1425G keep their
+  // optics in an object of their own at the root, not under WANDevice.
+  'InternetGatewayDevice.X_ALU_OntOpticalParam.RXPower',
   'InternetGatewayDevice.WANDevice.1.X_ALU-COM_GponInterfaceConfig.RXPower',
   // Huawei HG/EG series
   'InternetGatewayDevice.WANDevice.1.X_HW_GponInterfaceConfig.RXPower',
@@ -85,8 +87,28 @@ export const RX_POWER_FALLBACK_PATHS = Object.freeze([
 export const TEMPERATURE_FALLBACK_PATHS = Object.freeze([
   'InternetGatewayDevice.DeviceInfo.TemperatureStatus.TemperatureSensor.1.Value',
   'InternetGatewayDevice.DeviceInfo.TemperatureStatus.TemperatureSensor.2.Value',
-  'Device.DeviceInfo.TemperatureStatus.TemperatureSensor.1.Value'
+  'Device.DeviceInfo.TemperatureStatus.TemperatureSensor.1.Value',
+  // Nokia G-series: the transceiver's own reading, beside its RX power. The
+  // TemperatureStatus above reads -274 ("no reading") on the G-0425G.
+  'InternetGatewayDevice.X_ALU_OntOpticalParam.Temperature'
 ]);
+
+/**
+ * Vendor optics objects that sit at the root of the TR-098 tree, outside
+ * `WANDevice`. Named so the detail page and the fleet probe can project them
+ * whole — GenieACS only returns what a projection names, and a scan can only
+ * find what came back.
+ */
+export const VENDOR_OPTICAL_OBJECTS = Object.freeze([
+  'InternetGatewayDevice.X_ALU_OntOpticalParam'
+]);
+
+/**
+ * A root-level vendor object that holds optics: `X_<vendor>_…Optic…`, or one
+ * named for the PON itself (`X_<vendor>_GponInfo`). Anchored after the vendor
+ * prefix so `…ResponseTime` is not read as a PON.
+ */
+const VENDOR_OPTICAL_ROOT = /^X_[A-Za-z0-9-]+_(?:.*optic|[gex]?pon)/i;
 
 /**
  * A GPON ONT that is lit reads somewhere between roughly -30 dBm (the receiver
@@ -181,6 +203,26 @@ function collectRxCandidates(node, prefix, depth, budget, found) {
 }
 
 /**
+ * Where an ONT keeps its optics: each `WANDevice`, each TR-181 optical
+ * interface, and the vendor objects at the root of the TR-098 tree — where
+ * Nokia's G-series puts `X_ALU_OntOpticalParam`, and where a scan of the WAN
+ * tree alone read N/D on every one of them.
+ */
+function opticalScopes(item) {
+  const scopes = [];
+  for (const [key, node] of indexedChildren(item?.InternetGatewayDevice?.WANDevice)) {
+    scopes.push({ node, prefix: `InternetGatewayDevice.WANDevice.${key}` });
+  }
+  for (const [key, node] of namedChildren(item?.InternetGatewayDevice)) {
+    if (VENDOR_OPTICAL_ROOT.test(key)) scopes.push({ node, prefix: `InternetGatewayDevice.${key}` });
+  }
+  for (const [key, node] of indexedChildren(item?.Device?.Optical?.Interface)) {
+    scopes.push({ node, prefix: `Device.Optical.Interface.${key}` });
+  }
+  return scopes;
+}
+
+/**
  * Finds an optical RX reading by what the parameter is called rather than by
  * where a particular vendor put it.
  *
@@ -195,17 +237,8 @@ export function findRxPowerReading(item, readValue) {
   const candidates = [];
   const budget = { left: SCAN_NODE_BUDGET };
 
-  for (const [wanKey, wanDevice] of indexedChildren(item?.InternetGatewayDevice?.WANDevice)) {
-    collectRxCandidates(
-      wanDevice,
-      `InternetGatewayDevice.WANDevice.${wanKey}`,
-      1,
-      budget,
-      candidates
-    );
-  }
-  for (const [key, iface] of indexedChildren(item?.Device?.Optical?.Interface)) {
-    collectRxCandidates(iface, `Device.Optical.Interface.${key}`, 1, budget, candidates);
+  for (const { node, prefix } of opticalScopes(item)) {
+    collectRxCandidates(node, prefix, 1, budget, candidates);
   }
 
   for (const candidate of candidates) {
@@ -267,24 +300,28 @@ function collectNamed(node, prefix, depth, budget, found, names) {
 export function findTemperatureReading(item, readValue) {
   const candidates = [];
   const budget = { left: SCAN_NODE_BUDGET };
-  for (const [wanKey, wanDevice] of indexedChildren(item?.InternetGatewayDevice?.WANDevice)) {
-    collectNamed(
-      wanDevice,
-      `InternetGatewayDevice.WANDevice.${wanKey}`,
-      1,
-      budget,
-      candidates,
-      TEMPERATURE_NAMES
-    );
-  }
-  for (const [key, iface] of indexedChildren(item?.Device?.Optical?.Interface)) {
-    collectNamed(iface, `Device.Optical.Interface.${key}`, 1, budget, candidates, TEMPERATURE_NAMES);
+  for (const { node, prefix } of opticalScopes(item)) {
+    collectNamed(node, prefix, 1, budget, candidates, TEMPERATURE_NAMES);
   }
   for (const candidate of candidates) {
     const value = normalizeTemperatureReading(readValue(candidate.node));
     if (value !== null) return { value, path: candidate.path };
   }
   return null;
+}
+
+/**
+ * Every leaf the scans would read an RX power or a temperature from, with
+ * whatever GenieACS holds there. A leaf with no `_value` is one GenieACS knows
+ * the name of and never read — the list of names to ask the ONT for.
+ */
+export function opticalReadingLeaves(item) {
+  const found = [];
+  for (const { node, prefix } of opticalScopes(item)) {
+    collectRxCandidates(node, prefix, 1, { left: SCAN_NODE_BUDGET }, found);
+    collectNamed(node, prefix, 1, { left: SCAN_NODE_BUDGET }, found, TEMPERATURE_NAMES);
+  }
+  return found;
 }
 
 /**
@@ -445,5 +482,7 @@ export default {
   listDocumentParameters,
   normalizeRxPowerReading,
   normalizeTemperatureReading,
-  pppoeLoginLeaves
+  opticalReadingLeaves,
+  pppoeLoginLeaves,
+  VENDOR_OPTICAL_OBJECTS
 };

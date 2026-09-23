@@ -14,7 +14,9 @@ import {
   listDocumentParameters,
   normalizeRxPowerReading,
   normalizeTemperatureReading,
-  pppoeLoginLeaves
+  opticalReadingLeaves,
+  pppoeLoginLeaves,
+  VENDOR_OPTICAL_OBJECTS
 } from './deviceParameterFallbacks.js';
 import Vendor from '../models/Vendor.js';
 import WifiSecurityConfig from '../models/WifiSecurityConfig.js';
@@ -731,7 +733,7 @@ class DeviceService {
     try {
       const rows = await this.fetchDeviceListPage(
         null,
-        ['_id', 'InternetGatewayDevice.WANDevice', 'Device.Optical'],
+        ['_id', 'InternetGatewayDevice.WANDevice', 'Device.Optical', ...VENDOR_OPTICAL_OBJECTS],
         { limit: this.RX_POWER_PROBE_SAMPLE }
       );
       for (const row of rows) {
@@ -1113,6 +1115,7 @@ class DeviceService {
       'Device.Hosts.Host',
       'InternetGatewayDevice.WANDevice.1.WANEthernetInterfaceConfig.MACAddress',
       'InternetGatewayDevice.WANDevice',
+      ...VENDOR_OPTICAL_OBJECTS,
       ...TEMPERATURE_FALLBACK_PATHS,
       // `InternetGatewayDevice.WANDevice` above already carries the TR-098
       // fallbacks; these are the TR-181 ones, which sit outside it.
@@ -1148,7 +1151,26 @@ class DeviceService {
     // optical path, which is the fallback for a probe that sampled five
     // devices that happened to have nothing to report.
     await this.noteRxPowerPath(detail.virtualParameters?.rxpower);
+    await this.requestUnreadOptics(deviceId, data[0], detail.virtualParameters);
     return detail;
+  }
+
+  /**
+   * Queues a read of the optical leaves GenieACS knows by name and never read,
+   * when the page came out without a signal or a temperature.
+   *
+   * The same gap the PPPoE login had on the ZTE fleet: a Nokia G-series lists
+   * `X_ALU_OntOpticalParam` on its first inform, and nothing ever asks for the
+   * values under it, so the page reads N/D until someone does.
+   */
+  static async requestUnreadOptics(deviceId, item, virtualParameters) {
+    const missing = [virtualParameters?.rxpower, virtualParameters?.temperature]
+      .some((reading) => reading?.value === null || reading?.value === undefined);
+    if (!missing) return;
+    const unread = opticalReadingLeaves(item)
+      .filter((leaf) => !this.holdsValue(leaf.node))
+      .map((leaf) => leaf.path);
+    if (unread.length > 0) await this.requestParameterRead(deviceId, 'optics', unread);
   }
 
   /**
@@ -1655,40 +1677,44 @@ class DeviceService {
     return Boolean(node && typeof node === 'object' && '_value' in node);
   }
 
-  /** How often one ONT is asked for its login, at most. */
+  /** How often one ONT is asked for the same kind of reading, at most. */
   static PPPOE_READ_INTERVAL_MS = 60 * 60 * 1000;
 
   /** Beyond this many leaves one task is a sweep, not a read. */
   static PPPOE_READ_LIMIT = 8;
 
-  /** `${tenant}\0${device}` → when its login was last asked for. */
-  static pppoeReadRequests = new Map();
+  /** `${tenant}\0${device}\0${kind}` → when that reading was last asked for. */
+  static parameterReadRequests = new Map();
 
   static pppoeReadKey(deviceId) {
     return `${currentTenantId()}\0${deviceId}`;
   }
 
+  static async requestPppoeLogin(deviceId, paths) {
+    return this.requestParameterRead(deviceId, 'pppoe', paths);
+  }
+
   /**
-   * Queues a read of the named login leaves for the ONT's next Inform.
+   * Queues a read of the named leaves for the ONT's next Inform.
    *
    * Explicit leaves, because that is what a ZTE F-series answers reliably: it
    * is the `refreshObject` of a whole WAN subtree it faults on, which is how a
    * summon can leave the login unread. No connection request — this runs on
    * the way to a page, and the next periodic Inform is soon enough. Asked at
-   * most once an hour per ONT, so a page opened ten times queues one task.
-   * Never throws: a GenieACS that refuses leaves the ONT where it was.
+   * most once an hour per ONT and kind, so a page opened ten times queues one
+   * task. Never throws: a GenieACS that refuses leaves the ONT where it was.
    */
-  static async requestPppoeLogin(deviceId, paths) {
-    const key = this.pppoeReadKey(deviceId);
+  static async requestParameterRead(deviceId, kind, paths) {
+    const key = `${this.pppoeReadKey(deviceId)}\0${kind}`;
     const now = Date.now();
-    const last = this.pppoeReadRequests.get(key);
+    const last = this.parameterReadRequests.get(key);
     if (last && now - last < this.PPPOE_READ_INTERVAL_MS) return false;
-    if (this.pppoeReadRequests.size > 10000) {
-      for (const [entry, at] of this.pppoeReadRequests) {
-        if (now - at >= this.PPPOE_READ_INTERVAL_MS) this.pppoeReadRequests.delete(entry);
+    if (this.parameterReadRequests.size > 10000) {
+      for (const [entry, at] of this.parameterReadRequests) {
+        if (now - at >= this.PPPOE_READ_INTERVAL_MS) this.parameterReadRequests.delete(entry);
       }
     }
-    this.pppoeReadRequests.set(key, now);
+    this.parameterReadRequests.set(key, now);
     try {
       await this.fetchFromGenieAcs(`${encodeURIComponent(deviceId)}/tasks`, {}, 'POST', {
         name: 'getParameterValues',
@@ -1696,7 +1722,7 @@ class DeviceService {
       });
       return true;
     } catch (error) {
-      console.warn(`Unable to queue the PPPoE login read of ${deviceId}: ${error.message}`);
+      console.warn(`Unable to queue the ${kind} read of ${deviceId}: ${error.message}`);
       return false;
     }
   }
@@ -2036,20 +2062,42 @@ class DeviceService {
    * obvious connection to a bell someone pressed.
    *
    * A read that fails falls back to TR-098 alone rather than to asking for
-   * everything: guessing wide is what this exists to avoid.
+   * everything: guessing wide is what this exists to avoid. The same read
+   * says which vendor objects this ONT's make has — see `vendorSummonObjects`.
    */
-  static async detectSummonRoots(deviceId) {
+  static async readSummonShape(deviceId) {
     try {
       const rows = await this.fetchDeviceListPage(
         JSON.stringify({ _id: deviceId }),
-        ['_id', 'InternetGatewayDevice.DeviceInfo', 'Device.DeviceInfo']
+        ['_id', '_deviceId', 'InternetGatewayDevice.DeviceInfo', 'Device.DeviceInfo', ...VENDOR_OPTICAL_OBJECTS]
       );
       const roots = Object.keys(this.SUMMON_REFRESH_OBJECTS).filter((root) => rows[0]?.[root]);
-      if (roots.length > 0) return roots;
+      if (roots.length > 0) {
+        // Nokia's object is a TR-098 one; a TR-181 Nokia has no place for it.
+        const vendorObjects = roots.includes('InternetGatewayDevice')
+          ? this.vendorSummonObjects(rows[0])
+          : [];
+        return { roots, vendorObjects };
+      }
     } catch (error) {
       console.warn(`Unable to read the data model of ${deviceId}: ${error.message}`);
     }
-    return ['InternetGatewayDevice'];
+    return { roots: ['InternetGatewayDevice'], vendorObjects: [] };
+  }
+
+  /**
+   * Nokia's optics object, for a Nokia whose document holds none of its
+   * readings yet. Asked by make, never by guess: the object is Nokia's own,
+   * and posting its refresh to any other ONT is a task it was always going
+   * to refuse — a fault in the way of everything queued after it.
+   */
+  static vendorSummonObjects(row) {
+    const make = `${row?._deviceId?._Manufacturer ?? ''} ${row?._deviceId?._OUI ?? ''}`;
+    if (!/nokia|alcl|alcatel/i.test(make)) return [];
+    const [objectName] = VENDOR_OPTICAL_OBJECTS;
+    const known = opticalReadingLeaves(row)
+      .some((leaf) => leaf.path.startsWith(`${objectName}.`));
+    return known ? [] : [objectName];
   }
 
   /**
@@ -2061,8 +2109,11 @@ class DeviceService {
    * the inform they actually asked for.
    */
   static async refreshSummonObjects(deviceId) {
-    const roots = await this.detectSummonRoots(deviceId);
-    const objects = roots.flatMap((root) => this.SUMMON_REFRESH_OBJECTS[root] ?? []);
+    const { roots, vendorObjects } = await this.readSummonShape(deviceId);
+    const objects = [
+      ...roots.flatMap((root) => this.SUMMON_REFRESH_OBJECTS[root] ?? []),
+      ...vendorObjects
+    ];
 
     const refreshed = [];
     for (const objectName of objects) {
@@ -2081,32 +2132,45 @@ class DeviceService {
   }
 
   /**
-   * Asks the ONT for every PPPoE login leaf its document names, by name.
+   * Asks the ONT, by name, for every PPPoE login and optical leaf its
+   * document names.
    *
    * The `refreshObject` above is supposed to bring these too, but a ZTE
    * F-series faults on it and the login stays unread — so the SGP link, which
-   * matches on that login, never forms. A separate task, so a leaf the ONT no
-   * longer has costs this read and not the summon the operator asked for.
+   * matches on that login, never forms — and a Nokia keeps its optics outside
+   * the objects refreshed. A separate task, so a leaf the ONT no longer has
+   * costs this read and not the summon the operator asked for.
    */
-  static async readSummonPppoeLogins(deviceId) {
+  static async readSummonLeaves(deviceId) {
     try {
       const [full] = await this.fetchDeviceListPage(
         JSON.stringify({ _id: deviceId }),
-        ['_id', 'InternetGatewayDevice.WANDevice', 'Device.PPP.Interface']
+        [
+          '_id',
+          'InternetGatewayDevice.WANDevice',
+          'Device.PPP.Interface',
+          'Device.Optical.Interface',
+          ...VENDOR_OPTICAL_OBJECTS
+        ]
       );
-      const paths = full ? pppoeLoginLeaves(full).map((leaf) => leaf.path) : [];
+      const paths = full
+        ? [...pppoeLoginLeaves(full), ...opticalReadingLeaves(full)].map((leaf) => leaf.path)
+        : [];
       if (paths.length === 0) return;
       const result = await this.postTask(deviceId, {
         name: 'getParameterValues',
-        parameterNames: paths.slice(0, this.PPPOE_READ_LIMIT)
+        parameterNames: [...new Set(paths)].slice(0, this.SUMMON_READ_LIMIT)
       });
       if (result?.fault?.faultString) {
-        console.warn(`${deviceId} refused to report its PPPoE login: ${result.fault.faultString}`);
+        console.warn(`${deviceId} refused to report its login and optics: ${result.fault.faultString}`);
       }
     } catch (error) {
-      console.warn(`Unable to read the PPPoE login of ${deviceId}: ${error.message}`);
+      console.warn(`Unable to read the login and optics of ${deviceId}: ${error.message}`);
     }
   }
+
+  /** Login and optics together: a few connections plus a few readings. */
+  static SUMMON_READ_LIMIT = 12;
 
   /**
    * Keeps every listing looking for the optical path for a while.
@@ -2146,7 +2210,7 @@ class DeviceService {
       throw new Error(data.fault.faultString);
     }
 
-    await this.readSummonPppoeLogins(deviceId);
+    await this.readSummonLeaves(deviceId);
     if (refreshed.length > 0) await this.expectFreshRxPower();
 
     return { ...(data && typeof data === 'object' ? data : {}), refreshed };
