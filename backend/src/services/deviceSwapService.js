@@ -1,5 +1,6 @@
 import DeviceSwap from '../models/DeviceSwap.js';
 import SgpLink from '../models/SgpLink.js';
+import DeviceTagService from './deviceTagService.js';
 import { timestampMs } from '../utils/helpers.js';
 
 /**
@@ -55,6 +56,11 @@ class DeviceSwapService {
     if (!flapping) {
       const moved = await SgpLink.moveDevice(previous, next);
       linkAction = moved.action;
+      // The contract tag follows the link off the old ONT and onto the new.
+      if (moved.action !== 'none') {
+        await DeviceTagService.safeReconcile(previous);
+        await DeviceTagService.safeReconcile(next);
+      }
     }
 
     const { swap } = await DeviceSwap.record({

@@ -7,6 +7,7 @@ import SgpLink from '../models/SgpLink.js';
 import CustomerService from './customerService.js';
 import CustomerWifiCredentialService from './customerWifiCredentialService.js';
 import DeviceService from './deviceService.js';
+import DeviceTagService from './deviceTagService.js';
 import SgpService from './sgpService.js';
 import Setting from '../models/Setting.js';
 import { TranslatableError } from '../i18n/index.js';
@@ -906,7 +907,9 @@ class ProvisioningService {
       }));
     } catch (error) {
       console.warn(`Could not link ${plan.deviceId} to its SGP contract: ${error.message}`);
+      return;
     }
+    await DeviceTagService.safeReconcile(plan.deviceId);
   }
 
   // ----------------------------------------------------------------- poller

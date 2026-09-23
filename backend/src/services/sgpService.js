@@ -3,6 +3,7 @@ import AppState from '../models/AppState.js';
 import CustomerAccount from '../models/CustomerAccount.js';
 import SgpLink from '../models/SgpLink.js';
 import DeviceService from './deviceService.js';
+import DeviceTagService from './deviceTagService.js';
 import { createSecretBox } from '../utils/secretBox.js';
 import { PinnedTransport, RESPONSE_TOO_LARGE } from '../utils/net/pinnedFetch.js';
 import { IS_SAAS } from '../config/edition.js';
@@ -1224,6 +1225,9 @@ class SgpService {
       accountId: account?.id ?? null,
       linkMode: usable?.link_mode === 'manual' ? 'manual' : 'auto'
     }));
+    // Only when the contract changed: a refresh that confirms the same one
+    // has nothing new to tell GenieACS.
+    if (link?.contract !== usable?.contract) await DeviceTagService.safeReconcile(deviceId);
     return { link, account, contract, source: 'sgp' };
   }
 
@@ -1239,15 +1243,19 @@ class SgpService {
       throw new SgpError('sgp.error.contractNotFound', { code: 'not_found', status: 404 });
     }
     const account = await CustomerAccount.getByDeviceId(deviceId);
-    return SgpLink.upsert(this.contractToLinkRow(selected, {
+    const link = await SgpLink.upsert(this.contractToLinkRow(selected, {
       deviceId,
       accountId: account?.id ?? null,
       linkMode: 'manual'
     }));
+    await DeviceTagService.safeReconcile(deviceId);
+    return link;
   }
 
   static async unlinkDevice(deviceId) {
-    return SgpLink.deleteByDeviceId(deviceId);
+    const removed = await SgpLink.deleteByDeviceId(deviceId);
+    await DeviceTagService.safeReconcile(deviceId);
+    return removed;
   }
 
   // Rows written before the `state` column existed carry no value at all, so the
@@ -1420,6 +1428,9 @@ class SgpService {
       startedAt: startedAt.toISOString(),
       finishedAt: finishedAt.toISOString()
     };
+    // After the links are settled, so the tags describe where this run left
+    // them — and this is what tags a fleet linked before tagging existed.
+    await DeviceTagService.safeReconcileFleet();
     await AppState.upsert(SYNC_STATE_KEY, JSON.stringify(result));
     return result;
   }
