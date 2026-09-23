@@ -502,6 +502,13 @@ export default {
   'whatsapp.phoneSaveFailed': 'Non è stato possibile salvare il telefono',
   'whatsapp.error.invalidPhone': 'Non sembra un telefono utilizzabile',
   'whatsapp.error.subscriberNotFound': 'Nessun abbonato con quel contratto',
+  'whatsapp.contactsLoaded': '{count} contatto/i',
+  'whatsapp.contactsLoadFailed': 'Impossibile caricare i contatti',
+  'whatsapp.conversationOpened': 'Conversazione aperta',
+  'whatsapp.conversationOpenFailed': 'Impossibile aprire la conversazione',
+  'whatsapp.subscriberLinked': 'Conversazione collegata all’abbonato',
+  'whatsapp.subscriberLinkFailed': 'Impossibile collegare la conversazione',
+  'whatsapp.error.subscriberNoPhone': 'Questo abbonato non ha un numero di telefono registrato',
   // WhatsApp — inbox e bot de autoatendimento (onda 3)
   'whatsapp.error.conversationNotFound': 'Conversazione non trovata',
   'whatsapp.conversationClosed': 'Conversazione chiusa',

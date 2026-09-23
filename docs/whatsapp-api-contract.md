@@ -809,6 +809,65 @@ abriria cem queries para desenhar uma tela.
 `phone_manual` que o operador digitou ganha do `phone_e164` que o SGP
 sincronizou, porque digitar foi a correção.
 
+O número é comparado **com e sem o nono dígito** (`variantesTelefoneBr`): o
+WhatsApp ainda entrega muito celular antigo como `55 + DDD + 8`, e o SGP guarda o
+mesmo aparelho com o 9. Número fixo (8 dígitos começando de 2 a 5) nunca ganha
+variante. A variante só serve para casar; o envio continua usando o número como
+está.
+
+O vínculo acontece em três momentos, e nenhum deles sobrescreve um contrato já
+gravado: na chegada de cada mensagem (com ou sem o bot), ao abrir a conversa e,
+em lote, na própria listagem — que é o que resolve as conversas antigas.
+
+`POST /api/whatsapp/conversations/:id/subscriber` (`whatsapp.send`) é o vínculo
+à mão, para o número que o SGP não conhece:
+
+```json
+{ "contract": "10231", "savePhone": true }
+```
+
+Ele **sobrescreve** o vínculo atual. `savePhone: true` também grava o número da
+conversa como `phone_manual` do contrato — a mesma escrita de
+`PUT /subscribers/:contract/phone` — e por isso exige `campaigns.manage`
+(403 `missing_permission` sem ela). Responde a conversa no formato da listagem;
+404 `conversation_not_found` ou `subscriber_not_found`.
+
+### Contatos do SGP — `/api/whatsapp/contacts`
+
+`GET /api/whatsapp/contacts?search=&limit=50&offset=0` (`whatsapp.read`) lista
+os assinantes de `sgp_links`, **um por contrato**, com a conversa que já existe
+com cada um:
+
+```json
+{
+  "total": 1,
+  "contacts": [{
+    "contract": "10231",
+    "clientName": "Carlinhos Vendas",
+    "document": "•••8909",
+    "deviceId": "ONT-1",
+    "phone": "5593992081870",
+    "phoneSource": "sgp",
+    "optedOut": false,
+    "conversationId": 12,
+    "lastMessageAt": "2026-09-23T16:04:00.000Z"
+  }]
+}
+```
+
+A busca olha nome, contrato, CPF/CNPJ e os dois telefones. O documento sai
+mascarado; a busca vê ele inteiro.
+
+`POST /api/whatsapp/contacts/:contract/conversation` (`whatsapp.send`) devolve a
+conversa com o assinante — `200` com a que já existe (pelo contrato ou por
+qualquer grafia do número), `201` com uma nova, vazia, pelo número de propósito
+`general`. Abrir não envia nada. `409 subscriber_no_phone` quando o cadastro não
+tem telefone, `400 no_account` sem número conectado, `404 subscriber_not_found`.
+
+A conversa nova fica com o número do SGP no `external_thread_id`. Quando a
+resposta chega pela outra grafia do nono dígito, `WaConversation.ensure` acha o
+fio existente em vez de abrir um segundo.
+
 **Essa resolução é conveniência, nunca autenticação.** Quem escreveu provou
 apenas que tem um telefone que o WhatsApp entrega. Nada que ela destrave pode
 ser segredo nem ação destrutiva: o painel já tem um portal do cliente com senha

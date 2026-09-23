@@ -1,5 +1,7 @@
 import WaSendService from '../services/waSendService.js';
 import WaConversationService from '../services/waConversationService.js';
+import WaContactService from '../services/waContactService.js';
+import { roleHas } from '../config/permissions.js';
 import WaMessage from '../models/WaMessage.js';
 import { WaError } from '../services/whatsappConfigService.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
@@ -102,6 +104,63 @@ class WhatsAppMessageController {
       ));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.conversationStatusFailed');
+    }
+  }
+
+  /**
+   * Says, by hand, which SGP subscriber a thread belongs to.
+   *
+   * `savePhone` writes the thread's number onto the contract as its manual
+   * phone — the same write as the billing screen's number correction — so it
+   * asks for the same `campaigns.manage` that route asks for. Linking alone is
+   * inbox work and stays `whatsapp.send`, like the route.
+   */
+  static async linkSubscriber(req, res) {
+    const savePhone = req.body?.savePhone === true;
+    if (savePhone && !roleHas(req.user?.role, 'campaigns.manage')) {
+      return res.status(403).json({
+        message: req.t('auth.insufficientPermissions'),
+        code: 'missing_permission'
+      });
+    }
+    try {
+      const conversation = await WaConversationService.linkSubscriber(req.params?.id, {
+        contract: req.body?.contract,
+        savePhone
+      });
+      return res.json(createResponse(req.t('whatsapp.subscriberLinked'), conversation));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.subscriberLinkFailed');
+    }
+  }
+
+  /** The SGP's subscribers as contacts, with the thread each one already has. */
+  static async listContacts(req, res) {
+    try {
+      const data = await WaContactService.list({
+        search: req.query?.search,
+        limit: req.query?.limit,
+        offset: req.query?.offset
+      });
+      return res.json(createResponse(
+        req.t('whatsapp.contactsLoaded', { count: data.contacts.length }),
+        data
+      ));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.contactsLoadFailed');
+    }
+  }
+
+  /** The thread with one subscriber — the existing one, or a new empty one. */
+  static async openContactConversation(req, res) {
+    try {
+      const { conversation, created } = await WaContactService.openConversation(req.params?.contract);
+      return res.status(created ? 201 : 200).json(createResponse(
+        req.t('whatsapp.conversationOpened'),
+        conversation
+      ));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.conversationOpenFailed');
     }
   }
 

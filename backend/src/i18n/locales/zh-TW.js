@@ -503,6 +503,13 @@ export default {
   'whatsapp.phoneSaveFailed': '無法儲存電話號碼',
   'whatsapp.error.invalidPhone': '這不像是一個可用的電話號碼',
   'whatsapp.error.subscriberNotFound': '找不到使用該合約的用戶',
+  'whatsapp.contactsLoaded': '{count} 位聯絡人',
+  'whatsapp.contactsLoadFailed': '無法載入聯絡人',
+  'whatsapp.conversationOpened': '已開啟對話',
+  'whatsapp.conversationOpenFailed': '無法開啟對話',
+  'whatsapp.subscriberLinked': '對話已連結至用戶',
+  'whatsapp.subscriberLinkFailed': '無法連結對話',
+  'whatsapp.error.subscriberNoPhone': '此用戶沒有登記電話號碼',
   // WhatsApp — 收件匣與自助服務機器人（第三階段）
   'whatsapp.error.conversationNotFound': '找不到該對話',
   'whatsapp.conversationClosed': '對話已結束',

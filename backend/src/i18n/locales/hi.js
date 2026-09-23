@@ -504,6 +504,13 @@ export default {
   'whatsapp.phoneSaveFailed': 'फ़ोन नंबर सहेजा नहीं जा सका',
   'whatsapp.error.invalidPhone': 'यह उपयोग योग्य फ़ोन नंबर नहीं लगता',
   'whatsapp.error.subscriberNotFound': 'उस अनुबंध वाला कोई ग्राहक नहीं है',
+  'whatsapp.contactsLoaded': '{count} संपर्क',
+  'whatsapp.contactsLoadFailed': 'संपर्क लोड नहीं हो सके',
+  'whatsapp.conversationOpened': 'बातचीत खोली गई',
+  'whatsapp.conversationOpenFailed': 'बातचीत नहीं खोली जा सकी',
+  'whatsapp.subscriberLinked': 'बातचीत ग्राहक से जोड़ी गई',
+  'whatsapp.subscriberLinkFailed': 'बातचीत नहीं जोड़ी जा सकी',
+  'whatsapp.error.subscriberNoPhone': 'इस ग्राहक का कोई फ़ोन नंबर दर्ज नहीं है',
 
   // WhatsApp — इनबॉक्स और स्व-सेवा बॉट (चरण 3)
   'whatsapp.error.conversationNotFound': 'बातचीत नहीं मिली',

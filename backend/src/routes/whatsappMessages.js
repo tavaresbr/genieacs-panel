@@ -36,6 +36,33 @@ router.post(
   WhatsAppMessageController.setStatus
 );
 
+// Which subscriber a thread belongs to, said by hand — for the number the SGP
+// does not know. Asking to save that number on the contract is checked again
+// in the controller, against the billing screen's own permission.
+router.post(
+  '/conversations/:id/subscriber',
+  authenticateToken,
+  requirePermission('whatsapp.send'),
+  WhatsAppMessageController.linkSubscriber
+);
+
+// The SGP's subscribers as contacts. Reading is inbox work, like the list of
+// conversations; opening a thread is `whatsapp.send`, because the next thing
+// the operator does in it is speak as the provider.
+router.get(
+  '/contacts',
+  authenticateToken,
+  requirePermission('whatsapp.read'),
+  WhatsAppMessageController.listContacts
+);
+
+router.post(
+  '/contacts/:contract/conversation',
+  authenticateToken,
+  requirePermission('whatsapp.send'),
+  WhatsAppMessageController.openContactConversation
+);
+
 router.post(
   '/conversations/:id/messages',
   authenticateToken,

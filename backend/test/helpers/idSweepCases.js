@@ -393,6 +393,31 @@ export const casos = [
     controleSoNaoAchou: true,
     codigoDeNaoAchou: 'conversation_not_found'
   },
+  // Endereçada pelo contrato do SGP, não por id daqui. Com o do vizinho não há
+  // assinante (404 `subscriber_not_found`) e nenhuma conversa pode nascer; com
+  // o próprio, a conversa abre.
+  {
+    chave: 'sgpContract',
+    label: 'POST /api/whatsapp/contacts/:contract/conversation',
+    method: 'POST',
+    path: (contract) => `/api/whatsapp/contacts/${encodeURIComponent(contract)}/conversation`,
+    tabela: 'sgp_links',
+    coluna: 'contract'
+  },
+  // O contrato do corpo não existe em nenhum dos dois, de propósito: com o id do
+  // vizinho a conversa não pode ser achada (404 `conversation_not_found`), e
+  // com o próprio a rota passa dela e recusa o contrato — o controle exige só
+  // que a CONVERSA tenha sido encontrada.
+  {
+    chave: 'conversation',
+    label: 'POST /api/whatsapp/conversations/:id/subscriber',
+    method: 'POST',
+    path: (id) => `/api/whatsapp/conversations/${id}/subscriber`,
+    body: { contract: 'CONTRATO-QUE-NAO-EXISTE' },
+    tabela: 'wa_conversations',
+    controleSoNaoAchou: true,
+    codigoDeNaoAchou: 'conversation_not_found'
+  },
   // 409 e não 404, e está certo: a rota não distingue "não existe" de "não dá
   // para reenfileirar", e a leitura por baixo é escopada — o vizinho recebe a
   // mesma recusa que receberia para uma mensagem já entregue. O que se exige

@@ -1,12 +1,14 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { Icon } from '@/components/ui/icon'
 import { useTranslation } from '@/contexts/language-context'
 import type { WhatsAppConversation, WhatsAppMessage } from '@/lib/api'
 import { conversationAddress, conversationTitle } from '@/components/whatsapp/conversation-list'
 import { MessageBubble } from '@/components/whatsapp/message-bubble'
+import { SubscriberLinker } from '@/components/whatsapp/subscriber-linker'
+import { useAuth } from '@/contexts/auth-context'
 
 /** How close to the foot counts as "the operator is at the bottom". */
 const STICK_PX = 120
@@ -26,6 +28,8 @@ interface ConversationThreadProps {
   /** Undefined when the operator may not read the ERP: then there is no button. */
   sgpPanelOpen?: boolean
   onToggleSgpPanel?: () => void
+  /** The operator linked the thread to an SGP subscriber by hand. */
+  onLinked: (conversation: WhatsAppConversation) => void
 }
 
 /**
@@ -48,9 +52,12 @@ export function ConversationThread({
   filing,
   onFile,
   sgpPanelOpen,
-  onToggleSgpPanel
+  onToggleSgpPanel,
+  onLinked
 }: ConversationThreadProps) {
   const { t } = useTranslation()
+  const { can } = useAuth()
+  const [linkerOpen, setLinkerOpen] = useState(false)
   const closed = Boolean(conversation.closedAt)
   const scrollRef = useRef<HTMLDivElement>(null)
   const stick = useRef(true)
@@ -65,6 +72,7 @@ export function ConversationThread({
   // operator came here for.
   useEffect(() => {
     const box = scrollRef.current
+    setLinkerOpen(false)
     if (!box) return
     stick.current = true
     box.scrollTop = box.scrollHeight
@@ -119,7 +127,19 @@ export function ConversationThread({
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {can('whatsapp.send') && (
+            <button
+              type="button"
+              className="modern-button-secondary"
+              aria-expanded={linkerOpen}
+              onClick={() => setLinkerOpen((open) => !open)}
+            >
+              <Icon name="edit" size={16} />
+              {t(conversation.contract ? 'whatsapp.inbox.changeSubscriber' : 'whatsapp.inbox.linkSubscriber')}
+            </button>
+          )}
+
           {/* Closing is not a destructive act and is not offered as one: the
               hint says what it does, and the same button undoes it. */}
           <button
@@ -156,6 +176,17 @@ export function ConversationThread({
           )}
         </div>
       </header>
+
+      {linkerOpen && (
+        <SubscriberLinker
+          conversation={conversation}
+          onCancel={() => setLinkerOpen(false)}
+          onLinked={(linked) => {
+            setLinkerOpen(false)
+            onLinked(linked)
+          }}
+        />
+      )}
 
       <div
         ref={scrollRef}

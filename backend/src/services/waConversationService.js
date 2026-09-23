@@ -6,6 +6,7 @@ import CustomerAccount from '../models/CustomerAccount.js';
 import { WaError } from './whatsappConfigService.js';
 import WaSendService from './waSendService.js';
 import { tdb } from '../config/database.js';
+import { normalizarTelefoneBr, variantesTelefoneBr } from '../utils/wa/waDestino.js';
 
 /** How many messages a thread hands back before the caller has to ask for more. */
 const PAGE = 100;
@@ -39,13 +40,20 @@ class WaConversationService {
   static async resolveSubscriber(phone) {
     const digits = String(phone ?? '').replace(/\D/g, '');
     if (!digits) return { link: null, account: null, matchedOn: null };
+    // Com e sem o nono dígito: o WhatsApp entrega muito celular antigo como
+    // 55 + DDD + 8, e o SGP guarda o mesmo aparelho com o 9. Comparar só a
+    // grafia exata deixava o assinante que escreve do número cadastrado como
+    // "não vinculado".
+    const spellings = [...new Set([digits, ...variantesTelefoneBr(digits)])];
 
     // Through `tdb`: a number that belongs to another provider's subscriber has
     // to come back unknown here. Resolving it would hand this provider's
     // operator — and, through the bot, whoever holds that phone — a contract,
     // a name and a document from a cadastre they have no part in.
-    const manual = await tdb('sgp_links').where({ phone_manual: digits }).first();
-    const link = manual || (await tdb('sgp_links').where({ phone_e164: digits }).first()) || null;
+    const manual = await tdb('sgp_links').whereIn('phone_manual', spellings).orderBy('id', 'asc').first();
+    const link = manual
+      || (await tdb('sgp_links').whereIn('phone_e164', spellings).orderBy('id', 'asc').first())
+      || null;
     if (!link) return { link: null, account: null, matchedOn: null };
 
     const account = link.device_id ? await CustomerAccount.getByDeviceId(link.device_id) : null;
@@ -79,6 +87,83 @@ class WaConversationService {
       // coluna liga uma conversa a um titular. Era esta, e ela estava morta.
       customer_account_id: conversation.customer_account_id ?? account?.id ?? null
     });
+  }
+
+  /**
+   * `bindSubscriber` for a whole page of the inbox, in two queries.
+   *
+   * The inbox used to show every thread from before the binding existed — and
+   * every thread the bot never answered — as "not linked to any subscriber",
+   * forever. Resolving them here fixes the backlog as the operator scrolls,
+   * without a migration and without one query per row on a list that polls.
+   * Rows are patched in place, so the caller draws the contract it just
+   * learned. A thread that already carries a contract is never touched.
+   */
+  static async bindUnlinked(rows) {
+    const pending = rows.filter((row) => !row.contract && row.wa_phone_e164);
+    if (pending.length === 0) return rows;
+
+    const spellingsOf = new Map(pending.map((row) => [row.id, variantesTelefoneBr(row.wa_phone_e164)]));
+    const all = [...new Set([...spellingsOf.values()].flat())];
+    if (all.length === 0) return rows;
+    const links = await tdb('sgp_links')
+      .where((match) => match.whereIn('phone_manual', all).orWhereIn('phone_e164', all))
+      .orderBy('id', 'asc');
+    if (links.length === 0) return rows;
+
+    for (const row of pending) {
+      const spellings = spellingsOf.get(row.id);
+      const link = links.find((l) => spellings.includes(l.phone_manual))
+        || links.find((l) => spellings.includes(l.phone_e164));
+      if (!link) continue;
+      const account = link.device_id ? await CustomerAccount.getByDeviceId(link.device_id) : null;
+      const patch = {
+        contract: link.contract,
+        device_id: link.device_id,
+        customer_account_id: row.customer_account_id ?? account?.id ?? null
+      };
+      await WaConversation.update(row.id, patch);
+      Object.assign(row, patch);
+    }
+    return rows;
+  }
+
+  /**
+   * The operator saying who this thread is, by hand.
+   *
+   * For the number the ERP does not know — the subscriber writing from a
+   * relative's phone, a new chip, a cadastre with no mobile at all. Unlike
+   * `bindSubscriber` this DOES overwrite: it is the correction that the
+   * automatic binding promises never to undo.
+   *
+   * `savePhone` also records the thread's number as the contract's manual
+   * phone, so the next message from it resolves on its own and billing reaches
+   * the number the subscriber actually answers. It is the same write as the
+   * billing screen's number correction, and the controller holds it to the
+   * same permission.
+   */
+  static async linkSubscriber(id, { contract, savePhone = false } = {}) {
+    const conversation = await this.get(id);
+    const key = String(contract ?? '').trim();
+    const links = key ? await SgpLink.getByContract(key) : [];
+    if (links.length === 0) {
+      throw new WaError('whatsapp.error.subscriberNotFound', {
+        code: 'subscriber_not_found',
+        status: 404
+      });
+    }
+    const link = links[0];
+    const account = link.device_id ? await CustomerAccount.getByDeviceId(link.device_id) : null;
+    const updated = await WaConversation.update(conversation.id, {
+      contract: link.contract,
+      device_id: link.device_id,
+      customer_account_id: account?.id ?? null
+    });
+
+    const phone = normalizarTelefoneBr(conversation.wa_phone_e164);
+    if (savePhone && phone) await SgpLink.setManualPhone(link.contract, phone);
+
+    return this.decorate(updated);
   }
 
   /** The browser shape. Built field by field, like every other public shape here. */
@@ -139,6 +224,7 @@ class WaConversationService {
       searchContracts: term ? await this.contractsMatchingClientName(term) : []
     });
     if (rows.length === 0) return [];
+    await this.bindUnlinked(rows);
 
     // Two batched lookups rather than two per row: an inbox with fifty threads
     // would otherwise open a hundred queries to draw one screen.
@@ -209,7 +295,10 @@ class WaConversationService {
    * which is the only thing "read" can mean here.
    */
   static async messages(id, { limit = PAGE, before = null } = {}) {
-    const conversation = await this.get(id);
+    let conversation = await this.get(id);
+    // A thread that arrived before the subscriber's number was known — or
+    // before inbound messages bound it at all — is resolved when it is opened.
+    if (!conversation.contract) conversation = await this.bindSubscriber(conversation);
     const cursor = Number.parseInt(String(before ?? ''), 10);
     const rows = await WaMessage.listForConversation(conversation.id, {
       limit: Math.min(Math.max(Number(limit) || PAGE, 1), 500),

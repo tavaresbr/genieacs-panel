@@ -504,6 +504,13 @@ export default {
   'whatsapp.phoneSaveFailed': 'The phone number could not be saved',
   'whatsapp.error.invalidPhone': 'That does not look like a usable phone number',
   'whatsapp.error.subscriberNotFound': 'No subscriber with that contract',
+  'whatsapp.contactsLoaded': '{count} contact(s)',
+  'whatsapp.contactsLoadFailed': 'Could not load the contacts',
+  'whatsapp.conversationOpened': 'Conversation opened',
+  'whatsapp.conversationOpenFailed': 'Could not open the conversation',
+  'whatsapp.subscriberLinked': 'Conversation linked to the subscriber',
+  'whatsapp.subscriberLinkFailed': 'Could not link the conversation',
+  'whatsapp.error.subscriberNoPhone': 'This subscriber has no phone number on file',
   // WhatsApp — inbox e bot de autoatendimento (onda 3)
   'whatsapp.error.conversationNotFound': 'Conversation not found',
   'whatsapp.conversationClosed': 'Conversation closed',
