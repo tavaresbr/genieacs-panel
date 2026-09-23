@@ -327,6 +327,7 @@ export default {
   'sgp.error.urlCredentials': 'Die SGP-URL darf keinen Benutzer und kein Passwort enthalten',
   'sgp.error.blockedHost': 'Die SGP-URL verweist auf eine Adresse, die diese Installation nicht erreichen darf',
   'sgp.error.pathsRelative': 'Die SGP-API-Pfade müssen relativ sein, etwa /api/ura/titulos/',
+  'sgp.error.pathPlaceholder': 'Postman-Variablen wie {{url}} sind im Pfad nicht erlaubt; die SGP-Adresse kommt aus dem URL-Feld. Verwenden Sie z. B. /api/ura/clientes/',
   'sgp.error.configIncomplete': 'Geben Sie SGP-URL, App und Token an, bevor Sie die Integration aktivieren',
   'sgp.error.notConfigured': 'Die SGP-Integration ist nicht konfiguriert',
   'sgp.error.customerListNotConfigured': 'Der Pfad der SGP-Kundenliste ist nicht gesetzt. Tragen Sie ihn unter Einstellungen → SGP ein.',

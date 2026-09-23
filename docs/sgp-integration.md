@@ -177,7 +177,7 @@ that expose it elsewhere; the sync sends the paging parameters in the JSON body:
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `endpoints.customerList` | `/api/ura/clientes/` | Relative path of the client listing. An empty value falls back to the default. |
+| `endpoints.customerList` | `/api/ura/clientes/` | Relative path of the client listing. An empty value falls back to the default. A leading Postman variable (`{{url}}/api/...`) is dropped, since the address comes from `baseUrl`; one left in the middle is refused. |
 | `contactsPaging` | `offset` | `offset` sends a row offset; `page` sends a page number from 1 |
 | `contactsOffsetParam` / `contactsLimitParam` | `offset` / `limit` | The parameter names the install expects |
 | `contactsPageSize` | 100 | 10–500 |

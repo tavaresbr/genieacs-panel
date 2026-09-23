@@ -372,6 +372,7 @@ export default {
   'sgp.error.urlCredentials': 'SGP の URL にユーザーやパスワードを含めないでください',
   'sgp.error.blockedHost': 'SGP の URL は、このインストールから到達できないアドレスを指しています',
   'sgp.error.pathsRelative': 'SGP の API のパスは /api/ura/titulos/ のような相対パスで指定してください',
+  'sgp.error.pathPlaceholder': 'パスに {{url}} のような Postman の変数は使えません。SGP のアドレスは URL 欄から取得されます。例: /api/ura/clientes/',
   'sgp.error.configIncomplete': '連携を有効にする前に、SGP の URL、アプリ、トークンを入力してください',
   'sgp.error.notConfigured': 'SGP 連携が設定されていません',
   'sgp.error.customerListNotConfigured': 'SGP の顧客一覧のパスが設定されていません。設定 → SGP で入力してください。',

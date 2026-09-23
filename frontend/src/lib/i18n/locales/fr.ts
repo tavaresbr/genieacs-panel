@@ -1605,6 +1605,7 @@ const fr: Dictionary = {
   'settings.sgp.contacts.hint': 'Importe tous les clients du SGP dans les contacts WhatsApp, avec ou sans contrat et avec ou sans équipement. Le chemin de la liste des clients est déjà renseigné ; vérifiez-le avec le bouton Tester avant de synchroniser.',
   'settings.sgp.contacts.path': 'Chemin de la liste des clients',
   'settings.sgp.contacts.pathHint': 'Relatif à l’adresse du SGP, avec les mêmes app et jeton. La valeur par défaut est /api/ura/clientes/ ; ne la changez que si le support du SGP indique un autre chemin.',
+  'settings.sgp.contacts.pathPlaceholder': 'Pas de {{url}} ici : l’adresse du SGP vient du champ URL ci-dessus. Utilisez seulement /api/ura/clientes/',
   'settings.sgp.contacts.paging': 'Pagination',
   'settings.sgp.contacts.pagingOffset': 'Décalage de lignes (offset/limit)',
   'settings.sgp.contacts.pagingPage': 'Numéro de page (page/limit)',

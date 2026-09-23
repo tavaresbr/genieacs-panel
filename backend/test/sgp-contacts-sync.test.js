@@ -8,6 +8,7 @@ const { default: WhatsAppConfigService } = await import('../src/services/whatsap
 const { default: WhatsAppAccount } = await import('../src/models/WhatsAppAccount.js');
 const { default: WaConversation } = await import('../src/models/WaConversation.js');
 const { default: SgpContactSyncService } = await import('../src/services/sgpContactSyncService.js');
+const { default: AppState } = await import('../src/models/AppState.js');
 
 /**
  * Todos os clientes do SGP nos contatos do WhatsApp, com ou sem contrato, com
@@ -172,6 +173,38 @@ describe('o caminho padrão', () => {
     await configurar({ endpoints: { customerList: '' } });
     const config = await asTenant(() => SgpService.getConfig());
     assert.equal(config.endpoints.customerList, '/api/ura/clientes/');
+  });
+
+  it('tira a variável {{url}} de um caminho colado do Postman', async () => {
+    await configurar({ endpoints: { customerList: '/{{url}}/api/ura/clientes/' } });
+    let config = await asTenant(() => SgpService.getConfig());
+    assert.equal(config.endpoints.customerList, '/api/ura/clientes/');
+
+    await configurar({ endpoints: { customerList: '{{url}}/api/ura/clientes/' } });
+    config = await asTenant(() => SgpService.getConfig());
+    assert.equal(config.endpoints.customerList, '/api/ura/clientes/');
+  });
+
+  it('recusa uma variável do Postman no meio do caminho', async () => {
+    const res = await call(`${panelUrl}/api/sgp/config`, {
+      method: 'PUT',
+      headers: authHeaders(token),
+      body: { endpoints: { customerList: '/api/{{versao}}/clientes/' } }
+    });
+    assert.equal(res.status, 400);
+    assert.equal(res.body.code, 'invalid_endpoint');
+  });
+
+  it('lê limpo um caminho com {{url}} salvo antes da correção', async () => {
+    await asTenant(async () => {
+      const stored = JSON.parse(await AppState.get('sgp_integration_config'));
+      stored.endpoints = { ...stored.endpoints, customerList: '/{{url}}/api/ura/clientes/' };
+      await AppState.upsert('sgp_integration_config', JSON.stringify(stored));
+      SgpService.invalidateConfigCache();
+    });
+    const config = await asTenant(() => SgpService.getConfig());
+    assert.equal(config.endpoints.customerList, '/api/ura/clientes/');
+    await configurar({ endpoints: { customerList: '' } });
   });
 });
 

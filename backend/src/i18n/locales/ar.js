@@ -372,6 +372,7 @@ export default {
   'sgp.error.urlCredentials': 'يجب ألّا يحتوي عنوان SGP على مستخدم أو كلمة مرور',
   'sgp.error.blockedHost': 'يشير عنوان SGP إلى عنوان لا يُسمح لهذا التثبيت بالوصول إليه',
   'sgp.error.pathsRelative': 'يجب أن تكون مسارات واجهة SGP نسبية، مثل /api/ura/titulos/',
+  'sgp.error.pathPlaceholder': 'متغيرات Postman مثل {{url}} غير مقبولة في المسار؛ عنوان SGP يأتي من حقل URL. استخدم مثلًا /api/ura/clientes/',
   'sgp.error.configIncomplete': 'أدخل عنوان SGP والتطبيق والرمز قبل تفعيل التكامل',
   'sgp.error.notConfigured': 'التكامل مع SGP غير مُعدّ',
   'sgp.error.customerListNotConfigured': 'مسار قائمة عملاء SGP غير مضبوط. املأه في الإعدادات ← SGP.',

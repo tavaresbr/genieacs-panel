@@ -1481,6 +1481,7 @@ const en = {
   'settings.sgp.contacts.hint': 'Brings every SGP client into the WhatsApp contacts — with or without a contract, with or without equipment. The client listing path comes filled in; check it with the Test button before syncing.',
   'settings.sgp.contacts.path': 'Client listing path',
   'settings.sgp.contacts.pathHint': 'Relative to the SGP address, using the same app and token. The default is /api/ura/clientes/; change it only if SGP support gives you another path.',
+  'settings.sgp.contacts.pathPlaceholder': 'No {{url}} here: the SGP address comes from the URL field above. Use just /api/ura/clientes/',
   'settings.sgp.contacts.paging': 'Paging',
   'settings.sgp.contacts.pagingOffset': 'Row offset (offset/limit)',
   'settings.sgp.contacts.pagingPage': 'Page number (page/limit)',

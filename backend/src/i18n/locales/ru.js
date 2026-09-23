@@ -373,6 +373,7 @@ export default {
   'sgp.error.urlCredentials': 'Адрес SGP не должен содержать пользователя или пароль',
   'sgp.error.blockedHost': 'Адрес SGP указывает на адрес, недоступный для этой установки',
   'sgp.error.pathsRelative': 'Пути API SGP должны быть относительными, например /api/ura/titulos/',
+  'sgp.error.pathPlaceholder': 'Переменные Postman, такие как {{url}}, в пути не допускаются; адрес SGP берётся из поля URL. Используйте, например, /api/ura/clientes/',
   'sgp.error.configIncomplete': 'Укажите адрес, приложение и токен SGP, прежде чем включать интеграцию',
   'sgp.error.notConfigured': 'Интеграция с SGP не настроена',
   'sgp.error.customerListNotConfigured': 'Путь списка клиентов SGP не задан. Укажите его в Настройки → SGP.',

@@ -1479,6 +1479,7 @@ const zhCN: Dictionary = {
   'settings.sgp.contacts.hint': '将 SGP 的所有客户导入 WhatsApp 联系人——无论有无合同、有无设备。客户列表路径已预先填写；同步前请先用“测试”按钮确认。',
   'settings.sgp.contacts.path': '客户列表路径',
   'settings.sgp.contacts.pathHint': '相对于 SGP 地址，使用相同的 app 和令牌。默认为 /api/ura/clientes/；仅在 SGP 支持指明其他路径时更改。',
+  'settings.sgp.contacts.pathPlaceholder': '此处无需 {{url}}：SGP 地址来自上方的 URL 字段。只需填写 /api/ura/clientes/',
   'settings.sgp.contacts.paging': '分页方式',
   'settings.sgp.contacts.pagingOffset': '行偏移 (offset/limit)',
   'settings.sgp.contacts.pagingPage': '页码 (page/limit)',

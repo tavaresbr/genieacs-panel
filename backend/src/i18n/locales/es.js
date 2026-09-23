@@ -370,6 +370,7 @@ export default {
   'sgp.error.urlCredentials': 'La URL del SGP no puede contener usuario ni contraseña',
   'sgp.error.blockedHost': 'La URL del SGP apunta a una dirección que esta instalación no puede alcanzar',
   'sgp.error.pathsRelative': 'Las rutas de la API del SGP deben ser relativas, como /api/ura/titulos/',
+  'sgp.error.pathPlaceholder': 'Las variables de Postman como {{url}} no se aceptan en la ruta; la dirección del SGP viene del campo URL. Use, por ejemplo, /api/ura/clientes/',
   'sgp.error.configIncomplete': 'Ingresa la URL, el app y el token del SGP antes de activar la integración',
   'sgp.error.notConfigured': 'La integración con el SGP no está configurada',
   'sgp.error.customerListNotConfigured': 'La ruta del listado de clientes del SGP no está configurada. Complétela en Configuración → SGP.',

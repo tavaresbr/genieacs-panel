@@ -371,6 +371,7 @@ export default {
   'sgp.error.urlCredentials': 'SGP पते में उपयोगकर्ता या पासवर्ड नहीं होना चाहिए',
   'sgp.error.blockedHost': 'SGP पता ऐसे पते की ओर संकेत करता है जिस तक यह इंस्टॉलेशन नहीं पहुँच सकता',
   'sgp.error.pathsRelative': 'SGP API पथ सापेक्ष होने चाहिए, जैसे /api/ura/titulos/',
+  'sgp.error.pathPlaceholder': 'पथ में {{url}} जैसे Postman वेरिएबल स्वीकार नहीं हैं; SGP पता URL फ़ील्ड से आता है। उदाहरण के लिए /api/ura/clientes/ इस्तेमाल करें',
   'sgp.error.configIncomplete': 'एकीकरण सक्षम करने से पहले SGP पता, ऐप और टोकन दर्ज करें',
   'sgp.error.notConfigured': 'SGP एकीकरण कॉन्फ़िगर नहीं है',
   'sgp.error.customerListNotConfigured': 'SGP ग्राहक सूची का पथ सेट नहीं है। सेटिंग्स → SGP में भरें।',

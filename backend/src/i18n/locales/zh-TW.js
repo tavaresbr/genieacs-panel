@@ -372,6 +372,7 @@ export default {
   'sgp.error.urlCredentials': 'SGP 位址中不得包含使用者名稱或密碼',
   'sgp.error.blockedHost': 'SGP 位址指向本部署無法存取的位址',
   'sgp.error.pathsRelative': 'SGP 的 API 路徑需為相對路徑，例如 /api/ura/titulos/',
+  'sgp.error.pathPlaceholder': '路徑中不能使用 {{url}} 之類的 Postman 變數；SGP 位址來自 URL 欄位。例如使用 /api/ura/clientes/',
   'sgp.error.configIncomplete': '啟用整合前，請填寫 SGP 位址、應用程式與權杖',
   'sgp.error.notConfigured': 'SGP 整合尚未設定',
   'sgp.error.customerListNotConfigured': '未設定 SGP 客戶清單路徑。請在 設定 → SGP 中填寫。',

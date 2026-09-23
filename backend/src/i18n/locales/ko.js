@@ -374,6 +374,7 @@ export default {
   'sgp.error.urlCredentials': 'SGP URL에는 사용자나 비밀번호가 포함될 수 없습니다',
   'sgp.error.blockedHost': 'SGP URL이 이 설치 환경에서 접근할 수 없는 주소를 가리킵니다',
   'sgp.error.pathsRelative': 'SGP API 경로는 /api/ura/titulos/ 처럼 상대 경로여야 합니다',
+  'sgp.error.pathPlaceholder': '경로에 {{url}} 같은 Postman 변수는 사용할 수 없습니다. SGP 주소는 URL 필드에서 가져옵니다. 예: /api/ura/clientes/',
   'sgp.error.configIncomplete': '연동을 활성화하기 전에 SGP URL, 앱, 토큰을 입력하십시오',
   'sgp.error.notConfigured': 'SGP 연동이 설정되지 않았습니다',
   'sgp.error.customerListNotConfigured': 'SGP 고객 목록 경로가 설정되지 않았습니다. 설정 → SGP에서 입력하세요.',

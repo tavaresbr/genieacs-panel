@@ -1478,6 +1478,7 @@ const ja: Dictionary = {
   'settings.sgp.contacts.hint': '契約・機器の有無を問わず、SGP のすべての顧客を WhatsApp の連絡先に取り込みます。顧客一覧のパスは入力済みです。同期の前にテストボタンで確認してください。',
   'settings.sgp.contacts.path': '顧客一覧のパス',
   'settings.sgp.contacts.pathHint': 'SGP のアドレスからの相対パスで、同じ app とトークンを使います。既定は /api/ura/clientes/ です。SGP サポートから別のパスを案内された場合のみ変更してください。',
+  'settings.sgp.contacts.pathPlaceholder': 'ここに {{url}} は不要です。SGP のアドレスは上の URL 欄から取得されます。/api/ura/clientes/ だけを入力してください',
   'settings.sgp.contacts.paging': 'ページ分割',
   'settings.sgp.contacts.pagingOffset': '行オフセット (offset/limit)',
   'settings.sgp.contacts.pagingPage': 'ページ番号 (page/limit)',

@@ -1486,6 +1486,7 @@ const ru: Dictionary = {
   'settings.sgp.contacts.hint': 'Загружает всех клиентов SGP в контакты WhatsApp — с договором и без, с оборудованием и без. Путь списка клиентов уже заполнен; проверьте его кнопкой «Проверить» перед синхронизацией.',
   'settings.sgp.contacts.path': 'Путь списка клиентов',
   'settings.sgp.contacts.pathHint': 'Относительно адреса SGP, с теми же app и токеном. По умолчанию /api/ura/clientes/; меняйте, только если поддержка SGP укажет другой путь.',
+  'settings.sgp.contacts.pathPlaceholder': 'Не указывайте здесь {{url}}: адрес SGP берётся из поля URL выше. Используйте только /api/ura/clientes/',
   'settings.sgp.contacts.paging': 'Постраничность',
   'settings.sgp.contacts.pagingOffset': 'Смещение строк (offset/limit)',
   'settings.sgp.contacts.pagingPage': 'Номер страницы (page/limit)',

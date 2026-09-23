@@ -373,6 +373,7 @@ export default {
   'sgp.error.urlCredentials': 'SGP 地址中不得包含用户名或密码',
   'sgp.error.blockedHost': 'SGP 地址指向了本部署无法访问的地址',
   'sgp.error.pathsRelative': 'SGP 的 API 路径需为相对路径，例如 /api/ura/titulos/',
+  'sgp.error.pathPlaceholder': '路径中不能使用 {{url}} 之类的 Postman 变量；SGP 地址来自 URL 字段。例如使用 /api/ura/clientes/',
   'sgp.error.configIncomplete': '启用集成前，请填写 SGP 地址、应用和令牌',
   'sgp.error.notConfigured': 'SGP 集成尚未配置',
   'sgp.error.customerListNotConfigured': '未设置 SGP 客户列表路径。请在 设置 → SGP 中填写。',

@@ -1459,6 +1459,7 @@ const hi: Dictionary = {
   'settings.sgp.contacts.hint': 'SGP के सभी ग्राहकों को WhatsApp संपर्कों में लाता है — अनुबंध हो या न हो, उपकरण हो या न हो। ग्राहक सूची पथ पहले से भरा है; सिंक करने से पहले परीक्षण बटन से जाँचें।',
   'settings.sgp.contacts.path': 'ग्राहक सूची पथ',
   'settings.sgp.contacts.pathHint': 'SGP पते के सापेक्ष, उसी ऐप और टोकन के साथ। डिफ़ॉल्ट /api/ura/clientes/ है; इसे तभी बदलें जब SGP सहायता कोई और पथ बताए।',
+  'settings.sgp.contacts.pathPlaceholder': 'यहाँ {{url}} न डालें: SGP पता ऊपर के URL फ़ील्ड से आता है। केवल /api/ura/clientes/ इस्तेमाल करें',
   'settings.sgp.contacts.paging': 'पृष्ठांकन',
   'settings.sgp.contacts.pagingOffset': 'पंक्ति ऑफ़सेट (offset/limit)',
   'settings.sgp.contacts.pagingPage': 'पृष्ठ संख्या (page/limit)',

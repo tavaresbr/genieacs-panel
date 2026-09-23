@@ -1362,6 +1362,7 @@ const de: Dictionary = {
   'settings.sgp.contacts.hint': 'Holt alle SGP-Kunden in die WhatsApp-Kontakte – mit oder ohne Vertrag, mit oder ohne Gerät. Der Pfad der Kundenliste ist bereits eingetragen; prüfen Sie ihn vor dem Synchronisieren mit „Testen“.',
   'settings.sgp.contacts.path': 'Pfad der Kundenliste',
   'settings.sgp.contacts.pathHint': 'Relativ zur SGP-Adresse, mit derselben App und demselben Token. Standard ist /api/ura/clientes/; ändern Sie ihn nur, wenn der SGP-Support einen anderen Pfad nennt.',
+  'settings.sgp.contacts.pathPlaceholder': 'Kein {{url}} hier: Die SGP-Adresse kommt aus dem URL-Feld oben. Verwenden Sie nur /api/ura/clientes/',
   'settings.sgp.contacts.paging': 'Seitenaufteilung',
   'settings.sgp.contacts.pagingOffset': 'Zeilenversatz (offset/limit)',
   'settings.sgp.contacts.pagingPage': 'Seitennummer (page/limit)',

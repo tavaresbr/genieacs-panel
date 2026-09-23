@@ -201,6 +201,11 @@ export function SgpContactsSyncPanel({ config, onConfigChange }: Props) {
             onChange={(event) => setForm((current) => ({ ...current, path: event.target.value }))}
           />
           <p className="mt-1 text-xs text-muted-foreground">{t('settings.sgp.contacts.pathHint')}</p>
+          {/\{\{|\}\}/.test(form.path) && (
+            <p className="mt-1 text-xs text-amber-600 dark:text-amber-400" role="alert" data-testid="sgp-contacts-path-placeholder">
+              {t('settings.sgp.contacts.pathPlaceholder')}
+            </p>
+          )}
         </div>
         <div>
           <label className="field-label" htmlFor="sgp-contacts-paging">{t('settings.sgp.contacts.paging')}</label>

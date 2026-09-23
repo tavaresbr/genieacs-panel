@@ -79,13 +79,31 @@ export const DEFAULT_TICKET_OCCURRENCE_TYPE = 5;
  */
 const LEGACY_UNLOCK_ENDPOINT = '/api/ura/liberacao/';
 
+/**
+ * A path pasted from a Postman collection starts with its base-address
+ * variable — `{{url}}/api/ura/clientes/`. The base address is the integration's
+ * own URL field, so a leading `{{...}}` is dropped instead of being sent to the
+ * SGP as part of the path.
+ */
+function stripLeadingPlaceholders(path) {
+  if (typeof path !== 'string') return path;
+  const stripped = path.trim().replace(/^\/?(?:\{\{[^{}]*\}\}\/?)+/, '');
+  if (stripped === path.trim()) return path;
+  if (!stripped) return '';
+  return stripped.startsWith('/') ? stripped : `/${stripped}`;
+}
+
 function withEndpointDefaults(stored) {
   const endpoints = { ...DEFAULT_ENDPOINTS, ...(stored || {}) };
+  for (const [key, value] of Object.entries(endpoints)) {
+    const cleaned = stripLeadingPlaceholders(value);
+    if (cleaned !== value) endpoints[key] = cleaned || DEFAULT_ENDPOINTS[key];
+  }
   if (endpoints.unlock === LEGACY_UNLOCK_ENDPOINT) endpoints.unlock = DEFAULT_ENDPOINTS.unlock;
   // Saved empty by the release that had no default for it: an empty value is
   // "not chosen", not "switched off" — `contactsSyncEnabled` is what switches
   // the sync off.
-  endpoints.customerList = stored?.customerList || DEFAULT_ENDPOINTS.customerList;
+  endpoints.customerList = endpoints.customerList || DEFAULT_ENDPOINTS.customerList;
   return endpoints;
 }
 
@@ -687,8 +705,14 @@ class SgpService {
   }
 
   static normalizeEndpoint(value, fallback) {
-    const text = String(value ?? '').trim();
+    const text = stripLeadingPlaceholders(String(value ?? '').trim());
     if (!text) return fallback;
+    if (text.includes('{{') || text.includes('}}')) {
+      throw new SgpError('sgp.error.pathPlaceholder', {
+        code: 'invalid_endpoint',
+        status: 400
+      });
+    }
     if (/^https?:\/\//i.test(text) || text.includes('..')) {
       throw new SgpError('sgp.error.pathsRelative', {
         code: 'invalid_endpoint',

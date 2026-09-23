@@ -1484,6 +1484,7 @@ const ko: Dictionary = {
   'settings.sgp.contacts.hint': '계약·장비 유무와 관계없이 SGP의 모든 고객을 WhatsApp 연락처로 가져옵니다. 고객 목록 경로는 미리 입력되어 있으니 동기화 전에 테스트 버튼으로 확인하세요.',
   'settings.sgp.contacts.path': '고객 목록 경로',
   'settings.sgp.contacts.pathHint': 'SGP 주소 기준 상대 경로이며 같은 앱과 토큰을 사용합니다. 기본값은 /api/ura/clientes/이며, SGP 지원팀이 다른 경로를 안내한 경우에만 변경하세요.',
+  'settings.sgp.contacts.pathPlaceholder': '여기에 {{url}}을 넣지 마세요. SGP 주소는 위의 URL 필드에서 가져옵니다. /api/ura/clientes/만 입력하세요',
   'settings.sgp.contacts.paging': '페이지 나누기',
   'settings.sgp.contacts.pagingOffset': '행 오프셋 (offset/limit)',
   'settings.sgp.contacts.pagingPage': '페이지 번호 (page/limit)',
