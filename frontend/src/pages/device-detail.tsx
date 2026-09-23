@@ -15,6 +15,8 @@ import { useAuth } from '@/contexts/auth-context'
 import { CustomerLgpd } from '@/components/customer-lgpd'
 import { useWifiStatusFilter, WifiStatusFilterControl } from '@/components/wifi-status-filter'
 import { filterWifiByStatus } from '@/lib/wifi-filter'
+import { FilterRail, useStoredChoice } from '@/components/ui/filter-rail'
+import { filterInvoicesByStatus, parseInvoiceStatusFilter, type InvoiceStatusFilter } from '@/lib/invoice-filter'
 import { useTranslation } from '@/contexts/language-context'
 import { RX_BAND_STYLE, rxBand } from '@/lib/rx-signal'
 
@@ -641,6 +643,7 @@ export default function DeviceDetailPage() {
   const [addingWan, setAddingWan] = useState(false)
   const [sgpLink, setSgpLink] = useState<SgpContractLink | null>(null)
   const [sgpInvoices, setSgpInvoices] = useState<SgpInvoice[]>([])
+  const [invoiceFilter, setInvoiceFilter] = useStoredChoice<InvoiceStatusFilter>('deviceDetail.invoiceFilter', parseInvoiceStatusFilter)
   const [sgpLoading, setSgpLoading] = useState(false)
   const [sgpMessage, setSgpMessage] = useState<string | null>(null)
   const [sgpAvailable, setSgpAvailable] = useState(false)
@@ -1163,6 +1166,7 @@ export default function DeviceDetailPage() {
   const signalInfo = getSignalStrengthInfo(vp.rxpower?.value);
   const wifiNetworks = device.wifi ?? []
   const { visible: filteredWifi, counts: wifiCounts } = filterWifiByStatus(wifiNetworks, wifiFilter, (ssid) => ssid.enable)
+  const { visible: visibleInvoices, counts: invoiceCounts } = filterInvoicesByStatus(sgpInvoices, invoiceFilter)
 
   /**
    * Abre (ou fecha) o formulário do chamado. Um só caminho para os dois botões
@@ -1642,7 +1646,22 @@ export default function DeviceDetailPage() {
                     </p>
 
                     <div className="mt-5 border-t border-border pt-4">
-                      <h3 className="font-semibold">{t('detail.sgp.openInvoices')}</h3>
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <h3 className="font-semibold">{t('detail.sgp.invoicesTitle')}</h3>
+                        {sgpInvoices.length > 0 && (
+                          <FilterRail
+                            value={invoiceFilter}
+                            onChange={setInvoiceFilter}
+                            ariaLabel={t('detail.sgp.invoiceFilterAria')}
+                            options={[
+                              { value: 'open', label: t('detail.sgp.invoiceFilterOpen', { count: invoiceCounts.open }) },
+                              { value: 'cancelled', label: t('detail.sgp.invoiceFilterCancelled', { count: invoiceCounts.cancelled }) },
+                              { value: 'other', label: t('detail.sgp.invoiceFilterOther', { count: invoiceCounts.other }) },
+                              { value: 'all', label: t('detail.sgp.invoiceFilterAll', { count: invoiceCounts.all }) },
+                            ]}
+                          />
+                        )}
+                      </div>
                       {sgpMessage && (
                         <p className="mt-2 text-sm text-[hsl(var(--status-warning))]">{sgpMessage}</p>
                       )}
@@ -1650,9 +1669,11 @@ export default function DeviceDetailPage() {
                         <p className="mt-2 text-sm text-muted-foreground">
                           {t(sgpMessage ? 'detail.sgp.invoicesUnavailable' : 'detail.sgp.noInvoices')}
                         </p>
+                      ) : visibleInvoices.length === 0 ? (
+                        <p className="mt-3 text-sm text-muted-foreground">{t('detail.sgp.invoiceFilterEmpty')}</p>
                       ) : (
                         <ul className="mt-3 space-y-3">
-                          {sgpInvoices.map((invoice, index) => (
+                          {visibleInvoices.map((invoice, index) => (
                             <li
                               key={invoice.id || `${invoice.dueDate}-${index}`}
                               className="rounded-md border border-border p-4"
