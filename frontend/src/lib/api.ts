@@ -1610,9 +1610,19 @@ export interface SgpContactsSyncResult {
   /** True when a ceiling or an SGP that ignores paging stopped the run early. */
   partial: boolean
   reason?: 'paging_ignored' | 'ceiling' | 'empty'
+  /** The SGP ignored the page size and sent its whole base in one answer — complete, not partial. */
+  note?: 'all_at_once'
   durationMs: number
   startedAt: string
   finishedAt: string
+}
+
+/** The contacts sync as the settings screen polls it: the sync runs in the background. */
+export interface SgpContactsSyncStatus {
+  lastRun: SgpContactsSyncResult | null
+  running: boolean
+  /** Why the last attempt failed, already translated; cleared by the next run that finishes. */
+  lastError: { at: string; code: string; message: string } | null
 }
 
 /** The first page of the listing, for the test button. Nothing is written. */
@@ -1790,10 +1800,11 @@ export const sgpAPI = {
     apiClient.post<SgpTicket>(`/sgp/devices/${encodeURIComponent(deviceId)}/ticket`, payload),
 
   getContactsSync: () =>
-    apiClient.get<SgpContactsSyncResult | null>('/sgp/contacts/sync'),
+    apiClient.get<SgpContactsSyncStatus>('/sgp/contacts/sync'),
 
+  /** Starts the sync and answers at once (202); `getContactsSync` says when it is done. */
   syncContacts: () =>
-    apiClient.post<SgpContactsSyncResult>('/sgp/contacts/sync'),
+    apiClient.post<{ running: boolean }>('/sgp/contacts/sync'),
 
   testContacts: () =>
     apiClient.post<SgpContactsTestResult>('/sgp/contacts/test'),

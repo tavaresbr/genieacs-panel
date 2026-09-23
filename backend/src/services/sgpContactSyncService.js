@@ -5,6 +5,8 @@ import { tdb } from '../config/database.js';
 import { currentTenantId } from '../config/tenantContext.js';
 
 const STATE_KEY = 'sgp_contacts_sync_last_run';
+/** Why the last run failed, if it did; cleared by the next run that finishes. */
+const ERROR_KEY = 'sgp_contacts_sync_last_error';
 
 /** A pause between pages, so a sync of thousands of clients does not hammer the SGP. */
 const PAGE_PACE_MS = 200;
@@ -20,6 +22,15 @@ const PAGE_PACE_MS = 200;
  */
 const MAX_PAGES = 2000;
 const MAX_ROWS = 1_000_000;
+
+function readJson(raw) {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
 
 const sleep = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
 
@@ -47,13 +58,38 @@ class SgpContactSyncService {
   static running = new Set();
 
   static async getLastRun() {
-    const raw = await AppState.get(STATE_KEY);
-    if (!raw) return null;
-    try {
-      return JSON.parse(raw);
-    } catch {
-      return null;
+    return readJson(await AppState.get(STATE_KEY));
+  }
+
+  /**
+   * What the settings screen shows: the last finished run, whether one is in
+   * flight right now, and why the last attempt failed if it did. The error
+   * keeps its translation key, so each reader sees it in their own language.
+   */
+  static async getStatus() {
+    return {
+      lastRun: await this.getLastRun(),
+      running: this.running.has(currentTenantId()),
+      lastError: readJson(await AppState.get(ERROR_KEY))
+    };
+  }
+
+  /**
+   * The button's entry point: checks what can be checked at once, then lets
+   * the run go on in the background. A base of thousands of clients — or an
+   * SGP that builds all of them into one answer — takes longer than the proxy
+   * in front of the panel waits for a response, so the screen asks
+   * `getStatus` until it is done instead of holding the request open. The
+   * tenant scope travels with the promise.
+   */
+  static async start() {
+    SgpService.requireReady(await SgpService.getConfig());
+    if (this.running.has(currentTenantId())) {
+      throw new SgpError('sgp.error.contactsSyncRunning', { code: 'contacts_sync_running', status: 409 });
     }
+    void this.syncAll().catch((error) => {
+      console.warn(`SGP contacts sync failed: ${error.code || error.message}`);
+    });
   }
 
   /**
@@ -85,7 +121,18 @@ class SgpContactSyncService {
     }
     this.running.add(tenantId);
     try {
-      return await this.run();
+      const result = await this.run();
+      await AppState.upsert(ERROR_KEY, '');
+      return result;
+    } catch (error) {
+      await AppState.upsert(ERROR_KEY, JSON.stringify({
+        at: new Date().toISOString(),
+        code: error.code || 'error',
+        translationKey: error.translationKey || null,
+        translationVars: error.translationVars || null,
+        message: error.translationKey ? null : String(error.message || '')
+      })).catch(() => {});
+      throw error;
     } finally {
       this.running.delete(tenantId);
     }
@@ -130,6 +177,13 @@ class SgpContactSyncService {
       }
 
       if (received < config.contactsPageSize) break;
+      // More than was asked for: the SGP ignored the limit and sent its whole
+      // base in one answer. Everything is stored already; asking for the next
+      // page would only fetch the same list again.
+      if (received > config.contactsPageSize) {
+        summary.note = 'all_at_once';
+        break;
+      }
       if (summary.total >= MAX_ROWS || page === MAX_PAGES - 1) {
         summary.partial = true;
         summary.reason = 'ceiling';

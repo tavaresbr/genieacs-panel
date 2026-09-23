@@ -177,7 +177,7 @@ that expose it elsewhere; the sync sends the paging parameters in the JSON body:
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `endpoints.customerList` | `/api/ura/clientes/` | Relative path of the client listing. An empty value falls back to the default. |
+| `endpoints.customerList` | `/api/ura/clientes/` | Relative path of the client listing. An empty value falls back to the default. A leading Postman variable (`{{url}}/api/...`) is dropped, since the address comes from `baseUrl`; one left in the middle is refused. |
 | `contactsPaging` | `offset` | `offset` sends a row offset; `page` sends a page number from 1 |
 | `contactsOffsetParam` / `contactsLimitParam` | `offset` / `limit` | The parameter names the install expects |
 | `contactsPageSize` | 100 | 10–500 |
@@ -210,8 +210,15 @@ removed from the SGP keeps its row and its conversations; a manually corrected
 phone is never overwritten; a client that gains a contract has its contract-less
 row retired and its conversations moved to the contract.
 
-Routes: `GET /api/sgp/contacts/sync` (last run, `sgp.read`),
-`POST /api/sgp/contacts/sync` (run now, `sgp.act`), `POST /api/sgp/contacts/test`
+A page with MORE rows than the page size means the SGP ignored the limit and
+sent its whole base at once: every row is stored, the run stops there and is
+complete (`note: 'all_at_once'`). Listing calls get their own deadline (90 s,
+under the proxy's 120 s) and body ceiling (64 MB); every other SGP call keeps
+15 s and 4 MB.
+
+Routes: `GET /api/sgp/contacts/sync` (`{ lastRun, running, lastError }`, `sgp.read`),
+`POST /api/sgp/contacts/sync` (starts a run in the background and answers 202,
+`sgp.act`; the screen polls the GET), `POST /api/sgp/contacts/test`
 (first page only, `sgp.config`).
 
 ## Customer portal
