@@ -202,6 +202,147 @@ export function findRxPowerReading(item, readValue) {
   return null;
 }
 
+/**
+ * Names a vendor gives the optics' temperature. Anchored for the same reason
+ * as the RX names: `TemperatureThreshold` or `TemperatureAlarm` must not be
+ * read back as the temperature of the transceiver.
+ */
+const TEMPERATURE_NAMES = /^(?:transceiver_?)?temperature$|^temp$|^optical_?temperature$/i;
+
+/** A transceiver that is running reads somewhere in this window, in °C. */
+const TEMPERATURE_MIN_C = -40;
+const TEMPERATURE_MAX_C = 120;
+
+/**
+ * Normalizes a temperature reading to °C. SFF-8472 publishes it in units of
+ * 1/256 °C, and several firmwares pass that through untouched — 11520 is
+ * 45 °C — so the raw value is tried first and the 1/256 scale second.
+ */
+export function normalizeTemperatureReading(value) {
+  const numeric = parseReading(value);
+  if (numeric === null) return null;
+  for (const scale of [1, 256]) {
+    const scaled = numeric / scale;
+    if (scaled >= TEMPERATURE_MIN_C && scaled <= TEMPERATURE_MAX_C && scaled !== 0) {
+      return Math.round(scaled * 10) / 10;
+    }
+  }
+  return null;
+}
+
+function collectNamed(node, prefix, depth, budget, found, names) {
+  if (depth > SCAN_MAX_DEPTH || budget.left <= 0) return;
+  for (const [key, child] of namedChildren(node)) {
+    if (budget.left-- <= 0) return;
+    const path = `${prefix}.${key}`;
+    if (names.test(key)) {
+      found.push({ path, node: child });
+      continue;
+    }
+    collectNamed(child, path, depth + 1, budget, found, names);
+  }
+}
+
+/**
+ * The optics' temperature, found by what the parameter is called — the same
+ * approach `findRxPowerReading` takes, for the same reason: every vendor puts
+ * it under its own object, and a fleet running anything the catalogue does
+ * not name reads N/D with the value sitting in the document.
+ */
+export function findTemperatureReading(item, readValue) {
+  const candidates = [];
+  const budget = { left: SCAN_NODE_BUDGET };
+  for (const [wanKey, wanDevice] of indexedChildren(item?.InternetGatewayDevice?.WANDevice)) {
+    collectNamed(
+      wanDevice,
+      `InternetGatewayDevice.WANDevice.${wanKey}`,
+      1,
+      budget,
+      candidates,
+      TEMPERATURE_NAMES
+    );
+  }
+  for (const [key, iface] of indexedChildren(item?.Device?.Optical?.Interface)) {
+    collectNamed(iface, `Device.Optical.Interface.${key}`, 1, budget, candidates, TEMPERATURE_NAMES);
+  }
+  for (const candidate of candidates) {
+    const value = normalizeTemperatureReading(readValue(candidate.node));
+    if (value !== null) return { value, path: candidate.path };
+  }
+  return null;
+}
+
+/**
+ * A WAN connection parameter found by name, in the connection itself or in
+ * the `WANConnectionDevice` above it, where some vendors keep the VLAN.
+ * Returns the full path, or null.
+ */
+export function findWanParameterByName(item, connectionPath, names) {
+  const parts = String(connectionPath).split('.');
+  const scopes = [connectionPath, parts.slice(0, -2).join('.')];
+  for (const scope of scopes) {
+    let node = item;
+    for (const part of scope.split('.')) node = node?.[part];
+    const found = [];
+    collectNamed(node, scope, 1, { left: SCAN_NODE_BUDGET }, found, names);
+    // One level only: a VLAN two objects down belongs to something else.
+    const direct = found.filter((entry) => entry.path.split('.').length <= scope.split('.').length + 2);
+    if (direct.length > 0) return direct[0].path;
+  }
+  return null;
+}
+
+export const WAN_VLAN_NAMES = /^(?:x_[a-z0-9-]+_)?(?:vlan_?id|vlanidmark|vlan)$/i;
+export const WAN_SERVICE_NAMES = /^(?:x_[a-z0-9-]+_)?service_?list$/i;
+
+/** How many rows a parameter listing hands back at most. */
+const PARAMETER_LIST_LIMIT = 500;
+
+/** Values that are credentials, and so are never shown back. */
+const SECRET_NAMES = /password|passwd|passphrase|secret|presharedkey|keypassphrase|wepkey/i;
+
+/**
+ * Every parameter in a GenieACS device document, one row per leaf, filtered
+ * by `search` (matched anywhere in the path, case-insensitive).
+ *
+ * An object GenieACS knows exists but never read comes back as a row with no
+ * value, marked `read: false` — that is the difference between "the ONT has
+ * no such parameter" and "nobody asked it yet", which is what the operator is
+ * trying to tell apart.
+ */
+export function listDocumentParameters(item, search = '') {
+  const needle = String(search ?? '').trim().toLowerCase();
+  const rows = [];
+  let total = 0;
+  const walk = (node, path) => {
+    if (!node || typeof node !== 'object') return;
+    const isLeaf = '_value' in node;
+    if (path && (isLeaf || (node._object === false && !isLeaf))) {
+      if (!needle || path.toLowerCase().includes(needle)) {
+        total += 1;
+        if (rows.length < PARAMETER_LIST_LIMIT) {
+          const secret = SECRET_NAMES.test(path.split('.').at(-1));
+          rows.push({
+            path,
+            value: !isLeaf ? null : secret ? '******' : node._value,
+            type: node._type ?? null,
+            writable: node._writable ?? null,
+            timestamp: node._timestamp ?? null,
+            read: isLeaf
+          });
+        }
+      }
+      if (isLeaf) return;
+    }
+    for (const [key, child] of Object.entries(node)) {
+      if (key.startsWith('_')) continue;
+      walk(child, path ? `${path}.${key}` : key);
+    }
+  };
+  walk(item, '');
+  return { rows, total, limit: PARAMETER_LIST_LIMIT };
+}
+
 /** The numeric children of a GenieACS object node, in index order. */
 function indexedChildren(node) {
   if (!node || typeof node !== 'object') return [];
@@ -255,5 +396,9 @@ export default {
   RX_POWER_FALLBACK_PATHS,
   findPppoeUsername,
   findRxPowerReading,
-  normalizeRxPowerReading
+  findTemperatureReading,
+  findWanParameterByName,
+  listDocumentParameters,
+  normalizeRxPowerReading,
+  normalizeTemperatureReading
 };

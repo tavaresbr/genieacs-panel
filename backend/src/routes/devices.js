@@ -12,6 +12,10 @@ router.delete('/faults/:faultId', authenticateToken, requirePermission('devices.
 // Above the bare `/:deviceId` route, so `/swaps` is not read as a device id.
 router.get('/swaps', authenticateToken, requirePermission('devices.inspect'), DeviceController.getSwaps);
 router.post('/swaps/:id/acknowledge', authenticateToken, requirePermission('devices.write'), DeviceController.acknowledgeSwap);
+// The device id travels in the query, not the path: GenieACS ids are not rows
+// of this panel, and route-coverage.test.js keeps id-addressed routes from
+// growing. Above `/:deviceId`, so `parameters` is not read as a device id.
+router.get('/parameters', authenticateToken, requirePermission('devices.inspect'), DeviceController.getDeviceParameters);
 // Above the bare `/:deviceId` route, like the other device sub-paths.
 router.get('/:deviceId/history', authenticateToken, requirePermission('devices.list'), DeviceController.getHistory);
 router.get('/:deviceId/swaps', authenticateToken, requirePermission('devices.inspect'), DeviceController.getDeviceSwaps);

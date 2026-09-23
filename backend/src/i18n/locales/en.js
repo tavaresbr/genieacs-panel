@@ -82,6 +82,8 @@ export default {
   'device.history.rangeInvalid': 'Invalid date range: it must run forwards and cover at most one year',
   'device.history.deviceIdRequired': 'The device ID is required',
   'device.swaps.retrieved': 'Device swaps retrieved',
+  'device.parameters.retrieved': "Device parameters retrieved",
+  'device.parameters.failed': "Could not read the device parameters",
   'device.swaps.failed': 'Failed to read the device swaps',
   'device.swaps.notFound': 'Swap not found',
   'device.swaps.acknowledged': 'Swap acknowledged',

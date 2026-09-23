@@ -82,6 +82,8 @@ export default {
   'device.history.rangeInvalid': '時間範圍無效：必須向前推移且最長不超過一年',
   'device.history.deviceIdRequired': '需要裝置 ID',
   'device.swaps.retrieved': '已取得裝置更換紀錄',
+  'device.parameters.retrieved': "已取得裝置參數",
+  'device.parameters.failed': "無法讀取裝置參數",
   'device.swaps.failed': '無法讀取裝置更換紀錄',
   'device.swaps.notFound': '找不到更換紀錄',
   'device.swaps.acknowledged': '更換紀錄已確認',

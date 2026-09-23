@@ -5,9 +5,14 @@ import { asTenant, authHeaders, call, startTestServers, stopTestServers } from '
 
 const { default: Setting } = await import('../src/models/Setting.js');
 const {
+  WAN_VLAN_NAMES,
   findPppoeUsername,
   findRxPowerReading,
-  normalizeRxPowerReading
+  findTemperatureReading,
+  findWanParameterByName,
+  listDocumentParameters,
+  normalizeRxPowerReading,
+  normalizeTemperatureReading
 } = await import('../src/services/deviceParameterFallbacks.js');
 
 /** How GenieACS wraps a reported parameter. */
@@ -261,5 +266,91 @@ describe('GET /api/devices without VirtualParameters', () => {
 
     assert.equal(device.pppoe, 'scripted-3');
     assert.equal(device.rxpower, '-19.87');
+  });
+});
+
+/** A Nokia with its optics' temperature and its VLAN under `X_ALU-COM_…` names. */
+function nokiaWithAluNames() {
+  const device = bareOnt(9);
+  const wan = device.InternetGatewayDevice.WANDevice[1];
+  wan['X_ALU-COM_GponInterfaceConfig'].TransceiverTemperature = param('11520');
+  wan['X_ALU-COM_GponInterfaceConfig'].TemperatureThreshold = param('85');
+  wan.WANConnectionDevice[1]['X_ALU-COM_VLANID'] = param('100');
+  wan.WANConnectionDevice[1].WANPPPConnection[1].Password = param('segredo-pppoe');
+  wan.WANConnectionDevice[1].WANPPPConnection[1].ConnectionType = { _object: false, _writable: true };
+  return device;
+}
+
+describe('a temperature found by its own name', () => {
+  const readValue = (node) => node?._value;
+
+  it('reads the 1/256 °C scale the transceiver publishes', () => {
+    assert.equal(normalizeTemperatureReading('11520'), 45);
+    assert.equal(normalizeTemperatureReading('47.5'), 47.5);
+    assert.equal(normalizeTemperatureReading('0'), null);
+    assert.equal(normalizeTemperatureReading('garbage'), null);
+  });
+
+  it('finds it under a vendor object, and not the threshold beside it', () => {
+    assert.deepEqual(findTemperatureReading(nokiaWithAluNames(), readValue), {
+      value: 45,
+      path: 'InternetGatewayDevice.WANDevice.1.X_ALU-COM_GponInterfaceConfig.TransceiverTemperature'
+    });
+  });
+
+  it('shows it on the device list', async () => {
+    genieAcs.fleet = [nokiaWithAluNames()];
+    // The detail page is where the path is learned; the listing then asks for it.
+    await call(`${panelUrl}/api/devices/${encodeURIComponent(genieAcs.fleet[0]._id)}`, {
+      headers: authHeaders(token)
+    });
+    const [device] = await listDevices();
+    assert.equal(device.temperature, 45);
+  });
+});
+
+describe('a WAN VLAN under a vendor name', () => {
+  it('is found on the connection device above the PPPoE connection', () => {
+    const path = 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1';
+    assert.equal(
+      findWanParameterByName(nokiaWithAluNames(), path, WAN_VLAN_NAMES),
+      'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.X_ALU-COM_VLANID'
+    );
+  });
+});
+
+describe('the parameter listing for one ONT', () => {
+  it('flattens the document and filters by path', () => {
+    const { rows, total } = listDocumentParameters(nokiaWithAluNames(), 'temperature');
+    assert.equal(total, 2);
+    assert.ok(rows.some((row) => row.path.endsWith('TransceiverTemperature') && row.value === '11520'));
+  });
+
+  it('never hands a password back', () => {
+    const { rows } = listDocumentParameters(nokiaWithAluNames(), 'password');
+    assert.equal(rows[0].value, '******');
+  });
+
+  it('tells a parameter nobody read apart from one that is missing', () => {
+    const { rows } = listDocumentParameters(nokiaWithAluNames(), 'ConnectionType');
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].read, false);
+  });
+
+  it('is served to the operator, with the device id in the query', async () => {
+    genieAcs.fleet = [nokiaWithAluNames()];
+    const { status, body } = await call(
+      `${panelUrl}/api/devices/parameters?deviceId=${encodeURIComponent(genieAcs.fleet[0]._id)}&search=VLAN`,
+      { headers: authHeaders(token) }
+    );
+    assert.equal(status, 200);
+    assert.deepEqual(body.data.rows.map((row) => row.path), [
+      'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.X_ALU-COM_VLANID'
+    ]);
+  });
+
+  it('requires a session', async () => {
+    const { status } = await call(`${panelUrl}/api/devices/parameters?deviceId=x`);
+    assert.equal(status, 401);
   });
 });

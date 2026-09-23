@@ -82,6 +82,8 @@ export default {
   'device.history.rangeInvalid': 'Неверный интервал: он должен идти вперёд и охватывать не более года',
   'device.history.deviceIdRequired': 'Требуется идентификатор устройства',
   'device.swaps.retrieved': 'Замены оборудования получены',
+  'device.parameters.retrieved': "Параметры устройства получены",
+  'device.parameters.failed': "Не удалось прочитать параметры устройства",
   'device.swaps.failed': 'Не удалось прочитать замены оборудования',
   'device.swaps.notFound': 'Замена не найдена',
   'device.swaps.acknowledged': 'Замена подтверждена',
