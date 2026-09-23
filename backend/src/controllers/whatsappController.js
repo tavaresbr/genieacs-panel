@@ -238,7 +238,8 @@ class WhatsAppController {
       const account = await EvolutionInstanceService.updateAccount(req.params?.id, {
         label: body.label,
         purpose: body.purpose,
-        isDefault: body.isDefault
+        isDefault: body.isDefault,
+        color: body.color
       });
       return res.json(createResponse(req.t('whatsapp.accountUpdated'), {
         account: WhatsAppConfigService.publicAccount(account)

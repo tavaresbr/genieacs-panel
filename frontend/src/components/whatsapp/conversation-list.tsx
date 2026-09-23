@@ -2,7 +2,8 @@
 
 import { Icon } from '@/components/ui/icon'
 import { useTranslation } from '@/contexts/language-context'
-import type { WhatsAppConversation } from '@/lib/api'
+import type { WhatsAppAccount, WhatsAppConversation } from '@/lib/api'
+import { accountTag } from '@/lib/wa-account-color'
 
 /**
  * What to call the person on the other end.
@@ -56,6 +57,8 @@ function stamp(iso: string | null, intlLocale: string): string {
 
 interface ConversationListProps {
   conversations: WhatsAppConversation[]
+  /** Os números do provedor, por id: cada linha diz por qual deles chegou. */
+  accounts: ReadonlyMap<number, WhatsAppAccount>
   selectedId: number | null
   onSelect: (conversation: WhatsAppConversation) => void
   /** A search term or a non-default pile is narrowing what is drawn here. */
@@ -68,7 +71,7 @@ interface ConversationListProps {
  * clears when a thread is opened have to be settled in one place, and that
  * place is the page.
  */
-export function ConversationList({ conversations, selectedId, onSelect, filtered }: ConversationListProps) {
+export function ConversationList({ conversations, accounts, selectedId, onSelect, filtered }: ConversationListProps) {
   const { t, intlLocale } = useTranslation()
 
   if (conversations.length === 0) {
@@ -88,15 +91,22 @@ export function ConversationList({ conversations, selectedId, onSelect, filtered
       {conversations.map((conversation) => {
         const active = conversation.id === selectedId
         const address = conversationAddress(conversation)
+        const numero = accountTag(accounts, conversation)
+        // A faixa da esquerda é a cor do NÚMERO que recebeu, sempre que ele é
+        // conhecido — e a linha aberta continua reconhecível pelo fundo. Sem
+        // número conhecido, a faixa volta a ser só a da seleção, como antes.
+        const faixa = numero
+          ? `${numero.className} shadow-[inset_4px_0_0_0_hsl(var(--wa-account))]`
+          : active ? 'shadow-[inset_3px_0_0_0_hsl(var(--primary))]' : ''
         return (
           <li key={conversation.id}>
             <button
               type="button"
               onClick={() => onSelect(conversation)}
               aria-current={active ? 'true' : undefined}
-              className={`flex w-full flex-col gap-1.5 px-3 py-3 text-start transition-colors ${
+              className={`flex w-full flex-col gap-1.5 px-3 py-3 text-start transition-colors ${faixa} ${
                 active
-                  ? 'bg-[hsl(var(--surface-subtle))] shadow-[inset_3px_0_0_0_hsl(var(--primary))]'
+                  ? 'bg-[hsl(var(--surface-subtle))]'
                   : 'hover:bg-[hsl(var(--surface-subtle))]'
               }`}
             >
@@ -118,6 +128,7 @@ export function ConversationList({ conversations, selectedId, onSelect, filtered
               )}
 
               <span className="flex flex-wrap items-center gap-1.5">
+                {numero?.showName && <AccountChip name={numero.name} />}
                 {/* Only ever visible under the closed or the all pile, which is
                     exactly where a row's state stops being obvious. */}
                 {conversation.closedAt && (
@@ -154,5 +165,25 @@ export function ConversationList({ conversations, selectedId, onSelect, filtered
         )
       })}
     </ul>
+  )
+}
+
+/**
+ * O nome do número que recebeu a conversa, na cor dele.
+ *
+ * Vai dentro de um elemento que já carrega a classe do número (`accountTag`),
+ * então só lê `--wa-account`. Exportado porque o cabeçalho da conversa mostra o
+ * mesmo chip.
+ */
+export function AccountChip({ name }: { name: string }) {
+  const { t } = useTranslation()
+  return (
+    <span
+      className="inline-flex max-w-full items-center gap-1 rounded-full border border-[hsl(var(--wa-account))]/35 bg-[hsl(var(--wa-account))]/10 px-2 py-0.5 text-[0.68rem] font-semibold text-[hsl(var(--wa-account))]"
+      title={t('whatsapp.inbox.receivedBy', { number: name })}
+    >
+      <span className="size-1.5 shrink-0 rounded-full bg-[hsl(var(--wa-account))]" aria-hidden="true" />
+      <span className="truncate">{name}</span>
+    </span>
   )
 }

@@ -13,6 +13,13 @@ import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
 import { formatRelativeTime } from '@/lib/utils'
+import {
+  WA_ACCOUNT_CLASS,
+  WA_ACCOUNT_COLORS,
+  WA_ACCOUNT_COLOR_LABEL,
+  accountColor,
+  type WaAccountColor
+} from '@/lib/wa-account-color'
 
 const PURPOSES: WhatsAppPurpose[] = ['general', 'billing', 'support', 'sales', 'alerts']
 
@@ -439,9 +446,10 @@ export function WhatsAppConnection({ config }: Props) {
     baseUrl: string
     adminKey: string
   }>({ label: '', purpose: 'general', baseUrl: '', adminKey: '' })
-  const [edit, setEdit] = useState<{ label: string; purpose: WhatsAppPurpose }>({
+  const [edit, setEdit] = useState<{ label: string; purpose: WhatsAppPurpose; color: WaAccountColor }>({
     label: '',
-    purpose: 'general'
+    purpose: 'general',
+    color: WA_ACCOUNT_COLORS[0]
   })
 
   const managed = Boolean(config?.managed)
@@ -569,7 +577,8 @@ export function WhatsAppConnection({ config }: Props) {
     try {
       const res = await whatsappAPI.updateAccount(account.id, {
         label: edit.label,
-        purpose: edit.purpose
+        purpose: edit.purpose,
+        color: edit.color
       })
       if (!res.success) {
         toast.error(whatsappErrorMessage(t, res.code))
@@ -706,7 +715,14 @@ export function WhatsAppConnection({ config }: Props) {
               <li key={account.id} className="rounded-md border border-border p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="text-sm font-semibold text-foreground">
+                    {/* A cor aparece aqui, onde ela é configurada, para o
+                        operador aprender o mapa antes de vê-lo na caixa. */}
+                    <p className={`flex items-center gap-2 text-sm font-semibold text-foreground ${WA_ACCOUNT_CLASS[accountColor(account)]}`}>
+                      <span
+                        className="size-3 shrink-0 rounded-full bg-[hsl(var(--wa-account))]"
+                        title={t(WA_ACCOUNT_COLOR_LABEL[accountColor(account)])}
+                        aria-hidden="true"
+                      />
                       {account.label || account.name}
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
@@ -817,6 +833,27 @@ export function WhatsAppConnection({ config }: Props) {
                         ))}
                       </select>
                     </div>
+                    <fieldset className="sm:col-span-2">
+                      <legend className="field-label">{t('whatsapp.accounts.color')}</legend>
+                      <div className="flex flex-wrap gap-2">
+                        {WA_ACCOUNT_COLORS.map((cor) => (
+                          <button
+                            key={cor}
+                            type="button"
+                            aria-pressed={edit.color === cor}
+                            onClick={() => setEdit((c) => ({ ...c, color: cor }))}
+                            className={`${WA_ACCOUNT_CLASS[cor]} inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+                              edit.color === cor
+                                ? 'border-[hsl(var(--wa-account))] bg-[hsl(var(--wa-account))]/15 text-[hsl(var(--wa-account))]'
+                                : 'border-border text-muted-foreground hover:border-[hsl(var(--wa-account))]/60'
+                            }`}
+                          >
+                            <span className="size-3 shrink-0 rounded-full bg-[hsl(var(--wa-account))]" aria-hidden="true" />
+                            {t(WA_ACCOUNT_COLOR_LABEL[cor])}
+                          </button>
+                        ))}
+                      </div>
+                    </fieldset>
                     <div className="flex flex-wrap gap-3 sm:col-span-2">
                       <button
                         type="button"
@@ -926,7 +963,7 @@ export function WhatsAppConnection({ config }: Props) {
                       className="modern-button-secondary"
                       disabled={busy}
                       onClick={() => {
-                        setEdit({ label: account.label ?? '', purpose: account.purpose })
+                        setEdit({ label: account.label ?? '', purpose: account.purpose, color: accountColor(account) })
                         setEditing(account.id)
                       }}
                     >

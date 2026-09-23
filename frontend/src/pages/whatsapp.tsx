@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   whatsappAPI,
+  type WhatsAppAccount,
   type WhatsAppConversation,
   type WhatsAppMessage
 } from '@/lib/api'
@@ -153,6 +154,9 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
   const [draft, setDraft] = useState<{ id: number; text: string } | null>(null)
 
   const [conversations, setConversations] = useState<WhatsAppConversation[]>([])
+  // Os números do provedor, para cada conversa dizer por qual deles chegou.
+  // Lidos uma vez: número novo é raro, e entra na próxima abertura da tela.
+  const [accounts, setAccounts] = useState<ReadonlyMap<number, WhatsAppAccount>>(() => new Map())
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [conversation, setConversation] = useState<WhatsAppConversation | null>(null)
   const [messages, setMessages] = useState<WhatsAppMessage[]>([])
@@ -311,6 +315,17 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
   useEffect(() => { loadListRef.current = loadList }, [loadList])
 
   useEffect(() => { void loadList(true) }, [loadList])
+
+  // Falhar aqui não derruba a caixa: sem os números, as conversas aparecem sem
+  // cor, como antes de existir cor. Por isso nem toast — a caixa funciona.
+  useEffect(() => {
+    let vivo = true
+    void whatsappAPI.listAccounts().then((res) => {
+      if (!vivo || !res.success || !Array.isArray(res.data)) return
+      setAccounts(new Map(res.data.map((account) => [account.id, account])))
+    }).catch(() => {})
+    return () => { vivo = false }
+  }, [])
 
   // A filter the operator changed is asked for at once rather than waited for.
   // The ref is written here, immediately before the reload it belongs to, so
@@ -609,6 +624,7 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
                   : (
                     <ConversationList
                       conversations={conversations}
+                      accounts={accounts}
                       selectedId={selectedId}
                       onSelect={select}
                       // An empty list under a search term is a different fact
@@ -625,6 +641,7 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
                 <>
                   <ConversationThread
                     conversation={conversation}
+                    accounts={accounts}
                     messages={messages}
                     loading={loadingThread}
                     canLoadMore={hasOlder && !loadingOlder}
