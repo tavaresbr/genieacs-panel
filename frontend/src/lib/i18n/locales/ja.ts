@@ -1555,7 +1555,7 @@ const ja: Dictionary = {
   'whatsapp.sgp.noIp': 'ONTがIPを報告していません',
   'whatsapp.sgp.rxPower': '光信号',
   'whatsapp.sgp.lastInform': '最終inform',
-  'whatsapp.sgp.openRouter': 'ルーターを開く',
+  'whatsapp.sgp.openSgp': 'SGPで開く',
   'whatsapp.sgp.unlockConfirm': '契約 {contract} の信頼解除をSGPに依頼しますか？',
   'whatsapp.sgp.unlockActiveHint': '契約は有効です。解除が適用されるかはSGPが判断します。',
   'whatsapp.sgp.contractData': '契約情報',

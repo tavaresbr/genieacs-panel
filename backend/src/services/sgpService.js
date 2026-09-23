@@ -331,6 +331,9 @@ function normalizeContract(entry, { includeSecrets = false } = {}) {
     ])),
     plan: asText(pick(entry, ['planoInternet', 'plano', 'planoDescricao', 'servico'])),
     name: asText(pick(entry, ['razaoSocial', 'nome', 'nomeCliente', 'cliente'])),
+    // Only a field that says it is the client's: a contract row's own `id` is
+    // the contract's, and a wrong client id opens someone else's page in SGP.
+    clientId: asText(pick(entry, ['clienteId', 'idCliente', 'cliente_id', 'codigoCliente'])),
     document: asText(pick(entry, ['cpfcnpj', 'cpfCnpj', 'documento'])),
     address: asText(pick(entry, ['endereco', 'enderecoCompleto', 'contratoEndereco'])),
     login: asText(pick(entry, ['login', 'usuario', 'pppoe', 'loginPppoe'])),

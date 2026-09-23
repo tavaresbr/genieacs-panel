@@ -1556,7 +1556,7 @@ const zhTW: Dictionary = {
   'whatsapp.sgp.noIp': 'ONT 未回報 IP',
   'whatsapp.sgp.rxPower': '光訊號',
   'whatsapp.sgp.lastInform': '最後 inform',
-  'whatsapp.sgp.openRouter': '開啟路由器',
+  'whatsapp.sgp.openSgp': '在 SGP 中開啟',
   'whatsapp.sgp.unlockConfirm': '要在 SGP 中為合約 {contract} 申請信任解鎖嗎？',
   'whatsapp.sgp.unlockActiveHint': '合約為有效狀態；是否適用解鎖由 SGP 決定。',
   'whatsapp.sgp.contractData': '合約資訊',

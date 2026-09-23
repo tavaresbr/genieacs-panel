@@ -2417,6 +2417,8 @@ export type WaSubscriberPanel =
         error: WaSubscriberPartError | null
       }
       contract: WaSubscriberContract | null
+      /** The client's page in the SGP web app, or null when SGP gave no client id. */
+      sgpUrl: string | null
       router:
         | { available: false; reason: 'unlinked' | 'unreachable'; deviceId: string | null; deviceIds: string[]; error?: WaSubscriberPartError }
         | {

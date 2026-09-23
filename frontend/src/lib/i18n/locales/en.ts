@@ -1558,7 +1558,7 @@ const en = {
   'whatsapp.sgp.noIp': 'The ONT did not report an IP',
   'whatsapp.sgp.rxPower': 'Optical signal',
   'whatsapp.sgp.lastInform': 'Last inform',
-  'whatsapp.sgp.openRouter': 'Open router',
+  'whatsapp.sgp.openSgp': 'Open in SGP',
   'whatsapp.sgp.unlockConfirm': 'Request a trust unlock in SGP for contract {contract}?',
   'whatsapp.sgp.unlockActiveHint': 'The contract is active; SGP decides whether an unlock applies.',
   'whatsapp.sgp.contractData': 'Contract data',

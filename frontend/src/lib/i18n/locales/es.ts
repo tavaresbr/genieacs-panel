@@ -1556,7 +1556,7 @@ const es: Dictionary = {
   'whatsapp.sgp.noIp': 'La ONT no informó IP',
   'whatsapp.sgp.rxPower': 'Señal óptica',
   'whatsapp.sgp.lastInform': 'Último inform',
-  'whatsapp.sgp.openRouter': 'Abrir router',
+  'whatsapp.sgp.openSgp': 'Abrir en SGP',
   'whatsapp.sgp.unlockConfirm': '¿Solicitar un desbloqueo de confianza en SGP para el contrato {contract}?',
   'whatsapp.sgp.unlockActiveHint': 'El contrato está activo; SGP decide si aplica el desbloqueo.',
   'whatsapp.sgp.contractData': 'Datos del contrato',

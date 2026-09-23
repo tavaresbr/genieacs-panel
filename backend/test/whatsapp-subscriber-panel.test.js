@@ -42,6 +42,7 @@ const CONTRATOS = [
   },
   {
     contratoId: ATIVO,
+    clienteId: 57,
     razaoSocial: 'SINDICATO DOS VIGILANTES',
     cpfcnpj: DOCUMENTO,
     contratoStatusDisplay: 'Ativo',
@@ -190,6 +191,16 @@ describe('the SGP module beside a thread', () => {
     assert.equal(data.contract.state, 'active');
     assert.equal(data.attendance.clientName, 'SINDICATO DOS VIGILANTES');
     assert.equal(data.attendance.matchedOn, 'sgp');
+  });
+
+  it('links to the client page in the SGP web app, and only from a client id SGP sent', async () => {
+    const { body } = await painel(fios.assinante);
+    assert.match(body.data.sgpUrl, /\/admin\/cliente\/57\/contratos\/$/);
+    assert.ok(body.data.sgpUrl.startsWith('http://127.0.0.1:'));
+
+    // The suspended contract comes without a client id: no link, no guess.
+    const other = await painel(fios.assinante, `?contract=${SUSPENSO}`);
+    assert.equal(other.body.data.sgpUrl, null);
   });
 
   it('reads the router address from the ONT, not from the ERP', async () => {
