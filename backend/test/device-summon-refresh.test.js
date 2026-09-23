@@ -217,6 +217,17 @@ describe('summoning a device', () => {
     assert.ok(read.parameterNames.includes('InternetGatewayDevice.DeviceInfo.SerialNumber'));
   });
 
+  it('asks the ONT for its PPPoE login by name, after the inform', async () => {
+    // A ZTE F-series faults on refreshing the whole WAN tree and its login
+    // stays unread; without the login the SGP contract never links.
+    await summon();
+    const reads = genieAcs.tasks.filter((task) => task.name === 'getParameterValues');
+    assert.equal(reads.length, 2);
+    assert.deepEqual(reads[1].parameterNames, [
+      'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Username'
+    ]);
+  });
+
   it('survives an ONT that carries the root but refuses the object', async () => {
     genieAcs.refusedObjects = new Set(TR098_OBJECTS);
 

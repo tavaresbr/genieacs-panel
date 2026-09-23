@@ -395,6 +395,8 @@ export default {
   'sgp.error.unlockRefused': 'SGPがこの契約の信頼解除を拒否しました',
   'sgp.error.contractNotInConversation': 'この契約はこの会話に属していません',
   'sgp.error.deviceUnlinked': 'この ONT にはまだ SGP の契約が紐づいていません。手動で紐づけるか、PPPoE ログインを確認してください。',
+  'sgp.error.loginRequested': 'ONT はまだ GenieACS に PPPoE ログインを報告していません。読み取りを要求しました。次の Inform で届きます。数分後に再試行するか、CPF/契約で手動で紐づけてください。',
+  'sgp.error.loginNotReported': 'ONT は TR-069 で PPPoE ログインを報告しません（OLT が OMCI で WAN を設定している場合によくあります）。CPF/契約で手動で紐づけてください。',
   'sgp.error.noContractForDevice': 'この ONT に対応する SGP の契約が見つかりませんでした',
   'sgp.error.contractNotFound': 'SGP に契約が見つかりません',
   'sgp.error.webhookSecretRequired': 'SGP のイベント受信を有効にする前に、Webhook のシークレットを生成してください',

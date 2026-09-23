@@ -1530,7 +1530,8 @@ class SgpService {
   }
 
   /**
-   * The login the ONT reports, or null — never an error.
+   * The login the ONT reports and why there is none, never an error — see
+   * `DeviceService.inspectReportedPppoe` for the states.
    *
    * A GenieACS that is unreachable must not turn "this ONT has no contract
    * yet" into a failed page: the caller falls back to having no identifier,
@@ -1538,11 +1539,27 @@ class SgpService {
    */
   static async reportedPppoeLogin(deviceId) {
     try {
-      return await DeviceService.getReportedPppoe(deviceId);
+      return await DeviceService.inspectReportedPppoe(deviceId);
     } catch (error) {
       console.warn(`Unable to read the reported PPPoE login of ${deviceId}: ${error.message}`);
-      return null;
+      return { login: null, state: 'unknown' };
     }
+  }
+
+  /**
+   * The error for an ONT with no identifier to look up, saying which gap it
+   * is. "Check the PPPoE login" sent operators to the SGP cadastre while the
+   * login was simply never read off the ONT — every ZTE F-series whose WAN the
+   * GenieACS provision never fetched.
+   */
+  static unlinkedError(reported) {
+    if (reported?.state === 'requested') {
+      return new SgpError('sgp.error.loginRequested', { code: 'unlinked', status: 404 });
+    }
+    if (reported?.state === 'empty') {
+      return new SgpError('sgp.error.loginNotReported', { code: 'unlinked', status: 404 });
+    }
+    return new SgpError('sgp.error.deviceUnlinked', { code: 'unlinked', status: 404 });
   }
 
   // Resolves the SGP contract bound to a panel device. A stored link always
@@ -1577,11 +1594,12 @@ class SgpService {
     // subscriber portal. An account-backed device already carries a login, so
     // this costs nothing there — and the portal, the one caller on a
     // subscriber's critical path, always has an account.
-    const reportedLogin = !manual
+    const reported = !manual
       && config.linkMode === 'pppoe'
       && !normalizeLogin(account?.pppoe_username)
       ? await this.reportedPppoeLogin(deviceId)
       : null;
+    const reportedLogin = reported?.login || null;
 
     // The same protection where there is no account to compare. An ONT whose
     // reported login no longer matches the contract on file is an ONT that
@@ -1612,7 +1630,7 @@ class SgpService {
 
     if (!filters.contract && !filters.login) {
       if (cacheable) return { link: usable, account, source: 'cache' };
-      throw new SgpError('sgp.error.deviceUnlinked', { code: 'unlinked', status: 404 });
+      throw this.unlinkedError(reported);
     }
 
     const { contracts } = await this.lookupCustomer(filters, config);
@@ -1774,10 +1792,16 @@ class SgpService {
     }
 
     const covered = new Set(accounts.map((account) => String(account.device_id)));
-    const extra = devices
-      .filter((device) => device._id
-        && !covered.has(String(device._id))
-        && normalizeLogin(device.pppoe))
+    const uncovered = devices.filter((device) => device._id && !covered.has(String(device._id)));
+    const probed = await this.probeUnreadLogins(
+      uncovered.filter((device) => !normalizeLogin(device.pppoe))
+    );
+    const extra = uncovered
+      .map((device) => ({
+        ...device,
+        pppoe: normalizeLogin(device.pppoe) ? device.pppoe : probed.get(device._id)
+      }))
+      .filter((device) => normalizeLogin(device.pppoe))
       .map((device) => ({
         id: null,
         device_id: device._id,
@@ -1785,6 +1809,38 @@ class SgpService {
         pppoe_username: device.pppoe
       }));
     return [...accounts, ...extra];
+  }
+
+  /** ONTs without a login one sweep looks into, at most. */
+  static LOGIN_PROBE_BATCH = 25;
+
+  /** `${tenant}\0${device}` → when a sweep last looked into its login. */
+  static loginProbes = new Map();
+
+  /**
+   * Looks into the ONTs the identity read found no login for, a batch per
+   * sweep, and returns the logins that turned up.
+   *
+   * The identity read projects named paths only, so an ONT whose login sits
+   * elsewhere — or was never read off it — is invisible to it. Inspecting one
+   * finds the first kind now and queues a read for the second, so the next
+   * sweep after its Inform links it. Each ONT is looked into once an hour at
+   * most, which is what lets a fleet of bridged ONTs rotate through the batch
+   * instead of holding it forever.
+   */
+  static async probeUnreadLogins(devices) {
+    const found = new Map();
+    const now = Date.now();
+    const due = devices.filter((device) => {
+      const last = this.loginProbes.get(DeviceService.pppoeReadKey(device._id));
+      return !last || now - last >= DeviceService.PPPOE_READ_INTERVAL_MS;
+    }).slice(0, this.LOGIN_PROBE_BATCH);
+    for (const device of due) {
+      this.loginProbes.set(DeviceService.pppoeReadKey(device._id), now);
+      const reported = await this.reportedPppoeLogin(device._id);
+      if (reported.login) found.set(device._id, reported.login);
+    }
+    return found;
   }
 
   // Fleet-wide refresh of every device this install can identify — see

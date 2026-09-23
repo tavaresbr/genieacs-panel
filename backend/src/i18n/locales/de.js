@@ -350,6 +350,8 @@ export default {
   'sgp.error.unlockRefused': 'SGP hat die Vertrauensentsperrung für diesen Vertrag abgelehnt',
   'sgp.error.contractNotInConversation': 'Dieser Vertrag gehört nicht zu diesem Gespräch',
   'sgp.error.deviceUnlinked': 'Dieses ONT ist noch mit keinem SGP-Vertrag verknüpft. Verknüpfen Sie es manuell oder prüfen Sie den PPPoE-Login.',
+  'sgp.error.loginRequested': 'Das ONT hat GenieACS seinen PPPoE-Login noch nicht gemeldet. Eine Abfrage wurde angefordert und kommt mit dem nächsten Inform; versuchen Sie es in einigen Minuten erneut oder verknüpfen Sie es manuell per CPF/Vertrag.',
+  'sgp.error.loginNotReported': 'Das ONT meldet seinen PPPoE-Login nicht über TR-069 (häufig, wenn die OLT das WAN per OMCI konfiguriert). Verknüpfen Sie es manuell per CPF/Vertrag.',
   'sgp.error.noContractForDevice': 'Für dieses ONT wurde kein SGP-Vertrag gefunden',
   'sgp.error.contractNotFound': 'Vertrag in SGP nicht gefunden',
   'sgp.error.testCredentialsRequired': 'Geben Sie SGP-URL, App und Token an, um die Verbindung zu testen',

@@ -396,6 +396,8 @@ export default {
   'sgp.error.unlockRefused': 'رفض SGP فك الحظر بالثقة لهذا العقد',
   'sgp.error.contractNotInConversation': 'هذا العقد لا يخص هذه المحادثة',
   'sgp.error.deviceUnlinked': 'هذا الجهاز غير مرتبط بعقد في SGP بعد. اربطه يدويًا أو تحقّق من اسم دخول PPPoE.',
+  'sgp.error.loginRequested': 'لم يُبلغ جهاز ONT خادم GenieACS باسم دخول PPPoE بعد. طُلبت القراءة وستصل مع رسالة Inform التالية؛ أعد المحاولة بعد دقائق أو اربطه يدويًا عبر CPF/العقد.',
+  'sgp.error.loginNotReported': 'لا يُبلغ جهاز ONT عن اسم دخول PPPoE عبر TR-069 (شائع عندما يهيّئ OLT واجهة WAN عبر OMCI). اربطه يدويًا عبر CPF/العقد.',
   'sgp.error.noContractForDevice': 'لم يُعثر على عقد في SGP لهذا الجهاز',
   'sgp.error.contractNotFound': 'العقد غير موجود في SGP',
   'sgp.error.webhookSecretRequired': 'أنشئ سر webhook قبل تفعيل استقبال أحداث SGP',
