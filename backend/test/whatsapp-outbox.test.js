@@ -6,7 +6,8 @@ import { asTenant, authHeaders, call, getDb, runInTenant, startTestServers, stop
 const { default: WhatsAppConfigService } = await import('../src/services/whatsappConfigService.js');
 const { default: WhatsAppAccount } = await import('../src/models/WhatsAppAccount.js');
 const { default: WaConversation } = await import('../src/models/WaConversation.js');
-const { default: WaMessage } = await import('../src/models/WaMessage.js');
+const { default: WaMessage, RECLAIM_MS } = await import('../src/models/WaMessage.js');
+const { currentTenantId } = await import('../src/config/tenantContext.js');
 const { default: WaOptOut } = await import('../src/models/WaOptOut.js');
 const { default: WaOutboxWorker } = await import('../src/services/waOutboxWorker.js');
 const { default: AppState } = await import('../src/models/AppState.js');
@@ -826,5 +827,127 @@ describe('o teto de quem enfileira', () => {
     }
     whatsappSendLimiter.resetKey(`user:${userId}`);
     await clearOutbox();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// A passagem ociosa
+//
+// O worker acorda a cada cinco segundos e visitava TODO provedor ativo para
+// perguntar a cada um se havia algo na fila — uma consulta pela lista de
+// provedores e mais uma por provedor, com a fila vazia em todos, que é o estado
+// normal de um painel. Agora ele pergunta uma vez e visita só quem respondeu.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('a passagem ociosa do envio', () => {
+  let ociosos;
+
+  before(async () => {
+    for (const slug of ['ocioso-a', 'ocioso-b', 'ocioso-c']) {
+      // eslint-disable-next-line no-await-in-loop -- três linhas de fixture
+      await getDb()('tenants').insert({ slug, name: slug, status: 'active' });
+    }
+    ociosos = await getDb()('tenants').whereIn('slug', ['ocioso-a', 'ocioso-b', 'ocioso-c']).pluck('id');
+  });
+
+  /** Quem `tickForTenant` atendeu, na ordem. */
+  async function visitados(fn) {
+    const lista = [];
+    const original = WaOutboxWorker.tickForTenant;
+    WaOutboxWorker.tickForTenant = function espiao() {
+      lista.push(currentTenantId());
+      return original.call(this);
+    };
+    try {
+      await fn();
+    } finally {
+      WaOutboxWorker.tickForTenant = original;
+    }
+    return lista;
+  }
+
+  it('com a fila vazia em todo mundo, é UMA consulta — com um provedor ou com cinco', async () => {
+    await clearOutbox();
+    // A premissa, conferida em vez de suposta: nenhum provedor tem nada vencido.
+    // Sem ela a contagem abaixo mediria o resto de outro teste.
+    assert.deepEqual(await WaMessage.providersWithSendable(), []);
+    assert.ok(
+      (await getDb()('tenants').where({ status: 'active' }).count({ n: '*' }))[0].n >= 4,
+      'o caso só prova algo com vários provedores ativos'
+    );
+
+    const db = getDb();
+    let consultas = 0;
+    const contar = () => { consultas += 1; };
+    db.on('query', contar);
+    let visitas;
+    try {
+      visitas = await visitados(() => WaOutboxWorker.tick());
+    } finally {
+      db.off('query', contar);
+    }
+    assert.deepEqual(visitas, [], 'visitou provedor sem nada na fila');
+    assert.equal(consultas, 1);
+  });
+
+  it('visita só quem tem mensagem vencida, e ela sai', async () => {
+    await clearOutbox();
+    const conversation = await newConversation();
+    const { body } = await post(conversation.id, { body: 'só este provedor tem fila' });
+
+    let summary;
+    const visitas = await visitados(async () => { summary = await WaOutboxWorker.tick(); });
+
+    assert.deepEqual(visitas, [1]);
+    for (const id of ociosos) assert.ok(!visitas.includes(id));
+    assert.equal(summary.sent, 1);
+    assert.equal((await asTenant(() => WaMessage.getById(body.data.id))).delivery_status, 'sent');
+  });
+
+  it('uma mensagem ainda em espera de nova tentativa não acorda o provedor', async () => {
+    await clearOutbox();
+    const conversation = await newConversation();
+    const { body } = await post(conversation.id, { body: 'ainda não é a hora' });
+    await asTenant(() => WaMessage.update(body.data.id, { next_attempt_at: new Date(Date.now() + 60_000) }));
+
+    const visitas = await visitados(() => WaOutboxWorker.tick());
+    assert.deepEqual(visitas, []);
+    assert.equal(sendTextCalls().length, 0);
+  });
+
+  it('a garra de uma passagem que morreu no meio acorda o provedor', async () => {
+    // O caminho de recuperação: uma linha presa em 'sending' além do prazo de
+    // retomada. Se a pergunta prévia usasse um critério próprio e esquecesse
+    // este ramo, a mensagem ficaria presa para sempre — sem erro nenhum.
+    await clearOutbox();
+    const conversation = await newConversation();
+    const { body } = await post(conversation.id, { body: 'a passagem anterior morreu' });
+    await asTenant(() => WaMessage.update(body.data.id, {
+      delivery_status: 'sending',
+      claimed_at: new Date(Date.now() - RECLAIM_MS - 60_000)
+    }));
+
+    const visitas = await visitados(() => WaOutboxWorker.tick());
+    assert.deepEqual(visitas, [1]);
+    assert.equal((await asTenant(() => WaMessage.getById(body.data.id))).delivery_status, 'sent');
+  });
+
+  it('o provedor suspenso não é visitado, mesmo com fila', async () => {
+    // A pergunta prévia atravessa o escopo e não sabe de status; quem sabe é o
+    // laço. Suspender o provedor dos testes durante o caso é o jeito de ter uma
+    // fila de verdade num suspenso — conta, conversa e linha reais.
+    await clearOutbox();
+    const conversation = await newConversation();
+    await post(conversation.id, { body: 'não pode sair' });
+    await getDb()('tenants').where({ id: 1 }).update({ status: 'suspended' });
+
+    try {
+      assert.ok((await WaMessage.providersWithSendable()).includes(1), 'a premissa: ele TEM fila');
+      const visitas = await visitados(() => WaOutboxWorker.tick());
+      assert.deepEqual(visitas, [], 'o suspenso foi visitado');
+      assert.equal(sendTextCalls().length, 0);
+    } finally {
+      await getDb()('tenants').where({ id: 1 }).update({ status: 'active' });
+      await clearOutbox();
+    }
   });
 });

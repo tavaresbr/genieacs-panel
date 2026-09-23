@@ -1,4 +1,5 @@
 import { getDb, tdb, tinsertReturningId } from '../config/database.js';
+import { runUnscoped } from '../config/tenantContext.js';
 
 /** How long a message may sit in 'sending' before another pass may retake it. */
 export const RECLAIM_MS = 5 * 60 * 1000;
@@ -196,6 +197,36 @@ class WaMessage {
       .where({ id })
       .update({ ...patch, updated_at: new Date() });
     return this.getById(id);
+  }
+
+  /**
+   * Os provedores que têm alguma mensagem para a fila levar agora.
+   *
+   * O worker acorda a cada cinco segundos e visitava TODO provedor ativo para
+   * perguntar isto a cada um: uma consulta pela lista de provedores e mais uma
+   * por provedor, com a fila vazia em todos — que é o estado normal de um
+   * painel. Doze consultas por minuto por provedor para ouvir "nada".
+   *
+   * Perguntar uma vez para todos exige atravessar o escopo, e a resposta é o
+   * único dado que atravessa: ids de provedor, nunca uma linha de mensagem. Cada
+   * provedor da lista continua sendo servido pelo `listSendable` dele, dentro
+   * do escopo dele, e é ali que a fila é lida de fato.
+   *
+   * O critério é o MESMO `sendable` da listagem e da garra. Um critério próprio
+   * aqui divergiria dos dois na primeira vez que alguém mexesse num deles, e o
+   * provedor com mensagem vencida ficaria sem visita — uma fila parada sem erro.
+   */
+  static async providersWithSendable() {
+    const now = new Date();
+    const rows = await runUnscoped(
+      'the outbox worker asks which providers have anything due before opening a scope for each',
+      // tenant-scope-exempt: só `tenant_id` sai daqui; a fila é lida no escopo de cada um.
+      () => getDb()('wa_messages')
+        .distinct('tenant_id')
+        .whereNull('external_id')
+        .where((q) => sendable(q, now))
+    );
+    return rows.map((row) => Number(row.tenant_id)).filter(Number.isInteger);
   }
 
   /** Ids the outbox worker should try next, oldest first. */

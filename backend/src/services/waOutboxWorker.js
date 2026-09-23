@@ -166,10 +166,20 @@ class WaOutboxWorker {
    * uma campanha devolvia o minuto cheio — o teto que o painel promete seguir
    * é o que o WhatsApp impõe, e ele não reinicia junto com o nosso processo.
    *
+   * Só visita quem tem mensagem vencida. A fila vazia é o estado normal de um
+   * painel, e a visita a cada provedor para ouvir "nada" custava uma consulta
+   * por provedor a cada cinco segundos, mais a da lista de provedores. Agora a
+   * passagem ociosa é UMA consulta, com um provedor ou com cem.
+   *
+   * O efeito colateral é de propósito: o provedor sem nada na fila não tem
+   * `skipped` a relatar, porque não foi visitado. `disabled` e `rate_limited`
+   * continuam aparecendo onde importam — para quem tem mensagem esperando.
+   *
    * @returns {Promise<{ sent: number, failed: number, skipped: string|null }>}
    */
   static async tick() {
-    const summaries = await forEachTenant(() => this.tickForTenant());
+    const pendentes = await WaMessage.providersWithSendable();
+    const summaries = await forEachTenant(() => this.tickForTenant(), { only: pendentes });
     return summaries.reduce(
       (total, one) => ({
         sent: total.sent + one.sent,
