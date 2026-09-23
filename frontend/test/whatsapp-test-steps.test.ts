@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { testNotes, testOutcome, testPassed, toneOf } from '@/lib/whatsapp-test'
+import { testNotes, testOutcome, toneOf } from '@/lib/whatsapp-test'
 import type { WhatsAppConfigTest } from '@/lib/api'
 import en from '@/lib/i18n/locales/en'
 import type { TranslationKey, TranslationVars } from '@/lib/i18n/dictionary'
@@ -56,7 +56,7 @@ describe('o tom de cada veredito', () => {
 
 describe('"está tudo certo" é uma afirmação, não um resumo', () => {
   it('os seis aprovados passam', () => {
-    expect(testPassed(TUDO_CERTO)).toBe(true)
+    expect(testOutcome(TUDO_CERTO)).toBe('passed')
   })
 
   it('um `skipped` DERRUBA o tudo-certo', () => {
@@ -66,12 +66,12 @@ describe('"está tudo certo" é uma afirmação, não um resumo', () => {
     const comVoltaPulada = resultado(
       TUDO_CERTO.passos.map((p) => (p.passo === 'roundTrip' ? { ...p, veredito: 'skipped' } : p))
     )
-    expect(testPassed(comVoltaPulada)).toBe(false)
+    expect(testOutcome(comVoltaPulada)).not.toBe('passed')
   })
 
   it('e o resultado vazio não é aprovação', () => {
-    expect(testPassed(null)).toBe(false)
-    expect(testPassed(resultado([]))).toBe(false)
+    expect(testOutcome(null)).toBe('failed')
+    expect(testOutcome(resultado([]))).toBe('failed')
   })
 })
 
@@ -182,7 +182,7 @@ describe('o descompasso entre o painel e o servidor', () => {
     // passaram" sobre uma órfã manda procurar defeito que pode não existir.
     expect(testOutcome(TUDO_CERTO)).toBe('passed')
     expect(testOutcome(comInstancias('skipped'))).toBe('warned')
-    expect(testPassed(comInstancias('orphans', 2))).toBe(false)
+    expect(testOutcome(comInstancias('orphans', 2))).toBe('warned')
   })
 
   it('e a frase da órfã explica o webhook antigo, que é a consequência real', () => {

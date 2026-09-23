@@ -2,11 +2,9 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { loadDictionary, setActiveLocale } from '@/lib/i18n'
 import {
-  cn,
   formatDate,
   formatNumber,
-  formatRelativeTime,
-  getStatusColor
+  formatRelativeTime
 } from '@/lib/utils'
 import en from '@/lib/i18n/locales/en'
 
@@ -36,26 +34,6 @@ describe('abbreviating a count', () => {
    */
   it('does not abbreviate a negative', () => {
     expect(formatNumber(-1500)).toBe('-1500')
-  })
-})
-
-describe('the colour of a status', () => {
-  it('reads both spellings of each state', () => {
-    expect(getStatusColor('online')).toBe(getStatusColor('up'))
-    expect(getStatusColor('offline')).toBe(getStatusColor('down'))
-    expect(getStatusColor('ONLINE')).toBe(getStatusColor('online'))
-  })
-
-  it('gives an unknown status the neutral colour, not a green one', () => {
-    const neutral = getStatusColor('whatever-this-is')
-    expect(neutral).toContain('gray')
-    expect(neutral).not.toContain('green')
-  })
-
-  it('carries a dark-mode variant for every state it knows', () => {
-    for (const status of ['online', 'offline', 'warning', 'unknown']) {
-      expect(getStatusColor(status), status).toContain('dark:')
-    }
   })
 })
 
@@ -122,21 +100,6 @@ describe('formatting a timestamp', () => {
 
     await loadDictionary('pt-BR')
     expect(formatDate(null)).toBe('N/D')
-  })
-})
-
-describe('merging class names', () => {
-  it('lets the later Tailwind class win over the earlier one', () => {
-    expect(cn('p-2', 'p-4')).toBe('p-4')
-    expect(cn('text-red-500', 'text-blue-500')).toBe('text-blue-500')
-  })
-
-  it('drops what is conditional and false, and keeps the rest', () => {
-    // A variable rather than a literal, which is how a component calls it —
-    // `cn('block', collapsed && 'hidden', …)`.
-    const collapsed = false
-    expect(cn('block', collapsed && 'hidden', undefined, null, 'text-sm'))
-      .toBe('block text-sm')
   })
 })
 

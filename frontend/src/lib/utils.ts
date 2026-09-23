@@ -1,10 +1,4 @@
-import { type ClassValue, clsx } from "clsx"
-import { twMerge } from "tailwind-merge"
 import { getActiveLocale, getIntlLocale, translate } from "@/lib/i18n"
-
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
-}
 
 export function formatNumber(num: number): string {
   if (num >= 1000000) {
@@ -96,22 +90,6 @@ export function formatRelativeTime(dateString: string, now: Date = new Date()): 
   return relative.format(-faixa.valor, faixa.unidade)
 }
 
-export function getStatusColor(status: string): string {
-  switch (status.toLowerCase()) {
-    case 'online':
-    case 'up':
-      return 'text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900/30'
-    case 'offline':
-    case 'down':
-      return 'text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30'
-    case 'warning':
-      return 'text-yellow-600 bg-yellow-100 dark:text-yellow-400 dark:bg-yellow-900/30'
-    default:
-      return 'text-gray-600 bg-gray-100 dark:text-gray-400 dark:bg-gray-900/30'
-  }
-}
-
-
 export function debounce<T extends (...args: any[]) => any>(
   func: T,
   waitFor: number
@@ -121,10 +99,6 @@ export function debounce<T extends (...args: any[]) => any>(
     clearTimeout(timeout)
     timeout = setTimeout(() => func(...args), waitFor)
   }
-}
-
-export function generateId(): string {
-  return Math.random().toString(36).substr(2, 9)
 }
 
 export function copyToClipboard(text: string): Promise<boolean> {

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -123,5 +125,18 @@ describe('a query escrita', () => {
     const url = filtersToQuery({ ...NO_FILTERS, search: 'a&status=online' })
     expect(filtersFromQuery(url).search).toBe('a&status=online')
     expect(filtersFromQuery(url).status).toBe('all')
+  })
+})
+
+describe('a tela lê por aqui', () => {
+  it('e não por uma cópia própria, campo a campo', () => {
+    // A ida e volta acima só prova alguma coisa sobre a tela se a tela ler pela
+    // mesma função. Ela lia por conta própria — `searchParams.get` e um leitor
+    // por campo —, e um campo novo esquecido ali passaria com este arquivo
+    // inteiro verde.
+    const tela = readFileSync(join(__dirname, '..', 'src', 'pages', 'devices.tsx'), 'utf8')
+    expect(tela).toContain('filtersFromQuery(searchParams)')
+    expect(tela).not.toMatch(/\b(status|sgp|focus|page)FromQuery\(/)
+    expect(tela).not.toContain('searchParams.get(')
   })
 })
