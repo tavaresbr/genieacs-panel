@@ -1309,7 +1309,6 @@ const de: Dictionary = {
   'whatsapp.health.sweepNow': 'Alte jetzt löschen',
   'whatsapp.health.sweepOff': 'Anhänge bleiben für immer. Setze in den Einstellungen eine Aufbewahrungsfrist, um alte zu löschen.',
   'whatsapp.health.loadFailed': 'Der Zustand der Integration konnte nicht gelesen werden.',
-  'whatsapp.inbox.subtitle': 'Alles, was auf den verbundenen Nummern ankam, neueste zuerst.',
   'whatsapp.inbox.selectOne': 'Wähle eine Unterhaltung, um sie zu lesen.',
   'whatsapp.inbox.close': 'Schließen',
   'whatsapp.inbox.reopen': 'Wieder öffnen',

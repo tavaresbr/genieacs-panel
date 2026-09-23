@@ -1406,7 +1406,6 @@ const hi: Dictionary = {
   'whatsapp.health.sweepNow': 'पुराने अभी हटाएँ',
   'whatsapp.health.sweepOff': 'अनुलग्नक हमेशा रखे जाते हैं। पुराने हटाने के लिए सेटिंग्स में एक अवधि निर्धारित करें।',
   'whatsapp.health.loadFailed': 'एकीकरण की स्थिति पढ़ी नहीं जा सकी।',
-  'whatsapp.inbox.subtitle': 'जुड़े नंबरों पर आया सब कुछ, सबसे नया पहले।',
   'whatsapp.inbox.selectOne': 'पढ़ने के लिए कोई बातचीत चुनें।',
   'whatsapp.inbox.close': 'बंद करें',
   'whatsapp.inbox.reopen': 'फिर से खोलें',

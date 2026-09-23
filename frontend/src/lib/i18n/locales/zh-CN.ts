@@ -1426,7 +1426,6 @@ const zhCN: Dictionary = {
   'whatsapp.health.sweepNow': '立即删除旧文件',
   'whatsapp.health.sweepOff': '附件会永久保留。要删除旧文件，请在设置中设定保留期限。',
   'whatsapp.health.loadFailed': '无法读取集成运行状态。',
-  'whatsapp.inbox.subtitle': '已接入号码收到的全部消息，按时间倒序排列。',
   'whatsapp.inbox.selectOne': '选择一个会话即可查看内容。',
   'whatsapp.inbox.close': '结束',
   'whatsapp.inbox.reopen': '重新打开',

@@ -1431,7 +1431,6 @@ const ko: Dictionary = {
   'whatsapp.health.sweepNow': '오래된 파일 지금 삭제',
   'whatsapp.health.sweepOff': '첨부 파일은 무기한 보관됩니다. 오래된 파일을 지우려면 설정에서 보관 기간을 정하세요.',
   'whatsapp.health.loadFailed': '연동 상태를 확인할 수 없습니다.',
-  'whatsapp.inbox.subtitle': '연결된 번호로 수신된 모든 내용을 최신순으로 표시합니다.',
   'whatsapp.inbox.selectOne': '읽을 대화를 선택하십시오.',
   'whatsapp.inbox.close': '종료',
   'whatsapp.inbox.reopen': '다시 열기',

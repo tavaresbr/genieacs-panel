@@ -1426,7 +1426,6 @@ const ptBR: Dictionary = {
   'whatsapp.health.sweepNow': 'Apagar os antigos agora',
   'whatsapp.health.sweepOff': 'Os anexos ficam para sempre. Defina um prazo de guarda nas Configurações para apagar os antigos.',
   'whatsapp.health.loadFailed': 'Não foi possível ler a saúde da integração.',
-  'whatsapp.inbox.subtitle': 'Tudo que chegou nos números conectados, do mais recente para o mais antigo.',
   'whatsapp.inbox.selectOne': 'Escolha uma conversa para ler.',
   'whatsapp.inbox.close': 'Encerrar',
   'whatsapp.inbox.reopen': 'Reabrir',

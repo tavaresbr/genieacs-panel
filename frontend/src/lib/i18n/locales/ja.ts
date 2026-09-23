@@ -1425,7 +1425,6 @@ const ja: Dictionary = {
   'whatsapp.health.sweepNow': '古いものを今すぐ削除',
   'whatsapp.health.sweepOff': '添付は無期限で保存されます。古いものを削除するには設定で保存期間を決めてください。',
   'whatsapp.health.loadFailed': '連携の状態を読み取れませんでした。',
-  'whatsapp.inbox.subtitle': '接続済みの番号に届いたすべての内容を、新しい順に表示します。',
   'whatsapp.inbox.selectOne': '会話を選ぶと内容が表示されます。',
   'whatsapp.inbox.close': '完了にする',
   'whatsapp.inbox.reopen': '再開する',

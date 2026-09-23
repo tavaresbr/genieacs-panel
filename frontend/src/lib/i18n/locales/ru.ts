@@ -1433,7 +1433,6 @@ const ru: Dictionary = {
   'whatsapp.health.sweepNow': 'Удалить старые сейчас',
   'whatsapp.health.sweepOff': 'Вложения хранятся бессрочно. Задайте срок хранения в настройках, чтобы удалять старые.',
   'whatsapp.health.loadFailed': 'Не удалось получить состояние интеграции.',
-  'whatsapp.inbox.subtitle': 'Всё, что поступило на подключённые номера, начиная с самого нового.',
   'whatsapp.inbox.selectOne': 'Выберите диалог, чтобы прочитать его.',
   'whatsapp.inbox.close': 'Завершить',
   'whatsapp.inbox.reopen': 'Открыть снова',
