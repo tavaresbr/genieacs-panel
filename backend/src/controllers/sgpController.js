@@ -57,7 +57,14 @@ class SgpController {
         eventRetentionDays: body.eventRetentionDays,
         eventTypeMap: body.eventTypeMap,
         ticketEnabled: body.ticketEnabled,
-        ticketOccurrenceType: body.ticketOccurrenceType
+        ticketOccurrenceType: body.ticketOccurrenceType,
+        // The "Contacts for WhatsApp" section saves through this same route.
+        contactsSyncEnabled: body.contactsSyncEnabled,
+        contactsSyncIntervalHours: body.contactsSyncIntervalHours,
+        contactsPageSize: body.contactsPageSize,
+        contactsPaging: body.contactsPaging,
+        contactsOffsetParam: body.contactsOffsetParam,
+        contactsLimitParam: body.contactsLimitParam
         // `webhookSecret` is deliberately not accepted here: it is only ever
         // set through the rotate action, which shows it once.
       });
