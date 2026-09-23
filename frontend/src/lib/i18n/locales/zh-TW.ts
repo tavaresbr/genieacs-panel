@@ -791,6 +791,8 @@ const zhTW: Dictionary = {
   'detail.info.softwareVersion': '軟體版本',
   'detail.info.lastBoot': '最近開機',
   'detail.info.lastRegistered': '最近註冊',
+  'detail.info.wanMac': 'WAN MAC',
+  'detail.info.lanMac': 'LAN MAC',
   'detail.customer.kicker': '客戶存取',
   'detail.customer.title': '客戶 ID',
   'detail.customer.notGenerated': '未產生',

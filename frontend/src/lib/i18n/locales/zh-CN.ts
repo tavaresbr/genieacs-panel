@@ -791,6 +791,8 @@ const zhCN: Dictionary = {
   'detail.info.softwareVersion': '软件版本',
   'detail.info.lastBoot': '最近启动',
   'detail.info.lastRegistered': '最近注册',
+  'detail.info.wanMac': 'WAN MAC',
+  'detail.info.lanMac': 'LAN MAC',
   'detail.customer.kicker': '客户访问',
   'detail.customer.title': '客户 ID',
   'detail.customer.notGenerated': '未生成',

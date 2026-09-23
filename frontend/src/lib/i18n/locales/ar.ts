@@ -768,6 +768,8 @@ const ar: Dictionary = {
   'detail.info.softwareVersion': 'إصدار البرنامج',
   'detail.info.lastBoot': 'آخر إقلاع',
   'detail.info.lastRegistered': 'آخر تسجيل',
+  'detail.info.wanMac': 'عنوان MAC لشبكة WAN',
+  'detail.info.lanMac': 'عنوان MAC لشبكة LAN',
   'detail.customer.kicker': 'دخول المشترك',
   'detail.customer.title': 'معرّف العميل',
   'detail.customer.notGenerated': 'غير مُنشأ',

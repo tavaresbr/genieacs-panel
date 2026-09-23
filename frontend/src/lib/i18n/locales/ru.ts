@@ -795,6 +795,8 @@ const ru: Dictionary = {
   'detail.info.softwareVersion': 'Версия ПО',
   'detail.info.lastBoot': 'Последняя загрузка',
   'detail.info.lastRegistered': 'Последняя регистрация',
+  'detail.info.wanMac': 'MAC WAN',
+  'detail.info.lanMac': 'MAC LAN',
   'detail.customer.kicker': 'Доступ абонента',
   'detail.customer.title': 'Идентификатор клиента',
   'detail.customer.notGenerated': 'Не создан',

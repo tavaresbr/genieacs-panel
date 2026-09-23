@@ -791,6 +791,8 @@ const ja: Dictionary = {
   'detail.info.softwareVersion': 'ソフトウェアバージョン',
   'detail.info.lastBoot': '最終起動',
   'detail.info.lastRegistered': '最終登録',
+  'detail.info.wanMac': 'WAN MAC',
+  'detail.info.lanMac': 'LAN MAC',
   'detail.customer.kicker': '顧客のアクセス',
   'detail.customer.title': '顧客 ID',
   'detail.customer.notGenerated': '未生成',

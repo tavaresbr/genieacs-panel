@@ -768,6 +768,8 @@ const hi: Dictionary = {
   'detail.info.softwareVersion': 'सॉफ़्टवेयर संस्करण',
   'detail.info.lastBoot': 'अंतिम बूट',
   'detail.info.lastRegistered': 'अंतिम पंजीकरण',
+  'detail.info.wanMac': 'WAN MAC',
+  'detail.info.lanMac': 'LAN MAC',
   'detail.customer.kicker': 'ग्राहक पहुँच',
   'detail.customer.title': 'ग्राहक आईडी',
   'detail.customer.notGenerated': 'नहीं बनाई गई',

@@ -792,6 +792,8 @@ const ko: Dictionary = {
   'detail.info.softwareVersion': '소프트웨어 버전',
   'detail.info.lastBoot': '마지막 부팅',
   'detail.info.lastRegistered': '마지막 등록',
+  'detail.info.wanMac': 'WAN MAC',
+  'detail.info.lanMac': 'LAN MAC',
   'detail.customer.kicker': '고객 접속',
   'detail.customer.title': '고객 ID',
   'detail.customer.notGenerated': '생성되지 않음',
