@@ -515,6 +515,7 @@ export default {
   'whatsapp.subscriberLinked': 'Conversation liée à l’abonné',
   'whatsapp.subscriberLinkFailed': 'Impossible de lier la conversation',
   'whatsapp.error.subscriberNoPhone': 'Cet abonné n’a aucun numéro de téléphone enregistré',
+  'whatsapp.error.lookupTermRequired': 'Saisissez un CPF/CNPJ ou un contrat pour chercher dans le SGP',
   'whatsapp.bot.portalHint': 'Pour le mot de passe WiFi et pour changer le nom du réseau, connectez-vous au portail client : {link}',
   'whatsapp.bot.notRecognised': 'Nous n’avons pas trouvé de contrat pour ce numéro. Un conseiller vous répond sous peu.',
   'whatsapp.bot.handoff': 'Je transmets à un conseiller.',

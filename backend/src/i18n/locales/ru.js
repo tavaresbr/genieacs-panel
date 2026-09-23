@@ -512,6 +512,7 @@ export default {
   'whatsapp.subscriberLinked': 'Диалог привязан к абоненту',
   'whatsapp.subscriberLinkFailed': 'Не удалось привязать диалог',
   'whatsapp.error.subscriberNoPhone': 'У этого абонента нет номера телефона',
+  'whatsapp.error.lookupTermRequired': 'Введите CPF/CNPJ или номер договора для поиска в SGP',
   // WhatsApp — входящие и бот самообслуживания (этап 3)
   'whatsapp.error.conversationNotFound': 'Диалог не найден',
   'whatsapp.conversationClosed': 'Диалог завершён',

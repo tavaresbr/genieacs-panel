@@ -88,7 +88,12 @@ export async function alcanceDoAssinante(account) {
     if (deviceIds.length) q.orWhereIn('device_id', deviceIds);
   }).orderBy('id');
   const contratos = [...new Set(vinculos.map((v) => v.contract).filter(Boolean))];
-  const telefones = vinculos.flatMap((v) => [v.phone_e164, v.phone_manual]).filter(Boolean);
+  // O mesmo contrato também pode estar em `sgp_contacts`: foi achado numa busca
+  // ao SGP antes de a ONT dele aparecer no painel, e a linha fica.
+  const contatos = contratos.length
+    ? await tdb('sgp_contacts').whereIn('contract', contratos).orderBy('id')
+    : [];
+  const telefones = [...vinculos, ...contatos].flatMap((v) => [v.phone_e164, v.phone_manual]).filter(Boolean);
 
   const conversas = (deviceIds.length || contratos.length || telefones.length)
     ? await tdb('wa_conversations').where((q) => {
@@ -117,6 +122,7 @@ export async function alcanceDoAssinante(account) {
     contratos,
     telefones: [...new Set(telefones)],
     vinculos,
+    contatos,
     conversas,
     conversaIds: conversas.map((c) => c.id),
     nos,
@@ -145,7 +151,7 @@ class CustomerDataExportService {
     const account = await CustomerAccount.getById(accountId);
     if (!account) return null;
 
-    const { deviceIds, contratos, telefones: todosTelefones, vinculos, conversas, conversaIds, nos, noIds }
+    const { deviceIds, contratos, telefones: todosTelefones, vinculos, contatos, conversas, conversaIds, nos, noIds }
       = await alcanceDoAssinante(account);
 
     const dados = {};
@@ -161,6 +167,7 @@ class CustomerDataExportService {
     guardar('customer_wifi_credentials', await tdb('customer_wifi_credentials')
       .where({ account_id: account.id }).orderBy('id'));
     guardar('sgp_links', vinculos);
+    guardar('sgp_contacts', contatos);
     guardar('device_swaps', await tdb('device_swaps').where((q) => {
       q.where({ account_id: account.id });
       if (deviceIds.length) q.orWhereIn('device_id', deviceIds);

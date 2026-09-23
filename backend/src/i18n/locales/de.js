@@ -512,6 +512,7 @@ export default {
   'whatsapp.subscriberLinked': 'Unterhaltung mit dem Teilnehmer verknüpft',
   'whatsapp.subscriberLinkFailed': 'Die Unterhaltung konnte nicht verknüpft werden',
   'whatsapp.error.subscriberNoPhone': 'Für diesen Teilnehmer ist keine Telefonnummer hinterlegt',
+  'whatsapp.error.lookupTermRequired': 'Geben Sie eine CPF/CNPJ oder einen Vertrag ein, um im SGP zu suchen',
   // WhatsApp — inbox e bot de autoatendimento (onda 3)
   'whatsapp.error.conversationNotFound': 'Unterhaltung nicht gefunden',
   'whatsapp.conversationClosed': 'Unterhaltung geschlossen',

@@ -103,7 +103,7 @@ class CustomerErasureService {
    */
   static async survey(account) {
     const alcance = await alcanceDoAssinante(account);
-    const { deviceIds, contratos, telefones, vinculos, conversaIds, nos } = alcance;
+    const { deviceIds, contratos, telefones, vinculos, contatos, conversaIds, nos } = alcance;
 
     const contar = async (tabela, montar) => {
       const [linha] = await montar(tdb(tabela)).count({ n: '*' });
@@ -116,6 +116,7 @@ class CustomerErasureService {
         'customer_wifi_credentials', (q) => q.where({ account_id: account.id })
       ),
       sgp_links: vinculos.length,
+      sgp_contacts: contatos.length,
       sgp_events: (deviceIds.length || contratos.length)
         ? await contar('sgp_events', (q) => q.where((w) => {
           if (deviceIds.length) w.whereIn('device_id', deviceIds);
@@ -187,7 +188,7 @@ class CustomerErasureService {
    * que o que foi gravado na trilha seja o que vai ser executado.
    */
   static async erase(account, { alcance }) {
-    const { deviceIds, contratos, telefones, vinculos, conversaIds, noIds } = alcance;
+    const { deviceIds, contratos, telefones, vinculos, contatos, conversaIds, noIds } = alcance;
     const marca = `erased:${account.id}`;
 
     await getDb().transaction(async (trx) => {
@@ -216,6 +217,16 @@ class CustomerErasureService {
         await tdb('sgp_links', trx)
           .whereIn('id', vinculos.map((v) => v.id))
           .update({ ...IDENTIDADE_NO_CONTRATO, updated_at: new Date() });
+      }
+
+      // O mesmo contrato achado numa busca ao SGP. A linha fica pelo mesmo
+      // motivo da de `sgp_links`, e a pessoa sai dela pelas mesmas colunas —
+      // menos `login`, que esta tabela não tem.
+      if (contatos.length) {
+        const { login: _login, ...identidade } = IDENTIDADE_NO_CONTRATO;
+        await tdb('sgp_contacts', trx)
+          .whereIn('id', contatos.map((c) => c.id))
+          .update({ ...identidade, updated_at: new Date() });
       }
 
       // `customer_id` permanece: é sintético, gerado pelo painel, e é a única

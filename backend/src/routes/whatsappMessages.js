@@ -56,6 +56,21 @@ router.get(
   WhatsAppMessageController.listContacts
 );
 
+// The subscriber the panel has no ONT for, asked of the SGP by CPF/CNPJ or
+// contract. `sgp.read` on top of `whatsapp.read`, because this is the same
+// question as `GET /api/sgp/customers` — a name, a document and a phone out of
+// the ERP — and it takes the same limiter, since every call reaches the SGP.
+// Declared before `/contacts/:contract/...` for readability; the paths differ
+// in length, so neither can shadow the other.
+router.post(
+  '/contacts/lookup',
+  authenticateToken,
+  requirePermission('whatsapp.read'),
+  requirePermission('sgp.read'),
+  sgpAdminLimiter,
+  WhatsAppMessageController.lookupContacts
+);
+
 router.post(
   '/contacts/:contract/conversation',
   authenticateToken,

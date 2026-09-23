@@ -509,6 +509,7 @@ export default {
   'whatsapp.subscriberLinked': '대화를 가입자와 연결했습니다',
   'whatsapp.subscriberLinkFailed': '대화를 연결하지 못했습니다',
   'whatsapp.error.subscriberNoPhone': '이 가입자에게 등록된 전화번호가 없습니다',
+  'whatsapp.error.lookupTermRequired': 'SGP에서 검색하려면 CPF/CNPJ 또는 계약 번호를 입력하세요',
   // WhatsApp — 수신함 및 셀프서비스 봇 (3차)
   'whatsapp.error.conversationNotFound': '대화를 찾을 수 없습니다',
   'whatsapp.conversationClosed': '대화를 종료했습니다',

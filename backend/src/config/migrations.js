@@ -1325,6 +1325,44 @@ const BILLING_TABLES = [
   ['billing_charges', billingChargesTable]
 ];
 
+/**
+ * Os assinantes do SGP que o painel conhece SEM uma ONT.
+ *
+ * `sgp_links` é chaveada pelo aparelho: é o espelho do contrato de cada ONT, e
+ * um assinante cuja ONT o painel não enxerga — equipamento de outro fabricante,
+ * rádio, cadastro novo, ONT que ainda não informou — simplesmente não existia
+ * para o WhatsApp. Não havia como abrir conversa com ele nem reconhecer o
+ * número dele quando escrevia.
+ *
+ * A linha nasce de uma consulta ao SGP que um operador pediu (por CPF/CNPJ ou
+ * contrato), e é por contrato: o que se guarda é o suficiente para falar com a
+ * pessoa — nome, documento, telefone — e nada do equipamento. `phone_manual`
+ * tem o mesmo papel que em `sgp_links`: a correção do operador, que uma nova
+ * consulta ao SGP nunca sobrescreve.
+ */
+const sgpContactsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.string('contract', 64).notNullable();
+  t.string('document', 32);
+  t.string('client_name', 255);
+  t.string('status', 64);
+  t.string('status_label', 128);
+  t.string('state', 16).notNullable().defaultTo('unknown');
+  addSgpPhoneColumns(t);
+  t.timestamp('last_synced_at').defaultTo(db.fn.now());
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  t.timestamp('updated_at').defaultTo(db.fn.now());
+  t.unique(['tenant_id', 'contract'], 'sgp_contacts_contract_uq');
+  t.index(['tenant_id', 'phone_e164'], 'sgp_contacts_phone_idx');
+  t.index(['tenant_id', 'phone_manual'], 'sgp_contacts_phone_manual_idx');
+};
+
+const SGP_CONTACT_TABLES = [
+  ['sgp_contacts', sgpContactsTable]
+];
+
 const TENANCY_TABLES = [
   ['tenants', tenantsTable]
 ];
@@ -1383,7 +1421,8 @@ export const SCHEMA_TABLES = [
   ...WHATSAPP_TABLES,
   ...DEVICE_HISTORY_TABLES,
   ...DEVICE_SWAP_TABLES,
-  ...BILLING_TABLES
+  ...BILLING_TABLES,
+  ...SGP_CONTACT_TABLES
 ].map(([name]) => name);
 
 /**
@@ -3318,6 +3357,23 @@ export const migrations = [
 
       // Filha da chave estrangeira, então não há dependente a derrubar antes.
       await db.schema.dropTable('wifi_security_mappings');
+    }
+  },
+  {
+    /**
+     * Os contatos do SGP sem ONT — ver `sgpContactsTable`.
+     *
+     * Nasce vazia. A primeira linha sai da primeira busca de um operador no
+     * SGP pela aba Contatos do WhatsApp.
+     */
+    id: '0053_sgp_contacts',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      return db.schema.hasTable('sgp_contacts');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      await createTableIfMissing(db, 'sgp_contacts', sgpContactsTable(db));
     }
   }
 ];

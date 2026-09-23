@@ -503,6 +503,7 @@ export default {
   'whatsapp.subscriberLinked': '会話を加入者に紐付けました',
   'whatsapp.subscriberLinkFailed': '会話を紐付けできませんでした',
   'whatsapp.error.subscriberNoPhone': 'この加入者には電話番号が登録されていません',
+  'whatsapp.error.lookupTermRequired': 'SGP を検索するには CPF/CNPJ または契約番号を入力してください',
   // WhatsApp — 受信箱とセルフサービスのボット (第 3 段階)
   'whatsapp.error.conversationNotFound': '会話が見つかりません',
   'whatsapp.conversationClosed': '会話を完了にしました',

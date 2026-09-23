@@ -846,6 +846,7 @@ com cada um:
     "clientName": "Carlinhos Vendas",
     "document": "•••8909",
     "deviceId": "ONT-1",
+    "hasDevice": true,
     "phone": "5593992081870",
     "phoneSource": "sgp",
     "optedOut": false,
@@ -863,6 +864,35 @@ conversa com o assinante — `200` com a que já existe (pelo contrato ou por
 qualquer grafia do número), `201` com uma nova, vazia, pelo número de propósito
 `general`. Abrir não envia nada. `409 subscriber_no_phone` quando o cadastro não
 tem telefone, `400 no_account` sem número conectado, `404 subscriber_not_found`.
+
+#### Assinantes sem ONT — `POST /api/whatsapp/contacts/lookup`
+
+`sgp_links` é chaveada pela ONT, então o assinante sem ONT no painel (rádio,
+outro fabricante, cadastro novo) não aparece na listagem acima. Esta rota
+(`whatsapp.read` + `sgp.read`, com o limitador das rotas do SGP) pergunta ao
+próprio SGP:
+
+```json
+{ "search": "987.654.321-00" }
+```
+
+O SGP só busca por documento ou contrato, nunca por nome: 11 ou 14 dígitos
+viram `cpfcnpj`, qualquer outra coisa vira `contrato`. A resposta tem o mesmo
+formato da listagem. Cada contrato achado que **não** tem ONT é guardado em
+`sgp_contacts` (um por contrato, por provedor); o que já tem ONT continua sendo
+de `sgp_links` e não é duplicado. "Cliente não encontrado" é resposta vazia, não
+erro; `400 lookup_term_required` sem termo; as recusas do SGP chegam com o
+código e a frase do SGP.
+
+A partir daí o contato sem ONT funciona como os outros: aparece na listagem com
+`hasDevice: false`, abre conversa, pode ser escolhido em
+`/conversations/:id/subscriber` (e `savePhone` grava em `sgp_contacts`), e o
+número dele é reconhecido quando ele escreve — sempre com `device_id` nulo.
+Ele NÃO entra no `resolveSubscriber` que o bot usa: o bot responde sobre fatura
+e sinal a partir da ONT, e não há ONT.
+
+`sgp_contacts` entra no export e na exclusão de dados do assinante pelo
+contrato, como `sgp_links`.
 
 A conversa nova fica com o número do SGP no `external_thread_id`. Quando a
 resposta chega pela outra grafia do nono dígito, `WaConversation.ensure` acha o

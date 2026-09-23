@@ -510,6 +510,7 @@ export default {
   'whatsapp.subscriberLinked': 'تم ربط المحادثة بالمشترك',
   'whatsapp.subscriberLinkFailed': 'تعذّر ربط المحادثة',
   'whatsapp.error.subscriberNoPhone': 'لا يوجد رقم هاتف مسجل لهذا المشترك',
+  'whatsapp.error.lookupTermRequired': 'اكتب CPF/CNPJ أو رقم عقد للبحث في SGP',
   'whatsapp.error.conversationNotFound': 'المحادثة غير موجودة',
   'whatsapp.conversationClosed': 'أُنهيت المحادثة',
   'whatsapp.conversationReopened': 'أُعيد فتح المحادثة',
