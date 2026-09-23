@@ -271,6 +271,48 @@ describe('o caminho padrão', () => {
   });
 });
 
+describe('salvar a seção pela tela', () => {
+  const salvar = (body) => call(`${panelUrl}/api/sgp/config`, { method: 'PUT', headers: authHeaders(token), body });
+
+  it('guarda a sincronização automática, o intervalo e a paginação', async () => {
+    const res = await salvar({
+      contactsSyncEnabled: true,
+      contactsSyncIntervalHours: 6,
+      contactsPageSize: 30,
+      contactsPaging: 'page',
+      contactsOffsetParam: 'pagina',
+      contactsLimitParam: 'quantidade'
+    });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+
+    const lido = await call(`${panelUrl}/api/sgp/config`, auth());
+    const config = lido.body.data;
+    assert.equal(config.contactsSyncEnabled, true);
+    assert.equal(config.contactsSyncIntervalHours, 6);
+    assert.equal(config.contactsPageSize, 30);
+    assert.equal(config.contactsPaging, 'page');
+    assert.equal(config.contactsOffsetParam, 'pagina');
+    assert.equal(config.contactsLimitParam, 'quantidade');
+  });
+
+  it('salvar o formulário principal do SGP não desliga a sincronização automática', async () => {
+    const res = await salvar({ linkMode: 'manual' });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.data.contactsSyncEnabled, true);
+    assert.equal(res.body.data.contactsPageSize, 30);
+
+    // De volta ao que o resto do arquivo espera.
+    await configurar({
+      contactsSyncEnabled: false,
+      contactsSyncIntervalHours: 24,
+      contactsPageSize: 10,
+      contactsPaging: 'offset',
+      contactsOffsetParam: 'offset',
+      contactsLimitParam: 'limit'
+    });
+  });
+});
+
 describe('o botão de testar', () => {
   it('lê só a primeira página e não grava nada', async () => {
     assert.equal(LIST_PATH, '/api/ura/clientes/');
