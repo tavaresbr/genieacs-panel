@@ -1536,7 +1536,7 @@ const ar: Dictionary = {
   'whatsapp.sgp.noIp': 'لم يُبلغ الـ ONT عن IP',
   'whatsapp.sgp.rxPower': 'الإشارة الضوئية',
   'whatsapp.sgp.lastInform': 'آخر inform',
-  'whatsapp.sgp.openRouter': 'فتح الراوتر',
+  'whatsapp.sgp.openSgp': 'فتح في SGP',
   'whatsapp.sgp.unlockConfirm': 'طلب فك حظر بالثقة في SGP للعقد {contract}؟',
   'whatsapp.sgp.unlockActiveHint': 'العقد نشط؛ SGP يقرر ما إذا كان فك الحظر ينطبق.',
   'whatsapp.sgp.contractData': 'بيانات العقد',

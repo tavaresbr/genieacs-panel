@@ -7,7 +7,7 @@ import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import { useAuth } from '@/contexts/auth-context'
-import { copyToClipboard, formatBrl, isSafeExternalUrl, routerUrl, sgpBadge } from '@/lib/sgp'
+import { copyToClipboard, formatBrl, isSafeExternalUrl, sgpBadge } from '@/lib/sgp'
 import type { TranslationKey } from '@/lib/i18n'
 
 /**
@@ -472,6 +472,17 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
                     {t(panel.router.reason === 'unlinked' ? 'whatsapp.sgp.routerUnlinked' : 'whatsapp.sgp.routerUnreachable')}
                   </p>
                   <PartError error={panel.router.error} />
+                  {isSafeExternalUrl(panel.sgpUrl) && (
+                    <a
+                      className="modern-button-secondary mt-2"
+                      href={panel.sgpUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Icon name="external" size={15} />
+                      {t('whatsapp.sgp.openSgp')}
+                    </a>
+                  )}
                 </>
               ) : (
                 <div className="space-y-2">
@@ -507,15 +518,15 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
                     </Field>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {routerUrl(panel.router.ipAddress) && (
+                    {isSafeExternalUrl(panel.sgpUrl) && (
                       <a
                         className="modern-button-secondary"
-                        href={routerUrl(panel.router.ipAddress) ?? undefined}
+                        href={panel.sgpUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                       >
                         <Icon name="external" size={15} />
-                        {t('whatsapp.sgp.openRouter')}
+                        {t('whatsapp.sgp.openSgp')}
                       </a>
                     )}
                     <Link

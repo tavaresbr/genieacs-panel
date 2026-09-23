@@ -1439,7 +1439,7 @@ const de: Dictionary = {
   'whatsapp.sgp.noIp': 'Die ONT hat keine IP gemeldet',
   'whatsapp.sgp.rxPower': 'Optisches Signal',
   'whatsapp.sgp.lastInform': 'Letzter Inform',
-  'whatsapp.sgp.openRouter': 'Router öffnen',
+  'whatsapp.sgp.openSgp': 'In SGP öffnen',
   'whatsapp.sgp.unlockConfirm': 'Vertrauensentsperrung in SGP für Vertrag {contract} anfordern?',
   'whatsapp.sgp.unlockActiveHint': 'Der Vertrag ist aktiv; SGP entscheidet, ob die Entsperrung gilt.',
   'whatsapp.sgp.contractData': 'Vertragsdaten',

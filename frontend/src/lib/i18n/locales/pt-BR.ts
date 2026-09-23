@@ -1556,7 +1556,7 @@ const ptBR: Dictionary = {
   'whatsapp.sgp.noIp': 'A ONU não informou IP',
   'whatsapp.sgp.rxPower': 'Sinal óptico',
   'whatsapp.sgp.lastInform': 'Último inform',
-  'whatsapp.sgp.openRouter': 'Abrir roteador',
+  'whatsapp.sgp.openSgp': 'Abrir no SGP',
   'whatsapp.sgp.unlockConfirm': 'Solicitar liberação em confiança no SGP para o contrato {contract}?',
   'whatsapp.sgp.unlockActiveHint': 'O contrato está ativo; o SGP decide se a liberação se aplica.',
   'whatsapp.sgp.contractData': 'Dados do contrato',

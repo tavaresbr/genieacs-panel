@@ -1563,7 +1563,7 @@ const ru: Dictionary = {
   'whatsapp.sgp.noIp': 'ONT не сообщил IP',
   'whatsapp.sgp.rxPower': 'Оптический сигнал',
   'whatsapp.sgp.lastInform': 'Последний inform',
-  'whatsapp.sgp.openRouter': 'Открыть роутер',
+  'whatsapp.sgp.openSgp': 'Открыть в SGP',
   'whatsapp.sgp.unlockConfirm': 'Запросить в SGP доверительную разблокировку для договора {contract}?',
   'whatsapp.sgp.unlockActiveHint': 'Договор активен; SGP решает, применима ли разблокировка.',
   'whatsapp.sgp.contractData': 'Данные договора',

@@ -1536,7 +1536,7 @@ const hi: Dictionary = {
   'whatsapp.sgp.noIp': 'ONT ने IP नहीं बताया',
   'whatsapp.sgp.rxPower': 'ऑप्टिकल सिग्नल',
   'whatsapp.sgp.lastInform': 'आख़िरी inform',
-  'whatsapp.sgp.openRouter': 'राउटर खोलें',
+  'whatsapp.sgp.openSgp': 'SGP में खोलें',
   'whatsapp.sgp.unlockConfirm': 'अनुबंध {contract} के लिए SGP में भरोसे पर अनलॉक का अनुरोध करें?',
   'whatsapp.sgp.unlockActiveHint': 'अनुबंध सक्रिय है; अनलॉक लागू होगा या नहीं, यह SGP तय करता है।',
   'whatsapp.sgp.contractData': 'अनुबंध विवरण',

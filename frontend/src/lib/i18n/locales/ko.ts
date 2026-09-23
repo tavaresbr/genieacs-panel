@@ -1561,7 +1561,7 @@ const ko: Dictionary = {
   'whatsapp.sgp.noIp': 'ONT가 IP를 보고하지 않았습니다',
   'whatsapp.sgp.rxPower': '광 신호',
   'whatsapp.sgp.lastInform': '마지막 inform',
-  'whatsapp.sgp.openRouter': '라우터 열기',
+  'whatsapp.sgp.openSgp': 'SGP에서 열기',
   'whatsapp.sgp.unlockConfirm': '계약 {contract}에 대해 SGP에 신뢰 해제를 요청할까요?',
   'whatsapp.sgp.unlockActiveHint': '계약이 활성 상태입니다. 해제 적용 여부는 SGP가 결정합니다.',
   'whatsapp.sgp.contractData': '계약 정보',
