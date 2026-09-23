@@ -791,6 +791,8 @@ const fr: Dictionary = {
   'detail.info.softwareVersion': 'Version logicielle',
   'detail.info.lastBoot': 'Dernier démarrage',
   'detail.info.lastRegistered': 'Dernier enregistrement',
+  'detail.info.wanMac': 'MAC WAN',
+  'detail.info.lanMac': 'MAC LAN',
   'detail.customer.kicker': 'Accès client',
   'detail.customer.title': 'ID client',
   'detail.customer.notGenerated': 'Non généré',

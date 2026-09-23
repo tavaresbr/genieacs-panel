@@ -791,6 +791,8 @@ const ptBR: Dictionary = {
   'detail.info.softwareVersion': 'Versão de software',
   'detail.info.lastBoot': 'Último boot',
   'detail.info.lastRegistered': 'Último registro',
+  'detail.info.wanMac': 'MAC WAN',
+  'detail.info.lanMac': 'MAC LAN',
   'detail.customer.kicker': 'Acesso do cliente',
   'detail.customer.title': 'ID do cliente',
   'detail.customer.notGenerated': 'Não gerado',

@@ -793,6 +793,8 @@ const en = {
   'detail.info.softwareVersion': 'Software version',
   'detail.info.lastBoot': 'Last boot',
   'detail.info.lastRegistered': 'Last registered',
+  'detail.info.wanMac': 'WAN MAC',
+  'detail.info.lanMac': 'LAN MAC',
   'detail.customer.kicker': 'Customer access',
   'detail.customer.title': 'Customer ID',
   'detail.customer.notGenerated': 'Not generated',

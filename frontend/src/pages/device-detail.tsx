@@ -61,6 +61,8 @@ interface ProcessedDeviceDetail {
     softwareVersion?: string;
     upTime?: string;
     macAddress?: string;
+    wanMacAddress?: string | null;
+    lanMacAddress?: string | null;
   };
   virtualParameters: {
     [key: string]: { path: string; value: any }
@@ -1446,6 +1448,16 @@ export default function DeviceDetailPage() {
                 <div className="flex justify-between">
                   <span className="text-gray-600 dark:text-gray-400">{t('detail.info.productClass')}:</span>
                   <span>{deviceInfo.productclass || t('common.na')}</span>
+                </div>
+                {/* O MAC WAN é o que o SGP mostra na sessão PPPoE — é por ele
+                    que se confere, no ERP, qual assinante está neste ONT. */}
+                <div className="flex justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">{t('detail.info.wanMac')}:</span>
+                  <span className="font-mono text-sm">{deviceInfo.wanMacAddress || t('common.na')}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">{t('detail.info.lanMac')}:</span>
+                  <span className="font-mono text-sm">{deviceInfo.lanMacAddress || t('common.na')}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600 dark:text-gray-400">{t('detail.info.hardwareVersion')}:</span>

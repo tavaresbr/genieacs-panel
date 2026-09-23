@@ -1096,6 +1096,42 @@ class DeviceService {
     await this.rememberRxPowerPath(path, state);
   }
 
+  /**
+   * The WAN MAC the ONT's Internet connection uses.
+   *
+   * The PPPoE connection the login was read from comes first: an ONT with
+   * TR-069, VoIP and Internet on separate connections has a MAC on each, and
+   * only the Internet one is what the RADIUS — and the SGP — sees. Then the
+   * first connection that reports one, then the WAN port itself.
+   */
+  static resolveWanMacAddress(item, pppoePath = null) {
+    const read = (path) => {
+      const value = this.getParameterValue(item, path);
+      return typeof value === 'string' && value.trim() ? value.trim() : null;
+    };
+    if (pppoePath && /\.WANPPPConnection\.\d+\.Username$/.test(pppoePath)) {
+      const own = read(pppoePath.replace(/\.Username$/, '.MACAddress'));
+      if (own) return own;
+    }
+    const wanDevices = item?.InternetGatewayDevice?.WANDevice;
+    for (const [wanKey, wanDevice] of Object.entries(wanDevices || {})) {
+      if (!/^\d+$/.test(wanKey)) continue;
+      for (const [connKey, connection] of Object.entries(wanDevice?.WANConnectionDevice || {})) {
+        if (!/^\d+$/.test(connKey)) continue;
+        for (const type of ['WANPPPConnection', 'WANIPConnection']) {
+          for (const key of Object.keys(connection?.[type] || {})) {
+            if (!/^\d+$/.test(key)) continue;
+            const found = read(
+              `InternetGatewayDevice.WANDevice.${wanKey}.WANConnectionDevice.${connKey}.${type}.${key}.MACAddress`
+            );
+            if (found) return found;
+          }
+        }
+      }
+    }
+    return read('InternetGatewayDevice.WANDevice.1.WANEthernetInterfaceConfig.MACAddress');
+  }
+
   static async processDetailDeviceData(item, virtualParams) {
     const getValue = (path) => {
       return this.getParameterValue(item, path);
@@ -1132,6 +1168,10 @@ class DeviceService {
     const vendor = vendorObj ? vendorObj.name.toLowerCase() : 'unknown';
     const vendorId = vendorObj ? vendorObj.id : null;
 
+    const pppoeUsername = this.resolvePppoeUsername(item, virtualParams);
+    const lanMacAddress = getValue('InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.1.MACAddress');
+    const wanMacAddress = this.resolveWanMacAddress(item, pppoeUsername.value ? pppoeUsername.path : null);
+
     const deviceInfo = {
       productclass: productClass,
       serialNumber: item._deviceId?._SerialNumber || null,
@@ -1140,13 +1180,13 @@ class DeviceService {
       hardwareVersion: getValue('InternetGatewayDevice.DeviceInfo.HardwareVersion'),
       softwareVersion: getValue('InternetGatewayDevice.DeviceInfo.SoftwareVersion'),
       upTime: getValue('InternetGatewayDevice.DeviceInfo.UpTime'),
-      macAddress: 
-        getValue('InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.1.MACAddress') ||
-        getValue('InternetGatewayDevice.WANDevice.1.WANEthernetInterfaceConfig.MACAddress') ||
-        null
+      macAddress: lanMacAddress || wanMacAddress || null,
+      lanMacAddress: lanMacAddress || null,
+      // The address the ONT dials from — the one the SGP shows on the PPPoE
+      // session, and so the one that ties this ONT to a subscriber there.
+      wanMacAddress
     };
 
-    const pppoeUsername = this.resolvePppoeUsername(item, virtualParams);
     // The detail page projects the whole WAN tree, so it is where an ONT
     // model's login path is most often seen first.
     if (pppoeUsername.value && pppoeUsername.path !== virtualParams.vpPppoeUsername) {
