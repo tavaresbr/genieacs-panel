@@ -1455,6 +1455,67 @@ class DeviceService {
     return found.value;
   }
 
+  /**
+   * The WAN addresses one ONT reports, for the operator's "router access".
+   *
+   * The ERP never had this: SGP knows the contract and the login, not the
+   * address the CPE is holding right now, which is why an attendant working
+   * from the ERP alone reads "IP not available". The ONT itself answers it,
+   * from `ExternalIPAddress` on each WAN connection (TR-098) or the IPv4
+   * addresses of each IP interface (TR-181).
+   *
+   * Only addresses, status and names come back — never a password, even
+   * though the PPP subtree holding them is the one being read.
+   */
+  static async getWanAddresses(deviceId) {
+    if (!deviceId) return [];
+    const [item] = await this.fetchDeviceListPage(
+      JSON.stringify({ _id: deviceId }),
+      ['_id', 'InternetGatewayDevice.WANDevice', 'Device.IP.Interface']
+    );
+    if (!item) return [];
+
+    const read = (node, key) => this.readNodeValue(node?.[key]);
+    const children = (node) => Object.entries(node && typeof node === 'object' ? node : {})
+      .filter(([key, value]) => /^\d+$/.test(key) && value && typeof value === 'object');
+    const connections = [];
+
+    for (const [, wanDevice] of children(item.InternetGatewayDevice?.WANDevice)) {
+      for (const [, connDevice] of children(wanDevice?.WANConnectionDevice)) {
+        for (const [kind, type] of [['WANPPPConnection', 'PPPoE'], ['WANIPConnection', 'IP']]) {
+          for (const [, conn] of children(connDevice?.[kind])) {
+            const address = read(conn, 'ExternalIPAddress');
+            connections.push({
+              type,
+              name: read(conn, 'Name'),
+              status: read(conn, 'ConnectionStatus'),
+              ipAddress: this.hasReportedValue(address) ? String(address).trim() : null
+            });
+          }
+        }
+      }
+    }
+
+    for (const [, iface] of children(item.Device?.IP?.Interface)) {
+      const name = read(iface, 'Name') ?? read(iface, 'Alias');
+      // The LAN bridge carries an IPv4 address too, and it is the gateway's own
+      // address on the subscriber's side — not the one anyone asked for.
+      if (name && /lan|^br/i.test(String(name))) continue;
+      for (const [, entry] of children(iface?.IPv4Address)) {
+        const address = read(entry, 'IPAddress');
+        if (!this.hasReportedValue(address)) continue;
+        connections.push({
+          type: 'IP',
+          name,
+          status: read(iface, 'Status'),
+          ipAddress: String(address).trim()
+        });
+      }
+    }
+
+    return connections;
+  }
+
   static async getCustomerPortalOverview(deviceId) {
     if (!deviceId) throw new Error('Device ID is required');
 

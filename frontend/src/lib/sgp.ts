@@ -57,4 +57,47 @@ export function sgpBadge(link: SgpBadgeInput | null | undefined): SgpBadge {
   }
 }
 
+/**
+ * O que a tela do aparelho e o módulo SGP da conversa mostram de um título.
+ * Moram aqui, e não em cada tela, para os dois lugares escreverem igual.
+ */
+
+/** SGP reports amounts in BRL; only the grouping follows the reader's locale. */
+export function formatBrl(amount: number | null, intlLocale: string) {
+  if (amount === null || !Number.isFinite(amount)) return '—'
+  return amount.toLocaleString(intlLocale, { style: 'currency', currency: 'BRL' })
+}
+
+export function isSafeExternalUrl(value: string | null): value is string {
+  if (!value) return false
+  try {
+    return ['http:', 'https:'].includes(new URL(value).protocol)
+  } catch {
+    return false
+  }
+}
+
+export async function copyToClipboard(value: string) {
+  try {
+    await navigator.clipboard.writeText(value)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * The router's own management page, from the WAN address the ONT reported.
+ * Only a bare dotted IPv4 becomes a link: anything else the ONT might put in
+ * that field is shown as text and never navigated to.
+ */
+export function routerUrl(ip: string | null | undefined): string | null {
+  const value = String(ip ?? '').trim()
+  const parts = value.split('.')
+  if (parts.length !== 4) return null
+  if (!parts.every((part) => /^\d{1,3}$/.test(part) && Number(part) <= 255)) return null
+  if (value === '0.0.0.0') return null
+  return `http://${value}/`
+}
+
 export default sgpBadge

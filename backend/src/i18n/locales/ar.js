@@ -381,6 +381,7 @@ export default {
   'sgp.error.queryFailed': 'أعاد SGP خطأً لهذا الاستعلام',
   'sgp.error.identifierRequired': 'أدخل رقم مستند أو عقد أو اسم دخول PPPoE للاستعلام من SGP',
   'sgp.error.contractRequired': 'عقد SGP مطلوب',
+  'sgp.error.contractNotInConversation': 'هذا العقد لا يخص هذه المحادثة',
   'sgp.error.deviceUnlinked': 'هذا الجهاز غير مرتبط بعقد في SGP بعد. اربطه يدويًا أو تحقّق من اسم دخول PPPoE.',
   'sgp.error.noContractForDevice': 'لم يُعثر على عقد في SGP لهذا الجهاز',
   'sgp.error.contractNotFound': 'العقد غير موجود في SGP',

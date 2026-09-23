@@ -2294,6 +2294,88 @@ export interface WhatsAppConversation {
   updatedAt: string | null
 }
 
+/** One contract as the SGP lookup returned it, with the state the server derived. */
+export interface WaSubscriberContract {
+  contract: string
+  status: string | null
+  statusLabel: string | null
+  plan: string | null
+  name: string | null
+  document: string | null
+  address: string | null
+  login: string | null
+  phone: string | null
+  blocked: boolean | null
+  state: SgpContractState
+}
+
+/** A part of the panel that failed on its own, already in the reader's language. */
+export interface WaSubscriberPartError {
+  code: string
+  message: string | null
+}
+
+/**
+ * The SGP module beside a WhatsApp thread. Each part answers on its own: the
+ * ERP failing leaves the router half standing, and the other way round.
+ */
+export type WaSubscriberPanel =
+  | {
+      ready: false
+      attendance: WaSubscriberAttendance
+      ticketEnabled: false
+    }
+  | {
+      ready: true
+      attendance: WaSubscriberAttendance & {
+        clientName: string | null
+        document: string | null
+        /** How the number was recognised; `conversation` when an operator bound it. */
+        matchedOn: 'manual' | 'sgp' | 'conversation' | null
+      }
+      contracts: {
+        items: WaSubscriberContract[]
+        selected: string | null
+        /** The contract asked for is not among the ones found. Nothing was guessed. */
+        missing: boolean
+        /** False when the number gave the server nothing to search with. */
+        searched: boolean
+        /** SGP failed and the list is the last stored link. */
+        stale: boolean
+        error: WaSubscriberPartError | null
+      }
+      contract: WaSubscriberContract | null
+      router:
+        | { available: false; reason: 'unlinked' | 'unreachable'; deviceId: string | null; deviceIds: string[]; error?: WaSubscriberPartError }
+        | {
+            available: true
+            deviceId: string
+            deviceIds: string[]
+            status: 'online' | 'offline' | null
+            lastInform: string | null
+            ont: { manufacturer: string | null; model: string | null; serialNumber: string | null } | null
+            rxPower: number | string | null
+            connectedDevices: number | string | null
+            ipAddress: string | null
+            connections: { type: string; name: string | null; status: string | null; ipAddress: string | null }[]
+          }
+      invoices: {
+        items: SgpInvoice[]
+        /** The oldest overdue invoice, else the next one due. */
+        highlight: string | null
+        error: WaSubscriberPartError | null
+      }
+      ticketEnabled: boolean
+    }
+
+export interface WaSubscriberAttendance {
+  conversationId: number
+  phone: string | null
+  pushName: string | null
+  contract: string | null
+  deviceId: string | null
+}
+
 export interface WhatsAppMessage {
   id: number
   conversationId: number
@@ -2541,6 +2623,27 @@ export const whatsappAPI = {
   // "resend" read the row's body and sent a new message, which left the failed
   // row behind, produced a duplicate for the subscriber, and did nothing at all
   // when the content was an attachment and the body was empty.
+  // ── The SGP module beside a thread ─────────────────────────────────────
+  // `contract` is an exact pick from the contracts found; `document` is the
+  // manual search for a number the panel does not know. Every act names the
+  // contract, and the server refuses one it did not itself find for the thread.
+  getSubscriberPanel: (conversationId: number, params: { contract?: string; document?: string } = {}) => {
+    const query = new URLSearchParams()
+    if (params.contract) query.set('contract', params.contract)
+    if (params.document) query.set('document', params.document)
+    const suffix = query.toString() ? `?${query.toString()}` : ''
+    return apiClient.get<WaSubscriberPanel>(`/whatsapp/conversations/${conversationId}/subscriber${suffix}`)
+  },
+
+  bindSubscriber: (conversationId: number, payload: { contract: string; document?: string }) =>
+    apiClient.post<WaSubscriberPanel>(`/whatsapp/conversations/${conversationId}/subscriber/bind`, payload),
+
+  subscriberUnlock: (conversationId: number, contract: string) =>
+    apiClient.post<{ contract: string }>(`/whatsapp/conversations/${conversationId}/subscriber/unlock`, { contract }),
+
+  subscriberTicket: (conversationId: number, payload: { contract: string; content: string; note?: string }) =>
+    apiClient.post<SgpTicket>(`/whatsapp/conversations/${conversationId}/subscriber/ticket`, payload),
+
   requeueMessage: (id: number) =>
     apiClient.post<WhatsAppMessage>(`/whatsapp/messages/${id}/requeue`, {}),
 

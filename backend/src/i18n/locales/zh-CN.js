@@ -381,6 +381,7 @@ export default {
   'sgp.error.queryFailed': 'SGP 对该查询返回了错误',
   'sgp.error.identifierRequired': '请输入证件号、合同或 PPPoE 账号以查询 SGP',
   'sgp.error.contractRequired': '需要提供 SGP 合同',
+  'sgp.error.contractNotInConversation': '此合同不属于该对话',
   'sgp.error.deviceUnlinked': '该 ONT 尚未关联任何 SGP 合同。请手动关联，或检查 PPPoE 账号。',
   'sgp.error.noContractForDevice': '未找到该 ONT 对应的 SGP 合同',
   'sgp.error.contractNotFound': 'SGP 中找不到该合同',

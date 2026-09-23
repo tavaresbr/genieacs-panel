@@ -12,6 +12,7 @@ import { useTranslation } from '@/contexts/language-context'
 import { whatsappErrorMessage } from '@/components/whatsapp-connection'
 import { ConversationList } from '@/components/whatsapp/conversation-list'
 import { ConversationThread } from '@/components/whatsapp/conversation-thread'
+import { SubscriberPanel } from '@/components/whatsapp/subscriber-panel'
 import { ThreadComposer, type ComposerAttachment } from '@/components/whatsapp/thread-composer'
 import { BillingPanel } from '@/components/whatsapp/billing-panel'
 import { CampaignsPanel } from '@/components/whatsapp/campaigns-panel'
@@ -97,9 +98,48 @@ function mergeNewest(page: WhatsAppMessage[], current: WhatsAppMessage[]): Whats
  * the reply box on the right. The routes it consumes are frozen in
  * `docs/whatsapp-api-contract.md`.
  */
+/** Where the operator's choice to keep the SGP module open is remembered. */
+const SGP_PANEL_KEY = 'whatsapp.sgpPanelOpen'
+
+/**
+ * Open by default only where it fits beside the thread. Below xl it is a drawer
+ * over the conversation, and one that opens by itself on every thread would
+ * hide what the operator came to read.
+ */
+function readPanelPreference(): boolean {
+  let wide: boolean
+  try {
+    wide = window.matchMedia('(min-width: 1280px)').matches
+  } catch {
+    wide = false
+  }
+  try {
+    const stored = window.localStorage.getItem(SGP_PANEL_KEY)
+    return stored === null ? wide : stored === '1'
+  } catch {
+    return wide
+  }
+}
+
 function InboxTab() {
   const { t } = useTranslation()
   const toast = useToast()
+  const { can } = useAuth()
+  // The module reads the ERP, so it is there only for whoever may read it;
+  // an inbox-only operator keeps the two-column screen they had.
+  const canSeeSgp = can('sgp.read')
+  const [sgpPanelOpen, setSgpPanelOpen] = useState(readPanelPreference)
+  const toggleSgpPanel = useCallback(() => {
+    setSgpPanelOpen((open) => {
+      try {
+        window.localStorage.setItem(SGP_PANEL_KEY, open ? '0' : '1')
+      } catch {
+        // A browser that will not store it just forgets it on reload.
+      }
+      return !open
+    })
+  }, [])
+  const showSgpPanel = canSeeSgp && sgpPanelOpen
 
   const [conversations, setConversations] = useState<WhatsAppConversation[]>([])
   const [selectedId, setSelectedId] = useState<number | null>(null)
@@ -503,7 +543,11 @@ function InboxTab() {
             </button>
           </section>
         ) : (
-          <section className="modern-card grid h-[calc(100vh-16rem)] min-h-[32rem] grid-cols-1 overflow-hidden lg:grid-cols-[minmax(17rem,22rem)_1fr]">
+          <section
+            className={`modern-card grid h-[calc(100vh-16rem)] min-h-[32rem] grid-cols-1 overflow-hidden lg:grid-cols-[minmax(17rem,22rem)_1fr] ${
+              showSgpPanel && conversation ? 'xl:grid-cols-[minmax(16rem,20rem)_1fr_minmax(18rem,22rem)]' : ''
+            }`}
+          >
             <div className="flex min-h-0 flex-col border-border lg:border-e">
               <div className="space-y-2 border-b border-border px-3 py-3">
                 <input
@@ -560,6 +604,8 @@ function InboxTab() {
                     resendingId={resendingId}
                     filing={filing}
                     onFile={(next) => void file(next)}
+                    sgpPanelOpen={canSeeSgp ? showSgpPanel : undefined}
+                    onToggleSgpPanel={canSeeSgp ? toggleSgpPanel : undefined}
                   />
                   <ThreadComposer optedOut={conversation.optedOut} sending={sending} onSend={send} />
                 </>
@@ -570,6 +616,24 @@ function InboxTab() {
                 </div>
               )}
             </div>
+
+            {/* Beside the thread from xl up. Narrower, a third column would
+                squeeze the conversation, so it is a drawer over it instead —
+                above the mobile top bar (z 1200), whose height would otherwise
+                hide the drawer's own close button, and below the navigation
+                menu (z 2000). */}
+            {showSgpPanel && conversation && (
+              <div className="fixed inset-y-0 end-0 z-[1500] w-[min(22rem,100vw)] border-s border-border shadow-xl xl:static xl:z-auto xl:h-full xl:min-h-0 xl:w-auto xl:shadow-none">
+                <SubscriberPanel
+                  conversationId={conversation.id}
+                  onClose={toggleSgpPanel}
+                  onBound={() => {
+                    void loadList(false)
+                    void loadThreadRef.current(conversation.id, true)
+                  }}
+                />
+              </div>
+            )}
           </section>
         )}
       </div>

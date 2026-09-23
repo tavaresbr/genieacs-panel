@@ -381,6 +381,7 @@ export default {
   'sgp.error.queryFailed': 'SGP returned an error for this query',
   'sgp.error.identifierRequired': 'Enter a document, a contract, or a PPPoE login to query SGP',
   'sgp.error.contractRequired': 'The SGP contract is required',
+  'sgp.error.contractNotInConversation': 'This contract does not belong to this conversation',
   'sgp.error.deviceUnlinked': 'This ONT has no SGP contract linked yet. Link it manually or check the PPPoE login.',
   'sgp.error.noContractForDevice': 'No SGP contract was found for this ONT',
   'sgp.error.contractNotFound': 'Contract not found in SGP',

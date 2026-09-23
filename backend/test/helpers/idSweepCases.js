@@ -330,6 +330,49 @@ export const casos = [
     body: { status: 'closed' },
     tabela: 'wa_conversations'
   },
+  // O módulo SGP ao lado da conversa. A conversa é lida escopada ANTES de
+  // qualquer consulta ao ERP, então o id do vizinho é 404 e o ERP nem é
+  // chamado. Com o id próprio a resposta depende do SGP estar configurado aqui
+  // (não está), e o controle só exige que a conversa tenha sido achada.
+  {
+    chave: 'conversation',
+    label: 'GET /api/whatsapp/conversations/:id/subscriber',
+    method: 'GET',
+    path: (id) => `/api/whatsapp/conversations/${id}/subscriber`,
+    tabela: 'wa_conversations',
+    controleSoNaoAchou: true,
+    codigoDeNaoAchou: 'conversation_not_found'
+  },
+  {
+    chave: 'conversation',
+    label: 'POST /api/whatsapp/conversations/:id/subscriber/bind',
+    method: 'POST',
+    path: (id) => `/api/whatsapp/conversations/${id}/subscriber/bind`,
+    body: { contract: '1' },
+    tabela: 'wa_conversations',
+    controleSoNaoAchou: true,
+    codigoDeNaoAchou: 'conversation_not_found'
+  },
+  {
+    chave: 'conversation',
+    label: 'POST /api/whatsapp/conversations/:id/subscriber/unlock',
+    method: 'POST',
+    path: (id) => `/api/whatsapp/conversations/${id}/subscriber/unlock`,
+    body: { contract: '1' },
+    tabela: 'wa_conversations',
+    controleSoNaoAchou: true,
+    codigoDeNaoAchou: 'conversation_not_found'
+  },
+  {
+    chave: 'conversation',
+    label: 'POST /api/whatsapp/conversations/:id/subscriber/ticket',
+    method: 'POST',
+    path: (id) => `/api/whatsapp/conversations/${id}/subscriber/ticket`,
+    body: { contract: '1', content: 'Escrito no contrato do vizinho' },
+    tabela: 'wa_conversations',
+    controleSoNaoAchou: true,
+    codigoDeNaoAchou: 'conversation_not_found'
+  },
   // 409 e não 404, e está certo: a rota não distingue "não existe" de "não dá
   // para reenfileirar", e a leitura por baixo é escopada — o vizinho recebe a
   // mesma recusa que receberia para uma mensagem já entregue. O que se exige

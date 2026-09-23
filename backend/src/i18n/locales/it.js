@@ -379,6 +379,7 @@ export default {
   'sgp.error.queryFailed': 'SGP ha restituito un errore per questa consultazione',
   'sgp.error.identifierRequired': 'Inserisci documento, contratto o login PPPoE per consultare SGP',
   'sgp.error.contractRequired': 'Il contratto SGP è obbligatorio',
+  'sgp.error.contractNotInConversation': 'Questo contratto non appartiene a questa conversazione',
   'sgp.error.deviceUnlinked': 'Questa ONT non ha ancora un contratto SGP collegato. Collegalo manualmente o verifica il login PPPoE.',
   'sgp.error.noContractForDevice': 'Nessun contratto SGP trovato per questa ONT',
   'sgp.error.contractNotFound': 'Contratto non trovato in SGP',

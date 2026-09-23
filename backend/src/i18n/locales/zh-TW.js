@@ -380,6 +380,7 @@ export default {
   'sgp.error.queryFailed': 'SGP 對該查詢回傳了錯誤',
   'sgp.error.identifierRequired': '請輸入證號、合約或 PPPoE 帳號以查詢 SGP',
   'sgp.error.contractRequired': '需要提供 SGP 合約',
+  'sgp.error.contractNotInConversation': '此合約不屬於該對話',
   'sgp.error.deviceUnlinked': '該 ONT 尚未連結任何 SGP 合約。請手動連結，或確認 PPPoE 帳號。',
   'sgp.error.noContractForDevice': '找不到該 ONT 對應的 SGP 合約',
   'sgp.error.contractNotFound': 'SGP 中找不到該合約',

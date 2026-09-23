@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { sgpBadge } from '@/lib/sgp'
+import { routerUrl, sgpBadge } from '@/lib/sgp'
 
 /**
  * A cor do selo de um contrato do ERP.
@@ -75,5 +75,28 @@ describe('e o texto dele', () => {
     // Um ERP que devolve '   ' faria a tela desenhar um selo vazio, que não
     // diz nada e ainda parece um defeito de layout.
     expect(sgpBadge({ state: 'active', statusLabel: '   ', status: null }).text).toBeNull()
+  })
+})
+
+/**
+ * O link "Abrir roteador" do módulo SGP da conversa. O endereço vem da ONT,
+ * e o que a ONT escreve no campo não é confiável como URL: só um IPv4 comum
+ * vira link, e qualquer outra coisa fica como texto.
+ */
+describe('routerUrl', () => {
+  it('turns a dotted IPv4 into the router page', () => {
+    expect(routerUrl('100.64.10.20')).toBe('http://100.64.10.20/')
+    expect(routerUrl(' 177.10.0.1 ')).toBe('http://177.10.0.1/')
+  })
+
+  it('refuses anything that is not a plain address', () => {
+    expect(routerUrl(null)).toBeNull()
+    expect(routerUrl('')).toBeNull()
+    expect(routerUrl('0.0.0.0')).toBeNull()
+    expect(routerUrl('256.1.1.1')).toBeNull()
+    expect(routerUrl('1.2.3')).toBeNull()
+    expect(routerUrl('javascript:alert(1)')).toBeNull()
+    expect(routerUrl('evil.example/1.2.3.4')).toBeNull()
+    expect(routerUrl('2804:14c::1')).toBeNull()
   })
 })

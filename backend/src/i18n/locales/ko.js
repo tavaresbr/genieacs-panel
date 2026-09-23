@@ -382,6 +382,7 @@ export default {
   'sgp.error.queryFailed': 'SGP가 이 조회에 대해 오류를 반환했습니다',
   'sgp.error.identifierRequired': 'SGP를 조회하려면 증서 번호, 계약 또는 PPPoE 로그인을 입력하십시오',
   'sgp.error.contractRequired': 'SGP 계약이 필요합니다',
+  'sgp.error.contractNotInConversation': '이 계약은 이 대화에 속하지 않습니다',
   'sgp.error.deviceUnlinked': '이 ONT에는 아직 SGP 계약이 연결되지 않았습니다. 수동으로 연결하거나 PPPoE 로그인을 확인하십시오.',
   'sgp.error.noContractForDevice': '이 ONT에 해당하는 SGP 계약을 찾지 못했습니다',
   'sgp.error.contractNotFound': 'SGP에서 계약을 찾을 수 없습니다',
