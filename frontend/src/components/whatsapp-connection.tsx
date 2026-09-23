@@ -59,6 +59,7 @@ const ERROR_KEYS: Record<string, TranslationKey> = {
   attachment_not_found: 'whatsapp.error.attachmentNotFound',
   no_public_url: 'whatsapp.error.noPublicUrl',
   subscriber_not_found: 'whatsapp.error.subscriberNotFound',
+  subscriber_no_phone: 'whatsapp.error.subscriberNoPhone',
   // Templates, campaigns and the alert rules. `no_recipients` is the campaign's
   // — the alert scan raises `no_alert_recipients` precisely so one code does
   // not have to mean both "nobody is on duty" and "the filters left nobody".

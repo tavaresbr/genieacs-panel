@@ -10,6 +10,7 @@ import { lerRecibo } from '../utils/wa/waRecibo.js';
 import { pedeSaida } from '../utils/wa/waOptOutTexto.js';
 import WaMediaService from './waMediaService.js';
 import WaBotService from './waBotService.js';
+import WaConversationService from './waConversationService.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { DATA_DIR } from '../config/paths.js';
@@ -377,6 +378,24 @@ async function gravarMensagem(account, item) {
     patch.unread_count = getDb().raw('unread_count + 1');
   }
   await WaConversation.update(conversation.id, patch);
+
+  // 8b. Quem é o assinante do outro lado.
+  //
+  // Aqui, e não só dentro do bot: o vínculo era feito apenas quando o bot
+  // chegava a responder, então um provedor com o autoatendimento desligado — ou
+  // um fio com operador presente — nunca via o contrato ao lado da conversa, e
+  // a caixa inteira dizia "número não vinculado". `bindSubscriber` escreve uma
+  // vez e nunca sobrescreve o vínculo que um operador corrigiu à mão.
+  //
+  // Só na entrada, e sem deixar uma falha virar 500: o evento já está gravado,
+  // e um erro aqui faria o servidor reenviá-lo para sempre.
+  if (!fromMe && !conversation.contract) {
+    try {
+      await WaConversationService.bindSubscriber(conversation);
+    } catch (error) {
+      console.error('waInbound bindSubscriber:', error?.message || error);
+    }
+  }
 
   // 9. O bot de autoatendimento.
   // Depois de gravar e depois do opt-out, de propósito: o bot decide sobre uma

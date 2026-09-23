@@ -501,6 +501,13 @@ export default {
   'whatsapp.phoneSaveFailed': 'Die Telefonnummer konnte nicht gespeichert werden',
   'whatsapp.error.invalidPhone': 'Das sieht nicht nach einer nutzbaren Telefonnummer aus',
   'whatsapp.error.subscriberNotFound': 'Kein Teilnehmer mit diesem Vertrag',
+  'whatsapp.contactsLoaded': '{count} Kontakt(e)',
+  'whatsapp.contactsLoadFailed': 'Die Kontakte konnten nicht geladen werden',
+  'whatsapp.conversationOpened': 'Unterhaltung geöffnet',
+  'whatsapp.conversationOpenFailed': 'Die Unterhaltung konnte nicht geöffnet werden',
+  'whatsapp.subscriberLinked': 'Unterhaltung mit dem Teilnehmer verknüpft',
+  'whatsapp.subscriberLinkFailed': 'Die Unterhaltung konnte nicht verknüpft werden',
+  'whatsapp.error.subscriberNoPhone': 'Für diesen Teilnehmer ist keine Telefonnummer hinterlegt',
   // WhatsApp — inbox e bot de autoatendimento (onda 3)
   'whatsapp.error.conversationNotFound': 'Unterhaltung nicht gefunden',
   'whatsapp.conversationClosed': 'Unterhaltung geschlossen',

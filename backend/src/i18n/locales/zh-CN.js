@@ -500,6 +500,13 @@ export default {
   'whatsapp.phoneSaveFailed': '无法保存电话号码',
   'whatsapp.error.invalidPhone': '这不像是一个可用的电话号码',
   'whatsapp.error.subscriberNotFound': '找不到该合同号对应的用户',
+  'whatsapp.contactsLoaded': '{count} 个联系人',
+  'whatsapp.contactsLoadFailed': '无法加载联系人',
+  'whatsapp.conversationOpened': '已打开会话',
+  'whatsapp.conversationOpenFailed': '无法打开会话',
+  'whatsapp.subscriberLinked': '会话已关联到用户',
+  'whatsapp.subscriberLinkFailed': '无法关联会话',
+  'whatsapp.error.subscriberNoPhone': '该用户没有登记电话号码',
   // WhatsApp — 收件箱与自助服务机器人（第三阶段）
   'whatsapp.error.conversationNotFound': '找不到该会话',
   'whatsapp.conversationClosed': '会话已结束',
