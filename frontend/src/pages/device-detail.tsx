@@ -14,8 +14,8 @@ import { DeviceHistoryCard } from '@/components/device-history-card'
 import { DeviceSwapsCard } from '@/components/device-swaps-card'
 import { useAuth } from '@/contexts/auth-context'
 import { CustomerLgpd } from '@/components/customer-lgpd'
-import { useWifiStatusFilter, WifiStatusFilterControl } from '@/components/wifi-status-filter'
-import { filterWifiByStatus } from '@/lib/wifi-filter'
+import { WifiStatusFilterControl } from '@/components/wifi-status-filter'
+import { filterWifiByStatus, type WifiStatusFilter } from '@/lib/wifi-filter'
 import { FilterRail, useStoredChoice } from '@/components/ui/filter-rail'
 import { filterInvoicesByStatus, parseInvoiceStatusFilter, type InvoiceStatusFilter } from '@/lib/invoice-filter'
 import { useTranslation } from '@/contexts/language-context'
@@ -633,7 +633,10 @@ export default function DeviceDetailPage() {
   const [isCredentialModalOpen, setIsCredentialModalOpen] = useState(false)
   const [credentialType, setCredentialType] = useState<'super' | 'user' | null>(null);
   const [editingWifi, setEditingWifi] = useState<WifiNetwork | null>(null)
-  const [wifiFilter, setWifiFilter] = useWifiStatusFilter('deviceDetail.wifiFilter')
+  // `null` = ninguém escolheu ainda nesta visita à aba: vale o padrão
+  // (Ativas, ou Todas quando não há rede ativa). Volta a `null` a cada
+  // entrada na aba WiFi.
+  const [wifiFilterChoice, setWifiFilterChoice] = useState<WifiStatusFilter | null>(null)
   const [savingWifi, setSavingWifi] = useState(false)
   const [installationDate, setInstallationDate] = useState('')
   const [savingInstallationDate, setSavingInstallationDate] = useState(false)
@@ -1166,6 +1169,8 @@ export default function DeviceDetailPage() {
   const primaryWAN = (device.wan && device.wan.length > 0) ? device.wan[0] : null
   const signalInfo = getSignalStrengthInfo(vp.rxpower?.value);
   const wifiNetworks = device.wifi ?? []
+  const wifiEnabledCount = wifiNetworks.filter((ssid) => ssid.enable === true).length
+  const wifiFilter: WifiStatusFilter = wifiFilterChoice ?? (wifiEnabledCount > 0 ? 'enabled' : 'all')
   const { visible: filteredWifi, counts: wifiCounts } = filterWifiByStatus(wifiNetworks, wifiFilter, (ssid) => ssid.enable)
   const { visible: visibleInvoices, counts: invoiceCounts } = filterInvoicesByStatus(sgpInvoices, invoiceFilter)
 
@@ -1372,7 +1377,7 @@ export default function DeviceDetailPage() {
               {t('detail.tab.wan')}
             </button>
             <button
-              onClick={() => setActiveTab('wifi')}
+              onClick={() => { setActiveTab('wifi'); setWifiFilterChoice(null) }}
               className="tab-button"
               data-active={activeTab === 'wifi'}
               role="tab"
@@ -2032,7 +2037,7 @@ export default function DeviceDetailPage() {
                 <p className="section-description mt-1">{t('detail.wifi.description')}</p>
               </div>
               {wifiNetworks.length > 0 && (
-                <WifiStatusFilterControl value={wifiFilter} onChange={setWifiFilter} counts={wifiCounts} />
+                <WifiStatusFilterControl value={wifiFilter} onChange={setWifiFilterChoice} counts={wifiCounts} />
               )}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
