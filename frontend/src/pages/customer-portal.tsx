@@ -2,6 +2,8 @@ import { FormEvent, useCallback, useEffect, useState } from 'react'
 import { BrandMark } from '@/components/brand-mark'
 import { Icon } from '@/components/ui/icon'
 import { QrCode } from '@/components/qr-code'
+import { useWifiStatusFilter, WifiStatusFilterControl } from '@/components/wifi-status-filter'
+import { filterWifiByStatus } from '@/lib/wifi-filter'
 import { looksLikeBrCode } from '@/lib/qr/encode'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import { useTranslation } from '@/contexts/language-context'
@@ -147,6 +149,7 @@ export default function CustomerPortal() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [wifiEditor, setWifiEditor] = useState<WifiEditor | null>(null)
+  const [wifiFilter, setWifiFilter] = useWifiStatusFilter('customerPortal.wifiFilter')
   const [wifiSaving, setWifiSaving] = useState(false)
   const [showWifiPassword, setShowWifiPassword] = useState(false)
   const [visibleSavedPasswordIndex, setVisibleSavedPasswordIndex] = useState<number | null>(null)
@@ -459,6 +462,12 @@ export default function CustomerPortal() {
     }
   }
 
+  const { visible: visibleWifi, counts: wifiCounts } = filterWifiByStatus(
+    overview?.wifi ?? [],
+    wifiFilter,
+    (network) => network.enabled
+  )
+
   if (checkingSession) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-background p-5">
@@ -646,6 +655,9 @@ export default function CustomerPortal() {
               <section className="modern-card p-5 sm:p-6">
                 <h2 className="section-heading">{t('portal.wifi.title')}</h2>
                 <p className="section-description mb-5">{t('portal.wifi.description')}</p>
+                {overview.wifi.length > 0 && (
+                  <WifiStatusFilterControl value={wifiFilter} onChange={setWifiFilter} counts={wifiCounts} className="mb-4" />
+                )}
                 {wifiFeedback && (
                   <div
                     className={`mb-4 rounded-md border p-3 text-sm ${
@@ -659,9 +671,13 @@ export default function CustomerPortal() {
                     {wifiFeedback.message}
                   </div>
                 )}
-                {overview.wifi.length ? (
+                {overview.wifi.length && !visibleWifi.length ? (
+                  <p className="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                    {t('detail.wifi.filterEmpty')}
+                  </p>
+                ) : overview.wifi.length ? (
                   <div className="space-y-3">
-                    {overview.wifi.map((network) => (
+                    {visibleWifi.map((network) => (
                       <article key={network.index} className="rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-4">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">

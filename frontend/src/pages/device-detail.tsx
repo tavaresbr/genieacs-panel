@@ -13,6 +13,8 @@ import { DeviceHistoryCard } from '@/components/device-history-card'
 import { DeviceSwapsCard } from '@/components/device-swaps-card'
 import { useAuth } from '@/contexts/auth-context'
 import { CustomerLgpd } from '@/components/customer-lgpd'
+import { useWifiStatusFilter, WifiStatusFilterControl } from '@/components/wifi-status-filter'
+import { filterWifiByStatus } from '@/lib/wifi-filter'
 import { useTranslation } from '@/contexts/language-context'
 
 interface WanBindingData {
@@ -625,7 +627,7 @@ export default function DeviceDetailPage() {
   const [isCredentialModalOpen, setIsCredentialModalOpen] = useState(false)
   const [credentialType, setCredentialType] = useState<'super' | 'user' | null>(null);
   const [editingWifi, setEditingWifi] = useState<WifiNetwork | null>(null)
-  const [wifiFilter, setWifiFilter] = useState<'all' | 'enabled' | 'disabled'>('all')
+  const [wifiFilter, setWifiFilter] = useWifiStatusFilter('deviceDetail.wifiFilter')
   const [savingWifi, setSavingWifi] = useState(false)
   const [installationDate, setInstallationDate] = useState('')
   const [savingInstallationDate, setSavingInstallationDate] = useState(false)
@@ -1188,13 +1190,8 @@ export default function DeviceDetailPage() {
   const deviceInfo = device.deviceInfo || {}
   const primaryWAN = (device.wan && device.wan.length > 0) ? device.wan[0] : null
   const signalInfo = getSignalStrengthInfo(vp.rxpower?.value);
-  // "Estado desconhecido" conta como desativada: só é ativa a rede que o CPE
-  // confirmou estar transmitindo.
   const wifiNetworks = device.wifi ?? []
-  const enabledWifiCount = wifiNetworks.filter((ssid) => ssid.enable === true).length
-  const filteredWifi = wifiFilter === 'all'
-    ? wifiNetworks
-    : wifiNetworks.filter((ssid) => (ssid.enable === true) === (wifiFilter === 'enabled'))
+  const { visible: filteredWifi, counts: wifiCounts } = filterWifiByStatus(wifiNetworks, wifiFilter, (ssid) => ssid.enable)
 
   /**
    * Abre (ou fecha) o formulário do chamado. Um só caminho para os dois botões
@@ -2032,24 +2029,7 @@ export default function DeviceDetailPage() {
                 <p className="section-description mt-1">{t('detail.wifi.description')}</p>
               </div>
               {wifiNetworks.length > 0 && (
-                <div className="tab-rail" role="group" aria-label={t('detail.wifi.filterAria')}>
-                  {([
-                    ['all', 'detail.wifi.filterAll', wifiNetworks.length],
-                    ['enabled', 'detail.wifi.filterEnabled', enabledWifiCount],
-                    ['disabled', 'detail.wifi.filterDisabled', wifiNetworks.length - enabledWifiCount],
-                  ] as const).map(([value, label, count]) => (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => setWifiFilter(value)}
-                      className="tab-button"
-                      data-active={wifiFilter === value}
-                      aria-pressed={wifiFilter === value}
-                    >
-                      {t(label, { count })}
-                    </button>
-                  ))}
-                </div>
+                <WifiStatusFilterControl value={wifiFilter} onChange={setWifiFilter} counts={wifiCounts} />
               )}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
