@@ -498,6 +498,13 @@ export default {
   'whatsapp.phoneSaveFailed': '전화번호를 저장하지 못했습니다',
   'whatsapp.error.invalidPhone': '사용할 수 있는 전화번호 형식이 아닙니다',
   'whatsapp.error.subscriberNotFound': '해당 계약의 가입자를 찾을 수 없습니다',
+  'whatsapp.contactsLoaded': '연락처 {count}건',
+  'whatsapp.contactsLoadFailed': '연락처를 불러오지 못했습니다',
+  'whatsapp.conversationOpened': '대화를 열었습니다',
+  'whatsapp.conversationOpenFailed': '대화를 열지 못했습니다',
+  'whatsapp.subscriberLinked': '대화를 가입자와 연결했습니다',
+  'whatsapp.subscriberLinkFailed': '대화를 연결하지 못했습니다',
+  'whatsapp.error.subscriberNoPhone': '이 가입자에게 등록된 전화번호가 없습니다',
   // WhatsApp — 수신함 및 셀프서비스 봇 (3차)
   'whatsapp.error.conversationNotFound': '대화를 찾을 수 없습니다',
   'whatsapp.conversationClosed': '대화를 종료했습니다',

@@ -501,6 +501,13 @@ export default {
   'whatsapp.phoneSaveFailed': 'Не удалось сохранить номер телефона',
   'whatsapp.error.invalidPhone': 'Это не похоже на пригодный номер телефона',
   'whatsapp.error.subscriberNotFound': 'Абонент с таким договором не найден',
+  'whatsapp.contactsLoaded': 'Контактов: {count}',
+  'whatsapp.contactsLoadFailed': 'Не удалось загрузить контакты',
+  'whatsapp.conversationOpened': 'Диалог открыт',
+  'whatsapp.conversationOpenFailed': 'Не удалось открыть диалог',
+  'whatsapp.subscriberLinked': 'Диалог привязан к абоненту',
+  'whatsapp.subscriberLinkFailed': 'Не удалось привязать диалог',
+  'whatsapp.error.subscriberNoPhone': 'У этого абонента нет номера телефона',
   // WhatsApp — входящие и бот самообслуживания (этап 3)
   'whatsapp.error.conversationNotFound': 'Диалог не найден',
   'whatsapp.conversationClosed': 'Диалог завершён',

@@ -1,4 +1,7 @@
 import { tdb, tinsertReturningId } from '../config/database.js';
+import { variantesTelefoneBr } from '../utils/wa/waDestino.js';
+
+const PHONE_DOMAIN = '@s.whatsapp.net';
 
 /** One thread with one contact on one connected number. */
 class WaConversation {
@@ -15,6 +18,26 @@ class WaConversation {
   }
 
   /**
+   * The thread already open under the OTHER spelling of the same mobile.
+   *
+   * A conversation started from the panel is keyed by the number the ERP holds
+   * — with the ninth digit — while WhatsApp still addresses many older accounts
+   * by the twelve-digit form. Without this the subscriber's answer would open a
+   * second thread beside the one the operator is waiting in.
+   */
+  static async getByPhoneSpelling(accountId, externalThreadId) {
+    const thread = String(externalThreadId ?? '');
+    if (!thread.endsWith(PHONE_DOMAIN)) return null;
+    const digits = thread.slice(0, -PHONE_DOMAIN.length);
+    for (const spelling of variantesTelefoneBr(digits)) {
+      if (spelling === digits) continue;
+      const found = await this.getByThread(accountId, `${spelling}${PHONE_DOMAIN}`);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  /**
    * Finds or creates the thread an inbound event belongs to.
    *
    * `external_thread_id` is the key because it is what both server flavors send
@@ -22,7 +45,8 @@ class WaConversation {
    * arrive later, or only one of the two ever.
    */
   static async ensure({ accountId, externalThreadId, waPhone, waLid, pushName }) {
-    const existing = await this.getByThread(accountId, externalThreadId);
+    const existing = (await this.getByThread(accountId, externalThreadId))
+      || (await this.getByPhoneSpelling(accountId, externalThreadId));
     const now = new Date();
     if (existing) {
       // Only fill gaps. A pushName the operator already corrected, or a phone

@@ -108,6 +108,7 @@ const POR_ID = new Map([
   ['DELETE /api/settings/:key', 'idem, e o apagar de um não apaga a do outro'],
   ['GET /api/vendor-management/wifi-security-configs/by-product-class/:productClass', 'classe de produto do fabricante, igual nos dois; prova em vendor-catalogue-tenancy.test.js'],
   ['PUT /api/whatsapp/subscribers/:contract/phone', 'o contrato é do SGP e os dois podem tê-lo; prova em tenant-leak.test.js'],
+  ['POST /api/whatsapp/contacts/:contract/conversation', 'varredura'],
   ['GET /api/customer/wifi/:index/password', 'índice do rádio no aparelho, não linha; a sessão do portal é escopada, prova em tenant-subdomain.test.js'],
 
   // --- Anexo servido por token assinado.

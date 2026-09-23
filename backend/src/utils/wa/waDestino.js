@@ -64,3 +64,37 @@ export function normalizarTelefoneBr(bruto) {
   if (d.length >= 8 && d.length <= 15) return d;
   return '';
 }
+
+/**
+ * As grafias sob as quais o MESMO celular brasileiro pode aparecer: com e sem o
+ * nono dígito.
+ *
+ * Serve para CASAR, nunca para enviar. O WhatsApp ainda endereça muita conta
+ * antiga pelo número de 12 dígitos (55 + DDD + 8) — é o que chega no JID de uma
+ * mensagem recebida —, enquanto o SGP guarda o mesmo aparelho com o 9 na
+ * frente. Comparando só a grafia exata, o assinante que escreve do celular
+ * cadastrado aparece como "número não vinculado".
+ *
+ * O cuidado de `normalizarTelefoneBr` vale aqui também: só se mexe no nono
+ * dígito de celular. Um número de 8 dígitos que começa com 2 a 5 é fixo e fica
+ * como está — acrescentar um 9 nele produziria o celular de outra pessoa.
+ *
+ * @param {string|null|undefined} bruto
+ * @returns {string[]} a grafia normalizada primeiro, e a alternativa quando houver
+ */
+export function variantesTelefoneBr(bruto) {
+  const d = normalizarTelefoneBr(bruto);
+  if (!d) return [];
+  if (!d.startsWith('55')) return [d];
+  const ddd = d.slice(2, 4);
+  const local = d.slice(4);
+  // 55 + DDD + 9 + 8 dígitos de celular → a grafia antiga, sem o 9.
+  if (local.length === 9 && local[0] === '9' && /[6-9]/.test(local[1])) {
+    return [d, `55${ddd}${local.slice(1)}`];
+  }
+  // 55 + DDD + 8 dígitos de celular → a grafia atual, com o 9.
+  if (local.length === 8 && /[6-9]/.test(local[0])) {
+    return [d, `55${ddd}9${local}`];
+  }
+  return [d];
+}

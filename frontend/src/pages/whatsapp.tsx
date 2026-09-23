@@ -18,6 +18,7 @@ import { CampaignsPanel } from '@/components/whatsapp/campaigns-panel'
 import { TemplatesPanel } from '@/components/whatsapp/templates-panel'
 import { OptOutPanel } from '@/components/whatsapp/opt-out-panel'
 import { AlertsPanel } from '@/components/whatsapp/alerts-panel'
+import { ContactsPanel } from '@/components/whatsapp/contacts-panel'
 import { HealthStrip } from '@/components/whatsapp/health-strip'
 import { useAuth } from '@/contexts/auth-context'
 
@@ -97,7 +98,15 @@ function mergeNewest(page: WhatsAppMessage[], current: WhatsAppMessage[]): Whats
  * the reply box on the right. The routes it consumes are frozen in
  * `docs/whatsapp-api-contract.md`.
  */
-function InboxTab() {
+interface InboxTabProps {
+  /**
+   * A thread to open on arrival — the one the Contacts tab just opened or
+   * started. Drawn from this row while its history loads, like a click.
+   */
+  initialConversation?: WhatsAppConversation | null
+}
+
+function InboxTab({ initialConversation = null }: InboxTabProps) {
   const { t } = useTranslation()
   const toast = useToast()
 
@@ -314,6 +323,24 @@ function InboxTab() {
     setMessages([])
     setHasOlder(false)
     setSelectedId(next.id)
+  }, [])
+
+  // Arriving from Contacts with a thread in hand. Opened once, on mount — the
+  // page remounts this tab for every thread it hands over.
+  useEffect(() => {
+    if (initialConversation) select(initialConversation)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  /**
+   * The operator linked the open thread to a subscriber by hand: the header
+   * shows the contract at once, and the list is asked again so the row's
+   * name follows.
+   */
+  const linked = useCallback((next: WhatsAppConversation) => {
+    if (selectedIdRef.current === next.id) setConversation(next)
+    setConversations((rows) => rows.map((row) => (row.id === next.id ? { ...row, ...next } : row)))
+    void loadListRef.current?.(false)
   }, [])
 
   /**
@@ -560,6 +587,7 @@ function InboxTab() {
                     resendingId={resendingId}
                     filing={filing}
                     onFile={(next) => void file(next)}
+                    onLinked={linked}
                   />
                   <ThreadComposer optedOut={conversation.optedOut} sending={sending} onSend={send} />
                 </>
@@ -751,6 +779,7 @@ function RequeueFailedButton() {
  */
 const TABS = [
   ['inbox', 'whatsapp.inbox.title', 'whatsapp.read'],
+  ['contacts', 'whatsapp.contacts.title', 'whatsapp.read'],
   ['billing', 'whatsapp.billing.title', 'campaigns.read'],
   ['campaigns', 'whatsapp.broadcast.title', 'campaigns.read'],
   ['templates', 'whatsapp.templates.title', 'campaigns.read'],
@@ -777,6 +806,9 @@ export default function WhatsAppPage() {
   const { t } = useTranslation()
   const { can } = useAuth()
   const [tab, setTab] = useState<TabId>('inbox')
+  // The thread Contacts handed over, and a counter that remounts the inbox for
+  // each hand-over so it opens that thread even when it was already on screen.
+  const [handOver, setHandOver] = useState<{ conversation: WhatsAppConversation; seq: number } | null>(null)
   const visibleTabs = TABS.filter(([, , permission]) => can(permission))
 
   return (
@@ -810,7 +842,10 @@ export default function WhatsAppPage() {
             <button
               key={id}
               type="button"
-              onClick={() => setTab(id)}
+              onClick={() => {
+                setTab(id)
+                setHandOver(null)
+              }}
               className="tab-button"
               data-active={tab === id}
               role="tab"
@@ -821,7 +856,17 @@ export default function WhatsAppPage() {
           ))}
         </div>
 
-        {tab === 'inbox' && <InboxTab />}
+        {tab === 'inbox' && (
+          <InboxTab key={handOver?.seq ?? 0} initialConversation={handOver?.conversation ?? null} />
+        )}
+        {tab === 'contacts' && (
+          <ContactsPanel
+            onOpenConversation={(conversation) => {
+              setHandOver((current) => ({ conversation, seq: (current?.seq ?? 0) + 1 }))
+              setTab('inbox')
+            }}
+          />
+        )}
         {tab === 'billing' && <BillingPanel />}
         {tab === 'campaigns' && <CampaignsPanel />}
         {tab === 'templates' && <TemplatesPanel />}
