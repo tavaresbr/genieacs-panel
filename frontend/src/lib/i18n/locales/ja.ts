@@ -1891,6 +1891,7 @@ const ja: Dictionary = {
   'platform.plans.unlimited': '無制限',
   'platform.plans.limitHint': '空欄は上限なしです。0 は「上限ゼロ」となり、すべてが作成できなくなります。',
   'platform.plans.price': '価格',
+  'platform.plans.priceInvalid': '銭の前にカンマを付けて価格を入力してください — 1.234,00 や 89,90。無料プランは 0 と入力します。',
   'platform.plans.currency': '通貨',
   'platform.plans.trialDays': 'トライアル日数',
   'platform.plans.active': '有効',

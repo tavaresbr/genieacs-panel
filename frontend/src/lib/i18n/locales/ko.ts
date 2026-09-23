@@ -1898,6 +1898,7 @@ const ko: Dictionary = {
   'platform.plans.unlimited': '무제한',
   'platform.plans.limitHint': '비워 두면 한도가 없습니다. 0은 한도가 0이라는 뜻이며, 모든 것을 막습니다.',
   'platform.plans.price': '가격',
+  'platform.plans.priceInvalid': '센트 앞에 쉼표를 넣어 가격을 입력하세요 — 1.234,00 또는 89,90. 무료 요금제는 0을 입력하세요.',
   'platform.plans.currency': '통화',
   'platform.plans.trialDays': '체험 일수',
   'platform.plans.active': '활성',

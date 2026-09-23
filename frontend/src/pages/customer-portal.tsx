@@ -6,6 +6,7 @@ import { looksLikeBrCode } from '@/lib/qr/encode'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import { useTranslation } from '@/contexts/language-context'
 import { getActiveLocale, isCustomerSessionCode, translate } from '@/lib/i18n'
+import { billingFailure } from '@/lib/portal-billing'
 
 type PortalOverview = {
   customerId: string
@@ -61,17 +62,6 @@ type PortalBilling = {
 }
 
 type ApiResult<T> = { success: boolean; message?: string; data?: T; code?: string }
-
-// Only an upstream hiccup is worth showing to a subscriber. A disabled
-// integration or a contract that is not linked yet hides the section instead.
-const TRANSIENT_BILLING_CODES = new Set([
-  'timeout',
-  'unreachable',
-  'sgp_rejected',
-  'http_error',
-  'invalid_response',
-  'unauthorized'
-])
 
 type WifiEditor = { index: number; ssid: string; password: string }
 
@@ -234,18 +224,18 @@ export default function CustomerPortal() {
       if (!result.success || !result.data) {
         if (isCustomerSessionCode(result.code)) setAuthenticated(false)
         setBilling(null)
-        setBillingError(
-          result.code && TRANSIENT_BILLING_CODES.has(result.code)
-            ? (result.message || t('portal.billing.temporaryFailure'))
-            : ''
-        )
+        const falha = billingFailure(result, t('portal.billing.temporaryFailure'))
+        setBillingError(falha.kind === 'error' ? falha.message : '')
         return
       }
       setBilling(result.data)
       setBillingError('')
     } catch {
+      // A rede caiu no meio. Antes isto zerava a mensagem e a seção sumia:
+      // o assinante lia "não há fatura". Agora é falha, e falha aparece.
       setBilling(null)
-      setBillingError('')
+      const falha = billingFailure(null, t('portal.billing.temporaryFailure'))
+      setBillingError(falha.kind === 'error' ? falha.message : '')
     } finally {
       setBillingLoading(false)
     }

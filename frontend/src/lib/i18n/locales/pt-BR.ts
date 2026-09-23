@@ -1891,6 +1891,7 @@ const ptBR: Dictionary = {
   'platform.plans.unlimited': 'sem limite',
   'platform.plans.limitHint': 'Campo vazio quer dizer sem limite. Zero é um limite de zero, que bloqueia tudo.',
   'platform.plans.price': 'Preço',
+  'platform.plans.priceInvalid': 'Informe o preço com vírgula nos centavos — 1.234,00 ou 89,90. Para um plano gratuito, digite 0.',
   'platform.plans.currency': 'Moeda',
   'platform.plans.trialDays': 'Dias de teste',
   'platform.plans.active': 'Ativo',

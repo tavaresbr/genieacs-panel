@@ -1893,6 +1893,7 @@ const en = {
   'platform.plans.unlimited': 'unlimited',
   'platform.plans.limitHint': 'Leave a field empty for no limit. Zero is a limit of zero, which blocks everything.',
   'platform.plans.price': 'Price',
+  'platform.plans.priceInvalid': 'Enter the price with a comma before the cents — 1.234,00 or 89,90. For a free plan, type 0.',
   'platform.plans.currency': 'Currency',
   'platform.plans.trialDays': 'Trial days',
   'platform.plans.active': 'Active',

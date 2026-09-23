@@ -1892,6 +1892,7 @@ const zhTW: Dictionary = {
   'platform.plans.unlimited': '不限',
   'platform.plans.limitHint': '留空表示不限。填 0 表示上限為零，會擋下一切。',
   'platform.plans.price': '價格',
+  'platform.plans.priceInvalid': '請在分位前以逗號輸入價格 — 1.234,00 或 89,90。免費方案請輸入 0。',
   'platform.plans.currency': '貨幣',
   'platform.plans.trialDays': '試用天數',
   'platform.plans.active': '已啟用',

@@ -1891,6 +1891,7 @@ const es: Dictionary = {
   'platform.plans.unlimited': 'sin límite',
   'platform.plans.limitHint': 'Un campo vacío quiere decir sin límite. Cero es un límite de cero, que bloquea todo.',
   'platform.plans.price': 'Precio',
+  'platform.plans.priceInvalid': 'Ingrese el precio con coma en los centavos — 1.234,00 o 89,90. Para un plan gratuito, escriba 0.',
   'platform.plans.currency': 'Moneda',
   'platform.plans.trialDays': 'Días de prueba',
   'platform.plans.active': 'Activo',

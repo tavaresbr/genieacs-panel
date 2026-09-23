@@ -1900,6 +1900,7 @@ const ar: Dictionary = {
   'platform.plans.unlimited': 'بلا حدّ',
   'platform.plans.limitHint': 'اترك الحقل فارغًا فلا يكون هناك حدّ. أما صفر فهو حدّ قيمته صفر، ويمنع كل شيء.',
   'platform.plans.price': 'السعر',
+  'platform.plans.priceInvalid': 'أدخل السعر بفاصلة قبل الكسور — 1.234,00 أو 89,90. للخطة المجانية اكتب 0.',
   'platform.plans.currency': 'العملة',
   'platform.plans.trialDays': 'أيام التجربة',
   'platform.plans.active': 'نشطة',

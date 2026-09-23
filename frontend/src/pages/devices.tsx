@@ -25,6 +25,7 @@ import { useToast } from '@/components/ui/toast'
 import { Icon } from '@/components/ui/icon'
 import { useTranslation } from '@/contexts/language-context'
 import { formatDate } from '@/lib/utils'
+import { RX_BAND_STYLE, rxBand } from '@/lib/rx-signal'
 import type { Device, Vendor } from '@/types'
 
 interface ProcessedDevice extends Device {
@@ -105,43 +106,13 @@ export default function DevicesPage() {
     )
   }, [searchTerm, filterStatus, filterSgp, filterFocus, page, setSearchParams])
 
-  const getSignalStrengthInfo = (rxPowerStr: any) => {
-    const rxpower = parseFloat(String(rxPowerStr));
-
-    if (isNaN(rxpower)) {
-      return {
-        color: 'text-gray-500 dark:text-gray-400',
-        label: t('common.na'),
-        badgeClass: 'modern-badge'
-      };
-    }
-
-    if (rxpower >= -21.99) {
-      return {
-        color: 'text-green-600 dark:text-green-400',
-        label: t('devices.signal.excellent'),
-        badgeClass: 'modern-badge-success'
-      };
-    }
-    if (rxpower >= -24.99) {
-      return {
-        color: 'text-blue-600 dark:text-blue-400',
-        label: t('devices.signal.good'),
-        badgeClass: 'modern-badge-info'
-      };
-    }
-    if (rxpower >= -26.99) {
-      return {
-        color: 'text-yellow-600 dark:text-yellow-400',
-        label: t('devices.signal.poor'),
-        badgeClass: 'modern-badge-warning'
-      };
-    }
-    return {
-      color: 'text-red-600 dark:text-red-400',
-      label: t('devices.signal.danger'),
-      badgeClass: 'modern-badge-error'
-    };
+  // A faixa sai de `lib/rx-signal`, a mesma leitura e os mesmos limiares do
+  // backend que conta o painel. Esta tela tinha uma cópia própria, com
+  // `parseFloat` — que lia "-25 dBm" como -25 enquanto o painel contava
+  // "desconhecido".
+  const getSignalStrengthInfo = (rxPowerStr: unknown) => {
+    const estilo = RX_BAND_STYLE[rxBand(rxPowerStr)]
+    return { color: estilo.color, label: t(estilo.labelKey), badgeClass: estilo.badgeClass }
   }
 
   const findBrand = useCallback((manufacturer: string, productClass: string, vendors: Vendor[]) => {

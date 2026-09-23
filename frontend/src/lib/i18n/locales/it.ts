@@ -1897,6 +1897,7 @@ const it: Dictionary = {
   'platform.plans.unlimited': 'nessun limite',
   'platform.plans.limitHint': 'Un campo vuoto vuol dire nessun limite. Zero è un limite di zero, che blocca tutto.',
   'platform.plans.price': 'Prezzo',
+  'platform.plans.priceInvalid': 'Inserisci il prezzo con la virgola prima dei centesimi — 1.234,00 o 89,90. Per un piano gratuito, digita 0.',
   'platform.plans.currency': 'Valuta',
   'platform.plans.trialDays': 'Giorni di prova',
   'platform.plans.active': 'Attivo',

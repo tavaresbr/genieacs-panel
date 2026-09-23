@@ -1895,6 +1895,7 @@ const de: Dictionary = {
   'platform.plans.unlimited': 'unbegrenzt',
   'platform.plans.limitHint': 'Ein leeres Feld heißt kein Limit. Null ist ein Limit von null und blockiert alles.',
   'platform.plans.price': 'Preis',
+  'platform.plans.priceInvalid': 'Geben Sie den Preis mit Komma vor den Cent ein — 1.234,00 oder 89,90. Für einen kostenlosen Tarif geben Sie 0 ein.',
   'platform.plans.currency': 'Währung',
   'platform.plans.trialDays': 'Testtage',
   'platform.plans.active': 'Aktiv',

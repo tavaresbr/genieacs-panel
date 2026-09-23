@@ -1899,6 +1899,7 @@ const hi: Dictionary = {
   'platform.plans.unlimited': 'असीमित',
   'platform.plans.limitHint': 'कोई सीमा न रखनी हो तो फ़ील्ड खाली छोड़ें। शून्य का मतलब है शून्य की सीमा, जो सब कुछ रोक देती है।',
   'platform.plans.price': 'कीमत',
+  'platform.plans.priceInvalid': 'पैसों से पहले अल्पविराम लगाकर कीमत दर्ज करें — 1.234,00 या 89,90। मुफ़्त योजना के लिए 0 लिखें।',
   'platform.plans.currency': 'मुद्रा',
   'platform.plans.trialDays': 'ट्रायल के दिन',
   'platform.plans.active': 'सक्रिय',
