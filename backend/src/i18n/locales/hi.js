@@ -394,6 +394,8 @@ export default {
   'sgp.error.unlockRefused': 'SGP ने इस अनुबंध के लिए भरोसे पर अनलॉक अस्वीकार कर दिया',
   'sgp.error.contractNotInConversation': 'यह अनुबंध इस बातचीत से संबंधित नहीं है',
   'sgp.error.deviceUnlinked': 'इस ONT से अभी कोई SGP अनुबंध जुड़ा नहीं है। इसे मैन्युअल रूप से जोड़ें या PPPoE लॉगिन जाँचें।',
+  'sgp.error.loginRequested': 'ONT ने अभी तक GenieACS को अपना PPPoE लॉगिन नहीं बताया है। रीड का अनुरोध किया गया है और अगले Inform के साथ आएगा; कुछ मिनट बाद फिर कोशिश करें या CPF/अनुबंध से मैन्युअल रूप से जोड़ें।',
+  'sgp.error.loginNotReported': 'ONT TR-069 पर अपना PPPoE लॉगिन नहीं बताता (आम है जब OLT, OMCI से WAN कॉन्फ़िगर करता है)। CPF/अनुबंध से मैन्युअल रूप से जोड़ें।',
   'sgp.error.noContractForDevice': 'इस ONT के लिए कोई SGP अनुबंध नहीं मिला',
   'sgp.error.contractNotFound': 'SGP में अनुबंध नहीं मिला',
   'sgp.error.webhookSecretRequired': 'SGP इवेंट डिलीवरी सक्षम करने से पहले वेबहुक सीक्रेट जनरेट करें',

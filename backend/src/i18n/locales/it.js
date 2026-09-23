@@ -394,6 +394,8 @@ export default {
   'sgp.error.unlockRefused': 'SGP ha rifiutato lo sblocco di fiducia di questo contratto',
   'sgp.error.contractNotInConversation': 'Questo contratto non appartiene a questa conversazione',
   'sgp.error.deviceUnlinked': 'Questa ONT non ha ancora un contratto SGP collegato. Collegalo manualmente o verifica il login PPPoE.',
+  'sgp.error.loginRequested': 'L’ONT non ha ancora comunicato il login PPPoE a GenieACS. La lettura è stata richiesta e arriva con il prossimo Inform; riprova tra qualche minuto o collegala manualmente per CPF/contratto.',
+  'sgp.error.loginNotReported': 'L’ONT non comunica il login PPPoE via TR-069 (comune quando l’OLT configura la WAN via OMCI). Collegala manualmente per CPF/contratto.',
   'sgp.error.noContractForDevice': 'Nessun contratto SGP trovato per questa ONT',
   'sgp.error.contractNotFound': 'Contratto non trovato in SGP',
   'sgp.error.webhookSecretRequired': 'Genera un segreto per il webhook prima di attivare la ricezione degli eventi SGP',

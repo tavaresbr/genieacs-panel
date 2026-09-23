@@ -406,6 +406,34 @@ export function findPppoeUsername(item, readValue) {
   return null;
 }
 
+/**
+ * Every PPPoE login leaf the document names, with whatever GenieACS holds
+ * there — a value node, a node it only knows the name of, or nothing.
+ *
+ * A GenieACS stores only what it was asked to fetch. A ZTE F-series reports
+ * its WAN connections and their addresses in the Inform, so the objects are in
+ * the document from day one; the `Username` beside them is not, until someone
+ * asks for it by name. This is the list of names to ask for.
+ */
+export function pppoeLoginLeaves(item) {
+  const leaves = [];
+  for (const [wanKey, wanDevice] of indexedChildren(item?.InternetGatewayDevice?.WANDevice)) {
+    for (const [connKey, connectionDevice] of indexedChildren(wanDevice?.WANConnectionDevice)) {
+      for (const [pppKey, connection] of indexedChildren(connectionDevice?.WANPPPConnection)) {
+        leaves.push({
+          path: `InternetGatewayDevice.WANDevice.${wanKey}.WANConnectionDevice.${connKey}`
+            + `.WANPPPConnection.${pppKey}.Username`,
+          node: connection?.Username
+        });
+      }
+    }
+  }
+  for (const [key, iface] of indexedChildren(item?.Device?.PPP?.Interface)) {
+    leaves.push({ path: `Device.PPP.Interface.${key}.Username`, node: iface?.Username });
+  }
+  return leaves;
+}
+
 export default {
   PPPOE_FALLBACK_PATHS,
   RX_POWER_FALLBACK_PATHS,
@@ -416,5 +444,6 @@ export default {
   findWanParameterByName,
   listDocumentParameters,
   normalizeRxPowerReading,
-  normalizeTemperatureReading
+  normalizeTemperatureReading,
+  pppoeLoginLeaves
 };

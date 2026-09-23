@@ -20,18 +20,27 @@ const identities = () => asTenant(() => DeviceService.getCustomerIdentityDevices
  */
 const ONT = {
   zte: { device: 'zte-f670l', login: 'st100.563', connection: 4 },
-  nokia: { device: 'alcl-g0425g', login: 'TA100.034', connection: 1 }
+  nokia: { device: 'alcl-g0425g', login: 'TA100.034', connection: 1 },
+  // A ZTE whose GenieACS holds only what the Inform carried: the connection
+  // and its address, and no `Username` until someone asks for it by name.
+  zteUnread: { device: 'zte-f670l-unread', login: 'st100.777', connection: 1, unread: true },
+  // One that was asked and answered with nothing — a WAN the OLT set up.
+  zteOmci: { device: 'zte-f670l-omci', login: '', connection: 1 }
 };
 
 /** What the SGP cadastre holds. Exact match, like the real lookup. */
 const CADASTRE = new Map([
   ['st100.563', '593'],
-  ['ta100.034', '34']
+  ['ta100.034', '34'],
+  ['st100.777', '777']
 ]);
 
 let sgpServer;
 let genieServer;
 let lookups = [];
+let tasks = [];
+/** ONTs that have since informed and answered the queued read. */
+const answered = new Set();
 
 function document(ont) {
   return {
@@ -43,7 +52,11 @@ function document(ont) {
         1: {
           WANConnectionDevice: {
             [ont.connection]: {
-              WANPPPConnection: { 1: { Username: { _value: ont.login } } }
+              WANPPPConnection: {
+                1: ont.unread && !answered.has(ont.device)
+                  ? { ExternalIPAddress: { _value: '100.80.0.241' } }
+                  : { Username: { _value: ont.login } }
+              }
             }
           }
         }
@@ -75,6 +88,21 @@ function startGenieStub() {
     if (!url.pathname.startsWith('/devices')) {
       res.writeHead(404, { 'Content-Type': 'application/json' });
       return res.end('[]');
+    }
+    const task = url.pathname.match(/^\/devices\/([^/]+)\/tasks$/);
+    if (task && req.method === 'POST') {
+      let body = '';
+      req.on('data', (chunk) => { body += chunk; });
+      req.on('end', () => {
+        tasks.push({
+          device: decodeURIComponent(task[1]),
+          connectionRequest: url.searchParams.has('connection_request'),
+          ...JSON.parse(body || '{}')
+        });
+        res.writeHead(202, { 'Content-Type': 'application/json' });
+        res.end('{}');
+      });
+      return undefined;
     }
     const raw = url.searchParams.get('query');
     const wanted = raw ? JSON.parse(raw)._id : null;
@@ -144,6 +172,10 @@ after(async () => {
 
 beforeEach(async () => {
   lookups = [];
+  tasks = [];
+  answered.clear();
+  DeviceService.pppoeReadRequests.clear();
+  SgpService.loginProbes.clear();
   await asTenant(() => getDb()('sgp_links').del());
   await asTenant(() => getDb()('app_state').where({ key: DeviceService.PPPOE_PATH_KEY }).del());
 });
@@ -178,5 +210,59 @@ describe('an ONT whose login case differs from the cadastre', () => {
   it('asks once when the login already matches', async () => {
     await resolve(ONT.zte.device);
     assert.equal(lookups.length, 1);
+  });
+});
+
+describe('a ZTE whose login GenieACS never read', () => {
+  const loginReads = () => tasks.filter((task) => task.name === 'getParameterValues');
+
+  it('asks the ONT for that login by name, and says so', async () => {
+    await assert.rejects(resolve(ONT.zteUnread.device), { message: 'sgp.error.loginRequested' });
+
+    assert.equal(lookups.length, 0, 'no login, no lookup');
+    assert.deepEqual(loginReads().map(({ device, parameterNames, connectionRequest }) => (
+      { device, parameterNames, connectionRequest }
+    )), [{
+      device: ONT.zteUnread.device,
+      parameterNames: ['InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Username'],
+      connectionRequest: false
+    }]);
+  });
+
+  it('asks once however often the page is opened', async () => {
+    await assert.rejects(resolve(ONT.zteUnread.device));
+    await assert.rejects(resolve(ONT.zteUnread.device));
+    assert.equal(loginReads().length, 1);
+  });
+
+  it('is linked once the ONT has answered', async () => {
+    await assert.rejects(resolve(ONT.zteUnread.device));
+    answered.add(ONT.zteUnread.device);
+
+    const { link } = await resolve(ONT.zteUnread.device);
+    assert.equal(lookups.at(-1).login, ONT.zteUnread.login);
+    assert.equal(link.contract, '777');
+  });
+
+  it('is picked up by the fleet sweep, which queues the same read', async () => {
+    const targets = await asTenant(async () => SgpService.syncTargets(await SgpService.getConfig()));
+    assert.ok(!targets.some((target) => target.device_id === ONT.zteUnread.device));
+    assert.deepEqual(loginReads().map((task) => task.device), [ONT.zteUnread.device]);
+
+    answered.add(ONT.zteUnread.device);
+    SgpService.loginProbes.clear();
+    const later = await asTenant(async () => SgpService.syncTargets(await SgpService.getConfig()));
+    assert.equal(
+      later.find((target) => target.device_id === ONT.zteUnread.device)?.pppoe_username,
+      ONT.zteUnread.login
+    );
+  });
+});
+
+describe('a ZTE that answers its login empty', () => {
+  it('is not asked again, and the error says the ONT does not report it', async () => {
+    await assert.rejects(resolve(ONT.zteOmci.device), { message: 'sgp.error.loginNotReported' });
+    assert.equal(tasks.length, 0);
+    assert.equal(lookups.length, 0);
   });
 });

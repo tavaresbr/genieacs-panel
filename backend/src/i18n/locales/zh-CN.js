@@ -396,6 +396,8 @@ export default {
   'sgp.error.unlockRefused': 'SGP 拒绝了此合同的信任解锁',
   'sgp.error.contractNotInConversation': '此合同不属于该对话',
   'sgp.error.deviceUnlinked': '该 ONT 尚未关联任何 SGP 合同。请手动关联，或检查 PPPoE 账号。',
+  'sgp.error.loginRequested': '该 ONT 尚未向 GenieACS 报告 PPPoE 账号。已请求读取，将随下一次 Inform 到达；请几分钟后重试，或按 CPF/合同手动关联。',
+  'sgp.error.loginNotReported': '该 ONT 不通过 TR-069 报告 PPPoE 账号（OLT 通过 OMCI 配置 WAN 时常见）。请按 CPF/合同手动关联。',
   'sgp.error.noContractForDevice': '未找到该 ONT 对应的 SGP 合同',
   'sgp.error.contractNotFound': 'SGP 中找不到该合同',
   'sgp.error.webhookSecretRequired': '启用 SGP 事件接收前，请先生成 Webhook 密钥',

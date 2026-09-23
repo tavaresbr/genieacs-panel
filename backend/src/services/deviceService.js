@@ -13,7 +13,8 @@ import {
   findWanParameterByName,
   listDocumentParameters,
   normalizeRxPowerReading,
-  normalizeTemperatureReading
+  normalizeTemperatureReading,
+  pppoeLoginLeaves
 } from './deviceParameterFallbacks.js';
 import Vendor from '../models/Vendor.js';
 import WifiSecurityConfig from '../models/WifiSecurityConfig.js';
@@ -1600,7 +1601,20 @@ class DeviceService {
    * ONT, or one that has not reported a login.
    */
   static async getReportedPppoe(deviceId) {
-    if (!deviceId) return null;
+    return (await this.inspectReportedPppoe(deviceId)).login;
+  }
+
+  /**
+   * The login one ONT reports, and — when there is none — why.
+   *
+   * `state` is `found` with a login; `requested` when the ONT has PPPoE
+   * connections whose `Username` GenieACS never read, and a read of exactly
+   * those leaves has been queued for its next Inform; `empty` when the ONT was
+   * asked and answered with nothing (a WAN the OLT configures over OMCI keeps
+   * the login out of TR-069); `absent` when it has no PPPoE connection at all.
+   */
+  static async inspectReportedPppoe(deviceId) {
+    if (!deviceId) return { login: null, state: 'absent' };
     const virtualParams = await this.getVirtualParameters();
     const query = JSON.stringify({ _id: deviceId });
     const rows = await this.fetchDeviceListPage(
@@ -1612,9 +1626,9 @@ class DeviceService {
         ...await this.readPppoePaths()
       ].filter(Boolean)
     );
-    if (rows.length === 0) return null;
+    if (rows.length === 0) return { login: null, state: 'absent' };
     const login = this.resolvePppoeUsername(rows[0], virtualParams).value;
-    if (typeof login === 'string' && login.trim()) return login.trim();
+    if (typeof login === 'string' && login.trim()) return { login: login.trim(), state: 'found' };
 
     // Nothing at the paths the panel knows. One device's whole WAN tree is a
     // cheap read, and the path it turns up is kept for the listing.
@@ -1623,9 +1637,68 @@ class DeviceService {
       ['_id', 'InternetGatewayDevice.WANDevice', 'Device.PPP.Interface']
     );
     const found = full ? findPppoeUsername(full, (node) => this.readNodeValue(node)) : null;
-    if (!found) return null;
-    await this.rememberPppoePath(found.path);
-    return found.value;
+    if (found) {
+      await this.rememberPppoePath(found.path);
+      return { login: found.value, state: 'found' };
+    }
+
+    const leaves = full ? pppoeLoginLeaves(full) : [];
+    if (leaves.length === 0) return { login: null, state: 'absent' };
+    const unread = leaves.filter((leaf) => !this.holdsValue(leaf.node)).map((leaf) => leaf.path);
+    if (unread.length === 0) return { login: null, state: 'empty' };
+    await this.requestPppoeLogin(deviceId, unread);
+    return { login: null, state: 'requested' };
+  }
+
+  /** Whether GenieACS read this leaf's value, as opposed to only its name. */
+  static holdsValue(node) {
+    return Boolean(node && typeof node === 'object' && '_value' in node);
+  }
+
+  /** How often one ONT is asked for its login, at most. */
+  static PPPOE_READ_INTERVAL_MS = 60 * 60 * 1000;
+
+  /** Beyond this many leaves one task is a sweep, not a read. */
+  static PPPOE_READ_LIMIT = 8;
+
+  /** `${tenant}\0${device}` → when its login was last asked for. */
+  static pppoeReadRequests = new Map();
+
+  static pppoeReadKey(deviceId) {
+    return `${currentTenantId()}\0${deviceId}`;
+  }
+
+  /**
+   * Queues a read of the named login leaves for the ONT's next Inform.
+   *
+   * Explicit leaves, because that is what a ZTE F-series answers reliably: it
+   * is the `refreshObject` of a whole WAN subtree it faults on, which is how a
+   * summon can leave the login unread. No connection request — this runs on
+   * the way to a page, and the next periodic Inform is soon enough. Asked at
+   * most once an hour per ONT, so a page opened ten times queues one task.
+   * Never throws: a GenieACS that refuses leaves the ONT where it was.
+   */
+  static async requestPppoeLogin(deviceId, paths) {
+    const key = this.pppoeReadKey(deviceId);
+    const now = Date.now();
+    const last = this.pppoeReadRequests.get(key);
+    if (last && now - last < this.PPPOE_READ_INTERVAL_MS) return false;
+    if (this.pppoeReadRequests.size > 10000) {
+      for (const [entry, at] of this.pppoeReadRequests) {
+        if (now - at >= this.PPPOE_READ_INTERVAL_MS) this.pppoeReadRequests.delete(entry);
+      }
+    }
+    this.pppoeReadRequests.set(key, now);
+    try {
+      await this.fetchFromGenieAcs(`${encodeURIComponent(deviceId)}/tasks`, {}, 'POST', {
+        name: 'getParameterValues',
+        parameterNames: paths.slice(0, this.PPPOE_READ_LIMIT)
+      });
+      return true;
+    } catch (error) {
+      console.warn(`Unable to queue the PPPoE login read of ${deviceId}: ${error.message}`);
+      return false;
+    }
   }
 
   /**
@@ -2008,6 +2081,34 @@ class DeviceService {
   }
 
   /**
+   * Asks the ONT for every PPPoE login leaf its document names, by name.
+   *
+   * The `refreshObject` above is supposed to bring these too, but a ZTE
+   * F-series faults on it and the login stays unread — so the SGP link, which
+   * matches on that login, never forms. A separate task, so a leaf the ONT no
+   * longer has costs this read and not the summon the operator asked for.
+   */
+  static async readSummonPppoeLogins(deviceId) {
+    try {
+      const [full] = await this.fetchDeviceListPage(
+        JSON.stringify({ _id: deviceId }),
+        ['_id', 'InternetGatewayDevice.WANDevice', 'Device.PPP.Interface']
+      );
+      const paths = full ? pppoeLoginLeaves(full).map((leaf) => leaf.path) : [];
+      if (paths.length === 0) return;
+      const result = await this.postTask(deviceId, {
+        name: 'getParameterValues',
+        parameterNames: paths.slice(0, this.PPPOE_READ_LIMIT)
+      });
+      if (result?.fault?.faultString) {
+        console.warn(`${deviceId} refused to report its PPPoE login: ${result.fault.faultString}`);
+      }
+    } catch (error) {
+      console.warn(`Unable to read the PPPoE login of ${deviceId}: ${error.message}`);
+    }
+  }
+
+  /**
    * Keeps every listing looking for the optical path for a while.
    *
    * A summon is the operator asking for a value the panel does not have yet,
@@ -2045,6 +2146,7 @@ class DeviceService {
       throw new Error(data.fault.faultString);
     }
 
+    await this.readSummonPppoeLogins(deviceId);
     if (refreshed.length > 0) await this.expectFreshRxPower();
 
     return { ...(data && typeof data === 'object' ? data : {}), refreshed };

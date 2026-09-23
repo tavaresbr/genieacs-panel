@@ -397,6 +397,8 @@ export default {
   'sgp.error.unlockRefused': 'SGP가 이 계약의 신뢰 해제를 거부했습니다',
   'sgp.error.contractNotInConversation': '이 계약은 이 대화에 속하지 않습니다',
   'sgp.error.deviceUnlinked': '이 ONT에는 아직 SGP 계약이 연결되지 않았습니다. 수동으로 연결하거나 PPPoE 로그인을 확인하십시오.',
+  'sgp.error.loginRequested': 'ONT가 아직 GenieACS에 PPPoE 로그인을 보고하지 않았습니다. 읽기를 요청했으며 다음 Inform과 함께 도착합니다. 몇 분 후 다시 시도하거나 CPF/계약으로 수동 연결하십시오.',
+  'sgp.error.loginNotReported': 'ONT가 TR-069로 PPPoE 로그인을 보고하지 않습니다(OLT가 OMCI로 WAN을 구성할 때 흔함). CPF/계약으로 수동 연결하십시오.',
   'sgp.error.noContractForDevice': '이 ONT에 해당하는 SGP 계약을 찾지 못했습니다',
   'sgp.error.contractNotFound': 'SGP에서 계약을 찾을 수 없습니다',
   'sgp.error.webhookSecretRequired': 'SGP 이벤트 수신을 활성화하기 전에 웹훅 시크릿을 생성하십시오',
