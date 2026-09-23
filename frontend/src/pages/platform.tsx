@@ -404,10 +404,10 @@ export default function PlatformPage() {
                           {!active && (
                             <span className="mt-1 block text-xs text-muted-foreground">
                               {tenant.suspendedAt
-                                ? t('platform.suspendedSince', {
+                                ? t('platform.suspendedHowLong', {
                                   when: formatRelativeTime(tenant.suspendedAt)
                                 })
-                                : t('platform.suspendedSinceUnknown')}
+                                : t('platform.suspendedHowLongUnknown')}
                             </span>
                           )}
                         </td>

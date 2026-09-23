@@ -625,6 +625,7 @@ export default function DeviceDetailPage() {
   const [isCredentialModalOpen, setIsCredentialModalOpen] = useState(false)
   const [credentialType, setCredentialType] = useState<'super' | 'user' | null>(null);
   const [editingWifi, setEditingWifi] = useState<WifiNetwork | null>(null)
+  const [wifiFilter, setWifiFilter] = useState<'all' | 'enabled' | 'disabled'>('all')
   const [savingWifi, setSavingWifi] = useState(false)
   const [installationDate, setInstallationDate] = useState('')
   const [savingInstallationDate, setSavingInstallationDate] = useState(false)
@@ -1187,6 +1188,13 @@ export default function DeviceDetailPage() {
   const deviceInfo = device.deviceInfo || {}
   const primaryWAN = (device.wan && device.wan.length > 0) ? device.wan[0] : null
   const signalInfo = getSignalStrengthInfo(vp.rxpower?.value);
+  // "Estado desconhecido" conta como desativada: só é ativa a rede que o CPE
+  // confirmou estar transmitindo.
+  const wifiNetworks = device.wifi ?? []
+  const enabledWifiCount = wifiNetworks.filter((ssid) => ssid.enable === true).length
+  const filteredWifi = wifiFilter === 'all'
+    ? wifiNetworks
+    : wifiNetworks.filter((ssid) => (ssid.enable === true) === (wifiFilter === 'enabled'))
 
   /**
    * Abre (ou fecha) o formulário do chamado. Um só caminho para os dois botões
@@ -2018,13 +2026,39 @@ export default function DeviceDetailPage() {
         {/* Tab WiFi */}
         {activeTab === 'wifi' && (
           <div className="modern-card p-5 sm:p-6">
-            <div className="mb-5">
-              <h2 className="section-heading">{t('detail.wifi.title')}</h2>
-              <p className="section-description mt-1">{t('detail.wifi.description')}</p>
+            <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <h2 className="section-heading">{t('detail.wifi.title')}</h2>
+                <p className="section-description mt-1">{t('detail.wifi.description')}</p>
+              </div>
+              {wifiNetworks.length > 0 && (
+                <div className="tab-rail" role="group" aria-label={t('detail.wifi.filterAria')}>
+                  {([
+                    ['all', 'detail.wifi.filterAll', wifiNetworks.length],
+                    ['enabled', 'detail.wifi.filterEnabled', enabledWifiCount],
+                    ['disabled', 'detail.wifi.filterDisabled', wifiNetworks.length - enabledWifiCount],
+                  ] as const).map(([value, label, count]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setWifiFilter(value)}
+                      className="tab-button"
+                      data-active={wifiFilter === value}
+                      aria-pressed={wifiFilter === value}
+                    >
+                      {t(label, { count })}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {device.wifi && device.wifi.length > 0 ? (
-                device.wifi.map((ssid) => (
+              {wifiNetworks.length === 0 ? (
+                <p className="text-gray-500 dark:text-gray-400 md:col-span-2">{t('detail.wifi.empty')}</p>
+              ) : filteredWifi.length === 0 ? (
+                <p className="text-gray-500 dark:text-gray-400 md:col-span-2">{t('detail.wifi.filterEmpty')}</p>
+              ) : (
+                filteredWifi.map((ssid) => (
                   <div key={ssid.index} className="rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-4">
                     <div className="mb-4 flex items-start justify-between gap-3">
                       <div>
@@ -2065,8 +2099,6 @@ export default function DeviceDetailPage() {
                     )}
                   </div>
                 ))
-              ) : (
-                <p className="text-gray-500 dark:text-gray-400 md:col-span-2">{t('detail.wifi.empty')}</p>
               )}
             </div>
           </div>
