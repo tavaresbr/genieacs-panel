@@ -11,11 +11,8 @@ import {
   type SgpLinkRow,
 } from '@/lib/api'
 import {
+  filtersFromQuery,
   filtersToQuery,
-  focusFromQuery,
-  pageFromQuery,
-  sgpFromQuery,
-  statusFromQuery,
   type DeviceFocusFilter,
   type DeviceStatusFilter,
   type SgpFilter,
@@ -57,21 +54,22 @@ export default function DevicesPage() {
   // Lido UMA vez, na montagem. Depois daqui quem manda é o estado da tela, e a
   // URL o acompanha — ler a query a cada render faria o endereço e os
   // seletores brigarem pelo mesmo valor a cada tecla digitada.
+  //
+  // Pela MESMA função que o teste de ida e volta exercita. A tela lia campo a
+  // campo, por conta própria, e aquele teste provava uma leitura que ela não
+  // fazia: um campo novo esquecido aqui passaria verde.
+  const [inicial] = useState(() => filtersFromQuery(searchParams))
   const [devices, setDevices] = useState<Device[]>([])
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [paging, setPaging] = useState({ page: 1, pageSize: PAGE_SIZE, total: 0, totalPages: 0 })
   const [loading, setLoading] = useState(true)
   const [initialLoad, setInitialLoad] = useState(true)
-  const [searchInput, setSearchInput] = useState(() => searchParams.get('search') ?? '')
-  const [searchTerm, setSearchTerm] = useState(() => searchParams.get('search') ?? '')
-  const [filterStatus, setFilterStatus] = useState<DeviceStatusFilter>(
-    () => statusFromQuery(searchParams.get('status'))
-  )
-  const [page, setPage] = useState(() => pageFromQuery(searchParams.get('page')))
-  const [filterSgp, setFilterSgp] = useState<SgpFilter>(() => sgpFromQuery(searchParams.get('sgp')))
-  const [filterFocus, setFilterFocus] = useState<DeviceFocusFilter>(
-    () => focusFromQuery(searchParams.get('focus'))
-  )
+  const [searchInput, setSearchInput] = useState(inicial.search)
+  const [searchTerm, setSearchTerm] = useState(inicial.search)
+  const [filterStatus, setFilterStatus] = useState<DeviceStatusFilter>(inicial.status)
+  const [page, setPage] = useState(inicial.page)
+  const [filterSgp, setFilterSgp] = useState<SgpFilter>(inicial.sgp)
+  const [filterFocus, setFilterFocus] = useState<DeviceFocusFilter>(inicial.focus)
   const [sgpLinks, setSgpLinks] = useState<Map<string, SgpLinkRow>>(new Map())
   const [sgpAvailable, setSgpAvailable] = useState(false)
   const [loadError, setLoadError] = useState('')

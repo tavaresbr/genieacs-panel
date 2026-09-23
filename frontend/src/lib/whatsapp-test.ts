@@ -188,8 +188,3 @@ export function testOutcome(resultado: WhatsAppConfigTest | null): 'passed' | 'w
   if (tons.includes('alarm')) return 'failed'
   return tons.includes('warn') ? 'warned' : 'passed'
 }
-
-/** Todos os passos aprovados, sem ressalva nenhuma. */
-export function testPassed(resultado: WhatsAppConfigTest | null): boolean {
-  return testOutcome(resultado) === 'passed'
-}
