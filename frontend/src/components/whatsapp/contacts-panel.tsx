@@ -1,12 +1,14 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router'
 import { whatsappAPI, type WhatsAppContact, type WhatsAppContactState, type WhatsAppConversation } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import { useAuth } from '@/contexts/auth-context'
 import { whatsappErrorMessage } from '@/components/whatsapp-connection'
+import { SGP_CONTACTS_HREF } from '@/components/settings/sgp-contacts-sync-panel'
 
 /** Same pause as the inbox search: one request per word, not per letter. */
 const SEARCH_DEBOUNCE_MS = 350
@@ -271,7 +273,13 @@ export function ContactsPanel({ onOpenConversation }: ContactsPanelProps) {
               <p className="empty-state-copy">{t('whatsapp.contacts.lookupHint')}</p>
             )}
             {!sgpResult && !loading && !debounced && !stateFilter && can('sgp.config') && (
-              <p className="empty-state-copy">{t('whatsapp.contacts.syncHint')}</p>
+              <>
+                <p className="empty-state-copy">{t('whatsapp.contacts.syncHint')}</p>
+                <Link to={SGP_CONTACTS_HREF} className="modern-button-secondary mt-4">
+                  <Icon name="settings" size={16} />
+                  {t('settings.whatsapp.sgpContacts.open')}
+                </Link>
+              </>
             )}
           </div>
         ) : (

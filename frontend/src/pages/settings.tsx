@@ -29,7 +29,11 @@ import { Icon } from '@/components/ui/icon'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import { ProvisioningTab } from '@/components/settings/provisioning-tab'
 import { SgpEventsPanel } from '@/components/settings/sgp-events-panel'
-import { SgpContactsSyncPanel } from '@/components/settings/sgp-contacts-sync-panel'
+import {
+  SGP_CONTACTS_ANCHOR,
+  SgpContactsShortcut,
+  SgpContactsSyncPanel
+} from '@/components/settings/sgp-contacts-sync-panel'
 import { WhatsAppConnection, whatsappErrorMessage } from '@/components/whatsapp-connection'
 import { TEST_TONE_CLASS, testNotes, testOutcome } from '@/lib/whatsapp-test'
 import { auditRetentionError } from '@/lib/settings-validation'
@@ -101,6 +105,26 @@ const GENIE_SECRET_STATE_BADGES: Record<GenieSecretState, string> = {
   typed: 'modern-badge-info'
 }
 
+/** The tabs `?tab=` may open. */
+const SETTINGS_TABS = [
+  'general', 'virtual-params', 'customer-portal', 'sgp', 'provisioning',
+  'whatsapp', 'security', 'vendors', 'wifi-security', 'database'
+]
+
+/**
+ * Scrolls to a section once its tab has rendered it. The tab loads its data
+ * first, so the element may not exist yet on the first frames; a few short
+ * retries cover that without a timer that outlives the page.
+ */
+function scrollToSection(id: string, attempts = 20) {
+  const element = document.getElementById(id)
+  if (element) {
+    element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    return
+  }
+  if (attempts > 0) window.setTimeout(() => scrollToSection(id, attempts - 1), 150)
+}
+
 export default function Settings() {
   const { t, formatDateTime } = useTranslation()
   const { user: currentUser, can, refreshUser } = useAuth()
@@ -131,7 +155,17 @@ export default function Settings() {
   })
   const [loading, setLoading] = useState(false)
   const [exportando, setExportando] = useState(false)
-  const [activeTab, setActiveTab] = useState('general')
+  // The tab can come from the address — `/settings?tab=sgp` — so other screens
+  // can link to a section instead of describing where it is. Only the tabs
+  // that exist are taken; anything else opens the first one, as before.
+  const [activeTab, setActiveTab] = useState(() => {
+    try {
+      const wanted = new URLSearchParams(window.location.search).get('tab')
+      return wanted && SETTINGS_TABS.includes(wanted) ? wanted : 'general'
+    } catch {
+      return 'general'
+    }
+  })
   const [testResult, setTestResult] = useState<{success: boolean, message: string, deviceCount?: number} | null>(null)
   const [genieAuthConfig, setGenieAuthConfig] = useState<GenieAcsAuthConfig | null>(null)
   const [genieAuthForm, setGenieAuthForm] = useState<{
@@ -209,6 +243,13 @@ export default function Settings() {
   const [waTestError, setWaTestError] = useState<string | null>(null)
 
   // The context may resolve after the first render; keep the field in step.
+  // Arriving from a link to a section (`#sgp-contacts-sync`): scroll to it once
+  // its tab has drawn it.
+  useEffect(() => {
+    const anchor = window.location.hash.replace(/^#/, '')
+    if (anchor) scrollToSection(anchor)
+  }, [])
+
   useEffect(() => {
     setSettings(prev => (prev.appName === tenantName ? prev : { ...prev, appName: tenantName }))
   }, [tenantName])
@@ -1971,7 +2012,10 @@ export default function Settings() {
               </div>
             )}
 
-            {sgpConfig?.ready && <SgpContactsSyncPanel config={sgpConfig} onConfigChange={setSgpConfig} />}
+            {/* Always there once the config has loaded — hidden until the
+                integration was ready, it was simply not found. It says itself
+                what is missing. */}
+            {sgpConfig && <SgpContactsSyncPanel config={sgpConfig} onConfigChange={setSgpConfig} />}
 
             <SgpEventsPanel config={sgpConfig} onConfigChange={setSgpConfig} />
           </div>
@@ -2278,6 +2322,15 @@ export default function Settings() {
             <p className="field-hint mt-2">{t('settings.whatsapp.test.savedOnly')}</p>
 
             <WhatsAppConnection config={waConfig} />
+
+            {can('sgp.read') && (
+              <SgpContactsShortcut
+                onOpen={() => {
+                  setActiveTab('sgp')
+                  scrollToSection(SGP_CONTACTS_ANCHOR)
+                }}
+              />
+            )}
           </div>
         )}
 

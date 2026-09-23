@@ -12,6 +12,49 @@ import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import { useAuth } from '@/contexts/auth-context'
 
+/** Where the section sits, so the WhatsApp tab and the contacts screen can link to it. */
+export const SGP_CONTACTS_ANCHOR = 'sgp-contacts-sync'
+
+/** The address that opens Settings on the SGP tab, scrolled to this section. */
+export const SGP_CONTACTS_HREF = `/settings?tab=sgp#${SGP_CONTACTS_ANCHOR}`
+
+/**
+ * The same section, announced where people look for it first: the WhatsApp
+ * tab of Settings. Only a summary and the way there — the form stays in one
+ * place, next to the SGP credentials it depends on.
+ */
+export function SgpContactsShortcut({ onOpen }: { onOpen: () => void }) {
+  const { t, formatDateTime } = useTranslation()
+  const [lastRun, setLastRun] = useState<SgpContactsSyncResult | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    void sgpAPI.getContactsSync().then((res) => {
+      if (alive && res.success) setLastRun(res.data ?? null)
+    })
+    return () => { alive = false }
+  }, [])
+
+  return (
+    <div className="mt-6 border-t border-border pt-5" data-testid="sgp-contacts-shortcut">
+      <h3 className="font-semibold">{t('settings.whatsapp.sgpContacts.title')}</h3>
+      <p className="mt-1 text-sm leading-6 text-muted-foreground">{t('settings.whatsapp.sgpContacts.hint')}</p>
+      <p className="mt-2 text-xs text-muted-foreground">
+        {lastRun
+          ? t('settings.sgp.syncFinished', {
+            time: formatDateTime(lastRun.finishedAt),
+            seconds: (lastRun.durationMs / 1000).toFixed(1)
+          })
+          : t('settings.sgp.syncNever')}
+      </p>
+      <button type="button" className="modern-button-secondary mt-3" onClick={onOpen}>
+        <Icon name="external" size={16} />
+        {t('settings.whatsapp.sgpContacts.open')}
+      </button>
+    </div>
+  )
+}
+
 interface Props {
   config: SgpConfig | null
   onConfigChange: (config: SgpConfig) => void
@@ -130,11 +173,21 @@ export function SgpContactsSyncPanel({ config, onConfigChange }: Props) {
   // Test and sync read the SAVED path; an edited but unsaved one would test
   // something other than what the timer will run.
   const dirtyPath = form.path.trim() !== savedPath
+  // The integration itself (address, app, token) is saved in the form above.
+  // Until it is, nothing here can reach the SGP — said on screen instead of
+  // hiding the section, which is how it went unfound.
+  const ready = Boolean(config?.ready)
 
   return (
-    <div className="mt-6 border-t border-border pt-5" data-testid="sgp-contacts-sync">
+    <div id={SGP_CONTACTS_ANCHOR} className="mt-6 scroll-mt-6 border-t border-border pt-5" data-testid="sgp-contacts-sync">
       <h3 className="font-semibold">{t('settings.sgp.contacts.title')}</h3>
       <p className="mt-1 text-sm leading-6 text-muted-foreground">{t('settings.sgp.contacts.hint')}</p>
+      {!ready && (
+        <p className="mt-3 flex items-start gap-2 rounded-md border border-border bg-muted/30 p-3 text-sm">
+          <Icon name="info" size={16} />
+          <span>{t('settings.sgp.contacts.notReady')}</span>
+        </p>
+      )}
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <div className="sm:col-span-2">
@@ -241,7 +294,7 @@ export function SgpContactsSyncPanel({ config, onConfigChange }: Props) {
           <button
             type="button"
             className="modern-button-secondary"
-            disabled={testing || !savedPath || dirtyPath}
+            disabled={!ready || testing || !savedPath || dirtyPath}
             title={dirtyPath ? t('settings.sgp.contacts.saveFirst') : undefined}
             onClick={() => void runTest()}
           >
@@ -253,7 +306,7 @@ export function SgpContactsSyncPanel({ config, onConfigChange }: Props) {
           <button
             type="button"
             className="modern-button-secondary"
-            disabled={syncing || !savedPath || dirtyPath}
+            disabled={!ready || syncing || !savedPath || dirtyPath}
             title={dirtyPath ? t('settings.sgp.contacts.saveFirst') : undefined}
             onClick={() => void runSync()}
           >
