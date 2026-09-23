@@ -1428,7 +1428,6 @@ const en = {
   'whatsapp.health.sweepNow': 'Delete the old ones now',
   'whatsapp.health.sweepOff': 'Attachments are kept forever. Set a retention window in Settings to delete the old ones.',
   'whatsapp.health.loadFailed': 'Could not read the integration health.',
-  'whatsapp.inbox.subtitle': 'Everything that arrived on the connected numbers, newest first.',
   'whatsapp.inbox.selectOne': 'Pick a conversation to read it.',
   'whatsapp.inbox.close': 'Close',
   'whatsapp.inbox.reopen': 'Reopen',

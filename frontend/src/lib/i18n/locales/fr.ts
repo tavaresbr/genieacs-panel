@@ -1552,7 +1552,6 @@ const fr: Dictionary = {
   'settings.whatsapp.portalUrl': 'URL du portail client',
   'settings.whatsapp.portalUrlHint': 'Là où l’abonné atteint le portail client depuis l’extérieur. C’est le lien que le bot envoie pour tout ce qui exige un mot de passe — la clé WiFi, changer le nom du réseau, redémarrer l’ONT. Laissé vide, le bot passe la main à un conseiller plutôt que d’envoyer un lien qui n’ouvre rien. Ce n’est pas l’adresse ci-dessus : le portail est une autre application, sur son propre port, sauf si un proxy inverse place les deux derrière le même nom d’hôte.',
   'whatsapp.accounts.removedLocallyOnly': 'Le numéro a été retiré du panneau, mais le serveur Evolution a gardé l’instance. Supprimez-la là aussi, sinon elle reste connectée sans que le panneau la voie.',
-  'whatsapp.inbox.subtitle': 'Tout ce qui est arrivé sur les numéros connectés, du plus récent au plus ancien.',
   'whatsapp.inbox.selectOne': 'Choisissez une conversation pour la lire.',
   'whatsapp.inbox.close': 'Clôturer',
   'whatsapp.inbox.reopen': 'Rouvrir',

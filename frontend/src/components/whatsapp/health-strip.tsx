@@ -1,11 +1,12 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { whatsappAPI, type WhatsAppHealth } from '@/lib/api'
 import type { TranslationKey, TranslationVars } from '@/lib/i18n'
 import { Icon } from '@/components/ui/icon'
 import { useTranslation } from '@/contexts/language-context'
 import { formatRelativeTime } from '@/lib/utils'
+import { healthActions, type HealthActions } from '@/lib/wa-health-actions'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Polling
@@ -315,8 +316,12 @@ function notesFor(
  * here: deleting old attachments belongs to the media sweeper's route, and a
  * button that called it from a screen that only counts would be a destructive
  * action on a poll surface.
+ *
+ * O que a tira faz é dar LUGAR às ações da página, na mesma linha, e dizer
+ * quais delas têm o que fazer (`healthActions`) — porque é ela que tem os
+ * números. Os botões continuam sendo da página, com as permissões deles.
  */
-export function HealthStrip() {
+export function HealthStrip({ actions }: { actions?: (available: HealthActions) => ReactNode } = {}) {
   const { t, formatNumber } = useTranslation()
 
   const [health, setHealth] = useState<WhatsAppHealth | null>(null)
@@ -388,7 +393,7 @@ export function HealthStrip() {
   if (failed) {
     return (
       <div
-        className="modern-card flex items-center gap-2 border-[hsl(var(--status-danger)/0.35)] bg-[hsl(var(--status-danger)/0.07)] px-4 py-3 text-sm text-[hsl(var(--status-danger))]"
+        className="flex min-w-0 items-center gap-2 rounded-md border border-[hsl(var(--status-danger)/0.35)] bg-[hsl(var(--status-danger)/0.07)] px-2.5 py-1 text-xs leading-5 text-[hsl(var(--status-danger))]"
         role="status"
       >
         <Icon name="warning" className="h-4 w-4 shrink-0" />
@@ -402,36 +407,49 @@ export function HealthStrip() {
   const notes = notesFor(health, t, formatNumber)
   const alarming = notes.some((note) => note.tone === 'alarm')
 
+  // Uma linha, sem cartão em volta: a tira mora ao lado do título da página, e
+  // o que ela diz está nos chips — o cartão era embalagem, e custava uma faixa
+  // inteira da tela numa ferramenta que o operador usa o dia todo.
   return (
-    <div
-      className="modern-card flex flex-col gap-2.5 px-4 py-3 sm:flex-row sm:items-center sm:gap-4"
-      // Polite, not assertive: an operator typing a reply must not be
-      // interrupted mid-sentence by a screen reader reading a file count.
-      role="status"
-      aria-live="polite"
-      aria-label={t('whatsapp.health.title')}
-    >
-      <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:shrink-0">
-        <Icon
-          name={alarming ? 'warning' : 'check'}
-          className={alarming
-            ? 'h-4 w-4 text-[hsl(var(--status-danger))]'
-            : 'h-4 w-4 text-[hsl(var(--status-success))]'}
-        />
-        {t('whatsapp.health.title')}
-      </p>
+    // `min-w-[18rem]`: quando não cabe ao lado do título, a tira desce inteira
+    // para a linha de baixo, em vez de se espremer numa coluna estreita.
+    <div className="flex min-w-[18rem] flex-1 flex-wrap items-center gap-x-3 gap-y-2">
+      <div
+        className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2"
+        // Polite, not assertive: an operator typing a reply must not be
+        // interrupted mid-sentence by a screen reader reading a file count.
+        role="status"
+        aria-live="polite"
+        aria-label={t('whatsapp.health.title')}
+      >
+        <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <Icon
+            name={alarming ? 'warning' : 'check'}
+            className={alarming
+              ? 'h-4 w-4 text-[hsl(var(--status-danger))]'
+              : 'h-4 w-4 text-[hsl(var(--status-success))]'}
+          />
+          {t('whatsapp.health.title')}
+        </p>
 
-      <ul className="flex min-w-0 flex-wrap items-center gap-2" role="list">
-        {notes.map((note) => (
-          <li
-            key={note.key}
-            className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs leading-5 ${TONE_CLASS[note.tone]}`}
-          >
-            <Icon name={TONE_ICON[note.tone]} className="h-3.5 w-3.5 shrink-0" />
-            <span className="tabular-nums">{note.text}</span>
-          </li>
-        ))}
-      </ul>
+        <ul className="flex min-w-0 flex-wrap items-center gap-2" role="list">
+          {notes.map((note) => (
+            <li
+              key={note.key}
+              className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs leading-5 ${TONE_CLASS[note.tone]}`}
+            >
+              <Icon name={TONE_ICON[note.tone]} className="h-3.5 w-3.5 shrink-0" />
+              <span className="tabular-nums">{note.text}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {/* Fora da região `aria-live`: um botão que aparece não é notícia. No fim
+          da linha, empurrado para a direita, para não se misturar aos avisos. */}
+      {actions && (
+        <div className="ms-auto flex flex-wrap items-center gap-2">{actions(healthActions(health))}</div>
+      )}
     </div>
   )
 }

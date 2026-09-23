@@ -553,30 +553,9 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
   return (
     <section className="space-y-5">
       <div>
-        <header className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h2 className="section-heading">{t('whatsapp.inbox.title')}</h2>
-            <p className="section-description">{t('whatsapp.inbox.subtitle')}</p>
-          </div>
-          <div className="flex items-center gap-3 text-sm text-muted-foreground">
-            {unreadTotal > 0 && (
-              <span className="modern-badge-success">{t('whatsapp.inbox.unread', { count: unreadTotal })}</span>
-            )}
-            <button
-              type="button"
-              className="icon-button"
-              aria-label={t('common.refresh')}
-              onClick={() => {
-                void loadList(false)
-                const id = selectedIdRef.current
-                if (id !== null) void loadThreadRef.current(id, true)
-              }}
-            >
-              <Icon name="refresh" size={18} />
-            </button>
-          </div>
-        </header>
-
+        {/* Sem título próprio: a aba ativa já diz "Conversas", e um segundo
+            título aqui era uma faixa inteira repetindo o nome dela. O contador
+            e o atualizar moram agora no topo da lista, onde se usam. */}
         {listError ? (
           <section className="modern-card empty-state" role="alert">
             <div className="empty-state-icon text-[hsl(var(--status-danger))]"><Icon name="warning" size={22} /></div>
@@ -587,35 +566,60 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
             </button>
           </section>
         ) : (
+          // A altura desconta o que fica acima e abaixo da caixa em tela
+          // larga: o respiro da página em cima e embaixo, a linha do título e
+          // as abas — medido num print, 10,5rem. Era 16rem para um topo de
+          // cinco camadas, e o topo novo deixava a caixa curta; um topo que
+          // voltar a crescer faz a página rolar, que é o que este número evita.
           <section
-            className={`modern-card grid h-[calc(100vh-16rem)] min-h-[32rem] grid-cols-1 overflow-hidden lg:grid-cols-[minmax(17rem,22rem)_1fr] ${
+            className={`modern-card grid h-[calc(100vh-10.5rem)] min-h-[32rem] grid-cols-1 overflow-hidden lg:grid-cols-[minmax(17rem,22rem)_1fr] ${
               showSgpPanel && conversation ? 'xl:grid-cols-[minmax(16rem,20rem)_1fr_minmax(18rem,22rem)]' : ''
             }`}
           >
             <div className="flex min-h-0 flex-col border-border lg:border-e">
               <div className="space-y-2 border-b border-border px-3 py-3">
-                <input
-                  type="search"
-                  className="modern-input"
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder={t('whatsapp.inbox.searchPlaceholder')}
-                  aria-label={t('whatsapp.inbox.searchPlaceholder')}
-                />
-                <div className="tab-rail" role="tablist" aria-label={t('whatsapp.inbox.title')}>
-                  {FILTERS.map(([id, labelKey]) => (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => setStatus(id)}
-                      className="tab-button"
-                      data-active={status === id}
-                      role="tab"
-                      aria-selected={status === id}
-                    >
-                      {t(labelKey)}
-                    </button>
-                  ))}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="search"
+                    className="modern-input"
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder={t('whatsapp.inbox.searchPlaceholder')}
+                    aria-label={t('whatsapp.inbox.searchPlaceholder')}
+                  />
+                  <button
+                    type="button"
+                    className="icon-button shrink-0"
+                    aria-label={t('common.refresh')}
+                    title={t('common.refresh')}
+                    onClick={() => {
+                      void loadList(false)
+                      const id = selectedIdRef.current
+                      if (id !== null) void loadThreadRef.current(id, true)
+                    }}
+                  >
+                    <Icon name="refresh" size={18} />
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="tab-rail min-w-0 flex-1" role="tablist" aria-label={t('whatsapp.inbox.title')}>
+                    {FILTERS.map(([id, labelKey]) => (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => setStatus(id)}
+                        className="tab-button"
+                        data-active={status === id}
+                        role="tab"
+                        aria-selected={status === id}
+                      >
+                        {t(labelKey)}
+                      </button>
+                    ))}
+                  </div>
+                  {unreadTotal > 0 && (
+                    <span className="modern-badge-success shrink-0">{t('whatsapp.inbox.unread', { count: unreadTotal })}</span>
+                  )}
                 </div>
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto">
@@ -769,11 +773,11 @@ function MediaSweepButton() {
   return (
     <button
       type="button"
-      className="modern-button-secondary"
+      className="modern-button-secondary min-h-9 px-3 py-1 text-xs"
       disabled={sweeping}
       onClick={() => void sweep()}
     >
-      <Icon name="trash" size={17} />
+      <Icon name="trash" size={14} />
       {t('whatsapp.health.sweepNow')}
     </button>
   )
@@ -843,11 +847,11 @@ function RequeueFailedButton() {
   return (
     <button
       type="button"
-      className="modern-button-secondary"
+      className="modern-button-secondary min-h-9 px-3 py-1 text-xs"
       disabled={requeuing}
       onClick={() => void requeueAll()}
     >
-      <Icon name="refresh" size={17} className={requeuing ? 'animate-spin' : ''} />
+      <Icon name="refresh" size={14} className={requeuing ? 'animate-spin' : ''} />
       {t('whatsapp.outbox.requeueAll')}
     </button>
   )
@@ -899,28 +903,29 @@ export default function WhatsAppPage() {
   return (
     <div className="page-shell">
       <div className="page-frame">
-        <header className="page-header">
-          <div>
-            <p className="page-kicker">{t('sidebar.nav.whatsapp')}</p>
-            <h1 className="page-title">{t('sidebar.nav.whatsapp')}</h1>
-            <p className="page-description">{t('sidebar.nav.whatsappDescription')}</p>
-          </div>
-        </header>
-
         {/*
-          Above the rail, and outside the tab switch, on purpose. It is the
-          first thing an operator sees on this route, and it must keep
-          answering "is this working?" whichever tab they are working in —
-          mounted inside one of them, the integration would go dark the moment
-          somebody opened Campaigns.
+          Uma linha só: o título, a tira e as ações. Esta página é ferramenta de
+          trabalho o dia todo, e o cabeçalho de página padrão (rótulo, título,
+          subtítulo, divisória) mais a tira em cartão e uma fileira só para dois
+          botões empurravam a caixa de entrada para fora da tela.
+
+          A tira fica aqui, fora da troca de abas, de propósito: tem que
+          continuar respondendo "está funcionando?" em qualquer aba — montada
+          dentro de uma delas, a integração sumiria ao abrir Campanhas.
         */}
-        <HealthStrip />
-        {/* One row of actions on the strip's own figures, in the order the
-            numbers above them read: the failed count first, the disk second. */}
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <RequeueFailedButton />
-          <MediaSweepButton />
-        </div>
+        <header className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-border pb-3">
+          <h1 className="text-xl font-bold leading-tight text-foreground">{t('sidebar.nav.whatsapp')}</h1>
+          <HealthStrip
+            actions={(disponivel) => (
+              <>
+                {/* Na ordem em que os números da tira se leem: as falhas
+                    primeiro, o disco depois. E só quando há o que fazer. */}
+                {disponivel.requeue && <RequeueFailedButton />}
+                {disponivel.sweep && <MediaSweepButton />}
+              </>
+            )}
+          />
+        </header>
 
         <div className="tab-rail" role="tablist" aria-label={t('sidebar.nav.whatsapp')}>
           {visibleTabs.map(([id, labelKey]) => (

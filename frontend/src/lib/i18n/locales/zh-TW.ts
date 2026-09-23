@@ -1426,7 +1426,6 @@ const zhTW: Dictionary = {
   'whatsapp.health.sweepNow': '立即刪除舊檔案',
   'whatsapp.health.sweepOff': '附件會永久保留。要刪除舊檔案，請在設定中設定保留期限。',
   'whatsapp.health.loadFailed': '無法讀取整合運作狀態。',
-  'whatsapp.inbox.subtitle': '已接入號碼收到的全部訊息，依時間由新至舊排列。',
   'whatsapp.inbox.selectOne': '選擇一則對話即可檢視內容。',
   'whatsapp.inbox.close': '結束',
   'whatsapp.inbox.reopen': '重新開啟',

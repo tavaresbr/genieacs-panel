@@ -1406,7 +1406,6 @@ const ar: Dictionary = {
   'whatsapp.health.sweepNow': 'حذف القديمة الآن',
   'whatsapp.health.sweepOff': 'يُحتفظ بالمرفقات دائمًا. اضبط مدة احتفاظ في الإعدادات لحذف القديمة منها.',
   'whatsapp.health.loadFailed': 'تعذّرت قراءة حالة التكامل.',
-  'whatsapp.inbox.subtitle': 'كل ما وصل إلى الأرقام المرتبطة، من الأحدث إلى الأقدم.',
   'whatsapp.inbox.selectOne': 'اختر محادثة لقراءتها.',
   'whatsapp.inbox.close': 'إنهاء',
   'whatsapp.inbox.reopen': 'إعادة الفتح',

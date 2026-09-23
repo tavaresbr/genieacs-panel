@@ -1432,7 +1432,6 @@ const it: Dictionary = {
   'whatsapp.health.sweepNow': 'Elimina i vecchi adesso',
   'whatsapp.health.sweepOff': 'Gli allegati restano per sempre. Imposta una finestra di conservazione nelle Impostazioni per eliminare i vecchi.',
   'whatsapp.health.loadFailed': 'Non è stato possibile leggere lo stato dell’integrazione.',
-  'whatsapp.inbox.subtitle': 'Tutto ciò che è arrivato sui numeri connessi, dal più recente al più vecchio.',
   'whatsapp.inbox.selectOne': 'Scegli una conversazione per leggerla.',
   'whatsapp.inbox.close': 'Chiudi',
   'whatsapp.inbox.reopen': 'Riapri',
