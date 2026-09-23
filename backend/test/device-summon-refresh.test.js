@@ -168,7 +168,8 @@ const listDevices = () => call(`${panelUrl}/api/devices`, { headers: authHeaders
 
 const TR098_OBJECTS = [
   'InternetGatewayDevice.WANDevice',
-  'InternetGatewayDevice.LANDevice.1.WLANConfiguration'
+  'InternetGatewayDevice.LANDevice.1.WLANConfiguration',
+  'InternetGatewayDevice.DeviceInfo.TemperatureStatus'
 ];
 
 describe('summoning a device', () => {
@@ -206,7 +207,7 @@ describe('summoning a device', () => {
   it('asks a TR-181 ONT for its own optical object instead', async () => {
     genieAcs.dataModel = 'Device';
     const { body } = await summon();
-    assert.deepEqual(body.data.refreshed, ['Device.Optical']);
+    assert.deepEqual(body.data.refreshed, ['Device.Optical', 'Device.DeviceInfo.TemperatureStatus']);
   });
 
   it('still requests the inform it always did', async () => {

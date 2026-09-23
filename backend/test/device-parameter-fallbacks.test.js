@@ -354,3 +354,29 @@ describe('the parameter listing for one ONT', () => {
     assert.equal(status, 401);
   });
 });
+
+/** A Nokia G-0425G-C: the temperature sits in DeviceInfo, not beside the optics. */
+function nokiaWithDeviceInfoTemperature(value) {
+  const device = bareOnt(8);
+  device.InternetGatewayDevice.DeviceInfo.TemperatureStatus = {
+    TemperatureSensor: { 1: { Name: param('CPU'), Status: param('Enabled'), Value: param(value) } }
+  };
+  return device;
+}
+
+describe('a temperature in DeviceInfo.TemperatureStatus', () => {
+  it('is read on the device list', async () => {
+    genieAcs.fleet = [nokiaWithDeviceInfoTemperature('52')];
+    const [device] = await listDevices();
+    assert.equal(device.temperature, 52);
+    assert.ok(genieAcs.projections.at(-1).includes(
+      'InternetGatewayDevice.DeviceInfo.TemperatureStatus.TemperatureSensor.1.Value'
+    ));
+  });
+
+  it('treats TR-098\'s -274 as no reading', async () => {
+    genieAcs.fleet = [nokiaWithDeviceInfoTemperature('-274')];
+    const [device] = await listDevices();
+    assert.equal(device.temperature, null);
+  });
+});

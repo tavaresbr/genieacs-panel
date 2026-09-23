@@ -76,6 +76,19 @@ export const RX_POWER_FALLBACK_PATHS = Object.freeze([
 ]);
 
 /**
+ * The standard home of a CPE's temperature: TR-098 and TR-181 both define
+ * `DeviceInfo.TemperatureStatus.TemperatureSensor.{i}.Value`, in °C. Nokia's
+ * G-series publishes it there rather than beside the optics, which is why a
+ * scan of the WAN tree alone read N/D on those ONTs. Named here so the list
+ * can project it; `-274` is the TR-098 "no reading" value and is rejected.
+ */
+export const TEMPERATURE_FALLBACK_PATHS = Object.freeze([
+  'InternetGatewayDevice.DeviceInfo.TemperatureStatus.TemperatureSensor.1.Value',
+  'InternetGatewayDevice.DeviceInfo.TemperatureStatus.TemperatureSensor.2.Value',
+  'Device.DeviceInfo.TemperatureStatus.TemperatureSensor.1.Value'
+]);
+
+/**
  * A GPON ONT that is lit reads somewhere between roughly -30 dBm (the receiver
  * floor) and -8 dBm (too hot). The window is deliberately wider than that: it
  * is here to reject a reading in the wrong unit, not to judge the link.
@@ -220,7 +233,9 @@ const TEMPERATURE_MAX_C = 120;
  */
 export function normalizeTemperatureReading(value) {
   const numeric = parseReading(value);
-  if (numeric === null) return null;
+  // -274 is TR-098's "the sensor has no reading", below absolute zero on
+  // purpose; read at the 1/256 scale it would pass as -1 °C.
+  if (numeric === null || numeric === -274) return null;
   for (const scale of [1, 256]) {
     const scaled = numeric / scale;
     if (scaled >= TEMPERATURE_MIN_C && scaled <= TEMPERATURE_MAX_C && scaled !== 0) {
@@ -394,6 +409,7 @@ export function findPppoeUsername(item, readValue) {
 export default {
   PPPOE_FALLBACK_PATHS,
   RX_POWER_FALLBACK_PATHS,
+  TEMPERATURE_FALLBACK_PATHS,
   findPppoeUsername,
   findRxPowerReading,
   findTemperatureReading,
