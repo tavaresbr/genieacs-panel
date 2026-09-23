@@ -939,6 +939,7 @@ const ru: Dictionary = {
   'detail.wifi.filterAll': 'Все ({count})',
   'detail.wifi.filterEnabled': 'Включённые ({count})',
   'detail.wifi.filterDisabled': 'Отключённые ({count})',
+  'detail.wifi.filterUnknown': 'Неизвестно ({count})',
   'detail.wifi.filterEmpty': 'Нет сетей, соответствующих фильтру.',
   'detail.wifiModal.title': 'Изменение Wi-Fi SSID {index}',
   'detail.wifiModal.close': 'Закрыть редактор Wi-Fi',

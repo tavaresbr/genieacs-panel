@@ -934,6 +934,7 @@ const zhTW: Dictionary = {
   'detail.wifi.filterAll': '全部 ({count})',
   'detail.wifi.filterEnabled': '已啟用 ({count})',
   'detail.wifi.filterDisabled': '已停用 ({count})',
+  'detail.wifi.filterUnknown': '未知 ({count})',
   'detail.wifi.filterEmpty': '沒有符合此篩選條件的網路。',
   'detail.wifiModal.title': '編輯 Wi-Fi SSID {index}',
   'detail.wifiModal.close': '關閉 Wi-Fi 編輯器',

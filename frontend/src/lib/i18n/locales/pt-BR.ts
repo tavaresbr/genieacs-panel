@@ -934,6 +934,7 @@ const ptBR: Dictionary = {
   'detail.wifi.filterAll': 'Todas ({count})',
   'detail.wifi.filterEnabled': 'Ativas ({count})',
   'detail.wifi.filterDisabled': 'Desativadas ({count})',
+  'detail.wifi.filterUnknown': 'Desconhecidas ({count})',
   'detail.wifi.filterEmpty': 'Nenhuma rede corresponde a este filtro.',
   'detail.wifiModal.title': 'Editar SSID {index}',
   'detail.wifiModal.close': 'Fechar o editor de WiFi',

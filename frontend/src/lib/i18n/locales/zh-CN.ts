@@ -934,6 +934,7 @@ const zhCN: Dictionary = {
   'detail.wifi.filterAll': '全部 ({count})',
   'detail.wifi.filterEnabled': '已启用 ({count})',
   'detail.wifi.filterDisabled': '已禁用 ({count})',
+  'detail.wifi.filterUnknown': '未知 ({count})',
   'detail.wifi.filterEmpty': '没有符合此筛选条件的网络。',
   'detail.wifiModal.title': '编辑 Wi-Fi SSID {index}',
   'detail.wifiModal.close': '关闭 Wi-Fi 编辑器',

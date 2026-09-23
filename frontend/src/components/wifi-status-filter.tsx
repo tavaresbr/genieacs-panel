@@ -29,6 +29,11 @@ export function WifiStatusFilterControl({ value, onChange, counts, className }: 
         { value: 'all', label: t('detail.wifi.filterAll', { count: counts.all }) },
         { value: 'enabled', label: t('detail.wifi.filterEnabled', { count: counts.enabled }) },
         { value: 'disabled', label: t('detail.wifi.filterDisabled', { count: counts.disabled }) },
+        // Só aparece quando há redes sem estado informado (ou quando é a
+        // escolha salva, para o filtro ativo nunca sumir da barra).
+        ...(counts.unknown > 0 || value === 'unknown'
+          ? [{ value: 'unknown' as const, label: t('detail.wifi.filterUnknown', { count: counts.unknown }) }]
+          : []),
       ]}
     />
   )
