@@ -138,6 +138,10 @@ export const DEFAULT_EVENT_TYPE_MAP = Object.freeze({
   trocaplano: 'contract_changed'
 });
 
+// A title's status is free text, worded by each provider. See `isOpenInvoice`.
+const INVOICE_CANCELLED_PATTERN = /cancel|estorn|exclu|anulad/;
+const INVOICE_OPEN_PATTERN = /abert|pendent|vencid|vencer|atras|gerad|emitid|aguard/;
+
 export const CONTRACT_STATES = Object.freeze(['active', 'blocked', 'cancelled', 'unknown']);
 
 const CONTRACT_STATE_PATTERNS = Object.freeze({
@@ -1110,7 +1114,33 @@ class SgpService {
     return this.pickContract(contracts, filters?.contract ?? null);
   }
 
-  static async listInvoices({ contract, document, onlyOpen = true, limit } = {}) {
+  /**
+   * Whether an invoice is really open: not settled, not cancelled, and — when
+   * SGP names a status at all — one that reads as open.
+   *
+   * The SGP does not honour `apenas_titulos_em_aberto` everywhere, and what it
+   * sends back regardless includes cancelled titles, with a free-text status
+   * and no payment. Counted as open, a cancelled 2024 title was the "oldest
+   * open invoice" the SGP module highlighted and the second copy billed.
+   * Same rule, same order, as the device page's `lib/invoice-filter.ts`:
+   * cancellation first, so "cancelado" can never fall into "aberto".
+   */
+  static isOpenInvoice(invoice) {
+    if (!invoice || invoice.paid) return false;
+    const status = stripAccents(invoice.status);
+    if (INVOICE_CANCELLED_PATTERN.test(status)) return false;
+    return !status || INVOICE_OPEN_PATTERN.test(status);
+  }
+
+  /**
+   * @param {object} options
+   * @param {boolean} [options.onlyOpen] ask SGP for open titles, and keep only
+   *   those `isOpenInvoice` agrees are open.
+   * @param {boolean} [options.includeClosed] with `onlyOpen`, still drop only
+   *   the settled ones — for the device page, whose status tabs show the
+   *   cancelled and the rest on purpose.
+   */
+  static async listInvoices({ contract, document, onlyOpen = true, includeClosed = false, limit } = {}) {
     const config = await this.getConfig();
     const payload = this.buildLookupPayload({ contract, document });
     payload.limit = Math.min(Math.max(Number(limit) || config.invoiceLimit, 1), 24);
@@ -1123,7 +1153,8 @@ class SgpService {
       .filter((invoice) => invoice.amount !== null || invoice.dueDate || invoice.id)
       // Not every SGP install honours the "open only" flag, so settled
       // invoices are dropped here as well.
-      .filter((invoice) => !onlyOpen || !invoice.paid);
+      .filter((invoice) => !onlyOpen || !invoice.paid)
+      .filter((invoice) => !onlyOpen || includeClosed || this.isOpenInvoice(invoice));
     invoices.sort((left, right) => String(left.dueDate || '').localeCompare(String(right.dueDate || '')));
     return {
       invoices,

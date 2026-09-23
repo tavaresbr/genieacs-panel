@@ -73,6 +73,7 @@ function startSgpStub() {
         return send({
           status: 1,
           titulos: [
+            { numerodocumento: 'T-0', valor: '99,90', vencimento: '2019-01-10', status: 'Cancelado' },
             { numerodocumento: 'T-2', valor: '99,90', vencimento: '2099-12-10', status: 'Em aberto' },
             { numerodocumento: 'T-1', valor: '99,90', vencimento: '2020-01-10', status: 'Em aberto', linhadigitavel: LINHA }
           ]
@@ -199,9 +200,9 @@ describe('the SGP module beside a thread', () => {
     assert.equal(JSON.stringify(body).includes('senha-pppoe-secreta'), false, 'no PPPoE password leaves the server');
   });
 
-  it('points at the oldest overdue invoice', async () => {
+  it('points at the oldest overdue invoice, and never at a cancelled one', async () => {
     const { body } = await painel(fios.assinante);
-    assert.equal(body.data.invoices.items.length, 2);
+    assert.deepEqual(body.data.invoices.items.map((i) => i.id).sort(), ['T-1', 'T-2']);
     assert.equal(body.data.invoices.highlight, 'T-1');
   });
 
