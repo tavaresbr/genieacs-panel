@@ -2641,6 +2641,18 @@ export const whatsappAPI = {
   subscriberUnlock: (conversationId: number, contract: string) =>
     apiClient.post<{ contract: string }>(`/whatsapp/conversations/${conversationId}/subscriber/unlock`, { contract }),
 
+  // The billing text for the subscriber's invoice, rendered by the server with
+  // the same rules as a campaign. It comes back to the composer; nothing is sent.
+  subscriberSecondCopy: (conversationId: number, payload: { contract: string; template: string }) =>
+    apiClient.post<{ contract: string; invoiceId: string | null; text: string }>(
+      `/whatsapp/conversations/${conversationId}/subscriber/second-copy`,
+      payload
+    ),
+
+  // "This number is theirs": the thread's phone becomes the contract's manual phone.
+  subscriberSavePhone: (conversationId: number, contract: string) =>
+    apiClient.post<WaSubscriberPanel>(`/whatsapp/conversations/${conversationId}/subscriber/phone`, { contract }),
+
   subscriberTicket: (conversationId: number, payload: { contract: string; content: string; note?: string }) =>
     apiClient.post<SgpTicket>(`/whatsapp/conversations/${conversationId}/subscriber/ticket`, payload),
 

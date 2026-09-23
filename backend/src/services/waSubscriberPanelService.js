@@ -1,9 +1,17 @@
 import SgpService, { SgpError, deriveContractState } from './sgpService.js';
 import DeviceService from './deviceService.js';
 import WaConversationService from './waConversationService.js';
+import WaTemplateService from './waTemplateService.js';
+import WaBillingService from './waBillingService.js';
+import { WaError } from './whatsappConfigService.js';
 import SgpLink from '../models/SgpLink.js';
 import WaConversation from '../models/WaConversation.js';
-import { maisAntigaEmAberto } from '../utils/wa/waCobranca.js';
+import {
+  maisAntigaEmAberto,
+  modeloEhLembrete,
+  renderCobranca,
+  variaveisDeCobranca
+} from '../utils/wa/waCobranca.js';
 
 /**
  * The "SGP module" beside a WhatsApp thread: who is writing, which contracts
@@ -278,6 +286,57 @@ class WaSubscriberPanelService {
     const { contract: clean } = await this.actionContract(conversationId, contract);
     const result = await SgpService.requestTrustUnlock({ contract: clean });
     return { contract: clean, message: result.message };
+  }
+
+  /**
+   * The billing text for this subscriber's invoice, for the operator to read
+   * before sending — never sent from here.
+   *
+   * The same three rules as a dunning campaign, because it is the same text:
+   * the template declares whether it is a reminder (`modeloEhLembrete`), the
+   * invoice is `maisAntigaEmAberto`'s, and a variable with no value refuses
+   * the whole text (`renderCobranca`) instead of handing the operator a
+   * "PIX: " with nothing after it.
+   */
+  static async secondCopy(conversationId, { contract, template }) {
+    const { contract: clean } = await this.actionContract(conversationId, contract);
+    const { body } = await WaTemplateService.resolveBody(template);
+
+    const [link] = await SgpLink.getByContract(clean);
+    let name = link?.client_name || null;
+    if (!name) {
+      const { contracts } = await SgpService.lookupCustomer({ contract: clean });
+      name = SgpService.exactContract(contracts, clean)?.name || null;
+    }
+
+    const hoje = new Date();
+    const { invoices } = await SgpService.listInvoices({ contract: clean, onlyOpen: true });
+    const { fatura, soFuturas } = maisAntigaEmAberto(invoices, hoje, modeloEhLembrete(body));
+    if (!fatura) {
+      throw new WaError(
+        soFuturas ? 'whatsapp.error.secondCopyFutureOnly' : 'whatsapp.error.secondCopyNoInvoice',
+        { code: soFuturas ? 'future_only' : 'no_invoice', status: 409 }
+      );
+    }
+    const text = renderCobranca(body, variaveisDeCobranca(fatura, name, hoje));
+    if (text === null) {
+      throw new WaError('whatsapp.error.secondCopyIncomplete', { code: 'template_incomplete', status: 409 });
+    }
+    return { contract: clean, invoiceId: fatura.id ?? null, text };
+  }
+
+  /**
+   * "This number is theirs": the conversation's phone becomes the manual phone
+   * of a contract the server found for it. The write, its normalisation and
+   * its refusals are the billing screen's own (`setSubscriberPhone`).
+   */
+  static async savePhone(conversationId, { contract }) {
+    const { conversation, contract: clean } = await this.actionContract(conversationId, contract);
+    if (!conversation.wa_phone_e164) {
+      throw new WaError('whatsapp.error.invalidPhone', { code: 'invalid_phone', status: 400 });
+    }
+    await WaBillingService.setSubscriberPhone(clean, conversation.wa_phone_e164);
+    return this.build(conversation.id, { contract: clean });
   }
 
   static async ticket(conversationId, { contract, content, note }) {

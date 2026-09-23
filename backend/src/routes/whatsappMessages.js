@@ -76,6 +76,27 @@ router.post(
   WhatsAppSubscriberController.unlock
 );
 
+// The billing text is only ever handed back to the composer: `whatsapp.send`
+// because the only use of it is a message, `sgp.read` because it reads the ERP.
+router.post(
+  '/conversations/:id/subscriber/second-copy',
+  authenticateToken,
+  requirePermission('whatsapp.send'),
+  requirePermission('sgp.read'),
+  sgpAdminLimiter,
+  WhatsAppSubscriberController.secondCopy
+);
+
+// The same capability the billing screen asks for the same write.
+router.post(
+  '/conversations/:id/subscriber/phone',
+  authenticateToken,
+  requirePermission('whatsapp.read'),
+  requirePermission('campaigns.manage'),
+  sgpAdminLimiter,
+  WhatsAppSubscriberController.savePhone
+);
+
 router.post(
   '/conversations/:id/subscriber/ticket',
   authenticateToken,

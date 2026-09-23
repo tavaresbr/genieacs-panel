@@ -140,6 +140,8 @@ function InboxTab() {
     })
   }, [])
   const showSgpPanel = canSeeSgp && sgpPanelOpen
+  // What the SGP module hands the reply box — the second copy's text.
+  const [draft, setDraft] = useState<{ id: number; text: string } | null>(null)
 
   const [conversations, setConversations] = useState<WhatsAppConversation[]>([])
   const [selectedId, setSelectedId] = useState<number | null>(null)
@@ -607,7 +609,7 @@ function InboxTab() {
                     sgpPanelOpen={canSeeSgp ? showSgpPanel : undefined}
                     onToggleSgpPanel={canSeeSgp ? toggleSgpPanel : undefined}
                   />
-                  <ThreadComposer optedOut={conversation.optedOut} sending={sending} onSend={send} />
+                  <ThreadComposer optedOut={conversation.optedOut} sending={sending} onSend={send} draft={draft} />
                 </>
               ) : (
                 <div className="empty-state flex-1">
@@ -626,7 +628,9 @@ function InboxTab() {
               <div className="fixed inset-y-0 end-0 z-[1500] w-[min(22rem,100vw)] border-s border-border shadow-xl xl:static xl:z-auto xl:h-full xl:min-h-0 xl:w-auto xl:shadow-none">
                 <SubscriberPanel
                   conversationId={conversation.id}
+                  boundContract={conversation.contract}
                   onClose={toggleSgpPanel}
+                  onDraft={(text) => setDraft((current) => ({ id: (current?.id ?? 0) + 1, text }))}
                   onBound={() => {
                     void loadList(false)
                     void loadThreadRef.current(conversation.id, true)

@@ -18,6 +18,7 @@ const SUSPENSO = '255';
 const ASSINANTE = '5593981215425';
 const DESCONHECIDO = '5511900000009';
 const WAN_IP = '100.64.10.20';
+const LINHA = '34191790010104351004791020150008699999999999';
 
 let panelUrl;
 let token;
@@ -73,7 +74,7 @@ function startSgpStub() {
           status: 1,
           titulos: [
             { numerodocumento: 'T-2', valor: '99,90', vencimento: '2099-12-10', status: 'Em aberto' },
-            { numerodocumento: 'T-1', valor: '99,90', vencimento: '2020-01-10', status: 'Em aberto' }
+            { numerodocumento: 'T-1', valor: '99,90', vencimento: '2020-01-10', status: 'Em aberto', linhadigitavel: LINHA }
           ]
         });
       }
@@ -273,5 +274,47 @@ describe('acting from the thread', () => {
     assert.equal(row.contract, ATIVO);
     assert.equal(row.device_id, DEVICE_ID);
     assert.equal(body.data.router.ipAddress, WAN_IP);
+  });
+});
+
+describe('the second copy and the number, from the thread', () => {
+  const segundaVia = (body) => agir(fios.assinante, 'second-copy', body);
+
+  it('renders the oldest overdue invoice into the billing text, and sends nothing', async () => {
+    const antes = await getDb()('wa_messages').count({ total: '*' }).first();
+    const { status, body } = await segundaVia({
+      contract: ATIVO,
+      template: 'Olá {{nome}}, a fatura de {{valor}} venceu há {{dias_atraso}} dias. Linha: {{linha_digitavel}}'
+    });
+    assert.equal(status, 200, JSON.stringify(body));
+    assert.equal(body.data.invoiceId, 'T-1');
+    assert.match(body.data.text, /SINDICATO DOS VIGILANTES/);
+    assert.match(body.data.text, /R\$ 99,90/);
+    assert.ok(body.data.text.includes(LINHA));
+    const depois = await getDb()('wa_messages').count({ total: '*' }).first();
+    assert.deepEqual(depois, antes, 'the text goes back to the composer, never to the outbox');
+  });
+
+  it('refuses the whole text when the template cites a field the invoice lacks', async () => {
+    const { status, body } = await segundaVia({ contract: ATIVO, template: 'PIX: {{pix}}' });
+    assert.equal(status, 409);
+    assert.equal(body.code, 'template_incomplete');
+  });
+
+  it('refuses a contract that is not this conversation', async () => {
+    const { status, body } = await segundaVia({ contract: '9999', template: 'Olá {{nome}}' });
+    assert.equal(status, 409);
+    assert.equal(body.code, 'contract_not_in_conversation');
+  });
+
+  it('saves the thread number as the contract manual phone', async () => {
+    const { status, body } = await agir(fios.estranho, 'phone', { contract: ATIVO });
+    assert.equal(status, 200, JSON.stringify(body));
+    const [link] = await getDb()('sgp_links').where({ contract: ATIVO });
+    assert.equal(link.phone_manual, DESCONHECIDO);
+    assert.equal(body.data.attendance.matchedOn, 'manual');
+
+    const outro = await agir(fios.estranho, 'phone', { contract: '9999' });
+    assert.equal(outro.status, 409);
   });
 });

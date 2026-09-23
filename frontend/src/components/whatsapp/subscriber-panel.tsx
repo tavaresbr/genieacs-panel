@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
-import { whatsappAPI, type WaSubscriberPanel, type WaSubscriberPartError } from '@/lib/api'
+import { whatsappAPI, type WaSubscriberPanel, type WaSubscriberPartError, type WhatsAppTemplate } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
@@ -26,9 +26,13 @@ import type { TranslationKey } from '@/lib/i18n'
 
 interface SubscriberPanelProps {
   conversationId: number
+  /** The contract the thread shows right now; the panel says when it differs. */
+  boundContract?: string | null
   onClose: () => void
   /** The thread's binding changed; the list and header should reload. */
   onBound?: () => void
+  /** Hands a text to the reply box. Absent where there is no box to fill. */
+  onDraft?: (text: string) => void
 }
 
 function Card({ icon, title, children }: { icon: string; title: string; children: ReactNode }) {
@@ -68,11 +72,15 @@ const MATCHED_ON: Record<string, TranslationKey> = {
   conversation: 'whatsapp.sgp.matchedConversation'
 }
 
-export function SubscriberPanel({ conversationId, onClose, onBound }: SubscriberPanelProps) {
+export function SubscriberPanel({ conversationId, boundContract = null, onClose, onBound, onDraft }: SubscriberPanelProps) {
   const { t, formatDateTime, intlLocale } = useTranslation()
   const { can } = useAuth()
   const toast = useToast()
   const canAct = can('sgp.act')
+  // The second copy needs the templates (campaigns.read) and ends in a reply
+  // (whatsapp.send); the manual phone is the billing screen's own write.
+  const canSecondCopy = Boolean(onDraft) && can('whatsapp.send') && can('campaigns.read')
+  const canSavePhone = can('campaigns.manage')
 
   const [panel, setPanel] = useState<WaSubscriberPanel | null>(null)
   const [loading, setLoading] = useState(true)
@@ -80,12 +88,16 @@ export function SubscriberPanel({ conversationId, onClose, onBound }: Subscriber
   const [contract, setContract] = useState<string | null>(null)
   const [document, setDocument] = useState('')
   const [searchedDocument, setSearchedDocument] = useState<string | null>(null)
-  const [busy, setBusy] = useState<'unlock' | 'ticket' | 'bind' | null>(null)
+  const [busy, setBusy] = useState<'unlock' | 'ticket' | 'bind' | 'secondCopy' | 'phone' | null>(null)
+  const [templates, setTemplates] = useState<WhatsAppTemplate[] | null>(null)
+  const [templateId, setTemplateId] = useState('')
   const [ticketOpen, setTicketOpen] = useState(false)
   const [ticketText, setTicketText] = useState('')
   // The answer to an older request must not overwrite a newer one: switching
   // threads while SGP is slow is exactly when the two cross.
   const requestRef = useRef(0)
+  // The panel answer the list was last told about, so one answer is one reload.
+  const notifiedRef = useRef<WaSubscriberPanel | null>(null)
 
   const load = useCallback(async (params: { contract?: string | null; document?: string | null } = {}) => {
     const request = ++requestRef.current
@@ -120,6 +132,31 @@ export function SubscriberPanel({ conversationId, onClose, onBound }: Subscriber
     void load()
   }, [conversationId, load])
 
+  // Loaded once per panel, not per thread: the templates are the provider's,
+  // not the subscriber's.
+  useEffect(() => {
+    if (!canSecondCopy) return
+    let alive = true
+    whatsappAPI.listTemplates({ category: 'cobranca' })
+      .then((res) => {
+        if (!alive) return
+        const rows = res.success && res.data ? res.data.filter((row) => row.active) : []
+        setTemplates(rows)
+        setTemplateId((current) => current || (rows[0] ? String(rows[0].id) : ''))
+      })
+      .catch(() => { if (alive) setTemplates([]) })
+    return () => { alive = false }
+  }, [canSecondCopy])
+
+  // Opening the panel can bind a thread the inbound path had not: the server
+  // resolves the number on the way in. The list and the header would say "not
+  // linked" until their next poll; they hear it now instead.
+  useEffect(() => {
+    if (!panel || notifiedRef.current === panel) return
+    notifiedRef.current = panel
+    if ((panel.attendance.contract ?? null) !== (boundContract ?? null)) onBound?.()
+  }, [panel, boundContract, onBound])
+
   const selectContract = (value: string) => {
     setContract(value)
     setTicketOpen(false)
@@ -146,9 +183,9 @@ export function SubscriberPanel({ conversationId, onClose, onBound }: Subscriber
         return
       }
       toast.success(t('whatsapp.sgp.bound', { contract }))
+      // The effect above tells the list: the new answer carries the new contract.
       setPanel(res.data)
       setSearchedDocument(null)
-      onBound?.()
     } catch {
       toast.error(t('api.requestFailed'))
     } finally {
@@ -168,6 +205,45 @@ export function SubscriberPanel({ conversationId, onClose, onBound }: Subscriber
       }
       toast.success(res.message || t('detail.sgp.unlockSent'))
       void load({ contract, document: searchedDocument })
+    } catch {
+      toast.error(t('api.requestFailed'))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const prepareSecondCopy = async () => {
+    if (!contract || !templateId || !onDraft) return
+    setBusy('secondCopy')
+    try {
+      const res = await whatsappAPI.subscriberSecondCopy(conversationId, { contract, template: templateId })
+      if (!res.success || !res.data) {
+        // The server's own sentence: "no open invoice" and "the template cites
+        // a field this invoice lacks" are different fixes.
+        toast.error(res.message || t('detail.sgp.queryFailed'))
+        return
+      }
+      onDraft(res.data.text)
+      toast.success(t('whatsapp.sgp.secondCopyReady'))
+    } catch {
+      toast.error(t('api.requestFailed'))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const savePhone = async () => {
+    if (!contract) return
+    if (!window.confirm(t('whatsapp.sgp.savePhoneConfirm', { contract }))) return
+    setBusy('phone')
+    try {
+      const res = await whatsappAPI.subscriberSavePhone(conversationId, contract)
+      if (!res.success || !res.data) {
+        toast.error(res.message || t('api.requestFailed'))
+        return
+      }
+      toast.success(t('whatsapp.sgp.phoneSaved', { contract }))
+      setPanel(res.data)
     } catch {
       toast.error(t('api.requestFailed'))
     } finally {
@@ -273,6 +349,22 @@ export function SubscriberPanel({ conversationId, onClose, onBound }: Subscriber
               </button>
             )}
           </div>
+          {/* Only where it would change something: a number already saved by
+              hand, or a contract with no ONT row to write it on, has nothing
+              to gain from the button. */}
+          {canSavePhone && phone && panel.ready && panel.contract
+            && panel.attendance.matchedOn !== 'manual'
+            && panel.router.deviceIds.length > 0 && (
+            <button
+              type="button"
+              className="modern-button-secondary mt-2 w-full"
+              disabled={busy !== null}
+              onClick={() => void savePhone()}
+            >
+              <Icon name="phone" size={15} />
+              {t('whatsapp.sgp.savePhone', { contract: panel.contract.contract })}
+            </button>
+          )}
         </Card>
 
         {!panel.ready ? (
@@ -517,6 +609,40 @@ export function SubscriberPanel({ conversationId, onClose, onBound }: Subscriber
 
             {panel.contract && (
               <Card icon="invoice" title={t('detail.sgp.openInvoices')}>
+                {canSecondCopy && !panel.invoices.error && panel.invoices.items.length > 0 && (
+                  <div className="mb-3 rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-2">
+                    {templates && templates.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">{t('whatsapp.sgp.noTemplates')}</p>
+                    ) : (
+                      <>
+                        <label className="metric-label" htmlFor={`wa-second-copy-${conversationId}`}>
+                          {t('whatsapp.sgp.secondCopyTemplate')}
+                        </label>
+                        <select
+                          id={`wa-second-copy-${conversationId}`}
+                          className="modern-input mt-1 w-full"
+                          value={templateId}
+                          disabled={!templates}
+                          onChange={(event) => setTemplateId(event.target.value)}
+                        >
+                          {(templates ?? []).map((row) => (
+                            <option key={row.id} value={String(row.id)}>{row.name}</option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          className="modern-button mt-2 w-full"
+                          disabled={busy !== null || !templateId}
+                          onClick={() => void prepareSecondCopy()}
+                        >
+                          <Icon name="invoice" size={15} />
+                          {t('whatsapp.sgp.secondCopy')}
+                        </button>
+                        <p className="mt-1 text-xs text-muted-foreground">{t('whatsapp.sgp.secondCopyHint')}</p>
+                      </>
+                    )}
+                  </div>
+                )}
                 {panel.invoices.error ? (
                   <PartError error={panel.invoices.error} />
                 ) : panel.invoices.items.length === 0 ? (

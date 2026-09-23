@@ -70,6 +70,27 @@ class WhatsAppSubscriberController {
     }
   }
 
+  static async secondCopy(req, res) {
+    try {
+      const result = await WaSubscriberPanelService.secondCopy(req.params?.id, {
+        contract: req.body?.contract,
+        template: req.body?.template
+      });
+      return res.json(createResponse(req.t('sgp.dataLoaded'), result));
+    } catch (error) {
+      return handleError(req, res, error, 'sgp.dataLoadFailed');
+    }
+  }
+
+  static async savePhone(req, res) {
+    try {
+      const panel = await WaSubscriberPanelService.savePhone(req.params?.id, { contract: req.body?.contract });
+      return res.json(createResponse(req.t('whatsapp.phoneSaved'), present(req, panel)));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.phoneSaveFailed');
+    }
+  }
+
   static async ticket(req, res) {
     try {
       const body = req.body ?? {};

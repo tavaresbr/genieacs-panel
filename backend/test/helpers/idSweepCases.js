@@ -365,6 +365,26 @@ export const casos = [
   },
   {
     chave: 'conversation',
+    label: 'POST /api/whatsapp/conversations/:id/subscriber/second-copy',
+    method: 'POST',
+    path: (id) => `/api/whatsapp/conversations/${id}/subscriber/second-copy`,
+    body: { contract: '1', template: 'Olá {{nome}}' },
+    tabela: 'wa_conversations',
+    controleSoNaoAchou: true,
+    codigoDeNaoAchou: 'conversation_not_found'
+  },
+  {
+    chave: 'conversation',
+    label: 'POST /api/whatsapp/conversations/:id/subscriber/phone',
+    method: 'POST',
+    path: (id) => `/api/whatsapp/conversations/${id}/subscriber/phone`,
+    body: { contract: '1' },
+    tabela: 'wa_conversations',
+    controleSoNaoAchou: true,
+    codigoDeNaoAchou: 'conversation_not_found'
+  },
+  {
+    chave: 'conversation',
     label: 'POST /api/whatsapp/conversations/:id/subscriber/ticket',
     method: 'POST',
     path: (id) => `/api/whatsapp/conversations/${id}/subscriber/ticket`,
