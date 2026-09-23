@@ -912,6 +912,7 @@ const ar: Dictionary = {
   'detail.wifi.filterAll': 'الكل ({count})',
   'detail.wifi.filterEnabled': 'مفعّلة ({count})',
   'detail.wifi.filterDisabled': 'معطّلة ({count})',
+  'detail.wifi.filterUnknown': 'غير معروفة ({count})',
   'detail.wifi.filterEmpty': 'لا توجد شبكات تطابق هذا الفلتر.',
   'detail.wifiModal.title': 'تعديل Wi-Fi SSID {index}',
   'detail.wifiModal.close': 'إغلاق محرّر Wi-Fi',

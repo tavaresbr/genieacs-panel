@@ -912,6 +912,7 @@ const hi: Dictionary = {
   'detail.wifi.filterAll': 'सभी ({count})',
   'detail.wifi.filterEnabled': 'सक्रिय ({count})',
   'detail.wifi.filterDisabled': 'निष्क्रिय ({count})',
+  'detail.wifi.filterUnknown': 'अज्ञात ({count})',
   'detail.wifi.filterEmpty': 'इस फ़िल्टर से कोई नेटवर्क मेल नहीं खाता।',
   'detail.wifiModal.title': 'Wi-Fi SSID {index} संपादित करें',
   'detail.wifiModal.close': 'Wi-Fi संपादक बंद करें',

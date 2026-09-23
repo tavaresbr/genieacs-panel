@@ -10,11 +10,11 @@ const networks = [
 ]
 
 describe('filterWifiByStatus', () => {
-  const run = (filter: 'all' | 'enabled' | 'disabled') =>
+  const run = (filter: 'all' | 'enabled' | 'disabled' | 'unknown') =>
     filterWifiByStatus(networks, filter, (n) => n.enable)
 
-  it('conta ativas e trata estado desconhecido como desativada', () => {
-    expect(run('all').counts).toEqual({ all: 4, enabled: 1, disabled: 3 })
+  it('conta ativas, desativadas e desconhecidas separadamente', () => {
+    expect(run('all').counts).toEqual({ all: 4, enabled: 1, disabled: 1, unknown: 2 })
   })
 
   it('mostra todas por padrão', () => {
@@ -25,8 +25,12 @@ describe('filterWifiByStatus', () => {
     expect(run('enabled').visible.map((n) => n.index)).toEqual([1])
   })
 
-  it('mostra desativadas e desconhecidas', () => {
-    expect(run('disabled').visible.map((n) => n.index)).toEqual([2, 3, 4])
+  it('mostra só as desativadas', () => {
+    expect(run('disabled').visible.map((n) => n.index)).toEqual([2])
+  })
+
+  it('mostra só as de estado desconhecido', () => {
+    expect(run('unknown').visible.map((n) => n.index)).toEqual([3, 4])
   })
 })
 
@@ -35,6 +39,7 @@ describe('parseWifiStatusFilter', () => {
     expect(parseWifiStatusFilter('enabled')).toBe('enabled')
     expect(parseWifiStatusFilter('disabled')).toBe('disabled')
     expect(parseWifiStatusFilter('all')).toBe('all')
+    expect(parseWifiStatusFilter('unknown')).toBe('unknown')
   })
 
   it('volta para "all" com valor ausente ou inválido', () => {

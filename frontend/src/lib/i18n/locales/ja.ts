@@ -934,6 +934,7 @@ const ja: Dictionary = {
   'detail.wifi.filterAll': 'すべて ({count})',
   'detail.wifi.filterEnabled': '有効 ({count})',
   'detail.wifi.filterDisabled': '無効 ({count})',
+  'detail.wifi.filterUnknown': '不明 ({count})',
   'detail.wifi.filterEmpty': 'このフィルターに一致するネットワークはありません。',
   'detail.wifiModal.title': 'Wi-Fi SSID {index} を編集',
   'detail.wifiModal.close': 'Wi-Fi エディターを閉じる',

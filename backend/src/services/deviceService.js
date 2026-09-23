@@ -167,6 +167,33 @@ class DeviceService {
     );
   }
 
+  /**
+   * Parameters, besides `Enable`, that say whether a WLAN instance is on.
+   * Some ONTs (Nokia among them) leave `Enable` unfetched while `Status` or
+   * `RadioEnabled` are known; without them the panel shows every SSID as
+   * "unknown state".
+   */
+  static WLAN_STATE_FIELDS = Object.freeze(['Enable', 'RadioEnabled', 'Status']);
+
+  /**
+   * On, off, or `null` when nothing the ONT reported says. `Enable` wins;
+   * `Status` counts only when it is one of the TR-098 values that decide it
+   * ("Up" / "Disabled"), since "Error" says nothing about the setting.
+   */
+  static resolveWlanEnabled(getValue, index) {
+    const base = `InternetGatewayDevice.LANDevice.1.WLANConfiguration.${index}`;
+    for (const field of ['Enable', 'RadioEnabled']) {
+      const value = getValue(`${base}.${field}`);
+      if (this.hasReportedValue(value)) return this.isEnabledValue(value);
+    }
+    const status = getValue(`${base}.Status`);
+    if (typeof status !== 'string') return null;
+    const normalized = status.trim().toLowerCase();
+    if (normalized === 'up') return true;
+    if (normalized === 'disabled') return false;
+    return null;
+  }
+
   static resolveParameterPath(basePath, configuredPath) {
     if (!configuredPath) return null;
     if (
@@ -974,6 +1001,8 @@ class DeviceService {
       virtualParams.vpUserAdmin,
       virtualParams.vpUserPassword,
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.Enable',
+      'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.RadioEnabled',
+      'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.Status',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.PreSharedKey.1.KeyPassphrase',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.KeyPassphrase',
@@ -981,6 +1010,8 @@ class DeviceService {
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.TotalAssociations',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.Channel',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.Enable',
+      'InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.RadioEnabled',
+      'InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.Status',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.SSID',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.PreSharedKey.1.KeyPassphrase',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.KeyPassphrase',
@@ -988,6 +1019,8 @@ class DeviceService {
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.TotalAssociations',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.Channel',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.Enable',
+      'InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.RadioEnabled',
+      'InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.Status',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.SSID',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.PreSharedKey.1.KeyPassphrase',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.KeyPassphrase',
@@ -995,6 +1028,8 @@ class DeviceService {
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.TotalAssociations',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.Channel',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.Enable',
+      'InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.RadioEnabled',
+      'InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.Status',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.SSID',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.PreSharedKey.1.KeyPassphrase',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.KeyPassphrase',
@@ -1002,6 +1037,8 @@ class DeviceService {
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.TotalAssociations',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.4.Channel',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.Enable',
+      'InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.RadioEnabled',
+      'InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.Status',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.SSID',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.PreSharedKey.1.KeyPassphrase',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.KeyPassphrase',
@@ -1009,6 +1046,8 @@ class DeviceService {
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.TotalAssociations',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.Channel',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.Enable',
+      'InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.RadioEnabled',
+      'InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.Status',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.SSID',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.PreSharedKey.1.KeyPassphrase',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.KeyPassphrase',
@@ -1016,6 +1055,8 @@ class DeviceService {
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.TotalAssociations',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.6.Channel',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.Enable',
+      'InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.RadioEnabled',
+      'InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.Status',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.SSID',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.PreSharedKey.1.KeyPassphrase',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.KeyPassphrase',
@@ -1023,6 +1064,8 @@ class DeviceService {
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.TotalAssociations',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.7.Channel',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.Enable',
+      'InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.RadioEnabled',
+      'InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.Status',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.SSID',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.PreSharedKey.1.KeyPassphrase',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.8.KeyPassphrase',
@@ -1243,10 +1286,9 @@ class DeviceService {
           const hasVirtualMapping = Boolean(
             virtualNamePath && this.getParameterNode(item, virtualNamePath)
           );
-          const enableValue = getValue(`InternetGatewayDevice.LANDevice.1.WLANConfiguration.${i}.Enable`);
           wifi.push({
             index: i,
-            enable: enableValue === null ? null : this.isEnabledValue(enableValue),
+            enable: this.resolveWlanEnabled(getValue, i),
             ssid: (virtualNamePath ? getValue(virtualNamePath) : null) ??
               getValue(`InternetGatewayDevice.LANDevice.1.WLANConfiguration.${i}.SSID`),
             password: (virtualPasswordPath ? getValue(virtualPasswordPath) : null) ??
@@ -1577,7 +1619,9 @@ class DeviceService {
     ];
     for (let index = 1; index <= 8; index += 1) {
       projection.push(
-        `InternetGatewayDevice.LANDevice.1.WLANConfiguration.${index}.Enable`,
+        ...this.WLAN_STATE_FIELDS.map(
+          (field) => `InternetGatewayDevice.LANDevice.1.WLANConfiguration.${index}.${field}`
+        ),
         `InternetGatewayDevice.LANDevice.1.WLANConfiguration.${index}.SSID`,
         `InternetGatewayDevice.LANDevice.1.WLANConfiguration.${index}.TotalAssociations`
       );
@@ -1599,13 +1643,10 @@ class DeviceService {
         `InternetGatewayDevice.LANDevice.1.WLANConfiguration.${index}.SSID`
       );
       if (ssid === null || ssid === '') continue;
-      const enabled = getValue(
-        `InternetGatewayDevice.LANDevice.1.WLANConfiguration.${index}.Enable`
-      );
       wifi.push({
         index,
         ssid,
-        enabled: enabled === null ? null : this.isEnabledValue(enabled),
+        enabled: this.resolveWlanEnabled(getValue, index),
         connectedDevices: getValue(
           `InternetGatewayDevice.LANDevice.1.WLANConfiguration.${index}.TotalAssociations`
         )
@@ -1804,7 +1845,12 @@ class DeviceService {
    * the reading is there from the next inform on.
    */
   static SUMMON_REFRESH_OBJECTS = Object.freeze({
-    InternetGatewayDevice: ['InternetGatewayDevice.WANDevice'],
+    // WLANConfiguration too: many provision scripts fetch only the SSID
+    // names, which leaves every network's on/off state unknown.
+    InternetGatewayDevice: [
+      'InternetGatewayDevice.WANDevice',
+      'InternetGatewayDevice.LANDevice.1.WLANConfiguration'
+    ],
     Device: ['Device.Optical']
   });
 

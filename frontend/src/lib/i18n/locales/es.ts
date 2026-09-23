@@ -934,6 +934,7 @@ const es: Dictionary = {
   'detail.wifi.filterAll': 'Todas ({count})',
   'detail.wifi.filterEnabled': 'Activas ({count})',
   'detail.wifi.filterDisabled': 'Desactivadas ({count})',
+  'detail.wifi.filterUnknown': 'Desconocidas ({count})',
   'detail.wifi.filterEmpty': 'Ninguna red coincide con este filtro.',
   'detail.wifiModal.title': 'Editar SSID {index}',
   'detail.wifiModal.close': 'Cerrar el editor de WiFi',

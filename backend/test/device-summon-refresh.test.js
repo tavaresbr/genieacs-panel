@@ -166,6 +166,11 @@ const summon = () => call(`${panelUrl}/api/devices/summon`, {
 
 const listDevices = () => call(`${panelUrl}/api/devices`, { headers: authHeaders(token) });
 
+const TR098_OBJECTS = [
+  'InternetGatewayDevice.WANDevice',
+  'InternetGatewayDevice.LANDevice.1.WLANConfiguration'
+];
+
 describe('summoning a device', () => {
   it('asks the ONT to re-report the object its optical reading lives under', async () => {
     const { status, body } = await summon();
@@ -174,8 +179,18 @@ describe('summoning a device', () => {
     const refreshed = genieAcs.tasks
       .filter((task) => task.name === 'refreshObject')
       .map((task) => task.objectName);
-    assert.deepEqual(refreshed, ['InternetGatewayDevice.WANDevice']);
-    assert.deepEqual(body.data.refreshed, ['InternetGatewayDevice.WANDevice']);
+    assert.deepEqual(refreshed, TR098_OBJECTS);
+    assert.deepEqual(body.data.refreshed, TR098_OBJECTS);
+  });
+
+  it('asks the ONT to re-report its WiFi networks, so their on/off state is known', async () => {
+    await summon();
+    assert.ok(
+      genieAcs.tasks.some((task) =>
+        task.name === 'refreshObject' &&
+        task.objectName === 'InternetGatewayDevice.LANDevice.1.WLANConfiguration'),
+      'the summon refreshes WLANConfiguration'
+    );
   });
 
   it('never posts a TR-181 refresh to a TR-098 ONT', async () => {
@@ -202,7 +217,7 @@ describe('summoning a device', () => {
   });
 
   it('survives an ONT that carries the root but refuses the object', async () => {
-    genieAcs.refusedObjects = new Set(['InternetGatewayDevice.WANDevice']);
+    genieAcs.refusedObjects = new Set(TR098_OBJECTS);
 
     const { status, body } = await summon();
     assert.equal(status, 200);

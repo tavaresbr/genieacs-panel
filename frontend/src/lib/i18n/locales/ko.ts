@@ -936,6 +936,7 @@ const ko: Dictionary = {
   'detail.wifi.filterAll': '전체 ({count})',
   'detail.wifi.filterEnabled': '활성 ({count})',
   'detail.wifi.filterDisabled': '비활성 ({count})',
+  'detail.wifi.filterUnknown': '알 수 없음 ({count})',
   'detail.wifi.filterEmpty': '이 필터와 일치하는 네트워크가 없습니다.',
   'detail.wifiModal.title': 'Wi-Fi SSID {index} 편집',
   'detail.wifiModal.close': 'Wi-Fi 편집기 닫기',

@@ -936,6 +936,7 @@ const en = {
   'detail.wifi.filterAll': 'All ({count})',
   'detail.wifi.filterEnabled': 'Enabled ({count})',
   'detail.wifi.filterDisabled': 'Disabled ({count})',
+  'detail.wifi.filterUnknown': 'Unknown ({count})',
   'detail.wifi.filterEmpty': 'No networks match this filter.',
   'detail.wifiModal.title': 'Edit WiFi SSID {index}',
   'detail.wifiModal.close': 'Close the WiFi editor',
