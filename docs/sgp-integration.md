@@ -155,6 +155,45 @@ state; each list under `divergences` is a sample capped at 50 entries, so a
 fleet-sized divergence stays readable. `lastSync` repeats the stored sync
 summary, or is `null` before the first run.
 
+### Contacts sync (every client, for WhatsApp)
+
+Brings every SGP client into the WhatsApp **Contacts** tab — with or without a
+contract, with or without equipment in the panel. It lives under
+**Settings → SGP → Contacts for WhatsApp**.
+
+The URA reference has no standard "list every client" call, and the path differs
+between SGP versions, so the listing path is a setting (`endpoints.customerList`,
+empty by default). The request uses the same `app` + `token` as every other call,
+as a POST with the paging parameters in the JSON body:
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `endpoints.customerList` | *(empty)* | Relative path of the client listing. Empty = the sync is off. |
+| `contactsPaging` | `offset` | `offset` sends a row offset; `page` sends a page number from 1 |
+| `contactsOffsetParam` / `contactsLimitParam` | `offset` / `limit` | The parameter names the install expects |
+| `contactsPageSize` | 100 | 10–500 |
+| `contactsSyncEnabled` / `contactsSyncIntervalHours` | off / 24 | Runs on the scheduler, in the background |
+
+The answer is read from the first array under `clientes`, `contratos`, `dados`,
+`data`, `results` or `items`. Each entry may be a client with a nested
+`contratos` list (one contact per contract), a contract row, or a client with no
+contract (one contact, keyed by the client `id`). Phones are read from the usual
+fields or from a `telefones`/`contatos` list, preferring a mobile.
+
+**Test** reads the first page, writes nothing, and shows how many clients came
+back and which fields they carry — use it to confirm the path before syncing.
+
+Safety: a page that repeats the previous one's first client (an SGP that ignores
+the paging parameters) stops the run as `partial` with reason `paging_ignored`;
+2 000 pages or 1 000 000 rows is a hard ceiling. Nothing is ever deleted: a client
+removed from the SGP keeps its row and its conversations; a manually corrected
+phone is never overwritten; a client that gains a contract has its contract-less
+row retired and its conversations moved to the contract.
+
+Routes: `GET /api/sgp/contacts/sync` (last run, `sgp.read`),
+`POST /api/sgp/contacts/sync` (run now, `sgp.act`), `POST /api/sgp/contacts/test`
+(first page only, `sgp.config`).
+
 ## Customer portal
 
 Two portal options are configured in the same settings tab:

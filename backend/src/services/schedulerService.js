@@ -3,6 +3,7 @@ import DeviceService from './deviceService.js';
 import ProvisioningService from './provisioningService.js';
 import SgpEventService from './sgpEventService.js';
 import SgpService from './sgpService.js';
+import SgpContactSyncService from './sgpContactSyncService.js';
 import { forEachTenant, forEveryTenant } from '../config/tenantJobs.js';
 import { currentTenantId } from '../config/tenantContext.js';
 import AuditLog from '../models/AuditLog.js';
@@ -293,6 +294,26 @@ class SchedulerService {
       ) {
         summary.reconcile = await SgpEventService.reconcile({});
         await this.writeState({ lastReconcileAt: new Date().toISOString() });
+      }
+
+      // Every client of the SGP into the WhatsApp contacts. Only once the
+      // operator has set the listing path and switched it on.
+      //
+      // Not awaited: a sync of thousands of clients takes minutes, and this
+      // tick also drains the outbox and the events of every other job. The
+      // clock is written BEFORE the run, so a slow sync is not started again
+      // on the next tick, and the service's own lock refuses an overlap with
+      // the button in Settings. The tenant scope travels with the promise.
+      if (
+        sgpConfig.contactsSyncEnabled
+        && sgpConfig.endpoints.customerList
+        && this.due(state.lastContactsSyncAt, sgpConfig.contactsSyncIntervalHours * 3_600_000)
+      ) {
+        await this.writeState({ lastContactsSyncAt: new Date().toISOString() });
+        summary.contacts = 'started';
+        void SgpContactSyncService.syncAll().catch((error) => {
+          console.warn(`SGP contacts sync failed: ${error.code || error.message}`);
+        });
       }
     }
 

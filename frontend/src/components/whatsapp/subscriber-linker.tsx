@@ -93,11 +93,11 @@ export function SubscriberLinker({ conversation, onLinked, onCancel }: Subscribe
   }
 
   const link = async (contact: WhatsAppContact) => {
-    setLinking(contact.contract)
+    setLinking(contact.key)
     try {
       const res = await whatsappAPI.linkConversationSubscriber(
         conversation.id,
-        contact.contract,
+        contact.key,
         canSavePhone && savePhone
       )
       if (!alive.current) return
@@ -105,7 +105,7 @@ export function SubscriberLinker({ conversation, onLinked, onCancel }: Subscribe
         toast.error(whatsappErrorMessage(t, res.code))
         return
       }
-      toast.success(t('whatsapp.inbox.linked', { name: contact.clientName || contact.contract }))
+      toast.success(t('whatsapp.inbox.linked', { name: contact.clientName || contact.contract || contact.key }))
       onLinked(res.data)
     } catch {
       if (alive.current) toast.error(t('api.requestFailed'))
@@ -167,7 +167,7 @@ export function SubscriberLinker({ conversation, onLinked, onCancel }: Subscribe
               )}
             </li>
           ) : results.map((contact) => (
-            <li key={contact.contract}>
+            <li key={contact.key}>
               <button
                 type="button"
                 className="flex w-full items-center justify-between gap-3 px-3 py-2 text-start hover:bg-muted/50 disabled:opacity-60"
@@ -179,16 +179,18 @@ export function SubscriberLinker({ conversation, onLinked, onCancel }: Subscribe
                     {contact.clientName || '—'}
                   </span>
                   <span className="block truncate font-mono text-xs text-muted-foreground">
-                    {t('whatsapp.inbox.contract')}: {contact.contract}
+                    {contact.contract
+                      ? `${t('whatsapp.inbox.contract')}: ${contact.contract}`
+                      : t('whatsapp.contacts.noContract')}
                     {contact.phone ? ` · ${contact.phone}` : ''}
                     {contact.hasDevice ? '' : ` · ${t('whatsapp.contacts.noDevice')}`}
                   </span>
                 </span>
                 <span className="modern-badge shrink-0">
                   <Icon
-                    name={linking === contact.contract ? 'refresh' : 'check'}
+                    name={linking === contact.key ? 'refresh' : 'check'}
                     size={12}
-                    className={linking === contact.contract ? 'animate-spin' : ''}
+                    className={linking === contact.key ? 'animate-spin' : ''}
                   />
                   {t('whatsapp.inbox.linkChoose')}
                 </span>

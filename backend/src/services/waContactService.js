@@ -24,6 +24,27 @@ const MAX_LIMIT = 200;
  */
 const ROW_CEILING = 5000;
 
+/**
+ * The same ceiling for `sgp_contacts`, which the full sync fills with every
+ * client of the SGP. Only the columns the list draws are read, so even this
+ * many rows is a few megabytes, once per request.
+ */
+const CONTACT_CEILING = 50_000;
+
+/** What the status filter accepts. `none` is a client with no contract. */
+export const CONTACT_STATES = Object.freeze(['active', 'blocked', 'cancelled', 'unknown', 'none']);
+
+const CONTACT_KEY = /^c:(\d+)$/;
+
+/**
+ * How a contact is addressed from the browser: its contract when it has one,
+ * `c:<row id>` when it does not. The route parameter and the link body take
+ * either.
+ */
+export function contactKey(subscriber) {
+  return subscriber.contract ? String(subscriber.contract) : `c:${subscriber.contactId}`;
+}
+
 /** CPF/CNPJ on screen as its last digits only — the search still sees all of it. */
 function maskDocument(document) {
   const digits = String(document ?? '').replace(/\D/g, '');
@@ -45,20 +66,30 @@ function maskDocument(document) {
  * subscribers an operator looked up in the SGP that have no ONT in the panel.
  */
 class WaContactService {
-  static async list({ search = '', limit = DEFAULT_LIMIT, offset = 0 } = {}) {
+  static async list({ search = '', limit = DEFAULT_LIMIT, offset = 0, state = '' } = {}) {
     const size = Math.min(Math.max(Number(limit) || DEFAULT_LIMIT, 1), MAX_LIMIT);
     const skip = Math.max(Number(offset) || 0, 0);
     const raw = String(search ?? '').trim();
 
-    const withDevice = WaBillingService.subscribersFrom(await this.searchTable('sgp_links', raw));
+    const linkRows = await this.searchTable('sgp_links', raw);
+    const linkStates = new Map(linkRows.map((row) => [String(row.contract), row.state || 'unknown']));
+    const withDevice = WaBillingService.subscribersFrom(linkRows).map((subscriber) => ({
+      ...subscriber,
+      contactId: null,
+      state: linkStates.get(subscriber.contract) || 'unknown',
+      lastSeenAt: null
+    }));
     const known = new Set(withDevice.map((s) => s.contract));
-    // A contract that has since gained an ONT is drawn from `sgp_links`, which
-    // is the fresher mirror; its `sgp_contacts` row is only a leftover.
-    const withoutDevice = (await this.searchTable('sgp_contacts', raw))
-      .filter((row) => !known.has(String(row.contract)))
+    // A contract that has an ONT is drawn from `sgp_links`, which is the
+    // fresher mirror; its `sgp_contacts` row only duplicates it.
+    const withoutDevice = (await this.searchTable('sgp_contacts', raw, CONTACT_CEILING))
+      .filter((row) => !row.contract || !known.has(String(row.contract)))
       .map((row) => this.subscriberFromContact(row));
 
-    const subscribers = [...withDevice, ...withoutDevice].sort((a, b) => (
+    const wanted = CONTACT_STATES.includes(state) ? state : null;
+    const subscribers = [...withDevice, ...withoutDevice]
+      .filter((subscriber) => !wanted || subscriber.state === wanted)
+      .sort((a, b) => (
       String(a.clientName ?? '').localeCompare(String(b.clientName ?? ''), 'pt-BR')
       || String(a.contract).localeCompare(String(b.contract))
     ));
@@ -73,7 +104,7 @@ class WaContactService {
    * One of the two directories, filtered by what the operator typed. The two
    * tables share every column the search reads, on purpose.
    */
-  static async searchTable(table, raw) {
+  static async searchTable(table, raw, ceiling = ROW_CEILING) {
     const query = tdb(table);
     const term = WaConversation.likeTerm(raw);
     if (raw) {
@@ -101,7 +132,7 @@ class WaContactService {
       .orderBy('client_name', 'asc')
       .orderBy('contract', 'asc')
       .orderBy('id', 'asc')
-      .limit(ROW_CEILING);
+      .limit(ceiling);
   }
 
   /** An `sgp_contacts` row in the shape `subscribersFrom` gives an `sgp_links` one. */
@@ -109,12 +140,15 @@ class WaContactService {
     const manual = normalizarTelefoneBr(row.phone_manual);
     const fromSgp = normalizarTelefoneBr(row.phone_e164);
     return {
-      contract: String(row.contract),
+      contract: row.contract ? String(row.contract) : null,
+      contactId: row.id,
       clientName: row.client_name || null,
       document: row.document || null,
       deviceId: null,
       phone: manual || fromSgp || null,
-      phoneSource: manual ? 'manual' : (fromSgp ? 'sgp' : null)
+      phoneSource: manual ? 'manual' : (fromSgp ? 'sgp' : null),
+      state: row.contract ? (row.state || 'unknown') : 'none',
+      lastSeenAt: row.last_seen_at || null
     };
   }
 
@@ -125,8 +159,16 @@ class WaContactService {
   static async subscriberFor(contract) {
     const key = String(contract ?? '').trim();
     if (!key) return null;
+    // `c:<id>`: a client with no contract, addressed by its row.
+    const byId = key.match(CONTACT_KEY);
+    if (byId) {
+      const contact = await SgpContact.getById(byId[1]);
+      return contact ? this.subscriberFromContact(contact) : null;
+    }
     const links = await SgpLink.getByContract(key);
-    if (links.length > 0) return WaBillingService.subscribersFrom(links)[0];
+    if (links.length > 0) {
+      return { ...WaBillingService.subscribersFrom(links)[0], contactId: null, state: links[0].state || 'unknown' };
+    }
     const contact = await SgpContact.getByContract(key);
     return contact ? this.subscriberFromContact(contact) : null;
   }
@@ -174,27 +216,36 @@ class WaContactService {
    */
   static async decorate(subscribers) {
     if (subscribers.length === 0) return [];
-    const contracts = subscribers.map((s) => s.contract);
+    const contracts = subscribers.map((s) => s.contract).filter(Boolean);
+    const contactIds = subscribers.filter((s) => !s.contract && s.contactId).map((s) => s.contactId);
     const phones = [...new Set(subscribers.flatMap((s) => variantesTelefoneBr(s.phone)))];
 
     const threads = await tdb('wa_conversations')
       .where((match) => {
-        match.whereIn('contract', contracts);
+        match.whereRaw('1 = 0');
+        if (contracts.length > 0) match.orWhereIn('contract', contracts);
+        if (contactIds.length > 0) match.orWhereIn('sgp_contact_id', contactIds);
         if (phones.length > 0) match.orWhereIn('wa_phone_e164', phones);
       })
       .orderBy('last_message_at', 'desc')
-      .select('id', 'contract', 'wa_phone_e164', 'last_message_at', 'closed_at');
+      .select('id', 'contract', 'sgp_contact_id', 'wa_phone_e164', 'last_message_at', 'closed_at');
     const blocked = await WaOptOut.activePhones(phones);
 
     return subscribers.map((subscriber) => {
       const spellings = variantesTelefoneBr(subscriber.phone);
       // The thread bound to the contract first: it is the one an operator
       // already confirmed. A thread matched only by number comes second.
-      const thread = threads.find((row) => row.contract === subscriber.contract)
+      const thread = (subscriber.contract
+        ? threads.find((row) => row.contract === subscriber.contract)
+        : threads.find((row) => Number(row.sgp_contact_id) === Number(subscriber.contactId)))
         || threads.find((row) => spellings.includes(row.wa_phone_e164))
         || null;
       return {
+        key: contactKey(subscriber),
         contract: subscriber.contract,
+        hasContract: Boolean(subscriber.contract),
+        state: subscriber.state || 'unknown',
+        lastSeenAt: subscriber.lastSeenAt || null,
         clientName: subscriber.clientName,
         document: maskDocument(subscriber.document),
         deviceId: subscriber.deviceId,
@@ -256,13 +307,19 @@ class WaContactService {
       pushName: subscriber.clientName || null
     });
     const customer = subscriber.deviceId ? await CustomerAccount.getByDeviceId(subscriber.deviceId) : null;
-    const bound = conversation.contract
+    const alreadyBound = conversation.contract || conversation.sgp_contact_id;
+    const bound = alreadyBound
       ? conversation
-      : await WaConversation.update(conversation.id, {
-        contract: subscriber.contract,
-        device_id: subscriber.deviceId,
-        customer_account_id: conversation.customer_account_id ?? customer?.id ?? null
-      });
+      : await WaConversation.update(conversation.id, subscriber.contract
+        ? {
+          contract: subscriber.contract,
+          device_id: subscriber.deviceId,
+          customer_account_id: conversation.customer_account_id ?? customer?.id ?? null
+        }
+        // A client with no contract is bound by its row: there is no contract
+        // to write, and inventing one would send billing looking for invoices
+        // under it.
+        : { sgp_contact_id: subscriber.contactId });
     return { conversation: await WaConversationService.decorate(bound), created: true };
   }
 }

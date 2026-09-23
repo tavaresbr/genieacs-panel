@@ -1545,7 +1545,14 @@ export interface SgpConfig {
   portalBilling: boolean
   portalUnlock: boolean
   invoiceLimit: number
-  endpoints: { customer: string; invoices: string; unlock: string; ticket: string }
+  endpoints: {
+    customer: string
+    invoices: string
+    unlock: string
+    ticket: string
+    /** The full client listing behind the contacts sync. Empty until set. */
+    customerList: string
+  }
   tokenConfigured: boolean
   ready: boolean
   updatedAt: string | null
@@ -1562,6 +1569,37 @@ export interface SgpConfig {
   ticketEnabled: boolean
   /** The install's own Tipo de Ocorrência id; SGP documents 5 as the default. */
   ticketOccurrenceType: number
+  contactsSyncEnabled: boolean
+  contactsSyncIntervalHours: number
+  contactsPageSize: number
+  contactsPaging: 'offset' | 'page'
+  contactsOffsetParam: string
+  contactsLimitParam: string
+}
+
+/** What one run of the SGP contacts sync did. */
+export interface SgpContactsSyncResult {
+  total: number
+  created: number
+  updated: number
+  withoutContract: number
+  pages: number
+  /** True when a ceiling or an SGP that ignores paging stopped the run early. */
+  partial: boolean
+  reason?: 'paging_ignored' | 'ceiling'
+  durationMs: number
+  startedAt: string
+  finishedAt: string
+}
+
+/** The first page of the listing, for the test button. Nothing is written. */
+export interface SgpContactsTestResult {
+  received: number
+  rows: number
+  withContract: number
+  withPhone: number
+  fields: string[]
+  sample: { contract: string | null; name: string | null; hasPhone: boolean }[]
 }
 
 export interface SgpTicket {
@@ -1727,6 +1765,15 @@ export const sgpAPI = {
 
   openTicket: (deviceId: string, payload: { content: string; note?: string }) =>
     apiClient.post<SgpTicket>(`/sgp/devices/${encodeURIComponent(deviceId)}/ticket`, payload),
+
+  getContactsSync: () =>
+    apiClient.get<SgpContactsSyncResult | null>('/sgp/contacts/sync'),
+
+  syncContacts: () =>
+    apiClient.post<SgpContactsSyncResult>('/sgp/contacts/sync'),
+
+  testContacts: () =>
+    apiClient.post<SgpContactsTestResult>('/sgp/contacts/test'),
 
   getLinks: () =>
     apiClient.get<{ links: SgpLinkRow[] }>('/sgp/links'),
@@ -2283,6 +2330,8 @@ export interface WhatsAppConversation {
   pushName: string | null
   deviceId: string | null
   contract: string | null
+  /** The SGP client with no contract this thread is bound to, if any. */
+  sgpContactId: number | null
   clientName: string | null
   /** The contact asked not to be contacted. Replying is still allowed. */
   optedOut: boolean
@@ -2377,8 +2426,17 @@ export interface WaSubscriberAttendance {
 }
 
 /** An SGP subscriber as a WhatsApp contact — one per contract. */
+export type WhatsAppContactState = 'active' | 'blocked' | 'cancelled' | 'unknown' | 'none'
+
 export interface WhatsAppContact {
-  contract: string
+  /** How the contact is addressed: its contract, or `c:<id>` when it has none. */
+  key: string
+  contract: string | null
+  hasContract: boolean
+  /** `none` is a client with no contract. */
+  state: WhatsAppContactState
+  /** When the SGP sync last saw this client; null for ONT-linked or looked-up rows. */
+  lastSeenAt: string | null
   clientName: string | null
   /** CPF/CNPJ as its last digits only. */
   document: string | null
@@ -2614,16 +2672,17 @@ export const whatsappAPI = {
 
   // Says by hand which SGP subscriber a thread belongs to. `savePhone` also
   // writes the thread's number onto the contract, and needs `campaigns.manage`.
-  linkConversationSubscriber: (conversationId: number, contract: string, savePhone = false) =>
+  linkConversationSubscriber: (conversationId: number, key: string, savePhone = false) =>
     apiClient.post<WhatsAppConversation>(
       `/whatsapp/conversations/${conversationId}/subscriber`,
-      { contract, savePhone }
+      { contract: key, savePhone }
     ),
 
   // ── SGP contacts ─────────────────────────────────────────────────────
-  listContacts: (params: { search?: string; limit?: number; offset?: number } = {}) => {
+  listContacts: (params: { search?: string; limit?: number; offset?: number; state?: WhatsAppContactState } = {}) => {
     const query = new URLSearchParams()
     if (params.search) query.set('search', params.search)
+    if (params.state) query.set('state', params.state)
     if (params.limit) query.set('limit', String(params.limit))
     if (params.offset) query.set('offset', String(params.offset))
     const suffix = query.toString()
@@ -2637,8 +2696,8 @@ export const whatsappAPI = {
 
   // The existing thread with this subscriber, or a new empty one. Opening sends
   // nothing.
-  openContactConversation: (contract: string) =>
-    apiClient.post<WhatsAppConversation>(`/whatsapp/contacts/${encodeURIComponent(contract)}/conversation`),
+  openContactConversation: (key: string) =>
+    apiClient.post<WhatsAppConversation>(`/whatsapp/contacts/${encodeURIComponent(key)}/conversation`),
 
   // Reading a thread clears its unread count server-side — the operator looking
   // at it is the only thing "read" can mean here.

@@ -143,7 +143,8 @@ class WhatsAppMessageController {
       const data = await WaContactService.list({
         search: req.query?.search,
         limit: req.query?.limit,
-        offset: req.query?.offset
+        offset: req.query?.offset,
+        state: req.query?.state
       });
       return res.json(createResponse(
         req.t('whatsapp.contactsLoaded', { count: data.contacts.length }),

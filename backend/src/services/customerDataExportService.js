@@ -90,16 +90,25 @@ export async function alcanceDoAssinante(account) {
   const contratos = [...new Set(vinculos.map((v) => v.contract).filter(Boolean))];
   // O mesmo contrato também pode estar em `sgp_contacts`: foi achado numa busca
   // ao SGP antes de a ONT dele aparecer no painel, e a linha fica.
-  const contatos = contratos.length
-    ? await tdb('sgp_contacts').whereIn('contract', contratos).orderBy('id')
+  // E o cadastro SEM contrato da mesma pessoa, que a sincronização completa
+  // traz do SGP: ele não tem contrato para casar, então casa pelo documento.
+  const documentos = [...new Set(vinculos.map((v) => v.document).filter(Boolean))];
+  const contatos = (contratos.length || documentos.length)
+    ? await tdb('sgp_contacts').where((q) => {
+      if (contratos.length) q.whereIn('contract', contratos);
+      if (documentos.length) q.orWhere((semContrato) => semContrato.whereNull('contract').whereIn('document', documentos));
+    }).orderBy('id')
     : [];
   const telefones = [...vinculos, ...contatos].flatMap((v) => [v.phone_e164, v.phone_manual]).filter(Boolean);
 
-  const conversas = (deviceIds.length || contratos.length || telefones.length)
+  const contatoIds = contatos.map((c) => c.id);
+  const conversas = (deviceIds.length || contratos.length || telefones.length || contatoIds.length)
     ? await tdb('wa_conversations').where((q) => {
       q.where({ customer_account_id: account.id });
       if (deviceIds.length) q.orWhereIn('device_id', deviceIds);
       if (contratos.length) q.orWhereIn('contract', contratos);
+      // A conversa com o cadastro sem contrato aponta para a linha, não para um contrato.
+      if (contatoIds.length) q.orWhereIn('sgp_contact_id', contatoIds);
       if (telefones.length) q.orWhereIn('wa_phone_e164', [...new Set(telefones)]);
     }).orderBy('id')
     : [];
