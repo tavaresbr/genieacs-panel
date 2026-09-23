@@ -22,6 +22,7 @@ credentials plus one customer filter:
 | Open invoices | `/api/ura/titulos/` | `contrato` (or `cpfcnpj`), `limit`, `apenas_titulos_em_aberto` |
 | Trust unlock | `/api/ura/liberacao/` | `contrato` |
 | Open a ticket | `/api/ura/chamado/` | `contrato`, `conteudo`, `ocorrenciatipo`, optional `observacao` |
+| Client listing | `/api/ura/clientes/` | optional `cpfcnpj`; the contacts sync adds its paging parameters |
 
 Responses are read through a normalizing layer, so field spellings that differ
 between SGP releases (`linhadigitavel`, `linha_digitavel`, `linhaDigitavel`) and
@@ -161,14 +162,22 @@ Brings every SGP client into the WhatsApp **Contacts** tab — with or without a
 contract, with or without equipment in the panel. It lives under
 **Settings → SGP → Contacts for WhatsApp**.
 
-The URA reference has no standard "list every client" call, and the path differs
-between SGP versions, so the listing path is a setting (`endpoints.customerList`,
-empty by default). The request uses the same `app` + `token` as every other call,
-as a POST with the paging parameters in the JSON body:
+The listing is `POST /api/ura/clientes/`, with the same `app` + `token` as every
+other call:
+
+```sh
+curl --location '{{url}}/api/ura/clientes/' \
+  --data '{ "app": "{{app}}", "token": "{{token}}", "cpfcnpj": "999.999.999-99" }'
+```
+
+Whether it lists every client **without** `cpfcnpj`, and which paging parameters
+it honours, depends on the SGP version — the **Test** button answers both on the
+install itself. The path is a setting (`endpoints.customerList`) for installs
+that expose it elsewhere; the sync sends the paging parameters in the JSON body:
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `endpoints.customerList` | *(empty)* | Relative path of the client listing. Empty = the sync is off. |
+| `endpoints.customerList` | `/api/ura/clientes/` | Relative path of the client listing. An empty value falls back to the default. |
 | `contactsPaging` | `offset` | `offset` sends a row offset; `page` sends a page number from 1 |
 | `contactsOffsetParam` / `contactsLimitParam` | `offset` / `limit` | The parameter names the install expects |
 | `contactsPageSize` | 100 | 10–500 |
@@ -182,6 +191,17 @@ fields or from a `telefones`/`contatos` list, preferring a mobile.
 
 **Test** reads the first page, writes nothing, and shows how many clients came
 back and which fields they carry — use it to confirm the path before syncing.
+
+A first page with no clients at all is reported as `partial` with reason
+`empty` — most likely an install whose listing only answers with a filter —
+rather than as a sync that found nobody. An outright refusal arrives with the
+SGP's own message.
+
+The **Search the SGP** button on the contacts screen uses the same endpoint with
+`cpfcnpj` next to `consultacliente`: it is the only lookup that finds a client
+with **no contract**. Only rows whose document matches the one typed are kept,
+so an install that ignores the filter cannot turn a CPF search into a list of
+strangers.
 
 Safety: a page that repeats the previous one's first client (an SGP that ignores
 the paging parameters) stops the run as `partial` with reason `paging_ignored`;

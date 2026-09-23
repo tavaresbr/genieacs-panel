@@ -33,6 +33,17 @@ const CADASTRO = [
   { contrato: 'C-ONT', razaoSocial: 'Com ONT', cpfcnpj: '44455566677', contratoStatus: 'Ativo', celular: '5511944445555' }
 ];
 
+/**
+ * O que a listagem de clientes (`/api/ura/clientes/`) tem além dos contratos:
+ * um cadastro sem contrato, que o `consultacliente` não acha. Ela ignora o
+ * filtro de propósito e devolve todo mundo — a busca tem que ficar só com o
+ * CPF pedido.
+ */
+const CLIENTES = [
+  { id: 701, nome: 'Diego Sem Contrato', cpfcnpj: '444.444.444-44', celular: '(93) 99444-4444', contratos: [] },
+  { id: 702, nome: 'Um Estranho', cpfcnpj: '777.777.777-77', celular: '(93) 99777-7777', contratos: [] }
+];
+
 let panelUrl;
 let token;
 let accountId;
@@ -62,6 +73,7 @@ function startSgpStub() {
         res.end(JSON.stringify(data));
       };
       if (payload.app !== APP || payload.token !== TOKEN) return send({ status: 0, msg: 'Token inválido' });
+      if (req.url.startsWith('/api/ura/clientes/')) return send({ status: 1, clientes: CLIENTES });
       if (!req.url.startsWith('/api/ura/consultacliente')) return send({ status: 0, msg: 'Endpoint inexistente' });
       const contratos = CADASTRO.filter((c) => (
         (payload.cpfcnpj && c.cpfcnpj === payload.cpfcnpj)
@@ -173,6 +185,32 @@ describe('buscar no SGP', () => {
     const res = await buscar('   ');
     assert.equal(res.status, 400);
     assert.equal(res.body.code, 'lookup_term_required');
+  });
+});
+
+describe('buscar no SGP um cliente sem contrato', () => {
+  it('acha pelo CPF na listagem de clientes, só o CPF pedido', async () => {
+    const res = await buscar('444.444.444-44');
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body.data.contacts.map((c) => c.clientName), ['Diego Sem Contrato']);
+    const diego = res.body.data.contacts[0];
+    assert.equal(diego.hasContract, false);
+    assert.equal(diego.state, 'none');
+    assert.match(diego.key, /^c:\d+$/);
+    assert.equal(diego.phone, '5593994444444');
+
+    const aberta = await call(`${panelUrl}/api/whatsapp/contacts/${encodeURIComponent(diego.key)}/conversation`, {
+      method: 'POST', headers: authHeaders(token)
+    });
+    assert.equal(aberta.status, 201);
+    assert.equal(aberta.body.data.clientName, 'Diego Sem Contrato');
+    assert.equal(aberta.body.data.contract, null);
+  });
+
+  it('buscar de novo não duplica o cadastro', async () => {
+    await buscar('44444444444');
+    const linhas = await asTenant(() => getDb()('sgp_contacts').where({ document: '44444444444' }));
+    assert.equal(linhas.length, 1);
   });
 });
 

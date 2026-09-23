@@ -32,10 +32,11 @@ function rowKey(row) {
  * Every client of the SGP, into `sgp_contacts` — with or without a contract,
  * with or without equipment in the panel.
  *
- * The listing path is configured per install (`endpoints.customerList`): the
- * URA reference has no "list everyone" call, and the path differs between SGP
- * versions. Until it is set, every entry point here refuses with
- * `customer_list_not_configured` and nothing runs on a timer.
+ * The listing path is `endpoints.customerList`, `/api/ura/clientes/` by
+ * default and adjustable per install. Whether it lists everyone without a
+ * filter depends on the SGP; a first page that comes back empty is reported as
+ * `partial`/`empty` instead of as a sync that found nobody. Nothing runs on a
+ * timer until `contactsSyncEnabled` is switched on.
  *
  * Nothing is ever deleted. A client that disappears from the SGP keeps its row
  * with an old `last_seen_at`, which the contacts screen shows; conversations
@@ -100,7 +101,16 @@ class SgpContactSyncService {
       if (page > 0) await sleep(PAGE_PACE_MS);
       const { rows, received } = await SgpService.listCustomersPage(page, config);
       summary.pages += 1;
-      if (received === 0) break;
+      if (received === 0) {
+        // Nothing at all on the first page: most likely an endpoint that only
+        // answers with a filter. Said as such, so an empty run does not read
+        // as "the SGP has no clients".
+        if (page === 0) {
+          summary.partial = true;
+          summary.reason = 'empty';
+        }
+        break;
+      }
 
       // The same first row as the previous page: the SGP is not paging.
       const first = rowKey(rows[0]);
