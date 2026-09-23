@@ -39,8 +39,24 @@ export const DEFAULT_ENDPOINTS = Object.freeze({
   customer: '/api/ura/consultacliente/',
   invoices: '/api/ura/titulos/',
   unlock: '/api/ura/liberacao/',
-  ticket: '/api/ura/chamado/'
+  ticket: '/api/ura/chamado/',
+  // The full client listing behind the WhatsApp contacts sync. Empty on
+  // purpose: the URA reference every install shares has no "list everyone"
+  // call, and the path differs between SGP versions, so the operator fills it
+  // in (and proves it with the test button) before any sync runs.
+  customerList: ''
 });
+
+/** How a listing page is addressed: by row offset, or by page number from 1. */
+export const CONTACTS_PAGING = Object.freeze(['offset', 'page']);
+
+/** A request parameter name the operator may configure: an identifier, nothing else. */
+const PARAM_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,31}$/;
+
+function paramName(value, fallback) {
+  const text = String(value ?? '').trim();
+  return PARAM_NAME.test(text) ? text : fallback;
+}
 
 /**
  * The Tipo de Ocorrência a ticket is filed under when the operator has not set
@@ -304,6 +320,87 @@ function normalizeContract(entry, { includeSecrets = false } = {}) {
   };
 }
 
+/**
+ * A phone out of a client record that may keep it in a list rather than a
+ * field — `telefones: ['...']` or `contatos: [{ tipo, contato }]`, depending on
+ * the install. A mobile (the one WhatsApp can reach) is preferred when the list
+ * has several; the first usable number otherwise.
+ */
+function phoneFrom(entry) {
+  const direct = normalizarTelefoneBr(pick(entry, PHONE_NAMES));
+  if (direct) return direct;
+  const list = pick(entry, ['telefones', 'contatos', 'fones', 'phones']);
+  if (!Array.isArray(list)) return null;
+  const numbers = list
+    .map((item) => normalizarTelefoneBr(
+      item && typeof item === 'object'
+        ? pick(item, ['numero', 'contato', 'telefone', 'celular', 'valor', 'number'])
+        : item
+    ))
+    .filter(Boolean);
+  // 55 + DDD + 9 + eight digits: the shape of a mobile today.
+  return numbers.find((n) => /^55\d{2}9\d{8}$/.test(n)) || numbers[0] || null;
+}
+
+const CLIENT_ID_NAMES = Object.freeze(['clienteId', 'idCliente', 'cliente_id', 'codigoCliente', 'id']);
+
+/**
+ * One entry of the client listing, as the rows `sgp_contacts` stores.
+ *
+ * The listing is not standardised across SGP versions, so three shapes are
+ * read: a client carrying its contracts in a nested list (one row per
+ * contract), a contract row with the client inlined (one row), and a client
+ * with no contract at all (one row, contract `null`). A contract row falls back
+ * to its client's name, document and phone when it has none of its own.
+ */
+function normalizeCustomer(entry) {
+  if (!entry || typeof entry !== 'object') return [];
+  const clientId = asText(pick(entry, CLIENT_ID_NAMES));
+  const client = {
+    clientId,
+    name: asText(pick(entry, ['nome', 'razaoSocial', 'nomeCliente', 'cliente'])),
+    document: asText(pick(entry, ['cpfcnpj', 'cpfCnpj', 'documento', 'cpf', 'cnpj'])),
+    phone: phoneFrom(entry)
+  };
+
+  const nested = pick(entry, ['contratos', 'contracts']);
+  if (Array.isArray(nested) && nested.length > 0) {
+    return nested
+      .map((item) => {
+        const contract = normalizeContract(item);
+        if (!contract) return null;
+        return {
+          ...contract,
+          clientId: client.clientId,
+          name: contract.name || client.name,
+          document: contract.document || client.document,
+          phone: contract.phone || phoneFrom(item) || client.phone
+        };
+      })
+      .filter(Boolean);
+  }
+
+  const contract = normalizeContract(entry);
+  if (contract) {
+    // A contract row: its own `id` is the contract's, not the client's, so only
+    // an explicitly named client id is kept.
+    const explicitClient = asText(pick(entry, CLIENT_ID_NAMES.filter((name) => name !== 'id')));
+    return [{ ...contract, clientId: explicitClient, phone: contract.phone || client.phone }];
+  }
+
+  if (!client.clientId && !client.document) return [];
+  return [{
+    contract: null,
+    clientId: client.clientId,
+    name: client.name,
+    document: client.document,
+    phone: client.phone,
+    status: asText(pick(entry, ['status', 'situacao'])),
+    statusLabel: null,
+    blocked: null
+  }];
+}
+
 function stripAccents(value) {
   return String(value ?? '')
     .normalize('NFD')
@@ -419,7 +516,13 @@ const DEFAULT_CONFIG = Object.freeze({
   reconcileIntervalMinutes: 15,
   reconcileBatchSize: 25,
   eventRetentionDays: 90,
-  eventTypeMap: {}
+  eventTypeMap: {},
+  contactsSyncEnabled: false,
+  contactsSyncIntervalHours: 24,
+  contactsPageSize: 100,
+  contactsPaging: 'offset',
+  contactsOffsetParam: 'offset',
+  contactsLimitParam: 'limit'
 });
 
 /**
@@ -611,10 +714,36 @@ class SgpService {
       ticketOccurrenceType: clampNumber(
         stored.ticketOccurrenceType, 1, 999999, DEFAULT_TICKET_OCCURRENCE_TYPE
       ),
+      ...this.readContactsSync(stored),
       updatedAt: stored.updatedAt || null
     };
     this.configCache.set(config);
     return config;
+  }
+
+  /**
+   * The contacts-sync settings, clamped. Shared by the reader and the writer so
+   * a stored value and a patched one go through the same bounds.
+   */
+  static readContactsSync(source, fallback = DEFAULT_CONFIG) {
+    return {
+      contactsSyncEnabled: source.contactsSyncEnabled === undefined
+        ? fallback.contactsSyncEnabled === true
+        : source.contactsSyncEnabled === true,
+      contactsSyncIntervalHours: clampNumber(
+        source.contactsSyncIntervalHours ?? fallback.contactsSyncIntervalHours, 1, 168, 24
+      ),
+      contactsPageSize: clampNumber(source.contactsPageSize ?? fallback.contactsPageSize, 10, 500, 100),
+      contactsPaging: CONTACTS_PAGING.includes(source.contactsPaging)
+        ? source.contactsPaging
+        : (CONTACTS_PAGING.includes(fallback.contactsPaging) ? fallback.contactsPaging : 'offset'),
+      contactsOffsetParam: paramName(
+        source.contactsOffsetParam, paramName(fallback.contactsOffsetParam, 'offset')
+      ),
+      contactsLimitParam: paramName(
+        source.contactsLimitParam, paramName(fallback.contactsLimitParam, 'limit')
+      )
+    };
   }
 
   static async getPublicConfig() {
@@ -705,8 +834,13 @@ class SgpService {
         ),
         ticket: this.normalizeEndpoint(
           patch.endpoints?.ticket ?? current.endpoints.ticket, DEFAULT_ENDPOINTS.ticket
+        ),
+        // `''` clears it, which is how the sync is switched back off for good.
+        customerList: this.normalizeEndpoint(
+          patch.endpoints?.customerList ?? current.endpoints.customerList, ''
         )
       },
+      ...this.readContactsSync(patch, current),
       updatedAt: new Date().toISOString()
     };
 
@@ -1076,8 +1210,60 @@ class SgpService {
     }
   }
 
+  /**
+   * One page of the full client listing (`endpoints.customerList`).
+   *
+   * Same transport, credentials and ceilings as every other SGP call. `page`
+   * counts from 0 here; the request says whichever the install expects — a row
+   * offset, or a page number from 1.
+   *
+   * @returns {Promise<{ rows: object[], received: number }>} `received` is how
+   *   many entries the SGP returned, which is what tells the caller whether the
+   *   page was the last one; `rows` can be more (one per contract) or fewer.
+   */
+  static async listCustomersPage(page, configOverride = null) {
+    const config = this.requireReady(configOverride || await this.getConfig());
+    if (!config.endpoints.customerList) {
+      throw new SgpError('sgp.error.customerListNotConfigured', {
+        code: 'customer_list_not_configured',
+        status: 409
+      });
+    }
+    const size = config.contactsPageSize;
+    const position = config.contactsPaging === 'page' ? page + 1 : page * size;
+    const data = await this.request('customerList', {
+      [config.contactsOffsetParam]: position,
+      [config.contactsLimitParam]: size
+    }, config);
+    const entries = firstArray(data, ['clientes', 'contratos', 'dados', 'data', 'results', 'items']);
+    return {
+      rows: entries.flatMap((entry) => normalizeCustomer(entry)),
+      received: entries.length,
+      // For the test button: which fields the install actually sends, so an
+      // operator can see at once whether the path is the right one.
+      fields: entries[0] && typeof entries[0] === 'object' ? Object.keys(entries[0]).slice(0, 40) : []
+    };
+  }
+
   /** The `sgp_contacts` row for one contract — `contractToLinkRow` without the equipment. */
   static contractToContactRow(contract) {
+    if (!contract.contract) {
+      // A client with no contract: nothing to derive a contract state from.
+      return {
+        contract: null,
+        sgp_client_id: contract.clientId ? String(contract.clientId).slice(0, 64) : null,
+        document: contract.document ? String(contract.document).replace(/\D/g, '').slice(0, 32) : null,
+        client_name: contract.name ? String(contract.name).slice(0, 255) : null,
+        status: contract.status ? String(contract.status).slice(0, 64) : null,
+        status_label: null,
+        state: 'none',
+        phone_e164: contract.phone || null
+      };
+    }
+    // No `sgp_client_id` on a contract row: one client can hold several
+    // contracts, and the column is unique — it is the key of the row WITHOUT a
+    // contract only. The sync uses the client id to retire that row once the
+    // client gains a contract.
     return {
       contract: contract.contract,
       document: contract.document ? String(contract.document).replace(/\D/g, '').slice(0, 32) : null,

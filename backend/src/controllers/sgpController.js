@@ -1,5 +1,6 @@
 import SgpService, { SgpError } from '../services/sgpService.js';
 import SgpLink from '../models/SgpLink.js';
+import SgpContactSyncService from '../services/sgpContactSyncService.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { translateError } from '../i18n/index.js';
 
@@ -111,6 +112,34 @@ class SgpController {
       ));
     } catch (error) {
       return handleError(req, res, error, 'sgp.linksLoadFailed');
+    }
+  }
+
+  // ── Every SGP client into the WhatsApp contacts ─────────────────────
+
+  static async getContactsSync(req, res) {
+    try {
+      return res.json(createResponse(req.t('sgp.contactsSyncLoaded'), await SgpContactSyncService.getLastRun()));
+    } catch (error) {
+      return handleError(req, res, error, 'sgp.contactsSyncFailed');
+    }
+  }
+
+  static async syncContacts(req, res) {
+    try {
+      const result = await SgpContactSyncService.syncAll();
+      return res.json(createResponse(req.t('sgp.contactsSynced', { count: result.total }), result));
+    } catch (error) {
+      return handleError(req, res, error, 'sgp.contactsSyncFailed');
+    }
+  }
+
+  static async testContacts(req, res) {
+    try {
+      const result = await SgpContactSyncService.test();
+      return res.json(createResponse(req.t('sgp.contactsTested', { count: result.received }), result));
+    } catch (error) {
+      return handleError(req, res, error, 'sgp.contactsSyncFailed');
     }
   }
 

@@ -892,7 +892,26 @@ Ele NÃO entra no `resolveSubscriber` que o bot usa: o bot responde sobre fatura
 e sinal a partir da ONT, e não há ONT.
 
 `sgp_contacts` entra no export e na exclusão de dados do assinante pelo
-contrato, como `sgp_links`.
+contrato, como `sgp_links` — e o cadastro sem contrato da mesma pessoa, pelo
+documento.
+
+#### Todos os clientes, com ou sem contrato
+
+A sincronização completa (ver `docs/sgp-integration.md`, "Contacts sync") enche
+`sgp_contacts` com todos os clientes do SGP. Um cliente **sem contrato** não tem
+contrato para servir de endereço, então todo contato ganha uma chave:
+
+- `key`: o contrato, quando existe; `c:<id da linha>` quando não existe. É o
+  que `POST /contacts/:key/conversation` e o `contract` de
+  `POST /conversations/:id/subscriber` aceitam.
+- `hasContract`, `state` (`active` | `blocked` | `cancelled` | `unknown` |
+  `none`) e `lastSeenAt` (quando a sincronização o viu por último).
+- `GET /contacts?state=none` filtra por situação.
+
+A conversa com um cliente sem contrato é vinculada por
+`wa_conversations.sgp_contact_id` (exposto como `sgpContactId`), nunca por um
+contrato inventado — a cobrança consulta faturas pelo contrato. Quando o cliente
+ganha contrato no SGP, a sincronização move a conversa para o contrato.
 
 A conversa nova fica com o número do SGP no `external_thread_id`. Quando a
 resposta chega pela outra grafia do nono dígito, `WaConversation.ensure` acha o

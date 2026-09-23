@@ -1340,21 +1340,37 @@ const BILLING_TABLES = [
  * tem o mesmo papel que em `sgp_links`: a correção do operador, que uma nova
  * consulta ao SGP nunca sobrescreve.
  */
+/**
+ * O que a sincronização completa dos contatos (0054) acrescentou.
+ *
+ * `sgp_client_id` é o id do CLIENTE no SGP, e é a chave de quem não tem
+ * contrato: um cadastro sem contrato não tem mais nada que o identifique de uma
+ * sincronização para a outra. `last_seen_at` é quando a última sincronização o
+ * viu — ninguém é apagado por sumir do SGP, a tela só diz há quanto tempo.
+ */
+const SGP_CONTACT_SYNC_COLUMNS = [
+  ['sgp_client_id', (t) => t.string('sgp_client_id', 64)],
+  ['last_seen_at', (t) => t.timestamp('last_seen_at')]
+];
+
 const sgpContactsTable = (db) => (t) => {
   t.increments('id').primary();
   t.integer('tenant_id').unsigned().notNullable()
     .references('id').inTable('tenants').onDelete('CASCADE');
-  t.string('contract', 64).notNullable();
+  // Nulo para o cadastro sem contrato — ver 0054.
+  t.string('contract', 64);
   t.string('document', 32);
   t.string('client_name', 255);
   t.string('status', 64);
   t.string('status_label', 128);
   t.string('state', 16).notNullable().defaultTo('unknown');
   addSgpPhoneColumns(t);
+  for (const [, add] of SGP_CONTACT_SYNC_COLUMNS) add(t);
   t.timestamp('last_synced_at').defaultTo(db.fn.now());
   t.timestamp('created_at').defaultTo(db.fn.now());
   t.timestamp('updated_at').defaultTo(db.fn.now());
   t.unique(['tenant_id', 'contract'], 'sgp_contacts_contract_uq');
+  t.unique(['tenant_id', 'sgp_client_id'], 'sgp_contacts_client_uq');
   t.index(['tenant_id', 'phone_e164'], 'sgp_contacts_phone_idx');
   t.index(['tenant_id', 'phone_manual'], 'sgp_contacts_phone_manual_idx');
 };
@@ -3374,6 +3390,51 @@ export const migrations = [
     async up(db) {
       if (!(await db.schema.hasTable('tenants'))) return;
       await createTableIfMissing(db, 'sgp_contacts', sgpContactsTable(db));
+    }
+  },
+  {
+    /**
+     * Todos os clientes do SGP, com ou sem contrato.
+     *
+     * A 0053 guardava só o que um operador buscava, e sempre por contrato. A
+     * sincronização completa traz também o cadastro sem contrato, então:
+     *
+     * - `sgp_contacts.contract` passa a aceitar nulo. O unique por
+     *   `(tenant_id, contract)` continua: nulos não colidem nos três bancos.
+     * - `sgp_client_id` e `last_seen_at` — ver `SGP_CONTACT_SYNC_COLUMNS`.
+     * - `wa_conversations.sgp_contact_id`, o vínculo de uma conversa com um
+     *   cliente sem contrato. Sem chave estrangeira de propósito:
+     *   `wa_conversations` vem antes de `sgp_contacts` em `SCHEMA_TABLES`, que
+     *   é a ordem em que a cópia e a exclusão de provedor percorrem as tabelas,
+     *   e uma FK para trás quebraria a cópia. Um id que não acha linha é lido
+     *   como "sem vínculo", que é o mesmo que o `SET NULL` faria.
+     */
+    id: '0054_sgp_contacts_full_sync',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('sgp_contacts'))) return true;
+      if ((await missingColumns(db, 'sgp_contacts', SGP_CONTACT_SYNC_COLUMNS)).length) return false;
+      if (!(await db.schema.hasTable('wa_conversations'))) return true;
+      return db.schema.hasColumn('wa_conversations', 'sgp_contact_id');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('sgp_contacts'))) return;
+      const missing = await missingColumns(db, 'sgp_contacts', SGP_CONTACT_SYNC_COLUMNS);
+      if (missing.length) {
+        await db.schema.alterTable('sgp_contacts', (t) => {
+          for (const add of missing) add(t);
+          t.string('contract', 64).nullable().alter();
+          t.unique(['tenant_id', 'sgp_client_id'], 'sgp_contacts_client_uq');
+        });
+      }
+      if (
+        (await db.schema.hasTable('wa_conversations'))
+        && !(await db.schema.hasColumn('wa_conversations', 'sgp_contact_id'))
+      ) {
+        await db.schema.alterTable('wa_conversations', (t) => {
+          t.integer('sgp_contact_id').unsigned();
+          t.index(['sgp_contact_id'], 'wa_conversations_sgp_contact_idx');
+        });
+      }
     }
   }
 ];

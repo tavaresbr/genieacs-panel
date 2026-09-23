@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { whatsappAPI, type WhatsAppContact, type WhatsAppConversation } from '@/lib/api'
+import { whatsappAPI, type WhatsAppContact, type WhatsAppContactState, type WhatsAppConversation } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
@@ -11,6 +11,20 @@ import { whatsappErrorMessage } from '@/components/whatsapp-connection'
 /** Same pause as the inbox search: one request per word, not per letter. */
 const SEARCH_DEBOUNCE_MS = 350
 const PAGE = 50
+
+/**
+ * The status filter, in the order an operator reaches for it. `none` is a
+ * client the SGP has with no contract at all, which the full sync brings in.
+ */
+const STATE_FILTERS = [
+  ['', 'whatsapp.contacts.filterAll'],
+  ['active', 'whatsapp.contacts.filterActive'],
+  ['blocked', 'whatsapp.contacts.filterBlocked'],
+  ['cancelled', 'whatsapp.contacts.filterCancelled'],
+  ['none', 'whatsapp.contacts.filterNoContract']
+] as const
+
+type StateFilter = (typeof STATE_FILTERS)[number][0]
 
 interface ContactsPanelProps {
   /** Called with the thread to show — the page switches to the inbox with it open. */
@@ -42,6 +56,7 @@ export function ContactsPanel({ onOpenConversation }: ContactsPanelProps) {
   // table shows — the panel's own directory comes back when the search changes.
   const [sgpResult, setSgpResult] = useState<{ term: string; contacts: WhatsAppContact[] } | null>(null)
   const [lookingUp, setLookingUp] = useState(false)
+  const [stateFilter, setStateFilter] = useState<StateFilter>('')
 
   const alive = useRef(true)
   // The newest request wins: a slow answer for "ben" must not overwrite the
@@ -85,10 +100,14 @@ export function ContactsPanel({ onOpenConversation }: ContactsPanelProps) {
     }
   }, [search, t, toast])
 
-  const load = useCallback(async (term: string) => {
+  const load = useCallback(async (term: string, state: StateFilter) => {
     const seq = ++requestSeq.current
     setLoading(true)
-    const res = await whatsappAPI.listContacts({ search: term || undefined, limit: PAGE })
+    const res = await whatsappAPI.listContacts({
+      search: term || undefined,
+      limit: PAGE,
+      state: (state || undefined) as WhatsAppContactState | undefined
+    })
     if (!alive.current || seq !== requestSeq.current) return
     if (res.success && res.data) {
       setContacts(res.data.contacts)
@@ -100,7 +119,7 @@ export function ContactsPanel({ onOpenConversation }: ContactsPanelProps) {
     setLoading(false)
   }, [t])
 
-  useEffect(() => { void load(debounced) }, [debounced, load])
+  useEffect(() => { void load(debounced, stateFilter) }, [debounced, stateFilter, load])
 
   const loadMore = useCallback(async () => {
     const seq = requestSeq.current
@@ -108,7 +127,8 @@ export function ContactsPanel({ onOpenConversation }: ContactsPanelProps) {
     const res = await whatsappAPI.listContacts({
       search: debounced || undefined,
       limit: PAGE,
-      offset: contacts.length
+      offset: contacts.length,
+      state: (stateFilter || undefined) as WhatsAppContactState | undefined
     })
     if (!alive.current) return
     setLoadingMore(false)
@@ -120,15 +140,15 @@ export function ContactsPanel({ onOpenConversation }: ContactsPanelProps) {
     const page = res.data.contacts
     setContacts((current) => [
       ...current,
-      ...page.filter((row) => !current.some((held) => held.contract === row.contract))
+      ...page.filter((row) => !current.some((held) => held.key === row.key))
     ])
     setTotal(res.data.total)
-  }, [contacts.length, debounced, t, toast])
+  }, [contacts.length, debounced, stateFilter, t, toast])
 
   const open = useCallback(async (contact: WhatsAppContact) => {
-    setOpeningContract(contact.contract)
+    setOpeningContract(contact.key)
     try {
-      const res = await whatsappAPI.openContactConversation(contact.contract)
+      const res = await whatsappAPI.openContactConversation(contact.key)
       if (!alive.current) return
       if (!res.success || !res.data) {
         toast.error(whatsappErrorMessage(t, res.code))
@@ -163,7 +183,7 @@ export function ContactsPanel({ onOpenConversation }: ContactsPanelProps) {
         <button
           type="button"
           className="modern-button-secondary shrink-0"
-          onClick={() => void load(debounced)}
+          onClick={() => void load(debounced, stateFilter)}
           disabled={loading}
         >
           <Icon name="refresh" size={16} className={loading ? 'animate-spin' : ''} />
@@ -202,6 +222,24 @@ export function ContactsPanel({ onOpenConversation }: ContactsPanelProps) {
         )}
       </form>
 
+      {!sgpResult && (
+        <div className="tab-rail" role="tablist" aria-label={t('whatsapp.contacts.title')}>
+          {STATE_FILTERS.map(([id, labelKey]) => (
+            <button
+              key={id || 'all'}
+              type="button"
+              className="tab-button"
+              data-active={stateFilter === id}
+              role="tab"
+              aria-selected={stateFilter === id}
+              onClick={() => setStateFilter(id)}
+            >
+              {t(labelKey)}
+            </button>
+          ))}
+        </div>
+      )}
+
       {sgpResult && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
           <span>{t('whatsapp.contacts.lookupResult', { term: sgpResult.term, count: sgpResult.contacts.length })}</span>
@@ -232,6 +270,9 @@ export function ContactsPanel({ onOpenConversation }: ContactsPanelProps) {
             {!sgpResult && !loading && canLookup && (
               <p className="empty-state-copy">{t('whatsapp.contacts.lookupHint')}</p>
             )}
+            {!sgpResult && !loading && !debounced && !stateFilter && can('sgp.config') && (
+              <p className="empty-state-copy">{t('whatsapp.contacts.syncHint')}</p>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -247,7 +288,7 @@ export function ContactsPanel({ onOpenConversation }: ContactsPanelProps) {
               </thead>
               <tbody>
                 {shown.map((contact) => (
-                  <tr key={contact.contract} data-contract={contact.contract}>
+                  <tr key={contact.key} data-contract={contact.contract ?? ''}>
                     <td>
                       <span className="block font-semibold">{contact.clientName || '—'}</span>
                       <span className="flex flex-wrap items-center gap-1.5">
@@ -259,9 +300,17 @@ export function ContactsPanel({ onOpenConversation }: ContactsPanelProps) {
                             {t('whatsapp.contacts.noDevice')}
                           </span>
                         )}
+                        {contact.state === 'blocked' && (
+                          <span className="modern-badge-warning">{t('whatsapp.contacts.stateBlocked')}</span>
+                        )}
+                        {contact.state === 'cancelled' && (
+                          <span className="modern-badge-error">{t('whatsapp.contacts.stateCancelled')}</span>
+                        )}
                       </span>
                     </td>
-                    <td className="font-mono">{contact.contract}</td>
+                    <td className="font-mono">
+                      {contact.contract ?? <span className="font-sans text-muted-foreground">{t('whatsapp.contacts.noContract')}</span>}
+                    </td>
                     <td>
                       {contact.phone ? (
                         <span className="flex flex-wrap items-center gap-1.5">
@@ -294,9 +343,9 @@ export function ContactsPanel({ onOpenConversation }: ContactsPanelProps) {
                           onClick={() => void open(contact)}
                         >
                           <Icon
-                            name={openingContract === contact.contract ? 'refresh' : 'chat'}
+                            name={openingContract === contact.key ? 'refresh' : 'chat'}
                             size={16}
-                            className={openingContract === contact.contract ? 'animate-spin' : ''}
+                            className={openingContract === contact.key ? 'animate-spin' : ''}
                           />
                           {t(contact.conversationId
                             ? 'whatsapp.contacts.openConversation'

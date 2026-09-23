@@ -99,7 +99,9 @@ class WaConversation {
    * `sgp_links`, so the caller resolves it to `searchContracts` in one batched
    * query and hands the result down; matching it here would mean a join per row.
    */
-  static async listRecent({ limit = 50, offset = 0, status = 'open', search = '', searchContracts = [] } = {}) {
+  static async listRecent({
+    limit = 50, offset = 0, status = 'open', search = '', searchContracts = [], searchContactIds = []
+  } = {}) {
     const query = tdb('wa_conversations');
 
     if (status === 'closed') query.whereNotNull('closed_at');
@@ -127,6 +129,9 @@ class WaConversation {
         // written twice, and only one of the two spellings is in the column.
         if (digits) match.orWhere('wa_phone_e164', 'like', `%${digits}%`);
         if (searchContracts.length > 0) match.orWhereIn('contract', searchContracts);
+        // A client with no contract is bound by row, so a name search reaches
+        // their thread through `sgp_contact_id`.
+        if (searchContactIds.length > 0) match.orWhereIn('sgp_contact_id', searchContactIds);
       });
     }
 

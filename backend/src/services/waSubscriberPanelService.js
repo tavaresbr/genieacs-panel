@@ -5,6 +5,7 @@ import WaTemplateService from './waTemplateService.js';
 import WaBillingService from './waBillingService.js';
 import { WaError } from './whatsappConfigService.js';
 import SgpLink from '../models/SgpLink.js';
+import SgpContact from '../models/SgpContact.js';
 import WaConversation from '../models/WaConversation.js';
 import {
   maisAntigaEmAberto,
@@ -110,7 +111,12 @@ class WaSubscriberPanelService {
    */
   static async findContracts(conversation, { document = null } = {}) {
     const { link, matchedOn } = await this.storedLink(conversation);
-    const searchDocument = onlyDigits(document) || onlyDigits(link?.document);
+    // A thread bound to an SGP client with no contract and no ONT: its
+    // document is the only handle the SGP lookup accepts.
+    const contact = !link && !conversation.contract && conversation.sgp_contact_id
+      ? await SgpContact.getById(conversation.sgp_contact_id)
+      : null;
+    const searchDocument = onlyDigits(document) || onlyDigits(link?.document) || onlyDigits(contact?.document);
     const searchContract = conversation.contract || link?.contract || null;
 
     if (!searchDocument && !searchContract) {

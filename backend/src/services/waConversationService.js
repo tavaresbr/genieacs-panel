@@ -65,6 +65,13 @@ class WaConversationService {
    * The `sgp_contacts` subscriber behind a phone — the one with no ONT in the
    * panel. Same order as `resolveSubscriber`: the operator's correction first.
    */
+  /** How a conversation points at an `sgp_contacts` row: by contract, or by the row. */
+  static contactBinding(contact) {
+    return contact.contract
+      ? { contract: contact.contract, device_id: null, sgp_contact_id: null }
+      : { contract: null, device_id: null, sgp_contact_id: contact.id };
+  }
+
   static async resolveContact(phone) {
     const spellings = variantesTelefoneBr(phone);
     if (spellings.length === 0) return null;
@@ -81,7 +88,7 @@ class WaConversationService {
    * the next inbound message.
    */
   static async bindSubscriber(conversation) {
-    if (!conversation || conversation.contract) return conversation;
+    if (!conversation || conversation.contract || conversation.sgp_contact_id) return conversation;
     const { link, account } = await this.resolveSubscriber(conversation.wa_phone_e164);
     if (!link) {
       // No ONT for this number, but maybe a subscriber an operator already
@@ -89,7 +96,7 @@ class WaConversationService {
       // reads that one, and it answers about invoices and signal from the ONT.
       const contact = await this.resolveContact(conversation.wa_phone_e164);
       if (!contact) return conversation;
-      return WaConversation.update(conversation.id, { contract: contact.contract, device_id: null });
+      return WaConversation.update(conversation.id, this.contactBinding(contact));
     }
     return WaConversation.update(conversation.id, {
       contract: link.contract,
@@ -120,7 +127,7 @@ class WaConversationService {
    * learned. A thread that already carries a contract is never touched.
    */
   static async bindUnlinked(rows) {
-    const pending = rows.filter((row) => !row.contract && row.wa_phone_e164);
+    const pending = rows.filter((row) => !row.contract && !row.sgp_contact_id && row.wa_phone_e164);
     if (pending.length === 0) return rows;
 
     const spellingsOf = new Map(pending.map((row) => [row.id, variantesTelefoneBr(row.wa_phone_e164)]));
@@ -140,7 +147,7 @@ class WaConversationService {
       if (!link) {
         const contact = pick(contacts, spellings);
         if (!contact) continue;
-        const patch = { contract: contact.contract, device_id: null };
+        const patch = this.contactBinding(contact);
         await WaConversation.update(row.id, patch);
         Object.assign(row, patch);
         continue;
@@ -174,9 +181,13 @@ class WaConversationService {
   static async linkSubscriber(id, { contract, savePhone = false } = {}) {
     const conversation = await this.get(id);
     const key = String(contract ?? '').trim();
-    const links = key ? await SgpLink.getByContract(key) : [];
-    // A subscriber with no ONT in the panel, found by a lookup in the SGP.
-    const contact = links.length === 0 && key ? await SgpContact.getByContract(key) : null;
+    // `c:<id>` names a client with no contract, by its `sgp_contacts` row.
+    const byId = key.match(/^c:(\d+)$/);
+    const links = key && !byId ? await SgpLink.getByContract(key) : [];
+    // A subscriber with no ONT in the panel, found by a lookup or the sync.
+    const contact = links.length === 0 && key
+      ? (byId ? await SgpContact.getById(byId[1]) : await SgpContact.getByContract(key))
+      : null;
     if (links.length === 0 && !contact) {
       throw new WaError('whatsapp.error.subscriberNotFound', {
         code: 'subscriber_not_found',
@@ -185,16 +196,14 @@ class WaConversationService {
     }
     const link = links[0] ?? null;
     const account = link?.device_id ? await CustomerAccount.getByDeviceId(link.device_id) : null;
-    const updated = await WaConversation.update(conversation.id, {
-      contract: link ? link.contract : contact.contract,
-      device_id: link?.device_id ?? null,
-      customer_account_id: account?.id ?? null
-    });
+    const updated = await WaConversation.update(conversation.id, link
+      ? { contract: link.contract, device_id: link.device_id ?? null, sgp_contact_id: null, customer_account_id: account?.id ?? null }
+      : { ...this.contactBinding(contact), customer_account_id: null });
 
     const phone = normalizarTelefoneBr(conversation.wa_phone_e164);
     if (savePhone && phone) {
       if (link) await SgpLink.setManualPhone(link.contract, phone);
-      else await SgpContact.setManualPhone(contact.contract, phone);
+      else await SgpContact.setManualPhoneById(contact.id, phone);
     }
 
     return this.decorate(updated);
@@ -211,6 +220,7 @@ class WaConversationService {
       pushName: row.push_name || null,
       deviceId: row.device_id || null,
       contract: row.contract || null,
+      sgpContactId: row.sgp_contact_id ? Number(row.sgp_contact_id) : null,
       clientName: extra.clientName ?? null,
       optedOut: extra.optedOut ?? false,
       lastMessageAt: row.last_message_at || null,
@@ -239,6 +249,17 @@ class WaConversationService {
     return [...new Set([...links, ...contacts].map((row) => row.contract).filter(Boolean))];
   }
 
+  /** Same question for the clients with no contract, who are bound by row id. */
+  static async contactIdsMatchingClientName(term) {
+    const like = `%${WaConversation.likeTerm(term)}%`;
+    if (like === '%%') return [];
+    const rows = await tdb('sgp_contacts')
+      .whereNull('contract')
+      .whereRaw('lower(client_name) like ?', [like])
+      .select('id');
+    return rows.map((row) => row.id);
+  }
+
   /**
    * @param {'open'|'closed'|'all'} status which pile to draw.
    *
@@ -256,7 +277,8 @@ class WaConversationService {
       offset: Math.max(Number(offset) || 0, 0),
       status: ['open', 'closed', 'all'].includes(status) ? status : 'open',
       search: term,
-      searchContracts: term ? await this.contractsMatchingClientName(term) : []
+      searchContracts: term ? await this.contractsMatchingClientName(term) : [],
+      searchContactIds: term ? await this.contactIdsMatchingClientName(term) : []
     });
     if (rows.length === 0) return [];
     await this.bindUnlinked(rows);
@@ -265,6 +287,12 @@ class WaConversationService {
     // would otherwise open a hundred queries to draw one screen.
     const contracts = [...new Set(rows.map((r) => r.contract).filter(Boolean))];
     const names = new Map();
+    const contactIds = [...new Set(rows.filter((r) => !r.contract && r.sgp_contact_id).map((r) => r.sgp_contact_id))];
+    const contactNames = new Map();
+    if (contactIds.length > 0) {
+      const found = await tdb('sgp_contacts').whereIn('id', contactIds).select('id', 'client_name');
+      for (const contact of found) contactNames.set(Number(contact.id), contact.client_name);
+    }
     if (contracts.length > 0) {
       // The ONT's mirror wins over a lookup's row for the same contract.
       const contacts = await tdb('sgp_contacts').whereIn('contract', contracts).select('contract', 'client_name');
@@ -275,7 +303,9 @@ class WaConversationService {
     const blocked = await WaOptOut.activePhones(rows.map((r) => r.wa_phone_e164));
 
     return rows.map((row) => this.publicConversation(row, {
-      clientName: row.contract ? names.get(row.contract) ?? null : null,
+      clientName: row.contract
+        ? names.get(row.contract) ?? null
+        : (row.sgp_contact_id ? contactNames.get(Number(row.sgp_contact_id)) ?? null : null),
       optedOut: blocked.has(row.wa_phone_e164)
     }));
   }
@@ -299,7 +329,11 @@ class WaConversationService {
     const link = conversation.contract && conversation.device_id
       ? await SgpLink.getByDeviceId(conversation.device_id)
       : null;
-    const contact = conversation.contract && !link ? await SgpContact.getByContract(conversation.contract) : null;
+    const contact = link
+      ? null
+      : (conversation.contract
+        ? await SgpContact.getByContract(conversation.contract)
+        : (conversation.sgp_contact_id ? await SgpContact.getById(conversation.sgp_contact_id) : null));
     return this.publicConversation(conversation, {
       clientName: link?.client_name ?? contact?.client_name ?? null,
       optedOut: await WaOptOut.isActive({
@@ -339,7 +373,7 @@ class WaConversationService {
     let conversation = await this.get(id);
     // A thread that arrived before the subscriber's number was known — or
     // before inbound messages bound it at all — is resolved when it is opened.
-    if (!conversation.contract) conversation = await this.bindSubscriber(conversation);
+    if (!conversation.contract && !conversation.sgp_contact_id) conversation = await this.bindSubscriber(conversation);
     const cursor = Number.parseInt(String(before ?? ''), 10);
     const rows = await WaMessage.listForConversation(conversation.id, {
       limit: Math.min(Math.max(Number(limit) || PAGE, 1), 500),

@@ -29,6 +29,7 @@ import { Icon } from '@/components/ui/icon'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import { ProvisioningTab } from '@/components/settings/provisioning-tab'
 import { SgpEventsPanel } from '@/components/settings/sgp-events-panel'
+import { SgpContactsSyncPanel } from '@/components/settings/sgp-contacts-sync-panel'
 import { WhatsAppConnection, whatsappErrorMessage } from '@/components/whatsapp-connection'
 import { TEST_TONE_CLASS, testNotes, testOutcome } from '@/lib/whatsapp-test'
 import { auditRetentionError } from '@/lib/settings-validation'
@@ -1969,6 +1970,8 @@ export default function Settings() {
                 )}
               </div>
             )}
+
+            {sgpConfig?.ready && <SgpContactsSyncPanel config={sgpConfig} onConfigChange={setSgpConfig} />}
 
             <SgpEventsPanel config={sgpConfig} onConfigChange={setSgpConfig} />
           </div>
