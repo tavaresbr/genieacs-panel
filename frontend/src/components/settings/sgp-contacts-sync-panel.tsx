@@ -144,7 +144,7 @@ export function SgpContactsSyncPanel({ config, onConfigChange }: Props) {
             className="modern-input font-mono"
             value={form.path}
             disabled={!canConfigure}
-            placeholder="/api/..."
+            placeholder="/api/ura/clientes/"
             onChange={(event) => setForm((current) => ({ ...current, path: event.target.value }))}
           />
           <p className="mt-1 text-xs text-muted-foreground">{t('settings.sgp.contacts.pathHint')}</p>
@@ -315,7 +315,9 @@ export function SgpContactsSyncPanel({ config, onConfigChange }: Props) {
               <Icon name="warning" size={14} />
               {t(lastRun.reason === 'paging_ignored'
                 ? 'settings.sgp.contacts.partialPaging'
-                : 'settings.sgp.contacts.partialCeiling')}
+                : lastRun.reason === 'empty'
+                  ? 'settings.sgp.contacts.partialEmpty'
+                  : 'settings.sgp.contacts.partialCeiling')}
             </p>
           )}
         </>

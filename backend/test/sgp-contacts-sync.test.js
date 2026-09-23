@@ -7,6 +7,7 @@ const { default: SgpService } = await import('../src/services/sgpService.js');
 const { default: WhatsAppConfigService } = await import('../src/services/whatsappConfigService.js');
 const { default: WhatsAppAccount } = await import('../src/models/WhatsAppAccount.js');
 const { default: WaConversation } = await import('../src/models/WaConversation.js');
+const { default: SgpContactSyncService } = await import('../src/services/sgpContactSyncService.js');
 
 /**
  * Todos os clientes do SGP nos contatos do WhatsApp, com ou sem contrato, com
@@ -23,6 +24,10 @@ const APP = 'painel';
 const TOKEN = 'token-da-listagem';
 const LIST_PATH = '/api/ura/clientes/';
 const BROKEN_PATH = '/api/ura/clientes-sem-pagina/';
+/** Answers an empty list when asked without a filter. */
+const EMPTY_PATH = '/api/ura/clientes-vazio/';
+/** Refuses outright without a filter, the way an URA call does. */
+const FILTER_PATH = '/api/ura/clientes-com-filtro/';
 const INSTANCE = 'painel-sync-contatos';
 const WEBHOOK_TOKEN = 'segredo-do-webhook-sync';
 
@@ -60,6 +65,9 @@ let lastListPayload = null;
 
 const auth = () => ({ headers: authHeaders(token) });
 const sincronizar = () => call(`${panelUrl}/api/sgp/contacts/sync`, { method: 'POST', ...auth() });
+// Direto no serviço: a rota tem o limitador da sincronização de frota, que é o
+// certo em produção e acaba com o orçamento de um arquivo de testes.
+const sincronizarDireto = () => asTenant(() => SgpContactSyncService.syncAll());
 const testar = () => call(`${panelUrl}/api/sgp/contacts/test`, { method: 'POST', ...auth() });
 const contatos = (query = '') => call(`${panelUrl}/api/whatsapp/contacts${query}`, auth());
 const linhas = () => asTenant(() => getDb()('sgp_contacts').orderBy('id'));
@@ -84,6 +92,8 @@ function startSgpStub() {
         const limit = Number(payload.limit) || 10;
         return send({ status: 1, clientes: clientes.slice(offset, offset + limit) });
       }
+      if (req.url.startsWith(EMPTY_PATH)) return send({ status: 1, clientes: [] });
+      if (req.url.startsWith(FILTER_PATH)) return send({ status: 0, msg: 'Informe ao menos um filtro' });
       if (req.url.startsWith(BROKEN_PATH)) {
         return send({ status: 1, clientes: clientes.slice(0, Number(payload.limit) || 10) });
       }
@@ -152,17 +162,22 @@ after(async () => {
   await stopTestServers();
 });
 
-describe('sem o caminho da listagem', () => {
-  it('recusa com um código que a tela explica', async () => {
-    const res = await sincronizar();
-    assert.equal(res.status, 409);
-    assert.equal(res.body.code, 'customer_list_not_configured');
+describe('o caminho padrão', () => {
+  it('é /api/ura/clientes/, sem ninguém precisar preencher', async () => {
+    const config = await asTenant(() => SgpService.getConfig());
+    assert.equal(config.endpoints.customerList, '/api/ura/clientes/');
+  });
+
+  it('também para quem salvou o campo vazio na versão anterior', async () => {
+    await configurar({ endpoints: { customerList: '' } });
+    const config = await asTenant(() => SgpService.getConfig());
+    assert.equal(config.endpoints.customerList, '/api/ura/clientes/');
   });
 });
 
 describe('o botão de testar', () => {
   it('lê só a primeira página e não grava nada', async () => {
-    await configurar({ endpoints: { customerList: LIST_PATH } });
+    assert.equal(LIST_PATH, '/api/ura/clientes/');
     const res = await testar();
     assert.equal(res.status, 200);
     assert.equal(res.body.data.received, 10);
@@ -300,6 +315,25 @@ describe('conversa com um cliente sem contrato', () => {
     const fio = await asTenant(() => WaConversation.getById(fioId));
     assert.equal(fio.contract, 'K-NOVO');
     assert.equal(fio.sgp_contact_id, null);
+  });
+});
+
+describe('um SGP que não lista sem filtro', () => {
+  it('uma primeira página vazia é avisada, não comemorada', async () => {
+    await configurar({ endpoints: { customerList: EMPTY_PATH } });
+    const res = await sincronizarDireto();
+    assert.equal(res.partial, true);
+    assert.equal(res.reason, 'empty');
+    assert.equal(res.total, 0);
+  });
+
+  it('a recusa chega com a frase do próprio SGP', async () => {
+    await configurar({ endpoints: { customerList: FILTER_PATH } });
+    const res = await testar();
+    assert.equal(res.status, 502);
+    assert.equal(res.body.code, 'sgp_rejected');
+    assert.match(res.body.message, /Informe ao menos um filtro/);
+    await assert.rejects(sincronizarDireto(), (error) => error.code === 'sgp_rejected');
   });
 });
 

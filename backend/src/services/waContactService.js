@@ -194,17 +194,42 @@ class WaContactService {
       : { contract: raw };
 
     const found = await SgpService.lookupContacts(filters);
-    const contracts = [];
+    const keys = [];
     for (const contract of found) {
       if ((await SgpLink.getByContract(contract.contract)).length === 0) {
         await SgpContact.upsertFromSgp(SgpService.contractToContactRow(contract));
       }
-      if (!contracts.includes(contract.contract)) contracts.push(contract.contract);
+      if (!keys.includes(contract.contract)) keys.push(contract.contract);
+    }
+
+    // By document, the client listing too: it is the only lookup that finds a
+    // client with NO contract, which `consultacliente` cannot. Best effort —
+    // an install whose listing refuses or is unreachable still answers with
+    // what the contract lookup found.
+    if (filters.document) {
+      let clients = [];
+      try {
+        clients = await SgpService.lookupClients({ document: filters.document });
+      } catch (error) {
+        console.warn(`SGP client listing lookup failed: ${error.code || error.message}`);
+      }
+      for (const client of clients) {
+        if (client.contract) {
+          if (keys.includes(client.contract)) continue;
+          if ((await SgpLink.getByContract(client.contract)).length === 0) {
+            await SgpContact.upsertFromSgp(SgpService.contractToContactRow(client));
+          }
+          keys.push(client.contract);
+          continue;
+        }
+        const stored = await SgpContact.upsertFromSgp(SgpService.contractToContactRow(client));
+        if (stored && !keys.includes(`c:${stored.id}`)) keys.push(`c:${stored.id}`);
+      }
     }
 
     const subscribers = [];
-    for (const contract of contracts) {
-      const subscriber = await this.subscriberFor(contract);
+    for (const key of keys) {
+      const subscriber = await this.subscriberFor(key);
       if (subscriber) subscribers.push(subscriber);
     }
     return { total: subscribers.length, contacts: await this.decorate(subscribers) };

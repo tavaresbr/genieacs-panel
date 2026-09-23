@@ -40,11 +40,11 @@ export const DEFAULT_ENDPOINTS = Object.freeze({
   invoices: '/api/ura/titulos/',
   unlock: '/api/ura/liberacao/',
   ticket: '/api/ura/chamado/',
-  // The full client listing behind the WhatsApp contacts sync. Empty on
-  // purpose: the URA reference every install shares has no "list everyone"
-  // call, and the path differs between SGP versions, so the operator fills it
-  // in (and proves it with the test button) before any sync runs.
-  customerList: ''
+  // The client listing behind the WhatsApp contacts sync. It takes the same
+  // `app`/`token` and accepts `cpfcnpj` as a filter; whether it lists everyone
+  // without one depends on the install, which is what the test button in
+  // Settings answers before any sync runs.
+  customerList: '/api/ura/clientes/'
 });
 
 /** How a listing page is addressed: by row offset, or by page number from 1. */
@@ -698,7 +698,14 @@ class SgpService {
       portalBilling: stored.portalBilling !== false,
       portalUnlock: stored.portalUnlock === true,
       invoiceLimit: Number(stored.invoiceLimit) > 0 ? Math.min(Number(stored.invoiceLimit), 24) : 6,
-      endpoints: { ...DEFAULT_ENDPOINTS, ...(stored.endpoints || {}) },
+      endpoints: {
+        ...DEFAULT_ENDPOINTS,
+        ...(stored.endpoints || {}),
+        // Saved empty by the release that had no default for it: an empty
+        // value is "not chosen", not "switched off" — `contactsSyncEnabled` is
+        // what switches the sync off.
+        customerList: stored.endpoints?.customerList || DEFAULT_ENDPOINTS.customerList
+      },
       webhookSecret: decryptWebhookSecret(stored.webhookSecret),
       webhookEnabled: stored.webhookEnabled === true,
       webhookRequireTimestamp: stored.webhookRequireTimestamp === true,
@@ -835,9 +842,8 @@ class SgpService {
         ticket: this.normalizeEndpoint(
           patch.endpoints?.ticket ?? current.endpoints.ticket, DEFAULT_ENDPOINTS.ticket
         ),
-        // `''` clears it, which is how the sync is switched back off for good.
         customerList: this.normalizeEndpoint(
-          patch.endpoints?.customerList ?? current.endpoints.customerList, ''
+          patch.endpoints?.customerList ?? current.endpoints.customerList, DEFAULT_ENDPOINTS.customerList
         )
       },
       ...this.readContactsSync(patch, current),
@@ -1243,6 +1249,30 @@ class SgpService {
       // operator can see at once whether the path is the right one.
       fields: entries[0] && typeof entries[0] === 'object' ? Object.keys(entries[0]).slice(0, 40) : []
     };
+  }
+
+  /**
+   * The clients the listing endpoint holds under one document — the lookup
+   * that also finds a client with NO contract, which `consultacliente` (a
+   * contract lookup) cannot. Rows as `listCustomersPage` gives them.
+   */
+  static async lookupClients({ document }) {
+    const digits = String(document ?? '').replace(/\D/g, '');
+    if (!digits) return [];
+    const config = this.requireReady(await this.getConfig());
+    if (!config.endpoints.customerList) return [];
+    try {
+      const data = await this.request('customerList', { cpfcnpj: digits }, config);
+      return firstArray(data, ['clientes', 'contratos', 'dados', 'data', 'results', 'items'])
+        .flatMap((entry) => normalizeCustomer(entry))
+        // Only the client asked for: an install that ignores the filter and
+        // answers with a page of everyone must not turn a CPF search into a
+        // list of strangers.
+        .filter((row) => String(row.document ?? '').replace(/\D/g, '') === digits);
+    } catch (error) {
+      if (isNotFound(error)) return [];
+      throw error;
+    }
   }
 
   /** The `sgp_contacts` row for one contract — `contractToLinkRow` without the equipment. */

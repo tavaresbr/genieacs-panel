@@ -1586,7 +1586,7 @@ export interface SgpContactsSyncResult {
   pages: number
   /** True when a ceiling or an SGP that ignores paging stopped the run early. */
   partial: boolean
-  reason?: 'paging_ignored' | 'ceiling'
+  reason?: 'paging_ignored' | 'ceiling' | 'empty'
   durationMs: number
   startedAt: string
   finishedAt: string
