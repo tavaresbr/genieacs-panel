@@ -52,9 +52,16 @@ export async function forSoleTenant(reason, fn) {
  *
  * One provider failing does not stop the others: a broken integration at one
  * ISP must not silently halt the job for every other ISP on the deployment.
+ *
+ * `only` restringe a visita a esses ids, e o filtro de ativo continua valendo
+ * sobre eles: quem chama sabe quem tem trabalho, e esta função continua sendo
+ * quem sabe quem está trabalhando. Lista vazia é "ninguém", sem ir ao banco.
  */
-export async function forEachTenant(job, { onError } = {}) {
-  const tenants = await getDb()('tenants').where({ status: 'active' }).orderBy('id', 'asc');
+export async function forEachTenant(job, { onError, only = null } = {}) {
+  if (only && only.length === 0) return [];
+  const query = getDb()('tenants').where({ status: 'active' }).orderBy('id', 'asc');
+  if (only) query.whereIn('id', only);
+  const tenants = await query;
   const results = [];
   for (const tenant of tenants) {
     try {
