@@ -356,6 +356,8 @@ class WhatsAppConfigService {
       name: row.name,
       label: row.label || null,
       purpose: row.purpose,
+      // A cor do número na caixa de entrada. Não é segredo: sai para quem lê.
+      color: row.color || null,
       flavor: row.flavor,
       baseUrl: row.base_url,
       status: row.status,

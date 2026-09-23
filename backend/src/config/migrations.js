@@ -19,6 +19,7 @@
  */
 
 import { withWebhookPath } from './waWebhookPath.js';
+import { nextAccountColor } from './waAccountColors.js';
 
 /** A chave do blob de configuração do Evolution em `app_state`. */
 const EVOLUTION_CONFIG_KEY = 'whatsapp_evolution_config';
@@ -798,6 +799,9 @@ const whatsappAccountsTable = (db) => (t) => {
   // acima existem para cifrar.
   t.string('webhook_server_url', 255);
   t.timestamp('webhook_checked_at');
+  // A cor do número na caixa de entrada — ver `config/waAccountColors.js`.
+  // Nula só em linha anterior à 0055, que a preenche.
+  t.string('color', 16);
   // A VOLTA: o painel se chamou pela porta da frente e contou o que aconteceu.
   // Distinto do veredito acima porque responde outra pergunta — aquele diz o
   // que está GRAVADO no servidor, este diz se uma entrada por aquele endereço
@@ -3434,6 +3438,57 @@ export const migrations = [
           t.integer('sgp_contact_id').unsigned();
           t.index(['sgp_contact_id'], 'wa_conversations_sgp_contact_idx');
         });
+      }
+    }
+  },
+  {
+    /**
+     * Uma cor para cada número do WhatsApp.
+     *
+     * A caixa de entrada misturava as conversas de todos os números do provedor
+     * sem dizer qual recebeu cada uma. A coluna guarda a cor do número; quem a
+     * escolhe na criação é `EvolutionInstanceService.createAccount`, e o
+     * administrador pode trocá-la depois.
+     *
+     * O backfill é o que faz a mudança aparecer no deploy sem ninguém mexer:
+     * cada provedor tem os seus números coloridos em ordem de id, com a mesma
+     * regra da criação — então quem tem dois números ganha duas cores
+     * DIFERENTES, e não duas vezes a primeira da paleta.
+     *
+     * Só preenche quem está nulo, então rodar de novo (o processo que morre
+     * entre o passo e o registro dele) não troca a cor de ninguém — nem a que o
+     * administrador já escolheu. Um número que nasça sem cor depois disto (um
+     * processo antigo ainda de pé no deploy) não é alcançado aqui, porque o
+     * runner não repete passo registrado; a tela lhe dá uma cor de reserva
+     * derivada do id, e a primeira troca feita à mão a grava.
+     */
+    id: '0055_whatsapp_account_color',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('whatsapp_accounts'))) return true;
+      return db.schema.hasColumn('whatsapp_accounts', 'color');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('whatsapp_accounts'))) return;
+      if (!(await db.schema.hasColumn('whatsapp_accounts', 'color'))) {
+        await db.schema.alterTable('whatsapp_accounts', (t) => t.string('color', 16));
+      }
+      const linhas = await db('whatsapp_accounts')
+        .select('id', 'tenant_id', 'color')
+        .orderBy([{ column: 'tenant_id' }, { column: 'id' }]);
+      // As cores já gravadas contam desde o começo, e não só as que este passo
+      // der: um número que já tem cor não pode ganhar um vizinho igual a ele.
+      const usadas = new Map();
+      for (const linha of linhas) {
+        if (!usadas.has(linha.tenant_id)) usadas.set(linha.tenant_id, []);
+        if (linha.color) usadas.get(linha.tenant_id).push(linha.color);
+      }
+      for (const linha of linhas) {
+        if (linha.color) continue;
+        const doProvedor = usadas.get(linha.tenant_id);
+        const cor = nextAccountColor(doProvedor);
+        doProvedor.push(cor);
+        // eslint-disable-next-line no-await-in-loop -- um número por vez, e são poucos
+        await db('whatsapp_accounts').where({ id: linha.id }).update({ color: cor });
       }
     }
   }

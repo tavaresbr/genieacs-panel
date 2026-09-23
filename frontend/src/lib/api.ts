@@ -2094,6 +2094,11 @@ export interface WhatsAppAccount {
   name: string
   label: string | null
   purpose: WhatsAppPurpose
+  /**
+   * A cor do número na caixa de entrada, uma de `WA_ACCOUNT_COLORS`. Nula só
+   * num número anterior a ela; a tela cai numa cor derivada do id.
+   */
+  color: string | null
   flavor: 'go' | 'v2'
   baseUrl: string
   status: WhatsAppStatus
@@ -2588,7 +2593,7 @@ export const whatsappAPI = {
   deleteAccount: (id: number) =>
     apiClient.delete<{ removedOnServer: boolean; serverError: string | null }>(`/whatsapp/accounts/${id}`),
 
-  updateAccount: (id: number, patch: { label?: string; purpose?: WhatsAppPurpose; isDefault?: boolean }) =>
+  updateAccount: (id: number, patch: { label?: string; purpose?: WhatsAppPurpose; isDefault?: boolean; color?: string }) =>
     apiClient.requestWithBody<{ account: WhatsAppAccount }>('PATCH', `/whatsapp/accounts/${id}`, patch),
 
   checkNumbers: (numbers: string[]) =>

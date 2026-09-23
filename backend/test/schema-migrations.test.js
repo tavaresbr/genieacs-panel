@@ -1164,3 +1164,65 @@ describe('o caminho do webhook nas linhas que já estavam gravadas', () => {
     assert.equal(await step.isApplied(db), true);
   });
 });
+
+describe('a cor dos números que já existiam', () => {
+  const db = createDatabase('whatsapp-account-color');
+  const PASSO = '0055_whatsapp_account_color';
+  let alfa;
+  let beta;
+
+  const numero = (tenantId, nome, extra = {}) => insertReturningId('whatsapp_accounts', {
+    tenant_id: tenantId, name: nome, base_url: 'https://evo.exemplo.test', ...extra
+  }, db);
+  const coresDe = async (tenantId) => (await db('whatsapp_accounts')
+    .where({ tenant_id: tenantId }).orderBy('id')).map((row) => row.color);
+
+  /**
+   * O caminho de upgrade de verdade: a tabela SEM a coluna, com números dentro.
+   * A fábrica da tabela já nasce com `color`, então a coluna é tirada à mão para
+   * o banco ficar como estava antes deste passo.
+   */
+  before(async () => {
+    for (const migration of migrations.filter((m) => m.id < PASSO)) {
+      await migration.up(db);
+    }
+    await db.schema.alterTable('whatsapp_accounts', (t) => t.dropColumn('color'));
+    alfa = (await db('tenants').orderBy('id', 'asc').first()).id;
+    beta = await insertReturningId('tenants', { slug: 'beta', name: 'Beta', status: 'active' }, db);
+
+    // Intercalados de propósito: a ordem por id mistura os dois provedores, e
+    // a cor de um não pode sair da contagem do outro.
+    await numero(alfa, 'alfa-suporte');
+    await numero(beta, 'beta-unico');
+    await numero(alfa, 'alfa-cobranca');
+    await numero(alfa, 'alfa-vendas');
+    await ensureSchema(db);
+  });
+
+  it('dá a cada número do provedor uma cor diferente, em ordem de id', async () => {
+    assert.deepEqual(await coresDe(alfa), ['blue', 'pink', 'lime']);
+  });
+
+  it('e o vizinho começa a paleta do zero, sem contar as cores do outro', async () => {
+    assert.deepEqual(await coresDe(beta), ['blue']);
+  });
+
+  it('rodar de novo preenche só quem está sem cor, sem repetir as que já existem', async () => {
+    // O processo que morre entre o passo e o registro dele volta a este passo.
+    // O que ele achar sem cor ganha a próxima livre do provedor — não a
+    // primeira da paleta de novo.
+    await numero(alfa, 'alfa-atrasado');
+    const step = migrations.find((m) => m.id === PASSO);
+    await step.up(db);
+    assert.deepEqual(await coresDe(alfa), ['blue', 'pink', 'lime', 'violet']);
+    assert.equal(await step.isApplied(db), true);
+  });
+
+  it('e rodar de novo não troca a cor de ninguém', async () => {
+    const antes = await coresDe(alfa);
+    await db('whatsapp_accounts').where({ name: 'alfa-suporte' }).update({ color: 'lime' });
+    const step = migrations.find((m) => m.id === PASSO);
+    await step.up(db);
+    assert.deepEqual(await coresDe(alfa), ['lime', ...antes.slice(1)], 'a cor escolhida à mão foi sobrescrita');
+  });
+});

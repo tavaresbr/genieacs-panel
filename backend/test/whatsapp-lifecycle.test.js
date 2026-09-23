@@ -6,6 +6,7 @@ import { asTenant, authHeaders, call, startTestServers, stopTestServers } from '
 const { default: WhatsAppConfigService } = await import('../src/services/whatsappConfigService.js');
 const { default: WhatsAppAccount } = await import('../src/models/WhatsAppAccount.js');
 const { setProbeFetcher } = await import('../src/services/evolutionInstanceService.js');
+const { WA_ACCOUNT_COLORS, nextAccountColor } = await import('../src/config/waAccountColors.js');
 
 const WEBHOOK_BASE = 'https://painel.provedor.com.br/api/whatsapp-webhook';
 
@@ -543,6 +544,68 @@ describe('editing what the panel knows about a number', () => {
       body: { purpose: 'qualquer-coisa' }
     });
     assert.equal(status, 400);
+  });
+});
+
+/**
+ * A cor de cada número, que é o que separa as conversas de um número das do
+ * outro na caixa de entrada.
+ */
+describe('a cor de cada número', () => {
+  const cores = async () => (await asTenant(() => WhatsAppAccount.getAll())).map((row) => row.color);
+
+  it('cada número novo nasce com uma cor que nenhum outro tem, enquanto houver livre', async () => {
+    // Até o nono número, nunca duas iguais; a partir dele, a menos usada. Os
+    // números criados pelos casos acima contam — é o provedor inteiro.
+    for (let rodada = 0; rodada < WA_ACCOUNT_COLORS.length + 1; rodada += 1) {
+      // eslint-disable-next-line no-await-in-loop -- a cor de um depende dos anteriores
+      const antes = await cores();
+      // eslint-disable-next-line no-await-in-loop -- idem
+      const { status, body } = await createAccount(v2.baseUrl, { label: `Cor ${rodada}` });
+      assert.equal(status, 201);
+      const cor = body.data.account.color;
+      assert.equal(cor, nextAccountColor(antes));
+      if (antes.length < WA_ACCOUNT_COLORS.length) {
+        assert.ok(!antes.includes(cor), `repetiu ${cor} com ${antes.length} números`);
+      }
+    }
+  });
+
+  it('e a listagem entrega a cor, que é o que a caixa de entrada lê', async () => {
+    const { status, body } = await call(`${panelUrl}/api/whatsapp/accounts`, { headers: authHeaders(token) });
+    assert.equal(status, 200);
+    for (const account of body.data) {
+      assert.ok(WA_ACCOUNT_COLORS.includes(account.color), `${account.id} sem cor da paleta`);
+    }
+  });
+
+  it('o administrador troca por outra da paleta', async () => {
+    const [primeiro] = await asTenant(() => WhatsAppAccount.getAll());
+    const outra = WA_ACCOUNT_COLORS.find((cor) => cor !== primeiro.color);
+    const { status, body } = await call(`${panelUrl}/api/whatsapp/accounts/${primeiro.id}`, {
+      method: 'PATCH',
+      headers: authHeaders(token),
+      body: { color: outra }
+    });
+    assert.equal(status, 200);
+    assert.equal(body.data.account.color, outra);
+    // E trocar a cor não mexe no resto do número.
+    assert.equal(body.data.account.label, primeiro.label);
+    assert.equal(body.data.account.purpose, primeiro.purpose);
+  });
+
+  it('e uma cor fora da paleta é recusada, sem gravar nada', async () => {
+    const [primeiro] = await asTenant(() => WhatsAppAccount.getAll());
+    for (const invalida of ['red', '#ff0000', '', 'BLUE']) {
+      // eslint-disable-next-line no-await-in-loop -- um valor por vez
+      const { status } = await call(`${panelUrl}/api/whatsapp/accounts/${primeiro.id}`, {
+        method: 'PATCH',
+        headers: authHeaders(token),
+        body: { color: invalida }
+      });
+      assert.equal(status, 400, `aceitou ${JSON.stringify(invalida)}`);
+    }
+    assert.equal((await asTenant(() => WhatsAppAccount.getById(primeiro.id))).color, primeiro.color);
   });
 });
 

@@ -6,6 +6,7 @@ import { safeFetch } from '../utils/wa/ssrfGuard.js';
 import { mintNonce, probeBody, probeVerdict } from '../utils/wa/waWebhookProbe.js';
 import { sign as signProbeTicket } from '../utils/wa/waProbeTicket.js';
 import { WA_WEBHOOK_PATH } from '../config/waWebhookPath.js';
+import { isAccountColor, nextAccountColor } from '../config/waAccountColors.js';
 import {
   checkNumbersRequest,
   connectRequest,
@@ -234,6 +235,22 @@ class EvolutionInstanceService {
     return clientForAccount(account, config, WhatsAppConfigService.decryptInstanceToken(account));
   }
 
+  /**
+   * A cor escolhida na tela, que só pode ser uma da paleta.
+   *
+   * Recusada, e não ignorada, pelo mesmo motivo da finalidade logo abaixo: a
+   * tela oferece oito amostras e nada mais, então só uma requisição escrita à
+   * mão chega aqui com outra coisa — e um 200 que não gravou nada diria a quem
+   * a escreveu que gravou.
+   */
+  static normalizeColor(value) {
+    const color = String(value ?? '').trim();
+    if (!isAccountColor(color)) {
+      throw new WaError('whatsapp.accountActionFailed', { code: 'invalid_color', status: 400 });
+    }
+    return color;
+  }
+
   static normalizePurpose(value, fallback = 'general') {
     if (value === undefined || value === null || value === '') return fallback;
     const purpose = String(value).trim();
@@ -316,10 +333,14 @@ class EvolutionInstanceService {
       lastError = describeFailure(error);
     }
 
+    // A cor sai das que os outros números DESTE provedor já têm, para que dois
+    // números nunca nasçam iguais enquanto houver cor livre na paleta.
+    const outros = await WhatsAppAccount.getAll();
     const account = await WhatsAppAccount.create({
       name,
       label: label ? String(label).trim().slice(0, 128) : null,
       purpose: chosenPurpose,
+      color: nextAccountColor(outros.map((row) => row.color)),
       flavor,
       base_url: client.baseUrl,
       instance_id: instanceId,
@@ -936,7 +957,7 @@ class EvolutionInstanceService {
   }
 
   /** Panel-side metadata. Nothing here reaches the Evolution server. */
-  static async updateAccount(id, { label, purpose, isDefault } = {}) {
+  static async updateAccount(id, { label, purpose, isDefault, color } = {}) {
     const account = await this.loadAccount(id);
     const patch = {};
     if (label !== undefined) {
@@ -944,6 +965,7 @@ class EvolutionInstanceService {
       patch.label = text || null;
     }
     if (purpose !== undefined) patch.purpose = this.normalizePurpose(purpose, account.purpose);
+    if (color !== undefined) patch.color = this.normalizeColor(color);
     if (isDefault === false) patch.is_default = false;
 
     let updated = Object.keys(patch).length ? await WhatsAppAccount.update(account.id, patch) : account;

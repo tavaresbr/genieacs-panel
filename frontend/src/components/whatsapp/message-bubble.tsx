@@ -232,9 +232,15 @@ interface MessageBubbleProps {
    */
   onResend: (message: WhatsAppMessage) => void
   resending: boolean
+  /**
+   * O balão recebido na cor do número que o recebeu. A cor vem de
+   * `--wa-account`, definida pela lista em volta; sem número conhecido, o
+   * balão fica neutro, como era.
+   */
+  accountTinted?: boolean
 }
 
-export function MessageBubble({ message, onResend, resending }: MessageBubbleProps) {
+export function MessageBubble({ message, onResend, resending, accountTinted = false }: MessageBubbleProps) {
   const { t, intlLocale } = useTranslation()
   const stamp = clock(message.createdAt, intlLocale)
 
@@ -285,7 +291,9 @@ export function MessageBubble({ message, onResend, resending }: MessageBubblePro
       <div
         className={`max-w-[min(38rem,85%)] rounded-[var(--radius)] border px-3 py-2 ${
           inbound
-            ? 'border-border bg-card text-card-foreground'
+            ? accountTinted
+              ? 'border-[hsl(var(--wa-account))]/40 bg-[hsl(var(--wa-account))]/[0.07] text-card-foreground'
+              : 'border-border bg-card text-card-foreground'
             : failed
               ? 'border-[hsl(var(--status-danger))]/45 bg-[hsl(var(--status-danger))]/[0.07] text-foreground'
               : 'border-primary/30 bg-primary/10 text-foreground'

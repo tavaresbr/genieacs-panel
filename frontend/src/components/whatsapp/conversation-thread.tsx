@@ -4,8 +4,9 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { Icon } from '@/components/ui/icon'
 import { useTranslation } from '@/contexts/language-context'
-import type { WhatsAppConversation, WhatsAppMessage } from '@/lib/api'
-import { conversationAddress, conversationTitle } from '@/components/whatsapp/conversation-list'
+import type { WhatsAppAccount, WhatsAppConversation, WhatsAppMessage } from '@/lib/api'
+import { AccountChip, conversationAddress, conversationTitle } from '@/components/whatsapp/conversation-list'
+import { accountTag } from '@/lib/wa-account-color'
 import { MessageBubble } from '@/components/whatsapp/message-bubble'
 import { SubscriberLinker } from '@/components/whatsapp/subscriber-linker'
 import { useAuth } from '@/contexts/auth-context'
@@ -15,6 +16,8 @@ const STICK_PX = 120
 
 interface ConversationThreadProps {
   conversation: WhatsAppConversation
+  /** Os números do provedor, por id: a conversa diz por qual deles chegou. */
+  accounts: ReadonlyMap<number, WhatsAppAccount>
   /** Newest first, exactly as the API hands them over. */
   messages: WhatsAppMessage[]
   loading: boolean
@@ -43,6 +46,7 @@ interface ConversationThreadProps {
  */
 export function ConversationThread({
   conversation,
+  accounts,
   messages,
   loading,
   canLoadMore,
@@ -63,6 +67,7 @@ export function ConversationThread({
   const stick = useRef(true)
 
   const address = conversationAddress(conversation)
+  const numero = accountTag(accounts, conversation)
   // The API hands the history back newest first; a conversation reads the other
   // way round.
   const ordered = [...messages].reverse()
@@ -95,7 +100,8 @@ export function ConversationThread({
           <h2 className="truncate text-base font-semibold text-foreground">{conversationTitle(conversation)}</h2>
           {address && <p className="truncate font-mono text-xs text-muted-foreground">{address}</p>}
 
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <div className={`mt-2 flex flex-wrap items-center gap-1.5 ${numero?.className ?? ''}`}>
+            {numero?.showName && <AccountChip name={numero.name} />}
             {conversation.contract ? (
               <span className="modern-badge-info">
                 <Icon name="invoice" size={12} />
@@ -211,13 +217,17 @@ export function ConversationThread({
             <p className="empty-state-copy">{loading ? t('common.loading') : t('whatsapp.inbox.noMessages')}</p>
           </div>
         ) : (
-          <ul className="flex flex-col gap-2" role="list">
+          // A classe do número fica na lista, e o balão RECEBIDO lê a cor dela:
+          // é a mensagem que chegou por aquele número. O que o provedor mandou
+          // continua na cor do painel.
+          <ul className={`flex flex-col gap-2 ${numero?.className ?? ''}`} role="list">
             {ordered.map((message) => (
               <MessageBubble
                 key={message.id}
                 message={message}
                 onResend={onResend}
                 resending={resendingId === message.id}
+                accountTinted={numero !== null}
               />
             ))}
           </ul>

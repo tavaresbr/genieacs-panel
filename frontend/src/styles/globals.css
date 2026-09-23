@@ -30,6 +30,18 @@
     --status-warning: 35 92% 40%;
     --status-danger: 2 63% 43%;
     --status-info: 205 62% 38%;
+    /* A cor de cada número do WhatsApp (`lib/wa-account-color.ts`). Sem
+       vermelho, verde nem amarelo: essas são as de estado, logo acima — nem
+       verde-azulado, perto demais do `--primary` das respostas. Tom de
+       texto — o fundo do balão e do chip é esta mesma cor com alfa baixo. */
+    --wa-blue: 221 70% 45%;
+    --wa-violet: 262 52% 50%;
+    --wa-pink: 330 62% 45%;
+    --wa-fuchsia: 292 58% 42%;
+    --wa-orange: 21 82% 44%;
+    --wa-cyan: 192 80% 33%;
+    --wa-indigo: 239 45% 46%;
+    --wa-lime: 84 70% 29%;
     --radius: 0.625rem;
     color-scheme: light;
   }
@@ -61,6 +73,14 @@
     --status-warning: 38 89% 54%;
     --status-danger: 2 64% 58%;
     --status-info: 202 72% 61%;
+    --wa-blue: 217 85% 67%;
+    --wa-violet: 262 72% 73%;
+    --wa-pink: 330 72% 69%;
+    --wa-fuchsia: 292 65% 71%;
+    --wa-orange: 24 88% 62%;
+    --wa-cyan: 190 70% 56%;
+    --wa-indigo: 235 70% 73%;
+    --wa-lime: 82 55% 52%;
     color-scheme: dark;
   }
 
@@ -369,3 +389,20 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/*
+ * O número do WhatsApp de cada conversa, como uma variável só.
+ *
+ * Fora de `@layer` de propósito: o nome da classe sai de um mapa em
+ * `lib/wa-account-color.ts`, e regra dentro de camada que o Tailwind não acha
+ * escrita no código é descartada no build. Quem pinta lê `--wa-account`, com
+ * classes fixas — a cor nunca entra montada numa string de classe.
+ */
+.wa-account-blue { --wa-account: var(--wa-blue); }
+.wa-account-violet { --wa-account: var(--wa-violet); }
+.wa-account-pink { --wa-account: var(--wa-pink); }
+.wa-account-fuchsia { --wa-account: var(--wa-fuchsia); }
+.wa-account-orange { --wa-account: var(--wa-orange); }
+.wa-account-cyan { --wa-account: var(--wa-cyan); }
+.wa-account-indigo { --wa-account: var(--wa-indigo); }
+.wa-account-lime { --wa-account: var(--wa-lime); }
