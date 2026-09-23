@@ -383,15 +383,35 @@ function normalizeContract(entry, { includeSecrets = false } = {}) {
  * the install. A mobile (the one WhatsApp can reach) is preferred when the list
  * has several; the first usable number otherwise.
  */
+const PHONE_LIST_NAMES = Object.freeze(['telefones', 'contatos', 'fones', 'phones', 'celulares']);
+/** Inside a `contatos` object: the lists that hold numbers — never `emails`. */
+const PHONE_GROUP_NAMES = Object.freeze([
+  'celulares', 'celular', 'whatsapp', 'whatsapps', 'telefones', 'telefone', 'fones', 'fone', 'phones'
+]);
+
+/** Every value a contacts field may hold, flattened: a list, or an object of lists by kind. */
+function phoneCandidates(value) {
+  if (value === null || value === undefined) return [];
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'object') {
+    return PHONE_GROUP_NAMES.flatMap((name) => {
+      const group = pick(value, [name]);
+      if (group === null || group === undefined) return [];
+      return Array.isArray(group) ? group : [group];
+    });
+  }
+  return [value];
+}
+
 function phoneFrom(entry) {
   const direct = normalizarTelefoneBr(pick(entry, PHONE_NAMES));
   if (direct) return direct;
-  const list = pick(entry, ['telefones', 'contatos', 'fones', 'phones']);
-  if (!Array.isArray(list)) return null;
+  const list = PHONE_LIST_NAMES.flatMap((name) => phoneCandidates(pick(entry, [name])));
+  if (list.length === 0) return null;
   const numbers = list
     .map((item) => normalizarTelefoneBr(
       item && typeof item === 'object'
-        ? pick(item, ['numero', 'contato', 'telefone', 'celular', 'valor', 'number'])
+        ? pick(item, ['numero', 'contato', 'telefone', 'celular', 'fone', 'valor', 'number'])
         : item
     ))
     .filter(Boolean);
@@ -410,6 +430,39 @@ const CLIENT_ID_NAMES = Object.freeze(['clienteId', 'idCliente', 'cliente_id', '
  * with no contract at all (one row, contract `null`). A contract row falls back
  * to its client's name, document and phone when it has none of its own.
  */
+/**
+ * The field NAMES inside a listing's nested contracts and contacts — never a
+ * value — so the test button shows at once why a page read no contract or no
+ * phone, and the next version can learn the shape without anyone pasting a
+ * client's data anywhere.
+ */
+function describeValue(value) {
+  if (Array.isArray(value)) {
+    const first = value.find((item) => item !== null && item !== undefined);
+    if (first === undefined) return '[]';
+    return first && typeof first === 'object'
+      ? `[{ ${Object.keys(first).slice(0, 20).join(', ')} }]`
+      : `[${typeof first}]`;
+  }
+  if (value && typeof value === 'object') {
+    return `{ ${Object.entries(value).slice(0, 20).map(([key, inner]) => `${key}: ${describeValue(inner)}`).join(', ')} }`;
+  }
+  return value === null || value === undefined ? 'null' : typeof value;
+}
+
+function listingShape(entries) {
+  const shape = {};
+  for (const name of ['contratos', 'contatos', 'telefones']) {
+    // The first client that has something there: an empty list says nothing.
+    const withValue = entries.find((entry) => {
+      const value = entry && typeof entry === 'object' ? entry[name] : undefined;
+      return Array.isArray(value) ? value.length > 0 : value !== null && value !== undefined && value !== '';
+    });
+    if (withValue) shape[name] = describeValue(withValue[name]);
+  }
+  return shape;
+}
+
 function normalizeCustomer(entry) {
   if (!entry || typeof entry !== 'object') return [];
   const clientId = asText(pick(entry, CLIENT_ID_NAMES));
@@ -422,9 +475,14 @@ function normalizeCustomer(entry) {
 
   const nested = pick(entry, ['contratos', 'contracts']);
   if (Array.isArray(nested) && nested.length > 0) {
-    return nested
+    const rows = nested
       .map((item) => {
-        const contract = normalizeContract(item);
+        // Inside a client's `contratos` list an item's own `id` IS the
+        // contract's — the one place a bare `id` may be read as one.
+        const contract = normalizeContract(item)
+          || (item && typeof item === 'object' && asText(pick(item, ['id']))
+            ? normalizeContract({ ...item, contrato: pick(item, ['id']) })
+            : null);
         if (!contract) return null;
         return {
           ...contract,
@@ -435,6 +493,9 @@ function normalizeCustomer(entry) {
         };
       })
       .filter(Boolean);
+    // Contracts in a shape none of the names above read: the client is still a
+    // client, and is kept without a contract instead of vanishing.
+    if (rows.length > 0) return rows;
   }
 
   const contract = normalizeContract(entry);
@@ -1353,7 +1414,8 @@ class SgpService {
       received: entries.length,
       // For the test button: which fields the install actually sends, so an
       // operator can see at once whether the path is the right one.
-      fields: entries[0] && typeof entries[0] === 'object' ? Object.keys(entries[0]).slice(0, 40) : []
+      fields: entries[0] && typeof entries[0] === 'object' ? Object.keys(entries[0]).slice(0, 40) : [],
+      shape: listingShape(entries)
     };
   }
 

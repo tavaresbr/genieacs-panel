@@ -99,8 +99,14 @@ class SgpContactSyncService {
    */
   static async test() {
     const config = await SgpService.getConfig();
+    const started = Date.now();
     const page = await SgpService.listCustomersPage(0, config);
     return {
+      // How long one page takes is what the page size should be chosen by: an
+      // SGP that computes each client's invoices answers slower per client.
+      durationMs: Date.now() - started,
+      pageSize: config.contactsPageSize,
+      shape: page.shape,
       received: page.received,
       rows: page.rows.length,
       withContract: page.rows.filter((row) => row.contract).length,
@@ -146,7 +152,20 @@ class SgpContactSyncService {
     let previousFirst = null;
     for (let page = 0; page < MAX_PAGES; page += 1) {
       if (page > 0) await sleep(PAGE_PACE_MS);
-      const { rows, received } = await SgpService.listCustomersPage(page, config);
+      let listed;
+      try {
+        listed = await this.readPage(page, config);
+      } catch (error) {
+        // What was stored so far stays stored, and is said as such: a run that
+        // dies on page 40 has still brought 3 900 clients in.
+        if (summary.pages > 0) {
+          summary.partial = true;
+          summary.reason = 'error';
+          await this.saveRun(summary, startedAt);
+        }
+        throw error;
+      }
+      const { rows, received } = listed;
       summary.pages += 1;
       if (received === 0) {
         // Nothing at all on the first page: most likely an endpoint that only
@@ -191,6 +210,10 @@ class SgpContactSyncService {
       }
     }
 
+    return this.saveRun(summary, startedAt);
+  }
+
+  static async saveRun(summary, startedAt) {
     const finishedAt = new Date();
     const result = {
       ...summary,
@@ -200,6 +223,17 @@ class SgpContactSyncService {
     };
     await AppState.upsert(STATE_KEY, JSON.stringify(result));
     return result;
+  }
+
+  /** One page, asked twice when the first answer did not come in time: a slow SGP is often slow once. */
+  static async readPage(page, config) {
+    try {
+      return await SgpService.listCustomersPage(page, config);
+    } catch (error) {
+      if (error?.code !== 'timeout') throw error;
+      await sleep(PAGE_PACE_MS * 5);
+      return SgpService.listCustomersPage(page, config);
+    }
   }
 
   /** @returns {Promise<'created'|'updated'|null>} */

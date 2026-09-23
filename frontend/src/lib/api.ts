@@ -1609,7 +1609,7 @@ export interface SgpContactsSyncResult {
   pages: number
   /** True when a ceiling or an SGP that ignores paging stopped the run early. */
   partial: boolean
-  reason?: 'paging_ignored' | 'ceiling' | 'empty'
+  reason?: 'paging_ignored' | 'ceiling' | 'empty' | 'error'
   /** The SGP ignored the page size and sent its whole base in one answer — complete, not partial. */
   note?: 'all_at_once'
   durationMs: number
@@ -1627,6 +1627,11 @@ export interface SgpContactsSyncStatus {
 
 /** The first page of the listing, for the test button. Nothing is written. */
 export interface SgpContactsTestResult {
+  /** How long the page took — what the page size should be chosen by. */
+  durationMs: number
+  pageSize: number
+  /** Field names inside nested `contratos`/`contatos`, never values. */
+  shape: Record<string, string>
   received: number
   rows: number
   withContract: number
