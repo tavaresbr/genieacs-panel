@@ -1,6 +1,7 @@
 import WaSendService from '../services/waSendService.js';
 import WaConversationService from '../services/waConversationService.js';
 import WaContactService from '../services/waContactService.js';
+import { SgpError } from '../services/sgpService.js';
 import { roleHas } from '../config/permissions.js';
 import WaMessage from '../models/WaMessage.js';
 import { WaError } from '../services/whatsappConfigService.js';
@@ -26,7 +27,9 @@ const MAX_REQUEUE_HOURS = 24;
 const HOUR_MS = 60 * 60 * 1000;
 
 function handleError(req, res, error, fallbackKey) {
-  if (error instanceof WaError) {
+  // The SGP lookup on the contacts screen answers with the SGP's own refusals
+  // ("integration off", "unreachable"), already coded and translated there.
+  if (error instanceof WaError || error instanceof SgpError) {
     // The code lets the UI tell "no number is connected" from "this thread has
     // nowhere to send" without dumping the Evolution response at the operator.
     return res.status(error.status).json({
@@ -142,6 +145,22 @@ class WhatsAppMessageController {
         limit: req.query?.limit,
         offset: req.query?.offset
       });
+      return res.json(createResponse(
+        req.t('whatsapp.contactsLoaded', { count: data.contacts.length }),
+        data
+      ));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.contactsLoadFailed');
+    }
+  }
+
+  /**
+   * Asks the SGP for a subscriber by CPF/CNPJ or contract — the way to reach
+   * one the panel has no ONT for. What it finds becomes a contact.
+   */
+  static async lookupContacts(req, res) {
+    try {
+      const data = await WaContactService.lookupSgp(req.body?.search);
       return res.json(createResponse(
         req.t('whatsapp.contactsLoaded', { count: data.contacts.length }),
         data

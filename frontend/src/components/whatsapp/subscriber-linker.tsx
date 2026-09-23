@@ -37,6 +37,8 @@ export function SubscriberLinker({ conversation, onLinked, onCancel }: Subscribe
   const [loading, setLoading] = useState(false)
   const [savePhone, setSavePhone] = useState(canSavePhone)
   const [linking, setLinking] = useState<string | null>(null)
+  const [lookingUp, setLookingUp] = useState(false)
+  const canLookup = can('sgp.read')
   const seq = useRef(0)
   const alive = useRef(true)
 
@@ -67,6 +69,28 @@ export function SubscriberLinker({ conversation, onLinked, onCancel }: Subscribe
     }, SEARCH_DEBOUNCE_MS)
     return () => clearTimeout(timer)
   }, [search, t, toast])
+
+  /** The subscriber with no ONT in the panel, asked of the SGP by CPF/CNPJ or contract. */
+  const lookupSgp = async () => {
+    const term = search.trim()
+    if (!term) return
+    seq.current += 1
+    setLookingUp(true)
+    try {
+      const res = await whatsappAPI.lookupContacts(term)
+      if (!alive.current) return
+      if (!res.success || !res.data) {
+        toast.error(res.message || whatsappErrorMessage(t, res.code))
+        return
+      }
+      setResults(res.data.contacts)
+      if (res.data.contacts.length === 0) toast.info(t('whatsapp.contacts.lookupNone'))
+    } catch {
+      if (alive.current) toast.error(t('api.requestFailed'))
+    } finally {
+      if (alive.current) setLookingUp(false)
+    }
+  }
 
   const link = async (contact: WhatsAppContact) => {
     setLinking(contact.contract)
@@ -127,8 +151,20 @@ export function SubscriberLinker({ conversation, onLinked, onCancel }: Subscribe
       {search.trim() && (
         <ul className="max-h-60 divide-y divide-border overflow-y-auto rounded-md border border-border bg-card">
           {results.length === 0 ? (
-            <li className="px-3 py-3 text-sm text-muted-foreground">
-              {loading ? t('common.loading') : t('whatsapp.contacts.noMatch')}
+            <li className="flex flex-wrap items-center justify-between gap-2 px-3 py-3 text-sm text-muted-foreground">
+              <span>{loading || lookingUp ? t('common.loading') : t('whatsapp.contacts.noMatch')}</span>
+              {!loading && canLookup && (
+                <button
+                  type="button"
+                  className="modern-button-secondary"
+                  disabled={lookingUp}
+                  title={t('whatsapp.contacts.lookupHint')}
+                  onClick={() => void lookupSgp()}
+                >
+                  <Icon name="search" size={14} />
+                  {t('whatsapp.contacts.lookup')}
+                </button>
+              )}
             </li>
           ) : results.map((contact) => (
             <li key={contact.contract}>
@@ -145,6 +181,7 @@ export function SubscriberLinker({ conversation, onLinked, onCancel }: Subscribe
                   <span className="block truncate font-mono text-xs text-muted-foreground">
                     {t('whatsapp.inbox.contract')}: {contact.contract}
                     {contact.phone ? ` · ${contact.phone}` : ''}
+                    {contact.hasDevice ? '' : ` · ${t('whatsapp.contacts.noDevice')}`}
                   </span>
                 </span>
                 <span className="modern-badge shrink-0">

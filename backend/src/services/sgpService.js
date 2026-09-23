@@ -1059,6 +1059,36 @@ class SgpService {
     };
   }
 
+  /**
+   * The subscribers the SGP holds under a document or a contract, for the
+   * WhatsApp contacts screen.
+   *
+   * "No such customer" is an empty answer here, not a failure: the operator
+   * typed a number and the honest reply is that the SGP has nobody under it.
+   */
+  static async lookupContacts(filters) {
+    try {
+      const { contracts } = await this.lookupCustomer(filters);
+      return contracts;
+    } catch (error) {
+      if (isNotFound(error)) return [];
+      throw error;
+    }
+  }
+
+  /** The `sgp_contacts` row for one contract — `contractToLinkRow` without the equipment. */
+  static contractToContactRow(contract) {
+    return {
+      contract: contract.contract,
+      document: contract.document ? String(contract.document).replace(/\D/g, '').slice(0, 32) : null,
+      client_name: contract.name ? String(contract.name).slice(0, 255) : null,
+      status: contract.status ? String(contract.status).slice(0, 64) : null,
+      status_label: contract.statusLabel ? String(contract.statusLabel).slice(0, 128) : null,
+      state: deriveContractState(contract),
+      phone_e164: contract.phone || null
+    };
+  }
+
   static contractToLinkRow(contract, { deviceId, accountId, linkMode }) {
     return {
       device_id: deviceId,

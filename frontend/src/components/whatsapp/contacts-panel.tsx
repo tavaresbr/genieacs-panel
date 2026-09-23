@@ -38,6 +38,10 @@ export function ContactsPanel({ onOpenConversation }: ContactsPanelProps) {
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [openingContract, setOpeningContract] = useState<string | null>(null)
+  // What the SGP answered for a CPF/CNPJ or contract. While set, it is what the
+  // table shows — the panel's own directory comes back when the search changes.
+  const [sgpResult, setSgpResult] = useState<{ term: string; contacts: WhatsAppContact[] } | null>(null)
+  const [lookingUp, setLookingUp] = useState(false)
 
   const alive = useRef(true)
   // The newest request wins: a slow answer for "ben" must not overwrite the
@@ -53,6 +57,33 @@ export function ContactsPanel({ onOpenConversation }: ContactsPanelProps) {
     const timer = setTimeout(() => setDebounced(search.trim()), SEARCH_DEBOUNCE_MS)
     return () => clearTimeout(timer)
   }, [search])
+
+  /**
+   * Asks the SGP for what the panel's directory does not have: a subscriber
+   * with no ONT here. The SGP answers by CPF/CNPJ or contract only, never by
+   * name, and the button says so.
+   */
+  const lookupSgp = useCallback(async () => {
+    const term = search.trim()
+    if (!term) return
+    setLookingUp(true)
+    try {
+      const res = await whatsappAPI.lookupContacts(term)
+      if (!alive.current) return
+      if (!res.success || !res.data) {
+        // The server's own sentence: an SGP refusal ("integration off",
+        // "unreachable") is already translated there, and a generic failure
+        // would hide which one it was.
+        toast.error(res.message || whatsappErrorMessage(t, res.code))
+        return
+      }
+      setSgpResult({ term, contacts: res.data.contacts })
+    } catch {
+      if (alive.current) toast.error(t('api.requestFailed'))
+    } finally {
+      if (alive.current) setLookingUp(false)
+    }
+  }, [search, t, toast])
 
   const load = useCallback(async (term: string) => {
     const seq = ++requestSeq.current
@@ -119,6 +150,8 @@ export function ContactsPanel({ onOpenConversation }: ContactsPanelProps) {
   }
 
   const canSend = can('whatsapp.send')
+  const canLookup = can('sgp.read')
+  const shown = sgpResult ? sgpResult.contacts : contacts
 
   return (
     <section className="flex flex-col gap-5">
@@ -138,14 +171,45 @@ export function ContactsPanel({ onOpenConversation }: ContactsPanelProps) {
         </button>
       </header>
 
-      <input
-        type="search"
-        className="modern-input"
-        value={search}
-        onChange={(event) => setSearch(event.target.value)}
-        placeholder={t('whatsapp.contacts.searchPlaceholder')}
-        aria-label={t('whatsapp.contacts.searchPlaceholder')}
-      />
+      <form
+        className="flex flex-col gap-2 sm:flex-row"
+        onSubmit={(event) => {
+          event.preventDefault()
+          if (canLookup) void lookupSgp()
+        }}
+      >
+        <input
+          type="search"
+          className="modern-input flex-1"
+          value={search}
+          onChange={(event) => {
+            setSearch(event.target.value)
+            setSgpResult(null)
+          }}
+          placeholder={t('whatsapp.contacts.searchPlaceholder')}
+          aria-label={t('whatsapp.contacts.searchPlaceholder')}
+        />
+        {canLookup && (
+          <button
+            type="submit"
+            className="modern-button-secondary shrink-0"
+            disabled={!search.trim() || lookingUp}
+            title={t('whatsapp.contacts.lookupHint')}
+          >
+            <Icon name={lookingUp ? 'refresh' : 'search'} size={16} className={lookingUp ? 'animate-spin' : ''} />
+            {t('whatsapp.contacts.lookup')}
+          </button>
+        )}
+      </form>
+
+      {sgpResult && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
+          <span>{t('whatsapp.contacts.lookupResult', { term: sgpResult.term, count: sgpResult.contacts.length })}</span>
+          <button type="button" className="modern-button-secondary" onClick={() => setSgpResult(null)}>
+            {t('whatsapp.contacts.lookupBack')}
+          </button>
+        </div>
+      )}
 
       {loadError && (
         <p className="flex items-center gap-2 text-sm text-[hsl(var(--status-danger))]" role="alert">
@@ -155,14 +219,19 @@ export function ContactsPanel({ onOpenConversation }: ContactsPanelProps) {
       )}
 
       <section className="modern-card overflow-hidden">
-        {contacts.length === 0 ? (
+        {shown.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-state-icon"><Icon name={debounced ? 'search' : 'phone'} size={22} /></div>
+            <div className="empty-state-icon"><Icon name={debounced || sgpResult ? 'search' : 'phone'} size={22} /></div>
             <p className="empty-state-title">
-              {loading
-                ? t('common.loading')
-                : t(debounced ? 'whatsapp.contacts.noMatch' : 'whatsapp.contacts.empty')}
+              {sgpResult
+                ? t('whatsapp.contacts.lookupNone')
+                : loading
+                  ? t('common.loading')
+                  : t(debounced ? 'whatsapp.contacts.noMatch' : 'whatsapp.contacts.empty')}
             </p>
+            {!sgpResult && !loading && canLookup && (
+              <p className="empty-state-copy">{t('whatsapp.contacts.lookupHint')}</p>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -177,13 +246,20 @@ export function ContactsPanel({ onOpenConversation }: ContactsPanelProps) {
                 </tr>
               </thead>
               <tbody>
-                {contacts.map((contact) => (
+                {shown.map((contact) => (
                   <tr key={contact.contract} data-contract={contact.contract}>
                     <td>
                       <span className="block font-semibold">{contact.clientName || '—'}</span>
-                      {contact.document && (
-                        <span className="text-xs text-muted-foreground">{contact.document}</span>
-                      )}
+                      <span className="flex flex-wrap items-center gap-1.5">
+                        {contact.document && (
+                          <span className="text-xs text-muted-foreground">{contact.document}</span>
+                        )}
+                        {!contact.hasDevice && (
+                          <span className="modern-badge" title={t('whatsapp.contacts.noDeviceHint')}>
+                            {t('whatsapp.contacts.noDevice')}
+                          </span>
+                        )}
+                      </span>
                     </td>
                     <td className="font-mono">{contact.contract}</td>
                     <td>
@@ -236,7 +312,7 @@ export function ContactsPanel({ onOpenConversation }: ContactsPanelProps) {
         )}
       </section>
 
-      {contacts.length > 0 && (
+      {!sgpResult && contacts.length > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
           <span>{t('whatsapp.contacts.showing', { shown: contacts.length, total })}</span>
           {contacts.length < total && (

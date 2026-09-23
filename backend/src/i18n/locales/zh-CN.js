@@ -507,6 +507,7 @@ export default {
   'whatsapp.subscriberLinked': '会话已关联到用户',
   'whatsapp.subscriberLinkFailed': '无法关联会话',
   'whatsapp.error.subscriberNoPhone': '该用户没有登记电话号码',
+  'whatsapp.error.lookupTermRequired': '请输入 CPF/CNPJ 或合同号以在 SGP 中搜索',
   // WhatsApp — 收件箱与自助服务机器人（第三阶段）
   'whatsapp.error.conversationNotFound': '找不到该会话',
   'whatsapp.conversationClosed': '会话已结束',

@@ -2,6 +2,7 @@ import WaConversation from '../models/WaConversation.js';
 import WaMessage from '../models/WaMessage.js';
 import WaOptOut from '../models/WaOptOut.js';
 import SgpLink from '../models/SgpLink.js';
+import SgpContact from '../models/SgpContact.js';
 import CustomerAccount from '../models/CustomerAccount.js';
 import { WaError } from './whatsappConfigService.js';
 import WaSendService from './waSendService.js';
@@ -61,6 +62,18 @@ class WaConversationService {
   }
 
   /**
+   * The `sgp_contacts` subscriber behind a phone — the one with no ONT in the
+   * panel. Same order as `resolveSubscriber`: the operator's correction first.
+   */
+  static async resolveContact(phone) {
+    const spellings = variantesTelefoneBr(phone);
+    if (spellings.length === 0) return null;
+    return (await tdb('sgp_contacts').whereIn('phone_manual', spellings).orderBy('id', 'asc').first())
+      || (await tdb('sgp_contacts').whereIn('phone_e164', spellings).orderBy('id', 'asc').first())
+      || null;
+  }
+
+  /**
    * Binds a conversation to the subscriber it belongs to.
    *
    * Written once, when the thread is first resolved, and left alone afterwards:
@@ -70,7 +83,14 @@ class WaConversationService {
   static async bindSubscriber(conversation) {
     if (!conversation || conversation.contract) return conversation;
     const { link, account } = await this.resolveSubscriber(conversation.wa_phone_e164);
-    if (!link) return conversation;
+    if (!link) {
+      // No ONT for this number, but maybe a subscriber an operator already
+      // looked up in the SGP. Bound here and not in `resolveSubscriber`: the bot
+      // reads that one, and it answers about invoices and signal from the ONT.
+      const contact = await this.resolveContact(conversation.wa_phone_e164);
+      if (!contact) return conversation;
+      return WaConversation.update(conversation.id, { contract: contact.contract, device_id: null });
+    }
     return WaConversation.update(conversation.id, {
       contract: link.contract,
       device_id: link.device_id,
@@ -106,16 +126,25 @@ class WaConversationService {
     const spellingsOf = new Map(pending.map((row) => [row.id, variantesTelefoneBr(row.wa_phone_e164)]));
     const all = [...new Set([...spellingsOf.values()].flat())];
     if (all.length === 0) return rows;
-    const links = await tdb('sgp_links')
-      .where((match) => match.whereIn('phone_manual', all).orWhereIn('phone_e164', all))
-      .orderBy('id', 'asc');
-    if (links.length === 0) return rows;
+    const byPhone = (match) => match.whereIn('phone_manual', all).orWhereIn('phone_e164', all);
+    const links = await tdb('sgp_links').where(byPhone).orderBy('id', 'asc');
+    const contacts = await tdb('sgp_contacts').where(byPhone).orderBy('id', 'asc');
+    if (links.length === 0 && contacts.length === 0) return rows;
+
+    const pick = (rowsOf, spellings) => rowsOf.find((l) => spellings.includes(l.phone_manual))
+      || rowsOf.find((l) => spellings.includes(l.phone_e164));
 
     for (const row of pending) {
       const spellings = spellingsOf.get(row.id);
-      const link = links.find((l) => spellings.includes(l.phone_manual))
-        || links.find((l) => spellings.includes(l.phone_e164));
-      if (!link) continue;
+      const link = pick(links, spellings);
+      if (!link) {
+        const contact = pick(contacts, spellings);
+        if (!contact) continue;
+        const patch = { contract: contact.contract, device_id: null };
+        await WaConversation.update(row.id, patch);
+        Object.assign(row, patch);
+        continue;
+      }
       const account = link.device_id ? await CustomerAccount.getByDeviceId(link.device_id) : null;
       const patch = {
         contract: link.contract,
@@ -146,22 +175,27 @@ class WaConversationService {
     const conversation = await this.get(id);
     const key = String(contract ?? '').trim();
     const links = key ? await SgpLink.getByContract(key) : [];
-    if (links.length === 0) {
+    // A subscriber with no ONT in the panel, found by a lookup in the SGP.
+    const contact = links.length === 0 && key ? await SgpContact.getByContract(key) : null;
+    if (links.length === 0 && !contact) {
       throw new WaError('whatsapp.error.subscriberNotFound', {
         code: 'subscriber_not_found',
         status: 404
       });
     }
-    const link = links[0];
-    const account = link.device_id ? await CustomerAccount.getByDeviceId(link.device_id) : null;
+    const link = links[0] ?? null;
+    const account = link?.device_id ? await CustomerAccount.getByDeviceId(link.device_id) : null;
     const updated = await WaConversation.update(conversation.id, {
-      contract: link.contract,
-      device_id: link.device_id,
+      contract: link ? link.contract : contact.contract,
+      device_id: link?.device_id ?? null,
       customer_account_id: account?.id ?? null
     });
 
     const phone = normalizarTelefoneBr(conversation.wa_phone_e164);
-    if (savePhone && phone) await SgpLink.setManualPhone(link.contract, phone);
+    if (savePhone && phone) {
+      if (link) await SgpLink.setManualPhone(link.contract, phone);
+      else await SgpContact.setManualPhone(contact.contract, phone);
+    }
 
     return this.decorate(updated);
   }
@@ -201,7 +235,8 @@ class WaConversationService {
     const like = `%${WaConversation.likeTerm(term)}%`;
     if (like === '%%') return [];
     const links = await tdb('sgp_links').whereRaw('lower(client_name) like ?', [like]).select('contract');
-    return [...new Set(links.map((link) => link.contract).filter(Boolean))];
+    const contacts = await tdb('sgp_contacts').whereRaw('lower(client_name) like ?', [like]).select('contract');
+    return [...new Set([...links, ...contacts].map((row) => row.contract).filter(Boolean))];
   }
 
   /**
@@ -231,6 +266,9 @@ class WaConversationService {
     const contracts = [...new Set(rows.map((r) => r.contract).filter(Boolean))];
     const names = new Map();
     if (contracts.length > 0) {
+      // The ONT's mirror wins over a lookup's row for the same contract.
+      const contacts = await tdb('sgp_contacts').whereIn('contract', contracts).select('contract', 'client_name');
+      for (const contact of contacts) names.set(contact.contract, contact.client_name);
       const links = await tdb('sgp_links').whereIn('contract', contracts).select('contract', 'client_name');
       for (const link of links) names.set(link.contract, link.client_name);
     }
@@ -258,9 +296,12 @@ class WaConversationService {
 
   /** The thread as the browser wants it, with the two facts the row cannot hold. */
   static async decorate(conversation) {
-    const link = conversation.contract ? await SgpLink.getByDeviceId(conversation.device_id) : null;
+    const link = conversation.contract && conversation.device_id
+      ? await SgpLink.getByDeviceId(conversation.device_id)
+      : null;
+    const contact = conversation.contract && !link ? await SgpContact.getByContract(conversation.contract) : null;
     return this.publicConversation(conversation, {
-      clientName: link?.client_name ?? null,
+      clientName: link?.client_name ?? contact?.client_name ?? null,
       optedOut: await WaOptOut.isActive({
         waPhone: conversation.wa_phone_e164,
         waLid: conversation.wa_lid

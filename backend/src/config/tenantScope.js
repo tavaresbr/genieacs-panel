@@ -43,6 +43,10 @@ export const SCOPED_TABLES = new Set([
   // against: unfiltered, one provider's operator could type a number and be
   // handed another provider's contract, name and document.
   'sgp_links',
+  // O mesmo cadastro para quem não tem ONT no painel: nome, documento e
+  // telefone de um assinante, achados por uma busca no SGP. Pelo mesmo motivo
+  // de `sgp_links`, é contra ela que um número de WhatsApp é resolvido.
+  'sgp_contacts',
   // The ERP event log, and the heaviest concentration of personal data here:
   // contract, document, PPPoE login, device id and a redacted payload, per
   // event. Deployment-wide it also had a second failure that read as no

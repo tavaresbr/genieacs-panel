@@ -3,7 +3,7 @@ import WhatsAppMessageController from '../controllers/whatsappMessageController.
 import WhatsAppAttachmentController from '../controllers/whatsappAttachmentController.js';
 import WhatsAppMediaController from '../controllers/whatsappMediaController.js';
 import { authenticateToken, requirePermission } from '../middleware/auth.js';
-import { whatsappBulkRequeueLimiter, whatsappSendLimiter } from '../middleware/rateLimit.js';
+import { sgpAdminLimiter, whatsappBulkRequeueLimiter, whatsappSendLimiter } from '../middleware/rateLimit.js';
 
 const router = express.Router();
 
@@ -53,6 +53,21 @@ router.get(
   authenticateToken,
   requirePermission('whatsapp.read'),
   WhatsAppMessageController.listContacts
+);
+
+// The subscriber the panel has no ONT for, asked of the SGP by CPF/CNPJ or
+// contract. `sgp.read` on top of `whatsapp.read`, because this is the same
+// question as `GET /api/sgp/customers` — a name, a document and a phone out of
+// the ERP — and it takes the same limiter, since every call reaches the SGP.
+// Declared before `/contacts/:contract/...` for readability; the paths differ
+// in length, so neither can shadow the other.
+router.post(
+  '/contacts/lookup',
+  authenticateToken,
+  requirePermission('whatsapp.read'),
+  requirePermission('sgp.read'),
+  sgpAdminLimiter,
+  WhatsAppMessageController.lookupContacts
 );
 
 router.post(

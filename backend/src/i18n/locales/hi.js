@@ -507,6 +507,7 @@ export default {
   'whatsapp.subscriberLinked': 'बातचीत ग्राहक से जोड़ी गई',
   'whatsapp.subscriberLinkFailed': 'बातचीत नहीं जोड़ी जा सकी',
   'whatsapp.error.subscriberNoPhone': 'इस ग्राहक का कोई फ़ोन नंबर दर्ज नहीं है',
+  'whatsapp.error.lookupTermRequired': 'SGP में खोजने के लिए CPF/CNPJ या अनुबंध दर्ज करें',
 
   // WhatsApp — इनबॉक्स और स्व-सेवा बॉट (चरण 3)
   'whatsapp.error.conversationNotFound': 'बातचीत नहीं मिली',

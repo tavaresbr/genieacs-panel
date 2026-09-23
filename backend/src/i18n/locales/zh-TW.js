@@ -506,6 +506,7 @@ export default {
   'whatsapp.subscriberLinked': '對話已連結至用戶',
   'whatsapp.subscriberLinkFailed': '無法連結對話',
   'whatsapp.error.subscriberNoPhone': '此用戶沒有登記電話號碼',
+  'whatsapp.error.lookupTermRequired': '請輸入 CPF/CNPJ 或合約號碼以在 SGP 中搜尋',
   // WhatsApp — 收件匣與自助服務機器人（第三階段）
   'whatsapp.error.conversationNotFound': '找不到該對話',
   'whatsapp.conversationClosed': '對話已結束',

@@ -504,6 +504,7 @@ export default {
   'whatsapp.subscriberLinked': 'Conversa vinculada ao assinante',
   'whatsapp.subscriberLinkFailed': 'Não foi possível vincular a conversa',
   'whatsapp.error.subscriberNoPhone': 'Este assinante não tem telefone cadastrado',
+  'whatsapp.error.lookupTermRequired': 'Digite um CPF/CNPJ ou um contrato para buscar no SGP',
   // WhatsApp — inbox e bot de autoatendimento (onda 3)
   'whatsapp.error.conversationNotFound': 'Conversa não encontrada',
   'whatsapp.conversationClosed': 'Conversa encerrada',

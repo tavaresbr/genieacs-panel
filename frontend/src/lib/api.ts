@@ -2301,6 +2301,8 @@ export interface WhatsAppContact {
   /** CPF/CNPJ as its last digits only. */
   document: string | null
   deviceId: string | null
+  /** False for a subscriber found by an SGP lookup that has no ONT in the panel. */
+  hasDevice: boolean
   phone: string | null
   phoneSource: 'manual' | 'sgp' | null
   optedOut: boolean
@@ -2545,6 +2547,11 @@ export const whatsappAPI = {
     const suffix = query.toString()
     return apiClient.get<WhatsAppContactPage>(`/whatsapp/contacts${suffix ? `?${suffix}` : ''}`)
   },
+
+  // Asks the SGP itself, by CPF/CNPJ or contract — the way to reach a
+  // subscriber with no ONT in the panel. What it finds becomes a contact.
+  lookupContacts: (search: string) =>
+    apiClient.post<WhatsAppContactPage>('/whatsapp/contacts/lookup', { search }),
 
   // The existing thread with this subscriber, or a new empty one. Opening sends
   // nothing.
