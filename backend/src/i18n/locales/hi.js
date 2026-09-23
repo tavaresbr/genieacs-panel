@@ -385,6 +385,7 @@ export default {
   'sgp.error.queryFailed': 'SGP ने इस क्वेरी के लिए त्रुटि लौटाई',
   'sgp.error.identifierRequired': 'SGP से पूछताछ करने के लिए दस्तावेज़, अनुबंध या PPPoE लॉगिन दर्ज करें',
   'sgp.error.contractRequired': 'SGP अनुबंध आवश्यक है',
+  'sgp.error.unlockRefused': 'SGP ने इस अनुबंध के लिए भरोसे पर अनलॉक अस्वीकार कर दिया',
   'sgp.error.contractNotInConversation': 'यह अनुबंध इस बातचीत से संबंधित नहीं है',
   'sgp.error.deviceUnlinked': 'इस ONT से अभी कोई SGP अनुबंध जुड़ा नहीं है। इसे मैन्युअल रूप से जोड़ें या PPPoE लॉगिन जाँचें।',
   'sgp.error.noContractForDevice': 'इस ONT के लिए कोई SGP अनुबंध नहीं मिला',

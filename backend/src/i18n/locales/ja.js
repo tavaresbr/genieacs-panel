@@ -386,6 +386,7 @@ export default {
   'sgp.error.queryFailed': 'この照会に対して SGP がエラーを返しました',
   'sgp.error.identifierRequired': 'SGP に照会するには、証明書番号、契約、PPPoE ログインのいずれかを入力してください',
   'sgp.error.contractRequired': 'SGP の契約が必要です',
+  'sgp.error.unlockRefused': 'SGPがこの契約の信頼解除を拒否しました',
   'sgp.error.contractNotInConversation': 'この契約はこの会話に属していません',
   'sgp.error.deviceUnlinked': 'この ONT にはまだ SGP の契約が紐づいていません。手動で紐づけるか、PPPoE ログインを確認してください。',
   'sgp.error.noContractForDevice': 'この ONT に対応する SGP の契約が見つかりませんでした',

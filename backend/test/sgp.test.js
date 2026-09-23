@@ -23,6 +23,8 @@ let portalPassword;
 let sgpUrl;
 let sgpServer;
 const requests = [];
+/** What the stub's trust unlock answers with, so one test can make SGP refuse. */
+let unlockRefused = false;
 
 /** Minimal stand-in for a provider's SGP instance. */
 function startSgpStub() {
@@ -83,9 +85,11 @@ function startSgpStub() {
         });
       }
       if (req.url.startsWith('/api/ura/liberacao')) {
-        return String(payload.contrato) === '4321'
-          ? send({ status: 1, msg: 'Liberação efetuada' })
-          : send({ status: 0, msg: 'Contrato inválido' });
+        if (String(payload.contrato) !== '4321') return send({ status: 0, msg: 'Contrato inválido' });
+        // SGP's own refusal: a status that is not one of the failure flags,
+        // and `liberado: false` saying what actually happened.
+        if (unlockRefused) return send({ status: 2, liberado: false, msg: 'Contrato não está suspenso' });
+        return send({ status: 1, liberado: true, liberado_dias: 3, protocolo: '20260923001', msg: 'Liberação efetuada' });
       }
       res.writeHead(404, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ status: 0, msg: 'Endpoint inexistente' }));
@@ -316,6 +320,7 @@ describe('device to contract resolution', () => {
   });
 
   it('requests a trust unlock for the linked contract', async () => {
+    const before = requests.length;
     const { status, body } = await call(`${panelUrl}/api/sgp/devices/${DEVICE_ID}/unlock`, {
       method: 'POST',
       headers: authHeaders(token)
@@ -323,6 +328,42 @@ describe('device to contract resolution', () => {
     assert.equal(status, 200);
     assert.equal(body.data.contract, '4321');
     assert.match(body.message, /Liberação/);
+    // The route SGP documents for the promise of payment, not `/liberacao/`.
+    const sent = requests.slice(before).find((entry) => entry.url.includes('liberacao'));
+    assert.equal(sent.url, '/api/ura/liberacaopromessa/');
+  });
+
+  it('reports a refused promise as a refusal, not as done', async () => {
+    unlockRefused = true;
+    try {
+      const { status, body } = await call(`${panelUrl}/api/sgp/devices/${DEVICE_ID}/unlock`, {
+        method: 'POST',
+        headers: authHeaders(token)
+      });
+      assert.equal(status, 409);
+      assert.equal(body.code, 'unlock_refused');
+      assert.match(body.message, /não está suspenso/);
+    } finally {
+      unlockRefused = false;
+    }
+  });
+
+  it('moves a provider off the old default path it saved without choosing', async () => {
+    // Every Save wrote the defaults back, so the wrong one is stored verbatim.
+    await asTenant(async () => {
+      const stored = JSON.parse(await AppState.get('sgp_integration_config'));
+      stored.endpoints = { ...stored.endpoints, unlock: '/api/ura/liberacao/' };
+      await AppState.upsert('sgp_integration_config', JSON.stringify(stored));
+      SgpService.invalidateConfigCache();
+    });
+    const before = requests.length;
+    const { status } = await call(`${panelUrl}/api/sgp/devices/${DEVICE_ID}/unlock`, {
+      method: 'POST',
+      headers: authHeaders(token)
+    });
+    assert.equal(status, 200);
+    const sent = requests.slice(before).find((entry) => entry.url.includes('liberacao'));
+    assert.equal(sent.url, '/api/ura/liberacaopromessa/');
   });
 });
 

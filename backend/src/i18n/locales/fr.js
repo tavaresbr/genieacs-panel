@@ -387,6 +387,7 @@ export default {
   'sgp.error.queryFailed': 'SGP a renvoyé une erreur pour cette requête',
   'sgp.error.identifierRequired': 'Saisissez un document, un contrat ou un identifiant PPPoE pour interroger SGP',
   'sgp.error.contractRequired': 'Le contrat SGP est requis',
+  'sgp.error.unlockRefused': 'SGP a refusé le déblocage de confiance de ce contrat',
   'sgp.error.contractNotInConversation': 'Ce contrat n\'appartient pas à cette conversation',
   'sgp.error.deviceUnlinked': 'Cet ONT n’est encore lié à aucun contrat SGP. Liez-le manuellement ou vérifiez l’identifiant PPPoE.',
   'sgp.error.noContractForDevice': 'Aucun contrat SGP n’a été trouvé pour cet ONT',

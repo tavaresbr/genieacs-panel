@@ -206,7 +206,7 @@ describe('the endpoint path', () => {
     assert.equal(changed.body.data.endpoints.ticket, '/api/ura/chamado-alternativo/');
 
     // The other three must not have moved with it.
-    assert.equal(changed.body.data.endpoints.unlock, '/api/ura/liberacao/');
+    assert.equal(changed.body.data.endpoints.unlock, '/api/ura/liberacaopromessa/');
     await configure({ endpoints: { ticket: '/api/ura/chamado/' } });
   });
 });
