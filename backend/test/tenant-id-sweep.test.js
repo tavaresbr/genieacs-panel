@@ -270,6 +270,18 @@ async function semear(tenantId, slug) {
       attempts: 1
     });
 
+    // O contrato do SGP, um por provedor e não o mesmo nos dois, pelo motivo
+    // da planta de fibra acima: o que se pergunta é se o contrato do VIZINHO
+    // abre conversa aqui. Com telefone, para que o controle chegue a abrir.
+    alvo.sgpContract = `CONTRATO-${slug}`;
+    await semearLinha('sgp_links', {
+      device_id: `ONT-CONTATO-${slug}`,
+      contract: alvo.sgpContract,
+      client_name: `Contato do ${slug}`,
+      state: 'active',
+      phone_e164: '5511922222222'
+    });
+
     return alvo;
   });
 }

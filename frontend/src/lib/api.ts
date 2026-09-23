@@ -2294,6 +2294,26 @@ export interface WhatsAppConversation {
   updatedAt: string | null
 }
 
+/** An SGP subscriber as a WhatsApp contact — one per contract. */
+export interface WhatsAppContact {
+  contract: string
+  clientName: string | null
+  /** CPF/CNPJ as its last digits only. */
+  document: string | null
+  deviceId: string | null
+  phone: string | null
+  phoneSource: 'manual' | 'sgp' | null
+  optedOut: boolean
+  /** The thread already open with this subscriber, if any. */
+  conversationId: number | null
+  lastMessageAt: string | null
+}
+
+export interface WhatsAppContactPage {
+  total: number
+  contacts: WhatsAppContact[]
+}
+
 export interface WhatsAppMessage {
   id: number
   conversationId: number
@@ -2507,6 +2527,29 @@ export const whatsappAPI = {
   // not answered by an archive.
   setConversationStatus: (conversationId: number, status: 'open' | 'closed') =>
     apiClient.post<WhatsAppConversation>(`/whatsapp/conversations/${conversationId}/status`, { status }),
+
+  // Says by hand which SGP subscriber a thread belongs to. `savePhone` also
+  // writes the thread's number onto the contract, and needs `campaigns.manage`.
+  linkConversationSubscriber: (conversationId: number, contract: string, savePhone = false) =>
+    apiClient.post<WhatsAppConversation>(
+      `/whatsapp/conversations/${conversationId}/subscriber`,
+      { contract, savePhone }
+    ),
+
+  // ── SGP contacts ─────────────────────────────────────────────────────
+  listContacts: (params: { search?: string; limit?: number; offset?: number } = {}) => {
+    const query = new URLSearchParams()
+    if (params.search) query.set('search', params.search)
+    if (params.limit) query.set('limit', String(params.limit))
+    if (params.offset) query.set('offset', String(params.offset))
+    const suffix = query.toString()
+    return apiClient.get<WhatsAppContactPage>(`/whatsapp/contacts${suffix ? `?${suffix}` : ''}`)
+  },
+
+  // The existing thread with this subscriber, or a new empty one. Opening sends
+  // nothing.
+  openContactConversation: (contract: string) =>
+    apiClient.post<WhatsAppConversation>(`/whatsapp/contacts/${encodeURIComponent(contract)}/conversation`),
 
   // Reading a thread clears its unread count server-side — the operator looking
   // at it is the only thing "read" can mean here.

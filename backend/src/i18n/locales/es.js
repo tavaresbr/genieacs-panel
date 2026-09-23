@@ -497,6 +497,13 @@ export default {
   'whatsapp.phoneSaveFailed': 'No se pudo guardar el teléfono',
   'whatsapp.error.invalidPhone': 'Eso no parece un teléfono utilizable',
   'whatsapp.error.subscriberNotFound': 'Ningún suscriptor con ese contrato',
+  'whatsapp.contactsLoaded': '{count} contacto(s)',
+  'whatsapp.contactsLoadFailed': 'No se pudieron cargar los contactos',
+  'whatsapp.conversationOpened': 'Conversación abierta',
+  'whatsapp.conversationOpenFailed': 'No se pudo abrir la conversación',
+  'whatsapp.subscriberLinked': 'Conversación vinculada al suscriptor',
+  'whatsapp.subscriberLinkFailed': 'No se pudo vincular la conversación',
+  'whatsapp.error.subscriberNoPhone': 'Este suscriptor no tiene teléfono registrado',
   // WhatsApp — inbox e bot de autoatendimento (onda 3)
   'whatsapp.error.conversationNotFound': 'Conversación no encontrada',
   'whatsapp.conversationClosed': 'Conversación cerrada',

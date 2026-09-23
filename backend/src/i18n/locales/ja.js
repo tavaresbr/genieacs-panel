@@ -495,6 +495,13 @@ export default {
   'whatsapp.phoneSaveFailed': '電話番号を保存できませんでした',
   'whatsapp.error.invalidPhone': '使用できる電話番号の形式ではないようです',
   'whatsapp.error.subscriberNotFound': 'その契約番号の加入者が見つかりません',
+  'whatsapp.contactsLoaded': '連絡先 {count} 件',
+  'whatsapp.contactsLoadFailed': '連絡先を読み込めませんでした',
+  'whatsapp.conversationOpened': '会話を開きました',
+  'whatsapp.conversationOpenFailed': '会話を開けませんでした',
+  'whatsapp.subscriberLinked': '会話を加入者に紐付けました',
+  'whatsapp.subscriberLinkFailed': '会話を紐付けできませんでした',
+  'whatsapp.error.subscriberNoPhone': 'この加入者には電話番号が登録されていません',
   // WhatsApp — 受信箱とセルフサービスのボット (第 3 段階)
   'whatsapp.error.conversationNotFound': '会話が見つかりません',
   'whatsapp.conversationClosed': '会話を完了にしました',
