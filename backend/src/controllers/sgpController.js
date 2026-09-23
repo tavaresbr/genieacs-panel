@@ -179,7 +179,9 @@ class SgpController {
         try {
           ({ invoices } = await SgpService.listInvoices({
             contract: link.contract,
-            onlyOpen: req.query?.open !== '0'
+            onlyOpen: req.query?.open !== '0',
+            // The device page sorts the titles into status tabs itself.
+            includeClosed: true
           }));
         } catch (error) {
           invoiceError = error instanceof SgpError ? error.message : 'Falha ao consultar títulos';

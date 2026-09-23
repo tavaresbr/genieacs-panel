@@ -75,6 +75,14 @@ function startSgpStub() {
               link: 'https://provedor.example/boleto/900123/'
             },
             {
+              // Cancelled, unpaid, and sent anyway: SGP does not always honour
+              // the "open only" flag. Never open — the device page still sees it.
+              numerodocumento: '800001',
+              valor: '99,90',
+              vencimento: '2024-06-01',
+              status: 'Cancelado'
+            },
+            {
               numerodocumento: '900122',
               valor: 129.9,
               vencimento: '2026-09-10',
@@ -279,7 +287,7 @@ describe('device to contract resolution', () => {
     const { body } = await call(`${panelUrl}/api/sgp/devices/${DEVICE_ID}`, {
       headers: authHeaders(token)
     });
-    const [invoice] = body.data.invoices;
+    const invoice = body.data.invoices.find((entry) => entry.id === '900123');
     assert.equal(invoice.amount, 129.9);
     assert.equal(invoice.dueDate, '2026-10-10');
     assert.equal(invoice.digitableLine, '34191790010104351004791020150008699999999999');
@@ -289,8 +297,9 @@ describe('device to contract resolution', () => {
     const { body } = await call(`${panelUrl}/api/sgp/devices/${DEVICE_ID}`, {
       headers: authHeaders(token)
     });
-    assert.equal(body.data.invoices.length, 1);
     assert.ok(body.data.invoices.every((invoice) => !invoice.paid));
+    // The cancelled one stays: the device page sorts titles into status tabs.
+    assert.deepEqual(body.data.invoices.map((invoice) => invoice.id).sort(), ['800001', '900123']);
   });
 
   it('reports an unlinked device instead of guessing a contract', async () => {
