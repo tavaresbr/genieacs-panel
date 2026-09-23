@@ -105,7 +105,21 @@ class AuditLog {
     // Gravada aqui, e não só na trilha da plataforma, porque quem tem direito
     // de saber que entraram no painel dele é o dono do painel — e a trilha da
     // plataforma é a nossa, ele não a lê.
-    PLATFORM_IMPERSONATED: 'platform.impersonated'
+    PLATFORM_IMPERSONATED: 'platform.impersonated',
+    // O que o operador fez NA ONT. Até aqui só a senha do portal deixava
+    // linha; reiniciar, mudar WAN, Wi-Fi e credencial, e apagar o aparelho do
+    // ACS não deixavam nada — e é a primeira pergunta de quem recebe a ligação
+    // do assinante: "quem mexeu no meu roteador?". O `detail` guarda QUAIS
+    // campos, nunca os valores: a senha do Wi-Fi e a credencial da ONT não
+    // podem ter uma segunda cópia com a retenção da trilha. "Forçar contato"
+    // fica de fora de propósito: ele só pede à ONT que se reporte, e não muda
+    // nada nela.
+    DEVICE_REBOOTED: 'device.rebooted',
+    DEVICE_DELETED: 'device.deleted',
+    DEVICE_WAN_CHANGED: 'device.wan_changed',
+    DEVICE_WAN_ADDED: 'device.wan_added',
+    DEVICE_WIFI_CHANGED: 'device.wifi_changed',
+    DEVICE_CREDENTIALS_CHANGED: 'device.credentials_changed'
   });
 
   /**
