@@ -2,8 +2,9 @@ import express from 'express';
 import WhatsAppMessageController from '../controllers/whatsappMessageController.js';
 import WhatsAppAttachmentController from '../controllers/whatsappAttachmentController.js';
 import WhatsAppMediaController from '../controllers/whatsappMediaController.js';
+import WhatsAppSubscriberController from '../controllers/whatsappSubscriberController.js';
 import { authenticateToken, requirePermission } from '../middleware/auth.js';
-import { whatsappBulkRequeueLimiter, whatsappSendLimiter } from '../middleware/rateLimit.js';
+import { sgpAdminLimiter, whatsappBulkRequeueLimiter, whatsappSendLimiter } from '../middleware/rateLimit.js';
 
 const router = express.Router();
 
@@ -68,6 +69,68 @@ router.post(
   requirePermission('whatsapp.send'),
   whatsappSendLimiter,
   WhatsAppMessageController.send
+);
+
+// The SGP module beside the thread. Reading takes both the inbox and the ERP:
+// a `whatsapp.read` operator without `sgp.read` sees the thread, not the
+// contract behind it. Every act on the ERP is `sgp.act`, as on the device page,
+// and rides the same budget as the device page's SGP routes, since each one is
+// a call to the provider.
+router.get(
+  '/conversations/:id/subscriber',
+  authenticateToken,
+  requirePermission('whatsapp.read'),
+  requirePermission('sgp.read'),
+  sgpAdminLimiter,
+  WhatsAppSubscriberController.get
+);
+
+router.post(
+  '/conversations/:id/subscriber/bind',
+  authenticateToken,
+  requirePermission('whatsapp.read'),
+  requirePermission('sgp.act'),
+  sgpAdminLimiter,
+  WhatsAppSubscriberController.bind
+);
+
+router.post(
+  '/conversations/:id/subscriber/unlock',
+  authenticateToken,
+  requirePermission('whatsapp.read'),
+  requirePermission('sgp.act'),
+  sgpAdminLimiter,
+  WhatsAppSubscriberController.unlock
+);
+
+// The billing text is only ever handed back to the composer: `whatsapp.send`
+// because the only use of it is a message, `sgp.read` because it reads the ERP.
+router.post(
+  '/conversations/:id/subscriber/second-copy',
+  authenticateToken,
+  requirePermission('whatsapp.send'),
+  requirePermission('sgp.read'),
+  sgpAdminLimiter,
+  WhatsAppSubscriberController.secondCopy
+);
+
+// The same capability the billing screen asks for the same write.
+router.post(
+  '/conversations/:id/subscriber/phone',
+  authenticateToken,
+  requirePermission('whatsapp.read'),
+  requirePermission('campaigns.manage'),
+  sgpAdminLimiter,
+  WhatsAppSubscriberController.savePhone
+);
+
+router.post(
+  '/conversations/:id/subscriber/ticket',
+  authenticateToken,
+  requirePermission('whatsapp.read'),
+  requirePermission('sgp.act'),
+  sgpAdminLimiter,
+  WhatsAppSubscriberController.ticket
 );
 
 // The operator's file, one step ahead of the message that carries it. The body

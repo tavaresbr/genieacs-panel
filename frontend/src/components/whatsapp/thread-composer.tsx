@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { whatsappErrorMessage } from '@/components/whatsapp-connection'
@@ -19,6 +19,13 @@ interface ThreadComposerProps {
   optedOut: boolean
   sending: boolean
   onSend: (body: string, isNote: boolean, attachment?: ComposerAttachment) => Promise<boolean>
+  /**
+   * Text handed in from outside — the SGP module's second copy. It REPLACES
+   * what is in the box and goes nowhere by itself: the operator reads it and
+   * presses Send. `id` changes on every hand-over, so the same text twice is
+   * two hand-overs.
+   */
+  draft?: { id: number; text: string } | null
 }
 
 /**
@@ -67,7 +74,7 @@ const ALLOWED_TYPES = [
  *    not "text". The server agrees: it refuses `message_empty` only when both
  *    are missing.
  */
-export function ThreadComposer({ optedOut, sending, onSend }: ThreadComposerProps) {
+export function ThreadComposer({ optedOut, sending, onSend, draft = null }: ThreadComposerProps) {
   const { t } = useTranslation()
   const toast = useToast()
   const [body, setBody] = useState('')
@@ -76,6 +83,19 @@ export function ThreadComposer({ optedOut, sending, onSend }: ThreadComposerProp
   const [uploading, setUploading] = useState(false)
   const boxRef = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  // Taken in during render rather than in an effect, so the box never paints
+  // one frame with the old text. A draft is a reply, never a note: a billing
+  // text filed as an internal note would be a customer waiting for nothing.
+  const [takenDraft, setTakenDraft] = useState<number | null>(draft?.id ?? null)
+  if (draft && draft.id !== takenDraft) {
+    setTakenDraft(draft.id)
+    setBody(draft.text)
+    setIsNote(false)
+  }
+  useEffect(() => {
+    if (draft) boxRef.current?.focus()
+  }, [draft])
 
   const busy = sending || uploading
   const empty = body.trim().length === 0 && !file

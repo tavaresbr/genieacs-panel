@@ -25,6 +25,9 @@ interface ConversationThreadProps {
   /** A close or reopen is in flight; the button must not be pressed twice. */
   filing: boolean
   onFile: (status: 'open' | 'closed') => void
+  /** Undefined when the operator may not read the ERP: then there is no button. */
+  sgpPanelOpen?: boolean
+  onToggleSgpPanel?: () => void
   /** The operator linked the thread to an SGP subscriber by hand. */
   onLinked: (conversation: WhatsAppConversation) => void
 }
@@ -48,6 +51,8 @@ export function ConversationThread({
   resendingId,
   filing,
   onFile,
+  sgpPanelOpen,
+  onToggleSgpPanel,
   onLinked
 }: ConversationThreadProps) {
   const { t } = useTranslation()
@@ -147,6 +152,18 @@ export function ConversationThread({
             <Icon name={closed ? 'refresh' : 'check'} size={16} className={filing ? 'animate-spin' : ''} />
             {t(closed ? 'whatsapp.inbox.reopen' : 'whatsapp.inbox.close')}
           </button>
+
+          {onToggleSgpPanel && (
+            <button
+              type="button"
+              className="modern-button-secondary"
+              aria-pressed={Boolean(sgpPanelOpen)}
+              onClick={onToggleSgpPanel}
+            >
+              <Icon name="database" size={16} />
+              {t('whatsapp.sgp.toggle')}
+            </button>
+          )}
 
           {conversation.deviceId && (
             <Link

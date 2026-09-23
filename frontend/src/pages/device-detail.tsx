@@ -6,7 +6,7 @@ import { useToast } from '@/components/ui/toast'
 import { useLoading } from '@/components/ui/loading'
 import { devicesAPI, sgpAPI, type SgpContractLink, type SgpInvoice } from '@/lib/api'
 import { formatDate } from '@/lib/utils'
-import { sgpBadge } from '@/lib/sgp'
+import { copyToClipboard, formatBrl, isSafeExternalUrl, sgpBadge } from '@/lib/sgp'
 import { Icon } from '@/components/ui/icon'
 import { ProvisioningCard } from '@/components/provisioning-card'
 import { DeviceHistoryCard } from '@/components/device-history-card'
@@ -600,30 +600,6 @@ function EditWifiModal({
   )
 }
 
-
-/** SGP reports amounts in BRL; only the grouping follows the reader's locale. */
-function formatBrl(amount: number | null, intlLocale: string) {
-  if (amount === null || !Number.isFinite(amount)) return '—'
-  return amount.toLocaleString(intlLocale, { style: 'currency', currency: 'BRL' })
-}
-
-function isSafeExternalUrl(value: string | null): value is string {
-  if (!value) return false
-  try {
-    return ['http:', 'https:'].includes(new URL(value).protocol)
-  } catch {
-    return false
-  }
-}
-
-async function copyToClipboard(value: string) {
-  try {
-    await navigator.clipboard.writeText(value)
-    return true
-  } catch {
-    return false
-  }
-}
 
 export default function DeviceDetailPage() {
   const navigate = useNavigate()
