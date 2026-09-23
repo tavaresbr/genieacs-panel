@@ -2,6 +2,7 @@ import AuditLog from '../models/AuditLog.js';
 import DeviceService from '../services/deviceService.js';
 import DeviceHistoryService from '../services/deviceHistoryService.js';
 import CustomerService from '../services/customerService.js';
+import DeviceTagService from '../services/deviceTagService.js';
 import CustomerPortalPasswordService from '../services/customerPortalPasswordService.js';
 import CustomerAccount from '../models/CustomerAccount.js';
 import DeviceProfile from '../models/DeviceProfile.js';
@@ -475,6 +476,8 @@ class DeviceController {
           pppoe: detail.virtualParameters?.pppoeUsername?.value
         });
       }
+      // Whoever records the installation is the technician the ACS names.
+      await DeviceTagService.safeReconcile(id, { technician: req.user?.username });
       return res.json(createResponse(req.t('device.installationDateSaved'), {
         installationDate: profile.installation_date,
         installationTag,

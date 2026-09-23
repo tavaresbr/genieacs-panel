@@ -1,6 +1,7 @@
 import ProvisioningProfile from '../models/ProvisioningProfile.js';
 import ProvisioningRun from '../models/ProvisioningRun.js';
 import ProvisioningService from '../services/provisioningService.js';
+import DeviceTagService from '../services/deviceTagService.js';
 import { SgpError } from '../services/sgpService.js';
 import { translateError } from '../i18n/index.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
@@ -132,6 +133,9 @@ class ProvisioningController {
       // Run it inline so the operator sees the outcome instead of a promise,
       // then hand back whatever state the run reached.
       const run = await ProvisioningService.executeRun(queued);
+      // A manual run has a person behind it, and that person is the
+      // technician the ACS names; the scheduler's runs leave the tag alone.
+      await DeviceTagService.safeReconcile(deviceId, { technician: req.user?.username });
       return res.json(createResponse(req.t('provisioning.runFinished'), {
         run: ProvisioningService.publicRun(run, req.t)
       }));
