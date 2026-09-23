@@ -4,6 +4,7 @@ import VendorService from './vendorService.js';
 import {
   PPPOE_FALLBACK_PATHS,
   RX_POWER_FALLBACK_PATHS,
+  TEMPERATURE_FALLBACK_PATHS,
   WAN_SERVICE_NAMES,
   WAN_VLAN_NAMES,
   findPppoeUsername,
@@ -444,6 +445,7 @@ class DeviceService {
       ...learnedPppoePaths,
       ...RX_POWER_FALLBACK_PATHS,
       ...learnedRxPaths,
+      ...TEMPERATURE_FALLBACK_PATHS,
       ...learnedTemperaturePaths,
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.SSID',
@@ -903,6 +905,7 @@ class DeviceService {
       virtualParams.vpActiveDevices,
       ...RX_POWER_FALLBACK_PATHS,
       ...learnedRxPaths,
+      ...TEMPERATURE_FALLBACK_PATHS,
       ...learnedTemperaturePaths,
       '_lastInform',
       '_registered'
@@ -934,6 +937,7 @@ class DeviceService {
       virtualParams.vpRxPower,
       virtualParams.vpTemperature,
       ...RX_POWER_FALLBACK_PATHS,
+      ...TEMPERATURE_FALLBACK_PATHS,
       'InternetGatewayDevice.DeviceInfo.UpTime'
     ].filter(Boolean);
     const data = await this.fetchFromGenieAcs('', { projection: projection.join(',') });
@@ -944,7 +948,7 @@ class DeviceService {
       deviceId: item._id || null,
       lastInform: item._lastInform ?? null,
       rxPower: this.resolveRxPower(item, virtualParams).value,
-      temperature: this.getParameterValue(item, virtualParams.vpTemperature),
+      temperature: this.resolveTemperature(item, virtualParams).value,
       uptime: this.getParameterValue(item, 'InternetGatewayDevice.DeviceInfo.UpTime')
     }));
   }
@@ -1108,6 +1112,7 @@ class DeviceService {
       'Device.Hosts.Host',
       'InternetGatewayDevice.WANDevice.1.WANEthernetInterfaceConfig.MACAddress',
       'InternetGatewayDevice.WANDevice',
+      ...TEMPERATURE_FALLBACK_PATHS,
       // `InternetGatewayDevice.WANDevice` above already carries the TR-098
       // fallbacks; these are the TR-181 ones, which sit outside it.
       ...PPPOE_FALLBACK_PATHS.filter((path) => path.startsWith('Device.')),
@@ -1208,7 +1213,7 @@ class DeviceService {
       return { value: configured, path: virtualParams.vpTemperature };
     }
     const read = (node) => this.readNodeValue(node);
-    for (const path of learnedPaths) {
+    for (const path of [...learnedPaths, ...TEMPERATURE_FALLBACK_PATHS]) {
       const value = normalizeTemperatureReading(this.getParameterValue(item, path));
       if (value !== null) return { value, path };
     }
@@ -1933,11 +1938,14 @@ class DeviceService {
   static SUMMON_REFRESH_OBJECTS = Object.freeze({
     // WLANConfiguration too: many provision scripts fetch only the SSID
     // names, which leaves every network's on/off state unknown.
+    // TemperatureStatus too: GenieACS lists the sensor on the first inform but
+    // never reads its value unless asked, and that read is what a summon is for.
     InternetGatewayDevice: [
       'InternetGatewayDevice.WANDevice',
-      'InternetGatewayDevice.LANDevice.1.WLANConfiguration'
+      'InternetGatewayDevice.LANDevice.1.WLANConfiguration',
+      'InternetGatewayDevice.DeviceInfo.TemperatureStatus'
     ],
-    Device: ['Device.Optical']
+    Device: ['Device.Optical', 'Device.DeviceInfo.TemperatureStatus']
   });
 
   /** How long after a summon every listing looks again for the reading. */
