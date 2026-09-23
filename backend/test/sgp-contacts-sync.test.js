@@ -31,6 +31,12 @@ const EMPTY_PATH = '/api/ura/clientes-vazio/';
 const ALL_PATH = '/api/ura/clientes-tudo/';
 /** Takes longer than the listing deadline to answer. */
 const SLOW_PATH = '/api/ura/clientes-lento/';
+/** Contracts keyed by `id` and contacts as an object of lists, the way some SGP versions send them. */
+const SHAPE_PATH = '/api/ura/clientes-formato/';
+/** Answers page one, then refuses page two. */
+const BREAKS_PATH = '/api/ura/clientes-quebra/';
+/** Misses the deadline once, then answers at once. */
+const SLOW_ONCE_PATH = '/api/ura/clientes-lento-uma-vez/';
 /** Refuses outright without a filter, the way an URA call does. */
 const FILTER_PATH = '/api/ura/clientes-com-filtro/';
 const INSTANCE = 'painel-sync-contatos';
@@ -67,6 +73,7 @@ let beta;
 let accountId;
 let sgpServer;
 let lastListPayload = null;
+let slowOnceCalls = 0;
 
 const auth = () => ({ headers: authHeaders(token) });
 const situacao = () => call(`${panelUrl}/api/sgp/contacts/sync`, auth());
@@ -110,6 +117,39 @@ function startSgpStub() {
         const offset = Number(payload.offset) || 0;
         const limit = Number(payload.limit) || 10;
         return send({ status: 1, clientes: clientes.slice(offset, offset + limit) });
+      }
+      if (req.url.startsWith(SHAPE_PATH)) {
+        return send({
+          status: 1,
+          clientes: [
+            {
+              id: 7,
+              nome: '7 - Elane Formato',
+              cpfcnpj: '700.000.000-07',
+              contratos: [{ id: 7070, status: 'Ativo' }],
+              contatos: { emails: ['elane@exemplo.test'], celulares: ['(93) 99123-7070'], telefones: [] }
+            },
+            {
+              id: 8,
+              nome: 'Contrato Ilegível',
+              cpfcnpj: '800.000.000-08',
+              contratos: [{ numero: 'X' }],
+              contatos: [{ tipo: 'celular', fone: '93991238080' }]
+            }
+          ]
+        });
+      }
+      if (req.url.startsWith(BREAKS_PATH)) {
+        if ((Number(payload.offset) || 0) > 0) return send({ status: 0, msg: 'Falha na página dois' });
+        return send({ status: 1, clientes: clientes.slice(0, Number(payload.limit) || 10) });
+      }
+      if (req.url.startsWith(SLOW_ONCE_PATH)) {
+        slowOnceCalls += 1;
+        if (slowOnceCalls === 1) {
+          setTimeout(() => send({ status: 1, clientes: [] }), 400);
+          return undefined;
+        }
+        return send({ status: 1, clientes: clientes.slice(0, 3) });
       }
       if (req.url.startsWith(ALL_PATH)) return send({ status: 1, clientes });
       if (req.url.startsWith(SLOW_PATH)) {
@@ -399,6 +439,51 @@ describe('um SGP que não lista sem filtro', () => {
     const res = await sincronizar();
     assert.equal(res.body.lastError.code, 'sgp_rejected');
     assert.match(res.body.lastError.message, /Informe ao menos um filtro/);
+  });
+});
+
+describe('os formatos de outras versões do SGP', () => {
+  it('lê o contrato pelo id dentro de contratos e o celular dentro de contatos', async () => {
+    await configurar({ endpoints: { customerList: SHAPE_PATH } });
+    const res = await testar();
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.data.withContract, 1);
+    assert.equal(res.body.data.withPhone, 2);
+    assert.equal(res.body.data.rows, 2, 'o cliente de contrato ilegível continua lá, sem contrato');
+    assert.match(res.body.data.shape.contratos, /id, status/);
+    assert.match(res.body.data.shape.contatos, /celulares: \[string\]/);
+    assert.ok(!JSON.stringify(res.body.data.shape).includes('99123'), 'o formato não traz valores');
+    assert.equal(typeof res.body.data.durationMs, 'number');
+
+    await sincronizarDireto();
+    const elane = (await linhas()).find((row) => row.contract === '7070');
+    assert.ok(elane, 'o contrato 7070 foi gravado');
+    assert.equal(elane.phone_e164, '5593991237070');
+  });
+
+  it('uma página que falha no meio guarda o que já leu, como parcial', async () => {
+    await configurar({ endpoints: { customerList: BREAKS_PATH } });
+    // Direto no serviço, pelo orçamento do limitador; a tela lê o mesmo GET.
+    await assert.rejects(sincronizarDireto(), (error) => error.code === 'sgp_rejected');
+    const res = await situacao();
+    assert.equal(res.body.data.lastRun.partial, true);
+    assert.equal(res.body.data.lastRun.reason, 'error');
+    assert.equal(res.body.data.lastRun.pages, 1);
+    assert.ok(res.body.data.lastRun.total > 0);
+    assert.equal(res.body.data.lastError.code, 'sgp_rejected');
+  });
+
+  it('pede de novo a página que estourou o prazo uma vez', async () => {
+    await configurar({ endpoints: { customerList: SLOW_ONCE_PATH } });
+    const prazoReal = SgpService.LIST_TIMEOUT_MS;
+    SgpService.LIST_TIMEOUT_MS = 100;
+    try {
+      const res = await sincronizarDireto();
+      assert.equal(res.total, 3);
+      assert.equal(slowOnceCalls, 2);
+    } finally {
+      SgpService.LIST_TIMEOUT_MS = prazoReal;
+    }
   });
 });
 

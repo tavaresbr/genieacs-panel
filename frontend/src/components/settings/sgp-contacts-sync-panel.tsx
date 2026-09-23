@@ -15,6 +15,15 @@ import { useAuth } from '@/contexts/auth-context'
 
 const SYNC_POLL_MS = 3000
 
+/** A test page slower than this leaves little room under the 90 s a page may take. */
+const SLOW_PAGE_MS = 30_000
+
+/** A page size that answers in about 20 s at the speed the test measured, never under 10. */
+function suggestedPageSize(test: SgpContactsTestResult) {
+  const perClient = test.durationMs / Math.max(test.received, 1)
+  return Math.max(10, Math.min(test.pageSize, Math.floor(20_000 / Math.max(perClient, 1) / 10) * 10))
+}
+
 /** Where the section sits, so the WhatsApp tab and the contacts screen can link to it. */
 export const SGP_CONTACTS_ANCHOR = 'sgp-contacts-sync'
 
@@ -352,11 +361,28 @@ export function SgpContactsSyncPanel({ config, onConfigChange }: Props) {
               withPhone: test.withPhone
             })}
           </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {t('settings.sgp.contacts.testDuration', { seconds: (test.durationMs / 1000).toFixed(1) })}
+          </p>
+          {test.durationMs > SLOW_PAGE_MS && (
+            <p className="mt-1 flex items-start gap-2 text-xs text-[hsl(var(--status-warning))]">
+              <Icon name="warning" size={14} />
+              {t('settings.sgp.contacts.testSlow', {
+                seconds: Math.round(test.durationMs / 1000),
+                suggested: suggestedPageSize(test)
+              })}
+            </p>
+          )}
           {test.fields.length > 0 && (
             <p className="mt-1 break-words font-mono text-xs text-muted-foreground">
               {t('settings.sgp.contacts.testFields')}: {test.fields.join(', ')}
             </p>
           )}
+          {Object.entries(test.shape ?? {}).map(([field, description]) => (
+            <p key={field} className="mt-1 break-words font-mono text-xs text-muted-foreground">
+              {field}: {description}
+            </p>
+          ))}
           {test.sample.length > 0 && (
             <ul className="mt-2 list-disc ps-5 text-xs text-muted-foreground">
               {test.sample.map((row, index) => (
@@ -400,7 +426,9 @@ export function SgpContactsSyncPanel({ config, onConfigChange }: Props) {
                 ? 'settings.sgp.contacts.partialPaging'
                 : lastRun.reason === 'empty'
                   ? 'settings.sgp.contacts.partialEmpty'
-                  : 'settings.sgp.contacts.partialCeiling')}
+                  : lastRun.reason === 'error'
+                    ? 'settings.sgp.contacts.partialError'
+                    : 'settings.sgp.contacts.partialCeiling')}
             </p>
           )}
         </>
