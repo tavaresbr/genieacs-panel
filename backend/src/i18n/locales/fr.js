@@ -82,6 +82,8 @@ export default {
   'device.history.rangeInvalid': "Intervalle invalide : il doit avancer et couvrir au plus un an",
   'device.history.deviceIdRequired': "L'identifiant de l'équipement est obligatoire",
   'device.swaps.retrieved': "Remplacements d'équipement récupérés",
+  'device.parameters.retrieved': "Paramètres de l'équipement récupérés",
+  'device.parameters.failed': "Impossible de lire les paramètres de l'équipement",
   'device.swaps.failed': "Impossible de lire les remplacements d'équipement",
   'device.swaps.notFound': 'Remplacement introuvable',
   'device.swaps.acknowledged': 'Remplacement confirmé',

@@ -1360,6 +1360,23 @@ export interface DeviceHistory {
   points: DeviceHistoryPoint[]
 }
 
+/** One parameter as GenieACS holds it; `read: false` means it exists but was never read. */
+export interface DeviceParameter {
+  path: string
+  value: string | number | boolean | null
+  type: string | null
+  writable: boolean | null
+  timestamp: string | null
+  read: boolean
+}
+
+export interface DeviceParameterList {
+  rows: DeviceParameter[]
+  total: number
+  limit: number
+  lastInform: string | null
+}
+
 export interface DeviceSwap {
   id: number
   customerId: string | null
@@ -1421,6 +1438,12 @@ export const devicesAPI = {
     return apiClient.get<DeviceHistory>(
       `/devices/${encodeURIComponent(deviceId)}/history${suffix ? `?${suffix}` : ''}`
     )
+  },
+
+  getDeviceParameters: (deviceId: string, search = '') => {
+    const query = new URLSearchParams({ deviceId })
+    if (search) query.set('search', search)
+    return apiClient.get<DeviceParameterList>(`/devices/parameters?${query.toString()}`)
   },
 
   getSwaps: () => apiClient.get<DeviceSwapList>('/devices/swaps'),

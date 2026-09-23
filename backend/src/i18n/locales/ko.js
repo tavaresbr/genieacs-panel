@@ -82,6 +82,8 @@ export default {
   'device.history.rangeInvalid': '잘못된 기간입니다. 미래 방향이어야 하며 최대 1년까지입니다',
   'device.history.deviceIdRequired': '장치 ID가 필요합니다',
   'device.swaps.retrieved': '장비 교체 내역을 가져왔습니다',
+  'device.parameters.retrieved': "장비 파라미터를 가져왔습니다",
+  'device.parameters.failed': "장비 파라미터를 읽을 수 없습니다",
   'device.swaps.failed': '장비 교체 내역을 읽지 못했습니다',
   'device.swaps.notFound': '교체 기록을 찾을 수 없습니다',
   'device.swaps.acknowledged': '교체를 확인했습니다',

@@ -82,6 +82,8 @@ export default {
   'device.history.rangeInvalid': '期間が不正です。未来方向で、最長1年までにしてください',
   'device.history.deviceIdRequired': 'デバイスIDが必要です',
   'device.swaps.retrieved': '機器の交換履歴を取得しました',
+  'device.parameters.retrieved': "機器パラメータを取得しました",
+  'device.parameters.failed': "機器パラメータを読み取れませんでした",
   'device.swaps.failed': '機器の交換履歴を読み取れませんでした',
   'device.swaps.notFound': '交換が見つかりません',
   'device.swaps.acknowledged': '交換を確認済みにしました',

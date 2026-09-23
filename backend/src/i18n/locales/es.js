@@ -79,6 +79,8 @@ export default {
   'device.history.rangeInvalid': 'Intervalo inválido: debe avanzar y cubrir como máximo un año',
   'device.history.deviceIdRequired': 'El ID del equipo es obligatorio',
   'device.swaps.retrieved': 'Cambios de equipo obtenidos',
+  'device.parameters.retrieved': "Parámetros del equipo obtenidos",
+  'device.parameters.failed': "No se pudieron leer los parámetros del equipo",
   'device.swaps.failed': 'No se pudieron leer los cambios de equipo',
   'device.swaps.notFound': 'Cambio no encontrado',
   'device.swaps.acknowledged': 'Cambio confirmado',

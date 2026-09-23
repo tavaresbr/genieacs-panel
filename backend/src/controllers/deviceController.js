@@ -107,6 +107,28 @@ class DeviceController {
   }
 
   /** Every replacement one ONT took part in, at either end of it. */
+  /**
+   * Every parameter GenieACS holds for one ONT, for telling "the ONT does not
+   * publish this" apart from "GenieACS never read it" when a field reads N/D.
+   * Credentials come back masked.
+   */
+  static async getDeviceParameters(req, res) {
+    try {
+      const deviceId = String(req.query?.deviceId ?? '').trim();
+      if (!deviceId) {
+        return res.status(400).json(createErrorResponse(req.t('device.history.deviceIdRequired')));
+      }
+      const result = await DeviceService.listDeviceParameters(deviceId, req.query?.search);
+      return res.json(createResponse(req.t('device.parameters.retrieved'), result));
+    } catch (error) {
+      if (error.translationKey === 'device.notFound') {
+        return res.status(404).json(createErrorResponse(req.t('device.notFound')));
+      }
+      console.error('Get device parameters error:', error);
+      return res.status(502).json(createErrorResponse(req.t('device.parameters.failed'), error.message));
+    }
+  }
+
   static async getDeviceSwaps(req, res) {
     try {
       const deviceId = String(req.params?.deviceId ?? '').trim();

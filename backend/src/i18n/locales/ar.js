@@ -80,6 +80,8 @@ export default {
   'device.history.rangeInvalid': 'نطاق زمني غير صالح: يجب أن يتقدّم إلى الأمام وألّا يتجاوز سنة واحدة',
   'device.history.deviceIdRequired': 'معرّف الجهاز مطلوب',
   'device.swaps.retrieved': 'تم جلب عمليات استبدال الأجهزة',
+  'device.parameters.retrieved': "تم جلب معلمات الجهاز",
+  'device.parameters.failed': "تعذّر قراءة معلمات الجهاز",
   'device.swaps.failed': 'تعذّرت قراءة عمليات استبدال الأجهزة',
   'device.swaps.notFound': 'عملية الاستبدال غير موجودة',
   'device.swaps.acknowledged': 'تم إقرار عملية الاستبدال',

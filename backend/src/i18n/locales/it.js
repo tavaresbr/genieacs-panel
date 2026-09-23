@@ -79,6 +79,8 @@ export default {
   'device.history.rangeInvalid': 'Intervallo non valido: deve procedere in avanti e coprire al massimo un anno',
   'device.history.deviceIdRequired': "L'ID del dispositivo è obbligatorio",
   'device.swaps.retrieved': 'Sostituzioni di apparato recuperate',
+  'device.parameters.retrieved': "Parametri dell'apparato recuperati",
+  'device.parameters.failed': "Impossibile leggere i parametri dell'apparato",
   'device.swaps.failed': 'Impossibile leggere le sostituzioni di apparato',
   'device.swaps.notFound': 'Sostituzione non trovata',
   'device.swaps.acknowledged': 'Sostituzione confermata',

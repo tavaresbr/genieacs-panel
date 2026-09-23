@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { useToast } from '@/components/ui/toast'
+import { DeviceParametersCard } from '@/components/device-parameters-card'
 import { useLoading } from '@/components/ui/loading'
 import { devicesAPI, sgpAPI, type SgpContractLink, type SgpInvoice } from '@/lib/api'
 import { formatDate } from '@/lib/utils'
@@ -2118,6 +2119,8 @@ export default function DeviceDetailPage() {
                   </div>
                 </div>
               </div>
+
+              <DeviceParametersCard deviceId={deviceId} />
 
               {/* <div>
                 <h3 className="text-md font-medium mb-3 text-gray-900 dark:text-gray-100">Raw Device Data (Debug)</h3>

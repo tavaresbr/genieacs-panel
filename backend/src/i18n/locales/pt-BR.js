@@ -79,6 +79,8 @@ export default {
   'device.history.rangeInvalid': 'Intervalo inválido: precisa ir para frente e cobrir no máximo um ano',
   'device.history.deviceIdRequired': 'O ID do equipamento é obrigatório',
   'device.swaps.retrieved': 'Trocas de equipamento carregadas',
+  'device.parameters.retrieved': "Parâmetros do equipamento carregados",
+  'device.parameters.failed': "Não foi possível ler os parâmetros do equipamento",
   'device.swaps.failed': 'Falha ao ler as trocas de equipamento',
   'device.swaps.notFound': 'Troca não encontrada',
   'device.swaps.acknowledged': 'Troca confirmada',

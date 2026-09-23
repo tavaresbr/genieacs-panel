@@ -82,6 +82,8 @@ export default {
   'device.history.rangeInvalid': '时间范围无效：必须向前推移且最长不超过一年',
   'device.history.deviceIdRequired': '需要设备 ID',
   'device.swaps.retrieved': '已获取设备更换记录',
+  'device.parameters.retrieved': "已获取设备参数",
+  'device.parameters.failed': "无法读取设备参数",
   'device.swaps.failed': '无法读取设备更换记录',
   'device.swaps.notFound': '未找到更换记录',
   'device.swaps.acknowledged': '更换记录已确认',

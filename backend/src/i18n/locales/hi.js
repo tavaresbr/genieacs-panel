@@ -80,6 +80,8 @@ export default {
   'device.history.rangeInvalid': 'अमान्य तिथि अवधि: यह आगे की ओर चलनी चाहिए और अधिकतम एक वर्ष की हो सकती है',
   'device.history.deviceIdRequired': 'उपकरण आईडी आवश्यक है',
   'device.swaps.retrieved': 'उपकरण अदला-बदली प्राप्त हुई',
+  'device.parameters.retrieved': "उपकरण पैरामीटर प्राप्त हुए",
+  'device.parameters.failed': "उपकरण पैरामीटर पढ़े नहीं जा सके",
   'device.swaps.failed': 'उपकरण अदला-बदली पढ़ी नहीं जा सकी',
   'device.swaps.notFound': 'अदला-बदली नहीं मिली',
   'device.swaps.acknowledged': 'अदला-बदली स्वीकार की गई',

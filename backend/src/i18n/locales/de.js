@@ -82,6 +82,8 @@ export default {
   'device.history.rangeInvalid': 'Ungültiger Zeitraum: Er muss vorwärts laufen und höchstens ein Jahr umfassen',
   'device.history.deviceIdRequired': 'Die Geräte-ID ist erforderlich',
   'device.swaps.retrieved': 'Gerätetausche abgerufen',
+  'device.parameters.retrieved': "Geräteparameter abgerufen",
+  'device.parameters.failed': "Geräteparameter konnten nicht gelesen werden",
   'device.swaps.failed': 'Gerätetausche konnten nicht gelesen werden',
   'device.swaps.notFound': 'Tausch nicht gefunden',
   'device.swaps.acknowledged': 'Tausch bestätigt',

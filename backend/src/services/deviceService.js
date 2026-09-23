@@ -4,9 +4,15 @@ import VendorService from './vendorService.js';
 import {
   PPPOE_FALLBACK_PATHS,
   RX_POWER_FALLBACK_PATHS,
+  WAN_SERVICE_NAMES,
+  WAN_VLAN_NAMES,
   findPppoeUsername,
   findRxPowerReading,
-  normalizeRxPowerReading
+  findTemperatureReading,
+  findWanParameterByName,
+  listDocumentParameters,
+  normalizeRxPowerReading,
+  normalizeTemperatureReading
 } from './deviceParameterFallbacks.js';
 import Vendor from '../models/Vendor.js';
 import WifiSecurityConfig from '../models/WifiSecurityConfig.js';
@@ -387,7 +393,12 @@ class DeviceService {
     };
   }
 
-  static buildDeviceListProjection(virtualParams, learnedRxPaths = [], learnedPppoePaths = []) {
+  static buildDeviceListProjection(
+    virtualParams,
+    learnedRxPaths = [],
+    learnedPppoePaths = [],
+    learnedTemperaturePaths = []
+  ) {
     return [
       '_id',
       '_deviceId._ProductClass',
@@ -406,6 +417,7 @@ class DeviceService {
       ...learnedPppoePaths,
       ...RX_POWER_FALLBACK_PATHS,
       ...learnedRxPaths,
+      ...learnedTemperaturePaths,
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.SSID',
       'InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.SSID',
@@ -750,10 +762,12 @@ class DeviceService {
     const { page, pageSize, search, status, focus } = this.normalizeDeviceListQuery(options);
     const virtualParams = await this.getVirtualParameters();
     const learnedRxPaths = await this.ensureRxPowerPaths();
+    const learnedTemperaturePaths = await this.readTemperaturePaths();
     const projection = this.buildDeviceListProjection(
       virtualParams,
       learnedRxPaths,
-      await this.readPppoePaths()
+      await this.readPppoePaths(),
+      learnedTemperaturePaths
     );
     const listQuery = this.buildDeviceListQuery(status, focus);
     const queryParam = listQuery ? JSON.stringify(listQuery) : null;
@@ -774,7 +788,9 @@ class DeviceService {
         : [];
       return {
         devices: rows
-          .map((item) => this.processDeviceData(item, virtualParams, learnedRxPaths))
+          .map((item) => this.processDeviceData(
+            item, virtualParams, learnedRxPaths, learnedTemperaturePaths
+          ))
           .reverse(),
         page: currentPage,
         pageSize,
@@ -785,7 +801,9 @@ class DeviceService {
 
     const rows = await this.fetchDeviceListPage(queryParam, projection);
     let matches = rows
-      .map((item) => this.processDeviceData(item, virtualParams, learnedRxPaths))
+      .map((item) => this.processDeviceData(
+        item, virtualParams, learnedRxPaths, learnedTemperaturePaths
+      ))
       .reverse()
       .filter((device) => this.deviceMatchesFocus(device, focus));
 
@@ -848,6 +866,7 @@ class DeviceService {
   static async getDashboardDevices() {
     const virtualParams = await this.getVirtualParameters();
     const learnedRxPaths = (await this.readRxPowerState())?.paths ?? [];
+    const learnedTemperaturePaths = await this.readTemperaturePaths();
     const projection = [
       '_id',
       '_deviceId._ProductClass',
@@ -857,6 +876,7 @@ class DeviceService {
       virtualParams.vpActiveDevices,
       ...RX_POWER_FALLBACK_PATHS,
       ...learnedRxPaths,
+      ...learnedTemperaturePaths,
       '_lastInform',
       '_registered'
     ].filter(Boolean);
@@ -864,7 +884,9 @@ class DeviceService {
     if (!Array.isArray(data)) {
       throw new Error('Invalid GenieACS dashboard response');
     }
-    return data.map((item) => this.processDeviceData(item, virtualParams, learnedRxPaths));
+    return data.map((item) => this.processDeviceData(
+      item, virtualParams, learnedRxPaths, learnedTemperaturePaths
+    ));
   }
 
   /**
@@ -900,11 +922,11 @@ class DeviceService {
     }));
   }
 
-  static processDeviceData(item, virtualParams, learnedRxPaths = []) {
+  static processDeviceData(item, virtualParams, learnedRxPaths = [], learnedTemperaturePaths = []) {
     const pppsecret = this.resolvePppoeUsername(item, virtualParams).value;
     const wanbridge = this.getParameterValue(item, virtualParams.vpWanBridge);
     const rxpower = this.resolveRxPower(item, virtualParams, learnedRxPaths).value;
-    const gettemp = this.getParameterValue(item, virtualParams.vpTemperature);
+    const gettemp = this.resolveTemperature(item, virtualParams, learnedTemperaturePaths).value;
     const activedevices = this.getParameterValue(item, virtualParams.vpActiveDevices);
 
     const deviceId = item._id || null;
@@ -1132,6 +1154,59 @@ class DeviceService {
     return read('InternetGatewayDevice.WANDevice.1.WANEthernetInterfaceConfig.MACAddress');
   }
 
+  /**
+   * The optics' temperature, and where it was read: the VirtualParameter
+   * first and untouched, then the paths this installation was seen to use,
+   * then a scan by name — the same order the RX power is read in.
+   */
+  static resolveTemperature(item, virtualParams, learnedPaths = []) {
+    const configured = this.getParameterValue(item, virtualParams.vpTemperature);
+    if (this.hasReportedValue(configured)) {
+      return { value: configured, path: virtualParams.vpTemperature };
+    }
+    const read = (node) => this.readNodeValue(node);
+    for (const path of learnedPaths) {
+      const value = normalizeTemperatureReading(this.getParameterValue(item, path));
+      if (value !== null) return { value, path };
+    }
+    return findTemperatureReading(item, read) || { value: null, path: virtualParams.vpTemperature };
+  }
+
+  static TEMPERATURE_PATH_KEY = 'temperature_path';
+
+  static async readTemperaturePaths() {
+    try {
+      const raw = await AppState.get(this.TEMPERATURE_PATH_KEY);
+      const paths = raw ? JSON.parse(raw)?.paths : [];
+      return Array.isArray(paths) ? paths.filter((path) => typeof path === 'string' && path) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  /** Files a temperature path the detail page found, for the listing. Never throws. */
+  static async rememberTemperaturePath(path) {
+    try {
+      const known = await this.readTemperaturePaths();
+      if (!path || known.includes(path)) return;
+      await AppState.upsert(
+        this.TEMPERATURE_PATH_KEY,
+        JSON.stringify({ paths: [path, ...known].slice(0, 4) })
+      );
+    } catch (error) {
+      console.warn(`Unable to record the temperature path: ${error.message}`);
+    }
+  }
+
+  /** Every parameter GenieACS holds for one ONT, filtered by `search`. */
+  static async listDeviceParameters(deviceId, search = '') {
+    const item = await this.fetchDeviceDocument(deviceId);
+    return {
+      ...listDocumentParameters(item, String(search ?? '').slice(0, 128)),
+      lastInform: item._lastInform ?? null
+    };
+  }
+
   static async processDetailDeviceData(item, virtualParams) {
     const getValue = (path) => {
       return this.getParameterValue(item, path);
@@ -1168,6 +1243,10 @@ class DeviceService {
     const vendor = vendorObj ? vendorObj.name.toLowerCase() : 'unknown';
     const vendorId = vendorObj ? vendorObj.id : null;
 
+    const temperature = this.resolveTemperature(item, virtualParams);
+    if (temperature.value !== null && temperature.path !== virtualParams.vpTemperature) {
+      await this.rememberTemperaturePath(temperature.path);
+    }
     const pppoeUsername = this.resolvePppoeUsername(item, virtualParams);
     const lanMacAddress = getValue('InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.1.MACAddress');
     const wanMacAddress = this.resolveWanMacAddress(item, pppoeUsername.value ? pppoeUsername.path : null);
@@ -1203,10 +1282,7 @@ class DeviceService {
         value: getVPValue(virtualParams.vpWanBridge)
       },
       rxpower: this.resolveRxPower(item, virtualParams),
-      temperature: {
-        path: virtualParams.vpTemperature,
-        value: getVPValue(virtualParams.vpTemperature)
-      },
+      temperature,
       activedevices: {
         path: virtualParams.vpActiveDevices,
         value: getVPValue(virtualParams.vpActiveDevices)
@@ -1301,17 +1377,27 @@ class DeviceService {
 
           for (const { connection, connType, connPath, index } of connections) {
             
+            // The catalogue first; then by name, which is how a Nokia's
+            // `X_ALU-COM_…` VLAN — or any prefix nobody listed — is found.
             const vlanParameter = this.findWanParameter(
               item,
               connPath,
               vendorObj?.vlan_id_path,
               WAN_PARAMETER_CANDIDATES.vlan
+            ) || this.findWanParameter(
+              item,
+              connPath,
+              findWanParameterByName(item, connPath, WAN_VLAN_NAMES)
             );
             const serviceParameter = this.findWanParameter(
               item,
               connPath,
               vendorObj?.service_list_path,
               WAN_PARAMETER_CANDIDATES.serviceList
+            ) || this.findWanParameter(
+              item,
+              connPath,
+              findWanParameterByName(item, connPath, WAN_SERVICE_NAMES)
             );
             const nameParameter = this.findWanParameter(item, connPath, 'Name');
             const usernameParameter = this.findWanParameter(item, connPath, 'Username');
