@@ -38,7 +38,10 @@ const DIVERGENCE_LIMIT = 50;
 export const DEFAULT_ENDPOINTS = Object.freeze({
   customer: '/api/ura/consultacliente/',
   invoices: '/api/ura/titulos/',
-  unlock: '/api/ura/liberacao/',
+  // `liberacaopromessa` is the route SGP documents for the trust unlock (the
+  // "liberação por promessa de pagamento"). The panel shipped `/liberacao/`
+  // first, which SGP does not serve — see LEGACY_UNLOCK_ENDPOINT.
+  unlock: '/api/ura/liberacaopromessa/',
   ticket: '/api/ura/chamado/',
   // The client listing behind the WhatsApp contacts sync. It takes the same
   // `app`/`token` and accepts `cpfcnpj` as a filter; whether it lists everyone
@@ -64,6 +67,27 @@ function paramName(value, fallback) {
  * still has its own catalogue, which is why it is configurable.
  */
 export const DEFAULT_TICKET_OCCURRENCE_TYPE = 5;
+
+/**
+ * The unlock path the panel used to default to, and which SGP never served.
+ *
+ * Saving the SGP settings writes every endpoint back, defaults included, so
+ * every provider that ever pressed Save has this path stored as if it had been
+ * chosen. It was not: it was the panel's wrong default. Reading it back as the
+ * right one is what makes the fix reach them without asking each operator to
+ * find a field they never touched. A path anyone typed on purpose is left alone.
+ */
+const LEGACY_UNLOCK_ENDPOINT = '/api/ura/liberacao/';
+
+function withEndpointDefaults(stored) {
+  const endpoints = { ...DEFAULT_ENDPOINTS, ...(stored || {}) };
+  if (endpoints.unlock === LEGACY_UNLOCK_ENDPOINT) endpoints.unlock = DEFAULT_ENDPOINTS.unlock;
+  // Saved empty by the release that had no default for it: an empty value is
+  // "not chosen", not "switched off" — `contactsSyncEnabled` is what switches
+  // the sync off.
+  endpoints.customerList = stored?.customerList || DEFAULT_ENDPOINTS.customerList;
+  return endpoints;
+}
 
 export const LINK_MODES = Object.freeze(['pppoe', 'customer_id', 'manual']);
 
@@ -678,7 +702,7 @@ class SgpService {
       return {
         ...DEFAULT_CONFIG,
         ...parsed,
-        endpoints: { ...DEFAULT_ENDPOINTS, ...(parsed.endpoints || {}) }
+        endpoints: withEndpointDefaults(parsed.endpoints)
       };
     } catch {
       return { ...DEFAULT_CONFIG, token: null };
@@ -698,14 +722,7 @@ class SgpService {
       portalBilling: stored.portalBilling !== false,
       portalUnlock: stored.portalUnlock === true,
       invoiceLimit: Number(stored.invoiceLimit) > 0 ? Math.min(Number(stored.invoiceLimit), 24) : 6,
-      endpoints: {
-        ...DEFAULT_ENDPOINTS,
-        ...(stored.endpoints || {}),
-        // Saved empty by the release that had no default for it: an empty
-        // value is "not chosen", not "switched off" — `contactsSyncEnabled` is
-        // what switches the sync off.
-        customerList: stored.endpoints?.customerList || DEFAULT_ENDPOINTS.customerList
-      },
+      endpoints: withEndpointDefaults(stored.endpoints),
       webhookSecret: decryptWebhookSecret(stored.webhookSecret),
       webhookEnabled: stored.webhookEnabled === true,
       webhookRequireTimestamp: stored.webhookRequireTimestamp === true,
@@ -1123,9 +1140,24 @@ class SgpService {
       });
     }
     const data = await this.request('unlock', { contrato: cleanContract });
+    const message = asText(pick(data, ['msg', 'mensagem', 'message']));
+    // SGP answers a refused promise (contract not suspended, promise already
+    // used this month) with `liberado: false` and a status that is NOT one of
+    // the failure flags `request` recognises. Read as success, the operator was
+    // told the subscriber was back online when nothing had changed.
+    const released = pick(data, ['liberado']);
+    if (released !== null && ['0', 'false', 'nao', 'não', 'n'].includes(String(released).trim().toLowerCase())) {
+      throw new SgpError(message || 'sgp.error.unlockRefused', {
+        code: 'unlock_refused',
+        status: 409,
+        raw: Boolean(message)
+      });
+    }
+    const days = Number(pick(data, ['liberado_dias', 'liberadoDias', 'dias']));
     return {
-      message: asText(pick(data, ['msg', 'mensagem', 'message']))
-        || 'Liberação em confiança solicitada ao SGP'
+      message: message || 'Liberação em confiança solicitada ao SGP',
+      protocol: asText(pick(data, ['protocolo', 'protocol'])),
+      days: Number.isFinite(days) && days > 0 ? days : null
     };
   }
 

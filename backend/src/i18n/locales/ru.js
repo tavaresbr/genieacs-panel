@@ -387,6 +387,7 @@ export default {
   'sgp.error.queryFailed': 'SGP вернула ошибку на этот запрос',
   'sgp.error.identifierRequired': 'Для запроса в SGP укажите документ, договор или логин PPPoE',
   'sgp.error.contractRequired': 'Требуется договор SGP',
+  'sgp.error.unlockRefused': 'SGP отклонил доверительную разблокировку этого договора',
   'sgp.error.contractNotInConversation': 'Этот договор не относится к этому диалогу',
   'sgp.error.deviceUnlinked': 'Этот ONT ещё не привязан к договору SGP. Привяжите его вручную или проверьте логин PPPoE.',
   'sgp.error.noContractForDevice': 'Для этого ONT договор SGP не найден',

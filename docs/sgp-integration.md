@@ -20,7 +20,7 @@ credentials plus one customer filter:
 | --- | --- | --- |
 | Contract lookup | `/api/ura/consultacliente/` | `cpfcnpj`, `contrato`, or `login` |
 | Open invoices | `/api/ura/titulos/` | `contrato` (or `cpfcnpj`), `limit`, `apenas_titulos_em_aberto` |
-| Trust unlock | `/api/ura/liberacao/` | `contrato` |
+| Trust unlock | `/api/ura/liberacaopromessa/` | `contrato` |
 | Open a ticket | `/api/ura/chamado/` | `contrato`, `conteudo`, `ocorrenciatipo`, optional `observacao` |
 | Client listing | `/api/ura/clientes/` | optional `cpfcnpj`; the contacts sync adds its paging parameters |
 
