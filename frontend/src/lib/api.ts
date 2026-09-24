@@ -12,6 +12,34 @@ export interface SubscriptionBlockedDetail {
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || ''
 
+export interface DeviceFirmwareFile {
+  /** O id do arquivo no GenieACS — em geral o nome com que foi subido. */
+  id: string
+  version: string | null
+  oui: string | null
+  productClass: string | null
+  size: number | null
+  uploadedAt: string | null
+  /** É a versão que a ONT já roda. */
+  installed: boolean
+}
+
+export interface DeviceFirmwareList {
+  deviceId: string
+  current: string | null
+  productClass: string | null
+  files: DeviceFirmwareFile[]
+  /** Firmwares no GenieACS que ficaram de fora por serem de outro modelo, ou não dizerem o modelo. */
+  otherModels: number
+}
+
+export interface DeviceFirmwareUpgrade {
+  deviceId: string
+  file: DeviceFirmwareFile
+  from: string | null
+  queued: boolean
+}
+
 export type DeviceDiagnosticKind = 'ping' | 'traceroute'
 
 export interface DeviceDiagnosticStart {
@@ -1512,6 +1540,13 @@ export const devicesAPI = {
 
   readDiagnostic: (deviceId: string, kind: DeviceDiagnosticKind) =>
     apiClient.post<DeviceDiagnosticResult>('/devices/diagnostics/result', { deviceId, kind }),
+
+  // Os firmwares do GenieACS que servem para o modelo desta ONT.
+  listFirmware: (deviceId: string) =>
+    apiClient.get<DeviceFirmwareList>(`/devices/firmware?${new URLSearchParams({ deviceId }).toString()}`),
+
+  upgradeFirmware: (deviceId: string, fileId: string) =>
+    apiClient.post<DeviceFirmwareUpgrade>('/devices/firmware/upgrade', { deviceId, fileId }),
 
   summonDevice: (deviceId: string, parameters?: string[]) =>
     apiClient.post('/devices/summon', { deviceId, parameters }),

@@ -27,9 +27,9 @@ import assert from 'node:assert/strict';
  *
  * ## O que este arquivo NÃO afirma
  *
- * São **40 rotas**, não as 91. A amostra foi escolhida para que cada uma das
+ * São **42 rotas**, não as 91. A amostra foi escolhida para que cada uma das
  * 31 capacidades apareça pelo menos uma vez, e a garantia de não-regressão que
- * o teste do `admin` dá vale **sobre estas 35** — não sobre o painel inteiro.
+ * o teste do `admin` dá vale **sobre estas 42** — não sobre o painel inteiro.
  * Quem quiser a afirmação forte ("nenhuma das 91 rotas mudou de dono") precisa
  * de outra prova; a varredura estática de `permissions.test.js` é o que existe
  * hoje mais perto disso, e ela olha o nome da capacidade, não o alcance.
@@ -201,6 +201,21 @@ const CASOS = [
     method: 'POST',
     path: () => '/api/devices/diagnostics/result',
     body: { deviceId: DEVICE_ID, kind: 'ping' },
+    aceito: [200]
+  },
+  {
+    cap: 'devices.maintain',
+    label: 'GET /api/devices/firmware',
+    method: 'GET',
+    path: () => `/api/devices/firmware?deviceId=${DEVICE_ID}`,
+    aceito: [200]
+  },
+  {
+    cap: 'devices.maintain',
+    label: 'POST /api/devices/firmware/upgrade',
+    method: 'POST',
+    path: () => '/api/devices/firmware/upgrade',
+    body: { deviceId: DEVICE_ID, fileId: 'f670l-v9.bin' },
     aceito: [200]
   },
   {
@@ -497,6 +512,12 @@ before(async () => {
   // 500 provaria alcance mas não distinguiria "passou pela guarda" de "quebrou
   // antes dela" tão bem quanto um 200 distingue.
   genie = await startGenieAcsStub({ devices: [buildDevice({ id: DEVICE_ID })] });
+  // Um firmware do modelo do aparelho do stub, para a troca passar da guarda
+  // e chegar ao ACS — sem ele a rota daria 400 e não distinguiria as duas coisas.
+  genie.state.files = [{
+    _id: 'f670l-v9.bin',
+    metadata: { fileType: '1 Firmware Upgrade Image', oui: '', productClass: 'F670L', version: 'V9.9' }
+  }];
 
   const db = getDb();
   tenantId = (await db('tenants').orderBy('id', 'asc').first()).id;
@@ -648,10 +669,10 @@ describe('a matriz e a expectativa deste arquivo', () => {
   });
 
   it('não encolhe sem que alguém diga', () => {
-    // O cabeçalho promete uma amostra de 40 rotas e a promessa de não-regressão
+    // O cabeçalho promete uma amostra de 42 rotas e a promessa de não-regressão
     // do `admin` vale sobre ELA. Uma rota apagada por um merge desajeitado
     // deixaria a promessa valendo sobre menos coisa, calada.
-    assert.equal(CASOS.length, 40);
+    assert.equal(CASOS.length, 42);
   });
 });
 
@@ -678,7 +699,7 @@ describe('quem não tem a capacidade toma 403', () => {
 
 /**
  * O par que dá sentido ao de cima, e a garantia de não-regressão do `admin`:
- * ele aparece aqui em TODAS as 40 rotas, porque a matriz lhe dá as 31
+ * ele aparece aqui em TODAS as 42 rotas, porque a matriz lhe dá as 31
  * capacidades. Nenhuma das rotas desta amostra saiu do alcance dele na onda 17.
  */
 describe('quem tem a capacidade passa pela guarda', () => {

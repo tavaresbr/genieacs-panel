@@ -28,6 +28,12 @@ import {
   isValidDiagnosticHost,
   readDiagnosticResult
 } from './deviceDiagnostics.js';
+import {
+  FIRMWARE_FILE_TYPE,
+  compatibleFirmware,
+  currentFirmwareVersion,
+  isInstalledVersion
+} from './firmwareFiles.js';
 import Vendor from '../models/Vendor.js';
 import WifiSecurityConfig from '../models/WifiSecurityConfig.js';
 import AppState from '../models/AppState.js';
@@ -2060,6 +2066,63 @@ class DeviceService {
 
   static async rebootDevice(deviceId) {
     return this.postTask(deviceId, { name: 'reboot' });
+  }
+
+  /**
+   * Os firmwares do GenieACS que servem para esta ONT, e a versão que ela roda.
+   *
+   * A regra de quem serve para quem está em `firmwareFiles.js`; aqui só se lê
+   * o que ela precisa — a identidade da ONT e a coleção `files`.
+   */
+  static async listFirmware(deviceId) {
+    const rows = await this.fetchDeviceListPage(
+      JSON.stringify({ _id: deviceId }),
+      ['_id', '_deviceId', 'InternetGatewayDevice.DeviceInfo.SoftwareVersion', 'Device.DeviceInfo.SoftwareVersion']
+    );
+    if (rows.length === 0) throw new TranslatableError('device.notFound', null, { status: 404 });
+    const row = rows[0];
+    const device = {
+      oui: row?._deviceId?._OUI ?? null,
+      productClass: row?._deviceId?._ProductClass ?? null
+    };
+    const files = await this.fetchGenieAcsCollection('files', {
+      query: JSON.stringify({ 'metadata.fileType': FIRMWARE_FILE_TYPE }),
+      limit: 500
+    });
+    const { compatible, otherModels } = compatibleFirmware(files, device);
+    const current = currentFirmwareVersion(row);
+    return {
+      current,
+      productClass: device.productClass,
+      files: compatible.map((file) => ({ ...file, installed: isInstalledVersion(file, current) })),
+      otherModels
+    };
+  }
+
+  /**
+   * Manda a ONT baixar e instalar um firmware do GenieACS.
+   *
+   * O arquivo é conferido de novo aqui, com a mesma regra da lista: a tela
+   * pode estar velha, e a API é chamada por quem não usa a tela. Um firmware
+   * de outro modelo pode deixar a ONT sem subir, e isso não tem volta pelo
+   * painel. Reinstalar a versão que ela já roda também é recusado — só
+   * derrubaria o assinante durante a gravação e o reinício.
+   */
+  static async upgradeFirmware(deviceId, fileId) {
+    const alvo = String(fileId ?? '').trim();
+    if (!alvo) {
+      throw new TranslatableError('device.firmwareNotCompatible', null, { status: 400, code: 'firmware_not_compatible' });
+    }
+    const listing = await this.listFirmware(deviceId);
+    const file = listing.files.find((candidate) => candidate.id === alvo);
+    if (!file) {
+      throw new TranslatableError('device.firmwareNotCompatible', null, { status: 400, code: 'firmware_not_compatible' });
+    }
+    if (file.installed) {
+      throw new TranslatableError('device.firmwareAlreadyInstalled', null, { status: 400, code: 'firmware_already_installed' });
+    }
+    const { applied } = await this.postProvisioningTask(deviceId, { name: 'download', file: file.id });
+    return { file, from: listing.current, queued: !applied };
   }
 
   /**
