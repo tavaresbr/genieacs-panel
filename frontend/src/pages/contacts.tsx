@@ -19,7 +19,7 @@ export default function ContactsPage() {
   return (
     <div className="page-shell">
       <div className="page-frame">
-        <ContactsPanel onOpenConversation={openConversation} />
+        <ContactsPanel onOpenConversation={openConversation} defaultState="active" />
       </div>
     </div>
   )
