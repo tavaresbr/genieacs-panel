@@ -56,6 +56,8 @@ export default {
   'auth.mfaEnabled': 'Zwei-Schritt-Anmeldung aktiviert',
   'auth.mfaDisabled': 'Zwei-Schritt-Anmeldung deaktiviert',
   'auth.mfaRecoveryRegenerated': 'Neue Wiederherstellungscodes erzeugt; die alten gelten nicht mehr',
+  'auth.mfaEnrollmentRequired': 'Dieser Anbieter verlangt die Anmeldung in zwei Schritten. Aktivieren Sie sie, um fortzufahren',
+  'auth.mfaRequiredByProvider': 'Ein Anbieter, für den Sie arbeiten, verlangt die Anmeldung in zwei Schritten; sie kann nicht ausgeschaltet werden',
   'auth.passwordUpdated': 'Passwort erfolgreich aktualisiert',
 
   // Ratenbegrenzung
@@ -634,6 +636,10 @@ export default {
   'users.ownAdminRole': 'Sie können Ihre eigene Administratorrolle nicht entfernen',
   'users.lastAdmin': 'Das Panel muss mindestens einen Administrator behalten',
   'users.passwordElsewhere': 'Dieser Operator arbeitet auch für einen anderen Anbieter; nur er selbst kann sein Passwort ändern',
+  'users.mfaResetSelf': 'Um Ihre eigene Anmeldung in zwei Schritten auszuschalten, nutzen Sie die Karte Ihres Kontos',
+  'users.mfaElsewhere': 'Dieser Operator arbeitet auch für einen anderen Anbieter; seine Anmeldung in zwei Schritten kann nur auf dem Server ausgeschaltet werden',
+  'users.mfaPlatform': 'Dieser Operator verwaltet auch die Plattform; seine Anmeldung in zwei Schritten kann nur auf dem Server ausgeschaltet werden',
+  'users.mfaReset': 'Anmeldung in zwei Schritten ausgeschaltet; die Sitzungen des Operators wurden beendet',
   'users.updated': 'Operator aktualisiert',
   'users.updateFailed': 'Der Operator konnte nicht aktualisiert werden',
   'users.deleteSelf': 'Sie können das Konto, mit dem Sie angemeldet sind, nicht löschen',
@@ -652,6 +658,9 @@ export default {
   'subscription.retrieveFailed': 'Abonnement konnte nicht gelesen werden',
 
   'tenant.renamed': 'Anbieter umbenannt',
+  'tenant.securityInvalid': 'Geben Sie an, ob die Anmeldung in zwei Schritten verlangt wird (wahr oder falsch)',
+  'tenant.mfaEnableYourselfFirst': 'Aktivieren Sie Ihre eigene Anmeldung in zwei Schritten, bevor Sie sie vom Team verlangen',
+  'tenant.securityUpdated': 'Vorgabe zur Anmeldung in zwei Schritten aktualisiert',
   'tenant.renameFailed': 'Anbieter konnte nicht umbenannt werden',
   'tenant.nameInvalid': 'Der Anbietername muss zwischen 1 und 128 Zeichen lang sein',
   'auth.signupCreated': 'Anbieter erstellt. Melden Sie sich unter seiner eigenen Adresse an.',

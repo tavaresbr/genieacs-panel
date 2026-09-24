@@ -11,5 +11,8 @@ router.get('/', authenticateToken, requirePermission('operators.read'), UsersCon
 router.post('/', operatorCreateLimiter, authenticateToken, requirePermission('operators.manage'), UsersController.create);
 router.patch('/:id', authenticateToken, requirePermission('operators.manage'), UsersController.update);
 router.delete('/:id', authenticateToken, requirePermission('operators.manage'), UsersController.remove);
+// Desliga o 2FA de quem perdeu o celular e os códigos. As regras (dono, outro
+// provedor, plataforma) estão no controlador.
+router.post('/:id/mfa-reset', authenticateToken, requirePermission('operators.manage'), UsersController.resetMfa);
 
 export default router;

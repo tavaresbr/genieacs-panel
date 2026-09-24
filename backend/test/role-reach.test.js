@@ -27,9 +27,9 @@ import assert from 'node:assert/strict';
  *
  * ## O que este arquivo NÃO afirma
  *
- * São **48 rotas**, não as 91. A amostra foi escolhida para que cada uma das
+ * São **51 rotas**, não as 91. A amostra foi escolhida para que cada uma das
  * 33 capacidades apareça pelo menos uma vez, e a garantia de não-regressão que
- * o teste do `admin` dá vale **sobre estas 48** — não sobre o painel inteiro.
+ * o teste do `admin` dá vale **sobre estas 51** — não sobre o painel inteiro.
  * Quem quiser a afirmação forte ("nenhuma das 91 rotas mudou de dono") precisa
  * de outra prova; a varredura estática de `permissions.test.js` é o que existe
  * hoje mais perto disso, e ela olha o nome da capacidade, não o alcance.
@@ -473,6 +473,25 @@ const CASOS = [
     aceito: [200]
   },
   {
+    cap: 'settings.read',
+    label: 'GET /api/tenant/security',
+    method: 'GET',
+    path: () => '/api/tenant/security',
+    aceito: [200]
+  },
+  {
+    // O corpo inválido é de propósito: o 400 vem depois da guarda e ANTES da
+    // regra do dono, então o `owner` e o `admin` recebem a mesma resposta e o
+    // caso mede só a capacidade. Com um corpo válido o `admin` levaria o 403 de
+    // `users.ownerOnly`, que é outra regra, provada em `mfa-policy.test.js`.
+    cap: 'settings.write',
+    label: 'PUT /api/tenant/security',
+    method: 'PUT',
+    path: () => '/api/tenant/security',
+    body: { requireMfa: 'sim' },
+    aceito: [400]
+  },
+  {
     cap: 'operators.read',
     label: 'GET /api/users',
     method: 'GET',
@@ -509,6 +528,16 @@ const CASOS = [
     path: () => `/api/users/${ids.alvo}`,
     body: { role: 'viewer' },
     aceito: [200]
+  },
+  {
+    // O mesmo alvo, que não tem 2FA: o 409 só se alcança depois da guarda e de
+    // achar a pessoa na equipe, e repetir a chamada não muda nada.
+    cap: 'operators.manage',
+    label: 'POST /api/users/:id/mfa-reset',
+    method: 'POST',
+    path: () => `/api/users/${ids.alvo}/mfa-reset`,
+    aceito: [409],
+    codigoAceito: 'mfa_not_enabled'
   },
   {
     // O dossiê de UM assinante. Capacidade própria e não `customers.secrets`:
@@ -720,10 +749,10 @@ describe('a matriz e a expectativa deste arquivo', () => {
   });
 
   it('não encolhe sem que alguém diga', () => {
-    // O cabeçalho promete uma amostra de 48 rotas e a promessa de não-regressão
+    // O cabeçalho promete uma amostra de 51 rotas e a promessa de não-regressão
     // do `admin` vale sobre ELA. Uma rota apagada por um merge desajeitado
     // deixaria a promessa valendo sobre menos coisa, calada.
-    assert.equal(CASOS.length, 48);
+    assert.equal(CASOS.length, 51);
   });
 });
 
@@ -750,7 +779,7 @@ describe('quem não tem a capacidade toma 403', () => {
 
 /**
  * O par que dá sentido ao de cima, e a garantia de não-regressão do `admin`:
- * ele aparece aqui em TODAS as 48 rotas, porque a matriz lhe dá as 33
+ * ele aparece aqui em TODAS as 51 rotas, porque a matriz lhe dá as 33
  * capacidades. Nenhuma das rotas desta amostra saiu do alcance dele na onda 17.
  */
 describe('quem tem a capacidade passa pela guarda', () => {

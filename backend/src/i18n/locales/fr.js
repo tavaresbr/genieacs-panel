@@ -56,6 +56,8 @@ export default {
   'auth.mfaEnabled': 'Connexion en deux étapes activée',
   'auth.mfaDisabled': 'Connexion en deux étapes désactivée',
   'auth.mfaRecoveryRegenerated': 'Nouveaux codes de récupération générés ; les anciens ne sont plus valables',
+  'auth.mfaEnrollmentRequired': 'Ce fournisseur exige la connexion en deux étapes. Activez-la pour continuer',
+  'auth.mfaRequiredByProvider': 'Un fournisseur pour lequel vous travaillez exige la connexion en deux étapes ; elle ne peut pas être désactivée',
   'auth.passwordUpdated': 'Mot de passe mis à jour',
 
   // Limitation de débit
@@ -629,6 +631,10 @@ export default {
   'users.ownAdminRole': 'Vous ne pouvez pas retirer votre propre rôle d’administrateur',
   'users.lastAdmin': 'Le panneau doit conserver au moins un administrateur',
   'users.passwordElsewhere': 'Cet opérateur travaille aussi chez un autre fournisseur ; lui seul peut changer son mot de passe',
+  'users.mfaResetSelf': 'Pour désactiver votre propre connexion en deux étapes, utilisez la carte de votre compte',
+  'users.mfaElsewhere': 'Cet opérateur travaille aussi pour un autre fournisseur ; sa connexion en deux étapes ne peut être désactivée que sur le serveur',
+  'users.mfaPlatform': 'Cet opérateur administre aussi la plateforme ; sa connexion en deux étapes ne peut être désactivée que sur le serveur',
+  'users.mfaReset': 'Connexion en deux étapes désactivée ; les sessions de l\'opérateur ont été fermées',
   'users.updated': 'Opérateur mis à jour',
   'users.updateFailed': 'Impossible de mettre à jour l’opérateur',
   'users.deleteSelf': 'Vous ne pouvez pas supprimer le compte avec lequel vous êtes connecté',
@@ -647,6 +653,9 @@ export default {
   'subscription.retrieveFailed': 'Impossible de lire l\'abonnement',
 
   'tenant.renamed': 'Fournisseur renommé',
+  'tenant.securityInvalid': 'Indiquez si la connexion en deux étapes est exigée (vrai ou faux)',
+  'tenant.mfaEnableYourselfFirst': 'Activez votre propre connexion en deux étapes avant de l\'exiger de l\'équipe',
+  'tenant.securityUpdated': 'Exigence de connexion en deux étapes mise à jour',
   'tenant.renameFailed': 'Impossible de renommer le fournisseur',
   'tenant.nameInvalid': 'Le nom du fournisseur doit compter entre 1 et 128 caractères',
   'auth.signupCreated': 'Fournisseur créé. Connectez-vous à sa propre adresse.',

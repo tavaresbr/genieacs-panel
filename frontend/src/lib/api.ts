@@ -1,5 +1,6 @@
 import { getActiveLocale, translate } from '@/lib/i18n'
 import type { LoginResponse, OperatorRole, User } from '@/types'
+import { MFA_ENROLLMENT_EVENT, isMfaEnrollmentRefusal } from '@/lib/mfa-enrollment'
 
 // Acima de `apiClient`, que o dispara: um `const` de módulo lido antes da
 // declaração é uma ReferenceError no primeiro 402.
@@ -260,6 +261,12 @@ class ApiClient {
         }
       }
 
+      // O provedor passou a exigir o 2FA e esta pessoa não ativou: quem leva à
+      // ativação é a casca do app, que ouve este evento — como o 402 acima.
+      if (isMfaEnrollmentRefusal(response.status, data.code) && typeof window !== 'undefined') {
+        window.dispatchEvent(new Event(MFA_ENROLLMENT_EVENT))
+      }
+
       if (!response.ok) {
         return {
           success: false,
@@ -407,6 +414,9 @@ class ApiClient {
               detail: { code: data.code, message: data.message || '', subscription: data.subscription ?? null }
             }))
           }
+        }
+        if (isMfaEnrollmentRefusal(response.status, data.code) && typeof window !== 'undefined') {
+          window.dispatchEvent(new Event(MFA_ENROLLMENT_EVENT))
         }
 
         return {
@@ -805,7 +815,20 @@ export const tenantAPI = {
    * sem teto —, o que é por que quem chama precisa de um estado de espera de
    * verdade e não de um `await` escondido atrás de um clique.
    */
-  export: () => apiClient.getBlob('/tenant/export')
+  export: () => apiClient.getBlob('/tenant/export'),
+
+  /** Se o provedor exige o 2FA da equipe, quantos ainda faltam, e se quem pergunta pode mudar. */
+  security: () => apiClient.get<TenantSecurity>('/tenant/security'),
+
+  /** Só o dono (ou o admin onde não há dono); ligar pede o 2FA de quem liga. */
+  updateSecurity: (requireMfa: boolean) =>
+    apiClient.requestWithBody<{ requireMfa: boolean }>('PUT', '/tenant/security', { requireMfa })
+}
+
+export interface TenantSecurity {
+  requireMfa: boolean
+  membersWithoutMfa: number
+  canChange: boolean
 }
 
 /** O que a exclusão de um assinante devolve: o recibo do que deixou de existir. */
@@ -1509,6 +1532,10 @@ export const usersAPI = {
 
   remove: (id: number) =>
     apiClient.delete<{ id: number }>(`/users/${id}`),
+
+  /** Desliga o 2FA de quem perdeu o celular e os códigos, e derruba as sessões dela. */
+  resetMfa: (id: number) =>
+    apiClient.post<{ id: number; mfaEnabled: false }>(`/users/${id}/mfa-reset`, {}),
 }
 
 export interface PortalPasswordResponse {

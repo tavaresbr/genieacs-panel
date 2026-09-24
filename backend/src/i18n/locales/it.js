@@ -53,6 +53,8 @@ export default {
   'auth.mfaEnabled': 'Accesso in due passaggi attivato',
   'auth.mfaDisabled': 'Accesso in due passaggi disattivato',
   'auth.mfaRecoveryRegenerated': 'Nuovi codici di recupero generati; i vecchi non valgono più',
+  'auth.mfaEnrollmentRequired': 'Questo provider richiede l\'accesso in due passaggi. Attivalo per continuare',
+  'auth.mfaRequiredByProvider': 'Un provider per cui lavori richiede l\'accesso in due passaggi; non può essere disattivato',
   'auth.passwordUpdated': 'Password aggiornata correttamente',
 
   // Limite di richieste
@@ -631,6 +633,10 @@ export default {
   'users.ownAdminRole': 'Non puoi rimuovere il tuo stesso ruolo di amministratore',
   'users.lastAdmin': 'Il pannello deve mantenere almeno un amministratore',
   'users.passwordElsewhere': 'Questo operatore lavora anche per un altro provider; solo lui può cambiare la propria password',
+  'users.mfaResetSelf': 'Per disattivare il tuo accesso in due passaggi, usa la scheda del tuo account',
+  'users.mfaElsewhere': 'Questo operatore lavora anche per un altro provider; il suo accesso in due passaggi può essere disattivato solo sul server',
+  'users.mfaPlatform': 'Questo operatore amministra anche la piattaforma; il suo accesso in due passaggi può essere disattivato solo sul server',
+  'users.mfaReset': 'Accesso in due passaggi disattivato; le sessioni dell\'operatore sono state chiuse',
   'users.updated': 'Operatore aggiornato',
   'users.updateFailed': 'Impossibile aggiornare l’operatore',
   'users.deleteSelf': 'Non puoi eliminare l’account con cui hai effettuato l’accesso',
@@ -649,6 +655,9 @@ export default {
   'subscription.retrieveFailed': 'Impossibile leggere l\'abbonamento',
 
   'tenant.renamed': 'Provider rinominato',
+  'tenant.securityInvalid': 'Indica se l\'accesso in due passaggi è obbligatorio (vero o falso)',
+  'tenant.mfaEnableYourselfFirst': 'Attiva il tuo accesso in due passaggi prima di richiederlo al team',
+  'tenant.securityUpdated': 'Requisito dell\'accesso in due passaggi aggiornato',
   'tenant.renameFailed': 'Impossibile rinominare il provider',
   'tenant.nameInvalid': 'Il nome del provider deve avere tra 1 e 128 caratteri',
   'auth.signupCreated': 'Provider creato. Accedi dal suo indirizzo.',

@@ -666,6 +666,10 @@ class AuthController {
             role: membership.role,
             tenantId: Number(membership.tenant_id),
             isPlatformAdmin: await holdsControlPlane(user.id),
+            // O provedor exige o 2FA e esta pessoa ainda não ativou: a tela vai
+            // direto para a ativação. É o mesmo que a sessão vai dizer a cada
+            // requisição — aqui só poupa a tela de descobrir pelo primeiro 403.
+            mfaEnrollmentRequired: !mfaEnabled(user) && (await Tenant.requiresMfa(membership.tenant_id)),
             createdAt: user.created_at,
             updatedAt: user.updated_at
           },
@@ -864,6 +868,8 @@ class AuthController {
           emailVerified: Boolean(user.email_verified_at),
           // Só se está ligado — o segredo e os códigos nunca saem daqui.
           mfaEnabled: Boolean(user.totp_enabled_at),
+          // Da sessão, que acabou de ler a exigência do provedor e a pessoa.
+          mfaEnrollmentRequired: Boolean(req.user.mfaEnrollmentRequired),
           // From the session rather than from the row, for the same reason the
           // login response reports it that way: this is the answer the panel
           // rebuilds its menus from after a page reload, and `users.role` is

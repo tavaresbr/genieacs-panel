@@ -53,6 +53,8 @@ export default {
   'auth.mfaEnabled': 'Login em duas etapas ligado',
   'auth.mfaDisabled': 'Login em duas etapas desligado',
   'auth.mfaRecoveryRegenerated': 'Novos códigos de recuperação gerados; os antigos deixaram de valer',
+  'auth.mfaEnrollmentRequired': 'Este provedor exige o login em duas etapas. Ative-o para continuar',
+  'auth.mfaRequiredByProvider': 'Um provedor em que você trabalha exige o login em duas etapas; ele não pode ser desligado',
   'auth.passwordUpdated': 'Senha atualizada com sucesso',
 
   // Limite de requisições
@@ -632,6 +634,10 @@ export default {
   'users.ownAdminRole': 'Você não pode remover o seu próprio papel de administrador',
   'users.lastAdmin': 'O painel precisa manter pelo menos um administrador',
   'users.passwordElsewhere': 'Este operador também trabalha em outro provedor; só ele pode trocar a própria senha',
+  'users.mfaResetSelf': 'Para desligar o seu próprio login em duas etapas, use o cartão da sua conta',
+  'users.mfaElsewhere': 'Este operador também trabalha em outro provedor; o login em duas etapas dele só pode ser desligado pelo servidor',
+  'users.mfaPlatform': 'Este operador também administra a plataforma; o login em duas etapas dele só pode ser desligado pelo servidor',
+  'users.mfaReset': 'Login em duas etapas desligado; as sessões do operador foram encerradas',
   'users.updated': 'Operador atualizado',
   'users.updateFailed': 'Não foi possível atualizar o operador',
   'users.deleteSelf': 'Você não pode excluir a conta com que está conectado',
@@ -650,6 +656,9 @@ export default {
   'subscription.retrieveFailed': 'Não foi possível ler a assinatura',
 
   'tenant.renamed': 'Provedor renomeado',
+  'tenant.securityInvalid': 'Informe se o login em duas etapas é exigido (verdadeiro ou falso)',
+  'tenant.mfaEnableYourselfFirst': 'Ative o seu próprio login em duas etapas antes de exigi-lo da equipe',
+  'tenant.securityUpdated': 'Exigência do login em duas etapas atualizada',
   'tenant.renameFailed': 'Não foi possível renomear o provedor',
   'tenant.nameInvalid': 'O nome do provedor deve ter entre 1 e 128 caracteres',
   'auth.signupCreated': 'Provedor criado. Entre pelo endereço dele.',

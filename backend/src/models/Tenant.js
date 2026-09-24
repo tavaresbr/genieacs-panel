@@ -330,6 +330,27 @@ class Tenant {
       });
     return changed > 0;
   }
+
+  /** Se o provedor exige o login em duas etapas da equipe. */
+  static async requiresMfa(id) {
+    const row = await getDb()('tenants').where({ id }).first('require_mfa');
+    return mfaRequired(row);
+  }
+
+  static async setRequireMfa(id, required) {
+    const changed = await getDb()('tenants')
+      .where({ id })
+      .update({ require_mfa: Boolean(required), updated_at: new Date() });
+    return changed > 0;
+  }
+}
+
+/**
+ * A coluna lida como booleano nos três bancos: o Postgres devolve `true`, o
+ * MySQL e o SQLite devolvem `1`. Linha ausente é "não exige".
+ */
+export function mfaRequired(row) {
+  return Boolean(Number(row?.require_mfa ?? 0));
 }
 
 export default Tenant;
