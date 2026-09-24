@@ -133,6 +133,7 @@ export default {
   'settings.created': 'Configuración creada correctamente',
   'settings.createFailed': 'No se pudo crear la configuración',
   'settings.updated': 'Configuración actualizada correctamente',
+  'settings.onboardingInvalid': 'Indica qué marcar como visto: el asistente o la lista de pasos',
   'settings.updateFailed': 'No se pudo actualizar la configuración',
   'settings.deleted': 'Configuración eliminada correctamente',
   'settings.deleteFailed': 'No se pudo eliminar la configuración',

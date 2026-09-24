@@ -10,6 +10,7 @@ import Tenant from '../models/Tenant.js';
 import { suggestGenieAcsUrl } from '../services/genieacsSuggestion.js';
 import { currentTenantId } from '../config/tenantContext.js';
 import CustomerAccount from '../models/CustomerAccount.js';
+import OnboardingService from '../services/onboardingService.js';
 
 const ALLOWED_SETTING_KEYS = new Set([
   'appName',
@@ -74,6 +75,39 @@ function validateSetting(key, value) {
 }
 
 class SettingsController {
+  /**
+   * Os primeiros passos do provedor: o checklist do Dashboard e a marca de que
+   * o assistente de boas-vindas já foi visto. Ver `OnboardingService`.
+   */
+  static async getOnboardingStatus(req, res) {
+    try {
+      const status = await OnboardingService.status(currentTenantId());
+      return res.json(createResponse(req.t('settings.listRetrieved'), status));
+    } catch (error) {
+      console.error('Onboarding status error:', error);
+      return res.status(500).json(createErrorResponse(req.t('common.internalError'), error.message));
+    }
+  }
+
+  /**
+   * "Já vi": o assistente foi concluído ou pulado, ou o checklist foi ocultado.
+   * Gravado no provedor, e não no navegador, para que outro administrador ou
+   * outra máquina não recebam o assistente de novo.
+   */
+  static async dismissOnboarding(req, res) {
+    const what = req.body?.what;
+    if (what !== 'wizard' && what !== 'checklist') {
+      return res.status(400).json(createErrorResponse(req.t('settings.onboardingInvalid'), null, 'invalid_onboarding_target'));
+    }
+    try {
+      await OnboardingService.dismiss(what);
+      return res.json(createResponse(req.t('settings.updated'), { what }));
+    } catch (error) {
+      console.error('Onboarding dismiss error:', error);
+      return res.status(500).json(createErrorResponse(req.t('common.internalError'), error.message));
+    }
+  }
+
   /**
    * `GET /api/settings/genieacs-suggestion` — o endereço de ACS que a
    * plataforma sugere a ESTE provedor, ou nada.

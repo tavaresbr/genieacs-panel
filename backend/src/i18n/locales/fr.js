@@ -136,6 +136,7 @@ export default {
   'settings.created': 'Paramètre créé',
   'settings.createFailed': 'Impossible de créer le paramètre',
   'settings.updated': 'Paramètre mis à jour',
+  'settings.onboardingInvalid': 'Indiquez ce qu\'il faut marquer comme vu : l\'assistant ou la liste d\'étapes',
   'settings.updateFailed': 'Impossible de mettre à jour le paramètre',
   'settings.deleted': 'Paramètre supprimé',
   'settings.deleteFailed': 'Impossible de supprimer le paramètre',

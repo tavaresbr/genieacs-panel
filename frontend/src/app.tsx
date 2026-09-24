@@ -68,8 +68,19 @@ function AuthFallback() {
  * The test is the one fact a panel cannot work without: no GenieACS address.
  * Only on the SaaS edition (a self-hosted install has its own setup wizard),
  * only for somebody who can write settings, and never again once the wizard
- * was finished or skipped for this provider in this browser.
+ * was finished or skipped for this provider — a mark kept on the server, so
+ * another admin or another browser is not sent back to it.
  */
+function onboardingDismissedLocally(slug: string | null | undefined): boolean {
+  if (!slug) return false
+  try {
+    const value = localStorage.getItem(onboardingDismissKey(slug))
+    return value === '1' || value === '2'
+  } catch {
+    return false
+  }
+}
+
 function OnboardingGate({ children }: { children: React.ReactNode }) {
   const { can } = useAuth()
   const { tenant, isSaas } = useTenant()
@@ -83,13 +94,27 @@ function OnboardingGate({ children }: { children: React.ReactNode }) {
     // coisa cuja resposta é "vazio" para sempre — e empurrá-la para o
     // onboarding para sempre junto.
     if (tenant.kind === 'platform') { setNeedsOnboarding(false); return }
-    let dismissed = false
-    try { dismissed = localStorage.getItem(onboardingDismissKey(tenant.slug)) === '1' } catch {}
-    if (dismissed) { setNeedsOnboarding(false); return }
+    // O "já vi" mora no provedor (servidor); o navegador guarda só um espelho,
+    // para não esperar a rede a cada página. '1' é o valor de antes, gravado
+    // só aqui: sobe para o servidor uma vez e vira '2', já sincronizado.
+    const key = onboardingDismissKey(tenant.slug)
+    let local: string | null = null
+    try { local = localStorage.getItem(key) } catch {}
+    if (local === '1') {
+      void settingsAPI.dismissOnboarding('wizard').then((res) => {
+        if (res.success) { try { localStorage.setItem(key, '2') } catch {} }
+      }).catch(() => {})
+    }
+    if (local === '1' || local === '2') { setNeedsOnboarding(false); return }
     let cancelled = false
-    void settingsAPI.getAll().then((res) => {
+    void Promise.all([
+      settingsAPI.getAll(),
+      settingsAPI.onboardingStatus().catch(() => null)
+    ]).then(([res, onboarding]) => {
       if (cancelled) return
       const url = res.success && res.data ? String((res.data as { genieAcsUrl?: string }).genieAcsUrl ?? '') : ''
+      const dismissed = Boolean(onboarding?.success && onboarding.data?.wizardDone)
+      if (dismissed) { try { localStorage.setItem(key, '2') } catch {} }
       // A decisão mora em `needsGenieAcsOnboarding`, testada sem DOM: uma regra
       // escrita dentro de um `useEffect` é uma regra que ninguém verifica.
       setNeedsOnboarding(res.success && needsGenieAcsOnboarding({
@@ -100,7 +125,12 @@ function OnboardingGate({ children }: { children: React.ReactNode }) {
   }, [isSaas, tenant, can])
 
   if (needsOnboarding === null) return <PageFallback />
-  if (needsOnboarding && location.pathname !== '/onboarding') return <Navigate to="/onboarding" replace />
+  // A decisão acima é tomada uma vez por sessão; concluir ou pular o assistente
+  // grava a marca local e navega, sem refazê-la. Relida aqui, a marca deixa
+  // quem acabou de pular chegar ao Dashboard em vez de voltar ao assistente.
+  if (needsOnboarding && location.pathname !== '/onboarding' && !onboardingDismissedLocally(tenant?.slug)) {
+    return <Navigate to="/onboarding" replace />
+  }
   return <>{children}</>
 }
 

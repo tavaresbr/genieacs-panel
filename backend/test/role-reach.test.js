@@ -411,6 +411,22 @@ const CASOS = [
     aceito: [200]
   },
   {
+    cap: 'settings.read',
+    label: 'GET /api/settings/onboarding',
+    method: 'GET',
+    path: () => '/api/settings/onboarding',
+    aceito: [200]
+  },
+  {
+    // Repetível: marcar de novo só regrava o carimbo.
+    cap: 'settings.write',
+    label: 'POST /api/settings/onboarding/dismiss',
+    method: 'POST',
+    path: () => '/api/settings/onboarding/dismiss',
+    body: { what: 'checklist' },
+    aceito: [200]
+  },
+  {
     // `appName` já existe em toda instalação (é um dos `DEFAULT_SETTINGS`) e o
     // corpo repete o valor que ela tem: a chamada é repetível, e o que muda de
     // um papel para o outro é só quem pode fazê-la.

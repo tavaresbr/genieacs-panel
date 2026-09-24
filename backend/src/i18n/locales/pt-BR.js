@@ -133,6 +133,7 @@ export default {
   'settings.created': 'Configuração criada com sucesso',
   'settings.createFailed': 'Não foi possível criar a configuração',
   'settings.updated': 'Configuração atualizada com sucesso',
+  'settings.onboardingInvalid': 'Indique o que marcar como visto: o assistente ou o checklist',
   'settings.updateFailed': 'Não foi possível atualizar a configuração',
   'settings.deleted': 'Configuração excluída com sucesso',
   'settings.deleteFailed': 'Não foi possível excluir a configuração',

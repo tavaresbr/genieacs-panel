@@ -1617,6 +1617,23 @@ export const settingsAPI = {
    */
   genieAcsSuggestion: () =>
     apiClient.get<GenieAcsSuggestion>('/settings/genieacs-suggestion'),
+
+  /** Os primeiros passos do provedor: o checklist e se o assistente já foi visto. */
+  onboardingStatus: () =>
+    apiClient.get<OnboardingStatus>('/settings/onboarding'),
+
+  /** Marca, no provedor, que o assistente foi concluído/pulado ou o checklist ocultado. */
+  dismissOnboarding: (what: 'wizard' | 'checklist') =>
+    apiClient.post('/settings/onboarding/dismiss', { what }),
+}
+
+export type OnboardingItemKey = 'genieacs' | 'firstDevice' | 'provisioning' | 'sgp' | 'whatsapp' | 'team'
+
+/** Conferido no que o provedor TEM, não numa marca clicada. */
+export interface OnboardingStatus {
+  wizardDone: boolean
+  checklistDismissed: boolean
+  items: Array<{ key: OnboardingItemKey; done: boolean }>
 }
 
 /** O que a rota de sugestão devolve. Nunca um endereço que o painel recusaria ao salvar. */

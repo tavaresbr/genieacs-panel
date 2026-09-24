@@ -136,6 +136,7 @@ export default {
   'settings.created': '설정을 생성했습니다',
   'settings.createFailed': '설정을 생성하지 못했습니다',
   'settings.updated': '설정을 업데이트했습니다',
+  'settings.onboardingInvalid': '확인함으로 표시할 대상을 지정하세요: 마법사 또는 체크리스트',
   'settings.updateFailed': '설정을 업데이트하지 못했습니다',
   'settings.deleted': '설정을 삭제했습니다',
   'settings.deleteFailed': '설정을 삭제하지 못했습니다',
