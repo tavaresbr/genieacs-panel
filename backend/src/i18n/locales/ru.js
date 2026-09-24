@@ -79,6 +79,8 @@ export default {
   'device.notFound': 'Устройство не найдено',
   'device.listRetrieved': 'Список устройств получен',
   'device.listFailed': 'Не удалось получить список устройств',
+  'device.exportTooLarge': 'В выборке больше {max} устройств. Отфильтруйте список перед загрузкой таблицы',
+  'device.exportFailed': 'Не удалось сформировать таблицу устройств',
   'device.detailRetrieved': 'Данные устройства получены',
   'device.detailFailed': 'Не удалось получить данные устройства',
   'device.deleted': 'Устройство удалено',

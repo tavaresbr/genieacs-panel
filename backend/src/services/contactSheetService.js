@@ -3,6 +3,7 @@ import SgpClient from '../models/SgpClient.js';
 import ContactProfileService, { ContactProfileError, checkField, shownValue } from './contactProfileService.js';
 import WaContactService from './waContactService.js';
 import { normalizarTelefoneBr } from '../utils/wa/waDestino.js';
+import { toCsvWith } from '../utils/csv.js';
 
 /** The largest spreadsheet the import reads: well over the biggest base this panel serves. */
 export const IMPORT_MAX_BYTES = 5 * 1024 * 1024;
@@ -53,23 +54,9 @@ function sheetError(key, vars = null, status = 400) {
 
 // ── CSV ───────────────────────────────────────────────────────────────────
 
-/**
- * A cell that a spreadsheet would read as a formula is written with a leading
- * apostrophe: a name like `=HYPERLINK(...)` typed into the SGP must not become
- * a live formula on the operator's machine. The import takes the apostrophe
- * back off.
- */
-function csvCell(value) {
-  let text = value === null || value === undefined ? '' : String(value);
-  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
-  return /[;"\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-}
-
-/** A CSV as Excel in Portuguese opens it: BOM, `;`, CRLF. */
+/** A CSV as Excel in Portuguese opens it — the rules live in `utils/csv.js`. */
 export function toCsv(rows) {
-  const lines = [COLUMNS.map((column) => csvCell(column.header)).join(';')];
-  for (const row of rows) lines.push(COLUMNS.map((column) => csvCell(row[column.field])).join(';'));
-  return `﻿${lines.join('\r\n')}\r\n`;
+  return toCsvWith(COLUMNS, rows);
 }
 
 /**

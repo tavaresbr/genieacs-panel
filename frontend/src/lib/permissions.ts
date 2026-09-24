@@ -33,6 +33,10 @@ export const PERMISSIONS = [
   'devices.inspect',
   'devices.write',
   'devices.maintain',
+  // A lista de equipamentos inteira num arquivo (série, PPPoE, ID do cliente).
+  // Separada de `devices.list` como `contacts.export` é de `contacts.read`: ver
+  // página por página não é o mesmo que levar a base toda de uma vez.
+  'devices.export',
   'customers.secrets',
   'map.read',
   'map.write',
@@ -95,6 +99,7 @@ const TECH: Permission[] = [
 const ADMIN: Permission[] = [
   ...TECH,
   'devices.maintain',
+  'devices.export',
   'catalogue.write',
   'sgp.config',
   'provisioning.write',

@@ -109,3 +109,23 @@ export function filtersToQuery(filters: DeviceFilters): URLSearchParams {
   if (filters.page > 1) query.set('page', String(filters.page))
   return query
 }
+
+/**
+ * A query da planilha: o recorte que o SERVIDOR sabe aplicar — busca, estado
+ * e foco. A página não entra (a planilha leva todas), e o filtro do ERP também
+ * não: ele é feito na tela, sobre a página que chegou, e o servidor não o
+ * conhece. Por isso `exportIgnoresSgp` existe — a tela avisa em vez de
+ * entregar um arquivo com mais linhas do que a lista mostra.
+ */
+export function deviceExportQuery(filters: Pick<DeviceFilters, 'search' | 'status' | 'focus'>): URLSearchParams {
+  const query = new URLSearchParams()
+  const search = filters.search.trim()
+  if (search) query.set('search', search)
+  if (filters.status !== 'all') query.set('status', filters.status)
+  if (filters.focus !== 'all') query.set('focus', filters.focus)
+  return query
+}
+
+export function exportIgnoresSgp(filters: Pick<DeviceFilters, 'sgp'>): boolean {
+  return filters.sgp !== 'all'
+}

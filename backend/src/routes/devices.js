@@ -8,6 +8,10 @@ const router = express.Router();
 router.get('/', authenticateToken, requirePermission('devices.list'), DeviceController.getDevices);
 router.get('/dashboard', authenticateToken, requirePermission('devices.list'), DeviceController.getDashboard);
 router.get('/faults', authenticateToken, requirePermission('devices.list'), DeviceController.getFaults);
+// O recorte da lista numa planilha. Capacidade própria, só do dono e do admin:
+// levar a base toda de uma vez não é o mesmo que ver página por página. Acima
+// de `/:deviceId`, para `export` não ser lido como id de aparelho.
+router.get('/export', authenticateToken, requirePermission('devices.export'), DeviceController.exportDevices);
 router.delete('/faults/:faultId', authenticateToken, requirePermission('devices.write'), DeviceController.deleteFault);
 // Above the bare `/:deviceId` route, so `/swaps` is not read as a device id.
 router.get('/swaps', authenticateToken, requirePermission('devices.inspect'), DeviceController.getSwaps);

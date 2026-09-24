@@ -79,6 +79,8 @@ export default {
   'device.notFound': '找不到該設備',
   'device.listRetrieved': '已取得設備清單',
   'device.listFailed': '無法取得設備清單',
+  'device.exportTooLarge': '所選設備超過 {max} 台。請先篩選列表再下載試算表',
+  'device.exportFailed': '無法產生設備試算表',
   'device.detailRetrieved': '已取得設備詳細資料',
   'device.detailFailed': '無法取得設備詳細資料',
   'device.deleted': '設備已刪除',

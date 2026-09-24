@@ -76,6 +76,8 @@ export default {
   'device.notFound': 'Equipamento não encontrado',
   'device.listRetrieved': 'Equipamentos obtidos com sucesso',
   'device.listFailed': 'Não foi possível obter os equipamentos',
+  'device.exportTooLarge': 'O recorte tem mais de {max} equipamentos. Filtre a lista antes de baixar a planilha',
+  'device.exportFailed': 'Não foi possível gerar a planilha de equipamentos',
   'device.detailRetrieved': 'Detalhe do equipamento obtido com sucesso',
   'device.detailFailed': 'Não foi possível obter o detalhe do equipamento',
   'device.deleted': 'Equipamento excluído com sucesso',

@@ -79,6 +79,8 @@ export default {
   'device.notFound': 'Gerät nicht gefunden',
   'device.listRetrieved': 'Geräte erfolgreich abgerufen',
   'device.listFailed': 'Die Geräte konnten nicht abgerufen werden',
+  'device.exportTooLarge': 'Die Auswahl umfasst mehr als {max} Geräte. Filtern Sie die Liste, bevor Sie die Tabelle herunterladen',
+  'device.exportFailed': 'Die Gerätetabelle konnte nicht erstellt werden',
   'device.detailRetrieved': 'Gerätedetails erfolgreich abgerufen',
   'device.detailFailed': 'Die Gerätedetails konnten nicht abgerufen werden',
   'device.deleted': 'Gerät erfolgreich gelöscht',

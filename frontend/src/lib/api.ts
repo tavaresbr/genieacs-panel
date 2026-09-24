@@ -1638,6 +1638,12 @@ export const devicesAPI = {
     return apiClient.get(`/devices${search ? `?${search}` : ''}`)
   },
 
+  /** O recorte da lista numa planilha (CSV). A query vem de `deviceExportQuery`. */
+  exportSheet: (query: URLSearchParams) => {
+    const suffix = query.toString()
+    return apiClient.getBlob(`/devices/export${suffix ? `?${suffix}` : ''}`)
+  },
+
   getDashboard: (force = false) =>
     apiClient.get(`/devices/dashboard${force ? '?refresh=1' : ''}`),
 

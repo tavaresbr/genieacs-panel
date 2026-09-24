@@ -77,6 +77,8 @@ export default {
   'device.notFound': 'الجهاز غير موجود',
   'device.listRetrieved': 'تم جلب قائمة الأجهزة',
   'device.listFailed': 'تعذّر جلب قائمة الأجهزة',
+  'device.exportTooLarge': 'يحتوي التحديد على أكثر من {max} جهاز. صفِّ القائمة قبل تنزيل جدول البيانات',
+  'device.exportFailed': 'تعذّر إنشاء جدول بيانات الأجهزة',
   'device.detailRetrieved': 'تم جلب تفاصيل الجهاز',
   'device.detailFailed': 'تعذّر جلب تفاصيل الجهاز',
   'device.deleted': 'تم حذف الجهاز',

@@ -881,6 +881,62 @@ class DeviceService {
     };
   }
 
+  /** Quantas linhas a planilha leva, no máximo. Acima disso, a resposta pede um recorte. */
+  static DEVICE_EXPORT_MAX = 5000;
+
+  /**
+   * O recorte da lista inteiro, sem paginar — o que a planilha leva.
+   *
+   * Os mesmos filtros e a mesma ordem de `getDevicesPage`, e por isso as mesmas
+   * linhas que a tela mostraria página por página. Com uma diferença que é o
+   * motivo deste método não chamar aquele: a lista decora cada página com
+   * `CustomerService.decorateDevices`, que CRIA a conta do assinante que falta.
+   * Aqui não se escreve nada — o ID do cliente vem da leitura de
+   * `lookupCustomerIds`, e o aparelho sem conta sai com a coluna vazia.
+   *
+   * Sem busca e sem recorte local, a contagem do NBI vem antes da leitura: um
+   * recorte grande demais é recusado sem trazer a frota.
+   */
+  static async getDevicesForExport(options = {}) {
+    const { search, status, focus } = this.normalizeDeviceListQuery(options);
+    const max = this.DEVICE_EXPORT_MAX;
+    const grandeDemais = () => new TranslatableError('device.exportTooLarge', { max: String(max) }, {
+      status: 413,
+      code: 'export_too_large'
+    });
+    const virtualParams = await this.getVirtualParameters();
+    const learnedRxPaths = await this.ensureRxPowerPaths();
+    const learnedTemperaturePaths = await this.readTemperaturePaths();
+    const projection = this.buildDeviceListProjection(
+      virtualParams,
+      learnedRxPaths,
+      await this.readPppoePaths(),
+      learnedTemperaturePaths
+    );
+    const listQuery = this.buildDeviceListQuery(status, focus);
+    const queryParam = listQuery ? JSON.stringify(listQuery) : null;
+
+    if (!search && !this.focusNeedsLocalPass(focus)) {
+      if ((await this.countDevicesFromGenieAcs(queryParam)) > max) throw grandeDemais();
+    }
+
+    const rows = await this.fetchDeviceListPage(queryParam, projection);
+    let matches = rows
+      .map((item) => this.processDeviceData(
+        item, virtualParams, learnedRxPaths, learnedTemperaturePaths
+      ))
+      .reverse()
+      .filter((device) => this.deviceMatchesFocus(device, focus));
+    const customerIds = await this.lookupCustomerIds(matches.map((device) => device._id));
+    matches = matches.map((device) => ({ ...device, customerId: customerIds.get(String(device._id)) || null }));
+    if (search) {
+      const needle = search.toLowerCase();
+      matches = matches.filter((device) => this.deviceMatchesSearch(device, needle));
+    }
+    if (matches.length > max) throw grandeDemais();
+    return { devices: matches, filters: { search, status, focus } };
+  }
+
   /**
    * Read-only Customer ID lookup used while matching a search term. Account
    * creation stays in CustomerService and is only run over the returned page.

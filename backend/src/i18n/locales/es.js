@@ -76,6 +76,8 @@ export default {
   'device.notFound': 'Equipo no encontrado',
   'device.listRetrieved': 'Equipos obtenidos correctamente',
   'device.listFailed': 'No se pudieron obtener los equipos',
+  'device.exportTooLarge': 'La selección tiene más de {max} equipos. Filtre la lista antes de descargar la planilla',
+  'device.exportFailed': 'No se pudo generar la planilla de equipos',
   'device.detailRetrieved': 'Detalle del equipo obtenido correctamente',
   'device.detailFailed': 'No se pudo obtener el detalle del equipo',
   'device.deleted': 'Equipo eliminado correctamente',

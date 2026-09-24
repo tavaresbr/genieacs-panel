@@ -79,6 +79,8 @@ export default {
   'device.notFound': 'Équipement introuvable',
   'device.listRetrieved': 'Équipements récupérés',
   'device.listFailed': 'Impossible d’obtenir les équipements',
+  'device.exportTooLarge': 'La sélection compte plus de {max} équipements. Filtrez la liste avant de télécharger le tableur',
+  'device.exportFailed': 'Impossible de générer le tableur des équipements',
   'device.detailRetrieved': 'Détail de l’équipement récupéré',
   'device.detailFailed': 'Impossible d’obtenir le détail de l’équipement',
   'device.deleted': 'Équipement supprimé',
