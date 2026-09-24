@@ -2803,6 +2803,8 @@ export interface WhatsAppAlertSettings {
   emailRecipients?: string[]
   /** Só na leitura: se o servidor manda e-mail. Sem isso, o campo avisa. */
   mailConfigured?: boolean
+  /** Só na leitura: se há um bot guardado (o token nunca vem) e o grupo. */
+  telegram?: { configured: boolean; chatId: string }
   rules: Record<WhatsAppAlertRule, { enabled: boolean; threshold: number | null; cooldownMinutes: number }>
 }
 
@@ -3125,8 +3127,17 @@ export const whatsappAPI = {
   getAlertSettings: () =>
     apiClient.get<WhatsAppAlertSettings>('/whatsapp/alerts/settings'),
 
-  updateAlertSettings: (settings: Partial<WhatsAppAlertSettings>) =>
+  updateAlertSettings: (
+    settings: Partial<Omit<WhatsAppAlertSettings, 'telegram'>> & {
+      /** `botToken` omitido mantém o guardado; `''` apaga. */
+      telegram?: { botToken?: string; chatId?: string }
+    }
+  ) =>
     apiClient.put<WhatsAppAlertSettings>('/whatsapp/alerts/settings', settings),
+
+  /** Uma mensagem de teste no grupo do Telegram dos alertas. */
+  testAlertTelegram: () =>
+    apiClient.post<{ sent: boolean }>('/whatsapp/alerts/telegram/test', {}),
 
   runAlertScan: () =>
     apiClient.post<{ fired: number; cleared: number }>('/whatsapp/alerts/scan', {}),

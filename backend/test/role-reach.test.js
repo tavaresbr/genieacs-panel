@@ -27,9 +27,9 @@ import assert from 'node:assert/strict';
  *
  * ## O que este arquivo NÃO afirma
  *
- * São **52 rotas**, não as 91. A amostra foi escolhida para que cada uma das
+ * São **53 rotas**, não as 91. A amostra foi escolhida para que cada uma das
  * 34 capacidades apareça pelo menos uma vez, e a garantia de não-regressão que
- * o teste do `admin` dá vale **sobre estas 52** — não sobre o painel inteiro.
+ * o teste do `admin` dá vale **sobre estas 53** — não sobre o painel inteiro.
  * Quem quiser a afirmação forte ("nenhuma das 91 rotas mudou de dono") precisa
  * de outra prova; a varredura estática de `permissions.test.js` é o que existe
  * hoje mais perto disso, e ela olha o nome da capacidade, não o alcance.
@@ -441,6 +441,17 @@ const CASOS = [
     aceito: [200]
   },
   {
+    // A mensagem de teste do Telegram dos alertas. Sem bot configurado, o 400
+    // só se alcança DEPOIS da guarda — e a chamada não manda nada a ninguém.
+    cap: 'whatsapp.config',
+    label: 'POST /api/whatsapp/alerts/telegram/test',
+    method: 'POST',
+    path: () => '/api/whatsapp/alerts/telegram/test',
+    body: {},
+    aceito: [400],
+    codigoAceito: 'telegram_not_configured'
+  },
+  {
     cap: 'campaigns.manage',
     label: 'PUT /api/whatsapp/templates/:id',
     method: 'PUT',
@@ -759,10 +770,10 @@ describe('a matriz e a expectativa deste arquivo', () => {
   });
 
   it('não encolhe sem que alguém diga', () => {
-    // O cabeçalho promete uma amostra de 52 rotas e a promessa de não-regressão
+    // O cabeçalho promete uma amostra de 53 rotas e a promessa de não-regressão
     // do `admin` vale sobre ELA. Uma rota apagada por um merge desajeitado
     // deixaria a promessa valendo sobre menos coisa, calada.
-    assert.equal(CASOS.length, 52);
+    assert.equal(CASOS.length, 53);
   });
 });
 
@@ -789,7 +800,7 @@ describe('quem não tem a capacidade toma 403', () => {
 
 /**
  * O par que dá sentido ao de cima, e a garantia de não-regressão do `admin`:
- * ele aparece aqui em TODAS as 52 rotas, porque a matriz lhe dá as 34
+ * ele aparece aqui em TODAS as 53 rotas, porque a matriz lhe dá as 34
  * capacidades. Nenhuma das rotas desta amostra saiu do alcance dele na onda 17.
  */
 describe('quem tem a capacidade passa pela guarda', () => {

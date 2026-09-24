@@ -40,6 +40,9 @@ class AuditLog {
     // a mais fácil de disparar. O `detail` guarda o veredito de cada passo e o
     // endereço do webhook já redigido; nunca a chave admin nem token nenhum.
     WHATSAPP_CONFIG_TESTED: 'whatsapp.config_tested',
+    // O bot ou o grupo do Telegram dos alertas mudou. `{ tokenChanged, chatId }`
+    // — o grupo não é segredo e é o que se procura; o token nunca vem aqui.
+    ALERTS_TELEGRAM_CHANGED: 'alerts.telegram_changed',
     // A conta de portal do assinante ANTERIOR de uma ONT foi encerrada, porque
     // o aparelho passou a reportar outro login PPPoE. É destrutivo — o Customer
     // ID muda, a senha do portal é recunhada e o vínculo com o ERP é apagado —

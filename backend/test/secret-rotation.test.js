@@ -244,3 +244,33 @@ describe('o segredo do login em duas etapas entra na rotação', () => {
     }
   });
 });
+
+describe('o token do bot do Telegram dos alertas entra na rotação', () => {
+  const TELEGRAM = 'skygenpanel-telegram-bot-v1';
+
+  it('re-cifra o token aninhado nos ajustes de alerta, e o resto do objeto fica', async () => {
+    process.env.SECRET_BOX_KEY = CHAVE_ANTIGA;
+    const token = '123456789:AAHfake-token-do-bot-com-segredo-longo';
+    await runInTenant(tenantId, () => AppState.upsert('whatsapp_alert_settings', JSON.stringify({
+      enabled: true,
+      recipients: [],
+      telegram: { botToken: { v: 1, ...createSecretBox(TELEGRAM).encrypt(token) }, chatId: '-1001234567890' }
+    })));
+
+    try {
+      emRotacao();
+      await SecretRotationService.run();
+
+      anteriorRemovida();
+      const guardado = JSON.parse(await runInTenant(tenantId, () => AppState.get('whatsapp_alert_settings')));
+      assert.equal(
+        createSecretBox(TELEGRAM).decrypt(guardado.telegram.botToken), token,
+        'o token do Telegram ficou ilegível ao largar a chave anterior'
+      );
+      assert.equal(guardado.telegram.botToken.v, 1);
+      assert.equal(guardado.telegram.chatId, '-1001234567890');
+    } finally {
+      await runInTenant(tenantId, () => AppState.upsert('whatsapp_alert_settings', JSON.stringify({})));
+    }
+  });
+});

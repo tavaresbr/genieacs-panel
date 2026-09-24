@@ -266,6 +266,18 @@ export const portalUnlockLimiter = limiter({
  * Operator SGP calls reach the provider's billing system on every request, so
  * they get a tighter budget than the generic API limiter allows.
  */
+/**
+ * A mensagem de teste do Telegram dos alertas. Cada clique é uma chamada ao
+ * Telegram com o token do provedor e uma mensagem num grupo de gente: dez por
+ * minuto sobram para quem está acertando o bot, e seguram um laço.
+ */
+export const telegramTestLimiter = limiter({
+  windowMs: 60 * 1000,
+  max: 10,
+  keyGenerator: (req) => (req.user?.userId ? `user:${req.user.userId}` : `ip:${ipKey(req)}`),
+  message: limitMessage('rateLimit.telegramTest', 'rate_limited_telegram')
+});
+
 export const sgpAdminLimiter = limiter({
   windowMs: 60 * 1000,
   max: 60,

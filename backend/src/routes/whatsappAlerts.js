@@ -1,6 +1,7 @@
 import express from 'express';
 import WhatsAppAlertsController from '../controllers/whatsappAlertsController.js';
 import { authenticateToken, requirePermission } from '../middleware/auth.js';
+import { telegramTestLimiter } from '../middleware/rateLimit.js';
 
 const router = express.Router();
 
@@ -10,5 +11,7 @@ const router = express.Router();
 router.get('/alerts/settings', authenticateToken, requirePermission('whatsapp.config'), WhatsAppAlertsController.getSettings);
 router.put('/alerts/settings', authenticateToken, requirePermission('whatsapp.config'), WhatsAppAlertsController.updateSettings);
 router.post('/alerts/scan', authenticateToken, requirePermission('whatsapp.config'), WhatsAppAlertsController.scan);
+// Uma mensagem de teste no grupo do Telegram: é o que diz se o bot está lá.
+router.post('/alerts/telegram/test', authenticateToken, requirePermission('whatsapp.config'), telegramTestLimiter, WhatsAppAlertsController.testTelegram);
 
 export default router;
