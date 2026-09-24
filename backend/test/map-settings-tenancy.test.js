@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { getDb, insertReturningId, runInTenant, startTestServers, stopTestServers } from './helpers/harness.js';
 
 const { default: MapSettings } = await import('../src/models/MapSettings.js');
+const { default: migrations } = await import('../src/config/migrations.js');
+const { runUnscoped } = await import('../src/config/tenantContext.js');
 
 /**
  * The map centre, per provider.
@@ -83,5 +85,37 @@ describe('two providers, two cities', () => {
     const rows = await getDb()('map_settings').where({ id: 1 }).orderBy('tenant_id');
     assert.equal(rows.length, 2, 'the old primary key allowed exactly one');
     assert.deepEqual(rows.map((r) => Number(r.tenant_id)), [Number(alfa), Number(beta)]);
+  });
+});
+
+describe('o padrão é Brasília, não Jacarta', () => {
+  const passo = migrations.find((m) => m.id === '0061_map_center_brasilia');
+  // O runner roda os passos fora de qualquer provedor (`ensureSchema`); aqui também.
+  const semProvedor = (fn) => runUnscoped('teste do passo 0061', fn);
+  const JACARTA = { center_lat: '-6.2088', center_lng: '106.8456', max_zoom_in: '18', max_zoom_out: '5', default_zoom: '13' };
+
+  it('restaurar o padrão leva a Brasília', async () => {
+    await save(alfa, SANTAREM);
+    await runInTenant(alfa, () => MapSettings.reset());
+    const deAlfa = await read(alfa);
+    assert.equal(deAlfa.center_lat, '-15.7942');
+    assert.equal(deAlfa.center_lng, '-47.8822');
+  });
+
+  it('a migração tira de Jacarta só quem ainda está lá', async () => {
+    assert.ok(passo, 'o passo 0061 existe');
+    await save(alfa, JACARTA);
+    await save(beta, MANAUS);
+    assert.equal(await semProvedor(() => passo.isApplied(getDb())), false, 'há provedor em Jacarta');
+
+    await semProvedor(() => passo.up(getDb()));
+
+    const deAlfa = await read(alfa);
+    const deBeta = await read(beta);
+    assert.equal(deAlfa.center_lat, '-15.7942');
+    assert.equal(deAlfa.center_lng, '-47.8822');
+    assert.equal(deAlfa.default_zoom, JACARTA.default_zoom, 'o zoom não é tocado');
+    assert.equal(deBeta.center_lat, MANAUS.center_lat, 'quem escolheu a própria cidade fica onde está');
+    assert.equal(await semProvedor(() => passo.isApplied(getDb())), true);
   });
 });
