@@ -1431,8 +1431,12 @@ export const platformAPI = {
    * compartilhada de propósito, justamente para não ser apagada com o que
    * registra.
    */
-  deleteTenant: (id: number) =>
-    apiClient.delete<{ tenant: { id: number; slug: string; name: string } }>(`/platform/tenants/${id}`),
+  // `confirmSlug` vai no corpo: o backend confere o slug de novo, exato, e
+  // recusa o DELETE sem ele. `apiClient.delete` não manda corpo nenhum.
+  deleteTenant: (id: number, confirmSlug: string) =>
+    apiClient.requestWithBody<{ tenant: { id: number; slug: string; name: string } }>(
+      'DELETE', `/platform/tenants/${id}`, { confirmSlug }
+    ),
 
   /**
    * A trilha do plano de controle: o que quem opera o SaaS fez COM um provedor.
