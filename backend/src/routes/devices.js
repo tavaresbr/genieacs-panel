@@ -15,6 +15,11 @@ router.post('/swaps/:id/acknowledge', authenticateToken, requirePermission('devi
 // The device id travels in the query, not the path: GenieACS ids are not rows
 // of this panel, and route-coverage.test.js keeps id-addressed routes from
 // growing. Above `/:deviceId`, so `parameters` is not read as a device id.
+// Firmware: os arquivos do GenieACS que servem para esta ONT, e a troca.
+// `devices.maintain`: a ONT grava e reinicia, e um firmware errado não tem
+// volta pelo painel. O aparelho vai na query e no corpo, como nas vizinhas.
+router.get('/firmware', authenticateToken, requirePermission('devices.maintain'), DeviceController.listFirmware);
+router.post('/firmware/upgrade', authenticateToken, requirePermission('devices.maintain'), DeviceController.upgradeFirmware);
 router.get('/parameters', authenticateToken, requirePermission('devices.inspect'), DeviceController.getDeviceParameters);
 // Above the bare `/:deviceId` route, like the other device sub-paths.
 router.get('/:deviceId/history', authenticateToken, requirePermission('devices.list'), DeviceController.getHistory);

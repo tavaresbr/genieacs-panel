@@ -14,6 +14,7 @@ import { serialMatches } from '@/lib/device-actions'
 import { DeviceHistoryCard } from '@/components/device-history-card'
 import { DeviceSwapsCard } from '@/components/device-swaps-card'
 import { DeviceDiagnosticsCard } from '@/components/device-diagnostics-card'
+import { DeviceFirmwareCard } from '@/components/device-firmware-card'
 import { useAuth } from '@/contexts/auth-context'
 import { CustomerLgpd } from '@/components/customer-lgpd'
 import { WifiStatusFilterControl } from '@/components/wifi-status-filter'
@@ -1937,6 +1938,8 @@ export default function DeviceDetailPage() {
             <DeviceSwapsCard deviceId={deviceId} />
 
             {canWriteDevice && <DeviceDiagnosticsCard deviceId={deviceId} />}
+
+            {canMaintainDevice && <DeviceFirmwareCard deviceId={deviceId} />}
 
             <DeviceHistoryCard deviceId={deviceId} />
 

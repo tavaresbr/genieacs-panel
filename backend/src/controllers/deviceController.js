@@ -463,6 +463,55 @@ class DeviceController {
     }
   }
 
+  static async listFirmware(req, res) {
+    const deviceId = String(req.query?.deviceId ?? '').trim();
+    if (!deviceId) {
+      return res.status(400).json(createErrorResponse(req.t('device.idRequired')));
+    }
+    try {
+      const result = await DeviceService.listFirmware(deviceId);
+      return res.json(createResponse(null, { deviceId, ...result }));
+    } catch (error) {
+      if (error.translationKey) {
+        return res.status(error.status || 400).json(
+          createErrorResponse(translateError(req.t, error), null, error.code || null)
+        );
+      }
+      console.error('List firmware error:', error);
+      return res.status(502).json(createErrorResponse(req.t('device.firmwareListFailed'), error.message));
+    }
+  }
+
+  static async upgradeFirmware(req, res) {
+    const { deviceId, fileId } = req.body || {};
+    if (!deviceId) {
+      return res.status(400).json(createErrorResponse(req.t('device.idRequired')));
+    }
+    try {
+      const result = await DeviceService.upgradeFirmware(String(deviceId), fileId);
+      await registrarAcaoNaOnt(req, AuditLog.ACTIONS.DEVICE_FIRMWARE_UPGRADE, deviceId, {
+        file: result.file.id.slice(0, 128),
+        from: result.from ? String(result.from).slice(0, 64) : null,
+        to: result.file.version ? result.file.version.slice(0, 64) : null
+      });
+      DeviceService.invalidateDashboard();
+      return res.json(createResponse(req.t('device.firmwareUpgradeStarted'), {
+        deviceId,
+        file: result.file,
+        from: result.from,
+        queued: result.queued
+      }));
+    } catch (error) {
+      if (error.translationKey) {
+        return res.status(error.status || 400).json(
+          createErrorResponse(translateError(req.t, error), null, error.code || null)
+        );
+      }
+      console.error('Firmware upgrade error:', error);
+      return res.status(502).json(createErrorResponse(req.t('device.firmwareUpgradeFailed'), error.message));
+    }
+  }
+
   static async startDiagnostic(req, res) {
     const { deviceId, kind, host, count } = req.body || {};
     if (!deviceId) {
