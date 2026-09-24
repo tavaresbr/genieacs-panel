@@ -414,6 +414,8 @@ function QrPairing({ account, seedQr = null, busy, onAccount, onForceNew }: QrPa
 
 interface Props {
   config: WhatsAppConfig | null
+  /** Sem a margem e a linha de cima: para quando o bloco é o único da tela (o assistente de boas-vindas). */
+  compact?: boolean
 }
 
 /**
@@ -421,7 +423,7 @@ interface Props {
  * pairing state machine does not have to share a component with nine other
  * tabs' worth of form state.
  */
-export function WhatsAppConnection({ config }: Props) {
+export function WhatsAppConnection({ config, compact = false }: Props) {
   const { t, formatDateTime } = useTranslation()
   const toast = useToast()
 
@@ -592,7 +594,7 @@ export function WhatsAppConnection({ config }: Props) {
   }, [edit, load, t, toast])
 
   return (
-    <div className="mt-8 border-t border-border pt-6">
+    <div className={compact ? '' : 'mt-8 border-t border-border pt-6'}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 className="section-heading">{t('whatsapp.accounts.title')}</h3>
         <div className="flex gap-2">
