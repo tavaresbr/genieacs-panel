@@ -1,3 +1,4 @@
+import bcrypt from 'bcryptjs';
 import AuditLog from '../models/AuditLog.js';
 import DeviceService from '../services/deviceService.js';
 import DeviceHistoryService from '../services/deviceHistoryService.js';
@@ -8,6 +9,7 @@ import CustomerAccount from '../models/CustomerAccount.js';
 import DeviceProfile from '../models/DeviceProfile.js';
 import DeviceSwap, { publicSwap } from '../models/DeviceSwap.js';
 import TenantUser from '../models/TenantUser.js';
+import User from '../models/User.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { translateError } from '../i18n/index.js';
 
@@ -443,11 +445,28 @@ class DeviceController {
   }
 
   static async factoryResetDevice(req, res) {
-    const { deviceId, confirmSerial } = req.body || {};
+    const { deviceId, confirmSerial, password, passwordConfirm } = req.body || {};
     if (!deviceId) {
       return res.status(400).json(createErrorResponse(req.t('device.idRequired')));
     }
+    // A senha do operador, digitada DUAS vezes, antes de qualquer conversa com
+    // o ACS. Conferida aqui e não só na tela: a API é chamada por quem não usa
+    // a tela, e um token esquecido aberto não pode apagar uma ONT sozinho.
+    // 403 e não 401 na senha errada: 401 diz "sessão inválida", e a sessão
+    // continua válida.
+    if (!password || !passwordConfirm) {
+      return res.status(400).json(createErrorResponse(req.t('device.factoryResetPasswordRequired'), null, 'password_required'));
+    }
+    if (String(password) !== String(passwordConfirm)) {
+      return res.status(400).json(createErrorResponse(req.t('device.factoryResetPasswordMismatch'), null, 'password_mismatch'));
+    }
     try {
+      const user = await User.findById(req.user?.userId);
+      const confere = Boolean(user?.password)
+        && await bcrypt.compare(String(password).slice(0, 128), user.password);
+      if (!confere) {
+        return res.status(403).json(createErrorResponse(req.t('device.factoryResetPasswordIncorrect'), null, 'password_incorrect'));
+      }
       await DeviceService.factoryResetDevice(String(deviceId), confirmSerial);
       await registrarAcaoNaOnt(req, AuditLog.ACTIONS.DEVICE_FACTORY_RESET, deviceId);
       DeviceService.invalidateDashboard();

@@ -423,6 +423,20 @@ export const deviceDiagnosticLimiter = limiter({
   message: limitMessage('rateLimit.requests', 'rate_limited')
 });
 
+/**
+ * `POST /api/devices/factory-reset`: o reset pede a senha do operador, duas
+ * vezes. Quem tem só o token roubado poderia usar a rota para adivinhar a
+ * senha; dez ERROS por quarto de hora, por operador, deixam isso sem valor.
+ * Um reset que deu certo não conta.
+ */
+export const factoryResetLimiter = limiter({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  skipSuccessfulRequests: true,
+  keyGenerator: (req) => (req.user?.userId ? `user:${req.user.userId}` : `ip:${ipKey(req)}`),
+  message: limitMessage('rateLimit.requests', 'rate_limited')
+});
+
 export const portalPasswordAdminLimiter = limiter({
   windowMs: 15 * 60 * 1000,
   max: 60,

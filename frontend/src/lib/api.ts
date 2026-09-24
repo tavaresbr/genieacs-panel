@@ -1500,9 +1500,11 @@ export const devicesAPI = {
   rebootDevice: (deviceId: string) =>
     apiClient.post('/devices/reboot', { deviceId }),
 
-  // A série digitada vai junto: o servidor confere que é a DESTE aparelho.
-  factoryResetDevice: (deviceId: string, confirmSerial: string) =>
-    apiClient.post('/devices/factory-reset', { deviceId, confirmSerial }),
+  // A série digitada vai junto: o servidor confere que é a DESTE aparelho. E a
+  // senha do operador, duas vezes: o servidor confere que as duas são iguais e
+  // que é a dele.
+  factoryResetDevice: (deviceId: string, confirmSerial: string, password: string, passwordConfirm: string) =>
+    apiClient.post('/devices/factory-reset', { deviceId, confirmSerial, password, passwordConfirm }),
 
   // Ping e traceroute pela ONT. O aparelho vai no corpo, como no reiniciar.
   startDiagnostic: (deviceId: string, kind: DeviceDiagnosticKind, host: string) =>
