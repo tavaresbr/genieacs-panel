@@ -27,9 +27,9 @@ import assert from 'node:assert/strict';
  *
  * ## O que este arquivo NÃO afirma
  *
- * São **42 rotas**, não as 91. A amostra foi escolhida para que cada uma das
+ * São **44 rotas**, não as 91. A amostra foi escolhida para que cada uma das
  * 31 capacidades apareça pelo menos uma vez, e a garantia de não-regressão que
- * o teste do `admin` dá vale **sobre estas 42** — não sobre o painel inteiro.
+ * o teste do `admin` dá vale **sobre estas 44** — não sobre o painel inteiro.
  * Quem quiser a afirmação forte ("nenhuma das 91 rotas mudou de dono") precisa
  * de outra prova; a varredura estática de `permissions.test.js` é o que existe
  * hoje mais perto disso, e ela olha o nome da capacidade, não o alcance.
@@ -685,10 +685,10 @@ describe('a matriz e a expectativa deste arquivo', () => {
   });
 
   it('não encolhe sem que alguém diga', () => {
-    // O cabeçalho promete uma amostra de 42 rotas e a promessa de não-regressão
+    // O cabeçalho promete uma amostra de 44 rotas e a promessa de não-regressão
     // do `admin` vale sobre ELA. Uma rota apagada por um merge desajeitado
     // deixaria a promessa valendo sobre menos coisa, calada.
-    assert.equal(CASOS.length, 42);
+    assert.equal(CASOS.length, 44);
   });
 });
 
@@ -715,7 +715,7 @@ describe('quem não tem a capacidade toma 403', () => {
 
 /**
  * O par que dá sentido ao de cima, e a garantia de não-regressão do `admin`:
- * ele aparece aqui em TODAS as 42 rotas, porque a matriz lhe dá as 31
+ * ele aparece aqui em TODAS as 44 rotas, porque a matriz lhe dá as 31
  * capacidades. Nenhuma das rotas desta amostra saiu do alcance dele na onda 17.
  */
 describe('quem tem a capacidade passa pela guarda', () => {
