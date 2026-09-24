@@ -142,6 +142,12 @@ export function ConversationList({ conversations, accounts, selectedId, onSelect
                     {t('whatsapp.inbox.unread', { count: conversation.unreadCount })}
                   </span>
                 )}
+                {conversation.botPausedUntil && (
+                  <span className="modern-badge-warning" title={t('whatsapp.inbox.wantsHumanHint')}>
+                    <Icon name="contacts" size={12} />
+                    {t('whatsapp.inbox.wantsHuman')}
+                  </span>
+                )}
                 {conversation.optedOut && (
                   <span className="modern-badge-warning" title={t('whatsapp.inbox.optedOutHint')}>
                     <Icon name="bell" size={12} />

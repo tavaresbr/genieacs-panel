@@ -550,6 +550,8 @@ export default {
   'whatsapp.bot.portalHint': 'Wi-Fi 비밀번호 확인과 네트워크 이름 변경은 고객 포털에 로그인해 이용하십시오: {link}',
   'whatsapp.bot.notRecognised': '이 번호에 해당하는 계약을 찾지 못했습니다. 잠시 후 상담원이 답변드리겠습니다.',
   'whatsapp.bot.handoff': '상담원에게 연결해 드리겠습니다.',
+  'whatsapp.bot.menu': '안녕하세요! 자동 상담입니다. 번호로 답해 주세요:\n\n1 — 청구서 사본\n2 — 연결 상태\n3 — 상담원과 대화',
+  'whatsapp.bot.handoffQueued': '알겠습니다! 상담원이 곧 여기에서 답변드립니다. 메뉴를 다시 보려면 "menu"라고 입력하세요.',
   'whatsapp.bot.noOpenInvoice': '현재 미납 청구서가 없습니다.',
   'whatsapp.bot.invoice': '{amount} 청구서, 납기 {dueDate}.',
   'whatsapp.bot.signalOk': '인터넷이 정상 연결되어 있습니다. 광 신호: {rxPower} dBm.',

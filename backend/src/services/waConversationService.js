@@ -227,6 +227,11 @@ class WaConversationService {
       lastInboundAt: row.last_inbound_at || null,
       unreadCount: Number(row.unread_count || 0),
       closedAt: row.closed_at || null,
+      // Só enquanto vale: uma pausa vencida é um bot que já voltou a falar, e
+      // o selo "pediu atendente" nela seria um aviso sobre o passado.
+      botPausedUntil: row.bot_paused_until && new Date(row.bot_paused_until).getTime() > Date.now()
+        ? new Date(row.bot_paused_until).toISOString()
+        : null,
       createdAt: row.created_at || null,
       updatedAt: row.updated_at || null
     };

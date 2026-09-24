@@ -550,6 +550,8 @@ export default {
   'whatsapp.bot.portalHint': 'Per la password del WiFi e per cambiare il nome della rete, accedi al portale clienti: {link}',
   'whatsapp.bot.notRecognised': 'Non abbiamo trovato un contratto per questo numero. Un operatore risponderà a breve.',
   'whatsapp.bot.handoff': 'Passo a un operatore.',
+  'whatsapp.bot.menu': 'Ciao! Sono l\'assistente automatico. Rispondi con il numero:\n\n1 — Duplicato della fattura\n2 — Stato della connessione\n3 — Parlare con un operatore',
+  'whatsapp.bot.handoffQueued': 'Certo! Un operatore ti risponderà qui a breve. Per rivedere il menu, scrivi "menu".',
   'whatsapp.bot.noOpenInvoice': 'Non hai fatture aperte al momento.',
   'whatsapp.bot.invoice': 'Fattura di {amount}, scadenza {dueDate}.',
   'whatsapp.bot.signalOk': 'La tua connessione è online. Segnale ottico: {rxPower} dBm.',

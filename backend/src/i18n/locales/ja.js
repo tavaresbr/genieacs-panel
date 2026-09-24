@@ -544,6 +544,8 @@ export default {
   'whatsapp.bot.portalHint': 'Wi-Fi のパスワードの確認やネットワーク名の変更は、顧客ポータルにログインしてお手続きください: {link}',
   'whatsapp.bot.notRecognised': 'この番号に対応する契約が見つかりませんでした。担当者より追ってご連絡いたします。',
   'whatsapp.bot.handoff': '担当者におつなぎいたします。',
+  'whatsapp.bot.menu': 'こんにちは！自動応答です。番号で返信してください:\n\n1 — 請求書の再発行\n2 — 接続状況\n3 — 担当者と話す',
+  'whatsapp.bot.handoffQueued': '承知しました！担当者がまもなくここで返信します。メニューをもう一度見るには "menu" と送ってください。',
   'whatsapp.bot.noOpenInvoice': '現在、未払いの請求はございません。',
   'whatsapp.bot.invoice': '請求額 {amount}、支払期日 {dueDate} です。',
   'whatsapp.bot.signalOk': '回線はオンラインです。光信号: {rxPower} dBm。',

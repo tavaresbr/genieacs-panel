@@ -553,6 +553,8 @@ export default {
   'whatsapp.bot.portalHint': 'Für dein WLAN-Passwort und zum Ändern des Netzwerknamens melde dich im Kundenportal an: {link}',
   'whatsapp.bot.notRecognised': 'Zu dieser Nummer wurde kein Vertrag gefunden. Ein Mitarbeiter meldet sich in Kürze.',
   'whatsapp.bot.handoff': 'Ich gebe das an einen Mitarbeiter weiter.',
+  'whatsapp.bot.menu': 'Hallo! Hier ist der automatische Service. Antworten Sie mit der Nummer:\n\n1 — Rechnungskopie\n2 — Verbindungsstatus\n3 — Mit einem Mitarbeiter sprechen',
+  'whatsapp.bot.handoffQueued': 'Alles klar! Ein Mitarbeiter antwortet Ihnen hier in Kürze. Für das Menü schreiben Sie einfach "menu".',
   'whatsapp.bot.noOpenInvoice': 'Du hast derzeit keine offene Rechnung.',
   'whatsapp.bot.invoice': 'Rechnung über {amount}, fällig am {dueDate}.',
   'whatsapp.bot.signalOk': 'Deine Verbindung ist online. Optisches Signal: {rxPower} dBm.',

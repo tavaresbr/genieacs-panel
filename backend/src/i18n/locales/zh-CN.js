@@ -552,6 +552,8 @@ export default {
   'whatsapp.bot.portalHint': '如需查看 Wi-Fi 密码或修改网络名称，请登录客户门户：{link}',
   'whatsapp.bot.notRecognised': '未查询到该号码对应的合同。客服人员会尽快回复您。',
   'whatsapp.bot.handoff': '将为您转接客服人员。',
+  'whatsapp.bot.menu': '您好！这里是自动服务。请回复数字：\n\n1 — 账单副本\n2 — 连接状态\n3 — 联系人工客服',
+  'whatsapp.bot.handoffQueued': '好的！客服很快会在这里回复您。想再次查看菜单，请发送 "menu"。',
   'whatsapp.bot.noOpenInvoice': '您目前没有未付的账单。',
   'whatsapp.bot.invoice': '账单金额 {amount}，到期日 {dueDate}。',
   'whatsapp.bot.signalOk': '您的宽带在线。光信号：{rxPower} dBm。',

@@ -40,6 +40,7 @@ class WhatsAppController {
         webhookBaseUrl: body.webhookBaseUrl,
         rejectCallMessage: body.rejectCallMessage,
         portalPublicUrl: body.portalPublicUrl,
+        botEnabled: body.botEnabled,
         rateLimitPerMin: body.rateLimitPerMin,
         mediaRetentionDays: body.mediaRetentionDays,
         messageRetentionDays: body.messageRetentionDays,

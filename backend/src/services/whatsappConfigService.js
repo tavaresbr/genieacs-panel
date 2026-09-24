@@ -75,6 +75,10 @@ const DEFAULT_CONFIG = Object.freeze({
   // 404s for the one person the bot exists to help, so an empty value makes the
   // bot hand off to a human instead of sending a broken link.
   portalPublicUrl: '',
+  // O atendimento automático (`WaBotService`). Ligado por padrão: era o
+  // comportamento antes de existir a chave, e um provedor que nunca abriu a
+  // tela não pode perder o bot por uma atualização.
+  botEnabled: true,
   // Per-minute ceiling for outbound messages, shared by the outbox worker and
   // any campaign that does not set its own.
   rateLimitPerMin: 20,
@@ -177,6 +181,7 @@ class WhatsAppConfigService {
       webhookBaseUrl: String(stored.webhookBaseUrl || ''),
       rejectCallMessage: String(stored.rejectCallMessage || DEFAULT_CONFIG.rejectCallMessage),
       portalPublicUrl: String(stored.portalPublicUrl || ''),
+      botEnabled: stored.botEnabled !== false,
       rateLimitPerMin: Number(stored.rateLimitPerMin) > 0
         ? Math.min(Number(stored.rateLimitPerMin), 120)
         : DEFAULT_CONFIG.rateLimitPerMin,
@@ -200,6 +205,7 @@ class WhatsAppConfigService {
       webhookBaseUrl: String(stored.webhookBaseUrl || ''),
       rejectCallMessage: String(stored.rejectCallMessage || DEFAULT_CONFIG.rejectCallMessage),
       portalPublicUrl: String(stored.portalPublicUrl || ''),
+      botEnabled: stored.botEnabled !== false,
       rateLimitPerMin: Number(stored.rateLimitPerMin) > 0
         ? Math.min(Number(stored.rateLimitPerMin), 120)
         : DEFAULT_CONFIG.rateLimitPerMin,
@@ -283,6 +289,9 @@ class WhatsAppConfigService {
           'whatsapp.error.invalidPortalUrl',
           'invalid_portal_url'
         ),
+      botEnabled: patch.botEnabled === undefined
+        ? current.botEnabled
+        : patch.botEnabled !== false,
       mediaRetentionDays: patch.mediaRetentionDays === undefined
         ? current.mediaRetentionDays
         : normalizeRetentionDays(patch.mediaRetentionDays),

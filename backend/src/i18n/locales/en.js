@@ -552,6 +552,8 @@ export default {
   'whatsapp.bot.portalHint': 'For your WiFi password and to change the network name, sign in to the customer portal: {link}',
   'whatsapp.bot.notRecognised': 'We could not find a contract for this number. An attendant will reply shortly.',
   'whatsapp.bot.handoff': 'I will pass this to an attendant.',
+  'whatsapp.bot.menu': 'Hi! This is the automatic assistant. Reply with a number:\n\n1 — Invoice copy\n2 — Connection status\n3 — Talk to an agent',
+  'whatsapp.bot.handoffQueued': 'Sure! An agent will reply here shortly. To see the menu again, just write "menu".',
   'whatsapp.bot.noOpenInvoice': 'You have no open invoice right now.',
   'whatsapp.bot.invoice': 'Invoice of {amount}, due {dueDate}.',
   'whatsapp.bot.signalOk': 'Your connection is online. Optical signal: {rxPower} dBm.',

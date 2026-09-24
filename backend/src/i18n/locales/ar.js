@@ -550,6 +550,8 @@ export default {
   'whatsapp.bot.portalHint': 'لمعرفة كلمة مرور Wi-Fi ولتغيير اسم الشبكة، سجّل الدخول إلى بوابة المشترك: {link}',
   'whatsapp.bot.notRecognised': 'لم نعثر على عقد مرتبط بهذا الرقم. سيرد عليك أحد الموظّفين قريبًا.',
   'whatsapp.bot.handoff': 'سأحوّل هذا إلى أحد الموظّفين.',
+  'whatsapp.bot.menu': 'مرحبًا! أنا خدمة الرد الآلي. أجب بالرقم:\n\n1 — نسخة من الفاتورة\n2 — حالة الاتصال\n3 — التحدث إلى موظف',
+  'whatsapp.bot.handoffQueued': 'حسنًا! سيرد عليك موظف هنا قريبًا. لعرض القائمة مجددًا اكتب "menu".',
   'whatsapp.bot.noOpenInvoice': 'لا توجد لديك فاتورة مستحقة حاليًا.',
   'whatsapp.bot.invoice': 'فاتورة بمبلغ {amount}، تستحق في {dueDate}.',
   'whatsapp.bot.signalOk': 'اتصالك يعمل. الإشارة الضوئية: {rxPower} dBm.',
