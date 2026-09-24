@@ -759,6 +759,15 @@ class AuthController {
           // not what this session is authorised with.
           role: req.user.role,
           tenantId: req.user.tenantId,
+          // O provedor DESTA sessão, pelo token — o que o topo do menu mostra.
+          // O perfil público (`/api/public/tenant`) é resolvido pelo host, e num
+          // host único ele nomeia sempre o primeiro provedor: um nome errado
+          // exatamente onde a tela diz "você está no painel de X". Nulo na
+          // sessão do console, que não é de provedor nenhum.
+          tenant: req.user.platform || !req.user.tenantId
+            ? null
+            : await Tenant.findPublicById(req.user.tenantId)
+              .then((row) => (row ? { slug: row.slug ?? null, name: row.name } : null)),
           // Presente só na sessão do console, e é o que diz à tela que esta
           // sessão não tem provedor — em vez de ela deduzir isso de um
           // `tenantId` nulo, que é a dedução que um dia alguém faz errado.

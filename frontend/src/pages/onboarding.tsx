@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { mapSettingsAPI, settingsAPI, tenantAPI, usersAPI, type GenieAcsAuthType } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
+import { LocationPicker } from '@/components/location-picker'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import { useTenant } from '@/contexts/tenant-context'
@@ -75,6 +76,14 @@ export default function Onboarding() {
   }, [])
 
   const finish = () => {
+    // No provedor, para outro administrador ou outro navegador não receberem o
+    // assistente de novo. Se a gravação falhar, o '1' local faz o gate subir a
+    // marca na próxima visita.
+    void settingsAPI.dismissOnboarding('wizard').then((res) => {
+      if (res.success && tenant?.slug) {
+        try { localStorage.setItem(onboardingDismissKey(tenant.slug), '2') } catch {}
+      }
+    }).catch(() => {})
     if (tenant?.slug) {
       try { localStorage.setItem(onboardingDismissKey(tenant.slug), '1') } catch {}
     }
@@ -176,6 +185,11 @@ export default function Onboarding() {
                   <input id="ob-lng" className="modern-input w-full" inputMode="decimal" value={center.lng} onChange={(e) => setCenter((c) => ({ ...c, lng: e.target.value }))} />
                 </div>
               </div>
+              <LocationPicker
+                lat={center.lat.trim() === '' ? null : Number(center.lat)}
+                lng={center.lng.trim() === '' ? null : Number(center.lng)}
+                onChange={(lat, lng) => setCenter({ lat: String(lat), lng: String(lng) })}
+              />
               <p className="field-hint">{t('onboarding.identity.mapHint')}</p>
               <button type="button" className="modern-button" disabled={busy} onClick={() => void saveIdentity()}>
                 {busy ? t('common.saving') : t('common.next')}

@@ -10,6 +10,9 @@ import { LanguageSwitcher } from '@/components/language-switcher'
 import { Icon } from '@/components/ui/icon'
 import { BrandMark } from '@/components/brand-mark'
 import { APP_RELEASE, ReleaseNotesModal } from '@/components/release-notes-modal'
+
+/** "1.17.0 (3acef98)": a versão e o commit do build, quando há. */
+const APP_VERSION_LABEL = __APP_COMMIT__ ? `${APP_RELEASE.version} (${__APP_COMMIT__})` : APP_RELEASE.version
 import { normalizeRole, ROLE_LABEL_KEYS } from '@/lib/permissions'
 import { wearingPlatformHat } from '@/lib/shell'
 
@@ -38,11 +41,39 @@ const menuItems = [
   { href: '/settings', labelKey: 'sidebar.nav.settings', descriptionKey: 'sidebar.nav.settingsDescription', icon: 'settings', permission: 'settings.read' },
 ] as const
 
+/**
+ * O que os dois cabeçalhos (o do menu e a barra do celular) dizem sobre de
+ * quem é o painel aberto.
+ *
+ * Pelo TOKEN (`user.tenant`), e não pelo host: num host único o perfil público
+ * nomeia sempre o primeiro provedor, e o cabeçalho diria o nome de um
+ * provedor enquanto a sessão é de outro. Até `/auth/user` responder, vale o
+ * nome do host.
+ */
+function useSessionHeader(naPlataforma: boolean) {
+  const { t } = useTranslation()
+  const { user } = useAuth()
+  const { name: appName } = useTenant()
+  const sessionName = user?.tenant?.name || appName
+  const platformSession = naPlataforma || Boolean(user?.platform)
+  const headerSubtitle = platformSession
+    ? t('sidebar.platformAdmin')
+    : user?.tenant?.slug
+      ? t('sidebar.providerSlug', { slug: user.tenant.slug })
+      : t('app.tagline')
+  return { sessionName, platformSession, headerSubtitle }
+}
+
 export default function Sidebar() {
   const { t } = useTranslation()
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const { pathname } = useLocation()
+  const { user: sessionUser } = useAuth()
+  const { tenant: hostTenant } = useTenant()
+  const mobileHeader = useSessionHeader(wearingPlatformHat({
+    pathname, panelBaseDomain: hostTenant?.panelBaseDomain, isPlatformAdmin: Boolean(sessionUser?.isPlatformAdmin)
+  }))
 
   useEffect(() => {
     setIsMobileOpen(false)
@@ -60,8 +91,8 @@ export default function Sidebar() {
         <Link to="/dashboard" className="flex min-w-0 items-center gap-2.5" aria-label={t('sidebar.operationsAria')}>
           <BrandMark className="size-8 shrink-0" />
           <div className="min-w-0">
-            <div className="truncate text-sm font-bold leading-tight">SkyGenPanel</div>
-            <div className="text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{t('app.tagline')}</div>
+            <div className="truncate text-sm font-bold leading-tight">{mobileHeader.sessionName}</div>
+            <div className="truncate text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{mobileHeader.headerSubtitle}</div>
           </div>
         </Link>
         <button
@@ -161,6 +192,7 @@ function SidebarContent({
   const displayName = user?.username || t('sidebar.defaultOperator')
   const initial = displayName.slice(0, 1).toUpperCase()
   const [showReleaseNotes, setShowReleaseNotes] = useState(false)
+  const { sessionName, platformSession, headerSubtitle } = useSessionHeader(naPlataforma)
 
   return (
     <>
@@ -173,15 +205,18 @@ function SidebarContent({
           to={naPlataforma ? '/platform' : '/dashboard'}
           onClick={closeMobile}
           className="flex min-w-0 items-center gap-3"
-          title={isCollapsed ? (naPlataforma ? t('console.header') : appName) : undefined}
+          title={isCollapsed ? `${naPlataforma ? t('console.header') : sessionName} — ${headerSubtitle}` : undefined}
         >
           <BrandMark className="size-10 shrink-0" />
           {!isCollapsed && (
             <div className="min-w-0">
               <div className="truncate text-[0.95rem] font-bold leading-tight text-white">
-                {naPlataforma ? t('console.header') : appName}
+                {naPlataforma ? t('console.header') : sessionName}
               </div>
-              <div className="mt-0.5 text-[0.63rem] font-bold uppercase tracking-[0.14em] text-[#9aa9a2]">{t('app.tagline')}</div>
+              <div className="mt-0.5 flex min-w-0 items-center gap-1 text-[0.63rem] font-bold uppercase tracking-[0.14em] text-[#9aa9a2]">
+                {platformSession && <Icon name="lock" size={11} className="shrink-0" />}
+                <span className="truncate">{headerSubtitle}</span>
+              </div>
             </div>
           )}
         </Link>
@@ -275,15 +310,18 @@ function SidebarContent({
           className={`mb-2 flex min-h-11 w-full items-center rounded-md text-[#aab8b0] transition-colors hover:bg-white/8 hover:text-white ${
             isCollapsed ? 'justify-center px-1' : 'justify-between gap-3 px-2.5'
           }`}
-          aria-label={t('sidebar.releaseNotesAria', { version: APP_RELEASE.version })}
-          title={isCollapsed ? t('sidebar.versionTooltip', { version: APP_RELEASE.version }) : undefined}
+          aria-label={t('sidebar.releaseNotesAria', { version: APP_VERSION_LABEL })}
+          title={isCollapsed ? t('sidebar.versionTooltip', { version: APP_VERSION_LABEL }) : undefined}
         >
           {isCollapsed ? (
             <span className="font-mono text-[0.62rem] font-bold">v{APP_RELEASE.version.split('.').slice(0, 2).join('.')}</span>
           ) : (
             <>
               <span className="flex items-center gap-2 text-xs font-semibold"><Icon name="info" size={17} />{t('sidebar.whatsNew')}</span>
-              <span className="rounded bg-white/8 px-2 py-1 font-mono text-[0.65rem] font-bold text-[#d7dfda]">v{APP_RELEASE.version}</span>
+              <span className="rounded bg-white/8 px-2 py-1 font-mono text-[0.65rem] font-bold text-[#d7dfda]">
+                v{APP_RELEASE.version}
+                {__APP_COMMIT__ && <span className="font-normal text-[#9aa9a2]"> · {__APP_COMMIT__}</span>}
+              </span>
             </>
           )}
         </button>

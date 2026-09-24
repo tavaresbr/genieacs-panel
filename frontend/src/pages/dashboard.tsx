@@ -12,6 +12,7 @@ import { PieChart } from '@/components/charts/pie-chart'
 import { BarChart } from '@/components/charts/bar-chart'
 import { TrendChart } from '@/components/charts/trend-chart'
 import { DeviceSwapsCard } from '@/components/device-swaps-card'
+import { OnboardingChecklist } from '@/components/onboarding-checklist'
 
 interface Fault {
   id: string
@@ -326,6 +327,8 @@ export default function DashboardPage() {
             <button className="modern-button-secondary" onClick={() => void loadDashboard(true)}>{t('common.retry')}</button>
           </div>
         )}
+
+        <OnboardingChecklist />
 
         {canInspect && <DeviceSwapsCard />}
 

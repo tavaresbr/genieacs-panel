@@ -102,8 +102,9 @@ export function wearingPlatformHat(
  *    para sempre, qualquer regra baseada só no campo a empurraria para sempre.
  * 3. **`genieAcsUrl`** — a pergunta original, e continua sendo a que decide
  *    para um provedor de verdade.
- * 4. **`dismissed`** — quem clicou em "Pular por enquanto". Fica no navegador,
- *    por provedor, e é escolha de quem opera.
+ * 4. **`dismissed`** — o assistente já foi concluído ou pulado neste provedor.
+ *    A marca fica no servidor (`/api/settings/onboarding`), com um espelho no
+ *    navegador para não esperar a rede a cada página.
  */
 export interface OnboardingInput {
   /** Edição hospedada? Só nela existe onboarding. */
@@ -112,7 +113,7 @@ export interface OnboardingInput {
   kind: string | null | undefined
   /** O endereço da NBI já gravado, se houver. */
   genieAcsUrl: string | null | undefined
-  /** Se quem opera já pediu para pular, neste navegador. */
+  /** Se o assistente já foi concluído ou pulado neste provedor. */
   dismissed: boolean
 }
 

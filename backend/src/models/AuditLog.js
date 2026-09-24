@@ -135,7 +135,10 @@ class AuditLog {
     // Ping ou traceroute pedido à ONT. Não muda a configuração dela, e entra
     // mesmo assim: é tráfego saindo da rede do cliente, e o destino — que não
     // é segredo — é justamente o que quem investiga quer ler.
-    DEVICE_DIAGNOSTIC_STARTED: 'device.diagnostic_started'
+    DEVICE_DIAGNOSTIC_STARTED: 'device.diagnostic_started',
+    // Firmware trocado: a ONT grava e reinicia. O detalhe diz o arquivo e as
+    // duas versões — a de antes é a que se procura quando algo parou depois.
+    DEVICE_FIRMWARE_UPGRADE: 'device.firmware_upgrade'
   });
 
   /**
