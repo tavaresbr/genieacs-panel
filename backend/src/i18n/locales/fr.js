@@ -48,6 +48,14 @@ export default {
   'auth.passwordChangeRequired': 'Le mot de passe actuel et le nouveau sont requis',
   'auth.newPasswordLength': 'Le nouveau mot de passe doit comporter entre 8 et 128 caractères',
   'auth.currentPasswordIncorrect': 'Le mot de passe actuel est incorrect',
+  'auth.mfaRequired': 'Saisissez le code de votre application d\'authentification',
+  'auth.mfaInvalid': 'Code invalide',
+  'auth.mfaAlreadyEnabled': 'La connexion en deux étapes est déjà activée',
+  'auth.mfaNotStarted': 'Recommencez l\'activation : aucun code en attente',
+  'auth.mfaNotEnabled': 'La connexion en deux étapes n\'est pas activée',
+  'auth.mfaEnabled': 'Connexion en deux étapes activée',
+  'auth.mfaDisabled': 'Connexion en deux étapes désactivée',
+  'auth.mfaRecoveryRegenerated': 'Nouveaux codes de récupération générés ; les anciens ne sont plus valables',
   'auth.passwordUpdated': 'Mot de passe mis à jour',
 
   // Limitation de débit

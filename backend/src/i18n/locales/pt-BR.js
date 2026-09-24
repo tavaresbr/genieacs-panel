@@ -45,6 +45,14 @@ export default {
   'auth.passwordChangeRequired': 'A senha atual e a nova senha são obrigatórias',
   'auth.newPasswordLength': 'A nova senha deve ter entre 8 e 128 caracteres',
   'auth.currentPasswordIncorrect': 'A senha atual está incorreta',
+  'auth.mfaRequired': 'Digite o código do app autenticador',
+  'auth.mfaInvalid': 'Código inválido',
+  'auth.mfaAlreadyEnabled': 'O login em duas etapas já está ligado',
+  'auth.mfaNotStarted': 'Comece a ativação de novo: não há código pendente',
+  'auth.mfaNotEnabled': 'O login em duas etapas não está ligado',
+  'auth.mfaEnabled': 'Login em duas etapas ligado',
+  'auth.mfaDisabled': 'Login em duas etapas desligado',
+  'auth.mfaRecoveryRegenerated': 'Novos códigos de recuperação gerados; os antigos deixaram de valer',
   'auth.passwordUpdated': 'Senha atualizada com sucesso',
 
   // Limite de requisições

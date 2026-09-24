@@ -48,6 +48,14 @@ export default {
   'auth.passwordChangeRequired': '需要填写当前密码和新密码',
   'auth.newPasswordLength': '新密码需为 8 至 128 个字符',
   'auth.currentPasswordIncorrect': '当前密码不正确',
+  'auth.mfaRequired': '请输入身份验证器应用中的代码',
+  'auth.mfaInvalid': '代码无效',
+  'auth.mfaAlreadyEnabled': '两步登录已开启',
+  'auth.mfaNotStarted': '请重新开始启用：没有待确认的代码',
+  'auth.mfaNotEnabled': '两步登录未开启',
+  'auth.mfaEnabled': '已开启两步登录',
+  'auth.mfaDisabled': '已关闭两步登录',
+  'auth.mfaRecoveryRegenerated': '已生成新的恢复代码；旧代码不再有效',
   'auth.passwordUpdated': '密码已更新',
 
   // 频率限制

@@ -1450,6 +1450,24 @@ const sgpClientsTable = (db) => (t) => {
   t.index(['tenant_id', 'document'], 'sgp_clients_document_idx');
 };
 
+/**
+ * Os códigos de recuperação do login em duas etapas — ver `0059_user_totp`.
+ * Só o hash de cada código: são senhas de uso único.
+ */
+const userRecoveryCodesTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('user_id').unsigned().notNullable()
+    .references('id').inTable('users').onDelete('CASCADE');
+  t.string('code_hash', 64).notNullable();
+  t.timestamp('used_at').nullable();
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.index(['user_id']);
+};
+
+const MFA_TABLES = [
+  ['user_recovery_codes', userRecoveryCodesTable]
+];
+
 const SGP_CONTACT_TABLES = [
   ['sgp_contacts', sgpContactsTable],
   ['sgp_clients', sgpClientsTable]
@@ -1514,7 +1532,8 @@ export const SCHEMA_TABLES = [
   ...DEVICE_HISTORY_TABLES,
   ...DEVICE_SWAP_TABLES,
   ...BILLING_TABLES,
-  ...SGP_CONTACT_TABLES
+  ...SGP_CONTACT_TABLES,
+  ...MFA_TABLES
 ].map(([name]) => name);
 
 /**
@@ -3632,6 +3651,44 @@ export const migrations = [
       await db.schema.alterTable('wa_conversations', (t) => {
         t.timestamp('bot_paused_until').nullable();
       });
+    }
+  },
+  {
+    /**
+     * Login em duas etapas (app autenticador).
+     *
+     * Em `users`, e não por provedor: a linha é a PESSOA, que pode trabalhar em
+     * vários provedores e no console com o mesmo login — o segundo fator é
+     * dela, e vale em todos. O segredo é cifrado como os outros segredos do
+     * painel (`secretBox`, contexto próprio, com a versão da chave), e
+     * `totp_last_step` é o último passo aceito: o mesmo código não entra duas
+     * vezes.
+     *
+     * Os códigos de recuperação em tabela própria, guardados só como hash — são
+     * uma senha de uso único cada.
+     */
+    id: '0059_user_totp',
+    async isApplied(db) {
+      return (await db.schema.hasColumn('users', 'totp_enabled_at'))
+        && db.schema.hasTable('user_recovery_codes');
+    },
+    async up(db) {
+      const faltando = await missingColumns(db, 'users', [
+        ['totp_ciphertext', (t) => t.text('totp_ciphertext').nullable()],
+        ['totp_iv', (t) => t.string('totp_iv', 32).nullable()],
+        ['totp_tag', (t) => t.string('totp_tag', 32).nullable()],
+        ['totp_key_version', (t) => t.integer('totp_key_version').nullable()],
+        ['totp_enabled_at', (t) => t.timestamp('totp_enabled_at').nullable()],
+        ['totp_last_step', (t) => t.bigInteger('totp_last_step').nullable()]
+      ]);
+      if (faltando.length > 0) {
+        await db.schema.alterTable('users', (t) => {
+          for (const add of faltando) add(t);
+        });
+      }
+      for (const [nome, construtor] of MFA_TABLES) {
+        await createTableIfMissing(db, nome, construtor(db));
+      }
     }
   }
 ];

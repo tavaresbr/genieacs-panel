@@ -6,6 +6,7 @@ import {
   authTicketRedeemLimiter,
   emailChangeLimiter,
   impersonationRedeemLimiter,
+  mfaLimiter,
   passwordResetLimiter
 } from '../middleware/rateLimit.js';
 
@@ -50,6 +51,15 @@ router.post('/logout', authenticateToken, AuthController.logout);
 router.post('/refresh', AuthController.refreshToken);
 
 router.post('/change-password', authenticateToken, AuthController.changePassword);
+
+// Login em duas etapas da própria conta. O limite vem DEPOIS da sessão, para
+// contar por pessoa: é ele que segura quem tenta adivinhar os 6 dígitos numa
+// sessão roubada para desligar o 2FA.
+router.get('/mfa', authenticateToken, AuthController.mfaStatus);
+router.post('/mfa/setup', authenticateToken, mfaLimiter, AuthController.mfaSetup);
+router.post('/mfa/enable', authenticateToken, mfaLimiter, AuthController.mfaEnable);
+router.post('/mfa/disable', authenticateToken, mfaLimiter, AuthController.mfaDisable);
+router.post('/mfa/recovery-codes', authenticateToken, mfaLimiter, AuthController.mfaRegenerateRecovery);
 
 router.post('/change-username', authenticateToken, AuthController.changeUsername);
 

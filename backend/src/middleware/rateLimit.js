@@ -437,6 +437,18 @@ export const factoryResetLimiter = limiter({
   message: limitMessage('rateLimit.requests', 'rate_limited')
 });
 
+/**
+ * O login em duas etapas da própria conta: ativar, desligar, trocar os códigos.
+ * Por pessoa, e apertado: cada tentativa é um palpite nos 6 dígitos, e quem
+ * tenta desligar o 2FA de uma sessão roubada não pode ter palpites à vontade.
+ */
+export const mfaLimiter = limiter({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  keyGenerator: (req) => (req.user?.userId ? `user:${req.user.userId}` : `ip:${ipKey(req)}`),
+  message: limitMessage('rateLimit.attempts', 'rate_limited')
+});
+
 export const portalPasswordAdminLimiter = limiter({
   windowMs: 15 * 60 * 1000,
   max: 60,

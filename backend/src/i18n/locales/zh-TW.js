@@ -48,6 +48,14 @@ export default {
   'auth.passwordChangeRequired': '需要填寫目前的密碼與新密碼',
   'auth.newPasswordLength': '新密碼需為 8 至 128 個字元',
   'auth.currentPasswordIncorrect': '目前的密碼不正確',
+  'auth.mfaRequired': '請輸入驗證器應用程式中的代碼',
+  'auth.mfaInvalid': '代碼無效',
+  'auth.mfaAlreadyEnabled': '兩步驟登入已開啟',
+  'auth.mfaNotStarted': '請重新開始啟用：沒有待確認的代碼',
+  'auth.mfaNotEnabled': '兩步驟登入未開啟',
+  'auth.mfaEnabled': '已開啟兩步驟登入',
+  'auth.mfaDisabled': '已關閉兩步驟登入',
+  'auth.mfaRecoveryRegenerated': '已產生新的復原代碼；舊代碼不再有效',
   'auth.passwordUpdated': '密碼已更新',
 
   // 速率限制

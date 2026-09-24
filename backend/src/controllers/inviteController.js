@@ -11,6 +11,7 @@ import AuditLog from '../models/AuditLog.js';
 import { ROLES, normalizeRole, roleHas } from '../config/permissions.js';
 import { generateTokens } from '../middleware/auth.js';
 import { createResponse, createErrorResponse, isValidEmail } from '../utils/helpers.js';
+import MfaService, { mfaEnabled } from '../services/mfaService.js';
 import {
   MAX_TTL_MS,
   MIN_TTL_MS,
@@ -222,6 +223,19 @@ class InviteController {
         // o convite era a porta dos fundos da chave.
         if (!acceptsIdentifier(username, existente)) {
           return res.status(401).json(createErrorResponse(req.t('auth.invalidCredentials')));
+        }
+        // O segundo fator, pela mesma razão da linha de cima: aceitar o
+        // convite emite sessão, e sem isto quem tivesse a senha vazada de uma
+        // conta com 2FA entraria por aqui sem o código. Gasto já aqui — este
+        // caminho não tem uma segunda ida como a escolha de provedor do login.
+        if (mfaEnabled(existente)) {
+          const { totpCode } = req.body || {};
+          if (totpCode === undefined || totpCode === null || totpCode === '') {
+            return res.status(401).json(createErrorResponse(req.t('auth.mfaRequired'), null, 'mfa_required'));
+          }
+          if (!(await MfaService.verifySecondFactor(existente, totpCode)).ok) {
+            return res.status(401).json(createErrorResponse(req.t('auth.mfaInvalid'), null, 'mfa_invalid'));
+          }
         }
         // Já trabalha aqui: o convite não some e não vira erro. É o caso do
         // link clicado duas vezes, e a resposta certa para "me põe na equipe"

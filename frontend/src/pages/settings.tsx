@@ -48,6 +48,7 @@ import { exportFileName } from '@/lib/utils'
 import { InvitePanel } from '@/components/settings/invite-panel'
 import { ProviderAddressPanel } from '@/components/settings/provider-address-panel'
 import type { Vendor as VendorType, WifiSecurityConfig as WifiSecurityConfigType } from '@/types'
+import { MfaCard } from '@/components/mfa-card'
 
 const INSTALLER_VIRTUAL_PARAMETERS = {
   vpPppoeUsername: 'VirtualParameters.PPPUsername',
@@ -2469,6 +2470,7 @@ export default function Settings() {
             <h2 className="section-heading">{t('settings.security.title')}</h2>
             <p className="section-description mb-6">{t('settings.security.description')}</p>
             <div className="space-y-6">
+              <MfaCard />
               <section className="rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-4">
                 <h3 className="font-semibold text-foreground">{t('settings.security.changeUsername')}</h3>
                 <p className="mb-4 mt-1 text-sm text-muted-foreground">{t('settings.security.changeUsernameHint')}</p>

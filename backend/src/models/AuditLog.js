@@ -142,7 +142,15 @@ class AuditLog {
     // Uma ação em vários aparelhos: UMA linha por lote, com a ação, as
     // contagens e o recorte da lista. Uma linha por aparelho afogaria a trilha
     // e esconderia justamente que foi um lote.
-    DEVICE_BATCH_ACTION: 'device.batch_action'
+    DEVICE_BATCH_ACTION: 'device.batch_action',
+    // Login em duas etapas da própria conta. Nunca o segredo nem os códigos:
+    // só que foi ligado, desligado, que os códigos foram trocados — e, o que o
+    // dono mais quer ver, que alguém entrou com um código de recuperação (o
+    // celular sumiu).
+    USER_MFA_ENABLED: 'user.mfa_enabled',
+    USER_MFA_DISABLED: 'user.mfa_disabled',
+    USER_MFA_RECOVERY_REGENERATED: 'user.mfa_recovery_regenerated',
+    USER_MFA_RECOVERY_USED: 'user.mfa_recovery_used'
   });
 
   /**

@@ -9,6 +9,7 @@ import { Icon } from '@/components/ui/icon'
 import { BrandMark } from '@/components/brand-mark'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import { useTranslation } from '@/contexts/language-context'
+import { cleanSecondFactor, mfaStepDaResposta } from '@/lib/login-mfa'
 
 
 
@@ -38,6 +39,10 @@ export default function Invite() {
   const [form, setForm] = useState({ username: '', email: '', password: '' })
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  // Quem já tem conta com login em duas etapas: aceitar o convite emite sessão,
+  // então o servidor pede o código como no login.
+  const [pedindoCodigo, setPedindoCodigo] = useState(false)
+  const [codigo, setCodigo] = useState('')
 
   useEffect(() => {
     if (!token) { setLoading(false); return }
@@ -66,8 +71,16 @@ export default function Invite() {
       const res = await invitesAPI.accept(token, {
         username: form.username.trim(),
         email: form.email.trim(),
-        password: form.password
+        password: form.password,
+        ...(pedindoCodigo && codigo.trim() ? { totpCode: cleanSecondFactor(codigo) } : {})
       })
+      const passo = mfaStepDaResposta(res)
+      if (passo) {
+        setPedindoCodigo(true)
+        setCodigo('')
+        setError(passo === 'invalid' ? t('login.mfa.invalid') : t('login.mfa.subtitle'))
+        return
+      }
       if (res.success && res.data) {
         adoptSession(res.data.token, res.data.refreshToken, res.data.user)
         navigate('/dashboard', { replace: true })
@@ -152,6 +165,18 @@ export default function Invite() {
                   />
                   <p className="field-hint">{t('invite.passwordHint')}</p>
                 </div>
+                {pedindoCodigo && (
+                  <div>
+                    <label htmlFor="invite-totp" className="field-label">{t('login.mfa.code')}</label>
+                    <input
+                      id="invite-totp" type="text" className="modern-input font-mono tracking-widest" required
+                      autoComplete="one-time-code" autoFocus maxLength={32} placeholder="123 456"
+                      value={codigo}
+                      onChange={(e) => setCodigo(e.target.value)}
+                    />
+                    <p className="field-hint">{t('login.mfa.hint')}</p>
+                  </div>
+                )}
 
                 <button type="submit" disabled={submitting} className="modern-button w-full">
                   {submitting ? t('invite.accepting') : t('invite.accept')}

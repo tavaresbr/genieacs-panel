@@ -9,6 +9,7 @@ import { BrandMark } from '@/components/brand-mark'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import { useTranslation } from '@/contexts/language-context'
 import { useTenant } from '@/contexts/tenant-context'
+import { cleanSecondFactor } from '@/lib/login-mfa'
 
 /**
  * A mesma tela serve as duas portas, e a variante é o que muda entre elas.
@@ -36,6 +37,15 @@ export default function Login({ variant = 'provider' }: { variant?: 'provider' |
    * diz nada a quem não tem a senha.
    */
   const [destinos, setDestinos] = useState<LoginDestinations | null>(null)
+  /**
+   * O passo do código do app autenticador, quando a conta tem 2FA.
+   *
+   * O código fica em memória junto com a senha, como ela: vai de novo em cada
+   * ida (a escolha de provedor, se vier), e o servidor só o gasta quando a
+   * sessão nasce.
+   */
+  const [pedindoCodigo, setPedindoCodigo] = useState(false)
+  const [codigo, setCodigo] = useState('')
   const { login } = useAuth()
   const { t } = useTranslation()
   const { name, tenant } = useTenant()
@@ -51,10 +61,20 @@ export default function Login({ variant = 'provider' }: { variant?: 'provider' |
     setLoading(true)
     setError('')
     try {
-      const resultado = await login(formData.identifier, formData.password, destino)
+      const segundoFator = pedindoCodigo ? cleanSecondFactor(codigo) : undefined
+      const resultado = await login(formData.identifier, formData.password, destino, segundoFator)
       if (resultado === true) return
       if (resultado === false) {
         setError(t('login.error.invalidCredentials'))
+        return
+      }
+      if (resultado === 'required') {
+        setPedindoCodigo(true)
+        return
+      }
+      if (resultado === 'invalid') {
+        setCodigo('')
+        setError(t('login.mfa.invalid'))
         return
       }
       setDestinos(resultado)
@@ -111,12 +131,14 @@ export default function Login({ variant = 'provider' }: { variant?: 'provider' |
             <div className="mb-7">
               <p className="page-kicker">{t(doConsole ? 'login.platform.kicker' : 'login.kicker')}</p>
               <h1 className="text-2xl font-bold text-foreground">
-                {destinos ? t('login.destination.title') : t(doConsole ? 'login.platform.title' : 'login.title')}
+                {destinos
+                  ? t('login.destination.title')
+                  : pedindoCodigo ? t('login.mfa.title') : t(doConsole ? 'login.platform.title' : 'login.title')}
               </h1>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
                 {destinos
                   ? t('login.destination.subtitle')
-                  : t(doConsole ? 'login.platform.subtitle' : 'login.subtitle')}
+                  : pedindoCodigo ? t('login.mfa.subtitle') : t(doConsole ? 'login.platform.subtitle' : 'login.subtitle')}
               </p>
             </div>
 
@@ -161,12 +183,54 @@ export default function Login({ variant = 'provider' }: { variant?: 'provider' |
                 <button
                   type="button"
                   disabled={loading}
-                  onClick={() => { setDestinos(null); setError('') }}
+                  onClick={() => { setDestinos(null); setPedindoCodigo(false); setCodigo(''); setError('') }}
                   className="w-full text-center text-sm underline text-muted-foreground"
                 >
                   {t('login.destination.back')}
                 </button>
               </div>
+            ) : pedindoCodigo ? (
+              /* O passo do código. A senha já foi conferida: o servidor só pede
+                 o código a quem a acertou. */
+              <form className="space-y-5" onSubmit={handleSubmit} noValidate>
+                {error && (
+                  <div id="login-error" className="alert-error flex gap-2.5" role="alert">
+                    <Icon name="warning" size={19} className="mt-0.5 shrink-0" />
+                    <span>{error}</span>
+                  </div>
+                )}
+                <div>
+                  <label htmlFor="totp-code" className="field-label">{t('login.mfa.code')}</label>
+                  <input
+                    id="totp-code"
+                    name="totp-code"
+                    type="text"
+                    inputMode="text"
+                    autoComplete="one-time-code"
+                    autoFocus
+                    required
+                    maxLength={32}
+                    value={codigo}
+                    onChange={(event) => setCodigo(event.target.value)}
+                    className="modern-input font-mono tracking-widest"
+                    placeholder="123 456"
+                    aria-invalid={Boolean(error)}
+                    aria-describedby={error ? 'login-error' : 'totp-hint'}
+                  />
+                  <p id="totp-hint" className="field-hint">{t('login.mfa.hint')}</p>
+                </div>
+                <button type="submit" disabled={loading || !codigo.trim()} className="modern-button w-full">
+                  {loading ? t('login.submitting') : t('login.mfa.submit')}
+                </button>
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => { setPedindoCodigo(false); setCodigo(''); setError('') }}
+                  className="w-full text-center text-sm underline text-muted-foreground"
+                >
+                  {t('login.destination.back')}
+                </button>
+              </form>
             ) : (
             <form className="space-y-5" onSubmit={handleSubmit} noValidate>
               {error && (

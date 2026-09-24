@@ -1,5 +1,5 @@
 import { createSecretBox, LEGACY_KEY_VERSION } from '../utils/secretBox.js';
-import { tdb } from '../config/database.js';
+import { getDb, tdb } from '../config/database.js';
 import AppState from '../models/AppState.js';
 import Tenant from '../models/Tenant.js';
 import { runInTenant } from '../config/tenantContext.js';
@@ -143,6 +143,24 @@ const BLOBS = Object.freeze([
 ]);
 
 /**
+ * Segredos em tabela COMPARTILHADA — da pessoa, e não de um provedor.
+ *
+ * O segredo do login em duas etapas mora em `users`, que não tem provedor: a
+ * mesma pessoa entra em vários. Por isso ele é rotacionado uma vez, fora do
+ * laço dos provedores. Sem esta lista, seria o primeiro segredo do painel fora
+ * da rotação — e o dia de largar a chave anterior trancaria todo mundo que usa
+ * o 2FA do lado de fora.
+ */
+const COLUNAS_COMPARTILHADAS = Object.freeze([
+  {
+    tabela: 'users',
+    prefixo: 'totp',
+    versao: 'totp_key_version',
+    contexto: 'skygenpanel-user-totp-v1'
+  }
+]);
+
+/**
  * As caixas, criadas AQUI e não importadas dos serviços.
  *
  * Os serviços chamam `createSecretBox` no topo do módulo, então as chaves deles
@@ -151,7 +169,7 @@ const BLOBS = Object.freeze([
  */
 function caixas() {
   const porContexto = new Map();
-  for (const contexto of [...COLUNAS, ...BLOBS].map((s) => s.contexto)) {
+  for (const contexto of [...COLUNAS, ...COLUNAS_COMPARTILHADAS, ...BLOBS].map((s) => s.contexto)) {
     if (!porContexto.has(contexto)) porContexto.set(contexto, createSecretBox(contexto));
   }
   return porContexto;
@@ -184,6 +202,7 @@ class SecretUnreadableError extends Error {
 
 class SecretRotationService {
   static get COLUNAS() { return COLUNAS; }
+  static get COLUNAS_COMPARTILHADAS() { return COLUNAS_COMPARTILHADAS; }
   static get BLOBS() { return BLOBS; }
 
   /**
@@ -218,12 +237,19 @@ class SecretRotationService {
       });
     }
 
+    // Uma vez, fora de qualquer provedor: a tabela é da pessoa.
+    for (const alvo of COLUNAS_COMPARTILHADAS) {
+      // eslint-disable-next-line no-await-in-loop -- em série, como o resto
+      await this.rotacionarColuna(alvo, boxes.get(alvo.contexto), { dryRun, contar, resumo, consulta: getDb() });
+    }
+
     return resumo;
   }
 
-  static async rotacionarColuna(alvo, box, { dryRun, contar, resumo }) {
+  static async rotacionarColuna(alvo, box, { dryRun, contar, resumo, consulta = null }) {
     const { tabela, prefixo, versao } = alvo;
-    const linhas = await tdb(tabela)
+    const db = (nome) => (consulta ? consulta(nome) : tdb(nome));
+    const linhas = await db(tabela)
       .whereNotNull(`${prefixo}_ciphertext`)
       .select('id', `${prefixo}_ciphertext`, `${prefixo}_iv`, `${prefixo}_tag`, versao);
 
@@ -237,7 +263,7 @@ class SecretRotationService {
       if (dryRun) continue;
 
       const cifrado = box.encrypt(aberto);
-      await tdb(tabela).where({ id: linha.id }).update({
+      await db(tabela).where({ id: linha.id }).update({
         [`${prefixo}_ciphertext`]: cifrado.password_ciphertext,
         [`${prefixo}_iv`]: cifrado.password_iv,
         [`${prefixo}_tag`]: cifrado.password_tag,

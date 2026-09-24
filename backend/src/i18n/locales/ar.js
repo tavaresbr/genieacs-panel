@@ -46,6 +46,14 @@ export default {
   'auth.passwordChangeRequired': 'كلمة المرور الحالية والجديدة مطلوبتان',
   'auth.newPasswordLength': 'يجب أن تتراوح كلمة المرور الجديدة بين ٨ و١٢٨ حرفًا',
   'auth.currentPasswordIncorrect': 'كلمة المرور الحالية غير صحيحة',
+  'auth.mfaRequired': 'أدخل الرمز من تطبيق المصادقة',
+  'auth.mfaInvalid': 'رمز غير صالح',
+  'auth.mfaAlreadyEnabled': 'تسجيل الدخول بخطوتين مفعّل بالفعل',
+  'auth.mfaNotStarted': 'ابدأ التفعيل من جديد: لا يوجد رمز معلق',
+  'auth.mfaNotEnabled': 'تسجيل الدخول بخطوتين غير مفعّل',
+  'auth.mfaEnabled': 'تم تفعيل تسجيل الدخول بخطوتين',
+  'auth.mfaDisabled': 'تم إيقاف تسجيل الدخول بخطوتين',
+  'auth.mfaRecoveryRegenerated': 'تم إنشاء رموز استرداد جديدة؛ الرموز القديمة لم تعد صالحة',
   'auth.passwordUpdated': 'تم تحديث كلمة المرور',
 
   // حدود المعدّل

@@ -36,6 +36,8 @@ export interface User {
    * Opcional pelo mesmo motivo de `email`: nem toda resposta traz o campo.
    */
   emailVerified?: boolean
+  /** Se o login em duas etapas está ligado — só isso; o segredo nunca vem. */
+  mfaEnabled?: boolean
   /**
    * O papel NO PROVEDOR desta sessão — e `null` quando ela não tem provedor.
    *

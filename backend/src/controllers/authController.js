@@ -18,6 +18,7 @@ import AuditLog from '../models/AuditLog.js';
 import { runInTenant } from '../config/tenantContext.js';
 import { recordPanelActivity } from '../services/dashboardSchedule.js';
 import { mailTransport, panelUrlFor } from '../services/mail/index.js';
+import MfaService, { mfaEnabled } from '../services/mfaService.js';
 
 const DUMMY_PASSWORD_HASH = bcrypt.hashSync('skygenpanel-invalid-login-placeholder', 12);
 
@@ -455,7 +456,7 @@ class AuthController {
 
   static async login(req, res) {
     try {
-      const { username, password, tenantId, destination } = req.body;
+      const { username, password, tenantId, destination, totpCode } = req.body;
 
       if (!username || !password) {
         return res.status(400).json(
@@ -500,6 +501,33 @@ class AuthController {
         );
       }
 
+      // O segundo fator, ANTES de qualquer ramo — console, escolha de
+      // provedor, provedor. Cada um desses emite sessão ou diz para onde a
+      // pessoa pode ir, e as duas coisas são o que a segunda etapa protege.
+      //
+      // Só chega aqui quem acertou a senha: senha errada é o 401 de sempre,
+      // sem pista de 2FA. Pedir o código revela que a senha estava certa, e é
+      // o preço de toda segunda etapa — o que ela protege é justamente o caso
+      // em que a senha já vazou.
+      let segundoFator = null;
+      const codigoInvalido = () => res.status(401).json(
+        createErrorResponse(req.t('auth.mfaInvalid'), null, 'mfa_invalid')
+      );
+      if (mfaEnabled(user)) {
+        if (totpCode === undefined || totpCode === null || totpCode === '') {
+          return res.status(401).json(createErrorResponse(req.t('auth.mfaRequired'), null, 'mfa_required'));
+        }
+        // Conferido aqui, GASTO só onde a sessão nasce (`gastarCodigo`): a
+        // resposta pode ser "em qual provedor?", e a tela reenvia o mesmo
+        // código com a escolha.
+        segundoFator = await MfaService.verifySecondFactor(user, totpCode, { consume: false });
+        if (!segundoFator.ok) return codigoInvalido();
+      }
+      // Gasta o código no instante de emitir a sessão. Falha aqui é a mesma
+      // entrada chegando duas vezes ao mesmo tempo: só uma passa.
+      const gastarCodigo = async () => !segundoFator
+        || (await MfaService.verifySecondFactor(user, totpCode)).ok;
+
       // O login do CONSOLE, no endereço da própria plataforma.
       //
       // Entra aqui, ANTES da linha de baixo, e a ordem é a decisão: ali o
@@ -520,6 +548,7 @@ class AuthController {
             createErrorResponse(req.t('auth.invalidCredentials'))
           );
         }
+        if (!(await gastarCodigo())) return codigoInvalido();
         return respostaDoConsole(req, res, user);
       }
 
@@ -536,6 +565,7 @@ class AuthController {
             createErrorResponse(req.t('auth.invalidCredentials'))
           );
         }
+        if (!(await gastarCodigo())) return codigoInvalido();
         return respostaDoConsole(req, res, user);
       }
 
@@ -578,6 +608,7 @@ class AuthController {
         // nenhum — entra nele sem ser perguntado: é o único destino que existe,
         // e a alternativa seria o 401 de "trabalha para ninguém".
         if (destinos.tenants.length === 0 && destinos.console) {
+          if (!(await gastarCodigo())) return codigoInvalido();
           return respostaDoConsole(req, res, user);
         }
       }
@@ -603,8 +634,19 @@ class AuthController {
         );
       }
 
+      if (!(await gastarCodigo())) return codigoInvalido();
       const { accessToken, refreshToken } = generateTokens(user, membership);
       await marcarAtividade(membership.tenant_id);
+      // Entrar com um código de recuperação deixa linha na trilha do provedor
+      // em que a sessão abriu: é o sinal de que o celular sumiu, e o dono quer
+      // saber. `fromRequest` não lança.
+      if (segundoFator?.via === 'recovery') {
+        await runInTenant(membership.tenant_id, () => AuditLog.fromRequest(
+          // `req.ip` é um getter do Express: espalhar `req` o perderia.
+          { ip: req.ip, user: { userId: user.id, username: user.username } },
+          { action: AuditLog.ACTIONS.USER_MFA_RECOVERY_USED, subjectType: 'user', subjectId: String(user.id) }
+        ));
+      }
 
       return res.json(
         createResponse(req.t('auth.loginSuccess'), {
@@ -636,6 +678,73 @@ class AuthController {
       return res.status(500).json(
         createErrorResponse(req.t('common.internalError'), error.message)
       );
+    }
+  }
+
+  /**
+   * As rotas do login em duas etapas, todas sobre a PRÓPRIA conta de quem está
+   * na sessão — por isso nenhuma pede capacidade além de estar logado, como
+   * trocar a própria senha.
+   */
+  static mfaError(req, res, error, label) {
+    if (error.translationKey) {
+      return res.status(error.status || 400).json(
+        createErrorResponse(req.t(error.translationKey), null, error.code || null)
+      );
+    }
+    console.error(`${label} error:`, error);
+    return res.status(500).json(createErrorResponse(req.t('common.internalError'), error.message));
+  }
+
+  static async mfaStatus(req, res) {
+    try {
+      return res.json(createResponse(null, await MfaService.status(req.user.userId)));
+    } catch (error) {
+      return AuthController.mfaError(req, res, error, 'MFA status');
+    }
+  }
+
+  static async mfaSetup(req, res) {
+    try {
+      return res.json(createResponse(null, await MfaService.setup(req.user.userId)));
+    } catch (error) {
+      return AuthController.mfaError(req, res, error, 'MFA setup');
+    }
+  }
+
+  static async mfaEnable(req, res) {
+    try {
+      const result = await MfaService.enable(req.user.userId, req.body?.code);
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.USER_MFA_ENABLED, subjectType: 'user', subjectId: String(req.user.userId)
+      });
+      return res.json(createResponse(req.t('auth.mfaEnabled'), result));
+    } catch (error) {
+      return AuthController.mfaError(req, res, error, 'MFA enable');
+    }
+  }
+
+  static async mfaDisable(req, res) {
+    try {
+      await MfaService.disable(req.user.userId, req.body?.password, req.body?.code);
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.USER_MFA_DISABLED, subjectType: 'user', subjectId: String(req.user.userId)
+      });
+      return res.json(createResponse(req.t('auth.mfaDisabled'), { enabled: false }));
+    } catch (error) {
+      return AuthController.mfaError(req, res, error, 'MFA disable');
+    }
+  }
+
+  static async mfaRegenerateRecovery(req, res) {
+    try {
+      const result = await MfaService.regenerateRecoveryCodes(req.user.userId, req.body?.password, req.body?.code);
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.USER_MFA_RECOVERY_REGENERATED, subjectType: 'user', subjectId: String(req.user.userId)
+      });
+      return res.json(createResponse(req.t('auth.mfaRecoveryRegenerated'), result));
+    } catch (error) {
+      return AuthController.mfaError(req, res, error, 'MFA recovery codes');
     }
   }
 
@@ -753,6 +862,8 @@ class AuthController {
           // se a redefinição de senha vai funcionar para esta pessoa no dia em
           // que ela precisar, que é um dia em que ela não vai poder resolver.
           emailVerified: Boolean(user.email_verified_at),
+          // Só se está ligado — o segredo e os códigos nunca saem daqui.
+          mfaEnabled: Boolean(user.totp_enabled_at),
           // From the session rather than from the row, for the same reason the
           // login response reports it that way: this is the answer the panel
           // rebuilds its menus from after a page reload, and `users.role` is

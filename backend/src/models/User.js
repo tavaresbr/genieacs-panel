@@ -104,7 +104,7 @@ class User {
       (await getDb()('users')
         .select(
           'id', 'username', 'email', 'email_verified_at', 'role', 'password',
-          'token_version', 'created_at', 'updated_at'
+          'token_version', 'totp_enabled_at', 'created_at', 'updated_at'
         )
         .where({ id })
         .first()) || null
