@@ -37,6 +37,11 @@ describe('self-hosted: o provedor configura a própria infraestrutura', () => {
     assert.equal(status, 200);
   });
 
+  it('grava os parâmetros TR-069', async () => {
+    const { status } = await api('/settings/vpRxPower', { method: 'PUT', body: { value: 'VirtualParameters.RX' } });
+    assert.equal(status, 200);
+  });
+
   it('grava a credencial da NBI', async () => {
     const { status } = await api('/settings/genieacs-auth', {
       method: 'PUT',

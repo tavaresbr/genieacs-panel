@@ -2449,6 +2449,9 @@ const ptBR: Dictionary = {
   'catalogue.propagate.row': '{added} inseridos, {updated} sobrescritos',
   'catalogue.propagate.failed': 'Não foi possível enviar as atualizações.',
   'settings.platformManaged.whatsappDescription': 'Conecta um ou mais números de WhatsApp pelo servidor Evolution API da plataforma. Os tokens são gravados criptografados e nunca retornam para o navegador.',
+  'settings.panelIdentity.title': 'Painel',
+  'settings.panelIdentity.description': 'O nome exibido no painel, o idioma deste navegador e por quanto tempo a trilha de auditoria é guardada.',
+  'platform.genieacs.vpDescription': 'Os caminhos que o painel lê dos equipamentos deste provedor. Dependem dos scripts de provisionamento instalados no GenieACS da plataforma, por isso o provedor não os edita.',
 }
 
 export default ptBR

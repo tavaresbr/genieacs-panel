@@ -2449,6 +2449,9 @@ const es: Dictionary = {
   'catalogue.propagate.row': '{added} agregados, {updated} sobrescritos',
   'catalogue.propagate.failed': 'No se pudieron enviar las actualizaciones.',
   'settings.platformManaged.whatsappDescription': 'Conecta uno o más números de WhatsApp mediante el servidor Evolution API de la plataforma. Los tokens se guardan cifrados y nunca vuelven al navegador.',
+  'settings.panelIdentity.title': 'Panel',
+  'settings.panelIdentity.description': 'El nombre que muestra el panel, el idioma de este navegador y cuánto tiempo se guarda el registro de auditoría.',
+  'platform.genieacs.vpDescription': 'Las rutas que el panel lee de los equipos de este proveedor. Dependen de los scripts de aprovisionamiento instalados en el GenieACS de la plataforma, por eso el proveedor no las edita.',
 }
 
 export default es

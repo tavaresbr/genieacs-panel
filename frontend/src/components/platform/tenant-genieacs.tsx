@@ -11,6 +11,7 @@ import { useToast } from '@/components/ui/toast'
 import { Icon } from '@/components/ui/icon'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
+import { INSTALLER_VIRTUAL_PARAMETERS, VIRTUAL_PARAMETER_FIELDS } from '@/lib/virtual-parameters'
 
 interface Props {
   tenant: Tenant
@@ -43,6 +44,9 @@ export function TenantGenieAcs({ tenant }: Props) {
   const [username, setUsername] = useState('')
   const [secret, setSecret] = useState('')
   const [clearSecret, setClearSecret] = useState(false)
+  // Os caminhos TR-069 dependem dos scripts instalados no ACS — o da
+  // plataforma, na SaaS —, e por isso moram aqui e não na tela do provedor.
+  const [vps, setVps] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
   const [testMessage, setTestMessage] = useState<{ ok: boolean; text: string } | null>(null)
@@ -54,6 +58,7 @@ export function TenantGenieAcs({ tenant }: Props) {
     setUsername(next.auth.username)
     setSecret('')
     setClearSecret(false)
+    setVps({ ...next.virtualParameters })
   }, [])
 
   useEffect(() => {
@@ -80,7 +85,8 @@ export function TenantGenieAcs({ tenant }: Props) {
         url: url.trim(),
         authType,
         username: username.trim(),
-        ...(clearSecret ? { secret: '' } : secret ? { secret } : {})
+        ...(clearSecret ? { secret: '' } : secret ? { secret } : {}),
+        virtualParameters: vps
       })
       if (res.success && res.data) {
         preencher(res.data)
@@ -197,6 +203,41 @@ export function TenantGenieAcs({ tenant }: Props) {
             )}
           </div>
         )}
+      </div>
+
+      <div className="border-t border-border pt-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h4 className="font-semibold text-foreground">{t('settings.vp.title')}</h4>
+            <p className="mt-1 text-sm text-muted-foreground">{t('platform.genieacs.vpDescription')}</p>
+          </div>
+          <button
+            type="button"
+            className="modern-button-secondary shrink-0"
+            onClick={() => setVps((atual) => ({ ...atual, ...INSTALLER_VIRTUAL_PARAMETERS }))}
+          >
+            <Icon name="refresh" size={17} />
+            {t('settings.vp.usePreset')}
+          </button>
+        </div>
+        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+          {VIRTUAL_PARAMETER_FIELDS.map((field) => (
+            <div key={field.key}>
+              <label htmlFor={`tenant-${tenant.id}-${field.key}`} className="block text-sm font-medium mb-1">
+                {t(field.labelKey)}
+              </label>
+              <input
+                id={`tenant-${tenant.id}-${field.key}`}
+                value={vps[field.key] ?? ''}
+                placeholder={field.hintKey ? t('settings.vp.optionalPlaceholder') : undefined}
+                onChange={(e) => setVps((atual) => ({ ...atual, [field.key]: e.target.value }))}
+                className="modern-input w-full font-mono text-sm"
+                autoComplete="off"
+              />
+              <p className="field-hint">{field.hintKey ? t(field.hintKey) : field.parameterName}</p>
+            </div>
+          ))}
+        </div>
       </div>
 
       {testMessage && (

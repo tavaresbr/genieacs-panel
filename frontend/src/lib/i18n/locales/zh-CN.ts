@@ -2449,6 +2449,9 @@ const zhCN: Dictionary = {
   'catalogue.propagate.row': '新增 {added} 个，覆盖 {updated} 个',
   'catalogue.propagate.failed': '无法发送更新。',
   'settings.platformManaged.whatsappDescription': '通过平台的 Evolution API 服务器连接一个或多个 WhatsApp 号码。令牌加密存储，绝不会返回浏览器。',
+  'settings.panelIdentity.title': '面板',
+  'settings.panelIdentity.description': '面板显示的名称、此浏览器的语言以及审计记录的保留时长。',
+  'platform.genieacs.vpDescription': '面板从该服务商设备读取的路径。它们取决于平台 GenieACS 上安装的配置脚本，因此服务商不编辑它们。',
 }
 
 export default zhCN

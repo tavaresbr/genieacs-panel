@@ -7,6 +7,7 @@ import { suggestGenieAcsUrl } from '../services/genieacsSuggestion.js';
 import { runInTenant } from '../config/tenantContext.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { probeGenieAcs } from './settingsController.js';
+import { VIRTUAL_PARAMETER_KEYS } from '../config/platformManaged.js';
 
 /**
  * O GenieACS de um provedor, configurado do console.
@@ -52,8 +53,30 @@ function urlProblem(raw) {
   return null;
 }
 
+/**
+ * `{ vpRxPower: 'VirtualParameters.X', … }` lido do corpo, ou o erro. Só as
+ * chaves conhecidas; vazio é permitido (os dois campos opcionais da tela).
+ */
+function readVirtualParameters(raw) {
+  if (raw === undefined) return { value: null };
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return { error: 'virtualParameters must be an object' };
+  }
+  const value = {};
+  for (const [key, v] of Object.entries(raw)) {
+    if (!VIRTUAL_PARAMETER_KEYS.includes(key)) return { error: `Unknown virtual parameter: ${key}` };
+    const text = String(v ?? '').trim();
+    if (text.length > 255) return { error: `${key} is too long` };
+    value[key] = text;
+  }
+  return { value };
+}
+
 async function snapshot(tenant) {
   return runInTenant(tenant.id, async () => ({
+    virtualParameters: Object.fromEntries(await Promise.all(
+      VIRTUAL_PARAMETER_KEYS.map(async (key) => [key, (await Setting.getByKey(key)) ?? ''])
+    )),
     url: (await Setting.getByKey('genieAcsUrl')) || '',
     auth: await GenieAcsAuthService.getPublicConfig(),
     suggestion: suggestGenieAcsUrl(tenant)
@@ -74,7 +97,7 @@ class PlatformGenieAcsController {
   }
 
   /**
-   * `PUT /api/platform/tenants/:id/genieacs` — `{ url?, authType?, username?, secret? }`.
+   * `PUT /api/platform/tenants/:id/genieacs` — `{ url?, authType?, username?, secret?, virtualParameters? }`.
    *
    * Campo ausente mantém o que está lá, e `secret` segue a regra da tela do
    * provedor: `undefined` mantém, `''` apaga.
@@ -94,6 +117,8 @@ class PlatformGenieAcsController {
         return res.status(400).json(createErrorResponse(`authType must be one of ${AUTH_TYPES.join(', ')}`));
       }
       const mandouAuth = ['authType', 'username', 'secret'].some((k) => corpo[k] !== undefined);
+      const vps = readVirtualParameters(corpo.virtualParameters);
+      if (vps.error) return res.status(400).json(createErrorResponse(vps.error));
 
       const antes = await snapshot(tenant);
       const tipoFinal = corpo.authType ?? antes.auth.authType;
@@ -104,9 +129,13 @@ class PlatformGenieAcsController {
 
       const urlNova = mandouUrl ? String(corpo.url).trim() : antes.url;
       const mudouUrl = mandouUrl && urlNova !== antes.url;
+      const vpsMudados = vps.value
+        ? Object.entries(vps.value).filter(([key, v]) => v !== antes.virtualParameters[key])
+        : [];
 
       await runInTenant(tenant.id, async () => {
         if (mudouUrl) await Setting.upsert('genieAcsUrl', urlNova);
+        for (const [key, v] of vpsMudados) await Setting.upsert(key, v);
         if (mandouAuth) {
           await GenieAcsAuthService.saveConfig({
             authType: corpo.authType,
@@ -117,7 +146,7 @@ class PlatformGenieAcsController {
       });
       const depois = await snapshot(tenant);
 
-      if (!mudouUrl && !mandouAuth) {
+      if (!mudouUrl && !mandouAuth && vpsMudados.length === 0) {
         return res.json(createResponse('GenieACS configuration unchanged', depois));
       }
 
@@ -126,6 +155,11 @@ class PlatformGenieAcsController {
       // do provedor.
       const detail = {};
       if (mudouUrl) detail.url = { from: antes.url || null, to: urlNova || null };
+      if (vpsMudados.length) {
+        detail.virtualParameters = Object.fromEntries(
+          vpsMudados.map(([key, v]) => [key, { from: antes.virtualParameters[key] || null, to: v || null }])
+        );
+      }
       if (mandouAuth) {
         detail.auth = {
           authType: depois.auth.authType,

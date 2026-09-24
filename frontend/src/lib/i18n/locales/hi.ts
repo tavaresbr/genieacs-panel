@@ -2457,6 +2457,9 @@ const hi: Dictionary = {
   'catalogue.propagate.row': '{added} जोड़ी गईं, {updated} अधिलेखित',
   'catalogue.propagate.failed': 'अपडेट भेजे नहीं जा सके।',
   'settings.platformManaged.whatsappDescription': 'प्लेटफ़ॉर्म के Evolution API सर्वर के ज़रिए एक या अधिक WhatsApp नंबर जोड़ता है। टोकन एन्क्रिप्ट करके रखे जाते हैं और ब्राउज़र में कभी वापस नहीं आते।',
+  'settings.panelIdentity.title': 'पैनल',
+  'settings.panelIdentity.description': 'पैनल पर दिखाया गया नाम, इस ब्राउज़र की भाषा और ऑडिट ट्रेल कितने समय तक रखा जाता है।',
+  'platform.genieacs.vpDescription': 'वे पथ जिन्हें पैनल इस प्रदाता के उपकरणों से पढ़ता है। ये प्लेटफ़ॉर्म के GenieACS में इंस्टॉल प्रोविज़निंग स्क्रिप्ट पर निर्भर हैं, इसलिए प्रदाता इन्हें संपादित नहीं करता।',
 }
 
 export default hi

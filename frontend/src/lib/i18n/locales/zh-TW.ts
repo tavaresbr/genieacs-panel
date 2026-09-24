@@ -2450,6 +2450,9 @@ const zhTW: Dictionary = {
   'catalogue.propagate.row': '新增 {added} 個，覆寫 {updated} 個',
   'catalogue.propagate.failed': '無法傳送更新。',
   'settings.platformManaged.whatsappDescription': '透過平台的 Evolution API 伺服器連接一個或多個 WhatsApp 號碼。權杖加密儲存，絕不會回傳瀏覽器。',
+  'settings.panelIdentity.title': '面板',
+  'settings.panelIdentity.description': '面板顯示的名稱、此瀏覽器的語言以及稽核記錄的保留時長。',
+  'platform.genieacs.vpDescription': '面板從該服務商設備讀取的路徑。它們取決於平台 GenieACS 上安裝的配置腳本，因此服務商不編輯它們。',
 }
 
 export default zhTW

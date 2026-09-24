@@ -2456,6 +2456,9 @@ const ko: Dictionary = {
   'catalogue.propagate.row': '{added}개 추가, {updated}개 덮어씀',
   'catalogue.propagate.failed': '업데이트를 보낼 수 없습니다.',
   'settings.platformManaged.whatsappDescription': '플랫폼의 Evolution API 서버를 통해 하나 이상의 WhatsApp 번호를 연결합니다. 토큰은 암호화되어 저장되며 브라우저로 반환되지 않습니다.',
+  'settings.panelIdentity.title': '패널',
+  'settings.panelIdentity.description': '패널에 표시되는 이름, 이 브라우저의 언어, 감사 기록 보관 기간입니다.',
+  'platform.genieacs.vpDescription': '패널이 이 공급자의 장비에서 읽는 경로입니다. 플랫폼 GenieACS에 설치된 프로비저닝 스크립트에 따라 달라지므로 공급자는 편집하지 않습니다.',
 }
 
 export default ko

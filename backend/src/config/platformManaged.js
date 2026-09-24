@@ -19,8 +19,20 @@ import { getDb } from './database.js';
  * ela nunca é "gerenciada pela plataforma" — ela É a plataforma.
  */
 
+/**
+ * Os caminhos dos parâmetros virtuais TR-069 que o painel lê do GenieACS.
+ *
+ * Dependem dos scripts de provisionamento instalados no ACS — que, na SaaS, é
+ * da plataforma. Por isso, junto com o endereço do ACS, quem os mantém é o
+ * console, e não o provedor.
+ */
+export const VIRTUAL_PARAMETER_KEYS = Object.freeze([
+  'vpPppoeUsername', 'vpWanBridge', 'vpRxPower', 'vpTemperature', 'vpActiveDevices',
+  'vpSuperAdmin', 'vpSuperPassword', 'vpUserAdmin', 'vpUserPassword'
+]);
+
 /** Chaves de `settings` que só o console grava na SaaS. */
-export const PLATFORM_MANAGED_SETTING_KEYS = Object.freeze(['genieAcsUrl']);
+export const PLATFORM_MANAGED_SETTING_KEYS = Object.freeze(['genieAcsUrl', ...VIRTUAL_PARAMETER_KEYS]);
 
 /**
  * Os campos do WhatsApp que descrevem o SERVIDOR Evolution, e não o uso que o
