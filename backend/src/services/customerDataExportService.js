@@ -99,6 +99,17 @@ export async function alcanceDoAssinante(account) {
       if (documentos.length) q.orWhere((semContrato) => semContrato.whereNull('contract').whereIn('document', documentos));
     }).orderBy('id')
     : [];
+  // A ficha completa da mesma pessoa: pelo cliente dono de cada contrato, pelo
+  // cadastro sem contrato, e pelo documento.
+  const chavesCliente = [...new Set(contatos.flatMap((c) => [c.client_ref, c.contract ? null : c.sgp_client_id]).filter(Boolean))];
+  const documentosCliente = [...new Set([...documentos, ...contatos.map((c) => c.document)].filter(Boolean))];
+  const clientes = (chavesCliente.length || documentosCliente.length)
+    ? await tdb('sgp_clients').where((q) => {
+      q.whereRaw('1 = 0');
+      if (chavesCliente.length) q.orWhereIn('sgp_client_id', chavesCliente);
+      if (documentosCliente.length) q.orWhereIn('document', documentosCliente);
+    }).orderBy('id')
+    : [];
   const telefones = [...vinculos, ...contatos].flatMap((v) => [v.phone_e164, v.phone_manual]).filter(Boolean);
 
   const contatoIds = contatos.map((c) => c.id);
@@ -132,6 +143,7 @@ export async function alcanceDoAssinante(account) {
     telefones: [...new Set(telefones)],
     vinculos,
     contatos,
+    clientes,
     conversas,
     conversaIds: conversas.map((c) => c.id),
     nos,
@@ -160,7 +172,7 @@ class CustomerDataExportService {
     const account = await CustomerAccount.getById(accountId);
     if (!account) return null;
 
-    const { deviceIds, contratos, telefones: todosTelefones, vinculos, contatos, conversas, conversaIds, nos, noIds }
+    const { deviceIds, contratos, telefones: todosTelefones, vinculos, contatos, clientes, conversas, conversaIds, nos, noIds }
       = await alcanceDoAssinante(account);
 
     const dados = {};
@@ -177,6 +189,7 @@ class CustomerDataExportService {
       .where({ account_id: account.id }).orderBy('id'));
     guardar('sgp_links', vinculos);
     guardar('sgp_contacts', contatos);
+    guardar('sgp_clients', clientes);
     guardar('device_swaps', await tdb('device_swaps').where((q) => {
       q.where({ account_id: account.id });
       if (deviceIds.length) q.orWhereIn('device_id', deviceIds);

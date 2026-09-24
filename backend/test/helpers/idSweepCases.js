@@ -404,6 +404,36 @@ export const casos = [
     tabela: 'sgp_links',
     coluna: 'contract'
   },
+  // A ficha completa do cliente, pela mesma chave da lista de contatos. O
+  // contrato do vizinho não acha linha (404 `not_found`); o próprio abre a
+  // ficha a partir do `sgp_links`, mesmo sem sincronização de contatos.
+  {
+    chave: 'sgpContract',
+    label: 'GET /api/contacts/:key',
+    method: 'GET',
+    path: (contract) => `/api/contacts/${encodeURIComponent(contract)}`,
+    tabela: 'sgp_links',
+    coluna: 'contract'
+  },
+  // Os títulos pedem ao SGP, que aqui não está configurado: no controle a rota
+  // passa da busca da ficha e para no SGP, que é o que separa as duas.
+  {
+    chave: 'sgpContract',
+    label: 'GET /api/contacts/:key/invoices',
+    method: 'GET',
+    path: (contract) => `/api/contacts/${encodeURIComponent(contract)}/invoices`,
+    tabela: 'sgp_links',
+    coluna: 'contract'
+  },
+  {
+    chave: 'sgpContract',
+    label: 'PATCH /api/contacts/:key',
+    method: 'PATCH',
+    path: (contract) => `/api/contacts/${encodeURIComponent(contract)}`,
+    body: { notes: 'anotação da varredura' },
+    tabela: 'sgp_links',
+    coluna: 'contract'
+  },
   // O contrato do corpo não existe em nenhum dos dois, de propósito: com o id do
   // vizinho a conversa não pode ser achada (404 `conversation_not_found`), e
   // com o próprio a rota passa dela e recusa o contrato — o controle exige só

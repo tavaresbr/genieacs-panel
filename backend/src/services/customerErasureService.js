@@ -117,6 +117,7 @@ class CustomerErasureService {
       ),
       sgp_links: vinculos.length,
       sgp_contacts: contatos.length,
+      sgp_clients: alcance.clientes.length,
       sgp_events: (deviceIds.length || contratos.length)
         ? await contar('sgp_events', (q) => q.where((w) => {
           if (deviceIds.length) w.whereIn('device_id', deviceIds);
@@ -220,13 +221,20 @@ class CustomerErasureService {
       }
 
       // O mesmo contrato achado numa busca ao SGP. A linha fica pelo mesmo
-      // motivo da de `sgp_links`, e a pessoa sai dela pelas mesmas colunas —
-      // menos `login`, que esta tabela não tem.
+      // motivo da de `sgp_links`, e a pessoa sai dela pelas mesmas colunas,
+      // mais o endereço do contrato.
       if (contatos.length) {
-        const { login: _login, ...identidade } = IDENTIDADE_NO_CONTRATO;
         await tdb('sgp_contacts', trx)
           .whereIn('id', contatos.map((c) => c.id))
-          .update({ ...identidade, updated_at: new Date() });
+          .update({ ...IDENTIDADE_NO_CONTRATO, address: null, updated_at: new Date() });
+      }
+
+      // A ficha completa é a pessoa inteira — endereço, nascimento, todos os
+      // contatos, o que o operador anotou —, e não tem nada que não seja dela.
+      // Sai inteira. Uma sincronização posterior pode trazê-la de volta do SGP,
+      // que é onde o pedido de exclusão tem que ser atendido também.
+      if (alcance.clientes.length) {
+        await tdb('sgp_clients', trx).whereIn('id', alcance.clientes.map((c) => c.id)).del();
       }
 
       // `customer_id` permanece: é sintético, gerado pelo painel, e é a única

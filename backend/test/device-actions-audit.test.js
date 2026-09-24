@@ -25,6 +25,8 @@ const SENHA_ONT = 'Senha-Da-Ont-Nao-Pode-Vazar';
 
 let panelUrl;
 let token;
+/** A senha do operador de `before`, duas vezes: o reset de fábrica pede as duas. */
+const SENHAS = { password: 'operator-password-1', passwordConfirm: 'operator-password-1' };
 let genie;
 
 before(async () => {
@@ -121,7 +123,7 @@ describe('a trilha do que se faz na ONT', () => {
     const antes = (await linhas(AuditLog.ACTIONS.DEVICE_FACTORY_RESET)).length;
     for (const errada of ['ZTEG00000000', '', undefined]) {
       // eslint-disable-next-line no-await-in-loop -- uma tentativa por vez
-      const { status, body } = await post('/api/devices/factory-reset', { deviceId: DEVICE_ID, confirmSerial: errada });
+      const { status, body } = await post('/api/devices/factory-reset', { deviceId: DEVICE_ID, confirmSerial: errada, ...SENHAS });
       assert.equal(status, 400, `aceitou ${JSON.stringify(errada)}`);
       assert.equal(body.code, 'serial_mismatch');
     }
@@ -129,8 +131,27 @@ describe('a trilha do que se faz na ONT', () => {
     assert.equal((await linhas(AuditLog.ACTIONS.DEVICE_FACTORY_RESET)).length, antes);
   });
 
+  it('o reset de fábrica exige a senha do operador, digitada duas vezes e certa', async () => {
+    // Série certa em todos: o que decide aqui é só a senha.
+    const antes = (await linhas(AuditLog.ACTIONS.DEVICE_FACTORY_RESET)).length;
+    const casos = [
+      [{}, 400, 'password_required'],
+      [{ password: 'operator-password-1' }, 400, 'password_required'],
+      [{ password: 'operator-password-1', passwordConfirm: 'operator-password-2' }, 400, 'password_mismatch'],
+      [{ password: 'senha-errada-1', passwordConfirm: 'senha-errada-1' }, 403, 'password_incorrect']
+    ];
+    for (const [senhas, esperado, codigo] of casos) {
+      // eslint-disable-next-line no-await-in-loop -- uma tentativa por vez
+      const { status, body } = await post('/api/devices/factory-reset', { deviceId: DEVICE_ID, confirmSerial: 'ZTEG12345678', ...senhas });
+      assert.equal(status, esperado, `aceitou ${JSON.stringify(senhas)}`);
+      assert.equal(body.code, codigo);
+    }
+    assert.equal(genie.state.tasks.filter((t) => t.task?.name === 'factoryReset').length, 0, 'mandou o reset sem a senha certa');
+    assert.equal((await linhas(AuditLog.ACTIONS.DEVICE_FACTORY_RESET)).length, antes);
+  });
+
   it('com a série certa — sem ligar para maiúsculas e espaços — a ONT volta de fábrica, com linha', async () => {
-    const { status } = await post('/api/devices/factory-reset', { deviceId: DEVICE_ID, confirmSerial: '  zteg12345678 ' });
+    const { status } = await post('/api/devices/factory-reset', { deviceId: DEVICE_ID, confirmSerial: '  zteg12345678 ', ...SENHAS });
     assert.equal(status, 200);
     assert.deepEqual(
       genie.state.tasks.filter((t) => t.task?.name === 'factoryReset').map((t) => t.deviceId),

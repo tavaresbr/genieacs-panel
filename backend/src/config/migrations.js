@@ -1357,6 +1357,22 @@ const SGP_CONTACT_SYNC_COLUMNS = [
   ['last_seen_at', (t) => t.timestamp('last_seen_at')]
 ];
 
+/**
+ * O que o cadastro completo (0056) acrescentou a cada contrato: o que a
+ * listagem do SGP já mandava e o painel descartava. `client_ref` é o id do
+ * cliente no SGP dono do contrato — não único, um cliente tem vários — e é o
+ * que liga a linha à ficha em `sgp_clients`.
+ */
+const SGP_CONTACT_PROFILE_COLUMNS = [
+  ['client_ref', (t) => t.string('client_ref', 64)],
+  ['plan', (t) => t.string('plan', 255)],
+  ['due_day', (t) => t.string('due_day', 32)],
+  ['status_reason', (t) => t.string('status_reason', 255)],
+  ['login', (t) => t.string('login', 128)],
+  ['address', (t) => t.text('address')],
+  ['contract_created_at', (t) => t.string('contract_created_at', 32)]
+];
+
 const sgpContactsTable = (db) => (t) => {
   t.increments('id').primary();
   t.integer('tenant_id').unsigned().notNullable()
@@ -1370,6 +1386,7 @@ const sgpContactsTable = (db) => (t) => {
   t.string('state', 16).notNullable().defaultTo('unknown');
   addSgpPhoneColumns(t);
   for (const [, add] of SGP_CONTACT_SYNC_COLUMNS) add(t);
+  for (const [, add] of SGP_CONTACT_PROFILE_COLUMNS) add(t);
   t.timestamp('last_synced_at').defaultTo(db.fn.now());
   t.timestamp('created_at').defaultTo(db.fn.now());
   t.timestamp('updated_at').defaultTo(db.fn.now());
@@ -1377,10 +1394,49 @@ const sgpContactsTable = (db) => (t) => {
   t.unique(['tenant_id', 'sgp_client_id'], 'sgp_contacts_client_uq');
   t.index(['tenant_id', 'phone_e164'], 'sgp_contacts_phone_idx');
   t.index(['tenant_id', 'phone_manual'], 'sgp_contacts_phone_manual_idx');
+  t.index(['tenant_id', 'client_ref'], 'sgp_contacts_client_ref_idx');
+};
+
+/**
+ * A ficha de cada cliente — uma linha por cliente, e não por contrato como
+ * `sgp_contacts`.
+ *
+ * Os campos vêm da listagem do SGP; `overrides` guarda, por campo, o que um
+ * operador escreveu no painel, e é o que a tela mostra no lugar do valor do
+ * SGP. A sincronização reescreve só os campos do SGP e nunca toca em
+ * `overrides` nem em `notes`. `source` = `panel` é o cliente criado no painel,
+ * sem SGP atrás; o id dele começa com `panel:`.
+ *
+ * Endereço, telefones, e-mails e `overrides` são JSON em texto: os três bancos
+ * guardam e devolvem igual, e ninguém filtra por dentro deles.
+ */
+const sgpClientsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.string('sgp_client_id', 64).notNullable();
+  t.string('source', 16).notNullable().defaultTo('sgp');
+  t.string('document', 32);
+  t.string('person_type', 16);
+  t.string('name', 255);
+  t.string('gender', 16);
+  t.string('birth_date', 32);
+  t.string('registered_at', 32);
+  t.text('address');
+  t.text('phones');
+  t.text('emails');
+  t.text('overrides');
+  t.text('notes');
+  t.timestamp('last_seen_at');
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  t.timestamp('updated_at').defaultTo(db.fn.now());
+  t.unique(['tenant_id', 'sgp_client_id'], 'sgp_clients_client_uq');
+  t.index(['tenant_id', 'document'], 'sgp_clients_document_idx');
 };
 
 const SGP_CONTACT_TABLES = [
-  ['sgp_contacts', sgpContactsTable]
+  ['sgp_contacts', sgpContactsTable],
+  ['sgp_clients', sgpClientsTable]
 ];
 
 const TENANCY_TABLES = [
@@ -3490,6 +3546,35 @@ export const migrations = [
         // eslint-disable-next-line no-await-in-loop -- um número por vez, e são poucos
         await db('whatsapp_accounts').where({ id: linha.id }).update({ color: cor });
       }
+    }
+  },
+  {
+    /**
+     * O cadastro completo dos clientes do SGP.
+     *
+     * - `sgp_clients`, a ficha por cliente — ver `sgpClientsTable`.
+     * - Em `sgp_contacts`, o que faltava de cada contrato — ver
+     *   `SGP_CONTACT_PROFILE_COLUMNS`.
+     *
+     * As linhas antigas ficam com os campos novos vazios até a próxima
+     * sincronização, que os preenche.
+     */
+    id: '0056_sgp_client_profiles',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('sgp_contacts'))) return true;
+      if ((await missingColumns(db, 'sgp_contacts', SGP_CONTACT_PROFILE_COLUMNS)).length) return false;
+      return db.schema.hasTable('sgp_clients');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('sgp_contacts'))) return;
+      const missing = await missingColumns(db, 'sgp_contacts', SGP_CONTACT_PROFILE_COLUMNS);
+      if (missing.length) {
+        await db.schema.alterTable('sgp_contacts', (t) => {
+          for (const add of missing) add(t);
+          t.index(['tenant_id', 'client_ref'], 'sgp_contacts_client_ref_idx');
+        });
+      }
+      await createTableIfMissing(db, 'sgp_clients', sgpClientsTable(db));
     }
   }
 ];

@@ -534,30 +534,41 @@ function FactoryResetModal({
   const { t } = useTranslation()
   const toast = useToast()
   const [typed, setTyped] = useState('')
+  const [password, setPassword] = useState('')
+  const [passwordConfirm, setPasswordConfirm] = useState('')
   const [sending, setSending] = useState(false)
 
+  // A senha nunca sobrevive ao diálogo: fechou, apagou.
   useEffect(() => {
-    if (isOpen) setTyped('')
+    if (isOpen) {
+      setTyped('')
+      setPassword('')
+      setPasswordConfirm('')
+    }
   }, [isOpen])
 
   if (!isOpen) return null
 
   const alvo = serial || deviceId
   const confere = serialMatches(typed, serial, deviceId)
+  // A senha duas vezes: o servidor confere as duas e que é a do operador; aqui
+  // só se evita mandar um par que já se sabe diferente.
+  const senhasDiferentes = passwordConfirm.length > 0 && password !== passwordConfirm
+  const podeEnviar = confere && password.length > 0 && password === passwordConfirm
 
   const enviar = async () => {
-    if (!confere) return
+    if (!podeEnviar) return
     setSending(true)
     try {
-      const res = await devicesAPI.factoryResetDevice(deviceId, typed)
+      const res = await devicesAPI.factoryResetDevice(deviceId, typed, password, passwordConfirm)
       if (res.success) {
         toast.success(res.message || t('detail.factoryReset.title'))
         onDone()
       } else {
         toast.error(res.message || t('detail.factoryReset.failed'))
       }
-    } catch {
-      toast.error(t('detail.factoryReset.failed'))
+    } catch (error) {
+      toast.error(error instanceof Error && error.message ? error.message : t('detail.factoryReset.failed'))
     } finally {
       setSending(false)
     }
@@ -587,6 +598,35 @@ function FactoryResetModal({
             value={typed}
             onChange={(event) => setTyped(event.target.value)}
           />
+          <label htmlFor="factory-reset-password" className="field-label pt-1">
+            {t('detail.factoryReset.password')}
+          </label>
+          <input
+            id="factory-reset-password"
+            type="password"
+            autoComplete="current-password"
+            className="modern-input w-full"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+          />
+          <label htmlFor="factory-reset-password-confirm" className="field-label pt-1">
+            {t('detail.factoryReset.passwordConfirm')}
+          </label>
+          <input
+            id="factory-reset-password-confirm"
+            type="password"
+            autoComplete="current-password"
+            className="modern-input w-full"
+            aria-invalid={senhasDiferentes}
+            aria-describedby={senhasDiferentes ? 'factory-reset-password-mismatch' : undefined}
+            value={passwordConfirm}
+            onChange={(event) => setPasswordConfirm(event.target.value)}
+          />
+          {senhasDiferentes && (
+            <p id="factory-reset-password-mismatch" className="text-xs text-[hsl(var(--status-danger))]">
+              {t('detail.factoryReset.passwordMismatch')}
+            </p>
+          )}
         </div>
         <div className="flex items-center justify-end gap-3 border-t border-border p-5">
           <button type="button" className="modern-button-secondary" onClick={onClose} disabled={sending}>
@@ -595,7 +635,7 @@ function FactoryResetModal({
           <button
             type="button"
             className="modern-button-danger"
-            disabled={!confere || sending}
+            disabled={!podeEnviar || sending}
             onClick={() => void enviar()}
           >
             <Icon name="warning" size={16} />

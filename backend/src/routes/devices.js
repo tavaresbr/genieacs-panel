@@ -1,7 +1,7 @@
 import express from 'express';
 import DeviceController from '../controllers/deviceController.js';
 import { authenticateToken, requirePermission } from '../middleware/auth.js';
-import { deviceDiagnosticLimiter, portalPasswordAdminLimiter } from '../middleware/rateLimit.js';
+import { deviceDiagnosticLimiter, factoryResetLimiter, portalPasswordAdminLimiter } from '../middleware/rateLimit.js';
 
 const router = express.Router();
 
@@ -31,7 +31,7 @@ router.delete('/:deviceId', authenticateToken, requirePermission('devices.write'
 router.post('/reboot', authenticateToken, requirePermission('devices.write'), DeviceController.rebootDevice);
 // O aparelho vai no corpo, como no reiniciar: o id é do GenieACS, e a varredura
 // de ids do painel não o alcança (ver `route-coverage.test.js`).
-router.post('/factory-reset', authenticateToken, requirePermission('devices.maintain'), DeviceController.factoryResetDevice);
+router.post('/factory-reset', authenticateToken, requirePermission('devices.maintain'), factoryResetLimiter, DeviceController.factoryResetDevice);
 // Ping e traceroute pela ONT. `devices.write` e não `devices.maintain`: é o
 // trabalho diário do plantão e não muda a configuração do cliente. O segundo
 // é um POST porque pode pedir à ONT o resultado — não é só leitura. O limite

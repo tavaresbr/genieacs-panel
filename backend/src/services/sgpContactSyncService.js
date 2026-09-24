@@ -1,5 +1,6 @@
 import SgpService, { SgpError } from './sgpService.js';
 import SgpContact from '../models/SgpContact.js';
+import SgpClient from '../models/SgpClient.js';
 import AppState from '../models/AppState.js';
 import { tdb } from '../config/database.js';
 import { currentTenantId } from '../config/tenantContext.js';
@@ -165,7 +166,7 @@ class SgpContactSyncService {
         }
         throw error;
       }
-      const { rows, received } = listed;
+      const { rows, received, clients = [] } = listed;
       summary.pages += 1;
       if (received === 0) {
         // Nothing at all on the first page: most likely an endpoint that only
@@ -186,6 +187,12 @@ class SgpContactSyncService {
         break;
       }
       previousFirst = first;
+
+      // The record of each client first: who they are, where they live, every
+      // phone and e-mail. The contracts below point at it by `client_ref`.
+      for (const profile of clients) {
+        await SgpClient.upsertFromSgp(profile, { seenAt: startedAt });
+      }
 
       for (const row of rows) {
         const outcome = await this.store(row, startedAt);

@@ -92,6 +92,11 @@ export const PERMISSIONS = Object.freeze([
   // pessoas não é ato de plantão.
   'campaigns.read',
   'campaigns.manage',
+  // A ficha completa do cliente do SGP. `read` é abrir a ficha, com o CPF
+  // inteiro, o endereço e todos os contatos; `edit` é corrigir o cadastro no
+  // painel.
+  'contacts.read',
+  'contacts.edit',
   'settings.read',
   'settings.write',
   'operators.read',
@@ -141,7 +146,9 @@ const TECH = [
   'provisioning.run',
   'whatsapp.read',
   'whatsapp.send',
-  'campaigns.read'
+  'campaigns.read',
+  'contacts.read',
+  'contacts.edit'
 ];
 
 /** Administra a operação do provedor. */

@@ -1528,9 +1528,11 @@ export const devicesAPI = {
   rebootDevice: (deviceId: string) =>
     apiClient.post('/devices/reboot', { deviceId }),
 
-  // A série digitada vai junto: o servidor confere que é a DESTE aparelho.
-  factoryResetDevice: (deviceId: string, confirmSerial: string) =>
-    apiClient.post('/devices/factory-reset', { deviceId, confirmSerial }),
+  // A série digitada vai junto: o servidor confere que é a DESTE aparelho. E a
+  // senha do operador, duas vezes: o servidor confere que as duas são iguais e
+  // que é a dele.
+  factoryResetDevice: (deviceId: string, confirmSerial: string, password: string, passwordConfirm: string) =>
+    apiClient.post('/devices/factory-reset', { deviceId, confirmSerial, password, passwordConfirm }),
 
   // Ping e traceroute pela ONT. O aparelho vai no corpo, como no reiniciar.
   startDiagnostic: (deviceId: string, kind: DeviceDiagnosticKind, host: string) =>
@@ -1847,6 +1849,99 @@ export interface SgpInvoice {
   link: string | null
   pix: string | null
   paid: boolean
+}
+
+export interface ContactAddress {
+  street?: string
+  number?: string
+  complement?: string
+  district?: string
+  city?: string
+  state?: string
+  zip?: string
+  reference?: string
+  /** An address the SGP sent as one line of text. */
+  line?: string
+}
+
+/** One field of a client record: what shows, what the SGP has, and whether an operator changed it. */
+export interface ContactField<T> {
+  value: T
+  sgpValue: T
+  edited: boolean
+  editedBy: string | null
+  editedAt: string | null
+}
+
+export interface ContactProfileContract {
+  key: string
+  contract: string
+  state: WhatsAppContactState
+  status: string | null
+  statusReason: string | null
+  plan: string | null
+  dueDay: string | null
+  login: string | null
+  address: string | null
+  createdAt: string | null
+  deviceId: string | null
+  hasDevice: boolean
+}
+
+/** The full client record behind the Contacts screen. */
+export interface ContactProfile {
+  key: string
+  /** `panel` for a client typed in the panel, with no SGP behind it. */
+  source: 'sgp' | 'panel'
+  clientId: string | null
+  sgpUrl: string | null
+  fields: {
+    name: ContactField<string | null>
+    personType: ContactField<string | null>
+    document: ContactField<string | null>
+    gender: ContactField<string | null>
+    birthDate: ContactField<string | null>
+    address: ContactField<ContactAddress | null>
+    phones: ContactField<string[]>
+    emails: ContactField<string[]>
+  }
+  notes: string | null
+  registeredAt: string | null
+  lastSeenAt: string | null
+  whatsappPhone: string | null
+  whatsappPhoneSource: 'manual' | 'sgp' | null
+  contracts: ContactProfileContract[]
+}
+
+export type ContactProfileField = keyof ContactProfile['fields']
+
+/** An edit: a field set to `null` goes back to the SGP's value. */
+export type ContactProfilePatch = Partial<{
+  name: string | null
+  personType: string | null
+  document: string | null
+  gender: string | null
+  birthDate: string | null
+  address: ContactAddress | null
+  phones: string[] | null
+  emails: string[] | null
+  notes: string | null
+  whatsappPhone: string | null
+}>
+
+export const contactsAPI = {
+  get: (key: string) =>
+    apiClient.get<ContactProfile>(`/contacts/${encodeURIComponent(key)}`),
+
+  update: (key: string, patch: ContactProfilePatch) =>
+    apiClient.requestWithBody<ContactProfile>('PATCH', `/contacts/${encodeURIComponent(key)}`, patch),
+
+  create: (data: ContactProfilePatch & { name: string }) =>
+    apiClient.post<ContactProfile>('/contacts', data),
+
+  /** Open invoices of each contract, asked of the SGP now. */
+  invoices: (key: string) =>
+    apiClient.get<{ contract: string; invoices: SgpInvoice[] }[]>(`/contacts/${encodeURIComponent(key)}/invoices`)
 }
 
 // SGP (Sistema de Gestão de Provedores) integration API
