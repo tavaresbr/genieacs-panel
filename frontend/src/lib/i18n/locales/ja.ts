@@ -116,6 +116,8 @@ const ja: Dictionary = {
   'contacts.profile.dueOn': '期限 {date}',
   'contacts.profile.copied': 'コピーしました',
   'contacts.profile.copyLine': '支払い番号',
+  'contacts.profile.addPhone': '電話番号を追加',
+  'contacts.profile.removePhone': '電話番号を削除',
   'contacts.profile.sendInvoice': 'WhatsAppで送信',
   'contacts.profile.sendInvoiceNoPhone': '顧客にWhatsApp番号がありません',
   'contacts.profile.sendInvoiceFailed': '請求書を送信できませんでした',

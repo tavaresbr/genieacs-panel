@@ -116,6 +116,8 @@ const hi: Dictionary = {
   'contacts.profile.dueOn': '{date} को देय',
   'contacts.profile.copied': 'कॉपी किया गया',
   'contacts.profile.copyLine': 'भुगतान लाइन',
+  'contacts.profile.addPhone': 'फ़ोन जोड़ें',
+  'contacts.profile.removePhone': 'फ़ोन हटाएँ',
   'contacts.profile.sendInvoice': 'WhatsApp से भेजें',
   'contacts.profile.sendInvoiceNoPhone': 'ग्राहक का कोई WhatsApp नंबर नहीं है',
   'contacts.profile.sendInvoiceFailed': 'बिल नहीं भेजा जा सका',

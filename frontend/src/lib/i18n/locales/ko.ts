@@ -116,6 +116,8 @@ const ko: Dictionary = {
   'contacts.profile.dueOn': '{date} 만기',
   'contacts.profile.copied': '복사했습니다',
   'contacts.profile.copyLine': '납부 번호',
+  'contacts.profile.addPhone': '전화번호 추가',
+  'contacts.profile.removePhone': '전화번호 삭제',
   'contacts.profile.sendInvoice': 'WhatsApp으로 보내기',
   'contacts.profile.sendInvoiceNoPhone': '고객에게 WhatsApp 번호가 없습니다',
   'contacts.profile.sendInvoiceFailed': '청구서를 보낼 수 없습니다',

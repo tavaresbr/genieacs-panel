@@ -116,6 +116,8 @@ const ar: Dictionary = {
   'contacts.profile.dueOn': 'يستحق في {date}',
   'contacts.profile.copied': 'تم النسخ',
   'contacts.profile.copyLine': 'سطر الدفع',
+  'contacts.profile.addPhone': 'إضافة هاتف',
+  'contacts.profile.removePhone': 'إزالة الهاتف',
   'contacts.profile.sendInvoice': 'إرسال عبر واتساب',
   'contacts.profile.sendInvoiceNoPhone': 'ليس لدى العميل رقم واتساب',
   'contacts.profile.sendInvoiceFailed': 'تعذّر إرسال الفاتورة',
