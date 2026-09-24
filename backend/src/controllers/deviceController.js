@@ -484,7 +484,7 @@ class DeviceController {
   }
 
   static async runBatch(req, res) {
-    const { action, deviceIds, filter } = req.body || {};
+    const { action, deviceIds, filter, fileId } = req.body || {};
     if (!BATCH_ACTIONS.includes(action)) {
       return res.status(400).json(createErrorResponse(req.t('device.batchInvalid'), null, 'invalid_action'));
     }
@@ -498,19 +498,38 @@ class DeviceController {
       );
     }
     try {
-      const results = await DeviceService.runBatch(action, ids);
+      const { results, file } = await DeviceService.runBatch(action, ids, { fileId });
       const summary = batchSummary(results);
       await AuditLog.fromRequest(req, {
         action: AuditLog.ACTIONS.DEVICE_BATCH_ACTION,
         subjectType: 'device',
         subjectId: null,
-        detail: { action, ...summary, filter: batchFilterLabel(filter) }
+        detail: {
+          action,
+          ...summary,
+          ...(file ? { file: file.id.slice(0, 128), version: file.version ? file.version.slice(0, 64) : null } : {}),
+          filter: batchFilterLabel(filter)
+        }
       });
       if (summary.sent + summary.queued > 0) DeviceService.invalidateDashboard();
-      return res.json(createResponse(req.t('device.batchDone'), { action, summary, results }));
+      return res.json(createResponse(req.t('device.batchDone'), { action, summary, results, file }));
     } catch (error) {
+      if (error.translationKey) {
+        return res.status(error.status || 400).json(
+          createErrorResponse(translateError(req.t, error), null, error.code || null)
+        );
+      }
       console.error('Device batch error:', error);
       return res.status(502).json(createErrorResponse(req.t('device.batchFailed'), error.message));
+    }
+  }
+
+  static async listFirmwareCatalog(req, res) {
+    try {
+      return res.json(createResponse(null, await DeviceService.listFirmwareCatalog()));
+    } catch (error) {
+      console.error('List firmware catalog error:', error);
+      return res.status(502).json(createErrorResponse(req.t('device.firmwareListFailed'), error.message));
     }
   }
 

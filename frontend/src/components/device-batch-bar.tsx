@@ -1,5 +1,11 @@
 import { useState } from 'react'
-import { devicesAPI, type DeviceBatchResponse, type DeviceBatchResult } from '@/lib/api'
+import {
+  devicesAPI,
+  type DeviceBatchAction,
+  type DeviceBatchResponse,
+  type DeviceBatchResult,
+  type DeviceFirmwareCatalog
+} from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
@@ -9,7 +15,9 @@ import { BATCH_LIMIT, type Selection } from '@/lib/device-batch'
 const REASON_KEY: Record<NonNullable<DeviceBatchResult['reason']>, TranslationKey> = {
   not_found: 'devices.batch.reason.notFound',
   acs_error: 'devices.batch.reason.acsError',
-  refused: 'devices.batch.reason.refused'
+  refused: 'devices.batch.reason.refused',
+  firmware_not_compatible: 'devices.batch.reason.firmwareNotCompatible',
+  firmware_already_installed: 'devices.batch.reason.firmwareAlreadyInstalled'
 }
 
 interface DeviceBatchBarProps {
@@ -33,7 +41,12 @@ export function DeviceBatchBar({
 }: DeviceBatchBarProps) {
   const { t } = useTranslation()
   const toast = useToast()
-  const [confirmando, setConfirmando] = useState(false)
+  // Qual ação está sendo confirmada, ou nenhuma.
+  const [confirmando, setConfirmando] = useState<DeviceBatchAction | null>(null)
+  // Firmware: a lista do GenieACS, carregada ao abrir, e o arquivo escolhido.
+  const [catalogo, setCatalogo] = useState<DeviceFirmwareCatalog | null>(null)
+  const [catalogoErro, setCatalogoErro] = useState(false)
+  const [fileId, setFileId] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
   const [resultado, setResultado] = useState<DeviceBatchResponse | null>(null)
   // Os rótulos de quando o lote saiu: a seleção é limpa ao mandar, e o
@@ -42,12 +55,31 @@ export function DeviceBatchBar({
 
   if (selection.size === 0 && !resultado) return null
 
+  const abrirFirmware = async () => {
+    setConfirmando('firmware')
+    setCatalogo(null)
+    setCatalogoErro(false)
+    setFileId(null)
+    try {
+      const res = await devicesAPI.listFirmwareCatalog()
+      if (res.success && res.data) {
+        setCatalogo(res.data)
+        setFileId(res.data.files[0]?.id ?? null)
+      } else {
+        setCatalogoErro(true)
+      }
+    } catch {
+      setCatalogoErro(true)
+    }
+  }
+
   const enviar = async () => {
+    if (!confirmando || (confirmando === 'firmware' && !fileId)) return
     setEnviando(true)
     try {
-      const res = await devicesAPI.runBatch('reboot', [...selection.keys()], filter)
+      const res = await devicesAPI.runBatch(confirmando, [...selection.keys()], filter, confirmando === 'firmware' ? fileId ?? undefined : undefined)
       if (res.success && res.data) {
-        setConfirmando(false)
+        setConfirmando(null)
         setRotulos(new Map(selection))
         setResultado(res.data)
         onClear()
@@ -82,7 +114,11 @@ export function DeviceBatchBar({
             <button type="button" className="modern-button-secondary" onClick={onClear}>
               {t('devices.batch.clear')}
             </button>
-            <button type="button" className="modern-button" onClick={() => setConfirmando(true)}>
+            <button type="button" className="modern-button-secondary" onClick={() => void abrirFirmware()}>
+              <Icon name="box" size={16} />
+              {t('devices.batch.firmware')}
+            </button>
+            <button type="button" className="modern-button" onClick={() => setConfirmando('reboot')}>
               <Icon name="power" size={16} />
               {t('devices.batch.reboot')}
             </button>
@@ -96,22 +132,61 @@ export function DeviceBatchBar({
             <div className="flex items-center gap-2 border-b border-border p-5">
               <Icon name="warning" size={20} className="shrink-0 text-[hsl(var(--status-warning))]" />
               <h3 id="batch-confirm-title" className="text-lg font-semibold text-foreground">
-                {t('devices.batch.confirmTitle', { count: String(selection.size) })}
+                {confirmando === 'firmware'
+                  ? t('devices.batch.firmwareTitle', { count: String(selection.size) })
+                  : t('devices.batch.confirmTitle', { count: String(selection.size) })}
               </h3>
             </div>
-            <div className="space-y-3 p-5 text-sm leading-6">
-              <p className="text-foreground">{t('devices.batch.consequence')}</p>
+            <div className="max-h-[60vh] space-y-3 overflow-auto p-5 text-sm leading-6">
+              {confirmando === 'firmware' && (
+                <>
+                  {!catalogo && !catalogoErro && <p className="text-muted-foreground">{t('devices.batch.firmwareLoading')}</p>}
+                  {catalogoErro && <p className="text-[hsl(var(--status-danger))]">{t('devices.batch.firmwareLoadFailed')}</p>}
+                  {catalogo && catalogo.files.length === 0 && <p className="text-muted-foreground">{t('devices.batch.firmwareNone')}</p>}
+                  {catalogo && catalogo.files.length > 0 && (
+                    <div role="radiogroup" aria-label={t('devices.batch.firmware')} className="space-y-2">
+                      {catalogo.files.map((file) => (
+                        <label
+                          key={file.id}
+                          className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 ${fileId === file.id ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/40'}`}
+                        >
+                          <input type="radio" name="batch-firmware" className="mt-1" checked={fileId === file.id} onChange={() => setFileId(file.id)} />
+                          <span className="min-w-0">
+                            <span className="block font-medium text-foreground">{file.version || file.id}</span>
+                            <span className="block text-xs text-muted-foreground">{t('devices.batch.firmwareModel', { model: file.productClass || '—' })}</span>
+                            <span className="block truncate font-mono text-xs text-muted-foreground">{file.id}</span>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                  {catalogo && catalogo.unclassified > 0 && (
+                    <p className="field-hint">{t('devices.batch.firmwareUnclassified', { count: String(catalogo.unclassified) })}</p>
+                  )}
+                  <p className="text-foreground">{t('devices.batch.firmwareConsequence')}</p>
+                </>
+              )}
+              {confirmando === 'reboot' && <p className="text-foreground">{t('devices.batch.consequence')}</p>}
               <p className="max-h-32 overflow-auto rounded-md bg-muted/50 p-2 font-mono text-xs text-muted-foreground">
                 {[...selection.values()].join(' · ')}
               </p>
             </div>
             <div className="flex items-center justify-end gap-3 border-t border-border p-5">
-              <button type="button" className="modern-button-secondary" onClick={() => setConfirmando(false)} disabled={enviando}>
+              <button type="button" className="modern-button-secondary" onClick={() => setConfirmando(null)} disabled={enviando}>
                 {t('common.cancel')}
               </button>
-              <button type="button" className="modern-button" disabled={enviando} onClick={() => void enviar()}>
-                <Icon name="power" size={16} />
-                {enviando ? t('devices.batch.sending') : t('devices.batch.confirm', { count: String(selection.size) })}
+              <button
+                type="button"
+                className="modern-button"
+                disabled={enviando || (confirmando === 'firmware' && !fileId)}
+                onClick={() => void enviar()}
+              >
+                <Icon name={confirmando === 'firmware' ? 'box' : 'power'} size={16} />
+                {enviando
+                  ? t('devices.batch.sending')
+                  : confirmando === 'firmware'
+                    ? t('devices.batch.firmwareConfirm', { count: String(selection.size) })
+                    : t('devices.batch.confirm', { count: String(selection.size) })}
               </button>
             </div>
           </div>

@@ -18,6 +18,9 @@ router.post('/swaps/:id/acknowledge', authenticateToken, requirePermission('devi
 // Firmware: os arquivos do GenieACS que servem para esta ONT, e a troca.
 // `devices.maintain`: a ONT grava e reinicia, e um firmware errado não tem
 // volta pelo painel. O aparelho vai na query e no corpo, como nas vizinhas.
+// Todos os firmwares que dizem o modelo: a lista do lote, onde as ONTs
+// marcadas podem ser de modelos diferentes.
+router.get('/firmware/files', authenticateToken, requirePermission('devices.maintain'), DeviceController.listFirmwareCatalog);
 router.get('/firmware', authenticateToken, requirePermission('devices.maintain'), DeviceController.listFirmware);
 router.post('/firmware/upgrade', authenticateToken, requirePermission('devices.maintain'), DeviceController.upgradeFirmware);
 router.get('/parameters', authenticateToken, requirePermission('devices.inspect'), DeviceController.getDeviceParameters);

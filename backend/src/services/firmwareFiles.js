@@ -57,6 +57,31 @@ export function compatibleFirmware(files, device) {
   return { compatible, otherModels };
 }
 
+/**
+ * Todos os firmwares do GenieACS que dizem para qual modelo servem.
+ *
+ * É a lista do lote, onde as ONTs marcadas podem ser de modelos diferentes: a
+ * escolha é de um arquivo, e cada ONT é conferida contra ele na hora de mandar
+ * (`compatibleFirmware`). Arquivo sem modelo fica de fora pelo mesmo motivo de
+ * sempre — não serve para ninguém — e é contado.
+ */
+export function firmwareCatalog(files) {
+  const catalog = [];
+  let unclassified = 0;
+  for (const file of Array.isArray(files) ? files : []) {
+    if (!file || file._id === undefined || file._id === null) continue;
+    const meta = file.metadata ?? {};
+    if (!igual(meta.fileType, FIRMWARE_FILE_TYPE)) continue;
+    if (vazio(meta.productClass)) {
+      unclassified += 1;
+      continue;
+    }
+    catalog.push(publicFile(file));
+  }
+  catalog.sort((a, b) => String(b.uploadedAt ?? '').localeCompare(String(a.uploadedAt ?? '')));
+  return { files: catalog, unclassified };
+}
+
 /** A versão que a ONT diz rodar, nos dois modelos de dados. */
 export function currentFirmwareVersion(row) {
   const pick = (node) => {
