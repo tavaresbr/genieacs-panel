@@ -94,7 +94,6 @@ const helmetOptions = {
         'data:',
         'blob:',
         'https://tile.openstreetmap.org',
-        'https://*.basemaps.cartocdn.com',
         'https://mt1.google.com'
       ],
       connectSrc: ["'self'"],

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useTheme } from '@/contexts/theme-context'
+import { getTileSpec } from '@/lib/map-tiles'
 import 'leaflet/dist/leaflet.css'
 
 /**
@@ -10,8 +11,7 @@ import 'leaflet/dist/leaflet.css'
  * PNGs que o bundler não resolve — o mesmo motivo pelo qual o mapa da rede
  * desenha os seus.
  *
- * Os tiles são os mesmos do mapa da rede (OSM claro, CARTO escuro), já
- * liberados no `img-src` da CSP do backend.
+ * Os tiles são os mesmos do mapa da rede (`lib/map-tiles.ts`).
  */
 
 const MARKER_HTML =
@@ -29,10 +29,8 @@ interface Props {
 
 function setTiles(L: any, map: any, previous: any, dark: boolean) {
   if (previous) map.removeLayer(previous)
-  const layer = dark
-    ? L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; OpenStreetMap contributors &copy; CARTO' })
-    : L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors' })
-  return layer.addTo(map)
+  const { url, ...options } = getTileSpec('osm', dark)
+  return L.tileLayer(url, options).addTo(map)
 }
 
 /** Seis casas decimais: ~10 cm, mais do que qualquer centro de mapa precisa. */

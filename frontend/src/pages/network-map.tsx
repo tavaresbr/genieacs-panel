@@ -7,6 +7,7 @@ import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
 import { mappingAPI, mapSettingsAPI } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
+import { getTileSpec, type Basemap } from '@/lib/map-tiles'
 import { useToast } from '@/components/ui/toast'
 import 'leaflet/dist/leaflet.css'
 
@@ -16,7 +17,6 @@ const leafletModulePromise = import('leaflet')
 
 type NodeType = 'htb' | 'olt' | 'odc' | 'odp' | 'ont' | 'server'
 type FiberType = 'backbone' | 'feeder' | 'distribution' | 'drop' | 'patch'
-type Basemap = 'osm' | 'google'
 
 interface MapNode {
   id: number
@@ -77,25 +77,6 @@ function getTypeLabelKey(type: NodeType) {
 
 function getFiberMeta(type: FiberType) {
   return FIBER_TYPES.find((entry) => entry.value === type) || FIBER_TYPES[2]
-}
-
-function getTileUrlAndAttrib(basemap: Basemap, dark: boolean) {
-  if (basemap === 'google') {
-    return {
-      url: 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}&hl=id&gl=id',
-      attribution: 'Map data &copy; Google'
-    }
-  }
-  if (dark) {
-    return {
-      url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-      attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
-    }
-  }
-  return {
-    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-    attribution: '&copy; OpenStreetMap contributors'
-  }
 }
 
 function getNodeSvg(type: NodeType) {
@@ -404,8 +385,8 @@ export default function NetworkMap() {
     const map = mapRef.current
     if (!L || !map) return
     if (tileLayerRef.current) map.removeLayer(tileLayerRef.current)
-    const tile = getTileUrlAndAttrib(basemap, isDarkMode)
-    tileLayerRef.current = L.tileLayer(tile.url, { attribution: tile.attribution }).addTo(map)
+    const { url, ...options } = getTileSpec(basemap, isDarkMode)
+    tileLayerRef.current = L.tileLayer(url, options).addTo(map)
   }, [basemap, isDarkMode])
 
   const updateMapObjects = useCallback(() => {

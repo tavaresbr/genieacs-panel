@@ -406,3 +406,8 @@
 .wa-account-cyan { --wa-account: var(--wa-cyan); }
 .wa-account-indigo { --wa-account: var(--wa-indigo); }
 .wa-account-lime { --wa-account: var(--wa-lime); }
+
+/* Tema escuro dos mapas: escurece só os tiles OSM (ver lib/map-tiles.ts). */
+.map-tiles-dark {
+  filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9);
+}
