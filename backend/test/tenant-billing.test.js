@@ -8,6 +8,7 @@ const { default: Tenant } = await import('../src/models/Tenant.js');
 const { default: AuditLog } = await import('../src/models/AuditLog.js');
 const { default: TenantExportService } = await import('../src/services/tenantExportService.js');
 const { mapBrasilApiCnpj } = await import('../src/services/cnpjLookupService.js');
+const { setLogSink } = await import('../src/utils/logger.js');
 const { normalizeTaxId, isValidTaxId, isValidCpf, isValidCnpj } = await import(
   '../src/utils/taxId.js'
 );
@@ -265,12 +266,21 @@ describe('preencher o cadastro pelo CNPJ', () => {
     ddd_telefone_1: '1133334444'
   };
 
-  const fakeBrasilApi = (status, body) => {
+  // Cada fonte da cascata responde o que o teste mandar; o que não estiver no
+  // mapa responde 503, para nenhum teste sair de verdade para a internet.
+  const HOSTS = {
+    brasilapi: 'https://brasilapi.com.br/',
+    cnpjws: 'https://publica.cnpj.ws/',
+    receitaws: 'https://receitaws.com.br/'
+  };
+  const fakeFontes = (respostas) => {
     consultas = [];
     globalThis.fetch = (input, init) => {
       const url = String(input);
-      if (url.startsWith('https://brasilapi.com.br/')) {
+      const fonte = Object.keys(HOSTS).find((nome) => url.startsWith(HOSTS[nome]));
+      if (fonte) {
         consultas.push(url);
+        const [status, body] = respostas[fonte] ?? [503, {}];
         return Promise.resolve(new Response(JSON.stringify(body ?? {}), {
           status, headers: { 'Content-Type': 'application/json' }
         }));
@@ -278,6 +288,7 @@ describe('preencher o cadastro pelo CNPJ', () => {
       return realFetch(input, init);
     };
   };
+  const fakeBrasilApi = (status, body) => fakeFontes({ brasilapi: [status, body] });
 
   const lookup = (cnpj, headers = authHeaders(token)) =>
     call(`${panelUrl}/api/tenant/cnpj?cnpj=${encodeURIComponent(cnpj)}`, { headers });
@@ -314,11 +325,66 @@ describe('preencher o cadastro pelo CNPJ', () => {
     assert.deepEqual(consultas, []);
   });
 
-  it('404 quando a Receita não conhece; 502 quando a consulta falha', async () => {
+  it('404 na primeira fonte encerra a busca; 502 só quando todas falham', async () => {
     fakeBrasilApi(404, { message: 'not found' });
     assert.equal((await lookup(CNPJ_BOM)).status, 404);
-    fakeBrasilApi(500, {});
-    assert.equal((await lookup(CNPJ_BOM)).status, 502);
+    assert.equal(consultas.length, 1);
+
+    fakeFontes({ brasilapi: [403, {}], cnpjws: [429, {}], receitaws: [500, {}] });
+    // O motivo de cada fonte vai para o log — é por ele que se descobre, em
+    // produção, se o servidor está sem saída ou se a fonte recusou o IP.
+    const linhas = [];
+    setLogSink((linha, nivel) => { if (nivel === 'warn') linhas.push(linha) });
+    let falhou;
+    try {
+      falhou = await lookup(CNPJ_BOM);
+    } finally {
+      setLogSink(null);
+    }
+    assert.equal(falhou.status, 502);
+    assert.equal(consultas.length, 3);
+    const aviso = linhas.find((linha) => linha.includes('cnpj lookup failed')) ?? '';
+    assert.match(aviso, /brasilapi: HTTP 403/);
+    assert.match(aviso, /cnpjws: HTTP 429/);
+    assert.match(aviso, /receitaws: HTTP 500/);
+  });
+
+  it('quando a BrasilAPI recusa, a CNPJ.ws preenche', async () => {
+    fakeFontes({
+      brasilapi: [403, {}],
+      cnpjws: [200, {
+        razao_social: 'PROVEDOR ALFA TELECOMUNICACOES LTDA',
+        estabelecimento: {
+          tipo_logradouro: 'Avenida', logradouro: 'Paulista', numero: '1000', complemento: 'Sala 12',
+          bairro: 'Bela Vista', cep: '01310100', cidade: { nome: 'São Paulo' }, estado: { sigla: 'SP' },
+          email: 'fin@alfa.test', ddd1: '11', telefone1: '33334444'
+        }
+      }]
+    });
+    const res = await lookup(CNPJ_BOM);
+    assert.equal(res.status, 200);
+    assert.equal(res.body.data.legalName, 'PROVEDOR ALFA TELECOMUNICACOES LTDA');
+    assert.equal(res.body.data.addressLine, 'Avenida Paulista');
+    assert.equal(res.body.data.city, 'São Paulo');
+    assert.equal(res.body.data.phone, '1133334444');
+    assert.equal(consultas.length, 2);
+  });
+
+  it('e se as duas primeiras caem, a ReceitaWS preenche; o "não encontrado" dela vira 404', async () => {
+    fakeFontes({
+      receitaws: [200, {
+        status: 'OK', nome: 'PROVEDOR ALFA', logradouro: 'AV PAULISTA', numero: '1000', bairro: 'BELA VISTA',
+        municipio: 'SAO PAULO', uf: 'SP', cep: '01.310-100', email: 'fin@alfa.test',
+        telefone: '(11) 3333-4444 / (11) 5555-6666'
+      }]
+    });
+    const res = await lookup(CNPJ_BOM);
+    assert.equal(res.status, 200);
+    assert.equal(res.body.data.postalCode, '01310100');
+    assert.equal(res.body.data.phone, '(11) 3333-4444');
+
+    fakeFontes({ receitaws: [200, { status: 'ERROR', message: 'CNPJ inválido' }] });
+    assert.equal((await lookup(CNPJ_BOM)).status, 404);
   });
 
   it('sem sessão não consulta', async () => {
