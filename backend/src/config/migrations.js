@@ -3718,6 +3718,31 @@ export const migrations = [
         });
       }
     }
+  },
+  {
+    /**
+     * O centro do mapa que ainda está em Jacarta vai para Brasília.
+     *
+     * Jacarta (-6.2088, 106.8456) era o padrão do projeto de origem, e ficou
+     * gravado para quem salvou o mapa — ou restaurou o padrão — antes de o
+     * padrão mudar. Nenhum provedor brasileiro escolheu esse ponto de
+     * propósito; quem mudou o centro para a própria cidade não é tocado,
+     * porque só se troca o par exato.
+     */
+    id: '0061_map_center_brasilia',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('map_settings'))) return true;
+      const jacarta = await db('map_settings')
+        .where({ center_lat: '-6.2088', center_lng: '106.8456' })
+        .first();
+      return !jacarta;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('map_settings'))) return;
+      await db('map_settings')
+        .where({ center_lat: '-6.2088', center_lng: '106.8456' })
+        .update({ center_lat: '-15.7942', center_lng: '-47.8822' });
+    }
   }
 ];
 export default migrations;
