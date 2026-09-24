@@ -94,9 +94,12 @@ export const PERMISSIONS = Object.freeze([
   'campaigns.manage',
   // A ficha completa do cliente do SGP. `read` é abrir a ficha, com o CPF
   // inteiro, o endereço e todos os contatos; `edit` é corrigir o cadastro no
-  // painel.
+  // painel. `export` e `import` são a base inteira numa planilha, e por isso
+  // não são do plantão: o mesmo argumento de `tenant.export`.
   'contacts.read',
   'contacts.edit',
+  'contacts.export',
+  'contacts.import',
   'settings.read',
   'settings.write',
   'operators.read',
@@ -160,6 +163,8 @@ const ADMIN = [
   'provisioning.write',
   'whatsapp.config',
   'campaigns.manage',
+  'contacts.export',
+  'contacts.import',
   'settings.read',
   'settings.write',
   'operators.read',

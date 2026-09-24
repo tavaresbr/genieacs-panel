@@ -1,5 +1,6 @@
 import AuditLog from '../models/AuditLog.js';
 import ContactProfileService, { ContactProfileError } from '../services/contactProfileService.js';
+import ContactSheetService from '../services/contactSheetService.js';
 import { SgpError } from '../services/sgpService.js';
 import { translateError } from '../i18n/index.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
@@ -73,5 +74,60 @@ class ContactController {
     }
   }
 }
+
+/** The day in the file name, so two exports of the same day sort together. */
+function today() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+ContactController.exportSheet = async function exportSheet(req, res) {
+  try {
+    const filters = { search: String(req.query.search ?? ''), state: String(req.query.state ?? '') };
+    const { csv, count } = await ContactSheetService.exportCsv(filters);
+    await AuditLog.fromRequest(req, {
+      action: AuditLog.ACTIONS.CONTACTS_EXPORTED,
+      subjectType: 'contacts',
+      subjectId: null,
+      detail: { count, search: filters.search ? true : false, state: filters.state || null }
+    });
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="contatos-${today()}.csv"`);
+    return res.send(csv);
+  } catch (error) {
+    return handleError(req, res, error, 'contacts.exportFailed');
+  }
+};
+
+/**
+ * `?mode=preview` reads the sheet and says what it would do; `?mode=apply`
+ * does it. The body is the CSV itself, as `text/csv`: a 5 MB sheet does not
+ * fit the JSON parser's limit, and does not need to.
+ */
+ContactController.importSheet = async function importSheet(req, res) {
+  try {
+    const text = typeof req.body === 'string' ? req.body : '';
+    const translate = (plan) => ({
+      ...plan,
+      errors: plan.errors.map((error) => ({ line: error.line, message: req.t(error.key, error.vars ?? undefined) }))
+    });
+    if (req.query.mode !== 'apply') {
+      const plan = await ContactSheetService.plan(text);
+      return res.json(createResponse(req.t('contacts.import.previewed'), translate(ContactSheetService.summary(plan))));
+    }
+    const result = await ContactSheetService.apply(text, actorOf(req));
+    await AuditLog.fromRequest(req, {
+      action: AuditLog.ACTIONS.CONTACTS_IMPORTED,
+      subjectType: 'contacts',
+      subjectId: null,
+      detail: { total: result.total, updated: result.updated, created: result.created, errors: result.errors.length }
+    });
+    return res.json(createResponse(
+      req.t('contacts.import.applied', { updated: result.updated, created: result.created }),
+      translate(result)
+    ));
+  } catch (error) {
+    return handleError(req, res, error, 'contacts.importFailed');
+  }
+};
 
 export default ContactController;
