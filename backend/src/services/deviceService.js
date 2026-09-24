@@ -34,6 +34,7 @@ import {
   currentFirmwareVersion,
   isInstalledVersion
 } from './firmwareFiles.js';
+import { mapWithLimit } from './deviceBatch.js';
 import Vendor from '../models/Vendor.js';
 import WifiSecurityConfig from '../models/WifiSecurityConfig.js';
 import AppState from '../models/AppState.js';
@@ -2066,6 +2067,56 @@ class DeviceService {
 
   static async rebootDevice(deviceId) {
     return this.postTask(deviceId, { name: 'reboot' });
+  }
+
+  /** Quantas ONTs do lote recebem a tarefa ao mesmo tempo. O teto do ACS fica por baixo. */
+  static BATCH_PARALLEL = 4;
+
+  /** Quantos ids cabem numa consulta de existência sem esticar demais a URL. */
+  static BATCH_LOOKUP_CHUNK = 50;
+
+  /**
+   * Uma ação em vários aparelhos, com o resultado de cada um.
+   *
+   * Primeiro confere quais existem no ACS, numa leitura por bloco: mandar
+   * tarefa para um id que o ACS não conhece é um 404 que se leria como falha
+   * do ACS. Se essa leitura falhar, o lote inteiro para ANTES de mandar
+   * qualquer coisa — o ACS está fora, e mandar metade seria pior.
+   *
+   * Depois, cada aparelho recebe a tarefa por conta própria: uma ONT que
+   * recusa, ou uma chamada que cai, vira `failed` naquele aparelho e o resto
+   * segue. `sent` é o ACS ter aplicado na hora (200); `queued`, a tarefa
+   * esperando a ONT se conectar (202).
+   *
+   * @param {'reboot'} action
+   * @param {string[]} deviceIds já normalizados por `normalizeBatchIds`
+   */
+  static async runBatch(action, deviceIds) {
+    const existentes = new Set();
+    for (let inicio = 0; inicio < deviceIds.length; inicio += this.BATCH_LOOKUP_CHUNK) {
+      const bloco = deviceIds.slice(inicio, inicio + this.BATCH_LOOKUP_CHUNK);
+      // eslint-disable-next-line no-await-in-loop -- um bloco por vez, para não disputar o ACS consigo mesmo
+      const rows = await this.fetchDeviceListPage(JSON.stringify({ _id: { $in: bloco } }), ['_id']);
+      for (const row of rows) existentes.add(String(row._id));
+    }
+
+    const task = { reboot: { name: 'reboot' } }[action];
+    const results = await mapWithLimit(deviceIds, this.BATCH_PARALLEL, async (deviceId) => {
+      if (!existentes.has(deviceId)) return { deviceId, outcome: 'failed', reason: 'not_found' };
+      try {
+        const { applied } = await this.postProvisioningTask(deviceId, task);
+        return { deviceId, outcome: applied ? 'sent' : 'queued', reason: null };
+      } catch (error) {
+        return {
+          deviceId,
+          outcome: 'failed',
+          reason: /reported a fault/i.test(String(error?.message)) ? 'refused' : 'acs_error'
+        };
+      }
+    });
+    return results.map((result, indice) => (result && !result.error
+      ? result
+      : { deviceId: deviceIds[indice], outcome: 'failed', reason: 'acs_error' }));
   }
 
   /**

@@ -23,6 +23,16 @@ import { Icon } from '@/components/ui/icon'
 import { useTranslation } from '@/contexts/language-context'
 import { formatDate } from '@/lib/utils'
 import { RX_BAND_STYLE, rxBand } from '@/lib/rx-signal'
+import { useAuth } from '@/contexts/auth-context'
+import { DeviceBatchBar } from '@/components/device-batch-bar'
+import {
+  BATCH_LIMIT,
+  canSelectWholeFilter,
+  pageSelectionState,
+  toggleOne,
+  togglePage,
+  type SelectableRow
+} from '@/lib/device-batch'
 import type { Device, Vendor } from '@/types'
 
 interface ProcessedDevice extends Device {
@@ -78,6 +88,18 @@ export default function DevicesPage() {
   const loadingCtl = useLoading()
   const toast = useToast()
   const { t } = useTranslation()
+  const { can } = useAuth()
+  // Ações em lote: só para quem tem `devices.maintain` — um clique alcança
+  // muitos assinantes. Sem a permissão, a lista fica exatamente como era.
+  const canBatch = can('devices.maintain')
+  const [selected, setSelected] = useState<Map<string, string>>(new Map())
+  const [selectingAll, setSelectingAll] = useState(false)
+
+  // Trocar o filtro limpa a seleção: a trilha registra o recorte usado, e uma
+  // seleção feita sob outro filtro diria na trilha um recorte que não é o dela.
+  useEffect(() => {
+    setSelected(new Map())
+  }, [searchTerm, filterStatus, filterFocus, filterSgp])
 
   /**
    * A URL acompanha os filtros.
@@ -299,6 +321,37 @@ export default function DevicesPage() {
   // The contract filter hides rows of the current page, so the server range
   // alone would not explain what is on screen.
   const contractFiltered = visibleDevices.length !== processedDevices.length
+  const pageRows: SelectableRow[] = visibleDevices.map((device) => ({ id: device._id, label: device.SerialNumber || device._id }))
+  const pageState = pageSelectionState(selected, pageRows)
+  const batchFilter: Record<string, string> = {
+    ...(searchTerm ? { search: searchTerm } : {}),
+    ...(filterStatus !== 'all' ? { status: filterStatus } : {}),
+    ...(filterFocus !== 'all' ? { focus: filterFocus } : {})
+  }
+
+  // "Todos os N do filtro": busca os ids página a página, no maior tamanho que
+  // a API aceita, e para no teto do lote.
+  const selectWholeFilter = async () => {
+    setSelectingAll(true)
+    try {
+      const next = new Map(selected)
+      for (let pagina = 1; next.size < Math.min(paging.total, BATCH_LIMIT); pagina += 1) {
+        const res = await devicesAPI.getDevices({ page: pagina, pageSize: 100, search: searchTerm, status: filterStatus, focus: filterFocus })
+        const payload = res.success ? (res.data as DeviceListResponse<Device>) : null
+        const linhas = payload?.devices ?? []
+        for (const device of linhas) {
+          if (next.size >= BATCH_LIMIT) break
+          next.set(device._id, device.SerialNumber || device._id)
+        }
+        if (!payload || linhas.length === 0 || pagina >= payload.totalPages) break
+      }
+      setSelected(next)
+    } catch {
+      toast.error(t('devices.batch.selectAllFailed'))
+    } finally {
+      setSelectingAll(false)
+    }
+  }
 
   const DeviceStatus = ({ device }: { device: ProcessedDevice }) => (
     <span className={device.isOnline ? 'modern-badge-success' : 'modern-badge-error'}>
@@ -453,11 +506,33 @@ export default function DevicesPage() {
               </section>
             ) : (
               <>
+                {canBatch && (
+                  <DeviceBatchBar
+                    selection={selected}
+                    filter={batchFilter}
+                    filterTotal={paging.total}
+                    canSelectAll={canSelectWholeFilter(paging.total, selected.size, contractFiltered)}
+                    selectingAll={selectingAll}
+                    onSelectAll={() => void selectWholeFilter()}
+                    onClear={() => setSelected(new Map())}
+                  />
+                )}
                 <section className="modern-card desktop-table overflow-hidden" aria-busy={loading}>
                   <div className="max-h-[calc(100vh-18rem)] overflow-auto">
                     <table className="modern-table">
                       <thead>
                         <tr>
+                          {canBatch && (
+                            <th className="w-10">
+                              <input
+                                type="checkbox"
+                                aria-label={t('devices.batch.selectPage')}
+                                checked={pageState === 'all'}
+                                ref={(el) => { if (el) el.indeterminate = pageState === 'some' }}
+                                onChange={() => setSelected((current) => togglePage(current, pageRows))}
+                              />
+                            </th>
+                          )}
                           <th>{t('devices.table.status')}</th>
                           <th>{t('devices.table.serial')}</th>
                           <th>{t('devices.table.vendorModel')}</th>
@@ -474,6 +549,16 @@ export default function DevicesPage() {
                           const signalInfo = getSignalStrengthInfo(device.rxpower)
                           return (
                             <tr key={device._id}>
+                              {canBatch && (
+                                <td className="w-10">
+                                  <input
+                                    type="checkbox"
+                                    aria-label={t('devices.batch.selectOne', { device: device.SerialNumber || device._id })}
+                                    checked={selected.has(device._id)}
+                                    onChange={() => setSelected((current) => toggleOne(current, { id: device._id, label: device.SerialNumber || device._id }))}
+                                  />
+                                </td>
+                              )}
                               <td><DeviceStatus device={device} /></td>
                               <td className="max-w-[18rem]">
                                 <Link to={`/devices/detail?id=${encodeURIComponent(device._id)}`} className="block truncate font-mono text-sm font-semibold text-primary hover:underline">
@@ -520,7 +605,17 @@ export default function DevicesPage() {
                       <article key={device._id} className="mobile-data-card">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <DeviceStatus device={device} />
+                            <div className="flex items-center gap-3">
+                              {canBatch && (
+                                <input
+                                  type="checkbox"
+                                  aria-label={t('devices.batch.selectOne', { device: device.SerialNumber || device._id })}
+                                  checked={selected.has(device._id)}
+                                  onChange={() => setSelected((current) => toggleOne(current, { id: device._id, label: device.SerialNumber || device._id }))}
+                                />
+                              )}
+                              <DeviceStatus device={device} />
+                            </div>
                             <Link to={`/devices/detail?id=${encodeURIComponent(device._id)}`} className="mt-2 block truncate font-mono text-sm font-semibold text-primary">
                               {device.SerialNumber || device._id}
                             </Link>

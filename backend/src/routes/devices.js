@@ -38,6 +38,9 @@ router.post('/factory-reset', authenticateToken, requirePermission('devices.main
 // segura a tela esquecida aberta consultando.
 router.post('/diagnostics', authenticateToken, requirePermission('devices.write'), deviceDiagnosticLimiter, DeviceController.startDiagnostic);
 router.post('/diagnostics/result', authenticateToken, requirePermission('devices.write'), deviceDiagnosticLimiter, DeviceController.readDiagnostic);
+// Uma ação em vários aparelhos de uma vez, com os ids no corpo (até 200).
+// `devices.maintain`: um clique alcança muitos assinantes.
+router.post('/batch', authenticateToken, requirePermission('devices.maintain'), DeviceController.runBatch);
 router.post('/summon', authenticateToken, requirePermission('devices.write'), DeviceController.summonDevice);
 router.post('/:id/update-wan', authenticateToken, requirePermission('devices.write'), DeviceController.updateWanConfig);
 router.post('/:id/add-wan', authenticateToken, requirePermission('devices.write'), DeviceController.addWanConnection);

@@ -12,6 +12,7 @@ import TenantUser from '../models/TenantUser.js';
 import User from '../models/User.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { translateError } from '../i18n/index.js';
+import { BATCH_ACTIONS, BATCH_LIMIT, batchFilterLabel, batchSummary, normalizeBatchIds } from '../services/deviceBatch.js';
 
 /**
  * A linha da trilha para uma ação que MUDOU a ONT, gravada só depois do sucesso.
@@ -479,6 +480,37 @@ class DeviceController {
       }
       console.error('Factory reset error:', error);
       return res.status(502).json(createErrorResponse(req.t('device.factoryResetFailed'), error.message));
+    }
+  }
+
+  static async runBatch(req, res) {
+    const { action, deviceIds, filter } = req.body || {};
+    if (!BATCH_ACTIONS.includes(action)) {
+      return res.status(400).json(createErrorResponse(req.t('device.batchInvalid'), null, 'invalid_action'));
+    }
+    const ids = normalizeBatchIds(deviceIds);
+    if (!ids || ids.length === 0) {
+      return res.status(400).json(createErrorResponse(req.t('device.batchInvalid'), null, 'invalid_devices'));
+    }
+    if (ids.length > BATCH_LIMIT) {
+      return res.status(400).json(
+        createErrorResponse(req.t('device.batchTooLarge', { limit: BATCH_LIMIT }), null, 'batch_too_large')
+      );
+    }
+    try {
+      const results = await DeviceService.runBatch(action, ids);
+      const summary = batchSummary(results);
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.DEVICE_BATCH_ACTION,
+        subjectType: 'device',
+        subjectId: null,
+        detail: { action, ...summary, filter: batchFilterLabel(filter) }
+      });
+      if (summary.sent + summary.queued > 0) DeviceService.invalidateDashboard();
+      return res.json(createResponse(req.t('device.batchDone'), { action, summary, results }));
+    } catch (error) {
+      console.error('Device batch error:', error);
+      return res.status(502).json(createErrorResponse(req.t('device.batchFailed'), error.message));
     }
   }
 
