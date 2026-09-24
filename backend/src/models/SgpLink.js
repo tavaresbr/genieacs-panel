@@ -1,4 +1,4 @@
-import { tdb, tinsert } from '../config/database.js';
+import { tdb, tinsert, withDeadlockRetry } from '../config/database.js';
 
 class SgpLink {
   static async getByDeviceId(deviceId) {
@@ -16,9 +16,11 @@ class SgpLink {
     // reading one ACS do see the same ids. On MySQL the target is ignored
     // either way, so naming it wrongly is invisible there and fails loudly on
     // SQLite and Postgres.
-    await tinsert('sgp_links', { ...link, updated_at: now })
+    // The fleet sync writes several links at once; on MySQL two of these
+    // upserts can deadlock, and the one the database drops is safe to repeat.
+    await withDeadlockRetry(() => tinsert('sgp_links', { ...link, updated_at: now })
       .onConflict(['tenant_id', 'device_id'])
-      .merge({ ...link, updated_at: now });
+      .merge({ ...link, updated_at: now }));
     return this.getByDeviceId(link.device_id);
   }
 
