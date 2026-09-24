@@ -1045,6 +1045,8 @@ const hi: Dictionary = {
   'detail.wifi.security': 'सुरक्षा',
   'detail.wifi.associatedClients': 'संबद्ध क्लाइंट',
   'detail.wifi.notReported': 'रिपोर्ट नहीं हुआ',
+  'detail.wifi.passwordNotReported': 'डिवाइस द्वारा रिपोर्ट नहीं',
+  'detail.wifi.passwordNotReportedHint': 'डिवाइस पासवर्ड रिपोर्ट नहीं करता। सेट करने के लिए SSID संपादित करें का उपयोग करें।',
   'detail.wifi.edit': 'SSID {index} संपादित करें',
   'detail.wifi.adminRequired': 'आपकी भूमिका Wi-Fi कॉन्फ़िगरेशन बदलने की अनुमति नहीं देती।',
   'detail.wifi.empty': 'कोई Wi-Fi SSID रिपोर्ट नहीं हुआ।',

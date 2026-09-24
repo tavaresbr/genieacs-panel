@@ -1045,6 +1045,8 @@ const ar: Dictionary = {
   'detail.wifi.security': 'الأمان',
   'detail.wifi.associatedClients': 'العملاء المرتبطون',
   'detail.wifi.notReported': 'غير مُبلَّغ',
+  'detail.wifi.passwordNotReported': 'لا يبلّغ عنها الجهاز',
+  'detail.wifi.passwordNotReportedHint': 'لا يبلّغ الجهاز عن كلمة المرور. لتعيين واحدة، استخدم تعديل SSID.',
   'detail.wifi.edit': 'تعديل SSID {index}',
   'detail.wifi.adminRequired': 'دورك لا يسمح بتغيير إعداد Wi-Fi.',
   'detail.wifi.empty': 'لا توجد شبكات Wi-Fi مُبلَّغ عنها.',

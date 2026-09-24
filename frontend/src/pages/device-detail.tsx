@@ -2312,7 +2312,16 @@ export default function DeviceDetailPage() {
                       </div>
                       <div className="flex justify-between gap-4">
                         <dt className="text-muted-foreground">{t('detail.wifi.password')}</dt>
-                        <dd className="font-mono">{ssid.password ? '••••••••' : t('detail.wifi.notReported')}</dd>
+                        {ssid.password ? (
+                          <dd className="font-mono">••••••••</dd>
+                        ) : (
+                          // O GenieACS quase nunca tem a senha: os ONTs não a
+                          // devolvem na leitura. "Não informado" soava como
+                          // defeito; isto diz de quem é a lacuna e o que fazer.
+                          <dd className="text-end text-muted-foreground" title={t('detail.wifi.passwordNotReportedHint')}>
+                            {t('detail.wifi.passwordNotReported')}
+                          </dd>
+                        )}
                       </div>
                       <div className="flex justify-between gap-4">
                         <dt className="text-muted-foreground">{t('detail.wifi.security')}</dt>

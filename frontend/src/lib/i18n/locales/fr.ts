@@ -1067,6 +1067,8 @@ const fr: Dictionary = {
   'detail.wifi.security': 'Sécurité',
   'detail.wifi.associatedClients': 'Clients associés',
   'detail.wifi.notReported': 'Non communiqué',
+  'detail.wifi.passwordNotReported': 'Non communiqué par l’équipement',
+  'detail.wifi.passwordNotReportedHint': 'L’équipement ne communique pas le mot de passe. Pour en définir un, utilisez Modifier le SSID.',
   'detail.wifi.edit': 'Modifier le SSID {index}',
   'detail.wifi.adminRequired': 'Votre rôle ne permet pas de modifier la configuration Wi-Fi.',
   'detail.wifi.empty': 'Aucun SSID Wi-Fi remonté.',

@@ -26,8 +26,11 @@ export function ConsoleHeader() {
       <BrandMark className="size-9 shrink-0" />
       <div className="min-w-0">
         <div className="truncate text-sm font-bold leading-tight text-foreground">{t('console.header')}</div>
-        <div className="mt-0.5 text-[0.62rem] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-          {t('app.genieacsOperations')}
+        {/* Quem está aqui, no mesmo lugar em que o menu do provedor diz
+            "Provedor · slug": esta sessão não é de provedor nenhum. */}
+        <div className="mt-0.5 flex items-center gap-1 text-[0.62rem] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+          <Icon name="lock" size={11} className="shrink-0" />
+          {t('sidebar.platformAdmin')}
         </div>
       </div>
       <div className="ms-auto flex items-center gap-3">

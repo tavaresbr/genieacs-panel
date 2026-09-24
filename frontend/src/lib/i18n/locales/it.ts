@@ -1071,6 +1071,8 @@ const it: Dictionary = {
   'detail.wifi.security': 'Sicurezza',
   'detail.wifi.associatedClients': 'Client associati',
   'detail.wifi.notReported': 'Non riportato',
+  'detail.wifi.passwordNotReported': 'Non comunicata dal dispositivo',
+  'detail.wifi.passwordNotReportedHint': 'Il dispositivo non comunica la password. Per impostarne una, usa Modifica SSID.',
   'detail.wifi.edit': 'Modifica SSID {index}',
   'detail.wifi.adminRequired': 'Il tuo ruolo non consente di modificare la configurazione WiFi.',
   'detail.wifi.empty': 'Nessun SSID WiFi riportato.',
