@@ -622,6 +622,7 @@ const ja: Dictionary = {
   'settings.title': 'パネルの設定',
   'settings.description': 'GenieACS への接続、ベンダーごとのパラメーターパス、管理者アカウント、パネルのデータ保存先を管理します。',
   'settings.sectionsAria': '設定のセクション',
+  'settings.tab.provider': '一般',
   'settings.tab.general': 'パネルと ACS',
   'settings.tab.virtualParams': 'TR-069 パラメーター',
   'settings.tab.customerPortal': '顧客ポータル',

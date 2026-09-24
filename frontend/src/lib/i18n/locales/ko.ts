@@ -622,6 +622,7 @@ const ko: Dictionary = {
   'settings.title': '패널 설정',
   'settings.description': 'GenieACS 연결, 제조사별 매개변수 경로, 관리자 계정, 패널 데이터 저장소를 관리합니다.',
   'settings.sectionsAria': '설정 영역',
+  'settings.tab.provider': '일반',
   'settings.tab.general': '패널 및 ACS',
   'settings.tab.virtualParams': 'TR-069 매개변수',
   'settings.tab.customerPortal': '고객 포털',

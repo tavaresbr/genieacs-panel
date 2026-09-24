@@ -625,6 +625,7 @@ const ru: Dictionary = {
   'settings.title': 'Настройка панели',
   'settings.description': 'Управляйте подключением к GenieACS, путями параметров производителей, учётными записями администраторов и хранилищем данных панели.',
   'settings.sectionsAria': 'Разделы настроек',
+  'settings.tab.provider': 'Общие',
   'settings.tab.general': 'Панель и ACS',
   'settings.tab.virtualParams': 'Параметры TR-069',
   'settings.tab.customerPortal': 'Портал абонента',

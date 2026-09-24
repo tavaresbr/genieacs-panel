@@ -622,6 +622,7 @@ const zhCN: Dictionary = {
   'settings.title': '面板配置',
   'settings.description': '管理 GenieACS 连接、厂商参数路径、管理员账号以及面板的数据存储。',
   'settings.sectionsAria': '配置分区',
+  'settings.tab.provider': '常规',
   'settings.tab.general': '面板与 ACS',
   'settings.tab.virtualParams': 'TR-069 参数',
   'settings.tab.customerPortal': '客户门户',

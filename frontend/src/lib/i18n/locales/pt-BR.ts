@@ -622,6 +622,7 @@ const ptBR: Dictionary = {
   'settings.title': 'Configuração do painel',
   'settings.description': 'Gerencie a conexão com o GenieACS, os caminhos de parâmetros dos fabricantes, as contas de administrador e o banco de dados do painel.',
   'settings.sectionsAria': 'Seções de configuração',
+  'settings.tab.provider': 'Geral',
   'settings.tab.general': 'Painel e ACS',
   'settings.tab.virtualParams': 'Parâmetros TR-069',
   'settings.tab.customerPortal': 'Portal do cliente',
