@@ -1,29 +1,38 @@
 import { useEffect, useState } from 'react'
 import { mapSettingsAPI, subscriptionAPI, tenantAPI, type TenantBilling } from '@/lib/api'
-import { ADDRESS_FIELDS, CLASSE_LARGURA } from '@/components/billing-profile'
+import { ADDRESS_FIELDS, CLASSE_LARGURA, CONTACT_FIELDS, IDENTITY_FIELDS, type BillingField } from '@/components/billing-profile'
+import type { TranslationKey } from '@/lib/i18n'
 import { LocationPicker } from '@/components/location-picker'
 import { useToast } from '@/components/ui/toast'
 import { useAuth } from '@/contexts/auth-context'
 import { useTranslation } from '@/contexts/language-context'
 
 /**
- * O endereço principal do provedor e o ponto dele no mapa, num bloco só.
+ * O cadastro do provedor (empresa, endereço, contato) e o ponto da sede no
+ * mapa, num bloco só.
  *
- * Nenhum dado novo: o endereço é o do cadastro fiscal (o mesmo que a tela
- * Plano edita) e o ponto é o centro do mapa da rede. Aqui é onde o operador
+ * Nenhum dado novo: o cadastro é o fiscal (o mesmo que a tela Plano edita) e
+ * o ponto é o centro do mapa da rede. Aqui é onde o operador
  * procura "o endereço do provedor"; lá é onde o contador procura a nota.
  *
  * Cada metade exige a própria permissão — `settings.write` para o endereço,
  * `map.write` para o ponto — e o Salvar só grava a metade que a pessoa pode
- * gravar. Do endereço vão só os campos que mudaram: a rota trata campo
- * ausente como "não mexe", e o resto do cadastro fiscal (razão social, CNPJ…)
- * nem aparece aqui.
+ * gravar. Do cadastro vão só os campos que mudaram: a rota trata campo
+ * ausente como "não mexe", então editar aqui não desfaz o que alguém acabou
+ * de gravar pela tela Plano noutro campo.
  */
 type AddressForm = Record<string, string>
 
+const SECTIONS: Array<{ title: TranslationKey; fields: BillingField[] }> = [
+  { title: 'settings.providerAddress.companySection', fields: IDENTITY_FIELDS },
+  { title: 'settings.providerAddress.addressSection', fields: ADDRESS_FIELDS },
+  { title: 'settings.providerAddress.contactSection', fields: CONTACT_FIELDS }
+]
+const ALL_FIELDS = SECTIONS.flatMap((section) => section.fields)
+
 function addressFrom(billing: TenantBilling | null): AddressForm {
   const out: AddressForm = {}
-  for (const { chave } of ADDRESS_FIELDS) out[chave] = (billing?.[chave] ?? '') as string
+  for (const { chave } of ALL_FIELDS) out[chave] = (billing?.[chave] ?? '') as string
   return out
 }
 
@@ -64,7 +73,7 @@ export function ProviderAddressPanel() {
     try {
       if (canAddress) {
         const patch: Partial<TenantBilling> = {}
-        for (const { chave } of ADDRESS_FIELDS) {
+        for (const { chave } of ALL_FIELDS) {
           if ((address[chave] ?? '') !== (savedAddress[chave] ?? '')) patch[chave] = address[chave] ?? ''
         }
         if (Object.keys(patch).length) {
@@ -92,22 +101,28 @@ export function ProviderAddressPanel() {
       <h2 className="section-heading">{t('settings.providerAddress.title')}</h2>
       <p className="section-description mb-6">{t('settings.providerAddress.description')}</p>
       <div className="space-y-5">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
-          {ADDRESS_FIELDS.map(({ chave, label, largura, maxLength, inputMode }) => (
-            <div key={chave} className={CLASSE_LARGURA[largura]}>
-              <label htmlFor={`provider-${chave}`} className="field-label">{t(label)}</label>
-              <input
-                id={`provider-${chave}`}
-                className="modern-input w-full"
-                value={address[chave] ?? ''}
-                maxLength={maxLength}
-                inputMode={inputMode}
-                disabled={!canAddress || busy || !loaded}
-                onChange={(e) => setAddress((a) => ({ ...a, [chave]: e.target.value }))}
-              />
+        {SECTIONS.map(({ title, fields }, index) => (
+          <div key={title} className={index > 0 ? 'border-t border-border pt-5' : undefined}>
+            <h3 className="mb-4 font-semibold">{t(title)}</h3>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
+              {fields.map(({ chave, label, hint, largura, maxLength, inputMode }) => (
+                <div key={chave} className={CLASSE_LARGURA[largura]}>
+                  <label htmlFor={`provider-${chave}`} className="field-label">{t(label)}</label>
+                  <input
+                    id={`provider-${chave}`}
+                    className="modern-input w-full"
+                    value={address[chave] ?? ''}
+                    maxLength={maxLength}
+                    inputMode={inputMode}
+                    disabled={!canAddress || busy || !loaded}
+                    onChange={(e) => setAddress((a) => ({ ...a, [chave]: e.target.value }))}
+                  />
+                  {hint && <p className="field-hint">{t(hint)}</p>}
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </div>
+        ))}
 
         <div className="border-t border-border pt-5">
           <h3 className="font-semibold">{t('settings.providerAddress.mapLabel')}</h3>

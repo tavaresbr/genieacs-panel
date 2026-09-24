@@ -29,7 +29,7 @@ export type BillingField = {
 }
 
 /**
- * Os campos do endereço, também usados pelo painel "Endereço principal do
+ * Os campos do endereço. Estas listas também montam o painel "Cadastro do
  * provedor" das configurações — o mesmo registro, editável nos dois lugares.
  */
 export const ADDRESS_FIELDS: BillingField[] = [
@@ -42,14 +42,20 @@ export const ADDRESS_FIELDS: BillingField[] = [
   { chave: 'state', label: 'billing.state', largura: 'third', maxLength: 2 }
 ]
 
-const CAMPOS: BillingField[] = [
+/** Quem é o provedor: razão social, CNPJ e inscrição estadual. */
+export const IDENTITY_FIELDS: BillingField[] = [
   { chave: 'legalName', label: 'billing.legalName', largura: 'full', maxLength: 160 },
   { chave: 'taxId', label: 'billing.taxId', hint: 'billing.taxIdHint', largura: 'half', maxLength: 20, inputMode: 'numeric' },
-  { chave: 'stateRegistration', label: 'billing.stateRegistration', hint: 'billing.stateRegistrationHint', largura: 'half', maxLength: 32 },
-  ...ADDRESS_FIELDS,
+  { chave: 'stateRegistration', label: 'billing.stateRegistration', hint: 'billing.stateRegistrationHint', largura: 'half', maxLength: 32 }
+]
+
+/** Para onde vai a cobrança. */
+export const CONTACT_FIELDS: BillingField[] = [
   { chave: 'email', label: 'billing.email', hint: 'billing.emailHint', largura: 'half', maxLength: 160 },
   { chave: 'phone', label: 'billing.phone', largura: 'half', maxLength: 32 }
 ]
+
+const CAMPOS: BillingField[] = [...IDENTITY_FIELDS, ...ADDRESS_FIELDS, ...CONTACT_FIELDS]
 
 export const CLASSE_LARGURA = {
   full: 'sm:col-span-6',
