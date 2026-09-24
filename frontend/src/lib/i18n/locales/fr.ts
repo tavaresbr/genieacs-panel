@@ -616,6 +616,7 @@ const fr: Dictionary = {
   'settings.title': 'Configuration du panneau',
   'settings.description': 'Gérez la connexion GenieACS, les chemins de paramètres par fabricant, les comptes administrateurs et le stockage de données du panneau.',
   'settings.sectionsAria': 'Sections de configuration',
+  'settings.tab.provider': 'Général',
   'settings.tab.general': 'Panneau et ACS',
   'settings.tab.virtualParams': 'Paramètres TR-069',
   'settings.tab.customerPortal': 'Portail client',

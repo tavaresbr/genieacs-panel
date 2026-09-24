@@ -619,6 +619,7 @@ const de: Dictionary = {
   'settings.title': 'Panel-Konfiguration',
   'settings.description': 'Verwalten Sie die GenieACS-Verbindung, die Parameterpfade der Hersteller, die Administratorkonten und die Datenbank des Panels.',
   'settings.sectionsAria': 'Konfigurationsbereiche',
+  'settings.tab.provider': 'Allgemein',
   'settings.tab.general': 'Panel und ACS',
   'settings.tab.virtualParams': 'TR-069-Parameter',
   'settings.tab.customerPortal': 'Kundenportal',

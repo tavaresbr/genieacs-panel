@@ -611,6 +611,7 @@ const ar: Dictionary = {
   'settings.title': 'إعدادات اللوحة',
   'settings.description': 'أدِر الاتصال بـ GenieACS ومسارات معطيات المصنّعين وحسابات المديرين ومخزن بيانات اللوحة.',
   'settings.sectionsAria': 'أقسام الإعدادات',
+  'settings.tab.provider': 'عام',
   'settings.tab.general': 'اللوحة وACS',
   'settings.tab.virtualParams': 'معطيات TR-069',
   'settings.tab.customerPortal': 'بوابة المشترك',

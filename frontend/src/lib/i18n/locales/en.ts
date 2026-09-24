@@ -618,6 +618,7 @@ const en = {
   'settings.title': 'Panel configuration',
   'settings.description': 'Manage the GenieACS connection, vendor parameter paths, administrator accounts, and the panel data store.',
   'settings.sectionsAria': 'Configuration sections',
+  'settings.tab.provider': 'General',
   'settings.tab.general': 'Panel & ACS',
   'settings.tab.virtualParams': 'TR-069 parameters',
   'settings.tab.customerPortal': 'Customer portal',

@@ -611,6 +611,7 @@ const hi: Dictionary = {
   'settings.title': 'पैनल कॉन्फ़िगरेशन',
   'settings.description': 'GenieACS कनेक्शन, विक्रेता मापदंड पथ, प्रशासक खाते और पैनल डेटा स्टोर प्रबंधित करें।',
   'settings.sectionsAria': 'कॉन्फ़िगरेशन अनुभाग',
+  'settings.tab.provider': 'सामान्य',
   'settings.tab.general': 'पैनल और ACS',
   'settings.tab.virtualParams': 'TR-069 मापदंड',
   'settings.tab.customerPortal': 'ग्राहक पोर्टल',
