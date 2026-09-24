@@ -29,6 +29,7 @@ class WhatsAppAlertsController {
         enabled: body.enabled,
         intervalSeconds: body.intervalSeconds,
         recipients: body.recipients,
+        emailRecipients: body.emailRecipients,
         rules: body.rules
       });
       return res.json(createResponse(req.t('whatsapp.alerts.rulesSaved'), settings));
@@ -61,6 +62,7 @@ class WhatsAppAlertsController {
         not_configured: ['whatsapp.error.notConfigured', 'not_configured', 409],
         no_alert_number: ['whatsapp.alerts.noAlertNumber', 'no_alert_number', 409],
         no_recipients: ['whatsapp.alerts.noRecipients', 'no_alert_recipients', 409],
+        mail_not_configured: ['whatsapp.alerts.mailNotConfigured', 'mail_not_configured', 409],
         no_devices: ['whatsapp.alerts.noDevices', 'no_devices', 502]
       };
       const refusal = summary.skipped ? REFUSALS[summary.skipped] : null;

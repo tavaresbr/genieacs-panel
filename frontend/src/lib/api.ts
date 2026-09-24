@@ -2799,6 +2799,10 @@ export interface WhatsAppAlertSettings {
   enabled: boolean
   intervalSeconds: number
   recipients: string[]
+  /** E-mails da equipe: o segundo canal, pelo SMTP do servidor. */
+  emailRecipients?: string[]
+  /** Só na leitura: se o servidor manda e-mail. Sem isso, o campo avisa. */
+  mailConfigured?: boolean
   rules: Record<WhatsAppAlertRule, { enabled: boolean; threshold: number | null; cooldownMinutes: number }>
 }
 

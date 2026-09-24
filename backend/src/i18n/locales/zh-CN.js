@@ -544,6 +544,8 @@ export default {
   'whatsapp.alerts.scanDone': '触发 {fired} 条告警，解除 {cleared} 条',
   'whatsapp.alerts.scanFailed': '告警扫描失败',
   'whatsapp.alerts.noRecipients': '没有设置接收技术告警的号码',
+  'whatsapp.alerts.invalidEmail': '"{email}" 不是有效的电子邮件地址',
+  'whatsapp.alerts.mailNotConfigured': '服务器未配置邮件，因此无法发送邮件告警',
   'whatsapp.alerts.disabledSkip': '告警功能已关闭，因此未执行检查',
   'whatsapp.alerts.noAlertNumber': '没有已接入的号码被设为告警用途',
   'whatsapp.alerts.noDevices': '无法读取设备清单，因此未执行检查',

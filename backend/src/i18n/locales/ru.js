@@ -545,6 +545,8 @@ export default {
   'whatsapp.alerts.scanDone': 'создано оповещений: {fired}, снято: {cleared}',
   'whatsapp.alerts.scanFailed': 'Проверка оповещений завершилась ошибкой',
   'whatsapp.alerts.noRecipients': 'Ни один номер не назначен для получения технических оповещений',
+  'whatsapp.alerts.invalidEmail': '«{email}» — недопустимый адрес e-mail',
+  'whatsapp.alerts.mailNotConfigured': 'На сервере не настроена почта, поэтому оповещения по e-mail не отправляются',
   'whatsapp.alerts.disabledSkip': 'Оповещения выключены, поэтому проверка не выполнялась',
   'whatsapp.alerts.noAlertNumber': 'Ни один подключённый номер не назначен для оповещений',
   'whatsapp.alerts.noDevices': 'Не удалось прочитать список устройств, поэтому проверка не выполнялась',

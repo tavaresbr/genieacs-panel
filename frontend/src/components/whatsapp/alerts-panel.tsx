@@ -118,6 +118,8 @@ interface AlertsForm {
   intervalSeconds: string
   /** The textarea verbatim, one number per line. Parsed only on save. */
   recipients: string
+  /** O mesmo, um e-mail por linha. */
+  emailRecipients: string
   rules: Record<WhatsAppAlertRule, RuleForm>
 }
 
@@ -139,6 +141,7 @@ function toForm(settings: WhatsAppAlertSettings): AlertsForm {
     enabled: settings.enabled,
     intervalSeconds: String(settings.intervalSeconds),
     recipients: (settings.recipients ?? []).join('\n'),
+    emailRecipients: (settings.emailRecipients ?? []).join('\n'),
     rules
   }
 }
@@ -237,7 +240,14 @@ export function AlertsPanel() {
     () => (form ? parseRecipients(form.recipients) : []),
     [form]
   )
-  const noRecipients = recipients.length === 0
+  const emailRecipients = useMemo(
+    () => (form ? parseRecipients(form.emailRecipients) : []),
+    [form]
+  )
+  // Ninguém em canal nenhum: é esse o estado que o aviso grita, e agora são
+  // dois canais — um número OU um e-mail já é alguém para acordar.
+  const noRecipients = recipients.length === 0 && emailRecipients.length === 0
+  const mailOff = stored?.mailConfigured === false
 
   const patchRule = (rule: WhatsAppAlertRule, patch: Partial<RuleForm>) => {
     setForm((current) => (current
@@ -291,6 +301,7 @@ export function AlertsPanel() {
         enabled: form.enabled,
         intervalSeconds: parseInteger(form.intervalSeconds, stored?.intervalSeconds ?? INTERVAL_MIN_S),
         recipients,
+        emailRecipients,
         rules
       })
       if (res.success && res.data) {
@@ -444,6 +455,39 @@ export function AlertsPanel() {
               ) : (
                 <p id="wa-alerts-recipients-hint" className="field-hint">
                   {t('whatsapp.alerts.recipientsHint')}
+                </p>
+              )}
+            </div>
+
+            {/* ── Os e-mails da equipe ─────────────────────────────────────
+                O segundo canal. Sem SMTP no servidor, o campo continua (a lista
+                fica guardada para o dia em que houver), mas diz que nada sai. */}
+            <div>
+              <label htmlFor="wa-alerts-emails" className="field-label">
+                {t('whatsapp.alerts.emailRecipients')}
+              </label>
+              <textarea
+                id="wa-alerts-emails"
+                rows={3}
+                className="modern-input w-full font-mono text-sm"
+                value={form.emailRecipients}
+                aria-describedby="wa-alerts-emails-hint"
+                placeholder="plantao@provedor.com.br"
+                onChange={(event) => setForm((current) => (current
+                  ? { ...current, emailRecipients: event.target.value }
+                  : current))}
+              />
+              {mailOff ? (
+                <p
+                  id="wa-alerts-emails-hint"
+                  className="mt-2 flex items-start gap-2 rounded-md border border-[hsl(var(--status-warning)/0.45)] bg-[hsl(var(--status-warning)/0.11)] px-3 py-2.5 text-sm leading-5 text-foreground"
+                >
+                  <Icon name="warning" size={16} className="mt-0.5 shrink-0 text-[hsl(var(--status-warning))]" />
+                  <span>{t('whatsapp.alerts.mailNotConfigured')}</span>
+                </p>
+              ) : (
+                <p id="wa-alerts-emails-hint" className="field-hint">
+                  {t('whatsapp.alerts.emailRecipientsHint')}
                 </p>
               )}
             </div>

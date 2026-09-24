@@ -14,6 +14,9 @@ import { timestampMs } from '../utils/helpers.js';
 import { DEFAULT_LOCALE, translatorFor } from '../i18n/index.js';
 import { TenantCache } from '../config/tenantCache.js';
 import { currentTenantId } from '../config/tenantContext.js';
+import { mailConfigured, mailTransport } from './mail/index.js';
+import { isValidEmail } from '../utils/helpers.js';
+import Tenant from '../models/Tenant.js';
 
 const SETTINGS_KEY = 'whatsapp_alert_settings';
 
@@ -97,8 +100,14 @@ const DEFAULT_SETTINGS = Object.freeze({
   // faster would only spend GenieACS reads to discover the same answer.
   intervalSeconds: 300,
   recipients: [],
+  // O segundo canal: e-mails da equipe, pelo SMTP do servidor. Mesma regra
+  // dos números — quem recebe é a equipe, nunca o assinante.
+  emailRecipients: [],
   rules: DEFAULT_RULES
 });
+
+/** O assunto de um alerta por e-mail, cortado: é lido na notificação do celular. */
+const EMAIL_SUBJECT_MAX = 120;
 
 /** The node types an ONT is grouped under for a mass outage. */
 const AGGREGATION_TYPES = Object.freeze(['odp', 'odc', 'olt']);
@@ -261,6 +270,36 @@ class WaAlertService {
     return numbers;
   }
 
+  /**
+   * Os e-mails da equipe: lista ou texto colado, minúsculos e sem repetição.
+   * Recusar o inválido pelo mesmo motivo dos números — ele falharia em todo
+   * alerta, para sempre, num log que ninguém lê.
+   */
+  static normalizeEmailRecipients(raw) {
+    const list = Array.isArray(raw) ? raw : String(raw ?? '').split(/[,;\n\s]/);
+    const emails = [];
+    for (const entry of list) {
+      const text = String(entry ?? '').trim().toLowerCase();
+      if (!text) continue;
+      if (!isValidEmail(text)) {
+        throw new WaError('whatsapp.alerts.invalidEmail', {
+          code: 'invalid_email',
+          status: 400,
+          vars: { email: text }
+        });
+      }
+      if (!emails.includes(text)) emails.push(text);
+    }
+    if (emails.length > MAX_RECIPIENTS) {
+      throw new WaError('whatsapp.error.tooManyRecipients', {
+        code: 'too_many_recipients',
+        status: 400,
+        vars: { max: MAX_RECIPIENTS }
+      });
+    }
+    return emails;
+  }
+
   static async getSettings() {
     const cached = this.settingsCache.get();
     if (cached) return cached;
@@ -272,6 +311,9 @@ class WaAlertService {
       // written by an older version still yields dialable numbers.
       recipients: Array.isArray(stored.recipients)
         ? stored.recipients.map((entry) => normalizarTelefoneBr(entry)).filter(Boolean)
+        : [],
+      emailRecipients: Array.isArray(stored.emailRecipients)
+        ? stored.emailRecipients.map((entry) => String(entry ?? '').trim().toLowerCase()).filter((entry) => isValidEmail(entry))
         : [],
       rules: this.normalizeRules(stored.rules),
       updatedAt: stored.updatedAt || null
@@ -288,10 +330,15 @@ class WaAlertService {
   static async getPublicSettings() {
     const settings = await this.getSettings();
     const account = await WhatsAppAccount.getForPurpose('alerts');
+    const whatsappReady = Boolean(account && settings.recipients.length > 0);
+    const emailReady = Boolean(mailConfigured() && settings.emailRecipients.length > 0);
     return {
       ...settings,
       hasAlertsNumber: Boolean(account),
-      ready: Boolean(settings.enabled && account && settings.recipients.length > 0)
+      // Se o servidor manda e-mail — sem isso, o campo dos e-mails avisa em vez
+      // de aceitar endereços que nunca vão receber nada.
+      mailConfigured: mailConfigured(),
+      ready: Boolean(settings.enabled && (whatsappReady || emailReady))
     };
   }
 
@@ -328,6 +375,9 @@ class WaAlertService {
       recipients: patch.recipients === undefined
         ? current.recipients
         : this.normalizeRecipients(patch.recipients),
+      emailRecipients: patch.emailRecipients === undefined
+        ? current.emailRecipients
+        : this.normalizeEmailRecipients(patch.emailRecipients),
       rules: patch.rules === undefined
         ? current.rules
         // Merged onto the stored rules, so a screen that sends one rule cannot
@@ -336,7 +386,7 @@ class WaAlertService {
       updatedAt: new Date().toISOString()
     };
 
-    if (next.enabled && next.recipients.length === 0) {
+    if (next.enabled && next.recipients.length === 0 && next.emailRecipients.length === 0) {
       // `no_alert_recipients`, the same code the scan raises for the same
       // reason. The campaign's `no_recipients` means "the filters left nobody
       // to charge", and a form that translated the code would put that sentence
@@ -450,29 +500,12 @@ class WaAlertService {
         return summary;
       }
 
-      const config = await WhatsAppConfigService.getConfig();
-      if (!WhatsAppConfigService.isReady(config)) {
-        // Distinct from `disabled`: the rules are on and the integration is
-        // not. An admin who pressed the button is owed the difference between
-        // "you turned this off" and "WhatsApp was never set up".
-        summary.skipped = 'not_configured';
-        return summary;
-      }
-
-      // The number that carries the alerts, with the usual fallbacks. No
-      // connected number at all, or nobody to send to, and the pass stops
-      // BEFORE it reads the fleet: raising conditions nobody will hear about
-      // would leave `wa_alert_state` claiming everyone was told.
-      const account = await WhatsAppAccount.getForPurpose('alerts');
-      if (!account) {
-        // Also its own reason. "No number is on duty" is fixed on this screen;
-        // "no connected number can carry alerts" is fixed on the connection
-        // screen, and one message for both sends the admin to the wrong one.
-        summary.skipped = 'no_alert_number';
-        return summary;
-      }
-      if (settings.recipients.length === 0) {
-        summary.skipped = 'no_recipients';
+      // Os canais, decididos ANTES de ler a frota — a regra de sempre: nenhum
+      // canal pronto, e a passagem para aqui, porque abrir condição que ninguém
+      // vai ouvir deixaria `wa_alert_state` dizendo que todos foram avisados.
+      const channels = await this.readyChannels(settings);
+      if (!channels.whatsapp && !channels.email) {
+        summary.skipped = channels.reason;
         return summary;
       }
 
@@ -486,13 +519,7 @@ class WaAlertService {
       }
 
       const { firing, unknown } = await this.evaluate(devices, settings, now);
-      const recipients = await this.dialableRecipients(settings.recipients);
-      if (recipients.length === 0) {
-        summary.skipped = 'no_recipients';
-        return summary;
-      }
-
-      await this.reconcile({ firing, unknown, settings, account, recipients, now, summary });
+      await this.reconcile({ firing, unknown, settings, channels, now, summary });
     } catch (error) {
       // Reported, not thrown — see the method comment.
       summary.error = error.message;
@@ -500,6 +527,49 @@ class WaAlertService {
       console.warn(`WhatsApp alert scan failed: ${error.message}`);
     }
     return summary;
+  }
+
+  /**
+   * Os canais que podem levar um alerta agora, e — quando nenhum pode — o
+   * motivo mais útil para a tela.
+   *
+   * O WhatsApp exige a integração pronta, um número com a finalidade "alertas"
+   * e alguém discável (a lista de não perturbe vale aqui também). O e-mail
+   * exige o SMTP do servidor e algum endereço. Quando só o WhatsApp está em
+   * uso, os motivos são os de sempre (`not_configured`, `no_alert_number`,
+   * `no_recipients`); quando só há e-mails e o servidor não manda e-mail, o
+   * motivo é `mail_not_configured` — o conserto é em outro lugar.
+   */
+  static async readyChannels(settings) {
+    let whatsapp = null;
+    let reason = null;
+    if (settings.recipients.length > 0) {
+      const config = await WhatsAppConfigService.getConfig();
+      if (!WhatsAppConfigService.isReady(config)) {
+        reason = 'not_configured';
+      } else {
+        const account = await WhatsAppAccount.getForPurpose('alerts');
+        if (!account) {
+          reason = 'no_alert_number';
+        } else {
+          const recipients = await this.dialableRecipients(settings.recipients);
+          if (recipients.length > 0) whatsapp = { account, recipients };
+          else reason = 'no_recipients';
+        }
+      }
+    }
+
+    let email = null;
+    if (settings.emailRecipients.length > 0) {
+      if (mailConfigured()) {
+        const tenant = await Tenant.findPublicById(currentTenantId()).catch(() => null);
+        email = { recipients: settings.emailRecipients, tenantName: tenant?.name || null };
+      } else if (!whatsapp) {
+        reason = reason || 'mail_not_configured';
+      }
+    }
+
+    return { whatsapp, email, reason: reason || 'no_recipients' };
   }
 
   /**
@@ -694,7 +764,7 @@ class WaAlertService {
    * notify once; still firing → nothing until the cooldown passes; recovered →
    * one message and the row goes; can't tell → leave it exactly as it was.
    */
-  static async reconcile({ firing, unknown, settings, account, recipients, now, summary }) {
+  static async reconcile({ firing, unknown, settings, channels, now, summary }) {
     const open = await WaAlertState.listOpen();
     const openByKey = new Map(open.map((row) => [conditionKey(row.rule, row.subject), row]));
     const stamp = new Date(now);
@@ -705,7 +775,7 @@ class WaAlertService {
       if (!row) {
         const opened = await WaAlertState.open({ rule: condition.rule, subject: condition.subject, now: stamp });
         summary.fired += 1;
-        const sent = await this.notify({ account, recipients, condition, cleared: false });
+        const sent = await this.notify({ channels, condition, cleared: false });
         if (sent > 0) {
           summary.notified += sent;
             await WaAlertState.markNotified(opened.id, stamp);
@@ -718,7 +788,7 @@ class WaAlertService {
         || now - lastNotified >= rule.cooldownMinutes * 60_000;
       if (!cooledDown) continue;
 
-      const sent = await this.notify({ account, recipients, condition, cleared: false });
+      const sent = await this.notify({ channels, condition, cleared: false });
       if (sent > 0) {
         summary.notified += sent;
         await WaAlertState.markNotified(row.id, stamp);
@@ -733,8 +803,7 @@ class WaAlertService {
       const rule = settings.rules[row.rule];
       if (rule?.enabled && row.notify_count > 0) {
         summary.notified += await this.notify({
-          account,
-          recipients,
+          channels,
           condition: { rule: row.rule, subject: row.subject, vars: { device: row.subject, node: row.subject } },
           cleared: true
         });
@@ -760,18 +829,26 @@ class WaAlertService {
   }
 
   /**
-   * Composes the message and drops one copy per recipient into the outbox.
+   * Manda por cada canal pronto e diz quantas cópias saíram.
    *
-   * Never throws: one recipient whose number the server refuses must not stop
-   * the other five from being told, and must not stop the condition being
-   * recorded as raised.
+   * Nunca lança: um destinatário que falha não pode impedir os outros de serem
+   * avisados, nem impedir a condição de ser registrada. A condição conta como
+   * avisada se QUALQUER canal entregou — o cooldown e a recuperação valem para
+   * os canais juntos, e não um relógio para cada um.
    *
-   * @returns {Promise<number>} how many copies were enqueued
+   * @returns {Promise<number>} how many copies went out, all channels together
    */
-  static async notify({ account, recipients, condition, cleared }) {
+  static async notify({ channels, condition, cleared }) {
     const body = this.compose(condition, cleared);
     if (!body) return 0;
+    let sent = 0;
+    if (channels?.whatsapp) sent += await this.notifyWhatsApp(channels.whatsapp, body);
+    if (channels?.email) sent += await this.notifyEmail(channels.email, body);
+    return sent;
+  }
 
+  /** Uma cópia por número no outbox do WhatsApp. */
+  static async notifyWhatsApp({ account, recipients }, body) {
     let sent = 0;
     for (const number of recipients) {
       try {
@@ -795,6 +872,31 @@ class WaAlertService {
       }
     }
     return sent;
+  }
+
+  /**
+   * Um e-mail por endereço, em sequência, pelo SMTP do servidor.
+   *
+   * O transporte nunca lança — devolve `false` e registra a falha com o
+   * endereço mascarado —, então um endereço que o servidor recusa só não conta.
+   */
+  static async notifyEmail({ recipients, tenantName }, body) {
+    const subject = this.emailSubject(body, tenantName);
+    let sent = 0;
+    for (const to of recipients) {
+      if (await mailTransport().send({ to, subject, text: body })) sent += 1;
+    }
+    return sent;
+  }
+
+  /**
+   * A primeira linha da mensagem, com o nome do provedor na frente: quem
+   * atende vários ISPs precisa saber de qual veio antes de abrir.
+   */
+  static emailSubject(body, tenantName) {
+    const primeira = String(body).split('\n').find((linha) => linha.trim()) || '';
+    const assunto = tenantName ? `[${tenantName}] ${primeira.trim()}` : primeira.trim();
+    return assunto.length > EMAIL_SUBJECT_MAX ? `${assunto.slice(0, EMAIL_SUBJECT_MAX - 1)}…` : assunto;
   }
 
   /**

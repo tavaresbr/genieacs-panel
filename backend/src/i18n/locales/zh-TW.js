@@ -543,6 +543,8 @@ export default {
   'whatsapp.alerts.scanDone': '觸發 {fired} 則警示，解除 {cleared} 則',
   'whatsapp.alerts.scanFailed': '警示掃描失敗',
   'whatsapp.alerts.noRecipients': '未設定接收技術警示的號碼',
+  'whatsapp.alerts.invalidEmail': '"{email}" 不是有效的電子郵件地址',
+  'whatsapp.alerts.mailNotConfigured': '伺服器未設定郵件，因此無法寄送郵件警示',
   'whatsapp.alerts.disabledSkip': '警示功能已關閉，因此未執行檢查',
   'whatsapp.alerts.noAlertNumber': '沒有已接入的號碼被設為警示用途',
   'whatsapp.alerts.noDevices': '無法讀取設備清單，因此未執行檢查',
