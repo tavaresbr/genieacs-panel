@@ -174,7 +174,7 @@ beforeEach(async () => {
   lookups = [];
   tasks = [];
   answered.clear();
-  DeviceService.pppoeReadRequests.clear();
+  DeviceService.parameterReadRequests.clear();
   SgpService.loginProbes.clear();
   await asTenant(() => getDb()('sgp_links').del());
   await asTenant(() => getDb()('app_state').where({ key: DeviceService.PPPOE_PATH_KEY }).del());

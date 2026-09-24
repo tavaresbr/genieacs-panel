@@ -169,7 +169,9 @@ const listDevices = () => call(`${panelUrl}/api/devices`, { headers: authHeaders
 const TR098_OBJECTS = [
   'InternetGatewayDevice.WANDevice',
   'InternetGatewayDevice.LANDevice.1.WLANConfiguration',
-  'InternetGatewayDevice.DeviceInfo.TemperatureStatus'
+  'InternetGatewayDevice.DeviceInfo.TemperatureStatus',
+  // The fixture is a Nokia (alcl) with no optics object in its document yet.
+  'InternetGatewayDevice.X_ALU_OntOpticalParam'
 ];
 
 describe('summoning a device', () => {
