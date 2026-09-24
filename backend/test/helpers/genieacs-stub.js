@@ -100,7 +100,8 @@ export function startGenieAcsStub({ devices = [buildDevice()], taskStatus = 200,
   // `onTask` é chamado a cada tarefa aceita com 200, com a tarefa e o estado:
   // é como um teste faz a ONT "responder" — mudar o documento que o ACS guarda.
   // Tarefa aceita com 202 fica em `GET /tasks`, que é a fila do ACS.
-  const state = { devices, tasks: [], tags: [], deleted: [], taskStatus, respond, requests: [], onTask: null };
+  // `files` é a coleção de arquivos do ACS (firmware), como o NBI a devolve.
+  const state = { devices, tasks: [], tags: [], deleted: [], files: [], taskStatus, respond, requests: [], onTask: null };
 
   const server = http.createServer((req, res) => {
     let raw = '';
@@ -127,6 +128,17 @@ export function startGenieAcsStub({ devices = [buildDevice()], taskStatus = 200,
         state.tasks.push(entry);
         if (state.taskStatus === 200 && state.onTask) state.onTask(entry, state);
         return send(state.taskStatus, task);
+      }
+
+      if (url.pathname === '/files' && req.method === 'GET') {
+        let filter = {};
+        try {
+          filter = JSON.parse(url.searchParams.get('query') || '{}');
+        } catch {
+          filter = {};
+        }
+        const tipo = filter['metadata.fileType'];
+        return send(200, state.files.filter((file) => !tipo || file.metadata?.fileType === tipo));
       }
 
       if (url.pathname === '/tasks' && req.method === 'GET') {

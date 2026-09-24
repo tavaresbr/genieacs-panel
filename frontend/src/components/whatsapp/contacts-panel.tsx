@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
-import { contactsAPI, whatsappAPI, type WhatsAppContact, type WhatsAppContactState, type WhatsAppConversation } from '@/lib/api'
+import { contactsAPI, type ContactImportResult, whatsappAPI, type WhatsAppContact, type WhatsAppContactState, type WhatsAppConversation } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
+import type { TranslationKey } from '@/lib/i18n/dictionary'
 import { useAuth } from '@/contexts/auth-context'
 import { whatsappErrorMessage } from '@/components/whatsapp-connection'
 import { SGP_CONTACTS_HREF } from '@/components/settings/sgp-contacts-sync-panel'
@@ -175,6 +176,31 @@ export function ContactsPanel({ onOpenConversation }: ContactsPanelProps) {
   const canOpenProfile = can('contacts.read')
   const canCreate = can('contacts.edit')
   const [creating, setCreating] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const canExport = can('contacts.export')
+  const canImport = can('contacts.import')
+
+  const exportSheet = async () => {
+    setExporting(true)
+    try {
+      const res = await contactsAPI.exportSheet({ search: debounced, state: stateFilter })
+      if (!res.success || !res.blob) {
+        toast.error(res.message || t('contacts.sheet.exportFailed'))
+        return
+      }
+      const url = URL.createObjectURL(res.blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = res.filename || 'contatos.csv'
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+    } finally {
+      setExporting(false)
+    }
+  }
   const canLookup = can('sgp.read')
   const shown = sgpResult ? sgpResult.contacts : contacts
 
@@ -186,6 +212,18 @@ export function ContactsPanel({ onOpenConversation }: ContactsPanelProps) {
           <p className="section-description">{t('whatsapp.contacts.subtitle')}</p>
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
+          {canExport && (
+            <button type="button" className="modern-button-secondary" disabled={exporting} onClick={() => void exportSheet()}>
+              <Icon name="external" size={16} />
+              {t('contacts.sheet.export')}
+            </button>
+          )}
+          {canImport && (
+            <button type="button" className="modern-button-secondary" onClick={() => setImporting(true)}>
+              <Icon name="copy" size={16} />
+              {t('contacts.sheet.import')}
+            </button>
+          )}
           {canCreate && (
             <button type="button" className="modern-button" onClick={() => setCreating(true)}>
               <Icon name="contacts" size={16} />
@@ -204,6 +242,15 @@ export function ContactsPanel({ onOpenConversation }: ContactsPanelProps) {
         </div>
       </header>
       {creating && <NewContactModal onClose={() => setCreating(false)} />}
+      {importing && (
+        <ImportSheetModal
+          onClose={() => setImporting(false)}
+          onApplied={() => {
+            setImporting(false)
+            void load(debounced, stateFilter)
+          }}
+        />
+      )}
 
       <form
         className="flex flex-col gap-2 sm:flex-row"
@@ -459,6 +506,129 @@ function NewContactModal({ onClose }: { onClose: () => void }) {
           <button type="button" className="modern-button-secondary" onClick={onClose} disabled={saving}>{t('common.cancel')}</button>
           <button type="button" className="modern-button" disabled={saving || !form.name.trim()} onClick={() => void create()}>
             {t('common.save')}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** The record's field names as the preview shows them. */
+const FIELD_LABELS: Record<string, TranslationKey> = {
+  name: 'contacts.profile.name',
+  personType: 'contacts.profile.personType',
+  document: 'contacts.profile.document',
+  birthDate: 'contacts.profile.birthDate',
+  gender: 'contacts.profile.gender',
+  address: 'contacts.profile.address',
+  phones: 'contacts.profile.phones',
+  emails: 'contacts.profile.emails',
+  whatsappPhone: 'contacts.profile.whatsappPhone',
+  notes: 'contacts.profile.notes'
+}
+
+/**
+ * The import, in two steps: the preview says what the sheet would change and
+ * which lines are wrong; nothing is written until Apply.
+ */
+function ImportSheetModal({ onClose, onApplied }: { onClose: () => void; onApplied: () => void }) {
+  const { t } = useTranslation()
+  const toast = useToast()
+  const [csv, setCsv] = useState<string | null>(null)
+  const [fileName, setFileName] = useState('')
+  const [preview, setPreview] = useState<ContactImportResult | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const readFile = async (file: File | undefined) => {
+    setPreview(null)
+    if (!file) return
+    setFileName(file.name)
+    const text = await file.text()
+    setCsv(text)
+    setBusy(true)
+    const res = await contactsAPI.importSheet(text, 'preview')
+    setBusy(false)
+    if (!res.success || !res.data) {
+      toast.error(res.message || t('contacts.sheet.importFailed'))
+      return
+    }
+    setPreview(res.data)
+  }
+
+  const apply = async () => {
+    if (!csv) return
+    setBusy(true)
+    const res = await contactsAPI.importSheet(csv, 'apply')
+    setBusy(false)
+    if (!res.success || !res.data) {
+      toast.error(res.message || t('contacts.sheet.importFailed'))
+      return
+    }
+    toast.success(res.message || t('contacts.sheet.applied'))
+    onApplied()
+  }
+
+  return (
+    <div className="fixed inset-0 z-[2100] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="import-sheet-title">
+      <div className="modern-card max-h-[90vh] w-full max-w-2xl overflow-y-auto p-5 sm:p-6" data-testid="import-sheet">
+        <h2 id="import-sheet-title" className="section-heading mb-1">{t('contacts.sheet.importTitle')}</h2>
+        <p className="section-description mb-5">{t('contacts.sheet.importHint')}</p>
+
+        <label className="field-label" htmlFor="import-sheet-file">{t('contacts.sheet.file')}</label>
+        <input
+          id="import-sheet-file"
+          type="file"
+          accept=".csv,text/csv"
+          className="modern-input"
+          disabled={busy}
+          onChange={(event) => void readFile(event.target.files?.[0])}
+        />
+        {busy && <p className="mt-3 text-sm text-muted-foreground" role="status">{t('contacts.sheet.reading')}</p>}
+
+        {preview && (
+          <div className="mt-5 space-y-4 text-sm">
+            <p className="font-semibold">
+              {t('contacts.sheet.summary', {
+                file: fileName,
+                total: preview.total,
+                updates: preview.updates,
+                creates: preview.creates,
+                unchanged: preview.unchanged,
+                errors: preview.errors.length
+              })}
+            </p>
+            {preview.rows.length > 0 && (
+              <ul className="max-h-48 space-y-1 overflow-y-auto rounded-md border border-border p-3">
+                {preview.rows.map((row) => (
+                  <li key={row.line}>
+                    <span className="font-mono text-xs text-muted-foreground">{t('contacts.sheet.line', { line: row.line })}</span>{' '}
+                    <span className={row.kind === 'create' ? 'modern-badge-info' : 'modern-badge'}>
+                      {t(row.kind === 'create' ? 'contacts.sheet.create' : 'contacts.sheet.update')}
+                    </span>{' '}
+                    {row.name || row.key} <span className="text-muted-foreground">· {row.fields.map((field) => (FIELD_LABELS[field] ? t(FIELD_LABELS[field]) : field)).join(', ')}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {preview.errors.length > 0 && (
+              <ul className="max-h-40 space-y-1 overflow-y-auto rounded-md border border-border p-3 text-[hsl(var(--status-danger))]">
+                {preview.errors.map((error) => (
+                  <li key={error.line}>{t('contacts.sheet.line', { line: error.line })}: {error.message}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
+        <div className="mt-6 flex justify-end gap-2">
+          <button type="button" className="modern-button-secondary" onClick={onClose} disabled={busy}>{t('common.cancel')}</button>
+          <button
+            type="button"
+            className="modern-button"
+            disabled={busy || !preview || preview.updates + preview.creates === 0}
+            onClick={() => void apply()}
+          >
+            {t('contacts.sheet.apply')}
           </button>
         </div>
       </div>

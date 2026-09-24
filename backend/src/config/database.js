@@ -187,4 +187,36 @@ export function isUniqueViolation(error) {
   return code === 'SQLITE_CONSTRAINT_UNIQUE' || code === 'ER_DUP_ENTRY' || code === '23505';
 }
 
+/**
+ * Se um erro é o banco desfazendo uma escrita por deadlock (ou, no SQLite, por
+ * arquivo ocupado) — o tipo de erro em que tentar de novo é a resposta certa.
+ */
+export function isDeadlock(error) {
+  const code = String(error?.code ?? '');
+  return code === 'ER_LOCK_DEADLOCK' || Number(error?.errno) === 1213
+    || code === '40P01' || code === 'SQLITE_BUSY';
+}
+
+/**
+ * Roda `fn` e, se o banco a desfizer por deadlock, roda de novo — até
+ * `attempts` vezes, com uma pausa curta e sorteada entre elas para as duas
+ * escritas não baterem de novo no mesmo instante. Qualquer outro erro sobe na
+ * hora.
+ *
+ * Existe por causa do MySQL: `INSERT … ON DUPLICATE KEY UPDATE` simultâneos
+ * na mesma tabela (a sincronização da frota grava vários vínculos em
+ * paralelo) podem travar um ao outro no InnoDB, e o banco resolve derrubando
+ * um deles. A escrita derrubada não fez nada; repeti-la é seguro.
+ */
+export async function withDeadlockRetry(fn, { attempts = 3, pauseMs = 25 } = {}) {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (attempt >= attempts || !isDeadlock(error)) throw error;
+      await new Promise((resolve) => { setTimeout(resolve, pauseMs * attempt + Math.floor(Math.random() * pauseMs)); });
+    }
+  }
+}
+
 export { isSqlite };

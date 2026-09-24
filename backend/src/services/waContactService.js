@@ -70,6 +70,19 @@ class WaContactService {
   static async list({ search = '', limit = DEFAULT_LIMIT, offset = 0, state = '' } = {}) {
     const size = Math.min(Math.max(Number(limit) || DEFAULT_LIMIT, 1), MAX_LIMIT);
     const skip = Math.max(Number(offset) || 0, 0);
+    const subscribers = await this.collect({ search, state });
+    const page = await this.withEditedNames(subscribers.slice(skip, skip + size));
+    return {
+      total: subscribers.length,
+      contacts: await this.decorate(page)
+    };
+  }
+
+  /**
+   * Every subscriber the list would show for this search and state, in its
+   * order and unpaged — the list pages it, the spreadsheet export takes it all.
+   */
+  static async collect({ search = '', state = '' } = {}) {
     const raw = String(search ?? '').trim();
 
     const linkRows = await this.searchTable('sgp_links', raw);
@@ -88,17 +101,12 @@ class WaContactService {
       .map((row) => this.subscriberFromContact(row));
 
     const wanted = CONTACT_STATES.includes(state) ? state : null;
-    const subscribers = [...withDevice, ...withoutDevice]
+    return [...withDevice, ...withoutDevice]
       .filter((subscriber) => !wanted || subscriber.state === wanted)
       .sort((a, b) => (
       String(a.clientName ?? '').localeCompare(String(b.clientName ?? ''), 'pt-BR')
       || String(a.contract).localeCompare(String(b.contract))
     ));
-    const page = await this.withEditedNames(subscribers.slice(skip, skip + size));
-    return {
-      total: subscribers.length,
-      contacts: await this.decorate(page)
-    };
   }
 
   /**

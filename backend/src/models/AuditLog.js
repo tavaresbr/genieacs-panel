@@ -77,6 +77,10 @@ class AuditLog {
     // mesmo motivo de `tenant.billing_changed`.
     CONTACT_UPDATED: 'contact.updated',
     CONTACT_CREATED: 'contact.created',
+    // A base de contatos saiu numa planilha, ou entrou por uma. O `detail`
+    // guarda quantidades e filtros, nunca uma linha da planilha.
+    CONTACTS_EXPORTED: 'contacts.exported',
+    CONTACTS_IMPORTED: 'contacts.imported',
     // A assinatura mudou de plano ou de estado. Gravada NO provedor, com
     // `actorKind: 'platform'`, pelo mesmo motivo da suspensão: quem vai
     // perguntar "por que meu painel ficou só leitura" é o ISP, e a resposta
@@ -131,7 +135,10 @@ class AuditLog {
     // Ping ou traceroute pedido à ONT. Não muda a configuração dela, e entra
     // mesmo assim: é tráfego saindo da rede do cliente, e o destino — que não
     // é segredo — é justamente o que quem investiga quer ler.
-    DEVICE_DIAGNOSTIC_STARTED: 'device.diagnostic_started'
+    DEVICE_DIAGNOSTIC_STARTED: 'device.diagnostic_started',
+    // Firmware trocado: a ONT grava e reinicia. O detalhe diz o arquivo e as
+    // duas versões — a de antes é a que se procura quando algo parou depois.
+    DEVICE_FIRMWARE_UPGRADE: 'device.firmware_upgrade'
   });
 
   /**

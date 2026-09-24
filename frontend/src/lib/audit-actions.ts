@@ -40,6 +40,8 @@ export const AUDIT_ACTION_LABEL_KEYS: Record<string, TranslationKey> = {
   'customer_data.erased': 'audit.action.customerDataErased',
   'contact.updated': 'audit.action.contactUpdated',
   'contact.created': 'audit.action.contactCreated',
+  'contacts.exported': 'audit.action.contactsExported',
+  'contacts.imported': 'audit.action.contactsImported',
   'subscription.changed': 'audit.action.subscriptionChanged',
   'tenant.renamed': 'audit.action.tenantRenamed',
   'tenant.slug_changed': 'audit.action.tenantSlugChanged',
@@ -56,6 +58,7 @@ export const AUDIT_ACTION_LABEL_KEYS: Record<string, TranslationKey> = {
   'device.credentials_changed': 'audit.action.deviceCredentialsChanged',
   'device.factory_reset': 'audit.action.deviceFactoryReset',
   'device.diagnostic_started': 'audit.action.deviceDiagnosticStarted',
+  'device.firmware_upgrade': 'audit.action.deviceFirmwareUpgrade',
   'subscriber_account.retired': 'audit.action.subscriberAccountRetired',
   'whatsapp.config_tested': 'audit.action.whatsappConfigTested'
 }

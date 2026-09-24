@@ -14,6 +14,7 @@ import { serialMatches } from '@/lib/device-actions'
 import { DeviceHistoryCard } from '@/components/device-history-card'
 import { DeviceSwapsCard } from '@/components/device-swaps-card'
 import { DeviceDiagnosticsCard } from '@/components/device-diagnostics-card'
+import { DeviceFirmwareCard } from '@/components/device-firmware-card'
 import { useAuth } from '@/contexts/auth-context'
 import { CustomerLgpd } from '@/components/customer-lgpd'
 import { WifiStatusFilterControl } from '@/components/wifi-status-filter'
@@ -1895,6 +1896,10 @@ export default function DeviceDetailPage() {
                             value={invoiceFilter}
                             onChange={setInvoiceFilter}
                             ariaLabel={t('detail.sgp.invoiceFilterAria')}
+                            // Quatro botões não cabem na largura de um celular:
+                            // quebram em duas linhas em vez de rolar de lado e
+                            // esconder "Todos".
+                            className="flex-wrap"
                             options={[
                               { value: 'open', label: t('detail.sgp.invoiceFilterOpen', { count: invoiceCounts.open }) },
                               { value: 'cancelled', label: t('detail.sgp.invoiceFilterCancelled', { count: invoiceCounts.cancelled }) },
@@ -2011,6 +2016,8 @@ export default function DeviceDetailPage() {
             <DeviceSwapsCard deviceId={deviceId} />
 
             {canWriteDevice && <DeviceDiagnosticsCard deviceId={deviceId} />}
+
+            {canMaintainDevice && <DeviceFirmwareCard deviceId={deviceId} />}
 
             <DeviceHistoryCard deviceId={deviceId} />
 

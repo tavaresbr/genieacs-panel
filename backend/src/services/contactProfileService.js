@@ -102,6 +102,20 @@ function sgpValue(field, client, row) {
   }
 }
 
+/** What the record shows for one field: the operator's edit, or the SGP's value. */
+export function shownValue(field, client, row) {
+  const edit = client?.overrides?.[field];
+  return edit ? edit.value : sgpValue(field, client, row);
+}
+
+/**
+ * One edited field, checked and put in the shape the record keeps — the same
+ * check a PATCH goes through, for the spreadsheet import.
+ */
+export function checkField(field, value) {
+  return cleanField(field, value);
+}
+
 function isSgpId(clientId) {
   return Boolean(clientId) && !/^(panel|doc):/.test(String(clientId));
 }

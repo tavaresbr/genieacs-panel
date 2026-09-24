@@ -27,9 +27,9 @@ import assert from 'node:assert/strict';
  *
  * ## O que este arquivo NÃO afirma
  *
- * São **40 rotas**, não as 91. A amostra foi escolhida para que cada uma das
- * 31 capacidades apareça pelo menos uma vez, e a garantia de não-regressão que
- * o teste do `admin` dá vale **sobre estas 35** — não sobre o painel inteiro.
+ * São **46 rotas**, não as 91. A amostra foi escolhida para que cada uma das
+ * 33 capacidades apareça pelo menos uma vez, e a garantia de não-regressão que
+ * o teste do `admin` dá vale **sobre estas 46** — não sobre o painel inteiro.
  * Quem quiser a afirmação forte ("nenhuma das 91 rotas mudou de dono") precisa
  * de outra prova; a varredura estática de `permissions.test.js` é o que existe
  * hoje mais perto disso, e ela olha o nome da capacidade, não o alcance.
@@ -100,6 +100,8 @@ const QUEM_TEM = {
   'tenant.export': ['owner', 'admin'],
   'customers.dossier': ['owner', 'admin'],
   'customers.erase': ['owner', 'admin'],
+  'contacts.export': ['owner', 'admin'],
+  'contacts.import': ['owner', 'admin'],
   'database.manage': ['owner', 'admin']
 };
 
@@ -201,6 +203,21 @@ const CASOS = [
     method: 'POST',
     path: () => '/api/devices/diagnostics/result',
     body: { deviceId: DEVICE_ID, kind: 'ping' },
+    aceito: [200]
+  },
+  {
+    cap: 'devices.maintain',
+    label: 'GET /api/devices/firmware',
+    method: 'GET',
+    path: () => `/api/devices/firmware?deviceId=${DEVICE_ID}`,
+    aceito: [200]
+  },
+  {
+    cap: 'devices.maintain',
+    label: 'POST /api/devices/firmware/upgrade',
+    method: 'POST',
+    path: () => '/api/devices/firmware/upgrade',
+    body: { deviceId: DEVICE_ID, fileId: 'f670l-v9.bin' },
     aceito: [200]
   },
   {
@@ -346,6 +363,24 @@ const CASOS = [
 
   // ── O que só quem administra alcança ──────────────────────────────────
   {
+    cap: 'contacts.export',
+    label: 'GET /api/contacts/export',
+    method: 'GET',
+    path: () => '/api/contacts/export',
+    aceito: [200]
+  },
+  {
+    // Uma planilha sem linhas: quem passa pela guarda chega à leitura e ouve
+    // 400 `empty`, que é o que separa "não pode" de "não mandou nada".
+    cap: 'contacts.import',
+    label: 'POST /api/contacts/import',
+    method: 'POST',
+    path: () => '/api/contacts/import?mode=preview',
+    body: {},
+    aceito: [400],
+    codigoAceito: 'empty'
+  },
+  {
     cap: 'catalogue.write',
     label: 'PUT /api/vendor-management/:id',
     method: 'PUT',
@@ -393,6 +428,22 @@ const CASOS = [
     label: 'GET /api/settings',
     method: 'GET',
     path: () => '/api/settings',
+    aceito: [200]
+  },
+  {
+    cap: 'settings.read',
+    label: 'GET /api/settings/onboarding',
+    method: 'GET',
+    path: () => '/api/settings/onboarding',
+    aceito: [200]
+  },
+  {
+    // Repetível: marcar de novo só regrava o carimbo.
+    cap: 'settings.write',
+    label: 'POST /api/settings/onboarding/dismiss',
+    method: 'POST',
+    path: () => '/api/settings/onboarding/dismiss',
+    body: { what: 'checklist' },
     aceito: [200]
   },
   {
@@ -497,6 +548,12 @@ before(async () => {
   // 500 provaria alcance mas não distinguiria "passou pela guarda" de "quebrou
   // antes dela" tão bem quanto um 200 distingue.
   genie = await startGenieAcsStub({ devices: [buildDevice({ id: DEVICE_ID })] });
+  // Um firmware do modelo do aparelho do stub, para a troca passar da guarda
+  // e chegar ao ACS — sem ele a rota daria 400 e não distinguiria as duas coisas.
+  genie.state.files = [{
+    _id: 'f670l-v9.bin',
+    metadata: { fileType: '1 Firmware Upgrade Image', oui: '', productClass: 'F670L', version: 'V9.9' }
+  }];
 
   const db = getDb();
   tenantId = (await db('tenants').orderBy('id', 'asc').first()).id;
@@ -623,7 +680,7 @@ describe('a matriz e a expectativa deste arquivo', () => {
     }
   });
 
-  it('cobre as 31 capacidades', () => {
+  it('cobre as 33 capacidades', () => {
     // Uma capacidade fora da amostra é uma rota sem prova de alcance nenhuma.
     const deFora = PERMISSIONS.filter((cap) => !QUEM_TEM[cap]);
     assert.deepEqual(deFora, [], `capacidades sem caso: ${deFora.join(', ')}`);
@@ -633,25 +690,25 @@ describe('a matriz e a expectativa deste arquivo', () => {
 
   it('tem par de recusa para toda capacidade que algum papel não tem', () => {
     /**
-     * A afirmação central do arquivo, conferida sobre a própria amostra: 28 das
-     * 31 capacidades têm alguém do lado de fora, e cada uma delas precisa de
+     * A afirmação central do arquivo, conferida sobre a própria amostra: 30 das
+     * 33 capacidades têm alguém do lado de fora, e cada uma delas precisa de
      * pelo menos uma rota onde essa recusa é exercitada. As 3 restantes são as
      * do `viewer`, que TODO papel tem — para elas não existe par de recusa a
      * escrever, e dizer o número aqui é o que impede que uma capacidade caia
      * silenciosamente para dentro do `viewer` sem ninguém notar.
      */
     const comRecusa = PERMISSIONS.filter((cap) => QUEM_TEM[cap].length < ROLES.length);
-    assert.equal(comRecusa.length, 28);
+    assert.equal(comRecusa.length, 30);
     for (const cap of comRecusa) {
       assert.ok(CASOS.some((caso) => caso.cap === cap), `${cap} sem rota para recusar`);
     }
   });
 
   it('não encolhe sem que alguém diga', () => {
-    // O cabeçalho promete uma amostra de 40 rotas e a promessa de não-regressão
+    // O cabeçalho promete uma amostra de 46 rotas e a promessa de não-regressão
     // do `admin` vale sobre ELA. Uma rota apagada por um merge desajeitado
     // deixaria a promessa valendo sobre menos coisa, calada.
-    assert.equal(CASOS.length, 40);
+    assert.equal(CASOS.length, 46);
   });
 });
 
@@ -678,7 +735,7 @@ describe('quem não tem a capacidade toma 403', () => {
 
 /**
  * O par que dá sentido ao de cima, e a garantia de não-regressão do `admin`:
- * ele aparece aqui em TODAS as 40 rotas, porque a matriz lhe dá as 31
+ * ele aparece aqui em TODAS as 46 rotas, porque a matriz lhe dá as 33
  * capacidades. Nenhuma das rotas desta amostra saiu do alcance dele na onda 17.
  */
 describe('quem tem a capacidade passa pela guarda', () => {
@@ -718,9 +775,9 @@ describe('o alcance do viewer, sobre a amostra', () => {
 
   it('não alcança nada que mexa em aparelho, em gente ou em configuração', () => {
     // A amostra inteira menos as três acima, numa afirmação só: o que o
-    // `viewer` NÃO alcança é 28 das 31 capacidades.
+    // `viewer` NÃO alcança é 30 das 33 capacidades.
     const fechadas = PERMISSIONS.filter((cap) => !QUEM_TEM[cap].includes('viewer'));
-    assert.equal(fechadas.length, 28, fechadas.join(', '));
+    assert.equal(fechadas.length, 30, fechadas.join(', '));
   });
 });
 

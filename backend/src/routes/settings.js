@@ -30,6 +30,12 @@ router.get('/genieacs-suggestion', authenticateToken, requirePermission('setting
 router.get('/genieacs-auth', authenticateToken, requirePermission('settings.read'), SettingsController.getGenieAcsAuth);
 router.put('/genieacs-auth', authenticateToken, requirePermission('settings.write'), SettingsController.updateGenieAcsAuth);
 
+// Os primeiros passos do provedor novo. Também ANTES de `/:key`, pela mesma
+// razão das rotas acima. Ler é `settings.read`: o checklist só aparece a quem
+// administra; marcar "já vi" é `settings.write`, como gravar qualquer ajuste.
+router.get('/onboarding', authenticateToken, requirePermission('settings.read'), SettingsController.getOnboardingStatus);
+router.post('/onboarding/dismiss', authenticateToken, requirePermission('settings.write'), SettingsController.dismissOnboarding);
+
 router.get('/:key', authenticateToken, requirePermission('settings.read'), SettingsController.getSettingByKey);
 
 router.post('/', authenticateToken, requirePermission('settings.write'), SettingsController.createSetting);

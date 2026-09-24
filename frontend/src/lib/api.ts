@@ -12,6 +12,34 @@ export interface SubscriptionBlockedDetail {
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || ''
 
+export interface DeviceFirmwareFile {
+  /** O id do arquivo no GenieACS — em geral o nome com que foi subido. */
+  id: string
+  version: string | null
+  oui: string | null
+  productClass: string | null
+  size: number | null
+  uploadedAt: string | null
+  /** É a versão que a ONT já roda. */
+  installed: boolean
+}
+
+export interface DeviceFirmwareList {
+  deviceId: string
+  current: string | null
+  productClass: string | null
+  files: DeviceFirmwareFile[]
+  /** Firmwares no GenieACS que ficaram de fora por serem de outro modelo, ou não dizerem o modelo. */
+  otherModels: number
+}
+
+export interface DeviceFirmwareUpgrade {
+  deviceId: string
+  file: DeviceFirmwareFile
+  from: string | null
+  queued: boolean
+}
+
 export type DeviceDiagnosticKind = 'ping' | 'traceroute'
 
 export interface DeviceDiagnosticStart {
@@ -379,6 +407,15 @@ class ApiClient {
     } catch {
       return { success: false, message: translate(getActiveLocale(), 'api.requestFailed') }
     }
+  }
+
+  /** A body that is not JSON — a CSV sheet, sent as the text it is. */
+  async postText<T>(endpoint: string, text: string, contentType = 'text/csv'): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, {
+      method: 'POST',
+      body: text,
+      headers: { 'Content-Type': contentType }
+    })
   }
 
   async requestWithBody<T>(
@@ -1567,6 +1604,13 @@ export const devicesAPI = {
   readDiagnostic: (deviceId: string, kind: DeviceDiagnosticKind) =>
     apiClient.post<DeviceDiagnosticResult>('/devices/diagnostics/result', { deviceId, kind }),
 
+  // Os firmwares do GenieACS que servem para o modelo desta ONT.
+  listFirmware: (deviceId: string) =>
+    apiClient.get<DeviceFirmwareList>(`/devices/firmware?${new URLSearchParams({ deviceId }).toString()}`),
+
+  upgradeFirmware: (deviceId: string, fileId: string) =>
+    apiClient.post<DeviceFirmwareUpgrade>('/devices/firmware/upgrade', { deviceId, fileId }),
+
   summonDevice: (deviceId: string, parameters?: string[]) =>
     apiClient.post('/devices/summon', { deviceId, parameters }),
 
@@ -1636,6 +1680,23 @@ export const settingsAPI = {
    */
   genieAcsSuggestion: () =>
     apiClient.get<GenieAcsSuggestion>('/settings/genieacs-suggestion'),
+
+  /** Os primeiros passos do provedor: o checklist e se o assistente já foi visto. */
+  onboardingStatus: () =>
+    apiClient.get<OnboardingStatus>('/settings/onboarding'),
+
+  /** Marca, no provedor, que o assistente foi concluído/pulado ou o checklist ocultado. */
+  dismissOnboarding: (what: 'wizard' | 'checklist') =>
+    apiClient.post('/settings/onboarding/dismiss', { what }),
+}
+
+export type OnboardingItemKey = 'genieacs' | 'firstDevice' | 'provisioning' | 'sgp' | 'whatsapp' | 'team'
+
+/** Conferido no que o provedor TEM, não numa marca clicada. */
+export interface OnboardingStatus {
+  wizardDone: boolean
+  checklistDismissed: boolean
+  items: Array<{ key: OnboardingItemKey; done: boolean }>
 }
 
 /** O que a rota de sugestão devolve. Nunca um endereço que o painel recusaria ao salvar. */
@@ -1948,6 +2009,18 @@ export type ContactProfilePatch = Partial<{
   whatsappPhone: string | null
 }>
 
+/** What a spreadsheet import did — or, in a preview, would do. */
+export interface ContactImportResult {
+  total: number
+  updates: number
+  creates: number
+  unchanged: number
+  errors: { line: number; message: string }[]
+  rows: { line: number; kind: 'update' | 'create'; key: string | null; name: string | null; fields: string[] }[]
+  updated?: number
+  created?: number
+}
+
 export const contactsAPI = {
   get: (key: string) =>
     apiClient.get<ContactProfile>(`/contacts/${encodeURIComponent(key)}`),
@@ -1957,6 +2030,19 @@ export const contactsAPI = {
 
   create: (data: ContactProfilePatch & { name: string }) =>
     apiClient.post<ContactProfile>('/contacts', data),
+
+  /** The contacts as a CSV, with the list's search and state filter. */
+  exportSheet: (filters: { search?: string; state?: string } = {}) => {
+    const query = new URLSearchParams()
+    if (filters.search) query.set('search', filters.search)
+    if (filters.state) query.set('state', filters.state)
+    const suffix = query.toString()
+    return apiClient.getBlob(`/contacts/export${suffix ? `?${suffix}` : ''}`)
+  },
+
+  /** `preview` says what the sheet would change; `apply` changes it. */
+  importSheet: (csv: string, mode: 'preview' | 'apply') =>
+    apiClient.postText<ContactImportResult>(`/contacts/import?mode=${mode}`, csv),
 
   /** Open invoices of each contract, asked of the SGP now. */
   invoices: (key: string) =>
