@@ -683,4 +683,11 @@ export default {
   'customers.eraseNotLogged': 'لم يُسجَّل الحذف في سجل التدقيق، لذلك لم يُنفَّذ',
   'customers.eraseFailed': 'تعذّر حذف بيانات المشترك',
   'customers.erased': 'تم حذف بيانات المشترك',
+  'contacts.loaded': 'تم تحميل بيانات العميل',
+  'contacts.loadFailed': 'تعذر تحميل بيانات العميل',
+  'contacts.updated': 'تم تحديث بيانات العميل',
+  'contacts.created': 'تم إنشاء العميل',
+  'contacts.saveFailed': 'تعذر حفظ بيانات العميل',
+  'contacts.error.notFound': 'العميل غير موجود',
+  'contacts.error.invalidField': 'قيمة غير صالحة في الحقل {field}',
 };

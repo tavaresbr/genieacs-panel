@@ -692,4 +692,11 @@ export default {
   'customers.eraseNotLogged': 'Удаление не записано в журнал, поэтому не выполнено',
   'customers.eraseFailed': 'Не удалось удалить данные абонента',
   'customers.erased': 'Данные абонента удалены',
+  'contacts.loaded': 'Карточка загружена',
+  'contacts.loadFailed': 'Не удалось загрузить карточку',
+  'contacts.updated': 'Карточка обновлена',
+  'contacts.created': 'Клиент создан',
+  'contacts.saveFailed': 'Не удалось сохранить карточку',
+  'contacts.error.notFound': 'Клиент не найден',
+  'contacts.error.invalidField': 'Недопустимое значение в поле {field}',
 };

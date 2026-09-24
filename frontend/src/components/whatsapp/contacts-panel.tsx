@@ -1,8 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router'
-import { whatsappAPI, type WhatsAppContact, type WhatsAppContactState, type WhatsAppConversation } from '@/lib/api'
+import { Link, useNavigate } from 'react-router'
+import { contactsAPI, whatsappAPI, type WhatsAppContact, type WhatsAppContactState, type WhatsAppConversation } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
@@ -172,6 +172,9 @@ export function ContactsPanel({ onOpenConversation }: ContactsPanelProps) {
   }
 
   const canSend = can('whatsapp.send')
+  const canOpenProfile = can('contacts.read')
+  const canCreate = can('contacts.edit')
+  const [creating, setCreating] = useState(false)
   const canLookup = can('sgp.read')
   const shown = sgpResult ? sgpResult.contacts : contacts
 
@@ -182,16 +185,25 @@ export function ContactsPanel({ onOpenConversation }: ContactsPanelProps) {
           <h2 className="section-heading">{t('whatsapp.contacts.title')}</h2>
           <p className="section-description">{t('whatsapp.contacts.subtitle')}</p>
         </div>
-        <button
-          type="button"
-          className="modern-button-secondary shrink-0"
-          onClick={() => void load(debounced, stateFilter)}
-          disabled={loading}
-        >
-          <Icon name="refresh" size={16} className={loading ? 'animate-spin' : ''} />
-          {t('common.refresh')}
-        </button>
+        <div className="flex shrink-0 flex-wrap gap-2">
+          {canCreate && (
+            <button type="button" className="modern-button" onClick={() => setCreating(true)}>
+              <Icon name="contacts" size={16} />
+              {t('contacts.profile.new')}
+            </button>
+          )}
+          <button
+            type="button"
+            className="modern-button-secondary"
+            onClick={() => void load(debounced, stateFilter)}
+            disabled={loading}
+          >
+            <Icon name="refresh" size={16} className={loading ? 'animate-spin' : ''} />
+            {t('common.refresh')}
+          </button>
+        </div>
       </header>
+      {creating && <NewContactModal onClose={() => setCreating(false)} />}
 
       <form
         className="flex flex-col gap-2 sm:flex-row"
@@ -298,7 +310,16 @@ export function ContactsPanel({ onOpenConversation }: ContactsPanelProps) {
                 {shown.map((contact) => (
                   <tr key={contact.key} data-contract={contact.contract ?? ''}>
                     <td>
-                      <span className="block font-semibold">{contact.clientName || '—'}</span>
+                      {canOpenProfile ? (
+                        <Link
+                          to={`/contacts/${encodeURIComponent(contact.key)}`}
+                          className="block font-semibold hover:text-primary hover:underline"
+                        >
+                          {contact.clientName || '—'}
+                        </Link>
+                      ) : (
+                        <span className="block font-semibold">{contact.clientName || '—'}</span>
+                      )}
                       <span className="flex flex-wrap items-center gap-1.5">
                         {contact.document && (
                           <span className="text-xs text-muted-foreground">{contact.document}</span>
@@ -385,5 +406,62 @@ export function ContactsPanel({ onOpenConversation }: ContactsPanelProps) {
         </div>
       )}
     </section>
+  )
+}
+
+/** A client with no SGP behind it: the name is enough, the rest goes in the record after. */
+function NewContactModal({ onClose }: { onClose: () => void }) {
+  const { t } = useTranslation()
+  const toast = useToast()
+  const navigate = useNavigate()
+  const [form, setForm] = useState({ name: '', document: '', whatsappPhone: '' })
+  const [saving, setSaving] = useState(false)
+
+  const create = async () => {
+    setSaving(true)
+    const res = await contactsAPI.create({
+      name: form.name.trim(),
+      ...(form.document.trim() ? { document: form.document.trim() } : {}),
+      ...(form.whatsappPhone.trim() ? { whatsappPhone: form.whatsappPhone.trim() } : {})
+    })
+    setSaving(false)
+    if (!res.success || !res.data) {
+      toast.error(res.message || t('contacts.profile.saveFailed'))
+      return
+    }
+    toast.success(t('contacts.profile.created'))
+    navigate(`/contacts/${encodeURIComponent(res.data.key)}`)
+  }
+
+  return (
+    <div className="fixed inset-0 z-[2100] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="new-contact-title">
+      <div className="modern-card w-full max-w-md p-5 sm:p-6">
+        <h2 id="new-contact-title" className="section-heading mb-1">{t('contacts.profile.new')}</h2>
+        <p className="section-description mb-5">{t('contacts.profile.newHint')}</p>
+        <div className="grid gap-4">
+          {([
+            ['name', 'contacts.profile.name'],
+            ['document', 'contacts.profile.document'],
+            ['whatsappPhone', 'contacts.profile.whatsappPhone']
+          ] as const).map(([field, labelKey]) => (
+            <div key={field}>
+              <label className="field-label" htmlFor={`new-contact-${field}`}>{t(labelKey)}</label>
+              <input
+                id={`new-contact-${field}`}
+                className="modern-input"
+                value={form[field]}
+                onChange={(event) => setForm((current) => ({ ...current, [field]: event.target.value }))}
+              />
+            </div>
+          ))}
+        </div>
+        <div className="mt-6 flex justify-end gap-2">
+          <button type="button" className="modern-button-secondary" onClick={onClose} disabled={saving}>{t('common.cancel')}</button>
+          <button type="button" className="modern-button" disabled={saving || !form.name.trim()} onClick={() => void create()}>
+            {t('common.save')}
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }

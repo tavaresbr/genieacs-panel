@@ -49,6 +49,8 @@ export const PERMISSIONS = [
   'whatsapp.config',
   'campaigns.read',
   'campaigns.manage',
+  'contacts.read',
+  'contacts.edit',
   'settings.read',
   'settings.write',
   'operators.read',
@@ -82,7 +84,9 @@ const TECH: Permission[] = [
   'provisioning.run',
   'whatsapp.read',
   'whatsapp.send',
-  'campaigns.read'
+  'campaigns.read',
+  'contacts.read',
+  'contacts.edit'
 ]
 
 /** Administra a operação do provedor. */

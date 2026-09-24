@@ -344,6 +344,41 @@ const PPPOE_PASSWORD_NAMES = Object.freeze([
   'pppoe_password', 'passwordPppoe', 'clave'
 ]);
 
+/**
+ * An address as the SGP sends it — an object with its parts under names that
+ * vary by version, or one line of text — as the parts the client record shows.
+ * `null` when there is nothing to show.
+ */
+function normalizeAddress(value) {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    const line = asText(value);
+    return line ? { line } : null;
+  }
+  const parts = {
+    street: asText(pick(value, ['logradouro', 'rua', 'endereco', 'street'])),
+    number: asText(pick(value, ['numero', 'num', 'number'])),
+    complement: asText(pick(value, ['complemento', 'complement'])),
+    district: asText(pick(value, ['bairro', 'district'])),
+    city: asText(pick(value, ['cidade', 'municipio', 'city'])),
+    state: asText(pick(value, ['uf', 'estado', 'state'])),
+    zip: asText(pick(value, ['cep', 'zip', 'zipcode'])),
+    reference: asText(pick(value, ['pontoReferencia', 'ponto_referencia', 'referencia']))
+  };
+  return Object.values(parts).some(Boolean)
+    ? Object.fromEntries(Object.entries(parts).filter(([, part]) => part))
+    : null;
+}
+
+/** One line of an address, for a contract row and for the listing. */
+function addressLine(address) {
+  if (!address) return null;
+  if (address.line) return address.line;
+  const street = [address.street, address.number].filter(Boolean).join(', ');
+  const place = [address.district, [address.city, address.state].filter(Boolean).join('/')].filter(Boolean).join(' - ');
+  return [street, address.complement, place, address.zip].filter(Boolean).join(' · ') || null;
+}
+
 function normalizeContract(entry, { includeSecrets = false } = {}) {
   const contract = asText(pick(entry, ['contrato', 'contratoId', 'idContrato', 'contract']));
   if (!contract) return null;
@@ -362,7 +397,10 @@ function normalizeContract(entry, { includeSecrets = false } = {}) {
     // the contract's, and a wrong client id opens someone else's page in SGP.
     clientId: asText(pick(entry, ['clienteId', 'idCliente', 'cliente_id', 'codigoCliente'])),
     document: asText(pick(entry, ['cpfcnpj', 'cpfCnpj', 'documento'])),
-    address: asText(pick(entry, ['endereco', 'enderecoCompleto', 'contratoEndereco'])),
+    address: addressLine(normalizeAddress(pick(entry, ['endereco', 'enderecoCompleto', 'contratoEndereco']))),
+    dueDay: asText(pick(entry, ['vencimento', 'diaVencimento', 'dia_vencimento', 'vencimentoDia'])),
+    statusReason: asText(pick(entry, ['motivo_status', 'motivoStatus', 'motivoSituacao'])),
+    createdAt: asText(pick(entry, ['dataCadastro', 'data_cadastro', 'dataAtivacao', 'dataInicio'])),
     login: asText(pick(entry, ['login', 'usuario', 'pppoe', 'loginPppoe'])),
     // Normalized to sendable digits here rather than at send time, so a cadastre
     // that stores "(93) 98111-0449" and one that stores "5593981110449" reach
@@ -421,6 +459,85 @@ function phoneFrom(entry) {
 }
 
 const CLIENT_ID_NAMES = Object.freeze(['clienteId', 'idCliente', 'cliente_id', 'codigoCliente', 'id']);
+
+const EMAIL_LIST_NAMES = Object.freeze(['emails', 'email', 'e_mails', 'mails']);
+
+/** Every e-mail a client record carries, in a field of its own or in a contacts list. */
+function emailsFrom(entry) {
+  const found = [];
+  const add = (value) => {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      add(pick(value, ['email', 'contato', 'valor', 'endereco']));
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach(add);
+      return;
+    }
+    const text = asText(value);
+    if (text && /^[^\s@]+@[^\s@]+$/.test(text)) found.push(text.toLowerCase());
+  };
+  add(pick(entry, EMAIL_LIST_NAMES));
+  const contacts = pick(entry, ['contatos']);
+  if (Array.isArray(contacts)) contacts.forEach(add);
+  else if (contacts && typeof contacts === 'object') add(pick(contacts, EMAIL_LIST_NAMES));
+  return [...new Set(found)].slice(0, 20);
+}
+
+/** Every phone a client record carries — `phoneFrom` picks one of these. */
+function phonesFrom(entry) {
+  const numbers = [];
+  for (const name of PHONE_NAMES) {
+    const phone = normalizarTelefoneBr(pick(entry, [name]));
+    if (phone) numbers.push(phone);
+  }
+  for (const name of PHONE_LIST_NAMES) {
+    for (const item of phoneCandidates(pick(entry, [name]))) {
+      const phone = normalizarTelefoneBr(
+        item && typeof item === 'object'
+          ? pick(item, ['numero', 'contato', 'telefone', 'celular', 'fone', 'valor', 'number'])
+          : item
+      );
+      if (phone) numbers.push(phone);
+    }
+  }
+  return [...new Set(numbers)].slice(0, 20);
+}
+
+const PERSON_TYPES = Object.freeze({ f: 'PF', pf: 'PF', fisica: 'PF', j: 'PJ', pj: 'PJ', juridica: 'PJ' });
+
+/**
+ * The client behind one listing entry, as the record `sgp_clients` keeps: who
+ * the person is, where they live and every way to reach them. `null` for an
+ * entry that names no client — a contract row with no client id and no
+ * document says nothing about who holds it.
+ */
+function clientProfile(entry) {
+  if (!entry || typeof entry !== 'object') return null;
+  // A contract row's own `id` is the contract's: only a field that says it is
+  // the client's names the client there.
+  const nested = pick(entry, ['contratos', 'contracts']);
+  const isContractRow = !Array.isArray(nested) && Boolean(normalizeContract(entry));
+  const clientId = asText(pick(entry, isContractRow
+    ? CLIENT_ID_NAMES.filter((name) => name !== 'id')
+    : CLIENT_ID_NAMES));
+  const documentDigits = String(asText(pick(entry, ['cpfcnpj', 'cpfCnpj', 'documento', 'cpf', 'cnpj'])) ?? '')
+    .replace(/\D/g, '') || null;
+  if (!clientId && !documentDigits) return null;
+  const type = stripAccents(asText(pick(entry, ['tipo', 'tipoPessoa', 'tipo_pessoa', 'personType'])) ?? '');
+  return {
+    clientId,
+    document: documentDigits,
+    name: asText(pick(entry, ['nome', 'razaoSocial', 'nomeCliente', 'cliente'])),
+    personType: PERSON_TYPES[type] || (type ? type.toUpperCase().slice(0, 16) : null),
+    gender: asText(pick(entry, ['sexo', 'genero', 'gender'])),
+    birthDate: asText(pick(entry, ['dataNascimento', 'data_nascimento', 'nascimento', 'dataFundacao'])),
+    registeredAt: isContractRow ? null : asText(pick(entry, ['dataCadastro', 'data_cadastro', 'clienteDesde'])),
+    address: normalizeAddress(pick(entry, ['endereco', 'enderecoCompleto', 'enderecoCobranca'])),
+    phones: phonesFrom(entry),
+    emails: emailsFrom(entry)
+  };
+}
 
 /**
  * One entry of the client listing, as the rows `sgp_contacts` stores.
@@ -1447,7 +1564,8 @@ class SgpService {
       // For the test button: which fields the install actually sends, so an
       // operator can see at once whether the path is the right one.
       fields: entries[0] && typeof entries[0] === 'object' ? Object.keys(entries[0]).slice(0, 40) : [],
-      shape: listingShape(entries)
+      shape: listingShape(entries),
+      clients: entries.map((entry) => clientProfile(entry)).filter(Boolean)
     };
   }
 
@@ -1487,7 +1605,8 @@ class SgpService {
         status: contract.status ? String(contract.status).slice(0, 64) : null,
         status_label: null,
         state: 'none',
-        phone_e164: contract.phone || null
+        phone_e164: contract.phone || null,
+        client_ref: contract.clientId ? String(contract.clientId).slice(0, 64) : null
       };
     }
     // No `sgp_client_id` on a contract row: one client can hold several
@@ -1501,7 +1620,14 @@ class SgpService {
       status: contract.status ? String(contract.status).slice(0, 64) : null,
       status_label: contract.statusLabel ? String(contract.statusLabel).slice(0, 128) : null,
       state: deriveContractState(contract),
-      phone_e164: contract.phone || null
+      phone_e164: contract.phone || null,
+      client_ref: contract.clientId ? String(contract.clientId).slice(0, 64) : null,
+      plan: contract.plan ? String(contract.plan).slice(0, 255) : null,
+      due_day: contract.dueDay ? String(contract.dueDay).slice(0, 32) : null,
+      status_reason: contract.statusReason ? String(contract.statusReason).slice(0, 255) : null,
+      login: contract.login ? String(contract.login).slice(0, 128) : null,
+      address: contract.address ? String(contract.address).slice(0, 2000) : null,
+      contract_created_at: contract.createdAt ? String(contract.createdAt).slice(0, 32) : null
     };
   }
 

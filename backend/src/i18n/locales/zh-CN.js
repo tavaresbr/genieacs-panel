@@ -691,4 +691,11 @@ export default {
   'customers.eraseNotLogged': '删除未记入审计轨迹，因此未执行',
   'customers.eraseFailed': '删除用户数据失败',
   'customers.erased': '用户数据已删除',
+  'contacts.loaded': '已加载客户资料',
+  'contacts.loadFailed': '无法加载客户资料',
+  'contacts.updated': '客户资料已更新',
+  'contacts.created': '客户已创建',
+  'contacts.saveFailed': '无法保存客户资料',
+  'contacts.error.notFound': '未找到客户',
+  'contacts.error.invalidField': '字段 {field} 的值无效',
 };

@@ -692,4 +692,11 @@ export default {
   'customers.eraseNotLogged': 'Die Löschung wurde nicht protokolliert und daher nicht ausgeführt',
   'customers.eraseFailed': 'Teilnehmerdaten konnten nicht gelöscht werden',
   'customers.erased': 'Teilnehmerdaten gelöscht',
+  'contacts.loaded': 'Kundendaten geladen',
+  'contacts.loadFailed': 'Kundendaten konnten nicht geladen werden',
+  'contacts.updated': 'Kundendaten aktualisiert',
+  'contacts.created': 'Kunde angelegt',
+  'contacts.saveFailed': 'Kundendaten konnten nicht gespeichert werden',
+  'contacts.error.notFound': 'Kunde nicht gefunden',
+  'contacts.error.invalidField': 'Ungültiger Wert im Feld {field}',
 };

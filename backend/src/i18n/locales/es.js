@@ -688,4 +688,11 @@ export default {
   'customers.eraseNotLogged': 'El borrado no se registró en el historial, por lo que no se realizó',
   'customers.eraseFailed': 'No se pudieron borrar los datos del suscriptor',
   'customers.erased': 'Datos del suscriptor borrados',
+  'contacts.loaded': 'Ficha cargada',
+  'contacts.loadFailed': 'No se pudo cargar la ficha',
+  'contacts.updated': 'Ficha actualizada',
+  'contacts.created': 'Cliente creado',
+  'contacts.saveFailed': 'No se pudo guardar la ficha',
+  'contacts.error.notFound': 'Cliente no encontrado',
+  'contacts.error.invalidField': 'Valor no válido en el campo {field}',
 };

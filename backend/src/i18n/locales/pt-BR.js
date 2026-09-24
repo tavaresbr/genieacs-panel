@@ -690,4 +690,11 @@ export default {
   'customers.eraseNotLogged': 'A exclusão não foi registrada na trilha, então não foi feita',
   'customers.eraseFailed': 'Falha ao apagar os dados do assinante',
   'customers.erased': 'Dados do assinante apagados',
+  'contacts.loaded': 'Cadastro carregado',
+  'contacts.loadFailed': 'Não foi possível carregar o cadastro',
+  'contacts.updated': 'Cadastro atualizado',
+  'contacts.created': 'Cliente criado',
+  'contacts.saveFailed': 'Não foi possível salvar o cadastro',
+  'contacts.error.notFound': 'Cliente não encontrado',
+  'contacts.error.invalidField': 'Valor inválido no campo {field}',
 };

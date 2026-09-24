@@ -691,4 +691,11 @@ export default {
   'customers.eraseNotLogged': 'मिटाना ऑडिट ट्रेल में दर्ज नहीं हुआ, इसलिए किया नहीं गया',
   'customers.eraseFailed': 'ग्राहक डेटा मिटाने में विफल',
   'customers.erased': 'ग्राहक डेटा मिटा दिया गया',
+  'contacts.loaded': 'ग्राहक विवरण लोड हुआ',
+  'contacts.loadFailed': 'ग्राहक विवरण लोड नहीं हो सका',
+  'contacts.updated': 'ग्राहक विवरण अपडेट हुआ',
+  'contacts.created': 'ग्राहक बनाया गया',
+  'contacts.saveFailed': 'ग्राहक विवरण सहेजा नहीं जा सका',
+  'contacts.error.notFound': 'ग्राहक नहीं मिला',
+  'contacts.error.invalidField': '{field} फ़ील्ड में अमान्य मान',
 };
