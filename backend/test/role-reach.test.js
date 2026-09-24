@@ -209,7 +209,13 @@ const CASOS = [
     label: 'POST /api/devices/factory-reset',
     method: 'POST',
     path: () => '/api/devices/factory-reset',
-    body: { deviceId: DEVICE_ID, confirmSerial: 'ZTEG12345678' },
+    // A senha de QUEM pede, duas vezes: o reset também exige a do operador.
+    body: (papel) => ({
+      deviceId: DEVICE_ID,
+      confirmSerial: 'ZTEG12345678',
+      password: `senha-do-${papel}-1`,
+      passwordConfirm: `senha-do-${papel}-1`
+    }),
     aceito: [200]
   },
   {
@@ -458,7 +464,7 @@ function pedir(papel, caso) {
   return call(`${panelUrl}${caso.path()}`, {
     method: caso.method,
     headers: authHeaders(tokens[papel]),
-    body: caso.body
+    body: typeof caso.body === 'function' ? caso.body(papel) : caso.body
   });
 }
 
