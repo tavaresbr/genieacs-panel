@@ -702,4 +702,10 @@ export default {
   'contacts.saveFailed': 'Kundendaten konnten nicht gespeichert werden',
   'contacts.error.notFound': 'Kunde nicht gefunden',
   'contacts.error.invalidField': 'Ungültiger Wert im Feld {field}',
+  'settings.platformManaged': 'Diese Einstellung wird vom Plattformadministrator verwaltet',
+  'settings.validation.auditRetentionAboveCap': 'Ihr Tarif bewahrt das Audit-Protokoll höchstens {max} Tage auf',
+  'whatsapp.error.platformServerMissing': 'Die Plattform hat ihren WhatsApp-Server noch nicht eingerichtet. Wenden Sie sich an den Plattformadministrator',
+  'whatsapp.error.retentionAboveCap': 'Ihr Tarif bewahrt den WhatsApp-Verlauf höchstens {max} Tage auf',
+  'catalogue.noDefault': 'Dieses Profil ist nicht im Standardkatalog der Plattform',
+  'catalogue.resetDone': 'Profil auf den Plattformstandard zurückgesetzt',
 };

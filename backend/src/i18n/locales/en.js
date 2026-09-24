@@ -701,4 +701,10 @@ export default {
   'contacts.saveFailed': 'Could not save the client record',
   'contacts.error.notFound': 'Client not found',
   'contacts.error.invalidField': 'Invalid value in field {field}',
+  'settings.platformManaged': 'This setting is managed by the platform administrator',
+  'settings.validation.auditRetentionAboveCap': 'Your plan keeps the audit trail for at most {max} days',
+  'whatsapp.error.platformServerMissing': 'The platform has not configured its WhatsApp server yet. Contact the platform administrator',
+  'whatsapp.error.retentionAboveCap': 'Your plan keeps WhatsApp history for at most {max} days',
+  'catalogue.noDefault': "This profile is not in the platform's default catalogue",
+  'catalogue.resetDone': 'Profile restored to the platform default',
 };

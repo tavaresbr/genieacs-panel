@@ -701,4 +701,10 @@ export default {
   'contacts.saveFailed': '顧客情報を保存できませんでした',
   'contacts.error.notFound': '顧客が見つかりません',
   'contacts.error.invalidField': '{field} の値が正しくありません',
+  'settings.platformManaged': 'この設定はプラットフォーム管理者が管理しています',
+  'settings.validation.auditRetentionAboveCap': 'ご利用のプランでは監査ログを最大 {max} 日間保持します',
+  'whatsapp.error.platformServerMissing': 'プラットフォームはまだ WhatsApp サーバーを設定していません。プラットフォーム管理者に連絡してください',
+  'whatsapp.error.retentionAboveCap': 'ご利用のプランでは WhatsApp の履歴を最大 {max} 日間保持します',
+  'catalogue.noDefault': 'このプロファイルはプラットフォームの標準カタログにありません',
+  'catalogue.resetDone': 'プロファイルをプラットフォームの標準に戻しました',
 };

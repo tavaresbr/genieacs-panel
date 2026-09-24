@@ -697,4 +697,10 @@ export default {
   'contacts.saveFailed': 'Impossible d’enregistrer la fiche',
   'contacts.error.notFound': 'Client introuvable',
   'contacts.error.invalidField': 'Valeur invalide dans le champ {field}',
+  'settings.platformManaged': "Ce paramètre est géré par l'administrateur de la plateforme",
+  'settings.validation.auditRetentionAboveCap': "Votre forfait conserve le journal d'audit au maximum {max} jours",
+  'whatsapp.error.platformServerMissing': "La plateforme n'a pas encore configuré son serveur WhatsApp. Contactez l'administrateur de la plateforme",
+  'whatsapp.error.retentionAboveCap': "Votre forfait conserve l'historique WhatsApp au maximum {max} jours",
+  'catalogue.noDefault': 'Ce profil ne figure pas dans le catalogue par défaut de la plateforme',
+  'catalogue.resetDone': 'Profil rétabli selon la valeur par défaut de la plateforme',
 };

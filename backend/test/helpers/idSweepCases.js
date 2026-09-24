@@ -233,6 +233,28 @@ export const casos = [
     tabela: 'wifi_security_config'
   },
   {
+    // Restaurar o padrão escreve na linha — com o id do vizinho seria
+    // sobrescrever o perfil de outro ISP. No controle, sem caixa de plataforma,
+    // a linha é achada e a resposta é "não há padrão" (`no_default`), que é o
+    // que prova que o 404 do vizinho veio de não achar a linha.
+    chave: 'vendor',
+    label: 'POST /api/vendor-management/:id/reset',
+    method: 'POST',
+    path: (id) => `/api/vendor-management/${id}/reset`,
+    tabela: 'vendors',
+    controleSoNaoAchou: true,
+    codigoDeNaoAchou: 'not_found'
+  },
+  {
+    chave: 'wifiConfig',
+    label: 'POST /api/vendor-management/wifi-security-configs/:id/reset',
+    method: 'POST',
+    path: (id) => `/api/vendor-management/wifi-security-configs/${id}/reset`,
+    tabela: 'wifi_security_config',
+    controleSoNaoAchou: true,
+    codigoDeNaoAchou: 'not_found'
+  },
+  {
     chave: 'wifiConfig',
     label: 'DELETE /api/vendor-management/wifi-security-configs/:id',
     method: 'DELETE',

@@ -1,6 +1,7 @@
 import express from 'express';
 import { timingSafeEqual } from 'node:crypto';
 import PlatformController from '../controllers/platformController.js';
+import PlatformGenieAcsController from '../controllers/platformGenieAcsController.js';
 import { authenticateToken, requirePlatformAdmin } from '../middleware/auth.js';
 import { platformExportLimiter } from '../middleware/rateLimit.js';
 
@@ -73,6 +74,13 @@ router.post('/tenants/:id/impersonate', authenticateToken, requirePlatformAdmin,
 // toda tabela escopada de um provedor, e é a leitura mais cara do painel.
 router.get('/tenants/:id/export', authenticateToken, requirePlatformAdmin, platformExportLimiter, PlatformController.exportTenant);
 
+// O GenieACS de cada provedor. Na SaaS é a plataforma quem hospeda o ACS, então
+// é daqui — e não da tela de Configuração do provedor — que se diz para onde o
+// painel dele fala. Ver `config/platformManaged.js`.
+router.get('/tenants/:id/genieacs', authenticateToken, requirePlatformAdmin, PlatformGenieAcsController.get);
+router.put('/tenants/:id/genieacs', authenticateToken, requirePlatformAdmin, PlatformGenieAcsController.update);
+router.post('/tenants/:id/genieacs/test', authenticateToken, requirePlatformAdmin, PlatformGenieAcsController.test);
+
 router.get('/metrics', allowMetricsScraper, PlatformController.metrics);
 
 // Os fatos do deploy: edição, dialeto do banco, endereços, e o que está ou não
@@ -82,10 +90,13 @@ router.get('/metrics', allowMetricsScraper, PlatformController.metrics);
 router.get('/deployment', authenticateToken, requirePlatformAdmin, PlatformController.deployment);
 
 // De onde o próximo provedor herda o catálogo de equipamentos, e quem hoje não
-// tem nenhum. Só leitura: editar o catálogo padrão é editar o da CAIXA da
+// tem nenhum. A leitura é só leitura: editar o catálogo padrão é editar o da CAIXA da
 // plataforma, nas telas de Configuração que já existem — a mesma decisão que a
 // Parte 1 tomou para o WhatsApp, e pelo mesmo motivo.
 router.get('/catalogue', authenticateToken, requirePlatformAdmin, PlatformController.catalogue);
+// Reenvia o catálogo da caixa aos provedores: insere o que falta e, só quando
+// pedido, sobrescreve o que tem o mesmo nome. Nunca apaga.
+router.post('/catalogue/propagate', authenticateToken, requirePlatformAdmin, PlatformController.propagateCatalogue);
 
 // A trilha do plano de controle. Só leitura, como a do provedor e pelo mesmo
 // motivo: se desse para apagar uma linha, a primeira coisa a fazer depois de

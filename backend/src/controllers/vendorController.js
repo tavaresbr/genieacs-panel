@@ -1,6 +1,22 @@
 import Vendor from '../models/Vendor.js';
 import WifiSecurityConfig from '../models/WifiSecurityConfig.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
+import { getDb } from '../config/database.js';
+import { currentTenantId } from '../config/tenantContext.js';
+import { catalogueSource, sourceCatalogueRow } from '../config/seed.js';
+
+/**
+ * A versão do catálogo PADRÃO de uma linha deste provedor, ou `null`.
+ *
+ * Padrão aqui é o da caixa da plataforma e só dela: quando a fonte é outro
+ * provedor (deploy sem caixa, ou self-hosted), "restaurar padrão" copiaria o
+ * ajuste de um cliente para outro, e não existe padrão a restaurar.
+ */
+async function defaultRowFor(table, identity) {
+  const fonte = await catalogueSource(getDb());
+  if (fonte.kind !== 'platform' || fonte.id === Number(currentTenantId())) return null;
+  return sourceCatalogueRow(getDb(), { sourceId: fonte.id, table, identity });
+}
 
 class VendorController {
   static async getAllVendors(req, res) {
@@ -312,6 +328,36 @@ class VendorController {
       return res.status(500).json(
         createErrorResponse(req.t('wifiConfig.deleteFailed'), error.message)
       );
+    }
+  }
+
+  /** `POST /api/vendor-management/:id/reset` — o perfil volta a ser o do catálogo padrão. */
+  static async resetVendor(req, res) {
+    try {
+      const vendor = await Vendor.findById(req.params.id);
+      if (!vendor) return res.status(404).json(createErrorResponse(req.t('vendor.notFound'), null, 'not_found'));
+      const padrao = await defaultRowFor('vendors', vendor.name);
+      if (!padrao) return res.status(404).json(createErrorResponse(req.t('catalogue.noDefault'), null, 'no_default'));
+      await Vendor.resetTo(vendor.id, padrao);
+      return res.json(createResponse(req.t('catalogue.resetDone'), await Vendor.findById(vendor.id)));
+    } catch (error) {
+      console.error('Reset vendor error:', error);
+      return res.status(500).json(createErrorResponse(req.t('vendor.updateFailed'), error.message));
+    }
+  }
+
+  /** `POST /api/vendor-management/wifi-security-configs/:id/reset` — idem, para o mapeamento WiFi. */
+  static async resetWifiSecurityConfig(req, res) {
+    try {
+      const config = await WifiSecurityConfig.getById(req.params.id);
+      if (!config) return res.status(404).json(createErrorResponse(req.t('wifiConfig.notFound'), null, 'not_found'));
+      const padrao = await defaultRowFor('wifi_security_config', config.product_class);
+      if (!padrao) return res.status(404).json(createErrorResponse(req.t('catalogue.noDefault'), null, 'no_default'));
+      await WifiSecurityConfig.resetTo(config.id, padrao);
+      return res.json(createResponse(req.t('catalogue.resetDone'), await WifiSecurityConfig.getById(config.id)));
+    } catch (error) {
+      console.error('Reset WiFi security config error:', error);
+      return res.status(500).json(createErrorResponse(req.t('wifiConfig.updateFailed'), error.message));
     }
   }
 }

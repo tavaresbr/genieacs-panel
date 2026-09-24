@@ -5,6 +5,7 @@ import BillingCharge from '../models/BillingCharge.js';
 import { getDb, tdb, isUniqueViolation } from '../config/database.js';
 import { TenantCache } from '../config/tenantCache.js';
 import { currentTenantId, runInTenant } from '../config/tenantContext.js';
+import { IS_SAAS } from '../config/edition.js';
 
 /**
  * O ciclo de vida da assinatura, e o que cada estado deixa fazer.
@@ -295,7 +296,8 @@ class SubscriptionService {
       plan: plan ? {
         code: plan.code,
         name: plan.name,
-        limits: this.limitsOf(plan)
+        limits: this.limitsOf(plan),
+        retention: this.retentionCapsOf(plan)
       } : null,
       trialEndsAt: subscription.trial_ends_at ?? null,
       renewsAt: subscription.renews_at ?? null,
@@ -310,6 +312,52 @@ class SubscriptionService {
       subscribers: asLimit(plan?.max_subscribers),
       devices: asLimit(plan?.max_devices)
     };
+  }
+
+  /**
+   * Os tetos de retenção do plano, em dias; `null` é sem teto.
+   *
+   * `audit` é a trilha de auditoria, `messages` e `media` são o histórico e os
+   * anexos do WhatsApp. Separados dos `limits` porque não são contagem de uso
+   * — ninguém "passa" de um teto de retenção, o que passa é apagado.
+   */
+  static retentionCapsOf(plan) {
+    const asCap = (value) => {
+      const n = Number(value);
+      return value === null || value === undefined || !Number.isInteger(n) || n < 1 ? null : n;
+    };
+    return {
+      audit: asCap(plan?.max_audit_retention_days),
+      messages: asCap(plan?.max_message_retention_days),
+      media: asCap(plan?.max_media_retention_days)
+    };
+  }
+
+  /** Os tetos do provedor em escopo. Na self-hosted não há plano, e não há teto. */
+  static async retentionCaps() {
+    if (!IS_SAAS) return this.retentionCapsOf(null);
+    const { plan } = await this.current();
+    return this.retentionCapsOf(plan);
+  }
+
+  /**
+   * Os dias que valem, dado o que o provedor escolheu e o teto do plano.
+   *
+   * Sem teto, é o que o provedor escolheu — inclusive zero, "para sempre". Com
+   * teto, o menor dos dois, e "para sempre" vira o teto: guardar para sempre
+   * é justamente o que o teto existe para impedir.
+   */
+  static capRetention(days, cap) {
+    const escolhido = Math.trunc(Number(days));
+    if (cap === null || cap === undefined) return Number.isFinite(escolhido) && escolhido > 0 ? escolhido : 0;
+    if (!Number.isFinite(escolhido) || escolhido <= 0) return cap;
+    return Math.min(escolhido, cap);
+  }
+
+  /** `capRetention` para o provedor em escopo; `kind` é `audit`, `messages` ou `media`. */
+  static async effectiveRetention(kind, days) {
+    const caps = await this.retentionCaps();
+    return this.capRetention(days, caps[kind] ?? null);
   }
 
   // ── Limites ──────────────────────────────────────────────────────────
@@ -389,6 +437,7 @@ class SubscriptionService {
       subscription: this.present(state),
       usage: { operators, subscribers, devices },
       limits,
+      retention: IS_SAAS ? this.retentionCapsOf(state.plan) : this.retentionCapsOf(null),
       over: {
         operators: over(operators, limits.operators),
         subscribers: over(subscribers, limits.subscribers),

@@ -19,7 +19,7 @@ import { forgetResolvedTenant } from '../middleware/tenantResolver.js';
 import AuditLog from '../models/AuditLog.js';
 import { runInTenant } from '../config/tenantContext.js';
 import { getDb } from '../config/database.js';
-import { catalogueSizes, catalogueSource, seedDefaults } from '../config/seed.js';
+import { catalogueSizes, catalogueSource, propagateCatalogue, seedDefaults } from '../config/seed.js';
 import Vendor from '../models/Vendor.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { slugProblem } from '../utils/slug.js';
@@ -314,6 +314,55 @@ class PlatformController {
       return res.status(500).json(
         createErrorResponse('Failed to read the default catalogue', error.message)
       );
+    }
+  }
+
+  /**
+   * `POST /api/platform/catalogue/propagate` — `{ tenantIds?, overwrite? }`.
+   *
+   * Leva aos provedores o que a caixa da plataforma tem no catálogo e eles
+   * não. Sem `overwrite`, o que o provedor já tem fica como ele deixou; com
+   * ele, os perfis de mesmo nome recebem a versão padrão. Nada é apagado. Ver
+   * `propagateCatalogue` em `config/seed.js`.
+   *
+   * Só da CAIXA: sem ela a "fonte" é o catálogo de um cliente, e empurrar o
+   * ajuste de um ISP para os outros não é padrão nenhum.
+   */
+  static async propagateCatalogue(req, res) {
+    try {
+      const db = getDb();
+      const fonte = await catalogueSource(db);
+      if (fonte.kind !== 'platform') {
+        return res.status(409).json(createErrorResponse(
+          'The default catalogue is not the platform box yet; create it and fill its catalogue first'
+        ));
+      }
+      const corpo = req.body ?? {};
+      let tenantIds = null;
+      if (corpo.tenantIds !== undefined && corpo.tenantIds !== null) {
+        if (!Array.isArray(corpo.tenantIds) || corpo.tenantIds.some((id) => !Number.isInteger(Number(id)))) {
+          return res.status(400).json(createErrorResponse('tenantIds must be a list of provider ids'));
+        }
+        const pedidos = corpo.tenantIds.map(Number);
+        const provedores = new Set((await Tenant.providers()).map((t) => Number(t.id)));
+        tenantIds = pedidos.filter((id) => provedores.has(id));
+      }
+      const overwrite = corpo.overwrite === true;
+      const results = await propagateCatalogue(db, { sourceId: fonte.id, tenantIds, overwrite });
+
+      await PlatformAudit.fromRequest(req, {
+        action: PlatformAudit.ACTIONS.CATALOGUE_PROPAGATED,
+        detail: {
+          overwrite,
+          providers: results.length,
+          added: results.reduce((n, r) => n + r.added, 0),
+          updated: results.reduce((n, r) => n + r.updated, 0)
+        }
+      });
+      return res.json(createResponse('Catalogue propagated', { overwrite, results }));
+    } catch (error) {
+      console.error('Platform catalogue propagate error:', error);
+      return res.status(500).json(createErrorResponse('Failed to propagate the catalogue', error.message));
     }
   }
 

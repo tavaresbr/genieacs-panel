@@ -141,6 +141,9 @@ const POR_ID = new Map([
   // um vazamento, então a prova é mais forte que "404 para id desconhecido":
   // `platform-tenant-export.test.js` exige que o arquivo de um provedor traga
   // as linhas DELE e nenhuma do vizinho.
+  ['GET /api/platform/tenants/:id/genieacs', 'plano de controle; prova em platform-managed-settings.test.js'],
+  ['PUT /api/platform/tenants/:id/genieacs', 'plano de controle; prova em platform-managed-settings.test.js — inclusive a de que gravar no alfa não toca o beta'],
+  ['POST /api/platform/tenants/:id/genieacs/test', 'plano de controle; prova em platform-managed-settings.test.js'],
   ['GET /api/platform/tenants/:id/export', 'plano de controle; prova em platform-tenant-export.test.js — inclusive a de que o arquivo de um não traz linha do outro']
 ]);
 
@@ -287,7 +290,13 @@ describe('toda rota endereçada por um parâmetro', () => {
   // único caso em que devolver a linha do outro seria o trabalho e não o
   // vazamento. As 43 de agora: aparelho (20), chave natural (7), anexo por
   // token (2) e o console (14). `TETO_FORA_DO_CONSOLE` não se move.
-  const TETO_DE_EXCECOES = 43;
+  //
+  // E as três do GenieACS de um provedor configurado do console
+  // (`/tenants/:id/genieacs`), que pagam o mesmo pedágio: na SaaS é a
+  // plataforma quem diz para onde o painel de cada provedor fala, e olhar o
+  // provedor pelo id é o trabalho. A prova de que gravar no alfa não toca o
+  // beta está em platform-managed-settings.test.js. São 46.
+  const TETO_DE_EXCECOES = 46;
 
   /**
    * As exceções que são do plano de controle, nomeadas uma a uma.
@@ -315,7 +324,10 @@ describe('toda rota endereçada por um parâmetro', () => {
     'PUT /api/platform/tenants/:id/subscription',
     'POST /api/platform/tenants/:id/payments',
     'GET /api/platform/tenants/:id/usage',
-    'GET /api/platform/tenants/:id/export'
+    'GET /api/platform/tenants/:id/export',
+    'GET /api/platform/tenants/:id/genieacs',
+    'PUT /api/platform/tenants/:id/genieacs',
+    'POST /api/platform/tenants/:id/genieacs/test'
   ]);
 
   // Este é o número que guarda o que a varredura existe para guardar, e ELE só

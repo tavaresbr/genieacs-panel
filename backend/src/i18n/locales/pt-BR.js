@@ -700,4 +700,10 @@ export default {
   'contacts.saveFailed': 'Não foi possível salvar o cadastro',
   'contacts.error.notFound': 'Cliente não encontrado',
   'contacts.error.invalidField': 'Valor inválido no campo {field}',
+  'settings.platformManaged': 'Esta configuração é gerenciada pelo administrador da plataforma',
+  'settings.validation.auditRetentionAboveCap': 'O seu plano guarda a trilha de auditoria por no máximo {max} dias',
+  'whatsapp.error.platformServerMissing': 'A plataforma ainda não configurou o servidor de WhatsApp. Fale com o administrador da plataforma',
+  'whatsapp.error.retentionAboveCap': 'O seu plano guarda o histórico do WhatsApp por no máximo {max} dias',
+  'catalogue.noDefault': 'Este perfil não existe no catálogo padrão da plataforma',
+  'catalogue.resetDone': 'Perfil restaurado para o padrão da plataforma',
 };

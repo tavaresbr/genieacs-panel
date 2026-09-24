@@ -30,7 +30,7 @@ export default function Onboarding() {
   const { t } = useTranslation()
   const toast = useToast()
   const navigate = useNavigate()
-  const { tenant, name: currentName, refresh } = useTenant()
+  const { tenant, name: currentName, refresh, platformManaged } = useTenant()
   const [step, setStep] = useState<Step>('identity')
   const [busy, setBusy] = useState(false)
 
@@ -189,7 +189,22 @@ export default function Onboarding() {
             </>
           )}
 
-          {step === 'acs' && (
+          {/* Na SaaS quem aponta o painel para o ACS é a plataforma, pelo
+              console: o passo vira aviso, e segue adiante sem gravar nada. */}
+          {step === 'acs' && platformManaged && (
+            <>
+              <div className="flex items-start gap-2 rounded-md border border-border bg-muted/40 p-4">
+                <Icon name="lock" size={16} className="mt-0.5 shrink-0" />
+                <p className="text-sm leading-6">{t('onboarding.acs.platformManaged')}</p>
+              </div>
+              <div className="flex gap-2">
+                <button type="button" className="modern-button-secondary" disabled={busy} onClick={() => setStep('identity')}>{t('common.back')}</button>
+                <button type="button" className="modern-button" onClick={() => setStep('team')}>{t('common.next')}</button>
+              </div>
+            </>
+          )}
+
+          {step === 'acs' && !platformManaged && (
             <>
               <div>
                 <label htmlFor="ob-acs" className="field-label">{t('settings.general.genieAcsUrl')}</label>

@@ -44,6 +44,9 @@ export function PlatformBoxCard({ box }: { box: PlatformBoxData | null }) {
   }
 
   const endereco = platformBoxUrl({ slug: box.slug, panelBaseDomain: base, path: '/whatsapp' })
+  // O servidor Evolution de TODOS os provedores mora na configuração da caixa:
+  // é lá, e só lá, que endereço, chave e webhook são editados na SaaS.
+  const servidor = platformBoxUrl({ slug: box.slug, panelBaseDomain: base, path: '/settings?tab=whatsapp' })
 
   return (
     <section className="modern-card mb-6 p-5 sm:p-6">
@@ -61,10 +64,17 @@ export function PlatformBoxCard({ box }: { box: PlatformBoxData | null }) {
             {t('platform.box.open')}
           </a>
         ) : null}
+        {servidor ? (
+          <a href={servidor} target="_blank" rel="noopener noreferrer" className="modern-button-secondary">
+            <Icon name="settings" size={17} />
+            {t('platform.box.whatsappServer')}
+          </a>
+        ) : null}
       </div>
       <p className="field-hint mt-4">
         {endereco ? t('platform.box.hint') : t('platform.box.hintSingleHost')}
       </p>
+      <p className="field-hint mt-1">{t('platform.box.whatsappServerHint')}</p>
     </section>
   )
 }

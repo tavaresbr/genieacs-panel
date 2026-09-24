@@ -21,6 +21,8 @@ import {
   type SgpSyncSummary,
   type WhatsAppConfig,
   type WhatsAppConfigTest,
+  type RetentionCaps,
+  subscriptionAPI,
   tenantAPI,
 } from '@/lib/api'
 import { useToast } from '@/components/ui/toast'
@@ -36,7 +38,7 @@ import {
 } from '@/components/settings/sgp-contacts-sync-panel'
 import { WhatsAppConnection, whatsappErrorMessage } from '@/components/whatsapp-connection'
 import { TEST_TONE_CLASS, testNotes, testOutcome } from '@/lib/whatsapp-test'
-import { auditRetentionError } from '@/lib/settings-validation'
+import { auditRetentionError, waRetentionAboveCap } from '@/lib/settings-validation'
 import { useAuth } from '@/contexts/auth-context'
 import { useTenant } from '@/contexts/tenant-context'
 import { useTranslation } from '@/contexts/language-context'
@@ -128,7 +130,7 @@ function scrollToSection(id: string, attempts = 20) {
 export default function Settings() {
   const { t, formatDateTime } = useTranslation()
   const { user: currentUser, can, refreshUser } = useAuth()
-  const { name: tenantName, isSaas, tenant, refresh: refreshTenant } = useTenant()
+  const { name: tenantName, isSaas, platformManaged, tenant, refresh: refreshTenant } = useTenant()
   // Lidos aqui em cima, antes de qualquer handler que os feche: um `const`
   // do componente lido dentro de um callback ANTES da linha que o declara é
   // uma ReferenceError se o callback rodar durante a renderização, e a regra
@@ -241,6 +243,18 @@ export default function Settings() {
   // seis falhou.
   const [waTestResult, setWaTestResult] = useState<WhatsAppConfigTest | null>(null)
   const [waTestError, setWaTestError] = useState<string | null>(null)
+  // Os tetos de retenção do plano, na SaaS. Nulo enquanto não chegou, e na
+  // self-hosted, onde não há plano: aí a tela se comporta como sempre.
+  const [retentionCaps, setRetentionCaps] = useState<RetentionCaps | null>(null)
+
+  useEffect(() => {
+    if (!isSaas) return
+    let cancelled = false
+    void subscriptionAPI.current().then((res) => {
+      if (!cancelled && res.success && res.data?.retention) setRetentionCaps(res.data.retention)
+    })
+    return () => { cancelled = true }
+  }, [isSaas])
 
   // The context may resolve after the first render; keep the field in step.
   // Arriving from a link to a section (`#sgp-contacts-sync`): scroll to it once
@@ -974,7 +988,7 @@ export default function Settings() {
     // O servidor recusa `basic` sem usuário com 400, e com razão: o header
     // sairia com usuário vazio e o ACS o recusaria sem dizer por quê. Barrar
     // aqui evita a ida perdida e diz qual campo falta, que a resposta não diz.
-    if (genieAuthForm.authType === 'basic' && !genieAuthForm.username.trim()) {
+    if (!platformManaged && genieAuthForm.authType === 'basic' && !genieAuthForm.username.trim()) {
       toast.error(t('settings.genieAuth.usernameRequired'))
       return
     }
@@ -982,7 +996,7 @@ export default function Settings() {
     // percorre as chaves e para na primeira recusa com uma mensagem genérica,
     // sem dizer qual campo. Enquanto todo campo vinha de um seletor isso nunca
     // apareceu.
-    const prazoRuim = auditRetentionError(settings.auditRetentionDays)
+    const prazoRuim = auditRetentionError(settings.auditRetentionDays, retentionCaps?.audit ?? null)
     if (prazoRuim) {
       toast.error(t(prazoRuim))
       return
@@ -1002,7 +1016,11 @@ export default function Settings() {
         }
         await refreshTenant()
       }
-      const entries = Object.entries(settings).filter(([key]) => key !== 'appName').sort(([left], [right]) => {
+      // Na SaaS a URL do ACS é gravada pelo console; mandá-la daqui seria uma
+      // recusa (403) a cada salvar, por um campo que a tela nem deixa editar.
+      const entries = Object.entries(settings)
+        .filter(([key]) => key !== 'appName' && !(platformManaged && key === 'genieAcsUrl'))
+        .sort(([left], [right]) => {
         if (left === 'autoGenerateCustomerId') return 1
         if (right === 'autoGenerateCustomerId') return -1
         return 0
@@ -1022,7 +1040,7 @@ export default function Settings() {
         }
       }
 
-      if (ok) {
+      if (ok && !platformManaged) {
         // A URL acabou de ser gravada, então é ela que o servidor vai comparar
         // com o endereço testado daqui em diante — o aviso de teste anônimo
         // some sozinho depois de salvar, que é o desfecho que ele pedia.
@@ -1267,6 +1285,24 @@ export default function Settings() {
     }
   }
 
+  /**
+   * Volta um perfil ao que está no catálogo padrão da plataforma. Só na SaaS,
+   * onde a cópia do provedor nasceu da caixa: na self-hosted não há padrão.
+   */
+  const resetCatalogueRow = async (kind: 'vendor' | 'wifi', id: number, name: string) => {
+    if (!confirm(t('settings.catalogue.resetConfirm', { name }))) return
+    const res = kind === 'vendor'
+      ? await vendorsAPI.reset(id)
+      : await vendorsAPI.resetWifiSecurityConfig(id)
+    if (res.success) {
+      toast.success(res.message || t('settings.catalogue.resetDone'))
+      if (kind === 'vendor') await fetchVendors()
+      else await fetchWifiConfigs()
+    } else {
+      toast.error(res.message || t('settings.operationFailed'))
+    }
+  }
+
   return (
     <div className="page-shell">
       <div className="page-frame">
@@ -1403,6 +1439,38 @@ export default function Settings() {
                   <LanguageSwitcher className="w-full sm:w-72" />
                   <p className="field-hint">{t('settings.general.languageHint')}</p>
                 </div>
+                {platformManaged ? (
+                  /* Na SaaS quem aponta este painel para o ACS é a plataforma,
+                     pelo console. O provedor vê para onde aponta e se responde
+                     — que é o que ele precisa saber quando as ONTs somem —,
+                     e o teste usa o endereço gravado, não um digitado. */
+                  <div className="rounded-md border border-border bg-muted/40 p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="field-label">{t('settings.general.genieAcsUrl')}</p>
+                        <p className="break-all font-mono text-sm text-foreground">
+                          {settings.genieAcsUrl || t('settings.platformManaged.notConfigured')}
+                        </p>
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          {t('settings.genieAuth.title')}: {t(GENIE_AUTH_TYPE_LABELS[genieAuthConfig?.authType ?? 'none'])}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleTestConnection}
+                        disabled={loading || !settings.genieAcsUrl}
+                        className="modern-button"
+                      >
+                        {loading ? t('settings.general.testing') : t('settings.general.testConnection')}
+                      </button>
+                    </div>
+                    <p className="field-hint mt-3 flex items-center gap-2">
+                      <Icon name="lock" size={14} />
+                      {t('settings.platformManaged.genieAcs')}
+                    </p>
+                  </div>
+                ) : (
+                <>
                 <div>
                   <label htmlFor="genieacs-url" className="field-label">{t('settings.general.genieAcsUrl')}</label>
                   <div className="flex flex-col gap-2 sm:flex-row">
@@ -1535,6 +1603,8 @@ export default function Settings() {
                     )}
                   </div>
                 </div>
+                </>
+                )}
               </div>
 
               {/* O prazo da trilha.
@@ -1558,7 +1628,7 @@ export default function Settings() {
                     id="audit-retention"
                     type="number"
                     min={30}
-                    max={3650}
+                    max={retentionCaps?.audit ?? 3650}
                     step={1}
                     className="modern-input w-full"
                     value={settings.auditRetentionDays}
@@ -1568,6 +1638,9 @@ export default function Settings() {
                     }))}
                   />
                   <p className="field-hint">{t('settings.audit.retentionHint')}</p>
+                  {retentionCaps?.audit != null && (
+                    <p className="field-hint">{t('settings.retentionCap', { max: retentionCaps.audit })}</p>
+                  )}
                 </div>
               </div>
 
@@ -2027,7 +2100,9 @@ export default function Settings() {
           <div className="modern-card max-w-3xl p-5 sm:p-6">
             <p className="page-kicker">{t('settings.whatsapp.kicker')}</p>
             <h2 className="section-heading">{t('settings.whatsapp.title')}</h2>
-            <p className="section-description mb-6">{t('settings.whatsapp.description')}</p>
+            <p className="section-description mb-6">
+              {t(platformManaged ? 'settings.platformManaged.whatsappDescription' : 'settings.whatsapp.description')}
+            </p>
 
             <div className="mb-5 flex flex-wrap items-center gap-2">
               <span className={waConfig?.ready ? 'modern-badge-success' : 'modern-badge'}>
@@ -2035,15 +2110,32 @@ export default function Settings() {
               </span>
               {/* Whether a key is stored, never the key: it is encrypted at rest
                   and the API does not return it. */}
-              <span className="text-xs text-muted-foreground">
-                {t(waConfig?.managedAdminKeyConfigured
-                  ? 'settings.whatsapp.adminKeyStored'
-                  : 'settings.whatsapp.adminKeyMissing')}
-                {waConfig?.updatedAt ? ` · ${formatDateTime(waConfig.updatedAt)}` : ''}
-              </span>
+              {!platformManaged && (
+                <span className="text-xs text-muted-foreground">
+                  {t(waConfig?.managedAdminKeyConfigured
+                    ? 'settings.whatsapp.adminKeyStored'
+                    : 'settings.whatsapp.adminKeyMissing')}
+                  {waConfig?.updatedAt ? ` · ${formatDateTime(waConfig.updatedAt)}` : ''}
+                </span>
+              )}
             </div>
 
+            {/* Na SaaS o servidor Evolution é um só, da plataforma: endereço,
+                chave, hosts e webhook são configurados na caixa dela. Aqui fica
+                o uso que o provedor faz dele. */}
+            {platformManaged && (
+              <div className="mb-5 flex items-start gap-2 rounded-md border border-border bg-muted/40 p-4">
+                <Icon name="lock" size={16} className="mt-0.5 shrink-0" />
+                <p className="text-sm leading-6">
+                  {t(waConfig?.managedUrl
+                    ? 'settings.platformManaged.whatsapp'
+                    : 'settings.platformManaged.whatsappMissing')}
+                </p>
+              </div>
+            )}
+
             <div className="space-y-4">
+              {!platformManaged && (
               <div>
                 <label htmlFor="wa-webhook-url" className="field-label">
                   {t('settings.whatsapp.webhookUrl')}
@@ -2066,6 +2158,7 @@ export default function Settings() {
                 />
                 <p className="field-hint">{t('settings.whatsapp.webhookUrlHint')}</p>
               </div>
+              )}
 
               <div>
                 <label htmlFor="wa-portal-url" className="field-label">
@@ -2082,6 +2175,8 @@ export default function Settings() {
                 <p className="field-hint">{t('settings.whatsapp.portalUrlHint')}</p>
               </div>
 
+              {!platformManaged && (
+              <>
               <div>
                 <label htmlFor="wa-allowed-hosts" className="field-label">
                   {t('settings.whatsapp.allowedHosts')}
@@ -2127,6 +2222,8 @@ export default function Settings() {
                   <p className="field-hint">{t('settings.whatsapp.adminKeyHint')}</p>
                 </div>
               </div>
+              </>
+              )}
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
@@ -2167,7 +2264,7 @@ export default function Settings() {
                     id="wa-media-retention"
                     type="number"
                     min={0}
-                    max={3650}
+                    max={retentionCaps?.media ?? 3650}
                     className="modern-input w-full"
                     value={waForm.mediaRetentionDays}
                     onChange={(event) => setWaForm((current) => ({
@@ -2181,6 +2278,11 @@ export default function Settings() {
                     }))}
                   />
                   <p className="field-hint">{t('settings.whatsapp.mediaRetentionHint')}</p>
+                  {retentionCaps?.media != null && (
+                    <p className={waRetentionAboveCap(waForm.mediaRetentionDays, retentionCaps.media) ? 'field-hint text-[hsl(var(--status-danger))]' : 'field-hint'}>
+                      {t('settings.retentionCap', { max: retentionCaps.media })}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label htmlFor="wa-message-retention" className="field-label">
@@ -2190,7 +2292,7 @@ export default function Settings() {
                     id="wa-message-retention"
                     type="number"
                     min={0}
-                    max={3650}
+                    max={retentionCaps?.messages ?? 3650}
                     className="modern-input w-full"
                     value={waForm.messageRetentionDays}
                     onChange={(event) => setWaForm((current) => ({
@@ -2207,6 +2309,11 @@ export default function Settings() {
                       setting this one alone keeps every thread that ever
                       carried a file. The hint is where that is said. */}
                   <p className="field-hint">{t('settings.whatsapp.messageRetentionHint')}</p>
+                  {retentionCaps?.messages != null && (
+                    <p className={waRetentionAboveCap(waForm.messageRetentionDays, retentionCaps.messages) ? 'field-hint text-[hsl(var(--status-danger))]' : 'field-hint'}>
+                      {t('settings.retentionCap', { max: retentionCaps.messages })}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -2218,7 +2325,8 @@ export default function Settings() {
                   eventos do ERP, provisionamento e trilha todos nascem com
                   prazo. Aqui é onde ficam o texto das conversas, as fotos e os
                   documentos que o assinante mandou. */}
-              {(waForm.mediaRetentionDays === 0 || waForm.messageRetentionDays === 0) && (
+              {((waForm.mediaRetentionDays === 0 && retentionCaps?.media == null)
+                || (waForm.messageRetentionDays === 0 && retentionCaps?.messages == null)) && (
                 <div className="mt-4 flex items-start gap-2 rounded-md border border-[hsl(var(--status-warning)/0.4)] bg-[hsl(var(--status-warning)/0.08)] p-4">
                   <Icon name="info" size={18} className="mt-0.5 shrink-0 text-[hsl(var(--status-warning))]" />
                   <p className="text-sm leading-6">{t('settings.whatsapp.retentionForeverWarning')}</p>
@@ -3048,6 +3156,16 @@ export default function Settings() {
                               >
                                 <Icon name="edit" size={18} />
                               </button>
+                              {platformManaged && (
+                                <button
+                                  onClick={() => void resetCatalogueRow('vendor', v.id, v.name)}
+                                  className="text-muted-foreground hover:text-foreground"
+                                  title={t('settings.catalogue.reset')}
+                                  aria-label={t('settings.catalogue.reset')}
+                                >
+                                  <Icon name="refresh" size={18} />
+                                </button>
+                              )}
                               <button
                                 onClick={() => deleteVendor(v.id)}
                                 className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
@@ -3179,6 +3297,14 @@ export default function Settings() {
                               >
                                 {t('common.edit')}
                               </button>
+                              {platformManaged && (
+                                <button
+                                  onClick={() => void resetCatalogueRow('wifi', cfg.id, cfg.product_class)}
+                                  className="text-muted-foreground hover:text-foreground font-medium text-sm"
+                                >
+                                  {t('settings.catalogue.reset')}
+                                </button>
+                              )}
                               <button
                                 onClick={() => deleteWifiConfig(cfg.id)}
                                 className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 font-medium text-sm"

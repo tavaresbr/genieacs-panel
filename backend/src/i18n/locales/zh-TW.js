@@ -701,4 +701,10 @@ export default {
   'contacts.saveFailed': '無法儲存客戶資料',
   'contacts.error.notFound': '找不到客戶',
   'contacts.error.invalidField': '欄位 {field} 的值無效',
+  'settings.platformManaged': '此設定由平台管理員管理',
+  'settings.validation.auditRetentionAboveCap': '您的方案最多保留稽核記錄 {max} 天',
+  'whatsapp.error.platformServerMissing': '平台尚未設定其 WhatsApp 伺服器。請聯絡平台管理員',
+  'whatsapp.error.retentionAboveCap': '您的方案最多保留 WhatsApp 歷史 {max} 天',
+  'catalogue.noDefault': '此設定檔不在平台的預設目錄中',
+  'catalogue.resetDone': '設定檔已還原為平台預設值',
 };

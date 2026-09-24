@@ -35,6 +35,14 @@ class PlatformAudit {
     // gateway e SE há vínculo — nunca o id do cliente, que é a chave que decide
     // para quem vai o crédito.
     TENANT_GATEWAY_CHANGED: 'tenant.gateway_changed',
+    // Para onde o painel de um provedor fala com o GenieACS, e com que
+    // credencial. Na SaaS só o console grava isso, e a linha é o que responde
+    // "desde quando este cliente aponta para aquele ACS, e quem mudou".
+    TENANT_GENIEACS_CHANGED: 'tenant.genieacs_changed',
+    // O servidor Evolution que atende todos os provedores.
+    PLATFORM_WHATSAPP_CHANGED: 'platform.whatsapp_changed',
+    // O catálogo padrão de equipamentos foi reenviado aos provedores.
+    CATALOGUE_PROPAGATED: 'catalogue.propagated',
     // A Fase 5: o que o plano de controle fez com a assinatura de um provedor.
     PLAN_CREATED: 'plan.created',
     PLAN_UPDATED: 'plan.updated',
