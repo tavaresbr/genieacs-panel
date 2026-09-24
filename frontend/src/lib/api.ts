@@ -12,6 +12,46 @@ export interface SubscriptionBlockedDetail {
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || ''
 
+export type DeviceDiagnosticKind = 'ping' | 'traceroute'
+
+export interface DeviceDiagnosticStart {
+  deviceId: string
+  kind: DeviceDiagnosticKind
+  root: 'InternetGatewayDevice' | 'Device'
+  host: string
+  /** A ONT não recebeu agora: o pedido ficou na fila do ACS até ela se conectar. */
+  queued: boolean
+}
+
+export interface DeviceDiagnosticHop {
+  hop: number
+  host: string | null
+  address: string | null
+  times: number[]
+  error: number | null
+}
+
+export interface DeviceDiagnosticResult {
+  deviceId: string
+  kind: DeviceDiagnosticKind
+  root: 'InternetGatewayDevice' | 'Device'
+  state: 'idle' | 'running' | 'complete' | 'error'
+  /** O `Error_*` que a ONT reportou, inteiro. */
+  error: string | null
+  host: string | null
+  /** Quando o ACS leu o estado pela última vez — o resultado pode ser de antes. */
+  measuredAt: string | null
+  ping: {
+    success: number | null
+    failure: number | null
+    average: number | null
+    minimum: number | null
+    maximum: number | null
+  } | null
+  hops: DeviceDiagnosticHop[] | null
+  responseTime: number | null
+}
+
 export interface ApiResponse<T = any> {
   success: boolean
   data?: T
@@ -1463,6 +1503,13 @@ export const devicesAPI = {
   // A série digitada vai junto: o servidor confere que é a DESTE aparelho.
   factoryResetDevice: (deviceId: string, confirmSerial: string) =>
     apiClient.post('/devices/factory-reset', { deviceId, confirmSerial }),
+
+  // Ping e traceroute pela ONT. O aparelho vai no corpo, como no reiniciar.
+  startDiagnostic: (deviceId: string, kind: DeviceDiagnosticKind, host: string) =>
+    apiClient.post<DeviceDiagnosticStart>('/devices/diagnostics', { deviceId, kind, host }),
+
+  readDiagnostic: (deviceId: string, kind: DeviceDiagnosticKind) =>
+    apiClient.post<DeviceDiagnosticResult>('/devices/diagnostics/result', { deviceId, kind }),
 
   summonDevice: (deviceId: string, parameters?: string[]) =>
     apiClient.post('/devices/summon', { deviceId, parameters }),

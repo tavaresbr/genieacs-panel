@@ -97,7 +97,10 @@ export function buildDevice({
  * behaviour on between requests.
  */
 export function startGenieAcsStub({ devices = [buildDevice()], taskStatus = 200, respond = null } = {}) {
-  const state = { devices, tasks: [], tags: [], deleted: [], taskStatus, respond, requests: [] };
+  // `onTask` é chamado a cada tarefa aceita com 200, com a tarefa e o estado:
+  // é como um teste faz a ONT "responder" — mudar o documento que o ACS guarda.
+  // Tarefa aceita com 202 fica em `GET /tasks`, que é a fila do ACS.
+  const state = { devices, tasks: [], tags: [], deleted: [], taskStatus, respond, requests: [], onTask: null };
 
   const server = http.createServer((req, res) => {
     let raw = '';
@@ -120,8 +123,23 @@ export function startGenieAcsStub({ devices = [buildDevice()], taskStatus = 200,
         } catch {
           task = null;
         }
-        state.tasks.push({ deviceId: decodeURIComponent(taskMatch[1]), task });
+        const entry = { deviceId: decodeURIComponent(taskMatch[1]), task, status: state.taskStatus };
+        state.tasks.push(entry);
+        if (state.taskStatus === 200 && state.onTask) state.onTask(entry, state);
         return send(state.taskStatus, task);
+      }
+
+      if (url.pathname === '/tasks' && req.method === 'GET') {
+        let filter = {};
+        try {
+          filter = JSON.parse(url.searchParams.get('query') || '{}');
+        } catch {
+          filter = {};
+        }
+        return send(200, state.tasks
+          .filter((entry) => entry.status === 202)
+          .filter((entry) => !filter.device || entry.deviceId === filter.device)
+          .map((entry, index) => ({ _id: `task-${index}`, device: entry.deviceId, name: entry.task?.name })));
       }
 
       const tagMatch = url.pathname.match(/^\/devices\/([^/]+)\/tags\/([^/]+)$/);

@@ -410,6 +410,19 @@ export const provisioningActionLimiter = limiter({
   message: limitMessage('rateLimit.provisioningAction')
 });
 
+/**
+ * Ping e traceroute pela ONT. A tela consulta o resultado a cada cinco
+ * segundos enquanto a ONT roda, e cada consulta pode virar uma tarefa no ACS:
+ * quarenta por minuto por operador cobre três diagnósticos seguidos e segura a
+ * aba esquecida aberta.
+ */
+export const deviceDiagnosticLimiter = limiter({
+  windowMs: 60 * 1000,
+  max: 40,
+  keyGenerator: (req) => (req.user?.userId ? `user:${req.user.userId}` : `ip:${ipKey(req)}`),
+  message: limitMessage('rateLimit.requests', 'rate_limited')
+});
+
 export const portalPasswordAdminLimiter = limiter({
   windowMs: 15 * 60 * 1000,
   max: 60,
