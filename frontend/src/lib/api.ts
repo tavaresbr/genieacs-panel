@@ -2114,7 +2114,34 @@ export const contactsAPI = {
 
   /** Open invoices of each contract, asked of the SGP now. */
   invoices: (key: string) =>
-    apiClient.get<{ contract: string; invoices: SgpInvoice[] }[]>(`/contacts/${encodeURIComponent(key)}/invoices`)
+    apiClient.get<{ contract: string; invoices: SgpInvoice[] }[]>(`/contacts/${encodeURIComponent(key)}/invoices`),
+
+  /** The suggested WhatsApp text for one open invoice; nothing is sent. */
+  invoiceMessage: (key: string, invoiceId: string) =>
+    apiClient.get<ContactInvoiceMessage>(
+      `/contacts/${encodeURIComponent(key)}/invoices/${encodeURIComponent(invoiceId)}/whatsapp`
+    ),
+
+  sendInvoice: (key: string, invoiceId: string, text: string) =>
+    apiClient.post<ContactInvoiceSent>(
+      `/contacts/${encodeURIComponent(key)}/invoices/${encodeURIComponent(invoiceId)}/whatsapp`,
+      { text }
+    )
+}
+
+export interface ContactInvoiceMessage {
+  contract: string
+  invoiceId: string
+  phone: string | null
+  text: string
+}
+
+export interface ContactInvoiceSent {
+  contract: string
+  invoiceId: string
+  conversationId: number
+  messageId: number
+  conversation: WhatsAppConversation
 }
 
 // SGP (Sistema de Gestão de Provedores) integration API

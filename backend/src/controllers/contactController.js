@@ -1,12 +1,14 @@
 import AuditLog from '../models/AuditLog.js';
 import ContactProfileService, { ContactProfileError } from '../services/contactProfileService.js';
 import ContactSheetService from '../services/contactSheetService.js';
+import ContactInvoiceService from '../services/contactInvoiceService.js';
+import { WaError } from '../services/whatsappConfigService.js';
 import { SgpError } from '../services/sgpService.js';
 import { translateError } from '../i18n/index.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 
 function handleError(req, res, error, fallbackKey) {
-  if (error instanceof ContactProfileError || error instanceof SgpError) {
+  if (error instanceof ContactProfileError || error instanceof SgpError || error instanceof WaError) {
     return res.status(error.status).json({
       ...createErrorResponse(translateError(req.t, error), error.code),
       code: error.code
@@ -39,6 +41,37 @@ class ContactController {
       return res.json(createResponse(req.t('contacts.loaded'), await ContactProfileService.invoices(req.params.key)));
     } catch (error) {
       return handleError(req, res, error, 'contacts.loadFailed');
+    }
+  }
+
+  /** The suggested WhatsApp text for one open invoice; nothing is sent. */
+  static async invoiceMessage(req, res) {
+    try {
+      const data = await ContactInvoiceService.preview(req.params.key, req.params.invoiceId, req.t);
+      return res.json(createResponse(req.t('contacts.loaded'), data));
+    } catch (error) {
+      return handleError(req, res, error, 'contacts.invoiceSendFailed');
+    }
+  }
+
+  static async sendInvoice(req, res) {
+    try {
+      const result = await ContactInvoiceService.send(
+        req.params.key,
+        req.params.invoiceId,
+        { text: req.body?.text },
+        req.user?.userId ?? null
+      );
+      // Which invoice went to whom, never the text: it carries the PIX code.
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.CONTACT_INVOICE_SENT,
+        subjectType: 'contact',
+        subjectId: String(req.params.key).slice(0, 64),
+        detail: { contract: result.contract, invoiceId: result.invoiceId, conversationId: result.conversationId }
+      });
+      return res.status(201).json(createResponse(req.t('contacts.invoiceSent'), result));
+    } catch (error) {
+      return handleError(req, res, error, 'contacts.invoiceSendFailed');
     }
   }
 

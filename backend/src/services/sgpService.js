@@ -672,7 +672,7 @@ function normalizeInvoice(entry) {
     digitableLine: asText(pick(entry, ['linhadigitavel', 'linhaDigitavel', 'linha'])),
     barcode: asText(pick(entry, ['codigodebarras', 'codigoBarras', 'barras'])),
     link: asText(pick(entry, ['link', 'linkboleto', 'linkBoleto', 'url', 'urlBoleto'])),
-    pix: asText(pick(entry, ['pix', 'pixCopiaECola', 'pixcopiaecola', 'qrcodePix', 'qrcode'])),
+    pix: asText(pick(entry, ['pix', 'pixCopiaECola', 'pixcopiaecola', 'codigoPix', 'codigopix', 'pixCopiaCola', 'pix_copia_cola', 'qrcodePix', 'qrcode'])),
     paid: (() => {
       const status = asText(pick(entry, ['status', 'situacao', 'statusDisplay']));
       if (paidAt) return true;

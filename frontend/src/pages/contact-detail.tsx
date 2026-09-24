@@ -9,6 +9,7 @@ import {
   type ContactProfile,
   type ContactProfileField,
   type ContactProfilePatch,
+  type ContactInvoiceMessage,
   type SgpInvoice
 } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
@@ -244,7 +245,7 @@ export default function ContactDetailPage() {
           )}
         </Card>
 
-        {profile.contracts.length > 0 && <InvoicesCard contactKey={profile.key} />}
+        {profile.contracts.length > 0 && <InvoicesCard contactKey={profile.key} whatsappPhone={profile.whatsappPhone} />}
 
         {editing && (
           <EditModal
@@ -310,11 +311,14 @@ function FieldRow<T>({ label, field, canEdit, onRestore, children }: {
   )
 }
 
-function InvoicesCard({ contactKey }: { contactKey: string }) {
+function InvoicesCard({ contactKey, whatsappPhone }: { contactKey: string; whatsappPhone: string | null }) {
   const { t, intlLocale } = useTranslation()
+  const { can } = useAuth()
   const toast = useToast()
   const [groups, setGroups] = useState<{ contract: string; invoices: SgpInvoice[] }[] | null>(null)
   const [loading, setLoading] = useState(false)
+  const [sending, setSending] = useState<string | null>(null)
+  const canSend = can('whatsapp.send')
 
   const load = async () => {
     setLoading(true)
@@ -357,12 +361,118 @@ function InvoicesCard({ contactKey }: { contactKey: string }) {
                     <Icon name="copy" size={14} /> PIX
                   </button>
                 )}
+                {canSend && invoice.id && (
+                  <button
+                    type="button"
+                    className="modern-button-secondary"
+                    disabled={!whatsappPhone}
+                    title={whatsappPhone ? undefined : t('contacts.profile.sendInvoiceNoPhone')}
+                    onClick={() => setSending(invoice.id)}
+                  >
+                    <Icon name="chat" size={14} /> {t('contacts.profile.sendInvoice')}
+                  </button>
+                )}
               </span>
             </li>
           ))}
         </ul>
       )}
+      {sending && <SendInvoiceModal contactKey={contactKey} invoiceId={sending} onClose={() => setSending(null)} />}
     </Card>
+  )
+}
+
+/**
+ * The text the server suggests for one invoice, edited if the operator wants,
+ * then queued like any reply. The line, the PIX and the link in the preview
+ * come from the SGP, asked again when the modal opens.
+ */
+function SendInvoiceModal({ contactKey, invoiceId, onClose }: { contactKey: string; invoiceId: string; onClose: () => void }) {
+  const { t } = useTranslation()
+  const toast = useToast()
+  const navigate = useNavigate()
+  const [preview, setPreview] = useState<ContactInvoiceMessage | null>(null)
+  const [text, setText] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [sent, setSent] = useState<Awaited<ReturnType<typeof contactsAPI.sendInvoice>>['data'] | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    contactsAPI.invoiceMessage(contactKey, invoiceId)
+      .then((res) => {
+        if (!alive) return
+        if (!res.success || !res.data) {
+          setError(res.message || t('contacts.profile.sendInvoiceFailed'))
+          return
+        }
+        setPreview(res.data)
+        setText(res.data.text)
+      })
+      .catch(() => { if (alive) setError(t('api.requestFailed')) })
+    return () => { alive = false }
+  }, [contactKey, invoiceId, t])
+
+  const send = async () => {
+    setBusy(true)
+    try {
+      const res = await contactsAPI.sendInvoice(contactKey, invoiceId, text)
+      if (!res.success || !res.data) {
+        toast.error(res.message || t('contacts.profile.sendInvoiceFailed'))
+        return
+      }
+      toast.success(t('contacts.profile.sendInvoiceDone'))
+      setSent(res.data)
+    } catch {
+      toast.error(t('api.requestFailed'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[2100] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="send-invoice-title">
+      <div className="modern-card max-h-[90vh] w-full max-w-xl overflow-y-auto p-5 sm:p-6">
+        <h2 id="send-invoice-title" className="section-heading mb-1">{t('contacts.profile.sendInvoiceTitle')}</h2>
+        {preview?.phone && (
+          <p className="section-description mb-4">{t('contacts.profile.sendInvoiceTo', { phone: phoneText(preview.phone) })}</p>
+        )}
+
+        {error ? (
+          <p className="text-sm text-[hsl(var(--status-warning))]" role="status">{error}</p>
+        ) : !preview ? (
+          <p className="text-sm text-muted-foreground">{t('contacts.profile.loading')}</p>
+        ) : sent ? (
+          <p className="text-sm">{t('contacts.profile.sendInvoiceDone')}</p>
+        ) : (
+          <>
+            <label className="field-label" htmlFor="send-invoice-text">{t('contacts.profile.sendInvoiceText')}</label>
+            <textarea
+              id="send-invoice-text"
+              className="modern-input min-h-64 font-mono text-xs"
+              value={text}
+              maxLength={4000}
+              onChange={(event) => setText(event.target.value)}
+            />
+          </>
+        )}
+
+        <div className="mt-6 flex justify-end gap-2">
+          <button type="button" className="modern-button-secondary" onClick={onClose} disabled={busy}>
+            {sent ? t('common.close') : t('common.cancel')}
+          </button>
+          {sent ? (
+            <button type="button" className="modern-button" onClick={() => navigate('/whatsapp', { state: { conversation: sent.conversation } })}>
+              <Icon name="chat" size={16} /> {t('contacts.profile.openConversation')}
+            </button>
+          ) : (
+            <button type="button" className="modern-button" disabled={busy || !preview || !text.trim()} onClick={() => void send()}>
+              <Icon name="chat" size={16} /> {busy ? t('contacts.profile.sending') : t('contacts.profile.send')}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
   )
 }
 
