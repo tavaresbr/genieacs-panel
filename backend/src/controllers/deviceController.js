@@ -442,6 +442,27 @@ class DeviceController {
     }
   }
 
+  static async factoryResetDevice(req, res) {
+    const { deviceId, confirmSerial } = req.body || {};
+    if (!deviceId) {
+      return res.status(400).json(createErrorResponse(req.t('device.idRequired')));
+    }
+    try {
+      await DeviceService.factoryResetDevice(String(deviceId), confirmSerial);
+      await registrarAcaoNaOnt(req, AuditLog.ACTIONS.DEVICE_FACTORY_RESET, deviceId);
+      DeviceService.invalidateDashboard();
+      return res.json(createResponse(req.t('device.factoryResetStarted'), { deviceId }));
+    } catch (error) {
+      if (error.translationKey) {
+        return res.status(error.status || 400).json(
+          createErrorResponse(translateError(req.t, error), null, error.code || null)
+        );
+      }
+      console.error('Factory reset error:', error);
+      return res.status(502).json(createErrorResponse(req.t('device.factoryResetFailed'), error.message));
+    }
+  }
+
   static async summonDevice(req, res) {
     const { deviceId, parameters = [] } = req.body;
 

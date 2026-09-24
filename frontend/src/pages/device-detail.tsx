@@ -10,6 +10,7 @@ import { formatDate } from '@/lib/utils'
 import { copyToClipboard, formatBrl, isSafeExternalUrl, sgpBadge } from '@/lib/sgp'
 import { Icon } from '@/components/ui/icon'
 import { ProvisioningCard } from '@/components/provisioning-card'
+import { serialMatches } from '@/lib/device-actions'
 import { DeviceHistoryCard } from '@/components/device-history-card'
 import { DeviceSwapsCard } from '@/components/device-swaps-card'
 import { useAuth } from '@/contexts/auth-context'
@@ -506,6 +507,104 @@ function EditCredentialModal({
   )
 }
 
+/**
+ * O reset de fábrica, que não tem volta.
+ *
+ * Pede o número de série digitado, e não um "tem certeza?": a tela pode ter
+ * ficado aberta noutro aparelho, e o que se quer impedir é o clique no aparelho
+ * errado — um "OK" passa por reflexo, digitar a série do aparelho não.
+ */
+function FactoryResetModal({
+  isOpen,
+  onClose,
+  deviceId,
+  serial,
+  provisioningAvailable,
+  onDone
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  deviceId: string;
+  serial: string | null;
+  provisioningAvailable: boolean;
+  onDone: () => void;
+}) {
+  const { t } = useTranslation()
+  const toast = useToast()
+  const [typed, setTyped] = useState('')
+  const [sending, setSending] = useState(false)
+
+  useEffect(() => {
+    if (isOpen) setTyped('')
+  }, [isOpen])
+
+  if (!isOpen) return null
+
+  const alvo = serial || deviceId
+  const confere = serialMatches(typed, serial, deviceId)
+
+  const enviar = async () => {
+    if (!confere) return
+    setSending(true)
+    try {
+      const res = await devicesAPI.factoryResetDevice(deviceId, typed)
+      if (res.success) {
+        toast.success(res.message || t('detail.factoryReset.title'))
+        onDone()
+      } else {
+        toast.error(res.message || t('detail.factoryReset.failed'))
+      }
+    } catch {
+      toast.error(t('detail.factoryReset.failed'))
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[2100] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="factory-reset-title">
+      <div className="modern-card w-full max-w-md">
+        <div className="flex items-center gap-2 border-b border-border p-5">
+          <Icon name="warning" size={20} className="shrink-0 text-[hsl(var(--status-danger))]" />
+          <h3 id="factory-reset-title" className="text-lg font-semibold text-foreground">{t('detail.factoryReset.title')}</h3>
+        </div>
+        <div className="space-y-3 p-5 text-sm leading-6">
+          <p className="text-foreground">{t('detail.factoryReset.consequence')}</p>
+          {provisioningAvailable && (
+            <p className="text-muted-foreground">{t('detail.factoryReset.provisionHint')}</p>
+          )}
+          <label htmlFor="factory-reset-serial" className="field-label pt-1">
+            {t('detail.factoryReset.typeSerial', { serial: alvo })}
+          </label>
+          <input
+            id="factory-reset-serial"
+            type="text"
+            autoComplete="off"
+            spellCheck={false}
+            className="modern-input w-full font-mono"
+            value={typed}
+            onChange={(event) => setTyped(event.target.value)}
+          />
+        </div>
+        <div className="flex items-center justify-end gap-3 border-t border-border p-5">
+          <button type="button" className="modern-button-secondary" onClick={onClose} disabled={sending}>
+            {t('common.cancel')}
+          </button>
+          <button
+            type="button"
+            className="modern-button-danger"
+            disabled={!confere || sending}
+            onClick={() => void enviar()}
+          >
+            <Icon name="warning" size={16} />
+            {sending ? t('detail.factoryReset.sending') : t('detail.factoryReset.confirm')}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function EditWifiModal({
   wifi,
   onClose,
@@ -617,6 +716,7 @@ export default function DeviceDetailPage() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
   const [rebooting, setRebooting] = useState(false)
+  const [factoryResetOpen, setFactoryResetOpen] = useState(false)
   const { can } = useAuth()
   // Revelar a senha do portal é `customers.secrets`, e mexer no CPE é
   // `devices.write` — capacidades distintas na matriz porque quem reinicia uma
@@ -625,6 +725,9 @@ export default function DeviceDetailPage() {
   // trabalho dele.
   const canReadSecrets = can('customers.secrets')
   const canWriteDevice = can('devices.write')
+  // O que não tem volta é do admin: o plantão reinicia, mas não apaga a
+  // configuração do cliente.
+  const canMaintainDevice = can('devices.maintain')
   const { t, formatDateTime, intlLocale } = useTranslation()
   const toast = useToast()
   const loadingCtl = useLoading()
@@ -1237,6 +1340,16 @@ export default function DeviceDetailPage() {
               <Icon name="power" size={17} />
               {rebooting ? t('detail.rebooting') : t('detail.reboot')}
             </button>
+            {canMaintainDevice && (
+              <button
+                type="button"
+                onClick={() => setFactoryResetOpen(true)}
+                className="modern-button-secondary text-[hsl(var(--status-danger))]"
+              >
+                <Icon name="warning" size={17} />
+                {t('detail.factoryReset.button')}
+              </button>
+            )}
             <button
               onClick={handleSummon}
               className="modern-button inline-flex items-center gap-1.5"
@@ -2154,6 +2267,14 @@ export default function DeviceDetailPage() {
             ''
           }
           onSave={handleSaveCredentials}
+        />
+        <FactoryResetModal
+          isOpen={factoryResetOpen}
+          onClose={() => setFactoryResetOpen(false)}
+          deviceId={deviceId}
+          serial={deviceInfo?.serialNumber || null}
+          provisioningAvailable={sgpAvailable}
+          onDone={() => setFactoryResetOpen(false)}
         />
         <EditWifiModal
           wifi={editingWifi}

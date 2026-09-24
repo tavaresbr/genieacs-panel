@@ -119,7 +119,10 @@ class AuditLog {
     DEVICE_WAN_CHANGED: 'device.wan_changed',
     DEVICE_WAN_ADDED: 'device.wan_added',
     DEVICE_WIFI_CHANGED: 'device.wifi_changed',
-    DEVICE_CREDENTIALS_CHANGED: 'device.credentials_changed'
+    DEVICE_CREDENTIALS_CHANGED: 'device.credentials_changed',
+    // A ONT voltou de fábrica: sem PPPoE, sem Wi-Fi, assinante sem internet até
+    // alguém reprovisionar. A linha que mais importa desta família.
+    DEVICE_FACTORY_RESET: 'device.factory_reset'
   });
 
   /**

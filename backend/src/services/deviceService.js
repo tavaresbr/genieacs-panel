@@ -2020,6 +2020,34 @@ class DeviceService {
     return true;
   }
 
+  /**
+   * Devolve a ONT à configuração de fábrica — conferindo antes que quem pediu
+   * digitou o número de série DESTE aparelho.
+   *
+   * A conferência mora aqui, e não só na tela, porque é o que separa um reset
+   * pedido de propósito de uma requisição com o id errado: a tela pode ter
+   * ficado aberta noutro aparelho, e a API é chamada por quem não usa a tela.
+   * Sem série no documento (ACS que não a reporta), vale o id do aparelho.
+   */
+  static async factoryResetDevice(deviceId, confirmSerial) {
+    const rows = await this.fetchFromGenieAcs('', {
+      query: JSON.stringify({ _id: deviceId }),
+      projection: '_deviceId._SerialNumber'
+    });
+    if (!Array.isArray(rows) || rows.length === 0) {
+      throw new TranslatableError('device.notFound', null, { status: 404 });
+    }
+    const esperado = String(rows[0]?._deviceId?._SerialNumber || deviceId).trim().toUpperCase();
+    const digitado = String(confirmSerial ?? '').trim().toUpperCase();
+    if (!digitado || digitado !== esperado) {
+      throw new TranslatableError('device.factoryResetSerialMismatch', null, {
+        status: 400,
+        code: 'serial_mismatch'
+      });
+    }
+    return this.postTask(deviceId, { name: 'factoryReset' });
+  }
+
   static async rebootDevice(deviceId) {
     return this.postTask(deviceId, { name: 'reboot' });
   }
