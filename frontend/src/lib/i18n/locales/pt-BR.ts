@@ -381,7 +381,7 @@ const ptBR: Dictionary = {
   'devices.error.retry': 'Recarregar inventário',
   'devices.error.checkConfig': 'Verificar configuração do ACS',
   'devices.filter.searchLabel': 'Buscar no inventário',
-  'devices.filter.searchPlaceholder': 'Serial, ID do cliente, PPPoE, marca ou modelo',
+  'devices.filter.searchPlaceholder': 'Serial, nome do assinante, contrato, ID do cliente, PPPoE, marca ou modelo',
   'devices.filter.statusLabel': 'Status da conexão',
   'devices.filter.all': 'Todos os equipamentos',
   'devices.filter.onlineOnly': 'Somente online',

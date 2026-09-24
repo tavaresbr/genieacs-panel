@@ -221,7 +221,9 @@ export default function PlatformPage() {
     }
     setBusyId(tenant.id)
     try {
-      const res = await platformAPI.deleteTenant(tenant.id)
+      // O slug EXATO da linha, e não o digitado: a conferência acima tolera
+      // espaço e maiúscula, e a do servidor não.
+      const res = await platformAPI.deleteTenant(tenant.id, tenant.slug)
       if (!res.success) {
         toast.error(res.message || t('platform.deleteFailed'))
         return

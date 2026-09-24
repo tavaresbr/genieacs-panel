@@ -374,7 +374,7 @@ const hi: Dictionary = {
   'devices.error.retry': 'सूची फिर लोड करें',
   'devices.error.checkConfig': 'ACS कॉन्फ़िगरेशन देखें',
   'devices.filter.searchLabel': 'सूची में खोजें',
-  'devices.filter.searchPlaceholder': 'सीरियल, ग्राहक आईडी, PPPoE, ब्रांड या मॉडल',
+  'devices.filter.searchPlaceholder': 'सीरियल, ग्राहक का नाम, अनुबंध, ग्राहक आईडी, PPPoE, ब्रांड या मॉडल',
   'devices.filter.statusLabel': 'कनेक्शन स्थिति',
   'devices.filter.all': 'सभी उपकरण',
   'devices.filter.onlineOnly': 'केवल ऑनलाइन',
