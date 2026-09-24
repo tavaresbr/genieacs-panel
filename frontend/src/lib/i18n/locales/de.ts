@@ -1093,6 +1093,8 @@ const de: Dictionary = {
   'detail.wifi.security': 'Sicherheit',
   'detail.wifi.associatedClients': 'Verbundene Clients',
   'detail.wifi.notReported': 'Nicht gemeldet',
+  'detail.wifi.passwordNotReported': 'Vom Gerät nicht gemeldet',
+  'detail.wifi.passwordNotReportedHint': 'Das Gerät meldet das Passwort nicht. Zum Festlegen „SSID bearbeiten“ verwenden.',
   'detail.wifi.edit': 'SSID {index} bearbeiten',
   'detail.wifi.adminRequired': 'Ihre Rolle erlaubt es nicht, die WLAN-Konfiguration zu ändern.',
   'detail.wifi.empty': 'Keine WLAN-SSIDs gemeldet.',

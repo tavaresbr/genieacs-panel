@@ -1095,6 +1095,8 @@ const ru: Dictionary = {
   'detail.wifi.security': 'Безопасность',
   'detail.wifi.associatedClients': 'Подключённые клиенты',
   'detail.wifi.notReported': 'Не передано',
+  'detail.wifi.passwordNotReported': 'Устройство не сообщает',
+  'detail.wifi.passwordNotReportedHint': 'Устройство не сообщает пароль. Чтобы задать его, используйте «Изменить SSID».',
   'detail.wifi.edit': 'Изменить SSID {index}',
   'detail.wifi.adminRequired': 'Ваша роль не позволяет менять настройки Wi-Fi.',
   'detail.wifi.empty': 'Сети Wi-Fi не переданы.',

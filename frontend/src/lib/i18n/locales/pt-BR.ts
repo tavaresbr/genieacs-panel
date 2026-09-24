@@ -1090,6 +1090,8 @@ const ptBR: Dictionary = {
   'detail.wifi.security': 'Segurança',
   'detail.wifi.associatedClients': 'Clientes associados',
   'detail.wifi.notReported': 'Não informado',
+  'detail.wifi.passwordNotReported': 'Não informada pelo equipamento',
+  'detail.wifi.passwordNotReportedHint': 'O equipamento não informa a senha. Para definir uma, use Editar SSID.',
   'detail.wifi.edit': 'Editar SSID {index}',
   'detail.wifi.adminRequired': 'Seu papel não permite alterar a configuração de WiFi.',
   'detail.wifi.empty': 'Nenhum SSID de WiFi informado.',

@@ -1090,6 +1090,8 @@ const es: Dictionary = {
   'detail.wifi.security': 'Seguridad',
   'detail.wifi.associatedClients': 'Clientes asociados',
   'detail.wifi.notReported': 'No informado',
+  'detail.wifi.passwordNotReported': 'No informada por el equipo',
+  'detail.wifi.passwordNotReportedHint': 'El equipo no informa la contraseña. Para definir una, use Editar SSID.',
   'detail.wifi.edit': 'Editar SSID {index}',
   'detail.wifi.adminRequired': 'Tu rol no permite cambiar la configuración de WiFi.',
   'detail.wifi.empty': 'No se informaron SSID de WiFi.',

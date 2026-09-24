@@ -1090,6 +1090,8 @@ const zhTW: Dictionary = {
   'detail.wifi.security': '安全性',
   'detail.wifi.associatedClients': '已連結的用戶端',
   'detail.wifi.notReported': '未回報',
+  'detail.wifi.passwordNotReported': '設備未回報',
+  'detail.wifi.passwordNotReportedHint': '設備不回報密碼。如需設定，請使用「編輯 SSID」。',
   'detail.wifi.edit': '編輯 SSID {index}',
   'detail.wifi.adminRequired': '目前的角色無法變更 Wi-Fi 設定。',
   'detail.wifi.empty': '未回報任何 Wi-Fi SSID。',

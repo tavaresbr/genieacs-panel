@@ -1092,6 +1092,8 @@ const en = {
   'detail.wifi.security': 'Security',
   'detail.wifi.associatedClients': 'Associated clients',
   'detail.wifi.notReported': 'Not reported',
+  'detail.wifi.passwordNotReported': 'Not reported by the device',
+  'detail.wifi.passwordNotReportedHint': 'The device does not report the password. To set one, use Edit SSID.',
   'detail.wifi.edit': 'Edit SSID {index}',
   'detail.wifi.adminRequired': 'Your role does not allow changing the WiFi configuration.',
   'detail.wifi.empty': 'No WiFi SSIDs reported.',

@@ -1090,6 +1090,8 @@ const zhCN: Dictionary = {
   'detail.wifi.security': '安全',
   'detail.wifi.associatedClients': '已关联客户端',
   'detail.wifi.notReported': '未上报',
+  'detail.wifi.passwordNotReported': '设备未上报',
+  'detail.wifi.passwordNotReportedHint': '设备不上报密码。如需设置，请使用“编辑 SSID”。',
   'detail.wifi.edit': '编辑 SSID {index}',
   'detail.wifi.adminRequired': '当前角色无法修改 Wi-Fi 配置。',
   'detail.wifi.empty': '未上报任何 Wi-Fi SSID。',

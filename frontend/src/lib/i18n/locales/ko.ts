@@ -1092,6 +1092,8 @@ const ko: Dictionary = {
   'detail.wifi.security': '보안',
   'detail.wifi.associatedClients': '연결된 클라이언트',
   'detail.wifi.notReported': '보고되지 않음',
+  'detail.wifi.passwordNotReported': '장비가 보고하지 않음',
+  'detail.wifi.passwordNotReportedHint': '장비가 비밀번호를 보고하지 않습니다. 설정하려면 SSID 편집을 사용하세요.',
   'detail.wifi.edit': 'SSID {index} 편집',
   'detail.wifi.adminRequired': '현재 역할로는 Wi-Fi 설정을 변경할 수 없습니다.',
   'detail.wifi.empty': '보고된 Wi-Fi SSID가 없습니다.',

@@ -1090,6 +1090,8 @@ const ja: Dictionary = {
   'detail.wifi.security': 'セキュリティ',
   'detail.wifi.associatedClients': '接続中のクライアント',
   'detail.wifi.notReported': '報告なし',
+  'detail.wifi.passwordNotReported': '機器から報告されません',
+  'detail.wifi.passwordNotReportedHint': '機器はパスワードを報告しません。設定するには「SSID を編集」を使用してください。',
   'detail.wifi.edit': 'SSID {index} を編集',
   'detail.wifi.adminRequired': '現在のロールでは Wi-Fi の設定を変更できません。',
   'detail.wifi.empty': 'Wi-Fi の SSID は報告されていません。',
