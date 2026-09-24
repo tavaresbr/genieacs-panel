@@ -127,6 +127,8 @@ const en = {
   'sidebar.nav.settings': 'Configuration',
   'sidebar.nav.settingsDescription': 'ACS and vendors',
   'sidebar.whatsNew': 'What’s new',
+  'sidebar.providerSlug': 'Provider · {slug}',
+  'sidebar.platformAdmin': 'Platform administrator',
   'sidebar.releaseNotesAria': 'Open release notes for SkyGenPanel version {version}',
   'sidebar.versionTooltip': 'Version {version} · What’s new',
   'sidebar.defaultOperator': 'Operator',

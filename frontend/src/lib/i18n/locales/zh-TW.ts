@@ -125,6 +125,8 @@ const zhTW: Dictionary = {
   'sidebar.nav.settings': '設定',
   'sidebar.nav.settingsDescription': 'ACS 與廠商',
   'sidebar.whatsNew': '更新內容',
+  'sidebar.providerSlug': '服務商 · {slug}',
+  'sidebar.platformAdmin': '平台管理員',
   'sidebar.releaseNotesAria': '開啟 SkyGenPanel {version} 版的版本資訊',
   'sidebar.versionTooltip': '版本 {version} · 更新內容',
   'sidebar.defaultOperator': '維運人員',

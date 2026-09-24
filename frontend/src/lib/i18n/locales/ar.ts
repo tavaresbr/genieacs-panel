@@ -125,6 +125,8 @@ const ar: Dictionary = {
   'sidebar.nav.settings': 'الإعدادات',
   'sidebar.nav.settingsDescription': 'ACS والمصنّعون',
   'sidebar.whatsNew': 'ما الجديد',
+  'sidebar.providerSlug': 'المزوّد · {slug}',
+  'sidebar.platformAdmin': 'مسؤول المنصة',
   'sidebar.releaseNotesAria': 'فتح ملاحظات إصدار SkyGenPanel رقم {version}',
   'sidebar.versionTooltip': 'الإصدار {version} · ما الجديد',
   'sidebar.defaultOperator': 'المشغّل',

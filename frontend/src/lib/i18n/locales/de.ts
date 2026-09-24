@@ -125,6 +125,8 @@ const de: Dictionary = {
   'sidebar.nav.settings': 'Konfiguration',
   'sidebar.nav.settingsDescription': 'ACS und Hersteller',
   'sidebar.whatsNew': 'Neuerungen',
+  'sidebar.providerSlug': 'Anbieter · {slug}',
+  'sidebar.platformAdmin': 'Plattform-Administrator',
   'sidebar.releaseNotesAria': 'Versionshinweise zu SkyGenPanel {version} öffnen',
   'sidebar.versionTooltip': 'Version {version} · Neuerungen',
   'sidebar.defaultOperator': 'Operator',

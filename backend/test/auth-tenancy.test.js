@@ -205,6 +205,19 @@ describe('a request authenticated for one provider', () => {
   // requests, and the answer has to be the other ISP's ACS address in one and
   // never in the other. Before this change `resolveTenant` answered with the
   // first provider for both, so the Beta session read Alfa's row.
+  // O topo do menu diz de quem é o painel. Tem que ser o provedor do TOKEN:
+  // mesma pessoa, mesmo host, e a resposta muda só com a sessão.
+  it('names the session\'s own provider in /auth/user', async () => {
+    const fromAlfa = await call(`${panelUrl}/api/auth/user`, { headers: authHeaders(atAlfa) });
+    const fromBeta = await call(`${panelUrl}/api/auth/user`, { headers: authHeaders(atBeta) });
+    const alfaRow = await getDb()('tenants').where({ id: alfa }).first();
+
+    assert.equal(fromAlfa.status, 200);
+    assert.equal(fromBeta.status, 200);
+    assert.deepEqual(fromAlfa.body.data.tenant, { slug: alfaRow.slug ?? null, name: alfaRow.name });
+    assert.deepEqual(fromBeta.body.data.tenant, { slug: 'beta', name: 'Provedor Beta' });
+  });
+
   it('reads that provider\'s rows and never the other\'s', async () => {
     const fromAlfa = await acsSeenBy(atAlfa);
     const fromBeta = await acsSeenBy(atBeta);

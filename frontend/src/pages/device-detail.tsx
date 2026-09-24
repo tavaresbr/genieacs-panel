@@ -1895,6 +1895,10 @@ export default function DeviceDetailPage() {
                             value={invoiceFilter}
                             onChange={setInvoiceFilter}
                             ariaLabel={t('detail.sgp.invoiceFilterAria')}
+                            // Quatro botões não cabem na largura de um celular:
+                            // quebram em duas linhas em vez de rolar de lado e
+                            // esconder "Todos".
+                            className="flex-wrap"
                             options={[
                               { value: 'open', label: t('detail.sgp.invoiceFilterOpen', { count: invoiceCounts.open }) },
                               { value: 'cancelled', label: t('detail.sgp.invoiceFilterCancelled', { count: invoiceCounts.cancelled }) },

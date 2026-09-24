@@ -125,6 +125,8 @@ const hi: Dictionary = {
   'sidebar.nav.settings': 'कॉन्फ़िगरेशन',
   'sidebar.nav.settingsDescription': 'ACS और विक्रेता',
   'sidebar.whatsNew': 'नया क्या है',
+  'sidebar.providerSlug': 'प्रदाता · {slug}',
+  'sidebar.platformAdmin': 'प्लेटफ़ॉर्म व्यवस्थापक',
   'sidebar.releaseNotesAria': 'SkyGenPanel संस्करण {version} के रिलीज़ नोट खोलें',
   'sidebar.versionTooltip': 'संस्करण {version} · नया क्या है',
   'sidebar.defaultOperator': 'ऑपरेटर',

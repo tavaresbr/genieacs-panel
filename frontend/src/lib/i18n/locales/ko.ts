@@ -125,6 +125,8 @@ const ko: Dictionary = {
   'sidebar.nav.settings': '설정',
   'sidebar.nav.settingsDescription': 'ACS 및 제조사',
   'sidebar.whatsNew': '새로운 기능',
+  'sidebar.providerSlug': '공급자 · {slug}',
+  'sidebar.platformAdmin': '플랫폼 관리자',
   'sidebar.releaseNotesAria': 'SkyGenPanel {version} 버전의 릴리스 노트 열기',
   'sidebar.versionTooltip': '버전 {version} · 새로운 기능',
   'sidebar.defaultOperator': '운영자',

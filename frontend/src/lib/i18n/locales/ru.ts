@@ -125,6 +125,8 @@ const ru: Dictionary = {
   'sidebar.nav.settings': 'Настройка',
   'sidebar.nav.settingsDescription': 'ACS и производители',
   'sidebar.whatsNew': 'Что нового',
+  'sidebar.providerSlug': 'Провайдер · {slug}',
+  'sidebar.platformAdmin': 'Администратор платформы',
   'sidebar.releaseNotesAria': 'Открыть список изменений SkyGenPanel версии {version}',
   'sidebar.versionTooltip': 'Версия {version} · Что нового',
   'sidebar.defaultOperator': 'Оператор',
