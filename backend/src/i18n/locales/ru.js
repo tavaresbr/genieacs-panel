@@ -48,6 +48,14 @@ export default {
   'auth.passwordChangeRequired': 'Требуются текущий и новый пароль',
   'auth.newPasswordLength': 'Новый пароль должен содержать от 8 до 128 символов',
   'auth.currentPasswordIncorrect': 'Текущий пароль указан неверно',
+  'auth.mfaRequired': 'Введите код из приложения-аутентификатора',
+  'auth.mfaInvalid': 'Неверный код',
+  'auth.mfaAlreadyEnabled': 'Двухэтапный вход уже включён',
+  'auth.mfaNotStarted': 'Начните активацию заново: нет ожидающего кода',
+  'auth.mfaNotEnabled': 'Двухэтапный вход не включён',
+  'auth.mfaEnabled': 'Двухэтапный вход включён',
+  'auth.mfaDisabled': 'Двухэтапный вход выключен',
+  'auth.mfaRecoveryRegenerated': 'Созданы новые коды восстановления; старые больше не действуют',
   'auth.passwordUpdated': 'Пароль обновлён',
 
   // Ограничение частоты запросов

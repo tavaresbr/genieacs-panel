@@ -60,6 +60,10 @@ export const AUDIT_ACTION_LABEL_KEYS: Record<string, TranslationKey> = {
   'device.diagnostic_started': 'audit.action.deviceDiagnosticStarted',
   'device.firmware_upgrade': 'audit.action.deviceFirmwareUpgrade',
   'device.batch_action': 'audit.action.deviceBatchAction',
+  'user.mfa_enabled': 'audit.action.userMfaEnabled',
+  'user.mfa_disabled': 'audit.action.userMfaDisabled',
+  'user.mfa_recovery_regenerated': 'audit.action.userMfaRecoveryRegenerated',
+  'user.mfa_recovery_used': 'audit.action.userMfaRecoveryUsed',
   'subscriber_account.retired': 'audit.action.subscriberAccountRetired',
   'whatsapp.config_tested': 'audit.action.whatsappConfigTested'
 }

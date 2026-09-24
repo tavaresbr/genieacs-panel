@@ -523,6 +523,23 @@ export interface LoginTenantOption {
  * Só existe onde o endereço não nomeia provedor: com subdomínio por provedor o
  * host já respondeu, e o login nunca pergunta.
  */
+export interface MfaStatus {
+  enabled: boolean
+  /** Códigos de recuperação ainda não usados. */
+  recoveryRemaining: number
+}
+
+export interface MfaSetup {
+  /** O segredo em base32, para digitar no app quando não der para ler o QR. */
+  secret: string
+  /** A URI `otpauth://` que o QR code carrega. */
+  uri: string
+}
+
+export interface MfaRecoveryCodes {
+  recoveryCodes: string[]
+}
+
 export interface LoginDestinations {
   tenants: LoginTenantOption[]
   console: boolean
@@ -547,13 +564,25 @@ export const authAPI = {
    * e-mail. Renomear o parâmetro aqui faria a tela parecer mandar outra coisa
    * do que manda.
    */
-  login: (identifier: string, password: string, destino?: LoginDestination) =>
+  // `totpCode` é o código do app autenticador (ou um de recuperação), quando a
+  // conta tem login em duas etapas. Vai junto com a senha em toda ida: o
+  // servidor só o gasta quando a sessão nasce.
+  login: (identifier: string, password: string, destino?: LoginDestination, totpCode?: string) =>
     apiClient.post('/auth/login', {
       username: identifier,
       password,
       ...(destino?.tenantId ? { tenantId: destino.tenantId } : {}),
-      ...(destino?.console ? { destination: 'console' } : {})
+      ...(destino?.console ? { destination: 'console' } : {}),
+      ...(totpCode ? { totpCode } : {})
     }),
+
+  // Login em duas etapas da própria conta.
+  mfaStatus: () => apiClient.get<MfaStatus>('/auth/mfa'),
+  mfaSetup: () => apiClient.post<MfaSetup>('/auth/mfa/setup', {}),
+  mfaEnable: (code: string) => apiClient.post<MfaRecoveryCodes>('/auth/mfa/enable', { code }),
+  mfaDisable: (password: string, code: string) => apiClient.post('/auth/mfa/disable', { password, code }),
+  mfaRegenerateRecovery: (password: string, code: string) =>
+    apiClient.post<MfaRecoveryCodes>('/auth/mfa/recovery-codes', { password, code }),
 
   getCurrentUser: () =>
     apiClient.get('/auth/user'),
@@ -900,7 +929,7 @@ export const invitesAPI = {
     apiClient.post<InvitePreview>('/invites/token/preview', { token }),
 
   /** Aceita, com a conta que a pessoa já tem ou com uma nova. Devolve a sessão. */
-  accept: (token: string, payload: { username: string; password: string; email?: string }) =>
+  accept: (token: string, payload: { username: string; password: string; email?: string; totpCode?: string }) =>
     apiClient.post<LoginResponse>('/invites/token/accept', { ...payload, token })
 }
 

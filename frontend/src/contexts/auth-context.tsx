@@ -5,6 +5,7 @@ import type { LoginDestination, LoginDestinations } from '@/lib/api'
 import { sessionKind } from '@/lib/shell'
 import { apiClient, authAPI, storedSession } from '@/lib/api'
 import { destinosDaResposta } from '@/lib/login-destinations'
+import { mfaStepDaResposta, type MfaStep } from '@/lib/login-mfa'
 import { useNavigate } from 'react-router'
 import { roleHas, type Permission } from '@/lib/permissions'
 import type { User } from '@/types'
@@ -31,8 +32,8 @@ interface AuthContextType {
    * endereço não nomeia provedor e a pessoa trabalha em mais de um.
    */
   login: (
-    identifier: string, password: string, destino?: LoginDestination
-  ) => Promise<boolean | LoginDestinations>
+    identifier: string, password: string, destino?: LoginDestination, totpCode?: string
+  ) => Promise<boolean | LoginDestinations | MfaStep>
   completeSetup: (username: string, password: string, email: string) => Promise<boolean>
   /** Para quem chega com a sessão já pronta: o convite aceito e a personificação resgatada. */
   adoptSession: (
@@ -124,10 +125,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, [navigate, needsSetup])
 
   const login = async (
-    identifier: string, password: string, destino?: LoginDestination
-  ): Promise<boolean | LoginDestinations> => {
+    identifier: string, password: string, destino?: LoginDestination, totpCode?: string
+  ): Promise<boolean | LoginDestinations | MfaStep> => {
     try {
-      const res = await authAPI.login(identifier, password, destino)
+      const res = await authAPI.login(identifier, password, destino, totpCode)
+      // A senha está certa e falta (ou não serviu) o código do app: nem
+      // credencial errada, nem sessão. A tela pede o código.
+      const codigo = mfaStepDaResposta(res)
+      if (codigo) return codigo
       // "Em qual deles?" não é falha de credencial: a senha está certa e falta
       // escolher. Devolver os destinos em vez de `false` é o que deixa a tela
       // perguntar em vez de dizer que a senha está errada.

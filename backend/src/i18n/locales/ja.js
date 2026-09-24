@@ -48,6 +48,14 @@ export default {
   'auth.passwordChangeRequired': '現在のパスワードと新しいパスワードが必要です',
   'auth.newPasswordLength': '新しいパスワードは 8〜128 文字で入力してください',
   'auth.currentPasswordIncorrect': '現在のパスワードが正しくありません',
+  'auth.mfaRequired': '認証アプリのコードを入力してください',
+  'auth.mfaInvalid': 'コードが無効です',
+  'auth.mfaAlreadyEnabled': '2 段階ログインはすでに有効です',
+  'auth.mfaNotStarted': '有効化をやり直してください：保留中のコードがありません',
+  'auth.mfaNotEnabled': '2 段階ログインは有効になっていません',
+  'auth.mfaEnabled': '2 段階ログインを有効にしました',
+  'auth.mfaDisabled': '2 段階ログインを無効にしました',
+  'auth.mfaRecoveryRegenerated': '新しい復旧コードを生成しました。古いコードは使えません',
   'auth.passwordUpdated': 'パスワードを更新しました',
 
   // レート制限

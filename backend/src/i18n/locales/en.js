@@ -48,6 +48,14 @@ export default {
   'auth.passwordChangeRequired': 'The current password and the new password are required',
   'auth.newPasswordLength': 'The new password must be between 8 and 128 characters',
   'auth.currentPasswordIncorrect': 'The current password is incorrect',
+  'auth.mfaRequired': 'Enter the code from your authenticator app',
+  'auth.mfaInvalid': 'Invalid code',
+  'auth.mfaAlreadyEnabled': 'Two-step login is already on',
+  'auth.mfaNotStarted': 'Start the activation again: no pending code',
+  'auth.mfaNotEnabled': 'Two-step login is not on',
+  'auth.mfaEnabled': 'Two-step login turned on',
+  'auth.mfaDisabled': 'Two-step login turned off',
+  'auth.mfaRecoveryRegenerated': 'New recovery codes generated; the old ones no longer work',
   'auth.passwordUpdated': 'Password updated successfully',
 
   // Rate limiting

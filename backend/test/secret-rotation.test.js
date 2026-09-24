@@ -205,3 +205,42 @@ describe('o blob de app_state, onde dois segredos dividem a mesma chave', () => 
     assert.equal(guardado.baseUrl, 'https://sgp.exemplo.test');
   });
 });
+
+describe('o segredo do login em duas etapas entra na rotação', () => {
+  const TOTP = 'skygenpanel-user-totp-v1';
+
+  it('re-cifra o segredo guardado em `users`, que é da pessoa e não de um provedor', async () => {
+    // `users` é compartilhada: fica fora do laço dos provedores, e sem o caminho
+    // próprio este seria o primeiro segredo do painel que a rotação não alcança.
+    process.env.SECRET_BOX_KEY = CHAVE_ANTIGA;
+    const cifrado = createSecretBox(TOTP).encrypt('JBSWY3DPEHPK3PXP');
+    const [id] = await getDb()('users').insert({
+      username: 'pessoa-com-2fa',
+      password: 'hash-qualquer',
+      role: 'admin',
+      totp_ciphertext: cifrado.password_ciphertext,
+      totp_iv: cifrado.password_iv,
+      totp_tag: cifrado.password_tag,
+      totp_key_version: cifrado.password_key_version,
+      totp_enabled_at: new Date()
+    }).returning('id').then((linhas) => linhas.map((l) => (typeof l === 'object' ? l.id : l)));
+
+    try {
+      emRotacao();
+      const resumo = await SecretRotationService.run();
+      assert.ok(resumo.reescritas >= 1);
+
+      anteriorRemovida();
+      const linha = await getDb()('users').where({ id }).first();
+      const aberto = createSecretBox(TOTP).decrypt({
+        password_ciphertext: linha.totp_ciphertext,
+        password_iv: linha.totp_iv,
+        password_tag: linha.totp_tag,
+        password_key_version: linha.totp_key_version
+      });
+      assert.equal(aberto, 'JBSWY3DPEHPK3PXP', 'o segredo do 2FA ficou ilegível ao largar a chave anterior');
+    } finally {
+      await getDb()('users').where({ id }).del();
+    }
+  });
+});

@@ -141,6 +141,10 @@ export const SHARED_TABLES = new Set([
   // through the scope would be circular. `TenantUser` carries the rule that
   // every query against it must name a person or a provider.
   'tenant_users',
+  // Os códigos de recuperação do login em duas etapas. Da PESSOA, como a linha
+  // de `users` a que pertencem: o segundo fator vale em todo provedor em que
+  // ela trabalha, e é lido no login, antes de existir escopo.
+  'user_recovery_codes',
   // A trilha do plano de controle: o que quem opera o SaaS fez COM um
   // provedor. Compartilhada porque é ACIMA dos provedores e porque a linha que
   // registra a exclusão de um tem que sobreviver a ele — escopada, ela seria

@@ -52,6 +52,7 @@ import { INSTALLER_VIRTUAL_PARAMETERS, VIRTUAL_PARAMETER_FIELDS } from '@/lib/vi
 /** O que a SaaS grava pelo console e não por esta tela: o ACS e os parâmetros TR-069. */
 const PLATFORM_MANAGED_KEYS = new Set<string>(['genieAcsUrl', ...Object.keys(INSTALLER_VIRTUAL_PARAMETERS)])
 import type { Vendor as VendorType, WifiSecurityConfig as WifiSecurityConfigType } from '@/types'
+import { MfaCard } from '@/components/mfa-card'
 
 /**
  * Mapas em vez de nome de chave montado com template literal.
@@ -2509,6 +2510,7 @@ export default function Settings() {
             <h2 className="section-heading">{t('settings.security.title')}</h2>
             <p className="section-description mb-6">{t('settings.security.description')}</p>
             <div className="space-y-6">
+              <MfaCard />
               <section className="rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-4">
                 <h3 className="font-semibold text-foreground">{t('settings.security.changeUsername')}</h3>
                 <p className="mb-4 mt-1 text-sm text-muted-foreground">{t('settings.security.changeUsernameHint')}</p>

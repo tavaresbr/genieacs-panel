@@ -48,6 +48,14 @@ export default {
   'auth.passwordChangeRequired': '현재 비밀번호와 새 비밀번호가 필요합니다',
   'auth.newPasswordLength': '새 비밀번호는 8자에서 128자 사이여야 합니다',
   'auth.currentPasswordIncorrect': '현재 비밀번호가 올바르지 않습니다',
+  'auth.mfaRequired': '인증 앱의 코드를 입력하세요',
+  'auth.mfaInvalid': '잘못된 코드입니다',
+  'auth.mfaAlreadyEnabled': '2단계 로그인이 이미 켜져 있습니다',
+  'auth.mfaNotStarted': '활성화를 다시 시작하세요: 대기 중인 코드가 없습니다',
+  'auth.mfaNotEnabled': '2단계 로그인이 켜져 있지 않습니다',
+  'auth.mfaEnabled': '2단계 로그인을 켰습니다',
+  'auth.mfaDisabled': '2단계 로그인을 껐습니다',
+  'auth.mfaRecoveryRegenerated': '새 복구 코드를 만들었습니다. 이전 코드는 더 이상 사용할 수 없습니다',
   'auth.passwordUpdated': '비밀번호를 변경했습니다',
 
   // 요청 제한

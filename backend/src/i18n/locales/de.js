@@ -48,6 +48,14 @@ export default {
   'auth.passwordChangeRequired': 'Das aktuelle und das neue Passwort sind erforderlich',
   'auth.newPasswordLength': 'Das neue Passwort muss zwischen 8 und 128 Zeichen lang sein',
   'auth.currentPasswordIncorrect': 'Das aktuelle Passwort ist falsch',
+  'auth.mfaRequired': 'Geben Sie den Code aus Ihrer Authenticator-App ein',
+  'auth.mfaInvalid': 'Ungültiger Code',
+  'auth.mfaAlreadyEnabled': 'Die Zwei-Schritt-Anmeldung ist bereits aktiv',
+  'auth.mfaNotStarted': 'Starten Sie die Aktivierung neu: kein ausstehender Code',
+  'auth.mfaNotEnabled': 'Die Zwei-Schritt-Anmeldung ist nicht aktiv',
+  'auth.mfaEnabled': 'Zwei-Schritt-Anmeldung aktiviert',
+  'auth.mfaDisabled': 'Zwei-Schritt-Anmeldung deaktiviert',
+  'auth.mfaRecoveryRegenerated': 'Neue Wiederherstellungscodes erzeugt; die alten gelten nicht mehr',
   'auth.passwordUpdated': 'Passwort erfolgreich aktualisiert',
 
   // Ratenbegrenzung

@@ -46,6 +46,14 @@ export default {
   'auth.passwordChangeRequired': 'मौजूदा और नया पासवर्ड आवश्यक हैं',
   'auth.newPasswordLength': 'नया पासवर्ड 8 से 128 अक्षरों के बीच होना चाहिए',
   'auth.currentPasswordIncorrect': 'मौजूदा पासवर्ड ग़लत है',
+  'auth.mfaRequired': 'ऑथेंटिकेटर ऐप का कोड दर्ज करें',
+  'auth.mfaInvalid': 'अमान्य कोड',
+  'auth.mfaAlreadyEnabled': 'दो-चरण लॉगिन पहले से चालू है',
+  'auth.mfaNotStarted': 'सक्रियण फिर से शुरू करें: कोई लंबित कोड नहीं',
+  'auth.mfaNotEnabled': 'दो-चरण लॉगिन चालू नहीं है',
+  'auth.mfaEnabled': 'दो-चरण लॉगिन चालू किया गया',
+  'auth.mfaDisabled': 'दो-चरण लॉगिन बंद किया गया',
+  'auth.mfaRecoveryRegenerated': 'नए रिकवरी कोड बनाए गए; पुराने अब मान्य नहीं हैं',
   'auth.passwordUpdated': 'पासवर्ड अपडेट हो गया',
 
   // दर सीमा
