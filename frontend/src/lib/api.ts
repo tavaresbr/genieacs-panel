@@ -12,19 +12,27 @@ export interface SubscriptionBlockedDetail {
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || ''
 
-export type DeviceBatchAction = 'reboot'
+export type DeviceBatchAction = 'reboot' | 'firmware'
 
 export interface DeviceBatchResult {
   deviceId: string
   /** `sent`: o ACS aplicou; `queued`: espera a ONT se conectar; `failed`: ver `reason`. */
   outcome: 'sent' | 'queued' | 'failed'
-  reason: 'not_found' | 'acs_error' | 'refused' | null
+  reason: 'not_found' | 'acs_error' | 'refused' | 'firmware_not_compatible' | 'firmware_already_installed' | null
 }
 
 export interface DeviceBatchResponse {
   action: DeviceBatchAction
   summary: { total: number; sent: number; queued: number; failed: number }
   results: DeviceBatchResult[]
+  /** O arquivo mandado, no firmware em lote. */
+  file?: Omit<DeviceFirmwareFile, 'installed'> | null
+}
+
+/** Os firmwares que dizem o modelo — a lista do lote — e quantos não dizem. */
+export interface DeviceFirmwareCatalog {
+  files: Omit<DeviceFirmwareFile, 'installed'>[]
+  unclassified: number
 }
 
 export interface DeviceFirmwareFile {
@@ -1620,8 +1628,10 @@ export const devicesAPI = {
     apiClient.post<DeviceDiagnosticResult>('/devices/diagnostics/result', { deviceId, kind }),
 
   // Uma ação em vários aparelhos de uma vez (até 200), com o resultado de cada um.
-  runBatch: (action: DeviceBatchAction, deviceIds: string[], filter?: Record<string, string>) =>
-    apiClient.post<DeviceBatchResponse>('/devices/batch', { action, deviceIds, filter }),
+  runBatch: (action: DeviceBatchAction, deviceIds: string[], filter?: Record<string, string>, fileId?: string) =>
+    apiClient.post<DeviceBatchResponse>('/devices/batch', { action, deviceIds, filter, fileId }),
+
+  listFirmwareCatalog: () => apiClient.get<DeviceFirmwareCatalog>('/devices/firmware/files'),
 
   // Os firmwares do GenieACS que servem para o modelo desta ONT.
   listFirmware: (deviceId: string) =>

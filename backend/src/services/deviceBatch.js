@@ -8,7 +8,7 @@
  */
 
 export const BATCH_LIMIT = 200;
-export const BATCH_ACTIONS = Object.freeze(['reboot']);
+export const BATCH_ACTIONS = Object.freeze(['reboot', 'firmware']);
 
 /** Um id de aparelho do GenieACS, do tamanho que a trilha e o ACS aceitam. */
 const ID_MAX = 256;

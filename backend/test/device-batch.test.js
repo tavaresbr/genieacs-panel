@@ -27,7 +27,9 @@ let genie;
 
 before(async () => {
   ({ panelUrl } = await startTestServers());
-  genie = await startGenieAcsStub({ devices: IDS.map((id) => buildDevice({ id })) });
+  const outroModelo = buildDevice({ id: 'ONT-OUTRO-MODELO' });
+  outroModelo._deviceId._ProductClass = 'HG8145X6';
+  genie = await startGenieAcsStub({ devices: [...IDS.map((id) => buildDevice({ id })), outroModelo] });
   const setup = await call(`${panelUrl}/api/auth/setup`, {
     method: 'POST',
     body: { username: 'operator', password: 'operator-password-1', email: 'operator@exemplo.test' }
@@ -46,11 +48,18 @@ beforeEach(() => {
   genie.state.taskStatus = 200;
   genie.state.taskStatusFor = null;
   genie.state.tasks.length = 0;
+  genie.state.files = [
+    { _id: 'f670l-v2.bin', uploadDate: '2026-09-10T00:00:00.000Z', metadata: { fileType: '1 Firmware Upgrade Image', oui: '', productClass: 'F670L', version: 'V2.0' } },
+    { _id: 'sem-modelo.bin', uploadDate: '2026-09-11T00:00:00.000Z', metadata: { fileType: '1 Firmware Upgrade Image', oui: '', productClass: '', version: 'V9' } },
+    { _id: 'config.xml', metadata: { fileType: '3 Vendor Configuration File', productClass: 'F670L' } }
+  ];
 });
 
 const post = (body) => call(`${panelUrl}/api/devices/batch`, { method: 'POST', headers: authHeaders(token), body });
 const linhas = () => getDb()('audit_log').where({ action: AuditLog.ACTIONS.DEVICE_BATCH_ACTION }).orderBy('id', 'asc');
 const reboots = () => genie.state.tasks.filter((entry) => entry.task?.name === 'reboot').map((entry) => entry.deviceId);
+const downloads = () => genie.state.tasks.filter((entry) => entry.task?.name === 'download').map((entry) => [entry.deviceId, entry.task.file]);
+const versao = (id) => genie.state.devices.find((device) => device._id === id).InternetGatewayDevice.DeviceInfo.SoftwareVersion;
 
 describe('o lote, sem rede', () => {
   it('ids limpos: sem vazio, sem repetição, na ordem em que vieram', () => {
@@ -163,6 +172,58 @@ describe('reiniciar em lote', () => {
     const antes = (await linhas()).length;
     const { status } = await post({ action: 'reboot', deviceIds: IDS });
     assert.equal(status, 502);
+    assert.equal(genie.state.tasks.length, 0);
+    assert.equal((await linhas()).length, antes);
+  });
+});
+
+describe('firmware em lote', () => {
+  it('a lista do lote traz os firmwares que dizem o modelo, e conta os que não dizem', async () => {
+    const { status, body } = await call(`${panelUrl}/api/devices/firmware/files`, { headers: authHeaders(token) });
+    assert.equal(status, 200, JSON.stringify(body));
+    assert.deepEqual(body.data.files.map((file) => file.id), ['f670l-v2.bin']);
+    assert.equal(body.data.unclassified, 1);
+  });
+
+  it('cada ONT é conferida contra o arquivo: outro modelo e versão já instalada ficam de fora, sem tarefa', async () => {
+    const antes = (await linhas()).length;
+    const original = versao(IDS[1])._value;
+    versao(IDS[1])._value = 'V2.0';
+    try {
+      const { status, body } = await post({
+        action: 'firmware',
+        fileId: 'f670l-v2.bin',
+        deviceIds: [IDS[0], IDS[1], 'ONT-OUTRO-MODELO', 'NAO-EXISTE']
+      });
+      assert.equal(status, 200, JSON.stringify(body));
+      assert.deepEqual(
+        body.data.results.map((result) => [result.deviceId, result.outcome, result.reason]),
+        [
+          [IDS[0], 'sent', null],
+          [IDS[1], 'failed', 'firmware_already_installed'],
+          ['ONT-OUTRO-MODELO', 'failed', 'firmware_not_compatible'],
+          ['NAO-EXISTE', 'failed', 'not_found']
+        ]
+      );
+      assert.deepEqual(downloads(), [[IDS[0], 'f670l-v2.bin']]);
+      const linha = (await linhas()).at(-1);
+      assert.equal((await linhas()).length, antes + 1);
+      assert.deepEqual(JSON.parse(linha.detail), {
+        action: 'firmware', total: 4, sent: 1, queued: 0, failed: 3, file: 'f670l-v2.bin', version: 'V2.0', filter: null
+      });
+    } finally {
+      versao(IDS[1])._value = original;
+    }
+  });
+
+  it('arquivo que não existe, não é firmware ou não diz o modelo: 400, nada sai e nada entra na trilha', async () => {
+    const antes = (await linhas()).length;
+    for (const fileId of ['nao-existe.bin', 'sem-modelo.bin', 'config.xml', '', undefined]) {
+      // eslint-disable-next-line no-await-in-loop -- uma tentativa por vez
+      const { status, body } = await post({ action: 'firmware', fileId, deviceIds: IDS });
+      assert.equal(status, 400, `aceitou ${JSON.stringify(fileId)}`);
+      assert.equal(body.code, 'firmware_not_compatible');
+    }
     assert.equal(genie.state.tasks.length, 0);
     assert.equal((await linhas()).length, antes);
   });

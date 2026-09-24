@@ -32,6 +32,7 @@ import {
   FIRMWARE_FILE_TYPE,
   compatibleFirmware,
   currentFirmwareVersion,
+  firmwareCatalog,
   isInstalledVersion
 } from './firmwareFiles.js';
 import { mapWithLimit } from './deviceBatch.js';
@@ -2088,21 +2089,57 @@ class DeviceService {
    * segue. `sent` é o ACS ter aplicado na hora (200); `queued`, a tarefa
    * esperando a ONT se conectar (202).
    *
-   * @param {'reboot'} action
+   * No firmware, cada ONT é conferida contra o arquivo com a mesma regra da
+   * troca de um aparelho só: outro modelo, ou a versão que ela já roda, vira
+   * `failed` com o motivo, sem tarefa — um lote misturado não manda firmware
+   * errado para ninguém.
+   *
+   * @param {'reboot'|'firmware'} action
    * @param {string[]} deviceIds já normalizados por `normalizeBatchIds`
    */
-  static async runBatch(action, deviceIds) {
-    const existentes = new Set();
+  static async runBatch(action, deviceIds, { fileId = null } = {}) {
+    // Firmware: o arquivo é resolvido UMA vez, antes de qualquer tarefa. Um
+    // arquivo que não existe ou não é firmware recusa o lote inteiro — não há
+    // ONT para a qual ele sirva.
+    let arquivo = null;
+    if (action === 'firmware') {
+      const { files } = await this.listFirmwareCatalog();
+      arquivo = files.find((file) => file.id === String(fileId ?? '').trim()) ?? null;
+      if (!arquivo) {
+        throw new TranslatableError('device.firmwareNotCompatible', null, { status: 400, code: 'firmware_not_compatible' });
+      }
+    }
+
+    const existentes = new Map();
+    const projecao = action === 'firmware'
+      ? ['_id', '_deviceId', 'InternetGatewayDevice.DeviceInfo.SoftwareVersion', 'Device.DeviceInfo.SoftwareVersion']
+      : ['_id'];
     for (let inicio = 0; inicio < deviceIds.length; inicio += this.BATCH_LOOKUP_CHUNK) {
       const bloco = deviceIds.slice(inicio, inicio + this.BATCH_LOOKUP_CHUNK);
       // eslint-disable-next-line no-await-in-loop -- um bloco por vez, para não disputar o ACS consigo mesmo
-      const rows = await this.fetchDeviceListPage(JSON.stringify({ _id: { $in: bloco } }), ['_id']);
-      for (const row of rows) existentes.add(String(row._id));
+      const rows = await this.fetchDeviceListPage(JSON.stringify({ _id: { $in: bloco } }), projecao);
+      for (const row of rows) existentes.set(String(row._id), row);
     }
 
-    const task = { reboot: { name: 'reboot' } }[action];
     const results = await mapWithLimit(deviceIds, this.BATCH_PARALLEL, async (deviceId) => {
-      if (!existentes.has(deviceId)) return { deviceId, outcome: 'failed', reason: 'not_found' };
+      const row = existentes.get(deviceId);
+      if (!row) return { deviceId, outcome: 'failed', reason: 'not_found' };
+
+      let task = { name: 'reboot' };
+      if (action === 'firmware') {
+        // A mesma regra da troca de um aparelho só: o modelo da ONT tem que ser
+        // o do arquivo, e a versão que ela já roda não é reinstalada.
+        const device = { oui: row?._deviceId?._OUI ?? null, productClass: row?._deviceId?._ProductClass ?? null };
+        const { compatible } = compatibleFirmware([{ _id: arquivo.id, metadata: {
+          fileType: FIRMWARE_FILE_TYPE, oui: arquivo.oui, productClass: arquivo.productClass, version: arquivo.version
+        } }], device);
+        if (compatible.length === 0) return { deviceId, outcome: 'failed', reason: 'firmware_not_compatible' };
+        if (isInstalledVersion(arquivo, currentFirmwareVersion(row))) {
+          return { deviceId, outcome: 'failed', reason: 'firmware_already_installed' };
+        }
+        task = { name: 'download', file: arquivo.id };
+      }
+
       try {
         const { applied } = await this.postProvisioningTask(deviceId, task);
         return { deviceId, outcome: applied ? 'sent' : 'queued', reason: null };
@@ -2114,9 +2151,19 @@ class DeviceService {
         };
       }
     });
-    return results.map((result, indice) => (result && !result.error
+    const normalizados = results.map((result, indice) => (result && !result.error
       ? result
       : { deviceId: deviceIds[indice], outcome: 'failed', reason: 'acs_error' }));
+    return { results: normalizados, file: arquivo };
+  }
+
+  /** Todos os firmwares do GenieACS que dizem o modelo — a lista do lote. */
+  static async listFirmwareCatalog() {
+    const files = await this.fetchGenieAcsCollection('files', {
+      query: JSON.stringify({ 'metadata.fileType': FIRMWARE_FILE_TYPE }),
+      limit: 500
+    });
+    return firmwareCatalog(files);
   }
 
   /**
