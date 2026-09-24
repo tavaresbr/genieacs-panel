@@ -47,37 +47,11 @@ import { OPERATOR_ROLES, ROLE_LABEL_KEYS, ROLE_SUMMARY_KEYS } from '@/lib/permis
 import { exportFileName } from '@/lib/utils'
 import { InvitePanel } from '@/components/settings/invite-panel'
 import { ProviderAddressPanel } from '@/components/settings/provider-address-panel'
+import { INSTALLER_VIRTUAL_PARAMETERS, VIRTUAL_PARAMETER_FIELDS } from '@/lib/virtual-parameters'
+
+/** O que a SaaS grava pelo console e não por esta tela: o ACS e os parâmetros TR-069. */
+const PLATFORM_MANAGED_KEYS = new Set<string>(['genieAcsUrl', ...Object.keys(INSTALLER_VIRTUAL_PARAMETERS)])
 import type { Vendor as VendorType, WifiSecurityConfig as WifiSecurityConfigType } from '@/types'
-
-const INSTALLER_VIRTUAL_PARAMETERS = {
-  vpPppoeUsername: 'VirtualParameters.PPPUsername',
-  vpWanBridge: 'VirtualParameters.WANBridge',
-  vpRxPower: 'VirtualParameters.OpticalRXPower',
-  vpTemperature: 'VirtualParameters.OpticalTemperature',
-  vpActiveDevices: 'VirtualParameters.TotalStations',
-  vpSuperAdmin: 'VirtualParameters.LoginSuperUser',
-  vpSuperPassword: 'VirtualParameters.LoginSuperPass',
-  vpUserAdmin: '',
-  vpUserPassword: ''
-}
-
-/** `hintKey` is set for the fields the installer does not provide; the others show the raw parameter name. */
-const VIRTUAL_PARAMETER_FIELDS: {
-  key: keyof typeof INSTALLER_VIRTUAL_PARAMETERS
-  labelKey: TranslationKey
-  parameterName?: string
-  hintKey?: TranslationKey
-}[] = [
-  { key: 'vpPppoeUsername', labelKey: 'settings.vp.pppoeUsername', parameterName: 'PPPUsername' },
-  { key: 'vpWanBridge', labelKey: 'settings.vp.wanBridge', parameterName: 'WANBridge' },
-  { key: 'vpRxPower', labelKey: 'settings.vp.rxPower', parameterName: 'OpticalRXPower' },
-  { key: 'vpTemperature', labelKey: 'settings.vp.temperature', parameterName: 'OpticalTemperature' },
-  { key: 'vpActiveDevices', labelKey: 'settings.vp.activeDevices', parameterName: 'TotalStations' },
-  { key: 'vpSuperAdmin', labelKey: 'settings.vp.superAdmin', parameterName: 'LoginSuperUser' },
-  { key: 'vpSuperPassword', labelKey: 'settings.vp.superPassword', parameterName: 'LoginSuperPass' },
-  { key: 'vpUserAdmin', labelKey: 'settings.vp.userAdmin', hintKey: 'settings.vp.optionalHint' },
-  { key: 'vpUserPassword', labelKey: 'settings.vp.userPassword', hintKey: 'settings.vp.optionalHint' }
-]
 
 /**
  * Mapas em vez de nome de chave montado com template literal.
@@ -174,6 +148,15 @@ export default function Settings() {
       return fallback
     }
   })
+  // Na SaaS, "Painel e ACS" e "Parâmetros TR-069" não existem para o
+  // provedor. O perfil do provedor chega depois da primeira renderização, e um
+  // `?tab=` antigo pode apontar para uma delas: nos dois casos a tela vai para
+  // a primeira aba que ele tem.
+  useEffect(() => {
+    if (platformManaged && (activeTab === 'general' || activeTab === 'virtual-params')) {
+      setActiveTab(canEditProvider ? 'provider' : 'customer-portal')
+    }
+  }, [platformManaged, activeTab, canEditProvider])
   const [testResult, setTestResult] = useState<{success: boolean, message: string, deviceCount?: number} | null>(null)
   const [genieAuthConfig, setGenieAuthConfig] = useState<GenieAcsAuthConfig | null>(null)
   const [genieAuthForm, setGenieAuthForm] = useState<{
@@ -1028,7 +1011,7 @@ export default function Settings() {
       // Na SaaS a URL do ACS é gravada pelo console; mandá-la daqui seria uma
       // recusa (403) a cada salvar, por um campo que a tela nem deixa editar.
       const entries = Object.entries(settings)
-        .filter(([key]) => key !== 'appName' && !(platformManaged && key === 'genieAcsUrl'))
+        .filter(([key]) => key !== 'appName' && !(platformManaged && PLATFORM_MANAGED_KEYS.has(key)))
         .sort(([left], [right]) => {
         if (left === 'autoGenerateCustomerId') return 1
         if (right === 'autoGenerateCustomerId') return -1
@@ -1312,6 +1295,70 @@ export default function Settings() {
     }
   }
 
+  // Nome, idioma e prazo da trilha: na self-hosted ficam em "Painel e ACS";
+  // na SaaS, onde aquela aba é da plataforma, vão para "Geral". Um pedaço só,
+  // desenhado nos dois lugares.
+  const identityFields = (
+    <>
+      <div>
+        <label htmlFor="application-name" className="field-label">{t('settings.general.appName')}</label>
+        <input
+          id="application-name"
+          type="text"
+          value={settings.appName}
+          onChange={(e) => setSettings({...settings, appName: e.target.value})}
+          className="modern-input w-full"
+        />
+      </div>
+      <div>
+        <p className="field-label">{t('settings.general.language')}</p>
+        <LanguageSwitcher className="w-full sm:w-72" />
+        <p className="field-hint">{t('settings.general.languageHint')}</p>
+      </div>
+    </>
+  )
+
+  const auditRetentionSection = (
+    <>
+    {/* O prazo da trilha.
+        Aqui e não na aba "Acesso da conta": aquela é sobre a conta de
+        QUEM ESTÁ USANDO o painel — trocar o próprio usuário, a
+        própria senha — e tem botões de salvar próprios. Este é
+        política do provedor, gravado pelo mesmo Salvar que grava o
+        resto desta aba.
+
+        Os dois limites da ajuda não são enfeite: o servidor recusa
+        fora deles, e dizer os números aqui é o que evita a ida
+        perdida. */}
+    <div className="mt-6 border-t border-border pt-6">
+      <h3 className="font-semibold">{t('settings.audit.title')}</h3>
+      <p className="field-hint mb-4 mt-1">{t('settings.audit.description')}</p>
+      <div className="max-w-xs">
+        <label htmlFor="audit-retention" className="field-label">
+          {t('settings.audit.retention')}
+        </label>
+        <input
+          id="audit-retention"
+          type="number"
+          min={30}
+          max={retentionCaps?.audit ?? 3650}
+          step={1}
+          className="modern-input w-full"
+          value={settings.auditRetentionDays}
+          onChange={(event) => setSettings((current) => ({
+            ...current,
+            auditRetentionDays: event.target.value
+          }))}
+        />
+        <p className="field-hint">{t('settings.audit.retentionHint')}</p>
+        {retentionCaps?.audit != null && (
+          <p className="field-hint">{t('settings.retentionCap', { max: retentionCaps.audit })}</p>
+        )}
+      </div>
+    </div>
+    </>
+  )
+
   return (
     <div className="page-shell">
       <div className="page-frame">
@@ -1336,24 +1383,32 @@ export default function Settings() {
                 {t('settings.tab.provider')}
               </button>
             )}
-            <button
-              onClick={() => setActiveTab('general')}
-              className="tab-button"
-              data-active={activeTab === 'general'}
-              role="tab"
-              aria-selected={activeTab === 'general'}
-            >
-              {t('settings.tab.general')}
-            </button>
-            <button
-              onClick={() => setActiveTab('virtual-params')}
-              className="tab-button"
-              data-active={activeTab === 'virtual-params'}
-              role="tab"
-              aria-selected={activeTab === 'virtual-params'}
-            >
-              {t('settings.tab.virtualParams')}
-            </button>
+            {/* Na SaaS o ACS e os parâmetros TR-069 são da plataforma: as duas
+                abas só existem para quem os configura — a self-hosted e a
+                caixa da plataforma. O provedor edita nome, idioma e trilha na
+                aba "Geral". */}
+            {!platformManaged && (
+              <>
+                <button
+                  onClick={() => setActiveTab('general')}
+                  className="tab-button"
+                  data-active={activeTab === 'general'}
+                  role="tab"
+                  aria-selected={activeTab === 'general'}
+                >
+                  {t('settings.tab.general')}
+                </button>
+                <button
+                  onClick={() => setActiveTab('virtual-params')}
+                  className="tab-button"
+                  data-active={activeTab === 'virtual-params'}
+                  role="tab"
+                  aria-selected={activeTab === 'virtual-params'}
+                >
+                  {t('settings.tab.virtualParams')}
+                </button>
+              </>
+            )}
             <button
               onClick={() => setActiveTab('customer-portal')}
               className="tab-button"
@@ -1439,32 +1494,31 @@ export default function Settings() {
         {/* Content */}
         {activeTab === 'provider' && canEditProvider && (
           <div className="space-y-6">
+            {/* Na SaaS a aba "Painel e ACS" é da plataforma; o que nela era do
+                provedor — o nome, o idioma e o prazo da trilha — vem para cá,
+                gravado pelo Salvar desta aba. */}
+            {platformManaged && can('settings.write') && (
+              <div className="modern-card max-w-3xl p-5 sm:p-6">
+                <h2 className="section-heading">{t('settings.panelIdentity.title')}</h2>
+                <p className="section-description mb-6">{t('settings.panelIdentity.description')}</p>
+                <div className="space-y-4">
+                  {identityFields}
+                </div>
+                {auditRetentionSection}
+              </div>
+            )}
             <ProviderAddressPanel />
           </div>
         )}
 
-        {activeTab === 'general' && (
+        {activeTab === 'general' && !platformManaged && (
           <div className="space-y-6">
             {/* App Settings */}
             <div className="modern-card max-w-3xl p-5 sm:p-6">
               <h2 className="section-heading">{t('settings.general.title')}</h2>
               <p className="section-description mb-6">{t('settings.general.description')}</p>
               <div className="space-y-4">
-                <div>
-                  <label htmlFor="application-name" className="field-label">{t('settings.general.appName')}</label>
-                  <input
-                    id="application-name"
-                    type="text"
-                    value={settings.appName}
-                    onChange={(e) => setSettings({...settings, appName: e.target.value})}
-                    className="modern-input w-full"
-                  />
-                </div>
-                <div>
-                  <p className="field-label">{t('settings.general.language')}</p>
-                  <LanguageSwitcher className="w-full sm:w-72" />
-                  <p className="field-hint">{t('settings.general.languageHint')}</p>
-                </div>
+                {identityFields}
                 {platformManaged ? (
                   /* Na SaaS quem aponta este painel para o ACS é a plataforma,
                      pelo console. O provedor vê para onde aponta e se responde
@@ -1633,42 +1687,7 @@ export default function Settings() {
                 )}
               </div>
 
-              {/* O prazo da trilha.
-                  Aqui e não na aba "Acesso da conta": aquela é sobre a conta de
-                  QUEM ESTÁ USANDO o painel — trocar o próprio usuário, a
-                  própria senha — e tem botões de salvar próprios. Este é
-                  política do provedor, gravado pelo mesmo Salvar que grava o
-                  resto desta aba.
-
-                  Os dois limites da ajuda não são enfeite: o servidor recusa
-                  fora deles, e dizer os números aqui é o que evita a ida
-                  perdida. */}
-              <div className="mt-6 border-t border-border pt-6">
-                <h3 className="font-semibold">{t('settings.audit.title')}</h3>
-                <p className="field-hint mb-4 mt-1">{t('settings.audit.description')}</p>
-                <div className="max-w-xs">
-                  <label htmlFor="audit-retention" className="field-label">
-                    {t('settings.audit.retention')}
-                  </label>
-                  <input
-                    id="audit-retention"
-                    type="number"
-                    min={30}
-                    max={retentionCaps?.audit ?? 3650}
-                    step={1}
-                    className="modern-input w-full"
-                    value={settings.auditRetentionDays}
-                    onChange={(event) => setSettings((current) => ({
-                      ...current,
-                      auditRetentionDays: event.target.value
-                    }))}
-                  />
-                  <p className="field-hint">{t('settings.audit.retentionHint')}</p>
-                  {retentionCaps?.audit != null && (
-                    <p className="field-hint">{t('settings.retentionCap', { max: retentionCaps.audit })}</p>
-                  )}
-                </div>
-              </div>
+              {auditRetentionSection}
 
               {testResult && (
                 <div className={`mt-4 p-4 rounded-md ${
@@ -1691,7 +1710,7 @@ export default function Settings() {
           </div>
         )}
 
-        {activeTab === 'virtual-params' && (
+        {activeTab === 'virtual-params' && !platformManaged && (
           <div className="modern-card p-5 sm:p-6">
             <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
@@ -3443,7 +3462,8 @@ export default function Settings() {
         )}
 
         {/* Save Button */}
-        {(activeTab === 'general' || activeTab === 'virtual-params' || activeTab === 'customer-portal') && (
+        {(activeTab === 'general' || activeTab === 'virtual-params' || activeTab === 'customer-portal'
+          || (activeTab === 'provider' && platformManaged && can('settings.write'))) && (
           <div className="flex justify-end mt-8">
             <button
               onClick={handleSaveSettings}

@@ -2465,6 +2465,9 @@ const ar: Dictionary = {
   'catalogue.propagate.row': 'أضيف {added}، استُبدل {updated}',
   'catalogue.propagate.failed': 'تعذر إرسال التحديثات.',
   'settings.platformManaged.whatsappDescription': 'يربط رقم واتساب واحدًا أو أكثر عبر خادم Evolution API التابع للمنصة. تُحفظ الرموز مشفرة ولا تعود أبدًا إلى المتصفح.',
+  'settings.panelIdentity.title': 'اللوحة',
+  'settings.panelIdentity.description': 'الاسم المعروض في اللوحة ولغة هذا المتصفح ومدة الاحتفاظ بسجل التدقيق.',
+  'platform.genieacs.vpDescription': 'المسارات التي تقرؤها اللوحة من أجهزة هذا المزوّد. تعتمد على نصوص التهيئة المثبتة في GenieACS الخاص بالمنصة، لذلك لا يعدّلها المزوّد.',
 }
 
 export default ar

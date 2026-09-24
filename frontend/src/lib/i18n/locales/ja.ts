@@ -2456,6 +2456,9 @@ const ja: Dictionary = {
   'catalogue.propagate.row': '{added} 件追加、{updated} 件上書き',
   'catalogue.propagate.failed': '更新を送信できませんでした。',
   'settings.platformManaged.whatsappDescription': 'プラットフォームの Evolution API サーバーを通じて 1 つ以上の WhatsApp 番号を接続します。トークンは暗号化して保存され、ブラウザーに返されることはありません。',
+  'settings.panelIdentity.title': 'パネル',
+  'settings.panelIdentity.description': 'パネルに表示する名前、このブラウザーの言語、監査ログの保持期間。',
+  'platform.genieacs.vpDescription': 'パネルがこのプロバイダーの機器から読み取るパスです。プラットフォームの GenieACS にインストールされたプロビジョニングスクリプトに依存するため、プロバイダーは編集しません。',
 }
 
 export default ja

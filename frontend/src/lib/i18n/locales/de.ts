@@ -2460,6 +2460,9 @@ const de: Dictionary = {
   'catalogue.propagate.row': '{added} hinzugefügt, {updated} überschrieben',
   'catalogue.propagate.failed': 'Die Updates konnten nicht gesendet werden.',
   'settings.platformManaged.whatsappDescription': 'Verbindet eine oder mehrere WhatsApp-Nummern über den Evolution-API-Server der Plattform. Tokens werden verschlüsselt gespeichert und nie an den Browser zurückgegeben.',
+  'settings.panelIdentity.title': 'Panel',
+  'settings.panelIdentity.description': 'Der im Panel angezeigte Name, die Sprache dieses Browsers und wie lange das Audit-Protokoll aufbewahrt wird.',
+  'platform.genieacs.vpDescription': 'Die Pfade, die das Panel von den Geräten dieses Anbieters liest. Sie hängen von den Provisionierungsskripten im GenieACS der Plattform ab, daher bearbeitet der Anbieter sie nicht.',
 }
 
 export default de

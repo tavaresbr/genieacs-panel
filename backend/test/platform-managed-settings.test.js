@@ -93,9 +93,15 @@ describe('o GenieACS, pelo lado do provedor', () => {
     assert.equal(body.code, 'platform_managed');
   });
 
+  it('nem os parâmetros TR-069, que dependem do ACS da plataforma', async () => {
+    const { status, body } = await api('/settings/vpRxPower', { method: 'PUT', body: { value: 'VirtualParameters.RX' } });
+    assert.equal(status, 403);
+    assert.equal(body.code, 'platform_managed');
+  });
+
   it('mas continua lendo a credencial e gravando o que é dele', async () => {
     assert.equal((await api('/settings/genieacs-auth')).status, 200);
-    const { status } = await api('/settings/vpRxPower', { method: 'PUT', body: { value: 'VirtualParameters.RX' } });
+    const { status } = await api('/settings/customerIdPrefixMode', { method: 'PUT', body: { value: 'default' } });
     assert.equal(status, 200);
   });
 });
@@ -116,6 +122,23 @@ describe('o GenieACS, pelo console', () => {
 
     assert.equal(await runInTenant(alfa, () => Setting.getByKey('genieAcsUrl')), 'http://acs-alfa.exemplo.test:7557');
     assert.equal(await runInTenant(beta, () => Setting.getByKey('genieAcsUrl')), betaAntes, 'o beta ficou como estava');
+  });
+
+  it('grava os parâmetros TR-069 do provedor pedido, e recusa chave desconhecida', async () => {
+    const { status, body } = await api(`/platform/tenants/${alfa}/genieacs`, {
+      method: 'PUT',
+      body: { virtualParameters: { vpRxPower: 'VirtualParameters.RXAlfa' } }
+    });
+    assert.equal(status, 200, JSON.stringify(body));
+    assert.equal(body.data.virtualParameters.vpRxPower, 'VirtualParameters.RXAlfa');
+    assert.equal(await runInTenant(alfa, () => Setting.getByKey('vpRxPower')), 'VirtualParameters.RXAlfa');
+    assert.notEqual(await runInTenant(beta, () => Setting.getByKey('vpRxPower')), 'VirtualParameters.RXAlfa');
+
+    const ruim = await api(`/platform/tenants/${alfa}/genieacs`, {
+      method: 'PUT',
+      body: { virtualParameters: { appName: 'x' } }
+    });
+    assert.equal(ruim.status, 400);
   });
 
   it('deixa rastro nas duas trilhas', async () => {

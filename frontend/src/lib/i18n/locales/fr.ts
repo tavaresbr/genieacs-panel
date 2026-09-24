@@ -2456,6 +2456,9 @@ const fr: Dictionary = {
   'catalogue.propagate.row': '{added} ajoutés, {updated} écrasés',
   'catalogue.propagate.failed': 'Impossible d’envoyer les mises à jour.',
   'settings.platformManaged.whatsappDescription': 'Connecte un ou plusieurs numéros WhatsApp via le serveur Evolution API de la plateforme. Les jetons sont stockés chiffrés et ne reviennent jamais au navigateur.',
+  'settings.panelIdentity.title': 'Panneau',
+  'settings.panelIdentity.description': 'Le nom affiché sur le panneau, la langue de ce navigateur et la durée de conservation du journal d’audit.',
+  'platform.genieacs.vpDescription': 'Les chemins que le panneau lit sur les équipements de ce fournisseur. Ils dépendent des scripts de provisionnement installés sur le GenieACS de la plateforme ; le fournisseur ne les modifie donc pas.',
 }
 
 export default fr

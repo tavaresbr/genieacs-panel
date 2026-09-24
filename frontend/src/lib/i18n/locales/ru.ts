@@ -2464,6 +2464,9 @@ const ru: Dictionary = {
   'catalogue.propagate.row': 'добавлено {added}, перезаписано {updated}',
   'catalogue.propagate.failed': 'Не удалось отправить обновления.',
   'settings.platformManaged.whatsappDescription': 'Подключает один или несколько номеров WhatsApp через сервер Evolution API платформы. Токены хранятся в зашифрованном виде и никогда не возвращаются в браузер.',
+  'settings.panelIdentity.title': 'Панель',
+  'settings.panelIdentity.description': 'Название панели, язык этого браузера и срок хранения журнала аудита.',
+  'platform.genieacs.vpDescription': 'Пути, которые панель читает с устройств этого провайдера. Они зависят от скриптов провижининга в GenieACS платформы, поэтому провайдер их не редактирует.',
 }
 
 export default ru

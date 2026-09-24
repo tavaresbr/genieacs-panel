@@ -2458,6 +2458,9 @@ const en = {
   'catalogue.propagate.row': '{added} added, {updated} overwritten',
   'catalogue.propagate.failed': 'Could not send the updates.',
   'settings.platformManaged.whatsappDescription': "Connects one or more WhatsApp numbers through the platform's Evolution API server. Tokens are stored encrypted and never return to the browser.",
+  'settings.panelIdentity.title': 'Panel',
+  'settings.panelIdentity.description': 'The name shown on the panel, the language of this browser and how long the audit trail is kept.',
+  'platform.genieacs.vpDescription': "The paths the panel reads from this provider's devices. They depend on the provisioning scripts installed on the platform's GenieACS, so the provider does not edit them.",
 }
 
 export default en
