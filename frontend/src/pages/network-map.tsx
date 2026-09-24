@@ -286,7 +286,7 @@ export default function NetworkMap() {
   const [editingEdge, setEditingEdge] = useState(false)
   const [mapView, setMapView] = useState<'map' | 'list'>('map')
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
-  const [mapCenter, setMapCenter] = useState<[number, number]>([-6.2088, 106.8456])
+  const [mapCenter, setMapCenter] = useState<[number, number]>([-15.7942, -47.8822])
   const [defaultZoom, setDefaultZoom] = useState(12)
   const [minZoom, setMinZoom] = useState(5)
   const [maxZoom, setMaxZoom] = useState(18)

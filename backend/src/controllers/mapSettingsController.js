@@ -1,4 +1,4 @@
-import MapSettings from '../models/MapSettings.js';
+import MapSettings, { DEFAULTS as MAP_DEFAULTS } from '../models/MapSettings.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 
 class MapSettingsController {
@@ -8,13 +8,7 @@ class MapSettingsController {
       
       if (!settings) {
         return res.json(
-          createResponse(req.t('mapSettings.retrieved'), {
-            center_lat: '-6.2088',
-            center_lng: '106.8456',
-            max_zoom_in: '18',
-            max_zoom_out: '5',
-            default_zoom: '13'
-          })
+          createResponse(req.t('mapSettings.retrieved'), { ...MAP_DEFAULTS })
         );
       }
       

@@ -1,12 +1,17 @@
 import { getDb, tdb, tinsert } from '../config/database.js';
 
-const DEFAULTS = {
-  center_lat: '-6.2088',
-  center_lng: '106.8456',
+/**
+ * Brasília: o painel é vendido a provedores brasileiros, e o onboarding e a aba
+ * Geral pedem a cada um onde a planta dele fica. Jacarta era a casa do projeto
+ * de origem, não a nossa — e é o mesmo par que `seed.js` grava.
+ */
+export const DEFAULTS = Object.freeze({
+  center_lat: '-15.7942',
+  center_lng: '-47.8822',
   max_zoom_in: '18',
   max_zoom_out: '5',
   default_zoom: '13'
-};
+});
 
 /**
  * Where the operator's own fibre plant is centred, per provider.
