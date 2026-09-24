@@ -381,7 +381,7 @@ const es: Dictionary = {
   'devices.error.retry': 'Reintentar inventario',
   'devices.error.checkConfig': 'Revisar configuración del ACS',
   'devices.filter.searchLabel': 'Buscar en el inventario',
-  'devices.filter.searchPlaceholder': 'Serie, ID de cliente, PPPoE, marca o modelo',
+  'devices.filter.searchPlaceholder': 'Serie, nombre del abonado, contrato, ID de cliente, PPPoE, marca o modelo',
   'devices.filter.statusLabel': 'Estado de conexión',
   'devices.filter.all': 'Todos los equipos',
   'devices.filter.onlineOnly': 'Solo en línea',

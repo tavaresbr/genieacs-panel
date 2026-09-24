@@ -382,7 +382,7 @@ const ru: Dictionary = {
   'devices.error.retry': 'Повторить загрузку',
   'devices.error.checkConfig': 'Проверить настройки ACS',
   'devices.filter.searchLabel': 'Поиск по реестру',
-  'devices.filter.searchPlaceholder': 'Серийный номер, ID клиента, PPPoE, производитель или модель',
+  'devices.filter.searchPlaceholder': 'Серийный номер, имя абонента, договор, ID клиента, PPPoE, производитель или модель',
   'devices.filter.statusLabel': 'Состояние подключения',
   'devices.filter.all': 'Все устройства',
   'devices.filter.onlineOnly': 'Только в сети',

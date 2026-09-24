@@ -381,7 +381,7 @@ const zhTW: Dictionary = {
   'devices.error.retry': '重新取得清單',
   'devices.error.checkConfig': '檢查 ACS 設定',
   'devices.filter.searchLabel': '搜尋清單',
-  'devices.filter.searchPlaceholder': '序號、客戶 ID、PPPoE、品牌或型號',
+  'devices.filter.searchPlaceholder': '序號、用戶姓名、合約、客戶 ID、PPPoE、品牌或型號',
   'devices.filter.statusLabel': '連線狀態',
   'devices.filter.all': '全部設備',
   'devices.filter.onlineOnly': '僅線上',

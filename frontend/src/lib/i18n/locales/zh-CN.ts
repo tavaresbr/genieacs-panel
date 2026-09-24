@@ -381,7 +381,7 @@ const zhCN: Dictionary = {
   'devices.error.retry': '重新获取清单',
   'devices.error.checkConfig': '检查 ACS 配置',
   'devices.filter.searchLabel': '搜索清单',
-  'devices.filter.searchPlaceholder': '序列号、客户 ID、PPPoE、品牌或型号',
+  'devices.filter.searchPlaceholder': '序列号、用户姓名、合同、客户 ID、PPPoE、品牌或型号',
   'devices.filter.statusLabel': '连接状态',
   'devices.filter.all': '全部设备',
   'devices.filter.onlineOnly': '仅在线',

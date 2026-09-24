@@ -383,7 +383,7 @@ const en = {
   'devices.error.retry': 'Retry inventory',
   'devices.error.checkConfig': 'Check ACS configuration',
   'devices.filter.searchLabel': 'Search inventory',
-  'devices.filter.searchPlaceholder': 'Serial, customer ID, PPPoE, brand, or model',
+  'devices.filter.searchPlaceholder': 'Serial, subscriber name, contract, customer ID, PPPoE, brand, or model',
   'devices.filter.statusLabel': 'Connection status',
   'devices.filter.all': 'All devices',
   'devices.filter.onlineOnly': 'Online only',

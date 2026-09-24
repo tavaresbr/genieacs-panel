@@ -374,7 +374,7 @@ const ar: Dictionary = {
   'devices.error.retry': 'إعادة تحميل السجل',
   'devices.error.checkConfig': 'مراجعة إعدادات ACS',
   'devices.filter.searchLabel': 'البحث في السجل',
-  'devices.filter.searchPlaceholder': 'الرقم التسلسلي أو معرّف العميل أو PPPoE أو العلامة أو الطراز',
+  'devices.filter.searchPlaceholder': 'الرقم التسلسلي أو اسم المشترك أو العقد أو معرّف العميل أو PPPoE أو العلامة أو الطراز',
   'devices.filter.statusLabel': 'حالة الاتصال',
   'devices.filter.all': 'كل الأجهزة',
   'devices.filter.onlineOnly': 'المتصلة فقط',

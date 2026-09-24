@@ -381,7 +381,7 @@ const ko: Dictionary = {
   'devices.error.retry': '목록 다시 가져오기',
   'devices.error.checkConfig': 'ACS 설정 확인',
   'devices.filter.searchLabel': '목록 검색',
-  'devices.filter.searchPlaceholder': '일련번호, 고객 ID, PPPoE, 브랜드, 모델',
+  'devices.filter.searchPlaceholder': '일련번호, 가입자 이름, 계약, 고객 ID, PPPoE, 브랜드, 모델',
   'devices.filter.statusLabel': '연결 상태',
   'devices.filter.all': '전체 장비',
   'devices.filter.onlineOnly': '온라인만',
