@@ -542,6 +542,8 @@ export default {
   'whatsapp.alerts.scanDone': '{fired} avviso/i attivato/i, {cleared} chiuso/i',
   'whatsapp.alerts.scanFailed': 'La scansione degli avvisi è fallita',
   'whatsapp.alerts.noRecipients': 'Nessun numero è impostato per ricevere avvisi tecnici',
+  'whatsapp.alerts.invalidEmail': '"{email}" non è un indirizzo e-mail valido',
+  'whatsapp.alerts.mailNotConfigured': 'Il server non ha l\'e-mail configurata, quindi gli avvisi via e-mail non partono',
   'whatsapp.alerts.disabledSkip': 'Gli avvisi sono spenti, quindi non è stato controllato nulla',
   'whatsapp.alerts.noAlertNumber': 'Nessun numero connesso ha lo scopo avvisi',
   'whatsapp.alerts.noDevices': 'Non è stato possibile leggere la rete, quindi non è stato controllato nulla',

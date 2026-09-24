@@ -544,6 +544,8 @@ export default {
   'whatsapp.alerts.scanDone': '{fired} अलर्ट जारी हुए, {cleared} समाप्त हुए',
   'whatsapp.alerts.scanFailed': 'अलर्ट स्कैन विफल रहा',
   'whatsapp.alerts.noRecipients': 'तकनीकी अलर्ट प्राप्त करने के लिए कोई नंबर सेट नहीं है',
+  'whatsapp.alerts.invalidEmail': '"{email}" मान्य ईमेल पता नहीं है',
+  'whatsapp.alerts.mailNotConfigured': 'सर्वर पर ईमेल कॉन्फ़िगर नहीं है, इसलिए ईमेल अलर्ट नहीं भेजे जा सकते',
   'whatsapp.alerts.disabledSkip': 'अलर्ट बंद हैं, इसलिए कुछ भी जाँचा नहीं गया',
   'whatsapp.alerts.noAlertNumber': 'किसी भी कनेक्टेड नंबर का उद्देश्य अलर्ट नहीं है',
   'whatsapp.alerts.noDevices': 'फ़्लीट पढ़ी नहीं जा सकी, इसलिए कुछ भी जाँचा नहीं गया',

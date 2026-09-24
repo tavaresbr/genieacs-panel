@@ -543,6 +543,8 @@ export default {
   'whatsapp.alerts.scanDone': 'صدر {fired} تنبيهًا، ورُفع {cleared}',
   'whatsapp.alerts.scanFailed': 'أخفق فحص التنبيهات',
   'whatsapp.alerts.noRecipients': 'لا يوجد رقم مخصّص لاستقبال التنبيهات الفنية',
+  'whatsapp.alerts.invalidEmail': '"{email}" ليس عنوان بريد إلكتروني صالحًا',
+  'whatsapp.alerts.mailNotConfigured': 'لم يُعدّ البريد الإلكتروني على الخادم، لذا لا تُرسل التنبيهات بالبريد',
   'whatsapp.alerts.disabledSkip': 'التنبيهات معطّلة، لذا لم يُفحص شيء',
   'whatsapp.alerts.noAlertNumber': 'لا يوجد رقم مرتبط مخصّص للتنبيهات',
   'whatsapp.alerts.noDevices': 'تعذّرت قراءة قائمة الأجهزة، لذا لم يُفحص شيء',

@@ -545,6 +545,8 @@ export default {
   'whatsapp.alerts.scanDone': '{fired} Warnung(en) ausgelöst, {cleared} beendet',
   'whatsapp.alerts.scanFailed': 'Der Warnungs-Scan ist fehlgeschlagen',
   'whatsapp.alerts.noRecipients': 'Keine Nummer ist für technische Warnungen eingestellt',
+  'whatsapp.alerts.invalidEmail': '„{email}" ist keine gültige E-Mail-Adresse',
+  'whatsapp.alerts.mailNotConfigured': 'Auf dem Server ist keine E-Mail eingerichtet, daher werden keine E-Mail-Warnungen versendet',
   'whatsapp.alerts.disabledSkip': 'Die Warnungen sind aus, also wurde nichts geprüft',
   'whatsapp.alerts.noAlertNumber': 'Keine verbundene Nummer trägt den Zweck Warnungen',
   'whatsapp.alerts.noDevices': 'Das Netz konnte nicht gelesen werden, also wurde nichts geprüft',

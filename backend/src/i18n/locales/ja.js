@@ -539,6 +539,8 @@ export default {
   'whatsapp.alerts.scanDone': 'アラート {fired} 件を発報、{cleared} 件を解除しました',
   'whatsapp.alerts.scanFailed': 'アラートの検査に失敗しました',
   'whatsapp.alerts.noRecipients': '技術アラートの受信先に設定された番号がありません',
+  'whatsapp.alerts.invalidEmail': '「{email}」は有効なメールアドレスではありません',
+  'whatsapp.alerts.mailNotConfigured': 'サーバーにメールが設定されていないため、メールでのアラートは送信されません',
   'whatsapp.phoneSaved': '電話番号を保存しました',
   'whatsapp.phoneSaveFailed': '電話番号を保存できませんでした',
   'whatsapp.error.invalidPhone': '使用できる電話番号の形式ではないようです',

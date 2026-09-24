@@ -544,6 +544,8 @@ export default {
   'whatsapp.alerts.scanDone': '{fired} alert(s) raised, {cleared} cleared',
   'whatsapp.alerts.scanFailed': 'The alert scan failed',
   'whatsapp.alerts.noRecipients': 'No number is set to receive technical alerts',
+  'whatsapp.alerts.invalidEmail': '"{email}" is not a valid email address',
+  'whatsapp.alerts.mailNotConfigured': 'The server has no email configured, so email alerts cannot go out',
   'whatsapp.alerts.disabledSkip': 'Alerts are switched off, so nothing was checked',
   'whatsapp.alerts.noAlertNumber': 'No connected number carries the alerts purpose',
   'whatsapp.alerts.noDevices': 'The fleet could not be read, so nothing was checked',

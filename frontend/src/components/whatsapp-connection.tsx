@@ -83,6 +83,8 @@ const ERROR_KEYS: Record<string, TranslationKey> = {
   rate_limited: 'whatsapp.error.rateLimited',
   broadcast_not_found: 'whatsapp.broadcast.notFound',
   no_alert_recipients: 'whatsapp.alerts.noRecipients',
+  invalid_email: 'whatsapp.alerts.invalidEmail',
+  mail_not_configured: 'whatsapp.alerts.mailNotConfigured',
   no_alert_number: 'whatsapp.alerts.noAlertNumber',
   alerts_disabled: 'whatsapp.alerts.disabledSkip',
   no_devices: 'whatsapp.alerts.noDevices',

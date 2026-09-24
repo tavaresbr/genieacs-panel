@@ -542,6 +542,8 @@ export default {
   'whatsapp.alerts.scanDone': '알림 {fired}건 발생, {cleared}건 해제',
   'whatsapp.alerts.scanFailed': '알림 검사가 실패했습니다',
   'whatsapp.alerts.noRecipients': '기술 알림을 받도록 지정된 번호가 없습니다',
+  'whatsapp.alerts.invalidEmail': '"{email}"은(는) 올바른 이메일 주소가 아닙니다',
+  'whatsapp.alerts.mailNotConfigured': '서버에 이메일이 설정되어 있지 않아 이메일 알림을 보낼 수 없습니다',
   'whatsapp.alerts.disabledSkip': '알림이 꺼져 있어 아무것도 확인하지 않았습니다',
   'whatsapp.alerts.noAlertNumber': '알림 용도로 지정된 연결 번호가 없습니다',
   'whatsapp.alerts.noDevices': '장비 목록을 읽지 못해 아무것도 확인하지 않았습니다',
