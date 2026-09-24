@@ -694,4 +694,11 @@ export default {
   'customers.eraseNotLogged': '삭제가 감사 기록에 남지 않아 실행되지 않았습니다',
   'customers.eraseFailed': '가입자 데이터를 삭제하지 못했습니다',
   'customers.erased': '가입자 데이터를 삭제했습니다',
+  'contacts.loaded': '고객 정보를 불러왔습니다',
+  'contacts.loadFailed': '고객 정보를 불러올 수 없습니다',
+  'contacts.updated': '고객 정보를 업데이트했습니다',
+  'contacts.created': '고객을 만들었습니다',
+  'contacts.saveFailed': '고객 정보를 저장할 수 없습니다',
+  'contacts.error.notFound': '고객을 찾을 수 없습니다',
+  'contacts.error.invalidField': '{field} 필드의 값이 올바르지 않습니다',
 };

@@ -689,4 +689,11 @@ export default {
   'customers.eraseNotLogged': 'La cancellazione non è stata registrata nel registro, quindi non è stata eseguita',
   'customers.eraseFailed': 'Impossibile cancellare i dati dell\'abbonato',
   'customers.erased': 'Dati dell\'abbonato cancellati',
+  'contacts.loaded': 'Scheda caricata',
+  'contacts.loadFailed': 'Impossibile caricare la scheda',
+  'contacts.updated': 'Scheda aggiornata',
+  'contacts.created': 'Cliente creato',
+  'contacts.saveFailed': 'Impossibile salvare la scheda',
+  'contacts.error.notFound': 'Cliente non trovato',
+  'contacts.error.invalidField': 'Valore non valido nel campo {field}',
 };

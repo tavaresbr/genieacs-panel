@@ -691,4 +691,11 @@ export default {
   'customers.eraseNotLogged': 'The erasure was not recorded in the trail, so it was not performed',
   'customers.eraseFailed': 'Failed to erase the subscriber data',
   'customers.erased': 'Subscriber data erased',
+  'contacts.loaded': 'Client record loaded',
+  'contacts.loadFailed': 'Could not load the client record',
+  'contacts.updated': 'Client record updated',
+  'contacts.created': 'Client created',
+  'contacts.saveFailed': 'Could not save the client record',
+  'contacts.error.notFound': 'Client not found',
+  'contacts.error.invalidField': 'Invalid value in field {field}',
 };

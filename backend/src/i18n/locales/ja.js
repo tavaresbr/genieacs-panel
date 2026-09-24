@@ -691,4 +691,11 @@ export default {
   'customers.eraseNotLogged': '削除が監査証跡に記録されなかったため、実行されませんでした',
   'customers.eraseFailed': '加入者データの削除に失敗しました',
   'customers.erased': '加入者データを削除しました',
+  'contacts.loaded': '顧客情報を読み込みました',
+  'contacts.loadFailed': '顧客情報を読み込めませんでした',
+  'contacts.updated': '顧客情報を更新しました',
+  'contacts.created': '顧客を作成しました',
+  'contacts.saveFailed': '顧客情報を保存できませんでした',
+  'contacts.error.notFound': '顧客が見つかりません',
+  'contacts.error.invalidField': '{field} の値が正しくありません',
 };

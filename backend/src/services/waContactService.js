@@ -2,6 +2,7 @@ import WaConversation from '../models/WaConversation.js';
 import WaOptOut from '../models/WaOptOut.js';
 import SgpLink from '../models/SgpLink.js';
 import SgpContact from '../models/SgpContact.js';
+import ContactProfileService from './contactProfileService.js';
 import SgpService from './sgpService.js';
 import WhatsAppAccount from '../models/WhatsAppAccount.js';
 import CustomerAccount from '../models/CustomerAccount.js';
@@ -93,11 +94,35 @@ class WaContactService {
       String(a.clientName ?? '').localeCompare(String(b.clientName ?? ''), 'pt-BR')
       || String(a.contract).localeCompare(String(b.contract))
     ));
-    const page = subscribers.slice(skip, skip + size);
+    const page = await this.withEditedNames(subscribers.slice(skip, skip + size));
     return {
       total: subscribers.length,
       contacts: await this.decorate(page)
     };
+  }
+
+  /**
+   * The name an operator gave a client in its record, over the SGP's, for the
+   * rows of one page. The search still matches the SGP's name.
+   */
+  static async withEditedNames(page) {
+    if (page.length === 0) return page;
+    const contracts = page.map((s) => s.contract).filter(Boolean).map(String);
+    const ids = page.filter((s) => !s.contract && s.contactId).map((s) => s.contactId);
+    const rows = await tdb('sgp_contacts').where((match) => {
+      match.whereRaw('1 = 0');
+      if (contracts.length > 0) match.orWhereIn('contract', contracts);
+      if (ids.length > 0) match.orWhereIn('id', ids);
+    }).select('id', 'contract', 'sgp_client_id', 'client_ref');
+    const names = await ContactProfileService.editedNames(rows);
+    if (names.size === 0) return page;
+    return page.map((subscriber) => {
+      const row = rows.find((entry) => (subscriber.contract
+        ? String(entry.contract) === String(subscriber.contract)
+        : Number(entry.id) === Number(subscriber.contactId)));
+      const name = row ? names.get(row.client_ref || (!row.contract ? row.sgp_client_id : null)) : null;
+      return name ? { ...subscriber, clientName: name } : subscriber;
+    });
   }
 
   /**

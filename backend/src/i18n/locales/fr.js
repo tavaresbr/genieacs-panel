@@ -687,4 +687,11 @@ export default {
   'customers.eraseNotLogged': 'L\'effacement n\'a pas été enregistré dans le journal, il n\'a donc pas eu lieu',
   'customers.eraseFailed': 'Échec de l\'effacement des données de l\'abonné',
   'customers.erased': 'Données de l\'abonné effacées',
+  'contacts.loaded': 'Fiche chargée',
+  'contacts.loadFailed': 'Impossible de charger la fiche',
+  'contacts.updated': 'Fiche mise à jour',
+  'contacts.created': 'Client créé',
+  'contacts.saveFailed': 'Impossible d’enregistrer la fiche',
+  'contacts.error.notFound': 'Client introuvable',
+  'contacts.error.invalidField': 'Valeur invalide dans le champ {field}',
 };

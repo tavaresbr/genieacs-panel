@@ -54,6 +54,13 @@ class SgpContact {
       status_label: row.status_label ?? null,
       state: row.state ?? 'unknown',
       phone_e164: row.phone_e164 ?? null,
+      client_ref: row.client_ref ?? null,
+      plan: row.plan ?? null,
+      due_day: row.due_day ?? null,
+      status_reason: row.status_reason ?? null,
+      login: row.login ?? null,
+      address: row.address ?? null,
+      contract_created_at: row.contract_created_at ?? null,
       last_synced_at: now,
       updated_at: now,
       ...(seenAt ? { last_seen_at: seenAt } : {})
@@ -85,6 +92,18 @@ class SgpContact {
       .whereNull('sgp_client_id')
       .where({ document: values.document })
       .first();
+  }
+
+  /**
+   * Every row of one client: its contracts (by `client_ref`) and its row
+   * without a contract (by `sgp_client_id`).
+   */
+  static async getByClient(clientId) {
+    if (!clientId) return [];
+    const id = String(clientId);
+    return tdb('sgp_contacts')
+      .where((query) => query.where({ client_ref: id }).orWhere((inner) => inner.whereNull('contract').where({ sgp_client_id: id })))
+      .orderBy('id');
   }
 
   /** `null` clears the override, like `SgpLink.setManualPhone`. */

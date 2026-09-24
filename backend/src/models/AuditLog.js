@@ -72,6 +72,11 @@ class AuditLog {
     // certo — continua dizendo que a conta 412 foi apagada, no dia tal, por
     // fulano, e já não há como saber quem era 412.
     CUSTOMER_DATA_ERASED: 'customer_data.erased',
+    // O cadastro de um cliente foi corrigido no painel, ou um cliente foi
+    // criado nele. O `detail` guarda QUAIS campos, nunca os valores — pelo
+    // mesmo motivo de `tenant.billing_changed`.
+    CONTACT_UPDATED: 'contact.updated',
+    CONTACT_CREATED: 'contact.created',
     // A assinatura mudou de plano ou de estado. Gravada NO provedor, com
     // `actorKind: 'platform'`, pelo mesmo motivo da suspensão: quem vai
     // perguntar "por que meu painel ficou só leitura" é o ISP, e a resposta
