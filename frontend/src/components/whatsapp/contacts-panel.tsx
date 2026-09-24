@@ -27,11 +27,13 @@ const STATE_FILTERS = [
   ['none', 'whatsapp.contacts.filterNoContract']
 ] as const
 
-type StateFilter = (typeof STATE_FILTERS)[number][0]
+export type StateFilter = (typeof STATE_FILTERS)[number][0]
 
 interface ContactsPanelProps {
   /** Called with the thread to show — the page switches to the inbox with it open. */
   onOpenConversation: (conversation: WhatsAppConversation) => void
+  /** The tab the list opens on. The Contacts menu entry opens on the active subscribers. */
+  defaultState?: StateFilter
 }
 
 /**
@@ -42,7 +44,7 @@ interface ContactsPanelProps {
  * whether a thread with them already exists, and open it — or start one.
  * Starting sends nothing; the operator lands in an empty thread and writes.
  */
-export function ContactsPanel({ onOpenConversation }: ContactsPanelProps) {
+export function ContactsPanel({ onOpenConversation, defaultState = '' }: ContactsPanelProps) {
   const { t, intlLocale } = useTranslation()
   const { can } = useAuth()
   const toast = useToast()
@@ -59,7 +61,7 @@ export function ContactsPanel({ onOpenConversation }: ContactsPanelProps) {
   // table shows — the panel's own directory comes back when the search changes.
   const [sgpResult, setSgpResult] = useState<{ term: string; contacts: WhatsAppContact[] } | null>(null)
   const [lookingUp, setLookingUp] = useState(false)
-  const [stateFilter, setStateFilter] = useState<StateFilter>('')
+  const [stateFilter, setStateFilter] = useState<StateFilter>(defaultState)
 
   const alive = useRef(true)
   // The newest request wins: a slow answer for "ben" must not overwrite the
@@ -331,7 +333,7 @@ export function ContactsPanel({ onOpenConversation }: ContactsPanelProps) {
             {!sgpResult && !loading && canLookup && (
               <p className="empty-state-copy">{t('whatsapp.contacts.lookupHint')}</p>
             )}
-            {!sgpResult && !loading && !debounced && !stateFilter && can('sgp.config') && (
+            {!sgpResult && !loading && !debounced && stateFilter === defaultState && can('sgp.config') && (
               <>
                 <p className="empty-state-copy">{t('whatsapp.contacts.syncHint')}</p>
                 <Link to={SGP_CONTACTS_HREF} className="modern-button-secondary mt-4">
