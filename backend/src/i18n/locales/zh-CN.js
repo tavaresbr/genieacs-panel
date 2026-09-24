@@ -131,6 +131,7 @@ export default {
   'settings.created': '设置项已创建',
   'settings.createFailed': '无法创建设置项',
   'settings.updated': '设置项已更新',
+  'settings.onboardingInvalid': '请指明要标记为已查看的内容：向导或清单',
   'settings.updateFailed': '无法更新设置项',
   'settings.deleted': '设置项已删除',
   'settings.deleteFailed': '无法删除设置项',

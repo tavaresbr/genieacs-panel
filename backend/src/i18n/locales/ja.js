@@ -131,6 +131,7 @@ export default {
   'settings.created': '設定を作成しました',
   'settings.createFailed': '設定を作成できませんでした',
   'settings.updated': '設定を更新しました',
+  'settings.onboardingInvalid': '既読にする対象を指定してください: ウィザードまたはチェックリスト',
   'settings.updateFailed': '設定を更新できませんでした',
   'settings.deleted': '設定を削除しました',
   'settings.deleteFailed': '設定を削除できませんでした',

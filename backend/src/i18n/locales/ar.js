@@ -129,6 +129,7 @@ export default {
   'settings.created': 'تم إنشاء الإعداد',
   'settings.createFailed': 'تعذّر إنشاء الإعداد',
   'settings.updated': 'تم تحديث الإعداد',
+  'settings.onboardingInvalid': 'حدّد ما يجب تعليمه كمُطّلع عليه: المعالج أو قائمة الخطوات',
   'settings.updateFailed': 'تعذّر تحديث الإعداد',
   'settings.deleted': 'تم حذف الإعداد',
   'settings.deleteFailed': 'تعذّر حذف الإعداد',

@@ -131,6 +131,7 @@ export default {
   'settings.created': 'Einstellung erfolgreich erstellt',
   'settings.createFailed': 'Die Einstellung konnte nicht erstellt werden',
   'settings.updated': 'Einstellung erfolgreich aktualisiert',
+  'settings.onboardingInvalid': 'Geben Sie an, was als gesehen markiert werden soll: der Assistent oder die Checkliste',
   'settings.updateFailed': 'Die Einstellung konnte nicht aktualisiert werden',
   'settings.deleted': 'Einstellung erfolgreich gelöscht',
   'settings.deleteFailed': 'Die Einstellung konnte nicht gelöscht werden',

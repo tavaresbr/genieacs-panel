@@ -131,6 +131,7 @@ export default {
   'settings.created': 'Setting created successfully',
   'settings.createFailed': 'Failed to create the setting',
   'settings.updated': 'Setting updated successfully',
+  'settings.onboardingInvalid': 'Say what to mark as seen: the wizard or the checklist',
   'settings.updateFailed': 'Failed to update the setting',
   'settings.deleted': 'Setting deleted successfully',
   'settings.deleteFailed': 'Failed to delete the setting',

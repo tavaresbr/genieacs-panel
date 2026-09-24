@@ -76,6 +76,14 @@ export default function Onboarding() {
   }, [])
 
   const finish = () => {
+    // No provedor, para outro administrador ou outro navegador não receberem o
+    // assistente de novo. Se a gravação falhar, o '1' local faz o gate subir a
+    // marca na próxima visita.
+    void settingsAPI.dismissOnboarding('wizard').then((res) => {
+      if (res.success && tenant?.slug) {
+        try { localStorage.setItem(onboardingDismissKey(tenant.slug), '2') } catch {}
+      }
+    }).catch(() => {})
     if (tenant?.slug) {
       try { localStorage.setItem(onboardingDismissKey(tenant.slug), '1') } catch {}
     }

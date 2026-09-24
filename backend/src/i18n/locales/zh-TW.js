@@ -131,6 +131,7 @@ export default {
   'settings.created': '設定項目已建立',
   'settings.createFailed': '無法建立設定項目',
   'settings.updated': '設定項目已更新',
+  'settings.onboardingInvalid': '請指明要標記為已查看的內容：精靈或清單',
   'settings.updateFailed': '無法更新設定項目',
   'settings.deleted': '設定項目已刪除',
   'settings.deleteFailed': '無法刪除設定項目',

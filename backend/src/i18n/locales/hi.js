@@ -129,6 +129,7 @@ export default {
   'settings.created': 'सेटिंग बन गई',
   'settings.createFailed': 'सेटिंग नहीं बनाई जा सकी',
   'settings.updated': 'सेटिंग अपडेट हो गई',
+  'settings.onboardingInvalid': 'बताएँ कि क्या देखा हुआ चिह्नित करना है: विज़ार्ड या चेकलिस्ट',
   'settings.updateFailed': 'सेटिंग अपडेट नहीं हो सकी',
   'settings.deleted': 'सेटिंग हटा दी गई',
   'settings.deleteFailed': 'सेटिंग हटाई नहीं जा सकी',

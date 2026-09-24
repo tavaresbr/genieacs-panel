@@ -128,6 +128,7 @@ export default {
   'settings.created': 'Impostazione creata correttamente',
   'settings.createFailed': 'Non è stato possibile creare l’impostazione',
   'settings.updated': 'Impostazione aggiornata correttamente',
+  'settings.onboardingInvalid': 'Indica cosa segnare come visto: la procedura guidata o la checklist',
   'settings.updateFailed': 'Non è stato possibile aggiornare l’impostazione',
   'settings.deleted': 'Impostazione eliminata correttamente',
   'settings.deleteFailed': 'Non è stato possibile eliminare l’impostazione',

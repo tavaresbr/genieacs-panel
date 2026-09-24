@@ -131,6 +131,7 @@ export default {
   'settings.created': 'Настройка создана',
   'settings.createFailed': 'Не удалось создать настройку',
   'settings.updated': 'Настройка обновлена',
+  'settings.onboardingInvalid': 'Укажите, что отметить как просмотренное: мастер или список шагов',
   'settings.updateFailed': 'Не удалось обновить настройку',
   'settings.deleted': 'Настройка удалена',
   'settings.deleteFailed': 'Не удалось удалить настройку',
