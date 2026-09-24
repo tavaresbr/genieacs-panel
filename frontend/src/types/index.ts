@@ -70,6 +70,12 @@ export interface User {
    */
   platform?: boolean
   /**
+   * O provedor DESTA sessão, lido do token pelo backend — o que o topo do menu
+   * mostra. Nulo na sessão do console. Opcional porque só `GET /api/auth/user`
+   * traz o campo; até ele responder, a tela usa o perfil público do host.
+   */
+  tenant?: { slug: string | null; name: string } | null
+  /**
    * Presente só numa sessão de personificação: quem, do plano de controle,
    * está olhando este painel.
    *

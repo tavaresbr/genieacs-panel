@@ -64,6 +64,8 @@ const ptBR: Dictionary = {
   'sidebar.nav.settings': 'Configuração',
   'sidebar.nav.settingsDescription': 'ACS e fabricantes',
   'sidebar.whatsNew': 'Novidades',
+  'sidebar.providerSlug': 'Provedor · {slug}',
+  'sidebar.platformAdmin': 'Administrador da plataforma',
   'sidebar.releaseNotesAria': 'Abrir notas da versão {version} do SkyGenPanel',
   'sidebar.versionTooltip': 'Versão {version} · Novidades',
   'sidebar.defaultOperator': 'Operador',

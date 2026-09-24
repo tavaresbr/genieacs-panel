@@ -64,6 +64,8 @@ const ja: Dictionary = {
   'sidebar.nav.settings': '設定',
   'sidebar.nav.settingsDescription': 'ACS とベンダー',
   'sidebar.whatsNew': '新着情報',
+  'sidebar.providerSlug': 'プロバイダー · {slug}',
+  'sidebar.platformAdmin': 'プラットフォーム管理者',
   'sidebar.releaseNotesAria': 'SkyGenPanel バージョン {version} のリリースノートを開く',
   'sidebar.versionTooltip': 'バージョン {version} · 新着情報',
   'sidebar.defaultOperator': 'オペレーター',

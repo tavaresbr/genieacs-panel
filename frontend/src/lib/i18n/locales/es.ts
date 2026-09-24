@@ -64,6 +64,8 @@ const es: Dictionary = {
   'sidebar.nav.settings': 'Configuración',
   'sidebar.nav.settingsDescription': 'ACS y fabricantes',
   'sidebar.whatsNew': 'Novedades',
+  'sidebar.providerSlug': 'Proveedor · {slug}',
+  'sidebar.platformAdmin': 'Administrador de la plataforma',
   'sidebar.releaseNotesAria': 'Abrir notas de la versión {version} de SkyGenPanel',
   'sidebar.versionTooltip': 'Versión {version} · Novedades',
   'sidebar.defaultOperator': 'Operador',

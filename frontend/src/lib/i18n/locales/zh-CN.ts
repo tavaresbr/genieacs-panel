@@ -64,6 +64,8 @@ const zhCN: Dictionary = {
   'sidebar.nav.settings': '配置',
   'sidebar.nav.settingsDescription': 'ACS 与厂商',
   'sidebar.whatsNew': '更新内容',
+  'sidebar.providerSlug': '服务商 · {slug}',
+  'sidebar.platformAdmin': '平台管理员',
   'sidebar.releaseNotesAria': '打开 SkyGenPanel {version} 版的发行说明',
   'sidebar.versionTooltip': '版本 {version} · 更新内容',
   'sidebar.defaultOperator': '运维人员',
