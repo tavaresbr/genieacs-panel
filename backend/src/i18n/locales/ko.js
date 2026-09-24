@@ -79,6 +79,8 @@ export default {
   'device.notFound': '장비를 찾을 수 없습니다',
   'device.listRetrieved': '장비 목록을 조회했습니다',
   'device.listFailed': '장비 목록을 조회하지 못했습니다',
+  'device.exportTooLarge': '선택된 장비가 {max}대를 넘습니다. 스프레드시트를 받기 전에 목록을 필터링하세요',
+  'device.exportFailed': '장비 스프레드시트를 만들지 못했습니다',
   'device.detailRetrieved': '장비 상세 정보를 조회했습니다',
   'device.detailFailed': '장비 상세 정보를 조회하지 못했습니다',
   'device.deleted': '장비를 삭제했습니다',

@@ -42,6 +42,7 @@ export const AUDIT_ACTION_LABEL_KEYS: Record<string, TranslationKey> = {
   'contact.created': 'audit.action.contactCreated',
   'contact.invoice_sent': 'audit.action.contactInvoiceSent',
   'contacts.exported': 'audit.action.contactsExported',
+  'devices.exported': 'audit.action.devicesExported',
   'contacts.imported': 'audit.action.contactsImported',
   'subscription.changed': 'audit.action.subscriptionChanged',
   'tenant.renamed': 'audit.action.tenantRenamed',

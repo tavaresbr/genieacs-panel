@@ -79,6 +79,8 @@ export default {
   'device.notFound': 'Device not found',
   'device.listRetrieved': 'Devices retrieved successfully',
   'device.listFailed': 'Failed to get the devices',
+  'device.exportTooLarge': 'The selection has more than {max} devices. Filter the list before downloading the spreadsheet',
+  'device.exportFailed': 'Could not generate the device spreadsheet',
   'device.detailRetrieved': 'Device detail retrieved successfully',
   'device.detailFailed': 'Failed to get the device detail',
   'device.deleted': 'Device deleted successfully',

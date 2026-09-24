@@ -79,6 +79,8 @@ export default {
   'device.notFound': '機器が見つかりません',
   'device.listRetrieved': '機器を取得しました',
   'device.listFailed': '機器を取得できませんでした',
+  'device.exportTooLarge': '対象が {max} 台を超えています。スプレッドシートをダウンロードする前に一覧を絞り込んでください',
+  'device.exportFailed': '機器のスプレッドシートを作成できませんでした',
   'device.detailRetrieved': '機器の詳細を取得しました',
   'device.detailFailed': '機器の詳細を取得できませんでした',
   'device.deleted': '機器を削除しました',

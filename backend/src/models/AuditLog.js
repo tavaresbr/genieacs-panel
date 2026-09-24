@@ -84,6 +84,9 @@ class AuditLog {
     // guarda quantidades e filtros, nunca uma linha da planilha.
     CONTACTS_EXPORTED: 'contacts.exported',
     CONTACTS_IMPORTED: 'contacts.imported',
+    // A lista de equipamentos saiu numa planilha. Quantas linhas e o recorte
+    // (estado, foco, se houve busca) — nunca o texto buscado nem uma linha.
+    DEVICES_EXPORTED: 'devices.exported',
     // A assinatura mudou de plano ou de estado. Gravada NO provedor, com
     // `actorKind: 'platform'`, pelo mesmo motivo da suspensão: quem vai
     // perguntar "por que meu painel ficou só leitura" é o ISP, e a resposta

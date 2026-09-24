@@ -79,6 +79,8 @@ export default {
   'device.notFound': '找不到该设备',
   'device.listRetrieved': '已获取设备列表',
   'device.listFailed': '无法获取设备列表',
+  'device.exportTooLarge': '所选设备超过 {max} 台。请先筛选列表再下载表格',
+  'device.exportFailed': '无法生成设备表格',
   'device.detailRetrieved': '已获取设备详情',
   'device.detailFailed': '无法获取设备详情',
   'device.deleted': '设备已删除',

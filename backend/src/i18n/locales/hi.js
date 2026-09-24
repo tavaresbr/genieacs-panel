@@ -77,6 +77,8 @@ export default {
   'device.notFound': 'उपकरण नहीं मिला',
   'device.listRetrieved': 'उपकरण सूची प्राप्त हुई',
   'device.listFailed': 'उपकरण सूची प्राप्त नहीं हो सकी',
+  'device.exportTooLarge': 'चयन में {max} से अधिक उपकरण हैं। स्प्रेडशीट डाउनलोड करने से पहले सूची फ़िल्टर करें',
+  'device.exportFailed': 'उपकरणों की स्प्रेडशीट नहीं बनाई जा सकी',
   'device.detailRetrieved': 'उपकरण विवरण प्राप्त हुआ',
   'device.detailFailed': 'उपकरण विवरण प्राप्त नहीं हो सका',
   'device.deleted': 'उपकरण हटा दिया गया',

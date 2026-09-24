@@ -76,6 +76,8 @@ export default {
   'device.notFound': 'Apparato non trovato',
   'device.listRetrieved': 'Apparati ottenuti correttamente',
   'device.listFailed': 'Non è stato possibile ottenere gli apparati',
+  'device.exportTooLarge': 'La selezione ha più di {max} dispositivi. Filtra l\'elenco prima di scaricare il foglio',
+  'device.exportFailed': 'Impossibile generare il foglio dei dispositivi',
   'device.detailRetrieved': 'Dettaglio dell’apparato ottenuto correttamente',
   'device.detailFailed': 'Non è stato possibile ottenere il dettaglio dell’apparato',
   'device.deleted': 'Apparato eliminato correttamente',

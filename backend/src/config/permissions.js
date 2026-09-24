@@ -62,6 +62,10 @@ export const PERMISSIONS = Object.freeze([
   // apagar a configuração do cliente — um reset deixa o assinante sem internet
   // até alguém reprovisionar.
   'devices.maintain',
+  // A lista de equipamentos inteira num arquivo (série, PPPoE, ID do cliente).
+  // Separada de `devices.list` como `contacts.export` é de `contacts.read`: ver
+  // página por página não é o mesmo que levar a base toda de uma vez.
+  'devices.export',
   // Revelar ou redefinir a senha do portal do assinante. Separada de
   // `devices.write` de propósito: é a única rota do painel que devolve um
   // segredo de outra pessoa, e quem pode reiniciar uma ONT não precisa dela por
@@ -158,6 +162,7 @@ const TECH = [
 const ADMIN = [
   ...TECH,
   'devices.maintain',
+  'devices.export',
   'catalogue.write',
   'sgp.config',
   'provisioning.write',

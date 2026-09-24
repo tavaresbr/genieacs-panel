@@ -12,6 +12,7 @@ import TenantUser from '../models/TenantUser.js';
 import User from '../models/User.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { translateError } from '../i18n/index.js';
+import { exportDevicesCsv } from '../services/deviceExport.js';
 import { BATCH_ACTIONS, BATCH_LIMIT, batchFilterLabel, batchSummary, normalizeBatchIds } from '../services/deviceBatch.js';
 
 /**
@@ -73,6 +74,41 @@ async function swapAcknowledgers(req, swaps) {
 }
 
 class DeviceController {
+  /**
+   * `GET /api/devices/export` — o recorte da lista numa planilha.
+   *
+   * Os filtros são os da lista (`status`, `focus`, `search`), lidos pela mesma
+   * normalização; a trilha guarda quantas linhas saíram e o recorte, e diz só
+   * SE houve busca — o texto buscado pode ser o nome de um assinante.
+   */
+  static async exportDevices(req, res) {
+    try {
+      const { csv, count, filters } = await exportDevicesCsv(req.query);
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.DEVICES_EXPORTED,
+        subjectType: 'devices',
+        subjectId: null,
+        detail: {
+          count,
+          status: filters.status,
+          focus: filters.focus,
+          search: Boolean(filters.search)
+        }
+      });
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="equipamentos-${new Date().toISOString().slice(0, 10)}.csv"`);
+      return res.send(csv);
+    } catch (error) {
+      if (error.translationKey) {
+        return res.status(error.status || 400).json(
+          createErrorResponse(translateError(req.t, error), null, error.code || null)
+        );
+      }
+      console.error('Export devices error:', error);
+      return res.status(500).json(createErrorResponse(req.t('device.exportFailed'), error.message));
+    }
+  }
+
   static async getDashboard(req, res) {
     try {
       const dashboard = await DeviceService.getDashboardData(req.query.refresh === '1');

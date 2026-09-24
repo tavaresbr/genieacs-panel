@@ -11,6 +11,8 @@ import {
   type SgpLinkRow,
 } from '@/lib/api'
 import {
+  deviceExportQuery,
+  exportIgnoresSgp,
   filtersFromQuery,
   filtersToQuery,
   type DeviceFocusFilter,
@@ -92,6 +94,11 @@ export default function DevicesPage() {
   // Ações em lote: só para quem tem `devices.maintain` — um clique alcança
   // muitos assinantes. Sem a permissão, a lista fica exatamente como era.
   const canBatch = can('devices.maintain')
+  // A planilha: só dono e admin (`devices.export`), com o recorte que o
+  // servidor sabe aplicar. O filtro do ERP é feito aqui na tela e não entra —
+  // a tela diz isso em vez de entregar mais linhas do que mostra.
+  const canExport = can('devices.export')
+  const [exporting, setExporting] = useState(false)
   const [selected, setSelected] = useState<Map<string, string>>(new Map())
   const [selectingAll, setSelectingAll] = useState(false)
 
@@ -375,6 +382,28 @@ export default function DevicesPage() {
     )
   }
 
+  const exportSheet = async () => {
+    setExporting(true)
+    try {
+      const res = await devicesAPI.exportSheet(deviceExportQuery({ search: searchTerm, status: filterStatus, focus: filterFocus }))
+      if (!res.success || !res.blob) {
+        toast.error(res.message || t('devices.export.failed'))
+        return
+      }
+      const url = URL.createObjectURL(res.blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = res.filename || 'equipamentos.csv'
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+      if (exportIgnoresSgp({ sgp: filterSgp })) toast.info(t('devices.export.sgpIgnored'))
+    } finally {
+      setExporting(false)
+    }
+  }
+
   return (
     <div className="page-shell">
       <div className="page-frame">
@@ -386,6 +415,18 @@ export default function DevicesPage() {
           </div>
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
             <span><strong className="data-value">{paging.total}</strong> {t('devices.totalLabel')}</span>
+            {canExport && (
+              <button
+                type="button"
+                className="modern-button-secondary"
+                disabled={exporting}
+                onClick={() => void exportSheet()}
+                title={exportIgnoresSgp({ sgp: filterSgp }) ? t('devices.export.sgpIgnored') : undefined}
+              >
+                <Icon name="external" size={16} />
+                {t('devices.export.button')}
+              </button>
+            )}
             <button type="button" onClick={() => setRefreshNonce((value) => value + 1)} className="icon-button" aria-label={t('devices.refreshAria')}>
               <Icon name="refresh" size={18} />
             </button>
