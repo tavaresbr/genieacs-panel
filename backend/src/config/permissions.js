@@ -56,6 +56,12 @@ export const PERMISSIONS = Object.freeze([
   'devices.list',
   'devices.inspect',
   'devices.write',
+  // O que não tem volta ou atinge a ONT inteira: reset de fábrica (e, a seguir,
+  // firmware e ações em lote). Separada de `devices.write` porque o plantão
+  // reinicia e ajusta Wi-Fi o dia todo, e não precisa, por consequência, poder
+  // apagar a configuração do cliente — um reset deixa o assinante sem internet
+  // até alguém reprovisionar.
+  'devices.maintain',
   // Revelar ou redefinir a senha do portal do assinante. Separada de
   // `devices.write` de propósito: é a única rota do painel que devolve um
   // segredo de outra pessoa, e quem pode reiniciar uma ONT não precisa dela por
@@ -141,6 +147,7 @@ const TECH = [
 /** Administra a operação do provedor. */
 const ADMIN = [
   ...TECH,
+  'devices.maintain',
   'catalogue.write',
   'sgp.config',
   'provisioning.write',

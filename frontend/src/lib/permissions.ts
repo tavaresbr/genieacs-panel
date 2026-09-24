@@ -32,6 +32,7 @@ export const PERMISSIONS = [
   'devices.list',
   'devices.inspect',
   'devices.write',
+  'devices.maintain',
   'customers.secrets',
   'map.read',
   'map.write',
@@ -87,6 +88,7 @@ const TECH: Permission[] = [
 /** Administra a operação do provedor. */
 const ADMIN: Permission[] = [
   ...TECH,
+  'devices.maintain',
   'catalogue.write',
   'sgp.config',
   'provisioning.write',

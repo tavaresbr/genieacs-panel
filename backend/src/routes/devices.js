@@ -24,6 +24,9 @@ router.post('/:deviceId/portal-password/reset', authenticateToken, requirePermis
 router.get('/:deviceId', authenticateToken, requirePermission('devices.inspect'), DeviceController.getDeviceDetail);
 router.delete('/:deviceId', authenticateToken, requirePermission('devices.write'), DeviceController.deleteDevice);
 router.post('/reboot', authenticateToken, requirePermission('devices.write'), DeviceController.rebootDevice);
+// O aparelho vai no corpo, como no reiniciar: o id é do GenieACS, e a varredura
+// de ids do painel não o alcança (ver `route-coverage.test.js`).
+router.post('/factory-reset', authenticateToken, requirePermission('devices.maintain'), DeviceController.factoryResetDevice);
 router.post('/summon', authenticateToken, requirePermission('devices.write'), DeviceController.summonDevice);
 router.post('/:id/update-wan', authenticateToken, requirePermission('devices.write'), DeviceController.updateWanConfig);
 router.post('/:id/add-wan', authenticateToken, requirePermission('devices.write'), DeviceController.addWanConnection);

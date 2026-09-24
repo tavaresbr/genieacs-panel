@@ -115,6 +115,31 @@ describe('a trilha do que se faz na ONT', () => {
     assert.equal((await linhas(AuditLog.ACTIONS.DEVICE_REBOOTED)).length, antes);
   });
 
+  it('o reset de fábrica exige o número de série DESTE aparelho', async () => {
+    // A tela pode ter ficado aberta noutro aparelho, e a API é chamada por quem
+    // não usa a tela. Série errada: nenhuma tarefa sai, nenhuma linha entra.
+    const antes = (await linhas(AuditLog.ACTIONS.DEVICE_FACTORY_RESET)).length;
+    for (const errada of ['ZTEG00000000', '', undefined]) {
+      // eslint-disable-next-line no-await-in-loop -- uma tentativa por vez
+      const { status, body } = await post('/api/devices/factory-reset', { deviceId: DEVICE_ID, confirmSerial: errada });
+      assert.equal(status, 400, `aceitou ${JSON.stringify(errada)}`);
+      assert.equal(body.code, 'serial_mismatch');
+    }
+    assert.equal(genie.state.tasks.filter((t) => t.task?.name === 'factoryReset').length, 0, 'mandou o reset com a série errada');
+    assert.equal((await linhas(AuditLog.ACTIONS.DEVICE_FACTORY_RESET)).length, antes);
+  });
+
+  it('com a série certa — sem ligar para maiúsculas e espaços — a ONT volta de fábrica, com linha', async () => {
+    const { status } = await post('/api/devices/factory-reset', { deviceId: DEVICE_ID, confirmSerial: '  zteg12345678 ' });
+    assert.equal(status, 200);
+    assert.deepEqual(
+      genie.state.tasks.filter((t) => t.task?.name === 'factoryReset').map((t) => t.deviceId),
+      [DEVICE_ID]
+    );
+    const linha = (await linhas(AuditLog.ACTIONS.DEVICE_FACTORY_RESET)).at(-1);
+    assert.equal(linha?.subject_id, DEVICE_ID);
+  });
+
   it('forçar contato não deixa linha, de propósito: não muda nada na ONT', async () => {
     const antes = await getDb()('audit_log').count({ n: '*' });
     await post('/api/devices/summon', { deviceId: DEVICE_ID });

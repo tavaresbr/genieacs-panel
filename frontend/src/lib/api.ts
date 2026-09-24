@@ -1460,6 +1460,10 @@ export const devicesAPI = {
   rebootDevice: (deviceId: string) =>
     apiClient.post('/devices/reboot', { deviceId }),
 
+  // A série digitada vai junto: o servidor confere que é a DESTE aparelho.
+  factoryResetDevice: (deviceId: string, confirmSerial: string) =>
+    apiClient.post('/devices/factory-reset', { deviceId, confirmSerial }),
+
   summonDevice: (deviceId: string, parameters?: string[]) =>
     apiClient.post('/devices/summon', { deviceId, parameters }),
 
