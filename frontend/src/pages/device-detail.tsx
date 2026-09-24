@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { useToast } from '@/components/ui/toast'
 import { DeviceParametersCard } from '@/components/device-parameters-card'
@@ -1330,6 +1330,108 @@ export default function DeviceDetailPage() {
     }
   }
 
+  // Os botões do topo, cada um só quando o perfil e o contrato o permitem.
+  const contractActions = Boolean(sgpAvailable && sgpLink)
+  const headerActions: Array<{ key: string; label: string; render: () => ReactNode }> = [
+    {
+      key: 'reboot',
+      label: t('detail.reboot'),
+      render: () => (
+        <button key="reboot" onClick={handleReboot} disabled={rebooting} className="modern-button-secondary">
+          <Icon name="power" size={17} />
+          {rebooting ? t('detail.rebooting') : t('detail.reboot')}
+        </button>
+      )
+    },
+    ...(canMaintainDevice ? [{
+      key: 'factoryReset',
+      label: t('detail.factoryReset.button'),
+      render: () => (
+        <button
+          key="factoryReset"
+          type="button"
+          onClick={() => setFactoryResetOpen(true)}
+          className="modern-button-secondary text-[hsl(var(--status-danger))]"
+        >
+          <Icon name="warning" size={17} />
+          {t('detail.factoryReset.button')}
+        </button>
+      )
+    }] : []),
+    {
+      key: 'summon',
+      label: t('detail.requestInform'),
+      render: () => (
+        <button
+          key="summon"
+          onClick={handleSummon}
+          className="modern-button inline-flex items-center gap-1.5"
+          title={t('detail.summonTitle')}
+        >
+          <Icon name="bell" size={16} /> {t('detail.requestInform')}
+        </button>
+      )
+    },
+    ...(contractActions ? [{
+      key: 'unlock',
+      label: t('detail.sgp.unlock'),
+      render: () => (
+        <button
+          key="unlock"
+          type="button"
+          className="modern-button-secondary"
+          disabled={sgpUnlocking}
+          onClick={() => void handleSgpUnlock()}
+        >
+          <Icon name="unlock" size={16} />
+          {sgpUnlocking ? t('detail.sgp.unlocking') : t('detail.sgp.unlock')}
+        </button>
+      )
+    }] : []),
+    ...(contractActions && sgpTicketEnabled ? [{
+      key: 'ticket',
+      label: t('detail.sgp.ticket'),
+      render: () => (
+        <button key="ticket" type="button" className="modern-button-secondary" onClick={toggleTicket}>
+          <Icon name="chat" size={16} />
+          {t('detail.sgp.ticket')}
+        </button>
+      )
+    }] : []),
+    ...(contractActions && isSafeExternalUrl(sgpUrl) ? [{
+      key: 'openSgp',
+      label: t('detail.sgp.openSgp'),
+      render: () => (
+        <a
+          key="openSgp"
+          className="modern-button-secondary"
+          href={sgpUrl ?? undefined}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <Icon name="external" size={16} />
+          {t('detail.sgp.openSgp')}
+        </a>
+      )
+    }] : []),
+    ...(contractActions && can('whatsapp.send') ? [{
+      key: 'whatsapp',
+      label: t('detail.sgp.openWhatsapp'),
+      render: () => (
+        <button
+          key="whatsapp"
+          type="button"
+          className="modern-button-secondary"
+          disabled={openingWhatsApp}
+          onClick={() => void openWhatsApp()}
+        >
+          <Icon name="phone" size={16} />
+          {t('detail.sgp.openWhatsapp')}
+        </button>
+      )
+    }] : [])
+  ].sort((a, b) => a.label.localeCompare(b.label, intlLocale, { sensitivity: 'base' }))
+
   return (
     <div className="page-shell">
       <div className="page-frame">
@@ -1358,85 +1460,17 @@ export default function DeviceDetailPage() {
               </span>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={handleReboot}
-              disabled={rebooting}
-              className="modern-button-secondary"
-            >
-              <Icon name="power" size={17} />
-              {rebooting ? t('detail.rebooting') : t('detail.reboot')}
-            </button>
-            {canMaintainDevice && (
-              <button
-                type="button"
-                onClick={() => setFactoryResetOpen(true)}
-                className="modern-button-secondary text-[hsl(var(--status-danger))]"
-              >
-                <Icon name="warning" size={17} />
-                {t('detail.factoryReset.button')}
-              </button>
-            )}
-            <button
-              onClick={handleSummon}
-              className="modern-button inline-flex items-center gap-1.5"
-              title={t('detail.summonTitle')}
-            >
-              <Icon name="bell" size={16} /> {t('detail.requestInform')}
-            </button>
-            {/* As duas ações do CONTRATO, repetidas aqui em cima — o mesmo que a
-                faixa do cliente faz com os dados dele, e pela mesma razão: quem
-                está no telefone age antes de rolar a página. Continuam também no
-                bloco do SGP, que é onde moram as faturas e o desvincular.
+          {/* Em ordem alfabética pelo nome traduzido, em qualquer idioma: quem
+              procura um botão lê a fileira, e a ordem não pode depender de quais
+              ações o perfil ou o contrato liberam. Ordena pelo nome FIXO de cada
+              ação, não pelo "…ando" de quando está em andamento, para o botão
+              não pular de lugar no meio do clique.
 
-                Secundárias das duas vezes, embora no bloco a liberação seja a
-                primária: aqui o botão verde já é o "Solicitar Inform", e dois
-                primários lado a lado não dizem qual é o principal. */}
-            {sgpAvailable && sgpLink && (
-              <>
-                <button
-                  type="button"
-                  className="modern-button-secondary"
-                  disabled={sgpUnlocking}
-                  onClick={() => void handleSgpUnlock()}
-                >
-                  <Icon name="unlock" size={16} />
-                  {sgpUnlocking ? t('detail.sgp.unlocking') : t('detail.sgp.unlock')}
-                </button>
-                {sgpTicketEnabled && (
-                  <button
-                    type="button"
-                    className="modern-button-secondary"
-                    onClick={toggleTicket}
-                  >
-                    <Icon name="chat" size={16} />
-                    {t('detail.sgp.ticket')}
-                  </button>
-                )}
-                {isSafeExternalUrl(sgpUrl) && (
-                  <a
-                    className="modern-button-secondary"
-                    href={sgpUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <Icon name="external" size={16} />
-                    {t('detail.sgp.openSgp')}
-                  </a>
-                )}
-                {can('whatsapp.send') && (
-                  <button
-                    type="button"
-                    className="modern-button-secondary"
-                    disabled={openingWhatsApp}
-                    onClick={() => void openWhatsApp()}
-                  >
-                    <Icon name="phone" size={16} />
-                    {t('detail.sgp.openWhatsapp')}
-                  </button>
-                )}
-              </>
-            )}
+              As ações do CONTRATO (liberação, chamado, SGP, WhatsApp) repetem as
+              do bloco do SGP: quem está no telefone age antes de rolar a página.
+              Todas secundárias — o verde já é o "Solicitar Inform". */}
+          <div className="flex flex-wrap items-center gap-2">
+            {headerActions.map((action) => action.render())}
           </div>
         </header>
 
