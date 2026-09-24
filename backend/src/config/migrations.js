@@ -1153,6 +1153,15 @@ const plansTable = (db) => (t) => {
    * "Mensal" e "anual" são como a tela chama 30 e 365, e isso é da tela.
    */
   t.integer('period_days').unsigned().notNullable().defaultTo(30);
+  /**
+   * Tetos de retenção, em dias: até quando o provedor pode guardar a trilha
+   * de auditoria, as mensagens e os anexos do WhatsApp. Nulo é sem teto —
+   * o provedor decide sozinho, como sempre decidiu. Com teto, o valor dele
+   * continua valendo quando é menor, e "para sempre" passa a ser o teto.
+   */
+  t.integer('max_audit_retention_days').unsigned();
+  t.integer('max_message_retention_days').unsigned();
+  t.integer('max_media_retention_days').unsigned();
   // Um plano desativado não some — assinaturas ainda apontam para ele — mas
   // deixa de ser oferecido a provedor novo.
   t.boolean('active').notNullable().defaultTo(true);
@@ -1371,6 +1380,13 @@ const SGP_CONTACT_PROFILE_COLUMNS = [
   ['login', (t) => t.string('login', 128)],
   ['address', (t) => t.text('address')],
   ['contract_created_at', (t) => t.string('contract_created_at', 32)]
+];
+
+/** Os tetos de retenção de `plans`, para a migração que os acrescenta. */
+const PLAN_RETENTION_COLUMNS = [
+  ['max_audit_retention_days', (t) => t.integer('max_audit_retention_days').unsigned()],
+  ['max_message_retention_days', (t) => t.integer('max_message_retention_days').unsigned()],
+  ['max_media_retention_days', (t) => t.integer('max_media_retention_days').unsigned()]
 ];
 
 const sgpContactsTable = (db) => (t) => {
@@ -3575,6 +3591,27 @@ export const migrations = [
         });
       }
       await createTableIfMissing(db, 'sgp_clients', sgpClientsTable(db));
+    }
+  },
+  {
+    /**
+     * Tetos de retenção por plano — ver `plansTable`.
+     *
+     * Nascem nulos, que é "sem teto": nenhum provedor perde histórico no dia
+     * do upgrade. Quem passa a limitar é o console, plano a plano.
+     */
+    id: '0057_plan_retention_caps',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('plans'))) return true;
+      return (await missingColumns(db, 'plans', PLAN_RETENTION_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('plans'))) return;
+      const missing = await missingColumns(db, 'plans', PLAN_RETENTION_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('plans', (t) => {
+        for (const add of missing) add(t);
+      });
     }
   }
 ];

@@ -25,12 +25,26 @@ interface Rascunho {
   trialDays: string
   /** Quanto tempo um pagamento compra. Trinta é mensal, 365 é anual. */
   periodDays: string
+  /** Tetos de retenção, em dias. Vazio é sem teto. */
+  maxAuditRetentionDays: string
+  maxMessageRetentionDays: string
+  maxMediaRetentionDays: string
   active: boolean
 }
 
 const VAZIO: Rascunho = {
   code: '', name: '', maxOperators: '', maxSubscribers: '', maxDevices: '',
-  price: '', currency: 'BRL', trialDays: '14', periodDays: '30', active: true
+  price: '', currency: 'BRL', trialDays: '14', periodDays: '30',
+  maxAuditRetentionDays: '', maxMessageRetentionDays: '', maxMediaRetentionDays: '', active: true
+}
+
+/**
+ * Teto de retenção: vazio é sem teto (`null`), e zero também — "zero dias" não
+ * é teto que faça sentido, e o backend o recusa.
+ */
+function teto(texto: string): number | null {
+  const n = limite(texto)
+  return n === null || n < 1 ? null : n
 }
 
 /**
@@ -61,6 +75,9 @@ function paraRascunho(plan: Plan): Rascunho {
     currency: plan.currency,
     trialDays: String(plan.trialDays),
     periodDays: String(plan.periodDays),
+    maxAuditRetentionDays: plan.retention?.audit == null ? '' : String(plan.retention.audit),
+    maxMessageRetentionDays: plan.retention?.messages == null ? '' : String(plan.retention.messages),
+    maxMediaRetentionDays: plan.retention?.media == null ? '' : String(plan.retention.media),
     active: plan.active
   }
 }
@@ -151,6 +168,9 @@ export function PlanCatalog({ plans, onChange }: Props) {
       // Piso 1 e não 0: período zero é uma assinatura que vence no instante em
       // que é paga. O backend recusa; a tela não deixa chegar lá.
       periodDays: Math.max(1, Math.floor(Number(rascunho.periodDays) || 30)),
+      maxAuditRetentionDays: teto(rascunho.maxAuditRetentionDays),
+      maxMessageRetentionDays: teto(rascunho.maxMessageRetentionDays),
+      maxMediaRetentionDays: teto(rascunho.maxMediaRetentionDays),
       active: rascunho.active
     }
 
@@ -273,6 +293,28 @@ export function PlanCatalog({ plans, onChange }: Props) {
           <p className="field-hint">{t('platform.plans.periodDaysHint')}</p>
         </div>
       </div>
+
+      {/* Até quando o provedor pode guardar o que é dado pessoal. Com teto, o
+          valor que ele escolher continua valendo quando é menor; "para sempre"
+          passa a ser o teto. */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {([
+          ['maxAuditRetentionDays', 'platform.plans.maxAuditRetention'],
+          ['maxMessageRetentionDays', 'platform.plans.maxMessageRetention'],
+          ['maxMediaRetentionDays', 'platform.plans.maxMediaRetention']
+        ] as const).map(([campo, chave]) => (
+          <div key={campo}>
+            <label className="field-label" htmlFor={`plan-${campo}`}>{t(chave)}</label>
+            <input
+              id={`plan-${campo}`} type="number" min={1} max={3650} className="modern-input w-full"
+              value={rascunho[campo]}
+              onChange={(e) => setRascunho((r) => ({ ...r, [campo]: e.target.value }))}
+              placeholder={t('platform.plans.noCap')}
+            />
+          </div>
+        ))}
+      </div>
+      <p className="field-hint">{t('platform.plans.retentionHint')}</p>
 
       <label className="flex items-center gap-2 text-sm text-foreground">
         <input

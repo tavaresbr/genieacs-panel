@@ -50,6 +50,35 @@ function parsePeriodDays(value) {
   return { ok: true, value: n };
 }
 
+/**
+ * Os tetos de retenção: inteiro ≥ 1, ou vazio/nulo para "sem teto". Zero não
+ * é aceito porque "zero dias" não é teto nenhum que faça sentido — apagaria
+ * tudo, todo dia.
+ */
+const RETENTION_FIELDS = [
+  ['maxAuditRetentionDays', 'max_audit_retention_days'],
+  ['maxMessageRetentionDays', 'max_message_retention_days'],
+  ['maxMediaRetentionDays', 'max_media_retention_days']
+];
+
+function parseRetentionCap(value) {
+  if (value === null || value === undefined || value === '') return { ok: true, value: null };
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 1 || n > 3650) return { ok: false };
+  return { ok: true, value: n };
+}
+
+/** Lê os tetos do corpo em `target`; devolve a mensagem de erro, ou `null`. */
+function readRetentionCaps(body, target) {
+  for (const [key, column] of RETENTION_FIELDS) {
+    if (body[key] === undefined) continue;
+    const parsed = parseRetentionCap(body[key]);
+    if (!parsed.ok) return `${key} must be an integer between 1 and 3650, or null`;
+    target[column] = parsed.value;
+  }
+  return null;
+}
+
 function presentPlan(plan) {
   return {
     id: plan.id,
@@ -62,6 +91,8 @@ function presentPlan(plan) {
     // Quanto tempo um pagamento compra. Sem isto a tela nunca vê o campo, e um
     // plano anual seria criável só por SQL.
     periodDays: Number(plan.period_days ?? 30),
+    // Até quantos dias o provedor pode guardar trilha, mensagens e anexos.
+    retention: SubscriptionService.retentionCapsOf(plan),
     active: Boolean(plan.active),
     createdAt: plan.created_at ?? null
   };
@@ -148,6 +179,8 @@ class PlatformBillingController {
       // Ausente fica com o default da coluna, e não com um 30 repetido aqui: a
       // segunda cópia de um default é a que diverge quando a primeira muda.
       if (periodo.value !== null) row.period_days = periodo.value;
+      const erroRetencao = readRetentionCaps(body, row);
+      if (erroRetencao) return res.status(400).json(createErrorResponse(erroRetencao));
       row.currency = String(body.currency ?? 'BRL').toUpperCase().slice(0, 3);
       row.active = body.active === undefined ? true : Boolean(body.active);
 
@@ -209,6 +242,8 @@ class PlatformBillingController {
         }
         if (periodo.value !== null) patch.period_days = periodo.value;
       }
+      const erroRetencao = readRetentionCaps(body, patch);
+      if (erroRetencao) return res.status(400).json(createErrorResponse(erroRetencao));
       if (body.currency !== undefined) patch.currency = String(body.currency).toUpperCase().slice(0, 3);
       if (body.active !== undefined) patch.active = Boolean(body.active);
       if (Object.keys(patch).length === 0) {

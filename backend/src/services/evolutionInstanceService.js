@@ -214,6 +214,14 @@ class EvolutionInstanceService {
     if (config.managedUrl) {
       return { baseUrl: config.managedUrl, adminKey: config.managedAdminKey };
     }
+    // Na SaaS o servidor é da plataforma: sem ele configurado, o provedor não
+    // aponta um servidor próprio — espera a plataforma configurar o dela.
+    if (config.platformManaged) {
+      throw new WaError('whatsapp.error.platformServerMissing', {
+        code: 'platform_server_missing',
+        status: 409
+      });
+    }
     return { baseUrl: String(baseUrl || '').trim(), adminKey: String(adminKey || '').trim() };
   }
 

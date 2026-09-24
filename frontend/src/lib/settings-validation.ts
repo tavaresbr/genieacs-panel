@@ -32,12 +32,25 @@ export const AUDIT_RETENTION_MAX_DAYS = 3650
  * e `'12abc'` e devolve um inteiro dos dois — que passaria por qualquer teste
  * de tipo e chegaria ao servidor como um número que ninguém digitou.
  */
-export function auditRetentionError(value: string): TranslationKey | null {
+export function auditRetentionError(value: string, cap: number | null = null): TranslationKey | null {
   const texto = String(value ?? '').trim()
   if (!/^[0-9]+$/.test(texto)) return 'settings.audit.retentionInvalid'
   const dias = Number.parseInt(texto, 10)
   if (dias < AUDIT_RETENTION_MIN_DAYS || dias > AUDIT_RETENTION_MAX_DAYS) {
     return 'settings.audit.retentionInvalid'
   }
+  // O teto do plano, na SaaS. O servidor recusa acima dele com 422; dizer
+  // aqui é o que dá ao operador o número em vez de "não foi possível salvar".
+  if (cap !== null && dias > cap) return 'settings.audit.retentionAboveCap'
   return null
+}
+
+/**
+ * Os dias de retenção do WhatsApp (mensagens ou anexos) acima do teto do
+ * plano. Zero é "para sempre", e com teto isso é acima dele por definição.
+ */
+export function waRetentionAboveCap(days: number, cap: number | null | undefined): boolean {
+  if (cap === null || cap === undefined) return false
+  const n = Math.trunc(Number(days))
+  return !Number.isFinite(n) || n <= 0 || n > cap
 }

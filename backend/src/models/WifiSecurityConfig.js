@@ -99,6 +99,19 @@ class WifiSecurityConfig {
     return count > 0;
   }
 
+  /**
+   * Põe numa linha do provedor as colunas de outra — a do catálogo padrão,
+   * no "restaurar padrão". O id e o provedor ficam; o resto é substituído.
+   * `false` quando a linha não é deste provedor.
+   */
+  static async resetTo(id, columns) {
+    const affected = await tdb('wifi_security_config').where({ id }).update({
+      ...columns,
+      updated_at: getDb().fn.now()
+    });
+    return affected > 0;
+  }
+
   static async delete(id) {
     const count = await tdb('wifi_security_config').where({ id }).del();
     return count > 0;

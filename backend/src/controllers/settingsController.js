@@ -10,6 +10,35 @@ import Tenant from '../models/Tenant.js';
 import { suggestGenieAcsUrl } from '../services/genieacsSuggestion.js';
 import { currentTenantId } from '../config/tenantContext.js';
 import CustomerAccount from '../models/CustomerAccount.js';
+import { PLATFORM_MANAGED_SETTING_KEYS, platformManagesCurrentTenant } from '../config/platformManaged.js';
+import SubscriptionService from '../services/subscriptionService.js';
+
+/**
+ * O prazo da trilha acima do teto do plano é recusado com 422, e não cortado
+ * em silêncio: o provedor precisa ver que o número dele não é o que vai valer.
+ * `null` quando está dentro do teto, ou quando não há teto.
+ */
+async function auditRetentionAboveCap(key, value) {
+  if (key !== 'auditRetentionDays') return null;
+  const { audit } = await SubscriptionService.retentionCaps();
+  if (audit === null) return null;
+  return Number.parseInt(String(value), 10) > audit ? audit : null;
+}
+
+/**
+ * A recusa de quando o provedor tenta gravar o que é da plataforma. 403 com um
+ * código que a tela reconhece: não é validação errada, é a porta errada — a
+ * mudança existe, só que é feita no console.
+ */
+function platformManagedResponse(req, res) {
+  return res.status(403).json(
+    createErrorResponse(req.t('settings.platformManaged'), null, 'platform_managed')
+  );
+}
+
+async function refusesPlatformKey(key) {
+  return PLATFORM_MANAGED_SETTING_KEYS.includes(String(key)) && platformManagesCurrentTenant();
+}
 import OnboardingService from '../services/onboardingService.js';
 
 const ALLOWED_SETTING_KEYS = new Set([
@@ -160,6 +189,7 @@ class SettingsController {
 
   static async updateGenieAcsAuth(req, res) {
     try {
+      if (await platformManagesCurrentTenant()) return platformManagedResponse(req, res);
       const authType = req.body?.authType;
       if (authType !== undefined && !AUTH_TYPES.includes(authType)) {
         return res.status(400).json(
@@ -265,9 +295,18 @@ class SettingsController {
         );
       }
 
+      if (await refusesPlatformKey(key)) return platformManagedResponse(req, res);
+
       const validated = validateSetting(String(key), value);
       if (validated.errorKey) {
         return res.status(400).json(createErrorResponse(req.t(validated.errorKey)));
+      }
+
+      const teto = await auditRetentionAboveCap(String(key), validated.value);
+      if (teto !== null) {
+        return res.status(422).json(createErrorResponse(
+          req.t('settings.validation.auditRetentionAboveCap', { max: teto }), null, 'retention_above_cap'
+        ));
       }
 
       await Setting.create(key, validated.value);
@@ -293,9 +332,18 @@ class SettingsController {
         );
       }
 
+      if (await refusesPlatformKey(key)) return platformManagedResponse(req, res);
+
       const validated = validateSetting(String(key), value);
       if (validated.errorKey) {
         return res.status(400).json(createErrorResponse(req.t(validated.errorKey)));
+      }
+
+      const teto = await auditRetentionAboveCap(String(key), validated.value);
+      if (teto !== null) {
+        return res.status(422).json(createErrorResponse(
+          req.t('settings.validation.auditRetentionAboveCap', { max: teto }), null, 'retention_above_cap'
+        ));
       }
 
       const updated = await Setting.update(key, validated.value);
@@ -386,6 +434,7 @@ class SettingsController {
       if (!ALLOWED_SETTING_KEYS.has(key)) {
         return res.status(404).json(createErrorResponse(req.t('settings.notFound')));
       }
+      if (await refusesPlatformKey(key)) return platformManagedResponse(req, res);
 
       const deleted = await Setting.delete(key);
       
@@ -408,132 +457,150 @@ class SettingsController {
 
   static async testGenieAcsConnection(req, res) {
     try {
-      const { url } = req.body;
-      
-      if (!url) {
-        return res.status(400).json(
-          createErrorResponse(req.t('settings.urlRequired'))
-        );
-      }
-      
-      let testUrl;
-      try {
-        testUrl = new URL(String(url).trim());
-      } catch {
-        return res.status(400).json(
-          createErrorResponse(req.t('settings.urlInvalid'))
-        );
-      }
-
-      if (!['http:', 'https:'].includes(testUrl.protocol)) {
-        return res.status(400).json(
-          createErrorResponse(req.t('settings.urlSchemeUnsupported'))
-        );
-      }
-
-      if (testUrl.username || testUrl.password) {
-        return res.status(400).json(
-          createErrorResponse(req.t('settings.urlCredentialsUnsupported'))
-        );
-      }
-
-      testUrl.pathname = '/devices';
-      testUrl.search = '';
-      testUrl.hash = '';
-      testUrl.searchParams.set('limit', '1');
-      
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
-      
-      try {
-        // The URL under test arrives in the request body, so this is the one
-        // GenieACS call whose destination is named by the caller rather than by
-        // stored settings. It goes through the same guard as every other, or
-        // the "test connection" button is a probe for anything our network can
-        // reach that the configured URL is not allowed to be.
-        // A credencial guardada só acompanha o teste quando o endereço testado
-        // é a MESMA origem que está salva.
-        //
-        // Não é zelo: a URL vem no corpo do request, então mandar a credencial
-        // para qualquer endereço faria deste botão um jeito de LER o segredo —
-        // aponte para um servidor seu, leia o header. Ele é gravado para nunca
-        // mais ser exibido, e um administrador recuperaria assim o que um
-        // antecessor configurou. Contra a mesma origem já salva não há o que
-        // extrair: o segredo já vai para lá a cada requisição do painel.
-        //
-        // O efeito colateral é honesto e vale dizer na tela: testar um endereço
-        // NOVO vai sem autenticação, e contra uma NBI que exige credencial isso
-        // responde 401. É a resposta certa — a configuração daquele endereço
-        // ainda não foi salva, então não há credencial dele para usar.
-        const salva = await DeviceService.getGenieAcsUrl().catch(() => null);
-        const mesmaOrigem = (() => {
-          try { return salva ? new URL(salva).origin === testUrl.origin : false; } catch { return false; }
-        })();
-        const response = await GenieAcsEgress.fetch(testUrl, {
-          method: 'GET',
-          headers: mesmaOrigem
-            ? await GenieAcsAuthService.nbiHeaders()
-            : { Accept: 'application/json' },
-          signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        if (!response.ok) {
-          return res.status(502).json(
-            createErrorResponse(
-              req.t('settings.connectionStatus', { status: response.status }),
-              req.t('settings.connectionTestFailed')
-            )
-          );
-        }
-        
-        const data = await response.json();
-        
-        if (Array.isArray(data)) {
-          return res.json(
-            createResponse(req.t('settings.connectionSuccess'), {
-              deviceCount: data.length
-            })
-          );
-        } else {
-          return res.json(
-            createResponse(req.t('settings.connectionUnexpectedFormat'))
-          );
-        }
-      } catch (error) {
-        clearTimeout(timeoutId);
-        
-        // A refused address is the operator's own misconfiguration, not an
-        // upstream outage, so it answers 400 with the reason rather than 502.
-        if (error.code === EGRESS_REFUSED) {
-          return res.status(400).json(
-            createErrorResponse(req.t('settings.urlEgressRefused'), error.message)
-          );
-        }
-
-        if (error.name === 'AbortError' || error.type === 'request-timeout') {
-          return res.status(504).json(
-            createErrorResponse(req.t('settings.connectionTimeout'))
-          );
-        }
-        
-        if (error.code === 'ECONNREFUSED') {
-          return res.status(502).json(
-            createErrorResponse(req.t('settings.connectionRefused'))
-          );
-        }
-        
-        return res.status(502).json(
-          createErrorResponse(req.t('settings.connectionFailed'), error.message)
-        );
-      }
+      // Na SaaS o provedor não escolhe para onde o painel fala: testa o
+      // endereço que a plataforma gravou, e o corpo do request é ignorado. É
+      // o que mantém o botão útil ("o ACS está respondendo?") sem ele virar
+      // uma sonda para endereços que o provedor não pode gravar.
+      const url = (await platformManagesCurrentTenant())
+        ? await DeviceService.getGenieAcsUrl().catch(() => null)
+        : req.body?.url;
+      const { status, body } = await probeGenieAcs(req.t, url);
+      return res.status(status).json(body);
     } catch (error) {
       console.error('Test GenieACS connection error:', error);
       return res.status(500).json(
         createErrorResponse(req.t('common.internalError'), error.message)
       );
     }
+  }
+}
+
+/**
+ * Pergunta ao GenieACS em `url` se ele responde, com o mesmo guarda de saída
+ * de toda outra chamada. Devolve `{ status, body }` em vez de escrever na
+ * resposta, porque o console chama isto em nome de um provedor — dentro do
+ * `runInTenant` dele, com a credencial dele — e responde pela própria rota.
+ */
+export async function probeGenieAcs(t, url) {
+  const reply = (status, body) => ({ status, body });
+
+  if (!url) {
+    return reply(400,
+      createErrorResponse(t('settings.urlRequired'))
+    );
+  }
+
+  let testUrl;
+  try {
+    testUrl = new URL(String(url).trim());
+  } catch {
+    return reply(400,
+      createErrorResponse(t('settings.urlInvalid'))
+    );
+  }
+
+  if (!['http:', 'https:'].includes(testUrl.protocol)) {
+    return reply(400,
+      createErrorResponse(t('settings.urlSchemeUnsupported'))
+    );
+  }
+
+  if (testUrl.username || testUrl.password) {
+    return reply(400,
+      createErrorResponse(t('settings.urlCredentialsUnsupported'))
+    );
+  }
+
+  testUrl.pathname = '/devices';
+  testUrl.search = '';
+  testUrl.hash = '';
+  testUrl.searchParams.set('limit', '1');
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+  try {
+    // The URL under test arrives in the request body, so this is the one
+    // GenieACS call whose destination is named by the caller rather than by
+    // stored settings. It goes through the same guard as every other, or
+    // the "test connection" button is a probe for anything our network can
+    // reach that the configured URL is not allowed to be.
+    // A credencial guardada só acompanha o teste quando o endereço testado
+    // é a MESMA origem que está salva.
+    //
+    // Não é zelo: a URL vem no corpo do request, então mandar a credencial
+    // para qualquer endereço faria deste botão um jeito de LER o segredo —
+    // aponte para um servidor seu, leia o header. Ele é gravado para nunca
+    // mais ser exibido, e um administrador recuperaria assim o que um
+    // antecessor configurou. Contra a mesma origem já salva não há o que
+    // extrair: o segredo já vai para lá a cada requisição do painel.
+    //
+    // O efeito colateral é honesto e vale dizer na tela: testar um endereço
+    // NOVO vai sem autenticação, e contra uma NBI que exige credencial isso
+    // responde 401. É a resposta certa — a configuração daquele endereço
+    // ainda não foi salva, então não há credencial dele para usar.
+    const salva = await DeviceService.getGenieAcsUrl().catch(() => null);
+    const mesmaOrigem = (() => {
+      try { return salva ? new URL(salva).origin === testUrl.origin : false; } catch { return false; }
+    })();
+    const response = await GenieAcsEgress.fetch(testUrl, {
+      method: 'GET',
+      headers: mesmaOrigem
+        ? await GenieAcsAuthService.nbiHeaders()
+        : { Accept: 'application/json' },
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      return reply(502,
+        createErrorResponse(
+          t('settings.connectionStatus', { status: response.status }),
+          t('settings.connectionTestFailed')
+        )
+      );
+    }
+
+    const data = await response.json();
+
+    if (Array.isArray(data)) {
+      return reply(200,
+        createResponse(t('settings.connectionSuccess'), {
+          deviceCount: data.length
+        })
+      );
+    } else {
+      return reply(200,
+        createResponse(t('settings.connectionUnexpectedFormat'))
+      );
+    }
+  } catch (error) {
+    clearTimeout(timeoutId);
+
+    // A refused address is the operator's own misconfiguration, not an
+    // upstream outage, so it answers 400 with the reason rather than 502.
+    if (error.code === EGRESS_REFUSED) {
+      return reply(400,
+        createErrorResponse(t('settings.urlEgressRefused'), error.message)
+      );
+    }
+
+    if (error.name === 'AbortError' || error.type === 'request-timeout') {
+      return reply(504,
+        createErrorResponse(t('settings.connectionTimeout'))
+      );
+    }
+
+    if (error.code === 'ECONNREFUSED') {
+      return reply(502,
+        createErrorResponse(t('settings.connectionRefused'))
+      );
+    }
+
+    return reply(502,
+      createErrorResponse(t('settings.connectionFailed'), error.message)
+    );
   }
 }
 

@@ -35,6 +35,13 @@ interface TenantContextValue {
    */
   providerName: string | null
   isSaas: boolean
+  /**
+   * Se a infraestrutura deste painel (GenieACS, servidor do WhatsApp) é
+   * configurada pela plataforma e não por ele. Verdade na SaaS para todo
+   * provedor; falso na self-hosted e na caixa da plataforma, que é onde o
+   * administrador da plataforma configura o que vale para todos.
+   */
+  platformManaged: boolean
   /** The platform's own front door: a SaaS host that names no provider. Only sign-up lives here. */
   isPlatformHost: boolean
   /** Re-read after the provider renamed itself. */
@@ -71,6 +78,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     name,
     providerName: tenant?.name ?? null,
     isSaas: tenant?.edition === 'saas',
+    platformManaged: tenant?.edition === 'saas' && tenant.kind !== 'platform',
     isPlatformHost: tenant !== null && tenant.slug === null,
     refresh
   }), [tenant, loading, name, refresh])

@@ -1689,3 +1689,53 @@ derruba o caso.
   operador edita e salva, e a volta é quem manda ele ir lá. Uma migração
   mexendo em configuração de produção pelas costas de quem opera é mais do que
   esta correção precisa.
+
+## Onda 27 — a fronteira entre o console e a Configuração do provedor ✅ *(implementada)*
+
+Na SaaS, a tela de Configuração do provedor deixava ele mexer em coisas que
+são infraestrutura da plataforma: para onde o painel fala com o GenieACS (e
+com que credencial), e o servidor Evolution do WhatsApp. Os **dados** já eram
+separados por provedor (`settings` e `app_state` são escopados); o que faltava
+era decidir **quem escreve o quê**. A regra mora em `config/platformManaged.js`
+e vale só com `EDITION=saas`. A self-hosted não muda nada, porque ali o dono da
+instalação é o próprio provedor e não existe console.
+
+| Item | Console / caixa da plataforma (SaaS) | Configuração do provedor |
+|---|---|---|
+| Provedores, planos, admins, trilha, deploy | ✅ (já existia) | — |
+| URL + credencial do GenieACS de cada provedor | ✅ console, botão **GenieACS** na linha do provedor | Só leitura: endereço, tipo de autenticação e "Testar conexão" (testa o **gravado**, ignora o corpo) |
+| Servidor Evolution (URL, chave admin, hosts permitidos, webhook) | ✅ um só, na aba WhatsApp da **caixa da plataforma** | — |
+| Números, mensagem de recusa de chamada, link do portal, envios por minuto, alertas | — | ✅ |
+| Catálogo padrão (fabricantes + mapeamentos WiFi) | ✅ editado na caixa; **Enviar atualizações** na aba Catálogo padrão | A cópia é do provedor, editável, com **Restaurar padrão** por perfil |
+| Tetos de retenção (trilha, mensagens, anexos) | ✅ no plano | Escolhe um valor ≤ teto |
+| Nome, idioma, TR-069, portal, SGP, ativação, acesso da conta | — | ✅ |
+| Banco de dados | — | Só na self-hosted |
+
+### Como cada peça foi feita
+
+- **GenieACS.**
+  - Na SaaS, o provedor recebe `403 platform_managed` ao gravar `genieAcsUrl` (POST/PUT/DELETE em `/api/settings`) e em `PUT /settings/genieacs-auth`.
+  - O console grava por `GET`/`PUT /api/platform/tenants/:id/genieacs` e testa por `POST …/genieacs/test`. As rotas rodam no `runInTenant` do alvo, então os dados continuam onde estavam.
+  - Cada gravação deixa linha nas duas trilhas: `tenant.genieacs_changed` na nossa, `genieacs.*_changed` com `actor_kind = platform` na do provedor.
+  - O teste de conexão virou `probeGenieAcs`, reaproveitado pelos dois lados.
+- **Evolution.**
+  - `whatsappConfigService` lê os quatro campos de servidor (`WA_SERVER_FIELDS`) do `app_state` da caixa quando o tenant é gerenciado.
+  - Na gravação, o provedor tem esses campos ignorados. Os valores antigos dele ficam guardados, mas não são lidos.
+  - Um provedor sem servidor da plataforma não cria número (`409 platform_server_missing`).
+  - A caixa salvar limpa o cache de todos os provedores.
+  - No primeiro boot com caixa, `adoptPlatformWhatsAppServer` copia para ela o servidor do provedor mais antigo que tinha um. Roda uma vez só, com marcador em `app_state`.
+- **Catálogo.**
+  - `propagateCatalogue` (em `config/seed.js`) insere o que falta, pela identidade `vendors.name` / `wifi_security_config.product_class`.
+  - Só sobrescreve com `overwrite`, e nunca apaga.
+  - A fonte tem de ser a caixa (`409` caso contrário): empurrar o catálogo de um cliente para os outros não é padrão nenhum.
+  - `POST /api/vendor-management/:id/reset` e `…/wifi-security-configs/:id/reset` voltam uma linha ao padrão. Os dois estão na varredura de ids.
+- **Retenção.**
+  - Migração `0057_plan_retention_caps`: três colunas nulas em `plans`, e nulo é sem teto.
+  - `SubscriptionService.capRetention` devolve o menor entre a escolha do provedor e o teto, e com teto "para sempre" (0) vira o teto.
+  - É aplicado na poda da trilha e nas duas varreduras do WhatsApp, através do `getConfig`.
+  - Gravar acima do teto responde `422 retention_above_cap`.
+
+### O que ficou de fora de propósito
+
+- **Tela nova no console para editar o catálogo ou o servidor Evolution.** Os dois são editados nas telas de Configuração da **caixa da plataforma**, que já existem. Uma segunda tela para escrever a mesma coisa é a que fica para trás.
+- **Apagar o que o provedor tinha gravado** (URL do Evolution, chave). Deixou de ser lido, e apagar seria destruir sem pedido.

@@ -12,6 +12,7 @@ import AuthTicket from '../models/AuthTicket.js';
 import ImpersonationTicket from '../models/ImpersonationTicket.js';
 import { refreshDeploymentSharing } from './genieacsEgress.js';
 import SubscriptionNoticeService from './subscriptionNoticeService.js';
+import SubscriptionService from './subscriptionService.js';
 import ChargeIssuingService from './chargeIssuingService.js';
 import {
   dueForRefresh, isDormant, lastPanelActivityAt, refreshTtlMs, tenantOffsetMs
@@ -352,7 +353,21 @@ class SchedulerService {
    * uma poda parada é a tabela crescendo em silêncio, que é pior que o prazo
    * errado.
    */
+  /**
+   * O prazo que vale: o do provedor, limitado pelo teto do plano dele (na
+   * SaaS). O teto lê o plano, e um plano ilegível não pode parar a poda — cai
+   * no prazo do provedor, que é o que valia antes de existir teto.
+   */
   static async auditRetentionDays() {
+    const escolhido = await this.chosenAuditRetentionDays();
+    try {
+      return await SubscriptionService.effectiveRetention('audit', escolhido);
+    } catch {
+      return escolhido;
+    }
+  }
+
+  static async chosenAuditRetentionDays() {
     const bruto = String(await Setting.getByKey('auditRetentionDays').catch(() => null) ?? '').trim();
     // Só dígitos, e o texto inteiro. `Number.parseInt` aceita `'12abc'` e
     // devolve 12 — e 12 é um inteiro positivo, então passaria pelo teste de

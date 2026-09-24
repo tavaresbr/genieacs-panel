@@ -1,4 +1,6 @@
 import { getDb, insertReturningId } from './database.js';
+import { IS_SAAS } from './edition.js';
+import { WA_SERVER_FIELDS } from './platformManaged.js';
 
 export const DEFAULT_SETTINGS = {
   appName: 'SkyGenPanel',
@@ -117,6 +119,73 @@ export async function seedDefaults(db = getDb(), { tenantIds = null } = {}) {
 
   await seedVendorCatalogue(db, tenants);
   await seedSubscriptions(db, tenants);
+  if (!tenantIds) await adoptPlatformWhatsAppServer(db);
+}
+
+const WA_CONFIG_KEY = 'whatsapp_evolution_config';
+const WA_ADOPTED_KEY = 'platform_whatsapp_server_adopted';
+
+function parseBlob(row) {
+  try {
+    return row?.value ? JSON.parse(row.value) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Na SaaS, o servidor Evolution passou a ser um só, guardado na caixa da
+ * plataforma (ver `config/platformManaged.js`). Um deploy que já rodava tinha
+ * esse servidor configurado DENTRO de um provedor — o único jeito que havia.
+ *
+ * Uma vez, no primeiro boot com caixa: se ela ainda não tem servidor, herda o
+ * do provedor mais antigo que tem. Sem isso, o dia do upgrade seria o dia em
+ * que nenhum provedor consegue criar número novo. Os números já pareados não
+ * dependem disto — cada um guarda o próprio endereço.
+ *
+ * O que o provedor tinha fica onde estava: não é mais lido enquanto a
+ * plataforma manda, e apagar seria destruir o que ninguém pediu.
+ */
+export async function adoptPlatformWhatsAppServer(db = getDb()) {
+  if (!IS_SAAS) return false;
+  const caixa = await db('tenants').where({ kind: 'platform' }).orderBy('id', 'asc').first();
+  if (!caixa) return false;
+  if (await db('app_state').where({ tenant_id: caixa.id, key: WA_ADOPTED_KEY }).first()) return false;
+
+  const marcar = () => db('app_state').insert({ tenant_id: caixa.id, key: WA_ADOPTED_KEY, value: '1' });
+  const daCaixaRow = await db('app_state').where({ tenant_id: caixa.id, key: WA_CONFIG_KEY }).first();
+  const daCaixa = parseBlob(daCaixaRow) ?? {};
+  if (daCaixa.managedUrl) {
+    await marcar();
+    return false;
+  }
+
+  const provedores = await db('tenants').where({ kind: 'provider' }).orderBy('id', 'asc');
+  for (const provedor of provedores) {
+    const blob = parseBlob(await db('app_state').where({ tenant_id: provedor.id, key: WA_CONFIG_KEY }).first());
+    if (!blob?.managedUrl) continue;
+    const proximo = { ...daCaixa };
+    // A chave vai cifrada como está: a caixa de segredo não amarra o texto
+    // cifrado ao provedor, então o mesmo blob abre dos dois lados.
+    // Campo que a caixa já tem (o webhook dela, por exemplo, se ela já usava
+    // WhatsApp) fica o dela.
+    const vazio = (v) => v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0);
+    for (const field of WA_SERVER_FIELDS) {
+      if (vazio(proximo[field])) proximo[field] = blob[field] ?? null;
+    }
+    const value = JSON.stringify(proximo);
+    if (daCaixaRow) {
+      await db('app_state').where({ tenant_id: caixa.id, key: WA_CONFIG_KEY }).update({ value });
+    } else {
+      await db('app_state').insert({ tenant_id: caixa.id, key: WA_CONFIG_KEY, value });
+    }
+    await marcar();
+    return true;
+  }
+  // Nenhum provedor tinha servidor: nada a herdar, e a marca fica para não
+  // repetir a pergunta a cada boot.
+  await marcar();
+  return false;
 }
 
 /** As tabelas do catálogo de equipamentos. */
@@ -341,4 +410,92 @@ async function copyCatalogue(db, sourceId, targetId) {
     const { id, tenant_id, created_at, updated_at, ...columns } = config;
     await db('wifi_security_config').insert({ ...columns, tenant_id: targetId });
   }
+}
+
+/**
+ * Como cada linha do catálogo é reconhecida entre dois provedores.
+ *
+ * O id não serve — cada provedor tem os seus. O que diz "é o mesmo perfil" é o
+ * nome do fabricante e a classe de produto do mapeamento WiFi, que é também
+ * como a tela os mostra e como o operador os procura.
+ */
+const CATALOGUE_IDENTITY = Object.freeze({
+  vendors: 'name',
+  wifi_security_config: 'product_class'
+});
+
+function catalogueColumns(row) {
+  const { id, tenant_id, created_at, updated_at, ...columns } = row;
+  return columns;
+}
+
+/**
+ * Reenvia o catálogo da fonte (a caixa da plataforma) aos provedores.
+ *
+ * A cópia do boot só acontece para quem está VAZIO. Depois disso, um perfil
+ * novo que a plataforma cadastrou não chegava a ninguém. Esta é a volta:
+ *
+ *   - linha que o provedor NÃO tem (pela identidade acima) é inserida;
+ *   - linha que ele TEM fica como está, porque a cópia dele é dele e pode ter
+ *     sido ajustada — a menos que `overwrite` seja pedido, e aí ela recebe as
+ *     colunas da fonte (o id e o provedor ficam);
+ *   - linha que só ele tem nunca é apagada.
+ *
+ * `tenantIds` restringe a quem; sem ele, todo provedor (a própria fonte fica
+ * de fora). Devolve, por provedor, quantas linhas entraram e quantas foram
+ * sobrescritas.
+ */
+export async function propagateCatalogue(db = getDb(), { sourceId, tenantIds = null, overwrite = false } = {}) {
+  if (!sourceId) return [];
+  const alvos = await (tenantIds
+    ? db('tenants').whereIn('id', tenantIds)
+    : db('tenants').where({ kind: 'provider' })
+  ).whereNot({ id: sourceId }).orderBy('id', 'asc');
+
+  const fonte = {};
+  for (const table of Object.keys(CATALOGUE_IDENTITY)) {
+    fonte[table] = await db(table).where({ tenant_id: sourceId }).orderBy('id', 'asc');
+  }
+
+  const resultado = [];
+  for (const alvo of alvos) {
+    let added = 0;
+    let updated = 0;
+    for (const [table, chave] of Object.entries(CATALOGUE_IDENTITY)) {
+      const existentes = new Map(
+        (await db(table).where({ tenant_id: alvo.id })).map((row) => [String(row[chave]), row])
+      );
+      for (const row of fonte[table]) {
+        const presente = existentes.get(String(row[chave]));
+        if (!presente) {
+          if (table === 'vendors') {
+            await insertReturningId(table, { ...catalogueColumns(row), tenant_id: alvo.id }, db);
+          } else {
+            await db(table).insert({ ...catalogueColumns(row), tenant_id: alvo.id });
+          }
+          existentes.set(String(row[chave]), row);
+          added += 1;
+        } else if (overwrite) {
+          await db(table)
+            .where({ tenant_id: alvo.id, id: presente.id })
+            .update({ ...catalogueColumns(row), updated_at: new Date() });
+          updated += 1;
+        }
+      }
+    }
+    resultado.push({ tenantId: Number(alvo.id), slug: alvo.slug, added, updated });
+  }
+  return resultado;
+}
+
+/**
+ * A versão da fonte de UMA linha do catálogo de um provedor, pela identidade.
+ * `null` quando a fonte não tem aquele perfil — é um perfil só do provedor.
+ */
+export async function sourceCatalogueRow(db, { sourceId, table, identity }) {
+  if (!sourceId || !CATALOGUE_IDENTITY[table]) return null;
+  const row = await db(table)
+    .where({ tenant_id: sourceId, [CATALOGUE_IDENTITY[table]]: identity })
+    .first();
+  return row ? catalogueColumns(row) : null;
 }

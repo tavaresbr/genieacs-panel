@@ -4,6 +4,11 @@ import { WA_WEBHOOK_PATH, withWebhookPath } from '../config/waWebhookPath.js';
 import { createSecretBox } from '../utils/secretBox.js';
 import { normalizeEvoUrl, parseAllowedHosts } from '../utils/wa/evolutionPolicy.js';
 import { TenantCache } from '../config/tenantCache.js';
+import { IS_SAAS } from '../config/edition.js';
+import { currentTenantId, runInTenant } from '../config/tenantContext.js';
+import { WA_SERVER_FIELDS, platformManagesCurrentTenant } from '../config/platformManaged.js';
+import Tenant from '../models/Tenant.js';
+import SubscriptionService from './subscriptionService.js';
 
 const CONFIG_KEY = 'whatsapp_evolution_config';
 const CONFIG_CACHE_TTL_MS = 30_000;
@@ -139,11 +144,34 @@ class WhatsAppConfigService {
     }
   }
 
-  static async getConfig() {
-    const cached = this.configCache.get();
-    if (cached) return cached;
+  /**
+   * O que está guardado, com o SERVIDOR vindo de quem manda nele.
+   *
+   * Na SaaS, o servidor Evolution (endereço, chave, hosts permitidos, URL do
+   * webhook) é um só para todos os provedores e mora no `app_state` da caixa
+   * da plataforma — é lá que o administrador da plataforma o configura, na
+   * tela de WhatsApp dela. O provedor guarda só o uso que faz dele: se está
+   * ligado, a mensagem de recusa, o portal, o ritmo e a retenção. Sem caixa da
+   * plataforma, o servidor sai vazio, e a integração fica sem ter para onde
+   * criar número — que é o estado honesto de um deploy que ainda não o
+   * configurou.
+   */
+  static async readEffectiveConfig() {
     const stored = await this.readStoredConfig();
-    const config = {
+    if (!(await platformManagesCurrentTenant())) return { ...stored, platformManaged: false };
+    const platform = await Tenant.platform();
+    const server = platform
+      ? await runInTenant(platform.id, () => this.readStoredConfig())
+      : { ...DEFAULT_CONFIG, managedAdminKey: null };
+    const merged = { ...stored, platformManaged: true };
+    for (const field of WA_SERVER_FIELDS) merged[field] = server[field];
+    return merged;
+  }
+
+  /** Só o que ESTE tenant guardou, decodificado, sem o servidor da plataforma. */
+  static async readOwnConfig() {
+    const stored = await this.readStoredConfig();
+    return {
       enabled: stored.enabled === true,
       allowedHosts: parseAllowedHosts(stored.allowedHosts),
       webhookBaseUrl: String(stored.webhookBaseUrl || ''),
@@ -155,7 +183,38 @@ class WhatsAppConfigService {
       mediaRetentionDays: normalizeRetentionDays(stored.mediaRetentionDays),
       messageRetentionDays: normalizeRetentionDays(stored.messageRetentionDays),
       managedUrl: normalizeEvoUrl(stored.managedUrl || ''),
+      managedAdminKey: decryptSecret(adminKeyBox, stored.managedAdminKey)
+    };
+  }
+
+  static async getConfig() {
+    const cached = this.configCache.get();
+    if (cached) return cached;
+    const stored = await this.readEffectiveConfig();
+    // Um plano ilegível não pode derrubar o WhatsApp: sem teto é o que valia
+    // antes de existir teto.
+    const caps = await SubscriptionService.retentionCaps().catch(() => ({ media: null, messages: null }));
+    const config = {
+      enabled: stored.enabled === true,
+      allowedHosts: parseAllowedHosts(stored.allowedHosts),
+      webhookBaseUrl: String(stored.webhookBaseUrl || ''),
+      rejectCallMessage: String(stored.rejectCallMessage || DEFAULT_CONFIG.rejectCallMessage),
+      portalPublicUrl: String(stored.portalPublicUrl || ''),
+      rateLimitPerMin: Number(stored.rateLimitPerMin) > 0
+        ? Math.min(Number(stored.rateLimitPerMin), 120)
+        : DEFAULT_CONFIG.rateLimitPerMin,
+      // O que vale, e não só o que foi escolhido: com teto no plano, é o
+      // menor dos dois — e é este número que as duas varreduras leem.
+      mediaRetentionDays: SubscriptionService.capRetention(
+        normalizeRetentionDays(stored.mediaRetentionDays), caps.media
+      ),
+      messageRetentionDays: SubscriptionService.capRetention(
+        normalizeRetentionDays(stored.messageRetentionDays), caps.messages
+      ),
+      retentionCaps: { media: caps.media, messages: caps.messages },
+      managedUrl: normalizeEvoUrl(stored.managedUrl || ''),
       managedAdminKey: decryptSecret(adminKeyBox, stored.managedAdminKey),
+      platformManaged: stored.platformManaged === true,
       updatedAt: stored.updatedAt || null
     };
     this.configCache.set(config);
@@ -178,8 +237,34 @@ class WhatsAppConfigService {
     return Boolean(config.enabled && config.webhookBaseUrl);
   }
 
-  static async saveConfig(patch = {}) {
-    const current = await this.getConfig();
+  static async saveConfig(input = {}) {
+    // Provedor gerenciado não escreve o servidor: os campos dele são ignorados
+    // em vez de recusados, porque a tela manda o formulário inteiro e o que
+    // importa é que eles não sejam gravados — nem aqui, nem por cima dos da
+    // plataforma.
+    const managed = await platformManagesCurrentTenant();
+    const patch = { ...input };
+    if (managed) for (const field of WA_SERVER_FIELDS) delete patch[field];
+    // O que ESTE tenant guardou, e não o efetivo: o efetivo já vem limitado
+    // pelo teto do plano, e regravá-lo trocaria em silêncio a escolha do
+    // provedor pelo teto.
+    const current = await this.readOwnConfig();
+
+    // Acima do teto do plano é recusado, e não cortado: o provedor precisa
+    // saber que o número que ele digitou não é o que vai valer. "Para sempre"
+    // (zero) com teto é acima dele por definição.
+    const caps = await SubscriptionService.retentionCaps().catch(() => ({ media: null, messages: null }));
+    for (const [field, cap] of [['mediaRetentionDays', caps.media], ['messageRetentionDays', caps.messages]]) {
+      if (patch[field] === undefined || cap === null) continue;
+      const days = normalizeRetentionDays(patch[field]);
+      if (days === 0 || days > cap) {
+        throw new WaError('whatsapp.error.retentionAboveCap', {
+          code: 'retention_above_cap',
+          status: 422,
+          vars: { max: cap }
+        });
+      }
+    }
     const next = {
       enabled: patch.enabled === undefined ? current.enabled : patch.enabled === true,
       allowedHosts: patch.allowedHosts === undefined
@@ -218,7 +303,12 @@ class WhatsAppConfigService {
     let managedAdminKey = current.managedAdminKey;
     if (patch.managedAdminKey !== undefined) managedAdminKey = String(patch.managedAdminKey).trim();
 
-    if (next.enabled && !next.webhookBaseUrl) {
+    // O servidor do provedor gerenciado é o da plataforma: é ELE que precisa
+    // de webhook. O que o provedor tinha guardado de antes fica como estava —
+    // não é lido enquanto a plataforma manda, e apagar seria destruir o que
+    // ninguém pediu para destruir.
+    const webhookEfetivo = managed ? (await this.getConfig()).webhookBaseUrl : next.webhookBaseUrl;
+    if (next.enabled && !webhookEfetivo) {
       throw new WaError('whatsapp.error.incompleteConfig', {
         code: 'incomplete_config',
         status: 400
@@ -229,7 +319,14 @@ class WhatsAppConfigService {
       ...next,
       managedAdminKey: managedAdminKey ? encryptSecret(adminKeyBox, managedAdminKey) : null
     }));
-    this.invalidateConfigCache();
+    // A caixa da plataforma, na SaaS, acabou de trocar o servidor de TODO
+    // provedor — cada um guarda a sua cópia mesclada no cache, então aqui é
+    // `clear` e não `invalidate`.
+    if (IS_SAAS && !managed && (await Tenant.findById(currentTenantId()))?.kind === 'platform') {
+      this.configCache.clear();
+    } else {
+      this.invalidateConfigCache();
+    }
     return this.getPublicConfig();
   }
 

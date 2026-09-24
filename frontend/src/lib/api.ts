@@ -940,6 +940,22 @@ export interface DefaultCatalogue {
   providers: Array<{ id: number; name: string; slug: string; rows: number }>
 }
 
+/** O que o reenvio do catálogo fez em cada provedor. */
+export interface CataloguePropagation {
+  tenantId: number
+  slug: string
+  added: number
+  updated: number
+}
+
+/** O GenieACS de um provedor, como o console o vê: sem o segredo. */
+export interface TenantGenieAcs {
+  url: string
+  auth: GenieAcsAuthConfig
+  /** O endereço que o deploy sugere a este provedor, ou nulo. */
+  suggestion: string | null
+}
+
 export interface CatalogueTenant {
   id: number
   name: string | null
@@ -994,6 +1010,17 @@ export interface TenantGateway {
   customerRef: string | null
 }
 
+/**
+ * Até quantos dias o plano deixa o provedor guardar a trilha de auditoria
+ * (`audit`), as mensagens (`messages`) e os anexos (`media`) do WhatsApp.
+ * Nulo é sem teto — o provedor decide sozinho.
+ */
+export interface RetentionCaps {
+  audit: number | null
+  messages: number | null
+  media: number | null
+}
+
 /** Null means "no limit". */
 export interface PlanLimits {
   operators: number | null
@@ -1017,6 +1044,8 @@ export interface Plan {
    * tempo, e um ISP que pagasse o ano inteiro recebia trinta dias.
    */
   periodDays: number
+  /** Tetos de retenção do plano, em dias. */
+  retention: RetentionCaps
   active: boolean
   createdAt: string | null
   /** How many providers are on it — only from the console's list. */
@@ -1077,6 +1106,8 @@ export interface SubscriptionUsage {
   billing: TenantBilling | null
   usage: { operators: number; subscribers: number; devices: number | null }
   limits: PlanLimits
+  /** Os tetos de retenção do plano. Todos nulos na self-hosted. */
+  retention?: RetentionCaps
   over: { operators: boolean; subscribers: boolean; devices: boolean }
 }
 
@@ -1266,12 +1297,14 @@ export const platformAPI = {
     code: string; name: string; maxOperators: number | null; maxSubscribers: number | null
     maxDevices: number | null; priceCents: number; currency: string; trialDays: number
     periodDays?: number; active?: boolean
+    maxAuditRetentionDays?: number | null; maxMessageRetentionDays?: number | null; maxMediaRetentionDays?: number | null
   }) =>
     apiClient.post<{ plan: Plan }>('/platform/plans', payload),
 
   updatePlan: (id: number, payload: Partial<{
     name: string; maxOperators: number | null; maxSubscribers: number | null; maxDevices: number | null
     priceCents: number; currency: string; trialDays: number; periodDays: number; active: boolean
+    maxAuditRetentionDays: number | null; maxMessageRetentionDays: number | null; maxMediaRetentionDays: number | null
   }>) =>
     apiClient.requestWithBody<{ plan: Plan }>('PATCH', `/platform/plans/${id}`, payload),
 
@@ -1350,6 +1383,27 @@ export const platformAPI = {
    */
   catalogue: () =>
     apiClient.get<DefaultCatalogue>('/platform/catalogue'),
+
+  /**
+   * Leva aos provedores o que o catálogo da caixa tem e eles não. Sem
+   * `overwrite`, o que o provedor ajustou fica; com ele, os perfis de mesmo
+   * nome recebem a versão padrão. Nada é apagado.
+   */
+  propagateCatalogue: (payload: { tenantIds?: number[]; overwrite?: boolean } = {}) =>
+    apiClient.post<{ overwrite: boolean; results: CataloguePropagation[] }>('/platform/catalogue/propagate', payload),
+
+  /** O GenieACS de um provedor: na SaaS é o console quem o configura. */
+  getTenantGenieAcs: (tenantId: number) =>
+    apiClient.get<TenantGenieAcs>(`/platform/tenants/${tenantId}/genieacs`),
+
+  /** `secret` ausente mantém o guardado; `''` apaga. */
+  updateTenantGenieAcs: (tenantId: number, payload: {
+    url?: string; authType?: GenieAcsAuthType; username?: string; secret?: string
+  }) =>
+    apiClient.put<TenantGenieAcs>(`/platform/tenants/${tenantId}/genieacs`, payload),
+
+  testTenantGenieAcs: (tenantId: number, url?: string) =>
+    apiClient.post<{ deviceCount?: number }>(`/platform/tenants/${tenantId}/genieacs/test`, url ? { url } : {}),
 
   /** O cadastro do próprio console: quem tem a chave do plano de controle. */
   listAdmins: () =>
@@ -2223,6 +2277,10 @@ export const vendorsAPI = {
   delete: (id: number) =>
     apiClient.delete(`/vendor-management/${id}`),
 
+  /** Volta o perfil ao que está no catálogo padrão da plataforma. */
+  reset: (id: number) =>
+    apiClient.post(`/vendor-management/${id}/reset`, {}),
+
   // WiFi security configs (by product class)
   getAllWifiSecurityConfigs: () =>
     apiClient.get('/vendor-management/wifi-security-configs'),
@@ -2241,6 +2299,9 @@ export const vendorsAPI = {
 
   deleteWifiSecurityConfig: (id: number) =>
     apiClient.delete(`/vendor-management/wifi-security-configs/${id}`),
+
+  resetWifiSecurityConfig: (id: number) =>
+    apiClient.post(`/vendor-management/wifi-security-configs/${id}/reset`, {}),
 }
 
 // Mapping API
@@ -2332,6 +2393,13 @@ export interface WhatsAppConfig {
   managedUrl: string
   managed: boolean
   managedAdminKeyConfigured: boolean
+  /**
+   * Se o servidor (endereço, chave, hosts, webhook) é o da plataforma. Na SaaS
+   * é, para todo provedor: a tela esconde esses campos e mostra só o uso.
+   */
+  platformManaged?: boolean
+  /** Tetos do plano para as duas retenções; nulo é sem teto. */
+  retentionCaps?: { media: number | null; messages: number | null }
   ready: boolean
   updatedAt: string | null
 }

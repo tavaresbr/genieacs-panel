@@ -1,8 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { platformAPI, type DefaultCatalogue } from '@/lib/api'
+import { platformAPI, type CataloguePropagation, type DefaultCatalogue } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
+import { useToast } from '@/components/ui/toast'
 import { useTenant } from '@/contexts/tenant-context'
 import { useTranslation } from '@/contexts/language-context'
 import { platformBoxUrl } from '@/lib/shell'
@@ -22,13 +23,18 @@ import { platformBoxUrl } from '@/lib/shell'
  * parando de escrever VLAN e service list. Nada disso dá erro: a tela só fica
  * errada, e ninguém liga o sintoma à causa.
  *
- * **Só leitura, de propósito.** Editar o catálogo padrão é editar o catálogo da
+ * **A leitura é só leitura, de propósito.** Editar o catálogo padrão é editar o catálogo da
  * caixa, nas telas de Configuração que já existem e funcionam. Reconstruí-las
  * aqui seria uma segunda forma de escrever a mesma coisa — e a segunda forma é
  * a que fica para trás.
  *
  * O que esta tela tem que as de lá não podem ter: **quem está sem catálogo**.
  * Nenhum provedor enxerga os outros, então esse fato não existe em tela alguma.
+ *
+ * E o **reenvio**: a cópia do catálogo só acontecia no dia em que o provedor
+ * nascia, então um perfil que a plataforma cadastrasse depois não chegava a
+ * ninguém. "Enviar atualizações" leva o que falta; o que o provedor ajustou
+ * fica dele, a menos que se peça para sobrescrever.
  */
 
 function Linha({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
@@ -43,7 +49,11 @@ function Linha({ rotulo, children }: { rotulo: string; children: React.ReactNode
 export function DefaultCatalogueTab() {
   const { t } = useTranslation()
   const { tenant } = useTenant()
+  const toast = useToast()
   const [info, setInfo] = useState<DefaultCatalogue | null>(null)
+  const [overwrite, setOverwrite] = useState(false)
+  const [propagating, setPropagating] = useState(false)
+  const [lastRun, setLastRun] = useState<CataloguePropagation[] | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -62,6 +72,25 @@ export function DefaultCatalogueTab() {
   useEffect(() => {
     void load()
   }, [load])
+
+  const propagar = async () => {
+    if (overwrite && !window.confirm(t('catalogue.propagate.overwriteConfirm'))) return
+    setPropagating(true)
+    try {
+      const res = await platformAPI.propagateCatalogue({ overwrite })
+      if (res.success && res.data) {
+        setLastRun(res.data.results)
+        const added = res.data.results.reduce((n, r) => n + r.added, 0)
+        const updated = res.data.results.reduce((n, r) => n + r.updated, 0)
+        toast.success(t('catalogue.propagate.done', { added, updated, providers: res.data.results.length }))
+        void load()
+      } else {
+        toast.error(res.message || t('catalogue.propagate.failed'))
+      }
+    } finally {
+      setPropagating(false)
+    }
+  }
 
   if (loading) return <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
   if (error !== null) return <p className="text-sm text-destructive">{error || t('catalogue.loadFailed')}</p>
@@ -151,6 +180,42 @@ export function DefaultCatalogueTab() {
           </ul>
         )}
       </section>
+
+      {info.source === 'platform' && (
+        <section className="modern-card p-5 sm:p-6 lg:col-span-2">
+          <h2 className="section-heading">{t('catalogue.propagate.title')}</h2>
+          <p className="field-hint mt-1">{t('catalogue.propagate.description')}</p>
+          <label className="mt-4 flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={overwrite}
+              onChange={(e) => setOverwrite(e.target.checked)}
+            />
+            <span>{t('catalogue.propagate.overwrite')}</span>
+          </label>
+          <button
+            type="button"
+            className="modern-button mt-4"
+            disabled={propagating}
+            onClick={() => void propagar()}
+          >
+            <Icon name="refresh" size={17} />
+            {propagating ? t('catalogue.propagate.running') : t('catalogue.propagate.button')}
+          </button>
+          {lastRun && lastRun.some((r) => r.added || r.updated) && (
+            <ul className="mt-4 space-y-1 text-sm">
+              {lastRun.filter((r) => r.added || r.updated).map((r) => (
+                <li key={r.tenantId} className="text-muted-foreground">
+                  <span className="font-medium text-foreground">{r.slug}</span>
+                  {' · '}
+                  {t('catalogue.propagate.row', { added: r.added, updated: r.updated })}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
 
       <section className="modern-card p-5 sm:p-6 lg:col-span-2">
         <h2 className="section-heading">{t('catalogue.providersTitle')}</h2>

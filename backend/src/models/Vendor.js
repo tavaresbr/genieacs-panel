@@ -125,6 +125,19 @@ class Vendor {
     return affected > 0;
   }
 
+  /**
+   * Põe numa linha do provedor as colunas de outra — a do catálogo padrão,
+   * no "restaurar padrão". O id e o provedor ficam; o resto é substituído.
+   * `false` quando a linha não é deste provedor.
+   */
+  static async resetTo(id, columns) {
+    const affected = await tdb('vendors').where({ id }).update({
+      ...columns,
+      updated_at: getDb().fn.now()
+    });
+    return affected > 0;
+  }
+
   static async delete(id) {
     const affected = await tdb('vendors').where({ id }).del();
     return affected > 0;

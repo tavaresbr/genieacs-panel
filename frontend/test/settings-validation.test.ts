@@ -4,6 +4,7 @@ import {
   auditRetentionError,
   AUDIT_RETENTION_MAX_DAYS,
   AUDIT_RETENTION_MIN_DAYS,
+  waRetentionAboveCap,
 } from '@/lib/settings-validation'
 import en from '@/lib/i18n/locales/en'
 
@@ -57,5 +58,20 @@ describe('o prazo que não serve', () => {
     const chave = auditRetentionError('9999')
     expect(chave).not.toBeNull()
     expect(String(en[chave!]).trim().length).toBeGreaterThan(0)
+  })
+})
+
+describe('o teto do plano', () => {
+  it('recusa a trilha acima do teto e aceita até ele', () => {
+    expect(auditRetentionError('91', 90)).toBe('settings.audit.retentionAboveCap')
+    expect(auditRetentionError('90', 90)).toBeNull()
+    expect(auditRetentionError('3650', null)).toBeNull()
+  })
+
+  it('no WhatsApp, "para sempre" com teto é acima dele', () => {
+    expect(waRetentionAboveCap(0, 30)).toBe(true)
+    expect(waRetentionAboveCap(31, 30)).toBe(true)
+    expect(waRetentionAboveCap(30, 30)).toBe(false)
+    expect(waRetentionAboveCap(0, null)).toBe(false)
   })
 })
