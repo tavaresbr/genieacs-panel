@@ -689,6 +689,9 @@ export default {
 
   'tenant.billingInvalid': 'Os dados de faturamento são inválidos',
   'tenant.billingTaxIdInvalid': 'O documento não é um CNPJ nem um CPF válido',
+  'tenant.cnpjFound': "Dados do CNPJ encontrados",
+  'tenant.cnpjNotFound': "CNPJ não encontrado na Receita Federal",
+  'tenant.cnpjLookupFailed': "Não foi possível consultar o CNPJ agora; preencha à mão",
   'tenant.billingPostalCodeInvalid': 'O CEP deve ter oito dígitos',
   'tenant.billingEmailInvalid': 'O e-mail de cobrança é inválido',
   'subscription.notice.trialSoonSubject': 'Seu teste do {provider} termina em {date}',

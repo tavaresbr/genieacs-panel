@@ -690,6 +690,9 @@ export default {
 
   'tenant.billingInvalid': '請求情報が正しくありません',
   'tenant.billingTaxIdInvalid': '番号が有効な CNPJ または CPF ではありません',
+  'tenant.cnpjFound': "CNPJ のデータが見つかりました",
+  'tenant.cnpjNotFound': "Receita Federal に CNPJ が見つかりません",
+  'tenant.cnpjLookupFailed': "現在 CNPJ を照会できません。手入力してください",
   'tenant.billingPostalCodeInvalid': '郵便番号は 8 桁である必要があります',
   'tenant.billingEmailInvalid': '請求用のメールアドレスが正しくありません',
   'subscription.notice.trialSoonSubject': '{provider} の試用期間は {date} に終了します',

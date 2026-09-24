@@ -48,6 +48,7 @@ export function ProviderAddressPanel() {
   const [center, setCenter] = useState<{ lat: string; lng: string }>({ lat: '', lng: '' })
   const [loaded, setLoaded] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [lookingUp, setLookingUp] = useState(false)
 
   useEffect(() => {
     void (async () => {
@@ -66,6 +67,28 @@ export function ProviderAddressPanel() {
   const lat = Number(center.lat), lng = Number(center.lng)
   const validPoint = center.lat.trim() !== '' && center.lng.trim() !== ''
     && Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180
+
+  // Preenche o formulário com o que a Receita tem para o CNPJ digitado. Só o
+  // formulário: quem confere e salva é o operador, pelo mesmo Salvar.
+  const fillFromCnpj = async () => {
+    setLookingUp(true)
+    try {
+      const res = await tenantAPI.lookupCnpj(address.taxId ?? '')
+      if (!res.success || !res.data) { toast.error(res.message || t('settings.providerAddress.cnpjLookupFailed')); return }
+      const found = res.data
+      setAddress((a) => {
+        const next = { ...a }
+        for (const { chave } of ALL_FIELDS) {
+          const value = found[chave]
+          if (typeof value === 'string' && value.trim() !== '') next[chave] = value
+        }
+        return next
+      })
+      toast.success(t('settings.providerAddress.cnpjFilled'))
+    } finally {
+      setLookingUp(false)
+    }
+  }
 
   const save = async () => {
     if (canMap && !validPoint) { toast.error(t('settings.providerAddress.invalid')); return }
@@ -108,15 +131,27 @@ export function ProviderAddressPanel() {
               {fields.map(({ chave, label, hint, largura, maxLength, inputMode }) => (
                 <div key={chave} className={CLASSE_LARGURA[largura]}>
                   <label htmlFor={`provider-${chave}`} className="field-label">{t(label)}</label>
-                  <input
-                    id={`provider-${chave}`}
-                    className="modern-input w-full"
-                    value={address[chave] ?? ''}
-                    maxLength={maxLength}
-                    inputMode={inputMode}
-                    disabled={!canAddress || busy || !loaded}
-                    onChange={(e) => setAddress((a) => ({ ...a, [chave]: e.target.value }))}
-                  />
+                  <div className={chave === 'taxId' ? 'flex flex-col gap-2 sm:flex-row' : undefined}>
+                    <input
+                      id={`provider-${chave}`}
+                      className={chave === 'taxId' ? 'modern-input w-full sm:flex-1' : 'modern-input w-full'}
+                      value={address[chave] ?? ''}
+                      maxLength={maxLength}
+                      inputMode={inputMode}
+                      disabled={!canAddress || busy || lookingUp || !loaded}
+                      onChange={(e) => setAddress((a) => ({ ...a, [chave]: e.target.value }))}
+                    />
+                    {chave === 'taxId' && canAddress && (
+                      <button
+                        type="button"
+                        className="modern-button-secondary whitespace-nowrap"
+                        disabled={busy || lookingUp || !loaded || (address.taxId ?? '').replace(/\D/g, '').length !== 14}
+                        onClick={() => void fillFromCnpj()}
+                      >
+                        {lookingUp ? t('settings.providerAddress.cnpjLooking') : t('settings.providerAddress.cnpjFill')}
+                      </button>
+                    )}
+                  </div>
                   {hint && <p className="field-hint">{t(hint)}</p>}
                 </div>
               ))}

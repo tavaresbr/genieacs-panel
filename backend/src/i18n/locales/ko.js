@@ -693,6 +693,9 @@ export default {
 
   'tenant.billingInvalid': '청구 정보가 올바르지 않습니다',
   'tenant.billingTaxIdInvalid': '유효한 CNPJ 또는 CPF가 아닙니다',
+  'tenant.cnpjFound': "CNPJ 정보를 찾았습니다",
+  'tenant.cnpjNotFound': "Receita Federal에서 CNPJ를 찾을 수 없습니다",
+  'tenant.cnpjLookupFailed': "지금은 CNPJ를 조회할 수 없습니다. 직접 입력하세요",
   'tenant.billingPostalCodeInvalid': '우편번호는 여덟 자리여야 합니다',
   'tenant.billingEmailInvalid': '청구용 이메일 주소가 올바르지 않습니다',
   'subscription.notice.trialSoonSubject': '{provider} 체험이 {date}에 끝납니다',

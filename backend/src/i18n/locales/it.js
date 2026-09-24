@@ -688,6 +688,9 @@ export default {
 
   'tenant.billingInvalid': 'I dati di fatturazione non sono validi',
   'tenant.billingTaxIdInvalid': 'Il documento non è un CNPJ né un CPF valido',
+  'tenant.cnpjFound': "Dati del CNPJ trovati",
+  'tenant.cnpjNotFound': "CNPJ non trovato presso la Receita Federal",
+  'tenant.cnpjLookupFailed': "Impossibile consultare il CNPJ ora; compila a mano",
   'tenant.billingPostalCodeInvalid': 'Il codice postale deve avere otto cifre',
   'tenant.billingEmailInvalid': "L'e-mail di fatturazione non è valida",
   'subscription.notice.trialSoonSubject': 'La tua prova di {provider} termina il {date}',

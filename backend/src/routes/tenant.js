@@ -39,4 +39,9 @@ router.get('/charges', authenticateToken, requirePermission('settings.read'), Te
 // configurações, agora na linha do provedor — ver o controlador.
 router.patch('/', authenticateToken, requirePermission('settings.write'), TenantController.rename);
 
+// Os dados públicos de um CNPJ, para preencher o cadastro acima. Só lê; pede
+// `settings.write` porque só serve a quem vai gravar o cadastro. O número vai
+// na query (`?cnpj=`): não endereça linha nenhuma, é só o que se consulta.
+router.get('/cnpj', authenticateToken, requirePermission('settings.write'), TenantController.lookupCnpj);
+
 export default router;

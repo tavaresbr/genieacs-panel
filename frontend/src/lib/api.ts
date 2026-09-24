@@ -761,6 +761,13 @@ export const tenantAPI = {
     ),
 
   /**
+   * Os dados públicos de um CNPJ (Receita, via BrasilAPI no servidor), no
+   * formato do cadastro. Só sugere: nada é gravado até o Salvar.
+   */
+  lookupCnpj: (cnpj: string) =>
+    apiClient.get<Partial<TenantBilling>>(`/tenant/cnpj?cnpj=${encodeURIComponent(cnpj.replace(/\D/g, ''))}`),
+
+  /**
    * Todo o cadastro deste provedor, num arquivo.
    *
    * Não é envelope de API: a rota responde com `Content-Disposition: attachment`
