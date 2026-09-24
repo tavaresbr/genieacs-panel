@@ -447,6 +447,25 @@ export const casos = [
     tabela: 'sgp_links',
     coluna: 'contract'
   },
+  // O boleto pelo WhatsApp pede os títulos ao SGP, como a rota acima: no
+  // controle passa da busca da ficha e para no SGP.
+  {
+    chave: 'sgpContract',
+    label: 'GET /api/contacts/:key/invoices/:invoiceId/whatsapp',
+    method: 'GET',
+    path: (contract) => `/api/contacts/${encodeURIComponent(contract)}/invoices/T-1/whatsapp`,
+    tabela: 'sgp_links',
+    coluna: 'contract'
+  },
+  {
+    chave: 'sgpContract',
+    label: 'POST /api/contacts/:key/invoices/:invoiceId/whatsapp',
+    method: 'POST',
+    path: (contract) => `/api/contacts/${encodeURIComponent(contract)}/invoices/T-1/whatsapp`,
+    body: { text: 'boleto da varredura' },
+    tabela: 'sgp_links',
+    coluna: 'contract'
+  },
   {
     chave: 'sgpContract',
     label: 'PATCH /api/contacts/:key',

@@ -77,6 +77,9 @@ class AuditLog {
     // mesmo motivo de `tenant.billing_changed`.
     CONTACT_UPDATED: 'contact.updated',
     CONTACT_CREATED: 'contact.created',
+    // Um título em aberto foi mandado ao cliente pelo WhatsApp, pela ficha. O
+    // `detail` diz qual título e qual conversa, nunca o texto (tem o PIX).
+    CONTACT_INVOICE_SENT: 'contact.invoice_sent',
     // A base de contatos saiu numa planilha, ou entrou por uma. O `detail`
     // guarda quantidades e filtros, nunca uma linha da planilha.
     CONTACTS_EXPORTED: 'contacts.exported',

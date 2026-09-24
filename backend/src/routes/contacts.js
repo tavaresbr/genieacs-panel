@@ -2,7 +2,7 @@ import express from 'express';
 import ContactController from '../controllers/contactController.js';
 import { IMPORT_MAX_BYTES } from '../services/contactSheetService.js';
 import { authenticateToken, requirePermission } from '../middleware/auth.js';
-import { sgpAdminLimiter } from '../middleware/rateLimit.js';
+import { sgpAdminLimiter, whatsappSendLimiter } from '../middleware/rateLimit.js';
 
 const router = express.Router();
 
@@ -33,6 +33,25 @@ router.get(
   requirePermission('contacts.read'),
   sgpAdminLimiter,
   ContactController.invoices
+);
+// One open invoice to the client over WhatsApp: the preview asks the SGP, the
+// send asks it again and goes out through the ordinary reply queue.
+router.get(
+  '/:key/invoices/:invoiceId/whatsapp',
+  authenticateToken,
+  requirePermission('contacts.read'),
+  requirePermission('whatsapp.send'),
+  sgpAdminLimiter,
+  ContactController.invoiceMessage
+);
+router.post(
+  '/:key/invoices/:invoiceId/whatsapp',
+  authenticateToken,
+  requirePermission('contacts.read'),
+  requirePermission('whatsapp.send'),
+  whatsappSendLimiter,
+  sgpAdminLimiter,
+  ContactController.sendInvoice
 );
 router.patch('/:key', authenticateToken, requirePermission('contacts.edit'), ContactController.update);
 
