@@ -46,7 +46,7 @@ import type { TranslationKey } from '@/lib/i18n'
 import { OPERATOR_ROLES, ROLE_LABEL_KEYS, ROLE_SUMMARY_KEYS } from '@/lib/permissions'
 import { exportFileName } from '@/lib/utils'
 import { InvitePanel } from '@/components/settings/invite-panel'
-import { MapCenterPanel } from '@/components/settings/map-center-panel'
+import { ProviderAddressPanel } from '@/components/settings/provider-address-panel'
 import type { Vendor as VendorType, WifiSecurityConfig as WifiSecurityConfigType } from '@/types'
 
 const INSTALLER_VIRTUAL_PARAMETERS = {
@@ -1666,7 +1666,7 @@ export default function Settings() {
                 </div>
               )}
             </div>
-            {can('map.write') && <MapCenterPanel />}
+            {(can('settings.write') || can('map.write')) && <ProviderAddressPanel />}
           </div>
         )}
 

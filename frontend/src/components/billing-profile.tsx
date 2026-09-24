@@ -19,29 +19,39 @@ import type { TranslationKey } from '@/lib/i18n'
  * mantém é um endereço que ele corrige no dia em que muda — o console tem só a
  * leitura, para faturar.
  */
-const CAMPOS: Array<{
+export type BillingField = {
   chave: keyof TenantBilling
   label: TranslationKey
   hint?: TranslationKey
   largura: 'full' | 'half' | 'third'
   maxLength: number
   inputMode?: 'numeric'
-}> = [
-  { chave: 'legalName', label: 'billing.legalName', largura: 'full', maxLength: 160 },
-  { chave: 'taxId', label: 'billing.taxId', hint: 'billing.taxIdHint', largura: 'half', maxLength: 20, inputMode: 'numeric' },
-  { chave: 'stateRegistration', label: 'billing.stateRegistration', hint: 'billing.stateRegistrationHint', largura: 'half', maxLength: 32 },
+}
+
+/**
+ * Os campos do endereço, também usados pelo painel "Endereço principal do
+ * provedor" das configurações — o mesmo registro, editável nos dois lugares.
+ */
+export const ADDRESS_FIELDS: BillingField[] = [
   { chave: 'postalCode', label: 'billing.postalCode', largura: 'third', maxLength: 9, inputMode: 'numeric' },
   { chave: 'addressLine', label: 'billing.addressLine', largura: 'full', maxLength: 160 },
   { chave: 'addressNumber', label: 'billing.addressNumber', largura: 'third', maxLength: 16 },
   { chave: 'addressExtra', label: 'billing.addressExtra', largura: 'third', maxLength: 80 },
   { chave: 'district', label: 'billing.district', largura: 'third', maxLength: 80 },
   { chave: 'city', label: 'billing.city', largura: 'half', maxLength: 80 },
-  { chave: 'state', label: 'billing.state', largura: 'third', maxLength: 2 },
+  { chave: 'state', label: 'billing.state', largura: 'third', maxLength: 2 }
+]
+
+const CAMPOS: BillingField[] = [
+  { chave: 'legalName', label: 'billing.legalName', largura: 'full', maxLength: 160 },
+  { chave: 'taxId', label: 'billing.taxId', hint: 'billing.taxIdHint', largura: 'half', maxLength: 20, inputMode: 'numeric' },
+  { chave: 'stateRegistration', label: 'billing.stateRegistration', hint: 'billing.stateRegistrationHint', largura: 'half', maxLength: 32 },
+  ...ADDRESS_FIELDS,
   { chave: 'email', label: 'billing.email', hint: 'billing.emailHint', largura: 'half', maxLength: 160 },
   { chave: 'phone', label: 'billing.phone', largura: 'half', maxLength: 32 }
 ]
 
-const CLASSE_LARGURA = {
+export const CLASSE_LARGURA = {
   full: 'sm:col-span-6',
   half: 'sm:col-span-3',
   third: 'sm:col-span-2'
