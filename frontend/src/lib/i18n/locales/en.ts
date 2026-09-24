@@ -1215,6 +1215,8 @@ const en = {
   'detail.sgp.unlockConfirm': 'Request a trust unlock for this contract in SGP?',
   'detail.sgp.unlockSent': 'Request sent to SGP',
   'detail.sgp.ticket': 'Open a ticket',
+  'detail.sgp.openSgp': 'Open in SGP',
+  'detail.sgp.openWhatsapp': 'Message on WhatsApp',
   'detail.sgp.ticketLabel': 'What is happening',
   'detail.sgp.ticketHint': 'Filed against contract {contract} in SGP.',
   'detail.sgp.ticketSend': 'Open the ticket',

@@ -68,18 +68,6 @@ function contractFromLink(link) {
   };
 }
 
-/**
- * The client's page in the SGP web app, where an attendant goes to do what the
- * panel does not: `/admin/cliente/{id}/contratos/`. Only from a client id the
- * SGP itself sent (or the contacts sync stored), never a guess from the
- * contract number.
- */
-function sgpClientUrl(baseUrl, clientId) {
-  const id = String(clientId ?? '').trim();
-  if (!baseUrl || !/^\d+$/.test(id)) return null;
-  return `${String(baseUrl).replace(/\/+$/, '')}/admin/cliente/${id}/contratos/`;
-}
-
 function onlyDigits(value) {
   return String(value ?? '').replace(/\D/g, '');
 }
@@ -235,7 +223,7 @@ class WaSubscriberPanelService {
       this.invoices(selected?.contract ?? null),
       selected?.clientId || !selected ? null : SgpContact.getByContract(selected.contract)
     ]);
-    const sgpUrl = sgpClientUrl(config.baseUrl, selected?.clientId || contact?.sgp_client_id);
+    const sgpUrl = SgpService.clientPageUrl(config, selected?.clientId || contact?.sgp_client_id);
 
     return {
       ready: true,

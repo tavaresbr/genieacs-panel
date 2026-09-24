@@ -1192,6 +1192,8 @@ const hi: Dictionary = {
   'detail.sgp.unlockConfirm': 'SGP में इस अनुबंध के लिए भरोसे पर अनब्लॉक का अनुरोध करें?',
   'detail.sgp.unlockSent': 'अनुरोध SGP को भेज दिया गया',
   'detail.sgp.ticket': 'शिकायत खोलें',
+  'detail.sgp.openSgp': 'SGP में खोलें',
+  'detail.sgp.openWhatsapp': 'WhatsApp पर संपर्क करें',
   'detail.sgp.ticketLabel': 'क्या हो रहा है',
   'detail.sgp.ticketHint': 'SGP में अनुबंध {contract} पर दर्ज होगी।',
   'detail.sgp.ticketSend': 'शिकायत खोलें',

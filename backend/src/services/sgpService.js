@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import AppState from '../models/AppState.js';
 import CustomerAccount from '../models/CustomerAccount.js';
 import SgpLink from '../models/SgpLink.js';
+import SgpContact from '../models/SgpContact.js';
 import DeviceService from './deviceService.js';
 import DeviceTagService from './deviceTagService.js';
 import { createSecretBox } from '../utils/secretBox.js';
@@ -1264,6 +1265,37 @@ class SgpService {
       invoices,
       message: asText(pick(data, ['msg', 'mensagem', 'message']))
     };
+  }
+
+  /**
+   * The client's page in the SGP web app, where an attendant goes to do what the
+   * panel does not: `/admin/cliente/{id}/contratos/`. Only from a client id the
+   * SGP itself sent (or the contacts sync stored), never a guess from the
+   * contract number — a wrong id opens someone else's page.
+   */
+  static clientPageUrl(config, clientId) {
+    const id = String(clientId ?? '').trim();
+    const baseUrl = String(config?.baseUrl ?? '').replace(/\/+$/, '');
+    if (!baseUrl || !/^\d+$/.test(id)) return null;
+    return `${baseUrl}/admin/cliente/${id}/contratos/`;
+  }
+
+  /**
+   * The SGP page of the client behind a contract, or null. The contacts sync
+   * already stored the client id for most contracts; only when it has not does
+   * this ask SGP, and a failure there is a missing button, never a failed page.
+   */
+  static async clientPageUrlForContract(contract) {
+    if (!contract) return null;
+    const config = await this.getConfig();
+    const stored = await SgpContact.getByContract(contract);
+    if (stored?.sgp_client_id) return this.clientPageUrl(config, stored.sgp_client_id);
+    try {
+      const { contracts } = await this.lookupCustomer({ contract }, config);
+      return this.clientPageUrl(config, this.exactContract(contracts, contract)?.clientId);
+    } catch {
+      return null;
+    }
   }
 
   static async requestTrustUnlock({ contract }) {

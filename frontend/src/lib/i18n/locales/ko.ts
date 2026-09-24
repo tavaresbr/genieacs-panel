@@ -1217,6 +1217,8 @@ const ko: Dictionary = {
   'detail.sgp.unlockConfirm': 'SGP에서 이 계약의 신용 해제를 요청하시겠습니까?',
   'detail.sgp.unlockSent': 'SGP로 요청을 보냈습니다',
   'detail.sgp.ticket': '접수하기',
+  'detail.sgp.openSgp': 'SGP에서 열기',
+  'detail.sgp.openWhatsapp': 'WhatsApp으로 연락',
   'detail.sgp.ticketLabel': '발생 중인 내용',
   'detail.sgp.ticketHint': 'SGP 계약 {contract}에 접수합니다.',
   'detail.sgp.ticketSend': '접수하기',

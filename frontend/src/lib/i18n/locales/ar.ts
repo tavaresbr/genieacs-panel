@@ -1192,6 +1192,8 @@ const ar: Dictionary = {
   'detail.sgp.unlockConfirm': 'طلب فكّ حجب ائتماني لهذا العقد في SGP؟',
   'detail.sgp.unlockSent': 'أُرسل الطلب إلى SGP',
   'detail.sgp.ticket': 'فتح بلاغ',
+  'detail.sgp.openSgp': 'فتح في SGP',
+  'detail.sgp.openWhatsapp': 'مراسلة عبر WhatsApp',
   'detail.sgp.ticketLabel': 'ما الذي يحدث',
   'detail.sgp.ticketHint': 'يُسجَّل على العقد {contract} في SGP.',
   'detail.sgp.ticketSend': 'فتح البلاغ',

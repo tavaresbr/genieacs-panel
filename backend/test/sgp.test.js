@@ -52,6 +52,7 @@ function startSgpStub() {
           status: 1,
           contratos: [{
             contrato: 4321,
+            clienteId: 57,
             contratoStatus: 1,
             contratoStatusDisplay: 'Ativo',
             planoInternet: 'Fibra 500MB',
@@ -291,6 +292,13 @@ describe('device to contract resolution', () => {
     assert.equal(invoice.amount, 129.9);
     assert.equal(invoice.dueDate, '2026-10-10');
     assert.equal(invoice.digitableLine, '34191790010104351004791020150008699999999999');
+  });
+
+  it('links to the client page in the SGP web app from the client id SGP sent', async () => {
+    const { body } = await call(`${panelUrl}/api/sgp/devices/${DEVICE_ID}`, {
+      headers: authHeaders(token)
+    });
+    assert.equal(body.data.sgpUrl, `${sgpUrl}/admin/cliente/57/contratos/`);
   });
 
   it('drops invoices that are already settled', async () => {

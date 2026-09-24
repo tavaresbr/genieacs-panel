@@ -1213,6 +1213,8 @@ const zhCN: Dictionary = {
   'detail.sgp.unlockConfirm': '在 SGP 中为该合同申请信用开机？',
   'detail.sgp.unlockSent': '申请已发送至 SGP',
   'detail.sgp.ticket': '创建工单',
+  'detail.sgp.openSgp': '在 SGP 中打开',
+  'detail.sgp.openWhatsapp': '通过 WhatsApp 联系',
   'detail.sgp.ticketLabel': '发生了什么',
   'detail.sgp.ticketHint': '将创建在 SGP 合同 {contract} 下。',
   'detail.sgp.ticketSend': '创建工单',
