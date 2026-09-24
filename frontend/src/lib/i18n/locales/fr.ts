@@ -2003,7 +2003,7 @@ const fr: Dictionary = {
   'onboarding.identity.description': 'Le nom que verront les opérateurs et l\'emplacement du réseau sur la carte.',
   'onboarding.identity.lat': 'Latitude du centre de la carte',
   'onboarding.identity.lng': 'Longitude du centre de la carte',
-  'onboarding.identity.mapHint': 'Facultatif. Degrés décimaux, par ex. -15.7942 et -47.8822. La carte s\'ouvre centrée ici.',
+  'onboarding.identity.mapHint': 'Facultatif. Cliquez sur la carte ou faites glisser le marqueur pour choisir l\'emplacement, ou saisissez des degrés décimaux (par ex. -15.7942 et -47.8822). La carte s\'ouvre centrée ici.',
   'onboarding.acs.title': 'Votre GenieACS',
   'onboarding.acs.description': 'L\'adresse de la NBI par laquelle le panneau gère les équipements, et son mode d\'authentification.',
   'onboarding.acs.testOk': 'Connexion OK.',

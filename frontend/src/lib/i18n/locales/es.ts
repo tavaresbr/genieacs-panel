@@ -2003,7 +2003,7 @@ const es: Dictionary = {
   'onboarding.identity.description': 'El nombre que verán los operadores y dónde está la planta en el mapa.',
   'onboarding.identity.lat': 'Latitud del centro del mapa',
   'onboarding.identity.lng': 'Longitud del centro del mapa',
-  'onboarding.identity.mapHint': 'Opcional. Grados decimales, p. ej. -15.7942 y -47.8822. El mapa se abre centrado aquí.',
+  'onboarding.identity.mapHint': 'Opcional. Haz clic en el mapa o arrastra el marcador para elegir el lugar, o escribe grados decimales (p. ej. -15.7942 y -47.8822). El mapa se abre centrado aquí.',
   'onboarding.acs.title': 'Su GenieACS',
   'onboarding.acs.description': 'La dirección de la NBI por la que el panel gestiona los equipos, y cómo se autentica.',
   'onboarding.acs.testOk': 'Conexión correcta.',

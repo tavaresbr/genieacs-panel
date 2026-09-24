@@ -1971,7 +1971,7 @@ const ar: Dictionary = {
   'onboarding.identity.description': 'الاسم الذي سيراه المشغّلون وموقع الشبكة على الخريطة.',
   'onboarding.identity.lat': 'خط عرض مركز الخريطة',
   'onboarding.identity.lng': 'خط طول مركز الخريطة',
-  'onboarding.identity.mapHint': 'اختياري. درجات عشرية، مثل -15.7942 و -47.8822. تُفتح الخريطة متمركزة هنا.',
+  'onboarding.identity.mapHint': 'اختياري. انقر على الخريطة أو اسحب العلامة لاختيار الموقع، أو اكتب درجات عشرية (مثل -15.7942 و -47.8822). تُفتح الخريطة متمركزة هنا.',
   'onboarding.acs.title': 'GenieACS الخاص بك',
   'onboarding.acs.description': 'عنوان NBI الذي تدير اللوحة الأجهزة من خلاله، وطريقة المصادقة.',
   'onboarding.acs.testOk': 'الاتصال سليم.',

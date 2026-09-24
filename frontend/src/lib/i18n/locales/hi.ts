@@ -1970,7 +1970,7 @@ const hi: Dictionary = {
   'onboarding.identity.description': 'वह नाम जो ऑपरेटर देखेंगे, और नक्शे पर नेटवर्क कहाँ है।',
   'onboarding.identity.lat': 'नक्शे के केंद्र का अक्षांश',
   'onboarding.identity.lng': 'नक्शे के केंद्र का देशांतर',
-  'onboarding.identity.mapHint': 'वैकल्पिक। दशमलव डिग्री, जैसे -15.7942 और -47.8822। नक्शा यहीं केंद्रित होकर खुलेगा।',
+  'onboarding.identity.mapHint': 'वैकल्पिक। जगह चुनने के लिए नक्शे पर क्लिक करें या मार्कर खींचें, या दशमलव डिग्री लिखें (जैसे -15.7942 और -47.8822)। नक्शा यहीं केंद्रित होकर खुलेगा।',
   'onboarding.acs.title': 'आपका GenieACS',
   'onboarding.acs.description': 'वह NBI पता जिससे पैनल डिवाइस प्रबंधित करता है, और वह कैसे प्रमाणित होता है।',
   'onboarding.acs.testOk': 'कनेक्शन ठीक है।',
