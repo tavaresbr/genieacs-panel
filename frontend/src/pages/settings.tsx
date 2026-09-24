@@ -110,7 +110,7 @@ const GENIE_SECRET_STATE_BADGES: Record<GenieSecretState, string> = {
 
 /** The tabs `?tab=` may open. */
 const SETTINGS_TABS = [
-  'general', 'virtual-params', 'customer-portal', 'sgp', 'provisioning',
+  'provider', 'general', 'virtual-params', 'customer-portal', 'sgp', 'provisioning',
   'whatsapp', 'security', 'vendors', 'wifi-security', 'database'
 ]
 
@@ -161,12 +161,17 @@ export default function Settings() {
   // The tab can come from the address — `/settings?tab=sgp` — so other screens
   // can link to a section instead of describing where it is. Only the tabs
   // that exist are taken; anything else opens the first one, as before.
+  // A aba "Geral" (endereço e mapa do provedor) só existe para quem pode
+  // gravar uma das duas metades; quem não pode abre em "Painel e ACS".
+  const canEditProvider = can('settings.write') || can('map.write')
   const [activeTab, setActiveTab] = useState(() => {
+    const fallback = canEditProvider ? 'provider' : 'general'
     try {
       const wanted = new URLSearchParams(window.location.search).get('tab')
-      return wanted && SETTINGS_TABS.includes(wanted) ? wanted : 'general'
+      if (wanted === 'provider' && !canEditProvider) return 'general'
+      return wanted && SETTINGS_TABS.includes(wanted) ? wanted : fallback
     } catch {
-      return 'general'
+      return fallback
     }
   })
   const [testResult, setTestResult] = useState<{success: boolean, message: string, deviceCount?: number} | null>(null)
@@ -1320,6 +1325,17 @@ export default function Settings() {
 
         <div className="mb-6">
           <div className="tab-rail" role="tablist" aria-label={t('settings.sectionsAria')}>
+            {canEditProvider && (
+              <button
+                onClick={() => setActiveTab('provider')}
+                className="tab-button"
+                data-active={activeTab === 'provider'}
+                role="tab"
+                aria-selected={activeTab === 'provider'}
+              >
+                {t('settings.tab.provider')}
+              </button>
+            )}
             <button
               onClick={() => setActiveTab('general')}
               className="tab-button"
@@ -1421,6 +1437,12 @@ export default function Settings() {
         </div>
 
         {/* Content */}
+        {activeTab === 'provider' && canEditProvider && (
+          <div className="space-y-6">
+            <ProviderAddressPanel />
+          </div>
+        )}
+
         {activeTab === 'general' && (
           <div className="space-y-6">
             {/* App Settings */}
@@ -1666,7 +1688,6 @@ export default function Settings() {
                 </div>
               )}
             </div>
-            {(can('settings.write') || can('map.write')) && <ProviderAddressPanel />}
           </div>
         )}
 

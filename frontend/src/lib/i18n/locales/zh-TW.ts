@@ -616,6 +616,7 @@ const zhTW: Dictionary = {
   'settings.title': '面板設定',
   'settings.description': '管理 GenieACS 連線、廠商參數路徑、管理員帳號以及面板的資料儲存位置。',
   'settings.sectionsAria': '設定分區',
+  'settings.tab.provider': '一般',
   'settings.tab.general': '面板與 ACS',
   'settings.tab.virtualParams': 'TR-069 參數',
   'settings.tab.customerPortal': '客戶入口網站',
