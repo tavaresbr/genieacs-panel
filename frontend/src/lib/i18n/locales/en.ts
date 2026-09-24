@@ -59,6 +59,8 @@ const en = {
   'sidebar.nav.dashboardDescription': 'Fleet health',
   'sidebar.nav.devices': 'Device Inventory',
   'sidebar.nav.devicesDescription': 'ONT and CPE',
+  'sidebar.nav.contacts': 'Contacts',
+  'sidebar.nav.contactsDescription': 'SGP subscribers',
   'sidebar.nav.networkMap': 'Network Topology',
   'sidebar.nav.networkMapDescription': 'Physical nodes',
   'sidebar.nav.settings': 'Configuration',

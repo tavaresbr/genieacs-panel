@@ -57,6 +57,8 @@ const zhCN: Dictionary = {
   'sidebar.nav.dashboardDescription': '设备总体状况',
   'sidebar.nav.devices': '设备清单',
   'sidebar.nav.devicesDescription': 'ONT 与 CPE',
+  'sidebar.nav.contacts': '联系人',
+  'sidebar.nav.contactsDescription': 'SGP 用户',
   'sidebar.nav.networkMap': '网络拓扑',
   'sidebar.nav.networkMapDescription': '物理节点',
   'sidebar.nav.settings': '配置',

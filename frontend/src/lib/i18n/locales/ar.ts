@@ -57,6 +57,8 @@ const ar: Dictionary = {
   'sidebar.nav.dashboardDescription': 'حالة الشبكة',
   'sidebar.nav.devices': 'سجل الأجهزة',
   'sidebar.nav.devicesDescription': 'أجهزة ONT وCPE',
+  'sidebar.nav.contacts': 'جهات الاتصال',
+  'sidebar.nav.contactsDescription': 'مشتركو SGP',
   'sidebar.nav.networkMap': 'طوبولوجيا الشبكة',
   'sidebar.nav.networkMapDescription': 'العقد المادية',
   'sidebar.nav.settings': 'الإعدادات',

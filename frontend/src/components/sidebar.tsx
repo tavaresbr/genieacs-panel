@@ -29,6 +29,7 @@ import { wearingPlatformHat } from '@/lib/shell'
 const menuItems = [
   { href: '/dashboard', labelKey: 'sidebar.nav.dashboard', descriptionKey: 'sidebar.nav.dashboardDescription', icon: 'dashboard', permission: 'devices.list' },
   { href: '/devices', labelKey: 'sidebar.nav.devices', descriptionKey: 'sidebar.nav.devicesDescription', icon: 'devices', permission: 'devices.list' },
+  { href: '/contacts', labelKey: 'sidebar.nav.contacts', descriptionKey: 'sidebar.nav.contactsDescription', icon: 'contacts', permission: 'whatsapp.read' },
   { href: '/network-map', labelKey: 'sidebar.nav.networkMap', descriptionKey: 'sidebar.nav.networkMapDescription', icon: 'map', permission: 'map.read' },
   { href: '/whatsapp', labelKey: 'sidebar.nav.whatsapp', descriptionKey: 'sidebar.nav.whatsappDescription', icon: 'chat', permission: 'whatsapp.read' },
   { href: '/settings', labelKey: 'sidebar.nav.settings', descriptionKey: 'sidebar.nav.settingsDescription', icon: 'settings', permission: 'settings.read' },
