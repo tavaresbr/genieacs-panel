@@ -1939,7 +1939,7 @@ const ptBR: Dictionary = {
   'onboarding.identity.description': 'O nome que os operadores vão ver e onde a planta fica no mapa.',
   'onboarding.identity.lat': 'Latitude do centro do mapa',
   'onboarding.identity.lng': 'Longitude do centro do mapa',
-  'onboarding.identity.mapHint': 'Opcional. Graus decimais, por exemplo -15.7942 e -47.8822. O mapa abre centrado aqui.',
+  'onboarding.identity.mapHint': 'Opcional. Clique no mapa ou arraste o marcador para escolher o local, ou digite graus decimais (ex.: -15.7942 e -47.8822). O mapa abre centrado aqui.',
   'onboarding.acs.title': 'Seu GenieACS',
   'onboarding.acs.description': 'O endereço da NBI pelo qual o painel gerencia os equipamentos, e como ele se autentica.',
   'onboarding.acs.testOk': 'Conexão OK.',

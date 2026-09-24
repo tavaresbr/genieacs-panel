@@ -1940,7 +1940,7 @@ const zhTW: Dictionary = {
   'onboarding.identity.description': '操作員將看到的名稱，以及網路在地圖上的位置。',
   'onboarding.identity.lat': '地圖中心緯度',
   'onboarding.identity.lng': '地圖中心經度',
-  'onboarding.identity.mapHint': '選填。十進位度數，例如 -15.7942 和 -47.8822。地圖將以此為中心開啟。',
+  'onboarding.identity.mapHint': '選填。點擊地圖或拖曳標記來選擇位置，或輸入十進位度數（例如 -15.7942 和 -47.8822）。地圖將以此為中心開啟。',
   'onboarding.acs.title': '您的 GenieACS',
   'onboarding.acs.description': '面板管理設備所用的 NBI 位址及其驗證方式。',
   'onboarding.acs.testOk': '連線正常。',

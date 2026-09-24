@@ -1946,7 +1946,7 @@ const ko: Dictionary = {
   'onboarding.identity.description': '운영자에게 보이는 이름과 지도에서 망이 있는 위치입니다.',
   'onboarding.identity.lat': '지도 중심 위도',
   'onboarding.identity.lng': '지도 중심 경도',
-  'onboarding.identity.mapHint': '선택 사항. 십진 도 단위(예: -15.7942, -47.8822). 지도는 이곳을 중심으로 열립니다.',
+  'onboarding.identity.mapHint': '선택 사항. 지도를 클릭하거나 마커를 끌어 위치를 고르거나, 십진 도 단위로 입력하세요(예: -15.7942, -47.8822). 지도는 이곳을 중심으로 열립니다.',
   'onboarding.acs.title': '내 GenieACS',
   'onboarding.acs.description': '패널이 장비를 관리하는 NBI 주소와 인증 방식입니다.',
   'onboarding.acs.testOk': '연결 OK.',

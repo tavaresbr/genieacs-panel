@@ -1941,7 +1941,7 @@ const en = {
   'onboarding.identity.description': 'The name operators will see and where the plant is on the map.',
   'onboarding.identity.lat': 'Map centre latitude',
   'onboarding.identity.lng': 'Map centre longitude',
-  'onboarding.identity.mapHint': 'Optional. Decimal degrees, e.g. -15.7942 and -47.8822. The map opens centred here.',
+  'onboarding.identity.mapHint': 'Optional. Click the map or drag the marker to pick the spot, or type decimal degrees (e.g. -15.7942 and -47.8822). The map opens centred here.',
   'onboarding.acs.title': 'Your GenieACS',
   'onboarding.acs.description': 'The NBI address the panel manages devices through, and how it authenticates.',
   'onboarding.acs.testOk': 'Connection OK.',

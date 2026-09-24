@@ -1943,7 +1943,7 @@ const de: Dictionary = {
   'onboarding.identity.description': 'Der Name, den die Operatoren sehen, und wo das Netz auf der Karte liegt.',
   'onboarding.identity.lat': 'Breitengrad der Kartenmitte',
   'onboarding.identity.lng': 'Längengrad der Kartenmitte',
-  'onboarding.identity.mapHint': 'Optional. Dezimalgrad, z. B. -15.7942 und -47.8822. Die Karte öffnet hier zentriert.',
+  'onboarding.identity.mapHint': 'Optional. Auf die Karte klicken oder die Markierung ziehen, um den Ort zu wählen, oder Dezimalgrad eingeben (z. B. -15.7942 und -47.8822). Die Karte öffnet hier zentriert.',
   'onboarding.acs.title': 'Ihr GenieACS',
   'onboarding.acs.description': 'Die NBI-Adresse, über die das Panel die Geräte verwaltet, und wie es sich authentifiziert.',
   'onboarding.acs.testOk': 'Verbindung OK.',

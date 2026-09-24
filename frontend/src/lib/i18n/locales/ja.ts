@@ -1939,7 +1939,7 @@ const ja: Dictionary = {
   'onboarding.identity.description': 'オペレーターに表示される名前と、地図上での設備の位置です。',
   'onboarding.identity.lat': '地図の中心の緯度',
   'onboarding.identity.lng': '地図の中心の経度',
-  'onboarding.identity.mapHint': '任意。十進度で入力します（例: -15.7942 と -47.8822）。地図はここを中心に開きます。',
+  'onboarding.identity.mapHint': '任意。地図をクリックするかマーカーをドラッグして場所を選ぶか、十進度で入力します（例: -15.7942 と -47.8822）。地図はここを中心に開きます。',
   'onboarding.acs.title': 'あなたの GenieACS',
   'onboarding.acs.description': 'パネルが機器を管理する NBI のアドレスと、その認証方法です。',
   'onboarding.acs.testOk': '接続 OK。',

@@ -1939,7 +1939,7 @@ const zhCN: Dictionary = {
   'onboarding.identity.description': '操作员将看到的名称，以及网络在地图上的位置。',
   'onboarding.identity.lat': '地图中心纬度',
   'onboarding.identity.lng': '地图中心经度',
-  'onboarding.identity.mapHint': '可选。十进制度数，例如 -15.7942 和 -47.8822。地图将以此为中心打开。',
+  'onboarding.identity.mapHint': '可选。点击地图或拖动标记来选择位置，或输入十进制度数（例如 -15.7942 和 -47.8822）。地图将以此为中心打开。',
   'onboarding.acs.title': '您的 GenieACS',
   'onboarding.acs.description': '面板管理设备所用的 NBI 地址及其认证方式。',
   'onboarding.acs.testOk': '连接正常。',

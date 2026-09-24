@@ -1945,7 +1945,7 @@ const it: Dictionary = {
   'onboarding.identity.description': 'Il nome che vedranno gli operatori e dove si trova la rete sulla mappa.',
   'onboarding.identity.lat': 'Latitudine del centro mappa',
   'onboarding.identity.lng': 'Longitudine del centro mappa',
-  'onboarding.identity.mapHint': 'Facoltativo. Gradi decimali, ad es. -15.7942 e -47.8822. La mappa si apre centrata qui.',
+  'onboarding.identity.mapHint': 'Facoltativo. Fai clic sulla mappa o trascina il segnaposto per scegliere il punto, oppure inserisci gradi decimali (ad es. -15.7942 e -47.8822). La mappa si apre centrata qui.',
   'onboarding.acs.title': 'Il tuo GenieACS',
   'onboarding.acs.description': 'L\'indirizzo della NBI attraverso cui il pannello gestisce i dispositivi, e come si autentica.',
   'onboarding.acs.testOk': 'Connessione OK.',
