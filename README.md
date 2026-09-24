@@ -121,6 +121,7 @@ Both listeners bind to `127.0.0.1` by default. This is suitable for a reverse pr
 | `skygenpanel status` | Show service and endpoint status |
 | `skygenpanel logs [N]` | Follow the latest log lines; defaults to 100 |
 | `skygenpanel reset-password <user> [password]` | Reset an operator password; prompts securely when the password is omitted |
+| `skygenpanel reset-mfa <user>` | Turn off two-step login for someone who lost their phone and recovery codes, and end their sessions |
 | `skygenpanel backup` | Take a backup now: database, WhatsApp attachments, and the fingerprint of the encryption keys |
 | `skygenpanel backup verify` | Report how old the newest backup is and whether the keys still match the ones it was taken with |
 | `skygenpanel rotate-key [--dry-run]` | Rewrite every stored secret with the live `SECRET_BOX_KEY`; `--dry-run` counts them per key version without writing |

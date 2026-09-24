@@ -44,6 +44,7 @@ class TenantUser {
         'tenants.name as name',
         'tenants.slug as slug',
         'tenants.status as status',
+        'tenants.require_mfa as require_mfa',
         'tenant_users.role as role'
       );
   }
@@ -61,6 +62,17 @@ class TenantUser {
       .first()) || null;
   }
 
+  /**
+   * O vínculo, com a exigência de 2FA do provedor ao lado — o que a sessão
+   * precisa a cada requisição, numa consulta só.
+   */
+  static async findWithPolicy(tenantId, userId) {
+    return (await getDb()('tenant_users')
+      .join('tenants', 'tenants.id', 'tenant_users.tenant_id')
+      .where({ 'tenant_users.tenant_id': tenantId, 'tenant_users.user_id': userId })
+      .first('tenant_users.*', 'tenants.require_mfa')) || null;
+  }
+
   /** Everyone who works for one provider, with the person's details joined on. */
   static async listForTenant(tenantId) {
     return getDb()('tenant_users')
@@ -71,6 +83,7 @@ class TenantUser {
         'users.id',
         'users.username',
         'users.email',
+        'users.totp_enabled_at',
         'users.created_at',
         'users.updated_at',
         'tenant_users.role',

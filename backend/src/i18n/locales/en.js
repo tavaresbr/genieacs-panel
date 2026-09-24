@@ -56,6 +56,8 @@ export default {
   'auth.mfaEnabled': 'Two-step login turned on',
   'auth.mfaDisabled': 'Two-step login turned off',
   'auth.mfaRecoveryRegenerated': 'New recovery codes generated; the old ones no longer work',
+  'auth.mfaEnrollmentRequired': 'This provider requires two-step login. Turn it on to continue',
+  'auth.mfaRequiredByProvider': 'A provider you work for requires two-step login; it cannot be turned off',
   'auth.passwordUpdated': 'Password updated successfully',
 
   // Rate limiting
@@ -633,6 +635,10 @@ export default {
   'users.ownAdminRole': 'You cannot remove your own administrator role',
   'users.lastAdmin': 'The panel must keep at least one administrator',
   'users.passwordElsewhere': 'This operator also works for another provider; only they can change their password',
+  'users.mfaResetSelf': 'To turn off your own two-step login, use your account card',
+  'users.mfaElsewhere': 'This operator also works for another provider; their two-step login can only be turned off on the server',
+  'users.mfaPlatform': 'This operator also administers the platform; their two-step login can only be turned off on the server',
+  'users.mfaReset': 'Two-step login turned off; the operator\'s sessions were ended',
   'users.updated': 'Operator updated',
   'users.updateFailed': 'Failed to update the operator',
   'users.deleteSelf': 'You cannot delete the account you are signed in with',
@@ -651,6 +657,9 @@ export default {
   'subscription.retrieveFailed': 'Failed to read the subscription',
 
   'tenant.renamed': 'Provider renamed',
+  'tenant.securityInvalid': 'State whether two-step login is required (true or false)',
+  'tenant.mfaEnableYourselfFirst': 'Turn on your own two-step login before requiring it from the team',
+  'tenant.securityUpdated': 'Two-step login requirement updated',
   'tenant.renameFailed': 'Failed to rename the provider',
   'tenant.nameInvalid': 'The provider name must be between 1 and 128 characters',
   'auth.signupCreated': 'Provider created. Sign in at its own address.',

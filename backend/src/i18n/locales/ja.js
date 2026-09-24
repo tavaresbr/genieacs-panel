@@ -56,6 +56,8 @@ export default {
   'auth.mfaEnabled': '2 段階ログインを有効にしました',
   'auth.mfaDisabled': '2 段階ログインを無効にしました',
   'auth.mfaRecoveryRegenerated': '新しい復旧コードを生成しました。古いコードは使えません',
+  'auth.mfaEnrollmentRequired': 'このプロバイダーでは2段階ログインが必須です。続行するには有効にしてください',
+  'auth.mfaRequiredByProvider': '所属するプロバイダーが2段階ログインを必須にしているため、無効にできません',
   'auth.passwordUpdated': 'パスワードを更新しました',
 
   // レート制限
@@ -633,6 +635,10 @@ export default {
   'users.ownAdminRole': '自分自身の管理者権限は削除できません',
   'users.lastAdmin': 'パネルには少なくとも 1 人の管理者が必要です',
   'users.passwordElsewhere': 'このオペレーターは他のプロバイダーにも所属しています。パスワードは本人のみ変更できます',
+  'users.mfaResetSelf': '自分の2段階ログインを無効にするには、アカウントのカードを使ってください',
+  'users.mfaElsewhere': 'このオペレーターは別のプロバイダーでも働いています。2段階ログインはサーバー上でのみ無効にできます',
+  'users.mfaPlatform': 'このオペレーターはプラットフォームも管理しています。2段階ログインはサーバー上でのみ無効にできます',
+  'users.mfaReset': '2段階ログインを無効にし、オペレーターのセッションを終了しました',
   'users.updated': 'オペレーターを更新しました',
   'users.updateFailed': 'オペレーターを更新できませんでした',
   'users.deleteSelf': '現在ログイン中のアカウントは削除できません',
@@ -651,6 +657,9 @@ export default {
   'subscription.retrieveFailed': 'サブスクリプションを読み取れませんでした',
 
   'tenant.renamed': 'プロバイダー名を変更しました',
+  'tenant.securityInvalid': '2段階ログインを必須にするかどうか（true または false）を指定してください',
+  'tenant.mfaEnableYourselfFirst': 'チームに必須にする前に、ご自身の2段階ログインを有効にしてください',
+  'tenant.securityUpdated': '2段階ログインの必須設定を更新しました',
   'tenant.renameFailed': 'プロバイダー名を変更できませんでした',
   'tenant.nameInvalid': 'プロバイダー名は1〜128文字で入力してください',
   'auth.signupCreated': 'プロバイダーを作成しました。専用アドレスからサインインしてください。',

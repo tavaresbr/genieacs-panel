@@ -64,6 +64,8 @@ export const AUDIT_ACTION_LABEL_KEYS: Record<string, TranslationKey> = {
   'user.mfa_disabled': 'audit.action.userMfaDisabled',
   'user.mfa_recovery_regenerated': 'audit.action.userMfaRecoveryRegenerated',
   'user.mfa_recovery_used': 'audit.action.userMfaRecoveryUsed',
+  'tenant.mfa_required_changed': 'audit.action.tenantMfaRequiredChanged',
+  'operator.mfa_reset': 'audit.action.operatorMfaReset',
   'subscriber_account.retired': 'audit.action.subscriberAccountRetired',
   'whatsapp.config_tested': 'audit.action.whatsappConfigTested'
 }

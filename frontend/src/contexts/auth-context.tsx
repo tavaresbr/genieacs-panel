@@ -6,6 +6,7 @@ import { sessionKind } from '@/lib/shell'
 import { apiClient, authAPI, storedSession } from '@/lib/api'
 import { destinosDaResposta } from '@/lib/login-destinations'
 import { mfaStepDaResposta, type MfaStep } from '@/lib/login-mfa'
+import { MFA_ENROLLMENT_EVENT } from '@/lib/mfa-enrollment'
 import { useNavigate } from 'react-router'
 import { roleHas, type Permission } from '@/lib/permissions'
 import type { User } from '@/types'
@@ -64,6 +65,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate()
   // Ver a checagem de boot: marca que outra tela já pôs uma sessão no lugar.
   const adotada = useRef(false)
+  // O ouvinte do evento da ativação obrigatória é registrado uma vez; ele chama
+  // a `refreshUser` da renderização mais recente por aqui.
+  const refreshUserRef = useRef<() => Promise<void>>(async () => {})
 
   useEffect(() => {
     const checkAuthStatus = async () => {
@@ -123,6 +127,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     window.addEventListener('auth:unauthorized', handleUnauthorized)
     return () => window.removeEventListener('auth:unauthorized', handleUnauthorized)
   }, [navigate, needsSetup])
+
+  // O provedor passou a exigir o 2FA no meio do expediente: a próxima chamada
+  // volta com a recusa, e reler a conta traz `mfaEnrollmentRequired`, que é o
+  // que leva a casca à tela de ativar. Reler e não só marcar, porque quem
+  // decide é o servidor — a marca sai do mesmo jeito que entrou.
+  useEffect(() => {
+    const handleEnrollment = () => { void refreshUserRef.current() }
+    window.addEventListener(MFA_ENROLLMENT_EVENT, handleEnrollment)
+    return () => window.removeEventListener(MFA_ENROLLMENT_EVENT, handleEnrollment)
+  }, [])
 
   const login = async (
     identifier: string, password: string, destino?: LoginDestination, totpCode?: string
@@ -247,6 +261,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // comportamento certo: não é ela que decide se a sessão ainda vale.
     }
   }
+
+  useEffect(() => {
+    refreshUserRef.current = refreshUser
+  })
 
   const value = {
     user, isAuthenticated, loading, needsSetup, can, login, completeSetup,

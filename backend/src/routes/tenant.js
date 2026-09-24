@@ -44,4 +44,10 @@ router.patch('/', authenticateToken, requirePermission('settings.write'), Tenant
 // na query (`?cnpj=`): não endereça linha nenhuma, é só o que se consulta.
 router.get('/cnpj', authenticateToken, requirePermission('settings.write'), TenantController.lookupCnpj);
 
+// A exigência do login em duas etapas para a equipe. Ler é de quem lê a
+// configuração; gravar pede `settings.write` E papel `owner`, conferido no
+// controlador — a matriz não tem capacidade só do dono.
+router.get('/security', authenticateToken, requirePermission('settings.read'), TenantController.getSecurity);
+router.put('/security', authenticateToken, requirePermission('settings.write'), TenantController.updateSecurity);
+
 export default router;

@@ -10,6 +10,8 @@ import { LanguageProvider, useTranslation } from '@/contexts/language-context'
 import { SubscriptionNotice } from '@/components/subscription-notice'
 import { ImpersonationBanner } from '@/components/impersonation-banner'
 import { ConsoleHeader } from '@/components/console-header'
+import { MfaEnrollmentScreen } from '@/components/mfa-enrollment-screen'
+import { mustEnroll } from '@/lib/mfa-enrollment'
 import { TenantProvider, useTenant } from '@/contexts/tenant-context'
 import { settingsAPI } from '@/lib/api'
 import { onboardingDismissKey } from '@/lib/onboarding'
@@ -135,10 +137,13 @@ function OnboardingGate({ children }: { children: React.ReactNode }) {
 }
 
 function ProtectedShell() {
-  const { isAuthenticated, loading, needsSetup } = useAuth()
+  const { isAuthenticated, loading, needsSetup, user } = useAuth()
   if (loading) return <AuthFallback />
   if (needsSetup) return <Navigate to="/setup" replace />
   if (!isAuthenticated) return <Navigate to="/login" replace />
+  // O provedor exige o 2FA e esta pessoa não ativou: nada do painel abriria —
+  // o servidor recusa —, então a casca inteira dá lugar à ativação.
+  if (mustEnroll(user)) return <MfaEnrollmentScreen />
 
   return (
     <div className="flex min-h-screen">

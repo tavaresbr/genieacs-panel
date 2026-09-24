@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useState, useEffect, useRef } from 'react'
+import { Fragment, useCallback, useState, useEffect, useRef } from 'react'
 import {
   apiClient,
   vendorsAPI,
@@ -15,6 +15,7 @@ import {
   type GenieAcsAuthPayload,
   type GenieAcsAuthType,
   type EmailReadiness,
+  type MfaStatus,
   type Operator,
   type OperatorRole,
   type SgpConfig,
@@ -53,6 +54,8 @@ import { INSTALLER_VIRTUAL_PARAMETERS, VIRTUAL_PARAMETER_FIELDS } from '@/lib/vi
 const PLATFORM_MANAGED_KEYS = new Set<string>(['genieAcsUrl', ...Object.keys(INSTALLER_VIRTUAL_PARAMETERS)])
 import type { Vendor as VendorType, WifiSecurityConfig as WifiSecurityConfigType } from '@/types'
 import { MfaCard } from '@/components/mfa-card'
+import { MfaPolicyCard } from '@/components/mfa-policy-card'
+import { canOfferMfaReset } from '@/lib/mfa-enrollment'
 
 /**
  * Mapas em vez de nome de chave montado com template literal.
@@ -115,6 +118,10 @@ export default function Settings() {
   const toast = useToast()
   const loadingCtl = useLoading()
   const isOwner = currentUser?.role === 'owner'
+  // Se quem está na tela já usa o 2FA — o cartão da exigência precisa saber,
+  // porque ligar a exigência pede isso. Vem do cartão do 2FA, que é quem relê.
+  const [meuMfa, setMeuMfa] = useState(Boolean(currentUser?.mfaEnabled))
+  const lembrarMeuMfa = useCallback((status: MfaStatus) => setMeuMfa(status.enabled), [])
   const canReadOperators = can('operators.read')
   const canManageOperators = can('operators.manage')
   const canExportTenant = can('tenant.export')
@@ -939,6 +946,26 @@ export default function Settings() {
         setResetPasswordValue('')
       } else {
         toast.error(res.message || t('settings.operators.passwordFailed'))
+      }
+    } finally {
+      setOperatorBusyId(null)
+    }
+  }
+
+  // Quem perdeu o celular e os códigos. A confirmação nomeia a pessoa e diz o
+  // que acontece: o 2FA sai, as sessões caem, e a senha sozinha volta a entrar
+  // (num provedor que exige, a pessoa é levada a ativar de novo).
+  const resetOperatorMfa = async (operator: Operator) => {
+    if (!confirm(t('settings.operators.confirmMfaReset', { username: operator.username }))) return
+    setOperatorBusyId(operator.id)
+    try {
+      const res = await usersAPI.resetMfa(operator.id)
+      if (res.success) {
+        setOperators((current) => current.map((item) => (item.id === operator.id ? { ...item, mfaEnabled: false } : item)))
+        toast.success(t('settings.operators.mfaResetDone', { username: operator.username }))
+      } else {
+        // Outro provedor, a plataforma, o dono: o servidor explica por quê.
+        toast.error(res.message || t('settings.operators.mfaResetFailed'))
       }
     } finally {
       setOperatorBusyId(null)
@@ -2510,7 +2537,12 @@ export default function Settings() {
             <h2 className="section-heading">{t('settings.security.title')}</h2>
             <p className="section-description mb-6">{t('settings.security.description')}</p>
             <div className="space-y-6">
-              <MfaCard />
+              <MfaCard onStatusChange={lembrarMeuMfa} />
+              {/* A exigência da equipe é do provedor: fora dele (console) não há
+                  equipe, e quem não lê a configuração não a vê. */}
+              {!currentUser?.platform && can('settings.read') && (
+                <MfaPolicyCard selfMfaEnabled={meuMfa} />
+              )}
               <section className="rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-4">
                 <h3 className="font-semibold text-foreground">{t('settings.security.changeUsername')}</h3>
                 <p className="mb-4 mt-1 text-sm text-muted-foreground">{t('settings.security.changeUsernameHint')}</p>
@@ -2839,6 +2871,9 @@ export default function Settings() {
                                   {isSelf && (
                                     <span className="modern-badge ms-2">{t('settings.operators.you')}</span>
                                   )}
+                                  <span className={`${operator.mfaEnabled ? 'modern-badge-success' : 'modern-badge'} ms-2`}>
+                                    {operator.mfaEnabled ? t('settings.operators.mfaOn') : t('settings.operators.mfaOff')}
+                                  </span>
                                 </td>
                                 {/* Vazio é informação, e por isso não some
                                     num travessão: uma conta sem endereço é uma
@@ -2882,6 +2917,17 @@ export default function Settings() {
                                     >
                                       <Icon name="lock" size={18} />
                                     </button>
+                                    {canOfferMfaReset(operator, { isSelf, isOwner }) && (
+                                      <button
+                                        onClick={() => void resetOperatorMfa(operator)}
+                                        disabled={operatorBusyId === operator.id}
+                                        className="text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300"
+                                        title={t('settings.operators.mfaReset')}
+                                        aria-label={t('settings.operators.mfaResetFor', { username: operator.username })}
+                                      >
+                                        <Icon name="phone" size={18} />
+                                      </button>
+                                    )}
                                     <button
                                       onClick={() => void deleteOperator(operator)}
                                       disabled={operatorBusyId === operator.id}

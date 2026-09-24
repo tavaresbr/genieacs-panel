@@ -56,6 +56,8 @@ export default {
   'auth.mfaEnabled': '2단계 로그인을 켰습니다',
   'auth.mfaDisabled': '2단계 로그인을 껐습니다',
   'auth.mfaRecoveryRegenerated': '새 복구 코드를 만들었습니다. 이전 코드는 더 이상 사용할 수 없습니다',
+  'auth.mfaEnrollmentRequired': '이 공급자는 2단계 로그인을 요구합니다. 계속하려면 켜 주세요',
+  'auth.mfaRequiredByProvider': '소속 공급자가 2단계 로그인을 요구하므로 끌 수 없습니다',
   'auth.passwordUpdated': '비밀번호를 변경했습니다',
 
   // 요청 제한
@@ -636,6 +638,10 @@ export default {
   'users.ownAdminRole': '자신의 관리자 역할은 제거할 수 없습니다',
   'users.lastAdmin': '패널에는 관리자가 최소 한 명은 있어야 합니다',
   'users.passwordElsewhere': '이 운영자는 다른 제공자에서도 근무합니다. 비밀번호는 본인만 변경할 수 있습니다',
+  'users.mfaResetSelf': '본인의 2단계 로그인을 끄려면 계정 카드를 사용하세요',
+  'users.mfaElsewhere': '이 운영자는 다른 공급자에서도 일합니다. 2단계 로그인은 서버에서만 끌 수 있습니다',
+  'users.mfaPlatform': '이 운영자는 플랫폼도 관리합니다. 2단계 로그인은 서버에서만 끌 수 있습니다',
+  'users.mfaReset': '2단계 로그인을 껐고 운영자의 세션을 종료했습니다',
   'users.updated': '운영자를 수정했습니다',
   'users.updateFailed': '운영자를 수정하지 못했습니다',
   'users.deleteSelf': '현재 로그인한 계정은 삭제할 수 없습니다',
@@ -654,6 +660,9 @@ export default {
   'subscription.retrieveFailed': '구독 정보를 읽지 못했습니다',
 
   'tenant.renamed': '사업자 이름이 변경되었습니다',
+  'tenant.securityInvalid': '2단계 로그인 필수 여부(true 또는 false)를 지정하세요',
+  'tenant.mfaEnableYourselfFirst': '팀에 요구하기 전에 본인의 2단계 로그인을 먼저 켜세요',
+  'tenant.securityUpdated': '2단계 로그인 요구 설정을 업데이트했습니다',
   'tenant.renameFailed': '사업자 이름을 변경하지 못했습니다',
   'tenant.nameInvalid': '사업자 이름은 1~128자여야 합니다',
   'auth.signupCreated': '사업자가 생성되었습니다. 전용 주소에서 로그인하세요.',

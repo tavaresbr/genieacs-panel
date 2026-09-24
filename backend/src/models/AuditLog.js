@@ -150,7 +150,12 @@ class AuditLog {
     USER_MFA_ENABLED: 'user.mfa_enabled',
     USER_MFA_DISABLED: 'user.mfa_disabled',
     USER_MFA_RECOVERY_REGENERATED: 'user.mfa_recovery_regenerated',
-    USER_MFA_RECOVERY_USED: 'user.mfa_recovery_used'
+    USER_MFA_RECOVERY_USED: 'user.mfa_recovery_used',
+    // O dono passou a exigir (ou deixou de exigir) o 2FA da equipe, com
+    // `{ from, to }`; e alguém da equipe teve o 2FA desligado por quem
+    // administra — celular e códigos perdidos —, com o nome da pessoa.
+    TENANT_MFA_REQUIRED_CHANGED: 'tenant.mfa_required_changed',
+    OPERATOR_MFA_RESET: 'operator.mfa_reset'
   });
 
   /**

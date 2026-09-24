@@ -17,7 +17,16 @@ type Acao = 'desligar' | 'trocar' | null
  * durante a ativação. Os códigos de recuperação aparecem uma única vez — o
  * servidor guarda só o hash — e a tela diz isso antes de deixar sair.
  */
-export function MfaCard() {
+export function MfaCard({ onRecoveryCodesSaved, onStatusChange }: {
+  /**
+   * Chamado quando a pessoa diz que guardou os códigos. A ativação obrigatória
+   * usa isto para só então sair da tela: sair logo depois de ativar levaria os
+   * códigos embora antes de alguém tê-los copiado.
+   */
+  onRecoveryCodesSaved?: () => void
+  /** Cada vez que o estado é relido: o cartão da exigência precisa saber se quem liga já usa o 2FA. */
+  onStatusChange?: (status: MfaStatus) => void
+} = {}) {
   const { t } = useTranslation()
   const toast = useToast()
   const [status, setStatus] = useState<MfaStatus | null>(null)
@@ -31,11 +40,14 @@ export function MfaCard() {
   const carregar = useCallback(async () => {
     try {
       const res = await authAPI.mfaStatus()
-      if (res.success && res.data) setStatus(res.data)
+      if (res.success && res.data) {
+        setStatus(res.data)
+        onStatusChange?.(res.data)
+      }
     } catch {
       /* sem o estado, o cartão mostra só o botão de ativar, que o servidor confere */
     }
-  }, [])
+  }, [onStatusChange])
 
   useEffect(() => {
     void carregar()
@@ -152,7 +164,7 @@ export function MfaCard() {
             <button type="button" className="modern-button-secondary" onClick={baixarCodigos}>
               {t('settings.mfa.download')}
             </button>
-            <button type="button" className="modern-button" onClick={() => setCodigosNovos(null)}>
+            <button type="button" className="modern-button" onClick={() => { setCodigosNovos(null); onRecoveryCodesSaved?.() }}>
               {t('settings.mfa.savedThem')}
             </button>
           </div>

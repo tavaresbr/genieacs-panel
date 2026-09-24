@@ -53,6 +53,8 @@ export default {
   'auth.mfaEnabled': 'Inicio de sesión en dos pasos activado',
   'auth.mfaDisabled': 'Inicio de sesión en dos pasos desactivado',
   'auth.mfaRecoveryRegenerated': 'Se generaron nuevos códigos de recuperación; los anteriores ya no sirven',
+  'auth.mfaEnrollmentRequired': 'Este proveedor exige el inicio de sesión en dos pasos. Actívelo para continuar',
+  'auth.mfaRequiredByProvider': 'Un proveedor en el que trabaja exige el inicio de sesión en dos pasos; no se puede desactivar',
   'auth.passwordUpdated': 'Contraseña actualizada correctamente',
 
   // Límite de solicitudes
@@ -630,6 +632,10 @@ export default {
   'users.ownAdminRole': 'No puede quitar su propio rol de administrador',
   'users.lastAdmin': 'El panel debe mantener al menos un administrador',
   'users.passwordElsewhere': 'Este operador también trabaja en otro proveedor; solo él puede cambiar su contraseña',
+  'users.mfaResetSelf': 'Para desactivar su propio inicio de sesión en dos pasos, use la tarjeta de su cuenta',
+  'users.mfaElsewhere': 'Este operador también trabaja en otro proveedor; su inicio de sesión en dos pasos solo puede desactivarse en el servidor',
+  'users.mfaPlatform': 'Este operador también administra la plataforma; su inicio de sesión en dos pasos solo puede desactivarse en el servidor',
+  'users.mfaReset': 'Inicio de sesión en dos pasos desactivado; las sesiones del operador se cerraron',
   'users.updated': 'Operador actualizado',
   'users.updateFailed': 'No se pudo actualizar el operador',
   'users.deleteSelf': 'No puede eliminar la cuenta con la que ha iniciado sesión',
@@ -648,6 +654,9 @@ export default {
   'subscription.retrieveFailed': 'No se pudo leer la suscripción',
 
   'tenant.renamed': 'Proveedor renombrado',
+  'tenant.securityInvalid': 'Indique si el inicio de sesión en dos pasos es obligatorio (verdadero o falso)',
+  'tenant.mfaEnableYourselfFirst': 'Active su propio inicio de sesión en dos pasos antes de exigirlo al equipo',
+  'tenant.securityUpdated': 'Requisito de inicio de sesión en dos pasos actualizado',
   'tenant.renameFailed': 'No se pudo renombrar el proveedor',
   'tenant.nameInvalid': 'El nombre del proveedor debe tener entre 1 y 128 caracteres',
   'auth.signupCreated': 'Proveedor creado. Inicie sesión en su propia dirección.',

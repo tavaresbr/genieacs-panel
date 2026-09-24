@@ -56,6 +56,8 @@ export default {
   'auth.mfaEnabled': '已开启两步登录',
   'auth.mfaDisabled': '已关闭两步登录',
   'auth.mfaRecoveryRegenerated': '已生成新的恢复代码；旧代码不再有效',
+  'auth.mfaEnrollmentRequired': '该服务商要求两步登录。请启用后继续',
+  'auth.mfaRequiredByProvider': '您所在的服务商要求两步登录，无法关闭',
   'auth.passwordUpdated': '密码已更新',
 
   // 频率限制
@@ -633,6 +635,10 @@ export default {
   'users.ownAdminRole': '您不能移除自己的管理员角色',
   'users.lastAdmin': '面板必须至少保留一名管理员',
   'users.passwordElsewhere': '该操作员同时在另一家服务商任职；只有本人可以修改密码',
+  'users.mfaResetSelf': '要关闭您自己的两步登录，请使用您账户的卡片',
+  'users.mfaElsewhere': '该操作员也在其他服务商工作；其两步登录只能在服务器上关闭',
+  'users.mfaPlatform': '该操作员也管理平台；其两步登录只能在服务器上关闭',
+  'users.mfaReset': '已关闭两步登录；该操作员的会话已结束',
   'users.updated': '操作员已更新',
   'users.updateFailed': '无法更新操作员',
   'users.deleteSelf': '您不能删除当前登录的账户',
@@ -651,6 +657,9 @@ export default {
   'subscription.retrieveFailed': '无法读取订阅',
 
   'tenant.renamed': '运营商已重命名',
+  'tenant.securityInvalid': '请说明是否要求两步登录（true 或 false）',
+  'tenant.mfaEnableYourselfFirst': '要求团队使用前，请先启用您自己的两步登录',
+  'tenant.securityUpdated': '两步登录要求已更新',
   'tenant.renameFailed': '无法重命名运营商',
   'tenant.nameInvalid': '运营商名称长度须为 1 到 128 个字符',
   'auth.signupCreated': '运营商已创建。请在其专属地址登录。',

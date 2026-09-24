@@ -4,6 +4,8 @@ import { getDb } from '../config/database.js';
 import { createSecretBox } from '../utils/secretBox.js';
 import { generateTotpSecret, totpUri, verifyTotp } from '../utils/totp.js';
 import { TranslatableError } from '../i18n/index.js';
+import TenantUser from '../models/TenantUser.js';
+import { mfaRequired } from '../models/Tenant.js';
 
 /**
  * Login em duas etapas: o segredo do app autenticador e os códigos de
@@ -206,15 +208,51 @@ class MfaService {
     if (!ok) throw recusa('auth.mfaInvalid', 'mfa_invalid');
   }
 
+  /**
+   * Desligar o próprio 2FA é recusado enquanto algum provedor da pessoa o
+   * exigir. Deixar desligar só a levaria, na requisição seguinte, à tela de
+   * ativar de novo — e no meio do caminho ela teria uma sessão sem segundo fator
+   * num provedor que o proibiu.
+   */
   static async disable(userId, password, code) {
     const user = await this.findUser(userId);
     if (!user) throw recusa('auth.userNotFound', 'user_not_found', 404);
     if (!mfaEnabled(user)) throw recusa('auth.mfaNotEnabled', 'mfa_not_enabled', 409);
+    const vinculos = await TenantUser.listForUserWithTenant(userId);
+    if (vinculos.some((vinculo) => mfaRequired(vinculo))) {
+      throw recusa('auth.mfaRequiredByProvider', 'mfa_required_by_provider', 409);
+    }
     await this.confirmIdentity(user, password, code);
     await getDb().transaction(async (trx) => {
       await trx('users').where({ id: userId }).update({ ...SEM_SEGREDO, updated_at: new Date() });
       await trx('user_recovery_codes').where({ user_id: userId }).del();
     });
+  }
+
+  /**
+   * Desliga o 2FA de alguém que perdeu o celular E os códigos — por quem
+   * administra a equipe, ou pelo comando do servidor.
+   *
+   * Sobe o `token_version` junto: as sessões abertas caem. Quem pede isso
+   * acredita que o segundo fator saiu do controle da pessoa, e a mesma dúvida
+   * vale para uma sessão que alguém esteja usando no lugar dela.
+   *
+   * @returns {Promise<boolean>} se havia 2FA para desligar
+   */
+  static async resetForUser(userId) {
+    const db = getDb();
+    const user = await this.findUser(userId);
+    if (!user) return false;
+    const tinha = mfaEnabled(user) || Boolean(user.totp_ciphertext);
+    await db.transaction(async (trx) => {
+      await trx('users').where({ id: userId }).update({
+        ...SEM_SEGREDO,
+        token_version: db.raw('token_version + 1'),
+        updated_at: new Date()
+      });
+      await trx('user_recovery_codes').where({ user_id: userId }).del();
+    });
+    return tinha;
   }
 
   /** Códigos novos; os antigos, usados ou não, deixam de valer. */

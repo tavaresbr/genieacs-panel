@@ -1,4 +1,7 @@
 import Tenant from '../models/Tenant.js';
+import TenantUser from '../models/TenantUser.js';
+import User from '../models/User.js';
+import { normalizeRole } from '../config/permissions.js';
 import { createResponse, createErrorResponse, isValidEmail } from '../utils/helpers.js';
 import TenantExportService from '../services/tenantExportService.js';
 import AuditLog from '../models/AuditLog.js';
@@ -85,6 +88,14 @@ function billingPatch(entrada) {
  */
 const NAME_MAX_LENGTH = 128;
 
+/** Quem liga e desliga a exigência do 2FA: o `owner`, ou o `admin` onde não há `owner`. */
+async function governaSeguranca(tenantId, role) {
+  const papel = normalizeRole(role);
+  if (papel === 'owner') return true;
+  if (papel !== 'admin') return false;
+  return (await TenantUser.countByRole(tenantId, 'owner')) === 0;
+}
+
 class TenantController {
   /**
    * `PATCH /api/tenant` — the provider renames itself.
@@ -116,6 +127,79 @@ class TenantController {
       return res.json(createResponse(req.t('tenant.cnpjFound'), { taxId: cnpj, ...result.data }));
     } catch (error) {
       return res.status(502).json(createErrorResponse(req.t('tenant.cnpjLookupFailed'), error.message));
+    }
+  }
+
+  /**
+   * `GET /api/tenant/security` — se o provedor exige o 2FA da equipe, e
+   * quantas pessoas da equipe ainda não o ativaram (o que o dono quer saber
+   * antes de ligar a exigência, e depois, para cobrar quem falta).
+   */
+  static async getSecurity(req, res) {
+    try {
+      const [requireMfa, equipe] = await Promise.all([
+        Tenant.requiresMfa(req.tenantId),
+        TenantUser.listForTenant(req.tenantId)
+      ]);
+      return res.json(createResponse(null, {
+        requireMfa,
+        membersWithoutMfa: equipe.filter((membro) => !membro.totp_enabled_at).length,
+        // Se quem pergunta pode mudar — a tela mostra a chave ou só o estado.
+        canChange: await governaSeguranca(req.tenantId, req.user.role)
+      }));
+    } catch (error) {
+      console.error('Tenant security error:', error);
+      return res.status(500).json(createErrorResponse(req.t('common.internalError'), error.message));
+    }
+  }
+
+  /**
+   * `PUT /api/tenant/security` — o dono liga ou desliga a exigência do 2FA.
+   *
+   * "O dono" é o `owner` — e, num provedor sem nenhum `owner`, o `admin`. O
+   * `/setup` de uma instalação nova cria o primeiro operador como `admin` (só
+   * as instalações anteriores à 0030 e o cadastro da edição SaaS têm um
+   * `owner`), e sem essa segunda metade ninguém ali conseguiria ligar a
+   * exigência.
+   *
+   * Só o `owner`, conferido aqui como em `usersController` (`users.ownerOnly`):
+   * `settings.write` é também do `admin`, e é justamente de quem administra que
+   * o dono pode querer exigir o segundo fator.
+   *
+   * Ligar exige que o próprio dono já use o 2FA — senão o primeiro clique o
+   * trancaria na tela de ativação no meio do que estava fazendo.
+   */
+  static async updateSecurity(req, res) {
+    try {
+      const pedido = req.body?.requireMfa;
+      if (typeof pedido !== 'boolean') {
+        return res.status(400).json(createErrorResponse(req.t('tenant.securityInvalid')));
+      }
+      if (!(await governaSeguranca(req.tenantId, req.user.role))) {
+        return res.status(403).json(createErrorResponse(req.t('users.ownerOnly')));
+      }
+      if (pedido) {
+        const eu = await User.findById(req.user.userId);
+        if (!eu?.totp_enabled_at) {
+          return res.status(409).json(
+            createErrorResponse(req.t('tenant.mfaEnableYourselfFirst'), null, 'mfa_enable_yourself_first')
+          );
+        }
+      }
+      const antes = await Tenant.requiresMfa(req.tenantId);
+      if (antes !== pedido) {
+        await Tenant.setRequireMfa(req.tenantId, pedido);
+        await AuditLog.fromRequest(req, {
+          action: AuditLog.ACTIONS.TENANT_MFA_REQUIRED_CHANGED,
+          subjectType: 'tenant',
+          subjectId: req.tenantId,
+          detail: { from: antes, to: pedido }
+        });
+      }
+      return res.json(createResponse(req.t('tenant.securityUpdated'), { requireMfa: pedido }));
+    } catch (error) {
+      console.error('Tenant security update error:', error);
+      return res.status(500).json(createErrorResponse(req.t('common.internalError'), error.message));
     }
   }
 

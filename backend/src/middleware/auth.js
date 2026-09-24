@@ -4,7 +4,7 @@ import User from '../models/User.js';
 import { DEVELOPMENT_FALLBACK, isProduction } from '../config/runtimeEnv.js';
 import TenantUser from '../models/TenantUser.js';
 import PlatformAdmin from '../models/PlatformAdmin.js';
-import Tenant from '../models/Tenant.js';
+import Tenant, { mfaRequired } from '../models/Tenant.js';
 import { runInTenant, runUnscoped } from '../config/tenantContext.js';
 import { roleHas } from '../config/permissions.js';
 import { subscriptionRefusal } from './subscriptionGate.js';
@@ -258,6 +258,23 @@ async function resolveMembership(userId, tenantId) {
 }
 
 /**
+ * O vínculo com a exigência de 2FA do provedor ao lado, para a sessão.
+ *
+ * Com o provedor nomeado no token — todo token cunhado hoje —, é uma consulta
+ * só, a mesma que já se fazia, com um `join`. O token antigo sem provedor paga
+ * uma segunda, e só ele.
+ */
+async function resolveSessionMembership(userId, tenantId) {
+  if (tenantId === undefined || tenantId === null) {
+    const unico = await resolveMembership(userId, tenantId);
+    return unico ? TenantUser.findWithPolicy(unico.tenant_id, userId) : null;
+  }
+  const id = Number(tenantId);
+  if (!Number.isInteger(id) || id <= 0) return null;
+  return TenantUser.findWithPolicy(id, userId);
+}
+
+/**
  * Who is asking and where they are asking from, or null for "not a session".
  *
  * Every refusal collapses to the same null on purpose: an expired revocation,
@@ -303,7 +320,7 @@ async function hydrateAuthenticatedUser(decoded) {
   if (forma === 'personificacao') return hydrateImpersonation(user, decoded);
   if (forma === 'console') return hydrateConsole(user);
 
-  const membership = await resolveMembership(user.id, decoded.tenantId);
+  const membership = await resolveSessionMembership(user.id, decoded.tenantId);
   if (!membership) return null;
 
   return {
@@ -311,7 +328,34 @@ async function hydrateAuthenticatedUser(decoded) {
     username: user.username,
     role: membership.role,
     tenantId: Number(membership.tenant_id),
-    tokenVersion: Number(user.token_version || 0)
+    tokenVersion: Number(user.token_version || 0),
+    // O provedor exige o 2FA e esta pessoa ainda não ativou. Lido a cada
+    // requisição, e não gravado no token: o dono liga a exigência e quem já
+    // estava dentro é parado na próxima chamada, não quando o token vencer.
+    mfaEnrollmentRequired: mfaRequired(membership) && !user.totp_enabled_at
+  };
+}
+
+/**
+ * O que quem precisa ativar o 2FA ainda alcança: a própria conta — ver quem é,
+ * ativar, sair, renovar a sessão — e o nome do provedor na tela.
+ *
+ * Tudo em `/api/auth/` e não uma lista de rotas dali: são as rotas da conta da
+ * pessoa, nenhuma lê nem escreve dado do provedor, e uma lista fina quebraria
+ * em silêncio no dia em que a tela de ativação precisasse de mais uma delas.
+ */
+const MFA_ENROLLMENT_PREFIXES = ['/api/auth/'];
+const MFA_ENROLLMENT_PATHS = new Set(['/api/auth', '/api/tenant/public']);
+
+function mfaEnrollmentRefusal(req, session) {
+  if (!session.mfaEnrollmentRequired) return null;
+  const path = String(req.originalUrl || req.url || '').split('?')[0];
+  if (MFA_ENROLLMENT_PATHS.has(path)) return null;
+  if (MFA_ENROLLMENT_PREFIXES.some((prefix) => path.startsWith(prefix))) return null;
+  return {
+    success: false,
+    code: 'mfa_enrollment_required',
+    message: req.t('auth.mfaEnrollmentRequired')
   };
 }
 
@@ -462,6 +506,9 @@ async function authenticateToken(req, res, next) {
 
   const readOnly = impersonationRefusal(req, session);
   if (readOnly) return res.status(403).json(readOnly);
+
+  const semSegundoFator = mfaEnrollmentRefusal(req, session);
+  if (semSegundoFator) return res.status(403).json(semSegundoFator);
 
   req.user = session;
   req.tenantId = session.tenantId;

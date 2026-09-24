@@ -217,6 +217,17 @@ cmd_reset_password() {
   ( cd "$INSTALL_DIR/backend" && RESET_PASSWORD="$pass" node scripts/reset-password.js "$user" )
 }
 
+# Para quem perdeu o celular e os códigos de recuperação e que a tela da equipe
+# não pode destravar (o último dono, quem trabalha em vários provedores, quem
+# opera a plataforma). O nome não é segredo, então vai por argumento.
+cmd_reset_mfa() {
+  need_root
+  validate_install_dir
+  local user="${1:-}"
+  [ -n "$user" ] || die "Usage: skygenpanel reset-mfa <username>"
+  ( cd "$INSTALL_DIR/backend" && node scripts/reset-mfa.js "$user" )
+}
+
 # A chave entra por VARIÁVEL DE AMBIENTE, nunca por argumento: argv aparece em
 # `ps` para qualquer usuário da máquina e fica no histórico do shell. É a mesma
 # regra de `reset-password` acima, e aqui pesa mais — o segredo é a chave mestra
@@ -258,6 +269,7 @@ Commands:
   version                     Show installed version and Git revision
   logs [N]                    Follow the last N log lines (default 100)
   reset-password <u> [p]      Reset password (prompts securely when omitted)
+  reset-mfa <u>               Turn off two-step login for someone who lost it
   backup [verify]             Take a backup now, or report the newest one
   rotate-key [--dry-run]      Rewrite stored secrets with the live SECRET_BOX_KEY
   help                        Show this help
@@ -275,6 +287,7 @@ case "${1:-help}" in
   version|-v|--version) cmd_version ;;
   logs)            cmd_logs "${2:-100}" ;;
   reset-password)  cmd_reset_password "${2:-}" "${3:-}" ;;
+  reset-mfa)       cmd_reset_mfa "${2:-}" ;;
   backup)          cmd_backup "${2:-run}" ;;
   rotate-key)      cmd_rotate_key "${2:-}" ;;
   help|-h|--help)  usage ;;

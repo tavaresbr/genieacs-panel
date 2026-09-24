@@ -4,6 +4,8 @@ import { planLimitResponse } from '../utils/planLimit.js';
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 import TenantUser from '../models/TenantUser.js';
+import PlatformAdmin from '../models/PlatformAdmin.js';
+import MfaService from '../services/mfaService.js';
 import { createResponse, createErrorResponse, isValidEmail } from '../utils/helpers.js';
 import { ROLES, normalizeRole, roleHas } from '../config/permissions.js';
 
@@ -68,6 +70,9 @@ function present(member) {
     // login sem trancar ninguém do lado de fora.
     email: member.email ?? null,
     role: presentRole(member.role),
+    // Só se está ligado: é o que a tela precisa para dizer quem ainda falta
+    // quando o dono exige o 2FA, e para oferecer o destravar.
+    mfaEnabled: Boolean(member.totp_enabled_at),
     createdAt: member.created_at,
     updatedAt: member.updated_at
   };
@@ -394,6 +399,64 @@ class UsersController {
       console.error('Delete user error:', error);
       return res.status(500).json(
         createErrorResponse(req.t('users.deleteFailed'), error.message)
+      );
+    }
+  }
+
+  /**
+   * Desliga o 2FA de alguém da equipe que perdeu o celular e os códigos.
+   *
+   * As regras são as da troca de senha pela equipe, logo acima, pelo mesmo
+   * motivo — o 2FA, como a senha, é da PESSOA:
+   * - quem não é daqui responde como inexistente;
+   * - quem trabalha também em outro provedor é recusado: desligar aqui
+   *   desligaria a proteção dela lá, e este provedor não decide por aquele;
+   * - o 2FA de um `owner` só um `owner` desliga — senão um `admin` tiraria o
+   *   segundo fator do dono e, com a troca de senha ao lado, tomaria a conta;
+   * - quem opera a plataforma é recusado: o 2FA dela protege o console;
+   * - a si mesmo, não: o cartão da própria conta faz isso com senha e código.
+   * Nesses casos, o comando do servidor (`skygenpanel reset-mfa`) é a saída.
+   */
+  static async resetMfa(req, res) {
+    try {
+      const tenantId = tenantOf(req);
+      const id = Number(req.params?.id);
+      if (!Number.isInteger(id)) {
+        return res.status(400).json(createErrorResponse(req.t('users.invalidId')));
+      }
+      if (id === req.user.userId) {
+        return res.status(400).json(createErrorResponse(req.t('users.mfaResetSelf')));
+      }
+      const membership = await TenantUser.find(tenantId, id);
+      const user = membership ? await User.findById(id) : null;
+      if (!membership || !user) {
+        return res.status(404).json(createErrorResponse(req.t('users.notFound')));
+      }
+      if (presentRole(membership.role) === 'owner' && presentRole(req.user.role) !== 'owner') {
+        return res.status(403).json(createErrorResponse(req.t('users.ownerOnly')));
+      }
+      if ((await TenantUser.listForUser(id)).length > 1) {
+        return res.status(409).json(createErrorResponse(req.t('users.mfaElsewhere'), null, 'mfa_elsewhere'));
+      }
+      if (await PlatformAdmin.has(id)) {
+        return res.status(409).json(createErrorResponse(req.t('users.mfaPlatform'), null, 'mfa_platform'));
+      }
+      if (!user.totp_enabled_at) {
+        return res.status(409).json(createErrorResponse(req.t('auth.mfaNotEnabled'), null, 'mfa_not_enabled'));
+      }
+
+      await MfaService.resetForUser(id);
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.OPERATOR_MFA_RESET,
+        subjectType: 'tenant_user',
+        subjectId: id,
+        detail: { username: user.username }
+      });
+      return res.json(createResponse(req.t('users.mfaReset'), { id, mfaEnabled: false }));
+    } catch (error) {
+      console.error('Reset MFA error:', error);
+      return res.status(500).json(
+        createErrorResponse(req.t('users.updateFailed'), error.message)
       );
     }
   }

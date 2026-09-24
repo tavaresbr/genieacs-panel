@@ -56,6 +56,8 @@ export default {
   'auth.mfaEnabled': '已開啟兩步驟登入',
   'auth.mfaDisabled': '已關閉兩步驟登入',
   'auth.mfaRecoveryRegenerated': '已產生新的復原代碼；舊代碼不再有效',
+  'auth.mfaEnrollmentRequired': '此服務商要求兩步驟登入。請啟用後繼續',
+  'auth.mfaRequiredByProvider': '您所在的服務商要求兩步驟登入，無法關閉',
   'auth.passwordUpdated': '密碼已更新',
 
   // 速率限制
@@ -633,6 +635,10 @@ export default {
   'users.ownAdminRole': '您不能移除自己的管理員角色',
   'users.lastAdmin': '面板必須至少保留一位管理員',
   'users.passwordElsewhere': '此操作員同時在另一家服務商任職；只有本人可以變更密碼',
+  'users.mfaResetSelf': '要關閉您自己的兩步驟登入，請使用您帳戶的卡片',
+  'users.mfaElsewhere': '該操作員也在其他服務商工作；其兩步驟登入只能在伺服器上關閉',
+  'users.mfaPlatform': '該操作員也管理平台；其兩步驟登入只能在伺服器上關閉',
+  'users.mfaReset': '已關閉兩步驟登入；該操作員的工作階段已結束',
   'users.updated': '操作員已更新',
   'users.updateFailed': '無法更新操作員',
   'users.deleteSelf': '您不能刪除目前登入的帳戶',
@@ -651,6 +657,9 @@ export default {
   'subscription.retrieveFailed': '無法讀取訂閱',
 
   'tenant.renamed': '業者已重新命名',
+  'tenant.securityInvalid': '請說明是否要求兩步驟登入（true 或 false）',
+  'tenant.mfaEnableYourselfFirst': '要求團隊使用前，請先啟用您自己的兩步驟登入',
+  'tenant.securityUpdated': '兩步驟登入要求已更新',
   'tenant.renameFailed': '無法重新命名業者',
   'tenant.nameInvalid': '業者名稱長度須為 1 到 128 個字元',
   'auth.signupCreated': '業者已建立。請在其專屬網址登入。',

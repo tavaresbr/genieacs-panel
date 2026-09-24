@@ -39,6 +39,11 @@ export interface User {
   /** Se o login em duas etapas está ligado — só isso; o segredo nunca vem. */
   mfaEnabled?: boolean
   /**
+   * O provedor desta sessão exige o 2FA e esta pessoa ainda não ativou: a
+   * casca do painel dá lugar à ativação até ela ativar.
+   */
+  mfaEnrollmentRequired?: boolean
+  /**
    * O papel NO PROVEDOR desta sessão — e `null` quando ela não tem provedor.
    *
    * A sessão do console é esse caso: ela não trabalha em provedor nenhum, então

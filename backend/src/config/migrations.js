@@ -3690,6 +3690,34 @@ export const migrations = [
         await createTableIfMissing(db, nome, construtor(db));
       }
     }
+  },
+  {
+    /**
+     * O dono do provedor pode exigir o login em duas etapas da equipe.
+     *
+     * Coluna no PROVEDOR, e não chave em `settings`: aquela tabela se grava por
+     * `PUT /api/settings/:key`, que o `admin` também alcança, e ele desligaria
+     * pela porta genérica o que só o dono pode ligar. Aqui a única escrita é a
+     * rota própria, que confere o papel.
+     *
+     * Nasce falsa para todo mundo: ligar é decisão do dono, nunca do deploy.
+     */
+    id: '0060_tenant_require_mfa',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      return db.schema.hasColumn('tenants', 'require_mfa');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      const faltando = await missingColumns(db, 'tenants', [
+        ['require_mfa', (t) => t.boolean('require_mfa').notNullable().defaultTo(false)]
+      ]);
+      if (faltando.length) {
+        await db.schema.alterTable('tenants', (t) => {
+          for (const add of faltando) add(t);
+        });
+      }
+    }
   }
 ];
 export default migrations;

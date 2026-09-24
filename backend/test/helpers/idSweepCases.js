@@ -54,6 +54,18 @@ export const casos = [
     tabela: 'users'
   },
   {
+    // Desligar o 2FA de alguém da equipe. O id do vizinho tem que dar 404 antes
+    // de qualquer outra regra: um 409 "trabalha em outro provedor" ou "não tem
+    // 2FA" já teria dito que a pessoa existe. No controle, a pessoa semeada não
+    // tem 2FA e a resposta é 409 — que só se alcança depois de achá-la aqui.
+    // Antes do DELETE: o controle dele encerra o vínculo da pessoa semeada.
+    chave: 'user',
+    label: 'POST /api/users/:id/mfa-reset',
+    method: 'POST',
+    path: (id) => `/api/users/${id}/mfa-reset`,
+    tabela: 'users'
+  },
+  {
     chave: 'user',
     label: 'DELETE /api/users/:id',
     method: 'DELETE',
