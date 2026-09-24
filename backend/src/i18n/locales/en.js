@@ -690,6 +690,9 @@ export default {
 
   'tenant.billingInvalid': 'The billing details are invalid',
   'tenant.billingTaxIdInvalid': 'The tax number is not a valid CNPJ or CPF',
+  'tenant.cnpjFound': "CNPJ data found",
+  'tenant.cnpjNotFound': "CNPJ not found at the Federal Revenue",
+  'tenant.cnpjLookupFailed': "Could not look up the CNPJ right now; fill it in by hand",
   'tenant.billingPostalCodeInvalid': 'The postal code must have eight digits',
   'tenant.billingEmailInvalid': 'The billing e-mail address is invalid',
   'subscription.notice.trialSoonSubject': 'Your {provider} trial ends on {date}',

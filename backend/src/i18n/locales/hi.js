@@ -690,6 +690,9 @@ export default {
 
   'tenant.billingInvalid': 'बिलिंग विवरण अमान्य हैं',
   'tenant.billingTaxIdInvalid': 'यह संख्या मान्य CNPJ या CPF नहीं है',
+  'tenant.cnpjFound': "CNPJ का डेटा मिला",
+  'tenant.cnpjNotFound': "Receita Federal में CNPJ नहीं मिला",
+  'tenant.cnpjLookupFailed': "अभी CNPJ नहीं देखा जा सका; हाथ से भरें",
   'tenant.billingPostalCodeInvalid': 'पिन कोड आठ अंकों का होना चाहिए',
   'tenant.billingEmailInvalid': 'बिलिंग ई-मेल पता अमान्य है',
   'subscription.notice.trialSoonSubject': '{provider} का ट्रायल {date} को समाप्त होगा',

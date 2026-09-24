@@ -691,6 +691,9 @@ export default {
 
   'tenant.billingInvalid': 'Die Rechnungsdaten sind ungültig',
   'tenant.billingTaxIdInvalid': 'Die Steuernummer ist weder eine gültige CNPJ noch eine gültige CPF',
+  'tenant.cnpjFound': "CNPJ-Daten gefunden",
+  'tenant.cnpjNotFound': "CNPJ bei der Receita Federal nicht gefunden",
+  'tenant.cnpjLookupFailed': "Die CNPJ konnte gerade nicht abgefragt werden; bitte von Hand ausfüllen",
   'tenant.billingPostalCodeInvalid': 'Die Postleitzahl muss acht Ziffern haben',
   'tenant.billingEmailInvalid': 'Die Rechnungs-E-Mail-Adresse ist ungültig',
   'subscription.notice.trialSoonSubject': 'Ihre {provider}-Testphase endet am {date}',

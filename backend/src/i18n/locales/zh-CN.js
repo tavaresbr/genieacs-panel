@@ -690,6 +690,9 @@ export default {
 
   'tenant.billingInvalid': '开票信息无效',
   'tenant.billingTaxIdInvalid': '该号码不是有效的 CNPJ 或 CPF',
+  'tenant.cnpjFound': "已找到 CNPJ 信息",
+  'tenant.cnpjNotFound': "在 Receita Federal 未找到该 CNPJ",
+  'tenant.cnpjLookupFailed': "暂时无法查询 CNPJ，请手动填写",
   'tenant.billingPostalCodeInvalid': '邮政编码必须为八位数字',
   'tenant.billingEmailInvalid': '账单邮箱地址无效',
   'subscription.notice.trialSoonSubject': '{provider} 的试用将于 {date} 结束',

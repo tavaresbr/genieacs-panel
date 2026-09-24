@@ -691,6 +691,9 @@ export default {
 
   'tenant.billingInvalid': 'Платёжные данные недействительны',
   'tenant.billingTaxIdInvalid': 'Номер не является действительным CNPJ или CPF',
+  'tenant.cnpjFound': "Данные CNPJ найдены",
+  'tenant.cnpjNotFound': "CNPJ не найден в Receita Federal",
+  'tenant.cnpjLookupFailed': "Сейчас не удалось проверить CNPJ; заполните вручную",
   'tenant.billingPostalCodeInvalid': 'Почтовый индекс должен содержать восемь цифр',
   'tenant.billingEmailInvalid': 'Адрес электронной почты для счетов недействителен',
   'subscription.notice.trialSoonSubject': 'Ваш пробный период {provider} заканчивается {date}',

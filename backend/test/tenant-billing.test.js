@@ -7,6 +7,7 @@ import {
 const { default: Tenant } = await import('../src/models/Tenant.js');
 const { default: AuditLog } = await import('../src/models/AuditLog.js');
 const { default: TenantExportService } = await import('../src/services/tenantExportService.js');
+const { mapBrasilApiCnpj } = await import('../src/services/cnpjLookupService.js');
 const { normalizeTaxId, isValidTaxId, isValidCpf, isValidCnpj } = await import(
   '../src/utils/taxId.js'
 );
@@ -234,5 +235,102 @@ describe('o cadastro fiscal não é público', () => {
       method: 'PATCH', body: { billing: FISCAL }
     });
     assert.equal(semToken.status, 401);
+  });
+});
+
+/**
+ * Preencher o cadastro pelo CNPJ.
+ *
+ * A consulta vai para a BrasilAPI; aqui ela é trocada por uma resposta fixa,
+ * deixando passar as chamadas do próprio teste ao painel. O que se prova: o
+ * número é conferido antes de gastar a consulta, a resposta volta no formato
+ * do cadastro, e nada é gravado — preencher não é salvar.
+ */
+describe('preencher o cadastro pelo CNPJ', () => {
+  const realFetch = globalThis.fetch;
+  let consultas;
+
+  const RESPOSTA = {
+    cnpj: CNPJ_BOM,
+    razao_social: 'PROVEDOR ALFA TELECOMUNICACOES LTDA',
+    descricao_tipo_de_logradouro: 'AVENIDA',
+    logradouro: 'PAULISTA',
+    numero: '1000',
+    complemento: 'SALA 12',
+    bairro: 'BELA VISTA',
+    municipio: 'SAO PAULO',
+    uf: 'sp',
+    cep: '01310100',
+    email: 'Financeiro@Alfa.test',
+    ddd_telefone_1: '1133334444'
+  };
+
+  const fakeBrasilApi = (status, body) => {
+    consultas = [];
+    globalThis.fetch = (input, init) => {
+      const url = String(input);
+      if (url.startsWith('https://brasilapi.com.br/')) {
+        consultas.push(url);
+        return Promise.resolve(new Response(JSON.stringify(body ?? {}), {
+          status, headers: { 'Content-Type': 'application/json' }
+        }));
+      }
+      return realFetch(input, init);
+    };
+  };
+
+  const lookup = (cnpj, headers = authHeaders(token)) =>
+    call(`${panelUrl}/api/tenant/cnpj?cnpj=${encodeURIComponent(cnpj)}`, { headers });
+
+  after(() => { globalThis.fetch = realFetch; });
+
+  it('devolve os dados no formato do cadastro, sem gravar', async () => {
+    fakeBrasilApi(200, RESPOSTA);
+    const res = await lookup('11.222.333/0001-81');
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body.data, {
+      taxId: CNPJ_BOM,
+      legalName: 'PROVEDOR ALFA TELECOMUNICACOES LTDA',
+      postalCode: '01310100',
+      addressLine: 'AVENIDA PAULISTA',
+      addressNumber: '1000',
+      addressExtra: 'SALA 12',
+      district: 'BELA VISTA',
+      city: 'SAO PAULO',
+      state: 'SP',
+      email: 'financeiro@alfa.test',
+      phone: '1133334444'
+    });
+    assert.deepEqual(consultas, [`https://brasilapi.com.br/api/cnpj/v1/${CNPJ_BOM}`]);
+    const linha = await getDb()('tenants').where({ id: meu }).first();
+    assert.equal(linha.billing_tax_id, null);
+    assert.equal(linha.billing_legal_name, null);
+  });
+
+  it('recusa o que não é CNPJ sem consultar ninguém', async () => {
+    fakeBrasilApi(200, RESPOSTA);
+    assert.equal((await lookup('11222333000182')).status, 400);
+    assert.equal((await lookup(CPF_BOM)).status, 400);
+    assert.deepEqual(consultas, []);
+  });
+
+  it('404 quando a Receita não conhece; 502 quando a consulta falha', async () => {
+    fakeBrasilApi(404, { message: 'not found' });
+    assert.equal((await lookup(CNPJ_BOM)).status, 404);
+    fakeBrasilApi(500, {});
+    assert.equal((await lookup(CNPJ_BOM)).status, 502);
+  });
+
+  it('sem sessão não consulta', async () => {
+    fakeBrasilApi(200, RESPOSTA);
+    assert.equal((await lookup(CNPJ_BOM, {})).status, 401);
+    assert.deepEqual(consultas, []);
+  });
+
+  it('o que não veio fica de fora, e o que não cabe é cortado', () => {
+    const mapeado = mapBrasilApiCnpj({ razao_social: 'X'.repeat(300), cep: 1310100, uf: null, email: '' });
+    assert.deepEqual(Object.keys(mapeado).sort(), ['legalName', 'postalCode']);
+    assert.equal(mapeado.legalName.length, 160);
+    assert.equal(mapeado.postalCode, '01310100');
   });
 });

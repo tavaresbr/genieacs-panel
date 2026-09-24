@@ -682,6 +682,9 @@ export default {
 
   'tenant.billingInvalid': 'بيانات الفوترة غير صالحة',
   'tenant.billingTaxIdInvalid': 'الرقم ليس CNPJ ولا CPF صالحًا',
+  'tenant.cnpjFound': "تم العثور على بيانات CNPJ",
+  'tenant.cnpjNotFound': "لم يُعثر على CNPJ لدى Receita Federal",
+  'tenant.cnpjLookupFailed': "تعذّر الاستعلام عن CNPJ الآن؛ املأ البيانات يدويًا",
   'tenant.billingPostalCodeInvalid': 'يجب أن يتكوّن الرمز البريدي من ثمانية أرقام',
   'tenant.billingEmailInvalid': 'عنوان البريد الإلكتروني للفوترة غير صالح',
   'subscription.notice.trialSoonSubject': 'تنتهي تجربتك لـ {provider} في {date}',

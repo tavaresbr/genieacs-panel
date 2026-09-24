@@ -7,7 +7,8 @@ import BillingCharge from '../models/BillingCharge.js';
 import DeviceService from '../services/deviceService.js';
 import { EDITION } from '../config/edition.js';
 import { panelBaseDomain, usesTenantSubdomains } from '../middleware/tenantResolver.js';
-import { normalizeTaxId, isValidTaxId } from '../utils/taxId.js';
+import { normalizeTaxId, isValidTaxId, isValidCnpj } from '../utils/taxId.js';
+import { lookupCnpj } from '../services/cnpjLookupService.js';
 
 /**
  * O cadastro fiscal vindo do corpo, normalizado — ou o motivo de recusa.
@@ -95,6 +96,29 @@ class TenantController {
    * two screens. Audited on the provider's own trail: renaming is not
    * sensitive, but it is the kind of change somebody asks "who did that" about.
    */
+  /**
+   * Os dados públicos de um CNPJ, para preencher o cadastro — sem gravar.
+   *
+   * 400 para o número que nem é um CNPJ (não vale gastar a consulta), 404
+   * quando a Receita não o conhece e 502 quando a consulta falhou; em
+   * nenhum dos casos o cadastro deixa de poder ser digitado à mão.
+   */
+  static async lookupCnpj(req, res) {
+    const cnpj = normalizeTaxId(req.query?.cnpj);
+    if (!isValidCnpj(cnpj)) {
+      return res.status(400).json(createErrorResponse(req.t('tenant.billingTaxIdInvalid')));
+    }
+    try {
+      const result = await lookupCnpj(cnpj);
+      if (!result.found) {
+        return res.status(404).json(createErrorResponse(req.t('tenant.cnpjNotFound')));
+      }
+      return res.json(createResponse(req.t('tenant.cnpjFound'), { taxId: cnpj, ...result.data }));
+    } catch (error) {
+      return res.status(502).json(createErrorResponse(req.t('tenant.cnpjLookupFailed'), error.message));
+    }
+  }
+
   static async rename(req, res) {
     try {
       const temNome = req.body?.name !== undefined;
