@@ -10,6 +10,9 @@ import { LanguageSwitcher } from '@/components/language-switcher'
 import { Icon } from '@/components/ui/icon'
 import { BrandMark } from '@/components/brand-mark'
 import { APP_RELEASE, ReleaseNotesModal } from '@/components/release-notes-modal'
+
+/** "1.17.0 (3acef98)": a versão e o commit do build, quando há. */
+const APP_VERSION_LABEL = __APP_COMMIT__ ? `${APP_RELEASE.version} (${__APP_COMMIT__})` : APP_RELEASE.version
 import { normalizeRole, ROLE_LABEL_KEYS } from '@/lib/permissions'
 import { wearingPlatformHat } from '@/lib/shell'
 
@@ -275,15 +278,18 @@ function SidebarContent({
           className={`mb-2 flex min-h-11 w-full items-center rounded-md text-[#aab8b0] transition-colors hover:bg-white/8 hover:text-white ${
             isCollapsed ? 'justify-center px-1' : 'justify-between gap-3 px-2.5'
           }`}
-          aria-label={t('sidebar.releaseNotesAria', { version: APP_RELEASE.version })}
-          title={isCollapsed ? t('sidebar.versionTooltip', { version: APP_RELEASE.version }) : undefined}
+          aria-label={t('sidebar.releaseNotesAria', { version: APP_VERSION_LABEL })}
+          title={isCollapsed ? t('sidebar.versionTooltip', { version: APP_VERSION_LABEL }) : undefined}
         >
           {isCollapsed ? (
             <span className="font-mono text-[0.62rem] font-bold">v{APP_RELEASE.version.split('.').slice(0, 2).join('.')}</span>
           ) : (
             <>
               <span className="flex items-center gap-2 text-xs font-semibold"><Icon name="info" size={17} />{t('sidebar.whatsNew')}</span>
-              <span className="rounded bg-white/8 px-2 py-1 font-mono text-[0.65rem] font-bold text-[#d7dfda]">v{APP_RELEASE.version}</span>
+              <span className="rounded bg-white/8 px-2 py-1 font-mono text-[0.65rem] font-bold text-[#d7dfda]">
+                v{APP_RELEASE.version}
+                {__APP_COMMIT__ && <span className="font-normal text-[#9aa9a2]"> · {__APP_COMMIT__}</span>}
+              </span>
             </>
           )}
         </button>
