@@ -12,6 +12,37 @@ import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { translateError } from '../i18n/index.js';
 
 /**
+ * A linha da trilha para uma ação que MUDOU a ONT, gravada só depois do sucesso.
+ *
+ * `fromRequest` não lança — a trilha nunca vira a causa de um 500 numa ação
+ * que já aconteceu —, então isto pode ser aguardado sem `try` em volta.
+ */
+function registrarAcaoNaOnt(req, action, deviceId, detail = null) {
+  return AuditLog.fromRequest(req, {
+    action,
+    subjectType: 'device',
+    subjectId: String(deviceId ?? '').slice(0, 128),
+    detail
+  });
+}
+
+/**
+ * QUAIS campos o formulário mandou — os nomes, nunca os valores.
+ *
+ * A senha do Wi-Fi e a da ONT viajam nesses formulários, e a trilha não pode
+ * ser a segunda cópia delas: ela é exportada com o provedor e tem retenção
+ * própria. Os nomes vêm do navegador, então só passam os que têm cara de nome
+ * de campo, e no máximo vinte.
+ */
+function camposDoFormulario(formData) {
+  if (!formData || typeof formData !== 'object' || Array.isArray(formData)) return null;
+  const nomes = Object.keys(formData)
+    .filter((nome) => /^[A-Za-z0-9_.-]{1,40}$/.test(nome))
+    .slice(0, 20);
+  return nomes.length ? nomes.join(', ') : null;
+}
+
+/**
  * O nome de quem dispensou cada troca, por id de operador.
  *
  * `acknowledged_by` guarda só o id, e `users` é tabela COMPARTILHADA de
@@ -373,6 +404,7 @@ class DeviceController {
       }
 
       await DeviceService.deleteDevice(deviceId);
+      await registrarAcaoNaOnt(req, AuditLog.ACTIONS.DEVICE_DELETED, deviceId);
       return res.json(
         createResponse(req.t('device.deleted'), { deviceId })
       );
@@ -395,6 +427,7 @@ class DeviceController {
       }
 
       const result = await DeviceService.rebootDevice(deviceId);
+      await registrarAcaoNaOnt(req, AuditLog.ACTIONS.DEVICE_REBOOTED, deviceId);
       return res.json(
         createResponse(req.t('device.rebootStarted'), { 
           deviceId, 
@@ -441,6 +474,10 @@ class DeviceController {
 
     try {
       const result = await DeviceService.updateWanConfig(id, wanIndex, formData);
+      await registrarAcaoNaOnt(req, AuditLog.ACTIONS.DEVICE_WAN_CHANGED, id, {
+        wanIndex: String(wanIndex).slice(0, 16),
+        fields: camposDoFormulario(formData)
+      });
       return res.json(createResponse(req.t(result.messageKey, result.messageVars), result));
     } catch (error) {
       console.error(`Error in updateWanConfig for ${id}:`, error);
@@ -460,6 +497,9 @@ class DeviceController {
     try {
       const result = await DeviceService.addWanConnection(id, String(containerPath), String(type));
       DeviceService.invalidateDashboard();
+      await registrarAcaoNaOnt(req, AuditLog.ACTIONS.DEVICE_WAN_ADDED, id, {
+        type: String(type).slice(0, 32)
+      });
       return res.json(createResponse(req.t(result.messageKey, result.messageVars), result));
     } catch (error) {
       console.error(`Error adding WAN connection for ${id}:`, error);
@@ -524,6 +564,10 @@ class DeviceController {
 
     try {
       const result = await DeviceService.updateCredentials(id, type, password);
+      // O TIPO de credencial (usuário da web, do suporte), nunca a senha.
+      await registrarAcaoNaOnt(req, AuditLog.ACTIONS.DEVICE_CREDENTIALS_CHANGED, id, {
+        type: String(type).slice(0, 32)
+      });
       res.json({ success: true, data: result, message: req.t(result.messageKey, result.messageVars) });
     } catch (error) {
       console.error(`Error in updateCredentials for ${id}:`, error);
@@ -543,6 +587,10 @@ class DeviceController {
     try {
       const result = await DeviceService.updateWifiConfig(id, index, formData);
       DeviceService.invalidateDashboard();
+      await registrarAcaoNaOnt(req, AuditLog.ACTIONS.DEVICE_WIFI_CHANGED, id, {
+        index: String(index).slice(0, 16),
+        fields: camposDoFormulario(formData)
+      });
       return res.json(createResponse(req.t(result.messageKey, result.messageVars), result));
     } catch (error) {
       console.error(`Error in updateWifiConfig for ${id}:`, error);

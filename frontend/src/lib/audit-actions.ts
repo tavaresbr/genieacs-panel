@@ -46,6 +46,12 @@ export const AUDIT_ACTION_LABEL_KEYS: Record<string, TranslationKey> = {
   'password_reset.requested': 'audit.action.passwordResetRequested',
   'password_reset.completed': 'audit.action.passwordResetCompleted',
   'platform.impersonated': 'audit.action.platformImpersonated',
+  'device.rebooted': 'audit.action.deviceRebooted',
+  'device.deleted': 'audit.action.deviceDeleted',
+  'device.wan_changed': 'audit.action.deviceWanChanged',
+  'device.wan_added': 'audit.action.deviceWanAdded',
+  'device.wifi_changed': 'audit.action.deviceWifiChanged',
+  'device.credentials_changed': 'audit.action.deviceCredentialsChanged',
   'subscriber_account.retired': 'audit.action.subscriberAccountRetired',
   'whatsapp.config_tested': 'audit.action.whatsappConfigTested'
 }

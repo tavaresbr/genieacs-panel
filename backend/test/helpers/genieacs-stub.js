@@ -97,7 +97,7 @@ export function buildDevice({
  * behaviour on between requests.
  */
 export function startGenieAcsStub({ devices = [buildDevice()], taskStatus = 200, respond = null } = {}) {
-  const state = { devices, tasks: [], tags: [], taskStatus, respond, requests: [] };
+  const state = { devices, tasks: [], tags: [], deleted: [], taskStatus, respond, requests: [] };
 
   const server = http.createServer((req, res) => {
     let raw = '';
@@ -131,6 +131,12 @@ export function startGenieAcsStub({ devices = [buildDevice()], taskStatus = 200,
           tag: decodeURIComponent(tagMatch[2]),
           method: req.method
         });
+        return send(200, {});
+      }
+
+      const deviceMatch = url.pathname.match(/^\/devices\/([^/]+)$/);
+      if (deviceMatch && req.method === 'DELETE') {
+        state.deleted.push(decodeURIComponent(deviceMatch[1]));
         return send(200, {});
       }
 
