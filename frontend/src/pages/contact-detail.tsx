@@ -37,6 +37,25 @@ function phoneText(phone: string) {
   return phone
 }
 
+/**
+ * A phone as it is typed: digits only, masked as it grows — (93) 9885-1993
+ * becomes (93) 98851-9934 at the eleventh digit. A stored number (55 + DDD +
+ * number) drops the country code; typing stops at eleven digits, so a DDD 55
+ * typed by hand is never mistaken for it.
+ */
+function maskPhone(value: string) {
+  let digits = value.replace(/\D/g, '')
+  if (digits.startsWith('55') && (digits.length === 12 || digits.length === 13)) digits = digits.slice(2)
+  digits = digits.slice(0, 11)
+  if (digits.length === 0) return ''
+  if (digits.length <= 2) return `(${digits}`
+  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`
+  if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`
+}
+
+const phoneDigits = (value: string) => value.replace(/\D/g, '')
+
 function documentText(document: string | null) {
   const digits = String(document ?? '')
   if (digits.length === 11) return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`
@@ -483,7 +502,7 @@ interface EditForm {
   gender: string
   birthDate: string
   address: Record<(typeof ADDRESS_PARTS)[number], string>
-  phones: string
+  phones: string[]
   emails: string
   whatsappPhone: string
   notes: string
@@ -500,9 +519,9 @@ function formFrom(profile: ContactProfile): EditForm {
     address: Object.fromEntries(ADDRESS_PARTS.map((part) => [
       part, part === 'street' && !address.street && address.line ? address.line : (address[part] ?? '')
     ])) as EditForm['address'],
-    phones: profile.fields.phones.value.join('\n'),
+    phones: profile.fields.phones.value.length > 0 ? profile.fields.phones.value.map(maskPhone) : [''],
     emails: profile.fields.emails.value.join('\n'),
-    whatsappPhone: profile.whatsappPhone ?? '',
+    whatsappPhone: maskPhone(profile.whatsappPhone ?? ''),
     notes: profile.notes ?? ''
   }
 }
@@ -518,9 +537,10 @@ function patchFrom(before: EditForm, after: EditForm): ContactProfilePatch {
   if (ADDRESS_PARTS.some((part) => after.address[part].trim() !== before.address[part].trim())) {
     patch.address = Object.fromEntries(ADDRESS_PARTS.map((part) => [part, after.address[part].trim()]).filter(([, value]) => value))
   }
-  if (lines(after.phones).join() !== lines(before.phones).join()) patch.phones = lines(after.phones)
+  const phonesOf = (form: EditForm) => form.phones.map(phoneDigits).filter(Boolean)
+  if (phonesOf(after).join() !== phonesOf(before).join()) patch.phones = phonesOf(after)
   if (lines(after.emails).join() !== lines(before.emails).join()) patch.emails = lines(after.emails)
-  if (after.whatsappPhone.trim() !== before.whatsappPhone.trim()) patch.whatsappPhone = after.whatsappPhone.trim() || null
+  if (phoneDigits(after.whatsappPhone) !== phoneDigits(before.whatsappPhone)) patch.whatsappPhone = phoneDigits(after.whatsappPhone) || null
   if (after.notes !== before.notes) patch.notes = after.notes.trim() || null
   return patch
 }
@@ -536,6 +556,14 @@ function EditModal({ profile, onClose, onSave }: {
   const [saving, setSaving] = useState(false)
   const set = (field: keyof EditForm) => (event: { target: { value: string } }) =>
     setForm((current) => ({ ...current, [field]: event.target.value }))
+  const setPhone = (index: number, value: string) =>
+    setForm((current) => ({ ...current, phones: current.phones.map((phone, at) => (at === index ? maskPhone(value) : phone)) }))
+  // The last field empties instead of going away, so there is always one to type in.
+  const removePhone = (index: number) =>
+    setForm((current) => {
+      const phones = current.phones.filter((_, at) => at !== index)
+      return { ...current, phones: phones.length > 0 ? phones : [''] }
+    })
   const setAddress = (part: (typeof ADDRESS_PARTS)[number]) => (event: { target: { value: string } }) =>
     setForm((current) => ({ ...current, address: { ...current.address, [part]: event.target.value } }))
 
@@ -572,12 +600,54 @@ function EditModal({ profile, onClose, onSave }: {
           ))}
 
           <h3 className="mt-2 font-semibold sm:col-span-2">{t('contacts.profile.contacts')}</h3>
-          <TextInput id="contact-whatsapp" label={t('contacts.profile.whatsappPhone')} value={form.whatsappPhone} onChange={set('whatsappPhone')} />
+          <div>
+            <label className="field-label" htmlFor="contact-whatsapp">{t('contacts.profile.whatsappPhone')}</label>
+            <input
+              id="contact-whatsapp"
+              className="modern-input"
+              type="tel"
+              inputMode="numeric"
+              placeholder="(00) 00000-0000"
+              value={form.whatsappPhone}
+              onChange={(event) => setForm((current) => ({ ...current, whatsappPhone: maskPhone(event.target.value) }))}
+            />
+          </div>
           <div />
           <div>
-            <label className="field-label" htmlFor="contact-phones">{t('contacts.profile.phones')}</label>
-            <textarea id="contact-phones" className="modern-input min-h-24" value={form.phones} onChange={set('phones')} />
-            <p className="field-hint">{t('contacts.profile.onePerLine')}</p>
+            <span className="field-label">{t('contacts.profile.phones')}</span>
+            <div className="space-y-2">
+              {form.phones.map((phone, index) => (
+                <div key={index} className="flex gap-2">
+                  <input
+                    id={index === 0 ? 'contact-phones' : undefined}
+                    className="modern-input"
+                    type="tel"
+                    inputMode="numeric"
+                    placeholder="(00) 00000-0000"
+                    aria-label={`${t('contacts.profile.phones')} ${index + 1}`}
+                    value={phone}
+                    onChange={(event) => setPhone(index, event.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="modern-button-secondary shrink-0"
+                    aria-label={t('contacts.profile.removePhone')}
+                    title={t('contacts.profile.removePhone')}
+                    onClick={() => removePhone(index)}
+                  >
+                    <Icon name="trash" size={14} />
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                className="modern-button-secondary"
+                disabled={form.phones.length >= 20}
+                onClick={() => setForm((current) => ({ ...current, phones: [...current.phones, ''] }))}
+              >
+                <Icon name="phone" size={14} /> {t('contacts.profile.addPhone')}
+              </button>
+            </div>
           </div>
           <div>
             <label className="field-label" htmlFor="contact-emails">{t('contacts.profile.emails')}</label>

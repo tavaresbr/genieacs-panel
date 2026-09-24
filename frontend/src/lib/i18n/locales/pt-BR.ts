@@ -116,6 +116,8 @@ const ptBR: Dictionary = {
   'contacts.profile.dueOn': 'vence em {date}',
   'contacts.profile.copied': 'Copiado',
   'contacts.profile.copyLine': 'Linha digitável',
+  'contacts.profile.addPhone': 'Adicionar telefone',
+  'contacts.profile.removePhone': 'Remover telefone',
   'contacts.profile.sendInvoice': 'Enviar pelo WhatsApp',
   'contacts.profile.sendInvoiceNoPhone': 'O cliente não tem telefone do WhatsApp',
   'contacts.profile.sendInvoiceFailed': 'Não foi possível enviar o título',

@@ -116,6 +116,8 @@ const it: Dictionary = {
   'contacts.profile.dueOn': 'scade il {date}',
   'contacts.profile.copied': 'Copiato',
   'contacts.profile.copyLine': 'Linea digitabile',
+  'contacts.profile.addPhone': 'Aggiungi telefono',
+  'contacts.profile.removePhone': 'Rimuovi telefono',
   'contacts.profile.sendInvoice': 'Invia via WhatsApp',
   'contacts.profile.sendInvoiceNoPhone': 'Il cliente non ha un telefono WhatsApp',
   'contacts.profile.sendInvoiceFailed': 'Impossibile inviare la fattura',

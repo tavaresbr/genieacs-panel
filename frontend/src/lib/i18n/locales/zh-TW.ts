@@ -116,6 +116,8 @@ const zhTW: Dictionary = {
   'contacts.profile.dueOn': '{date} 到期',
   'contacts.profile.copied': '已複製',
   'contacts.profile.copyLine': '付款碼',
+  'contacts.profile.addPhone': '新增電話',
+  'contacts.profile.removePhone': '移除電話',
   'contacts.profile.sendInvoice': '透過 WhatsApp 傳送',
   'contacts.profile.sendInvoiceNoPhone': '客戶沒有 WhatsApp 號碼',
   'contacts.profile.sendInvoiceFailed': '無法傳送帳單',

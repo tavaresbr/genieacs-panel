@@ -118,6 +118,8 @@ const en = {
   'contacts.profile.dueOn': 'due {date}',
   'contacts.profile.copied': 'Copied',
   'contacts.profile.copyLine': 'Payment line',
+  'contacts.profile.addPhone': 'Add phone',
+  'contacts.profile.removePhone': 'Remove phone',
   'contacts.profile.sendInvoice': 'Send via WhatsApp',
   'contacts.profile.sendInvoiceNoPhone': 'The client has no WhatsApp phone',
   'contacts.profile.sendInvoiceFailed': 'Could not send the invoice',
