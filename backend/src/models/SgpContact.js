@@ -1,4 +1,4 @@
-import { tdb, tinsert } from '../config/database.js';
+import { tdb, tinsert, withDeadlockRetry } from '../config/database.js';
 
 /**
  * An SGP client the panel knows — see `sgpContactsTable` in
@@ -67,11 +67,11 @@ class SgpContact {
     };
 
     if (values.contract) {
-      await tinsert('sgp_contacts', values).onConflict(['tenant_id', 'contract']).merge(values);
+      await withDeadlockRetry(() => tinsert('sgp_contacts', values).onConflict(['tenant_id', 'contract']).merge(values));
       return this.getByContract(values.contract);
     }
     if (values.sgp_client_id) {
-      await tinsert('sgp_contacts', values).onConflict(['tenant_id', 'sgp_client_id']).merge(values);
+      await withDeadlockRetry(() => tinsert('sgp_contacts', values).onConflict(['tenant_id', 'sgp_client_id']).merge(values));
       return this.getClientRow(values.sgp_client_id);
     }
     // No contract and no client id: the document is the only handle left, and

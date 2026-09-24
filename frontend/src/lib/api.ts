@@ -409,6 +409,15 @@ class ApiClient {
     }
   }
 
+  /** A body that is not JSON — a CSV sheet, sent as the text it is. */
+  async postText<T>(endpoint: string, text: string, contentType = 'text/csv'): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, {
+      method: 'POST',
+      body: text,
+      headers: { 'Content-Type': contentType }
+    })
+  }
+
   async requestWithBody<T>(
     method: 'POST' | 'PUT' | 'PATCH' | 'DELETE',
     endpoint: string,
@@ -1946,6 +1955,18 @@ export type ContactProfilePatch = Partial<{
   whatsappPhone: string | null
 }>
 
+/** What a spreadsheet import did — or, in a preview, would do. */
+export interface ContactImportResult {
+  total: number
+  updates: number
+  creates: number
+  unchanged: number
+  errors: { line: number; message: string }[]
+  rows: { line: number; kind: 'update' | 'create'; key: string | null; name: string | null; fields: string[] }[]
+  updated?: number
+  created?: number
+}
+
 export const contactsAPI = {
   get: (key: string) =>
     apiClient.get<ContactProfile>(`/contacts/${encodeURIComponent(key)}`),
@@ -1955,6 +1976,19 @@ export const contactsAPI = {
 
   create: (data: ContactProfilePatch & { name: string }) =>
     apiClient.post<ContactProfile>('/contacts', data),
+
+  /** The contacts as a CSV, with the list's search and state filter. */
+  exportSheet: (filters: { search?: string; state?: string } = {}) => {
+    const query = new URLSearchParams()
+    if (filters.search) query.set('search', filters.search)
+    if (filters.state) query.set('state', filters.state)
+    const suffix = query.toString()
+    return apiClient.getBlob(`/contacts/export${suffix ? `?${suffix}` : ''}`)
+  },
+
+  /** `preview` says what the sheet would change; `apply` changes it. */
+  importSheet: (csv: string, mode: 'preview' | 'apply') =>
+    apiClient.postText<ContactImportResult>(`/contacts/import?mode=${mode}`, csv),
 
   /** Open invoices of each contract, asked of the SGP now. */
   invoices: (key: string) =>

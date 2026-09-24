@@ -246,3 +246,82 @@ describe('criar um cliente no painel', () => {
     assert.equal(res.status, 400);
   });
 });
+
+describe('a planilha', () => {
+  const exportar = (query = '') => fetch(`${panelUrl}/api/contacts/export${query}`, { headers: authHeaders(token) });
+  const importar = (csv, mode) => fetch(`${panelUrl}/api/contacts/import?mode=${mode}`, {
+    method: 'POST',
+    headers: { ...authHeaders(token), 'Content-Type': 'text/csv' },
+    body: csv
+  }).then(async (res) => ({ status: res.status, body: await res.json() }));
+
+  it('exporta um CSV que o Excel abre: BOM, ponto e vírgula, o que a ficha mostra', async () => {
+    const res = await exportar();
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get('content-type'), /text\/csv/);
+    assert.match(res.headers.get('content-disposition'), /attachment; filename="contatos-/);
+    const bytes = Buffer.from(await res.arrayBuffer());
+    assert.deepEqual([...bytes.subarray(0, 3)], [0xEF, 0xBB, 0xBF], 'começa com o BOM do UTF-8');
+    const csv = bytes.toString('utf8').replace(/^\uFEFF/, '');
+    assert.ok(csv.startsWith('Chave;Contrato;Nome;'), csv.slice(0, 80));
+    const linha373 = csv.split('\r\n').find((line) => line.startsWith('373;'));
+    assert.ok(linha373, csv);
+    assert.match(linha373, /Av\. Nova/, 'o endereço editado no painel é o que sai');
+    assert.match(linha373, /Prefere contato à tarde/);
+  });
+
+  it('exportar e importar o mesmo arquivo não muda nada', async () => {
+    const csv = await (await exportar()).text();
+    const res = await importar(csv, 'preview');
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.data.updates, 0, JSON.stringify(res.body.data.rows));
+    assert.equal(res.body.data.creates, 0);
+    assert.deepEqual(res.body.data.errors, []);
+  });
+
+  it('a prévia diz o que muda sem gravar; aplicar grava como edição do painel', async () => {
+    const csv = [
+      'Contrato;Nome;E-mails;Cidade',
+      '374;Elane da Planilha;;',
+      '373;;;',
+      ';Cliente Novo da Planilha;novo@exemplo.test;Belém',
+      'NAO-EXISTE;Alguém;;',
+      '373;;isto não é e-mail;'
+    ].join('\n');
+    const previa = await importar(csv, 'preview');
+    assert.equal(previa.status, 200, JSON.stringify(previa.body));
+    assert.equal(previa.body.data.updates, 1);
+    assert.equal(previa.body.data.creates, 1);
+    assert.equal(previa.body.data.errors.length, 2);
+    assert.deepEqual(previa.body.data.errors.map((error) => error.line), [5, 6]);
+    assert.deepEqual(previa.body.data.rows.find((row) => row.line === 2).fields, ['name']);
+    assert.equal((await ficha('374')).body.data.fields.name.value, '7 - Elane Patriqui', 'a prévia não grava');
+
+    const aplicado = await importar(csv, 'apply');
+    assert.equal(aplicado.status, 200, JSON.stringify(aplicado.body));
+    assert.equal(aplicado.body.data.updated, 1);
+    assert.equal(aplicado.body.data.created, 1);
+    const perfil = (await ficha('374')).body.data;
+    assert.equal(perfil.fields.name.value, 'Elane da Planilha');
+    assert.equal(perfil.fields.name.edited, true);
+
+    const lista = await contatos('?search=Planilha');
+    assert.ok(lista.body.data.contacts.some((contato) => contato.clientName === 'Cliente Novo da Planilha'));
+
+    const trilha = await asTenant(() => getDb()('audit_log').where({ action: 'contacts.imported' }).first());
+    assert.ok(trilha, 'a importação fica na trilha');
+    assert.ok(!String(trilha.detail).includes('Elane'), 'com quantidades, nunca linhas');
+  });
+
+  it('uma célula que viraria fórmula sai neutralizada', async () => {
+    await editar('373', { notes: '=HYPERLINK("http://x")' });
+    const csv = await (await exportar('?search=373')).text();
+    assert.match(csv, /'=HYPERLINK/);
+  });
+
+  it('recusa uma planilha sem as colunas do exportar', async () => {
+    const res = await importar('Fruta;Cor\nbanana;amarela', 'preview');
+    assert.equal(res.status, 400);
+    assert.equal(res.body.code, 'badHeader');
+  });
+});
