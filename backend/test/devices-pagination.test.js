@@ -278,6 +278,33 @@ describe('GET /api/devices pagination', () => {
     assert.deepEqual(empty.body.data.devices, []);
   });
 
+  it('finds a device by its SGP subscriber name, ignoring case and accents, and by its contract', async () => {
+    await asTenant(() => getDb()('sgp_links').insert({
+      tenant_id: getDb().raw('(select id from tenants order by id limit 1)'),
+      device_id: 'ONT-011',
+      contract: '451',
+      client_name: 'ANTÔNIA OLIVEIRA DOS SANTOS',
+      state: 'active',
+      link_mode: 'manual'
+    }));
+    try {
+      const porNome = await listDevices('?search=antonia%20oliveira');
+      assert.equal(porNome.body.data.total, 1);
+      assert.equal(porNome.body.data.devices[0]._id, 'ONT-011');
+
+      const comAcento = await listDevices(`?search=${encodeURIComponent('Antônia')}`);
+      assert.equal(comAcento.body.data.total, 1);
+
+      const porContrato = await listDevices('?search=451');
+      assert.ok(porContrato.body.data.devices.some((device) => device._id === 'ONT-011'));
+
+      const ninguem = await listDevices('?search=fulano%20de%20tal');
+      assert.equal(ninguem.body.data.total, 0);
+    } finally {
+      await asTenant(() => getDb()('sgp_links').where({ device_id: 'ONT-011' }).del());
+    }
+  });
+
   it('combines a search with the pushed-down status filter', async () => {
     const { body } = await listDevices('?search=zte&status=online');
     // Odd indices are ZTE, and indices below 12 are online: 1, 3, 5, 7, 9, 11.

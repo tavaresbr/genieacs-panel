@@ -381,7 +381,7 @@ const ja: Dictionary = {
   'devices.error.retry': '一覧を再取得',
   'devices.error.checkConfig': 'ACS 設定を確認',
   'devices.filter.searchLabel': '一覧を検索',
-  'devices.filter.searchPlaceholder': 'シリアル、顧客 ID、PPPoE、メーカー、機種',
+  'devices.filter.searchPlaceholder': 'シリアル、加入者名、契約、顧客 ID、PPPoE、メーカー、機種',
   'devices.filter.statusLabel': '接続状態',
   'devices.filter.all': 'すべての機器',
   'devices.filter.onlineOnly': 'オンラインのみ',

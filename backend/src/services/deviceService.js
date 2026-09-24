@@ -1,5 +1,6 @@
 import Setting from '../models/Setting.js';
 import CustomerAccount from '../models/CustomerAccount.js';
+import SgpLink from '../models/SgpLink.js';
 import VendorService from './vendorService.js';
 import {
   PPPOE_FALLBACK_PATHS,
@@ -785,16 +786,28 @@ class DeviceService {
     return data;
   }
 
+  /**
+   * Minúsculas e sem acento: quem procura "Antônia" digita "antonia", e o SGP
+   * guarda o nome em maiúsculas, com ou sem acento, conforme quem cadastrou.
+   */
+  static normalizeSearchText(value) {
+    return String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  }
+
   static deviceMatchesSearch(device, needle) {
     if (!needle) return true;
+    const alvo = this.normalizeSearchText(needle);
     return [
       device._id,
       device.SerialNumber,
       device.productclass,
       device.manufacturer,
       device.pppoe,
-      device.customerId
-    ].some((field) => String(field ?? '').toLowerCase().includes(needle));
+      device.customerId,
+      // O assinante do SGP: é pelo nome que o atendente procura quem ligou.
+      device.sgpClientName,
+      device.sgpContract
+    ].some((field) => this.normalizeSearchText(field).includes(alvo));
   }
 
   /**
@@ -860,10 +873,19 @@ class DeviceService {
     if (search) {
       // O Customer ID é do painel, não do GenieACS, e por isso a busca é a
       // única que precisa dele — sobre o que o recorte já deixou passar.
-      const customerIds = await this.lookupCustomerIds(matches.map((device) => device._id));
+      const ids = matches.map((device) => device._id);
+      const [customerIds, sgpLinks] = await Promise.all([
+        this.lookupCustomerIds(ids),
+        this.lookupSgpLinks(ids)
+      ]);
       const needle = search.toLowerCase();
       matches = matches.filter((device) => this.deviceMatchesSearch(
-        { ...device, customerId: customerIds.get(String(device._id)) || null },
+        {
+          ...device,
+          customerId: customerIds.get(String(device._id)) || null,
+          sgpClientName: sgpLinks.get(String(device._id))?.clientName ?? null,
+          sgpContract: sgpLinks.get(String(device._id))?.contract ?? null
+        },
         needle
       ));
     }
@@ -930,11 +952,34 @@ class DeviceService {
     const customerIds = await this.lookupCustomerIds(matches.map((device) => device._id));
     matches = matches.map((device) => ({ ...device, customerId: customerIds.get(String(device._id)) || null }));
     if (search) {
+      // O nome do assinante entra só para filtrar: a planilha continua com as
+      // mesmas colunas, e bate linha a linha com o que a tela mostrou.
+      const sgpLinks = await this.lookupSgpLinks(matches.map((device) => device._id));
       const needle = search.toLowerCase();
-      matches = matches.filter((device) => this.deviceMatchesSearch(device, needle));
+      matches = matches.filter((device) => this.deviceMatchesSearch({
+        ...device,
+        sgpClientName: sgpLinks.get(String(device._id))?.clientName ?? null,
+        sgpContract: sgpLinks.get(String(device._id))?.contract ?? null
+      }, needle));
     }
     if (matches.length > max) throw grandeDemais();
     return { devices: matches, filters: { search, status, focus } };
+  }
+
+  /**
+   * O contrato e o nome do assinante do SGP de cada aparelho, só para a busca.
+   * Uma leitura em lotes, do provedor atual (`sgp_links` passa por `tdb`).
+   */
+  static async lookupSgpLinks(deviceIds) {
+    const ids = deviceIds.map((id) => String(id ?? '')).filter(Boolean);
+    const found = new Map();
+    for (let offset = 0; offset < ids.length; offset += 500) {
+      const rows = await SgpLink.getByDeviceIds(ids.slice(offset, offset + 500));
+      for (const row of rows) {
+        found.set(String(row.device_id), { clientName: row.client_name || null, contract: row.contract || null });
+      }
+    }
+    return found;
   }
 
   /**
