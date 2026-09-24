@@ -553,6 +553,8 @@ export default {
   'whatsapp.bot.portalHint': 'Para a senha do WiFi e para trocar o nome da rede, entre no portal do cliente: {link}',
   'whatsapp.bot.notRecognised': 'Não encontramos um contrato para este número. Um atendente responde em instantes.',
   'whatsapp.bot.handoff': 'Vou passar para um atendente.',
+  'whatsapp.bot.menu': 'Olá! Sou o atendimento automático. Responda com o número:\n\n1 — 2ª via do boleto\n2 — Situação da conexão\n3 — Falar com um atendente',
+  'whatsapp.bot.handoffQueued': 'Certo! Um atendente vai te responder aqui em breve. Se quiser o menu de novo, é só escrever "menu".',
   'whatsapp.bot.noOpenInvoice': 'Você não tem fatura em aberto agora.',
   'whatsapp.bot.invoice': 'Fatura de {amount}, vencimento {dueDate}.',
   'whatsapp.bot.signalOk': 'Sua conexão está online. Sinal óptico: {rxPower} dBm.',

@@ -83,7 +83,7 @@ const JANELA_HUMANO_MS = 30 * 60 * 1000;
  * send, once per recipient, and stops. Only two auto-responders answering each
  * other can, and only the bot answers.
  */
-const TETO_POR_HORA = 3;
+const TETO_POR_HORA = 6;
 const JANELA_TETO_MS = 60 * 60 * 1000;
 
 /**
@@ -151,23 +151,72 @@ const INTENCOES = [
  * "sinal" inside "assinalar". The message does not have to BE the term — a
  * question is a sentence — but the term has to be whole words inside it.
  */
-const PADROES = INTENCOES.map(({ nome, termos }) => ({
+/**
+ * Pedir uma pessoa, e pedir o menu. Depois dos três grupos de cima: "quero
+ * falar com um atendente sobre o boleto" é pergunta de boleto, e a fatura é a
+ * resposta que resolve.
+ */
+const INTENCOES_DE_CONVERSA = [
+  {
+    nome: 'atendente',
+    termos: [
+      'atendente', 'atendimento humano', 'humano', 'pessoa', 'falar com alguem',
+      'falar com uma pessoa', 'suporte humano', 'operador'
+    ]
+  },
+  {
+    nome: 'menu',
+    termos: [
+      'menu', 'opcoes', 'inicio', 'oi', 'ola', 'oie', 'bom dia', 'boa tarde', 'boa noite',
+      'hello', 'hi'
+    ]
+  }
+];
+
+const PADROES = [...INTENCOES, ...INTENCOES_DE_CONVERSA].map(({ nome, termos }) => ({
   nome,
   regex: termos.map((termo) => new RegExp(`(?:^| )${termo}(?: |$)`))
 }));
 
 /**
- * Which intent a message body carries, or `handoff` when none of them does.
- * Exported because the routing table is the part worth testing on its own.
+ * As opções do menu, pelo número. "1", "1 - boleto", "opção 2": o número vem
+ * no começo da mensagem. Um número no meio ("faz 3 dias que caiu") é frase, e
+ * segue para as palavras.
+ */
+const OPCOES_DO_MENU = { 1: 'fatura', 2: 'sinal', 3: 'atendente' };
+const OPCAO = /^(?:opcao )?([1-3])(?: |$)/;
+
+/**
+ * Which intent a message body carries. Exported because the routing table is
+ * the part worth testing on its own.
+ *
+ * `portal` vem antes até do número: um pedido de senha tem resposta fixa, e
+ * "1 senha do wifi" continua sendo um pedido de senha. Sem nada reconhecível,
+ * a resposta é o `menu` — mostrar o que o bot sabe fazer é mais útil do que
+ * passar para um atendente uma mensagem que talvez só dizia "oi".
  */
 export function classificarIntencao(texto) {
   const limpo = normalizarTexto(texto);
-  if (!limpo) return 'handoff';
-  for (const { nome, regex } of PADROES) {
+  if (!limpo) return 'menu';
+  const [portal, ...resto] = PADROES;
+  if (portal.regex.some((re) => re.test(limpo))) return portal.nome;
+  const opcao = OPCAO.exec(limpo);
+  if (opcao) return OPCOES_DO_MENU[opcao[1]];
+  for (const { nome, regex } of resto) {
     if (regex.some((re) => re.test(limpo))) return nome;
   }
-  return 'handoff';
+  return 'menu';
 }
+
+/**
+ * Quanto tempo o bot fica calado depois que o assinante pede um atendente.
+ *
+ * Quatro horas: o bastante para um atendente chegar no mesmo turno sem o bot
+ * responder "digite 1, 2 ou 3" a cada mensagem de quem já pediu uma pessoa. E
+ * não para sempre: quem volta no dia seguinte encontra o bot de novo. O
+ * assinante pode trazê-lo de volta antes, escrevendo "menu".
+ */
+const PAUSA_ATENDENTE_MS = 4 * 60 * 60 * 1000;
 
 /**
  * Server-side text has no request locale: a WhatsApp message carries no
@@ -258,6 +307,8 @@ class WaBotService {
 
   static TETO_POR_HORA = TETO_POR_HORA;
 
+  static PAUSA_ATENDENTE_MS = PAUSA_ATENDENTE_MS;
+
   /**
    * Answers one inbound message, or stays quiet.
    *
@@ -302,6 +353,10 @@ class WaBotService {
 
     const texto = String(body ?? '').trim();
     if (!texto) return { replied: false, reason: 'empty' };
+
+    // Desligado na tela do WhatsApp: o provedor atende tudo à mão.
+    const { botEnabled } = await WhatsAppConfigService.getConfig();
+    if (botEnabled === false) return { replied: false, reason: 'disabled' };
 
     // An opt-out is already recorded by the inbound handler and confirmed
     // elsewhere. Routing "SAIR" through the intent table would answer a request
@@ -382,6 +437,26 @@ class WaBotService {
     await WaConversationService.bindSubscriber(conversation);
 
     const intencao = classificarIntencao(texto);
+
+    // Quem pediu um atendente não recebe o menu de volta a cada mensagem: a
+    // conversa fica com os humanos até a pausa vencer — ou até o próprio
+    // assinante pedir o menu, que é o que tira a pausa.
+    const pausadoAte = conversation.bot_paused_until ? new Date(conversation.bot_paused_until).getTime() : 0;
+    if (pausadoAte > Date.now()) {
+      if (intencao !== 'menu') return { replied: false, reason: 'paused' };
+      await this.pausar(conversation, null);
+    }
+
+    if (intencao === 'menu') {
+      await this.responderCom(conversation, t('whatsapp.bot.menu'));
+      return { replied: true, intent: 'menu' };
+    }
+    if (intencao === 'atendente') {
+      await this.pausar(conversation, new Date(Date.now() + PAUSA_ATENDENTE_MS));
+      await this.responderCom(conversation, t('whatsapp.bot.handoffQueued'));
+      return { replied: true, intent: 'atendente' };
+    }
+
     let resposta = null;
     try {
       if (intencao === 'portal') resposta = await responderPortal();
@@ -414,6 +489,14 @@ class WaBotService {
    * The outbox worker delivers it. The bot never speaks to Evolution: enqueuing
    * is what keeps a slow provider server out of the webhook's response time.
    */
+  /** Grava (ou tira, com `null`) a pausa do bot nesta conversa. */
+  static async pausar(conversation, ate) {
+    await tdb('wa_conversations')
+      .where({ id: conversation.id })
+      .update({ bot_paused_until: ate, updated_at: new Date() });
+    conversation.bot_paused_until = ate;
+  }
+
   static async responderCom(conversation, texto) {
     // `userId` stays null so the human-presence check above does not read the
     // bot as an operator; `source` is what makes this row the bot's, and it is

@@ -223,6 +223,7 @@ export default function Settings() {
     enabled: false,
     webhookBaseUrl: '',
     portalPublicUrl: '',
+    botEnabled: true,
     allowedHosts: '',
     managedUrl: '',
     managedAdminKey: '',
@@ -382,6 +383,7 @@ export default function Settings() {
         enabled: config.enabled,
         webhookBaseUrl: config.webhookBaseUrl,
         portalPublicUrl: config.portalPublicUrl,
+        botEnabled: config.botEnabled !== false,
         allowedHosts: config.allowedHosts.join('\n'),
         managedUrl: config.managedUrl,
         // The stored admin key never leaves the server; an empty field keeps it.
@@ -528,6 +530,7 @@ export default function Settings() {
         enabled: waForm.enabled,
         webhookBaseUrl: waForm.webhookBaseUrl,
         portalPublicUrl: waForm.portalPublicUrl,
+        botEnabled: waForm.botEnabled,
         // The API takes the textarea verbatim, one host per line.
         allowedHosts: waForm.allowedHosts,
         managedUrl: waForm.managedUrl,
@@ -2175,6 +2178,23 @@ export default function Settings() {
                   onChange={(event) => setWaForm((current) => ({ ...current, portalPublicUrl: event.target.value }))}
                 />
                 <p className="field-hint">{t('settings.whatsapp.portalUrlHint')}</p>
+              </div>
+
+              <div className="rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-4">
+                <label className="flex cursor-pointer items-start gap-3">
+                  <input
+                    type="checkbox"
+                    className="mt-1 h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
+                    checked={waForm.botEnabled}
+                    onChange={(event) => setWaForm((current) => ({ ...current, botEnabled: event.target.checked }))}
+                  />
+                  <span>
+                    <span className="block font-semibold">{t('settings.whatsapp.botEnabled')}</span>
+                    <span className="mt-1 block text-sm leading-6 text-muted-foreground">
+                      {t('settings.whatsapp.botEnabledHint')}
+                    </span>
+                  </span>
+                </label>
               </div>
 
               {!platformManaged && (

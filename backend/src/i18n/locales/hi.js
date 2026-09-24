@@ -557,6 +557,8 @@ export default {
   'whatsapp.bot.portalHint': 'अपना WiFi पासवर्ड देखने और नेटवर्क का नाम बदलने के लिए ग्राहक पोर्टल में साइन इन करें: {link}',
   'whatsapp.bot.notRecognised': 'हमें इस नंबर के लिए कोई अनुबंध नहीं मिला। एक प्रतिनिधि शीघ्र ही उत्तर देगा।',
   'whatsapp.bot.handoff': 'मैं इसे एक प्रतिनिधि को सौंप दूँगा।',
+  'whatsapp.bot.menu': 'नमस्ते! मैं स्वचालित सहायता हूँ। नंबर से जवाब दें:\n\n1 — बिल की प्रति\n2 — कनेक्शन की स्थिति\n3 — किसी एजेंट से बात करें',
+  'whatsapp.bot.handoffQueued': 'ठीक है! एक एजेंट जल्द ही यहाँ जवाब देगा। मेनू फिर से देखने के लिए "menu" लिखें।',
   'whatsapp.bot.noOpenInvoice': 'इस समय आपका कोई बकाया बिल नहीं है।',
   'whatsapp.bot.invoice': '{amount} का बिल, नियत तिथि {dueDate}।',
   'whatsapp.bot.signalOk': 'आपका कनेक्शन ऑनलाइन है। ऑप्टिकल सिग्नल: {rxPower} dBm।',

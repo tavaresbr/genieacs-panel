@@ -359,9 +359,79 @@ describe('intent routing for a resolved subscriber', () => {
     }
   });
 
-  it('sends anything else to a human', async () => {
+  it('answers anything it does not know with the numbered menu', async () => {
     const texto = await unicaResposta(ASSINANTE, 'vocês atendem no bairro Aeroporto?');
-    assert.match(texto, /atendente/i);
+    assert.match(texto, /1 — 2ª via/);
+    assert.match(texto, /2 — Situação da conexão/);
+    assert.match(texto, /3 — Falar com um atendente/);
+  });
+
+  it('answers a greeting with the menu', async () => {
+    const texto = await unicaResposta(ASSINANTE, 'Olá, bom dia!');
+    assert.match(texto, /Responda com o número/);
+  });
+
+  it('answers the menu numbers with the invoice and the connection', async () => {
+    const fatura = await unicaResposta(ASSINANTE, '1');
+    assert.ok(fatura.includes(LINHA_DIGITAVEL), 'option 1 is the invoice');
+    const sinal = await unicaResposta(ASSINANTE, 'opção 2');
+    assert.match(sinal, /online/i);
+  });
+});
+
+describe('asking for a person', () => {
+  it('confirms, pauses the bot and lets the thread go quiet until the subscriber asks for the menu', async () => {
+    const telefone = ASSINANTE;
+    const texto = await unicaResposta(telefone, '3');
+    assert.match(texto, /atendente vai te responder/i);
+
+    const conversa = await conversaDe(telefone);
+    assert.ok(conversa.bot_paused_until, 'the pause is recorded on the thread');
+    assert.ok(new Date(conversa.bot_paused_until).getTime() > Date.now());
+
+    // Anything else while paused: silence, the thread is the humans'.
+    await receber(telefone, 'alguém aí? preciso da segunda via');
+    assert.equal((await respostas(telefone)).length, 1, 'no answer while paused');
+
+    // "menu" is the subscriber taking the bot back.
+    await receber(telefone, 'menu');
+    const saidas = await respostas(telefone);
+    assert.equal(saidas.length, 2);
+    assert.match(saidas[1], /Responda com o número/);
+    assert.equal((await conversaDe(telefone)).bot_paused_until, null, 'the menu lifts the pause');
+  });
+
+  it('shows the pause to the inbox while it lasts', async () => {
+    const telefone = ASSINANTE;
+    await unicaResposta(telefone, 'quero falar com um atendente');
+    const conversa = await conversaDe(telefone);
+    const { default: WaConversationService } = await import('../src/services/waConversationService.js');
+    const publica = WaConversationService.publicConversation(conversa);
+    assert.ok(publica.botPausedUntil, 'the inbox gets the pause');
+    const vencida = WaConversationService.publicConversation({ ...conversa, bot_paused_until: new Date(Date.now() - 1000) });
+    assert.equal(vencida.botPausedUntil, null, 'an expired pause is not shown');
+  });
+});
+
+describe('the on/off switch', () => {
+  it('stays silent on every message while the bot is off', async () => {
+    await asTenant(() => WhatsAppConfigService.saveConfig({ botEnabled: false }));
+    try {
+      const telefone = ASSINANTE;
+      await limparFio(telefone);
+      await receber(telefone, 'oi');
+      await receber(telefone, '1');
+      assert.deepEqual(await respostas(telefone), []);
+      const config = await asTenant(() => WhatsAppConfigService.getPublicConfig());
+      assert.equal(config.botEnabled, false);
+    } finally {
+      await asTenant(() => WhatsAppConfigService.saveConfig({ botEnabled: true }));
+    }
+  });
+
+  it('is on by default for a provider that never saved the switch', async () => {
+    const config = await asTenant(() => WhatsAppConfigService.getPublicConfig());
+    assert.equal(config.botEnabled, true);
   });
 });
 
@@ -696,17 +766,22 @@ describe('the intent table on its own', () => {
     assert.equal(classificarIntencao('SEGUNDA VIA!!!'), 'fatura');
     assert.equal(classificarIntencao('Qual é a senha do Wi-Fi?'), 'portal');
     assert.equal(classificarIntencao('estou sem internet'), 'sinal');
-    assert.equal(classificarIntencao('bom dia'), 'handoff');
-    assert.equal(classificarIntencao(''), 'handoff');
-    assert.equal(classificarIntencao(null), 'handoff');
+    assert.equal(classificarIntencao('bom dia'), 'menu');
+    assert.equal(classificarIntencao(''), 'menu');
+    assert.equal(classificarIntencao(null), 'menu');
+    assert.equal(classificarIntencao('1'), 'fatura');
+    assert.equal(classificarIntencao('2 - conexão'), 'sinal');
+    assert.equal(classificarIntencao('Opção 3'), 'atendente');
+    assert.equal(classificarIntencao('faz 3 dias que caiu a internet'), 'sinal', 'a number mid-sentence is not an option');
+    assert.equal(classificarIntencao('1 senha do wifi'), 'portal', 'a secret request wins over the menu number');
   });
 
   it('does not read a term inside a longer word', async () => {
     const { classificarIntencao } = await import('../src/services/waBotService.js');
     // The lesson `waOptOutTexto.js` paid for: substring matching turns
     // "assinalar" into a signal complaint and "prepago" into a payment.
-    assert.equal(classificarIntencao('preciso assinalar uma coisa'), 'handoff');
-    assert.equal(classificarIntencao('quero resenha do plano'), 'handoff');
+    assert.equal(classificarIntencao('preciso assinalar uma coisa'), 'menu');
+    assert.equal(classificarIntencao('quero resenha do plano'), 'menu');
   });
 
   it('sends a message that asks for a secret to the portal even when it also complains', async () => {

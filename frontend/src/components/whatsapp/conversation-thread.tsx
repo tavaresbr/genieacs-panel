@@ -118,6 +118,12 @@ export function ConversationThread({
                 {t('whatsapp.inbox.subscriber')}: {conversation.clientName}
               </span>
             )}
+            {conversation.botPausedUntil && (
+              <span className="modern-badge-warning" title={t('whatsapp.inbox.wantsHumanHint')}>
+                <Icon name="contacts" size={12} />
+                {t('whatsapp.inbox.wantsHuman')}
+              </span>
+            )}
             {conversation.optedOut && (
               <span className="modern-badge-warning" title={t('whatsapp.inbox.optedOutHint')}>
                 <Icon name="bell" size={12} />

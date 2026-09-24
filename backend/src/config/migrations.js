@@ -3613,6 +3613,26 @@ export const migrations = [
         for (const add of missing) add(t);
       });
     }
+  },
+  {
+    /**
+     * Até quando o bot fica calado numa conversa em que o assinante pediu um
+     * atendente. Nulo é "o bot pode responder". Uma coluna, e não uma tabela
+     * de estado: o menu do bot não tem memória, e o único estado que ele
+     * precisa lembrar é este.
+     */
+    id: '0058_wa_bot_pause',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('wa_conversations'))) return true;
+      return db.schema.hasColumn('wa_conversations', 'bot_paused_until');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('wa_conversations'))) return;
+      if (await db.schema.hasColumn('wa_conversations', 'bot_paused_until')) return;
+      await db.schema.alterTable('wa_conversations', (t) => {
+        t.timestamp('bot_paused_until').nullable();
+      });
+    }
   }
 ];
 export default migrations;

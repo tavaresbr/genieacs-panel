@@ -554,6 +554,8 @@ export default {
   'whatsapp.bot.portalHint': 'Pour le mot de passe WiFi et pour changer le nom du réseau, connectez-vous au portail client : {link}',
   'whatsapp.bot.notRecognised': 'Nous n’avons pas trouvé de contrat pour ce numéro. Un conseiller vous répond sous peu.',
   'whatsapp.bot.handoff': 'Je transmets à un conseiller.',
+  'whatsapp.bot.menu': 'Bonjour ! Je suis l\'assistant automatique. Répondez avec le numéro :\n\n1 — Duplicata de la facture\n2 — État de la connexion\n3 — Parler à un conseiller',
+  'whatsapp.bot.handoffQueued': 'D\'accord ! Un conseiller vous répondra ici bientôt. Pour revoir le menu, écrivez "menu".',
   'whatsapp.bot.noOpenInvoice': 'Vous n’avez aucune facture en attente pour le moment.',
   'whatsapp.bot.invoice': 'Facture de {amount}, échéance {dueDate}.',
   'whatsapp.bot.signalOk': 'Votre connexion est en ligne. Signal optique : {rxPower} dBm.',

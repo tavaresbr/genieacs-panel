@@ -2404,6 +2404,8 @@ export interface WhatsAppConfig {
   // Where the customer portal answers from outside. Its own field, not the
   // panel's address: the portal is a separate app on a separate port.
   portalPublicUrl: string
+  /** O atendimento automático (menu, 2ª via, sinal). Ligado por padrão. */
+  botEnabled: boolean
   /** Days a stored attachment is kept. 0 means forever, and is the default. */
   mediaRetentionDays: number
   /** Days a message row is kept. 0 is forever, and is the default. */
@@ -2704,6 +2706,8 @@ export interface WhatsAppConversation {
   lastInboundAt: string | null
   unreadCount: number
   closedAt: string | null
+  /** Até quando o bot fica calado porque o assinante pediu um atendente; null fora da pausa. */
+  botPausedUntil?: string | null
   createdAt: string | null
   updatedAt: string | null
 }

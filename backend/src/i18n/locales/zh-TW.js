@@ -555,6 +555,8 @@ export default {
   'whatsapp.bot.portalHint': '如需查看 Wi-Fi 密碼或變更網路名稱，請登入客戶入口網站：{link}',
   'whatsapp.bot.notRecognised': '未查到該號碼對應的合約。客服人員會盡快回覆您。',
   'whatsapp.bot.handoff': '將為您轉接客服人員。',
+  'whatsapp.bot.menu': '您好！這裡是自動服務。請回覆數字：\n\n1 — 帳單副本\n2 — 連線狀態\n3 — 聯絡真人客服',
+  'whatsapp.bot.handoffQueued': '好的！客服很快會在這裡回覆您。想再次查看選單，請傳送 "menu"。',
   'whatsapp.bot.noOpenInvoice': '您目前沒有未付的帳單。',
   'whatsapp.bot.invoice': '帳單金額 {amount}，到期日 {dueDate}。',
   'whatsapp.bot.signalOk': '您的寬頻在線。光訊號：{rxPower} dBm。',
