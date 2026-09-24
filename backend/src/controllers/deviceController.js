@@ -463,6 +463,48 @@ class DeviceController {
     }
   }
 
+  static async startDiagnostic(req, res) {
+    const { deviceId, kind, host, count } = req.body || {};
+    if (!deviceId) {
+      return res.status(400).json(createErrorResponse(req.t('device.idRequired')));
+    }
+    try {
+      const result = await DeviceService.startDiagnostic(String(deviceId), { kind, host, count });
+      await registrarAcaoNaOnt(req, AuditLog.ACTIONS.DEVICE_DIAGNOSTIC_STARTED, deviceId, {
+        kind: result.kind,
+        host: result.host
+      });
+      return res.json(createResponse(req.t('device.diagnosticStarted'), { deviceId, ...result }));
+    } catch (error) {
+      if (error.translationKey) {
+        return res.status(error.status || 400).json(
+          createErrorResponse(translateError(req.t, error), null, error.code || null)
+        );
+      }
+      console.error('Start diagnostic error:', error);
+      return res.status(502).json(createErrorResponse(req.t('device.diagnosticFailed'), error.message));
+    }
+  }
+
+  static async readDiagnostic(req, res) {
+    const { deviceId, kind } = req.body || {};
+    if (!deviceId) {
+      return res.status(400).json(createErrorResponse(req.t('device.idRequired')));
+    }
+    try {
+      const result = await DeviceService.readDiagnostic(String(deviceId), kind);
+      return res.json(createResponse(null, { deviceId, ...result }));
+    } catch (error) {
+      if (error.translationKey) {
+        return res.status(error.status || 400).json(
+          createErrorResponse(translateError(req.t, error), null, error.code || null)
+        );
+      }
+      console.error('Read diagnostic error:', error);
+      return res.status(502).json(createErrorResponse(req.t('device.diagnosticFailed'), error.message));
+    }
+  }
+
   static async summonDevice(req, res) {
     const { deviceId, parameters = [] } = req.body;
 

@@ -18,6 +18,16 @@ import {
   pppoeLoginLeaves,
   VENDOR_OPTICAL_OBJECTS
 } from './deviceParameterFallbacks.js';
+import {
+  DIAGNOSTIC_KINDS,
+  DIAGNOSTIC_OBJECTS,
+  PING_COUNT_DEFAULT,
+  PING_COUNT_MAX,
+  diagnosticRequest,
+  diagnosticRoot,
+  isValidDiagnosticHost,
+  readDiagnosticResult
+} from './deviceDiagnostics.js';
 import Vendor from '../models/Vendor.js';
 import WifiSecurityConfig from '../models/WifiSecurityConfig.js';
 import AppState from '../models/AppState.js';
@@ -2050,6 +2060,99 @@ class DeviceService {
 
   static async rebootDevice(deviceId) {
     return this.postTask(deviceId, { name: 'reboot' });
+  }
+
+  /**
+   * Pede à ONT um ping ou um traceroute, no modelo de dados que ela fala.
+   *
+   * O modelo vem de `readSummonShape`, o mesmo que já decide o que o forçar
+   * contato pede: um detector só, para as duas perguntas não divergirem.
+   *
+   * `queued` diz se a ONT recebeu o pedido agora (200) ou se ele ficou na fila
+   * do ACS até ela se conectar (202). Com a fila, o documento continua com o
+   * resultado da vez anterior, e a tela não pode esperar por ele como novo.
+   */
+  static async startDiagnostic(deviceId, { kind, host, count } = {}) {
+    if (!DIAGNOSTIC_KINDS.includes(kind)) {
+      throw new TranslatableError('device.diagnosticInvalid', null, { status: 400, code: 'invalid_kind' });
+    }
+    if (!isValidDiagnosticHost(host)) {
+      throw new TranslatableError('device.diagnosticInvalidHost', null, { status: 400, code: 'invalid_host' });
+    }
+    const repeticoes = count === undefined || count === null || count === '' ? PING_COUNT_DEFAULT : Number(count);
+    if (!Number.isInteger(repeticoes) || repeticoes < 1 || repeticoes > PING_COUNT_MAX) {
+      throw new TranslatableError('device.diagnosticInvalid', null, { status: 400, code: 'invalid_count' });
+    }
+    const { roots } = await this.readSummonShape(deviceId);
+    const root = diagnosticRoot(roots);
+    const { parameterValues } = diagnosticRequest(root, kind, host, { count: repeticoes });
+    const { applied } = await this.postProvisioningTask(deviceId, { name: 'setParameterValues', parameterValues });
+    return { kind, root, host: String(host).trim(), queued: !applied };
+  }
+
+  /**
+   * Se o ACS ainda tem tarefa esperando por este aparelho.
+   *
+   * Uma ONT fora do ar não executa nada, e cada consulta da tela que pedisse
+   * outra leitura empilharia mais uma tarefa na fila dela — até dezenas, todas
+   * rodando de uma vez quando ela voltasse. Com tarefa na fila, não se pede
+   * outra.
+   */
+  static async hasPendingTask(deviceId) {
+    try {
+      const tasks = await this.fetchGenieAcsCollection('tasks', {
+        query: JSON.stringify({ device: deviceId }),
+        projection: '_id'
+      });
+      return Array.isArray(tasks) && tasks.length > 0;
+    } catch (error) {
+      // Sem saber, não pede: é a escolha que não empilha.
+      console.warn(`Unable to read the pending tasks of ${deviceId}: ${error.message}`);
+      return true;
+    }
+  }
+
+  /**
+   * O resultado do último diagnóstico, buscando-o na ONT quando ela já pode tê-lo.
+   *
+   * A ONT avisa "8 DIAGNOSTICS COMPLETE" ao terminar, mas o GenieACS não busca
+   * o resultado sozinho: o documento continua dizendo `Requested` até alguém
+   * pedir o objeto de novo. É o que esta leitura faz, uma vez por consulta e
+   * só sem tarefa na fila.
+   */
+  static async readDiagnostic(deviceId, kind) {
+    if (!DIAGNOSTIC_KINDS.includes(kind)) {
+      throw new TranslatableError('device.diagnosticInvalid', null, { status: 400, code: 'invalid_kind' });
+    }
+    const ler = async () => {
+      const rows = await this.fetchDeviceListPage(
+        JSON.stringify({ _id: deviceId }),
+        [
+          '_id',
+          'InternetGatewayDevice.DeviceInfo',
+          'Device.DeviceInfo',
+          DIAGNOSTIC_OBJECTS.InternetGatewayDevice[kind],
+          DIAGNOSTIC_OBJECTS.Device[kind]
+        ]
+      );
+      if (rows.length === 0) throw new TranslatableError('device.notFound', null, { status: 404 });
+      const row = rows[0];
+      const root = diagnosticRoot(Object.keys(this.SUMMON_REFRESH_OBJECTS).filter((name) => row?.[name]));
+      return readDiagnosticResult(row, root, kind);
+    };
+
+    const result = await ler();
+    if (result.state !== 'running' || await this.hasPendingTask(deviceId)) return result;
+    try {
+      const { applied } = await this.postProvisioningTask(deviceId, {
+        name: 'refreshObject',
+        objectName: DIAGNOSTIC_OBJECTS[result.root][kind]
+      });
+      return applied ? await ler() : result;
+    } catch (error) {
+      console.warn(`Unable to read the ${kind} result of ${deviceId}: ${error.message}`);
+      return result;
+    }
   }
 
   /**

@@ -27,7 +27,7 @@ import assert from 'node:assert/strict';
  *
  * ## O que este arquivo NÃO afirma
  *
- * São **36 rotas**, não as 91. A amostra foi escolhida para que cada uma das
+ * São **38 rotas**, não as 91. A amostra foi escolhida para que cada uma das
  * 29 capacidades apareça pelo menos uma vez, e a garantia de não-regressão que
  * o teste do `admin` dá vale **sobre estas 35** — não sobre o painel inteiro.
  * Quem quiser a afirmação forte ("nenhuma das 91 rotas mudou de dono") precisa
@@ -182,6 +182,23 @@ const CASOS = [
     method: 'POST',
     path: () => '/api/devices/reboot',
     body: { deviceId: DEVICE_ID },
+    aceito: [200]
+  },
+  {
+    // Ping pela ONT: é do plantão, então `tech` passa e `viewer` não.
+    cap: 'devices.write',
+    label: 'POST /api/devices/diagnostics',
+    method: 'POST',
+    path: () => '/api/devices/diagnostics',
+    body: { deviceId: DEVICE_ID, kind: 'ping', host: '8.8.8.8' },
+    aceito: [200]
+  },
+  {
+    cap: 'devices.write',
+    label: 'POST /api/devices/diagnostics/result',
+    method: 'POST',
+    path: () => '/api/devices/diagnostics/result',
+    body: { deviceId: DEVICE_ID, kind: 'ping' },
     aceito: [200]
   },
   {
@@ -604,10 +621,10 @@ describe('a matriz e a expectativa deste arquivo', () => {
   });
 
   it('não encolhe sem que alguém diga', () => {
-    // O cabeçalho promete uma amostra de 36 rotas e a promessa de não-regressão
+    // O cabeçalho promete uma amostra de 38 rotas e a promessa de não-regressão
     // do `admin` vale sobre ELA. Uma rota apagada por um merge desajeitado
     // deixaria a promessa valendo sobre menos coisa, calada.
-    assert.equal(CASOS.length, 36);
+    assert.equal(CASOS.length, 38);
   });
 });
 
@@ -634,7 +651,7 @@ describe('quem não tem a capacidade toma 403', () => {
 
 /**
  * O par que dá sentido ao de cima, e a garantia de não-regressão do `admin`:
- * ele aparece aqui em TODAS as 36 rotas, porque a matriz lhe dá as 29
+ * ele aparece aqui em TODAS as 38 rotas, porque a matriz lhe dá as 29
  * capacidades. Nenhuma das rotas desta amostra saiu do alcance dele na onda 17.
  */
 describe('quem tem a capacidade passa pela guarda', () => {

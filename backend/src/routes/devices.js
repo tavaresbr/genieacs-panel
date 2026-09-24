@@ -1,7 +1,7 @@
 import express from 'express';
 import DeviceController from '../controllers/deviceController.js';
 import { authenticateToken, requirePermission } from '../middleware/auth.js';
-import { portalPasswordAdminLimiter } from '../middleware/rateLimit.js';
+import { deviceDiagnosticLimiter, portalPasswordAdminLimiter } from '../middleware/rateLimit.js';
 
 const router = express.Router();
 
@@ -27,6 +27,12 @@ router.post('/reboot', authenticateToken, requirePermission('devices.write'), De
 // O aparelho vai no corpo, como no reiniciar: o id é do GenieACS, e a varredura
 // de ids do painel não o alcança (ver `route-coverage.test.js`).
 router.post('/factory-reset', authenticateToken, requirePermission('devices.maintain'), DeviceController.factoryResetDevice);
+// Ping e traceroute pela ONT. `devices.write` e não `devices.maintain`: é o
+// trabalho diário do plantão e não muda a configuração do cliente. O segundo
+// é um POST porque pode pedir à ONT o resultado — não é só leitura. O limite
+// segura a tela esquecida aberta consultando.
+router.post('/diagnostics', authenticateToken, requirePermission('devices.write'), deviceDiagnosticLimiter, DeviceController.startDiagnostic);
+router.post('/diagnostics/result', authenticateToken, requirePermission('devices.write'), deviceDiagnosticLimiter, DeviceController.readDiagnostic);
 router.post('/summon', authenticateToken, requirePermission('devices.write'), DeviceController.summonDevice);
 router.post('/:id/update-wan', authenticateToken, requirePermission('devices.write'), DeviceController.updateWanConfig);
 router.post('/:id/add-wan', authenticateToken, requirePermission('devices.write'), DeviceController.addWanConnection);

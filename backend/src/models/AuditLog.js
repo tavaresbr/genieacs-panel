@@ -122,7 +122,11 @@ class AuditLog {
     DEVICE_CREDENTIALS_CHANGED: 'device.credentials_changed',
     // A ONT voltou de fábrica: sem PPPoE, sem Wi-Fi, assinante sem internet até
     // alguém reprovisionar. A linha que mais importa desta família.
-    DEVICE_FACTORY_RESET: 'device.factory_reset'
+    DEVICE_FACTORY_RESET: 'device.factory_reset',
+    // Ping ou traceroute pedido à ONT. Não muda a configuração dela, e entra
+    // mesmo assim: é tráfego saindo da rede do cliente, e o destino — que não
+    // é segredo — é justamente o que quem investiga quer ler.
+    DEVICE_DIAGNOSTIC_STARTED: 'device.diagnostic_started'
   });
 
   /**
