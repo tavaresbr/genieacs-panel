@@ -1096,6 +1096,8 @@ const de: Dictionary = {
   'detail.sgp.unlockConfirm': 'Eine Vertrauensfreigabe für diesen Vertrag in SGP anfordern?',
   'detail.sgp.unlockSent': 'Anfrage an SGP gesendet',
   'detail.sgp.ticket': 'Ticket eröffnen',
+  'detail.sgp.openSgp': 'In SGP öffnen',
+  'detail.sgp.openWhatsapp': 'Per WhatsApp schreiben',
   'detail.sgp.ticketLabel': 'Was passiert',
   'detail.sgp.ticketHint': 'Eröffnet zu Vertrag {contract} in SGP.',
   'detail.sgp.ticketSend': 'Ticket eröffnen',

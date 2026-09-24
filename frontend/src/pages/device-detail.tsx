@@ -5,7 +5,7 @@ import { useNavigate, useSearchParams } from 'react-router'
 import { useToast } from '@/components/ui/toast'
 import { DeviceParametersCard } from '@/components/device-parameters-card'
 import { useLoading } from '@/components/ui/loading'
-import { devicesAPI, sgpAPI, type SgpContractLink, type SgpInvoice } from '@/lib/api'
+import { devicesAPI, sgpAPI, whatsappAPI, type SgpContractLink, type SgpInvoice } from '@/lib/api'
 import { formatDate } from '@/lib/utils'
 import { copyToClipboard, formatBrl, isSafeExternalUrl, sgpBadge } from '@/lib/sgp'
 import { Icon } from '@/components/ui/icon'
@@ -757,6 +757,8 @@ export default function DeviceDetailPage() {
   const [sgpContractInput, setSgpContractInput] = useState('')
   const [sgpUnlocking, setSgpUnlocking] = useState(false)
   const [sgpTicketEnabled, setSgpTicketEnabled] = useState(false)
+  const [sgpUrl, setSgpUrl] = useState<string | null>(null)
+  const [openingWhatsApp, setOpeningWhatsApp] = useState(false)
   const [ticketOpen, setTicketOpen] = useState(false)
   const [ticketText, setTicketText] = useState('')
   const [ticketSending, setTicketSending] = useState(false)
@@ -925,9 +927,11 @@ export default function DeviceDetailPage() {
         setSgpInvoices(res.data.invoices || [])
         setSgpMessage(res.data.invoiceError)
         setSgpTicketEnabled(res.data.ticketEnabled === true)
+        setSgpUrl(res.data.sgpUrl ?? null)
         return
       }
       setSgpLink(null)
+      setSgpUrl(null)
       setSgpInvoices([])
       // The card stays hidden while the integration is switched off.
       setSgpAvailable(res.code !== 'not_configured')
@@ -1303,6 +1307,28 @@ export default function DeviceDetailPage() {
     setTicketOpen((open) => !open)
   }
 
+  /**
+   * Opens this subscriber's WhatsApp thread — the one already there, or a new
+   * one on the contract's number — and lands on it in the inbox. The route
+   * refuses a contract with no number on record, and says so.
+   */
+  const openWhatsApp = async () => {
+    if (!sgpLink) return
+    setOpeningWhatsApp(true)
+    try {
+      const res = await whatsappAPI.openContactConversation(sgpLink.contract)
+      if (!res.success || !res.data) {
+        toast.error(res.message || t('api.requestFailed'))
+        return
+      }
+      navigate('/whatsapp', { state: { conversation: res.data } })
+    } catch {
+      toast.error(t('api.requestFailed'))
+    } finally {
+      setOpeningWhatsApp(false)
+    }
+  }
+
   return (
     <div className="page-shell">
       <div className="page-frame">
@@ -1384,6 +1410,28 @@ export default function DeviceDetailPage() {
                   >
                     <Icon name="chat" size={16} />
                     {t('detail.sgp.ticket')}
+                  </button>
+                )}
+                {isSafeExternalUrl(sgpUrl) && (
+                  <a
+                    className="modern-button-secondary"
+                    href={sgpUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Icon name="external" size={16} />
+                    {t('detail.sgp.openSgp')}
+                  </a>
+                )}
+                {can('whatsapp.send') && (
+                  <button
+                    type="button"
+                    className="modern-button-secondary"
+                    disabled={openingWhatsApp}
+                    onClick={() => void openWhatsApp()}
+                  >
+                    <Icon name="phone" size={16} />
+                    {t('detail.sgp.openWhatsapp')}
                   </button>
                 )}
               </>

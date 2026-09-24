@@ -1213,6 +1213,8 @@ const es: Dictionary = {
   'detail.sgp.unlockConfirm': '¿Solicitar un desbloqueo de confianza para este contrato en SGP?',
   'detail.sgp.unlockSent': 'Solicitud enviada a SGP',
   'detail.sgp.ticket': 'Abrir ticket',
+  'detail.sgp.openSgp': 'Abrir en SGP',
+  'detail.sgp.openWhatsapp': 'Escribir por WhatsApp',
   'detail.sgp.ticketLabel': 'Qué está pasando',
   'detail.sgp.ticketHint': 'Abierto en el contrato {contract} del SGP.',
   'detail.sgp.ticketSend': 'Abrir el ticket',

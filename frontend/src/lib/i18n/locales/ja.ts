@@ -1212,6 +1212,8 @@ const ja: Dictionary = {
   'detail.sgp.unlockConfirm': 'この契約について SGP に一時解除を要求しますか?',
   'detail.sgp.unlockSent': 'SGP に要求を送信しました',
   'detail.sgp.ticket': '問い合わせを登録',
+  'detail.sgp.openSgp': 'SGPで開く',
+  'detail.sgp.openWhatsapp': 'WhatsAppで連絡',
   'detail.sgp.ticketLabel': '発生している内容',
   'detail.sgp.ticketHint': 'SGP の契約 {contract} に登録します。',
   'detail.sgp.ticketSend': '問い合わせを登録',

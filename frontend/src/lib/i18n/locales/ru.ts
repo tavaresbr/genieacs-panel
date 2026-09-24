@@ -1219,6 +1219,8 @@ const ru: Dictionary = {
   'detail.sgp.unlockConfirm': 'Запросить в SGP разблокировку в кредит по этому договору?',
   'detail.sgp.unlockSent': 'Запрос отправлен в SGP',
   'detail.sgp.ticket': 'Создать заявку',
+  'detail.sgp.openSgp': 'Открыть в SGP',
+  'detail.sgp.openWhatsapp': 'Написать в WhatsApp',
   'detail.sgp.ticketLabel': 'Что происходит',
   'detail.sgp.ticketHint': 'Создана по договору {contract} в SGP.',
   'detail.sgp.ticketSend': 'Создать заявку',

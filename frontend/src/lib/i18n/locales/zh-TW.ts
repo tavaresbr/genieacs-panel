@@ -1213,6 +1213,8 @@ const zhTW: Dictionary = {
   'detail.sgp.unlockConfirm': '在 SGP 中為該合約申請信用復機？',
   'detail.sgp.unlockSent': '申請已傳送至 SGP',
   'detail.sgp.ticket': '建立工單',
+  'detail.sgp.openSgp': '在 SGP 中開啟',
+  'detail.sgp.openWhatsapp': '透過 WhatsApp 聯絡',
   'detail.sgp.ticketLabel': '發生了什麼',
   'detail.sgp.ticketHint': '將建立在 SGP 合約 {contract} 下。',
   'detail.sgp.ticketSend': '建立工單',

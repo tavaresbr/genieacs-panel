@@ -200,6 +200,8 @@ class SgpController {
       }
       return res.json(createResponse(req.t('sgp.dataLoaded'), {
         link: SgpService.publicLink(link),
+        // The "Open in SGP" button: null when SGP gave no client id.
+        sgpUrl: await SgpService.clientPageUrlForContract(link.contract),
         invoices,
         invoiceError,
         // Carried with the data it gates, so the device page does not need a

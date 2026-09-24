@@ -1213,6 +1213,8 @@ const ptBR: Dictionary = {
   'detail.sgp.unlockConfirm': 'Solicitar liberação em confiança para este contrato no SGP?',
   'detail.sgp.unlockSent': 'Solicitação enviada ao SGP',
   'detail.sgp.ticket': 'Abrir chamado',
+  'detail.sgp.openSgp': 'Abrir no SGP',
+  'detail.sgp.openWhatsapp': 'Chamar no WhatsApp',
   'detail.sgp.ticketLabel': 'O que está acontecendo',
   'detail.sgp.ticketHint': 'Aberto no contrato {contract} do SGP.',
   'detail.sgp.ticketSend': 'Abrir o chamado',

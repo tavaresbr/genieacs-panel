@@ -1791,6 +1791,8 @@ export const sgpAPI = {
       link: SgpContractLink
       invoices: SgpInvoice[]
       invoiceError: string | null
+      /** The client's page in the SGP web app, or null when SGP gave no client id. */
+      sgpUrl: string | null
       ticketEnabled: boolean
     }>(
       `/sgp/devices/${encodeURIComponent(deviceId)}${options.refresh ? '?refresh=1' : ''}`
