@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { mapSettingsAPI, settingsAPI, sgpAPI, tenantAPI, usersAPI, whatsappAPI, type GenieAcsAuthType, type WhatsAppConfig } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
-import { LocationPicker } from '@/components/location-picker'
+import { LocationPicker, wrapLongitude } from '@/components/location-picker'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import { useTenant } from '@/contexts/tenant-context'
@@ -224,7 +224,7 @@ export default function Onboarding() {
         if (!res.success) { toast.error(res.message || t('settings.saveError')); return }
         await refresh()
       }
-      const lat = Number(center.lat), lng = Number(center.lng)
+      const lat = Number(center.lat), lng = wrapLongitude(Number(center.lng))
       if (center.lat !== '' && center.lng !== '' && Number.isFinite(lat) && Number.isFinite(lng)) {
         const current = await mapSettingsAPI.get()
         const res = await mapSettingsAPI.update({ ...(current.data as object ?? {}), center_lat: String(lat), center_lng: String(lng) })

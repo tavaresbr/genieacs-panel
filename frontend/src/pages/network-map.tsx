@@ -469,7 +469,7 @@ export default function NetworkMap() {
   useEffect(() => { if (mapRef.current) updateMapObjects() }, [updateMapObjects])
 
   const openNewNode = () => {
-    const center = mapRef.current?.getCenter()
+    const center = mapRef.current?.getCenter()?.wrap()
     setEditingNode(false)
     setNodeEditor({
       node_id: '', type: 'odp', name: '',

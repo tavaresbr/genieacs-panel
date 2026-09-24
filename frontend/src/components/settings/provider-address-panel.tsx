@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { mapSettingsAPI, subscriptionAPI, tenantAPI, type TenantBilling } from '@/lib/api'
 import { ADDRESS_FIELDS, CLASSE_LARGURA, CONTACT_FIELDS, IDENTITY_FIELDS, type BillingField } from '@/components/billing-profile'
 import type { TranslationKey } from '@/lib/i18n'
-import { LocationPicker } from '@/components/location-picker'
+import { LocationPicker, wrapLongitude } from '@/components/location-picker'
 import { useToast } from '@/components/ui/toast'
 import { useAuth } from '@/contexts/auth-context'
 import { useTranslation } from '@/contexts/language-context'
@@ -64,7 +64,7 @@ export function ProviderAddressPanel() {
     })()
   }, [])
 
-  const lat = Number(center.lat), lng = Number(center.lng)
+  const lat = Number(center.lat), lng = wrapLongitude(Number(center.lng))
   const validPoint = center.lat.trim() !== '' && center.lng.trim() !== ''
     && Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180
 
@@ -112,6 +112,8 @@ export function ProviderAddressPanel() {
         if (!current.success) { toast.error(current.message || t('settings.saveError')); return }
         const res = await mapSettingsAPI.update({ ...(current.data as object ?? {}), center_lat: String(lat), center_lng: String(lng) })
         if (!res.success) { toast.error(res.message || t('settings.saveError')); return }
+        // O campo passa a mostrar o que foi gravado (longitude já em ±180).
+        setCenter({ lat: String(lat), lng: String(lng) })
       }
       toast.success(t('settings.providerAddress.saved'))
     } finally {

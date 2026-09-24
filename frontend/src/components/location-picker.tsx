@@ -36,6 +36,16 @@ function setTiles(L: any, map: any, previous: any, dark: boolean) {
 /** Seis casas decimais: ~10 cm, mais do que qualquer centro de mapa precisa. */
 const round = (n: number) => Math.round(n * 1e6) / 1e6
 
+/**
+ * Longitude trazida para [-180, 180]. 304 e -56 são o mesmo meridiano; quem
+ * digitou (ou colou) o valor de uma volta a mais no globo não precisa ver a
+ * gravação recusada por isso.
+ */
+export function wrapLongitude(lng: number): number {
+  if (!Number.isFinite(lng) || (lng >= -180 && lng <= 180)) return lng
+  return round(((((lng + 180) % 360) + 360) % 360) - 180)
+}
+
 export function LocationPicker({ lat, lng, onChange, fallback = [-15.7942, -47.8822], className }: Props) {
   const { isDarkMode } = useTheme()
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -68,13 +78,16 @@ export function LocationPicker({ lat, lng, onChange, fallback = [-15.7942, -47.8
         icon: L.divIcon({ className: '', html: MARKER_HTML, iconSize: [22, 22], iconAnchor: [11, 22] })
       }).addTo(map)
       markerRef.current = marker
+      // `wrap()`: arrastado para a cópia do mundo ao lado, o Leaflet devolve
+      // longitudes fora de ±180 (304 em vez de -56), que o servidor recusa.
       marker.on('dragend', () => {
-        const p = marker.getLatLng()
+        const p = marker.getLatLng().wrap()
         onChangeRef.current(round(p.lat), round(p.lng))
       })
       map.on('click', (e: any) => {
         marker.setLatLng(e.latlng)
-        onChangeRef.current(round(e.latlng.lat), round(e.latlng.lng))
+        const p = e.latlng.wrap()
+        onChangeRef.current(round(p.lat), round(p.lng))
       })
       tileRef.current = setTiles(L, map, null, darkRef.current)
     })()
@@ -98,7 +111,7 @@ export function LocationPicker({ lat, lng, onChange, fallback = [-15.7942, -47.8
   useEffect(() => {
     const map = mapRef.current, marker = markerRef.current
     if (!map || !marker || !hasPoint) return
-    const current = marker.getLatLng()
+    const current = marker.getLatLng().wrap()
     if (round(current.lat) === round(lat as number) && round(current.lng) === round(lng as number)) return
     marker.setLatLng([lat, lng])
     if (!map.getBounds().contains([lat, lng])) map.setView([lat, lng], Math.max(map.getZoom(), 13))
