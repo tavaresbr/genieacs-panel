@@ -101,7 +101,7 @@ export function startGenieAcsStub({ devices = [buildDevice()], taskStatus = 200,
   // é como um teste faz a ONT "responder" — mudar o documento que o ACS guarda.
   // Tarefa aceita com 202 fica em `GET /tasks`, que é a fila do ACS.
   // `files` é a coleção de arquivos do ACS (firmware), como o NBI a devolve.
-  const state = { devices, tasks: [], tags: [], deleted: [], files: [], taskStatus, respond, requests: [], onTask: null };
+  const state = { devices, tasks: [], tags: [], deleted: [], files: [], taskStatus, taskStatusFor: null, respond, requests: [], onTask: null };
 
   const server = http.createServer((req, res) => {
     let raw = '';
@@ -124,10 +124,14 @@ export function startGenieAcsStub({ devices = [buildDevice()], taskStatus = 200,
         } catch {
           task = null;
         }
-        const entry = { deviceId: decodeURIComponent(taskMatch[1]), task, status: state.taskStatus };
+        const deviceId = decodeURIComponent(taskMatch[1]);
+        // `taskStatusFor` responde por aparelho: é como um teste faz UMA ONT
+        // de um lote recusar enquanto as outras aceitam.
+        const status = state.taskStatusFor?.(deviceId) ?? state.taskStatus;
+        const entry = { deviceId, task, status };
         state.tasks.push(entry);
-        if (state.taskStatus === 200 && state.onTask) state.onTask(entry, state);
-        return send(state.taskStatus, task);
+        if (status === 200 && state.onTask) state.onTask(entry, state);
+        return send(status, status >= 400 ? { message: 'refused' } : task);
       }
 
       if (url.pathname === '/files' && req.method === 'GET') {
@@ -179,7 +183,13 @@ export function startGenieAcsStub({ devices = [buildDevice()], taskStatus = 200,
         } catch {
           filter = {};
         }
-        return send(200, state.devices.filter((device) => !filter._id || device._id === filter._id));
+        // `_id` como valor ou como `{ $in: [...] }`, as duas formas que o painel usa.
+        const casa = (id) => {
+          if (!filter._id) return true;
+          if (Array.isArray(filter._id?.$in)) return filter._id.$in.includes(id);
+          return id === filter._id;
+        };
+        return send(200, state.devices.filter((device) => casa(device._id)));
       }
 
       if (url.pathname === '/faults') return send(200, []);

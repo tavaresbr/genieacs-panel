@@ -138,7 +138,11 @@ class AuditLog {
     DEVICE_DIAGNOSTIC_STARTED: 'device.diagnostic_started',
     // Firmware trocado: a ONT grava e reinicia. O detalhe diz o arquivo e as
     // duas versões — a de antes é a que se procura quando algo parou depois.
-    DEVICE_FIRMWARE_UPGRADE: 'device.firmware_upgrade'
+    DEVICE_FIRMWARE_UPGRADE: 'device.firmware_upgrade',
+    // Uma ação em vários aparelhos: UMA linha por lote, com a ação, as
+    // contagens e o recorte da lista. Uma linha por aparelho afogaria a trilha
+    // e esconderia justamente que foi um lote.
+    DEVICE_BATCH_ACTION: 'device.batch_action'
   });
 
   /**

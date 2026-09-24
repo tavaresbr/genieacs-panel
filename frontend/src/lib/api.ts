@@ -12,6 +12,21 @@ export interface SubscriptionBlockedDetail {
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || ''
 
+export type DeviceBatchAction = 'reboot'
+
+export interface DeviceBatchResult {
+  deviceId: string
+  /** `sent`: o ACS aplicou; `queued`: espera a ONT se conectar; `failed`: ver `reason`. */
+  outcome: 'sent' | 'queued' | 'failed'
+  reason: 'not_found' | 'acs_error' | 'refused' | null
+}
+
+export interface DeviceBatchResponse {
+  action: DeviceBatchAction
+  summary: { total: number; sent: number; queued: number; failed: number }
+  results: DeviceBatchResult[]
+}
+
 export interface DeviceFirmwareFile {
   /** O id do arquivo no GenieACS — em geral o nome com que foi subido. */
   id: string
@@ -1549,6 +1564,10 @@ export const devicesAPI = {
 
   readDiagnostic: (deviceId: string, kind: DeviceDiagnosticKind) =>
     apiClient.post<DeviceDiagnosticResult>('/devices/diagnostics/result', { deviceId, kind }),
+
+  // Uma ação em vários aparelhos de uma vez (até 200), com o resultado de cada um.
+  runBatch: (action: DeviceBatchAction, deviceIds: string[], filter?: Record<string, string>) =>
+    apiClient.post<DeviceBatchResponse>('/devices/batch', { action, deviceIds, filter }),
 
   // Os firmwares do GenieACS que servem para o modelo desta ONT.
   listFirmware: (deviceId: string) =>
