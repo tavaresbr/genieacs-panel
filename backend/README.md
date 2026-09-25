@@ -1,4 +1,4 @@
-# SkyGenPanel Backend
+# TR69 Controle Backend
 
 API Express 5 yang juga menyajikan hasil static export frontend. Database default adalah SQLite di `DATA_DIR`; MySQL dapat dipilih dan dimigrasikan saat runtime melalui halaman Settings.
 

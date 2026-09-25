@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# SkyGenPanel installer — single-service GenieACS panel (UI + API on one port).
+# TR69 Controle installer — single-service GenieACS panel (UI + API on one port).
 # Usage:  curl -fsSL https://raw.githubusercontent.com/skydashnet/genieacs-panel/main/deploy/install.sh | sudo bash
 #
 set -euo pipefail
@@ -329,7 +329,7 @@ chmod 600 "$ENV_FILE"
 log "Installing systemd unit /etc/systemd/system/${SERVICE_NAME}.service"
 cat > "/etc/systemd/system/${SERVICE_NAME}.service" <<EOF
 [Unit]
-Description=SkyGenPanel (GenieACS management panel)
+Description=TR69 Controle (GenieACS management panel)
 After=network.target
 
 [Service]

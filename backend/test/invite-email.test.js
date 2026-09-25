@@ -52,7 +52,7 @@ after(async () => {
 
 function ligarSmtp() {
   process.env.SMTP_URL = `smtp://usuario:senha@127.0.0.1:${smtpPort}?ignoreTLS=true`;
-  process.env.MAIL_FROM = 'SkyGenPanel <nao-responda@exemplo.test>';
+  process.env.MAIL_FROM = 'TR69 Controle <nao-responda@exemplo.test>';
   resetMailTransport();
 }
 
@@ -94,7 +94,7 @@ describe('com transporte configurado', () => {
 
     const mensagem = recebidas[0];
     assert.match(mensagem, /To: colega@exemplo\.test/);
-    assert.match(mensagem, /From: SkyGenPanel <nao-responda@exemplo\.test>/);
+    assert.match(mensagem, /From: TR69 Controle <nao-responda@exemplo\.test>/);
 
     // O corpo vem em quoted-printable, que é como um `#` e uma linha longa
     // atravessam SMTP. Decodificado, o link tem que estar inteiro.
@@ -133,7 +133,7 @@ describe('com transporte configurado', () => {
   it('o convite sobrevive ao SMTP fora do ar', async () => {
     // Uma porta onde não há ninguém: o envio falha, e é só o envio que falha.
     process.env.SMTP_URL = 'smtp://usuario:senha@127.0.0.1:1?ignoreTLS=true&connectionTimeout=300';
-    process.env.MAIL_FROM = 'SkyGenPanel <nao-responda@exemplo.test>';
+    process.env.MAIL_FROM = 'TR69 Controle <nao-responda@exemplo.test>';
     resetMailTransport();
 
     const { status, body } = await convidar({ role: 'tech', email: 'colega2@exemplo.test' });

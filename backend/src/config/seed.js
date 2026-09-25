@@ -1,9 +1,10 @@
 import { getDb, insertReturningId } from './database.js';
 import { IS_SAAS } from './edition.js';
 import { WA_SERVER_FIELDS } from './platformManaged.js';
+import { LEGACY_PRODUCT_NAMES, PRODUCT_NAME } from './brand.js';
 
 export const DEFAULT_SETTINGS = {
-  appName: 'SkyGenPanel',
+  appName: PRODUCT_NAME,
   genieAcsUrl: '',
   autoGenerateCustomerId: 'false',
   customerIdPrefixMode: 'default',
@@ -34,10 +35,11 @@ export const DEFAULT_SETTINGS = {
   auditRetentionDays: '365'
 };
 
-// Values shipped by older SkyGenPanel releases. Only these exact values are
-// migrated, so an operator's custom mappings are never overwritten.
+// Values shipped by older releases. Only these exact values are migrated, so
+// an operator's custom mappings are never overwritten. A key may list several:
+// the product was "GenieACS Panel", then "SkyGenPanel".
 export const LEGACY_DEFAULT_SETTINGS = {
-  appName: 'GenieACS Panel',
+  appName: LEGACY_PRODUCT_NAMES,
   vpPppoeUsername: 'VirtualParameters.pppoeUsername',
   vpWanBridge: 'VirtualParameters.WANBRIDGE',
   vpRxPower: 'VirtualParameters.RXPower',
@@ -86,7 +88,7 @@ export async function seedDefaults(db = getDb(), { tenantIds = null } = {}) {
         await db('settings').insert({ tenant_id: tenant.id, key, value });
       } else if (
         Object.hasOwn(LEGACY_DEFAULT_SETTINGS, key) &&
-        existing.value === LEGACY_DEFAULT_SETTINGS[key]
+        [].concat(LEGACY_DEFAULT_SETTINGS[key]).includes(existing.value)
       ) {
         await db('settings')
           .where({ tenant_id: tenant.id, key })

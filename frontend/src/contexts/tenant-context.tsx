@@ -17,7 +17,7 @@ import { publicTenantAPI, type PublicTenant } from '@/lib/api'
  * by product — signup, the database switcher — have to know which product
  * they are in, and the backend is the only one that does.
  */
-export const FALLBACK_NAME = 'SkyGenPanel'
+export const FALLBACK_NAME = 'TR69 Controle'
 
 interface TenantContextValue {
   tenant: PublicTenant | null
@@ -29,7 +29,7 @@ interface TenantContextValue {
    *
    * Ao lado de `name`, que nunca é vazio: aquele serve para preencher um título
    * e cai no nome do produto quando não há provedor; este serve para quem
-   * precisa saber se há um — e ali "SkyGenPanel" não é uma resposta, é um
+   * precisa saber se há um — e ali "TR69 Controle" não é uma resposta, é um
    * marcador de ausência que uma tela acabaria mostrando como se fosse o nome
    * de alguém.
    */

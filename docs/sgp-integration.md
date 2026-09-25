@@ -1,6 +1,6 @@
 # SGP integration
 
-SkyGenPanel can read subscriber contract and billing data from
+TR69 Controle can read subscriber contract and billing data from
 [SGP (Sistema de Gestão de Provedores)](https://sgp.net.br) through the provider's
 own integration API. Once configured, an operator sees the contract, plan,
 service status, and open invoices next to the ONT, and the customer portal can
@@ -33,7 +33,7 @@ accepted. Requests time out after 15 seconds.
 
 1. In SGP, open **Administração → Integrações → Tokens** and create a token.
    Note the *app* name and the generated token.
-2. In SkyGenPanel, open **Settings → SGP integration** as an administrator.
+2. In TR69 Controle, open **Settings → SGP integration** as an administrator.
 3. Fill in:
    - **SGP URL** — the provider base URL, e.g. `https://provedor.sgp.net.br`.
    - **App** and **Token** — the credentials from step 1.

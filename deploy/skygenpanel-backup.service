@@ -1,5 +1,5 @@
 [Unit]
-Description=SkyGenPanel backup (database, attachments, key fingerprint)
+Description=TR69 Controle backup (database, attachments, key fingerprint)
 After=network.target skygenpanel.service
 
 [Service]

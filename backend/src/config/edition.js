@@ -1,7 +1,7 @@
 import 'dotenv/config';
 
 /**
- * SkyGenPanel ships as two editions from one codebase.
+ * TR69 Controle ships as two editions from one codebase.
  *
  * `selfhosted` is the historical product: one install per ISP, owned and run by
  * that ISP. `saas` is the hosted service, where one deployment serves many ISPs

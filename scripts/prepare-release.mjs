@@ -202,4 +202,4 @@ fs.writeFileSync(
   `${header}\n\n${releaseEntry}${previousReleases ? `\n\n${previousReleases}` : ''}\n`
 );
 
-console.log(`Prepared SkyGenPanel v${nextVersion} (build ${currentCount + 1}) from ${commits.length} Git commit(s).`);
+console.log(`Prepared TR69 Controle v${nextVersion} (build ${currentCount + 1}) from ${commits.length} Git commit(s).`);

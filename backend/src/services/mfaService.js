@@ -6,6 +6,7 @@ import { generateTotpSecret, totpUri, verifyTotp } from '../utils/totp.js';
 import { TranslatableError } from '../i18n/index.js';
 import TenantUser from '../models/TenantUser.js';
 import { mfaRequired } from '../models/Tenant.js';
+import { PRODUCT_NAME } from '../config/brand.js';
 
 /**
  * Login em duas etapas: o segredo do app autenticador e os códigos de
@@ -18,7 +19,7 @@ import { mfaRequired } from '../models/Tenant.js';
 
 export const MFA_SECRET_CONTEXT = 'skygenpanel-user-totp-v1';
 export const RECOVERY_CODE_COUNT = 10;
-export const MFA_ISSUER = 'SkyGenPanel';
+export const MFA_ISSUER = PRODUCT_NAME;
 
 let box = null;
 const caixa = () => {

@@ -5,6 +5,7 @@ import { isUniqueViolation } from '../config/database.js';
 import Subscription from '../models/Subscription.js';
 import Plan from '../models/Plan.js';
 import { providerFor } from './billing/registry.js';
+import { PRODUCT_NAME } from '../config/brand.js';
 
 /**
  * A régua de emissão: quem cobra o provedor, e quando.
@@ -262,7 +263,7 @@ class ChargeIssuingService {
         amountCents: preco,
         currency: moeda,
         dueDate: vencimentoDoGateway,
-        description: `${tenant.name || 'SkyGenPanel'} — ${plan.name || plan.code}`,
+        description: `${tenant.name || PRODUCT_NAME} — ${plan.name || plan.code}`,
         // O formato que o webhook espera de volta, com o período junto: é por
         // ele que a entrega acha o provedor sem depender do cadastro do cliente
         // no gateway estar ligado a quem se pensa.

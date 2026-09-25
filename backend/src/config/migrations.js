@@ -20,6 +20,7 @@
 
 import { withWebhookPath } from './waWebhookPath.js';
 import { nextAccountColor } from './waAccountColors.js';
+import { LEGACY_PRODUCT_NAMES, PRODUCT_NAME } from './brand.js';
 
 /** A chave do blob de configuração do Evolution em `app_state`. */
 const EVOLUTION_CONFIG_KEY = 'whatsapp_evolution_config';
@@ -1762,7 +1763,7 @@ export const migrations = [
         const appName = await db('settings').where({ key: 'appName' }).first();
         await db('tenants').insert({
           slug: 'default',
-          name: appName?.value || 'SkyGenPanel',
+          name: appName?.value || PRODUCT_NAME,
           status: 'active'
         });
         tenant = await db('tenants').orderBy('id', 'asc').first();
@@ -2862,7 +2863,8 @@ export const migrations = [
       const rows = await db('settings').where({ key: 'appName' }).select('tenant_id', 'value');
       for (const row of rows) {
         const name = String(row.value ?? '').trim();
-        if (!name || name === 'SkyGenPanel') continue;
+        // Qualquer nome de fábrica, o de hoje e os de antes, é "não escolheu nome".
+        if (!name || name === PRODUCT_NAME || LEGACY_PRODUCT_NAMES.includes(name)) continue;
         await db('tenants').where({ id: row.tenant_id }).whereNot({ name }).update({ name, updated_at: new Date() });
       }
       // The flag lives in `app_state` of the FIRST provider only, as the marker
@@ -3742,6 +3744,29 @@ export const migrations = [
       await db('map_settings')
         .where({ center_lat: '-6.2088', center_lng: '106.8456' })
         .update({ center_lat: '-15.7942', center_lng: '-47.8822' });
+    }
+  },
+  {
+    /**
+     * O produto passou a se chamar "TR69 Controle".
+     *
+     * Um provedor ainda com o nome de fábrica antigo nunca escolheu nome — ele
+     * nasceu assim —, então mostrar "SkyGenPanel" no topo da tela dele é
+     * mostrar a marca velha. Só o valor EXATO de fábrica é trocado: um provedor
+     * que se deu um nome, qualquer nome, fica com ele. O setting `appName` de
+     * fábrica é atualizado pelo `seedDefaults` no boot.
+     */
+    id: '0062_product_rename_tr69_controle',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      const antigo = await db('tenants').whereIn('name', LEGACY_PRODUCT_NAMES).first();
+      return !antigo;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      await db('tenants')
+        .whereIn('name', LEGACY_PRODUCT_NAMES)
+        .update({ name: PRODUCT_NAME, updated_at: new Date() });
     }
   }
 ];

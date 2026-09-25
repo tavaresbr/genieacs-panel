@@ -1,6 +1,6 @@
 # Automatic provisioning
 
-SkyGenPanel can activate a new subscriber's ONT on its own: when an ONT informs,
+TR69 Controle can activate a new subscriber's ONT on its own: when an ONT informs,
 the panel resolves its SGP contract from the PPPoE login the device already
 reports, matches the contract's plan against a **provisioning profile**, and
 writes the WiFi settings, the CPE administrative password, and the PPPoE WAN.

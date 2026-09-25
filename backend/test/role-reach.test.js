@@ -479,7 +479,7 @@ const CASOS = [
     label: 'PUT /api/settings/:key',
     method: 'PUT',
     path: () => '/api/settings/appName',
-    body: { value: 'SkyGenPanel' },
+    body: { value: 'TR69 Controle' },
     aceito: [200]
   },
   {

@@ -41,7 +41,7 @@ const mensagens = () => recebidas.map((bruta) => decodificarQuotedPrintable(brut
 
 function ligarSmtp() {
   process.env.SMTP_URL = `smtp://usuario:senha@127.0.0.1:${smtpPort}?ignoreTLS=true`;
-  process.env.MAIL_FROM = 'SkyGenPanel <nao-responda@exemplo.test>';
+  process.env.MAIL_FROM = 'TR69 Controle <nao-responda@exemplo.test>';
   resetMailTransport();
 }
 

@@ -17,7 +17,7 @@ import { panelBaseDomain } from '../../middleware/tenantResolver.js';
  * interface em `mailTransport.js` é onde ela entra.
  *
  *   SMTP_URL=smtps://usuario:senha@smtp.exemplo.com:465
- *   MAIL_FROM=SkyGenPanel <nao-responda@exemplo.com>
+ *   MAIL_FROM=TR69 Controle <nao-responda@exemplo.com>
  *
  * Sem as duas, não há transporte, e o painel funciona como sempre funcionou:
  * o link do convite sai na resposta e quem convidou o entrega como quiser.
