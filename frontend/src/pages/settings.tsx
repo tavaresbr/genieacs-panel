@@ -54,6 +54,7 @@ import { INSTALLER_VIRTUAL_PARAMETERS, VIRTUAL_PARAMETER_FIELDS } from '@/lib/vi
 const PLATFORM_MANAGED_KEYS = new Set<string>(['genieAcsUrl', ...Object.keys(INSTALLER_VIRTUAL_PARAMETERS)])
 import type { Vendor as VendorType, WifiSecurityConfig as WifiSecurityConfigType } from '@/types'
 import { MfaCard } from '@/components/mfa-card'
+import { AboutTab } from '@/components/settings/about-tab'
 import { MfaPolicyCard } from '@/components/mfa-policy-card'
 import { canOfferMfaReset } from '@/lib/mfa-enrollment'
 
@@ -89,7 +90,7 @@ const GENIE_SECRET_STATE_BADGES: Record<GenieSecretState, string> = {
 /** The tabs `?tab=` may open. */
 const SETTINGS_TABS = [
   'provider', 'general', 'virtual-params', 'customer-portal', 'sgp', 'provisioning',
-  'whatsapp', 'security', 'vendors', 'wifi-security', 'database'
+  'whatsapp', 'security', 'vendors', 'wifi-security', 'database', 'about'
 ]
 
 /**
@@ -1516,6 +1517,15 @@ export default function Settings() {
                 {t('settings.tab.database')}
               </button>
             )}
+            <button
+              onClick={() => setActiveTab('about')}
+              className="tab-button"
+              data-active={activeTab === 'about'}
+              role="tab"
+              aria-selected={activeTab === 'about'}
+            >
+              {t('settings.tab.about')}
+            </button>
           </div>
         </div>
 
@@ -3432,6 +3442,8 @@ export default function Settings() {
             </div>
           </div>
         )}
+
+        {activeTab === 'about' && <AboutTab appName={tenantName} />}
 
         {activeTab === 'database' && (
           <div className="modern-card p-6 max-w-2xl">
