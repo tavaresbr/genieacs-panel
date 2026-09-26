@@ -281,7 +281,13 @@ export default function Settings() {
         // `appName` is no longer read from settings: the provider's name lives
         // on the `tenants` row and arrives through the tenant context.
         const { appName: _legacyAppName, ...rest } = res.data as any
-        setSettings(prev => ({ ...prev, ...rest }))
+        // Só as chaves que esta tela conhece: o salvar regrava cada uma, e uma
+        // chave a mais (estado interno de um servidor mais antigo) seria
+        // recusada e pararia o salvar no meio.
+        setSettings(prev => ({
+          ...prev,
+          ...Object.fromEntries(Object.entries(rest).filter(([key]) => key in prev))
+        }))
         setSavedGenieAcsUrl(String((res.data as any).genieAcsUrl ?? ''))
       }
       setTestResult(null)

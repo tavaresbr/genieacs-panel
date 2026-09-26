@@ -268,7 +268,13 @@ class SettingsController {
 
   static async getAllSettings(req, res) {
     try {
-      const settings = await Setting.getAll();
+      // Só as chaves que esta rota também grava. A tabela guarda estado
+      // interno (`onboardingWizardDoneAt`, `deviceScopeTag`…), e a tela de
+      // configurações regrava tudo o que lê: uma chave interna na lista virava
+      // um PUT recusado ("chave não suportada") que interrompia o salvar no
+      // meio — antes de chegar à geração de IDs, que vai por último.
+      const all = await Setting.getAll();
+      const settings = Object.fromEntries(Object.entries(all).filter(([key]) => ALLOWED_SETTING_KEYS.has(key)));
       return res.json(
         createResponse(req.t('settings.listRetrieved'), settings)
       );
