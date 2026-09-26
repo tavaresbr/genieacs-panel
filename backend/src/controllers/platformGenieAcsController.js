@@ -9,7 +9,7 @@ import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { probeGenieAcs } from './settingsController.js';
 import { VIRTUAL_PARAMETER_KEYS } from '../config/platformManaged.js';
 import { getDb } from '../config/database.js';
-import { DEVICE_SCOPE_KEY, DEVICE_SCOPE_TAG_PATTERN } from '../services/genieacs/direct.js';
+import { DEVICE_SCOPE_KEY, DEVICE_SCOPE_TAG_PATTERN, forgetSharedAcs } from '../services/genieacs/direct.js';
 import { TAG_PREFIX } from '../services/deviceTagService.js';
 import DeviceScopeTagger, {
   AUTO_PREFIXES_KEY, AUTO_PREFIXES_MAX, AUTO_PREFIX_MAX_LENGTH, parsePrefixes, prefixesOverlap
@@ -253,6 +253,9 @@ class PlatformGenieAcsController {
           });
         }
       });
+      // Endereço ou tag mudaram: quem divide o ACS com quem muda junto, e o
+      // escopo de cada painel tem que ser recalculado já, não em 30 s.
+      if (mudouUrl || mudouTag) forgetSharedAcs();
       const depois = await snapshot(tenant);
 
       if (!mudouUrl && !mudouTag && !mudouPrefixos && !mandouAuth && vpsMudados.length === 0) {

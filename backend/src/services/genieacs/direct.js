@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import Setting from '../../models/Setting.js';
 import { getDb } from '../../config/database.js';
+import { currentTenantId } from '../../config/tenantContext.js';
 import { TranslatableError } from '../../i18n/index.js';
 import GenieAcsEgress from '../genieacsEgress.js';
 import GenieAcsAuthService from '../genieacsAuthService.js';
@@ -57,6 +58,30 @@ export function mergeScopeQuery(rawQuery, tag) {
 const semEscopo = new AsyncLocalStorage();
 export function withoutDeviceScope(fn) {
   return semEscopo.run(true, fn);
+}
+
+/**
+ * A tag que nenhuma ONT carrega: o escopo de um provedor SEM tag num GenieACS
+ * que outro provedor também usa. Sem ela, esse provedor via a frota de todos;
+ * com ela, vê nada até a plataforma definir a tag dele — o lado seguro.
+ */
+export const UNASSIGNED_SCOPE_TAG = '__sem_tag_de_provedor__';
+
+/** Por provedor: o endereço do ACS dele é usado por outro? Lido do banco no máximo a cada 30 s. */
+const compartilhado = new Map();
+const COMPARTILHADO_TTL_MS = 30_000;
+
+/** Esquece o que se sabe sobre ACS compartilhado — o console chama ao mudar endereço ou tag. */
+export function forgetSharedAcs() {
+  compartilhado.clear();
+}
+
+function origemDe(url) {
+  try {
+    return url ? new URL(String(url).trim()).origin : null;
+  } catch {
+    return null;
+  }
 }
 
 const naoEncontrado = () => new TranslatableError('device.notFound', null, { status: 404, code: 'device_not_found' });
@@ -185,10 +210,38 @@ class DirectConnector {
     });
   }
 
-  /** A tag de equipamentos deste provedor, ou `null` quando o ACS é só dele. */
+  /**
+   * A tag de equipamentos deste provedor; `null` quando o ACS é só dele.
+   *
+   * Sem tag num ACS que outro provedor também usa, o escopo é
+   * `UNASSIGNED_SCOPE_TAG`: nada casa, e o provedor não vê a frota alheia
+   * enquanto a plataforma não define a dele.
+   */
   static async scopeTag() {
     const raw = String((await Setting.getByKey(DEVICE_SCOPE_KEY)) ?? '').trim();
-    return DEVICE_SCOPE_TAG_PATTERN.test(raw) ? raw : null;
+    if (DEVICE_SCOPE_TAG_PATTERN.test(raw)) return raw;
+    return (await this.sharesAcs()) ? UNASSIGNED_SCOPE_TAG : null;
+  }
+
+  /** Outro provedor (não a plataforma) aponta para a mesma origem de GenieACS que este? */
+  static async sharesAcs() {
+    const id = currentTenantId();
+    const guardado = compartilhado.get(id);
+    if (guardado && guardado.expiresAt > Date.now()) return guardado.value;
+    const minha = origemDe(await this.baseUrl());
+    let value = false;
+    if (minha) {
+      // tenant-scope-exempt: a pergunta é justamente se OUTRO provedor usa o
+      // mesmo ACS — atravessa provedores de propósito, e só lê o endereço.
+      const rows = await getDb()('settings')
+        .where({ key: 'genieAcsUrl' })
+        .whereNot({ tenant_id: id })
+        .whereIn('tenant_id', getDb()('tenants').whereNot({ kind: 'platform' }).select('id'))
+        .select('value');
+      value = rows.some((row) => origemDe(row.value) === minha);
+    }
+    compartilhado.set(id, { value, expiresAt: Date.now() + COMPARTILHADO_TTL_MS });
+    return value;
   }
 
   /**
