@@ -50,6 +50,7 @@ class AuditLog {
     // some. O ISP que perguntasse "por que meu assinante perdeu o acesso" não
     // tinha onde olhar.
     SUBSCRIBER_ACCOUNT_RETIRED: 'subscriber_account.retired',
+    WHATSAPP_BOT_TRUST_UNLOCK: 'whatsapp.bot_trust_unlock',
     TENANT_EXPORTED: 'tenant.exported',
     // O cadastro fiscal do provedor mudou — razão social, CNPJ, endereço,
     // contato de cobrança. Registra QUAIS campos, nunca os valores: a trilha

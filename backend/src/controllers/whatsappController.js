@@ -41,6 +41,7 @@ class WhatsAppController {
         rejectCallMessage: body.rejectCallMessage,
         portalPublicUrl: body.portalPublicUrl,
         botEnabled: body.botEnabled,
+        botUnlockEnabled: body.botUnlockEnabled,
         rateLimitPerMin: body.rateLimitPerMin,
         mediaRetentionDays: body.mediaRetentionDays,
         messageRetentionDays: body.messageRetentionDays,

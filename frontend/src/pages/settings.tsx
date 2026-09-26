@@ -227,6 +227,7 @@ export default function Settings() {
     webhookBaseUrl: '',
     portalPublicUrl: '',
     botEnabled: true,
+    botUnlockEnabled: false,
     allowedHosts: '',
     managedUrl: '',
     managedAdminKey: '',
@@ -387,6 +388,7 @@ export default function Settings() {
         webhookBaseUrl: config.webhookBaseUrl,
         portalPublicUrl: config.portalPublicUrl,
         botEnabled: config.botEnabled !== false,
+        botUnlockEnabled: config.botUnlockEnabled === true,
         allowedHosts: config.allowedHosts.join('\n'),
         managedUrl: config.managedUrl,
         // The stored admin key never leaves the server; an empty field keeps it.
@@ -534,6 +536,7 @@ export default function Settings() {
         webhookBaseUrl: waForm.webhookBaseUrl,
         portalPublicUrl: waForm.portalPublicUrl,
         botEnabled: waForm.botEnabled,
+        botUnlockEnabled: waForm.botUnlockEnabled,
         // The API takes the textarea verbatim, one host per line.
         allowedHosts: waForm.allowedHosts,
         managedUrl: waForm.managedUrl,
@@ -2337,6 +2340,21 @@ export default function Settings() {
                     <span className="block font-semibold">{t('settings.whatsapp.botEnabled')}</span>
                     <span className="mt-1 block text-sm leading-6 text-muted-foreground">
                       {t('settings.whatsapp.botEnabledHint')}
+                    </span>
+                  </span>
+                </label>
+                <label className={`mt-4 flex items-start gap-3 border-t border-border pt-4 ${waForm.botEnabled ? 'cursor-pointer' : 'opacity-60'}`}>
+                  <input
+                    type="checkbox"
+                    className="mt-1 h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
+                    checked={waForm.botUnlockEnabled}
+                    disabled={!waForm.botEnabled}
+                    onChange={(event) => setWaForm((current) => ({ ...current, botUnlockEnabled: event.target.checked }))}
+                  />
+                  <span>
+                    <span className="block font-semibold">{t('settings.whatsapp.botUnlockEnabled')}</span>
+                    <span className="mt-1 block text-sm leading-6 text-muted-foreground">
+                      {t('settings.whatsapp.botUnlockEnabledHint')}
                     </span>
                   </span>
                 </label>

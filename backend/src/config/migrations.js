@@ -3788,6 +3788,39 @@ export const migrations = [
         t.string('phone', 32);
       });
     }
+  },
+  {
+    /**
+     * O passo do bot numa conversa: esperando o CPF/CNPJ, ou escolhendo entre
+     * os contratos que o documento trouxe.
+     *
+     * Colunas na conversa, e não uma tabela de sessões, pelo mesmo motivo de
+     * `bot_paused_until`: o estado é um só por conversa, curto e descartável —
+     * o passo vence em 30 min e o contador de tentativas em 1 h.
+     * `bot_step_data` guarda só contrato e rótulo para a escolha, nunca o
+     * documento que o assinante digitou.
+     */
+    id: '0064_wa_bot_step',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('wa_conversations'))) return true;
+      return db.schema.hasColumn('wa_conversations', 'bot_doc_window_at');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('wa_conversations'))) return;
+      const colunas = [
+        ['bot_step', (t) => t.string('bot_step', 32).nullable()],
+        ['bot_step_data', (t) => t.text('bot_step_data').nullable()],
+        ['bot_step_at', (t) => t.timestamp('bot_step_at').nullable()],
+        ['bot_doc_attempts', (t) => t.integer('bot_doc_attempts').notNullable().defaultTo(0)],
+        ['bot_doc_window_at', (t) => t.timestamp('bot_doc_window_at').nullable()]
+      ];
+      for (const [nome, criar] of colunas) {
+        // eslint-disable-next-line no-await-in-loop -- uma coluna por vez, cada uma conferida
+        if (await db.schema.hasColumn('wa_conversations', nome)) continue;
+        // eslint-disable-next-line no-await-in-loop
+        await db.schema.alterTable('wa_conversations', criar);
+      }
+    }
   }
 ];
 export default migrations;
