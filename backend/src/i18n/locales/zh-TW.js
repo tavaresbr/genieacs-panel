@@ -87,6 +87,7 @@ export default {
   'device.detailFailed': '無法取得設備詳細資料',
   'device.deleted': '設備已刪除',
   'device.deleteFailed': '無法刪除設備',
+  'device.deletePasswordRequired': '請輸入兩次密碼以確認刪除',
   'device.rebootStarted': '設備重新啟動已發起',
   'device.factoryResetStarted': '已要求恢復原廠設定。在重新佈建之前，ONT 將沒有 PPPoE 與 Wi-Fi。',
   'device.factoryResetFailed': '無法將 ONT 恢復原廠設定',

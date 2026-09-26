@@ -87,6 +87,7 @@ export default {
   'device.detailFailed': '无法获取设备详情',
   'device.deleted': '设备已删除',
   'device.deleteFailed': '无法删除设备',
+  'device.deletePasswordRequired': '请输入两次密码以确认删除',
   'device.rebootStarted': '设备重启已发起',
   'device.factoryResetStarted': '已请求恢复出厂设置。在重新配置之前，ONT 将没有 PPPoE 和 Wi-Fi。',
   'device.factoryResetFailed': '无法将 ONT 恢复出厂设置',

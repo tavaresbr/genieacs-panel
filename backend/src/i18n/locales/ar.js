@@ -85,6 +85,7 @@ export default {
   'device.detailFailed': 'تعذّر جلب تفاصيل الجهاز',
   'device.deleted': 'تم حذف الجهاز',
   'device.deleteFailed': 'تعذّر حذف الجهاز',
+  'device.deletePasswordRequired': 'اكتب كلمة المرور مرتين لتأكيد الإزالة',
   'device.rebootStarted': 'بدأت إعادة تشغيل الجهاز',
   'device.factoryResetStarted': 'طُلبت إعادة ضبط المصنع. سيعود ONT دون PPPoE وWi-Fi حتى تُعاد تهيئته.',
   'device.factoryResetFailed': 'تعذّرت إعادة ضبط ONT إلى إعدادات المصنع',

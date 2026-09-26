@@ -85,6 +85,7 @@ export default {
   'device.detailFailed': 'उपकरण विवरण प्राप्त नहीं हो सका',
   'device.deleted': 'उपकरण हटा दिया गया',
   'device.deleteFailed': 'उपकरण हटाया नहीं जा सका',
+  'device.deletePasswordRequired': 'हटाने की पुष्टि के लिए अपना पासवर्ड दो बार लिखें',
   'device.rebootStarted': 'उपकरण की पुनःप्रारंभ प्रक्रिया शुरू हुई',
   'device.factoryResetStarted': 'फ़ैक्टरी रीसेट का अनुरोध किया गया। दोबारा प्रोविज़न होने तक ONT बिना PPPoE और Wi-Fi के रहेगा।',
   'device.factoryResetFailed': 'ONT को फ़ैक्टरी सेटिंग्स पर रीसेट नहीं किया जा सका',

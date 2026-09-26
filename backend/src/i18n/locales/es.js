@@ -84,6 +84,7 @@ export default {
   'device.detailFailed': 'No se pudo obtener el detalle del equipo',
   'device.deleted': 'Equipo eliminado correctamente',
   'device.deleteFailed': 'No se pudo eliminar el equipo',
+  'device.deletePasswordRequired': 'Escriba su contraseña dos veces para confirmar la eliminación',
   'device.rebootStarted': 'Reinicio del equipo iniciado correctamente',
   'device.factoryResetStarted': 'Restablecimiento de fábrica solicitado. La ONT volverá sin PPPoE ni Wi-Fi hasta que se aprovisione de nuevo.',
   'device.factoryResetFailed': 'No se pudo restablecer la ONT a fábrica',

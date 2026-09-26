@@ -89,6 +89,13 @@ async function swapAcknowledgers(req, swaps) {
   );
 }
 
+/** Se `password` é a senha de quem está logado. */
+async function senhaDoOperadorConfere(req, password) {
+  const user = await User.findById(req.user?.userId);
+  return Boolean(user?.password)
+    && await bcrypt.compare(String(password).slice(0, 128), user.password);
+}
+
 class DeviceController {
   /**
    * `GET /api/devices/export` — o recorte da lista numa planilha.
@@ -501,26 +508,42 @@ class DeviceController {
     }
   }
 
+  /**
+   * Remove a ONT do GenieACS. Pede o que o reset de fábrica pede — a série
+   * digitada e a senha do operador duas vezes —, porque também não tem volta:
+   * o uso é apagar o ONT antigo que ficou no ACS depois de uma troca, e o
+   * clique no aparelho errado apagaria o que está em serviço.
+   */
   static async deleteDevice(req, res) {
+    const { deviceId } = req.params;
+    const { confirmSerial, password, passwordConfirm } = req.body || {};
+    if (!deviceId) {
+      return res.status(400).json(createErrorResponse(req.t('device.idRequired')));
+    }
+    if (!password || !passwordConfirm) {
+      return res.status(400).json(createErrorResponse(req.t('device.deletePasswordRequired'), null, 'password_required'));
+    }
+    if (String(password) !== String(passwordConfirm)) {
+      return res.status(400).json(createErrorResponse(req.t('device.factoryResetPasswordMismatch'), null, 'password_mismatch'));
+    }
     try {
-      const { deviceId } = req.params;
-      
-      if (!deviceId) {
-        return res.status(400).json(
-          createErrorResponse(req.t('device.idRequired'))
-        );
+      if (!await senhaDoOperadorConfere(req, password)) {
+        return res.status(403).json(createErrorResponse(req.t('device.factoryResetPasswordIncorrect'), null, 'password_incorrect'));
       }
-
-      await DeviceService.deleteDevice(deviceId);
+      await DeviceService.deleteDevice(String(deviceId), confirmSerial);
       await registrarAcaoNaOnt(req, AuditLog.ACTIONS.DEVICE_DELETED, deviceId);
+      DeviceService.invalidateDashboard();
       return res.json(
         createResponse(req.t('device.deleted'), { deviceId })
       );
     } catch (error) {
-
       const escopo = respostaDeEscopo(req, res, error);
-
       if (escopo) return escopo;
+      if (error.translationKey) {
+        return res.status(error.status || 400).json(
+          createErrorResponse(translateError(req.t, error), null, error.code || null)
+        );
+      }
       console.error('Delete device error:', error);
       return res.status(500).json(
         createErrorResponse(req.t('device.deleteFailed'), error.message)
@@ -575,10 +598,7 @@ class DeviceController {
       return res.status(400).json(createErrorResponse(req.t('device.factoryResetPasswordMismatch'), null, 'password_mismatch'));
     }
     try {
-      const user = await User.findById(req.user?.userId);
-      const confere = Boolean(user?.password)
-        && await bcrypt.compare(String(password).slice(0, 128), user.password);
-      if (!confere) {
+      if (!await senhaDoOperadorConfere(req, password)) {
         return res.status(403).json(createErrorResponse(req.t('device.factoryResetPasswordIncorrect'), null, 'password_incorrect'));
       }
       await DeviceService.factoryResetDevice(String(deviceId), confirmSerial);

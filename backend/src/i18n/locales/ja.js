@@ -87,6 +87,7 @@ export default {
   'device.detailFailed': '機器の詳細を取得できませんでした',
   'device.deleted': '機器を削除しました',
   'device.deleteFailed': '機器を削除できませんでした',
+  'device.deletePasswordRequired': '削除を確定するには、パスワードを2回入力してください',
   'device.rebootStarted': '機器の再起動を開始しました',
   'device.factoryResetStarted': '工場出荷時リセットを要求しました。再プロビジョニングされるまで ONT は PPPoE と Wi-Fi なしで戻ります。',
   'device.factoryResetFailed': 'ONT を工場出荷時の状態に戻せませんでした',

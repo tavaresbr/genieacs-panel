@@ -10,7 +10,7 @@ import { formatDate } from '@/lib/utils'
 import { copyToClipboard, formatBrl, isSafeExternalUrl, sgpBadge } from '@/lib/sgp'
 import { Icon } from '@/components/ui/icon'
 import { ProvisioningCard } from '@/components/provisioning-card'
-import { serialMatches } from '@/lib/device-actions'
+import { informedRecently, serialMatches } from '@/lib/device-actions'
 import { DeviceHistoryCard } from '@/components/device-history-card'
 import { DeviceSwapsCard } from '@/components/device-swaps-card'
 import { DeviceDiagnosticsCard } from '@/components/device-diagnostics-card'
@@ -22,6 +22,7 @@ import { filterWifiByStatus, type WifiStatusFilter } from '@/lib/wifi-filter'
 import { FilterRail, useStoredChoice } from '@/components/ui/filter-rail'
 import { filterInvoicesByStatus, parseInvoiceStatusFilter, type InvoiceStatusFilter } from '@/lib/invoice-filter'
 import { useTranslation } from '@/contexts/language-context'
+import type { TranslationKey } from '@/lib/i18n'
 import { RX_BAND_STYLE, rxBand } from '@/lib/rx-signal'
 
 interface WanBindingData {
@@ -510,26 +511,53 @@ function EditCredentialModal({
 }
 
 /**
- * O reset de fábrica, que não tem volta.
+ * O texto de cada ação sem volta que o diálogo abaixo confirma. A série e a
+ * senha são pedidas do mesmo jeito nas duas, então esses rótulos são um só.
+ */
+const IRREVERSIBLE_TEXTS = {
+  factoryReset: {
+    title: 'detail.factoryReset.title',
+    consequence: 'detail.factoryReset.consequence',
+    confirm: 'detail.factoryReset.confirm',
+    sending: 'detail.factoryReset.sending',
+    failed: 'detail.factoryReset.failed'
+  },
+  remove: {
+    title: 'detail.remove.title',
+    consequence: 'detail.remove.consequence',
+    confirm: 'detail.remove.confirm',
+    sending: 'detail.remove.sending',
+    failed: 'detail.remove.failed'
+  }
+} satisfies Record<string, Record<string, TranslationKey>>
+
+type IrreversibleAction = keyof typeof IRREVERSIBLE_TEXTS
+
+/**
+ * As ações que não têm volta: o reset de fábrica e a remoção do GenieACS.
  *
  * Pede o número de série digitado, e não um "tem certeza?": a tela pode ter
  * ficado aberta noutro aparelho, e o que se quer impedir é o clique no aparelho
  * errado — um "OK" passa por reflexo, digitar a série do aparelho não.
  */
-function FactoryResetModal({
+function IrreversibleActionModal({
+  action,
   isOpen,
   onClose,
   deviceId,
   serial,
+  lastInform,
   provisioningAvailable,
   onDone
 }: {
+  action: IrreversibleAction | null;
   isOpen: boolean;
   onClose: () => void;
   deviceId: string;
   serial: string | null;
+  lastInform: string | null;
   provisioningAvailable: boolean;
-  onDone: () => void;
+  onDone: (action: IrreversibleAction) => void;
 }) {
   const { t } = useTranslation()
   const toast = useToast()
@@ -547,8 +575,9 @@ function FactoryResetModal({
     }
   }, [isOpen])
 
-  if (!isOpen) return null
+  if (!isOpen || !action) return null
 
+  const texts = IRREVERSIBLE_TEXTS[action]
   const alvo = serial || deviceId
   const confere = serialMatches(typed, serial, deviceId)
   // A senha duas vezes: o servidor confere as duas e que é a do operador; aqui
@@ -560,15 +589,17 @@ function FactoryResetModal({
     if (!podeEnviar) return
     setSending(true)
     try {
-      const res = await devicesAPI.factoryResetDevice(deviceId, typed, password, passwordConfirm)
+      const res = action === 'remove'
+        ? await devicesAPI.deleteDevice(deviceId, typed, password, passwordConfirm)
+        : await devicesAPI.factoryResetDevice(deviceId, typed, password, passwordConfirm)
       if (res.success) {
-        toast.success(res.message || t('detail.factoryReset.title'))
-        onDone()
+        toast.success(res.message || t(texts.title))
+        onDone(action)
       } else {
-        toast.error(res.message || t('detail.factoryReset.failed'))
+        toast.error(res.message || t(texts.failed))
       }
     } catch (error) {
-      toast.error(error instanceof Error && error.message ? error.message : t('detail.factoryReset.failed'))
+      toast.error(error instanceof Error && error.message ? error.message : t(texts.failed))
     } finally {
       setSending(false)
     }
@@ -579,11 +610,16 @@ function FactoryResetModal({
       <div className="modern-card w-full max-w-md">
         <div className="flex items-center gap-2 border-b border-border p-5">
           <Icon name="warning" size={20} className="shrink-0 text-[hsl(var(--status-danger))]" />
-          <h3 id="factory-reset-title" className="text-lg font-semibold text-foreground">{t('detail.factoryReset.title')}</h3>
+          <h3 id="factory-reset-title" className="text-lg font-semibold text-foreground">{t(texts.title)}</h3>
         </div>
         <div className="space-y-3 p-5 text-sm leading-6">
-          <p className="text-foreground">{t('detail.factoryReset.consequence')}</p>
-          {provisioningAvailable && (
+          <p className="text-foreground">{t(texts.consequence)}</p>
+          {action === 'remove' && informedRecently(lastInform) && (
+            <p className="rounded-md border border-[hsl(var(--status-warning))]/50 bg-[hsl(var(--status-warning))]/10 px-3 py-2 text-[hsl(var(--status-warning))]">
+              {t('detail.remove.onlineWarning')}
+            </p>
+          )}
+          {action === 'factoryReset' && provisioningAvailable && (
             <p className="text-muted-foreground">{t('detail.factoryReset.provisionHint')}</p>
           )}
           <label htmlFor="factory-reset-serial" className="field-label pt-1">
@@ -639,7 +675,7 @@ function FactoryResetModal({
             onClick={() => void enviar()}
           >
             <Icon name="warning" size={16} />
-            {sending ? t('detail.factoryReset.sending') : t('detail.factoryReset.confirm')}
+            {sending ? t(texts.sending) : t(texts.confirm)}
           </button>
         </div>
       </div>
@@ -758,7 +794,7 @@ export default function DeviceDetailPage() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
   const [rebooting, setRebooting] = useState(false)
-  const [factoryResetOpen, setFactoryResetOpen] = useState(false)
+  const [irreversibleAction, setIrreversibleAction] = useState<IrreversibleAction | null>(null)
   const { can } = useAuth()
   // Revelar a senha do portal é `customers.secrets`, e mexer no CPE é
   // `devices.write` — capacidades distintas na matriz porque quem reinicia uma
@@ -1391,11 +1427,25 @@ export default function DeviceDetailPage() {
         <button
           key="factoryReset"
           type="button"
-          onClick={() => setFactoryResetOpen(true)}
+          onClick={() => setIrreversibleAction('factoryReset')}
           className="modern-button-secondary text-[hsl(var(--status-danger))]"
         >
           <Icon name="warning" size={17} />
           {t('detail.factoryReset.button')}
+        </button>
+      )
+    }, {
+      key: 'remove',
+      label: t('detail.remove.button'),
+      render: () => (
+        <button
+          key="remove"
+          type="button"
+          onClick={() => setIrreversibleAction('remove')}
+          className="modern-button-secondary text-[hsl(var(--status-danger))]"
+        >
+          <Icon name="trash" size={17} />
+          {t('detail.remove.button')}
         </button>
       )
     }] : []),
@@ -2409,13 +2459,19 @@ export default function DeviceDetailPage() {
           }
           onSave={handleSaveCredentials}
         />
-        <FactoryResetModal
-          isOpen={factoryResetOpen}
-          onClose={() => setFactoryResetOpen(false)}
+        <IrreversibleActionModal
+          action={irreversibleAction}
+          isOpen={irreversibleAction !== null}
+          onClose={() => setIrreversibleAction(null)}
           deviceId={deviceId}
           serial={deviceInfo?.serialNumber || null}
+          lastInform={device._lastInform || null}
           provisioningAvailable={sgpAvailable}
-          onDone={() => setFactoryResetOpen(false)}
+          onDone={(done) => {
+            setIrreversibleAction(null)
+            // A página de um aparelho que o ACS já não conhece não tem o que mostrar.
+            if (done === 'remove') navigate('/devices')
+          }}
         />
         <EditWifiModal
           wifi={editingWifi}

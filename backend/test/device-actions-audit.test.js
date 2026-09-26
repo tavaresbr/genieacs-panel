@@ -96,10 +96,38 @@ describe('a trilha do que se faz na ONT', () => {
     assert.ok(!JSON.stringify(linha).includes(SENHA_ONT), 'a senha da ONT foi parar na trilha');
   });
 
+  it('apagar o aparelho do ACS exige a série e a senha, como o reset de fábrica', async () => {
+    // O uso é apagar o ONT antigo que ficou no ACS depois de uma troca; o
+    // clique no aparelho errado apagaria o que está em serviço.
+    const apagar = (body) => call(`${panelUrl}/api/devices/${DEVICE_ID}`, {
+      method: 'DELETE',
+      headers: authHeaders(token),
+      body
+    });
+    const antes = (await linhas(AuditLog.ACTIONS.DEVICE_DELETED)).length;
+    const casos = [
+      [undefined, 400, 'password_required'],
+      [{ confirmSerial: 'ZTEG12345678' }, 400, 'password_required'],
+      [{ confirmSerial: 'ZTEG12345678', password: 'operator-password-1', passwordConfirm: 'x' }, 400, 'password_mismatch'],
+      [{ confirmSerial: 'ZTEG12345678', password: 'senha-errada-1', passwordConfirm: 'senha-errada-1' }, 403, 'password_incorrect'],
+      [{ confirmSerial: 'ZTEG00000000', ...SENHAS }, 400, 'serial_mismatch'],
+      [{ ...SENHAS }, 400, 'serial_mismatch']
+    ];
+    for (const [body, esperado, codigo] of casos) {
+      // eslint-disable-next-line no-await-in-loop -- uma tentativa por vez
+      const res = await apagar(body);
+      assert.equal(res.status, esperado, `aceitou ${JSON.stringify(body)}`);
+      assert.equal(res.body.code, codigo);
+    }
+    assert.deepEqual(genie.state.deleted, [], 'apagou sem a confirmação');
+    assert.equal((await linhas(AuditLog.ACTIONS.DEVICE_DELETED)).length, antes);
+  });
+
   it('apagar o aparelho do ACS deixa linha', async () => {
     const { status } = await call(`${panelUrl}/api/devices/${DEVICE_ID}`, {
       method: 'DELETE',
-      headers: authHeaders(token)
+      headers: authHeaders(token),
+      body: { confirmSerial: ' zteg12345678 ', ...SENHAS }
     });
     assert.equal(status, 200);
     assert.deepEqual(genie.state.deleted, [DEVICE_ID]);

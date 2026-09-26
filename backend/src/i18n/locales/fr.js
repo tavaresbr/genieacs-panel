@@ -87,6 +87,7 @@ export default {
   'device.detailFailed': 'Impossible d’obtenir le détail de l’équipement',
   'device.deleted': 'Équipement supprimé',
   'device.deleteFailed': 'Impossible de supprimer l’équipement',
+  'device.deletePasswordRequired': 'Saisissez votre mot de passe deux fois pour confirmer la suppression',
   'device.rebootStarted': 'Redémarrage de l’équipement lancé',
   'device.factoryResetStarted': 'Réinitialisation d\'usine demandée. L\'ONT reviendra sans PPPoE ni Wi-Fi jusqu\'à un nouveau provisionnement.',
   'device.factoryResetFailed': 'Impossible de réinitialiser l\'ONT aux paramètres d\'usine',

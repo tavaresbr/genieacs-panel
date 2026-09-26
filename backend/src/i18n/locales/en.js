@@ -87,6 +87,7 @@ export default {
   'device.detailFailed': 'Failed to get the device detail',
   'device.deleted': 'Device deleted successfully',
   'device.deleteFailed': 'Failed to delete the device',
+  'device.deletePasswordRequired': 'Type your password twice to confirm the removal',
   'device.rebootStarted': 'Device reboot started successfully',
   'device.factoryResetStarted': 'ONT factory reset requested. It will come back without PPPoE and Wi-Fi until it is provisioned again.',
   'device.factoryResetFailed': 'Could not reset the ONT to factory settings',

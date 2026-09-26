@@ -1,7 +1,7 @@
 import express from 'express';
 import DeviceController from '../controllers/deviceController.js';
 import { authenticateToken, requirePermission } from '../middleware/auth.js';
-import { deviceDiagnosticLimiter, factoryResetLimiter, portalPasswordAdminLimiter } from '../middleware/rateLimit.js';
+import { deviceDeleteLimiter, deviceDiagnosticLimiter, factoryResetLimiter, portalPasswordAdminLimiter } from '../middleware/rateLimit.js';
 
 const router = express.Router();
 
@@ -34,7 +34,7 @@ router.get('/:deviceId/swaps', authenticateToken, requirePermission('devices.ins
 router.get('/:deviceId/portal-password', authenticateToken, requirePermission('customers.secrets'), portalPasswordAdminLimiter, DeviceController.getPortalPassword);
 router.post('/:deviceId/portal-password/reset', authenticateToken, requirePermission('customers.secrets'), portalPasswordAdminLimiter, DeviceController.resetPortalPassword);
 router.get('/:deviceId', authenticateToken, requirePermission('devices.inspect'), DeviceController.getDeviceDetail);
-router.delete('/:deviceId', authenticateToken, requirePermission('devices.write'), DeviceController.deleteDevice);
+router.delete('/:deviceId', authenticateToken, requirePermission('devices.maintain'), deviceDeleteLimiter, DeviceController.deleteDevice);
 router.post('/reboot', authenticateToken, requirePermission('devices.write'), DeviceController.rebootDevice);
 // O aparelho vai no corpo, como no reiniciar: o id é do GenieACS, e a varredura
 // de ids do painel não o alcança (ver `route-coverage.test.js`).
