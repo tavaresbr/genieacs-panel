@@ -75,6 +75,7 @@ export default {
   // Equipamentos
   'device.idRequired': 'O ID do equipamento é obrigatório',
   'device.notFound': 'Equipamento não encontrado',
+  'device.scopeTagProtected': 'A tag do provedor não pode ser alterada por aqui',
   'device.listRetrieved': 'Equipamentos obtidos com sucesso',
   'device.listFailed': 'Não foi possível obter os equipamentos',
   'device.exportTooLarge': 'O recorte tem mais de {max} equipamentos. Filtre a lista antes de baixar a planilha',

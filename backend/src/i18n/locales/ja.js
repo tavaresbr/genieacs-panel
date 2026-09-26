@@ -78,6 +78,7 @@ export default {
   // 機器
   'device.idRequired': '機器 ID が必要です',
   'device.notFound': '機器が見つかりません',
+  'device.scopeTagProtected': 'プロバイダーのタグはここでは変更できません',
   'device.listRetrieved': '機器を取得しました',
   'device.listFailed': '機器を取得できませんでした',
   'device.exportTooLarge': '対象が {max} 台を超えています。スプレッドシートをダウンロードする前に一覧を絞り込んでください',

@@ -76,6 +76,7 @@ export default {
   // الأجهزة
   'device.idRequired': 'معرّف الجهاز مطلوب',
   'device.notFound': 'الجهاز غير موجود',
+  'device.scopeTagProtected': 'لا يمكن تغيير وسم المزوّد من هنا',
   'device.listRetrieved': 'تم جلب قائمة الأجهزة',
   'device.listFailed': 'تعذّر جلب قائمة الأجهزة',
   'device.exportTooLarge': 'يحتوي التحديد على أكثر من {max} جهاز. صفِّ القائمة قبل تنزيل جدول البيانات',

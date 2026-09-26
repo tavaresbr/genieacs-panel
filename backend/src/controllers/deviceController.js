@@ -16,6 +16,22 @@ import { exportDevicesCsv } from '../services/deviceExport.js';
 import { BATCH_ACTIONS, BATCH_LIMIT, batchFilterLabel, batchSummary, normalizeBatchIds } from '../services/deviceBatch.js';
 
 /**
+ * A recusa do escopo do provedor (ACS compartilhado) como resposta própria.
+ *
+ * O conector recusa equipamento que não é do provedor com "não encontrado", e
+ * a tag de um provedor com 403. Sem isto, cada `catch` abaixo transformaria a
+ * recusa num 500 genérico — que o operador lê como pane, e não como "esse
+ * equipamento não existe aqui".
+ */
+function respostaDeEscopo(req, res, error) {
+  const chave = error?.translationKey;
+  if (chave !== 'device.notFound' && chave !== 'device.scopeTagProtected') return null;
+  return res.status(error.status || (chave === 'device.notFound' ? 404 : 403)).json(
+    createErrorResponse(translateError(req.t, error), null, error.code || null)
+  );
+}
+
+/**
  * A linha da trilha para uma ação que MUDOU a ONT, gravada só depois do sucesso.
  *
  * `fromRequest` não lança — a trilha nunca vira a causa de um 500 numa ação
@@ -99,6 +115,10 @@ class DeviceController {
       res.setHeader('Content-Disposition', `attachment; filename="equipamentos-${new Date().toISOString().slice(0, 10)}.csv"`);
       return res.send(csv);
     } catch (error) {
+
+      const escopo = respostaDeEscopo(req, res, error);
+
+      if (escopo) return escopo;
       if (error.translationKey) {
         return res.status(error.status || 400).json(
           createErrorResponse(translateError(req.t, error), null, error.code || null)
@@ -114,6 +134,10 @@ class DeviceController {
       const dashboard = await DeviceService.getDashboardData(req.query.refresh === '1');
       return res.json(createResponse(req.t('device.dashboardRetrieved'), dashboard));
     } catch (error) {
+
+      const escopo = respostaDeEscopo(req, res, error);
+
+      if (escopo) return escopo;
       console.error('Get dashboard error:', error);
       return res.status(502).json(
         createErrorResponse(req.t('device.dashboardFailed'), error.message)
@@ -143,6 +167,10 @@ class DeviceController {
       const history = await DeviceHistoryService.readRange(deviceId, { from, to });
       return res.json(createResponse(req.t('device.history.retrieved'), history));
     } catch (error) {
+
+      const escopo = respostaDeEscopo(req, res, error);
+
+      if (escopo) return escopo;
       console.error('Get device history error:', error);
       return res.status(502).json(
         createErrorResponse(req.t('device.history.failed'), error.message)
@@ -169,6 +197,10 @@ class DeviceController {
         open: rows.length
       }));
     } catch (error) {
+
+      const escopo = respostaDeEscopo(req, res, error);
+
+      if (escopo) return escopo;
       console.error('List device swaps error:', error);
       return res.status(500).json(
         createErrorResponse(req.t('device.swaps.failed'), error.message)
@@ -191,6 +223,10 @@ class DeviceController {
       const result = await DeviceService.listDeviceParameters(deviceId, req.query?.search);
       return res.json(createResponse(req.t('device.parameters.retrieved'), result));
     } catch (error) {
+
+      const escopo = respostaDeEscopo(req, res, error);
+
+      if (escopo) return escopo;
       if (error.translationKey === 'device.notFound') {
         return res.status(404).json(createErrorResponse(req.t('device.notFound')));
       }
@@ -213,6 +249,10 @@ class DeviceController {
         swaps: rows.map((row) => publicSwap(row, nomes))
       }));
     } catch (error) {
+
+      const escopo = respostaDeEscopo(req, res, error);
+
+      if (escopo) return escopo;
       console.error('Get device swaps error:', error);
       return res.status(500).json(
         createErrorResponse(req.t('device.swaps.failed'), error.message)
@@ -241,6 +281,10 @@ class DeviceController {
         publicSwap(swap, await swapAcknowledgers(req, [swap]))
       ));
     } catch (error) {
+
+      const escopo = respostaDeEscopo(req, res, error);
+
+      if (escopo) return escopo;
       console.error('Acknowledge device swap error:', error);
       return res.status(500).json(
         createErrorResponse(req.t('device.swaps.failed'), error.message)
@@ -254,6 +298,10 @@ class DeviceController {
       void DeviceService.mergeDashboardFaults(faults);
       return res.json(createResponse(req.t('device.faultsRetrieved'), faults));
     } catch (error) {
+
+      const escopo = respostaDeEscopo(req, res, error);
+
+      if (escopo) return escopo;
       console.error('Get faults error:', error);
       return res.status(502).json(
         createErrorResponse(req.t('device.faultsFailed'), error.message)
@@ -267,6 +315,10 @@ class DeviceController {
       DeviceService.invalidateDashboard();
       return res.json(createResponse(req.t('device.faultCleared')));
     } catch (error) {
+
+      const escopo = respostaDeEscopo(req, res, error);
+
+      if (escopo) return escopo;
       console.error('Delete fault error:', error);
       const validationError = error.message === 'Invalid fault ID';
       return res.status(validationError ? 400 : 502).json(
@@ -292,6 +344,10 @@ class DeviceController {
         })
       );
     } catch (error) {
+
+      const escopo = respostaDeEscopo(req, res, error);
+
+      if (escopo) return escopo;
       console.error('Get devices error:', error);
       return res.status(500).json(
         createErrorResponse(req.t('device.listFailed'), error.message)
@@ -326,7 +382,8 @@ class DeviceController {
         account = await CustomerService.ensureAccount({
           _id: deviceId,
           softwareId: deviceDetail.deviceInfo?.softwareVersion,
-          pppoe: reportedPppoe
+          pppoe: reportedPppoe,
+          lastInform: deviceDetail.lastInform
         }) || (staleSubscriber ? null : account);
       }
       return res.json(
@@ -350,6 +407,10 @@ class DeviceController {
         })
       );
     } catch (error) {
+
+      const escopo = respostaDeEscopo(req, res, error);
+
+      if (escopo) return escopo;
       console.error('Get device detail error:', error);
       
       if (error.translationKey === 'device.notFound') {
@@ -398,6 +459,10 @@ class DeviceController {
         updatedAt: account.password_updated_at || null
       }));
     } catch (error) {
+
+      const escopo = respostaDeEscopo(req, res, error);
+
+      if (escopo) return escopo;
       console.error('Get portal password error:', error);
       return res.status(500).json(
         createErrorResponse(req.t('device.portalPasswordReadFailed'), error.message)
@@ -425,6 +490,10 @@ class DeviceController {
         password
       }));
     } catch (error) {
+
+      const escopo = respostaDeEscopo(req, res, error);
+
+      if (escopo) return escopo;
       console.error('Reset portal password error:', error);
       return res.status(500).json(
         createErrorResponse(req.t('device.portalPasswordResetFailed'), error.message)
@@ -448,6 +517,10 @@ class DeviceController {
         createResponse(req.t('device.deleted'), { deviceId })
       );
     } catch (error) {
+
+      const escopo = respostaDeEscopo(req, res, error);
+
+      if (escopo) return escopo;
       console.error('Delete device error:', error);
       return res.status(500).json(
         createErrorResponse(req.t('device.deleteFailed'), error.message)
@@ -474,6 +547,10 @@ class DeviceController {
         })
       );
     } catch (error) {
+
+      const escopo = respostaDeEscopo(req, res, error);
+
+      if (escopo) return escopo;
       console.error('Reboot device error:', error);
       return res.status(500).json(
         createErrorResponse(req.t('device.rebootFailed'), error.message)
@@ -509,6 +586,10 @@ class DeviceController {
       DeviceService.invalidateDashboard();
       return res.json(createResponse(req.t('device.factoryResetStarted'), { deviceId }));
     } catch (error) {
+
+      const escopo = respostaDeEscopo(req, res, error);
+
+      if (escopo) return escopo;
       if (error.translationKey) {
         return res.status(error.status || 400).json(
           createErrorResponse(translateError(req.t, error), null, error.code || null)
@@ -550,6 +631,10 @@ class DeviceController {
       if (summary.sent + summary.queued > 0) DeviceService.invalidateDashboard();
       return res.json(createResponse(req.t('device.batchDone'), { action, summary, results, file }));
     } catch (error) {
+
+      const escopo = respostaDeEscopo(req, res, error);
+
+      if (escopo) return escopo;
       if (error.translationKey) {
         return res.status(error.status || 400).json(
           createErrorResponse(translateError(req.t, error), null, error.code || null)
@@ -564,6 +649,10 @@ class DeviceController {
     try {
       return res.json(createResponse(null, await DeviceService.listFirmwareCatalog()));
     } catch (error) {
+
+      const escopo = respostaDeEscopo(req, res, error);
+
+      if (escopo) return escopo;
       console.error('List firmware catalog error:', error);
       return res.status(502).json(createErrorResponse(req.t('device.firmwareListFailed'), error.message));
     }
@@ -578,6 +667,10 @@ class DeviceController {
       const result = await DeviceService.listFirmware(deviceId);
       return res.json(createResponse(null, { deviceId, ...result }));
     } catch (error) {
+
+      const escopo = respostaDeEscopo(req, res, error);
+
+      if (escopo) return escopo;
       if (error.translationKey) {
         return res.status(error.status || 400).json(
           createErrorResponse(translateError(req.t, error), null, error.code || null)
@@ -608,6 +701,10 @@ class DeviceController {
         queued: result.queued
       }));
     } catch (error) {
+
+      const escopo = respostaDeEscopo(req, res, error);
+
+      if (escopo) return escopo;
       if (error.translationKey) {
         return res.status(error.status || 400).json(
           createErrorResponse(translateError(req.t, error), null, error.code || null)
@@ -631,6 +728,10 @@ class DeviceController {
       });
       return res.json(createResponse(req.t('device.diagnosticStarted'), { deviceId, ...result }));
     } catch (error) {
+
+      const escopo = respostaDeEscopo(req, res, error);
+
+      if (escopo) return escopo;
       if (error.translationKey) {
         return res.status(error.status || 400).json(
           createErrorResponse(translateError(req.t, error), null, error.code || null)
@@ -650,6 +751,10 @@ class DeviceController {
       const result = await DeviceService.readDiagnostic(String(deviceId), kind);
       return res.json(createResponse(null, { deviceId, ...result }));
     } catch (error) {
+
+      const escopo = respostaDeEscopo(req, res, error);
+
+      if (escopo) return escopo;
       if (error.translationKey) {
         return res.status(error.status || 400).json(
           createErrorResponse(translateError(req.t, error), null, error.code || null)
@@ -675,6 +780,10 @@ class DeviceController {
         createResponse(req.t('device.summonQueued'), data)
       );
     } catch (error) {
+
+      const escopo = respostaDeEscopo(req, res, error);
+
+      if (escopo) return escopo;
       console.error('Error summoning device:', error.message);
       return res.status(500).json(
         createErrorResponse(req.t('device.summonFailed'), error.message)
@@ -698,6 +807,10 @@ class DeviceController {
       });
       return res.json(createResponse(req.t(result.messageKey, result.messageVars), result));
     } catch (error) {
+
+      const escopo = respostaDeEscopo(req, res, error);
+
+      if (escopo) return escopo;
       console.error(`Error in updateWanConfig for ${id}:`, error);
       const validationError = /^(Invalid|VLAN ID|PPP |WAN |No editable|Only PPPoE|Vendor not found)/.test(error.message);
       res.status(validationError ? 400 : 500).json(
@@ -720,6 +833,10 @@ class DeviceController {
       });
       return res.json(createResponse(req.t(result.messageKey, result.messageVars), result));
     } catch (error) {
+
+      const escopo = respostaDeEscopo(req, res, error);
+
+      if (escopo) return escopo;
       console.error(`Error adding WAN connection for ${id}:`, error);
       if (error.translationKey) {
         return res.status(error.status || 400).json(
@@ -753,7 +870,8 @@ class DeviceController {
         account = await CustomerService.ensureAccount({
           _id: id,
           softwareId: detail.deviceInfo?.softwareVersion,
-          pppoe: detail.virtualParameters?.pppoeUsername?.value
+          pppoe: detail.virtualParameters?.pppoeUsername?.value,
+          lastInform: detail.lastInform
         });
       }
       // Whoever records the installation is the technician the ACS names.
@@ -764,6 +882,10 @@ class DeviceController {
         customerId: account?.customer_id || null
       }));
     } catch (error) {
+
+      const escopo = respostaDeEscopo(req, res, error);
+
+      if (escopo) return escopo;
       console.error(`Error saving installation date for ${id}:`, error);
       const status = error.translationKey === 'device.notFound' ? 404 : 502;
       return res.status(status).json(
@@ -788,6 +910,10 @@ class DeviceController {
       });
       res.json({ success: true, data: result, message: req.t(result.messageKey, result.messageVars) });
     } catch (error) {
+
+      const escopo = respostaDeEscopo(req, res, error);
+
+      if (escopo) return escopo;
       console.error(`Error in updateCredentials for ${id}:`, error);
       const validationError = /^(Invalid credential|Password must|VirtualParameter path)/.test(error.message);
       res.status(validationError ? 400 : 500).json(
@@ -811,6 +937,10 @@ class DeviceController {
       });
       return res.json(createResponse(req.t(result.messageKey, result.messageVars), result));
     } catch (error) {
+
+      const escopo = respostaDeEscopo(req, res, error);
+
+      if (escopo) return escopo;
       console.error(`Error in updateWifiConfig for ${id}:`, error);
       if (error.translationKey) {
         return res.status(error.status || 400).json(
