@@ -1,6 +1,7 @@
 import { getActiveLocale, translate } from '@/lib/i18n'
 import type { LoginResponse, OperatorRole, User } from '@/types'
 import { MFA_ENROLLMENT_EVENT, isMfaEnrollmentRefusal } from '@/lib/mfa-enrollment'
+import type { LiveStatus } from '@/lib/map-status'
 
 // Acima de `apiClient`, que o dispara: um `const` de módulo lido antes da
 // declaração é uma ReferenceError no primeiro 402.
@@ -1857,6 +1858,10 @@ export const settingsAPI = {
   syncCustomerIds: () =>
     apiClient.post('/settings/sync-customer-ids'),
 
+  /** Como está a sincronização de IDs de cliente (em curso, última passada). */
+  customerIdSyncStatus: () =>
+    apiClient.get<CustomerIdSyncStatus>('/settings/customer-id-sync'),
+
   delete: (key: string) =>
     apiClient.delete(`/settings/${key}`),
 
@@ -2570,6 +2575,10 @@ export const mappingAPI = {
   importData: (data: { nodes: unknown[]; edges: unknown[] }) =>
     apiClient.post<MapImportResult>('/mapping-data/import', data),
 
+  /** Estado ao vivo (online, sinal fraco, offline) dos pontos com PPPoE. */
+  liveStatus: () =>
+    apiClient.get<LiveStatus>('/mapping-data/status'),
+
   /** Busca livre de um lugar no Brasil (Nominatim, pelo servidor). */
   searchAddress: (q: string) =>
     apiClient.get<PlaceResult[]>(`/mapping-data/geocode?q=${encodeURIComponent(q)}`),
@@ -2581,6 +2590,24 @@ export interface MapImportResult {
   skippedNodes: number
   skippedEdges: number
   errors: string[]
+}
+
+export interface CustomerIdSyncStatus {
+  enabled: boolean
+  running: boolean
+  startedAt: string | null
+  last: null | {
+    ok: boolean
+    startedAt: string
+    finishedAt: string
+    total?: number
+    existing?: number
+    generated?: number
+    pending?: number
+    code?: string
+    status?: number | null
+    message?: string
+  }
 }
 
 export interface PlaceResult {

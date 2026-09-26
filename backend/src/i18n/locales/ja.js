@@ -279,6 +279,8 @@ export default {
   'mapping.resetFailed': '構成データを初期化できませんでした',
   'mapping.imported': "インポート完了：ポイント {nodes} 件、ケーブル {edges} 件を追加しました",
   'mapping.importFailed': "マップデータをインポートできませんでした",
+  'mapping.statusReady': "ネットワークの状態を取得しました",
+  'mapping.statusFailed': "現在デバイスの状態を読み取れません",
   'mapping.searchTooShort': "検索するには3文字以上入力してください。",
   'mapping.searchDone': "検索が完了しました",
   'mapping.searchFailed': "現在住所を検索できません。しばらくしてから再度お試しください。",
