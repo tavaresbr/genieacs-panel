@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   MFA_ENROLLMENT_CODE,
   canOfferMfaReset,
+  canOfferPasswordReset,
   isMfaEnrollmentRefusal,
   mfaPolicyState,
   mustEnroll
@@ -59,6 +60,19 @@ describe('o botão de desligar o 2FA de alguém da equipe', () => {
   it('num owner, só para outro owner', () => {
     expect(canOfferMfaReset({ mfaEnabled: true, role: 'owner' }, comum)).toBe(false)
     expect(canOfferMfaReset({ mfaEnabled: true, role: 'owner' }, { isSelf: false, isOwner: true })).toBe(true)
+  })
+})
+
+describe('o cadeado de redefinir a senha de alguém da equipe', () => {
+  it('num owner, só para outro owner', () => {
+    expect(canOfferPasswordReset({ role: 'owner' }, { isOwner: false })).toBe(false)
+    expect(canOfferPasswordReset({ role: 'owner' }, { isOwner: true })).toBe(true)
+  })
+
+  it('nos outros papéis, para quem administra a equipe', () => {
+    for (const role of ['admin', 'tech', 'viewer']) {
+      expect(canOfferPasswordReset({ role }, { isOwner: false })).toBe(true)
+    }
   })
 })
 

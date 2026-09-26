@@ -49,7 +49,8 @@ export function DeviceParametersCard({ deviceId }: DeviceParametersCardProps) {
     setSummoning(true)
     try {
       const res = await devicesAPI.summonDevice(deviceId)
-      if (res.success) toast.success(t('detail.parameters.summoned'))
+      if (res.success && res.data?.reached === false) toast.warning(res.message || t('detail.parameters.summoned'))
+      else if (res.success) toast.success(t('detail.parameters.summoned'))
       else toast.error(res.message || t('devices.summon.failed'))
     } catch {
       toast.error(t('devices.summon.error'))

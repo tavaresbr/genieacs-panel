@@ -248,6 +248,19 @@ class UsersController {
         );
       }
 
+      // A senha de um `owner` é dele (ou de outro `owner`) para trocar. Sem
+      // isto, um `admin` definia a senha do dono e entrava como ele — tomava a
+      // conta pela porta ao lado das que já estão fechadas (papel, vínculo,
+      // 2FA). Conferido ANTES de qualquer escrita: um PATCH com papel e senha
+      // juntos não pode trocar o papel e só depois recusar a senha.
+      if (nextPassword !== undefined
+        && presentRole(membership.role) === 'owner'
+        && presentRole(req.user.role) !== 'owner') {
+        return res.status(403).json(
+          createErrorResponse(req.t('users.ownerOnly'))
+        );
+      }
+
       if (nextRole !== undefined) {
         if (!ROLES.includes(nextRole)) {
           return res.status(400).json(

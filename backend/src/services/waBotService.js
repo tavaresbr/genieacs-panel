@@ -3,10 +3,12 @@ import SgpService from './sgpService.js';
 import WaConversationService from './waConversationService.js';
 import WaSendService from './waSendService.js';
 import WhatsAppConfigService from './whatsappConfigService.js';
+import AuditLog from '../models/AuditLog.js';
 import { tdb } from '../config/database.js';
 import { DEFAULT_LOCALE, translate } from '../i18n/index.js';
 import { comoDataBr, comoReal, maisAntigaEmAberto } from '../utils/wa/waCobranca.js';
 import { normalizarTexto, pedeSaida } from '../utils/wa/waOptOutTexto.js';
+import { isValidCnpj, isValidCpf, normalizeTaxId } from '../utils/taxId.js';
 
 /**
  * The self-service bot: it answers the subscriber who wrote in.
@@ -23,7 +25,10 @@ import { normalizarTexto, pedeSaida } from '../utils/wa/waOptOutTexto.js';
  *
  *   MAY  — the open invoice (amount, due date, digitable line, PIX, link),
  *          whether the connection is up and its optical signal, hand off to a
- *          human.
+ *          human — and, only when the provider switched it on, ASK the SGP
+ *          for a trust unlock ("liberação em confiança") of a blocked
+ *          contract. The SGP decides; the bot only asks, and the request is
+ *          written to the provider's audit trail.
  *   MUST NOT — send a WiFi password, send a portal password, change an SSID,
  *          reboot an ONT, or anything else that changes the service. Those get
  *          `whatsapp.bot.portalHint` and the portal link, because the portal
@@ -120,6 +125,18 @@ const INTENCOES = [
     ]
   },
   /**
+   * Pedir para desbloquear. Antes da fatura: "quero liberar, pago amanhã" é
+   * pedido de liberação. Com a liberação desligada no provedor, a resposta cai
+   * na fatura (ver `responderLiberacao`), que é o que desbloqueia de verdade.
+   */
+  {
+    nome: 'liberar',
+    termos: [
+      'liberar', 'libera', 'liberacao', 'liberacao em confianca', 'em confianca',
+      'desbloquear', 'desbloqueia', 'desbloqueio', 'religar', 'religa'
+    ]
+  },
+  /**
    * Before the signal group, because a Brazilian ISP subscriber whose line is
    * blocked for non-payment writes "estou sem internet, é o boleto?" — and the
    * invoice is the answer that actually unblocks them.
@@ -183,8 +200,8 @@ const PADROES = [...INTENCOES, ...INTENCOES_DE_CONVERSA].map(({ nome, termos }) 
  * no começo da mensagem. Um número no meio ("faz 3 dias que caiu") é frase, e
  * segue para as palavras.
  */
-const OPCOES_DO_MENU = { 1: 'fatura', 2: 'sinal', 3: 'atendente' };
-const OPCAO = /^(?:opcao )?([1-3])(?: |$)/;
+const OPCOES_DO_MENU = { 1: 'fatura', 2: 'sinal', 3: 'atendente', 4: 'liberar' };
+const OPCAO = /^(?:opcao )?([1-4])(?: |$)/;
 
 /**
  * Which intent a message body carries. Exported because the routing table is
@@ -209,6 +226,20 @@ export function classificarIntencao(texto) {
 }
 
 /**
+ * O assinante PEDIU o menu — com as palavras dele, e não por cair no padrão.
+ *
+ * `classificarIntencao` responde `menu` também para o que não reconhece, e é
+ * certo para quem não está em pausa. Numa pausa, não: "obrigado", ou o CPF de
+ * quem esgotou as tentativas, tiravam a pausa e traziam o bot de volta por
+ * cima do atendente.
+ */
+function pedeMenu(texto) {
+  const limpo = normalizarTexto(texto);
+  const menu = PADROES.find(({ nome }) => nome === 'menu');
+  return Boolean(limpo) && menu.regex.some((re) => re.test(limpo));
+}
+
+/**
  * Quanto tempo o bot fica calado depois que o assinante pede um atendente.
  *
  * Quatro horas: o bastante para um atendente chegar no mesmo turno sem o bot
@@ -217,6 +248,23 @@ export function classificarIntencao(texto) {
  * assinante pode trazê-lo de volta antes, escrevendo "menu".
  */
 const PAUSA_ATENDENTE_MS = 4 * 60 * 60 * 1000;
+
+/**
+ * A identificação pelo CPF/CNPJ do titular, para o número que o cadastro não
+ * conhece.
+ *
+ * O passo (esperando o documento, escolhendo entre contratos) vale 30 min: quem
+ * volta depois recomeça do pedido do documento. E são 3 tentativas erradas por
+ * hora — acertar um CPF por tentativa é o ataque que isto barra; na terceira o
+ * bot passa para um atendente, com a mesma pausa do "atendente".
+ */
+const PASSO_VALIDADE_MS = 30 * 60 * 1000;
+const TENTATIVAS_DOCUMENTO = 3;
+const JANELA_TENTATIVAS_MS = 60 * 60 * 1000;
+/** Quantos contratos cabem na lista de escolha: um dígito por opção. */
+const MAX_CONTRATOS_NA_LISTA = 9;
+const PASSO_DOCUMENTO = 'aguardando_documento';
+const PASSO_ESCOLHA = 'escolhendo_contrato';
 
 /**
  * Server-side text has no request locale: a WhatsApp message carries no
@@ -302,12 +350,87 @@ async function responderPortal() {
   return portal ? t('whatsapp.bot.portalHint', { link: portal }) : null;
 }
 
+/**
+ * O contrato está bloqueado/suspenso no SGP? A liberação em confiança só faz
+ * sentido aí — o SGP recusaria de qualquer jeito, e oferecer a opção a quem
+ * está navegando é um convite a pedir o que não precisa.
+ */
+async function contratoBloqueado(contract) {
+  const contratos = await SgpService.lookupContacts({ contract });
+  const alvo = SgpService.exactContract(contratos, contract) || contratos[0];
+  if (!alvo) return false;
+  if (alvo.blocked === true) return true;
+  return /suspen|bloque/.test(normalizarTexto(`${alvo.status || ''} ${alvo.statusLabel || ''}`));
+}
+
+/** O menu, com a opção 4 só quando o provedor ligou a liberação e o contrato está bloqueado. */
+async function menuPara(link) {
+  const { botUnlockEnabled } = await WhatsAppConfigService.getConfig();
+  if (botUnlockEnabled && link?.contract) {
+    try {
+      if (await contratoBloqueado(link.contract)) return t('whatsapp.bot.menuWithUnlock');
+    } catch (error) {
+      // SGP fora: o menu sem a opção 4 ainda é um menu que funciona.
+      console.warn('waBot menu:', error?.message || error);
+    }
+  }
+  return t('whatsapp.bot.menu');
+}
+
+/**
+ * Pede a liberação em confiança ao SGP, que decide.
+ *
+ * Desligada no provedor, "quero liberar" recebe a fatura — é ela que
+ * desbloqueia de verdade, e dizer "não posso" a quem pediu ajuda seria pior.
+ */
+async function responderLiberacao(link, conversation) {
+  const { botUnlockEnabled } = await WhatsAppConfigService.getConfig();
+  if (!botUnlockEnabled) return responderFatura(link);
+  if (!(await contratoBloqueado(link.contract))) return t('whatsapp.bot.unlockNotBlocked');
+  let resultado;
+  try {
+    resultado = await SgpService.requestTrustUnlock({ contract: link.contract });
+  } catch (error) {
+    // Recusa do SGP (já usada no mês, contrato que não aceita) é resposta,
+    // não falha: o assinante sabe o que houve e como falar com alguém.
+    if (error?.code === 'unlock_refused') return t('whatsapp.bot.unlockRefused');
+    throw error;
+  }
+  await AuditLog.record({
+    action: AuditLog.ACTIONS.WHATSAPP_BOT_TRUST_UNLOCK,
+    actorKind: 'system',
+    actorUsername: 'bot-whatsapp',
+    subjectType: 'contract',
+    subjectId: link.contract,
+    detail: {
+      conversationId: conversation.id,
+      protocol: resultado.protocol ?? null,
+      days: resultado.days ?? null
+    }
+  });
+  const linhas = [t('whatsapp.bot.unlockDone')];
+  if (resultado.days) linhas.push(t('whatsapp.bot.unlockDays', { days: resultado.days }));
+  if (resultado.protocol) linhas.push(t('whatsapp.bot.unlockProtocol', { protocol: resultado.protocol }));
+  return linhas.join('\n');
+}
+
+/** O passo gravado, ou `null` quando não há ou já venceu. */
+function passoAtivo(conversation) {
+  if (!conversation?.bot_step || !conversation.bot_step_at) return null;
+  const desde = new Date(conversation.bot_step_at).getTime();
+  return Date.now() - desde < PASSO_VALIDADE_MS ? conversation.bot_step : null;
+}
+
 class WaBotService {
   static JANELA_HUMANO_MS = JANELA_HUMANO_MS;
 
   static TETO_POR_HORA = TETO_POR_HORA;
 
   static PAUSA_ATENDENTE_MS = PAUSA_ATENDENTE_MS;
+
+  static TENTATIVAS_DOCUMENTO = TENTATIVAS_DOCUMENTO;
+
+  static PASSO_VALIDADE_MS = PASSO_VALIDADE_MS;
 
   /**
    * Answers one inbound message, or stays quiet.
@@ -421,21 +544,6 @@ class WaBotService {
       .pluck('id');
     if (automaticas.length >= TETO_POR_HORA) return { replied: false, reason: 'rate_limited' };
 
-    // Identity last, because it is the only check that leaves the panel's own
-    // tables. An unresolved number is told so and left for a human: it never
-    // gets contract data, because the only thing it proved is that it holds a
-    // phone.
-    const { link } = await WaConversationService.resolveSubscriber(conversation.wa_phone_e164);
-    if (!link) {
-      await this.responderCom(conversation, t('whatsapp.bot.notRecognised'));
-      return { replied: true, intent: 'notRecognised' };
-    }
-
-    // Worth doing while we are here and have the match: the thread carries the
-    // contract from now on, so the operator opening it sees the ONT and the
-    // invoices. `bindSubscriber` writes once and never overwrites.
-    await WaConversationService.bindSubscriber(conversation);
-
     const intencao = classificarIntencao(texto);
 
     // Quem pediu um atendente não recebe o menu de volta a cada mensagem: a
@@ -443,12 +551,48 @@ class WaBotService {
     // assinante pedir o menu, que é o que tira a pausa.
     const pausadoAte = conversation.bot_paused_until ? new Date(conversation.bot_paused_until).getTime() : 0;
     if (pausadoAte > Date.now()) {
-      if (intencao !== 'menu') return { replied: false, reason: 'paused' };
+      if (!pedeMenu(texto)) return { replied: false, reason: 'paused' };
       await this.pausar(conversation, null);
     }
 
+    // Identity last, because it is the only check that leaves the panel's own
+    // tables. A number the cadastre knows is the stage-1 convenience; one it
+    // does not know is asked for the holder's CPF/CNPJ, and gets no contract
+    // data until that matches.
+    let { link } = await WaConversationService.resolveSubscriber(conversation.wa_phone_e164);
+    if (link) {
+      // Worth doing while we are here and have the match: the thread carries
+      // the contract from now on, so the operator opening it sees the ONT and
+      // the invoices. `bindSubscriber` writes once and never overwrites.
+      await WaConversationService.bindSubscriber(conversation);
+    } else {
+      // Relida: o webhook pode ter acabado de ligar a conversa, e o passo do
+      // bot mora nela.
+      const atual = (await tdb('wa_conversations').where({ id: conversation.id }).first()) || conversation;
+      if (atual.contract) {
+        // Ligada antes — pelo documento, neste bot, ou por um atendente.
+        link = { contract: atual.contract, device_id: atual.device_id ?? null };
+      } else {
+        const escolhendo = passoAtivo(atual) === PASSO_ESCOLHA && /^\s*\d/.test(texto);
+        if (intencao === 'atendente' && !escolhendo) {
+          await this.pausar(conversation, new Date(Date.now() + PAUSA_ATENDENTE_MS));
+          await this.responderCom(conversation, t('whatsapp.bot.handoffQueued'));
+          return { replied: true, intent: 'atendente' };
+        }
+        try {
+          return await this.identificar(atual, texto);
+        } catch (error) {
+          // SGP fora do ar no meio da identificação: um atendente, e não o
+          // silêncio de quem mandou o CPF e não ouviu nada.
+          console.error('waBot identificar:', error?.message || error);
+          await this.responderCom(conversation, t('whatsapp.bot.handoff'));
+          return { replied: true, intent: 'handoff', from: 'identificar' };
+        }
+      }
+    }
+
     if (intencao === 'menu') {
-      await this.responderCom(conversation, t('whatsapp.bot.menu'));
+      await this.responderCom(conversation, await menuPara(link));
       return { replied: true, intent: 'menu' };
     }
     if (intencao === 'atendente') {
@@ -461,7 +605,9 @@ class WaBotService {
     try {
       if (intencao === 'portal') resposta = await responderPortal();
       else if (intencao === 'fatura') resposta = await responderFatura(link);
-      else if (intencao === 'sinal') resposta = await responderSinal(link);
+      else if (intencao === 'sinal') {
+        resposta = link.device_id ? await responderSinal(link) : t('whatsapp.bot.noDevice');
+      } else if (intencao === 'liberar') resposta = await responderLiberacao(link, conversation);
     } catch (error) {
       // SGP down, GenieACS unreachable, a contract the ERP no longer knows: the
       // customer asked a real question and deserves better than silence, so the
@@ -489,6 +635,125 @@ class WaBotService {
    * The outbox worker delivers it. The bot never speaks to Evolution: enqueuing
    * is what keeps a slow provider server out of the webhook's response time.
    */
+  /**
+   * O número que o cadastro não conhece: pede o CPF/CNPJ do titular, confere,
+   * e liga a conversa ao contrato — nunca o telefone (ver `bindByDocument`).
+   */
+  static async identificar(conversation, texto) {
+    const sgp = await SgpService.getConfig();
+    // Sem SGP não há onde conferir um documento: o comportamento da etapa 1.
+    if (!SgpService.isReady(sgp)) {
+      await this.responderCom(conversation, t('whatsapp.bot.notRecognised'));
+      return { replied: true, intent: 'notRecognised' };
+    }
+
+    const passo = passoAtivo(conversation);
+    const digitos = normalizeTaxId(texto);
+    const pareceDocumento = digitos.length === 11 || digitos.length === 14;
+
+    if (passo === PASSO_ESCOLHA && !pareceDocumento) {
+      let opcoes = [];
+      try { opcoes = JSON.parse(conversation.bot_step_data || '[]'); } catch { opcoes = []; }
+      const escolhida = /^\s*(\d{1,2})(?:\D|$)/.exec(texto);
+      const opcao = escolhida ? opcoes[Number(escolhida[1]) - 1] : null;
+      if (opcao?.contract) return this.vincular(conversation, opcao.contract);
+      await this.responderCom(conversation, this.textoEscolha(opcoes));
+      return { replied: true, intent: 'chooseContract' };
+    }
+
+    if (pareceDocumento || (passo === PASSO_DOCUMENTO && /\d/.test(texto))) {
+      return this.receberDocumento(conversation, digitos);
+    }
+
+    await this.gravarPasso(conversation, { bot_step: PASSO_DOCUMENTO, bot_step_data: null, bot_step_at: new Date() });
+    await this.responderCom(conversation, t('whatsapp.bot.askDocument'));
+    return { replied: true, intent: 'askDocument' };
+  }
+
+  /** Um documento digitado: tentativa contada, conferência e consulta ao SGP. */
+  static async receberDocumento(conversation, digitos) {
+    const agora = Date.now();
+    const janela = conversation.bot_doc_window_at ? new Date(conversation.bot_doc_window_at).getTime() : 0;
+    let tentativas = agora - janela < JANELA_TENTATIVAS_MS ? Number(conversation.bot_doc_attempts || 0) : 0;
+    const inicioJanela = tentativas > 0 ? new Date(janela) : new Date(agora);
+
+    const esgotou = async () => {
+      await this.gravarPasso(conversation, { bot_step: null, bot_step_data: null, bot_step_at: null });
+      await this.pausar(conversation, new Date(agora + PAUSA_ATENDENTE_MS));
+      await this.responderCom(conversation, t('whatsapp.bot.tooManyAttempts'));
+      return { replied: true, intent: 'tooManyAttempts' };
+    };
+    if (tentativas >= TENTATIVAS_DOCUMENTO) return esgotou();
+
+    const falhou = async (chave) => {
+      tentativas += 1;
+      await this.gravarPasso(conversation, {
+        bot_step: PASSO_DOCUMENTO,
+        bot_step_data: null,
+        bot_step_at: new Date(agora),
+        bot_doc_attempts: tentativas,
+        bot_doc_window_at: inicioJanela
+      });
+      if (tentativas >= TENTATIVAS_DOCUMENTO) return esgotou();
+      await this.responderCom(conversation, t(chave));
+      return { replied: true, intent: chave.split('.').pop() };
+    };
+
+    if (!isValidCpf(digitos) && !isValidCnpj(digitos)) return falhou('whatsapp.bot.invalidDocument');
+
+    const contratos = await SgpService.lookupContacts({ document: digitos });
+    if (contratos.length === 0) return falhou('whatsapp.bot.documentNotFound');
+    if (contratos.length === 1) return this.vincular(conversation, contratos[0].contract);
+
+    // Só contrato e rótulo: o documento que o assinante digitou não é guardado.
+    const opcoes = contratos.slice(0, MAX_CONTRATOS_NA_LISTA).map((c) => ({
+      contract: c.contract,
+      label: [c.address, c.statusLabel || c.status].filter(Boolean).join(' · ')
+    }));
+    await this.gravarPasso(conversation, {
+      bot_step: PASSO_ESCOLHA,
+      bot_step_data: JSON.stringify(opcoes),
+      bot_step_at: new Date(agora)
+    });
+    await this.responderCom(conversation, this.textoEscolha(opcoes));
+    return { replied: true, intent: 'chooseContract' };
+  }
+
+  static textoEscolha(opcoes) {
+    const linhas = [t('whatsapp.bot.chooseContract')];
+    opcoes.forEach((opcao, i) => {
+      linhas.push(t('whatsapp.bot.contractOption', {
+        n: i + 1,
+        contract: opcao.contract,
+        label: opcao.label ? ` — ${opcao.label}` : ''
+      }));
+    });
+    return linhas.join('\n');
+  }
+
+  /** Liga a conversa ao contrato, zera o passo e as tentativas, e manda o menu. */
+  static async vincular(conversation, contract) {
+    const ligada = await WaConversationService.bindByDocument(conversation, { contract });
+    await this.gravarPasso(conversation, {
+      bot_step: null,
+      bot_step_data: null,
+      bot_step_at: null,
+      bot_doc_attempts: 0,
+      bot_doc_window_at: null
+    });
+    const link = { contract: ligada?.contract || contract, device_id: ligada?.device_id ?? null };
+    await this.responderCom(conversation, await menuPara(link));
+    return { replied: true, intent: 'identified' };
+  }
+
+  /** Grava o passo da identificação nesta conversa. */
+  static async gravarPasso(conversation, patch) {
+    await tdb('wa_conversations')
+      .where({ id: conversation.id })
+      .update({ ...patch, updated_at: new Date() });
+    Object.assign(conversation, patch);
+  }
+
   /** Grava (ou tira, com `null`) a pausa do bot nesta conversa. */
   static async pausar(conversation, ate) {
     await tdb('wa_conversations')

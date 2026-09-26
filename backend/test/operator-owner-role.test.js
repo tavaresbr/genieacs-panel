@@ -11,7 +11,7 @@ const { default: TenantUser } = await import('../src/models/TenantUser.js');
  * `owner` e `admin` alcançam exatamente as mesmas rotas — a diferença inteira
  * entre os dois é quem mexe no papel de quem. Uma regra que existe em um lugar
  * só não é uma regra: quem quiser contorná-la usa a porta ao lado. Este arquivo
- * cobre as três portas — promover, rebaixar e encerrar o vínculo — e existe
+ * cobre as portas — promover, rebaixar, encerrar o vínculo e trocar a senha — e existe
  * porque a terceira ficou de fora na primeira escrita: um `admin` não podia
  * rebaixar um `owner`, mas podia apagar a membership dele, que é pior.
  */
@@ -100,6 +100,50 @@ describe('um admin diante do owner', () => {
     });
     assert.equal(status, 200);
     assert.equal((await papelDe(alvo.id)).role, 'tech');
+  });
+});
+
+describe('a senha do owner', () => {
+  // A quarta porta: o papel, o vínculo e o 2FA do dono já eram só dele; a
+  // senha não era, e trocar a senha é entrar como ele.
+  const trocarSenha = (token, id, body) => call(`${panelUrl}/api/users/${id}`, {
+    method: 'PATCH', headers: authHeaders(token), body
+  });
+  const consegueEntrar = async (username, senha) => (await call(`${panelUrl}/api/auth/login`, {
+    method: 'POST', body: { username, password: senha }
+  })).status === 200;
+
+  it('um admin não troca', async () => {
+    const { status, body } = await trocarSenha(adminToken, ownerId, { password: 'senha-do-admin-agora' });
+    assert.equal(status, 403, JSON.stringify(body));
+    assert.equal(await consegueEntrar('a-dona', 'senha-do-admin-agora'), false, 'a senha nova do admin entrou na conta da dona');
+    assert.equal(await consegueEntrar('a-dona', 'senha-da-dona-1'), true, 'a dona perdeu a própria senha');
+    // A recusa não derruba a sessão dela: o token_version não subiu.
+    const sessao = await call(`${panelUrl}/api/auth/user`, { headers: authHeaders(ownerToken) });
+    assert.equal(sessao.status, 200);
+  });
+
+  it('nem junto com o papel, e nada muda', async () => {
+    const { status } = await trocarSenha(adminToken, ownerId, { role: 'admin', password: 'senha-do-admin-agora' });
+    assert.equal(status, 403);
+    assert.equal((await papelDe(ownerId)).role, 'owner');
+    assert.equal(await consegueEntrar('a-dona', 'senha-da-dona-1'), true);
+  });
+
+  it('outro owner troca', async () => {
+    const segundoDono = await criar('o-segundo-dono', 'senha-do-segundo-1', 'owner');
+    const { status } = await trocarSenha(ownerToken, segundoDono, { password: 'senha-nova-do-segundo' });
+    assert.equal(status, 200);
+    assert.equal(await consegueEntrar('o-segundo-dono', 'senha-nova-do-segundo'), true);
+  });
+
+  it('e o admin continua trocando a senha de quem não é owner', async () => {
+    // O par obrigatório: sem ele, um admin que não trocasse senha de ninguém
+    // daria os mesmos 403 acima e o bloco passaria provando nada.
+    const alvo = await criar('mais-um-admin', 'senha-do-mais-um-1', 'admin');
+    const { status } = await trocarSenha(adminToken, alvo, { password: 'senha-nova-do-mais-um' });
+    assert.equal(status, 200);
+    assert.equal(await consegueEntrar('mais-um-admin', 'senha-nova-do-mais-um'), true);
   });
 });
 

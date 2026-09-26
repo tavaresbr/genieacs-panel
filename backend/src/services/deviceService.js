@@ -2031,23 +2031,35 @@ class DeviceService {
     };
   }
 
-  static async postTask(deviceId, task) {
+  /**
+   * `connectionRequest: false` only queues the task for the ONT's next
+   * periodic Inform, without GenieACS trying to reach it first — the way to
+   * post follow-up tasks once one request has already found it unreachable.
+   */
+  static async postTask(deviceId, task, { connectionRequest = true } = {}) {
     const endpoint = `${encodeURIComponent(deviceId)}/tasks`;
-    return this.fetchFromGenieAcs(endpoint, { connection_request: 1 }, 'POST', task);
+    return this.fetchFromGenieAcs(
+      endpoint,
+      connectionRequest ? { connection_request: 1 } : {},
+      'POST',
+      task
+    );
   }
 
   /**
-   * Posts a task and reports how GenieACS took it. `fetchFromGenieAcs`
-   * discards the status code, but provisioning has to tell the two cases
-   * apart: 200 means the connection request reached the CPE and the task ran,
-   * 202 means it was only queued for some later inform. Recording a 202 as
-   * "applied" would mark a device provisioned that never received anything.
+   * Posts a task and says whether the ONT was reached.
+   *
+   * GenieACS answers 200 when the connection request got through and the
+   * task ran, and 202 when it could only queue it — with the reason in the
+   * status line ("Device is offline" for an ONT behind CGNAT it cannot call
+   * back). `fetchFromGenieAcs` drops both, which is how "Solicitar Inform"
+   * came to report success for ONTs it never reached.
    */
-  static async postProvisioningTask(deviceId, task) {
+  static async postTaskWithStatus(deviceId, task, { connectionRequest = true } = {}) {
     const connector = await connectorFor();
     const response = await connector.request(
       this.devicePath(`${encodeURIComponent(deviceId)}/tasks`),
-      { query: { connection_request: 1 }, method: 'POST', body: task }
+      { query: connectionRequest ? { connection_request: 1 } : {}, method: 'POST', body: task }
     );
     const text = await response.text().catch(() => '');
     if (!response.ok) {
@@ -2059,10 +2071,28 @@ class DeviceService {
     } catch {
       body = null;
     }
+    const reached = response.status === 200;
+    return {
+      status: response.status,
+      reached,
+      reason: reached ? null : (response.statusText || null),
+      body
+    };
+  }
+
+  /**
+   * Posts a task and reports how GenieACS took it. `fetchFromGenieAcs`
+   * discards the status code, but provisioning has to tell the two cases
+   * apart: 200 means the connection request reached the CPE and the task ran,
+   * 202 means it was only queued for some later inform. Recording a 202 as
+   * "applied" would mark a device provisioned that never received anything.
+   */
+  static async postProvisioningTask(deviceId, task) {
+    const { status, reached, body } = await this.postTaskWithStatus(deviceId, task);
     if (body?.fault?.faultString) {
       throw new Error(`GenieACS reported a fault: ${body.fault.faultString}`);
     }
-    return { status: response.status, applied: response.status === 200, body };
+    return { status, applied: reached, body };
   }
 
   /**
@@ -2557,7 +2587,7 @@ class DeviceService {
    * existing, not a summon that failed, and it must not cost the operator
    * the inform they actually asked for.
    */
-  static async refreshSummonObjects(deviceId) {
+  static async refreshSummonObjects(deviceId, { connectionRequest = true } = {}) {
     const { roots, vendorObjects } = await this.readSummonShape(deviceId);
     const objects = [
       ...roots.flatMap((root) => this.SUMMON_REFRESH_OBJECTS[root] ?? []),
@@ -2567,7 +2597,11 @@ class DeviceService {
     const refreshed = [];
     for (const objectName of objects) {
       try {
-        const result = await this.postTask(deviceId, { name: 'refreshObject', objectName });
+        const result = await this.postTask(
+          deviceId,
+          { name: 'refreshObject', objectName },
+          { connectionRequest }
+        );
         if (result?.fault?.faultString) {
           console.warn(`${deviceId} refused to refresh ${objectName}: ${result.fault.faultString}`);
           continue;
@@ -2590,7 +2624,7 @@ class DeviceService {
    * the objects refreshed. A separate task, so a leaf the ONT no longer has
    * costs this read and not the summon the operator asked for.
    */
-  static async readSummonLeaves(deviceId) {
+  static async readSummonLeaves(deviceId, { connectionRequest = true } = {}) {
     try {
       const [full] = await this.fetchDeviceListPage(
         JSON.stringify({ _id: deviceId }),
@@ -2609,7 +2643,7 @@ class DeviceService {
       const result = await this.postTask(deviceId, {
         name: 'getParameterValues',
         parameterNames: [...new Set(paths)].slice(0, this.SUMMON_READ_LIMIT)
-      });
+      }, { connectionRequest });
       if (result?.fault?.faultString) {
         console.warn(`${deviceId} refused to report its login and optics: ${result.fault.faultString}`);
       }
@@ -2645,9 +2679,11 @@ class DeviceService {
       throw new Error('Every parameter path must be a string of at most 512 characters');
     }
 
-    const refreshed = await this.refreshSummonObjects(deviceId);
-
-    const data = await this.postTask(deviceId, {
+    // The inform the operator asked for goes first: its answer says whether
+    // the ONT can be reached at all. When it cannot, every task after it is
+    // only queued — asking GenieACS to call an ONT behind CGNAT again for each
+    // one would make the button wait out the same timeout several times over.
+    const { reached, reason, body: data } = await this.postTaskWithStatus(deviceId, {
       name: 'getParameterValues',
       parameterNames: [
         'InternetGatewayDevice.DeviceInfo.SerialNumber',
@@ -2659,10 +2695,11 @@ class DeviceService {
       throw new Error(data.fault.faultString);
     }
 
-    await this.readSummonLeaves(deviceId);
+    const refreshed = await this.refreshSummonObjects(deviceId, { connectionRequest: reached });
+    await this.readSummonLeaves(deviceId, { connectionRequest: reached });
     if (refreshed.length > 0) await this.expectFreshRxPower();
 
-    return { ...(data && typeof data === 'object' ? data : {}), refreshed };
+    return { ...(data && typeof data === 'object' ? data : {}), refreshed, reached, reason };
   }
 
   /**

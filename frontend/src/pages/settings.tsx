@@ -56,7 +56,7 @@ import type { Vendor as VendorType, WifiSecurityConfig as WifiSecurityConfigType
 import { MfaCard } from '@/components/mfa-card'
 import { AboutTab } from '@/components/settings/about-tab'
 import { MfaPolicyCard } from '@/components/mfa-policy-card'
-import { canOfferMfaReset } from '@/lib/mfa-enrollment'
+import { canOfferMfaReset, canOfferPasswordReset } from '@/lib/mfa-enrollment'
 
 /**
  * Mapas em vez de nome de chave montado com template literal.
@@ -241,6 +241,7 @@ export default function Settings() {
     webhookBaseUrl: '',
     portalPublicUrl: '',
     botEnabled: true,
+    botUnlockEnabled: false,
     allowedHosts: '',
     managedUrl: '',
     managedAdminKey: '',
@@ -401,6 +402,7 @@ export default function Settings() {
         webhookBaseUrl: config.webhookBaseUrl,
         portalPublicUrl: config.portalPublicUrl,
         botEnabled: config.botEnabled !== false,
+        botUnlockEnabled: config.botUnlockEnabled === true,
         allowedHosts: config.allowedHosts.join('\n'),
         managedUrl: config.managedUrl,
         // The stored admin key never leaves the server; an empty field keeps it.
@@ -548,6 +550,7 @@ export default function Settings() {
         webhookBaseUrl: waForm.webhookBaseUrl,
         portalPublicUrl: waForm.portalPublicUrl,
         botEnabled: waForm.botEnabled,
+        botUnlockEnabled: waForm.botUnlockEnabled,
         // The API takes the textarea verbatim, one host per line.
         allowedHosts: waForm.allowedHosts,
         managedUrl: waForm.managedUrl,
@@ -1454,17 +1457,19 @@ export default function Settings() {
 
   const renderOperatorActions = (operator: Operator, isSelf: boolean) => (
     <div className="flex shrink-0 items-center gap-1 md:gap-2">
-      <button
-        onClick={() => {
-          setResetPasswordId((current) => (current === operator.id ? null : operator.id))
-          setResetPasswordValue('')
-        }}
-        className={`${ICON_ACTION} text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300`}
-        title={t('settings.operators.resetPassword')}
-        aria-label={t('settings.operators.resetPasswordFor', { username: operator.username })}
-      >
-        <Icon name="lock" size={18} />
-      </button>
+      {canOfferPasswordReset(operator, { isOwner }) && (
+        <button
+          onClick={() => {
+            setResetPasswordId((current) => (current === operator.id ? null : operator.id))
+            setResetPasswordValue('')
+          }}
+          className={`${ICON_ACTION} text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300`}
+          title={t('settings.operators.resetPassword')}
+          aria-label={t('settings.operators.resetPasswordFor', { username: operator.username })}
+        >
+          <Icon name="lock" size={18} />
+        </button>
+      )}
       {canOfferMfaReset(operator, { isSelf, isOwner }) && (
         <button
           onClick={() => void resetOperatorMfa(operator)}
@@ -2528,6 +2533,21 @@ export default function Settings() {
                     <span className="block font-semibold">{t('settings.whatsapp.botEnabled')}</span>
                     <span className="mt-1 block text-sm leading-6 text-muted-foreground">
                       {t('settings.whatsapp.botEnabledHint')}
+                    </span>
+                  </span>
+                </label>
+                <label className={`mt-4 flex items-start gap-3 border-t border-border pt-4 ${waForm.botEnabled ? 'cursor-pointer' : 'opacity-60'}`}>
+                  <input
+                    type="checkbox"
+                    className="mt-1 h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
+                    checked={waForm.botUnlockEnabled}
+                    disabled={!waForm.botEnabled}
+                    onChange={(event) => setWaForm((current) => ({ ...current, botUnlockEnabled: event.target.checked }))}
+                  />
+                  <span>
+                    <span className="block font-semibold">{t('settings.whatsapp.botUnlockEnabled')}</span>
+                    <span className="mt-1 block text-sm leading-6 text-muted-foreground">
+                      {t('settings.whatsapp.botUnlockEnabledHint')}
                     </span>
                   </span>
                 </label>
