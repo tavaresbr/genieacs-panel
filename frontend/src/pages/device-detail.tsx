@@ -25,6 +25,10 @@ import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
 import { RX_BAND_STYLE, rxBand } from '@/lib/rx-signal'
 
+/* Linha rótulo/valor dos cartões: no celular o valor (ID, série, usuário
+   PPPoE) quebra dentro da coluna em vez de empurrar a página para o lado. */
+const KV_ROW = 'flex justify-between gap-4 [&>:first-child]:shrink-0 [&>:last-child]:min-w-0 [&>:last-child]:text-end [&>:last-child]:[overflow-wrap:anywhere]'
+
 interface WanBindingData {
   lan: string[];
   ssid: string[];
@@ -226,7 +230,7 @@ function EditWanModal({
           </h3>
           <button
             onClick={onClose}
-            className="p-1 rounded-full text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300"
+            className="p-2 rounded-full text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -235,7 +239,7 @@ function EditWanModal({
         </div>
 
         {/* Form Body */}
-        <div className="p-6 space-y-6 overflow-y-auto">
+        <div className="p-5 sm:p-6 space-y-6 overflow-y-auto">
           {/* 1. WAN Name */}
           <div>
             <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">{t('detail.wanModal.name')}</label>
@@ -402,7 +406,7 @@ function EditWanModal({
         </div>
 
         {/* Footer Modal (Tombol Save) */}
-        <div className="flex items-center justify-end p-5 space-x-3 rtl:space-x-reverse border-t border-gray-200 dark:border-gray-700">
+        <div className="flex flex-wrap items-center justify-end gap-3 p-5 border-t border-gray-200 dark:border-gray-700">
           <button
             onClick={onClose}
             className="modern-button-secondary"
@@ -450,7 +454,7 @@ function EditCredentialModal({
 
   return (
     <div className="fixed inset-0 z-[2100] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="credential-dialog-title">
-      <div className="modern-card w-full max-w-md">
+      <div className="modern-card flex max-h-[90vh] w-full max-w-md flex-col">
         {/* Header Modal */}
         <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-gray-700">
           <h3 id="credential-dialog-title" className="text-xl font-semibold text-gray-900 dark:text-gray-100">
@@ -458,7 +462,7 @@ function EditCredentialModal({
           </h3>
           <button
             onClick={onClose}
-            className="p-1 rounded-full text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300"
+            className="p-2 rounded-full text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -467,7 +471,7 @@ function EditCredentialModal({
         </div>
 
         {/* Form Body */}
-        <div className="p-6 space-y-4">
+        <div className="p-5 sm:p-6 space-y-4 overflow-y-auto">
            <div>
             <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">{t('detail.credentials.username')}</label>
             <input
@@ -490,7 +494,7 @@ function EditCredentialModal({
         </div>
 
         {/* Footer Modal */}
-        <div className="flex items-center justify-end p-5 space-x-3 rtl:space-x-reverse border-t border-gray-200 dark:border-gray-700">
+        <div className="flex flex-wrap items-center justify-end gap-3 p-5 border-t border-gray-200 dark:border-gray-700">
           <button
             onClick={onClose}
             className="modern-button-secondary"
@@ -607,12 +611,12 @@ function IrreversibleActionModal({
 
   return (
     <div className="fixed inset-0 z-[2100] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="factory-reset-title">
-      <div className="modern-card w-full max-w-md">
+      <div className="modern-card flex max-h-[90vh] w-full max-w-md flex-col">
         <div className="flex items-center gap-2 border-b border-border p-5">
           <Icon name="warning" size={20} className="shrink-0 text-[hsl(var(--status-danger))]" />
           <h3 id="factory-reset-title" className="text-lg font-semibold text-foreground">{t(texts.title)}</h3>
         </div>
-        <div className="space-y-3 p-5 text-sm leading-6">
+        <div className="space-y-3 overflow-y-auto p-5 text-sm leading-6">
           <p className="text-foreground">{t(texts.consequence)}</p>
           {action === 'remove' && informedRecently(lastInform) && (
             <p className="rounded-md border border-[hsl(var(--status-warning))]/50 bg-[hsl(var(--status-warning))]/10 px-3 py-2 text-[hsl(var(--status-warning))]">
@@ -622,7 +626,7 @@ function IrreversibleActionModal({
           {action === 'factoryReset' && provisioningAvailable && (
             <p className="text-muted-foreground">{t('detail.factoryReset.provisionHint')}</p>
           )}
-          <label htmlFor="factory-reset-serial" className="field-label pt-1">
+          <label htmlFor="factory-reset-serial" className="field-label pt-1 [overflow-wrap:anywhere]">
             {t('detail.factoryReset.typeSerial', { serial: alvo })}
           </label>
           <input
@@ -664,7 +668,7 @@ function IrreversibleActionModal({
             </p>
           )}
         </div>
-        <div className="flex items-center justify-end gap-3 border-t border-border p-5">
+        <div className="flex flex-wrap items-center justify-end gap-3 border-t border-border p-5">
           <button type="button" className="modern-button-secondary" onClick={onClose} disabled={sending}>
             {t('common.cancel')}
           </button>
@@ -719,14 +723,14 @@ function EditWifiModal({
   return (
     <div className="fixed inset-0 z-[2100] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="wifi-dialog-title">
       <div className="modern-card flex max-h-[92vh] w-full max-w-lg flex-col">
-        <div className="flex items-start justify-between border-b border-border p-5">
-          <div>
+        <div className="flex items-start justify-between gap-3 border-b border-border p-5">
+          <div className="min-w-0">
             <h3 id="wifi-dialog-title" className="section-heading">{t('detail.wifiModal.title', { index: wifi.index })}</h3>
             <p className="section-description mt-1">
               {wifi.usesVirtualParameters ? t('detail.wifiModal.vpNote') : t('detail.wifiModal.tr098Note')}
             </p>
           </div>
-          <button type="button" onClick={onClose} className="icon-button" aria-label={t('detail.wifiModal.close')}>
+          <button type="button" onClick={onClose} className="icon-button shrink-0" aria-label={t('detail.wifiModal.close')}>
             <Icon name="x" size={19} />
           </button>
         </div>
@@ -774,7 +778,7 @@ function EditWifiModal({
             {t('detail.wifiModal.warning')}
           </div>
         </div>
-        <div className="flex justify-end gap-2 border-t border-border p-5">
+        <div className="flex flex-wrap justify-end gap-2 border-t border-border p-5">
           <button type="button" onClick={onClose} className="modern-button-secondary" disabled={saving}>{t('common.cancel')}</button>
           <button type="button" onClick={() => onSave(form)} className="modern-button" disabled={saving || !form.ssid.trim()}>
             {saving ? t('detail.wifiModal.queuing') : t('detail.wifiModal.apply')}
@@ -1526,8 +1530,10 @@ export default function DeviceDetailPage() {
   return (
     <div className="page-shell">
       <div className="page-frame">
-        <header className="page-header">
-          <div>
+        {/* Entre sm e lg a fileira de botões espremia o título numa coluna
+            estreita: ali o cabeçalho continua empilhado, como no celular. */}
+        <header className="page-header sm:flex-col sm:items-stretch lg:flex-row lg:items-end">
+          <div className="min-w-0">
             <div className="mb-3">
               <button
                 onClick={() => navigate('/devices')}
@@ -1560,7 +1566,7 @@ export default function DeviceDetailPage() {
               As ações do CONTRATO (liberação, chamado, SGP, WhatsApp) repetem as
               do bloco do SGP: quem está no telefone age antes de rolar a página.
               Todas secundárias — o verde já é o "Solicitar Inform". */}
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="grid grid-cols-2 gap-2 text-center sm:flex sm:flex-wrap sm:items-center sm:text-start [&_svg]:shrink-0">
             {headerActions.map((action) => action.render())}
           </div>
         </header>
@@ -1604,8 +1610,8 @@ export default function DeviceDetailPage() {
 
         {/* Device Info Cards */}
         <div className="mb-6 grid grid-cols-2 overflow-hidden rounded-[var(--radius)] border border-border bg-card lg:grid-cols-4">
-          <div className="border-b border-e border-border p-4 lg:border-b-0">
-            <div className="flex items-center justify-between mb-2">
+          <div className="min-w-0 border-b border-e border-border p-4 lg:border-b-0">
+            <div className="flex items-center justify-between gap-2 mb-2">
               <span className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('detail.metric.signal')}</span>
               <span className={signalInfo.badgeClass}>{signalInfo.label}</span>
             </div>
@@ -1613,8 +1619,8 @@ export default function DeviceDetailPage() {
               {vp.rxpower?.value !== null && vp.rxpower?.value !== undefined ? `${vp.rxpower.value} dBm` : t('common.na')}
             </div>
           </div>
-          <div className="border-b border-border p-4 lg:border-b-0 lg:border-e">
-            <div className="flex items-center justify-between mb-2">
+          <div className="min-w-0 border-b border-border p-4 lg:border-b-0 lg:border-e">
+            <div className="flex items-center justify-between gap-2 mb-2">
               <span className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('detail.metric.temperature')}</span>
               <Icon name="thermometer" size={20} className="text-gray-400 dark:text-gray-500" />
             </div>
@@ -1622,8 +1628,8 @@ export default function DeviceDetailPage() {
               {vp.temperature?.value ?? t('common.na')}
             </div>
           </div>
-          <div className="border-e border-border p-4">
-            <div className="flex items-center justify-between mb-2">
+          <div className="min-w-0 border-e border-border p-4">
+            <div className="flex items-center justify-between gap-2 mb-2">
               <span className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('detail.metric.activeDevices')}</span>
               <Icon name="phone" size={20} className="text-gray-400 dark:text-gray-500" />
             </div>
@@ -1631,12 +1637,12 @@ export default function DeviceDetailPage() {
               {vp.activedevices?.value || 0}
             </div>
           </div>
-          <div className="p-4">
-            <div className="flex items-center justify-between mb-2">
+          <div className="min-w-0 p-4">
+            <div className="flex items-center justify-between gap-2 mb-2">
               <span className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('detail.metric.model')}</span>
               <Icon name="server" size={20} className="text-gray-400 dark:text-gray-500" />
             </div>
-            <div className="text-lg font-bold text-gray-900 dark:text-gray-100">
+            <div className="text-lg font-bold text-gray-900 dark:text-gray-100 [overflow-wrap:anywhere]">
               {deviceInfo.productclass || t('common.na')}
             </div>
           </div>
@@ -1696,48 +1702,48 @@ export default function DeviceDetailPage() {
         {/* Tab Overview */}
         {activeTab === 'overview' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="modern-card p-6">
+            <div className="modern-card p-5 sm:p-6">
               <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">{t('detail.info.title')}</h2>
               <div className="space-y-3">
-                <div className="flex justify-between">
+                <div className={KV_ROW}>
                   <span className="text-gray-600 dark:text-gray-400">{t('detail.info.deviceId')}:</span>
                   <span className="font-mono text-sm">{device._id}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className={KV_ROW}>
                   <span className="text-gray-600 dark:text-gray-400">{t('detail.info.serialNumber')}:</span>
                   <span className="font-mono text-sm">{deviceInfo.serialNumber || t('common.na')}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className={KV_ROW}>
                   <span className="text-gray-600 dark:text-gray-400">{t('detail.info.manufacturer')}:</span>
                   <span>{deviceInfo.manufacturer || t('common.na')}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className={KV_ROW}>
                   <span className="text-gray-600 dark:text-gray-400">{t('detail.info.productClass')}:</span>
                   <span>{deviceInfo.productclass || t('common.na')}</span>
                 </div>
                 {/* O MAC WAN é o que o SGP mostra na sessão PPPoE — é por ele
                     que se confere, no ERP, qual assinante está neste ONT. */}
-                <div className="flex justify-between">
+                <div className={KV_ROW}>
                   <span className="text-gray-600 dark:text-gray-400">{t('detail.info.wanMac')}:</span>
                   <span className="font-mono text-sm">{deviceInfo.wanMacAddress || t('common.na')}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className={KV_ROW}>
                   <span className="text-gray-600 dark:text-gray-400">{t('detail.info.lanMac')}:</span>
                   <span className="font-mono text-sm">{deviceInfo.lanMacAddress || t('common.na')}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className={KV_ROW}>
                   <span className="text-gray-600 dark:text-gray-400">{t('detail.info.hardwareVersion')}:</span>
                   <span>{deviceInfo.hardwareVersion || t('common.na')}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className={KV_ROW}>
                   <span className="text-gray-600 dark:text-gray-400">{t('detail.info.softwareVersion')}:</span>
                   <span>{deviceInfo.softwareVersion || t('common.na')}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className={KV_ROW}>
                   <span className="text-gray-600 dark:text-gray-400">{t('detail.info.lastBoot')}:</span>
                   <span>{formatDate(device._lastBoot)}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className={KV_ROW}>
                   <span className="text-gray-600 dark:text-gray-400">{t('detail.info.lastRegistered')}:</span>
                   <span>{formatDate(device._registered)}</span>
                 </div>
@@ -1910,13 +1916,13 @@ export default function DeviceDetailPage() {
                         <p className="metric-label">{t('detail.sgp.contract')}</p>
                         <p className="mt-1 font-mono font-semibold">{sgpLink.contract}</p>
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <p className="metric-label">{t('detail.sgp.client')}</p>
-                        <p className="mt-1 font-semibold">{sgpLink.clientName || '—'}</p>
+                        <p className="mt-1 font-semibold [overflow-wrap:anywhere]">{sgpLink.clientName || '—'}</p>
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <p className="metric-label">{t('detail.sgp.plan')}</p>
-                        <p className="mt-1 font-semibold">{sgpLink.plan || '—'}</p>
+                        <p className="mt-1 font-semibold [overflow-wrap:anywhere]">{sgpLink.plan || '—'}</p>
                       </div>
                       <div>
                         <p className="metric-label">{t('detail.sgp.status')}</p>
@@ -1930,7 +1936,7 @@ export default function DeviceDetailPage() {
                         </p>
                       </div>
                     </div>
-                    <p className="mt-3 text-xs text-muted-foreground">
+                    <p className="mt-3 text-xs text-muted-foreground [overflow-wrap:anywhere]">
                       {t(sgpLink.linkMode === 'manual' ? 'detail.sgp.linkManual' : 'detail.sgp.linkAuto')}
                       {sgpLink.login ? ` · ${t('detail.sgp.linkLogin', { login: sgpLink.login })}` : ''}
                       {sgpLink.lastSyncedAt
@@ -1981,7 +1987,7 @@ export default function DeviceDetailPage() {
                                   {t('detail.sgp.dueOn', { date: invoiceDueDate(invoice.dueDate) })}
                                 </span>
                               </div>
-                              <p className="mt-1 text-sm text-muted-foreground">
+                              <p className="mt-1 text-sm text-muted-foreground [overflow-wrap:anywhere]">
                                 {invoice.description || t('detail.sgp.invoiceFallback')}
                                 {invoice.status ? ` · ${invoice.status}` : ''}
                               </p>
@@ -2071,20 +2077,20 @@ export default function DeviceDetailPage() {
 
             <DeviceHistoryCard deviceId={deviceId} />
 
-            <div className="modern-card p-6">
+            <div className="modern-card p-5 sm:p-6">
               <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">{t('detail.signalInfo.title')}</h2>
               <div className="space-y-3">
-                 <div className="flex justify-between">
+                 <div className={KV_ROW}>
                     <span className="text-gray-600 dark:text-gray-400">{t('detail.signalInfo.rxPower')}:</span>
                     <span className={`font-medium ${signalInfo.color}`}>
                       {vp.rxpower?.value !== null && vp.rxpower?.value !== undefined ? `${vp.rxpower.value} dBm` : t('common.na')}
                     </span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className={KV_ROW}>
                     <span className="text-gray-600 dark:text-gray-400">{t('detail.signalInfo.temperature')}:</span>
                     <span className="font-medium">{vp.temperature?.value ?? t('common.na')}</span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className={KV_ROW}>
                     <span className="text-gray-600 dark:text-gray-400">{t('detail.signalInfo.connectionStatus')}:</span>
                     {primaryWAN ? getStatusBadge(primaryWAN.status || 'Disconnected') : <span className="modern-badge">{t('common.na')}</span>}
                   </div>
@@ -2102,8 +2108,8 @@ export default function DeviceDetailPage() {
                 <p className="section-description">{t('detail.wan.description')}</p>
               </div>
               {canWriteDevice && (
-                <div className="grid gap-2 sm:grid-cols-[minmax(15rem,1fr)_8rem_auto]">
-                  <div>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(15rem,1fr)_8rem_auto]">
+                  <div className="min-w-0">
                     <label htmlFor="wan-container" className="field-label">{t('detail.wan.container')}</label>
                     <select id="wan-container" className="modern-input max-w-full" value={wanContainer}
                       onChange={(event) => setWanContainer(event.target.value)}>
@@ -2132,16 +2138,16 @@ export default function DeviceDetailPage() {
                 device.wan.map((wan) => (
                   <div key={wan.index} className="flex flex-col border border-gray-200 dark:border-gray-700 rounded-md">
                     <div className="p-5 space-y-3">
-                      <div className="flex justify-between items-center">
-                        <h3 className="text-md font-semibold text-gray-900 dark:text-gray-100">
+                      <div className="flex justify-between items-start gap-3">
+                        <h3 className="min-w-0 text-md font-semibold text-gray-900 dark:text-gray-100 [overflow-wrap:anywhere]">
                           {wan.name || t('detail.wan.connection', { index: wan.index })}
                         </h3>
-                        {getStatusBadge(wan.status || 'Disconnected')}
+                        <span className="shrink-0">{getStatusBadge(wan.status || 'Disconnected')}</span>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3 pt-3 border-t border-gray-200 dark:border-gray-700">
                         <div className="space-y-3">
-                          <div className="flex justify-between">
+                          <div className={KV_ROW}>
                             <span className="text-gray-600 dark:text-gray-400">{t('detail.wan.vlanId')}:</span>
                             <span className="font-medium">
                               { (wan.vlanId === null || wan.vlanId === undefined) ? (
@@ -2153,17 +2159,17 @@ export default function DeviceDetailPage() {
                               )}
                             </span>
                           </div>
-                          <div className="flex justify-between">
+                          <div className={KV_ROW}>
                             <span className="text-gray-600 dark:text-gray-400">{t('detail.wan.username')}:</span>
                             <span className="font-mono text-sm">{wan.username || t('common.na')}</span>
                           </div>
-                          <div className="flex justify-between">
+                          <div className={KV_ROW}>
                             <span className="text-gray-600 dark:text-gray-400">{t('detail.wan.ipAddress')}:</span>
                             <span className="font-mono text-sm">{wan.ipAddress || t('common.na')}</span>
                           </div>
                         </div>
                         <div className="space-y-3">
-                          <div className="flex justify-between">
+                          <div className={KV_ROW}>
                             <span className="text-gray-600 dark:text-gray-400">{t('detail.wan.service')}:</span>
                             <span className="font-medium">
                             { (wan.serviceList === null || wan.serviceList === undefined) ? (
@@ -2175,11 +2181,11 @@ export default function DeviceDetailPage() {
                               )}
                             </span>
                           </div>
-                          <div className="flex justify-between">
+                          <div className={KV_ROW}>
                             <span className="text-gray-600 dark:text-gray-400">{t('detail.wan.connectionType')}:</span>
                             <span className="font-medium">{wan.connectionType || t('common.na')}</span>
                           </div>
-                          <div className="flex justify-between">
+                          <div className={KV_ROW}>
                             <span className="text-gray-600 dark:text-gray-400">{t('detail.wan.nat')}:</span>
                             <span className="font-medium">
                               { (wan.natEnabled === null || wan.natEnabled === undefined) ? t('common.na') : (
@@ -2269,7 +2275,7 @@ export default function DeviceDetailPage() {
                 <h2 className="section-heading">{t('detail.clients.title')}</h2>
                 <p className="section-description">{t('detail.clients.description')}</p>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <span className="modern-badge-success">{t('detail.clients.onlineCount', { count: device.clients?.filter((client) => client.active === true).length || 0 })}</span>
                 <span className="modern-badge">{t('detail.clients.offlineCount', { count: device.clients?.filter((client) => client.active === false).length || 0 })}</span>
               </div>
@@ -2344,7 +2350,7 @@ export default function DeviceDetailPage() {
                 filteredWifi.map((ssid) => (
                   <div key={ssid.index} className="rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-4">
                     <div className="mb-4 flex items-start justify-between gap-3">
-                      <div>
+                      <div className="min-w-0">
                         <h3 className="font-semibold text-foreground">{t('detail.wifi.ssidTitle', { index: ssid.index })}</h3>
                         <div className="mt-1 flex flex-wrap gap-2">
                           <span className={ssid.enable === false ? 'modern-badge-error' : ssid.enable === true ? 'modern-badge-success' : 'modern-badge'}>
@@ -2353,7 +2359,7 @@ export default function DeviceDetailPage() {
                           {ssid.usesVirtualParameters && <span className="modern-badge-info">{t('detail.wifi.installerVp')}</span>}
                         </div>
                       </div>
-                      <span className="font-mono text-xs text-muted-foreground">{t('detail.wifi.channelShort')} {ssid.channel ?? '—'}</span>
+                      <span className="shrink-0 font-mono text-xs text-muted-foreground">{t('detail.wifi.channelShort')} {ssid.channel ?? '—'}</span>
                     </div>
                     <dl className="space-y-3 text-sm">
                       <div className="flex justify-between gap-4">
@@ -2375,7 +2381,7 @@ export default function DeviceDetailPage() {
                       </div>
                       <div className="flex justify-between gap-4">
                         <dt className="text-muted-foreground">{t('detail.wifi.security')}</dt>
-                        <dd className="text-end">{ssid.security || t('detail.wifi.notReported')}</dd>
+                        <dd className="min-w-0 text-end [overflow-wrap:anywhere]">{ssid.security || t('detail.wifi.notReported')}</dd>
                       </div>
                       <div className="flex justify-between gap-4">
                         <dt className="text-muted-foreground">{t('detail.wifi.associatedClients')}</dt>
@@ -2398,7 +2404,7 @@ export default function DeviceDetailPage() {
 
         {/* Tab Advanced */}
         {activeTab === 'advanced' && (
-          <div className="modern-card p-6">
+          <div className="modern-card p-5 sm:p-6">
             <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">{t('detail.advanced.title')}</h2>
             <div className="space-y-6">
               <div>
@@ -2406,7 +2412,7 @@ export default function DeviceDetailPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="border border-gray-200 dark:border-gray-700 rounded-md p-4">
                     <h4 className="font-medium mb-2 text-gray-900 dark:text-gray-100">{t('detail.credentials.superadmin')}</h4>
-                    <p className="text-sm text-gray-500">{t('detail.advanced.user')}: {vp.superAdmin?.value || t('common.na')}</p>
+                    <p className="text-sm text-gray-500 [overflow-wrap:anywhere]">{t('detail.advanced.user')}: {vp.superAdmin?.value || t('common.na')}</p>
                     <p className="text-sm text-gray-500">{t('detail.advanced.pass')}: {vp.superPassword?.value ? '******' : t('common.na')}</p>
                     <button
                       onClick={() => handleOpenCredentialModal('super')}
@@ -2417,7 +2423,7 @@ export default function DeviceDetailPage() {
                   </div>
                   <div className="border border-gray-200 dark:border-gray-700 rounded-md p-4">
                     <h4 className="font-medium mb-2 text-gray-900 dark:text-gray-100">{t('detail.credentials.useradmin')}</h4>
-                    <p className="text-sm text-gray-500">{t('detail.advanced.user')}: {vp.userAdmin?.value || t('common.na')}</p>
+                    <p className="text-sm text-gray-500 [overflow-wrap:anywhere]">{t('detail.advanced.user')}: {vp.userAdmin?.value || t('common.na')}</p>
                     <p className="text-sm text-gray-500">{t('detail.advanced.pass')}: {vp.userPassword?.value ? '******' : t('common.na')}</p>
                     <button
                       onClick={() => handleOpenCredentialModal('user')}

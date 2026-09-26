@@ -84,7 +84,7 @@ export function DeviceParametersCard({ deviceId }: DeviceParametersCardProps) {
         }}
       >
         <input
-          className="modern-input min-w-0 flex-1"
+          className="modern-input min-w-0 flex-1 basis-full sm:basis-0"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           placeholder={t('detail.parameters.searchPlaceholder')}
@@ -105,7 +105,7 @@ export function DeviceParametersCard({ deviceId }: DeviceParametersCardProps) {
           <button
             key={term}
             type="button"
-            className="rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground hover:text-primary"
+            className="min-h-10 rounded-full border border-border px-3 py-1 text-xs text-muted-foreground hover:text-primary sm:min-h-0 sm:px-2 sm:py-0.5"
             onClick={() => pick(term)}
           >
             {term}
@@ -137,19 +137,25 @@ export function DeviceParametersCard({ deviceId }: DeviceParametersCardProps) {
                   <tr>
                     <th className="px-3 py-2">{t('detail.parameters.path')}</th>
                     <th className="px-3 py-2">{t('detail.parameters.value')}</th>
-                    <th className="px-3 py-2">{t('detail.parameters.readAt')}</th>
+                    <th className="hidden px-3 py-2 sm:table-cell">{t('detail.parameters.readAt')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {result.rows.map((row) => (
                     <tr key={row.path}>
-                      <td className="break-all px-3 py-1.5 font-mono">{row.path}</td>
+                      <td className="break-all px-3 py-1.5 font-mono">
+                        {row.path}
+                        {/* No celular a coluna da hora sai e ela vem aqui, para o caminho ter largura. */}
+                        <span className="mt-0.5 block break-normal font-sans text-muted-foreground sm:hidden">
+                          {row.timestamp ? formatDateTime(row.timestamp) : '—'}
+                        </span>
+                      </td>
                       <td className="break-all px-3 py-1.5 font-mono">
                         {row.read
                           ? String(row.value ?? '')
-                          : <span className="text-[hsl(var(--status-warning))]">{t('detail.parameters.notRead')}</span>}
+                          : <span className="whitespace-nowrap text-[hsl(var(--status-warning))]">{t('detail.parameters.notRead')}</span>}
                       </td>
-                      <td className="whitespace-nowrap px-3 py-1.5 text-muted-foreground">
+                      <td className="hidden whitespace-nowrap px-3 py-1.5 text-muted-foreground sm:table-cell">
                         {row.timestamp ? formatDateTime(row.timestamp) : '—'}
                       </td>
                     </tr>
