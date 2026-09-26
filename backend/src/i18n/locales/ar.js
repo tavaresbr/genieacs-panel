@@ -478,6 +478,7 @@ export default {
   'whatsapp.error.attachmentTooLarge': 'حجم الملف أكبر من {max} ميغابايت',
   'whatsapp.error.attachmentEmpty': 'الملف فارغ',
   'whatsapp.error.attachmentTypeNotAllowed': 'لا يمكن إرسال هذا النوع من الملفات من هنا',
+  'whatsapp.error.attachmentContentMismatch': 'محتوى الملف لا يطابق نوعه',
   'whatsapp.error.attachmentNotAllowed': 'لا يمكن إرسال هذا المرفق من هنا',
   'whatsapp.error.noPublicUrl': 'اضبط عنوان webhook العام قبل إرسال المرفقات: فهو العنوان الذي يجلبها منه خادم Evolution',
   'whatsapp.attachmentStored': 'الملف جاهز للإرسال',

@@ -5,6 +5,12 @@ import express from 'express';
 import { DATA_DIR } from '../config/paths.js';
 import { WaError } from './whatsappConfigService.js';
 import { nomeSeguro, tenantMediaDir } from './waMediaService.js';
+import {
+  ATTACHMENT_TYPES,
+  ATTACHMENT_TYPE_ALIASES,
+  MAX_ATTACHMENT_MB
+} from '../config/waAttachmentTypes.js';
+import { matchesDeclaredType } from '../utils/wa/sniffAttachment.js';
 
 /**
  * The file the OPERATOR sends, on its way in.
@@ -24,8 +30,10 @@ import { nomeSeguro, tenantMediaDir } from './waMediaService.js';
  * would run is the session of the operator who opened it.
  */
 
-/** The ceiling, in bytes and in the unit the refusal says out loud. */
-export const MAX_ATTACHMENT_MB = 16;
+/** The ceiling, in bytes and in the unit the refusal says out loud. O número
+ * mora em `config/waAttachmentTypes.js`, que a tela também lê; reexportado aqui
+ * para quem já importava daqui. */
+export { MAX_ATTACHMENT_MB };
 export const MAX_ATTACHMENT_BYTES = MAX_ATTACHMENT_MB * 1024 * 1024;
 
 /**
@@ -36,15 +44,13 @@ export const MAX_ATTACHMENT_BYTES = MAX_ATTACHMENT_MB * 1024 * 1024;
  * decides to do with the file later. A `laudo.html` uploaded as `image/png` is
  * stored as `.png`, and a `foto.png` uploaded as `text/html` is not stored.
  */
-export const ALLOWED_TYPES = Object.freeze({
-  'image/jpeg': '.jpg',
-  'image/png': '.png',
-  'image/webp': '.webp',
-  'application/pdf': '.pdf',
-  'video/mp4': '.mp4',
-  'audio/ogg': '.ogg',
-  'audio/mpeg': '.mp3'
-});
+export const ALLOWED_TYPES = Object.freeze(Object.fromEntries(
+  // Derivado da lista única: a primeira extensão de cada linha é a do disco.
+  ATTACHMENT_TYPES.map((row) => [row.type, row.extensions[0]])
+));
+
+/** A linha da lista para um tipo já normalizado, ou undefined. */
+const TYPE_ROWS = new Map(ATTACHMENT_TYPES.map((row) => [row.type, row]));
 
 /**
  * The provider's outbound subfolder, so inbound and outbound never collide.
@@ -62,9 +68,14 @@ export function outDir() {
  * to the global JSON parser. */
 export const ATTACHMENT_PATH = '/api/whatsapp/attachments';
 
-/** The `Content-Type` without its parameters, lowercased. */
+/**
+ * The `Content-Type` without its parameters, lowercased — e com o apelido
+ * trocado pelo nome da lista (`image/jpg` → `image/jpeg`). O apelido só entra
+ * por aqui: o que se guarda e o que se compara é sempre o nome canônico.
+ */
 export function normalizeType(contentType) {
-  return String(contentType || '').split(';')[0].trim().toLowerCase();
+  const base = String(contentType || '').split(';')[0].trim().toLowerCase();
+  return ATTACHMENT_TYPE_ALIASES[base] || base;
 }
 
 /**
@@ -85,7 +96,65 @@ export function displayName(headerValue, type) {
   } catch {
     decoded = raw;
   }
-  return nomeSeguro(decoded, 'document', type);
+  const nome = nomeSeguro(decoded, 'document', type);
+  return comExtensaoDoTipo(nome, decoded, type);
+}
+
+/**
+ * O rótulo terminando numa extensão que o tipo aceita.
+ *
+ * No WhatsApp o nome do documento é o que o celular do assinante usa para
+ * decidir com que app abrir: um `.docx` que chega como `contrato.bin` não abre,
+ * e um PDF que chega como `fatura.exe` é pior. `nomeSeguro` só conhece as
+ * extensões de mídia recebida, então sem nada aqui um nome sem extensão ganhava
+ * `.bin`. A extensão de um nome que não combina com o tipo é mantida e a do
+ * tipo é acrescentada depois (`relatorio.final.pdf`), para não comer um pedaço
+ * do nome que o operador escolheu.
+ */
+function comExtensaoDoTipo(nome, original, type) {
+  const row = TYPE_ROWS.get(type);
+  if (!row) return nome;
+  const principal = row.extensions[0];
+  const atual = path.extname(nome).toLowerCase();
+  if (row.extensions.includes(atual)) return nome;
+  // `nomeSeguro` pôs `.bin` num nome que veio sem extensão: é essa que sai.
+  const semBin = atual === '.bin' && path.extname(String(original)).toLowerCase() !== '.bin'
+    ? nome.slice(0, -atual.length)
+    : nome;
+  return `${semBin}${principal}`;
+}
+
+/**
+ * O nome depois da conversão: a extensão antiga sai e entra a do tipo novo.
+ * `IMG_0001.HEIC` vira `IMG_0001.jpg` — o assinante recebe um JPEG, e um nome
+ * dizendo HEIC faria o celular dele procurar o app errado.
+ */
+function trocarExtensao(nome, type) {
+  const extensao = ALLOWED_TYPES[type];
+  const atual = path.extname(nome);
+  return `${atual ? nome.slice(0, -atual.length) : nome}${extensao}`;
+}
+
+/**
+ * HEIC → JPEG, com o conversor carregado só na primeira foto de iPhone.
+ *
+ * `heic-convert` puxa um decodificador HEVC inteiro em JS/wasm; carregar isso
+ * na subida do painel custaria memória a todo provedor que nunca recebe HEIC.
+ * Qualquer falha — arquivo truncado, HEIC com a marca certa e o miolo errado —
+ * vira a mesma recusa de conteúdo: o que o operador mandou não é o que disse.
+ */
+async function converter(buffer, destino) {
+  if (destino !== 'image/jpeg') throw new Error(`conversão não suportada: ${destino}`);
+  const { default: convert } = await import('heic-convert');
+  const saida = await convert({ buffer, format: 'JPEG', quality: 0.9 });
+  return Buffer.from(saida);
+}
+
+function recusaDeConteudo() {
+  return new WaError('whatsapp.error.attachmentContentMismatch', {
+    code: 'attachment_content_mismatch',
+    status: 415
+  });
 }
 
 class WaAttachmentService {
@@ -128,14 +197,39 @@ class WaAttachmentService {
       });
     }
 
-    const type = normalizeType(contentType);
-    const extension = ALLOWED_TYPES[type];
-    if (!extension) {
+    const declared = normalizeType(contentType);
+    const row = TYPE_ROWS.get(declared);
+    if (!row) {
       throw new WaError('whatsapp.error.attachmentTypeNotAllowed', {
         code: 'attachment_type_not_allowed',
         status: 415
       });
     }
+
+    // O tipo está na lista; agora, se os bytes são mesmo dele. Depois do teto e
+    // do vazio, que são mais baratos e já dizem o motivo certo.
+    if (!matchesDeclaredType(buffer, declared)) throw recusaDeConteudo();
+
+    let bytes = buffer;
+    let type = declared;
+    if (row.convertTo) {
+      try {
+        bytes = await converter(buffer, row.convertTo);
+      } catch {
+        throw recusaDeConteudo();
+      }
+      // O teto vale para o que sai também: é o JPEG que vai para o WhatsApp, e
+      // o limite de mídia de lá não sabe que o arquivo já foi um HEIC menor.
+      if (bytes.length > MAX_ATTACHMENT_BYTES) {
+        throw new WaError('whatsapp.error.attachmentTooLarge', {
+          code: 'attachment_too_large',
+          status: 413,
+          vars: { max: MAX_ATTACHMENT_MB }
+        });
+      }
+      type = row.convertTo;
+    }
+    const extension = ALLOWED_TYPES[type];
 
     const now = new Date();
     const year = String(now.getUTCFullYear());
@@ -148,13 +242,12 @@ class WaAttachmentService {
     const destination = path.join(DATA_DIR, relative);
 
     await fs.mkdir(path.dirname(destination), { recursive: true });
-    await fs.writeFile(destination, buffer);
+    await fs.writeFile(destination, bytes);
 
-    return {
-      path: relative,
-      type,
-      name: displayName(fileName, type)
-    };
+    const name = type === declared
+      ? displayName(fileName, type)
+      : trocarExtensao(displayName(fileName, declared), type);
+    return { path: relative, type, name };
   }
 }
 

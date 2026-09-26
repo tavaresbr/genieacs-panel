@@ -16,11 +16,10 @@ let panelUrl;
 let token;
 let conversationId;
 
-/** A one-pixel PNG, as real bytes: the route stores what it is given. */
-const PNG = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
-  'base64'
-);
+/** A one-pixel PNG, as real bytes: the route stores what it is given. Os
+ * outros tipos vêm com os primeiros bytes certos de `helpers/attachmentSamples`,
+ * porque o upload confere a assinatura contra o tipo declarado. */
+const { PNG, SAMPLES } = await import('./helpers/attachmentSamples.js');
 
 /**
  * The upload as the browser makes it: the raw file as the body, its name
@@ -187,7 +186,9 @@ describe('WhatsApp attachments — what the operator uploads', () => {
   });
 
   it('refuses every other type off the allowlist, and a request with no type at all', async () => {
-    for (const type of ['text/html', 'application/octet-stream', 'application/x-msdownload', 'image/gif']) {
+    // GIF saiu desta lista quando entrou na lista única; `application/javascript`
+    // ocupa o lugar — um script é exatamente o que nunca pode ser anexo.
+    for (const type of ['text/html', 'application/octet-stream', 'application/x-msdownload', 'application/javascript']) {
       const { status, body } = await upload(PNG, { type, name: 'arquivo' });
       assert.equal(status, 415, `${type} should not be stored`);
       assert.equal(body.code, 'attachment_type_not_allowed');
@@ -200,7 +201,9 @@ describe('WhatsApp attachments — what the operator uploads', () => {
     assert.equal(semTipo.body.code, 'attachment_type_not_allowed');
   });
 
-  it('accepts the whole allowlist, one extension each', async () => {
+  it('accepts the original allowlist, one extension each', async () => {
+    // Os sete tipos de antes, ainda aceitos com a mesma extensão. A lista nova
+    // inteira é conferida em `whatsapp-attachment-types.test.js`.
     const esperado = {
       'image/jpeg': '.jpg',
       'image/png': '.png',
@@ -212,7 +215,7 @@ describe('WhatsApp attachments — what the operator uploads', () => {
     };
     for (const [type, extension] of Object.entries(esperado)) {
       // The parameters a browser adds to a type must not decide the answer.
-      const { status, body } = await upload(PNG, { type: `${type}; charset=binary`, name: 'x' });
+      const { status, body } = await upload(SAMPLES[type], { type: `${type}; charset=binary`, name: 'x' });
       assert.equal(status, 201, `${type} should be stored`);
       assert.equal(body.data.type, type);
       assert.equal(path.extname(body.data.path), extension);

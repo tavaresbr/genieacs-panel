@@ -333,9 +333,13 @@ export function sendAudioRequest(flavor, name, p) {
 /**
  * @param {EvoFlavor} flavor
  * @param {string} name
- * @param {{ number: string, type: string, url: string, caption: string, fileName: string }} p
+ * @param {{ number: string, type: string, url: string, caption: string, fileName: string, mimetype?: string }} p
  *   `type` é image | video | audio | document — o vocabulário é o mesmo nas duas
  *   APIs, mas os NOMES DOS CAMPOS não são.
+ *   `mimetype` só vai para o v2, cujo `sendMedia` tem o campo: sem ele o
+ *   servidor deduz o tipo pela URL, e a URL do painel não tem extensão — um
+ *   `.docx` chegava como arquivo genérico. No GO não há registro de que
+ *   `/send/media` aceite o campo, e chutar campo é o erro que já custou caro.
  * @returns {EvoRequest}
  */
 export function sendMediaRequest(flavor, name, p) {
@@ -352,7 +356,14 @@ export function sendMediaRequest(flavor, name, p) {
     path: `/message/sendMedia/${enc(name)}`,
     method: 'POST',
     key: 'instance',
-    body: { number: p.number, mediatype: p.type, media: p.url, caption: p.caption, fileName: p.fileName }
+    body: {
+      number: p.number,
+      mediatype: p.type,
+      media: p.url,
+      caption: p.caption,
+      fileName: p.fileName,
+      ...(p.mimetype ? { mimetype: p.mimetype } : {})
+    }
   };
 }
 

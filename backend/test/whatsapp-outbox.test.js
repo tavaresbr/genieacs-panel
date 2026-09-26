@@ -408,6 +408,9 @@ describe('audio is a voice bubble before it is a file', () => {
     assert.equal(audioCalls().length, 0);
     assert.equal(mediaCalls().length, 1);
     assert.equal(mediaCalls()[0].payload.mediatype, 'document');
+    // O tipo vai junto no v2: a URL do painel não tem extensão, e sem o campo o
+    // servidor tinha de adivinhar o que era aquele arquivo.
+    assert.equal(mediaCalls()[0].payload.mimetype, 'application/pdf');
   });
 });
 
