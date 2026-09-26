@@ -286,7 +286,7 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null }: Thre
 
   return (
     <div
-      className="relative border-t border-border bg-card p-3"
+      className="relative border-t border-border bg-card p-2.5 sm:p-3"
       data-testid="composer"
       onDragEnter={dragEnter}
       onDragOver={dragOver}
@@ -312,8 +312,12 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null }: Thre
 
       <textarea
         ref={boxRef}
-        rows={3}
-        className={`modern-input min-h-20 resize-y ${
+        // Duas linhas no celular, onde cada linha da caixa é uma linha a menos
+        // de conversa; a partir de `sm`, a altura de sempre. O `!` é porque
+        // `textarea.modern-input` (globals.css) fixa `min-h-24` com
+        // especificidade maior que a de uma classe utilitária.
+        rows={2}
+        className={`modern-input min-h-20 resize-y max-sm:!min-h-14 ${
           isNote
             ? 'border-[hsl(var(--status-warning))]/70 bg-[hsl(var(--status-warning))]/[0.06] focus:border-[hsl(var(--status-warning))] focus:ring-[hsl(var(--status-warning))]/20'
             : ''
@@ -331,7 +335,8 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null }: Thre
       />
 
       {items.length === 0 ? (
-        <p className="field-hint">{t('whatsapp.inbox.attachHint')}</p>
+        // Arrastar e Ctrl+V não existem no celular: a dica só aparece onde vale.
+        <p className="field-hint hidden sm:block">{t('whatsapp.inbox.attachHint')}</p>
       ) : (
         <div className="mt-2" data-testid="composer-attachments">
           <p className="field-hint mb-1.5 mt-0 flex flex-wrap gap-x-1.5">
@@ -372,9 +377,12 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null }: Thre
         </div>
       )}
 
-      <div className="mt-2.5 flex flex-wrap items-start justify-between gap-3">
+      <div className="mt-2.5 flex flex-wrap items-center justify-between gap-3 sm:items-start">
         <div className="min-w-0">
-          <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-foreground">
+          <label
+            className="inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-foreground"
+            title={t('whatsapp.inbox.noteHint')}
+          >
             <input
               type="checkbox"
               className="size-4 accent-[hsl(var(--status-warning))]"
@@ -384,7 +392,7 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null }: Thre
             <Icon name="lock" size={14} className={isNote ? 'text-[hsl(var(--status-warning))]' : 'text-muted-foreground'} />
             {t('whatsapp.inbox.note')}
           </label>
-          <p className="field-hint max-w-md">{t('whatsapp.inbox.noteHint')}</p>
+          <p className="field-hint hidden max-w-md sm:block">{t('whatsapp.inbox.noteHint')}</p>
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
@@ -404,14 +412,14 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null }: Thre
           />
           <button
             type="button"
-            className="modern-button-secondary shrink-0"
+            className="modern-button-secondary shrink-0 px-3 sm:px-4"
             aria-label={t('whatsapp.inbox.attach')}
             title={t('whatsapp.inbox.attachHint')}
             disabled={busy || items.length >= MAX_ATTACHMENTS_PER_SEND}
             onClick={() => fileRef.current?.click()}
           >
             <Icon name="paperclip" size={16} />
-            {t('whatsapp.inbox.attach')}
+            <span className="hidden sm:inline">{t('whatsapp.inbox.attach')}</span>
           </button>
 
           <button

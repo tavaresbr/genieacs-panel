@@ -282,9 +282,16 @@
     @apply transition-colors hover:bg-[hsl(var(--surface-subtle))];
   }
 
+  /* Rola de lado quando as abas não cabem (no celular), sem a barra cinza à
+     vista: o sublinhado da aba ativa e a aba cortada na borda já dizem que há
+     mais para o lado. */
   .tab-rail {
     @apply flex gap-1 overflow-x-auto border-b border-border;
-    scrollbar-width: thin;
+    scrollbar-width: none;
+  }
+
+  .tab-rail::-webkit-scrollbar {
+    display: none;
   }
 
   .tab-button {

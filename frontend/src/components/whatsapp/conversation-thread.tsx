@@ -33,6 +33,11 @@ interface ConversationThreadProps {
   onToggleSgpPanel?: () => void
   /** The operator linked the thread to an SGP subscriber by hand. */
   onLinked: (conversation: WhatsAppConversation) => void
+  /**
+   * Back to the list. Only drawn below `lg`, where the inbox shows one pane at
+   * a time; on a wide screen the list is right there.
+   */
+  onBack?: () => void
 }
 
 /**
@@ -57,7 +62,8 @@ export function ConversationThread({
   onFile,
   sgpPanelOpen,
   onToggleSgpPanel,
-  onLinked
+  onLinked,
+  onBack
 }: ConversationThreadProps) {
   const { t } = useTranslation()
   const { can } = useAuth()
@@ -95,8 +101,19 @@ export function ConversationThread({
 
   return (
     <>
-      <header className="flex flex-wrap items-start justify-between gap-3 border-b border-border bg-card px-4 py-3">
+      <header className="flex flex-wrap items-start justify-between gap-3 border-b border-border bg-card px-3 py-3 sm:px-4">
         <div className="min-w-0">
+          {onBack && (
+            <button
+              type="button"
+              className="-ms-1 mb-1 inline-flex min-h-9 items-center gap-1.5 rounded-md px-1 text-sm font-semibold text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:hidden"
+              data-testid="inbox-back"
+              onClick={onBack}
+            >
+              <Icon name="back" size={16} />
+              {t('whatsapp.inbox.title')}
+            </button>
+          )}
           <h2 className="truncate text-base font-semibold text-foreground">{conversationTitle(conversation)}</h2>
           {address && <p className="truncate font-mono text-xs text-muted-foreground">{address}</p>}
 
@@ -139,16 +156,22 @@ export function ConversationThread({
           </div>
         </div>
 
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
+        {/* No celular os quatro viram só ícone, com o nome no `aria-label` e
+            no `title`, e o grupo quebra linha em vez de sair da tela. */}
+        <div className="flex flex-wrap items-center gap-2">
           {can('whatsapp.send') && (
             <button
               type="button"
-              className="modern-button-secondary"
+              className="modern-button-secondary px-3 sm:px-4"
               aria-expanded={linkerOpen}
+              aria-label={t(conversation.contract ? 'whatsapp.inbox.changeSubscriber' : 'whatsapp.inbox.linkSubscriber')}
+              title={t(conversation.contract ? 'whatsapp.inbox.changeSubscriber' : 'whatsapp.inbox.linkSubscriber')}
               onClick={() => setLinkerOpen((open) => !open)}
             >
               <Icon name="edit" size={16} />
-              {t(conversation.contract ? 'whatsapp.inbox.changeSubscriber' : 'whatsapp.inbox.linkSubscriber')}
+              <span className="hidden sm:inline">
+                {t(conversation.contract ? 'whatsapp.inbox.changeSubscriber' : 'whatsapp.inbox.linkSubscriber')}
+              </span>
             </button>
           )}
 
@@ -156,34 +179,39 @@ export function ConversationThread({
               hint says what it does, and the same button undoes it. */}
           <button
             type="button"
-            className="modern-button-secondary"
+            className="modern-button-secondary px-3 sm:px-4"
             disabled={filing}
+            aria-label={t(closed ? 'whatsapp.inbox.reopen' : 'whatsapp.inbox.close')}
             title={t('whatsapp.inbox.closeHint')}
             onClick={() => onFile(closed ? 'open' : 'closed')}
           >
             <Icon name={closed ? 'refresh' : 'check'} size={16} className={filing ? 'animate-spin' : ''} />
-            {t(closed ? 'whatsapp.inbox.reopen' : 'whatsapp.inbox.close')}
+            <span className="hidden sm:inline">{t(closed ? 'whatsapp.inbox.reopen' : 'whatsapp.inbox.close')}</span>
           </button>
 
           {onToggleSgpPanel && (
             <button
               type="button"
-              className="modern-button-secondary"
+              className="modern-button-secondary px-3 sm:px-4"
               aria-pressed={Boolean(sgpPanelOpen)}
+              aria-label={t('whatsapp.sgp.toggle')}
+              title={t('whatsapp.sgp.toggle')}
               onClick={onToggleSgpPanel}
             >
               <Icon name="database" size={16} />
-              {t('whatsapp.sgp.toggle')}
+              <span className="hidden sm:inline">{t('whatsapp.sgp.toggle')}</span>
             </button>
           )}
 
           {conversation.deviceId && (
             <Link
               to={`/devices/detail?id=${encodeURIComponent(conversation.deviceId)}`}
-              className="modern-button-secondary"
+              className="modern-button-secondary px-3 sm:px-4"
+              aria-label={t('whatsapp.inbox.openDevice')}
+              title={t('whatsapp.inbox.openDevice')}
             >
               <Icon name="server" size={16} />
-              {t('whatsapp.inbox.openDevice')}
+              <span className="hidden sm:inline">{t('whatsapp.inbox.openDevice')}</span>
             </Link>
           )}
         </div>
@@ -202,7 +230,7 @@ export function ConversationThread({
 
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto bg-[hsl(var(--surface-subtle))] px-4 py-4"
+        className="min-h-0 flex-1 overflow-y-auto bg-[hsl(var(--surface-subtle))] px-3 py-3 sm:px-4 sm:py-4"
         onScroll={(event) => {
           const box = event.currentTarget
           stick.current = box.scrollHeight - box.scrollTop - box.clientHeight < STICK_PX

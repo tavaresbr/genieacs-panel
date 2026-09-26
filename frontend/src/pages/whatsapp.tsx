@@ -22,6 +22,7 @@ import { OptOutPanel } from '@/components/whatsapp/opt-out-panel'
 import { AlertsPanel } from '@/components/whatsapp/alerts-panel'
 import { ContactsPanel } from '@/components/whatsapp/contacts-panel'
 import { HealthBell } from '@/components/whatsapp/health-strip'
+import { inboxPanes } from '@/lib/wa-inbox-pane'
 import { useAuth } from '@/contexts/auth-context'
 import { useLocation } from 'react-router'
 
@@ -383,6 +384,23 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
     setSelectedId(next.id)
   }, [])
 
+  /**
+   * Back to the list — the phone's "← Conversas". On a wide screen the list
+   * never left, so this only exists for the one-pane layout (`inboxPanes`).
+   * Clearing the ref first is what makes a thread poll already in flight drop
+   * its answer instead of reopening the conversation behind the operator.
+   */
+  const closeThread = useCallback(() => {
+    selectedIdRef.current = null
+    threadStampRef.current = null
+    threadFailures.current = 0
+    threadBlockedUntil.current = 0
+    setConversation(null)
+    setMessages([])
+    setHasOlder(false)
+    setSelectedId(null)
+  }, [])
+
   // Arriving from Contacts with a thread in hand. Opened once, on mount — the
   // page remounts this tab for every thread it hands over.
   useEffect(() => {
@@ -550,6 +568,8 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
   }, [t, toast])
 
   const unreadTotal = conversations.reduce((sum, row) => sum + row.unreadCount, 0)
+  // No celular, lista OU conversa; no computador, as duas (`lib/wa-inbox-pane.ts`).
+  const panes = inboxPanes(conversation !== null)
 
   return (
     <section className="space-y-5">
@@ -572,12 +592,15 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
           // as abas — medido num print, 10,5rem. Era 16rem para um topo de
           // cinco camadas, e o topo novo deixava a caixa curta; um topo que
           // voltar a crescer faz a página rolar, que é o que este número evita.
+          // No celular desconta também a barra fixa do painel (4rem), e usa
+          // `dvh`: o `vh` do navegador móvel conta a barra de endereço que
+          // aparece e some, e a caixa de escrever ficava embaixo dela.
           <section
-            className={`modern-card grid h-[calc(100vh-10.5rem)] min-h-[32rem] grid-cols-1 overflow-hidden lg:grid-cols-[minmax(17rem,22rem)_1fr] ${
+            className={`modern-card grid h-[calc(100dvh-13.5rem)] min-h-[26rem] grid-cols-1 overflow-hidden lg:h-[calc(100vh-10.5rem)] lg:min-h-[32rem] lg:grid-cols-[minmax(17rem,22rem)_1fr] ${
               showSgpPanel && conversation ? 'xl:grid-cols-[minmax(16rem,20rem)_1fr_minmax(18rem,22rem)]' : ''
             }`}
           >
-            <div className="flex min-h-0 flex-col border-border lg:border-e">
+            <div className={`${panes.list} min-h-0 flex-col border-border lg:border-e`}>
               <div className="space-y-2 border-b border-border px-3 py-3">
                 <div className="flex items-center gap-2">
                   <input
@@ -641,7 +664,7 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
               </div>
             </div>
 
-            <div className="flex min-h-0 flex-col">
+            <div className={`${panes.thread} min-h-0 flex-col`}>
               {conversation ? (
                 <>
                   <ConversationThread
@@ -658,6 +681,7 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
                     sgpPanelOpen={canSeeSgp ? showSgpPanel : undefined}
                     onToggleSgpPanel={canSeeSgp ? toggleSgpPanel : undefined}
                     onLinked={linked}
+                    onBack={closeThread}
                   />
                   <ThreadComposer optedOut={conversation.optedOut} sending={sending} onSend={send} draft={draft} />
                 </>
