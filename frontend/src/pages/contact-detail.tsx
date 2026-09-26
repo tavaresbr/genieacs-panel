@@ -95,11 +95,11 @@ export default function ContactDetailPage() {
 
   // The thread with this client in the panel's inbox: the one that exists, or
   // a new empty one. Opening sends nothing; the operator writes in the inbox.
-  const openConversation = async () => {
+  const openConversation = async (phone?: string) => {
     if (!profile) return
     setOpening(true)
     try {
-      const res = await whatsappAPI.openContactConversation(profile.key)
+      const res = await whatsappAPI.openContactConversation(profile.key, phone)
       if (!res.success || !res.data) {
         toast.error(res.message || t('api.requestFailed'))
         return
@@ -240,7 +240,25 @@ export default function ContactDetailPage() {
               </Row>
               <FieldRow label={t('contacts.profile.phones')} field={fields.phones} canEdit={canEdit} onRestore={restore('phones')}>
                 {fields.phones.value.length > 0 && (
-                  <ul className="space-y-1">{fields.phones.value.map((phone) => <li key={phone}>{phoneText(phone)}</li>)}</ul>
+                  <ul className="space-y-1">
+                    {fields.phones.value.map((phone) => (
+                      <li key={phone} className="flex items-center gap-2">
+                        {phoneText(phone)}
+                        {can('whatsapp.send') && (
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-1 text-xs text-primary hover:underline disabled:opacity-50"
+                            disabled={opening}
+                            title={t('contacts.profile.chatThisNumber')}
+                            aria-label={`${t('contacts.profile.chatThisNumber')} ${phoneText(phone)}`}
+                            onClick={() => void openConversation(phone)}
+                          >
+                            <Icon name="chat" size={14} /> {t('contacts.profile.chat')}
+                          </button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
                 )}
               </FieldRow>
               <FieldRow label={t('contacts.profile.emails')} field={fields.emails} canEdit={canEdit} onRestore={restore('emails')}>

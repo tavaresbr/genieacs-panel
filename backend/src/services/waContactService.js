@@ -359,7 +359,7 @@ class WaContactService {
    *
    * @returns {Promise<{ conversation: object, created: boolean }>}
    */
-  static async openConversation(contract) {
+  static async openConversation(contract, { phone = null } = {}) {
     const subscriber = await this.subscriberFor(contract);
     if (!subscriber) {
       throw new WaError('whatsapp.error.subscriberNotFound', {
@@ -367,14 +367,30 @@ class WaContactService {
         status: 404
       });
     }
-    const [contact] = await this.decorate([subscriber]);
 
-    if (contact.conversationId) {
-      const existing = await WaConversation.getById(contact.conversationId);
-      return { conversation: await WaConversationService.decorate(existing), created: false };
+    // Another of the client's numbers, picked from its record. Only a number
+    // the record lists: this route opens threads with subscribers, not with
+    // whatever number a browser sends.
+    const wanted = phone ? normalizarTelefoneBr(phone) : null;
+    if (phone && !wanted) {
+      throw new WaError('whatsapp.error.invalidPhone', { code: 'invalid_phone', status: 400 });
+    }
+    const extra = wanted && wanted !== normalizarTelefoneBr(subscriber.phone);
+    if (extra) {
+      const profile = await ContactProfileService.get(String(contract)).catch(() => null);
+      const listed = (profile?.fields?.phones?.value ?? []).map((entry) => normalizarTelefoneBr(entry));
+      if (!listed.includes(wanted)) {
+        throw new WaError('whatsapp.error.invalidPhone', { code: 'invalid_phone', status: 400 });
+      }
+    } else {
+      const [contact] = await this.decorate([subscriber]);
+      if (contact.conversationId) {
+        const existing = await WaConversation.getById(contact.conversationId);
+        return { conversation: await WaConversationService.decorate(existing), created: false };
+      }
     }
 
-    const number = normalizarTelefoneBr(subscriber.phone);
+    const number = extra ? wanted : normalizarTelefoneBr(subscriber.phone);
     if (!number) {
       throw new WaError('whatsapp.error.subscriberNoPhone', {
         code: 'subscriber_no_phone',

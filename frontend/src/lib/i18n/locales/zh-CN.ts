@@ -116,6 +116,8 @@ const zhCN: Dictionary = {
   'contacts.profile.dueOn': '{date} 到期',
   'contacts.profile.copied': '已复制',
   'contacts.profile.copyLine': '付款码',
+  'contacts.profile.chat': '聊天',
+  'contacts.profile.chatThisNumber': '与此号码打开 WhatsApp 会话',
   'contacts.profile.addPhone': '添加电话',
   'contacts.profile.removePhone': '删除电话',
   'contacts.profile.sendInvoice': '通过 WhatsApp 发送',

@@ -174,7 +174,8 @@ class WhatsAppMessageController {
   /** The thread with one subscriber — the existing one, or a new empty one. */
   static async openContactConversation(req, res) {
     try {
-      const { conversation, created } = await WaContactService.openConversation(req.params?.contract);
+      const phone = typeof req.body?.phone === 'string' ? req.body.phone : null;
+      const { conversation, created } = await WaContactService.openConversation(req.params?.contract, { phone });
       return res.status(created ? 201 : 200).json(createResponse(
         req.t('whatsapp.conversationOpened'),
         conversation

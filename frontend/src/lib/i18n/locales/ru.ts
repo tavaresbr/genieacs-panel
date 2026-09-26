@@ -116,6 +116,8 @@ const ru: Dictionary = {
   'contacts.profile.dueOn': 'срок {date}',
   'contacts.profile.copied': 'Скопировано',
   'contacts.profile.copyLine': 'Строка оплаты',
+  'contacts.profile.chat': 'Написать',
+  'contacts.profile.chatThisNumber': 'Открыть диалог WhatsApp с этим номером',
   'contacts.profile.addPhone': 'Добавить телефон',
   'contacts.profile.removePhone': 'Удалить телефон',
   'contacts.profile.sendInvoice': 'Отправить в WhatsApp',

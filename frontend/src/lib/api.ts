@@ -3274,8 +3274,13 @@ export const whatsappAPI = {
 
   // The existing thread with this subscriber, or a new empty one. Opening sends
   // nothing.
-  openContactConversation: (key: string) =>
-    apiClient.post<WhatsAppConversation>(`/whatsapp/contacts/${encodeURIComponent(key)}/conversation`),
+  // `phone`: another of the client's numbers, from its record, instead of its
+  // WhatsApp number.
+  openContactConversation: (key: string, phone?: string) =>
+    apiClient.post<WhatsAppConversation>(
+      `/whatsapp/contacts/${encodeURIComponent(key)}/conversation`,
+      phone ? { phone } : undefined
+    ),
 
   // Reading a thread clears its unread count server-side — the operator looking
   // at it is the only thing "read" can mean here.
