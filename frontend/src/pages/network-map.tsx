@@ -19,6 +19,7 @@ import {
 import { buildKml, kmlFileName } from '@/lib/kml-export'
 import { LIVE_COLORS, LIVE_REFRESH_MS, LIVE_STATES, liveLabelKey, type LiveItem, type LiveStatus } from '@/lib/map-status'
 import { Link } from 'react-router'
+import { BOX_TYPES, NEARBY_METERS, boxOccupancy, capacityOf } from '@/lib/box-occupancy'
 import 'leaflet/dist/leaflet.css'
 
 // Start fetching the map engine as soon as this route chunk is evaluated. The
@@ -269,6 +270,70 @@ function ImportDialog({
         </button>
       </div>
     </ModalShell>
+  )
+}
+
+/**
+ * O miolo do detalhe de uma caixa: portas usadas e livres, os clientes
+ * ligados por cabo (com o estado ao vivo, quando há) e os clientes próximos
+ * que ainda não têm cabo desenhado.
+ */
+function BoxClients({
+  box, nodes, edges, live, onSelect
+}: {
+  box: MapNode
+  nodes: MapNode[]
+  edges: MapEdge[]
+  live: Map<string, LiveItem>
+  onSelect: (node: MapNode) => void
+}) {
+  const { t } = useTranslation()
+  const occupancy = useMemo(() => boxOccupancy(box, nodes, edges), [box, edges, nodes])
+  const percent = occupancy.capacity ? Math.min(100, Math.round((occupancy.used / occupancy.capacity) * 100)) : 0
+  const row = (node: MapNode, extra?: string) => {
+    const state = live.get(node.node_id)
+    return (
+      <li key={node.node_id}>
+        <button type="button" className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-start text-sm hover:bg-muted" onClick={() => onSelect(node)}>
+          <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: state ? LIVE_COLORS[state.state] : 'transparent', border: state ? 'none' : '1px solid hsl(var(--border))' }}
+            title={state ? t(liveLabelKey(state.state)) : undefined} />
+          <span className="min-w-0 flex-1 truncate">{node.name}</span>
+          {node.pppoe && <span className="truncate font-mono text-xs text-muted-foreground">{node.pppoe}</span>}
+          {extra && <span className="shrink-0 text-xs text-muted-foreground">{extra}</span>}
+        </button>
+      </li>
+    )
+  }
+  return (
+    <div className="mt-5 space-y-4 border-t border-border pt-4">
+      <div>
+        <p className="metric-label">{t('map.box.ports')}</p>
+        {occupancy.capacity === null ? (
+          <p className="mt-1 text-sm">{t('map.box.noCapacity', { used: occupancy.used })}</p>
+        ) : (
+          <>
+            <p className={`mt-1 text-sm font-semibold ${occupancy.over ? 'text-[hsl(var(--status-danger))]' : ''}`}>
+              {t(occupancy.over ? 'map.box.over' : 'map.box.usage', { used: occupancy.used, capacity: occupancy.capacity, free: occupancy.free ?? 0 })}
+            </p>
+            <div className="mt-2 h-2 overflow-hidden rounded bg-muted" role="progressbar" aria-valuenow={occupancy.used} aria-valuemin={0} aria-valuemax={occupancy.capacity}>
+              <div className="h-full rounded" style={{ width: `${percent}%`, background: occupancy.over ? LIVE_COLORS.offline : percent >= 85 ? LIVE_COLORS.weak : LIVE_COLORS.online }} />
+            </div>
+          </>
+        )}
+      </div>
+      <div>
+        <p className="metric-label">{t('map.box.clients', { count: occupancy.clients.length })}</p>
+        {occupancy.clients.length
+          ? <ul className="mt-1 max-h-56 overflow-y-auto">{occupancy.clients.map((node) => row(node))}</ul>
+          : <p className="mt-1 text-sm text-muted-foreground">{t('map.box.noClients')}</p>}
+      </div>
+      {occupancy.nearby.length > 0 && (
+        <div>
+          <p className="metric-label">{t('map.box.nearby', { meters: NEARBY_METERS })}</p>
+          <ul className="mt-1 max-h-40 overflow-y-auto">{occupancy.nearby.map((entry) => row(entry.node, `${entry.distance} m`))}</ul>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -630,6 +695,23 @@ export default function NetworkMap() {
       line.on('click', () => { setSelectedEdge(edge); setSelectedNode(null) })
     })
 
+    // Clientes por caixa numa passada só pelos cabos: calcular a ocupação
+    // caixa a caixa percorreria o mapa inteiro para cada uma.
+    const clientsPerBox = new Map<string, Set<string>>()
+    const link = (box: MapNode, client: MapNode) => {
+      if (client.type !== 'ont' || !BOX_TYPES.has(box.type)) return
+      const set = clientsPerBox.get(box.node_id) ?? new Set<string>()
+      set.add(client.node_id)
+      clientsPerBox.set(box.node_id, set)
+    }
+    edges.forEach((edge) => {
+      const a = byId.get(edge.source)
+      const b = byId.get(edge.target)
+      if (!a || !b) return
+      link(a, b)
+      link(b, a)
+    })
+
     nodes.forEach((node) => {
       const iconColor = isDarkMode ? '#f4f3ed' : '#173f35'
       const state = liveByNode.get(node.node_id)
@@ -640,7 +722,9 @@ export default function NetworkMap() {
       const marker = L.marker([node.latitude, node.longitude], {
         icon: L.divIcon({ className: '', html, iconSize: [28, 28], iconAnchor: [14, 14] })
       }).addTo(markersLayerRef.current)
-      marker.bindTooltip(`<strong>${escapeHtml(node.name)}</strong><br>${escapeHtml(nodeTypeLabel(node.type))} · ${escapeHtml(node.node_id)}${state ? `<br>${escapeHtml(liveText(state))}` : ''}`)
+      const capacity = BOX_TYPES.has(node.type) ? capacityOf(node) : null
+      const portsText = capacity !== null ? `<br>${escapeHtml(t('map.box.tooltip', { used: clientsPerBox.get(node.node_id)?.size ?? 0, capacity }))}` : ''
+      marker.bindTooltip(`<strong>${escapeHtml(node.name)}</strong><br>${escapeHtml(nodeTypeLabel(node.type))} · ${escapeHtml(node.node_id)}${state ? `<br>${escapeHtml(liveText(state))}` : ''}${portsText}`)
       marker.on('click', () => { setSelectedNode(node); setSelectedEdge(null) })
     })
     // A sede por cima de tudo: é o ponto de referência de quem olha a rede.
@@ -974,6 +1058,9 @@ export default function NetworkMap() {
               })()}
               {selectedNode.notes && <div className="sm:col-span-2"><dt className="metric-label">{t('map.node.notes')}</dt><dd className="mt-1 whitespace-pre-wrap">{selectedNode.notes}</dd></div>}
             </dl>
+            {BOX_TYPES.has(selectedNode.type) && (
+              <BoxClients box={selectedNode} nodes={nodes} edges={edges} live={liveByNode} onSelect={(node) => setSelectedNode(node)} />
+            )}
             <div className="mt-6 flex flex-wrap justify-end gap-2">
               {canEditMap && <button className="modern-button-secondary" onClick={() => { setEditingNode(true); setNodeEditor({ ...selectedNode }); setSelectedNode(null) }}><Icon name="edit" size={17} />{t('common.edit')}</button>}
               {canEditMap && <button className="modern-button-secondary text-[hsl(var(--status-danger))]" onClick={() => void deleteNode(selectedNode)}><Icon name="trash" size={17} />{t('common.delete')}</button>}
