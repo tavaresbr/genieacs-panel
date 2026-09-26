@@ -1040,9 +1040,13 @@ export interface TenantGenieAcs {
   suggestion: string | null
   /** A tag que separa os equipamentos deste provedor num GenieACS compartilhado; `''` sem filtro. */
   deviceTag: string
+  /** Prefixos de login PPPoE que o agendador marca sozinho com a tag; vazio desliga. */
+  autoTagPrefixes: string[]
+  /** A última passada da marcação automática, ou nulo se nunca rodou. */
+  lastAutoTag: { at: string; tagged: number; conflictCount: number; error: string | null } | null
   /** Os outros provedores no mesmo GenieACS, e se algum dos que o dividem está sem tag. */
   sharedAcs: {
-    providers: { id: number; name: string; deviceTag: string }[]
+    providers: { id: number; name: string; deviceTag: string; autoTagPrefixes: string[] }[]
     missingTag: boolean
   }
 }
@@ -1505,7 +1509,7 @@ export const platformAPI = {
   /** `secret` ausente mantém o guardado; `''` apaga. */
   updateTenantGenieAcs: (tenantId: number, payload: {
     url?: string; authType?: GenieAcsAuthType; username?: string; secret?: string
-    virtualParameters?: Record<string, string>; deviceTag?: string
+    virtualParameters?: Record<string, string>; deviceTag?: string; autoTagPrefixes?: string
   }) =>
     apiClient.put<TenantGenieAcs>(`/platform/tenants/${tenantId}/genieacs`, payload),
 

@@ -41,7 +41,7 @@ const AUTH_LABELS: Record<GenieAcsAuthType, TranslationKey> = {
  * da tag — sempre com prévia antes de aplicar.
  */
 export function TenantGenieAcs({ tenant }: Props) {
-  const { t } = useTranslation()
+  const { t, formatDateTime } = useTranslation()
   const toast = useToast()
 
   const [data, setData] = useState<TenantGenieAcsData | null>(null)
@@ -57,6 +57,7 @@ export function TenantGenieAcs({ tenant }: Props) {
   const [testing, setTesting] = useState(false)
   const [testMessage, setTestMessage] = useState<{ ok: boolean; text: string } | null>(null)
   const [deviceTag, setDeviceTag] = useState('')
+  const [autoPrefixes, setAutoPrefixes] = useState('')
   const [pppoePrefix, setPppoePrefix] = useState('')
   const [serials, setSerials] = useState('')
   const [tagging, setTagging] = useState(false)
@@ -71,6 +72,7 @@ export function TenantGenieAcs({ tenant }: Props) {
     setClearSecret(false)
     setVps({ ...next.virtualParameters })
     setDeviceTag(next.deviceTag ?? '')
+    setAutoPrefixes((next.autoTagPrefixes ?? []).join(', '))
   }, [])
 
   useEffect(() => {
@@ -99,7 +101,8 @@ export function TenantGenieAcs({ tenant }: Props) {
         username: username.trim(),
         ...(clearSecret ? { secret: '' } : secret ? { secret } : {}),
         virtualParameters: vps,
-        deviceTag: deviceTag.trim()
+        deviceTag: deviceTag.trim(),
+        autoTagPrefixes: autoPrefixes
       })
       if (res.success && res.data) {
         preencher(res.data)
@@ -315,6 +318,33 @@ export function TenantGenieAcs({ tenant }: Props) {
             autoComplete="off"
           />
           <p className="field-hint">{t('platform.genieacs.deviceTagHint')}</p>
+        </div>
+
+        <div className="mt-4 max-w-xl">
+          <label htmlFor={`tenant-${tenant.id}-acs-auto`} className="block text-sm font-medium mb-1">
+            {t('platform.genieacs.autoTagPrefixes')}
+          </label>
+          <input
+            id={`tenant-${tenant.id}-acs-auto`}
+            value={autoPrefixes}
+            onChange={(e) => setAutoPrefixes(e.target.value)}
+            className="modern-input w-full font-mono"
+            placeholder="TA100, TA200"
+            disabled={!deviceTag.trim()}
+            autoComplete="off"
+          />
+          <p className="field-hint">{t('platform.genieacs.autoTagHint')}</p>
+          {data.lastAutoTag && (
+            <p className={`mt-1 text-sm ${data.lastAutoTag.error ? 'text-[hsl(var(--status-danger))]' : 'text-muted-foreground'}`}>
+              {data.lastAutoTag.error
+                ? t('platform.genieacs.autoTagFailed', { when: formatDateTime(data.lastAutoTag.at) })
+                : t('platform.genieacs.autoTagLast', {
+                  when: formatDateTime(data.lastAutoTag.at),
+                  tagged: data.lastAutoTag.tagged,
+                  conflicts: data.lastAutoTag.conflictCount
+                })}
+            </p>
+          )}
         </div>
 
         {data.deviceTag && (
