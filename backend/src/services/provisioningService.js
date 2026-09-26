@@ -877,7 +877,8 @@ class ProvisioningService {
       const account = await CustomerService.ensureAccount({
         _id: plan.deviceId,
         softwareId,
-        pppoe: plan.login
+        pppoe: plan.login,
+        _lastInform: plan.device?._lastInform
       });
       if (!account) {
         const faltando = [

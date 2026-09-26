@@ -231,14 +231,67 @@ describe('two ONTs trading one login', () => {
     const forward = await asTenant(() => DeviceSwap.getPair('ont-old', 'ont-new'));
     await asTenant(() => DeviceSwap.acknowledge(forward.id));
 
-    // Nothing for longer than the flap window: the next swap is news again.
-    const longAgo = new Date(Date.now() - DeviceSwapService.flapWindowMs() - 60_000);
+    // Nothing for a whole day: the next swap is news again.
+    const longAgo = new Date(Date.now() - DeviceSwapService.dismissedFlapWindowMs() - 60_000);
     await getDb()('device_swaps').update({ occurred_at: longAgo });
 
     await ensure(inform('ont-new'));
 
     const reopened = await asTenant(() => DeviceSwap.getById(forward.id));
     assert.equal(reopened.acknowledged_at, null);
+  });
+
+  it('keeps it dismissed across a gap longer than the flap window', async () => {
+    // The pair trades whenever someone opens the device list or the sweep
+    // runs, and an hour between two of those is ordinary. That hour used to
+    // put both directions back on the dashboard after "Confirmar".
+    await ensure(inform('ont-old'));
+    await ensure(inform('ont-new'));
+    await ensure(inform('ont-old'));
+    const forward = await asTenant(() => DeviceSwap.getPair('ont-old', 'ont-new'));
+    await asTenant(() => DeviceSwap.acknowledge(forward.id));
+
+    const anHourAgo = new Date(Date.now() - 60 * 60_000);
+    await getDb()('device_swaps').update({ occurred_at: anHourAgo });
+    await ensure(inform('ont-new'));
+    await ensure(inform('ont-old'));
+
+    assert.equal((await openSwaps()).length, 0);
+    const rows = await getDb()('device_swaps');
+    assert.ok(rows.every((row) => Boolean(row.flapping)), 'the pair is still read as unstable');
+  });
+});
+
+describe('the ONT that informed last keeps the account', () => {
+  const minutesAgo = (minutes) => new Date(Date.now() - minutes * 60_000).toISOString();
+  const sync = (devices) => asTenant(() => CustomerService.syncDevices(devices, { enabled: true }));
+
+  it('does not hand the account back to the old ONT still sitting in GenieACS', async () => {
+    // The old ONT stayed in GenieACS with the same login. Each sweep saw it
+    // without an account and took it back: A→B, B→A, "par instável · 97×".
+    const old = { ...inform('ont-old'), _lastInform: minutesAgo(600) };
+    const replacement = { ...inform('ont-new'), _lastInform: minutesAgo(2) };
+    await ensure({ ...old, _lastInform: minutesAgo(700) });
+    await sync([old, replacement]);
+    await sync([old, replacement]);
+    await sync([old, replacement]);
+
+    const [account] = await getDb()('customer_accounts').where({ active: true });
+    assert.equal(account.device_id, 'ont-new');
+    const rows = await getDb()('device_swaps');
+    assert.equal(rows.length, 1, 'one swap, and no way back');
+    assert.equal(rows[0].device_id, 'ont-new');
+    assert.equal(Number(rows[0].repeat_count), 1);
+  });
+
+  it('still moves the account when the new ONT informed after the old one', async () => {
+    await ensure({ ...inform('ont-old'), _lastInform: minutesAgo(30) });
+    const moved = await sync([
+      { ...inform('ont-old'), _lastInform: minutesAgo(30) },
+      { ...inform('ont-new'), _lastInform: minutesAgo(1) }
+    ]);
+    assert.ok(moved.get('ont-new'));
+    assert.equal(moved.get('ont-old'), undefined);
   });
 });
 

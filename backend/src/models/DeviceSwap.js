@@ -56,16 +56,16 @@ class DeviceSwap {
    * a swallowed one. The unique index still decides a race, and the loser reads
    * back what the winner stored.
    */
-  static async record(row) {
+  static async record(row, options = {}) {
     const existing = await this.getPair(row.previous_device_id, row.device_id);
-    if (existing) return this.repeat(existing, row);
+    if (existing) return this.repeat(existing, row, options);
     try {
       const id = await tinsertReturningId('device_swaps', row);
       return { created: true, swap: await this.getById(id) };
     } catch (error) {
       const stored = await this.getPair(row.previous_device_id, row.device_id);
       if (!stored) throw error;
-      return { created: false, swap: await this.repeat(stored, row).then((r) => r.swap) };
+      return { created: false, swap: await this.repeat(stored, row, options).then((r) => r.swap) };
     }
   }
 
@@ -80,16 +80,20 @@ class DeviceSwap {
    * trading the login inside the flap window: that is the very thing they
    * confirmed, and reopening it on every inform put the warning back on the
    * dashboard minutes after each dismissal, for as long as both ONTs stayed
-   * powered on. Once the pair goes quiet past the window, `row.flapping` is
-   * false and the next swap reopens it as before.
+   * powered on. "Inside the window" is `keepDismissed`, the service's longer
+   * dismissal window, not the 30-minute flap window: gaps of more than half an
+   * hour between two trades are ordinary, and each one used to clear the
+   * dismissal — and the `flapping` flag with it, so the next trade reopened the
+   * other direction too. While the dismissal holds, so does the flag. Once the
+   * pair goes quiet past that window the next swap reopens it as before.
    */
-  static async repeat(existing, row) {
+  static async repeat(existing, row, { keepDismissed = false } = {}) {
     const now = new Date();
-    const stillDismissed = Boolean(existing.acknowledged_at && existing.flapping && row.flapping);
+    const stillDismissed = Boolean(existing.acknowledged_at && existing.flapping && keepDismissed);
     await tdb('device_swaps').where({ id: existing.id }).update({
       matched_by: row.matched_by,
       link_action: row.link_action,
-      flapping: row.flapping,
+      flapping: stillDismissed || row.flapping,
       contract: row.contract ?? existing.contract,
       customer_id: row.customer_id ?? existing.customer_id,
       account_id: row.account_id ?? existing.account_id,
