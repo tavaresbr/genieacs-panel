@@ -12,6 +12,9 @@ import {
 } from '../middleware/portalAuth.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { translateError } from '../i18n/index.js';
+import Setting from '../models/Setting.js';
+import Tenant from '../models/Tenant.js';
+import { currentTenantId } from '../config/tenantContext.js';
 
 // Entries are only worth keeping for their 30 second lifetime, so the map is
 // swept whenever it grows past this many customers instead of retaining one
@@ -62,6 +65,46 @@ class CustomerPortalController {
     } catch (error) {
       console.error('Customer portal login error:', error);
       return res.status(500).json(createErrorResponse(req.t('portal.loginFailed'), null, 'login_failed'));
+    }
+  }
+
+  /**
+   * "Fale com seu provedor": o contato que o provedor escolheu mostrar.
+   *
+   * Desligado (o padrão), só `{ enabled: false }` — nem o nome sai. Ligado,
+   * cada campo é montado aqui, um a um, a partir de `PORTAL_CONTACT_COLUMNS`:
+   * o que não está nessa lista (CNPJ, inscrição, gateway) não tem caminho
+   * para esta resposta. Os campos das configurações valem sobre o cadastro.
+   */
+  static async provider(req, res) {
+    try {
+      const enabled = String(await Setting.getByKey('portalShowProviderContact') ?? '') === 'true';
+      if (!enabled) {
+        return res.json(createResponse(req.t('portal.providerReady'), { enabled: false }, 'provider_ok'));
+      }
+      const [row, phone, whatsapp, email] = await Promise.all([
+        Tenant.findPortalContactById(currentTenantId()),
+        Setting.getByKey('portalContactPhone'),
+        Setting.getByKey('portalContactWhatsapp'),
+        Setting.getByKey('portalContactEmail')
+      ]);
+      const text = (value) => String(value ?? '').trim() || null;
+      const street = [text(row?.billing_address_line), text(row?.billing_address_number)].filter(Boolean).join(', ');
+      const cityState = [text(row?.billing_city), text(row?.billing_state)].filter(Boolean).join(' - ');
+      const address = [street, text(row?.billing_address_extra), text(row?.billing_district), cityState, text(row?.billing_postal_code)]
+        .filter(Boolean)
+        .join(' · ') || null;
+      return res.json(createResponse(req.t('portal.providerReady'), {
+        enabled: true,
+        name: text(row?.name),
+        phone: text(phone) ?? text(row?.billing_phone),
+        whatsapp: text(whatsapp),
+        email: text(email) ?? text(row?.billing_email),
+        address
+      }, 'provider_ok'));
+    } catch (error) {
+      console.error('Customer portal provider contact error:', error);
+      return res.status(500).json(createErrorResponse(req.t('portal.providerUnavailable'), null, 'provider_unavailable'));
     }
   }
 

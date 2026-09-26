@@ -1,5 +1,6 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react'
 import { BrandMark } from '@/components/brand-mark'
+import { hasContact, mailtoHref, telHref, whatsappHref, type ProviderContact } from '@/lib/portal-contact'
 import { Icon } from '@/components/ui/icon'
 import { QrCode } from '@/components/qr-code'
 import { useWifiStatusFilter, WifiStatusFilterControl } from '@/components/wifi-status-filter'
@@ -146,6 +147,7 @@ export default function CustomerPortal() {
   const [revealedWifiPasswords, setRevealedWifiPasswords] = useState<Record<number, string>>({})
   const [revealingWifiPasswordIndex, setRevealingWifiPasswordIndex] = useState<number | null>(null)
   const [billing, setBilling] = useState<PortalBilling | null>(null)
+  const [providerContact, setProviderContact] = useState<ProviderContact | null>(null)
   const [billingLoading, setBillingLoading] = useState(false)
   const [billingError, setBillingError] = useState('')
   const [unlockPending, setUnlockPending] = useState(false)
@@ -220,6 +222,17 @@ export default function CustomerPortal() {
       : '—'
   )
 
+  // O contato é opcional e secundário: falhar aqui não vira erro na tela,
+  // o cartão simplesmente não aparece.
+  const loadProvider = useCallback(async () => {
+    try {
+      const result = await portalRequest<ProviderContact>('/provider')
+      setProviderContact(result.success && result.data ? result.data : null)
+    } catch {
+      setProviderContact(null)
+    }
+  }, [])
+
   const loadBilling = useCallback(async () => {
     setBillingLoading(true)
     try {
@@ -285,13 +298,14 @@ export default function CustomerPortal() {
         if (result.success) {
           void loadOverview()
           void loadBilling()
+          void loadProvider()
         }
       })
       .finally(() => {
         if (!cancelled) setCheckingSession(false)
       })
     return () => { cancelled = true }
-  }, [loadOverview, loadBilling])
+  }, [loadOverview, loadBilling, loadProvider])
 
   useEffect(() => {
     if (!authenticated) return
@@ -309,6 +323,7 @@ export default function CustomerPortal() {
     setRevealingWifiPasswordIndex(null)
     setWifiFeedback(null)
     setBilling(null)
+    setProviderContact(null)
     setBillingError('')
     setBillingFeedback(null)
     setCopiedCode(null)
@@ -332,6 +347,7 @@ export default function CustomerPortal() {
       setShowLoginPassword(false)
       await loadOverview()
       void loadBilling()
+      void loadProvider()
     } catch {
       setError(t('portal.error.retry'))
     } finally {
@@ -555,7 +571,7 @@ export default function CustomerPortal() {
           <div className="flex min-w-0 items-center gap-3">
             <BrandMark className="h-10 w-10 shrink-0" title="TR69 Controle" />
             <div className="min-w-0">
-              <p className="font-bold">{t('portal.name')}</p>
+              <p className="truncate font-bold">{providerContact?.enabled && providerContact.name ? providerContact.name : t('portal.name')}</p>
               <p className="truncate font-mono text-xs text-muted-foreground">{overview?.customerId || customerId}</p>
             </div>
           </div>
@@ -1004,6 +1020,38 @@ export default function CustomerPortal() {
                   </button>
                 </div>
               </div>
+            </section>
+          )}
+
+          {hasContact(providerContact) && (
+            <section className="modern-card mt-5 p-4 sm:p-5" aria-labelledby="portal-contact-title">
+              <p className="page-kicker">{t('portal.contact.kicker')}</p>
+              <h2 id="portal-contact-title" className="section-heading">
+                {providerContact.name ? t('portal.contact.titleNamed', { name: providerContact.name }) : t('portal.contact.title')}
+              </h2>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {whatsappHref(providerContact.whatsapp) && (
+                  <a className="modern-button" href={whatsappHref(providerContact.whatsapp) as string} target="_blank" rel="noopener noreferrer">
+                    <Icon name="chat" size={17} /> {t('portal.contact.whatsapp')}
+                  </a>
+                )}
+                {telHref(providerContact.phone) && (
+                  <a className="modern-button-secondary" href={telHref(providerContact.phone) as string}>
+                    <Icon name="phone" size={17} /> {providerContact.phone}
+                  </a>
+                )}
+                {mailtoHref(providerContact.email) && (
+                  <a className="modern-button-secondary" href={mailtoHref(providerContact.email) as string}>
+                    <Icon name="document" size={17} /> {providerContact.email}
+                  </a>
+                )}
+              </div>
+              {providerContact.address && (
+                <p className="mt-4 flex items-start gap-2 text-sm text-muted-foreground">
+                  <Icon name="pin" size={16} className="mt-0.5 shrink-0" />
+                  <span>{providerContact.address}</span>
+                </p>
+              )}
             </section>
           )}
 

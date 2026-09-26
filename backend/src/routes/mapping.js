@@ -4,6 +4,8 @@ import { authenticateToken, requirePermission } from '../middleware/auth.js';
 
 const router = express.Router();
 
+router.get('/geocode', authenticateToken, requirePermission('map.read'), MappingController.searchAddress);
+
 router.get('/nodes', authenticateToken, requirePermission('map.read'), MappingController.getAllNodes);
 
 router.get('/nodes/:nodeId', authenticateToken, requirePermission('map.read'), MappingController.getNodeByNodeId);
@@ -23,6 +25,8 @@ router.post('/edges', authenticateToken, requirePermission('map.write'), Mapping
 router.put('/edges/:edgeId', authenticateToken, requirePermission('map.write'), MappingController.updateEdge);
 
 router.delete('/edges/:edgeId', authenticateToken, requirePermission('map.write'), MappingController.deleteEdge);
+
+router.post('/import', authenticateToken, requirePermission('map.write'), MappingController.importMappingData);
 
 router.post('/sync', authenticateToken, requirePermission('map.write'), MappingController.syncMappingData);
 

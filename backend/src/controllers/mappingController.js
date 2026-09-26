@@ -3,6 +3,16 @@ import MappingEdge from '../models/MappingEdge.js';
 import User from '../models/User.js';
 import bcrypt from 'bcryptjs';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
+import { searchPlaces } from '../services/addressLookupService.js';
+
+/**
+ * A política de uso do Nominatim é de uma consulta por segundo por
+ * aplicação — o painel inteiro, não cada provedor. As buscas fazem fila; se a
+ * fila passar de alguns segundos, a próxima ouve "tente de novo" em vez de
+ * esperar sem fim.
+ */
+const searchQueue = { next: 0 };
+const sleep = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
 
 const NODE_TYPES = new Set(['htb', 'olt', 'odc', 'odp', 'ont', 'server']);
 const FIBER_TYPES = new Set(['backbone', 'feeder', 'distribution', 'drop', 'patch']);
@@ -95,7 +105,7 @@ function validateEdgePayload(payload) {
   if (distance !== null && (!Number.isFinite(distance) || distance < 0 || distance > 1_000_000)) {
     return { errorKey: 'mapping.validation.distance' };
   }
-  if (waypoints.error) return waypoints;
+  if (waypoints.errorKey) return waypoints;
 
   return {
     value: {
@@ -111,6 +121,31 @@ function validateEdgePayload(payload) {
 }
 
 class MappingController {
+  /** Intervalo entre consultas ao Nominatim (os testes zeram). */
+  static SEARCH_INTERVAL_MS = 1_000;
+  static SEARCH_MAX_WAIT_MS = 5_000;
+
+  static async searchAddress(req, res) {
+    const q = String(req.query.q ?? '').replace(/\s+/g, ' ').trim();
+    if (q.length < 3 || q.length > 200) {
+      return res.status(400).json(createErrorResponse(req.t('mapping.searchTooShort')));
+    }
+    const now = Date.now();
+    const wait = Math.max(0, searchQueue.next - now);
+    if (wait > MappingController.SEARCH_MAX_WAIT_MS) {
+      return res.status(429).json(createErrorResponse(req.t('mapping.searchBusy')));
+    }
+    searchQueue.next = Math.max(now, searchQueue.next) + MappingController.SEARCH_INTERVAL_MS;
+    if (wait) await sleep(wait);
+    try {
+      const results = await searchPlaces(q, { limit: 5 });
+      return res.json(createResponse(req.t('mapping.searchDone'), results));
+    } catch (error) {
+      console.warn(`Map address search failed: ${error.message}`);
+      return res.status(502).json(createErrorResponse(req.t('mapping.searchFailed'), error.message));
+    }
+  }
+
   static async getAllNodes(req, res) {
     try {
       const nodes = await MappingNode.getAll();
@@ -459,6 +494,65 @@ class MappingController {
       return res.status(500).json(
         createErrorResponse(req.t('mapping.syncFailed'), error.message)
       );
+    }
+  }
+
+  /**
+   * Importação de KML/KMZ: o navegador lê o arquivo e manda pontos e cabos em
+   * lotes. Acrescenta, não substitui — ver `MappingEdge.importData`.
+   */
+  static async importMappingData(req, res) {
+    try {
+      const { nodes, edges } = req.body || {};
+      if (!Array.isArray(nodes) || !Array.isArray(edges)) {
+        return res.status(400).json(createErrorResponse(req.t('mapping.invalidFormat')));
+      }
+      if (nodes.length > 2_000 || edges.length > 4_000) {
+        return res.status(400).json(createErrorResponse(req.t('mapping.importTooLarge')));
+      }
+      const validatedNodes = [];
+      const nodeIds = new Set();
+      for (const node of nodes) {
+        const validated = validateNodePayload(node || {});
+        if (validated.errorKey) {
+          return res.status(400).json(createErrorResponse(
+            req.t('mapping.invalidNode', { error: req.t(validated.errorKey) })
+          ));
+        }
+        if (nodeIds.has(validated.value.node_id)) {
+          return res.status(400).json(createErrorResponse(
+            req.t('mapping.duplicateNodeId', { id: validated.value.node_id })
+          ));
+        }
+        nodeIds.add(validated.value.node_id);
+        validatedNodes.push(validated.value);
+      }
+      const validatedEdges = [];
+      const edgeIds = new Set();
+      for (const edge of edges) {
+        const validated = validateEdgePayload(edge || {});
+        if (validated.errorKey) {
+          return res.status(400).json(createErrorResponse(
+            req.t('mapping.invalidCable', { error: req.t(validated.errorKey) })
+          ));
+        }
+        if (edgeIds.has(validated.value.edge_id)) {
+          return res.status(400).json(createErrorResponse(
+            req.t('mapping.duplicateCableId', { id: validated.value.edge_id })
+          ));
+        }
+        edgeIds.add(validated.value.edge_id);
+        validatedEdges.push(validated.value);
+      }
+
+      const result = await MappingEdge.importData(validatedNodes, validatedEdges);
+      return res.json(createResponse(req.t('mapping.imported', {
+        nodes: result.createdNodes,
+        edges: result.createdEdges
+      }), result));
+    } catch (error) {
+      console.error('Import mapping data error:', error);
+      return res.status(500).json(createErrorResponse(req.t('mapping.importFailed'), error.message));
     }
   }
 

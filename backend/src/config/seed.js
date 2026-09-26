@@ -32,7 +32,14 @@ export const DEFAULT_SETTINGS = {
   // O leitor em `schedulerService` continua com o mesmo padrão e os mesmos
   // limites, e continua sendo a última linha: ele alcança valor escrito direto
   // no banco, e um deploy que nunca rodou o seed.
-  auditRetentionDays: '365'
+  auditRetentionDays: '365',
+  // O contato do provedor no portal do assinante. Desligado até o provedor
+  // ligar: mostrar telefone e endereço a quem entra no portal é decisão dele.
+  // Os três campos são opcionais; vazios, o portal usa o do cadastro.
+  portalShowProviderContact: 'false',
+  portalContactPhone: '',
+  portalContactWhatsapp: '',
+  portalContactEmail: ''
 };
 
 // Values shipped by older releases. Only these exact values are migrated, so

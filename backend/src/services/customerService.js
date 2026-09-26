@@ -58,6 +58,15 @@ function calendarDay(date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
+
+/** Colisão de chave única nos três bancos (SQLite, MySQL, Postgres). */
+function isUniqueViolation(error) {
+  return error?.code === 'SQLITE_CONSTRAINT_UNIQUE'
+    || error?.code === 'ER_DUP_ENTRY'
+    || error?.code === '23505'
+    || /unique/i.test(String(error?.message || ''));
+}
+
 class CustomerService {
   static isEnabledValue(value) {
     return value === true || value === 1 || value === '1' || value === 'true';
@@ -232,7 +241,16 @@ class CustomerService {
       // same identity, so this branch — not the PPPoE one below — is where the
       // ordinary swap lands.
       if (!await this.shouldTakeAccount(existingByIdentity, device, deviceId, informs)) return null;
-      const moved = await CustomerAccount.touch(existingByIdentity.id, deviceId);
+      let moved;
+      try {
+        moved = await CustomerAccount.touch(existingByIdentity.id, deviceId);
+      } catch (error) {
+        // Outra linha ainda segura este device_id: não é motivo para derrubar
+        // a sincronização da frota inteira. Fica para a próxima passada.
+        if (!isUniqueViolation(error)) throw error;
+        console.warn(`Customer ID sync: device ${deviceId} still held by another account; skipped`);
+        return null;
+      }
       await this.noteSwap(existingByIdentity, deviceId, 'identity_hash');
       return moved;
     }
@@ -377,11 +395,7 @@ class CustomerService {
         identity_hash: identityHash
       });
     } catch (error) {
-      const duplicate =
-        error.code === 'SQLITE_CONSTRAINT_UNIQUE' ||
-        error.code === 'ER_DUP_ENTRY' ||
-        /unique/i.test(error.message);
-      if (!duplicate) throw error;
+      if (!isUniqueViolation(error)) throw error;
       return CustomerAccount.touch(account.id, deviceId);
     }
   }

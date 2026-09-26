@@ -2557,6 +2557,28 @@ export const mappingAPI = {
 
   resetData: (password: string) =>
     apiClient.requestWithBody('DELETE', '/mapping-data/reset', { password }),
+
+  /** Acrescenta pontos e cabos (importação de KML/KMZ); nunca apaga nem sobrescreve. */
+  importData: (data: { nodes: unknown[]; edges: unknown[] }) =>
+    apiClient.post<MapImportResult>('/mapping-data/import', data),
+
+  /** Busca livre de um lugar no Brasil (Nominatim, pelo servidor). */
+  searchAddress: (q: string) =>
+    apiClient.get<PlaceResult[]>(`/mapping-data/geocode?q=${encodeURIComponent(q)}`),
+}
+
+export interface MapImportResult {
+  createdNodes: number
+  createdEdges: number
+  skippedNodes: number
+  skippedEdges: number
+  errors: string[]
+}
+
+export interface PlaceResult {
+  lat: number
+  lng: number
+  label: string
 }
 
 // Map Settings API

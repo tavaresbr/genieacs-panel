@@ -11,6 +11,11 @@ import { DEFAULT_MAP_CENTER, isDefaultCenter } from '@/lib/provider-location'
 import { Icon } from '@/components/ui/icon'
 import { getTileSpec, type Basemap } from '@/lib/map-tiles'
 import { useToast } from '@/components/ui/toast'
+import { MapAddressSearch } from '@/components/map-address-search'
+import type { PlaceResult } from '@/lib/api'
+import {
+  buildImportPlan, chunkImportPlan, parseKml, readKmlFile, type ParsedKml
+} from '@/lib/kml-import'
 import 'leaflet/dist/leaflet.css'
 
 // Start fetching the map engine as soon as this route chunk is evaluated. The
@@ -114,6 +119,153 @@ function ModalShell({ title, onClose, children }: { title: string; onClose: () =
         {children}
       </div>
     </div>
+  )
+}
+
+const KML_ERRORS = ['kml_invalid', 'kmz_invalid', 'kmz_no_kml', 'kmz_unsupported'] as const
+const MAX_KML_BYTES = 50 * 1024 * 1024
+
+/**
+ * Importar KML/KMZ: o arquivo é lido aqui mesmo, a prévia diz o que vai entrar
+ * e só então os pontos e cabos vão ao servidor, em lotes. Acrescenta; nada do
+ * que já está no mapa é apagado ou alterado.
+ */
+function ImportDialog({
+  nodes, edges, onClose, onDone
+}: {
+  nodes: MapNode[]
+  edges: MapEdge[]
+  onClose: () => void
+  onDone: () => void
+}) {
+  const { t } = useTranslation()
+  const toast = useToast()
+  const [fileName, setFileName] = useState('')
+  const [parsed, setParsed] = useState<ParsedKml | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [reading, setReading] = useState(false)
+  const [defaultType, setDefaultType] = useState<NodeType>('odp')
+  const [fiberType, setFiberType] = useState<FiberType>('distribution')
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
+
+  const plan = useMemo(() => parsed && buildImportPlan(parsed, {
+    defaultType,
+    fiberType,
+    existingNodes: nodes,
+    existingEdgeIds: edges.map((edge) => edge.edge_id),
+    endpointName: (name, end) => t(end === 'start' ? 'map.import.endpointStart' : 'map.import.endpointEnd', { name })
+  }), [defaultType, edges, fiberType, nodes, parsed, t])
+
+  const pick = async (file: File | undefined) => {
+    setParsed(null)
+    setError(null)
+    if (!file) return
+    setFileName(file.name)
+    if (file.size > MAX_KML_BYTES) {
+      setError(t('map.import.tooBig'))
+      return
+    }
+    setReading(true)
+    try {
+      setParsed(parseKml(await readKmlFile(file)))
+    } catch (err) {
+      const code = err instanceof Error ? err.message : ''
+      setError(t((KML_ERRORS as readonly string[]).includes(code) ? `map.import.error.${code}` as TranslationKey : 'map.import.error.kml_invalid'))
+    } finally {
+      setReading(false)
+    }
+  }
+
+  const submit = async () => {
+    if (!plan) return
+    const batches = chunkImportPlan(plan)
+    const total = { nodes: 0, edges: 0, skipped: 0, errors: 0 }
+    setProgress({ done: 0, total: batches.length })
+    try {
+      for (const [index, batch] of batches.entries()) {
+        const response = await mappingAPI.importData(batch)
+        if (!response.success || !response.data) throw new Error(response.message || t('map.import.failed'))
+        total.nodes += response.data.createdNodes
+        total.edges += response.data.createdEdges
+        total.skipped += response.data.skippedNodes + response.data.skippedEdges
+        total.errors += response.data.errors.length
+        setProgress({ done: index + 1, total: batches.length })
+      }
+      toast.success(t('map.import.done', { nodes: total.nodes, edges: total.edges }))
+      if (total.skipped) toast.info(t('map.import.doneSkipped', { count: total.skipped }))
+      if (total.errors) toast.error(t('map.import.doneErrors', { count: total.errors }))
+      onDone()
+    } catch (err) {
+      // Lotes já gravados ficam: a importação só acrescenta, e repetir o
+      // arquivo pula o que já entrou.
+      toast.error(err instanceof Error ? err.message : t('map.import.failed'))
+      if (total.nodes || total.edges) onDone()
+      else setProgress(null)
+    }
+  }
+
+  const busy = reading || progress !== null
+  const empty = parsed && !parsed.points.length && !parsed.lines.length
+
+  return (
+    <ModalShell title={t('map.import.title')} onClose={busy ? () => undefined : onClose}>
+      <p className="mb-4 text-sm leading-6 text-muted-foreground">{t('map.import.description')}</p>
+      <label className="field-label" htmlFor="kml-file">{t('map.import.file')}</label>
+      <input id="kml-file" type="file" accept=".kml,.kmz,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz"
+        className="modern-input w-full" disabled={busy} onChange={(event) => void pick(event.target.files?.[0])} />
+      {reading && <p className="mt-3 text-sm text-muted-foreground">{t('map.import.reading')}</p>}
+      {error && <p className="mt-3 text-sm text-destructive" role="alert">{error}</p>}
+      {empty && <p className="mt-3 text-sm text-muted-foreground">{t('map.import.empty')}</p>}
+
+      {plan && parsed && !empty && (
+        <div className="mt-5 space-y-4">
+          <p className="font-semibold">{fileName} · {t('map.import.summary', { points: parsed.points.length, cables: parsed.lines.length })}</p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="field-label" htmlFor="kml-node-type">{t('map.import.defaultType')}</label>
+              <select id="kml-node-type" className="modern-input w-full" value={defaultType} disabled={busy}
+                onChange={(event) => setDefaultType(event.target.value as NodeType)}>
+                {NODE_TYPES.map((type) => <option key={type.value} value={type.value}>{t(type.labelKey)}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="field-label" htmlFor="kml-fiber-type">{t('map.import.fiberType')}</label>
+              <select id="kml-fiber-type" className="modern-input w-full" value={fiberType} disabled={busy}
+                onChange={(event) => setFiberType(event.target.value as FiberType)}>
+                {FIBER_TYPES.map((type) => <option key={type.value} value={type.value}>{t(type.labelKey)}</option>)}
+              </select>
+            </div>
+          </div>
+          <p className="field-hint">{t('map.import.typeHint')}</p>
+          <ul className="space-y-1 text-sm">
+            {plan.snappedEnds > 0 && <li className="flex gap-2"><Icon name="check" size={16} className="mt-0.5 shrink-0 text-emerald-500" />{t('map.import.snapped', { count: plan.snappedEnds })}</li>}
+            {plan.endpointNodes > 0 && <li className="flex gap-2"><Icon name="info" size={16} className="mt-0.5 shrink-0" />{t('map.import.endpoints', { count: plan.endpointNodes })}</li>}
+            {plan.outsideBrazil > 0 && <li className="flex gap-2"><Icon name="warning" size={16} className="mt-0.5 shrink-0 text-amber-500" />{t('map.import.outside', { count: plan.outsideBrazil })}</li>}
+            {parsed.ignored > 0 && <li className="flex gap-2"><Icon name="info" size={16} className="mt-0.5 shrink-0" />{t('map.import.ignored', { count: parsed.ignored })}</li>}
+          </ul>
+          <div className="grid gap-4 text-sm sm:grid-cols-2">
+            {([['map.import.previewNodes', plan.nodes.map((node) => `${node.name} · ${t(getTypeLabelKey(node.type) ?? 'map.nodeType.odp')}`)],
+              ['map.import.previewCables', plan.edges.map((edge) => `${edge.edge_id}${edge.distance ? ` · ${edge.distance} m` : ''}`)]] as const).map(([label, items]) => (
+              <div key={label} className="rounded-md border border-border p-3">
+                <p className="metric-label">{t(label)} ({items.length})</p>
+                <ul className="mt-2 space-y-1">
+                  {items.slice(0, 6).map((item, index) => <li key={index} className="truncate" title={item}>{item}</li>)}
+                  {items.length > 6 && <li className="text-muted-foreground">{t('map.import.more', { count: items.length - 6 })}</li>}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="mt-6 flex flex-wrap justify-end gap-2">
+        <button type="button" className="modern-button-secondary" onClick={onClose} disabled={busy}>{t('common.cancel')}</button>
+        <button type="button" className="modern-button" disabled={busy || !plan || Boolean(empty)} onClick={() => void submit()}>
+          <Icon name={progress ? 'refresh' : 'check'} size={17} className={progress ? 'animate-spin' : ''} />
+          {progress ? t('map.import.progress', { done: progress.done, total: progress.total }) : t('map.import.submit')}
+        </button>
+      </div>
+    </ModalShell>
   )
 }
 
@@ -298,6 +450,10 @@ export default function NetworkMap() {
   const [minZoom, setMinZoom] = useState(5)
   const [maxZoom, setMaxZoom] = useState(18)
   const [basemap, setBasemap] = useState<Basemap>('osm')
+  /** O lugar achado pela busca, marcado no mapa até ser fechado. */
+  const [foundPlace, setFoundPlace] = useState<PlaceResult | null>(null)
+  const [importOpen, setImportOpen] = useState(false)
+  const searchMarkerRef = useRef<any>(null)
   const { isDarkMode } = useTheme()
   const { can } = useAuth()
   const { t, formatTime } = useTranslation()
@@ -503,8 +659,8 @@ export default function NetworkMap() {
   useEffect(() => { if (mapRef.current) updateTileLayer() }, [updateTileLayer])
   useEffect(() => { if (mapRef.current) updateMapObjects() }, [updateMapObjects])
 
-  const openNewNode = () => {
-    const center = mapRef.current?.getCenter()?.wrap()
+  const openNewNode = (at?: { lat: number; lng: number }) => {
+    const center = at ?? mapRef.current?.getCenter()?.wrap()
     setEditingNode(false)
     setNodeEditor({
       node_id: '', type: 'odp', name: '',
@@ -513,6 +669,24 @@ export default function NetworkMap() {
       capacity: null, splitter: '', pppoe: '', notes: ''
     })
   }
+  // O marcador da busca fica fora das camadas de pontos e cabos, que são
+  // redesenhadas a cada recarga: ele some só quando o operador fecha.
+  useEffect(() => {
+    const L = leafletRef.current
+    const map = mapRef.current
+    searchMarkerRef.current?.remove()
+    searchMarkerRef.current = null
+    if (!L || !map || !foundPlace) return
+    const html = '<div style="width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#f59e0b;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.5)"></div>'
+    searchMarkerRef.current = L.marker([foundPlace.lat, foundPlace.lng], {
+      icon: L.divIcon({ className: '', html, iconSize: [26, 26], iconAnchor: [13, 26] }),
+      zIndexOffset: 2000,
+      keyboard: false
+    }).addTo(map)
+    searchMarkerRef.current.bindTooltip(escapeHtml(foundPlace.label))
+    map.flyTo([foundPlace.lat, foundPlace.lng], Math.min(maxZoom, 17), { duration: 0.8 })
+  }, [foundPlace, maxZoom])
+
   const openNewEdge = () => {
     setEditingEdge(false)
     setEdgeEditor({
@@ -594,8 +768,9 @@ export default function NetworkMap() {
             <p className="page-description">{t('map.description')}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {canEditMap && <button type="button" className="modern-button" onClick={openNewNode}><Icon name="pin" size={17} />{t('map.addNode')}</button>}
+            {canEditMap && <button type="button" className="modern-button" onClick={() => openNewNode()}><Icon name="pin" size={17} />{t('map.addNode')}</button>}
             {canEditMap && <button type="button" className="modern-button-secondary" onClick={openNewEdge}><Icon name="signal" size={17} />{t('map.drawCable')}</button>}
+            {canEditMap && <button type="button" className="modern-button-secondary" onClick={() => setImportOpen(true)}><Icon name="document" size={17} />{t('map.import.button')}</button>}
             <button type="button" className="modern-button-secondary" disabled={loading} onClick={() => void loadData(false)}>
               <Icon name="refresh" size={17} className={loading ? 'animate-spin' : ''} />{t('common.refresh')}
             </button>
@@ -630,6 +805,8 @@ export default function NetworkMap() {
                 <h2 className="section-heading">{t('map.physicalMap')}</h2>
                 <p className="text-xs text-muted-foreground">{t('map.physicalMapHint')}</p>
               </div>
+              <div className="flex flex-wrap items-center gap-2">
+              <MapAddressSearch onPick={(place) => { setMapView('map'); setFoundPlace(place) }} />
               <div className="inline-flex rounded-md border border-border bg-muted p-1">
                 {([['osm', 'OpenStreetMap'], ['google', 'Google Maps']] as const).map(([value, label]) => (
                   <button key={value} type="button" onClick={() => { setBasemap(value); localStorage.setItem('networkMapBasemap', value) }}
@@ -638,8 +815,25 @@ export default function NetworkMap() {
                   </button>
                 ))}
               </div>
+              </div>
             </div>
-            <div className="h-[62vh] min-h-[28rem] max-h-[54rem]"><div ref={mapContainerRef} className="h-full w-full" /></div>
+            <div className="relative h-[62vh] min-h-[28rem] max-h-[54rem]">
+              <div ref={mapContainerRef} className="h-full w-full" />
+              {foundPlace && (
+                <div className="absolute bottom-3 start-3 z-[500] flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-2 rounded-md border border-border bg-card/95 px-3 py-2 text-xs shadow-sm sm:max-w-md">
+                  <Icon name="pin" size={15} className="shrink-0 text-amber-500" />
+                  <span className="min-w-0 flex-1 truncate" title={foundPlace.label}>{foundPlace.label}</span>
+                  {canEditMap && (
+                    <button type="button" className="modern-button min-h-8 px-2 text-xs" onClick={() => openNewNode(foundPlace)}>
+                      {t('map.search.addHere')}
+                    </button>
+                  )}
+                  <button type="button" className="min-h-8 px-1 text-muted-foreground hover:text-foreground" onClick={() => setFoundPlace(null)} aria-label={t('common.close')}>
+                    <Icon name="x" size={15} />
+                  </button>
+                </div>
+              )}
+            </div>
           </section>
 
           <section className={`space-y-4 ${mapView === 'list' ? '' : 'hidden'}`}>
@@ -727,6 +921,7 @@ export default function NetworkMap() {
           </ModalShell>
         )}
         {nodeEditor && <NodeEditor initial={nodeEditor} editing={editingNode} saving={saving} onClose={() => setNodeEditor(null)} onSave={(value) => void saveNode(value)} />}
+        {importOpen && <ImportDialog nodes={nodes} edges={edges} onClose={() => setImportOpen(false)} onDone={() => { setImportOpen(false); hasCenteredAssetsRef.current = false; void loadData(false) }} />}
         {edgeEditor && <EdgeEditor initial={edgeEditor} nodes={nodes} editing={editingEdge} saving={saving} onClose={() => setEdgeEditor(null)} onSave={(value) => void saveEdge(value)} />}
       </div>
     </div>

@@ -22,6 +22,12 @@ router.get(
   CustomerPortalController.session
 );
 router.get(
+  '/provider',
+  authenticatePortalCustomer,
+  portalAccountLimiter,
+  CustomerPortalController.provider
+);
+router.get(
   '/overview',
   authenticatePortalCustomer,
   portalAccountLimiter,
