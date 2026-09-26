@@ -1005,11 +1005,19 @@ export default function Settings() {
     return genieAuthForm.secret ? genieAuthForm.secret : undefined
   }
 
-  const handleSaveSettings = async () => {
+  /**
+   * `provider` é o Salvar da aba Geral na SaaS: grava só o que aquela aba
+   * mostra — o nome e o prazo da trilha. Antes ele gravava todas as chaves,
+   * o ACS e ainda disparava a sincronização de IDs de cliente, de outra aba;
+   * quando essa falhava, o operador via um erro que não tinha nada com o que
+   * ele acabara de editar.
+   */
+  const handleSaveSettings = async (scope: 'all' | 'provider' = 'all') => {
+    const onlyProvider = scope === 'provider'
     // O servidor recusa `basic` sem usuário com 400, e com razão: o header
     // sairia com usuário vazio e o ACS o recusaria sem dizer por quê. Barrar
     // aqui evita a ida perdida e diz qual campo falta, que a resposta não diz.
-    if (!platformManaged && genieAuthForm.authType === 'basic' && !genieAuthForm.username.trim()) {
+    if (!onlyProvider && !platformManaged && genieAuthForm.authType === 'basic' && !genieAuthForm.username.trim()) {
       toast.error(t('settings.genieAuth.usernameRequired'))
       return
     }
@@ -1041,6 +1049,7 @@ export default function Settings() {
       // recusa (403) a cada salvar, por um campo que a tela nem deixa editar.
       const entries = Object.entries(settings)
         .filter(([key]) => key !== 'appName' && !(platformManaged && PLATFORM_MANAGED_KEYS.has(key)))
+        .filter(([key]) => !onlyProvider || key === 'auditRetentionDays')
         .sort(([left], [right]) => {
         if (left === 'autoGenerateCustomerId') return 1
         if (right === 'autoGenerateCustomerId') return -1
@@ -1061,7 +1070,7 @@ export default function Settings() {
         }
       }
 
-      if (ok && !platformManaged) {
+      if (ok && !platformManaged && !onlyProvider) {
         // A URL acabou de ser gravada, então é ela que o servidor vai comparar
         // com o endereço testado daqui em diante — o aviso de teste anônimo
         // some sozinho depois de salvar, que é o desfecho que ele pedia.
@@ -1088,11 +1097,15 @@ export default function Settings() {
         }
       }
 
-      if (ok && settings.autoGenerateCustomerId === 'true') {
+      if (ok && !onlyProvider && settings.autoGenerateCustomerId === 'true') {
         const sync = await settingsAPI.syncCustomerIds()
         if (!sync.success) {
-          ok = false
-          errorMessage = sync.message || t('settings.syncError')
+          // As configurações JÁ foram gravadas; o que falhou foi a sincronia
+          // com o ACS, que roda depois. Dizer só "não foi possível" fazia
+          // parecer que nada tinha sido salvo.
+          toast.success(successMessage)
+          toast.error(sync.message || t('settings.syncError'))
+          return
         } else {
           const result = sync.data as { generated?: number; existing?: number; pending?: number }
           successMessage = t('settings.syncSummary', {
@@ -3526,7 +3539,7 @@ export default function Settings() {
           || (activeTab === 'provider' && platformManaged && can('settings.write'))) && (
           <div className="flex justify-end mt-8">
             <button
-              onClick={handleSaveSettings}
+              onClick={() => void handleSaveSettings(activeTab === 'provider' ? 'provider' : 'all')}
               disabled={loading}
               className="modern-button"
             >
