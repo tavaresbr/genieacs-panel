@@ -2573,6 +2573,22 @@ const fr: Dictionary = {
   'settings.panelIdentity.title': 'Panneau',
   'settings.panelIdentity.description': 'Le nom affiché sur le panneau, la langue de ce navigateur et la durée de conservation du journal d’audit.',
   'platform.genieacs.vpDescription': 'Les chemins que le panneau lit sur les équipements de ce fournisseur. Ils dépendent des scripts de provisionnement installés sur le GenieACS de la plateforme ; le fournisseur ne les modifie donc pas.',
+  'platform.genieacs.scopeTitle': 'Séparation par tag (GenieACS partagé)',
+  'platform.genieacs.scopeDescription': 'Avec un tag défini, le panneau de ce fournisseur ne voit et n\'agit que sur les équipements du GenieACS portant ce tag. Vide, il voit tout — ne le laissez vide que si le GenieACS est dédié à ce fournisseur.',
+  'platform.genieacs.sharedMissingTag': 'D\'autres fournisseurs utilisent ce même GenieACS et l\'un d\'eux n\'a pas de tag : ils voient les équipements des autres.',
+  'platform.genieacs.sharedOk': 'D\'autres fournisseurs utilisent ce même GenieACS, tous avec un tag :',
+  'platform.genieacs.noTag': 'sans tag',
+  'platform.genieacs.deviceTag': 'Tag des équipements',
+  'platform.genieacs.deviceTagHint': 'Lettres, chiffres et _, 64 caractères maximum. N\'utilisez pas les préfixes contrato_, idcliente_, loja_ ou tecnico_.',
+  'platform.genieacs.bulkTitle': 'Marquer les équipements avec le tag {tag}',
+  'platform.genieacs.bulkDescription': 'Pour le parc déjà présent dans le GenieACS avant le tag. Recherchez par préfixe d\'identifiant PPPoE ou collez les numéros de série ; vérifiez l\'aperçu avant d\'appliquer.',
+  'platform.genieacs.pppoePrefix': 'Préfixe de l\'identifiant PPPoE',
+  'platform.genieacs.serials': 'Numéros de série (un par ligne ou séparés par des virgules)',
+  'platform.genieacs.previewSummary': 'Trouvés : {matched} · à marquer : {toTag} · déjà marqués : {already} · d\'un autre fournisseur : {conflicts}',
+  'platform.genieacs.conflictsHint': 'Les équipements portant le tag d\'un autre fournisseur ne sont pas modifiés. Corrigez-les à la main dans le GenieACS s\'ils sont erronés :',
+  'platform.genieacs.preview': 'Aperçu',
+  'platform.genieacs.applyTag': 'Marquer {count} équipements',
+  'platform.genieacs.tagApplied': '{count} équipements marqués',
 }
 
 export default fr

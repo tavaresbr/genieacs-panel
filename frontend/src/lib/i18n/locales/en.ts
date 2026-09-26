@@ -2575,6 +2575,22 @@ const en = {
   'settings.panelIdentity.title': 'Panel',
   'settings.panelIdentity.description': 'The name shown on the panel, the language of this browser and how long the audit trail is kept.',
   'platform.genieacs.vpDescription': "The paths the panel reads from this provider's devices. They depend on the provisioning scripts installed on the platform's GenieACS, so the provider does not edit them.",
+  'platform.genieacs.scopeTitle': 'Tag separation (shared GenieACS)',
+  'platform.genieacs.scopeDescription': 'With a tag set, this provider\'s panel only sees and acts on GenieACS devices carrying that tag. Empty means it sees everything — leave it empty only when the GenieACS belongs to this provider alone.',
+  'platform.genieacs.sharedMissingTag': 'Other providers use this same GenieACS and at least one has no tag: they are seeing each other\'s devices.',
+  'platform.genieacs.sharedOk': 'Other providers use this same GenieACS, all tagged:',
+  'platform.genieacs.noTag': 'no tag',
+  'platform.genieacs.deviceTag': 'Device tag',
+  'platform.genieacs.deviceTagHint': 'Letters, digits and _, up to 64 characters. Do not use the prefixes contrato_, idcliente_, loja_ or tecnico_.',
+  'platform.genieacs.bulkTitle': 'Tag devices with {tag}',
+  'platform.genieacs.bulkDescription': 'For the fleet that was already in GenieACS before the tag. Match by PPPoE login prefix or paste serial numbers; check the preview before applying.',
+  'platform.genieacs.pppoePrefix': 'PPPoE login prefix',
+  'platform.genieacs.serials': 'Serial numbers (one per line or comma-separated)',
+  'platform.genieacs.previewSummary': 'Matched: {matched} · to tag: {toTag} · already tagged: {already} · another provider\'s: {conflicts}',
+  'platform.genieacs.conflictsHint': 'Devices carrying another provider\'s tag are left untouched. Fix them by hand in GenieACS if they are wrong:',
+  'platform.genieacs.preview': 'Preview',
+  'platform.genieacs.applyTag': 'Tag {count} devices',
+  'platform.genieacs.tagApplied': '{count} devices tagged',
 }
 
 export default en

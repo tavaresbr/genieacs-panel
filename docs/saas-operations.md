@@ -727,3 +727,66 @@ no extrato para alguém resolver com o botão do console. Não foi construído p
 de o gateway aceitar pagamento divergente, o que não dá para conferir sem uma conta lá
 dentro, e um mecanismo construído sobre uma suposição sobre dinheiro é pior que a falta
 dele.
+
+## 11. Vários provedores num GenieACS só
+
+O painel separa os provedores pelo endereço do GenieACS de cada um. Quando dois
+provedores apontam para o **mesmo** GenieACS, só essa separação não basta: cada um veria
+(e poderia reiniciar, apagar ou resetar) a frota inteira. O que os separa, nesse caso, é a
+**tag de equipamentos**:
+
+- No console, aba **Provedores → GenieACS**, cada provedor ganha uma tag (letras, números e
+  `_`; os prefixos `contrato_`, `idcliente_`, `loja_` e `tecnico_` são do painel e ficam de
+  fora). Duas tags iguais em dois provedores são recusadas.
+- Com a tag definida, o painel daquele provedor só enxerga ONTs que a carregam: lista,
+  contagem, Dashboard, exportação, falhas, detalhe e toda ação. Um equipamento de outro
+  provedor responde "não encontrado", como se não existisse.
+- Tag vazia é o comportamento antigo — use só quando o GenieACS é exclusivo do provedor.
+- O provedor não troca nem remove a própria tag: é campo da plataforma, e a API de tags
+  do painel recusa mexer em qualquer tag que seja de algum provedor.
+- O console avisa, no cartão do GenieACS, quando outros provedores usam o mesmo endereço
+  e algum deles está sem tag — esse é o estado em que as frotas estão misturadas.
+
+**Atenção à ordem:** um provedor com tag e sem nenhum equipamento marcado vê a lista
+vazia. É o lado seguro, mas combine com ele antes, ou marque a frota logo em seguida.
+
+### Marcar a frota que já existe
+
+No mesmo cartão, **Marcar equipamentos** procura na frota inteira do GenieACS por prefixo
+do login PPPoE (ex.: `TA100`) ou por uma lista de seriais colada. **Ver prévia** mostra
+quantos casam, quantos já estão marcados, quantos serão marcados e quais carregam a tag de
+OUTRO provedor — esses nunca são alterados, e ficam listados para a correção à mão no
+GenieACS. Só depois da prévia aparece o botão que aplica. Cada aplicação entra na trilha da
+plataforma.
+
+### Marcar sozinho os equipamentos novos
+
+Para ONT nova já chegar marcada, uma provision no GenieACS pode aplicar a tag a partir do
+login PPPoE. Exemplo (ajuste prefixos e tags; um `if` por provedor):
+
+```js
+// Provision "tag-provedor" — preset em todo Inform (evento 0 BOOTSTRAP, 1 BOOT ou periódico)
+const agora = Date.now();
+const user = declare(
+  "InternetGatewayDevice.WANDevice.*.WANConnectionDevice.*.WANPPPConnection.*.Username",
+  { value: agora - 24 * 3600 * 1000 }
+);
+
+let login = "";
+for (const p of user) if (p.value && p.value[0]) { login = String(p.value[0]); break; }
+
+const regras = [
+  { prefixo: "TA100", tag: "tavaresfibra" },
+  { prefixo: "INV", tag: "inove" }
+];
+for (const r of regras) {
+  if (login.toUpperCase().startsWith(r.prefixo)) {
+    declare("Tags." + r.tag, null, { value: true });
+    break;
+  }
+}
+```
+
+Em ONT TR-181 o caminho do login é `Device.PPP.Interface.*.Username`. A provision só
+**acrescenta** tag; um equipamento que troca de provedor tem a tag antiga removida à mão no
+GenieACS (o painel não deixa um provedor removê-la).

@@ -75,6 +75,7 @@ export default {
   // उपकरण
   'device.idRequired': 'उपकरण आईडी आवश्यक है',
   'device.notFound': 'उपकरण नहीं मिला',
+  'device.scopeTagProtected': 'प्रदाता का टैग यहाँ से नहीं बदला जा सकता',
   'device.listRetrieved': 'उपकरण सूची प्राप्त हुई',
   'device.listFailed': 'उपकरण सूची प्राप्त नहीं हो सकी',
   'device.exportTooLarge': 'चयन में {max} से अधिक उपकरण हैं। स्प्रेडशीट डाउनलोड करने से पहले सूची फ़िल्टर करें',

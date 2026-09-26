@@ -77,6 +77,7 @@ export default {
   // Устройства
   'device.idRequired': 'Требуется идентификатор устройства',
   'device.notFound': 'Устройство не найдено',
+  'device.scopeTagProtected': 'Тег провайдера нельзя изменить здесь',
   'device.listRetrieved': 'Список устройств получен',
   'device.listFailed': 'Не удалось получить список устройств',
   'device.exportTooLarge': 'В выборке больше {max} устройств. Отфильтруйте список перед загрузкой таблицы',

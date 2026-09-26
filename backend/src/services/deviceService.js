@@ -903,6 +903,35 @@ class DeviceService {
     };
   }
 
+  /**
+   * A frota como o ACS a tem — serial, PPPoE e tags de cada equipamento.
+   *
+   * Para a ferramenta da plataforma que marca equipamentos com a tag de um
+   * provedor: quem chama roda dentro de `withoutDeviceScope`, porque o que se
+   * procura são justamente os equipamentos que ainda não têm tag.
+   */
+  static async listFleetIdentity() {
+    const virtualParams = await this.getVirtualParameters();
+    const learnedRxPaths = (await this.readRxPowerState())?.paths ?? [];
+    const learnedTemperaturePaths = await this.readTemperaturePaths();
+    const projection = this.buildDeviceListProjection(
+      virtualParams,
+      learnedRxPaths,
+      await this.readPppoePaths(),
+      learnedTemperaturePaths
+    );
+    const rows = await this.fetchDeviceListPage(null, [...projection, '_tags']);
+    return rows.map((item) => {
+      const device = this.processDeviceData(item, virtualParams, learnedRxPaths, learnedTemperaturePaths);
+      return {
+        _id: String(item._id),
+        serial: String(device.SerialNumber ?? '').trim(),
+        pppoe: String(device.pppoe ?? '').trim(),
+        tags: Array.isArray(item._tags) ? item._tags.map(String) : []
+      };
+    });
+  }
+
   /** Quantas linhas a planilha leva, no máximo. Acima disso, a resposta pede um recorte. */
   static DEVICE_EXPORT_MAX = 5000;
 
@@ -2963,10 +2992,18 @@ class DeviceService {
 
   static async getFaults(limit = 50, timeoutMs = 15_000) {
     const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 200);
+    // Num ACS compartilhado as falhas são de todos: só as dos equipamentos do
+    // provedor passam. Lê-se mais do que o limite para que o recorte ainda
+    // devolva uma lista cheia, e a lista de equipamentos vem pelo filtro normal.
+    const connector = await connectorFor();
+    const tag = await connector.scopeTag();
+    const donos = tag
+      ? new Set(((await this.fetchFromGenieAcs('', { projection: '_id' })) || []).map((row) => String(row._id)))
+      : null;
     const data = await this.fetchGenieAcsCollection(
       'faults',
       {
-        limit: safeLimit
+        limit: donos ? Math.min(safeLimit * 10, 2000) : safeLimit
       },
       'GET',
       null,
@@ -2975,14 +3012,23 @@ class DeviceService {
     if (!Array.isArray(data)) {
       throw new Error('Invalid faults API response');
     }
+    const doProvedor = (fault) => {
+      if (!donos) return true;
+      const id = String(fault?._id ?? '');
+      const corte = id.lastIndexOf(':');
+      const device = fault?.device ?? (corte > 0 ? id.slice(0, corte) : id);
+      return donos.has(String(device));
+    };
     return data
+      .filter(doProvedor)
       .map((fault) => this.normalizeFault(fault))
       .filter(Boolean)
       .sort((left, right) => {
         const a = left.timestamp ? new Date(left.timestamp).getTime() : 0;
         const b = right.timestamp ? new Date(right.timestamp).getTime() : 0;
         return (Number.isFinite(b) ? b : 0) - (Number.isFinite(a) ? a : 0);
-      });
+      })
+      .slice(0, safeLimit);
   }
 
   static async deleteFault(faultId) {

@@ -77,6 +77,7 @@ export default {
   // 设备
   'device.idRequired': '需要提供设备 ID',
   'device.notFound': '找不到该设备',
+  'device.scopeTagProtected': '服务商标签无法在此更改',
   'device.listRetrieved': '已获取设备列表',
   'device.listFailed': '无法获取设备列表',
   'device.exportTooLarge': '所选设备超过 {max} 台。请先筛选列表再下载表格',

@@ -77,6 +77,7 @@ export default {
   // Équipements
   'device.idRequired': 'L’ID de l’équipement est requis',
   'device.notFound': 'Équipement introuvable',
+  'device.scopeTagProtected': 'L\'étiquette du fournisseur ne peut pas être modifiée ici',
   'device.listRetrieved': 'Équipements récupérés',
   'device.listFailed': 'Impossible d’obtenir les équipements',
   'device.exportTooLarge': 'La sélection compte plus de {max} équipements. Filtrez la liste avant de télécharger le tableur',

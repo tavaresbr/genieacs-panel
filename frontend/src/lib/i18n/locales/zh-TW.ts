@@ -2574,6 +2574,22 @@ const zhTW: Dictionary = {
   'settings.panelIdentity.title': '面板',
   'settings.panelIdentity.description': '面板顯示的名稱、此瀏覽器的語言以及稽核記錄的保留時長。',
   'platform.genieacs.vpDescription': '面板從該服務商設備讀取的路徑。它們取決於平台 GenieACS 上安裝的配置腳本，因此服務商不編輯它們。',
+  'platform.genieacs.scopeTitle': '依標籤隔離（共用 GenieACS）',
+  'platform.genieacs.scopeDescription': '設定標籤後，此供應商的面板只能檢視與操作帶有該標籤的 GenieACS 設備。留空則可見全部——僅當 GenieACS 為此供應商專用時才留空。',
+  'platform.genieacs.sharedMissingTag': '其他供應商也使用同一個 GenieACS，且有供應商未設定標籤：他們能看到彼此的設備。',
+  'platform.genieacs.sharedOk': '其他供應商也使用同一個 GenieACS，皆已設定標籤：',
+  'platform.genieacs.noTag': '無標籤',
+  'platform.genieacs.deviceTag': '設備標籤',
+  'platform.genieacs.deviceTagHint': '字母、數字與 _，最多 64 個字元。請勿使用 contrato_、idcliente_、loja_ 或 tecnico_ 前綴。',
+  'platform.genieacs.bulkTitle': '為設備加上標籤 {tag}',
+  'platform.genieacs.bulkDescription': '用於設定標籤前已在 GenieACS 中的設備。依 PPPoE 帳號前綴比對或貼上序號；套用前請先檢視預覽。',
+  'platform.genieacs.pppoePrefix': 'PPPoE 帳號前綴',
+  'platform.genieacs.serials': '序號（每行一個或以逗號分隔）',
+  'platform.genieacs.previewSummary': '符合：{matched} · 待標記：{toTag} · 已標記：{already} · 屬於其他供應商：{conflicts}',
+  'platform.genieacs.conflictsHint': '帶有其他供應商標籤的設備不會被修改。如有錯誤，請在 GenieACS 中手動修正：',
+  'platform.genieacs.preview': '預覽',
+  'platform.genieacs.applyTag': '標記 {count} 台設備',
+  'platform.genieacs.tagApplied': '已標記 {count} 台設備',
 }
 
 export default zhTW

@@ -2573,6 +2573,22 @@ const ja: Dictionary = {
   'settings.panelIdentity.title': 'パネル',
   'settings.panelIdentity.description': 'パネルに表示する名前、このブラウザーの言語、監査ログの保持期間。',
   'platform.genieacs.vpDescription': 'パネルがこのプロバイダーの機器から読み取るパスです。プラットフォームの GenieACS にインストールされたプロビジョニングスクリプトに依存するため、プロバイダーは編集しません。',
+  'platform.genieacs.scopeTitle': 'タグによる分離（共有GenieACS）',
+  'platform.genieacs.scopeDescription': 'タグを設定すると、このプロバイダーのパネルはそのタグを持つGenieACSの機器だけを表示・操作します。空の場合はすべてが見えます。GenieACSがこのプロバイダー専用の場合にのみ空にしてください。',
+  'platform.genieacs.sharedMissingTag': '同じGenieACSを使う他のプロバイダーがあり、タグのないものがあります。互いの機器が見えている状態です。',
+  'platform.genieacs.sharedOk': '同じGenieACSを使う他のプロバイダー（すべてタグ設定済み）：',
+  'platform.genieacs.noTag': 'タグなし',
+  'platform.genieacs.deviceTag': '機器タグ',
+  'platform.genieacs.deviceTagHint': '英数字と _、最大64文字。contrato_、idcliente_、loja_、tecnico_ で始まるものは使えません。',
+  'platform.genieacs.bulkTitle': '機器にタグ {tag} を付ける',
+  'platform.genieacs.bulkDescription': 'タグ設定前からGenieACSにある機器向けです。PPPoEログインの接頭辞で検索するか、シリアル番号を貼り付けてください。適用前にプレビューを確認してください。',
+  'platform.genieacs.pppoePrefix': 'PPPoEログインの接頭辞',
+  'platform.genieacs.serials': 'シリアル番号（1行に1つ、またはカンマ区切り）',
+  'platform.genieacs.previewSummary': '一致: {matched} · 付与予定: {toTag} · 付与済み: {already} · 他プロバイダー: {conflicts}',
+  'platform.genieacs.conflictsHint': '他のプロバイダーのタグを持つ機器は変更されません。誤りがあればGenieACSで手動で修正してください：',
+  'platform.genieacs.preview': 'プレビュー',
+  'platform.genieacs.applyTag': '{count}台にタグを付ける',
+  'platform.genieacs.tagApplied': '{count}台にタグを付けました',
 }
 
 export default ja

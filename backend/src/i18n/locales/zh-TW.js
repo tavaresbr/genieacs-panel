@@ -77,6 +77,7 @@ export default {
   // 設備
   'device.idRequired': '需要提供設備 ID',
   'device.notFound': '找不到該設備',
+  'device.scopeTagProtected': '服務商標籤無法在此變更',
   'device.listRetrieved': '已取得設備清單',
   'device.listFailed': '無法取得設備清單',
   'device.exportTooLarge': '所選設備超過 {max} 台。請先篩選列表再下載試算表',

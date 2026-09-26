@@ -8,6 +8,10 @@ import { runInTenant } from '../config/tenantContext.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { probeGenieAcs } from './settingsController.js';
 import { VIRTUAL_PARAMETER_KEYS } from '../config/platformManaged.js';
+import { getDb } from '../config/database.js';
+import DeviceService from '../services/deviceService.js';
+import DirectConnector, { DEVICE_SCOPE_KEY, DEVICE_SCOPE_TAG_PATTERN, withoutDeviceScope } from '../services/genieacs/direct.js';
+import { TAG_PREFIX } from '../services/deviceTagService.js';
 
 /**
  * O GenieACS de um provedor, configurado do console.
@@ -72,15 +76,68 @@ function readVirtualParameters(raw) {
   return { value };
 }
 
+/**
+ * `''` apaga; senão, letras, números, `-` e `_`. Não pode começar com um
+ * prefixo que o painel gerencia (`contrato_`, `loja_`...): esses o painel
+ * reescreve sozinho, e a tag do provedor sumiria na primeira passada.
+ */
+function scopeTagProblem(raw) {
+  const text = String(raw ?? '').trim();
+  if (!text) return null;
+  if (!DEVICE_SCOPE_TAG_PATTERN.test(text)) return 'Device tag must be 1-64 letters, digits or "_"';
+  if (Object.values(TAG_PREFIX).some((prefix) => text.toLowerCase().startsWith(prefix))) {
+    return 'Device tag must not start with a prefix the panel manages';
+  }
+  return null;
+}
+
+/**
+ * Outros provedores apontando para o MESMO GenieACS, e se algum deles (ou
+ * este) está sem tag. Sem tag num ACS compartilhado, cada um vê a frota de
+ * todos — é o aviso que o console tem que dar.
+ */
+async function sharedAcs(tenant, url) {
+  const origem = (() => { try { return url ? new URL(url).origin : null; } catch { return null; } })();
+  if (!origem) return { providers: [], missingTag: false };
+  // tenant-scope-exempt: o console comparando o ACS de todos os provedores —
+  // atravessar provedores é o trabalho desta leitura.
+  const rows = await getDb()('settings')
+    .whereIn('key', ['genieAcsUrl', DEVICE_SCOPE_KEY])
+    .whereIn('tenant_id', getDb()('tenants').select('id'))
+    .select('tenant_id', 'key', 'value');
+  const porProvedor = new Map();
+  for (const row of rows) {
+    const atual = porProvedor.get(row.tenant_id) || {};
+    atual[row.key] = String(row.value ?? '').trim();
+    porProvedor.set(row.tenant_id, atual);
+  }
+  const mesmos = [...porProvedor.entries()].filter(([, v]) => {
+    try { return v.genieAcsUrl && new URL(v.genieAcsUrl).origin === origem; } catch { return false; }
+  });
+  if (mesmos.length < 2) return { providers: [], missingTag: false };
+  const ids = mesmos.map(([id]) => id);
+  const nomes = new Map((await getDb()('tenants').whereIn('id', ids).select('id', 'name', 'kind'))
+    .map((t) => [t.id, t]));
+  const providers = mesmos
+    .filter(([id]) => nomes.get(id)?.kind !== 'platform')
+    .map(([id, v]) => ({ id, name: nomes.get(id)?.name || String(id), deviceTag: v[DEVICE_SCOPE_KEY] || '' }));
+  return {
+    providers: providers.filter((p) => p.id !== tenant.id),
+    missingTag: providers.length > 1 && providers.some((p) => !p.deviceTag)
+  };
+}
+
 async function snapshot(tenant) {
-  return runInTenant(tenant.id, async () => ({
+  const base = await runInTenant(tenant.id, async () => ({
     virtualParameters: Object.fromEntries(await Promise.all(
       VIRTUAL_PARAMETER_KEYS.map(async (key) => [key, (await Setting.getByKey(key)) ?? ''])
     )),
     url: (await Setting.getByKey('genieAcsUrl')) || '',
+    deviceTag: (await Setting.getByKey(DEVICE_SCOPE_KEY)) || '',
     auth: await GenieAcsAuthService.getPublicConfig(),
     suggestion: suggestGenieAcsUrl(tenant)
   }));
+  return { ...base, sharedAcs: await sharedAcs(tenant, base.url) };
 }
 
 class PlatformGenieAcsController {
@@ -119,6 +176,21 @@ class PlatformGenieAcsController {
       const mandouAuth = ['authType', 'username', 'secret'].some((k) => corpo[k] !== undefined);
       const vps = readVirtualParameters(corpo.virtualParameters);
       if (vps.error) return res.status(400).json(createErrorResponse(vps.error));
+      const mandouTag = corpo.deviceTag !== undefined;
+      if (mandouTag) {
+        const problem = scopeTagProblem(corpo.deviceTag);
+        if (problem) return res.status(400).json(createErrorResponse(problem));
+        const tagNova = String(corpo.deviceTag).trim();
+        // tenant-scope-exempt: dois provedores com a mesma tag enxergariam um a
+        // frota do outro — a conferência olha os outros provedores de propósito.
+        if (tagNova) {
+          const dono = await getDb()('settings')
+            .where({ key: DEVICE_SCOPE_KEY, value: tagNova })
+            .whereNot({ tenant_id: tenant.id })
+            .first();
+          if (dono) return res.status(409).json(createErrorResponse('Another provider already uses this device tag'));
+        }
+      }
 
       const antes = await snapshot(tenant);
       const tipoFinal = corpo.authType ?? antes.auth.authType;
@@ -129,12 +201,15 @@ class PlatformGenieAcsController {
 
       const urlNova = mandouUrl ? String(corpo.url).trim() : antes.url;
       const mudouUrl = mandouUrl && urlNova !== antes.url;
+      const tagNova = mandouTag ? String(corpo.deviceTag).trim() : antes.deviceTag;
+      const mudouTag = mandouTag && tagNova !== antes.deviceTag;
       const vpsMudados = vps.value
         ? Object.entries(vps.value).filter(([key, v]) => v !== antes.virtualParameters[key])
         : [];
 
       await runInTenant(tenant.id, async () => {
         if (mudouUrl) await Setting.upsert('genieAcsUrl', urlNova);
+        if (mudouTag) await Setting.upsert(DEVICE_SCOPE_KEY, tagNova);
         for (const [key, v] of vpsMudados) await Setting.upsert(key, v);
         if (mandouAuth) {
           await GenieAcsAuthService.saveConfig({
@@ -146,7 +221,7 @@ class PlatformGenieAcsController {
       });
       const depois = await snapshot(tenant);
 
-      if (!mudouUrl && !mandouAuth && vpsMudados.length === 0) {
+      if (!mudouUrl && !mudouTag && !mandouAuth && vpsMudados.length === 0) {
         return res.json(createResponse('GenieACS configuration unchanged', depois));
       }
 
@@ -155,6 +230,7 @@ class PlatformGenieAcsController {
       // do provedor.
       const detail = {};
       if (mudouUrl) detail.url = { from: antes.url || null, to: urlNova || null };
+      if (mudouTag) detail.deviceTag = { from: antes.deviceTag || null, to: tagNova || null };
       if (vpsMudados.length) {
         detail.virtualParameters = Object.fromEntries(
           vpsMudados.map(([key, v]) => [key, { from: antes.virtualParameters[key] || null, to: v || null }])
@@ -197,6 +273,87 @@ class PlatformGenieAcsController {
     } catch (error) {
       console.error('Platform GenieACS update error:', error);
       return res.status(500).json(createErrorResponse('Internal server error', error.message));
+    }
+  }
+
+  /**
+   * `POST /api/platform/tenants/:id/genieacs/tag-devices` —
+   * `{ pppoePrefix?, serials?, apply? }`.
+   *
+   * Marca com a tag do provedor os equipamentos do ACS que casam com um prefixo
+   * de login PPPoE ou com uma lista de seriais. Sem `apply`, só conta: o console
+   * mostra quantos seriam marcados antes de marcar.
+   *
+   * Roda SEM o escopo do provedor, porque o que se procura é justamente o que
+   * ainda não tem tag. Equipamento que já carrega a tag de OUTRO provedor não é
+   * tocado — ele volta como conflito, para a plataforma decidir à mão.
+   */
+  static async tagDevices(req, res) {
+    try {
+      const tenant = await loadTarget(req, res);
+      if (!tenant) return undefined;
+      const corpo = req.body ?? {};
+      const prefixo = String(corpo.pppoePrefix ?? '').trim().toLowerCase();
+      const listaCrua = Array.isArray(corpo.serials) ? corpo.serials.join(' ') : String(corpo.serials ?? '');
+      const seriais = new Set(listaCrua.split(/[\s,;]+/).map((s) => s.trim().toUpperCase()).filter(Boolean));
+      if (!prefixo && seriais.size === 0) {
+        return res.status(400).json(createErrorResponse('Give a PPPoE prefix or a list of serial numbers'));
+      }
+      if (prefixo.length > 64 || seriais.size > 5000) {
+        return res.status(400).json(createErrorResponse('Filter is too large'));
+      }
+      const aplicar = corpo.apply === true;
+
+      const resultado = await runInTenant(tenant.id, async () => {
+        const tag = String((await Setting.getByKey(DEVICE_SCOPE_KEY)) ?? '').trim();
+        if (!tag) return { error: 'Set the provider device tag first' };
+        const tagsDeProvedor = await DirectConnector.allScopeTags();
+        return withoutDeviceScope(async () => {
+          const frota = await DeviceService.listFleetIdentity();
+          const casam = frota.filter((d) => (prefixo && d.pppoe.toLowerCase().startsWith(prefixo))
+            || (seriais.size && seriais.has(d.serial.toUpperCase())));
+          const jaMarcados = [];
+          const conflitos = [];
+          const marcar = [];
+          for (const d of casam) {
+            if (d.tags.includes(tag)) jaMarcados.push(d);
+            else if (d.tags.some((t) => tagsDeProvedor.has(t))) conflitos.push(d);
+            else marcar.push(d);
+          }
+          let marcados = 0;
+          if (aplicar) {
+            for (const d of marcar) {
+              // eslint-disable-next-line no-await-in-loop -- um por vez: o ACS é compartilhado
+              await DeviceService.mutateDeviceTag(d._id, tag, 'POST');
+              marcados += 1;
+            }
+          }
+          return {
+            tag,
+            matched: casam.length,
+            alreadyTagged: jaMarcados.length,
+            toTag: marcar.length,
+            tagged: marcados,
+            conflicts: conflitos.slice(0, 50).map((d) => ({
+              id: d._id, serial: d.serial, pppoe: d.pppoe, tags: d.tags.filter((t) => tagsDeProvedor.has(t))
+            })),
+            conflictCount: conflitos.length
+          };
+        });
+      });
+      if (resultado.error) return res.status(400).json(createErrorResponse(resultado.error));
+
+      if (aplicar && resultado.tagged > 0) {
+        await PlatformAudit.fromRequest(req, {
+          action: PlatformAudit.ACTIONS.TENANT_GENIEACS_CHANGED,
+          tenant,
+          detail: { taggedDevices: resultado.tagged, tag: resultado.tag, pppoePrefix: prefixo || null, serials: seriais.size || null }
+        });
+      }
+      return res.json(createResponse(aplicar ? 'Devices tagged' : 'Devices that would be tagged', resultado));
+    } catch (error) {
+      console.error('Platform GenieACS tag-devices error:', error);
+      return res.status(502).json(createErrorResponse('Could not tag devices', error.message));
     }
   }
 

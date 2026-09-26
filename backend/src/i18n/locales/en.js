@@ -77,6 +77,7 @@ export default {
   // Devices
   'device.idRequired': 'The device ID is required',
   'device.notFound': 'Device not found',
+  'device.scopeTagProtected': 'The provider tag cannot be changed here',
   'device.listRetrieved': 'Devices retrieved successfully',
   'device.listFailed': 'Failed to get the devices',
   'device.exportTooLarge': 'The selection has more than {max} devices. Filter the list before downloading the spreadsheet',

@@ -183,16 +183,27 @@ export function startGenieAcsStub({ devices = [buildDevice()], taskStatus = 200,
         } catch {
           filter = {};
         }
-        // `_id` como valor ou como `{ $in: [...] }`, as duas formas que o painel usa.
-        const casa = (id) => {
-          if (!filter._id) return true;
-          if (Array.isArray(filter._id?.$in)) return filter._id.$in.includes(id);
-          return id === filter._id;
+        // `_id` como valor ou como `{ $in: [...] }`, `_tags` como valor (a tag do
+        // provedor num ACS compartilhado) e `$and` juntando os dois — as formas
+        // que o painel usa. O resto do filtro é ignorado, como sempre foi.
+        const casa = (device, f) => {
+          if (Array.isArray(f.$and)) return f.$and.every((parte) => casa(device, parte || {}));
+          if (f._id !== undefined) {
+            if (Array.isArray(f._id?.$in)) { if (!f._id.$in.includes(device._id)) return false; }
+            else if (device._id !== f._id) return false;
+          }
+          if (f._tags !== undefined && !(device._tags || []).includes(f._tags)) return false;
+          return true;
         };
-        return send(200, state.devices.filter((device) => casa(device._id)));
+        return send(200, state.devices.filter((device) => casa(device, filter)));
       }
 
-      if (url.pathname === '/faults') return send(200, []);
+      if (url.pathname === '/faults') return send(200, state.faults || []);
+      const faultMatch = url.pathname.match(/^\/faults\/([^/]+)$/);
+      if (faultMatch && req.method === 'DELETE') {
+        state.deletedFaults = [...(state.deletedFaults || []), decodeURIComponent(faultMatch[1])];
+        return send(200, {});
+      }
       return send(404, { message: 'not found' });
     });
   });
