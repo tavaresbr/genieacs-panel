@@ -2634,6 +2634,22 @@ const ru: Dictionary = {
   'audit.action.operatorPasswordLinkIssued': 'Платформа создала новую ссылку для пароля',
   'audit.action.operatorPasswordSet': 'Платформа задала пароль оператора',
   'audit.action.operatorSessionsRevoked': 'Платформа завершила сеансы оператора',
+  'platform.genieacs.scopeTitle': 'Разделение по тегу (общий GenieACS)',
+  'platform.genieacs.scopeDescription': 'Если тег задан, панель этого провайдера видит и изменяет только устройства GenieACS с этим тегом. Пустое значение — видно всё; оставляйте пустым, только если GenieACS принадлежит одному этому провайдеру.',
+  'platform.genieacs.sharedMissingTag': 'Другие провайдеры используют этот же GenieACS, и у кого-то нет тега: они видят устройства друг друга.',
+  'platform.genieacs.sharedOk': 'Другие провайдеры используют этот же GenieACS, у всех есть тег:',
+  'platform.genieacs.noTag': 'без тега',
+  'platform.genieacs.deviceTag': 'Тег устройств',
+  'platform.genieacs.deviceTagHint': 'Буквы, цифры и _, до 64 символов. Не используйте префиксы contrato_, idcliente_, loja_ и tecnico_.',
+  'platform.genieacs.bulkTitle': 'Пометить устройства тегом {tag}',
+  'platform.genieacs.bulkDescription': 'Для устройств, которые были в GenieACS до появления тега. Ищите по префиксу логина PPPoE или вставьте серийные номера; проверьте предпросмотр перед применением.',
+  'platform.genieacs.pppoePrefix': 'Префикс логина PPPoE',
+  'platform.genieacs.serials': 'Серийные номера (по одному в строке или через запятую)',
+  'platform.genieacs.previewSummary': 'Найдено: {matched} · пометить: {toTag} · уже помечены: {already} · другого провайдера: {conflicts}',
+  'platform.genieacs.conflictsHint': 'Устройства с тегом другого провайдера не изменяются. Если это ошибка, исправьте вручную в GenieACS:',
+  'platform.genieacs.preview': 'Предпросмотр',
+  'platform.genieacs.applyTag': 'Пометить устройства: {count}',
+  'platform.genieacs.tagApplied': 'Помечено устройств: {count}',
 }
 
 export default ru

@@ -1038,6 +1038,24 @@ export interface TenantGenieAcs {
   auth: GenieAcsAuthConfig
   /** O endereço que o deploy sugere a este provedor, ou nulo. */
   suggestion: string | null
+  /** A tag que separa os equipamentos deste provedor num GenieACS compartilhado; `''` sem filtro. */
+  deviceTag: string
+  /** Os outros provedores no mesmo GenieACS, e se algum dos que o dividem está sem tag. */
+  sharedAcs: {
+    providers: { id: number; name: string; deviceTag: string }[]
+    missingTag: boolean
+  }
+}
+
+/** O que a marcação em lote achou (e, com `apply`, marcou) na frota do ACS. */
+export interface TenantDeviceTagging {
+  tag: string
+  matched: number
+  alreadyTagged: number
+  toTag: number
+  tagged: number
+  conflicts: { id: string; serial: string; pppoe: string; tags: string[] }[]
+  conflictCount: number
 }
 
 export interface CatalogueTenant {
@@ -1523,9 +1541,13 @@ export const platformAPI = {
   /** `secret` ausente mantém o guardado; `''` apaga. */
   updateTenantGenieAcs: (tenantId: number, payload: {
     url?: string; authType?: GenieAcsAuthType; username?: string; secret?: string
-    virtualParameters?: Record<string, string>
+    virtualParameters?: Record<string, string>; deviceTag?: string
   }) =>
     apiClient.put<TenantGenieAcs>(`/platform/tenants/${tenantId}/genieacs`, payload),
+
+  /** Sem `apply` é só a prévia: quantos equipamentos seriam marcados. */
+  tagTenantDevices: (tenantId: number, payload: { pppoePrefix?: string; serials?: string; apply?: boolean }) =>
+    apiClient.post<TenantDeviceTagging>(`/platform/tenants/${tenantId}/genieacs/tag-devices`, payload),
 
   testTenantGenieAcs: (tenantId: number, url?: string) =>
     apiClient.post<{ deviceCount?: number }>(`/platform/tenants/${tenantId}/genieacs/test`, url ? { url } : {}),

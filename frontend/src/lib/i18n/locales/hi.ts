@@ -2634,6 +2634,22 @@ const hi: Dictionary = {
   'audit.action.operatorPasswordLinkIssued': 'प्लेटफ़ॉर्म ने नया पासवर्ड लिंक बनाया',
   'audit.action.operatorPasswordSet': 'प्लेटफ़ॉर्म ने ऑपरेटर पासवर्ड सेट किया',
   'audit.action.operatorSessionsRevoked': 'प्लेटफ़ॉर्म ने ऑपरेटर सत्र समाप्त किए',
+  'platform.genieacs.scopeTitle': 'टैग से अलगाव (साझा GenieACS)',
+  'platform.genieacs.scopeDescription': 'टैग सेट होने पर, इस प्रदाता का पैनल केवल उसी टैग वाले GenieACS उपकरण देखता और उन पर कार्य करता है। खाली होने पर सब कुछ दिखता है — इसे तभी खाली छोड़ें जब GenieACS केवल इसी प्रदाता का हो।',
+  'platform.genieacs.sharedMissingTag': 'अन्य प्रदाता भी यही GenieACS उपयोग करते हैं और किसी का टैग नहीं है: वे एक-दूसरे के उपकरण देख रहे हैं।',
+  'platform.genieacs.sharedOk': 'अन्य प्रदाता भी यही GenieACS उपयोग करते हैं, सभी के टैग हैं:',
+  'platform.genieacs.noTag': 'कोई टैग नहीं',
+  'platform.genieacs.deviceTag': 'उपकरण टैग',
+  'platform.genieacs.deviceTagHint': 'अक्षर, अंक और _, अधिकतम 64 वर्ण। contrato_, idcliente_, loja_ या tecnico_ उपसर्ग का उपयोग न करें।',
+  'platform.genieacs.bulkTitle': 'उपकरणों को {tag} टैग दें',
+  'platform.genieacs.bulkDescription': 'टैग से पहले GenieACS में मौजूद उपकरणों के लिए। PPPoE लॉगिन उपसर्ग से खोजें या सीरियल नंबर चिपकाएँ; लागू करने से पहले पूर्वावलोकन देखें।',
+  'platform.genieacs.pppoePrefix': 'PPPoE लॉगिन उपसर्ग',
+  'platform.genieacs.serials': 'सीरियल नंबर (प्रति पंक्ति एक या अल्पविराम से अलग)',
+  'platform.genieacs.previewSummary': 'मिले: {matched} · टैग करने हैं: {toTag} · पहले से टैग: {already} · अन्य प्रदाता के: {conflicts}',
+  'platform.genieacs.conflictsHint': 'अन्य प्रदाता के टैग वाले उपकरण नहीं बदले जाते। यदि गलत हों तो GenieACS में हाथ से ठीक करें:',
+  'platform.genieacs.preview': 'पूर्वावलोकन',
+  'platform.genieacs.applyTag': '{count} उपकरण टैग करें',
+  'platform.genieacs.tagApplied': '{count} उपकरण टैग किए गए',
 }
 
 export default hi

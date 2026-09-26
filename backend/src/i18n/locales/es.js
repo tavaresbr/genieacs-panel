@@ -75,6 +75,7 @@ export default {
   // Equipos
   'device.idRequired': 'El ID del equipo es obligatorio',
   'device.notFound': 'Equipo no encontrado',
+  'device.scopeTagProtected': 'La etiqueta del proveedor no se puede cambiar aquí',
   'device.listRetrieved': 'Equipos obtenidos correctamente',
   'device.listFailed': 'No se pudieron obtener los equipos',
   'device.exportTooLarge': 'La selección tiene más de {max} equipos. Filtre la lista antes de descargar la planilla',

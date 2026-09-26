@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import {
   contactsAPI,
+  whatsappAPI,
   type ContactAddress,
   type ContactField,
   type ContactProfile,
@@ -75,6 +76,7 @@ export default function ContactDetailPage() {
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [editing, setEditing] = useState(false)
+  const [opening, setOpening] = useState(false)
   const canEdit = can('contacts.edit')
 
   const load = useCallback(async () => {
@@ -90,6 +92,25 @@ export default function ContactDetailPage() {
   }, [key])
 
   useEffect(() => { void load() }, [load])
+
+  // The thread with this client in the panel's inbox: the one that exists, or
+  // a new empty one. Opening sends nothing; the operator writes in the inbox.
+  const openConversation = async () => {
+    if (!profile) return
+    setOpening(true)
+    try {
+      const res = await whatsappAPI.openContactConversation(profile.key)
+      if (!res.success || !res.data) {
+        toast.error(res.message || t('api.requestFailed'))
+        return
+      }
+      navigate('/whatsapp', { state: { conversation: res.data } })
+    } catch {
+      toast.error(t('api.requestFailed'))
+    } finally {
+      setOpening(false)
+    }
+  }
 
   const save = async (patch: ContactProfilePatch) => {
     const res = await contactsAPI.update(key, patch)
@@ -157,6 +178,17 @@ export default function ContactDetailPage() {
               <a className="modern-button-secondary" href={profile.sgpUrl} target="_blank" rel="noreferrer">
                 <Icon name="external" size={16} /> {t('contacts.profile.openInSgp')}
               </a>
+            )}
+            {can('whatsapp.send') && (
+              <button
+                type="button"
+                className="modern-button-secondary"
+                disabled={opening || !profile.whatsappPhone}
+                title={profile.whatsappPhone ? undefined : t('contacts.profile.sendInvoiceNoPhone')}
+                onClick={() => void openConversation()}
+              >
+                <Icon name="chat" size={16} /> {t('contacts.profile.openConversation')}
+              </button>
             )}
             {canEdit && (
               <button type="button" className="modern-button" onClick={() => setEditing(true)}>

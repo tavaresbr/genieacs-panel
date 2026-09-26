@@ -148,6 +148,7 @@ const POR_ID = new Map([
   ['GET /api/platform/tenants/:id/genieacs', 'plano de controle; prova em platform-managed-settings.test.js'],
   ['PUT /api/platform/tenants/:id/genieacs', 'plano de controle; prova em platform-managed-settings.test.js — inclusive a de que gravar no alfa não toca o beta'],
   ['POST /api/platform/tenants/:id/genieacs/test', 'plano de controle; prova em platform-managed-settings.test.js'],
+  ['POST /api/platform/tenants/:id/genieacs/tag-devices', 'plano de controle; prova em shared-acs-scope.test.js — marca só o que não tem dono, nunca o de outro provedor'],
   ['GET /api/platform/tenants/:id/export', 'plano de controle; prova em platform-tenant-export.test.js — inclusive a de que o arquivo de um não traz linha do outro']
 ]);
 
@@ -300,11 +301,19 @@ describe('toda rota endereçada por um parâmetro', () => {
   // plataforma quem diz para onde o painel de cada provedor fala, e olhar o
   // provedor pelo id é o trabalho. A prova de que gravar no alfa não toca o
   // beta está em platform-managed-settings.test.js. São 46.
+  //
+  // E a quarta, `/tenants/:id/genieacs/tag-devices`: a plataforma marcando com
+  // a tag de um provedor os equipamentos sem dono de um ACS compartilhado. A
+  // prova de que ela não toma equipamento de outro provedor está em
+  // shared-acs-scope.test.js. São 47.
+  //
   // E as quatro da conta de um membro da equipe no console (editar, link de
   // senha, senha na hora, encerrar sessões), pelo mesmo pedágio das de
   // `members/:userId`: a prova de que o id de outro provedor responde 404 está
   // em platform-member-edit.test.js.
-  const TETO_DE_EXCECOES = 50;
+  // São 51.
+  const TETO_DE_EXCECOES = 51;
+
 
   /**
    * As exceções que são do plano de controle, nomeadas uma a uma.
@@ -339,7 +348,8 @@ describe('toda rota endereçada por um parâmetro', () => {
     'GET /api/platform/tenants/:id/export',
     'GET /api/platform/tenants/:id/genieacs',
     'PUT /api/platform/tenants/:id/genieacs',
-    'POST /api/platform/tenants/:id/genieacs/test'
+    'POST /api/platform/tenants/:id/genieacs/test',
+    'POST /api/platform/tenants/:id/genieacs/tag-devices'
   ]);
 
   // Este é o número que guarda o que a varredura existe para guardar, e ELE só

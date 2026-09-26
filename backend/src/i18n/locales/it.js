@@ -75,6 +75,7 @@ export default {
   // Apparati
   'device.idRequired': 'L’ID dell’apparato è obbligatorio',
   'device.notFound': 'Apparato non trovato',
+  'device.scopeTagProtected': 'L\'etichetta del provider non può essere modificata qui',
   'device.listRetrieved': 'Apparati ottenuti correttamente',
   'device.listFailed': 'Non è stato possibile ottenere gli apparati',
   'device.exportTooLarge': 'La selezione ha più di {max} dispositivi. Filtra l\'elenco prima di scaricare il foglio',

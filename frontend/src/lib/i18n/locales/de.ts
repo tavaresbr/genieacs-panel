@@ -2630,6 +2630,22 @@ const de: Dictionary = {
   'audit.action.operatorPasswordLinkIssued': 'Neuer Passwort-Link von der Plattform erzeugt',
   'audit.action.operatorPasswordSet': 'Operatorpasswort von der Plattform festgelegt',
   'audit.action.operatorSessionsRevoked': 'Operatorsitzungen von der Plattform beendet',
+  'platform.genieacs.scopeTitle': 'Trennung per Tag (gemeinsames GenieACS)',
+  'platform.genieacs.scopeDescription': 'Mit gesetztem Tag sieht und bearbeitet das Panel dieses Anbieters nur GenieACS-Geräte mit diesem Tag. Leer bedeutet: alles sichtbar — nur leer lassen, wenn das GenieACS ausschließlich diesem Anbieter gehört.',
+  'platform.genieacs.sharedMissingTag': 'Andere Anbieter nutzen dasselbe GenieACS und mindestens einer hat keinen Tag: Sie sehen gegenseitig ihre Geräte.',
+  'platform.genieacs.sharedOk': 'Andere Anbieter nutzen dasselbe GenieACS, alle mit Tag:',
+  'platform.genieacs.noTag': 'kein Tag',
+  'platform.genieacs.deviceTag': 'Geräte-Tag',
+  'platform.genieacs.deviceTagHint': 'Buchstaben, Ziffern und _, bis zu 64 Zeichen. Nicht die Präfixe contrato_, idcliente_, loja_ oder tecnico_ verwenden.',
+  'platform.genieacs.bulkTitle': 'Geräte mit {tag} markieren',
+  'platform.genieacs.bulkDescription': 'Für die Flotte, die schon vor dem Tag im GenieACS war. Nach PPPoE-Login-Präfix suchen oder Seriennummern einfügen; vor dem Anwenden die Vorschau prüfen.',
+  'platform.genieacs.pppoePrefix': 'PPPoE-Login-Präfix',
+  'platform.genieacs.serials': 'Seriennummern (eine pro Zeile oder durch Komma getrennt)',
+  'platform.genieacs.previewSummary': 'Gefunden: {matched} · zu markieren: {toTag} · bereits markiert: {already} · anderer Anbieter: {conflicts}',
+  'platform.genieacs.conflictsHint': 'Geräte mit dem Tag eines anderen Anbieters bleiben unverändert. Falls falsch, im GenieACS von Hand korrigieren:',
+  'platform.genieacs.preview': 'Vorschau',
+  'platform.genieacs.applyTag': '{count} Geräte markieren',
+  'platform.genieacs.tagApplied': '{count} Geräte markiert',
 }
 
 export default de

@@ -2626,6 +2626,22 @@ const zhCN: Dictionary = {
   'audit.action.operatorPasswordLinkIssued': '平台生成了新的密码链接',
   'audit.action.operatorPasswordSet': '平台设置了操作员密码',
   'audit.action.operatorSessionsRevoked': '平台结束了操作员会话',
+  'platform.genieacs.scopeTitle': '按标签隔离（共享 GenieACS）',
+  'platform.genieacs.scopeDescription': '设置标签后，此服务商的面板只能查看和操作带有该标签的 GenieACS 设备。留空则可见全部——仅当 GenieACS 为此服务商独享时才留空。',
+  'platform.genieacs.sharedMissingTag': '其他服务商也在使用同一个 GenieACS，且有服务商未设置标签：他们能看到彼此的设备。',
+  'platform.genieacs.sharedOk': '其他服务商也在使用同一个 GenieACS，均已设置标签：',
+  'platform.genieacs.noTag': '无标签',
+  'platform.genieacs.deviceTag': '设备标签',
+  'platform.genieacs.deviceTagHint': '字母、数字和 _，最多 64 个字符。不要使用 contrato_、idcliente_、loja_ 或 tecnico_ 前缀。',
+  'platform.genieacs.bulkTitle': '为设备添加标签 {tag}',
+  'platform.genieacs.bulkDescription': '用于设置标签前已在 GenieACS 中的设备。按 PPPoE 账号前缀匹配或粘贴序列号；应用前请先查看预览。',
+  'platform.genieacs.pppoePrefix': 'PPPoE 账号前缀',
+  'platform.genieacs.serials': '序列号（每行一个或用逗号分隔）',
+  'platform.genieacs.previewSummary': '匹配：{matched} · 待标记：{toTag} · 已标记：{already} · 属于其他服务商：{conflicts}',
+  'platform.genieacs.conflictsHint': '带有其他服务商标签的设备不会被修改。如有错误，请在 GenieACS 中手动修正：',
+  'platform.genieacs.preview': '预览',
+  'platform.genieacs.applyTag': '标记 {count} 台设备',
+  'platform.genieacs.tagApplied': '已标记 {count} 台设备',
 }
 
 export default zhCN

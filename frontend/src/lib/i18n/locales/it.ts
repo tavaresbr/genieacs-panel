@@ -2632,6 +2632,22 @@ const it: Dictionary = {
   'audit.action.operatorPasswordLinkIssued': 'Nuovo link della password generato dalla piattaforma',
   'audit.action.operatorPasswordSet': 'Password operatore impostata dalla piattaforma',
   'audit.action.operatorSessionsRevoked': 'Sessioni operatore chiuse dalla piattaforma',
+  'platform.genieacs.scopeTitle': 'Separazione per tag (GenieACS condiviso)',
+  'platform.genieacs.scopeDescription': 'Con un tag impostato, il pannello di questo provider vede e agisce solo sui dispositivi del GenieACS che portano quel tag. Vuoto, vede tutto — lascialo vuoto solo se il GenieACS è esclusivo di questo provider.',
+  'platform.genieacs.sharedMissingTag': 'Altri provider usano questo stesso GenieACS e almeno uno è senza tag: stanno vedendo i dispositivi degli altri.',
+  'platform.genieacs.sharedOk': 'Altri provider usano questo stesso GenieACS, tutti con tag:',
+  'platform.genieacs.noTag': 'senza tag',
+  'platform.genieacs.deviceTag': 'Tag dei dispositivi',
+  'platform.genieacs.deviceTagHint': 'Lettere, numeri e _, fino a 64 caratteri. Non usare i prefissi contrato_, idcliente_, loja_ o tecnico_.',
+  'platform.genieacs.bulkTitle': 'Marca i dispositivi con il tag {tag}',
+  'platform.genieacs.bulkDescription': 'Per la flotta già presente nel GenieACS prima del tag. Cerca per prefisso del login PPPoE o incolla i numeri di serie; controlla l\'anteprima prima di applicare.',
+  'platform.genieacs.pppoePrefix': 'Prefisso del login PPPoE',
+  'platform.genieacs.serials': 'Numeri di serie (uno per riga o separati da virgola)',
+  'platform.genieacs.previewSummary': 'Trovati: {matched} · da marcare: {toTag} · già marcati: {already} · di un altro provider: {conflicts}',
+  'platform.genieacs.conflictsHint': 'I dispositivi con il tag di un altro provider non vengono modificati. Correggili a mano nel GenieACS se sono errati:',
+  'platform.genieacs.preview': 'Anteprima',
+  'platform.genieacs.applyTag': 'Marca {count} dispositivi',
+  'platform.genieacs.tagApplied': '{count} dispositivi marcati',
 }
 
 export default it

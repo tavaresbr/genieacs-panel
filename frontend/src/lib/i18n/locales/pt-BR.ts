@@ -2626,6 +2626,22 @@ const ptBR: Dictionary = {
   'audit.action.operatorPasswordLinkIssued': 'Link de senha novo gerado pela plataforma',
   'audit.action.operatorPasswordSet': 'Senha de operador definida pela plataforma',
   'audit.action.operatorSessionsRevoked': 'Sessões de operador encerradas pela plataforma',
+  'platform.genieacs.scopeTitle': 'Separação por tag (GenieACS compartilhado)',
+  'platform.genieacs.scopeDescription': 'Com uma tag definida, o painel deste provedor só vê e só age nos equipamentos do GenieACS que carregam essa tag. Vazio, vê tudo — use vazio apenas quando o GenieACS for exclusivo deste provedor.',
+  'platform.genieacs.sharedMissingTag': 'Outros provedores usam este mesmo GenieACS e algum está sem tag: eles estão vendo os equipamentos uns dos outros.',
+  'platform.genieacs.sharedOk': 'Outros provedores usam este mesmo GenieACS, todos com tag:',
+  'platform.genieacs.noTag': 'sem tag',
+  'platform.genieacs.deviceTag': 'Tag de equipamentos',
+  'platform.genieacs.deviceTagHint': 'Letras, números e _, até 64 caracteres. Não use os prefixos contrato_, idcliente_, loja_ ou tecnico_.',
+  'platform.genieacs.bulkTitle': 'Marcar equipamentos com a tag {tag}',
+  'platform.genieacs.bulkDescription': 'Para a frota que já estava no GenieACS antes da tag. Procure por prefixo do login PPPoE ou cole os seriais; veja a prévia antes de aplicar.',
+  'platform.genieacs.pppoePrefix': 'Prefixo do login PPPoE',
+  'platform.genieacs.serials': 'Seriais (um por linha ou separados por vírgula)',
+  'platform.genieacs.previewSummary': 'Encontrados: {matched} · a marcar: {toTag} · já marcados: {already} · de outro provedor: {conflicts}',
+  'platform.genieacs.conflictsHint': 'Equipamentos com a tag de outro provedor não são alterados. Resolva à mão no GenieACS se estiverem errados:',
+  'platform.genieacs.preview': 'Ver prévia',
+  'platform.genieacs.applyTag': 'Marcar {count} equipamentos',
+  'platform.genieacs.tagApplied': '{count} equipamentos marcados',
 }
 
 export default ptBR

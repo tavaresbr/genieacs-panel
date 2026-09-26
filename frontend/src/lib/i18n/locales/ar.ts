@@ -2635,6 +2635,22 @@ const ar: Dictionary = {
   'audit.action.operatorPasswordLinkIssued': 'أنشأت المنصة رابط كلمة مرور جديدًا',
   'audit.action.operatorPasswordSet': 'عيّنت المنصة كلمة مرور المشغّل',
   'audit.action.operatorSessionsRevoked': 'أنهت المنصة جلسات المشغّل',
+  'platform.genieacs.scopeTitle': 'الفصل بالوسم (GenieACS مشترك)',
+  'platform.genieacs.scopeDescription': 'عند تعيين وسم، لا ترى لوحة هذا المزوّد ولا تتحكم إلا في أجهزة GenieACS التي تحمل هذا الوسم. إذا كان فارغًا فهي ترى كل شيء — اتركه فارغًا فقط إذا كان GenieACS خاصًا بهذا المزوّد.',
+  'platform.genieacs.sharedMissingTag': 'مزوّدون آخرون يستخدمون نفس GenieACS وأحدهم بلا وسم: إنهم يرون أجهزة بعضهم البعض.',
+  'platform.genieacs.sharedOk': 'مزوّدون آخرون يستخدمون نفس GenieACS، وجميعهم لديهم وسم:',
+  'platform.genieacs.noTag': 'بلا وسم',
+  'platform.genieacs.deviceTag': 'وسم الأجهزة',
+  'platform.genieacs.deviceTagHint': 'حروف وأرقام و _، حتى 64 حرفًا. لا تستخدم البادئات contrato_ أو idcliente_ أو loja_ أو tecnico_.',
+  'platform.genieacs.bulkTitle': 'وسم الأجهزة بـ {tag}',
+  'platform.genieacs.bulkDescription': 'للأجهزة الموجودة في GenieACS قبل الوسم. ابحث ببادئة اسم مستخدم PPPoE أو الصق الأرقام التسلسلية؛ راجع المعاينة قبل التطبيق.',
+  'platform.genieacs.pppoePrefix': 'بادئة اسم مستخدم PPPoE',
+  'platform.genieacs.serials': 'الأرقام التسلسلية (واحد في كل سطر أو مفصولة بفواصل)',
+  'platform.genieacs.previewSummary': 'المطابقة: {matched} · للوسم: {toTag} · موسومة مسبقًا: {already} · لمزوّد آخر: {conflicts}',
+  'platform.genieacs.conflictsHint': 'لا تُعدَّل الأجهزة التي تحمل وسم مزوّد آخر. صحّحها يدويًا في GenieACS إن كانت خاطئة:',
+  'platform.genieacs.preview': 'معاينة',
+  'platform.genieacs.applyTag': 'وسم {count} من الأجهزة',
+  'platform.genieacs.tagApplied': 'تم وسم {count} من الأجهزة',
 }
 
 export default ar
