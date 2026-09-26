@@ -2117,7 +2117,7 @@ const de: Dictionary = {
   'platform.addMemberHint': 'Das legt die Zugehörigkeit an und rührt das Passwort nie an.',
   'platform.inviteMember': 'Jemanden einladen, der noch keinen Zugang hat',
   'platform.inviteMemberHint': 'So bekommt ein neuer Anbieter sein erstes Konto: der Link öffnet unter der Adresse dieses Anbieters, und wer annimmt, wählt Benutzername und Passwort selbst — die Plattform kennt es nie.',
-  'platform.inviteNoAddress': 'Dieses Deployment hat keine Basis-Domain konfiguriert, daher kommt hier das Token heraus. Es gilt unter der Adresse des Anbieters, nach /invite#.',
+  'platform.linkFromThisAddress': 'Der Link verwendet die Adresse dieses Panels. Damit der E-Mail-Versand funktioniert, setzen Sie PUBLIC_BASE_URL auf dem Server.',
   'platform.memberNotFound': 'Diese Person hat auf diesem Deployment noch keinen Zugang. Nutzen Sie die Einladung oben: sie legt das Konto an und wählt ihr Passwort selbst.',
   'platform.operator.title': 'Betreiberkonto anlegen',
   'platform.operator.description': 'Für den Anbieter, den Sie verwalten: das Konto entsteht fertig, und die Person wählt über den Link nur das Passwort. Nutzen Sie die Einladung unten, wenn der Neuzugang auch den Benutzernamen selbst wählen soll.',

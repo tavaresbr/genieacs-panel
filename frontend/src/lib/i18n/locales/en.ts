@@ -2115,7 +2115,7 @@ const en = {
   'platform.addMemberHint': 'This creates a membership and never touches their password.',
   'platform.inviteMember': 'Invite somebody with no login yet',
   'platform.inviteMemberHint': 'This is how a new provider gets its first account: the link opens at that provider\'s address, and whoever accepts chooses their own username and password — the platform never knows it.',
-  'platform.inviteNoAddress': 'This deployment has no base domain configured, so what you get here is the token. It is valid at the provider\'s address, after /invite#.',
+  'platform.linkFromThisAddress': 'The link uses this panel\'s address. For the e-mail button to work, set PUBLIC_BASE_URL on the server.',
   'platform.memberNotFound': 'That person has no login on this deployment yet. Use the invitation above: they create the account and choose their own password.',
   'platform.operator.title': 'Create an operator account',
   'platform.operator.description': 'For the provider you administer: the account is created ready, and the person only chooses a password through the link. Use the invitation below when whoever joins should also choose their own username.',

@@ -2113,7 +2113,7 @@ const ja: Dictionary = {
   'platform.addMemberHint': '所属を作成するだけで、パスワードには一切触れません。',
   'platform.inviteMember': 'まだログインを持たない人を招待',
   'platform.inviteMemberHint': '新しいプロバイダーが最初のアカウントを得る方法です。リンクはそのプロバイダーのアドレスで開き、受け取った本人がユーザー名とパスワードを決めます — プラットフォームがそれを知ることはありません。',
-  'platform.inviteNoAddress': 'この環境にはベースドメインが設定されていないため、ここに出るのはトークンです。プロバイダーのアドレスの /invite# の後ろで使えます。',
+  'platform.linkFromThisAddress': 'リンクはこのパネルのアドレスを使います。メール送信を有効にするには、サーバーで PUBLIC_BASE_URL を設定してください。',
   'platform.memberNotFound': 'この人はまだこの環境にログインを持っていません。上の招待を使ってください。本人がアカウントを作り、パスワードを決めます。',
   'platform.operator.title': 'オペレーターのアカウントを作成',
   'platform.operator.description': '運用を代行しているプロバイダー向けです。アカウントはそのまま使える状態で作られ、本人はリンクからパスワードを決めるだけです。ユーザー名も本人に決めてほしい場合は、下の招待を使ってください。',

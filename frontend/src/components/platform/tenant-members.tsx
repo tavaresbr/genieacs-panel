@@ -6,6 +6,7 @@ import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import { OPERATOR_ROLES, ROLE_LABEL_KEYS } from '@/lib/permissions'
+import { panelLink } from '@/lib/panel-link'
 import { whatsappShareUrl } from '@/lib/whatsapp-share'
 import { MemberAccount } from '@/components/platform/member-account'
 
@@ -35,7 +36,7 @@ export function TenantMembers({ tenant, onMembershipChange }: Props) {
   const [convidando, setConvidando] = useState(false)
   // O convite cunhado, mostrado UMA vez: o banco guarda só o hash do token, e
   // nem esta tela nem nenhuma outra consegue dizê-lo de novo.
-  const [cunhado, setCunhado] = useState<{ link: string | null; token: string; emailed: boolean } | null>(null)
+  const [cunhado, setCunhado] = useState<{ link: string; fromThisAddress: boolean; token: string; emailed: boolean } | null>(null)
   const [conta, setConta] = useState<{ username: string; email: string; phone: string; role: OperatorRole; password: string }>(
     { username: '', email: '', phone: '', role: 'admin', password: '' }
   )
@@ -43,7 +44,7 @@ export function TenantMembers({ tenant, onMembershipChange }: Props) {
   // passa por quem opera o console.
   const [senhaDigitada, setSenhaDigitada] = useState(false)
   const [criando, setCriando] = useState(false)
-  const [criada, setCriada] = useState<{ username: string; phone: string | null; link: string | null; token: string | null; emailed: boolean } | null>(null)
+  const [criada, setCriada] = useState<{ username: string; phone: string | null; link: string | null; fromThisAddress: boolean; token: string | null; emailed: boolean } | null>(null)
 
   const tenantId = tenant.id
 
@@ -113,7 +114,12 @@ export function TenantMembers({ tenant, onMembershipChange }: Props) {
         toast.error(res.message || t('invite.createFailed'))
         return
       }
-      setCunhado({ link: res.data.url, token: res.data.token, emailed: res.data.emailed })
+      setCunhado({
+        link: panelLink(res.data.url, res.data.token, '/invite'),
+        fromThisAddress: !res.data.url,
+        token: res.data.token,
+        emailed: res.data.emailed
+      })
       setConvite((c) => ({ ...c, email: '' }))
     } finally {
       setConvidando(false)
@@ -165,7 +171,8 @@ export function TenantMembers({ tenant, onMembershipChange }: Props) {
       setCriada({
         username,
         phone: res.data.membership.phone,
-        link: res.data.url,
+        link: res.data.token ? panelLink(res.data.url, res.data.token, '/reset-password') : null,
+        fromThisAddress: Boolean(res.data.token) && !res.data.url,
         token: res.data.token,
         emailed: res.data.emailed
       })
@@ -359,12 +366,12 @@ export function TenantMembers({ tenant, onMembershipChange }: Props) {
                   <input
                     className="modern-input flex-1 font-mono text-xs"
                     readOnly
-                    value={criada.link ?? criada.token}
+                    value={criada.link ?? ''}
                   />
                   <button
                     type="button"
                     className="modern-button-secondary shrink-0"
-                    onClick={() => void copiar(criada.link ?? criada.token ?? '')}
+                    onClick={() => void copiar(criada.link ?? '')}
                   >
                     <Icon name="copy" size={17} />
                     {t('common.copy')}
@@ -373,7 +380,7 @@ export function TenantMembers({ tenant, onMembershipChange }: Props) {
                     href={whatsappShareUrl(criada.phone, t('platform.member.whatsappMessage', {
                       username: criada.username,
                       provider: tenant.name,
-                      url: criada.link ?? criada.token ?? ''
+                      url: criada.link ?? ''
                     }))}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -383,8 +390,8 @@ export function TenantMembers({ tenant, onMembershipChange }: Props) {
                     {t('platform.member.sendWhatsapp')}
                   </a>
                 </div>
-                {criada.link === null && (
-                  <p className="field-hint">{t('platform.inviteNoAddress')}</p>
+                {criada.fromThisAddress && (
+                  <p className="field-hint">{t('platform.linkFromThisAddress')}</p>
                 )}
               </>
             )}
@@ -438,12 +445,12 @@ export function TenantMembers({ tenant, onMembershipChange }: Props) {
               <input
                 className="modern-input flex-1 font-mono text-xs"
                 readOnly
-                value={cunhado.link ?? cunhado.token}
+                value={cunhado.link}
               />
               <button
                 type="button"
                 className="modern-button-secondary shrink-0"
-                onClick={() => void copiar(cunhado.link ?? cunhado.token)}
+                onClick={() => void copiar(cunhado.link)}
               >
                 <Icon name="copy" size={17} />
                 {t('common.copy')}
@@ -451,7 +458,7 @@ export function TenantMembers({ tenant, onMembershipChange }: Props) {
               <a
                 href={whatsappShareUrl(null, t('platform.member.whatsappInvite', {
                   provider: tenant.name,
-                  url: cunhado.link ?? cunhado.token
+                  url: cunhado.link
                 }))}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -461,11 +468,10 @@ export function TenantMembers({ tenant, onMembershipChange }: Props) {
                 {t('platform.member.sendWhatsapp')}
               </a>
             </div>
-            {/* Sem domínio-base o servidor não tem host para montar o link, e o
-                que sobra é o token: quem entrega precisa saber que ele vale no
-                endereço do provedor, com `/invite#` na frente. */}
-            {cunhado.link === null && (
-              <p className="field-hint">{t('platform.inviteNoAddress')}</p>
+            {/* Sem domínio-base o servidor não tem host para montar o link, e
+                ele sai com o endereço desta aba: ver `panelLink`. */}
+            {cunhado.fromThisAddress && (
+              <p className="field-hint">{t('platform.linkFromThisAddress')}</p>
             )}
           </div>
         )}

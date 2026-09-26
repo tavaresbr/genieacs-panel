@@ -2113,7 +2113,7 @@ const zhCN: Dictionary = {
   'platform.addMemberHint': '这只会建立归属关系，绝不会改动其密码。',
   'platform.inviteMember': '邀请还没有登录账号的人',
   'platform.inviteMemberHint': '新运营商就是这样拿到第一个账号的：链接在该运营商的地址上打开，接受邀请的人自己设定用户名和密码——平台永远不会知道。',
-  'platform.inviteNoAddress': '本部署没有配置基础域名，所以这里给出的是令牌。它在运营商地址的 /invite# 之后有效。',
+  'platform.linkFromThisAddress': '链接使用本面板的地址。要让邮件发送生效，请在服务器上设置 PUBLIC_BASE_URL。',
   'platform.memberNotFound': '这个人在本部署还没有登录账号。请使用上面的邀请：由本人创建账号并设定自己的密码。',
   'platform.operator.title': '创建操作员账号',
   'platform.operator.description': '用于你代为管理的运营商：账号创建即可用，本人只需通过链接设定密码。如果新加入的人还要自己选用户名，请使用下面的邀请。',

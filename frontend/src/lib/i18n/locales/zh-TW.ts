@@ -2114,7 +2114,7 @@ const zhTW: Dictionary = {
   'platform.addMemberHint': '這只會建立歸屬關係，絕不會更動其密碼。',
   'platform.inviteMember': '邀請還沒有登入帳號的人',
   'platform.inviteMemberHint': '新業者就是這樣拿到第一個帳號的：連結在該業者的網址上開啟，接受邀請的人自行設定使用者名稱與密碼——平台永遠不會知道。',
-  'platform.inviteNoAddress': '本部署沒有設定基礎網域，所以這裡給出的是權杖。它在業者網址的 /invite# 之後有效。',
+  'platform.linkFromThisAddress': '連結使用本面板的網址。要讓郵件寄送生效，請在伺服器上設定 PUBLIC_BASE_URL。',
   'platform.memberNotFound': '這個人在本部署還沒有登入帳號。請使用上方的邀請：由本人建立帳號並設定自己的密碼。',
   'platform.operator.title': '建立操作員帳號',
   'platform.operator.description': '用於你代為管理的業者：帳號建立即可用，本人只需透過連結設定密碼。若新加入的人還要自行選使用者名稱，請使用下方的邀請。',

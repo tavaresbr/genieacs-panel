@@ -2113,7 +2113,7 @@ const ptBR: Dictionary = {
   'platform.addMemberHint': 'Isto cria o vínculo e nunca toca na senha da pessoa.',
   'platform.inviteMember': 'Convidar quem ainda não tem login',
   'platform.inviteMemberHint': 'É assim que um provedor novo ganha a primeira conta: o link abre no endereço dele, e quem aceita escolhe o próprio usuário e senha — a plataforma nunca sabe a senha.',
-  'platform.inviteNoAddress': 'Este deploy não tem domínio-base configurado, então o que sai aqui é o token. Ele vale no endereço do provedor, depois de /invite#.',
+  'platform.linkFromThisAddress': 'O link usa o endereço deste painel. Para o envio por e-mail funcionar, defina PUBLIC_BASE_URL no servidor.',
   'platform.memberNotFound': 'Essa pessoa ainda não tem login nesta instalação. Use o convite acima: ela cria a conta e escolhe a própria senha.',
   'platform.operator.title': 'Criar conta de operador',
   'platform.operator.description': 'Para o provedor que você administra: a conta nasce pronta, e a pessoa só escolhe a senha pelo link. Use o convite abaixo quando quem entra deve escolher também o próprio nome de usuário.',

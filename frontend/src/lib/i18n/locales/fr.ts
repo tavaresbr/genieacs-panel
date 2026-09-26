@@ -2113,7 +2113,7 @@ const fr: Dictionary = {
   'platform.addMemberHint': 'Cela crée l’appartenance et ne touche jamais à son mot de passe.',
   'platform.inviteMember': 'Inviter quelqu\'un qui n\'a pas encore de compte',
   'platform.inviteMemberHint': 'C\'est ainsi qu\'un nouveau fournisseur obtient son premier compte : le lien ouvre à l\'adresse de ce fournisseur, et la personne qui accepte choisit son identifiant et son mot de passe — la plateforme ne le connaît jamais.',
-  'platform.inviteNoAddress': 'Ce déploiement n\'a pas de domaine de base configuré, donc ce qui sort ici est le jeton. Il vaut à l\'adresse du fournisseur, après /invite#.',
+  'platform.linkFromThisAddress': 'Le lien utilise l\'adresse de ce panneau. Pour que l\'envoi par e-mail fonctionne, définissez PUBLIC_BASE_URL sur le serveur.',
   'platform.memberNotFound': 'Cette personne n\'a pas encore de compte sur ce déploiement. Utilisez l\'invitation ci-dessus : elle crée le compte et choisit son mot de passe.',
   'platform.operator.title': 'Créer un compte opérateur',
   'platform.operator.description': 'Pour le fournisseur que vous administrez : le compte naît prêt, et la personne choisit seulement son mot de passe via le lien. Utilisez l\'invitation ci-dessous quand celui qui arrive doit aussi choisir son identifiant.',

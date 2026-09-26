@@ -2120,7 +2120,7 @@ const ko: Dictionary = {
   'platform.addMemberHint': '소속만 만들며 비밀번호는 절대 건드리지 않습니다.',
   'platform.inviteMember': '아직 로그인이 없는 사람 초대',
   'platform.inviteMemberHint': '새 사업자가 첫 계정을 얻는 방법입니다. 링크는 그 사업자 주소에서 열리고, 수락한 사람이 직접 아이디와 비밀번호를 정합니다 — 플랫폼은 그것을 알지 못합니다.',
-  'platform.inviteNoAddress': '이 배포에는 기본 도메인이 설정되어 있지 않아 여기에는 토큰이 나옵니다. 사업자 주소의 /invite# 뒤에서 유효합니다.',
+  'platform.linkFromThisAddress': '링크는 이 패널의 주소를 사용합니다. 이메일 발송이 작동하려면 서버에 PUBLIC_BASE_URL을 설정하세요.',
   'platform.memberNotFound': '이 사람은 아직 이 배포에 로그인이 없습니다. 위의 초대를 사용하세요. 본인이 계정을 만들고 비밀번호를 정합니다.',
   'platform.operator.title': '운영자 계정 만들기',
   'platform.operator.description': '직접 운영하는 사업자용입니다. 계정은 바로 쓸 수 있는 상태로 만들어지고, 본인은 링크에서 비밀번호만 정합니다. 들어오는 사람이 아이디도 직접 정해야 한다면 아래의 초대를 쓰세요.',

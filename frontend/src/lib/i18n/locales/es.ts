@@ -2113,7 +2113,7 @@ const es: Dictionary = {
   'platform.addMemberHint': 'Esto crea la pertenencia y nunca toca su contraseña.',
   'platform.inviteMember': 'Invitar a alguien que aún no tiene acceso',
   'platform.inviteMemberHint': 'Así consigue su primera cuenta un proveedor nuevo: el enlace abre en la dirección de ese proveedor, y quien acepta elige su propio usuario y contraseña — la plataforma nunca la conoce.',
-  'platform.inviteNoAddress': 'Esta instalación no tiene dominio base configurado, así que lo que sale aquí es el token. Vale en la dirección del proveedor, después de /invite#.',
+  'platform.linkFromThisAddress': 'El enlace usa la dirección de este panel. Para que el envío por correo funcione, defina PUBLIC_BASE_URL en el servidor.',
   'platform.memberNotFound': 'Esa persona todavía no tiene acceso en esta instalación. Use la invitación de arriba: ella crea la cuenta y elige su propia contraseña.',
   'platform.operator.title': 'Crear cuenta de operador',
   'platform.operator.description': 'Para el proveedor que usted administra: la cuenta nace lista y la persona solo elige la contraseña por el enlace. Use la invitación de abajo cuando quien entra deba elegir también su propio usuario.',
