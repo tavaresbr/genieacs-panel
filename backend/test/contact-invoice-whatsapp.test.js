@@ -23,7 +23,7 @@ const clientes = [
     id: 21,
     nome: 'ELANE PATRIQUI',
     cpfcnpj: '123.456.789-09',
-    contatos: { celulares: ['(93) 98851-9934'] },
+    contatos: { celulares: ['(93) 98851-9934', '(11) 92134-5262'] },
     contratos: [{ id: 329, status: 'Ativo', vencimento: '15' }]
   },
   {
@@ -167,6 +167,25 @@ describe('a conversa pela ficha', () => {
     const res = await call(`${panelUrl}/api/whatsapp/contacts/329/conversation`, { method: 'POST', headers: authHeaders(token) });
     assert.ok([200, 201].includes(res.status), JSON.stringify(res.body));
     assert.equal(res.body.data.waPhoneE164, '5593988519934');
+  });
+});
+
+describe('conversar com outro número da ficha', () => {
+  const abrir = (body) => call(`${panelUrl}/api/whatsapp/contacts/329/conversation`, {
+    method: 'POST', headers: authHeaders(token), body
+  });
+
+  it('abre a conversa com o número extra que a ficha lista', async () => {
+    const res = await abrir({ phone: '(11) 92134-5262' });
+    assert.ok([200, 201].includes(res.status), JSON.stringify(res.body));
+    assert.equal(res.body.data.waPhoneE164, '5511921345262');
+    assert.equal(res.body.data.contract, '329');
+  });
+
+  it('recusa um número que a ficha não lista', async () => {
+    const res = await abrir({ phone: '(21) 99999-0000' });
+    assert.equal(res.status, 400);
+    assert.equal(res.body.code, 'invalid_phone');
   });
 });
 

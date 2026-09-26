@@ -116,6 +116,8 @@ const es: Dictionary = {
   'contacts.profile.dueOn': 'vence el {date}',
   'contacts.profile.copied': 'Copiado',
   'contacts.profile.copyLine': 'Línea digitable',
+  'contacts.profile.chat': 'Conversar',
+  'contacts.profile.chatThisNumber': 'Abrir conversación de WhatsApp con este número',
   'contacts.profile.addPhone': 'Agregar teléfono',
   'contacts.profile.removePhone': 'Quitar teléfono',
   'contacts.profile.sendInvoice': 'Enviar por WhatsApp',

@@ -118,6 +118,8 @@ const en = {
   'contacts.profile.dueOn': 'due {date}',
   'contacts.profile.copied': 'Copied',
   'contacts.profile.copyLine': 'Payment line',
+  'contacts.profile.chat': 'Chat',
+  'contacts.profile.chatThisNumber': 'Open a WhatsApp conversation with this number',
   'contacts.profile.addPhone': 'Add phone',
   'contacts.profile.removePhone': 'Remove phone',
   'contacts.profile.sendInvoice': 'Send via WhatsApp',

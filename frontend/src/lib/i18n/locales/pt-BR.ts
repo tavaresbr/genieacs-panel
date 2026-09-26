@@ -116,6 +116,8 @@ const ptBR: Dictionary = {
   'contacts.profile.dueOn': 'vence em {date}',
   'contacts.profile.copied': 'Copiado',
   'contacts.profile.copyLine': 'Linha digitável',
+  'contacts.profile.chat': 'Conversar',
+  'contacts.profile.chatThisNumber': 'Abrir conversa no WhatsApp com este número',
   'contacts.profile.addPhone': 'Adicionar telefone',
   'contacts.profile.removePhone': 'Remover telefone',
   'contacts.profile.sendInvoice': 'Enviar pelo WhatsApp',
