@@ -4,6 +4,8 @@ import User from '../models/User.js';
 import bcrypt from 'bcryptjs';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { searchPlaces } from '../services/addressLookupService.js';
+import MapStatusService from '../services/mapStatusService.js';
+import { classifySyncError } from '../services/customerSyncErrors.js';
 
 /**
  * A política de uso do Nominatim é de uma consulta por segundo por
@@ -124,6 +126,22 @@ class MappingController {
   /** Intervalo entre consultas ao Nominatim (os testes zeram). */
   static SEARCH_INTERVAL_MS = 1_000;
   static SEARCH_MAX_WAIT_MS = 5_000;
+
+  /** Estado ao vivo dos pontos com PPPoE — ver `MapStatusService`. */
+  static async liveStatus(req, res) {
+    try {
+      return res.json(createResponse(req.t('mapping.statusReady'), await MapStatusService.status()));
+    } catch (error) {
+      console.warn(`Map live status failed: ${error.message}`);
+      // Mesmo classificador da sincronização de IDs: diz se o ACS não
+      // respondeu, recusou a credencial ou nem está configurado.
+      const reason = classifySyncError(error);
+      const message = reason.code === 'database'
+        ? req.t('mapping.statusFailed')
+        : req.t(reason.reasonKey, reason.status ? { status: reason.status } : undefined);
+      return res.status(502).json(createErrorResponse(message, error.message, reason.code));
+    }
+  }
 
   static async searchAddress(req, res) {
     const q = String(req.query.q ?? '').replace(/\s+/g, ' ').trim();

@@ -278,6 +278,8 @@ export default {
   'mapping.resetFailed': '无法重置拓扑数据',
   'mapping.imported': "导入完成：已添加 {nodes} 个点位和 {edges} 条光缆",
   'mapping.importFailed': "无法导入地图数据",
+  'mapping.statusReady': "已获取网络状态",
+  'mapping.statusFailed': "暂时无法读取设备状态",
   'mapping.searchTooShort': "请至少输入 3 个字符进行搜索。",
   'mapping.searchDone': "搜索完成",
   'mapping.searchFailed': "暂时无法搜索地址，请稍后再试。",

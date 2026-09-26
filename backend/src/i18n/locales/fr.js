@@ -278,6 +278,8 @@ export default {
   'mapping.resetFailed': 'Impossible de réinitialiser les données de la carte',
   'mapping.imported': "Importation terminée : {nodes} point(s) et {edges} câble(s) ajoutés",
   'mapping.importFailed': "Impossible d'importer les données de la carte",
+  'mapping.statusReady': "État du réseau récupéré",
+  'mapping.statusFailed': "Impossible de lire l'état des équipements pour le moment",
   'mapping.searchTooShort': "Saisissez au moins 3 caractères pour rechercher.",
   'mapping.searchDone': "Recherche terminée",
   'mapping.searchFailed': "Impossible de rechercher l'adresse pour le moment. Réessayez dans un instant.",

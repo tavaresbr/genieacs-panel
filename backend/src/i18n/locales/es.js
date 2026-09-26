@@ -275,6 +275,8 @@ export default {
   'mapping.resetFailed': 'No se pudieron restablecer los datos del mapa',
   'mapping.imported': "Importación completada: {nodes} punto(s) y {edges} cable(s) agregados",
   'mapping.importFailed': "No fue posible importar los datos del mapa",
+  'mapping.statusReady': "Estado de la red obtenido",
+  'mapping.statusFailed': "No fue posible leer el estado de los equipos ahora",
   'mapping.searchTooShort': "Escriba al menos 3 caracteres para buscar.",
   'mapping.searchDone': "Búsqueda completada",
   'mapping.searchFailed': "No fue posible buscar la dirección ahora. Inténtelo de nuevo en unos instantes.",

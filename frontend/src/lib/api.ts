@@ -1,6 +1,7 @@
 import { getActiveLocale, translate } from '@/lib/i18n'
 import type { LoginResponse, OperatorRole, User } from '@/types'
 import { MFA_ENROLLMENT_EVENT, isMfaEnrollmentRefusal } from '@/lib/mfa-enrollment'
+import type { LiveStatus } from '@/lib/map-status'
 
 // Acima de `apiClient`, que o dispara: um `const` de módulo lido antes da
 // declaração é uma ReferenceError no primeiro 402.
@@ -2565,6 +2566,10 @@ export const mappingAPI = {
   /** Acrescenta pontos e cabos (importação de KML/KMZ); nunca apaga nem sobrescreve. */
   importData: (data: { nodes: unknown[]; edges: unknown[] }) =>
     apiClient.post<MapImportResult>('/mapping-data/import', data),
+
+  /** Estado ao vivo (online, sinal fraco, offline) dos pontos com PPPoE. */
+  liveStatus: () =>
+    apiClient.get<LiveStatus>('/mapping-data/status'),
 
   /** Busca livre de um lugar no Brasil (Nominatim, pelo servidor). */
   searchAddress: (q: string) =>
