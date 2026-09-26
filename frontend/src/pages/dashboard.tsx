@@ -337,7 +337,7 @@ export default function DashboardPage() {
             clique em "3 novos em 24h" abre três linhas. As faixas são as
             mesmas dos dois lados porque são o mesmo código — se o número e a
             lista discordassem, o link seria pior que texto parado. */}
-        <section className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
           {([
             ['dashboard.stat.total', data.stats.total, 'server', 'text-foreground', '/devices'],
             ['dashboard.stat.online', data.stats.online, 'check', 'text-[hsl(var(--status-success))]', '/devices?status=online'],
@@ -346,8 +346,8 @@ export default function DashboardPage() {
           ] as const).map(([labelKey, value, icon, color, to]) => {
             const corpo = (
               <>
-                <div className="flex items-start justify-between"><p className="metric-label">{t(labelKey)}</p><Icon name={icon} size={19} className="text-muted-foreground" /></div>
-                <p className={`metric-value mt-4 ${color}`}>{value}</p>
+                <div className="flex items-start justify-between gap-2"><p className="metric-label min-w-0">{t(labelKey)}</p><Icon name={icon} size={19} className="shrink-0 text-muted-foreground" /></div>
+                <p className={`metric-value mt-3 truncate text-2xl sm:mt-4 sm:text-3xl ${color}`}>{value}</p>
               </>
             )
             return to
@@ -355,12 +355,12 @@ export default function DashboardPage() {
                 <Link
                   key={labelKey}
                   to={to}
-                  className="modern-card block p-5 transition-colors hover:border-primary focus-visible:border-primary"
+                  className="modern-card block min-w-0 p-4 transition-colors hover:border-primary focus-visible:border-primary sm:p-5"
                 >
                   {corpo}
                 </Link>
               )
-              : <div key={labelKey} className="modern-card p-5">{corpo}</div>
+              : <div key={labelKey} className="modern-card min-w-0 p-4 sm:p-5">{corpo}</div>
           })}
         </section>
 
@@ -388,17 +388,17 @@ export default function DashboardPage() {
             <div className="mt-5 divide-y divide-border">
               {/* Levava para `/devices` sem filtro: clicar em "7 offline" abria
                   os 29. O recorte agora vai na URL. */}
-              <Link to="/devices?status=offline" className="flex min-h-16 items-center justify-between py-3 hover:text-primary"><span><strong className="block text-sm">{t('dashboard.queue.offline')}</strong><small className="text-muted-foreground">{t('dashboard.queue.offlineHint')}</small></span><span className="data-value text-[hsl(var(--status-danger))]">{data.stats.offline}</span></Link>
+              <Link to="/devices?status=offline" className="flex min-h-16 items-center justify-between gap-3 py-3 hover:text-primary"><span><strong className="block text-sm">{t('dashboard.queue.offline')}</strong><small className="text-muted-foreground">{t('dashboard.queue.offlineHint')}</small></span><span className="data-value text-[hsl(var(--status-danger))]">{data.stats.offline}</span></Link>
               {/* As falhas não são uma lista de equipamentos: a tabela delas
                   está logo abaixo, nesta mesma página. O destino honesto é
                   ela, e não `/devices`. */}
-              <a href="#dashboard-faults" className="flex min-h-16 items-center justify-between py-3 hover:text-primary"><span><strong className="block text-sm">{t('dashboard.queue.faults')}</strong><small className="text-muted-foreground">{t('dashboard.queue.faultsHint')}</small></span><span className="data-value text-[hsl(var(--status-danger))]">{data.faults.length}</span></a>
+              <a href="#dashboard-faults" className="flex min-h-16 items-center justify-between gap-3 py-3 hover:text-primary"><span><strong className="block text-sm">{t('dashboard.queue.faults')}</strong><small className="text-muted-foreground">{t('dashboard.queue.faultsHint')}</small></span><span className="data-value text-[hsl(var(--status-danger))]">{data.faults.length}</span></a>
               {/* Voltou a ser link, e só porque o recorte existe: `focus=weak-signal`
                   devolve as faixas Poor e Danger, que são as duas que este
                   número soma. Ele tinha DEIXADO de ser link no dia em que
                   levava a `/devices` sem filtro — prometia "estes com sinal
                   fraco" e entregava o inventário inteiro. */}
-              <Link to="/devices?focus=weak-signal" className="flex min-h-16 items-center justify-between py-3 hover:text-primary"><span><strong className="block text-sm">{t('dashboard.queue.weakSignal')}</strong><small className="text-muted-foreground">{t('dashboard.queue.weakSignalHint')}</small></span><span className="data-value text-[hsl(var(--status-warning))]">{signalRisk}</span></Link>
+              <Link to="/devices?focus=weak-signal" className="flex min-h-16 items-center justify-between gap-3 py-3 hover:text-primary"><span><strong className="block text-sm">{t('dashboard.queue.weakSignal')}</strong><small className="text-muted-foreground">{t('dashboard.queue.weakSignalHint')}</small></span><span className="data-value text-[hsl(var(--status-warning))]">{signalRisk}</span></Link>
             </div>
           </div>
         </section>
@@ -427,9 +427,9 @@ export default function DashboardPage() {
                 </span>
               </p>
             </div>
-            <div className="grid gap-px bg-border md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-px bg-border md:grid-cols-3">
               {sgpGroups.map((group) => (
-                <div key={group.key} className="bg-card p-5">
+                <div key={group.key} className="min-w-0 bg-card p-5">
                   <div className="flex items-start justify-between gap-3">
                     <h3 className="text-sm font-semibold">{t(group.titleKey)}</h3>
                     <span className={`data-value ${group.tone}`}>{group.total}</span>
@@ -490,7 +490,7 @@ export default function DashboardPage() {
             </div>
           </div>
           {data.faultsError && <div className="border-b border-border bg-[hsl(var(--status-warning))]/10 px-5 py-3 text-sm">{data.faultsError}</div>}
-          <div className="overflow-x-auto">
+          <div className="desktop-table overflow-x-auto">
             <table className="modern-table">
               <thead><tr><th>{t('dashboard.faults.time')}</th><th>{t('dashboard.faults.device')}</th><th>{t('dashboard.faults.channelCode')}</th><th>{t('dashboard.faults.message')}</th>{canWrite && <th>{t('dashboard.faults.action')}</th>}</tr></thead>
               <tbody>
@@ -507,6 +507,27 @@ export default function DashboardPage() {
               </tbody>
             </table>
           </div>
+          {/* No celular a mesma lista vira cartões: a tabela obrigava a rolar
+              de lado para ler a mensagem, que é o que importa na falha. */}
+          <ul className="mobile-card-list divide-y divide-border">
+            {data.faults.slice(0, 25).map((fault) => (
+              <li key={fault.id} className="space-y-2 px-4 py-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="modern-badge-error">{fault.code}</span>
+                  <span className="text-xs text-muted-foreground">{formatFaultTime(fault.timestamp)}</span>
+                </div>
+                <p className="break-all font-mono text-xs">{fault.deviceId || '—'}</p>
+                <p className="break-words text-sm">{fault.message}</p>
+                <p className="text-xs text-muted-foreground">{fault.channel}{fault.retries ? ` · ${t('dashboard.faults.retry', { count: fault.retries })}` : ''}</p>
+                {canWrite && (
+                  <button type="button" className="modern-button-secondary w-full" disabled={clearingFault === fault.id} onClick={() => void clearFault(fault)}>
+                    {clearingFault === fault.id ? t('dashboard.faults.clearing') : t('dashboard.faults.clear')}
+                  </button>
+                )}
+              </li>
+            ))}
+            {!data.faults.length && <li className="py-12 text-center text-sm text-muted-foreground">{t('dashboard.faults.empty')}</li>}
+          </ul>
         </section>
       </div>
     </div>

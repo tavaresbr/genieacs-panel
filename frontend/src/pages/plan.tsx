@@ -80,7 +80,7 @@ export default function PlanPage() {
             <h1 className="page-title">{t('plan.title')}</h1>
             <p className="page-description">{t('plan.subtitle')}</p>
           </div>
-          <button type="button" className="modern-button-secondary" disabled={loading} onClick={() => void load()}>
+          <button type="button" className="modern-button-secondary self-start sm:self-auto" disabled={loading} onClick={() => void load()}>
             <Icon name="refresh" size={17} className={loading ? 'animate-spin' : ''} />
             {t('common.refresh')}
           </button>
@@ -96,7 +96,7 @@ export default function PlanPage() {
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
             <section className="modern-card p-5 sm:p-6">
               <h2 className="section-heading">{t('platform.subscription.plan')}</h2>
-              <p className="mt-1 text-2xl font-semibold text-foreground">{subscription.plan?.name ?? '—'}</p>
+              <p className="mt-1 break-words text-2xl font-semibold text-foreground">{subscription.plan?.name ?? '—'}</p>
               <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
                 <span className={badgeClass(subscription.status)}>
                   {t(STATUS_KEYS[subscription.status] ?? 'platform.subscription.suspended')}
@@ -143,9 +143,9 @@ export default function PlanPage() {
                   const over = data!.over[key]
                   return (
                     <li key={key}>
-                      <div className="mb-1 flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">{label}</span>
-                        <span className={over ? 'font-semibold text-destructive' : 'font-medium'}>{text}</span>
+                      <div className="mb-1 flex items-center justify-between gap-3 text-sm">
+                        <span className="min-w-0 text-muted-foreground">{label}</span>
+                        <span className={`shrink-0 ${over ? 'font-semibold text-destructive' : 'font-medium'}`}>{text}</span>
                       </div>
                       <div className="h-2 w-full overflow-hidden rounded-full bg-muted" aria-hidden="true">
                         <div
