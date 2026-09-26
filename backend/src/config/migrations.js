@@ -217,6 +217,9 @@ const usersTable = (db) => (t) => {
   t.timestamp('email_verified_at');
   t.string('password', 255).notNullable();
   t.string('role', 32).notNullable().defaultTo('user');
+  // Telefone da pessoa, só dígitos (com DDI). Serve para o console mandar o
+  // link de senha pelo WhatsApp; nulo é o estado de toda conta anterior a ele.
+  t.string('phone', 32);
   addTokenVersion(t);
   t.timestamp('created_at').defaultTo(db.fn.now());
   t.timestamp('updated_at').defaultTo(db.fn.now());
@@ -3767,6 +3770,23 @@ export const migrations = [
       await db('tenants')
         .whereIn('name', LEGACY_PRODUCT_NAMES)
         .update({ name: PRODUCT_NAME, updated_at: new Date() });
+    }
+  },
+  {
+    /**
+     * O telefone da pessoa — ver `usersTable`. Nasce nulo para todo mundo.
+     */
+    id: '0063_user_phone',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('users'))) return true;
+      return db.schema.hasColumn('users', 'phone');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('users'))) return;
+      if (await db.schema.hasColumn('users', 'phone')) return;
+      await db.schema.alterTable('users', (t) => {
+        t.string('phone', 32);
+      });
     }
   }
 ];

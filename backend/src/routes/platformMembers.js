@@ -59,6 +59,34 @@ router.post(
   PlatformMemberController.invite
 );
 
+// Mexer numa conta da equipe: os dados (login, e-mail, telefone, papel), um
+// link novo de definir senha, a senha na hora e o fim das sessões. Todas pelo
+// provedor da URL, e 404 para quem não trabalha nele.
+router.patch(
+  '/tenants/:id/members/:userId',
+  authenticateToken,
+  requirePlatformAdmin,
+  PlatformMemberController.update
+);
+router.post(
+  '/tenants/:id/members/:userId/password-link',
+  authenticateToken,
+  requirePlatformAdmin,
+  PlatformMemberController.passwordLink
+);
+router.post(
+  '/tenants/:id/members/:userId/password',
+  authenticateToken,
+  requirePlatformAdmin,
+  PlatformMemberController.setPassword
+);
+router.post(
+  '/tenants/:id/members/:userId/sessions/revoke',
+  authenticateToken,
+  requirePlatformAdmin,
+  PlatformMemberController.revokeSessions
+);
+
 router.delete(
   '/tenants/:id/members/:userId',
   authenticateToken,

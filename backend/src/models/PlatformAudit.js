@@ -68,6 +68,12 @@ class PlatformAudit {
     OPERATOR_CREATED: 'tenant.operator_created',
     MEMBER_ADDED: 'tenant.member_added',
     MEMBER_REMOVED: 'tenant.member_removed',
+    // Mexer numa conta da equipe de um provedor, do console. As quatro
+    // espelham as de `AuditLog` com o mesmo nome e nunca carregam o segredo.
+    MEMBER_UPDATED: 'tenant.member_updated',
+    MEMBER_PASSWORD_LINK_ISSUED: 'tenant.member_password_link',
+    MEMBER_PASSWORD_SET: 'tenant.member_password_set',
+    MEMBER_SESSIONS_REVOKED: 'tenant.member_sessions_revoked',
     // Quem pediu para olhar o painel de qual cliente. Gravada na cunhagem do
     // bilhete — antes de a sessão existir —, porque é o pedido que é o ato do
     // plano de controle. Que a sessão tenha de fato começado é o que a trilha

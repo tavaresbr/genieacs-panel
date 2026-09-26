@@ -103,7 +103,7 @@ class User {
     return (
       (await getDb()('users')
         .select(
-          'id', 'username', 'email', 'email_verified_at', 'role', 'password',
+          'id', 'username', 'email', 'email_verified_at', 'phone', 'role', 'password',
           'token_version', 'totp_enabled_at', 'created_at', 'updated_at'
         )
         .where({ id })
@@ -140,9 +140,9 @@ class User {
    * e nenhum provedor a que pertencer.
    */
   static async create(userData, trx = null) {
-    const { username, password, role = 'viewer', email = null } = userData;
+    const { username, password, role = 'viewer', email = null, phone = null } = userData;
     const id = await insertReturningId('users', {
-      username, password, role, email: User.normalizeEmail(email)
+      username, password, role, email: User.normalizeEmail(email), phone: phone || null
     }, trx);
     return id;
   }
@@ -320,6 +320,13 @@ class User {
     await getDb()('users')
       .where({ id })
       .update({ username: newUsername, updated_at: new Date() });
+  }
+
+  /** Só dígitos, ou nulo para apagar. Quem chama normaliza. */
+  static async updatePhone(id, phone) {
+    await getDb()('users')
+      .where({ id })
+      .update({ phone: phone || null, updated_at: new Date() });
   }
 
   static async revokeSessions(id) {

@@ -83,6 +83,7 @@ class TenantUser {
         'users.id',
         'users.username',
         'users.email',
+        'users.phone',
         'users.totp_enabled_at',
         'users.created_at',
         'users.updated_at',
