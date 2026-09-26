@@ -80,6 +80,7 @@ router.get('/tenants/:id/export', authenticateToken, requirePlatformAdmin, platf
 router.get('/tenants/:id/genieacs', authenticateToken, requirePlatformAdmin, PlatformGenieAcsController.get);
 router.put('/tenants/:id/genieacs', authenticateToken, requirePlatformAdmin, PlatformGenieAcsController.update);
 router.post('/tenants/:id/genieacs/test', authenticateToken, requirePlatformAdmin, PlatformGenieAcsController.test);
+router.post('/tenants/:id/genieacs/tag-devices', authenticateToken, requirePlatformAdmin, PlatformGenieAcsController.tagDevices);
 
 router.get('/metrics', allowMetricsScraper, PlatformController.metrics);
 

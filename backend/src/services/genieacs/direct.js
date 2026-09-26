@@ -1,4 +1,7 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import Setting from '../../models/Setting.js';
+import { getDb } from '../../config/database.js';
+import { TranslatableError } from '../../i18n/index.js';
 import GenieAcsEgress from '../genieacsEgress.js';
 import GenieAcsAuthService from '../genieacsAuthService.js';
 import { withAcsSlot } from './concurrency.js';
@@ -19,6 +22,44 @@ import { withAcsSlot } from './concurrency.js';
  */
 
 const DEFAULT_TIMEOUT_MS = 15_000;
+
+/**
+ * A tag de equipamentos do provedor, num GenieACS COMPARTILHADO.
+ *
+ * O desenho original é um ACS por provedor, e nele o endereço basta para
+ * separar as frotas. Quando vários provedores apontam para o MESMO ACS, o
+ * endereço não separa nada: cada um veria — e poderia reiniciar, apagar,
+ * resetar — a frota de todos. A tag é o que separa: com ela definida, o
+ * provedor só enxerga e só age em equipamento que carrega essa tag.
+ *
+ * Quem grava é a plataforma, pelo console (`platformGenieAcsController`). Vazia
+ * é o comportamento de sempre: ACS exclusivo, ou instalação própria.
+ */
+export const DEVICE_SCOPE_KEY = 'deviceScopeTag';
+export const DEVICE_SCOPE_TAG_PATTERN = /^[A-Za-z0-9_]{1,64}$/;
+
+/** `{ ...query }` com a busca original E a tag, ou só a tag. */
+export function mergeScopeQuery(rawQuery, tag) {
+  let base = null;
+  if (rawQuery !== undefined && rawQuery !== null && String(rawQuery).trim() !== '') {
+    base = typeof rawQuery === 'string' ? JSON.parse(rawQuery) : rawQuery;
+  }
+  const escopo = { _tags: tag };
+  const temBase = base && typeof base === 'object' && Object.keys(base).length > 0;
+  return JSON.stringify(temBase ? { $and: [base, escopo] } : escopo);
+}
+
+/**
+ * Sem o escopo do provedor, só dentro de `fn`. Existe para UMA coisa: a
+ * ferramenta da plataforma que marca com a tag os equipamentos que ainda não
+ * têm dono — que, por definição, o filtro não deixaria ver.
+ */
+const semEscopo = new AsyncLocalStorage();
+export function withoutDeviceScope(fn) {
+  return semEscopo.run(true, fn);
+}
+
+const naoEncontrado = () => new TranslatableError('device.notFound', null, { status: 404, code: 'device_not_found' });
 
 class DirectConnector {
   static mode = 'direct';
@@ -90,8 +131,17 @@ class DirectConnector {
     method = 'GET',
     body = null,
     headers = {},
-    timeoutMs = DEFAULT_TIMEOUT_MS
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+    unscoped = false
   } = {}) {
+    // O escopo do provedor vem ANTES de montar a URL: é aqui, e só aqui, que
+    // toda conversa com o ACS passa — lista, detalhe, tarefa, tag, falha.
+    // `unscoped` é só para o próprio conector (a conferência de posse) e para
+    // a ferramenta da plataforma que marca equipamentos ainda sem dono.
+    if (!unscoped && !semEscopo.getStore()) {
+      const tag = await this.scopeTag();
+      if (tag) query = await this.applyScope(tag, endpoint, String(method || 'GET').toUpperCase(), query);
+    }
     const url = await this.urlFor(endpoint, query);
 
     // O prazo E a credencial ficam DEPOIS de a vaga sair, dentro do callback.
@@ -133,6 +183,88 @@ class DirectConnector {
         clearTimeout(timeoutId);
       }
     });
+  }
+
+  /** A tag de equipamentos deste provedor, ou `null` quando o ACS é só dele. */
+  static async scopeTag() {
+    const raw = String((await Setting.getByKey(DEVICE_SCOPE_KEY)) ?? '').trim();
+    return DEVICE_SCOPE_TAG_PATTERN.test(raw) ? raw : null;
+  }
+
+  /**
+   * As tags de TODOS os provedores. Leitura fora do escopo de propósito: é o
+   * que impede um provedor de pôr (ou tirar) a tag de outro num equipamento.
+   */
+  static async allScopeTags() {
+    // tenant-scope-exempt: as tags de TODOS os provedores, para que um não ponha
+    // nem tire a de outro. Atravessa provedores de propósito, e o filtro por
+    // `tenant_id` diz quais — os que existem.
+    const rows = await getDb()('settings')
+      .where({ key: DEVICE_SCOPE_KEY })
+      .whereIn('tenant_id', getDb()('tenants').select('id'))
+      .select('value');
+    return new Set(rows.map((row) => String(row.value ?? '').trim()).filter(Boolean));
+  }
+
+  /** O equipamento é deste provedor? Senão, "não encontrado" — nunca "é de outro". */
+  static async assertOwned(tag, deviceId) {
+    const id = String(deviceId ?? '');
+    if (!id) throw naoEncontrado();
+    const response = await this.request(this.collectionPath('devices'), {
+      unscoped: true,
+      query: { query: JSON.stringify({ _id: id, _tags: tag }), projection: '_id' }
+    });
+    if (!response.ok) throw naoEncontrado();
+    const text = await response.text();
+    const rows = text ? JSON.parse(text) : [];
+    if (!Array.isArray(rows) || rows.length === 0) throw naoEncontrado();
+  }
+
+  /**
+   * Aplica a tag do provedor a uma requisição.
+   *
+   * - Leitura da coleção de equipamentos: a busca ganha `_tags = tag`.
+   * - Qualquer coisa num equipamento (`devices/<id>/...`: tarefa, tag, apagar):
+   *   antes, o equipamento tem que ser do provedor.
+   * - Tag de provedor num equipamento: ninguém põe nem tira pela API do painel.
+   * - Falha (`faults/<device>:<canal>`): o equipamento da falha tem que ser dele.
+   * - Fila de tarefas de um equipamento: idem.
+   */
+  static async applyScope(tag, endpoint, method, query = {}) {
+    const caminho = String(endpoint ?? '').replace(/^\/+/, '');
+    const partes = caminho.split('/');
+
+    if (partes[0] === 'devices') {
+      if (partes.length === 1 || partes[1] === '') {
+        if (method !== 'GET') throw naoEncontrado();
+        return { ...query, query: mergeScopeQuery(query?.query, tag) };
+      }
+      const deviceId = decodeURIComponent(partes[1]);
+      if (partes[2] === 'tags' && partes[3] !== undefined) {
+        const alvo = decodeURIComponent(partes[3]);
+        if ((await this.allScopeTags()).has(alvo) || alvo === tag) {
+          throw new TranslatableError('device.scopeTagProtected', null, { status: 403, code: 'scope_tag_protected' });
+        }
+      }
+      await this.assertOwned(tag, deviceId);
+      return query;
+    }
+
+    if (partes[0] === 'faults' && partes[1]) {
+      const faultId = decodeURIComponent(partes[1]);
+      const corte = faultId.lastIndexOf(':');
+      await this.assertOwned(tag, corte > 0 ? faultId.slice(0, corte) : faultId);
+      return query;
+    }
+
+    if (partes[0] === 'tasks' && query?.query) {
+      let filtro = {};
+      try { filtro = JSON.parse(query.query); } catch { filtro = {}; }
+      if (typeof filtro.device === 'string') await this.assertOwned(tag, filtro.device);
+      return query;
+    }
+
+    return query;
   }
 
   /**

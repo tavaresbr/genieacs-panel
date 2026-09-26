@@ -5,6 +5,7 @@ import {
   platformAPI,
   type GenieAcsAuthType,
   type Tenant,
+  type TenantDeviceTagging,
   type TenantGenieAcs as TenantGenieAcsData
 } from '@/lib/api'
 import { useToast } from '@/components/ui/toast'
@@ -33,6 +34,11 @@ const AUTH_LABELS: Record<GenieAcsAuthType, TranslationKey> = {
  *
  * O segredo nunca volta do servidor: o campo vazio mantém o guardado, e apagar
  * é um pedido explícito — a mesma regra da tela do provedor.
+ *
+ * A "tag de equipamentos" é o que separa provedores que dividem o mesmo
+ * GenieACS: com ela, o painel do provedor só enxerga (e só age em) ONTs que a
+ * carregam. A marcação em lote existe para a frota que já estava no ACS antes
+ * da tag — sempre com prévia antes de aplicar.
  */
 export function TenantGenieAcs({ tenant }: Props) {
   const { t } = useTranslation()
@@ -50,6 +56,11 @@ export function TenantGenieAcs({ tenant }: Props) {
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
   const [testMessage, setTestMessage] = useState<{ ok: boolean; text: string } | null>(null)
+  const [deviceTag, setDeviceTag] = useState('')
+  const [pppoePrefix, setPppoePrefix] = useState('')
+  const [serials, setSerials] = useState('')
+  const [tagging, setTagging] = useState(false)
+  const [preview, setPreview] = useState<TenantDeviceTagging | null>(null)
 
   const preencher = useCallback((next: TenantGenieAcsData) => {
     setData(next)
@@ -59,6 +70,7 @@ export function TenantGenieAcs({ tenant }: Props) {
     setSecret('')
     setClearSecret(false)
     setVps({ ...next.virtualParameters })
+    setDeviceTag(next.deviceTag ?? '')
   }, [])
 
   useEffect(() => {
@@ -86,7 +98,8 @@ export function TenantGenieAcs({ tenant }: Props) {
         authType,
         username: username.trim(),
         ...(clearSecret ? { secret: '' } : secret ? { secret } : {}),
-        virtualParameters: vps
+        virtualParameters: vps,
+        deviceTag: deviceTag.trim()
       })
       if (res.success && res.data) {
         preencher(res.data)
@@ -111,6 +124,25 @@ export function TenantGenieAcs({ tenant }: Props) {
       setTestMessage({ ok: res.success, text: res.message || (res.success ? t('settings.general.connectionOk') : t('platform.saveFailed')) })
     } finally {
       setTesting(false)
+    }
+  }
+
+  const marcar = async (apply: boolean) => {
+    setTagging(true)
+    try {
+      const res = await platformAPI.tagTenantDevices(tenant.id, {
+        ...(pppoePrefix.trim() ? { pppoePrefix: pppoePrefix.trim() } : {}),
+        ...(serials.trim() ? { serials } : {}),
+        apply
+      })
+      if (!res.success || !res.data) {
+        toast.error(res.message || t('platform.saveFailed'))
+        return
+      }
+      setPreview(apply ? null : res.data)
+      if (apply) toast.success(t('platform.genieacs.tagApplied', { count: res.data.tagged }))
+    } finally {
+      setTagging(false)
     }
   }
 
@@ -238,6 +270,121 @@ export function TenantGenieAcs({ tenant }: Props) {
             </div>
           ))}
         </div>
+      </div>
+
+      <div className="border-t border-border pt-4">
+        <h4 className="font-semibold text-foreground">{t('platform.genieacs.scopeTitle')}</h4>
+        <p className="mt-1 text-sm text-muted-foreground">{t('platform.genieacs.scopeDescription')}</p>
+
+        {data.sharedAcs.providers.length > 0 && (
+          <div className="mt-3 flex items-start gap-2 rounded-md border border-border bg-muted/40 p-3">
+            <Icon
+              name="warning"
+              size={16}
+              className={`mt-0.5 shrink-0 ${data.sharedAcs.missingTag ? 'text-[hsl(var(--status-danger))]' : 'text-[hsl(var(--status-warning))]'}`}
+            />
+            <div className="text-sm leading-6">
+              <p className="font-medium">
+                {t(data.sharedAcs.missingTag ? 'platform.genieacs.sharedMissingTag' : 'platform.genieacs.sharedOk')}
+              </p>
+              <ul className="mt-1 list-disc pl-5">
+                {data.sharedAcs.providers.map((p) => (
+                  <li key={p.id}>
+                    {p.name}: {p.deviceTag
+                      ? <span className="font-mono">{p.deviceTag}</span>
+                      : <span className="text-[hsl(var(--status-danger))]">{t('platform.genieacs.noTag')}</span>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
+
+        <div className="mt-4 max-w-sm">
+          <label htmlFor={`tenant-${tenant.id}-acs-tag`} className="block text-sm font-medium mb-1">
+            {t('platform.genieacs.deviceTag')}
+          </label>
+          <input
+            id={`tenant-${tenant.id}-acs-tag`}
+            value={deviceTag}
+            onChange={(e) => setDeviceTag(e.target.value)}
+            className="modern-input w-full font-mono"
+            placeholder={(tenant.slug || 'provedor').replace(/-/g, '_')}
+            maxLength={64}
+            pattern="[A-Za-z0-9_]*"
+            autoComplete="off"
+          />
+          <p className="field-hint">{t('platform.genieacs.deviceTagHint')}</p>
+        </div>
+
+        {data.deviceTag && (
+          <div className="mt-4 rounded-md border border-border p-4">
+            <h5 className="font-medium text-foreground">{t('platform.genieacs.bulkTitle', { tag: data.deviceTag })}</h5>
+            <p className="mt-1 text-sm text-muted-foreground">{t('platform.genieacs.bulkDescription')}</p>
+            <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label htmlFor={`tenant-${tenant.id}-tag-prefix`} className="block text-sm font-medium mb-1">
+                  {t('platform.genieacs.pppoePrefix')}
+                </label>
+                <input
+                  id={`tenant-${tenant.id}-tag-prefix`}
+                  value={pppoePrefix}
+                  onChange={(e) => { setPppoePrefix(e.target.value); setPreview(null) }}
+                  className="modern-input w-full font-mono"
+                  placeholder="TA100"
+                  autoComplete="off"
+                />
+              </div>
+              <div>
+                <label htmlFor={`tenant-${tenant.id}-tag-serials`} className="block text-sm font-medium mb-1">
+                  {t('platform.genieacs.serials')}
+                </label>
+                <textarea
+                  id={`tenant-${tenant.id}-tag-serials`}
+                  value={serials}
+                  onChange={(e) => { setSerials(e.target.value); setPreview(null) }}
+                  className="modern-input w-full font-mono text-sm"
+                  rows={3}
+                  placeholder="ZTEG12345678"
+                />
+              </div>
+            </div>
+
+            {preview && (
+              <div className="mt-3 text-sm leading-6">
+                <p>{t('platform.genieacs.previewSummary', {
+                  matched: preview.matched, toTag: preview.toTag, already: preview.alreadyTagged, conflicts: preview.conflictCount
+                })}</p>
+                {preview.conflictCount > 0 && (
+                  <div className="mt-2">
+                    <p className="text-[hsl(var(--status-warning))]">{t('platform.genieacs.conflictsHint')}</p>
+                    <ul className="mt-1 list-disc pl-5 font-mono text-xs">
+                      {preview.conflicts.map((c) => (
+                        <li key={c.id}>{c.serial || c.id}{c.pppoe ? ` · ${c.pppoe}` : ''} → {c.tags.join(', ')}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                className="modern-button-secondary"
+                disabled={tagging || (!pppoePrefix.trim() && !serials.trim())}
+                onClick={() => void marcar(false)}
+              >
+                {t('platform.genieacs.preview')}
+              </button>
+              {preview && preview.toTag > 0 && (
+                <button type="button" className="modern-button" disabled={tagging} onClick={() => void marcar(true)}>
+                  {t('platform.genieacs.applyTag', { count: preview.toTag })}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {testMessage && (

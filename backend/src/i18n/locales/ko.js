@@ -78,6 +78,7 @@ export default {
   // 장비
   'device.idRequired': '장비 ID가 필요합니다',
   'device.notFound': '장비를 찾을 수 없습니다',
+  'device.scopeTagProtected': '제공자 태그는 여기서 변경할 수 없습니다',
   'device.listRetrieved': '장비 목록을 조회했습니다',
   'device.listFailed': '장비 목록을 조회하지 못했습니다',
   'device.exportTooLarge': '선택된 장비가 {max}대를 넘습니다. 스프레드시트를 받기 전에 목록을 필터링하세요',

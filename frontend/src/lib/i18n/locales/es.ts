@@ -2594,6 +2594,22 @@ const es: Dictionary = {
   'settings.panelIdentity.title': 'Panel',
   'settings.panelIdentity.description': 'El nombre que muestra el panel, el idioma de este navegador y cuánto tiempo se guarda el registro de auditoría.',
   'platform.genieacs.vpDescription': 'Las rutas que el panel lee de los equipos de este proveedor. Dependen de los scripts de aprovisionamiento instalados en el GenieACS de la plataforma, por eso el proveedor no las edita.',
+  'platform.genieacs.scopeTitle': 'Separación por etiqueta (GenieACS compartido)',
+  'platform.genieacs.scopeDescription': 'Con una etiqueta definida, el panel de este proveedor solo ve y actúa sobre los equipos del GenieACS que la llevan. Vacía, lo ve todo — déjela vacía solo si el GenieACS es exclusivo de este proveedor.',
+  'platform.genieacs.sharedMissingTag': 'Otros proveedores usan este mismo GenieACS y alguno no tiene etiqueta: están viendo los equipos de los demás.',
+  'platform.genieacs.sharedOk': 'Otros proveedores usan este mismo GenieACS, todos con etiqueta:',
+  'platform.genieacs.noTag': 'sin etiqueta',
+  'platform.genieacs.deviceTag': 'Etiqueta de equipos',
+  'platform.genieacs.deviceTagHint': 'Letras, números y _, hasta 64 caracteres. No use los prefijos contrato_, idcliente_, loja_ ni tecnico_.',
+  'platform.genieacs.bulkTitle': 'Marcar equipos con la etiqueta {tag}',
+  'platform.genieacs.bulkDescription': 'Para la flota que ya estaba en el GenieACS antes de la etiqueta. Busque por prefijo del usuario PPPoE o pegue los números de serie; revise la vista previa antes de aplicar.',
+  'platform.genieacs.pppoePrefix': 'Prefijo del usuario PPPoE',
+  'platform.genieacs.serials': 'Números de serie (uno por línea o separados por comas)',
+  'platform.genieacs.previewSummary': 'Encontrados: {matched} · a marcar: {toTag} · ya marcados: {already} · de otro proveedor: {conflicts}',
+  'platform.genieacs.conflictsHint': 'Los equipos con la etiqueta de otro proveedor no se modifican. Corríjalos a mano en el GenieACS si están mal:',
+  'platform.genieacs.preview': 'Vista previa',
+  'platform.genieacs.applyTag': 'Marcar {count} equipos',
+  'platform.genieacs.tagApplied': '{count} equipos marcados',
 }
 
 export default es

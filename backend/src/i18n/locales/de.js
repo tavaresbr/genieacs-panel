@@ -78,6 +78,7 @@ export default {
   // Geräte
   'device.idRequired': 'Die Geräte-ID ist erforderlich',
   'device.notFound': 'Gerät nicht gefunden',
+  'device.scopeTagProtected': 'Das Anbieter-Tag kann hier nicht geändert werden',
   'device.listRetrieved': 'Geräte erfolgreich abgerufen',
   'device.listFailed': 'Die Geräte konnten nicht abgerufen werden',
   'device.exportTooLarge': 'Die Auswahl umfasst mehr als {max} Geräte. Filtern Sie die Liste, bevor Sie die Tabelle herunterladen',
