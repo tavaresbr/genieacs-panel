@@ -11,6 +11,8 @@ import { DEFAULT_MAP_CENTER, isDefaultCenter } from '@/lib/provider-location'
 import { Icon } from '@/components/ui/icon'
 import { getTileSpec, type Basemap } from '@/lib/map-tiles'
 import { useToast } from '@/components/ui/toast'
+import { MapAddressSearch } from '@/components/map-address-search'
+import type { PlaceResult } from '@/lib/api'
 import 'leaflet/dist/leaflet.css'
 
 // Start fetching the map engine as soon as this route chunk is evaluated. The
@@ -298,6 +300,9 @@ export default function NetworkMap() {
   const [minZoom, setMinZoom] = useState(5)
   const [maxZoom, setMaxZoom] = useState(18)
   const [basemap, setBasemap] = useState<Basemap>('osm')
+  /** O lugar achado pela busca, marcado no mapa até ser fechado. */
+  const [foundPlace, setFoundPlace] = useState<PlaceResult | null>(null)
+  const searchMarkerRef = useRef<any>(null)
   const { isDarkMode } = useTheme()
   const { can } = useAuth()
   const { t, formatTime } = useTranslation()
@@ -503,8 +508,8 @@ export default function NetworkMap() {
   useEffect(() => { if (mapRef.current) updateTileLayer() }, [updateTileLayer])
   useEffect(() => { if (mapRef.current) updateMapObjects() }, [updateMapObjects])
 
-  const openNewNode = () => {
-    const center = mapRef.current?.getCenter()?.wrap()
+  const openNewNode = (at?: { lat: number; lng: number }) => {
+    const center = at ?? mapRef.current?.getCenter()?.wrap()
     setEditingNode(false)
     setNodeEditor({
       node_id: '', type: 'odp', name: '',
@@ -513,6 +518,24 @@ export default function NetworkMap() {
       capacity: null, splitter: '', pppoe: '', notes: ''
     })
   }
+  // O marcador da busca fica fora das camadas de pontos e cabos, que são
+  // redesenhadas a cada recarga: ele some só quando o operador fecha.
+  useEffect(() => {
+    const L = leafletRef.current
+    const map = mapRef.current
+    searchMarkerRef.current?.remove()
+    searchMarkerRef.current = null
+    if (!L || !map || !foundPlace) return
+    const html = '<div style="width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#f59e0b;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.5)"></div>'
+    searchMarkerRef.current = L.marker([foundPlace.lat, foundPlace.lng], {
+      icon: L.divIcon({ className: '', html, iconSize: [26, 26], iconAnchor: [13, 26] }),
+      zIndexOffset: 2000,
+      keyboard: false
+    }).addTo(map)
+    searchMarkerRef.current.bindTooltip(escapeHtml(foundPlace.label))
+    map.flyTo([foundPlace.lat, foundPlace.lng], Math.min(maxZoom, 17), { duration: 0.8 })
+  }, [foundPlace, maxZoom])
+
   const openNewEdge = () => {
     setEditingEdge(false)
     setEdgeEditor({
@@ -594,7 +617,7 @@ export default function NetworkMap() {
             <p className="page-description">{t('map.description')}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {canEditMap && <button type="button" className="modern-button" onClick={openNewNode}><Icon name="pin" size={17} />{t('map.addNode')}</button>}
+            {canEditMap && <button type="button" className="modern-button" onClick={() => openNewNode()}><Icon name="pin" size={17} />{t('map.addNode')}</button>}
             {canEditMap && <button type="button" className="modern-button-secondary" onClick={openNewEdge}><Icon name="signal" size={17} />{t('map.drawCable')}</button>}
             <button type="button" className="modern-button-secondary" disabled={loading} onClick={() => void loadData(false)}>
               <Icon name="refresh" size={17} className={loading ? 'animate-spin' : ''} />{t('common.refresh')}
@@ -630,6 +653,8 @@ export default function NetworkMap() {
                 <h2 className="section-heading">{t('map.physicalMap')}</h2>
                 <p className="text-xs text-muted-foreground">{t('map.physicalMapHint')}</p>
               </div>
+              <div className="flex flex-wrap items-center gap-2">
+              <MapAddressSearch onPick={(place) => { setMapView('map'); setFoundPlace(place) }} />
               <div className="inline-flex rounded-md border border-border bg-muted p-1">
                 {([['osm', 'OpenStreetMap'], ['google', 'Google Maps']] as const).map(([value, label]) => (
                   <button key={value} type="button" onClick={() => { setBasemap(value); localStorage.setItem('networkMapBasemap', value) }}
@@ -638,8 +663,25 @@ export default function NetworkMap() {
                   </button>
                 ))}
               </div>
+              </div>
             </div>
-            <div className="h-[62vh] min-h-[28rem] max-h-[54rem]"><div ref={mapContainerRef} className="h-full w-full" /></div>
+            <div className="relative h-[62vh] min-h-[28rem] max-h-[54rem]">
+              <div ref={mapContainerRef} className="h-full w-full" />
+              {foundPlace && (
+                <div className="absolute bottom-3 start-3 z-[500] flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-2 rounded-md border border-border bg-card/95 px-3 py-2 text-xs shadow-sm sm:max-w-md">
+                  <Icon name="pin" size={15} className="shrink-0 text-amber-500" />
+                  <span className="min-w-0 flex-1 truncate" title={foundPlace.label}>{foundPlace.label}</span>
+                  {canEditMap && (
+                    <button type="button" className="modern-button min-h-8 px-2 text-xs" onClick={() => openNewNode(foundPlace)}>
+                      {t('map.search.addHere')}
+                    </button>
+                  )}
+                  <button type="button" className="min-h-8 px-1 text-muted-foreground hover:text-foreground" onClick={() => setFoundPlace(null)} aria-label={t('common.close')}>
+                    <Icon name="x" size={15} />
+                  </button>
+                </div>
+              )}
+            </div>
           </section>
 
           <section className={`space-y-4 ${mapView === 'list' ? '' : 'hidden'}`}>

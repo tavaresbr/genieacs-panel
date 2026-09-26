@@ -2557,6 +2557,16 @@ export const mappingAPI = {
 
   resetData: (password: string) =>
     apiClient.requestWithBody('DELETE', '/mapping-data/reset', { password }),
+
+  /** Busca livre de um lugar no Brasil (Nominatim, pelo servidor). */
+  searchAddress: (q: string) =>
+    apiClient.get<PlaceResult[]>(`/mapping-data/geocode?q=${encodeURIComponent(q)}`),
+}
+
+export interface PlaceResult {
+  lat: number
+  lng: number
+  label: string
 }
 
 // Map Settings API

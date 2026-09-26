@@ -183,4 +183,32 @@ export async function geocodeAddress(campos) {
   throw new Error(resumo);
 }
 
-export default { lookupCep, geocodeAddress, mapBrasilApiCep, mapViaCep };
+/** Rótulo curto: o `display_name` do Nominatim chega a ter dez partes. */
+function rotulo(item) {
+  const partes = String(item?.display_name || '').split(',').map((parte) => parte.trim()).filter(Boolean);
+  return partes.filter((parte) => parte !== 'Brasil' && !/^Região (Geográfica|Metropolitana)/.test(parte)).slice(0, 5).join(', ').slice(0, 200);
+}
+
+/**
+ * Busca livre de um lugar no Brasil (rua, bairro, cidade, ponto conhecido),
+ * para a caixa de busca da Topologia.
+ *
+ * `[{ lat, lng, label }]`, vazio quando nada foi achado; lança quando a
+ * consulta falhou.
+ */
+export async function searchPlaces(q, { limit = 5 } = {}) {
+  const termo = texto(q).slice(0, 200);
+  const query = new URLSearchParams({ format: 'jsonv2', limit: String(limit), countrycodes: 'br', q: termo });
+  const response = await fetch(`${NOMINATIM}?${query}`, { headers: HEADERS, signal: AbortSignal.timeout(TIMEOUT_MS) });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const lista = await response.json();
+  if (!Array.isArray(lista)) return [];
+  return lista
+    .map((item) => {
+      const ponto = coordenada(item.lat, item.lon);
+      return ponto ? { ...ponto, label: rotulo(item) } : null;
+    })
+    .filter(Boolean);
+}
+
+export default { lookupCep, geocodeAddress, searchPlaces, mapBrasilApiCep, mapViaCep };
