@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { Icon } from '@/components/ui/icon'
 import { useTranslation } from '@/contexts/language-context'
@@ -10,6 +10,7 @@ import { accountTag } from '@/lib/wa-account-color'
 import { MessageBubble } from '@/components/whatsapp/message-bubble'
 import { SubscriberLinker } from '@/components/whatsapp/subscriber-linker'
 import { useAuth } from '@/contexts/auth-context'
+import { showActionLabels } from '@/lib/wa-thread-actions'
 
 /** How close to the foot counts as "the operator is at the bottom". */
 const STICK_PX = 120
@@ -70,6 +71,8 @@ export function ConversationThread({
   const [linkerOpen, setLinkerOpen] = useState(false)
   const closed = Boolean(conversation.closedAt)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const headerRef = useRef<HTMLElement>(null)
+  const [headerWidth, setHeaderWidth] = useState(0)
   const stick = useRef(true)
 
   const address = conversationAddress(conversation)
@@ -78,6 +81,23 @@ export function ConversationThread({
   // way round.
   const ordered = [...messages].reverse()
   const lastId = ordered.length > 0 ? ordered[ordered.length - 1].id : null
+
+  // Os botões do cabeçalho levam texto só quando a coluna da conversa tem
+  // largura para os quatro (`lib/wa-thread-actions.ts`). A primeira medida é
+  // antes da pintura, para o texto não aparecer e sumir ao abrir a conversa; a
+  // partir daí o observador acompanha a janela e o módulo SGP abrindo ao lado.
+  useLayoutEffect(() => {
+    const header = headerRef.current
+    if (!header) return
+    setHeaderWidth(header.clientWidth)
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(([entry]) => setHeaderWidth(entry.contentRect.width))
+    observer.observe(header)
+    return () => observer.disconnect()
+  }, [])
+  const withLabels = showActionLabels(headerWidth)
+  const actionClass = withLabels ? 'modern-button-secondary' : 'modern-button-secondary px-3'
+  const labelClass = withLabels ? 'inline' : 'hidden'
 
   // A new thread always opens at its foot: the newest message is the one the
   // operator came here for.
@@ -101,7 +121,10 @@ export function ConversationThread({
 
   return (
     <>
-      <header className="flex flex-wrap items-start justify-between gap-3 border-b border-border bg-card px-3 py-3 sm:px-4">
+      <header
+        ref={headerRef}
+        className="flex flex-wrap items-start justify-between gap-3 border-b border-border bg-card px-3 py-3 sm:px-4"
+      >
         <div className="min-w-0">
           {onBack && (
             <button
@@ -156,20 +179,21 @@ export function ConversationThread({
           </div>
         </div>
 
-        {/* No celular os quatro viram só ícone, com o nome no `aria-label` e
-            no `title`, e o grupo quebra linha em vez de sair da tela. */}
+        {/* Com a coluna estreita (celular, notebook, módulo SGP aberto) os
+            quatro viram só ícone, com o nome no `aria-label` e no `title`; e o
+            grupo quebra linha em vez de sair da tela. */}
         <div className="flex flex-wrap items-center gap-2">
           {can('whatsapp.send') && (
             <button
               type="button"
-              className="modern-button-secondary px-3 sm:px-4"
+              className={actionClass}
               aria-expanded={linkerOpen}
               aria-label={t(conversation.contract ? 'whatsapp.inbox.changeSubscriber' : 'whatsapp.inbox.linkSubscriber')}
               title={t(conversation.contract ? 'whatsapp.inbox.changeSubscriber' : 'whatsapp.inbox.linkSubscriber')}
               onClick={() => setLinkerOpen((open) => !open)}
             >
               <Icon name="edit" size={16} />
-              <span className="hidden sm:inline">
+              <span className={labelClass}>
                 {t(conversation.contract ? 'whatsapp.inbox.changeSubscriber' : 'whatsapp.inbox.linkSubscriber')}
               </span>
             </button>
@@ -179,39 +203,39 @@ export function ConversationThread({
               hint says what it does, and the same button undoes it. */}
           <button
             type="button"
-            className="modern-button-secondary px-3 sm:px-4"
+            className={actionClass}
             disabled={filing}
             aria-label={t(closed ? 'whatsapp.inbox.reopen' : 'whatsapp.inbox.close')}
             title={t('whatsapp.inbox.closeHint')}
             onClick={() => onFile(closed ? 'open' : 'closed')}
           >
             <Icon name={closed ? 'refresh' : 'check'} size={16} className={filing ? 'animate-spin' : ''} />
-            <span className="hidden sm:inline">{t(closed ? 'whatsapp.inbox.reopen' : 'whatsapp.inbox.close')}</span>
+            <span className={labelClass}>{t(closed ? 'whatsapp.inbox.reopen' : 'whatsapp.inbox.close')}</span>
           </button>
 
           {onToggleSgpPanel && (
             <button
               type="button"
-              className="modern-button-secondary px-3 sm:px-4"
+              className={actionClass}
               aria-pressed={Boolean(sgpPanelOpen)}
               aria-label={t('whatsapp.sgp.toggle')}
               title={t('whatsapp.sgp.toggle')}
               onClick={onToggleSgpPanel}
             >
               <Icon name="database" size={16} />
-              <span className="hidden sm:inline">{t('whatsapp.sgp.toggle')}</span>
+              <span className={labelClass}>{t('whatsapp.sgp.toggle')}</span>
             </button>
           )}
 
           {conversation.deviceId && (
             <Link
               to={`/devices/detail?id=${encodeURIComponent(conversation.deviceId)}`}
-              className="modern-button-secondary px-3 sm:px-4"
+              className={actionClass}
               aria-label={t('whatsapp.inbox.openDevice')}
               title={t('whatsapp.inbox.openDevice')}
             >
               <Icon name="server" size={16} />
-              <span className="hidden sm:inline">{t('whatsapp.inbox.openDevice')}</span>
+              <span className={labelClass}>{t('whatsapp.inbox.openDevice')}</span>
             </Link>
           )}
         </div>
