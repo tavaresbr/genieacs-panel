@@ -278,8 +278,9 @@ function SetupRoute() {
  * As rotas do console: a árvore inteira do endereço da plataforma.
  *
  * Curta de propósito. Fora dela ficam o setup (cria operador de provedor), o
- * convite, o resgate de personificação, a redefinição de senha e a confirmação
- * de e-mail — todas são de um provedor e nenhuma é servida neste endereço.
+ * convite, a redefinição de senha e a confirmação de e-mail — todas são de um
+ * provedor e nenhuma é servida neste endereço. O resgate de personificação é
+ * a exceção, e o comentário na rota diz por quê.
  * `/signup` fica porque o ápice é a porta de entrada das duas pessoas que
  * chegam sem conta: o ISP que ainda não existe e quem opera a plataforma.
  */
@@ -288,6 +289,14 @@ function ConsoleRoutes() {
     <Routes>
       <Route path="/login" element={<Suspense fallback={<AuthFallback />}><ConsoleLoginRoute /></Suspense>} />
       <Route path="/signup" element={<Suspense fallback={<AuthFallback />}><SignupRoute /></Suspense>} />
+      {/* O resgate da personificação também mora aqui. Num deploy de host
+          único o "Abrir o painel" abre `/impersonate` no MESMO endereço, e a
+          aba nova herda do `localStorage` a sessão do console — então é esta
+          árvore que monta. Sem a rota, o `*` abaixo mandava para `/platform`
+          e o bilhete nunca virava a sessão do provedor: o botão "abria" o
+          próprio console. Resgatado, a sessão da aba passa a ser de provedor
+          e a casca troca sozinha. */}
+      <Route path="/impersonate" element={<Suspense fallback={<AuthFallback />}><ImpersonatePage /></Suspense>} />
       <Route element={<ConsoleShell />}>
         <Route path="/platform" element={<PlatformPage />} />
         <Route path="*" element={<Navigate to="/platform" replace />} />
