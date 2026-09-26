@@ -2347,7 +2347,7 @@ const ru: Dictionary = {
   'impersonate.failed': 'Эта ссылка больше не действует. Создайте новую в консоли.',
   'impersonate.missing': 'В этом адресе нет билета.',
   'impersonate.bannerTitle': 'Сеанс поддержки.',
-  'impersonate.bannerText': 'Вы смотрите {provider} как {operator}, только для чтения.',
+  'impersonate.bannerText': 'Вы в панели {provider} как {operator}. Каждое изменение записывается в журнал провайдера от имени платформы.',
   'impersonate.leave': 'Выйти',
   'platform.impersonate': 'Открыть панель',
   'platform.impersonateConfirm': 'Открыть сеанс поддержки только для чтения в панели {provider}? Он будет записан в журнал самого провайдера.',

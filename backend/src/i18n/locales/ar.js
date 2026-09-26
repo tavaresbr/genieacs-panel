@@ -677,7 +677,7 @@ export default {
   'tenant.securityUpdated': 'تم تحديث اشتراط تسجيل الدخول بخطوتين',
   'tenant.renameFailed': 'تعذّرت إعادة تسمية المزوّد',
   'tenant.nameInvalid': 'يجب أن يكون اسم المزوّد بين 1 و128 حرفًا',
-  'auth.impersonationReadOnly': 'هذه جلسة دعم للقراءة فقط. لا يمكن تغيير أي شيء منها.',
+  'auth.impersonationReadOnly': 'في جلسة الدعم لا تتوفر إجراءات الحساب (تسجيل الخروج، كلمة المرور، العامل الثاني).',
   'auth.impersonationTicketRequired': 'تذكرة انتحال الهوية مطلوبة',
   'auth.impersonationTicketInvalid': 'لم يعد رابط انتحال الهوية هذا صالحًا. أنشئ رابطًا جديدًا من وحدة التحكم.',
   'auth.impersonationStarted': 'بدأت جلسة الدعم',

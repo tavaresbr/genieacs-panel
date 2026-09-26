@@ -2339,7 +2339,7 @@ const ja: Dictionary = {
   'impersonate.failed': 'このリンクは無効です。コンソールから新しく発行してください。',
   'impersonate.missing': 'このアドレスにはチケットがありません。',
   'impersonate.bannerTitle': 'サポートセッション。',
-  'impersonate.bannerText': '{operator} として {provider} を読み取り専用で見ています。',
+  'impersonate.bannerText': '{operator} として {provider} のパネルにいます。変更はすべてプラットフォーム名義でプロバイダーの監査ログに記録されます。',
   'impersonate.leave': '終了',
   'platform.impersonate': 'パネルを開く',
   'platform.impersonateConfirm': '{provider} のパネルで読み取り専用のサポートセッションを開きますか？ そのプロバイダー自身の監査記録に残ります。',

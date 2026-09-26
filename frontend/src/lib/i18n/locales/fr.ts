@@ -2339,7 +2339,7 @@ const fr: Dictionary = {
   'impersonate.failed': 'Ce lien n\'est plus valide. Générez-en un autre depuis la console.',
   'impersonate.missing': 'Cette adresse ne porte aucun ticket.',
   'impersonate.bannerTitle': 'Session d\'assistance.',
-  'impersonate.bannerText': 'Vous regardez {provider} en tant que {operator}, en lecture seule.',
+  'impersonate.bannerText': 'Vous êtes dans le panneau de {provider} en tant que {operator}. Toute modification est enregistrée dans le journal du fournisseur au nom de la plateforme.',
   'impersonate.leave': 'Quitter',
   'platform.impersonate': 'Ouvrir le panneau',
   'platform.impersonateConfirm': 'Ouvrir une session d\'assistance en lecture seule dans le panneau de {provider} ? Elle est inscrite dans le journal du fournisseur lui-même.',

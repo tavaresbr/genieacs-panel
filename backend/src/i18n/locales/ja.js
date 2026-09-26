@@ -685,7 +685,7 @@ export default {
   'auth.signupInvalid': 'プロバイダー名、ユーザー名（3〜64文字）、パスワード（8〜128文字）が必要です',
   'auth.signupSlugTaken': 'このサブドメインは既に使用されています',
   'auth.signupUsernameTaken': 'このユーザー名は既に使用されています',
-  'auth.impersonationReadOnly': 'これは読み取り専用のサポートセッションです。ここからは何も変更できません。',
+  'auth.impersonationReadOnly': 'サポートセッションでは、アカウント操作（ログアウト、パスワード、二要素認証）は利用できません。',
   'auth.impersonationTicketRequired': 'なりすましチケットが必要です',
   'auth.impersonationTicketInvalid': 'このなりすましリンクは無効になりました。コンソールから新しく発行してください。',
   'auth.impersonationStarted': 'サポートセッションを開始しました',

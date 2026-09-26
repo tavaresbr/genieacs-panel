@@ -2343,7 +2343,7 @@ const de: Dictionary = {
   'impersonate.failed': 'Dieser Link gilt nicht mehr. Erzeugen Sie in der Konsole einen neuen.',
   'impersonate.missing': 'Diese Adresse enthält kein Ticket.',
   'impersonate.bannerTitle': 'Support-Sitzung.',
-  'impersonate.bannerText': 'Sie sehen {provider} als {operator}, nur lesend.',
+  'impersonate.bannerText': 'Sie sind im Panel von {provider} als {operator}. Jede Änderung wird im Protokoll des Anbieters im Namen der Plattform festgehalten.',
   'impersonate.leave': 'Verlassen',
   'platform.impersonate': 'Panel öffnen',
   'platform.impersonateConfirm': 'Eine Support-Sitzung mit Lesezugriff im Panel von {provider} öffnen? Sie wird im Protokoll des Anbieters selbst vermerkt.',

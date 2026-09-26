@@ -426,7 +426,7 @@ class AuthController {
           id: platformUser.id,
           username: platformUser.username,
           email: platformUser.email ?? null,
-          role: 'viewer',
+          role: 'admin',
           tenantId: Number(ticket.tenant_id),
           // Falso de propósito, e não é contradição: dentro de uma
           // personificação o console não é alcançável — `requirePlatformAdmin`

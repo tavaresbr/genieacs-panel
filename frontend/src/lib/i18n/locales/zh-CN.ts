@@ -2339,7 +2339,7 @@ const zhCN: Dictionary = {
   'impersonate.failed': '此链接已失效，请在控制台重新生成。',
   'impersonate.missing': '此地址不含凭据。',
   'impersonate.bannerTitle': '支持会话。',
-  'impersonate.bannerText': '您正以 {operator} 的身份只读查看 {provider}。',
+  'impersonate.bannerText': '您正以 {operator} 身份在 {provider} 的面板中。所有更改都会以平台名义记录在该服务商的审计日志中。',
   'impersonate.leave': '退出',
   'platform.impersonate': '打开面板',
   'platform.impersonateConfirm': '要在 {provider} 的面板中打开只读支持会话吗？此操作会记入该运营商自己的审计记录。',

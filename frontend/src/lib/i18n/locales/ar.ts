@@ -2348,7 +2348,7 @@ const ar: Dictionary = {
   'impersonate.failed': 'لم يعد هذا الرابط صالحًا. أنشئ رابطًا جديدًا من وحدة التحكم.',
   'impersonate.missing': 'هذا العنوان لا يحمل أي تذكرة.',
   'impersonate.bannerTitle': 'جلسة دعم.',
-  'impersonate.bannerText': 'أنت تشاهد {provider} بصفة {operator}، للقراءة فقط.',
+  'impersonate.bannerText': 'أنت في لوحة {provider} بصفتك {operator}. يُسجَّل كل تغيير في سجل المزوّد باسم المنصة.',
   'impersonate.leave': 'خروج',
   'platform.impersonate': 'فتح اللوحة',
   'platform.impersonateConfirm': 'هل تفتح جلسة دعم للقراءة فقط في لوحة {provider}؟ تُسجَّل في سجل تدقيق المزوّد نفسه.',
