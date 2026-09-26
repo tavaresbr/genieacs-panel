@@ -1,4 +1,4 @@
-import { getDb, tdb, tinsert } from '../config/database.js';
+import { getDb, tbatchInsert, tdb, tinsert } from '../config/database.js';
 
 function parseWaypoints(row) {
   if (!row) return row;
@@ -109,6 +109,65 @@ class MappingEdge {
       }
     });
     return true;
+  }
+
+  /**
+   * Acrescenta pontos e cabos ao mapa do provedor — a importação de KML/KMZ.
+   *
+   * Ao contrário de `syncData`, não apaga nada: um id que já existe é pulado e
+   * contado, nunca sobrescrito, para que importar o mesmo arquivo duas vezes
+   * (ou um arquivo que repete um ponto desenhado à mão) não mexa no que está
+   * lá. Um cabo cujo ponto não existe nem no mapa nem no lote volta em
+   * `errors`. Tudo numa transação: ou o lote entra, ou nada entra.
+   */
+  static async importData(nodes, edges) {
+    return getDb().transaction(async (trx) => {
+      const existingNodes = new Set((await tdb('mapping_nodes', trx).select('node_id')).map((row) => row.node_id));
+      const existingEdges = new Set((await tdb('mapping_edges', trx).select('edge_id')).map((row) => row.edge_id));
+
+      const newNodes = nodes.filter((node) => !existingNodes.has(node.node_id));
+      const known = new Set([...existingNodes, ...newNodes.map((node) => node.node_id)]);
+      const errors = [];
+      const newEdges = [];
+      let skippedEdges = 0;
+      for (const edge of edges) {
+        if (existingEdges.has(edge.edge_id)) { skippedEdges += 1; continue; }
+        if (!known.has(edge.source) || !known.has(edge.target)) { errors.push(edge.edge_id); continue; }
+        newEdges.push(edge);
+      }
+
+      if (newNodes.length) {
+        await tbatchInsert('mapping_nodes', newNodes.map((n) => ({
+          node_id: n.node_id,
+          type: n.type,
+          name: n.name,
+          latitude: n.latitude,
+          longitude: n.longitude,
+          capacity: n.capacity,
+          splitter: n.splitter,
+          pppoe: n.pppoe,
+          notes: n.notes
+        })), 100, trx);
+      }
+      if (newEdges.length) {
+        await tbatchInsert('mapping_edges', newEdges.map((e) => ({
+          edge_id: e.edge_id,
+          source: e.source,
+          target: e.target,
+          fiber_type: e.fiber_type,
+          distance: e.distance,
+          waypoints: e.waypoints ? JSON.stringify(e.waypoints) : null,
+          notes: e.notes
+        })), 100, trx);
+      }
+      return {
+        createdNodes: newNodes.length,
+        createdEdges: newEdges.length,
+        skippedNodes: nodes.length - newNodes.length,
+        skippedEdges,
+        errors
+      };
+    });
   }
 }
 

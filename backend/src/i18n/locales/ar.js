@@ -275,6 +275,8 @@ export default {
   'mapping.importTooLarge': 'بيانات الخريطة المستوردة كبيرة جدًا.',
   'mapping.reset': 'حُذفت كل بيانات الخريطة',
   'mapping.resetFailed': 'تعذّرت إعادة ضبط بيانات الخريطة',
+  'mapping.imported': "اكتمل الاستيراد: أُضيفت {nodes} نقطة و{edges} كابل",
+  'mapping.importFailed': "تعذّر استيراد بيانات الخريطة",
   'mapping.searchTooShort': "اكتب 3 أحرف على الأقل للبحث.",
   'mapping.searchDone': "اكتمل البحث",
   'mapping.searchFailed': "تعذّر البحث عن العنوان الآن. حاول مرة أخرى بعد قليل.",

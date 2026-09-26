@@ -276,6 +276,8 @@ export default {
   'mapping.importTooLarge': 'L’import de la carte est trop volumineux.',
   'mapping.reset': 'Toutes les données de la carte ont été supprimées',
   'mapping.resetFailed': 'Impossible de réinitialiser les données de la carte',
+  'mapping.imported': "Importation terminée : {nodes} point(s) et {edges} câble(s) ajoutés",
+  'mapping.importFailed': "Impossible d'importer les données de la carte",
   'mapping.searchTooShort': "Saisissez au moins 3 caractères pour rechercher.",
   'mapping.searchDone': "Recherche terminée",
   'mapping.searchFailed': "Impossible de rechercher l'adresse pour le moment. Réessayez dans un instant.",

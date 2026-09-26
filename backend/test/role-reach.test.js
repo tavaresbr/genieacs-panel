@@ -27,9 +27,9 @@ import assert from 'node:assert/strict';
  *
  * ## O que este arquivo NÃO afirma
  *
- * São **53 rotas**, não as 91. A amostra foi escolhida para que cada uma das
+ * São **54 rotas**, não as 91. A amostra foi escolhida para que cada uma das
  * 34 capacidades apareça pelo menos uma vez, e a garantia de não-regressão que
- * o teste do `admin` dá vale **sobre estas 53** — não sobre o painel inteiro.
+ * o teste do `admin` dá vale **sobre estas 54** — não sobre o painel inteiro.
  * Quem quiser a afirmação forte ("nenhuma das 91 rotas mudou de dono") precisa
  * de outra prova; a varredura estática de `permissions.test.js` é o que existe
  * hoje mais perto disso, e ela olha o nome da capacidade, não o alcance.
@@ -288,6 +288,15 @@ const CASOS = [
     method: 'PUT',
     path: () => '/api/mapping-data/nodes/caixa-1',
     body: { type: 'odp', name: 'Caixa 1', latitude: -23.55, longitude: -46.63 },
+    aceito: [200]
+  },
+  {
+    cap: 'map.write',
+    label: 'POST /api/mapping-data/import',
+    method: 'POST',
+    path: () => '/api/mapping-data/import',
+    // Vazio de propósito: importar nada é repetível, e acrescentar não apaga.
+    body: { nodes: [], edges: [] },
     aceito: [200]
   },
   {
@@ -770,10 +779,10 @@ describe('a matriz e a expectativa deste arquivo', () => {
   });
 
   it('não encolhe sem que alguém diga', () => {
-    // O cabeçalho promete uma amostra de 53 rotas e a promessa de não-regressão
+    // O cabeçalho promete uma amostra de 54 rotas e a promessa de não-regressão
     // do `admin` vale sobre ELA. Uma rota apagada por um merge desajeitado
     // deixaria a promessa valendo sobre menos coisa, calada.
-    assert.equal(CASOS.length, 53);
+    assert.equal(CASOS.length, 54);
   });
 });
 
@@ -800,7 +809,7 @@ describe('quem não tem a capacidade toma 403', () => {
 
 /**
  * O par que dá sentido ao de cima, e a garantia de não-regressão do `admin`:
- * ele aparece aqui em TODAS as 53 rotas, porque a matriz lhe dá as 34
+ * ele aparece aqui em TODAS as 54 rotas, porque a matriz lhe dá as 34
  * capacidades. Nenhuma das rotas desta amostra saiu do alcance dele na onda 17.
  */
 describe('quem tem a capacidade passa pela guarda', () => {

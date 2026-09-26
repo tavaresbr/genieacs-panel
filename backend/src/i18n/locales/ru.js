@@ -276,6 +276,8 @@ export default {
   'mapping.importTooLarge': 'Импортируемые данные карты слишком велики.',
   'mapping.reset': 'Все данные карты удалены',
   'mapping.resetFailed': 'Не удалось сбросить данные карты',
+  'mapping.imported': "Импорт завершён: добавлено точек — {nodes}, кабелей — {edges}",
+  'mapping.importFailed': "Не удалось импортировать данные карты",
   'mapping.searchTooShort': "Введите не менее 3 символов для поиска.",
   'mapping.searchDone': "Поиск завершён",
   'mapping.searchFailed': "Сейчас не удалось найти адрес. Повторите попытку чуть позже.",

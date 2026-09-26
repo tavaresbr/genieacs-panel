@@ -26,6 +26,8 @@ router.put('/edges/:edgeId', authenticateToken, requirePermission('map.write'), 
 
 router.delete('/edges/:edgeId', authenticateToken, requirePermission('map.write'), MappingController.deleteEdge);
 
+router.post('/import', authenticateToken, requirePermission('map.write'), MappingController.importMappingData);
+
 router.post('/sync', authenticateToken, requirePermission('map.write'), MappingController.syncMappingData);
 
 router.delete('/reset', authenticateToken, requirePermission('map.write'), MappingController.resetMappingData);

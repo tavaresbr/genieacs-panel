@@ -275,6 +275,8 @@ export default {
   'mapping.importTooLarge': '匯入的拓撲資料過大。',
   'mapping.reset': '全部拓撲資料已刪除',
   'mapping.resetFailed': '無法重設拓撲資料',
+  'mapping.imported': "匯入完成：已新增 {nodes} 個點位和 {edges} 條光纜",
+  'mapping.importFailed': "無法匯入地圖資料",
   'mapping.searchTooShort': "請至少輸入 3 個字元進行搜尋。",
   'mapping.searchDone': "搜尋完成",
   'mapping.searchFailed': "暫時無法搜尋地址，請稍後再試。",

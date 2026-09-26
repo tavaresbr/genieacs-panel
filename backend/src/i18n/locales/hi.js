@@ -274,6 +274,8 @@ export default {
   'mapping.importTooLarge': 'आयात किया जा रहा मानचित्र डेटा बहुत बड़ा है।',
   'mapping.reset': 'सारा मानचित्र डेटा हटा दिया गया',
   'mapping.resetFailed': 'मानचित्र डेटा रीसेट नहीं हो सका',
+  'mapping.imported': "आयात पूरा: {nodes} पॉइंट और {edges} केबल जोड़े गए",
+  'mapping.importFailed': "मैप डेटा आयात नहीं हो सका",
   'mapping.searchTooShort': "खोजने के लिए कम से कम 3 अक्षर लिखें।",
   'mapping.searchDone': "खोज पूरी हुई",
   'mapping.searchFailed': "अभी पता नहीं खोजा जा सका। थोड़ी देर में फिर कोशिश करें।",

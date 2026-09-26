@@ -276,6 +276,8 @@ export default {
   'mapping.importTooLarge': 'The mapping import is too large.',
   'mapping.reset': 'All mapping data was deleted successfully',
   'mapping.resetFailed': 'Failed to reset the mapping data',
+  'mapping.imported': "Import complete: {nodes} node(s) and {edges} cable(s) added",
+  'mapping.importFailed': "Could not import the map data",
   'mapping.searchTooShort': "Type at least 3 characters to search.",
   'mapping.searchDone': "Search complete",
   'mapping.searchFailed': "Could not search the address right now. Try again shortly.",

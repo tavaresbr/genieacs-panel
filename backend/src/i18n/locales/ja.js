@@ -275,6 +275,8 @@ export default {
   'mapping.importTooLarge': '構成のインポートデータが大きすぎます。',
   'mapping.reset': 'すべての構成データを削除しました',
   'mapping.resetFailed': '構成データを初期化できませんでした',
+  'mapping.imported': "インポート完了：ポイント {nodes} 件、ケーブル {edges} 件を追加しました",
+  'mapping.importFailed': "マップデータをインポートできませんでした",
   'mapping.searchTooShort': "検索するには3文字以上入力してください。",
   'mapping.searchDone': "検索が完了しました",
   'mapping.searchFailed': "現在住所を検索できません。しばらくしてから再度お試しください。",

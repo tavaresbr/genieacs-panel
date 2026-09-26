@@ -273,6 +273,8 @@ export default {
   'mapping.importTooLarge': 'A importação do mapa é grande demais.',
   'mapping.reset': 'Todos os dados do mapa foram excluídos com sucesso',
   'mapping.resetFailed': 'Não foi possível limpar os dados do mapa',
+  'mapping.imported': "Importação concluída: {nodes} ponto(s) e {edges} cabo(s) adicionados",
+  'mapping.importFailed': "Não foi possível importar os dados do mapa",
   'mapping.searchTooShort': "Digite ao menos 3 letras para buscar.",
   'mapping.searchDone': "Busca concluída",
   'mapping.searchFailed': "Não foi possível buscar o endereço agora. Tente de novo em instantes.",

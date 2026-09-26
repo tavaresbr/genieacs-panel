@@ -276,6 +276,8 @@ export default {
   'mapping.importTooLarge': '导入的拓扑数据过大。',
   'mapping.reset': '全部拓扑数据已删除',
   'mapping.resetFailed': '无法重置拓扑数据',
+  'mapping.imported': "导入完成：已添加 {nodes} 个点位和 {edges} 条光缆",
+  'mapping.importFailed': "无法导入地图数据",
   'mapping.searchTooShort': "请至少输入 3 个字符进行搜索。",
   'mapping.searchDone': "搜索完成",
   'mapping.searchFailed': "暂时无法搜索地址，请稍后再试。",
