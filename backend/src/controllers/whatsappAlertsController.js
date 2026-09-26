@@ -2,6 +2,7 @@ import WaAlertService from '../services/waAlertService.js';
 import { WaError } from '../services/whatsappConfigService.js';
 import { handleError } from './whatsappController.js';
 import { createResponse } from '../utils/helpers.js';
+import AuditLog from '../models/AuditLog.js';
 
 /**
  * The admin surface for technical alerts.
@@ -25,13 +26,29 @@ class WhatsAppAlertsController {
   static async updateSettings(req, res) {
     try {
       const body = req.body ?? {};
+      const antes = await WaAlertService.getPublicSettings();
       const settings = await WaAlertService.saveSettings({
         enabled: body.enabled,
         intervalSeconds: body.intervalSeconds,
         recipients: body.recipients,
         emailRecipients: body.emailRecipients,
+        telegram: body.telegram,
         rules: body.rules
       });
+      // O bot ou o grupo do Telegram mudou: uma linha na trilha. O token nunca
+      // — só que ele mudou (ou saiu).
+      const pedido = body.telegram && typeof body.telegram === 'object' ? body.telegram : null;
+      const grupoMudou = pedido?.chatId !== undefined && antes.telegram.chatId !== settings.telegram.chatId;
+      const tokenMudou = pedido?.botToken !== undefined
+        && (String(pedido.botToken).trim() !== '' || antes.telegram.configured !== settings.telegram.configured);
+      if (grupoMudou || tokenMudou) {
+        await AuditLog.fromRequest(req, {
+          action: AuditLog.ACTIONS.ALERTS_TELEGRAM_CHANGED,
+          subjectType: 'alerts',
+          subjectId: null,
+          detail: { tokenChanged: tokenMudou, chatId: settings.telegram.chatId || null }
+        });
+      }
       return res.json(createResponse(req.t('whatsapp.alerts.rulesSaved'), settings));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.alerts.rulesSaveFailed');
@@ -47,6 +64,16 @@ class WhatsAppAlertsController {
    * 409 with the reason, not a cheerful `{fired: 0}`: the operator pressed the
    * button precisely to find out whether this works.
    */
+  /** Uma mensagem de teste no grupo do Telegram, com o motivo quando não chega. */
+  static async testTelegram(req, res) {
+    try {
+      await WaAlertService.sendTelegramTest();
+      return res.json(createResponse(req.t('whatsapp.alerts.telegramTestSent'), { sent: true }));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.alerts.telegramFailed');
+    }
+  }
+
   static async scan(req, res) {
     try {
       const summary = await WaAlertService.scan();

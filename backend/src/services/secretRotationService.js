@@ -139,6 +139,12 @@ const BLOBS = Object.freeze([
     chave: 'whatsapp_evolution_config',
     caminho: ['managedAdminKey'],
     contexto: 'skygenpanel-evolution-admin-key-v1'
+  },
+  {
+    // O token do bot do Telegram dos alertas, dentro dos ajustes de alerta.
+    chave: 'whatsapp_alert_settings',
+    caminho: ['telegram', 'botToken'],
+    contexto: 'skygenpanel-telegram-bot-v1'
   }
 ]);
 

@@ -11,6 +11,7 @@ import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
+import { telegramCanTest, telegramPatch, telegramWillNotify, type TelegramForm } from '@/lib/alert-telegram'
 
 /**
  * The four rules, in the order the service evaluates them, each with the ONE
@@ -120,6 +121,8 @@ interface AlertsForm {
   recipients: string
   /** O mesmo, um e-mail por linha. */
   emailRecipients: string
+  /** O bloco do Telegram — ver `lib/alert-telegram.ts`. */
+  telegram: TelegramForm
   rules: Record<WhatsAppAlertRule, RuleForm>
 }
 
@@ -142,6 +145,8 @@ function toForm(settings: WhatsAppAlertSettings): AlertsForm {
     intervalSeconds: String(settings.intervalSeconds),
     recipients: (settings.recipients ?? []).join('\n'),
     emailRecipients: (settings.emailRecipients ?? []).join('\n'),
+    // O token nunca vem: o campo começa vazio, que quer dizer "manter".
+    telegram: { token: '', chatId: settings.telegram?.chatId ?? '', remove: false },
     rules
   }
 }
@@ -246,7 +251,12 @@ export function AlertsPanel() {
   )
   // Ninguém em canal nenhum: é esse o estado que o aviso grita, e agora são
   // dois canais — um número OU um e-mail já é alguém para acordar.
-  const noRecipients = recipients.length === 0 && emailRecipients.length === 0
+  const telegramOn = form ? telegramWillNotify(form.telegram, Boolean(stored?.telegram?.configured)) : false
+  const noRecipients = recipients.length === 0 && emailRecipients.length === 0 && !telegramOn
+  const [testingTelegram, setTestingTelegram] = useState(false)
+  const patchTelegram = (patch: Partial<TelegramForm>) => {
+    setForm((current) => (current ? { ...current, telegram: { ...current.telegram, ...patch } } : current))
+  }
   const mailOff = stored?.mailConfigured === false
 
   const patchRule = (rule: WhatsAppAlertRule, patch: Partial<RuleForm>) => {
@@ -302,6 +312,7 @@ export function AlertsPanel() {
         intervalSeconds: parseInteger(form.intervalSeconds, stored?.intervalSeconds ?? INTERVAL_MIN_S),
         recipients,
         emailRecipients,
+        telegram: telegramPatch(form.telegram),
         rules
       })
       if (res.success && res.data) {
@@ -319,6 +330,20 @@ export function AlertsPanel() {
       toast.error(whatsappErrorMessage(t, res.code))
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleTelegramTest = async () => {
+    setTestingTelegram(true)
+    try {
+      const res = await whatsappAPI.testAlertTelegram()
+      if (res.success) {
+        toast.success(res.message || t('whatsapp.alerts.telegramTestSent'))
+        return
+      }
+      toast.error(whatsappErrorMessage(t, res.code))
+    } finally {
+      setTestingTelegram(false)
     }
   }
 
@@ -491,6 +516,67 @@ export function AlertsPanel() {
                 </p>
               )}
             </div>
+
+            {/* ── O Telegram ─────────────────────────────────────────────
+                Um bot do provedor mandando para um grupo da equipe. O token
+                nunca volta do servidor: o campo vazio mantém o guardado, e
+                remover é um botão próprio. */}
+            <fieldset className="space-y-3 rounded-md border border-border p-4">
+              <legend className="px-1 text-sm font-semibold text-foreground">{t('whatsapp.alerts.telegramTitle')}</legend>
+              <ol className="list-decimal space-y-1 ps-5 text-sm text-muted-foreground">
+                <li>{t('whatsapp.alerts.telegramStep1')}</li>
+                <li>{t('whatsapp.alerts.telegramStep2')}</li>
+                <li>{t('whatsapp.alerts.telegramStep3')}</li>
+              </ol>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="wa-alerts-telegram-token" className="field-label">{t('whatsapp.alerts.telegramToken')}</label>
+                  <input
+                    id="wa-alerts-telegram-token"
+                    type="password"
+                    autoComplete="off"
+                    className="modern-input w-full font-mono text-sm"
+                    value={form.telegram.token}
+                    disabled={form.telegram.remove}
+                    placeholder={stored?.telegram?.configured && !form.telegram.remove ? t('whatsapp.alerts.telegramTokenStored') : '123456789:AA…'}
+                    onChange={(event) => patchTelegram({ token: event.target.value })}
+                  />
+                  {stored?.telegram?.configured && (
+                    <button
+                      type="button"
+                      className="mt-1 text-xs font-semibold text-primary hover:underline"
+                      onClick={() => patchTelegram({ remove: !form.telegram.remove, token: '' })}
+                    >
+                      {form.telegram.remove ? t('whatsapp.alerts.telegramKeep') : t('whatsapp.alerts.telegramRemove')}
+                    </button>
+                  )}
+                </div>
+                <div>
+                  <label htmlFor="wa-alerts-telegram-chat" className="field-label">{t('whatsapp.alerts.telegramChat')}</label>
+                  <input
+                    id="wa-alerts-telegram-chat"
+                    type="text"
+                    className="modern-input w-full font-mono text-sm"
+                    value={form.telegram.chatId}
+                    placeholder="-1001234567890"
+                    onChange={(event) => patchTelegram({ chatId: event.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  className="modern-button-secondary"
+                  disabled={testingTelegram || !telegramCanTest(form.telegram, stored?.telegram)}
+                  onClick={() => void handleTelegramTest()}
+                >
+                  {t('whatsapp.alerts.telegramTest')}
+                </button>
+                {!telegramCanTest(form.telegram, stored?.telegram) && (
+                  <span className="field-hint">{t('whatsapp.alerts.telegramSaveFirst')}</span>
+                )}
+              </div>
+            </fieldset>
 
             {/* ── The four rules ──────────────────────────────────────────
                 One row each, and each row carries its own unit sentence under

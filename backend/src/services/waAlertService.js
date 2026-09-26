@@ -17,6 +17,8 @@ import { currentTenantId } from '../config/tenantContext.js';
 import { mailConfigured, mailTransport } from './mail/index.js';
 import { isValidEmail } from '../utils/helpers.js';
 import Tenant from '../models/Tenant.js';
+import { createSecretBox } from '../utils/secretBox.js';
+import { TELEGRAM_CHAT_PATTERN, TELEGRAM_TOKEN_PATTERN, sendTelegramMessage } from './telegramClient.js';
 
 const SETTINGS_KEY = 'whatsapp_alert_settings';
 
@@ -104,6 +106,27 @@ const DEFAULT_SETTINGS = Object.freeze({
   // dos números — quem recebe é a equipe, nunca o assinante.
   emailRecipients: [],
   rules: DEFAULT_RULES
+});
+
+/**
+ * O token do bot do Telegram, cifrado dentro dos ajustes (`app_state`), com
+ * contexto próprio — e na lista da rotação da `SECRET_BOX_KEY`
+ * (`secretRotationService.js`, `BLOBS`).
+ */
+export const TELEGRAM_SECRET_CONTEXT = 'skygenpanel-telegram-bot-v1';
+let telegramBox = null;
+const caixaTelegram = () => {
+  telegramBox ??= createSecretBox(TELEGRAM_SECRET_CONTEXT);
+  return telegramBox;
+};
+
+/** Os códigos do cliente do Telegram, e a frase de cada um. */
+const TELEGRAM_ERROR_KEYS = Object.freeze({
+  telegram_invalid_token: 'whatsapp.alerts.telegramInvalidToken',
+  telegram_bot_not_in_chat: 'whatsapp.alerts.telegramBotNotInChat',
+  telegram_chat_not_found: 'whatsapp.alerts.telegramChatNotFound',
+  telegram_unreachable: 'whatsapp.alerts.telegramUnreachable',
+  telegram_failed: 'whatsapp.alerts.telegramFailed'
 });
 
 /** O assunto de um alerta por e-mail, cortado: é lido na notificação do celular. */
@@ -300,6 +323,34 @@ class WaAlertService {
     return emails;
   }
 
+  /**
+   * O bloco do Telegram de um salvamento.
+   *
+   * `botToken` omitido mantém o guardado e `''` apaga — a mesma regra da chave
+   * admin do Evolution: a tela nunca recebe o token, então não tem como mandá-lo
+   * de volta, e "não mexi no campo" não pode virar "apague". O formato é
+   * conferido aqui, onde quem colou ainda está olhando a tela.
+   */
+  static normalizeTelegram(patch, current) {
+    const atual = current || { token: '', chatId: '' };
+    if (patch === undefined || patch === null) return atual;
+    let token = atual.token;
+    if (patch.botToken !== undefined) {
+      token = String(patch.botToken ?? '').trim();
+      if (token && !TELEGRAM_TOKEN_PATTERN.test(token)) {
+        throw new WaError('whatsapp.alerts.telegramTokenInvalid', { code: 'invalid_telegram_token', status: 400 });
+      }
+    }
+    let chatId = atual.chatId;
+    if (patch.chatId !== undefined) {
+      chatId = String(patch.chatId ?? '').trim();
+      if (chatId && !TELEGRAM_CHAT_PATTERN.test(chatId)) {
+        throw new WaError('whatsapp.alerts.telegramChatInvalid', { code: 'invalid_telegram_chat', status: 400 });
+      }
+    }
+    return { token, chatId };
+  }
+
   static async getSettings() {
     const cached = this.settingsCache.get();
     if (cached) return cached;
@@ -315,6 +366,11 @@ class WaAlertService {
       emailRecipients: Array.isArray(stored.emailRecipients)
         ? stored.emailRecipients.map((entry) => String(entry ?? '').trim().toLowerCase()).filter((entry) => isValidEmail(entry))
         : [],
+      // O token aberto só aqui, na memória do processo; nunca sai para a tela.
+      telegram: {
+        token: stored.telegram?.botToken ? (caixaTelegram().decrypt(stored.telegram.botToken) ?? '') : '',
+        chatId: typeof stored.telegram?.chatId === 'string' ? stored.telegram.chatId : ''
+      },
       rules: this.normalizeRules(stored.rules),
       updatedAt: stored.updatedAt || null
     };
@@ -332,13 +388,16 @@ class WaAlertService {
     const account = await WhatsAppAccount.getForPurpose('alerts');
     const whatsappReady = Boolean(account && settings.recipients.length > 0);
     const emailReady = Boolean(mailConfigured() && settings.emailRecipients.length > 0);
+    const telegramReady = Boolean(settings.telegram.token && settings.telegram.chatId);
     return {
       ...settings,
+      // O token NUNCA: só se há um guardado, e o grupo, que não é segredo.
+      telegram: { configured: Boolean(settings.telegram.token), chatId: settings.telegram.chatId },
       hasAlertsNumber: Boolean(account),
       // Se o servidor manda e-mail — sem isso, o campo dos e-mails avisa em vez
       // de aceitar endereços que nunca vão receber nada.
       mailConfigured: mailConfigured(),
-      ready: Boolean(settings.enabled && (whatsappReady || emailReady))
+      ready: Boolean(settings.enabled && (whatsappReady || emailReady || telegramReady))
     };
   }
 
@@ -378,6 +437,7 @@ class WaAlertService {
       emailRecipients: patch.emailRecipients === undefined
         ? current.emailRecipients
         : this.normalizeEmailRecipients(patch.emailRecipients),
+      telegram: this.normalizeTelegram(patch.telegram, current.telegram),
       rules: patch.rules === undefined
         ? current.rules
         // Merged onto the stored rules, so a screen that sends one rule cannot
@@ -386,7 +446,8 @@ class WaAlertService {
       updatedAt: new Date().toISOString()
     };
 
-    if (next.enabled && next.recipients.length === 0 && next.emailRecipients.length === 0) {
+    const temTelegram = Boolean(next.telegram.token && next.telegram.chatId);
+    if (next.enabled && next.recipients.length === 0 && next.emailRecipients.length === 0 && !temTelegram) {
       // `no_alert_recipients`, the same code the scan raises for the same
       // reason. The campaign's `no_recipients` means "the filters left nobody
       // to charge", and a form that translated the code would put that sentence
@@ -397,7 +458,14 @@ class WaAlertService {
       });
     }
 
-    await AppState.upsert(SETTINGS_KEY, JSON.stringify(next));
+    // O token entra cifrado; o que fica em memória (o cache) é relido do banco.
+    await AppState.upsert(SETTINGS_KEY, JSON.stringify({
+      ...next,
+      telegram: {
+        botToken: next.telegram.token ? { v: 1, ...caixaTelegram().encrypt(next.telegram.token) } : null,
+        chatId: next.telegram.chatId
+      }
+    }));
     this.invalidateSettingsCache();
     return this.getPublicSettings();
   }
@@ -504,7 +572,7 @@ class WaAlertService {
       // canal pronto, e a passagem para aqui, porque abrir condição que ninguém
       // vai ouvir deixaria `wa_alert_state` dizendo que todos foram avisados.
       const channels = await this.readyChannels(settings);
-      if (!channels.whatsapp && !channels.email) {
+      if (!channels.whatsapp && !channels.email && !channels.telegram) {
         summary.skipped = channels.reason;
         return summary;
       }
@@ -569,7 +637,12 @@ class WaAlertService {
       }
     }
 
-    return { whatsapp, email, reason: reason || 'no_recipients' };
+    // O Telegram é um grupo, não uma lista: pronto é ter o bot e o grupo.
+    const telegram = settings.telegram?.token && settings.telegram?.chatId
+      ? { token: settings.telegram.token, chatId: settings.telegram.chatId }
+      : null;
+
+    return { whatsapp, email, telegram, reason: reason || 'no_recipients' };
   }
 
   /**
@@ -844,6 +917,7 @@ class WaAlertService {
     let sent = 0;
     if (channels?.whatsapp) sent += await this.notifyWhatsApp(channels.whatsapp, body);
     if (channels?.email) sent += await this.notifyEmail(channels.email, body);
+    if (channels?.telegram) sent += await this.notifyTelegram(channels.telegram, body);
     return sent;
   }
 
@@ -887,6 +961,40 @@ class WaAlertService {
       if (await mailTransport().send({ to, subject, text: body })) sent += 1;
     }
     return sent;
+  }
+
+  /**
+   * Uma mensagem no grupo. O cliente nunca lança e nunca devolve a URL (que
+   * leva o token): o aviso no log é só o código.
+   */
+  static async notifyTelegram({ token, chatId }, body) {
+    const resultado = await sendTelegramMessage({ token, chatId, text: body });
+    if (resultado.ok) return 1;
+    console.warn(`Telegram alert not sent: ${resultado.code}`);
+    return 0;
+  }
+
+  /**
+   * A mensagem de teste do botão da tela. Lança com a frase do motivo — é
+   * isso que diz ao operador que o bot não está no grupo.
+   */
+  static async sendTelegramTest() {
+    const settings = await this.getSettings();
+    if (!settings.telegram.token || !settings.telegram.chatId) {
+      throw new WaError('whatsapp.alerts.telegramNotConfigured', { code: 'telegram_not_configured', status: 400 });
+    }
+    const tenant = await Tenant.findPublicById(currentTenantId()).catch(() => null);
+    const t = translatorFor(DEFAULT_LOCALE);
+    const resultado = await sendTelegramMessage({
+      token: settings.telegram.token,
+      chatId: settings.telegram.chatId,
+      text: t('whatsapp.alerts.telegramTestMessage', { name: tenant?.name || 'SkyGenPanel' })
+    });
+    if (resultado.ok) return { sent: true };
+    throw new WaError(TELEGRAM_ERROR_KEYS[resultado.code] || TELEGRAM_ERROR_KEYS.telegram_failed, {
+      code: resultado.code,
+      status: 502
+    });
   }
 
   /**
