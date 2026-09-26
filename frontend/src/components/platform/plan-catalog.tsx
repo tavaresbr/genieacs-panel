@@ -384,7 +384,7 @@ export function PlanCatalog({ plans, onChange }: Props) {
                   {plan.subscribers !== undefined && ` · ${t('platform.plans.summarySubscribers', { count: plan.subscribers })}`}
                 </p>
               </div>
-              <div className="flex shrink-0 gap-2">
+              <div className="flex shrink-0 flex-wrap gap-2">
                 <button
                   type="button" className="modern-button-secondary"
                   onClick={() => (editandoEste(plan) ? fechar() : abrirEdicao(plan))}

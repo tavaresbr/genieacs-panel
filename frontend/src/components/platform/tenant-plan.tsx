@@ -332,7 +332,7 @@ export function TenantPlan({ tenant, plans, onSubscriptionChange }: Props) {
                   .replace('{expected}', formatMoney(underpayment.expected, moedaDoPlano))}
               </p>
               <p className="field-hint">{t('platform.subscription.underpaidHint')}</p>
-              <div className="mt-2 flex gap-2">
+              <div className="mt-2 flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={() => void savePayment(true)}

@@ -109,9 +109,9 @@ function ModalShell({ title, onClose, children }: { title: string; onClose: () =
   const { t } = useTranslation()
   return (
     <div className="fixed inset-0 z-[2200] flex items-center justify-center bg-black/65 p-4" role="dialog" aria-modal="true">
-      <div className="modern-card max-h-[92vh] w-full max-w-2xl overflow-y-auto p-5 sm:p-6">
+      <div className="modern-card max-h-[92dvh] w-full max-w-2xl overflow-y-auto p-5 sm:p-6">
         <div className="mb-5 flex items-center justify-between gap-4">
-          <h2 className="section-heading">{title}</h2>
+          <h2 className="section-heading min-w-0 break-words">{title}</h2>
           <button type="button" onClick={onClose} className="icon-button" aria-label={t('common.close')}>
             <Icon name="x" size={20} />
           </button>
@@ -219,7 +219,7 @@ function ImportDialog({
 
       {plan && parsed && !empty && (
         <div className="mt-5 space-y-4">
-          <p className="font-semibold">{fileName} · {t('map.import.summary', { points: parsed.points.length, cables: parsed.lines.length })}</p>
+          <p className="break-all font-semibold">{fileName} · {t('map.import.summary', { points: parsed.points.length, cables: parsed.lines.length })}</p>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="field-label" htmlFor="kml-node-type">{t('map.import.defaultType')}</label>
@@ -336,7 +336,7 @@ function NodeEditor({
               onChange={(event) => set('notes', event.target.value)} />
           </label>
         </div>
-        <div className="flex justify-end gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
           <button type="button" className="modern-button-secondary" onClick={onClose}>{t('common.cancel')}</button>
           <button type="submit" className="modern-button" disabled={saving}>
             <Icon name={saving ? 'refresh' : 'check'} size={17} className={saving ? 'animate-spin' : ''} />
@@ -415,7 +415,7 @@ function EdgeEditor({
         <p className="text-xs text-muted-foreground">
           {t('map.edge.autoDrawHint')}
         </p>
-        <div className="flex justify-end gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
           <button type="button" className="modern-button-secondary" onClick={onClose}>{t('common.cancel')}</button>
           <button type="submit" className="modern-button" disabled={saving || nodes.length < 2 || form.source === form.target}>
             <Icon name={saving ? 'refresh' : 'check'} size={17} className={saving ? 'animate-spin' : ''} />
@@ -791,7 +791,7 @@ export default function NetworkMap() {
           <div className="flex rounded-md border border-border bg-card p-1">
             {(['map', 'list'] as const).map((view) => (
               <button key={view} type="button" onClick={() => setMapView(view)}
-                className={`min-h-9 rounded px-3 text-sm font-semibold ${mapView === view ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>
+                className={`min-h-10 rounded px-3 text-sm font-semibold sm:min-h-9 ${mapView === view ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>
                 {view === 'map' ? t('map.view.map') : t('map.view.list')}
               </button>
             ))}
@@ -805,30 +805,34 @@ export default function NetworkMap() {
                 <h2 className="section-heading">{t('map.physicalMap')}</h2>
                 <p className="text-xs text-muted-foreground">{t('map.physicalMapHint')}</p>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
               <MapAddressSearch onPick={(place) => { setMapView('map'); setFoundPlace(place) }} />
               <div className="inline-flex rounded-md border border-border bg-muted p-1">
                 {([['osm', 'OpenStreetMap'], ['google', 'Google Maps']] as const).map(([value, label]) => (
                   <button key={value} type="button" onClick={() => { setBasemap(value); localStorage.setItem('networkMapBasemap', value) }}
-                    className={`min-h-9 rounded px-3 text-xs font-semibold ${basemap === value ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'}`}>
+                    className={`min-h-10 rounded px-3 text-xs font-semibold sm:min-h-9 ${basemap === value ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'}`}>
                     {label}
                   </button>
                 ))}
               </div>
               </div>
             </div>
-            <div className="relative h-[62vh] min-h-[28rem] max-h-[54rem]">
-              <div ref={mapContainerRef} className="h-full w-full" />
+            {/* No celular a altura sai da viewport dinâmica e o piso é menor: com
+                28rem fixos o mapa engolia a tela deitada, e arrastar nele não rola
+                a página. `isolate` prende os z-index do Leaflet (até 1000) aqui
+                dentro, abaixo do cabeçalho fixo e da gaveta. */}
+            <div className="relative h-[60dvh] min-h-[18rem] max-h-[54rem] sm:h-[62vh] sm:min-h-[28rem]">
+              <div ref={mapContainerRef} className="isolate h-full w-full" />
               {foundPlace && (
                 <div className="absolute bottom-3 start-3 z-[500] flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-2 rounded-md border border-border bg-card/95 px-3 py-2 text-xs shadow-sm sm:max-w-md">
                   <Icon name="pin" size={15} className="shrink-0 text-amber-500" />
                   <span className="min-w-0 flex-1 truncate" title={foundPlace.label}>{foundPlace.label}</span>
                   {canEditMap && (
-                    <button type="button" className="modern-button min-h-8 px-2 text-xs" onClick={() => openNewNode(foundPlace)}>
+                    <button type="button" className="modern-button min-h-10 px-2 text-xs sm:min-h-8" onClick={() => openNewNode(foundPlace)}>
                       {t('map.search.addHere')}
                     </button>
                   )}
-                  <button type="button" className="min-h-8 px-1 text-muted-foreground hover:text-foreground" onClick={() => setFoundPlace(null)} aria-label={t('common.close')}>
+                  <button type="button" className="inline-flex min-h-10 min-w-10 items-center justify-center px-1 text-muted-foreground hover:text-foreground sm:min-h-8 sm:min-w-0" onClick={() => setFoundPlace(null)} aria-label={t('common.close')}>
                     <Icon name="x" size={15} />
                   </button>
                 </div>
@@ -839,7 +843,23 @@ export default function NetworkMap() {
           <section className={`space-y-4 ${mapView === 'list' ? '' : 'hidden'}`}>
             <div className="modern-card overflow-hidden">
               <div className="border-b border-border px-5 py-4"><h2 className="section-heading">{t('map.metric.nodes')}</h2></div>
-              <div className="overflow-x-auto">
+              <ul className="mobile-card-list divide-y divide-border">
+                {nodes.map((node) => (
+                  <li key={node.node_id}>
+                    <button type="button" className="flex w-full items-start gap-3 px-4 py-3 text-start hover:bg-[hsl(var(--surface-subtle))]" onClick={() => setSelectedNode(node)}>
+                      <Icon name={nodeIconName(node.type)} size={18} className="mt-0.5 shrink-0 text-muted-foreground" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block break-words font-semibold">{node.name}</span>
+                        <span className="mt-0.5 block break-all font-mono text-xs text-muted-foreground">{node.node_id} · {nodeTypeLabel(node.type)}</span>
+                        <span className="mt-0.5 block font-mono text-xs text-muted-foreground">{node.latitude.toFixed(6)}, {node.longitude.toFixed(6)}</span>
+                      </span>
+                      <Icon name="chevron-right" size={17} className="mt-0.5 shrink-0 text-muted-foreground" />
+                    </button>
+                  </li>
+                ))}
+                {!nodes.length && <li className="px-4 py-10 text-center text-sm text-muted-foreground">{t('map.nodes.empty')}</li>}
+              </ul>
+              <div className="desktop-table overflow-x-auto">
                 <table className="modern-table">
                   <thead><tr><th>{t('map.table.id')}</th><th>{t('map.table.name')}</th><th>{t('map.table.type')}</th><th>{t('map.table.coordinates')}</th><th>{t('common.actions')}</th></tr></thead>
                   <tbody>
@@ -859,7 +879,25 @@ export default function NetworkMap() {
             </div>
             <div className="modern-card overflow-hidden">
               <div className="border-b border-border px-5 py-4"><h2 className="section-heading">{t('map.metric.cables')}</h2></div>
-              <div className="overflow-x-auto">
+              <ul className="mobile-card-list divide-y divide-border">
+                {edges.map((edge) => (
+                  <li key={edge.edge_id}>
+                    <button type="button" className="flex w-full items-start gap-3 px-4 py-3 text-start hover:bg-[hsl(var(--surface-subtle))]" onClick={() => setSelectedEdge(edge)}>
+                      <span className="mt-2 h-2 w-6 shrink-0 rounded" style={{ background: getFiberMeta(edge.fiber_type).color }} />
+                      <span className="min-w-0 flex-1">
+                        <span className="block break-all font-mono text-sm font-semibold">{edge.edge_id}</span>
+                        <span className="mt-0.5 block break-all text-xs text-muted-foreground">{edge.source} → {edge.target}</span>
+                        <span className="mt-0.5 block text-xs text-muted-foreground">
+                          {t(getFiberMeta(edge.fiber_type).labelKey)}{edge.distance == null ? '' : ` · ${edge.distance} m`}
+                        </span>
+                      </span>
+                      <Icon name="chevron-right" size={17} className="mt-0.5 shrink-0 text-muted-foreground" />
+                    </button>
+                  </li>
+                ))}
+                {!edges.length && <li className="px-4 py-10 text-center text-sm text-muted-foreground">{t('map.cables.empty')}</li>}
+              </ul>
+              <div className="desktop-table overflow-x-auto">
                 <table className="modern-table">
                   <thead><tr><th>{t('map.table.id')}</th><th>{t('map.table.route')}</th><th>{t('map.table.type')}</th><th>{t('map.table.distance')}</th><th>{t('common.actions')}</th></tr></thead>
                   <tbody>
@@ -889,13 +927,13 @@ export default function NetworkMap() {
         {selectedNode && (
           <ModalShell title={selectedNode.name} onClose={() => setSelectedNode(null)}>
             <dl className="grid gap-4 sm:grid-cols-2">
-              <div><dt className="metric-label">{t('map.node.id')}</dt><dd className="mt-1 font-mono">{selectedNode.node_id}</dd></div>
+              <div><dt className="metric-label">{t('map.node.id')}</dt><dd className="mt-1 break-all font-mono">{selectedNode.node_id}</dd></div>
               <div><dt className="metric-label">{t('map.table.type')}</dt><dd className="mt-1">{nodeTypeLabel(selectedNode.type)}</dd></div>
               <div><dt className="metric-label">{t('map.table.coordinates')}</dt><dd className="mt-1 font-mono text-sm">{selectedNode.latitude}, {selectedNode.longitude}</dd></div>
               <div><dt className="metric-label">{t('map.node.capacity')}</dt><dd className="mt-1">{selectedNode.capacity ?? '—'}</dd></div>
               <div><dt className="metric-label">{t('map.node.splitter')}</dt><dd className="mt-1">{selectedNode.splitter || '—'}</dd></div>
-              <div><dt className="metric-label">PPPoE</dt><dd className="mt-1">{selectedNode.pppoe || '—'}</dd></div>
-              {selectedNode.notes && <div className="sm:col-span-2"><dt className="metric-label">{t('map.node.notes')}</dt><dd className="mt-1 whitespace-pre-wrap">{selectedNode.notes}</dd></div>}
+              <div><dt className="metric-label">PPPoE</dt><dd className="mt-1 break-all">{selectedNode.pppoe || '—'}</dd></div>
+              {selectedNode.notes && <div className="sm:col-span-2"><dt className="metric-label">{t('map.node.notes')}</dt><dd className="mt-1 whitespace-pre-wrap break-words">{selectedNode.notes}</dd></div>}
             </dl>
             <div className="mt-6 flex flex-wrap justify-end gap-2">
               {canEditMap && <button className="modern-button-secondary" onClick={() => { setEditingNode(true); setNodeEditor({ ...selectedNode }); setSelectedNode(null) }}><Icon name="edit" size={17} />{t('common.edit')}</button>}
@@ -907,11 +945,11 @@ export default function NetworkMap() {
         {selectedEdge && (
           <ModalShell title={selectedEdge.edge_id} onClose={() => setSelectedEdge(null)}>
             <dl className="grid gap-4 sm:grid-cols-2">
-              <div><dt className="metric-label">{t('map.table.route')}</dt><dd className="mt-1">{selectedEdge.source} → {selectedEdge.target}</dd></div>
+              <div><dt className="metric-label">{t('map.table.route')}</dt><dd className="mt-1 break-all">{selectedEdge.source} → {selectedEdge.target}</dd></div>
               <div><dt className="metric-label">{t('map.edge.fiberType')}</dt><dd className="mt-1">{t(getFiberMeta(selectedEdge.fiber_type).labelKey)}</dd></div>
               <div><dt className="metric-label">{t('map.table.distance')}</dt><dd className="mt-1">{selectedEdge.distance == null ? '—' : `${selectedEdge.distance} m`}</dd></div>
               <div><dt className="metric-label">{t('map.edge.waypoints')}</dt><dd className="mt-1">{selectedEdge.waypoints?.length || 0}</dd></div>
-              {selectedEdge.notes && <div className="sm:col-span-2"><dt className="metric-label">{t('map.node.notes')}</dt><dd className="mt-1 whitespace-pre-wrap">{selectedEdge.notes}</dd></div>}
+              {selectedEdge.notes && <div className="sm:col-span-2"><dt className="metric-label">{t('map.node.notes')}</dt><dd className="mt-1 whitespace-pre-wrap break-words">{selectedEdge.notes}</dd></div>}
             </dl>
             <div className="mt-6 flex flex-wrap justify-end gap-2">
               {canEditMap && <button className="modern-button-secondary" onClick={() => { setEditingEdge(true); setEdgeEditor({ ...selectedEdge }); setSelectedEdge(null) }}><Icon name="edit" size={17} />{t('common.edit')}</button>}

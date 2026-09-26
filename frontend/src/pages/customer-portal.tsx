@@ -635,8 +635,9 @@ export default function CustomerPortal() {
               <MetricCard icon="phone" label={t('portal.metric.connectedDevices')} value={text(overview.connectedDevices)} helper={t('portal.metric.connectedDevicesHelper')} />
             </section>
 
+            {/* min-w-0: sem ele o item da grade cresce até o número de série e a página rola de lado no celular */}
             <div className="mt-5 grid gap-5 lg:grid-cols-[1.05fr_.95fr]">
-              <section className="modern-card p-5 sm:p-6">
+              <section className="modern-card min-w-0 p-5 sm:p-6">
                 <h2 className="section-heading">{t('portal.ont.title')}</h2>
                 <p className="section-description mb-5">{t('portal.ont.description')}</p>
                 <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
@@ -652,13 +653,13 @@ export default function CustomerPortal() {
                   ].map(([label, value]) => (
                     <div key={label} className="border-b border-border pb-3">
                       <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</dt>
-                      <dd className="mt-1 break-words font-mono text-sm">{value}</dd>
+                      <dd className="mt-1 break-all font-mono text-sm">{value}</dd>
                     </div>
                   ))}
                 </dl>
               </section>
 
-              <section className="modern-card p-5 sm:p-6">
+              <section className="modern-card min-w-0 p-5 sm:p-6">
                 <h2 className="section-heading">{t('portal.wifi.title')}</h2>
                 <p className="section-description mb-5">{t('portal.wifi.description')}</p>
                 {overview.wifi.length > 0 && (
@@ -1036,20 +1037,20 @@ export default function CustomerPortal() {
                   </a>
                 )}
                 {telHref(providerContact.phone) && (
-                  <a className="modern-button-secondary" href={telHref(providerContact.phone) as string}>
-                    <Icon name="phone" size={17} /> {providerContact.phone}
+                  <a className="modern-button-secondary max-w-full" href={telHref(providerContact.phone) as string}>
+                    <Icon name="phone" size={17} className="shrink-0" /> <span className="min-w-0 break-all">{providerContact.phone}</span>
                   </a>
                 )}
                 {mailtoHref(providerContact.email) && (
-                  <a className="modern-button-secondary" href={mailtoHref(providerContact.email) as string}>
-                    <Icon name="document" size={17} /> {providerContact.email}
+                  <a className="modern-button-secondary max-w-full" href={mailtoHref(providerContact.email) as string}>
+                    <Icon name="document" size={17} className="shrink-0" /> <span className="min-w-0 break-all">{providerContact.email}</span>
                   </a>
                 )}
               </div>
               {providerContact.address && (
                 <p className="mt-4 flex items-start gap-2 text-sm text-muted-foreground">
                   <Icon name="pin" size={16} className="mt-0.5 shrink-0" />
-                  <span>{providerContact.address}</span>
+                  <span className="min-w-0 break-words">{providerContact.address}</span>
                 </p>
               )}
             </section>

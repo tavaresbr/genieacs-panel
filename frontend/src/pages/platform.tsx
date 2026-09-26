@@ -18,6 +18,26 @@ import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import { exportFileName, formatRelativeTime } from '@/lib/utils'
 
+/**
+ * Celular e tablet: a tabela de provedores vira cartões (a coluna de ações
+ * espremia nove botões um embaixo do outro). Decidido em JS e não só em CSS
+ * porque o painel aberto da linha monta formulários e busca dados — escondido
+ * por classe, montaria duas vezes.
+ */
+const CONSULTA_ESTREITA = '(max-width: 1023px)'
+
+function useEstreito() {
+  const [estreito, setEstreito] = useState(() => window.matchMedia?.(CONSULTA_ESTREITA).matches ?? false)
+  useEffect(() => {
+    const consulta = window.matchMedia?.(CONSULTA_ESTREITA)
+    if (!consulta) return
+    const mudou = () => setEstreito(consulta.matches)
+    consulta.addEventListener('change', mudou)
+    return () => consulta.removeEventListener('change', mudou)
+  }, [])
+  return estreito
+}
+
 export default function PlatformPage() {
   const { t } = useTranslation()
   const toast = useToast()
@@ -46,6 +66,7 @@ export default function PlatformPage() {
    * lado de quem os assina. Provedores é o padrão: é o que se abre para fazer
    * alguma coisa; as outras três são consulta ou manutenção rara.
    */
+  const estreito = useEstreito()
   const [aba, setAba] = useState<'tenants' | 'plans' | 'admins' | 'audit' | 'deployment' | 'catalogue'>('tenants')
 
   const loadTenants = useCallback(async () => {
@@ -258,6 +279,175 @@ export default function PlatformPage() {
     }
   }
 
+  // As células e os botões de uma linha, escritos uma vez: a tabela e os
+  // cartões do celular mostram as mesmas coisas.
+  const statusDe = (tenant: Tenant) => {
+    const active = tenant.status === 'active'
+    return (
+      <>
+        <span className={active ? 'modern-badge-success' : 'modern-badge-warning'}>
+          {t(active ? 'platform.statusActive' : 'platform.statusSuspended')}
+        </span>
+        {/* Desde quando, e só para o suspenso: num ativo a
+            informação não existe. "Suspenso" sozinho não
+            distingue quem parou semana passada de quem está
+            parado há dois anos guardando CPF e contrato dos
+            assinantes — e era essa a diferença invisível. */}
+        {!active && (
+          <span className="mt-1 block text-xs text-muted-foreground">
+            {tenant.suspendedAt
+              ? t('platform.suspendedHowLong', {
+                when: formatRelativeTime(tenant.suspendedAt)
+              })
+              : t('platform.suspendedHowLongUnknown')}
+          </span>
+        )}
+      </>
+    )
+  }
+
+  const planoDe = (tenant: Tenant) => (
+    tenant.subscription ? (
+      <span className="flex flex-wrap items-center gap-2">
+        <span>{tenant.subscription.planName ?? tenant.subscription.planCode ?? '—'}</span>
+        <span className={statusBadgeClass(tenant.subscription.status)}>
+          {t(STATUS_LABEL_KEYS[tenant.subscription.status])}
+        </span>
+      </span>
+    ) : (
+      <span className="text-muted-foreground">—</span>
+    )
+  )
+
+  const acoesDe = (tenant: Tenant) => {
+    const active = tenant.status === 'active'
+    const expanded = expandedId === tenant.id
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Primeiro do grupo: é o que responde "o que está
+            cadastrado aqui", e é a pergunta que se faz da
+            linha antes de mexer em equipe ou em plano. */}
+        <button
+          type="button"
+          onClick={() => abrirPainel(tenant.id, 'data')}
+          className="modern-button-secondary"
+          aria-expanded={expanded && expandedPanel === 'data'}
+        >
+          <Icon name="edit" size={17} />
+          {t('platform.data.edit')}
+        </button>
+        <button
+          type="button"
+          onClick={() => abrirPainel(tenant.id, 'members')}
+          className="modern-button-secondary"
+          aria-expanded={expanded && expandedPanel === 'members'}
+        >
+          {t('platform.members')}
+        </button>
+        <button
+          type="button"
+          onClick={() => abrirPainel(tenant.id, 'plan')}
+          className="modern-button-secondary"
+          aria-expanded={expanded && expandedPanel === 'plan'}
+        >
+          {t('platform.subscription.plan')}
+        </button>
+        {/* A correlação com o gateway mora aqui e não na
+            aba de plano: plano é o que o cliente comprou,
+            isto é quem ele é num sistema de fora — e quem
+            mexe num não está necessariamente mexendo no
+            outro. */}
+        <button
+          type="button"
+          onClick={() => abrirPainel(tenant.id, 'gateway')}
+          className="modern-button-secondary"
+          aria-expanded={expanded && expandedPanel === 'gateway'}
+        >
+          {t('platform.gateway.tab')}
+        </button>
+        {/* Na SaaS é a plataforma quem aponta o painel de
+            cada provedor para o ACS dele; a tela de
+            Configuração do provedor só mostra e testa. */}
+        <button
+          type="button"
+          onClick={() => abrirPainel(tenant.id, 'genieacs')}
+          className="modern-button-secondary"
+          aria-expanded={expanded && expandedPanel === 'genieacs'}
+        >
+          {t('platform.genieacs.tab')}
+        </button>
+        {/* Só de um provedor ativo: o painel de um suspenso
+            está fora do ar para os operadores dele, e é
+            isso que a personificação mostraria. */}
+        {active && (
+          <button
+            type="button"
+            onClick={() => void impersonar(tenant)}
+            disabled={busyId === tenant.id}
+            className="modern-button-secondary"
+          >
+            <Icon name="eye" size={17} />
+            {t('platform.impersonate')}
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => void toggleStatus(tenant)}
+          disabled={busyId === tenant.id}
+          className="modern-button-secondary"
+        >
+          <Icon name="power" size={17} />
+          {t(active ? 'platform.suspend' : 'platform.reactivate')}
+        </button>
+        {/* Nos DOIS estados, e é o ponto: suspenso, o
+            provedor não alcança a exportação dele — e
+            suspender é o que a exclusão exige antes. Vem
+            ANTES do apagar porque é a ordem em que se
+            usa. */}
+        <button
+          type="button"
+          onClick={() => void exportar(tenant)}
+          disabled={busyId === tenant.id}
+          className="modern-button-secondary"
+        >
+          <Icon name="database" size={17} />
+          {t('platform.export')}
+        </button>
+        {/* Só de um provedor SUSPENSO: apagar é o fim de
+            uma conversa que começou com a suspensão, e
+            exigir os dois passos dá ao cliente a janela
+            entre "seu painel parou" e "seus dados foram
+            embora" — janela que agora tem porta, no botão
+            acima. */}
+        {!active && (
+          <button
+            type="button"
+            onClick={() => void apagar(tenant)}
+            disabled={busyId === tenant.id}
+            className="modern-button-secondary text-destructive"
+          >
+            <Icon name="trash" size={17} />
+            {t('platform.delete')}
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  const painelDe = (tenant: Tenant) => (
+    expandedPanel === 'data' ? (
+      <TenantData tenant={tenant} onTenantChange={() => void loadTenants()} />
+    ) : expandedPanel === 'members' ? (
+      <TenantMembers tenant={tenant} onMembershipChange={() => void loadTenants()} />
+    ) : expandedPanel === 'gateway' ? (
+      <TenantGateway tenant={tenant} onTenantChange={() => void loadTenants()} />
+    ) : expandedPanel === 'genieacs' ? (
+      <TenantGenieAcs tenant={tenant} />
+    ) : (
+      <TenantPlan tenant={tenant} plans={plans} onSubscriptionChange={() => void loadTenants()} />
+    )
+  )
+
   return (
     <div className="page-shell">
       <div className="page-frame">
@@ -360,7 +550,39 @@ export default function PlatformPage() {
           </div>
         )}
 
-        {aba === 'tenants' && (
+        {aba === 'tenants' && estreito && (
+          <div className="space-y-3">
+            {loading ? (
+              <p className="modern-card py-8 text-center text-sm text-muted-foreground">{t('common.loading')}</p>
+            ) : error !== null ? (
+              <p className="modern-card py-8 text-center text-sm text-destructive">{error || t('platform.loadFailed')}</p>
+            ) : tenants.length === 0 ? (
+              <p className="modern-card py-8 text-center text-sm text-muted-foreground">{t('platform.empty')}</p>
+            ) : (
+              tenants.map((tenant) => (
+                <article key={tenant.id} className="modern-card p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <h2 className="break-words font-semibold text-foreground">{tenant.name}</h2>
+                      <p className="break-all font-mono text-xs text-muted-foreground">{tenant.slug}</p>
+                    </div>
+                    <div className="text-end">{statusDe(tenant)}</div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+                    {planoDe(tenant)}
+                    <span className="text-muted-foreground">{t('platform.operators', { count: tenant.operators })}</span>
+                  </div>
+                  <div className="mt-4 border-t border-border pt-4">{acoesDe(tenant)}</div>
+                  {expandedId === tenant.id && (
+                    <div className="mt-4 min-w-0 border-t border-border pt-4">{painelDe(tenant)}</div>
+                  )}
+                </article>
+              ))
+            )}
+          </div>
+        )}
+
+        {aba === 'tenants' && !estreito && (
         <div className="modern-card overflow-x-auto">
           <table className="modern-table">
             <thead>
@@ -388,173 +610,22 @@ export default function PlatformPage() {
                 </tr>
               ) : (
                 tenants.map((tenant) => {
-                  const active = tenant.status === 'active'
                   const expanded = expandedId === tenant.id
                   return (
                     <Fragment key={tenant.id}>
                       <tr>
                         <td className="font-medium">{tenant.name}</td>
                         <td className="font-mono text-sm">{tenant.slug}</td>
-                        <td>
-                          <span className={active ? 'modern-badge-success' : 'modern-badge-warning'}>
-                            {t(active ? 'platform.statusActive' : 'platform.statusSuspended')}
-                          </span>
-                          {/* Desde quando, e só para o suspenso: num ativo a
-                              informação não existe. "Suspenso" sozinho não
-                              distingue quem parou semana passada de quem está
-                              parado há dois anos guardando CPF e contrato dos
-                              assinantes — e era essa a diferença invisível. */}
-                          {!active && (
-                            <span className="mt-1 block text-xs text-muted-foreground">
-                              {tenant.suspendedAt
-                                ? t('platform.suspendedHowLong', {
-                                  when: formatRelativeTime(tenant.suspendedAt)
-                                })
-                                : t('platform.suspendedHowLongUnknown')}
-                            </span>
-                          )}
-                        </td>
-                        <td className="text-sm">
-                          {tenant.subscription ? (
-                            <span className="flex flex-wrap items-center gap-2">
-                              <span>{tenant.subscription.planName ?? tenant.subscription.planCode ?? '—'}</span>
-                              <span className={statusBadgeClass(tenant.subscription.status)}>
-                                {t(STATUS_LABEL_KEYS[tenant.subscription.status])}
-                              </span>
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </td>
+                        <td>{statusDe(tenant)}</td>
+                        <td className="text-sm">{planoDe(tenant)}</td>
                         <td className="text-sm text-muted-foreground">
                           {t('platform.operators', { count: tenant.operators })}
                         </td>
-                        <td>
-                          <div className="flex flex-wrap items-center gap-2">
-                            {/* Primeiro do grupo: é o que responde "o que está
-                                cadastrado aqui", e é a pergunta que se faz da
-                                linha antes de mexer em equipe ou em plano. */}
-                            <button
-                              type="button"
-                              onClick={() => abrirPainel(tenant.id, 'data')}
-                              className="modern-button-secondary"
-                              aria-expanded={expanded && expandedPanel === 'data'}
-                            >
-                              <Icon name="edit" size={17} />
-                              {t('platform.data.edit')}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => abrirPainel(tenant.id, 'members')}
-                              className="modern-button-secondary"
-                              aria-expanded={expanded && expandedPanel === 'members'}
-                            >
-                              {t('platform.members')}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => abrirPainel(tenant.id, 'plan')}
-                              className="modern-button-secondary"
-                              aria-expanded={expanded && expandedPanel === 'plan'}
-                            >
-                              {t('platform.subscription.plan')}
-                            </button>
-                            {/* A correlação com o gateway mora aqui e não na
-                                aba de plano: plano é o que o cliente comprou,
-                                isto é quem ele é num sistema de fora — e quem
-                                mexe num não está necessariamente mexendo no
-                                outro. */}
-                            <button
-                              type="button"
-                              onClick={() => abrirPainel(tenant.id, 'gateway')}
-                              className="modern-button-secondary"
-                              aria-expanded={expanded && expandedPanel === 'gateway'}
-                            >
-                              {t('platform.gateway.tab')}
-                            </button>
-                            {/* Na SaaS é a plataforma quem aponta o painel de
-                                cada provedor para o ACS dele; a tela de
-                                Configuração do provedor só mostra e testa. */}
-                            <button
-                              type="button"
-                              onClick={() => abrirPainel(tenant.id, 'genieacs')}
-                              className="modern-button-secondary"
-                              aria-expanded={expanded && expandedPanel === 'genieacs'}
-                            >
-                              {t('platform.genieacs.tab')}
-                            </button>
-                            {/* Só de um provedor ativo: o painel de um suspenso
-                                está fora do ar para os operadores dele, e é
-                                isso que a personificação mostraria. */}
-                            {active && (
-                              <button
-                                type="button"
-                                onClick={() => void impersonar(tenant)}
-                                disabled={busyId === tenant.id}
-                                className="modern-button-secondary"
-                              >
-                                <Icon name="eye" size={17} />
-                                {t('platform.impersonate')}
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => void toggleStatus(tenant)}
-                              disabled={busyId === tenant.id}
-                              className="modern-button-secondary"
-                            >
-                              <Icon name="power" size={17} />
-                              {t(active ? 'platform.suspend' : 'platform.reactivate')}
-                            </button>
-                            {/* Nos DOIS estados, e é o ponto: suspenso, o
-                                provedor não alcança a exportação dele — e
-                                suspender é o que a exclusão exige antes. Vem
-                                ANTES do apagar porque é a ordem em que se
-                                usa. */}
-                            <button
-                              type="button"
-                              onClick={() => void exportar(tenant)}
-                              disabled={busyId === tenant.id}
-                              className="modern-button-secondary"
-                            >
-                              <Icon name="database" size={17} />
-                              {t('platform.export')}
-                            </button>
-                            {/* Só de um provedor SUSPENSO: apagar é o fim de
-                                uma conversa que começou com a suspensão, e
-                                exigir os dois passos dá ao cliente a janela
-                                entre "seu painel parou" e "seus dados foram
-                                embora" — janela que agora tem porta, no botão
-                                acima. */}
-                            {!active && (
-                              <button
-                                type="button"
-                                onClick={() => void apagar(tenant)}
-                                disabled={busyId === tenant.id}
-                                className="modern-button-secondary text-destructive"
-                              >
-                                <Icon name="trash" size={17} />
-                                {t('platform.delete')}
-                              </button>
-                            )}
-                          </div>
-                        </td>
+                        <td>{acoesDe(tenant)}</td>
                       </tr>
                       {expanded && (
                         <tr>
-                          <td colSpan={6}>
-                            {expandedPanel === 'data' ? (
-                              <TenantData tenant={tenant} onTenantChange={() => void loadTenants()} />
-                            ) : expandedPanel === 'members' ? (
-                              <TenantMembers tenant={tenant} onMembershipChange={() => void loadTenants()} />
-                            ) : expandedPanel === 'gateway' ? (
-                              <TenantGateway tenant={tenant} onTenantChange={() => void loadTenants()} />
-                            ) : expandedPanel === 'genieacs' ? (
-                              <TenantGenieAcs tenant={tenant} />
-                            ) : (
-                              <TenantPlan tenant={tenant} plans={plans} onSubscriptionChange={() => void loadTenants()} />
-                            )}
-                          </td>
+                          <td colSpan={6}>{painelDe(tenant)}</td>
                         </tr>
                       )}
                     </Fragment>
