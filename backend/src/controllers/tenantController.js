@@ -12,6 +12,7 @@ import { EDITION } from '../config/edition.js';
 import { panelBaseDomain, usesTenantSubdomains } from '../middleware/tenantResolver.js';
 import { normalizeTaxId, isValidTaxId, isValidCnpj } from '../utils/taxId.js';
 import { lookupCnpj } from '../services/cnpjLookupService.js';
+import { lookupCep, geocodeAddress } from '../services/addressLookupService.js';
 
 /**
  * O cadastro fiscal vindo do corpo, normalizado — ou o motivo de recusa.
@@ -200,6 +201,46 @@ class TenantController {
     } catch (error) {
       console.error('Tenant security update error:', error);
       return res.status(500).json(createErrorResponse(req.t('common.internalError'), error.message));
+    }
+  }
+
+  /** O endereço de um CEP, para preencher o cadastro — sem gravar. */
+  static async lookupCep(req, res) {
+    const cep = String(req.query?.cep ?? '').replace(/\D/g, '');
+    if (cep.length !== 8) {
+      return res.status(400).json(createErrorResponse(req.t('tenant.cepInvalid')));
+    }
+    try {
+      const result = await lookupCep(cep);
+      if (!result.found) {
+        return res.status(404).json(createErrorResponse(req.t('tenant.cepNotFound')));
+      }
+      return res.json(createResponse(req.t('tenant.cepFound'), result.data));
+    } catch (error) {
+      return res.status(502).json(createErrorResponse(req.t('tenant.cepLookupFailed'), error.message));
+    }
+  }
+
+  /**
+   * O ponto no mapa de um endereço, para posicionar a sede — sem gravar.
+   * Cidade e UF são o mínimo: sem elas, não há onde procurar.
+   */
+  static async geocode(req, res) {
+    const campos = {};
+    for (const chave of ['addressLine', 'addressNumber', 'district', 'city', 'state', 'postalCode']) {
+      campos[chave] = String(req.query?.[chave] ?? '').slice(0, 160);
+    }
+    if (!campos.city.trim() || !campos.state.trim()) {
+      return res.status(400).json(createErrorResponse(req.t('tenant.geocodeNeedsCity')));
+    }
+    try {
+      const result = await geocodeAddress(campos);
+      if (!result.found) {
+        return res.status(404).json(createErrorResponse(req.t('tenant.geocodeNotFound')));
+      }
+      return res.json(createResponse(req.t('tenant.geocodeFound'), result.data));
+    } catch (error) {
+      return res.status(502).json(createErrorResponse(req.t('tenant.geocodeFailed'), error.message));
     }
   }
 

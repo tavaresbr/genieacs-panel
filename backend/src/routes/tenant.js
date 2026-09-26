@@ -44,6 +44,13 @@ router.patch('/', authenticateToken, requirePermission('settings.write'), Tenant
 // na query (`?cnpj=`): não endereça linha nenhuma, é só o que se consulta.
 router.get('/cnpj', authenticateToken, requirePermission('settings.write'), TenantController.lookupCnpj);
 
+// O endereço de um CEP, para o mesmo cadastro. Também só lê.
+router.get('/cep', authenticateToken, requirePermission('settings.write'), TenantController.lookupCep);
+
+// O ponto no mapa de um endereço, para posicionar a sede. Pede `map.write`
+// porque o que ele alimenta é o centro do mapa, que é essa permissão que grava.
+router.get('/geocode', authenticateToken, requirePermission('map.write'), TenantController.geocode);
+
 // A exigência do login em duas etapas para a equipe. Ler é de quem lê a
 // configuração; gravar pede `settings.write` E papel `owner`, conferido no
 // controlador — a matriz não tem capacidade só do dono.

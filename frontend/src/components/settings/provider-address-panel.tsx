@@ -3,6 +3,7 @@ import { mapSettingsAPI, subscriptionAPI, tenantAPI, type TenantBilling } from '
 import { ADDRESS_FIELDS, CLASSE_LARGURA, CONTACT_FIELDS, IDENTITY_FIELDS, type BillingField } from '@/components/billing-profile'
 import type { TranslationKey } from '@/lib/i18n'
 import { LocationPicker, wrapLongitude } from '@/components/location-picker'
+import { canGeocode, geocodeFields } from '@/lib/provider-location'
 import { useToast } from '@/components/ui/toast'
 import { useAuth } from '@/contexts/auth-context'
 import { useTranslation } from '@/contexts/language-context'
@@ -49,6 +50,7 @@ export function ProviderAddressPanel() {
   const [loaded, setLoaded] = useState(false)
   const [busy, setBusy] = useState(false)
   const [lookingUp, setLookingUp] = useState(false)
+  const [locating, setLocating] = useState(false)
 
   useEffect(() => {
     void (async () => {
@@ -68,26 +70,84 @@ export function ProviderAddressPanel() {
   const validPoint = center.lat.trim() !== '' && center.lng.trim() !== ''
     && Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180
 
-  // Preenche o formulário com o que a Receita tem para o CNPJ digitado. Só o
-  // formulário: quem confere e salva é o operador, pelo mesmo Salvar.
+  /** Junta ao formulário o que a consulta trouxe, só nos campos do cadastro e só o que veio preenchido. */
+  const merge = (base: AddressForm, found: Partial<Record<string, unknown>>) => {
+    const next = { ...base }
+    for (const { chave } of ALL_FIELDS) {
+      const value = found[chave]
+      if (typeof value === 'string' && value.trim() !== '') next[chave] = value
+    }
+    return next
+  }
+
+  /**
+   * Põe o marcador da sede no endereço do formulário (Nominatim, no servidor).
+   * `silent` é a chamada automática depois de CNPJ/CEP: se falhar, não
+   * incomoda — o botão "Localizar no mapa" continua ali.
+   */
+  const locateOnMap = async (form: AddressForm, silent = false) => {
+    if (!canMap || !canGeocode(form)) {
+      if (!silent) toast.error(t('settings.providerAddress.locateNeedsCity'))
+      return
+    }
+    setLocating(true)
+    try {
+      const res = await tenantAPI.geocode(geocodeFields(form))
+      if (!res.success || !res.data) {
+        if (!silent) toast.error(res.message || t('settings.providerAddress.locateFailed'))
+        return
+      }
+      setCenter({ lat: String(res.data.lat), lng: String(res.data.lng) })
+      toast.success(t(res.data.precision === 'address'
+        ? 'settings.providerAddress.locatedAddress'
+        : 'settings.providerAddress.locatedCity'))
+    } finally {
+      setLocating(false)
+    }
+  }
+
+  // Preenche o formulário com o que a Receita tem para o CNPJ digitado, e
+  // leva o marcador para o endereço achado. Só o formulário: quem confere e
+  // salva é o operador, pelo mesmo Salvar.
   const fillFromCnpj = async () => {
     setLookingUp(true)
     try {
       const res = await tenantAPI.lookupCnpj(address.taxId ?? '')
       if (!res.success || !res.data) { toast.error(res.message || t('settings.providerAddress.cnpjLookupFailed')); return }
-      const found = res.data
-      setAddress((a) => {
-        const next = { ...a }
-        for (const { chave } of ALL_FIELDS) {
-          const value = found[chave]
-          if (typeof value === 'string' && value.trim() !== '') next[chave] = value
-        }
-        return next
-      })
+      const next = merge(address, res.data)
+      setAddress(next)
       toast.success(t('settings.providerAddress.cnpjFilled'))
+      await locateOnMap(next, true)
     } finally {
       setLookingUp(false)
     }
+  }
+
+  // O endereço do CEP. Número e complemento ficam: o CEP não os conhece.
+  // Quando a fonte já traz o ponto, ele vale; senão, geocodifica.
+  const fillFromCep = async () => {
+    setLookingUp(true)
+    try {
+      const res = await tenantAPI.lookupCep(address.postalCode ?? '')
+      if (!res.success || !res.data) { toast.error(res.message || t('settings.providerAddress.cepLookupFailed')); return }
+      const next = merge(address, res.data)
+      setAddress(next)
+      toast.success(t('settings.providerAddress.cepFilled'))
+      const { lat: pointLat, lng: pointLng } = res.data
+      if (canMap && typeof pointLat === 'number' && typeof pointLng === 'number') {
+        setCenter({ lat: String(pointLat), lng: String(pointLng) })
+      } else {
+        await locateOnMap(next, true)
+      }
+    } finally {
+      setLookingUp(false)
+    }
+  }
+
+  /** Os campos que têm botão de consulta ao lado. */
+  const LOOKUPS: Record<string, { run: () => Promise<void>; digits: number; label: TranslationKey; busyLabel: TranslationKey }> = {
+    taxId: { run: fillFromCnpj, digits: 14, label: 'settings.providerAddress.cnpjFill', busyLabel: 'settings.providerAddress.cnpjLooking' },
+    postalCode: { run: fillFromCep, digits: 8, label: 'settings.providerAddress.cepFill', busyLabel: 'settings.providerAddress.cepLooking' }
   }
 
   const save = async () => {
@@ -133,24 +193,24 @@ export function ProviderAddressPanel() {
               {fields.map(({ chave, label, hint, largura, maxLength, inputMode }) => (
                 <div key={chave} className={CLASSE_LARGURA[largura]}>
                   <label htmlFor={`provider-${chave}`} className="field-label">{t(label)}</label>
-                  <div className={chave === 'taxId' ? 'flex flex-col gap-2 sm:flex-row' : undefined}>
+                  <div className={LOOKUPS[chave] ? 'flex flex-col gap-2 sm:flex-row' : undefined}>
                     <input
                       id={`provider-${chave}`}
-                      className={chave === 'taxId' ? 'modern-input w-full sm:flex-1' : 'modern-input w-full'}
+                      className={LOOKUPS[chave] ? 'modern-input w-full sm:flex-1' : 'modern-input w-full'}
                       value={address[chave] ?? ''}
                       maxLength={maxLength}
                       inputMode={inputMode}
                       disabled={!canAddress || busy || lookingUp || !loaded}
                       onChange={(e) => setAddress((a) => ({ ...a, [chave]: e.target.value }))}
                     />
-                    {chave === 'taxId' && canAddress && (
+                    {LOOKUPS[chave] && canAddress && (
                       <button
                         type="button"
                         className="modern-button-secondary whitespace-nowrap"
-                        disabled={busy || lookingUp || !loaded || (address.taxId ?? '').replace(/\D/g, '').length !== 14}
-                        onClick={() => void fillFromCnpj()}
+                        disabled={busy || lookingUp || !loaded || (address[chave] ?? '').replace(/\D/g, '').length !== LOOKUPS[chave].digits}
+                        onClick={() => void LOOKUPS[chave].run()}
                       >
-                        {lookingUp ? t('settings.providerAddress.cnpjLooking') : t('settings.providerAddress.cnpjFill')}
+                        {lookingUp ? t(LOOKUPS[chave].busyLabel) : t(LOOKUPS[chave].label)}
                       </button>
                     )}
                   </div>
@@ -162,8 +222,22 @@ export function ProviderAddressPanel() {
         ))}
 
         <div className="border-t border-border pt-5">
-          <h3 className="font-semibold">{t('settings.providerAddress.mapLabel')}</h3>
-          <p className="field-hint mb-4 mt-1">{t('onboarding.identity.mapHint')}</p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h3 className="font-semibold">{t('settings.providerAddress.mapLabel')}</h3>
+              <p className="field-hint mb-4 mt-1">{t('onboarding.identity.mapHint')}</p>
+            </div>
+            {canMap && (
+              <button
+                type="button"
+                className="modern-button-secondary whitespace-nowrap"
+                disabled={busy || locating || !loaded || !canGeocode(address)}
+                onClick={() => void locateOnMap(address)}
+              >
+                {locating ? t('settings.providerAddress.locating') : t('settings.providerAddress.locate')}
+              </button>
+            )}
+          </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="provider-lat" className="field-label">{t('onboarding.identity.lat')}</label>

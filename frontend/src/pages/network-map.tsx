@@ -5,7 +5,9 @@ import { useAuth } from '@/contexts/auth-context'
 import { useTheme } from '@/contexts/theme-context'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
-import { mappingAPI, mapSettingsAPI } from '@/lib/api'
+import { mappingAPI, mapSettingsAPI, subscriptionAPI } from '@/lib/api'
+import { useTenant } from '@/contexts/tenant-context'
+import { DEFAULT_MAP_CENTER, isDefaultCenter } from '@/lib/provider-location'
 import { Icon } from '@/components/ui/icon'
 import { getTileSpec, type Basemap } from '@/lib/map-tiles'
 import { useToast } from '@/components/ui/toast'
@@ -286,7 +288,12 @@ export default function NetworkMap() {
   const [editingEdge, setEditingEdge] = useState(false)
   const [mapView, setMapView] = useState<'map' | 'list'>('map')
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
-  const [mapCenter, setMapCenter] = useState<[number, number]>([-15.7942, -47.8822])
+  const [mapCenter, setMapCenter] = useState<[number, number]>(DEFAULT_MAP_CENTER)
+  // A sede do provedor: o centro salvo, quando alguém o escolheu (não é o
+  // padrão de Brasília). `address` só com `settings.read`, que é quem lê o cadastro.
+  const [headquarters, setHeadquarters] = useState<{ lat: number; lng: number; address: string } | null>(null)
+  const { name: tenantName } = useTenant()
+  const canReadBilling = useAuth().can('settings.read')
   const [defaultZoom, setDefaultZoom] = useState(12)
   const [minZoom, setMinZoom] = useState(5)
   const [maxZoom, setMaxZoom] = useState(18)
@@ -354,7 +361,24 @@ export default function NetworkMap() {
       const settings = settingsRes?.data as any
       if (settings) {
         const center: [number, number] = [Number(settings.center_lat), Number(settings.center_lng)]
-        if (center.every(Number.isFinite)) setMapCenter(center)
+        if (center.every(Number.isFinite)) {
+          setMapCenter(center)
+          if (!isDefaultCenter(center[0], center[1])) {
+            let address = ''
+            if (canReadBilling) {
+              const sub = await subscriptionAPI.current()
+              const b = sub.success ? sub.data?.billing : null
+              if (b) {
+                const street = [b.addressLine, b.addressNumber].filter(Boolean).join(', ')
+                const place = [b.city, b.state].filter(Boolean).join(' - ')
+                address = [street, b.district, place].filter(Boolean).join(' · ')
+              }
+            }
+            setHeadquarters({ lat: center[0], lng: center[1], address })
+          } else {
+            setHeadquarters(null)
+          }
+        }
         if (Number.isFinite(Number(settings.default_zoom))) setDefaultZoom(Number(settings.default_zoom))
         if (Number.isFinite(Number(settings.max_zoom_out))) setMinZoom(Number(settings.max_zoom_out))
         if (Number.isFinite(Number(settings.max_zoom_in))) setMaxZoom(Number(settings.max_zoom_in))
@@ -365,7 +389,7 @@ export default function NetworkMap() {
     } finally {
       setLoading(false)
     }
-  }, [t, toast])
+  }, [canReadBilling, t, toast])
 
   useEffect(() => { void loadData() }, [loadData])
   useEffect(() => {
@@ -428,6 +452,17 @@ export default function NetworkMap() {
       marker.bindTooltip(`<strong>${escapeHtml(node.name)}</strong><br>${escapeHtml(nodeTypeLabel(node.type))} · ${escapeHtml(node.node_id)}`)
       marker.on('click', () => { setSelectedNode(node); setSelectedEdge(null) })
     })
+    // A sede por cima de tudo: é o ponto de referência de quem olha a rede.
+    if (headquarters) {
+      const html = `<div style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:#10b981;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.35)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/></svg></div>`
+      const hq = L.marker([headquarters.lat, headquarters.lng], {
+        icon: L.divIcon({ className: '', html, iconSize: [32, 32], iconAnchor: [16, 16] }),
+        zIndexOffset: 1000,
+        keyboard: false
+      }).addTo(markersLayerRef.current)
+      const title = `<strong>${escapeHtml(t('map.headquarters'))}</strong> · ${escapeHtml(tenantName)}`
+      hq.bindTooltip(headquarters.address ? `${title}<br>${escapeHtml(headquarters.address)}` : title)
+    }
     if (nodes.length && !hasCenteredAssetsRef.current) {
       const center = nodes.reduce(
         (total, node) => [total[0] + node.latitude, total[1] + node.longitude] as [number, number],
@@ -439,7 +474,7 @@ export default function NetworkMap() {
       )
       hasCenteredAssetsRef.current = true
     }
-  }, [edges, isDarkMode, maxZoom, minZoom, nodeTypeLabel, nodes, t])
+  }, [edges, headquarters, isDarkMode, maxZoom, minZoom, nodeTypeLabel, nodes, t, tenantName])
 
   useEffect(() => {
     if (mapView !== 'map') return

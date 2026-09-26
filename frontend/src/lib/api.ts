@@ -804,7 +804,24 @@ export const tenantAPI = {
    * formato do cadastro. Só sugere: nada é gravado até o Salvar.
    */
   lookupCnpj: (cnpj: string) =>
-    apiClient.get<Partial<TenantBilling>>(`/tenant/cnpj?cnpj=${encodeURIComponent(cnpj.replace(/\D/g, ''))}`),
+    apiClient.get<Partial<TenantBilling> & { tradeName?: string }>(`/tenant/cnpj?cnpj=${encodeURIComponent(cnpj.replace(/\D/g, ''))}`),
+
+  /**
+   * O endereço de um CEP (BrasilAPI/ViaCEP, no servidor). `lat`/`lng` vêm
+   * quando a fonte tem o ponto. Só sugere, como o CNPJ.
+   */
+  lookupCep: (cep: string) =>
+    apiClient.get<Partial<TenantBilling> & { lat?: number; lng?: number }>(`/tenant/cep?cep=${encodeURIComponent(cep.replace(/\D/g, ''))}`),
+
+  /**
+   * O ponto no mapa de um endereço (Nominatim/OpenStreetMap, no servidor).
+   * `precision: 'city'` quando só a cidade foi achada — a tela pede ajuste.
+   */
+  geocode: (fields: Partial<Pick<TenantBilling, 'addressLine' | 'addressNumber' | 'district' | 'city' | 'state' | 'postalCode'>>) => {
+    const query = new URLSearchParams()
+    for (const [key, value] of Object.entries(fields)) if (value) query.set(key, value)
+    return apiClient.get<{ lat: number; lng: number; precision: 'address' | 'city' }>(`/tenant/geocode?${query}`)
+  },
 
   /**
    * Todo o cadastro deste provedor, num arquivo.

@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { mapSettingsAPI, settingsAPI, sgpAPI, tenantAPI, usersAPI, whatsappAPI, type GenieAcsAuthType, type WhatsAppConfig } from '@/lib/api'
+import { mapSettingsAPI, settingsAPI, sgpAPI, tenantAPI, usersAPI, whatsappAPI, type GenieAcsAuthType, type TenantBilling, type WhatsAppConfig } from '@/lib/api'
+import { canGeocode, geocodeFields } from '@/lib/provider-location'
 import { Icon } from '@/components/ui/icon'
 import { LocationPicker, wrapLongitude } from '@/components/location-picker'
 import { useToast } from '@/components/ui/toast'
@@ -49,6 +50,8 @@ export default function Onboarding() {
   // 403 ao salvar é um passo que não deveria aparecer.
   const canSgp = can('sgp.config')
   const canWhatsapp = can('whatsapp.config')
+  const canBilling = can('settings.write')
+  const canMapWrite = can('map.write')
   const steps = useMemo<Step[]>(() => [
     'welcome', 'identity', 'acs',
     ...(canSgp ? ['sgp' as const] : []),
@@ -69,6 +72,10 @@ export default function Onboarding() {
 
   const [name, setName] = useState(currentName)
   const [center, setCenter] = useState<{ lat: string; lng: string }>({ lat: '', lng: '' })
+  // O CNPJ do passo 1 e o cadastro que ele trouxe, gravado ao avançar.
+  const [cnpj, setCnpj] = useState('')
+  const [cnpjBusy, setCnpjBusy] = useState(false)
+  const [billingFound, setBillingFound] = useState<Partial<TenantBilling> | null>(null)
   const [acs, setAcs] = useState({ url: '', authType: 'none' as GenieAcsAuthType, username: '', secret: '' })
   const [testResult, setTestResult] = useState<string | null>(null)
   /** O endereço que a plataforma sugere para este provedor, se houver um. */
@@ -215,6 +222,31 @@ export default function Onboarding() {
     navigate('/dashboard', { replace: true })
   }
 
+  /**
+   * O CNPJ preenche o passo inteiro: o nome do painel (nome fantasia, ou a
+   * razão social), o cadastro fiscal — gravado ao avançar — e o ponto no mapa
+   * pelo endereço. Tudo editável antes de avançar.
+   */
+  const fillFromCnpj = async () => {
+    setCnpjBusy(true)
+    try {
+      const res = await tenantAPI.lookupCnpj(cnpj)
+      if (!res.success || !res.data) { toast.error(res.message || t('settings.providerAddress.cnpjLookupFailed')); return }
+      const { tradeName, ...billing } = res.data
+      const suggested = (tradeName || billing.legalName || '').trim()
+      if (suggested) setName(suggested.slice(0, 128))
+      setBillingFound(billing)
+      toast.success(t('onboarding.identity.cnpjFilled'))
+      const form = billing as Record<string, string | null | undefined>
+      if (canMapWrite && canGeocode(form)) {
+        const geo = await tenantAPI.geocode(geocodeFields(form))
+        if (geo.success && geo.data) setCenter({ lat: String(geo.data.lat), lng: String(geo.data.lng) })
+      }
+    } finally {
+      setCnpjBusy(false)
+    }
+  }
+
   const saveIdentity = async () => {
     setBusy(true)
     try {
@@ -223,6 +255,13 @@ export default function Onboarding() {
         const res = await tenantAPI.rename(trimmed)
         if (!res.success) { toast.error(res.message || t('settings.saveError')); return }
         await refresh()
+      }
+      // O cadastro que o CNPJ trouxe. Um erro aqui avisa, mas não prende o
+      // provedor no primeiro passo: a aba Geral grava o mesmo depois.
+      if (billingFound && canBilling) {
+        const res = await tenantAPI.updateBilling(billingFound)
+        if (res.success) setBillingFound(null)
+        else toast.error(res.message || t('billing.saveFailed'))
       }
       const lat = Number(center.lat), lng = wrapLongitude(Number(center.lng))
       if (center.lat !== '' && center.lng !== '' && Number.isFinite(lat) && Number.isFinite(lng)) {
@@ -342,6 +381,23 @@ export default function Onboarding() {
 
           {step === 'identity' && (
             <>
+              {canBilling && (
+                <div>
+                  <label htmlFor="ob-cnpj" className="field-label">{t('onboarding.identity.cnpj')}</label>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <input id="ob-cnpj" className="modern-input w-full sm:flex-1" inputMode="numeric" maxLength={20} value={cnpj} onChange={(e) => setCnpj(e.target.value)} />
+                    <button
+                      type="button"
+                      className="modern-button-secondary whitespace-nowrap"
+                      disabled={busy || cnpjBusy || cnpj.replace(/\D/g, '').length !== 14}
+                      onClick={() => void fillFromCnpj()}
+                    >
+                      {cnpjBusy ? t('settings.providerAddress.cnpjLooking') : t('settings.providerAddress.cnpjFill')}
+                    </button>
+                  </div>
+                  <p className="field-hint">{t('onboarding.identity.cnpjHint')}</p>
+                </div>
+              )}
               <div>
                 <label htmlFor="ob-name" className="field-label">{t('settings.general.appName')}</label>
                 <input id="ob-name" className="modern-input w-full" value={name} onChange={(e) => setName(e.target.value)} maxLength={128} />
