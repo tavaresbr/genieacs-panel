@@ -594,9 +594,11 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
           // voltar a crescer faz a página rolar, que é o que este número evita.
           // No celular desconta também a barra fixa do painel (4rem), e usa
           // `dvh`: o `vh` do navegador móvel conta a barra de endereço que
-          // aparece e some, e a caixa de escrever ficava embaixo dela.
+          // aparece e some, e a caixa de escrever ficava embaixo dela. A
+          // página, nesta aba, troca o respiro de baixo pela área segura do
+          // iPhone (ver `WhatsAppPage`), e a conta desconta o mesmo.
           <section
-            className={`modern-card grid h-[calc(100dvh-13.5rem)] min-h-[26rem] grid-cols-1 overflow-hidden lg:h-[calc(100vh-10.5rem)] lg:min-h-[32rem] lg:grid-cols-[minmax(17rem,22rem)_1fr] ${
+            className={`modern-card grid h-[calc(100dvh-13.5rem-env(safe-area-inset-bottom))] min-h-[22rem] grid-cols-1 overflow-hidden lg:h-[calc(100vh-10.5rem)] lg:min-h-[32rem] lg:grid-cols-[minmax(17rem,22rem)_1fr] ${
               showSgpPanel && conversation ? 'xl:grid-cols-[minmax(16rem,20rem)_1fr_minmax(18rem,22rem)]' : ''
             }`}
           >
@@ -646,7 +648,7 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
                   )}
                 </div>
               </div>
-              <div className="min-h-0 flex-1 overflow-y-auto">
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
                 {loadingList
                   ? <p className="px-3 py-6 text-center text-sm text-muted-foreground">{t('common.loading')}</p>
                   : (
@@ -698,6 +700,15 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
                 above the mobile top bar (z 1200), whose height would otherwise
                 hide the drawer's own close button, and below the navigation
                 menu (z 2000). */}
+            {showSgpPanel && conversation && (
+              // Fundo escuro só enquanto é gaveta: tocar fora fecha, como
+              // qualquer gaveta de celular.
+              <div
+                className="fixed inset-0 z-[1499] bg-black/40 lg:hidden"
+                aria-hidden="true"
+                onClick={toggleSgpPanel}
+              />
+            )}
             {showSgpPanel && conversation && (
               <div className="fixed inset-y-0 end-0 z-[1500] w-[min(22rem,100vw)] border-s border-border shadow-xl xl:static xl:z-auto xl:h-full xl:min-h-0 xl:w-auto xl:shadow-none">
                 <SubscriberPanel
@@ -931,7 +942,9 @@ export default function WhatsAppPage() {
   const visibleTabs = TABS.filter(([, , permission]) => can(permission))
 
   return (
-    <div className="page-shell">
+    // Na caixa de entrada o cartão já ocupa a altura da tela: o `pb-24` da
+    // página só fazia a tela inteira rolar por baixo da conversa no celular.
+    <div className={`page-shell ${tab === 'inbox' ? 'pb-[calc(0.75rem+env(safe-area-inset-bottom))] lg:pb-8' : ''}`}>
       <div className="page-frame">
         {/*
           Uma linha só: o título à esquerda e o sino de "Está funcionando?" à

@@ -47,6 +47,9 @@ const SKIP_REASONS: { key: keyof WhatsAppSkipCounts; label: TranslationKey }[] =
   { key: 'templateIncomplete', label: 'whatsapp.billing.skippedTemplateIncomplete' }
 ]
 
+/** A célula da tabela de devedores quando, no celular, ela vira lista. */
+const MOBILE_CELL = 'max-md:block max-md:!border-0 max-md:!px-1 max-md:!py-0.5'
+
 /**
  * A body citing `{{dias_para_vencer}}` IS a reminder — the same test the
  * dispatcher runs (`modeloEhLembrete`, utils/wa/waCobranca.js). The two
@@ -425,9 +428,12 @@ export function BillingPanel() {
             </p>
           </div>
         ) : (
+          // No celular a tabela vira uma lista: cada linha é um bloco com a
+          // caixa de marcar à esquerda e o resto empilhado ao lado — seis
+          // colunas rolando de lado escondiam o valor e o vencimento.
           <div className="overflow-x-auto">
-            <table className="modern-table">
-              <thead>
+            <table className="modern-table max-md:block">
+              <thead className="max-md:hidden">
                 <tr>
                   <th scope="col" className="w-12">
                     <input
@@ -444,27 +450,32 @@ export function BillingPanel() {
                   <th scope="col">{t('whatsapp.billing.dueDate')}</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="max-md:block">
                 {rows.map((row) => {
                   const days = row.daysOverdue
                   return (
-                    <tr key={row.contract} data-contract={row.contract}>
-                      <td>
+                    <tr
+                      key={row.contract}
+                      data-contract={row.contract}
+                      className="max-md:grid max-md:grid-cols-[2.5rem_minmax(0,1fr)] max-md:border-b max-md:border-border/70 max-md:px-2 max-md:py-2 max-md:last:border-b-0"
+                    >
+                      <td className={`${MOBILE_CELL} max-md:row-span-5 max-md:!pt-1`}>
                         <input
                           type="checkbox"
+                          className="max-md:size-5"
                           aria-label={row.contract}
                           checked={selected.has(row.contract)}
                           onChange={() => toggle(row.contract)}
                         />
                       </td>
-                      <td className="font-semibold">{row.contract}</td>
-                      <td>
+                      <td className={`${MOBILE_CELL} font-semibold`}>{row.contract}</td>
+                      <td className={MOBILE_CELL}>
                         <span className="block">{row.clientName || '—'}</span>
                         {row.document && (
                           <span className="text-xs text-muted-foreground">{row.document}</span>
                         )}
                       </td>
-                      <td>
+                      <td className={MOBILE_CELL}>
                         {editing === row.contract ? (
                           <div className="space-y-2" data-testid={`wa-phone-editor-${row.contract}`}>
                             <label htmlFor={`wa-phone-${row.contract}`} className="field-label">
@@ -549,8 +560,8 @@ export function BillingPanel() {
                           </div>
                         )}
                       </td>
-                      <td>{currency(row.amount, intlLocale)}</td>
-                      <td>
+                      <td className={`${MOBILE_CELL} max-md:font-semibold`}>{currency(row.amount, intlLocale)}</td>
+                      <td className={`${MOBILE_CELL} max-md:flex max-md:flex-wrap max-md:items-center max-md:gap-2`}>
                         <span className="block">{row.dueDate ? formatDate(row.dueDate) : '—'}</span>
                         {days !== null && (
                           <span className={days > 0 ? 'modern-badge-warning' : 'modern-badge-info'}>

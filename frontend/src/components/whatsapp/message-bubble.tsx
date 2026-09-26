@@ -254,7 +254,7 @@ export function MessageBubble({ message, onResend, resending, accountTinted = fa
   const attachment = message.attachment && <Attachment message={message} />
 
   const body = message.body
-    ? <p className="whitespace-pre-wrap break-words text-sm leading-6">{message.body}</p>
+    ? <p className="whitespace-pre-wrap break-words text-sm leading-6 [overflow-wrap:anywhere]">{message.body}</p>
     : !message.attachment
       ? <p className="text-sm italic text-muted-foreground">{t('whatsapp.inbox.attachment')}</p>
       : null
@@ -289,7 +289,7 @@ export function MessageBubble({ message, onResend, resending, accountTinted = fa
   return (
     <li className={`flex w-full ${inbound ? 'justify-start' : 'justify-end'}`}>
       <div
-        className={`max-w-[min(38rem,85%)] rounded-[var(--radius)] border px-3 py-2 ${
+        className={`min-w-0 max-w-[min(38rem,85%)] rounded-[var(--radius)] border px-3 py-2 ${
           inbound
             ? accountTinted
               ? 'border-[hsl(var(--wa-account))]/40 bg-[hsl(var(--wa-account))]/[0.07] text-card-foreground'
@@ -332,7 +332,7 @@ export function MessageBubble({ message, onResend, resending, accountTinted = fa
         {failed && (
           <div className="mt-2 border-t border-[hsl(var(--status-danger))]/25 pt-2">
             <p
-              className="text-xs leading-5 text-[hsl(var(--status-danger))]"
+              className="break-words text-xs leading-5 text-[hsl(var(--status-danger))] [overflow-wrap:anywhere]"
               title={message.deliveryError || undefined}
             >
               {t('whatsapp.inbox.deliveryFailed', {

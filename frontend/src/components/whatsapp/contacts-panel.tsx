@@ -206,6 +206,76 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
   const canLookup = can('sgp.read')
   const shown = sgpResult ? sgpResult.contacts : contacts
 
+  // Pedaços de cada linha, os mesmos na tabela e nos cartões do celular.
+  const nameOf = (contact: WhatsAppContact) => (canOpenProfile ? (
+    <Link
+      to={`/contacts/${encodeURIComponent(contact.key)}`}
+      className="block break-words font-semibold hover:text-primary hover:underline"
+    >
+      {contact.clientName || '—'}
+    </Link>
+  ) : (
+    <span className="block break-words font-semibold">{contact.clientName || '—'}</span>
+  ))
+
+  const tagsOf = (contact: WhatsAppContact) => (
+    <span className="flex flex-wrap items-center gap-1.5">
+      {contact.document && (
+        <span className="text-xs text-muted-foreground">{contact.document}</span>
+      )}
+      {!contact.hasDevice && (
+        <span className="modern-badge" title={t('whatsapp.contacts.noDeviceHint')}>
+          {t('whatsapp.contacts.noDevice')}
+        </span>
+      )}
+      {contact.state === 'blocked' && (
+        <span className="modern-badge-warning">{t('whatsapp.contacts.stateBlocked')}</span>
+      )}
+      {contact.state === 'cancelled' && (
+        <span className="modern-badge-error">{t('whatsapp.contacts.stateCancelled')}</span>
+      )}
+    </span>
+  )
+
+  const phoneOf = (contact: WhatsAppContact) => (contact.phone ? (
+    <span className="flex flex-wrap items-center gap-1.5">
+      <span className="font-mono">{contact.phone}</span>
+      {contact.phoneSource === 'manual' && (
+        <span className="modern-badge" title={t('whatsapp.contacts.phoneManualHint')}>
+          {t('whatsapp.contacts.phoneManual')}
+        </span>
+      )}
+      {contact.optedOut && (
+        <span className="modern-badge-warning" title={t('whatsapp.inbox.optedOutHint')}>
+          <Icon name="bell" size={12} />
+          {t('whatsapp.inbox.optedOut')}
+        </span>
+      )}
+    </span>
+  ) : (
+    <span className="text-muted-foreground">{t('whatsapp.contacts.noPhone')}</span>
+  ))
+
+  const actionOf = (contact: WhatsAppContact, extra = '') => (
+    canSend && (contact.conversationId || contact.phone) ? (
+      <button
+        type="button"
+        className={`${contact.conversationId ? 'modern-button-secondary' : 'modern-button'}${extra ? ` ${extra}` : ''}`}
+        disabled={openingContract !== null}
+        onClick={() => void open(contact)}
+      >
+        <Icon
+          name={openingContract === contact.key ? 'refresh' : 'chat'}
+          size={16}
+          className={openingContract === contact.key ? 'animate-spin' : ''}
+        />
+        {t(contact.conversationId
+          ? 'whatsapp.contacts.openConversation'
+          : 'whatsapp.contacts.startConversation')}
+      </button>
+    ) : null
+  )
+
   return (
     <section className="flex flex-col gap-5">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -213,7 +283,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
           <h2 className="section-heading">{t('whatsapp.contacts.title')}</h2>
           <p className="section-description">{t('whatsapp.contacts.subtitle')}</p>
         </div>
-        <div className="flex shrink-0 flex-wrap gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0 sm:flex-wrap">
           {canExport && (
             <button type="button" className="modern-button-secondary" disabled={exporting} onClick={() => void exportSheet()}>
               <Icon name="external" size={16} />
@@ -344,98 +414,65 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
             )}
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="modern-table">
-              <thead>
-                <tr>
-                  <th scope="col">{t('whatsapp.inbox.subscriber')}</th>
-                  <th scope="col">{t('whatsapp.inbox.contract')}</th>
-                  <th scope="col">{t('whatsapp.optOut.phone')}</th>
-                  <th scope="col">{t('whatsapp.contacts.lastMessage')}</th>
-                  <th scope="col"><span className="sr-only">{t('whatsapp.contacts.actions')}</span></th>
-                </tr>
-              </thead>
-              <tbody>
-                {shown.map((contact) => (
-                  <tr key={contact.key} data-contract={contact.contract ?? ''}>
-                    <td>
-                      {canOpenProfile ? (
-                        <Link
-                          to={`/contacts/${encodeURIComponent(contact.key)}`}
-                          className="block font-semibold hover:text-primary hover:underline"
-                        >
-                          {contact.clientName || '—'}
-                        </Link>
-                      ) : (
-                        <span className="block font-semibold">{contact.clientName || '—'}</span>
-                      )}
-                      <span className="flex flex-wrap items-center gap-1.5">
-                        {contact.document && (
-                          <span className="text-xs text-muted-foreground">{contact.document}</span>
-                        )}
-                        {!contact.hasDevice && (
-                          <span className="modern-badge" title={t('whatsapp.contacts.noDeviceHint')}>
-                            {t('whatsapp.contacts.noDevice')}
-                          </span>
-                        )}
-                        {contact.state === 'blocked' && (
-                          <span className="modern-badge-warning">{t('whatsapp.contacts.stateBlocked')}</span>
-                        )}
-                        {contact.state === 'cancelled' && (
-                          <span className="modern-badge-error">{t('whatsapp.contacts.stateCancelled')}</span>
-                        )}
-                      </span>
-                    </td>
-                    <td className="font-mono">
-                      {contact.contract ?? <span className="font-sans text-muted-foreground">{t('whatsapp.contacts.noContract')}</span>}
-                    </td>
-                    <td>
-                      {contact.phone ? (
-                        <span className="flex flex-wrap items-center gap-1.5">
-                          <span className="font-mono">{contact.phone}</span>
-                          {contact.phoneSource === 'manual' && (
-                            <span className="modern-badge" title={t('whatsapp.contacts.phoneManualHint')}>
-                              {t('whatsapp.contacts.phoneManual')}
-                            </span>
-                          )}
-                          {contact.optedOut && (
-                            <span className="modern-badge-warning" title={t('whatsapp.inbox.optedOutHint')}>
-                              <Icon name="bell" size={12} />
-                              {t('whatsapp.inbox.optedOut')}
-                            </span>
-                          )}
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">{t('whatsapp.contacts.noPhone')}</span>
-                      )}
-                    </td>
-                    <td className="text-sm text-muted-foreground">
-                      {contact.conversationId ? stamp(contact.lastMessageAt) || '—' : '—'}
-                    </td>
-                    <td className="text-end">
-                      {canSend && (contact.conversationId || contact.phone) && (
-                        <button
-                          type="button"
-                          className={contact.conversationId ? 'modern-button-secondary' : 'modern-button'}
-                          disabled={openingContract !== null}
-                          onClick={() => void open(contact)}
-                        >
-                          <Icon
-                            name={openingContract === contact.key ? 'refresh' : 'chat'}
-                            size={16}
-                            className={openingContract === contact.key ? 'animate-spin' : ''}
-                          />
-                          {t(contact.conversationId
-                            ? 'whatsapp.contacts.openConversation'
-                            : 'whatsapp.contacts.startConversation')}
-                        </button>
-                      )}
-                    </td>
+          <>
+            <div className="desktop-table overflow-x-auto">
+              <table className="modern-table">
+                <thead>
+                  <tr>
+                    <th scope="col">{t('whatsapp.inbox.subscriber')}</th>
+                    <th scope="col">{t('whatsapp.inbox.contract')}</th>
+                    <th scope="col">{t('whatsapp.optOut.phone')}</th>
+                    <th scope="col">{t('whatsapp.contacts.lastMessage')}</th>
+                    <th scope="col"><span className="sr-only">{t('whatsapp.contacts.actions')}</span></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {shown.map((contact) => (
+                    <tr key={contact.key} data-contract={contact.contract ?? ''}>
+                      <td>
+                        {nameOf(contact)}
+                        {tagsOf(contact)}
+                      </td>
+                      <td className="font-mono">
+                        {contact.contract ?? <span className="font-sans text-muted-foreground">{t('whatsapp.contacts.noContract')}</span>}
+                      </td>
+                      <td>{phoneOf(contact)}</td>
+                      <td className="text-sm text-muted-foreground">
+                        {contact.conversationId ? stamp(contact.lastMessageAt) || '—' : '—'}
+                      </td>
+                      <td className="text-end">{actionOf(contact)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {/* No celular, um cartão por assinante: a tabela de cinco colunas
+                rolava de lado e o nome virava uma coluna de cinco linhas. */}
+            <ul className="mobile-card-list divide-y divide-border" role="list">
+              {shown.map((contact) => (
+                <li key={contact.key} className="space-y-2 p-4" data-contract={contact.contract ?? ''}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      {nameOf(contact)}
+                      {tagsOf(contact)}
+                    </div>
+                    {contact.contract ? (
+                      <span className="shrink-0 font-mono text-sm">{contact.contract}</span>
+                    ) : (
+                      <span className="shrink-0 text-xs text-muted-foreground">{t('whatsapp.contacts.noContract')}</span>
+                    )}
+                  </div>
+                  <div className="text-sm">{phoneOf(contact)}</div>
+                  {contact.conversationId && contact.lastMessageAt && (
+                    <p className="text-xs text-muted-foreground">
+                      {t('whatsapp.contacts.lastMessage')}: {stamp(contact.lastMessageAt)}
+                    </p>
+                  )}
+                  {actionOf(contact, 'w-full')}
+                </li>
+              ))}
+            </ul>
+          </>
         )}
       </section>
 
@@ -484,7 +521,7 @@ function NewContactModal({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 z-[2100] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="new-contact-title">
-      <div className="modern-card w-full max-w-md p-5 sm:p-6">
+      <div className="modern-card max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto p-5 sm:p-6">
         <h2 id="new-contact-title" className="section-heading mb-1">{t('contacts.profile.new')}</h2>
         <p className="section-description mb-5">{t('contacts.profile.newHint')}</p>
         <div className="grid gap-4">
@@ -504,7 +541,7 @@ function NewContactModal({ onClose }: { onClose: () => void }) {
             </div>
           ))}
         </div>
-        <div className="mt-6 flex justify-end gap-2">
+        <div className="mt-6 flex flex-wrap justify-end gap-2">
           <button type="button" className="modern-button-secondary" onClick={onClose} disabled={saving}>{t('common.cancel')}</button>
           <button type="button" className="modern-button" disabled={saving || !form.name.trim()} onClick={() => void create()}>
             {t('common.save')}
@@ -572,7 +609,7 @@ function ImportSheetModal({ onClose, onApplied }: { onClose: () => void; onAppli
 
   return (
     <div className="fixed inset-0 z-[2100] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="import-sheet-title">
-      <div className="modern-card max-h-[90vh] w-full max-w-2xl overflow-y-auto p-5 sm:p-6" data-testid="import-sheet">
+      <div className="modern-card max-h-[calc(100dvh-2rem)] w-full max-w-2xl overflow-y-auto p-5 sm:p-6" data-testid="import-sheet">
         <h2 id="import-sheet-title" className="section-heading mb-1">{t('contacts.sheet.importTitle')}</h2>
         <p className="section-description mb-5">{t('contacts.sheet.importHint')}</p>
 
@@ -622,7 +659,7 @@ function ImportSheetModal({ onClose, onApplied }: { onClose: () => void; onAppli
           </div>
         )}
 
-        <div className="mt-6 flex justify-end gap-2">
+        <div className="mt-6 flex flex-wrap justify-end gap-2">
           <button type="button" className="modern-button-secondary" onClick={onClose} disabled={busy}>{t('common.cancel')}</button>
           <button
             type="button"
