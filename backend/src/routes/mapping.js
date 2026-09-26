@@ -4,6 +4,8 @@ import { authenticateToken, requirePermission } from '../middleware/auth.js';
 
 const router = express.Router();
 
+router.get('/status', authenticateToken, requirePermission('map.read'), MappingController.liveStatus);
+
 router.get('/geocode', authenticateToken, requirePermission('map.read'), MappingController.searchAddress);
 
 router.get('/nodes', authenticateToken, requirePermission('map.read'), MappingController.getAllNodes);

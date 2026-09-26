@@ -16,6 +16,8 @@ export interface KmlPoint {
   folders: string[]
   lat: number
   lng: number
+  /** `ExtendedData` do Placemark — o painel escreve ali o id e o tipo ao exportar. */
+  data?: Record<string, string>
 }
 
 export interface KmlLine {
@@ -23,6 +25,7 @@ export interface KmlLine {
   description: string
   folders: string[]
   coords: [number, number][]
+  data?: Record<string, string>
 }
 
 export interface ParsedKml {
@@ -39,6 +42,9 @@ export interface ImportNode {
   latitude: number
   longitude: number
   notes: string | null
+  capacity?: number | null
+  splitter?: string | null
+  pppoe?: string | null
 }
 
 export interface ImportEdge {
@@ -149,9 +155,20 @@ export async function readKmlFile(file: Blob & { name?: string }): Promise<strin
  */
 interface XmlNode {
   name: string
+  attrs: Record<string, string>
   parent: XmlNode | null
   children: XmlNode[]
   text: string
+}
+
+const localName = (qualified: string) => qualified.slice(qualified.indexOf(':') + 1)
+
+function parseAttrs(raw: string | undefined): Record<string, string> {
+  const attrs: Record<string, string> = {}
+  if (!raw) return attrs
+  const pattern = /([^\s=]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g
+  for (let m = pattern.exec(raw); m; m = pattern.exec(raw)) attrs[localName(m[1])] = decodeEntities(m[2] ?? m[3] ?? '')
+  return attrs
 }
 
 const ENTITIES: Record<string, string> = { lt: '<', gt: '>', amp: '&', quot: '"', apos: "'", nbsp: ' ' }
@@ -166,21 +183,19 @@ function decodeEntities(value: string): string {
   })
 }
 
-const localName = (qualified: string) => qualified.slice(qualified.indexOf(':') + 1)
-
 function parseXml(text: string): XmlNode {
-  const root: XmlNode = { name: '#document', parent: null, children: [], text: '' }
+  const root: XmlNode = { name: '#document', attrs: {}, parent: null, children: [], text: '' }
   let current = root
   let elements = 0
-  const token = /<!\[CDATA\[([\s\S]*?)\]\]>|<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<!DOCTYPE[^>]*>|<\/([^\s>]+)\s*>|<([^\s/>!?]+)(?:\s+[^>]*?)?(\/?)>|([^<]+)|(<)/gi
+  const token = /<!\[CDATA\[([\s\S]*?)\]\]>|<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<!DOCTYPE[^>]*>|<\/([^\s>]+)\s*>|<([^\s/>!?]+)(\s+[^>]*?)?(\/?)>|([^<]+)|(<)/gi
   for (let m = token.exec(text); m; m = token.exec(text)) {
-    const [, cdata, close, open, selfClose, chars, stray] = m
+    const [, cdata, close, open, rawAttrs, selfClose, chars, stray] = m
     if (stray) throw new Error('kml_invalid')
     if (cdata !== undefined) current.text += cdata
     else if (chars !== undefined) current.text += decodeEntities(chars)
     else if (open) {
       elements += 1
-      const node: XmlNode = { name: localName(open), parent: current, children: [], text: '' }
+      const node: XmlNode = { name: localName(open), attrs: parseAttrs(rawAttrs), parent: current, children: [], text: '' }
       current.children.push(node)
       if (!selfClose) current = node
     } else if (close) {
@@ -244,17 +259,24 @@ export function parseKml(text: string): ParsedKml {
         if (folderName) folders.unshift(folderName)
       }
     }
+    const data: Record<string, string> = {}
+    for (const field of descendants(placemark, 'Data')) {
+      if (field.attrs.name) data[field.attrs.name] = childText(field, 'value')
+    }
+    for (const field of descendants(placemark, 'SimpleData')) {
+      if (field.attrs.name) data[field.attrs.name] = textOf(field)
+    }
     let used = false
     for (const point of descendants(placemark, 'Point')) {
       const [coord] = parseCoordinates(textOf(descendants(point, 'coordinates')[0]))
       if (!coord) continue
-      result.points.push({ name, description, folders, lat: coord[0], lng: coord[1] })
+      result.points.push({ name, description, folders, lat: coord[0], lng: coord[1], data })
       used = true
     }
     for (const line of descendants(placemark, 'LineString')) {
       const coords = parseCoordinates(textOf(descendants(line, 'coordinates')[0]))
       if (coords.length < 2) continue
-      result.lines.push({ name, description, folders, coords })
+      result.lines.push({ name, description, folders, coords, data })
       used = true
     }
     if (!used) result.ignored += 1
@@ -335,6 +357,10 @@ export function guessFiberType(texts: string[], fallback: ImportFiberType): Impo
   return fallback
 }
 
+const VALID_ID = /^[A-Za-z0-9._:-]{1,128}$/
+const NODE_TYPE_SET = new Set<string>(['htb', 'olt', 'odc', 'odp', 'ont', 'server'])
+const FIBER_TYPE_SET = new Set<string>(['backbone', 'feeder', 'distribution', 'drop', 'patch'])
+
 const insideBrazil = (lat: number, lng: number) => lat >= -34 && lat <= 6 && lng >= -74.5 && lng <= -28
 
 const round6 = (n: number) => Math.round(n * 1e6) / 1e6
@@ -349,15 +375,32 @@ export function buildImportPlan(parsed: ParsedKml, options: BuildOptions): Impor
   let snappedEnds = 0
   let outsideBrazil = 0
 
-  const addNode = (name: string, lat: number, lng: number, type: ImportNodeType, notes: string | null) => {
+  // Ids que vieram no arquivo (exportado pelo painel). Um id que já está no
+  // mapa é mantido de propósito: o servidor pula o que existe, e é isso que
+  // faz reimportar o mesmo arquivo não duplicar nada.
+  const fileNodeIds = new Set<string>()
+  const fileEdgeIds = new Set<string>()
+  const takeId = (wanted: string | undefined, fromFile: Set<string>, all: Set<string>) => {
+    if (!wanted || !VALID_ID.test(wanted) || fromFile.has(wanted)) return null
+    fromFile.add(wanted)
+    all.add(wanted)
+    return wanted
+  }
+
+  const addNode = (
+    name: string, lat: number, lng: number, type: ImportNodeType, notes: string | null,
+    extra: Partial<Pick<ImportNode, 'capacity' | 'splitter' | 'pppoe'>> & { id?: string } = {}
+  ) => {
     if (!insideBrazil(lat, lng)) outsideBrazil += 1
+    const { id, ...fields } = extra
     const node: ImportNode = {
-      node_id: uniqueId(slugify(name, 'ponto'), nodeIds),
+      node_id: takeId(id, fileNodeIds, nodeIds) ?? uniqueId(slugify(name, 'ponto'), nodeIds),
       type,
       name: (name || 'Ponto').slice(0, 255),
       latitude: round6(lat),
       longitude: round6(lng),
-      notes: notes ? notes.slice(0, 5000) : null
+      notes: notes ? notes.slice(0, 5000) : null,
+      ...fields
     }
     nodes.push(node)
     snapTargets.push(node)
@@ -366,7 +409,15 @@ export function buildImportPlan(parsed: ParsedKml, options: BuildOptions): Impor
 
   parsed.points.forEach((point, index) => {
     const name = point.name || `Ponto ${index + 1}`
-    addNode(name, point.lat, point.lng, guessNodeType([point.name, ...point.folders], options.defaultType), point.description || null)
+    const data = point.data ?? {}
+    const type = NODE_TYPE_SET.has(data.type) ? data.type as ImportNodeType : guessNodeType([point.name, ...point.folders], options.defaultType)
+    const capacity = Number.parseInt(data.capacity ?? '', 10)
+    addNode(name, point.lat, point.lng, type, point.description || null, {
+      id: data.node_id,
+      capacity: Number.isInteger(capacity) && capacity >= 0 ? capacity : null,
+      splitter: data.splitter ? data.splitter.slice(0, 64) : null,
+      pppoe: data.pppoe ? data.pppoe.slice(0, 255) : null
+    })
   })
 
   const nearest = (coord: [number, number], exclude?: string) => {
@@ -390,16 +441,21 @@ export function buildImportPlan(parsed: ParsedKml, options: BuildOptions): Impor
       endpointNodes += 1
       return addNode(options.endpointName(lineName, end), coord[0], coord[1], options.defaultType, null).node_id
     }
-    const source = endpoint(first, 'start')
+    const data = line.data ?? {}
+    // As pontas nomeadas no arquivo valem quando o ponto existe (no mapa ou
+    // no arquivo); senão, a ponta procura o ponto mais próximo, como sempre.
+    const named = (id: string | undefined) => (id && nodeIds.has(id) ? id : null)
+    const source = named(data.source) ?? endpoint(first, 'start')
     // Cabo fechado (volta ao mesmo ponto) não pode ligar um ponto a ele mesmo.
-    const target = endpoint(last, 'end', source)
+    const namedTarget = named(data.target)
+    const target = namedTarget && namedTarget !== source ? namedTarget : endpoint(last, 'end', source)
     const length = Math.round(pathLength(line.coords))
     const middle = line.coords.slice(1, -1).map(([lat, lng]) => [round6(lat), round6(lng)] as [number, number])
     edges.push({
-      edge_id: uniqueId(slugify(lineName, 'cabo'), edgeIds),
+      edge_id: takeId(data.edge_id, fileEdgeIds, edgeIds) ?? uniqueId(slugify(lineName, 'cabo'), edgeIds),
       source,
       target,
-      fiber_type: guessFiberType([line.name, ...line.folders], options.fiberType),
+      fiber_type: FIBER_TYPE_SET.has(data.fiber_type) ? data.fiber_type as ImportFiberType : guessFiberType([line.name, ...line.folders], options.fiberType),
       distance: length > 0 && length <= 1_000_000 ? length : null,
       waypoints: middle.length ? simplifyWaypoints(middle) : null,
       notes: line.description ? line.description.slice(0, 5000) : null

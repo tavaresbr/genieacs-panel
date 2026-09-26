@@ -1775,6 +1775,46 @@ class DeviceService {
   }
 
   /**
+   * A frota do jeito que o mapa da rede precisa: login PPPoE, se está online
+   * e o sinal óptico de cada equipamento — nada mais. É o que pinta os pontos
+   * da Topologia que têm PPPoE cadastrado.
+   *
+   * Uma consulta só, com projeção, como a telemetria; o prazo é o mesmo da
+   * sincronização de IDs, porque é a frota inteira numa resposta.
+   */
+  static async getMapStatusFleet() {
+    const virtualParams = await this.getVirtualParameters();
+    const learnedRxPaths = (await this.readRxPowerState())?.paths ?? [];
+    const projection = [
+      '_id',
+      '_lastInform',
+      virtualParams.vpPppoeUsername,
+      virtualParams.vpRxPower,
+      ...PPPOE_FALLBACK_PATHS,
+      ...await this.readPppoePaths(),
+      ...RX_POWER_FALLBACK_PATHS,
+      ...learnedRxPaths
+    ].filter(Boolean);
+    const data = await this.fetchFromGenieAcs('', { projection: [...new Set(projection)].join(',') }, 'GET', null, {
+      timeoutMs: this.CUSTOMER_IDENTITY_TIMEOUT_MS
+    });
+    if (!Array.isArray(data)) {
+      throw new Error('Invalid GenieACS map status response');
+    }
+    const now = Date.now();
+    return data.map((item) => {
+      const rx = Number(this.resolveRxPower(item, virtualParams, learnedRxPaths).value);
+      return {
+        deviceId: item._id || null,
+        lastInform: item._lastInform || null,
+        online: this.isDeviceOnline(item, now),
+        pppoe: this.resolvePppoeUsername(item, virtualParams).value,
+        rxPower: Number.isFinite(rx) && rx !== 0 ? rx : null
+      };
+    });
+  }
+
+  /**
    * The PPPoE login one ONT reports, and nothing else.
    *
    * For a caller that holds a device id and needs the subscriber's login

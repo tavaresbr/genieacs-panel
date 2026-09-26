@@ -36,6 +36,10 @@ router.put('/genieacs-auth', authenticateToken, requirePermission('settings.writ
 router.get('/onboarding', authenticateToken, requirePermission('settings.read'), SettingsController.getOnboardingStatus);
 router.post('/onboarding/dismiss', authenticateToken, requirePermission('settings.write'), SettingsController.dismissOnboarding);
 
+// Como está a sincronização de IDs de cliente. Antes de `/:key`, pela mesma
+// razão das rotas acima.
+router.get('/customer-id-sync', authenticateToken, requirePermission('settings.read'), SettingsController.customerIdSyncStatus);
+
 router.get('/:key', authenticateToken, requirePermission('settings.read'), SettingsController.getSettingByKey);
 
 router.post('/', authenticateToken, requirePermission('settings.write'), SettingsController.createSetting);

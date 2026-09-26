@@ -278,6 +278,8 @@ export default {
   'mapping.resetFailed': 'Non è stato possibile azzerare i dati della mappa',
   'mapping.imported': "Importazione completata: {nodes} punto/i e {edges} cavo/i aggiunti",
   'mapping.importFailed': "Impossibile importare i dati della mappa",
+  'mapping.statusReady': "Stato della rete ottenuto",
+  'mapping.statusFailed': "Impossibile leggere lo stato dei dispositivi in questo momento",
   'mapping.searchTooShort': "Digita almeno 3 caratteri per cercare.",
   'mapping.searchDone': "Ricerca completata",
   'mapping.searchFailed': "Impossibile cercare l'indirizzo in questo momento. Riprova tra poco.",

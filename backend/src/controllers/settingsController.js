@@ -268,7 +268,13 @@ class SettingsController {
 
   static async getAllSettings(req, res) {
     try {
-      const settings = await Setting.getAll();
+      // Só as chaves que esta rota também grava. A tabela guarda estado
+      // interno (`onboardingWizardDoneAt`, `deviceScopeTag`…), e a tela de
+      // configurações regrava tudo o que lê: uma chave interna na lista virava
+      // um PUT recusado ("chave não suportada") que interrompia o salvar no
+      // meio — antes de chegar à geração de IDs, que vai por último.
+      const all = await Setting.getAll();
+      const settings = Object.fromEntries(Object.entries(all).filter(([key]) => ALLOWED_SETTING_KEYS.has(key)));
       return res.json(
         createResponse(req.t('settings.listRetrieved'), settings)
       );
@@ -404,6 +410,31 @@ class SettingsController {
       return res.status(500).json(
         createErrorResponse(req.t('settings.updateFailed'), error.message)
       );
+    }
+  }
+
+  /**
+   * Como está a sincronização de IDs de cliente: ligada ou não, se há uma
+   * passada em curso e como terminou a última — com o motivo traduzido,
+   * quando falhou.
+   */
+  static async customerIdSyncStatus(req, res) {
+    try {
+      const enabled = await CustomerService.isAutoGenerationEnabled();
+      const status = await CustomerIdSyncJob.status(currentTenantId() ?? 'default');
+      const last = status.last && !status.last.ok
+        ? {
+            ...status.last,
+            message: req.t(
+              status.last.reasonKey || 'settings.customerIdSyncFailed',
+              status.last.status ? { status: status.last.status } : undefined
+            )
+          }
+        : status.last;
+      return res.json(createResponse(req.t('settings.listRetrieved'), { enabled, ...status, last }));
+    } catch (error) {
+      console.error('Customer ID sync status error:', error);
+      return res.status(500).json(createErrorResponse(req.t('common.internalError'), error.message));
     }
   }
 
