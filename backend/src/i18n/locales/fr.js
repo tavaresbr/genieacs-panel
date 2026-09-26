@@ -681,7 +681,7 @@ export default {
   'auth.signupInvalid': 'Le nom du fournisseur, l\'identifiant (3–64) et le mot de passe (8–128) sont requis',
   'auth.signupSlugTaken': 'Ce sous-domaine est déjà pris',
   'auth.signupUsernameTaken': 'Cet identifiant est déjà pris',
-  'auth.impersonationReadOnly': 'Ceci est une session d\'assistance en lecture seule. Rien ne peut y être modifié.',
+  'auth.impersonationReadOnly': 'Dans une session d\'assistance, les actions du compte (déconnexion, mot de passe, double authentification) ne sont pas disponibles.',
   'auth.impersonationTicketRequired': 'Le ticket d\'usurpation est obligatoire',
   'auth.impersonationTicketInvalid': 'Ce lien d\'usurpation n\'est plus valide. Générez-en un autre depuis la console.',
   'auth.impersonationStarted': 'Session d\'assistance démarrée',

@@ -2347,7 +2347,7 @@ const hi: Dictionary = {
   'impersonate.failed': 'यह लिंक अब मान्य नहीं है। कंसोल से नया बनाएँ।',
   'impersonate.missing': 'इस पते में कोई टिकट नहीं है।',
   'impersonate.bannerTitle': 'सहायता सत्र।',
-  'impersonate.bannerText': 'आप {operator} के रूप में {provider} को केवल-पढ़ने के लिए देख रहे हैं।',
+  'impersonate.bannerText': 'आप {provider} के पैनल में {operator} के रूप में हैं। हर बदलाव प्रदाता के लॉग में प्लेटफ़ॉर्म के नाम से दर्ज होता है।',
   'impersonate.leave': 'बाहर निकलें',
   'platform.impersonate': 'पैनल खोलें',
   'platform.impersonateConfirm': 'क्या {provider} के पैनल में केवल-पढ़ने वाला सहायता सत्र खोलें? यह उस प्रदाता के अपने ऑडिट रिकॉर्ड में दर्ज होता है।',

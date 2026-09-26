@@ -2345,7 +2345,7 @@ const it: Dictionary = {
   'impersonate.failed': 'Questo link non è più valido. Generane un altro dalla console.',
   'impersonate.missing': 'Questo indirizzo non porta alcun ticket.',
   'impersonate.bannerTitle': 'Sessione di assistenza.',
-  'impersonate.bannerText': 'Stai guardando {provider} come {operator}, in sola lettura.',
+  'impersonate.bannerText': 'Sei nel pannello di {provider} come {operator}. Ogni modifica viene registrata nel registro del provider a nome della piattaforma.',
   'impersonate.leave': 'Esci',
   'platform.impersonate': 'Apri il pannello',
   'platform.impersonateConfirm': 'Aprire una sessione di assistenza in sola lettura nel pannello di {provider}? Resta registrata nel registro del provider stesso.',

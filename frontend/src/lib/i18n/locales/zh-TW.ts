@@ -2340,7 +2340,7 @@ const zhTW: Dictionary = {
   'impersonate.failed': '此連結已失效，請在主控台重新產生。',
   'impersonate.missing': '此位址不含憑證。',
   'impersonate.bannerTitle': '支援工作階段。',
-  'impersonate.bannerText': '您正以 {operator} 的身分唯讀檢視 {provider}。',
+  'impersonate.bannerText': '您正以 {operator} 身分在 {provider} 的面板中。所有變更都會以平台名義記錄在該供應商的稽核紀錄中。',
   'impersonate.leave': '離開',
   'platform.impersonate': '開啟面板',
   'platform.impersonateConfirm': '要在 {provider} 的面板中開啟唯讀支援工作階段嗎？此操作會記入該業者自己的稽核紀錄。',

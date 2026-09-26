@@ -2346,7 +2346,7 @@ const ko: Dictionary = {
   'impersonate.failed': '이 링크는 더 이상 유효하지 않습니다. 콘솔에서 새로 발급하세요.',
   'impersonate.missing': '이 주소에는 티켓이 없습니다.',
   'impersonate.bannerTitle': '지원 세션.',
-  'impersonate.bannerText': '{operator}(으)로 {provider}를 읽기 전용으로 보고 있습니다.',
+  'impersonate.bannerText': '{operator}(으)로 {provider}의 패널에 있습니다. 모든 변경은 플랫폼 명의로 공급자의 감사 기록에 남습니다.',
   'impersonate.leave': '나가기',
   'platform.impersonate': '패널 열기',
   'platform.impersonateConfirm': '{provider} 패널에서 읽기 전용 지원 세션을 열까요? 해당 사업자의 감사 기록에 남습니다.',

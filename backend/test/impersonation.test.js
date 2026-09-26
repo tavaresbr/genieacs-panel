@@ -213,7 +213,7 @@ describe('cunhar o bilhete', () => {
 });
 
 describe('resgatar o bilhete', () => {
-  it('vira uma sessão de leitura e deixa na trilha DO PROVEDOR que entraram', async () => {
+  it('vira uma sessão de atendimento (admin) e deixa na trilha DO PROVEDOR que entraram', async () => {
     const minted = await noConsole(`/api/platform/tenants/${beta}/impersonate`, {
       method: 'POST', headers: bearer(plataformaToken)
     });
@@ -223,7 +223,7 @@ describe('resgatar o bilhete', () => {
       method: 'POST', body: { ticket }
     });
     assert.equal(status, 200, JSON.stringify(body));
-    assert.equal(body.data.user.role, 'viewer');
+    assert.equal(body.data.user.role, 'admin');
     assert.equal(body.data.user.tenantId, beta);
     assert.equal(body.data.user.impersonation.platformUsername, 'plataforma');
     // Falso mesmo sendo a pessoa do cadastro: dentro da personificação o
@@ -308,28 +308,37 @@ describe('a sessão de personificação', () => {
     const token = await personificar();
     const { status, body } = await noBeta('/api/auth/user', { headers: bearer(token) });
     assert.equal(status, 200);
-    assert.equal(body.data.role, 'viewer');
+    assert.equal(body.data.role, 'admin');
     assert.equal(body.data.tenantId, beta);
     assert.equal(body.data.impersonation.platformUsername, 'plataforma');
     assert.equal(body.data.isPlatformAdmin, false);
   });
 
-  it('não escreve nada, em rota nenhuma', async () => {
+  it('escreve no painel do provedor, e a trilha dele diz que foi a plataforma', async () => {
     const token = await personificar();
-    for (const [method, path, body] of [
-      ['PATCH', '/api/tenant', { name: 'Renomeado à revelia' }],
-      ['POST', '/api/users', { username: 'intruso', email: 'intruso@exemplo.test', password: 'senha-intrusa-1', role: 'admin' }],
-      ['PUT', '/api/settings/genieAcsUrl', { value: 'http://trocado.exemplo' }],
-      ['POST', '/api/invites', { role: 'admin' }],
-      ['DELETE', '/api/settings/genieAcsUrl']
-    ]) {
-      const res = await noBeta(path, { method, headers: bearer(token), body });
-      assert.equal(res.status, 403, `${method} ${path}: ${JSON.stringify(res.body)}`);
-      assert.equal(res.body.code, 'impersonation_read_only', `${method} ${path}`);
-    }
-    // E o nome do provedor continua o que era.
+    const res = await noBeta('/api/tenant', { method: 'PATCH', headers: bearer(token), body: { name: 'Beta via atendimento' } });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
     const { body } = await noBeta('/api/tenant/public');
-    assert.equal(body.data.name, 'Provedor Beta');
+    assert.equal(body.data.name, 'Beta via atendimento');
+
+    const linha = await runInTenant(beta, () => getDb()('audit_log')
+      .where({ tenant_id: beta, action: 'tenant.renamed' })
+      .orderBy('id', 'desc').first());
+    assert.ok(linha, 'a escrita do atendimento não deixou linha na trilha do provedor');
+    assert.equal(linha.actor_kind, 'platform');
+    assert.equal(linha.actor_username, 'plataforma');
+
+    // Devolve o nome, que outros casos leem.
+    await noBeta('/api/tenant', { method: 'PATCH', headers: bearer(token), body: { name: 'Provedor Beta' } });
+  });
+
+  it('não mexe na conta de quem personifica', async () => {
+    const token = await personificar();
+    const res = await noBeta('/api/auth/change-password', {
+      method: 'POST', headers: bearer(token), body: { currentPassword: 'x', newPassword: 'outra-senha-123' }
+    });
+    assert.equal(res.status, 403, JSON.stringify(res.body));
+    assert.equal(res.body.code, 'impersonation_read_only');
   });
 
   // ───────────────────────────────────────────────────────────────────────
@@ -353,7 +362,7 @@ describe('a sessão de personificação', () => {
   // `hydrateImpersonation` produz.
   // ───────────────────────────────────────────────────────────────────────
   const SESSAO_PERSONIFICANDO = () => ({
-    userId: plataformaUserId, username: 'plataforma', role: 'viewer',
+    userId: plataformaUserId, username: 'plataforma', role: 'admin',
     impersonation: { platformUsername: 'plataforma' }
   });
   const SESSAO_DO_PROVEDOR = () => ({

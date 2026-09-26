@@ -2339,7 +2339,7 @@ const ptBR: Dictionary = {
   'impersonate.failed': 'Este link não vale mais. Gere outro pelo console.',
   'impersonate.missing': 'Este endereço não traz bilhete nenhum.',
   'impersonate.bannerTitle': 'Sessão de atendimento.',
-  'impersonate.bannerText': 'Você está olhando o {provider} como {operator}, só de leitura.',
+  'impersonate.bannerText': 'Você está no painel de {provider} como {operator}. Tudo o que for alterado fica na trilha do provedor em nome da plataforma.',
   'impersonate.leave': 'Sair',
   'platform.impersonate': 'Abrir o painel',
   'platform.impersonateConfirm': 'Abrir uma sessão de atendimento, só de leitura, no painel do {provider}? Fica registrada na trilha do próprio provedor.',

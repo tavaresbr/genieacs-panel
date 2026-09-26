@@ -27,6 +27,7 @@ delete process.env.PORTAL_BASE_DOMAIN;
 
 const { getDb, startTestServers, stopTestServers } = await import('./helpers/harness.js');
 const { runInTenant } = await import('../src/config/tenantContext.js');
+const { default: Subscription } = await import('../src/models/Subscription.js');
 
 function call(url, { method = 'GET', headers = {}, body } = {}) {
   const target = new URL(url);
@@ -88,6 +89,10 @@ before(async () => {
   await db('tenants').insert({ slug: 'segundo', name: 'Provedor Segundo', status: 'active' });
   segundo = (await db('tenants').where({ slug: 'segundo' }).first()).id;
   assert.notEqual(primeiro, segundo);
+  // Com assinatura em dia: o atendimento escreve, e a porta da assinatura
+  // recusaria a escrita de um provedor sem plano antes de ela chegar.
+  const plano = await db('plans').orderBy('id', 'asc').first();
+  await runInTenant(segundo, () => Subscription.upsertForTenant(segundo, { plan_id: plano.id, status: 'active' }));
 
   const setup = await api('/api/auth/setup', {
     method: 'POST',
@@ -111,7 +116,7 @@ describe('personificar num deploy de host único', () => {
 
     assert.equal(status, 200, JSON.stringify(body));
     assert.equal(body.data.user.tenantId, segundo);
-    assert.equal(body.data.user.role, 'viewer');
+    assert.equal(body.data.user.role, 'admin');
     assert.equal(body.data.tenant.slug, 'segundo');
   });
 
@@ -163,16 +168,20 @@ describe('personificar num deploy de host único', () => {
     assert.equal(body.data.user.tenantId, primeiro);
   });
 
-  it('continua sendo só leitura, e continua servindo uma vez só', async () => {
+  it('escreve no provedor do BILHETE, não no do endereço, e continua servindo uma vez só', async () => {
     const ticket = await bilhetePara(segundo);
     const aberta = await api('/api/auth/impersonate/redeem', { method: 'POST', body: { ticket } });
     const token = aberta.body.data.token;
 
-    const escrita = await api('/api/settings/appName', {
-      method: 'PUT', headers: bearer(token), body: { value: 'nome novo' }
+    const nomePrimeiro = (await getDb()('tenants').where({ id: primeiro }).first()).name;
+    const escrita = await api('/api/tenant', {
+      method: 'PATCH', headers: bearer(token), body: { name: 'Segundo pelo atendimento' }
     });
-    assert.equal(escrita.status, 403);
-    assert.equal(escrita.body.code, 'impersonation_read_only');
+    assert.equal(escrita.status, 200, JSON.stringify(escrita.body));
+    assert.equal((await getDb()('tenants').where({ id: segundo }).first()).name, 'Segundo pelo atendimento');
+    assert.equal((await getDb()('tenants').where({ id: primeiro }).first()).name, nomePrimeiro,
+      'a escrita caiu no provedor do endereço');
+    await getDb()('tenants').where({ id: segundo }).update({ name: 'Provedor Segundo' });
 
     assert.equal((await api('/api/auth/impersonate/redeem', { method: 'POST', body: { ticket } })).status, 404);
   });

@@ -140,7 +140,7 @@ function verifyToken(token) {
 /**
  * O token de uma personificação. Só o de acesso: não existe refresh.
  *
- * `role: 'viewer'` está escrito aqui e é reafirmado na hidratação, que não lê
+ * `role` (`IMPERSONATION_ROLE`) está escrito aqui e é reafirmado na hidratação, que não lê
  * o papel do token. Os dois de propósito: o que está no token é o registro do
  * que a sessão era, e o que a hidratação impõe é o que ela pode. Um token
  * forjado com `role: 'owner'` — que exigiria a chave, mas ainda assim — não
@@ -150,6 +150,18 @@ function verifyToken(token) {
  * sessão dessa pessoa que está aberta, e trocar a senha dela tem que derrubá-la
  * aqui como derruba em qualquer outro lugar.
  */
+/**
+ * O papel de uma sessão de atendimento: `admin`, o conjunto inteiro do painel.
+ *
+ * Era `viewer`, e a sessão não abria nem o detalhe de um equipamento (a
+ * capacidade `devices.inspect` é do plantão para cima). A plataforma atende o
+ * provedor mexendo no painel dele — WiFi, PPPoE, reinício —, e decidiu que o
+ * atendimento faz isso. O que continua garantindo que o cliente saiba quem foi
+ * é a trilha: toda escrita de uma personificação entra no `audit_log` do
+ * provedor com `actorKind: 'platform'` e o usuário da plataforma.
+ */
+const IMPERSONATION_ROLE = 'admin';
+
 function generateImpersonationToken(platformUser, tenantId) {
   const id = Number(tenantId);
   if (!Number.isInteger(id) || id <= 0) {
@@ -160,7 +172,7 @@ function generateImpersonationToken(platformUser, tenantId) {
       userId: platformUser.id,
       username: platformUser.username,
       tenantId: id,
-      role: 'viewer',
+      role: IMPERSONATION_ROLE,
       impersonation: true,
       tokenVersion: Number(platformUser.token_version || 0)
     },
@@ -403,7 +415,7 @@ async function hydrateConsole(user) {
  * - **a linha do provedor**, porque um provedor apagado no meio de um
  *   atendimento não pode continuar sendo lido por um token que o nomeia.
  *
- * E o papel é imposto aqui, `viewer`, sem olhar o token. Ver `requireReadOnly`
+ * E o papel é imposto aqui, `IMPERSONATION_ROLE`, sem olhar o token. Ver `impersonationRefusal`
  * logo abaixo para o segundo muro.
  */
 async function hydrateImpersonation(user, decoded) {
@@ -416,7 +428,7 @@ async function hydrateImpersonation(user, decoded) {
   return {
     userId: user.id,
     username: user.username,
-    role: 'viewer',
+    role: IMPERSONATION_ROLE,
     tenantId,
     tokenVersion: Number(user.token_version || 0),
     // O que a tela mostra na faixa, o que a trilha nomeia, e o que as guardas
@@ -586,29 +598,27 @@ function tokenMatchesHost(req, session) {
 const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 /**
- * Personificar é OLHAR. A recusa da escrita, ou null.
+ * O que uma sessão de atendimento NÃO escreve, ou null.
  *
- * O papel `viewer` que a hidratação impõe já barraria quase tudo, porque quase
- * toda rota de escrita pede uma capacidade que o `viewer` não tem. Quase não
- * serve: a lista do que o `viewer` alcança muda quando alguém acrescenta uma
- * capacidade a ele, e uma rota nova que esqueça o `requirePermission` não é
- * barrada por papel nenhum. Este muro é por MÉTODO, acima de toda rota, e não
- * depende de a matriz continuar sendo o que é hoje.
+ * Personificar era só olhar, e este muro recusava toda escrita. A plataforma
+ * passou a atender mexendo no painel do cliente — com o papel `admin` e cada
+ * escrita assinada na trilha do provedor como `actorKind: 'platform'` —, então
+ * o muro encolheu para o que nunca é do provedor: as rotas da conta.
  *
- * E a razão de existir é anterior à segurança do dado: uma escrita feita numa
- * personificação aparece no painel do cliente como coisa que o cliente fez.
- * Um atendimento não pode produzir isso. Quando um cliente precisa que a gente
- * mexa em algo, o caminho é ele pedir e alguém da equipe DELE fazer — ou o
- * console, que age em nome da plataforma e assina como tal.
- *
- * O `POST /api/auth/logout` é o caso que mostra o muro trabalhando: ele
- * incrementa o `token_version` da pessoa, e a pessoa aqui é quem personifica.
- * Sem esta recusa, "sair" de uma personificação derrubaria as sessões dessa
- * pessoa em todo o deploy.
+ * O `POST /api/auth/logout` é o caso que mostra por quê: ele incrementa o
+ * `token_version` da pessoa, e a pessoa aqui é quem personifica. Sem esta
+ * recusa, "sair" de uma personificação derrubaria as sessões dessa pessoa em
+ * todo o deploy.
  */
 function impersonationRefusal(req, session) {
   if (!session.impersonation) return null;
   if (READ_METHODS.has(req.method)) return null;
+  // Só as rotas da CONTA ficam de fora. Nelas "quem" é a pessoa que
+  // personifica, não o provedor: sair incrementaria o `token_version` dela e
+  // derrubaria as sessões dela em todo o deploy; trocar senha ou segundo fator
+  // mexeria na conta da plataforma a partir do painel de um cliente.
+  const caminho = String(req.originalUrl || req.url || '').split('?')[0];
+  if (!caminho.startsWith('/api/auth/')) return null;
   return {
     success: false,
     message: req.t('auth.impersonationReadOnly'),

@@ -110,9 +110,10 @@ class PlatformController {
    * JWT no query string entra em log de proxy e em histórico; um cookie no
    * domínio-pai desfaz a garantia host-only que a Fase 2 conquistou.
    *
-   * A sessão que o bilhete vai produzir é de LEITURA, sempre — ver
-   * `impersonationRefusal` em `middleware/auth.js` para por que a escrita fica
-   * de fora, que é uma razão de produto antes de ser de segurança.
+   * A sessão que o bilhete vai produzir entra como `admin` e pode escrever;
+   * cada escrita fica na trilha do provedor assinada pela plataforma. Só as
+   * rotas da conta ficam de fora — ver `impersonationRefusal` em
+   * `middleware/auth.js`.
    *
    * Escrita aqui em `platform_audit`, que é a nossa trilha: registra quem
    * pediu para olhar o painel de quem. Que a sessão tenha realmente começado

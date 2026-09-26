@@ -2339,7 +2339,7 @@ const es: Dictionary = {
   'impersonate.failed': 'Este enlace ya no es válido. Genere otro desde la consola.',
   'impersonate.missing': 'Esta dirección no trae ningún tique.',
   'impersonate.bannerTitle': 'Sesión de soporte.',
-  'impersonate.bannerText': 'Está viendo {provider} como {operator}, solo de lectura.',
+  'impersonate.bannerText': 'Está en el panel de {provider} como {operator}. Todo cambio queda en el registro del proveedor a nombre de la plataforma.',
   'impersonate.leave': 'Salir',
   'platform.impersonate': 'Abrir el panel',
   'platform.impersonateConfirm': '¿Abrir una sesión de soporte, solo de lectura, en el panel de {provider}? Queda registrada en el registro del propio proveedor.',

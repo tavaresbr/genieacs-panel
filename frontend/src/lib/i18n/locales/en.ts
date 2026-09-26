@@ -2341,7 +2341,7 @@ const en = {
   'impersonate.failed': 'This link is no longer valid. Start a new one from the console.',
   'impersonate.missing': 'This address carries no ticket.',
   'impersonate.bannerTitle': 'Support session.',
-  'impersonate.bannerText': 'You are looking at {provider} as {operator}, read-only.',
+  'impersonate.bannerText': 'You are in {provider}\'s panel as {operator}. Every change is recorded in the provider\'s audit trail on behalf of the platform.',
   'impersonate.leave': 'Leave',
   'platform.impersonate': 'Open the panel',
   'platform.impersonateConfirm': 'Open a read-only support session in the panel of {provider}? It is recorded in this provider\'s own audit trail.',
