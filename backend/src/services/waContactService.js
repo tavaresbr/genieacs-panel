@@ -2,7 +2,7 @@ import WaConversation from '../models/WaConversation.js';
 import WaOptOut from '../models/WaOptOut.js';
 import SgpLink from '../models/SgpLink.js';
 import SgpContact from '../models/SgpContact.js';
-import ContactProfileService from './contactProfileService.js';
+import ContactProfileService, { whatsappPhoneOf } from './contactProfileService.js';
 import SgpService from './sgpService.js';
 import WhatsAppAccount from '../models/WhatsAppAccount.js';
 import CustomerAccount from '../models/CustomerAccount.js';
@@ -199,10 +199,14 @@ class WaContactService {
       return contact ? this.subscriberFromContact(contact) : null;
     }
     const links = await SgpLink.getByContract(key);
-    if (links.length > 0) {
-      return { ...WaBillingService.subscribersFrom(links)[0], contactId: null, state: links[0].state || 'unknown' };
-    }
     const contact = await SgpContact.getByContract(key);
+    if (links.length > 0) {
+      const subscriber = { ...WaBillingService.subscribersFrom(links)[0], contactId: null, state: links[0].state || 'unknown' };
+      // The ONT's row often has no phone while the contacts sync brought the
+      // contract's number (or the client record corrected it): the number is
+      // the one the client record shows (`whatsappPhoneOf`).
+      return { ...subscriber, ...whatsappPhoneOf(links[0], contact) };
+    }
     return contact ? this.subscriberFromContact(contact) : null;
   }
 

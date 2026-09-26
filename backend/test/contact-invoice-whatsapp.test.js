@@ -95,6 +95,11 @@ before(async () => {
     enabled: true, baseUrl: sgpUrl, app: APP, token: TOKEN, linkMode: 'manual', contactsPageSize: 10
   }));
   await asTenant(() => SgpContactSyncService.syncAll());
+  // O contrato 329 também tem ONT, e a linha da ONT não tem telefone: o número
+  // é o que a sincronização de contatos trouxe, o mesmo que a ficha mostra.
+  await asTenant(() => getDb()('sgp_links').insert({
+    device_id: 'ONT-329', contract: '329', client_name: 'ELANE PATRIQUI', state: 'active', link_mode: 'auto'
+  }));
   await asTenant(() => WhatsAppAccount.create({
     name: INSTANCE,
     purpose: 'support',
@@ -142,6 +147,16 @@ describe('a prévia do boleto', () => {
     assert.equal(outro.body.code, 'invoice_not_found');
     const nenhum = await prever('329', 'NAO-EXISTE');
     assert.equal(nenhum.status, 404);
+  });
+});
+
+describe('a conversa pela ficha', () => {
+  it('um contrato com ONT sem telefone abre a conversa pelo número da ficha', async () => {
+    const ficha = await call(`${panelUrl}/api/contacts/329`, { headers: authHeaders(token) });
+    assert.equal(ficha.body.data.whatsappPhone, '5593988519934');
+    const res = await call(`${panelUrl}/api/whatsapp/contacts/329/conversation`, { method: 'POST', headers: authHeaders(token) });
+    assert.ok([200, 201].includes(res.status), JSON.stringify(res.body));
+    assert.equal(res.body.data.waPhoneE164, '5593988519934');
   });
 });
 
