@@ -1692,6 +1692,8 @@ const ja: Dictionary = {
   'whatsapp.actions.delete': '削除',
   'whatsapp.inbox.title': '会話',
   'whatsapp.health.title': '動いていますか？',
+  'whatsapp.health.bellLabel': '警告 {count} 件',
+  'whatsapp.health.allGood': '問題ありません',
   'whatsapp.health.connected': '{total} 件中 {connected} 件の番号が接続中',
   'whatsapp.health.noNumbers': '接続中の番号がありません。送受信はできません',
   'whatsapp.health.queued': '{count} 件が送信待ち',

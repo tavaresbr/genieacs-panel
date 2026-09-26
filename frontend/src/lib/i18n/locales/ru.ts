@@ -1700,6 +1700,8 @@ const ru: Dictionary = {
   'whatsapp.actions.delete': 'Удалить',
   'whatsapp.inbox.title': 'Диалоги',
   'whatsapp.health.title': 'Работает ли интеграция?',
+  'whatsapp.health.bellLabel': 'Предупреждений: {count}',
+  'whatsapp.health.allGood': 'Всё в порядке',
   'whatsapp.health.connected': 'подключено номеров: {connected} из {total}',
   'whatsapp.health.noNumbers': 'Нет подключённых номеров — отправка и приём невозможны',
   'whatsapp.health.queued': 'ожидают отправки: {count}',

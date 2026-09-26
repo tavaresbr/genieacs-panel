@@ -1693,6 +1693,8 @@ const zhTW: Dictionary = {
   'whatsapp.actions.delete': '刪除',
   'whatsapp.inbox.title': '對話',
   'whatsapp.health.title': '運作正常嗎？',
+  'whatsapp.health.bellLabel': '{count} 則警告',
+  'whatsapp.health.allGood': '一切正常',
   'whatsapp.health.connected': '{total} 個號碼中有 {connected} 個已連線',
   'whatsapp.health.noNumbers': '沒有已連線的號碼——無法收發',
   'whatsapp.health.queued': '{count} 則等待傳送',

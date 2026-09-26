@@ -7,6 +7,7 @@ import { Icon } from '@/components/ui/icon'
 import { useTranslation } from '@/contexts/language-context'
 import { formatRelativeTime } from '@/lib/utils'
 import { healthActions, type HealthActions } from '@/lib/wa-health-actions'
+import { healthBadge, type HealthTone } from '@/lib/wa-health-badge'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Polling
@@ -53,7 +54,7 @@ const STUCK_QUEUE_MS = 30 * 60 * 1000
 const SILENCE_MS = 24 * 60 * 60 * 1000
 
 /** Loud, worth noticing, or background. Nothing in between. */
-type Tone = 'alarm' | 'warn' | 'calm'
+type Tone = HealthTone
 
 /** One thing the strip has to say. */
 interface Note {
@@ -303,8 +304,7 @@ function notesFor(
 }
 
 /**
- * "Is this working?", above the tab rail, so it is the first thing an operator
- * sees on `/whatsapp`.
+ * "Is this working?", as a bell in the top corner of `/whatsapp`.
  *
  * The failure it exists to end: a failed message is visible only inside its own
  * thread, a queue that stopped moving is visible nowhere at all, and the
@@ -317,28 +317,36 @@ function notesFor(
  * button that called it from a screen that only counts would be a destructive
  * action on a poll surface.
  *
- * O que a tira faz é dar LUGAR às ações da página, na mesma linha, e dizer
- * quais delas têm o que fazer (`healthActions`) — porque é ela que tem os
- * números. Os botões continuam sendo da página, com as permissões deles.
+ * Por que um sino, e não mais uma tira: com vários avisos a tira ocupava três
+ * linhas acima da caixa de entrada, numa ferramenta que o operador usa o dia
+ * todo. Os avisos passaram para um painel que abre no clique; fechado, o sino
+ * diz o pior tom e quantos avisos há (`healthBadge`), que é o que precisa ser
+ * visto sem pedir.
+ *
+ * O painel dá LUGAR às ações da página e diz quais delas têm o que fazer
+ * (`healthActions`) — porque é ele que tem os números. Os botões continuam
+ * sendo da página, com as permissões deles.
  */
-export function HealthStrip({ actions }: { actions?: (available: HealthActions) => ReactNode } = {}) {
+export function HealthBell({ actions }: { actions?: (available: HealthActions) => ReactNode } = {}) {
   const { t, formatNumber } = useTranslation()
 
   const [health, setHealth] = useState<WhatsAppHealth | null>(null)
   const [failed, setFailed] = useState(false)
-  const [loading, setLoading] = useState(true)
+  const [open, setOpen] = useState(false)
 
   const alive = useRef(true)
   const inFlight = useRef(false)
   const failures = useRef(0)
   const blockedUntil = useRef(0)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     alive.current = true
     return () => { alive.current = false }
   }, [])
 
-  const load = useCallback(async (initial: boolean) => {
+  const load = useCallback(async () => {
     // Single-flight. A poll that arrives while the last one is still out is
     // dropped rather than queued: the next tick is a minute away and this is a
     // summary, so there is nothing to catch up on.
@@ -351,7 +359,7 @@ export function HealthStrip({ actions }: { actions?: (available: HealthActions) 
         failures.current += 1
         blockedUntil.current = Date.now()
           + (2 ** Math.min(failures.current, BACKOFF_CAP) - 1) * HEALTH_POLL_MS
-        // A strip that cannot read must say so rather than keep showing the
+        // A bell that cannot read must say so rather than keep showing the
         // last good numbers: stale reassurance is the exact failure mode this
         // component was built against.
         setFailed(true)
@@ -369,11 +377,10 @@ export function HealthStrip({ actions }: { actions?: (available: HealthActions) 
       setFailed(true)
     } finally {
       inFlight.current = false
-      if (initial && alive.current) setLoading(false)
     }
   }, [])
 
-  useEffect(() => { void load(true) }, [load])
+  useEffect(() => { void load() }, [load])
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -381,77 +388,139 @@ export function HealthStrip({ actions }: { actions?: (available: HealthActions) 
       // skips the tick entirely rather than catching up on wake.
       if (document.visibilityState !== 'visible') return
       if (Date.now() < blockedUntil.current) return
-      void load(false)
+      void load()
     }, HEALTH_POLL_MS)
     return () => clearInterval(timer)
   }, [load])
 
-  // Nothing yet on the very first load. A skeleton here would push the tab rail
-  // down and then let it snap back on every mount of the page.
-  if (loading && !health && !failed) return null
+  // Aberto, o painel fecha num clique fora ou no Esc — e o Esc devolve o foco
+  // ao sino, para quem navega pelo teclado não se perder na página.
+  useEffect(() => {
+    if (!open) return
+    const onPointer = (event: MouseEvent | TouchEvent) => {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false)
+    }
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      setOpen(false)
+      buttonRef.current?.focus()
+    }
+    document.addEventListener('mousedown', onPointer)
+    document.addEventListener('touchstart', onPointer)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onPointer)
+      document.removeEventListener('touchstart', onPointer)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
 
-  if (failed) {
-    return (
-      <div
-        className="flex min-w-0 items-center gap-2 rounded-md border border-[hsl(var(--status-danger)/0.35)] bg-[hsl(var(--status-danger)/0.07)] px-2.5 py-1 text-xs leading-5 text-[hsl(var(--status-danger))]"
-        role="status"
-      >
-        <Icon name="warning" className="h-4 w-4 shrink-0" />
-        <span>{t('whatsapp.health.loadFailed')}</span>
-      </div>
-    )
-  }
+  // Uma leitura que falhou não mostra os números velhos: o painel diz que não
+  // leu, e o sino fica vermelho.
+  const notes = health && !failed ? notesFor(health, t, formatNumber) : []
+  const badge = healthBadge(notes.map((note) => note.tone), failed)
+  const available = health && !failed ? healthActions(health) : null
+  const buttons = actions && available ? actions(available) : null
+  const summary = badge.unreadable
+    ? t('whatsapp.health.loadFailed')
+    : badge.count > 0
+      ? t('whatsapp.health.bellLabel', { count: formatNumber(badge.count) })
+      : t('whatsapp.health.allGood')
 
-  if (!health) return null
+  const badgeClass = badge.tone === 'alarm'
+    ? 'bg-[hsl(var(--status-danger))] text-white'
+    : 'bg-[hsl(var(--status-warning))] text-black'
 
-  const notes = notesFor(health, t, formatNumber)
-  const alarming = notes.some((note) => note.tone === 'alarm')
-
-  // Uma linha, sem cartão em volta: a tira mora ao lado do título da página, e
-  // o que ela diz está nos chips — o cartão era embalagem, e custava uma faixa
-  // inteira da tela numa ferramenta que o operador usa o dia todo.
   return (
-    // `min-w-[18rem]`: quando não cabe ao lado do título, a tira desce inteira
-    // para a linha de baixo, em vez de se espremer numa coluna estreita.
-    <div className="flex min-w-[18rem] flex-1 flex-wrap items-center gap-x-3 gap-y-2">
-      <div
-        className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2"
-        // Polite, not assertive: an operator typing a reply must not be
-        // interrupted mid-sentence by a screen reader reading a file count.
-        role="status"
-        aria-live="polite"
-        aria-label={t('whatsapp.health.title')}
+    <div ref={rootRef} className="relative ms-auto">
+      <button
+        ref={buttonRef}
+        type="button"
+        className="icon-button relative"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-label={`${t('whatsapp.health.title')} — ${summary}`}
+        title={summary}
+        data-testid="health-bell"
+        data-tone={badge.tone}
+        onClick={() => setOpen((current) => !current)}
       >
-        <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          <Icon
-            name={alarming ? 'warning' : 'check'}
-            className={alarming
-              ? 'h-4 w-4 text-[hsl(var(--status-danger))]'
-              : 'h-4 w-4 text-[hsl(var(--status-success))]'}
-          />
-          {t('whatsapp.health.title')}
-        </p>
+        <Icon name="bell" className="h-5 w-5" />
+        {(badge.unreadable || badge.count > 0) && (
+          <span
+            className={`absolute -end-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[0.6875rem] font-bold leading-none tabular-nums ring-2 ring-background ${badgeClass}`}
+            aria-hidden="true"
+          >
+            {badge.unreadable ? '!' : badge.count > 99 ? '99+' : formatNumber(badge.count)}
+          </span>
+        )}
+      </button>
 
-        <ul className="flex min-w-0 flex-wrap items-center gap-2" role="list">
-          {notes.map((note) => (
-            <li
-              key={note.key}
-              className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs leading-5 ${TONE_CLASS[note.tone]}`}
+      {/* Fechado, o leitor de tela ainda ouve quando a situação muda. Polite,
+          not assertive: an operator typing a reply must not be interrupted
+          mid-sentence. */}
+      <span className="sr-only" role="status" aria-live="polite">{summary}</span>
+
+      {open && (
+        <div
+          role="dialog"
+          aria-label={t('whatsapp.health.title')}
+          data-testid="health-panel"
+          className="absolute end-0 top-full z-40 mt-2 w-[24rem] max-w-[calc(100vw-2rem)] rounded-[var(--radius)] border border-border bg-card p-3 text-card-foreground shadow-lg"
+        >
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <Icon
+                name={badge.tone === 'calm' ? 'check' : 'warning'}
+                className={badge.tone === 'calm'
+                  ? 'h-4 w-4 text-[hsl(var(--status-success))]'
+                  : 'h-4 w-4 text-[hsl(var(--status-danger))]'}
+              />
+              {t('whatsapp.health.title')}
+            </p>
+            <button
+              type="button"
+              className="icon-button size-8"
+              aria-label={t('common.close')}
+              onClick={() => {
+                setOpen(false)
+                buttonRef.current?.focus()
+              }}
             >
-              <Icon name={TONE_ICON[note.tone]} className="h-3.5 w-3.5 shrink-0" />
-              <span className="tabular-nums">{note.text}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
+              <Icon name="x" className="h-4 w-4" />
+            </button>
+          </div>
 
-      {/* Fora da região `aria-live`: um botão que aparece não é notícia. No fim
-          da linha, empurrado para a direita, para não se misturar aos avisos. */}
-      {actions && (
-        <div className="ms-auto flex flex-wrap items-center gap-2">{actions(healthActions(health))}</div>
+          {badge.unreadable ? (
+            <p className="flex items-center gap-2 rounded-md border border-[hsl(var(--status-danger)/0.35)] bg-[hsl(var(--status-danger)/0.07)] px-2.5 py-1.5 text-xs leading-5 text-[hsl(var(--status-danger))]">
+              <Icon name="warning" className="h-4 w-4 shrink-0" />
+              <span>{t('whatsapp.health.loadFailed')}</span>
+            </p>
+          ) : !health ? (
+            <p className="px-1 py-2 text-xs text-muted-foreground">{t('common.loading')}</p>
+          ) : (
+            <ul className="flex flex-col gap-1.5" role="list">
+              {notes.map((note) => (
+                <li
+                  key={note.key}
+                  className={`flex items-start gap-2 rounded-md border px-2.5 py-1.5 text-xs leading-5 ${TONE_CLASS[note.tone]}`}
+                >
+                  <Icon name={TONE_ICON[note.tone]} className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <span className="min-w-0 break-words tabular-nums">{note.text}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {/* Um botão que aparece não é notícia: fica fora da lista de avisos,
+              e só existe quando há o que fazer. */}
+          {buttons && (
+            <div className="mt-3 flex flex-wrap justify-end gap-2 border-t border-border pt-3">{buttons}</div>
+          )}
+        </div>
       )}
     </div>
   )
 }
 
-export default HealthStrip
+export default HealthBell

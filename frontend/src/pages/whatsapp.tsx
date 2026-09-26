@@ -21,7 +21,7 @@ import { TemplatesPanel } from '@/components/whatsapp/templates-panel'
 import { OptOutPanel } from '@/components/whatsapp/opt-out-panel'
 import { AlertsPanel } from '@/components/whatsapp/alerts-panel'
 import { ContactsPanel } from '@/components/whatsapp/contacts-panel'
-import { HealthStrip } from '@/components/whatsapp/health-strip'
+import { HealthBell } from '@/components/whatsapp/health-strip'
 import { useAuth } from '@/contexts/auth-context'
 import { useLocation } from 'react-router'
 
@@ -696,7 +696,7 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
 }
 
 /**
- * "Delete the old attachments now", under the health strip.
+ * "Delete the old attachments now", inside the health bell's panel.
  *
  * `POST /whatsapp/media/sweep` has existed since the attachment retention
  * landed and had no screen: the policy was set in Settings and then applied
@@ -789,13 +789,13 @@ function MediaSweepButton() {
  *
  * The backend clamps `hours` to the same twenty-four, so this number is not a
  * limit the screen enforces — it is the number the confirmation must not lie
- * about. It is also the window the health strip counts as `failed24h`, which is
+ * about. It is also the window the health bell counts as `failed24h`, which is
  * the figure the operator is looking at when they reach for this button.
  */
 const REQUEUE_WINDOW_HOURS = 24
 
 /**
- * "Send the failed ones again", beside the sweep and under the health strip.
+ * "Send the failed ones again", beside the sweep in the health bell's panel.
  *
  * This is where the button belongs because this is where the failure is
  * reported: the strip above says `failed24h: 3200` after an Evolution restart
@@ -910,22 +910,22 @@ export default function WhatsAppPage() {
     <div className="page-shell">
       <div className="page-frame">
         {/*
-          Uma linha só: o título, a tira e as ações. Esta página é ferramenta de
-          trabalho o dia todo, e o cabeçalho de página padrão (rótulo, título,
-          subtítulo, divisória) mais a tira em cartão e uma fileira só para dois
-          botões empurravam a caixa de entrada para fora da tela.
+          Uma linha só: o título à esquerda e o sino de "Está funcionando?" à
+          direita. Os avisos e as duas ações de manutenção moram no painel do
+          sino — como tira, com vários avisos, ocupavam três linhas acima da
+          caixa de entrada numa ferramenta de trabalho o dia todo.
 
-          A tira fica aqui, fora da troca de abas, de propósito: tem que
-          continuar respondendo "está funcionando?" em qualquer aba — montada
+          O sino fica aqui, fora da troca de abas, de propósito: tem que
+          continuar respondendo "está funcionando?" em qualquer aba — montado
           dentro de uma delas, a integração sumiria ao abrir Campanhas.
         */}
-        <header className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-border pb-3">
+        <header className="mb-4 flex items-center gap-3 border-b border-border pb-3">
           <h1 className="text-xl font-bold leading-tight text-foreground">{t('sidebar.nav.whatsapp')}</h1>
-          <HealthStrip
+          <HealthBell
             actions={(disponivel) => (
               <>
-                {/* Na ordem em que os números da tira se leem: as falhas
-                    primeiro, o disco depois. E só quando há o que fazer. */}
+                {/* Na ordem em que os avisos se leem: as falhas primeiro, o
+                    disco depois. E só quando há o que fazer. */}
                 {disponivel.requeue && <RequeueFailedButton />}
                 {disponivel.sweep && <MediaSweepButton />}
               </>

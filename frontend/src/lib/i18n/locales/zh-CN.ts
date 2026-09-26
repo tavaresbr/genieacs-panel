@@ -1693,6 +1693,8 @@ const zhCN: Dictionary = {
   'whatsapp.actions.delete': '删除',
   'whatsapp.inbox.title': '会话',
   'whatsapp.health.title': '运行正常吗？',
+  'whatsapp.health.bellLabel': '{count} 条警告',
+  'whatsapp.health.allGood': '一切正常',
   'whatsapp.health.connected': '{total} 个号码中有 {connected} 个已连接',
   'whatsapp.health.noNumbers': '没有已连接的号码——无法收发',
   'whatsapp.health.queued': '{count} 条等待发送',

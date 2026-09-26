@@ -1695,6 +1695,8 @@ const en = {
   'whatsapp.actions.delete': 'Delete',
   'whatsapp.inbox.title': 'Conversations',
   'whatsapp.health.title': 'Is it working?',
+  'whatsapp.health.bellLabel': '{count} warning(s)',
+  'whatsapp.health.allGood': 'All good',
   'whatsapp.health.connected': '{connected} of {total} numbers connected',
   'whatsapp.health.noNumbers': 'No number connected — nothing can be sent or received',
   'whatsapp.health.queued': '{count} waiting to go out',
