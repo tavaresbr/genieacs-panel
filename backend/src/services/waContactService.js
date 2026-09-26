@@ -93,6 +93,7 @@ class WaContactService {
       state: linkStates.get(subscriber.contract) || 'unknown',
       lastSeenAt: null
     }));
+    await this.fillPhonesFromContacts(withDevice);
     const known = new Set(withDevice.map((s) => s.contract));
     // A contract that has an ONT is drawn from `sgp_links`, which is the
     // fresher mirror; its `sgp_contacts` row only duplicates it.
@@ -107,6 +108,32 @@ class WaContactService {
       String(a.clientName ?? '').localeCompare(String(b.clientName ?? ''), 'pt-BR')
       || String(a.contract).localeCompare(String(b.contract))
     ));
+  }
+
+  /**
+   * The number of each ONT subscriber as its client record shows it. The ONT
+   * row often has no phone while the contacts sync brought the contract's
+   * number, and the list must offer the conversation the record offers —
+   * `whatsappPhoneOf` decides between the two rows, for both screens.
+   */
+  static async fillPhonesFromContacts(subscribers) {
+    const contracts = subscribers.map((s) => String(s.contract));
+    const byContract = new Map();
+    for (let at = 0; at < contracts.length; at += 500) {
+      // eslint-disable-next-line no-await-in-loop -- a few chunks, one query each
+      const rows = await tdb('sgp_contacts')
+        .whereIn('contract', contracts.slice(at, at + 500))
+        .select('contract', 'phone_manual', 'phone_e164');
+      for (const row of rows) byContract.set(String(row.contract), row);
+    }
+    for (const subscriber of subscribers) {
+      const contact = byContract.get(String(subscriber.contract));
+      if (!contact) continue;
+      const link = subscriber.phoneSource === 'manual'
+        ? { phone_manual: subscriber.phone }
+        : { phone_e164: subscriber.phone };
+      Object.assign(subscriber, whatsappPhoneOf(link, contact));
+    }
   }
 
   /**

@@ -150,6 +150,16 @@ describe('a prévia do boleto', () => {
   });
 });
 
+describe('a lista de contatos', () => {
+  it('um contrato com ONT sem telefone aparece com o número da ficha', async () => {
+    const res = await call(`${panelUrl}/api/whatsapp/contacts?search=329`, { headers: authHeaders(token) });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    const linha = res.body.data.contacts.find((contato) => contato.contract === '329');
+    assert.ok(linha, JSON.stringify(res.body.data.contacts));
+    assert.equal(linha.phone, '5593988519934');
+  });
+});
+
 describe('a conversa pela ficha', () => {
   it('um contrato com ONT sem telefone abre a conversa pelo número da ficha', async () => {
     const ficha = await call(`${panelUrl}/api/contacts/329`, { headers: authHeaders(token) });
