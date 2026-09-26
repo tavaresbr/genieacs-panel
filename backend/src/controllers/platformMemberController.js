@@ -6,7 +6,8 @@ import User from '../models/User.js';
 import AuditLog from '../models/AuditLog.js';
 import PlatformAudit from '../models/PlatformAudit.js';
 import { runInTenant } from '../config/tenantContext.js';
-import { ROLES } from './usersController.js';
+import { ROLES, applyRoleSideEffects } from './usersController.js';
+import { normalizarTelefoneBr } from '../utils/wa/waDestino.js';
 import { normalizeRole, roleHas } from '../config/permissions.js';
 import TenantInvite from '../models/TenantInvite.js';
 import AuthTicket from '../models/AuthTicket.js';
@@ -81,8 +82,64 @@ function present(member) {
   return {
     userId: member.id,
     username: member.username,
+    email: member.email ?? null,
+    phone: member.phone ?? null,
     role: presentRole(member.role)
   };
+}
+
+/**
+ * O telefone lido do corpo: `undefined` quando não veio, `''` para apagar, os
+ * dígitos normalizados, ou `null` quando veio e não é telefone.
+ */
+function readPhone(raw) {
+  if (raw === undefined) return undefined;
+  const texto = String(raw ?? '').trim();
+  if (!texto) return '';
+  const digitos = normalizarTelefoneBr(texto);
+  return digitos || null;
+}
+
+/**
+ * O provedor e a pessoa nomeados no caminho, e o vínculo entre eles — ou a
+ * resposta de erro já enviada. Uma pessoa de OUTRO provedor responde 404: o
+ * console age sobre a equipe do provedor da URL, e só sobre ela.
+ */
+async function loadMember(req, res) {
+  const tenantId = parseId(req.params?.id);
+  const userId = parseId(req.params?.userId);
+  if (!tenantId) {
+    res.status(400).json(createErrorResponse('Invalid provider id'));
+    return null;
+  }
+  if (!userId) {
+    res.status(400).json(createErrorResponse('Invalid operator id'));
+    return null;
+  }
+  const tenant = await findTenant(tenantId);
+  if (!tenant) {
+    tenantNotFound(res);
+    return null;
+  }
+  const membership = await TenantUser.find(tenantId, userId);
+  const person = membership ? await User.findById(userId) : null;
+  if (!membership || !person) {
+    res.status(404).json(createErrorResponse('Membership not found'));
+    return null;
+  }
+  return { tenant, tenantId, userId, membership, person };
+}
+
+/** As duas trilhas de uma ação sobre uma conta da equipe. */
+async function recordMemberAction(req, { tenant, tenantId, userId }, platformAction, tenantAction, detail) {
+  await PlatformAudit.fromRequest(req, { action: platformAction, tenant, detail: { userId, ...detail } });
+  await runInTenant(tenantId, () => AuditLog.fromRequest(req, {
+    action: tenantAction,
+    actorKind: 'platform',
+    subjectType: 'tenant_user',
+    subjectId: userId,
+    detail
+  }));
 }
 
 function parseId(value) {
@@ -296,6 +353,10 @@ class PlatformMemberController {
       const username = String(req.body?.username ?? '').trim();
       const email = User.normalizeEmail(req.body?.email);
       const role = req.body?.role;
+      const phone = readPhone(req.body?.phone);
+      if (phone === null) {
+        return res.status(400).json(createErrorResponse('Invalid phone number', null, 'invalid_phone'));
+      }
       // A senha é opcional: sem ela, o caminho é o link. Lida como veio, sem
       // `trim()` — espaço nas pontas de uma senha é senha.
       const mandouSenha = req.body?.password !== undefined && req.body?.password !== null;
@@ -353,7 +414,7 @@ class PlatformMemberController {
       // entra em lugar nenhum e não aparece em tela nenhuma — é lixo que só o
       // banco enxerga.
       const userId = await getDb().transaction(async (trx) => {
-        const id = await User.create({ username, password: hash, role, email }, trx);
+        const id = await User.create({ username, password: hash, role, email, phone: phone || null }, trx);
         await TenantUser.create({ tenantId, userId: id, role }, trx);
         return id;
       });
@@ -390,7 +451,7 @@ class PlatformMemberController {
       const emailed = token ? await sendPasswordSetup({ req, tenant, email, token }) : false;
 
       return res.status(201).json(createResponse('Operator created', {
-        membership: present({ id: userId, username, role }),
+        membership: present({ id: userId, username, email, phone: phone || null, role }),
         // Mostrado uma vez, como o token do convite: o banco guarda só o hash.
         // `null` quando a senha foi digitada — ali não há o que entregar além
         // dela mesma.
@@ -630,6 +691,207 @@ class PlatformMemberController {
       return res.status(500).json(
         createErrorResponse('Failed to end the membership', error.message)
       );
+    }
+  }
+
+  /**
+   * `PATCH /api/platform/tenants/:id/members/:userId` — `{ role?, username?, email?, phone? }`.
+   *
+   * O papel é DESTE provedor. Login, e-mail e telefone são da PESSOA: quem
+   * trabalha em mais de um provedor muda nos dois, e a resposta diz isso
+   * (`sharedAccount`) para a tela avisar antes de alguém estranhar.
+   *
+   * A regra "só o dono promove dono" de `/api/users` não vale aqui, pela mesma
+   * razão de `add` e `invite`: o console está acima do provedor. A do último
+   * administrador vale, pelo motivo escrito em `remove`.
+   */
+  static async update(req, res) {
+    try {
+      const alvo = await loadMember(req, res);
+      if (!alvo) return undefined;
+      const { tenantId, userId, membership, person } = alvo;
+      const corpo = req.body ?? {};
+      const mudancas = {};
+
+      if (corpo.role !== undefined) {
+        if (!ROLES.includes(corpo.role)) {
+          return res.status(400).json(createErrorResponse(`Role must be one of: ${ROLES.join(', ')}`));
+        }
+        if (presentRole(corpo.role) !== presentRole(membership.role)) {
+          const eraAdmin = roleHas(membership.role, 'operators.manage');
+          const seraAdmin = roleHas(corpo.role, 'operators.manage');
+          if (eraAdmin && !seraAdmin && await TenantUser.countByRoles(tenantId, ADMINISTRADORES) <= 1) {
+            return res.status(409).json(createErrorResponse('A provider must keep at least one administrator'));
+          }
+          mudancas.role = { from: presentRole(membership.role), to: presentRole(corpo.role) };
+        }
+      }
+
+      let username;
+      if (corpo.username !== undefined) {
+        username = String(corpo.username ?? '').trim();
+        if (username.length < 3 || username.length > 64) {
+          return res.status(400).json(createErrorResponse('Username must be between 3 and 64 characters'));
+        }
+        if (username !== person.username) mudancas.username = { from: person.username, to: username };
+      }
+
+      let email;
+      if (corpo.email !== undefined) {
+        email = User.normalizeEmail(corpo.email);
+        if (!email || !isValidEmail(email)) {
+          return res.status(400).json(createErrorResponse('Invalid e-mail address'));
+        }
+        if (email !== (person.email ?? null)) mudancas.email = { from: person.email ?? null, to: email };
+      }
+
+      const phone = readPhone(corpo.phone);
+      if (phone === null) {
+        return res.status(400).json(createErrorResponse('Invalid phone number', null, 'invalid_phone'));
+      }
+      if (phone !== undefined && (phone || null) !== (person.phone ?? null)) {
+        mudancas.phone = { from: person.phone ?? null, to: phone || null };
+      }
+
+      if (mudancas.username || mudancas.email) {
+        const conflito = await User.loginConflict({
+          username: mudancas.username ? username : null,
+          email: mudancas.email ? email : null,
+          exceptId: userId
+        });
+        if (conflito) {
+          return res.status(409).json(createErrorResponse(
+            conflito === 'email_taken' ? 'E-mail already taken' : 'Username already taken',
+            null,
+            conflito
+          ));
+        }
+      }
+
+      if (mudancas.role) {
+        await TenantUser.setRole(tenantId, userId, corpo.role);
+        await applyRoleSideEffects(userId, corpo.role);
+      }
+      if (mudancas.username) await User.updateUsername(userId, username);
+      if (mudancas.email) await User.updateEmail(userId, email);
+      if (mudancas.phone) await User.updatePhone(userId, phone);
+
+      if (Object.keys(mudancas).length) {
+        await recordMemberAction(
+          req, alvo,
+          PlatformAudit.ACTIONS.MEMBER_UPDATED,
+          AuditLog.ACTIONS.OPERATOR_UPDATED,
+          { username: username ?? person.username, changes: mudancas }
+        );
+      }
+
+      const depois = await User.findById(userId);
+      const vinculo = await TenantUser.find(tenantId, userId);
+      const memberships = await TenantUser.listForUser(userId);
+      return res.json(createResponse('Membership updated', {
+        membership: present({ ...depois, role: vinculo.role }),
+        sharedAccount: memberships.length > 1
+      }));
+    } catch (error) {
+      console.error('Update membership error:', error);
+      return res.status(500).json(createErrorResponse('Failed to update the member', error.message));
+    }
+  }
+
+  /**
+   * `POST .../members/:userId/password-link` — `{ sendEmail? }`.
+   *
+   * Um link novo de definir senha, que invalida o anterior (`AuthTicket.create`
+   * queima os abertos do mesmo propósito). Devolvido UMA vez, como no
+   * `createOperator`, para quem opera copiar ou mandar pelo WhatsApp; o banco
+   * guarda só o hash, e nenhuma trilha guarda o link.
+   */
+  static async passwordLink(req, res) {
+    try {
+      const alvo = await loadMember(req, res);
+      if (!alvo) return undefined;
+      const { tenant, tenantId, userId, person } = alvo;
+      const { token } = await AuthTicket.create({
+        purpose: AuthTicket.PURPOSES.PASSWORD_RESET,
+        userId,
+        tenantId,
+        email: person.email ?? null,
+        ttlMs: PASSWORD_SETUP_TTL_MS
+      });
+      const querEmail = req.body?.sendEmail === true;
+      const emailed = querEmail && person.email
+        ? await sendPasswordSetup({ req, tenant, email: person.email, token })
+        : false;
+      await recordMemberAction(
+        req, alvo,
+        PlatformAudit.ACTIONS.MEMBER_PASSWORD_LINK_ISSUED,
+        AuditLog.ACTIONS.OPERATOR_PASSWORD_LINK_ISSUED,
+        { username: person.username, emailed }
+      );
+      return res.json(createResponse('Password link issued', {
+        url: passwordSetupLink(tenant, token),
+        token,
+        emailed,
+        expiresInMs: PASSWORD_SETUP_TTL_MS
+      }));
+    } catch (error) {
+      console.error('Member password link error:', error);
+      return res.status(500).json(createErrorResponse('Failed to issue the password link', error.message));
+    }
+  }
+
+  /**
+   * `POST .../members/:userId/password` — `{ password }`.
+   *
+   * A senha definida por quem opera o console. `updatePassword` encerra as
+   * sessões da pessoa, em todo provedor — a senha é uma só.
+   */
+  static async setPassword(req, res) {
+    try {
+      const alvo = await loadMember(req, res);
+      if (!alvo) return undefined;
+      const password = req.body?.password === undefined || req.body?.password === null
+        ? ''
+        : String(req.body.password);
+      if (password.length < 8 || password.length > 128) {
+        return res.status(400).json(createErrorResponse('Password must be between 8 and 128 characters'));
+      }
+      await User.updatePassword(alvo.userId, await bcrypt.hash(password, BCRYPT_ROUNDS));
+      await recordMemberAction(
+        req, alvo,
+        PlatformAudit.ACTIONS.MEMBER_PASSWORD_SET,
+        AuditLog.ACTIONS.OPERATOR_PASSWORD_SET,
+        { username: alvo.person.username }
+      );
+      return res.json(createResponse('Password updated', { userId: alvo.userId }));
+    } catch (error) {
+      console.error('Member set password error:', error);
+      return res.status(500).json(createErrorResponse('Failed to set the password', error.message));
+    }
+  }
+
+  /**
+   * `POST .../members/:userId/sessions/revoke` — derruba toda sessão da pessoa.
+   *
+   * `token_version` é da pessoa, então vale em todo provedor dela: é para o
+   * caso "o celular com o painel aberto foi perdido", em que é isso mesmo que
+   * se quer.
+   */
+  static async revokeSessions(req, res) {
+    try {
+      const alvo = await loadMember(req, res);
+      if (!alvo) return undefined;
+      await User.revokeSessions(alvo.userId);
+      await recordMemberAction(
+        req, alvo,
+        PlatformAudit.ACTIONS.MEMBER_SESSIONS_REVOKED,
+        AuditLog.ACTIONS.OPERATOR_SESSIONS_REVOKED,
+        { username: alvo.person.username }
+      );
+      return res.json(createResponse('Sessions revoked', { userId: alvo.userId }));
+    } catch (error) {
+      console.error('Member revoke sessions error:', error);
+      return res.status(500).json(createErrorResponse('Failed to revoke the sessions', error.message));
     }
   }
 }

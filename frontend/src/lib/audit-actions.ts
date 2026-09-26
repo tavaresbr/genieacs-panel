@@ -68,6 +68,10 @@ export const AUDIT_ACTION_LABEL_KEYS: Record<string, TranslationKey> = {
   'user.mfa_recovery_used': 'audit.action.userMfaRecoveryUsed',
   'tenant.mfa_required_changed': 'audit.action.tenantMfaRequiredChanged',
   'operator.mfa_reset': 'audit.action.operatorMfaReset',
+  'operator.updated': 'audit.action.operatorUpdated',
+  'operator.password_link_issued': 'audit.action.operatorPasswordLinkIssued',
+  'operator.password_set': 'audit.action.operatorPasswordSet',
+  'operator.sessions_revoked': 'audit.action.operatorSessionsRevoked',
   'subscriber_account.retired': 'audit.action.subscriberAccountRetired',
   'whatsapp.config_tested': 'audit.action.whatsappConfigTested',
   'alerts.telegram_changed': 'audit.action.alertsTelegramChanged'

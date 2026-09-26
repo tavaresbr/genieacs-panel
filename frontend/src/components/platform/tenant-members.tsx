@@ -6,6 +6,8 @@ import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import { OPERATOR_ROLES, ROLE_LABEL_KEYS } from '@/lib/permissions'
+import { whatsappShareUrl } from '@/lib/whatsapp-share'
+import { MemberAccount } from '@/components/platform/member-account'
 
 interface Props {
   tenant: Tenant
@@ -34,14 +36,14 @@ export function TenantMembers({ tenant, onMembershipChange }: Props) {
   // O convite cunhado, mostrado UMA vez: o banco guarda só o hash do token, e
   // nem esta tela nem nenhuma outra consegue dizê-lo de novo.
   const [cunhado, setCunhado] = useState<{ link: string | null; token: string; emailed: boolean } | null>(null)
-  const [conta, setConta] = useState<{ username: string; email: string; role: OperatorRole; password: string }>(
-    { username: '', email: '', role: 'admin', password: '' }
+  const [conta, setConta] = useState<{ username: string; email: string; phone: string; role: OperatorRole; password: string }>(
+    { username: '', email: '', phone: '', role: 'admin', password: '' }
   )
   // `false` é o padrão de propósito: no caminho do link, a senha inicial não
   // passa por quem opera o console.
   const [senhaDigitada, setSenhaDigitada] = useState(false)
   const [criando, setCriando] = useState(false)
-  const [criada, setCriada] = useState<{ username: string; link: string | null; token: string | null; emailed: boolean } | null>(null)
+  const [criada, setCriada] = useState<{ username: string; phone: string | null; link: string | null; token: string | null; emailed: boolean } | null>(null)
 
   const tenantId = tenant.id
 
@@ -149,22 +151,25 @@ export function TenantMembers({ tenant, onMembershipChange }: Props) {
         username,
         email,
         role: conta.role,
+        ...(conta.phone.trim() ? { phone: conta.phone.trim() } : {}),
         ...(senhaDigitada ? { password } : {})
       })
       if (!res.success || !res.data) {
         // 409 com código diz QUAL dos dois está tomado; o resto vem do backend.
         if (res.code === 'username_taken') toast.error(t('platform.operator.usernameTaken'))
         else if (res.code === 'email_taken') toast.error(t('platform.operator.emailTaken'))
+        else if (res.code === 'invalid_phone') toast.error(t('platform.member.phoneInvalid'))
         else toast.error(res.message || t('platform.saveFailed'))
         return
       }
       setCriada({
         username,
+        phone: res.data.membership.phone,
         link: res.data.url,
         token: res.data.token,
         emailed: res.data.emailed
       })
-      setConta({ username: '', email: '', role: conta.role, password: '' })
+      setConta({ username: '', email: '', phone: '', role: conta.role, password: '' })
       await loadMembers()
       onMembershipChange()
     } finally {
@@ -215,22 +220,17 @@ export function TenantMembers({ tenant, onMembershipChange }: Props) {
       ) : (
         <ul className="divide-y divide-border rounded-md border border-border bg-card">
           {members.map((member) => (
-            <li key={member.userId} className="flex items-center justify-between gap-3 px-3 py-2">
-              <span className="min-w-0">
-                <span className="truncate text-sm font-medium">{member.username}</span>
-                <span className="modern-badge ms-2">{roleLabel(member.role)}</span>
-              </span>
-              <button
-                type="button"
-                onClick={() => void removeMember(member)}
-                disabled={busyUserId === member.userId}
-                className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
-                title={t('platform.removeMember')}
-                aria-label={t('platform.removeMember')}
-              >
-                <Icon name="logout" size={18} />
-              </button>
-            </li>
+            <MemberAccount
+              key={member.userId}
+              tenant={tenant}
+              member={member}
+              busy={busyUserId === member.userId}
+              onRemove={(m) => void removeMember(m)}
+              onUpdated={(atualizado) => {
+                setMembers((atual) => atual.map((m) => (m.userId === atualizado.userId ? atualizado : m)))
+                onMembershipChange()
+              }}
+            />
           ))}
         </ul>
       )}
@@ -243,7 +243,7 @@ export function TenantMembers({ tenant, onMembershipChange }: Props) {
         <h4 className="text-sm font-semibold text-foreground">{t('platform.operator.title')}</h4>
         <p className="mb-2 mt-1 text-sm text-muted-foreground">{t('platform.operator.description')}</p>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <label htmlFor={`platform-operator-username-${tenantId}`} className="block text-sm font-medium mb-1">
               {t('settings.operators.username')}
@@ -267,6 +267,20 @@ export function TenantMembers({ tenant, onMembershipChange }: Props) {
               onChange={(e) => setConta((c) => ({ ...c, email: e.target.value }))}
               className="modern-input w-full"
               placeholder={t('settings.operators.emailPlaceholder')}
+              autoComplete="off"
+            />
+          </div>
+          <div>
+            <label htmlFor={`platform-operator-phone-${tenantId}`} className="block text-sm font-medium mb-1">
+              {t('platform.member.phone')}
+            </label>
+            <input
+              id={`platform-operator-phone-${tenantId}`}
+              type="tel"
+              value={conta.phone}
+              onChange={(e) => setConta((c) => ({ ...c, phone: e.target.value }))}
+              className="modern-input w-full"
+              placeholder="(11) 98765-4321"
               autoComplete="off"
             />
           </div>
@@ -355,6 +369,19 @@ export function TenantMembers({ tenant, onMembershipChange }: Props) {
                     <Icon name="copy" size={17} />
                     {t('common.copy')}
                   </button>
+                  <a
+                    href={whatsappShareUrl(criada.phone, t('platform.member.whatsappMessage', {
+                      username: criada.username,
+                      provider: tenant.name,
+                      url: criada.link ?? criada.token ?? ''
+                    }))}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="modern-button shrink-0"
+                  >
+                    <Icon name="chat" size={17} />
+                    {t('platform.member.sendWhatsapp')}
+                  </a>
                 </div>
                 {criada.link === null && (
                   <p className="field-hint">{t('platform.inviteNoAddress')}</p>
@@ -421,6 +448,18 @@ export function TenantMembers({ tenant, onMembershipChange }: Props) {
                 <Icon name="copy" size={17} />
                 {t('common.copy')}
               </button>
+              <a
+                href={whatsappShareUrl(null, t('platform.member.whatsappInvite', {
+                  provider: tenant.name,
+                  url: cunhado.link ?? cunhado.token
+                }))}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="modern-button shrink-0"
+              >
+                <Icon name="chat" size={17} />
+                {t('platform.member.sendWhatsapp')}
+              </a>
             </div>
             {/* Sem domínio-base o servidor não tem host para montar o link, e o
                 que sobra é o token: quem entrega precisa saber que ele vale no

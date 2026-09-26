@@ -164,7 +164,14 @@ class AuditLog {
     // `{ from, to }`; e alguém da equipe teve o 2FA desligado por quem
     // administra — celular e códigos perdidos —, com o nome da pessoa.
     TENANT_MFA_REQUIRED_CHANGED: 'tenant.mfa_required_changed',
-    OPERATOR_MFA_RESET: 'operator.mfa_reset'
+    OPERATOR_MFA_RESET: 'operator.mfa_reset',
+    // O que o console fez numa conta da equipe: dados trocados (login, e-mail,
+    // telefone, papel — o detalhe diz quais), um link de senha novo gerado, a
+    // senha definida na hora e as sessões encerradas. Nunca o segredo.
+    OPERATOR_UPDATED: 'operator.updated',
+    OPERATOR_PASSWORD_LINK_ISSUED: 'operator.password_link_issued',
+    OPERATOR_PASSWORD_SET: 'operator.password_set',
+    OPERATOR_SESSIONS_REVOKED: 'operator.sessions_revoked'
   });
 
   /**

@@ -92,7 +92,7 @@ function present(member) {
  * este provedor mudar o que aquela pessoa pode fazer em outro. Aí a coluna fica
  * como está e só as sessões caem.
  */
-async function applyRoleSideEffects(userId, role) {
+export async function applyRoleSideEffects(userId, role) {
   const memberships = await TenantUser.listForUser(userId);
   if (memberships.length <= 1) {
     await User.updateRole(userId, role);

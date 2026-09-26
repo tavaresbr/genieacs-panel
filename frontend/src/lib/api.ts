@@ -1262,7 +1262,19 @@ export type SubscriptionGateCode = typeof SUBSCRIPTION_GATE_CODES[number]
 export interface TenantMembership {
   userId: number
   username: string
+  /** O e-mail e o telefone são da PESSOA, e valem em todo provedor dela. */
+  email: string | null
+  /** Só dígitos, com DDI (ex.: 5511987654321). */
+  phone: string | null
   role: OperatorRole
+}
+
+/** O link de definir senha, devolvido uma vez. `url` é nula sem domínio-base. */
+export interface MemberPasswordLink {
+  url: string | null
+  token: string
+  emailed: boolean
+  expiresInMs: number
 }
 
 /**
@@ -1326,7 +1338,7 @@ export const platformAPI = {
    */
   createOperator: (
     tenantId: number,
-    payload: { username: string; email: string; role: OperatorRole; password?: string }
+    payload: { username: string; email: string; role: OperatorRole; password?: string; phone?: string }
   ) =>
     apiClient.post<{
       membership: TenantMembership
@@ -1394,6 +1406,30 @@ export const platformAPI = {
 
   removeMembership: (tenantId: number, userId: number) =>
     apiClient.delete<{ userId: number }>(`/platform/tenants/${tenantId}/members/${userId}`),
+
+  /** Login, e-mail e telefone são da pessoa; o papel é deste provedor. */
+  updateMembership: (tenantId: number, userId: number, payload: Partial<{
+    username: string; email: string; phone: string; role: OperatorRole
+  }>) =>
+    apiClient.requestWithBody<{ membership: TenantMembership; sharedAccount: boolean }>(
+      'PATCH', `/platform/tenants/${tenantId}/members/${userId}`, payload
+    ),
+
+  /** Um link novo de definir senha; o anterior deixa de valer. */
+  memberPasswordLink: (tenantId: number, userId: number, sendEmail = false) =>
+    apiClient.post<MemberPasswordLink>(
+      `/platform/tenants/${tenantId}/members/${userId}/password-link`, { sendEmail }
+    ),
+
+  setMemberPassword: (tenantId: number, userId: number, password: string) =>
+    apiClient.post<{ userId: number }>(
+      `/platform/tenants/${tenantId}/members/${userId}/password`, { password }
+    ),
+
+  revokeMemberSessions: (tenantId: number, userId: number) =>
+    apiClient.post<{ userId: number }>(
+      `/platform/tenants/${tenantId}/members/${userId}/sessions/revoke`, {}
+    ),
 
   // ── A metade comercial: planos, assinatura, pagamento, uso ──────────
   listPlans: () =>

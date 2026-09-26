@@ -125,6 +125,10 @@ const POR_ID = new Map([
   ['POST /api/platform/tenants/:id/invites', 'plano de controle; prova em platform-members.test.js'],
   ['POST /api/platform/tenants/:id/operators', 'plano de controle; prova em platform-members.test.js'],
   ['DELETE /api/platform/tenants/:id/members/:userId', 'plano de controle; prova em platform-members.test.js'],
+  ['PATCH /api/platform/tenants/:id/members/:userId', 'plano de controle; prova em platform-member-edit.test.js'],
+  ['POST /api/platform/tenants/:id/members/:userId/password-link', 'plano de controle; prova em platform-member-edit.test.js'],
+  ['POST /api/platform/tenants/:id/members/:userId/password', 'plano de controle; prova em platform-member-edit.test.js'],
+  ['POST /api/platform/tenants/:id/members/:userId/sessions/revoke', 'plano de controle; prova em platform-member-edit.test.js'],
   // O id aqui não é de linha de provedor nenhum: é o da PESSOA no cadastro do
   // plano de controle, que é tabela compartilhada e não tem `tenant_id` para o
   // vizinho alcançar. O que se prova é o mesmo das outras: quem não está no
@@ -302,7 +306,14 @@ describe('toda rota endereçada por um parâmetro', () => {
   // a tag de um provedor os equipamentos sem dono de um ACS compartilhado. A
   // prova de que ela não toma equipamento de outro provedor está em
   // shared-acs-scope.test.js. São 47.
-  const TETO_DE_EXCECOES = 47;
+  //
+  // E as quatro da conta de um membro da equipe no console (editar, link de
+  // senha, senha na hora, encerrar sessões), pelo mesmo pedágio das de
+  // `members/:userId`: a prova de que o id de outro provedor responde 404 está
+  // em platform-member-edit.test.js.
+  // São 51.
+  const TETO_DE_EXCECOES = 51;
+
 
   /**
    * As exceções que são do plano de controle, nomeadas uma a uma.
@@ -324,6 +335,10 @@ describe('toda rota endereçada por um parâmetro', () => {
     'POST /api/platform/tenants/:id/invites',
     'POST /api/platform/tenants/:id/operators',
     'DELETE /api/platform/tenants/:id/members/:userId',
+    'PATCH /api/platform/tenants/:id/members/:userId',
+    'POST /api/platform/tenants/:id/members/:userId/password-link',
+    'POST /api/platform/tenants/:id/members/:userId/password',
+    'POST /api/platform/tenants/:id/members/:userId/sessions/revoke',
     'DELETE /api/platform/admins/:userId',
     'PATCH /api/platform/plans/:id',
     'GET /api/platform/tenants/:id/subscription',
