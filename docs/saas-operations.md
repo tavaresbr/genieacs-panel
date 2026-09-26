@@ -761,8 +761,20 @@ plataforma.
 
 ### Marcar sozinho os equipamentos novos
 
-Para ONT nova já chegar marcada, uma provision no GenieACS pode aplicar a tag a partir do
-login PPPoE. Exemplo (ajuste prefixos e tags; um `if` por provedor):
+No mesmo cartão, **Prefixos PPPoE para marcação automática** (ex.: `TA100, TA200`) liga a
+marcação pelo próprio painel: a cada 15 minutos o agendador procura, na frota do GenieACS,
+ONTs cujo login começa com um desses prefixos e aplica a tag do provedor — com as mesmas
+regras da ferramenta manual (só acrescenta; ONT com a tag de outro provedor fica de fora e
+conta como conflito). O cartão mostra quando foi a última passada e quantas marcou.
+
+- Exige a tag definida; lista vazia desliga.
+- Dois provedores no mesmo GenieACS não podem ter prefixos que se cobrem (`TA1` e `TA100`):
+  o console recusa, porque os dois disputariam as mesmas ONTs.
+- Uma ONT nova pode levar até 15 minutos para aparecer no painel do provedor.
+
+**Alternativa sem espera:** para a ONT já chegar marcada no primeiro Inform, uma provision
+no GenieACS pode aplicar a tag a partir do login PPPoE. Exemplo (ajuste prefixos e tags; um
+`if` por provedor):
 
 ```js
 // Provision "tag-provedor" — preset em todo Inform (evento 0 BOOTSTRAP, 1 BOOT ou periódico)

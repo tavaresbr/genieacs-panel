@@ -9,9 +9,11 @@ import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { probeGenieAcs } from './settingsController.js';
 import { VIRTUAL_PARAMETER_KEYS } from '../config/platformManaged.js';
 import { getDb } from '../config/database.js';
-import DeviceService from '../services/deviceService.js';
-import DirectConnector, { DEVICE_SCOPE_KEY, DEVICE_SCOPE_TAG_PATTERN, withoutDeviceScope } from '../services/genieacs/direct.js';
+import { DEVICE_SCOPE_KEY, DEVICE_SCOPE_TAG_PATTERN } from '../services/genieacs/direct.js';
 import { TAG_PREFIX } from '../services/deviceTagService.js';
+import DeviceScopeTagger, {
+  AUTO_PREFIXES_KEY, AUTO_PREFIXES_MAX, AUTO_PREFIX_MAX_LENGTH, parsePrefixes, prefixesOverlap
+} from '../services/deviceScopeTagger.js';
 
 /**
  * O GenieACS de um provedor, configurado do console.
@@ -102,7 +104,7 @@ async function sharedAcs(tenant, url) {
   // tenant-scope-exempt: o console comparando o ACS de todos os provedores —
   // atravessar provedores é o trabalho desta leitura.
   const rows = await getDb()('settings')
-    .whereIn('key', ['genieAcsUrl', DEVICE_SCOPE_KEY])
+    .whereIn('key', ['genieAcsUrl', DEVICE_SCOPE_KEY, AUTO_PREFIXES_KEY])
     .whereIn('tenant_id', getDb()('tenants').select('id'))
     .select('tenant_id', 'key', 'value');
   const porProvedor = new Map();
@@ -120,7 +122,12 @@ async function sharedAcs(tenant, url) {
     .map((t) => [t.id, t]));
   const providers = mesmos
     .filter(([id]) => nomes.get(id)?.kind !== 'platform')
-    .map(([id, v]) => ({ id, name: nomes.get(id)?.name || String(id), deviceTag: v[DEVICE_SCOPE_KEY] || '' }));
+    .map(([id, v]) => ({
+      id,
+      name: nomes.get(id)?.name || String(id),
+      deviceTag: v[DEVICE_SCOPE_KEY] || '',
+      autoTagPrefixes: parsePrefixes(v[AUTO_PREFIXES_KEY])
+    }));
   return {
     providers: providers.filter((p) => p.id !== tenant.id),
     missingTag: providers.length > 1 && providers.some((p) => !p.deviceTag)
@@ -134,6 +141,8 @@ async function snapshot(tenant) {
     )),
     url: (await Setting.getByKey('genieAcsUrl')) || '',
     deviceTag: (await Setting.getByKey(DEVICE_SCOPE_KEY)) || '',
+    autoTagPrefixes: await DeviceScopeTagger.autoPrefixes(),
+    lastAutoTag: await DeviceScopeTagger.lastAuto(),
     auth: await GenieAcsAuthService.getPublicConfig(),
     suggestion: suggestGenieAcsUrl(tenant)
   }));
@@ -154,7 +163,7 @@ class PlatformGenieAcsController {
   }
 
   /**
-   * `PUT /api/platform/tenants/:id/genieacs` — `{ url?, authType?, username?, secret?, virtualParameters? }`.
+   * `PUT /api/platform/tenants/:id/genieacs` — `{ url?, authType?, username?, secret?, virtualParameters?, deviceTag?, autoTagPrefixes? }`.
    *
    * Campo ausente mantém o que está lá, e `secret` segue a regra da tela do
    * provedor: `undefined` mantém, `''` apaga.
@@ -193,6 +202,30 @@ class PlatformGenieAcsController {
       }
 
       const antes = await snapshot(tenant);
+      const mandouPrefixos = corpo.autoTagPrefixes !== undefined;
+      const prefixosNovos = mandouPrefixos ? parsePrefixes(corpo.autoTagPrefixes) : antes.autoTagPrefixes;
+      if (mandouPrefixos) {
+        if (prefixosNovos.length > AUTO_PREFIXES_MAX) {
+          return res.status(400).json(createErrorResponse(`At most ${AUTO_PREFIXES_MAX} auto-tag prefixes`));
+        }
+        if (prefixosNovos.some((p) => p.length > AUTO_PREFIX_MAX_LENGTH)) {
+          return res.status(400).json(createErrorResponse('Auto-tag prefix is too long'));
+        }
+        const tagFinal = mandouTag ? String(corpo.deviceTag).trim() : antes.deviceTag;
+        if (prefixosNovos.length > 0 && !tagFinal) {
+          return res.status(400).json(createErrorResponse('Set the provider device tag before auto-tag prefixes'));
+        }
+        // Dois provedores no mesmo ACS com prefixos que se cobrem disputariam
+        // as mesmas ONTs — o primeiro a passar ficaria com elas.
+        const urlFinal = mandouUrl ? String(corpo.url).trim() : antes.url;
+        const vizinhos = (await sharedAcs(tenant, urlFinal)).providers;
+        const disputa = vizinhos.find((v) => v.autoTagPrefixes
+          .some((dele) => prefixosNovos.some((meu) => prefixesOverlap(meu, dele))));
+        if (disputa) {
+          return res.status(409).json(createErrorResponse(`Auto-tag prefixes overlap with provider ${disputa.name}`));
+        }
+      }
+      const mudouPrefixos = mandouPrefixos && prefixosNovos.join(',') !== antes.autoTagPrefixes.join(',');
       const tipoFinal = corpo.authType ?? antes.auth.authType;
       const usuarioFinal = corpo.username === undefined ? antes.auth.username : String(corpo.username).trim();
       if (mandouAuth && tipoFinal === 'basic' && !usuarioFinal) {
@@ -210,6 +243,7 @@ class PlatformGenieAcsController {
       await runInTenant(tenant.id, async () => {
         if (mudouUrl) await Setting.upsert('genieAcsUrl', urlNova);
         if (mudouTag) await Setting.upsert(DEVICE_SCOPE_KEY, tagNova);
+        if (mudouPrefixos) await Setting.upsert(AUTO_PREFIXES_KEY, prefixosNovos.join(','));
         for (const [key, v] of vpsMudados) await Setting.upsert(key, v);
         if (mandouAuth) {
           await GenieAcsAuthService.saveConfig({
@@ -221,7 +255,7 @@ class PlatformGenieAcsController {
       });
       const depois = await snapshot(tenant);
 
-      if (!mudouUrl && !mudouTag && !mandouAuth && vpsMudados.length === 0) {
+      if (!mudouUrl && !mudouTag && !mudouPrefixos && !mandouAuth && vpsMudados.length === 0) {
         return res.json(createResponse('GenieACS configuration unchanged', depois));
       }
 
@@ -231,6 +265,7 @@ class PlatformGenieAcsController {
       const detail = {};
       if (mudouUrl) detail.url = { from: antes.url || null, to: urlNova || null };
       if (mudouTag) detail.deviceTag = { from: antes.deviceTag || null, to: tagNova || null };
+      if (mudouPrefixos) detail.autoTagPrefixes = { from: antes.autoTagPrefixes, to: prefixosNovos };
       if (vpsMudados.length) {
         detail.virtualParameters = Object.fromEntries(
           vpsMudados.map(([key, v]) => [key, { from: antes.virtualParameters[key] || null, to: v || null }])
@@ -304,43 +339,11 @@ class PlatformGenieAcsController {
       }
       const aplicar = corpo.apply === true;
 
-      const resultado = await runInTenant(tenant.id, async () => {
-        const tag = String((await Setting.getByKey(DEVICE_SCOPE_KEY)) ?? '').trim();
-        if (!tag) return { error: 'Set the provider device tag first' };
-        const tagsDeProvedor = await DirectConnector.allScopeTags();
-        return withoutDeviceScope(async () => {
-          const frota = await DeviceService.listFleetIdentity();
-          const casam = frota.filter((d) => (prefixo && d.pppoe.toLowerCase().startsWith(prefixo))
-            || (seriais.size && seriais.has(d.serial.toUpperCase())));
-          const jaMarcados = [];
-          const conflitos = [];
-          const marcar = [];
-          for (const d of casam) {
-            if (d.tags.includes(tag)) jaMarcados.push(d);
-            else if (d.tags.some((t) => tagsDeProvedor.has(t))) conflitos.push(d);
-            else marcar.push(d);
-          }
-          let marcados = 0;
-          if (aplicar) {
-            for (const d of marcar) {
-              // eslint-disable-next-line no-await-in-loop -- um por vez: o ACS é compartilhado
-              await DeviceService.mutateDeviceTag(d._id, tag, 'POST');
-              marcados += 1;
-            }
-          }
-          return {
-            tag,
-            matched: casam.length,
-            alreadyTagged: jaMarcados.length,
-            toTag: marcar.length,
-            tagged: marcados,
-            conflicts: conflitos.slice(0, 50).map((d) => ({
-              id: d._id, serial: d.serial, pppoe: d.pppoe, tags: d.tags.filter((t) => tagsDeProvedor.has(t))
-            })),
-            conflictCount: conflitos.length
-          };
-        });
-      });
+      const resultado = await runInTenant(tenant.id, () => DeviceScopeTagger.run({
+        prefixes: prefixo ? [prefixo] : [],
+        serials: seriais,
+        apply: aplicar
+      }));
       if (resultado.error) return res.status(400).json(createErrorResponse(resultado.error));
 
       if (aplicar && resultado.tagged > 0) {

@@ -18,6 +18,8 @@ const { buildDevice, startGenieAcsStub } = await import('./helpers/genieacs-stub
 const { default: Setting } = await import('../src/models/Setting.js');
 const { default: DeviceService } = await import('../src/services/deviceService.js');
 const { default: GenieAcsEgress } = await import('../src/services/genieacsEgress.js');
+const { default: SchedulerService } = await import('../src/services/schedulerService.js');
+const { default: AppState } = await import('../src/models/AppState.js');
 
 // A guarda de egresso da SaaS recusa loopback, com razão — e o ACS de mentira
 // deste teste mora no loopback. A guarda tem os testes dela; aqui o que está em
@@ -83,6 +85,12 @@ beforeEach(async () => {
   genie.state.deletedFaults = [];
   await definirTag(alfa, 'alfa');
   await definirTag(beta, 'beta');
+  for (const id of [alfa, beta]) {
+    await runInTenant(id, async () => {
+      await Setting.upsert('deviceScopeAutoPrefixes', '');
+      await AppState.upsert('scheduler_state', '{}');
+    });
+  }
   DeviceService.forgetDashboards();
 });
 
@@ -210,5 +218,62 @@ describe('o console da plataforma', () => {
     assert.equal(body.data.tagged, 0);
     assert.equal(body.data.conflictCount, 1);
     assert.deepEqual(genie.state.tags, []);
+  });
+});
+
+describe('a marcação automática pelo prefixo do PPPoE', () => {
+  const tenantRow = async (id) => getDb()('tenants').where({ id }).first();
+  const passada = async (id) => runInTenant(id, async () => SchedulerService.runJobs({ tenant: await tenantRow(id) }));
+
+  it('o agendador marca as ONTs novas do provedor e não toca as de outro', async () => {
+    const salvo = await api(`/platform/tenants/${alfa}/genieacs`, {
+      method: 'PUT', body: { autoTagPrefixes: 'TA100, beta' }
+    });
+    assert.equal(salvo.status, 200, JSON.stringify(salvo.body));
+    assert.deepEqual(salvo.body.data.autoTagPrefixes, ['ta100', 'beta']);
+
+    const resumo = await passada(alfa);
+    assert.equal(resumo.autoTag.tagged, 1);
+    assert.equal(resumo.autoTag.conflictCount, 1, 'a ONT da beta fica como conflito');
+    assert.deepEqual(genie.state.tags, [{ deviceId: 'ONT-SEMDONO', tag: 'alfa', method: 'POST' }]);
+
+    const { body } = await api(`/platform/tenants/${alfa}/genieacs`);
+    assert.equal(body.data.lastAutoTag.tagged, 1);
+
+    genie.state.tags.length = 0;
+    const segunda = await passada(alfa);
+    assert.equal(segunda.autoTag, null, 'dentro de 15 minutos não passa de novo');
+    assert.deepEqual(genie.state.tags, []);
+  });
+
+  it('sem prefixo, ou sem tag, não faz nada', async () => {
+    const semPrefixo = await passada(alfa);
+    assert.equal(semPrefixo.autoTag, null);
+    await runInTenant(alfa, () => Setting.upsert('deviceScopeAutoPrefixes', 'ta100'));
+    await definirTag(alfa, '');
+    const semTag = await passada(alfa);
+    assert.equal(semTag.autoTag, null);
+    assert.deepEqual(genie.state.tags, []);
+  });
+
+  it('o console recusa prefixo sem tag e prefixos que se sobrepõem entre provedores do mesmo ACS', async () => {
+    await definirTag(beta, '');
+    const semTag = await api(`/platform/tenants/${beta}/genieacs`, { method: 'PUT', body: { autoTagPrefixes: 'TB' } });
+    assert.equal(semTag.status, 400);
+
+    await runInTenant(alfa, () => Setting.upsert('deviceScopeAutoPrefixes', 'ta100'));
+    const disputa = await api(`/platform/tenants/${beta}/genieacs`, {
+      method: 'PUT', body: { deviceTag: 'beta', autoTagPrefixes: ['TA1'] }
+    });
+    assert.equal(disputa.status, 409);
+    const ok = await api(`/platform/tenants/${beta}/genieacs`, {
+      method: 'PUT', body: { deviceTag: 'beta', autoTagPrefixes: ['TB'] }
+    });
+    assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  });
+
+  it('o provedor não grava os próprios prefixos pela tela dele', async () => {
+    const { status } = await api('/settings/deviceScopeAutoPrefixes', { method: 'PUT', body: { value: 'x' } });
+    assert.notEqual(status, 200);
   });
 });

@@ -14,6 +14,7 @@ import { refreshDeploymentSharing } from './genieacsEgress.js';
 import SubscriptionNoticeService from './subscriptionNoticeService.js';
 import SubscriptionService from './subscriptionService.js';
 import ChargeIssuingService from './chargeIssuingService.js';
+import DeviceScopeTagger, { AUTO_TAG_INTERVAL_MS } from './deviceScopeTagger.js';
 import {
   dueForRefresh, isDormant, lastPanelActivityAt, refreshTtlMs, tenantOffsetMs
 } from './dashboardSchedule.js';
@@ -224,11 +225,24 @@ class SchedulerService {
 
   static async runJobs({ tenant = null } = {}) {
     const summary = {
-      provisioning: null, events: null, reconcile: null, dashboard: null, subscriptionNotice: null
+      provisioning: null, events: null, reconcile: null, dashboard: null, subscriptionNotice: null, autoTag: null
     };
     const state = await this.readState();
 
     summary.dashboard = await this.refreshDashboard(state);
+
+    // As ONTs novas de um provedor num GenieACS compartilhado ganham a tag
+    // dele pelo prefixo do login PPPoE — sem ela, ficariam invisíveis para o
+    // próprio dono. Desligado (sem tag ou sem prefixo), `runAuto` responde
+    // `null` e o relógio não anda, para a primeira passada sair logo que a
+    // plataforma ligar. Falha do ACS vira o resumo da passada, não exceção.
+    if (this.due(state.lastAutoTagAt, AUTO_TAG_INTERVAL_MS)) {
+      summary.autoTag = await DeviceScopeTagger.runAuto().catch((error) => {
+        console.warn(`Device auto-tag failed: ${error.message}`);
+        return { error: error.message };
+      });
+      if (summary.autoTag) await this.writeState({ lastAutoTagAt: new Date().toISOString() });
+    }
 
     // O aviso de vencimento roda DENTRO do laço por provedor, e não numa
     // passada global sobre `subscriptions`, porque ele precisa do provedor em
