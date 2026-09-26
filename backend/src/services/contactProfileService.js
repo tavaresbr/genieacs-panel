@@ -20,6 +20,27 @@ const ADDRESS_PARTS = Object.freeze([
   'street', 'number', 'complement', 'district', 'city', 'state', 'zip', 'reference', 'line'
 ]);
 
+/**
+ * The WhatsApp number of a contract, from its ONT row (`sgp_links`) and its
+ * contacts row (`sgp_contacts`), either of which may be missing: a number
+ * corrected by hand wins over one the SGP sent, and between two of the same
+ * kind the contacts row's — the one the client record edits — wins. The
+ * record and the conversation it opens read it here, so they agree.
+ */
+export function whatsappPhoneOf(link, contact) {
+  const candidates = [
+    [contact?.phone_manual, 'manual'],
+    [link?.phone_manual, 'manual'],
+    [contact?.phone_e164, 'sgp'],
+    [link?.phone_e164, 'sgp']
+  ];
+  for (const [raw, source] of candidates) {
+    const phone = normalizarTelefoneBr(raw);
+    if (phone) return { phone, phoneSource: source };
+  }
+  return { phone: null, phoneSource: null };
+}
+
 export class ContactProfileError extends Error {
   constructor(message, { code = 'invalid', status = 400, vars = null } = {}) {
     super(message);
@@ -200,6 +221,9 @@ class ContactProfileService {
       ? await tdb('sgp_links').whereIn('contract', contractRows.map((entry) => String(entry.contract))).select('contract', 'device_id')
       : [];
 
+    const link = row.fromLink ? row : (row.contract ? await tdb('sgp_links').where({ contract: String(row.contract) }).first() : null);
+    const whatsapp = whatsappPhoneOf(link, row.fromLink ? null : row);
+
     const config = await SgpService.getConfig().catch(() => null);
     const clientId = client?.sgp_client_id ?? null;
     return {
@@ -211,8 +235,8 @@ class ContactProfileService {
       notes: client?.notes ?? null,
       registeredAt: client?.registered_at ?? null,
       lastSeenAt: client?.last_seen_at ?? row.last_seen_at ?? null,
-      whatsappPhone: normalizarTelefoneBr(row.phone_manual) || row.phone_e164 || null,
-      whatsappPhoneSource: normalizarTelefoneBr(row.phone_manual) ? 'manual' : (row.phone_e164 ? 'sgp' : null),
+      whatsappPhone: whatsapp.phone,
+      whatsappPhoneSource: whatsapp.phoneSource,
       contracts: contractRows.map((entry) => {
         const device = devices.find((link) => String(link.contract) === String(entry.contract));
         return {
