@@ -1673,6 +1673,8 @@ const ar: Dictionary = {
   'whatsapp.actions.delete': 'حذف',
   'whatsapp.inbox.title': 'المحادثات',
   'whatsapp.health.title': 'هل يعمل التكامل؟',
+  'whatsapp.health.bellLabel': 'التنبيهات: {count}',
+  'whatsapp.health.allGood': 'كل شيء على ما يرام',
   'whatsapp.health.connected': '{connected} من أصل {total} أرقام مرتبطة',
   'whatsapp.health.noNumbers': 'لا يوجد رقم مرتبط — لا يمكن إرسال أو استقبال أي شيء',
   'whatsapp.health.queued': '{count} بانتظار الإرسال',

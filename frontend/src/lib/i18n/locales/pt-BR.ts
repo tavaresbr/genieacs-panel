@@ -1693,6 +1693,8 @@ const ptBR: Dictionary = {
   'whatsapp.actions.delete': 'Excluir',
   'whatsapp.inbox.title': 'Conversas',
   'whatsapp.health.title': 'Está funcionando?',
+  'whatsapp.health.bellLabel': '{count} aviso(s)',
+  'whatsapp.health.allGood': 'Tudo certo',
   'whatsapp.health.connected': '{connected} de {total} números conectados',
   'whatsapp.health.noNumbers': 'Nenhum número conectado — nada entra nem sai',
   'whatsapp.health.queued': '{count} esperando para sair',

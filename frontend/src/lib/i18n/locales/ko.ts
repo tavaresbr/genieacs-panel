@@ -1698,6 +1698,8 @@ const ko: Dictionary = {
   'whatsapp.actions.delete': '삭제',
   'whatsapp.inbox.title': '대화',
   'whatsapp.health.title': '작동 중인가요?',
+  'whatsapp.health.bellLabel': '경고 {count}건',
+  'whatsapp.health.allGood': '모두 정상',
   'whatsapp.health.connected': '번호 {total}개 중 {connected}개 연결됨',
   'whatsapp.health.noNumbers': '연결된 번호가 없습니다 — 주고받을 수 없습니다',
   'whatsapp.health.queued': '{count}건 발송 대기 중',

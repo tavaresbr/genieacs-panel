@@ -1673,6 +1673,8 @@ const hi: Dictionary = {
   'whatsapp.actions.delete': 'हटाएँ',
   'whatsapp.inbox.title': 'बातचीत',
   'whatsapp.health.title': 'क्या यह काम कर रहा है?',
+  'whatsapp.health.bellLabel': '{count} चेतावनी',
+  'whatsapp.health.allGood': 'सब ठीक है',
   'whatsapp.health.connected': '{total} में से {connected} नंबर जुड़े हैं',
   'whatsapp.health.noNumbers': 'कोई नंबर नहीं जुड़ा — न कुछ भेजा जा सकता है, न मिल सकता है',
   'whatsapp.health.queued': '{count} भेजे जाने की प्रतीक्षा में',

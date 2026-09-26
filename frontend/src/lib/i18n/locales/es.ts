@@ -1693,6 +1693,8 @@ const es: Dictionary = {
   'whatsapp.actions.delete': 'Eliminar',
   'whatsapp.inbox.title': 'Conversaciones',
   'whatsapp.health.title': '¿Está funcionando?',
+  'whatsapp.health.bellLabel': '{count} aviso(s)',
+  'whatsapp.health.allGood': 'Todo bien',
   'whatsapp.health.connected': '{connected} de {total} números conectados',
   'whatsapp.health.noNumbers': 'Ningún número conectado — no entra ni sale nada',
   'whatsapp.health.queued': '{count} esperando para salir',
