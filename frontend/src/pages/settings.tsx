@@ -56,7 +56,7 @@ import type { Vendor as VendorType, WifiSecurityConfig as WifiSecurityConfigType
 import { MfaCard } from '@/components/mfa-card'
 import { AboutTab } from '@/components/settings/about-tab'
 import { MfaPolicyCard } from '@/components/mfa-policy-card'
-import { canOfferMfaReset } from '@/lib/mfa-enrollment'
+import { canOfferMfaReset, canOfferPasswordReset } from '@/lib/mfa-enrollment'
 
 /**
  * Mapas em vez de nome de chave montado com template literal.
@@ -3001,17 +3001,19 @@ export default function Settings() {
                                 <td className="text-sm text-muted-foreground">{formatDateTime(operator.createdAt)}</td>
                                 <td>
                                   <div className="flex items-center gap-2">
-                                    <button
-                                      onClick={() => {
-                                        setResetPasswordId((current) => (current === operator.id ? null : operator.id))
-                                        setResetPasswordValue('')
-                                      }}
-                                      className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                                      title={t('settings.operators.resetPassword')}
-                                      aria-label={t('settings.operators.resetPasswordFor', { username: operator.username })}
-                                    >
-                                      <Icon name="lock" size={18} />
-                                    </button>
+                                    {canOfferPasswordReset(operator, { isOwner }) && (
+                                      <button
+                                        onClick={() => {
+                                          setResetPasswordId((current) => (current === operator.id ? null : operator.id))
+                                          setResetPasswordValue('')
+                                        }}
+                                        className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                                        title={t('settings.operators.resetPassword')}
+                                        aria-label={t('settings.operators.resetPasswordFor', { username: operator.username })}
+                                      >
+                                        <Icon name="lock" size={18} />
+                                      </button>
+                                    )}
                                     {canOfferMfaReset(operator, { isSelf, isOwner }) && (
                                       <button
                                         onClick={() => void resetOperatorMfa(operator)}
