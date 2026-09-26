@@ -17,6 +17,8 @@ const genieAcs = {
   server: null,
   tasks: [],
   refusedObjects: new Set(),
+  /** An ONT behind CGNAT: GenieACS cannot call it back and only queues. */
+  unreachable: false,
   optical: null,
   /** TR-181 ONTs answer on `Device.` and have no `InternetGatewayDevice`. */
   dataModel: 'InternetGatewayDevice'
@@ -106,7 +108,12 @@ function startGenieAcsStub() {
 
       if (req.method === 'POST' && url.pathname.endsWith('/tasks')) {
         const task = await readBody(req);
-        genieAcs.tasks.push(task);
+        genieAcs.tasks.push({ ...task, connectionRequest: url.searchParams.has('connection_request') });
+        if (genieAcs.unreachable && url.searchParams.has('connection_request')) {
+          res.writeHead(202, 'Device is offline', { 'Content-Type': 'application/json' })
+            .end(JSON.stringify(task));
+          return;
+        }
         if (task?.name === 'refreshObject' && genieAcs.refusedObjects.has(task.objectName)) {
           res.writeHead(200, { 'Content-Type': 'application/json' })
             .end(JSON.stringify({ fault: { faultString: 'Invalid parameter name' } }));
@@ -153,6 +160,7 @@ after(async () => {
 beforeEach(async () => {
   genieAcs.tasks = [];
   genieAcs.refusedObjects = new Set();
+  genieAcs.unreachable = false;
   genieAcs.optical = null;
   genieAcs.dataModel = 'InternetGatewayDevice';
   await asTenant(() => getDb()('app_state').where({ key: 'rx_power_path' }).del());
@@ -264,5 +272,37 @@ describe('the reading a summon was asked for', () => {
     genieAcs.optical = { object: 'X_TAV-COM_PonOptical', value: '-1902' };
     const { body } = await listDevices();
     assert.equal(body.data.devices[0].rxpower, -19.02);
+  });
+});
+
+describe('summoning an ONT GenieACS cannot reach', () => {
+  it('says the request waits for the next Inform instead of reporting success', async () => {
+    genieAcs.unreachable = true;
+    const { status, body } = await summon();
+
+    assert.equal(status, 200);
+    assert.equal(body.data.reached, false);
+    assert.equal(body.data.reason, 'Device is offline');
+    assert.match(body.message, /Device is offline/);
+    assert.match(body.message, /Inform/);
+  });
+
+  it('asks GenieACS to call the ONT once, and only queues the rest', async () => {
+    genieAcs.unreachable = true;
+    await summon();
+
+    const called = genieAcs.tasks.filter((task) => task.connectionRequest);
+    assert.equal(called.length, 1, 'one connection request, not one per task');
+    assert.equal(called[0].name, 'getParameterValues');
+    assert.ok(
+      genieAcs.tasks.some((task) => task.name === 'refreshObject' && !task.connectionRequest),
+      'the refreshes are still queued for the next Inform'
+    );
+  });
+
+  it('reports success when the ONT answers', async () => {
+    const { body } = await summon();
+    assert.equal(body.data.reached, true);
+    assert.equal(body.data.reason, null);
   });
 });
