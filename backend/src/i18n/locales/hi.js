@@ -478,6 +478,7 @@ export default {
   'whatsapp.error.attachmentTooLarge': 'फ़ाइल {max} MB से बड़ी है',
   'whatsapp.error.attachmentEmpty': 'फ़ाइल खाली है',
   'whatsapp.error.attachmentTypeNotAllowed': 'इस प्रकार की फ़ाइल यहाँ से नहीं भेजी जा सकती',
+  'whatsapp.error.attachmentContentMismatch': 'फ़ाइल की सामग्री उसके प्रकार से मेल नहीं खाती',
   'whatsapp.error.attachmentNotAllowed': 'वह अटैचमेंट यहाँ से नहीं भेजा जा सकता',
   'whatsapp.error.noPublicUrl': 'अटैचमेंट भेजने से पहले सार्वजनिक वेबहुक URL सेट करें: Evolution सर्वर उन्हें इसी पते से लाता है',
   'whatsapp.attachmentStored': 'फ़ाइल भेजने के लिए तैयार है',

@@ -21,6 +21,7 @@
     "dotenv": "^18.0.3",
     "express": "^5.1.0",
     "express-rate-limit": "^8.7.0",
+    "heic-convert": "^2.1.0",
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.2",
     "knex": "^3.3.0",

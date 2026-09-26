@@ -4,7 +4,9 @@ import WaMessage from '../models/WaMessage.js';
 import WhatsAppAccount from '../models/WhatsAppAccount.js';
 import WhatsAppConfigService, { WaError } from './whatsappConfigService.js';
 import { DATA_DIR } from '../config/paths.js';
-import { outDir } from './waAttachmentService.js';
+import { normalizeType, outDir } from './waAttachmentService.js';
+import { ATTACHMENT_TYPES } from '../config/waAttachmentTypes.js';
+import { safeContentType } from './waMediaFile.js';
 import { clientForAccount } from './evolutionClient.js';
 import {
   readSentId,
@@ -246,14 +248,23 @@ export function destinationFor(conversation) {
   return normalizarTelefoneBr(destino.valor) || null;
 }
 
+/** O `kind` de cada tipo da lista única, para o envio não adivinhar pelo prefixo. */
+const KIND_BY_TYPE = new Map(ATTACHMENT_TYPES.map((row) => [row.type, row.kind]));
+
 /**
  * Evolution's media vocabulary has exactly four words. The column holds a MIME
  * type, so the mapping is by family — and anything unrecognised is a
  * 'document', which is the one kind that carries any bytes at all.
+ *
+ * Um tipo da lista (`config/waAttachmentTypes.js`) usa o `kind` que está lá —
+ * é a mesma linha que a tela e o upload leem. O prefixo fica como reserva para
+ * o que não está na lista: linhas antigas e anexos de bot/alerta.
  */
 export function mediaKind(attachmentType) {
   const raw = String(attachmentType || '').trim().toLowerCase();
   if (['image', 'video', 'audio', 'document'].includes(raw)) return raw;
+  const known = KIND_BY_TYPE.get(normalizeType(raw));
+  if (known) return known;
   if (raw.startsWith('image/')) return 'image';
   if (raw.startsWith('video/')) return 'video';
   if (raw.startsWith('audio/')) return 'audio';
@@ -388,7 +399,10 @@ async function sendThrough(client, account, message, number, config) {
     type: kind,
     url: mediaUrl,
     caption,
-    fileName: message.attachment_name || ''
+    fileName: message.attachment_name || '',
+    // O tipo sem parâmetros e só se for um tipo MIME de verdade — a coluna veio
+    // de um request. Sem tipo guardado, nada: o servidor deduz como fazia antes.
+    mimetype: message.attachment_type ? safeContentType(message.attachment_type) : undefined
   }));
   return readSentId(data);
 }

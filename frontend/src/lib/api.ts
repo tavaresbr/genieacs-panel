@@ -3362,11 +3362,15 @@ export const whatsappAPI = {
   // The raw file as the body, its name in a header. No multipart, and so no
   // upload dependency for one screen — the same choice the SGP webhook makes
   // with `express.raw`. Returns the stored reference `sendMessage` takes.
-  uploadAttachment: (file: File) =>
+  // `type` é o que a tela resolveu (`resolveAttachmentType`), não o do
+  // navegador: a foto HEIC do iPhone chega sem tipo e o Windows chama CSV de
+  // planilha do Excel, e o servidor confere o conteúdo contra o que for
+  // declarado aqui — declarar errado é ser recusado com razão.
+  uploadAttachment: (file: File, type?: string) =>
     apiClient.sendBlob<{ path: string; type: string; name: string }>(
       '/whatsapp/attachments',
       file,
-      { 'Content-Type': file.type || 'application/octet-stream', 'X-File-Name': encodeURIComponent(file.name) }
+      { 'Content-Type': type || file.type || 'application/octet-stream', 'X-File-Name': encodeURIComponent(file.name) }
     ),
 
   // A blob rather than a URL, because the route is session-authenticated and an
