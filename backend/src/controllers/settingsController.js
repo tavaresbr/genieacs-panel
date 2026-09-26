@@ -413,6 +413,31 @@ class SettingsController {
     }
   }
 
+  /**
+   * Como está a sincronização de IDs de cliente: ligada ou não, se há uma
+   * passada em curso e como terminou a última — com o motivo traduzido,
+   * quando falhou.
+   */
+  static async customerIdSyncStatus(req, res) {
+    try {
+      const enabled = await CustomerService.isAutoGenerationEnabled();
+      const status = await CustomerIdSyncJob.status(currentTenantId() ?? 'default');
+      const last = status.last && !status.last.ok
+        ? {
+            ...status.last,
+            message: req.t(
+              status.last.reasonKey || 'settings.customerIdSyncFailed',
+              status.last.status ? { status: status.last.status } : undefined
+            )
+          }
+        : status.last;
+      return res.json(createResponse(req.t('settings.listRetrieved'), { enabled, ...status, last }));
+    } catch (error) {
+      console.error('Customer ID sync status error:', error);
+      return res.status(500).json(createErrorResponse(req.t('common.internalError'), error.message));
+    }
+  }
+
   static async syncCustomerIds(req, res) {
     try {
       const enabled = await CustomerService.isAutoGenerationEnabled();

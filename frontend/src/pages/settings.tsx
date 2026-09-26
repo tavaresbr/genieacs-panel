@@ -37,6 +37,7 @@ import {
   SgpContactsShortcut,
   SgpContactsSyncPanel
 } from '@/components/settings/sgp-contacts-sync-panel'
+import { CustomerIdSyncStatusPanel } from '@/components/settings/customer-id-sync-status'
 import { WhatsAppConnection, whatsappErrorMessage } from '@/components/whatsapp-connection'
 import { TEST_TONE_CLASS, testNotes, testOutcome } from '@/lib/whatsapp-test'
 import { auditRetentionError, waRetentionAboveCap } from '@/lib/settings-validation'
@@ -146,6 +147,9 @@ export default function Settings() {
     ...INSTALLER_VIRTUAL_PARAMETERS
   })
   const [loading, setLoading] = useState(false)
+  // Muda a cada salvar que dispara a sincronização de IDs, para o quadro de
+  // andamento reler na hora em vez de esperar o próximo ciclo.
+  const [syncStatusKey, setSyncStatusKey] = useState(0)
   const [exportando, setExportando] = useState(false)
   // The tab can come from the address — `/settings?tab=sgp` — so other screens
   // can link to a section instead of describing where it is. Only the tabs
@@ -1111,6 +1115,7 @@ export default function Settings() {
 
       if (ok && !onlyProvider && settings.autoGenerateCustomerId === 'true') {
         const sync = await settingsAPI.syncCustomerIds()
+        setSyncStatusKey((key) => key + 1)
         if (!sync.success) {
           // As configurações JÁ foram gravadas; o que falhou foi a sincronia
           // com o ACS, que roda depois. Dizer só "não foi possível" fazia
@@ -1847,6 +1852,8 @@ export default function Settings() {
                 </span>
               </span>
             </label>
+
+            <CustomerIdSyncStatusPanel canWrite={can('settings.write')} refreshKey={syncStatusKey} />
 
             <div className="mt-5 grid gap-5 rounded-md border border-border p-4 sm:grid-cols-2">
               <fieldset>

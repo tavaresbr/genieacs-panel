@@ -1849,6 +1849,10 @@ export const settingsAPI = {
   syncCustomerIds: () =>
     apiClient.post('/settings/sync-customer-ids'),
 
+  /** Como está a sincronização de IDs de cliente (em curso, última passada). */
+  customerIdSyncStatus: () =>
+    apiClient.get<CustomerIdSyncStatus>('/settings/customer-id-sync'),
+
   delete: (key: string) =>
     apiClient.delete(`/settings/${key}`),
 
@@ -2573,6 +2577,24 @@ export interface MapImportResult {
   skippedNodes: number
   skippedEdges: number
   errors: string[]
+}
+
+export interface CustomerIdSyncStatus {
+  enabled: boolean
+  running: boolean
+  startedAt: string | null
+  last: null | {
+    ok: boolean
+    startedAt: string
+    finishedAt: string
+    total?: number
+    existing?: number
+    generated?: number
+    pending?: number
+    code?: string
+    status?: number | null
+    message?: string
+  }
 }
 
 export interface PlaceResult {

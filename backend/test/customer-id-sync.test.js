@@ -166,6 +166,54 @@ describe('POST /api/settings/sync-customer-ids', () => {
   });
 });
 
+describe('GET /api/settings/customer-id-sync', () => {
+  const status = () => call(`${panelUrl}/api/settings/customer-id-sync`, { headers: authHeaders(token) });
+
+  it('guarda como terminou a última passada, com contagens', async () => {
+    await ligar('true');
+    const res = await sincronizar();
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    await CustomerIdSyncJob.idle();
+    const st = await status();
+    assert.equal(st.status, 200);
+    assert.equal(st.body.data.enabled, true);
+    assert.equal(st.body.data.running, false);
+    assert.equal(st.body.data.last.ok, true);
+    assert.equal(typeof st.body.data.last.total, 'number');
+    assert.ok(st.body.data.last.finishedAt);
+  });
+
+  it('falha guardada com o motivo traduzido e o status HTTP', async () => {
+    await ligar('true');
+    genie.state.respond = ({ send }) => send(401, {});
+    assert.equal((await sincronizar()).status, 502);
+    await CustomerIdSyncJob.idle();
+    const st = await status();
+    assert.equal(st.body.data.last.ok, false);
+    assert.equal(st.body.data.last.code, 'genieacs_http');
+    assert.equal(st.body.data.last.status, 401);
+    assert.match(st.body.data.last.message, /401/);
+  });
+
+  it('mostra a passada em curso, e a chave interna não aparece na lista de configurações', async (t) => {
+    await ligar('true');
+    let liberar;
+    const segura = new Promise((resolve) => { liberar = resolve; });
+    const original = CustomerService.syncDevices.bind(CustomerService);
+    t.mock.method(CustomerService, 'syncDevices', async (...args) => { await segura; return original(...args); });
+    CustomerIdSyncJob.BUDGET_MS = 50;
+    assert.equal((await sincronizar()).body.data.running, true);
+    const st = await status();
+    assert.equal(st.body.data.running, true);
+    assert.ok(st.body.data.startedAt);
+    liberar();
+    await CustomerIdSyncJob.idle();
+    assert.equal((await status()).body.data.running, false);
+    const lista = await call(`${panelUrl}/api/settings`, { headers: authHeaders(token) });
+    assert.ok(!('customerIdSyncLast' in lista.body.data));
+  });
+});
+
 describe('classifySyncError', () => {
   it('reconhece cada causa', () => {
     const casos = [
