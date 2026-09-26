@@ -1,7 +1,8 @@
 # Changelog
 
-SkyGenPanel follows [Semantic Versioning](https://semver.org/). Release versions
-are calculated from conventional commits since the previous `v*` Git tag.
+TR69 Controle follows [Semantic Versioning](https://semver.org/). Release versions
+are calculated from conventional commits since the previous release commit
+(`chore(release): vX.Y.Z`); a `v*` Git tag counts too, when it names a newer version.
 
 ## [1.17.0] - 2026-09-22
 
