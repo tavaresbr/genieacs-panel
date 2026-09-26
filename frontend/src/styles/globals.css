@@ -91,6 +91,8 @@
   html {
     min-width: 320px;
     background: hsl(var(--background));
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
 
   body {
@@ -143,8 +145,10 @@
 }
 
 @layer components {
+  /* No celular o `main` da casca já desconta a barra fixa (pt-16), para que as
+     faixas de personificação e de assinatura apareçam abaixo dela. */
   .page-shell {
-    @apply px-4 pb-24 pt-20 sm:px-6 lg:px-8 lg:py-8;
+    @apply px-4 pb-24 pt-4 sm:px-6 lg:px-8 lg:py-8;
   }
 
   .page-frame {
@@ -211,7 +215,7 @@
   }
 
   .modern-input {
-    @apply min-h-11 w-full rounded-md border border-input bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/80 transition-[border-color,box-shadow] duration-150 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15 disabled:bg-muted disabled:text-muted-foreground;
+    @apply min-h-11 w-full min-w-0 rounded-md border border-input bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/80 transition-[border-color,box-shadow] duration-150 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15 disabled:bg-muted disabled:text-muted-foreground;
   }
 
   textarea.modern-input {
@@ -335,6 +339,16 @@
     @apply mt-2 font-mono text-3xl font-semibold tracking-tight text-foreground;
   }
 
+  /* Diálogos: o fundo e o painel que cabem na tela do celular — o painel rola
+     por dentro em vez de passar da altura da tela. */
+  .modal-backdrop {
+    @apply fixed inset-0 z-[2100] flex items-end justify-center bg-black/60 p-3 sm:items-center sm:p-4;
+  }
+
+  .modal-panel {
+    @apply w-full max-h-[calc(100dvh-1.5rem)] overflow-y-auto overscroll-contain sm:max-h-[calc(100dvh-2rem)];
+  }
+
   .mobile-data-card {
     @apply rounded-[var(--radius)] border border-border bg-card p-4;
   }
@@ -346,28 +360,28 @@
   }
 
   .alert-error {
-    @apply rounded-md border px-4 py-3 text-sm;
+    @apply rounded-md border px-4 py-3 text-sm [overflow-wrap:anywhere];
     border-color: hsl(var(--status-danger) / 0.28);
     color: hsl(var(--status-danger));
     background: hsl(var(--status-danger) / 0.07);
   }
 
   .alert-success {
-    @apply rounded-md border px-4 py-3 text-sm;
+    @apply rounded-md border px-4 py-3 text-sm [overflow-wrap:anywhere];
     border-color: hsl(var(--status-success) / 0.28);
     color: hsl(var(--status-success));
     background: hsl(var(--status-success) / 0.07);
   }
 
   .alert-warning {
-    @apply rounded-md border px-4 py-3 text-sm;
+    @apply rounded-md border px-4 py-3 text-sm [overflow-wrap:anywhere];
     border-color: hsl(var(--status-warning) / 0.28);
     color: hsl(var(--status-warning));
     background: hsl(var(--status-warning) / 0.07);
   }
 
   .alert-info {
-    @apply rounded-md border px-4 py-3 text-sm;
+    @apply rounded-md border px-4 py-3 text-sm [overflow-wrap:anywhere];
     border-color: hsl(var(--status-info) / 0.28);
     color: hsl(var(--status-info));
     background: hsl(var(--status-info) / 0.07);
@@ -383,6 +397,16 @@
 @media (min-width: 768px) {
   .mobile-card-list {
     display: none;
+  }
+}
+
+/* O Safari do iPhone/iPad dá zoom em campo com fonte menor que 16px ao focar.
+   Só em tela de toque: no desktop os campos continuam com o tamanho da classe. */
+@media (max-width: 1023px) and (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
+  select,
+  textarea {
+    font-size: max(16px, 1em);
   }
 }
 

@@ -53,8 +53,8 @@ export function ReleaseNotesModal({ open, onClose }: { open: boolean; onClose: (
     <div className="fixed inset-0 z-[3000] flex items-end justify-center bg-[#07100c]/75 p-0 backdrop-blur-[2px] sm:items-center sm:p-6"
       role="dialog" aria-modal="true" aria-labelledby="release-notes-title">
       <button type="button" className="absolute inset-0 cursor-default" onClick={onClose} aria-label={t('release.close')} />
-      <section className="modern-card relative flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-b-none shadow-2xl sm:rounded-[var(--radius)]">
-        <header className="relative overflow-hidden border-b border-border bg-[#173f35] px-5 py-6 text-[#f4f3ed] sm:px-7">
+      <section className="modern-card relative flex max-h-[92vh] w-full supports-[height:100dvh]:max-h-[92dvh] max-w-2xl flex-col overflow-hidden rounded-b-none shadow-2xl sm:rounded-[var(--radius)]">
+        <header className="relative shrink-0 overflow-hidden border-b border-border bg-[#173f35] px-5 py-6 text-[#f4f3ed] sm:px-7">
           <div className="absolute -end-16 -top-24 size-64 rounded-full border-[42px] border-white/5" aria-hidden="true" />
           <div className="relative flex items-start justify-between gap-5">
             <div className="flex min-w-0 items-start gap-4">
@@ -76,7 +76,7 @@ export function ReleaseNotesModal({ open, onClose }: { open: boolean; onClose: (
           </div>
         </header>
 
-        <div className="overflow-y-auto px-5 py-5 sm:px-7 sm:py-6">
+        <div className="min-h-0 overflow-y-auto overscroll-contain px-5 py-5 sm:px-7 sm:py-6">
           <div className="mb-5">
             <h3 className="section-heading">{t('release.highlights')}</h3>
             <p className="section-description">{t('release.highlightsDescription', { tag: release.basedOnTag })}</p>
@@ -95,7 +95,7 @@ export function ReleaseNotesModal({ open, onClose }: { open: boolean; onClose: (
                         <span className={style.className}>{translateCategory(change.category)}</span>
                         <span className="font-mono text-[0.68rem] text-muted-foreground">{change.shortHash}</span>
                       </div>
-                      <p className="mt-2 text-sm font-semibold leading-6 text-foreground">{change.title}</p>
+                      <p className="mt-2 text-sm font-semibold leading-6 text-foreground [overflow-wrap:anywhere]">{change.title}</p>
                     </div>
                   </div>
                 </li>
@@ -104,7 +104,7 @@ export function ReleaseNotesModal({ open, onClose }: { open: boolean; onClose: (
           </ol>
         </div>
 
-        <footer className="flex flex-col gap-3 border-t border-border bg-[hsl(var(--surface-subtle))] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+        <footer className="flex shrink-0 flex-col gap-3 border-t border-border bg-[hsl(var(--surface-subtle))] px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:flex-row sm:py-4 sm:items-center sm:justify-between sm:px-7">
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
             <span>{t('release.build')} <strong className="font-mono text-foreground">#{release.build}</strong></span>
             <span>{t('release.source')} <strong className="font-mono text-foreground">{release.sourceCommit}</strong></span>

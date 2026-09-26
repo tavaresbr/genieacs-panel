@@ -59,14 +59,14 @@ export default function Signup() {
     <main className="flex min-h-screen items-start justify-center bg-background px-4 pb-10 pt-16 sm:px-8 lg:items-center">
       <div className="w-full max-w-md">
         <div className="mb-8 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <BrandMark className="size-10" title={hostName} />
-            <div>
-              <div className="font-bold">{hostName}</div>
+          <div className="flex min-w-0 items-center gap-3">
+            <BrandMark className="size-10 shrink-0" title={hostName} />
+            <div className="min-w-0">
+              <div className="font-bold [overflow-wrap:anywhere]">{hostName}</div>
               <div className="text-[0.65rem] font-bold uppercase tracking-[0.13em] text-muted-foreground">{t('app.genieacsOperations')}</div>
             </div>
           </div>
-          <LanguageSwitcher className="ml-auto" />
+          <LanguageSwitcher className="ml-auto shrink-0" />
         </div>
 
         <div className="auth-panel">
@@ -117,12 +117,12 @@ export default function Signup() {
                   <label htmlFor="slug" className="field-label">{t('signup.slug')}</label>
                   <div className="flex items-center gap-2">
                     <input
-                      id="slug" className="modern-input font-mono" required maxLength={63}
+                      id="slug" className="modern-input min-w-0 flex-1 font-mono" required maxLength={63}
                       value={form.slug}
                       onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
                       aria-describedby="slug-hint"
                     />
-                    <span className="shrink-0 text-sm text-muted-foreground">.{base}</span>
+                    <span className="min-w-0 max-w-[55%] text-sm text-muted-foreground [overflow-wrap:anywhere]">.{base}</span>
                   </div>
                   <p id="slug-hint" className="field-hint">{t('platform.slugHint')}</p>
                 </div>
