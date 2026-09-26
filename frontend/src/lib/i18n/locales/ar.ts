@@ -487,6 +487,8 @@ const ar: Dictionary = {
   'map.search.empty': 'لم يتم العثور على مكان.',
   'map.search.addHere': 'أضف نقطة هنا',
   'map.import.button': 'استيراد KML/KMZ',
+  'map.export.button': 'تصدير KML',
+  'map.export.hint': 'ينزّل الصناديق والكابلات لفتحها في Google Earth أو حفظها كنسخة احتياطية؛ إعادة الاستيراد لا تكرّر شيئًا.',
   'map.import.title': 'استيراد KML/KMZ',
   'map.import.description': 'ملف مُصدَّر من Google Earth أو Google My Maps أو QGIS. تصبح النقاط صناديق والمسارات كابلات؛ ولا يُحذف أو يُعدَّل أي شيء موجود على الخريطة.',
   'map.import.file': 'ملف ‎.kml أو ‎.kmz',

@@ -493,6 +493,8 @@ const zhTW: Dictionary = {
   'map.search.empty': '找不到地點。',
   'map.search.addHere': '在此新增點位',
   'map.import.button': '匯入 KML/KMZ',
+  'map.export.button': '匯出 KML',
+  'map.export.hint': '下載分纖箱和光纜，可在 Google 地球中開啟或作為備份；重新匯入不會重複。',
   'map.import.title': '匯入 KML/KMZ',
   'map.import.description': '從 Google 地球、Google 我的地圖或 QGIS 匯出的檔案。點位會成為分纖箱，路徑會成為光纜；地圖上已有的內容不會被刪除或修改。',
   'map.import.file': '.kml 或 .kmz 檔案',

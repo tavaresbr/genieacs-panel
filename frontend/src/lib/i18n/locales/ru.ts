@@ -495,6 +495,8 @@ const ru: Dictionary = {
   'map.search.empty': 'Ничего не найдено.',
   'map.search.addHere': 'Добавить точку здесь',
   'map.import.button': 'Импорт KML/KMZ',
+  'map.export.button': 'Экспорт KML',
+  'map.export.hint': 'Скачивает боксы и кабели для Google Earth или как резервную копию; повторный импорт ничего не дублирует.',
   'map.import.title': 'Импорт KML/KMZ',
   'map.import.description': 'Файл, экспортированный из Google Earth, Google My Maps или QGIS. Точки становятся муфтами/боксами, линии — кабелями; то, что уже есть на карте, не удаляется и не изменяется.',
   'map.import.file': 'Файл .kml или .kmz',

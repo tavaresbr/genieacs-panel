@@ -493,6 +493,8 @@ const ja: Dictionary = {
   'map.search.empty': '場所が見つかりません。',
   'map.search.addHere': 'ここにポイントを追加',
   'map.import.button': 'KML/KMZ をインポート',
+  'map.export.button': 'KML を書き出し',
+  'map.export.hint': 'ボックスとケーブルを Google Earth 用またはバックアップとしてダウンロードします。再インポートしても重複しません。',
   'map.import.title': 'KML/KMZ をインポート',
   'map.import.description': 'Google Earth、Google マイマップ、QGIS から書き出したファイル。ポイントはボックス、パスはケーブルになります。既存のマップ上のものは削除も変更もされません。',
   'map.import.file': '.kml または .kmz ファイル',

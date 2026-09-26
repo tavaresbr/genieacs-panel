@@ -493,6 +493,8 @@ const fr: Dictionary = {
   'map.search.empty': 'Aucun lieu trouvé.',
   'map.search.addHere': 'Ajouter un point ici',
   'map.import.button': 'Importer KML/KMZ',
+  'map.export.button': 'Exporter KML',
+  'map.export.hint': 'Télécharge boîtiers et câbles pour Google Earth ou comme sauvegarde ; réimporter le fichier ne duplique rien.',
   'map.import.title': 'Importer KML/KMZ',
   'map.import.description': 'Fichier exporté depuis Google Earth, Google My Maps ou QGIS. Les points deviennent des boîtiers et les tracés des câbles ; rien de ce qui est déjà sur la carte n\'est supprimé ni modifié.',
   'map.import.file': 'Fichier .kml ou .kmz',

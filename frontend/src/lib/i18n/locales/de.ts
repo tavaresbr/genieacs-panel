@@ -494,6 +494,8 @@ const de: Dictionary = {
   'map.search.empty': 'Kein Ort gefunden.',
   'map.search.addHere': 'Punkt hier hinzufügen',
   'map.import.button': 'KML/KMZ importieren',
+  'map.export.button': 'KML exportieren',
+  'map.export.hint': 'Lädt Boxen und Kabel für Google Earth oder als Sicherung herunter; erneutes Importieren dupliziert nichts.',
   'map.import.title': 'KML/KMZ importieren',
   'map.import.description': 'Eine aus Google Earth, Google My Maps oder QGIS exportierte Datei. Punkte werden zu Boxen und Pfade zu Kabeln; nichts, was schon auf der Karte ist, wird gelöscht oder geändert.',
   'map.import.file': '.kml- oder .kmz-Datei',

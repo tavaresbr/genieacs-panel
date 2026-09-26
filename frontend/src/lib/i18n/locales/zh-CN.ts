@@ -493,6 +493,8 @@ const zhCN: Dictionary = {
   'map.search.empty': '未找到地点。',
   'map.search.addHere': '在此添加点位',
   'map.import.button': '导入 KML/KMZ',
+  'map.export.button': '导出 KML',
+  'map.export.hint': '下载分纤箱和光缆，可在 Google 地球中打开或作为备份；重新导入不会重复。',
   'map.import.title': '导入 KML/KMZ',
   'map.import.description': '从 Google 地球、Google 我的地图或 QGIS 导出的文件。点位会成为分纤箱，路径会成为光缆；地图上已有的内容不会被删除或修改。',
   'map.import.file': '.kml 或 .kmz 文件',

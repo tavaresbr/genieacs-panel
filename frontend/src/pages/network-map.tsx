@@ -16,6 +16,7 @@ import type { PlaceResult } from '@/lib/api'
 import {
   buildImportPlan, chunkImportPlan, parseKml, readKmlFile, type ParsedKml
 } from '@/lib/kml-import'
+import { buildKml, kmlFileName } from '@/lib/kml-export'
 import 'leaflet/dist/leaflet.css'
 
 // Start fetching the map engine as soon as this route chunk is evaluated. The
@@ -444,7 +445,7 @@ export default function NetworkMap() {
   // A sede do provedor: o centro salvo, quando alguém o escolheu (não é o
   // padrão de Brasília). `address` só com `settings.read`, que é quem lê o cadastro.
   const [headquarters, setHeadquarters] = useState<{ lat: number; lng: number; address: string } | null>(null)
-  const { name: tenantName } = useTenant()
+  const { name: tenantName, tenant } = useTenant()
   const canReadBilling = useAuth().can('settings.read')
   const [defaultZoom, setDefaultZoom] = useState(12)
   const [minZoom, setMinZoom] = useState(5)
@@ -687,6 +688,21 @@ export default function NetworkMap() {
     map.flyTo([foundPlace.lat, foundPlace.lng], Math.min(maxZoom, 17), { duration: 0.8 })
   }, [foundPlace, maxZoom])
 
+  // O arquivo é montado aqui mesmo, a partir do que a tela já carregou.
+  const exportKml = () => {
+    const kml = buildKml(nodes, edges, {
+      document: `${tenantName} · ${t('map.title')}`,
+      nodeType: (type) => nodeTypeLabel(type as NodeType),
+      fiberType: (type) => t(getFiberMeta(type as FiberType).labelKey)
+    })
+    const url = URL.createObjectURL(new Blob([kml], { type: 'application/vnd.google-earth.kml+xml' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = kmlFileName(tenant?.slug || tenantName)
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
   const openNewEdge = () => {
     setEditingEdge(false)
     setEdgeEditor({
@@ -771,6 +787,9 @@ export default function NetworkMap() {
             {canEditMap && <button type="button" className="modern-button" onClick={() => openNewNode()}><Icon name="pin" size={17} />{t('map.addNode')}</button>}
             {canEditMap && <button type="button" className="modern-button-secondary" onClick={openNewEdge}><Icon name="signal" size={17} />{t('map.drawCable')}</button>}
             {canEditMap && <button type="button" className="modern-button-secondary" onClick={() => setImportOpen(true)}><Icon name="document" size={17} />{t('map.import.button')}</button>}
+            <button type="button" className="modern-button-secondary" disabled={!nodes.length} onClick={exportKml} title={t('map.export.hint')}>
+              <Icon name="external" size={17} />{t('map.export.button')}
+            </button>
             <button type="button" className="modern-button-secondary" disabled={loading} onClick={() => void loadData(false)}>
               <Icon name="refresh" size={17} className={loading ? 'animate-spin' : ''} />{t('common.refresh')}
             </button>

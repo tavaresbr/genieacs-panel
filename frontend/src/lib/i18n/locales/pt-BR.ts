@@ -493,6 +493,8 @@ const ptBR: Dictionary = {
   'map.search.empty': 'Nenhum lugar encontrado.',
   'map.search.addHere': 'Adicionar ponto aqui',
   'map.import.button': 'Importar KML/KMZ',
+  'map.export.button': 'Exportar KML',
+  'map.export.hint': 'Baixa caixas e cabos para abrir no Google Earth ou guardar como cópia; reimportar o arquivo não duplica nada.',
   'map.import.title': 'Importar KML/KMZ',
   'map.import.description': 'Arquivo exportado do Google Earth, Google My Maps ou QGIS. Pontos viram caixas e caminhos viram cabos; nada do que já está no mapa é apagado ou alterado.',
   'map.import.file': 'Arquivo .kml ou .kmz',

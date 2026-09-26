@@ -494,6 +494,8 @@ const it: Dictionary = {
   'map.search.empty': 'Nessun luogo trovato.',
   'map.search.addHere': 'Aggiungi punto qui',
   'map.import.button': 'Importa KML/KMZ',
+  'map.export.button': 'Esporta KML',
+  'map.export.hint': 'Scarica scatole e cavi per Google Earth o come copia di sicurezza; reimportare il file non duplica nulla.',
   'map.import.title': 'Importa KML/KMZ',
   'map.import.description': 'File esportato da Google Earth, Google My Maps o QGIS. I punti diventano scatole e i percorsi cavi; nulla di ciò che è già sulla mappa viene eliminato o modificato.',
   'map.import.file': 'File .kml o .kmz',

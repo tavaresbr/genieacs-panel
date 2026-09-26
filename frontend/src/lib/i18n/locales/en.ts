@@ -495,6 +495,8 @@ const en = {
   'map.search.empty': 'No place found.',
   'map.search.addHere': 'Add node here',
   'map.import.button': 'Import KML/KMZ',
+  'map.export.button': 'Export KML',
+  'map.export.hint': 'Downloads boxes and cables to open in Google Earth or keep as a backup; re-importing the file duplicates nothing.',
   'map.import.title': 'Import KML/KMZ',
   'map.import.description': 'A file exported from Google Earth, Google My Maps or QGIS. Points become boxes and paths become cables; nothing already on the map is deleted or changed.',
   'map.import.file': '.kml or .kmz file',

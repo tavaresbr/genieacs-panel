@@ -487,6 +487,8 @@ const hi: Dictionary = {
   'map.search.empty': 'कोई स्थान नहीं मिला।',
   'map.search.addHere': 'यहाँ पॉइंट जोड़ें',
   'map.import.button': 'KML/KMZ आयात करें',
+  'map.export.button': 'KML निर्यात करें',
+  'map.export.hint': 'बॉक्स और केबल Google Earth में खोलने या बैकअप के लिए डाउनलोड करता है; दोबारा आयात करने पर कुछ दोहराया नहीं जाता।',
   'map.import.title': 'KML/KMZ आयात करें',
   'map.import.description': 'Google Earth, Google My Maps या QGIS से निर्यात की गई फ़ाइल। पॉइंट बॉक्स बनते हैं और पथ केबल; मैप पर पहले से मौजूद कुछ भी हटाया या बदला नहीं जाता।',
   'map.import.file': '.kml या .kmz फ़ाइल',

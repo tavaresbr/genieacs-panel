@@ -493,6 +493,8 @@ const ko: Dictionary = {
   'map.search.empty': '장소를 찾을 수 없습니다.',
   'map.search.addHere': '여기에 지점 추가',
   'map.import.button': 'KML/KMZ 가져오기',
+  'map.export.button': 'KML 내보내기',
+  'map.export.hint': '함체와 케이블을 Google 어스용 또는 백업으로 내려받습니다. 다시 가져와도 중복되지 않습니다.',
   'map.import.title': 'KML/KMZ 가져오기',
   'map.import.description': 'Google 어스, Google 내 지도 또는 QGIS에서 내보낸 파일입니다. 지점은 함체로, 경로는 케이블이 되며 지도에 이미 있는 항목은 삭제되거나 변경되지 않습니다.',
   'map.import.file': '.kml 또는 .kmz 파일',
