@@ -79,6 +79,10 @@ const DEFAULT_CONFIG = Object.freeze({
   // comportamento antes de existir a chave, e um provedor que nunca abriu a
   // tela não pode perder o bot por uma atualização.
   botEnabled: true,
+  // O bot pedir a liberação em confiança ao SGP sozinho. Desligado por
+  // padrão: é a única ação que o bot faz no serviço do assinante, e ligar é
+  // decisão do provedor.
+  botUnlockEnabled: false,
   // Per-minute ceiling for outbound messages, shared by the outbox worker and
   // any campaign that does not set its own.
   rateLimitPerMin: 20,
@@ -182,6 +186,7 @@ class WhatsAppConfigService {
       rejectCallMessage: String(stored.rejectCallMessage || DEFAULT_CONFIG.rejectCallMessage),
       portalPublicUrl: String(stored.portalPublicUrl || ''),
       botEnabled: stored.botEnabled !== false,
+      botUnlockEnabled: stored.botUnlockEnabled === true,
       rateLimitPerMin: Number(stored.rateLimitPerMin) > 0
         ? Math.min(Number(stored.rateLimitPerMin), 120)
         : DEFAULT_CONFIG.rateLimitPerMin,
@@ -206,6 +211,7 @@ class WhatsAppConfigService {
       rejectCallMessage: String(stored.rejectCallMessage || DEFAULT_CONFIG.rejectCallMessage),
       portalPublicUrl: String(stored.portalPublicUrl || ''),
       botEnabled: stored.botEnabled !== false,
+      botUnlockEnabled: stored.botUnlockEnabled === true,
       rateLimitPerMin: Number(stored.rateLimitPerMin) > 0
         ? Math.min(Number(stored.rateLimitPerMin), 120)
         : DEFAULT_CONFIG.rateLimitPerMin,
@@ -292,6 +298,9 @@ class WhatsAppConfigService {
       botEnabled: patch.botEnabled === undefined
         ? current.botEnabled
         : patch.botEnabled !== false,
+      botUnlockEnabled: patch.botUnlockEnabled === undefined
+        ? current.botUnlockEnabled
+        : patch.botUnlockEnabled === true,
       mediaRetentionDays: patch.mediaRetentionDays === undefined
         ? current.mediaRetentionDays
         : normalizeRetentionDays(patch.mediaRetentionDays),

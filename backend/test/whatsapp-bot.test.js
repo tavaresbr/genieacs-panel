@@ -44,6 +44,23 @@ const LINHA_DIGITAVEL = '34191790010104351004791020150008699999999999';
 const PIX = '00020126580014BR.GOV.BCB.PIX0136bot-teste-chave-pix5204000053039865802BR';
 const LINK_BOLETO = 'https://provedor.example/boleto/900123/';
 
+/**
+ * Etapa 2: o número que o cadastro não conhece se identifica pelo CPF/CNPJ.
+ * Três CPFs válidos — um com um contrato (suspenso), um com dois, um sem
+ * cadastro — e o que o SGP de mentira recebeu, para provar o que NÃO foi
+ * consultado.
+ */
+const DOC_UM = '52998224725';
+const DOC_DOIS = '11144477735';
+const DOC_NENHUM = '93541134780';
+const CONTRATOS_SGP = [
+  { contratoId: '7001', cpfcnpj: DOC_UM, razaoSocial: 'Maria Souza', contratoStatusDisplay: 'Suspenso', bloqueado: true, endereco: 'Rua A, 10' },
+  { contratoId: '7101', cpfcnpj: DOC_DOIS, razaoSocial: 'Pedro Lima', contratoStatusDisplay: 'Ativo', bloqueado: false, endereco: 'Rua B, 20' },
+  { contratoId: '7102', cpfcnpj: DOC_DOIS, razaoSocial: 'Pedro Lima', contratoStatusDisplay: 'Ativo', bloqueado: false, endereco: 'Rua C, 30' }
+];
+const pedidosSgp = [];
+let liberacaoRecusada = false;
+
 let panelUrl;
 let token;
 let genie;
@@ -78,6 +95,16 @@ function startSgpStub() {
       };
       if (payload.app !== APP || payload.token !== SGP_TOKEN) {
         return send({ status: 0, msg: 'Token inválido' });
+      }
+      pedidosSgp.push({ url: req.url, payload });
+      if (req.url.startsWith('/api/ura/consultacliente')) {
+        const achados = CONTRATOS_SGP.filter((c) => (payload.cpfcnpj && c.cpfcnpj === payload.cpfcnpj)
+          || (payload.contrato && c.contratoId === String(payload.contrato)));
+        return send(achados.length ? { status: 1, contratos: achados } : { status: 0, msg: 'Cliente não encontrado' });
+      }
+      if (req.url.startsWith('/api/ura/liberacaopromessa')) {
+        if (liberacaoRecusada) return send({ status: 2, liberado: false, msg: 'Promessa já utilizada' });
+        return send({ status: 1, liberado: true, liberado_dias: 3, protocolo: 'PROT-777', msg: 'Liberação efetuada' });
       }
       if (req.url.startsWith('/api/ura/titulos')) {
         return send({
@@ -787,5 +814,161 @@ describe('the intent table on its own', () => {
   it('sends a message that asks for a secret to the portal even when it also complains', async () => {
     const { classificarIntencao } = await import('../src/services/waBotService.js');
     assert.equal(classificarIntencao('estou sem internet e esqueci a senha do wifi'), 'portal');
+  });
+});
+
+describe('etapa 2: identificação pelo CPF/CNPJ', () => {
+  const ultima = async (telefone) => (await respostas(telefone)).at(-1);
+  const consultas = () => pedidosSgp.filter((p) => p.url.startsWith('/api/ura/consultacliente'));
+
+  it('pede o CPF/CNPJ a um número que o cadastro não conhece', async () => {
+    const texto = await unicaResposta(DESCONHECIDO, 'boa noite');
+    assert.match(texto, /CPF ou CNPJ/);
+  });
+
+  it('um CPF inválido não chega ao SGP', async () => {
+    await limparFio(DESCONHECIDO);
+    const antes = consultas().length;
+    await receber(DESCONHECIDO, '123.456.789-00');
+    assert.match(await ultima(DESCONHECIDO), /não é válido/);
+    assert.equal(consultas().length, antes, 'um documento inválido foi consultado no SGP');
+  });
+
+  it('com um contrato, liga a conversa e manda o menu; depois o 1 traz a fatura', async () => {
+    await limparFio(DESCONHECIDO);
+    await receber(DESCONHECIDO, `meu cpf é ${DOC_UM}`);
+    const menu = await ultima(DESCONHECIDO);
+    assert.match(menu, /1 — 2ª via/);
+    assert.ok(!menu.includes('4 —'), 'a opção 4 apareceu com a liberação desligada');
+    assert.equal((await conversaDe(DESCONHECIDO)).contract, '7001');
+
+    await receber(DESCONHECIDO, '1');
+    assert.ok((await ultima(DESCONHECIDO)).includes(LINHA_DIGITAVEL));
+
+    // Só a conversa: o telefone não virou o do contrato.
+    const gravados = await getDb()('sgp_links').where({ phone_e164: DESCONHECIDO }).orWhere({ phone_manual: DESCONHECIDO });
+    assert.equal(gravados.length, 0);
+    const passo = await conversaDe(DESCONHECIDO);
+    assert.equal(passo.bot_step, null);
+  });
+
+  it('com vários contratos, lista e liga o escolhido — sem guardar o documento', async () => {
+    await limparFio(DESCONHECIDO);
+    await receber(DESCONHECIDO, DOC_DOIS);
+    const lista = await ultima(DESCONHECIDO);
+    assert.match(lista, /1 — Contrato 7101/);
+    assert.match(lista, /2 — Contrato 7102/);
+    const escolhendo = await conversaDe(DESCONHECIDO);
+    assert.equal(escolhendo.bot_step, 'escolhendo_contrato');
+    assert.ok(!String(escolhendo.bot_step_data).includes(DOC_DOIS), 'o documento foi guardado no passo');
+
+    await receber(DESCONHECIDO, '2');
+    assert.equal((await conversaDe(DESCONHECIDO)).contract, '7102');
+    assert.match(await ultima(DESCONHECIDO), /1 — 2ª via/);
+  });
+
+  it('um documento sem cadastro é dito, e o passo continua esperando', async () => {
+    await limparFio(DESCONHECIDO);
+    await receber(DESCONHECIDO, DOC_NENHUM);
+    assert.match(await ultima(DESCONHECIDO), /Não encontrei cadastro/);
+    assert.equal((await conversaDe(DESCONHECIDO)).bot_step, 'aguardando_documento');
+  });
+
+  it('na terceira tentativa errada, passa para um atendente e pausa o bot', async () => {
+    await limparFio(DESCONHECIDO);
+    await receber(DESCONHECIDO, '11111111111');
+    await receber(DESCONHECIDO, DOC_NENHUM);
+    await receber(DESCONHECIDO, '22222222222');
+    assert.match(await ultima(DESCONHECIDO), /atendente/);
+    const conversa = await conversaDe(DESCONHECIDO);
+    assert.ok(new Date(conversa.bot_paused_until).getTime() > Date.now(), 'o bot não pausou');
+
+    // E pausado, fica quieto.
+    const quantas = (await respostas(DESCONHECIDO)).length;
+    await receber(DESCONHECIDO, DOC_UM);
+    assert.equal((await respostas(DESCONHECIDO)).length, quantas);
+  });
+
+  it('um passo vencido volta ao pedido do documento', async () => {
+    await limparFio(DESCONHECIDO);
+    await receber(DESCONHECIDO, DOC_DOIS);
+    const conversa = await conversaDe(DESCONHECIDO);
+    await getDb()('wa_conversations').where({ id: conversa.id })
+      .update({ bot_step_at: new Date(Date.now() - WaBotService.PASSO_VALIDADE_MS - 60_000) });
+    await receber(DESCONHECIDO, '1');
+    assert.match(await ultima(DESCONHECIDO), /CPF ou CNPJ/);
+    assert.equal((await conversaDe(DESCONHECIDO)).contract, null);
+  });
+});
+
+describe('etapa 2: liberação em confiança pelo bot', () => {
+  const ultima = async (telefone) => (await respostas(telefone)).at(-1);
+  const liberacoes = () => pedidosSgp.filter((p) => p.url.startsWith('/api/ura/liberacaopromessa'));
+  const ligar = (valor) => asTenant(() => WhatsAppConfigService.saveConfig({ botUnlockEnabled: valor }));
+
+  it('desligada, o "4" cai na fatura e nada é pedido ao SGP', async () => {
+    await ligar(false);
+    await limparFio(DESCONHECIDO);
+    await receber(DESCONHECIDO, DOC_UM);
+    const antes = liberacoes().length;
+    await receber(DESCONHECIDO, '4');
+    assert.ok((await ultima(DESCONHECIDO)).includes(LINHA_DIGITAVEL));
+    assert.equal(liberacoes().length, antes);
+  });
+
+  it('ligada e com o contrato bloqueado, mostra a opção 4, libera e deixa na trilha', async () => {
+    await ligar(true);
+    try {
+      await limparFio(DESCONHECIDO);
+      await receber(DESCONHECIDO, DOC_UM);
+      assert.match(await ultima(DESCONHECIDO), /4 — Liberar em confiança/);
+
+      const antes = liberacoes().length;
+      await receber(DESCONHECIDO, '4');
+      const texto = await ultima(DESCONHECIDO);
+      assert.match(texto, /liberação em confiança/i);
+      assert.match(texto, /3 dias/);
+      assert.match(texto, /PROT-777/);
+      assert.equal(liberacoes().length, antes + 1);
+      assert.equal(liberacoes().at(-1).payload.contrato, '7001');
+
+      const linha = await getDb()('audit_log')
+        .where({ action: 'whatsapp.bot_trust_unlock', subject_id: '7001' })
+        .orderBy('id', 'desc').first();
+      assert.ok(linha, 'a liberação não foi para a trilha');
+      assert.equal(linha.actor_kind, 'system');
+    } finally {
+      await ligar(false);
+    }
+  });
+
+  it('ligada, mas com o contrato em dia, não oferece nem pede', async () => {
+    await ligar(true);
+    try {
+      await limparFio(DESCONHECIDO);
+      await receber(DESCONHECIDO, DOC_DOIS);
+      await receber(DESCONHECIDO, '1');
+      assert.ok(!(await ultima(DESCONHECIDO)).includes('4 —'));
+      const antes = liberacoes().length;
+      await receber(DESCONHECIDO, 'quero liberar');
+      assert.match(await ultima(DESCONHECIDO), /não está bloqueado/);
+      assert.equal(liberacoes().length, antes);
+    } finally {
+      await ligar(false);
+    }
+  });
+
+  it('uma recusa do SGP vira resposta, não silêncio', async () => {
+    await ligar(true);
+    liberacaoRecusada = true;
+    try {
+      await limparFio(DESCONHECIDO);
+      await receber(DESCONHECIDO, DOC_UM);
+      await receber(DESCONHECIDO, '4');
+      assert.match(await ultima(DESCONHECIDO), /Não foi possível liberar/);
+    } finally {
+      liberacaoRecusada = false;
+      await ligar(false);
+    }
   });
 });

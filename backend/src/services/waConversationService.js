@@ -117,6 +117,27 @@ class WaConversationService {
   }
 
   /**
+   * A conversa ligada ao contrato que o próprio assinante apontou no bot, pelo
+   * CPF/CNPJ do titular.
+   *
+   * Só a CONVERSA, e nunca o telefone: `sgp_links.phone_*` fica como está, e a
+   * próxima conversa deste número pede o documento de novo. Quem sabe o CPF de
+   * alguém não vira, por isso, o dono daquele contrato para sempre. E, como
+   * `bindSubscriber`, só preenche o vazio — um vínculo que um atendente fez não
+   * é trocado pelo que o bot ouviu.
+   */
+  static async bindByDocument(conversation, { contract }) {
+    if (!conversation?.id || !contract) return conversation;
+    const atual = await WaConversation.getById(conversation.id);
+    if (atual?.contract) return atual;
+    const [primeiro] = await SgpLink.getByContract(contract);
+    return WaConversation.update(conversation.id, {
+      contract: String(contract),
+      device_id: primeiro?.device_id ?? null
+    });
+  }
+
+  /**
    * `bindSubscriber` for a whole page of the inbox, in two queries.
    *
    * The inbox used to show every thread from before the binding existed — and

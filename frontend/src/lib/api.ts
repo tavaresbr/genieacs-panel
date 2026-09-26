@@ -2625,6 +2625,8 @@ export interface WhatsAppConfig {
   portalPublicUrl: string
   /** O atendimento automático (menu, 2ª via, sinal). Ligado por padrão. */
   botEnabled: boolean
+  /** O bot pedir a liberação em confiança ao SGP. Desligado por padrão. */
+  botUnlockEnabled: boolean
   /** Days a stored attachment is kept. 0 means forever, and is the default. */
   mediaRetentionDays: number
   /** Days a message row is kept. 0 is forever, and is the default. */
