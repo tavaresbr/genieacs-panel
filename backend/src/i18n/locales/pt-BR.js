@@ -84,6 +84,7 @@ export default {
   'device.detailFailed': 'Não foi possível obter o detalhe do equipamento',
   'device.deleted': 'Equipamento excluído com sucesso',
   'device.deleteFailed': 'Não foi possível excluir o equipamento',
+  'device.deletePasswordRequired': 'Digite sua senha duas vezes para confirmar a remoção',
   'device.rebootStarted': 'Reinício do equipamento iniciado com sucesso',
   'device.factoryResetStarted': 'Reset de fábrica pedido. A ONT volta sem PPPoE e sem Wi-Fi até ser provisionada de novo.',
   'device.factoryResetFailed': 'Não foi possível fazer o reset de fábrica da ONT',

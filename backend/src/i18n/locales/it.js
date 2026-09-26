@@ -84,6 +84,7 @@ export default {
   'device.detailFailed': 'Non è stato possibile ottenere il dettaglio dell’apparato',
   'device.deleted': 'Apparato eliminato correttamente',
   'device.deleteFailed': 'Non è stato possibile eliminare l’apparato',
+  'device.deletePasswordRequired': 'Digita la password due volte per confermare la rimozione',
   'device.rebootStarted': 'Riavvio dell’apparato avviato correttamente',
   'device.factoryResetStarted': 'Ripristino di fabbrica richiesto. L\'ONT tornerà senza PPPoE e senza Wi-Fi finché non verrà riconfigurata.',
   'device.factoryResetFailed': 'Impossibile ripristinare l\'ONT alle impostazioni di fabbrica',

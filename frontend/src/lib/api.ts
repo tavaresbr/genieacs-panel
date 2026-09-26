@@ -355,8 +355,11 @@ class ApiClient {
     })
   }
 
-  async delete<T>(endpoint: string): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint, { method: 'DELETE' })
+  async delete<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, {
+      method: 'DELETE',
+      body: data ? JSON.stringify(data) : undefined,
+    })
   }
 
   /**
@@ -1763,8 +1766,10 @@ export const devicesAPI = {
   acknowledgeSwap: (id: number) =>
     apiClient.post<DeviceSwap>(`/devices/swaps/${encodeURIComponent(id)}/acknowledge`),
 
-  deleteDevice: (deviceId: string) =>
-    apiClient.delete(`/devices/${encodeURIComponent(deviceId)}`),
+  // Remove a ONT do GenieACS. Pede o mesmo que o reset de fábrica: a série
+  // digitada e a senha do operador duas vezes, conferidas pelo servidor.
+  deleteDevice: (deviceId: string, confirmSerial: string, password: string, passwordConfirm: string) =>
+    apiClient.delete(`/devices/${encodeURIComponent(deviceId)}`, { confirmSerial, password, passwordConfirm }),
 
   rebootDevice: (deviceId: string) =>
     apiClient.post('/devices/reboot', { deviceId }),

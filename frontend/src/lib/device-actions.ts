@@ -18,3 +18,21 @@ export function serialMatches(typed: string, serial: string | null | undefined, 
   const digitado = String(typed ?? '').trim().toUpperCase()
   return digitado.length > 0 && digitado === esperado
 }
+
+/** A janela do "online" do painel: um inform nos últimos 10 minutos. */
+const ONLINE_WINDOW_MS = 10 * 60 * 1000
+
+/**
+ * Se a ONT informou há pouco — e, portanto, provavelmente ainda está ligada.
+ *
+ * É o aviso da remoção do GenieACS: uma ONT ligada se cadastra de novo no
+ * próximo inform, e a remoção que o operador acabou de confirmar não teria
+ * servido para nada.
+ */
+export function informedRecently(lastInform: string | null | undefined, now: number = Date.now()): boolean {
+  if (!lastInform) return false
+  const quando = new Date(lastInform).getTime()
+  if (!Number.isFinite(quando)) return false
+  const idade = now - quando
+  return idade >= 0 && idade < ONLINE_WINDOW_MS
+}

@@ -87,6 +87,7 @@ export default {
   'device.detailFailed': 'Die Gerätedetails konnten nicht abgerufen werden',
   'device.deleted': 'Gerät erfolgreich gelöscht',
   'device.deleteFailed': 'Das Gerät konnte nicht gelöscht werden',
+  'device.deletePasswordRequired': 'Geben Sie Ihr Passwort zweimal ein, um das Entfernen zu bestätigen',
   'device.rebootStarted': 'Neustart des Geräts erfolgreich gestartet',
   'device.factoryResetStarted': 'Werksreset angefordert. Die ONT kommt ohne PPPoE und WLAN zurück, bis sie neu provisioniert wird.',
   'device.factoryResetFailed': 'Die ONT konnte nicht auf Werkseinstellungen zurückgesetzt werden',

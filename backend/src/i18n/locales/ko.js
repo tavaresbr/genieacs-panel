@@ -87,6 +87,7 @@ export default {
   'device.detailFailed': '장비 상세 정보를 조회하지 못했습니다',
   'device.deleted': '장비를 삭제했습니다',
   'device.deleteFailed': '장비를 삭제하지 못했습니다',
+  'device.deletePasswordRequired': '삭제를 확인하려면 비밀번호를 두 번 입력하세요',
   'device.rebootStarted': '장비 재시작을 시작했습니다',
   'device.factoryResetStarted': '공장 초기화를 요청했습니다. 다시 프로비저닝될 때까지 ONT는 PPPoE와 Wi-Fi 없이 돌아옵니다.',
   'device.factoryResetFailed': 'ONT를 공장 초기화하지 못했습니다',

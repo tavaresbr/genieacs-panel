@@ -2155,7 +2155,13 @@ class DeviceService {
     };
   }
 
-  static async deleteDevice(deviceId) {
+  /**
+   * Apaga o cadastro da ONT no GenieACS — com a mesma conferência de série do
+   * reset de fábrica, e pelo mesmo motivo: não tem volta, e a tela pode ter
+   * ficado aberta noutro aparelho.
+   */
+  static async deleteDevice(deviceId, confirmSerial) {
+    await this.assertSerialConfirmed(deviceId, confirmSerial);
     const connector = await connectorFor();
     const response = await connector.request(
       this.devicePath(encodeURIComponent(deviceId)),
@@ -2178,6 +2184,16 @@ class DeviceService {
    * Sem série no documento (ACS que não a reporta), vale o id do aparelho.
    */
   static async factoryResetDevice(deviceId, confirmSerial) {
+    await this.assertSerialConfirmed(deviceId, confirmSerial);
+    return this.postTask(deviceId, { name: 'factoryReset' });
+  }
+
+  /**
+   * Que `confirmSerial` é o número de série DESTE aparelho — sem ligar para
+   * maiúsculas nem espaços nas pontas, e o id do aparelho quando o ACS não
+   * reporta série. 404 para o aparelho que o ACS não conhece.
+   */
+  static async assertSerialConfirmed(deviceId, confirmSerial) {
     const rows = await this.fetchFromGenieAcs('', {
       query: JSON.stringify({ _id: deviceId }),
       projection: '_deviceId._SerialNumber'
@@ -2193,7 +2209,6 @@ class DeviceService {
         code: 'serial_mismatch'
       });
     }
-    return this.postTask(deviceId, { name: 'factoryReset' });
   }
 
   static async rebootDevice(deviceId) {

@@ -450,6 +450,19 @@ export const factoryResetLimiter = limiter({
 });
 
 /**
+ * `DELETE /api/devices/:deviceId`: a remoção do GenieACS pede a senha do mesmo
+ * jeito que o reset, e pelo mesmo motivo tem o mesmo teto — num contador à
+ * parte, para que os erros de uma não bloqueiem a outra.
+ */
+export const deviceDeleteLimiter = limiter({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  skipSuccessfulRequests: true,
+  keyGenerator: (req) => (req.user?.userId ? `user:${req.user.userId}` : `ip:${ipKey(req)}`),
+  message: limitMessage('rateLimit.requests', 'rate_limited')
+});
+
+/**
  * O login em duas etapas da própria conta: ativar, desligar, trocar os códigos.
  * Por pessoa, e apertado: cada tentativa é um palpite nos 6 dígitos, e quem
  * tenta desligar o 2FA de uma sessão roubada não pode ter palpites à vontade.

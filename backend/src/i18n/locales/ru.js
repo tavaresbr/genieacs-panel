@@ -87,6 +87,7 @@ export default {
   'device.detailFailed': 'Не удалось получить данные устройства',
   'device.deleted': 'Устройство удалено',
   'device.deleteFailed': 'Не удалось удалить устройство',
+  'device.deletePasswordRequired': 'Введите пароль дважды, чтобы подтвердить удаление',
   'device.rebootStarted': 'Перезагрузка устройства запущена',
   'device.factoryResetStarted': 'Сброс к заводским настройкам запрошен. ONT вернётся без PPPoE и Wi-Fi, пока её не настроят заново.',
   'device.factoryResetFailed': 'Не удалось сбросить ONT к заводским настройкам',

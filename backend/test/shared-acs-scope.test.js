@@ -156,7 +156,10 @@ describe('um GenieACS compartilhado, com a tag do provedor', () => {
   it('reiniciar, apagar e diagnosticar um equipamento de outro provedor nunca chega ao ACS', async () => {
     const reboot = await api('/devices/reboot', { method: 'POST', body: { deviceId: 'ONT-BETA-1' } });
     assert.equal(reboot.status, 404, JSON.stringify(reboot.body));
-    const apagar = await api(`/devices/${encodeURIComponent('ONT-BETA-1')}`, { method: 'DELETE' });
+    const apagar = await api(`/devices/${encodeURIComponent('ONT-BETA-1')}`, {
+      method: 'DELETE',
+      body: { confirmSerial: 'ZTEG12345678', password: OWNER.password, passwordConfirm: OWNER.password }
+    });
     assert.equal(apagar.status, 404, JSON.stringify(apagar.body));
     const reset = await api('/devices/factory-reset', {
       method: 'POST',
