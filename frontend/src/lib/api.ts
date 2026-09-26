@@ -1712,6 +1712,12 @@ export interface DeviceSwapList {
   open?: number
 }
 
+export interface SummonResult {
+  refreshed?: string[]
+  reached?: boolean
+  reason?: string | null
+}
+
 export const devicesAPI = {
   getDevices: (params: DeviceListParams = {}) => {
     const query = new URLSearchParams()
@@ -1800,8 +1806,10 @@ export const devicesAPI = {
   upgradeFirmware: (deviceId: string, fileId: string) =>
     apiClient.post<DeviceFirmwareUpgrade>('/devices/firmware/upgrade', { deviceId, fileId }),
 
+  // `reached` is false when GenieACS could not call the ONT back (CGNAT, offline)
+  // and only queued the tasks for its next periodic Inform.
   summonDevice: (deviceId: string, parameters?: string[]) =>
-    apiClient.post('/devices/summon', { deviceId, parameters }),
+    apiClient.post<SummonResult>('/devices/summon', { deviceId, parameters }),
 
   updateWanConfig: (deviceId: string, wanIndex: string, formData: any) => {
     return apiClient.post(`/devices/${encodeURIComponent(deviceId)}/update-wan`, { wanIndex, formData });

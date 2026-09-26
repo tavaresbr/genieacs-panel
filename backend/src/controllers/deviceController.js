@@ -796,9 +796,15 @@ class DeviceController {
 
     try {
       const data = await DeviceService.summonDevice(deviceId, parameters);
-      return res.json(
-        createResponse(req.t('device.summonQueued'), data)
-      );
+      // Only a 200 from GenieACS means the ONT answered; a 202 means the tasks
+      // wait for its next periodic Inform, and the operator must be told so
+      // rather than reloading the page to the same N/D.
+      const message = data.reached
+        ? req.t('device.summonApplied')
+        : data.reason
+          ? req.t('device.summonDeferred', { reason: data.reason })
+          : req.t('device.summonDeferredNoReason');
+      return res.json(createResponse(message, data));
     } catch (error) {
 
       const escopo = respostaDeEscopo(req, res, error);

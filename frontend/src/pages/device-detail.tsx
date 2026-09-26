@@ -1234,7 +1234,9 @@ export default function DeviceDetailPage() {
     loadingCtl.show(t('devices.summon.loading'))
     try {
       const res = await devicesAPI.summonDevice(deviceId)
-      if (res.success) {
+      if (res.success && res.data?.reached === false) {
+        toast.warning(res.message || t('devices.summon.success'))
+      } else if (res.success) {
         toast.success(res.message || t('devices.summon.success'))
       } else {
         toast.error(res.message || t('devices.summon.failed'))
