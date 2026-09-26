@@ -17,6 +17,19 @@ import { timestampMs } from '../utils/helpers.js';
  */
 const FLAP_WINDOW_MS = 30 * 60_000;
 
+/**
+ * How long a pair the operator dismissed as unstable stays dismissed while it
+ * keeps trading the login.
+ *
+ * Longer than the flap window on purpose. The pair's rhythm is not the ONTs'
+ * inform interval but whoever opens the device list or runs the Customer ID
+ * sweep, and a gap of more than 30 minutes between two of those is ordinary.
+ * Measuring the dismissal by the flap window brought "Confirmar" back after
+ * every lunch break. A pair that stays quiet for a whole day is a new story,
+ * and the next swap after that reopens it.
+ */
+const DISMISSED_FLAP_WINDOW_MS = 24 * 60 * 60_000;
+
 function normalizeId(value) {
   return String(value ?? '').trim();
 }
@@ -24,6 +37,10 @@ function normalizeId(value) {
 class DeviceSwapService {
   static flapWindowMs() {
     return FLAP_WINDOW_MS;
+  }
+
+  static dismissedFlapWindowMs() {
+    return DISMISSED_FLAP_WINDOW_MS;
   }
 
   /**
@@ -49,6 +66,9 @@ class DeviceSwapService {
     const reverse = await DeviceSwap.getPair(next, previous);
     const flapping = Boolean(
       reverse && timestampMs(now) - timestampMs(reverse.occurred_at) <= FLAP_WINDOW_MS
+    );
+    const keepDismissed = Boolean(
+      reverse && timestampMs(now) - timestampMs(reverse.occurred_at) <= DISMISSED_FLAP_WINDOW_MS
     );
 
     const link = await SgpLink.getByDeviceId(previous);
@@ -77,7 +97,7 @@ class DeviceSwapService {
       occurred_at: now,
       created_at: now,
       updated_at: now
-    });
+    }, { keepDismissed });
 
     // Both directions describe the same unstable pair, so both are flagged —
     // otherwise the operator's list shows one row calling it a swap and one

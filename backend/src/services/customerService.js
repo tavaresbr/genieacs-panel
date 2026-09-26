@@ -4,6 +4,7 @@ import CustomerAccount from '../models/CustomerAccount.js';
 import SgpLink from '../models/SgpLink.js';
 import CustomerPortalPasswordService from './customerPortalPasswordService.js';
 import DeviceSwapService from './deviceSwapService.js';
+import DeviceService from './deviceService.js';
 import DeviceProfile from '../models/DeviceProfile.js';
 import Setting from '../models/Setting.js';
 import AuditLog from '../models/AuditLog.js';
@@ -17,6 +18,12 @@ const DEFAULT_GENERATION_SETTINGS = Object.freeze({
   companyPrefix: 'CSG',
   suffixMode: 'random'
 });
+
+/** Um `_lastInform` do GenieACS em milissegundos; `NaN` quando não há. */
+function informMs(value) {
+  if (!value) return Number.NaN;
+  return new Date(value).getTime();
+}
 
 function randomString(alphabet, length) {
   let result = '';
@@ -200,7 +207,7 @@ class CustomerService {
    * O orçamento de `syncDevices` continua onde está, e não é redundante: ele
    * evita N contagens numa página de frota. Esta é a que decide.
    */
-  static async ensureAccount(device) {
+  static async ensureAccount(device, { informs = null } = {}) {
     const deviceId = normalizeIdentityValue(device?._id);
     const softwareId = normalizeIdentityValue(device?.softwareId);
     const pppoeUsername = normalizeIdentityValue(device?.pppoe);
@@ -224,6 +231,7 @@ class CustomerService {
       // A replacement ONT of the same model on the same firmware hashes to the
       // same identity, so this branch — not the PPPoE one below — is where the
       // ordinary swap lands.
+      if (!await this.shouldTakeAccount(existingByIdentity, device, deviceId, informs)) return null;
       const moved = await CustomerAccount.touch(existingByIdentity.id, deviceId);
       await this.noteSwap(existingByIdentity, deviceId, 'identity_hash');
       return moved;
@@ -233,6 +241,7 @@ class CustomerService {
     // version both changed, so only the PPPoE login still matches.
     const existingByPppoe = await CustomerAccount.getActiveByPppoe(pppoeUsername);
     if (existingByPppoe) {
+      if (!await this.shouldTakeAccount(existingByPppoe, device, deviceId, informs)) return null;
       const moved = await this.touchIdentity(existingByPppoe, deviceId, softwareId, identityHash);
       await this.noteSwap(existingByPppoe, deviceId, 'pppoe');
       return moved;
@@ -296,6 +305,43 @@ class CustomerService {
       }
     }
     throw new TranslatableError('settings.customerIdAllocationFailed');
+  }
+
+  /**
+   * Se `device` pode tomar a conta que hoje está em outro ONT.
+   *
+   * Só quando ele falou com o GenieACS DEPOIS do ONT que a detém. O ONT
+   * antigo continua no GenieACS depois da troca — desligado na gaveta, ou
+   * ainda ligado na bancada —, informando o mesmo login PPPoE. A varredura de
+   * Customer ID e a lista de aparelhos passam pelos DOIS, e o que ficou sem
+   * conta a tomava de volta: A→B numa passada, B→A na seguinte, para sempre.
+   * Era isso o "par instável · 97×" do painel, e o vínculo do SGP indo e
+   * voltando junto. A conta segue o ONT que está em serviço, e o que está em
+   * serviço é o que informou por último.
+   *
+   * Sem a data de um dos dois — o chamador não a trouxe, o ONT antigo sumiu
+   * do GenieACS, o GenieACS não respondeu —, a conta se move como sempre se
+   * moveu: é o caso da troca de verdade, e travá-la seria pior.
+   */
+  static async shouldTakeAccount(account, device, deviceId, informs = null) {
+    const holderId = normalizeIdentityValue(account?.device_id);
+    if (!holderId || holderId === deviceId) return true;
+    const incoming = informMs(device?._lastInform ?? device?.lastInform);
+    if (!Number.isFinite(incoming)) return true;
+    let holder = informs?.has(holderId) ? informMs(informs.get(holderId)) : Number.NaN;
+    if (!Number.isFinite(holder) && !informs?.has(holderId)) {
+      try {
+        const [row] = await DeviceService.fetchDeviceListPage(
+          JSON.stringify({ _id: holderId }),
+          ['_id', '_lastInform']
+        );
+        holder = informMs(row?._lastInform);
+      } catch (error) {
+        console.warn(`Unable to read the last inform of ${holderId}: ${error.message}`);
+      }
+    }
+    if (!Number.isFinite(holder)) return true;
+    return incoming > holder;
   }
 
   /**
@@ -413,11 +459,16 @@ class CustomerService {
           );
         }
       }
+      // O último inform de cada ONT desta passada, para `shouldTakeAccount`
+      // decidir entre o antigo e o novo sem uma consulta ao GenieACS por troca.
+      const informs = new Map(devices
+        .filter((device) => device?._id)
+        .map((device) => [String(device._id), device._lastInform ?? device.lastInform ?? null]));
       // Keep database pressure bounded while avoiding a slow one-by-one sync
       // for larger GenieACS fleets.
       for (let offset = 0; offset < allowed.length; offset += 10) {
         await Promise.all(
-          allowed.slice(offset, offset + 10).map((device) => this.ensureAccount(device))
+          allowed.slice(offset, offset + 10).map((device) => this.ensureAccount(device, { informs }))
         );
       }
       if (allowed.length > 0) {

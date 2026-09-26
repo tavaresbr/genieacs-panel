@@ -326,7 +326,8 @@ class DeviceController {
         account = await CustomerService.ensureAccount({
           _id: deviceId,
           softwareId: deviceDetail.deviceInfo?.softwareVersion,
-          pppoe: reportedPppoe
+          pppoe: reportedPppoe,
+          lastInform: deviceDetail.lastInform
         }) || (staleSubscriber ? null : account);
       }
       return res.json(
@@ -753,7 +754,8 @@ class DeviceController {
         account = await CustomerService.ensureAccount({
           _id: id,
           softwareId: detail.deviceInfo?.softwareVersion,
-          pppoe: detail.virtualParameters?.pppoeUsername?.value
+          pppoe: detail.virtualParameters?.pppoeUsername?.value,
+          lastInform: detail.lastInform
         });
       }
       // Whoever records the installation is the technician the ACS names.
