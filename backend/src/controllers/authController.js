@@ -19,6 +19,7 @@ import { runInTenant } from '../config/tenantContext.js';
 import { recordPanelActivity } from '../services/dashboardSchedule.js';
 import { mailTransport, panelUrlFor } from '../services/mail/index.js';
 import MfaService, { mfaEnabled } from '../services/mfaService.js';
+import { PRODUCT_NAME } from '../config/brand.js';
 
 const DUMMY_PASSWORD_HASH = bcrypt.hashSync('skygenpanel-invalid-login-placeholder', 12);
 
@@ -60,7 +61,7 @@ async function enviarBilhete({ req, purpose, userId, tenantId, email, rota, assu
   }
 
   const { token } = await AuthTicket.create({ purpose, userId, tenantId, email });
-  const nome = tenant?.name || 'SkyGenPanel';
+  const nome = tenant?.name || PRODUCT_NAME;
   // Os dois prazos vão para o texto, e cada mensagem usa o que lhe cabe: meia
   // hora se diz em minutos, um dia se diz em horas. Vindos do próprio
   // `TTL_MS`, e não escritos na tradução, para que mexer no prazo não deixe

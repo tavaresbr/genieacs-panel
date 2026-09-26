@@ -138,7 +138,7 @@ describe('a requisição que sai para o gateway', () => {
     // `asaas-access-token` — dois cabeçalhos de nomes parecidos, e trocá-los dá
     // 401 numa direção só, a que só se exercita cobrando de verdade.
     assert.equal(pedido.accessToken, CHAVE);
-    assert.equal(pedido.userAgent, 'SkyGenPanel');
+    assert.equal(pedido.userAgent, 'TR69-Controle');
 
     // O corpo é EXATAMENTE este conjunto. O `deepEqual` sobre as chaves é o que
     // impede um campo chutado de entrar depois numa integração que ninguém

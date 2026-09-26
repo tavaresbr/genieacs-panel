@@ -24,7 +24,7 @@ const SEGREDOS = {
   BILLING_WEBHOOK_TOKEN: 'sentinela-do-webhook-de-cobranca',
   ASAAS_API_KEY: 'sentinela-da-chave-da-asaas',
   SMTP_URL: 'smtps://sentinela-do-usuario:sentinela-da-senha@smtp.exemplo.test:465',
-  MAIL_FROM: 'SkyGenPanel <nao-responda@exemplo.test>'
+  MAIL_FROM: 'TR69 Controle <nao-responda@exemplo.test>'
 };
 Object.assign(process.env, SEGREDOS);
 

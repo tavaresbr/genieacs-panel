@@ -1,7 +1,7 @@
 <div align="center">
-  <img src="frontend/public/icon.svg" alt="SkyGenPanel logo" width="104" height="104">
+  <img src="frontend/public/icon.svg" alt="TR69 Controle logo" width="104" height="104">
 
-  <h1>SkyGenPanel</h1>
+  <h1>TR69 Controle</h1>
 
   <p><strong>A focused operations console and customer self-service portal for GenieACS.</strong></p>
   <p>Monitor ONTs, manage network topology, configure multi-vendor devices, and give customers a safe view of their own connection from one lightweight service.</p>
@@ -28,7 +28,7 @@
 
 ## Overview
 
-SkyGenPanel is a management layer for GenieACS deployments. It combines an operator-facing panel on port `5890` with an isolated customer portal on port `5891`. SQLite works out of the box, while MySQL can be selected and migrated to later from the interface.
+TR69 Controle is a management layer for GenieACS deployments. It combines an operator-facing panel on port `5890` with an isolated customer portal on port `5891`. SQLite works out of the box, while MySQL can be selected and migrated to later from the interface.
 
 | Operator console | Customer portal |
 | --- | --- |
@@ -68,8 +68,8 @@ SkyGenPanel is a management layer for GenieACS deployments. It combines an opera
       <td align="center"><strong>Customer portal</strong></td>
     </tr>
     <tr>
-      <td><img src="docs/screenshots/operator-panel.png" alt="SkyGenPanel operator access screen" width="680"></td>
-      <td><img src="docs/screenshots/customer-portal.png" alt="SkyGenPanel customer portal access screen" width="680"></td>
+      <td><img src="docs/screenshots/operator-panel.png" alt="TR69 Controle operator access screen" width="680"></td>
+      <td><img src="docs/screenshots/customer-portal.png" alt="TR69 Controle customer portal access screen" width="680"></td>
     </tr>
     <tr>
       <td align="center"><sub>Secure access to fleet operations and GenieACS management.</sub></td>
@@ -144,7 +144,7 @@ alongside the data.
 
 ## Cloudflare Tunnel
 
-When `cloudflared` runs on the SkyGenPanel host, publish two HTTP services:
+When `cloudflared` runs on the TR69 Controle host, publish two HTTP services:
 
 | Public hostname | Origin service |
 | --- | --- |
@@ -469,7 +469,7 @@ one certificate per provider and installs its nginx block.
 
 ## License
 
-SkyGenPanel is available under the [MIT License](LICENSE).
+TR69 Controle is available under the [MIT License](LICENSE).
 
 For support, email [support@skydash.net](mailto:support@skydash.net) or open a [GitHub issue](https://github.com/skydashnet/genieacs-panel/issues).
 

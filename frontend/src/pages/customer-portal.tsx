@@ -462,7 +462,7 @@ export default function CustomerPortal() {
     return (
       <main className="flex min-h-screen items-center justify-center bg-background p-5">
         <div className="text-center" aria-live="polite">
-          <BrandMark className="mx-auto h-12 w-12" title="SkyGenPanel" />
+          <BrandMark className="mx-auto h-12 w-12" title="TR69 Controle" />
           <Icon name="refresh" className="mx-auto mt-5 animate-spin text-primary" />
           <p className="mt-2 text-sm text-muted-foreground">{t('portal.checkingSession')}</p>
         </div>
@@ -475,9 +475,9 @@ export default function CustomerPortal() {
       <main className="min-h-screen bg-background px-4 py-8 sm:flex sm:items-center sm:justify-center">
         <div className="mx-auto w-full max-w-md">
           <header className="mb-8 flex items-center gap-3">
-            <BrandMark className="h-12 w-12 shrink-0" title="SkyGenPanel" />
+            <BrandMark className="h-12 w-12 shrink-0" title="TR69 Controle" />
             <div className="min-w-0">
-              <p className="text-lg font-bold">SkyGenPanel</p>
+              <p className="text-lg font-bold">TR69 Controle</p>
               <p className="text-sm text-muted-foreground">{t('portal.name')}</p>
             </div>
             <LanguageSwitcher className="ms-auto shrink-0" />
@@ -553,7 +553,7 @@ export default function CustomerPortal() {
       <header className="border-b border-border bg-card">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
-            <BrandMark className="h-10 w-10 shrink-0" title="SkyGenPanel" />
+            <BrandMark className="h-10 w-10 shrink-0" title="TR69 Controle" />
             <div className="min-w-0">
               <p className="font-bold">{t('portal.name')}</p>
               <p className="truncate font-mono text-xs text-muted-foreground">{overview?.customerId || customerId}</p>

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# skygenpanel — management CLI for the SkyGenPanel service.
+# skygenpanel — management CLI for the TR69 Controle service.
 #
 set -euo pipefail
 
@@ -196,7 +196,7 @@ cmd_version() {
   [ -f "$INSTALL_DIR/package.json" ] || die "Package manifest not found: $INSTALL_DIR/package.json"
   version="$(node -p "require('${INSTALL_DIR}/package.json').version")"
   commit="$(git -C "$INSTALL_DIR" rev-parse --short=12 HEAD 2>/dev/null || echo unknown)"
-  printf 'SkyGenPanel v%s (%s)\n' "$version" "$commit"
+  printf 'TR69 Controle v%s (%s)\n' "$version" "$commit"
 }
 cmd_logs() {
   local lines="${1:-100}"
@@ -256,7 +256,7 @@ cmd_backup() {
 
 usage() {
   cat <<EOF
-skygenpanel — manage the SkyGenPanel service
+skygenpanel — manage the TR69 Controle service
 
 Usage: skygenpanel <command> [args]
 

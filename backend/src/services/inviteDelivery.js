@@ -1,5 +1,6 @@
 import { mailTransport, panelUrlFor } from './mail/index.js';
 import { normalizeRole } from '../config/permissions.js';
+import { PRODUCT_NAME } from '../config/brand.js';
 
 /**
  * A entrega de um convite: o que ele mostra, por onde ele é aceito, e o e-mail
@@ -95,7 +96,7 @@ export async function sendPasswordSetup({ req, tenant, email, token }) {
   const link = passwordSetupLink(tenant, token);
   if (!link) return false;
 
-  const nome = tenant?.name || 'SkyGenPanel';
+  const nome = tenant?.name || PRODUCT_NAME;
   const dias = Math.round(PASSWORD_SETUP_TTL_MS / (24 * 60 * 60 * 1000));
   return transporte.send({
     to: email,
@@ -124,7 +125,7 @@ export async function sendInvite({ req, tenant, email, token }) {
   const link = inviteLink(tenant, token);
   if (!link) return false;
 
-  const nome = tenant?.name || 'SkyGenPanel';
+  const nome = tenant?.name || PRODUCT_NAME;
   return transporte.send({
     to: email,
     subject: req.t('invite.mailSubject', { provider: nome }),

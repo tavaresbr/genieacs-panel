@@ -36,7 +36,7 @@ before(async () => {
   ({ server: smtp, recebidas } = smtpDeMentira());
   await new Promise((resolve) => smtp.listen(0, '127.0.0.1', resolve));
   process.env.SMTP_URL = `smtp://usuario:senha@127.0.0.1:${smtp.address().port}?ignoreTLS=true`;
-  process.env.MAIL_FROM = 'SkyGenPanel <nao-responda@exemplo.test>';
+  process.env.MAIL_FROM = 'TR69 Controle <nao-responda@exemplo.test>';
   resetMailTransport();
 
   await startTestServers();

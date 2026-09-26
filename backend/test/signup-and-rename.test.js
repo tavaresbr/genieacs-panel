@@ -168,7 +168,7 @@ describe('renaming the provider', () => {
     assert.equal(pub.body.data.name, 'Provedor da Casa');
     const line = await getDb()('audit_log').where({ action: 'tenant.renamed' }).first();
     assert.ok(line);
-    assert.deepEqual(JSON.parse(line.detail), { from: 'SkyGenPanel', to: 'Provedor da Casa' });
+    assert.deepEqual(JSON.parse(line.detail), { from: 'TR69 Controle', to: 'Provedor da Casa' });
   });
 
   it('is settings.write: a viewer is refused, and an empty or oversized name too', async () => {

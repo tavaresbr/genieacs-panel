@@ -1,6 +1,6 @@
 # Operar a edição SaaS
 
-Como subir, observar, guardar e desfazer um deploy do SkyGenPanel que serve vários
+Como subir, observar, guardar e desfazer um deploy do TR69 Controle que serve vários
 provedores. É o documento da Fase 7 do `saas-multi-tenant-plan.md`, escrito para quem
 está de plantão e não para quem desenhou o sistema: cada seção diz o que fazer e onde
 olhar, e o *porquê* fica em uma linha quando importa para não fazer errado.

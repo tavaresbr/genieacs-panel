@@ -118,7 +118,7 @@ async function chamar(caminho, { method = 'POST', payload = null } = {}) {
         'Content-Type': 'application/json',
         // O painel se identifica: o gateway registra isso e é o que aparece do
         // lado de lá quando alguém pergunta quem abriu a cobrança.
-        'User-Agent': 'SkyGenPanel',
+        'User-Agent': 'TR69-Controle',
         access_token: chave
       },
       body: corpo,

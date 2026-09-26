@@ -1,8 +1,8 @@
-# Plano: transformar o SkyGenPanel em SaaS multi-tenant
+# Plano: transformar o TR69 Controle em SaaS multi-tenant
 
 ## Contexto
 
-O SkyGenPanel nasceu **single-tenant por construção**: um install = um provedor. Estamos
+O TR69 Controle nasceu **single-tenant por construção**: um install = um provedor. Estamos
 comercializando-o como SaaS, onde cada cliente é um **provedor de internet (tenant)** com
 seus próprios operadores, seus próprios assinantes, seu próprio GenieACS e seu próprio plano.
 

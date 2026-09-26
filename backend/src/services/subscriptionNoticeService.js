@@ -6,6 +6,7 @@ import TenantUser from '../models/TenantUser.js';
 import { mailTransport, panelUrlFor } from './mail/index.js';
 import SubscriptionService from './subscriptionService.js';
 import BillingCharge from '../models/BillingCharge.js';
+import { PRODUCT_NAME } from '../config/brand.js';
 
 /**
  * O aviso que chega ANTES do bloqueio.
@@ -105,7 +106,7 @@ class SubscriptionNoticeService {
     const paraPagar = cobranca?.invoice_url || null;
 
     const vars = {
-      provider: tenant.name || 'SkyGenPanel',
+      provider: tenant.name || PRODUCT_NAME,
       // A data vai em ISO e curta: o idioma do destinatário é desconhecido, e
       // `12/09` é ambíguo entre metade do mundo e a outra metade.
       date: pendente.deadline.toISOString().slice(0, 10),

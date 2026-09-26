@@ -1,5 +1,5 @@
 [Unit]
-Description=Daily SkyGenPanel backup
+Description=Daily TR69 Controle backup
 
 [Timer]
 # 03:17 and not 03:00: thirty installs writing to the same NFS share at the
