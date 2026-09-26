@@ -80,7 +80,7 @@ class DeviceService {
     const id = currentTenantId();
     let cache = this.dashboardCaches.get(id);
     if (!cache) {
-      cache = { data: null, expiresAt: 0, promise: null, hydrated: false };
+      cache = { data: null, scope: null, expiresAt: 0, promise: null, hydrated: false };
       this.dashboardCaches.set(id, cache);
     }
     return cache;
@@ -3132,6 +3132,17 @@ class DeviceService {
     };
   }
 
+  /**
+   * O escopo de equipamentos em que o painel foi montado: a tag do provedor,
+   * a tag "sem dono" de um ACS compartilhado sem tag, ou `''` com o ACS só
+   * dele. Um painel montado noutro escopo é descartado, não servido — foi
+   * assim que um provedor recém-separado continuava vendo a frota de todos.
+   */
+  static async dashboardScope() {
+    const connector = await connectorFor();
+    return String((await connector.scopeTag?.()) ?? '');
+  }
+
   static async hydrateDashboardCache() {
     const cache = this.dashboardCacheFor();
     if (cache.hydrated) return;
@@ -3141,7 +3152,10 @@ class DeviceService {
       if (!stored) return;
       const snapshot = JSON.parse(stored);
       if (!snapshot?.data?.stats || !snapshot?.data?.generatedAt) return;
+      // Instantâneo sem escopo é de antes da separação por tag: não serve.
+      if (typeof snapshot.scope !== 'string') return;
       cache.data = snapshot.data;
+      cache.scope = snapshot.scope;
       cache.expiresAt = Number(snapshot.expiresAt) || 0;
     } catch (error) {
       console.warn('Ignoring invalid dashboard snapshot:', error.message);
@@ -3154,7 +3168,8 @@ class DeviceService {
     try {
       await AppState.upsert('dashboard_snapshot', JSON.stringify({
         data: cache.data,
-        expiresAt: cache.expiresAt
+        expiresAt: cache.expiresAt,
+        scope: cache.scope ?? ''
       }));
     } catch (error) {
       console.warn('Unable to persist dashboard snapshot:', error.message);
@@ -3171,10 +3186,14 @@ class DeviceService {
    */
   static async refreshDashboardData({ ttlMs } = {}) {
     const cache = this.dashboardCacheFor();
+    const scope = await this.dashboardScope();
     const devices = await this.getDashboardDevices();
-    const previousFaults = Array.isArray(cache.data?.faults) ? cache.data.faults : [];
-    const data = this.buildDashboardSummary(devices, previousFaults, cache.data?.faultsError || null);
+    // As falhas do painel anterior só valem se ele era do mesmo escopo.
+    const anterior = cache.scope === scope ? cache.data : null;
+    const previousFaults = Array.isArray(anterior?.faults) ? anterior.faults : [];
+    const data = this.buildDashboardSummary(devices, previousFaults, anterior?.faultsError || null);
     cache.data = data;
+    cache.scope = scope;
     cache.expiresAt = Date.now() + (Number.isFinite(ttlMs) && ttlMs > 0 ? ttlMs : this.dashboardCacheTtlMs);
     await this.persistDashboardCache();
     return data;
@@ -3184,6 +3203,7 @@ class DeviceService {
     const cache = this.dashboardCacheFor();
     await this.hydrateDashboardCache();
     if (!cache.data) return;
+    if (cache.scope !== await this.dashboardScope()) return;
     cache.data = { ...cache.data, faults, faultsError };
     await this.persistDashboardCache();
   }
@@ -3191,6 +3211,10 @@ class DeviceService {
   static async getDashboardData(force = false) {
     const cache = this.dashboardCacheFor();
     await this.hydrateDashboardCache();
+    if (cache.data && cache.scope !== await this.dashboardScope()) {
+      cache.data = null;
+      cache.expiresAt = 0;
+    }
 
     const startRefresh = () => {
       if (cache.promise) return cache.promise;

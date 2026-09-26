@@ -18,6 +18,7 @@ const { buildDevice, startGenieAcsStub } = await import('./helpers/genieacs-stub
 const { default: Setting } = await import('../src/models/Setting.js');
 const { default: DeviceService } = await import('../src/services/deviceService.js');
 const { default: GenieAcsEgress } = await import('../src/services/genieacsEgress.js');
+const { forgetSharedAcs } = await import('../src/services/genieacs/direct.js');
 const { default: SchedulerService } = await import('../src/services/schedulerService.js');
 const { default: AppState } = await import('../src/models/AppState.js');
 
@@ -91,6 +92,8 @@ beforeEach(async () => {
       await AppState.upsert('scheduler_state', '{}');
     });
   }
+  await runInTenant(beta, () => Setting.upsert('genieAcsUrl', genie.url));
+  forgetSharedAcs();
   DeviceService.forgetDashboards();
 });
 
@@ -108,10 +111,39 @@ describe('um GenieACS compartilhado, com a tag do provedor', () => {
     assert.equal(body.data.stats.total, 2);
   });
 
-  it('sem tag, tudo como antes: o ACS é tratado como exclusivo', async () => {
+  it('sem tag num ACS que outro provedor usa, não vê nada — nem na lista, nem no Dashboard', async () => {
     await definirTag(alfa, '');
+    const lista = await api('/devices?pageSize=50');
+    assert.equal(lista.body.data.total, 0);
+    const painel = await api('/devices/dashboard?refresh=1');
+    assert.equal(painel.body.data.stats.total, 0);
+  });
+
+  it('sem tag com o ACS só dele, tudo como antes', async () => {
+    await definirTag(alfa, '');
+    await runInTenant(beta, () => Setting.upsert('genieAcsUrl', 'http://outro-acs.exemplo:7557'));
+    forgetSharedAcs();
     const { body } = await api('/devices?pageSize=50');
     assert.equal(body.data.total, 4);
+  });
+
+  it('o Dashboard guardado de antes da separação não é servido depois dela', async () => {
+    await definirTag(alfa, '');
+    await runInTenant(beta, () => Setting.upsert('genieAcsUrl', 'http://outro-acs.exemplo:7557'));
+    forgetSharedAcs();
+    const antes = await api('/devices/dashboard?refresh=1');
+    assert.equal(antes.body.data.stats.total, 4);
+
+    // Outro provedor passa a usar o mesmo ACS: sem refresh forçado, o painel
+    // montado com a frota inteira tem que ser descartado.
+    await runInTenant(beta, () => Setting.upsert('genieAcsUrl', genie.url));
+    forgetSharedAcs();
+    const depois = await api('/devices/dashboard');
+    assert.equal(depois.body.data.stats.total, 0);
+
+    await definirTag(alfa, 'alfa');
+    const comTag = await api('/devices/dashboard');
+    assert.equal(comTag.body.data.stats.total, 2);
   });
 
   it('o detalhe de um equipamento de outro provedor é "não encontrado"', async () => {
