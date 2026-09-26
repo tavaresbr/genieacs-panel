@@ -7,7 +7,7 @@ import {
 const { default: Tenant } = await import('../src/models/Tenant.js');
 const { default: AuditLog } = await import('../src/models/AuditLog.js');
 const { default: TenantExportService } = await import('../src/services/tenantExportService.js');
-const { mapBrasilApiCnpj } = await import('../src/services/cnpjLookupService.js');
+const { mapBrasilApiCnpj, mapCnpjWs, mapReceitaWs } = await import('../src/services/cnpjLookupService.js');
 const { setLogSink } = await import('../src/utils/logger.js');
 const { normalizeTaxId, isValidTaxId, isValidCpf, isValidCnpj } = await import(
   '../src/utils/taxId.js'
@@ -398,5 +398,114 @@ describe('preencher o cadastro pelo CNPJ', () => {
     assert.deepEqual(Object.keys(mapeado).sort(), ['legalName', 'postalCode']);
     assert.equal(mapeado.legalName.length, 160);
     assert.equal(mapeado.postalCode, '01310100');
+  });
+});
+
+/**
+ * CEP → endereço e endereço → ponto no mapa.
+ *
+ * Mesmo arranjo do CNPJ: cada fonte externa responde o que o teste mandar, e
+ * o que não estiver previsto responde 503 — nenhuma chamada sai de verdade.
+ * Uma resposta pode ser função da URL, para o Nominatim, que é chamado duas
+ * vezes (endereço inteiro, depois só a cidade) com respostas diferentes.
+ */
+describe('CEP e localização no mapa', () => {
+  const realFetch = globalThis.fetch;
+  let consultas;
+  const HOSTS = {
+    brasilapi: 'https://brasilapi.com.br/',
+    viacep: 'https://viacep.com.br/',
+    nominatim: 'https://nominatim.openstreetmap.org/'
+  };
+  const fake = (respostas) => {
+    consultas = [];
+    globalThis.fetch = (input, init) => {
+      const url = String(input);
+      const fonte = Object.keys(HOSTS).find((nome) => url.startsWith(HOSTS[nome]));
+      if (!fonte) return realFetch(input, init);
+      consultas.push(url);
+      const resposta = respostas[fonte];
+      const [status, body] = typeof resposta === 'function' ? resposta(url) : (resposta ?? [503, {}]);
+      return Promise.resolve(new Response(JSON.stringify(body ?? {}), {
+        status, headers: { 'Content-Type': 'application/json' }
+      }));
+    };
+  };
+  const cep = (valor, headers = authHeaders(token)) =>
+    call(`${panelUrl}/api/tenant/cep?cep=${encodeURIComponent(valor)}`, { headers });
+  const geocode = (campos, headers = authHeaders(token)) =>
+    call(`${panelUrl}/api/tenant/geocode?${new URLSearchParams(campos)}`, { headers });
+
+  after(() => { globalThis.fetch = realFetch; });
+
+  it('CEP pela BrasilAPI, com as coordenadas quando ela traz', async () => {
+    fake({
+      brasilapi: [200, {
+        cep: '68180010', state: 'PA', city: 'Itaituba', neighborhood: 'Centro', street: 'Rodovia Transamazônica',
+        location: { type: 'Point', coordinates: { latitude: '-4.2636', longitude: '-55.9928' } }
+      }]
+    });
+    const res = await cep('68180-010');
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body.data, {
+      postalCode: '68180010', addressLine: 'Rodovia Transamazônica', district: 'Centro',
+      city: 'Itaituba', state: 'PA', lat: -4.2636, lng: -55.9928
+    });
+    assert.equal(consultas.length, 1);
+  });
+
+  it('quando a BrasilAPI cai, o ViaCEP preenche; o "erro" dele vira 404', async () => {
+    fake({
+      brasilapi: [500, {}],
+      viacep: [200, { cep: '68180-010', logradouro: 'Rua A', bairro: 'Bela Vista', localidade: 'Itaituba', uf: 'pa' }]
+    });
+    const res = await cep('68180010');
+    assert.equal(res.status, 200);
+    assert.equal(res.body.data.city, 'Itaituba');
+    assert.equal(res.body.data.state, 'PA');
+    assert.equal(res.body.data.lat, undefined);
+
+    fake({ brasilapi: [500, {}], viacep: [200, { erro: true }] });
+    assert.equal((await cep('99999999')).status, 404);
+  });
+
+  it('CEP sem 8 dígitos é recusado sem consultar; sem sessão, 401', async () => {
+    fake({});
+    assert.equal((await cep('6818')).status, 400);
+    assert.equal((await cep('68180010', {})).status, 401);
+    assert.deepEqual(consultas, []);
+  });
+
+  it('localiza pelo endereço inteiro, e só pela cidade quando a rua não é achada', async () => {
+    fake({ nominatim: [200, [{ lat: '-4.263615', lon: '-55.992787' }]] });
+    const exato = await geocode({ addressLine: 'Rodovia Transamazônica', addressNumber: '100', city: 'Itaituba', state: 'PA', postalCode: '68180010' });
+    assert.equal(exato.status, 200);
+    assert.deepEqual(exato.body.data, { lat: -4.263615, lng: -55.992787, precision: 'address' });
+    const busca = new URL(consultas[0]).searchParams;
+    assert.equal(busca.get('street'), '100 Rodovia Transamazônica');
+    assert.equal(busca.get('state'), 'Pará', 'a UF vira o nome do estado');
+    assert.equal(busca.get('postalcode'), '68180-010');
+
+    fake({ nominatim: (url) => (new URL(url).searchParams.has('street') ? [200, []] : [200, [{ lat: '-4.27', lon: '-55.98' }]]) });
+    const cidade = await geocode({ addressLine: 'Rua Nova', city: 'Itaituba', state: 'PA' });
+    assert.equal(cidade.status, 200);
+    assert.equal(cidade.body.data.precision, 'city');
+    assert.equal(consultas.length, 2);
+  });
+
+  it('404 quando nem a cidade é achada, 502 quando o Nominatim cai, 400 sem cidade', async () => {
+    fake({ nominatim: [200, []] });
+    assert.equal((await geocode({ city: 'Lugar Nenhum', state: 'PA' })).status, 404);
+    fake({ nominatim: [503, {}] });
+    assert.equal((await geocode({ city: 'Itaituba', state: 'PA' })).status, 502);
+    fake({});
+    assert.equal((await geocode({ addressLine: 'Rua A' })).status, 400);
+    assert.deepEqual(consultas, []);
+  });
+
+  it('o CNPJ traz o nome fantasia das três fontes', () => {
+    assert.equal(mapBrasilApiCnpj({ razao_social: 'X LTDA', nome_fantasia: 'Tavares Fibra' }).tradeName, 'Tavares Fibra');
+    assert.equal(mapCnpjWs({ razao_social: 'X LTDA', estabelecimento: { nome_fantasia: 'Tavares Fibra' } }).tradeName, 'Tavares Fibra');
+    assert.equal(mapReceitaWs({ nome: 'X LTDA', fantasia: 'Tavares Fibra' }).tradeName, 'Tavares Fibra');
   });
 });

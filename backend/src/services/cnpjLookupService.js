@@ -27,6 +27,9 @@ const HEADERS = {
 /** Os limites de `CAMPOS_FATURAMENTO` do controlador — o que não cabe, corta. */
 const LIMITES = {
   legalName: 160,
+  // O nome fantasia não é campo do cadastro: vai só para a tela sugerir o nome
+  // do painel (onboarding). Mesmo teto da razão social.
+  tradeName: 160,
   postalCode: 8,
   addressLine: 160,
   addressNumber: 16,
@@ -66,6 +69,7 @@ const juntar = (...partes) => partes.map(texto).filter(Boolean).join(' ');
 export function mapBrasilApiCnpj(dados) {
   return cadastro({
     legalName: dados?.razao_social,
+    tradeName: dados?.nome_fantasia,
     postalCode: dados?.cep,
     addressLine: juntar(dados?.descricao_tipo_de_logradouro, dados?.logradouro),
     addressNumber: dados?.numero,
@@ -83,6 +87,7 @@ export function mapCnpjWs(dados) {
   const est = dados?.estabelecimento ?? {};
   return cadastro({
     legalName: dados?.razao_social,
+    tradeName: est.nome_fantasia,
     postalCode: est.cep,
     addressLine: juntar(est.tipo_logradouro, est.logradouro),
     addressNumber: est.numero,
@@ -99,6 +104,7 @@ export function mapCnpjWs(dados) {
 export function mapReceitaWs(dados) {
   return cadastro({
     legalName: dados?.nome,
+    tradeName: dados?.fantasia,
     postalCode: dados?.cep,
     addressLine: dados?.logradouro,
     addressNumber: dados?.numero,
