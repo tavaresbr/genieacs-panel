@@ -63,7 +63,12 @@ const ALLOWED_SETTING_KEYS = new Set([
   // Um ISP em disputa precisa de mais, e um que resolveu guardar menos dado
   // pessoal precisa de menos — política de guarda é decisão de quem responde
   // pelos dados, não constante de código.
-  'auditRetentionDays'
+  'auditRetentionDays',
+  // O contato do provedor no portal do assinante (`GET /api/customer/provider`).
+  'portalShowProviderContact',
+  'portalContactPhone',
+  'portalContactWhatsapp',
+  'portalContactEmail'
 ]);
 
 // Validation runs without a request, so it reports translation keys and the
@@ -100,6 +105,27 @@ function validateSetting(key, value) {
     if (!Number.isInteger(dias) || String(dias) !== normalized.trim() || dias < 30 || dias > 3650) {
       return { errorKey: 'settings.validation.auditRetentionDays' };
     }
+  }
+  if (key === 'portalShowProviderContact' && !['true', 'false'].includes(normalized)) {
+    return { errorKey: 'settings.validation.portalContactToggle' };
+  }
+  if (key === 'portalContactPhone' || key === 'portalContactWhatsapp') {
+    // Vazio é "use o do cadastro". Preenchido, precisa ser um telefone que o
+    // `tel:` e o `wa.me` do portal consigam discar: de 10 a 13 dígitos (DDD e
+    // número, com ou sem o 55), e só os separadores de costume em volta.
+    const phone = normalized.trim();
+    const digits = phone.replace(/\D/g, '');
+    if (phone && (!/^[\d\s()+.-]{10,25}$/.test(phone) || digits.length < 10 || digits.length > 13)) {
+      return { errorKey: 'settings.validation.portalContactPhone' };
+    }
+    return { value: phone };
+  }
+  if (key === 'portalContactEmail') {
+    const email = normalized.trim();
+    if (email && (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) {
+      return { errorKey: 'settings.validation.portalContactEmail' };
+    }
+    return { value: email };
   }
   return { value: normalized };
 }

@@ -190,6 +190,9 @@ export default {
   'settings.validation.suffixMode': 'Le mode de suffixe de l’ID client doit être random ou installation_date',
   'settings.validation.appName': 'Le nom de l’application doit comporter entre 1 et 80 caractères',
   "settings.validation.auditRetentionDays": "La durée de conservation de la piste d'audit doit être un nombre entier de jours entre 30 et 3650",
+  'settings.validation.portalContactToggle': "Afficher le contact du fournisseur doit être true ou false",
+  'settings.validation.portalContactPhone': "Téléphone invalide : indiquez l'indicatif et le numéro (10 à 13 chiffres)",
+  'settings.validation.portalContactEmail': "E-mail de contact invalide",
 
   // Paramètres de la carte
   'mapSettings.retrieved': 'Paramètres de la carte récupérés',
@@ -325,6 +328,8 @@ export default {
   'portal.ontNotFound': 'ONT introuvable',
   'portal.ontNotRegistered': 'ONT introuvable. Contactez votre opérateur pour vérifier l’enregistrement de l’équipement.',
   'portal.overviewUnavailable': 'Les données de l’ONT ne peuvent pas être lues pour le moment. Réessayez dans un instant.',
+  'portal.providerReady': "Contact du fournisseur disponible",
+  'portal.providerUnavailable': "Le contact du fournisseur ne peut pas être lu pour le moment.",
   'portal.wifiNetworkInvalid': 'Réseau Wi-Fi invalide',
   'portal.wifiSsidInvalid': 'Le nom du Wi-Fi doit contenir de 1 à 32 caractères, sans caractères de contrôle',
   'portal.wifiPasswordInvalid': 'Le mot de passe Wi-Fi doit contenir de 8 à 63 caractères',

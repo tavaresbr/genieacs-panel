@@ -187,6 +187,9 @@ export default {
   'settings.validation.suffixMode': 'O modo de sufixo do ID de cliente deve ser random ou installation_date',
   'settings.validation.appName': 'O nome do aplicativo deve ter entre 1 e 80 caracteres',
   "settings.validation.auditRetentionDays": "O prazo da trilha deve ser um número inteiro de dias entre 30 e 3650",
+  'settings.validation.portalContactToggle': "Mostrar contato do provedor deve ser true ou false",
+  'settings.validation.portalContactPhone': "Telefone inválido: use DDD e número (10 a 13 dígitos)",
+  'settings.validation.portalContactEmail': "E-mail de contato inválido",
 
   // Configurações do mapa
   'mapSettings.retrieved': 'Configurações do mapa obtidas com sucesso',
@@ -322,6 +325,8 @@ export default {
   'portal.ontNotFound': 'ONT não encontrada',
   'portal.ontNotRegistered': 'ONT não encontrada. Fale com o seu provedor para verificar o cadastro do equipamento.',
   'portal.overviewUnavailable': 'Os dados da ONT não podem ser lidos agora. Tente novamente em instantes.',
+  'portal.providerReady': "Contato do provedor disponível",
+  'portal.providerUnavailable': "O contato do provedor não pode ser lido agora.",
   'portal.wifiNetworkInvalid': 'Rede WiFi inválida',
   'portal.wifiSsidInvalid': 'O nome da rede WiFi deve ter de 1 a 32 caracteres, sem caracteres de controle',
   'portal.wifiPasswordInvalid': 'A senha do WiFi deve ter de 8 a 63 caracteres',

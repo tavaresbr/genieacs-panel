@@ -137,6 +137,12 @@ export default function Settings() {
     // carga; este é só o que a tela mostra antes dela, e é o mesmo padrão que
     // o agendador usa quando não há nada salvo.
     auditRetentionDays: '365',
+    // O contato do provedor no portal do assinante; desligado até o provedor
+    // ligar. Telefone, WhatsApp e e-mail vazios usam os do cadastro.
+    portalShowProviderContact: 'false',
+    portalContactPhone: '',
+    portalContactWhatsapp: '',
+    portalContactEmail: '',
     ...INSTALLER_VIRTUAL_PARAMETERS
   })
   const [loading, setLoading] = useState(false)
@@ -1906,6 +1912,47 @@ export default function Settings() {
 
             <div className="mt-5 rounded-md border border-[hsl(var(--status-warning))]/40 bg-[hsl(var(--status-warning))]/10 p-4 text-sm leading-6">
               {t('settings.portal.disabledNotice')}
+            </div>
+
+            <div className="mt-5 rounded-md border border-border p-4">
+              <label className="flex cursor-pointer items-start gap-3">
+                <input
+                  type="checkbox"
+                  className="mt-1 h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
+                  checked={settings.portalShowProviderContact === 'true'}
+                  onChange={(event) => setSettings((current) => ({
+                    ...current,
+                    portalShowProviderContact: event.target.checked ? 'true' : 'false'
+                  }))}
+                />
+                <span>
+                  <span className="block font-semibold">{t('settings.portal.contactShow')}</span>
+                  <span className="mt-1 block text-sm leading-6 text-muted-foreground">{t('settings.portal.contactShowHint')}</span>
+                </span>
+              </label>
+              {settings.portalShowProviderContact === 'true' && (
+                <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                  <div>
+                    <label htmlFor="portal-contact-phone" className="field-label">{t('settings.portal.contactPhone')}</label>
+                    <input id="portal-contact-phone" type="tel" inputMode="tel" maxLength={25} className="modern-input w-full"
+                      placeholder="(93) 3518-0000" value={settings.portalContactPhone}
+                      onChange={(event) => setSettings((current) => ({ ...current, portalContactPhone: event.target.value }))} />
+                  </div>
+                  <div>
+                    <label htmlFor="portal-contact-whatsapp" className="field-label">{t('settings.portal.contactWhatsapp')}</label>
+                    <input id="portal-contact-whatsapp" type="tel" inputMode="tel" maxLength={25} className="modern-input w-full"
+                      placeholder="(93) 99100-2222" value={settings.portalContactWhatsapp}
+                      onChange={(event) => setSettings((current) => ({ ...current, portalContactWhatsapp: event.target.value }))} />
+                  </div>
+                  <div>
+                    <label htmlFor="portal-contact-email" className="field-label">{t('settings.portal.contactEmail')}</label>
+                    <input id="portal-contact-email" type="email" maxLength={254} className="modern-input w-full"
+                      placeholder="suporte@provedor.com.br" value={settings.portalContactEmail}
+                      onChange={(event) => setSettings((current) => ({ ...current, portalContactEmail: event.target.value }))} />
+                  </div>
+                  <p className="field-hint sm:col-span-3">{t('settings.portal.contactFieldsHint')}</p>
+                </div>
+              )}
             </div>
           </div>
         )}

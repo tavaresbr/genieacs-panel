@@ -188,6 +188,9 @@ export default {
   'settings.validation.suffixMode': 'ग्राहक आईडी प्रत्यय मोड random या installation_date होना चाहिए',
   'settings.validation.appName': 'ऐप्लिकेशन का नाम 1 से 80 अक्षरों के बीच होना चाहिए',
   "settings.validation.auditRetentionDays": "ऑडिट ट्रेल की अवधि 30 से 3650 दिनों के बीच पूर्ण संख्या होनी चाहिए",
+  'settings.validation.portalContactToggle': "प्रदाता संपर्क दिखाने का मान true या false होना चाहिए",
+  'settings.validation.portalContactPhone': "अमान्य फ़ोन: क्षेत्र कोड और नंबर लिखें (10 से 13 अंक)",
+  'settings.validation.portalContactEmail': "अमान्य संपर्क ईमेल",
 
   // मानचित्र सेटिंग्स
   'mapSettings.retrieved': 'मानचित्र सेटिंग्स प्राप्त हुईं',
@@ -323,6 +326,8 @@ export default {
   'portal.ontNotFound': 'ONT नहीं मिला',
   'portal.ontNotRegistered': 'ONT नहीं मिला। उपकरण के पंजीकरण की जाँच के लिए अपने सेवा प्रदाता से संपर्क करें।',
   'portal.overviewUnavailable': 'अभी ONT का डेटा पढ़ा नहीं जा सकता। थोड़ी देर में फिर कोशिश करें।',
+  'portal.providerReady': "प्रदाता का संपर्क उपलब्ध है",
+  'portal.providerUnavailable': "अभी प्रदाता का संपर्क नहीं पढ़ा जा सका।",
   'portal.wifiNetworkInvalid': 'अमान्य Wi-Fi नेटवर्क',
   'portal.wifiSsidInvalid': 'Wi-Fi नाम में 1 से 32 अक्षर होने चाहिए, नियंत्रण वर्ण नहीं',
   'portal.wifiPasswordInvalid': 'Wi-Fi पासवर्ड में 8 से 63 अक्षर होने चाहिए',

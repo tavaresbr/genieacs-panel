@@ -190,6 +190,9 @@ export default {
   'settings.validation.suffixMode': '顧客 ID の接尾辞モードは random または installation_date で指定してください',
   'settings.validation.appName': 'アプリケーション名は 1〜80 文字で入力してください',
   "settings.validation.auditRetentionDays": "監査証跡の保存期間は 30 から 3650 日までの整数でなければなりません",
+  'settings.validation.portalContactToggle': "プロバイダー連絡先の表示は true または false である必要があります",
+  'settings.validation.portalContactPhone': "電話番号が無効です：市外局番と番号（10〜13桁）を入力してください",
+  'settings.validation.portalContactEmail': "連絡先メールアドレスが無効です",
 
   // 地図の設定
   'mapSettings.retrieved': '地図の設定を取得しました',
@@ -324,6 +327,8 @@ export default {
   'portal.ontNotFound': 'ONT が見つかりません',
   'portal.ontNotRegistered': 'ONT が見つかりません。機器の登録状況について、ご契約先にお問い合わせください。',
   'portal.overviewUnavailable': '現在、ONT のデータを読み取れません。しばらくしてから再試行してください。',
+  'portal.providerReady': "プロバイダーの連絡先を取得しました",
+  'portal.providerUnavailable': "現在プロバイダーの連絡先を読み込めません。",
   'portal.wifiNetworkInvalid': 'Wi-Fi ネットワークが無効です',
   'portal.wifiSsidInvalid': 'Wi-Fi 名は制御文字を含まない 1〜32 文字で入力してください',
   'portal.wifiPasswordInvalid': 'Wi-Fi のパスワードは 8〜63 文字で入力してください',

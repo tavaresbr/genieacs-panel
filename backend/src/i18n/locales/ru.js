@@ -190,6 +190,9 @@ export default {
   'settings.validation.suffixMode': 'Режим суффикса идентификатора клиента должен быть random или installation_date',
   'settings.validation.appName': 'Название приложения должно содержать от 1 до 80 символов',
   "settings.validation.auditRetentionDays": "Срок хранения журнала аудита должен быть целым числом дней от 30 до 3650",
+  'settings.validation.portalContactToggle': "Параметр показа контактов провайдера должен быть true или false",
+  'settings.validation.portalContactPhone': "Неверный телефон: укажите код и номер (от 10 до 13 цифр)",
+  'settings.validation.portalContactEmail': "Неверный контактный e-mail",
 
   // Настройки карты
   'mapSettings.retrieved': 'Настройки карты получены',
@@ -325,6 +328,8 @@ export default {
   'portal.ontNotFound': 'ONT не найден',
   'portal.ontNotRegistered': 'ONT не найден. Обратитесь к провайдеру, чтобы проверить регистрацию устройства.',
   'portal.overviewUnavailable': 'Сейчас данные ONT прочитать нельзя. Повторите попытку чуть позже.',
+  'portal.providerReady': "Контакты провайдера доступны",
+  'portal.providerUnavailable': "Сейчас не удаётся получить контакты провайдера.",
   'portal.wifiNetworkInvalid': 'Некорректная сеть Wi-Fi',
   'portal.wifiSsidInvalid': 'Название Wi-Fi должно содержать от 1 до 32 символов без управляющих символов',
   'portal.wifiPasswordInvalid': 'Пароль Wi-Fi должен содержать от 8 до 63 символов',

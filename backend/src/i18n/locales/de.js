@@ -190,6 +190,9 @@ export default {
   'settings.validation.suffixMode': 'Der Suffixmodus der Kunden-ID muss random oder installation_date sein',
   'settings.validation.appName': 'Der Anwendungsname muss zwischen 1 und 80 Zeichen lang sein',
   "settings.validation.auditRetentionDays": "Die Aufbewahrungsfrist des Prüfpfads muss eine ganze Zahl von Tagen zwischen 30 und 3650 sein",
+  'settings.validation.portalContactToggle': "Anbieterkontakt anzeigen muss true oder false sein",
+  'settings.validation.portalContactPhone': "Ungültige Telefonnummer: Vorwahl und Nummer angeben (10 bis 13 Ziffern)",
+  'settings.validation.portalContactEmail': "Ungültige Kontakt-E-Mail",
 
   // Karteneinstellungen
   'mapSettings.retrieved': 'Karteneinstellungen erfolgreich abgerufen',
@@ -325,6 +328,8 @@ export default {
   'portal.ontNotFound': 'ONT nicht gefunden',
   'portal.ontNotRegistered': 'ONT nicht gefunden. Wenden Sie sich an Ihren Anbieter, um die Geräteregistrierung zu prüfen.',
   'portal.overviewUnavailable': 'Die ONT-Daten können derzeit nicht gelesen werden. Versuchen Sie es gleich erneut.',
+  'portal.providerReady': "Kontakt des Anbieters verfügbar",
+  'portal.providerUnavailable': "Der Kontakt des Anbieters kann gerade nicht gelesen werden.",
   'portal.wifiNetworkInvalid': 'Ungültiges WLAN-Netzwerk',
   'portal.wifiSsidInvalid': 'Der WLAN-Name muss 1 bis 32 Zeichen ohne Steuerzeichen enthalten',
   'portal.wifiPasswordInvalid': 'Das WLAN-Passwort muss 8 bis 63 Zeichen enthalten',

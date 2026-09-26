@@ -190,6 +190,9 @@ export default {
   'settings.validation.suffixMode': 'The customer ID suffix mode must be random or installation_date',
   'settings.validation.appName': 'The application name must be between 1 and 80 characters',
   "settings.validation.auditRetentionDays": "The audit trail retention must be a whole number of days between 30 and 3650",
+  'settings.validation.portalContactToggle': "Show provider contact must be true or false",
+  'settings.validation.portalContactPhone': "Invalid phone: use area code and number (10 to 13 digits)",
+  'settings.validation.portalContactEmail': "Invalid contact email",
 
   // Map settings
   'mapSettings.retrieved': 'Map settings retrieved successfully',
@@ -325,6 +328,8 @@ export default {
   'portal.ontNotFound': 'ONT not found',
   'portal.ontNotRegistered': 'ONT not found. Contact your provider to check the device registration.',
   'portal.overviewUnavailable': 'The ONT data cannot be read right now. Try again in a moment.',
+  'portal.providerReady': "Provider contact available",
+  'portal.providerUnavailable': "The provider contact cannot be read right now.",
   'portal.wifiNetworkInvalid': 'Invalid WiFi network',
   'portal.wifiSsidInvalid': 'The WiFi name must contain 1 to 32 characters without control characters',
   'portal.wifiPasswordInvalid': 'The WiFi password must contain 8 to 63 characters',

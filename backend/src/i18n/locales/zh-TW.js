@@ -190,6 +190,9 @@ export default {
   'settings.validation.suffixMode': '客戶 ID 的後置字元模式需為 random 或 installation_date',
   'settings.validation.appName': '應用程式名稱需為 1 至 80 個字元',
   "settings.validation.auditRetentionDays": "稽核軌跡的保留期限必須是 30 到 3650 之間的整數天",
+  'settings.validation.portalContactToggle': "顯示服務商聯絡方式必須為 true 或 false",
+  'settings.validation.portalContactPhone': "電話無效：請填寫區碼和號碼（10 到 13 位數字）",
+  'settings.validation.portalContactEmail': "聯絡電子郵件無效",
 
   // 地圖設定
   'mapSettings.retrieved': '已取得地圖設定',
@@ -324,6 +327,8 @@ export default {
   'portal.ontNotFound': '找不到該 ONT',
   'portal.ontNotRegistered': '找不到該 ONT。請聯絡您的電信業者確認設備的註冊狀況。',
   'portal.overviewUnavailable': '目前無法讀取 ONT 資料。請稍候重試。',
+  'portal.providerReady': "服務商聯絡方式可用",
+  'portal.providerUnavailable': "暫時無法讀取服務商聯絡方式。",
   'portal.wifiNetworkInvalid': 'Wi-Fi 網路無效',
   'portal.wifiSsidInvalid': 'Wi-Fi 名稱需為 1 至 32 個字元，且不能包含控制字元',
   'portal.wifiPasswordInvalid': 'Wi-Fi 密碼需為 8 至 63 個字元',

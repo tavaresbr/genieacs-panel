@@ -188,6 +188,9 @@ export default {
   'settings.validation.suffixMode': 'يجب أن يكون وضع لاحقة معرّف العميل random أو installation_date',
   'settings.validation.appName': 'يجب أن يتراوح اسم التطبيق بين حرف واحد و٨٠ حرفًا',
   "settings.validation.auditRetentionDays": "يجب أن تكون مدة حفظ سجل التدقيق عددًا صحيحًا من الأيام بين 30 و3650",
+  'settings.validation.portalContactToggle': "يجب أن تكون قيمة إظهار بيانات الاتصال بالمزوّد true أو false",
+  'settings.validation.portalContactPhone': "رقم هاتف غير صالح: أدخل رمز المنطقة والرقم (من 10 إلى 13 رقمًا)",
+  'settings.validation.portalContactEmail': "بريد الاتصال غير صالح",
 
   // إعدادات الخريطة
   'mapSettings.retrieved': 'تم جلب إعدادات الخريطة',
@@ -324,6 +327,8 @@ export default {
   'portal.ontNotFound': 'الجهاز غير موجود',
   'portal.ontNotRegistered': 'الجهاز غير موجود. تواصل مع مزوّد الخدمة للتحقّق من تسجيل الجهاز.',
   'portal.overviewUnavailable': 'تعذّرت قراءة بيانات الجهاز الآن. أعد المحاولة بعد قليل.',
+  'portal.providerReady': "بيانات الاتصال بالمزوّد متاحة",
+  'portal.providerUnavailable': "تعذّر قراءة بيانات الاتصال بالمزوّد الآن.",
   'portal.wifiNetworkInvalid': 'شبكة Wi-Fi غير صالحة',
   'portal.wifiSsidInvalid': 'يجب أن يتراوح اسم شبكة Wi-Fi بين حرف واحد و٣٢ حرفًا دون أحرف تحكّم',
   'portal.wifiPasswordInvalid': 'يجب أن تتراوح كلمة مرور Wi-Fi بين ٨ و٦٣ حرفًا',

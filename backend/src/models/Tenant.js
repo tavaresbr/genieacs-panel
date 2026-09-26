@@ -142,6 +142,36 @@ class Tenant {
   }
 
   /**
+   * O que o portal do assinante pode mostrar do provedor, quando ele liga
+   * "mostrar contato": nome, telefone, e-mail e endereço.
+   *
+   * Lista própria, e não um recorte de `BILLING_COLUMNS` na hora: CNPJ,
+   * inscrição estadual e razão social ficam de fora por construção, e quem
+   * um dia acrescentar uma coluna fiscal ao cadastro não a publica no portal
+   * sem passar por aqui.
+   */
+  static PORTAL_CONTACT_COLUMNS = [
+    'name',
+    'billing_phone',
+    'billing_email',
+    'billing_address_line',
+    'billing_address_number',
+    'billing_address_extra',
+    'billing_district',
+    'billing_city',
+    'billing_state',
+    'billing_postal_code'
+  ];
+
+  static async findPortalContactById(id) {
+    if (!id) return null;
+    const row = await getDb()('tenants')
+      .where({ id })
+      .first(...Tenant.PORTAL_CONTACT_COLUMNS);
+    return row || null;
+  }
+
+  /**
    * One provider's public identity, or null when no such row exists.
    *
    * Deliberately does NOT filter on `status`. It is tempting to make this

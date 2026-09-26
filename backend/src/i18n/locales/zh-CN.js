@@ -190,6 +190,9 @@ export default {
   'settings.validation.suffixMode': '客户 ID 的后缀模式需为 random 或 installation_date',
   'settings.validation.appName': '应用名称需为 1 至 80 个字符',
   "settings.validation.auditRetentionDays": "审计轨迹的保留期限必须是 30 到 3650 之间的整数天",
+  'settings.validation.portalContactToggle': "显示服务商联系方式必须为 true 或 false",
+  'settings.validation.portalContactPhone': "电话无效：请填写区号和号码（10 到 13 位数字）",
+  'settings.validation.portalContactEmail': "联系邮箱无效",
 
   // 地图设置
   'mapSettings.retrieved': '已获取地图设置',
@@ -325,6 +328,8 @@ export default {
   'portal.ontNotFound': '找不到该 ONT',
   'portal.ontNotRegistered': '找不到该 ONT。请联系您的运营商核实设备的注册情况。',
   'portal.overviewUnavailable': '目前无法读取 ONT 数据。请稍候重试。',
+  'portal.providerReady': "服务商联系方式可用",
+  'portal.providerUnavailable': "暂时无法读取服务商联系方式。",
   'portal.wifiNetworkInvalid': 'Wi-Fi 网络无效',
   'portal.wifiSsidInvalid': 'Wi-Fi 名称需为 1 至 32 个字符，且不能包含控制字符',
   'portal.wifiPasswordInvalid': 'Wi-Fi 密码需为 8 至 63 个字符',

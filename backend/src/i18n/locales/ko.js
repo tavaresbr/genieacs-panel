@@ -191,6 +191,9 @@ export default {
   'settings.validation.suffixMode': '고객 ID 접미사 모드는 random 또는 installation_date여야 합니다',
   'settings.validation.appName': '애플리케이션 이름은 1자에서 80자 사이여야 합니다',
   "settings.validation.auditRetentionDays": "감사 추적 보존 기간은 30일에서 3650일 사이의 정수여야 합니다",
+  'settings.validation.portalContactToggle': "공급자 연락처 표시는 true 또는 false여야 합니다",
+  'settings.validation.portalContactPhone': "잘못된 전화번호: 지역 번호와 번호(10~13자리)를 입력하세요",
+  'settings.validation.portalContactEmail': "잘못된 연락처 이메일",
 
   // 지도 설정
   'mapSettings.retrieved': '지도 설정을 조회했습니다',
@@ -326,6 +329,8 @@ export default {
   'portal.ontNotFound': 'ONT를 찾을 수 없습니다',
   'portal.ontNotRegistered': 'ONT를 찾을 수 없습니다. 장비 등록 상태를 사업자에게 문의하십시오.',
   'portal.overviewUnavailable': '지금은 ONT 데이터를 읽을 수 없습니다. 잠시 후 다시 시도하십시오.',
+  'portal.providerReady': "공급자 연락처를 사용할 수 있습니다",
+  'portal.providerUnavailable': "지금은 공급자 연락처를 읽을 수 없습니다.",
   'portal.wifiNetworkInvalid': '올바르지 않은 Wi-Fi 네트워크입니다',
   'portal.wifiSsidInvalid': 'Wi-Fi 이름은 제어 문자 없이 1자에서 32자 사이여야 합니다',
   'portal.wifiPasswordInvalid': 'Wi-Fi 비밀번호는 8자에서 63자 사이여야 합니다',
