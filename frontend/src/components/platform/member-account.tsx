@@ -12,6 +12,7 @@ import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import { OPERATOR_ROLES, ROLE_LABEL_KEYS } from '@/lib/permissions'
+import { panelLink } from '@/lib/panel-link'
 import { formatPhone, whatsappShareUrl } from '@/lib/whatsapp-share'
 
 interface Props {
@@ -161,7 +162,7 @@ export function MemberAccount({ tenant, member, busy, onUpdated, onRemove }: Pro
     }
   }
 
-  const textoLink = link?.url ?? link?.token ?? ''
+  const textoLink = link ? panelLink(link.url, link.token, '/reset-password') : ''
   const mensagem = t('platform.member.whatsappMessage', {
     username: member.username,
     provider: tenant.name,
@@ -332,7 +333,7 @@ export function MemberAccount({ tenant, member, busy, onUpdated, onRemove }: Pro
                   </a>
                 </div>
                 {!member.phone && <p className="field-hint">{t('platform.member.noPhone')}</p>}
-                {link.url === null && <p className="field-hint">{t('platform.inviteNoAddress')}</p>}
+                {link.url === null && <p className="field-hint">{t('platform.linkFromThisAddress')}</p>}
               </div>
             )}
           </div>

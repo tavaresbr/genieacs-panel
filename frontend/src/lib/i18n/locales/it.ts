@@ -2117,7 +2117,7 @@ const it: Dictionary = {
   'platform.addMemberHint': 'Crea l’appartenenza e non tocca mai la sua password.',
   'platform.inviteMember': 'Invitare qualcuno che non ha ancora un accesso',
   'platform.inviteMemberHint': 'È così che un provider nuovo ottiene il primo account: il link si apre all\'indirizzo di quel provider, e chi accetta sceglie da sé nome utente e password — la piattaforma non la conosce mai.',
-  'platform.inviteNoAddress': 'Questa installazione non ha un dominio di base configurato, quindi qui esce il token. Vale all\'indirizzo del provider, dopo /invite#.',
+  'platform.linkFromThisAddress': 'Il link usa l\'indirizzo di questo pannello. Perché l\'invio via e-mail funzioni, imposta PUBLIC_BASE_URL sul server.',
   'platform.memberNotFound': 'Quella persona non ha ancora un accesso su questa installazione. Usa l\'invito sopra: crea lei il proprio account e sceglie la propria password.',
   'platform.operator.title': 'Creare un account operatore',
   'platform.operator.description': 'Per il provider che lei amministra: l\'account nasce pronto e la persona sceglie solo la password tramite il link. Usi l\'invito qui sotto quando chi entra deve scegliere anche il proprio nome utente.',
