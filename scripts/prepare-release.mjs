@@ -153,18 +153,37 @@ export function findPreviousRelease(tryGit) {
     if (ref) candidates.push({ version: tag.slice(1), ref, source: 'tag' });
   }
 
-  if (candidates.length === 0) return null;
-  // Highest version wins; on a tie the release commit does, since it is the
-  // commit that declared the version and a tag may have been placed elsewhere.
-  candidates.sort((a, b) => compareVersions(b.version, a.version)
-    || (a.source === 'release commit' ? -1 : 1) - (b.source === 'release commit' ? -1 : 1));
-  const [previous] = candidates;
-  return { ...previous, label: `v${previous.version}` };
+  const previous = pickPrevious(candidates);
+  if (!previous) return null;
+  // Everything any release already shipped: every release commit, and the
+  // winner even when it is a tag. A tag that lost is left out on purpose —
+  // one sitting on the merge that carried its release also carries work the
+  // next release documents, and excluding it would hide that work.
+  const released = [...new Set([
+    ...candidates.filter((c) => c.source === 'release commit').map((c) => c.ref),
+    previous.ref
+  ])];
+  return { ...previous, label: `v${previous.version}`, released };
 }
 
-/** The commits the next release is made of, its own release commits excluded. */
+/**
+ * Highest version wins; on a tie the release commit does, since it is the
+ * commit that declared the version and a tag may have been placed elsewhere.
+ */
+export function pickPrevious(candidates) {
+  const rank = (candidate) => (candidate.source === 'release commit' ? 0 : 1);
+  return [...candidates].sort((a, b) => compareVersions(b.version, a.version) || rank(a) - rank(b))[0] || null;
+}
+
+/**
+ * The commits the next release is made of: reachable from HEAD and from no
+ * release already cut. Excluding every release, not only the latest, keeps a
+ * hotfix released from a side branch out of the next release once that branch
+ * is merged back.
+ */
 export function collectCommits(git, previous) {
-  const logRange = previous ? `${previous.ref}..HEAD` : 'HEAD';
+  const released = previous ? (previous.released || [previous.ref]) : [];
+  const logRange = released.length ? ['HEAD', '--not', ...released] : ['HEAD'];
   // Merge commits carry no release note of their own: their subject repeats the
   // branch that produced them, while the work itself is already listed by the
   // commits they bring in.
@@ -173,7 +192,7 @@ export function collectCommits(git, previous) {
     '--reverse',
     '--no-merges',
     '--format=%H%x1f%h%x1f%cs%x1f%s',
-    logRange
+    ...logRange
   ]);
   // A release commit documents the release itself, so it is never a note in the
   // next one — which happens whenever a release is regenerated before its tag
@@ -267,7 +286,16 @@ function main() {
   console.log(`Prepared TR69 Controle v${nextVersion} (build ${currentCount + 1}) from ${commits.length} Git commit(s), after ${previous?.label || 'repository start'} (${previous?.source || 'no previous release'}).`);
 }
 
-const invokedDirectly = process.argv[1]
-  && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+// `import.meta.url` is always the resolved file, so the path it was invoked by
+// has to be resolved too — otherwise a symlinked checkout exits 0 having done
+// nothing.
+function invokedDirectly() {
+  if (!process.argv[1]) return false;
+  try {
+    return fs.realpathSync(process.argv[1]) === fileURLToPath(import.meta.url);
+  } catch {
+    return false;
+  }
+}
 
-if (invokedDirectly) main();
+if (invokedDirectly()) main();
