@@ -173,6 +173,13 @@ export default {
 
   'settings.customerIdSyncedPending': 'ID cliente sincronizzati; {count} apparato/i necessitano ancora di SoftwareID, PPPoE o data di installazione',
   'settings.customerIdSyncFailed': 'Non è stato possibile sincronizzare gli ID cliente',
+  'settings.customerIdSyncRunning': "La sincronizzazione degli ID cliente è in corso; prosegue in background e gli ID compaiono nell'elenco dei dispositivi man mano che vengono generati.",
+  'settings.customerIdSync.timeout': "GenieACS non ha risposto in tempo elencando i dispositivi. Riprova; se persiste, controlla il carico dell'ACS.",
+  'settings.customerIdSync.unauthorized': "GenieACS ha rifiutato la credenziale NBI (HTTP {status}). Controlla utente e password dell'ACS.",
+  'settings.customerIdSync.http': "GenieACS ha risposto con un errore (HTTP {status}) elencando i dispositivi.",
+  'settings.customerIdSync.unreachable': "Impossibile raggiungere GenieACS. Controlla l'indirizzo dell'ACS e che il server risponda.",
+  'settings.customerIdSync.notConfigured': "L'indirizzo di GenieACS non è configurato.",
+  'settings.customerIdSync.badResponse': "GenieACS ha restituito una risposta inattesa elencando i dispositivi.",
   'settings.validation.unsupportedKey': 'Chiave di impostazione non supportata',
   'settings.validation.valueTooLong': 'Il valore dell’impostazione è troppo lungo',
   'settings.validation.autoGeneration': 'La generazione automatica deve essere true o false',

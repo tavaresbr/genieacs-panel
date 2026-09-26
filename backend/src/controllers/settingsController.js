@@ -9,7 +9,6 @@ import GenieAcsAuthService, { AUTH_TYPES } from '../services/genieacsAuthService
 import Tenant from '../models/Tenant.js';
 import { suggestGenieAcsUrl } from '../services/genieacsSuggestion.js';
 import { currentTenantId } from '../config/tenantContext.js';
-import CustomerAccount from '../models/CustomerAccount.js';
 import { PLATFORM_MANAGED_SETTING_KEYS, platformManagesCurrentTenant } from '../config/platformManaged.js';
 import SubscriptionService from '../services/subscriptionService.js';
 
@@ -40,6 +39,8 @@ async function refusesPlatformKey(key) {
   return PLATFORM_MANAGED_SETTING_KEYS.includes(String(key)) && platformManagesCurrentTenant();
 }
 import OnboardingService from '../services/onboardingService.js';
+import { classifySyncError } from '../services/customerSyncErrors.js';
+import CustomerIdSyncJob from '../services/customerIdSyncJob.js';
 
 const ALLOWED_SETTING_KEYS = new Set([
   'appName',
@@ -392,33 +393,30 @@ class SettingsController {
           pending: 0
         }));
       }
-      const devices = await DeviceService.getCustomerIdentityDevices();
-      const deviceIds = devices.map((device) => String(device?._id || '')).filter(Boolean);
-      const identityHashes = devices
-        .filter((device) => device?._id && device?.softwareId && device?.pppoe)
-        .map((device) => CustomerService.identityHash(device.softwareId, device.pppoe));
-      const existingRows = await CustomerAccount.getExistingForIdentities(deviceIds, identityHashes);
-      const customerIds = await CustomerService.syncDevices(devices, { enabled: true });
-      const generated = Math.max(customerIds.size - existingRows.length, 0);
-      const preserved = Math.min(existingRows.length, customerIds.size);
-      const pending = Math.max(new Set(deviceIds).size - customerIds.size, 0);
+      const result = await CustomerIdSyncJob.run(currentTenantId() ?? 'default');
+      if (result.running) {
+        return res.json(createResponse(req.t('settings.customerIdSyncRunning'), { enabled: true, running: true }));
+      }
       return res.json(createResponse(
-        pending
-          ? req.t('settings.customerIdSyncedPending', { count: pending })
+        result.pending
+          ? req.t('settings.customerIdSyncedPending', { count: result.pending })
           : req.t('settings.customerIdSynced'),
-        {
-          enabled: true,
-          total: deviceIds.length,
-          existing: preserved,
-          generated,
-          pending
-        }
+        result
       ));
     } catch (error) {
       console.error('Customer ID sync error:', error);
-      return res.status(502).json(
-        createErrorResponse(req.t('settings.customerIdSyncFailed'), translateError(req.t, error))
-      );
+      // O motivo vai classificado, também em produção: é o que diz ao operador
+      // onde olhar. O texto cru do erro continua só no log (e no `error` do
+      // modo desenvolvimento), porque pode carregar host e URL do ACS.
+      const reason = classifySyncError(error);
+      return res.status(502).json({
+        ...createErrorResponse(
+          req.t(reason.reasonKey, reason.status ? { status: reason.status } : undefined),
+          translateError(req.t, error),
+          reason.code
+        ),
+        ...(reason.status ? { status: reason.status } : {})
+      });
     }
   }
 

@@ -64,6 +64,8 @@ const WAN_PARAMETER_CANDIDATES = Object.freeze({
   ]
 });
 
+
+
 class DeviceService {
   /**
    * One dashboard cache per provider.
@@ -363,11 +365,11 @@ class DeviceService {
     return trecho ? `devices/${trecho}` : 'devices';
   }
 
-  static async fetchFromGenieAcs(endpoint, query = {}, method = 'GET', body = null) {
+  static async fetchFromGenieAcs(endpoint, query = {}, method = 'GET', body = null, { timeoutMs } = {}) {
     try {
       const connector = await connectorFor();
       const response = await connector.request(this.devicePath(endpoint), {
-        query, method, body
+        query, method, body, ...(timeoutMs ? { timeoutMs } : {})
       });
       if (!response.ok) {
         throw await this.genieAcsError('GenieACS API', response);
@@ -934,6 +936,12 @@ class DeviceService {
 
   /** Quantas linhas a planilha leva, no máximo. Acima disso, a resposta pede um recorte. */
   static DEVICE_EXPORT_MAX = 5000;
+  /**
+   * Prazo da leitura da frota inteira na sincronização de IDs de cliente. Os
+   * 15 s do conector servem a um aparelho; a frota toda, numa rede grande,
+   * passa disso e a sincronização caía sempre no mesmo erro genérico.
+   */
+  static CUSTOMER_IDENTITY_TIMEOUT_MS = 60_000;
 
   /**
    * O recorte da lista inteiro, sem paginar — o que a planilha leva.
@@ -1747,7 +1755,11 @@ class DeviceService {
       ...PPPOE_FALLBACK_PATHS,
       ...await this.readPppoePaths()
     ].filter(Boolean);
-    const data = await this.fetchFromGenieAcs('', { projection: projection.join(',') });
+    // A frota inteira numa resposta: com milhares de ONTs, os 15 s padrão do
+    // conector não bastam e a sincronização de IDs morria com "aborted".
+    const data = await this.fetchFromGenieAcs('', { projection: projection.join(',') }, 'GET', null, {
+      timeoutMs: this.CUSTOMER_IDENTITY_TIMEOUT_MS
+    });
     if (!Array.isArray(data)) {
       throw new Error('Invalid GenieACS customer identity response');
     }

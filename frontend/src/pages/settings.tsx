@@ -1107,7 +1107,14 @@ export default function Settings() {
           toast.error(sync.message || t('settings.syncError'))
           return
         } else {
-          const result = sync.data as { generated?: number; existing?: number; pending?: number }
+          const result = sync.data as { generated?: number; existing?: number; pending?: number; running?: boolean }
+          // Frota grande: o servidor respondeu no prazo e segue gerando em
+          // segundo plano. A frase dele já diz isso; não há contagem ainda.
+          if (result.running) {
+            toast.success(successMessage)
+            toast.info(sync.message || t('settings.syncSuccess'))
+            return
+          }
           successMessage = t('settings.syncSummary', {
             message: sync.message || t('settings.syncSuccess'),
             generated: result.generated || 0,

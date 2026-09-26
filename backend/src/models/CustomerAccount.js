@@ -1,5 +1,12 @@
 import { tdb, tinsertReturningId } from '../config/database.js';
 
+
+/** Parâmetros por consulta `whereIn`, abaixo do teto dos três bancos. */
+const LOTE = 500;
+function* emLotes(lista) {
+  for (let i = 0; i < lista.length; i += LOTE) yield lista.slice(i, i + LOTE);
+}
+
 class CustomerAccount {
   static async getAll() {
     return tdb('customer_accounts').orderBy('created_at', 'desc');
@@ -110,9 +117,13 @@ class CustomerAccount {
 
   static async getIdsByDeviceIds(deviceIds) {
     if (!Array.isArray(deviceIds) || deviceIds.length === 0) return [];
-    return tdb('customer_accounts')
-      .select('device_id', 'customer_id', 'pppoe_username')
-      .whereIn('device_id', deviceIds);
+    const rows = [];
+    for (const lote of emLotes(deviceIds)) {
+      rows.push(...await tdb('customer_accounts')
+        .select('device_id', 'customer_id', 'pppoe_username')
+        .whereIn('device_id', lote));
+    }
+    return rows;
   }
 
   static async getSyncTargets() {
@@ -127,17 +138,21 @@ class CustomerAccount {
     const normalizedIdentityHashes = Array.isArray(identityHashes) ? identityHashes.filter(Boolean) : [];
     if (normalizedDeviceIds.length === 0 && normalizedIdentityHashes.length === 0) return [];
 
-    return tdb('customer_accounts')
-      .select('id', 'device_id', 'identity_hash', 'customer_id')
-      .where((query) => {
-        if (normalizedDeviceIds.length > 0) {
-          query.whereIn('device_id', normalizedDeviceIds);
-        }
-        if (normalizedIdentityHashes.length > 0) {
-          const method = normalizedDeviceIds.length > 0 ? 'orWhereIn' : 'whereIn';
-          query[method]('identity_hash', normalizedIdentityHashes);
-        }
-      });
+    // Em lotes: a frota inteira num `whereIn` passa do teto de parâmetros do
+    // banco (SQLite, Postgres) e derrubava a sincronização de IDs inteira.
+    const porId = new Map();
+    const guardar = (lista) => { for (const row of lista) porId.set(row.id, row); };
+    for (const lote of emLotes(normalizedDeviceIds)) {
+      guardar(await tdb('customer_accounts')
+        .select('id', 'device_id', 'identity_hash', 'customer_id')
+        .whereIn('device_id', lote));
+    }
+    for (const lote of emLotes(normalizedIdentityHashes)) {
+      guardar(await tdb('customer_accounts')
+        .select('id', 'device_id', 'identity_hash', 'customer_id')
+        .whereIn('identity_hash', lote));
+    }
+    return [...porId.values()];
   }
 }
 
