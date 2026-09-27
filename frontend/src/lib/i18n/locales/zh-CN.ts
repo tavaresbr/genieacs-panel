@@ -230,6 +230,7 @@ const zhCN: Dictionary = {
   'login.platform.helpText': '平台账户的密码在服务器上用 scripts/reset-password.js 重置。',
   'console.header': '平台',
   'login.error.invalidCredentials': '用户名或邮箱与密码不匹配。请检查凭据。',
+  'login.error.accountLocked': '失败次数过多：此账户已被锁定几分钟。请稍后重试，或重置密码。',
   'login.error.unreachable': '面板无法连接到服务器。请检查网络连接后重试。',
 
   // 首次配置

@@ -227,6 +227,7 @@ const ar: Dictionary = {
   'login.platform.helpText': 'تُعاد تعيين كلمة مرور حساب المنصة على الخادم، عبر scripts/reset-password.js.',
   'console.header': 'المنصة',
   'login.error.invalidCredentials': 'اسم المستخدم أو كلمة المرور غير مطابقة. تحقّق من بيانات اعتماد المدير.',
+  'login.error.accountLocked': 'محاولات فاشلة كثيرة: هذا الحساب مقفل لبضع دقائق. انتظر وحاول مجددًا، أو أعد تعيين كلمة المرور.',
   'login.error.unreachable': 'تعذّر على اللوحة الوصول إلى الخادم. تحقّق من الاتصال وأعد المحاولة.',
 
   // الإعداد الأولي

@@ -230,6 +230,7 @@ const zhTW: Dictionary = {
   'login.platform.helpText': '平台帳戶的密碼在伺服器上用 scripts/reset-password.js 重設。',
   'console.header': '平台',
   'login.error.invalidCredentials': '使用者名稱或電子郵件與密碼不符。請確認憑證。',
+  'login.error.accountLocked': '失敗次數過多：此帳號已被鎖定幾分鐘。請稍後再試，或重設密碼。',
   'login.error.unreachable': '面板無法連線至伺服器。請檢查網路連線後重試。',
 
   // 首次設定

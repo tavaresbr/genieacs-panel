@@ -230,6 +230,7 @@ const fr: Dictionary = {
   'login.platform.helpText': 'Le mot de passe d\'un compte de plateforme se réinitialise sur le serveur, avec scripts/reset-password.js.',
   'console.header': 'Plateforme',
   'login.error.invalidCredentials': 'Le nom d’utilisateur ou l’e-mail et le mot de passe ne correspondent pas. Vérifiez les identifiants.',
+  'login.error.accountLocked': 'Trop de tentatives échouées : ce compte est bloqué pendant quelques minutes. Patientez puis réessayez, ou réinitialisez le mot de passe.',
   'login.error.unreachable': 'Le panneau n’a pas pu joindre le serveur. Vérifiez la connexion et réessayez.',
 
   // Configuration initiale

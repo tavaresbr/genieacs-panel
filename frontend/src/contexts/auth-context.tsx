@@ -5,7 +5,7 @@ import type { LoginDestination, LoginDestinations } from '@/lib/api'
 import { sessionKind } from '@/lib/shell'
 import { apiClient, authAPI, storedSession } from '@/lib/api'
 import { destinosDaResposta } from '@/lib/login-destinations'
-import { mfaStepDaResposta, type MfaStep } from '@/lib/login-mfa'
+import { contaBloqueadaNaResposta, mfaStepDaResposta, type MfaStep } from '@/lib/login-mfa'
 import { MFA_ENROLLMENT_EVENT } from '@/lib/mfa-enrollment'
 import { useNavigate } from 'react-router'
 import { roleHas, type Permission } from '@/lib/permissions'
@@ -30,11 +30,12 @@ interface AuthContextType {
   /**
    * Devolve `true` quando entrou, `false` quando a credencial não serve, e os
    * DESTINOS quando o servidor pediu para escolher — o que só acontece onde o
-   * endereço não nomeia provedor e a pessoa trabalha em mais de um.
+   * endereço não nomeia provedor e a pessoa trabalha em mais de um. `'locked'`
+   * é a conta bloqueada por tentativas demais.
    */
   login: (
     identifier: string, password: string, destino?: LoginDestination, totpCode?: string
-  ) => Promise<boolean | LoginDestinations | MfaStep>
+  ) => Promise<boolean | LoginDestinations | MfaStep | 'locked'>
   completeSetup: (username: string, password: string, email: string) => Promise<boolean>
   /** Para quem chega com a sessão já pronta: o convite aceito e a personificação resgatada. */
   adoptSession: (
@@ -140,9 +141,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const login = async (
     identifier: string, password: string, destino?: LoginDestination, totpCode?: string
-  ): Promise<boolean | LoginDestinations | MfaStep> => {
+  ): Promise<boolean | LoginDestinations | MfaStep | 'locked'> => {
     try {
       const res = await authAPI.login(identifier, password, destino, totpCode)
+      if (contaBloqueadaNaResposta(res)) return 'locked'
       // A senha está certa e falta (ou não serviu) o código do app: nem
       // credencial errada, nem sessão. A tela pede o código.
       const codigo = mfaStepDaResposta(res)

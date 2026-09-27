@@ -230,6 +230,7 @@ const de: Dictionary = {
   'login.platform.helpText': 'Das Passwort eines Plattformkontos wird auf dem Server zurückgesetzt, mit scripts/reset-password.js.',
   'console.header': 'Plattform',
   'login.error.invalidCredentials': 'Benutzername oder E-Mail und Passwort stimmen nicht. Prüfen Sie die Zugangsdaten.',
+  'login.error.accountLocked': 'Zu viele Fehlversuche: Dieses Konto ist für einige Minuten gesperrt. Warten Sie und versuchen Sie es erneut oder setzen Sie das Passwort zurück.',
   'login.error.unreachable': 'Das Panel konnte den Server nicht erreichen. Prüfen Sie die Verbindung und versuchen Sie es erneut.',
 
   // Ersteinrichtung

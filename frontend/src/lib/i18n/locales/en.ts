@@ -232,6 +232,7 @@ const en = {
   'login.platform.helpText': 'A platform account\'s password is reset on the server, with scripts/reset-password.js.',
   'console.header': 'Platform',
   'login.error.invalidCredentials': 'The username or email and the password do not match. Check the credentials.',
+  'login.error.accountLocked': 'Too many failed attempts: this account is locked for a few minutes. Wait and try again, or reset the password.',
   'login.error.unreachable': 'The panel could not reach the server. Check the connection and try again.',
 
   // First-run setup

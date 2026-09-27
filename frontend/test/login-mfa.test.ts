@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { ApiResponse } from '@/lib/api'
-import { cleanSecondFactor, mfaStepDaResposta } from '@/lib/login-mfa'
+import { cleanSecondFactor, contaBloqueadaNaResposta, mfaStepDaResposta } from '@/lib/login-mfa'
 
 const resposta = (parcial: Partial<ApiResponse>): ApiResponse => ({ success: false, ...parcial })
 
@@ -26,5 +26,14 @@ describe('o código digitado', () => {
 
   it('o de recuperação vai como foi digitado, para o servidor normalizar', () => {
     expect(cleanSecondFactor(' abcde-12345 ')).toBe('abcde-12345')
+  })
+})
+
+describe('a conta bloqueada', () => {
+  it('é o código dela, e não a senha errada nem o passo do 2FA', () => {
+    expect(contaBloqueadaNaResposta(resposta({ code: 'account_locked' }))).toBe(true)
+    expect(contaBloqueadaNaResposta(resposta({ code: 'invalid_credentials' }))).toBe(false)
+    expect(contaBloqueadaNaResposta(resposta({ code: 'mfa_required' }))).toBe(false)
+    expect(mfaStepDaResposta(resposta({ code: 'account_locked' }))).toBe(null)
   })
 })

@@ -230,6 +230,7 @@ const ja: Dictionary = {
   'login.platform.helpText': 'プラットフォームアカウントのパスワードは、サーバー上で scripts/reset-password.js により再設定します。',
   'console.header': 'プラットフォーム',
   'login.error.invalidCredentials': 'ユーザー名またはメールアドレスとパスワードが一致しません。認証情報を確認してください。',
+  'login.error.accountLocked': '失敗が多すぎるため、このアカウントは数分間ロックされています。しばらく待ってから再試行するか、パスワードをリセットしてください。',
   'login.error.unreachable': 'パネルからサーバーに接続できませんでした。接続を確認して再試行してください。',
 
   // 初回セットアップ
