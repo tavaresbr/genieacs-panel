@@ -522,8 +522,8 @@ function SendInvoiceModal({ contactKey, invoiceId, onClose }: { contactKey: stri
   }
 
   return (
-    <div className="fixed inset-0 z-[2100] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="send-invoice-title">
-      <div className="modern-card max-h-[calc(100dvh-2rem)] w-full max-w-xl overflow-y-auto p-5 sm:p-6">
+    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="send-invoice-title">
+      <div className="modal-panel modern-card max-w-xl p-5 sm:p-6">
         <h2 id="send-invoice-title" className="section-heading mb-1">{t('contacts.profile.sendInvoiceTitle')}</h2>
         {preview?.phone && (
           <p className="section-description mb-4">{t('contacts.profile.sendInvoiceTo', { phone: phoneText(preview.phone) })}</p>
@@ -640,8 +640,8 @@ function EditModal({ profile, onClose, onSave }: {
     setForm((current) => ({ ...current, address: { ...current.address, [part]: event.target.value } }))
 
   return (
-    <div className="fixed inset-0 z-[2100] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="contact-edit-title">
-      <div className="modern-card max-h-[calc(100dvh-2rem)] w-full max-w-3xl overflow-y-auto p-5 sm:p-6">
+    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="contact-edit-title">
+      <div className="modal-panel modern-card max-w-3xl p-5 sm:p-6">
         <h2 id="contact-edit-title" className="section-heading mb-1">{t('contacts.profile.editTitle')}</h2>
         <p className="section-description mb-5">{t('contacts.profile.editHint')}</p>
 
