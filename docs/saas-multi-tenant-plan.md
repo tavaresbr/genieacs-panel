@@ -112,8 +112,10 @@ original não previa:
   idêntico ao de rota inexistente).
 - **Fases 5, 6 e 7 entregues.** Da **Fase 4** entrou o modo `direct` inteiro — fronteira do
   conector, credencial NBI, as três correções de SSRF, a guarda de egresso e o teto de
-  concorrência. Continuam em aberto só os outros três modos (`agent`/`tunnel`/`hosted`) e as
-  colunas por provedor que eles exigiriam.
+  concorrência. Depois vieram o modo `tunnel` (a rede privada de cliente liberada por
+  provedor, em `tenant_genieacs_connections`) e o modo `agent` — o agente que o provedor
+  instala na rede dele, com o instalador servido pelo próprio painel. Continua em aberto só o
+  `hosted`.
 
 ### Decisões já tomadas
 
@@ -501,7 +503,7 @@ vítima, que simplesmente deixa de conseguir entrar sem nada na tela explicando 
 
 ---
 
-### Fase 4 — Conectividade GenieACS plugável ✅ *(entregue no modo `direct`; os outros três modos continuam em aberto)*
+### Fase 4 — Conectividade GenieACS plugável ✅ *(entregue nos modos `direct`, `tunnel` e `agent`; só o `hosted` continua em aberto)*
 
 Como você quer suportar os quatro modos, o certo é abstrair antes de implementar o segundo.
 
@@ -603,11 +605,18 @@ peças:
   cada 5 min. O custo que sobra é O(frota) por provedor ativo, e ele escala com o tamanho de
   um cliente, não com o número deles.
 
-**Roadmap dos outros modos** (mesma interface, sem reescrever o `DeviceService`):
-- `agent`: agente instalado no provedor abre WebSocket **de saída** para o SaaS; o conector
+**Os outros modos** (mesma interface, sem reescrever o `DeviceService`):
+- ✅ `agent`: agente instalado no provedor abre WebSocket **de saída** para o SaaS; o conector
   multiplexa requisição/resposta por cima. Nada exposto na internet — é o modo mais seguro e
-  o que eu recomendaria como padrão comercial depois do MVP.
-- `tunnel`: WireGuard/Cloudflare Tunnel — reutiliza o conector `direct` com
+  o que eu recomendaria como padrão comercial. Entregue com o hub em
+  `/api/genieacs-agent/connect`, o programa em `backend/agent/skygenpanel-agent.mjs` (um
+  arquivo, sem dependências) e o instalador `deploy/install-agent.sh`, que o painel serve em
+  `/api/genieacs-agent/install.sh` junto com o programa — os dois na versão do próprio
+  painel. A chave (`sgpa_…`) é guardada só como hash e nunca passa por argv na máquina do
+  provedor. **Limite conhecido:** a conexão do agente vive no processo, então o deploy com
+  agentes roda com UMA réplica do painel até existir roteamento por provedor. Operação em
+  `saas-operations.md` §12.
+- ✅ `tunnel`: WireGuard/Cloudflare Tunnel — reutiliza o conector `direct` com
   `allow_private_ranges` ligado. Custo é operacional (setup manual por cliente), não de código.
 - `hosted`: nós provisionamos o GenieACS; o conector `direct` aponta para a nossa rede interna.
 
@@ -1164,10 +1173,11 @@ Original: Fase 0 → 1 → 2 → 3 → 8 → 4 → 5 → 6 → 7.
    aceitar pagar os 152% medidos por consulta.
 4. ~~**Fase 4 — conector.**~~ ✅ na ordem certa: as três correções de SSRF e a guarda de
    egresso com IP fixado entraram **antes** de a URL virar dado do cliente; depois a
-   credencial NBI (onda 19) e o teto de concorrência. Do desenho original ficaram de fora,
-   e continuam em aberto: `mode` (`agent`/`tunnel`/`hosted`), `verify_tls` e
-   `allow_private_ranges` por provedor — a credencial vive num blob em `app_state`, sem
-   essas três colunas. O muro de escala, esse, fechou nas quatro peças.
+   credencial NBI (onda 19) e o teto de concorrência. Depois, `mode` por provedor em
+   `tenant_genieacs_connections`: `tunnel` (que absorveu o `allow_private_ranges` — liberar
+   rede privada sem dizer por quê seria uma chave esquecida ligada) e `agent`, com o
+   instalador servido pelo painel. Continuam em aberto o modo `hosted` e `verify_tls` por
+   provedor. O muro de escala, esse, fechou nas quatro peças.
 5. ~~**Fase 5**~~ ✅ planos, assinatura, `subscriptionGate`, limites nos quatro
    pontos de escrita, `billing_events` e o `ManualBillingProvider`. O gateway (Asaas)
    entrou pela metade que recebe: o webhook credita a assinatura sozinho, com a
