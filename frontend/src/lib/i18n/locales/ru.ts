@@ -471,6 +471,8 @@ const ru: Dictionary = {
   'devices.summon.button': 'Запросить новый Inform',
   'devices.summon.loading': 'Вызов устройства…',
   'devices.summon.success': 'Команда вызова отправлена.',
+  'devices.summon.deferredSince': 'Сейчас ONT недоступен. Последний Inform: {time}. Запрос поставлен в очередь и выполнится при следующем периодическом Inform.',
+  'devices.summon.deferredStale': 'ONT не присылал Inform с {time}. Запрос поставлен в очередь и выполнится только после его повторного подключения.',
   'devices.summon.failed': 'Не удалось отправить команду вызова',
   'devices.summon.error': 'Ошибка при отправке команды вызова',
   'devices.sgp.column': 'Договор SGP',

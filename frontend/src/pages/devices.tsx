@@ -36,6 +36,7 @@ import {
   type SelectableRow
 } from '@/lib/device-batch'
 import type { Device, Vendor } from '@/types'
+import { summonDeferredMessage } from '@/lib/device-actions'
 
 interface ProcessedDevice extends Device {
   isOnline: boolean
@@ -89,7 +90,7 @@ export default function DevicesPage() {
 
   const loadingCtl = useLoading()
   const toast = useToast()
-  const { t } = useTranslation()
+  const { t, formatDateTime } = useTranslation()
   const { can } = useAuth()
   // Ações em lote: só para quem tem `devices.maintain` — um clique alcança
   // muitos assinantes. Sem a permissão, a lista fica exatamente como era.
@@ -171,7 +172,7 @@ export default function DevicesPage() {
     try {
       const res = await devicesAPI.summonDevice(deviceId);
       if (res.success && res.data?.reached === false) {
-        toast.warning(res.message || t('devices.summon.success'));
+        toast.warning(summonDeferredMessage(res.data, t, formatDateTime, res.message || t('devices.summon.success')));
       } else if (res.success) {
         toast.success(res.message || t('devices.summon.success'));
       } else {

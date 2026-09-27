@@ -3,6 +3,7 @@ import { devicesAPI, type DeviceParameterList } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
+import { summonDeferredMessage } from '@/lib/device-actions'
 
 /** What an operator looks for when a field on the page reads N/D. */
 const SHORTCUTS = ['RXPower', 'Temperature', 'VLAN', 'ConnectionType', 'Username', 'MACAddress']
@@ -49,7 +50,9 @@ export function DeviceParametersCard({ deviceId }: DeviceParametersCardProps) {
     setSummoning(true)
     try {
       const res = await devicesAPI.summonDevice(deviceId)
-      if (res.success && res.data?.reached === false) toast.warning(res.message || t('detail.parameters.summoned'))
+      if (res.success && res.data?.reached === false) {
+        toast.warning(summonDeferredMessage(res.data, t, formatDateTime, res.message || t('detail.parameters.summoned')))
+      }
       else if (res.success) toast.success(t('detail.parameters.summoned'))
       else toast.error(res.message || t('devices.summon.failed'))
     } catch {

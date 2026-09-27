@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { informedRecently, serialMatches } from '@/lib/device-actions'
+import { informedRecently, serialMatches, summonDeferredMessage } from '@/lib/device-actions'
 
 /**
  * A confirmação do reset de fábrica: o botão só se acende com a série DESTE
@@ -42,5 +42,25 @@ describe('a ONT que informou há pouco', () => {
     expect(informedRecently(null, agora)).toBe(false)
     expect(informedRecently('ontem', agora)).toBe(false)
     expect(informedRecently('2026-09-26T12:05:00Z', agora)).toBe(false)
+  })
+})
+
+describe('summonDeferredMessage', () => {
+  const t = (key: string, vars?: Record<string, string | number>) => `${key}|${vars?.time ?? ''}`
+  const format = (value: string) => `fmt(${value})`
+
+  it('says since when an ONT silent for days has not informed', () => {
+    expect(summonDeferredMessage({ lastInform: '2026-09-14T11:52:39Z', stale: true }, t, format, 'fallback'))
+      .toBe('devices.summon.deferredStale|fmt(2026-09-14T11:52:39Z)')
+  })
+
+  it('gives the last Inform of an ONT that is only unreachable right now', () => {
+    expect(summonDeferredMessage({ lastInform: '2026-09-27T10:00:00Z', stale: false }, t, format, 'fallback'))
+      .toBe('devices.summon.deferredSince|fmt(2026-09-27T10:00:00Z)')
+  })
+
+  it('keeps the server text when there is no date', () => {
+    expect(summonDeferredMessage({ lastInform: null }, t, format, 'fallback')).toBe('fallback')
+    expect(summonDeferredMessage(undefined, t, format, 'fallback')).toBe('fallback')
   })
 })

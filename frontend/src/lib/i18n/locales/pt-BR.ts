@@ -470,6 +470,8 @@ const ptBR: Dictionary = {
   'devices.summon.button': 'Solicitar novo Inform',
   'devices.summon.loading': 'Convocando equipamento…',
   'devices.summon.success': 'Comando de convocação enviado.',
+  'devices.summon.deferredSince': 'A ONT não pôde ser contatada agora. Último Inform: {time}. O pedido ficou na fila e será executado no próximo Inform periódico dela.',
+  'devices.summon.deferredStale': 'A ONT está sem Inform desde {time}. O pedido ficou na fila e só será executado quando ela voltar a se conectar.',
   'devices.summon.failed': 'Não foi possível enviar o comando de convocação',
   'devices.summon.error': 'Erro ao enviar o comando de convocação',
   'devices.sgp.column': 'Contrato SGP',

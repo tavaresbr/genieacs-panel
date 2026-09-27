@@ -470,6 +470,8 @@ const fr: Dictionary = {
   'devices.summon.button': 'Demander un nouvel Inform',
   'devices.summon.loading': 'Appel de l’équipement…',
   'devices.summon.success': 'Commande d’appel envoyée.',
+  'devices.summon.deferredSince': 'L’ONT est injoignable pour le moment. Dernier Inform : {time}. La demande est en file d’attente et s’exécutera à son prochain Inform périodique.',
+  'devices.summon.deferredStale': 'L’ONT n’a plus envoyé d’Inform depuis le {time}. La demande est en file d’attente et ne s’exécutera qu’à sa reconnexion.',
   'devices.summon.failed': 'La commande d’appel n’a pas pu être envoyée',
   'devices.summon.error': 'Erreur lors de l’envoi de la commande d’appel',
   'devices.sgp.column': 'Contrat SGP',
