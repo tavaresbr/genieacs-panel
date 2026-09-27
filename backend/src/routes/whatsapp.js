@@ -16,6 +16,8 @@ router.put('/config', authenticateToken, requirePermission('whatsapp.config'), W
 // A aba Chatbot: o que o atendimento automático diz e quando.
 router.get('/bot-config', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.getBotConfig);
 router.put('/bot-config', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.updateBotConfig);
+// O relatório do bot é leitura de quem atende, não de quem configura.
+router.get('/bot-report', authenticateToken, requirePermission('whatsapp.read'), WhatsAppController.getBotReport);
 router.get('/accounts', authenticateToken, requirePermission('whatsapp.read'), WhatsAppController.listAccounts);
 
 // O diagnóstico da configuração, e a única rota deste roteador com limitador.

@@ -16,6 +16,7 @@ const { default: WhatsAppConfigService } = await import('../src/services/whatsap
 const { default: WhatsAppAccount } = await import('../src/models/WhatsAppAccount.js');
 const { default: WaBotService } = await import('../src/services/waBotService.js');
 const { default: WaBotConfigService } = await import('../src/services/waBotConfigService.js');
+const { tinsert } = await import('../src/config/database.js');
 
 const INSTANCE = 'painel-bot';
 const INSTANCE_TOKEN = 'token-instancia-bot';
@@ -1075,5 +1076,76 @@ describe('a aba Chatbot', () => {
     } finally {
       await restaurar();
     }
+  });
+});
+
+describe('o relatório do chatbot', () => {
+  const relatorio = async (days = 7) => {
+    const { status, body } = await call(`${panelUrl}/api/whatsapp/bot-report?days=${days}`, { headers: authHeaders(token) });
+    assert.equal(status, 200, JSON.stringify(body));
+    return body.data;
+  };
+  const ultimoEvento = async () => getDb()('wa_bot_events').orderBy('id', 'desc').first();
+
+  it('cada resposta do bot deixa um evento com a intenção', async () => {
+    await unicaResposta(ASSINANTE, 'segunda via do boleto');
+    assert.equal((await ultimoEvento()).intent, 'fatura');
+    await unicaResposta(ASSINANTE, 'oi');
+    assert.equal((await ultimoEvento()).intent, 'menu');
+    await unicaResposta(DESCONHECIDO, 'boa noite');
+    assert.equal((await ultimoEvento()).intent, 'askDocument');
+  });
+
+  it('conta as conversas, e só as sem humano depois como resolvidas pelo bot', async () => {
+    await getDb()('wa_bot_events').del();
+    await getDb()('audit_log').where({ action: 'whatsapp.bot_trust_unlock' }).del();
+    await unicaResposta(ASSINANTE, 'segunda via do boleto');
+    await unicaResposta(DESCONHECIDO, 'boa noite');
+
+    // Um operador responde a conversa do desconhecido depois do bot.
+    const conversa = await conversaDe(DESCONHECIDO);
+    const operador = await getDb()('users').orderBy('id').first();
+    await insertReturningId('wa_messages', {
+      conversation_id: conversa.id,
+      direction: 'out',
+      body: 'Oi, sou a Ana do suporte',
+      is_note: false,
+      delivery_status: 'sent',
+      sent_by: operador.id,
+      source: 'operator',
+      created_at: new Date(Date.now() + 1000),
+      updated_at: new Date(Date.now() + 1000)
+    });
+
+    const r = await relatorio();
+    assert.equal(r.conversations, 2);
+    assert.equal(r.resolvedWithoutHuman, 1);
+    assert.equal(r.resolvedRate, 0.5);
+    assert.equal(r.invoicesSent, 1);
+    assert.equal(r.unlocks, 0);
+    assert.equal(r.daily.length, 7);
+    assert.equal(r.daily.at(-1).conversations, 2);
+  });
+
+  it('põe os pedidos de atendente na hora do fuso do provedor', async () => {
+    await getDb()('wa_bot_events').del();
+    const quando = new Date(Date.now() - 60 * 60 * 1000);
+    await asTenant(() => tinsert('wa_bot_events', { conversation_id: null, intent: 'atendente', created_at: quando }));
+    const esperada = Number(new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Sao_Paulo', hour: '2-digit', hourCycle: 'h23'
+    }).format(quando));
+    const r = await relatorio();
+    assert.equal(r.humanRequests, 1);
+    assert.equal(r.humanRequestsByHour[esperada], 1);
+  });
+
+  it('fora do período não conta, e período desconhecido vira 7 dias', async () => {
+    await getDb()('wa_bot_events').del();
+    await asTenant(() => tinsert('wa_bot_events', {
+      conversation_id: null, intent: 'fatura', created_at: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000)
+    }));
+    assert.equal((await relatorio(7)).invoicesSent, 0);
+    assert.equal((await relatorio(30)).invoicesSent, 1);
+    assert.equal((await relatorio(5)).days, 7);
   });
 });

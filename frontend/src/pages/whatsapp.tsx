@@ -19,6 +19,7 @@ import { BillingPanel } from '@/components/whatsapp/billing-panel'
 import { CampaignsPanel } from '@/components/whatsapp/campaigns-panel'
 import { TemplatesPanel } from '@/components/whatsapp/templates-panel'
 import { OptOutPanel } from '@/components/whatsapp/opt-out-panel'
+import { BotReportPanel } from '@/components/whatsapp/bot-report-panel'
 import { AlertsPanel } from '@/components/whatsapp/alerts-panel'
 import { OutagePanel } from '@/components/outages/outage-panel'
 import { ContactsPanel } from '@/components/whatsapp/contacts-panel'
@@ -910,6 +911,7 @@ const TABS = [
   ['campaigns', 'whatsapp.broadcast.title', 'campaigns.read'],
   ['templates', 'whatsapp.templates.title', 'campaigns.read'],
   ['optOut', 'whatsapp.optOut.title', 'campaigns.read'],
+  ['botReport', 'whatsapp.botReport.tab', 'whatsapp.read'],
   ['alerts', 'whatsapp.alerts.title', 'whatsapp.config']
 ] as const
 
@@ -1005,6 +1007,7 @@ export default function WhatsAppPage() {
         {tab === 'campaigns' && <CampaignsPanel />}
         {tab === 'templates' && <TemplatesPanel />}
         {tab === 'optOut' && <OptOutPanel />}
+        {tab === 'botReport' && <BotReportPanel />}
         {/* Pela capacidade e não pela aba escolhida: o estado inicial é `inbox`,
             mas um papel que perca `whatsapp.config` enquanto está em Alertas
             continuaria montando um painel cujas requisições todas falham. */}

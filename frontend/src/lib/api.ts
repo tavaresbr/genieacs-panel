@@ -3267,6 +3267,29 @@ export interface BotConfig {
   hours: { enabled: boolean; timezone: string; week: BotHoursDay[] }
 }
 
+/** O relatório do chatbot: `GET /whatsapp/bot-report`. */
+export interface BotReport {
+  days: 7 | 30 | 90
+  timezone: string
+  replies: number
+  conversations: number
+  resolvedWithoutHuman: number
+  /** `null` sem nenhuma conversa no período. */
+  resolvedRate: number | null
+  invoicesSent: number
+  noOpenInvoice: number
+  signalChecks: number
+  outagesInformed: number
+  unlocks: number
+  identified: number
+  documentFailures: number
+  humanRequests: number
+  /** 24 posições, hora 0 a 23 no fuso do horário de atendimento. */
+  humanRequestsByHour: number[]
+  daily: { day: string; conversations: number }[]
+  intents: Record<string, number>
+}
+
 export const whatsappAPI = {
   getConfig: () =>
     apiClient.get<WhatsAppConfig>('/whatsapp/config'),
@@ -3277,6 +3300,9 @@ export const whatsappAPI = {
   /** Campo ausente mantém o gravado. */
   updateBotConfig: (config: Partial<Omit<BotConfig, 'defaults'>>) =>
     apiClient.put<BotConfig>('/whatsapp/bot-config', config),
+
+  getBotReport: (days: 7 | 30 | 90) =>
+    apiClient.get<BotReport>(`/whatsapp/bot-report?days=${days}`),
 
   // An omitted managedAdminKey keeps the stored one; "" clears it. The server
   // never returns it either way.
