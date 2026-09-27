@@ -12,6 +12,7 @@ import { ROLES, normalizeRole, roleHas } from '../config/permissions.js';
 import { generateTokens } from '../middleware/auth.js';
 import { createResponse, createErrorResponse, isValidEmail } from '../utils/helpers.js';
 import MfaService, { mfaEnabled } from '../services/mfaService.js';
+import AccountLockout from '../models/AccountLockout.js';
 import {
   MAX_TTL_MS,
   MIN_TTL_MS,
@@ -214,7 +215,17 @@ class InviteController {
         // seria uma tomada de conta: quem tivesse o link digitaria o nome de
         // qualquer pessoa do deploy e a anexaria a este provedor sem que ela
         // soubesse — e o papel viria junto.
+        //
+        // E é um oráculo da senha para quem tem o link: o balde desta rota é
+        // por endereço, trinta por quarto de hora, e um convite vale dias. Por
+        // isso a conferência passa pela mesma trava por conta do login — a
+        // senha é a mesma, e os palpites daqui somam aos de lá.
+        const tentativa = await AccountLockout.attempt(AccountLockout.forUser(existente.id));
+        if (!tentativa.allowed) {
+          return AccountLockout.refuse(req, res, tentativa, password, { user: existente, via: 'invite' });
+        }
         if (!await bcrypt.compare(password, existente.password)) {
+          await AccountLockout.failed(req, tentativa, { user: existente, via: 'invite' });
           return res.status(401).json(createErrorResponse(req.t('auth.invalidCredentials')));
         }
         // A mesma regra do `/login`, e DEPOIS da senha pelo mesmo motivo de lá:
@@ -234,9 +245,12 @@ class InviteController {
             return res.status(401).json(createErrorResponse(req.t('auth.mfaRequired'), null, 'mfa_required'));
           }
           if (!(await MfaService.verifySecondFactor(existente, totpCode)).ok) {
+            await AccountLockout.failed(req, tentativa, { user: existente, via: 'invite_mfa' });
             return res.status(401).json(createErrorResponse(req.t('auth.mfaInvalid'), null, 'mfa_invalid'));
           }
         }
+        // Senha e código conferidos: a prova terminou, a contagem some.
+        await AccountLockout.clear(tentativa.subject);
         // Já trabalha aqui: o convite não some e não vira erro. É o caso do
         // link clicado duas vezes, e a resposta certa para "me põe na equipe"
         // de quem já está na equipe é "pronto".

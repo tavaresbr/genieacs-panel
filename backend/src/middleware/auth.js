@@ -390,9 +390,27 @@ async function hydrateAuthenticatedUser(decoded) {
 const MFA_ENROLLMENT_PREFIXES = ['/api/auth/'];
 const MFA_ENROLLMENT_PATHS = new Set(['/api/auth', '/api/tenant/public']);
 
+/**
+ * O caminho como o ROTEADOR o enxerga, para as guardas que decidem por ele.
+ *
+ * O Express casa rota sem distinguir caixa (`caseSensitive` desligado, o
+ * padrão): `POST /API/Auth/logout` chega ao mesmo handler que
+ * `/api/auth/logout`. Uma guarda que compara o caminho cru ao pé da letra vê
+ * outra coisa que o roteador, e a diferença é um desvio — a personificação
+ * escrevia na conta de quem personifica só trocando a caixa. Minúsculas aqui
+ * fazem a guarda e o roteador concordarem; a query fica de fora porque não
+ * escolhe rota.
+ */
+function routedPath(req) {
+  return String(req.originalUrl || req.url || '').split('?')[0].toLowerCase();
+}
+
 function mfaEnrollmentRefusal(req, session) {
   if (!session.mfaEnrollmentRequired) return null;
-  const path = String(req.originalUrl || req.url || '').split('?')[0];
+  // Aqui a leitura crua falhava FECHADA (caixa trocada caía fora da lista e era
+  // recusada), mas o certo é a mesma leitura do roteador: `/API/Auth/mfa/setup`
+  // É a rota de ativação, e recusá-la só por caixa não protege nada.
+  const path = routedPath(req);
   if (MFA_ENROLLMENT_PATHS.has(path)) return null;
   if (MFA_ENROLLMENT_PREFIXES.some((prefix) => path.startsWith(prefix))) return null;
   return {
@@ -648,8 +666,9 @@ function impersonationRefusal(req, session) {
   // personifica, não o provedor: sair incrementaria o `token_version` dela e
   // derrubaria as sessões dela em todo o deploy; trocar senha ou segundo fator
   // mexeria na conta da plataforma a partir do painel de um cliente.
-  const caminho = String(req.originalUrl || req.url || '').split('?')[0];
-  if (!caminho.startsWith('/api/auth/')) return null;
+  // `routedPath` e não o caminho cru: o roteador ignora caixa, e com a
+  // comparação literal `POST /API/Auth/logout` atravessava este muro.
+  if (!routedPath(req).startsWith('/api/auth/')) return null;
   return {
     success: false,
     message: req.t('auth.impersonationReadOnly'),

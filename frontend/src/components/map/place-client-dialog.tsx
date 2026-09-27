@@ -82,8 +82,8 @@ export function PlaceClientDialog<T extends OccupancyNode>({
   }
 
   return (
-    <div className="fixed inset-0 z-[2300] flex items-center justify-center bg-black/65 p-4" role="dialog" aria-modal="true">
-      <div className="modern-card max-h-[92vh] w-full max-w-2xl overflow-y-auto p-5 sm:p-6">
+    <div className="modal-backdrop z-[2300] bg-black/65" role="dialog" aria-modal="true">
+      <div className="modal-panel modern-card max-w-2xl p-5 sm:p-6">
         <div className="mb-4 flex items-center justify-between gap-4">
           <h2 className="section-heading">{t('map.place.title', { pppoe: target.pppoe })}</h2>
           <button type="button" onClick={onClose} className="icon-button" aria-label={t('common.close')} disabled={saving}><Icon name="x" size={20} /></button>

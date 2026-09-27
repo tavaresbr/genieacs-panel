@@ -520,8 +520,8 @@ function NewContactModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-[2100] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="new-contact-title">
-      <div className="modern-card max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto p-5 sm:p-6">
+    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="new-contact-title">
+      <div className="modal-panel modern-card max-w-md p-5 sm:p-6">
         <h2 id="new-contact-title" className="section-heading mb-1">{t('contacts.profile.new')}</h2>
         <p className="section-description mb-5">{t('contacts.profile.newHint')}</p>
         <div className="grid gap-4">
@@ -608,8 +608,8 @@ function ImportSheetModal({ onClose, onApplied }: { onClose: () => void; onAppli
   }
 
   return (
-    <div className="fixed inset-0 z-[2100] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="import-sheet-title">
-      <div className="modern-card max-h-[calc(100dvh-2rem)] w-full max-w-2xl overflow-y-auto p-5 sm:p-6" data-testid="import-sheet">
+    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="import-sheet-title">
+      <div className="modal-panel modern-card max-w-2xl p-5 sm:p-6" data-testid="import-sheet">
         <h2 id="import-sheet-title" className="section-heading mb-1">{t('contacts.sheet.importTitle')}</h2>
         <p className="section-description mb-5">{t('contacts.sheet.importHint')}</p>
 

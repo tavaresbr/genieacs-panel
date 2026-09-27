@@ -150,8 +150,8 @@ export function DeviceFirmwareCard({ deviceId, onDone }: { deviceId: string; onD
       </div>
 
       {confirmando && arquivo && (
-        <div className="fixed inset-0 z-[2100] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="firmware-confirm-title">
-          <div className="modern-card flex max-h-[90vh] w-full max-w-md flex-col">
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="firmware-confirm-title">
+          <div className="modal-panel modern-card flex max-w-md flex-col">
             <div className="flex items-center gap-2 border-b border-border p-5">
               <Icon name="warning" size={20} className="shrink-0 text-[hsl(var(--status-warning))]" />
               <h3 id="firmware-confirm-title" className="text-lg font-semibold text-foreground">{t('detail.firmware.confirmTitle')}</h3>

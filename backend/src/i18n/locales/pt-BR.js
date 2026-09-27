@@ -21,6 +21,7 @@ export default {
   'auth.insufficientPermissions': 'Permissões insuficientes',
   'auth.credentialsRequired': 'Usuário e senha são obrigatórios',
   'auth.invalidCredentials': 'Usuário ou senha inválidos',
+  'auth.accountLocked': 'Muitas tentativas sem sucesso nesta conta. Aguarde alguns minutos e tente de novo.',
   'auth.loginSuccess': 'Login realizado com sucesso',
   'auth.chooseDestination': 'Escolha onde entrar',
   'auth.logoutSuccess': 'Sessão encerrada com sucesso',

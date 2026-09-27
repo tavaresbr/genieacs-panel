@@ -75,7 +75,7 @@ class Subscription {
   }
 
   /**
-   * Aplica a descida agendada (0070) — só se ela ainda é a que se leu.
+   * Aplica a descida agendada (0072) — só se ela ainda é a que se leu.
    *
    * Condicional pelo `pending_plan_id`, e não um `upsertForTenant` cego: o
    * agendador e um pagamento podem chegar ao mesmo prazo no mesmo minuto, e

@@ -22,6 +22,7 @@ export default {
   'auth.insufficientPermissions': 'अपर्याप्त अनुमतियाँ',
   'auth.credentialsRequired': 'उपयोगकर्ता नाम और पासवर्ड आवश्यक हैं',
   'auth.invalidCredentials': 'उपयोगकर्ता नाम या पासवर्ड अमान्य है',
+  'auth.accountLocked': 'इस खाते पर बहुत अधिक असफल प्रयास हुए हैं। कुछ मिनट प्रतीक्षा करें और फिर से प्रयास करें।',
   'auth.loginSuccess': 'लॉगिन सफल',
   'auth.chooseDestination': 'साइन इन करने की जगह चुनें',
   'auth.logoutSuccess': 'लॉगआउट सफल',

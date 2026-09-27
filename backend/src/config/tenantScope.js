@@ -98,6 +98,7 @@ export const SCOPED_TABLES = new Set([
   // its WHERE never was an identity filter — it meant "the only row", and the
   // second provider to save a map centre wrote over the first's.
   'map_settings',
+  'tenant_genieacs_connections',
   // The equipment catalogue. Its content really is the same fact about firmware
   // for every ISP, but the rows are edited on screen, so shared they made one
   // operator's corrected detection pattern or parameter path silently change
@@ -151,6 +152,11 @@ export const SHARED_TABLES = new Set([
   // de `users` a que pertencem: o segundo fator vale em todo provedor em que
   // ela trabalha, e é lido no login, antes de existir escopo.
   'user_recovery_codes',
+  // A contagem de tentativas de senha e de código por conta. Da PESSOA, como
+  // `users`: o login é um só em todos os provedores dela, e a trava tem que
+  // valer em todos — contada por provedor, cada subdomínio seria dez palpites
+  // novos. E é lida no login, antes de existir escopo.
+  'account_lockouts',
   // A trilha do plano de controle: o que quem opera o SaaS fez COM um
   // provedor. Compartilhada porque é ACIMA dos provedores e porque a linha que
   // registra a exclusão de um tem que sobreviver a ele — escopada, ela seria

@@ -24,6 +24,7 @@ export default {
   'auth.insufficientPermissions': 'Недостаточно прав',
   'auth.credentialsRequired': 'Требуются имя пользователя и пароль',
   'auth.invalidCredentials': 'Неверное имя пользователя или пароль',
+  'auth.accountLocked': 'Слишком много неудачных попыток для этой учётной записи. Подождите несколько минут и повторите попытку.',
   'auth.loginSuccess': 'Вход выполнен',
   'auth.chooseDestination': 'Выберите, куда войти',
   'auth.logoutSuccess': 'Выход выполнен',

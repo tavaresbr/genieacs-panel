@@ -5,6 +5,7 @@ import {
 } from '../utils/wa/evolutionApi.js';
 import { normalizeEvoUrl, isHostAllowed } from '../utils/wa/evolutionPolicy.js';
 import { assertPublicUrl, SsrfBlockedError } from '../utils/wa/ssrfGuard.js';
+import { PinnedTransport, bareHostname } from '../utils/net/pinnedFetch.js';
 
 const REQUEST_TIMEOUT_MS = 15_000;
 
@@ -62,8 +63,41 @@ export class EvolutionClient {
     this.flavor = flavor;
   }
 
+  /**
+   * Name resolution, as one overridable slot — the same one `GenieAcsEgress`
+   * has, for the same reason: a test drives a rebinding-shaped answer through
+   * it without owning a zone.
+   */
+  static lookup(hostname) {
+    return PinnedTransport.lookup(hostname);
+  }
+
+  /**
+   * O socket, como um encaixe substituível. O padrão é `PinnedTransport`, que
+   * conecta só aos endereços já conferidos; as suítes trocam isto para levar a
+   * chamada a um dublê em loopback sem desligar a guarda que vem antes.
+   */
+  static connect(options) {
+    return PinnedTransport.request(options);
+  }
+
   /** Rejects a target that the operator did not authorise, or that is not public. */
   async assertTarget() {
+    this.assertPolicy();
+    try {
+      await assertPublicUrl(this.baseUrl);
+    } catch (error) {
+      if (error instanceof SsrfBlockedError) throw blockedHost(error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * O que se decide sem rede: URL presente, TLS, allowlist do operador. A
+   * classificação do ENDEREÇO fica para `open`, que é quem conecta — conferir
+   * aqui e deixar outro resolvedor escolher o endereço depois era a brecha.
+   */
+  assertPolicy() {
     if (!this.baseUrl) {
       throw new WaError('whatsapp.error.invalidBaseUrl', { code: 'invalid_base_url', status: 400 });
     }
@@ -91,18 +125,50 @@ export class EvolutionClient {
     if (!isHostAllowed(this.baseUrl, this.allowedHosts)) {
       throw new WaError('whatsapp.error.hostNotAllowed', { code: 'host_not_allowed', status: 400 });
     }
-    try {
-      await assertPublicUrl(this.baseUrl);
-    } catch (error) {
-      if (error instanceof SsrfBlockedError) {
-        throw new WaError('whatsapp.error.blockedHost', {
-          code: 'blocked_host',
-          status: 400,
-          vars: { reason: error.message }
-        });
-      }
-      throw error;
+  }
+
+  /**
+   * Resolve, confere e conecta ao endereço conferido — e a nenhum outro.
+   *
+   * Isto era `assertPublicUrl` seguido de `fetch`, e são duas resoluções do
+   * mesmo nome: a primeira respondia um endereço público e passava na guarda, a
+   * segunda era do `fetch`, que resolve de novo por conta própria. Quem controla
+   * a zona faz as duas discordarem (DNS rebinding, TTL zero), e a chamada — com
+   * a chave global do servidor ou o token da instância no `apikey` — saía para o
+   * loopback ou para a VPC. `PinnedTransport` fixa o endereço conferido no
+   * `lookup` do socket, mantendo o nome no `Host` e no SNI, então o certificado
+   * continua sendo conferido contra o nome que o operador digitou.
+   *
+   * O prazo vale da resolução ao último byte, como antes valia do `fetch` em
+   * diante; e o teto de corpo agora é aplicado pelo transporte, antes de o
+   * corpo inteiro estar na memória.
+   */
+  async open(path, { method, headers, body }) {
+    const signal = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+    const url = new URL(`${this.baseUrl}${path}`);
+    const hostname = bareHostname(url.hostname);
+    const addresses = await PinnedTransport.vetTarget(hostname, {
+      lookup: (name) => EvolutionClient.lookup(name),
+      signal,
+      // A mesma frase vaga do `ssrfGuard`: quem lê é o administrador, mas o
+      // endereço interno não acrescenta nada ao que ele tem de consertar.
+      refuse: () => blockedHost('Private host blocked')
+    });
+    // O prazo pode ter vencido DENTRO da resolução; aí o motivo é o relógio.
+    signal.throwIfAborted();
+    if (addresses.length === 0) {
+      throw new Error(`${hostname} did not resolve to any address`);
     }
+    return EvolutionClient.connect({
+      url,
+      hostname,
+      addresses,
+      method,
+      headers,
+      body,
+      signal,
+      maxBytes: MAX_RESPONSE_BYTES
+    });
   }
 
   /**
@@ -136,26 +202,28 @@ export class EvolutionClient {
    * @param {{ path: string, method: string, body?: unknown, key: 'admin'|'instance' }} request
    */
   async send(request) {
-    await this.assertTarget();
-    const url = `${this.baseUrl}${request.path}`;
+    this.assertPolicy();
     const apikey = this.keyFor(request.key);
 
     let response;
     try {
-      response = await fetch(url, {
+      // Evolution does not redirect in normal use. Following one would send
+      // the instance token to wherever the redirect points, so a 3xx is
+      // treated as a failure rather than as a hop — and `PinnedTransport`
+      // never follows one, so it arrives here as an ordinary answer.
+      response = await this.open(request.path, {
         method: request.method,
-        // Evolution does not redirect in normal use. Following one would send
-        // the instance token to wherever the redirect points, so a 3xx is
-        // treated as a failure rather than as a hop.
-        redirect: 'manual',
         headers: { 'Content-Type': 'application/json', apikey },
-        body: request.body === undefined ? undefined : JSON.stringify(request.body),
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+        body: request.body === undefined ? undefined : JSON.stringify(request.body)
       });
     } catch (error) {
+      if (error instanceof WaError) throw error;
       if (error?.name === 'TimeoutError' || error?.name === 'AbortError') {
         throw new WaError('whatsapp.error.timeout', { code: 'timeout', status: 504 });
       }
+      // Um corpo acima de `MAX_RESPONSE_BYTES` também cai aqui: o transporte
+      // derruba o socket sem entregar status, e um Evolution que responde mais
+      // de um megabyte está quebrado ou é hostil — "inalcançável" é honesto.
       throw new WaError('whatsapp.error.unreachable', {
         code: 'unreachable',
         status: 502,
@@ -232,19 +300,28 @@ export class EvolutionClient {
 
   /** One unauthenticated GET, swallowing transport failures. */
   async probe(path) {
-    await this.assertTarget();
+    this.assertPolicy();
     try {
-      const response = await fetch(`${this.baseUrl}${path}`, {
+      const response = await this.open(path, {
         method: 'GET',
-        redirect: 'manual',
-        headers: { Accept: 'application/json' },
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+        headers: { Accept: 'application/json' }
       });
       return { ok: response.ok, status: response.status, data: await readBody(response) };
-    } catch {
+    } catch (error) {
+      // A recusa da guarda NÃO é "o servidor não respondeu": engolida aqui, um
+      // alvo privado viraria uma sonda silenciosa em vez de um erro legível.
+      if (error instanceof WaError) throw error;
       return { ok: false, status: 0, data: null };
     }
   }
+}
+
+function blockedHost(reason) {
+  return new WaError('whatsapp.error.blockedHost', {
+    code: 'blocked_host',
+    status: 400,
+    vars: { reason }
+  });
 }
 
 /**

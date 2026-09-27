@@ -1,3 +1,5 @@
+import type { TranslationKey, TranslationVars } from '@/lib/i18n'
+
 /**
  * As regras das ações que não têm volta na ONT, fora do componente.
  *
@@ -35,4 +37,26 @@ export function informedRecently(lastInform: string | null | undefined, now: num
   if (!Number.isFinite(quando)) return false
   const idade = now - quando
   return idade >= 0 && idade < ONLINE_WINDOW_MS
+}
+
+/**
+ * O aviso do "Solicitar Inform" quando o GenieACS não alcançou a ONT.
+ *
+ * "Fica na fila até o próximo Inform" soa como minutos; para uma ONT parada há
+ * doze dias é "quando ela voltar, se voltar", e o operador precisa saber qual
+ * dos dois. A data é formatada aqui, no fuso e no idioma de quem lê — por isso
+ * o texto é montado no navegador e não no servidor. Sem a data, fica o texto
+ * que o servidor mandou.
+ */
+export function summonDeferredMessage(
+  data: { lastInform?: string | null; stale?: boolean } | null | undefined,
+  t: (key: TranslationKey, vars?: TranslationVars) => string,
+  formatDateTime: (value: string) => string,
+  fallback: string
+): string {
+  if (!data?.lastInform) return fallback
+  const time = formatDateTime(data.lastInform)
+  return data.stale
+    ? t('devices.summon.deferredStale', { time })
+    : t('devices.summon.deferredSince', { time })
 }

@@ -308,7 +308,7 @@ class SubscriptionService {
     if (cached) return cached;
     const subscription = await Subscription.current();
     const plan = subscription ? await Plan.findById(subscription.plan_id) : null;
-    // A descida agendada (0070) viaja junto porque a tela e o console a
+    // A descida agendada (0072) viaja junto porque a tela e o console a
     // mostram ao lado do plano atual — e uma consulta a mais só para quem tem
     // uma, que é quase ninguém.
     const pendingPlan = subscription?.pending_plan_id ? await Plan.findById(subscription.pending_plan_id) : null;
@@ -597,7 +597,7 @@ class SubscriptionService {
       pending_plan_id: null,
       pending_plan_at: null,
       pending_plan_locked_at: null,
-      // A marca da subida no meio do período pago (0071): quem sobe agora a
+      // A marca da subida no meio do período pago (0073): quem sobe agora a
       // passa (`SelfBillingService`), e qualquer outra troca — o console, a
       // descida na hora — a apaga, porque o plano de agora não é mais o que
       // subiu sem pagar.
@@ -655,7 +655,7 @@ class SubscriptionService {
   }
 
   /**
-   * Se a descida agendada já foi PAGA pelo preço dela (0071): o período que
+   * Se a descida agendada já foi PAGA pelo preço dela (0073): o período que
    * começa na data da descida teve o pagamento conferido contra o plano
    * novo. Dali em diante ela não se desfaz nem espera o uso caber.
    */
@@ -824,7 +824,7 @@ class SubscriptionService {
     const currentEnd = asDate(before.renews_at);
     const base = currentEnd && currentEnd.getTime() > now.getTime() ? currentEnd : now;
 
-    // A descida agendada (0070) e o período que ela alcança.
+    // A descida agendada (0072) e o período que ela alcança.
     //
     // Se o período comprado começa na data da descida ou depois dela, ele é do
     // plano NOVO: é o preço dele que a cobrança daquele prazo pediu (a emissão
@@ -896,7 +896,7 @@ class SubscriptionService {
     // provedor mexe à vontade depois de pagar:
     //
     //   - pagou o preço de baixo (o que se pediu é menor que o preço do plano
-    //     atual): a descida fica TRAVADA (0071). Não se cancela nem se troca
+    //     atual): a descida fica TRAVADA (0073). Não se cancela nem se troca
     //     mais, e se aplica na data com o uso que houver — sem isto, pagar o
     //     barato adiantado e desistir da descida depois (ou crescer o uso para
     //     ela não se aplicar) era um mês de plano caro pelo preço do barato.
@@ -918,7 +918,7 @@ class SubscriptionService {
       patch.renews_at = new Date(base.getTime() + dias * DAY_MS);
       patch.status = 'active';
       patch.trial_ends_at = null;
-      // A subida no meio do período (0071) foi paga: o período que este
+      // A subida no meio do período (0073) foi paga: o período que este
       // pagamento compra é cobrado pelo plano de agora.
       patch.upgraded_at = null;
       if (destinoDaDescida === 'lock' && !descida) patch.pending_plan_locked_at = now;

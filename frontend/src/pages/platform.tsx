@@ -165,6 +165,12 @@ export default function PlatformPage() {
   const impersonar = async (tenant: Tenant) => {
     if (!window.confirm(t('platform.impersonateConfirm', { provider: tenant.name }))) return
     const aba = window.open('', '_blank')
+    // Corta o `window.opener` enquanto a aba ainda é `about:blank` e do mesmo
+    // origin: depois de navegar ela vira outro origin e a atribuição não pega
+    // mais. Sem isso o painel do provedor poderia redirecionar esta aba do
+    // console (reverse tabnabbing). Não dá para usar `noopener` no `open`,
+    // porque aí ele devolve null e perderíamos a detecção de pop-up bloqueado.
+    if (aba) aba.opener = null
     setBusyId(tenant.id)
     try {
       const res = await platformAPI.impersonate(tenant.id)
@@ -450,7 +456,7 @@ export default function PlatformPage() {
   )
 
   return (
-    <div className="page-shell">
+    <div className="page-shell pb-8">
       <div className="page-frame">
         <header className="page-header">
           <div>

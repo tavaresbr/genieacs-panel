@@ -126,6 +126,13 @@ class MfaService {
   /**
    * Liga o 2FA com o primeiro código certo, e devolve os códigos de
    * recuperação — a única vez em que eles existem em texto.
+   *
+   * Sobe o `token_version`, como `disable`, `regenerateRecoveryCodes` e
+   * `resetForUser`: mudar o segundo fator é mudar credencial, e toda sessão
+   * aberta antes disso cai. Quem ativa costuma fazê-lo justamente por
+   * desconfiar da senha — uma sessão que outra pessoa abriu com ela não pode
+   * sobreviver ao 2FA que veio fechá-la. A aba de quem pediu não cai: a rota
+   * devolve tokens novos (ver `AuthController.mfaEnable`).
    */
   static async enable(userId, code) {
     const user = await this.findUser(userId);
@@ -141,6 +148,7 @@ class MfaService {
       await trx('users').where({ id: userId }).update({
         totp_enabled_at: new Date(),
         totp_last_step: passo,
+        token_version: trx.raw('token_version + 1'),
         updated_at: new Date()
       });
       await trx('user_recovery_codes').where({ user_id: userId }).del();
@@ -214,6 +222,8 @@ class MfaService {
    * exigir. Deixar desligar só a levaria, na requisição seguinte, à tela de
    * ativar de novo — e no meio do caminho ela teria uma sessão sem segundo fator
    * num provedor que o proibiu.
+   *
+   * Sobe o `token_version`: ver `enable`.
    */
   static async disable(userId, password, code) {
     const user = await this.findUser(userId);
@@ -225,7 +235,11 @@ class MfaService {
     }
     await this.confirmIdentity(user, password, code);
     await getDb().transaction(async (trx) => {
-      await trx('users').where({ id: userId }).update({ ...SEM_SEGREDO, updated_at: new Date() });
+      await trx('users').where({ id: userId }).update({
+        ...SEM_SEGREDO,
+        token_version: trx.raw('token_version + 1'),
+        updated_at: new Date()
+      });
       await trx('user_recovery_codes').where({ user_id: userId }).del();
     });
   }
@@ -256,7 +270,12 @@ class MfaService {
     return tinha;
   }
 
-  /** Códigos novos; os antigos, usados ou não, deixam de valer. */
+  /**
+   * Códigos novos; os antigos, usados ou não, deixam de valer.
+   *
+   * Sobe o `token_version` também: quem troca os códigos acha que os antigos
+   * vazaram, e quem os tinha pode já ter entrado com um deles. Ver `enable`.
+   */
   static async regenerateRecoveryCodes(userId, password, code) {
     const user = await this.findUser(userId);
     if (!user) throw recusa('auth.userNotFound', 'user_not_found', 404);
@@ -264,6 +283,10 @@ class MfaService {
     await this.confirmIdentity(user, password, code);
     const codes = generateRecoveryCodes();
     await getDb().transaction(async (trx) => {
+      await trx('users').where({ id: userId }).update({
+        token_version: trx.raw('token_version + 1'),
+        updated_at: new Date()
+      });
       await trx('user_recovery_codes').where({ user_id: userId }).del();
       await trx('user_recovery_codes').insert(codes.map((c) => ({ user_id: userId, code_hash: hashRecoveryCode(c) })));
     });

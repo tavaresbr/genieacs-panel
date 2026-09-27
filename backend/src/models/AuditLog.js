@@ -26,6 +26,7 @@ class AuditLog {
     PORTAL_PASSWORD_RESET: 'portal_password.reset',
     GENIEACS_URL_CHANGED: 'genieacs.url_changed',
     GENIEACS_AUTH_CHANGED: 'genieacs.auth_changed',
+    GENIEACS_CONNECTION_CHANGED: 'genieacs.connection_changed',
     OPERATOR_ROLE_CHANGED: 'operator.role_changed',
     OPERATOR_REMOVED: 'operator.removed',
     OPERATOR_CREATED: 'operator.created',
@@ -163,6 +164,12 @@ class AuditLog {
     USER_MFA_DISABLED: 'user.mfa_disabled',
     USER_MFA_RECOVERY_REGENERATED: 'user.mfa_recovery_regenerated',
     USER_MFA_RECOVERY_USED: 'user.mfa_recovery_used',
+    // A conta foi travada por tentativas erradas demais — de senha ou de
+    // código (`models/AccountLockout.js`). Uma linha por trava, não por
+    // tentativa, gravada em cada provedor em que a pessoa trabalha: é o aviso
+    // de que alguém está tentando entrar. O `detail` diz por onde (`login`,
+    // `invite`, `change_password`...) e até quando; nunca o que foi digitado.
+    USER_ACCOUNT_LOCKED: 'user.account_locked',
     // O dono passou a exigir (ou deixou de exigir) o 2FA da equipe, com
     // `{ from, to }`; e alguém da equipe teve o 2FA desligado por quem
     // administra — celular e códigos perdidos —, com o nome da pessoa.

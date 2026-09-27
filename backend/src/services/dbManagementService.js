@@ -36,17 +36,58 @@ function validateExternal(config) {
   }
 }
 
-export async function testConfig(rawConfig) {
-  const config = normalizeConfig(rawConfig);
-  validateExternal(config);
+/**
+ * O que sai daqui quando o driver recusa a conexão: só o CÓDIGO do erro.
+ *
+ * A mensagem crua do `mysql2` ia inteira para o corpo da resposta, e ela diz
+ * mais do que quem pergunta precisa saber — o endereço interno com que o painel
+ * se apresentou ("Access denied for user 'u'@'172.18.0.3'"), o que respondeu do
+ * outro lado quando o host nem era um MySQL, a diferença entre porta fechada e
+ * porta que não responde contada em prosa. Com o código (`ECONNREFUSED`,
+ * `ETIMEDOUT`, `ENOTFOUND`, `ER_ACCESS_DENIED_ERROR`, `ER_BAD_DB_ERROR`) o
+ * operador ainda sabe o que consertar; o texto completo vai para o log do
+ * servidor, que é de quem opera a máquina.
+ *
+ * O que já é `TranslatableError` passa intacto: essas mensagens são nossas.
+ */
+function driverFailure(error) {
+  if (error?.translationKey) return error;
+  console.warn(`Database connection test failed: ${error?.message || error}`);
+  const code = typeof error?.code === 'string' && /^[A-Z0-9_]{2,64}$/.test(error.code)
+    ? error.code
+    : 'CONNECTION_ERROR';
+  return new Error(code);
+}
+
+async function probeConfig(config) {
   let probe;
   try {
     probe = knexFactory(buildKnexConfig(config));
     await probe.raw('SELECT 1');
     return true;
+  } catch (error) {
+    throw driverFailure(error);
   } finally {
     if (probe) await probe.destroy();
   }
+}
+
+/**
+ * Testa uma conexão com host, porta e credenciais vindos do corpo do request.
+ *
+ * Passa pelo mesmo portão da troca, e pelo mesmo motivo com outra cara: não há
+ * dado sendo copiado aqui, mas há um socket sendo aberto para onde o corpo
+ * mandar, e a resposta distingue "conectou", "recusou" e "não respondeu". Num
+ * deploy com mais de um provedor, isso é um administrador de provedor varrendo
+ * as portas da rede interna da plataforma pelo painel — o MySQL, o Redis, o
+ * serviço de metadados, uma porta de cada vez. A instalação de um provedor só,
+ * para a qual o botão existe, não muda nada.
+ */
+export async function testConfig(rawConfig) {
+  await assertSoleProvider();
+  const config = normalizeConfig(rawConfig);
+  validateExternal(config);
+  return probeConfig(config);
 }
 
 export function getActiveConfig() {
@@ -115,7 +156,7 @@ function isSameConfig(left, right) {
 }
 
 /**
- * Refuses the switch on a deployment that serves more than one provider.
+ * Refuses the switch (and the connection test) on a deployment that serves more than one provider.
  *
  * `copyData` reads every table with no provider predicate and writes it to a
  * host, user and password that came from the request body — so on a shared
@@ -152,7 +193,9 @@ export async function switchDatabase(rawConfig, { migrateData = false } = {}) {
     return getActiveConfig();
   }
 
-  await testConfig(config);
+  // `probeConfig`, e não `testConfig`: o portão já foi conferido no topo, e
+  // contar os provedores duas vezes na mesma chamada não protege nada a mais.
+  await probeConfig(config);
 
   const target = knexFactory(buildKnexConfig(config));
   try {

@@ -973,7 +973,8 @@ export default function WhatsAppPage() {
           />
         </header>
 
-        <div className="tab-rail" role="tablist" aria-label={t('sidebar.nav.whatsapp')}>
+        {/* A caixa de entrada conta a altura exata da tela; as outras abas ganham um respiro. */}
+        <div className={`tab-rail ${tab === 'inbox' ? '' : 'mb-4'}`} role="tablist" aria-label={t('sidebar.nav.whatsapp')}>
           {visibleTabs.map(([id, labelKey]) => (
             <button
               key={id}

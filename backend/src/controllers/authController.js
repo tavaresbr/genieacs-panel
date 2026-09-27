@@ -19,6 +19,7 @@ import { runInTenant } from '../config/tenantContext.js';
 import { recordPanelActivity } from '../services/dashboardSchedule.js';
 import { mailTransport, panelUrlFor } from '../services/mail/index.js';
 import MfaService, { mfaEnabled } from '../services/mfaService.js';
+import AccountLockout from '../models/AccountLockout.js';
 import { PRODUCT_NAME } from '../config/brand.js';
 
 const DUMMY_PASSWORD_HASH = bcrypt.hashSync('skygenpanel-invalid-login-placeholder', 12);
@@ -485,8 +486,20 @@ class AuthController {
       // duas contas — e se casasse, a resposta é null e ninguém entra.
       const user = await User.findByLogin(normalizedUsername);
 
+      // A trava por conta, ANTES de qualquer conferência. Conta que existe é
+      // contada pelo id — nome e e-mail são o mesmo alvo e dividem os dez
+      // palpites —; login inventado é contado pelo que foi digitado, e trava
+      // do mesmo jeito, para que a trava não diga quem tem conta.
+      const tentativa = await AccountLockout.attempt(
+        user ? AccountLockout.forUser(user.id) : AccountLockout.forIdentifier(normalizedUsername)
+      );
+      if (!tentativa.allowed) {
+        return AccountLockout.refuse(req, res, tentativa, password, { user, via: 'login' });
+      }
+
       if (!user) {
         await bcrypt.compare(String(password), DUMMY_PASSWORD_HASH);
+        await AccountLockout.failed(req, tentativa, { via: 'login' });
         return res.status(401).json(
           createErrorResponse(req.t('auth.invalidCredentials'))
         );
@@ -501,6 +514,7 @@ class AuthController {
       const isMatch = await bcrypt.compare(password, user.password);
 
       if (!isMatch || !identifierAccepted) {
+        await AccountLockout.failed(req, tentativa, { user, via: 'login' });
         return res.status(401).json(
           createErrorResponse(req.t('auth.invalidCredentials'))
         );
@@ -515,9 +529,16 @@ class AuthController {
       // o preço de toda segunda etapa — o que ela protege é justamente o caso
       // em que a senha já vazou.
       let segundoFator = null;
-      const codigoInvalido = () => res.status(401).json(
-        createErrorResponse(req.t('auth.mfaInvalid'), null, 'mfa_invalid')
-      );
+      // Código errado conta na mesma trava da senha, e a senha certa que veio
+      // junto NÃO zera nada: o 2FA existe para o caso em que a senha vazou, e
+      // zerar a contagem a cada senha certa daria palpites infinitos nos seis
+      // dígitos. A contagem só some quando a sessão sai.
+      const codigoInvalido = async () => {
+        await AccountLockout.failed(req, tentativa, { user, via: 'login_mfa' });
+        return res.status(401).json(
+          createErrorResponse(req.t('auth.mfaInvalid'), null, 'mfa_invalid')
+        );
+      };
       if (mfaEnabled(user)) {
         if (totpCode === undefined || totpCode === null || totpCode === '') {
           return res.status(401).json(createErrorResponse(req.t('auth.mfaRequired'), null, 'mfa_required'));
@@ -554,6 +575,7 @@ class AuthController {
           );
         }
         if (!(await gastarCodigo())) return codigoInvalido();
+        await AccountLockout.clear(tentativa.subject);
         return respostaDoConsole(req, res, user);
       }
 
@@ -571,6 +593,7 @@ class AuthController {
           );
         }
         if (!(await gastarCodigo())) return codigoInvalido();
+        await AccountLockout.clear(tentativa.subject);
         return respostaDoConsole(req, res, user);
       }
 
@@ -614,6 +637,7 @@ class AuthController {
         // e a alternativa seria o 401 de "trabalha para ninguém".
         if (destinos.tenants.length === 0 && destinos.console) {
           if (!(await gastarCodigo())) return codigoInvalido();
+          await AccountLockout.clear(tentativa.subject);
           return respostaDoConsole(req, res, user);
         }
       }
@@ -640,6 +664,8 @@ class AuthController {
       }
 
       if (!(await gastarCodigo())) return codigoInvalido();
+      // A sessão sai: a prova terminou, e a contagem de tentativas some.
+      await AccountLockout.clear(tentativa.subject);
       const { accessToken, refreshToken } = generateTokens(user, membership);
       await marcarAtividade(membership.tenant_id);
       // Entrar com um código de recuperação deixa linha na trilha do provedor
@@ -705,6 +731,26 @@ class AuthController {
     return res.status(500).json(createErrorResponse(req.t('common.internalError'), error.message));
   }
 
+  /**
+   * Tokens novos para a sessão que acabou de mudar o próprio segundo fator.
+   *
+   * Ativar, desligar e trocar os códigos sobem o `token_version` — toda sessão
+   * aberta antes cai. Menos a de quem pediu: ela provou agora mesmo o que a
+   * mudança exige, e derrubá-la jogaria a pessoa no login no meio da tela do
+   * 2FA, com os códigos de recuperação ainda por anotar. Cunhados do usuário
+   * RELIDO, que já carrega a versão nova, e na mesma forma da sessão que chamou
+   * — console para o console, o provedor e o papel já hidratados para o painel.
+   * A personificação não chega aqui: `/api/auth/` é escrita recusada a ela.
+   */
+  static async mfaFreshTokens(req) {
+    const user = await User.findById(req.user.userId);
+    if (!user) return {};
+    const { accessToken, refreshToken } = req.user.platform
+      ? generateConsoleTokens(user)
+      : generateTokens(user, { tenant_id: req.user.tenantId, role: req.user.role });
+    return { token: accessToken, refreshToken };
+  }
+
   static async mfaStatus(req, res) {
     try {
       return res.json(createResponse(null, await MfaService.status(req.user.userId)));
@@ -727,7 +773,9 @@ class AuthController {
       await AuditLog.fromRequest(req, {
         action: AuditLog.ACTIONS.USER_MFA_ENABLED, subjectType: 'user', subjectId: String(req.user.userId)
       });
-      return res.json(createResponse(req.t('auth.mfaEnabled'), result));
+      return res.json(createResponse(req.t('auth.mfaEnabled'), {
+        ...result, ...(await AuthController.mfaFreshTokens(req))
+      }));
     } catch (error) {
       return AuthController.mfaError(req, res, error, 'MFA enable');
     }
@@ -739,7 +787,9 @@ class AuthController {
       await AuditLog.fromRequest(req, {
         action: AuditLog.ACTIONS.USER_MFA_DISABLED, subjectType: 'user', subjectId: String(req.user.userId)
       });
-      return res.json(createResponse(req.t('auth.mfaDisabled'), { enabled: false }));
+      return res.json(createResponse(req.t('auth.mfaDisabled'), {
+        enabled: false, ...(await AuthController.mfaFreshTokens(req))
+      }));
     } catch (error) {
       return AuthController.mfaError(req, res, error, 'MFA disable');
     }
@@ -751,7 +801,9 @@ class AuthController {
       await AuditLog.fromRequest(req, {
         action: AuditLog.ACTIONS.USER_MFA_RECOVERY_REGENERATED, subjectType: 'user', subjectId: String(req.user.userId)
       });
-      return res.json(createResponse(req.t('auth.mfaRecoveryRegenerated'), result));
+      return res.json(createResponse(req.t('auth.mfaRecoveryRegenerated'), {
+        ...result, ...(await AuthController.mfaFreshTokens(req))
+      }));
     } catch (error) {
       return AuthController.mfaError(req, res, error, 'MFA recovery codes');
     }
@@ -1055,10 +1107,21 @@ class AuthController {
           createErrorResponse(req.t('auth.userNotFound'))
         );
       }
+
+      // A senha atual pedida aqui é um oráculo nas mãos de quem tem só o
+      // token — uma sessão roubada, um computador destravado — e o limitador
+      // desta rota é o genérico, trezentos por minuto. Ela conta na MESMA
+      // trava do login: é a mesma senha sendo adivinhada, e dez palpites por
+      // aqui não podem somar a dez pelo formulário de entrada.
+      const tentativa = await AccountLockout.attempt(AccountLockout.forUser(user.id));
+      if (!tentativa.allowed) {
+        return AccountLockout.refuse(req, res, tentativa, currentPassword, { user, via: 'change_password' });
+      }
       
       const isMatch = await bcrypt.compare(currentPassword, user.password);
       
       if (!isMatch) {
+        await AccountLockout.failed(req, tentativa, { user, via: 'change_password' });
         return res.status(401).json(
           createErrorResponse(req.t('auth.currentPasswordIncorrect'))
         );
@@ -1176,9 +1239,16 @@ class AuthController {
       if (!user) {
         return res.status(404).json(createErrorResponse(req.t('auth.userNotFound')));
       }
+      // O mesmo oráculo da troca de senha, e a mesma trava.
+      const tentativa = await AccountLockout.attempt(AccountLockout.forUser(user.id));
+      if (!tentativa.allowed) {
+        return AccountLockout.refuse(req, res, tentativa, currentPassword, { user, via: 'change_email' });
+      }
       if (!await bcrypt.compare(String(currentPassword), user.password)) {
+        await AccountLockout.failed(req, tentativa, { user, via: 'change_email' });
         return res.status(401).json(createErrorResponse(req.t('auth.currentPasswordIncorrect')));
       }
+      await AccountLockout.clear(tentativa.subject);
 
       // Contra o espaço de nomes inteiro, ignorando a própria linha: salvar o
       // endereço que já é o seu não pode responder "em uso".

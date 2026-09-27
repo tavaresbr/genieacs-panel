@@ -24,6 +24,7 @@ export default {
   'auth.insufficientPermissions': 'Autorisations insuffisantes',
   'auth.credentialsRequired': 'Le nom d’utilisateur et le mot de passe sont requis',
   'auth.invalidCredentials': 'Nom d’utilisateur ou mot de passe invalide',
+  'auth.accountLocked': 'Trop de tentatives infructueuses sur ce compte. Patientez quelques minutes puis réessayez.',
   'auth.loginSuccess': 'Connexion réussie',
   'auth.chooseDestination': 'Choisissez où vous connecter',
   'auth.logoutSuccess': 'Déconnexion réussie',

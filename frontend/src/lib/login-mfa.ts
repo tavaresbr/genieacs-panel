@@ -19,6 +19,18 @@ export function mfaStepDaResposta(res: ApiResponse): MfaStep | null {
 }
 
 /**
+ * A conta está bloqueada por tentativas demais (429 `account_locked`).
+ *
+ * Separado da senha errada de propósito: dizer "senha inválida" a quem está
+ * bloqueado faz a pessoa tentar de novo — cada tentativa é recusada igual — e
+ * ela conclui que esqueceu a senha. O servidor responde igual com a senha
+ * certa ou errada, então isto não revela nada que a tela não pudesse dizer.
+ */
+export function contaBloqueadaNaResposta(res: ApiResponse): boolean {
+  return !res.success && res.code === 'account_locked'
+}
+
+/**
  * O que a pessoa digitou no campo do código, limpo para mandar: o código do
  * app (6 dígitos, às vezes digitados com espaço no meio, como o app mostra) ou
  * um de recuperação ("xxxxx-xxxxx"), que o servidor normaliza.

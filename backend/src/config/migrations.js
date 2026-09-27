@@ -1377,14 +1377,14 @@ const billingChargesTable = (db) => (t) => {
   t.index(['tenant_id', 'status'], 'billing_charges_status_idx');
 };
 
-/** As colunas da 0069 — ver a migração. */
+/** As colunas da 0071 — ver a migração. */
 const BILLING_CHARGE_CLAIM_COLUMNS = [
   ['issuing_until', (t) => t.timestamp('issuing_until').nullable()],
   ['superseded_charges', (t) => t.text('superseded_charges').nullable()]
 ];
 
 /**
- * As colunas da 0070 — ver a migração.
+ * As colunas da 0072 — ver a migração.
  *
  * `pending_plan_id` com o MESMO tipo de `subscriptions.plan_id` (inteiro sem
  * sinal): no MySQL uma chave estrangeira entre um `INT` e um `INT UNSIGNED` é
@@ -1401,7 +1401,7 @@ const SUBSCRIPTION_PENDING_PLAN_COLUMNS = [
 ];
 
 /**
- * As colunas da 0071 — ver a migração. Instantes e não booleanos: quem lê o
+ * As colunas da 0073 — ver a migração. Instantes e não booleanos: quem lê o
  * banco depois quer saber QUANDO, e nulo continua querendo dizer "não".
  */
 const SUBSCRIPTION_PLAN_GUARD_COLUMNS = [
@@ -1620,6 +1620,50 @@ const MFA_TABLES = [
   ['user_recovery_codes', userRecoveryCodesTable]
 ];
 
+/**
+ * A contagem de tentativas por conta — ver `models/AccountLockout.js`.
+ *
+ * Sem chave estrangeira para `users`, de propósito: o sujeito é `user:<id>` para
+ * quem existe e `login:<sha256>` para o login inventado, e o segundo não aponta
+ * para linha nenhuma — é justamente o caso que impede a trava de virar oráculo
+ * de quem tem conta. Os instantes são milissegundos em `bigInteger`, e não
+ * `timestamp`: a comparação é feita contra `Date.now()` nos três dialetos, sem
+ * fuso nem precisão de coluna para discordar entre eles.
+ */
+const accountLockoutsTable = () => (t) => {
+  t.string('subject', 96).primary();
+  t.integer('attempts').notNullable().defaultTo(0);
+  t.bigInteger('window_started_at').notNullable();
+  t.bigInteger('locked_until').nullable();
+  t.bigInteger('updated_at').notNullable();
+  t.index(['updated_at'], 'account_lockouts_updated_idx');
+};
+
+const LOCKOUT_TABLES = [
+  ['account_lockouts', accountLockoutsTable]
+];
+
+/**
+ * Como o painel chega ao GenieACS de cada provedor: `direct` (a URL, como
+ * sempre foi), `tunnel` (a URL numa rede privada de cliente, liberada pela
+ * plataforma) e, depois, `agent`. Sem linha, vale `direct` — é o que todo
+ * provedor de antes desta tabela já fazia, e a migração não precisa escrever
+ * nada para que continue assim.
+ */
+const tenantGenieAcsConnectionsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.string('mode', 16).notNullable().defaultTo('direct');
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['tenant_id']);
+};
+
+const GENIEACS_CONNECTION_TABLES = [
+  ['tenant_genieacs_connections', tenantGenieAcsConnectionsTable]
+];
+
 const SGP_CONTACT_TABLES = [
   ['sgp_contacts', sgpContactsTable],
   ['sgp_clients', sgpClientsTable]
@@ -1688,7 +1732,9 @@ export const SCHEMA_TABLES = [
   ...SGP_CONTACT_TABLES,
   ...MFA_TABLES,
   ...OUTAGE_TABLES,
-  ...WA_BOT_EVENT_TABLES
+  ...WA_BOT_EVENT_TABLES,
+  ...GENIEACS_CONNECTION_TABLES,
+  ...LOCKOUT_TABLES
 ].map(([name]) => name);
 
 /**
@@ -4067,6 +4113,40 @@ export const migrations = [
   },
   {
     /**
+     * Como o painel chega ao GenieACS de cada provedor — ver
+     * `tenantGenieAcsConnectionsTable`. Tabela nova e vazia: sem linha vale
+     * `direct`, que é o que todos já faziam.
+     */
+    id: '0069_tenant_genieacs_connections',
+    async isApplied(db) {
+      return db.schema.hasTable('tenant_genieacs_connections');
+    },
+    async up(db) {
+      for (const [nome, construtor] of GENIEACS_CONNECTION_TABLES) {
+        // eslint-disable-next-line no-await-in-loop -- uma tabela por vez
+        await createTableIfMissing(db, nome, construtor(db));
+      }
+    }
+  },
+  {
+    /**
+     * A trava por conta contra força bruta — ver `accountLockoutsTable`. Nasce
+     * vazia: ninguém começa travado, e quem já errou a senha antes do upgrade
+     * começa a contar do zero.
+     */
+    id: '0070_account_lockouts',
+    async isApplied(db) {
+      return db.schema.hasTable('account_lockouts');
+    },
+    async up(db) {
+      for (const [nome, construtor] of LOCKOUT_TABLES) {
+        // eslint-disable-next-line no-await-in-loop -- uma tabela só, hoje
+        await createTableIfMissing(db, nome, construtor(db));
+      }
+    }
+  },
+  {
+    /**
      * A emissão com dono, e a memória das cobranças que foram trocadas.
      *
      * `issuing_until` é a garra: quem vai falar com o gateway por uma linha
@@ -4091,7 +4171,7 @@ export const migrations = [
      * Nulas nas linhas que já existem, que é o estado certo das duas: ninguém
      * está emitindo, e nada foi trocado.
      */
-    id: '0069_billing_charge_claims',
+    id: '0071_billing_charge_claims',
     async isApplied(db) {
       if (!(await db.schema.hasTable('billing_charges'))) return true;
       return (await missingColumns(db, 'billing_charges', BILLING_CHARGE_CLAIM_COLUMNS)).length === 0;
@@ -4127,7 +4207,7 @@ export const migrations = [
      * Nulas nas linhas que já existem, que é o estado certo das duas: ninguém
      * agendou nada ainda.
      */
-    id: '0070_subscription_pending_plan',
+    id: '0072_subscription_pending_plan',
     async isApplied(db) {
       if (!(await db.schema.hasTable('subscriptions'))) return true;
       return (await missingColumns(db, 'subscriptions', SUBSCRIPTION_PENDING_PLAN_COLUMNS)).length === 0;
@@ -4162,7 +4242,7 @@ export const migrations = [
      *
      * Nulas nas linhas que já existem, que é o estado certo das duas.
      */
-    id: '0071_subscription_plan_guards',
+    id: '0073_subscription_plan_guards',
     async isApplied(db) {
       if (!(await db.schema.hasTable('subscriptions'))) return true;
       return (await missingColumns(db, 'subscriptions', SUBSCRIPTION_PLAN_GUARD_COLUMNS)).length === 0;

@@ -30,15 +30,21 @@ const HOST_PUBLICO = 'https://203.0.113.10';
 
 let fetchReal;
 let requestReal;
+let connectReal;
+let lookupReal;
 
 beforeEach(() => {
   fetchReal = globalThis.fetch;
   requestReal = PinnedTransport.request;
+  connectReal = EvolutionClient.connect;
+  lookupReal = EvolutionClient.lookup;
 });
 
 afterEach(() => {
   globalThis.fetch = fetchReal;
   PinnedTransport.request = requestReal;
+  EvolutionClient.connect = connectReal;
+  EvolutionClient.lookup = lookupReal;
 });
 
 describe('safeFetch gives every outbound request a deadline', () => {
@@ -194,7 +200,7 @@ describe('the Evolution client requires TLS', () => {
 
   test('refuses a cleartext target before any request leaves', async () => {
     let chamou = false;
-    globalThis.fetch = () => { chamou = true; return new Response('{}'); };
+    EvolutionClient.connect = () => { chamou = true; return new Response('{}'); };
 
     await assert.rejects(
       () => comBase('http://evo.provedor.test').probe('/'),
@@ -227,7 +233,7 @@ describe('the Evolution client refuses to buffer an unbounded response', () => {
   const ENORME = 'A'.repeat(2 * 1024 * 1024);
 
   test('reads a normal answer exactly as before', async () => {
-    globalThis.fetch = () => new Response(JSON.stringify({ version: '2.1.1' }), {
+    EvolutionClient.connect = () => new Response(JSON.stringify({ version: '2.1.1' }), {
       status: 200,
       headers: { 'content-type': 'application/json' }
     });
@@ -238,7 +244,7 @@ describe('the Evolution client refuses to buffer an unbounded response', () => {
   });
 
   test('refuses a body that declares an oversized length', async () => {
-    globalThis.fetch = () => new Response(ENORME, {
+    EvolutionClient.connect = () => new Response(ENORME, {
       status: 200,
       headers: { 'content-length': String(ENORME.length) }
     });
@@ -255,7 +261,7 @@ describe('the Evolution client refuses to buffer an unbounded response', () => {
    * ou que mente. O total corrido é o que fecha essa porta.
    */
   test('refuses a body that declares nothing and streams past the cap', async () => {
-    globalThis.fetch = () => new Response(
+    EvolutionClient.connect = () => new Response(
       new ReadableStream({
         start(controller) {
           const pedaco = new TextEncoder().encode('A'.repeat(64 * 1024));
@@ -271,10 +277,65 @@ describe('the Evolution client refuses to buffer an unbounded response', () => {
   });
 
   test('answers null rather than a fragment, so nothing acts on half a document', async () => {
-    globalThis.fetch = () => new Response(`{"instances":["${ENORME}"]}`, { status: 200 });
+    EvolutionClient.connect = () => new Response(`{"instances":["${ENORME}"]}`, { status: 200 });
 
     const resultado = await cliente().probe('/');
     assert.equal(resultado.data, null);
     assert.notEqual(typeof resultado.data, 'string');
+  });
+});
+
+/**
+ * O endereço conferido é o endereço conectado.
+ *
+ * O cliente validava com `assertPublicUrl` e depois chamava `fetch`, que
+ * resolve o nome DE NOVO. Quem controla a zona responde público na primeira e
+ * privado na segunda (TTL zero), e a chamada — com a chave global ou o token
+ * da instância no `apikey` — saía para o loopback. Agora a resolução é uma só,
+ * e o que ela devolve é o que vai para o socket.
+ */
+describe('the Evolution client connects to the address it vetted', () => {
+  const NOME = 'https://evo.rebind.invalid';
+  const cliente = () => new EvolutionClient({ baseUrl: NOME, allowedHosts: [], adminKey: 'chave' });
+
+  test('resolves once and pins that answer, even when a second look would differ', async () => {
+    const respostas = ['203.0.113.20', '127.0.0.1'];
+    let consultas = 0;
+    EvolutionClient.lookup = async () => [{ address: respostas[consultas++] ?? '127.0.0.1', family: 4 }];
+    let pinados = null;
+    EvolutionClient.connect = async (opcoes) => {
+      pinados = opcoes.addresses.map((a) => a.address);
+      assert.equal(opcoes.hostname, 'evo.rebind.invalid', 'o nome segue no Host e no SNI');
+      return new Response('{}', { status: 200 });
+    };
+
+    await cliente().send({ path: '/instance/fetchInstances', method: 'GET', key: 'admin' });
+
+    assert.equal(consultas, 1, 'uma segunda resolução é a janela do rebinding');
+    assert.deepEqual(pinados, ['203.0.113.20']);
+  });
+
+  test('refuses a name that resolves into our own network, before any socket', async () => {
+    EvolutionClient.lookup = async () => [{ address: '10.0.0.5', family: 4 }];
+    let conectou = false;
+    EvolutionClient.connect = async () => { conectou = true; return new Response('{}'); };
+
+    await assert.rejects(
+      () => cliente().send({ path: '/instance/fetchInstances', method: 'GET', key: 'admin' }),
+      (error) => error.code === 'blocked_host' && !JSON.stringify(error.translationVars).includes('10.0.0.5')
+    );
+    // A sonda também: engolir a recusa como "não respondeu" esconderia o motivo.
+    await assert.rejects(() => cliente().probe('/'), (error) => error.code === 'blocked_host');
+    assert.equal(conectou, false);
+  });
+
+  test('refuses every answer, not just the first', async () => {
+    EvolutionClient.lookup = async () => [
+      { address: '203.0.113.21', family: 4 },
+      { address: '169.254.169.254', family: 4 }
+    ];
+    EvolutionClient.connect = async () => new Response('{}');
+
+    await assert.rejects(() => cliente().probe('/'), (error) => error.code === 'blocked_host');
   });
 });

@@ -2,6 +2,7 @@ import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { asTenant, authHeaders, call, startTestServers, stopTestServers } from './helpers/harness.js';
+import { rotearEvolution } from './helpers/evolutionRoute.js';
 
 const { default: WhatsAppConfigService } = await import('../src/services/whatsappConfigService.js');
 const { default: WhatsAppAccount } = await import('../src/models/WhatsAppAccount.js');
@@ -21,36 +22,27 @@ let token;
  * path — allowlist, guard, headers, status handling — runs unchanged.
  */
 const LOOPBACK_FOR = new Map();
-const realFetch = globalThis.fetch;
+let desfazerRota;
 
 function installFakeDns() {
-  globalThis.fetch = (input, init) => {
-    const raw = typeof input === 'string' ? input : String(input?.url ?? input);
-    let target = raw;
-    try {
-      const url = new URL(raw);
-      const port = LOOPBACK_FOR.get(url.hostname);
-      if (port) {
-        url.hostname = '127.0.0.1';
-        url.port = String(port);
-        // O esquema desce junto com o socket, e pela mesma razão.
-        //
-        // O cliente exige `https:` porque a chave dele viaja em toda
-        // requisição, então o servidor tem de se ANUNCIAR como https para o
-        // caminho de código sob teste rodar inteiro — allowlist, guard,
-        // headers. Só que o dublê é HTTP puro, e falar TLS com ele exigiria um
-        // certificado auto-assinado mais `rejectUnauthorized: false`, que é
-        // exatamente o que este código nunca faz, nem em teste. Esta camada já
-        // mente sobre ONDE o socket vai; mentir também sobre o esquema é a
-        // mesma mentira, uma linha abaixo da que se quer testar.
-        if (url.protocol === 'https:') url.protocol = 'http:';
-        target = url.toString();
-      }
-    } catch {
-      /* not an absolute URL: nothing to redirect */
-    }
-    return realFetch(target, init);
-  };
+  // Um andar abaixo do que era: o cliente conecta por `PinnedTransport` ao
+  // endereço que ele mesmo conferiu, e `globalThis.fetch` não é mais o caminho.
+  // O que se redireciona é o `connect` do cliente, DEPOIS da guarda — que vê o
+  // literal de TEST-NET-3 e deixa passar, como deixaria em produção.
+  //
+  // O esquema desce junto com o socket, e pela mesma razão de sempre.
+  //
+  // O cliente exige `https:` porque a chave dele viaja em toda requisição,
+  // então o servidor tem de se ANUNCIAR como https para o caminho de código sob
+  // teste rodar inteiro — allowlist, guard, headers. Só que o dublê é HTTP
+  // puro, e falar TLS com ele exigiria um certificado auto-assinado mais
+  // `rejectUnauthorized: false`, que é exatamente o que este código nunca faz,
+  // nem em teste. Esta camada já mente sobre ONDE o socket vai; mentir também
+  // sobre o esquema é a mesma mentira, uma linha abaixo da que se quer testar.
+  desfazerRota = rotearEvolution((url) => {
+    const port = LOOPBACK_FOR.get(url.hostname);
+    return port ? `http://127.0.0.1:${port}${url.pathname}${url.search}` : null;
+  });
 }
 
 /**
@@ -274,7 +266,7 @@ before(async () => {
 });
 
 after(async () => {
-  globalThis.fetch = realFetch;
+  desfazerRota?.();
   await Promise.all([v2, go, conflicting, adotado].map(
     (fake) => new Promise((resolve) => fake.server.close(resolve))
   ));

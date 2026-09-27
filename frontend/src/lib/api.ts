@@ -561,8 +561,27 @@ export interface MfaSetup {
   uri: string
 }
 
-export interface MfaRecoveryCodes {
+/**
+ * A sessão nova que ativar, desligar ou trocar os códigos do 2FA devolve.
+ *
+ * Mudar o segundo fator derruba toda sessão aberta antes (o servidor sobe o
+ * `token_version`), inclusive o token desta aba. A resposta traz o par novo, e
+ * `comSessaoNova` o guarda antes de devolver — sem isso a próxima chamada da
+ * tela do 2FA levaria a pessoa ao login, com os códigos ainda por anotar.
+ */
+export interface MfaFreshSession {
+  token?: string
+  refreshToken?: string
+}
+
+export interface MfaRecoveryCodes extends MfaFreshSession {
   recoveryCodes: string[]
+}
+
+async function comSessaoNova<T extends MfaFreshSession>(pedido: Promise<ApiResponse<T>>): Promise<ApiResponse<T>> {
+  const res = await pedido
+  if (res.success && res.data?.token) apiClient.setTokens(res.data.token, res.data.refreshToken)
+  return res
 }
 
 export interface LoginDestinations {
@@ -604,10 +623,12 @@ export const authAPI = {
   // Login em duas etapas da própria conta.
   mfaStatus: () => apiClient.get<MfaStatus>('/auth/mfa'),
   mfaSetup: () => apiClient.post<MfaSetup>('/auth/mfa/setup', {}),
-  mfaEnable: (code: string) => apiClient.post<MfaRecoveryCodes>('/auth/mfa/enable', { code }),
-  mfaDisable: (password: string, code: string) => apiClient.post('/auth/mfa/disable', { password, code }),
+  // As três que mudam o segundo fator devolvem sessão nova: ver `comSessaoNova`.
+  mfaEnable: (code: string) => comSessaoNova(apiClient.post<MfaRecoveryCodes>('/auth/mfa/enable', { code })),
+  mfaDisable: (password: string, code: string) =>
+    comSessaoNova(apiClient.post<MfaFreshSession & { enabled: boolean }>('/auth/mfa/disable', { password, code })),
   mfaRegenerateRecovery: (password: string, code: string) =>
-    apiClient.post<MfaRecoveryCodes>('/auth/mfa/recovery-codes', { password, code }),
+    comSessaoNova(apiClient.post<MfaRecoveryCodes>('/auth/mfa/recovery-codes', { password, code })),
 
   getCurrentUser: () =>
     apiClient.get('/auth/user'),
@@ -1063,10 +1084,15 @@ export interface CataloguePropagation {
 }
 
 /** O GenieACS de um provedor, como o console o vê: sem o segredo. */
+/** Como o painel chega ao GenieACS de um provedor. Só o console escolhe. */
+export type GenieAcsConnectionMode = 'direct' | 'tunnel'
+
 export interface TenantGenieAcs {
   /** Os caminhos dos parâmetros virtuais TR-069 deste provedor (`vpRxPower`, …). */
   virtualParameters: Record<string, string>
   url: string
+  /** `tunnel`: o GenieACS numa rede privada de cliente, liberada só para este provedor. */
+  mode: GenieAcsConnectionMode
   auth: GenieAcsAuthConfig
   /** O endereço que o deploy sugere a este provedor, ou nulo. */
   suggestion: string | null
@@ -1686,7 +1712,7 @@ export const platformAPI = {
 
   /** `secret` ausente mantém o guardado; `''` apaga. */
   updateTenantGenieAcs: (tenantId: number, payload: {
-    url?: string; authType?: GenieAcsAuthType; username?: string; secret?: string
+    url?: string; mode?: GenieAcsConnectionMode; authType?: GenieAcsAuthType; username?: string; secret?: string
     virtualParameters?: Record<string, string>; deviceTag?: string; autoTagPrefixes?: string
   }) =>
     apiClient.put<TenantGenieAcs>(`/platform/tenants/${tenantId}/genieacs`, payload),
@@ -1868,6 +1894,9 @@ export interface SummonResult {
   refreshed?: string[]
   reached?: boolean
   reason?: string | null
+  /** Only when `reached` is false: when the ONT last informed, and whether that is days ago. */
+  lastInform?: string | null
+  stale?: boolean
 }
 
 export const devicesAPI = {

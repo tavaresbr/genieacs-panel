@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   platformAPI,
   type GenieAcsAuthType,
+  type GenieAcsConnectionMode,
   type Tenant,
   type TenantDeviceTagging,
   type TenantGenieAcs as TenantGenieAcsData
@@ -46,6 +47,7 @@ export function TenantGenieAcs({ tenant }: Props) {
 
   const [data, setData] = useState<TenantGenieAcsData | null>(null)
   const [url, setUrl] = useState('')
+  const [mode, setMode] = useState<GenieAcsConnectionMode>('direct')
   const [authType, setAuthType] = useState<GenieAcsAuthType>('none')
   const [username, setUsername] = useState('')
   const [secret, setSecret] = useState('')
@@ -66,6 +68,7 @@ export function TenantGenieAcs({ tenant }: Props) {
   const preencher = useCallback((next: TenantGenieAcsData) => {
     setData(next)
     setUrl(next.url)
+    setMode(next.mode ?? 'direct')
     setAuthType(next.auth.authType)
     setUsername(next.auth.username)
     setSecret('')
@@ -97,6 +100,7 @@ export function TenantGenieAcs({ tenant }: Props) {
     try {
       const res = await platformAPI.updateTenantGenieAcs(tenant.id, {
         url: url.trim(),
+        mode,
         authType,
         username: username.trim(),
         ...(clearSecret ? { secret: '' } : secret ? { secret } : {}),
@@ -181,6 +185,24 @@ export function TenantGenieAcs({ tenant }: Props) {
           )}
         </div>
         <p className="field-hint">{t('settings.general.urlHint', { path: '/devices' })}</p>
+      </div>
+
+      <div>
+        <label htmlFor={`tenant-${tenant.id}-acs-mode`} className="block text-sm font-medium mb-1">
+          {t('platform.genieacs.mode')}
+        </label>
+        <select
+          id={`tenant-${tenant.id}-acs-mode`}
+          className="modern-input w-full md:w-80"
+          value={mode}
+          onChange={(e) => setMode(e.target.value as GenieAcsConnectionMode)}
+        >
+          <option value="direct">{t('platform.genieacs.modeDirect')}</option>
+          <option value="tunnel">{t('platform.genieacs.modeTunnel')}</option>
+        </select>
+        <p className="field-hint">
+          {t(mode === 'tunnel' ? 'platform.genieacs.modeTunnelHint' : 'platform.genieacs.modeDirectHint')}
+        </p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">

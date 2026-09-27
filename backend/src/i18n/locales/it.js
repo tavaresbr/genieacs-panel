@@ -21,6 +21,7 @@ export default {
   'auth.insufficientPermissions': 'Permessi insufficienti',
   'auth.credentialsRequired': 'Nome utente e password sono obbligatori',
   'auth.invalidCredentials': 'Nome utente o password non validi',
+  'auth.accountLocked': 'Troppi tentativi non riusciti su questo account. Attendi qualche minuto e riprova.',
   'auth.loginSuccess': 'Accesso effettuato',
   'auth.chooseDestination': 'Scegli dove accedere',
   'auth.logoutSuccess': 'Sessione chiusa',

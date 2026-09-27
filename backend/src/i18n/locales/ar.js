@@ -22,6 +22,7 @@ export default {
   'auth.insufficientPermissions': 'الصلاحيات غير كافية',
   'auth.credentialsRequired': 'اسم المستخدم وكلمة المرور مطلوبان',
   'auth.invalidCredentials': 'اسم المستخدم أو كلمة المرور غير صحيحة',
+  'auth.accountLocked': 'محاولات فاشلة كثيرة جدًا على هذا الحساب. انتظر بضع دقائق ثم حاول مرة أخرى.',
   'auth.loginSuccess': 'تم تسجيل الدخول',
   'auth.chooseDestination': 'اختر مكان تسجيل الدخول',
   'auth.logoutSuccess': 'تم تسجيل الخروج',
