@@ -123,7 +123,8 @@ describe('GET /api/mapping-data/status', () => {
     assert.equal(aberto.ended_at, null);
     assert.equal(aberto.peak_count, 2);
     assert.equal(aberto.total_clients, 3);
-    assert.equal(aberto.started_at, velho);
+    // O MySQL guarda o horário sem milissegundos: compara-se ao segundo.
+    assert.ok(Math.abs(Date.parse(aberto.started_at) - Date.parse(velho)) < 1000, `${aberto.started_at} ≠ ${velho}`);
     assert.equal(res.body.data.byNode[0].node_name, 'CTO Rua B');
 
     // Os dois voltam: a próxima leitura fecha a ocorrência.
