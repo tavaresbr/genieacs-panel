@@ -6,6 +6,7 @@ import WaConversation from '../models/WaConversation.js';
 import WaOptOut from '../models/WaOptOut.js';
 import WhatsAppAccount from '../models/WhatsAppAccount.js';
 import OutageIncidentService from './outageIncidentService.js';
+import MaintenanceService from './maintenanceService.js';
 import { forEachTenant } from '../config/tenantJobs.js';
 import DeviceService from './deviceService.js';
 import WaSendService from './waSendService.js';
@@ -744,8 +745,44 @@ class WaAlertService {
       }
     }
 
+    // Manutenção programada em andamento: o que está embaixo do nó caiu de
+    // propósito. Nada dispara — nem por aparelho nem por caixa — e nada é
+    // dado como resolvido: as condições vão para `unknown` e ficam como
+    // estavam, para não sair "normalizado" no meio da manutenção.
+    let manutencao = null;
+    try {
+      manutencao = await MaintenanceService.activeScope({ now });
+    } catch (error) {
+      console.warn(`WhatsApp alerts: maintenance scope unavailable: ${error.message}`);
+    }
+    const emManutencao = manutencao?.deviceIds ?? new Set();
+    if (emManutencao.size) {
+      for (const key of [...firing.keys()]) {
+        const condition = firing.get(key);
+        if (!emManutencao.has(String(condition.subject))) continue;
+        firing.delete(key);
+        unknown.add(key);
+      }
+      for (const deviceId of emManutencao) {
+        for (const rule of ['ont_offline', 'rx_power_low', 'temperature_high']) unknown.add(conditionKey(rule, deviceId));
+      }
+    }
+
     if (rules.mass_outage.enabled) {
-      await this.applyMassOutage({ offline, rules, firing, unknown, informs, now });
+      await this.applyMassOutage({
+        offline: emManutencao.size ? offline.filter((id) => !emManutencao.has(id)) : offline,
+        rules,
+        firing,
+        unknown,
+        informs,
+        now,
+        skipClients: manutencao?.ontNodeIds
+      });
+      for (const nodeId of manutencao?.nodeIds ?? []) {
+        const key = conditionKey('mass_outage', nodeId);
+        firing.delete(key);
+        unknown.add(key);
+      }
     }
 
     return { firing, unknown };
@@ -762,7 +799,7 @@ class WaAlertService {
    * the wrong end of the network. A cut further upstream simply produces one
    * message per affected ODP, which is still a handful instead of hundreds.
    */
-  static async applyMassOutage({ offline, rules, firing, unknown, informs = new Map(), now = Date.now() }) {
+  static async applyMassOutage({ offline, rules, firing, unknown, informs = new Map(), now = Date.now(), skipClients = null }) {
     // Nenhuma caixa cai com menos de 2: abaixo disso, nem se lê a topologia
     // nem se faz a segunda leitura da frota numa rede saudável.
     if (offline.length < 2) return;
@@ -793,7 +830,8 @@ class WaAlertService {
     for (const deviceId of offline) {
       const pppoe = pppoeByDevice.get(deviceId);
       const ontNode = pppoe ? nodeByPppoe.get(pppoe) : null;
-      if (!ontNode) continue;
+      // Embaixo de um nó em manutenção: não conta para a queda de ninguém.
+      if (!ontNode || skipClients?.has(ontNode.node_id)) continue;
       // Duas ONTs no mesmo login: vale o sinal mais antigo, o de quem caiu primeiro.
       const lastInform = informs.get(deviceId) ?? null;
       const previous = offlineClients.get(ontNode.node_id) ?? null;

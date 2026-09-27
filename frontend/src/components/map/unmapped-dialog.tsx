@@ -36,8 +36,8 @@ export function UnmappedDialog({ canWrite, onClose, onPlace }: {
   }, [data, query])
 
   return (
-    <div className="fixed inset-0 z-[2200] flex items-center justify-center bg-black/65 p-4" role="dialog" aria-modal="true">
-      <div className="modern-card flex max-h-[92vh] w-full max-w-2xl flex-col p-5 sm:p-6">
+    <div className="modal-backdrop z-[2200] bg-black/65" role="dialog" aria-modal="true">
+      <div className="modal-panel modern-card flex max-w-2xl flex-col p-5 sm:p-6">
         <div className="mb-3 flex items-center justify-between gap-4">
           <h2 className="section-heading">{t('map.unmapped.title', { count: data?.total ?? 0 })}</h2>
           <button type="button" onClick={onClose} className="icon-button" aria-label={t('common.close')}><Icon name="x" size={20} /></button>

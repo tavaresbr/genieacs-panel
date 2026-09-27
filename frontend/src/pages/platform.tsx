@@ -456,7 +456,7 @@ export default function PlatformPage() {
   )
 
   return (
-    <div className="page-shell">
+    <div className="page-shell pb-8">
       <div className="page-frame">
         <header className="page-header">
           <div>

@@ -1,6 +1,7 @@
 import express from 'express';
 import WhatsAppAlertsController from '../controllers/whatsappAlertsController.js';
 import OutageController from '../controllers/outageController.js';
+import MaintenanceController from '../controllers/maintenanceController.js';
 import { authenticateToken, requirePermission } from '../middleware/auth.js';
 import { telegramTestLimiter } from '../middleware/rateLimit.js';
 
@@ -22,5 +23,18 @@ router.get('/outages/:id', authenticateToken, requirePermission('whatsapp.read')
 router.patch('/outages/:id', authenticateToken, requirePermission('whatsapp.send'), OutageController.update);
 router.post('/outages/:id/notify', authenticateToken, requirePermission('whatsapp.send'), OutageController.notify);
 router.post('/outages/:id/resolve', authenticateToken, requirePermission('whatsapp.send'), OutageController.resolve);
+
+// Manutenção programada. Ler é de quem atende; agendar, avisar e encerrar
+// mandam mensagem ao assinante — de quem manda mensagem pelo provedor.
+// `nodes` e `preview` antes de `:id`, senão o Express leria "preview" como id.
+router.get('/maintenances', authenticateToken, requirePermission('whatsapp.read'), MaintenanceController.list);
+router.get('/maintenances/nodes', authenticateToken, requirePermission('whatsapp.read'), MaintenanceController.nodes);
+router.get('/maintenances/preview', authenticateToken, requirePermission('whatsapp.read'), MaintenanceController.preview);
+router.get('/maintenances/:id', authenticateToken, requirePermission('whatsapp.read'), MaintenanceController.get);
+router.post('/maintenances', authenticateToken, requirePermission('whatsapp.send'), MaintenanceController.create);
+router.patch('/maintenances/:id', authenticateToken, requirePermission('whatsapp.send'), MaintenanceController.update);
+router.post('/maintenances/:id/notify', authenticateToken, requirePermission('whatsapp.send'), MaintenanceController.notify);
+router.post('/maintenances/:id/cancel', authenticateToken, requirePermission('whatsapp.send'), MaintenanceController.cancel);
+router.post('/maintenances/:id/conclude', authenticateToken, requirePermission('whatsapp.send'), MaintenanceController.conclude);
 
 export default router;

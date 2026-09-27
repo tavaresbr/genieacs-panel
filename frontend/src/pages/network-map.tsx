@@ -25,6 +25,7 @@ import { PlaceClientDialog, type PlaceClientTarget } from '@/components/map/plac
 import { UnmappedDialog } from '@/components/map/unmapped-dialog'
 import { BOX_TYPES, NEARBY_METERS, boxOccupancy, capacityOf } from '@/lib/box-occupancy'
 import 'leaflet/dist/leaflet.css'
+import { MaintenanceForm } from '@/components/maintenance/maintenance-panel'
 
 // Start fetching the map engine as soon as this route chunk is evaluated. The
 // topology request and Leaflet download can then run in parallel.
@@ -113,11 +114,14 @@ function nodeIconName(type: NodeType) {
   return 'home'
 }
 
+/** Os nós que agrupam clientes: só neles cabe uma manutenção programada. */
+const MAINTENANCE_NODE_TYPES = new Set(['olt', 'odc', 'odp', 'htb'])
+
 function ModalShell({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   const { t } = useTranslation()
   return (
-    <div className="fixed inset-0 z-[2200] flex items-center justify-center bg-black/65 p-4" role="dialog" aria-modal="true">
-      <div className="modern-card max-h-[92dvh] w-full max-w-2xl overflow-y-auto p-5 sm:p-6">
+    <div className="modal-backdrop z-[2200] bg-black/65" role="dialog" aria-modal="true">
+      <div className="modal-panel modern-card max-w-2xl p-5 sm:p-6">
         <div className="mb-5 flex items-center justify-between gap-4">
           <h2 className="section-heading min-w-0 break-words">{title}</h2>
           <button type="button" onClick={onClose} className="icon-button" aria-label={t('common.close')}>
@@ -541,6 +545,9 @@ export default function NetworkMap() {
   // `map.write`, que a matriz dá ao plantão. Era `role === 'admin'`, o que
   // trancava o mapa para quem sobe em poste.
   const canEditMap = can('map.write')
+  // Agendar manutenção manda mensagem ao assinante: é de quem manda mensagem.
+  const canScheduleMaintenance = can('whatsapp.send')
+  const [maintenanceNode, setMaintenanceNode] = useState<MapNode | null>(null)
 
   const nodeTypeLabel = useCallback(
     (type: NodeType) => {
@@ -1218,8 +1225,22 @@ export default function NetworkMap() {
                 }))}`}>
                 <Icon name="chat" size={17} />{t('map.directions.share')}
               </a>
+              {canScheduleMaintenance && MAINTENANCE_NODE_TYPES.has(selectedNode.type) && (
+                <button className="modern-button-secondary" onClick={() => { setMaintenanceNode(selectedNode); setSelectedNode(null) }}>
+                  <Icon name="settings" size={17} />{t('maintenance.mapButton')}
+                </button>
+              )}
               <button className="modern-button" onClick={() => setSelectedNode(null)}>{t('common.close')}</button>
             </div>
+          </ModalShell>
+        )}
+        {maintenanceNode && (
+          <ModalShell title={t('maintenance.formTitleFor', { node: maintenanceNode.name })} onClose={() => setMaintenanceNode(null)}>
+            <MaintenanceForm
+              presetNodeId={maintenanceNode.node_id}
+              onCancel={() => setMaintenanceNode(null)}
+              onDone={() => setMaintenanceNode(null)}
+            />
           </ModalShell>
         )}
         {selectedEdge && (

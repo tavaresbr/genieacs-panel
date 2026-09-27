@@ -128,6 +128,45 @@ export const casos = [
     tabela: 'outage_incidents'
   },
   {
+    chave: 'maintenance',
+    label: 'GET /api/whatsapp/maintenances/:id',
+    method: 'GET',
+    path: (id) => `/api/whatsapp/maintenances/${id}`,
+    tabela: 'maintenance_windows'
+  },
+  {
+    chave: 'maintenance',
+    label: 'PATCH /api/whatsapp/maintenances/:id',
+    method: 'PATCH',
+    path: (id) => `/api/whatsapp/maintenances/${id}`,
+    body: { message: 'outro texto' },
+    tabela: 'maintenance_windows'
+  },
+  {
+    chave: 'maintenance',
+    label: 'POST /api/whatsapp/maintenances/:id/notify',
+    method: 'POST',
+    path: (id) => `/api/whatsapp/maintenances/${id}/notify`,
+    body: {},
+    tabela: 'maintenance_windows'
+  },
+  {
+    chave: 'maintenance',
+    label: 'POST /api/whatsapp/maintenances/:id/cancel',
+    method: 'POST',
+    path: (id) => `/api/whatsapp/maintenances/${id}/cancel`,
+    body: {},
+    tabela: 'maintenance_windows'
+  },
+  {
+    chave: 'maintenance',
+    label: 'POST /api/whatsapp/maintenances/:id/conclude',
+    method: 'POST',
+    path: (id) => `/api/whatsapp/maintenances/${id}/conclude`,
+    body: {},
+    tabela: 'maintenance_windows'
+  },
+  {
     chave: 'broadcast',
     label: 'POST /api/whatsapp/broadcasts/:id/status',
     method: 'POST',
