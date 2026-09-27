@@ -124,9 +124,20 @@ describe('ativar', () => {
 
   it('código certo liga e devolve dez códigos de recuperação, uma vez', async () => {
     const antes = await getDb()('audit_log').where({ action: AuditLog.ACTIONS.USER_MFA_ENABLED }).count({ n: '*' });
+    const velho = token;
     const { status, body } = await post('/api/auth/mfa/enable', { code: agora() });
     assert.equal(status, 200, JSON.stringify(body));
     recuperacao = body.data.recoveryCodes;
+
+    // Ativar é mudar credencial: a sessão aberta antes cai, e a aba de quem
+    // ativou segue com os tokens novos que a resposta traz.
+    assert.ok(body.data.token && body.data.refreshToken, 'a ativação não devolveu sessão nova');
+    assert.equal((await call(`${panelUrl}/api/auth/user`, { headers: authHeaders(velho) })).status, 403,
+      'a sessão de antes da ativação continuou valendo');
+    token = body.data.token;
+    assert.equal((await call(`${panelUrl}/api/auth/user`, { headers: authHeaders(token) })).status, 200);
+    const renovou = await call(`${panelUrl}/api/auth/refresh`, { method: 'POST', body: { refreshToken: body.data.refreshToken } });
+    assert.equal(renovou.status, 200, JSON.stringify(renovou.body));
     assert.equal(recuperacao.length, 10);
     assert.equal(new Set(recuperacao).size, 10);
     const depois = await getDb()('audit_log').where({ action: AuditLog.ACTIONS.USER_MFA_ENABLED }).count({ n: '*' });
@@ -252,9 +263,14 @@ describe('trocar os códigos e desligar', () => {
     assert.equal(semSenha.status, 401);
     assert.equal(semSenha.body.code, 'invalid_password');
 
+    const antes = token;
     const { status, body } = await post('/api/auth/mfa/recovery-codes', { password: SENHA, code: recuperacao[1] });
     assert.equal(status, 200, JSON.stringify(body));
     const novos = body.data.recoveryCodes;
+    // Quem troca os códigos acha que os antigos vazaram: as sessões caem junto.
+    assert.equal((await call(`${panelUrl}/api/auth/user`, { headers: authHeaders(antes) })).status, 403);
+    token = body.data.token;
+    assert.equal((await call(`${panelUrl}/api/auth/user`, { headers: authHeaders(token) })).status, 200);
     assert.equal(novos.length, 10);
 
     const velho = await login({ totpCode: recuperacao[2], tenantId: alfa });
@@ -272,8 +288,13 @@ describe('trocar os códigos e desligar', () => {
   });
 
   it('desligado, o login volta a ser só a senha, e os códigos somem', async () => {
+    const antes = token;
     const { status, body } = await post('/api/auth/mfa/disable', { password: SENHA, code: recuperacao[0] });
     assert.equal(status, 200, JSON.stringify(body));
+    assert.equal((await call(`${panelUrl}/api/auth/user`, { headers: authHeaders(antes) })).status, 403,
+      'a sessão de antes do desligamento continuou valendo');
+    token = body.data.token;
+    assert.equal((await call(`${panelUrl}/api/auth/user`, { headers: authHeaders(token) })).status, 200);
     assert.equal((await login({ tenantId: alfa })).status, 200);
     assert.equal(Number((await getDb()('user_recovery_codes').count({ n: '*' }))[0].n), 0);
     const usuario = await getDb()('users').where({ username: USUARIO }).first();

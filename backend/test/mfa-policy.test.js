@@ -46,6 +46,9 @@ async function ativar(quem) {
   segredos[quem] = setup.body.data.secret;
   const ligou = await post('/api/auth/mfa/enable', { code: totpCode(segredos[quem], totpStep()) }, tokens[quem]);
   assert.equal(ligou.status, 200, JSON.stringify(ligou.body));
+  // Ativar derruba as sessões abertas antes; a de quem ativou segue com o
+  // token que a própria resposta traz.
+  tokens[quem] = ligou.body.data.token;
 }
 
 async function criar(username, role) {
@@ -163,7 +166,7 @@ describe('quem está sem 2FA num provedor que exige', () => {
     assert.equal((await get('/api/auth/user', tokens[DONO])).body.data.mfaEnrollmentRequired, false);
   });
 
-  it('depois de ativar, a mesma sessão volta a trabalhar', async () => {
+  it('depois de ativar, a mesma aba volta a trabalhar, com o token que a ativação devolve', async () => {
     await ativar('gerente');
     assert.equal((await get('/api/users', tokens.gerente)).status, 200);
     assert.equal((await get('/api/auth/user', tokens.gerente)).body.data.mfaEnrollmentRequired, false);

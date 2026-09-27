@@ -705,6 +705,26 @@ class AuthController {
     return res.status(500).json(createErrorResponse(req.t('common.internalError'), error.message));
   }
 
+  /**
+   * Tokens novos para a sessão que acabou de mudar o próprio segundo fator.
+   *
+   * Ativar, desligar e trocar os códigos sobem o `token_version` — toda sessão
+   * aberta antes cai. Menos a de quem pediu: ela provou agora mesmo o que a
+   * mudança exige, e derrubá-la jogaria a pessoa no login no meio da tela do
+   * 2FA, com os códigos de recuperação ainda por anotar. Cunhados do usuário
+   * RELIDO, que já carrega a versão nova, e na mesma forma da sessão que chamou
+   * — console para o console, o provedor e o papel já hidratados para o painel.
+   * A personificação não chega aqui: `/api/auth/` é escrita recusada a ela.
+   */
+  static async mfaFreshTokens(req) {
+    const user = await User.findById(req.user.userId);
+    if (!user) return {};
+    const { accessToken, refreshToken } = req.user.platform
+      ? generateConsoleTokens(user)
+      : generateTokens(user, { tenant_id: req.user.tenantId, role: req.user.role });
+    return { token: accessToken, refreshToken };
+  }
+
   static async mfaStatus(req, res) {
     try {
       return res.json(createResponse(null, await MfaService.status(req.user.userId)));
@@ -727,7 +747,9 @@ class AuthController {
       await AuditLog.fromRequest(req, {
         action: AuditLog.ACTIONS.USER_MFA_ENABLED, subjectType: 'user', subjectId: String(req.user.userId)
       });
-      return res.json(createResponse(req.t('auth.mfaEnabled'), result));
+      return res.json(createResponse(req.t('auth.mfaEnabled'), {
+        ...result, ...(await AuthController.mfaFreshTokens(req))
+      }));
     } catch (error) {
       return AuthController.mfaError(req, res, error, 'MFA enable');
     }
@@ -739,7 +761,9 @@ class AuthController {
       await AuditLog.fromRequest(req, {
         action: AuditLog.ACTIONS.USER_MFA_DISABLED, subjectType: 'user', subjectId: String(req.user.userId)
       });
-      return res.json(createResponse(req.t('auth.mfaDisabled'), { enabled: false }));
+      return res.json(createResponse(req.t('auth.mfaDisabled'), {
+        enabled: false, ...(await AuthController.mfaFreshTokens(req))
+      }));
     } catch (error) {
       return AuthController.mfaError(req, res, error, 'MFA disable');
     }
@@ -751,7 +775,9 @@ class AuthController {
       await AuditLog.fromRequest(req, {
         action: AuditLog.ACTIONS.USER_MFA_RECOVERY_REGENERATED, subjectType: 'user', subjectId: String(req.user.userId)
       });
-      return res.json(createResponse(req.t('auth.mfaRecoveryRegenerated'), result));
+      return res.json(createResponse(req.t('auth.mfaRecoveryRegenerated'), {
+        ...result, ...(await AuthController.mfaFreshTokens(req))
+      }));
     } catch (error) {
       return AuthController.mfaError(req, res, error, 'MFA recovery codes');
     }
