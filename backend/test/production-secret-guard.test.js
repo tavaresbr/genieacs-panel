@@ -97,3 +97,48 @@ describe('a production process refuses the built-in fallback secret', () => {
     });
   }
 });
+
+/**
+ * `cp .env.example .env` produz segredos que passam na regra de tamanho — o
+ * valor de exemplo do JWT_SECRET tem 33 caracteres — e estão publicados neste
+ * repositório. Em produção, cada um deles é recusado na subida.
+ */
+describe('a production process refuses the example values from .env.example', () => {
+  const FORTE = 'b'.repeat(48);
+  const cases = [
+    {
+      what: 'the operator session secret',
+      specifier: './src/middleware/auth.js',
+      call: '',
+      env: { JWT_SECRET: 'change_me_to_a_long_random_string' },
+      expect: /JWT_SECRET still holds the example value/
+    },
+    {
+      what: 'the customer portal session secret',
+      specifier: './src/middleware/portalAuth.js',
+      call: '',
+      env: { JWT_SECRET: FORTE, PORTAL_JWT_SECRET: 'change_me_to_an_independent_long_random_string' },
+      expect: /PORTAL_JWT_SECRET still holds the example value/
+    },
+    {
+      what: 'the stored-secret encryption key',
+      specifier: './src/utils/secretBox.js',
+      call: "m.createSecretBox('probe');",
+      env: { JWT_SECRET: FORTE, SECRET_BOX_KEY: 'change_me_to_an_independent_long_random_string' },
+      expect: /SECRET_BOX_KEY still holds the example value/
+    }
+  ];
+
+  for (const { what, specifier, call, env, expect } of cases) {
+    it(`refuses ${what}`, async () => {
+      const output = await bootWith({ NODE_ENV: 'production', ...env }, REPORT(specifier, call));
+      assert.match(output, /^REFUSED: /, `${what} booted on the example value`);
+      assert.match(output, expect);
+    });
+
+    it(`still accepts the example value for ${what} outside production`, async () => {
+      const output = await bootWith(env, REPORT(specifier, call));
+      assert.equal(output.split('\n').pop(), 'BOOTED');
+    });
+  }
+});

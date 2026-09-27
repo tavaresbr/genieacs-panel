@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import CustomerAccount from '../models/CustomerAccount.js';
 import { isRequestSecure } from '../config/proxy.js';
-import { DEVELOPMENT_FALLBACK, isProduction } from '../config/runtimeEnv.js';
+import { DEVELOPMENT_FALLBACK, assertNotPlaceholderSecret, isProduction } from '../config/runtimeEnv.js';
 import { subscriptionRefusal } from './subscriptionGate.js';
 
 export const PORTAL_COOKIE_NAME = 'skygp_portal_session';
@@ -13,6 +13,7 @@ const baseSecret = process.env.PORTAL_JWT_SECRET || process.env.JWT_SECRET;
 if (!baseSecret && isProduction()) {
   throw new Error('PORTAL_JWT_SECRET or JWT_SECRET must be set in production');
 }
+assertNotPlaceholderSecret('PORTAL_JWT_SECRET', process.env.PORTAL_JWT_SECRET);
 const portalSecret = process.env.PORTAL_JWT_SECRET || crypto
   .createHmac('sha256', baseSecret || DEVELOPMENT_FALLBACK)
   .update('skygenpanel-customer-portal-v1')

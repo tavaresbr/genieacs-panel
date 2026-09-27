@@ -6,6 +6,9 @@ yarn.lock
 .env
 .env.local
 .env.production
+# deploy/saas.env and any other *.env hold live secrets; only the examples are tracked.
+*.env
+!*.env.example
 
 # Logs
 logs/
