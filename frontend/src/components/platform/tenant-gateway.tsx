@@ -4,6 +4,13 @@ import { useEffect, useState } from 'react'
 import { platformAPI, type Tenant } from '@/lib/api'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
+import type { TranslationKey } from '@/lib/i18n'
+
+/** Os providers que o backend sabe correlacionar. */
+const GATEWAYS: Array<{ value: string; label: TranslationKey }> = [
+  { value: 'asaas', label: 'platform.gateway.asaas' },
+  { value: 'manual', label: 'platform.gateway.manual' }
+]
 
 interface Props {
   tenant: Tenant
@@ -33,6 +40,7 @@ export function TenantGateway({ tenant, onTenantChange }: Props) {
   }
   const [form, setForm] = useState(atual)
   const [saving, setSaving] = useState(false)
+  const [creating, setCreating] = useState(false)
 
   useEffect(() => {
     setForm({
@@ -71,6 +79,30 @@ export function TenantGateway({ tenant, onTenantChange }: Props) {
     }
   }
 
+  /**
+   * Cria o cliente na Asaas e já grava a correlação — o caminho de quem ainda
+   * não tem cadastro lá, e que antes exigia abrir a Asaas, criar à mão e colar
+   * o id aqui. O cadastro fiscal do provedor é a fonte: sem CPF/CNPJ o backend
+   * recusa com 400 e a mensagem dele diz o que falta, então a tela só repassa.
+   */
+  const criarCliente = async () => {
+    if (creating) return
+    setCreating(true)
+    try {
+      const res = await platformAPI.createAsaasCustomer(tenant.id)
+      if (res.success) {
+        toast.success(t('platform.gateway.customerCreated', { provider: tenant.name }))
+        onTenantChange()
+      } else {
+        toast.error(res.message || t('platform.saveFailed'))
+      }
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const ligado = Boolean(tenant.gateway?.customerRef)
+
   return (
     <div className="space-y-4 py-3">
       <div>
@@ -83,14 +115,24 @@ export function TenantGateway({ tenant, onTenantChange }: Props) {
           <label htmlFor={`tenant-${tenant.id}-gateway`} className="block text-sm font-medium mb-1">
             {t('platform.gateway.name')}
           </label>
-          <input
+          {/* Lista fechada e não texto livre: o nome aqui tem de ser um provider
+              que o backend conhece, e um "Asaas" com maiúscula não casava com
+              webhook nenhum. Um valor antigo fora da lista continua aparecendo
+              como opção, para a tela não trocá-lo em silêncio. */}
+          <select
             id={`tenant-${tenant.id}-gateway`}
             value={form.gateway}
-            onChange={(e) => setForm((f) => ({ ...f, gateway: e.target.value.toLowerCase() }))}
-            className="modern-input w-full font-mono"
-            placeholder="asaas"
-            autoComplete="off"
-          />
+            onChange={(e) => setForm((f) => ({ ...f, gateway: e.target.value }))}
+            className="modern-input w-full"
+          >
+            <option value="">{t('platform.gateway.none')}</option>
+            {GATEWAYS.map((g) => (
+              <option key={g.value} value={g.value}>{t(g.label)}</option>
+            ))}
+            {form.gateway && !GATEWAYS.some((g) => g.value === form.gateway) && (
+              <option value={form.gateway}>{form.gateway}</option>
+            )}
+          </select>
         </div>
         <div>
           <label htmlFor={`tenant-${tenant.id}-customer`} className="block text-sm font-medium mb-1">
@@ -114,7 +156,7 @@ export function TenantGateway({ tenant, onTenantChange }: Props) {
         </p>
       )}
 
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={() => void salvar()} disabled={!podeSalvar} className="modern-button">
           {saving ? t('common.saving') : t('platform.data.save')}
         </button>
@@ -127,6 +169,20 @@ export function TenantGateway({ tenant, onTenantChange }: Props) {
           {t('common.cancel')}
         </button>
       </div>
+
+      {!ligado && (
+        <div className="border-t border-border pt-4">
+          <button
+            type="button"
+            onClick={() => void criarCliente()}
+            disabled={creating || saving || mudou}
+            className="modern-button-secondary"
+          >
+            {creating ? t('platform.gateway.creatingCustomer') : t('platform.gateway.createAsaasCustomer')}
+          </button>
+          <p className="field-hint">{t('platform.gateway.createAsaasCustomerHint')}</p>
+        </div>
+      )}
     </div>
   )
 }

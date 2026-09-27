@@ -1,5 +1,6 @@
 import { PinnedTransport } from '../../utils/net/pinnedFetch.js';
 import { IS_SAAS } from '../../config/edition.js';
+import { effectiveApiKey, effectiveBaseUrl } from './asaasSettingsService.js';
 
 /**
  * O cliente HTTP do gateway de pagamento — a única coisa deste repositório que
@@ -32,8 +33,6 @@ import { IS_SAAS } from '../../config/edition.js';
  * quem paga é o cliente.
  */
 
-const BASE_PADRAO = 'https://api.asaas.com/v3';
-
 /** Prazo da chamada inteira, da resolução do nome ao último byte. */
 const TIMEOUT_MS = 20_000;
 
@@ -52,15 +51,24 @@ export class AsaasError extends Error {
   }
 }
 
-/** A chave da API deste deploy, ou nulo. Lida a cada chamada: não se guarda. */
-export function apiKey() {
-  const valor = String(process.env.ASAAS_API_KEY ?? '').trim();
-  return valor.length ? valor : null;
+/**
+ * A chave da API deste deploy, ou nulo. Lida a cada chamada: não se guarda.
+ *
+ * Assíncrona desde que a chave passou a poder vir do console — a caixa da
+ * plataforma guarda o valor e o ambiente é só o que vale quando ela não tem
+ * nada (ver `asaasSettingsService`). O cache curto de lá é o que impede isto
+ * de virar uma leitura no banco por chamada.
+ */
+export async function apiKey() {
+  return effectiveApiKey();
 }
 
-/** A base da API, sem barra no fim. Variável para o teste poder existir. */
-export function baseUrl() {
-  return String(process.env.ASAAS_BASE_URL || BASE_PADRAO).trim().replace(/\/+$/, '');
+/**
+ * A base da API, sem barra no fim: `ASAAS_BASE_URL` quando posta (é a porta do
+ * teste), senão a do ambiente escolhido no console.
+ */
+export async function baseUrl() {
+  return effectiveBaseUrl();
 }
 
 /**
@@ -73,14 +81,15 @@ export function baseUrl() {
  * — e é o que alguém vai ler.
  */
 async function chamar(caminho, { method = 'POST', payload = null } = {}) {
-  const chave = apiKey();
-  if (!chave) throw new AsaasError('ASAAS_API_KEY is not configured', { code: 'not_configured' });
+  const chave = await apiKey();
+  if (!chave) throw new AsaasError('the Asaas API key is not configured', { code: 'not_configured' });
 
+  const base = await baseUrl();
   let url;
   try {
-    url = new URL(`${baseUrl()}${caminho}`);
+    url = new URL(`${base}${caminho}`);
   } catch {
-    throw new AsaasError(`ASAAS_BASE_URL is not a valid URL: ${baseUrl()}`, { code: 'invalid_base_url' });
+    throw new AsaasError(`ASAAS_BASE_URL is not a valid URL: ${base}`, { code: 'invalid_base_url' });
   }
   if (!['http:', 'https:'].includes(url.protocol)) {
     throw new AsaasError('ASAAS_BASE_URL must be http or https', { code: 'invalid_base_url' });
@@ -201,4 +210,48 @@ export async function createCharge({ customerRef, amountCents, currency = 'BRL',
   };
 }
 
-export default { createCharge, apiKey, baseUrl, AsaasError };
+/**
+ * Confere se a chave responde, e em nome de quem — o botão "Testar conexão" do
+ * console.
+ *
+ * `GET /myAccount/commercialInfo` é a leitura que devolve o NOME da conta, e o
+ * nome é o que faz o teste valer alguma coisa: "conectou" com a chave do
+ * sandbox de um colega também conecta, e só o nome mostra que a chave é da
+ * conta certa. Se o gateway não conhecer esse caminho (404), o saldo serve de
+ * segunda leitura: autentica igual, só não diz de quem é. Qualquer outra
+ * recusa — 401 sobretudo — sobe como está, porque é ela a resposta do teste.
+ *
+ * @returns {Promise<{accountName: string|null}>}
+ */
+export async function testConnection() {
+  try {
+    const conta = await chamar('/myAccount/commercialInfo', { method: 'GET' });
+    const nome = conta?.companyName || conta?.name || conta?.tradingName || null;
+    return { accountName: nome ? String(nome) : null };
+  } catch (error) {
+    if (!(error instanceof AsaasError) || error.status !== 404) throw error;
+  }
+  await chamar('/finance/balance', { method: 'GET' });
+  return { accountName: null };
+}
+
+/**
+ * Cria o cliente no gateway e devolve o id dele — o `billing_customer_ref` que
+ * o console grava no provedor.
+ *
+ * O corpo vem pronto de quem chama (o cadastro fiscal, traduzido para os nomes
+ * do gateway): este arquivo é transporte e não sabe o que é um CNPJ. O que ele
+ * garante é o mesmo de `createCharge` — um id na volta, ou um erro.
+ *
+ * @returns {Promise<{customerId: string}>}
+ */
+export async function createCustomer(payload) {
+  const resposta = await chamar('/customers', { payload });
+  const customerId = String(resposta?.id ?? '').trim();
+  if (!customerId) {
+    throw new AsaasError('gateway created a customer without an id', { code: 'bad_response' });
+  }
+  return { customerId };
+}
+
+export default { createCharge, createCustomer, testConnection, apiKey, baseUrl, AsaasError };
