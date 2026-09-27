@@ -1,8 +1,10 @@
 import { tdb } from '../config/database.js';
 import { currentTenantId } from '../config/tenantContext.js';
+import AuditLog from '../models/AuditLog.js';
 import CustomerAccount from '../models/CustomerAccount.js';
 import Tenant from '../models/Tenant.js';
 import { exportaColuna } from './tenantExportService.js';
+import { timestampMs } from '../utils/helpers.js';
 
 /**
  * O dossiê de UM assinante, num arquivo.
@@ -81,12 +83,24 @@ const SEM_DADO_DE_ASSINANTE = Object.freeze({
  * fizer discordar de propósito.
  */
 export async function alcanceDoAssinante(account) {
-  const deviceIds = await CustomerDataExportService.deviceIdsOf(account);
+  const posses = await possesDoAssinante(account);
+  const deviceIds = [...new Set(posses.map((p) => p.deviceId))];
+  const naPosse = (deviceId, quando) => {
+    const t = instante(quando);
+    if (!Number.isFinite(t)) return false;
+    return posses.some((p) => p.deviceId === deviceId && t >= p.desde && t < p.ate);
+  };
+  // O vínculo com o ERP e o alerta são o estado de AGORA do aparelho: só valem
+  // para a ONT que ainda está com esta conta.
+  const emPosseAgora = new Set(posses.filter((p) => p.ate === Infinity).map((p) => p.deviceId));
+  const minha = (valor) => valor !== null && valor !== undefined && Number(valor) === Number(account.id);
+  const deOutraConta = (valor) => valor !== null && valor !== undefined && !minha(valor);
 
-  const vinculos = await tdb('sgp_links').where((q) => {
+  const vinculos = (await tdb('sgp_links').where((q) => {
     q.where({ account_id: account.id });
     if (deviceIds.length) q.orWhereIn('device_id', deviceIds);
-  }).orderBy('id');
+  }).orderBy('id')).filter((v) => minha(v.account_id)
+    || (!deOutraConta(v.account_id) && emPosseAgora.has(v.device_id)));
   const contratos = [...new Set(vinculos.map((v) => v.contract).filter(Boolean))];
   // O mesmo contrato também pode estar em `sgp_contacts`: foi achado numa busca
   // ao SGP antes de a ONT dele aparecer no painel, e a linha fica.
@@ -113,15 +127,28 @@ export async function alcanceDoAssinante(account) {
   const telefones = [...vinculos, ...contatos].flatMap((v) => [v.phone_e164, v.phone_manual]).filter(Boolean);
 
   const contatoIds = contatos.map((c) => c.id);
+  const conjuntoContratos = new Set(contratos);
+  const conjuntoContatos = new Set(contatoIds);
+  const conjuntoTelefones = new Set(telefones);
+  // Uma conversa ligada a OUTRA conta é daquela pessoa, mesmo que tenha
+  // acontecido na mesma ONT; e uma solta, que casou só pelo aparelho, só é
+  // desta se começou enquanto o aparelho era desta conta. Sem isso, o dossiê de
+  // quem recebeu uma ONT reaproveitada trazia as conversas do dono anterior.
   const conversas = (deviceIds.length || contratos.length || telefones.length || contatoIds.length)
-    ? await tdb('wa_conversations').where((q) => {
+    ? (await tdb('wa_conversations').where((q) => {
       q.where({ customer_account_id: account.id });
       if (deviceIds.length) q.orWhereIn('device_id', deviceIds);
       if (contratos.length) q.orWhereIn('contract', contratos);
       // A conversa com o cadastro sem contrato aponta para a linha, não para um contrato.
       if (contatoIds.length) q.orWhereIn('sgp_contact_id', contatoIds);
-      if (telefones.length) q.orWhereIn('wa_phone_e164', [...new Set(telefones)]);
-    }).orderBy('id')
+      if (telefones.length) q.orWhereIn('wa_phone_e164', [...conjuntoTelefones]);
+    }).orderBy('id')).filter((c) => {
+      if (c.customer_account_id !== null && c.customer_account_id !== undefined) return minha(c.customer_account_id);
+      return conjuntoContratos.has(c.contract)
+        || conjuntoContatos.has(c.sgp_contact_id)
+        || conjuntoTelefones.has(c.wa_phone_e164)
+        || naPosse(c.device_id, c.created_at);
+    })
     : [];
 
   // O número da conversa também é telefone do titular, e pode não estar em
@@ -131,6 +158,30 @@ export async function alcanceDoAssinante(account) {
     if (conversa.wa_phone_e164) telefones.push(conversa.wa_phone_e164);
   }
 
+  // As linhas chaveadas só pelo aparelho, já recortadas pelo período de posse.
+  // Saem daqui prontas, e não como uma lista de devices, para que o export e a
+  // exclusão não possam recortar cada um do seu jeito.
+  const eventos = (deviceIds.length || contratos.length)
+    ? (await tdb('sgp_events').where((q) => {
+      if (deviceIds.length) q.whereIn('device_id', deviceIds);
+      if (contratos.length) q.orWhereIn('contract', contratos);
+    }).orderBy('id')).filter((e) => conjuntoContratos.has(e.contract)
+      || naPosse(e.device_id, e.occurred_at ?? e.received_at ?? e.created_at))
+    : [];
+  const amostras = deviceIds.length
+    ? (await tdb('device_samples').whereIn('device_id', deviceIds).orderBy('id'))
+      .filter((a) => naPosse(a.device_id, a.inform_at))
+    : [];
+  const horas = deviceIds.length
+    ? (await tdb('device_sample_hours').whereIn('device_id', deviceIds).orderBy('id'))
+      .filter((h) => naPosse(h.device_id, h.bucket_at))
+    : [];
+  const trocas = (await tdb('device_swaps').where((q) => {
+    q.where({ account_id: account.id });
+    if (deviceIds.length) q.orWhereIn('device_id', deviceIds);
+  }).orderBy('id')).filter((t) => minha(t.account_id)
+    || (!deOutraConta(t.account_id) && naPosse(t.device_id, t.occurred_at)));
+
   const nos = account.pppoe_username
     ? await tdb('mapping_nodes')
       .whereRaw('LOWER(pppoe) = ?', [String(account.pppoe_username).toLowerCase()])
@@ -139,6 +190,9 @@ export async function alcanceDoAssinante(account) {
 
   return {
     deviceIds,
+    posses,
+    naPosse,
+    emPosseAgora: [...emPosseAgora],
     contratos,
     telefones: [...new Set(telefones)],
     vinculos,
@@ -146,34 +200,145 @@ export async function alcanceDoAssinante(account) {
     clientes,
     conversas,
     conversaIds: conversas.map((c) => c.id),
+    eventos,
+    amostras,
+    horas,
+    trocas,
     nos,
     noIds: nos.map((n) => n.node_id)
   };
 }
 
+/**
+ * Milissegundos de um timestamp do banco. Texto sem fuso é UTC — é o que o
+ * `CURRENT_TIMESTAMP` do SQLite grava —, e lê-lo como hora local deslocaria
+ * cada fronteira de posse pelo fuso do servidor.
+ */
+function instante(valor) {
+  if (typeof valor === 'string'
+    && /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(valor.trim())) {
+    return Date.parse(`${valor.trim().replace(' ', 'T')}Z`);
+  }
+  return timestampMs(valor);
+}
+
+const ACAO_APOSENTADORIA = AuditLog.ACTIONS.SUBSCRIBER_ACCOUNT_RETIRED;
+
+function detalheDe(linha) {
+  try {
+    return JSON.parse(linha.detail || 'null') || {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Os períodos em que cada ONT foi DESTA conta: `[{ deviceId, desde, ate }]`,
+ * em milissegundos, `ate` exclusivo e `Infinity` enquanto ainda for.
+ *
+ * O device id não identifica uma pessoa, identifica um aparelho — e aparelho
+ * muda de casa. Quando o ISP recolhe a ONT de um assinante e instala na casa
+ * de outro, `retireAccount` fecha a conta antiga, mas a telemetria, os eventos
+ * do ERP e as conversas continuam gravados sob o mesmo id. Buscar só pelo id
+ * entregava ao novo assinante a história do anterior, e a exclusão pedida por
+ * um apagava a do outro.
+ *
+ * O período começa na criação da conta (primeira ONT) ou na troca que trouxe
+ * a ONT, e termina na próxima troca, na aposentadoria, ou quando OUTRA conta
+ * passa a responder pelo mesmo aparelho — o que vier primeiro.
+ */
+export async function possesDoAssinante(account) {
+  const criada = instante(account.created_at);
+  const inicio = Number.isFinite(criada) ? criada : -Infinity;
+
+  const aposentadorias = await tdb('audit_log')
+    .where({ action: ACAO_APOSENTADORIA, subject_type: 'customer_account' })
+    .orderBy('id');
+  const minhaAposentadoria = aposentadorias
+    .filter((l) => l.subject_id === String(account.customer_id))
+    .at(-1);
+
+  const aposentada = /^retired:/.test(String(account.device_id ?? ''));
+  const atual = aposentada
+    ? detalheDe(minhaAposentadoria ?? {}).deviceId ?? null
+    : (/^erased:/.test(String(account.device_id ?? '')) ? null : account.device_id);
+
+  const trocas = (await tdb('device_swaps').where({ account_id: account.id }))
+    .sort((a, b) => (instante(a.occurred_at) - instante(b.occurred_at)) || (a.id - b.id));
+
+  const sequencia = trocas.length
+    ? [
+      { deviceId: trocas[0].previous_device_id, desde: inicio },
+      ...trocas.map((t) => ({ deviceId: t.device_id, desde: instante(t.occurred_at) }))
+    ]
+    : (atual ? [{ deviceId: atual, desde: inicio }] : []);
+
+  let fim = Infinity;
+  if (!account.active) {
+    const quando = minhaAposentadoria
+      ? instante(minhaAposentadoria.created_at)
+      : instante(account.updated_at);
+    if (Number.isFinite(quando)) fim = quando;
+  }
+
+  const posses = sequencia
+    .filter((p) => p.deviceId)
+    .map((p, i) => ({
+      deviceId: p.deviceId,
+      desde: Number.isFinite(p.desde) ? p.desde : inicio,
+      ate: i + 1 < sequencia.length ? sequencia[i + 1].desde : fim
+    }));
+  const deviceIds = [...new Set(posses.map((p) => p.deviceId))];
+  if (!deviceIds.length) return posses;
+
+  // Quando cada OUTRA conta passou a responder pelos mesmos aparelhos.
+  const inicios = [];
+  for (const outra of await tdb('customer_accounts')
+    .whereIn('device_id', deviceIds).whereNot({ id: account.id })) {
+    inicios.push({ deviceId: outra.device_id, quando: instante(outra.created_at) });
+  }
+  for (const troca of await tdb('device_swaps')
+    .whereIn('device_id', deviceIds)
+    .whereNotNull('account_id')
+    .whereNot({ account_id: account.id })) {
+    inicios.push({ deviceId: troca.device_id, quando: instante(troca.occurred_at) });
+  }
+  // E as contas de outros que já foram aposentadas: o aparelho delas só
+  // sobrevive no registro da aposentadoria.
+  const aposentadasDeOutros = aposentadorias
+    .filter((l) => l.subject_id !== String(account.customer_id))
+    .map((l) => ({ customerId: l.subject_id, deviceId: detalheDe(l).deviceId }))
+    .filter((l) => deviceIds.includes(l.deviceId));
+  if (aposentadasDeOutros.length) {
+    const contas = await tdb('customer_accounts')
+      .whereIn('customer_id', aposentadasDeOutros.map((l) => l.customerId));
+    const criadaEm = new Map(contas.map((c) => [String(c.customer_id), instante(c.created_at)]));
+    for (const l of aposentadasDeOutros) {
+      if (criadaEm.has(l.customerId)) inicios.push({ deviceId: l.deviceId, quando: criadaEm.get(l.customerId) });
+    }
+  }
+
+  for (const posse of posses) {
+    for (const { deviceId, quando } of inicios) {
+      if (deviceId === posse.deviceId && Number.isFinite(quando) && quando > posse.desde && quando < posse.ate) {
+        posse.ate = quando;
+      }
+    }
+  }
+  return posses;
+}
+
 class CustomerDataExportService {
   static FORMAT_VERSION = 1;
-
-  /** Toda ONT que já foi desta conta: a atual e as que ficaram em `device_swaps`. */
-  static async deviceIdsOf(account) {
-    const ids = new Set();
-    // `retired:<id>` não é device id nenhum — é o que `retire()` escreve por
-    // cima do original, e procurar por ele não acharia linha alguma.
-    if (account.device_id && !/^retired:/.test(account.device_id)) ids.add(account.device_id);
-    const trocas = await tdb('device_swaps').where({ account_id: account.id });
-    for (const troca of trocas) {
-      if (troca.device_id) ids.add(troca.device_id);
-      if (troca.previous_device_id) ids.add(troca.previous_device_id);
-    }
-    return [...ids];
-  }
 
   static async build(accountId) {
     const account = await CustomerAccount.getById(accountId);
     if (!account) return null;
 
-    const { deviceIds, contratos, telefones: todosTelefones, vinculos, contatos, clientes, conversas, conversaIds, nos, noIds }
-      = await alcanceDoAssinante(account);
+    const {
+      deviceIds, naPosse, emPosseAgora, contratos, telefones: todosTelefones, vinculos, contatos,
+      clientes, conversas, conversaIds, eventos, amostras, horas, trocas, nos, noIds
+    } = await alcanceDoAssinante(account);
 
     const dados = {};
     const contagem = {};
@@ -190,34 +355,27 @@ class CustomerDataExportService {
     guardar('sgp_links', vinculos);
     guardar('sgp_contacts', contatos);
     guardar('sgp_clients', clientes);
-    guardar('device_swaps', await tdb('device_swaps').where((q) => {
-      q.where({ account_id: account.id });
-      if (deviceIds.length) q.orWhereIn('device_id', deviceIds);
-    }).orderBy('id'));
+    guardar('device_swaps', trocas);
 
-    for (const [tabela, coluna] of [
-      ['device_profiles', 'device_id'],
-      ['device_samples', 'device_id'],
-      ['device_sample_hours', 'device_id'],
-      ['provisioning_runs', 'device_id']
-    ]) {
-      guardar(tabela, deviceIds.length
-        ? await tdb(tabela).whereIn(coluna, deviceIds).orderBy('id')
-        : []);
-    }
-
-    guardar('sgp_events', (deviceIds.length || contratos.length)
-      ? await tdb('sgp_events').where((q) => {
-        if (deviceIds.length) q.whereIn('device_id', deviceIds);
-        if (contratos.length) q.orWhereIn('contract', contratos);
-      }).orderBy('id')
+    // O perfil é a data de instalação do aparelho, não um dado do período.
+    guardar('device_profiles', deviceIds.length
+      ? await tdb('device_profiles').whereIn('device_id', deviceIds).orderBy('id')
       : []);
+    guardar('device_samples', amostras);
+    guardar('device_sample_hours', horas);
+    guardar('provisioning_runs', deviceIds.length
+      ? (await tdb('provisioning_runs').whereIn('device_id', deviceIds).orderBy('id'))
+        .filter((r) => naPosse(r.device_id, r.created_at))
+      : []);
+
+    guardar('sgp_events', eventos);
 
     // `wa_alert_state.subject` guarda um device id OU um nó do mapa, conforme a
     // regra — por isso a busca é pelo conjunto de devices e não por uma coluna
-    // chamada `device_id`, que não existe nessa tabela.
-    guardar('wa_alert_state', deviceIds.length
-      ? await tdb('wa_alert_state').whereIn('subject', deviceIds).orderBy('id')
+    // chamada `device_id`, que não existe nessa tabela. É o estado de agora,
+    // então só da ONT que ainda é desta conta.
+    guardar('wa_alert_state', emPosseAgora.length
+      ? await tdb('wa_alert_state').whereIn('subject', emPosseAgora).orderBy('id')
       : []);
 
     guardar('wa_conversations', conversas);
@@ -249,8 +407,13 @@ class CustomerDataExportService {
     // A trilha do provedor, só as linhas que falam DESTA conta. O ator fica:
     // quem revelou a senha do portal de alguém é exatamente o que o titular tem
     // direito de saber.
+    // A aposentadoria é gravada pelo Customer ID, e não pelo id da linha.
     guardar('audit_log', await tdb('audit_log')
-      .where({ subject_type: 'customer_account', subject_id: String(account.id) })
+      .where({ subject_type: 'customer_account' })
+      .where((q) => {
+        q.where({ subject_id: String(account.id) })
+          .orWhere({ action: AuditLog.ACTIONS.SUBSCRIBER_ACCOUNT_RETIRED, subject_id: String(account.customer_id) });
+      })
       .orderBy('id'));
 
     const provedor = await Tenant.findById(currentTenantId());
