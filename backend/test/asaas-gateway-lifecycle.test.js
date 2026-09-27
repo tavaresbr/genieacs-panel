@@ -141,7 +141,7 @@ describe('o provedor criado como cliente no gateway', () => {
       billing_tax_id: '12.345.678/0001-95',
       billing_email: 'financeiro@alfa.test',
       billing_phone: '(11) 98765-4321',
-      billing_postal_code: '01310-100',
+      billing_postal_code: '01310100',
       billing_address_line: 'Av. Paulista',
       billing_address_number: '1000',
       billing_address_extra: 'sala 12',
