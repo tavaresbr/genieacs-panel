@@ -5,8 +5,14 @@ import DeviceTagService from '../services/deviceTagService.js';
 import { SgpError } from '../services/sgpService.js';
 import { translateError } from '../i18n/index.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
+import { acsAgentOfflineBody, isAgentOffline } from '../services/genieacs/agent.js';
 
 function handleError(req, res, error, fallbackKey) {
+  // O agente do GenieACS desconectado (modo `agent`) sai no formato comum das
+  // rotas que falam com o ACS, e não como `provisioning_error`.
+  if (isAgentOffline(error)) {
+    return res.status(503).json(acsAgentOfflineBody(error, translateError(req.t, error)));
+  }
   const status = error?.status ?? (error instanceof SgpError ? error.status : null);
   if (status) {
     return res.status(status).json({

@@ -80,6 +80,7 @@ export default {
   'device.idRequired': 'The device ID is required',
   'device.notFound': 'Device not found',
   'device.scopeTagProtected': 'The provider tag cannot be changed here',
+  'device.acsAgentOffline': 'The GenieACS agent is offline',
   'device.listRetrieved': 'Devices retrieved successfully',
   'device.listFailed': 'Failed to get the devices',
   'device.exportTooLarge': 'The selection has more than {max} devices. Filter the list before downloading the spreadsheet',
@@ -704,6 +705,8 @@ export default {
   'invite.alreadyMember': 'You already work for this provider',
 
   'settings.validation.genieAcsAuthType': 'The GenieACS authentication type must be none, basic or bearer',
+  'settings.validation.genieAcsConnectionMode': 'The connection mode must be direct or agent',
+  'settings.genieAcsAgentModeRequired': 'Switch the connection to agent mode before generating a key',
   'settings.validation.genieAcsAuthUsername': 'Basic authentication needs a username',
 
   'audit.listed': 'Audit trail retrieved',

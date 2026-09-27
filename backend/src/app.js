@@ -21,6 +21,7 @@ import {
 import { authenticateToken, requirePermission } from './middleware/auth.js';
 import { log, requestLogger } from './utils/logger.js';
 import { httpMetrics } from './utils/metrics.js';
+import { acsAgentOfflineBody, isAgentOffline } from './services/genieacs/agent.js';
 
 import authRoutes from './routes/auth.js';
 import deviceRoutes from './routes/devices.js';
@@ -53,6 +54,7 @@ import { WA_WEBHOOK_PATH } from './config/waWebhookPath.js';
 import whatsappMediaRoutes from './routes/whatsappMedia.js';
 import { ATTACHMENT_PATH, attachmentRawBody } from './services/waAttachmentService.js';
 import provisioningRoutes from './routes/provisioning.js';
+import genieacsAgentFileRoutes from './routes/genieacsAgentFiles.js';
 import { WEBHOOK_PATH } from './services/sgpService.js';
 
 dotenv.config();
@@ -276,6 +278,15 @@ app.use('/api/auth/signup', authLimiter);
 // fix. The reasoning is in `tenantController.js`.
 app.use('/api/tenant', tenantRoutes);
 
+// O instalador e o programa do agente do GenieACS, públicos e sem segredo.
+// Abaixo do resolvedor por um motivo só: o instalador sai com a origem do
+// painel como padrão de PANEL_URL, e essa origem é a do provedor que o
+// resolvedor já conferiu no banco — nunca o `Host` cru. No ápice os dois
+// caminhos estão em `PLATFORM_HOST_PATHS`, porque é de lá que o console mostra o
+// comando de instalação. A conexão do agente em si (`/connect`) não passa por
+// aqui: é o upgrade de WebSocket, atendido no servidor HTTP.
+app.use('/api/genieacs-agent', genieacsAgentFileRoutes);
+
 app.use('/api/auth', authRoutes);
 app.use('/api/devices', deviceRoutes);
 app.use('/api/customers', customerRoutes);
@@ -384,6 +395,11 @@ export function errorHandler(err, req, res, next) {
       success: false,
       message: t('common.invalidJson')
     });
+  }
+  // O agente do GenieACS desconectado chega aqui quando uma rota deixa o
+  // erro subir: sai no mesmo formato que as rotas de equipamento dão a ele.
+  if (isAgentOffline(err)) {
+    return res.status(503).json(acsAgentOfflineBody(err, translateError(t, err)));
   }
   const status = err.status || 500;
   // Internal messages are revealed only when the deployment explicitly asks

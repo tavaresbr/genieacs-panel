@@ -60,7 +60,9 @@ responde 404 para todos.
 `deploy/proxy/nginx-saas.conf.example` é esse proxy pronto para nginx — os quatro
 blocos, o `default_server` que recusa host desconhecido, e as armadilhas anotadas onde
 elas mordem (o curinga não cobre o apex; `http2 on;` não existe antes do nginx 1.25.1;
-as linhas `listen [::]` exigem IPv6).
+as linhas `listen [::]` exigem IPv6). Cada bloco do painel tem também o `location =
+/api/genieacs-agent/connect` que deixa passar o WebSocket do agente do GenieACS — ver a
+seção 12 antes de reaproveitar um proxy antigo.
 
 #### O certificado: um curinga, ou um por provedor
 
@@ -843,3 +845,109 @@ for (const r of regras) {
 Em ONT TR-181 o caminho do login é `Device.PPP.Interface.*.Username`. A provision só
 **acrescenta** tag; um equipamento que troca de provedor tem a tag antiga removida à mão no
 GenieACS (o painel não deixa um provedor removê-la).
+
+## 12. O GenieACS do provedor: direto, túnel ou agente
+
+Cada provedor diz ao painel **como** chegar ao GenieACS dele, e o modo é escolhido por
+provedor — na SaaS, pelo console (aba **Provedores**, cartão do GenieACS); na instalação
+própria, pelas Configurações do provedor, onde só `direto` e `agente` aparecem (lá a rede
+privada já é permitida, e o túnel não acrescenta nada).
+
+| Modo | Quando usar | O que o provedor precisa ter |
+| --- | --- | --- |
+| **Direto** (`direct`) | O GenieACS tem endereço público alcançável pelo painel | NBI (porta 7557) exposta, de preferência com credencial e TLS |
+| **Túnel** (`tunnel`) | O GenieACS está numa rede privada que **nós** alcançamos por VPN/WireGuard | O túnel montado do nosso lado; o painel passa a aceitar faixa privada para aquele provedor |
+| **Agente** (`agent`) | O GenieACS está atrás de NAT, sem IP público, e ninguém quer abrir porta | Uma máquina Linux com systemd na rede dele, que alcance o GenieACS e saia para a internet |
+
+Na dúvida, **agente**: nada fica exposto na rede do provedor, a conexão é de saída (passa
+por NAT e firewall comuns), e a credencial é uma chave que se troca num clique. O túnel
+continua sendo a saída para quem já tem VPN com a gente; o direto, para quem já publica a
+NBI.
+
+### Instalar o agente
+
+1. Ponha o provedor no modo **agente** e clique em **Gerar chave**. A chave (`sgpa_…`)
+   aparece **uma vez só** — o painel guarda apenas o hash dela. Copie antes de fechar.
+2. Numa máquina da rede do provedor (Debian/Ubuntu ou RHEL e derivados; qualquer uma que
+   alcance o GenieACS serve, inclusive o próprio servidor dele), como quem pode usar
+   `sudo`:
+
+   ```bash
+   curl -fsSL https://alfa.painel.exemplo.com/api/genieacs-agent/install.sh | sudo bash
+   ```
+
+   O endereço é o do painel daquele provedor — a tela mostra o comando pronto. O
+   instalador já vem com esse endereço como padrão e pergunta o resto: a chave (digitada
+   **sem eco**, lida do terminal e não do pipe) e o endereço da NBI (padrão
+   `http://127.0.0.1:7557`, que ele testa e avisa se não responder). Sem terminal — por
+   automação —, a chave vem de um arquivo: `curl -fsSL …/install.sh | sudo
+   AGENT_TOKEN_FILE=/root/chave.txt bash` (e `PANEL_URL`/`GENIEACS_URL` do mesmo jeito, se
+   o padrão não servir). **Nunca** pela linha de comando: o instalador recusa `--token` e ignora
+   `AGENT_TOKEN` no ambiente, porque o que passa por argumento aparece no `ps` de qualquer
+   usuário da máquina.
+3. O instalador põe o Node 22 se faltar (o mesmo piso do painel, 22.22), baixa o agente **do próprio painel** (na mesma
+   versão dele), cria o usuário de sistema `skygenpanel-agent` e sobe o serviço. Em
+   segundos o cartão do GenieACS mostra **conectado**, com a versão do agente.
+
+O que fica na máquina:
+
+| Onde | O quê |
+| --- | --- |
+| `/opt/skygenpanel-agent/skygenpanel-agent.mjs` | O programa (root, 0644) |
+| `/etc/skygenpanel-agent.env` | `PANEL_URL`, `AGENT_TOKEN`, `GENIEACS_URL` (root, **0600** — quem lê é o systemd, antes de trocar de usuário) |
+| `/etc/systemd/system/skygenpanel-agent.service` | A unidade, com o endurecimento do systemd (sem privilégio, sistema de arquivos só leitura, só IPv4/IPv6) |
+
+### Operar
+
+- **Ver o log:** `journalctl -u skygenpanel-agent -f`. "Chave revogada" quer dizer que
+  alguém gerou outra no painel (o agente continua tentando a cada minuto, esperando o
+  arquivo de ambiente ser atualizado); erro ao chamar o GenieACS local quer dizer que a
+  NBI caiu ou o endereço mudou.
+- **Estado:** `systemctl status skygenpanel-agent`. O serviço reinicia sozinho (a cada 5 s)
+  e nunca desiste; o agente reconecta ao painel sozinho depois de queda de rede ou de
+  restart do painel.
+- **Trocar a chave:** gere outra no painel — a conexão atual cai na hora (código 4001) — e
+  rode o instalador de novo, respondendo **n** a "manter a chave atual?". Ou edite
+  `AGENT_TOKEN=` em `/etc/skygenpanel-agent.env` e `sudo systemctl restart
+  skygenpanel-agent`. Troque sempre que alguém que viu a chave sair da equipe.
+- **Atualizar o agente:** rode o instalador de novo. Ele baixa o programa da versão
+  atual do painel e mantém a chave e os endereços gravados.
+- **Mudar o endereço do GenieACS:** instalador de novo, ou `GENIEACS_URL=` no mesmo
+  arquivo e `systemctl restart`.
+- **Desinstalar:**
+
+  ```bash
+  curl -fsSL https://alfa.painel.exemplo.com/api/genieacs-agent/install.sh | sudo bash -s -- --uninstall
+  ```
+
+  Para, desabilita e remove a unidade, o programa, o arquivo de ambiente e o usuário. O
+  Node fica. A chave continua válida no painel até alguém gerar outra ou mudar o modo —
+  faça uma das duas.
+
+Agente desconectado não derruba o painel: as telas que dependem do GenieACS respondem
+**503 `acs_agent_offline`**, com a hora em que o agente foi visto pela última vez, e o
+resto (assinantes, WhatsApp, cobrança) segue normal.
+
+### O que o deploy precisa para o agente funcionar
+
+- **O proxy tem que deixar o WebSocket passar.** O agente conecta em
+  `/api/genieacs-agent/connect`, e o `location /` dos exemplos apaga o cabeçalho
+  `Connection` (é o keepalive com o painel) — sem um bloco próprio, o upgrade não chega e o
+  agente leva 426. `deploy/proxy/nginx-saas.conf.example` e
+  `deploy/proxy/nginx-tenant.conf.template` já trazem o bloco `location =
+  /api/genieacs-agent/connect` com `Upgrade`/`Connection "upgrade"` e tempos de uma hora;
+  **um proxy instalado antes desta versão precisa dele acrescentado à mão** em cada
+  `server` do painel (os provedores que têm bloco próprio, feitos por `novo-provedor.sh`,
+  inclusive). O Cloudflare Tunnel passa WebSocket sem configuração.
+- **Uma réplica do painel.** A conexão de cada agente vive dentro do processo que a
+  aceitou. Com duas réplicas atrás de um balanceador, o agente fica preso a uma e os
+  pedidos que caem na outra respondem `acs_agent_offline` — metade das telas falhando
+  ao acaso. Enquanto não houver roteamento por provedor (mandar todo pedido de um
+  provedor para a réplica que tem o agente dele), o deploy com agentes roda com **uma
+  réplica só**. O `docker-compose.saas.yml` já sobe uma.
+- Os dois arquivos que o instalador baixa (`/api/genieacs-agent/install.sh` e
+  `/api/genieacs-agent/agent.mjs`) são públicos e sem segredo, servidos do disco do
+  painel — na imagem Docker, o instalador vai para `/app/deploy/`. O padrão de
+  `PANEL_URL` que o instalador traz vem do domínio-base (ou de `PUBLIC_BASE_URL` numa
+  instalação de um provedor só), **nunca** do `Host` do pedido; sem nenhum dos dois, o
+  instalador pergunta.

@@ -9,6 +9,11 @@ import GenieAcsAuthService, { AUTH_TYPES } from '../services/genieacsAuthService
 import Tenant from '../models/Tenant.js';
 import { suggestGenieAcsUrl } from '../services/genieacsSuggestion.js';
 import { connectorFor } from '../services/genieacs/connector.js';
+import {
+  acsAgentOfflineBody, afterModeChange, agentStatus, isAgentOffline, issueAgentToken
+} from '../services/genieacs/agent.js';
+import { forgetSharedAcs } from '../services/genieacs/direct.js';
+import GenieAcsConnection from '../models/GenieAcsConnection.js';
 import { currentTenantId } from '../config/tenantContext.js';
 import {
   PLATFORM_MANAGED_SETTING_KEYS,
@@ -16,7 +21,6 @@ import {
   platformManagesCurrentTenant,
   platformManagesGenieAcsCurrentTenant
 } from '../config/platformManaged.js';
-import { forgetSharedAcs } from '../services/genieacs/direct.js';
 import SubscriptionService from '../services/subscriptionService.js';
 
 /**
@@ -40,6 +44,26 @@ function platformManagedResponse(req, res) {
   return res.status(403).json(
     createErrorResponse(req.t('settings.platformManaged'), null, 'platform_managed')
   );
+}
+
+/**
+ * Os modos que o PROVEDOR escolhe pela tela dele. `tunnel` não está aqui: na
+ * SaaS quem escolhe é a plataforma (e esta rota já recusa com
+ * `platform_managed`), e na instalação própria a rede privada já é permitida
+ * no `direct` — o túnel não acrescentaria nada além de um nome a mais.
+ */
+const PROVIDER_CONNECTION_MODES = Object.freeze(['direct', 'agent']);
+
+/** O que a tela de Configurações lê da conexão com o GenieACS. */
+async function genieAcsConnectionSnapshot() {
+  return {
+    mode: await GenieAcsConnection.mode(),
+    // Quem administra o GenieACS escolhe como o painel chega a ele: na SaaS, o
+    // console — ou o próprio provedor, quando o console marcou que o servidor
+    // é dele (`ownership = 'own'`).
+    modeEditable: !(await platformManagesGenieAcsCurrentTenant()),
+    agent: await agentStatus()
+  };
 }
 
 async function refusesPlatformKey(key) {
@@ -293,6 +317,89 @@ class SettingsController {
     } catch (error) {
       console.error('Update GenieACS auth error:', error);
       return res.status(500).json(createErrorResponse(req.t('common.internalError'), error.message));
+    }
+  }
+
+  /**
+   * `GET /api/settings/genieacs-connection` — `{ mode, modeEditable, agent }`.
+   *
+   * `settings.write`, como as outras duas desta conexão: é a permissão que
+   * grava o `genieAcsUrl`, e o que esta tela mostra (a dica da chave, desde
+   * quando o agente está fora) só serve a quem pode agir sobre ele.
+   */
+  static async getGenieAcsConnection(req, res) {
+    try {
+      return res.json(createResponse(req.t('settings.listRetrieved'), await genieAcsConnectionSnapshot()));
+    } catch (error) {
+      console.error('Get GenieACS connection error:', error?.message || error);
+      return res.status(500).json(createErrorResponse(req.t('common.internalError')));
+    }
+  }
+
+  /**
+   * `PUT /api/settings/genieacs-connection` — `{ mode: 'direct'|'agent' }`.
+   *
+   * Na SaaS o modo é de quem administra o GenieACS, como o endereço: 403
+   * `platform_managed` se é a plataforma; o provedor com servidor próprio
+   * escolhe. O túnel fica de fora aqui em qualquer caso: ele mexe na regra de
+   * rede do PAINEL, e isso é só do console.
+   * Sair de `agent` derruba a conexão do agente (fechamento `4003`).
+   */
+  static async updateGenieAcsConnection(req, res) {
+    try {
+      if (await platformManagesGenieAcsCurrentTenant()) return platformManagedResponse(req, res);
+      const mode = req.body?.mode;
+      if (!PROVIDER_CONNECTION_MODES.includes(mode)) {
+        return res.status(400).json(
+          createErrorResponse(req.t('settings.validation.genieAcsConnectionMode'), null, 'invalid_mode')
+        );
+      }
+      const antes = await GenieAcsConnection.mode();
+      if (antes !== mode) {
+        await GenieAcsConnection.setMode(mode);
+        afterModeChange(antes, mode);
+        forgetSharedAcs();
+        await AuditLog.fromRequest(req, {
+          action: AuditLog.ACTIONS.GENIEACS_CONNECTION_CHANGED,
+          subjectType: 'settings',
+          subjectId: 'genieacs-connection',
+          detail: { from: antes, to: mode }
+        });
+      }
+      return res.json(createResponse(req.t('settings.updated'), await genieAcsConnectionSnapshot()));
+    } catch (error) {
+      console.error('Update GenieACS connection error:', error?.message || error);
+      return res.status(500).json(createErrorResponse(req.t('common.internalError')));
+    }
+  }
+
+  /**
+   * `POST /api/settings/genieacs-connection/agent-token` — 201 `{ token, agent }`.
+   *
+   * Nas duas edições: quem instala o agente é o provedor, na rede dele, e é
+   * ele quem precisa da chave — inclusive para trocá-la se vazar. Só com o
+   * modo em `agent` (senão 409 `mode_not_agent`): uma chave gerada para um
+   * modo que não a usa é uma credencial esquecida esperando alguém ligar o
+   * modo. A chave aparece só nesta resposta; a trilha guarda a dica.
+   */
+  static async generateGenieAcsAgentToken(req, res) {
+    try {
+      if ((await GenieAcsConnection.mode()) !== 'agent') {
+        return res.status(409).json(
+          createErrorResponse(req.t('settings.genieAcsAgentModeRequired'), null, 'mode_not_agent')
+        );
+      }
+      const { token, agent } = await issueAgentToken();
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.GENIEACS_AGENT_TOKEN_GENERATED,
+        subjectType: 'settings',
+        subjectId: 'genieacs-connection',
+        detail: { tokenHint: agent.tokenHint }
+      });
+      return res.status(201).json(createResponse(req.t('settings.updated'), { token, agent }));
+    } catch (error) {
+      console.error('Generate GenieACS agent token error:', error?.message || error);
+      return res.status(500).json(createErrorResponse(req.t('common.internalError')));
     }
   }
 
@@ -568,6 +675,37 @@ class SettingsController {
 }
 
 /**
+ * O teste de conexão no modo agente: um `GET /devices?limit=1` pelo conector,
+ * com a credencial e o escopo de sempre. As respostas seguem as do teste
+ * direto (mesmas frases, mesmos status), mais o 503 de agente desconectado.
+ */
+async function probeViaAgent(t, conector) {
+  const reply = (status, body) => ({ status, body });
+  try {
+    const response = await conector.request('devices', { query: { limit: 1 }, timeoutMs: 10_000 });
+    if (!response.ok) {
+      return reply(502, createErrorResponse(
+        t('settings.connectionStatus', { status: response.status }),
+        t('settings.connectionTestFailed')
+      ));
+    }
+    const data = await response.json().catch(() => null);
+    return Array.isArray(data)
+      ? reply(200, createResponse(t('settings.connectionSuccess'), { deviceCount: data.length }))
+      : reply(200, createResponse(t('settings.connectionUnexpectedFormat')));
+  } catch (error) {
+    if (isAgentOffline(error)) return reply(503, acsAgentOfflineBody(error, t('device.acsAgentOffline')));
+    if (error?.agentCode === 'timeout' || error?.name === 'TimeoutError') {
+      return reply(504, createErrorResponse(t('settings.connectionTimeout')));
+    }
+    if (error?.agentCode === 'upstream_unreachable') {
+      return reply(502, createErrorResponse(t('settings.connectionRefused')));
+    }
+    return reply(502, createErrorResponse(t('settings.connectionTestFailed')));
+  }
+}
+
+/**
  * Pergunta ao GenieACS em `url` se ele responde, com o mesmo guarda de saída
  * de toda outra chamada. Devolve `{ status, body }` em vez de escrever na
  * resposta, porque o console chama isto em nome de um provedor — dentro do
@@ -575,6 +713,12 @@ class SettingsController {
  */
 export async function probeGenieAcs(t, url) {
   const reply = (status, body) => ({ status, body });
+
+  // No modo agente não há endereço a testar daqui: quem chega ao GenieACS é o
+  // agente, na rede do provedor. O botão testa esse caminho inteiro — o mesmo
+  // que a lista de equipamentos usa —, e a URL do corpo não entra em nada.
+  const conector = await connectorFor();
+  if (conector.mode === 'agent') return probeViaAgent(t, conector);
 
   if (!url) {
     return reply(400,

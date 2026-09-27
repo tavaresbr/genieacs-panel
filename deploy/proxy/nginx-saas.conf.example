@@ -137,6 +137,37 @@ server {
     # (`express.json`), e a mídia do WhatsApp ele busca, não recebe.
     client_max_body_size 2m;
 
+    # --- O agente do GenieACS (WebSocket) ---------------------------------
+    #
+    # A conexão que o agente instalado na rede do provedor abre PARA o painel:
+    # um WebSocket que fica aberto por horas. Precisa de bloco próprio, e ANTES
+    # do `location /` só para ser lido primeiro — o `=` já ganha de qualquer
+    # prefixo. O motivo é a linha `proxy_set_header Connection ""` do bloco
+    # abaixo: ela existe para o keepalive com o painel, e apaga o
+    # `Connection: upgrade` do pedido. O nginx também não repassa `Upgrade`
+    # sozinho (é cabeçalho de salto). Sem este bloco o painel recebe um GET
+    # comum, o agente nunca conecta, e o log dele diz só "conexão recusada".
+    #
+    # Os tempos: o painel manda ping a cada 30 s, então o `read_timeout` nunca
+    # chega a contar numa conexão viva; 3600 s é para que ele não seja o motivo
+    # de uma queda. `proxy_buffering off` porque cada quadro é uma resposta que
+    # alguém está esperando na tela.
+    location = /api/genieacs-agent/connect {
+        proxy_pass http://127.0.0.1:5890;
+
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade    $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+        proxy_buffering off;
+    }
+
     location / {
         proxy_pass http://127.0.0.1:5890;
 
@@ -167,6 +198,24 @@ server {
     ssl_prefer_server_ciphers off;
 
     client_max_body_size 2m;
+
+    # O agente do GenieACS: o mesmo bloco do ápice, e pelo mesmo motivo — o
+    # `Connection ""` do `location /` abaixo apagaria o upgrade do WebSocket.
+    location = /api/genieacs-agent/connect {
+        proxy_pass http://127.0.0.1:5890;
+
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade    $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+        proxy_buffering off;
+    }
 
     location / {
         proxy_pass http://127.0.0.1:5890;

@@ -7,14 +7,17 @@ import { promisify } from 'node:util';
 
 const run = promisify(execFile);
 const backendDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const roots = ['src', 'scripts', 'test'];
+// `agent/` é o programa que o provedor instala na rede dele (`.mjs`, porque roda
+// solto, fora deste package.json): um erro de sintaxe ali só apareceria na
+// máquina do provedor, depois de instalado.
+const roots = ['src', 'scripts', 'test', 'agent'];
 
 function collect(dir, found = []) {
   if (!fs.existsSync(dir)) return found;
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const target = path.join(dir, entry.name);
     if (entry.isDirectory()) collect(target, found);
-    else if (entry.name.endsWith('.js')) found.push(target);
+    else if (entry.name.endsWith('.js') || entry.name.endsWith('.mjs')) found.push(target);
   }
   return found;
 }

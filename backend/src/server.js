@@ -20,6 +20,7 @@ import { installTenantTaggedConsole } from './utils/logger.js';
 import { applyRowLevelSecurity, assertRoleEnforcesRls, rlsEnabled } from './config/rls.js';
 import { SCOPED_TABLES } from './config/tenantScope.js';
 import { buildKnexConfig } from './config/dbConfig.js';
+import { agentHub, attachAgentHub } from './services/genieacs/agentHub.js';
 
 // Every `console.*` line written inside a request or a per-provider job
 // carries `[tenant=N]` from here on. Done at boot and not at import, so the
@@ -178,6 +179,11 @@ export const startServer = async () => {
       WaMessageSweeper.start();
       console.log(`Panel: http://localhost:${PORT}`);
     });
+    // O agente do GenieACS (modo `agent`) conecta por WebSocket no servidor do
+    // PAINEL, e só nele: o portal é a porta do assinante, e nada de lá deve
+    // aceitar upgrade nenhum. Ver `services/genieacs/agentHub.js` — inclusive a
+    // limitação de a conexão viver neste processo.
+    attachAgentHub(server);
     portalServer = portalApp.listen(PORTAL_PORT, PORTAL_HOST, () => {
       const address = portalServer.address();
       const activePort = typeof address === 'object' && address ? address.port : PORTAL_PORT;
@@ -202,6 +208,9 @@ async function shutdown(signal) {
   WaBroadcastService.stop();
   WaMediaSweeper.stop();
   WaMessageSweeper.stop();
+  // Antes de fechar o servidor: um WebSocket aberto é uma conexão que o
+  // `server.close` esperaria para sempre.
+  agentHub.close();
   if (server) {
     await new Promise((resolve) => server.close(resolve));
   }

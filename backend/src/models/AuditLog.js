@@ -27,6 +27,7 @@ class AuditLog {
     GENIEACS_URL_CHANGED: 'genieacs.url_changed',
     GENIEACS_AUTH_CHANGED: 'genieacs.auth_changed',
     GENIEACS_CONNECTION_CHANGED: 'genieacs.connection_changed',
+    GENIEACS_AGENT_TOKEN_GENERATED: 'genieacs.agent_token_generated',
     GENIEACS_OWNERSHIP_CHANGED: 'genieacs.ownership_changed',
     OPERATOR_ROLE_CHANGED: 'operator.role_changed',
     OPERATOR_REMOVED: 'operator.removed',

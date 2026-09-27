@@ -239,6 +239,12 @@ export default function DevicesPage() {
           })
           // The API clamps a page past the end; follow it so the controls agree.
           if (payload.page !== page) setPage(payload.page)
+        } else if (res.code === 'acs_agent_offline' && res.message) {
+          // O GenieACS deste provedor é alcançado pelo agente, e ele caiu: a
+          // frase genérica mandaria conferir o endereço, que não é o problema
+          // — o problema é a máquina onde o agente roda. `api.ts` já montou a
+          // frase com o "há quanto tempo".
+          setLoadError(res.message)
         } else {
           setLoadError(t('devices.error.inventory'))
         }

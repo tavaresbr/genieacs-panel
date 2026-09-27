@@ -215,6 +215,21 @@ export const authTicketRedeemLimiter = limiter({
   message: limitMessage('rateLimit.requests', 'rate_limited')
 });
 
+/**
+ * Os dois arquivos públicos do agente do GenieACS (instalador e programa).
+ *
+ * Não há o que proteger neles — nenhum carrega segredo —, então o balde não é
+ * contra enumeração: é contra alguém pôr um `curl` em laço e fazer o painel ler
+ * o disco a cada volta. Quem instala pede cada arquivo uma vez, e reinstalar
+ * dez máquinas seguidas atrás do mesmo NAT cabe com folga em trinta por minuto.
+ */
+export const agentFileLimiter = limiter({
+  windowMs: 60 * 1000,
+  max: 30,
+  keyGenerator: tenantIpKey,
+  message: limitMessage('rateLimit.requests', 'rate_limited')
+});
+
 /** Coarse per-address guard for the whole portal surface. */
 export const portalIpLimiter = limiter({
   windowMs: 60 * 1000,

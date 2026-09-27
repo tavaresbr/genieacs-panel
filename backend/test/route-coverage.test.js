@@ -62,7 +62,14 @@ const PUBLICAS = new Map([
   ['POST /api/customer/login', 'a porta de entrada do assinante, no listener do portal'],
   ['POST /api/auth/password-reset', 'quem perdeu a senha não tem sessão; responde a MESMA coisa exista a conta ou não, e a prova está em password-reset.test.js'],
   ['POST /api/auth/password-reset/confirm', 'o bilhete do e-mail É a credencial: uso único, meia hora, conferido por hash, contra o provedor do host e contra o endereço atual da conta'],
-  ['POST /api/auth/email/verify/confirm', 'idem, e é aberto do celular, onde não há sessão — pedir login para confirmar um link de e-mail é ensinar a equipe a cair em phishing']
+  ['POST /api/auth/email/verify/confirm', 'idem, e é aberto do celular, onde não há sessão — pedir login para confirmar um link de e-mail é ensinar a equipe a cair em phishing'],
+  // Os dois arquivos do agente do GenieACS. Quem os baixa é o `curl` na máquina
+  // do provedor, que não tem sessão nem deve ter: a credencial do agente é a
+  // chave, digitada lá, e nenhum dos dois arquivos a carrega. A prova do que
+  // sai (origem conferida, nenhum segredo, 404 limpo) está em
+  // genieacs-agent-files.test.js.
+  ['GET /api/genieacs-agent/install.sh', 'o instalador do agente: arquivo do disco sem segredo, com a origem do painel vinda do resolvedor, nunca do Host cru'],
+  ['GET /api/genieacs-agent/agent.mjs', 'o programa do agente, na versão deste painel: arquivo do disco sem segredo, inútil sem a chave']
 ]);
 
 /**
@@ -149,6 +156,7 @@ const POR_ID = new Map([
   ['PUT /api/platform/tenants/:id/genieacs', 'plano de controle; prova em platform-managed-settings.test.js — inclusive a de que gravar no alfa não toca o beta'],
   ['POST /api/platform/tenants/:id/genieacs/test', 'plano de controle; prova em platform-managed-settings.test.js'],
   ['POST /api/platform/tenants/:id/genieacs/tag-devices', 'plano de controle; prova em shared-acs-scope.test.js — marca só o que não tem dono, nunca o de outro provedor'],
+  ['POST /api/platform/tenants/:id/genieacs/agent-token', 'plano de controle; prova em genieacs-agent-saas.test.js — a chave vai só para o provedor pedido, e id que não existe é 404'],
   ['GET /api/platform/tenants/:id/export', 'plano de controle; prova em platform-tenant-export.test.js — inclusive a de que o arquivo de um não traz linha do outro'],
   ['POST /api/platform/tenants/:id/gateway/asaas-customer', 'plano de controle; prova em platform-integrations.test.js — inclusive o 404 da caixa da plataforma e de quem não existe']
 ]);
@@ -319,7 +327,12 @@ describe('toda rota endereçada por um parâmetro', () => {
   // cima, pelo mesmo pedágio — uma linha em `DO_CONSOLE` e mais uma aqui. A
   // prova (404 para a caixa e para quem não existe, 409 para quem já está
   // ligado) está em platform-integrations.test.js. São 52.
-  const TETO_DE_EXCECOES = 52;
+  //
+  // E `POST /tenants/:id/genieacs/agent-token`: o console gerando a chave do
+  // agente do GenieACS de um provedor (modo `agent`). Mesmo pedágio — uma
+  // linha em `DO_CONSOLE` e mais uma aqui; a prova de que a chave vai só para
+  // o provedor pedido está em genieacs-agent-saas.test.js. São 53.
+  const TETO_DE_EXCECOES = 53;
 
 
   /**
@@ -357,6 +370,7 @@ describe('toda rota endereçada por um parâmetro', () => {
     'PUT /api/platform/tenants/:id/genieacs',
     'POST /api/platform/tenants/:id/genieacs/test',
     'POST /api/platform/tenants/:id/genieacs/tag-devices',
+    'POST /api/platform/tenants/:id/genieacs/agent-token',
     'POST /api/platform/tenants/:id/gateway/asaas-customer'
   ]);
 
@@ -481,9 +495,16 @@ describe('a allowlist do endereço da plataforma', () => {
     return [...bloco[0].matchAll(/'([^']+)'/g)].map((m) => m[1]);
   };
 
-  it('serve por caminho exato só o perfil público e o cadastro', () => {
+  // Os dois arquivos do agente entraram de propósito: o console gera a chave
+  // de um provedor no ápice e mostra o comando de instalação com a origem de
+  // lá. Não leem dado de provedor nenhum — são dois arquivos do disco —, e a
+  // origem que o instalador leva no ápice é o domínio-base configurado, nunca o
+  // Host (prova em genieacs-agent-files-subdomain.test.js).
+  it('serve por caminho exato só o perfil público, o cadastro e os arquivos do agente', () => {
     assert.deepEqual(listaDe('PLATFORM_HOST_PATHS').sort(), [
       '/api/auth/signup',
+      '/api/genieacs-agent/agent.mjs',
+      '/api/genieacs-agent/install.sh',
       '/api/tenant/public'
     ]);
   });

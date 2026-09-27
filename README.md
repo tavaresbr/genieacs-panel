@@ -153,6 +153,61 @@ When `cloudflared` runs on the TR69 Controle host, publish two HTTP services:
 
 TLS terminates at Cloudflare, so the local origin URLs intentionally use HTTP. Keep Universal SSL active for the zone and wait for its edge certificate to reach `Active` before forcing HTTPS redirects.
 
+## GenieACS behind NAT: the agent
+
+The panel reaches each provider's GenieACS NBI in one of three modes, chosen per provider
+(in the platform console on the hosted edition, under the provider's Settings on a
+self-hosted install):
+
+| Mode | Use it when |
+| --- | --- |
+| **Direct** | The NBI (port 7557) is reachable from the panel |
+| **Tunnel** | The NBI sits on a private network the panel reaches through a VPN/WireGuard link (hosted edition) |
+| **Agent** | The NBI has no public address and nobody wants to open a port |
+
+In agent mode a small program runs on a machine inside the provider's network, opens an
+**outbound** WebSocket to the panel, and relays the panel's NBI requests to the local
+GenieACS. Nothing on the provider's side is exposed.
+
+1. Switch the provider to **agent** mode and generate a key. The `sgpa_…` key is shown
+   **once**; the panel keeps only its hash.
+2. On a Debian/Ubuntu or RHEL-family machine with systemd that can reach the GenieACS:
+
+   ```bash
+   curl -fsSL https://panel.example.com/api/genieacs-agent/install.sh | sudo bash
+   ```
+
+   The installer comes from the panel itself, so the agent always matches the panel's
+   version. It installs Node.js 22 if needed, asks for the key without echoing it (read
+   from the terminal, not from the pipe), asks for the NBI address (default
+   `http://127.0.0.1:7557`) and tests it, then starts the hardened
+   `skygenpanel-agent` service. For unattended runs, pass the key through a file:
+   `… | sudo AGENT_TOKEN_FILE=/root/agent-key bash`. The key is never accepted as an
+   argument or through `AGENT_TOKEN`: command lines are visible to every local user.
+
+| Task | How |
+| --- | --- |
+| Follow the log | `journalctl -u skygenpanel-agent -f` |
+| Rotate the key | Generate a new one in the panel (the current connection drops), then re-run the installer and answer **n** to "keep the current key?", or edit `AGENT_TOKEN=` in `/etc/skygenpanel-agent.env` (root, `0600`) and `systemctl restart skygenpanel-agent` |
+| Update the agent | Re-run the installer; the stored key and addresses are kept |
+| Uninstall | `curl -fsSL https://panel.example.com/api/genieacs-agent/install.sh \| sudo bash -s -- --uninstall` |
+
+Two things the deployment must provide:
+
+- **The reverse proxy must pass the WebSocket upgrade** on
+  `/api/genieacs-agent/connect`. A typical `location /` block sets `Connection ""` for
+  upstream keep-alive, which strips the upgrade and leaves the agent with a 426. The nginx
+  examples in `deploy/proxy/` carry a dedicated `location = /api/genieacs-agent/connect`
+  block (`Upgrade`, `Connection "upgrade"`, one-hour timeouts); copy it into any proxy
+  configured before this release. Cloudflare Tunnel passes WebSockets as is.
+- **A single panel replica.** An agent's connection lives in the process that accepted
+  it; behind a load balancer with two replicas, half of the requests would land where the
+  agent is not and fail with `acs_agent_offline`.
+
+The installer's default `PANEL_URL` comes from `TENANT_BASE_DOMAIN` (the provider's own
+subdomain) or `PUBLIC_BASE_URL`, never from the request's `Host` header; with neither set,
+it asks. Operations detail: [`docs/saas-operations.md` §12](docs/saas-operations.md).
+
 ## Configuration
 
 Environment configuration lives in `backend/.env`; see [`backend/.env.example`](backend/.env.example).

@@ -92,6 +92,58 @@ describe('toda chamada à NBI passa pelo mesmo lugar', () => {
   });
 
   /**
+   * A mesma garantia, agora que o transporte é trocável.
+   *
+   * O modo `agent` não sai pelo egresso: o pedido desce pelo WebSocket que o
+   * agente do provedor abriu (`agent.js`). A varredura acima olharia só para
+   * `GenieAcsEgress.fetch(` e deixaria o agente passar sem credencial em
+   * silêncio — que é exatamente a falha que ela existe para pegar, só que num
+   * transporte novo.
+   *
+   * Então a regra desceu para o ponto onde ela vale em qualquer modo: todo
+   * `send` (o transporte de um conector) monta a credencial ele mesmo, por
+   * `nbiHeaders`, junto da própria saída. No `agent.js`, a saída é o
+   * `agentHub.request(` — e ele não pode alcançar o egresso, senão seria um
+   * segundo caminho HTTP para fora com as guardas de outro modo.
+   */
+  it('e todo transporte de conector monta a credencial na própria saída', () => {
+    const DIR = path.join(SRC, 'services', 'genieacs');
+    const blocoDoSend = (fonte) => {
+      const inicio = fonte.search(/static async send\(/);
+      if (inicio < 0) return null;
+      // Até o próximo método estático (ou o fim da classe): o corpo do `send`.
+      const resto = fonte.slice(inicio + 1);
+      const fim = resto.search(/\n {2}static |\n}\n/);
+      return fim < 0 ? resto : resto.slice(0, fim);
+    };
+
+    const direto = fs.readFileSync(path.join(DIR, 'direct.js'), 'utf8');
+    const sendDireto = blocoDoSend(direto);
+    assert.ok(sendDireto, 'direct.js perdeu o `send`');
+    assert.match(sendDireto, /GenieAcsEgress\.fetch\(/, 'o `send` do direto não sai pelo egresso');
+    assert.match(sendDireto, /GenieAcsAuthService\.nbiHeaders\(/, 'o `send` do direto não monta a credencial');
+
+    const agente = fs.readFileSync(path.join(DIR, 'agent.js'), 'utf8');
+    assert.doesNotMatch(agente, /GenieAcsEgress\.fetch\(/, 'agent.js alcança o egresso');
+    // O agente troca SÓ o transporte: um `request` próprio pularia escopo,
+    // raiz, vaga e prazo, que moram no `request` herdado.
+    assert.doesNotMatch(agente, /static async request\(/, 'agent.js reescreve o `request`');
+    const sendAgente = blocoDoSend(agente);
+    assert.ok(sendAgente, 'agent.js não define o `send`');
+    assert.match(sendAgente, /agentHub\.request\(/, 'o `send` do agente não desce pelo hub');
+    assert.match(sendAgente, /GenieAcsAuthService\.nbiHeaders\(/, 'o `send` do agente não monta a credencial');
+
+    // E nenhum outro conector com transporte próprio sem credencial.
+    const semCredencial = fs.readdirSync(DIR)
+      .filter((nome) => nome.endsWith('.js'))
+      .filter((nome) => {
+        const bloco = blocoDoSend(fs.readFileSync(path.join(DIR, nome), 'utf8'));
+        return bloco !== null && !/GenieAcsAuthService\.nbiHeaders\(/.test(bloco);
+      });
+    assert.deepEqual(semCredencial, []);
+  });
+
+  /**
    * O que substituiu a varredura das sete: **nenhum outro arquivo fala com o
    * ACS**.
    *

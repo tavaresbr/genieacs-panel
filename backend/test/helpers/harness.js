@@ -47,6 +47,7 @@ const { ensureSchema } = await import('../../src/config/schema.js');
 const { seedDefaults } = await import('../../src/config/seed.js');
 const { getDb, closePool, insertReturningId } = await import('../../src/config/database.js');
 const { runInTenant } = await import('../../src/config/tenantContext.js');
+const { agentHub, attachAgentHub } = await import('../../src/services/genieacs/agentHub.js');
 
 // Re-exported so fixtures reach for the same dialect-aware helper the models
 // use: `const [id] = await knex(...).insert(...)` only yields an id on SQLite
@@ -89,6 +90,9 @@ export async function startTestServers({ beforeSchema } = {}) {
   await ensureSchema();
   await seedDefaults();
   const [panel, portal] = await Promise.all([listen(app), listen(portalApp)]);
+  // O agente do GenieACS no servidor do painel, como em `server.js`: os testes
+  // do modo agente exercitam o upgrade de verdade, e não um atalho.
+  attachAgentHub(panel);
   listeners.push(panel, portal);
   return {
     panelUrl: `http://127.0.0.1:${panel.address().port}`,
@@ -136,6 +140,9 @@ async function dropNamespace() {
 }
 
 export async function stopTestServers() {
+  // Antes dos servidores: um WebSocket de agente aberto seria uma conexão que
+  // o `server.close` esperaria para sempre.
+  agentHub.close();
   await Promise.all(listeners.splice(0).map(
     (server) => new Promise((resolve) => server.close(resolve))
   ));

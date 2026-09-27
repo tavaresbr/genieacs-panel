@@ -27,9 +27,9 @@ import assert from 'node:assert/strict';
  *
  * ## O que este arquivo NÃO afirma
  *
- * São **54 rotas**, não as 91. A amostra foi escolhida para que cada uma das
+ * São **57 rotas**, não as 91. A amostra foi escolhida para que cada uma das
  * 34 capacidades apareça pelo menos uma vez, e a garantia de não-regressão que
- * o teste do `admin` dá vale **sobre estas 54** — não sobre o painel inteiro.
+ * o teste do `admin` dá vale **sobre estas 57** — não sobre o painel inteiro.
  * Quem quiser a afirmação forte ("nenhuma das 91 rotas mudou de dono") precisa
  * de outra prova; a varredura estática de `permissions.test.js` é o que existe
  * hoje mais perto disso, e ela olha o nome da capacidade, não o alcance.
@@ -502,6 +502,36 @@ const CASOS = [
     body: { value: 'TR69 Controle' },
     aceito: [200]
   },
+  // A conexão com o GenieACS (direto ou pelo agente) e a chave do agente: ler
+  // em `settings.read`, como `/genieacs-auth`; mudar e gerar chave em
+  // `settings.write`, a permissão que grava o `genieAcsUrl`.
+  {
+    cap: 'settings.read',
+    label: 'GET /api/settings/genieacs-connection',
+    method: 'GET',
+    path: () => '/api/settings/genieacs-connection',
+    aceito: [200]
+  },
+  {
+    // Repetível: o modo já é `direct`, e gravar o mesmo não muda nada.
+    cap: 'settings.write',
+    label: 'PUT /api/settings/genieacs-connection',
+    method: 'PUT',
+    path: () => '/api/settings/genieacs-connection',
+    body: { mode: 'direct' },
+    aceito: [200]
+  },
+  {
+    // Com o modo em `direct` a geração é recusada com 409 — DEPOIS da guarda:
+    // o `code` prova que a requisição chegou ao controlador, e é repetível,
+    // ao contrário de um 201 que trocaria a chave a cada papel.
+    cap: 'settings.write',
+    label: 'POST /api/settings/genieacs-connection/agent-token',
+    method: 'POST',
+    path: () => '/api/settings/genieacs-connection/agent-token',
+    aceito: [409],
+    codigoAceito: 'mode_not_agent'
+  },
   {
     cap: 'settings.read',
     label: 'GET /api/tenant/security',
@@ -779,10 +809,11 @@ describe('a matriz e a expectativa deste arquivo', () => {
   });
 
   it('não encolhe sem que alguém diga', () => {
-    // O cabeçalho promete uma amostra de 54 rotas e a promessa de não-regressão
+    // O cabeçalho promete uma amostra de 57 rotas e a promessa de não-regressão
     // do `admin` vale sobre ELA. Uma rota apagada por um merge desajeitado
     // deixaria a promessa valendo sobre menos coisa, calada.
-    assert.equal(CASOS.length, 54);
+    // Eram 54; as três da conexão com o GenieACS (modo agente) entraram juntas.
+    assert.equal(CASOS.length, 57);
   });
 });
 
@@ -809,7 +840,7 @@ describe('quem não tem a capacidade toma 403', () => {
 
 /**
  * O par que dá sentido ao de cima, e a garantia de não-regressão do `admin`:
- * ele aparece aqui em TODAS as 54 rotas, porque a matriz lhe dá as 34
+ * ele aparece aqui em TODAS as 57 rotas, porque a matriz lhe dá as 34
  * capacidades. Nenhuma das rotas desta amostra saiu do alcance dele na onda 17.
  */
 describe('quem tem a capacidade passa pela guarda', () => {

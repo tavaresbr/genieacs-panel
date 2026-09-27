@@ -14,6 +14,7 @@ import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { translateError } from '../i18n/index.js';
 import { exportDevicesCsv } from '../services/deviceExport.js';
 import { BATCH_ACTIONS, BATCH_LIMIT, batchFilterLabel, batchSummary, normalizeBatchIds } from '../services/deviceBatch.js';
+import { acsAgentOfflineBody, isAgentOffline } from '../services/genieacs/agent.js';
 
 /**
  * A recusa do escopo do provedor (ACS compartilhado) como resposta própria.
@@ -22,8 +23,17 @@ import { BATCH_ACTIONS, BATCH_LIMIT, batchFilterLabel, batchSummary, normalizeBa
  * a tag de um provedor com 403. Sem isto, cada `catch` abaixo transformaria a
  * recusa num 500 genérico — que o operador lê como pane, e não como "esse
  * equipamento não existe aqui".
+ *
+ * E o agente desconectado (modo `agent`), pelo mesmo motivo: 503 com
+ * `code: 'acs_agent_offline'` e `lastSeenAt`, que a tela transforma em "o
+ * agente está fora do ar desde…" em vez de um 502 que parece defeito do ACS.
+ * Todo `catch` deste controlador passa por aqui, então nenhuma rota de
+ * equipamento precisa lembrar disso uma a uma.
  */
 function respostaDeEscopo(req, res, error) {
+  if (isAgentOffline(error)) {
+    return res.status(503).json(acsAgentOfflineBody(error, translateError(req.t, error)));
+  }
   const chave = error?.translationKey;
   if (chave !== 'device.notFound' && chave !== 'device.scopeTagProtected') return null;
   return res.status(error.status || (chave === 'device.notFound' ? 404 : 403)).json(

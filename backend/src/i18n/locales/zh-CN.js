@@ -80,6 +80,7 @@ export default {
   'device.idRequired': '需要提供设备 ID',
   'device.notFound': '找不到该设备',
   'device.scopeTagProtected': '服务商标签无法在此更改',
+  'device.acsAgentOffline': 'GenieACS 代理未连接',
   'device.listRetrieved': '已获取设备列表',
   'device.listFailed': '无法获取设备列表',
   'device.exportTooLarge': '所选设备超过 {max} 台。请先筛选列表再下载表格',
@@ -704,6 +705,8 @@ export default {
   'invite.alreadyMember': '您已经在为该服务商工作',
 
   'settings.validation.genieAcsAuthType': 'GenieACS 认证方式必须是 none、basic 或 bearer',
+  'settings.validation.genieAcsConnectionMode': '连接方式必须是 direct 或 agent',
+  'settings.genieAcsAgentModeRequired': '生成密钥前请先将连接切换为代理模式',
   'settings.validation.genieAcsAuthUsername': 'basic 认证需要用户名',
 
   'audit.listed': '已获取审计日志',

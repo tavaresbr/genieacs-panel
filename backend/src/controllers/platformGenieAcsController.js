@@ -11,6 +11,7 @@ import { VIRTUAL_PARAMETER_KEYS } from '../config/platformManaged.js';
 import { getDb } from '../config/database.js';
 import GenieAcsConnection, { CONNECTION_MODES, GENIEACS_OWNERSHIPS } from '../models/GenieAcsConnection.js';
 import { DEVICE_SCOPE_KEY, DEVICE_SCOPE_TAG_PATTERN, forgetSharedAcs } from '../services/genieacs/direct.js';
+import { afterModeChange, agentStatus, issueAgentToken } from '../services/genieacs/agent.js';
 import { TAG_PREFIX } from '../services/deviceTagService.js';
 import DeviceScopeTagger, {
   AUTO_PREFIXES_KEY, AUTO_PREFIXES_MAX, AUTO_PREFIX_MAX_LENGTH, parsePrefixes, prefixesOverlap
@@ -151,6 +152,7 @@ async function snapshot(tenant) {
     auth: await GenieAcsAuthService.getPublicConfig(),
     mode: await GenieAcsConnection.mode(),
     ownership: await GenieAcsConnection.ownership(),
+    agent: await agentStatus(),
     suggestion: suggestGenieAcsUrl(tenant)
   }));
   return { ...base, sharedAcs: await sharedAcs(tenant, base.url) };
@@ -172,8 +174,10 @@ class PlatformGenieAcsController {
   /**
    * `PUT /api/platform/tenants/:id/genieacs` — `{ url?, mode?, ownership?, authType?, username?, secret?, virtualParameters?, deviceTag?, autoTagPrefixes? }`.
    *
-   * `mode` é como o painel chega ao ACS: `direct` ou `tunnel` (rede privada
-   * de cliente liberada para este provedor). Só a plataforma escolhe.
+   * `mode` é como o painel chega ao ACS: `direct`, `tunnel` (rede privada
+   * de cliente liberada para este provedor) ou `agent` (o programa na rede do
+   * provedor, por WebSocket de saída). Na SaaS só a plataforma escolhe. Sair
+   * de `agent` derruba a conexão do agente (fechamento `4003`).
    *
    * `ownership` é quem administra o ACS: `platform` ou `own` (o servidor é do
    * provedor, e endereço, credencial e parâmetros TR-069 passam a ser dele).
@@ -264,7 +268,10 @@ class PlatformGenieAcsController {
 
       await runInTenant(tenant.id, async () => {
         if (mudouUrl) await Setting.upsert('genieAcsUrl', urlNova);
-        if (mudouModo) await GenieAcsConnection.setMode(corpo.mode);
+        if (mudouModo) {
+          await GenieAcsConnection.setMode(corpo.mode);
+          afterModeChange(antes.mode, corpo.mode);
+        }
         if (mudouDono) await GenieAcsConnection.setOwnership(corpo.ownership);
         if (mudouTag) await Setting.upsert(DEVICE_SCOPE_KEY, tagNova);
         if (mudouPrefixos) await Setting.upsert(AUTO_PREFIXES_KEY, prefixosNovos.join(','));
@@ -279,7 +286,9 @@ class PlatformGenieAcsController {
       });
       // Endereço ou tag mudaram: quem divide o ACS com quem muda junto, e o
       // escopo de cada painel tem que ser recalculado já, não em 30 s.
-      if (mudouUrl || mudouTag) forgetSharedAcs();
+      // O modo também: quem está em `agent` deixa de contar como vizinho no
+      // mesmo endereço (ver `sharesAcs`).
+      if (mudouUrl || mudouTag || mudouModo) forgetSharedAcs();
       const depois = await snapshot(tenant);
 
       if (!mudouUrl && !mudouModo && !mudouDono && !mudouTag && !mudouPrefixos && !mandouAuth && vpsMudados.length === 0) {
@@ -404,6 +413,41 @@ class PlatformGenieAcsController {
     } catch (error) {
       console.error('Platform GenieACS tag-devices error:', error);
       return res.status(502).json(createErrorResponse('Could not tag devices', error.message));
+    }
+  }
+
+  /**
+   * `POST /api/platform/tenants/:id/genieacs/agent-token` — gera a chave do
+   * agente do provedor. 201 `{ token, agent }`; a chave aparece só aqui.
+   *
+   * Em qualquer modo: a plataforma pode deixar a chave pronta antes de passar
+   * o provedor para `agent`, e o agente só entra quando o modo for `agent`
+   * (ver `agentHub.autenticar`). Gerar outra derruba a conexão atual (4001).
+   *
+   * As duas trilhas recebem a DICA da chave (os 4 últimos caracteres), nunca
+   * a chave.
+   */
+  static async agentToken(req, res) {
+    try {
+      const tenant = await loadTarget(req, res);
+      if (!tenant) return undefined;
+      const { token, agent } = await runInTenant(tenant.id, () => issueAgentToken());
+      await PlatformAudit.fromRequest(req, {
+        action: PlatformAudit.ACTIONS.TENANT_GENIEACS_CHANGED,
+        tenant,
+        detail: { agentToken: { tokenHint: agent.tokenHint } }
+      });
+      await runInTenant(tenant.id, () => AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.GENIEACS_AGENT_TOKEN_GENERATED,
+        actorKind: 'platform',
+        subjectType: 'settings',
+        subjectId: 'genieacs-connection',
+        detail: { tokenHint: agent.tokenHint }
+      }));
+      return res.status(201).json(createResponse('GenieACS agent key generated', { token, agent }));
+    } catch (error) {
+      console.error('Platform GenieACS agent-token error:', error?.message || error);
+      return res.status(500).json(createErrorResponse('Internal server error'));
     }
   }
 

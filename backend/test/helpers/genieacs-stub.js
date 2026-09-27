@@ -112,7 +112,16 @@ export function startGenieAcsStub({ devices = [buildDevice()], taskStatus = 200,
         res.writeHead(status, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(data ?? null));
       };
-      state.requests.push({ method: req.method, path: url.pathname, search: url.search });
+      // A credencial e o corpo também, para quem precisa provar que um pedido
+      // chegou IGUAL por dois caminhos (o direto e o agente).
+      state.requests.push({
+        method: req.method,
+        path: url.pathname,
+        search: url.search,
+        authorization: req.headers.authorization ?? null,
+        contentType: req.headers['content-type'] ?? null,
+        body: raw
+      });
 
       if (state.respond) return state.respond({ req, res, url, body: raw, send });
 

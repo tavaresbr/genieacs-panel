@@ -1694,11 +1694,38 @@ const LOCKOUT_TABLES = [
 ];
 
 /**
+ * O que o modo `agent` (0076) acrescentou à conexão do provedor.
+ *
+ * - `agent_token_hash`: o sha256 (hex) da chave do agente. A chave em si só
+ *   existe na resposta que a gerou e no arquivo de ambiente da máquina do
+ *   provedor; aqui fica o digest, que não volta a ser chave. ÚNICO porque é
+ *   por ele que a conexão do agente descobre DE QUEM é — a busca acontece
+ *   antes de existir provedor em escopo, e dois provedores com o mesmo digest
+ *   seriam uma conexão que serve os dois.
+ * - `agent_token_hint`: os 4 últimos caracteres, para a tela dizer QUAL chave
+ *   está valendo sem mostrá-la.
+ * - `agent_token_created_at`, `agent_last_seen_at`, `agent_version`: o que a
+ *   tela mostra do agente — desde quando a chave vale, quando ele foi visto
+ *   pela última vez e que versão diz ser.
+ *
+ * Tudo nulo: um provedor em `direct` não tem agente nenhum, e é o caso normal.
+ */
+const GENIEACS_AGENT_COLUMNS = [
+  ['agent_token_hash', (t) => t.string('agent_token_hash', 64).nullable()],
+  ['agent_token_hint', (t) => t.string('agent_token_hint', 8).nullable()],
+  ['agent_token_created_at', (t) => t.timestamp('agent_token_created_at').nullable()],
+  ['agent_last_seen_at', (t) => t.timestamp('agent_last_seen_at').nullable()],
+  ['agent_version', (t) => t.string('agent_version', 32).nullable()]
+];
+const GENIEACS_AGENT_TOKEN_INDEX = 'tgc_agent_token_hash_uq';
+
+/**
  * Como o painel chega ao GenieACS de cada provedor: `direct` (a URL, como
  * sempre foi), `tunnel` (a URL numa rede privada de cliente, liberada pela
- * plataforma) e, depois, `agent`. Sem linha, vale `direct` — é o que todo
- * provedor de antes desta tabela já fazia, e a migração não precisa escrever
- * nada para que continue assim.
+ * plataforma) e `agent` (um programa na rede do provedor que abriu WebSocket
+ * de saída para o painel — ver `GENIEACS_AGENT_COLUMNS`). Sem linha, vale
+ * `direct` — é o que todo provedor de antes desta tabela já fazia, e a
+ * migração não precisa escrever nada para que continue assim.
  */
 const tenantGenieAcsConnectionsTable = (db) => (t) => {
   t.increments('id').primary();
@@ -1708,9 +1735,11 @@ const tenantGenieAcsConnectionsTable = (db) => (t) => {
   // Quem administra o ACS na SaaS: `platform` (o console grava URL, credencial
   // e parâmetros TR-069) ou `own` (o servidor é do provedor, e ele mesmo grava).
   t.string('ownership', 16).notNullable().defaultTo('platform');
+  for (const [, add] of GENIEACS_AGENT_COLUMNS) add(t);
   t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
   t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
   t.unique(['tenant_id']);
+  t.unique(['agent_token_hash'], GENIEACS_AGENT_TOKEN_INDEX);
 };
 
 const GENIEACS_CONNECTION_TABLES = [
@@ -4341,6 +4370,31 @@ export const migrations = [
       if (!missing.length) return;
       await db.schema.alterTable('subscriptions', (t) => {
         for (const add of missing) add(t);
+      });
+    }
+  },
+  {
+    /**
+     * O modo `agent` do GenieACS — ver `GENIEACS_AGENT_COLUMNS`.
+     *
+     * Numa instalação nova a 0069 já cria a tabela com estas colunas (e o
+     * índice), e este passo não acha nada a fazer; numa que rodou a 0069 antes
+     * delas existirem, acrescenta. O índice único sai junto com as colunas, no
+     * mesmo `alterTable`, porque só falta quando elas faltam.
+     */
+    id: '0076_genieacs_agent',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenant_genieacs_connections'))) return true;
+      return (await missingColumns(db, 'tenant_genieacs_connections', GENIEACS_AGENT_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenant_genieacs_connections'))) return;
+      const faltando = await missingColumns(db, 'tenant_genieacs_connections', GENIEACS_AGENT_COLUMNS);
+      const semHash = !(await db.schema.hasColumn('tenant_genieacs_connections', 'agent_token_hash'));
+      if (!faltando.length) return;
+      await db.schema.alterTable('tenant_genieacs_connections', (t) => {
+        for (const add of faltando) add(t);
+        if (semHash) t.unique(['agent_token_hash'], GENIEACS_AGENT_TOKEN_INDEX);
       });
     }
   }

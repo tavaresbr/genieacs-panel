@@ -8,6 +8,10 @@ backend/coverage
 frontend/dist
 docs/screenshots
 deploy
+# O instalador do agente é conteúdo que o painel SERVE, não ferramenta de
+# deploy: o Dockerfile o copia para /app/deploy/, e sem esta exceção a rota
+# responderia 404 na imagem.
+!deploy/install-agent.sh
 scripts
 *.md
 !README.md
