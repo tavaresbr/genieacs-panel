@@ -524,33 +524,51 @@ export function ProvisioningTab() {
       {runs.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t('settings.provisioning.runsEmpty')}</p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-start text-xs uppercase text-muted-foreground">
-                <th className="py-2 pe-4">{t('settings.provisioning.runDevice')}</th>
-                <th className="py-2 pe-4">{t('settings.provisioning.runStatus')}</th>
-                <th className="py-2 pe-4">{t('settings.provisioning.runProfile')}</th>
-                <th className="py-2">{t('settings.provisioning.runUpdated')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {runs.map((run) => (
-                <tr key={run.id} className="border-t border-border">
-                  <td className="py-2 pe-4 font-mono text-xs">{run.deviceId}</td>
-                  <td className="py-2 pe-4">
-                    {run.status}
-                    {(run.errorMessage ?? run.error) && (
-                      <span className="block text-xs text-muted-foreground">{run.errorMessage ?? run.error}</span>
-                    )}
-                  </td>
-                  <td className="py-2 pe-4">{run.profileName ?? '—'}</td>
-                  <td className="py-2">{run.updatedAt ? formatDateTime(run.updatedAt) : '—'}</td>
+        <>
+          <ul className="mobile-card-list divide-y divide-border border-y border-border">
+            {runs.map((run) => (
+              <li key={run.id} className="space-y-1 py-2.5 text-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <span className="min-w-0 font-mono text-xs [overflow-wrap:anywhere]">{run.deviceId}</span>
+                  <span className="shrink-0 font-semibold">{run.status}</span>
+                </div>
+                {(run.errorMessage ?? run.error) && (
+                  <p className="text-xs text-muted-foreground [overflow-wrap:anywhere]">{run.errorMessage ?? run.error}</p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  {run.profileName ?? '—'} · {run.updatedAt ? formatDateTime(run.updatedAt) : '—'}
+                </p>
+              </li>
+            ))}
+          </ul>
+          <div className="desktop-table overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-start text-xs uppercase text-muted-foreground">
+                  <th className="py-2 pe-4">{t('settings.provisioning.runDevice')}</th>
+                  <th className="py-2 pe-4">{t('settings.provisioning.runStatus')}</th>
+                  <th className="py-2 pe-4">{t('settings.provisioning.runProfile')}</th>
+                  <th className="py-2">{t('settings.provisioning.runUpdated')}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {runs.map((run) => (
+                  <tr key={run.id} className="border-t border-border">
+                    <td className="py-2 pe-4 font-mono text-xs">{run.deviceId}</td>
+                    <td className="py-2 pe-4">
+                      {run.status}
+                      {(run.errorMessage ?? run.error) && (
+                        <span className="block text-xs text-muted-foreground">{run.errorMessage ?? run.error}</span>
+                      )}
+                    </td>
+                    <td className="py-2 pe-4">{run.profileName ?? '—'}</td>
+                    <td className="py-2">{run.updatedAt ? formatDateTime(run.updatedAt) : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   )

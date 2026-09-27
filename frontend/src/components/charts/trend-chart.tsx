@@ -1,3 +1,4 @@
+import { useId } from 'react'
 import { useChartWidth } from './use-chart-width'
 
 const BASE_WIDTH = 640
@@ -13,6 +14,8 @@ export function TrendChart({ data, valueLabel = 'Devices' }: { data: TrendPoint[
   // Até 640px o desenho usa a largura real (texto no tamanho certo no
   // celular); acima disso segue o `viewBox` de sempre, escalado.
   const [containerRef, measured] = useChartWidth<HTMLDivElement>(BASE_WIDTH)
+  // Um id por instância: dois gráficos na mesma página não dividem o degradê.
+  const gradientId = useId()
   const width = Math.min(measured, BASE_WIDTH)
   const height = 210
   const left = 24
@@ -38,7 +41,7 @@ export function TrendChart({ data, valueLabel = 'Devices' }: { data: TrendPoint[
     <div ref={containerRef} className="min-h-[250px] w-full">
       <svg viewBox={`0 0 ${width} ${height}`} className="h-[250px] w-full overflow-visible" role="img" aria-label={`${valueLabel} trend`}>
         <defs>
-          <linearGradient id="nativeDashboardTrend" x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity=".36" />
             <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity=".02" />
           </linearGradient>
@@ -47,7 +50,7 @@ export function TrendChart({ data, valueLabel = 'Devices' }: { data: TrendPoint[
           <line key={ratio} x1={left} x2={width - right} y1={top + chartHeight * ratio} y2={top + chartHeight * ratio}
             stroke="hsl(var(--border))" strokeWidth="1" />
         ))}
-        {area && <path d={area} fill="url(#nativeDashboardTrend)" />}
+        {area && <path d={area} fill={`url(#${gradientId})`} />}
         {line && <polyline points={line} fill="none" stroke="hsl(var(--primary))" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />}
         {points.map((point, index) => (
           <g key={point.name}>
