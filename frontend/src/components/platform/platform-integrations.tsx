@@ -7,6 +7,7 @@ import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
 import { copyToClipboard, formatRelativeTime } from '@/lib/utils'
+import { absoluteWebhookUrl } from '@/lib/webhook-url'
 
 /**
  * As integrações da PLATAFORMA — os serviços de terceiro com que o SaaS cobra
@@ -274,9 +275,9 @@ function AsaasCard() {
               type="text"
               readOnly
               className="modern-input w-full font-mono text-xs"
-              value={info.webhookUrl}
+              value={absoluteWebhookUrl(info.webhookUrl, window.location.origin)}
             />
-            <button type="button" className="modern-button-secondary shrink-0" onClick={() => void copiar(info.webhookUrl)}>
+            <button type="button" className="modern-button-secondary shrink-0" onClick={() => void copiar(absoluteWebhookUrl(info.webhookUrl, window.location.origin))}>
               <Icon name="copy" size={16} /> {t('common.copy')}
             </button>
           </div>
