@@ -1,5 +1,8 @@
 import DeviceService from './deviceService.js';
 import MappingNode from '../models/MappingNode.js';
+import MappingEdge from '../models/MappingEdge.js';
+import WaAlertService, { DEFAULT_RULES } from './waAlertService.js';
+import { detectOutages } from './outageDetector.js';
 import { currentTenantId } from '../config/tenantContext.js';
 
 /**
@@ -45,10 +48,20 @@ class MapStatusService {
     return devices;
   }
 
+  /** O limite da regra de queda em massa, para o mapa usar o mesmo do alerta. */
+  static async outageThreshold() {
+    try {
+      return (await WaAlertService.getSettings()).rules.mass_outage.threshold;
+    } catch {
+      return DEFAULT_RULES.mass_outage.threshold;
+    }
+  }
+
   static async status() {
-    const nodes = (await MappingNode.getAll()).filter((node) => normalize(node.pppoe));
+    const allNodes = await MappingNode.getAll();
+    const nodes = allNodes.filter((node) => normalize(node.pppoe));
     const summary = { online: 0, weak: 0, offline: 0, unknown: 0 };
-    if (!nodes.length) return { generatedAt: new Date().toISOString(), items: [], summary };
+    if (!nodes.length) return { generatedAt: new Date().toISOString(), items: [], summary, outages: [] };
 
     const byPppoe = new Map();
     for (const device of await this.fleet()) {
@@ -72,7 +85,23 @@ class MapStatusService {
         lastInform: device?.lastInform ?? null
       };
     });
-    return { generatedAt: new Date().toISOString(), items, summary };
+    // Provável rompimento: as caixas com vários clientes offline ao mesmo
+    // tempo, pela mesma regra do alerta de WhatsApp (`outageDetector`).
+    const offline = new Map(items
+      .filter((item) => item.state === 'offline')
+      .map((item) => [item.node_id, item.lastInform ? new Date(item.lastInform).getTime() : null]));
+    const outages = offline.size < 2
+      ? []
+      : detectOutages({ nodes: allNodes, edges: await MappingEdge.getAll(), offline, threshold: await this.outageThreshold() })
+        .map((outage) => ({
+          node_id: outage.box.node_id,
+          name: outage.box.name,
+          count: outage.count,
+          total: outage.total,
+          since: outage.since === null ? null : new Date(outage.since).toISOString(),
+          clients: outage.clients
+        }));
+    return { generatedAt: new Date().toISOString(), items, summary, outages };
   }
 }
 

@@ -633,7 +633,7 @@ export default {
   'whatsapp.alerts.rxPowerLowCleared': 'ONT {device} 的光信号已恢复正常',
   'whatsapp.alerts.temperatureHigh': 'ONT {device} 温度为 {value} °C（阈值 {threshold}）',
   'whatsapp.alerts.temperatureHighCleared': 'ONT {device} 的温度已恢复正常',
-  'whatsapp.alerts.massOutage': '大面积故障：{node} 下有 {count} 台 ONT 离线',
+  'whatsapp.alerts.massOutage': "{node} 可能断纤：{total} 个客户中 {count} 个已离线 {minutes} 分钟。位置：{link}",
   'whatsapp.alerts.massOutageCleared': '{node} 已恢复：ONT 重新开始应答',
   // WhatsApp — 机器人回复的正文
   'whatsapp.bot.invoiceDigitableLine': '条形码号：{value}',

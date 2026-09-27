@@ -634,7 +634,7 @@ export default {
   'whatsapp.alerts.rxPowerLowCleared': 'ONT {device} का ऑप्टिकल सिग्नल सामान्य पर लौट आया',
   'whatsapp.alerts.temperatureHigh': 'ONT {device} {value} °C पर है (सीमा {threshold})',
   'whatsapp.alerts.temperatureHighCleared': 'ONT {device} का तापमान सामान्य पर लौट आया',
-  'whatsapp.alerts.massOutage': 'सामूहिक व्यवधान: {node} पर {count} ONT ऑफ़लाइन',
+  'whatsapp.alerts.massOutage': "{node} पर संभावित फ़ाइबर कट: {total} में से {count} ग्राहक {minutes} मिनट से ऑफ़लाइन। स्थान: {link}",
   'whatsapp.alerts.massOutageCleared': '{node} वापस आ गया: ONT फिर से उत्तर दे रहे हैं',
   // WhatsApp — बॉट उत्तरों का मुख्य पाठ
   'whatsapp.bot.invoiceDigitableLine': 'टाइप करने योग्य पंक्ति: {value}',

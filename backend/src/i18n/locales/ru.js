@@ -634,7 +634,7 @@ export default {
   'whatsapp.alerts.rxPowerLowCleared': 'Оптический сигнал ONT {device} вернулся к норме',
   'whatsapp.alerts.temperatureHigh': 'ONT {device}: {value} °C (предел {threshold})',
   'whatsapp.alerts.temperatureHighCleared': 'Температура ONT {device} вернулась к норме',
-  'whatsapp.alerts.massOutage': 'Массовая авария: на узле {node} не в сети {count} ONT',
+  'whatsapp.alerts.massOutage': "Вероятный обрыв на {node}: не в сети {count} из {total} клиентов уже {minutes} мин. Место: {link}",
   'whatsapp.alerts.massOutageCleared': 'Узел {node} восстановлен: устройства ONT снова отвечают',
   // WhatsApp — тексты ответов бота
   'whatsapp.bot.invoiceDigitableLine': 'Банковский код: {value}',

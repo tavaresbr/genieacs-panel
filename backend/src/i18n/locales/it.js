@@ -631,7 +631,7 @@ export default {
   'whatsapp.alerts.rxPowerLowCleared': 'ONT {device} segnale ottico rientrato',
   'whatsapp.alerts.temperatureHigh': 'ONT {device} a {value} °C (limite {threshold})',
   'whatsapp.alerts.temperatureHighCleared': 'ONT {device} temperatura rientrata',
-  'whatsapp.alerts.massOutage': 'Guasto di massa: {count} ONT offline su {node}',
+  'whatsapp.alerts.massOutage': "Probabile rottura della fibra su {node}: {count} clienti su {total} offline da {minutes} min. Posizione: {link}",
   'whatsapp.alerts.massOutageCleared': '{node} ripristinato: le ONT rispondono di nuovo',
   // WhatsApp — corpo das respostas do bot
   'whatsapp.bot.invoiceDigitableLine': 'Codice a barre: {value}',
