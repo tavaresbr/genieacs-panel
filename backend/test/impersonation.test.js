@@ -437,6 +437,25 @@ describe('a sessão de personificação', () => {
       'sair de uma personificação não pode revogar as sessões de quem personifica');
   });
 
+  // O roteamento do Express não distingue caixa: `/API/Auth/logout` chega ao
+  // mesmo handler que `/api/auth/logout`. O muro comparava o caminho com
+  // `startsWith('/api/auth/')` ao pé da letra, então bastava trocar a caixa
+  // para a escrita na conta de quem personifica atravessar.
+  it('não mexe na conta de quem personifica nem trocando a caixa do caminho', async () => {
+    const token = await personificar();
+    const antes = await getDb()('users').where({ id: plataformaUserId }).first();
+    for (const caminho of ['/API/Auth/logout', '/Api/AUTH/change-username', '/api/Auth/mfa/setup']) {
+      const res = await noBeta(caminho, {
+        method: 'POST', headers: bearer(token), body: { username: 'sequestrado', password: 'x' }
+      });
+      assert.equal(res.status, 403, `${caminho}: ${JSON.stringify(res.body)}`);
+      assert.equal(res.body.code, 'impersonation_read_only', caminho);
+    }
+    const depois = await getDb()('users').where({ id: plataformaUserId }).first();
+    assert.equal(Number(depois.token_version), Number(antes.token_version));
+    assert.equal(depois.username, antes.username);
+  });
+
   it('não alcança o console de volta, em host nenhum', async () => {
     const token = await personificar();
     // Em host de provedor o console não está — nem no do beta, nem no da casa,

@@ -36,6 +36,49 @@ function parseCookies(header) {
 }
 
 /**
+ * Qual senha do portal esta sessão provou, sem carregar a senha nem o hash.
+ *
+ * O cookie vive meia hora e, até aqui, só `active` e `customer_id` eram
+ * relidos a cada requisição: quando o operador redefinia a senha do portal —
+ * justamente porque alguém que não devia a tinha —, quem já estava dentro
+ * seguia dentro até o cookie vencer. Agora o cookie leva uma impressão do
+ * `password_hash` do momento do login, e a guarda compara com o hash de agora.
+ *
+ * Do hash, e não de `password_updated_at` contra o `iat`, porque é exato: o
+ * bcrypt tem sal, então TODA redefinição muda o hash, mesmo no mesmo segundo do
+ * login; o `iat` tem resolução de segundo e o `timestamp` do MySQL arredonda,
+ * então a comparação de relógios ou deixa passar o cookie do mesmo segundo ou
+ * recusa o login feito logo depois da troca. E o apagamento dos dados do
+ * assinante zera o hash, o que também encerra a sessão. É um sha256 truncado de
+ * um bcrypt: o payload do JWT é legível por quem tem o cookie, e isto não
+ * serve para nada fora desta comparação.
+ */
+function passwordFingerprint(account) {
+  const hash = account?.password_hash;
+  if (!hash) return null;
+  return crypto.createHash('sha256').update(String(hash)).digest('base64url').slice(0, 22);
+}
+
+/**
+ * A sessão ainda corresponde à senha atual do portal?
+ *
+ * Cookies de antes da impressão não a trazem; para esses, a regra de relógio:
+ * emitido antes da última troca de senha, recusado. Em segundos inteiros,
+ * porque é a resolução do `iat` — some em meia hora, quando o último deles vencer.
+ */
+function sessionMatchesPassword(decoded, account) {
+  // Comparação simples, sem tempo constante: a impressão vem de um JWT
+  // assinado, então quem chama não escolhe o valor que está sendo comparado.
+  if (decoded.pwd !== undefined) {
+    const atual = passwordFingerprint(account);
+    return Boolean(atual) && decoded.pwd === atual;
+  }
+  const trocadaEm = account.password_updated_at ? new Date(account.password_updated_at).getTime() : NaN;
+  if (!Number.isFinite(trocadaEm)) return true;
+  return Number(decoded.iat) >= Math.floor(trocadaEm / 1000);
+}
+
+/**
  * The provider travels in the payload, and that is belt as well as braces.
  *
  * The braces already hold: `CustomerAccount.getById` below reads through `tdb`,
@@ -51,6 +94,8 @@ export function signPortalSession(account) {
       accountId: account.id,
       customerId: account.customer_id,
       tenantId: Number(account.tenant_id),
+      // Ver `passwordFingerprint`: redefinir a senha encerra este cookie.
+      pwd: passwordFingerprint(account),
       tokenType: 'customer'
     },
     portalSecret,
@@ -115,7 +160,12 @@ export async function authenticatePortalCustomer(req, res, next) {
       });
     }
     const account = await CustomerAccount.getById(decoded.accountId);
-    if (!account || !account.active || account.customer_id !== decoded.customerId) {
+    if (
+      !account
+      || !account.active
+      || account.customer_id !== decoded.customerId
+      || !sessionMatchesPassword(decoded, account)
+    ) {
       return res.status(401).json({
         success: false,
         message: req.t('portal.sessionStale'),
