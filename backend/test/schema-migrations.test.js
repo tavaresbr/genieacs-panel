@@ -31,7 +31,8 @@ const APP_TABLES = [
   'whatsapp_accounts',
   'device_samples',
   'device_sample_hours',
-  'device_swaps'
+  'device_swaps',
+  'outage_events'
 ];
 
 /** Every secret kept in its own columns records which key encrypted it. */

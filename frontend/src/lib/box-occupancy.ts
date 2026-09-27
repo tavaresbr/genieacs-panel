@@ -78,3 +78,81 @@ export function boxOccupancy<T extends OccupancyNode>(box: OccupancyNode, nodes:
     nearby
   }
 }
+
+export type OccupancyLevel = 'over' | 'full' | 'almost' | 'free' | 'unknown'
+
+export interface BoxRow<T extends OccupancyNode = OccupancyNode> {
+  box: T
+  capacity: number | null
+  used: number
+  free: number | null
+  percent: number | null
+  level: OccupancyLevel
+}
+
+/** A partir de quanto uma caixa conta como "quase lotada". */
+export const ALMOST_FULL = 0.85
+
+export function levelOf(used: number, capacity: number | null): OccupancyLevel {
+  if (capacity === null) return 'unknown'
+  if (used > capacity) return 'over'
+  if (used === capacity) return 'full'
+  if (used / capacity >= ALMOST_FULL) return 'almost'
+  return 'free'
+}
+
+/**
+ * A ocupação de TODAS as caixas numa passada só pelos cabos — a lista de
+ * ocupação tem milhares de caixas, e `boxOccupancy` caixa a caixa percorreria
+ * o mapa inteiro para cada uma. Ordem: as mais cheias primeiro.
+ */
+export function allBoxOccupancy<T extends OccupancyNode>(nodes: T[], edges: OccupancyEdge[]): BoxRow<T>[] {
+  const byId = new Map(nodes.map((node) => [node.node_id, node]))
+  const clients = new Map<string, Set<string>>()
+  const link = (box: T, client: T) => {
+    if (!CLIENT_TYPES.has(client.type) || !BOX_TYPES.has(box.type)) return
+    const set = clients.get(box.node_id) ?? new Set<string>()
+    set.add(client.node_id)
+    clients.set(box.node_id, set)
+  }
+  for (const edge of edges) {
+    const a = byId.get(edge.source)
+    const b = byId.get(edge.target)
+    if (!a || !b) continue
+    link(a, b)
+    link(b, a)
+  }
+  const rows = nodes.filter((node) => BOX_TYPES.has(node.type)).map((box) => {
+    const capacity = capacityOf(box)
+    const used = clients.get(box.node_id)?.size ?? 0
+    return {
+      box,
+      capacity,
+      used,
+      free: capacity === null ? null : Math.max(capacity - used, 0),
+      percent: capacity === null ? null : Math.round((used / capacity) * 100),
+      level: levelOf(used, capacity)
+    }
+  })
+  return rows.sort((a, b) => (b.percent ?? -1) - (a.percent ?? -1) || b.used - a.used || a.box.name.localeCompare(b.box.name))
+}
+
+const csvCell = (value: unknown) => {
+  const text = String(value ?? '')
+  // Célula que o Excel leria como fórmula sai neutralizada, como na planilha de equipamentos.
+  const safe = /^[=+\-@\t\r]/.test(text) && !/^-?\d+([.,]\d+)?$/.test(text) ? `'${text}` : text
+  return /[";\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe
+}
+
+/** Planilha da ocupação: separador `;`, com BOM, que é o que o Excel em português abre direto. */
+export function occupancyCsv(rows: BoxRow[], headers: string[], levelLabel: (level: OccupancyLevel) => string): string {
+  const lines = [headers.map(csvCell).join(';')]
+  for (const row of rows) {
+    lines.push([
+      row.box.node_id, row.box.name, row.box.type.toUpperCase(), row.used,
+      row.capacity ?? '', row.free ?? '', row.percent === null ? '' : `${row.percent}%`, levelLabel(row.level),
+      row.box.latitude, row.box.longitude
+    ].map(csvCell).join(';'))
+  }
+  return `\uFEFF${lines.join('\r\n')}\r\n`
+}

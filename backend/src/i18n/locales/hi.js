@@ -280,6 +280,7 @@ export default {
   'mapping.importFailed': "मैप डेटा आयात नहीं हो सका",
   'mapping.statusReady': "नेटवर्क की स्थिति मिल गई",
   'mapping.statusFailed': "अभी डिवाइस की स्थिति नहीं पढ़ी जा सकी",
+  'mapping.outagesReady': "फ़ाइबर कट का इतिहास मिला",
   'mapping.searchTooShort': "खोजने के लिए कम से कम 3 अक्षर लिखें।",
   'mapping.searchDone': "खोज पूरी हुई",
   'mapping.searchFailed': "अभी पता नहीं खोजा जा सका। थोड़ी देर में फिर कोशिश करें।",
@@ -457,6 +458,7 @@ export default {
   'sgp.error.contractNotFound': 'SGP में अनुबंध नहीं मिला',
   'sgp.error.webhookSecretRequired': 'SGP इवेंट डिलीवरी सक्षम करने से पहले वेबहुक सीक्रेट जनरेट करें',
   'sgp.error.testCredentialsRequired': 'कनेक्शन परखने के लिए SGP URL, ऐप और टोकन दर्ज करें',
+  'sgp.error.tokenForNewUrl': 'SGP का पता बदल गया है: सहेजने के लिए टोकन फिर से दर्ज करें',
   'sgp.testAccepted': 'SGP ने कनेक्शन और क्रेडेंशियल स्वीकार कर लिए। प्रतिक्रिया: {error}',
 
   'common.buildUnavailable': 'एप्लिकेशन बिल्ड उपलब्ध नहीं है',
@@ -710,6 +712,7 @@ export default {
   'users.mfaElsewhere': 'यह ऑपरेटर किसी अन्य प्रदाता के लिए भी काम करता है; इसका दो-चरणीय लॉगिन केवल सर्वर पर बंद किया जा सकता है',
   'users.mfaPlatform': 'यह ऑपरेटर प्लेटफ़ॉर्म का भी प्रबंधन करता है; इसका दो-चरणीय लॉगिन केवल सर्वर पर बंद किया जा सकता है',
   'users.passwordPlatform': 'यह ऑपरेटर प्लेटफ़ॉर्म का भी प्रबंधन करता है; केवल वही अपना पासवर्ड बदल सकता है',
+  'users.passwordSelf': 'अपना पासवर्ड बदलने के लिए अपनी प्रोफ़ाइल का उपयोग करें, जो वर्तमान पासवर्ड माँगती है',
   'users.mfaReset': 'दो-चरणीय लॉगिन बंद किया गया; ऑपरेटर के सत्र समाप्त कर दिए गए',
   'users.updated': 'ऑपरेटर अपडेट किया गया',
   'users.updateFailed': 'ऑपरेटर अपडेट नहीं किया जा सका',

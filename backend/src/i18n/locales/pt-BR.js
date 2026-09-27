@@ -279,6 +279,7 @@ export default {
   'mapping.importFailed': "Não foi possível importar os dados do mapa",
   'mapping.statusReady': "Estado da rede obtido",
   'mapping.statusFailed': "Não foi possível ler o estado dos equipamentos agora",
+  'mapping.outagesReady': "Histórico de rompimentos obtido",
   'mapping.searchTooShort': "Digite ao menos 3 letras para buscar.",
   'mapping.searchDone': "Busca concluída",
   'mapping.searchFailed': "Não foi possível buscar o endereço agora. Tente de novo em instantes.",
@@ -456,6 +457,7 @@ export default {
   'sgp.error.contractNotFound': 'Contrato não encontrado no SGP',
   'sgp.error.webhookSecretRequired': 'Gere um segredo de webhook antes de ativar o recebimento de eventos do SGP',
   'sgp.error.testCredentialsRequired': 'Informe URL, app e token do SGP para testar a conexão',
+  'sgp.error.tokenForNewUrl': 'O endereço do SGP mudou: informe o token de novo para salvar',
   'sgp.testAccepted': 'Conexão e credenciais aceitas pelo SGP. Resposta: {error}',
 
   'common.buildUnavailable': 'A build da aplicação está indisponível',
@@ -708,6 +710,7 @@ export default {
   'users.mfaElsewhere': 'Este operador também trabalha em outro provedor; o login em duas etapas dele só pode ser desligado pelo servidor',
   'users.mfaPlatform': 'Este operador também administra a plataforma; o login em duas etapas dele só pode ser desligado pelo servidor',
   'users.passwordPlatform': 'Este operador também administra a plataforma; a senha dele só pode ser trocada por ele mesmo',
+  'users.passwordSelf': 'Para trocar a própria senha, use o seu perfil, que pede a senha atual',
   'users.mfaReset': 'Login em duas etapas desligado; as sessões do operador foram encerradas',
   'users.updated': 'Operador atualizado',
   'users.updateFailed': 'Não foi possível atualizar o operador',

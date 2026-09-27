@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
-import { DEVELOPMENT_FALLBACK, isProduction } from '../config/runtimeEnv.js';
+import { DEVELOPMENT_FALLBACK, isProduction, assertNotPlaceholderSecret } from '../config/runtimeEnv.js';
 import TenantUser from '../models/TenantUser.js';
 import PlatformAdmin from '../models/PlatformAdmin.js';
 import Tenant, { mfaRequired } from '../models/Tenant.js';
@@ -61,6 +61,7 @@ const JWT_SECRET = (() => {
     if (isProduction() && secret.length < 32) {
       throw new Error('JWT_SECRET must be at least 32 characters in production');
     }
+    assertNotPlaceholderSecret('JWT_SECRET', secret);
     return secret;
   }
   if (isProduction()) {
@@ -262,11 +263,39 @@ function generateConsoleTokens(user) {
 async function resolveMembership(userId, tenantId) {
   if (tenantId === undefined || tenantId === null) {
     const memberships = await TenantUser.listForUser(userId);
-    return memberships.length === 1 ? memberships[0] : null;
+    return memberships.length === 1
+      ? openMembership(userId, memberships[0].tenant_id)
+      : null;
   }
+  return openMembership(userId, tenantId);
+}
+
+/**
+ * Se o provedor recebe esta pessoa: ativo, ou ela opera a plataforma.
+ *
+ * Suspender um provedor é trancá-lo. O resolvedor responde 404 no host dele,
+ * mas num deploy de host único — ou com o slug ainda em cache noutra réplica —
+ * o escopo vem do token, e sem esta conferência os operadores do provedor
+ * suspenso continuavam entrando, renovando a sessão e trabalhando lá dentro. A
+ * exclusão em duas etapas confia na suspensão para querer dizer "ninguém está
+ * trabalhando ali".
+ *
+ * Quem opera a plataforma passa: num deploy de host único o console é servido
+ * pela sessão de painel dele, e trancá-lo junto com o provedor tiraria de quem
+ * suspendeu a única rota para reativar ou concluir a exclusão.
+ */
+async function tenantOpenFor(userId, status) {
+  if (status === 'active') return true;
+  return PlatformAdmin.has(userId);
+}
+
+/** O vínculo de uma pessoa com um provedor, se o provedor a recebe. */
+async function openMembership(userId, tenantId) {
   const id = Number(tenantId);
   if (!Number.isInteger(id) || id <= 0) return null;
-  return TenantUser.find(id, userId);
+  const membership = await TenantUser.findWithStatus(id, userId);
+  if (!membership || !(await tenantOpenFor(userId, membership.tenant_status))) return null;
+  return membership;
 }
 
 /**
@@ -283,7 +312,9 @@ async function resolveSessionMembership(userId, tenantId) {
   }
   const id = Number(tenantId);
   if (!Number.isInteger(id) || id <= 0) return null;
-  return TenantUser.findWithPolicy(id, userId);
+  const membership = await TenantUser.findWithPolicy(id, userId);
+  if (!membership || !(await tenantOpenFor(userId, membership.tenant_status))) return null;
+  return membership;
 }
 
 /**
@@ -772,6 +803,7 @@ export {
   CONSOLE_AUDIENCE,
   verifyToken,
   resolveMembership,
+  openMembership,
   authenticateToken,
   requirePermission,
   requirePlatformAdmin

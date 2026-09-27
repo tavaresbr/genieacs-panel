@@ -388,10 +388,12 @@ export function errorHandler(err, req, res, next) {
   const status = err.status || 500;
   // Internal messages are revealed only when the deployment explicitly asks
   // for them; APP_ENV is unset on most installs, so "not production" would
-  // leak them by default.
+  // leak them by default. Read from the environment and not from the
+  // `APP_ENV` export, which defaults to 'development' for the startup banner
+  // and turned that default into "show everything".
   res.status(status).json({
     success: false,
-    message: status >= 500 && APP_ENV !== 'development'
+    message: status >= 500 && process.env.APP_ENV !== 'development'
       ? t('common.internalError')
       : (translateError(t, err) || t('common.internalError'))
   });

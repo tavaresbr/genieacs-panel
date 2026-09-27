@@ -24,6 +24,8 @@ interface Props {
   onChange: (lat: number, lng: number) => void
   /** Onde o mapa abre quando ainda não há ponto válido. */
   fallback?: [number, number]
+  /** O zoom desse `fallback` — o Brasil inteiro (4) quando não se sabe mais nada. */
+  fallbackZoom?: number
   className?: string
 }
 
@@ -46,7 +48,7 @@ export function wrapLongitude(lng: number): number {
   return round(((((lng + 180) % 360) + 360) % 360) - 180)
 }
 
-export function LocationPicker({ lat, lng, onChange, fallback = [-15.7942, -47.8822], className }: Props) {
+export function LocationPicker({ lat, lng, onChange, fallback = [-15.7942, -47.8822], fallbackZoom = 4, className }: Props) {
   const { isDarkMode } = useTheme()
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<any>(null)
@@ -71,7 +73,7 @@ export function LocationPicker({ lat, lng, onChange, fallback = [-15.7942, -47.8
       const L = (module as any).default ?? module
       leafletRef.current = L
       const start: [number, number] = hasPoint ? [lat as number, lng as number] : fallback
-      const map = L.map(containerRef.current, { center: start, zoom: hasPoint ? 13 : 4 })
+      const map = L.map(containerRef.current, { center: start, zoom: hasPoint ? 13 : fallbackZoom })
       mapRef.current = map
       const marker = L.marker(start, {
         draggable: true,

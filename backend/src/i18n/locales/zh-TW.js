@@ -281,6 +281,7 @@ export default {
   'mapping.importFailed': "無法匯入地圖資料",
   'mapping.statusReady': "已取得網路狀態",
   'mapping.statusFailed': "暫時無法讀取設備狀態",
+  'mapping.outagesReady': "已取得斷纖歷史",
   'mapping.searchTooShort': "請至少輸入 3 個字元進行搜尋。",
   'mapping.searchDone': "搜尋完成",
   'mapping.searchFailed': "暫時無法搜尋地址，請稍後再試。",
@@ -458,6 +459,7 @@ export default {
   'sgp.error.contractNotFound': 'SGP 中找不到該合約',
   'sgp.error.webhookSecretRequired': '啟用 SGP 事件接收前，請先產生 Webhook 密鑰',
   'sgp.error.testCredentialsRequired': '請輸入 SGP 位址、應用程式與權杖以測試連線',
+  'sgp.error.tokenForNewUrl': 'SGP 位址已變更：請重新輸入權杖以儲存',
   'sgp.testAccepted': 'SGP 已接受該連線與憑證。回應：{error}',
 
   'common.buildUnavailable': '應用程式組建產物無法使用',
@@ -709,6 +711,7 @@ export default {
   'users.mfaElsewhere': '該操作員也在其他服務商工作；其兩步驟登入只能在伺服器上關閉',
   'users.mfaPlatform': '該操作員也管理平台；其兩步驟登入只能在伺服器上關閉',
   'users.passwordPlatform': '此操作員也管理平台；只有本人可以變更密碼',
+  'users.passwordSelf': '要變更自己的密碼，請在個人資料中操作，那裡會要求輸入目前的密碼',
   'users.mfaReset': '已關閉兩步驟登入；該操作員的工作階段已結束',
   'users.updated': '操作員已更新',
   'users.updateFailed': '無法更新操作員',

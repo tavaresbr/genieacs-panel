@@ -896,6 +896,16 @@ class SgpService {
     return `${url.origin}${url.pathname.replace(/\/+$/, '')}`;
   }
 
+  /** Se os dois endereços têm a mesma origem (esquema, host e porta). */
+  static sameOrigin(a, b) {
+    if (!a || !b) return false;
+    try {
+      return new URL(a).origin === new URL(b).origin;
+    } catch {
+      return false;
+    }
+  }
+
   static normalizeEndpoint(value, fallback) {
     const text = stripLeadingPlaceholders(String(value ?? '').trim());
     if (!text) return fallback;
@@ -1092,6 +1102,13 @@ class SgpService {
     let token = current.token;
     if (patch.token !== undefined) {
       token = String(patch.token).trim();
+    } else if (token && !this.sameOrigin(next.baseUrl, current.baseUrl)) {
+      // Trocar o endereço e manter o token entregaria o segredo, na próxima
+      // chamada do painel, a quem o endereço novo apontar.
+      throw new SgpError('sgp.error.tokenForNewUrl', {
+        code: 'token_required',
+        status: 400
+      });
     }
 
     if (next.enabled && (!next.baseUrl || !next.app || !token)) {
@@ -2262,13 +2279,20 @@ class SgpService {
 
   static async testConnection(overrides = {}) {
     const current = await this.getConfig();
+    const baseUrl = overrides.baseUrl === undefined
+      ? current.baseUrl
+      : this.normalizeBaseUrl(overrides.baseUrl);
     const config = {
       ...current,
-      baseUrl: overrides.baseUrl === undefined
-        ? current.baseUrl
-        : this.normalizeBaseUrl(overrides.baseUrl),
+      baseUrl,
       app: overrides.app === undefined ? current.app : String(overrides.app).trim(),
-      token: overrides.token ? String(overrides.token).trim() : current.token,
+      // O token salvo vai no corpo da requisição. Testar um endereço vindo do
+      // navegador com ele faria deste botão um jeito de LER o segredo — aponte
+      // para um servidor seu e leia o corpo. Contra a origem já salva não há o
+      // que extrair; para uma nova, o token tem que ser digitado.
+      token: overrides.token
+        ? String(overrides.token).trim()
+        : (this.sameOrigin(baseUrl, current.baseUrl) ? current.token : null),
       // A connectivity probe must run even before the integration is switched on.
       enabled: true,
       endpoints: { ...current.endpoints, ...(overrides.endpoints || {}) }

@@ -281,6 +281,7 @@ export default {
   'mapping.importFailed': "تعذّر استيراد بيانات الخريطة",
   'mapping.statusReady': "تم جلب حالة الشبكة",
   'mapping.statusFailed': "تعذّر قراءة حالة الأجهزة الآن",
+  'mapping.outagesReady': "تم جلب سجل الانقطاعات",
   'mapping.searchTooShort': "اكتب 3 أحرف على الأقل للبحث.",
   'mapping.searchDone': "اكتمل البحث",
   'mapping.searchFailed': "تعذّر البحث عن العنوان الآن. حاول مرة أخرى بعد قليل.",
@@ -459,6 +460,7 @@ export default {
   'sgp.error.contractNotFound': 'العقد غير موجود في SGP',
   'sgp.error.webhookSecretRequired': 'أنشئ سر webhook قبل تفعيل استقبال أحداث SGP',
   'sgp.error.testCredentialsRequired': 'أدخل عنوان SGP والتطبيق والرمز لاختبار الاتصال',
+  'sgp.error.tokenForNewUrl': 'تغيّر عنوان SGP: أدخل الرمز مرة أخرى للحفظ',
   'sgp.testAccepted': 'قبل SGP الاتصال وبيانات الاعتماد. الاستجابة: {error}',
 
   'common.buildUnavailable': 'حزمة التطبيق غير متاحة',
@@ -702,6 +704,7 @@ export default {
   'users.mfaElsewhere': 'يعمل هذا المشغل لدى مزود آخر أيضًا؛ لا يمكن إيقاف تسجيل الدخول بخطوتين الخاص به إلا على الخادم',
   'users.mfaPlatform': 'يدير هذا المشغل المنصة أيضًا؛ لا يمكن إيقاف تسجيل الدخول بخطوتين الخاص به إلا على الخادم',
   'users.passwordPlatform': 'يدير هذا المشغل المنصة أيضًا؛ وحده يستطيع تغيير كلمة مروره',
+  'users.passwordSelf': 'لتغيير كلمة مرورك، استخدم ملفك الشخصي الذي يطلب كلمة المرور الحالية',
   'users.mfaReset': 'تم إيقاف تسجيل الدخول بخطوتين وإنهاء جلسات المشغل',
   'users.updated': 'تم تحديث المشغّل',
   'users.updateFailed': 'تعذّر تحديث المشغّل',

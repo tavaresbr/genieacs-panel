@@ -282,6 +282,7 @@ export default {
   'mapping.importFailed': "Impossible d'importer les données de la carte",
   'mapping.statusReady': "État du réseau récupéré",
   'mapping.statusFailed': "Impossible de lire l'état des équipements pour le moment",
+  'mapping.outagesReady': "Historique des coupures récupéré",
   'mapping.searchTooShort': "Saisissez au moins 3 caractères pour rechercher.",
   'mapping.searchDone': "Recherche terminée",
   'mapping.searchFailed': "Impossible de rechercher l'adresse pour le moment. Réessayez dans un instant.",
@@ -459,6 +460,7 @@ export default {
   'sgp.error.contractNotFound': 'Contrat introuvable dans SGP',
   'sgp.error.webhookSecretRequired': 'Générez un secret de webhook avant d’activer la réception des événements SGP',
   'sgp.error.testCredentialsRequired': 'Saisissez l’URL SGP, l’app et le jeton pour tester la connexion',
+  'sgp.error.tokenForNewUrl': 'L’adresse SGP a changé : saisissez de nouveau le jeton pour enregistrer',
   'sgp.testAccepted': 'SGP a accepté la connexion et les identifiants. Réponse : {error}',
 
   'common.buildUnavailable': 'Le build de l’application est indisponible',
@@ -705,6 +707,7 @@ export default {
   'users.mfaElsewhere': 'Cet opérateur travaille aussi pour un autre fournisseur ; sa connexion en deux étapes ne peut être désactivée que sur le serveur',
   'users.mfaPlatform': 'Cet opérateur administre aussi la plateforme ; sa connexion en deux étapes ne peut être désactivée que sur le serveur',
   'users.passwordPlatform': 'Cet opérateur administre aussi la plateforme ; lui seul peut changer son mot de passe',
+  'users.passwordSelf': 'Pour changer votre propre mot de passe, utilisez votre profil, qui demande le mot de passe actuel',
   'users.mfaReset': 'Connexion en deux étapes désactivée ; les sessions de l\'opérateur ont été fermées',
   'users.updated': 'Opérateur mis à jour',
   'users.updateFailed': 'Impossible de mettre à jour l’opérateur',

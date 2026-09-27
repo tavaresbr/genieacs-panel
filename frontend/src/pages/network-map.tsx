@@ -18,7 +18,11 @@ import {
 } from '@/lib/kml-import'
 import { buildKml, kmlFileName } from '@/lib/kml-export'
 import { LIVE_COLORS, LIVE_REFRESH_MS, LIVE_STATES, liveLabelKey, type LiveItem, type LiveOutage, type LiveStatus } from '@/lib/map-status'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
+import { BoxOccupancyView } from '@/components/map/box-occupancy-view'
+import { OutageHistoryView } from '@/components/map/outage-history-view'
+import { PlaceClientDialog, type PlaceClientTarget } from '@/components/map/place-client-dialog'
+import { UnmappedDialog } from '@/components/map/unmapped-dialog'
 import { BOX_TYPES, NEARBY_METERS, boxOccupancy, capacityOf } from '@/lib/box-occupancy'
 import 'leaflet/dist/leaflet.css'
 
@@ -506,7 +510,11 @@ export default function NetworkMap() {
   const [edgeEditor, setEdgeEditor] = useState<EdgeForm | null>(null)
   const [editingNode, setEditingNode] = useState(false)
   const [editingEdge, setEditingEdge] = useState(false)
-  const [mapView, setMapView] = useState<'map' | 'list'>('map')
+  const [mapView, setMapView] = useState<'map' | 'list' | 'boxes' | 'outages'>('map')
+  const [unmappedOpen, setUnmappedOpen] = useState(false)
+  const [placeTarget, setPlaceTarget] = useState<PlaceClientTarget | null>(null)
+  // `?place=<pppoe>` vem do botão "Colocar no mapa" da tela do equipamento.
+  const [searchParams, setSearchParams] = useSearchParams()
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
   const [mapCenter, setMapCenter] = useState<[number, number]>(DEFAULT_MAP_CENTER)
   // A sede do provedor: o centro salvo, quando alguém o escolheu (não é o
@@ -841,6 +849,46 @@ export default function NetworkMap() {
     URL.revokeObjectURL(url)
   }
 
+  // O diálogo abre onde o mapa está olhando agora — lido no clique, não no render.
+  const openPlace = (pppoe: string, name?: string) => {
+    // Com o mapa escondido (outra aba), o centro dele pode ser qualquer coisa;
+    // o centro dos pontos da rede é uma aposta melhor.
+    const current = mapView === 'map' ? mapRef.current?.getCenter() : null
+    const middle = nodes.length
+      ? [nodes.reduce((sum, node) => sum + node.latitude, 0) / nodes.length, nodes.reduce((sum, node) => sum + node.longitude, 0) / nodes.length] as [number, number]
+      : undefined
+    setPlaceTarget({ pppoe, name, center: current ? [current.lat, current.lng] : middle })
+  }
+
+  // Depois de colocar um cliente, a recarga traz o ponto novo: abre-o.
+  const pendingFocusRef = useRef<string | null>(null)
+  useEffect(() => {
+    const wanted = pendingFocusRef.current
+    if (!wanted) return
+    const node = nodes.find((item) => item.node_id === wanted)
+    if (!node) return
+    pendingFocusRef.current = null
+    focusBox(node.node_id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodes])
+
+  // `?place=<pppoe>`: se o cliente já está no mapa, abre o ponto dele; se não,
+  // o diálogo de colocar. Uma vez só, depois que o mapa carregou.
+  const placeParamHandled = useRef(false)
+  useEffect(() => {
+    const pppoe = searchParams.get('place')?.trim()
+    if (!pppoe || placeParamHandled.current || loading || !lastRefresh) return
+    placeParamHandled.current = true
+    const existing = nodes.find((node) => String(node.pppoe ?? '').trim().toLowerCase() === pppoe.toLowerCase())
+    if (existing) focusBox(existing.node_id)
+    else if (canEditMap) openPlace(pppoe, searchParams.get('name') || undefined)
+    const next = new URLSearchParams(searchParams)
+    next.delete('place')
+    next.delete('name')
+    setSearchParams(next, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, loading, lastRefresh, nodes, canEditMap])
+
   const openNewEdge = () => {
     setEditingEdge(false)
     setEdgeEditor({
@@ -924,6 +972,9 @@ export default function NetworkMap() {
           <div className="flex flex-wrap items-center gap-2">
             {canEditMap && <button type="button" className="modern-button" onClick={() => openNewNode()}><Icon name="pin" size={17} />{t('map.addNode')}</button>}
             {canEditMap && <button type="button" className="modern-button-secondary" onClick={openNewEdge}><Icon name="signal" size={17} />{t('map.drawCable')}</button>}
+            <button type="button" className="modern-button-secondary" onClick={() => setUnmappedOpen(true)} title={t('map.unmapped.hint')}>
+              <Icon name="devices" size={17} />{t('map.unmapped.button')}
+            </button>
             {canEditMap && <button type="button" className="modern-button-secondary" onClick={() => setImportOpen(true)}><Icon name="document" size={17} />{t('map.import.button')}</button>}
             <button type="button" className="modern-button-secondary" disabled={!nodes.length} onClick={exportKml} title={t('map.export.hint')}>
               <Icon name="external" size={17} />{t('map.export.button')}
@@ -953,10 +1004,10 @@ export default function NetworkMap() {
             {liveError && <span className="modern-badge text-[hsl(var(--status-danger))]" title={liveError}><Icon name="warning" size={14} />{t('map.live.unavailable')}</span>}
           </div>
           <div className="flex rounded-md border border-border bg-card p-1">
-            {(['map', 'list'] as const).map((view) => (
+            {(['map', 'list', 'boxes', 'outages'] as const).map((view) => (
               <button key={view} type="button" onClick={() => setMapView(view)}
                 className={`min-h-10 rounded px-3 text-sm font-semibold sm:min-h-9 ${mapView === view ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>
-                {view === 'map' ? t('map.view.map') : t('map.view.list')}
+                {t(`map.view.${view}` as const)}
               </button>
             ))}
           </div>
@@ -1099,6 +1150,11 @@ export default function NetworkMap() {
               </div>
             </div>
           </section>
+          {mapView === 'boxes' && (
+            <BoxOccupancyView nodes={nodes} edges={edges} outageIds={new Set(outageByBox.keys())} onSelect={(node) => setSelectedNode(node)}
+              fileName={kmlFileName(tenant?.slug || tenantName).replace(/^topologia-/, 'ocupacao-').replace(/\.kml$/, '.csv')} />
+          )}
+          {mapView === 'outages' && <OutageHistoryView onSelectBox={(nodeId) => focusBox(nodeId)} />}
           {loading && (
             <div className="pointer-events-none absolute end-3 top-3 z-[500] flex items-center gap-2 rounded-md border border-border bg-card/95 px-3 py-2 text-xs font-semibold shadow-sm">
               <Icon name="refresh" size={15} className="animate-spin" />
@@ -1147,6 +1203,21 @@ export default function NetworkMap() {
             <div className="mt-6 flex flex-wrap justify-end gap-2">
               {canEditMap && <button className="modern-button-secondary" onClick={() => { setEditingNode(true); setNodeEditor({ ...selectedNode }); setSelectedNode(null) }}><Icon name="edit" size={17} />{t('common.edit')}</button>}
               {canEditMap && <button className="modern-button-secondary text-[hsl(var(--status-danger))]" onClick={() => void deleteNode(selectedNode)}><Icon name="trash" size={17} />{t('common.delete')}</button>}
+              <a className="modern-button-secondary" target="_blank" rel="noopener noreferrer"
+                href={`https://www.google.com/maps/dir/?api=1&destination=${selectedNode.latitude},${selectedNode.longitude}`}>
+                <Icon name="map" size={17} />{t('map.directions.google')}
+              </a>
+              <a className="modern-button-secondary" target="_blank" rel="noopener noreferrer"
+                href={`https://waze.com/ul?ll=${selectedNode.latitude},${selectedNode.longitude}&navigate=yes`}>
+                <Icon name="external" size={17} />Waze
+              </a>
+              <a className="modern-button-secondary" target="_blank" rel="noopener noreferrer"
+                href={`https://wa.me/?text=${encodeURIComponent(t('map.directions.shareText', {
+                  name: selectedNode.name,
+                  link: `https://maps.google.com/?q=${selectedNode.latitude},${selectedNode.longitude}`
+                }))}`}>
+                <Icon name="chat" size={17} />{t('map.directions.share')}
+              </a>
               <button className="modern-button" onClick={() => setSelectedNode(null)}>{t('common.close')}</button>
             </div>
           </ModalShell>
@@ -1168,6 +1239,21 @@ export default function NetworkMap() {
           </ModalShell>
         )}
         {nodeEditor && <NodeEditor initial={nodeEditor} editing={editingNode} saving={saving} onClose={() => setNodeEditor(null)} onSave={(value) => void saveNode(value)} />}
+        {unmappedOpen && (
+          <UnmappedDialog canWrite={canEditMap} onClose={() => setUnmappedOpen(false)}
+            onPlace={(device) => { setUnmappedOpen(false); openPlace(device.pppoe) }} />
+        )}
+        {placeTarget && (
+          <PlaceClientDialog target={placeTarget} nodes={nodes} edges={edges} edgeIds={edges.map((edge) => edge.edge_id)}
+            center={placeTarget.center ?? mapCenter}
+            onClose={() => setPlaceTarget(null)}
+            onDone={(nodeId) => {
+              setPlaceTarget(null)
+              toast.success(t('map.place.done'))
+              pendingFocusRef.current = nodeId
+              void loadData(false)
+            }} />
+        )}
         {importOpen && <ImportDialog nodes={nodes} edges={edges} onClose={() => setImportOpen(false)} onDone={() => { setImportOpen(false); hasCenteredAssetsRef.current = false; void loadData(false) }} />}
         {edgeEditor && <EdgeEditor initial={edgeEditor} nodes={nodes} editing={editingEdge} saving={saving} onClose={() => setEdgeEditor(null)} onSave={(value) => void saveEdge(value)} />}
       </div>

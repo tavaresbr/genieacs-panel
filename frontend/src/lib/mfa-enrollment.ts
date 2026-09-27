@@ -51,12 +51,14 @@ export function canOfferMfaReset(
 /**
  * O cadeado "redefinir senha" na lista da equipe: num `owner`, só para outro
  * `owner`. O servidor recusa com 403 os outros casos (trocar a senha do dono é
- * entrar como ele); a tela não oferece o que vai ser recusado.
+ * entrar como ele); a tela não oferece o que vai ser recusado. Nem na própria
+ * linha: a própria senha se troca pelo perfil, que pede a atual.
  */
 export function canOfferPasswordReset(
   operator: { role: string | null },
-  { isOwner }: { isOwner: boolean }
+  { isOwner, isSelf = false }: { isOwner: boolean; isSelf?: boolean }
 ): boolean {
+  if (isSelf) return false
   return operator.role !== 'owner' || isOwner
 }
 

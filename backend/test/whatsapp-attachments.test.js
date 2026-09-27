@@ -305,6 +305,28 @@ describe('WhatsApp attachments — what the operator uploads', () => {
     assert.equal(recusada.body.code, 'attachment_not_allowed');
   });
 
+  /**
+   * O upload confere os bytes contra a lista, que deixa HTML de fora. O envio
+   * copiava o tipo e o nome do corpo da requisição: um `.txt` com HTML dentro
+   * passava pelo upload e saía para o assinante como `Fatura.html`,
+   * `text/html` — a página de golpe com o nome e o número do provedor.
+   */
+  it('takes the type from the stored file, never from the request', async () => {
+    const stored = await upload(Buffer.from('<html><body>pague aqui</body></html>\n'), {
+      type: 'text/plain', name: 'nota.txt'
+    });
+    assert.equal(stored.status, 201, JSON.stringify(stored.body));
+    const enviada = await enviar({
+      attachment: { url: stored.body.data.path, type: 'text/html', name: 'Fatura-Provedor.html' }
+    });
+
+    assert.equal(enviada.status, 201, JSON.stringify(enviada.body));
+    const row = await getDb()('wa_messages').where({ id: enviada.body.data.id }).first();
+    assert.equal(row.attachment_type, 'text/plain');
+    assert.match(row.attachment_name, /\.txt$/);
+    assert.equal(row.attachment_name.endsWith('.html'), false);
+  });
+
   it('keeps an internal note a note when it carries a file', async () => {
     const stored = await upload(PNG, { type: 'image/png', name: 'interno.png' });
     const enviada = await enviar({

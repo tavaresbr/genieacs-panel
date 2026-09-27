@@ -279,6 +279,7 @@ export default {
   'mapping.importFailed': "No fue posible importar los datos del mapa",
   'mapping.statusReady': "Estado de la red obtenido",
   'mapping.statusFailed': "No fue posible leer el estado de los equipos ahora",
+  'mapping.outagesReady': "Historial de cortes obtenido",
   'mapping.searchTooShort': "Escriba al menos 3 caracteres para buscar.",
   'mapping.searchDone': "Búsqueda completada",
   'mapping.searchFailed': "No fue posible buscar la dirección ahora. Inténtelo de nuevo en unos instantes.",
@@ -456,6 +457,7 @@ export default {
   'sgp.error.contractNotFound': 'Contrato no encontrado en el SGP',
   'sgp.error.webhookSecretRequired': 'Genera un secreto de webhook antes de activar la recepción de eventos del SGP',
   'sgp.error.testCredentialsRequired': 'Ingresa la URL, el app y el token del SGP para probar la conexión',
+  'sgp.error.tokenForNewUrl': 'La dirección del SGP cambió: ingresa el token de nuevo para guardar',
   'sgp.testAccepted': 'El SGP aceptó la conexión y las credenciales. Respuesta: {error}',
 
   'common.buildUnavailable': 'La compilación de la aplicación no está disponible',
@@ -706,6 +708,7 @@ export default {
   'users.mfaElsewhere': 'Este operador también trabaja en otro proveedor; su inicio de sesión en dos pasos solo puede desactivarse en el servidor',
   'users.mfaPlatform': 'Este operador también administra la plataforma; su inicio de sesión en dos pasos solo puede desactivarse en el servidor',
   'users.passwordPlatform': 'Este operador también administra la plataforma; solo él puede cambiar su contraseña',
+  'users.passwordSelf': 'Para cambiar tu propia contraseña, usa tu perfil, que pide la contraseña actual',
   'users.mfaReset': 'Inicio de sesión en dos pasos desactivado; las sesiones del operador se cerraron',
   'users.updated': 'Operador actualizado',
   'users.updateFailed': 'No se pudo actualizar el operador',
