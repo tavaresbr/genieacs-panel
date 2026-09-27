@@ -459,6 +459,7 @@ export default {
   'sgp.error.contractNotFound': 'SGP 中找不到该合同',
   'sgp.error.webhookSecretRequired': '启用 SGP 事件接收前，请先生成 Webhook 密钥',
   'sgp.error.testCredentialsRequired': '请输入 SGP 地址、应用和令牌以测试连接',
+  'sgp.error.tokenForNewUrl': 'SGP 地址已更改：请重新输入令牌以保存',
   'sgp.testAccepted': 'SGP 已接受该连接和凭据。响应：{error}',
 
   'common.buildUnavailable': '应用构建产物不可用',
@@ -709,6 +710,7 @@ export default {
   'users.mfaElsewhere': '该操作员也在其他服务商工作；其两步登录只能在服务器上关闭',
   'users.mfaPlatform': '该操作员也管理平台；其两步登录只能在服务器上关闭',
   'users.passwordPlatform': '该操作员也管理平台；只有本人可以修改密码',
+  'users.passwordSelf': '要修改自己的密码，请在个人资料中操作，那里会要求输入当前密码',
   'users.mfaReset': '已关闭两步登录；该操作员的会话已结束',
   'users.updated': '操作员已更新',
   'users.updateFailed': '无法更新操作员',

@@ -260,6 +260,14 @@ class UsersController {
           createErrorResponse(req.t('users.ownerOnly'))
         );
       }
+      // A própria senha se troca pelo perfil, que pede a senha atual. Por
+      // aqui bastava o token de acesso: quem roubasse um de uma hora definia
+      // uma senha nova e ficava com a conta.
+      if (nextPassword !== undefined && id === req.user.userId) {
+        return res.status(400).json(
+          createErrorResponse(req.t('users.passwordSelf'), null, 'password_self')
+        );
+      }
       // Quem administra a plataforma entra no console com esta mesma senha.
       // Deixar um provedor defini-la seria entregar a ele o console inteiro —
       // todos os provedores, personificação, cobrança. A mesma regra do

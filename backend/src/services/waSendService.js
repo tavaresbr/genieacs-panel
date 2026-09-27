@@ -4,7 +4,7 @@ import WaMessage from '../models/WaMessage.js';
 import WhatsAppAccount from '../models/WhatsAppAccount.js';
 import WhatsAppConfigService, { WaError } from './whatsappConfigService.js';
 import { DATA_DIR } from '../config/paths.js';
-import { normalizeType, outDir } from './waAttachmentService.js';
+import { displayName, normalizeType, outDir } from './waAttachmentService.js';
 import { ATTACHMENT_TYPES } from '../config/waAttachmentTypes.js';
 import { safeContentType } from './waMediaFile.js';
 import { clientForAccount } from './evolutionClient.js';
@@ -332,7 +332,26 @@ function confinarCaminho(relativo) {
   return alvo;
 }
 
-/** Accepts the request body's `attachment`, in either naming convention. */
+/**
+ * O tipo de um arquivo da pasta de saída, pela extensão com que o upload o
+ * gravou. O upload confere os primeiros bytes contra a lista e grava o arquivo
+ * com a extensão PRINCIPAL do tipo aprovado — então a extensão no disco é o
+ * veredito do upload, e a única fonte confiável do tipo daqui em diante.
+ */
+const TYPE_BY_STORED_EXTENSION = new Map(
+  ATTACHMENT_TYPES.filter((row) => !row.convertTo).map((row) => [row.extensions[0], row.type])
+);
+
+/**
+ * Accepts the request body's `attachment`, in either naming convention.
+ *
+ * Só o caminho vem do navegador. O tipo e o nome que o corpo trazia iam
+ * direto para o `mimetype` e o `fileName` do envio: um `.txt` com HTML dentro
+ * passava pelo upload e saía para o assinante como `Fatura.html`, `text/html`
+ * — a lista que deixa HTML de fora contornada no passo seguinte. Agora o tipo
+ * sai da extensão gravada e o nome passa pela mesma limpeza do upload,
+ * terminando na extensão desse tipo.
+ */
 function normalizeAttachment(attachment) {
   if (!attachment || typeof attachment !== 'object') return null;
   const caminho = String(attachment.url ?? attachment.path ?? '').trim();
@@ -342,12 +361,19 @@ function normalizeAttachment(attachment) {
   // à linha uma string que ninguém checou.
   const guardado = caminho.slice(0, BODY_ATTACHMENT_PATH_LIMIT);
   confinarCaminho(guardado);
-  const type = String(attachment.type ?? attachment.mimetype ?? '').trim();
-  const name = String(attachment.name ?? attachment.fileName ?? '').trim();
+  const type = TYPE_BY_STORED_EXTENSION.get(path.extname(guardado).toLowerCase());
+  if (!type) {
+    throw new WaError('whatsapp.error.attachmentNotAllowed', {
+      code: 'attachment_not_allowed',
+      status: 400
+    });
+  }
+  const pedido = String(attachment.name ?? attachment.fileName ?? '').trim();
+  const name = pedido ? displayName(encodeURIComponent(pedido), type) : null;
   return {
     path: guardado,
-    type: type.slice(0, ATTACHMENT_TYPE_LIMIT) || null,
-    name: name.slice(0, BODY_ATTACHMENT_PATH_LIMIT) || null
+    type: type.slice(0, ATTACHMENT_TYPE_LIMIT),
+    name: name ? name.slice(0, BODY_ATTACHMENT_PATH_LIMIT) : null
   };
 }
 

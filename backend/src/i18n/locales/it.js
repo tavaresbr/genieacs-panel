@@ -457,6 +457,7 @@ export default {
   'sgp.error.contractNotFound': 'Contratto non trovato in SGP',
   'sgp.error.webhookSecretRequired': 'Genera un segreto per il webhook prima di attivare la ricezione degli eventi SGP',
   'sgp.error.testCredentialsRequired': 'Inserisci URL, app e token di SGP per provare la connessione',
+  'sgp.error.tokenForNewUrl': 'L’indirizzo SGP è cambiato: inserisci di nuovo il token per salvare',
   'sgp.testAccepted': 'SGP ha accettato la connessione e le credenziali. Risposta: {error}',
 
   'common.buildUnavailable': 'La build dell’applicazione non è disponibile',
@@ -707,6 +708,7 @@ export default {
   'users.mfaElsewhere': 'Questo operatore lavora anche per un altro provider; il suo accesso in due passaggi può essere disattivato solo sul server',
   'users.mfaPlatform': 'Questo operatore amministra anche la piattaforma; il suo accesso in due passaggi può essere disattivato solo sul server',
   'users.passwordPlatform': 'Questo operatore amministra anche la piattaforma; solo lui può cambiare la propria password',
+  'users.passwordSelf': 'Per cambiare la tua password, usa il tuo profilo, che chiede la password attuale',
   'users.mfaReset': 'Accesso in due passaggi disattivato; le sessioni dell\'operatore sono state chiuse',
   'users.updated': 'Operatore aggiornato',
   'users.updateFailed': 'Impossibile aggiornare l’operatore',

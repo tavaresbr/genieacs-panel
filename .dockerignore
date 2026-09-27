@@ -11,5 +11,14 @@ deploy
 scripts
 *.md
 !README.md
-.env
-*.env
+# Patterns here match from the context root, so `.env` alone left
+# `backend/.env` -- the file the backend actually loads -- to be copied into
+# the image by `COPY backend/ ./`, with every secret in it.
+**/.env
+**/*.env
+**/.env.*
+!**/.env.example
+**/*.db
+**/*.sqlite
+**/*.sqlite3
+**/*.sqlite-*

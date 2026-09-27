@@ -458,6 +458,7 @@ export default {
   'sgp.error.contractNotFound': 'SGP に契約が見つかりません',
   'sgp.error.webhookSecretRequired': 'SGP のイベント受信を有効にする前に、Webhook のシークレットを生成してください',
   'sgp.error.testCredentialsRequired': '接続をテストするには、SGP の URL、アプリ、トークンを入力してください',
+  'sgp.error.tokenForNewUrl': 'SGP のアドレスが変更されました。保存するにはトークンを再入力してください',
   'sgp.testAccepted': 'SGP が接続と認証情報を受け付けました。応答: {error}',
 
   'common.buildUnavailable': 'アプリケーションのビルドを利用できません',
@@ -709,6 +710,7 @@ export default {
   'users.mfaElsewhere': 'このオペレーターは別のプロバイダーでも働いています。2段階ログインはサーバー上でのみ無効にできます',
   'users.mfaPlatform': 'このオペレーターはプラットフォームも管理しています。2段階ログインはサーバー上でのみ無効にできます',
   'users.passwordPlatform': 'このオペレーターはプラットフォームも管理しています。パスワードは本人のみ変更できます',
+  'users.passwordSelf': '自分のパスワードを変更するには、現在のパスワードを確認するプロフィールから行ってください',
   'users.mfaReset': '2段階ログインを無効にし、オペレーターのセッションを終了しました',
   'users.updated': 'オペレーターを更新しました',
   'users.updateFailed': 'オペレーターを更新できませんでした',

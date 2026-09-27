@@ -460,6 +460,7 @@ export default {
   'sgp.error.contractNotFound': 'SGP에서 계약을 찾을 수 없습니다',
   'sgp.error.webhookSecretRequired': 'SGP 이벤트 수신을 활성화하기 전에 웹훅 시크릿을 생성하십시오',
   'sgp.error.testCredentialsRequired': '연결을 테스트하려면 SGP URL, 앱, 토큰을 입력하십시오',
+  'sgp.error.tokenForNewUrl': 'SGP 주소가 변경되었습니다. 저장하려면 토큰을 다시 입력하십시오',
   'sgp.testAccepted': 'SGP가 연결과 자격 증명을 수락했습니다. 응답: {error}',
 
   'common.buildUnavailable': '애플리케이션 빌드를 사용할 수 없습니다',
@@ -712,6 +713,7 @@ export default {
   'users.mfaElsewhere': '이 운영자는 다른 공급자에서도 일합니다. 2단계 로그인은 서버에서만 끌 수 있습니다',
   'users.mfaPlatform': '이 운영자는 플랫폼도 관리합니다. 2단계 로그인은 서버에서만 끌 수 있습니다',
   'users.passwordPlatform': '이 운영자는 플랫폼도 관리합니다. 비밀번호는 본인만 변경할 수 있습니다',
+  'users.passwordSelf': '본인 비밀번호를 변경하려면 현재 비밀번호를 확인하는 프로필을 사용하십시오',
   'users.mfaReset': '2단계 로그인을 껐고 운영자의 세션을 종료했습니다',
   'users.updated': '운영자를 수정했습니다',
   'users.updateFailed': '운영자를 수정하지 못했습니다',
