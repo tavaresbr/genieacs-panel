@@ -170,6 +170,38 @@ describe('operator password reset', () => {
     bob.password = next;
   });
 
+  // O operador redefine a senha do portal justamente quando alguém que não
+  // devia a tem. Sem isto, quem já estava dentro seguia dentro pelos 30 minutos
+  // do cookie: a guarda só relia `active` e `customer_id`.
+  it('ends a portal session that was opened with the previous password', async () => {
+    const login = await call(`${portalUrl}/api/customer/login`, {
+      method: 'POST',
+      body: { customerId: bob.customerId, password: bob.password }
+    });
+    assert.equal(login.status, 200);
+    const stale = cookieHeader(sessionCookie(login.response));
+    const before = await call(`${portalUrl}/api/customer/session`, { headers: { Cookie: stale } });
+    assert.equal(before.status, 200);
+
+    // No mesmo segundo do login, de propósito: é o caso que uma comparação de
+    // relógio com a resolução do `iat` deixaria passar.
+    bob.password = await asTenant(() => CustomerPortalPasswordService.reset(bob.id));
+
+    const after = await call(`${portalUrl}/api/customer/session`, { headers: { Cookie: stale } });
+    assert.equal(after.status, 401, 'the session survived the password reset');
+    assert.equal(after.body.code, 'customer_session_invalid');
+
+    const relogin = await call(`${portalUrl}/api/customer/login`, {
+      method: 'POST',
+      body: { customerId: bob.customerId, password: bob.password }
+    });
+    assert.equal(relogin.status, 200);
+    const fresh = await call(`${portalUrl}/api/customer/session`, {
+      headers: { Cookie: cookieHeader(sessionCookie(relogin.response)) }
+    });
+    assert.equal(fresh.status, 200);
+  });
+
   it('reveals the stored password to an operator', async () => {
     const row = await getDb()('customer_accounts').where({ id: bob.id }).first();
     assert.equal(CustomerPortalPasswordService.reveal(row), bob.password);
