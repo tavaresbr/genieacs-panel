@@ -279,6 +279,7 @@ export default {
   'mapping.importFailed': "No fue posible importar los datos del mapa",
   'mapping.statusReady': "Estado de la red obtenido",
   'mapping.statusFailed': "No fue posible leer el estado de los equipos ahora",
+  'mapping.outagesReady': "Historial de cortes obtenido",
   'mapping.searchTooShort': "Escriba al menos 3 caracteres para buscar.",
   'mapping.searchDone': "Búsqueda completada",
   'mapping.searchFailed': "No fue posible buscar la dirección ahora. Inténtelo de nuevo en unos instantes.",

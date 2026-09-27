@@ -64,7 +64,8 @@ const SEM_DADO_DE_ASSINANTE = Object.freeze({
   wa_broadcasts: 'campanhas — o destinatário sai em wa_broadcast_recipients',
   subscriptions: 'assinatura do provedor conosco',
   billing_events: 'extrato do provedor conosco',
-  billing_charges: 'as cobranças que a plataforma emitiu ao provedor'
+  billing_charges: 'as cobranças que a plataforma emitiu ao provedor',
+  outage_events: 'rompimentos por caixa do mapa — só a caixa e contagens, nenhum assinante'
 });
 
 /**

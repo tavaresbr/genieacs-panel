@@ -1,0 +1,136 @@
+import { useMemo, useState } from 'react'
+import { useTranslation } from '@/contexts/language-context'
+import { Icon } from '@/components/ui/icon'
+import { allBoxOccupancy, occupancyCsv, type BoxRow, type OccupancyEdge, type OccupancyLevel, type OccupancyNode } from '@/lib/box-occupancy'
+
+/**
+ * Todas as caixas da rede por ocupação — lotadas, quase lotadas, com portas
+ * livres —, para planejar expansão. Clicar abre a caixa; a planilha leva a
+ * mesma lista, já filtrada.
+ */
+const LEVEL_COLORS: Record<OccupancyLevel, string> = {
+  over: '#ef4444',
+  full: '#ef4444',
+  almost: '#f59e0b',
+  free: '#22c55e',
+  unknown: '#94a3b8'
+}
+const FILTERS = ['all', 'over', 'full', 'almost', 'free', 'unknown'] as const
+type Filter = typeof FILTERS[number]
+
+export function BoxOccupancyView<T extends OccupancyNode>({
+  nodes, edges, outageIds, onSelect, fileName
+}: {
+  nodes: T[]
+  edges: OccupancyEdge[]
+  /** Caixas com provável rompimento agora — marcadas na lista. */
+  outageIds: Set<string>
+  onSelect: (node: T) => void
+  fileName: string
+}) {
+  const { t } = useTranslation()
+  const [filter, setFilter] = useState<Filter>('all')
+  const [query, setQuery] = useState('')
+  const rows = useMemo(() => allBoxOccupancy(nodes, edges), [edges, nodes])
+  const counts = useMemo(() => {
+    const result: Record<Filter, number> = { all: rows.length, over: 0, full: 0, almost: 0, free: 0, unknown: 0 }
+    for (const row of rows) result[row.level] += 1
+    return result
+  }, [rows])
+  const visible = useMemo(() => {
+    const term = query.trim().toLowerCase()
+    return rows.filter((row) => (filter === 'all' || row.level === filter)
+      && (!term || row.box.name.toLowerCase().includes(term) || row.box.node_id.toLowerCase().includes(term)))
+  }, [filter, query, rows])
+  const totals = useMemo(() => rows.reduce((sum, row) => ({
+    used: sum.used + row.used,
+    capacity: sum.capacity + (row.capacity ?? 0),
+    free: sum.free + (row.free ?? 0)
+  }), { used: 0, capacity: 0, free: 0 }), [rows])
+
+  const levelLabel = (level: OccupancyLevel) => t(`map.boxes.level.${level}`)
+  const download = () => {
+    const csv = occupancyCsv(visible as BoxRow[], [
+      t('map.table.id'), t('map.table.name'), t('map.table.type'), t('map.boxes.used'), t('map.node.capacity'),
+      t('map.boxes.free'), t('map.boxes.percent'), t('map.boxes.situation'), 'latitude', 'longitude'
+    ], levelLabel)
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = fileName
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
+  return (
+    <div className="modern-card overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
+        <div>
+          <h2 className="section-heading">{t('map.boxes.title')}</h2>
+          <p className="text-xs text-muted-foreground">
+            {t('map.boxes.summary', { boxes: rows.length, used: totals.used, capacity: totals.capacity, free: totals.free })}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <input type="search" className="modern-input min-h-9 w-48 text-sm" placeholder={t('map.boxes.search')} aria-label={t('map.boxes.search')}
+            value={query} onChange={(event) => setQuery(event.target.value)} />
+          <button type="button" className="modern-button-secondary min-h-9" disabled={!visible.length} onClick={download}>
+            <Icon name="document" size={16} />{t('map.boxes.export')}
+          </button>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2 border-b border-border px-5 py-3">
+        {FILTERS.map((value) => (
+          <button key={value} type="button" onClick={() => setFilter(value)}
+            className={`modern-badge ${filter === value ? 'ring-2 ring-primary' : ''}`}>
+            {value !== 'all' && <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: LEVEL_COLORS[value] }} />}
+            {value === 'all' ? t('map.boxes.all') : levelLabel(value)} {counts[value]}
+          </button>
+        ))}
+      </div>
+      <div className="overflow-x-auto">
+        <table className="modern-table">
+          <thead>
+            <tr>
+              <th>{t('map.table.name')}</th><th>{t('map.table.type')}</th><th>{t('map.boxes.usage')}</th>
+              <th>{t('map.boxes.free')}</th><th>{t('map.boxes.situation')}</th><th>{t('common.actions')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {visible.map((row) => (
+              <tr key={row.box.node_id}>
+                <td>
+                  <span className="font-semibold">{row.box.name}</span>
+                  <span className="block font-mono text-xs text-muted-foreground">{row.box.node_id}</span>
+                </td>
+                <td>{row.box.type.toUpperCase()}</td>
+                <td className="min-w-[10rem]">
+                  <span className="text-sm">{row.capacity === null ? row.used : `${row.used}/${row.capacity}`}</span>
+                  {row.percent !== null && (
+                    <div className="mt-1 h-1.5 overflow-hidden rounded bg-muted">
+                      <div className="h-full rounded" style={{ width: `${Math.min(100, row.percent)}%`, background: LEVEL_COLORS[row.level] }} />
+                    </div>
+                  )}
+                </td>
+                <td>{row.free ?? '—'}</td>
+                <td>
+                  <span className="inline-flex items-center gap-1.5 text-sm">
+                    <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: LEVEL_COLORS[row.level] }} />
+                    {levelLabel(row.level)}
+                  </span>
+                  {outageIds.has(row.box.node_id) && (
+                    <span className="mt-1 flex items-center gap-1 text-xs font-semibold" style={{ color: LEVEL_COLORS.over }}>
+                      <Icon name="warning" size={13} />{t('map.boxes.outageNow')}
+                    </span>
+                  )}
+                </td>
+                <td><button type="button" className="min-h-11 font-semibold text-primary hover:underline" onClick={() => onSelect(row.box)}>{t('common.details')}</button></td>
+              </tr>
+            ))}
+            {!visible.length && <tr><td colSpan={6} className="py-10 text-center text-muted-foreground">{t('map.boxes.empty')}</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}

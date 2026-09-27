@@ -5,6 +5,7 @@ const { asTenant, authHeaders, call, startTestServers, stopTestServers } = await
 const { buildDevice, startGenieAcsStub } = await import('./helpers/genieacs-stub.js');
 const { default: Setting } = await import('../src/models/Setting.js');
 const { default: MapStatusService, classifyNode } = await import('../src/services/mapStatusService.js');
+const { default: OutageWatcher } = await import('../src/services/outageWatcher.js');
 
 /**
  * Estado ao vivo na Topologia (`GET /api/mapping-data/status`).
@@ -109,6 +110,46 @@ describe('GET /api/mapping-data/status', () => {
     assert.equal(rompimento.total, 3);
     assert.deepEqual(rompimento.clients.sort(), ['cli-rb1', 'cli-rb2']);
     assert.equal(rompimento.since, velho);
+  });
+
+  it('o rompimento entra no histórico, com o pico, e fecha quando a caixa volta', async () => {
+    const historico = () => call(`${panelUrl}/api/mapping-data/outages`, { headers: authHeaders(token) });
+    // O teste anterior deixou a CTO Rua B com 2 de 3 offline; o vigia grava.
+    await OutageWatcher.tick();
+    let res = await historico();
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    const aberto = res.body.data.events.find((event) => event.node_id === 'cto-rua-b');
+    assert.ok(aberto, JSON.stringify(res.body.data));
+    assert.equal(aberto.ended_at, null);
+    assert.equal(aberto.peak_count, 2);
+    assert.equal(aberto.total_clients, 3);
+    assert.equal(aberto.started_at, velho);
+    assert.equal(res.body.data.byNode[0].node_name, 'CTO Rua B');
+
+    // Os dois voltam: a próxima leitura fecha a ocorrência.
+    for (const device of genie.state.devices) {
+      if (device._id === 'ONT-RB1' || device._id === 'ONT-RB2') device._lastInform = new Date().toISOString();
+    }
+    MapStatusService.clearCache();
+    await OutageWatcher.tick();
+    res = await historico();
+    const fechado = res.body.data.events.find((event) => event.node_id === 'cto-rua-b');
+    assert.ok(fechado.ended_at);
+    assert.ok(fechado.minutes >= 179, String(fechado.minutes));
+    assert.equal(res.body.data.events.filter((event) => event.node_id === 'cto-rua-b').length, 1, 'uma ocorrência, não uma por leitura');
+  });
+
+  it('lista os equipamentos com PPPoE que ainda não estão no mapa', async () => {
+    genie.state.devices.push(buildDevice({ id: 'ONT-NOVO', pppoeUsername: 'novo@vila' }));
+    MapStatusService.clearCache();
+    const res = await call(`${panelUrl}/api/mapping-data/unmapped`, { headers: authHeaders(token) });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    const logins = res.body.data.items.map((item) => item.pppoe);
+    assert.ok(logins.includes('novo@vila'));
+    // Já no mapa (mesmo com maiúscula/espaço no ponto): fica de fora.
+    assert.ok(!logins.includes('ana@vila'));
+    assert.ok(!logins.includes('rb1@vila'));
+    assert.equal(res.body.data.total, logins.length);
   });
 
   it('ACS fora do ar vira 502 com o motivo', async () => {

@@ -1134,6 +1134,36 @@ const DEVICE_SWAP_TABLES = [
 ];
 
 /**
+ * Histórico de rompimentos: cada vez que uma caixa do mapa (CTO/CEO/OLT) teve
+ * vários clientes offline ao mesmo tempo — ver `outageDetector.js`.
+ *
+ * Uma linha por ocorrência, aberta enquanto `ended_at` é nulo. `node_name`
+ * fica copiado para a linha continuar dizendo qual era a caixa depois que
+ * ela for renomeada ou apagada do mapa. Nenhum dado de assinante: a caixa e
+ * as contagens.
+ */
+const outageEventsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants');
+  t.string('node_id', 128).notNullable();
+  t.string('node_name', 255);
+  t.timestamp('started_at').notNullable();
+  t.timestamp('ended_at');
+  // O pico: quantos clientes estiveram offline juntos, de quantos a caixa tinha.
+  t.integer('peak_count').notNullable().defaultTo(0);
+  t.integer('total_clients').notNullable().defaultTo(0);
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  t.timestamp('updated_at').defaultTo(db.fn.now());
+  t.index(['tenant_id', 'ended_at'], 'outage_events_open_idx');
+  t.index(['tenant_id', 'node_id', 'started_at'], 'outage_events_node_idx');
+};
+
+const OUTAGE_TABLES = [
+  ['outage_events', outageEventsTable]
+];
+
+/**
  * O catálogo de planos do SaaS: o que se vende, e até onde cada um vai.
  *
  * Do deploy, não de um provedor — é a tabela de preços, e a tabela de preços
@@ -1550,6 +1580,7 @@ export const SCHEMA_TABLES = [
   ...DEVICE_HISTORY_TABLES,
   ...DEVICE_SWAP_TABLES,
   ...BILLING_TABLES,
+  ...OUTAGE_TABLES,
   ...SGP_CONTACT_TABLES,
   ...MFA_TABLES
 ].map(([name]) => name);
@@ -3886,6 +3917,16 @@ export const migrations = [
           }
         });
       }
+    }
+  },
+  {
+    /** O histórico de rompimentos — ver `outageEventsTable`. */
+    id: '0066_outage_events',
+    async isApplied(db) {
+      return db.schema.hasTable('outage_events');
+    },
+    async up(db) {
+      await createTableIfMissing(db, 'outage_events', outageEventsTable(db));
     }
   }
 ];
