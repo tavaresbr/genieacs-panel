@@ -1453,7 +1453,7 @@ export default function Settings() {
           <option key={role} value={role}>{t(ROLE_LABEL_KEYS[role])}</option>
         ))}
       </select>
-      <p className="field-hint max-w-xs">
+      <p className="field-hint max-w-[15rem]">
         {lockedByOwner
           ? t('settings.operators.ownerLocked')
           : t(ROLE_SUMMARY_KEYS[operator.role])}
@@ -3158,29 +3158,28 @@ export default function Settings() {
                   <table className="modern-table">
                     <thead>
                       <tr>
-                        <th>{t('settings.operators.username')}</th>
-                        <th>{t('settings.operators.email')}</th>
+                        <th>{t('settings.operators.username')} · {t('settings.operators.email')}</th>
                         <th>{t('settings.operators.role')}</th>
                         <th>{t('settings.operators.createdAt')}</th>
-                        <th>{t('common.actions')}</th>
+                        <th className="text-end">{t('common.actions')}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {operatorsLoading ? (
                         <tr>
-                          <td colSpan={5} className="text-center py-8 text-muted-foreground">
+                          <td colSpan={4} className="text-center py-8 text-muted-foreground">
                             {t('settings.operators.loading')}
                           </td>
                         </tr>
                       ) : operatorsError !== null ? (
                         <tr>
-                          <td colSpan={5} className="text-center py-8 text-destructive">
+                          <td colSpan={4} className="text-center py-8 text-destructive">
                             {operatorsError || t('settings.operators.loadFailed')}
                           </td>
                         </tr>
                       ) : operators.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="text-center py-8 text-muted-foreground">
+                          <td colSpan={4} className="text-center py-8 text-muted-foreground">
                             {t('settings.operators.empty')}
                           </td>
                         </tr>
@@ -3195,32 +3194,34 @@ export default function Settings() {
                           return (
                             <Fragment key={operator.id}>
                               <tr>
-                                <td className="font-medium">
-                                  {operator.username}
-                                  {isSelf && (
-                                    <span className="modern-badge ms-2">{t('settings.operators.you')}</span>
-                                  )}
-                                  <span className={`${operator.mfaEnabled ? 'modern-badge-success' : 'modern-badge'} ms-2`}>
-                                    {operator.mfaEnabled ? t('settings.operators.mfaOn') : t('settings.operators.mfaOff')}
-                                  </span>
+                                <td className="min-w-0">
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    <span className="font-medium [overflow-wrap:anywhere]">{operator.username}</span>
+                                    {isSelf && (
+                                      <span className="modern-badge">{t('settings.operators.you')}</span>
+                                    )}
+                                    <span className={operator.mfaEnabled ? 'modern-badge-success' : 'modern-badge'}>
+                                      {operator.mfaEnabled ? t('settings.operators.mfaOn') : t('settings.operators.mfaOff')}
+                                    </span>
+                                  </div>
+                                  {/* Vazio é informação, e por isso não some
+                                      num travessão: uma conta sem endereço é uma
+                                      conta que `LOGIN_REQUIRES_EMAIL` trancaria
+                                      do lado de fora, e é aqui que se vê quem
+                                      ainda falta. */}
+                                  <div className="mt-1 text-sm">
+                                    {operator.email
+                                      ? <span className="text-muted-foreground [overflow-wrap:anywhere]">{operator.email}</span>
+                                      : <span className="modern-badge">{t('settings.operators.emailMissing')}</span>}
+                                  </div>
                                 </td>
-                                {/* Vazio é informação, e por isso não some
-                                    num travessão: uma conta sem endereço é uma
-                                    conta que `LOGIN_REQUIRES_EMAIL` trancaria
-                                    do lado de fora, e esta coluna é onde se vê
-                                    quem ainda falta. */}
-                                <td className="text-sm">
-                                  {operator.email
-                                    ? <span className="text-muted-foreground">{operator.email}</span>
-                                    : <span className="modern-badge">{t('settings.operators.emailMissing')}</span>}
-                                </td>
-                                <td>{renderOperatorRole(operator, lockedByOwner, 'w-40')}</td>
-                                <td className="text-sm text-muted-foreground">{formatDateTime(operator.createdAt)}</td>
-                                <td>{renderOperatorActions(operator, isSelf)}</td>
+                                <td className="w-56 xl:w-64">{renderOperatorRole(operator, lockedByOwner, 'w-full max-w-[15rem]')}</td>
+                                <td className="w-28 text-sm text-muted-foreground xl:w-auto xl:whitespace-nowrap">{formatDateTime(operator.createdAt)}</td>
+                                <td className="w-px"><div className="flex justify-end">{renderOperatorActions(operator, isSelf)}</div></td>
                               </tr>
                               {resetPasswordId === operator.id && (
                                 <tr>
-                                  <td colSpan={5}>{renderOperatorPasswordForm(operator, 'd')}</td>
+                                  <td colSpan={4}>{renderOperatorPasswordForm(operator, 'd')}</td>
                                 </tr>
                               )}
                             </Fragment>
