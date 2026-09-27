@@ -639,7 +639,7 @@ export default {
   'whatsapp.alerts.rxPowerLowCleared': 'ONT {device} optical signal is back to normal',
   'whatsapp.alerts.temperatureHigh': 'ONT {device} at {value} °C (limit {threshold})',
   'whatsapp.alerts.temperatureHighCleared': 'ONT {device} temperature is back to normal',
-  'whatsapp.alerts.massOutage': 'Mass outage: {count} ONTs offline on {node}',
+  'whatsapp.alerts.massOutage': "Likely fibre cut at {node}: {count} of {total} clients offline for {minutes} min. Location: {link}",
   'whatsapp.alerts.massOutageCleared': '{node} is back: the ONTs are answering again',
   // WhatsApp — corpo das respostas do bot
   'whatsapp.bot.invoiceDigitableLine': 'Digitable line: {value}',

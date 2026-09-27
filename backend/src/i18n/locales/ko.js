@@ -637,7 +637,7 @@ export default {
   'whatsapp.alerts.rxPowerLowCleared': 'ONT {device}의 광 신호가 정상으로 돌아왔습니다',
   'whatsapp.alerts.temperatureHigh': 'ONT {device}의 온도가 {value} °C입니다 (기준 {threshold})',
   'whatsapp.alerts.temperatureHighCleared': 'ONT {device}의 온도가 정상으로 돌아왔습니다',
-  'whatsapp.alerts.massOutage': '대규모 장애: {node}에서 ONT {count}대가 오프라인입니다',
+  'whatsapp.alerts.massOutage': "{node} 단선 가능성: 고객 {total}명 중 {count}명이 {minutes}분째 오프라인입니다. 위치: {link}",
   'whatsapp.alerts.massOutageCleared': '{node}이(가) 복구되어 ONT가 다시 응답하고 있습니다',
   // WhatsApp — 봇 응답 본문
   'whatsapp.bot.invoiceDigitableLine': '바코드 번호: {value}',

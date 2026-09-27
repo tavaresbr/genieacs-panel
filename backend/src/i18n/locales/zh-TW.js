@@ -638,7 +638,7 @@ export default {
   'whatsapp.alerts.rxPowerLowCleared': 'ONT {device} 的光訊號已恢復正常',
   'whatsapp.alerts.temperatureHigh': 'ONT {device} 溫度為 {value} °C（臨界值 {threshold}）',
   'whatsapp.alerts.temperatureHighCleared': 'ONT {device} 的溫度已恢復正常',
-  'whatsapp.alerts.massOutage': '大規模故障：{node} 下有 {count} 台 ONT 離線',
+  'whatsapp.alerts.massOutage': "{node} 可能斷纖：{total} 個客戶中 {count} 個已離線 {minutes} 分鐘。位置：{link}",
   'whatsapp.alerts.massOutageCleared': '{node} 已恢復：ONT 重新開始回應',
   // WhatsApp — 機器人回覆的內文
   'whatsapp.bot.invoiceDigitableLine': '條碼號：{value}',

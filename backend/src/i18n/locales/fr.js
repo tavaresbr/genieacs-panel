@@ -640,7 +640,7 @@ export default {
   'whatsapp.alerts.rxPowerLowCleared': 'Le signal optique de l’ONT {device} est revenu à la normale',
   'whatsapp.alerts.temperatureHigh': 'ONT {device} à {value} °C (limite {threshold})',
   'whatsapp.alerts.temperatureHighCleared': 'La température de l’ONT {device} est revenue à la normale',
-  'whatsapp.alerts.massOutage': 'Panne massive : {count} ONT hors ligne sur {node}',
+  'whatsapp.alerts.massOutage': "Coupure de fibre probable à {node} : {count} clients sur {total} hors ligne depuis {minutes} min. Emplacement : {link}",
   'whatsapp.alerts.massOutageCleared': '{node} est rétabli : les ONT répondent de nouveau',
   'whatsapp.messageRequeued': 'Message remis dans la file',
   'whatsapp.messageNotRequeueable': 'Seul un message en échec peut être renvoyé.',

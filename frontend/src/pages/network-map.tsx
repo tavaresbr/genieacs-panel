@@ -17,7 +17,7 @@ import {
   buildImportPlan, chunkImportPlan, parseKml, readKmlFile, type ParsedKml
 } from '@/lib/kml-import'
 import { buildKml, kmlFileName } from '@/lib/kml-export'
-import { LIVE_COLORS, LIVE_REFRESH_MS, LIVE_STATES, liveLabelKey, type LiveItem, type LiveStatus } from '@/lib/map-status'
+import { LIVE_COLORS, LIVE_REFRESH_MS, LIVE_STATES, liveLabelKey, type LiveItem, type LiveOutage, type LiveStatus } from '@/lib/map-status'
 import { Link } from 'react-router'
 import { BOX_TYPES, NEARBY_METERS, boxOccupancy, capacityOf } from '@/lib/box-occupancy'
 import 'leaflet/dist/leaflet.css'
@@ -641,6 +641,7 @@ export default function NetworkMap() {
   }, [basemap, isDarkMode])
 
   const liveByNode = useMemo(() => new Map((live?.items ?? []).map((item) => [item.node_id, item])), [live])
+  const outageByBox = useMemo(() => new Map((live?.outages ?? []).map((outage) => [outage.node_id, outage])), [live])
   // A lista de logins é o que decide se vale perguntar ao ACS: mudar só a
   // posição de um ponto não pede releitura.
   const pppoeKey = useMemo(() => nodes.filter((node) => node.pppoe).map((node) => `${node.node_id}=${node.pppoe}`).sort().join('|'), [nodes])
@@ -664,6 +665,20 @@ export default function NetworkMap() {
     t(liveLabelKey(item.state)),
     item.rxPower !== null ? `RX ${item.rxPower} dBm` : null
   ].filter(Boolean).join(' · '), [t])
+
+  const outageLine = useCallback((outage: LiveOutage) => t(outage.since ? 'map.outage.line' : 'map.outage.lineNoTime', {
+    count: outage.count,
+    total: outage.total,
+    time: outage.since ? formatTime(new Date(outage.since)) : ''
+  }), [formatTime, t])
+
+  const focusBox = (nodeId: string) => {
+    const node = nodes.find((item) => item.node_id === nodeId)
+    if (!node) return
+    setMapView('map')
+    mapRef.current?.flyTo([node.latitude, node.longitude], Math.min(maxZoom, 17), { duration: 0.8 })
+    setSelectedNode(node)
+  }
 
   const updateMapObjects = useCallback(() => {
     const L = leafletRef.current
@@ -715,16 +730,21 @@ export default function NetworkMap() {
     nodes.forEach((node) => {
       const iconColor = isDarkMode ? '#f4f3ed' : '#173f35'
       const state = liveByNode.get(node.node_id)
+      const outage = outageByBox.get(node.node_id)
       // O estado ao vivo é uma bolinha no canto e a borda na mesma cor.
       const border = state ? LIVE_COLORS[state.state] : (isDarkMode ? '#53615a' : '#bdc9c2')
       const dot = state ? `<span style="position:absolute;top:-4px;right:-4px;width:11px;height:11px;border-radius:50%;background:${LIVE_COLORS[state.state]};border:2px solid ${isDarkMode ? '#17211c' : '#fff'}"></span>` : ''
-      const html = `<div style="position:relative;width:28px;height:28px;padding:3px;border-radius:8px;background:${isDarkMode ? '#17211c' : '#fff'};border:${state ? 2 : 1}px solid ${border};box-shadow:0 2px 6px rgba(0,0,0,.2)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${getNodeSvg(node.type)}</svg>${dot}</div>`
+      // Caixa com provável rompimento: borda vermelha grossa e halo, para ser
+      // a primeira coisa que o olho encontra no mapa.
+      const halo = outage ? `0 0 0 5px ${LIVE_COLORS.offline}55,0 2px 6px rgba(0,0,0,.2)` : '0 2px 6px rgba(0,0,0,.2)'
+      const html = `<div style="position:relative;width:28px;height:28px;padding:3px;border-radius:8px;background:${isDarkMode ? '#17211c' : '#fff'};border:${outage ? 3 : state ? 2 : 1}px solid ${outage ? LIVE_COLORS.offline : border};box-shadow:${halo}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${getNodeSvg(node.type)}</svg>${dot}</div>`
       const marker = L.marker([node.latitude, node.longitude], {
         icon: L.divIcon({ className: '', html, iconSize: [28, 28], iconAnchor: [14, 14] })
       }).addTo(markersLayerRef.current)
       const capacity = BOX_TYPES.has(node.type) ? capacityOf(node) : null
       const portsText = capacity !== null ? `<br>${escapeHtml(t('map.box.tooltip', { used: clientsPerBox.get(node.node_id)?.size ?? 0, capacity }))}` : ''
-      marker.bindTooltip(`<strong>${escapeHtml(node.name)}</strong><br>${escapeHtml(nodeTypeLabel(node.type))} · ${escapeHtml(node.node_id)}${state ? `<br>${escapeHtml(liveText(state))}` : ''}${portsText}`)
+      const outageText = outage ? `<br><strong style="color:${LIVE_COLORS.offline}">${escapeHtml(outageLine(outage))}</strong>` : ''
+      marker.bindTooltip(`<strong>${escapeHtml(node.name)}</strong><br>${escapeHtml(nodeTypeLabel(node.type))} · ${escapeHtml(node.node_id)}${state ? `<br>${escapeHtml(liveText(state))}` : ''}${portsText}${outageText}`)
       marker.on('click', () => { setSelectedNode(node); setSelectedEdge(null) })
     })
     // A sede por cima de tudo: é o ponto de referência de quem olha a rede.
@@ -749,7 +769,7 @@ export default function NetworkMap() {
       )
       hasCenteredAssetsRef.current = true
     }
-  }, [edges, headquarters, isDarkMode, liveByNode, liveText, maxZoom, minZoom, nodeTypeLabel, nodes, t, tenantName])
+  }, [edges, headquarters, isDarkMode, liveByNode, liveText, maxZoom, minZoom, nodeTypeLabel, nodes, outageByBox, outageLine, t, tenantName])
 
   useEffect(() => {
     if (mapView !== 'map') return
@@ -942,6 +962,25 @@ export default function NetworkMap() {
           </div>
         </div>
 
+        {(live?.outages ?? []).length > 0 && (
+          <div className="mb-3 rounded-[var(--radius)] border-2 p-3" style={{ borderColor: LIVE_COLORS.offline, background: `${LIVE_COLORS.offline}14` }} role="alert">
+            <p className="flex items-center gap-2 font-semibold" style={{ color: LIVE_COLORS.offline }}>
+              <Icon name="warning" size={18} />{t('map.outage.title', { count: live?.outages?.length ?? 0 })}
+            </p>
+            <ul className="mt-2 space-y-1">
+              {(live?.outages ?? []).map((outage) => (
+                <li key={outage.node_id} className="flex flex-wrap items-center gap-2 text-sm">
+                  <span className="font-semibold">{outage.name}</span>
+                  <span className="text-muted-foreground">{outageLine(outage)}</span>
+                  <button type="button" className="font-semibold text-primary hover:underline" onClick={() => focusBox(outage.node_id)}>
+                    {t('map.outage.show')}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         <div className="relative">
           <section className={`modern-card overflow-hidden ${mapView === 'map' ? '' : 'hidden'}`}>
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
@@ -1096,6 +1135,12 @@ export default function NetworkMap() {
               })()}
               {selectedNode.notes && <div className="sm:col-span-2"><dt className="metric-label">{t('map.node.notes')}</dt><dd className="mt-1 whitespace-pre-wrap break-words">{selectedNode.notes}</dd></div>}
             </dl>
+            {outageByBox.get(selectedNode.node_id) && (
+              <p className="mt-4 flex items-start gap-2 rounded-md border-2 p-3 text-sm font-semibold" style={{ borderColor: LIVE_COLORS.offline, color: LIVE_COLORS.offline }} role="alert">
+                <Icon name="warning" size={17} className="mt-0.5 shrink-0" />
+                {t('map.outage.boxNotice', { line: outageLine(outageByBox.get(selectedNode.node_id) as LiveOutage) })}
+              </p>
+            )}
             {BOX_TYPES.has(selectedNode.type) && (
               <BoxClients box={selectedNode} nodes={nodes} edges={edges} live={liveByNode} onSelect={(node) => setSelectedNode(node)} />
             )}

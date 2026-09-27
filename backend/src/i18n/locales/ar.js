@@ -636,7 +636,7 @@ export default {
   'whatsapp.alerts.rxPowerLowCleared': 'عادت الإشارة الضوئية للجهاز {device} إلى وضعها الطبيعي',
   'whatsapp.alerts.temperatureHigh': 'الجهاز {device} عند {value} °م (الحدّ {threshold})',
   'whatsapp.alerts.temperatureHighCleared': 'عادت حرارة الجهاز {device} إلى وضعها الطبيعي',
-  'whatsapp.alerts.massOutage': 'عطل جماعي: {count} جهازًا غير متصل على {node}',
+  'whatsapp.alerts.massOutage': "انقطاع محتمل في الألياف عند {node}: {count} من {total} عملاء غير متصلين منذ {minutes} دقيقة. الموقع: {link}",
   'whatsapp.alerts.massOutageCleared': 'عاد {node}: الأجهزة تستجيب مجددًا',
   'whatsapp.bot.invoiceDigitableLine': 'رقم السداد: {value}',
   'whatsapp.bot.invoicePix': 'رمز Pix للنسخ واللصق: {value}',

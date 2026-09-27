@@ -631,7 +631,7 @@ export default {
   'whatsapp.alerts.rxPowerLowCleared': 'ONT {device} の光信号が正常に戻りました',
   'whatsapp.alerts.temperatureHigh': 'ONT {device} が {value} °C です (しきい値 {threshold})',
   'whatsapp.alerts.temperatureHighCleared': 'ONT {device} の温度が正常に戻りました',
-  'whatsapp.alerts.massOutage': '広域障害: {node} で ONT {count} 台がオフラインです',
+  'whatsapp.alerts.massOutage': "{node} で断線の可能性：顧客 {total} 件中 {count} 件が {minutes} 分前からオフラインです。場所：{link}",
   'whatsapp.alerts.massOutageCleared': '{node} が復旧しました: ONT が再び応答しています',
   // WhatsApp — ボットの応答本文
   'whatsapp.bot.invoiceDigitableLine': 'バーコード番号: {value}',

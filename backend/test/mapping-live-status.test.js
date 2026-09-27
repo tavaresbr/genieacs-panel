@@ -81,6 +81,36 @@ describe('GET /api/mapping-data/status', () => {
     assert.deepEqual(res.body.data.summary, { online: 1, weak: 1, offline: 1, unknown: 1 });
   });
 
+  it('caixa com a maioria dos clientes offline aparece como provável rompimento', async () => {
+    const edge = (edge_id, source, target) => call(`${panelUrl}/api/mapping-data/edges`, {
+      method: 'POST', headers: authHeaders(token), body: { edge_id, source, target, fiber_type: 'drop' }
+    });
+    const caixa = await call(`${panelUrl}/api/mapping-data/nodes`, {
+      method: 'POST', headers: authHeaders(token),
+      body: { node_id: 'cto-rua-b', type: 'odp', name: 'CTO Rua B', latitude: -4.28, longitude: -55.99, capacity: 8 }
+    });
+    assert.equal(caixa.status, 201);
+    // Três clientes na caixa: dois caíram há horas, um segue online.
+    genie.state.devices.push(
+      buildDevice({ id: 'ONT-RB1', pppoeUsername: 'rb1@vila', lastInform: velho }),
+      buildDevice({ id: 'ONT-RB2', pppoeUsername: 'rb2@vila', lastInform: velho }),
+      buildDevice({ id: 'ONT-RB3', pppoeUsername: 'rb3@vila' })
+    );
+    for (const n of [1, 2, 3]) {
+      await ponto(`cli-rb${n}`, `rb${n}@vila`);
+      await edge(`drop-rb${n}`, 'cto-rua-b', `cli-rb${n}`);
+    }
+    const res = await status();
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    const rompimento = res.body.data.outages.find((item) => item.node_id === 'cto-rua-b');
+    assert.ok(rompimento, JSON.stringify(res.body.data.outages));
+    assert.equal(rompimento.name, 'CTO Rua B');
+    assert.equal(rompimento.count, 2);
+    assert.equal(rompimento.total, 3);
+    assert.deepEqual(rompimento.clients.sort(), ['cli-rb1', 'cli-rb2']);
+    assert.equal(rompimento.since, velho);
+  });
+
   it('ACS fora do ar vira 502 com o motivo', async () => {
     genie.state.respond = ({ send }) => send(401, {});
     const res = await status();

@@ -19,6 +19,7 @@ import { isValidEmail } from '../utils/helpers.js';
 import Tenant from '../models/Tenant.js';
 import { createSecretBox } from '../utils/secretBox.js';
 import { TELEGRAM_CHAT_PATTERN, TELEGRAM_TOKEN_PATTERN, sendTelegramMessage } from './telegramClient.js';
+import { detectOutages, mapsLink } from './outageDetector.js';
 
 const SETTINGS_KEY = 'whatsapp_alert_settings';
 
@@ -132,8 +133,6 @@ const TELEGRAM_ERROR_KEYS = Object.freeze({
 /** O assunto de um alerta por e-mail, cortado: é lido na notificação do celular. */
 const EMAIL_SUBJECT_MAX = 120;
 
-/** The node types an ONT is grouped under for a mass outage. */
-const AGGREGATION_TYPES = Object.freeze(['odp', 'odc', 'olt']);
 
 /**
  * A timestamp column, in milliseconds, whatever the driver handed back.
@@ -661,6 +660,9 @@ class WaAlertService {
     const rules = settings.rules;
 
     const offline = [];
+    // Quando cada um informou por último: a queda em massa usa o do primeiro
+    // a cair como "desde quando".
+    const informs = new Map();
     for (const device of devices) {
       // Per device, so one unreadable row cannot end the pass. A fleet always
       // contains at least one device mid-provisioning with half a datamodel.
@@ -680,6 +682,7 @@ class WaAlertService {
         }
 
         const ageMinutes = ageMs / 60_000;
+        informs.set(deviceId, lastInformMs);
         const isOnline = DeviceService.isDeviceOnline(device, now);
 
         if (rules.ont_offline.enabled) {
@@ -735,7 +738,7 @@ class WaAlertService {
     }
 
     if (rules.mass_outage.enabled) {
-      await this.applyMassOutage({ offline, rules, firing, unknown });
+      await this.applyMassOutage({ offline, rules, firing, unknown, informs, now });
     }
 
     return { firing, unknown };
@@ -752,11 +755,10 @@ class WaAlertService {
    * the wrong end of the network. A cut further upstream simply produces one
    * message per affected ODP, which is still a handful instead of hundreds.
    */
-  static async applyMassOutage({ offline, rules, firing, unknown }) {
-    const minimum = Math.max(2, Math.round(rules.mass_outage.threshold));
-    // Below the threshold no group can possibly reach it, so the topology and
-    // the second fleet read are never touched on a healthy network.
-    if (offline.length < minimum) return;
+  static async applyMassOutage({ offline, rules, firing, unknown, informs = new Map(), now = Date.now() }) {
+    // Nenhuma caixa cai com menos de 2: abaixo disso, nem se lê a topologia
+    // nem se faz a segunda leitura da frota numa rede saudável.
+    if (offline.length < 2) return;
 
     const nodes = await MappingNode.getAll();
     const ontNodes = nodes.filter((node) => node.type === 'ont' && node.pppoe);
@@ -778,54 +780,45 @@ class WaAlertService {
       nodeByPppoe.set(String(node.pppoe).trim().toLowerCase(), node);
     }
 
-    const edges = await MappingEdge.getAll();
-    const nodeById = new Map(nodes.map((node) => [node.node_id, node]));
-    const parentOf = new Map();
-    for (const edge of edges) {
-      for (const [from, to] of [[edge.source, edge.target], [edge.target, edge.source]]) {
-        const child = nodeById.get(from);
-        const parent = nodeById.get(to);
-        if (!child || !parent || child.type !== 'ont') continue;
-        if (!AGGREGATION_TYPES.includes(parent.type)) continue;
-        const current = parentOf.get(child.node_id);
-        // Nearest wins: odp before odc before olt, whatever order the edges
-        // happened to be written in.
-        if (
-          !current
-          || AGGREGATION_TYPES.indexOf(parent.type) < AGGREGATION_TYPES.indexOf(current.type)
-        ) {
-          parentOf.set(child.node_id, parent);
-        }
-      }
-    }
-
-    const groups = new Map();
+    // Cliente no mapa → os equipamentos dele que estão offline.
+    const offlineClients = new Map();
+    const devicesByClient = new Map();
     for (const deviceId of offline) {
       const pppoe = pppoeByDevice.get(deviceId);
-      if (!pppoe) continue;
-      const ontNode = nodeByPppoe.get(pppoe);
+      const ontNode = pppoe ? nodeByPppoe.get(pppoe) : null;
       if (!ontNode) continue;
-      const parent = parentOf.get(ontNode.node_id);
-      if (!parent) continue;
-      const bucket = groups.get(parent.node_id) || { node: parent, devices: [] };
-      bucket.devices.push(deviceId);
-      groups.set(parent.node_id, bucket);
+      // Duas ONTs no mesmo login: vale o sinal mais antigo, o de quem caiu primeiro.
+      const lastInform = informs.get(deviceId) ?? null;
+      const previous = offlineClients.get(ontNode.node_id) ?? null;
+      offlineClients.set(ontNode.node_id, previous === null ? lastInform : Math.min(previous, lastInform ?? previous));
+      devicesByClient.set(ontNode.node_id, [...(devicesByClient.get(ontNode.node_id) ?? []), deviceId]);
     }
 
-    for (const [nodeId, { node, devices }] of groups) {
-      if (devices.length < minimum) continue;
-      firing.set(conditionKey('mass_outage', nodeId), {
+    const edges = await MappingEdge.getAll();
+    const outages = detectOutages({ nodes, edges, offline: offlineClients, threshold: rules.mass_outage.threshold });
+
+    for (const outage of outages) {
+      const { box } = outage;
+      firing.set(conditionKey('mass_outage', box.node_id), {
         rule: 'mass_outage',
-        subject: nodeId,
-        vars: { node: node.name || nodeId, count: devices.length }
+        subject: box.node_id,
+        vars: {
+          node: box.name || box.node_id,
+          count: outage.count,
+          total: outage.total,
+          minutes: outage.since === null ? '?' : Math.max(0, Math.round((now - outage.since) / 60_000)),
+          link: mapsLink(box)
+        }
       });
-      for (const deviceId of devices) {
-        // Held back, not cleared. An `ont_offline` that was already firing for
-        // one of these devices keeps its row and stays quiet: clearing it would
-        // send "ONT recovered" in the middle of a fibre cut.
-        const key = conditionKey('ont_offline', deviceId);
-        firing.delete(key);
-        unknown.add(key);
+      for (const clientId of outage.clients) {
+        for (const deviceId of devicesByClient.get(clientId) ?? []) {
+          // Held back, not cleared. An `ont_offline` that was already firing for
+          // one of these devices keeps its row and stays quiet: clearing it would
+          // send "ONT recovered" in the middle of a fibre cut.
+          const key = conditionKey('ont_offline', deviceId);
+          firing.delete(key);
+          unknown.add(key);
+        }
       }
     }
   }
@@ -875,9 +868,12 @@ class WaAlertService {
       // watching any more.
       const rule = settings.rules[row.rule];
       if (rule?.enabled && row.notify_count > 0) {
+        // A caixa pelo nome, como no alerta que abriu: o id interno
+        // ("cto-01-2") não diz nada a quem lê no celular.
+        const box = row.rule === 'mass_outage' ? await MappingNode.getByNodeId(row.subject).catch(() => null) : null;
         summary.notified += await this.notify({
           channels,
-          condition: { rule: row.rule, subject: row.subject, vars: { device: row.subject, node: row.subject } },
+          condition: { rule: row.rule, subject: row.subject, vars: { device: row.subject, node: box?.name || row.subject } },
           cleared: true
         });
       }
