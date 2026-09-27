@@ -732,6 +732,8 @@ export default {
   'plans.retrieveFailed': 'प्लान पढ़े नहीं जा सके',
   'subscription.planChanged': 'प्लान बदल दिया गया',
   'subscription.planUnchanged': 'यह पहले से आपका प्लान है',
+  'subscription.planScheduled': 'छोटे प्लान पर बदलाव {date} के लिए निर्धारित; तब तक आपका मौजूदा प्लान जारी रहेगा',
+  'subscription.pendingCanceled': 'निर्धारित प्लान बदलाव रद्द किया गया; आपका मौजूदा प्लान जारी रहेगा',
   'subscription.planChangeFailed': 'प्लान बदला नहीं जा सका',
   'subscription.planNotFound': 'यह प्लान मौजूद नहीं है या अब उपलब्ध नहीं है',
   'subscription.notChangeable': 'इस सदस्यता का प्लान यहाँ से नहीं बदला जा सकता',

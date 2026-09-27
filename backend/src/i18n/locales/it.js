@@ -731,6 +731,8 @@ export default {
   'plans.retrieveFailed': 'Impossibile leggere i piani',
   'subscription.planChanged': 'Piano cambiato',
   'subscription.planUnchanged': 'Questo è già il tuo piano',
+  'subscription.planScheduled': 'Passaggio a un piano inferiore programmato per il {date}; fino ad allora resta il piano attuale',
+  'subscription.pendingCanceled': 'Cambio di piano programmato annullato; resta il piano attuale',
   'subscription.planChangeFailed': 'Impossibile cambiare il piano',
   'subscription.planNotFound': 'Questo piano non esiste o non è più offerto',
   'subscription.notChangeable': 'Il piano di questo abbonamento non può essere cambiato da qui',

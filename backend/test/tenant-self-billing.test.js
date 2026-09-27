@@ -14,6 +14,7 @@ const { default: ChargeIssuingService } = await import('../src/services/chargeIs
 const { default: SelfBillingService } = await import('../src/services/selfBillingService.js');
 const { ensureAsaasCustomer } = await import('../src/services/billing/asaasCustomerService.js');
 const { default: Tenant } = await import('../src/models/Tenant.js');
+const { default: SchedulerService } = await import('../src/services/schedulerService.js');
 
 /**
  * O provedor cuidando da própria conta: a lista de planos com preço, a troca
@@ -134,6 +135,10 @@ before(async () => {
   planos.extinto = await criar({ code: 'auto-extinto', name: 'Extinto', price_cents: 7000, active: false });
   planos.gratis = await criar({ code: 'auto-gratis', name: 'Grátis', price_cents: 0 });
   planos.recusado = await criar({ code: 'auto-recusado', name: 'Recusado', price_cents: 99999 });
+  planos.leve = await criar({ code: 'auto-leve', name: 'Leve', price_cents: 6990 });
+  planos.gemeo = await criar({ code: 'auto-gemeo', name: 'Gêmeo', price_cents: 9990 });
+  // Duas pessoas cabem — a dona e quem só olha — até o teto baixar no teste.
+  planos.enxuto = await criar({ code: 'auto-enxuto', name: 'Enxuto', price_cents: 4990, max_operators: 2 });
 });
 
 after(async () => {
@@ -143,11 +148,26 @@ after(async () => {
   await stopTestServers();
 });
 
-const daquiA = (dias) => new Date(Date.now() + dias * 86_400_000);
+/**
+ * Um instante relativo a agora, sem milissegundos: o `TIMESTAMP` do MySQL
+ * guarda segundos, e as comparações exatas de data abaixo (a da descida
+ * agendada, a do período estendido) não podem depender do banco.
+ */
+const daquiA = (dias) => {
+  const quando = new Date(Date.now() + dias * 86_400_000);
+  quando.setMilliseconds(0);
+  return quando;
+};
 
 async function assinar({ plan = planos.basico, status = 'active', renewsAt = daquiA(2), trialEndsAt = null } = {}) {
   await Subscription.upsertForTenant(alfa, {
-    plan_id: plan.id, status, renews_at: renewsAt, trial_ends_at: trialEndsAt, canceled_at: null
+    plan_id: plan.id,
+    status,
+    renews_at: renewsAt,
+    trial_ends_at: trialEndsAt,
+    canceled_at: null,
+    pending_plan_id: null,
+    pending_plan_at: null
   });
   await SubscriptionService.invalidate(alfa);
 }
@@ -254,7 +274,10 @@ describe('a troca de plano', () => {
   });
 
   it('409 over_limit quando o uso não cabe, com o recurso e os números', async () => {
-    // A dona e quem só olha: duas pessoas, e o mini aceita uma.
+    // A dona e quem só olha: duas pessoas, e o mini aceita uma. Em atraso,
+    // porque é a descida que vale NA HORA que confere o uso — a agendada
+    // confere na renovação (ver "a descida agendada").
+    await assinar({ status: 'past_due', renewsAt: daquiA(-3) });
     const res = await trocar(planos.mini.id);
     assert.equal(res.status, 409);
     assert.equal(res.body.code, 'over_limit');
@@ -659,5 +682,368 @@ describe('pagar agora', () => {
   it('403 para o viewer', async () => {
     assert.equal((await pagar(viewerToken)).status, 403);
     assert.equal(recebidas.length, 0);
+  });
+});
+
+describe('a descida agendada', () => {
+  const linha = () => Subscription.forTenant(alfa);
+  const ultimaTrilha = async () => {
+    const row = await getDb()('audit_log')
+      .where({ tenant_id: alfa, action: 'subscription.changed' }).orderBy('id', 'desc').first();
+    return row ? JSON.parse(row.detail) : null;
+  };
+  const trocasNoExtrato = () => getDb()('billing_events')
+    .where({ tenant_id: alfa, type: 'plan.changed' }).orderBy('id', 'asc');
+
+  it('subir vale na hora, e apaga a descida que estava agendada', async () => {
+    await assinar({ renewsAt: daquiA(20) });
+    assert.equal((await trocar(planos.leve.id)).status, 200);
+    assert.equal((await linha()).pending_plan_id, planos.leve.id);
+
+    const res = await trocar(planos.pro.id);
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.data.subscription.plan.code, 'auto-pro');
+    assert.equal(res.body.data.subscription.pendingPlan, null);
+    const depois = await linha();
+    assert.equal(depois.plan_id, planos.pro.id);
+    assert.equal(depois.pending_plan_id, null);
+    assert.equal(depois.pending_plan_at, null);
+    assert.equal((await ultimaTrilha()).scheduled, false);
+  });
+
+  it('descer com o período pago correndo fica para a renovação, com plano e tetos de agora', async () => {
+    const renova = daquiA(20);
+    await assinar({ renewsAt: renova });
+    const eventosAntes = (await trocasNoExtrato()).length;
+
+    const res = await trocar(planos.leve.id);
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.match(res.body.message, /agendad|scheduled/i);
+    const { subscription, limits } = res.body.data;
+    assert.equal(subscription.plan.code, 'auto-basico', 'o plano continua o que foi pago');
+    assert.equal(limits.operators, 5, 'e os tetos também');
+    assert.deepEqual(subscription.pendingPlan, {
+      id: planos.leve.id,
+      name: 'Leve',
+      priceCents: 6990,
+      effectiveAt: renova.toISOString(),
+      blockedBy: null
+    });
+
+    const depois = await linha();
+    assert.equal(depois.plan_id, planos.basico.id);
+    assert.equal(depois.pending_plan_id, planos.leve.id);
+    assert.equal(new Date(depois.pending_plan_at).getTime(), renova.getTime());
+    assert.equal((await trocasNoExtrato()).length, eventosAntes, 'nada trocou ainda: nada no extrato');
+
+    const trilha = await ultimaTrilha();
+    assert.equal(trilha.scheduled, true);
+    assert.equal(trilha.to, planos.leve.id);
+    assert.equal(trilha.effectiveAt, renova.toISOString());
+
+    // O GET diz o mesmo.
+    const lido = await pedir('/subscription');
+    assert.equal(lido.body.data.subscription.pendingPlan.id, planos.leve.id);
+
+    // E pedir de novo a mesma descida não mexe em nada.
+    const antes = (await getDb()('audit_log').where({ tenant_id: alfa }).count({ n: '*' }).first()).n;
+    const repetida = await trocar(planos.leve.id);
+    assert.equal(repetida.status, 200);
+    assert.match(repetida.body.message, /agendad|scheduled/i);
+    const depoisN = (await getDb()('audit_log').where({ tenant_id: alfa }).count({ n: '*' }).first()).n;
+    assert.equal(Number(depoisN), Number(antes));
+  });
+
+  it('a cobrança da renovação sai com o preço do plano agendado', async () => {
+    // Dois dias: dentro da janela de cinco do agendador.
+    await assinar({ renewsAt: daquiA(2) });
+    const res = await trocar(planos.leve.id);
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.deepEqual(recebidas, [], 'sem cobrança em aberto, nada a cancelar nem a emitir na troca');
+
+    const emitida = await runInTenant(alfa, () => ChargeIssuingService.issueCurrent());
+    assert.equal(emitida.issued, true, JSON.stringify(emitida));
+    assert.equal(emitida.amountCents, 6990);
+    const post = recebidas.find((r) => r.method === 'POST');
+    assert.equal(post.payload.value, 69.9);
+    assert.match(post.payload.description, /Leve/);
+    const [cobranca] = await cobrancas();
+    assert.equal(cobranca.amount_cents, 6990);
+    assert.equal((await linha()).plan_id, planos.basico.id, 'o plano só muda na renovação');
+  });
+
+  it('a cobrança da renovação já emitida é cancelada e reemitida com o preço menor', async () => {
+    await pagar();
+    const [velha] = await cobrancas();
+    assert.equal(velha.amount_cents, 9990);
+    recebidas = [];
+
+    const res = await trocar(planos.leve.id);
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.deepEqual(recebidas.map((r) => `${r.method} ${r.path}`), [
+      `DELETE /payments/${velha.gateway_charge_id}`,
+      'POST /payments'
+    ]);
+    assert.equal(recebidas[1].payload.value, 69.9);
+    const [nova] = await cobrancas();
+    assert.equal(nova.id, velha.id);
+    assert.equal(nova.amount_cents, 6990);
+    assert.equal((await linha()).plan_id, planos.basico.id);
+    assert.equal((await ultimaTrilha()).openCharge, 'reissued');
+  });
+
+  it('escolher o plano atual desiste da descida e devolve o preço à cobrança reemitida', async () => {
+    await pagar();
+    assert.equal((await trocar(planos.leve.id)).status, 200);
+    const [reemitida] = await cobrancas();
+    assert.equal(reemitida.amount_cents, 6990);
+    recebidas = [];
+
+    const res = await trocar(planos.basico.id);
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.match(res.body.message, /cancel/i);
+    assert.equal(res.body.data.subscription.pendingPlan, null);
+    assert.deepEqual(recebidas.map((r) => `${r.method} ${r.path}`), [
+      `DELETE /payments/${reemitida.gateway_charge_id}`,
+      'POST /payments'
+    ]);
+    assert.equal(recebidas[1].payload.value, 99.9);
+    const [cobranca] = await cobrancas();
+    assert.equal(cobranca.amount_cents, 9990);
+
+    const depois = await linha();
+    assert.equal(depois.plan_id, planos.basico.id);
+    assert.equal(depois.pending_plan_id, null);
+    const trilha = await ultimaTrilha();
+    assert.equal(trilha.pendingCanceled, true);
+    assert.equal(trilha.canceledPlanId, planos.leve.id);
+  });
+
+  it('outro plano mais barato substitui o agendado', async () => {
+    await assinar({ renewsAt: daquiA(20) });
+    assert.equal((await trocar(planos.leve.id)).status, 200);
+    const res = await trocar(planos.mini.id);
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal((await linha()).pending_plan_id, planos.mini.id);
+    assert.equal((await ultimaTrilha()).replacedPlanId, planos.leve.id);
+  });
+
+  it('o agendador aplica a descida quando a data chega', async () => {
+    await assinar({ renewsAt: daquiA(20) });
+    assert.equal((await trocar(planos.leve.id)).status, 200);
+    await getDb()('subscriptions').where({ tenant_id: alfa }).update({ pending_plan_at: daquiA(-0.01) });
+    const eventosAntes = (await trocasNoExtrato()).length;
+
+    const tenant = await Tenant.findById(alfa);
+    const resumo = await runInTenant(alfa, () => SchedulerService.runJobs({ tenant }));
+    assert.equal(resumo.pendingPlan.applied, true, JSON.stringify(resumo.pendingPlan));
+
+    const depois = await linha();
+    assert.equal(depois.plan_id, planos.leve.id);
+    assert.equal(depois.pending_plan_id, null);
+    assert.equal(depois.pending_plan_at, null);
+    const eventos = await trocasNoExtrato();
+    assert.equal(eventos.length, eventosAntes + 1);
+    const detalhe = JSON.parse(eventos.at(-1).detail);
+    assert.equal(detalhe.scheduled, true);
+    assert.equal(detalhe.from, planos.basico.id);
+    assert.equal(detalhe.to, planos.leve.id);
+
+    const lido = await pedir('/subscription');
+    assert.equal(lido.body.data.subscription.plan.code, 'auto-leve', 'o cache foi esquecido');
+
+    // A segunda passada não tem o que fazer.
+    const outra = await runInTenant(alfa, () => SubscriptionService.applyPendingPlan());
+    assert.equal(outra.reason, 'none');
+  });
+
+  it('antes da data, a aplicação não faz nada', async () => {
+    await assinar({ renewsAt: daquiA(20) });
+    assert.equal((await trocar(planos.leve.id)).status, 200);
+    const res = await runInTenant(alfa, () => SubscriptionService.applyPendingPlan());
+    assert.equal(res.reason, 'not_due');
+    assert.equal((await linha()).plan_id, planos.basico.id);
+  });
+
+  it('o pagamento atrasado da renovação aplica a descida e compra o período do plano novo', async () => {
+    await assinar({ renewsAt: daquiA(20) });
+    assert.equal((await trocar(planos.leve.id)).status, 200);
+    // A renovação passou sem o agendador rodar: o pagamento chega depois.
+    const venceu = daquiA(-1);
+    await getDb()('subscriptions').where({ tenant_id: alfa })
+      .update({ renews_at: venceu, pending_plan_at: venceu });
+
+    const pago = await runInTenant(alfa, () => SubscriptionService.recordPayment({
+      amountCents: 6990, provider: 'manual', externalId: 'pix-da-descida'
+    }));
+    assert.equal(pago.underpaid, false, 'pagou o preço do plano que o período novo tem');
+    assert.equal(pago.expectedCents, 6990);
+    assert.equal(pago.subscription.plan_id, planos.leve.id);
+    assert.equal(pago.subscription.pending_plan_id, null);
+    assert.equal(pago.subscription.status, 'active');
+    const eventos = await trocasNoExtrato();
+    const detalhe = JSON.parse(eventos.at(-1).detail);
+    assert.equal(detalhe.scheduled, true);
+    assert.equal(detalhe.byPayment, true);
+  });
+
+  it('o pagamento adiantado da renovação confere pelo plano novo, mas não troca antes da hora', async () => {
+    const renova = daquiA(2);
+    await assinar({ renewsAt: renova });
+    assert.equal((await trocar(planos.leve.id)).status, 200);
+
+    const pago = await runInTenant(alfa, () => SubscriptionService.recordPayment({
+      amountCents: 6990, provider: 'manual', externalId: 'pix-adiantado'
+    }));
+    assert.equal(pago.underpaid, false);
+    assert.equal(pago.expectedCents, 6990);
+    assert.equal(pago.subscription.plan_id, planos.basico.id, 'o período pago do plano caro vai até o fim');
+    assert.equal(pago.subscription.pending_plan_id, planos.leve.id);
+    assert.equal(new Date(pago.subscription.renews_at).getTime(), renova.getTime() + 30 * 86_400_000);
+
+    // E na data, a troca acontece — mesmo com `renews_at` já no mês seguinte.
+    const res = await runInTenant(alfa, () => SubscriptionService.applyPendingPlan({ now: daquiA(3) }));
+    assert.equal(res.applied, true);
+    assert.equal((await linha()).plan_id, planos.leve.id);
+  });
+
+  it('com o uso acima do plano agendado, agenda, avisa e não aplica', async () => {
+    // A dona e quem só olha: duas pessoas, e o mini aceita uma.
+    await assinar({ renewsAt: daquiA(20) });
+    const res = await trocar(planos.mini.id);
+    assert.equal(res.status, 200, 'na descida agendada o uso não é conferido agora');
+    assert.deepEqual(res.body.data.subscription.pendingPlan.blockedBy, { resource: 'operators', used: 2, limit: 1 });
+
+    const avisos = [];
+    const warn = console.warn;
+    console.warn = (...args) => { avisos.push(args.join(' ')); };
+    let aplicada;
+    let segunda;
+    try {
+      aplicada = await runInTenant(alfa, () => SubscriptionService.applyPendingPlan({ now: daquiA(21) }));
+      segunda = await runInTenant(alfa, () => SubscriptionService.applyPendingPlan({ now: daquiA(21) }));
+    } finally {
+      console.warn = warn;
+    }
+    assert.equal(aplicada.applied, false);
+    assert.equal(aplicada.reason, 'over_limit');
+    assert.deepEqual(aplicada.blockedBy, { resource: 'operators', used: 2, limit: 1 });
+    assert.equal(segunda.reason, 'over_limit');
+    assert.equal(avisos.filter((a) => /stays pending/.test(a)).length, 1, 'um aviso por agendamento, não por passada');
+    const depois = await linha();
+    assert.equal(depois.plan_id, planos.basico.id);
+    assert.equal(depois.pending_plan_id, planos.mini.id, 'a agendada continua viva');
+  });
+
+  it('com o uso acima do plano agendado, a cobrança da renovação sai pelo preço do atual', async () => {
+    await assinar({ renewsAt: daquiA(2) });
+    assert.equal((await trocar(planos.mini.id)).status, 200);
+
+    const emitida = await runInTenant(alfa, () => ChargeIssuingService.issueCurrent());
+    assert.equal(emitida.issued, true, JSON.stringify(emitida));
+    assert.equal(emitida.amountCents, 9990, 'a descida não vai se aplicar: o período é do plano atual');
+    assert.equal(recebidas.find((r) => r.method === 'POST').payload.value, 99.9);
+
+    // E o pagamento dela confere pelo mesmo preço — com ou sem a linha.
+    const pago = await runInTenant(alfa, () => SubscriptionService.recordPayment({
+      amountCents: 4990, provider: 'manual', externalId: 'pix-do-bloqueado'
+    }));
+    assert.equal(pago.expectedCents, 9990);
+    assert.equal(pago.underpaid, true);
+  });
+
+  it('bloqueada depois de a cobrança sair pelo preço menor, a cobrança volta ao preço do atual', async () => {
+    await assinar({ renewsAt: daquiA(2) });
+    try {
+      assert.equal((await trocar(planos.enxuto.id)).status, 200);
+      const emitida = await runInTenant(alfa, () => ChargeIssuingService.issueCurrent());
+      assert.equal(emitida.amountCents, 4990, 'cabia: saiu pelo preço da descida');
+      const [baixa] = await cobrancas();
+      recebidas = [];
+
+      // O uso deixa de caber (aqui, o teto baixa — dá no mesmo que contratar).
+      await Plan.update(planos.enxuto.id, { max_operators: 1 });
+      const passada = await runInTenant(alfa, () => ChargeIssuingService.issueCurrent());
+      assert.equal(passada.issued, true, JSON.stringify(passada));
+      assert.deepEqual(recebidas.map((r) => `${r.method} ${r.path}`), [
+        `DELETE /payments/${baixa.gateway_charge_id}`,
+        'POST /payments'
+      ]);
+      assert.equal(recebidas[1].payload.value, 99.9);
+      const [cheia] = await cobrancas();
+      assert.equal(cheia.id, baixa.id, 'a mesma linha do período');
+      assert.equal(cheia.amount_cents, 9990);
+      assert.equal((await linha()).pending_plan_id, planos.enxuto.id, 'a agendada continua viva');
+
+      // A passada seguinte não mexe mais.
+      recebidas = [];
+      const outra = await runInTenant(alfa, () => ChargeIssuingService.issueCurrent());
+      assert.equal(outra.reason, 'already_issued');
+      assert.deepEqual(recebidas, []);
+    } finally {
+      await Plan.update(planos.enxuto.id, { max_operators: 2 });
+    }
+  });
+
+  it('mas a cobrança já paga pelo preço menor não é tocada', async () => {
+    await assinar({ renewsAt: daquiA(2) });
+    try {
+      assert.equal((await trocar(planos.enxuto.id)).status, 200);
+      await runInTenant(alfa, () => ChargeIssuingService.issueCurrent());
+      const [baixa] = await cobrancas();
+      await getDb()('billing_charges').where({ id: baixa.id }).update({ status: 'paid' });
+      recebidas = [];
+
+      await Plan.update(planos.enxuto.id, { max_operators: 1 });
+      const passada = await runInTenant(alfa, () => ChargeIssuingService.issueCurrent());
+      assert.equal(passada.reason, 'already_settled');
+      assert.deepEqual(recebidas, []);
+      const [depois] = await cobrancas();
+      assert.equal(depois.amount_cents, 4990);
+      assert.equal(depois.gateway_charge_id, baixa.gateway_charge_id);
+    } finally {
+      await Plan.update(planos.enxuto.id, { max_operators: 2 });
+    }
+  });
+
+  it('em teste, em atraso ou sem data de renovação, descer vale na hora', async () => {
+    const casos = [
+      { status: 'trial', renewsAt: null, trialEndsAt: daquiA(5) },
+      { status: 'past_due', renewsAt: daquiA(-3) },
+      { status: 'active', renewsAt: daquiA(-1) },
+      { status: 'active', renewsAt: null }
+    ];
+    for (const caso of casos) {
+      await assinar(caso);
+      const res = await trocar(planos.leve.id);
+      const rotulo = JSON.stringify(caso);
+      assert.equal(res.status, 200, `${rotulo} ${JSON.stringify(res.body)}`);
+      assert.equal(res.body.data.subscription.plan.code, 'auto-leve', rotulo);
+      assert.equal(res.body.data.subscription.pendingPlan, null, rotulo);
+      const depois = await linha();
+      assert.equal(depois.plan_id, planos.leve.id, rotulo);
+      assert.equal(depois.pending_plan_id, null, rotulo);
+      assert.equal((await ultimaTrilha()).scheduled, false, rotulo);
+    }
+  });
+
+  it('preço igual, outro plano: vale na hora', async () => {
+    await assinar({ renewsAt: daquiA(20) });
+    const res = await trocar(planos.gemeo.id);
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal((await linha()).plan_id, planos.gemeo.id);
+    assert.equal(res.body.data.subscription.pendingPlan, null);
+  });
+
+  it('a troca pelo console vale na hora e apaga a agendada', async () => {
+    await assinar({ renewsAt: daquiA(20) });
+    assert.equal((await trocar(planos.leve.id)).status, 200);
+    await runInTenant(alfa, () => SubscriptionService.changePlan({ planId: planos.pro.id }));
+    const depois = await linha();
+    assert.equal(depois.plan_id, planos.pro.id);
+    assert.equal(depois.pending_plan_id, null);
+    assert.equal(depois.pending_plan_at, null);
+    const eventos = await trocasNoExtrato();
+    assert.equal(JSON.parse(eventos.at(-1).detail).pendingCleared, planos.leve.id);
   });
 });

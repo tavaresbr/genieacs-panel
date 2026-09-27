@@ -733,6 +733,8 @@ export default {
   'plans.retrieveFailed': 'プランを読み込めませんでした',
   'subscription.planChanged': 'プランを変更しました',
   'subscription.planUnchanged': 'すでにこのプランです',
+  'subscription.planScheduled': '{date} にプランのダウングレードを予約しました。それまでは現在のプランが有効です',
+  'subscription.pendingCanceled': '予約していたプラン変更を取り消しました。現在のプランが継続します',
   'subscription.planChangeFailed': 'プランを変更できませんでした',
   'subscription.planNotFound': 'このプランは存在しないか、提供が終了しています',
   'subscription.notChangeable': 'このサブスクリプションのプランはここでは変更できません',

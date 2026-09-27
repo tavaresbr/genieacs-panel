@@ -730,6 +730,8 @@ export default {
   'plans.retrieveFailed': 'No se pudieron leer los planes',
   'subscription.planChanged': 'Plan cambiado',
   'subscription.planUnchanged': 'Este ya es tu plan',
+  'subscription.planScheduled': 'Cambio a un plan menor programado para el {date}; tu plan actual sigue hasta entonces',
+  'subscription.pendingCanceled': 'Cambio de plan programado cancelado; tu plan actual sigue',
   'subscription.planChangeFailed': 'No se pudo cambiar el plan',
   'subscription.planNotFound': 'Este plan no existe o ya no se ofrece',
   'subscription.notChangeable': 'El plan de esta suscripción no se puede cambiar desde aquí',

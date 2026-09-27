@@ -6,6 +6,7 @@ import Subscription from '../models/Subscription.js';
 import Plan from '../models/Plan.js';
 import { providerFor } from './billing/registry.js';
 import { PRODUCT_NAME } from '../config/brand.js';
+import SubscriptionService from './subscriptionService.js';
 
 /**
  * A régua de emissão: quem cobra o provedor, e quando.
@@ -184,7 +185,9 @@ class ChargeIssuingService {
    * emitida (`already_issued`, agora COM a linha) — pagar agora a que já está
    * na mão do provedor é pagar ESSA, e não emitir outra.
    */
-  static async issueCurrent({ now = new Date(), tenant: doLaco = null, manual = false } = {}) {
+  static async issueCurrent({
+    now = new Date(), tenant: doLaco = null, manual = false, countDevices = null
+  } = {}) {
     const tenant = doLaco ?? await Tenant.findById(currentTenantId());
     if (!tenant) return { issued: false, reason: 'tenant_gone' };
 
@@ -231,7 +234,7 @@ class ChargeIssuingService {
       return { issued: false, reason: 'not_billable' };
     }
 
-    const preco = Number(plan?.price_cents ?? 0);
+    let preco = Number(plan?.price_cents ?? 0);
     // Plano de graça não gera cobrança de R$ 0,00 — o gateway a recusaria, e
     // com razão. É o caso do `unlimited`, que todo provedor herdado tem.
     if (!(preco > 0)) return { issued: false, reason: 'free_plan' };
@@ -275,7 +278,46 @@ class ChargeIssuingService {
     const antecedencia = now.getTime() + this.LEAD_DAYS * 86_400_000;
     if (!manual && vencimento.getTime() > antecedencia) return { issued: false, reason: 'not_due_yet' };
 
-    const moeda = plan.currency || 'BRL';
+    // O plano que ESTE prazo cobra. Quase sempre o atual; a exceção é a
+    // descida agendada (0070) para exatamente este prazo: a cobrança que sai
+    // cinco dias antes da renovação paga o período que começa nela, e esse
+    // período já é do plano novo. Cobrar o preço velho ali seria o provedor
+    // pagando o plano caro por um mês em que vai estar no barato.
+    //
+    // A comparação é pela chave do período, no fuso da cobrança, e não pelo
+    // instante: é a chave que identifica a cobrança, e dois instantes do mesmo
+    // dia em São Paulo são o mesmo prazo. O plano agendado é sempre pago (a
+    // descida só aceita plano pago), então a guarda do de graça lá em cima,
+    // feita com o atual, continua valendo.
+    //
+    // MAS só se o uso couber no plano agendado — a mesma conta que a aplicação
+    // faz (`SubscriptionService.overLimitOf`), contando só o que ele limita, e
+    // com a contagem de ONTs que falta valendo como "cabe", como em todo lugar.
+    // Sem esta guarda o buraco fechado pela descida agendada reabria por baixo:
+    // quem pede a descida e não se ajusta continua no plano caro (a aplicação
+    // recusa), mas a cobrança sairia pelo preço do barato — e o pagamento dela
+    // conferiria. Não caber é continuar no plano atual, e pagar por ele.
+    //
+    // Depois da guarda de antecedência, e não antes: o agendador passa a cada
+    // minuto, e contar uso (às vezes no ACS) semanas antes da janela de
+    // emissão seria carga sem resposta a dar.
+    let planoDoPeriodo = plan;
+    let descidaBloqueada = null;
+    if (subscription.pending_plan_id && subscription.pending_plan_at) {
+      const agendada = new Date(subscription.pending_plan_at);
+      if (!Number.isNaN(agendada.getTime()) && this.periodKey(agendada) === periodo) {
+        const agendado = await Plan.findById(subscription.pending_plan_id);
+        if (agendado && Number(agendado.price_cents ?? 0) > 0) {
+          descidaBloqueada = await SubscriptionService.overLimitOf(agendado, { countDevices });
+          if (!descidaBloqueada) {
+            planoDoPeriodo = agendado;
+            preco = Number(agendado.price_cents);
+          }
+        }
+      }
+    }
+
+    const moeda = planoDoPeriodo.currency || 'BRL';
     const garraAte = new Date(now.getTime() + this.CLAIM_MS);
     let existente = await BillingCharge.forPeriod(periodo);
     if (existente) {
@@ -294,6 +336,19 @@ class ChargeIssuingService {
       // emitir outra por cima é decisão de gente, não do agendador.
       if (existente.status === 'paid' || existente.status === 'canceled' || existente.status === 'refunded') {
         return { issued: false, reason: 'already_settled', charge: existente };
+      }
+      // A cobrança da renovação que saiu pelo preço da descida quando o uso
+      // ainda cabia, e agora não cabe mais: a descida não vai se aplicar, o
+      // período seguinte é do plano atual, e a fatura na mão do provedor pede
+      // o preço do outro. Volta ao preço do atual pela mesma porta da troca de
+      // plano — cancelada no gateway e reemitida —, e só enquanto está em
+      // aberto: a paga é dinheiro que entrou e fica como está.
+      //
+      // Só nessa direção. A contrária (bloqueada quando saiu, cabe agora)
+      // fica com o preço cheio até a renovação: um uso oscilando em volta do
+      // teto viraria uma fatura nova por oscilação na caixa de quem paga.
+      if (existente.gateway_charge_id && descidaBloqueada && Number(existente.amount_cents) !== preco) {
+        return this.repriceBlockedDowngrade({ subscription, plan, tenant, countDevices, charge: existente });
       }
       if (existente.gateway_charge_id) return { issued: false, reason: 'already_issued', charge: existente };
       if (!manual) {
@@ -372,7 +427,7 @@ class ChargeIssuingService {
         amountCents: preco,
         currency: moeda,
         dueDate: vencimentoDoGateway,
-        description: `${tenant.name || PRODUCT_NAME} — ${plan.name || plan.code}`,
+        description: `${tenant.name || PRODUCT_NAME} — ${planoDoPeriodo.name || planoDoPeriodo.code}`,
         // O formato que o webhook espera de volta, com o período junto: é por
         // ele que a entrega acha o provedor sem depender do cadastro do cliente
         // no gateway estar ligado a quem se pensa.
@@ -415,6 +470,34 @@ class ChargeIssuingService {
       chargeId: criada.chargeId,
       charge: await BillingCharge.findById(chargeId)
     };
+  }
+
+  /**
+   * A cobrança da renovação de volta ao preço do plano atual, quando a
+   * descida agendada que a baixou ficou bloqueada pelo uso (ver o comentário
+   * no ponto em que `issueCurrent` chama isto).
+   *
+   * Pela porta da troca de plano (`SelfBillingService.repriceOpenCharge`), e
+   * não por uma cópia dela aqui: é a mesma dança com o gateway — a garra, o
+   * cancelamento que para tudo quando falha, o `resetForReissue` condicional
+   * — e a reemissão volta por `issueCurrent`, que agora sai com o preço do
+   * atual porque o bloqueio continua. Nunca lança, como o resto deste job.
+   */
+  static async repriceBlockedDowngrade({ subscription, plan, tenant, countDevices, charge }) {
+    // Importado aqui, e não no topo: `selfBillingService` importa este
+    // arquivo, e o caminho de volta só é preciso neste caso raro.
+    const { default: SelfBillingService } = await import('./selfBillingService.js');
+    try {
+      const resultado = await SelfBillingService.repriceOpenCharge({ subscription, plan, tenant, countDevices });
+      console.warn(
+        `Renewal charge ${charge.id} of provider ${tenant.id} was repriced back to plan ${plan.id}: `
+        + 'the scheduled downgrade is blocked by usage'
+      );
+      return resultado.reissue ?? { issued: false, reason: resultado.charge === 'reissued' ? 'repriced' : 'already_issued',
+        charge: await BillingCharge.findById(charge.id) };
+    } catch (error) {
+      return { issued: false, reason: error.code === 'busy' ? 'raced' : 'reprice_failed', error: error.message, charge };
+    }
   }
 }
 

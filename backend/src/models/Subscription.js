@@ -74,6 +74,26 @@ class Subscription {
     return Subscription.forTenant(tenantId, db);
   }
 
+  /**
+   * Aplica a descida agendada (0070) — só se ela ainda é a que se leu.
+   *
+   * Condicional pelo `pending_plan_id`, e não um `upsertForTenant` cego: o
+   * agendador e um pagamento podem chegar ao mesmo prazo no mesmo minuto, e
+   * sem a condição os dois trocariam o plano e gravariam cada um a sua linha
+   * de "plano trocado" no extrato. Quem muda a linha é quem aplicou; o outro
+   * recebe `false` e não grava nada. Também não passa por cima de um
+   * cancelamento ou de uma troca pelo console que entrou no meio — os dois
+   * limpam a coluna, e a condição deixa de casar.
+   */
+  static async applyPendingPlan(tenantId, pendingPlanId, db = getDb()) {
+    if (!tenantId || !pendingPlanId) return false;
+    // tenant-scope-exempt: o provedor vem no argumento (ver acima).
+    const changed = await db('subscriptions')
+      .where({ tenant_id: tenantId, pending_plan_id: pendingPlanId })
+      .update({ plan_id: pendingPlanId, pending_plan_id: null, pending_plan_at: null, updated_at: new Date() });
+    return changed > 0;
+  }
+
   /** A do provedor em escopo — o caminho que um controlador do próprio provedor usaria. */
   static async createCurrent(row) {
     await tinsert('subscriptions', row);

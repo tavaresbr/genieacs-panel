@@ -733,6 +733,8 @@ export default {
   'plans.retrieveFailed': '无法读取套餐',
   'subscription.planChanged': '套餐已更改',
   'subscription.planUnchanged': '这已经是您的套餐',
+  'subscription.planScheduled': '已安排在 {date} 降级套餐；在此之前当前套餐继续有效',
+  'subscription.pendingCanceled': '已取消计划的套餐变更；当前套餐保持不变',
   'subscription.planChangeFailed': '无法更改套餐',
   'subscription.planNotFound': '该套餐不存在或已不再提供',
   'subscription.notChangeable': '此订阅的套餐无法在此更改',

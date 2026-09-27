@@ -729,6 +729,8 @@ export default {
   'plans.retrieveFailed': 'Impossible de lire les offres',
   'subscription.planChanged': 'Offre modifiée',
   'subscription.planUnchanged': 'C\'est déjà votre offre',
+  'subscription.planScheduled': 'Passage à une offre inférieure programmé pour le {date} ; votre offre actuelle reste valable d\'ici là',
+  'subscription.pendingCanceled': 'Changement d\'offre programmé annulé ; votre offre actuelle est conservée',
   'subscription.planChangeFailed': 'Impossible de changer d\'offre',
   'subscription.planNotFound': 'Cette offre n\'existe pas ou n\'est plus proposée',
   'subscription.notChangeable': 'L\'offre de cet abonnement ne peut pas être changée ici',

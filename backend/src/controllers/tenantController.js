@@ -9,6 +9,7 @@ import SubscriptionService from '../services/subscriptionService.js';
 import BillingCharge from '../models/BillingCharge.js';
 import DeviceService from '../services/deviceService.js';
 import SelfBillingService, { SelfBillingError } from '../services/selfBillingService.js';
+import ChargeIssuingService from '../services/chargeIssuingService.js';
 import PlatformAudit from '../models/PlatformAudit.js';
 import { translateError } from '../i18n/index.js';
 import { EDITION } from '../config/edition.js';
@@ -120,6 +121,34 @@ function selfBillingRefusal(req, res, error) {
     ...createErrorResponse(translateError(req.t, error), error.detail ?? null, error.code),
     ...(error.extra ?? {})
   });
+}
+
+/**
+ * A frase da troca de plano, que diz O QUE aconteceu — e são quatro coisas
+ * diferentes para quem clicou: trocou agora, vai trocar na renovação (com a
+ * data), desistiu da troca agendada, ou nada mudou.
+ *
+ * A data vai no idioma e no fuso da cobrança: é o dia em que a renovação
+ * acontece em São Paulo, o mesmo que a fatura mostra, e não o do servidor.
+ */
+function planChangeMessage(req, resultado) {
+  if (resultado.pendingCanceled) return req.t('subscription.pendingCanceled');
+  if (resultado.scheduled) {
+    return req.t('subscription.planScheduled', { date: formatBillingDate(resultado.effectiveAt, req.locale) });
+  }
+  return req.t(resultado.changed ? 'subscription.planChanged' : 'subscription.planUnchanged');
+}
+
+function formatBillingDate(value, locale) {
+  const date = value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) return '';
+  try {
+    return new Intl.DateTimeFormat(locale || 'pt-BR', {
+      timeZone: ChargeIssuingService.BILLING_TIMEZONE, dateStyle: 'short'
+    }).format(date);
+  } catch {
+    return ChargeIssuingService.isoDate(date);
+  }
 }
 
 /** Quem liga e desliga a exigência do 2FA: o `owner`, ou o `admin` onde não há `owner`. */
@@ -380,7 +409,9 @@ class TenantController {
 
   /**
    * `PUT /api/tenant/subscription/plan` — `{ planId }`: o provedor troca de
-   * plano, na hora.
+   * plano — na hora quando sobe, na renovação quando desce com um período
+   * pago correndo (`subscription.pendingPlan` na resposta), e escolher o plano
+   * atual com uma descida agendada desiste dela.
    *
    * A regra é de `SelfBillingService.changePlan`; aqui ficam as duas trilhas.
    * A do provedor, porque "quem trocou o nosso plano" é pergunta que o dono
@@ -400,12 +431,21 @@ class TenantController {
         countDevices: () => DeviceService.countDevicesFromGenieAcs()
       });
 
-      if (resultado.changed) {
+      // A desistência de uma descida agendada também vai para as duas trilhas:
+      // o plano não mudou, mas o que o provedor vai pagar na renovação mudou,
+      // e é essa a pergunta que a trilha da plataforma responde.
+      if (resultado.changed || resultado.pendingCanceled) {
         const detail = {
           from: resultado.from,
           to: resultado.to,
           toCode: resultado.plan?.code ?? null,
           selfService: true,
+          scheduled: Boolean(resultado.scheduled),
+          ...(resultado.scheduled && resultado.effectiveAt
+            ? { effectiveAt: new Date(resultado.effectiveAt).toISOString() } : {}),
+          ...(resultado.pendingCanceled
+            ? { pendingCanceled: true, canceledPlanId: resultado.canceledPlanId ?? null } : {}),
+          ...(resultado.replacedPlanId ? { replacedPlanId: resultado.replacedPlanId } : {}),
           ...(resultado.charge !== 'none' ? { openCharge: resultado.charge } : {})
         };
         await AuditLog.fromRequest(req, {
@@ -423,10 +463,7 @@ class TenantController {
         if (!registrada) console.warn(`Provider ${req.tenantId} changed its plan without a platform trail line`);
       }
 
-      return res.json(createResponse(
-        req.t(resultado.changed ? 'subscription.planChanged' : 'subscription.planUnchanged'),
-        await subscriptionPayload(req)
-      ));
+      return res.json(createResponse(planChangeMessage(req, resultado), await subscriptionPayload(req)));
     } catch (error) {
       if (error instanceof SelfBillingError) return selfBillingRefusal(req, res, error);
       console.error('Self-service plan change error:', error);
@@ -450,7 +487,9 @@ class TenantController {
    */
   static async payNow(req, res) {
     try {
-      const { charge, issued, customerCreated } = await SelfBillingService.payNow();
+      const { charge, issued, customerCreated } = await SelfBillingService.payNow({
+        countDevices: () => DeviceService.countDevicesFromGenieAcs()
+      });
       if (customerCreated) {
         const provedor = await Tenant.findById(req.tenantId);
         const registrada = await PlatformAudit.fromRequest(req, {

@@ -736,6 +736,8 @@ export default {
   'plans.retrieveFailed': '요금제를 읽지 못했습니다',
   'subscription.planChanged': '요금제가 변경되었습니다',
   'subscription.planUnchanged': '이미 사용 중인 요금제입니다',
+  'subscription.planScheduled': '{date}에 요금제 다운그레이드가 예약되었습니다. 그때까지 현재 요금제가 유지됩니다',
+  'subscription.pendingCanceled': '예약된 요금제 변경이 취소되었습니다. 현재 요금제가 유지됩니다',
   'subscription.planChangeFailed': '요금제를 변경하지 못했습니다',
   'subscription.planNotFound': '이 요금제는 존재하지 않거나 더 이상 제공되지 않습니다',
   'subscription.notChangeable': '이 구독의 요금제는 여기에서 변경할 수 없습니다',
