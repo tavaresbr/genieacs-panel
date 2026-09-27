@@ -77,6 +77,7 @@ export default {
   'device.idRequired': 'L’ID dell’apparato è obbligatorio',
   'device.notFound': 'Apparato non trovato',
   'device.scopeTagProtected': 'L\'etichetta del provider non può essere modificata qui',
+  'device.acsAgentOffline': 'L\'agente GenieACS è disconnesso',
   'device.listRetrieved': 'Apparati ottenuti correttamente',
   'device.listFailed': 'Non è stato possibile ottenere gli apparati',
   'device.exportTooLarge': 'La selezione ha più di {max} dispositivi. Filtra l\'elenco prima di scaricare il foglio',
@@ -682,6 +683,8 @@ export default {
   'invite.alreadyMember': 'Lavori già per questo provider',
 
   'settings.validation.genieAcsAuthType': 'Il tipo di autenticazione GenieACS deve essere none, basic o bearer',
+  'settings.validation.genieAcsConnectionMode': 'La modalità di connessione deve essere direct o agent',
+  'settings.genieAcsAgentModeRequired': 'Passa la connessione alla modalità agente prima di generare una chiave',
   'settings.validation.genieAcsAuthUsername': 'L\'autenticazione basic richiede un nome utente',
 
   'audit.listed': 'Registro di controllo recuperato',

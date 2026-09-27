@@ -2761,6 +2761,7 @@ const ja: Dictionary = {
   'audit.action.genieacsUrlChanged': 'GenieACS のアドレスを変更',
   'audit.action.genieacsAuthChanged': 'GenieACS の認証情報を変更',
   'audit.action.genieacsConnectionChanged': 'GenieACS の接続方法を変更しました',
+  'audit.action.genieacsAgentTokenGenerated': 'GenieACS エージェントのキーを生成しました',
   'audit.action.operatorRoleChanged': 'オペレーターの役割を変更',
   'audit.action.operatorRemoved': 'オペレーターを削除',
   'audit.action.operatorCreated': 'オペレーターを作成',

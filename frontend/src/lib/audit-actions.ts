@@ -28,6 +28,7 @@ export const AUDIT_ACTION_LABEL_KEYS: Record<string, TranslationKey> = {
   'genieacs.url_changed': 'audit.action.genieacsUrlChanged',
   'genieacs.auth_changed': 'audit.action.genieacsAuthChanged',
   'genieacs.connection_changed': 'audit.action.genieacsConnectionChanged',
+  'genieacs.agent_token_generated': 'audit.action.genieacsAgentTokenGenerated',
   'operator.role_changed': 'audit.action.operatorRoleChanged',
   'operator.removed': 'audit.action.operatorRemoved',
   'operator.created': 'audit.action.operatorCreated',

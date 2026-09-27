@@ -2765,6 +2765,7 @@ const de: Dictionary = {
   'audit.action.genieacsUrlChanged': 'GenieACS-Adresse geändert',
   'audit.action.genieacsAuthChanged': 'GenieACS-Zugangsdaten geändert',
   'audit.action.genieacsConnectionChanged': 'GenieACS-Verbindung geändert',
+  'audit.action.genieacsAgentTokenGenerated': 'Schlüssel für den GenieACS-Agenten erzeugt',
   'audit.action.operatorRoleChanged': 'Rolle des Bedieners geändert',
   'audit.action.operatorRemoved': 'Bediener entfernt',
   'audit.action.operatorCreated': 'Bediener angelegt',

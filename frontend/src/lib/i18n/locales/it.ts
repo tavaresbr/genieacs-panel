@@ -2767,6 +2767,7 @@ const it: Dictionary = {
   'audit.action.genieacsUrlChanged': 'Indirizzo GenieACS modificato',
   'audit.action.genieacsAuthChanged': 'Credenziali GenieACS modificate',
   'audit.action.genieacsConnectionChanged': 'Connessione GenieACS modificata',
+  'audit.action.genieacsAgentTokenGenerated': 'Chiave dell\'agente GenieACS generata',
   'audit.action.operatorRoleChanged': 'Ruolo operatore modificato',
   'audit.action.operatorRemoved': 'Operatore rimosso',
   'audit.action.operatorCreated': 'Operatore creato',

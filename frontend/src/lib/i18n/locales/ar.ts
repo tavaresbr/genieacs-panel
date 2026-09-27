@@ -2770,6 +2770,7 @@ const ar: Dictionary = {
   'audit.action.genieacsUrlChanged': 'تم تغيير عنوان GenieACS',
   'audit.action.genieacsAuthChanged': 'تم تغيير بيانات اعتماد GenieACS',
   'audit.action.genieacsConnectionChanged': 'تم تغيير اتصال GenieACS',
+  'audit.action.genieacsAgentTokenGenerated': 'تم إنشاء مفتاح وكيل GenieACS',
   'audit.action.operatorRoleChanged': 'تم تغيير دور المشغّل',
   'audit.action.operatorRemoved': 'تمت إزالة المشغّل',
   'audit.action.operatorCreated': 'تم إنشاء مشغّل',

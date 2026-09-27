@@ -32,8 +32,14 @@ import Tenant from '../models/Tenant.js';
  * Por sufixo e não por lista de nomes: o padrão do `secretBox` é
  * `<coisa>_ciphertext` / `_iv` / `_tag`, e o próximo segredo a nascer vai
  * seguí-lo. Uma lista de nomes deixaria o próximo de fora em silêncio.
+ *
+ * `_token_hash` pelo mesmo raciocínio, para digests de chave: o primeiro foi
+ * `agent_token_hash`, a chave do agente do GenieACS. O digest não volta a ser
+ * chave, mas quem tem o arquivo não precisa dele para nada — a chave se gera
+ * de novo do outro lado — e credencial exportada, ainda que inutilizável, é
+ * hábito que a próxima coluna herda (ver `token_hash` abaixo).
  */
-const SUFIXOS_OMITIDOS = ['_ciphertext', '_iv', '_tag'];
+const SUFIXOS_OMITIDOS = ['_ciphertext', '_iv', '_tag', '_token_hash'];
 
 /**
  * Colunas que também não saem, nomeadas uma a uma porque não têm padrão.

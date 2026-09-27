@@ -30,6 +30,15 @@ router.get('/genieacs-suggestion', authenticateToken, requirePermission('setting
 router.get('/genieacs-auth', authenticateToken, requirePermission('settings.read'), SettingsController.getGenieAcsAuth);
 router.put('/genieacs-auth', authenticateToken, requirePermission('settings.write'), SettingsController.updateGenieAcsAuth);
 
+// Como o painel chega ao GenieACS (direto ou pelo agente) e a chave do agente.
+// As três em `settings.write`, a permissão que grava o `genieAcsUrl`: é o mesmo
+// assunto, e a leitura só serve a quem pode agir sobre ele. ANTES de `/:key`,
+// pela mesma razão das rotas acima — o PUT cairia em `updateSetting` tentando
+// gravar uma chave chamada `genieacs-connection`.
+router.get('/genieacs-connection', authenticateToken, requirePermission('settings.write'), SettingsController.getGenieAcsConnection);
+router.put('/genieacs-connection', authenticateToken, requirePermission('settings.write'), SettingsController.updateGenieAcsConnection);
+router.post('/genieacs-connection/agent-token', authenticateToken, requirePermission('settings.write'), SettingsController.generateGenieAcsAgentToken);
+
 // Os primeiros passos do provedor novo. Também ANTES de `/:key`, pela mesma
 // razão das rotas acima. Ler é `settings.read`: o checklist só aparece a quem
 // administra; marcar "já vi" é `settings.write`, como gravar qualquer ajuste.

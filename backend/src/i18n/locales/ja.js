@@ -80,6 +80,7 @@ export default {
   'device.idRequired': '機器 ID が必要です',
   'device.notFound': '機器が見つかりません',
   'device.scopeTagProtected': 'プロバイダーのタグはここでは変更できません',
+  'device.acsAgentOffline': 'GenieACS エージェントが接続されていません',
   'device.listRetrieved': '機器を取得しました',
   'device.listFailed': '機器を取得できませんでした',
   'device.exportTooLarge': '対象が {max} 台を超えています。スプレッドシートをダウンロードする前に一覧を絞り込んでください',
@@ -684,6 +685,8 @@ export default {
   'invite.alreadyMember': 'すでにこのプロバイダーに所属しています',
 
   'settings.validation.genieAcsAuthType': 'GenieACS の認証方式は none、basic、bearer のいずれかにしてください',
+  'settings.validation.genieAcsConnectionMode': '接続方式は direct または agent にしてください',
+  'settings.genieAcsAgentModeRequired': 'キーを生成する前に接続をエージェントモードに切り替えてください',
   'settings.validation.genieAcsAuthUsername': 'basic 認証にはユーザー名が必要です',
 
   'audit.listed': '監査ログを取得しました',

@@ -2761,6 +2761,7 @@ const zhCN: Dictionary = {
   'audit.action.genieacsUrlChanged': '修改了 GenieACS 地址',
   'audit.action.genieacsAuthChanged': '修改了 GenieACS 凭据',
   'audit.action.genieacsConnectionChanged': 'GenieACS 连接方式已更改',
+  'audit.action.genieacsAgentTokenGenerated': '已生成 GenieACS 代理密钥',
   'audit.action.operatorRoleChanged': '修改了操作员角色',
   'audit.action.operatorRemoved': '删除了操作员',
   'audit.action.operatorCreated': '创建了操作员',

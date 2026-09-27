@@ -81,6 +81,8 @@ router.get('/tenants/:id/genieacs', authenticateToken, requirePlatformAdmin, Pla
 router.put('/tenants/:id/genieacs', authenticateToken, requirePlatformAdmin, PlatformGenieAcsController.update);
 router.post('/tenants/:id/genieacs/test', authenticateToken, requirePlatformAdmin, PlatformGenieAcsController.test);
 router.post('/tenants/:id/genieacs/tag-devices', authenticateToken, requirePlatformAdmin, PlatformGenieAcsController.tagDevices);
+// A chave do agente do GenieACS (modo `agent`). Mostrada uma vez, na resposta.
+router.post('/tenants/:id/genieacs/agent-token', authenticateToken, requirePlatformAdmin, PlatformGenieAcsController.agentToken);
 
 router.get('/metrics', allowMetricsScraper, PlatformController.metrics);
 

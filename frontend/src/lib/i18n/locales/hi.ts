@@ -2769,6 +2769,7 @@ const hi: Dictionary = {
   'audit.action.genieacsUrlChanged': 'GenieACS का पता बदला गया',
   'audit.action.genieacsAuthChanged': 'GenieACS के क्रेडेंशियल बदले गए',
   'audit.action.genieacsConnectionChanged': 'GenieACS कनेक्शन बदला गया',
+  'audit.action.genieacsAgentTokenGenerated': 'GenieACS एजेंट की कुंजी बनाई गई',
   'audit.action.operatorRoleChanged': 'ऑपरेटर की भूमिका बदली गई',
   'audit.action.operatorRemoved': 'ऑपरेटर हटाया गया',
   'audit.action.operatorCreated': 'ऑपरेटर बनाया गया',

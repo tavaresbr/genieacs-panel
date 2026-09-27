@@ -154,6 +154,11 @@ describe('o que NÃO entra', () => {
     assert.equal(exportaColuna('qualquer_coisa_nova_ciphertext'), false);
     assert.equal(exportaColuna('qualquer_coisa_nova_iv'), false);
     assert.equal(exportaColuna('qualquer_coisa_nova_tag'), false);
+    // O digest da chave do agente do GenieACS, e o próximo digest de chave.
+    assert.equal(exportaColuna('agent_token_hash'), false);
+    assert.equal(exportaColuna('qualquer_coisa_nova_token_hash'), false);
+    // Metadado da chave continua saindo: a tela e quem recebe sabem que existia.
+    assert.equal(exportaColuna('agent_token_hint'), true);
     assert.equal(exportaColuna('password_key_version'), true);
     assert.equal(exportaColuna('device_id'), true);
   });

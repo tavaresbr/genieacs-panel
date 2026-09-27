@@ -2761,6 +2761,7 @@ const ptBR: Dictionary = {
   'audit.action.genieacsUrlChanged': 'Endereço do GenieACS alterado',
   'audit.action.genieacsAuthChanged': 'Credenciais do GenieACS alteradas',
   'audit.action.genieacsConnectionChanged': 'Conexão do GenieACS alterada',
+  'audit.action.genieacsAgentTokenGenerated': 'Chave do agente do GenieACS gerada',
   'audit.action.operatorRoleChanged': 'Papel de operador alterado',
   'audit.action.operatorRemoved': 'Operador removido',
   'audit.action.operatorCreated': 'Operador criado',

@@ -2762,6 +2762,7 @@ const zhTW: Dictionary = {
   'audit.action.genieacsUrlChanged': '變更了 GenieACS 位址',
   'audit.action.genieacsAuthChanged': '變更了 GenieACS 憑證',
   'audit.action.genieacsConnectionChanged': 'GenieACS 連線方式已變更',
+  'audit.action.genieacsAgentTokenGenerated': '已產生 GenieACS 代理程式金鑰',
   'audit.action.operatorRoleChanged': '變更了操作員角色',
   'audit.action.operatorRemoved': '移除了操作員',
   'audit.action.operatorCreated': '建立了操作員',

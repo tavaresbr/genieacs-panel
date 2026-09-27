@@ -194,28 +194,57 @@ class DirectConnector {
     // usar o valor de quando a requisição foi ENFILEIRADA. Ela é lida quando a
     // requisição vai sair — e continua vindo de `nbiHeaders`, que é o único
     // lugar que a monta.
+    //
+    // O que sai daqui para `send` é o pedido já decidido — destino, método,
+    // corpo, prazo — e SÓ o transporte muda de um modo para o outro: o direto
+    // e o túnel vão pelo egresso, o agente (`agent.js`) desce pelo WebSocket
+    // que o programa do provedor abriu. Escopo, raiz, vaga e prazo continuam
+    // aqui, uma vez, para todos.
     return withAcsSlot(async () => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
       try {
-        const options = {
-          method,
-          headers: await GenieAcsAuthService.nbiHeaders(headers),
-          signal: controller.signal,
-          // Nunca seguir 3xx: um host autorizado que responde com redirecionamento
-          // está tentando levar a requisição a um lugar que ninguém autorizou, e
-          // seguir seria desfazer a guarda de egresso depois de ela ter passado.
-          redirect: 'manual'
-        };
+        const extras = { ...headers };
+        let payload = null;
         if (body !== null && body !== undefined) {
-          options.headers['Content-Type'] = 'application/json';
-          options.body = typeof body === 'string' ? body : JSON.stringify(body);
+          extras['Content-Type'] = 'application/json';
+          payload = typeof body === 'string' ? body : JSON.stringify(body);
         }
-        return await GenieAcsEgress.fetch(url, { ...options, ...this.egressOptions() });
+        return await this.send(url, {
+          method, headers: extras, body: payload, signal: controller.signal, timeoutMs
+        });
       } finally {
         clearTimeout(timeoutId);
       }
     });
+  }
+
+  /**
+   * O transporte: leva o pedido já montado até a NBI e devolve a `Response`.
+   *
+   * **A credencial é posta AQUI, por `nbiHeaders`, em todo transporte.** Não
+   * em `request`, que seria um lugar só — e é justamente por isso: um
+   * transporte novo que recebesse os headers prontos não teria como provar
+   * que eles vieram de `nbiHeaders`, e a guarda estática de
+   * `genieacs-nbi-auth.test.js` confere, arquivo por arquivo, que cada `send`
+   * monta a credencial do lado da sua própria saída. `headers` aqui são só os
+   * extras do chamador (e o `Content-Type` quando há corpo).
+   *
+   * Continua sendo lida quando a requisição vai sair, porque `send` roda
+   * dentro da vaga (ver o comentário em `request`).
+   */
+  static async send(url, { method, headers, body, signal }) {
+    const options = {
+      method,
+      headers: await GenieAcsAuthService.nbiHeaders(headers),
+      signal,
+      // Nunca seguir 3xx: um host autorizado que responde com redirecionamento
+      // está tentando levar a requisição a um lugar que ninguém autorizou, e
+      // seguir seria desfazer a guarda de egresso depois de ela ter passado.
+      redirect: 'manual'
+    };
+    if (body !== null && body !== undefined) options.body = body;
+    return GenieAcsEgress.fetch(url, { ...options, ...this.egressOptions() });
   }
 
   /**
@@ -241,10 +270,18 @@ class DirectConnector {
     if (minha) {
       // tenant-scope-exempt: a pergunta é justamente se OUTRO provedor usa o
       // mesmo ACS — atravessa provedores de propósito, e só lê o endereço.
+      //
+      // Quem está em modo `agent` não conta: o endereço dele (quando há) é o
+      // de dentro da rede DELE, alcançado pelo agente dele, e coincidir com o
+      // de outro — `http://localhost:7557` é o de metade das instalações — não
+      // é ACS compartilhado. Contá-lo poria o vizinho no escopo vazio.
       const rows = await getDb()('settings')
         .where({ key: 'genieAcsUrl' })
-        .whereNot({ tenant_id: id })
-        .whereIn('tenant_id', getDb()('tenants').whereNot({ kind: 'platform' }).select('id'))
+        .whereNot('settings.tenant_id', id)
+        .whereIn('settings.tenant_id', getDb()('tenants').whereNot({ kind: 'platform' }).select('id'))
+        .whereNotIn('settings.tenant_id', getDb()('tenant_genieacs_connections')
+          .where('tenant_genieacs_connections.mode', 'agent')
+          .select('tenant_genieacs_connections.tenant_id'))
         .select('value');
       value = rows.some((row) => origemDe(row.value) === minha);
     }

@@ -2,11 +2,13 @@ import { currentTenantId } from '../../config/tenantContext.js';
 import GenieAcsConnection from '../../models/GenieAcsConnection.js';
 import DirectConnector from './direct.js';
 import TunnelConnector from './tunnel.js';
+import AgentConnector from './agent.js';
 
 /** O conector de cada modo de `tenant_genieacs_connections`. */
 const CONECTORES = Object.freeze({
   direct: DirectConnector,
-  tunnel: TunnelConnector
+  tunnel: TunnelConnector,
+  agent: AgentConnector
 });
 
 /**
@@ -33,7 +35,15 @@ const CONECTORES = Object.freeze({
  *
  * - `direct`: a URL, pelo egresso com as guardas de sempre;
  * - `tunnel`: a mesma URL, com a rede privada DE CLIENTE liberada para este
- *   provedor (`tunnel.js`) — o GenieACS atrás de VPN/WireGuard.
+ *   provedor (`tunnel.js`) — o GenieACS atrás de VPN/WireGuard;
+ * - `agent`: sem URL alcançável nenhuma — um programa na rede do provedor
+ *   abriu WebSocket de saída para o painel, e o pedido desce por ele
+ *   (`agent.js`, `agentHub.js`). Só o transporte muda: escopo, raiz, vaga,
+ *   prazo e credencial são os do direto. Agente desconectado é
+ *   `acs_agent_offline` na hora, que as rotas devolvem como 503.
+ *
+ * Os três diferem só em `send` (e o túnel, em `egressOptions`): tudo o que
+ * vem antes de sair — e é onde mora a segurança — é o mesmo código.
  *
  * `allow_private_ranges` do plano virou o próprio modo `tunnel`, e não uma
  * coluna solta: liberar rede privada sem dizer por quê seria uma chave que
@@ -56,4 +66,4 @@ export async function connectorFor() {
   return CONECTORES[await GenieAcsConnection.mode()] ?? DirectConnector;
 }
 
-export { DirectConnector, TunnelConnector };
+export { DirectConnector, TunnelConnector, AgentConnector };

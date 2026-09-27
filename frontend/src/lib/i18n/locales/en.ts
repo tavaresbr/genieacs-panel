@@ -2763,6 +2763,7 @@ const en = {
   'audit.action.genieacsUrlChanged': 'GenieACS address changed',
   'audit.action.genieacsAuthChanged': 'GenieACS credentials changed',
   'audit.action.genieacsConnectionChanged': 'GenieACS connection changed',
+  'audit.action.genieacsAgentTokenGenerated': 'GenieACS agent key generated',
   'audit.action.operatorRoleChanged': 'Operator role changed',
   'audit.action.operatorRemoved': 'Operator removed',
   'audit.action.operatorCreated': 'Operator created',

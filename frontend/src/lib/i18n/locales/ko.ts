@@ -2768,6 +2768,7 @@ const ko: Dictionary = {
   'audit.action.genieacsUrlChanged': 'GenieACS 주소 변경',
   'audit.action.genieacsAuthChanged': 'GenieACS 자격 증명 변경',
   'audit.action.genieacsConnectionChanged': 'GenieACS 연결 방식이 변경됨',
+  'audit.action.genieacsAgentTokenGenerated': 'GenieACS 에이전트 키가 생성됨',
   'audit.action.operatorRoleChanged': '운영자 역할 변경',
   'audit.action.operatorRemoved': '운영자 삭제',
   'audit.action.operatorCreated': '운영자 생성',

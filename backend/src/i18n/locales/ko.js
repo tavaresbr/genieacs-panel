@@ -80,6 +80,7 @@ export default {
   'device.idRequired': '장비 ID가 필요합니다',
   'device.notFound': '장비를 찾을 수 없습니다',
   'device.scopeTagProtected': '제공자 태그는 여기서 변경할 수 없습니다',
+  'device.acsAgentOffline': 'GenieACS 에이전트가 연결되어 있지 않습니다',
   'device.listRetrieved': '장비 목록을 조회했습니다',
   'device.listFailed': '장비 목록을 조회하지 못했습니다',
   'device.exportTooLarge': '선택된 장비가 {max}대를 넘습니다. 스프레드시트를 받기 전에 목록을 필터링하세요',
@@ -687,6 +688,8 @@ export default {
   'invite.alreadyMember': '이미 이 사업자 소속입니다',
 
   'settings.validation.genieAcsAuthType': 'GenieACS 인증 방식은 none, basic, bearer 중 하나여야 합니다',
+  'settings.validation.genieAcsConnectionMode': '연결 방식은 direct 또는 agent여야 합니다',
+  'settings.genieAcsAgentModeRequired': '키를 생성하기 전에 연결을 에이전트 모드로 전환하세요',
   'settings.validation.genieAcsAuthUsername': 'basic 인증에는 사용자 이름이 필요합니다',
 
   'audit.listed': '감사 로그를 가져왔습니다',

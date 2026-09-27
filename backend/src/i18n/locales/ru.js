@@ -80,6 +80,7 @@ export default {
   'device.idRequired': 'Требуется идентификатор устройства',
   'device.notFound': 'Устройство не найдено',
   'device.scopeTagProtected': 'Тег провайдера нельзя изменить здесь',
+  'device.acsAgentOffline': 'Агент GenieACS не подключён',
   'device.listRetrieved': 'Список устройств получен',
   'device.listFailed': 'Не удалось получить список устройств',
   'device.exportTooLarge': 'В выборке больше {max} устройств. Отфильтруйте список перед загрузкой таблицы',
@@ -685,6 +686,8 @@ export default {
   'invite.alreadyMember': 'Вы уже работаете у этого провайдера',
 
   'settings.validation.genieAcsAuthType': 'Тип аутентификации GenieACS должен быть none, basic или bearer',
+  'settings.validation.genieAcsConnectionMode': 'Режим подключения должен быть direct или agent',
+  'settings.genieAcsAgentModeRequired': 'Переключите подключение в режим агента, прежде чем создавать ключ',
   'settings.validation.genieAcsAuthUsername': 'Аутентификация basic требует имя пользователя',
 
   'audit.listed': 'Журнал аудита получен',

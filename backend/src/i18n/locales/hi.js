@@ -78,6 +78,7 @@ export default {
   'device.idRequired': 'उपकरण आईडी आवश्यक है',
   'device.notFound': 'उपकरण नहीं मिला',
   'device.scopeTagProtected': 'प्रदाता का टैग यहाँ से नहीं बदला जा सकता',
+  'device.acsAgentOffline': 'GenieACS एजेंट कनेक्ट नहीं है',
   'device.listRetrieved': 'उपकरण सूची प्राप्त हुई',
   'device.listFailed': 'उपकरण सूची प्राप्त नहीं हो सकी',
   'device.exportTooLarge': 'चयन में {max} से अधिक उपकरण हैं। स्प्रेडशीट डाउनलोड करने से पहले सूची फ़िल्टर करें',
@@ -685,6 +686,8 @@ export default {
   'invite.alreadyMember': 'आप पहले से ही इस प्रदाता के लिए काम करते हैं',
 
   'settings.validation.genieAcsAuthType': 'GenieACS प्रमाणीकरण प्रकार none, basic या bearer होना चाहिए',
+  'settings.validation.genieAcsConnectionMode': 'कनेक्शन मोड direct या agent होना चाहिए',
+  'settings.genieAcsAgentModeRequired': 'कुंजी बनाने से पहले कनेक्शन को एजेंट मोड में बदलें',
   'settings.validation.genieAcsAuthUsername': 'बेसिक प्रमाणीकरण के लिए उपयोगकर्ता नाम आवश्यक है',
 
   'audit.listed': 'ऑडिट ट्रेल प्राप्त हुआ',

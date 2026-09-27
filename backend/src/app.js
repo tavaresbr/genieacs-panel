@@ -21,6 +21,7 @@ import {
 import { authenticateToken, requirePermission } from './middleware/auth.js';
 import { log, requestLogger } from './utils/logger.js';
 import { httpMetrics } from './utils/metrics.js';
+import { acsAgentOfflineBody, isAgentOffline } from './services/genieacs/agent.js';
 
 import authRoutes from './routes/auth.js';
 import deviceRoutes from './routes/devices.js';
@@ -384,6 +385,11 @@ export function errorHandler(err, req, res, next) {
       success: false,
       message: t('common.invalidJson')
     });
+  }
+  // O agente do GenieACS desconectado chega aqui quando uma rota deixa o
+  // erro subir: sai no mesmo formato que as rotas de equipamento dão a ele.
+  if (isAgentOffline(err)) {
+    return res.status(503).json(acsAgentOfflineBody(err, translateError(t, err)));
   }
   const status = err.status || 500;
   // Internal messages are revealed only when the deployment explicitly asks

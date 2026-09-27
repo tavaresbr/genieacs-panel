@@ -77,6 +77,7 @@ export default {
   'device.idRequired': 'O ID do equipamento é obrigatório',
   'device.notFound': 'Equipamento não encontrado',
   'device.scopeTagProtected': 'A tag do provedor não pode ser alterada por aqui',
+  'device.acsAgentOffline': 'O agente do GenieACS está desconectado',
   'device.listRetrieved': 'Equipamentos obtidos com sucesso',
   'device.listFailed': 'Não foi possível obter os equipamentos',
   'device.exportTooLarge': 'O recorte tem mais de {max} equipamentos. Filtre a lista antes de baixar a planilha',
@@ -681,6 +682,8 @@ export default {
   'invite.alreadyMember': 'Você já trabalha para este provedor',
 
   'settings.validation.genieAcsAuthType': 'O tipo de autenticação do GenieACS tem que ser none, basic ou bearer',
+  'settings.validation.genieAcsConnectionMode': 'O modo de conexão tem que ser direct ou agent',
+  'settings.genieAcsAgentModeRequired': 'Passe a conexão para o modo agente antes de gerar a chave',
   'settings.validation.genieAcsAuthUsername': 'A autenticação basic precisa de um usuário',
 
   'audit.listed': 'Trilha de auditoria carregada',
