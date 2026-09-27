@@ -1073,10 +1073,15 @@ export interface CataloguePropagation {
 }
 
 /** O GenieACS de um provedor, como o console o vê: sem o segredo. */
+/** Como o painel chega ao GenieACS de um provedor. Só o console escolhe. */
+export type GenieAcsConnectionMode = 'direct' | 'tunnel'
+
 export interface TenantGenieAcs {
   /** Os caminhos dos parâmetros virtuais TR-069 deste provedor (`vpRxPower`, …). */
   virtualParameters: Record<string, string>
   url: string
+  /** `tunnel`: o GenieACS numa rede privada de cliente, liberada só para este provedor. */
+  mode: GenieAcsConnectionMode
   auth: GenieAcsAuthConfig
   /** O endereço que o deploy sugere a este provedor, ou nulo. */
   suggestion: string | null
@@ -1649,7 +1654,7 @@ export const platformAPI = {
 
   /** `secret` ausente mantém o guardado; `''` apaga. */
   updateTenantGenieAcs: (tenantId: number, payload: {
-    url?: string; authType?: GenieAcsAuthType; username?: string; secret?: string
+    url?: string; mode?: GenieAcsConnectionMode; authType?: GenieAcsAuthType; username?: string; secret?: string
     virtualParameters?: Record<string, string>; deviceTag?: string; autoTagPrefixes?: string
   }) =>
     apiClient.put<TenantGenieAcs>(`/platform/tenants/${tenantId}/genieacs`, payload),
@@ -3283,6 +3288,29 @@ export interface BotConfig {
   hours: { enabled: boolean; timezone: string; week: BotHoursDay[] }
 }
 
+/** O relatório do chatbot: `GET /whatsapp/bot-report`. */
+export interface BotReport {
+  days: 7 | 30 | 90
+  timezone: string
+  replies: number
+  conversations: number
+  resolvedWithoutHuman: number
+  /** `null` sem nenhuma conversa no período. */
+  resolvedRate: number | null
+  invoicesSent: number
+  noOpenInvoice: number
+  signalChecks: number
+  outagesInformed: number
+  unlocks: number
+  identified: number
+  documentFailures: number
+  humanRequests: number
+  /** 24 posições, hora 0 a 23 no fuso do horário de atendimento. */
+  humanRequestsByHour: number[]
+  daily: { day: string; conversations: number }[]
+  intents: Record<string, number>
+}
+
 export const whatsappAPI = {
   getConfig: () =>
     apiClient.get<WhatsAppConfig>('/whatsapp/config'),
@@ -3293,6 +3321,9 @@ export const whatsappAPI = {
   /** Campo ausente mantém o gravado. */
   updateBotConfig: (config: Partial<Omit<BotConfig, 'defaults'>>) =>
     apiClient.put<BotConfig>('/whatsapp/bot-config', config),
+
+  getBotReport: (days: 7 | 30 | 90) =>
+    apiClient.get<BotReport>(`/whatsapp/bot-report?days=${days}`),
 
   // An omitted managedAdminKey keeps the stored one; "" clears it. The server
   // never returns it either way.

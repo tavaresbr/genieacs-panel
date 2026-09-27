@@ -89,6 +89,14 @@ const naoEncontrado = () => new TranslatableError('device.notFound', null, { sta
 class DirectConnector {
   static mode = 'direct';
 
+  /**
+   * O que este modo acrescenta ao egresso. O direto não acrescenta nada; o
+   * túnel (`tunnel.js`) libera a rede privada de cliente.
+   */
+  static egressOptions() {
+    return {};
+  }
+
   /** A URL configurada para este provedor, sem normalizar. */
   static async baseUrl() {
     const settings = await Setting.getAll();
@@ -203,7 +211,7 @@ class DirectConnector {
           options.headers['Content-Type'] = 'application/json';
           options.body = typeof body === 'string' ? body : JSON.stringify(body);
         }
-        return await GenieAcsEgress.fetch(url, options);
+        return await GenieAcsEgress.fetch(url, { ...options, ...this.egressOptions() });
       } finally {
         clearTimeout(timeoutId);
       }

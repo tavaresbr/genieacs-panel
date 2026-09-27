@@ -1558,6 +1558,27 @@ const outageIncidentDevicesTable = (db) => (t) => {
   t.index(['tenant_id', 'device_id'], 'outage_incident_devices_device_idx');
 };
 
+/**
+ * O que o bot respondeu, uma linha por resposta: a intenção e a conversa. É o
+ * que o relatório do chatbot conta — `wa_messages` guarda que o bot falou,
+ * não sobre o quê. Sem texto nenhum aqui: a mensagem continua só onde já
+ * estava. Podada em 180 dias pelo agendador.
+ */
+const waBotEventsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.integer('conversation_id').unsigned().nullable();
+  t.string('intent', 32).notNullable();
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.index(['tenant_id', 'created_at'], 'wa_bot_events_created_idx');
+  t.index(['tenant_id', 'conversation_id'], 'wa_bot_events_conversation_idx');
+};
+
+const WA_BOT_EVENT_TABLES = [
+  ['wa_bot_events', waBotEventsTable]
+];
+
 const OUTAGE_TABLES = [
   ['outage_incidents', outageIncidentsTable],
   ['outage_incident_devices', outageIncidentDevicesTable]
@@ -1588,6 +1609,27 @@ const accountLockoutsTable = () => (t) => {
 
 const LOCKOUT_TABLES = [
   ['account_lockouts', accountLockoutsTable]
+];
+
+/**
+ * Como o painel chega ao GenieACS de cada provedor: `direct` (a URL, como
+ * sempre foi), `tunnel` (a URL numa rede privada de cliente, liberada pela
+ * plataforma) e, depois, `agent`. Sem linha, vale `direct` — é o que todo
+ * provedor de antes desta tabela já fazia, e a migração não precisa escrever
+ * nada para que continue assim.
+ */
+const tenantGenieAcsConnectionsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.string('mode', 16).notNullable().defaultTo('direct');
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['tenant_id']);
+};
+
+const GENIEACS_CONNECTION_TABLES = [
+  ['tenant_genieacs_connections', tenantGenieAcsConnectionsTable]
 ];
 
 const SGP_CONTACT_TABLES = [
@@ -1658,6 +1700,8 @@ export const SCHEMA_TABLES = [
   ...SGP_CONTACT_TABLES,
   ...MFA_TABLES,
   ...OUTAGE_TABLES,
+  ...WA_BOT_EVENT_TABLES,
+  ...GENIEACS_CONNECTION_TABLES,
   ...LOCKOUT_TABLES
 ].map(([name]) => name);
 
@@ -4021,12 +4065,44 @@ export const migrations = [
     }
   },
   {
+    /** O que o bot respondeu — ver `waBotEventsTable`. */
+    id: '0068_wa_bot_events',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      return db.schema.hasTable('wa_bot_events');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      for (const [nome, construtor] of WA_BOT_EVENT_TABLES) {
+        // eslint-disable-next-line no-await-in-loop
+        await createTableIfMissing(db, nome, construtor(db));
+      }
+    }
+  },
+  {
+    /**
+     * Como o painel chega ao GenieACS de cada provedor — ver
+     * `tenantGenieAcsConnectionsTable`. Tabela nova e vazia: sem linha vale
+     * `direct`, que é o que todos já faziam.
+     */
+    id: '0069_tenant_genieacs_connections',
+    async isApplied(db) {
+      return db.schema.hasTable('tenant_genieacs_connections');
+    },
+    async up(db) {
+      for (const [nome, construtor] of GENIEACS_CONNECTION_TABLES) {
+        // eslint-disable-next-line no-await-in-loop -- uma tabela por vez
+        await createTableIfMissing(db, nome, construtor(db));
+      }
+    }
+  },
+  {
     /**
      * A trava por conta contra força bruta — ver `accountLockoutsTable`. Nasce
      * vazia: ninguém começa travado, e quem já errou a senha antes do upgrade
      * começa a contar do zero.
      */
-    id: '0068_account_lockouts',
+    id: '0070_account_lockouts',
     async isApplied(db) {
       return db.schema.hasTable('account_lockouts');
     },

@@ -8,6 +8,7 @@ import GenieAcsEgress, { EGRESS_REFUSED } from '../services/genieacsEgress.js';
 import GenieAcsAuthService, { AUTH_TYPES } from '../services/genieacsAuthService.js';
 import Tenant from '../models/Tenant.js';
 import { suggestGenieAcsUrl } from '../services/genieacsSuggestion.js';
+import { connectorFor } from '../services/genieacs/connector.js';
 import { currentTenantId } from '../config/tenantContext.js';
 import { PLATFORM_MANAGED_SETTING_KEYS, platformManagesCurrentTenant } from '../config/platformManaged.js';
 import SubscriptionService from '../services/subscriptionService.js';
@@ -598,12 +599,18 @@ export async function probeGenieAcs(t, url) {
     const mesmaOrigem = (() => {
       try { return salva ? new URL(salva).origin === testUrl.origin : false; } catch { return false; }
     })();
+    // O modo do provedor (túnel: rede privada de cliente liberada) vale para o
+    // teste pela mesma regra da credencial: só na origem JÁ SALVA. Um endereço
+    // qualquer vindo no corpo, com a rede privada liberada, faria do botão uma
+    // sonda da rede do painel — inclusive do túnel de outro provedor.
+    const modo = mesmaOrigem ? (await connectorFor()).egressOptions() : {};
     const response = await GenieAcsEgress.fetch(testUrl, {
       method: 'GET',
       headers: mesmaOrigem
         ? await GenieAcsAuthService.nbiHeaders()
         : { Accept: 'application/json' },
-      signal: controller.signal
+      signal: controller.signal,
+      ...modo
     });
 
     clearTimeout(timeoutId);

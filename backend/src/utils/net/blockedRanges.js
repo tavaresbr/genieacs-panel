@@ -166,3 +166,29 @@ export function blockedAddressReason(address) {
   if (bytes) return blockedIpv6Reason(bytes);
   return 'not a usable IP address';
 }
+
+/**
+ * Se o endereço é rede privada DE CLIENTE: onde mora um GenieACS atrás de VPN,
+ * WireGuard ou de um link dedicado — e nada além disso.
+ *
+ * É o que o modo `tunnel` libera, e a lista é curta de propósito: 10/8,
+ * 172.16/12, 192.168/16, CGNAT (100.64/10) e fc00::/7, também quando escritos
+ * dentro de um IPv6 que embute IPv4. Loopback, link-local (onde mora o serviço
+ * de metadados da nuvem), 0/8 e multicast continuam fora mesmo no túnel: são
+ * endereços do PRÓPRIO servidor do painel, e liberá-los faria do túnel de um
+ * cliente uma porta para dentro do painel.
+ */
+export function isCustomerPrivateAddress(address) {
+  const text = String(address ?? '').replace(/^\[|\]$/g, '').split('%')[0];
+  const v4Privado = ([a, b]) => a === 10
+    || (a === 172 && b >= 16 && b <= 31)
+    || (a === 192 && b === 168)
+    || (a === 100 && b >= 64 && b <= 127);
+  if (net.isIPv4(text)) return v4Privado(ipv4Bytes(text));
+  const bytes = ipv6Bytes(text);
+  if (!bytes) return false;
+  if ((bytes[0] & 0xfe) === 0xfc) return true;
+  const zeroThrough9 = bytes.slice(0, 10).every((byte) => byte === 0);
+  const embutido = zeroThrough9 && ((bytes[10] === 0xff && bytes[11] === 0xff) || (bytes[10] === 0 && bytes[11] === 0));
+  return embutido ? v4Privado(bytes.slice(12)) : false;
+}
