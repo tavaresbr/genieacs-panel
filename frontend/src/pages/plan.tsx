@@ -1,18 +1,35 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
-import { subscriptionAPI, type SubscriptionUsage } from '@/lib/api'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { subscriptionAPI, type SubscriptionUsage, type TenantPlanOption } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
 import { BillingProfile } from '@/components/billing-profile'
 import { TenantCharges } from '@/components/tenant-charges'
+import { useAuth } from '@/contexts/auth-context'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
+import { formatMoney } from '@/lib/money'
+import {
+  PLAN_RESOURCES,
+  canPayNow,
+  canSwitchTo,
+  needsBillingProfile,
+  overLimitDetail,
+  payInNewTab,
+  periodLabel,
+  resourceLabelKey
+} from '@/lib/plan-options'
 
 /**
- * The provider's own "plan and usage": which plan, in what state, how much of
- * it is used. Read-only on purpose — changing any of it is the platform's job,
- * and the screen says whom to talk to instead of offering a button that would
- * answer 404.
+ * O "plano e uso" do próprio provedor: qual plano, em que estado, quanto dele
+ * está em uso — e, para quem tem `settings.write`, a troca de plano e o
+ * "pagar agora".
+ *
+ * A troca vale na hora e sem proporcional: a próxima cobrança já sai com o
+ * preço novo. É o backend quem recusa a troca para um plano que não comporta o
+ * uso atual (`over_limit`); a tela só traduz a recusa em números. Quem não
+ * escreve vê o catálogo, mas sem botões — mostrar um botão que sempre daria 403
+ * é apontar para o que a pessoa não alcança.
  */
 const STATUS_KEYS: Record<string, TranslationKey> = {
   trial: 'platform.subscription.trial',
@@ -25,7 +42,7 @@ const STATUS_KEYS: Record<string, TranslationKey> = {
 function badgeClass(status: string | undefined) {
   if (status === 'active' || status === 'trial') return 'modern-badge-success'
   if (status === 'past_due') return 'modern-badge-warning'
-  return 'modern-badge-danger'
+  return 'modern-badge-error'
 }
 
 function formatDate(value: string | null | undefined) {
@@ -43,21 +60,94 @@ function expirou(value: string | null | undefined) {
 
 export default function PlanPage() {
   const { t } = useTranslation()
+  const { can } = useAuth()
   const [data, setData] = useState<SubscriptionUsage | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [plans, setPlans] = useState<TenantPlanOption[] | null>(null)
+  const [plansError, setPlansError] = useState<string | null>(null)
+  const [mudando, setMudando] = useState<number | null>(null)
+  const [pagando, setPagando] = useState(false)
+  const [aviso, setAviso] = useState<{ tipo: 'erro' | 'ok'; texto: string } | null>(null)
+  // Muda a cada troca de plano ou cobrança gerada: é o que faz a lista de
+  // cobranças, que carrega sozinha, buscar de novo.
+  const [chargesKey, setChargesKey] = useState(0)
+  const cadastroRef = useRef<HTMLDivElement>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
-    const res = await subscriptionAPI.current()
+    // O catálogo carrega junto, mas com o próprio erro: uma falha nele não
+    // pode esconder o plano atual, e vice-versa.
+    const [res, catalogo] = await Promise.all([subscriptionAPI.current(), subscriptionAPI.plans()])
     if (res.success && res.data) {
       setData(res.data)
       setError(null)
     } else {
       setError(res.message || '')
     }
+    if (catalogo.success && catalogo.data) {
+      setPlans(catalogo.data)
+      setPlansError(null)
+    } else {
+      setPlansError(catalogo.message || '')
+    }
     setLoading(false)
   }, [])
+
+  const podeEscrever = can('settings.write')
+
+  const mudarPara = async (plan: TenantPlanOption) => {
+    const periodo = periodLabel(plan.periodDays, formatMoney(plan.priceCents, plan.currency))
+    const preco = t(periodo.key, periodo.vars)
+    if (!window.confirm(t('plan.options.confirm', { name: plan.name, price: preco }))) return
+    setMudando(plan.id)
+    setAviso(null)
+    const res = await subscriptionAPI.changePlan(plan.id)
+    if (res.success && res.data) {
+      setData(res.data)
+      setError(null)
+      setAviso({ tipo: 'ok', texto: t('plan.options.changed', { name: plan.name }) })
+      // O preço novo muda o que "pagar agora" oferece, e a troca pode ter
+      // mexido na cobrança em aberto: as duas listas voltam do servidor.
+      const catalogo = await subscriptionAPI.plans()
+      if (catalogo.success && catalogo.data) setPlans(catalogo.data)
+      setChargesKey((k) => k + 1)
+    } else {
+      const acima = overLimitDetail(res)
+      setAviso({
+        tipo: 'erro',
+        texto: acima
+          ? t(acima.key, { resource: t(acima.resourceKey), used: acima.used, limit: acima.limit })
+          : res.message || t('plan.options.changeFailed')
+      })
+    }
+    setMudando(null)
+  }
+
+  // Síncrono até o `payInNewTab`: a aba nova tem que abrir dentro do clique,
+  // ou o navegador a bloqueia como pop-up.
+  const pagarAgora = () => {
+    setPagando(true)
+    setAviso(null)
+    void payInNewTab(subscriptionAPI.payNow).then((res) => {
+      setPagando(false)
+      setChargesKey((k) => k + 1)
+      if (res.success && res.data?.charge?.invoiceUrl) return
+      if (res.success) {
+        setAviso({ tipo: 'erro', texto: t('plan.payNoLink') })
+        return
+      }
+      const texto = res.message || t('plan.payFailed')
+      if (needsBillingProfile(res.code)) {
+        // O que falta está nesta mesma tela, logo abaixo: leva a pessoa até lá.
+        setAviso({ tipo: 'erro', texto: `${texto} ${t('plan.payBillingHint')}` })
+        cadastroRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        cadastroRef.current?.focus({ preventScroll: true })
+      } else {
+        setAviso({ tipo: 'erro', texto })
+      }
+    })
+  }
 
   useEffect(() => {
     void load()
@@ -128,7 +218,13 @@ export default function PlanPage() {
                   </div>
                 )}
               </dl>
-              <p className="field-hint mt-4">{t('plan.contactHint')}</p>
+              <p className="field-hint mt-4">{t('plan.changeHint')}</p>
+              {canPayNow(plans, podeEscrever) && (
+                <button type="button" className="modern-button mt-4" disabled={pagando} onClick={pagarAgora}>
+                  <Icon name="invoice" size={17} />
+                  {pagando ? t('plan.paying') : t('plan.payNow')}
+                </button>
+              )}
             </section>
 
             <section className="modern-card p-5 sm:p-6">
@@ -164,6 +260,66 @@ export default function PlanPage() {
           </div>
         )}
 
+        {aviso && (
+          <p
+            role={aviso.tipo === 'erro' ? 'alert' : 'status'}
+            className={`mt-6 text-sm ${aviso.tipo === 'erro' ? 'text-destructive' : 'text-emerald-700 dark:text-emerald-400'}`}
+          >
+            {aviso.texto}
+          </p>
+        )}
+
+        {/* O catálogo fica entre o plano atual e as cobranças: é a pergunta
+            seguinte a "em que plano estou". Fora do estado de carga da
+            assinatura, como as cobranças, porque tem a própria carga. */}
+        {!loading && (
+          <section className="modern-card mt-6 p-5 sm:p-6">
+            <h2 className="section-heading">{t('plan.options.title')}</h2>
+            <p className="section-description">{t('plan.options.description')}</p>
+            {plansError !== null ? (
+              <p className="mt-3 text-sm text-destructive">{plansError || t('plan.options.loadFailed')}</p>
+            ) : !plans?.length ? (
+              <p className="mt-3 text-sm text-muted-foreground">{t('plan.options.empty')}</p>
+            ) : (
+              <ul className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {plans.map((plan) => {
+                  const periodo = periodLabel(plan.periodDays, formatMoney(plan.priceCents, plan.currency))
+                  return (
+                    <li
+                      key={plan.id}
+                      className={`flex min-w-0 flex-col rounded-lg border p-4 ${plan.current ? 'border-primary' : 'border-border'}`}
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <h3 className="min-w-0 break-words font-semibold text-foreground">{plan.name}</h3>
+                        {plan.current && <span className="modern-badge-success">{t('plan.options.current')}</span>}
+                      </div>
+                      <p className="mt-1 text-lg font-semibold text-foreground">{t(periodo.key, periodo.vars)}</p>
+                      <dl className="mt-3 flex-1 space-y-1 text-sm">
+                        {PLAN_RESOURCES.map((recurso) => (
+                          <div key={recurso} className="flex justify-between gap-3">
+                            <dt className="text-muted-foreground">{t(resourceLabelKey(recurso))}</dt>
+                            <dd className="font-medium">{plan.limits[recurso] ?? t('plan.options.unlimited')}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                      {canSwitchTo(plan, podeEscrever) && (
+                        <button
+                          type="button"
+                          className="modern-button-secondary mt-4 w-full justify-center"
+                          disabled={mudando !== null}
+                          onClick={() => void mudarPara(plan)}
+                        >
+                          {mudando === plan.id ? t('plan.options.switching') : t('plan.options.switch')}
+                        </button>
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </section>
+        )}
+
         {/* As cobranças vêm ANTES do cadastro fiscal e depois do plano, que é a
             ordem da pergunta: em que plano estou, o que me foi cobrado, e para
             quem vai a nota. Fora do `else` do estado de carga acima de
@@ -171,14 +327,16 @@ export default function PlanPage() {
             assinatura — que é um dos que mais precisa pagar — continua vendo o
             que deve. */}
         <div className="mt-6">
-          <TenantCharges />
+          <TenantCharges refreshKey={chargesKey} />
         </div>
 
         {/* Abaixo do plano, e não numa aba das configurações: é a mesma
             conversa — em que plano estou, até quando paguei, e para quem vai a
             nota. */}
+        {/* `tabIndex` para o "pagar agora" poder levar o foco até aqui quando a
+            cobrança é recusada por falta de CNPJ ou razão social. */}
         {data && (
-          <div className="mt-6">
+          <div ref={cadastroRef} tabIndex={-1} className="mt-6 scroll-mt-4 outline-none">
             <BillingProfile
               billing={data.billing}
               onSaved={(billing) => setData((atual) => (atual ? { ...atual, billing } : atual))}

@@ -364,7 +364,7 @@ export function PlanCatalog({ plans, onChange }: Props) {
                       em minúsculas, como sufixo de um item de lista — e uma
                       chave quase igual só para a maiúscula seria pior do que
                       uma regra de estilo. */}
-                  <span className={`capitalize ${plan.active ? 'modern-badge-success' : 'modern-badge-danger'}`}>
+                  <span className={`capitalize ${plan.active ? 'modern-badge-success' : 'modern-badge-error'}`}>
                     {t(plan.active ? 'platform.plans.active' : 'platform.plans.inactive')}
                   </span>
                 </div>

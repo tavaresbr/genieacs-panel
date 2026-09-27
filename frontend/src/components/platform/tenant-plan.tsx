@@ -43,7 +43,7 @@ function expirou(value: string | null | undefined) {
 export function statusBadgeClass(status: SubscriptionStatus | null | undefined) {
   if (status === 'active' || status === 'trial') return 'modern-badge-success'
   if (status === 'past_due') return 'modern-badge-warning'
-  return 'modern-badge-danger'
+  return 'modern-badge-error'
 }
 
 function formatDate(value: string | null | undefined) {

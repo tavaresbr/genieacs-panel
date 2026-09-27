@@ -135,6 +135,13 @@ export interface ApiResponse<T = any> {
   expectedCents?: number
   paidCents?: number
   /**
+   * Só no 409 `over_limit` da troca de plano: qual recurso não cabe no plano
+   * escolhido, quanto o provedor usa e quanto o plano novo permite. `limit`
+   * é o mesmo campo do 402 logo acima.
+   */
+  resource?: 'operators' | 'subscribers' | 'devices'
+  used?: number
+  /**
    * Só no 409 do login: para onde esta conta pode entrar. Existe quando o
    * endereço não nomeia provedor e a pessoa trabalha em mais de um — a senha
    * está certa e falta escolher, que é conflito de estado e não credencial.
@@ -287,6 +294,10 @@ class ApiClient {
           ...(data.skipped ? { skipped: data.skipped } : {}),
           ...(data.subscription !== undefined ? { subscription: data.subscription } : {}),
           ...(typeof data.limit === 'number' ? { limit: data.limit, current: data.current } : {}),
+          // O 409 `over_limit` da troca de plano: a tela diz QUAL recurso
+          // passa do plano novo e por quanto, e isso só o servidor sabe.
+          ...(typeof data.resource === 'string' ? { resource: data.resource } : {}),
+          ...(typeof data.used === 'number' ? { used: data.used } : {}),
           // O 409 de valor curto, pelo mesmo desenho do 402 acima: a tela tem
           // que dizer QUANTO falta, e a conta é do servidor — refazê-la aqui
           // seria a segunda cópia de "quanto foi pedido", que é a que diverge.
@@ -1274,6 +1285,23 @@ export interface SubscriptionUsage {
 }
 
 /**
+ * Um plano do catálogo como o PROVEDOR o vê, para escolher para qual mudar.
+ *
+ * Só os planos à venda, com o preço e os tetos; `current` marca o que ele
+ * assina hoje. Limite nulo é ilimitado.
+ */
+export interface TenantPlanOption {
+  id: number
+  code: string
+  name: string
+  priceCents: number
+  currency: string
+  periodDays: number
+  limits: PlanLimits
+  current: boolean
+}
+
+/**
  * Uma cobrança emitida a este provedor, como ele a vê.
  *
  * `invoiceUrl` é a página do gateway onde se paga, e vem nula quando não há o
@@ -1662,7 +1690,26 @@ export const subscriptionAPI = {
    * que dá a saída do muro do 402, e por isso a tela de bloqueio também a
    * chama.
    */
-  charges: () => apiClient.get<{ charges: TenantChargeView[] }>('/tenant/charges')
+  charges: () => apiClient.get<{ charges: TenantChargeView[] }>('/tenant/charges'),
+
+  /** Os planos à venda, com o atual marcado. */
+  plans: () => apiClient.get<TenantPlanOption[]>('/tenant/plans'),
+
+  /**
+   * Troca o plano na hora, sem proporcional: a próxima cobrança já sai com o
+   * preço novo. Recusa com `over_limit` (e `resource`/`used`/`limit`) quando o
+   * uso atual não cabe no plano escolhido.
+   */
+  changePlan: (planId: number) =>
+    apiClient.put<SubscriptionUsage>('/tenant/subscription/plan', { planId }),
+
+  /**
+   * Emite (ou reaproveita) a cobrança do período e devolve o link de
+   * pagamento. Recusa sem cadastro fiscal (`missing_tax_id`,
+   * `invalid_tax_id`, `missing_name`) e em plano grátis (`free_plan`).
+   */
+  payNow: () =>
+    apiClient.post<{ charge: TenantChargeView }>('/tenant/charges/pay', {})
 }
 
 export const usersAPI = {
