@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   platformAPI,
+  type GenieAcsAgentStatus,
   type GenieAcsAuthType,
   type GenieAcsConnectionMode,
   type Tenant,
@@ -14,9 +15,23 @@ import { Icon } from '@/components/ui/icon'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
 import { INSTALLER_VIRTUAL_PARAMETERS, VIRTUAL_PARAMETER_FIELDS } from '@/lib/virtual-parameters'
+import { modeOptions } from '@/lib/genieacs-agent'
+import { GenieAcsAgentPanel } from '@/components/genieacs-agent-panel'
 
 interface Props {
   tenant: Tenant
+}
+
+const MODE_LABELS: Record<GenieAcsConnectionMode, TranslationKey> = {
+  direct: 'platform.genieacs.modeDirect',
+  tunnel: 'platform.genieacs.modeTunnel',
+  agent: 'platform.genieacs.modeAgent'
+}
+
+const MODE_HINTS: Record<GenieAcsConnectionMode, TranslationKey> = {
+  direct: 'platform.genieacs.modeDirectHint',
+  tunnel: 'platform.genieacs.modeTunnelHint',
+  agent: 'platform.genieacs.modeAgentHint'
 }
 
 const AUTH_LABELS: Record<GenieAcsAuthType, TranslationKey> = {
@@ -40,6 +55,10 @@ const AUTH_LABELS: Record<GenieAcsAuthType, TranslationKey> = {
  * GenieACS: com ela, o painel do provedor só enxerga (e só age em) ONTs que a
  * carregam. A marcação em lote existe para a frota que já estava no ACS antes
  * da tag — sempre com prévia antes de aplicar.
+ *
+ * O modo Agente é para o GenieACS numa rede sem IP público: um programa
+ * instalado lá abre a conexão até o painel. O bloco dele (estado, chave,
+ * instalação) é o mesmo das Configurações do provedor — `GenieAcsAgentPanel`.
  */
 export function TenantGenieAcs({ tenant }: Props) {
   const { t, formatDateTime } = useTranslation()
@@ -90,6 +109,13 @@ export function TenantGenieAcs({ tenant }: Props) {
     // apagaria o que a pessoa está digitando.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenant.id, preencher])
+
+  // A leitura periódica do bloco do agente traz o snapshot inteiro, mas só o
+  // `agent` é aproveitado: repreencher o formulário apagaria o que a pessoa
+  // está digitando nos outros campos.
+  const guardarAgente = useCallback((agent: GenieAcsAgentStatus) => {
+    setData((atual) => (atual ? { ...atual, agent } : atual))
+  }, [])
 
   const salvar = async () => {
     if (authType === 'basic' && !username.trim()) {
@@ -197,13 +223,28 @@ export function TenantGenieAcs({ tenant }: Props) {
           value={mode}
           onChange={(e) => setMode(e.target.value as GenieAcsConnectionMode)}
         >
-          <option value="direct">{t('platform.genieacs.modeDirect')}</option>
-          <option value="tunnel">{t('platform.genieacs.modeTunnel')}</option>
+          {modeOptions('console', true, mode).map((opcao) => (
+            <option key={opcao} value={opcao}>{t(MODE_LABELS[opcao])}</option>
+          ))}
         </select>
-        <p className="field-hint">
-          {t(mode === 'tunnel' ? 'platform.genieacs.modeTunnelHint' : 'platform.genieacs.modeDirectHint')}
-        </p>
+        <p className="field-hint">{t(MODE_HINTS[mode])}</p>
       </div>
+
+      {/* O bloco aparece com o SELETOR em Agente — a pessoa vê o que vem
+          antes de salvar —, mas a chave só é gerada com o modo gravado: ver
+          `keyButtonState`. O console é de administrador da plataforma, que
+          sempre pode gravar o GenieACS de um provedor. */}
+      {mode === 'agent' && (
+        <GenieAcsAgentPanel
+          idPrefix={`tenant-${tenant.id}`}
+          initialStatus={data.agent ?? null}
+          savedMode={data.mode ?? 'direct'}
+          canWrite
+          fetchStatus={() => platformAPI.getTenantGenieAcs(tenant.id)}
+          generateToken={() => platformAPI.generateTenantGenieAcsAgentToken(tenant.id)}
+          onStatus={guardarAgente}
+        />
+      )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <div>

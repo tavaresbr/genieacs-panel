@@ -795,6 +795,8 @@ export default function DeviceDetailPage() {
   const [searchParams] = useSearchParams()
   const deviceId = searchParams.get('id') || ''
   const [device, setDevice] = useState<ProcessedDeviceDetail | null>(null)
+  // A frase do 503 `acs_agent_offline`, quando é por isso que não há equipamento.
+  const [agentOffline, setAgentOffline] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
   const [rebooting, setRebooting] = useState(false)
@@ -871,11 +873,17 @@ export default function DeviceDetailPage() {
       const res = await devicesAPI.getDevice(deviceId)
       if (res.success && res.data) {
         const nextDevice = res.data as ProcessedDeviceDetail
+        setAgentOffline(null)
         setDevice(nextDevice)
         setInstallationDate(nextDevice.customer?.installationDate || '')
         setWanContainer((current) => current || nextDevice.wanContainers?.[0]?.path || '')
       } else {
-        toast.error(res.message || t('detail.loadFailed'))
+        // Agente desconectado não é "equipamento não encontrado": a tela vazia
+        // diz o que houve em vez de mandar a pessoa de volta à lista, que vai
+        // falhar igual. Uma releitura (o `isRefresh` depois de salvar) que cai
+        // aqui também troca a tela — o equipamento na tela já não é o de agora.
+        setAgentOffline(res.code === 'acs_agent_offline' ? (res.message || t('detail.loadFailed')) : null)
+        if (res.code !== 'acs_agent_offline') toast.error(res.message || t('detail.loadFailed'))
         setDevice(null)
       }
     } catch (error) {
@@ -1330,6 +1338,28 @@ export default function DeviceDetailPage() {
           <div className="grid gap-4 md:grid-cols-2">
             <div className="h-64 animate-pulse rounded-md bg-muted" />
             <div className="h-64 animate-pulse rounded-md bg-muted" />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!device && agentOffline) {
+    return (
+      <div className="page-shell">
+        <div className="page-frame">
+          <div className="modern-card empty-state" role="alert">
+            <div className="empty-state-icon text-[hsl(var(--status-danger))]"><Icon name="warning" size={22} /></div>
+            <h2 className="empty-state-title">{t('detail.agentOffline.title')}</h2>
+            <p className="empty-state-copy">{agentOffline}</p>
+            <div className="mt-5 flex flex-wrap justify-center gap-2">
+              <button type="button" onClick={() => void fetchDeviceDetails()} className="modern-button">
+                {t('devices.error.retry')}
+              </button>
+              <button type="button" onClick={() => navigate('/devices')} className="modern-button-secondary">
+                {t('detail.notFound.back')}
+              </button>
+            </div>
           </div>
         </div>
       </div>

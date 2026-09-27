@@ -2,6 +2,8 @@ import { getActiveLocale, translate } from '@/lib/i18n'
 import type { LoginResponse, OperatorRole, User } from '@/types'
 import { MFA_ENROLLMENT_EVENT, isMfaEnrollmentRefusal } from '@/lib/mfa-enrollment'
 import type { LiveStatus } from '@/lib/map-status'
+import { offlineMessageKey } from '@/lib/genieacs-agent'
+import { formatRelativeTime } from '@/lib/utils'
 
 // Acima de `apiClient`, que o dispara: um `const` de módulo lido antes da
 // declaração é uma ReferenceError no primeiro 402.
@@ -140,6 +142,30 @@ export interface ApiResponse<T = any> {
    * está certa e falta escolher, que é conflito de estado e não credencial.
    */
   destinations?: LoginDestinations
+  /**
+   * Só no 503 `acs_agent_offline`: quando o agente do GenieACS deste provedor
+   * foi visto pela última vez, ou `null` se nunca se conectou. A frase já vem
+   * montada em `message`; o campo segue junto para a tela que quiser mostrar a
+   * data inteira em vez do "há 3 horas".
+   */
+  lastSeenAt?: string | null
+}
+
+/**
+ * A frase do agente desconectado, montada AQUI e não no servidor.
+ *
+ * O 503 `acs_agent_offline` pode vir de qualquer rota que fala com o GenieACS —
+ * lista, detalhe, painel, ações —, e cada tela já mostra `res.message` quando a
+ * chamada falha. Traduzindo no único cano por onde todas passam, a lista, o
+ * detalhe e a tira do painel dizem "agente desconectado" sem que cada uma
+ * aprenda o código; e o "há quanto tempo" sai no relógio e no idioma de quem
+ * olha, que o servidor não conhece.
+ */
+export function agentOfflineMessage(lastSeenAt: string | null | undefined): string {
+  const key = offlineMessageKey(lastSeenAt)
+  return translate(getActiveLocale(), key, key === 'api.acsAgentOffline' && lastSeenAt
+    ? { when: formatRelativeTime(lastSeenAt) }
+    : undefined)
 }
 
 /**
@@ -269,6 +295,16 @@ class ApiClient {
       }
 
       if (!response.ok) {
+        if (data.code === 'acs_agent_offline') {
+          const lastSeenAt = typeof data.lastSeenAt === 'string' ? data.lastSeenAt : null
+          return {
+            success: false,
+            message: agentOfflineMessage(lastSeenAt),
+            error: data.error || translate(getActiveLocale(), 'api.unknownError'),
+            code: data.code,
+            lastSeenAt
+          }
+        }
         return {
           success: false,
           // `missing_permission` é o 403 de quem tem sessão boa e papel curto.
@@ -426,10 +462,14 @@ class ApiClient {
         return {
           success: false,
           code: data.code,
-          message: data.message || translate(
-            getActiveLocale(),
-            data.code === 'missing_permission' ? 'api.missingPermission' : 'api.requestFailed'
-          )
+          // A planilha de equipamentos passa por aqui e lê o GenieACS: o agente
+          // desconectado tem a mesma frase que em `request`.
+          message: data.code === 'acs_agent_offline'
+            ? agentOfflineMessage(typeof data.lastSeenAt === 'string' ? data.lastSeenAt : null)
+            : data.message || translate(
+              getActiveLocale(),
+              data.code === 'missing_permission' ? 'api.missingPermission' : 'api.requestFailed'
+            )
         }
       }
       return {
@@ -1072,16 +1112,62 @@ export interface CataloguePropagation {
   updated: number
 }
 
+/**
+ * Como o painel chega ao GenieACS de um provedor.
+ *
+ * `agent`: o GenieACS fica na rede do provedor, e um programa instalado lá (o
+ * agente) abre a conexão até o painel — nenhuma porta aberta do lado dele. O
+ * console escolhe entre os três; nas Configurações, a instalação própria
+ * escolhe entre `direct` e `agent` (ver `GenieAcsConnectionSettings`).
+ */
+export type GenieAcsConnectionMode = 'direct' | 'tunnel' | 'agent'
+
+/**
+ * O estado do agente do GenieACS de um provedor. Nunca a chave: `tokenHint` são
+ * os 4 últimos caracteres dela, para conferir qual está instalada.
+ */
+export interface GenieAcsAgentStatus {
+  tokenHint: string | null
+  tokenCreatedAt: string | null
+  /** Há uma conexão aberta agora. */
+  connected: boolean
+  /** A última vez que o agente esteve conectado; `null` se nunca esteve. */
+  lastSeenAt: string | null
+  /** A versão que o agente anunciou no `hello`. */
+  version: string | null
+}
+
+/** A resposta da geração de chave: a ÚNICA vez que a chave inteira sai do servidor. */
+export interface GenieAcsAgentToken {
+  token: string
+  agent: GenieAcsAgentStatus
+}
+
+/** Como o painel chega ao GenieACS, visto das Configurações do provedor. */
+export interface GenieAcsConnectionSettings {
+  mode: GenieAcsConnectionMode
+  /** Falso na SaaS: quem escolhe o modo é a plataforma, pelo console. */
+  modeEditable: boolean
+  agent: GenieAcsAgentStatus
+}
+
 /** O GenieACS de um provedor, como o console o vê: sem o segredo. */
-/** Como o painel chega ao GenieACS de um provedor. Só o console escolhe. */
-export type GenieAcsConnectionMode = 'direct' | 'tunnel'
 
 export interface TenantGenieAcs {
   /** Os caminhos dos parâmetros virtuais TR-069 deste provedor (`vpRxPower`, …). */
   virtualParameters: Record<string, string>
   url: string
-  /** `tunnel`: o GenieACS numa rede privada de cliente, liberada só para este provedor. */
+  /**
+   * `tunnel`: o GenieACS numa rede privada de cliente, liberada só para este
+   * provedor; `agent`: alcançado pelo agente instalado na rede do provedor.
+   */
   mode: GenieAcsConnectionMode
+  /**
+   * O estado do agente — presente em todo modo, porque a chave sobrevive a uma
+   * troca de modo e a tela mostra o que há ao voltar para `agent`. Opcional no
+   * tipo porque um servidor anterior ao agente não o manda.
+   */
+  agent?: GenieAcsAgentStatus
   auth: GenieAcsAuthConfig
   /** O endereço que o deploy sugere a este provedor, ou nulo. */
   suggestion: string | null
@@ -1663,6 +1749,13 @@ export const platformAPI = {
   tagTenantDevices: (tenantId: number, payload: { pppoePrefix?: string; serials?: string; apply?: boolean }) =>
     apiClient.post<TenantDeviceTagging>(`/platform/tenants/${tenantId}/genieacs/tag-devices`, payload),
 
+  /**
+   * Gera a chave do agente do GenieACS deste provedor. A resposta traz a chave
+   * inteira UMA vez; gerar outra desconecta o agente que roda com a atual.
+   */
+  generateTenantGenieAcsAgentToken: (tenantId: number) =>
+    apiClient.post<GenieAcsAgentToken>(`/platform/tenants/${tenantId}/genieacs/agent-token`),
+
   testTenantGenieAcs: (tenantId: number, url?: string) =>
     apiClient.post<{ deviceCount?: number }>(`/platform/tenants/${tenantId}/genieacs/test`, url ? { url } : {}),
 
@@ -1970,6 +2063,25 @@ export const settingsAPI = {
 
   updateGenieAcsAuth: (payload: GenieAcsAuthPayload) =>
     apiClient.put<GenieAcsAuthConfig>('/settings/genieacs-auth', payload),
+
+  /** Como o painel chega ao GenieACS deste provedor, e o estado do agente. */
+  getGenieAcsConnection: () =>
+    apiClient.get<GenieAcsConnectionSettings>('/settings/genieacs-connection'),
+
+  /**
+   * Troca o modo. Só a instalação própria: na SaaS o servidor responde 403
+   * `platform_managed` (quem escolhe é a plataforma). `tunnel` não é oferecido
+   * aqui — fora da SaaS a rede privada já é permitida, e o servidor recusa.
+   */
+  updateGenieAcsConnection: (payload: { mode: Exclude<GenieAcsConnectionMode, 'tunnel'> }) =>
+    apiClient.put<GenieAcsConnectionSettings>('/settings/genieacs-connection', payload),
+
+  /**
+   * Gera a chave do agente. Vale nas duas edições (quem instala o agente é o
+   * provedor), mas só com o modo gravado em `agent` — senão 409 `mode_not_agent`.
+   */
+  generateGenieAcsAgentToken: () =>
+    apiClient.post<GenieAcsAgentToken>('/settings/genieacs-connection/agent-token'),
 
   /**
    * O endereço de GenieACS que o deploy sugere a este provedor, ou `null`.
