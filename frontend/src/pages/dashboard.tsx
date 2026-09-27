@@ -69,7 +69,12 @@ interface SgpDivergenceGroup {
   emptyKey: TranslationKey
   tone: string
   total: number
-  rows: { deviceId: string; detail: string }[]
+  rows: {
+    deviceId: string
+    detail: string
+    /** Only the stale-active group sets this: `null` means no likely replacement was found. */
+    successor?: { deviceId: string } | null
+  }[]
 }
 
 /** GenieACS reports these bucket names in English; the panel shows them translated. */
@@ -227,6 +232,8 @@ export default function DashboardPage() {
   const sgpGroups = useMemo<SgpDivergenceGroup[]>(() => {
     if (!sgpOverview) return []
     const { onlineBlocked, offlineActive, unlinked } = sgpOverview.divergences
+    // `?? []`/`?? 0`: an older backend does not send the stale block yet.
+    const staleActive = sgpOverview.divergences.staleActive ?? []
     // The lists are samples; the counts to show come from `totals`.
     const { totals } = sgpOverview
     return [
@@ -254,6 +261,21 @@ export default function DashboardPage() {
           detail: [row.clientName, row.contract, row.lastInform ? t('dashboard.sgp.lastInform', { time: formatDateTime(row.lastInform) }) : null]
             .filter(Boolean)
             .join(' · '),
+        })),
+      },
+      {
+        key: 'staleActive',
+        titleKey: 'dashboard.sgp.staleActive.title',
+        hintKey: 'dashboard.sgp.staleActive.hint',
+        emptyKey: 'dashboard.sgp.staleActive.empty',
+        tone: 'text-[hsl(var(--status-warning))]',
+        total: totals.staleActive ?? 0,
+        rows: staleActive.slice(0, SGP_PREVIEW_ROWS).map((row) => ({
+          deviceId: row.deviceId,
+          detail: [row.clientName, row.contract, row.lastInform ? t('dashboard.sgp.lastInform', { time: formatDateTime(row.lastInform) }) : null]
+            .filter(Boolean)
+            .join(' · '),
+          successor: row.successor ? { deviceId: row.successor.deviceId } : null,
         })),
       },
       {
@@ -427,7 +449,7 @@ export default function DashboardPage() {
                 </span>
               </p>
             </div>
-            <div className="grid gap-px bg-border md:grid-cols-3">
+            <div className="grid gap-px bg-border md:grid-cols-2 xl:grid-cols-4">
               {sgpGroups.map((group) => (
                 <div key={group.key} className="bg-card p-5">
                   <div className="flex items-start justify-between gap-3">
@@ -451,6 +473,27 @@ export default function DashboardPage() {
                             </span>
                             <Icon name="chevron-right" size={16} className="shrink-0" />
                           </Link>
+                          {row.successor !== undefined && (
+                            <p className="-mt-1 flex flex-wrap items-center gap-2 pb-2 text-xs">
+                              {row.successor ? (
+                                <>
+                                  <span className="rounded-full border border-[hsl(var(--status-warning))]/50 bg-[hsl(var(--status-warning))]/10 px-2 py-0.5 text-[hsl(var(--status-warning))]">
+                                    {t('dashboard.sgp.staleActive.likelySwap')}
+                                  </span>
+                                  <Link
+                                    to={`/devices/detail?id=${encodeURIComponent(row.successor.deviceId)}`}
+                                    className="min-w-0 truncate font-mono hover:text-primary"
+                                  >
+                                    → {row.successor.deviceId}
+                                  </Link>
+                                </>
+                              ) : (
+                                <span className="rounded-full border border-border px-2 py-0.5 text-muted-foreground">
+                                  {t('dashboard.sgp.staleActive.noSuccessor')}
+                                </span>
+                              )}
+                            </p>
+                          )}
                         </li>
                       ))}
                     </ul>

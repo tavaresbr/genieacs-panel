@@ -22,7 +22,8 @@
  * uma lista fechada, e não por um cast que o TypeScript aceita e o servidor não.
  */
 
-export type DeviceStatusFilter = 'all' | 'online' | 'offline'
+/** `stale`: último Inform há mais de 3 dias — o servidor aplica o corte. */
+export type DeviceStatusFilter = 'all' | 'online' | 'offline' | 'stale'
 export type SgpFilter = 'all' | 'active' | 'blocked' | 'cancelled' | 'unknown' | 'unlinked'
 
 /**
@@ -34,7 +35,7 @@ export type SgpFilter = 'all' | 'active' | 'blocked' | 'cancelled' | 'unknown' |
  */
 export type DeviceFocusFilter = 'all' | 'new24h' | 'weak-signal' | 'hot' | 'many-clients'
 
-const STATUS_FILTERS: readonly DeviceStatusFilter[] = ['all', 'online', 'offline']
+const STATUS_FILTERS: readonly DeviceStatusFilter[] = ['all', 'online', 'offline', 'stale']
 const SGP_FILTERS: readonly SgpFilter[] = [
   'all', 'active', 'blocked', 'cancelled', 'unknown', 'unlinked'
 ]

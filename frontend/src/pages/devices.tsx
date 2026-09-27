@@ -477,6 +477,7 @@ export default function DevicesPage() {
                     <option value="all">{t('devices.filter.all')}</option>
                     <option value="online">{t('devices.filter.onlineOnly')}</option>
                     <option value="offline">{t('devices.filter.offlineOnly')}</option>
+                    <option value="stale">{t('devices.filter.staleOnly')}</option>
                   </select>
                   <Icon name="chevron-down" size={17} className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 </div>
