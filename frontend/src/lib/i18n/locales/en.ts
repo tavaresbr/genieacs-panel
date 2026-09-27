@@ -2760,6 +2760,7 @@ const en = {
   'audit.action.userMfaDisabled': 'Two-step login turned off',
   'audit.action.userMfaRecoveryRegenerated': 'Recovery codes replaced',
   'audit.action.userMfaRecoveryUsed': 'Signed in with a recovery code',
+  'audit.action.userAccountLocked': 'Account locked after failed attempts',
   'audit.action.alertsTelegramChanged': 'Alerts Telegram bot or group changed',
   'audit.action.tenantMfaRequiredChanged': 'Two-step login requirement changed',
   'audit.action.operatorMfaReset': 'Operator two-step login turned off by the team',

@@ -24,6 +24,7 @@ export default {
   'auth.insufficientPermissions': '權限不足',
   'auth.credentialsRequired': '需要填寫使用者名稱與密碼',
   'auth.invalidCredentials': '使用者名稱或密碼無效',
+  'auth.accountLocked': '此帳戶的失敗嘗試次數過多。請稍候幾分鐘再試一次。',
   'auth.loginSuccess': '登入成功',
   'auth.chooseDestination': '請選擇登入位置',
   'auth.logoutSuccess': '已登出',

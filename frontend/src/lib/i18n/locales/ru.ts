@@ -2766,6 +2766,7 @@ const ru: Dictionary = {
   'audit.action.userMfaDisabled': 'Двухэтапный вход выключен',
   'audit.action.userMfaRecoveryRegenerated': 'Коды восстановления заменены',
   'audit.action.userMfaRecoveryUsed': 'Вход по коду восстановления',
+  'audit.action.userAccountLocked': 'Учётная запись заблокирована после неудачных попыток',
   'audit.action.alertsTelegramChanged': 'Изменён бот или группа Telegram для оповещений',
   'audit.action.tenantMfaRequiredChanged': 'Требование двухэтапного входа изменено',
   'audit.action.operatorMfaReset': 'Двухэтапный вход оператора отключён командой',

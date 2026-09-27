@@ -2766,6 +2766,7 @@ const hi: Dictionary = {
   'audit.action.userMfaDisabled': 'दो-चरण लॉगिन बंद किया गया',
   'audit.action.userMfaRecoveryRegenerated': 'रिकवरी कोड बदले गए',
   'audit.action.userMfaRecoveryUsed': 'रिकवरी कोड से लॉगिन',
+  'audit.action.userAccountLocked': 'असफल प्रयासों के बाद खाता लॉक हुआ',
   'audit.action.alertsTelegramChanged': 'अलर्ट का Telegram बॉट या समूह बदला गया',
   'audit.action.tenantMfaRequiredChanged': 'दो-चरणीय लॉगिन की अनिवार्यता बदली गई',
   'audit.action.operatorMfaReset': 'टीम ने ऑपरेटर का दो-चरणीय लॉगिन बंद किया',

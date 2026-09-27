@@ -1,6 +1,7 @@
 import { getDb, insertReturningId, tinsert } from '../config/database.js';
 import { currentTenantId } from '../config/tenantContext.js';
 import { IS_SAAS } from '../config/edition.js';
+import AccountLockout from './AccountLockout.js';
 
 class User {
   /**
@@ -311,6 +312,13 @@ class User {
     });
   }
 
+  /**
+   * Senha nova, e com ela duas coisas que andam juntas: toda sessão antiga
+   * morre (`token_version`) e a trava por tentativas erradas some. A segunda é
+   * a porta de saída de quem foi trancado por um ataque — o link por e-mail, o
+   * administrador que define a senha — e todo caminho que troca a senha já
+   * provou alguma coisa antes de chegar aqui. Ver `AccountLockout`.
+   */
   static async updatePassword(id, hashedPassword) {
     await getDb()('users')
       .where({ id })
@@ -319,6 +327,7 @@ class User {
         token_version: getDb().raw('token_version + 1'),
         updated_at: new Date()
       });
+    await AccountLockout.clearUser(id);
   }
 
   static async updateUsername(id, newUsername) {

@@ -2759,6 +2759,7 @@ const zhTW: Dictionary = {
   'audit.action.userMfaDisabled': '關閉兩步驟登入',
   'audit.action.userMfaRecoveryRegenerated': '更換復原代碼',
   'audit.action.userMfaRecoveryUsed': '使用復原代碼登入',
+  'audit.action.userAccountLocked': '因多次失敗嘗試鎖定帳戶',
   'audit.action.alertsTelegramChanged': '警示 Telegram 機器人或群組已變更',
   'audit.action.tenantMfaRequiredChanged': '兩步驟登入要求已變更',
   'audit.action.operatorMfaReset': '團隊關閉了操作員的兩步驟登入',

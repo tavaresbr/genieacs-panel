@@ -66,6 +66,7 @@ export const AUDIT_ACTION_LABEL_KEYS: Record<string, TranslationKey> = {
   'user.mfa_disabled': 'audit.action.userMfaDisabled',
   'user.mfa_recovery_regenerated': 'audit.action.userMfaRecoveryRegenerated',
   'user.mfa_recovery_used': 'audit.action.userMfaRecoveryUsed',
+  'user.account_locked': 'audit.action.userAccountLocked',
   'tenant.mfa_required_changed': 'audit.action.tenantMfaRequiredChanged',
   'operator.mfa_reset': 'audit.action.operatorMfaReset',
   'operator.updated': 'audit.action.operatorUpdated',

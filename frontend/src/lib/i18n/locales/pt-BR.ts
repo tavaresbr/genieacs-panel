@@ -2758,6 +2758,7 @@ const ptBR: Dictionary = {
   'audit.action.userMfaDisabled': 'Login em duas etapas desligado',
   'audit.action.userMfaRecoveryRegenerated': 'Códigos de recuperação trocados',
   'audit.action.userMfaRecoveryUsed': 'Entrou com código de recuperação',
+  'audit.action.userAccountLocked': 'Conta travada por tentativas erradas',
   'audit.action.alertsTelegramChanged': 'Bot ou grupo do Telegram dos alertas alterado',
   'audit.action.tenantMfaRequiredChanged': 'Exigência do login em duas etapas alterada',
   'audit.action.operatorMfaReset': 'Login em duas etapas de operador desligado pela equipe',

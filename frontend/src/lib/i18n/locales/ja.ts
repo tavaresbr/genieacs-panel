@@ -2758,6 +2758,7 @@ const ja: Dictionary = {
   'audit.action.userMfaDisabled': '2 段階ログインを無効化',
   'audit.action.userMfaRecoveryRegenerated': '復旧コードを再発行',
   'audit.action.userMfaRecoveryUsed': '復旧コードでログイン',
+  'audit.action.userAccountLocked': '失敗した試行によりアカウントをロック',
   'audit.action.alertsTelegramChanged': 'アラートの Telegram ボットまたはグループを変更',
   'audit.action.tenantMfaRequiredChanged': '2段階ログインの必須設定を変更',
   'audit.action.operatorMfaReset': 'チームがオペレーターの2段階ログインを無効化',

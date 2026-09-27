@@ -2762,6 +2762,7 @@ const de: Dictionary = {
   'audit.action.userMfaDisabled': 'Zwei-Schritt-Anmeldung deaktiviert',
   'audit.action.userMfaRecoveryRegenerated': 'Wiederherstellungscodes ersetzt',
   'audit.action.userMfaRecoveryUsed': 'Mit Wiederherstellungscode angemeldet',
+  'audit.action.userAccountLocked': 'Konto nach Fehlversuchen gesperrt',
   'audit.action.alertsTelegramChanged': 'Telegram-Bot oder -Gruppe der Warnungen geändert',
   'audit.action.tenantMfaRequiredChanged': 'Vorgabe zur Anmeldung in zwei Schritten geändert',
   'audit.action.operatorMfaReset': 'Anmeldung in zwei Schritten eines Operators vom Team ausgeschaltet',

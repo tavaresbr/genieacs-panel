@@ -24,6 +24,7 @@ export default {
   'auth.insufficientPermissions': '权限不足',
   'auth.credentialsRequired': '需要填写用户名和密码',
   'auth.invalidCredentials': '用户名或密码无效',
+  'auth.accountLocked': '此账户的失败尝试次数过多。请等待几分钟后重试。',
   'auth.loginSuccess': '登录成功',
   'auth.chooseDestination': '请选择登录位置',
   'auth.logoutSuccess': '已退出登录',
