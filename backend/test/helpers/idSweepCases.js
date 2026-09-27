@@ -95,6 +95,39 @@ export const casos = [
     tabela: 'wa_opt_outs'
   },
   {
+    // Os incidentes de queda: a lista dos clientes atingidos de um provedor, e
+    // o botão que manda WhatsApp para eles. O `resolve` vem por último porque
+    // o controle fecha o incidente semeado.
+    chave: 'outage',
+    label: 'GET /api/whatsapp/outages/:id',
+    method: 'GET',
+    path: (id) => `/api/whatsapp/outages/${id}`,
+    tabela: 'outage_incidents'
+  },
+  {
+    chave: 'outage',
+    label: 'PATCH /api/whatsapp/outages/:id',
+    method: 'PATCH',
+    path: (id) => `/api/whatsapp/outages/${id}`,
+    body: { eta: 'amanhã' },
+    tabela: 'outage_incidents'
+  },
+  {
+    chave: 'outage',
+    label: 'POST /api/whatsapp/outages/:id/notify',
+    method: 'POST',
+    path: (id) => `/api/whatsapp/outages/${id}/notify`,
+    body: {},
+    tabela: 'outage_incidents'
+  },
+  {
+    chave: 'outage',
+    label: 'POST /api/whatsapp/outages/:id/resolve',
+    method: 'POST',
+    path: (id) => `/api/whatsapp/outages/${id}/resolve`,
+    tabela: 'outage_incidents'
+  },
+  {
     chave: 'broadcast',
     label: 'POST /api/whatsapp/broadcasts/:id/status',
     method: 'POST',

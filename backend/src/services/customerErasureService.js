@@ -127,6 +127,9 @@ class CustomerErasureService {
       device_samples: deviceIds.length
         ? await contar('device_samples', (q) => q.whereIn('device_id', deviceIds))
         : 0,
+      outage_incident_devices: deviceIds.length
+        ? await contar('outage_incident_devices', (q) => q.whereIn('device_id', deviceIds))
+        : 0,
       device_sample_hours: deviceIds.length
         ? await contar('device_sample_hours', (q) => q.whereIn('device_id', deviceIds))
         : 0,
@@ -210,6 +213,8 @@ class CustomerErasureService {
 
       if (deviceIds.length) {
         await tdb('device_samples', trx).whereIn('device_id', deviceIds).del();
+        // O registro de quem uma queda atingiu leva nome e telefone: sai junto.
+        await tdb('outage_incident_devices', trx).whereIn('device_id', deviceIds).del();
         await tdb('device_sample_hours', trx).whereIn('device_id', deviceIds).del();
       }
 

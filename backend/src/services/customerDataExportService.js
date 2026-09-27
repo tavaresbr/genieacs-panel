@@ -62,7 +62,8 @@ const SEM_DADO_DE_ASSINANTE = Object.freeze({
   wa_broadcasts: 'campanhas — o destinatário sai em wa_broadcast_recipients',
   subscriptions: 'assinatura do provedor conosco',
   billing_events: 'extrato do provedor conosco',
-  billing_charges: 'as cobranças que a plataforma emitiu ao provedor'
+  billing_charges: 'as cobranças que a plataforma emitiu ao provedor',
+  outage_incidents: 'quedas em massa por nó do mapa — quem foi atingido sai em outage_incident_devices'
 });
 
 /**
@@ -218,6 +219,12 @@ class CustomerDataExportService {
     // chamada `device_id`, que não existe nessa tabela.
     guardar('wa_alert_state', deviceIds.length
       ? await tdb('wa_alert_state').whereIn('subject', deviceIds).orderBy('id')
+      : []);
+
+    // Quedas em massa que atingiram as ONTs desta conta: nome, contrato e o
+    // telefone a que o aviso foi mandado.
+    guardar('outage_incident_devices', deviceIds.length
+      ? await tdb('outage_incident_devices').whereIn('device_id', deviceIds).orderBy('id')
       : []);
 
     guardar('wa_conversations', conversas);

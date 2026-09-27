@@ -205,6 +205,12 @@ async function semear(tenantId, slug) {
       active: true
     });
 
+    alvo.outage = await semearLinha('outage_incidents', {
+      node_id: `ODP-${slug}-queda`,
+      node_name: 'ODP da queda',
+      status: 'open'
+    });
+
     alvo.swap = await semearLinha('device_swaps', {
       previous_device_id: 'ONT-ANTIGA-0001',
       device_id: 'ONT-NOVA-0001',
