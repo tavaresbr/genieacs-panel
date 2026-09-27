@@ -206,7 +206,7 @@ async function reprecificarCobranca(subscription, plano) {
 
 /**
  * Se a descida agendada já foi paga pelo preço dela — e portanto não se
- * desfaz (0074).
+ * desfaz (0075).
  *
  * A marca na assinatura é a resposta (`pending_plan_locked_at`, gravada por
  * `recordPayment`). A cobrança do período da descida PAGA por menos que o
@@ -368,7 +368,7 @@ class SelfBillingService {
     const agendadoId = subscription.pending_plan_id ? Number(subscription.pending_plan_id) : null;
     const base = { from: de, to: id, scheduled: false, pendingCanceled: false, effectiveAt: null, charge: 'none' };
 
-    // A descida já PAGA pelo preço dela não se desfaz (0074): nem desistir,
+    // A descida já PAGA pelo preço dela não se desfaz (0075): nem desistir,
     // nem trocar por outra, nem subir antes da data. Pagar o barato adiantado
     // e depois ficar no caro — por desistência, ou subindo "de volta" — era o
     // mês de plano caro pelo preço do barato. Pedir a própria descida de novo
@@ -463,7 +463,7 @@ class SelfBillingService {
 
     // QUANDO a descida vale. Na renovação — a não ser que o plano de agora
     // tenha sido alcançado por uma SUBIDA neste mesmo período pago
-    // (`upgraded_at`, 0074). A subida não é cobrada no período em que
+    // (`upgraded_at`, 0075). A subida não é cobrada no período em que
     // acontece (não há proporcional); quem a paga é a cobrança seguinte.
     // Descer já na renovação seria usar o plano de cima o período inteiro sem
     // nunca pagá-lo — então a descida vai para a renovação SEGUINTE, e o

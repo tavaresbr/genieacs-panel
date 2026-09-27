@@ -873,6 +873,7 @@ export default {
   'contacts.invoiceMessage.pix': 'PIX 복사 및 붙여넣기:',
   'contacts.invoiceMessage.link': '청구서:',
   'settings.platformManaged': '이 설정은 플랫폼 관리자가 관리합니다',
+  'settings.genieAcsOriginInUse': '이 주소는 이미 다른 공급자의 GenieACS입니다. ACS를 공유하려면 플랫폼 관리자에게 문의하세요',
   'settings.validation.auditRetentionAboveCap': '요금제에서 감사 기록은 최대 {max}일까지 보관됩니다',
   'whatsapp.error.platformServerMissing': '플랫폼에서 아직 WhatsApp 서버를 설정하지 않았습니다. 플랫폼 관리자에게 문의하세요',
   'whatsapp.error.retentionAboveCap': '요금제에서 WhatsApp 기록은 최대 {max}일까지 보관됩니다',

@@ -14,7 +14,7 @@ export interface SubscriptionBlockedDetail {
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || ''
 
-export type DeviceBatchAction = 'reboot' | 'firmware'
+export type DeviceBatchAction = 'reboot' | 'firmware' | 'inform'
 
 export interface DeviceBatchResult {
   deviceId: string
@@ -1087,12 +1087,17 @@ export interface CataloguePropagation {
 /** Como o painel chega ao GenieACS de um provedor. Só o console escolhe. */
 export type GenieAcsConnectionMode = 'direct' | 'tunnel'
 
+/** Quem administra o GenieACS do provedor na SaaS: o console, ou o provedor (servidor próprio). */
+export type GenieAcsOwnership = 'platform' | 'own'
+
 export interface TenantGenieAcs {
   /** Os caminhos dos parâmetros virtuais TR-069 deste provedor (`vpRxPower`, …). */
   virtualParameters: Record<string, string>
   url: string
   /** `tunnel`: o GenieACS numa rede privada de cliente, liberada só para este provedor. */
   mode: GenieAcsConnectionMode
+  /** `own`: o servidor é do provedor, e ele mesmo grava endereço, credencial e parâmetros TR-069. */
+  ownership: GenieAcsOwnership
   auth: GenieAcsAuthConfig
   /** O endereço que o deploy sugere a este provedor, ou nulo. */
   suggestion: string | null
@@ -1712,7 +1717,7 @@ export const platformAPI = {
 
   /** `secret` ausente mantém o guardado; `''` apaga. */
   updateTenantGenieAcs: (tenantId: number, payload: {
-    url?: string; mode?: GenieAcsConnectionMode; authType?: GenieAcsAuthType; username?: string; secret?: string
+    url?: string; mode?: GenieAcsConnectionMode; ownership?: GenieAcsOwnership; authType?: GenieAcsAuthType; username?: string; secret?: string
     virtualParameters?: Record<string, string>; deviceTag?: string; autoTagPrefixes?: string
   }) =>
     apiClient.put<TenantGenieAcs>(`/platform/tenants/${tenantId}/genieacs`, payload),
@@ -2094,6 +2099,11 @@ export interface GenieAcsAuthConfig {
   username: string
   secretConfigured: boolean
   authTypes: GenieAcsAuthType[]
+  /**
+   * Se o ACS deste provedor é da plataforma (só leitura na tela). `false` na
+   * self-hosted e quando o console marcou que ele usa o próprio servidor.
+   */
+  platformManaged?: boolean
 }
 
 export interface GenieAcsAuthPayload {

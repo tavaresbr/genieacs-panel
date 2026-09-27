@@ -45,6 +45,18 @@ export default function Onboarding() {
   const { can } = useAuth()
   const [step, setStep] = useState<Step>('welcome')
   const [busy, setBusy] = useState(false)
+  // Na SaaS o ACS é da plataforma, salvo quando o console marcou que o
+  // provedor usa o próprio servidor. Até saber, o lado seguro: da plataforma.
+  const [ownAcs, setOwnAcs] = useState(false)
+  const acsManaged = platformManaged && !ownAcs
+  useEffect(() => {
+    if (!platformManaged) return
+    let cancelled = false
+    void settingsAPI.getGenieAcsAuth().then((res) => {
+      if (!cancelled && res.success && res.data?.platformManaged === false) setOwnAcs(true)
+    })
+    return () => { cancelled = true }
+  }, [platformManaged])
 
   // SGP e WhatsApp só para quem pode configurá-los: um passo que responderia
   // 403 ao salvar é um passo que não deveria aparecer.
@@ -425,8 +437,9 @@ export default function Onboarding() {
           )}
 
           {/* Na SaaS quem aponta o painel para o ACS é a plataforma, pelo
-              console: o passo vira aviso, e segue adiante sem gravar nada. */}
-          {step === 'acs' && platformManaged && (
+              console: o passo vira aviso, e segue adiante sem gravar nada.
+              Com ACS próprio, o passo é o mesmo da self-hosted. */}
+          {step === 'acs' && acsManaged && (
             <>
               <div className="flex items-start gap-2 rounded-md border border-border bg-muted/40 p-4">
                 <Icon name="lock" size={16} className="mt-0.5 shrink-0" />
@@ -439,7 +452,7 @@ export default function Onboarding() {
             </>
           )}
 
-          {step === 'acs' && !platformManaged && (
+          {step === 'acs' && !acsManaged && (
             <>
               <div>
                 <label htmlFor="ob-acs" className="field-label">{t('settings.general.genieAcsUrl')}</label>
@@ -560,7 +573,7 @@ export default function Onboarding() {
               <ul className="divide-y divide-border">
                 {([
                   ['onboarding.done.item.name', Boolean(currentName.trim())],
-                  ['onboarding.done.item.acs', saved.acs || platformManaged],
+                  ['onboarding.done.item.acs', saved.acs || acsManaged],
                   ...(canSgp ? [['onboarding.done.item.sgp', saved.sgp] as const] : []),
                   ...(canWhatsapp ? [['onboarding.done.item.whatsapp', saved.whatsapp] as const] : []),
                   ['onboarding.done.item.team', saved.colleague]
@@ -576,7 +589,7 @@ export default function Onboarding() {
                     </span>
                     {/* O ACS da SaaS é da plataforma: dizer "configurado" seria
                         afirmar o que o provedor não fez nem pode conferir. */}
-                    {key === 'onboarding.done.item.acs' && platformManaged && !saved.acs ? (
+                    {key === 'onboarding.done.item.acs' && acsManaged && !saved.acs ? (
                       <span className="modern-badge-info">{t('onboarding.done.byPlatform')}</span>
                     ) : (
                       <span className={ok ? 'modern-badge-success' : 'modern-badge-warning'}>

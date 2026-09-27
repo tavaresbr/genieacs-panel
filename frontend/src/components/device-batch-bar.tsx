@@ -116,6 +116,10 @@ export function DeviceBatchBar({
             </button>
           )}
           <div className="order-2 grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
+            <button type="button" className="modern-button-secondary col-span-2 whitespace-nowrap px-3 sm:col-span-1 sm:px-4" onClick={() => setConfirmando('inform')}>
+              <Icon name="refresh" size={16} />
+              {t('devices.batch.inform')}
+            </button>
             <button type="button" className="modern-button-secondary whitespace-nowrap px-3 sm:px-4" onClick={() => void abrirFirmware()}>
               <Icon name="box" size={16} />
               {t('devices.batch.firmware')}
@@ -136,7 +140,9 @@ export function DeviceBatchBar({
               <h3 id="batch-confirm-title" className="text-lg font-semibold text-foreground">
                 {confirmando === 'firmware'
                   ? t('devices.batch.firmwareTitle', { count: String(selection.size) })
-                  : t('devices.batch.confirmTitle', { count: String(selection.size) })}
+                  : confirmando === 'inform'
+                    ? t('devices.batch.informTitle', { count: String(selection.size) })
+                    : t('devices.batch.confirmTitle', { count: String(selection.size) })}
               </h3>
             </div>
             <div className="max-h-[60vh] min-h-0 flex-1 space-y-3 overflow-auto p-4 text-sm leading-6 sm:p-5">
@@ -169,6 +175,7 @@ export function DeviceBatchBar({
                 </>
               )}
               {confirmando === 'reboot' && <p className="text-foreground">{t('devices.batch.consequence')}</p>}
+              {confirmando === 'inform' && <p className="text-foreground">{t('devices.batch.informConsequence')}</p>}
               <p className="max-h-32 overflow-auto rounded-md bg-muted/50 p-2 font-mono text-xs text-muted-foreground">
                 {[...selection.values()].join(' · ')}
               </p>
@@ -183,12 +190,14 @@ export function DeviceBatchBar({
                 disabled={enviando || (confirmando === 'firmware' && !fileId)}
                 onClick={() => void enviar()}
               >
-                <Icon name={confirmando === 'firmware' ? 'box' : 'power'} size={16} />
+                <Icon name={confirmando === 'firmware' ? 'box' : confirmando === 'inform' ? 'refresh' : 'power'} size={16} />
                 {enviando
                   ? t('devices.batch.sending')
                   : confirmando === 'firmware'
                     ? t('devices.batch.firmwareConfirm', { count: String(selection.size) })
-                    : t('devices.batch.confirm', { count: String(selection.size) })}
+                    : confirmando === 'inform'
+                      ? t('devices.batch.informConfirm', { count: String(selection.size) })
+                      : t('devices.batch.confirm', { count: String(selection.size) })}
               </button>
             </div>
           </div>

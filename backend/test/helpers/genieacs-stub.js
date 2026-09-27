@@ -128,7 +128,7 @@ export function startGenieAcsStub({ devices = [buildDevice()], taskStatus = 200,
         // `taskStatusFor` responde por aparelho: é como um teste faz UMA ONT
         // de um lote recusar enquanto as outras aceitam.
         const status = state.taskStatusFor?.(deviceId) ?? state.taskStatus;
-        const entry = { deviceId, task, status };
+        const entry = { deviceId, task, status, connectionRequest: url.searchParams.has('connection_request') };
         state.tasks.push(entry);
         if (status === 200 && state.onTask) state.onTask(entry, state);
         return send(status, status >= 400 ? { message: 'refused' } : task);

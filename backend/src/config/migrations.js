@@ -1377,14 +1377,14 @@ const billingChargesTable = (db) => (t) => {
   t.index(['tenant_id', 'status'], 'billing_charges_status_idx');
 };
 
-/** As colunas da 0072 — ver a migração. */
+/** As colunas da 0073 — ver a migração. */
 const BILLING_CHARGE_CLAIM_COLUMNS = [
   ['issuing_until', (t) => t.timestamp('issuing_until').nullable()],
   ['superseded_charges', (t) => t.text('superseded_charges').nullable()]
 ];
 
 /**
- * As colunas da 0073 — ver a migração.
+ * As colunas da 0074 — ver a migração.
  *
  * `pending_plan_id` com o MESMO tipo de `subscriptions.plan_id` (inteiro sem
  * sinal): no MySQL uma chave estrangeira entre um `INT` e um `INT UNSIGNED` é
@@ -1401,7 +1401,7 @@ const SUBSCRIPTION_PENDING_PLAN_COLUMNS = [
 ];
 
 /**
- * As colunas da 0074 — ver a migração. Instantes e não booleanos: quem lê o
+ * As colunas da 0075 — ver a migração. Instantes e não booleanos: quem lê o
  * banco depois quer saber QUANDO, e nulo continua querendo dizer "não".
  */
 const SUBSCRIPTION_PLAN_GUARD_COLUMNS = [
@@ -1705,6 +1705,9 @@ const tenantGenieAcsConnectionsTable = (db) => (t) => {
   t.integer('tenant_id').unsigned().notNullable()
     .references('id').inTable('tenants').onDelete('CASCADE');
   t.string('mode', 16).notNullable().defaultTo('direct');
+  // Quem administra o ACS na SaaS: `platform` (o console grava URL, credencial
+  // e parâmetros TR-069) ou `own` (o servidor é do provedor, e ele mesmo grava).
+  t.string('ownership', 16).notNullable().defaultTo('platform');
   t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
   t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
   t.unique(['tenant_id']);
@@ -4213,6 +4216,25 @@ export const migrations = [
   },
   {
     /**
+     * Quem administra o GenieACS do provedor — ver
+     * `tenantGenieAcsConnectionsTable`. Todo mundo começa com `platform`, que
+     * é o que a SaaS já fazia; a tabela nova da 0069 já nasce com a coluna.
+     */
+    id: '0072_tenant_genieacs_ownership',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenant_genieacs_connections'))) return true;
+      return db.schema.hasColumn('tenant_genieacs_connections', 'ownership');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenant_genieacs_connections'))) return;
+      if (await db.schema.hasColumn('tenant_genieacs_connections', 'ownership')) return;
+      await db.schema.alterTable('tenant_genieacs_connections', (t) => {
+        t.string('ownership', 16).notNullable().defaultTo('platform');
+      });
+    }
+  },
+  {
+    /**
      * A emissão com dono, e a memória das cobranças que foram trocadas.
      *
      * `issuing_until` é a garra: quem vai falar com o gateway por uma linha
@@ -4237,7 +4259,7 @@ export const migrations = [
      * Nulas nas linhas que já existem, que é o estado certo das duas: ninguém
      * está emitindo, e nada foi trocado.
      */
-    id: '0072_billing_charge_claims',
+    id: '0073_billing_charge_claims',
     async isApplied(db) {
       if (!(await db.schema.hasTable('billing_charges'))) return true;
       return (await missingColumns(db, 'billing_charges', BILLING_CHARGE_CLAIM_COLUMNS)).length === 0;
@@ -4273,7 +4295,7 @@ export const migrations = [
      * Nulas nas linhas que já existem, que é o estado certo das duas: ninguém
      * agendou nada ainda.
      */
-    id: '0073_subscription_pending_plan',
+    id: '0074_subscription_pending_plan',
     async isApplied(db) {
       if (!(await db.schema.hasTable('subscriptions'))) return true;
       return (await missingColumns(db, 'subscriptions', SUBSCRIPTION_PENDING_PLAN_COLUMNS)).length === 0;
@@ -4308,7 +4330,7 @@ export const migrations = [
      *
      * Nulas nas linhas que já existem, que é o estado certo das duas.
      */
-    id: '0074_subscription_plan_guards',
+    id: '0075_subscription_plan_guards',
     async isApplied(db) {
       if (!(await db.schema.hasTable('subscriptions'))) return true;
       return (await missingColumns(db, 'subscriptions', SUBSCRIPTION_PLAN_GUARD_COLUMNS)).length === 0;
