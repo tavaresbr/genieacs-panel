@@ -164,7 +164,7 @@ describe('entrar no console pelo endereço da plataforma', () => {
     });
     assert.equal(status, 200, JSON.stringify(body));
     assert.equal(body.data.user.tenantId, casa);
-    assert.equal(body.data.user.role, 'admin');
+    assert.equal(body.data.user.role, 'owner');
     assert.equal(body.data.user.platform, undefined);
   });
 

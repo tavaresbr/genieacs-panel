@@ -580,7 +580,7 @@ describe('ending a membership', () => {
     // succeeded.
     assert.ok(
       Number((await getDb()('tenant_users')
-        .where({ tenant_id: alfa, role: 'admin' }).count({ n: '*' }).first()).n) >= 2
+        .where({ tenant_id: alfa }).whereIn('role', ['owner', 'admin']).count({ n: '*' }).first()).n) >= 2
     );
     const { status } = await call(
       `${platformUrl}/api/platform/tenants/${alfa}/members/${ownerId}`,
@@ -706,7 +706,7 @@ describe('the last administrator of a provider', () => {
     // emptying beta.
     assert.ok(
       Number((await getDb()('tenant_users')
-        .where({ tenant_id: alfa, role: 'admin' }).count({ n: '*' }).first()).n) >= 2
+        .where({ tenant_id: alfa }).whereIn('role', ['owner', 'admin']).count({ n: '*' }).first()).n) >= 2
     );
     const { status } = await call(
       `${platformUrl}/api/platform/tenants/${beta}/members/${brunoId}`,

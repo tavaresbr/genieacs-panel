@@ -32,7 +32,7 @@ export default {
   'auth.setupAlreadyCompleted': '設定已完成',
   'auth.usernameLength': '使用者名稱需為 3 至 64 個字元',
   'auth.passwordLength': '密碼需為 8 至 128 個字元',
-  'auth.adminCreated': '管理員帳號已建立',
+  'auth.adminCreated': '擁有者帳號已建立',
   'auth.usernameTaken': '該使用者名稱已被使用',
   'auth.adminCreateFailed': '無法建立管理員帳號',
   'auth.userNotFound': '找不到該使用者',

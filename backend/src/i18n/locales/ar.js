@@ -30,7 +30,7 @@ export default {
   'auth.setupAlreadyCompleted': 'الإعداد الأولي مكتمل بالفعل',
   'auth.usernameLength': 'يجب أن يتراوح اسم المستخدم بين ٣ و٦٤ حرفًا',
   'auth.passwordLength': 'يجب أن تتراوح كلمة المرور بين ٨ و١٢٨ حرفًا',
-  'auth.adminCreated': 'تم إنشاء حساب المدير',
+  'auth.adminCreated': 'تم إنشاء حساب المالك',
   'auth.usernameTaken': 'اسم المستخدم هذا مستخدم بالفعل',
   'auth.adminCreateFailed': 'تعذّر إنشاء حساب المدير',
   'auth.userNotFound': 'المستخدم غير موجود',

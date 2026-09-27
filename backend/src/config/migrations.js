@@ -177,6 +177,20 @@ const VENDOR_CATALOGUE_TABLES = ['vendors', 'wifi_security_config'];
 // and each is referenced by exactly one place per table so the initial schema
 // and the later upgrade steps can never drift apart.
 
+/**
+ * Os provedores que têm `admin` e nenhum `owner` — os que a 0065 promove.
+ * Lido direto das tabelas: a migração roda antes de qualquer contexto de
+ * provedor existir.
+ */
+async function semDonoComAdmin(db) {
+  const comDono = db('tenant_users').where({ role: 'owner' }).select('tenant_id');
+  const linhas = await db('tenant_users')
+    .where({ role: 'admin' })
+    .whereNotIn('tenant_id', comDono)
+    .distinct('tenant_id');
+  return linhas.map((linha) => linha.tenant_id).sort((a, b) => a - b);
+}
+
 const tenantUsersTable = (db) => (t) => {
   t.increments('id').primary();
   t.integer('tenant_id').unsigned().notNullable()
@@ -3819,6 +3833,58 @@ export const migrations = [
         if (await db.schema.hasColumn('wa_conversations', nome)) continue;
         // eslint-disable-next-line no-await-in-loop
         await db.schema.alterTable('wa_conversations', criar);
+      }
+    }
+  },
+  {
+    /**
+     * O provedor sem dono ganha dono: o administrador mais antigo.
+     *
+     * Até aqui o `/setup` criava o primeiro usuário como `admin`, e o provedor
+     * instalado assim nunca teve `owner` — o que só o dono decide ficava num
+     * remendo ("o admin governa onde não há owner"). Quem fez o `/setup` é o
+     * vínculo `admin` mais antigo do provedor, e é ele que vira dono.
+     *
+     * Uma pessoa por provedor, e só onde não há dono nenhum: provedor que já
+     * tem `owner` (cadastro público, console) não é tocado, e dois `admin`
+     * não viram dois donos. O `users.role` acompanha só quem trabalha apenas
+     * nesse provedor — a mesma regra de `applyRoleSideEffects`. A trilha do
+     * provedor registra a promoção, com o sistema como autor.
+     */
+    id: '0065_first_admin_becomes_owner',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenant_users'))) return true;
+      return (await semDonoComAdmin(db)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenant_users'))) return;
+      for (const tenantId of await semDonoComAdmin(db)) {
+        // eslint-disable-next-line no-await-in-loop -- um provedor por vez, cada um na sua transação
+        await db.transaction(async (trx) => {
+          const vinculo = await trx('tenant_users')
+            .where({ tenant_id: tenantId, role: 'admin' })
+            .orderBy([{ column: 'created_at', order: 'asc' }, { column: 'user_id', order: 'asc' }])
+            .first();
+          if (!vinculo) return;
+          await trx('tenant_users').where({ id: vinculo.id }).update({ role: 'owner', updated_at: new Date() });
+          const vinculos = await trx('tenant_users').where({ user_id: vinculo.user_id }).count({ n: '*' }).first();
+          if (Number(vinculos?.n || 0) <= 1) {
+            await trx('users').where({ id: vinculo.user_id }).update({ role: 'owner' });
+          }
+          if (await trx.schema.hasTable('audit_log')) {
+            const pessoa = await trx('users').where({ id: vinculo.user_id }).first('username');
+            await trx('audit_log').insert({
+              tenant_id: tenantId,
+              actor_user_id: null,
+              actor_username: null,
+              actor_kind: 'system',
+              action: 'operator.role_changed',
+              subject_type: 'tenant_user',
+              subject_id: String(vinculo.user_id),
+              detail: JSON.stringify({ username: pessoa?.username ?? null, from: 'admin', to: 'owner' })
+            });
+          }
+        });
       }
     }
   }
