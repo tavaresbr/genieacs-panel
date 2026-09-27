@@ -1463,7 +1463,7 @@ export default function Settings() {
 
   const renderOperatorActions = (operator: Operator, isSelf: boolean) => (
     <div className="flex shrink-0 items-center gap-1 md:gap-2">
-      {canOfferPasswordReset(operator, { isOwner }) && (
+      {canOfferPasswordReset(operator, { isOwner, isSelf }) && (
         <button
           onClick={() => {
             setResetPasswordId((current) => (current === operator.id ? null : operator.id))

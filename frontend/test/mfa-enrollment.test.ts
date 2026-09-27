@@ -74,6 +74,11 @@ describe('o cadeado de redefinir a senha de alguém da equipe', () => {
       expect(canOfferPasswordReset({ role }, { isOwner: false })).toBe(true)
     }
   })
+
+  it('nunca na própria linha: a própria senha é trocada pelo perfil', () => {
+    expect(canOfferPasswordReset({ role: 'admin' }, { isOwner: false, isSelf: true })).toBe(false)
+    expect(canOfferPasswordReset({ role: 'owner' }, { isOwner: true, isSelf: true })).toBe(false)
+  })
 })
 
 describe('o cartão da exigência', () => {
