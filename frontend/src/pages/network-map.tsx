@@ -120,8 +120,8 @@ const MAINTENANCE_NODE_TYPES = new Set(['olt', 'odc', 'odp', 'htb'])
 function ModalShell({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   const { t } = useTranslation()
   return (
-    <div className="fixed inset-0 z-[2200] flex items-center justify-center bg-black/65 p-4" role="dialog" aria-modal="true">
-      <div className="modern-card max-h-[92dvh] w-full max-w-2xl overflow-y-auto p-5 sm:p-6">
+    <div className="modal-backdrop z-[2200] bg-black/65" role="dialog" aria-modal="true">
+      <div className="modal-panel modern-card max-w-2xl p-5 sm:p-6">
         <div className="mb-5 flex items-center justify-between gap-4">
           <h2 className="section-heading min-w-0 break-words">{title}</h2>
           <button type="button" onClick={onClose} className="icon-button" aria-label={t('common.close')}>

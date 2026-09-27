@@ -221,8 +221,8 @@ function EditWanModal({
   if (!isOpen || !wanData) return null;
 
   return (
-    <div className="fixed inset-0 z-[2100] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="wan-dialog-title">
-      <div className="modern-card flex max-h-[90vh] w-full max-w-2xl flex-col">
+    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="wan-dialog-title">
+      <div className="modal-panel modern-card flex max-w-2xl flex-col">
         {/* Header Modal */}
         <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-gray-700">
           <h3 id="wan-dialog-title" className="text-xl font-semibold text-gray-900 dark:text-gray-100">
@@ -453,8 +453,8 @@ function EditCredentialModal({
   if (!isOpen || !credentialType) return null;
 
   return (
-    <div className="fixed inset-0 z-[2100] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="credential-dialog-title">
-      <div className="modern-card flex max-h-[90vh] w-full max-w-md flex-col">
+    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="credential-dialog-title">
+      <div className="modal-panel modern-card flex max-w-md flex-col">
         {/* Header Modal */}
         <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-gray-700">
           <h3 id="credential-dialog-title" className="text-xl font-semibold text-gray-900 dark:text-gray-100">
@@ -610,8 +610,8 @@ function IrreversibleActionModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[2100] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="factory-reset-title">
-      <div className="modern-card flex max-h-[90vh] w-full max-w-md flex-col">
+    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="factory-reset-title">
+      <div className="modal-panel modern-card flex max-w-md flex-col">
         <div className="flex items-center gap-2 border-b border-border p-5">
           <Icon name="warning" size={20} className="shrink-0 text-[hsl(var(--status-danger))]" />
           <h3 id="factory-reset-title" className="text-lg font-semibold text-foreground">{t(texts.title)}</h3>
@@ -721,8 +721,8 @@ function EditWifiModal({
   if (!wifi) return null
 
   return (
-    <div className="fixed inset-0 z-[2100] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="wifi-dialog-title">
-      <div className="modern-card flex max-h-[92vh] w-full max-w-lg flex-col">
+    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="wifi-dialog-title">
+      <div className="modal-panel modern-card flex max-w-lg flex-col">
         <div className="flex items-start justify-between gap-3 border-b border-border p-5">
           <div className="min-w-0">
             <h3 id="wifi-dialog-title" className="section-heading">{t('detail.wifiModal.title', { index: wifi.index })}</h3>
