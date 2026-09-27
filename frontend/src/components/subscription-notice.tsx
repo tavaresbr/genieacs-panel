@@ -13,6 +13,8 @@ import { useAuth } from '@/contexts/auth-context'
 import { useTranslation } from '@/contexts/language-context'
 import { BrandMark } from '@/components/brand-mark'
 import { cobrancaEmAberto } from '@/components/tenant-charges'
+import { canGenerateCharge, payInNewTab } from '@/lib/plan-options'
+import type { TenantPlanOption } from '@/lib/api'
 
 /**
  * O que o operador vê quando a assinatura do provedor não deixa passar.
@@ -41,10 +43,18 @@ const MESSAGE_KEYS: Record<SubscriptionGateCode, TranslationKey> = {
 
 export function SubscriptionNotice() {
   const { t } = useTranslation()
-  const { logout, user } = useAuth()
+  const { logout, user, can } = useAuth()
   const [blocked, setBlocked] = useState<SubscriptionBlockedDetail | null>(null)
   const [planName, setPlanName] = useState<string | null>(null)
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null)
+  // `null` enquanto a lista de cobranças não voltou: sem saber se já há boleto
+  // em aberto, oferecer "gerar cobrança" arriscaria emitir uma segunda.
+  const [chargesLoaded, setChargesLoaded] = useState(false)
+  const [paying, setPaying] = useState(false)
+  const [payError, setPayError] = useState<string | null>(null)
+  // O catálogo só serve para saber se o plano atual é pago: no grátis não há
+  // cobrança a gerar. A rota fica fora da porta da assinatura.
+  const [plans, setPlans] = useState<TenantPlanOption[] | null>(null)
 
   useEffect(() => {
     const onBlocked = (event: Event) => {
@@ -61,8 +71,14 @@ export function SubscriptionNotice() {
       // única tela que este operador alcança, então é nele que a saída tem que
       // estar. A rota está fora da porta da assinatura de propósito; sem isso
       // esta chamada responderia o mesmo 402 que trouxe o muro.
+      void subscriptionAPI.plans().then((res) => {
+        if (res.success && res.data) setPlans(res.data)
+      })
       void subscriptionAPI.charges().then((res) => {
-        if (res.success && res.data) setPaymentUrl(cobrancaEmAberto(res.data.charges)?.invoiceUrl ?? null)
+        if (res.success && res.data) {
+          setPaymentUrl(cobrancaEmAberto(res.data.charges)?.invoiceUrl ?? null)
+          setChargesLoaded(true)
+        }
       })
     }
     window.addEventListener(SUBSCRIPTION_BLOCKED_EVENT, onBlocked)
@@ -70,6 +86,28 @@ export function SubscriptionNotice() {
   }, [])
 
   if (!blocked) return null
+
+  // Sem boleto em aberto, a saída do muro é gerar um — quando o bloqueio se
+  // resolve pagando (atraso, teste vencido) e o plano é pago. As regras
+  // moram em `canGenerateCharge`.
+  const canGenerate = canGenerateCharge({
+    code: blocked.code, paymentUrl, chargesLoaded, canWrite: can('settings.write'), plans
+  })
+
+  // Síncrono até o `payInNewTab`: a aba nova precisa nascer dentro do clique.
+  const generateAndPay = () => {
+    setPaying(true)
+    setPayError(null)
+    void payInNewTab(subscriptionAPI.payNow).then((res) => {
+      setPaying(false)
+      const url = res.success ? res.data?.charge?.invoiceUrl ?? null : null
+      if (url) setPaymentUrl(url)
+      // `busy` também cai aqui: a frase do servidor já diz "tente de novo em
+      // instantes", e o botão volta a ficar habilitado para isso.
+      else if (res.success) setPayError(t('plan.payNoLink'))
+      else setPayError(res.message || t('plan.payFailed'))
+    })
+  }
 
   const message = t(MESSAGE_KEYS[blocked.code]) || blocked.message
   const wall = WALL_CODES.has(blocked.code)
@@ -85,6 +123,12 @@ export function SubscriptionNotice() {
             {t('charges.pay')}
           </a>
         )}
+        {canGenerate && (
+          <button type="button" className="ml-3 inline-flex min-h-8 items-center font-semibold underline lg:min-h-0" disabled={paying} onClick={generateAndPay}>
+            {paying ? t('plan.paying') : t('subscription.generateAndPay')}
+          </button>
+        )}
+        {payError && <span className="ml-3 font-medium">{payError}</span>}
         <button type="button" className="ml-3 inline-flex min-h-8 items-center underline lg:min-h-0" onClick={() => setBlocked(null)}>
           {t('common.close')}
         </button>
@@ -118,13 +162,22 @@ export function SubscriptionNotice() {
               {t('charges.pay')}
             </a>
           )}
+          {canGenerate && (
+            <button type="button" className="modern-button" disabled={paying} onClick={generateAndPay}>
+              {paying ? t('plan.paying') : t('subscription.generateAndPay')}
+            </button>
+          )}
           {user?.isPlatformAdmin && (
             <a href="/platform" className="modern-button-secondary">{t('platform.title')}</a>
           )}
-          <button type="button" className={paymentUrl ? 'modern-button-secondary' : 'modern-button'} onClick={logout}>
+          <button type="button" className={paymentUrl || canGenerate ? 'modern-button-secondary' : 'modern-button'} onClick={logout}>
             {t('sidebar.signOut')}
           </button>
         </div>
+        {/* A recusa vem com a frase do servidor: falta de CNPJ, plano grátis,
+            gateway fora. No muro não há o cadastro fiscal para onde levar a
+            pessoa, então a frase é tudo que se pode dar. */}
+        {payError && <p role="alert" className="mt-4 text-sm text-destructive">{payError}</p>}
       </div>
     </div>,
     document.body

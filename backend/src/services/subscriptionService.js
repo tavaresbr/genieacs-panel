@@ -52,6 +52,14 @@ const cache = new TenantCache(CACHE_TTL_MS);
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
+ * Qual agendamento de cada provedor já foi avisado como bloqueado pelo uso.
+ *
+ * Em memória e não no banco: é só para o agendador não repetir a mesma linha
+ * de log a cada minuto. Um reinício avisa de novo uma vez, o que é até bom.
+ */
+const avisosDeBloqueio = new Map();
+
+/**
  * O período pago de quem não tem período no plano.
  *
  * Deixou de ser A verdade e virou a reserva: o prazo agora sai de
@@ -102,6 +110,33 @@ async function valorPedido({ externalId, plano, currency }) {
       const moeda = String(cobranca.currency || '').toUpperCase();
       if (moeda && moeda !== moedaPaga) return { cents: null, motivo: 'currency_mismatch', fonte: 'charge' };
       return { cents: Math.floor(valor), motivo: null, fonte: 'charge' };
+    }
+  }
+
+  // 1b. **A cobrança que a linha JÁ FOI.** A troca de plano cancela no
+  //     gateway a cobrança em aberto e reemite a linha com o preço novo — mas
+  //     o boleto velho pode já estar impresso, e cancelar lá não desfaz um
+  //     pagamento que entrou antes do cancelamento. Esse pagamento chega com
+  //     o id velho, e a pergunta continua sendo "quanto se pediu POR ELE": o
+  //     valor que aquela cobrança tinha, e não o preço novo — senão quem pagou
+  //     exatamente o que viu seria "pago a menos".
+  //
+  //     Em voz alta, porque é o caso em que o provedor pode acabar pagando o
+  //     mesmo período duas vezes: a cobrança nova continua viva no gateway, e
+  //     cancelá-la ou estornar é decisão de gente.
+  if (!cobranca && externalId) {
+    const trocada = await BillingCharge.bySupersededGatewayId(externalId);
+    if (trocada) {
+      console.warn(
+        `Payment ${externalId} settled a SUPERSEDED charge (replaced by charge row ${trocada.row.id} `
+        + `after a plan change); the replacement may still be open at the gateway — review it in the console`
+      );
+      const valor = Number(trocada.superseded.amountCents);
+      if (Number.isFinite(valor) && valor > 0) {
+        const moeda = String(trocada.superseded.currency || '').toUpperCase();
+        if (moeda && moeda !== moedaPaga) return { cents: null, motivo: 'currency_mismatch', fonte: 'charge' };
+        return { cents: Math.floor(valor), motivo: null, fonte: 'superseded_charge' };
+      }
     }
   }
 
@@ -273,7 +308,11 @@ class SubscriptionService {
     if (cached) return cached;
     const subscription = await Subscription.current();
     const plan = subscription ? await Plan.findById(subscription.plan_id) : null;
-    return cache.set({ subscription, plan });
+    // A descida agendada (0074) viaja junto porque a tela e o console a
+    // mostram ao lado do plano atual — e uma consulta a mais só para quem tem
+    // uma, que é quase ninguém.
+    const pendingPlan = subscription?.pending_plan_id ? await Plan.findById(subscription.pending_plan_id) : null;
+    return cache.set({ subscription, plan, pendingPlan });
   }
 
   /** Esquece a leitura de UM provedor — a que o console acabou de mudar. */
@@ -282,11 +321,17 @@ class SubscriptionService {
   }
 
   /**
-   * O que o provedor (ou a tela de bloqueio) pode ver da própria assinatura.
-   * Sem preço: o preço é do console, e o que o operador precisa é o estado,
-   * o plano e até quando.
+   * O que o provedor (ou a tela de bloqueio) pode ver da própria assinatura:
+   * o estado, o plano e até quando.
+   *
+   * Sem preço, mas não por o preço ser segredo do console — deixou de ser
+   * quando o provedor passou a escolher o próprio plano. O preço mora em
+   * `GET /api/tenant/plans` (`SelfBillingService.listPlans`), junto do resto
+   * do catálogo, e o valor de fato cobrado mora na cobrança. Este objeto é
+   * também o que a porta da assinatura põe no corpo do 402, e ali a pergunta
+   * é "por que parei", não "quanto custa".
    */
-  static present({ subscription, plan }, now = new Date()) {
+  static present({ subscription, plan, pendingPlan = null }, now = new Date()) {
     if (!subscription) return null;
     const effective = this.effectiveStatus(subscription, now);
     return {
@@ -301,8 +346,76 @@ class SubscriptionService {
       } : null,
       trialEndsAt: subscription.trial_ends_at ?? null,
       renewsAt: subscription.renews_at ?? null,
-      canceledAt: subscription.canceled_at ?? null
+      canceledAt: subscription.canceled_at ?? null,
+      pendingPlan: this.presentPendingPlan(subscription, pendingPlan)
     };
+  }
+
+  /**
+   * A descida agendada, como a tela e o console a leem — ou nulo.
+   *
+   * Com o preço, ao contrário do plano atual logo acima: a pergunta que este
+   * campo responde é "quanto vou pagar a partir de quando", e sem o número a
+   * tela teria de cruzar com o catálogo para dizer uma frase. `blockedBy` não
+   * mora aqui: ele depende do uso, que só `usage` conta — é lá que ele entra.
+   */
+  static presentPendingPlan(subscription, pendingPlan) {
+    if (!subscription?.pending_plan_id || !pendingPlan) return null;
+    const quando = asDate(subscription.pending_plan_at);
+    return {
+      id: Number(pendingPlan.id),
+      name: pendingPlan.name,
+      priceCents: Number(pendingPlan.price_cents ?? 0),
+      effectiveAt: quando ? quando.toISOString() : null,
+      // Paga pelo preço dela: não se cancela nem se troca mais pela tela.
+      locked: this.isPendingLocked(subscription)
+    };
+  }
+
+  /**
+   * O primeiro teto de `limits` que `usage` já passa — ou nulo.
+   *
+   * Um recurso sem teto, ou sem contagem (a de ONTs falha quando o ACS está
+   * fora), não decide nada: dado que não se tem não vira recusa, a mesma regra
+   * de `usage`. A ordem é a da tela — operadores, assinantes, ONTs — para que
+   * a mesma situação dê sempre a mesma resposta.
+   */
+  static overLimitFor(limits, usage) {
+    for (const resource of ['operators', 'subscribers', 'devices']) {
+      const limit = limits?.[resource] ?? null;
+      const used = usage?.[resource];
+      if (limit === null || used === null || used === undefined) continue;
+      if (used > limit) return { resource, used, limit };
+    }
+    return null;
+  }
+
+  /**
+   * O que impede o plano `plan` de valer para o provedor em escopo agora, ou
+   * nulo — contando só o que o plano limita.
+   *
+   * É a pergunta que a descida agendada faz ao chegar a hora, e ela é feita
+   * pelo agendador a cada minuto enquanto o uso não couber: contar ONTs no ACS
+   * a cada minuto para um plano que nem limita ONTs seria carga à toa.
+   */
+  static async overLimitOf(plan, { countDevices = null } = {}) {
+    const limits = this.limitsOf(plan);
+    const usage = {};
+    if (limits.operators !== null) usage.operators = await this.operatorCount();
+    if (limits.subscribers !== null) usage.subscribers = await this.subscriberCount();
+    if (limits.devices !== null && typeof countDevices === 'function') {
+      try {
+        usage.devices = await countDevices();
+      } catch {
+        usage.devices = null;
+      }
+    }
+    return this.overLimitFor(limits, usage);
+  }
+
+  /** Os dias que um pagamento compra neste plano (ou a reserva de trinta). */
+  static periodDaysOf(plan) {
+    return periodoDoPlano(plan);
   }
 
   static limitsOf(plan) {
@@ -433,8 +546,22 @@ class SubscriptionService {
       }
     }
     const over = (used, limit) => (limit !== null && used !== null && used > limit);
+    const subscription = this.present(state);
+    // A descida agendada que não vai se aplicar enquanto o uso não couber:
+    // calculada aqui, com as contagens que esta tela já fez, para a tela
+    // avisar ANTES da renovação — e não o provedor descobrir depois que
+    // continuou pagando o plano caro porque tinha operadores demais.
+    // A travada (paga pelo preço dela) não tem bloqueio: aplica-se na data
+    // com o uso que houver.
+    if (subscription?.pendingPlan?.locked) {
+      subscription.pendingPlan.blockedBy = null;
+    } else if (subscription?.pendingPlan) {
+      subscription.pendingPlan.blockedBy = this.overLimitFor(
+        this.limitsOf(state.pendingPlan), { operators, subscribers, devices }
+      );
+    }
     return {
-      subscription: this.present(state),
+      subscription,
       usage: { operators, subscribers, devices },
       limits,
       retention: IS_SAAS ? this.retentionCapsOf(state.plan) : this.retentionCapsOf(null),
@@ -446,29 +573,159 @@ class SubscriptionService {
     };
   }
 
-  // ── Mudanças (chamadas pelo console, no escopo do provedor alvo) ─────
+  // ── Mudanças (chamadas pelo console, no escopo do provedor alvo — e, a
+  // troca de plano, também pelo próprio provedor, via `SelfBillingService`,
+  // que confere antes o que só vale para quem troca por dentro) ──────────
 
   /**
-   * Troca o plano do provedor em escopo. O status não muda: quem está em
-   * `past_due` continua devendo, só que num plano diferente.
+   * Troca o plano do provedor em escopo, NA HORA. O status não muda: quem está
+   * em `past_due` continua devendo, só que num plano diferente.
+   *
+   * E apaga a descida agendada, se houver uma: uma troca que vale agora é a
+   * última palavra sobre o plano, venha do console ou do provedor (a subida,
+   * a descida sem período pago correndo). Deixar a agendada viva faria o
+   * plano escolhido agora ser trocado de novo na renovação por uma decisão
+   * que a de agora já substituiu.
    */
-  static async changePlan({ planId, actorUserId = null }) {
+  static async changePlan({ planId, actorUserId = null, upgradedAt = null }) {
     const tenantId = currentTenantId();
     const plan = await Plan.findById(planId);
     if (!plan) throw new Error('Plan not found');
     const before = await Subscription.forTenant(tenantId);
     const subscription = await Subscription.upsertForTenant(tenantId, {
       plan_id: plan.id,
+      pending_plan_id: null,
+      pending_plan_at: null,
+      pending_plan_locked_at: null,
+      // A marca da subida no meio do período pago (0075): quem sobe agora a
+      // passa (`SelfBillingService`), e qualquer outra troca — o console, a
+      // descida na hora — a apaga, porque o plano de agora não é mais o que
+      // subiu sem pagar.
+      upgraded_at: upgradedAt,
       ...(before ? {} : { status: 'active' })
     });
     await BillingEvent.record({
       subscriptionId: subscription.id,
       type: BILLING_EVENT_TYPES.PLAN_CHANGED,
       createdBy: actorUserId,
-      detail: { from: before?.plan_id ?? null, to: plan.id, toCode: plan.code }
+      detail: {
+        from: before?.plan_id ?? null,
+        to: plan.id,
+        toCode: plan.code,
+        ...(before?.pending_plan_id ? { pendingCleared: Number(before.pending_plan_id) } : {})
+      }
     });
     cache.invalidate();
     return subscription;
+  }
+
+  /**
+   * Agenda a descida para `at` — o fim do período pago que está correndo.
+   *
+   * Só a linha e o cache: nenhum evento no extrato, porque nada mudou ainda —
+   * o plano, os tetos e o preço deste período são os de antes. O "plano
+   * trocado" entra no extrato quando a troca de fato acontece
+   * (`applyPendingPlan`), e a trilha de auditoria de quem pediu é do
+   * controlador. Uma segunda descida por cima substitui a primeira: é a mesma
+   * coluna, e só existe uma renovação por vez.
+   */
+  static async schedulePlanChange({ planId, at }) {
+    const tenantId = currentTenantId();
+    const quando = asDate(at);
+    if (!quando) throw new Error('A scheduled plan change needs a date');
+    const subscription = await Subscription.upsertForTenant(tenantId, {
+      pending_plan_id: planId,
+      pending_plan_at: quando,
+      pending_plan_locked_at: null
+    });
+    cache.invalidate();
+    return subscription;
+  }
+
+  /** Desiste da descida agendada: o plano atual segue depois da renovação. */
+  static async cancelPendingPlan() {
+    const tenantId = currentTenantId();
+    const subscription = await Subscription.upsertForTenant(tenantId, {
+      pending_plan_id: null,
+      pending_plan_at: null,
+      pending_plan_locked_at: null
+    });
+    cache.invalidate();
+    return subscription;
+  }
+
+  /**
+   * Se a descida agendada já foi PAGA pelo preço dela (0075): o período que
+   * começa na data da descida teve o pagamento conferido contra o plano
+   * novo. Dali em diante ela não se desfaz nem espera o uso caber.
+   */
+  static isPendingLocked(subscription) {
+    return Boolean(subscription?.pending_plan_id && subscription?.pending_plan_locked_at);
+  }
+
+  /**
+   * Aplica a descida agendada do provedor em escopo, se chegou a hora e se o
+   * uso cabe no plano novo.
+   *
+   * Chamada pelo agendador a cada passada, ANTES da emissão, e por
+   * `recordPayment` quando o pagamento abre o período que já é do plano novo.
+   * Nunca lança por causa do uso: não caber é o caso esperado de quem pediu a
+   * descida e não se ajustou, e a resposta é continuar no plano atual — que é
+   * o que ele comporta — com a agendada viva, até caber ou até alguém
+   * desistir dela. O aviso sai uma vez por agendamento, e não a cada minuto;
+   * a tela mostra o mesmo bloqueio o tempo todo (`pendingPlan.blockedBy`).
+   *
+   * @returns {Promise<{ applied: boolean, reason?: string, from?: number,
+   *   to?: number, blockedBy?: object }>}
+   */
+  static async applyPendingPlan({ now = new Date(), countDevices = null } = {}) {
+    const tenantId = currentTenantId();
+    const subscription = await Subscription.forTenant(tenantId);
+    if (!subscription?.pending_plan_id) return { applied: false, reason: 'none' };
+    const quando = asDate(subscription.pending_plan_at);
+    if (quando && quando.getTime() > now.getTime()) return { applied: false, reason: 'not_due' };
+
+    const plano = await Plan.findById(subscription.pending_plan_id);
+    if (!plano) {
+      // O console não apaga plano, mas um banco mexido à mão pode. Uma
+      // agendada para lugar nenhum não tem como se aplicar nunca, e ficaria
+      // tentando para sempre: sai, e o provedor fica onde está.
+      await this.cancelPendingPlan();
+      return { applied: false, reason: 'plan_gone' };
+    }
+
+    // Paga pelo preço dela, a descida se aplica na data com o uso que houver:
+    // segurá-la porque o uso cresceu DEPOIS de pagar o barato seria entregar
+    // o plano caro pelo preço do barato — o buraco que a trava fecha. Acima
+    // dos tetos, o provedor só não cresce mais (o 402 de operador, a
+    // sincronização que não cria assinante); o que já existe fica.
+    const travada = this.isPendingLocked(subscription);
+    const blockedBy = travada ? null : await this.overLimitOf(plano, { countDevices });
+    if (blockedBy) {
+      const marca = `${subscription.pending_plan_id}@${quando ? quando.getTime() : 'now'}`;
+      if (avisosDeBloqueio.get(tenantId) !== marca) {
+        avisosDeBloqueio.set(tenantId, marca);
+        console.warn(
+          `Scheduled plan change of provider ${tenantId} to plan ${plano.id} was not applied: `
+          + `${blockedBy.used} ${blockedBy.resource} over the limit of ${blockedBy.limit}; it stays pending`
+        );
+      }
+      return { applied: false, reason: 'over_limit', blockedBy };
+    }
+
+    const aplicou = await Subscription.applyPendingPlan(tenantId, plano.id);
+    if (!aplicou) return { applied: false, reason: 'raced' };
+    avisosDeBloqueio.delete(tenantId);
+    await BillingEvent.record({
+      subscriptionId: subscription.id,
+      type: BILLING_EVENT_TYPES.PLAN_CHANGED,
+      detail: {
+        from: subscription.plan_id ?? null, to: plano.id, toCode: plano.code, scheduled: true,
+        ...(travada ? { locked: true } : {})
+      }
+    });
+    cache.invalidate();
+    return { applied: true, from: subscription.plan_id ?? null, to: plano.id, locked: travada };
   }
 
   /**
@@ -560,7 +817,43 @@ class SubscriptionService {
     // `periodDays` explícito ainda vence o plano: é a saída para um ajuste
     // manual ou uma migração de contrato, e quem o passa está dizendo que sabe
     // mais que o catálogo naquele caso.
-    const plano = before.plan_id ? await Plan.findById(before.plan_id) : null;
+    const planoAtual = before.plan_id ? await Plan.findById(before.plan_id) : null;
+
+    // O período que este pagamento compra começa em `base`: no fim do período
+    // atual, quando ainda não venceu (pagou adiantado), ou agora (atrasado).
+    const currentEnd = asDate(before.renews_at);
+    const base = currentEnd && currentEnd.getTime() > now.getTime() ? currentEnd : now;
+
+    // A descida agendada (0074) e o período que ela alcança.
+    //
+    // Se o período comprado começa na data da descida ou depois dela, ele é do
+    // plano NOVO: é o preço dele que a cobrança daquele prazo pediu (a emissão
+    // já saiu com ele), e é o período dele que o pagamento estende. Conferir
+    // contra o plano velho chamaria de "pago a menos" quem pagou exatamente a
+    // fatura que recebeu.
+    //
+    // Aplicar a troca, porém, só quando a data já chegou (`now`): pago
+    // adiantado, o provedor ainda está no período do plano caro, que já pagou,
+    // e perder os tetos dele antes da hora seria cobrar um e entregar o outro.
+    // Nesse caso quem troca é o agendador, quando a data chegar.
+    const dataDaDescida = before.pending_plan_id ? asDate(before.pending_plan_at) : null;
+    const planoAgendado = before.pending_plan_id && (!dataDaDescida || base.getTime() >= dataDaDescida.getTime())
+      ? await Plan.findById(before.pending_plan_id)
+      : null;
+    // Com a mesma guarda da emissão: se o uso não cabe no plano agendado, a
+    // descida não vai se aplicar e a cobrança do prazo saiu (ou foi
+    // reprecificada) pelo preço do atual — é contra ele que se confere, QUANDO
+    // não há cobrança (a cobrança, havendo, é quem responde: `valorPedido`).
+    // As ONTs ficam de fora pela razão de sempre aqui: quem chama é o webhook,
+    // sem ACS em mãos — e não precisam entrar, porque o destino da descida
+    // abaixo não depende do uso, e sim do preço que foi pago. Contado FORA da
+    // transação — no SQLite a transação segura a única conexão, e uma
+    // contagem por fora dela esperaria para sempre. A travada não conta nada:
+    // já foi paga pelo preço dela.
+    const descidaBloqueada = planoAgendado && !this.isPendingLocked(before)
+      ? await this.overLimitOf(planoAgendado)
+      : null;
+    const plano = planoAgendado && !descidaBloqueada ? planoAgendado : planoAtual;
     const dias = periodDays ?? periodoDoPlano(plano);
 
     // A conferência do valor, que é o que separa "recebi dinheiro" de "esta
@@ -597,12 +890,46 @@ class SubscriptionService {
     const patch = {};
     const reactivates = !underpaid
       && (before.status === 'trial' || before.status === 'active' || before.status === 'past_due');
+
+    // O destino da descida agendada, decidido pelo PREÇO que este pagamento
+    // pagou pelo período que começa nela — e não pelo uso, que é o que um
+    // provedor mexe à vontade depois de pagar:
+    //
+    //   - pagou o preço de baixo (o que se pediu é menor que o preço do plano
+    //     atual): a descida fica TRAVADA (0075). Não se cancela nem se troca
+    //     mais, e se aplica na data com o uso que houver — sem isto, pagar o
+    //     barato adiantado e desistir da descida depois (ou crescer o uso para
+    //     ela não se aplicar) era um mês de plano caro pelo preço do barato.
+    //     Se a data já chegou (pagamento atrasado), aplica-se aqui mesmo, na
+    //     transação do pagamento, para o período novo nascer no plano novo.
+    //   - pagou o preço de cima (a descida estava bloqueada pelo uso e a
+    //     cobrança saiu pelo atual): o período é do plano atual, e a descida
+    //     vai para a renovação SEGUINTE — tenta de novo lá, pela mesma regra.
+    let destinoDaDescida = null;
+    if (reactivates && planoAgendado) {
+      const precoAtual = Number(planoAtual?.price_cents ?? 0);
+      const pagoBarato = pedido.cents !== null ? pedido.cents < precoAtual : plano === planoAgendado;
+      destinoDaDescida = pagoBarato ? 'lock' : 'postpone';
+    }
+    const descidaVenceu = !dataDaDescida || dataDaDescida.getTime() <= now.getTime();
+    const descida = destinoDaDescida === 'lock' && descidaVenceu ? planoAgendado : null;
+
     if (reactivates) {
-      const currentEnd = asDate(before.renews_at);
-      const base = currentEnd && currentEnd.getTime() > now.getTime() ? currentEnd : now;
       patch.renews_at = new Date(base.getTime() + dias * DAY_MS);
       patch.status = 'active';
       patch.trial_ends_at = null;
+      // A subida no meio do período (0075) foi paga: o período que este
+      // pagamento compra é cobrado pelo plano de agora.
+      patch.upgraded_at = null;
+      if (destinoDaDescida === 'lock' && !descida) patch.pending_plan_locked_at = now;
+      if (destinoDaDescida === 'postpone') {
+        console.warn(
+          `Payment for provider ${tenantId} paid the renewal at the current plan's price because the `
+          + `scheduled change to plan ${planoAgendado.id} is blocked by usage; it moves to the next renewal`
+        );
+        patch.pending_plan_at = patch.renews_at;
+        patch.pending_plan_locked_at = null;
+      }
     }
     const statusAfter = patch.status ?? before.status;
     const renewsAt = patch.renews_at ?? before.renews_at ?? null;
@@ -630,9 +957,29 @@ class SubscriptionService {
             ...(faltou && allowUnderpayment ? { underpaymentAccepted: true } : {})
           }
         }, trx);
+        // Na mesma transação do pagamento: um período novo que começasse no
+        // plano velho porque a troca falhou depois do commit seria exatamente
+        // a mistura que a descida agendada existe para não fazer. Condicional
+        // (ver `Subscription.applyPendingPlan`): se o agendador aplicou no
+        // mesmo minuto, o extrato ganha uma linha de troca, e não duas.
+        if (descida && await Subscription.applyPendingPlan(tenantId, descida.id, trx)) {
+          await BillingEvent.record({
+            subscriptionId: before.id,
+            type: BILLING_EVENT_TYPES.PLAN_CHANGED,
+            createdBy: actorUserId,
+            detail: {
+              from: before.plan_id ?? null,
+              to: descida.id,
+              toCode: descida.code,
+              scheduled: true,
+              byPayment: true,
+              locked: true
+            }
+          }, trx);
+        }
         return Object.keys(patch).length
           ? Subscription.upsertForTenant(tenantId, patch, trx)
-          : before;
+          : Subscription.forTenant(tenantId, trx);
       });
       return {
         subscription,

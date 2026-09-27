@@ -8,6 +8,10 @@ import AuditLog from '../models/AuditLog.js';
 import SubscriptionService from '../services/subscriptionService.js';
 import BillingCharge from '../models/BillingCharge.js';
 import DeviceService from '../services/deviceService.js';
+import SelfBillingService, { SelfBillingError } from '../services/selfBillingService.js';
+import ChargeIssuingService from '../services/chargeIssuingService.js';
+import PlatformAudit from '../models/PlatformAudit.js';
+import { translateError } from '../i18n/index.js';
 import { EDITION } from '../config/edition.js';
 import { panelBaseDomain, usesTenantSubdomains } from '../middleware/tenantResolver.js';
 import { normalizeTaxId, isValidTaxId, isValidCnpj } from '../utils/taxId.js';
@@ -88,6 +92,64 @@ function billingPatch(entrada) {
  * of the whole deployment, and everything below is written against that.
  */
 const NAME_MAX_LENGTH = 128;
+
+/**
+ * O corpo de `GET /api/tenant/subscription` — e o de `PUT
+ * /api/tenant/subscription/plan`, que devolve a mesma tela depois da troca.
+ * Uma função e não duas cópias: a tela que troca de plano redesenha com o que
+ * volta, e um campo que só uma das rotas mandasse sumiria da tela no clique.
+ */
+async function subscriptionPayload(req) {
+  const usage = await SubscriptionService.usage({
+    countDevices: () => DeviceService.countDevicesFromGenieAcs()
+  });
+  // O cadastro fiscal viaja aqui e não numa rota própria porque é a mesma
+  // tela: "plano e uso" é onde o provedor olha a parte comercial dele, e uma
+  // porta a mais no inventário custa mais do que quatro campos a mais num
+  // corpo que esta tela já busca.
+  const provedor = await Tenant.findById(req.tenantId);
+  return { ...usage, billing: Tenant.presentBilling(provedor) };
+}
+
+/**
+ * A recusa do autoatendimento de cobrança, no envelope de sempre: a mensagem
+ * no idioma de quem pediu, o código que a tela lê e, quando há, os números no
+ * topo do corpo (`resource`, `used`, `limit` do `over_limit`).
+ */
+function selfBillingRefusal(req, res, error) {
+  return res.status(error.status || 400).json({
+    ...createErrorResponse(translateError(req.t, error), error.detail ?? null, error.code),
+    ...(error.extra ?? {})
+  });
+}
+
+/**
+ * A frase da troca de plano, que diz O QUE aconteceu — e são quatro coisas
+ * diferentes para quem clicou: trocou agora, vai trocar na renovação (com a
+ * data), desistiu da troca agendada, ou nada mudou.
+ *
+ * A data vai no idioma e no fuso da cobrança: é o dia em que a renovação
+ * acontece em São Paulo, o mesmo que a fatura mostra, e não o do servidor.
+ */
+function planChangeMessage(req, resultado) {
+  if (resultado.pendingCanceled) return req.t('subscription.pendingCanceled');
+  if (resultado.scheduled) {
+    return req.t('subscription.planScheduled', { date: formatBillingDate(resultado.effectiveAt, req.locale) });
+  }
+  return req.t(resultado.changed ? 'subscription.planChanged' : 'subscription.planUnchanged');
+}
+
+function formatBillingDate(value, locale) {
+  const date = value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) return '';
+  try {
+    return new Intl.DateTimeFormat(locale || 'pt-BR', {
+      timeZone: ChargeIssuingService.BILLING_TIMEZONE, dateStyle: 'short'
+    }).format(date);
+  } catch {
+    return ChargeIssuingService.isoDate(date);
+  }
+}
 
 /** Quem liga e desliga a exigência do 2FA: o `owner`, ou o `admin` onde não há `owner`. */
 async function governaSeguranca(tenantId, role) {
@@ -312,28 +374,139 @@ class TenantController {
    * "plano e uso" do provedor, e a placa que a tela de bloqueio lê.
    *
    * A contagem de ONTs vem do GenieACS e pode falhar; ela vira `null` sem
-   * derrubar o resto (ver `SubscriptionService.usage`). Sem preço: o preço é
-   * do console.
+   * derrubar o resto (ver `SubscriptionService.usage`). O preço não vem aqui,
+   * e não por segredo — ele está em `GET /api/tenant/plans`, a lista de onde
+   * o provedor escolhe o plano: esta é a tela do estado, aquela a do catálogo.
    */
   static async getSubscription(req, res) {
     try {
-      const usage = await SubscriptionService.usage({
-        countDevices: () => DeviceService.countDevicesFromGenieAcs()
-      });
-      // O cadastro fiscal viaja aqui e não numa rota própria porque é a mesma
-      // tela: "plano e uso" é onde o provedor olha a parte comercial dele, e
-      // uma porta a mais no inventário custa mais do que quatro campos a mais
-      // num corpo que esta tela já busca.
-      const provedor = await Tenant.findById(req.tenantId);
-      return res.json(createResponse(req.t('subscription.retrieved'), {
-        ...usage,
-        billing: Tenant.presentBilling(provedor)
-      }));
+      return res.json(createResponse(req.t('subscription.retrieved'), await subscriptionPayload(req)));
     } catch (error) {
       console.error('Get subscription error:', error);
       return res.status(500).json(
         createErrorResponse(req.t('subscription.retrieveFailed'), error.message)
       );
+    }
+  }
+
+  /**
+   * `GET /api/tenant/plans`: o catálogo de onde o provedor escolhe, com o
+   * preço de cada plano e o dele marcado — ver `SelfBillingService.listPlans`
+   * para por que o atual entra mesmo fora de linha.
+   *
+   * `settings.read`, a mesma de `/subscription`. E fora da porta da
+   * assinatura, porque quem está em `past_due` é quem mais precisa comparar
+   * preços antes de pagar.
+   */
+  static async listPlans(req, res) {
+    try {
+      return res.json(createResponse(req.t('plans.retrieved'), await SelfBillingService.listPlans()));
+    } catch (error) {
+      console.error('List plans (tenant) error:', error);
+      return res.status(500).json(createErrorResponse(req.t('plans.retrieveFailed'), error.message));
+    }
+  }
+
+  /**
+   * `PUT /api/tenant/subscription/plan` — `{ planId }`: o provedor troca de
+   * plano — na hora quando sobe, na renovação quando desce com um período
+   * pago correndo (`subscription.pendingPlan` na resposta), e escolher o plano
+   * atual com uma descida agendada desiste dela.
+   *
+   * A regra é de `SelfBillingService.changePlan`; aqui ficam as duas trilhas.
+   * A do provedor, porque "quem trocou o nosso plano" é pergunta que o dono
+   * faz — com o ator de sempre, quem estava logado. E a da plataforma, com a
+   * mesma ação que o console grava quando é ele quem troca: o que o provedor
+   * paga mudou, e é na trilha da plataforma que se reconstrói a receita de um
+   * cliente. `selfService: true` é o que separa as duas origens ali, já que o
+   * ator é um operador do provedor e não alguém do console.
+   *
+   * Nenhuma das duas carrega preço: o plano é o fato, o preço é do catálogo.
+   */
+  static async changePlan(req, res) {
+    try {
+      const resultado = await SelfBillingService.changePlan({
+        planId: req.body?.planId,
+        actorUserId: req.user?.userId ?? null,
+        countDevices: () => DeviceService.countDevicesFromGenieAcs()
+      });
+
+      // A desistência de uma descida agendada também vai para as duas trilhas:
+      // o plano não mudou, mas o que o provedor vai pagar na renovação mudou,
+      // e é essa a pergunta que a trilha da plataforma responde.
+      if (resultado.changed || resultado.pendingCanceled) {
+        const detail = {
+          from: resultado.from,
+          to: resultado.to,
+          toCode: resultado.plan?.code ?? null,
+          selfService: true,
+          scheduled: Boolean(resultado.scheduled),
+          ...(resultado.scheduled && resultado.effectiveAt
+            ? { effectiveAt: new Date(resultado.effectiveAt).toISOString() } : {}),
+          ...(resultado.pendingCanceled
+            ? { pendingCanceled: true, canceledPlanId: resultado.canceledPlanId ?? null } : {}),
+          ...(resultado.replacedPlanId ? { replacedPlanId: resultado.replacedPlanId } : {}),
+          ...(resultado.deferredByUpgrade ? { deferredByUpgrade: true } : {}),
+          ...(resultado.charge !== 'none' ? { openCharge: resultado.charge } : {})
+        };
+        await AuditLog.fromRequest(req, {
+          action: AuditLog.ACTIONS.SUBSCRIPTION_CHANGED,
+          subjectType: 'subscription',
+          subjectId: req.tenantId,
+          detail
+        });
+        const provedor = await Tenant.findById(req.tenantId);
+        const registrada = await PlatformAudit.fromRequest(req, {
+          action: PlatformAudit.ACTIONS.SUBSCRIPTION_PLAN_CHANGED,
+          tenant: provedor,
+          detail
+        });
+        if (!registrada) console.warn(`Provider ${req.tenantId} changed its plan without a platform trail line`);
+      }
+
+      return res.json(createResponse(planChangeMessage(req, resultado), await subscriptionPayload(req)));
+    } catch (error) {
+      if (error instanceof SelfBillingError) return selfBillingRefusal(req, res, error);
+      console.error('Self-service plan change error:', error);
+      return res.status(500).json(createErrorResponse(req.t('subscription.planChangeFailed'), error.message));
+    }
+  }
+
+  /**
+   * `POST /api/tenant/charges/pay` — "pagar agora": a cobrança em aberto do
+   * período, a que já existe ou uma emitida neste clique, com o link.
+   *
+   * Sem corpo, e é de propósito: nada que o provedor mande decide valor,
+   * período, gateway ou cliente no gateway. O valor é o do plano, o período o
+   * da assinatura, e o cliente no gateway é criado (quando falta) com o
+   * cadastro fiscal que já está na linha — ver `asaasCustomerService`.
+   *
+   * Quando o clique CRIOU o cliente no Asaas, a plataforma ganha a linha que
+   * o botão do console grava: um cadastro foi aberto na conta dela, com o CNPJ
+   * de alguém, e isso não pode acontecer sem rastro só porque quem clicou
+   * estava do outro lado.
+   */
+  static async payNow(req, res) {
+    try {
+      const { charge, issued, customerCreated } = await SelfBillingService.payNow({
+        countDevices: () => DeviceService.countDevicesFromGenieAcs()
+      });
+      if (customerCreated) {
+        const provedor = await Tenant.findById(req.tenantId);
+        const registrada = await PlatformAudit.fromRequest(req, {
+          action: PlatformAudit.ACTIONS.TENANT_GATEWAY_CUSTOMER_CREATED,
+          tenant: provedor,
+          detail: { gateway: 'asaas', linked: true, selfService: true }
+        });
+        if (!registrada) console.warn(`Provider ${req.tenantId} gateway customer created without a platform trail line`);
+      }
+      return res.status(issued ? 201 : 200).json(createResponse(req.t('charges.payReady'), {
+        charge: BillingCharge.present(charge)
+      }));
+    } catch (error) {
+      if (error instanceof SelfBillingError) return selfBillingRefusal(req, res, error);
+      console.error('Pay now error:', error);
+      return res.status(500).json(createErrorResponse(req.t('charges.payFailed'), error.message));
     }
   }
 

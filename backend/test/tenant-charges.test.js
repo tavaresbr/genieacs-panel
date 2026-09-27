@@ -168,3 +168,59 @@ describe('e não é rota aberta', () => {
     assert.equal((await call(`${panelUrl}/api/tenant/charges`)).status, 401);
   });
 });
+
+/**
+ * O autoatendimento de cobrança — a lista de planos, a troca e o "pagar
+ * agora" — do lado de dentro da porta, pelo mesmo motivo desta lista: quem
+ * está em `past_due` é quem precisa deles. Aqui só se prova que a porta os
+ * deixa passar; o que cada rota faz depois está em
+ * `tenant-self-billing.test.js`, que roda no self-hosted para poder falar com
+ * um gateway de mentira.
+ */
+describe('o autoatendimento também passa pela porta', () => {
+  it('um provedor past_due chega ao "pagar agora" e à troca de plano, e não ao 402', async () => {
+    const { default: Plan } = await import('../src/models/Plan.js');
+    const pago = await Plan.create({
+      code: 'porta-pago', name: 'Pago', price_cents: 9900, currency: 'BRL', active: true
+    });
+    const outro = await Plan.create({
+      code: 'porta-outro', name: 'Outro', price_cents: 4900, currency: 'BRL', active: true
+    });
+    await estado({ status: 'past_due', plan_id: pago.id, renews_at: new Date(Date.now() - 86_400_000) });
+
+    const comum = await call(`${panelUrl}/api/users`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: { username: 'alguem-porta', password: 'senha-de-alguem-1', role: 'viewer' }
+    });
+    assert.equal(comum.status, 402, 'o provedor precisava estar bloqueado');
+
+    // Sem chave do gateway neste arquivo: a resposta é a recusa do
+    // CONTROLADOR (503), que só existe se a porta deixou passar.
+    const pagar = await call(`${panelUrl}/api/tenant/charges/pay`, { method: 'POST', headers: authHeaders(token) });
+    assert.equal(pagar.status, 503, JSON.stringify(pagar.body));
+    assert.equal(pagar.body.code, 'gateway_not_configured');
+
+    const planos = await call(`${panelUrl}/api/tenant/plans`, { headers: authHeaders(token) });
+    assert.equal(planos.status, 200);
+
+    const troca = await call(`${panelUrl}/api/tenant/subscription/plan`, {
+      method: 'PUT', headers: authHeaders(token), body: { planId: outro.id }
+    });
+    assert.equal(troca.status, 200, JSON.stringify(troca.body));
+  });
+
+  it('e o suspenso chega ao controlador, que recusa com 409 e não 402', async () => {
+    await estado({ status: 'suspended' });
+    const { default: Plan } = await import('../src/models/Plan.js');
+    const outro = await Plan.findByCode('porta-pago');
+    const troca = await call(`${panelUrl}/api/tenant/subscription/plan`, {
+      method: 'PUT', headers: authHeaders(token), body: { planId: outro.id }
+    });
+    assert.equal(troca.status, 409);
+    assert.equal(troca.body.code, 'not_changeable');
+    const pagar = await call(`${panelUrl}/api/tenant/charges/pay`, { method: 'POST', headers: authHeaders(token) });
+    assert.equal(pagar.status, 409);
+    assert.equal(pagar.body.code, 'not_billable');
+  });
+});

@@ -1377,6 +1377,38 @@ const billingChargesTable = (db) => (t) => {
   t.index(['tenant_id', 'status'], 'billing_charges_status_idx');
 };
 
+/** As colunas da 0073 — ver a migração. */
+const BILLING_CHARGE_CLAIM_COLUMNS = [
+  ['issuing_until', (t) => t.timestamp('issuing_until').nullable()],
+  ['superseded_charges', (t) => t.text('superseded_charges').nullable()]
+];
+
+/**
+ * As colunas da 0074 — ver a migração.
+ *
+ * `pending_plan_id` com o MESMO tipo de `subscriptions.plan_id` (inteiro sem
+ * sinal): no MySQL uma chave estrangeira entre um `INT` e um `INT UNSIGNED` é
+ * recusada, e a coluna tem de poder virar uma se um dia alguém quiser a
+ * constraint. Sem `.references` aqui, de propósito: acrescentar uma chave
+ * estrangeira a uma tabela que já existe é, no SQLite, recriar a tabela
+ * inteira — e a garantia que ela daria já é dada por quem escreve a coluna
+ * (`SelfBillingService.changePlan` só agenda um plano que acabou de ler), e
+ * `plans` não perde linha: o console desativa plano, nunca apaga.
+ */
+const SUBSCRIPTION_PENDING_PLAN_COLUMNS = [
+  ['pending_plan_id', (t) => t.integer('pending_plan_id').unsigned().nullable()],
+  ['pending_plan_at', (t) => t.timestamp('pending_plan_at').nullable()]
+];
+
+/**
+ * As colunas da 0075 — ver a migração. Instantes e não booleanos: quem lê o
+ * banco depois quer saber QUANDO, e nulo continua querendo dizer "não".
+ */
+const SUBSCRIPTION_PLAN_GUARD_COLUMNS = [
+  ['upgraded_at', (t) => t.timestamp('upgraded_at').nullable()],
+  ['pending_plan_locked_at', (t) => t.timestamp('pending_plan_locked_at').nullable()]
+];
+
 const BILLING_TABLES = [
   ['plans', plansTable],
   ['subscriptions', subscriptionsTable],
@@ -4198,6 +4230,117 @@ export const migrations = [
       if (await db.schema.hasColumn('tenant_genieacs_connections', 'ownership')) return;
       await db.schema.alterTable('tenant_genieacs_connections', (t) => {
         t.string('ownership', 16).notNullable().defaultTo('platform');
+      });
+    }
+  },
+  {
+    /**
+     * A emissão com dono, e a memória das cobranças que foram trocadas.
+     *
+     * `issuing_until` é a garra: quem vai falar com o gateway por uma linha
+     * grava aqui "até quando ela é minha", num `UPDATE` condicional, e só
+     * segue quem de fato mudou a linha. Sem ela, o agendador e um "pagar
+     * agora" (ou dois cliques, ou a troca de plano) que lessem a mesma linha
+     * sem `gateway_charge_id` criariam DUAS cobranças de verdade no gateway —
+     * a leitura de idempotência é leitura, e duas leituras simultâneas
+     * respondem a mesma coisa. Um instante e não um booleano: quem morreu
+     * segurando a garra (o processo caiu no meio da chamada) a solta sozinho
+     * quando o prazo passa, e a linha não fica presa para sempre.
+     *
+     * `superseded_charges` é o que a troca de plano apaga da linha ao
+     * reemitir: o id no gateway da cobrança velha e quanto ELA pedia. Um JSON
+     * numa coluna de texto, e não uma tabela: é histórico de uma linha só,
+     * raro (uma entrada por troca de plano com cobrança em aberto), lido
+     * apenas quando um pagamento chega com um id que nenhuma linha tem — e a
+     * pergunta é a de `valorPedido`: quanto se pediu por AQUELE pagamento.
+     * Sem isto, o pagamento atrasado da cobrança velha seria conferido contra
+     * o preço novo, e quem pagou exatamente o que viu seria "pago a menos".
+     *
+     * Nulas nas linhas que já existem, que é o estado certo das duas: ninguém
+     * está emitindo, e nada foi trocado.
+     */
+    id: '0073_billing_charge_claims',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('billing_charges'))) return true;
+      return (await missingColumns(db, 'billing_charges', BILLING_CHARGE_CLAIM_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('billing_charges'))) return;
+      const missing = await missingColumns(db, 'billing_charges', BILLING_CHARGE_CLAIM_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('billing_charges', (t) => {
+        for (const add of missing) add(t);
+      });
+    }
+  },
+  {
+    /**
+     * A descida de plano que espera a renovação.
+     *
+     * Até aqui toda troca feita pelo provedor valia na hora, e a revisão achou
+     * o buraco: subir para o plano caro logo depois de pagar, usar os tetos
+     * maiores o mês inteiro e descer de volta antes de a cobrança seguinte
+     * sair — o plano caro nunca era pago. A regra agora é que SUBIR vale na
+     * hora (paga-se a diferença a partir da próxima cobrança) e DESCER, com um
+     * período pago correndo, vale na renovação: o provedor fica no plano que
+     * pagou até o fim do que pagou.
+     *
+     * `pending_plan_id` é o plano para o qual a assinatura desce, e
+     * `pending_plan_at` é QUANDO — o `renews_at` do momento em que a descida
+     * foi pedida, gravado à parte e não relido de `renews_at`: um pagamento
+     * adiantado empurra `renews_at` para o mês seguinte, e a descida pedida
+     * para este mês não pode escorregar junto. É também por essa data que a
+     * emissão sabe que a cobrança daquele prazo já é do plano novo.
+     *
+     * Nulas nas linhas que já existem, que é o estado certo das duas: ninguém
+     * agendou nada ainda.
+     */
+    id: '0074_subscription_pending_plan',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('subscriptions'))) return true;
+      return (await missingColumns(db, 'subscriptions', SUBSCRIPTION_PENDING_PLAN_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('subscriptions'))) return;
+      const missing = await missingColumns(db, 'subscriptions', SUBSCRIPTION_PENDING_PLAN_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('subscriptions', (t) => {
+        for (const add of missing) add(t);
+      });
+    }
+  },
+  {
+    /**
+     * As duas travas que a revisão da descida agendada pediu, as duas contra
+     * o mesmo dano: um mês de plano caro pago pelo preço do barato.
+     *
+     * `upgraded_at` é quando o provedor SUBIU de plano no meio de um período
+     * pago — que não é cobrado (não há proporcional), e só se paga pela
+     * cobrança seguinte. Sem esta marca, subir no primeiro dia e agendar a
+     * descida antes da cobrança seguinte sair deixava o mês inteiro no plano
+     * caro de graça. Com ela, a descida pedida nesse período vai para a
+     * renovação SEGUINTE: o próximo período é cobrado pelo preço de cima. Um
+     * pagamento que estende o período a apaga — o plano de cima já foi pago.
+     *
+     * `pending_plan_locked_at` é quando o período que começa na descida foi
+     * PAGO pelo preço dela. Dali em diante a descida não se desfaz: cancelá-la
+     * ou trocá-la depois de pagar o barato era ficar no caro pelo preço do
+     * barato, e o uso que cresce depois de pagar não a segura — ela se aplica
+     * na data de qualquer jeito.
+     *
+     * Nulas nas linhas que já existem, que é o estado certo das duas.
+     */
+    id: '0075_subscription_plan_guards',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('subscriptions'))) return true;
+      return (await missingColumns(db, 'subscriptions', SUBSCRIPTION_PLAN_GUARD_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('subscriptions'))) return;
+      const missing = await missingColumns(db, 'subscriptions', SUBSCRIPTION_PLAN_GUARD_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('subscriptions', (t) => {
+        for (const add of missing) add(t);
       });
     }
   }

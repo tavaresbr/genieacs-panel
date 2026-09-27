@@ -35,6 +35,20 @@ router.get('/subscription', authenticateToken, requirePermission('settings.read'
 // exatamente quem precisa desta lista.
 router.get('/charges', authenticateToken, requirePermission('settings.read'), TenantController.listCharges);
 
+// O catálogo de planos, com preço, e o do provedor marcado. Mesma capacidade
+// e mesmo lado da porta da assinatura que `/subscription`: é a tela onde se
+// escolhe o plano, e quem está em `past_due` é quem mais precisa dela.
+router.get('/plans', authenticateToken, requirePermission('settings.read'), TenantController.listPlans);
+
+// O provedor troca de plano, e "pagar agora". Os dois são a conta do
+// provedor mudando — `settings.write`, que é de `owner` e `admin`, os mesmos
+// que gravam o cadastro fiscal que vai na fatura. Fora da porta da
+// assinatura, porque é por eles que um provedor em `past_due` SAI de lá;
+// `suspended` e `canceled` são recusados pelo controlador, com 409 e o
+// código que a tela lê. Nenhum dos dois lê gateway ou cliente do corpo.
+router.put('/subscription/plan', authenticateToken, requirePermission('settings.write'), TenantController.changePlan);
+router.post('/charges/pay', authenticateToken, requirePermission('settings.write'), TenantController.payNow);
+
 // O nome do provedor, escrito por quem administra. É o antigo `appName` das
 // configurações, agora na linha do provedor — ver o controlador.
 router.patch('/', authenticateToken, requirePermission('settings.write'), TenantController.rename);
