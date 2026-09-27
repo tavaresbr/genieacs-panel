@@ -13,6 +13,9 @@ const router = express.Router();
 // descobrir que a instância caiu não é política de acesso, é atraso.
 router.get('/config', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.getConfig);
 router.put('/config', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.updateConfig);
+// A aba Chatbot: o que o atendimento automático diz e quando.
+router.get('/bot-config', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.getBotConfig);
+router.put('/bot-config', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.updateBotConfig);
 router.get('/accounts', authenticateToken, requirePermission('whatsapp.read'), WhatsAppController.listAccounts);
 
 // O diagnóstico da configuração, e a única rota deste roteador com limitador.
