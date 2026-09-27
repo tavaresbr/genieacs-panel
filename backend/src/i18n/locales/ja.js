@@ -32,7 +32,7 @@ export default {
   'auth.setupAlreadyCompleted': 'セットアップは完了しています',
   'auth.usernameLength': 'ユーザー名は 3〜64 文字で入力してください',
   'auth.passwordLength': 'パスワードは 8〜128 文字で入力してください',
-  'auth.adminCreated': '管理者アカウントを作成しました',
+  'auth.adminCreated': 'オーナーアカウントを作成しました',
   'auth.usernameTaken': 'このユーザー名はすでに使用されています',
   'auth.adminCreateFailed': '管理者アカウントを作成できませんでした',
   'auth.userNotFound': 'ユーザーが見つかりません',

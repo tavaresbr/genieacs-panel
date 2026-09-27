@@ -30,7 +30,7 @@ export default {
   'auth.setupAlreadyCompleted': 'सेटअप पहले ही पूरा हो चुका है',
   'auth.usernameLength': 'उपयोगकर्ता नाम 3 से 64 अक्षरों के बीच होना चाहिए',
   'auth.passwordLength': 'पासवर्ड 8 से 128 अक्षरों के बीच होना चाहिए',
-  'auth.adminCreated': 'प्रशासक खाता बन गया',
+  'auth.adminCreated': 'स्वामी खाता बन गया',
   'auth.usernameTaken': 'यह उपयोगकर्ता नाम पहले से लिया जा चुका है',
   'auth.adminCreateFailed': 'प्रशासक खाता नहीं बनाया जा सका',
   'auth.userNotFound': 'उपयोगकर्ता नहीं मिला',

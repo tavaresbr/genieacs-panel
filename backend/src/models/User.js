@@ -276,14 +276,19 @@ class User {
         throw error;
       }
 
+      // Dono, e não `admin`: quem instala o painel é o dono do provedor, e o
+      // cadastro público (`authController.signup`) sempre criou `owner`. Como
+      // `admin`, o provedor nascia sem dono — e o que só o dono decide (exigir
+      // 2FA, mexer no papel de outro dono) ficava num remendo. Instalações de
+      // antes disto ganham o dono pela migração 0065.
       const id = await insertReturningId('users', {
         username,
         password,
         email: User.normalizeEmail(email),
-        role: 'admin'
+        role: 'owner'
       }, trx);
 
-      await trx('tenant_users').insert({ tenant_id: tenantId, user_id: id, role: 'admin' });
+      await trx('tenant_users').insert({ tenant_id: tenantId, user_id: id, role: 'owner' });
 
       // On the hosted edition the first administrator also gets the control
       // plane, because otherwise a SaaS deployment comes up with nobody able to
@@ -302,7 +307,7 @@ class User {
         await trx('platform_admins').insert({ user_id: id });
       }
 
-      return { id, tenantId, role: 'admin' };
+      return { id, tenantId, role: 'owner' };
     });
   }
 

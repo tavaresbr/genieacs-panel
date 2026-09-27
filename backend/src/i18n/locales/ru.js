@@ -32,7 +32,7 @@ export default {
   'auth.setupAlreadyCompleted': 'Первоначальная настройка уже завершена',
   'auth.usernameLength': 'Имя пользователя должно содержать от 3 до 64 символов',
   'auth.passwordLength': 'Пароль должен содержать от 8 до 128 символов',
-  'auth.adminCreated': 'Учётная запись администратора создана',
+  'auth.adminCreated': 'Учётная запись владельца создана',
   'auth.usernameTaken': 'Это имя пользователя уже занято',
   'auth.adminCreateFailed': 'Не удалось создать учётную запись администратора',
   'auth.userNotFound': 'Пользователь не найден',

@@ -32,7 +32,7 @@ export default {
   'auth.setupAlreadyCompleted': '초기 설정이 이미 완료되었습니다',
   'auth.usernameLength': '사용자 이름은 3자에서 64자 사이여야 합니다',
   'auth.passwordLength': '비밀번호는 8자에서 128자 사이여야 합니다',
-  'auth.adminCreated': '관리자 계정을 생성했습니다',
+  'auth.adminCreated': '소유자 계정을 생성했습니다',
   'auth.usernameTaken': '이미 사용 중인 사용자 이름입니다',
   'auth.adminCreateFailed': '관리자 계정을 생성하지 못했습니다',
   'auth.userNotFound': '사용자를 찾을 수 없습니다',

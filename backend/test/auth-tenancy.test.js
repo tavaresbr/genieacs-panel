@@ -107,14 +107,14 @@ describe('a fresh install', () => {
       body: { username: 'owner', password: 'owner-senha-1', email: 'owner@exemplo.test' }
     });
     assert.equal(status, 201);
-    assert.equal(body.data.user.role, 'admin');
+    assert.equal(body.data.user.role, 'owner');
     assert.equal(Number(body.data.user.tenantId), Number(alfa));
     ownerToken = body.data.token;
     idOf.owner = body.data.user.id;
 
     const membership = await TenantUser.find(alfa, body.data.user.id);
     assert.ok(membership, 'setup left the first administrator working for nobody');
-    assert.equal(membership.role, 'admin');
+    assert.equal(membership.role, 'owner');
   });
 
   it('lets that administrator sign in and reach an administrator-only route', async () => {

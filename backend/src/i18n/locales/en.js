@@ -32,7 +32,7 @@ export default {
   'auth.setupAlreadyCompleted': 'Setup already completed',
   'auth.usernameLength': 'The username must be between 3 and 64 characters',
   'auth.passwordLength': 'The password must be between 8 and 128 characters',
-  'auth.adminCreated': 'Administrator account created successfully',
+  'auth.adminCreated': 'Owner account created successfully',
   'auth.usernameTaken': 'That username is already taken',
   'auth.adminCreateFailed': 'Failed to create the administrator account',
   'auth.userNotFound': 'User not found',

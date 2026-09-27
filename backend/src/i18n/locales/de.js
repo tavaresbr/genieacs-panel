@@ -32,7 +32,7 @@ export default {
   'auth.setupAlreadyCompleted': 'Die Einrichtung ist bereits abgeschlossen',
   'auth.usernameLength': 'Der Benutzername muss zwischen 3 und 64 Zeichen lang sein',
   'auth.passwordLength': 'Das Passwort muss zwischen 8 und 128 Zeichen lang sein',
-  'auth.adminCreated': 'Administratorkonto erfolgreich erstellt',
+  'auth.adminCreated': 'Inhaberkonto erfolgreich erstellt',
   'auth.usernameTaken': 'Dieser Benutzername ist bereits vergeben',
   'auth.adminCreateFailed': 'Das Administratorkonto konnte nicht erstellt werden',
   'auth.userNotFound': 'Benutzer nicht gefunden',

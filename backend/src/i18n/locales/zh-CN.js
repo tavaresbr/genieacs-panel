@@ -32,7 +32,7 @@ export default {
   'auth.setupAlreadyCompleted': '配置已完成',
   'auth.usernameLength': '用户名需为 3 至 64 个字符',
   'auth.passwordLength': '密码需为 8 至 128 个字符',
-  'auth.adminCreated': '管理员账号已创建',
+  'auth.adminCreated': '所有者账号已创建',
   'auth.usernameTaken': '该用户名已被占用',
   'auth.adminCreateFailed': '无法创建管理员账号',
   'auth.userNotFound': '找不到该用户',

@@ -35,7 +35,7 @@ describe('operator setup', () => {
       body: admin
     });
     assert.equal(status, 201);
-    assert.equal(body.data.user.role, 'admin');
+    assert.equal(body.data.user.role, 'owner');
     assert.ok(body.data.token);
     assert.ok(body.data.refreshToken);
     session = body.data;
