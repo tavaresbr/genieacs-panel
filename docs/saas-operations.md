@@ -173,7 +173,9 @@ na trilha com quem deu a quem.
 
 Duas consequências de a conta não ter provedor, e as duas são desejadas: ela **não entra
 em `slug.painel.exemplo.com`** (o login de lá recusa quem não tem vínculo) e a senha
-dela se recupera com `node backend/scripts/reset-password.js`, porque o endereço da
+dela se recupera com `skygenpanel reset-password <usuário>` (ou
+`RESET_PASSWORD=... node backend/scripts/reset-password.js <usuário>` — a senha vem da
+variável ou da entrada padrão, nunca de argumento), porque o endereço da
 plataforma não serve a redefinição por e-mail — aquela grava na trilha de um provedor.
 
 É script e não rota de propósito: quem pode rodá-lo é quem tem o servidor, que é
