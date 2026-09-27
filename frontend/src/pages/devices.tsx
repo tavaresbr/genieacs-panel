@@ -100,6 +100,10 @@ export default function DevicesPage() {
   // a tela diz isso em vez de entregar mais linhas do que mostra.
   const canExport = can('devices.export')
   const [exporting, setExporting] = useState(false)
+  // A sincronização da frota com o SGP, a mesma de Configurações → SGP, à mão
+  // de quem está olhando a coluna de contratos. `sgp.act`, como a rota exige.
+  const canSyncSgp = can('sgp.act')
+  const [sgpSyncing, setSgpSyncing] = useState(false)
   const [selected, setSelected] = useState<Map<string, string>>(new Map())
   const [selectingAll, setSelectingAll] = useState(false)
 
@@ -413,6 +417,32 @@ export default function DevicesPage() {
     }
   }
 
+  const syncSgp = async () => {
+    setSgpSyncing(true)
+    loadingCtl.show(t('devices.sgpSync.loading'))
+    try {
+      const res = await sgpAPI.syncAll()
+      if (res.success && res.data) {
+        toast.success(t('devices.sgpSync.done', {
+          linked: res.data.linked,
+          created: res.data.created,
+          updated: res.data.updated,
+          relinked: res.data.relinked ?? 0,
+        }))
+        // Recarrega a lista e a coluna de contratos: os vínculos acabaram de mudar.
+        setRefreshNonce((value) => value + 1)
+        return
+      }
+      if (res.code === 'not_configured') setSgpAvailable(false)
+      toast.error(res.message || t('devices.sgpSync.failed'))
+    } catch {
+      toast.error(t('devices.sgpSync.failed'))
+    } finally {
+      loadingCtl.hide()
+      setSgpSyncing(false)
+    }
+  }
+
   return (
     <div className="page-shell">
       <div className="page-frame">
@@ -424,6 +454,18 @@ export default function DevicesPage() {
           </div>
           <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground sm:shrink-0 sm:flex-nowrap sm:gap-3">
             <span className="me-auto whitespace-nowrap sm:me-0"><strong className="data-value">{paging.total}</strong> {t('devices.totalLabel')}</span>
+            {canSyncSgp && sgpAvailable && (
+              <button
+                type="button"
+                className="modern-button-secondary whitespace-nowrap px-3 sm:px-4"
+                disabled={sgpSyncing}
+                onClick={() => void syncSgp()}
+                aria-label={t('devices.sgpSync.aria')}
+              >
+                <Icon name="refresh" size={16} />
+                {sgpSyncing ? t('devices.sgpSync.loading') : t('devices.sgpSync.button')}
+              </button>
+            )}
             {canExport && (
               <button
                 type="button"
