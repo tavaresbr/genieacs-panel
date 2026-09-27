@@ -1,4 +1,5 @@
 import AppState from '../models/AppState.js';
+import { tdb } from '../config/database.js';
 import DeviceService from './deviceService.js';
 import ProvisioningService from './provisioningService.js';
 import SgpEventService from './sgpEventService.js';
@@ -411,6 +412,12 @@ class SchedulerService {
       await SgpEventService.prune().catch((error) => {
         console.warn(`Could not prune SGP events: ${error.message}`);
       });
+      // O que o bot respondeu: 180 dias bastam para o relatório, que olha no
+      // máximo 90 para trás.
+      await tdb('wa_bot_events').where('created_at', '<', new Date(Date.now() - 180 * 24 * 3600_000)).del()
+        .catch((error) => {
+          console.warn(`Could not prune bot events: ${error.message}`);
+        });
       // A trilha de auditoria, pelo prazo DESTE provedor. Ver
       // `auditRetentionDays`: o padrão continua sendo um ano, e agora é padrão
       // e não sentença.

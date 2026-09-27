@@ -1558,6 +1558,27 @@ const outageIncidentDevicesTable = (db) => (t) => {
   t.index(['tenant_id', 'device_id'], 'outage_incident_devices_device_idx');
 };
 
+/**
+ * O que o bot respondeu, uma linha por resposta: a intenção e a conversa. É o
+ * que o relatório do chatbot conta — `wa_messages` guarda que o bot falou,
+ * não sobre o quê. Sem texto nenhum aqui: a mensagem continua só onde já
+ * estava. Podada em 180 dias pelo agendador.
+ */
+const waBotEventsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.integer('conversation_id').unsigned().nullable();
+  t.string('intent', 32).notNullable();
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.index(['tenant_id', 'created_at'], 'wa_bot_events_created_idx');
+  t.index(['tenant_id', 'conversation_id'], 'wa_bot_events_conversation_idx');
+};
+
+const WA_BOT_EVENT_TABLES = [
+  ['wa_bot_events', waBotEventsTable]
+];
+
 const OUTAGE_TABLES = [
   ['outage_incidents', outageIncidentsTable],
   ['outage_incident_devices', outageIncidentDevicesTable]
@@ -1634,7 +1655,8 @@ export const SCHEMA_TABLES = [
   ...OUTAGE_HISTORY_TABLES,
   ...SGP_CONTACT_TABLES,
   ...MFA_TABLES,
-  ...OUTAGE_TABLES
+  ...OUTAGE_TABLES,
+  ...WA_BOT_EVENT_TABLES
 ].map(([name]) => name);
 
 /**
@@ -3994,6 +4016,21 @@ export const migrations = [
     },
     async up(db) {
       await createTableIfMissing(db, 'outage_events', outageEventsTable(db));
+    }
+  },
+  {
+    /** O que o bot respondeu — ver `waBotEventsTable`. */
+    id: '0068_wa_bot_events',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      return db.schema.hasTable('wa_bot_events');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      for (const [nome, construtor] of WA_BOT_EVENT_TABLES) {
+        // eslint-disable-next-line no-await-in-loop
+        await createTableIfMissing(db, nome, construtor(db));
+      }
     }
   }
 ];

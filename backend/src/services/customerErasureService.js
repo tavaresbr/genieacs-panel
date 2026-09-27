@@ -129,6 +129,9 @@ class CustomerErasureService {
       wa_messages: conversaIds.length
         ? await contar('wa_messages', (q) => q.whereIn('conversation_id', conversaIds))
         : 0,
+      wa_bot_events: conversaIds.length
+        ? await contar('wa_bot_events', (q) => q.whereIn('conversation_id', conversaIds))
+        : 0,
       wa_broadcast_recipients: (telefones.length || contratos.length)
         ? await contar('wa_broadcast_recipients', (q) => q.where((w) => {
           if (telefones.length) w.whereIn('phone_e164', telefones);
@@ -189,6 +192,7 @@ class CustomerErasureService {
       await tdb('customer_wifi_credentials', trx).where({ account_id: account.id }).del();
 
       if (conversaIds.length) {
+        await tdb('wa_bot_events', trx).whereIn('conversation_id', conversaIds).del();
         await tdb('wa_messages', trx).whereIn('conversation_id', conversaIds).del();
         await tdb('wa_conversations', trx).whereIn('id', conversaIds).del();
       }
