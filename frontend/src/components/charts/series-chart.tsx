@@ -1,4 +1,5 @@
 import { useId, useMemo, useState } from 'react'
+import { useChartWidth } from './use-chart-width'
 
 export interface SeriesPoint {
   /** Seconds since the epoch, as the history endpoint returns them. */
@@ -42,7 +43,10 @@ export function SeriesChart({
   const gradientId = useId()
   const [hoverIndex, setHoverIndex] = useState<number | null>(null)
 
-  const width = 640
+  // Como no `TrendChart`: abaixo de 640px desenha na largura real, para o
+  // texto do eixo não encolher junto com o `viewBox`.
+  const [containerRef, measured] = useChartWidth<HTMLDivElement>(640)
+  const width = Math.min(measured, 640)
   const height = 220
   const left = 44
   const right = 16
@@ -102,7 +106,7 @@ export function SeriesChart({
 
   if (!geometry) {
     return (
-      <div className="flex min-h-[220px] items-center justify-center text-sm text-muted-foreground">
+      <div ref={containerRef} className="flex min-h-[220px] items-center justify-center text-sm text-muted-foreground">
         {emptyLabel}
       </div>
     )
@@ -128,14 +132,15 @@ export function SeriesChart({
   }
 
   return (
-    <div className="w-full">
+    <div ref={containerRef} className="w-full">
       <svg
         viewBox={`0 0 ${width} ${height}`}
         className="h-[240px] w-full"
         role="img"
         aria-label={ariaLabel}
-        onMouseMove={(event) => resolveHover(event.clientX, event.currentTarget)}
-        onMouseLeave={() => setHoverIndex(null)}
+        onPointerMove={(event) => resolveHover(event.clientX, event.currentTarget)}
+        onPointerDown={(event) => resolveHover(event.clientX, event.currentTarget)}
+        onPointerLeave={(event) => { if (event.pointerType === 'mouse') setHoverIndex(null) }}
       >
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">

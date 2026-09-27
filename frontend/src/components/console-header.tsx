@@ -33,7 +33,7 @@ export function ConsoleHeader() {
           {t('sidebar.platformAdmin')}
         </div>
       </div>
-      <div className="ms-auto flex items-center gap-3">
+      <div className="ms-auto flex shrink-0 items-center gap-2 sm:gap-3">
         <LanguageSwitcher />
         {user?.username && (
           <span className="hidden text-sm text-muted-foreground sm:inline">{user.username}</span>

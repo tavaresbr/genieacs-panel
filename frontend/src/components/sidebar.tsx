@@ -79,6 +79,19 @@ export default function Sidebar() {
     setIsMobileOpen(false)
   }, [pathname])
 
+  // Gaveta aberta: Esc fecha, e a página de trás não rola junto com o dedo.
+  useEffect(() => {
+    if (!isMobileOpen) return
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setIsMobileOpen(false) }
+    const overflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', onKey)
+    return () => {
+      document.body.style.overflow = overflow
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [isMobileOpen])
+
   const hideOnRoutes = ['/login', '/setup']
   if (hideOnRoutes.some((route) => pathname.startsWith(route))) return null
 
@@ -114,7 +127,7 @@ export default function Sidebar() {
             onClick={() => setIsMobileOpen(false)}
             aria-label={t('sidebar.closeNavigation')}
           />
-          <aside className="relative flex h-full w-[min(86vw,19rem)] flex-col bg-[#18211d] text-[#f4f3ed] shadow-2xl">
+          <aside className="relative flex h-full w-[min(86vw,19rem)] flex-col overscroll-contain bg-[#18211d] pb-[env(safe-area-inset-bottom)] text-[#f4f3ed] shadow-2xl">
             <SidebarContent isCollapsed={false} isActive={isActive} closeMobile={() => setIsMobileOpen(false)} />
           </aside>
         </div>
@@ -220,6 +233,16 @@ function SidebarContent({
             </div>
           )}
         </Link>
+        {closeMobile && (
+          <button
+            type="button"
+            onClick={closeMobile}
+            className="ms-auto -me-1.5 flex size-11 shrink-0 items-center justify-center rounded-md text-[#cad3ce] transition-colors hover:bg-white/8 hover:text-white"
+            aria-label={t('sidebar.closeNavigation')}
+          >
+            <Icon name="x" size={21} />
+          </button>
+        )}
       </div>
 
       <nav className={`min-h-0 flex-1 overflow-y-auto py-5 ${isCollapsed ? 'px-2.5' : 'px-3'}`} aria-label={t('sidebar.primaryNavigation')}>

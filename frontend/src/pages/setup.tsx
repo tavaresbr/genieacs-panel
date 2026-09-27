@@ -82,14 +82,14 @@ export default function Setup() {
       <main className="flex min-h-screen items-start justify-center px-4 pb-10 pt-12 sm:px-8 lg:items-center lg:py-10">
         <div className="w-full max-w-md">
           <div className="mb-8 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 lg:hidden">
-              <BrandMark className="size-10" title={name} />
-              <div>
-                <div className="font-bold">{name}</div>
+            <div className="flex min-w-0 items-center gap-3 lg:hidden">
+              <BrandMark className="size-10 shrink-0" title={name} />
+              <div className="min-w-0">
+                <div className="font-bold [overflow-wrap:anywhere]">{name}</div>
                 <div className="text-[0.65rem] font-bold uppercase tracking-[0.13em] text-muted-foreground">{t('setup.firstRun')}</div>
               </div>
             </div>
-            <LanguageSwitcher className="ms-auto" />
+            <LanguageSwitcher className="ms-auto shrink-0" />
           </div>
 
           <div className="auth-panel">

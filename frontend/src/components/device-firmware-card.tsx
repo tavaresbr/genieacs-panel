@@ -71,8 +71,8 @@ export function DeviceFirmwareCard({ deviceId, onDone }: { deviceId: string; onD
   return (
     <section className="modern-card p-5 sm:p-6">
       <div className="flex items-start gap-3">
-        <Icon name="box" className="mt-0.5 text-primary" />
-        <div>
+        <Icon name="box" className="mt-0.5 shrink-0 text-primary" />
+        <div className="min-w-0">
           <h2 className="section-heading">{t('detail.firmware.title')}</h2>
           <p className="section-description">
             {t('detail.firmware.current', { version: lista?.current || t('common.na') })}
@@ -151,18 +151,18 @@ export function DeviceFirmwareCard({ deviceId, onDone }: { deviceId: string; onD
 
       {confirmando && arquivo && (
         <div className="fixed inset-0 z-[2100] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="firmware-confirm-title">
-          <div className="modern-card w-full max-w-md">
+          <div className="modern-card flex max-h-[90vh] w-full max-w-md flex-col">
             <div className="flex items-center gap-2 border-b border-border p-5">
               <Icon name="warning" size={20} className="shrink-0 text-[hsl(var(--status-warning))]" />
               <h3 id="firmware-confirm-title" className="text-lg font-semibold text-foreground">{t('detail.firmware.confirmTitle')}</h3>
             </div>
-            <div className="space-y-3 p-5 text-sm leading-6">
-              <p className="font-mono text-foreground">
+            <div className="space-y-3 overflow-y-auto p-5 text-sm leading-6">
+              <p className="break-all font-mono text-foreground">
                 {lista?.current || t('common.na')} → {arquivo.version || arquivo.id}
               </p>
               <p className="text-foreground">{t('detail.firmware.consequence')}</p>
             </div>
-            <div className="flex items-center justify-end gap-3 border-t border-border p-5">
+            <div className="flex flex-wrap items-center justify-end gap-3 border-t border-border p-5">
               <button type="button" className="modern-button-secondary" onClick={() => setConfirmando(false)} disabled={enviando}>
                 {t('common.cancel')}
               </button>

@@ -35,8 +35,8 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
     if (!this.state.error) return this.props.children
     const isPortuguese = (navigator.language || '').toLowerCase().startsWith('pt')
     return (
-      <div role="alert" style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: '2rem', fontFamily: 'system-ui, sans-serif' }}>
-        <div style={{ maxWidth: '32rem', textAlign: 'center' }}>
+      <div role="alert" style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: '2rem 1rem', fontFamily: 'system-ui, sans-serif' }}>
+        <div style={{ width: '100%', maxWidth: '32rem', minWidth: 0, textAlign: 'center' }}>
           <h1 style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>
             {isPortuguese ? 'O painel encontrou um erro e não conseguiu abrir esta tela.' : 'The panel hit an error and could not open this screen.'}
           </h1>
@@ -48,7 +48,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
           <button type="button" onClick={() => window.location.reload()} style={{ padding: '0.6rem 1.2rem', borderRadius: '0.5rem', border: '1px solid currentColor', background: 'transparent', color: 'inherit', cursor: 'pointer' }}>
             {isPortuguese ? 'Recarregar' : 'Reload'}
           </button>
-          <pre style={{ marginTop: '1.5rem', textAlign: 'left', fontSize: '0.75rem', opacity: 0.6, whiteSpace: 'pre-wrap' }}>
+          <pre style={{ marginTop: '1.5rem', textAlign: 'left', fontSize: '0.75rem', opacity: 0.6, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
             {String(this.state.error?.message || this.state.error)}
           </pre>
         </div>

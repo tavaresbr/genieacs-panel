@@ -173,15 +173,15 @@ export function MemberAccount({ tenant, member, busy, onUpdated, onRemove }: Pro
     <li className="px-3 py-2">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <span className="min-w-0">
-          <span className="truncate text-sm font-medium">{member.username}</span>
+          <span className="break-all text-sm font-medium">{member.username}</span>
           <span className="modern-badge ms-2">{roleLabel(member.role)}</span>
           {(member.email || member.phone) && (
-            <span className="block text-xs text-muted-foreground">
+            <span className="block break-all text-xs text-muted-foreground">
               {[member.email, formatPhone(member.phone)].filter(Boolean).join(' · ')}
             </span>
           )}
         </span>
-        <span className="flex shrink-0 items-center gap-2">
+        <span className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             className="modern-button-secondary"
@@ -204,7 +204,7 @@ export function MemberAccount({ tenant, member, busy, onUpdated, onRemove }: Pro
             type="button"
             onClick={() => onRemove(member)}
             disabled={busy}
-            className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+            className="inline-flex size-10 items-center justify-center rounded-md text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
             title={t('platform.removeMember')}
             aria-label={t('platform.removeMember')}
           >

@@ -148,7 +148,7 @@ export function DeviceDiagnosticsCard({ deviceId }: { deviceId: string }) {
               aria-checked={kind === opcao}
               disabled={rodando}
               onClick={() => trocarTipo(opcao)}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+              className={`min-h-10 rounded-md px-3 py-1.5 text-sm font-medium transition-colors sm:min-h-0 ${
                 kind === opcao ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
               }`}
             >
@@ -156,7 +156,7 @@ export function DeviceDiagnosticsCard({ deviceId }: { deviceId: string }) {
             </button>
           ))}
         </div>
-        <div className="min-w-[14rem] flex-1">
+        <div className="min-w-0 flex-1 basis-full sm:min-w-[14rem] sm:basis-0">
           <label htmlFor="diagnostic-host" className="field-label">{t('detail.diagnostics.host')}</label>
           <input
             id="diagnostic-host"
@@ -224,7 +224,7 @@ export function DeviceDiagnosticsCard({ deviceId }: { deviceId: string }) {
         )}
         {mostraResultado && result.state !== 'idle' && (result.host || result.measuredAt) && (
           <p className="text-xs text-muted-foreground">
-            {result.host && <span className="font-mono">{result.host}</span>}
+            {result.host && <span className="break-all font-mono">{result.host}</span>}
             {result.host && result.measuredAt && ' · '}
             {result.measuredAt && t('detail.diagnostics.measuredAt', { when: formatDateTime(result.measuredAt) })}
           </p>
@@ -284,7 +284,7 @@ function TracerouteResultado({ hops, responseTime }: { hops: NonNullable<DeviceD
               return (
                 <tr key={hop.hop} className="border-t border-border">
                   <td className="px-3 py-2 tabular-nums text-muted-foreground">{hop.hop}</td>
-                  <td className="px-3 py-2 font-mono">
+                  <td className="break-all px-3 py-2 font-mono">
                     {hop.address || nome || '*'}
                     {nome && hop.address && <span className="ml-2 text-muted-foreground">{nome}</span>}
                   </td>

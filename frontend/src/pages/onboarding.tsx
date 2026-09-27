@@ -432,7 +432,7 @@ export default function Onboarding() {
                 <Icon name="lock" size={16} className="mt-0.5 shrink-0" />
                 <p className="text-sm leading-6">{t('onboarding.acs.platformManaged')}</p>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <button type="button" className="modern-button-secondary" disabled={busy} onClick={() => go(-1)}>{t('common.back')}</button>
                 <button type="button" className="modern-button" onClick={() => go(1)}>{t('common.next')}</button>
               </div>
@@ -479,7 +479,7 @@ export default function Onboarding() {
                   </div>
                 )}
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <button type="button" className="modern-button-secondary" disabled={busy} onClick={() => go(-1)}>{t('common.back')}</button>
                 <button type="button" className="modern-button" disabled={busy} onClick={() => void saveAcs()}>
                   {busy ? t('common.saving') : t('common.next')}
@@ -566,7 +566,7 @@ export default function Onboarding() {
                   ['onboarding.done.item.team', saved.colleague]
                 ] as const).map(([key, ok]) => (
                   <li key={key} className="flex items-center justify-between gap-3 py-2.5">
-                    <span className="flex items-center gap-2 text-sm text-foreground">
+                    <span className="flex min-w-0 items-center gap-2 text-sm text-foreground">
                       <Icon
                         name={ok ? 'check' : 'info'}
                         size={17}
@@ -611,7 +611,7 @@ export default function Onboarding() {
                 </div>
               </div>
               <p className="field-hint">{t('onboarding.team.hint')}</p>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <button type="button" className="modern-button-secondary" disabled={busy} onClick={() => go(-1)}>{t('common.back')}</button>
                 <button type="button" className="modern-button" disabled={busy || (colleague.username.trim() !== '' && (colleague.password.length < 8 || !colleague.email.includes('@')))} onClick={() => void saveColleague()}>
                   <Icon name="check" size={17} />
