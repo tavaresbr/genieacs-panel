@@ -1,5 +1,6 @@
 import WhatsAppConfigService, { WaError } from '../services/whatsappConfigService.js';
 import EvolutionInstanceService from '../services/evolutionInstanceService.js';
+import WaBotConfigService from '../services/waBotConfigService.js';
 import WaHealthService from '../services/waHealthService.js';
 import WhatsAppAccount from '../models/WhatsAppAccount.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
@@ -20,6 +21,32 @@ export function handleError(req, res, error, fallbackKey) {
 }
 
 class WhatsAppController {
+  /** `GET /api/whatsapp/bot-config` — a aba Chatbot: opções, textos, horário e os dois interruptores. */
+  static async getBotConfig(req, res) {
+    try {
+      return res.json(createResponse(req.t('whatsapp.configLoaded'), await WaBotConfigService.getPublic(req.locale)));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.configLoadFailed');
+    }
+  }
+
+  /** `PUT /api/whatsapp/bot-config` — campo ausente mantém o que está gravado. */
+  static async updateBotConfig(req, res) {
+    try {
+      const body = req.body ?? {};
+      const config = await WaBotConfigService.saveConfig({
+        enabled: body.enabled,
+        unlockEnabled: body.unlockEnabled,
+        options: body.options,
+        messages: body.messages,
+        hours: body.hours
+      }, req.locale);
+      return res.json(createResponse(req.t('whatsapp.configSaved'), config));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.configSaveFailed');
+    }
+  }
+
   static async getConfig(req, res) {
     try {
       return res.json(createResponse(

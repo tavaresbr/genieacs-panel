@@ -3125,9 +3125,40 @@ export interface WhatsAppMessage {
   updatedAt: string | null
 }
 
+/** Os textos do bot que o provedor pode trocar — só os sem variável. */
+export type BotMessageKey =
+  | 'greeting' | 'askDocument' | 'handoffQueued' | 'handoff' | 'notRecognised' | 'noOpenInvoice' | 'outsideHours'
+
+export interface BotHoursDay {
+  /** 0 é domingo, como `Date#getDay`. */
+  day: number
+  closed: boolean
+  open: string
+  close: string
+}
+
+/** A aba Chatbot: o que o atendimento automático diz e quando. */
+export interface BotConfig {
+  enabled: boolean
+  unlockEnabled: boolean
+  options: { invoice: boolean; signal: boolean; human: boolean; document: boolean }
+  /** Vazio usa o padrão. */
+  messages: Record<BotMessageKey, string>
+  /** Os textos padrão, no idioma de quem olha. */
+  defaults: Record<BotMessageKey, string>
+  hours: { enabled: boolean; timezone: string; week: BotHoursDay[] }
+}
+
 export const whatsappAPI = {
   getConfig: () =>
     apiClient.get<WhatsAppConfig>('/whatsapp/config'),
+
+  getBotConfig: () =>
+    apiClient.get<BotConfig>('/whatsapp/bot-config'),
+
+  /** Campo ausente mantém o gravado. */
+  updateBotConfig: (config: Partial<Omit<BotConfig, 'defaults'>>) =>
+    apiClient.put<BotConfig>('/whatsapp/bot-config', config),
 
   // An omitted managedAdminKey keeps the stored one; "" clears it. The server
   // never returns it either way.

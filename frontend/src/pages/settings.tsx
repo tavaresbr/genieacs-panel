@@ -56,6 +56,7 @@ const PLATFORM_MANAGED_KEYS = new Set<string>(['genieAcsUrl', ...Object.keys(INS
 import type { Vendor as VendorType, WifiSecurityConfig as WifiSecurityConfigType } from '@/types'
 import { MfaCard } from '@/components/mfa-card'
 import { AboutTab } from '@/components/settings/about-tab'
+import { ChatbotTab } from '@/components/settings/chatbot-tab'
 import { MfaPolicyCard } from '@/components/mfa-policy-card'
 import { canOfferMfaReset, canOfferPasswordReset } from '@/lib/mfa-enrollment'
 
@@ -91,7 +92,7 @@ const GENIE_SECRET_STATE_BADGES: Record<GenieSecretState, string> = {
 /** The tabs `?tab=` may open. */
 const SETTINGS_TABS = [
   'provider', 'general', 'virtual-params', 'customer-portal', 'sgp', 'provisioning',
-  'whatsapp', 'security', 'vendors', 'wifi-security', 'database', 'about'
+  'whatsapp', 'chatbot', 'security', 'vendors', 'wifi-security', 'database', 'about'
 ]
 
 /**
@@ -230,8 +231,6 @@ export default function Settings() {
     enabled: false,
     webhookBaseUrl: '',
     portalPublicUrl: '',
-    botEnabled: true,
-    botUnlockEnabled: false,
     allowedHosts: '',
     managedUrl: '',
     managedAdminKey: '',
@@ -397,8 +396,6 @@ export default function Settings() {
         enabled: config.enabled,
         webhookBaseUrl: config.webhookBaseUrl,
         portalPublicUrl: config.portalPublicUrl,
-        botEnabled: config.botEnabled !== false,
-        botUnlockEnabled: config.botUnlockEnabled === true,
         allowedHosts: config.allowedHosts.join('\n'),
         managedUrl: config.managedUrl,
         // The stored admin key never leaves the server; an empty field keeps it.
@@ -545,8 +542,6 @@ export default function Settings() {
         enabled: waForm.enabled,
         webhookBaseUrl: waForm.webhookBaseUrl,
         portalPublicUrl: waForm.portalPublicUrl,
-        botEnabled: waForm.botEnabled,
-        botUnlockEnabled: waForm.botUnlockEnabled,
         // The API takes the textarea verbatim, one host per line.
         allowedHosts: waForm.allowedHosts,
         managedUrl: waForm.managedUrl,
@@ -1517,6 +1512,17 @@ export default function Settings() {
                   mean editing five files another agent owns. */}
               {t('sidebar.nav.whatsapp')}
             </button>
+            {can('whatsapp.config') && (
+              <button
+                onClick={() => setActiveTab('chatbot')}
+                className="tab-button"
+                data-active={activeTab === 'chatbot'}
+                role="tab"
+                aria-selected={activeTab === 'chatbot'}
+              >
+                {t('settings.tab.chatbot')}
+              </button>
+            )}
             <button
               onClick={() => setActiveTab('security')}
               className="tab-button"
@@ -2341,37 +2347,6 @@ export default function Settings() {
                 <p className="field-hint">{t('settings.whatsapp.portalUrlHint')}</p>
               </div>
 
-              <div className="rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-4">
-                <label className="flex cursor-pointer items-start gap-3">
-                  <input
-                    type="checkbox"
-                    className="mt-1 h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
-                    checked={waForm.botEnabled}
-                    onChange={(event) => setWaForm((current) => ({ ...current, botEnabled: event.target.checked }))}
-                  />
-                  <span>
-                    <span className="block font-semibold">{t('settings.whatsapp.botEnabled')}</span>
-                    <span className="mt-1 block text-sm leading-6 text-muted-foreground">
-                      {t('settings.whatsapp.botEnabledHint')}
-                    </span>
-                  </span>
-                </label>
-                <label className={`mt-4 flex items-start gap-3 border-t border-border pt-4 ${waForm.botEnabled ? 'cursor-pointer' : 'opacity-60'}`}>
-                  <input
-                    type="checkbox"
-                    className="mt-1 h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
-                    checked={waForm.botUnlockEnabled}
-                    disabled={!waForm.botEnabled}
-                    onChange={(event) => setWaForm((current) => ({ ...current, botUnlockEnabled: event.target.checked }))}
-                  />
-                  <span>
-                    <span className="block font-semibold">{t('settings.whatsapp.botUnlockEnabled')}</span>
-                    <span className="mt-1 block text-sm leading-6 text-muted-foreground">
-                      {t('settings.whatsapp.botUnlockEnabledHint')}
-                    </span>
-                  </span>
-                </label>
-              </div>
 
               {!platformManaged && (
               <>
@@ -3542,6 +3517,8 @@ export default function Settings() {
             </div>
           </div>
         )}
+
+        {activeTab === 'chatbot' && can('whatsapp.config') && <ChatbotTab />}
 
         {activeTab === 'about' && <AboutTab appName={tenantName} />}
 
