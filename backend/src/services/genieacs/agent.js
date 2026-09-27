@@ -134,8 +134,8 @@ function toIso(value) {
 
 /**
  * O `AgentStatus` do provedor em escopo, como a tela o lê:
- * `{ tokenHint, tokenCreatedAt, connected, lastSeenAt, version }`. `connected`
- * vem do hub (é estado do processo, não do banco).
+ * `{ tokenHint, tokenCreatedAt, connected, connectedAt, lastSeenAt, version }`.
+ * `connected` e `connectedAt` vêm do hub (são estado do processo, não do banco).
  */
 export async function agentStatus() {
   const info = await GenieAcsConnection.agentInfo();
@@ -143,6 +143,7 @@ export async function agentStatus() {
     tokenHint: info.tokenHint,
     tokenCreatedAt: toIso(info.tokenCreatedAt),
     connected: agentHub.isConnected(currentTenantId()),
+    connectedAt: toIso(agentHub.connectedSince(currentTenantId())),
     lastSeenAt: toIso(info.lastSeenAt),
     version: info.version
   };

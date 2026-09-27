@@ -1,4 +1,5 @@
 import Setting from '../models/Setting.js';
+import GenieAcsConnection from '../models/GenieAcsConnection.js';
 import TenantUser from '../models/TenantUser.js';
 import WhatsAppAccount from '../models/WhatsAppAccount.js';
 import ProvisioningProfile from '../models/ProvisioningProfile.js';
@@ -39,7 +40,10 @@ function withTimeout(promise, ms) {
 export default class OnboardingService {
   static async status(tenantId) {
     const genieAcsUrl = await Setting.getByKey('genieAcsUrl').catch(() => null);
-    const hasAcs = Boolean(String(genieAcsUrl || '').trim());
+    // No modo agente o endereço pode ficar vazio: quem sabe onde o GenieACS
+    // está é o agente, na rede do provedor. Ter escolhido o modo é o passo.
+    const modoAgente = (await GenieAcsConnection.mode().catch(() => 'direct')) === 'agent';
+    const hasAcs = modoAgente || Boolean(String(genieAcsUrl || '').trim());
 
     const checks = {
       genieacs: async () => hasAcs,

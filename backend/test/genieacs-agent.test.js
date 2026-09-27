@@ -359,6 +359,39 @@ describe('o protocolo, do lado do painel', () => {
       (erro) => erro.code === 'acs_agent_upstream_unreachable'
     );
   });
+
+  it('resposta malformada a um pedido que espera: falha na hora, sem esperar o prazo', async () => {
+    await modo(alfa, 'agent');
+    await ligarAgente(await gerarChave(alfa), {
+      aoPedir: (msg, ws) => ws.send(JSON.stringify({ type: 'response', id: msg.id, status: 'duzentos', headers: {}, body: null }))
+    });
+    const inicio = Date.now();
+    await assert.rejects(
+      runInTenant(alfa, async () => (await connectorFor()).request('devices', { unscoped: true, timeoutMs: 10_000 })),
+      (erro) => erro.code === 'acs_agent_bad_request'
+    );
+    assert.ok(Date.now() - inicio < 2_000, 'esperou o prazo por uma resposta que já tinha chegado');
+  });
+
+  it('o painel manda o batimento como mensagem, além do ping de protocolo', async () => {
+    agentHub.close();
+    const anterior = agentHub.pingIntervalMs;
+    agentHub.pingIntervalMs = 40;
+    try {
+      await modo(alfa, 'agent');
+      const agente = await ligarAgente(await gerarChave(alfa));
+      const batimentos = [];
+      agente.ws.addEventListener('message', (evento) => {
+        if (JSON.parse(evento.data).type === 'ping') batimentos.push(Date.now());
+      });
+      await ate(() => batimentos.length >= 2, 'dois batimentos');
+      assert.ok(agentHub.connectedSince(alfa) instanceof Date);
+    } finally {
+      agentHub.close();
+      agentHub.pingIntervalMs = anterior;
+    }
+    assert.equal(agentHub.connectedSince(alfa), null);
+  });
 });
 
 describe('o pedido pelo agente é o pedido direto', () => {
@@ -502,7 +535,7 @@ describe('as rotas da chave e do modo', () => {
     assert.equal(status, 200, JSON.stringify(body));
     assert.equal(body.data.mode, 'direct');
     assert.equal(body.data.modeEditable, true);
-    assert.deepEqual(Object.keys(body.data.agent).sort(), ['connected', 'lastSeenAt', 'tokenCreatedAt', 'tokenHint', 'version']);
+    assert.deepEqual(Object.keys(body.data.agent).sort(), ['connected', 'connectedAt', 'lastSeenAt', 'tokenCreatedAt', 'tokenHint', 'version']);
     assert.equal(JSON.stringify(body).includes('hash'), false);
   });
 

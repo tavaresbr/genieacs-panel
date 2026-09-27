@@ -312,6 +312,7 @@ class AgentHub {
       ws,
       pendentes: new Map(),
       ultimoPong: Date.now(),
+      conectadaEm: new Date(),
       ultimaGravacao: 0,
       version: null
     };
@@ -376,12 +377,19 @@ class AgentHub {
 
     const status = Number(msg.status);
     const headers = cabecalhosValidos(msg.headers);
+    // Malformada, mas com o id de um pedido que espera: o pedido falha AGORA.
+    // Ignorar o frame (como se faz com um id desconhecido) deixaria o operador
+    // esperando o prazo inteiro por uma resposta que já chegou — quebrada.
     if (!Number.isInteger(status) || status < 100 || status > 599 || headers === null) {
-      return this.descartar(conexao, 'resposta malformada');
+      this.descartar(conexao, 'resposta malformada');
+      return pendente.falhar(new AgentRequestError('bad_request', 'GenieACS agent sent a malformed response'));
     }
     let body = Buffer.alloc(0);
     if (msg.body !== null && msg.body !== undefined) {
-      if (typeof msg.body !== 'string') return this.descartar(conexao, 'corpo malformado');
+      if (typeof msg.body !== 'string') {
+        this.descartar(conexao, 'corpo malformado');
+        return pendente.falhar(new AgentRequestError('bad_request', 'GenieACS agent sent a malformed body'));
+      }
       body = Buffer.from(msg.body, 'base64');
     }
     return pendente.cumprir({ status, headers, body });
@@ -436,10 +444,24 @@ class AgentHub {
       }
       try {
         conexao.ws.ping();
+        // O mesmo batimento, como MENSAGEM: o `WebSocket` do Node (o do agente)
+        // responde ao ping de protocolo mas não o mostra a quem o usa, e é por
+        // esta que o agente percebe uma conexão meio aberta e reconecta.
+        conexao.ws.send('{"type":"ping"}');
       } catch {
         conexao.ws.terminate();
       }
     }
+  }
+
+  /**
+   * Desde quando a conexão ATUAL do provedor está aberta, ou nulo. É estado do
+   * processo, como `isConnected`: o `agent_last_seen_at` do banco anda a cada
+   * pong e não serve para dizer "conectado desde".
+   */
+  connectedSince(tenantId) {
+    if (!this.isConnected(tenantId)) return null;
+    return this.conexoes.get(Number(tenantId)).conectadaEm;
   }
 
   isConnected(tenantId) {

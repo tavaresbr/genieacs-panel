@@ -502,10 +502,11 @@ const CASOS = [
     body: { value: 'TR69 Controle' },
     aceito: [200]
   },
-  // A conexão com o GenieACS (direto ou pelo agente) e a chave do agente: as
-  // três em `settings.write`, a permissão que grava o `genieAcsUrl`.
+  // A conexão com o GenieACS (direto ou pelo agente) e a chave do agente: ler
+  // em `settings.read`, como `/genieacs-auth`; mudar e gerar chave em
+  // `settings.write`, a permissão que grava o `genieAcsUrl`.
   {
-    cap: 'settings.write',
+    cap: 'settings.read',
     label: 'GET /api/settings/genieacs-connection',
     method: 'GET',
     path: () => '/api/settings/genieacs-connection',

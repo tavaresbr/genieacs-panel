@@ -1131,6 +1131,8 @@ export interface GenieAcsAgentStatus {
   tokenCreatedAt: string | null
   /** Há uma conexão aberta agora. */
   connected: boolean
+  /** Desde quando a conexão ATUAL está aberta; `null` sem conexão. */
+  connectedAt: string | null
   /** A última vez que o agente esteve conectado; `null` se nunca esteve. */
   lastSeenAt: string | null
   /** A versão que o agente anunciou no `hello`. */

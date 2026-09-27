@@ -9,7 +9,9 @@ import GenieAcsAuthService, { AUTH_TYPES } from '../services/genieacsAuthService
 import Tenant from '../models/Tenant.js';
 import { suggestGenieAcsUrl } from '../services/genieacsSuggestion.js';
 import { connectorFor } from '../services/genieacs/connector.js';
-import { afterModeChange, agentStatus, issueAgentToken } from '../services/genieacs/agent.js';
+import {
+  acsAgentOfflineBody, afterModeChange, agentStatus, isAgentOffline, issueAgentToken
+} from '../services/genieacs/agent.js';
 import { forgetSharedAcs } from '../services/genieacs/direct.js';
 import GenieAcsConnection from '../models/GenieAcsConnection.js';
 import { currentTenantId } from '../config/tenantContext.js';
@@ -632,6 +634,37 @@ class SettingsController {
 }
 
 /**
+ * O teste de conexão no modo agente: um `GET /devices?limit=1` pelo conector,
+ * com a credencial e o escopo de sempre. As respostas seguem as do teste
+ * direto (mesmas frases, mesmos status), mais o 503 de agente desconectado.
+ */
+async function probeViaAgent(t, conector) {
+  const reply = (status, body) => ({ status, body });
+  try {
+    const response = await conector.request('devices', { query: { limit: 1 }, timeoutMs: 10_000 });
+    if (!response.ok) {
+      return reply(502, createErrorResponse(
+        t('settings.connectionStatus', { status: response.status }),
+        t('settings.connectionTestFailed')
+      ));
+    }
+    const data = await response.json().catch(() => null);
+    return Array.isArray(data)
+      ? reply(200, createResponse(t('settings.connectionSuccess'), { deviceCount: data.length }))
+      : reply(200, createResponse(t('settings.connectionUnexpectedFormat')));
+  } catch (error) {
+    if (isAgentOffline(error)) return reply(503, acsAgentOfflineBody(error, t('device.acsAgentOffline')));
+    if (error?.agentCode === 'timeout' || error?.name === 'TimeoutError') {
+      return reply(504, createErrorResponse(t('settings.connectionTimeout')));
+    }
+    if (error?.agentCode === 'upstream_unreachable') {
+      return reply(502, createErrorResponse(t('settings.connectionRefused')));
+    }
+    return reply(502, createErrorResponse(t('settings.connectionTestFailed')));
+  }
+}
+
+/**
  * Pergunta ao GenieACS em `url` se ele responde, com o mesmo guarda de saída
  * de toda outra chamada. Devolve `{ status, body }` em vez de escrever na
  * resposta, porque o console chama isto em nome de um provedor — dentro do
@@ -639,6 +672,12 @@ class SettingsController {
  */
 export async function probeGenieAcs(t, url) {
   const reply = (status, body) => ({ status, body });
+
+  // No modo agente não há endereço a testar daqui: quem chega ao GenieACS é o
+  // agente, na rede do provedor. O botão testa esse caminho inteiro — o mesmo
+  // que a lista de equipamentos usa —, e a URL do corpo não entra em nada.
+  const conector = await connectorFor();
+  if (conector.mode === 'agent') return probeViaAgent(t, conector);
 
   if (!url) {
     return reply(400,

@@ -135,6 +135,16 @@ const DROPPED_RESPONSE_HEADERS = new Set([
 
 /** Sem `open` nesse tempo, a tentativa é dada como falha (um painel mudo não pode segurar o agente). */
 const HANDSHAKE_TIMEOUT_MS = 30_000;
+
+/**
+ * Silêncio máximo do painel numa conexão aberta. O painel manda
+ * `{ type: 'ping' }` a cada 30 s; o `WebSocket` do Node responde sozinho ao
+ * ping de PROTOCOLO, mas não o expõe, então uma conexão meio aberta (NAT que
+ * esqueceu o mapeamento, link que caiu sem FIN) só apareceria depois de
+ * minutos de keepalive TCP — com o painel dizendo "desconectado" e o agente
+ * achando que está tudo bem. Três batimentos perdidos e o agente reconecta.
+ */
+const SILENCE_LIMIT_MS = 90_000;
 /** Prazo da sondagem que descobre o status HTTP de um upgrade recusado (veja `probeUpgrade`). */
 const PROBE_TIMEOUT_MS = 10_000;
 /** De quanto em quanto tempo o resumo de pedidos vai para o log. */
@@ -433,7 +443,8 @@ export function startAgent({
   fetchImpl = globalThis.fetch,
   version = AGENT_VERSION,
   backoff = { minMs: 1000, maxMs: 60000 },
-  maxResponseBytes = MAX_RESPONSE_BYTES
+  maxResponseBytes = MAX_RESPONSE_BYTES,
+  silenceLimitMs = SILENCE_LIMIT_MS
 } = {}) {
   const log = makeLog(logger);
 
@@ -500,6 +511,8 @@ export function startAgent({
       jobs: new Set(),
       handshakeTimer: null,
       errorTimer: null,
+      silenceTimer: null,
+      lastMessageAt: 0,
       closeWaiters: []
     };
     current = conn;
@@ -524,6 +537,15 @@ export function startAgent({
       conn.opened = true;
       conn.openedAt = Date.now();
       clearTimeout(conn.handshakeTimer);
+      conn.lastMessageAt = Date.now();
+      conn.silenceTimer = setInterval(() => {
+        const silencio = Date.now() - conn.lastMessageAt;
+        if (silencio <= silenceLimitMs) return;
+        log.warn(`o painel está em silêncio há ${Math.round(silencio / 1000)} s; reconectando`);
+        try { conn.ws.close(); } catch { /* já fechando */ }
+        settle(conn, { kind: 'closed', code: 1006, reason: 'silêncio do painel' });
+      }, Math.max(10, Math.min(15_000, Math.floor(silenceLimitMs / 3))));
+      conn.silenceTimer.unref?.();
       if (keyRefused) log.info('a chave voltou a ser aceita pelo painel');
       keyRefused = false;
       log.info(`conectado ao painel ${panel.origin}`);
@@ -560,6 +582,7 @@ export function startAgent({
     conn.settled = true;
     clearTimeout(conn.handshakeTimer);
     clearTimeout(conn.errorTimer);
+    clearInterval(conn.silenceTimer);
     if (current === conn) current = null;
     // Os pedidos desta conexão não têm mais para onde responder: o painel já
     // os deu como perdidos quando ela caiu. Abortá-los libera as vagas e o
@@ -639,6 +662,7 @@ export function startAgent({
 
   function onMessage(conn, event) {
     if (conn !== current || stopped) return;
+    conn.lastMessageAt = Date.now();
     // Frame binário, JSON inválido, pedido sem id: o painel não fala assim.
     // Não há para quem responder (sem id) — conta e segue; a contagem aparece
     // no resumo do minuto.
@@ -657,6 +681,8 @@ export function startAgent({
       stats.malformed += 1;
       return;
     }
+    // O batimento do painel: já valeu por ter chegado (`lastMessageAt`).
+    if (message.type === 'ping') return;
     if (message.type !== 'request') {
       // Tipo desconhecido: talvez um painel mais novo. Ignorar (e contar) é o
       // que permite ao protocolo crescer sem quebrar agentes instalados.

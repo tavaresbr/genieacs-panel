@@ -3,6 +3,7 @@ import {
   AGENT_POLL_MS,
   agentFileUrl,
   agentPhase,
+  connectedSince,
   installCommand,
   keyAction,
   keyButtonState,
@@ -18,6 +19,7 @@ const status = (over: Partial<AgentStatusShape> = {}): AgentStatusShape => ({
   tokenHint: 'abcd',
   tokenCreatedAt: '2026-09-20T10:00:00.000Z',
   connected: false,
+  connectedAt: null,
   lastSeenAt: null,
   version: null,
   ...over
@@ -46,6 +48,21 @@ describe('agentPhase', () => {
     expect(agentPhase(status())).toBe('never')
     expect(agentPhase(status({ lastSeenAt: '' }))).toBe('never')
     expect(agentPhase(status({ lastSeenAt: 'ontem' }))).toBe('never')
+  })
+})
+
+describe('connectedSince', () => {
+  it('é o connectedAt da conexão aberta', () => {
+    expect(connectedSince(status({ connected: true, connectedAt: '2026-09-01T08:00:00Z', lastSeenAt: '2026-09-27T12:00:00Z' })))
+      .toBe('2026-09-01T08:00:00Z')
+  })
+
+  it('nunca o lastSeenAt, que anda a cada batimento', () => {
+    expect(connectedSince(status({ connected: true, connectedAt: null, lastSeenAt: '2026-09-27T12:00:00Z' }))).toBeNull()
+  })
+
+  it('sem conexão, não há "desde"', () => {
+    expect(connectedSince(status({ connected: false, connectedAt: '2026-09-01T08:00:00Z' }))).toBeNull()
   })
 })
 

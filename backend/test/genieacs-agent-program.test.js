@@ -163,6 +163,34 @@ describe('agente do GenieACS: conexão', () => {
     assert.equal(reply.status, 200);
   });
 
+  it('painel em silêncio (conexão meio aberta): o agente desiste dela e reconecta', async () => {
+    const panel = await startPanel();
+    const stub = await startStub();
+    const { log } = launch(panel, stub.url, { silenceLimitMs: 150 });
+    const first = await panel.connection(0);
+    await first.next((message) => message.type === 'hello');
+    // O painel não manda nada — nem o batimento. O socket continua "aberto".
+    const second = await panel.connection(1);
+    await second.next((message) => message.type === 'hello');
+    assert.match(log.text(), /em silêncio há \d+ s; reconectando/);
+  });
+
+  it('com o batimento do painel chegando, a conexão fica', async () => {
+    const panel = await startPanel();
+    const stub = await startStub();
+    const { log } = launch(panel, stub.url, { silenceLimitMs: 150 });
+    const first = await panel.connection(0);
+    await first.next((message) => message.type === 'hello');
+    const batimento = setInterval(() => first.ws.send('{"type":"ping"}'), 40);
+    try {
+      await sleep(600);
+    } finally {
+      clearInterval(batimento);
+    }
+    assert.equal(panel.connections.length, 1, 'reconectou com o painel falando');
+    assert.doesNotMatch(log.text(), /silêncio/);
+  });
+
   it('4001 (chave revogada): registra e espera o máximo, sem martelar o painel', async () => {
     const panel = await startPanel();
     const stub = await startStub();

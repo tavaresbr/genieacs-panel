@@ -498,10 +498,12 @@ ProtectKernelLogs=yes
 ProtectControlGroups=yes
 ProtectClock=yes
 ProtectHostname=yes
-# Só IPv4 e IPv6. Se a resolução de nomes desta distribuição depender de socket
-# Unix (nss-resolve do systemd-resolved sem o fallback para dns), acrescente
-# AF_UNIX aqui.
-RestrictAddressFamilies=AF_INET AF_INET6
+# IPv4 e IPv6 para o painel e o GenieACS, e o socket Unix só pela resolução de
+# nomes: em distribuições com o nss-resolve do systemd-resolved (Fedora, por
+# exemplo) o getaddrinfo fala com o resolvedor por socket Unix, e sem ele o
+# agente não acharia o painel pelo nome — falha que só apareceria na máquina
+# do provedor, sem nenhuma pista no log além de "painel inalcançável".
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 RestrictNamespaces=yes
 RestrictRealtime=yes
 RestrictSUIDSGID=yes

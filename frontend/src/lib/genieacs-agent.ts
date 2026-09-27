@@ -28,8 +28,18 @@ export interface AgentStatusShape {
   tokenHint: string | null
   tokenCreatedAt: string | null
   connected: boolean
+  connectedAt: string | null
   lastSeenAt: string | null
   version: string | null
+}
+
+/**
+ * O "conectado desde" da tela: só `connectedAt`, que o servidor marca quando a
+ * conexão abre. Nunca `lastSeenAt` — ele anda a cada batimento, e "conectado
+ * desde há 1 minuto" seria dito de um agente ligado há semanas.
+ */
+export function connectedSince(status: AgentStatusShape): string | null {
+  return status.connected && validDate(status.connectedAt) ? status.connectedAt : null
 }
 
 /**

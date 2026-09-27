@@ -6,6 +6,7 @@ import {
   AGENT_POLL_MS,
   agentFileUrl,
   agentPhase,
+  connectedSince,
   installCommand,
   keyAction,
   keyButtonState,
@@ -182,7 +183,7 @@ export function GenieAcsAgentPanel({
     if (phase === 'connected') {
       return [
         agent.version ? t('genieacsAgent.version', { version: agent.version }) : null,
-        agent.lastSeenAt ? t('genieacsAgent.connectedSince', { when: formatDateTime(agent.lastSeenAt) }) : null
+        connectedSince(agent) ? t('genieacsAgent.connectedSince', { when: formatDateTime(connectedSince(agent) as string) }) : null
       ].filter(Boolean).join(' · ')
     }
     if (phase === 'disconnected' && agent.lastSeenAt) {
