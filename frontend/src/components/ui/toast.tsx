@@ -161,7 +161,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <ToastContext.Provider value={value}>
       {children}
       {/* Toast Container */ }
-      <div className="pointer-events-none fixed start-4 end-4 top-20 z-[2200] flex flex-col gap-2 sm:start-auto sm:end-5 sm:top-5 sm:w-[24rem]">
+      <div className="pointer-events-none fixed start-4 end-4 top-20 z-[2200] flex flex-col gap-2 sm:start-auto sm:end-5 sm:w-[24rem] lg:top-5">
         {toasts.map((t) => (
           <div
             key={t.id}
@@ -171,7 +171,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             aria-atomic="true"
           >
             <Icon name={typeStyles[t.type].icon} size={19} className="mt-0.5 shrink-0" />
-            <div className="flex-1">
+            <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
               {t.title ? (
                 <div className="font-semibold mb-0.5">{t.title}</div>
               ) : null}
@@ -179,7 +179,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             </div>
             <button
               onClick={() => dismiss(t.id)}
-              className="flex size-8 shrink-0 items-center justify-center rounded text-current opacity-70 transition hover:bg-black/5 hover:opacity-100"
+              className="-my-1 -me-2 flex size-10 shrink-0 items-center justify-center rounded text-current opacity-70 transition hover:bg-black/5 hover:opacity-100 lg:m-0 lg:size-8"
               aria-label={translate('toast.dismiss')}
             >
               <Icon name="x" size={16} />

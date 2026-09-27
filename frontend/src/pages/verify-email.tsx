@@ -63,7 +63,7 @@ export default function VerifyEmail() {
         {estado === 'erro' && (
           <>
             <h1 className="mt-6 text-xl font-bold text-foreground">{t('verifyEmail.failedTitle')}</h1>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">{error}</p>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground [overflow-wrap:anywhere]">{error}</p>
           </>
         )}
         <p className="mt-5 text-sm">

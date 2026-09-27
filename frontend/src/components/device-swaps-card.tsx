@@ -90,20 +90,20 @@ export function DeviceSwapsCard({ deviceId }: DeviceSwapsCardProps) {
             <div className="min-w-0">
               <p className="flex flex-wrap items-center gap-2 text-sm font-semibold">
                 <Link
-                  to={`/devices/${encodeURIComponent(swap.previousDeviceId)}`}
+                  to={`/devices/detail?id=${encodeURIComponent(swap.previousDeviceId)}`}
                   className="max-w-full truncate font-mono text-xs hover:text-primary"
                 >
                   {swap.previousDeviceId}
                 </Link>
                 <Icon name="chevron-right" size={14} className="text-muted-foreground" />
                 <Link
-                  to={`/devices/${encodeURIComponent(swap.deviceId)}`}
+                  to={`/devices/detail?id=${encodeURIComponent(swap.deviceId)}`}
                   className="max-w-full truncate font-mono text-xs hover:text-primary"
                 >
                   {swap.deviceId}
                 </Link>
               </p>
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-1 text-xs text-muted-foreground [overflow-wrap:anywhere]">
                 {[
                   swap.customerId,
                   swap.pppoeUsername,

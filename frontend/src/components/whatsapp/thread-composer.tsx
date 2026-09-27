@@ -363,7 +363,7 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null }: Thre
                 </span>
                 <button
                   type="button"
-                  className="icon-button size-6 shrink-0"
+                  className="icon-button size-10 shrink-0 lg:size-6"
                   aria-label={t('whatsapp.inbox.attachRemove', { name: item.file.name })}
                   title={t('whatsapp.inbox.attachRemove', { name: item.file.name })}
                   disabled={busy}

@@ -117,14 +117,14 @@ export default function Login({ variant = 'provider' }: { variant?: 'provider' |
       <main className="flex min-h-screen items-start justify-center px-4 pb-10 pt-16 sm:px-8 lg:items-center lg:py-10">
         <div className="w-full max-w-md">
           <div className="mb-8 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 lg:hidden">
-              <BrandMark className="size-10" title={name} />
-              <div>
-                <div className="font-bold">{name}</div>
+            <div className="flex min-w-0 items-center gap-3 lg:hidden">
+              <BrandMark className="size-10 shrink-0" title={name} />
+              <div className="min-w-0">
+                <div className="font-bold [overflow-wrap:anywhere]">{name}</div>
                 <div className="text-[0.65rem] font-bold uppercase tracking-[0.13em] text-muted-foreground">{t('app.genieacsOperations')}</div>
               </div>
             </div>
-            <LanguageSwitcher className="ms-auto" />
+            <LanguageSwitcher className="ms-auto shrink-0" />
           </div>
 
           <div className="auth-panel">
@@ -161,12 +161,12 @@ export default function Login({ variant = 'provider' }: { variant?: 'provider' |
                     onClick={() => void entrar({ tenantId: provedor.id })}
                     className="modern-button w-full justify-between"
                   >
-                    <span>{provedor.name}</span>
+                    <span className="min-w-0 text-start [overflow-wrap:anywhere]">{provedor.name}</span>
                     {/* Suspenso continua na lista: quem trabalha lá entra e
                         encontra a tela que explica. Esconder o destino trocaria
                         a explicação por um erro de credencial. */}
                     {provedor.status !== 'active' && (
-                      <span className="text-xs opacity-80">{t('login.destination.suspended')}</span>
+                      <span className="shrink-0 text-xs opacity-80">{t('login.destination.suspended')}</span>
                     )}
                   </button>
                 ))}

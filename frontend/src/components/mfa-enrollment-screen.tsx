@@ -21,14 +21,14 @@ export function MfaEnrollmentScreen() {
   const provedor = user?.tenant?.name || tenantName
 
   return (
-    <div className="min-h-screen bg-background px-4 py-10">
+    <div className="min-h-screen bg-background px-4 py-6 sm:py-10">
       <div className="mx-auto max-w-3xl space-y-6">
         <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <BrandMark className="size-10" />
-            <span className="font-semibold text-foreground">{provedor}</span>
+          <div className="flex min-w-0 items-center gap-3">
+            <BrandMark className="size-10 shrink-0" />
+            <span className="min-w-0 font-semibold text-foreground [overflow-wrap:anywhere]">{provedor}</span>
           </div>
-          <button type="button" className="modern-button-secondary" onClick={logout}>
+          <button type="button" className="modern-button-secondary shrink-0 whitespace-nowrap" onClick={logout}>
             <Icon name="logout" size={16} /> {t('mfaEnrollment.logout')}
           </button>
         </div>

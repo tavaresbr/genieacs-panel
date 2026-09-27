@@ -386,7 +386,7 @@ function QrPairing({ account, seedQr = null, busy, onAccount, onForceNew }: QrPa
       <p className="field-hint">{t('whatsapp.qr.path')}</p>
 
       {qr ? (
-        <div className="mt-3 flex flex-col items-start gap-3 sm:flex-row sm:items-center">
+        <div className="mt-3 flex flex-col items-center gap-3 text-center sm:flex-row sm:items-center sm:text-start">
           {/* The white plate is not decoration: a QR rendered on the dark theme's
               background is not readable by a phone camera. */}
           <img
