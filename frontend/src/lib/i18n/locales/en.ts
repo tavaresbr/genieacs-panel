@@ -472,6 +472,8 @@ const en = {
   'devices.summon.button': 'Request new Inform',
   'devices.summon.loading': 'Summoning device…',
   'devices.summon.success': 'Summon command sent.',
+  'devices.summon.deferredSince': 'The ONT could not be reached right now. Last Inform: {time}. The request is queued and will run at its next periodic Inform.',
+  'devices.summon.deferredStale': 'The ONT has not informed since {time}. The request is queued and will only run once it connects again.',
   'devices.summon.failed': 'The summon command could not be sent',
   'devices.summon.error': 'Error while sending the summon command',
   'devices.sgp.column': 'SGP contract',

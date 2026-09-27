@@ -471,6 +471,8 @@ const it: Dictionary = {
   'devices.summon.button': 'Richiedi un nuovo Inform',
   'devices.summon.loading': 'Convocazione dell’apparato…',
   'devices.summon.success': 'Comando di convocazione inviato.',
+  'devices.summon.deferredSince': 'L’ONT non è raggiungibile ora. Ultimo Inform: {time}. La richiesta è in coda e verrà eseguita al prossimo Inform periodico.',
+  'devices.summon.deferredStale': 'L’ONT non invia Inform dal {time}. La richiesta è in coda e verrà eseguita solo quando si ricollegherà.',
   'devices.summon.failed': 'Non è stato possibile inviare il comando di convocazione',
   'devices.summon.error': 'Errore durante l’invio del comando di convocazione',
   'devices.sgp.column': 'Contratto SGP',

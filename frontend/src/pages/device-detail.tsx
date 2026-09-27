@@ -10,7 +10,7 @@ import { formatDate } from '@/lib/utils'
 import { copyToClipboard, formatBrl, isSafeExternalUrl, sgpBadge } from '@/lib/sgp'
 import { Icon } from '@/components/ui/icon'
 import { ProvisioningCard } from '@/components/provisioning-card'
-import { informedRecently, serialMatches } from '@/lib/device-actions'
+import { informedRecently, serialMatches, summonDeferredMessage } from '@/lib/device-actions'
 import { DeviceHistoryCard } from '@/components/device-history-card'
 import { DeviceSwapsCard } from '@/components/device-swaps-card'
 import { DeviceDiagnosticsCard } from '@/components/device-diagnostics-card'
@@ -1239,7 +1239,7 @@ export default function DeviceDetailPage() {
     try {
       const res = await devicesAPI.summonDevice(deviceId)
       if (res.success && res.data?.reached === false) {
-        toast.warning(res.message || t('devices.summon.success'))
+        toast.warning(summonDeferredMessage(res.data, t, formatDateTime, res.message || t('devices.summon.success')))
       } else if (res.success) {
         toast.success(res.message || t('devices.summon.success'))
       } else {

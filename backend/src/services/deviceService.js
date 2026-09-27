@@ -2748,7 +2748,39 @@ class DeviceService {
     await this.readSummonLeaves(deviceId, { connectionRequest: reached });
     if (refreshed.length > 0) await this.expectFreshRxPower();
 
-    return { ...(data && typeof data === 'object' ? data : {}), refreshed, reached, reason };
+    return {
+      ...(data && typeof data === 'object' ? data : {}),
+      refreshed,
+      reached,
+      reason,
+      ...(reached ? {} : await this.summonSilence(deviceId))
+    };
+  }
+
+  /**
+   * How long an ONT that could not be reached has been silent.
+   *
+   * "Queued for its next Inform" reads as minutes; for an ONT that stopped
+   * informing twelve days ago it is whenever it comes back, if ever, and the
+   * operator should be told which. Best effort: without the read the summon
+   * still answers, only less precisely.
+   */
+  static async summonSilence(deviceId, now = Date.now()) {
+    try {
+      const [row] = await this.fetchDeviceListPage(
+        JSON.stringify({ _id: deviceId }),
+        ['_id', '_lastInform']
+      );
+      const lastInform = row?._lastInform || null;
+      const informedAt = lastInform ? new Date(lastInform).getTime() : Number.NaN;
+      return {
+        lastInform,
+        stale: !(now - informedAt < this.STALE_AFTER_MS)
+      };
+    } catch (error) {
+      console.warn(`Unable to read when ${deviceId} last informed: ${error.message}`);
+      return {};
+    }
   }
 
   /**

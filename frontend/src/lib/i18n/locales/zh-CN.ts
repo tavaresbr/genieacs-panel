@@ -470,6 +470,8 @@ const zhCN: Dictionary = {
   'devices.summon.button': '请求新的 Inform',
   'devices.summon.loading': '正在呼叫设备…',
   'devices.summon.success': '呼叫指令已发送。',
+  'devices.summon.deferredSince': '当前无法连接 ONT。最后一次 Inform：{time}。请求已加入队列，将在其下一次周期性 Inform 时执行。',
+  'devices.summon.deferredStale': '该 ONT 自 {time} 起未发送 Inform。请求已加入队列，只有在其重新连接后才会执行。',
   'devices.summon.failed': '无法发送呼叫指令',
   'devices.summon.error': '发送呼叫指令时出错',
   'devices.sgp.column': 'SGP 合同',

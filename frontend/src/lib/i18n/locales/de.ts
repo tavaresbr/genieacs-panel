@@ -471,6 +471,8 @@ const de: Dictionary = {
   'devices.summon.button': 'Neuen Inform anfordern',
   'devices.summon.loading': 'Gerät wird angefordert…',
   'devices.summon.success': 'Anforderungsbefehl gesendet.',
+  'devices.summon.deferredSince': 'Das ONT ist gerade nicht erreichbar. Letzter Inform: {time}. Die Anfrage ist eingereiht und läuft beim nächsten periodischen Inform.',
+  'devices.summon.deferredStale': 'Das ONT hat seit {time} keinen Inform gesendet. Die Anfrage ist eingereiht und läuft erst, wenn es sich wieder verbindet.',
   'devices.summon.failed': 'Der Anforderungsbefehl konnte nicht gesendet werden',
   'devices.summon.error': 'Fehler beim Senden des Anforderungsbefehls',
   'devices.sgp.column': 'SGP-Vertrag',

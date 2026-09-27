@@ -464,6 +464,8 @@ const ar: Dictionary = {
   'devices.summon.button': 'طلب رسالة Inform جديدة',
   'devices.summon.loading': 'جارٍ استدعاء الجهاز…',
   'devices.summon.success': 'تم إرسال أمر الاستدعاء.',
+  'devices.summon.deferredSince': 'تعذّر الوصول إلى جهاز ONT الآن. آخر Inform: {time}. أُضيف الطلب إلى الطابور وسيُنفَّذ مع رسالة Inform الدورية التالية.',
+  'devices.summon.deferredStale': 'لم يُرسل جهاز ONT أي Inform منذ {time}. أُضيف الطلب إلى الطابور ولن يُنفَّذ إلا عند عودته للاتصال.',
   'devices.summon.failed': 'تعذّر إرسال أمر الاستدعاء',
   'devices.summon.error': 'خطأ أثناء إرسال أمر الاستدعاء',
   'devices.sgp.column': 'عقد SGP',

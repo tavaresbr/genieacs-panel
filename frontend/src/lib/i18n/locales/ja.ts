@@ -470,6 +470,8 @@ const ja: Dictionary = {
   'devices.summon.button': '新しい Inform を要求',
   'devices.summon.loading': '機器を呼び出しています…',
   'devices.summon.success': '呼び出しコマンドを送信しました。',
+  'devices.summon.deferredSince': '現在 ONT に接続できません。最終 Inform：{time}。要求はキューに入り、次の定期 Inform で実行されます。',
+  'devices.summon.deferredStale': 'ONT は {time} 以降 Inform を送信していません。要求はキューに入り、再接続したときにのみ実行されます。',
   'devices.summon.failed': '呼び出しコマンドを送信できませんでした',
   'devices.summon.error': '呼び出しコマンドの送信中にエラーが発生しました',
   'devices.sgp.column': 'SGP 契約',

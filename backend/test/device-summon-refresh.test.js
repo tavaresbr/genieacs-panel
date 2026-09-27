@@ -19,6 +19,8 @@ const genieAcs = {
   refusedObjects: new Set(),
   /** An ONT behind CGNAT: GenieACS cannot call it back and only queues. */
   unreachable: false,
+  /** When the TR-098 ONT last informed; now, unless a test says otherwise. */
+  lastInform: null,
   optical: null,
   /** TR-181 ONTs answer on `Device.` and have no `InternetGatewayDevice`. */
   dataModel: 'InternetGatewayDevice'
@@ -50,7 +52,7 @@ function ont() {
         }
       }
     },
-    _lastInform: new Date().toISOString(),
+    _lastInform: genieAcs.lastInform || new Date().toISOString(),
     _registered: new Date().toISOString()
   };
   if (genieAcs.optical) {
@@ -161,6 +163,7 @@ beforeEach(async () => {
   genieAcs.tasks = [];
   genieAcs.refusedObjects = new Set();
   genieAcs.unreachable = false;
+  genieAcs.lastInform = null;
   genieAcs.optical = null;
   genieAcs.dataModel = 'InternetGatewayDevice';
   await asTenant(() => getDb()('app_state').where({ key: 'rx_power_path' }).del());
@@ -285,6 +288,18 @@ describe('summoning an ONT GenieACS cannot reach', () => {
     assert.equal(body.data.reason, 'Device is offline');
     assert.match(body.message, /Device is offline/);
     assert.match(body.message, /Inform/);
+    assert.equal(body.data.stale, false, 'informed moments ago');
+    assert.ok(body.data.lastInform);
+  });
+
+  it('says when an ONT silent for days last informed', async () => {
+    genieAcs.unreachable = true;
+    genieAcs.lastInform = new Date(Date.now() - 12 * 24 * 60 * 60 * 1000).toISOString();
+    const { body } = await summon();
+
+    assert.equal(body.data.reached, false);
+    assert.equal(body.data.stale, true);
+    assert.equal(body.data.lastInform, genieAcs.lastInform);
   });
 
   it('asks GenieACS to call the ONT once, and only queues the rest', async () => {
@@ -304,5 +319,6 @@ describe('summoning an ONT GenieACS cannot reach', () => {
     const { body } = await summon();
     assert.equal(body.data.reached, true);
     assert.equal(body.data.reason, null);
+    assert.equal(body.data.stale, undefined, 'a reached ONT needs no silence read');
   });
 });

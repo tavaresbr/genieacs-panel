@@ -464,6 +464,8 @@ const hi: Dictionary = {
   'devices.summon.button': 'नई Inform का अनुरोध करें',
   'devices.summon.loading': 'उपकरण बुलाया जा रहा है…',
   'devices.summon.success': 'बुलावा आदेश भेज दिया गया।',
+  'devices.summon.deferredSince': 'ONT से अभी संपर्क नहीं हो सका। अंतिम Inform: {time}। अनुरोध कतार में है और अगले आवधिक Inform पर चलेगा।',
+  'devices.summon.deferredStale': 'ONT ने {time} से कोई Inform नहीं भेजा है। अनुरोध कतार में है और उसके दोबारा जुड़ने पर ही चलेगा।',
   'devices.summon.failed': 'बुलावा आदेश नहीं भेजा जा सका',
   'devices.summon.error': 'बुलावा आदेश भेजते समय त्रुटि',
   'devices.sgp.column': 'SGP अनुबंध',

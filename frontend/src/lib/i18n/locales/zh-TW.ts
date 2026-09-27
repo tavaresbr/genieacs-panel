@@ -470,6 +470,8 @@ const zhTW: Dictionary = {
   'devices.summon.button': '要求新的 Inform',
   'devices.summon.loading': '正在呼叫設備…',
   'devices.summon.success': '呼叫指令已送出。',
+  'devices.summon.deferredSince': '目前無法連線 ONT。最後一次 Inform：{time}。要求已排入佇列，將在其下一次週期性 Inform 時執行。',
+  'devices.summon.deferredStale': '該 ONT 自 {time} 起未傳送 Inform。要求已排入佇列，只有在其重新連線後才會執行。',
   'devices.summon.failed': '無法送出呼叫指令',
   'devices.summon.error': '送出呼叫指令時發生錯誤',
   'devices.sgp.column': 'SGP 合約',

@@ -1790,6 +1790,9 @@ export interface SummonResult {
   refreshed?: string[]
   reached?: boolean
   reason?: string | null
+  /** Only when `reached` is false: when the ONT last informed, and whether that is days ago. */
+  lastInform?: string | null
+  stale?: boolean
 }
 
 export const devicesAPI = {

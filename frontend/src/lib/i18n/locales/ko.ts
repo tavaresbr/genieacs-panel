@@ -470,6 +470,8 @@ const ko: Dictionary = {
   'devices.summon.button': '새 Inform 요청',
   'devices.summon.loading': '장비를 호출하는 중…',
   'devices.summon.success': '호출 명령을 전송했습니다.',
+  'devices.summon.deferredSince': '지금은 ONT에 연결할 수 없습니다. 마지막 Inform: {time}. 요청이 대기열에 추가되어 다음 주기적 Inform 때 실행됩니다.',
+  'devices.summon.deferredStale': 'ONT가 {time} 이후 Inform을 보내지 않았습니다. 요청이 대기열에 추가되었으며 다시 연결될 때에만 실행됩니다.',
   'devices.summon.failed': '호출 명령을 전송하지 못했습니다',
   'devices.summon.error': '호출 명령을 전송하는 중 오류가 발생했습니다',
   'devices.sgp.column': 'SGP 계약',
