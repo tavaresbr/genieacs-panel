@@ -26,6 +26,7 @@ class AuditLog {
     PORTAL_PASSWORD_RESET: 'portal_password.reset',
     GENIEACS_URL_CHANGED: 'genieacs.url_changed',
     GENIEACS_AUTH_CHANGED: 'genieacs.auth_changed',
+    GENIEACS_CONNECTION_CHANGED: 'genieacs.connection_changed',
     OPERATOR_ROLE_CHANGED: 'operator.role_changed',
     OPERATOR_REMOVED: 'operator.removed',
     OPERATOR_CREATED: 'operator.created',

@@ -201,7 +201,7 @@ export class GenieAcsEgress {
    * cancel, so an abort here stops holding the caller and leaves the lookup to
    * finish into nothing.
    */
-  static async resolveTarget(url, { allowPrivateAddresses = false, signal } = {}) {
+  static async resolveTarget(url, { allowPrivateAddresses = false, allowPrivateRanges = false, signal } = {}) {
     const parsed = url instanceof URL ? url : new URL(String(url));
 
     if (!['http:', 'https:'].includes(parsed.protocol)) {
@@ -232,6 +232,10 @@ export class GenieAcsEgress {
       lookup: (name) => this.lookup(name),
       signal,
       allowPrivateAddresses: allowPrivateAddresses || !protegido,
+      // O modo `tunnel` de um provedor: a rede privada DE CLIENTE passa, e
+      // loopback e metadados continuam recusados. Ligado só pela plataforma
+      // (`tenant_genieacs_connections`), nunca pela API do próprio provedor.
+      allowPrivateRanges,
       refuse: (message) => refuse(`GenieACS host ${message}`)
     });
 
@@ -253,10 +257,10 @@ export class GenieAcsEgress {
    * call sites already passed; the timeouts they arm around it work unchanged.
    */
   static async fetch(url, options = {}) {
-    const { allowPrivateAddresses = false, rejectUnauthorized = true } = options;
+    const { allowPrivateAddresses = false, allowPrivateRanges = false, rejectUnauthorized = true } = options;
     let target;
     try {
-      target = await this.resolveTarget(url, { allowPrivateAddresses, signal: options.signal });
+      target = await this.resolveTarget(url, { allowPrivateAddresses, allowPrivateRanges, signal: options.signal });
     } catch (error) {
       // Counted per provider, by what stopped it: a refusal is ours and a
       // resolution failure is the network's, and the two are different pages.

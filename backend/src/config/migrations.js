@@ -1472,6 +1472,27 @@ const MFA_TABLES = [
   ['user_recovery_codes', userRecoveryCodesTable]
 ];
 
+/**
+ * Como o painel chega ao GenieACS de cada provedor: `direct` (a URL, como
+ * sempre foi), `tunnel` (a URL numa rede privada de cliente, liberada pela
+ * plataforma) e, depois, `agent`. Sem linha, vale `direct` — é o que todo
+ * provedor de antes desta tabela já fazia, e a migração não precisa escrever
+ * nada para que continue assim.
+ */
+const tenantGenieAcsConnectionsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.string('mode', 16).notNullable().defaultTo('direct');
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['tenant_id']);
+};
+
+const GENIEACS_CONNECTION_TABLES = [
+  ['tenant_genieacs_connections', tenantGenieAcsConnectionsTable]
+];
+
 const SGP_CONTACT_TABLES = [
   ['sgp_contacts', sgpContactsTable],
   ['sgp_clients', sgpClientsTable]
@@ -1537,7 +1558,8 @@ export const SCHEMA_TABLES = [
   ...DEVICE_SWAP_TABLES,
   ...BILLING_TABLES,
   ...SGP_CONTACT_TABLES,
-  ...MFA_TABLES
+  ...MFA_TABLES,
+  ...GENIEACS_CONNECTION_TABLES
 ].map(([name]) => name);
 
 /**
@@ -3819,6 +3841,22 @@ export const migrations = [
         if (await db.schema.hasColumn('wa_conversations', nome)) continue;
         // eslint-disable-next-line no-await-in-loop
         await db.schema.alterTable('wa_conversations', criar);
+      }
+    }
+  },
+  {
+    /**
+     * Como o painel chega ao GenieACS de cada provedor — ver
+     * `tenantGenieAcsConnectionsTable`. Tabela nova e vazia: sem linha vale
+     * `direct`, que é o que todos já faziam.
+     */
+    id: '0066_tenant_genieacs_connections',
+    async isApplied(db) {
+      return db.schema.hasTable('tenant_genieacs_connections');
+    },
+    async up(db) {
+      for (const [nome, construtor] of GENIEACS_CONNECTION_TABLES) {
+        await createTableIfMissing(db, nome, construtor(db));
       }
     }
   }
