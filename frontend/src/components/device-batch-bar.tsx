@@ -129,8 +129,8 @@ export function DeviceBatchBar({
       )}
 
       {confirmando && (
-        <div className="fixed inset-0 z-[2100] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="batch-confirm-title">
-          <div className="modern-card flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col">
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="batch-confirm-title">
+          <div className="modal-panel modern-card flex max-w-md flex-col">
             <div className="flex items-center gap-2 border-b border-border p-4 sm:p-5">
               <Icon name="warning" size={20} className="shrink-0 text-[hsl(var(--status-warning))]" />
               <h3 id="batch-confirm-title" className="text-lg font-semibold text-foreground">
@@ -196,8 +196,8 @@ export function DeviceBatchBar({
       )}
 
       {resultado && (
-        <div className="fixed inset-0 z-[2100] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="batch-result-title">
-          <div className="modern-card flex max-h-[85vh] w-full max-w-lg flex-col">
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="batch-result-title">
+          <div className="modal-panel modern-card flex max-w-lg flex-col">
             <div className="border-b border-border p-4 sm:p-5">
               <h3 id="batch-result-title" className="text-lg font-semibold text-foreground">{t('devices.batch.resultTitle')}</h3>
               <p className="mt-1 text-sm text-muted-foreground">
