@@ -117,15 +117,17 @@ export function GenieAcsConnectionCard({ canWrite }: { canWrite: boolean }) {
 
   return (
     <div className="modern-card max-w-3xl p-5 sm:p-6">
-      <h2 className="section-heading">{t('settings.acsConnection.title')}</h2>
+      <h2 id="genieacs-connection-title" className="section-heading">{t('settings.acsConnection.title')}</h2>
       <p className="section-description mb-5">{t('settings.acsConnection.description')}</p>
 
       {editavel ? (
         <div>
-          <label htmlFor="genieacs-connection-mode" className="field-label">{t('platform.genieacs.mode')}</label>
+          {/* Sem rótulo visível: seria o título do cartão repetido logo abaixo
+              dele. O título é o rótulo, para o leitor de tela também. */}
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <select
               id="genieacs-connection-mode"
+              aria-labelledby="genieacs-connection-title"
               className="modern-input w-full sm:w-72"
               value={mode}
               onChange={(e) => setMode(e.target.value as GenieAcsConnectionMode)}
@@ -144,7 +146,6 @@ export function GenieAcsConnectionCard({ canWrite }: { canWrite: boolean }) {
         </div>
       ) : (
         <div className="rounded-md border border-border bg-muted/40 p-4">
-          <p className="field-label">{t('platform.genieacs.mode')}</p>
           <p className="text-sm font-medium text-foreground">{t(MODE_LABELS[conn.mode])}</p>
           <p className="mt-1 text-sm text-muted-foreground">{t(MODE_HINTS[conn.mode])}</p>
           <p className="field-hint mt-3 flex items-center gap-2">
