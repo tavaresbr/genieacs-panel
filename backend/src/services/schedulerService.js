@@ -13,6 +13,7 @@ import AuthTicket from '../models/AuthTicket.js';
 import ImpersonationTicket from '../models/ImpersonationTicket.js';
 import { refreshDeploymentSharing } from './genieacsEgress.js';
 import SubscriptionNoticeService from './subscriptionNoticeService.js';
+import MaintenanceService from './maintenanceService.js';
 import SubscriptionService from './subscriptionService.js';
 import ChargeIssuingService from './chargeIssuingService.js';
 import DeviceScopeTagger, { AUTO_TAG_INTERVAL_MS } from './deviceScopeTagger.js';
@@ -231,6 +232,13 @@ class SchedulerService {
     const state = await this.readState();
 
     summary.dashboard = await this.refreshDashboard(state);
+
+    // Manutenção programada: aviso na antecedência, início e fim da janela.
+    // Toda volta, sem cadência própria — cada passo tem o seu marcador na
+    // própria janela, como o aviso de vencimento logo abaixo.
+    await MaintenanceService.processDue().catch((error) => {
+      console.warn(`Maintenance windows pass failed: ${error.message}`);
+    });
 
     // As ONTs novas de um provedor num GenieACS compartilhado ganham a tag
     // dele pelo prefixo do login PPPoE — sem ela, ficariam invisíveis para o

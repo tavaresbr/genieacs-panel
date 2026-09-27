@@ -84,3 +84,45 @@ export function mapsLink(node) {
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return '';
   return `https://maps.google.com/?q=${lat.toFixed(6)},${lng.toFixed(6)}`;
 }
+
+/** Altura de cada tipo de nó na árvore da rede: só se desce para um menor. */
+const NIVEL = Object.freeze({ olt: 3, odc: 2, odp: 1, htb: 1, ont: 0 });
+
+/** Os tipos que podem entrar em manutenção programada. */
+export const MAINTENANCE_TYPES = Object.freeze(['olt', 'odc', 'odp', 'htb']);
+
+/**
+ * Os clientes (nós ONT) embaixo de um nó, em qualquer profundidade.
+ *
+ * `parentBoxes` só olha um salto, que basta para agrupar uma queda pela caixa
+ * mais próxima. Uma manutenção numa ODC ou numa OLT atinge tudo o que está
+ * pendurado nela, passando pelas ODPs. A busca só desce de nível — nunca
+ * volta para a OLT nem atravessa para a caixa vizinha pela OLT em comum.
+ */
+export function clientsBeneath(nodeId, nodes, edges) {
+  const nodeById = new Map(nodes.map((node) => [node.node_id, node]));
+  const inicio = nodeById.get(nodeId);
+  if (!inicio || !(inicio.type in NIVEL)) return [];
+  const vizinhos = new Map();
+  for (const edge of edges) {
+    for (const [a, b] of [[edge.source, edge.target], [edge.target, edge.source]]) {
+      if (!vizinhos.has(a)) vizinhos.set(a, []);
+      vizinhos.get(a).push(b);
+    }
+  }
+  const vistos = new Set([nodeId]);
+  const fila = [inicio];
+  const clientes = [];
+  while (fila.length) {
+    const atual = fila.shift();
+    for (const id of vizinhos.get(atual.node_id) ?? []) {
+      const vizinho = nodeById.get(id);
+      if (!vizinho || vistos.has(id) || !(vizinho.type in NIVEL)) continue;
+      if (NIVEL[vizinho.type] >= NIVEL[atual.type]) continue;
+      vistos.add(id);
+      if (vizinho.type === 'ont') clientes.push(vizinho);
+      else fila.push(vizinho);
+    }
+  }
+  return clientes;
+}

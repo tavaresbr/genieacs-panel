@@ -25,6 +25,7 @@ import { PlaceClientDialog, type PlaceClientTarget } from '@/components/map/plac
 import { UnmappedDialog } from '@/components/map/unmapped-dialog'
 import { BOX_TYPES, NEARBY_METERS, boxOccupancy, capacityOf } from '@/lib/box-occupancy'
 import 'leaflet/dist/leaflet.css'
+import { MaintenanceForm } from '@/components/maintenance/maintenance-panel'
 
 // Start fetching the map engine as soon as this route chunk is evaluated. The
 // topology request and Leaflet download can then run in parallel.
@@ -112,6 +113,9 @@ function nodeIconName(type: NodeType) {
   if (type === 'odp') return 'box'
   return 'home'
 }
+
+/** Os nós que agrupam clientes: só neles cabe uma manutenção programada. */
+const MAINTENANCE_NODE_TYPES = new Set(['olt', 'odc', 'odp', 'htb'])
 
 function ModalShell({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   const { t } = useTranslation()
@@ -541,6 +545,9 @@ export default function NetworkMap() {
   // `map.write`, que a matriz dá ao plantão. Era `role === 'admin'`, o que
   // trancava o mapa para quem sobe em poste.
   const canEditMap = can('map.write')
+  // Agendar manutenção manda mensagem ao assinante: é de quem manda mensagem.
+  const canScheduleMaintenance = can('whatsapp.send')
+  const [maintenanceNode, setMaintenanceNode] = useState<MapNode | null>(null)
 
   const nodeTypeLabel = useCallback(
     (type: NodeType) => {
@@ -1218,8 +1225,22 @@ export default function NetworkMap() {
                 }))}`}>
                 <Icon name="chat" size={17} />{t('map.directions.share')}
               </a>
+              {canScheduleMaintenance && MAINTENANCE_NODE_TYPES.has(selectedNode.type) && (
+                <button className="modern-button-secondary" onClick={() => { setMaintenanceNode(selectedNode); setSelectedNode(null) }}>
+                  <Icon name="settings" size={17} />{t('maintenance.mapButton')}
+                </button>
+              )}
               <button className="modern-button" onClick={() => setSelectedNode(null)}>{t('common.close')}</button>
             </div>
+          </ModalShell>
+        )}
+        {maintenanceNode && (
+          <ModalShell title={t('maintenance.formTitleFor', { node: maintenanceNode.name })} onClose={() => setMaintenanceNode(null)}>
+            <MaintenanceForm
+              presetNodeId={maintenanceNode.node_id}
+              onCancel={() => setMaintenanceNode(null)}
+              onDone={() => setMaintenanceNode(null)}
+            />
           </ModalShell>
         )}
         {selectedEdge && (
