@@ -710,7 +710,7 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
               />
             )}
             {showSgpPanel && conversation && (
-              <div className="fixed inset-y-0 end-0 z-[1500] w-[min(22rem,100vw)] border-s border-border shadow-xl xl:static xl:z-auto xl:h-full xl:min-h-0 xl:w-auto xl:shadow-none">
+              <div className="fixed inset-y-0 end-0 z-[1500] w-[min(22rem,100vw)] border-s border-border bg-card pr-[env(safe-area-inset-right)] shadow-xl xl:static xl:pr-0 xl:z-auto xl:h-full xl:min-h-0 xl:w-auto xl:shadow-none">
                 <SubscriberPanel
                   conversationId={conversation.id}
                   boundContract={conversation.contract}
