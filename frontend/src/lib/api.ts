@@ -1138,6 +1138,41 @@ export interface TenantGateway {
 }
 
 /**
+ * A integração com a Asaas, como o console a vê.
+ *
+ * **Configurado sim/não, nunca o valor**: a chave de API e o token do webhook
+ * entram pela tela e não voltam por ela. O `*Source` diz de onde o valor que
+ * vale veio — `db` é o que foi gravado no painel, `env` é a variável de ambiente
+ * que continua valendo enquanto o painel não grava nada por cima.
+ */
+export interface AsaasIntegration {
+  environment: 'sandbox' | 'production'
+  apiKeyConfigured: boolean
+  apiKeySource: 'db' | 'env' | null
+  webhookTokenConfigured: boolean
+  webhookTokenSource: 'db' | 'env' | null
+  /** O endereço que se cola na Asaas. Montado pelo backend a partir do deploy. */
+  webhookUrl: string
+  updatedAt: string | null
+}
+
+/**
+ * O que se grava na integração. Campo ausente não é tocado; campo presente e
+ * vazio apaga — o mesmo contrato do cadastro fiscal.
+ */
+export interface AsaasIntegrationUpdate {
+  environment?: 'sandbox' | 'production'
+  apiKey?: string
+  webhookToken?: string
+}
+
+export interface AsaasConnectionTest {
+  ok: boolean
+  accountName?: string
+  environment: 'sandbox' | 'production'
+}
+
+/**
  * Até quantos dias o plano deixa o provedor guardar a trilha de auditoria
  * (`audit`), as mensagens (`messages`) e os anexos (`media`) do WhatsApp.
  * Nulo é sem teto — o provedor decide sozinho.
@@ -1250,7 +1285,7 @@ export interface TenantChargeView {
   periodEnd: string
   amountCents: number
   currency: string
-  status: 'pending' | 'paid' | 'canceled' | 'failed'
+  status: 'pending' | 'paid' | 'canceled' | 'failed' | 'overdue' | 'refunded'
   dueDate: string | null
   invoiceUrl: string | null
   createdAt: string | null
@@ -1413,6 +1448,34 @@ export const platformAPI = {
     apiClient.requestWithBody<{ id: number; gateway: TenantGateway }>(
       'PATCH', `/platform/tenants/${id}`, { gateway }
     ),
+
+  /**
+   * Cria o cliente deste provedor na Asaas, a partir do cadastro fiscal dele, e
+   * já grava a correlação. 400 quando falta CPF/CNPJ; 409 quando o provedor já
+   * está ligado a um cliente — trocar de cliente é decisão para a mão.
+   */
+  createAsaasCustomer: (tenantId: number) =>
+    apiClient.post<{ id: number; gateway: TenantGateway }>(
+      `/platform/tenants/${tenantId}/gateway/asaas-customer`
+    ),
+
+  /** A integração com a Asaas: ambiente e o que está configurado — nunca os segredos. */
+  asaasIntegration: () =>
+    apiClient.get<AsaasIntegration>('/platform/integrations/asaas'),
+
+  saveAsaasIntegration: (body: AsaasIntegrationUpdate) =>
+    apiClient.put<AsaasIntegration>('/platform/integrations/asaas', body),
+
+  /** Chama a Asaas com a chave gravada. `ok: false` vem com o motivo em `message`. */
+  testAsaasIntegration: () =>
+    apiClient.post<AsaasConnectionTest>('/platform/integrations/asaas/test'),
+
+  /**
+   * Gera um token novo para o webhook e o devolve UMA vez. O anterior deixa de
+   * valer na hora: a Asaas precisa receber o novo antes da próxima entrega.
+   */
+  generateAsaasWebhookToken: () =>
+    apiClient.post<{ webhookToken: string }>('/platform/integrations/asaas/webhook-token'),
 
   listMemberships: (tenantId: number) =>
     apiClient.get<{ memberships: TenantMembership[] }>(`/platform/tenants/${tenantId}/members`),
