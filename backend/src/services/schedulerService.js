@@ -290,7 +290,24 @@ class SchedulerService {
     // `expiry_warned_for` faz o primeiro ser também o único, então na prática
     // o link chega no aviso de um prazo que mudou. É o preço de o aviso não
     // depender do gateway, e é mais barato que o contrário.
-    summary.chargeIssued = await ChargeIssuingService.issueCurrent({ tenant })
+    //
+    // Antes da emissão, a descida de plano agendada para a renovação que já
+    // chegou (ver `SubscriptionService.applyPendingPlan`). Antes porque a
+    // emissão pergunta pelo plano, e a pergunta tem de ver o plano de agora.
+    // As ONTs só são contadas se o plano novo as limita — e só quando há uma
+    // descida vencida, que é quase nunca.
+    summary.pendingPlan = await SubscriptionService.applyPendingPlan({
+      countDevices: () => DeviceService.countDevicesFromGenieAcs()
+    }).catch((error) => {
+      console.warn(`Could not apply the scheduled plan change: ${error.message}`);
+      return { applied: false, reason: 'error' };
+    });
+
+    // A mesma contagem de ONTs vai à emissão: é ela que decide se a cobrança
+    // da renovação já sai pelo preço da descida agendada (ver `issueCurrent`).
+    summary.chargeIssued = await ChargeIssuingService.issueCurrent({
+      tenant, countDevices: () => DeviceService.countDevicesFromGenieAcs()
+    })
       .catch((error) => {
         console.warn(`Could not issue the subscription charge: ${error.message}`);
         return { issued: false, reason: 'error' };

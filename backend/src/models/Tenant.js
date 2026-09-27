@@ -108,6 +108,26 @@ class Tenant {
     return changed > 0;
   }
 
+  /**
+   * Liga o provedor a um cliente no gateway SÓ SE ele ainda não tem nenhum.
+   *
+   * Um `UPDATE` condicional, e não ler-conferir-gravar: dois cliques quase
+   * juntos no "pagar agora" (ou o botão do console e o clique do provedor)
+   * passariam os dois pela leitura, e o segundo a gravar trocaria o vínculo
+   * do primeiro — com a primeira cobrança já emitida para um cliente que o
+   * provedor deixou de ter. Aqui o banco decide, e quem perde recebe `false`
+   * e relê quem ganhou.
+   *
+   * @returns {Promise<boolean>} se esta chamada fez o vínculo.
+   */
+  static async linkGatewayIfUnlinked(id, { gateway, customerRef }) {
+    const changed = await getDb()('tenants')
+      .where({ id })
+      .where((livre) => livre.whereNull('billing_customer_ref').orWhere('billing_customer_ref', ''))
+      .update({ billing_gateway: gateway, billing_customer_ref: customerRef, updated_at: new Date() });
+    return changed > 0;
+  }
+
   /** O cadastro fiscal de uma linha já lida, em camelCase, para a tela. */
   static presentBilling(row) {
     if (!row) return null;

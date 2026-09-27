@@ -1,6 +1,6 @@
 import { BillingProvider } from './billingProvider.js';
 import SubscriptionService from '../subscriptionService.js';
-import { createCharge as criarCobranca, apiKey } from './asaasClient.js';
+import { createCharge as criarCobranca, cancelCharge as cancelarCobranca, apiKey } from './asaasClient.js';
 
 /**
  * O Asaas, que era o nome escrito no comentário da interface desde que ela
@@ -90,6 +90,16 @@ export class AsaasBillingProvider extends BillingProvider {
    */
   async createCharge(cobranca) {
     return criarCobranca(cobranca);
+  }
+
+  /**
+   * Cancela no gateway uma cobrança que ele emitiu. Mesma costura de
+   * `createCharge`: quando cancelar é da troca de plano, o transporte é do
+   * cliente, e aqui fica só a delegação — é por ela que quem cancela pergunta
+   * ao provider da LINHA, e não ao Asaas pelo nome.
+   */
+  async cancelCharge(gatewayChargeId) {
+    return cancelarCobranca(gatewayChargeId);
   }
 
   /**

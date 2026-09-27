@@ -58,7 +58,12 @@ export function cobrancaEmAberto(charges: TenantChargeView[]) {
   return charges.find((c) => c.invoiceUrl && (c.status === 'pending' || c.status === 'overdue' || c.status === 'failed')) ?? null
 }
 
-export function TenantCharges() {
+/**
+ * `refreshKey` é o jeito de a página pedir uma recarga de fora: ela muda o
+ * número depois de trocar o plano ou gerar uma cobrança, e a lista busca de
+ * novo sem que a página precise saber como ela carrega.
+ */
+export function TenantCharges({ refreshKey = 0 }: { refreshKey?: number } = {}) {
   const { t } = useTranslation()
   const [charges, setCharges] = useState<TenantChargeView[] | null>(null)
   const [loading, setLoading] = useState(true)
@@ -78,7 +83,7 @@ export function TenantCharges() {
 
   useEffect(() => {
     void load()
-  }, [load])
+  }, [load, refreshKey])
 
   return (
     <section className="modern-card p-5 sm:p-6">

@@ -217,6 +217,36 @@ export async function createCharge({ customerRef, amountCents, currency = 'BRL',
 }
 
 /**
+ * Cancela (apaga) uma cobrança no gateway — `DELETE /payments/{id}`.
+ *
+ * Existe para a troca de plano feita pelo próprio provedor: a cobrança do
+ * período já emitida saiu com o preço velho, e deixá-la viva ao lado da nova
+ * seria pôr duas faturas do mesmo mês na mão de quem paga — e a primeira a ser
+ * paga, pelo valor errado.
+ *
+ * **404 é sucesso.** O que se quer é que a cobrança não exista mais do lado de
+ * lá, e "não existe" é exatamente isso: alguém a apagou no painel do gateway,
+ * ou uma tentativa anterior apagou e a resposta se perdeu. Tratar como erro
+ * travaria a troca de plano por uma cobrança que já não incomoda ninguém.
+ *
+ * O id vai codificado no caminho: ele veio do gateway, mas mora no nosso banco,
+ * e um caractere de caminho nele mudaria QUAL recurso se apaga.
+ *
+ * @returns {Promise<{ deleted: boolean, alreadyGone: boolean }>}
+ */
+export async function cancelCharge(chargeId) {
+  const id = String(chargeId ?? '').trim();
+  if (!id) throw new AsaasError('no gateway charge id to cancel', { code: 'bad_request' });
+  try {
+    const resposta = await chamar(`/payments/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    return { deleted: resposta?.deleted !== false, alreadyGone: false };
+  } catch (error) {
+    if (error instanceof AsaasError && error.status === 404) return { deleted: true, alreadyGone: true };
+    throw error;
+  }
+}
+
+/**
  * Confere se a chave responde, e em nome de quem — o botão "Testar conexão" do
  * console.
  *
@@ -260,4 +290,4 @@ export async function createCustomer(payload) {
   return { customerId };
 }
 
-export default { createCharge, createCustomer, testConnection, apiKey, baseUrl, AsaasError };
+export default { createCharge, cancelCharge, createCustomer, testConnection, apiKey, baseUrl, AsaasError };
