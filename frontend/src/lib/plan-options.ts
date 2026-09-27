@@ -1,4 +1,4 @@
-import type { ApiResponse, TenantChargeView, TenantPlanOption } from '@/lib/api'
+import type { ApiResponse, PendingPlan, SubscriptionView, TenantChargeView, TenantPlanOption } from '@/lib/api'
 import type { TranslationKey, TranslationVars } from '@/lib/i18n/dictionary'
 
 /**
@@ -44,19 +44,64 @@ export function periodLabel(periodDays: number, price: string): { key: Translati
  */
 export function overLimitDetail(res: Pick<ApiResponse, 'code' | 'resource' | 'used' | 'limit'>) {
   if (res.code !== 'over_limit') return null
-  if (!res.resource || !PLAN_RESOURCES.includes(res.resource)) return null
-  if (typeof res.used !== 'number' || typeof res.limit !== 'number') return null
-  return {
-    key: 'plan.options.overLimit' as TranslationKey,
-    resourceKey: RESOURCE_KEYS[res.resource],
-    used: res.used,
-    limit: res.limit
-  }
+  return limitDetail('plan.options.overLimit', res)
 }
 
-/** O botão "Mudar para este plano": só em quem escreve, e nunca no plano atual. */
-export function canSwitchTo(plan: TenantPlanOption, canWrite: boolean) {
-  return canWrite && !plan.current
+/**
+ * A descida agendada que não vai se aplicar enquanto o uso passar de um teto do
+ * plano novo — lida com os mesmos números do `over_limit`. Nulo sem bloqueio,
+ * ou com o bloqueio incompleto.
+ */
+export function pendingBlockedDetail(pending: Pick<PendingPlan, 'blockedBy'> | null | undefined) {
+  if (!pending?.blockedBy) return null
+  return limitDetail('plan.pending.blocked', pending.blockedBy)
+}
+
+function limitDetail(key: TranslationKey, info: { resource?: string; used?: number; limit?: number }) {
+  const resource = info.resource as PlanResource | undefined
+  if (!resource || !PLAN_RESOURCES.includes(resource)) return null
+  if (typeof info.used !== 'number' || typeof info.limit !== 'number') return null
+  return { key, resourceKey: RESOURCE_KEYS[resource], used: info.used, limit: info.limit }
+}
+
+/**
+ * O botão "Mudar para este plano": só em quem escreve, nunca no plano atual e
+ * nunca no que já está agendado — pedir de novo o mesmo agendamento não muda
+ * nada, e o cancelamento tem o botão próprio.
+ */
+export function canSwitchTo(plan: TenantPlanOption, canWrite: boolean, pendingPlanId?: number | null) {
+  return canWrite && !plan.current && plan.id !== pendingPlanId
+}
+
+export type PlanChangeKind = 'upgrade' | 'downgrade-now' | 'downgrade-scheduled' | 'same'
+
+/**
+ * O que a troca para `target` vai fazer, pela mesma regra do backend: subir de
+ * preço vale na hora; descer vale na renovação quando a assinatura está
+ * `active` e a renovação ainda não chegou, e na hora no teste, no atraso ou sem
+ * data de renovação. Preço igual é tratado como subida — vale na hora.
+ *
+ * É só para a frase da confirmação: quem decide é o servidor, e o `message`
+ * da resposta é o que a tela mostra depois.
+ */
+export function planChangeKind(
+  current: Pick<TenantPlanOption, 'id' | 'priceCents'> | null | undefined,
+  target: Pick<TenantPlanOption, 'id' | 'priceCents'>,
+  subscription: Pick<SubscriptionView, 'status' | 'renewsAt'> | null | undefined,
+  now: number = Date.now()
+): PlanChangeKind {
+  if (current && current.id === target.id) return 'same'
+  if (!current || target.priceCents >= current.priceCents) return 'upgrade'
+  const renova = subscription?.renewsAt ? new Date(subscription.renewsAt).getTime() : Number.NaN
+  if (subscription?.status === 'active' && !Number.isNaN(renova) && renova > now) return 'downgrade-scheduled'
+  return 'downgrade-now'
+}
+
+/** A chave da confirmação de cada tipo de troca. */
+export function confirmKey(kind: Exclude<PlanChangeKind, 'same'>): TranslationKey {
+  if (kind === 'downgrade-scheduled') return 'plan.options.confirmScheduled'
+  if (kind === 'downgrade-now') return 'plan.options.confirmDowngradeNow'
+  return 'plan.options.confirm'
 }
 
 /**

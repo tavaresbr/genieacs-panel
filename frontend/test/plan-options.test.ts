@@ -6,9 +6,12 @@ import {
   canSwitchTo,
   isBusy,
   needsBillingProfile,
+  confirmKey,
   overLimitDetail,
   payInNewTab,
-  periodLabel
+  pendingBlockedDetail,
+  periodLabel,
+  planChangeKind
 } from '@/lib/plan-options'
 
 const plano = (over: Partial<TenantPlanOption> = {}): TenantPlanOption => ({
@@ -27,6 +30,61 @@ describe('plan-options', () => {
     expect(canSwitchTo(plano(), true)).toBe(true)
     expect(canSwitchTo(plano({ current: true }), true)).toBe(false)
     expect(canSwitchTo(plano(), false)).toBe(false)
+    expect(canSwitchTo(plano({ id: 7 }), true, 7)).toBe(false)
+    expect(canSwitchTo(plano({ id: 7 }), true, 8)).toBe(true)
+    expect(canSwitchTo(plano({ id: 7 }), true, null)).toBe(true)
+  })
+
+  describe('planChangeKind', () => {
+    const agora = Date.parse('2026-09-27T12:00:00Z')
+    const atual = plano({ id: 2, priceCents: 9990, current: true })
+    const emDia = { status: 'active' as const, renewsAt: '2026-10-15T00:00:00Z' }
+
+    it('reconhece o plano atual', () => {
+      expect(planChangeKind(atual, atual, emDia, agora)).toBe('same')
+    })
+
+    it('subir de preço vale na hora, em qualquer estado', () => {
+      const caro = plano({ id: 3, priceCents: 19990 })
+      expect(planChangeKind(atual, caro, emDia, agora)).toBe('upgrade')
+      expect(planChangeKind(atual, caro, { status: 'trial', renewsAt: null }, agora)).toBe('upgrade')
+      // Preço igual não é descida.
+      expect(planChangeKind(atual, plano({ id: 4, priceCents: 9990 }), emDia, agora)).toBe('upgrade')
+      // Sem plano atual no catálogo não há o que comparar: vale na hora.
+      expect(planChangeKind(null, caro, emDia, agora)).toBe('upgrade')
+    })
+
+    it('descer com a assinatura em dia e renovação futura fica agendado', () => {
+      expect(planChangeKind(atual, plano({ id: 1, priceCents: 4990 }), emDia, agora)).toBe('downgrade-scheduled')
+      expect(planChangeKind(atual, plano({ id: 1, priceCents: 0 }), emDia, agora)).toBe('downgrade-scheduled')
+    })
+
+    it('descer no teste, no atraso, sem renovação ou com ela vencida vale na hora', () => {
+      const barato = plano({ id: 1, priceCents: 4990 })
+      expect(planChangeKind(atual, barato, { ...emDia, status: 'trial' }, agora)).toBe('downgrade-now')
+      expect(planChangeKind(atual, barato, { ...emDia, status: 'past_due' }, agora)).toBe('downgrade-now')
+      expect(planChangeKind(atual, barato, { ...emDia, renewsAt: null }, agora)).toBe('downgrade-now')
+      expect(planChangeKind(atual, barato, { ...emDia, renewsAt: '2026-09-01T00:00:00Z' }, agora)).toBe('downgrade-now')
+      expect(planChangeKind(atual, barato, { ...emDia, renewsAt: 'não é data' }, agora)).toBe('downgrade-now')
+      expect(planChangeKind(atual, barato, null, agora)).toBe('downgrade-now')
+    })
+
+    it('escolhe a confirmação de cada tipo', () => {
+      expect(confirmKey('upgrade')).toBe('plan.options.confirm')
+      expect(confirmKey('downgrade-now')).toBe('plan.options.confirmDowngradeNow')
+      expect(confirmKey('downgrade-scheduled')).toBe('plan.options.confirmScheduled')
+    })
+  })
+
+  it('lê o bloqueio da descida agendada', () => {
+    const base = { id: 1, name: 'Básico', priceCents: 4990, effectiveAt: '2026-10-15T00:00:00Z' }
+    expect(pendingBlockedDetail({ ...base, blockedBy: { resource: 'devices', used: 600, limit: 500 } })).toEqual({
+      key: 'plan.pending.blocked', resourceKey: 'platform.subscription.devices', used: 600, limit: 500
+    })
+    expect(pendingBlockedDetail({ ...base, blockedBy: null })).toBeNull()
+    expect(pendingBlockedDetail({ ...base, blockedBy: undefined })).toBeNull()
+    expect(pendingBlockedDetail(null)).toBeNull()
+    expect(pendingBlockedDetail({ ...base, blockedBy: { resource: 'x' as never, used: 1, limit: 0 } })).toBeNull()
   })
 
   it('pagar agora exige escrita e plano atual pago', () => {

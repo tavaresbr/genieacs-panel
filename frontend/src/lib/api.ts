@@ -1271,6 +1271,30 @@ export interface SubscriptionView {
   trialEndsAt: string | null
   renewsAt: string | null
   canceledAt: string | null
+  /**
+   * A descida de plano agendada para a renovação. Só existe com a assinatura
+   * em dia e renovação futura: até `effectiveAt` o plano atual continua
+   * valendo. Opcional porque servidores antigos não mandam o campo.
+   */
+  pendingPlan?: PendingPlan | null
+}
+
+/**
+ * O plano para o qual a assinatura desce na renovação. `blockedBy` diz que o
+ * uso atual passa de um teto do plano novo: enquanto passar, a troca não se
+ * aplica.
+ */
+export interface PendingPlan {
+  id: number
+  name: string
+  priceCents: number
+  /** ISO 8601. */
+  effectiveAt: string
+  blockedBy?: {
+    resource: 'operators' | 'subscribers' | 'devices'
+    used: number
+    limit: number
+  } | null
 }
 
 export interface SubscriptionUsage {
@@ -1696,9 +1720,12 @@ export const subscriptionAPI = {
   plans: () => apiClient.get<TenantPlanOption[]>('/tenant/plans'),
 
   /**
-   * Troca o plano na hora, sem proporcional: a próxima cobrança já sai com o
-   * preço novo. Recusa com `over_limit` (e `resource`/`used`/`limit`) quando o
-   * uso atual não cabe no plano escolhido.
+   * Troca o plano, sem proporcional: a próxima cobrança já sai com o preço
+   * novo. Subir vale na hora; descer com a assinatura `active` e renovação
+   * futura fica agendado (`pendingPlan`) para a renovação. Pedir o plano atual
+   * com uma descida agendada a cancela. O `message` da resposta, já
+   * traduzido, diz qual dos três aconteceu. Recusa com `over_limit` (e
+   * `resource`/`used`/`limit`) quando o uso atual não cabe no plano escolhido.
    */
   changePlan: (planId: number) =>
     apiClient.put<SubscriptionUsage>('/tenant/subscription/plan', { planId }),

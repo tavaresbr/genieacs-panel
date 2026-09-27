@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { subscriptionAPI, type SubscriptionUsage, type TenantPlanOption } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
+import { useToast } from '@/components/ui/toast'
 import { BillingProfile } from '@/components/billing-profile'
 import { TenantCharges } from '@/components/tenant-charges'
 import { useAuth } from '@/contexts/auth-context'
@@ -13,11 +14,14 @@ import {
   PLAN_RESOURCES,
   canPayNow,
   canSwitchTo,
+  confirmKey,
   isBusy,
   needsBillingProfile,
   overLimitDetail,
   payInNewTab,
+  pendingBlockedDetail,
   periodLabel,
+  planChangeKind,
   resourceLabelKey
 } from '@/lib/plan-options'
 
@@ -26,8 +30,11 @@ import {
  * está em uso — e, para quem tem `settings.write`, a troca de plano e o
  * "pagar agora".
  *
- * A troca vale na hora e sem proporcional: a próxima cobrança já sai com o
- * preço novo. É o backend quem recusa a troca para um plano que não comporta o
+ * Sem proporcional: a próxima cobrança já sai com o preço novo. Subir vale na
+ * hora; descer com a assinatura em dia fica agendado para a renovação
+ * (`pendingPlan`), e o agendamento se cancela pedindo o plano atual. A tela
+ * adianta na confirmação qual dos casos é, mas quem decide é o servidor — a
+ * frase dele é o que aparece depois. É o backend quem recusa a troca para um plano que não comporta o
  * uso atual (`over_limit`); a tela só traduz a recusa em números. Quem não
  * escreve vê o catálogo, mas sem botões — mostrar um botão que sempre daria 403
  * é apontar para o que a pessoa não alcança.
@@ -62,6 +69,7 @@ function expirou(value: string | null | undefined) {
 export default function PlanPage() {
   const { t } = useTranslation()
   const { can } = useAuth()
+  const toast = useToast()
   const [data, setData] = useState<SubscriptionUsage | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -69,6 +77,7 @@ export default function PlanPage() {
   const [plansError, setPlansError] = useState<string | null>(null)
   const [mudando, setMudando] = useState<number | null>(null)
   const [pagando, setPagando] = useState(false)
+  const [cancelando, setCancelando] = useState(false)
   // `info` é o `busy`: outra operação deste provedor em andamento no servidor.
   // Não é erro — é "tente de novo em instantes" — e não leva o tom vermelho.
   const [aviso, setAviso] = useState<{ tipo: 'erro' | 'ok' | 'info'; texto: string } | null>(null)
@@ -99,37 +108,56 @@ export default function PlanPage() {
 
   const podeEscrever = can('settings.write')
 
-  const mudarPara = async (plan: TenantPlanOption) => {
-    const periodo = periodLabel(plan.periodDays, formatMoney(plan.priceCents, plan.currency))
-    const preco = t(periodo.key, periodo.vars)
-    if (!window.confirm(t('plan.options.confirm', { name: plan.name, price: preco }))) return
-    setMudando(plan.id)
+  /**
+   * Pede a troca ao servidor e, no sucesso, mostra a frase dele — é ela que diz
+   * se valeu na hora, se ficou agendada ou se o agendamento caiu — e recarrega
+   * assinatura, catálogo e cobranças: o preço novo muda o que "pagar agora"
+   * oferece, e a troca pode ter mexido na cobrança em aberto.
+   */
+  const trocar = async (planId: number, fallback: string) => {
     setAviso(null)
-    const res = await subscriptionAPI.changePlan(plan.id)
+    const res = await subscriptionAPI.changePlan(planId)
     if (res.success && res.data) {
       setData(res.data)
       setError(null)
-      setAviso({ tipo: 'ok', texto: t('plan.options.changed', { name: plan.name }) })
-      // O preço novo muda o que "pagar agora" oferece, e a troca pode ter
-      // mexido na cobrança em aberto: as duas listas voltam do servidor.
-      const catalogo = await subscriptionAPI.plans()
+      toast.success(res.message || fallback)
+      const [atual, catalogo] = await Promise.all([subscriptionAPI.current(), subscriptionAPI.plans()])
+      if (atual.success && atual.data) setData(atual.data)
       if (catalogo.success && catalogo.data) setPlans(catalogo.data)
       setChargesKey((k) => k + 1)
-    } else {
-      const acima = overLimitDetail(res)
-      if (isBusy(res.code)) {
-        setAviso({ tipo: 'info', texto: res.message || t('plan.options.changeFailed') })
-        setMudando(null)
-        return
-      }
-      setAviso({
-        tipo: 'erro',
-        texto: acima
-          ? t(acima.key, { resource: t(acima.resourceKey), used: acima.used, limit: acima.limit })
-          : res.message || t('plan.options.changeFailed')
-      })
+      return
     }
+    if (isBusy(res.code)) {
+      setAviso({ tipo: 'info', texto: res.message || t('plan.options.changeFailed') })
+      return
+    }
+    const acima = overLimitDetail(res)
+    setAviso({
+      tipo: 'erro',
+      texto: acima
+        ? t(acima.key, { resource: t(acima.resourceKey), used: acima.used, limit: acima.limit })
+        : res.message || t('plan.options.changeFailed')
+    })
+  }
+
+  const mudarPara = async (plan: TenantPlanOption) => {
+    const periodo = periodLabel(plan.periodDays, formatMoney(plan.priceCents, plan.currency))
+    const preco = t(periodo.key, periodo.vars)
+    const atual = plans?.find((p) => p.current) ?? null
+    const tipo = planChangeKind(atual, plan, data?.subscription)
+    if (tipo === 'same') return
+    const vars = { name: plan.name, price: preco, date: formatDate(data?.subscription?.renewsAt) ?? '' }
+    if (!window.confirm(t(confirmKey(tipo), vars))) return
+    setMudando(plan.id)
+    await trocar(plan.id, t('plan.options.changed', { name: plan.name }))
     setMudando(null)
+  }
+
+  const cancelarAgendamento = async (planoAtualId: number, agendado: string) => {
+    if (!window.confirm(t('plan.pending.cancelConfirm', { plan: agendado }))) return
+    setCancelando(true)
+    await trocar(planoAtualId, t('plan.pending.canceled'))
+    setCancelando(false)
   }
 
   // Síncrono até o `payInNewTab`: a aba nova tem que abrir dentro do clique,
@@ -168,6 +196,9 @@ export default function PlanPage() {
 
   const subscription = data?.subscription ?? null
   const venceu = expirou(subscription?.renewsAt)
+  const pendente = subscription?.pendingPlan ?? null
+  const pendenteBloqueio = pendingBlockedDetail(pendente)
+  const planoAtualId = plans?.find((p) => p.current)?.id ?? null
 
   const meter = (used: number | null, limit: number | null) => {
     if (used === null) return { text: t('platform.subscription.uncounted'), pct: 0 }
@@ -273,6 +304,42 @@ export default function PlanPage() {
           </div>
         )}
 
+        {!loading && pendente && (
+          <section
+            role="status"
+            className="mt-6 flex flex-col gap-3 rounded-lg border border-[hsl(var(--status-info)/.3)] bg-[hsl(var(--status-info)/.06)] p-4 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <div className="flex min-w-0 gap-3">
+              <Icon name="info" size={18} className="mt-0.5 shrink-0 text-[hsl(var(--status-info))]" />
+              <div className="min-w-0 text-sm">
+                <p className="break-words font-medium text-foreground">
+                  {t('plan.pending.title', { plan: pendente.name, date: formatDate(pendente.effectiveAt) ?? '—' })}
+                </p>
+                <p className="mt-1 text-muted-foreground">{t('plan.pending.hint')}</p>
+                {pendenteBloqueio && (
+                  <p className="mt-2 text-[hsl(var(--status-warning))]">
+                    {t(pendenteBloqueio.key, {
+                      resource: t(pendenteBloqueio.resourceKey),
+                      used: pendenteBloqueio.used,
+                      limit: pendenteBloqueio.limit
+                    })}
+                  </p>
+                )}
+              </div>
+            </div>
+            {podeEscrever && planoAtualId !== null && (
+              <button
+                type="button"
+                className="modern-button-secondary w-full shrink-0 justify-center sm:w-auto"
+                disabled={cancelando || mudando !== null}
+                onClick={() => void cancelarAgendamento(planoAtualId, pendente.name)}
+              >
+                {cancelando ? t('plan.pending.canceling') : t('plan.pending.cancel')}
+              </button>
+            )}
+          </section>
+        )}
+
         {aviso && (
           <p
             role={aviso.tipo === 'erro' ? 'alert' : 'status'}
@@ -306,11 +373,16 @@ export default function PlanPage() {
                   return (
                     <li
                       key={plan.id}
-                      className={`flex min-w-0 flex-col rounded-lg border p-4 ${plan.current ? 'border-primary' : 'border-border'}`}
+                      className={`flex min-w-0 flex-col rounded-lg border p-4 ${
+                        plan.current ? 'border-primary' : plan.id === pendente?.id ? 'border-dashed border-primary/60' : 'border-border'
+                      }`}
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <h3 className="min-w-0 break-words font-semibold text-foreground">{plan.name}</h3>
                         {plan.current && <span className="modern-badge-success">{t('plan.options.current')}</span>}
+                        {!plan.current && plan.id === pendente?.id && (
+                          <span className="modern-badge-info">{t('plan.options.scheduled')}</span>
+                        )}
                       </div>
                       <p className="mt-1 text-lg font-semibold text-foreground">{t(periodo.key, periodo.vars)}</p>
                       <dl className="mt-3 flex-1 space-y-1 text-sm">
@@ -321,11 +393,11 @@ export default function PlanPage() {
                           </div>
                         ))}
                       </dl>
-                      {canSwitchTo(plan, podeEscrever) && (
+                      {canSwitchTo(plan, podeEscrever, pendente?.id) && (
                         <button
                           type="button"
                           className="modern-button-secondary mt-4 w-full justify-center"
-                          disabled={mudando !== null}
+                          disabled={mudando !== null || cancelando}
                           onClick={() => void mudarPara(plan)}
                         >
                           {mudando === plan.id ? t('plan.options.switching') : t('plan.options.switch')}
