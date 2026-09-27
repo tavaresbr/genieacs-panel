@@ -1636,7 +1636,8 @@ export interface DeviceListParams {
   page?: number
   pageSize?: number
   search?: string
-  status?: 'all' | 'online' | 'offline'
+  /** `stale`: last Inform older than 3 days, filtered server-side. */
+  status?: 'all' | 'online' | 'offline' | 'stale'
   focus?: 'all' | 'new24h' | 'weak-signal' | 'hot' | 'many-clients'
 }
 
@@ -1692,7 +1693,11 @@ export interface DeviceSwap {
   deviceId: string
   contract: string | null
   /** Which identity matched: same firmware hashes the same, so most swaps are `identity_hash`. */
-  matchedBy: 'identity_hash' | 'pppoe'
+  /**
+   * `stale_pppoe`: the link was moved automatically because the old ONT had
+   * been silent for 3+ days while another ONT with the same PPPoE login was online.
+   */
+  matchedBy: 'identity_hash' | 'pppoe' | 'stale_pppoe'
   /** What became of the previous ONT's SGP link. `held` means the pair is unstable. */
   linkAction: 'moved' | 'cleared' | 'none' | 'held'
   flapping: boolean
@@ -2081,6 +2086,16 @@ export interface SgpDivergenceRow {
   lastInform: string | null
 }
 
+/** An active contract whose linked ONT has sent no Inform for more than 3 days. */
+export interface SgpStaleActiveRow extends SgpDivergenceRow {
+  /** The ONT that probably replaced it, when one could be found online. */
+  successor: {
+    deviceId: string
+    lastInform: string | null
+    matchedBy: 'pppoe' | 'contract'
+  } | null
+}
+
 export interface SgpUnlinkedRow {
   deviceId: string
   customerId: string | null
@@ -2094,6 +2109,8 @@ export interface SgpSyncSummary {
   updated: number
   failed: number
   skipped: number
+  /** Links moved off an ONT silent for 3+ days onto the online ONT with the same PPPoE login. */
+  relinked?: number
   durationMs: number
   startedAt: string | null
   finishedAt: string | null
@@ -2108,11 +2125,13 @@ export interface SgpFleetOverview {
     unlinked: number
     onlineBlocked: number
     offlineActive: number
+    staleActive: number
   }
   byState: Record<SgpContractState, number>
   divergences: {
     onlineBlocked: SgpDivergenceRow[]
     offlineActive: SgpDivergenceRow[]
+    staleActive: SgpStaleActiveRow[]
     unlinked: SgpUnlinkedRow[]
   }
   lastSync: SgpSyncSummary | null

@@ -53,8 +53,14 @@ before(async () => {
   senhaDoPortal = await runInTenant(meu, () => CustomerPortalPasswordService.reveal(conta));
 
   await runInTenant(meu, async () => {
-    // Uma ONT trocada: a telemetria antiga fica sob o id ANTIGO.
+    // Uma ONT trocada: a telemetria antiga fica sob o id ANTIGO. Na ordem de
+    // uma troca de verdade — a conta nasce, a ONT antiga informa, e só depois
+    // ela é trocada.
+    const hora = 60 * 60 * 1000;
+    await getDb()('customer_accounts').where({ id: conta.id })
+      .update({ created_at: new Date(Date.now() - 2 * hora) });
     await tinsertReturningId('device_swaps', {
+      occurred_at: new Date(Date.now() - hora),
       account_id: conta.id,
       previous_device_id: 'ONT-ANTIGA',
       device_id: 'ONT-ATUAL',
@@ -62,7 +68,7 @@ before(async () => {
       link_action: 'kept'
     });
     await tinsertReturningId('device_samples', {
-      device_id: 'ONT-ANTIGA', inform_at: new Date(), rx_power: -27.5
+      device_id: 'ONT-ANTIGA', inform_at: new Date(Date.now() - 1.5 * hora), rx_power: -27.5
     });
     await tinsertReturningId('device_samples', {
       device_id: 'ONT-ATUAL', inform_at: new Date(), rx_power: -22.1

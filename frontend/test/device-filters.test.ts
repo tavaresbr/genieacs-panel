@@ -31,6 +31,7 @@ describe('a query lida', () => {
   it('traz o recorte que o painel escolheu', () => {
     expect(filtersFromQuery(q('status=offline'))).toEqual({ ...NO_FILTERS, status: 'offline' })
     expect(filtersFromQuery(q('status=online'))).toEqual({ ...NO_FILTERS, status: 'online' })
+    expect(filtersFromQuery(q('status=stale'))).toEqual({ ...NO_FILTERS, status: 'stale' })
   })
 
   it('e o recorte inteiro, quando há mais de um', () => {

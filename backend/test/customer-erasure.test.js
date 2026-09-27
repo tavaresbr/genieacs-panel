@@ -176,8 +176,15 @@ async function semear() {
     });
 
     // Uma ONT trocada: a telemetria da anterior só existe sob o id ANTIGO, e é
-    // por ela que a exclusão tem que passar também.
+    // por ela que a exclusão tem que passar também. As horas são as de uma
+    // troca de verdade — a conta nasce, a ONT antiga informa, e só depois ela é
+    // trocada —, porque o alcance recorta cada aparelho pelo período em que ele
+    // foi desta conta.
+    const hora = 60 * 60 * 1000;
+    await getDb()('customer_accounts').where({ id: account.id })
+      .update({ created_at: new Date(Date.now() - 2 * hora) });
     await tinsertReturningId('device_swaps', {
+      occurred_at: new Date(Date.now() - hora),
       account_id: account.id,
       customer_id: account.customer_id,
       pppoe_username: `assinante-${slug}`,
@@ -187,7 +194,7 @@ async function semear() {
       link_action: 'kept'
     });
     await tinsertReturningId('device_samples', {
-      device_id: `ONT-ANTIGA-${slug}`, inform_at: new Date(), rx_power: -30.1
+      device_id: `ONT-ANTIGA-${slug}`, inform_at: new Date(Date.now() - 1.5 * hora), rx_power: -30.1
     });
 
     return { account: await CustomerAccount.getById(account.id), senha, instanciaId, conversaId };
