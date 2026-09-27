@@ -826,6 +826,7 @@ export default {
   'contacts.invoiceMessage.pix': 'PIXコピー＆ペースト：',
   'contacts.invoiceMessage.link': '請求書：',
   'settings.platformManaged': 'この設定はプラットフォーム管理者が管理しています',
+  'settings.genieAcsOriginInUse': 'このアドレスはすでに別のプロバイダーの GenieACS です。ACS を共有するにはプラットフォーム管理者に連絡してください',
   'settings.validation.auditRetentionAboveCap': 'ご利用のプランでは監査ログを最大 {max} 日間保持します',
   'whatsapp.error.platformServerMissing': 'プラットフォームはまだ WhatsApp サーバーを設定していません。プラットフォーム管理者に連絡してください',
   'whatsapp.error.retentionAboveCap': 'ご利用のプランでは WhatsApp の履歴を最大 {max} 日間保持します',

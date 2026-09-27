@@ -172,14 +172,6 @@ export default function Settings() {
       return fallback
     }
   })
-  // Na SaaS, "Parâmetros TR-069" não existe para o provedor. O perfil do
-  // provedor chega depois da primeira renderização, e um `?tab=` antigo pode
-  // apontar para ela: nos dois casos a tela vai para a primeira aba que ele tem.
-  useEffect(() => {
-    if (platformManaged && activeTab === 'virtual-params') {
-      setActiveTab(canEditProvider ? 'provider' : 'customer-portal')
-    }
-  }, [platformManaged, activeTab, canEditProvider])
   // No celular a trilha de abas rola de lado: a aba ativa — a que veio do
   // `?tab=` inclusive — é trazida para a vista, senão a pessoa não vê onde está.
   const tabRailRef = useRef<HTMLDivElement>(null)
@@ -192,6 +184,18 @@ export default function Settings() {
   }, [activeTab, platformManaged, canEditProvider])
   const [testResult, setTestResult] = useState<{success: boolean, message: string, deviceCount?: number} | null>(null)
   const [genieAuthConfig, setGenieAuthConfig] = useState<GenieAcsAuthConfig | null>(null)
+  // O ACS é da plataforma (só leitura aqui) — ou é do provedor, na self-hosted
+  // e na SaaS quando o console marcou que ele usa o próprio servidor. Até a
+  // resposta chegar, vale o lado seguro: só leitura.
+  const genieAcsManaged = platformManaged && genieAuthConfig?.platformManaged !== false
+  // Com o ACS da plataforma, "Parâmetros TR-069" não existe para o provedor. Um
+  // `?tab=` antigo pode apontar para ela: a tela vai para a primeira aba que ele
+  // tem — depois de saber de quem é o ACS, para não tirar dali quem tem o próprio.
+  useEffect(() => {
+    if (genieAcsManaged && genieAuthConfig && activeTab === 'virtual-params') {
+      setActiveTab(canEditProvider ? 'provider' : 'customer-portal')
+    }
+  }, [genieAcsManaged, genieAuthConfig, activeTab, canEditProvider])
   const [genieAuthForm, setGenieAuthForm] = useState<{
     authType: GenieAcsAuthType
     username: string
@@ -1043,7 +1047,7 @@ export default function Settings() {
     // O servidor recusa `basic` sem usuário com 400, e com razão: o header
     // sairia com usuário vazio e o ACS o recusaria sem dizer por quê. Barrar
     // aqui evita a ida perdida e diz qual campo falta, que a resposta não diz.
-    if (!platformManaged && genieAuthForm.authType === 'basic' && !genieAuthForm.username.trim()) {
+    if (!genieAcsManaged && genieAuthForm.authType === 'basic' && !genieAuthForm.username.trim()) {
       toast.error(t('settings.genieAuth.usernameRequired'))
       return
     }
@@ -1074,7 +1078,7 @@ export default function Settings() {
       // Na SaaS a URL do ACS é gravada pelo console; mandá-la daqui seria uma
       // recusa (403) a cada salvar, por um campo que a tela nem deixa editar.
       const entries = Object.entries(settings)
-        .filter(([key]) => key !== 'appName' && !(platformManaged && PLATFORM_MANAGED_KEYS.has(key)))
+        .filter(([key]) => key !== 'appName' && !(genieAcsManaged && PLATFORM_MANAGED_KEYS.has(key)))
         .sort(([left], [right]) => {
         if (left === 'autoGenerateCustomerId') return 1
         if (right === 'autoGenerateCustomerId') return -1
@@ -1095,7 +1099,7 @@ export default function Settings() {
         }
       }
 
-      if (ok && !platformManaged) {
+      if (ok && !genieAcsManaged) {
         // A URL acabou de ser gravada, então é ela que o servidor vai comparar
         // com o endereço testado daqui em diante — o aviso de teste anônimo
         // some sozinho depois de salvar, que é o desfecho que ele pedia.
@@ -1636,9 +1640,10 @@ export default function Settings() {
                 {t('settings.tab.provider')}
               </button>
             )}
-            {/* Na SaaS o ACS é da plataforma: "Painel e ACS" o mostra só para
-                leitura, e os parâmetros TR-069 só existem para quem os
-                configura — a self-hosted e a caixa da plataforma. */}
+            {/* Na SaaS o ACS costuma ser da plataforma: "Painel e ACS" o mostra
+                só para leitura, e os parâmetros TR-069 só existem para quem os
+                configura — a self-hosted, a caixa da plataforma e o provedor
+                que o console marcou como dono do próprio servidor. */}
             <button
               onClick={() => setActiveTab('general')}
               className="tab-button"
@@ -1648,7 +1653,7 @@ export default function Settings() {
             >
               {t('settings.tab.general')}
             </button>
-            {!platformManaged && (
+            {!genieAcsManaged && (
               <button
                 onClick={() => setActiveTab('virtual-params')}
                 className="tab-button"
@@ -1776,7 +1781,7 @@ export default function Settings() {
               <p className="section-description mb-6">{t('settings.general.description')}</p>
               <div className="space-y-4">
                 {identityFields}
-                {platformManaged ? (
+                {genieAcsManaged ? (
                   /* Na SaaS quem aponta este painel para o ACS é a plataforma,
                      pelo console. O provedor vê para onde aponta e se responde
                      — que é o que ele precisa saber quando as ONTs somem —,
@@ -1967,7 +1972,7 @@ export default function Settings() {
           </div>
         )}
 
-        {activeTab === 'virtual-params' && !platformManaged && (
+        {activeTab === 'virtual-params' && !genieAcsManaged && (
           <div className="modern-card p-5 sm:p-6">
             <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>

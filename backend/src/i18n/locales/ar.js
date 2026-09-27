@@ -818,6 +818,7 @@ export default {
   'contacts.invoiceMessage.pix': 'رمز PIX للنسخ واللصق:',
   'contacts.invoiceMessage.link': 'الفاتورة:',
   'settings.platformManaged': 'يدير مسؤول المنصة هذا الإعداد',
+  'settings.genieAcsOriginInUse': 'هذا العنوان هو بالفعل GenieACS لمزود آخر. لمشاركة ACS، تواصل مع مسؤول المنصة',
   'settings.validation.auditRetentionAboveCap': 'تحتفظ خطتك بسجل التدقيق لمدة {max} يومًا كحد أقصى',
   'whatsapp.error.platformServerMissing': 'لم تقم المنصة بإعداد خادم واتساب بعد. تواصل مع مسؤول المنصة',
   'whatsapp.error.retentionAboveCap': 'تحتفظ خطتك بسجل واتساب لمدة {max} يومًا كحد أقصى',

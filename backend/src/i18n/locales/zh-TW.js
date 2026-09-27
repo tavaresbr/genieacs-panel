@@ -826,6 +826,7 @@ export default {
   'contacts.invoiceMessage.pix': 'PIX 複製貼上：',
   'contacts.invoiceMessage.link': '帳單：',
   'settings.platformManaged': '此設定由平台管理員管理',
+  'settings.genieAcsOriginInUse': '此位址已是其他服務商的 GenieACS。如需共用 ACS，請聯絡平台管理員',
   'settings.validation.auditRetentionAboveCap': '您的方案最多保留稽核記錄 {max} 天',
   'whatsapp.error.platformServerMissing': '平台尚未設定其 WhatsApp 伺服器。請聯絡平台管理員',
   'whatsapp.error.retentionAboveCap': '您的方案最多保留 WhatsApp 歷史 {max} 天',

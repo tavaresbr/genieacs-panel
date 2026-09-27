@@ -827,6 +827,7 @@ export default {
   'contacts.invoiceMessage.pix': 'PIX zum Kopieren:',
   'contacts.invoiceMessage.link': 'Rechnung:',
   'settings.platformManaged': 'Diese Einstellung wird vom Plattformadministrator verwaltet',
+  'settings.genieAcsOriginInUse': 'Diese Adresse ist bereits das GenieACS eines anderen Anbieters. Um ein ACS zu teilen, wenden Sie sich an den Plattformadministrator',
   'settings.validation.auditRetentionAboveCap': 'Ihr Tarif bewahrt das Audit-Protokoll höchstens {max} Tage auf',
   'whatsapp.error.platformServerMissing': 'Die Plattform hat ihren WhatsApp-Server noch nicht eingerichtet. Wenden Sie sich an den Plattformadministrator',
   'whatsapp.error.retentionAboveCap': 'Ihr Tarif bewahrt den WhatsApp-Verlauf höchstens {max} Tage auf',

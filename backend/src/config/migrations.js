@@ -1623,6 +1623,9 @@ const tenantGenieAcsConnectionsTable = (db) => (t) => {
   t.integer('tenant_id').unsigned().notNullable()
     .references('id').inTable('tenants').onDelete('CASCADE');
   t.string('mode', 16).notNullable().defaultTo('direct');
+  // Quem administra o ACS na SaaS: `platform` (o console grava URL, credencial
+  // e parâmetros TR-069) ou `own` (o servidor é do provedor, e ele mesmo grava).
+  t.string('ownership', 16).notNullable().defaultTo('platform');
   t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
   t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
   t.unique(['tenant_id']);
@@ -4111,6 +4114,25 @@ export const migrations = [
         // eslint-disable-next-line no-await-in-loop -- uma tabela só, hoje
         await createTableIfMissing(db, nome, construtor(db));
       }
+    }
+  },
+  {
+    /**
+     * Quem administra o GenieACS do provedor — ver
+     * `tenantGenieAcsConnectionsTable`. Todo mundo começa com `platform`, que
+     * é o que a SaaS já fazia; a tabela nova da 0069 já nasce com a coluna.
+     */
+    id: '0071_tenant_genieacs_ownership',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenant_genieacs_connections'))) return true;
+      return db.schema.hasColumn('tenant_genieacs_connections', 'ownership');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenant_genieacs_connections'))) return;
+      if (await db.schema.hasColumn('tenant_genieacs_connections', 'ownership')) return;
+      await db.schema.alterTable('tenant_genieacs_connections', (t) => {
+        t.string('ownership', 16).notNullable().defaultTo('platform');
+      });
     }
   }
 ];
