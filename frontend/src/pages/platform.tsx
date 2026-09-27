@@ -8,6 +8,7 @@ import { DeploymentHealth } from '@/components/platform/deployment-health'
 import { DefaultCatalogueTab } from '@/components/platform/default-catalogue'
 import { PlatformAdmins } from '@/components/platform/platform-admins'
 import { PlatformAudit } from '@/components/platform/platform-audit'
+import { PlatformIntegrations } from '@/components/platform/platform-integrations'
 import { TenantData } from '@/components/platform/tenant-data'
 import { TenantGateway } from '@/components/platform/tenant-gateway'
 import { TenantGenieAcs } from '@/components/platform/tenant-genieacs'
@@ -67,7 +68,7 @@ export default function PlatformPage() {
    * alguma coisa; as outras três são consulta ou manutenção rara.
    */
   const estreito = useEstreito()
-  const [aba, setAba] = useState<'tenants' | 'plans' | 'admins' | 'audit' | 'deployment' | 'catalogue'>('tenants')
+  const [aba, setAba] = useState<'tenants' | 'plans' | 'admins' | 'audit' | 'integrations' | 'deployment' | 'catalogue'>('tenants')
 
   const loadTenants = useCallback(async () => {
     const plansRes = await platformAPI.listPlans()
@@ -482,6 +483,9 @@ export default function PlatformPage() {
             ['plans', 'platform.tabs.plans'],
             ['admins', 'platform.tabs.admins'],
             ['audit', 'platform.tabs.audit'],
+            // Integrações antes das de consulta: é tela de configurar, mas de
+            // configurar uma vez — a chave e o webhook da Asaas, e pronto.
+            ['integrations', 'platform.tabs.integrations'],
             // As duas últimas são as de consulta mais rara: não se abre o
             // console para olhar variável de ambiente nem catálogo de
             // fabricante, abre-se quando alguma coisa não chegou ou um
@@ -504,6 +508,7 @@ export default function PlatformPage() {
         {aba === 'plans' && <PlanCatalog plans={plans} onChange={() => void loadTenants()} />}
         {aba === 'admins' && <PlatformAdmins />}
         {aba === 'audit' && <PlatformAudit />}
+        {aba === 'integrations' && <PlatformIntegrations />}
         {aba === 'deployment' && <DeploymentHealth />}
         {aba === 'catalogue' && <DefaultCatalogueTab />}
 

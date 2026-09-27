@@ -571,12 +571,14 @@ export default function CustomerPortal() {
           <div className="flex min-w-0 items-center gap-3">
             <BrandMark className="h-10 w-10 shrink-0" title="TR69 Controle" />
             <div className="min-w-0">
-              <p className="truncate font-bold">{providerContact?.enabled && providerContact.name ? providerContact.name : t('portal.name')}</p>
+              <p className="line-clamp-2 break-words font-bold leading-tight">{providerContact?.enabled && providerContact.name ? providerContact.name : t('portal.name')}</p>
               <p className="truncate font-mono text-xs text-muted-foreground">{overview?.customerId || customerId}</p>
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <LanguageSwitcher />
+            {/* No celular, só o globo e a sigla: o nome do provedor precisa do espaço. */}
+            <LanguageSwitcher compact className="w-11 sm:hidden" />
+            <LanguageSwitcher className="hidden sm:flex" />
             <button type="button" className="modern-button-secondary shrink-0 px-3" onClick={logout}>
               <Icon name="logout" size={17} /> <span className="hidden sm:inline">{t('portal.signOut')}</span>
             </button>

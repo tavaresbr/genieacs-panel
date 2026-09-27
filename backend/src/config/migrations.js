@@ -1159,7 +1159,7 @@ const outageEventsTable = (db) => (t) => {
   t.index(['tenant_id', 'node_id', 'started_at'], 'outage_events_node_idx');
 };
 
-const OUTAGE_TABLES = [
+const OUTAGE_HISTORY_TABLES = [
   ['outage_events', outageEventsTable]
 ];
 
@@ -1512,6 +1512,57 @@ const userRecoveryCodesTable = (db) => (t) => {
   t.index(['user_id']);
 };
 
+/**
+ * Uma queda em massa vista pelo alerta `mass_outage` — um nó do mapa (ODP,
+ * ODC, OLT) com ONTs demais offline ao mesmo tempo — e quem ela atingiu.
+ *
+ * O alerta avisa a equipe e esquece; o incidente é o que sobra para avisar o
+ * CLIENTE: a lista dos aparelhos, o que foi dito a quem e quando, e se o
+ * "normalizado" já saiu. `outage_incident_devices` guarda o telefone do
+ * momento do aviso, para o "normalizado" ir a quem recebeu o aviso mesmo que
+ * o cadastro mude no meio.
+ */
+const outageIncidentsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.string('node_id', 255).notNullable();
+  t.string('node_name', 255);
+  t.string('status', 16).notNullable().defaultTo('open');
+  t.timestamp('started_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('resolved_at').nullable();
+  t.string('eta_text', 255).nullable();
+  t.text('notice_body').nullable();
+  t.timestamp('notice_sent_at').nullable();
+  t.integer('notice_sent_by').nullable();
+  t.timestamp('recovery_sent_at').nullable();
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
+  t.index(['tenant_id', 'status'], 'outage_incidents_status_idx');
+};
+
+const outageIncidentDevicesTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.integer('incident_id').unsigned().notNullable()
+    .references('id').inTable('outage_incidents').onDelete('CASCADE');
+  t.string('device_id', 255).notNullable();
+  t.string('contract', 64).nullable();
+  t.string('client_name', 255).nullable();
+  t.string('phone_e164', 32).nullable();
+  t.timestamp('notified_at').nullable();
+  t.timestamp('recovered_at').nullable();
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['incident_id', 'device_id'], 'outage_incident_devices_uq');
+  t.index(['tenant_id', 'device_id'], 'outage_incident_devices_device_idx');
+};
+
+const OUTAGE_TABLES = [
+  ['outage_incidents', outageIncidentsTable],
+  ['outage_incident_devices', outageIncidentDevicesTable]
+];
+
 const MFA_TABLES = [
   ['user_recovery_codes', userRecoveryCodesTable]
 ];
@@ -1580,9 +1631,10 @@ export const SCHEMA_TABLES = [
   ...DEVICE_HISTORY_TABLES,
   ...DEVICE_SWAP_TABLES,
   ...BILLING_TABLES,
-  ...OUTAGE_TABLES,
+  ...OUTAGE_HISTORY_TABLES,
   ...SGP_CONTACT_TABLES,
-  ...MFA_TABLES
+  ...MFA_TABLES,
+  ...OUTAGE_TABLES
 ].map(([name]) => name);
 
 /**
@@ -3920,8 +3972,23 @@ export const migrations = [
     }
   },
   {
+    /** Os incidentes de queda em massa — ver `outageIncidentsTable`. */
+    id: '0066_outage_incidents',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      return db.schema.hasTable('outage_incident_devices');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      for (const [nome, construtor] of OUTAGE_TABLES) {
+        // eslint-disable-next-line no-await-in-loop -- a segunda aponta para a primeira
+        await createTableIfMissing(db, nome, construtor(db));
+      }
+    }
+  },
+  {
     /** O histórico de rompimentos — ver `outageEventsTable`. */
-    id: '0066_outage_events',
+    id: '0067_outage_events',
     async isApplied(db) {
       return db.schema.hasTable('outage_events');
     },

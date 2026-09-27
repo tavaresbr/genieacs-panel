@@ -24,13 +24,21 @@ const STATUS_KEYS: Record<TenantChargeView['status'], TranslationKey> = {
   // `failed` é a emissão que o gateway recusou — a cobrança não chegou ao
   // cliente. Dizer "falhou" a ele sem mais nada seria assustar por um problema
   // nosso, então o rótulo fala do que ele vê: ainda não há o que pagar aqui.
-  failed: 'charges.status.failed'
+  failed: 'charges.status.failed',
+  // `overdue` é a cobrança em aberto que passou do vencimento na Asaas. Ainda
+  // se paga — e o link continua na linha, igual ao de `pending`.
+  overdue: 'charges.status.overdue',
+  // `refunded` é o pagamento que voltou ao cliente: não há mais o que pagar.
+  refunded: 'charges.status.refunded'
 }
 
 function badgeClass(status: TenantChargeView['status']) {
   if (status === 'paid') return 'modern-badge-success'
   if (status === 'pending') return 'modern-badge-warning'
-  return 'modern-badge-danger'
+  // Estornada não é erro de ninguém: é um fato, e o selo neutro diz só isso.
+  if (status === 'refunded' || status === 'canceled') return 'modern-badge'
+  // `-error` e não `-danger`: é a classe que existe em `globals.css`.
+  return 'modern-badge-error'
 }
 
 function formatDate(value: string | null | undefined) {
@@ -47,7 +55,7 @@ function formatDate(value: string | null | undefined) {
  * sobre qual boleto está em aberto.
  */
 export function cobrancaEmAberto(charges: TenantChargeView[]) {
-  return charges.find((c) => c.invoiceUrl && (c.status === 'pending' || c.status === 'failed')) ?? null
+  return charges.find((c) => c.invoiceUrl && (c.status === 'pending' || c.status === 'overdue' || c.status === 'failed')) ?? null
 }
 
 export function TenantCharges() {
@@ -104,7 +112,11 @@ export function TenantCharges() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <span className={badgeClass(charge.status)}>{t(STATUS_KEYS[charge.status])}</span>
+                {/* Um status que este frontend ainda não conhece (backend mais novo)
+                    aparece cru, que é pouco, mas é mais do que uma célula vazia. */}
+                <span className={badgeClass(charge.status)}>
+                  {STATUS_KEYS[charge.status] ? t(STATUS_KEYS[charge.status]) : charge.status}
+                </span>
                 {charge.invoiceUrl && (
                   /* `noopener` porque é endereço de terceiro, e o alvo ganharia
                      acesso a esta janela por `window.opener` sem ele. */

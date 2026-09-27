@@ -47,6 +47,8 @@ export const SCOPED_TABLES = new Set([
   // telefone de um assinante, achados por uma busca no SGP. Pelo mesmo motivo
   // de `sgp_links`, é contra ela que um número de WhatsApp é resolvido.
   'sgp_contacts',
+  'outage_incidents',
+  'outage_incident_devices',
   // A ficha completa de cada cliente do SGP: endereço, nascimento, todos os
   // telefones e e-mails. O dado mais pessoal do painel inteiro.
   'sgp_clients',

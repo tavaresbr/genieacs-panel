@@ -7,7 +7,7 @@ import { EDITION } from '../config/edition.js';
 import { resolveClient } from '../config/dbConfig.js';
 import { rlsEnabled } from '../config/rls.js';
 import { mailConfigured } from '../services/mail/index.js';
-import { asaasBilling } from '../services/billing/asaasBillingProvider.js';
+import { readPublic as readAsaasSettings } from '../services/billing/asaasSettingsService.js';
 import { METRICS_CONTENT_TYPE, renderMetrics } from '../utils/metrics.js';
 import Subscription from '../models/Subscription.js';
 import SubscriptionService from '../services/subscriptionService.js';
@@ -187,8 +187,21 @@ class PlatformController {
    * em `/api/tenant/public`, que é aberta, e um endereço é público por
    * construção — é para onde as pessoas apontam o navegador.
    */
-  static deployment(req, res) {
+  static async deployment(req, res) {
     const client = resolveClient();
+    // Resolvido antes da resposta: a chave e o token do gateway passaram a
+    // poder vir do console, e saber se existem é uma leitura na caixa da
+    // plataforma. Falhar aqui é falhar a tela inteira, e com 500 — melhor que
+    // responder "não configurado" para um deploy que está.
+    let configured;
+    try {
+      configured = await PlatformController.presentConfigured(client);
+    } catch (error) {
+      console.error('Deployment facts error:', error);
+      return res.status(500).json(
+        createErrorResponse('Failed to read the deployment facts', error.message)
+      );
+    }
     return res.json(createResponse('Deployment retrieved successfully', {
       edition: EDITION,
       database: {
@@ -214,7 +227,7 @@ class PlatformController {
         // é onde isso deixa de ser invisível.
         genieAcsTemplate: String(process.env.GENIEACS_URL_TEMPLATE || '').trim() || null
       },
-      configured: PlatformController.presentConfigured(client)
+      configured
     }));
   }
 
@@ -238,15 +251,19 @@ class PlatformController {
    *   `false` num deploy que ligou `RLS_ENABLED=true` e está em SQLite é a
    *   resposta certa, e é a que ninguém tem hoje.
    */
-  static presentConfigured(client = resolveClient()) {
+  static async presentConfigured(client = resolveClient()) {
+    // As duas do gateway saem da mesma leitura que o webhook e a emissão fazem
+    // — o console primeiro, o ambiente depois —, para que a tela nunca diga
+    // "configurado" sobre um valor que a rota não vai usar.
+    const gateway = await readAsaasSettings();
     return {
       mail: mailConfigured(),
       // 32 é o piso que `allowMetricsScraper` exige para sequer comparar: um
       // token mais curto está configurado e não funciona, que é pior do que
       // ausente. A tela precisa dizer a verdade sobre o que vai acontecer.
       metricsToken: String(process.env.METRICS_TOKEN || '').length >= 32,
-      billingWebhookToken: Boolean(String(process.env.BILLING_WEBHOOK_TOKEN || '').trim()),
-      billingGateway: asaasBilling.isConfigured(),
+      billingWebhookToken: gateway.webhookTokenConfigured,
+      billingGateway: gateway.apiKeyConfigured,
       rls: rlsEnabled(client)
     };
   }

@@ -36,6 +36,16 @@ import { createCharge as criarCobranca, apiKey } from './asaasClient.js';
  */
 const EVENTOS_QUE_CREDITAM = new Set(['PAYMENT_CONFIRMED', 'PAYMENT_RECEIVED']);
 
+/**
+ * Os eventos que mudam o estado de uma cobrança sem creditar nada, e o estado
+ * que cada um grava em `billing_charges.status`. Ver `interpretarCiclo`.
+ */
+const EVENTOS_DO_CICLO = new Map([
+  ['PAYMENT_OVERDUE', 'overdue'],
+  ['PAYMENT_DELETED', 'canceled'],
+  ['PAYMENT_REFUNDED', 'refunded']
+]);
+
 /** Reais como o gateway manda (número JSON) para centavos inteiros. */
 function paraCentavos(valor) {
   const numero = Number(valor);
@@ -64,8 +74,13 @@ export class AsaasBillingProvider extends BillingProvider {
    * chave?"). Juntá-las faria um deploy sem chave parecer um provider que não
    * emite, e o job não teria como dizer qual dos dois problemas contar.
    */
-  isConfigured() {
-    return Boolean(apiKey());
+  async isConfigured() {
+    // Assíncrona desde que a chave pode vir do console, e não só do `.env`:
+    // saber se ela existe passou a ser uma leitura (com cache) na caixa da
+    // plataforma. Quem pergunta precisa do `await` — um `if (!isConfigured())`
+    // sem ele testaria uma Promise, que é sempre verdadeira, e o job trataria
+    // um deploy sem chave como configurado.
+    return Boolean(await apiKey());
   }
 
   /**
@@ -123,6 +138,52 @@ export class AsaasBillingProvider extends BillingProvider {
       // A nossa própria referência, quando fomos nós que criamos a cobrança.
       // Preferida sobre a de cima: ela é escrita por este painel e não depende
       // de o cadastro do cliente no gateway estar ligado ao provedor certo.
+      reference: pagamento.externalReference ? String(pagamento.externalReference) : null
+    };
+  }
+
+  /**
+   * O resto do ciclo de vida de uma cobrança: o que acontece com ela quando
+   * NÃO entra dinheiro.
+   *
+   * Separado de `interpretar` de propósito, e não um `kind` a mais no mesmo
+   * retorno: aquele é o caminho que CREDITA, e cada evento que ele aceita é um
+   * período dado a alguém. Misturar aqui eventos que só mudam a etiqueta da
+   * cobrança obrigaria quem lê o crédito a conferir o `kind` antes de creditar
+   * — e o esquecimento dessa conferência creditaria um estorno.
+   *
+   * Os três eventos, e o estado do painel que cada um vira:
+   *
+   * - `PAYMENT_OVERDUE` → `overdue`: venceu e ninguém pagou. Continua em aberto
+   *   — o link de pagamento continua valendo e o aviso de vencimento continua o
+   *   mandando —, só que agora com o nome certo.
+   * - `PAYMENT_DELETED` → `canceled`: alguém removeu a cobrança no painel do
+   *   gateway. É o mesmo `canceled` do console e da faxina de períodos velhos.
+   * - `PAYMENT_REFUNDED` → `refunded`: o dinheiro voltou para quem pagou. O
+   *   período que ele comprou NÃO é desfeito aqui — ver o controlador.
+   *
+   * Mesma direção de falha de `interpretar`: um campo que muda de nome devolve
+   * nulo, e nulo é "não faço nada".
+   *
+   * @returns {{event: string, status: string, externalId: string,
+   *            customerRef: string|null, reference: string|null}|null}
+   */
+  static interpretarCiclo(corpo) {
+    const evento = String(corpo?.event ?? '');
+    const status = EVENTOS_DO_CICLO.get(evento);
+    if (!status) return null;
+
+    const pagamento = corpo?.payment;
+    if (!pagamento || typeof pagamento !== 'object') return null;
+
+    const externalId = String(pagamento.id ?? '').trim();
+    if (!externalId) return null;
+
+    return {
+      event: evento,
+      status,
+      externalId,
+      customerRef: pagamento.customer ? String(pagamento.customer) : null,
       reference: pagamento.externalReference ? String(pagamento.externalReference) : null
     };
   }
