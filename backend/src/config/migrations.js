@@ -177,6 +177,20 @@ const VENDOR_CATALOGUE_TABLES = ['vendors', 'wifi_security_config'];
 // and each is referenced by exactly one place per table so the initial schema
 // and the later upgrade steps can never drift apart.
 
+/**
+ * Os provedores que têm `admin` e nenhum `owner` — os que a 0065 promove.
+ * Lido direto das tabelas: a migração roda antes de qualquer contexto de
+ * provedor existir.
+ */
+async function semDonoComAdmin(db) {
+  const comDono = db('tenant_users').where({ role: 'owner' }).select('tenant_id');
+  const linhas = await db('tenant_users')
+    .where({ role: 'admin' })
+    .whereNotIn('tenant_id', comDono)
+    .distinct('tenant_id');
+  return linhas.map((linha) => linha.tenant_id).sort((a, b) => a - b);
+}
+
 const tenantUsersTable = (db) => (t) => {
   t.increments('id').primary();
   t.integer('tenant_id').unsigned().notNullable()
@@ -1468,6 +1482,57 @@ const userRecoveryCodesTable = (db) => (t) => {
   t.index(['user_id']);
 };
 
+/**
+ * Uma queda em massa vista pelo alerta `mass_outage` — um nó do mapa (ODP,
+ * ODC, OLT) com ONTs demais offline ao mesmo tempo — e quem ela atingiu.
+ *
+ * O alerta avisa a equipe e esquece; o incidente é o que sobra para avisar o
+ * CLIENTE: a lista dos aparelhos, o que foi dito a quem e quando, e se o
+ * "normalizado" já saiu. `outage_incident_devices` guarda o telefone do
+ * momento do aviso, para o "normalizado" ir a quem recebeu o aviso mesmo que
+ * o cadastro mude no meio.
+ */
+const outageIncidentsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.string('node_id', 255).notNullable();
+  t.string('node_name', 255);
+  t.string('status', 16).notNullable().defaultTo('open');
+  t.timestamp('started_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('resolved_at').nullable();
+  t.string('eta_text', 255).nullable();
+  t.text('notice_body').nullable();
+  t.timestamp('notice_sent_at').nullable();
+  t.integer('notice_sent_by').nullable();
+  t.timestamp('recovery_sent_at').nullable();
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
+  t.index(['tenant_id', 'status'], 'outage_incidents_status_idx');
+};
+
+const outageIncidentDevicesTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.integer('incident_id').unsigned().notNullable()
+    .references('id').inTable('outage_incidents').onDelete('CASCADE');
+  t.string('device_id', 255).notNullable();
+  t.string('contract', 64).nullable();
+  t.string('client_name', 255).nullable();
+  t.string('phone_e164', 32).nullable();
+  t.timestamp('notified_at').nullable();
+  t.timestamp('recovered_at').nullable();
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['incident_id', 'device_id'], 'outage_incident_devices_uq');
+  t.index(['tenant_id', 'device_id'], 'outage_incident_devices_device_idx');
+};
+
+const OUTAGE_TABLES = [
+  ['outage_incidents', outageIncidentsTable],
+  ['outage_incident_devices', outageIncidentDevicesTable]
+];
+
 const MFA_TABLES = [
   ['user_recovery_codes', userRecoveryCodesTable]
 ];
@@ -1559,6 +1624,7 @@ export const SCHEMA_TABLES = [
   ...BILLING_TABLES,
   ...SGP_CONTACT_TABLES,
   ...MFA_TABLES,
+  ...OUTAGE_TABLES,
   ...GENIEACS_CONNECTION_TABLES
 ].map(([name]) => name);
 
@@ -3846,16 +3912,84 @@ export const migrations = [
   },
   {
     /**
+     * O provedor sem dono ganha dono: o administrador mais antigo.
+     *
+     * Até aqui o `/setup` criava o primeiro usuário como `admin`, e o provedor
+     * instalado assim nunca teve `owner` — o que só o dono decide ficava num
+     * remendo ("o admin governa onde não há owner"). Quem fez o `/setup` é o
+     * vínculo `admin` mais antigo do provedor, e é ele que vira dono.
+     *
+     * Uma pessoa por provedor, e só onde não há dono nenhum: provedor que já
+     * tem `owner` (cadastro público, console) não é tocado, e dois `admin`
+     * não viram dois donos. O `users.role` acompanha só quem trabalha apenas
+     * nesse provedor — a mesma regra de `applyRoleSideEffects`. A trilha do
+     * provedor registra a promoção, com o sistema como autor.
+     */
+    id: '0065_first_admin_becomes_owner',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenant_users'))) return true;
+      return (await semDonoComAdmin(db)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenant_users'))) return;
+      for (const tenantId of await semDonoComAdmin(db)) {
+        // eslint-disable-next-line no-await-in-loop -- um provedor por vez, cada um na sua transação
+        await db.transaction(async (trx) => {
+          const vinculo = await trx('tenant_users')
+            .where({ tenant_id: tenantId, role: 'admin' })
+            .orderBy([{ column: 'created_at', order: 'asc' }, { column: 'user_id', order: 'asc' }])
+            .first();
+          if (!vinculo) return;
+          await trx('tenant_users').where({ id: vinculo.id }).update({ role: 'owner', updated_at: new Date() });
+          const vinculos = await trx('tenant_users').where({ user_id: vinculo.user_id }).count({ n: '*' }).first();
+          if (Number(vinculos?.n || 0) <= 1) {
+            await trx('users').where({ id: vinculo.user_id }).update({ role: 'owner' });
+          }
+          if (await trx.schema.hasTable('audit_log')) {
+            const pessoa = await trx('users').where({ id: vinculo.user_id }).first('username');
+            await trx('audit_log').insert({
+              tenant_id: tenantId,
+              actor_user_id: null,
+              actor_username: null,
+              actor_kind: 'system',
+              action: 'operator.role_changed',
+              subject_type: 'tenant_user',
+              subject_id: String(vinculo.user_id),
+              detail: JSON.stringify({ username: pessoa?.username ?? null, from: 'admin', to: 'owner' })
+            });
+          }
+        });
+      }
+    }
+  },
+  {
+    /** Os incidentes de queda em massa — ver `outageIncidentsTable`. */
+    id: '0066_outage_incidents',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      return db.schema.hasTable('outage_incident_devices');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      for (const [nome, construtor] of OUTAGE_TABLES) {
+        // eslint-disable-next-line no-await-in-loop -- a segunda aponta para a primeira
+        await createTableIfMissing(db, nome, construtor(db));
+      }
+    }
+  },
+  {
+    /**
      * Como o painel chega ao GenieACS de cada provedor — ver
      * `tenantGenieAcsConnectionsTable`. Tabela nova e vazia: sem linha vale
      * `direct`, que é o que todos já faziam.
      */
-    id: '0066_tenant_genieacs_connections',
+    id: '0067_tenant_genieacs_connections',
     async isApplied(db) {
       return db.schema.hasTable('tenant_genieacs_connections');
     },
     async up(db) {
       for (const [nome, construtor] of GENIEACS_CONNECTION_TABLES) {
+        // eslint-disable-next-line no-await-in-loop -- uma tabela por vez
         await createTableIfMissing(db, nome, construtor(db));
       }
     }

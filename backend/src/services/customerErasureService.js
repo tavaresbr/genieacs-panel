@@ -103,7 +103,7 @@ class CustomerErasureService {
    */
   static async survey(account) {
     const alcance = await alcanceDoAssinante(account);
-    const { deviceIds, contratos, telefones, vinculos, contatos, conversaIds, nos } = alcance;
+    const { contratos, telefones, vinculos, contatos, conversaIds, eventos, amostras, horas, quedas, trocas, nos } = alcance;
 
     const contar = async (tabela, montar) => {
       const [linha] = await montar(tdb(tabela)).count({ n: '*' });
@@ -118,22 +118,13 @@ class CustomerErasureService {
       sgp_links: vinculos.length,
       sgp_contacts: contatos.length,
       sgp_clients: alcance.clientes.length,
-      sgp_events: (deviceIds.length || contratos.length)
-        ? await contar('sgp_events', (q) => q.where((w) => {
-          if (deviceIds.length) w.whereIn('device_id', deviceIds);
-          if (contratos.length) w.orWhereIn('contract', contratos);
-        }))
-        : 0,
-      device_samples: deviceIds.length
-        ? await contar('device_samples', (q) => q.whereIn('device_id', deviceIds))
-        : 0,
-      device_sample_hours: deviceIds.length
-        ? await contar('device_sample_hours', (q) => q.whereIn('device_id', deviceIds))
-        : 0,
-      device_swaps: await contar('device_swaps', (q) => q.where((w) => {
-        w.where({ account_id: account.id });
-        if (deviceIds.length) w.orWhereIn('device_id', deviceIds);
-      })),
+      // As linhas do aparelho já vêm recortadas pelo período em que ele foi
+      // desta conta: o que veio antes ou depois é de outro assinante.
+      sgp_events: eventos.length,
+      device_samples: amostras.length,
+      device_sample_hours: horas.length,
+      outage_incident_devices: quedas.length,
+      device_swaps: trocas.length,
       wa_conversations: conversaIds.length,
       wa_messages: conversaIds.length
         ? await contar('wa_messages', (q) => q.whereIn('conversation_id', conversaIds))
@@ -189,7 +180,8 @@ class CustomerErasureService {
    * que o que foi gravado na trilha seja o que vai ser executado.
    */
   static async erase(account, { alcance }) {
-    const { deviceIds, contratos, telefones, vinculos, contatos, conversaIds, noIds } = alcance;
+    const { contratos, telefones, vinculos, contatos, conversaIds, eventos, amostras, horas, quedas, trocas, noIds } = alcance;
+    const idsDe = (linhas) => linhas.map((l) => l.id);
     const marca = `erased:${account.id}`;
 
     await getDb().transaction(async (trx) => {
@@ -201,16 +193,17 @@ class CustomerErasureService {
         await tdb('wa_conversations', trx).whereIn('id', conversaIds).del();
       }
 
-      if (deviceIds.length || contratos.length) {
-        await tdb('sgp_events', trx).where((q) => {
-          if (deviceIds.length) q.whereIn('device_id', deviceIds);
-          if (contratos.length) q.orWhereIn('contract', contratos);
-        }).del();
-      }
-
-      if (deviceIds.length) {
-        await tdb('device_samples', trx).whereIn('device_id', deviceIds).del();
-        await tdb('device_sample_hours', trx).whereIn('device_id', deviceIds).del();
+      // Por id, e não por device: as linhas são as que o levantamento recortou
+      // pelo período de posse, e apagar pelo aparelho levaria junto a história
+      // de quem teve a ONT antes ou depois.
+      for (const [tabela, linhas] of [
+        ['sgp_events', eventos], ['device_samples', amostras], ['device_sample_hours', horas],
+        // Quem uma queda atingiu leva nome e telefone: sai junto.
+        ['outage_incident_devices', quedas]
+      ]) {
+        for (let i = 0; i < linhas.length; i += 500) {
+          await tdb(tabela, trx).whereIn('id', idsDe(linhas.slice(i, i + 500))).del();
+        }
       }
 
       // A partir daqui a linha fica e a pessoa sai dela.
@@ -240,10 +233,10 @@ class CustomerErasureService {
       // `customer_id` permanece: é sintético, gerado pelo painel, e é a única
       // costura entre esta linha e as linhas de trilha que falam dela. Sem ele,
       // a trilha passa a apontar para um id que não diz nada a ninguém.
-      await tdb('device_swaps', trx).where((q) => {
-        q.where({ account_id: account.id });
-        if (deviceIds.length) q.orWhereIn('device_id', deviceIds);
-      }).update({ pppoe_username: null, updated_at: new Date() });
+      if (trocas.length) {
+        await tdb('device_swaps', trx).whereIn('id', idsDe(trocas))
+          .update({ pppoe_username: null, updated_at: new Date() });
+      }
 
       if (telefones.length || contratos.length) {
         // `phone_e164` e `rendered_body` são NOT NULL — string vazia, e não

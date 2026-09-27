@@ -260,6 +260,15 @@ class UsersController {
           createErrorResponse(req.t('users.ownerOnly'))
         );
       }
+      // Quem administra a plataforma entra no console com esta mesma senha.
+      // Deixar um provedor defini-la seria entregar a ele o console inteiro —
+      // todos os provedores, personificação, cobrança. A mesma regra do
+      // `resetMfa`, e também antes de qualquer escrita.
+      if (nextPassword !== undefined && await PlatformAdmin.has(id)) {
+        return res.status(409).json(
+          createErrorResponse(req.t('users.passwordPlatform'), null, 'password_platform')
+        );
+      }
 
       if (nextRole !== undefined) {
         if (!ROLES.includes(nextRole)) {
@@ -338,6 +347,12 @@ class UsersController {
         }
         // updatePassword also revokes the operator's existing sessions.
         await User.updatePassword(id, await bcrypt.hash(password, BCRYPT_ROUNDS));
+        await AuditLog.fromRequest(req, {
+          action: AuditLog.ACTIONS.OPERATOR_PASSWORD_SET,
+          subjectType: 'tenant_user',
+          subjectId: id,
+          detail: { username: user.username }
+        });
       }
 
       const updated = await User.findById(id);

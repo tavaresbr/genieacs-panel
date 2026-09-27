@@ -398,6 +398,9 @@ class DeviceService {
 
   static ONLINE_WINDOW_MS = 10 * 60 * 1000;
 
+  /** Past this, a silent ONT is equipment gone rather than an outage. */
+  static STALE_AFTER_MS = 3 * 24 * 60 * 60 * 1000;
+
   static DEVICE_PAGE_SIZE_DEFAULT = 25;
 
   static DEVICE_PAGE_SIZE_MAX = 100;
@@ -440,7 +443,7 @@ class DeviceService {
         ? Math.min(rawPageSize, this.DEVICE_PAGE_SIZE_MAX)
         : this.DEVICE_PAGE_SIZE_DEFAULT,
       search: String(query.search ?? '').trim().slice(0, this.DEVICE_SEARCH_MAX_LENGTH),
-      status: ['online', 'offline'].includes(rawStatus) ? rawStatus : 'all',
+      status: ['online', 'offline', 'stale'].includes(rawStatus) ? rawStatus : 'all',
       focus: this.DEVICE_FOCUS_FILTERS.includes(rawFocus) ? rawFocus : 'all'
     };
   }
@@ -490,6 +493,12 @@ class DeviceService {
    * moves with wall-clock time, hence the cutoff is recomputed per request.
    */
   static buildDeviceStatusQuery(status, now = Date.now()) {
+    // `stale`: silent long enough that it is no outage but equipment gone —
+    // swapped, unplugged for good, or taken away. Same window as the SGP
+    // overview's "active contract, ONT silent" list.
+    if (status === 'stale') {
+      return { _lastInform: { $lt: new Date(now - this.STALE_AFTER_MS).toISOString() } };
+    }
     if (status !== 'online' && status !== 'offline') return null;
     const cutoff = new Date(now - this.ONLINE_WINDOW_MS).toISOString();
     return status === 'online'

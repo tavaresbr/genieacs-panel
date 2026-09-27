@@ -149,7 +149,8 @@ const POR_ID = new Map([
   ['PUT /api/platform/tenants/:id/genieacs', 'plano de controle; prova em platform-managed-settings.test.js — inclusive a de que gravar no alfa não toca o beta'],
   ['POST /api/platform/tenants/:id/genieacs/test', 'plano de controle; prova em platform-managed-settings.test.js'],
   ['POST /api/platform/tenants/:id/genieacs/tag-devices', 'plano de controle; prova em shared-acs-scope.test.js — marca só o que não tem dono, nunca o de outro provedor'],
-  ['GET /api/platform/tenants/:id/export', 'plano de controle; prova em platform-tenant-export.test.js — inclusive a de que o arquivo de um não traz linha do outro']
+  ['GET /api/platform/tenants/:id/export', 'plano de controle; prova em platform-tenant-export.test.js — inclusive a de que o arquivo de um não traz linha do outro'],
+  ['POST /api/platform/tenants/:id/gateway/asaas-customer', 'plano de controle; prova em platform-integrations.test.js — inclusive o 404 da caixa da plataforma e de quem não existe']
 ]);
 
 // Todo caso da varredura entra aqui sozinho: a lista dela é a fonte, e repetir
@@ -312,7 +313,13 @@ describe('toda rota endereçada por um parâmetro', () => {
   // `members/:userId`: a prova de que o id de outro provedor responde 404 está
   // em platform-member-edit.test.js.
   // São 51.
-  const TETO_DE_EXCECOES = 51;
+  //
+  // E `POST /tenants/:id/gateway/asaas-customer`: o console criando o provedor
+  // como cliente na conta Asaas da plataforma. O id é de provedor visto de
+  // cima, pelo mesmo pedágio — uma linha em `DO_CONSOLE` e mais uma aqui. A
+  // prova (404 para a caixa e para quem não existe, 409 para quem já está
+  // ligado) está em platform-integrations.test.js. São 52.
+  const TETO_DE_EXCECOES = 52;
 
 
   /**
@@ -349,7 +356,8 @@ describe('toda rota endereçada por um parâmetro', () => {
     'GET /api/platform/tenants/:id/genieacs',
     'PUT /api/platform/tenants/:id/genieacs',
     'POST /api/platform/tenants/:id/genieacs/test',
-    'POST /api/platform/tenants/:id/genieacs/tag-devices'
+    'POST /api/platform/tenants/:id/genieacs/tag-devices',
+    'POST /api/platform/tenants/:id/gateway/asaas-customer'
   ]);
 
   // Este é o número que guarda o que a varredura existe para guardar, e ELE só

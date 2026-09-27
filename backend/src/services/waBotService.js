@@ -3,6 +3,8 @@ import SgpService from './sgpService.js';
 import WaConversationService from './waConversationService.js';
 import WaSendService from './waSendService.js';
 import WhatsAppConfigService from './whatsappConfigService.js';
+import WaBotConfigService from './waBotConfigService.js';
+import OutageIncidentService from './outageIncidentService.js';
 import AuditLog from '../models/AuditLog.js';
 import { tdb } from '../config/database.js';
 import { DEFAULT_LOCALE, translate } from '../i18n/index.js';
@@ -299,7 +301,7 @@ async function responderFatura(link) {
   // invoice because a dunning message has nothing to charge for. Here the
   // customer ASKED, and "you have one due on the 10th" is the answer.
   const { fatura } = maisAntigaEmAberto(invoices, new Date(), true);
-  if (!fatura) return t('whatsapp.bot.noOpenInvoice');
+  if (!fatura) return WaBotConfigService.message('noOpenInvoice');
 
   const linhas = [t('whatsapp.bot.invoice', {
     amount: comoReal(fatura.amount),
@@ -344,6 +346,21 @@ async function responderSinal(link) {
   return t('whatsapp.bot.signalOk', { rxPower });
 }
 
+/**
+ * O aparelho está numa queda em massa aberta? Então a resposta é a queda —
+ * "é na sua região, estamos resolvendo" — e não "seu equipamento não está
+ * respondendo", que manda o assinante reiniciar o roteador à toa. Quem
+ * perguntou passa a contar como avisado e recebe o "normalizado" no fim.
+ */
+async function responderQueda(link, conversation) {
+  const incidente = await OutageIncidentService.openForDevice(link.device_id);
+  if (!incidente) return null;
+  await OutageIncidentService.markAsked(incidente.affected_id, conversation?.wa_phone_e164);
+  const linhas = [t('whatsapp.bot.outage', { node: incidente.node_name || incidente.node_id })];
+  if (incidente.eta_text) linhas.push(t('whatsapp.outage.eta', { eta: incidente.eta_text }));
+  return linhas.join('\n');
+}
+
 /** The portal link, or nothing when the panel does not know its own address. */
 async function responderPortal() {
   const portal = await linkDoPortal();
@@ -363,18 +380,42 @@ async function contratoBloqueado(contract) {
   return /suspen|bloque/.test(normalizarTexto(`${alvo.status || ''} ${alvo.statusLabel || ''}`));
 }
 
-/** O menu, com a opção 4 só quando o provedor ligou a liberação e o contrato está bloqueado. */
+/**
+ * O menu, montado: a saudação (a do provedor, ou a padrão) e uma linha por
+ * opção ligada na aba Chatbot. Os números são fixos — 1 fatura, 2 conexão,
+ * 3 atendente, 4 liberação —, então uma opção desligada deixa um buraco na
+ * contagem em vez de trocar o que "2" quer dizer para quem já decorou.
+ *
+ * A 4 só aparece com a liberação ligada e o contrato bloqueado.
+ */
 async function menuPara(link) {
+  const { options } = await WaBotConfigService.getConfig();
+  const linhas = [];
+  if (options.invoice) linhas.push(t('whatsapp.bot.menuOptionInvoice'));
+  if (options.signal) linhas.push(t('whatsapp.bot.menuOptionSignal'));
+  if (options.human) linhas.push(t('whatsapp.bot.menuOptionHuman'));
+
   const { botUnlockEnabled } = await WhatsAppConfigService.getConfig();
   if (botUnlockEnabled && link?.contract) {
     try {
-      if (await contratoBloqueado(link.contract)) return t('whatsapp.bot.menuWithUnlock');
+      if (await contratoBloqueado(link.contract)) linhas.push(t('whatsapp.bot.menuOptionUnlock'));
     } catch (error) {
       // SGP fora: o menu sem a opção 4 ainda é um menu que funciona.
       console.warn('waBot menu:', error?.message || error);
     }
   }
-  return t('whatsapp.bot.menu');
+  const saudacao = await WaBotConfigService.message('greeting');
+  return linhas.length ? `${saudacao}\n\n${linhas.join('\n')}` : saudacao;
+}
+
+/**
+ * A passagem para um humano, dita conforme o relógio: fora do horário de
+ * atendimento da aba Chatbot, o assinante fica sabendo que a resposta vem no
+ * próximo expediente, e não "em instantes".
+ */
+async function textoDePassagem(chave) {
+  if (!(await WaBotConfigService.withinHours())) return WaBotConfigService.message('outsideHours');
+  return WaBotConfigService.message(chave);
 }
 
 /**
@@ -576,7 +617,7 @@ class WaBotService {
         const escolhendo = passoAtivo(atual) === PASSO_ESCOLHA && /^\s*\d/.test(texto);
         if (intencao === 'atendente' && !escolhendo) {
           await this.pausar(conversation, new Date(Date.now() + PAUSA_ATENDENTE_MS));
-          await this.responderCom(conversation, t('whatsapp.bot.handoffQueued'));
+          await this.responderCom(conversation, await textoDePassagem('handoffQueued'));
           return { replied: true, intent: 'atendente' };
         }
         try {
@@ -585,7 +626,7 @@ class WaBotService {
           // SGP fora do ar no meio da identificação: um atendente, e não o
           // silêncio de quem mandou o CPF e não ouviu nada.
           console.error('waBot identificar:', error?.message || error);
-          await this.responderCom(conversation, t('whatsapp.bot.handoff'));
+          await this.responderCom(conversation, await textoDePassagem('handoff'));
           return { replied: true, intent: 'handoff', from: 'identificar' };
         }
       }
@@ -597,8 +638,21 @@ class WaBotService {
     }
     if (intencao === 'atendente') {
       await this.pausar(conversation, new Date(Date.now() + PAUSA_ATENDENTE_MS));
-      await this.responderCom(conversation, t('whatsapp.bot.handoffQueued'));
+      await this.responderCom(conversation, await textoDePassagem('handoffQueued'));
       return { replied: true, intent: 'atendente' };
+    }
+
+    // Uma opção que o provedor desligou na aba Chatbot responde com o menu —
+    // que já não a mostra. "Atendente" nunca é desligado de verdade: esconder
+    // a linha 3 não pode prender o assinante numa conversa com o robô.
+    const { options } = await WaBotConfigService.getConfig();
+    const { botUnlockEnabled } = await WhatsAppConfigService.getConfig();
+    const desligada = (intencao === 'fatura' && !options.invoice)
+      || (intencao === 'sinal' && !options.signal)
+      || (intencao === 'liberar' && !botUnlockEnabled && !options.invoice);
+    if (desligada) {
+      await this.responderCom(conversation, await menuPara(link));
+      return { replied: true, intent: 'menu', from: intencao };
     }
 
     let resposta = null;
@@ -606,7 +660,9 @@ class WaBotService {
       if (intencao === 'portal') resposta = await responderPortal();
       else if (intencao === 'fatura') resposta = await responderFatura(link);
       else if (intencao === 'sinal') {
-        resposta = link.device_id ? await responderSinal(link) : t('whatsapp.bot.noDevice');
+        resposta = link.device_id
+          ? (await responderQueda(link, conversation)) || await responderSinal(link)
+          : t('whatsapp.bot.noDevice');
       } else if (intencao === 'liberar') resposta = await responderLiberacao(link, conversation);
     } catch (error) {
       // SGP down, GenieACS unreachable, a contract the ERP no longer knows: the
@@ -617,7 +673,7 @@ class WaBotService {
     }
 
     if (!resposta) {
-      await this.responderCom(conversation, t('whatsapp.bot.handoff'));
+      await this.responderCom(conversation, await textoDePassagem('handoff'));
       return { replied: true, intent: 'handoff', from: intencao };
     }
 
@@ -642,8 +698,9 @@ class WaBotService {
   static async identificar(conversation, texto) {
     const sgp = await SgpService.getConfig();
     // Sem SGP não há onde conferir um documento: o comportamento da etapa 1.
-    if (!SgpService.isReady(sgp)) {
-      await this.responderCom(conversation, t('whatsapp.bot.notRecognised'));
+    const { options } = await WaBotConfigService.getConfig();
+    if (!SgpService.isReady(sgp) || !options.document) {
+      await this.responderCom(conversation, await WaBotConfigService.message('notRecognised'));
       return { replied: true, intent: 'notRecognised' };
     }
 
@@ -666,7 +723,7 @@ class WaBotService {
     }
 
     await this.gravarPasso(conversation, { bot_step: PASSO_DOCUMENTO, bot_step_data: null, bot_step_at: new Date() });
-    await this.responderCom(conversation, t('whatsapp.bot.askDocument'));
+    await this.responderCom(conversation, await WaBotConfigService.message('askDocument'));
     return { replied: true, intent: 'askDocument' };
   }
 

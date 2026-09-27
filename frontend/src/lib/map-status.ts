@@ -12,10 +12,22 @@ export interface LiveItem {
   lastInform: string | null
 }
 
+/** Caixa com vários clientes offline ao mesmo tempo — provável rompimento. */
+export interface LiveOutage {
+  node_id: string
+  name: string
+  count: number
+  total: number
+  /** Último sinal do primeiro cliente a cair: a melhor estimativa de quando rompeu. */
+  since: string | null
+  clients: string[]
+}
+
 export interface LiveStatus {
   generatedAt: string
   items: LiveItem[]
   summary: Record<LiveState, number>
+  outages?: LiveOutage[]
 }
 
 export const LIVE_STATES: LiveState[] = ['online', 'weak', 'offline', 'unknown']

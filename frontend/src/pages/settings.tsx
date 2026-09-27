@@ -56,6 +56,7 @@ const PLATFORM_MANAGED_KEYS = new Set<string>(['genieAcsUrl', ...Object.keys(INS
 import type { Vendor as VendorType, WifiSecurityConfig as WifiSecurityConfigType } from '@/types'
 import { MfaCard } from '@/components/mfa-card'
 import { AboutTab } from '@/components/settings/about-tab'
+import { ChatbotTab } from '@/components/settings/chatbot-tab'
 import { MfaPolicyCard } from '@/components/mfa-policy-card'
 import { canOfferMfaReset, canOfferPasswordReset } from '@/lib/mfa-enrollment'
 
@@ -91,7 +92,7 @@ const GENIE_SECRET_STATE_BADGES: Record<GenieSecretState, string> = {
 /** The tabs `?tab=` may open. */
 const SETTINGS_TABS = [
   'provider', 'general', 'virtual-params', 'customer-portal', 'sgp', 'provisioning',
-  'whatsapp', 'security', 'vendors', 'wifi-security', 'database', 'about'
+  'whatsapp', 'chatbot', 'security', 'vendors', 'wifi-security', 'database', 'about'
 ]
 
 // Botão só de ícone nas listas: 40px de alvo abaixo do desktop, onde o toque
@@ -244,8 +245,6 @@ export default function Settings() {
     enabled: false,
     webhookBaseUrl: '',
     portalPublicUrl: '',
-    botEnabled: true,
-    botUnlockEnabled: false,
     allowedHosts: '',
     managedUrl: '',
     managedAdminKey: '',
@@ -411,8 +410,6 @@ export default function Settings() {
         enabled: config.enabled,
         webhookBaseUrl: config.webhookBaseUrl,
         portalPublicUrl: config.portalPublicUrl,
-        botEnabled: config.botEnabled !== false,
-        botUnlockEnabled: config.botUnlockEnabled === true,
         allowedHosts: config.allowedHosts.join('\n'),
         managedUrl: config.managedUrl,
         // The stored admin key never leaves the server; an empty field keeps it.
@@ -559,8 +556,6 @@ export default function Settings() {
         enabled: waForm.enabled,
         webhookBaseUrl: waForm.webhookBaseUrl,
         portalPublicUrl: waForm.portalPublicUrl,
-        botEnabled: waForm.botEnabled,
-        botUnlockEnabled: waForm.botUnlockEnabled,
         // The API takes the textarea verbatim, one host per line.
         allowedHosts: waForm.allowedHosts,
         managedUrl: waForm.managedUrl,
@@ -1458,7 +1453,7 @@ export default function Settings() {
           <option key={role} value={role}>{t(ROLE_LABEL_KEYS[role])}</option>
         ))}
       </select>
-      <p className="field-hint max-w-xs">
+      <p className="field-hint max-w-[15rem]">
         {lockedByOwner
           ? t('settings.operators.ownerLocked')
           : t(ROLE_SUMMARY_KEYS[operator.role])}
@@ -1710,6 +1705,17 @@ export default function Settings() {
                   mean editing five files another agent owns. */}
               {t('sidebar.nav.whatsapp')}
             </button>
+            {can('whatsapp.config') && (
+              <button
+                onClick={() => setActiveTab('chatbot')}
+                className="tab-button"
+                data-active={activeTab === 'chatbot'}
+                role="tab"
+                aria-selected={activeTab === 'chatbot'}
+              >
+                {t('settings.tab.chatbot')}
+              </button>
+            )}
             <button
               onClick={() => setActiveTab('security')}
               className="tab-button"
@@ -2416,12 +2422,13 @@ export default function Settings() {
                 </button>
                 {sgpSyncSummary ? (
                   <>
-                    <dl className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+                    <dl className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-7">
                       {([
                         ['settings.sgp.syncTotal', sgpSyncSummary.total],
                         ['settings.sgp.syncLinked', sgpSyncSummary.linked],
                         ['settings.sgp.syncCreated', sgpSyncSummary.created],
                         ['settings.sgp.syncUpdated', sgpSyncSummary.updated],
+                        ['settings.sgp.syncRelinked', sgpSyncSummary.relinked ?? 0],
                         ['settings.sgp.syncSkipped', sgpSyncSummary.skipped],
                         ['settings.sgp.syncFailedCount', sgpSyncSummary.failed]
                       ] as const).map(([labelKey, value]) => (
@@ -2534,37 +2541,6 @@ export default function Settings() {
                 <p className="field-hint">{t('settings.whatsapp.portalUrlHint')}</p>
               </div>
 
-              <div className="rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-4">
-                <label className="flex cursor-pointer items-start gap-3">
-                  <input
-                    type="checkbox"
-                    className="mt-1 h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
-                    checked={waForm.botEnabled}
-                    onChange={(event) => setWaForm((current) => ({ ...current, botEnabled: event.target.checked }))}
-                  />
-                  <span>
-                    <span className="block font-semibold">{t('settings.whatsapp.botEnabled')}</span>
-                    <span className="mt-1 block text-sm leading-6 text-muted-foreground">
-                      {t('settings.whatsapp.botEnabledHint')}
-                    </span>
-                  </span>
-                </label>
-                <label className={`mt-4 flex items-start gap-3 border-t border-border pt-4 ${waForm.botEnabled ? 'cursor-pointer' : 'opacity-60'}`}>
-                  <input
-                    type="checkbox"
-                    className="mt-1 h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
-                    checked={waForm.botUnlockEnabled}
-                    disabled={!waForm.botEnabled}
-                    onChange={(event) => setWaForm((current) => ({ ...current, botUnlockEnabled: event.target.checked }))}
-                  />
-                  <span>
-                    <span className="block font-semibold">{t('settings.whatsapp.botUnlockEnabled')}</span>
-                    <span className="mt-1 block text-sm leading-6 text-muted-foreground">
-                      {t('settings.whatsapp.botUnlockEnabledHint')}
-                    </span>
-                  </span>
-                </label>
-              </div>
 
               {!platformManaged && (
               <>
@@ -3182,29 +3158,28 @@ export default function Settings() {
                   <table className="modern-table">
                     <thead>
                       <tr>
-                        <th>{t('settings.operators.username')}</th>
-                        <th>{t('settings.operators.email')}</th>
+                        <th>{t('settings.operators.username')} · {t('settings.operators.email')}</th>
                         <th>{t('settings.operators.role')}</th>
                         <th>{t('settings.operators.createdAt')}</th>
-                        <th>{t('common.actions')}</th>
+                        <th className="text-end">{t('common.actions')}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {operatorsLoading ? (
                         <tr>
-                          <td colSpan={5} className="text-center py-8 text-muted-foreground">
+                          <td colSpan={4} className="text-center py-8 text-muted-foreground">
                             {t('settings.operators.loading')}
                           </td>
                         </tr>
                       ) : operatorsError !== null ? (
                         <tr>
-                          <td colSpan={5} className="text-center py-8 text-destructive">
+                          <td colSpan={4} className="text-center py-8 text-destructive">
                             {operatorsError || t('settings.operators.loadFailed')}
                           </td>
                         </tr>
                       ) : operators.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="text-center py-8 text-muted-foreground">
+                          <td colSpan={4} className="text-center py-8 text-muted-foreground">
                             {t('settings.operators.empty')}
                           </td>
                         </tr>
@@ -3219,32 +3194,34 @@ export default function Settings() {
                           return (
                             <Fragment key={operator.id}>
                               <tr>
-                                <td className="font-medium">
-                                  {operator.username}
-                                  {isSelf && (
-                                    <span className="modern-badge ms-2">{t('settings.operators.you')}</span>
-                                  )}
-                                  <span className={`${operator.mfaEnabled ? 'modern-badge-success' : 'modern-badge'} ms-2`}>
-                                    {operator.mfaEnabled ? t('settings.operators.mfaOn') : t('settings.operators.mfaOff')}
-                                  </span>
+                                <td className="min-w-0">
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    <span className="font-medium [overflow-wrap:anywhere]">{operator.username}</span>
+                                    {isSelf && (
+                                      <span className="modern-badge">{t('settings.operators.you')}</span>
+                                    )}
+                                    <span className={operator.mfaEnabled ? 'modern-badge-success' : 'modern-badge'}>
+                                      {operator.mfaEnabled ? t('settings.operators.mfaOn') : t('settings.operators.mfaOff')}
+                                    </span>
+                                  </div>
+                                  {/* Vazio é informação, e por isso não some
+                                      num travessão: uma conta sem endereço é uma
+                                      conta que `LOGIN_REQUIRES_EMAIL` trancaria
+                                      do lado de fora, e é aqui que se vê quem
+                                      ainda falta. */}
+                                  <div className="mt-1 text-sm">
+                                    {operator.email
+                                      ? <span className="text-muted-foreground [overflow-wrap:anywhere]">{operator.email}</span>
+                                      : <span className="modern-badge">{t('settings.operators.emailMissing')}</span>}
+                                  </div>
                                 </td>
-                                {/* Vazio é informação, e por isso não some
-                                    num travessão: uma conta sem endereço é uma
-                                    conta que `LOGIN_REQUIRES_EMAIL` trancaria
-                                    do lado de fora, e esta coluna é onde se vê
-                                    quem ainda falta. */}
-                                <td className="text-sm">
-                                  {operator.email
-                                    ? <span className="text-muted-foreground">{operator.email}</span>
-                                    : <span className="modern-badge">{t('settings.operators.emailMissing')}</span>}
-                                </td>
-                                <td>{renderOperatorRole(operator, lockedByOwner, 'w-40')}</td>
-                                <td className="text-sm text-muted-foreground">{formatDateTime(operator.createdAt)}</td>
-                                <td>{renderOperatorActions(operator, isSelf)}</td>
+                                <td className="w-56 xl:w-64">{renderOperatorRole(operator, lockedByOwner, 'w-full max-w-[15rem]')}</td>
+                                <td className="w-28 text-sm text-muted-foreground xl:w-auto xl:whitespace-nowrap">{formatDateTime(operator.createdAt)}</td>
+                                <td className="w-px"><div className="flex justify-end">{renderOperatorActions(operator, isSelf)}</div></td>
                               </tr>
                               {resetPasswordId === operator.id && (
                                 <tr>
-                                  <td colSpan={5}>{renderOperatorPasswordForm(operator, 'd')}</td>
+                                  <td colSpan={4}>{renderOperatorPasswordForm(operator, 'd')}</td>
                                 </tr>
                               )}
                             </Fragment>
@@ -3693,6 +3670,8 @@ export default function Settings() {
             </div>
           </div>
         )}
+
+        {activeTab === 'chatbot' && can('whatsapp.config') && <ChatbotTab />}
 
         {activeTab === 'about' && <AboutTab appName={tenantName} />}
 

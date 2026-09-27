@@ -340,7 +340,7 @@ describe('the last administrator of this provider', () => {
       headers: authHeaders(carolToken)
     });
     assert.equal(removal.status, 403);
-    assert.equal((await membershipOf(alfa, ownerId)).role, 'admin', 'the owner still runs alfa');
+    assert.equal((await membershipOf(alfa, ownerId)).role, 'owner', 'the owner still runs alfa');
 
     const demotion = await call(`${panelUrl}/api/users/${ownerId}`, {
       method: 'PATCH',
@@ -348,7 +348,7 @@ describe('the last administrator of this provider', () => {
       body: { role: 'viewer' }
     });
     assert.equal(demotion.status, 403, 'demoting the last administrator is the same loss');
-    assert.equal((await membershipOf(alfa, ownerId)).role, 'admin');
+    assert.equal((await membershipOf(alfa, ownerId)).role, 'owner');
 
     // And signed into beta, where she really is an administrator, alfa's owner
     // is not somebody she can reach either — answered as nonexistent rather
@@ -364,7 +364,7 @@ describe('the last administrator of this provider', () => {
       headers: authHeaders(atBeta.body.data.token)
     });
     assert.equal(acrossProviders.status, 404);
-    assert.equal((await membershipOf(alfa, ownerId)).role, 'admin');
+    assert.equal((await membershipOf(alfa, ownerId)).role, 'owner');
 
     assert.equal(
       Number((await getDb()('tenant_users').where({ tenant_id: beta, role: 'admin' }).count({ n: '*' }).first()).n),

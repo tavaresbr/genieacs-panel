@@ -52,6 +52,8 @@ class AuditLog {
     // tinha onde olhar.
     SUBSCRIBER_ACCOUNT_RETIRED: 'subscriber_account.retired',
     WHATSAPP_BOT_TRUST_UNLOCK: 'whatsapp.bot_trust_unlock',
+    // Os clientes de uma queda em massa foram avisados por WhatsApp.
+    OUTAGE_NOTIFIED: 'outage.notified',
     TENANT_EXPORTED: 'tenant.exported',
     // O cadastro fiscal do provedor mudou — razão social, CNPJ, endereço,
     // contato de cobrança. Registra QUAIS campos, nunca os valores: a trilha

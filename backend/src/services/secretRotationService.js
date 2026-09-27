@@ -145,6 +145,21 @@ const BLOBS = Object.freeze([
     chave: 'whatsapp_alert_settings',
     caminho: ['telegram', 'botToken'],
     contexto: 'skygenpanel-telegram-bot-v1'
+  },
+  {
+    // A conta da plataforma no Asaas, gravada pelo console na caixa da
+    // plataforma: a chave da API que CHAMA o gateway...
+    chave: 'asaas_gateway_config',
+    caminho: ['apiKey'],
+    contexto: 'skygenpanel-asaas-gateway-v1'
+  },
+  {
+    // ...e o token que o gateway devolve na entrega do webhook. O mesmo blob e,
+    // ao contrário do SGP acima, a MESMA caixa — os dois foram cifrados por ela
+    // (`asaasSettingsService`), e é essa caixa que tem de re-cifrar os dois.
+    chave: 'asaas_gateway_config',
+    caminho: ['webhookToken'],
+    contexto: 'skygenpanel-asaas-gateway-v1'
   }
 ]);
 

@@ -82,13 +82,17 @@ after(async () => {
 
 describe('a exigência', () => {
   it('começa desligada, contando quem ainda não ativou', async () => {
+    // Um provedor como os instalados antes da 0065: o `/setup` agora cria o
+    // dono, e este bloco precisa de um provedor sem nenhum `owner` para provar
+    // a metade da regra que ainda vale para eles.
+    await getDb()('tenant_users').where({ tenant_id: alfa, user_id: ids[DONO] }).update({ role: 'admin' });
     const { status, body } = await get('/api/tenant/security', tokens.gerente);
     assert.equal(status, 200, JSON.stringify(body));
     assert.deepEqual(body.data, { requireMfa: false, membersWithoutMfa: 4, canChange: true });
   });
 
-  // O `/setup` cria o primeiro operador como `admin`: sem esta metade da regra,
-  // ninguém numa instalação nova conseguiria ligar a exigência.
+  // Instalação sem dono (o caso acima): sem esta metade da regra, ninguém ali
+  // conseguiria ligar a exigência.
   it('num provedor sem nenhum owner, o admin decide', async () => {
     const { status, body } = await put('/api/tenant/security', { requireMfa: false }, tokens.gerente);
     assert.equal(status, 200, JSON.stringify(body));

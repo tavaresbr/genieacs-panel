@@ -101,6 +101,9 @@
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* viewport-fit=cover: com o celular deitado, o notch fica na lateral. */
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
 
   h1,
@@ -271,11 +274,22 @@
   }
 
   .modern-table th {
-    @apply sticky top-0 z-10 border-b border-border bg-[hsl(var(--surface-subtle))] px-4 py-3 text-left text-[0.68rem] font-bold uppercase tracking-[0.12em] text-muted-foreground;
+    @apply sticky top-0 z-10 border-b border-border bg-[hsl(var(--surface-subtle))] px-3 py-2.5 text-left text-[0.68rem] font-bold uppercase tracking-[0.12em] text-muted-foreground;
   }
 
   .modern-table td {
-    @apply border-b border-border/70 px-4 py-3.5 align-middle text-foreground;
+    @apply border-b border-border/70 px-3 py-2.5 align-middle text-foreground;
+  }
+
+  /* Abaixo de lg (tablet e celular deitado) as linhas ficam mais baixas. */
+  @media (min-width: 1024px) {
+    .modern-table th {
+      @apply px-4 py-3;
+    }
+
+    .modern-table td {
+      @apply px-4 py-3.5;
+    }
   }
 
   .modern-table tbody tr:last-child td {

@@ -15,6 +15,7 @@ import { buildDevice, startGenieAcsStub } from './helpers/genieacs-stub.js';
 const { default: WhatsAppConfigService } = await import('../src/services/whatsappConfigService.js');
 const { default: WhatsAppAccount } = await import('../src/models/WhatsAppAccount.js');
 const { default: WaBotService } = await import('../src/services/waBotService.js');
+const { default: WaBotConfigService } = await import('../src/services/waBotConfigService.js');
 
 const INSTANCE = 'painel-bot';
 const INSTANCE_TOKEN = 'token-instancia-bot';
@@ -969,6 +970,110 @@ describe('etapa 2: liberação em confiança pelo bot', () => {
     } finally {
       liberacaoRecusada = false;
       await ligar(false);
+    }
+  });
+});
+
+describe('a aba Chatbot', () => {
+  const ultima = async (telefone) => (await respostas(telefone)).at(-1);
+  const aberto = [0, 1, 2, 3, 4, 5, 6].map((day) => ({ day, closed: false, open: '00:00', close: '23:59' }));
+  const fechado = [0, 1, 2, 3, 4, 5, 6].map((day) => ({ day, closed: true, open: '08:00', close: '18:00' }));
+  const restaurar = () => asTenant(() => WaBotConfigService.saveConfig({
+    options: { invoice: true, signal: true, human: true, document: true },
+    messages: { greeting: '', askDocument: '', handoffQueued: '', handoff: '', notRecognised: '', noOpenInvoice: '', outsideHours: '' },
+    hours: { enabled: false, week: aberto }
+  }));
+
+  it('lê os padrões e grava pela rota, recusando horário inválido', async () => {
+    const lido = await call(`${panelUrl}/api/whatsapp/bot-config`, { headers: authHeaders(token) });
+    assert.equal(lido.status, 200, JSON.stringify(lido.body));
+    assert.equal(lido.body.data.enabled, true);
+    assert.equal(lido.body.data.options.invoice, true);
+    assert.match(lido.body.data.defaults.greeting, /atendimento automático/);
+
+    const ruim = await call(`${panelUrl}/api/whatsapp/bot-config`, {
+      method: 'PUT',
+      headers: authHeaders(token),
+      body: { hours: { enabled: true, week: [{ day: 1, closed: false, open: '18:00', close: '08:00' }] } }
+    });
+    assert.equal(ruim.status, 400);
+
+    const fuso = await call(`${panelUrl}/api/whatsapp/bot-config`, {
+      method: 'PUT', headers: authHeaders(token), body: { hours: { timezone: 'Marte/Olimpo' } }
+    });
+    assert.equal(fuso.status, 400);
+
+    const ok = await call(`${panelUrl}/api/whatsapp/bot-config`, {
+      method: 'PUT', headers: authHeaders(token), body: { messages: { greeting: 'Oi! Aqui é a Tavares.' } }
+    });
+    assert.equal(ok.status, 200, JSON.stringify(ok.body));
+    assert.equal(ok.body.data.messages.greeting, 'Oi! Aqui é a Tavares.');
+    await restaurar();
+  });
+
+  it('a saudação personalizada abre o menu, e vazia volta à padrão', async () => {
+    await asTenant(() => WaBotConfigService.saveConfig({ messages: { greeting: 'Oi! Aqui é a Tavares.' } }));
+    try {
+      const texto = await unicaResposta(ASSINANTE, 'oi');
+      assert.match(texto, /^Oi! Aqui é a Tavares\./);
+      assert.match(texto, /1 — 2ª via/);
+    } finally {
+      await restaurar();
+    }
+    assert.match(await unicaResposta(ASSINANTE, 'oi'), /^Olá! Sou o atendimento automático/);
+  });
+
+  it('uma opção desligada some do menu, e pedi-la traz o menu', async () => {
+    await asTenant(() => WaBotConfigService.saveConfig({ options: { invoice: false } }));
+    try {
+      const menu = await unicaResposta(ASSINANTE, 'menu');
+      assert.ok(!menu.includes('1 —'), 'a opção desligada apareceu no menu');
+      assert.match(menu, /2 — Situação da conexão/);
+      const pedido = await unicaResposta(ASSINANTE, 'segunda via do boleto');
+      assert.ok(!pedido.includes(LINHA_DIGITAVEL), 'a fatura saiu com a opção desligada');
+      assert.match(pedido, /2 — Situação da conexão/);
+    } finally {
+      await restaurar();
+    }
+  });
+
+  it('sem a identificação por CPF, o número desconhecido volta ao aviso da etapa 1', async () => {
+    await asTenant(() => WaBotConfigService.saveConfig({ options: { document: false } }));
+    try {
+      const texto = await unicaResposta(DESCONHECIDO, 'oi');
+      assert.ok(!/CPF ou CNPJ/.test(texto), 'pediu o documento com a identificação desligada');
+      assert.match(texto, /contrato para este número/);
+    } finally {
+      await restaurar();
+    }
+  });
+
+  it('fora do horário, o pedido de atendente recebe o aviso de fora do expediente', async () => {
+    await asTenant(() => WaBotConfigService.saveConfig({ hours: { enabled: true, week: fechado } }));
+    try {
+      const fora = await unicaResposta(ASSINANTE, 'quero falar com um atendente');
+      assert.match(fora, /fora do horário/);
+    } finally {
+      await restaurar();
+    }
+    await asTenant(() => WaBotConfigService.saveConfig({ hours: { enabled: true, week: aberto } }));
+    try {
+      const dentro = await unicaResposta(ASSINANTE, 'quero falar com um atendente');
+      assert.match(dentro, /Um atendente vai te responder/);
+    } finally {
+      await restaurar();
+    }
+  });
+
+  it('o texto personalizado de fora do horário é o que sai', async () => {
+    await asTenant(() => WaBotConfigService.saveConfig({
+      hours: { enabled: true, week: fechado },
+      messages: { outsideHours: 'Atendemos de seg a sex, 8h às 18h.' }
+    }));
+    try {
+      assert.equal(await unicaResposta(ASSINANTE, 'atendente'), 'Atendemos de seg a sex, 8h às 18h.');
+    } finally {
+      await restaurar();
     }
   });
 });

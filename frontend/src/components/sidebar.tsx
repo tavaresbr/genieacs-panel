@@ -100,7 +100,7 @@ export default function Sidebar() {
 
   return (
     <>
-      <header className="fixed inset-x-0 top-0 z-[1200] flex h-16 items-center justify-between border-b border-border bg-card px-4 lg:hidden">
+      <header className="fixed inset-x-0 top-0 z-[1200] flex h-16 items-center justify-between border-b border-border bg-card pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] lg:hidden">
         <Link to="/dashboard" className="flex min-w-0 items-center gap-2.5" aria-label={t('sidebar.operationsAria')}>
           <BrandMark className="size-8 shrink-0" />
           <div className="min-w-0">
@@ -127,7 +127,7 @@ export default function Sidebar() {
             onClick={() => setIsMobileOpen(false)}
             aria-label={t('sidebar.closeNavigation')}
           />
-          <aside className="relative flex h-full w-[min(86vw,19rem)] flex-col overscroll-contain bg-[#18211d] pb-[env(safe-area-inset-bottom)] text-[#f4f3ed] shadow-2xl">
+          <aside className="relative flex h-full w-[min(86vw,19rem)] flex-col overscroll-contain bg-[#18211d] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] text-[#f4f3ed] shadow-2xl">
             <SidebarContent isCollapsed={false} isActive={isActive} closeMobile={() => setIsMobileOpen(false)} />
           </aside>
         </div>

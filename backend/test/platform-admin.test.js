@@ -204,7 +204,7 @@ describe('a self-hosted install', () => {
 
   it('creates the first administrator and puts nobody on the roster', () => {
     assert.equal(ran.setup.status, 201);
-    assert.equal(ran.setup.body.data.user.role, 'admin');
+    assert.equal(ran.setup.body.data.user.role, 'owner');
     assert.deepEqual(ran.rosterAfterSetup, [],
       'a self-hosted install was handed a control plane it does not have');
   });
@@ -257,7 +257,7 @@ describe('setup on a hosted install', () => {
 describe('the guard', () => {
   before(async () => {
     plataformaToken = (await signIn(PLATAFORMA)).body.data.token;
-    await hire(DONA, 'admin', plataformaToken);
+    await hire(DONA, 'owner', plataformaToken);
     await hire(PROMOVIDA, 'admin', plataformaToken);
     donaToken = (await signIn(DONA)).body.data.token;
     promovidaToken = (await signIn(PROMOVIDA)).body.data.token;
@@ -269,12 +269,13 @@ describe('the guard', () => {
     assert.equal(Number(body.data.userId), Number(idOf.plataforma));
   });
 
-  // The claim the whole second roster exists to make. Dona is an administrator:
-  // she creates operators, changes the ACS address and reads every device at
-  // her ISP. None of that is authority over the deployment that hosts her.
+  // The claim the whole second roster exists to make. Dona is her provider's
+  // owner — the top role there: she creates operators, changes the ACS address
+  // and reads every device at her ISP. None of that is authority over the
+  // deployment that hosts her.
   it('refuses a provider\'s own administrator', async () => {
     const { status } = await reachControlPlane(donaToken);
-    assert.equal(status, 404, 'being admin at a provider reached the control plane');
+    assert.equal(status, 404, 'being owner at a provider reached the control plane');
 
     // And her token is a perfectly good session — it is the privilege that is
     // missing, not the login. Without this the assertion above would pass just
@@ -283,7 +284,7 @@ describe('the guard', () => {
       headers: authHeaders(donaToken)
     });
     assert.equal(stillSignedIn.status, 200);
-    assert.equal(stillSignedIn.body.data.role, 'admin');
+    assert.equal(stillSignedIn.body.data.role, 'owner');
   });
 
   // Not merely "a 404 happened to come back": the contract is that her token
@@ -355,7 +356,8 @@ describe('what a session reports about the control plane', () => {
 
     assert.equal(platform.body.data.isPlatformAdmin, true);
     assert.equal(provider.body.data.isPlatformAdmin, false);
-    // Both are `admin`, which is exactly why the flag has to exist.
+    // Both are `owner` — the one who ran /setup and a provider's owner —, which
+    // is exactly why the flag has to exist.
     assert.equal(platform.body.data.role, provider.body.data.role);
   });
 

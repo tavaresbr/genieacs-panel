@@ -20,6 +20,7 @@ import { CampaignsPanel } from '@/components/whatsapp/campaigns-panel'
 import { TemplatesPanel } from '@/components/whatsapp/templates-panel'
 import { OptOutPanel } from '@/components/whatsapp/opt-out-panel'
 import { AlertsPanel } from '@/components/whatsapp/alerts-panel'
+import { OutagePanel } from '@/components/outages/outage-panel'
 import { ContactsPanel } from '@/components/whatsapp/contacts-panel'
 import { HealthBell } from '@/components/whatsapp/health-strip'
 import { inboxPanes } from '@/lib/wa-inbox-pane'
@@ -710,7 +711,7 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
               />
             )}
             {showSgpPanel && conversation && (
-              <div className="fixed inset-y-0 end-0 z-[1500] w-[min(22rem,100vw)] border-s border-border shadow-xl xl:static xl:z-auto xl:h-full xl:min-h-0 xl:w-auto xl:shadow-none">
+              <div className="fixed inset-y-0 end-0 z-[1500] w-[min(22rem,100vw)] border-s border-border bg-card pr-[env(safe-area-inset-right)] shadow-xl xl:static xl:pr-0 xl:z-auto xl:h-full xl:min-h-0 xl:w-auto xl:shadow-none">
                 <SubscriberPanel
                   conversationId={conversation.id}
                   boundContract={conversation.contract}
@@ -1007,7 +1008,12 @@ export default function WhatsAppPage() {
         {/* Pela capacidade e não pela aba escolhida: o estado inicial é `inbox`,
             mas um papel que perca `whatsapp.config` enquanto está em Alertas
             continuaria montando um painel cujas requisições todas falham. */}
-        {tab === 'alerts' && can('whatsapp.config') && <AlertsPanel />}
+        {tab === 'alerts' && can('whatsapp.config') && (
+          <>
+            <OutagePanel />
+            <AlertsPanel />
+          </>
+        )}
       </div>
     </div>
   )

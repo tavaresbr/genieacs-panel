@@ -1143,6 +1143,41 @@ export interface TenantGateway {
 }
 
 /**
+ * A integração com a Asaas, como o console a vê.
+ *
+ * **Configurado sim/não, nunca o valor**: a chave de API e o token do webhook
+ * entram pela tela e não voltam por ela. O `*Source` diz de onde o valor que
+ * vale veio — `db` é o que foi gravado no painel, `env` é a variável de ambiente
+ * que continua valendo enquanto o painel não grava nada por cima.
+ */
+export interface AsaasIntegration {
+  environment: 'sandbox' | 'production'
+  apiKeyConfigured: boolean
+  apiKeySource: 'db' | 'env' | null
+  webhookTokenConfigured: boolean
+  webhookTokenSource: 'db' | 'env' | null
+  /** O endereço que se cola na Asaas. Montado pelo backend a partir do deploy. */
+  webhookUrl: string
+  updatedAt: string | null
+}
+
+/**
+ * O que se grava na integração. Campo ausente não é tocado; campo presente e
+ * vazio apaga — o mesmo contrato do cadastro fiscal.
+ */
+export interface AsaasIntegrationUpdate {
+  environment?: 'sandbox' | 'production'
+  apiKey?: string
+  webhookToken?: string
+}
+
+export interface AsaasConnectionTest {
+  ok: boolean
+  accountName?: string
+  environment: 'sandbox' | 'production'
+}
+
+/**
  * Até quantos dias o plano deixa o provedor guardar a trilha de auditoria
  * (`audit`), as mensagens (`messages`) e os anexos (`media`) do WhatsApp.
  * Nulo é sem teto — o provedor decide sozinho.
@@ -1255,7 +1290,7 @@ export interface TenantChargeView {
   periodEnd: string
   amountCents: number
   currency: string
-  status: 'pending' | 'paid' | 'canceled' | 'failed'
+  status: 'pending' | 'paid' | 'canceled' | 'failed' | 'overdue' | 'refunded'
   dueDate: string | null
   invoiceUrl: string | null
   createdAt: string | null
@@ -1418,6 +1453,34 @@ export const platformAPI = {
     apiClient.requestWithBody<{ id: number; gateway: TenantGateway }>(
       'PATCH', `/platform/tenants/${id}`, { gateway }
     ),
+
+  /**
+   * Cria o cliente deste provedor na Asaas, a partir do cadastro fiscal dele, e
+   * já grava a correlação. 400 quando falta CPF/CNPJ; 409 quando o provedor já
+   * está ligado a um cliente — trocar de cliente é decisão para a mão.
+   */
+  createAsaasCustomer: (tenantId: number) =>
+    apiClient.post<{ id: number; gateway: TenantGateway }>(
+      `/platform/tenants/${tenantId}/gateway/asaas-customer`
+    ),
+
+  /** A integração com a Asaas: ambiente e o que está configurado — nunca os segredos. */
+  asaasIntegration: () =>
+    apiClient.get<AsaasIntegration>('/platform/integrations/asaas'),
+
+  saveAsaasIntegration: (body: AsaasIntegrationUpdate) =>
+    apiClient.put<AsaasIntegration>('/platform/integrations/asaas', body),
+
+  /** Chama a Asaas com a chave gravada. `ok: false` vem com o motivo em `message`. */
+  testAsaasIntegration: () =>
+    apiClient.post<AsaasConnectionTest>('/platform/integrations/asaas/test'),
+
+  /**
+   * Gera um token novo para o webhook e o devolve UMA vez. O anterior deixa de
+   * valer na hora: a Asaas precisa receber o novo antes da próxima entrega.
+   */
+  generateAsaasWebhookToken: () =>
+    apiClient.post<{ webhookToken: string }>('/platform/integrations/asaas/webhook-token'),
 
   listMemberships: (tenantId: number) =>
     apiClient.get<{ memberships: TenantMembership[] }>(`/platform/tenants/${tenantId}/members`),
@@ -1641,7 +1704,8 @@ export interface DeviceListParams {
   page?: number
   pageSize?: number
   search?: string
-  status?: 'all' | 'online' | 'offline'
+  /** `stale`: last Inform older than 3 days, filtered server-side. */
+  status?: 'all' | 'online' | 'offline' | 'stale'
   focus?: 'all' | 'new24h' | 'weak-signal' | 'hot' | 'many-clients'
 }
 
@@ -1697,7 +1761,11 @@ export interface DeviceSwap {
   deviceId: string
   contract: string | null
   /** Which identity matched: same firmware hashes the same, so most swaps are `identity_hash`. */
-  matchedBy: 'identity_hash' | 'pppoe'
+  /**
+   * `stale_pppoe`: the link was moved automatically because the old ONT had
+   * been silent for 3+ days while another ONT with the same PPPoE login was online.
+   */
+  matchedBy: 'identity_hash' | 'pppoe' | 'stale_pppoe'
   /** What became of the previous ONT's SGP link. `held` means the pair is unstable. */
   linkAction: 'moved' | 'cleared' | 'none' | 'held'
   flapping: boolean
@@ -2086,6 +2154,16 @@ export interface SgpDivergenceRow {
   lastInform: string | null
 }
 
+/** An active contract whose linked ONT has sent no Inform for more than 3 days. */
+export interface SgpStaleActiveRow extends SgpDivergenceRow {
+  /** The ONT that probably replaced it, when one could be found online. */
+  successor: {
+    deviceId: string
+    lastInform: string | null
+    matchedBy: 'pppoe' | 'contract'
+  } | null
+}
+
 export interface SgpUnlinkedRow {
   deviceId: string
   customerId: string | null
@@ -2099,6 +2177,8 @@ export interface SgpSyncSummary {
   updated: number
   failed: number
   skipped: number
+  /** Links moved off an ONT silent for 3+ days onto the online ONT with the same PPPoE login. */
+  relinked?: number
   durationMs: number
   startedAt: string | null
   finishedAt: string | null
@@ -2113,11 +2193,13 @@ export interface SgpFleetOverview {
     unlinked: number
     onlineBlocked: number
     offlineActive: number
+    staleActive: number
   }
   byState: Record<SgpContractState, number>
   divergences: {
     onlineBlocked: SgpDivergenceRow[]
     offlineActive: SgpDivergenceRow[]
+    staleActive: SgpStaleActiveRow[]
     unlinked: SgpUnlinkedRow[]
   }
   lastSync: SgpSyncSummary | null
@@ -3130,9 +3212,40 @@ export interface WhatsAppMessage {
   updatedAt: string | null
 }
 
+/** Os textos do bot que o provedor pode trocar — só os sem variável. */
+export type BotMessageKey =
+  | 'greeting' | 'askDocument' | 'handoffQueued' | 'handoff' | 'notRecognised' | 'noOpenInvoice' | 'outsideHours'
+
+export interface BotHoursDay {
+  /** 0 é domingo, como `Date#getDay`. */
+  day: number
+  closed: boolean
+  open: string
+  close: string
+}
+
+/** A aba Chatbot: o que o atendimento automático diz e quando. */
+export interface BotConfig {
+  enabled: boolean
+  unlockEnabled: boolean
+  options: { invoice: boolean; signal: boolean; human: boolean; document: boolean }
+  /** Vazio usa o padrão. */
+  messages: Record<BotMessageKey, string>
+  /** Os textos padrão, no idioma de quem olha. */
+  defaults: Record<BotMessageKey, string>
+  hours: { enabled: boolean; timezone: string; week: BotHoursDay[] }
+}
+
 export const whatsappAPI = {
   getConfig: () =>
     apiClient.get<WhatsAppConfig>('/whatsapp/config'),
+
+  getBotConfig: () =>
+    apiClient.get<BotConfig>('/whatsapp/bot-config'),
+
+  /** Campo ausente mantém o gravado. */
+  updateBotConfig: (config: Partial<Omit<BotConfig, 'defaults'>>) =>
+    apiClient.put<BotConfig>('/whatsapp/bot-config', config),
 
   // An omitted managedAdminKey keeps the stored one; "" clears it. The server
   // never returns it either way.
@@ -3467,3 +3580,38 @@ export const whatsappAPI = {
       { phone }
     ),
 }
+
+/** Uma queda em massa que o alerta viu, e o aviso aos clientes atingidos. */
+export interface OutageIncident {
+  id: number
+  nodeId: string
+  nodeName: string
+  status: 'open' | 'resolved'
+  startedAt: string
+  resolvedAt: string | null
+  eta: string | null
+  noticeBody: string | null
+  noticeSentAt: string | null
+  recoverySentAt: string | null
+  /** O texto que sai quando o operador não escreve outro. */
+  defaultNotice: string
+  affected: number
+  /** Telefones distintos com WhatsApp entre os atingidos. */
+  withPhone: number
+  notified: number
+}
+
+export interface OutageIncidentDetail extends OutageIncident {
+  devices: { deviceId: string; contract: string | null; clientName: string | null; hasPhone: boolean; notifiedAt: string | null }[]
+}
+
+export const outagesAPI = {
+  list: () => apiClient.get<{ incidents: OutageIncident[] }>('/whatsapp/outages'),
+  get: (id: number) => apiClient.get<OutageIncidentDetail>(`/whatsapp/outages/${id}`),
+  setEta: (id: number, eta: string) => apiClient.requestWithBody<OutageIncidentDetail>('PATCH', `/whatsapp/outages/${id}`, { eta }),
+  /** Avisa quem ainda não foi avisado. `body` vazio usa o texto padrão. */
+  notify: (id: number, payload: { eta?: string; body?: string }) =>
+    apiClient.post<{ sent: number; skippedOptOut: number; incident: OutageIncidentDetail }>(`/whatsapp/outages/${id}/notify`, payload),
+  resolve: (id: number) => apiClient.post<OutageIncidentDetail>(`/whatsapp/outages/${id}/resolve`, {}),
+}
+

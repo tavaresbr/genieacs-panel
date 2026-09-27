@@ -390,16 +390,53 @@ describe('a mass outage is one message, not forty', () => {
       _id: `dev-${index + 1}`,
       pppoe: `cliente${index + 1}`
     }));
-    // Four on ODP-1: under the threshold, so nothing is grouped and each one
-    // is announced on its own.
+    // Two of the five on ODP-1: under the threshold AND not the majority of the
+    // box, so nothing is grouped and each one is announced on its own.
     fleet = identities.map((item, index) => device(item._id, {
-      _lastInform: index < 4 ? informedMinutesAgo(45) : informedMinutesAgo(1)
+      _lastInform: index < 2 ? informedMinutesAgo(45) : informedMinutesAgo(1)
     }));
 
     const summary = await scan({ now: now() });
-    assert.equal(summary.fired, 4);
+    assert.equal(summary.fired, 2);
     const rules = new Set((await alertRows()).map((row) => row.rule));
     assert.deepEqual([...rules], ['ont_offline']);
+  });
+
+  it('a small box whose majority dropped is a fibre cut, told with "x of y", the time and the place', async () => {
+    await setRules({
+      ont_offline: { enabled: true, threshold: 30, cooldownMinutes: 60 },
+      mass_outage: { enabled: true, threshold: 5, cooldownMinutes: 60 },
+      rx_power_low: { enabled: false },
+      temperature_high: { enabled: false }
+    });
+
+    identities = Array.from({ length: 6 }, (unused, index) => ({
+      _id: `dev-${index + 1}`,
+      pppoe: `cliente${index + 1}`
+    }));
+    // Four of the five on ODP-1: below the absolute threshold of five, but 80%
+    // of the box. That is the drop cable, not four coincidences.
+    fleet = identities.map((item, index) => device(item._id, {
+      _lastInform: index < 4 ? informedMinutesAgo(45 + index) : informedMinutesAgo(1)
+    }));
+
+    const summary = await scan({ now: now() });
+    assert.equal(summary.fired, 1);
+    const rows = await alertRows();
+    assert.deepEqual(rows.map((row) => [row.rule, row.subject]), [['mass_outage', 'ODP-1']]);
+
+    const [message] = await outbox();
+    assert.match(message.body, /4 de 5/);
+    // "Há quanto tempo": o sinal mais antigo, o do primeiro que caiu.
+    assert.match(message.body, /48 min/);
+    assert.match(message.body, /https:\/\/maps\.google\.com\/\?q=-3\.\d+,-60\.\d+/);
+    // Voltou: a mensagem diz o NOME da caixa, não o id interno.
+    fleet = identities.map((item) => device(item._id, { _lastInform: informedMinutesAgo(1) }));
+    await scan({ now: now() });
+    const messages = await outbox();
+    assert.equal(messages.length, 2);
+    assert.ok(!messages[1].body.includes('ODP-1'), messages[1].body);
+    assert.match(messages[1].body, /ODP Centro restabelecido/);
   });
 });
 
