@@ -6,7 +6,7 @@ import User from '../models/User.js';
 import { acceptsIdentifier, canHoldSession, LOGIN_REQUIRES_EMAIL } from '../config/login.js';
 import TenantUser from '../models/TenantUser.js';
 import { IS_SAAS } from '../config/edition.js';
-import { CONSOLE_AUDIENCE, generateConsoleTokens, generateImpersonationToken, generateTokens, resolveMembership, verifyToken } from '../middleware/auth.js';
+import { CONSOLE_AUDIENCE, generateConsoleTokens, generateImpersonationToken, generateTokens, openMembership, resolveMembership, verifyToken } from '../middleware/auth.js';
 import { createResponse, createErrorResponse, isValidEmail } from '../utils/helpers.js';
 import Tenant from '../models/Tenant.js';
 import PlatformAudit from '../models/PlatformAudit.js';
@@ -125,10 +125,14 @@ async function membershipForLogin(userId, requestedTenantId) {
   if (requestedTenantId !== undefined && requestedTenantId !== null && requestedTenantId !== '') {
     const id = Number(requestedTenantId);
     if (!Number.isInteger(id) || id <= 0) return null;
-    return TenantUser.find(id, userId);
+    return openMembership(userId, id);
   }
-  const memberships = await TenantUser.listForUser(userId);
-  return memberships[0] || null;
+  // O primeiro provedor que recebe a pessoa. Um suspenso não recebe ninguém
+  // (salvo quem opera a plataforma), e escolhê-lo aqui trancaria do lado de
+  // fora quem também trabalha num provedor ativo.
+  const vinculos = await TenantUser.listForUserWithTenant(userId);
+  const ativo = vinculos.find((vinculo) => vinculo.status === 'active');
+  return openMembership(userId, (ativo ?? vinculos[0])?.id);
 }
 
 /**

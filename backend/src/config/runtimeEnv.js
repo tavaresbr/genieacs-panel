@@ -26,3 +26,25 @@ export const DEVELOPMENT_FALLBACK = 'insecure-development-secret';
 export function isProduction() {
   return process.env.APP_ENV === 'production' || process.env.NODE_ENV === 'production';
 }
+
+/**
+ * Refuses, in production, a secret copied from `.env.example` or equal to the
+ * development fallback.
+ *
+ * `JWT_SECRET=change_me_to_a_long_random_string` is 33 characters and passed
+ * the length rule, so a manual install that followed `cp .env.example .env`
+ * signed administrator sessions — and derived the stored-secret keys — from a
+ * value published in this repository. `install.sh` generates random secrets
+ * and never gets here; this is for the path around it.
+ *
+ * Only the placeholder is refused, not a short value: `PORTAL_JWT_SECRET` and
+ * `SECRET_BOX_KEY` never had a length rule, and adding one now would stop
+ * existing installs from booting over a value nobody can guess anyway.
+ */
+export function assertNotPlaceholderSecret(name, value) {
+  if (!value || !isProduction()) return;
+  const text = String(value).trim();
+  if (/change_?me/i.test(text) || text === DEVELOPMENT_FALLBACK) {
+    throw new Error(`${name} still holds the example value; generate a random one for production`);
+  }
+}

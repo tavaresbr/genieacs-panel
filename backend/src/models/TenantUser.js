@@ -70,7 +70,15 @@ class TenantUser {
     return (await getDb()('tenant_users')
       .join('tenants', 'tenants.id', 'tenant_users.tenant_id')
       .where({ 'tenant_users.tenant_id': tenantId, 'tenant_users.user_id': userId })
-      .first('tenant_users.*', 'tenants.require_mfa')) || null;
+      .first('tenant_users.*', 'tenants.require_mfa', 'tenants.status as tenant_status')) || null;
+  }
+
+  /** O vínculo, com o status do provedor ao lado (`tenant_status`). */
+  static async findWithStatus(tenantId, userId) {
+    return (await getDb()('tenant_users')
+      .join('tenants', 'tenants.id', 'tenant_users.tenant_id')
+      .where({ 'tenant_users.tenant_id': tenantId, 'tenant_users.user_id': userId })
+      .first('tenant_users.*', 'tenants.status as tenant_status')) || null;
   }
 
   /** Everyone who works for one provider, with the person's details joined on. */

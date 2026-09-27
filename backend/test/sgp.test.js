@@ -250,6 +250,82 @@ describe('SGP configuration', () => {
   });
 });
 
+/**
+ * O token salvo nunca é exibido — e não pode sair por outra porta. Testar ou
+ * salvar um endereço NOVO sem digitar o token mandaria o segredo guardado, no
+ * corpo da requisição, para quem o endereço apontar.
+ */
+describe('the stored SGP token stays with the stored address', () => {
+  let atacante;
+  let atacanteUrl;
+  const recebido = [];
+
+  before(async () => {
+    atacante = http.createServer((req, res) => {
+      let raw = '';
+      req.on('data', (chunk) => { raw += chunk; });
+      req.on('end', () => {
+        recebido.push(raw);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 1, contratos: [] }));
+      });
+    });
+    await new Promise((resolve) => atacante.listen(0, '127.0.0.1', resolve));
+    atacanteUrl = `http://127.0.0.1:${atacante.address().port}`;
+  });
+
+  after(async () => {
+    await new Promise((resolve) => atacante.close(resolve));
+  });
+
+  it('a connection test to another address does not carry it', async () => {
+    const { status } = await call(`${panelUrl}/api/sgp/test`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: { baseUrl: atacanteUrl, app: APP }
+    });
+    assert.equal(status, 400);
+    assert.equal(recebido.some((corpo) => corpo.includes(TOKEN)), false, 'o token salvo saiu para outro endereço');
+  });
+
+  it('saving another address without the token is refused, and nothing changes', async () => {
+    const { status, body } = await call(`${panelUrl}/api/sgp/config`, {
+      method: 'PUT',
+      headers: authHeaders(token),
+      body: { baseUrl: atacanteUrl }
+    });
+    assert.equal(status, 400);
+    assert.equal(body.code, 'token_required');
+    const config = await asTenant(() => SgpService.getConfig());
+    assert.equal(config.baseUrl, sgpUrl);
+    assert.equal(config.token, TOKEN);
+  });
+
+  it('the same address keeps working with the stored token', async () => {
+    const { status } = await call(`${panelUrl}/api/sgp/test`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: { baseUrl: sgpUrl }
+    });
+    assert.equal(status, 200);
+  });
+
+  it('a new address with a token typed along is accepted', async () => {
+    const { status } = await call(`${panelUrl}/api/sgp/config`, {
+      method: 'PUT',
+      headers: authHeaders(token),
+      body: { baseUrl: atacanteUrl, token: 'outro-token' }
+    });
+    assert.equal(status, 200);
+    const volta = await call(`${panelUrl}/api/sgp/config`, {
+      method: 'PUT',
+      headers: authHeaders(token),
+      body: { baseUrl: sgpUrl, token: TOKEN }
+    });
+    assert.equal(volta.status, 200);
+  });
+});
+
 describe('device to contract resolution', () => {
   it('resolves an ONT through its PPPoE login and caches the link', async () => {
     const { status, body } = await call(`${panelUrl}/api/sgp/devices/${DEVICE_ID}`, {

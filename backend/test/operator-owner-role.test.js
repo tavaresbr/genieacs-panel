@@ -161,6 +161,22 @@ describe('a senha do owner', () => {
   });
 });
 
+describe('a própria senha', () => {
+  // Pelo PATCH da equipe bastava o token de acesso — sem a senha atual. Quem
+  // roubasse um token de uma hora ficava com a conta para sempre.
+  it('não se troca pela rota da equipe, e nada muda', async () => {
+    const { status, body } = await call(`${panelUrl}/api/users/${adminId}`, {
+      method: 'PATCH', headers: authHeaders(adminToken), body: { password: 'senha-roubada-123' }
+    });
+    assert.equal(status, 400, JSON.stringify(body));
+    assert.equal(body.code, 'password_self');
+    const entra = await call(`${panelUrl}/api/auth/login`, {
+      method: 'POST', body: { username: 'o-admin', password: 'senha-roubada-123' }
+    });
+    assert.notEqual(entra.status, 200);
+  });
+});
+
 describe('a senha de quem opera a plataforma', () => {
   // Com a senha, o console: todos os provedores, personificação, cobrança. Um
   // provedor não pode defini-la — nem o admin, nem o owner, nem junto com o papel.

@@ -2666,6 +2666,14 @@ export const mappingAPI = {
   liveStatus: () =>
     apiClient.get<LiveStatus>('/mapping-data/status'),
 
+  /** Histórico de rompimentos por caixa, nos últimos `days` dias. */
+  outageHistory: (days = 90) =>
+    apiClient.get<OutageHistory>(`/mapping-data/outages?days=${days}`),
+
+  /** Equipamentos com PPPoE que ainda não estão no mapa. */
+  unmappedDevices: () =>
+    apiClient.get<{ total: number; items: UnmappedDevice[] }>('/mapping-data/unmapped'),
+
   /** Busca livre de um lugar no Brasil (Nominatim, pelo servidor). */
   searchAddress: (q: string) =>
     apiClient.get<PlaceResult[]>(`/mapping-data/geocode?q=${encodeURIComponent(q)}`),
@@ -2695,6 +2703,29 @@ export interface CustomerIdSyncStatus {
     status?: number | null
     message?: string
   }
+}
+
+export interface OutageHistory {
+  days: number
+  events: Array<{
+    id: number
+    node_id: string
+    node_name: string | null
+    started_at: string
+    ended_at: string | null
+    minutes: number | null
+    peak_count: number
+    total_clients: number
+  }>
+  byNode: Array<{ node_id: string; node_name: string | null; count: number; minutes: number; last_at: string }>
+}
+
+export interface UnmappedDevice {
+  deviceId: string | null
+  pppoe: string
+  online: boolean
+  rxPower: number | null
+  lastInform: string | null
 }
 
 export interface PlaceResult {

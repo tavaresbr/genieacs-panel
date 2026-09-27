@@ -3,6 +3,7 @@ import MappingNode from '../models/MappingNode.js';
 import MappingEdge from '../models/MappingEdge.js';
 import WaAlertService, { DEFAULT_RULES } from './waAlertService.js';
 import { detectOutages } from './outageDetector.js';
+import OutageEvent from '../models/OutageEvent.js';
 import { currentTenantId } from '../config/tenantContext.js';
 
 /**
@@ -57,11 +58,34 @@ class MapStatusService {
     }
   }
 
+  /**
+   * Os equipamentos do ACS que ainda não têm ponto no mapa (pelo PPPoE):
+   * é a lista de "colocar no mapa". Sem PPPoE não há como ligar ao ponto,
+   * então esses ficam de fora.
+   */
+  static async unmapped({ limit = 1000 } = {}) {
+    const mapped = new Set((await MappingNode.getAll()).map((node) => normalize(node.pppoe)).filter(Boolean));
+    const seen = new Set();
+    const devices = [];
+    for (const device of await this.fleet()) {
+      const login = normalize(device.pppoe);
+      if (!login || mapped.has(login) || seen.has(login)) continue;
+      seen.add(login);
+      devices.push(device);
+    }
+    devices.sort((a, b) => String(a.pppoe).localeCompare(String(b.pppoe)));
+    return { total: devices.length, items: devices.slice(0, limit) };
+  }
+
   static async status() {
     const allNodes = await MappingNode.getAll();
     const nodes = allNodes.filter((node) => normalize(node.pppoe));
     const summary = { online: 0, weak: 0, offline: 0, unknown: 0 };
-    if (!nodes.length) return { generatedAt: new Date().toISOString(), items: [], summary, outages: [] };
+    if (!nodes.length) {
+      // Sem cliente no mapa não há rompimento; o que estava aberto fecha.
+      await OutageEvent.observe([]).catch(() => {});
+      return { generatedAt: new Date().toISOString(), items: [], summary, outages: [] };
+    }
 
     const byPppoe = new Map();
     for (const device of await this.fleet()) {
@@ -101,6 +125,11 @@ class MapStatusService {
           since: outage.since === null ? null : new Date(outage.since).toISOString(),
           clients: outage.clients
         }));
+    // O histórico: esta é a foto completa do provedor, então pode abrir e
+    // fechar ocorrências. Falhar aqui não pode esconder o estado da tela.
+    await OutageEvent.observe(outages).catch((error) => {
+      console.warn(`Outage history not recorded: ${error.message}`);
+    });
     return { generatedAt: new Date().toISOString(), items, summary, outages };
   }
 }

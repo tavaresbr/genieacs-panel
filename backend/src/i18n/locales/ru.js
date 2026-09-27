@@ -282,6 +282,7 @@ export default {
   'mapping.importFailed': "Не удалось импортировать данные карты",
   'mapping.statusReady': "Состояние сети получено",
   'mapping.statusFailed': "Сейчас не удаётся получить состояние устройств",
+  'mapping.outagesReady': "История обрывов получена",
   'mapping.searchTooShort': "Введите не менее 3 символов для поиска.",
   'mapping.searchDone': "Поиск завершён",
   'mapping.searchFailed': "Сейчас не удалось найти адрес. Повторите попытку чуть позже.",
@@ -459,6 +460,7 @@ export default {
   'sgp.error.contractNotFound': 'Договор в SGP не найден',
   'sgp.error.webhookSecretRequired': 'Создайте секрет webhook, прежде чем включать приём событий SGP',
   'sgp.error.testCredentialsRequired': 'Для проверки соединения укажите адрес, приложение и токен SGP',
+  'sgp.error.tokenForNewUrl': 'Адрес SGP изменился: введите токен ещё раз, чтобы сохранить',
   'sgp.testAccepted': 'SGP приняла соединение и учётные данные. Ответ: {error}',
 
   'common.buildUnavailable': 'Сборка приложения недоступна',
@@ -710,6 +712,7 @@ export default {
   'users.mfaElsewhere': 'Этот оператор работает и в другом провайдере; его двухэтапный вход можно отключить только на сервере',
   'users.mfaPlatform': 'Этот оператор также администрирует платформу; его двухэтапный вход можно отключить только на сервере',
   'users.passwordPlatform': 'Этот оператор также администрирует платформу; сменить пароль может только он сам',
+  'users.passwordSelf': 'Чтобы сменить свой пароль, используйте профиль — он запрашивает текущий пароль',
   'users.mfaReset': 'Двухэтапный вход отключён; сеансы оператора завершены',
   'users.updated': 'Оператор обновлён',
   'users.updateFailed': 'Не удалось обновить оператора',

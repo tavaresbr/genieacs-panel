@@ -64,23 +64,32 @@ class CustomerIdSyncJob {
     if (running.has(key)) return { running: true };
     const started = new Date();
     const job = syncOnce();
-    running.set(key, job);
-    startedAt.set(key, started);
     // Dentro do prazo, quem loga e responde é o chamador; depois dele, não há
     // mais ninguém esperando e o log é o único lugar onde a falha aparece.
     // O desfecho vai para `LAST_SYNC_KEY` nos dois casos: é o que a tela lê
     // para dizer como terminou a passada que continuou em segundo plano.
+    //
+    // A resposta espera esse registro E a saída do mapa `running`: responder
+    // assim que a passada termina deixava uma janela em que um segundo pedido
+    // encontrava a trava ainda de pé e ouvia "em andamento" de uma passada
+    // que já tinha acabado.
     let detached = false;
-    job
+    const tracked = job
       .then(
-        (result) => this.remember({ ok: true, startedAt: started, result }),
-        (error) => {
+        async (result) => {
+          await this.remember({ ok: true, startedAt: started, result });
+          return { ok: true, result };
+        },
+        async (error) => {
           if (detached) console.error('Customer ID sync (background) error:', error);
           const reason = classifySyncError(error);
-          return this.remember({ ok: false, startedAt: started, code: reason.code, reasonKey: reason.reasonKey, status: reason.status ?? null });
+          await this.remember({ ok: false, startedAt: started, code: reason.code, reasonKey: reason.reasonKey, status: reason.status ?? null });
+          return { ok: false, error };
         }
       )
       .finally(() => { running.delete(key); startedAt.delete(key); });
+    running.set(key, tracked);
+    startedAt.set(key, started);
 
     let timer;
     const deadline = new Promise((resolve) => {
@@ -88,10 +97,13 @@ class CustomerIdSyncJob {
       timer.unref?.();
     });
     try {
-      const outcome = await Promise.race([job, deadline]);
-      if (outcome !== TIMED_OUT) return outcome;
-      detached = true;
-      return { running: true };
+      const outcome = await Promise.race([tracked, deadline]);
+      if (outcome === TIMED_OUT) {
+        detached = true;
+        return { running: true };
+      }
+      if (!outcome.ok) throw outcome.error;
+      return outcome.result;
     } finally {
       clearTimeout(timer);
     }

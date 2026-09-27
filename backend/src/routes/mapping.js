@@ -4,6 +4,10 @@ import { authenticateToken, requirePermission } from '../middleware/auth.js';
 
 const router = express.Router();
 
+router.get('/unmapped', authenticateToken, requirePermission('map.read'), MappingController.unmappedDevices);
+
+router.get('/outages', authenticateToken, requirePermission('map.read'), MappingController.outageHistory);
+
 router.get('/status', authenticateToken, requirePermission('map.read'), MappingController.liveStatus);
 
 router.get('/geocode', authenticateToken, requirePermission('map.read'), MappingController.searchAddress);

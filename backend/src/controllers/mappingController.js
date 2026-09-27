@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { searchPlaces } from '../services/addressLookupService.js';
 import MapStatusService from '../services/mapStatusService.js';
+import OutageEvent from '../models/OutageEvent.js';
 import { classifySyncError } from '../services/customerSyncErrors.js';
 
 /**
@@ -140,6 +141,32 @@ class MappingController {
         ? req.t('mapping.statusFailed')
         : req.t(reason.reasonKey, reason.status ? { status: reason.status } : undefined);
       return res.status(502).json(createErrorResponse(message, error.message, reason.code));
+    }
+  }
+
+  /** Equipamentos com PPPoE que ainda não estão no mapa. */
+  static async unmappedDevices(req, res) {
+    try {
+      return res.json(createResponse(req.t('mapping.statusReady'), await MapStatusService.unmapped()));
+    } catch (error) {
+      console.warn(`Unmapped devices failed: ${error.message}`);
+      const reason = classifySyncError(error);
+      const message = reason.code === 'database'
+        ? req.t('mapping.statusFailed')
+        : req.t(reason.reasonKey, reason.status ? { status: reason.status } : undefined);
+      return res.status(502).json(createErrorResponse(message, error.message, reason.code));
+    }
+  }
+
+  /** Histórico de rompimentos: as ocorrências e o resumo por caixa. */
+  static async outageHistory(req, res) {
+    try {
+      const days = Math.min(365, Math.max(1, Number.parseInt(String(req.query.days ?? '90'), 10) || 90));
+      const events = await OutageEvent.recent({ days });
+      return res.json(createResponse(req.t('mapping.outagesReady'), { days, events, byNode: OutageEvent.summarize(events) }));
+    } catch (error) {
+      console.error('Outage history error:', error);
+      return res.status(500).json(createErrorResponse(req.t('common.internalError'), error.message));
     }
   }
 

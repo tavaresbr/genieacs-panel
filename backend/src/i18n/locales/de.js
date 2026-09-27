@@ -282,6 +282,7 @@ export default {
   'mapping.importFailed': "Die Kartendaten konnten nicht importiert werden",
   'mapping.statusReady': "Netzstatus abgerufen",
   'mapping.statusFailed': "Der Gerätestatus kann gerade nicht gelesen werden",
+  'mapping.outagesReady': "Ausfallverlauf abgerufen",
   'mapping.searchTooShort': "Geben Sie mindestens 3 Zeichen ein, um zu suchen.",
   'mapping.searchDone': "Suche abgeschlossen",
   'mapping.searchFailed': "Die Adresse konnte gerade nicht gesucht werden. Versuchen Sie es gleich erneut.",
@@ -412,6 +413,7 @@ export default {
   'sgp.error.noContractForDevice': 'Für dieses ONT wurde kein SGP-Vertrag gefunden',
   'sgp.error.contractNotFound': 'Vertrag in SGP nicht gefunden',
   'sgp.error.testCredentialsRequired': 'Geben Sie SGP-URL, App und Token an, um die Verbindung zu testen',
+  'sgp.error.tokenForNewUrl': 'Die SGP-Adresse hat sich geändert: Geben Sie das Token erneut ein, um zu speichern',
   'sgp.testAccepted': 'SGP hat die Verbindung und die Zugangsdaten akzeptiert. Antwort: {error}',
 
   'common.buildUnavailable': 'Der Anwendungs-Build ist nicht verfügbar',
@@ -710,6 +712,7 @@ export default {
   'users.mfaElsewhere': 'Dieser Operator arbeitet auch für einen anderen Anbieter; seine Anmeldung in zwei Schritten kann nur auf dem Server ausgeschaltet werden',
   'users.mfaPlatform': 'Dieser Operator verwaltet auch die Plattform; seine Anmeldung in zwei Schritten kann nur auf dem Server ausgeschaltet werden',
   'users.passwordPlatform': 'Dieser Operator verwaltet auch die Plattform; nur er selbst kann sein Passwort ändern',
+  'users.passwordSelf': 'Um Ihr eigenes Passwort zu ändern, verwenden Sie Ihr Profil, das nach dem aktuellen Passwort fragt',
   'users.mfaReset': 'Anmeldung in zwei Schritten ausgeschaltet; die Sitzungen des Operators wurden beendet',
   'users.updated': 'Operator aktualisiert',
   'users.updateFailed': 'Der Operator konnte nicht aktualisiert werden',
