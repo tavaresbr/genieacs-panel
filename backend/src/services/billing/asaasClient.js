@@ -1,5 +1,5 @@
 import { PinnedTransport } from '../../utils/net/pinnedFetch.js';
-import { IS_SAAS } from '../../config/edition.js';
+import { deploymentIsShared } from '../genieacsEgress.js';
 import { effectiveApiKey, effectiveBaseUrl } from './asaasSettingsService.js';
 
 /**
@@ -104,11 +104,17 @@ async function chamar(caminho, { method = 'POST', payload = null } = {}) {
   // dele a pedido; aqui o leitor é quem opera a plataforma, e o endereço é a
   // informação que resolve o chamado.
   //
-  // `allowPrivateAddresses` só fora do SaaS, que é o que deixa um teste apontar
-  // a base para `127.0.0.1` sem abrir a porta no deploy hospedado.
+  // `allowPrivateAddresses` só num deploy de um provedor só, que é o que deixa
+  // um teste apontar a base para `127.0.0.1` sem abrir a porta no deploy
+  // hospedado. A régua é `deploymentIsShared()`, e não `IS_SAAS`, pelo mesmo
+  // motivo do ACS e do SGP: `EDITION` tem default `selfhosted`, e um deploy
+  // compartilhado que esqueça a variável não pode ganhar a rede privada de
+  // brinde. Aqui a base é do operador da plataforma, não de um inquilino — o
+  // risco é menor, mas a regra é uma só, e a guarda que muda de critério de
+  // cliente para cliente é a que alguém esquece de revisar.
   const addresses = await PinnedTransport.vetTarget(hostname, {
     signal: sinal,
-    allowPrivateAddresses: !IS_SAAS,
+    allowPrivateAddresses: !deploymentIsShared(),
     refuse: (motivo) => new AsaasError(motivo, { code: 'blocked_host' })
   });
   sinal.throwIfAborted();

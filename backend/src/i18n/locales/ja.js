@@ -24,6 +24,7 @@ export default {
   'auth.insufficientPermissions': '権限が不足しています',
   'auth.credentialsRequired': 'ユーザー名とパスワードが必要です',
   'auth.invalidCredentials': 'ユーザー名またはパスワードが無効です',
+  'auth.accountLocked': 'このアカウントで失敗した試行が多すぎます。数分待ってから再試行してください。',
   'auth.loginSuccess': 'ログインしました',
   'auth.chooseDestination': 'サインイン先を選択してください',
   'auth.logoutSuccess': 'ログアウトしました',

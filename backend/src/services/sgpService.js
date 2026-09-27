@@ -8,7 +8,7 @@ import DeviceTagService from './deviceTagService.js';
 import DeviceSwapService from './deviceSwapService.js';
 import { createSecretBox } from '../utils/secretBox.js';
 import { PinnedTransport, RESPONSE_TOO_LARGE } from '../utils/net/pinnedFetch.js';
-import { IS_SAAS } from '../config/edition.js';
+import { deploymentIsShared } from './genieacsEgress.js';
 import { normalizarTelefoneBr } from '../utils/wa/waDestino.js';
 import { TenantCache } from '../config/tenantCache.js';
 
@@ -780,11 +780,20 @@ const DEFAULT_CONFIG = Object.freeze({
  * arrives as an ordinary not-ok answer, so an SGP that answers 302 towards
  * somewhere else cannot move the request there.
  *
- * The address classes are refused on the SaaS edition only, for the same reason
- * `genieacsEgress` does the same: a self-hosted install runs its SGP on the
- * operator's own LAN, a private address is the normal case there, and the
- * person who typed the URL owns the box. The pinning and the ceiling apply in
- * both editions — one transport that behaves the same everywhere.
+ * The address classes are refused whenever the deployment is shared, for the
+ * same reason `genieacsEgress` does the same: a self-hosted install with one
+ * provider runs its SGP on the operator's own LAN, a private address is the
+ * normal case there, and the person who typed the URL owns the box. The
+ * pinning and the ceiling apply in both cases — one transport that behaves the
+ * same everywhere.
+ *
+ * "Compartilhado" é `deploymentIsShared()`, e não `IS_SAAS`: `EDITION` tem
+ * default `selfhosted`, e um deploy com vários provedores que suba sem a
+ * variável deixava qualquer administrador de provedor apontar o `baseUrl` do
+ * SGP para `127.0.0.1`, para a VPC ou para o serviço de metadados da nuvem — o
+ * mesmo modo de falha que `genieacsEgress` já tinha fechado para o ACS. A
+ * leitura é síncrona e de memória (a contagem de provedores é refeita no boot
+ * e a cada passada do agendador), então não pesa no caminho de cada chamada.
  *
  * Used by every SGP call, not just the probe: the portal's billing lookups and
  * the reconcile job go through `SgpService.request` too.
@@ -820,7 +829,7 @@ async function sgpFetch(url, { headers, body, signal, maxBytes = MAX_RESPONSE_BY
   // quem chamou é o dano que o prazo existe para evitar.
   const addresses = await PinnedTransport.vetTarget(hostname, {
     signal,
-    allowPrivateAddresses: !IS_SAAS,
+    allowPrivateAddresses: !deploymentIsShared(),
     refuse: () => new SgpError('sgp.error.blockedHost', { code: 'blocked_host', status: 400 })
   });
   // O prazo pode ter vencido DENTRO da resolução acima, e aí o motivo de parar é

@@ -230,6 +230,7 @@ const es: Dictionary = {
   'login.platform.helpText': 'La contraseña de una cuenta de plataforma se restablece en el servidor, con scripts/reset-password.js.',
   'console.header': 'Plataforma',
   'login.error.invalidCredentials': 'El usuario o correo y la contraseña no coinciden. Revisa las credenciales.',
+  'login.error.accountLocked': 'Demasiados intentos fallidos: esta cuenta está bloqueada unos minutos. Espera e inténtalo de nuevo, o restablece la contraseña.',
   'login.error.unreachable': 'El panel no pudo contactar al servidor. Revisa la conexión e inténtalo de nuevo.',
 
   // Configuración inicial
@@ -2791,6 +2792,7 @@ const es: Dictionary = {
   'audit.action.userMfaDisabled': 'Inicio de sesión en dos pasos desactivado',
   'audit.action.userMfaRecoveryRegenerated': 'Códigos de recuperación reemplazados',
   'audit.action.userMfaRecoveryUsed': 'Ingresó con un código de recuperación',
+  'audit.action.userAccountLocked': 'Cuenta bloqueada por intentos fallidos',
   'audit.action.alertsTelegramChanged': 'Bot o grupo de Telegram de alertas cambiado',
   'audit.action.tenantMfaRequiredChanged': 'Requisito de inicio de sesión en dos pasos cambiado',
   'audit.action.operatorMfaReset': 'Inicio de sesión en dos pasos de operador desactivado por el equipo',

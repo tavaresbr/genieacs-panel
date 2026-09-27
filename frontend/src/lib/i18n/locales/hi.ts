@@ -227,6 +227,7 @@ const hi: Dictionary = {
   'login.platform.helpText': 'प्लेटफ़ॉर्म खाते का पासवर्ड सर्वर पर scripts/reset-password.js से रीसेट किया जाता है।',
   'console.header': 'प्लेटफ़ॉर्म',
   'login.error.invalidCredentials': 'उपयोगकर्ता नाम या पासवर्ड मेल नहीं खाता। प्रशासक क्रेडेंशियल जाँचें।',
+  'login.error.accountLocked': 'बहुत अधिक असफल प्रयास: यह खाता कुछ मिनटों के लिए लॉक है। प्रतीक्षा करें और फिर प्रयास करें, या पासवर्ड रीसेट करें।',
   'login.error.unreachable': 'पैनल सर्वर तक नहीं पहुँच सका। कनेक्शन जाँचें और फिर कोशिश करें।',
 
   // प्रारंभिक सेटअप
@@ -2799,6 +2800,7 @@ const hi: Dictionary = {
   'audit.action.userMfaDisabled': 'दो-चरण लॉगिन बंद किया गया',
   'audit.action.userMfaRecoveryRegenerated': 'रिकवरी कोड बदले गए',
   'audit.action.userMfaRecoveryUsed': 'रिकवरी कोड से लॉगिन',
+  'audit.action.userAccountLocked': 'असफल प्रयासों के बाद खाता लॉक हुआ',
   'audit.action.alertsTelegramChanged': 'अलर्ट का Telegram बॉट या समूह बदला गया',
   'audit.action.tenantMfaRequiredChanged': 'दो-चरणीय लॉगिन की अनिवार्यता बदली गई',
   'audit.action.operatorMfaReset': 'टीम ने ऑपरेटर का दो-चरणीय लॉगिन बंद किया',

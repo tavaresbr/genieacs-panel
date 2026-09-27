@@ -24,6 +24,7 @@ export default {
   'auth.insufficientPermissions': 'Unzureichende Berechtigungen',
   'auth.credentialsRequired': 'Benutzername und Passwort sind erforderlich',
   'auth.invalidCredentials': 'Ungültiger Benutzername oder ungültiges Passwort',
+  'auth.accountLocked': 'Zu viele fehlgeschlagene Versuche für dieses Konto. Warten Sie einige Minuten und versuchen Sie es erneut.',
   'auth.loginSuccess': 'Anmeldung erfolgreich',
   'auth.chooseDestination': 'Wählen Sie, wo Sie sich anmelden möchten',
   'auth.logoutSuccess': 'Abmeldung erfolgreich',

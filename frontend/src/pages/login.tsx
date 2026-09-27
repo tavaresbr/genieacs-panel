@@ -68,6 +68,10 @@ export default function Login({ variant = 'provider' }: { variant?: 'provider' |
         setError(t('login.error.invalidCredentials'))
         return
       }
+      if (resultado === 'locked') {
+        setError(t('login.error.accountLocked'))
+        return
+      }
       if (resultado === 'required') {
         setPedindoCodigo(true)
         return

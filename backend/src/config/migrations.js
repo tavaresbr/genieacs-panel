@@ -1589,6 +1589,29 @@ const MFA_TABLES = [
 ];
 
 /**
+ * A contagem de tentativas por conta — ver `models/AccountLockout.js`.
+ *
+ * Sem chave estrangeira para `users`, de propósito: o sujeito é `user:<id>` para
+ * quem existe e `login:<sha256>` para o login inventado, e o segundo não aponta
+ * para linha nenhuma — é justamente o caso que impede a trava de virar oráculo
+ * de quem tem conta. Os instantes são milissegundos em `bigInteger`, e não
+ * `timestamp`: a comparação é feita contra `Date.now()` nos três dialetos, sem
+ * fuso nem precisão de coluna para discordar entre eles.
+ */
+const accountLockoutsTable = () => (t) => {
+  t.string('subject', 96).primary();
+  t.integer('attempts').notNullable().defaultTo(0);
+  t.bigInteger('window_started_at').notNullable();
+  t.bigInteger('locked_until').nullable();
+  t.bigInteger('updated_at').notNullable();
+  t.index(['updated_at'], 'account_lockouts_updated_idx');
+};
+
+const LOCKOUT_TABLES = [
+  ['account_lockouts', accountLockoutsTable]
+];
+
+/**
  * Como o painel chega ao GenieACS de cada provedor: `direct` (a URL, como
  * sempre foi), `tunnel` (a URL numa rede privada de cliente, liberada pela
  * plataforma) e, depois, `agent`. Sem linha, vale `direct` — é o que todo
@@ -1678,7 +1701,8 @@ export const SCHEMA_TABLES = [
   ...MFA_TABLES,
   ...OUTAGE_TABLES,
   ...WA_BOT_EVENT_TABLES,
-  ...GENIEACS_CONNECTION_TABLES
+  ...GENIEACS_CONNECTION_TABLES,
+  ...LOCKOUT_TABLES
 ].map(([name]) => name);
 
 /**
@@ -4068,6 +4092,23 @@ export const migrations = [
     async up(db) {
       for (const [nome, construtor] of GENIEACS_CONNECTION_TABLES) {
         // eslint-disable-next-line no-await-in-loop -- uma tabela por vez
+        await createTableIfMissing(db, nome, construtor(db));
+      }
+    }
+  },
+  {
+    /**
+     * A trava por conta contra força bruta — ver `accountLockoutsTable`. Nasce
+     * vazia: ninguém começa travado, e quem já errou a senha antes do upgrade
+     * começa a contar do zero.
+     */
+    id: '0070_account_lockouts',
+    async isApplied(db) {
+      return db.schema.hasTable('account_lockouts');
+    },
+    async up(db) {
+      for (const [nome, construtor] of LOCKOUT_TABLES) {
+        // eslint-disable-next-line no-await-in-loop -- uma tabela só, hoje
         await createTableIfMissing(db, nome, construtor(db));
       }
     }

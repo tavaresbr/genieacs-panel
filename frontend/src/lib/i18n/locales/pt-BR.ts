@@ -230,6 +230,7 @@ const ptBR: Dictionary = {
   'login.platform.helpText': 'A senha de uma conta de plataforma se redefine pelo servidor, com scripts/reset-password.js.',
   'console.header': 'Plataforma',
   'login.error.invalidCredentials': 'Usuário ou e-mail e senha não conferem. Verifique as credenciais.',
+  'login.error.accountLocked': 'Muitas tentativas erradas: esta conta está bloqueada por alguns minutos. Aguarde e tente de novo, ou redefina a senha.',
   'login.error.unreachable': 'O painel não conseguiu contatar o servidor. Verifique a conexão e tente novamente.',
 
   // Configuração inicial
@@ -2791,6 +2792,7 @@ const ptBR: Dictionary = {
   'audit.action.userMfaDisabled': 'Login em duas etapas desligado',
   'audit.action.userMfaRecoveryRegenerated': 'Códigos de recuperação trocados',
   'audit.action.userMfaRecoveryUsed': 'Entrou com código de recuperação',
+  'audit.action.userAccountLocked': 'Conta travada por tentativas erradas',
   'audit.action.alertsTelegramChanged': 'Bot ou grupo do Telegram dos alertas alterado',
   'audit.action.tenantMfaRequiredChanged': 'Exigência do login em duas etapas alterada',
   'audit.action.operatorMfaReset': 'Login em duas etapas de operador desligado pela equipe',

@@ -207,8 +207,11 @@ cmd_logs() {
 cmd_reset_password() {
   need_root
   validate_install_dir
-  local user="${1:-}" pass="${2:-}"
-  [ -n "$user" ] || die "Usage: skygenpanel reset-password <username> [newPassword]"
+  local user="${1:-}" pass="${RESET_PASSWORD:-}"
+  [ -n "$user" ] || die "Usage: skygenpanel reset-password <username>  (password prompted, or from RESET_PASSWORD)"
+  # Senha como argumento aparece em `ps` e no histórico do shell: recusa e
+  # aponta o caminho certo em vez de aceitar em silêncio o uso antigo.
+  [ -z "${2:-}" ] || die "Refusing a password given as an argument (visible in ps and shell history). Omit it to be prompted, or set RESET_PASSWORD."
   if [ -z "$pass" ]; then
     read -r -s -p "New password: " pass
     printf '\n'
@@ -268,7 +271,7 @@ Commands:
   status                      Show service status
   version                     Show installed version and Git revision
   logs [N]                    Follow the last N log lines (default 100)
-  reset-password <u> [p]      Reset password (prompts securely when omitted)
+  reset-password <u>          Reset password (prompts securely, or RESET_PASSWORD)
   reset-mfa <u>               Turn off two-step login for someone who lost it
   backup [verify]             Take a backup now, or report the newest one
   rotate-key [--dry-run]      Rewrite stored secrets with the live SECRET_BOX_KEY

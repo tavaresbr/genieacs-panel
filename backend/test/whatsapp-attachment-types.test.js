@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { asTenant, authHeaders, call, startTestServers, stopTestServers } from './helpers/harness.js';
+import { rotearBase } from './helpers/evolutionRoute.js';
 import { HEIC, HTML, PNG, SAMPLES } from './helpers/attachmentSamples.js';
 
 const { default: WhatsAppConfigService } = await import('../src/services/whatsappConfigService.js');
@@ -31,7 +32,7 @@ let token;
 let conversationId;
 let evoServer;
 let evoLocalUrl;
-let realFetch;
+let desfazerRota;
 const requests = [];
 
 async function upload(bytes, { type, name } = {}) {
@@ -72,12 +73,9 @@ before(async () => {
   // O mesmo desvio de `whatsapp-outbox.test.js`: a guarda de SSRF barra
   // loopback pelo literal, então a conta aponta para um nome público e o
   // `fetch` é reescrito para o stub.
-  realFetch = globalThis.fetch;
-  globalThis.fetch = (input, init) => {
-    const url = String(input instanceof Request ? input.url : input);
-    if (url.startsWith(EVO_BASE)) return realFetch(evoLocalUrl + url.slice(EVO_BASE.length), init);
-    return realFetch(input, init);
-  };
+  // O cliente Evolution conecta por `PinnedTransport`, não por `fetch`: a rota
+  // para o dublê troca os encaixes dele, e a guarda de endereço roda inteira.
+  desfazerRota = rotearBase(EVO_BASE, evoLocalUrl);
 
   const setup = await call(`${panelUrl}/api/auth/setup`, {
     method: 'POST',
@@ -111,7 +109,7 @@ before(async () => {
 });
 
 after(async () => {
-  globalThis.fetch = realFetch;
+  desfazerRota?.();
   WaOutboxWorker.stop();
   await new Promise((resolve) => evoServer.close(resolve));
   await stopTestServers();

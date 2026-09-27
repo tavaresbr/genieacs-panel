@@ -232,6 +232,7 @@ const en = {
   'login.platform.helpText': 'A platform account\'s password is reset on the server, with scripts/reset-password.js.',
   'console.header': 'Platform',
   'login.error.invalidCredentials': 'The username or email and the password do not match. Check the credentials.',
+  'login.error.accountLocked': 'Too many failed attempts: this account is locked for a few minutes. Wait and try again, or reset the password.',
   'login.error.unreachable': 'The panel could not reach the server. Check the connection and try again.',
 
   // First-run setup
@@ -2793,6 +2794,7 @@ const en = {
   'audit.action.userMfaDisabled': 'Two-step login turned off',
   'audit.action.userMfaRecoveryRegenerated': 'Recovery codes replaced',
   'audit.action.userMfaRecoveryUsed': 'Signed in with a recovery code',
+  'audit.action.userAccountLocked': 'Account locked after failed attempts',
   'audit.action.alertsTelegramChanged': 'Alerts Telegram bot or group changed',
   'audit.action.tenantMfaRequiredChanged': 'Two-step login requirement changed',
   'audit.action.operatorMfaReset': 'Operator two-step login turned off by the team',

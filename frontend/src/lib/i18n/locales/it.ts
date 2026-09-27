@@ -230,6 +230,7 @@ const it: Dictionary = {
   'login.platform.helpText': 'La password di un account di piattaforma si reimposta sul server, con scripts/reset-password.js.',
   'console.header': 'Piattaforma',
   'login.error.invalidCredentials': 'Nome utente o e-mail e password non corrispondono. Controlla le credenziali.',
+  'login.error.accountLocked': 'Troppi tentativi falliti: questo account è bloccato per alcuni minuti. Attendi e riprova, oppure reimposta la password.',
   'login.error.unreachable': 'Il pannello non è riuscito a contattare il server. Controlla la connessione e riprova.',
 
   // Configurazione iniziale
@@ -2797,6 +2798,7 @@ const it: Dictionary = {
   'audit.action.userMfaDisabled': 'Accesso in due passaggi disattivato',
   'audit.action.userMfaRecoveryRegenerated': 'Codici di recupero sostituiti',
   'audit.action.userMfaRecoveryUsed': 'Accesso con codice di recupero',
+  'audit.action.userAccountLocked': 'Account bloccato dopo tentativi falliti',
   'audit.action.alertsTelegramChanged': 'Bot o gruppo Telegram degli avvisi modificato',
   'audit.action.tenantMfaRequiredChanged': 'Requisito dell’accesso in due passaggi modificato',
   'audit.action.operatorMfaReset': 'Accesso in due passaggi di un operatore disattivato dal team',

@@ -230,6 +230,7 @@ const ko: Dictionary = {
   'login.platform.helpText': '플랫폼 계정의 비밀번호는 서버에서 scripts/reset-password.js 로 재설정합니다.',
   'console.header': '플랫폼',
   'login.error.invalidCredentials': '사용자 이름 또는 이메일과 비밀번호가 일치하지 않습니다. 인증 정보를 확인하십시오.',
+  'login.error.accountLocked': '실패한 시도가 너무 많아 이 계정이 몇 분간 잠겼습니다. 잠시 후 다시 시도하거나 비밀번호를 재설정하십시오.',
   'login.error.unreachable': '패널이 서버에 연결하지 못했습니다. 연결 상태를 확인한 후 다시 시도하십시오.',
 
   // 최초 설정
@@ -2798,6 +2799,7 @@ const ko: Dictionary = {
   'audit.action.userMfaDisabled': '2단계 로그인 꺼짐',
   'audit.action.userMfaRecoveryRegenerated': '복구 코드 교체',
   'audit.action.userMfaRecoveryUsed': '복구 코드로 로그인',
+  'audit.action.userAccountLocked': '실패한 시도로 계정 잠김',
   'audit.action.alertsTelegramChanged': '알림 텔레그램 봇 또는 그룹 변경',
   'audit.action.tenantMfaRequiredChanged': '2단계 로그인 요구 설정 변경',
   'audit.action.operatorMfaReset': '팀이 운영자의 2단계 로그인을 끔',

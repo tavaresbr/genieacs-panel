@@ -227,6 +227,7 @@ const ar: Dictionary = {
   'login.platform.helpText': 'تُعاد تعيين كلمة مرور حساب المنصة على الخادم، عبر scripts/reset-password.js.',
   'console.header': 'المنصة',
   'login.error.invalidCredentials': 'اسم المستخدم أو كلمة المرور غير مطابقة. تحقّق من بيانات اعتماد المدير.',
+  'login.error.accountLocked': 'محاولات فاشلة كثيرة: هذا الحساب مقفل لبضع دقائق. انتظر وحاول مجددًا، أو أعد تعيين كلمة المرور.',
   'login.error.unreachable': 'تعذّر على اللوحة الوصول إلى الخادم. تحقّق من الاتصال وأعد المحاولة.',
 
   // الإعداد الأولي
@@ -2800,6 +2801,7 @@ const ar: Dictionary = {
   'audit.action.userMfaDisabled': 'تم إيقاف تسجيل الدخول بخطوتين',
   'audit.action.userMfaRecoveryRegenerated': 'تم استبدال رموز الاسترداد',
   'audit.action.userMfaRecoveryUsed': 'تسجيل دخول برمز استرداد',
+  'audit.action.userAccountLocked': 'تم قفل الحساب بعد محاولات فاشلة',
   'audit.action.alertsTelegramChanged': 'تم تغيير بوت أو مجموعة تيليجرام للتنبيهات',
   'audit.action.tenantMfaRequiredChanged': 'تم تغيير اشتراط تسجيل الدخول بخطوتين',
   'audit.action.operatorMfaReset': 'أوقف الفريق تسجيل الدخول بخطوتين لمشغل',

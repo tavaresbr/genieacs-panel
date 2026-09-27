@@ -1,4 +1,8 @@
-FROM node:22-alpine AS frontend-build
+# A imagem base vai fixada por digest (o índice multi-arquitetura de
+# `node:22-alpine`), e não só pela tag: a tag é móvel, e um build de hoje e um
+# de amanhã poderiam sair de bases diferentes sem nenhuma linha mudar aqui. O
+# Dependabot (.github/dependabot.yml) abre o PR quando sai um digest novo.
+FROM node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402 AS frontend-build
 
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
@@ -10,7 +14,7 @@ RUN npm run build
 # `better-sqlite3` ships no prebuilt binary for Alpine's musl libc and has to
 # be compiled, and the compiler belongs in a stage the runtime image never
 # carries: python, make and g++ are a build-time need, not a thing to ship.
-FROM node:22-alpine AS backend-deps
+FROM node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402 AS backend-deps
 
 RUN apk add --no-cache python3 make g++
 WORKDIR /app/backend
@@ -24,7 +28,7 @@ COPY backend/package*.json ./
 COPY backend/scripts ./scripts
 RUN npm ci --omit=dev
 
-FROM node:22-alpine AS runtime
+FROM node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402 AS runtime
 
 ENV APP_ENV=production \
     APP_HOST=0.0.0.0 \

@@ -230,6 +230,7 @@ const ru: Dictionary = {
   'login.platform.helpText': 'Пароль учётной записи платформы сбрасывается на сервере, с помощью scripts/reset-password.js.',
   'console.header': 'Платформа',
   'login.error.invalidCredentials': 'Имя пользователя или адрес эл. почты и пароль не совпадают. Проверьте учётные данные.',
+  'login.error.accountLocked': 'Слишком много неудачных попыток: учётная запись заблокирована на несколько минут. Подождите и попробуйте снова или сбросьте пароль.',
   'login.error.unreachable': 'Панель не смогла связаться с сервером. Проверьте соединение и повторите попытку.',
 
   // Первоначальная настройка
@@ -2799,6 +2800,7 @@ const ru: Dictionary = {
   'audit.action.userMfaDisabled': 'Двухэтапный вход выключен',
   'audit.action.userMfaRecoveryRegenerated': 'Коды восстановления заменены',
   'audit.action.userMfaRecoveryUsed': 'Вход по коду восстановления',
+  'audit.action.userAccountLocked': 'Учётная запись заблокирована после неудачных попыток',
   'audit.action.alertsTelegramChanged': 'Изменён бот или группа Telegram для оповещений',
   'audit.action.tenantMfaRequiredChanged': 'Требование двухэтапного входа изменено',
   'audit.action.operatorMfaReset': 'Двухэтапный вход оператора отключён командой',
