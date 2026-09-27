@@ -141,6 +141,25 @@ describe('reiniciar em lote', () => {
     assert.equal(body.data.results[2].outcome, 'queued');
   });
 
+  it('Solicitar Inform em lote: cada ONT recebe a leitura só na fila, sem connection request', async () => {
+    // Sem connection request o GenieACS só enfileira: 202.
+    genie.state.taskStatus = 202;
+    const antes = (await linhas()).length;
+    const { status, body } = await post({ action: 'inform', deviceIds: IDS.slice(0, 2) });
+
+    assert.equal(status, 200, JSON.stringify(body));
+    assert.deepEqual(body.data.summary, { total: 2, sent: 0, queued: 2, failed: 0 });
+    for (const id of IDS.slice(0, 2)) {
+      const tarefas = genie.state.tasks.filter((entry) => entry.deviceId === id);
+      assert.ok(tarefas.some((entry) => entry.task?.name === 'getParameterValues'), id);
+      assert.ok(tarefas.some((entry) => entry.task?.name === 'refreshObject'), id);
+    }
+    assert.ok(genie.state.tasks.every((entry) => !entry.connectionRequest), 'nenhuma tarefa chama a ONT');
+    const depois = await linhas();
+    assert.equal(depois.length, antes + 1);
+    assert.equal(JSON.parse(depois.at(-1).detail).action, 'inform');
+  });
+
   it(`acima de ${BATCH_LIMIT} aparelhos: 400, nada sai`, async () => {
     const muitos = Array.from({ length: BATCH_LIMIT + 1 }, (_, i) => `ONT-${i}`);
     const { status, body } = await post({ action: 'reboot', deviceIds: muitos });

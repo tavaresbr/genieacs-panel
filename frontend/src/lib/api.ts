@@ -14,7 +14,7 @@ export interface SubscriptionBlockedDetail {
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || ''
 
-export type DeviceBatchAction = 'reboot' | 'firmware'
+export type DeviceBatchAction = 'reboot' | 'firmware' | 'inform'
 
 export interface DeviceBatchResult {
   deviceId: string
