@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import { authHeaders, call, getDb, startTestServers, stopTestServers } from './helpers/harness.js';
 
-const { switchDatabase } = await import('../src/services/dbManagementService.js');
+const { switchDatabase, testConfig } = await import('../src/services/dbManagementService.js');
 
 /**
  * O segundo portão da troca de banco: o que não depende de ninguém lembrar.
@@ -117,5 +117,70 @@ describe('switching the database on a shared deployment', () => {
       () => switchDatabase({ client: 'mysql2', migrateData: true }, { migrateData: true }),
       (error) => error.translationKey === 'database.missingMysqlFields'
     );
+  });
+});
+
+/**
+ * `POST /api/database/test` abria um socket para host e porta do corpo sem
+ * passar pelo portão — e a resposta distingue "conectou", "recusou" e "não
+ * respondeu". Num deploy compartilhado, isso é varredura de portas da rede
+ * interna pelas mãos de um administrador de provedor.
+ */
+describe('testing a database connection on a shared deployment', () => {
+  const sonda = { ...alvo, host: '127.0.0.1', port: 6379 };
+
+  it('is refused the moment a second provider exists, before any socket', async () => {
+    await getDb()('tenants').insert({ slug: 'beta', name: 'Provedor Beta', status: 'active' });
+    try {
+      const { status, body } = await call(`${panelUrl}/api/database/test`, {
+        method: 'POST',
+        headers: authHeaders(token),
+        body: sonda
+      });
+
+      assert.equal(status, 400);
+      assert.equal(body.success, false);
+      // Pelo mesmo motivo do teste da troca: a recusa tem de vir do portão, e
+      // não de a porta estar fechada.
+      assert.match(body.message, /provider|provedor|Anbieter|fournisseur/i);
+      assert.doesNotMatch(body.message, /ECONNREFUSED|ETIMEDOUT/);
+    } finally {
+      await getDb()('tenants').where({ slug: 'beta' }).del();
+    }
+  });
+
+  it('is refused at the service, not merely at the route', async () => {
+    await getDb()('tenants').insert({ slug: 'beta', name: 'Provedor Beta', status: 'suspended' });
+    try {
+      await assert.rejects(
+        () => testConfig(sonda),
+        (error) => error.translationKey === 'database.switchNotSoleProvider'
+      );
+    } finally {
+      await getDb()('tenants').where({ slug: 'beta' }).del();
+    }
+  });
+
+  it('lets a single-provider install through to the next step', async () => {
+    await assert.rejects(
+      () => testConfig({ client: 'mysql2' }),
+      (error) => error.translationKey === 'database.missingMysqlFields'
+    );
+  });
+
+  /**
+   * Com um provedor só a conexão é tentada, e o que volta do driver é o código,
+   * não a prosa: a porta 1 do loopback recusa na hora, sem rede nenhuma.
+   */
+  it('reflects only the driver error code, not its message', async () => {
+    const { status, body } = await call(`${panelUrl}/api/database/test`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: { ...sonda, port: 1 }
+    });
+
+    assert.equal(status, 400);
+    assert.match(body.message, /ECONNREFUSED|CONNECTION_ERROR/);
+    assert.doesNotMatch(body.message, /127\.0\.0\.1|connect /);
   });
 });
