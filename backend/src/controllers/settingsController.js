@@ -15,7 +15,12 @@ import {
 import { forgetSharedAcs } from '../services/genieacs/direct.js';
 import GenieAcsConnection from '../models/GenieAcsConnection.js';
 import { currentTenantId } from '../config/tenantContext.js';
-import { PLATFORM_MANAGED_SETTING_KEYS, platformManagesCurrentTenant } from '../config/platformManaged.js';
+import {
+  PLATFORM_MANAGED_SETTING_KEYS,
+  genieAcsOriginTakenByAnotherTenant,
+  platformManagesCurrentTenant,
+  platformManagesGenieAcsCurrentTenant
+} from '../config/platformManaged.js';
 import SubscriptionService from '../services/subscriptionService.js';
 
 /**
@@ -53,13 +58,39 @@ const PROVIDER_CONNECTION_MODES = Object.freeze(['direct', 'agent']);
 async function genieAcsConnectionSnapshot() {
   return {
     mode: await GenieAcsConnection.mode(),
-    modeEditable: !(await platformManagesCurrentTenant()),
+    // Quem administra o GenieACS escolhe como o painel chega a ele: na SaaS, o
+    // console — ou o próprio provedor, quando o console marcou que o servidor
+    // é dele (`ownership = 'own'`).
+    modeEditable: !(await platformManagesGenieAcsCurrentTenant()),
     agent: await agentStatus()
   };
 }
 
 async function refusesPlatformKey(key) {
-  return PLATFORM_MANAGED_SETTING_KEYS.includes(String(key)) && platformManagesCurrentTenant();
+  return PLATFORM_MANAGED_SETTING_KEYS.includes(String(key)) && platformManagesGenieAcsCurrentTenant();
+}
+
+/**
+ * A credencial pública mais `platformManaged`: se o ACS deste provedor é da
+ * plataforma (só leitura na tela) ou dele. Vai aqui, numa rota autenticada, e
+ * não no perfil público do provedor: quem administra o ACS de quem não é
+ * assunto de quem ainda não entrou.
+ */
+async function authConfigWithManaged(config) {
+  return { ...config, platformManaged: await platformManagesGenieAcsCurrentTenant() };
+}
+
+/**
+ * Na SaaS, o provedor com ACS próprio não grava o endereço do ACS de outro
+ * provedor — ver `genieAcsOriginTakenByAnotherTenant`. 409 com código próprio,
+ * que a tela traduz. Na self-hosted o dono da instalação é um só.
+ */
+async function refusesTakenOrigin(req, res, key, value) {
+  if (String(key) !== 'genieAcsUrl' || !(await platformManagesCurrentTenant())) return null;
+  if (!(await genieAcsOriginTakenByAnotherTenant(value))) return null;
+  return res.status(409).json(
+    createErrorResponse(req.t('settings.genieAcsOriginInUse'), null, 'genieacs_origin_in_use')
+  );
 }
 import OnboardingService from '../services/onboardingService.js';
 import { classifySyncError } from '../services/customerSyncErrors.js';
@@ -229,7 +260,7 @@ class SettingsController {
     try {
       return res.json(createResponse(
         req.t('settings.listRetrieved'),
-        await GenieAcsAuthService.getPublicConfig()
+        await authConfigWithManaged(await GenieAcsAuthService.getPublicConfig())
       ));
     } catch (error) {
       console.error('Get GenieACS auth error:', error);
@@ -239,7 +270,7 @@ class SettingsController {
 
   static async updateGenieAcsAuth(req, res) {
     try {
-      if (await platformManagesCurrentTenant()) return platformManagedResponse(req, res);
+      if (await platformManagesGenieAcsCurrentTenant()) return platformManagedResponse(req, res);
       const authType = req.body?.authType;
       if (authType !== undefined && !AUTH_TYPES.includes(authType)) {
         return res.status(400).json(
@@ -282,7 +313,7 @@ class SettingsController {
           secretConfigured: salvo.secretConfigured
         }
       });
-      return res.json(createResponse(req.t('settings.updated'), salvo));
+      return res.json(createResponse(req.t('settings.updated'), await authConfigWithManaged(salvo)));
     } catch (error) {
       console.error('Update GenieACS auth error:', error);
       return res.status(500).json(createErrorResponse(req.t('common.internalError'), error.message));
@@ -308,12 +339,15 @@ class SettingsController {
   /**
    * `PUT /api/settings/genieacs-connection` — `{ mode: 'direct'|'agent' }`.
    *
-   * Na SaaS o modo é da plataforma: 403 `platform_managed`, como o endereço.
+   * Na SaaS o modo é de quem administra o GenieACS, como o endereço: 403
+   * `platform_managed` se é a plataforma; o provedor com servidor próprio
+   * escolhe. O túnel fica de fora aqui em qualquer caso: ele mexe na regra de
+   * rede do PAINEL, e isso é só do console.
    * Sair de `agent` derruba a conexão do agente (fechamento `4003`).
    */
   static async updateGenieAcsConnection(req, res) {
     try {
-      if (await platformManagesCurrentTenant()) return platformManagedResponse(req, res);
+      if (await platformManagesGenieAcsCurrentTenant()) return platformManagedResponse(req, res);
       const mode = req.body?.mode;
       if (!PROVIDER_CONNECTION_MODES.includes(mode)) {
         return res.status(400).json(
@@ -437,6 +471,8 @@ class SettingsController {
       if (validated.errorKey) {
         return res.status(400).json(createErrorResponse(req.t(validated.errorKey)));
       }
+      const recusada = await refusesTakenOrigin(req, res, key, validated.value);
+      if (recusada) return recusada;
 
       const teto = await auditRetentionAboveCap(String(key), validated.value);
       if (teto !== null) {
@@ -474,6 +510,8 @@ class SettingsController {
       if (validated.errorKey) {
         return res.status(400).json(createErrorResponse(req.t(validated.errorKey)));
       }
+      const recusada = await refusesTakenOrigin(req, res, key, validated.value);
+      if (recusada) return recusada;
 
       const teto = await auditRetentionAboveCap(String(key), validated.value);
       if (teto !== null) {
@@ -497,6 +535,7 @@ class SettingsController {
       // painel fala é outra coisa: é para onde vão as credenciais dos
       // assinantes daquele provedor.
       if (key === 'genieAcsUrl') {
+        forgetSharedAcs();
         await AuditLog.fromRequest(req, {
           action: AuditLog.ACTIONS.GENIEACS_URL_CHANGED,
           subjectType: 'settings',
@@ -615,11 +654,13 @@ class SettingsController {
 
   static async testGenieAcsConnection(req, res) {
     try {
-      // Na SaaS o provedor não escolhe para onde o painel fala: testa o
-      // endereço que a plataforma gravou, e o corpo do request é ignorado. É
-      // o que mantém o botão útil ("o ACS está respondendo?") sem ele virar
-      // uma sonda para endereços que o provedor não pode gravar.
-      const url = (await platformManagesCurrentTenant())
+      // Na SaaS, com o ACS da plataforma, o provedor não escolhe para onde o
+      // painel fala: testa o endereço que a plataforma gravou, e o corpo do
+      // request é ignorado. É o que mantém o botão útil ("o ACS está
+      // respondendo?") sem ele virar uma sonda para endereços que o provedor
+      // não pode gravar. Com ACS próprio ele testa o que digitou, como na
+      // self-hosted — pelo mesmo guarda de saída.
+      const url = (await platformManagesGenieAcsCurrentTenant())
         ? await DeviceService.getGenieAcsUrl().catch(() => null)
         : req.body?.url;
       const { status, body } = await probeGenieAcs(req.t, url);

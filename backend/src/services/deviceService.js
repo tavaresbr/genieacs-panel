@@ -2377,6 +2377,13 @@ class DeviceService {
       }
 
       try {
+        if (action === 'inform') {
+          // The summon of the device page, queued: no connection request, so
+          // a fleet behind CGNAT does not make the batch wait out the ACS's
+          // timeout once per ONT. Each one reports at its next periodic Inform.
+          const { reached } = await this.summonDevice(deviceId, [], { connectionRequest: false });
+          return { deviceId, outcome: reached ? 'sent' : 'queued', reason: null };
+        }
         const { applied } = await this.postProvisioningTask(deviceId, task);
         return { deviceId, outcome: applied ? 'sent' : 'queued', reason: null };
       } catch (error) {
@@ -2720,7 +2727,7 @@ class DeviceService {
     await this.writeRxPowerState([], { eagerUntil: Date.now() + this.RX_POWER_EAGER_MS });
   }
 
-  static async summonDevice(deviceId, parameters = []) {
+  static async summonDevice(deviceId, parameters = [], { connectionRequest = true } = {}) {
     if (!Array.isArray(parameters) || parameters.length > 100) {
       throw new Error('Parameters must be an array with at most 100 entries');
     }
@@ -2738,7 +2745,7 @@ class DeviceService {
         'InternetGatewayDevice.DeviceInfo.SerialNumber',
         ...parameters
       ]
-    });
+    }, { connectionRequest });
 
     if (data && data.fault && data.fault.faultString) {
       throw new Error(data.fault.faultString);
@@ -2753,7 +2760,9 @@ class DeviceService {
       refreshed,
       reached,
       reason,
-      ...(reached ? {} : await this.summonSilence(deviceId))
+      // Only when the ONT was actually tried: a batch that just queues has
+      // nobody reading how long each one has been silent.
+      ...(reached || !connectionRequest ? {} : await this.summonSilence(deviceId))
     };
   }
 

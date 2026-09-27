@@ -849,6 +849,7 @@ export default {
   'contacts.invoiceMessage.pix': 'PIX copy and paste:',
   'contacts.invoiceMessage.link': 'Bill:',
   'settings.platformManaged': 'This setting is managed by the platform administrator',
+  'settings.genieAcsOriginInUse': "This address is already another provider's GenieACS. To share an ACS, contact the platform administrator",
   'settings.validation.auditRetentionAboveCap': 'Your plan keeps the audit trail for at most {max} days',
   'whatsapp.error.platformServerMissing': 'The platform has not configured its WhatsApp server yet. Contact the platform administrator',
   'whatsapp.error.retentionAboveCap': 'Your plan keeps WhatsApp history for at most {max} days',

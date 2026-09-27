@@ -9,7 +9,7 @@ import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { probeGenieAcs } from './settingsController.js';
 import { VIRTUAL_PARAMETER_KEYS } from '../config/platformManaged.js';
 import { getDb } from '../config/database.js';
-import GenieAcsConnection, { CONNECTION_MODES } from '../models/GenieAcsConnection.js';
+import GenieAcsConnection, { CONNECTION_MODES, GENIEACS_OWNERSHIPS } from '../models/GenieAcsConnection.js';
 import { DEVICE_SCOPE_KEY, DEVICE_SCOPE_TAG_PATTERN, forgetSharedAcs } from '../services/genieacs/direct.js';
 import { afterModeChange, agentStatus, issueAgentToken } from '../services/genieacs/agent.js';
 import { TAG_PREFIX } from '../services/deviceTagService.js';
@@ -27,6 +27,10 @@ import DeviceScopeTagger, {
  * `app_state` da credencial daquele tenant. O console só escreve lá de fora,
  * dentro do `runInTenant` do alvo, que é o mesmo caminho das outras ações do
  * plano de controle sobre um provedor.
+ *
+ * A exceção é o provedor com servidor próprio (`ownership = 'own'`, escolhido
+ * aqui): aí ele mesmo grava endereço, credencial e parâmetros TR-069 na tela
+ * dele. O console continua podendo editar tudo, para o suporte.
  *
  * Mensagens em inglês e sem tradução, como o resto do console.
  */
@@ -147,6 +151,7 @@ async function snapshot(tenant) {
     lastAutoTag: await DeviceScopeTagger.lastAuto(),
     auth: await GenieAcsAuthService.getPublicConfig(),
     mode: await GenieAcsConnection.mode(),
+    ownership: await GenieAcsConnection.ownership(),
     agent: await agentStatus(),
     suggestion: suggestGenieAcsUrl(tenant)
   }));
@@ -167,12 +172,16 @@ class PlatformGenieAcsController {
   }
 
   /**
-   * `PUT /api/platform/tenants/:id/genieacs` — `{ url?, mode?, authType?, username?, secret?, virtualParameters?, deviceTag?, autoTagPrefixes? }`.
+   * `PUT /api/platform/tenants/:id/genieacs` — `{ url?, mode?, ownership?, authType?, username?, secret?, virtualParameters?, deviceTag?, autoTagPrefixes? }`.
    *
    * `mode` é como o painel chega ao ACS: `direct`, `tunnel` (rede privada
    * de cliente liberada para este provedor) ou `agent` (o programa na rede do
    * provedor, por WebSocket de saída). Na SaaS só a plataforma escolhe. Sair
    * de `agent` derruba a conexão do agente (fechamento `4003`).
+   *
+   * `ownership` é quem administra o ACS: `platform` ou `own` (o servidor é do
+   * provedor, e endereço, credencial e parâmetros TR-069 passam a ser dele).
+   * Voltar para `platform` mantém o que ele gravou.
    *
    * Campo ausente mantém o que está lá, e `secret` segue a regra da tela do
    * provedor: `undefined` mantém, `''` apaga.
@@ -190,6 +199,9 @@ class PlatformGenieAcsController {
       }
       if (corpo.mode !== undefined && !CONNECTION_MODES.includes(corpo.mode)) {
         return res.status(400).json(createErrorResponse(`mode must be one of ${CONNECTION_MODES.join(', ')}`));
+      }
+      if (corpo.ownership !== undefined && !GENIEACS_OWNERSHIPS.includes(corpo.ownership)) {
+        return res.status(400).json(createErrorResponse(`ownership must be one of ${GENIEACS_OWNERSHIPS.join(', ')}`));
       }
       if (corpo.authType !== undefined && !AUTH_TYPES.includes(corpo.authType)) {
         return res.status(400).json(createErrorResponse(`authType must be one of ${AUTH_TYPES.join(', ')}`));
@@ -249,6 +261,7 @@ class PlatformGenieAcsController {
       const tagNova = mandouTag ? String(corpo.deviceTag).trim() : antes.deviceTag;
       const mudouTag = mandouTag && tagNova !== antes.deviceTag;
       const mudouModo = corpo.mode !== undefined && corpo.mode !== antes.mode;
+      const mudouDono = corpo.ownership !== undefined && corpo.ownership !== antes.ownership;
       const vpsMudados = vps.value
         ? Object.entries(vps.value).filter(([key, v]) => v !== antes.virtualParameters[key])
         : [];
@@ -259,6 +272,7 @@ class PlatformGenieAcsController {
           await GenieAcsConnection.setMode(corpo.mode);
           afterModeChange(antes.mode, corpo.mode);
         }
+        if (mudouDono) await GenieAcsConnection.setOwnership(corpo.ownership);
         if (mudouTag) await Setting.upsert(DEVICE_SCOPE_KEY, tagNova);
         if (mudouPrefixos) await Setting.upsert(AUTO_PREFIXES_KEY, prefixosNovos.join(','));
         for (const [key, v] of vpsMudados) await Setting.upsert(key, v);
@@ -277,7 +291,7 @@ class PlatformGenieAcsController {
       if (mudouUrl || mudouTag || mudouModo) forgetSharedAcs();
       const depois = await snapshot(tenant);
 
-      if (!mudouUrl && !mudouModo && !mudouTag && !mudouPrefixos && !mandouAuth && vpsMudados.length === 0) {
+      if (!mudouUrl && !mudouModo && !mudouDono && !mudouTag && !mudouPrefixos && !mandouAuth && vpsMudados.length === 0) {
         return res.json(createResponse('GenieACS configuration unchanged', depois));
       }
 
@@ -287,6 +301,7 @@ class PlatformGenieAcsController {
       const detail = {};
       if (mudouUrl) detail.url = { from: antes.url || null, to: urlNova || null };
       if (mudouModo) detail.mode = { from: antes.mode, to: corpo.mode };
+      if (mudouDono) detail.ownership = { from: antes.ownership, to: corpo.ownership };
       if (mudouTag) detail.deviceTag = { from: antes.deviceTag || null, to: tagNova || null };
       if (mudouPrefixos) detail.autoTagPrefixes = { from: antes.autoTagPrefixes, to: prefixosNovos };
       if (vpsMudados.length) {
@@ -324,6 +339,15 @@ class PlatformGenieAcsController {
           subjectType: 'settings',
           subjectId: 'genieacs-connection',
           detail: detail.mode
+        }));
+      }
+      if (mudouDono) {
+        await runInTenant(tenant.id, () => AuditLog.fromRequest(req, {
+          action: AuditLog.ACTIONS.GENIEACS_OWNERSHIP_CHANGED,
+          actorKind: 'platform',
+          subjectType: 'settings',
+          subjectId: 'genieacs-ownership',
+          detail: detail.ownership
         }));
       }
       if (mandouAuth) {

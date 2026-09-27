@@ -849,6 +849,7 @@ export default {
   'contacts.invoiceMessage.pix': 'PIX कॉपी और पेस्ट:',
   'contacts.invoiceMessage.link': 'बिल:',
   'settings.platformManaged': 'यह सेटिंग प्लेटफ़ॉर्म व्यवस्थापक द्वारा प्रबंधित की जाती है',
+  'settings.genieAcsOriginInUse': 'यह पता पहले से किसी अन्य प्रदाता का GenieACS है। ACS साझा करने के लिए प्लेटफ़ॉर्म व्यवस्थापक से संपर्क करें',
   'settings.validation.auditRetentionAboveCap': 'आपका प्लान ऑडिट ट्रेल को अधिकतम {max} दिनों तक रखता है',
   'whatsapp.error.platformServerMissing': 'प्लेटफ़ॉर्म ने अभी तक अपना WhatsApp सर्वर कॉन्फ़िगर नहीं किया है। प्लेटफ़ॉर्म व्यवस्थापक से संपर्क करें',
   'whatsapp.error.retentionAboveCap': 'आपका प्लान WhatsApp इतिहास को अधिकतम {max} दिनों तक रखता है',

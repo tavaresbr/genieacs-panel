@@ -2,9 +2,11 @@ import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 /**
- * O modo `agent` na SaaS: quem escolhe o modo é a plataforma, pelo console, e
- * a tela do provedor só lê — mas a CHAVE o provedor gera (é ele quem instala o
- * agente na rede dele), quando a plataforma já o pôs em `agent`.
+ * O modo `agent` na SaaS: quem escolhe o modo é quem administra o GenieACS — a
+ * plataforma, pelo console, e a tela do provedor só lê; ou o próprio provedor,
+ * quando o console marcou o servidor como dele (`ownership = 'own'`). A CHAVE o
+ * provedor gera nos dois casos (é ele quem instala o agente na rede dele),
+ * quando o modo já é `agent`.
  *
  * Arquivo à parte de `genieacs-agent.test.js` porque a edição é lida na carga:
  * um processo é SaaS ou self-hosted, nunca os dois.
@@ -81,6 +83,30 @@ describe('a tela do provedor, na SaaS', () => {
     assert.equal(status, 201, JSON.stringify(body));
     chaves.push(body.data.token);
     assert.match(body.data.token, /^sgpa_[A-Za-z0-9_-]{43}$/);
+  });
+
+  it('com o servidor próprio (ownership own), o provedor escolhe entre direto e agente — túnel, não', async () => {
+    const dono = await api(`/platform/tenants/${alfa}/genieacs`, { method: 'PUT', body: { ownership: 'own' } });
+    assert.equal(dono.status, 200, JSON.stringify(dono.body));
+    try {
+      const lido = await api('/settings/genieacs-connection');
+      assert.equal(lido.body.data.modeEditable, true);
+
+      const direto = await api('/settings/genieacs-connection', { method: 'PUT', body: { mode: 'direct' } });
+      assert.equal(direto.status, 200, JSON.stringify(direto.body));
+      assert.equal(await runInTenant(alfa, () => GenieAcsConnection.mode()), 'direct');
+
+      const tunel = await api('/settings/genieacs-connection', { method: 'PUT', body: { mode: 'tunnel' } });
+      assert.equal(tunel.status, 400, 'o túnel mexe na regra de rede do painel: é só do console');
+
+      const agente = await api('/settings/genieacs-connection', { method: 'PUT', body: { mode: 'agent' } });
+      assert.equal(agente.status, 200, JSON.stringify(agente.body));
+    } finally {
+      await api(`/platform/tenants/${alfa}/genieacs`, { method: 'PUT', body: { ownership: 'platform' } });
+    }
+    // De volta à plataforma, a escolha volta a ser só do console.
+    const depois = await api('/settings/genieacs-connection', { method: 'PUT', body: { mode: 'direct' } });
+    assert.equal(depois.status, 403);
   });
 });
 

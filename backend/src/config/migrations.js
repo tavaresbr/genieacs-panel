@@ -1662,7 +1662,7 @@ const LOCKOUT_TABLES = [
 ];
 
 /**
- * O que o modo `agent` (0072) acrescentou à conexão do provedor.
+ * O que o modo `agent` (0073) acrescentou à conexão do provedor.
  *
  * - `agent_token_hash`: o sha256 (hex) da chave do agente. A chave em si só
  *   existe na resposta que a gerou e no arquivo de ambiente da máquina do
@@ -1700,6 +1700,9 @@ const tenantGenieAcsConnectionsTable = (db) => (t) => {
   t.integer('tenant_id').unsigned().notNullable()
     .references('id').inTable('tenants').onDelete('CASCADE');
   t.string('mode', 16).notNullable().defaultTo('direct');
+  // Quem administra o ACS na SaaS: `platform` (o console grava URL, credencial
+  // e parâmetros TR-069) ou `own` (o servidor é do provedor, e ele mesmo grava).
+  t.string('ownership', 16).notNullable().defaultTo('platform');
   for (const [, add] of GENIEACS_AGENT_COLUMNS) add(t);
   t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
   t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
@@ -4210,6 +4213,25 @@ export const migrations = [
   },
   {
     /**
+     * Quem administra o GenieACS do provedor — ver
+     * `tenantGenieAcsConnectionsTable`. Todo mundo começa com `platform`, que
+     * é o que a SaaS já fazia; a tabela nova da 0069 já nasce com a coluna.
+     */
+    id: '0072_tenant_genieacs_ownership',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenant_genieacs_connections'))) return true;
+      return db.schema.hasColumn('tenant_genieacs_connections', 'ownership');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenant_genieacs_connections'))) return;
+      if (await db.schema.hasColumn('tenant_genieacs_connections', 'ownership')) return;
+      await db.schema.alterTable('tenant_genieacs_connections', (t) => {
+        t.string('ownership', 16).notNullable().defaultTo('platform');
+      });
+    }
+  },
+  {
+    /**
      * O modo `agent` do GenieACS — ver `GENIEACS_AGENT_COLUMNS`.
      *
      * Numa instalação nova a 0069 já cria a tabela com estas colunas (e o
@@ -4217,7 +4239,7 @@ export const migrations = [
      * delas existirem, acrescenta. O índice único sai junto com as colunas, no
      * mesmo `alterTable`, porque só falta quando elas faltam.
      */
-    id: '0072_genieacs_agent',
+    id: '0073_genieacs_agent',
     async isApplied(db) {
       if (!(await db.schema.hasTable('tenant_genieacs_connections'))) return true;
       return (await missingColumns(db, 'tenant_genieacs_connections', GENIEACS_AGENT_COLUMNS)).length === 0;

@@ -6,6 +6,7 @@ import {
   type GenieAcsAgentStatus,
   type GenieAcsAuthType,
   type GenieAcsConnectionMode,
+  type GenieAcsOwnership,
   type Tenant,
   type TenantDeviceTagging,
   type TenantGenieAcs as TenantGenieAcsData
@@ -48,6 +49,10 @@ const AUTH_LABELS: Record<GenieAcsAuthType, TranslationKey> = {
  * painel para qualquer endereço usaria o painel como ponte para dentro da rede
  * da plataforma. Ele continua vendo o endereço e testando a conexão.
  *
+ * A exceção é o provedor com servidor próprio: marcado aqui, ele passa a gravar
+ * endereço, credencial e parâmetros TR-069 na tela dele. Os campos continuam
+ * editáveis aqui, para o suporte.
+ *
  * O segredo nunca volta do servidor: o campo vazio mantém o guardado, e apagar
  * é um pedido explícito — a mesma regra da tela do provedor.
  *
@@ -67,6 +72,7 @@ export function TenantGenieAcs({ tenant }: Props) {
   const [data, setData] = useState<TenantGenieAcsData | null>(null)
   const [url, setUrl] = useState('')
   const [mode, setMode] = useState<GenieAcsConnectionMode>('direct')
+  const [ownership, setOwnership] = useState<GenieAcsOwnership>('platform')
   const [authType, setAuthType] = useState<GenieAcsAuthType>('none')
   const [username, setUsername] = useState('')
   const [secret, setSecret] = useState('')
@@ -88,6 +94,7 @@ export function TenantGenieAcs({ tenant }: Props) {
     setData(next)
     setUrl(next.url)
     setMode(next.mode ?? 'direct')
+    setOwnership(next.ownership ?? 'platform')
     setAuthType(next.auth.authType)
     setUsername(next.auth.username)
     setSecret('')
@@ -127,6 +134,7 @@ export function TenantGenieAcs({ tenant }: Props) {
       const res = await platformAPI.updateTenantGenieAcs(tenant.id, {
         url: url.trim(),
         mode,
+        ownership,
         authType,
         username: username.trim(),
         ...(clearSecret ? { secret: '' } : secret ? { secret } : {}),
@@ -188,6 +196,24 @@ export function TenantGenieAcs({ tenant }: Props) {
       <div>
         <h3 className="font-semibold text-foreground">{t('platform.genieacs.title')}</h3>
         <p className="mt-1 text-sm text-muted-foreground">{t('platform.genieacs.description')}</p>
+      </div>
+
+      <div>
+        <label htmlFor={`tenant-${tenant.id}-acs-ownership`} className="block text-sm font-medium mb-1">
+          {t('platform.genieacs.ownership')}
+        </label>
+        <select
+          id={`tenant-${tenant.id}-acs-ownership`}
+          className="modern-input w-full md:w-80"
+          value={ownership}
+          onChange={(e) => setOwnership(e.target.value as GenieAcsOwnership)}
+        >
+          <option value="platform">{t('platform.genieacs.ownershipPlatform')}</option>
+          <option value="own">{t('platform.genieacs.ownershipOwn')}</option>
+        </select>
+        <p className="field-hint">
+          {t(ownership === 'own' ? 'platform.genieacs.ownershipOwnHint' : 'platform.genieacs.ownershipPlatformHint')}
+        </p>
       </div>
 
       <div>

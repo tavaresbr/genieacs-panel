@@ -850,6 +850,7 @@ export default {
   'contacts.invoiceMessage.pix': 'PIX (скопировать и вставить):',
   'contacts.invoiceMessage.link': 'Счёт:',
   'settings.platformManaged': 'Этим параметром управляет администратор платформы',
+  'settings.genieAcsOriginInUse': 'Этот адрес уже используется GenieACS другого провайдера. Чтобы разделить ACS, обратитесь к администратору платформы',
   'settings.validation.auditRetentionAboveCap': 'Ваш тариф хранит журнал аудита не более {max} дней',
   'whatsapp.error.platformServerMissing': 'Платформа ещё не настроила свой сервер WhatsApp. Обратитесь к администратору платформы',
   'whatsapp.error.retentionAboveCap': 'Ваш тариф хранит историю WhatsApp не более {max} дней',

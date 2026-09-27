@@ -11,7 +11,14 @@ import { TenantCache } from '../config/tenantCache.js';
  */
 export const CONNECTION_MODES = Object.freeze(['direct', 'tunnel', 'agent']);
 
+/**
+ * Quem administra o ACS na SaaS: `platform` (o console) ou `own` (o provedor,
+ * com o servidor dele). Na self-hosted não faz diferença: lá é tudo do provedor.
+ */
+export const GENIEACS_OWNERSHIPS = Object.freeze(['platform', 'own']);
+
 const DEFAULT_MODE = 'direct';
+const DEFAULT_OWNERSHIP = 'platform';
 
 /** Teto de `agent_version`, que é a largura da coluna. */
 const AGENT_VERSION_MAX = 32;
@@ -33,33 +40,48 @@ export function sanitizeAgentVersion(raw) {
 }
 
 /**
- * Como o painel chega ao GenieACS do provedor em escopo
- * (`tenant_genieacs_connections`). Sem linha, `direct`.
+ * Como o painel chega ao GenieACS do provedor em escopo, e quem o administra
+ * (`tenant_genieacs_connections`). Sem linha, `direct` e `platform`.
  */
 class GenieAcsConnection {
-  static async mode() {
+  static async #row() {
     const guardado = cache.get();
     if (guardado) return guardado;
-    const row = await tdb('tenant_genieacs_connections').first('mode');
-    const mode = CONNECTION_MODES.includes(row?.mode) ? row.mode : DEFAULT_MODE;
-    cache.set(mode);
-    return mode;
+    const row = await tdb('tenant_genieacs_connections').first('mode', 'ownership');
+    const valor = {
+      mode: CONNECTION_MODES.includes(row?.mode) ? row.mode : DEFAULT_MODE,
+      ownership: GENIEACS_OWNERSHIPS.includes(row?.ownership) ? row.ownership : DEFAULT_OWNERSHIP
+    };
+    cache.set(valor);
+    return valor;
   }
 
-  static async setMode(mode) {
-    if (!CONNECTION_MODES.includes(mode)) throw new Error(`Unknown GenieACS connection mode: ${mode}`);
-    await this.upsert({ mode });
-    cache.invalidate();
-  }
-
-  /** Grava na linha do provedor em escopo, criando-a (em `direct`) se não houver. */
-  static async upsert(patch) {
+  static async #upsert(patch) {
     const existe = await tdb('tenant_genieacs_connections').first('id');
     if (existe) {
       await tdb('tenant_genieacs_connections').update({ ...patch, updated_at: new Date() });
     } else {
-      await tinsert('tenant_genieacs_connections', { mode: DEFAULT_MODE, ...patch });
+      await tinsert('tenant_genieacs_connections', patch);
     }
+    cache.invalidate();
+  }
+
+  static async mode() {
+    return (await GenieAcsConnection.#row()).mode;
+  }
+
+  static async ownership() {
+    return (await GenieAcsConnection.#row()).ownership;
+  }
+
+  static async setMode(mode) {
+    if (!CONNECTION_MODES.includes(mode)) throw new Error(`Unknown GenieACS connection mode: ${mode}`);
+    await GenieAcsConnection.#upsert({ mode });
+  }
+
+  static async setOwnership(ownership) {
+    if (!GENIEACS_OWNERSHIPS.includes(ownership)) throw new Error(`Unknown GenieACS ownership: ${ownership}`);
+    await GenieAcsConnection.#upsert({ ownership });
   }
 
   /**
@@ -81,7 +103,7 @@ class GenieAcsConnection {
 
   /** Troca a chave do agente do provedor em escopo: o digest novo substitui o velho. */
   static async setAgentToken(hash, hint) {
-    await this.upsert({
+    await GenieAcsConnection.#upsert({
       agent_token_hash: hash,
       agent_token_hint: hint,
       agent_token_created_at: new Date()

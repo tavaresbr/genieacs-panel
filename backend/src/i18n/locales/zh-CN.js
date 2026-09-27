@@ -849,6 +849,7 @@ export default {
   'contacts.invoiceMessage.pix': 'PIX 复制粘贴：',
   'contacts.invoiceMessage.link': '账单：',
   'settings.platformManaged': '此设置由平台管理员管理',
+  'settings.genieAcsOriginInUse': '此地址已是其他服务商的 GenieACS。如需共享 ACS，请联系平台管理员',
   'settings.validation.auditRetentionAboveCap': '您的套餐最多保留审计记录 {max} 天',
   'whatsapp.error.platformServerMissing': '平台尚未配置其 WhatsApp 服务器。请联系平台管理员',
   'whatsapp.error.retentionAboveCap': '您的套餐最多保留 WhatsApp 历史 {max} 天',
