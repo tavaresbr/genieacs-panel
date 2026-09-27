@@ -842,6 +842,7 @@ export default {
   'contacts.invoiceMessage.pix': 'PIX copier-coller :',
   'contacts.invoiceMessage.link': 'Facture :',
   'settings.platformManaged': "Ce paramètre est géré par l'administrateur de la plateforme",
+  'settings.genieAcsOriginInUse': "Cette adresse est déjà le GenieACS d'un autre fournisseur. Pour partager un ACS, contactez l'administrateur de la plateforme",
   'settings.validation.auditRetentionAboveCap': "Votre forfait conserve le journal d'audit au maximum {max} jours",
   'whatsapp.error.platformServerMissing': "La plateforme n'a pas encore configuré son serveur WhatsApp. Contactez l'administrateur de la plateforme",
   'whatsapp.error.retentionAboveCap': "Votre forfait conserve l'historique WhatsApp au maximum {max} jours",

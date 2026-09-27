@@ -1,6 +1,7 @@
 import { IS_SAAS } from './edition.js';
 import { currentTenantId } from './tenantContext.js';
 import { getDb } from './database.js';
+import GenieAcsConnection from '../models/GenieAcsConnection.js';
 
 /**
  * A fronteira entre o que a plataforma configura e o que o provedor configura.
@@ -17,6 +18,11 @@ import { getDb } from './database.js';
  * A caixa da plataforma (`kind = 'platform'`) é a exceção dentro da SaaS: é
  * nela que o administrador da plataforma edita o que vale para todos, então
  * ela nunca é "gerenciada pela plataforma" — ela É a plataforma.
+ *
+ * O GenieACS tem uma segunda exceção, por provedor: o console pode marcar que
+ * o provedor usa o PRÓPRIO servidor (`tenant_genieacs_connections.ownership =
+ * 'own'`). Aí o endereço, a credencial e os parâmetros TR-069 voltam para as
+ * mãos dele. O WhatsApp não muda com isso.
  */
 
 /**
@@ -50,4 +56,41 @@ export async function platformManagesCurrentTenant() {
   if (!IS_SAAS) return false;
   const tenant = await getDb()('tenants').where({ id: currentTenantId() }).first();
   return platformManages(tenant);
+}
+
+/**
+ * Se o GenieACS do provedor em escopo é da plataforma: SaaS, não é a caixa da
+ * plataforma, e o console não marcou que ele usa o próprio servidor.
+ */
+export async function platformManagesGenieAcsCurrentTenant() {
+  if (!(await platformManagesCurrentTenant())) return false;
+  return (await GenieAcsConnection.ownership()) !== 'own';
+}
+
+function origemDe(url) {
+  try {
+    return url ? new URL(String(url).trim()).origin : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Se a origem de `url` já é o ACS de outro provedor (ou o da plataforma).
+ *
+ * Um provedor com ACS próprio grava o endereço que quiser; se ele gravasse o
+ * endereço de um vizinho, o painel passaria a tratar os dois como um ACS
+ * compartilhado, e o vizinho sem tag de equipamentos deixaria de ver a frota
+ * dele. Dividir um ACS é decisão da plataforma, pelo console.
+ */
+export async function genieAcsOriginTakenByAnotherTenant(url) {
+  const origem = origemDe(url);
+  if (!origem) return false;
+  // tenant-scope-exempt: comparar com o ACS dos outros provedores é o trabalho
+  // desta leitura; nada dela volta para quem pergunta além do sim/não.
+  const rows = await getDb()('settings')
+    .where({ key: 'genieAcsUrl' })
+    .whereNot('tenant_id', currentTenantId())
+    .select('value');
+  return rows.some((row) => origemDe(row.value) === origem);
 }
