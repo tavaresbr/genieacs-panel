@@ -5,6 +5,7 @@ import SgpLink from '../models/SgpLink.js';
 import SgpContact from '../models/SgpContact.js';
 import DeviceService from './deviceService.js';
 import DeviceTagService from './deviceTagService.js';
+import DeviceSwapService from './deviceSwapService.js';
 import { createSecretBox } from '../utils/secretBox.js';
 import { PinnedTransport, RESPONSE_TOO_LARGE } from '../utils/net/pinnedFetch.js';
 import { IS_SAAS } from '../config/edition.js';
@@ -2011,7 +2012,16 @@ class SgpService {
   static async syncFleet() {
     const config = this.requireReady(await this.getConfig());
     const startedAt = new Date();
-    const targets = await this.syncTargets(config);
+    // First, so the refresh below confirms the links where they now are.
+    let relinked = 0;
+    let stranded = new Set();
+    try {
+      ({ relinked, stranded } = await this.relinkStale());
+    } catch (error) {
+      console.warn(`SGP fleet sync could not look for stranded links: ${error.message}`);
+    }
+    const targets = (await this.syncTargets(config))
+      .filter((target) => !stranded.has(String(target.device_id)));
     const stored = new Map(
       (await SgpLink.getAll()).map((link) => [link.device_id, link])
     );
@@ -2021,7 +2031,8 @@ class SgpService {
       created: 0,
       updated: 0,
       failed: 0,
-      skipped: 0
+      skipped: 0,
+      relinked
     };
 
     let cursor = 0;
@@ -2063,6 +2074,85 @@ class SgpService {
     return result;
   }
 
+  /**
+   * The equipment that most likely took over from a silent ONT: another
+   * device reporting the same PPPoE login, or one already linked to the same
+   * contract, that informed more recently. The most recent wins; null when
+   * there is none, which means the ONT is unplugged or its replacement never
+   * reached this GenieACS.
+   */
+  static findSuccessor(device, link, devices, links) {
+    const deviceId = String(device?._id || '');
+    const login = normalizeLogin(link?.login) || normalizeLogin(device?.pppoe);
+    const since = device?._lastInform ? new Date(device._lastInform).getTime() : Number.NEGATIVE_INFINITY;
+    let best = null;
+    for (const other of devices) {
+      const otherId = String(other?._id || '');
+      if (!otherId || otherId === deviceId || !other._lastInform) continue;
+      const informedAt = new Date(other._lastInform).getTime();
+      if (!(informedAt > since)) continue;
+      const matchedBy = login && normalizeLogin(other.pppoe) === login
+        ? 'pppoe'
+        : link?.contract && links.get(otherId)?.contract === link.contract
+          ? 'contract'
+          : null;
+      if (!matchedBy) continue;
+      if (!best || informedAt > best.informedAt) {
+        best = { deviceId: otherId, lastInform: other._lastInform, matchedBy, informedAt };
+      }
+    }
+    if (!best) return null;
+    const { informedAt, ...successor } = best;
+    return successor;
+  }
+
+  /**
+   * Moves the links stranded on ONTs that went silent days ago onto the ONT
+   * now informing with the same PPPoE login.
+   *
+   * The swap detection in `CustomerService.ensureAccount` only runs with
+   * generated Customer IDs and only once the new ONT's login was read, so an
+   * operator without either kept seeing the contract on the old ONT — N/D
+   * everywhere — while the subscriber browsed through the new one, and every
+   * fleet sync confirmed the stale link again. `DeviceSwapService.record`
+   * moves the link, reconciles the tags, logs the swap for the dashboard and
+   * holds a pair that keeps trading the login. A manual link is the
+   * operator's and is never moved.
+   *
+   * Returns the stranded ONTs too, so the sweep that follows does not look
+   * their login up again and write the contract straight back onto them.
+   */
+  static async relinkStale() {
+    const devices = await DeviceService.getCustomerIdentityDevices();
+    const links = new Map((await SgpLink.getAll()).map((link) => [link.device_id, link]));
+    const now = Date.now();
+    const ageOf = (device) => (device?._lastInform
+      ? now - new Date(device._lastInform).getTime()
+      : Number.POSITIVE_INFINITY);
+    let relinked = 0;
+    const stranded = new Set();
+    for (const device of devices) {
+      const deviceId = String(device._id || '');
+      const link = links.get(deviceId);
+      if (link?.link_mode === 'manual') continue;
+      if (ageOf(device) < DeviceService.STALE_AFTER_MS) continue;
+      const successor = this.findSuccessor(device, link, devices, links);
+      if (!successor || successor.matchedBy !== 'pppoe') continue;
+      if (!(ageOf({ _lastInform: successor.lastInform }) < ONLINE_WINDOW_MS)) continue;
+      stranded.add(deviceId);
+      if (!link) continue;
+      try {
+        const account = await CustomerAccount.getByDeviceId(deviceId);
+        const swap = await DeviceSwapService.record(account, deviceId, successor.deviceId, 'stale_pppoe');
+        if (swap && swap.link_action !== 'held') relinked += 1;
+        links.delete(deviceId);
+      } catch (error) {
+        console.warn(`Unable to move the SGP link off stale ONT ${deviceId}: ${error.message}`);
+      }
+    }
+    return { relinked, stranded };
+  }
+
   static async getLastSync() {
     const raw = await AppState.get(SYNC_STATE_KEY);
     if (!raw) return null;
@@ -2094,6 +2184,7 @@ class SgpService {
     const byState = { active: 0, blocked: 0, cancelled: 0, unknown: 0 };
     const onlineBlocked = [];
     const offlineActive = [];
+    const staleActive = [];
     const unlinked = [];
     let linked = 0;
 
@@ -2128,6 +2219,12 @@ class SgpService {
         onlineBlocked.push(entry);
       } else if (!online && state === 'active') {
         offlineActive.push(entry);
+        if (!(age < DeviceService.STALE_AFTER_MS)) {
+          staleActive.push({
+            ...entry,
+            successor: this.findSuccessor(device, link, devices, links)
+          });
+        }
       }
     }
 
@@ -2137,6 +2234,7 @@ class SgpService {
       .localeCompare(String(right.lastInform || ''));
     onlineBlocked.sort((left, right) => informOrder(right, left));
     offlineActive.sort(informOrder);
+    staleActive.sort(informOrder);
 
     return {
       enabled: true,
@@ -2145,7 +2243,8 @@ class SgpService {
         linked,
         unlinked: unlinked.length,
         onlineBlocked: onlineBlocked.length,
-        offlineActive: offlineActive.length
+        offlineActive: offlineActive.length,
+        staleActive: staleActive.length
       },
       byState,
       // The lists are samples capped at DIVERGENCE_LIMIT; `totals` always
@@ -2153,6 +2252,7 @@ class SgpService {
       divergences: {
         onlineBlocked: onlineBlocked.slice(0, DIVERGENCE_LIMIT),
         offlineActive: offlineActive.slice(0, DIVERGENCE_LIMIT),
+        staleActive: staleActive.slice(0, DIVERGENCE_LIMIT),
         unlinked: unlinked.slice(0, DIVERGENCE_LIMIT)
       },
       lastSync: await this.getLastSync(),

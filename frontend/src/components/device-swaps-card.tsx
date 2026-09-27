@@ -115,6 +115,13 @@ export function DeviceSwapsCard({ deviceId }: DeviceSwapsCardProps) {
                 <span className="rounded-full border border-border px-2 py-0.5 text-muted-foreground">
                   {t(LINK_ACTION_KEY[swap.linkAction])}
                 </span>
+                {/* Vínculo movido sozinho porque o ONT antigo ficou 3+ dias
+                    calado enquanto outro, com o mesmo login PPPoE, respondia. */}
+                {swap.matchedBy === 'stale_pppoe' && (
+                  <span className="rounded-full border border-border px-2 py-0.5 text-muted-foreground">
+                    {t('swaps.matched.stalePppoe')}
+                  </span>
+                )}
                 {swap.flapping && (
                   <span className="rounded-full border border-[hsl(var(--status-warning))]/50 bg-[hsl(var(--status-warning))]/10 px-2 py-0.5 text-[hsl(var(--status-warning))]">
                     {t('swaps.flapping', { count: swap.repeatCount })}

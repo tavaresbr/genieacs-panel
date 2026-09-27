@@ -2422,12 +2422,13 @@ export default function Settings() {
                 </button>
                 {sgpSyncSummary ? (
                   <>
-                    <dl className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+                    <dl className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-7">
                       {([
                         ['settings.sgp.syncTotal', sgpSyncSummary.total],
                         ['settings.sgp.syncLinked', sgpSyncSummary.linked],
                         ['settings.sgp.syncCreated', sgpSyncSummary.created],
                         ['settings.sgp.syncUpdated', sgpSyncSummary.updated],
+                        ['settings.sgp.syncRelinked', sgpSyncSummary.relinked ?? 0],
                         ['settings.sgp.syncSkipped', sgpSyncSummary.skipped],
                         ['settings.sgp.syncFailedCount', sgpSyncSummary.failed]
                       ] as const).map(([labelKey, value]) => (
