@@ -279,7 +279,7 @@ class ChargeIssuingService {
     if (!manual && vencimento.getTime() > antecedencia) return { issued: false, reason: 'not_due_yet' };
 
     // O plano que ESTE prazo cobra. Quase sempre o atual; a exceção é a
-    // descida agendada (0072) para exatamente este prazo: a cobrança que sai
+    // descida agendada (0073) para exatamente este prazo: a cobrança que sai
     // cinco dias antes da renovação paga o período que começa nela, e esse
     // período já é do plano novo. Cobrar o preço velho ali seria o provedor
     // pagando o plano caro por um mês em que vai estar no barato.
@@ -309,7 +309,7 @@ class ChargeIssuingService {
         const agendado = await Plan.findById(subscription.pending_plan_id);
         if (agendado && Number(agendado.price_cents ?? 0) > 0) {
           // Três fontes para o veredito, nesta ordem. A descida travada (paga
-          // pelo preço dela, 0073) não tem veredito: vale o preço dela. Quem
+          // pelo preço dela, 0074) não tem veredito: vale o preço dela. Quem
           // reemite logo depois de decidir — a troca de plano, a reprecificação
           // abaixo — passa o veredito que JÁ usou (`pendingBlockedBy`), para a
           // reemissão não recontar: uma contagem de ONTs que oscila entre as

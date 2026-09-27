@@ -54,6 +54,11 @@ class AuditLog {
     WHATSAPP_BOT_TRUST_UNLOCK: 'whatsapp.bot_trust_unlock',
     // Os clientes de uma queda em massa foram avisados por WhatsApp.
     OUTAGE_NOTIFIED: 'outage.notified',
+    // Manutenção programada: agendar, avisar os clientes e cancelar mexem com
+    // o que o assinante recebe no WhatsApp.
+    MAINTENANCE_SCHEDULED: 'maintenance.scheduled',
+    MAINTENANCE_NOTIFIED: 'maintenance.notified',
+    MAINTENANCE_CANCELLED: 'maintenance.cancelled',
     TENANT_EXPORTED: 'tenant.exported',
     // O cadastro fiscal do provedor mudou — razão social, CNPJ, endereço,
     // contato de cobrança. Registra QUAIS campos, nunca os valores: a trilha

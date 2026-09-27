@@ -14,6 +14,7 @@ import { TrendChart } from '@/components/charts/trend-chart'
 import { DeviceSwapsCard } from '@/components/device-swaps-card'
 import { OnboardingChecklist } from '@/components/onboarding-checklist'
 import { OutagePanel } from '@/components/outages/outage-panel'
+import { MaintenancePanel } from '@/components/maintenance/maintenance-panel'
 
 interface Fault {
   id: string
@@ -353,6 +354,7 @@ export default function DashboardPage() {
 
         {/* Só com queda em andamento; some sozinho quando ela acaba. */}
         {can('whatsapp.read') && <OutagePanel onlyOpen />}
+        {can('whatsapp.read') && <MaintenancePanel compact />}
 
         <OnboardingChecklist />
 
