@@ -172,12 +172,11 @@ export default function Settings() {
       return fallback
     }
   })
-  // Na SaaS, "Painel e ACS" e "Parâmetros TR-069" não existem para o
-  // provedor. O perfil do provedor chega depois da primeira renderização, e um
-  // `?tab=` antigo pode apontar para uma delas: nos dois casos a tela vai para
-  // a primeira aba que ele tem.
+  // Na SaaS, "Parâmetros TR-069" não existe para o provedor. O perfil do
+  // provedor chega depois da primeira renderização, e um `?tab=` antigo pode
+  // apontar para ela: nos dois casos a tela vai para a primeira aba que ele tem.
   useEffect(() => {
-    if (platformManaged && (activeTab === 'general' || activeTab === 'virtual-params')) {
+    if (platformManaged && activeTab === 'virtual-params') {
       setActiveTab(canEditProvider ? 'provider' : 'customer-portal')
     }
   }, [platformManaged, activeTab, canEditProvider])
@@ -1040,12 +1039,11 @@ export default function Settings() {
    * quando essa falhava, o operador via um erro que não tinha nada com o que
    * ele acabara de editar.
    */
-  const handleSaveSettings = async (scope: 'all' | 'provider' = 'all') => {
-    const onlyProvider = scope === 'provider'
+  const handleSaveSettings = async () => {
     // O servidor recusa `basic` sem usuário com 400, e com razão: o header
     // sairia com usuário vazio e o ACS o recusaria sem dizer por quê. Barrar
     // aqui evita a ida perdida e diz qual campo falta, que a resposta não diz.
-    if (!onlyProvider && !platformManaged && genieAuthForm.authType === 'basic' && !genieAuthForm.username.trim()) {
+    if (!platformManaged && genieAuthForm.authType === 'basic' && !genieAuthForm.username.trim()) {
       toast.error(t('settings.genieAuth.usernameRequired'))
       return
     }
@@ -1077,7 +1075,6 @@ export default function Settings() {
       // recusa (403) a cada salvar, por um campo que a tela nem deixa editar.
       const entries = Object.entries(settings)
         .filter(([key]) => key !== 'appName' && !(platformManaged && PLATFORM_MANAGED_KEYS.has(key)))
-        .filter(([key]) => !onlyProvider || key === 'auditRetentionDays')
         .sort(([left], [right]) => {
         if (left === 'autoGenerateCustomerId') return 1
         if (right === 'autoGenerateCustomerId') return -1
@@ -1098,7 +1095,7 @@ export default function Settings() {
         }
       }
 
-      if (ok && !platformManaged && !onlyProvider) {
+      if (ok && !platformManaged) {
         // A URL acabou de ser gravada, então é ela que o servidor vai comparar
         // com o endereço testado daqui em diante — o aviso de teste anônimo
         // some sozinho depois de salvar, que é o desfecho que ele pedia.
@@ -1125,7 +1122,7 @@ export default function Settings() {
         }
       }
 
-      if (ok && !onlyProvider && settings.autoGenerateCustomerId === 'true') {
+      if (ok && settings.autoGenerateCustomerId === 'true') {
         const sync = await settingsAPI.syncCustomerIds()
         setSyncStatusKey((key) => key + 1)
         if (!sync.success) {
@@ -1373,9 +1370,8 @@ export default function Settings() {
     }
   }
 
-  // Nome, idioma e prazo da trilha: na self-hosted ficam em "Painel e ACS";
-  // na SaaS, onde aquela aba é da plataforma, vão para "Geral". Um pedaço só,
-  // desenhado nos dois lugares.
+  // Nome, idioma e prazo da trilha: o que a aba "Painel e ACS" tem do provedor,
+  // na self-hosted e na SaaS.
   const identityFields = (
     <>
       <div>
@@ -1640,31 +1636,28 @@ export default function Settings() {
                 {t('settings.tab.provider')}
               </button>
             )}
-            {/* Na SaaS o ACS e os parâmetros TR-069 são da plataforma: as duas
-                abas só existem para quem os configura — a self-hosted e a
-                caixa da plataforma. O provedor edita nome, idioma e trilha na
-                aba "Geral". */}
+            {/* Na SaaS o ACS é da plataforma: "Painel e ACS" o mostra só para
+                leitura, e os parâmetros TR-069 só existem para quem os
+                configura — a self-hosted e a caixa da plataforma. */}
+            <button
+              onClick={() => setActiveTab('general')}
+              className="tab-button"
+              data-active={activeTab === 'general'}
+              role="tab"
+              aria-selected={activeTab === 'general'}
+            >
+              {t('settings.tab.general')}
+            </button>
             {!platformManaged && (
-              <>
-                <button
-                  onClick={() => setActiveTab('general')}
-                  className="tab-button"
-                  data-active={activeTab === 'general'}
-                  role="tab"
-                  aria-selected={activeTab === 'general'}
-                >
-                  {t('settings.tab.general')}
-                </button>
-                <button
-                  onClick={() => setActiveTab('virtual-params')}
-                  className="tab-button"
-                  data-active={activeTab === 'virtual-params'}
-                  role="tab"
-                  aria-selected={activeTab === 'virtual-params'}
-                >
-                  {t('settings.tab.virtualParams')}
-                </button>
-              </>
+              <button
+                onClick={() => setActiveTab('virtual-params')}
+                className="tab-button"
+                data-active={activeTab === 'virtual-params'}
+                role="tab"
+                aria-selected={activeTab === 'virtual-params'}
+              >
+                {t('settings.tab.virtualParams')}
+              </button>
             )}
             <button
               onClick={() => setActiveTab('customer-portal')}
@@ -1771,24 +1764,11 @@ export default function Settings() {
         {/* Content */}
         {activeTab === 'provider' && canEditProvider && (
           <div className="space-y-6">
-            {/* Na SaaS a aba "Painel e ACS" é da plataforma; o que nela era do
-                provedor — o nome, o idioma e o prazo da trilha — vem para cá,
-                gravado pelo Salvar desta aba. */}
-            {platformManaged && can('settings.write') && (
-              <div className="modern-card max-w-3xl p-5 sm:p-6">
-                <h2 className="section-heading">{t('settings.panelIdentity.title')}</h2>
-                <p className="section-description mb-6">{t('settings.panelIdentity.description')}</p>
-                <div className="space-y-4">
-                  {identityFields}
-                </div>
-                {auditRetentionSection}
-              </div>
-            )}
             <ProviderAddressPanel />
           </div>
         )}
 
-        {activeTab === 'general' && !platformManaged && (
+        {activeTab === 'general' && (
           <div className="space-y-6">
             {/* App Settings */}
             <div className="modern-card max-w-3xl p-5 sm:p-6">
@@ -3752,11 +3732,10 @@ export default function Settings() {
         )}
 
         {/* Save Button */}
-        {(activeTab === 'general' || activeTab === 'virtual-params' || activeTab === 'customer-portal'
-          || (activeTab === 'provider' && platformManaged && can('settings.write'))) && (
+        {(activeTab === 'general' || activeTab === 'virtual-params' || activeTab === 'customer-portal') && (
           <div className="flex justify-end mt-8">
             <button
-              onClick={() => void handleSaveSettings(activeTab === 'provider' ? 'provider' : 'all')}
+              onClick={() => void handleSaveSettings()}
               disabled={loading}
               className="modern-button"
             >
