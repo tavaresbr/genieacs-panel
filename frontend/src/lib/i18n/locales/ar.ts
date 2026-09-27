@@ -3000,6 +3000,7 @@ const ar: Dictionary = {
   'plan.options.scheduled': 'مجدول',
   'plan.pending.title': 'تغيير مجدول: {plan} اعتبارًا من {date}',
   'plan.pending.hint': 'حتى ذلك الحين تبقى على خطتك الحالية، بحدودها.',
+  'plan.pending.locked': 'تم دفع هذا التغيير بالفعل وسيُطبَّق في {date}.',
   'plan.pending.cancel': 'إلغاء الجدولة',
   'plan.pending.canceling': 'جارٍ الإلغاء…',
   'plan.pending.cancelConfirm': 'إلغاء التغيير المجدول إلى خطة {plan}؟ ستبقى على خطتك الحالية.',

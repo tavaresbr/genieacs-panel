@@ -2993,6 +2993,7 @@ const en = {
   'plan.options.scheduled': 'Scheduled',
   'plan.pending.title': 'Scheduled change: {plan} starting {date}',
   'plan.pending.hint': 'Until then you stay on your current plan, with its limits.',
+  'plan.pending.locked': 'The change has already been paid and will take effect on {date}.',
   'plan.pending.cancel': 'Cancel scheduled change',
   'plan.pending.canceling': 'Canceling…',
   'plan.pending.cancelConfirm': 'Cancel the scheduled change to the {plan} plan? You will stay on your current plan.',

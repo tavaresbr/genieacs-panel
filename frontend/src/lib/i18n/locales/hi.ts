@@ -2999,6 +2999,7 @@ const hi: Dictionary = {
   'plan.options.scheduled': 'निर्धारित',
   'plan.pending.title': 'निर्धारित बदलाव: {date} से {plan}',
   'plan.pending.hint': 'तब तक आप मौजूदा प्लान पर, उसकी सीमाओं के साथ, बने रहेंगे।',
+  'plan.pending.locked': 'यह बदलाव पहले ही भुगतान हो चुका है और {date} को लागू होगा।',
   'plan.pending.cancel': 'निर्धारित बदलाव रद्द करें',
   'plan.pending.canceling': 'रद्द किया जा रहा है…',
   'plan.pending.cancelConfirm': '{plan} प्लान पर निर्धारित बदलाव रद्द करें? आप मौजूदा प्लान पर ही रहेंगे।',

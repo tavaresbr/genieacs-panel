@@ -2991,6 +2991,7 @@ const ptBR: Dictionary = {
   'plan.options.scheduled': 'Agendado',
   'plan.pending.title': 'Mudança agendada: {plan} a partir de {date}',
   'plan.pending.hint': 'Até lá você continua no plano atual, com os limites dele.',
+  'plan.pending.locked': 'A mudança já foi paga e será aplicada em {date}.',
   'plan.pending.cancel': 'Cancelar agendamento',
   'plan.pending.canceling': 'Cancelando…',
   'plan.pending.cancelConfirm': 'Cancelar a mudança agendada para o plano {plan}? Você continua no plano atual.',

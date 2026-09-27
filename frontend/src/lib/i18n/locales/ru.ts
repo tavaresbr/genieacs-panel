@@ -2999,6 +2999,7 @@ const ru: Dictionary = {
   'plan.options.scheduled': 'Запланировано',
   'plan.pending.title': 'Запланированная смена: {plan} с {date}',
   'plan.pending.hint': 'До тех пор вы остаётесь на текущем тарифе, с его лимитами.',
+  'plan.pending.locked': 'Смена уже оплачена и вступит в силу {date}.',
   'plan.pending.cancel': 'Отменить смену',
   'plan.pending.canceling': 'Отмена…',
   'plan.pending.cancelConfirm': 'Отменить запланированную смену на тариф {plan}? Вы останетесь на текущем тарифе.',

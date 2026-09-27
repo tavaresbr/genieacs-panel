@@ -2991,6 +2991,7 @@ const es: Dictionary = {
   'plan.options.scheduled': 'Programado',
   'plan.pending.title': 'Cambio programado: {plan} a partir del {date}',
   'plan.pending.hint': 'Hasta entonces sigue en el plan actual, con sus límites.',
+  'plan.pending.locked': 'El cambio ya fue pagado y se aplicará el {date}.',
   'plan.pending.cancel': 'Cancelar programación',
   'plan.pending.canceling': 'Cancelando…',
   'plan.pending.cancelConfirm': '¿Cancelar el cambio programado al plan {plan}? Seguirá en el plan actual.',

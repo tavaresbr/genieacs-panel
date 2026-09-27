@@ -1290,6 +1290,12 @@ export interface PendingPlan {
   priceCents: number
   /** ISO 8601. */
   effectiveAt: string
+  /**
+   * O período já foi pago pelo preço menor: o agendamento não se cancela nem
+   * se substitui mais até se aplicar (o backend recusa com 409
+   * `pending_locked`). Opcional porque servidores antigos não mandam o campo.
+   */
+  locked?: boolean
   blockedBy?: {
     resource: 'operators' | 'subscribers' | 'devices'
     used: number

@@ -2998,6 +2998,7 @@ const ko: Dictionary = {
   'plan.options.scheduled': '예약됨',
   'plan.pending.title': '예약된 변경: {date}부터 {plan}',
   'plan.pending.hint': '그때까지는 현재 요금제와 그 한도가 유지됩니다.',
+  'plan.pending.locked': '변경은 이미 결제되었으며 {date}에 적용됩니다.',
   'plan.pending.cancel': '예약 취소',
   'plan.pending.canceling': '취소 중…',
   'plan.pending.cancelConfirm': '{plan} 요금제로의 예약된 변경을 취소할까요? 현재 요금제가 유지됩니다.',

@@ -2991,6 +2991,7 @@ const zhCN: Dictionary = {
   'plan.options.scheduled': '已安排',
   'plan.pending.title': '已安排更换：自 {date} 起使用 {plan}',
   'plan.pending.hint': '在此之前您仍使用当前套餐及其上限。',
+  'plan.pending.locked': '此变更已付款，将于 {date} 生效。',
   'plan.pending.cancel': '取消安排',
   'plan.pending.canceling': '正在取消…',
   'plan.pending.cancelConfirm': '取消已安排的 {plan} 套餐更换？您将继续使用当前套餐。',

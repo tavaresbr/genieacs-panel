@@ -2992,6 +2992,7 @@ const zhTW: Dictionary = {
   'plan.options.scheduled': '已排定',
   'plan.pending.title': '已排定更換：自 {date} 起使用 {plan}',
   'plan.pending.hint': '在此之前您仍使用目前方案及其上限。',
+  'plan.pending.locked': '此變更已付款，將於 {date} 生效。',
   'plan.pending.cancel': '取消排定',
   'plan.pending.canceling': '正在取消…',
   'plan.pending.cancelConfirm': '取消已排定的 {plan} 方案更換？您將繼續使用目前方案。',

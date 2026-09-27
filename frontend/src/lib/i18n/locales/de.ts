@@ -2995,6 +2995,7 @@ const de: Dictionary = {
   'plan.options.scheduled': 'Geplant',
   'plan.pending.title': 'Geplanter Wechsel: {plan} ab {date}',
   'plan.pending.hint': 'Bis dahin bleiben Sie im aktuellen Tarif, mit dessen Limits.',
+  'plan.pending.locked': 'Die Änderung ist bereits bezahlt und wird am {date} wirksam.',
   'plan.pending.cancel': 'Planung aufheben',
   'plan.pending.canceling': 'Wird aufgehoben…',
   'plan.pending.cancelConfirm': 'Den geplanten Wechsel zum Tarif {plan} aufheben? Sie bleiben im aktuellen Tarif.',

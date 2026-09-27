@@ -12,10 +12,13 @@ import type { TranslationKey } from '@/lib/i18n'
 import { formatMoney } from '@/lib/money'
 import {
   PLAN_RESOURCES,
+  canCancelPending,
   canPayNow,
   canSwitchTo,
   confirmKey,
   isBusy,
+  isPendingLocked,
+  isPendingLockedRefusal,
   needsBillingProfile,
   overLimitDetail,
   payInNewTab,
@@ -127,7 +130,13 @@ export default function PlanPage() {
       setChargesKey((k) => k + 1)
       return
     }
-    if (isBusy(res.code)) {
+    if (isBusy(res.code) || isPendingLockedRefusal(res.code)) {
+      // A trava pode ter nascido depois da última carga: recarrega para os
+      // botões sumirem.
+      if (isPendingLockedRefusal(res.code)) {
+        const atual = await subscriptionAPI.current()
+        if (atual.success && atual.data) setData(atual.data)
+      }
       setAviso({ tipo: 'info', texto: res.message || t('plan.options.changeFailed') })
       return
     }
@@ -263,7 +272,7 @@ export default function PlanPage() {
                 )}
               </dl>
               <p className="field-hint mt-4">{t('plan.changeHint')}</p>
-              {canPayNow(plans, podeEscrever) && (
+              {canPayNow(plans, podeEscrever, subscription) && (
                 <button type="button" className="modern-button mt-4" disabled={pagando} onClick={pagarAgora}>
                   <Icon name="invoice" size={17} />
                   {pagando ? t('plan.paying') : t('plan.payNow')}
@@ -316,6 +325,11 @@ export default function PlanPage() {
                   {t('plan.pending.title', { plan: pendente.name, date: formatDate(pendente.effectiveAt) ?? '—' })}
                 </p>
                 <p className="mt-1 text-muted-foreground">{t('plan.pending.hint')}</p>
+                {isPendingLocked(pendente) && (
+                  <p className="mt-1 text-muted-foreground">
+                    {t('plan.pending.locked', { date: formatDate(pendente.effectiveAt) ?? '—' })}
+                  </p>
+                )}
                 {pendenteBloqueio && (
                   <p className="mt-2 text-[hsl(var(--status-warning))]">
                     {t(pendenteBloqueio.key, {
@@ -327,7 +341,7 @@ export default function PlanPage() {
                 )}
               </div>
             </div>
-            {podeEscrever && planoAtualId !== null && (
+            {canCancelPending(pendente, podeEscrever) && planoAtualId !== null && (
               <button
                 type="button"
                 className="modern-button-secondary w-full shrink-0 justify-center sm:w-auto"
@@ -393,7 +407,7 @@ export default function PlanPage() {
                           </div>
                         ))}
                       </dl>
-                      {canSwitchTo(plan, podeEscrever, pendente?.id) && (
+                      {canSwitchTo(plan, podeEscrever, subscription) && (
                         <button
                           type="button"
                           className="modern-button-secondary mt-4 w-full justify-center"

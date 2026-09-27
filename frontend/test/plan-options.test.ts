@@ -2,9 +2,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { TenantPlanOption } from '@/lib/api'
 import {
   canGenerateCharge,
+  canCancelPending,
   canPayNow,
   canSwitchTo,
   isBusy,
+  isPendingLocked,
+  isPendingLockedRefusal,
+  subscriptionAllowsChanges,
   needsBillingProfile,
   confirmKey,
   overLimitDetail,
@@ -26,13 +30,52 @@ describe('plan-options', () => {
     expect(periodLabel(90, 'R$ 1')).toEqual({ key: 'plan.options.perDays', vars: { price: 'R$ 1', days: 90 } })
   })
 
+  const ativa = { status: 'active' as const, pendingPlan: null }
+  const agendado = (id: number, locked?: boolean) => ({
+    id, name: 'Básico', priceCents: 4990, effectiveAt: '2026-10-15T00:00:00Z', ...(locked === undefined ? {} : { locked })
+  })
+
   it('só oferece a troca a quem escreve e fora do plano atual', () => {
-    expect(canSwitchTo(plano(), true)).toBe(true)
-    expect(canSwitchTo(plano({ current: true }), true)).toBe(false)
-    expect(canSwitchTo(plano(), false)).toBe(false)
-    expect(canSwitchTo(plano({ id: 7 }), true, 7)).toBe(false)
-    expect(canSwitchTo(plano({ id: 7 }), true, 8)).toBe(true)
-    expect(canSwitchTo(plano({ id: 7 }), true, null)).toBe(true)
+    expect(canSwitchTo(plano(), true, ativa)).toBe(true)
+    expect(canSwitchTo(plano({ current: true }), true, ativa)).toBe(false)
+    expect(canSwitchTo(plano(), false, ativa)).toBe(false)
+    expect(canSwitchTo(plano({ id: 7 }), true, { ...ativa, pendingPlan: agendado(7) })).toBe(false)
+    expect(canSwitchTo(plano({ id: 7 }), true, { ...ativa, pendingPlan: agendado(8) })).toBe(true)
+    expect(canSwitchTo(plano({ id: 7 }), true, { status: 'active' })).toBe(true)
+  })
+
+  it('não oferece troca com a assinatura suspensa, cancelada ou ausente', () => {
+    expect(canSwitchTo(plano(), true, { status: 'trial' })).toBe(true)
+    expect(canSwitchTo(plano(), true, { status: 'past_due' })).toBe(true)
+    expect(canSwitchTo(plano(), true, { status: 'suspended' })).toBe(false)
+    expect(canSwitchTo(plano(), true, { status: 'canceled' })).toBe(false)
+    expect(canSwitchTo(plano(), true, null)).toBe(false)
+    expect(canSwitchTo(plano(), true, undefined)).toBe(false)
+    expect(subscriptionAllowsChanges({ status: 'active' })).toBe(true)
+    expect(subscriptionAllowsChanges({ status: 'suspended' })).toBe(false)
+    expect(subscriptionAllowsChanges(null)).toBe(false)
+  })
+
+  it('agendamento travado esconde toda troca e o cancelamento', () => {
+    const travada = { ...ativa, pendingPlan: agendado(7, true) }
+    expect(canSwitchTo(plano({ id: 8 }), true, travada)).toBe(false)
+    expect(canSwitchTo(plano({ id: 7 }), true, travada)).toBe(false)
+    expect(canSwitchTo(plano({ id: 8 }), true, { ...ativa, pendingPlan: agendado(7, false) })).toBe(true)
+    expect(isPendingLocked(agendado(7, true))).toBe(true)
+    expect(isPendingLocked(agendado(7, false))).toBe(false)
+    expect(isPendingLocked(agendado(7))).toBe(false)
+    expect(isPendingLocked(null)).toBe(false)
+    expect(canCancelPending(agendado(7), true)).toBe(true)
+    expect(canCancelPending(agendado(7, false), true)).toBe(true)
+    expect(canCancelPending(agendado(7, true), true)).toBe(false)
+    expect(canCancelPending(agendado(7), false)).toBe(false)
+    expect(canCancelPending(null, true)).toBe(false)
+  })
+
+  it('reconhece o pending_locked', () => {
+    expect(isPendingLockedRefusal('pending_locked')).toBe(true)
+    expect(isPendingLockedRefusal('busy')).toBe(false)
+    expect(isPendingLockedRefusal(undefined)).toBe(false)
   })
 
   describe('planChangeKind', () => {
@@ -87,12 +130,18 @@ describe('plan-options', () => {
     expect(pendingBlockedDetail({ ...base, blockedBy: { resource: 'x' as never, used: 1, limit: 0 } })).toBeNull()
   })
 
-  it('pagar agora exige escrita e plano atual pago', () => {
-    expect(canPayNow([plano({ current: true })], true)).toBe(true)
-    expect(canPayNow([plano({ current: true, priceCents: 0 })], true)).toBe(false)
-    expect(canPayNow([plano({ current: true })], false)).toBe(false)
-    expect(canPayNow([plano()], true)).toBe(false)
-    expect(canPayNow(null, true)).toBe(false)
+  it('pagar agora exige escrita, plano atual pago e assinatura que aceita cobrança', () => {
+    const ok = { status: 'active' as const }
+    expect(canPayNow([plano({ current: true })], true, ok)).toBe(true)
+    expect(canPayNow([plano({ current: true })], true, { status: 'trial' })).toBe(true)
+    expect(canPayNow([plano({ current: true })], true, { status: 'past_due' })).toBe(true)
+    expect(canPayNow([plano({ current: true, priceCents: 0 })], true, ok)).toBe(false)
+    expect(canPayNow([plano({ current: true })], false, ok)).toBe(false)
+    expect(canPayNow([plano()], true, ok)).toBe(false)
+    expect(canPayNow(null, true, ok)).toBe(false)
+    expect(canPayNow([plano({ current: true })], true, { status: 'suspended' })).toBe(false)
+    expect(canPayNow([plano({ current: true })], true, { status: 'canceled' })).toBe(false)
+    expect(canPayNow([plano({ current: true })], true, null)).toBe(false)
   })
 
   it('lê o over_limit só quando vem completo', () => {

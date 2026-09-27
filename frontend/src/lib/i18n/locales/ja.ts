@@ -2991,6 +2991,7 @@ const ja: Dictionary = {
   'plan.options.scheduled': '予定',
   'plan.pending.title': '予定された変更：{date} から {plan}',
   'plan.pending.hint': 'それまでは現在のプランとその上限のままです。',
+  'plan.pending.locked': '変更はすでに支払い済みで、{date} に適用されます。',
   'plan.pending.cancel': '予定を取り消す',
   'plan.pending.canceling': '取り消し中…',
   'plan.pending.cancelConfirm': '{plan} プランへの予定された変更を取り消しますか？現在のプランのままになります。',
