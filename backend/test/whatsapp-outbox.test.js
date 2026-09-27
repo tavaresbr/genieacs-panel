@@ -2,6 +2,7 @@ import { after, before, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { asTenant, authHeaders, call, getDb, runInTenant, startTestServers, stopTestServers } from './helpers/harness.js';
+import { rotearBase } from './helpers/evolutionRoute.js';
 
 const { default: WhatsAppConfigService } = await import('../src/services/whatsappConfigService.js');
 const { default: WhatsAppAccount } = await import('../src/models/WhatsAppAccount.js');
@@ -39,7 +40,7 @@ let supportId;
 let backupId;
 let evoServer;
 let evoLocalUrl;
-let realFetch;
+let desfazerRota;
 /**
  * A pasta de saída do provedor, preenchida no `before`.
  *
@@ -160,12 +161,9 @@ before(async () => {
   ({ panelUrl } = await startTestServers());
   evoLocalUrl = await startEvolutionStub();
 
-  realFetch = globalThis.fetch;
-  globalThis.fetch = (input, init) => {
-    const url = String(input instanceof Request ? input.url : input);
-    if (url.startsWith(EVO_BASE)) return realFetch(evoLocalUrl + url.slice(EVO_BASE.length), init);
-    return realFetch(input, init);
-  };
+  // O cliente Evolution conecta por `PinnedTransport`, não por `fetch`: a rota
+  // para o dublê troca os encaixes dele, e a guarda de endereço roda inteira.
+  desfazerRota = rotearBase(EVO_BASE, evoLocalUrl);
 
   const setup = await call(`${panelUrl}/api/auth/setup`, {
     method: 'POST',
@@ -209,7 +207,7 @@ before(async () => {
 });
 
 after(async () => {
-  globalThis.fetch = realFetch;
+  desfazerRota?.();
   WaOutboxWorker.stop();
   await new Promise((resolve) => evoServer.close(resolve));
   await stopTestServers();
