@@ -2,6 +2,7 @@ import { after, before, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { asTenant, getDb, startTestServers, stopTestServers } from './helpers/harness.js';
+import { rotearBase } from './helpers/evolutionRoute.js';
 
 const { default: WhatsAppConfigService, WaError } = await import('../src/services/whatsappConfigService.js');
 const { default: WhatsAppAccount } = await import('../src/models/WhatsAppAccount.js');
@@ -68,7 +69,7 @@ const sends = [];
 
 let evoServer;
 let evoLocalUrl;
-let realFetch;
+let desfazerRota;
 let accountId;
 let conversationId;
 
@@ -126,12 +127,9 @@ before(async () => {
   // The SSRF guard blocks loopback by literal, so the account points at a name
   // that resolves nowhere and `fetch` is rewritten onto the stub. Everything
   // past that line is real: a real socket, real status codes, real bodies.
-  realFetch = globalThis.fetch;
-  globalThis.fetch = (input, init) => {
-    const url = String(input instanceof Request ? input.url : input);
-    if (url.startsWith(EVO_BASE)) return realFetch(evoLocalUrl + url.slice(EVO_BASE.length), init);
-    return realFetch(input, init);
-  };
+  // O cliente Evolution conecta por `PinnedTransport`, não por `fetch`: a rota
+  // para o dublê troca os encaixes dele, e a guarda de endereço roda inteira.
+  desfazerRota = rotearBase(EVO_BASE, evoLocalUrl);
 
   await asTenant(() => WhatsAppConfigService.saveConfig({
     enabled: true,
@@ -164,7 +162,7 @@ before(async () => {
 });
 
 after(async () => {
-  globalThis.fetch = realFetch;
+  desfazerRota?.();
   WaOutboxWorker.stop();
   await new Promise((resolve) => evoServer.close(resolve));
   await stopTestServers();
