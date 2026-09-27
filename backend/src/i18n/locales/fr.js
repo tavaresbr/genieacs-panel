@@ -693,6 +693,7 @@ export default {
   'users.mfaResetSelf': 'Pour désactiver votre propre connexion en deux étapes, utilisez la carte de votre compte',
   'users.mfaElsewhere': 'Cet opérateur travaille aussi pour un autre fournisseur ; sa connexion en deux étapes ne peut être désactivée que sur le serveur',
   'users.mfaPlatform': 'Cet opérateur administre aussi la plateforme ; sa connexion en deux étapes ne peut être désactivée que sur le serveur',
+  'users.passwordPlatform': 'Cet opérateur administre aussi la plateforme ; lui seul peut changer son mot de passe',
   'users.mfaReset': 'Connexion en deux étapes désactivée ; les sessions de l\'opérateur ont été fermées',
   'users.updated': 'Opérateur mis à jour',
   'users.updateFailed': 'Impossible de mettre à jour l’opérateur',

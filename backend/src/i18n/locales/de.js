@@ -698,6 +698,7 @@ export default {
   'users.mfaResetSelf': 'Um Ihre eigene Anmeldung in zwei Schritten auszuschalten, nutzen Sie die Karte Ihres Kontos',
   'users.mfaElsewhere': 'Dieser Operator arbeitet auch für einen anderen Anbieter; seine Anmeldung in zwei Schritten kann nur auf dem Server ausgeschaltet werden',
   'users.mfaPlatform': 'Dieser Operator verwaltet auch die Plattform; seine Anmeldung in zwei Schritten kann nur auf dem Server ausgeschaltet werden',
+  'users.passwordPlatform': 'Dieser Operator verwaltet auch die Plattform; nur er selbst kann sein Passwort ändern',
   'users.mfaReset': 'Anmeldung in zwei Schritten ausgeschaltet; die Sitzungen des Operators wurden beendet',
   'users.updated': 'Operator aktualisiert',
   'users.updateFailed': 'Der Operator konnte nicht aktualisiert werden',

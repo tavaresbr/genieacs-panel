@@ -697,6 +697,7 @@ export default {
   'users.mfaResetSelf': '要关闭您自己的两步登录，请使用您账户的卡片',
   'users.mfaElsewhere': '该操作员也在其他服务商工作；其两步登录只能在服务器上关闭',
   'users.mfaPlatform': '该操作员也管理平台；其两步登录只能在服务器上关闭',
+  'users.passwordPlatform': '该操作员也管理平台；只有本人可以修改密码',
   'users.mfaReset': '已关闭两步登录；该操作员的会话已结束',
   'users.updated': '操作员已更新',
   'users.updateFailed': '无法更新操作员',

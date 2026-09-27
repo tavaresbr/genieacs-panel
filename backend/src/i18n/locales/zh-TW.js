@@ -697,6 +697,7 @@ export default {
   'users.mfaResetSelf': '要關閉您自己的兩步驟登入，請使用您帳戶的卡片',
   'users.mfaElsewhere': '該操作員也在其他服務商工作；其兩步驟登入只能在伺服器上關閉',
   'users.mfaPlatform': '該操作員也管理平台；其兩步驟登入只能在伺服器上關閉',
+  'users.passwordPlatform': '此操作員也管理平台；只有本人可以變更密碼',
   'users.mfaReset': '已關閉兩步驟登入；該操作員的工作階段已結束',
   'users.updated': '操作員已更新',
   'users.updateFailed': '無法更新操作員',

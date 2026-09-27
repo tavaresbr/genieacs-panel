@@ -700,6 +700,7 @@ export default {
   'users.mfaResetSelf': '본인의 2단계 로그인을 끄려면 계정 카드를 사용하세요',
   'users.mfaElsewhere': '이 운영자는 다른 공급자에서도 일합니다. 2단계 로그인은 서버에서만 끌 수 있습니다',
   'users.mfaPlatform': '이 운영자는 플랫폼도 관리합니다. 2단계 로그인은 서버에서만 끌 수 있습니다',
+  'users.passwordPlatform': '이 운영자는 플랫폼도 관리합니다. 비밀번호는 본인만 변경할 수 있습니다',
   'users.mfaReset': '2단계 로그인을 껐고 운영자의 세션을 종료했습니다',
   'users.updated': '운영자를 수정했습니다',
   'users.updateFailed': '운영자를 수정하지 못했습니다',
