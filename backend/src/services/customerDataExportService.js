@@ -67,7 +67,8 @@ const SEM_DADO_DE_ASSINANTE = Object.freeze({
   billing_events: 'extrato do provedor conosco',
   billing_charges: 'as cobranças que a plataforma emitiu ao provedor',
   outage_events: 'rompimentos por caixa do mapa — só a caixa e contagens, nenhum assinante',
-  outage_incidents: 'quedas em massa por nó do mapa — quem foi atingido sai em outage_incident_devices'
+  outage_incidents: 'quedas em massa por nó do mapa — quem foi atingido sai em outage_incident_devices',
+  maintenance_windows: 'manutenções programadas por nó do mapa — quem foi avisado sai em maintenance_window_devices'
 });
 
 /**
@@ -185,6 +186,12 @@ export async function alcanceDoAssinante(account) {
     ? (await tdb('outage_incident_devices').whereIn('device_id', deviceIds).orderBy('id'))
       .filter((q) => naPosse(q.device_id, q.created_at))
     : [];
+  // Manutenções programadas que avisaram a ONT enquanto era desta conta:
+  // mesmo recorte e mesmos dados das quedas.
+  const manutencoes = deviceIds.length
+    ? (await tdb('maintenance_window_devices').whereIn('device_id', deviceIds).orderBy('id'))
+      .filter((m) => naPosse(m.device_id, m.created_at))
+    : [];
   const trocas = (await tdb('device_swaps').where((q) => {
     q.where({ account_id: account.id });
     if (deviceIds.length) q.orWhereIn('device_id', deviceIds);
@@ -213,6 +220,7 @@ export async function alcanceDoAssinante(account) {
     amostras,
     horas,
     quedas,
+    manutencoes,
     trocas,
     nos,
     noIds: nos.map((n) => n.node_id)
@@ -347,7 +355,7 @@ class CustomerDataExportService {
 
     const {
       deviceIds, naPosse, emPosseAgora, contratos, telefones: todosTelefones, vinculos, contatos,
-      clientes, conversas, conversaIds, eventos, amostras, horas, quedas, trocas, nos, noIds
+      clientes, conversas, conversaIds, eventos, amostras, horas, quedas, manutencoes, trocas, nos, noIds
     } = await alcanceDoAssinante(account);
 
     const dados = {};
@@ -391,6 +399,7 @@ class CustomerDataExportService {
     // Quedas em massa que atingiram as ONTs desta conta: nome, contrato e o
     // telefone a que o aviso foi mandado.
     guardar('outage_incident_devices', quedas);
+    guardar('maintenance_window_devices', manutencoes);
 
     guardar('wa_conversations', conversas);
     // O que o bot respondeu nessas conversas: só a intenção e a hora.

@@ -1584,6 +1584,56 @@ const OUTAGE_TABLES = [
   ['outage_incident_devices', outageIncidentDevicesTable]
 ];
 
+/**
+ * Manutenção programada: uma janela em que o provedor para um nó do mapa de
+ * propósito (OLT, ODC, ODP, HTB). O aviso sai sozinho `lead_minutes` antes do
+ * início; durante a janela o alerta de queda e o histórico de rompimentos
+ * ignoram as ONTs embaixo do nó; no fim, quem foi avisado recebe o
+ * "concluída". `maintenance_window_devices` guarda o telefone do momento do
+ * aviso, como `outage_incident_devices`.
+ */
+const maintenanceWindowsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.string('node_id', 255).notNullable();
+  t.string('node_name', 255);
+  t.string('node_type', 16);
+  t.timestamp('starts_at').notNullable();
+  t.timestamp('ends_at').notNullable();
+  t.integer('lead_minutes').notNullable().defaultTo(1440);
+  t.text('message').nullable();
+  t.string('status', 16).notNullable().defaultTo('scheduled');
+  t.timestamp('notice_sent_at').nullable();
+  t.timestamp('closing_sent_at').nullable();
+  t.timestamp('finished_at').nullable();
+  t.integer('created_by').nullable();
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
+  t.index(['tenant_id', 'status', 'starts_at'], 'maintenance_windows_status_idx');
+};
+
+const maintenanceWindowDevicesTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.integer('window_id').unsigned().notNullable()
+    .references('id').inTable('maintenance_windows').onDelete('CASCADE');
+  t.string('device_id', 255).notNullable();
+  t.string('contract', 64).nullable();
+  t.string('client_name', 255).nullable();
+  t.string('phone_e164', 32).nullable();
+  t.timestamp('notified_at').nullable();
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['window_id', 'device_id'], 'maintenance_window_devices_uq');
+  t.index(['tenant_id', 'device_id'], 'maintenance_window_devices_device_idx');
+};
+
+const MAINTENANCE_TABLES = [
+  ['maintenance_windows', maintenanceWindowsTable],
+  ['maintenance_window_devices', maintenanceWindowDevicesTable]
+];
+
 const MFA_TABLES = [
   ['user_recovery_codes', userRecoveryCodesTable]
 ];
@@ -1612,7 +1662,7 @@ const LOCKOUT_TABLES = [
 ];
 
 /**
- * O que o modo `agent` (0071) acrescentou à conexão do provedor.
+ * O que o modo `agent` (0072) acrescentou à conexão do provedor.
  *
  * - `agent_token_hash`: o sha256 (hex) da chave do agente. A chave em si só
  *   existe na resposta que a gerou e no arquivo de ambiente da máquina do
@@ -1731,7 +1781,8 @@ export const SCHEMA_TABLES = [
   ...OUTAGE_TABLES,
   ...WA_BOT_EVENT_TABLES,
   ...GENIEACS_CONNECTION_TABLES,
-  ...LOCKOUT_TABLES
+  ...LOCKOUT_TABLES,
+  ...MAINTENANCE_TABLES
 ].map(([name]) => name);
 
 /**
@@ -4143,6 +4194,21 @@ export const migrations = [
     }
   },
   {
+    /** Manutenção programada — ver `maintenanceWindowsTable`. */
+    id: '0071_maintenance_windows',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      return db.schema.hasTable('maintenance_window_devices');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      for (const [nome, construtor] of MAINTENANCE_TABLES) {
+        // eslint-disable-next-line no-await-in-loop -- a segunda aponta para a primeira
+        await createTableIfMissing(db, nome, construtor(db));
+      }
+    }
+  },
+  {
     /**
      * O modo `agent` do GenieACS — ver `GENIEACS_AGENT_COLUMNS`.
      *
@@ -4151,7 +4217,7 @@ export const migrations = [
      * delas existirem, acrescenta. O índice único sai junto com as colunas, no
      * mesmo `alterTable`, porque só falta quando elas faltam.
      */
-    id: '0071_genieacs_agent',
+    id: '0072_genieacs_agent',
     async isApplied(db) {
       if (!(await db.schema.hasTable('tenant_genieacs_connections'))) return true;
       return (await missingColumns(db, 'tenant_genieacs_connections', GENIEACS_AGENT_COLUMNS)).length === 0;

@@ -4,6 +4,7 @@ import MappingEdge from '../models/MappingEdge.js';
 import WaAlertService, { DEFAULT_RULES } from './waAlertService.js';
 import { detectOutages } from './outageDetector.js';
 import OutageEvent from '../models/OutageEvent.js';
+import MaintenanceService from './maintenanceService.js';
 import { currentTenantId } from '../config/tenantContext.js';
 
 /**
@@ -111,8 +112,18 @@ class MapStatusService {
     });
     // Provável rompimento: as caixas com vários clientes offline ao mesmo
     // tempo, pela mesma regra do alerta de WhatsApp (`outageDetector`).
+    // Manutenção programada em andamento não é rompimento: as ONTs embaixo
+    // do nó ficam fora da conta, como no alerta — o mapa e a mensagem não
+    // podem discordar.
+    let emManutencao = new Set();
+    try {
+      emManutencao = (await MaintenanceService.activeScope()).ontNodeIds;
+    } catch (error) {
+      console.warn(`Map status: maintenance scope unavailable: ${error.message}`);
+    }
+    for (const item of items) if (emManutencao.has(item.node_id)) item.maintenance = true;
     const offline = new Map(items
-      .filter((item) => item.state === 'offline')
+      .filter((item) => item.state === 'offline' && !item.maintenance)
       .map((item) => [item.node_id, item.lastInform ? new Date(item.lastInform).getTime() : null]));
     const outages = offline.size < 2
       ? []

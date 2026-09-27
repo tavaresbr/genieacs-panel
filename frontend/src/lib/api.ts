@@ -3800,6 +3800,72 @@ export interface OutageIncidentDetail extends OutageIncident {
   devices: { deviceId: string; contract: string | null; clientName: string | null; hasPhone: boolean; notifiedAt: string | null }[]
 }
 
+export type MaintenanceStatus = 'scheduled' | 'active' | 'done' | 'cancelled'
+
+export interface MaintenanceWindow {
+  id: number
+  nodeId: string
+  nodeName: string
+  nodeType: string | null
+  startsAt: string
+  endsAt: string
+  leadHours: number
+  /** Quando o aviso automático sai (início menos a antecedência). */
+  noticeAt: string
+  message: string | null
+  status: MaintenanceStatus
+  noticeSentAt: string | null
+  closingSentAt: string | null
+  finishedAt: string | null
+  defaultNotice: string
+  affected: number
+  withPhone: number
+  notified: number
+}
+
+export interface MaintenanceWindowDetail extends MaintenanceWindow {
+  devices: { deviceId: string; contract: string | null; clientName: string | null; hasPhone: boolean; notifiedAt: string | null }[]
+}
+
+export interface MaintenanceNode {
+  nodeId: string
+  name: string
+  type: string
+}
+
+export interface MaintenancePreview {
+  nodeId: string
+  nodeName: string
+  nodeType: string
+  affected: number
+  withPhone: number
+  sampleNotice: string
+}
+
+export interface MaintenanceInput {
+  nodeId: string
+  startsAt: string
+  endsAt: string
+  leadHours: number
+  message?: string
+}
+
+export const maintenanceAPI = {
+  list: () => apiClient.get<{ windows: MaintenanceWindow[] }>('/whatsapp/maintenances'),
+  nodes: () => apiClient.get<{ nodes: MaintenanceNode[] }>('/whatsapp/maintenances/nodes'),
+  /** `startsAt`/`endsAt` só servem para o texto de exemplo sair com o horário escolhido. */
+  preview: (nodeId: string, window?: { startsAt: string; endsAt: string }) => {
+    const query = new URLSearchParams({ nodeId, ...(window ?? {}) })
+    return apiClient.get<MaintenancePreview>(`/whatsapp/maintenances/preview?${query.toString()}`)
+  },
+  get: (id: number) => apiClient.get<MaintenanceWindowDetail>(`/whatsapp/maintenances/${id}`),
+  create: (input: MaintenanceInput) => apiClient.post<MaintenanceWindowDetail>('/whatsapp/maintenances', input),
+  notify: (id: number) =>
+    apiClient.post<{ sent: number; skippedOptOut: number; window: MaintenanceWindowDetail }>(`/whatsapp/maintenances/${id}/notify`, {}),
+  cancel: (id: number) => apiClient.post<MaintenanceWindowDetail>(`/whatsapp/maintenances/${id}/cancel`, {}),
+  conclude: (id: number) => apiClient.post<MaintenanceWindowDetail>(`/whatsapp/maintenances/${id}/conclude`, {}),
+}
+
 export const outagesAPI = {
   list: () => apiClient.get<{ incidents: OutageIncident[] }>('/whatsapp/outages'),
   get: (id: number) => apiClient.get<OutageIncidentDetail>(`/whatsapp/outages/${id}`),

@@ -5,6 +5,7 @@ import WaSendService from './waSendService.js';
 import WhatsAppConfigService from './whatsappConfigService.js';
 import WaBotConfigService from './waBotConfigService.js';
 import OutageIncidentService from './outageIncidentService.js';
+import MaintenanceService from './maintenanceService.js';
 import AuditLog from '../models/AuditLog.js';
 import { tdb, tinsert } from '../config/database.js';
 import { DEFAULT_LOCALE, translate } from '../i18n/index.js';
@@ -361,6 +362,18 @@ async function responderQueda(link, conversation) {
   return linhas.join('\n');
 }
 
+/**
+ * O aparelho está embaixo de uma manutenção programada em andamento? Então a
+ * resposta é a manutenção, com o horário previsto de fim — pela mesma razão
+ * da queda: não mandar reiniciar o roteador à toa.
+ */
+async function responderManutencao(link, conversation) {
+  const janela = await MaintenanceService.activeForDevice(link.device_id);
+  if (!janela) return null;
+  await MaintenanceService.markAsked(janela.affected_id, conversation?.wa_phone_e164);
+  return (await MaintenanceService.textos(janela)).bot;
+}
+
 /** The portal link, or nothing when the panel does not know its own address. */
 async function responderPortal() {
   const portal = await linkDoPortal();
@@ -662,6 +675,11 @@ class WaBotService {
       if (intencao === 'portal') resposta = await responderPortal();
       else if (intencao === 'fatura') resposta = await responderFatura(link);
       else if (intencao === 'sinal') {
+        const manutencao = link.device_id ? await responderManutencao(link, conversation) : null;
+        if (manutencao) {
+          await this.responderCom(conversation, manutencao);
+          return { replied: true, intent: 'maintenance' };
+        }
         const queda = link.device_id ? await responderQueda(link, conversation) : null;
         if (queda) {
           await this.responderCom(conversation, queda);
