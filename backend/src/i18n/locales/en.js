@@ -459,6 +459,7 @@ export default {
   'sgp.error.contractNotFound': 'Contract not found in SGP',
   'sgp.error.webhookSecretRequired': 'Generate a webhook secret before enabling SGP event delivery',
   'sgp.error.testCredentialsRequired': 'Enter the SGP URL, app, and token to test the connection',
+  'sgp.error.tokenForNewUrl': 'The SGP address changed: enter the token again to save',
   'sgp.testAccepted': 'SGP accepted the connection and the credentials. Response: {error}',
 
   'common.buildUnavailable': 'The application build is unavailable',
@@ -698,6 +699,7 @@ export default {
   'users.mfaElsewhere': 'This operator also works for another provider; their two-step login can only be turned off on the server',
   'users.mfaPlatform': 'This operator also administers the platform; their two-step login can only be turned off on the server',
   'users.passwordPlatform': 'This operator also administers the platform; only they can change their password',
+  'users.passwordSelf': 'To change your own password, use your profile, which asks for the current one',
   'users.mfaReset': 'Two-step login turned off; the operator\'s sessions were ended',
   'users.updated': 'Operator updated',
   'users.updateFailed': 'Failed to update the operator',
