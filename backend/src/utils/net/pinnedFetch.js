@@ -43,7 +43,7 @@ import http from 'node:http';
 import https from 'node:https';
 import net from 'node:net';
 
-import { blockedAddressReason } from './blockedRanges.js';
+import { blockedAddressReason, isCustomerPrivateAddress } from './blockedRanges.js';
 
 /** Tag on the error a body over the ceiling raises, so a caller can tell it apart. */
 export const RESPONSE_TOO_LARGE = 'EGRESS_RESPONSE_TOO_LARGE';
@@ -196,13 +196,17 @@ export class PinnedTransport {
    * refusal in three different vocabularies and each of their callers already
    * matches on one of them.
    */
-  static async vetTarget(hostname, { lookup, signal, allowPrivateAddresses = false, refuse } = {}) {
+  static async vetTarget(hostname, {
+    lookup, signal, allowPrivateAddresses = false, allowPrivateRanges = false, refuse
+  } = {}) {
     const host = bareHostname(hostname);
     const addresses = await this.addressesFor(host, lookup, signal);
     if (allowPrivateAddresses) return addresses;
     for (const { address } of addresses) {
       const reason = blockedAddressReason(address);
-      if (reason) {
+      // `allowPrivateRanges` é o modo túnel: só a rede privada de cliente passa
+      // (`isCustomerPrivateAddress`); loopback e metadados continuam fora.
+      if (reason && !(allowPrivateRanges && isCustomerPrivateAddress(address))) {
         throw refuse(
           `${host} resolves to ${address}, which is ${reason} and cannot be reached from here`,
           { hostname: host, address, reason }

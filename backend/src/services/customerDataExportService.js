@@ -57,6 +57,7 @@ const SEM_DADO_DE_ASSINANTE = Object.freeze({
   vendors: 'catálogo de fabricantes',
   wifi_security_config: 'política de WiFi do provedor',
   map_settings: 'preferências do mapa',
+  tenant_genieacs_connections: 'como o painel chega ao GenieACS do provedor',
   tenant_invites: 'convites da equipe do provedor',
   provisioning_profiles: 'perfis de provisionamento',
   whatsapp_accounts: 'instâncias de WhatsApp do provedor',

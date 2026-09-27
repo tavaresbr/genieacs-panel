@@ -1588,6 +1588,27 @@ const MFA_TABLES = [
   ['user_recovery_codes', userRecoveryCodesTable]
 ];
 
+/**
+ * Como o painel chega ao GenieACS de cada provedor: `direct` (a URL, como
+ * sempre foi), `tunnel` (a URL numa rede privada de cliente, liberada pela
+ * plataforma) e, depois, `agent`. Sem linha, vale `direct` — é o que todo
+ * provedor de antes desta tabela já fazia, e a migração não precisa escrever
+ * nada para que continue assim.
+ */
+const tenantGenieAcsConnectionsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.string('mode', 16).notNullable().defaultTo('direct');
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['tenant_id']);
+};
+
+const GENIEACS_CONNECTION_TABLES = [
+  ['tenant_genieacs_connections', tenantGenieAcsConnectionsTable]
+];
+
 const SGP_CONTACT_TABLES = [
   ['sgp_contacts', sgpContactsTable],
   ['sgp_clients', sgpClientsTable]
@@ -1656,7 +1677,8 @@ export const SCHEMA_TABLES = [
   ...SGP_CONTACT_TABLES,
   ...MFA_TABLES,
   ...OUTAGE_TABLES,
-  ...WA_BOT_EVENT_TABLES
+  ...WA_BOT_EVENT_TABLES,
+  ...GENIEACS_CONNECTION_TABLES
 ].map(([name]) => name);
 
 /**
@@ -4029,6 +4051,23 @@ export const migrations = [
       if (!(await db.schema.hasTable('tenants'))) return;
       for (const [nome, construtor] of WA_BOT_EVENT_TABLES) {
         // eslint-disable-next-line no-await-in-loop
+        await createTableIfMissing(db, nome, construtor(db));
+      }
+    }
+  },
+  {
+    /**
+     * Como o painel chega ao GenieACS de cada provedor — ver
+     * `tenantGenieAcsConnectionsTable`. Tabela nova e vazia: sem linha vale
+     * `direct`, que é o que todos já faziam.
+     */
+    id: '0069_tenant_genieacs_connections',
+    async isApplied(db) {
+      return db.schema.hasTable('tenant_genieacs_connections');
+    },
+    async up(db) {
+      for (const [nome, construtor] of GENIEACS_CONNECTION_TABLES) {
+        // eslint-disable-next-line no-await-in-loop -- uma tabela por vez
         await createTableIfMissing(db, nome, construtor(db));
       }
     }

@@ -1,5 +1,13 @@
 import { currentTenantId } from '../../config/tenantContext.js';
+import GenieAcsConnection from '../../models/GenieAcsConnection.js';
 import DirectConnector from './direct.js';
+import TunnelConnector from './tunnel.js';
+
+/** O conector de cada modo de `tenant_genieacs_connections`. */
+const CONECTORES = Object.freeze({
+  direct: DirectConnector,
+  tunnel: TunnelConnector
+});
 
 /**
  * Por onde o painel fala com o GenieACS daquele provedor.
@@ -18,20 +26,18 @@ import DirectConnector from './direct.js';
  * instância que nós hospedamos — é problema do conector. Sem essa separação,
  * cada modo novo seria um `if` a mais nos sete lugares.
  *
- * ## O que NÃO tem, e por quê
+ * ## Os modos
  *
- * O plano previa uma tabela `tenant_genieacs_connections` com `mode`,
- * `verify_tls`, `allow_private_ranges`, `status` e `last_check_at`. Ela não
- * entra aqui, e a diferença é deliberada: hoje `mode` só poderia valer
- * `'direct'`, e `allow_private_ranges` não teria leitor — a decisão de faixa
- * privada é da edição, em `genieacsEgress`. Uma tabela cujas colunas nenhum
- * código lê é generalização especulativa com custo de migração num produto em
- * produção, e o dia em que o segundo modo existir é o dia em que aquelas
- * colunas passam a significar alguma coisa.
+ * O modo mora em `tenant_genieacs_connections` (sem linha, `direct`), e é
+ * escolhido AQUI e em mais nenhum lugar:
  *
- * O que ESTE arquivo entrega é a fronteira. Trocar a origem da configuração
- * — de `settings`/`app_state` para uma tabela — passa a ser mudança de uma
- * função (`connectorFor`), e não dos sete lugares de novo.
+ * - `direct`: a URL, pelo egresso com as guardas de sempre;
+ * - `tunnel`: a mesma URL, com a rede privada DE CLIENTE liberada para este
+ *   provedor (`tunnel.js`) — o GenieACS atrás de VPN/WireGuard.
+ *
+ * `allow_private_ranges` do plano virou o próprio modo `tunnel`, e não uma
+ * coluna solta: liberar rede privada sem dizer por quê seria uma chave que
+ * alguém liga "para testar" e esquece ligada.
  */
 
 /**
@@ -47,7 +53,7 @@ export async function connectorFor() {
   // provedor é uma requisição ao ACS de ninguém, que é exatamente o que a
   // tenancy existe para impedir.
   currentTenantId();
-  return DirectConnector;
+  return CONECTORES[await GenieAcsConnection.mode()] ?? DirectConnector;
 }
 
-export { DirectConnector };
+export { DirectConnector, TunnelConnector };

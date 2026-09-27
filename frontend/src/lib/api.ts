@@ -1052,10 +1052,15 @@ export interface CataloguePropagation {
 }
 
 /** O GenieACS de um provedor, como o console o vê: sem o segredo. */
+/** Como o painel chega ao GenieACS de um provedor. Só o console escolhe. */
+export type GenieAcsConnectionMode = 'direct' | 'tunnel'
+
 export interface TenantGenieAcs {
   /** Os caminhos dos parâmetros virtuais TR-069 deste provedor (`vpRxPower`, …). */
   virtualParameters: Record<string, string>
   url: string
+  /** `tunnel`: o GenieACS numa rede privada de cliente, liberada só para este provedor. */
+  mode: GenieAcsConnectionMode
   auth: GenieAcsAuthConfig
   /** O endereço que o deploy sugere a este provedor, ou nulo. */
   suggestion: string | null
@@ -1628,7 +1633,7 @@ export const platformAPI = {
 
   /** `secret` ausente mantém o guardado; `''` apaga. */
   updateTenantGenieAcs: (tenantId: number, payload: {
-    url?: string; authType?: GenieAcsAuthType; username?: string; secret?: string
+    url?: string; mode?: GenieAcsConnectionMode; authType?: GenieAcsAuthType; username?: string; secret?: string
     virtualParameters?: Record<string, string>; deviceTag?: string; autoTagPrefixes?: string
   }) =>
     apiClient.put<TenantGenieAcs>(`/platform/tenants/${tenantId}/genieacs`, payload),

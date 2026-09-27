@@ -98,6 +98,7 @@ export const SCOPED_TABLES = new Set([
   // its WHERE never was an identity filter — it meant "the only row", and the
   // second provider to save a map centre wrote over the first's.
   'map_settings',
+  'tenant_genieacs_connections',
   // The equipment catalogue. Its content really is the same fact about firmware
   // for every ISP, but the rows are edited on screen, so shared they made one
   // operator's corrected detection pattern or parameter path silently change
