@@ -6,7 +6,7 @@ import WhatsAppConfigService from './whatsappConfigService.js';
 import WaBotConfigService from './waBotConfigService.js';
 import OutageIncidentService from './outageIncidentService.js';
 import AuditLog from '../models/AuditLog.js';
-import { tdb } from '../config/database.js';
+import { tdb, tinsert } from '../config/database.js';
 import { DEFAULT_LOCALE, translate } from '../i18n/index.js';
 import { comoDataBr, comoReal, maisAntigaEmAberto } from '../utils/wa/waCobranca.js';
 import { normalizarTexto, pedeSaida } from '../utils/wa/waOptOutTexto.js';
@@ -489,7 +489,9 @@ class WaBotService {
    */
   static async responder({ conversation, messageId, body, direction } = {}) {
     try {
-      return await this.rotear({ conversation, messageId, body, direction });
+      const resultado = await this.rotear({ conversation, messageId, body, direction });
+      if (resultado?.replied) await this.registrar(conversation, resultado.intent);
+      return resultado;
     } catch (error) {
       // Having nowhere to send is a configuration state, not a fault: no number
       // is connected, or the thread is a LID with no phone behind it. Logging it
@@ -660,9 +662,12 @@ class WaBotService {
       if (intencao === 'portal') resposta = await responderPortal();
       else if (intencao === 'fatura') resposta = await responderFatura(link);
       else if (intencao === 'sinal') {
-        resposta = link.device_id
-          ? (await responderQueda(link, conversation)) || await responderSinal(link)
-          : t('whatsapp.bot.noDevice');
+        const queda = link.device_id ? await responderQueda(link, conversation) : null;
+        if (queda) {
+          await this.responderCom(conversation, queda);
+          return { replied: true, intent: 'outage' };
+        }
+        resposta = link.device_id ? await responderSinal(link) : t('whatsapp.bot.noDevice');
       } else if (intencao === 'liberar') resposta = await responderLiberacao(link, conversation);
     } catch (error) {
       // SGP down, GenieACS unreachable, a contract the ERP no longer knows: the
@@ -678,6 +683,11 @@ class WaBotService {
     }
 
     await this.responderCom(conversation, resposta);
+    // Para o relatório: "2ª via enviada" é a fatura que saiu, não o pedido
+    // respondido com "você não tem fatura em aberto".
+    if (intencao === 'fatura' && resposta === await WaBotConfigService.message('noOpenInvoice')) {
+      return { replied: true, intent: 'noOpenInvoice' };
+    }
     return { replied: true, intent: intencao };
   }
 
@@ -809,6 +819,22 @@ class WaBotService {
       .where({ id: conversation.id })
       .update({ ...patch, updated_at: new Date() });
     Object.assign(conversation, patch);
+  }
+
+  /**
+   * Uma linha para o relatório do chatbot: a intenção respondida. Calada:
+   * o relatório perder uma linha é melhor do que o assinante perder a resposta.
+   */
+  static async registrar(conversation, intent) {
+    try {
+      await tinsert('wa_bot_events', {
+        conversation_id: conversation?.id ?? null,
+        intent: String(intent || 'unknown').slice(0, 32),
+        created_at: new Date()
+      });
+    } catch (error) {
+      console.warn('waBot evento:', error?.message || error);
+    }
   }
 
   /** Grava (ou tira, com `null`) a pausa do bot nesta conversa. */

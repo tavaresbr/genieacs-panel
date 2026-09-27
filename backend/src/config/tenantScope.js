@@ -49,6 +49,7 @@ export const SCOPED_TABLES = new Set([
   'sgp_contacts',
   'outage_incidents',
   'outage_incident_devices',
+  'wa_bot_events',
   // A ficha completa de cada cliente do SGP: endereço, nascimento, todos os
   // telefones e e-mails. O dado mais pessoal do painel inteiro.
   'sgp_clients',
