@@ -34,6 +34,7 @@ import platformRoutes from './routes/platform.js';
 import platformMemberRoutes from './routes/platformMembers.js';
 import platformAdminRoutes from './routes/platformAdmins.js';
 import platformBillingRoutes from './routes/platformBilling.js';
+import platformIntegrationsRoutes from './routes/platformIntegrations.js';
 import userRoutes from './routes/users.js';
 import inviteRoutes from './routes/invites.js';
 import auditRoutes from './routes/audit.js';
@@ -309,6 +310,9 @@ if (IS_SAAS) {
   app.use('/api/platform', platformAdminRoutes);
   // E a terceira: planos, assinaturas e pagamentos — a Fase 5.
   app.use('/api/platform', platformBillingRoutes);
+  // E a quarta: a conta da plataforma nos sistemas de fora (o Asaas), e o
+  // provedor criado como cliente lá dentro.
+  app.use('/api/platform', platformIntegrationsRoutes);
 }
 app.use('/api/users', userRoutes);
 app.use('/api/invites', inviteRoutes);

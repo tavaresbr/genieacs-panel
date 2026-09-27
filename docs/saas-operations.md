@@ -612,22 +612,40 @@ marcando à mão. Com dez clientes passa; com cinquenta é uma pessoa por dia, e
 que erra.
 
 `POST /api/billing-webhook` recebe a entrega do gateway e credita a assinatura. Três coisas
-para ligar:
+para ligar — as duas primeiras no console, aba **Integrações → Asaas**:
 
-1. **`BILLING_WEBHOOK_TOKEN` no `.env` do deploy.** É a credencial que o gateway devolve
-   no cabeçalho `asaas-access-token` de toda entrega, e é do **deploy** e não de um
-   provedor: há uma conta no gateway e ela é nossa. Sem a variável configurada a rota
-   responde **404** — uma rota que mexe em dinheiro não pode ficar aberta porque alguém
-   esqueceu uma linha.
-2. **O endereço, no painel do gateway:** `https://<apex>/api/billing-webhook`. A rota é
-   montada acima do resolvedor de provedor de propósito: o apex não nomeia provedor
-   nenhum, e resolvida por host a entrega levaria 404 antes do controlador.
+1. **O token do webhook.** É a credencial que o gateway devolve no cabeçalho
+   `asaas-access-token` de toda entrega, e é do **deploy** e não de um provedor: há uma
+   conta no gateway e ela é nossa. O botão *Gerar token* cunha um (32 bytes aleatórios),
+   grava cifrado na caixa da plataforma e o mostra **uma vez** — cole-o no painel do
+   gateway, na configuração do webhook. Sem token nenhum a rota responde **404**: uma rota
+   que mexe em dinheiro não pode ficar aberta porque alguém esqueceu de configurá-la.
+2. **O endereço, no painel do gateway.** A tela de Integrações mostra o endereço pronto
+   (`https://<apex>/api/billing-webhook`, montado do `TENANT_BASE_DOMAIN` ou do
+   `PUBLIC_BASE_URL`). A rota é montada acima do resolvedor de provedor de propósito: o
+   apex não nomeia provedor nenhum, e resolvida por host a entrega levaria 404 antes do
+   controlador.
 3. **A correlação, no console**, aba *Gateway* de cada provedor: o nome do gateway
    (`asaas`) e o id do cliente lá dentro (`cus_…`). É por ela que a entrega volta ao
    provedor certo. Enquanto ela não existir, o pagamento vira uma linha de log dizendo
    `no provider for payment …` e a cobrança segue manual. **Só o console escreve** esses
    dois campos: um provedor que pudesse escrever o próprio id apontaria para o cliente de
-   outro e receberia o crédito alheio.
+   outro e receberia o crédito alheio. Em vez de colar um id, o console também pode
+   **criar o cliente no gateway** a partir do cadastro fiscal do provedor (razão social,
+   CPF/CNPJ, e-mail, telefone e endereço; `externalReference` = `tenant:<id>` e os avisos
+   do gateway desligados, porque os avisos são nossos) e ligá-lo na mesma operação. Exige
+   CPF/CNPJ no cadastro e recusa (409) quem já está ligado — para trocar, desligue antes.
+
+**Onde mora a configuração, e o `.env`.** A chave da API, o ambiente (sandbox ou produção)
+e o token do webhook ficam no `app_state` da **caixa da plataforma**, os dois segredos
+cifrados (contexto `skygenpanel-asaas-gateway-v1`, incluído na re-cifra da seção 6). A
+tela nunca mostra o valor, só se está configurado e **de onde vem**: `db` (gravado pelo
+console) ou `env`. As variáveis `ASAAS_API_KEY` e `BILLING_WEBHOOK_TOKEN` continuam
+funcionando como **fallback opcional** — o que o console gravou ganha, e apagar pelo
+console (campo vazio) devolve a palavra ao `.env`. Um deploy que já cobrava pelo `.env`
+não precisa mudar nada. Sem caixa da plataforma (self-hosted, ou SaaS que ainda não a
+criou) só o `.env` vale, e gravar pelo console responde 409 `no_platform_tenant`. Cada
+mudança fica na trilha da plataforma como `platform.integration_changed`, sem o valor.
 
 O caminho de volta tem duas chaves, nesta ordem: a nossa própria referência
 (`externalReference` no formato `tenant:<id>`, quando fomos nós que criamos a cobrança) e o
@@ -657,16 +675,22 @@ significa que o corpo chegou e não foi reconhecido.
 
 ### Emitir a cobrança
 
-A outra metade, e ela também deixou de ser manual. Duas variáveis a mais no `.env`:
+A outra metade, e ela também deixou de ser manual. Configure em **Integrações → Asaas**:
 
-- **`ASAAS_API_KEY`** — a chave com que o painel CHAMA o gateway. Não é a mesma coisa que
-  `BILLING_WEBHOOK_TOKEN`: aquela autentica a entrega que chega, esta autentica a chamada
-  que sai, e elas viajam em cabeçalhos diferentes (`asaas-access-token` na entrada,
+- **A chave da API** — a chave com que o painel CHAMA o gateway. Não é a mesma coisa que
+  o token do webhook: aquele autentica a entrega que chega, esta autentica a chamada que
+  sai, e elas viajam em cabeçalhos diferentes (`asaas-access-token` na entrada,
   `access_token` na saída). Trocá-las dá 401 numa direção só — a que só se exercita
-  cobrando de verdade.
-- **`ASAAS_BASE_URL`** — só para apontar o ambiente de testes
-  (`https://api-sandbox.asaas.com/v3`, com uma chave de sandbox). Em produção o default
-  serve.
+  cobrando de verdade. O botão *Testar conexão* confere a chave e mostra o nome da conta
+  (é o que distingue a chave certa da chave de sandbox de outra pessoa).
+- **O ambiente** — `sandbox` (`https://api-sandbox.asaas.com/v3`, chaves `$aact_hmlg_…`)
+  ou `production` (`https://api.asaas.com/v3`, chaves `$aact_prod_…`). Sem escolha no
+  console, é produção quando a chave vem do `.env` (o comportamento de antes) e sandbox
+  quando não há chave nenhuma.
+
+`ASAAS_API_KEY` no `.env` continua valendo como fallback, e **`ASAAS_BASE_URL`**, quando
+posta, ainda ganha do ambiente escolhido — ela existe para apontar o cliente a um servidor
+de testes, e não deveria estar posta num deploy de verdade.
 
 Sem a chave, nada é emitido e todo provedor segue na cobrança manual — e o job diz isso
 (`gateway_not_configured`) em vez de queimar tentativas.
@@ -718,6 +742,21 @@ No console, um valor curto volta **409** com os dois números, e a tela oferece 
 mesmo assim: é a saída para um acordo ou uma entrada negociada. Quem a usa fica na trilha
 da plataforma com `underpaymentAccepted`, porque "quem deu desconto a quem" é uma pergunta
 que alguém vai fazer.
+
+**O resto do ciclo de vida da cobrança** também chega pelo webhook, e só muda a etiqueta
+da cobrança em `billing_charges` — nunca o crédito:
+
+- `PAYMENT_OVERDUE` → **`overdue`**: venceu sem pagamento. Continua em aberto (o link de
+  pagamento vale e o aviso de vencimento o manda); um pagamento que chega depois a quita
+  normalmente.
+- `PAYMENT_DELETED` → **`canceled`**: alguém removeu a cobrança no painel do gateway. O
+  job não emite outra para o mesmo período.
+- `PAYMENT_REFUNDED` → **`refunded`**: o dinheiro voltou. **O período que ele comprou NÃO é
+  desfeito** — isso é decisão de gente, pelo console; o log do processo diz
+  `was REFUNDED — the subscription credit was NOT reversed`.
+
+Um evento fora de ordem não reabre nada (um `OVERDUE` atrasado não volta uma cobrança paga
+para em aberto), e todos respondem 200, inclusive quando a cobrança não é nossa.
 
 **O que continua fora:** a cobrança em moeda que não seja BRL (o gateway não tem campo de
 moeda, e o cliente recusa em voz alta em vez de cobrar reais com etiqueta de dólar);

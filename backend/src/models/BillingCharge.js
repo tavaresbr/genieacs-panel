@@ -24,8 +24,29 @@ export const CHARGE_STATUSES = Object.freeze([
    * "o cliente nunca recebeu a cobrança" e "ninguém tentou emitir" são o mesmo
    * silêncio, e são problemas com consertos opostos.
    */
-  'failed'
+  'failed',
+  /**
+   * Venceu e ninguém pagou (`PAYMENT_OVERDUE` do gateway). Continua EM ABERTO:
+   * o link de pagamento vale, o aviso de vencimento o manda e a faxina de
+   * períodos velhos a alcança — só o nome mudou, e é o nome que o provedor
+   * precisa ler na tela para saber que está atrasado.
+   */
+  'overdue',
+  /**
+   * O dinheiro voltou para quem pagou (`PAYMENT_REFUNDED`). Fechada: não há o
+   * que pagar nela. O período que ela comprou NÃO é desfeito sozinho — quem
+   * decide isso é gente, pelo console.
+   */
+  'refunded'
 ]);
+
+/**
+ * Os estados em que ainda se deve dinheiro por uma cobrança. Uma lista só, e
+ * não três `whereIn` escritos à mão: o `overdue` entrou depois e teria ficado
+ * de fora de algum deles — e uma cobrança atrasada fora da lista de "em
+ * aberto" é exatamente a que some da tela de quem precisa cobrar.
+ */
+export const OPEN_CHARGE_STATUSES = Object.freeze(['pending', 'failed', 'overdue']);
 
 class BillingCharge {
   /** A cobrança de um período, ou nada. É a leitura de idempotência da emissão. */
@@ -104,7 +125,7 @@ class BillingCharge {
     const chave = String(periodEnd ?? '').slice(0, 10);
     if (!chave) return [];
     return tdb('billing_charges')
-      .whereIn('status', ['pending', 'failed'])
+      .whereIn('status', OPEN_CHARGE_STATUSES)
       .where('period_end', '<', chave)
       .orderBy('period_end');
   }
@@ -112,7 +133,7 @@ class BillingCharge {
   /** A cobrança em aberto mais recente deste provedor — a que o aviso linka. */
   static async currentOpen() {
     return (await tdb('billing_charges')
-      .whereIn('status', ['pending', 'failed'])
+      .whereIn('status', OPEN_CHARGE_STATUSES)
       .orderBy('period_end', 'desc')
       .first()) || null;
   }
@@ -148,7 +169,7 @@ class BillingCharge {
       // Só de cobrança que ainda se paga. Um link de cobrança já quitada é um
       // botão que leva a uma página do gateway dizendo que não há o que pagar —
       // e, pior, convida a pagar de novo.
-      invoiceUrl: row.status === 'pending' || row.status === 'failed' ? (row.invoice_url ?? null) : null,
+      invoiceUrl: OPEN_CHARGE_STATUSES.includes(row.status) ? (row.invoice_url ?? null) : null,
       createdAt: row.created_at ?? null
     };
   }

@@ -171,7 +171,7 @@ class ChargeIssuingService {
     // variável queimaria as cinco tentativas de toda cobrança e chegaria em
     // `gave_up` — uma variável esquecida destruindo a cobrança em vez de
     // simplesmente adiá-la até alguém configurá-la.
-    if (typeof provider.isConfigured === 'function' && !provider.isConfigured()) {
+    if (typeof provider.isConfigured === 'function' && !(await provider.isConfigured())) {
       return { issued: false, reason: 'gateway_not_configured' };
     }
 
@@ -222,7 +222,9 @@ class ChargeIssuingService {
 
     const existente = await BillingCharge.forPeriod(periodo);
     if (existente) {
-      if (existente.status === 'paid' || existente.status === 'canceled') {
+      // `refunded` também: o período teve cobrança, ela foi paga e devolvida, e
+      // emitir outra por cima é decisão de gente, não do agendador.
+      if (existente.status === 'paid' || existente.status === 'canceled' || existente.status === 'refunded') {
         return { issued: false, reason: 'already_settled' };
       }
       if (existente.gateway_charge_id) return { issued: false, reason: 'already_issued' };
