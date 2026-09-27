@@ -734,6 +734,7 @@ export default {
   'subscription.planUnchanged': 'Este já é o seu plano',
   'subscription.planScheduled': 'Troca para um plano menor agendada para {date}; o plano atual continua até lá',
   'subscription.pendingCanceled': 'Troca de plano agendada cancelada; o plano atual continua',
+  'subscription.pendingLocked': 'A troca de plano agendada já foi paga pelo preço do plano novo e vale a partir de {date}; ela não pode mais ser alterada nem cancelada.',
   'subscription.planChangeFailed': 'Não foi possível trocar o plano',
   'subscription.planNotFound': 'Este plano não existe ou não é mais oferecido',
   'subscription.notChangeable': 'O plano desta assinatura não pode ser trocado por aqui',

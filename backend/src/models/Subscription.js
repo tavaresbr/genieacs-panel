@@ -90,7 +90,15 @@ class Subscription {
     // tenant-scope-exempt: o provedor vem no argumento (ver acima).
     const changed = await db('subscriptions')
       .where({ tenant_id: tenantId, pending_plan_id: pendingPlanId })
-      .update({ plan_id: pendingPlanId, pending_plan_id: null, pending_plan_at: null, updated_at: new Date() });
+      .update({
+        plan_id: pendingPlanId,
+        pending_plan_id: null,
+        pending_plan_at: null,
+        pending_plan_locked_at: null,
+        // O plano novo é o de baixo: não há subida no período a proteger.
+        upgraded_at: null,
+        updated_at: new Date()
+      });
     return changed > 0;
   }
 

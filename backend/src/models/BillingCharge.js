@@ -213,7 +213,7 @@ class BillingCharge {
    *
    * @returns {Promise<boolean>}
    */
-  static async resetForReissue(id, { amountCents, currency }) {
+  static async resetForReissue(id, { amountCents, currency, holdUntil = null }) {
     const linha = await BillingCharge.findById(id);
     if (!linha) return false;
     const anteriores = BillingCharge.supersededOf(linha);
@@ -238,7 +238,12 @@ class BillingCharge {
       attempts: 0,
       next_attempt_at: null,
       last_error: null,
-      issuing_until: null,
+      // A garra fica com quem reprecificou quando ele pede (`holdUntil`): a
+      // troca de plano ainda vai gravar o plano novo (ou a descida agendada)
+      // DEPOIS daqui, e uma linha solta entre as duas escritas seria emitida
+      // pelo agendador ou por um "pagar agora" com o preço que o estado velho
+      // ainda diz. Quem a segura a solta logo antes de reemitir.
+      issuing_until: holdUntil,
       superseded_charges: anteriores.length ? JSON.stringify(anteriores) : null,
       updated_at: new Date()
     });

@@ -186,7 +186,7 @@ class ChargeIssuingService {
    * na mão do provedor é pagar ESSA, e não emitir outra.
    */
   static async issueCurrent({
-    now = new Date(), tenant: doLaco = null, manual = false, countDevices = null
+    now = new Date(), tenant: doLaco = null, manual = false, countDevices = null, pendingBlockedBy = undefined
   } = {}) {
     const tenant = doLaco ?? await Tenant.findById(currentTenantId());
     if (!tenant) return { issued: false, reason: 'tenant_gone' };
@@ -308,7 +308,20 @@ class ChargeIssuingService {
       if (!Number.isNaN(agendada.getTime()) && this.periodKey(agendada) === periodo) {
         const agendado = await Plan.findById(subscription.pending_plan_id);
         if (agendado && Number(agendado.price_cents ?? 0) > 0) {
-          descidaBloqueada = await SubscriptionService.overLimitOf(agendado, { countDevices });
+          // Três fontes para o veredito, nesta ordem. A descida travada (paga
+          // pelo preço dela, 0071) não tem veredito: vale o preço dela. Quem
+          // reemite logo depois de decidir — a troca de plano, a reprecificação
+          // abaixo — passa o veredito que JÁ usou (`pendingBlockedBy`), para a
+          // reemissão não recontar: uma contagem de ONTs que oscila entre as
+          // duas leituras cancelaria e reemitiria a fatura sem fim. Sem nada
+          // disso, conta-se agora.
+          if (SubscriptionService.isPendingLocked(subscription)) {
+            descidaBloqueada = null;
+          } else if (pendingBlockedBy !== undefined) {
+            descidaBloqueada = pendingBlockedBy;
+          } else {
+            descidaBloqueada = await SubscriptionService.overLimitOf(agendado, { countDevices });
+          }
           if (!descidaBloqueada) {
             planoDoPeriodo = agendado;
             preco = Number(agendado.price_cents);
@@ -348,7 +361,9 @@ class ChargeIssuingService {
       // fica com o preço cheio até a renovação: um uso oscilando em volta do
       // teto viraria uma fatura nova por oscilação na caixa de quem paga.
       if (existente.gateway_charge_id && descidaBloqueada && Number(existente.amount_cents) !== preco) {
-        return this.repriceBlockedDowngrade({ subscription, plan, tenant, countDevices, charge: existente });
+        return this.repriceBlockedDowngrade({
+          subscription, plan, tenant, charge: existente, blockedBy: descidaBloqueada, now
+        });
       }
       if (existente.gateway_charge_id) return { issued: false, reason: 'already_issued', charge: existente };
       if (!manual) {
@@ -483,20 +498,43 @@ class ChargeIssuingService {
    * — e a reemissão volta por `issueCurrent`, que agora sai com o preço do
    * atual porque o bloqueio continua. Nunca lança, como o resto deste job.
    */
-  static async repriceBlockedDowngrade({ subscription, plan, tenant, countDevices, charge }) {
+  static async repriceBlockedDowngrade({ subscription, plan, tenant, charge, blockedBy, now = new Date() }) {
+    // A espera depois de uma falha, na própria linha: o agendador passa a
+    // cada minuto, e um gateway que recusa o cancelamento seria martelado com
+    // um DELETE por minuto. `next_attempt_at` numa linha JÁ emitida não
+    // significa mais nada para a emissão (ela só o lê em linha sem id no
+    // gateway), então é livre para isto — e `resetForReissue` o apaga quando
+    // a reprecificação enfim dá certo.
+    const espera = charge.next_attempt_at ? new Date(charge.next_attempt_at) : null;
+    if (espera && !Number.isNaN(espera.getTime()) && espera.getTime() > now.getTime()) {
+      return { issued: false, reason: 'backing_off', charge };
+    }
     // Importado aqui, e não no topo: `selfBillingService` importa este
     // arquivo, e o caminho de volta só é preciso neste caso raro.
     const { default: SelfBillingService } = await import('./selfBillingService.js');
     try {
-      const resultado = await SelfBillingService.repriceOpenCharge({ subscription, plan, tenant, countDevices });
+      const resultado = await SelfBillingService.repriceOpenCharge({ subscription, plan, tenant, blockedBy });
       console.warn(
         `Renewal charge ${charge.id} of provider ${tenant.id} was repriced back to plan ${plan.id}: `
         + 'the scheduled downgrade is blocked by usage'
       );
-      return resultado.reissue ?? { issued: false, reason: resultado.charge === 'reissued' ? 'repriced' : 'already_issued',
-        charge: await BillingCharge.findById(charge.id) };
+      return resultado.reissue ?? {
+        issued: false,
+        reason: resultado.charge === 'reissued' ? 'repriced' : 'already_issued',
+        charge: await BillingCharge.findById(charge.id)
+      };
     } catch (error) {
-      return { issued: false, reason: error.code === 'busy' ? 'raced' : 'reprice_failed', error: error.message, charge };
+      // Ocupada é outra passada mexendo nela agora: nada a esperar.
+      if (error.code === 'busy') return { issued: false, reason: 'raced', error: error.message, charge };
+      // `detail` é o motivo do gateway; `message`, numa recusa traduzível, é
+      // só a chave da frase — e quem lê `last_error` quer o motivo.
+      const motivo = String(error.detail ?? error.message ?? '');
+      await BillingCharge.update(charge.id, {
+        last_error: motivo.slice(0, 500),
+        next_attempt_at: new Date(now.getTime() + this.RETRY_AFTER_MS)
+      });
+      console.warn(`Could not reprice renewal charge ${charge.id} of provider ${tenant.id}: ${motivo}`);
+      return { issued: false, reason: 'reprice_failed', error: motivo, charge };
     }
   }
 }

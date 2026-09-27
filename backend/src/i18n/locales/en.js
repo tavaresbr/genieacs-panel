@@ -735,6 +735,7 @@ export default {
   'subscription.planUnchanged': 'This is already your plan',
   'subscription.planScheduled': 'Plan downgrade scheduled for {date}; your current plan stays until then',
   'subscription.pendingCanceled': 'Scheduled plan change canceled; your current plan stays',
+  'subscription.pendingLocked': 'The scheduled plan change was already paid at the new plan\'s price and takes effect on {date}; it can no longer be changed or canceled.',
   'subscription.planChangeFailed': 'Failed to change the plan',
   'subscription.planNotFound': 'This plan does not exist or is no longer offered',
   'subscription.notChangeable': 'The plan of this subscription cannot be changed here',

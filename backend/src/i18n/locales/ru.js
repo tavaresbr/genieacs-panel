@@ -736,6 +736,7 @@ export default {
   'subscription.planUnchanged': 'Это уже ваш тариф',
   'subscription.planScheduled': 'Переход на более дешёвый тариф запланирован на {date}; до этого действует текущий тариф',
   'subscription.pendingCanceled': 'Запланированная смена тарифа отменена; текущий тариф сохраняется',
+  'subscription.pendingLocked': 'Запланированная смена тарифа уже оплачена по цене нового тарифа и вступит в силу {date}; её больше нельзя изменить или отменить.',
   'subscription.planChangeFailed': 'Не удалось изменить тариф',
   'subscription.planNotFound': 'Этот тариф не существует или больше не предлагается',
   'subscription.notChangeable': 'Тариф этой подписки нельзя изменить здесь',

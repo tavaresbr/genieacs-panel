@@ -446,6 +446,7 @@ class TenantController {
           ...(resultado.pendingCanceled
             ? { pendingCanceled: true, canceledPlanId: resultado.canceledPlanId ?? null } : {}),
           ...(resultado.replacedPlanId ? { replacedPlanId: resultado.replacedPlanId } : {}),
+          ...(resultado.deferredByUpgrade ? { deferredByUpgrade: true } : {}),
           ...(resultado.charge !== 'none' ? { openCharge: resultado.charge } : {})
         };
         await AuditLog.fromRequest(req, {

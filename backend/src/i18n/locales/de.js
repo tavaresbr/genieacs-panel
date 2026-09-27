@@ -736,6 +736,7 @@ export default {
   'subscription.planUnchanged': 'Das ist bereits Ihr Tarif',
   'subscription.planScheduled': 'Wechsel in einen kleineren Tarif für den {date} geplant; bis dahin gilt Ihr aktueller Tarif',
   'subscription.pendingCanceled': 'Geplanter Tarifwechsel storniert; Ihr aktueller Tarif bleibt bestehen',
+  'subscription.pendingLocked': 'Der geplante Tarifwechsel wurde bereits zum Preis des neuen Tarifs bezahlt und gilt ab {date}; er kann nicht mehr geändert oder storniert werden.',
   'subscription.planChangeFailed': 'Tarif konnte nicht geändert werden',
   'subscription.planNotFound': 'Dieser Tarif existiert nicht oder wird nicht mehr angeboten',
   'subscription.notChangeable': 'Der Tarif dieses Abonnements kann hier nicht geändert werden',

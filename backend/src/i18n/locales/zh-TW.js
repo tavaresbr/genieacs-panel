@@ -735,6 +735,7 @@ export default {
   'subscription.planUnchanged': '這已經是您的方案',
   'subscription.planScheduled': '已排定於 {date} 降級方案；在此之前目前方案繼續有效',
   'subscription.pendingCanceled': '已取消排定的方案變更；目前方案維持不變',
+  'subscription.pendingLocked': '排定的方案變更已按新方案價格付款，將於 {date} 生效；無法再變更或取消。',
   'subscription.planChangeFailed': '無法變更方案',
   'subscription.planNotFound': '此方案不存在或已不再提供',
   'subscription.notChangeable': '此訂閱的方案無法在此變更',

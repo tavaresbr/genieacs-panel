@@ -1400,6 +1400,15 @@ const SUBSCRIPTION_PENDING_PLAN_COLUMNS = [
   ['pending_plan_at', (t) => t.timestamp('pending_plan_at').nullable()]
 ];
 
+/**
+ * As colunas da 0071 — ver a migração. Instantes e não booleanos: quem lê o
+ * banco depois quer saber QUANDO, e nulo continua querendo dizer "não".
+ */
+const SUBSCRIPTION_PLAN_GUARD_COLUMNS = [
+  ['upgraded_at', (t) => t.timestamp('upgraded_at').nullable()],
+  ['pending_plan_locked_at', (t) => t.timestamp('pending_plan_locked_at').nullable()]
+];
+
 const BILLING_TABLES = [
   ['plans', plansTable],
   ['subscriptions', subscriptionsTable],
@@ -4126,6 +4135,41 @@ export const migrations = [
     async up(db) {
       if (!(await db.schema.hasTable('subscriptions'))) return;
       const missing = await missingColumns(db, 'subscriptions', SUBSCRIPTION_PENDING_PLAN_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('subscriptions', (t) => {
+        for (const add of missing) add(t);
+      });
+    }
+  },
+  {
+    /**
+     * As duas travas que a revisão da descida agendada pediu, as duas contra
+     * o mesmo dano: um mês de plano caro pago pelo preço do barato.
+     *
+     * `upgraded_at` é quando o provedor SUBIU de plano no meio de um período
+     * pago — que não é cobrado (não há proporcional), e só se paga pela
+     * cobrança seguinte. Sem esta marca, subir no primeiro dia e agendar a
+     * descida antes da cobrança seguinte sair deixava o mês inteiro no plano
+     * caro de graça. Com ela, a descida pedida nesse período vai para a
+     * renovação SEGUINTE: o próximo período é cobrado pelo preço de cima. Um
+     * pagamento que estende o período a apaga — o plano de cima já foi pago.
+     *
+     * `pending_plan_locked_at` é quando o período que começa na descida foi
+     * PAGO pelo preço dela. Dali em diante a descida não se desfaz: cancelá-la
+     * ou trocá-la depois de pagar o barato era ficar no caro pelo preço do
+     * barato, e o uso que cresce depois de pagar não a segura — ela se aplica
+     * na data de qualquer jeito.
+     *
+     * Nulas nas linhas que já existem, que é o estado certo das duas.
+     */
+    id: '0071_subscription_plan_guards',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('subscriptions'))) return true;
+      return (await missingColumns(db, 'subscriptions', SUBSCRIPTION_PLAN_GUARD_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('subscriptions'))) return;
+      const missing = await missingColumns(db, 'subscriptions', SUBSCRIPTION_PLAN_GUARD_COLUMNS);
       if (!missing.length) return;
       await db.schema.alterTable('subscriptions', (t) => {
         for (const add of missing) add(t);

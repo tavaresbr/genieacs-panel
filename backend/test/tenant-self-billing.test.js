@@ -44,6 +44,8 @@ let recebidas = [];
 let proximoId = 0;
 /** Chamado pelo gateway de mentira antes de responder — é por ele que se encena uma corrida. */
 let aoReceber = null;
+/** Quando verdadeiro, o gateway de mentira recusa todo cancelamento (500). */
+let recusarCancelamento = false;
 let panelUrl;
 let alfa;
 let donoToken;
@@ -81,6 +83,7 @@ function subirGateway() {
       }
       if (req.method === 'DELETE' && caminho.startsWith('/payments/')) {
         const id = decodeURIComponent(caminho.slice('/payments/'.length));
+        if (recusarCancelamento) return responder(500, { errors: [{ description: 'cancelamento recusado' }] });
         if (id === 'pay_que_nao_cancela') return responder(500, { errors: [{ description: 'fora do ar' }] });
         if (id === 'pay_que_sumiu') return responder(404, {});
         return responder(200, { deleted: true, id });
@@ -138,6 +141,7 @@ before(async () => {
   planos.leve = await criar({ code: 'auto-leve', name: 'Leve', price_cents: 6990 });
   planos.gemeo = await criar({ code: 'auto-gemeo', name: 'Gêmeo', price_cents: 9990 });
   // Duas pessoas cabem — a dona e quem só olha — até o teto baixar no teste.
+  planos.poucas = await criar({ code: 'auto-poucas', name: 'Poucas', price_cents: 5990, max_devices: 10 });
   planos.enxuto = await criar({ code: 'auto-enxuto', name: 'Enxuto', price_cents: 4990, max_operators: 2 });
 });
 
@@ -167,7 +171,9 @@ async function assinar({ plan = planos.basico, status = 'active', renewsAt = daq
     trial_ends_at: trialEndsAt,
     canceled_at: null,
     pending_plan_id: null,
-    pending_plan_at: null
+    pending_plan_at: null,
+    pending_plan_locked_at: null,
+    upgraded_at: null
   });
   await SubscriptionService.invalidate(alfa);
 }
@@ -183,6 +189,7 @@ const pagar = (token) => pedir('/charges/pay', { method: 'POST', token });
 beforeEach(async () => {
   recebidas = [];
   aoReceber = null;
+  recusarCancelamento = false;
   await getDb()('billing_charges').where({ tenant_id: alfa }).del();
   await getDb()('tenants').where({ id: alfa })
     .update({ billing_gateway: 'asaas', billing_customer_ref: 'cus_alfa', ...CADASTRO });
@@ -727,6 +734,7 @@ describe('a descida agendada', () => {
       name: 'Leve',
       priceCents: 6990,
       effectiveAt: renova.toISOString(),
+      locked: false,
       blockedBy: null
     });
 
@@ -1047,3 +1055,265 @@ describe('a descida agendada', () => {
     assert.equal(JSON.parse(eventos.at(-1).detail).pendingCleared, planos.leve.id);
   });
 });
+
+describe('as travas da descida agendada', () => {
+  const linha = () => Subscription.forTenant(alfa);
+  const DIA = 86_400_000;
+
+  /** Agenda a descida, paga adiantado a cobrança da renovação pelo preço dela. */
+  async function pagarBaratoAdiantado(plano) {
+    const renova = daquiA(20);
+    await assinar({ renewsAt: renova });
+    assert.equal((await trocar(plano.id)).status, 200);
+    const pago = await pagar();
+    assert.equal(pago.status, 201, JSON.stringify(pago.body));
+    assert.equal(pago.body.data.charge.amountCents, Number(plano.price_cents), 'o pagar agora já cobra o preço da descida');
+    const [cobranca] = await cobrancas();
+    const res = await runInTenant(alfa, () => SubscriptionService.recordPayment({
+      amountCents: Number(plano.price_cents), provider: 'asaas', externalId: cobranca.gateway_charge_id
+    }));
+    assert.equal(res.underpaid, false);
+    return { renova, cobranca };
+  }
+
+  it('paga pelo preço da descida, ela trava: não se cancela, não se troca, não se sobe', async () => {
+    const { renova } = await pagarBaratoAdiantado(planos.leve);
+    const depois = await linha();
+    assert.ok(depois.pending_plan_locked_at, 'a trava foi gravada');
+    assert.equal(new Date(depois.renews_at).getTime(), renova.getTime() + 30 * DIA);
+    assert.equal(depois.plan_id, planos.basico.id, 'o plano de cima vale até a data');
+
+    const lido = await pedir('/subscription');
+    assert.equal(lido.body.data.subscription.pendingPlan.locked, true);
+    assert.equal(lido.body.data.subscription.pendingPlan.blockedBy, null);
+
+    recebidas = [];
+    for (const plano of [planos.basico, planos.mini, planos.pro]) {
+      const res = await trocar(plano.id);
+      assert.equal(res.status, 409, plano.code);
+      assert.equal(res.body.code, 'pending_locked', plano.code);
+      assert.equal(res.body.pendingPlanId, planos.leve.id);
+      assert.equal(res.body.effectiveAt, renova.toISOString());
+    }
+    const mesma = await trocar(planos.leve.id);
+    assert.equal(mesma.status, 200, 'pedir a própria descida de novo não muda nada');
+    assert.deepEqual(recebidas, [], 'nada foi cancelado nem emitido');
+    const fim = await linha();
+    assert.equal(fim.pending_plan_id, planos.leve.id);
+    assert.equal(fim.plan_id, planos.basico.id);
+  });
+
+  it('travada, aplica-se na data mesmo com o uso acima dos tetos', async () => {
+    await pagarBaratoAdiantado(planos.enxuto);
+    try {
+      await Plan.update(planos.enxuto.id, { max_operators: 1 });
+      const res = await runInTenant(alfa, () => SubscriptionService.applyPendingPlan({ now: daquiA(21) }));
+      assert.equal(res.applied, true, JSON.stringify(res));
+      assert.equal(res.locked, true);
+      const depois = await linha();
+      assert.equal(depois.plan_id, planos.enxuto.id);
+      assert.equal(depois.pending_plan_id, null);
+      assert.equal(depois.pending_plan_locked_at, null);
+    } finally {
+      await Plan.update(planos.enxuto.id, { max_operators: 2 });
+    }
+  });
+
+  it('a descida que limita ONTs trava pelo preço pago, sem contar ONT nenhuma no pagamento', async () => {
+    await pagarBaratoAdiantado(planos.poucas);
+    assert.ok((await linha()).pending_plan_locked_at);
+  });
+
+  it('a cobrança do período da descida paga barato também trava, mesmo sem a marca', async () => {
+    const renova = daquiA(20);
+    await assinar({ renewsAt: renova });
+    await getDb()('subscriptions').where({ tenant_id: alfa })
+      .update({ pending_plan_id: planos.leve.id, pending_plan_at: renova });
+    await runInTenant(alfa, async () => {
+      const id = await BillingCharge.open({
+        periodEnd: ChargeIssuingService.periodKey(renova), amountCents: 6990, currency: 'BRL', provider: 'asaas'
+      });
+      await BillingCharge.markIssued(id, { gatewayChargeId: 'pay_pago_por_fora' });
+      await BillingCharge.update(id, { status: 'paid' });
+    });
+    const res = await trocar(planos.basico.id);
+    assert.equal(res.status, 409);
+    assert.equal(res.body.code, 'pending_locked');
+    assert.ok((await linha()).pending_plan_locked_at, 'e a marca foi gravada');
+  });
+
+  it('bloqueada e paga pelo preço de cima, a descida vai para a renovação seguinte', async () => {
+    const renova = daquiA(2);
+    await assinar({ renewsAt: renova });
+    // Duas pessoas, e o mini aceita uma: bloqueada.
+    assert.equal((await trocar(planos.mini.id)).status, 200);
+    const emitida = await runInTenant(alfa, () => ChargeIssuingService.issueCurrent());
+    assert.equal(emitida.amountCents, 9990);
+    const [cobranca] = await cobrancas();
+
+    const avisos = [];
+    const warn = console.warn;
+    console.warn = (...args) => { avisos.push(args.join(' ')); };
+    let pago;
+    try {
+      pago = await runInTenant(alfa, () => SubscriptionService.recordPayment({
+        amountCents: 9990, provider: 'asaas', externalId: cobranca.gateway_charge_id
+      }));
+    } finally {
+      console.warn = warn;
+    }
+    assert.equal(pago.underpaid, false);
+    const depois = await linha();
+    const novaRenovacao = renova.getTime() + 30 * DIA;
+    assert.equal(new Date(depois.renews_at).getTime(), novaRenovacao);
+    assert.equal(depois.plan_id, planos.basico.id);
+    assert.equal(depois.pending_plan_id, planos.mini.id);
+    assert.equal(new Date(depois.pending_plan_at).getTime(), novaRenovacao, 'tenta de novo na renovação seguinte');
+    assert.equal(depois.pending_plan_locked_at, null, 'e não trava: foi pago o preço de cima');
+    assert.ok(avisos.some((a) => /next renewal/.test(a)));
+    // Destravada, a desistência continua possível.
+    assert.equal((await trocar(planos.basico.id)).status, 200);
+    assert.equal((await linha()).pending_plan_id, null);
+  });
+
+  it('subir no meio do período e descer em seguida: a descida vai para a renovação seguinte', async () => {
+    const renova = daquiA(2);
+    await assinar({ renewsAt: renova });
+    const subiu = await trocar(planos.pro.id);
+    assert.equal(subiu.status, 200);
+    assert.ok((await linha()).upgraded_at, 'a subida no meio do período fica marcada');
+
+    const desceu = await trocar(planos.basico.id);
+    assert.equal(desceu.status, 200, JSON.stringify(desceu.body));
+    const esperado = new Date(renova.getTime() + 30 * DIA).toISOString();
+    assert.equal(desceu.body.data.subscription.pendingPlan.effectiveAt, esperado);
+    assert.equal((await ultimaTrilhaDe('subscription.changed')).effectiveAt, esperado);
+
+    // A cobrança desta renovação sai pelo plano de cima — é ela que paga a subida.
+    const emitida = await runInTenant(alfa, () => ChargeIssuingService.issueCurrent());
+    assert.equal(emitida.amountCents, 19990);
+    const [cobranca] = await cobrancas();
+    const pago = await runInTenant(alfa, () => SubscriptionService.recordPayment({
+      amountCents: 19990, provider: 'asaas', externalId: cobranca.gateway_charge_id
+    }));
+    assert.equal(pago.underpaid, false);
+    const depois = await linha();
+    assert.equal(depois.upgraded_at, null, 'a subida foi paga: a marca sai');
+    assert.equal(depois.plan_id, planos.pro.id);
+    assert.equal(depois.pending_plan_id, planos.basico.id);
+    assert.equal(new Date(depois.pending_plan_at).toISOString(), esperado);
+    assert.equal(depois.pending_plan_locked_at, null);
+  });
+
+  it('a subida paga não adia: descer depois de pagar o plano de cima vale na renovação', async () => {
+    await assinar({ renewsAt: daquiA(20) });
+    assert.equal((await trocar(planos.pro.id)).status, 200);
+    await getDb()('subscriptions').where({ tenant_id: alfa }).update({ upgraded_at: null });
+    const res = await trocar(planos.basico.id);
+    const renova = (await linha()).renews_at;
+    assert.equal(res.body.data.subscription.pendingPlan.effectiveAt, new Date(renova).toISOString());
+  });
+
+  it('a linha reprecificada fica com dono até o estado novo estar gravado', async () => {
+    await pagar();
+    const [velha] = await cobrancas();
+    recebidas = [];
+    const original = SubscriptionService.schedulePlanChange;
+    let noMeio = null;
+    SubscriptionService.schedulePlanChange = async function comPassadaNoMeio(args) {
+      // O agendador (ou um pagar agora) chegando entre o reset e a gravação.
+      noMeio = await ChargeIssuingService.issueCurrent({ now: new Date() });
+      return original.call(this, args);
+    };
+    try {
+      const res = await trocar(planos.leve.id);
+      assert.equal(res.status, 200, JSON.stringify(res.body));
+    } finally {
+      SubscriptionService.schedulePlanChange = original;
+    }
+    assert.equal(noMeio.issued, false);
+    assert.equal(noMeio.reason, 'raced', 'a passada do meio não emite pelo preço velho');
+    const posts = recebidas.filter((r) => r.method === 'POST');
+    assert.equal(posts.length, 1);
+    assert.equal(posts[0].payload.value, 69.9);
+    const [nova] = await cobrancas();
+    assert.equal(nova.id, velha.id);
+    assert.equal(nova.amount_cents, 6990);
+    assert.equal(nova.issuing_until, null, 'e a garra foi solta no fim');
+  });
+
+  it('a reprecificação que falha no gateway espera antes de tentar de novo', async () => {
+    await assinar({ renewsAt: daquiA(2) });
+    try {
+      assert.equal((await trocar(planos.enxuto.id)).status, 200);
+      await runInTenant(alfa, () => ChargeIssuingService.issueCurrent());
+      await Plan.update(planos.enxuto.id, { max_operators: 1 });
+      recusarCancelamento = true;
+      recebidas = [];
+
+      const warn = console.warn;
+      console.warn = () => {};
+      let primeira;
+      let segunda;
+      try {
+        primeira = await runInTenant(alfa, () => ChargeIssuingService.issueCurrent());
+        segunda = await runInTenant(alfa, () => ChargeIssuingService.issueCurrent());
+      } finally {
+        console.warn = warn;
+      }
+      assert.equal(primeira.reason, 'reprice_failed');
+      assert.equal(segunda.reason, 'backing_off');
+      assert.equal(recebidas.filter((r) => r.method === 'DELETE').length, 1, 'um DELETE, não um por passada');
+      const [cobranca] = await cobrancas();
+      assert.match(cobranca.last_error, /cancelamento recusado/);
+      assert.equal(cobranca.amount_cents, 4990);
+
+      // Passada a espera e o gateway de volta, reprecifica.
+      recusarCancelamento = false;
+      await getDb()('billing_charges').where({ id: cobranca.id }).update({ next_attempt_at: daquiA(-1) });
+      const terceira = await runInTenant(alfa, () => ChargeIssuingService.issueCurrent());
+      assert.equal(terceira.issued, true, JSON.stringify(terceira));
+      const [cheia] = await cobrancas();
+      assert.equal(cheia.amount_cents, 9990);
+      assert.equal(cheia.next_attempt_at, null);
+    } finally {
+      await Plan.update(planos.enxuto.id, { max_operators: 2 });
+    }
+  });
+
+  it('bloqueada por ONTs, a reemissão usa o veredito da reprecificação, sem recontar', async () => {
+    await assinar({ renewsAt: daquiA(2) });
+    assert.equal((await trocar(planos.poucas.id)).status, 200);
+    const cabe = await runInTenant(alfa, () => ChargeIssuingService.issueCurrent({ countDevices: async () => 5 }));
+    assert.equal(cabe.amountCents, 5990);
+    recebidas = [];
+
+    // Cinquenta na primeira contagem, cinco daí em diante: a ONT que oscila.
+    let contagens = 0;
+    const oscila = async () => { contagens += 1; return contagens === 1 ? 50 : 5; };
+    const warn = console.warn;
+    console.warn = () => {};
+    let passada;
+    try {
+      passada = await runInTenant(alfa, () => ChargeIssuingService.issueCurrent({ countDevices: oscila }));
+    } finally {
+      console.warn = warn;
+    }
+    assert.equal(passada.issued, true, JSON.stringify(passada));
+    assert.equal(contagens, 1, 'contou uma vez só');
+    const posts = recebidas.filter((r) => r.method === 'POST');
+    assert.equal(posts.length, 1);
+    assert.equal(posts[0].payload.value, 99.9, 'reemitida pelo preço de cima, como decidido');
+
+    // E a passada seguinte, cabendo, não desce o preço de volta.
+    recebidas = [];
+    const seguinte = await runInTenant(alfa, () => ChargeIssuingService.issueCurrent({ countDevices: oscila }));
+    assert.equal(seguinte.reason, 'already_issued');
+    assert.deepEqual(recebidas, []);
+  });
+});
+
+async function ultimaTrilhaDe(action) {
+  const row = await getDb()('audit_log').where({ tenant_id: alfa, action }).orderBy('id', 'desc').first();
+  return row ? JSON.parse(row.detail) : null;
+}

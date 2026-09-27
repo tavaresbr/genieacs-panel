@@ -366,7 +366,9 @@ class SubscriptionService {
       id: Number(pendingPlan.id),
       name: pendingPlan.name,
       priceCents: Number(pendingPlan.price_cents ?? 0),
-      effectiveAt: quando ? quando.toISOString() : null
+      effectiveAt: quando ? quando.toISOString() : null,
+      // Paga pelo preço dela: não se cancela nem se troca mais pela tela.
+      locked: this.isPendingLocked(subscription)
     };
   }
 
@@ -409,6 +411,11 @@ class SubscriptionService {
       }
     }
     return this.overLimitFor(limits, usage);
+  }
+
+  /** Os dias que um pagamento compra neste plano (ou a reserva de trinta). */
+  static periodDaysOf(plan) {
+    return periodoDoPlano(plan);
   }
 
   static limitsOf(plan) {
@@ -544,7 +551,11 @@ class SubscriptionService {
     // calculada aqui, com as contagens que esta tela já fez, para a tela
     // avisar ANTES da renovação — e não o provedor descobrir depois que
     // continuou pagando o plano caro porque tinha operadores demais.
-    if (subscription?.pendingPlan) {
+    // A travada (paga pelo preço dela) não tem bloqueio: aplica-se na data
+    // com o uso que houver.
+    if (subscription?.pendingPlan?.locked) {
+      subscription.pendingPlan.blockedBy = null;
+    } else if (subscription?.pendingPlan) {
       subscription.pendingPlan.blockedBy = this.overLimitFor(
         this.limitsOf(state.pendingPlan), { operators, subscribers, devices }
       );
@@ -576,7 +587,7 @@ class SubscriptionService {
    * plano escolhido agora ser trocado de novo na renovação por uma decisão
    * que a de agora já substituiu.
    */
-  static async changePlan({ planId, actorUserId = null }) {
+  static async changePlan({ planId, actorUserId = null, upgradedAt = null }) {
     const tenantId = currentTenantId();
     const plan = await Plan.findById(planId);
     if (!plan) throw new Error('Plan not found');
@@ -585,6 +596,12 @@ class SubscriptionService {
       plan_id: plan.id,
       pending_plan_id: null,
       pending_plan_at: null,
+      pending_plan_locked_at: null,
+      // A marca da subida no meio do período pago (0071): quem sobe agora a
+      // passa (`SelfBillingService`), e qualquer outra troca — o console, a
+      // descida na hora — a apaga, porque o plano de agora não é mais o que
+      // subiu sem pagar.
+      upgraded_at: upgradedAt,
       ...(before ? {} : { status: 'active' })
     });
     await BillingEvent.record({
@@ -618,7 +635,8 @@ class SubscriptionService {
     if (!quando) throw new Error('A scheduled plan change needs a date');
     const subscription = await Subscription.upsertForTenant(tenantId, {
       pending_plan_id: planId,
-      pending_plan_at: quando
+      pending_plan_at: quando,
+      pending_plan_locked_at: null
     });
     cache.invalidate();
     return subscription;
@@ -629,10 +647,20 @@ class SubscriptionService {
     const tenantId = currentTenantId();
     const subscription = await Subscription.upsertForTenant(tenantId, {
       pending_plan_id: null,
-      pending_plan_at: null
+      pending_plan_at: null,
+      pending_plan_locked_at: null
     });
     cache.invalidate();
     return subscription;
+  }
+
+  /**
+   * Se a descida agendada já foi PAGA pelo preço dela (0071): o período que
+   * começa na data da descida teve o pagamento conferido contra o plano
+   * novo. Dali em diante ela não se desfaz nem espera o uso caber.
+   */
+  static isPendingLocked(subscription) {
+    return Boolean(subscription?.pending_plan_id && subscription?.pending_plan_locked_at);
   }
 
   /**
@@ -666,7 +694,13 @@ class SubscriptionService {
       return { applied: false, reason: 'plan_gone' };
     }
 
-    const blockedBy = await this.overLimitOf(plano, { countDevices });
+    // Paga pelo preço dela, a descida se aplica na data com o uso que houver:
+    // segurá-la porque o uso cresceu DEPOIS de pagar o barato seria entregar
+    // o plano caro pelo preço do barato — o buraco que a trava fecha. Acima
+    // dos tetos, o provedor só não cresce mais (o 402 de operador, a
+    // sincronização que não cria assinante); o que já existe fica.
+    const travada = this.isPendingLocked(subscription);
+    const blockedBy = travada ? null : await this.overLimitOf(plano, { countDevices });
     if (blockedBy) {
       const marca = `${subscription.pending_plan_id}@${quando ? quando.getTime() : 'now'}`;
       if (avisosDeBloqueio.get(tenantId) !== marca) {
@@ -685,10 +719,13 @@ class SubscriptionService {
     await BillingEvent.record({
       subscriptionId: subscription.id,
       type: BILLING_EVENT_TYPES.PLAN_CHANGED,
-      detail: { from: subscription.plan_id ?? null, to: plano.id, toCode: plano.code, scheduled: true }
+      detail: {
+        from: subscription.plan_id ?? null, to: plano.id, toCode: plano.code, scheduled: true,
+        ...(travada ? { locked: true } : {})
+      }
     });
     cache.invalidate();
-    return { applied: true, from: subscription.plan_id ?? null, to: plano.id };
+    return { applied: true, from: subscription.plan_id ?? null, to: plano.id, locked: travada };
   }
 
   /**
@@ -805,12 +842,17 @@ class SubscriptionService {
       : null;
     // Com a mesma guarda da emissão: se o uso não cabe no plano agendado, a
     // descida não vai se aplicar e a cobrança do prazo saiu (ou foi
-    // reprecificada) pelo preço do atual — é contra ele que se confere. As
-    // ONTs ficam de fora pela razão de sempre aqui: quem chama é o webhook,
-    // sem ACS em mãos. Contado FORA da transação, lá embaixo — no SQLite a
-    // transação segura a única conexão, e uma contagem por fora dela
-    // esperaria para sempre.
-    const descidaBloqueada = planoAgendado ? await this.overLimitOf(planoAgendado) : null;
+    // reprecificada) pelo preço do atual — é contra ele que se confere, QUANDO
+    // não há cobrança (a cobrança, havendo, é quem responde: `valorPedido`).
+    // As ONTs ficam de fora pela razão de sempre aqui: quem chama é o webhook,
+    // sem ACS em mãos — e não precisam entrar, porque o destino da descida
+    // abaixo não depende do uso, e sim do preço que foi pago. Contado FORA da
+    // transação — no SQLite a transação segura a única conexão, e uma
+    // contagem por fora dela esperaria para sempre. A travada não conta nada:
+    // já foi paga pelo preço dela.
+    const descidaBloqueada = planoAgendado && !this.isPendingLocked(before)
+      ? await this.overLimitOf(planoAgendado)
+      : null;
     const plano = planoAgendado && !descidaBloqueada ? planoAgendado : planoAtual;
     const dias = periodDays ?? periodoDoPlano(plano);
 
@@ -849,25 +891,45 @@ class SubscriptionService {
     const reactivates = !underpaid
       && (before.status === 'trial' || before.status === 'active' || before.status === 'past_due');
 
-    // A descida que este pagamento aplica: o período novo começa agora e já é
-    // do plano agendado — se o uso couber (ver `descidaBloqueada` acima).
-    let descida = null;
-    if (reactivates && planoAgendado && (!dataDaDescida || dataDaDescida.getTime() <= now.getTime())) {
-      if (descidaBloqueada) {
-        console.warn(
-          `Payment for provider ${tenantId} opened the period of scheduled plan ${planoAgendado.id}, `
-          + `but ${descidaBloqueada.used} ${descidaBloqueada.resource} exceed its limit of `
-          + `${descidaBloqueada.limit}; the change stays pending`
-        );
-      } else {
-        descida = planoAgendado;
-      }
+    // O destino da descida agendada, decidido pelo PREÇO que este pagamento
+    // pagou pelo período que começa nela — e não pelo uso, que é o que um
+    // provedor mexe à vontade depois de pagar:
+    //
+    //   - pagou o preço de baixo (o que se pediu é menor que o preço do plano
+    //     atual): a descida fica TRAVADA (0071). Não se cancela nem se troca
+    //     mais, e se aplica na data com o uso que houver — sem isto, pagar o
+    //     barato adiantado e desistir da descida depois (ou crescer o uso para
+    //     ela não se aplicar) era um mês de plano caro pelo preço do barato.
+    //     Se a data já chegou (pagamento atrasado), aplica-se aqui mesmo, na
+    //     transação do pagamento, para o período novo nascer no plano novo.
+    //   - pagou o preço de cima (a descida estava bloqueada pelo uso e a
+    //     cobrança saiu pelo atual): o período é do plano atual, e a descida
+    //     vai para a renovação SEGUINTE — tenta de novo lá, pela mesma regra.
+    let destinoDaDescida = null;
+    if (reactivates && planoAgendado) {
+      const precoAtual = Number(planoAtual?.price_cents ?? 0);
+      const pagoBarato = pedido.cents !== null ? pedido.cents < precoAtual : plano === planoAgendado;
+      destinoDaDescida = pagoBarato ? 'lock' : 'postpone';
     }
+    const descidaVenceu = !dataDaDescida || dataDaDescida.getTime() <= now.getTime();
+    const descida = destinoDaDescida === 'lock' && descidaVenceu ? planoAgendado : null;
 
     if (reactivates) {
       patch.renews_at = new Date(base.getTime() + dias * DAY_MS);
       patch.status = 'active';
       patch.trial_ends_at = null;
+      // A subida no meio do período (0071) foi paga: o período que este
+      // pagamento compra é cobrado pelo plano de agora.
+      patch.upgraded_at = null;
+      if (destinoDaDescida === 'lock' && !descida) patch.pending_plan_locked_at = now;
+      if (destinoDaDescida === 'postpone') {
+        console.warn(
+          `Payment for provider ${tenantId} paid the renewal at the current plan's price because the `
+          + `scheduled change to plan ${planoAgendado.id} is blocked by usage; it moves to the next renewal`
+        );
+        patch.pending_plan_at = patch.renews_at;
+        patch.pending_plan_locked_at = null;
+      }
     }
     const statusAfter = patch.status ?? before.status;
     const renewsAt = patch.renews_at ?? before.renews_at ?? null;
@@ -906,7 +968,12 @@ class SubscriptionService {
             type: BILLING_EVENT_TYPES.PLAN_CHANGED,
             createdBy: actorUserId,
             detail: {
-              from: before.plan_id ?? null, to: descida.id, toCode: descida.code, scheduled: true, byPayment: true
+              from: before.plan_id ?? null,
+              to: descida.id,
+              toCode: descida.code,
+              scheduled: true,
+              byPayment: true,
+              locked: true
             }
           }, trx);
         }
