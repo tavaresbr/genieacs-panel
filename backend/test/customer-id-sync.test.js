@@ -81,6 +81,24 @@ describe('POST /api/settings/sync-customer-ids', () => {
     assert.equal(again.body.data.existing, 2);
   });
 
+  it('dois pedidos seguidos: o segundo não ouve "em andamento" de uma passada que já acabou', async (t) => {
+    await ligar('true');
+    // Gravar o desfecho demora (no MySQL do CI, demorava o bastante): a
+    // resposta tem de esperar a trava sair, senão o segundo pedido a encontra.
+    const lento = CustomerIdSyncJob.remember.bind(CustomerIdSyncJob);
+    t.mock.method(CustomerIdSyncJob, 'remember', async (...args) => {
+      await new Promise((resolve) => { setTimeout(resolve, 150); });
+      return lento(...args);
+    });
+    const first = await sincronizar();
+    assert.equal(first.status, 200, JSON.stringify(first.body));
+    assert.notEqual(first.body.data.running, true);
+    const second = await sincronizar();
+    assert.equal(second.status, 200, JSON.stringify(second.body));
+    assert.notEqual(second.body.data.running, true, 'a passada anterior já tinha acabado');
+    assert.equal(typeof second.body.data.generated, 'number');
+  });
+
   it('ACS que não responde a tempo vira genieacs_timeout, não o erro genérico', async () => {
     await ligar('true');
     DeviceService.CUSTOMER_IDENTITY_TIMEOUT_MS = 150;

@@ -283,6 +283,7 @@ export default {
   'mapping.importFailed': "지도 데이터를 가져올 수 없습니다",
   'mapping.statusReady': "네트워크 상태를 가져왔습니다",
   'mapping.statusFailed': "지금은 장치 상태를 읽을 수 없습니다",
+  'mapping.outagesReady': "단선 기록을 가져왔습니다",
   'mapping.searchTooShort': "검색하려면 3자 이상 입력하세요.",
   'mapping.searchDone': "검색 완료",
   'mapping.searchFailed': "지금은 주소를 검색할 수 없습니다. 잠시 후 다시 시도하세요.",

@@ -282,6 +282,7 @@ export default {
   'mapping.importFailed': "Не удалось импортировать данные карты",
   'mapping.statusReady': "Состояние сети получено",
   'mapping.statusFailed': "Сейчас не удаётся получить состояние устройств",
+  'mapping.outagesReady': "История обрывов получена",
   'mapping.searchTooShort': "Введите не менее 3 символов для поиска.",
   'mapping.searchDone': "Поиск завершён",
   'mapping.searchFailed': "Сейчас не удалось найти адрес. Повторите попытку чуть позже.",

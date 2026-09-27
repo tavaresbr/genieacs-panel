@@ -1415,6 +1415,8 @@ export default function DeviceDetailPage() {
 
   // Os botões do topo, cada um só quando o perfil e o contrato o permitem.
   const contractActions = Boolean(sgpAvailable && sgpLink)
+  // O login PPPoE que o equipamento reporta: é o elo entre ele e o ponto do mapa.
+  const devicePppoe = device?.wan?.find((connection) => String(connection.username ?? '').trim())?.username?.trim() || ''
   const headerActions: Array<{ key: string; label: string; render: () => ReactNode }> = [
     {
       key: 'reboot',
@@ -1509,6 +1511,23 @@ export default function DeviceDetailPage() {
           <Icon name="external" size={16} />
           {t('detail.sgp.openSgp')}
         </a>
+      )
+    }] : []),
+    // Leva ao mapa com o login deste equipamento: se ele já tem ponto, o mapa
+    // abre o ponto; se não, o diálogo de colocá-lo (quem pode editar o mapa).
+    ...(devicePppoe && can('map.read') ? [{
+      key: 'placeOnMap',
+      label: t('detail.placeOnMap'),
+      render: () => (
+        <button
+          key="placeOnMap"
+          type="button"
+          className="modern-button-secondary"
+          onClick={() => navigate(`/network-map?place=${encodeURIComponent(devicePppoe)}`)}
+        >
+          <Icon name="map" size={16} />
+          {t('detail.placeOnMap')}
+        </button>
       )
     }] : []),
     ...(contractActions && can('whatsapp.send') ? [{

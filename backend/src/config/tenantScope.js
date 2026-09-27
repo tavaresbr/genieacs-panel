@@ -90,6 +90,9 @@ export const SCOPED_TABLES = new Set([
   'device_sample_hours',
   // Which ONT replaced which, for one provider's subscriber.
   'device_swaps',
+  // Rompimentos por caixa do mapa: a caixa é de um provedor, e o node_id só
+  // é único dentro dele.
+  'outage_events',
   // Where the operator's own plant is centred. A singleton keyed `id: 1`, so
   // its WHERE never was an identity filter — it meant "the only row", and the
   // second provider to save a map centre wrote over the first's.

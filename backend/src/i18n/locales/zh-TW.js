@@ -281,6 +281,7 @@ export default {
   'mapping.importFailed': "無法匯入地圖資料",
   'mapping.statusReady': "已取得網路狀態",
   'mapping.statusFailed': "暫時無法讀取設備狀態",
+  'mapping.outagesReady': "已取得斷纖歷史",
   'mapping.searchTooShort': "請至少輸入 3 個字元進行搜尋。",
   'mapping.searchDone': "搜尋完成",
   'mapping.searchFailed': "暫時無法搜尋地址，請稍後再試。",

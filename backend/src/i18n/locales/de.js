@@ -282,6 +282,7 @@ export default {
   'mapping.importFailed': "Die Kartendaten konnten nicht importiert werden",
   'mapping.statusReady': "Netzstatus abgerufen",
   'mapping.statusFailed': "Der Gerätestatus kann gerade nicht gelesen werden",
+  'mapping.outagesReady': "Ausfallverlauf abgerufen",
   'mapping.searchTooShort': "Geben Sie mindestens 3 Zeichen ein, um zu suchen.",
   'mapping.searchDone': "Suche abgeschlossen",
   'mapping.searchFailed': "Die Adresse konnte gerade nicht gesucht werden. Versuchen Sie es gleich erneut.",

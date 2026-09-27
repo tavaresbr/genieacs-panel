@@ -282,6 +282,7 @@ export default {
   'mapping.importFailed': "Could not import the map data",
   'mapping.statusReady': "Network status retrieved",
   'mapping.statusFailed': "Could not read the device status right now",
+  'mapping.outagesReady': "Outage history retrieved",
   'mapping.searchTooShort': "Type at least 3 characters to search.",
   'mapping.searchDone': "Search complete",
   'mapping.searchFailed': "Could not search the address right now. Try again shortly.",
