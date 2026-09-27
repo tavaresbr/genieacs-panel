@@ -211,6 +211,16 @@ async function semear(tenantId, slug) {
       status: 'open'
     });
 
+    alvo.maintenance = await semearLinha('maintenance_windows', {
+      node_id: `ODP-${slug}-manutencao`,
+      node_name: 'ODP da manutenção',
+      node_type: 'odp',
+      starts_at: new Date(Date.now() + 48 * 3600_000),
+      ends_at: new Date(Date.now() + 50 * 3600_000),
+      lead_minutes: 1440,
+      status: 'scheduled'
+    });
+
     alvo.swap = await semearLinha('device_swaps', {
       previous_device_id: 'ONT-ANTIGA-0001',
       device_id: 'ONT-NOVA-0001',

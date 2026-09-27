@@ -103,7 +103,7 @@ class CustomerErasureService {
    */
   static async survey(account) {
     const alcance = await alcanceDoAssinante(account);
-    const { contratos, telefones, vinculos, contatos, conversaIds, eventos, amostras, horas, quedas, trocas, nos } = alcance;
+    const { contratos, telefones, vinculos, contatos, conversaIds, eventos, amostras, horas, quedas, manutencoes, trocas, nos } = alcance;
 
     const contar = async (tabela, montar) => {
       const [linha] = await montar(tdb(tabela)).count({ n: '*' });
@@ -124,6 +124,7 @@ class CustomerErasureService {
       device_samples: amostras.length,
       device_sample_hours: horas.length,
       outage_incident_devices: quedas.length,
+      maintenance_window_devices: manutencoes.length,
       device_swaps: trocas.length,
       wa_conversations: conversaIds.length,
       wa_messages: conversaIds.length
@@ -183,7 +184,7 @@ class CustomerErasureService {
    * que o que foi gravado na trilha seja o que vai ser executado.
    */
   static async erase(account, { alcance }) {
-    const { contratos, telefones, vinculos, contatos, conversaIds, eventos, amostras, horas, quedas, trocas, noIds } = alcance;
+    const { contratos, telefones, vinculos, contatos, conversaIds, eventos, amostras, horas, quedas, manutencoes, trocas, noIds } = alcance;
     const idsDe = (linhas) => linhas.map((l) => l.id);
     const marca = `erased:${account.id}`;
 
@@ -203,7 +204,9 @@ class CustomerErasureService {
       for (const [tabela, linhas] of [
         ['sgp_events', eventos], ['device_samples', amostras], ['device_sample_hours', horas],
         // Quem uma queda atingiu leva nome e telefone: sai junto.
-        ['outage_incident_devices', quedas]
+        ['outage_incident_devices', quedas],
+        // O aviso de manutenção também: nome, contrato e telefone.
+        ['maintenance_window_devices', manutencoes]
       ]) {
         for (let i = 0; i < linhas.length; i += 500) {
           await tdb(tabela, trx).whereIn('id', idsDe(linhas.slice(i, i + 500))).del();
