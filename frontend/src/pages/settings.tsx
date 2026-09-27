@@ -32,6 +32,7 @@ import { Icon } from '@/components/ui/icon'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import { ProvisioningTab } from '@/components/settings/provisioning-tab'
 import { SgpEventsPanel } from '@/components/settings/sgp-events-panel'
+import { TeiahPanel } from '@/components/settings/teiah-panel'
 import {
   SGP_CONTACTS_ANCHOR,
   SgpContactsShortcut,
@@ -92,7 +93,7 @@ const GENIE_SECRET_STATE_BADGES: Record<GenieSecretState, string> = {
 
 /** The tabs `?tab=` may open. */
 const SETTINGS_TABS = [
-  'provider', 'general', 'virtual-params', 'customer-portal', 'sgp', 'provisioning',
+  'provider', 'general', 'virtual-params', 'customer-portal', 'sgp', 'teiah', 'provisioning',
   'whatsapp', 'chatbot', 'security', 'vendors', 'wifi-security', 'database', 'about'
 ]
 
@@ -1683,6 +1684,17 @@ export default function Settings() {
             >
               {t('settings.tab.sgp')}
             </button>
+            {can('teiah.read') && (
+              <button
+                onClick={() => setActiveTab('teiah')}
+                className="tab-button"
+                data-active={activeTab === 'teiah'}
+                role="tab"
+                aria-selected={activeTab === 'teiah'}
+              >
+                {t('settings.tab.teiah')}
+              </button>
+            )}
             <button
               onClick={() => setActiveTab('provisioning')}
               className="tab-button"
@@ -2450,6 +2462,8 @@ export default function Settings() {
             <SgpEventsPanel config={sgpConfig} onConfigChange={setSgpConfig} />
           </div>
         )}
+
+        {activeTab === 'teiah' && can('teiah.read') && <TeiahPanel />}
 
         {activeTab === 'provisioning' && <ProvisioningTab />}
 

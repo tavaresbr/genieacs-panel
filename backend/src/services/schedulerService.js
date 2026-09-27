@@ -5,6 +5,8 @@ import ProvisioningService from './provisioningService.js';
 import SgpEventService from './sgpEventService.js';
 import SgpService from './sgpService.js';
 import SgpContactSyncService from './sgpContactSyncService.js';
+import TeiahService from './teiahService.js';
+import TeiahExportService from './teiahExportService.js';
 import { forEachTenant, forEveryTenant } from '../config/tenantJobs.js';
 import { currentTenantId } from '../config/tenantContext.js';
 import AuditLog from '../models/AuditLog.js';
@@ -354,6 +356,22 @@ class SchedulerService {
         summary.contacts = 'started';
         void SgpContactSyncService.syncAll().catch((error) => {
           console.warn(`SGP contacts sync failed: ${error.code || error.message}`);
+        });
+      }
+
+      // The cancelled contracts with open invoices, to TeiaH Valid. Same shape
+      // as the contacts sync above: clock first, run in the background, and
+      // the service's own lock refuses an overlap with the Settings button.
+      const teiahConfig = await TeiahService.getConfig();
+      if (
+        TeiahService.isReady(teiahConfig)
+        && teiahConfig.exportEnabled
+        && this.due(state.lastTeiahExportAt, teiahConfig.exportIntervalHours * 3_600_000)
+      ) {
+        await this.writeState({ lastTeiahExportAt: new Date().toISOString() });
+        summary.teiah = 'started';
+        void TeiahExportService.exportAll().catch((error) => {
+          console.warn(`TeiaH export failed: ${error.code || error.message}`);
         });
       }
     }

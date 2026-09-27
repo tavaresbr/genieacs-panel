@@ -2597,6 +2597,104 @@ export interface ContactInvoiceSent {
 }
 
 // SGP (Sistema de Gestão de Provedores) integration API
+/** TeiaH Valid: the settings, without the API key. */
+export interface TeiahConfig {
+  enabled: boolean
+  baseUrl: string
+  exportEnabled: boolean
+  exportIntervalHours: number
+  batchSize: number
+  updatedAt: string | null
+  apiKeyConfigured: boolean
+  ready: boolean
+}
+
+/** Why a contract did not go to TeiaH Valid. */
+export type TeiahSkipReason =
+  | 'missing_address'
+  | 'missing_start'
+  | 'missing_cancellation'
+  | 'no_debt'
+  | 'invoices_failed'
+  | 'rejected'
+
+export interface TeiahExportResult {
+  total: number
+  sent: number
+  unchanged: number
+  skipped: number
+  errors: number
+  reasons: Partial<Record<TeiahSkipReason, number>>
+  partial?: boolean
+  durationMs: number
+  startedAt: string
+  finishedAt: string
+}
+
+export interface TeiahExportStatus {
+  lastRun: TeiahExportResult | null
+  running: boolean
+  lastError: { at: string; code: string; message: string } | null
+  totals: Partial<Record<'sent' | 'skipped' | 'error', number>>
+}
+
+export interface TeiahExportItem {
+  contract: string
+  clientName: string | null
+  address: string | null
+  status: 'sent' | 'skipped' | 'error'
+  reason: TeiahSkipReason | null
+  amount: number | null
+  sentAt: string | null
+  updatedAt: string
+}
+
+/** One `ImportAddressDto`, as it would be sent. */
+export interface TeiahImportItem {
+  estado: string
+  cidade: string
+  cep: string
+  bairro: string
+  rua: string
+  numero: string
+  complemento?: string
+  latitude?: number
+  longitude?: number
+  inadimplente_valor: number
+  data_inicio: string
+  data_cancelamento: string
+}
+
+export interface TeiahPreviewItem {
+  contract: string
+  clientName: string | null
+  item: TeiahImportItem | null
+  reason: TeiahSkipReason | null
+}
+
+export const teiahAPI = {
+  getConfig: () =>
+    apiClient.get<TeiahConfig>('/teiah/config'),
+
+  updateConfig: (config: Partial<Omit<TeiahConfig, 'apiKeyConfigured' | 'ready' | 'updatedAt'>> & { apiKey?: string }) =>
+    apiClient.put<TeiahConfig>('/teiah/config', config),
+
+  test: (payload: { baseUrl?: string; apiKey?: string }) =>
+    apiClient.post<{ ok: boolean; status: number; durationMs: number }>('/teiah/test', payload),
+
+  getExport: () =>
+    apiClient.get<TeiahExportStatus>('/teiah/export'),
+
+  listExportItems: (status?: 'sent' | 'skipped' | 'error') =>
+    apiClient.get<{ items: TeiahExportItem[] }>(`/teiah/export/items${status ? `?status=${status}` : ''}`),
+
+  previewExport: () =>
+    apiClient.get<{ items: TeiahPreviewItem[] }>('/teiah/export/preview'),
+
+  runExport: () =>
+    apiClient.post<{ running: boolean }>('/teiah/export/run')
+}
+
 export const sgpAPI = {
   getConfig: () =>
     apiClient.get<SgpConfig>('/sgp/config'),

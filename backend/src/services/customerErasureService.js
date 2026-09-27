@@ -118,6 +118,9 @@ class CustomerErasureService {
       sgp_links: vinculos.length,
       sgp_contacts: contatos.length,
       sgp_clients: alcance.clientes.length,
+      teiah_exports: contratos.length
+        ? await contar('teiah_exports', (q) => q.whereIn('contract', contratos))
+        : 0,
       // As linhas do aparelho já vêm recortadas pelo período em que ele foi
       // desta conta: o que veio antes ou depois é de outro assinante.
       sgp_events: eventos.length,
@@ -226,7 +229,19 @@ class CustomerErasureService {
       if (contatos.length) {
         await tdb('sgp_contacts', trx)
           .whereIn('id', contatos.map((c) => c.id))
-          .update({ ...IDENTIDADE_NO_CONTRATO, address: null, updated_at: new Date() });
+          .update({
+            ...IDENTIDADE_NO_CONTRATO,
+            address: null,
+            address_parts: null,
+            contract_cancelled_at: null,
+            updated_at: new Date()
+          });
+      }
+
+      // O registro do envio à TeiaH sai inteiro: é o contrato e a dívida desta
+      // pessoa. O que já está na base da TeiaH tem que ser pedido lá.
+      if (contratos.length) {
+        await tdb('teiah_exports', trx).whereIn('contract', contratos).del();
       }
 
       // A ficha completa é a pessoa inteira — endereço, nascimento, todos os

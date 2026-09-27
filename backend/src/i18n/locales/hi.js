@@ -73,6 +73,7 @@ export default {
   'rateLimit.telegramTest': 'बहुत सारे Telegram परीक्षण, एक मिनट रुकें',
   'rateLimit.platformExport': 'बहुत अधिक निर्यात, कृपया धीरे चलें',
   'rateLimit.sgpSync': 'बहुत अधिक पूर्ण समन्वयन। बाद में फिर कोशिश करें।',
+  'rateLimit.teiah': 'TeiaH Valid को बहुत अधिक अनुरोध। बाद में फिर कोशिश करें।',
 
   // उपकरण
   'device.idRequired': 'उपकरण आईडी आवश्यक है',
@@ -889,4 +890,28 @@ export default {
   'contacts.import.badHeader': 'पहली पंक्ति में निर्यात के कॉलम होने चाहिए (Chave, Contrato, CPF/CNPJ या Nome)',
   'contacts.import.rowNotFound': 'कुंजी या अनुबंध नहीं मिला',
   'contacts.import.rowNoName': 'नया ग्राहक बिना नाम के',
+
+  // TeiaH Valid
+  'teiah.configLoaded': 'TeiaH Valid कॉन्फ़िगरेशन लोड हुआ',
+  'teiah.configLoadFailed': 'TeiaH Valid कॉन्फ़िगरेशन लोड नहीं हो सका',
+  'teiah.configSaved': 'TeiaH Valid कॉन्फ़िगरेशन सहेजा गया',
+  'teiah.configSaveFailed': 'TeiaH Valid कॉन्फ़िगरेशन सहेजा नहीं जा सका',
+  'teiah.connectionOk': 'TeiaH Valid से कनेक्शन हुआ और कुंजी स्वीकार हुई',
+  'teiah.connectionTestFailed': 'TeiaH Valid कनेक्शन का परीक्षण विफल रहा',
+  'teiah.exportLoaded': 'TeiaH Valid निर्यात लोड हुआ',
+  'teiah.exportPreviewed': 'TeiaH Valid निर्यात का पूर्वावलोकन तैयार',
+  'teiah.exportStarted': 'TeiaH Valid निर्यात शुरू हुआ',
+  'teiah.exportFailed': 'TeiaH Valid निर्यात विफल रहा',
+  'teiah.error.urlInvalid': 'TeiaH Valid API पता अमान्य है',
+  'teiah.error.notConfigured': 'TeiaH Valid एकीकरण कॉन्फ़िगर नहीं है',
+  'teiah.error.apiKeyInvalid': 'अमान्य API कुंजी',
+  'teiah.error.apiKeyMissing': 'TeiaH Valid API कुंजी दर्ज करें',
+  'teiah.error.blockedHost': 'यह पता TeiaH Valid के लिए अनुमत नहीं है',
+  'teiah.error.unreachable': 'TeiaH Valid तक नहीं पहुँचा जा सका',
+  'teiah.error.timeout': 'TeiaH Valid ने समय सीमा में उत्तर नहीं दिया',
+  'teiah.error.invalidResponse': 'TeiaH Valid ने अमान्य उत्तर भेजा',
+  'teiah.error.credentialsRejected': 'TeiaH Valid ने API कुंजी अस्वीकार की',
+  'teiah.error.rateLimited': 'TeiaH Valid अनुरोध सीमित कर रहा है; बाद में प्रयास करें',
+  'teiah.error.status': 'TeiaH Valid ने स्थिति {status} के साथ उत्तर दिया',
+  'teiah.error.exportRunning': 'TeiaH Valid निर्यात पहले से चल रहा है'
 };

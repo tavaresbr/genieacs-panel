@@ -396,6 +396,25 @@ export const sgpSyncLimiter = limiter({
   message: limitMessage('rateLimit.sgpSync', 'rate_limited_sgp')
 });
 
+/**
+ * TeiaH Valid: the connection test and the preview each call an outside API
+ * (the preview the SGP too), so they get the SGP admin budget's shape.
+ */
+export const teiahAdminLimiter = limiter({
+  windowMs: 60 * 1000,
+  max: 20,
+  keyGenerator: (req) => (req.user?.userId ? `user:${req.user.userId}` : `ip:${ipKey(req)}`),
+  message: limitMessage('rateLimit.teiah', 'rate_limited_teiah')
+});
+
+/** A run reads the invoices of every cancelled contract: as rare as a fleet sync. */
+export const teiahExportLimiter = limiter({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  keyGenerator: (req) => (req.user?.userId ? `user:${req.user.userId}` : `ip:${ipKey(req)}`),
+  message: limitMessage('rateLimit.teiah', 'rate_limited_teiah')
+});
+
 /** Operator-side reveal/reset of a customer portal password. */
 /**
  * The webhook is public, so it gets its own bucket rather than sharing the

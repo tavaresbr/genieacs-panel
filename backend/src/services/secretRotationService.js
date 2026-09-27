@@ -136,6 +136,12 @@ const BLOBS = Object.freeze([
     contexto: 'skygenpanel-sgp-webhook-secret-v1'
   },
   {
+    // A chave de API da TeiaH Valid do provedor.
+    chave: 'teiah_integration_config',
+    caminho: ['apiKey'],
+    contexto: 'skygenpanel-teiah-apikey-v1'
+  },
+  {
     chave: 'whatsapp_evolution_config',
     caminho: ['managedAdminKey'],
     contexto: 'skygenpanel-evolution-admin-key-v1'

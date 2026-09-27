@@ -81,6 +81,13 @@ export const PERMISSIONS = Object.freeze([
   'sgp.read',
   'sgp.act',
   'sgp.config',
+  // A TeiaH Valid. `read` é ver o que foi enviado; `act` é disparar um envio,
+  // que manda endereço e dívida de ex-assinantes para fora do painel — por isso
+  // fica com quem responde pelo provedor, e não com o plantão; `config` é a
+  // chave de API.
+  'teiah.read',
+  'teiah.act',
+  'teiah.config',
   // O provisionamento. `run` dispara uma passada — escreve no CPE, é do
   // plantão; `write` muda a regra que decide o que será escrito, que é decisão
   // de quem responde pelo provedor.
@@ -149,6 +156,7 @@ const TECH = [
   'map.write',
   'sgp.read',
   'sgp.act',
+  'teiah.read',
   'provisioning.read',
   'provisioning.run',
   'whatsapp.read',
@@ -165,6 +173,8 @@ const ADMIN = [
   'devices.export',
   'catalogue.write',
   'sgp.config',
+  'teiah.act',
+  'teiah.config',
   'provisioning.write',
   'whatsapp.config',
   'campaigns.manage',

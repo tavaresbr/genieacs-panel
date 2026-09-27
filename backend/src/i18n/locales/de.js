@@ -75,6 +75,7 @@ export default {
   'rateLimit.telegramTest': 'Zu viele Telegram-Tests, warten Sie eine Minute',
   'rateLimit.platformExport': 'Zu viele Exporte, bitte langsamer',
   'rateLimit.sgpSync': 'Zu viele Flottensynchronisierungen. Versuchen Sie es später erneut.',
+  'rateLimit.teiah': 'Zu viele Anfragen an TeiaH Valid. Versuchen Sie es später erneut.',
 
   // Geräte
   'device.idRequired': 'Die Geräte-ID ist erforderlich',
@@ -890,4 +891,28 @@ export default {
   'contacts.import.badHeader': 'Die erste Zeile braucht die Exportspalten (Chave, Contrato, CPF/CNPJ oder Nome)',
   'contacts.import.rowNotFound': 'Schlüssel oder Vertrag nicht gefunden',
   'contacts.import.rowNoName': 'Neuer Kunde ohne Namen',
+
+  // TeiaH Valid
+  'teiah.configLoaded': 'TeiaH-Valid-Konfiguration geladen',
+  'teiah.configLoadFailed': 'TeiaH-Valid-Konfiguration konnte nicht geladen werden',
+  'teiah.configSaved': 'TeiaH-Valid-Konfiguration gespeichert',
+  'teiah.configSaveFailed': 'TeiaH-Valid-Konfiguration konnte nicht gespeichert werden',
+  'teiah.connectionOk': 'Verbindung zu TeiaH Valid hergestellt, Schlüssel akzeptiert',
+  'teiah.connectionTestFailed': 'Verbindungstest zu TeiaH Valid fehlgeschlagen',
+  'teiah.exportLoaded': 'TeiaH-Valid-Export geladen',
+  'teiah.exportPreviewed': 'Vorschau des TeiaH-Valid-Exports erstellt',
+  'teiah.exportStarted': 'TeiaH-Valid-Export gestartet',
+  'teiah.exportFailed': 'TeiaH-Valid-Export fehlgeschlagen',
+  'teiah.error.urlInvalid': 'Ungültige API-Adresse für TeiaH Valid',
+  'teiah.error.notConfigured': 'Die TeiaH-Valid-Integration ist nicht konfiguriert',
+  'teiah.error.apiKeyInvalid': 'Ungültiger API-Schlüssel',
+  'teiah.error.apiKeyMissing': 'Geben Sie den TeiaH-Valid-API-Schlüssel ein',
+  'teiah.error.blockedHost': 'Diese Adresse ist für TeiaH Valid nicht erlaubt',
+  'teiah.error.unreachable': 'TeiaH Valid ist nicht erreichbar',
+  'teiah.error.timeout': 'TeiaH Valid hat nicht rechtzeitig geantwortet',
+  'teiah.error.invalidResponse': 'TeiaH Valid hat eine ungültige Antwort gesendet',
+  'teiah.error.credentialsRejected': 'TeiaH Valid hat den API-Schlüssel abgelehnt',
+  'teiah.error.rateLimited': 'TeiaH Valid begrenzt die Anfragen; später erneut versuchen',
+  'teiah.error.status': 'TeiaH Valid hat mit dem Status {status} geantwortet',
+  'teiah.error.exportRunning': 'Ein TeiaH-Valid-Export läuft bereits'
 };

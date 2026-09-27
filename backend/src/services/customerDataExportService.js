@@ -373,6 +373,11 @@ class CustomerDataExportService {
     guardar('sgp_links', vinculos);
     guardar('sgp_contacts', contatos);
     guardar('sgp_clients', clientes);
+    // O envio à TeiaH Valid de um contrato desta pessoa: o valor em aberto e
+    // quando foi mandado. O endereço enviado é o de `sgp_contacts`, acima.
+    guardar('teiah_exports', contratos.length
+      ? await tdb('teiah_exports').whereIn('contract', contratos).orderBy('id')
+      : []);
     guardar('device_swaps', trocas);
 
     // O perfil é a data de instalação do aparelho, não um dado do período.

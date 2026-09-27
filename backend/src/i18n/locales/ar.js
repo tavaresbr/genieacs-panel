@@ -73,6 +73,7 @@ export default {
   'rateLimit.telegramTest': 'اختبارات تيليجرام كثيرة، انتظر دقيقة',
   'rateLimit.platformExport': 'عمليات تصدير كثيرة جدًا، يُرجى التمهّل',
   'rateLimit.sgpSync': 'عمليات مزامنة شاملة كثيرة جدًا. أعد المحاولة لاحقًا.',
+  'rateLimit.teiah': 'طلبات كثيرة جدًا إلى TeiaH Valid. أعد المحاولة لاحقًا.',
 
   // الأجهزة
   'device.idRequired': 'معرّف الجهاز مطلوب',
@@ -881,4 +882,28 @@ export default {
   'contacts.import.badHeader': 'يجب أن يحتوي السطر الأول على أعمدة التصدير (Chave أو Contrato أو CPF/CNPJ أو Nome)',
   'contacts.import.rowNotFound': 'المفتاح أو العقد غير موجود',
   'contacts.import.rowNoName': 'عميل جديد بلا اسم',
+
+  // TeiaH Valid
+  'teiah.configLoaded': 'تم تحميل إعدادات TeiaH Valid',
+  'teiah.configLoadFailed': 'تعذر تحميل إعدادات TeiaH Valid',
+  'teiah.configSaved': 'تم حفظ إعدادات TeiaH Valid',
+  'teiah.configSaveFailed': 'تعذر حفظ إعدادات TeiaH Valid',
+  'teiah.connectionOk': 'تم الاتصال بـ TeiaH Valid وقُبل المفتاح',
+  'teiah.connectionTestFailed': 'تعذر اختبار الاتصال بـ TeiaH Valid',
+  'teiah.exportLoaded': 'تم تحميل الإرسال إلى TeiaH Valid',
+  'teiah.exportPreviewed': 'تم إنشاء معاينة الإرسال إلى TeiaH Valid',
+  'teiah.exportStarted': 'بدأ الإرسال إلى TeiaH Valid',
+  'teiah.exportFailed': 'فشل الإرسال إلى TeiaH Valid',
+  'teiah.error.urlInvalid': 'عنوان واجهة TeiaH Valid غير صالح',
+  'teiah.error.notConfigured': 'تكامل TeiaH Valid غير مُعد',
+  'teiah.error.apiKeyInvalid': 'مفتاح API غير صالح',
+  'teiah.error.apiKeyMissing': 'أدخل مفتاح API الخاص بـ TeiaH Valid',
+  'teiah.error.blockedHost': 'هذا العنوان غير مسموح به لـ TeiaH Valid',
+  'teiah.error.unreachable': 'تعذر الوصول إلى TeiaH Valid',
+  'teiah.error.timeout': 'لم تستجب TeiaH Valid ضمن المهلة',
+  'teiah.error.invalidResponse': 'أرسلت TeiaH Valid استجابة غير صالحة',
+  'teiah.error.credentialsRejected': 'رفضت TeiaH Valid مفتاح API',
+  'teiah.error.rateLimited': 'تحد TeiaH Valid من الطلبات؛ أعد المحاولة لاحقًا',
+  'teiah.error.status': 'استجابت TeiaH Valid بالرمز {status}',
+  'teiah.error.exportRunning': 'يوجد إرسال إلى TeiaH Valid قيد التنفيذ بالفعل'
 };
