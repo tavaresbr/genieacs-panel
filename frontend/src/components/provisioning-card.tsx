@@ -72,7 +72,7 @@ export function ProvisioningCard({ deviceId }: Props) {
   return (
     <div className="modern-card p-5 sm:p-6 lg:col-span-2">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
+        <div className="min-w-0">
           <p className="page-kicker">{t('detail.provisioning.kicker')}</p>
           <h2 className="section-heading">{t('detail.provisioning.title')}</h2>
           <p className="section-description">{t('detail.provisioning.description')}</p>
@@ -118,17 +118,17 @@ export function ProvisioningCard({ deviceId }: Props) {
               </span>
             </div>
             {(latest.errorMessage ?? latest.error) && (
-              <p className="mt-2 text-sm text-muted-foreground">
+              <p className="mt-2 text-sm text-muted-foreground [overflow-wrap:anywhere]">
                 {latest.errorMessage ?? latest.error}
               </p>
             )}
             {latest.steps.length > 0 && (
               <ul className="mt-3 space-y-1 text-xs">
                 {latest.steps.map((step, index) => (
-                  <li key={`${step.step}-${index}`} className="flex flex-wrap gap-2">
+                  <li key={`${step.step}-${index}`} className="flex flex-wrap gap-2 [overflow-wrap:anywhere]">
                     <span className="font-medium">{step.step}</span>
                     <span className="text-muted-foreground">{step.status}</span>
-                    {step.detail && <span className="text-muted-foreground">· {step.detail}</span>}
+                    {step.detail && <span className="min-w-0 text-muted-foreground">· {step.detail}</span>}
                   </li>
                 ))}
               </ul>
@@ -148,7 +148,7 @@ export function ProvisioningCard({ deviceId }: Props) {
             </p>
           ) : (
             <>
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-1 text-xs text-muted-foreground [overflow-wrap:anywhere]">
                 {t('detail.provisioning.previewSummary', {
                   profile: preview.profile?.name ?? '—',
                   contract: preview.contract?.contract ?? '—',
@@ -165,8 +165,8 @@ export function ProvisioningCard({ deviceId }: Props) {
                     {preview.steps.flatMap((step) => step.parameters.map((parameter, index) => (
                       <tr key={`${step.step}-${parameter.path}-${index}`} className="border-t border-border">
                         <td className="py-1 pe-3 text-muted-foreground">{step.step}</td>
-                        <td className="py-1 pe-3 font-mono">{parameter.path}</td>
-                        <td className="py-1 font-mono">{String(parameter.value ?? '')}</td>
+                        <td className="break-all py-1 pe-3 font-mono">{parameter.path}</td>
+                        <td className="break-all py-1 font-mono">{String(parameter.value ?? '')}</td>
                       </tr>
                     )))}
                   </tbody>

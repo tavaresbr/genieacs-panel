@@ -60,13 +60,13 @@ export default function ResetPassword() {
     <main className="flex min-h-screen items-start justify-center bg-background px-4 pb-10 pt-16 sm:px-8 lg:items-center lg:py-10">
       <div className="w-full max-w-md">
         <div className="mb-8 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <BrandMark className="size-10" />
+          <div className="flex min-w-0 items-center gap-3">
+            <BrandMark className="size-10 shrink-0" />
             <div className="text-[0.65rem] font-bold uppercase tracking-[0.13em] text-muted-foreground">
               {t('app.genieacsOperations')}
             </div>
           </div>
-          <LanguageSwitcher className="ml-auto" />
+          <LanguageSwitcher className="ml-auto shrink-0" />
         </div>
 
         <div className="auth-panel">

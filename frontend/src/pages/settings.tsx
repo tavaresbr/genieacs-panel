@@ -94,6 +94,10 @@ const SETTINGS_TABS = [
   'whatsapp', 'security', 'vendors', 'wifi-security', 'database', 'about'
 ]
 
+// Botão só de ícone nas listas: 40px de alvo abaixo do desktop, onde o toque
+// precisa; no lg a linha da tabela volta ao tamanho do ícone.
+const ICON_ACTION = 'inline-flex h-10 w-10 items-center justify-center rounded-md lg:h-auto lg:w-auto'
+
 /**
  * Scrolls to a section once its tab has rendered it. The tab loads its data
  * first, so the element may not exist yet on the first frames; a few short
@@ -176,6 +180,16 @@ export default function Settings() {
       setActiveTab(canEditProvider ? 'provider' : 'customer-portal')
     }
   }, [platformManaged, activeTab, canEditProvider])
+  // No celular a trilha de abas rola de lado: a aba ativa — a que veio do
+  // `?tab=` inclusive — é trazida para a vista, senão a pessoa não vê onde está.
+  const tabRailRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const rail = tabRailRef.current
+    const ativa = rail?.querySelector<HTMLElement>('[data-active="true"]')
+    if (!rail || !ativa || rail.scrollWidth <= rail.clientWidth) return
+    const deslocamento = ativa.getBoundingClientRect().left - rail.getBoundingClientRect().left
+    rail.scrollTo({ left: rail.scrollLeft + deslocamento - (rail.clientWidth - ativa.offsetWidth) / 2 })
+  }, [activeTab, platformManaged, canEditProvider])
   const [testResult, setTestResult] = useState<{success: boolean, message: string, deviceCount?: number} | null>(null)
   const [genieAuthConfig, setGenieAuthConfig] = useState<GenieAcsAuthConfig | null>(null)
   const [genieAuthForm, setGenieAuthForm] = useState<{
@@ -1428,6 +1442,185 @@ export default function Settings() {
     </>
   )
 
+  // O papel, as ações e a troca de senha de um operador aparecem no cartão
+  // (celular) e na linha da tabela (desktop); o sufixo mantém os ids únicos,
+  // já que as duas listas existem no DOM ao mesmo tempo.
+  const renderOperatorRole = (operator: Operator, lockedByOwner: boolean, largura: string) => (
+    <>
+      <select
+        value={operator.role}
+        disabled={operatorBusyId === operator.id || lockedByOwner}
+        onChange={(e) => void changeOperatorRole(operator, e.target.value as OperatorRole)}
+        className={`modern-input ${largura}`}
+        aria-label={t('settings.operators.roleFor', { username: operator.username })}
+      >
+        {rolesFor(operator.role).map((role) => (
+          <option key={role} value={role}>{t(ROLE_LABEL_KEYS[role])}</option>
+        ))}
+      </select>
+      <p className="field-hint max-w-xs">
+        {lockedByOwner
+          ? t('settings.operators.ownerLocked')
+          : t(ROLE_SUMMARY_KEYS[operator.role])}
+      </p>
+    </>
+  )
+
+  const renderOperatorActions = (operator: Operator, isSelf: boolean) => (
+    <div className="flex shrink-0 items-center gap-1 md:gap-2">
+      {canOfferPasswordReset(operator, { isOwner }) && (
+        <button
+          onClick={() => {
+            setResetPasswordId((current) => (current === operator.id ? null : operator.id))
+            setResetPasswordValue('')
+          }}
+          className={`${ICON_ACTION} text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300`}
+          title={t('settings.operators.resetPassword')}
+          aria-label={t('settings.operators.resetPasswordFor', { username: operator.username })}
+        >
+          <Icon name="lock" size={18} />
+        </button>
+      )}
+      {canOfferMfaReset(operator, { isSelf, isOwner }) && (
+        <button
+          onClick={() => void resetOperatorMfa(operator)}
+          disabled={operatorBusyId === operator.id}
+          className={`${ICON_ACTION} text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300`}
+          title={t('settings.operators.mfaReset')}
+          aria-label={t('settings.operators.mfaResetFor', { username: operator.username })}
+        >
+          <Icon name="phone" size={18} />
+        </button>
+      )}
+      <button
+        onClick={() => void deleteOperator(operator)}
+        disabled={operatorBusyId === operator.id}
+        className={`${ICON_ACTION} text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300`}
+        title={t('common.delete')}
+        aria-label={t('settings.operators.deleteFor', { username: operator.username })}
+      >
+        <Icon name="trash" size={18} />
+      </button>
+    </div>
+  )
+
+  const renderOperatorPasswordForm = (operator: Operator, sufixo: string) => (
+    <>
+      <div className="flex flex-col gap-2 py-2 sm:flex-row sm:items-center">
+        <label className="text-sm font-medium" htmlFor={`operator-new-password-${sufixo}-${operator.id}`}>
+          {t('settings.operators.newPassword')}
+        </label>
+        <input
+          id={`operator-new-password-${sufixo}-${operator.id}`}
+          type="password"
+          value={resetPasswordValue}
+          onChange={(e) => setResetPasswordValue(e.target.value)}
+          className="modern-input sm:w-72"
+          autoComplete="new-password"
+          placeholder={t('settings.operators.passwordPlaceholder')}
+        />
+        <button
+          onClick={() => void submitOperatorPassword(operator)}
+          disabled={operatorBusyId === operator.id}
+          className="modern-button"
+        >
+          {t('settings.operators.savePassword')}
+        </button>
+        <button
+          onClick={() => { setResetPasswordId(null); setResetPasswordValue('') }}
+          className="modern-button-secondary"
+        >
+          {t('common.cancel')}
+        </button>
+      </div>
+      <p className="field-hint">{t('settings.operators.resetPasswordHint')}</p>
+    </>
+  )
+
+  const renderVendorActions = (v: VendorType) => (
+    <div className="flex shrink-0 items-center gap-1 md:gap-2">
+      <button
+        onClick={() => {
+          setEditingVendor(v)
+          setCreatingVendor(true)
+          setVendorForm({
+            name: v.name,
+            parameter_prefix: v.parameter_prefix || '',
+            manufacturer_patterns: (v.manufacturer_patterns || []).join(','),
+            product_patterns: (v.product_patterns || []).join(','),
+            service_list_path: v.service_list_path || '',
+            lan_binding_path: v.lan_binding_path || '',
+            vlan_id_path: v.vlan_id_path || '',
+            wifi_password_path: v.wifi_password_path || '',
+            http_wan_enable_path: v.http_wan_enable_path || '',
+            firewall_level_path: v.firewall_level_path || '',
+            priority: v.priority,
+            enabled: v.enabled,
+            description: v.description || ''
+          })
+        }}
+        className={`${ICON_ACTION} text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300`}
+        title={t('common.edit')}
+        aria-label={t('common.edit')}
+      >
+        <Icon name="edit" size={18} />
+      </button>
+      {platformManaged && (
+        <button
+          onClick={() => void resetCatalogueRow('vendor', v.id, v.name)}
+          className={`${ICON_ACTION} text-muted-foreground hover:text-foreground`}
+          title={t('settings.catalogue.reset')}
+          aria-label={t('settings.catalogue.reset')}
+        >
+          <Icon name="refresh" size={18} />
+        </button>
+      )}
+      <button
+        onClick={() => deleteVendor(v.id)}
+        className={`${ICON_ACTION} text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300`}
+        title={t('common.delete')}
+        aria-label={t('common.delete')}
+      >
+        <Icon name="trash" size={18} />
+      </button>
+    </div>
+  )
+
+  // Ações em texto: no celular ganham a altura de toque; no lg voltam a links.
+  const WIFI_ACTION = 'min-h-10 px-1 font-medium text-sm lg:min-h-0 lg:px-0'
+  const renderWifiActions = (cfg: WifiSecurityConfigType) => (
+    <div className="flex flex-wrap items-center gap-3">
+      <button
+        onClick={() => {
+          setEditingConfig(cfg);
+          setCreatingConfig(false);
+          setConfigForm({
+            product_class: cfg.product_class,
+            security_types: cfg.security_types,
+            password_param_path: cfg.password_param_path
+          })
+        }}
+        className={`${WIFI_ACTION} text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300`}
+      >
+        {t('common.edit')}
+      </button>
+      {platformManaged && (
+        <button
+          onClick={() => void resetCatalogueRow('wifi', cfg.id, cfg.product_class)}
+          className={`${WIFI_ACTION} text-muted-foreground hover:text-foreground`}
+        >
+          {t('settings.catalogue.reset')}
+        </button>
+      )}
+      <button
+        onClick={() => deleteWifiConfig(cfg.id)}
+        className={`${WIFI_ACTION} text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300`}
+      >
+        {t('common.delete')}
+      </button>
+    </div>
+  )
+
   return (
     <div className="page-shell">
       <div className="page-frame">
@@ -1440,7 +1633,7 @@ export default function Settings() {
         </header>
 
         <div className="mb-6">
-          <div className="tab-rail" role="tablist" aria-label={t('settings.sectionsAria')}>
+          <div ref={tabRailRef} className="tab-rail" role="tablist" aria-label={t('settings.sectionsAria')}>
             {canEditProvider && (
               <button
                 onClick={() => setActiveTab('provider')}
@@ -2641,7 +2834,7 @@ export default function Settings() {
         )}
 
         {activeTab === 'security' && (
-          <div className="modern-card max-w-5xl p-5 sm:p-6">
+          <div className="modern-card max-w-5xl p-4 sm:p-6">
             <h2 className="section-heading">{t('settings.security.title')}</h2>
             <p className="section-description mb-6">{t('settings.security.description')}</p>
             <div className="space-y-6">
@@ -2933,7 +3126,59 @@ export default function Settings() {
                   </div>
                 )}
 
-                <div className="overflow-x-auto">
+                {/* No celular a conta vira cartão: a tabela de cinco colunas
+                    só cabia rolando de lado, com as ações fora da vista — no
+                    tablet também, por isso o corte é o lg e não o md. */}
+                <ul className="space-y-3 lg:hidden" aria-busy={operatorsLoading}>
+                  {operatorsLoading ? (
+                    <li className="py-6 text-center text-sm text-muted-foreground">{t('settings.operators.loading')}</li>
+                  ) : operatorsError !== null ? (
+                    <li className="py-6 text-center text-sm text-destructive">
+                      {operatorsError || t('settings.operators.loadFailed')}
+                    </li>
+                  ) : operators.length === 0 ? (
+                    <li className="py-6 text-center text-sm text-muted-foreground">{t('settings.operators.empty')}</li>
+                  ) : (
+                    operators.map((operator) => {
+                      const isSelf = currentUser?.id === operator.id
+                      const lockedByOwner = operator.role === 'owner' && !isOwner
+                      return (
+                        <li key={operator.id} className="rounded-md border border-border bg-card p-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="break-words font-medium text-foreground">{operator.username}</p>
+                              <div className="mt-1 flex flex-wrap gap-1.5">
+                                {isSelf && <span className="modern-badge">{t('settings.operators.you')}</span>}
+                                <span className={operator.mfaEnabled ? 'modern-badge-success' : 'modern-badge'}>
+                                  {operator.mfaEnabled ? t('settings.operators.mfaOn') : t('settings.operators.mfaOff')}
+                                </span>
+                              </div>
+                            </div>
+                            {renderOperatorActions(operator, isSelf)}
+                          </div>
+                          <p className="mt-2 break-all text-sm">
+                            {operator.email
+                              ? <span className="text-muted-foreground">{operator.email}</span>
+                              : <span className="modern-badge">{t('settings.operators.emailMissing')}</span>}
+                          </p>
+                          <div className="mt-3">
+                            {renderOperatorRole(operator, lockedByOwner, 'w-full')}
+                          </div>
+                          <p className="mt-2 text-xs text-muted-foreground">
+                            {t('settings.operators.createdAt')}: {formatDateTime(operator.createdAt)}
+                          </p>
+                          {resetPasswordId === operator.id && (
+                            <div className="mt-3 border-t border-border pt-3">
+                              {renderOperatorPasswordForm(operator, 'm')}
+                            </div>
+                          )}
+                        </li>
+                      )
+                    })
+                  )}
+                </ul>
+
+                <div className="hidden overflow-x-auto lg:block">
                   <table className="modern-table">
                     <thead>
                       <tr>
@@ -2993,95 +3238,13 @@ export default function Settings() {
                                     ? <span className="text-muted-foreground">{operator.email}</span>
                                     : <span className="modern-badge">{t('settings.operators.emailMissing')}</span>}
                                 </td>
-                                <td>
-                                  <select
-                                    value={operator.role}
-                                    disabled={operatorBusyId === operator.id || lockedByOwner}
-                                    onChange={(e) => void changeOperatorRole(operator, e.target.value as OperatorRole)}
-                                    className="modern-input w-40"
-                                    aria-label={t('settings.operators.roleFor', { username: operator.username })}
-                                  >
-                                    {rolesFor(operator.role).map((role) => (
-                                      <option key={role} value={role}>{t(ROLE_LABEL_KEYS[role])}</option>
-                                    ))}
-                                  </select>
-                                  <p className="field-hint max-w-xs">
-                                    {lockedByOwner
-                                      ? t('settings.operators.ownerLocked')
-                                      : t(ROLE_SUMMARY_KEYS[operator.role])}
-                                  </p>
-                                </td>
+                                <td>{renderOperatorRole(operator, lockedByOwner, 'w-40')}</td>
                                 <td className="text-sm text-muted-foreground">{formatDateTime(operator.createdAt)}</td>
-                                <td>
-                                  <div className="flex items-center gap-2">
-                                    {canOfferPasswordReset(operator, { isOwner }) && (
-                                      <button
-                                        onClick={() => {
-                                          setResetPasswordId((current) => (current === operator.id ? null : operator.id))
-                                          setResetPasswordValue('')
-                                        }}
-                                        className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                                        title={t('settings.operators.resetPassword')}
-                                        aria-label={t('settings.operators.resetPasswordFor', { username: operator.username })}
-                                      >
-                                        <Icon name="lock" size={18} />
-                                      </button>
-                                    )}
-                                    {canOfferMfaReset(operator, { isSelf, isOwner }) && (
-                                      <button
-                                        onClick={() => void resetOperatorMfa(operator)}
-                                        disabled={operatorBusyId === operator.id}
-                                        className="text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300"
-                                        title={t('settings.operators.mfaReset')}
-                                        aria-label={t('settings.operators.mfaResetFor', { username: operator.username })}
-                                      >
-                                        <Icon name="phone" size={18} />
-                                      </button>
-                                    )}
-                                    <button
-                                      onClick={() => void deleteOperator(operator)}
-                                      disabled={operatorBusyId === operator.id}
-                                      className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
-                                      title={t('common.delete')}
-                                      aria-label={t('settings.operators.deleteFor', { username: operator.username })}
-                                    >
-                                      <Icon name="trash" size={18} />
-                                    </button>
-                                  </div>
-                                </td>
+                                <td>{renderOperatorActions(operator, isSelf)}</td>
                               </tr>
                               {resetPasswordId === operator.id && (
                                 <tr>
-                                  <td colSpan={5}>
-                                    <div className="flex flex-col gap-2 py-2 sm:flex-row sm:items-center">
-                                      <label className="text-sm font-medium" htmlFor={`operator-new-password-${operator.id}`}>
-                                        {t('settings.operators.newPassword')}
-                                      </label>
-                                      <input
-                                        id={`operator-new-password-${operator.id}`}
-                                        type="password"
-                                        value={resetPasswordValue}
-                                        onChange={(e) => setResetPasswordValue(e.target.value)}
-                                        className="modern-input sm:w-72"
-                                        autoComplete="new-password"
-                                        placeholder={t('settings.operators.passwordPlaceholder')}
-                                      />
-                                      <button
-                                        onClick={() => void submitOperatorPassword(operator)}
-                                        disabled={operatorBusyId === operator.id}
-                                        className="modern-button"
-                                      >
-                                        {t('settings.operators.savePassword')}
-                                      </button>
-                                      <button
-                                        onClick={() => { setResetPasswordId(null); setResetPasswordValue('') }}
-                                        className="modern-button-secondary"
-                                      >
-                                        {t('common.cancel')}
-                                      </button>
-                                    </div>
-                                    <p className="field-hint">{t('settings.operators.resetPasswordHint')}</p>
-                                  </td>
+                                  <td colSpan={5}>{renderOperatorPasswordForm(operator, 'd')}</td>
                                 </tr>
                               )}
                             </Fragment>
@@ -3122,8 +3285,8 @@ export default function Settings() {
         {activeTab === 'vendors' && (
           <div className="space-y-6">
             {/* Vendor List */}
-            <div className="modern-card p-6">
-              <div className="flex items-center justify-between mb-6">
+            <div className="modern-card p-4 sm:p-6">
+              <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{t('settings.vendors.title')}</h2>
                 <button
                   onClick={() => { resetVendorForm(); setCreatingVendor(true) }}
@@ -3295,7 +3458,46 @@ export default function Settings() {
                 </div>
               )}
 
-              <div className="overflow-x-auto">
+              <ul className="mobile-card-list space-y-3" aria-busy={vendorsLoading}>
+                {vendorsLoading ? (
+                  <li className="py-6 text-center text-sm text-muted-foreground">{t('settings.vendors.loading')}</li>
+                ) : vendorsError !== null ? (
+                  <li className="py-6 text-center text-sm text-[hsl(var(--status-danger))]">
+                    {vendorsError || t('settings.vendors.loadFailed')}
+                  </li>
+                ) : vendorList.length === 0 ? (
+                  <li className="py-6 text-center text-sm text-muted-foreground">{t('settings.vendors.empty')}</li>
+                ) : (
+                  vendorList.map((v) => (
+                    <li key={v.id} className="rounded-md border border-border bg-card p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="break-words font-medium text-foreground">{v.name}</p>
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            {t('settings.vendors.priority')}: {v.priority}
+                            <span className={`ms-2 ${v.enabled ? 'modern-badge-success' : 'modern-badge-error'}`}>
+                              {v.enabled ? t('common.enabled') : t('common.disabled')}
+                            </span>
+                          </p>
+                        </div>
+                        {renderVendorActions(v)}
+                      </div>
+                      {v.parameter_prefix && (
+                        <p className="mt-2 break-all font-mono text-xs">{v.parameter_prefix}</p>
+                      )}
+                      {(v.manufacturer_patterns || []).concat(v.product_patterns || []).length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {(v.manufacturer_patterns || []).concat(v.product_patterns || []).map((p, idx) => (
+                            <span key={idx} className="modern-badge break-all">{p}</span>
+                          ))}
+                        </div>
+                      )}
+                    </li>
+                  ))
+                )}
+              </ul>
+
+              <div className="desktop-table overflow-x-auto">
                 <table className="modern-table">
                   <thead>
                     <tr>
@@ -3348,54 +3550,7 @@ export default function Settings() {
                               {v.enabled ? t('common.enabled') : t('common.disabled')}
                             </span>
                           </td>
-                          <td>
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => {
-                                  setEditingVendor(v)
-                                  setCreatingVendor(true)
-                                  setVendorForm({
-                                    name: v.name,
-                                    parameter_prefix: v.parameter_prefix || '',
-                                    manufacturer_patterns: (v.manufacturer_patterns || []).join(','),
-                                    product_patterns: (v.product_patterns || []).join(','),
-                                    service_list_path: v.service_list_path || '',
-                                    lan_binding_path: v.lan_binding_path || '',
-                                    vlan_id_path: v.vlan_id_path || '',
-                                    wifi_password_path: v.wifi_password_path || '',
-                                    http_wan_enable_path: v.http_wan_enable_path || '',
-                                    firewall_level_path: v.firewall_level_path || '',
-                                    priority: v.priority,
-                                    enabled: v.enabled,
-                                    description: v.description || ''
-                                  })
-                                }}
-                                className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                                title={t('common.edit')}
-                                aria-label={t('common.edit')}
-                              >
-                                <Icon name="edit" size={18} />
-                              </button>
-                              {platformManaged && (
-                                <button
-                                  onClick={() => void resetCatalogueRow('vendor', v.id, v.name)}
-                                  className="text-muted-foreground hover:text-foreground"
-                                  title={t('settings.catalogue.reset')}
-                                  aria-label={t('settings.catalogue.reset')}
-                                >
-                                  <Icon name="refresh" size={18} />
-                                </button>
-                              )}
-                              <button
-                                onClick={() => deleteVendor(v.id)}
-                                className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
-                                title={t('common.delete')}
-                                aria-label={t('common.delete')}
-                              >
-                                <Icon name="trash" size={18} />
-                              </button>
-                            </div>
-                          </td>
+                          <td>{renderVendorActions(v)}</td>
                         </tr>
                       ))
                     )}
@@ -3410,8 +3565,8 @@ export default function Settings() {
         {activeTab === 'wifi-security' && (
           <div className="space-y-6">
             {/* WiFi Security Configs */}
-            <div className="modern-card p-6">
-              <div className="flex items-center justify-between mb-6">
+            <div className="modern-card p-4 sm:p-6">
+              <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{t('settings.wifi.title')}</h2>
                 <button
                   onClick={() => {
@@ -3463,7 +3618,34 @@ export default function Settings() {
                 </div>
               )}
 
-              <div className="overflow-x-auto">
+              <ul className="mobile-card-list space-y-3" aria-busy={wifiConfigLoading}>
+                {wifiConfigLoading ? (
+                  <li className="py-6 text-center text-sm text-muted-foreground">{t('settings.wifi.loading')}</li>
+                ) : wifiConfigError !== null ? (
+                  <li className="py-6 text-center text-sm text-[hsl(var(--status-danger))]">
+                    {wifiConfigError || t('settings.wifi.loadFailed')}
+                  </li>
+                ) : wifiConfigs.length === 0 ? (
+                  <li className="py-6 text-center text-sm text-muted-foreground">{t('settings.wifi.empty')}</li>
+                ) : (
+                  wifiConfigs.map(cfg => (
+                    <li key={cfg.id} className="rounded-md border border-border bg-card p-3">
+                      <p className="break-all font-medium text-foreground">{cfg.product_class}</p>
+                      <p className="mt-1 break-all font-mono text-xs text-muted-foreground">{cfg.password_param_path}</p>
+                      {(cfg.security_types_array || []).length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {(cfg.security_types_array || []).map((sec, idx) => (
+                            <span key={idx} className="modern-badge">{sec}</span>
+                          ))}
+                        </div>
+                      )}
+                      <div className="mt-2">{renderWifiActions(cfg)}</div>
+                    </li>
+                  ))
+                )}
+              </ul>
+
+              <div className="desktop-table overflow-x-auto">
                 <table className="modern-table">
                   {/* Style Header Tabel Sesuai SS */}
                   <thead>
@@ -3501,38 +3683,7 @@ export default function Settings() {
                               ))}
                             </div>
                           </td>
-                          <td>
-                            <div className="flex items-center gap-3">
-                              <button
-                                onClick={() => {
-                                  setEditingConfig(cfg);
-                                  setCreatingConfig(false);
-                                  setConfigForm({
-                                    product_class: cfg.product_class,
-                                    security_types: cfg.security_types,
-                                    password_param_path: cfg.password_param_path
-                                  })
-                                }}
-                                className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium text-sm"
-                              >
-                                {t('common.edit')}
-                              </button>
-                              {platformManaged && (
-                                <button
-                                  onClick={() => void resetCatalogueRow('wifi', cfg.id, cfg.product_class)}
-                                  className="text-muted-foreground hover:text-foreground font-medium text-sm"
-                                >
-                                  {t('settings.catalogue.reset')}
-                                </button>
-                              )}
-                              <button
-                                onClick={() => deleteWifiConfig(cfg.id)}
-                                className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 font-medium text-sm"
-                              >
-                                {t('common.delete')}
-                              </button>
-                            </div>
-                          </td>
+                          <td>{renderWifiActions(cfg)}</td>
                         </tr>
                       ))
                     )}
@@ -3546,7 +3697,7 @@ export default function Settings() {
         {activeTab === 'about' && <AboutTab appName={tenantName} />}
 
         {activeTab === 'database' && (
-          <div className="modern-card p-6 max-w-2xl">
+          <div className="modern-card max-w-2xl p-4 sm:p-6">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">{t('settings.db.title')}</h2>
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
               {t('settings.db.active', {

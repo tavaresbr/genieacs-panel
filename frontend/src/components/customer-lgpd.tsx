@@ -114,7 +114,7 @@ export function CustomerLgpd({ accountId, customerId }: {
       {podeApagar && abriuExclusao && (
         <div className="mt-3 rounded-lg border border-destructive/40 bg-destructive/5 p-3">
           <p className="text-xs leading-5 text-foreground">{t('detail.lgpd.eraseHint')}</p>
-          <label htmlFor="lgpd-confirm" className="field-label mt-3 block">
+          <label htmlFor="lgpd-confirm" className="field-label mt-3 block break-words">
             {t('detail.lgpd.eraseConfirmLabel', { id: customerId })}
           </label>
           <input

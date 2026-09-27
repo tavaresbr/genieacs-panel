@@ -198,7 +198,7 @@ export default function ContactDetailPage() {
           </div>
         </header>
 
-        <div className="grid gap-5 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           <Card title={t('contacts.profile.personal')}>
             <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
               <FieldRow label={t('contacts.profile.name')} field={fields.name} canEdit={canEdit} onRestore={restore('name')}>
@@ -270,7 +270,7 @@ export default function ContactDetailPage() {
           </Card>
 
           <Card title={t('contacts.profile.notes')}>
-            <p className="whitespace-pre-wrap text-sm">{profile.notes || <span className="text-muted-foreground">—</span>}</p>
+            <p className="whitespace-pre-wrap break-words text-sm [overflow-wrap:anywhere]">{profile.notes || <span className="text-muted-foreground">—</span>}</p>
           </Card>
         </div>
 
@@ -278,39 +278,61 @@ export default function ContactDetailPage() {
           {profile.contracts.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t('contacts.profile.noContracts')}</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="modern-table w-full">
-                <thead>
-                  <tr>
-                    <th>{t('contacts.profile.contract')}</th>
-                    <th>{t('contacts.profile.status')}</th>
-                    <th>{t('contacts.profile.plan')}</th>
-                    <th>{t('contacts.profile.dueDay')}</th>
-                    <th>{t('contacts.profile.since')}</th>
-                    <th>{t('contacts.profile.device')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {profile.contracts.map((contract) => (
-                    <tr key={contract.contract}>
-                      <td className="font-mono">{contract.contract}</td>
-                      <td>
-                        {contract.status || '—'}
-                        {contract.statusReason && <span className="block text-xs text-muted-foreground">{contract.statusReason}</span>}
-                      </td>
-                      <td>{contract.plan || '—'}</td>
-                      <td>{contract.dueDay || '—'}</td>
-                      <td>{contract.createdAt || '—'}</td>
-                      <td>
-                        {contract.deviceId
-                          ? <Link className="text-primary hover:underline" to={`/devices/${encodeURIComponent(contract.deviceId)}`}>{contract.deviceId}</Link>
-                          : <span className="text-muted-foreground">{t('contacts.profile.noDevice')}</span>}
-                      </td>
+            <>
+              <div className="desktop-table overflow-x-auto">
+                <table className="modern-table w-full">
+                  <thead>
+                    <tr>
+                      <th>{t('contacts.profile.contract')}</th>
+                      <th>{t('contacts.profile.status')}</th>
+                      <th>{t('contacts.profile.plan')}</th>
+                      <th>{t('contacts.profile.dueDay')}</th>
+                      <th>{t('contacts.profile.since')}</th>
+                      <th>{t('contacts.profile.device')}</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {profile.contracts.map((contract) => (
+                      <tr key={contract.contract}>
+                        <td className="font-mono">{contract.contract}</td>
+                        <td>
+                          {contract.status || '—'}
+                          {contract.statusReason && <span className="block text-xs text-muted-foreground">{contract.statusReason}</span>}
+                        </td>
+                        <td>{contract.plan || '—'}</td>
+                        <td>{contract.dueDay || '—'}</td>
+                        <td>{contract.createdAt || '—'}</td>
+                        <td>
+                          {contract.deviceId
+                            ? <Link className="text-primary hover:underline" to={`/devices/detail?id=${encodeURIComponent(contract.deviceId)}`}>{contract.deviceId}</Link>
+                            : <span className="text-muted-foreground">{t('contacts.profile.noDevice')}</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {/* No celular, um bloco por contrato: seis colunas rolando de lado
+                  escondiam o equipamento, que é o que se procura aqui. */}
+              <ul className="mobile-card-list divide-y divide-border" role="list">
+                {profile.contracts.map((contract) => (
+                  <li key={contract.contract} className="space-y-1.5 py-3 text-sm first:pt-0 last:pb-0">
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                      <span className="font-mono font-semibold">{contract.contract}</span>
+                      <span>{contract.status || '—'}</span>
+                    </div>
+                    {contract.statusReason && <p className="text-xs text-muted-foreground">{contract.statusReason}</p>}
+                    <p className="break-words">{contract.plan || '—'}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {t('contacts.profile.dueDay')}: {contract.dueDay || '—'} · {t('contacts.profile.since')}: {contract.createdAt || '—'}
+                    </p>
+                    {contract.deviceId
+                      ? <Link className="block break-all text-primary hover:underline" to={`/devices/detail?id=${encodeURIComponent(contract.deviceId)}`}>{contract.deviceId}</Link>
+                      : <p className="text-muted-foreground">{t('contacts.profile.noDevice')}</p>}
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
         </Card>
 
@@ -347,7 +369,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="border-b border-border pb-3">
       <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</dt>
-      <dd className="mt-1 break-words text-sm">{children || <span className="text-muted-foreground">—</span>}</dd>
+      <dd className="mt-1 break-words text-sm [overflow-wrap:anywhere]">{children || <span className="text-muted-foreground">—</span>}</dd>
     </div>
   )
 }
@@ -419,7 +441,7 @@ function InvoicesCard({ contactKey, whatsappPhone }: { contactKey: string; whats
                 <span className="ms-2 text-muted-foreground">{t('contacts.profile.dueOn', { date: invoice.dueDate ?? '—' })}</span>
                 <span className="ms-2 font-mono text-xs text-muted-foreground">{invoice.contract}</span>
               </span>
-              <span className="flex gap-2">
+              <span className="flex flex-wrap gap-2">
                 {invoice.digitableLine && (
                   <button type="button" className="modern-button-secondary" onClick={() => void copyToClipboard(invoice.digitableLine!).then(() => toast.success(t('contacts.profile.copied')))}>
                     <Icon name="copy" size={14} /> {t('contacts.profile.copyLine')}
@@ -501,7 +523,7 @@ function SendInvoiceModal({ contactKey, invoiceId, onClose }: { contactKey: stri
 
   return (
     <div className="fixed inset-0 z-[2100] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="send-invoice-title">
-      <div className="modern-card max-h-[90vh] w-full max-w-xl overflow-y-auto p-5 sm:p-6">
+      <div className="modern-card max-h-[calc(100dvh-2rem)] w-full max-w-xl overflow-y-auto p-5 sm:p-6">
         <h2 id="send-invoice-title" className="section-heading mb-1">{t('contacts.profile.sendInvoiceTitle')}</h2>
         {preview?.phone && (
           <p className="section-description mb-4">{t('contacts.profile.sendInvoiceTo', { phone: phoneText(preview.phone) })}</p>
@@ -526,7 +548,7 @@ function SendInvoiceModal({ contactKey, invoiceId, onClose }: { contactKey: stri
           </>
         )}
 
-        <div className="mt-6 flex justify-end gap-2">
+        <div className="mt-6 flex flex-wrap justify-end gap-2">
           <button type="button" className="modern-button-secondary" onClick={onClose} disabled={busy}>
             {sent ? t('common.close') : t('common.cancel')}
           </button>
@@ -619,7 +641,7 @@ function EditModal({ profile, onClose, onSave }: {
 
   return (
     <div className="fixed inset-0 z-[2100] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="contact-edit-title">
-      <div className="modern-card max-h-[90vh] w-full max-w-3xl overflow-y-auto p-5 sm:p-6">
+      <div className="modern-card max-h-[calc(100dvh-2rem)] w-full max-w-3xl overflow-y-auto p-5 sm:p-6">
         <h2 id="contact-edit-title" className="section-heading mb-1">{t('contacts.profile.editTitle')}</h2>
         <p className="section-description mb-5">{t('contacts.profile.editHint')}</p>
 
@@ -710,7 +732,7 @@ function EditModal({ profile, onClose, onSave }: {
           </div>
         </div>
 
-        <div className="mt-6 flex justify-end gap-2">
+        <div className="mt-6 flex flex-wrap justify-end gap-2">
           <button type="button" className="modern-button-secondary" onClick={onClose} disabled={saving}>{t('common.cancel')}</button>
           <button
             type="button"

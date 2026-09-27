@@ -7,9 +7,9 @@ export function BarChart({ data, valueLabel = 'Devices' }: { data: BarChartData[
   const max = Math.max(...data.map((item) => item.value), 1)
 
   return (
-    <div className="flex min-h-[250px] flex-col justify-center gap-3 py-2" role="img" aria-label={`${valueLabel} by category`}>
+    <div className="flex flex-col sm:min-h-[250px] justify-center gap-3 py-2" role="img" aria-label={`${valueLabel} by category`}>
       {data.map((item) => (
-        <div key={item.name} className="grid grid-cols-[minmax(5.5rem,0.45fr)_minmax(8rem,1fr)_2.5rem] items-center gap-3">
+        <div key={item.name} className="grid grid-cols-[minmax(4.5rem,0.45fr)_minmax(0,1fr)_auto] items-center gap-2 sm:grid-cols-[minmax(5.5rem,0.45fr)_minmax(8rem,1fr)_2.5rem] sm:gap-3">
           <span className="truncate text-end text-xs font-semibold text-muted-foreground" title={item.name}>{item.name}</span>
           <div className="h-5 overflow-hidden rounded-sm bg-muted">
             <div className="h-full min-w-1 rounded-sm bg-primary transition-[width] duration-300"

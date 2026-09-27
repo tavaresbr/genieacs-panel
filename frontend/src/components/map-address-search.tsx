@@ -57,14 +57,14 @@ export function MapAddressSearch({ onPick }: { onPick: (place: PlaceResult) => v
           placeholder={t('map.search.placeholder')}
           aria-label={t('map.search.placeholder')}
           maxLength={200}
-          className="modern-input min-h-9 flex-1 text-sm"
+          className="modern-input min-h-11 min-w-0 flex-1 text-sm sm:min-h-9"
         />
-        <button type="submit" className="modern-button-secondary min-h-9 px-3" disabled={busy} aria-label={t('map.search.button')} title={t('map.search.button')}>
+        <button type="submit" className="modern-button-secondary min-h-11 min-w-11 px-3 sm:min-h-9 sm:min-w-0" disabled={busy} aria-label={t('map.search.button')} title={t('map.search.button')}>
           <Icon name={busy ? 'refresh' : 'search'} size={16} className={busy ? 'animate-spin' : ''} />
         </button>
       </form>
       {(error || results) && (
-        <div className="absolute inset-x-0 top-full z-[1100] mt-1 overflow-hidden rounded-md border border-border bg-card shadow-lg">
+        <div className="absolute inset-x-0 top-full z-[1100] mt-1 max-h-72 overflow-y-auto rounded-md border border-border bg-card shadow-lg">
           {error && <p className="px-3 py-2 text-xs text-destructive">{error}</p>}
           {results && !results.length && <p className="px-3 py-2 text-xs text-muted-foreground">{t('map.search.empty')}</p>}
           {results?.map((place) => (
@@ -72,10 +72,10 @@ export function MapAddressSearch({ onPick }: { onPick: (place: PlaceResult) => v
               key={`${place.lat},${place.lng}`}
               type="button"
               onClick={() => { onPick(place); setResults(null) }}
-              className="flex w-full items-start gap-2 border-t border-border px-3 py-2 text-start text-xs first:border-t-0 hover:bg-muted"
+              className="flex min-h-11 w-full items-start gap-2 border-t border-border px-3 py-2 text-start sm:min-h-0 text-xs first:border-t-0 hover:bg-muted"
             >
               <Icon name="pin" size={14} className="mt-0.5 shrink-0" />
-              <span>{place.label}</span>
+              <span className="min-w-0 [overflow-wrap:anywhere]">{place.label}</span>
             </button>
           ))}
         </div>

@@ -324,7 +324,7 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
   return (
     <aside className="flex h-full min-h-0 flex-col bg-[hsl(var(--surface-subtle))]" aria-label={t('whatsapp.sgp.title')}>
       {header}
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] xl:pb-3">
         {loadError && <p className="text-xs text-[hsl(var(--status-danger))]" role="alert">{loadError}</p>}
 
         <Card icon="chat" title={t('whatsapp.sgp.attendance')}>
@@ -682,7 +682,7 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
                             {invoice.digitableLine && (
                               <button
                                 type="button"
-                                className="modern-button-secondary min-h-8 px-2 py-1 text-xs"
+                                className="modern-button-secondary min-h-10 px-2 py-1 text-xs lg:min-h-8"
                                 onClick={() => void copy(invoice.digitableLine ?? '', 'detail.sgp.copiedLine')}
                               >
                                 <Icon name="copy" size={13} />
@@ -692,7 +692,7 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
                             {invoice.pix && (
                               <button
                                 type="button"
-                                className="modern-button-secondary min-h-8 px-2 py-1 text-xs"
+                                className="modern-button-secondary min-h-10 px-2 py-1 text-xs lg:min-h-8"
                                 onClick={() => void copy(invoice.pix ?? '', 'detail.sgp.copiedPix')}
                               >
                                 <Icon name="copy" size={13} />
@@ -701,7 +701,7 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
                             )}
                             {isSafeExternalUrl(invoice.link) && (
                               <a
-                                className="modern-button-secondary min-h-8 px-2 py-1 text-xs"
+                                className="modern-button-secondary min-h-10 px-2 py-1 text-xs lg:min-h-8"
                                 href={invoice.link}
                                 target="_blank"
                                 rel="noopener noreferrer"

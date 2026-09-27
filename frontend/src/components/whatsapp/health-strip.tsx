@@ -480,7 +480,7 @@ export function HealthBell({ actions }: { actions?: (available: HealthActions) =
             </p>
             <button
               type="button"
-              className="icon-button size-8"
+              className="icon-button size-10 lg:size-8"
               aria-label={t('common.close')}
               onClick={() => {
                 setOpen(false)

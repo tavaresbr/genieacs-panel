@@ -34,7 +34,7 @@ export function ImpersonationBanner() {
   return (
     <div
       role="status"
-      className="sticky top-0 z-50 flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive"
+      className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-destructive/40 bg-background bg-gradient-to-r from-destructive/10 to-destructive/10 px-4 py-2 text-xs text-destructive [overflow-wrap:anywhere] sm:text-sm"
     >
       <Icon name="warning" size={17} className="shrink-0" />
       <span className="font-semibold">{t('impersonate.bannerTitle')}</span>
@@ -48,7 +48,7 @@ export function ImpersonationBanner() {
           operator: user.impersonation.platformUsername
         })}
       </span>
-      <button type="button" onClick={logout} className="ml-auto shrink-0 font-semibold underline">
+      <button type="button" onClick={logout} className="ml-auto inline-flex min-h-8 shrink-0 items-center font-semibold underline lg:min-h-0">
         {t('impersonate.leave')}
       </button>
     </div>

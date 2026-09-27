@@ -123,20 +123,23 @@ export function ConversationThread({
     <>
       <header
         ref={headerRef}
-        className="flex flex-wrap items-start justify-between gap-3 border-b border-border bg-card px-3 py-3 sm:px-4"
+        className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-border bg-card px-3 py-2.5 sm:px-4 lg:items-start lg:gap-3 lg:py-3"
       >
-        <div className="min-w-0">
-          {onBack && (
-            <button
-              type="button"
-              className="-ms-1 mb-1 inline-flex min-h-9 items-center gap-1.5 rounded-md px-1 text-sm font-semibold text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:hidden"
-              data-testid="inbox-back"
-              onClick={onBack}
-            >
-              <Icon name="back" size={16} />
-              {t('whatsapp.inbox.title')}
-            </button>
-          )}
+        {/* No celular o voltar e as ações dividem a primeira linha, e o nome
+            desce para a de baixo (`order-last`): numa linha própria cada, as
+            três comiam a altura que as mensagens tinham. */}
+        {onBack && (
+          <button
+            type="button"
+            className="-ms-1 inline-flex min-h-10 items-center gap-1.5 rounded-md px-1 text-sm font-semibold text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:hidden"
+            data-testid="inbox-back"
+            onClick={onBack}
+          >
+            <Icon name="back" size={16} />
+            {t('whatsapp.inbox.title')}
+          </button>
+        )}
+        <div className="order-last w-full min-w-0 lg:order-none lg:w-auto">
           <h2 className="truncate text-base font-semibold text-foreground">{conversationTitle(conversation)}</h2>
           {address && <p className="truncate font-mono text-xs text-muted-foreground">{address}</p>}
 
@@ -154,8 +157,8 @@ export function ConversationThread({
               </span>
             )}
             {conversation.clientName && (
-              <span className="modern-badge">
-                {t('whatsapp.inbox.subscriber')}: {conversation.clientName}
+              <span className="modern-badge max-w-full">
+                <span className="truncate">{t('whatsapp.inbox.subscriber')}: {conversation.clientName}</span>
               </span>
             )}
             {conversation.botPausedUntil && (
@@ -254,7 +257,7 @@ export function ConversationThread({
 
       <div
         ref={scrollRef}
-        className="min-h-0 flex-1 overflow-y-auto bg-[hsl(var(--surface-subtle))] px-3 py-3 sm:px-4 sm:py-4"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-[hsl(var(--surface-subtle))] px-3 py-3 sm:px-4 sm:py-4"
         onScroll={(event) => {
           const box = event.currentTarget
           stick.current = box.scrollHeight - box.scrollTop - box.clientHeight < STICK_PX

@@ -94,7 +94,29 @@ export function PlatformAudit() {
       ) : visiveis.length === 0 ? (
         <p className="mt-4 text-sm text-muted-foreground">{t('platform.audit.empty')}</p>
       ) : (
-        <div className="mt-4 overflow-x-auto">
+        <>
+        <ul className="mobile-card-list mt-4 divide-y divide-border border-t border-border">
+          {visiveis.map((entry) => (
+            <li key={entry.id} className="py-3 text-sm">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                <code className="break-all text-xs font-semibold">{entry.action}</code>
+                <span className="text-xs text-muted-foreground">{quando(entry.at)}</span>
+              </div>
+              <p className="mt-1 break-words">
+                {entry.actor.username || '—'}
+                {' · '}
+                {entry.tenant.name || entry.tenant.slug || '—'}
+                {entry.tenant.slug && entry.tenant.name && (
+                  <span className="ms-1 text-xs text-muted-foreground">({entry.tenant.slug})</span>
+                )}
+              </p>
+              {entry.detail && (
+                <p className="mt-1 break-all font-mono text-xs text-muted-foreground">{JSON.stringify(entry.detail)}</p>
+              )}
+            </li>
+          ))}
+        </ul>
+        <div className="desktop-table mt-4 overflow-x-auto">
           <table className="w-full min-w-[44rem] text-sm">
             <thead>
               <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
@@ -117,7 +139,7 @@ export function PlatformAudit() {
                       <span className="ms-1 text-xs text-muted-foreground">({entry.tenant.slug})</span>
                     )}
                   </td>
-                  <td className="py-2 text-xs text-muted-foreground">
+                  <td className="py-2 text-xs break-all text-muted-foreground">
                     {entry.detail ? JSON.stringify(entry.detail) : '—'}
                   </td>
                 </tr>
@@ -125,6 +147,7 @@ export function PlatformAudit() {
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       {nextBefore !== null && (

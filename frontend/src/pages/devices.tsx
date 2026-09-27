@@ -415,12 +415,12 @@ export default function DevicesPage() {
             <h1 className="page-title">{t('devices.title')}</h1>
             <p className="page-description">{t('devices.description')}</p>
           </div>
-          <div className="flex items-center gap-3 text-sm text-muted-foreground">
-            <span><strong className="data-value">{paging.total}</strong> {t('devices.totalLabel')}</span>
+          <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground sm:shrink-0 sm:flex-nowrap sm:gap-3">
+            <span className="me-auto whitespace-nowrap sm:me-0"><strong className="data-value">{paging.total}</strong> {t('devices.totalLabel')}</span>
             {canExport && (
               <button
                 type="button"
-                className="modern-button-secondary"
+                className="modern-button-secondary whitespace-nowrap px-3 sm:px-4"
                 disabled={exporting}
                 onClick={() => void exportSheet()}
                 title={exportIgnoresSgp({ sgp: filterSgp }) ? t('devices.export.sgpIgnored') : undefined}
@@ -447,8 +447,8 @@ export default function DevicesPage() {
           </section>
         ) : (
           <>
-            <section className={`mb-4 grid gap-3 rounded-[var(--radius)] border border-border bg-card p-3 lg:items-end ${sgpAvailable ? 'lg:grid-cols-[minmax(14rem,1fr)_11rem_12rem_13rem_auto]' : 'lg:grid-cols-[minmax(16rem,1fr)_12rem_13rem_auto]'}`}>
-              <div>
+            <section className={`mb-4 grid gap-3 rounded-[var(--radius)] border border-border bg-card p-3 sm:grid-cols-2 lg:items-end ${sgpAvailable ? 'lg:grid-cols-[minmax(14rem,1fr)_11rem_12rem_13rem_auto]' : 'lg:grid-cols-[minmax(16rem,1fr)_12rem_13rem_auto]'}`}>
+              <div className="sm:col-span-2 lg:col-span-1">
                 <label htmlFor="device-search" className="field-label">{t('devices.filter.searchLabel')}</label>
                 <div className="relative">
                   <Icon name="search" size={18} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -521,7 +521,7 @@ export default function DevicesPage() {
                   </div>
                 </div>
               )}
-              <div className="flex min-h-11 items-center justify-between gap-3 px-1 text-sm text-muted-foreground lg:justify-end">
+              <div className="flex min-h-11 items-center justify-between gap-3 px-1 text-sm text-muted-foreground sm:col-span-2 lg:col-span-1 lg:justify-end">
                 <span>
                   {t('devices.pagination.range', { from: rangeFrom, to: rangeTo, total: paging.total })}
                   {contractFiltered && <> · <strong className="data-value">{visibleDevices.length}</strong> {t('devices.shownLabel')}</>}
@@ -648,18 +648,21 @@ export default function DevicesPage() {
                       <article key={device._id} className="mobile-data-card">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-1">
                               {canBatch && (
-                                <input
-                                  type="checkbox"
-                                  aria-label={t('devices.batch.selectOne', { device: device.SerialNumber || device._id })}
-                                  checked={selected.has(device._id)}
-                                  onChange={() => setSelected((current) => toggleOne(current, { id: device._id, label: device.SerialNumber || device._id }))}
-                                />
+                                <label className="-ms-2 flex size-10 shrink-0 cursor-pointer items-center justify-center">
+                                  <input
+                                    type="checkbox"
+                                    className="size-4"
+                                    aria-label={t('devices.batch.selectOne', { device: device.SerialNumber || device._id })}
+                                    checked={selected.has(device._id)}
+                                    onChange={() => setSelected((current) => toggleOne(current, { id: device._id, label: device.SerialNumber || device._id }))}
+                                  />
+                                </label>
                               )}
                               <DeviceStatus device={device} />
                             </div>
-                            <Link to={`/devices/detail?id=${encodeURIComponent(device._id)}`} className="mt-2 block truncate font-mono text-sm font-semibold text-primary">
+                            <Link to={`/devices/detail?id=${encodeURIComponent(device._id)}`} className="mt-2 block break-all font-mono text-sm font-semibold text-primary">
                               {device.SerialNumber || device._id}
                             </Link>
                             <p className="mt-1 truncate text-xs text-muted-foreground">{device.brand} · {device.productclass || t('devices.unknownModel')}</p>
@@ -669,9 +672,9 @@ export default function DevicesPage() {
                           </Link>
                         </div>
                         <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-border pt-4 text-sm">
-                          <div><dt className="text-xs text-muted-foreground">PPPoE</dt><dd className="mt-1 truncate font-mono text-xs">{device.pppoe || t('devices.notReported')}</dd></div>
-                          <div><dt className="text-xs text-muted-foreground">{t('devices.table.customerId')}</dt><dd className="mt-1 truncate font-mono text-xs font-semibold">{device.customerId || t('devices.notGenerated')}</dd></div>
-                          {sgpAvailable && <div className="col-span-2"><dt className="text-xs text-muted-foreground">{t('devices.sgp.column')}</dt><dd className="mt-1">{renderSgpCell(device)}</dd></div>}
+                          <div className="min-w-0"><dt className="text-xs text-muted-foreground">PPPoE</dt><dd className="mt-1 truncate font-mono text-xs">{device.pppoe || t('devices.notReported')}</dd></div>
+                          <div className="min-w-0"><dt className="text-xs text-muted-foreground">{t('devices.table.customerId')}</dt><dd className="mt-1 truncate font-mono text-xs font-semibold">{device.customerId || t('devices.notGenerated')}</dd></div>
+                          {sgpAvailable && <div className="col-span-2 min-w-0"><dt className="text-xs text-muted-foreground">{t('devices.sgp.column')}</dt><dd className="mt-1">{renderSgpCell(device)}</dd></div>}
                           <div><dt className="text-xs text-muted-foreground">{t('devices.table.opticalRx')}</dt><dd className={`mt-1 font-mono text-xs font-semibold ${signalInfo.color}`}>{device.rxpower ?? t('common.na')}{device.rxpower !== null && device.rxpower !== undefined ? ' dBm' : ''}</dd></div>
                           <div className="col-span-2"><dt className="text-xs text-muted-foreground">{t('devices.table.lastInform')}</dt><dd className="mt-1 text-xs">{formatDate(device._lastInform)}</dd></div>
                         </dl>
@@ -688,21 +691,21 @@ export default function DevicesPage() {
                     {t('devices.pagination.range', { from: rangeFrom, to: rangeTo, total: paging.total })}
                     {contractFiltered && <> · <strong className="data-value">{visibleDevices.length}</strong> {t('devices.shownLabel')}</>}
                   </p>
-                  <div className="flex items-center gap-2">
+                  <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-start">
                     <button
                       type="button"
-                      className="modern-button-secondary"
+                      className="modern-button-secondary px-3 sm:px-4"
                       onClick={() => setPage((value) => Math.max(1, value - 1))}
                       disabled={loading || paging.page <= 1}
                     >
                       <Icon name="chevron-left" size={17} /> {t('devices.pagination.previous')}
                     </button>
-                    <span className="px-1 text-sm text-muted-foreground">
+                    <span className="px-1 text-center text-sm text-muted-foreground">
                       {t('devices.pagination.pageOf', { page: paging.page, totalPages: Math.max(1, paging.totalPages) })}
                     </span>
                     <button
                       type="button"
-                      className="modern-button-secondary"
+                      className="modern-button-secondary px-3 sm:px-4"
                       onClick={() => setPage((value) => value + 1)}
                       disabled={loading || paging.page >= paging.totalPages}
                     >

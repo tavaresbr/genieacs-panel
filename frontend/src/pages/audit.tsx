@@ -24,9 +24,9 @@ function Detalhe({ detail }: { detail: Record<string, unknown> | null }) {
   return (
     <div className="space-y-0.5">
       {visiveis.map(([chave, valor]) => (
-        <div key={chave}>
+        <div key={chave} className="break-words">
           <span className="text-muted-foreground">{chave}: </span>
-          <span className="text-foreground">
+          <span className="text-foreground [overflow-wrap:anywhere]">
             {valor === null || valor === undefined
               ? '—'
               : typeof valor === 'object'
@@ -163,44 +163,70 @@ export default function AuditPage() {
         ) : entries.length === 0 ? (
           <p className="text-sm text-muted-foreground">{t('audit.empty')}</p>
         ) : (
-          <div className="modern-card overflow-x-auto p-4 sm:p-5">
-            <table className="w-full min-w-[52rem] text-sm">
-              <thead>
-                <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
-                  <th className="py-2 pe-3 font-medium">{t('audit.column.when')}</th>
-                  <th className="py-2 pe-3 font-medium">{t('audit.column.action')}</th>
-                  <th className="py-2 pe-3 font-medium">{t('audit.column.actor')}</th>
-                  <th className="py-2 pe-3 font-medium">{t('audit.column.subject')}</th>
-                  <th className="py-2 pe-3 font-medium">{t('audit.column.detail')}</th>
-                  <th className="py-2 font-medium">{t('audit.column.ip')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {entries.map((entry) => (
-                  <tr key={entry.id} className="border-t border-border align-top">
-                    <td className="whitespace-nowrap py-2 pe-3 text-muted-foreground">
-                      {formatDateTime(entry.at)}
-                    </td>
-                    <td className="py-2 pe-3"><Acao action={entry.action} /></td>
-                    <td className="whitespace-nowrap py-2 pe-3"><Ator actor={entry.actor} /></td>
-                    <td className="py-2 pe-3 text-xs text-muted-foreground">
-                      {entry.subject.type
-                        ? <>{entry.subject.type}{entry.subject.id ? ` #${entry.subject.id}` : ''}</>
-                        : '—'}
-                    </td>
-                    <td className="py-2 pe-3 text-xs"><Detalhe detail={entry.detail} /></td>
-                    <td className="whitespace-nowrap py-2 text-xs text-muted-foreground">
-                      {entry.ip || '—'}
-                    </td>
+          <div className="modern-card p-4 sm:p-5">
+            <div className="desktop-table overflow-x-auto">
+              <table className="w-full min-w-[52rem] text-sm">
+                <thead>
+                  <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
+                    <th className="py-2 pe-3 font-medium">{t('audit.column.when')}</th>
+                    <th className="py-2 pe-3 font-medium">{t('audit.column.action')}</th>
+                    <th className="py-2 pe-3 font-medium">{t('audit.column.actor')}</th>
+                    <th className="py-2 pe-3 font-medium">{t('audit.column.subject')}</th>
+                    <th className="py-2 pe-3 font-medium">{t('audit.column.detail')}</th>
+                    <th className="py-2 font-medium">{t('audit.column.ip')}</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {entries.map((entry) => (
+                    <tr key={entry.id} className="border-t border-border align-top">
+                      <td className="whitespace-nowrap py-2 pe-3 text-muted-foreground">
+                        {formatDateTime(entry.at)}
+                      </td>
+                      <td className="py-2 pe-3"><Acao action={entry.action} /></td>
+                      <td className="whitespace-nowrap py-2 pe-3"><Ator actor={entry.actor} /></td>
+                      <td className="py-2 pe-3 text-xs text-muted-foreground">
+                        {entry.subject.type
+                          ? <>{entry.subject.type}{entry.subject.id ? ` #${entry.subject.id}` : ''}</>
+                          : '—'}
+                      </td>
+                      <td className="py-2 pe-3 text-xs"><Detalhe detail={entry.detail} /></td>
+                      <td className="whitespace-nowrap py-2 text-xs text-muted-foreground">
+                        {entry.ip || '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* No celular cada linha vira um bloco: seis colunas não cabem, e
+                rolar de lado esconderia justamente o detalhe. */}
+            <ul className="mobile-card-list divide-y divide-border">
+              {entries.map((entry) => (
+                <li key={entry.id} className="space-y-1.5 py-3 text-sm first:pt-0">
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                    <span className="min-w-0 font-medium [overflow-wrap:anywhere]"><Acao action={entry.action} /></span>
+                    <span className="text-xs text-muted-foreground">{formatDateTime(entry.at)}</span>
+                  </div>
+                  <div className="text-xs [overflow-wrap:anywhere]"><Ator actor={entry.actor} /></div>
+                  {(entry.subject.type || entry.ip) && (
+                    <p className="text-xs text-muted-foreground [overflow-wrap:anywhere]">
+                      {entry.subject.type && <>{entry.subject.type}{entry.subject.id ? ` #${entry.subject.id}` : ''}</>}
+                      {entry.subject.type && entry.ip ? ' · ' : ''}
+                      {entry.ip}
+                    </p>
+                  )}
+                  {entry.detail && Object.keys(entry.detail).length > 0 && (
+                    <div className="rounded-md bg-muted/50 p-2 text-xs"><Detalhe detail={entry.detail} /></div>
+                  )}
+                </li>
+              ))}
+            </ul>
 
             {nextBefore !== null && (
               <div className="mt-4">
                 <button
-                  type="button" className="modern-button-secondary" disabled={loading}
+                  type="button" className="modern-button-secondary w-full sm:w-auto" disabled={loading}
                   onClick={() => void carregar(nextBefore, filtro)}
                 >
                   {loading ? t('common.loading') : t('audit.loadMore')}

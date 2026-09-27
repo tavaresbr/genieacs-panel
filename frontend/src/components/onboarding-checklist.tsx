@@ -113,7 +113,7 @@ export function OnboardingChecklist() {
               {done ? (
                 <span className="modern-badge-success">{t('onboarding.checklist.done')}</span>
               ) : item.href ? (
-                <Link to={item.href} className="modern-button-secondary min-h-9 px-3 py-1 text-xs">
+                <Link to={item.href} className="modern-button-secondary min-h-10 px-3 py-1 text-xs lg:min-h-9">
                   {t(key === 'firstDevice' ? 'onboarding.checklist.view' : 'onboarding.checklist.configure')}
                 </Link>
               ) : (

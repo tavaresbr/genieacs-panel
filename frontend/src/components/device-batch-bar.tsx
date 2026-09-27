@@ -98,27 +98,29 @@ export function DeviceBatchBar({
   return (
     <>
       {selection.size > 0 && (
-        <div className="sticky top-[4.5rem] z-20 mb-3 flex lg:top-2 flex-wrap items-center gap-3 rounded-lg border border-primary/40 bg-card px-4 py-3 shadow-sm" role="region" aria-label={t('devices.batch.aria')}>
+        // No celular a barra fica compacta — contagem e "limpar" numa linha, as
+        // duas ações lado a lado na outra — porque ela gruda no topo e come a tela.
+        <div className="sticky top-[4.5rem] z-20 mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-primary/40 bg-card px-3 py-2.5 shadow-sm sm:gap-3 sm:px-4 sm:py-3 lg:top-2" role="region" aria-label={t('devices.batch.aria')}>
           <span className="text-sm font-semibold text-foreground">
             {t('devices.batch.selected', { count: String(selection.size) })}
           </span>
+          <button type="button" className="modern-button-secondary ms-auto whitespace-nowrap px-3 sm:order-1 sm:px-4" onClick={onClear}>
+            {t('devices.batch.clear')}
+          </button>
           {selection.size >= BATCH_LIMIT && (
-            <span className="text-xs text-[hsl(var(--status-warning))]">{t('devices.batch.limitReached', { limit: String(BATCH_LIMIT) })}</span>
+            <span className="order-1 text-xs text-[hsl(var(--status-warning))] sm:order-none">{t('devices.batch.limitReached', { limit: String(BATCH_LIMIT) })}</span>
           )}
           {canSelectAll && (
-            <button type="button" className="text-sm font-semibold text-primary hover:underline disabled:opacity-60" disabled={selectingAll} onClick={onSelectAll}>
+            <button type="button" className="order-1 min-h-10 text-start text-sm font-semibold text-primary hover:underline disabled:opacity-60 sm:order-none sm:min-h-0" disabled={selectingAll} onClick={onSelectAll}>
               {selectingAll ? t('devices.batch.selectingAll') : t('devices.batch.selectAll', { count: String(filterTotal) })}
             </button>
           )}
-          <div className="ms-auto flex flex-wrap items-center gap-2">
-            <button type="button" className="modern-button-secondary" onClick={onClear}>
-              {t('devices.batch.clear')}
-            </button>
-            <button type="button" className="modern-button-secondary" onClick={() => void abrirFirmware()}>
+          <div className="order-2 grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
+            <button type="button" className="modern-button-secondary whitespace-nowrap px-3 sm:px-4" onClick={() => void abrirFirmware()}>
               <Icon name="box" size={16} />
               {t('devices.batch.firmware')}
             </button>
-            <button type="button" className="modern-button" onClick={() => setConfirmando('reboot')}>
+            <button type="button" className="modern-button whitespace-nowrap px-3 sm:px-4" onClick={() => setConfirmando('reboot')}>
               <Icon name="power" size={16} />
               {t('devices.batch.reboot')}
             </button>
@@ -128,8 +130,8 @@ export function DeviceBatchBar({
 
       {confirmando && (
         <div className="fixed inset-0 z-[2100] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="batch-confirm-title">
-          <div className="modern-card w-full max-w-md">
-            <div className="flex items-center gap-2 border-b border-border p-5">
+          <div className="modern-card flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col">
+            <div className="flex items-center gap-2 border-b border-border p-4 sm:p-5">
               <Icon name="warning" size={20} className="shrink-0 text-[hsl(var(--status-warning))]" />
               <h3 id="batch-confirm-title" className="text-lg font-semibold text-foreground">
                 {confirmando === 'firmware'
@@ -137,7 +139,7 @@ export function DeviceBatchBar({
                   : t('devices.batch.confirmTitle', { count: String(selection.size) })}
               </h3>
             </div>
-            <div className="max-h-[60vh] space-y-3 overflow-auto p-5 text-sm leading-6">
+            <div className="max-h-[60vh] min-h-0 flex-1 space-y-3 overflow-auto p-4 text-sm leading-6 sm:p-5">
               {confirmando === 'firmware' && (
                 <>
                   {!catalogo && !catalogoErro && <p className="text-muted-foreground">{t('devices.batch.firmwareLoading')}</p>}
@@ -171,7 +173,7 @@ export function DeviceBatchBar({
                 {[...selection.values()].join(' · ')}
               </p>
             </div>
-            <div className="flex items-center justify-end gap-3 border-t border-border p-5">
+            <div className="flex flex-wrap items-center justify-end gap-3 border-t border-border p-4 sm:p-5">
               <button type="button" className="modern-button-secondary" onClick={() => setConfirmando(null)} disabled={enviando}>
                 {t('common.cancel')}
               </button>
@@ -196,7 +198,7 @@ export function DeviceBatchBar({
       {resultado && (
         <div className="fixed inset-0 z-[2100] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="batch-result-title">
           <div className="modern-card flex max-h-[85vh] w-full max-w-lg flex-col">
-            <div className="border-b border-border p-5">
+            <div className="border-b border-border p-4 sm:p-5">
               <h3 id="batch-result-title" className="text-lg font-semibold text-foreground">{t('devices.batch.resultTitle')}</h3>
               <p className="mt-1 text-sm text-muted-foreground">
                 {t('devices.batch.summary', {
@@ -206,10 +208,10 @@ export function DeviceBatchBar({
                 })}
               </p>
             </div>
-            <ul className="flex-1 divide-y divide-border overflow-auto px-5 text-sm">
+            <ul className="min-h-0 flex-1 divide-y divide-border overflow-auto px-4 text-sm sm:px-5">
               {resultado.results.map((item) => (
                 <li key={item.deviceId} className="flex items-center justify-between gap-3 py-2">
-                  <span className="truncate font-mono text-xs">{rotulo(item.deviceId)}</span>
+                  <span className="min-w-0 truncate font-mono text-xs">{rotulo(item.deviceId)}</span>
                   {item.outcome === 'sent' && <span className="modern-badge-success shrink-0">{t('devices.batch.outcome.sent')}</span>}
                   {item.outcome === 'queued' && <span className="modern-badge-warning shrink-0">{t('devices.batch.outcome.queued')}</span>}
                   {item.outcome === 'failed' && (
@@ -218,7 +220,7 @@ export function DeviceBatchBar({
                 </li>
               ))}
             </ul>
-            <div className="flex justify-end border-t border-border p-5">
+            <div className="flex justify-end border-t border-border p-4 sm:p-5">
               <button type="button" className="modern-button" onClick={() => setResultado(null)}>{t('common.close')}</button>
             </div>
           </div>
