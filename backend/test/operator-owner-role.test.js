@@ -4,6 +4,8 @@ import { authHeaders, call, getDb, runInTenant, startTestServers, stopTestServer
 
 const { default: User } = await import('../src/models/User.js');
 const { default: TenantUser } = await import('../src/models/TenantUser.js');
+const { default: PlatformAdmin } = await import('../src/models/PlatformAdmin.js');
+const { default: AuditLog } = await import('../src/models/AuditLog.js');
 
 /**
  * O papel de cima, e as duas portas que dão nele.
@@ -144,6 +146,45 @@ describe('a senha do owner', () => {
     const { status } = await trocarSenha(adminToken, alvo, { password: 'senha-nova-do-mais-um' });
     assert.equal(status, 200);
     assert.equal(await consegueEntrar('mais-um-admin', 'senha-nova-do-mais-um'), true);
+  });
+
+  it('a troca feita pela equipe fica na trilha, sem a senha', async () => {
+    const alvo = await criar('com-trilha', 'senha-da-trilha-1', 'tech');
+    const { status } = await trocarSenha(adminToken, alvo, { password: 'senha-nova-da-trilha' });
+    assert.equal(status, 200);
+    const linha = await getDb()('audit_log')
+      .where({ action: AuditLog.ACTIONS.OPERATOR_PASSWORD_SET, subject_id: String(alvo) })
+      .first();
+    assert.ok(linha, 'a troca de senha não deixou rastro');
+    assert.equal(linha.actor_user_id, adminId);
+    assert.deepEqual(JSON.parse(linha.detail), { username: 'com-trilha' });
+  });
+});
+
+describe('a senha de quem opera a plataforma', () => {
+  // Com a senha, o console: todos os provedores, personificação, cobrança. Um
+  // provedor não pode defini-la — nem o admin, nem o owner, nem junto com o papel.
+  const trocarSenha = (token, id, body) => call(`${panelUrl}/api/users/${id}`, {
+    method: 'PATCH', headers: authHeaders(token), body
+  });
+
+  it('ninguém do provedor troca, e nada muda', async () => {
+    const alvo = await criar('suporte-plataforma', 'senha-do-suporte-1', 'tech');
+    await PlatformAdmin.add(alvo);
+    try {
+      for (const token of [adminToken, ownerToken]) {
+        const { status, body } = await trocarSenha(token, alvo, { role: 'viewer', password: 'senha-do-provedor-1' });
+        assert.equal(status, 409, JSON.stringify(body));
+        assert.equal(body.code, 'password_platform');
+      }
+      assert.equal((await papelDe(alvo)).role, 'tech', 'o papel mudou antes da recusa');
+      const entra = await call(`${panelUrl}/api/auth/login`, {
+        method: 'POST', body: { username: 'suporte-plataforma', password: 'senha-do-provedor-1' }
+      });
+      assert.notEqual(entra.status, 200, 'a senha escolhida pelo provedor entrou na conta da plataforma');
+    } finally {
+      await PlatformAdmin.remove(alvo);
+    }
   });
 });
 

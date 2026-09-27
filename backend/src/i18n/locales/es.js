@@ -688,6 +688,7 @@ export default {
   'users.mfaResetSelf': 'Para desactivar su propio inicio de sesión en dos pasos, use la tarjeta de su cuenta',
   'users.mfaElsewhere': 'Este operador también trabaja en otro proveedor; su inicio de sesión en dos pasos solo puede desactivarse en el servidor',
   'users.mfaPlatform': 'Este operador también administra la plataforma; su inicio de sesión en dos pasos solo puede desactivarse en el servidor',
+  'users.passwordPlatform': 'Este operador también administra la plataforma; solo él puede cambiar su contraseña',
   'users.mfaReset': 'Inicio de sesión en dos pasos desactivado; las sesiones del operador se cerraron',
   'users.updated': 'Operador actualizado',
   'users.updateFailed': 'No se pudo actualizar el operador',

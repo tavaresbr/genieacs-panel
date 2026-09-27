@@ -691,6 +691,7 @@ export default {
   'users.mfaResetSelf': 'To turn off your own two-step login, use your account card',
   'users.mfaElsewhere': 'This operator also works for another provider; their two-step login can only be turned off on the server',
   'users.mfaPlatform': 'This operator also administers the platform; their two-step login can only be turned off on the server',
+  'users.passwordPlatform': 'This operator also administers the platform; only they can change their password',
   'users.mfaReset': 'Two-step login turned off; the operator\'s sessions were ended',
   'users.updated': 'Operator updated',
   'users.updateFailed': 'Failed to update the operator',

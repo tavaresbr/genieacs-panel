@@ -690,6 +690,7 @@ export default {
   'users.mfaResetSelf': 'Para desligar o seu próprio login em duas etapas, use o cartão da sua conta',
   'users.mfaElsewhere': 'Este operador também trabalha em outro provedor; o login em duas etapas dele só pode ser desligado pelo servidor',
   'users.mfaPlatform': 'Este operador também administra a plataforma; o login em duas etapas dele só pode ser desligado pelo servidor',
+  'users.passwordPlatform': 'Este operador também administra a plataforma; a senha dele só pode ser trocada por ele mesmo',
   'users.mfaReset': 'Login em duas etapas desligado; as sessões do operador foram encerradas',
   'users.updated': 'Operador atualizado',
   'users.updateFailed': 'Não foi possível atualizar o operador',

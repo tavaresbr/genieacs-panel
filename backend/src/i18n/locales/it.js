@@ -689,6 +689,7 @@ export default {
   'users.mfaResetSelf': 'Per disattivare il tuo accesso in due passaggi, usa la scheda del tuo account',
   'users.mfaElsewhere': 'Questo operatore lavora anche per un altro provider; il suo accesso in due passaggi può essere disattivato solo sul server',
   'users.mfaPlatform': 'Questo operatore amministra anche la piattaforma; il suo accesso in due passaggi può essere disattivato solo sul server',
+  'users.passwordPlatform': 'Questo operatore amministra anche la piattaforma; solo lui può cambiare la propria password',
   'users.mfaReset': 'Accesso in due passaggi disattivato; le sessioni dell\'operatore sono state chiuse',
   'users.updated': 'Operatore aggiornato',
   'users.updateFailed': 'Impossibile aggiornare l’operatore',
