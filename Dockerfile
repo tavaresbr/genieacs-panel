@@ -40,6 +40,13 @@ WORKDIR /app/backend
 COPY --from=backend-deps /app/backend/node_modules ./node_modules
 COPY backend/ ./
 COPY --from=frontend-build /app/frontend/dist /app/frontend/dist
+# O instalador do agente do GenieACS, que o painel serve em
+# `/api/genieacs-agent/install.sh`. A imagem não leva `deploy/` (o
+# `.dockerignore` o exclui: é o instalador do self-hosted, o compose e o proxy,
+# nada que rode aqui dentro), mas este arquivo é conteúdo servido pelo painel, e
+# a rota o procura relativo ao próprio módulo — `/app/backend/src/routes` →
+# `/app/deploy`. Só ele, e com a exceção correspondente no `.dockerignore`.
+COPY deploy/install-agent.sh /app/deploy/install-agent.sh
 
 RUN mkdir -p /var/lib/skygenpanel && chown -R node:node /var/lib/skygenpanel
 

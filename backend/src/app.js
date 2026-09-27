@@ -54,6 +54,7 @@ import { WA_WEBHOOK_PATH } from './config/waWebhookPath.js';
 import whatsappMediaRoutes from './routes/whatsappMedia.js';
 import { ATTACHMENT_PATH, attachmentRawBody } from './services/waAttachmentService.js';
 import provisioningRoutes from './routes/provisioning.js';
+import genieacsAgentFileRoutes from './routes/genieacsAgentFiles.js';
 import { WEBHOOK_PATH } from './services/sgpService.js';
 
 dotenv.config();
@@ -276,6 +277,15 @@ app.use('/api/auth/signup', authLimiter);
 // visible on every other path under `/api` too, so it is not this route's to
 // fix. The reasoning is in `tenantController.js`.
 app.use('/api/tenant', tenantRoutes);
+
+// O instalador e o programa do agente do GenieACS, públicos e sem segredo.
+// Abaixo do resolvedor por um motivo só: o instalador sai com a origem do
+// painel como padrão de PANEL_URL, e essa origem é a do provedor que o
+// resolvedor já conferiu no banco — nunca o `Host` cru. No ápice os dois
+// caminhos estão em `PLATFORM_HOST_PATHS`, porque é de lá que o console mostra o
+// comando de instalação. A conexão do agente em si (`/connect`) não passa por
+// aqui: é o upgrade de WebSocket, atendido no servidor HTTP.
+app.use('/api/genieacs-agent', genieacsAgentFileRoutes);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/devices', deviceRoutes);

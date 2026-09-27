@@ -62,7 +62,14 @@ const PUBLICAS = new Map([
   ['POST /api/customer/login', 'a porta de entrada do assinante, no listener do portal'],
   ['POST /api/auth/password-reset', 'quem perdeu a senha não tem sessão; responde a MESMA coisa exista a conta ou não, e a prova está em password-reset.test.js'],
   ['POST /api/auth/password-reset/confirm', 'o bilhete do e-mail É a credencial: uso único, meia hora, conferido por hash, contra o provedor do host e contra o endereço atual da conta'],
-  ['POST /api/auth/email/verify/confirm', 'idem, e é aberto do celular, onde não há sessão — pedir login para confirmar um link de e-mail é ensinar a equipe a cair em phishing']
+  ['POST /api/auth/email/verify/confirm', 'idem, e é aberto do celular, onde não há sessão — pedir login para confirmar um link de e-mail é ensinar a equipe a cair em phishing'],
+  // Os dois arquivos do agente do GenieACS. Quem os baixa é o `curl` na máquina
+  // do provedor, que não tem sessão nem deve ter: a credencial do agente é a
+  // chave, digitada lá, e nenhum dos dois arquivos a carrega. A prova do que
+  // sai (origem conferida, nenhum segredo, 404 limpo) está em
+  // genieacs-agent-files.test.js.
+  ['GET /api/genieacs-agent/install.sh', 'o instalador do agente: arquivo do disco sem segredo, com a origem do painel vinda do resolvedor, nunca do Host cru'],
+  ['GET /api/genieacs-agent/agent.mjs', 'o programa do agente, na versão deste painel: arquivo do disco sem segredo, inútil sem a chave']
 ]);
 
 /**
@@ -488,9 +495,16 @@ describe('a allowlist do endereço da plataforma', () => {
     return [...bloco[0].matchAll(/'([^']+)'/g)].map((m) => m[1]);
   };
 
-  it('serve por caminho exato só o perfil público e o cadastro', () => {
+  // Os dois arquivos do agente entraram de propósito: o console gera a chave
+  // de um provedor no ápice e mostra o comando de instalação com a origem de
+  // lá. Não leem dado de provedor nenhum — são dois arquivos do disco —, e a
+  // origem que o instalador leva no ápice é o domínio-base configurado, nunca o
+  // Host (prova em genieacs-agent-files-subdomain.test.js).
+  it('serve por caminho exato só o perfil público, o cadastro e os arquivos do agente', () => {
     assert.deepEqual(listaDe('PLATFORM_HOST_PATHS').sort(), [
       '/api/auth/signup',
+      '/api/genieacs-agent/agent.mjs',
+      '/api/genieacs-agent/install.sh',
       '/api/tenant/public'
     ]);
   });
