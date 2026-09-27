@@ -84,6 +84,16 @@ class ChargeIssuingService {
   static RETRY_AFTER_MS = 60 * 60 * 1000;
 
   /**
+   * Por quanto tempo quem vai emitir fica dono da linha (`issuing_until`).
+   *
+   * Folga larga sobre o prazo da chamada ao gateway (vinte segundos, em
+   * `asaasClient`): a garra só precisa durar mais que a chamada, e vencer
+   * sozinha quando o processo morre no meio dela — dois minutos depois,
+   * alguém retoma a linha em vez de ela ficar presa para sempre.
+   */
+  static CLAIM_MS = 2 * 60 * 1000;
+
+  /**
    * O fuso em que uma data de cobrança é lida.
    *
    * `toISOString()` é UTC, e o gateway lê `dueDate` no horário do Brasil: um
@@ -141,9 +151,40 @@ class ChargeIssuingService {
    *
    * Devolve `{ issued, reason }` e nunca lança: como o aviso, é um job, e
    * `{ issued: false, reason }` é o caso normal — a esmagadora maioria das
-   * passadas não tem nada a fazer.
+   * passadas não tem nada a fazer. Quando há uma linha do período no fim da
+   * conversa — emitida agora ou já emitida antes —, ela vem em `charge`, que é
+   * o que o "pagar agora" devolve à tela.
+   *
+   * ## `manual: true` — alguém clicou "pagar agora"
+   *
+   * O agendador pergunta "já é hora?"; o provedor que clica está dizendo que é.
+   * Três guardas existem por causa da máquina, e com uma pessoa do outro lado
+   * cedem:
+   *
+   *   - a antecedência (`not_due_yet`): quem quer pagar hoje a fatura que vence
+   *     daqui a vinte dias não precisa esperar a janela de cinco;
+   *   - o teto de tentativas (`gave_up`) e a espera entre elas (`backing_off`):
+   *     os dois existem para o agendador não martelar o gateway a cada minuto,
+   *     e um clique não é um laço. As tentativas voltam a zero — a pessoa está
+   *     olhando, e o que der errado ela lê na hora;
+   *   - a cobrança do período que foi CANCELADA (a troca para um plano de graça
+   *     e de volta, o console) volta a ser emitida, com o preço de agora: quem
+   *     pede para pagar um período que tem cobrança cancelada está pedindo a
+   *     cobrança, e "já está resolvido" seria mentira.
+   *
+   * E a assinatura sem prazo nenhum (`renews_at` e `trial_ends_at` nulos — a
+   * que o console pôs num plano sem nunca registrar pagamento) ganha um: o da
+   * cobrança em aberto, se houver, senão hoje. Para o agendador ela não tem o
+   * que cobrar; para quem clicou, tem, e o pagamento é o que a põe num ciclo.
+   * A cobrança em aberto vem antes de "hoje" para que o clique de amanhã ache
+   * a de hoje em vez de abrir outra com a chave de amanhã.
+   *
+   * O que NÃO cede: plataforma, provedor sem gateway que emita, gateway sem
+   * chave, assinatura parada por gente, plano de graça, e a cobrança já
+   * emitida (`already_issued`, agora COM a linha) — pagar agora a que já está
+   * na mão do provedor é pagar ESSA, e não emitir outra.
    */
-  static async issueCurrent({ now = new Date(), tenant: doLaco = null } = {}) {
+  static async issueCurrent({ now = new Date(), tenant: doLaco = null, manual = false } = {}) {
     const tenant = doLaco ?? await Tenant.findById(currentTenantId());
     if (!tenant) return { issued: false, reason: 'tenant_gone' };
 
@@ -198,12 +239,26 @@ class ChargeIssuingService {
     // O prazo vivo: o do período pago, ou o do teste para quem ainda não pagou
     // nenhuma vez — e é justamente o fim do teste que precisa de cobrança, ou o
     // primeiro pagamento nunca acontece.
-    const prazo = subscription.renews_at ?? subscription.trial_ends_at;
+    let prazo = subscription.renews_at ?? subscription.trial_ends_at;
+    // A chave do período, quando ela vem pronta de uma linha e não de um
+    // instante: `period_end` já é a data no fuso da cobrança, e passá-la por
+    // `new Date` e `periodKey` de novo a leria como meia-noite UTC — o dia
+    // ANTERIOR em São Paulo, e uma segunda cobrança com a chave errada.
+    let periodoPronto = null;
+    if (!prazo && manual) {
+      const aberta = await BillingCharge.currentOpen();
+      if (aberta) {
+        periodoPronto = String(aberta.period_end).slice(0, 10);
+        prazo = new Date(`${periodoPronto}T12:00:00-03:00`);
+      } else {
+        prazo = now;
+      }
+    }
     if (!prazo) return { issued: false, reason: 'no_deadline' };
     const vencimento = new Date(prazo);
     if (Number.isNaN(vencimento.getTime())) return { issued: false, reason: 'no_deadline' };
 
-    const periodo = this.periodKey(vencimento);
+    const periodo = periodoPronto ?? this.periodKey(vencimento);
 
     // A faxina vem ANTES da guarda de "ainda não venceu", e essa ordem foi o
     // teste que a encontrou: um provedor que acabou de pagar está, por
@@ -218,27 +273,74 @@ class ChargeIssuingService {
     await this.cancelStale(periodo);
 
     const antecedencia = now.getTime() + this.LEAD_DAYS * 86_400_000;
-    if (vencimento.getTime() > antecedencia) return { issued: false, reason: 'not_due_yet' };
+    if (!manual && vencimento.getTime() > antecedencia) return { issued: false, reason: 'not_due_yet' };
 
-    const existente = await BillingCharge.forPeriod(periodo);
+    const moeda = plan.currency || 'BRL';
+    const garraAte = new Date(now.getTime() + this.CLAIM_MS);
+    let existente = await BillingCharge.forPeriod(periodo);
     if (existente) {
+      // Reaberta pelo clique, com o preço de agora — ver o comentário do método.
+      // Só a cancelada: paga e devolvida continuam fechadas para todo mundo.
+      // Com a garra, como toda escrita que reemite: a troca de plano pode estar
+      // mexendo nesta mesma linha agora.
+      if (manual && existente.status === 'canceled') {
+        const minha = await BillingCharge.claim(existente.id, { until: garraAte, now, unissued: false });
+        if (!minha) return { issued: false, reason: 'raced', charge: existente };
+        const reaberta = await BillingCharge.resetForReissue(existente.id, { amountCents: preco, currency: moeda });
+        if (!reaberta) await BillingCharge.release(existente.id);
+        existente = await BillingCharge.findById(existente.id);
+      }
       // `refunded` também: o período teve cobrança, ela foi paga e devolvida, e
       // emitir outra por cima é decisão de gente, não do agendador.
       if (existente.status === 'paid' || existente.status === 'canceled' || existente.status === 'refunded') {
-        return { issued: false, reason: 'already_settled' };
+        return { issued: false, reason: 'already_settled', charge: existente };
       }
-      if (existente.gateway_charge_id) return { issued: false, reason: 'already_issued' };
-      if (Number(existente.attempts ?? 0) >= this.MAX_ATTEMPTS) {
-        return { issued: false, reason: 'gave_up' };
+      if (existente.gateway_charge_id) return { issued: false, reason: 'already_issued', charge: existente };
+      if (!manual) {
+        if (Number(existente.attempts ?? 0) >= this.MAX_ATTEMPTS) {
+          return { issued: false, reason: 'gave_up', charge: existente };
+        }
+        const espera = existente.next_attempt_at ? new Date(existente.next_attempt_at) : null;
+        if (espera && !Number.isNaN(espera.getTime()) && espera.getTime() > now.getTime()) {
+          return { issued: false, reason: 'backing_off', charge: existente };
+        }
       }
-      const espera = existente.next_attempt_at ? new Date(existente.next_attempt_at) : null;
-      if (espera && !Number.isNaN(espera.getTime()) && espera.getTime() > now.getTime()) {
-        return { issued: false, reason: 'backing_off' };
+
+      // A garra, e só depois dela qualquer escrita e a chamada ao gateway.
+      //
+      // Até aqui tudo foi LEITURA, e duas passadas — o agendador e um clique,
+      // dois cliques, a reemissão da troca de plano — podem ter lido a mesma
+      // linha sem `gateway_charge_id` no mesmo instante. Sem a garra, as duas
+      // criariam uma cobrança de verdade cada uma. Quem perde relê a linha: se
+      // o outro já emitiu, é `already_issued` com ela; se ainda está emitindo,
+      // é `raced`, também com ela — e quem clicou recebe a cobrança do outro
+      // assim que ela sair (ver `SelfBillingService.payNow`).
+      const minha = await BillingCharge.claim(existente.id, { until: garraAte, now });
+      if (!minha) {
+        const agora = await BillingCharge.findById(existente.id);
+        if (agora?.gateway_charge_id) return { issued: false, reason: 'already_issued', charge: agora };
+        return { issued: false, reason: 'raced', charge: agora };
       }
+
+      const patch = {};
+      // O clique não herda a paciência do agendador: zera o que foi contado
+      // por ele, e a tentativa desta pessoa é a primeira.
+      if (manual && (Number(existente.attempts ?? 0) > 0 || existente.next_attempt_at)) {
+        patch.attempts = 0;
+        patch.next_attempt_at = null;
+      }
+      // A linha que vai ser emitida de novo diz o preço de AGORA, que é o que
+      // vai ao gateway logo abaixo. Uma linha aberta com um preço e emitida com
+      // outro faria a conferência do pagamento (`valorPedido`, que lê a linha)
+      // chamar de "pago a menos" quem pagou exatamente o que viu.
+      if (Number(existente.amount_cents) !== preco || String(existente.currency || '').toUpperCase() !== moeda.toUpperCase()) {
+        patch.amount_cents = preco;
+        patch.currency = String(moeda).toUpperCase().slice(0, 3);
+      }
+      if (Object.keys(patch).length) await BillingCharge.update(existente.id, patch);
     }
 
     const vencimentoDoGateway = this.dueDateFor(vencimento, now);
-    const moeda = plan.currency || 'BRL';
 
     let chargeId = existente?.id ?? null;
     if (!chargeId) {
@@ -249,18 +351,23 @@ class ChargeIssuingService {
           amountCents: preco,
           currency: moeda,
           provider: provider.name,
-          dueDate: vencimentoDoGateway
+          dueDate: vencimentoDoGateway,
+          claimUntil: garraAte
         });
       } catch (error) {
         // Duas passadas se cruzaram e a outra ganhou. O índice único é quem
-        // decidiu, e perder aqui é o resultado certo — não é erro.
-        if (isUniqueViolation(error)) return { issued: false, reason: 'raced' };
+        // decidiu, e perder aqui é o resultado certo — não é erro. A linha de
+        // quem ganhou vai junto, para quem clicou.
+        if (isUniqueViolation(error)) {
+          return { issued: false, reason: 'raced', charge: await BillingCharge.forPeriod(periodo) };
+        }
         throw error;
       }
     }
 
+    let criada;
     try {
-      const criada = await provider.createCharge({
+      criada = await provider.createCharge({
         customerRef: tenant.billing_customer_ref,
         amountCents: preco,
         currency: moeda,
@@ -271,19 +378,43 @@ class ChargeIssuingService {
         // no gateway estar ligado a quem se pensa.
         reference: `tenant:${tenant.id}:${periodo}`
       });
-      // A tradução entre os dois vocabulários, num ponto só: o cliente fala a
-      // língua do gateway (`chargeId` é o id DELE) e a tabela fala a do painel
-      // (`gateway_charge_id` é o id de lá, visto daqui).
-      await BillingCharge.markIssued(chargeId, {
-        gatewayChargeId: criada.chargeId,
-        invoiceUrl: criada.invoiceUrl,
-        dueDate: criada.dueDate
-      });
-      return { issued: true, periodEnd: periodo, amountCents: preco, chargeId: criada.chargeId };
     } catch (error) {
       await BillingCharge.markFailed(chargeId, error.message, { retryAfterMs: this.RETRY_AFTER_MS });
       return { issued: false, reason: 'gateway_failed', error: error.message };
     }
+
+    // A tradução entre os dois vocabulários, num ponto só: o cliente fala a
+    // língua do gateway (`chargeId` é o id DELE) e a tabela fala a do painel
+    // (`gateway_charge_id` é o id de lá, visto daqui).
+    const gravada = await BillingCharge.markIssued(chargeId, {
+      gatewayChargeId: criada.chargeId,
+      invoiceUrl: criada.invoiceUrl,
+      dueDate: criada.dueDate
+    });
+    if (!gravada) {
+      // A garra venceu no meio de uma chamada lenta, outra passada a tomou e
+      // gravou primeiro. As duas cobranças existem no gateway; a da linha é a
+      // do outro, e a desta passada é a que sobra — cancelada lá agora, e dita
+      // em voz alta se nem isso der, porque é uma fatura a mais na mão de um
+      // cliente pagante.
+      try {
+        if (typeof provider.cancelCharge === 'function') await provider.cancelCharge(criada.chargeId);
+        console.warn(`Charge row ${chargeId} was issued by another pass; duplicate gateway charge ${criada.chargeId} was canceled`);
+      } catch (error) {
+        console.error(
+          `Charge row ${chargeId} was issued by another pass and duplicate gateway charge ${criada.chargeId} `
+          + `could NOT be canceled — cancel it by hand: ${error.message}`
+        );
+      }
+      return { issued: false, reason: 'raced', charge: await BillingCharge.findById(chargeId) };
+    }
+    return {
+      issued: true,
+      periodEnd: periodo,
+      amountCents: preco,
+      chargeId: criada.chargeId,
+      charge: await BillingCharge.findById(chargeId)
+    };
   }
 }
 

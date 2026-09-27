@@ -1707,6 +1707,9 @@ export const subscriptionAPI = {
    * Emite (ou reaproveita) a cobrança do período e devolve o link de
    * pagamento. Recusa sem cadastro fiscal (`missing_tax_id`,
    * `invalid_tax_id`, `missing_name`) e em plano grátis (`free_plan`).
+   *
+   * 201 (cobrança nova) e 200 (reaproveitada) são ambos sucesso: `request`
+   * olha `response.ok`, não o número, então os dois chegam iguais aqui.
    */
   payNow: () =>
     apiClient.post<{ charge: TenantChargeView }>('/tenant/charges/pay', {})

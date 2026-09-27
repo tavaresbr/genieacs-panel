@@ -8,7 +8,12 @@ import {
   readPublic,
   save
 } from '../services/billing/asaasSettingsService.js';
-import { AsaasError, createCustomer, testConnection } from '../services/billing/asaasClient.js';
+import { AsaasError, testConnection } from '../services/billing/asaasClient.js';
+import {
+  AsaasCustomerError,
+  customerPayloadFor,
+  ensureAsaasCustomer
+} from '../services/billing/asaasCustomerService.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
 
 /**
@@ -64,43 +69,13 @@ function settingsError(res, error) {
   return res.status(error.status || 400).json(createErrorResponse(error.message, null, error.code));
 }
 
-/** Só os dígitos. CPF e CNPJ chegam formatados do cadastro fiscal. */
-const digitos = (valor) => String(valor ?? '').replace(/\D+/g, '');
-
 /**
- * O cadastro fiscal do provedor, nos nomes do gateway.
- *
- * Só os campos preenchidos: o gateway trata `""` como "apague isto" em alguns
- * campos e como inválido em outros, e mandar só o que existe é a forma de não
- * precisar saber qual é qual.
- *
- * O telefone vai como celular quando tem cara de celular — onze dígitos, com o
- * nove na frente do número —, senão como fixo. O gateway manda o aviso de
- * cobrança por SMS só para `mobilePhone`, e um fixo nesse campo é recusado.
+ * O cadastro fiscal nos nomes do gateway mora em `asaasCustomerService`, junto
+ * com a criação do cliente — que deixou de ser só deste controlador quando o
+ * provedor passou a poder pedir "pagar agora" no próprio painel. Reexportado
+ * aqui para quem já o importava deste endereço.
  */
-export function customerPayloadFor(tenant) {
-  const payload = {
-    name: String(tenant.billing_legal_name || tenant.name || '').trim(),
-    cpfCnpj: digitos(tenant.billing_tax_id),
-    externalReference: `tenant:${tenant.id}`,
-    // A plataforma manda os avisos dela (e-mail de vencimento com o link). Os
-    // do gateway por cima seriam o mesmo recado duas vezes, com duas marcas.
-    notificationDisabled: true
-  };
-  const opcional = (chave, valor) => {
-    const texto = String(valor ?? '').trim();
-    if (texto) payload[chave] = texto;
-  };
-  opcional('email', tenant.billing_email);
-  const fone = digitos(tenant.billing_phone);
-  if (fone) payload[/^\d{2}9\d{8}$/.test(fone) ? 'mobilePhone' : 'phone'] = fone;
-  opcional('postalCode', digitos(tenant.billing_postal_code));
-  opcional('address', tenant.billing_address_line);
-  opcional('addressNumber', tenant.billing_address_number);
-  opcional('complement', tenant.billing_address_extra);
-  opcional('province', tenant.billing_district);
-  return payload;
-}
+export { customerPayloadFor };
 
 class PlatformIntegrationsController {
   /** `GET /api/platform/integrations/asaas` */
@@ -232,43 +207,24 @@ class PlatformIntegrationsController {
         ));
       }
 
-      const payload = customerPayloadFor(tenant);
-      if (!payload.cpfCnpj) {
-        return res.status(400).json(createErrorResponse(
-          'The provider has no tax id (CPF/CNPJ) in its billing details', null, 'missing_tax_id'
-        ));
-      }
-      if (payload.cpfCnpj.length !== 11 && payload.cpfCnpj.length !== 14) {
-        return res.status(400).json(createErrorResponse(
-          'The provider tax id must have 11 (CPF) or 14 (CNPJ) digits', null, 'invalid_tax_id'
-        ));
-      }
-      if (!payload.name) {
-        return res.status(400).json(createErrorResponse('The provider has no name', null, 'missing_name'));
-      }
-
-      let customerId;
+      // A criação, a tradução do cadastro e a conferência da corrida são do
+      // serviço, que o "pagar agora" do provedor também usa. O que fica aqui é
+      // o que é do console: o 409 para quem já está ligado (conferido acima,
+      // antes de chamar) e para a corrida perdida — `created: false` depois de
+      // a conferência de cima ter passado quer dizer que outro clique ligou o
+      // provedor enquanto este falava com o gateway.
+      let resultado;
       try {
-        ({ customerId } = await createCustomer(payload));
+        resultado = await ensureAsaasCustomer(id);
       } catch (error) {
-        if (!(error instanceof AsaasError)) throw error;
-        // Sem chave é configuração deste lado; recusa do gateway é o cadastro
-        // (um CNPJ que ele não aceita); o resto é o gateway ou a rede.
-        const status = error.code === 'not_configured' ? 400 : error.code === 'refused' ? 422 : 502;
-        return res.status(status).json(createErrorResponse(error.message, null, error.code));
+        if (!(error instanceof AsaasCustomerError)) throw error;
+        return res.status(error.status).json(createErrorResponse(error.message, null, error.code));
       }
-
-      // Relido antes de gravar: dois cliques quase juntos passariam os dois
-      // pela conferência de cima. O segundo perde aqui, e o cliente que ele
-      // criou no gateway fica no log — órfão, mas achável.
-      const agora = await Tenant.findById(id);
-      if (agora?.billing_customer_ref) {
-        console.warn(`Provider ${id} got linked meanwhile; gateway customer ${customerId} is orphaned`);
+      if (!resultado.created) {
         return res.status(409).json(createErrorResponse(
           'This provider is already linked to a gateway customer', null, 'already_linked'
         ));
       }
-      await Tenant.updateGateway(id, { billing_gateway: 'asaas', billing_customer_ref: customerId });
 
       const registrada = await PlatformAudit.fromRequest(req, {
         action: PlatformAudit.ACTIONS.TENANT_GATEWAY_CUSTOMER_CREATED,

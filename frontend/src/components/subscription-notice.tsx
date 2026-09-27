@@ -13,7 +13,8 @@ import { useAuth } from '@/contexts/auth-context'
 import { useTranslation } from '@/contexts/language-context'
 import { BrandMark } from '@/components/brand-mark'
 import { cobrancaEmAberto } from '@/components/tenant-charges'
-import { payInNewTab } from '@/lib/plan-options'
+import { canGenerateCharge, payInNewTab } from '@/lib/plan-options'
+import type { TenantPlanOption } from '@/lib/api'
 
 /**
  * O que o operador vê quando a assinatura do provedor não deixa passar.
@@ -51,6 +52,9 @@ export function SubscriptionNotice() {
   const [chargesLoaded, setChargesLoaded] = useState(false)
   const [paying, setPaying] = useState(false)
   const [payError, setPayError] = useState<string | null>(null)
+  // O catálogo só serve para saber se o plano atual é pago: no grátis não há
+  // cobrança a gerar. A rota fica fora da porta da assinatura.
+  const [plans, setPlans] = useState<TenantPlanOption[] | null>(null)
 
   useEffect(() => {
     const onBlocked = (event: Event) => {
@@ -67,6 +71,9 @@ export function SubscriptionNotice() {
       // única tela que este operador alcança, então é nele que a saída tem que
       // estar. A rota está fora da porta da assinatura de propósito; sem isso
       // esta chamada responderia o mesmo 402 que trouxe o muro.
+      void subscriptionAPI.plans().then((res) => {
+        if (res.success && res.data) setPlans(res.data)
+      })
       void subscriptionAPI.charges().then((res) => {
         if (res.success && res.data) {
           setPaymentUrl(cobrancaEmAberto(res.data.charges)?.invoiceUrl ?? null)
@@ -80,10 +87,12 @@ export function SubscriptionNotice() {
 
   if (!blocked) return null
 
-  // Sem boleto em aberto, a saída do muro é gerar um. Só para quem escreve
-  // nas configurações — é a mesma permissão que o backend exige — e só depois
-  // de a lista ter voltado, pelo motivo de `chargesLoaded`.
-  const canGenerate = !paymentUrl && chargesLoaded && can('settings.write')
+  // Sem boleto em aberto, a saída do muro é gerar um — quando o bloqueio se
+  // resolve pagando (atraso, teste vencido) e o plano é pago. As regras
+  // moram em `canGenerateCharge`.
+  const canGenerate = canGenerateCharge({
+    code: blocked.code, paymentUrl, chargesLoaded, canWrite: can('settings.write'), plans
+  })
 
   // Síncrono até o `payInNewTab`: a aba nova precisa nascer dentro do clique.
   const generateAndPay = () => {
@@ -93,7 +102,10 @@ export function SubscriptionNotice() {
       setPaying(false)
       const url = res.success ? res.data?.charge?.invoiceUrl ?? null : null
       if (url) setPaymentUrl(url)
-      else setPayError(res.success ? t('plan.payNoLink') : res.message || t('plan.payFailed'))
+      // `busy` também cai aqui: a frase do servidor já diz "tente de novo em
+      // instantes", e o botão volta a ficar habilitado para isso.
+      else if (res.success) setPayError(t('plan.payNoLink'))
+      else setPayError(res.message || t('plan.payFailed'))
     })
   }
 

@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { TenantPlanOption } from '@/lib/api'
 import {
+  canGenerateCharge,
   canPayNow,
   canSwitchTo,
+  isBusy,
   needsBillingProfile,
   overLimitDetail,
   payInNewTab,
@@ -51,6 +53,26 @@ describe('plan-options', () => {
     expect(needsBillingProfile(undefined)).toBe(false)
   })
 
+  it('reconhece o busy', () => {
+    expect(isBusy('busy')).toBe(true)
+    expect(isBusy('gateway_failed')).toBe(false)
+    expect(isBusy(undefined)).toBe(false)
+  })
+
+  it('só oferece gerar cobrança no atraso e no teste vencido, com plano pago', () => {
+    const base = { code: 'subscription_past_due', paymentUrl: null, chargesLoaded: true, canWrite: true, plans: [plano({ current: true })] }
+    expect(canGenerateCharge(base)).toBe(true)
+    expect(canGenerateCharge({ ...base, code: 'subscription_trial_expired' })).toBe(true)
+    expect(canGenerateCharge({ ...base, code: 'subscription_suspended' })).toBe(false)
+    expect(canGenerateCharge({ ...base, code: 'subscription_canceled' })).toBe(false)
+    expect(canGenerateCharge({ ...base, code: 'subscription_missing' })).toBe(false)
+    expect(canGenerateCharge({ ...base, paymentUrl: 'https://pay.test' })).toBe(false)
+    expect(canGenerateCharge({ ...base, chargesLoaded: false })).toBe(false)
+    expect(canGenerateCharge({ ...base, canWrite: false })).toBe(false)
+    expect(canGenerateCharge({ ...base, plans: [plano({ current: true, priceCents: 0 })] })).toBe(false)
+    expect(canGenerateCharge({ ...base, plans: null })).toBe(false)
+  })
+
   describe('payInNewTab', () => {
     afterEach(() => vi.unstubAllGlobals())
 
@@ -68,6 +90,21 @@ describe('plan-options', () => {
       expect(aba.opener).toBeNull()
       expect(aba.location.href).toBe('https://pay.test/1')
       expect(aba.close).not.toHaveBeenCalled()
+    })
+
+    it('trata 201 como 200: sucesso com link navega a aba', async () => {
+      const aba = { opener: {}, location: { href: '' }, close: vi.fn() }
+      vi.stubGlobal('window', { open: vi.fn(() => aba) })
+      await payInNewTab(async () => ({ success: true, data: { charge: { invoiceUrl: 'https://pay.test/2' } as never } }))
+      expect(aba.location.href).toBe('https://pay.test/2')
+    })
+
+    it('fecha a aba no busy', async () => {
+      const aba = { opener: {}, location: { href: '' }, close: vi.fn() }
+      vi.stubGlobal('window', { open: vi.fn(() => aba) })
+      const res = await payInNewTab(async () => ({ success: false, code: 'busy', message: 'Tente de novo' }))
+      expect(isBusy(res.code)).toBe(true)
+      expect(aba.close).toHaveBeenCalled()
     })
 
     it('fecha a aba na recusa', async () => {

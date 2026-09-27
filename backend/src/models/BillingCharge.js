@@ -56,6 +56,13 @@ class BillingCharge {
     return (await tdb('billing_charges', trx).where({ period_end: chave }).first()) || null;
   }
 
+  /** Uma cobrança pelo id da linha, dentro do provedor em escopo. */
+  static async findById(id, trx = null) {
+    const numero = Number(id);
+    if (!Number.isInteger(numero) || numero <= 0) return null;
+    return (await tdb('billing_charges', trx).where({ id: numero }).first()) || null;
+  }
+
   /** A cobrança que o gateway nomeia, dentro do provedor em escopo. */
   static async byGatewayId(gatewayChargeId) {
     const id = String(gatewayChargeId ?? '').slice(0, 128);
@@ -72,8 +79,15 @@ class BillingCharge {
    * O índice único `(tenant_id, period_end)` decide a corrida; esta inserção é
    * o bilhete que a ganha.
    */
-  static async open({ subscriptionId = null, periodEnd, amountCents, currency, provider, dueDate = null }) {
+  static async open({
+    subscriptionId = null, periodEnd, amountCents, currency, provider, dueDate = null, claimUntil = null
+  }) {
     return tinsertReturningId('billing_charges', {
+      // A linha nasce JÁ garrada por quem a inseriu — ver `claim`. Sem isto,
+      // entre a inserção e a chamada ao gateway, outra passada que lesse a
+      // linha nova sem `gateway_charge_id` a tomaria por "falhou no meio" e
+      // emitiria de novo.
+      issuing_until: claimUntil,
       subscription_id: subscriptionId,
       period_end: String(periodEnd).slice(0, 10),
       amount_cents: amountCents,
@@ -90,15 +104,58 @@ class BillingCharge {
     return changed > 0;
   }
 
-  /** O que o gateway devolveu quando a criação deu certo. */
+  /**
+   * O que o gateway devolveu quando a criação deu certo.
+   *
+   * Condicional: só grava numa linha que AINDA não tem id no gateway. A garra
+   * (`claim`) já impede duas emissões da mesma linha; esta condição é a
+   * segunda tranca, para o caso em que a garra venceu no meio de uma chamada
+   * lenta e outro a tomou. Aí as duas cobranças existem no gateway e só uma
+   * pode ficar na linha — a primeira a gravar. Quem chega depois recebe
+   * `false` e é quem precisa cancelar a sua do lado de lá.
+   *
+   * Solta a garra junto: a emissão acabou.
+   */
   static async markIssued(id, { gatewayChargeId, invoiceUrl = null, dueDate = null }) {
-    return BillingCharge.update(id, {
+    const changed = await tdb('billing_charges').where({ id }).whereNull('gateway_charge_id').update({
       gateway_charge_id: String(gatewayChargeId).slice(0, 128),
       invoice_url: invoiceUrl ? String(invoiceUrl).slice(0, 512) : null,
       ...(dueDate ? { due_date: dueDate } : {}),
       status: 'pending',
-      last_error: null
+      last_error: null,
+      issuing_until: null,
+      updated_at: new Date()
     });
+    return changed > 0;
+  }
+
+  /**
+   * Toma a linha para falar com o gateway por ela, até `until` — ou não toma.
+   *
+   * Um `UPDATE` condicional, e só segue quem de fato mudou a linha: é o banco
+   * que decide entre duas passadas que leram a mesma coisa ao mesmo tempo, do
+   * mesmo jeito que o índice único decide entre duas inserções. A garra de
+   * quem morreu no meio vence sozinha (`issuing_until` no passado), e a linha
+   * volta a ser de quem a pedir.
+   *
+   * `unissued: true` (o padrão, que é o da emissão) só toma linha sem id no
+   * gateway: uma linha já emitida não tem mais o que emitir. A troca de plano
+   * pede `false`, porque é justamente a linha emitida que ela vai cancelar e
+   * reemitir.
+   *
+   * @returns {Promise<boolean>} se esta chamada ficou com a linha.
+   */
+  static async claim(id, { until, now = new Date(), unissued = true } = {}) {
+    let query = tdb('billing_charges').where({ id })
+      .where((livre) => livre.whereNull('issuing_until').orWhere('issuing_until', '<', now));
+    if (unissued) query = query.whereNull('gateway_charge_id');
+    const changed = await query.update({ issuing_until: until, updated_at: new Date() });
+    return changed > 0;
+  }
+
+  /** Solta a garra, quando quem a tomou desistiu sem emitir nem falhar. */
+  static async release(id) {
+    return BillingCharge.update(id, { issuing_until: null });
   }
 
   /**
@@ -114,10 +171,116 @@ class BillingCharge {
       status: 'failed',
       last_error: String(motivo ?? '').slice(0, 500),
       next_attempt_at: retryAfterMs > 0 ? new Date(Date.now() + retryAfterMs) : null,
+      // A tentativa acabou, mal, e a linha volta a ser de quem vier depois
+      // da espera.
+      issuing_until: null,
       updated_at: new Date()
     });
     await tdb('billing_charges').where({ id }).increment('attempts', 1);
     return changed > 0;
+  }
+
+  /**
+   * Devolve a cobrança do período ao ponto de partida, com outro valor — para
+   * ser emitida de novo.
+   *
+   * É o que a troca de plano feita pelo provedor faz com a cobrança em aberto
+   * do período: a do gateway (se havia) já foi cancelada lá por quem chama, e
+   * aqui a linha esquece tudo o que dizia respeito a ELA — o id no gateway, a
+   * página de pagamento, as tentativas, o último erro — e fica com o preço
+   * novo, `pending` e sem id. É o estado que a emissão reconhece como "ainda
+   * não saiu", e por isso é o próximo passe dela (ou o "pagar agora") que a
+   * emite, pela porta de sempre.
+   *
+   * A MESMA linha, e não uma nova: o índice único `(tenant_id, period_end)` é
+   * o que impede duas cobranças do mesmo período, e abrir outra linha exigiria
+   * apagar esta — perdendo o histórico de que houve uma cobrança antes.
+   *
+   * `invoice_url` vai junto porque o link antigo leva a uma cobrança apagada;
+   * mostrá-lo na tela do provedor seria mandá-lo pagar o que não existe mais.
+   *
+   * O id velho NÃO some: vai para `superseded_charges`, com o valor que
+   * aquela cobrança pedia. Cancelar no gateway não impede que alguém pague o
+   * boleto velho que já estava impresso, e quando esse pagamento chegar a
+   * conferência precisa saber quanto AQUELA cobrança pedia — ver
+   * `bySupersededGatewayId`.
+   *
+   * Quem chama segura a garra da linha (`claim` com `unissued: false`); a
+   * condição sobre `gateway_charge_id` é a segunda tranca: se a linha mudou
+   * de id entre a leitura e aqui, alguém emitiu no meio, e reescrevê-la
+   * apagaria uma cobrança viva. Devolve `false` nesse caso, e solta a garra
+   * quando dá certo.
+   *
+   * @returns {Promise<boolean>}
+   */
+  static async resetForReissue(id, { amountCents, currency }) {
+    const linha = await BillingCharge.findById(id);
+    if (!linha) return false;
+    const anteriores = BillingCharge.supersededOf(linha);
+    if (linha.gateway_charge_id) {
+      anteriores.push({
+        id: String(linha.gateway_charge_id),
+        amountCents: Number(linha.amount_cents),
+        currency: String(linha.currency || 'BRL').toUpperCase(),
+        at: new Date().toISOString()
+      });
+    }
+    let query = tdb('billing_charges').where({ id });
+    query = linha.gateway_charge_id
+      ? query.where({ gateway_charge_id: linha.gateway_charge_id })
+      : query.whereNull('gateway_charge_id');
+    const changed = await query.update({
+      amount_cents: amountCents,
+      currency: String(currency || 'BRL').toUpperCase().slice(0, 3),
+      gateway_charge_id: null,
+      invoice_url: null,
+      status: 'pending',
+      attempts: 0,
+      next_attempt_at: null,
+      last_error: null,
+      issuing_until: null,
+      superseded_charges: anteriores.length ? JSON.stringify(anteriores) : null,
+      updated_at: new Date()
+    });
+    return changed > 0;
+  }
+
+  /** As cobranças que esta linha já foi, lidas da coluna — nunca lança. */
+  static supersededOf(linha) {
+    if (!linha?.superseded_charges) return [];
+    try {
+      const lista = JSON.parse(linha.superseded_charges);
+      return Array.isArray(lista) ? lista.filter((item) => item && item.id) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * A linha que JÁ FOI a cobrança que o gateway nomeia, e o que ela pedia.
+   *
+   * Só é perguntada quando `byGatewayId` não achou nada: o id é de uma
+   * cobrança que a troca de plano cancelou e substituiu. A busca é um `LIKE`
+   * sobre o JSON (com `!` como escape, que os três bancos aceitam do mesmo
+   * jeito), e a confirmação é pelo JSON lido — o `LIKE` só estreita, quem
+   * decide é a igualdade exata do id.
+   *
+   * @returns {Promise<{ row: object, superseded: { id: string, amountCents: number,
+   *   currency: string } } | null>}
+   */
+  static async bySupersededGatewayId(gatewayChargeId) {
+    const id = String(gatewayChargeId ?? '').slice(0, 128);
+    if (!id) return null;
+    const escapado = JSON.stringify(id).replace(/[!%_]/g, (c) => `!${c}`);
+    const linhas = await tdb('billing_charges')
+      .whereNotNull('superseded_charges')
+      .whereRaw("superseded_charges LIKE ? ESCAPE '!'", [`%${escapado}%`])
+      .limit(5);
+    for (const linha of linhas) {
+      const achada = BillingCharge.supersededOf(linha).find((item) => String(item.id) === id);
+      if (achada) return { row: linha, superseded: achada };
+    }
+    return null;
   }
 
   /** As cobranças ainda em aberto de períodos anteriores a este. */

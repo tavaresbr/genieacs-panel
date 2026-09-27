@@ -111,3 +111,39 @@ export async function payInNewTab(
   }
   return res
 }
+
+/**
+ * `busy`: outra troca ou cobrança deste provedor está em andamento no
+ * servidor. Não é falha — é "tente de novo em instantes", e a tela mostra a
+ * frase do servidor sem o tom de erro.
+ */
+export function isBusy(code: string | undefined) {
+  return code === 'busy'
+}
+
+/**
+ * Os 402 em que "gerar cobrança e pagar" é a saída: atraso e teste vencido (o
+ * período pago vencido chega como `subscription_past_due`, ver
+ * `SubscriptionService.decide`). Suspenso e cancelado são decisão da
+ * plataforma — pagar não os desfaz — e "sem assinatura" não tem o que cobrar.
+ */
+const PAYABLE_GATE_CODES = new Set<string>(['subscription_past_due', 'subscription_trial_expired'])
+
+/**
+ * O muro do 402 oferece "gerar cobrança e pagar"? Só quando o bloqueio se
+ * resolve pagando, não há boleto em aberto (a lista já voltou — sem ela, um
+ * segundo boleto poderia nascer), a pessoa escreve nas configurações e o plano
+ * atual é pago. Sem o catálogo não se sabe o preço, e aí não oferece: no
+ * grátis o backend responderia `free_plan`.
+ */
+export function canGenerateCharge(opts: {
+  code: string
+  paymentUrl: string | null
+  chargesLoaded: boolean
+  canWrite: boolean
+  plans: TenantPlanOption[] | null
+}) {
+  if (!PAYABLE_GATE_CODES.has(opts.code)) return false
+  if (opts.paymentUrl || !opts.chargesLoaded) return false
+  return canPayNow(opts.plans, opts.canWrite)
+}

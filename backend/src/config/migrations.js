@@ -1377,6 +1377,12 @@ const billingChargesTable = (db) => (t) => {
   t.index(['tenant_id', 'status'], 'billing_charges_status_idx');
 };
 
+/** As colunas da 0069 — ver a migração. */
+const BILLING_CHARGE_CLAIM_COLUMNS = [
+  ['issuing_until', (t) => t.timestamp('issuing_until').nullable()],
+  ['superseded_charges', (t) => t.text('superseded_charges').nullable()]
+];
+
 const BILLING_TABLES = [
   ['plans', plansTable],
   ['subscriptions', subscriptionsTable],
@@ -4031,6 +4037,46 @@ export const migrations = [
         // eslint-disable-next-line no-await-in-loop
         await createTableIfMissing(db, nome, construtor(db));
       }
+    }
+  },
+  {
+    /**
+     * A emissão com dono, e a memória das cobranças que foram trocadas.
+     *
+     * `issuing_until` é a garra: quem vai falar com o gateway por uma linha
+     * grava aqui "até quando ela é minha", num `UPDATE` condicional, e só
+     * segue quem de fato mudou a linha. Sem ela, o agendador e um "pagar
+     * agora" (ou dois cliques, ou a troca de plano) que lessem a mesma linha
+     * sem `gateway_charge_id` criariam DUAS cobranças de verdade no gateway —
+     * a leitura de idempotência é leitura, e duas leituras simultâneas
+     * respondem a mesma coisa. Um instante e não um booleano: quem morreu
+     * segurando a garra (o processo caiu no meio da chamada) a solta sozinho
+     * quando o prazo passa, e a linha não fica presa para sempre.
+     *
+     * `superseded_charges` é o que a troca de plano apaga da linha ao
+     * reemitir: o id no gateway da cobrança velha e quanto ELA pedia. Um JSON
+     * numa coluna de texto, e não uma tabela: é histórico de uma linha só,
+     * raro (uma entrada por troca de plano com cobrança em aberto), lido
+     * apenas quando um pagamento chega com um id que nenhuma linha tem — e a
+     * pergunta é a de `valorPedido`: quanto se pediu por AQUELE pagamento.
+     * Sem isto, o pagamento atrasado da cobrança velha seria conferido contra
+     * o preço novo, e quem pagou exatamente o que viu seria "pago a menos".
+     *
+     * Nulas nas linhas que já existem, que é o estado certo das duas: ninguém
+     * está emitindo, e nada foi trocado.
+     */
+    id: '0069_billing_charge_claims',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('billing_charges'))) return true;
+      return (await missingColumns(db, 'billing_charges', BILLING_CHARGE_CLAIM_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('billing_charges'))) return;
+      const missing = await missingColumns(db, 'billing_charges', BILLING_CHARGE_CLAIM_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('billing_charges', (t) => {
+        for (const add of missing) add(t);
+      });
     }
   }
 ];

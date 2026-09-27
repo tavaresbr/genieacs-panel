@@ -13,6 +13,7 @@ import {
   PLAN_RESOURCES,
   canPayNow,
   canSwitchTo,
+  isBusy,
   needsBillingProfile,
   overLimitDetail,
   payInNewTab,
@@ -68,7 +69,9 @@ export default function PlanPage() {
   const [plansError, setPlansError] = useState<string | null>(null)
   const [mudando, setMudando] = useState<number | null>(null)
   const [pagando, setPagando] = useState(false)
-  const [aviso, setAviso] = useState<{ tipo: 'erro' | 'ok'; texto: string } | null>(null)
+  // `info` é o `busy`: outra operação deste provedor em andamento no servidor.
+  // Não é erro — é "tente de novo em instantes" — e não leva o tom vermelho.
+  const [aviso, setAviso] = useState<{ tipo: 'erro' | 'ok' | 'info'; texto: string } | null>(null)
   // Muda a cada troca de plano ou cobrança gerada: é o que faz a lista de
   // cobranças, que carrega sozinha, buscar de novo.
   const [chargesKey, setChargesKey] = useState(0)
@@ -114,6 +117,11 @@ export default function PlanPage() {
       setChargesKey((k) => k + 1)
     } else {
       const acima = overLimitDetail(res)
+      if (isBusy(res.code)) {
+        setAviso({ tipo: 'info', texto: res.message || t('plan.options.changeFailed') })
+        setMudando(null)
+        return
+      }
       setAviso({
         tipo: 'erro',
         texto: acima
@@ -138,6 +146,11 @@ export default function PlanPage() {
         return
       }
       const texto = res.message || t('plan.payFailed')
+      if (isBusy(res.code)) {
+        // A aba em branco já foi fechada por `payInNewTab`.
+        setAviso({ tipo: 'info', texto })
+        return
+      }
       if (needsBillingProfile(res.code)) {
         // O que falta está nesta mesma tela, logo abaixo: leva a pessoa até lá.
         setAviso({ tipo: 'erro', texto: `${texto} ${t('plan.payBillingHint')}` })
@@ -263,7 +276,13 @@ export default function PlanPage() {
         {aviso && (
           <p
             role={aviso.tipo === 'erro' ? 'alert' : 'status'}
-            className={`mt-6 text-sm ${aviso.tipo === 'erro' ? 'text-destructive' : 'text-emerald-700 dark:text-emerald-400'}`}
+            className={`mt-6 text-sm ${
+              aviso.tipo === 'erro'
+                ? 'text-destructive'
+                : aviso.tipo === 'info'
+                  ? 'text-muted-foreground'
+                  : 'text-emerald-700 dark:text-emerald-400'
+            }`}
           >
             {aviso.texto}
           </p>

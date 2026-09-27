@@ -105,6 +105,33 @@ async function valorPedido({ externalId, plano, currency }) {
     }
   }
 
+  // 1b. **A cobrança que a linha JÁ FOI.** A troca de plano cancela no
+  //     gateway a cobrança em aberto e reemite a linha com o preço novo — mas
+  //     o boleto velho pode já estar impresso, e cancelar lá não desfaz um
+  //     pagamento que entrou antes do cancelamento. Esse pagamento chega com
+  //     o id velho, e a pergunta continua sendo "quanto se pediu POR ELE": o
+  //     valor que aquela cobrança tinha, e não o preço novo — senão quem pagou
+  //     exatamente o que viu seria "pago a menos".
+  //
+  //     Em voz alta, porque é o caso em que o provedor pode acabar pagando o
+  //     mesmo período duas vezes: a cobrança nova continua viva no gateway, e
+  //     cancelá-la ou estornar é decisão de gente.
+  if (!cobranca && externalId) {
+    const trocada = await BillingCharge.bySupersededGatewayId(externalId);
+    if (trocada) {
+      console.warn(
+        `Payment ${externalId} settled a SUPERSEDED charge (replaced by charge row ${trocada.row.id} `
+        + `after a plan change); the replacement may still be open at the gateway — review it in the console`
+      );
+      const valor = Number(trocada.superseded.amountCents);
+      if (Number.isFinite(valor) && valor > 0) {
+        const moeda = String(trocada.superseded.currency || '').toUpperCase();
+        if (moeda && moeda !== moedaPaga) return { cents: null, motivo: 'currency_mismatch', fonte: 'charge' };
+        return { cents: Math.floor(valor), motivo: null, fonte: 'superseded_charge' };
+      }
+    }
+  }
+
   const preco = Number(plano?.price_cents);
   if (!Number.isFinite(preco) || preco <= 0) return { cents: null, motivo: 'nothing_asked', fonte: null };
   const moedaPlano = String(plano?.currency || '').toUpperCase();
@@ -282,9 +309,15 @@ class SubscriptionService {
   }
 
   /**
-   * O que o provedor (ou a tela de bloqueio) pode ver da própria assinatura.
-   * Sem preço: o preço é do console, e o que o operador precisa é o estado,
-   * o plano e até quando.
+   * O que o provedor (ou a tela de bloqueio) pode ver da própria assinatura:
+   * o estado, o plano e até quando.
+   *
+   * Sem preço, mas não por o preço ser segredo do console — deixou de ser
+   * quando o provedor passou a escolher o próprio plano. O preço mora em
+   * `GET /api/tenant/plans` (`SelfBillingService.listPlans`), junto do resto
+   * do catálogo, e o valor de fato cobrado mora na cobrança. Este objeto é
+   * também o que a porta da assinatura põe no corpo do 402, e ali a pergunta
+   * é "por que parei", não "quanto custa".
    */
   static present({ subscription, plan }, now = new Date()) {
     if (!subscription) return null;
@@ -446,7 +479,9 @@ class SubscriptionService {
     };
   }
 
-  // ── Mudanças (chamadas pelo console, no escopo do provedor alvo) ─────
+  // ── Mudanças (chamadas pelo console, no escopo do provedor alvo — e, a
+  // troca de plano, também pelo próprio provedor, via `SelfBillingService`,
+  // que confere antes o que só vale para quem troca por dentro) ──────────
 
   /**
    * Troca o plano do provedor em escopo. O status não muda: quem está em
