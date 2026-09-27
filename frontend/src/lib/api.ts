@@ -3575,3 +3575,38 @@ export const whatsappAPI = {
       { phone }
     ),
 }
+
+/** Uma queda em massa que o alerta viu, e o aviso aos clientes atingidos. */
+export interface OutageIncident {
+  id: number
+  nodeId: string
+  nodeName: string
+  status: 'open' | 'resolved'
+  startedAt: string
+  resolvedAt: string | null
+  eta: string | null
+  noticeBody: string | null
+  noticeSentAt: string | null
+  recoverySentAt: string | null
+  /** O texto que sai quando o operador não escreve outro. */
+  defaultNotice: string
+  affected: number
+  /** Telefones distintos com WhatsApp entre os atingidos. */
+  withPhone: number
+  notified: number
+}
+
+export interface OutageIncidentDetail extends OutageIncident {
+  devices: { deviceId: string; contract: string | null; clientName: string | null; hasPhone: boolean; notifiedAt: string | null }[]
+}
+
+export const outagesAPI = {
+  list: () => apiClient.get<{ incidents: OutageIncident[] }>('/whatsapp/outages'),
+  get: (id: number) => apiClient.get<OutageIncidentDetail>(`/whatsapp/outages/${id}`),
+  setEta: (id: number, eta: string) => apiClient.requestWithBody<OutageIncidentDetail>('PATCH', `/whatsapp/outages/${id}`, { eta }),
+  /** Avisa quem ainda não foi avisado. `body` vazio usa o texto padrão. */
+  notify: (id: number, payload: { eta?: string; body?: string }) =>
+    apiClient.post<{ sent: number; skippedOptOut: number; incident: OutageIncidentDetail }>(`/whatsapp/outages/${id}/notify`, payload),
+  resolve: (id: number) => apiClient.post<OutageIncidentDetail>(`/whatsapp/outages/${id}/resolve`, {}),
+}
+

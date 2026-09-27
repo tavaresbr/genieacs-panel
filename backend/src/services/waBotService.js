@@ -4,6 +4,7 @@ import WaConversationService from './waConversationService.js';
 import WaSendService from './waSendService.js';
 import WhatsAppConfigService from './whatsappConfigService.js';
 import WaBotConfigService from './waBotConfigService.js';
+import OutageIncidentService from './outageIncidentService.js';
 import AuditLog from '../models/AuditLog.js';
 import { tdb } from '../config/database.js';
 import { DEFAULT_LOCALE, translate } from '../i18n/index.js';
@@ -345,6 +346,21 @@ async function responderSinal(link) {
   return t('whatsapp.bot.signalOk', { rxPower });
 }
 
+/**
+ * O aparelho está numa queda em massa aberta? Então a resposta é a queda —
+ * "é na sua região, estamos resolvendo" — e não "seu equipamento não está
+ * respondendo", que manda o assinante reiniciar o roteador à toa. Quem
+ * perguntou passa a contar como avisado e recebe o "normalizado" no fim.
+ */
+async function responderQueda(link, conversation) {
+  const incidente = await OutageIncidentService.openForDevice(link.device_id);
+  if (!incidente) return null;
+  await OutageIncidentService.markAsked(incidente.affected_id, conversation?.wa_phone_e164);
+  const linhas = [t('whatsapp.bot.outage', { node: incidente.node_name || incidente.node_id })];
+  if (incidente.eta_text) linhas.push(t('whatsapp.outage.eta', { eta: incidente.eta_text }));
+  return linhas.join('\n');
+}
+
 /** The portal link, or nothing when the panel does not know its own address. */
 async function responderPortal() {
   const portal = await linkDoPortal();
@@ -644,7 +660,9 @@ class WaBotService {
       if (intencao === 'portal') resposta = await responderPortal();
       else if (intencao === 'fatura') resposta = await responderFatura(link);
       else if (intencao === 'sinal') {
-        resposta = link.device_id ? await responderSinal(link) : t('whatsapp.bot.noDevice');
+        resposta = link.device_id
+          ? (await responderQueda(link, conversation)) || await responderSinal(link)
+          : t('whatsapp.bot.noDevice');
       } else if (intencao === 'liberar') resposta = await responderLiberacao(link, conversation);
     } catch (error) {
       // SGP down, GenieACS unreachable, a contract the ERP no longer knows: the

@@ -64,7 +64,8 @@ const SEM_DADO_DE_ASSINANTE = Object.freeze({
   wa_broadcasts: 'campanhas — o destinatário sai em wa_broadcast_recipients',
   subscriptions: 'assinatura do provedor conosco',
   billing_events: 'extrato do provedor conosco',
-  billing_charges: 'as cobranças que a plataforma emitiu ao provedor'
+  billing_charges: 'as cobranças que a plataforma emitiu ao provedor',
+  outage_incidents: 'quedas em massa por nó do mapa — quem foi atingido sai em outage_incident_devices'
 });
 
 /**
@@ -176,6 +177,12 @@ export async function alcanceDoAssinante(account) {
     ? (await tdb('device_sample_hours').whereIn('device_id', deviceIds).orderBy('id'))
       .filter((h) => naPosse(h.device_id, h.bucket_at))
     : [];
+  // Quedas em massa que atingiram a ONT enquanto era desta conta: guardam
+  // nome, contrato e o telefone a que o aviso foi.
+  const quedas = deviceIds.length
+    ? (await tdb('outage_incident_devices').whereIn('device_id', deviceIds).orderBy('id'))
+      .filter((q) => naPosse(q.device_id, q.created_at))
+    : [];
   const trocas = (await tdb('device_swaps').where((q) => {
     q.where({ account_id: account.id });
     if (deviceIds.length) q.orWhereIn('device_id', deviceIds);
@@ -203,6 +210,7 @@ export async function alcanceDoAssinante(account) {
     eventos,
     amostras,
     horas,
+    quedas,
     trocas,
     nos,
     noIds: nos.map((n) => n.node_id)
@@ -337,7 +345,7 @@ class CustomerDataExportService {
 
     const {
       deviceIds, naPosse, emPosseAgora, contratos, telefones: todosTelefones, vinculos, contatos,
-      clientes, conversas, conversaIds, eventos, amostras, horas, trocas, nos, noIds
+      clientes, conversas, conversaIds, eventos, amostras, horas, quedas, trocas, nos, noIds
     } = await alcanceDoAssinante(account);
 
     const dados = {};
@@ -377,6 +385,10 @@ class CustomerDataExportService {
     guardar('wa_alert_state', emPosseAgora.length
       ? await tdb('wa_alert_state').whereIn('subject', emPosseAgora).orderBy('id')
       : []);
+
+    // Quedas em massa que atingiram as ONTs desta conta: nome, contrato e o
+    // telefone a que o aviso foi mandado.
+    guardar('outage_incident_devices', quedas);
 
     guardar('wa_conversations', conversas);
     guardar('wa_messages', conversaIds.length

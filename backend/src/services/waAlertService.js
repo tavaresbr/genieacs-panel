@@ -5,6 +5,7 @@ import WaAlertState from '../models/WaAlertState.js';
 import WaConversation from '../models/WaConversation.js';
 import WaOptOut from '../models/WaOptOut.js';
 import WhatsAppAccount from '../models/WhatsAppAccount.js';
+import OutageIncidentService from './outageIncidentService.js';
 import { forEachTenant } from '../config/tenantJobs.js';
 import DeviceService from './deviceService.js';
 import WaSendService from './waSendService.js';
@@ -587,6 +588,12 @@ class WaAlertService {
 
       const { firing, unknown } = await this.evaluate(devices, settings, now);
       await this.reconcile({ firing, unknown, settings, channels, now, summary });
+      // O incidente de queda — o que o operador usa para avisar os CLIENTES.
+      // À parte e calado: um incidente que não abre não derruba o alerta da
+      // equipe, que já saiu.
+      await OutageIncidentService.syncFromScan({ firing, unknown }).catch((error) => {
+        console.warn(`Outage incident sync failed: ${error.message}`);
+      });
     } catch (error) {
       // Reported, not thrown — see the method comment.
       summary.error = error.message;
@@ -808,7 +815,10 @@ class WaAlertService {
           total: outage.total,
           minutes: outage.since === null ? '?' : Math.max(0, Math.round((now - outage.since) / 60_000)),
           link: mapsLink(box)
-        }
+        },
+        // Só em memória, para o incidente saber quem foi atingido — ver
+        // `OutageIncidentService.syncFromScan`. `wa_alert_state` não guarda.
+        devices: outage.clients.flatMap((clientId) => devicesByClient.get(clientId) ?? [])
       });
       for (const clientId of outage.clients) {
         for (const deviceId of devicesByClient.get(clientId) ?? []) {

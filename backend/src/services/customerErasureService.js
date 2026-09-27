@@ -103,7 +103,7 @@ class CustomerErasureService {
    */
   static async survey(account) {
     const alcance = await alcanceDoAssinante(account);
-    const { contratos, telefones, vinculos, contatos, conversaIds, eventos, amostras, horas, trocas, nos } = alcance;
+    const { contratos, telefones, vinculos, contatos, conversaIds, eventos, amostras, horas, quedas, trocas, nos } = alcance;
 
     const contar = async (tabela, montar) => {
       const [linha] = await montar(tdb(tabela)).count({ n: '*' });
@@ -123,6 +123,7 @@ class CustomerErasureService {
       sgp_events: eventos.length,
       device_samples: amostras.length,
       device_sample_hours: horas.length,
+      outage_incident_devices: quedas.length,
       device_swaps: trocas.length,
       wa_conversations: conversaIds.length,
       wa_messages: conversaIds.length
@@ -179,7 +180,7 @@ class CustomerErasureService {
    * que o que foi gravado na trilha seja o que vai ser executado.
    */
   static async erase(account, { alcance }) {
-    const { contratos, telefones, vinculos, contatos, conversaIds, eventos, amostras, horas, trocas, noIds } = alcance;
+    const { contratos, telefones, vinculos, contatos, conversaIds, eventos, amostras, horas, quedas, trocas, noIds } = alcance;
     const idsDe = (linhas) => linhas.map((l) => l.id);
     const marca = `erased:${account.id}`;
 
@@ -196,7 +197,9 @@ class CustomerErasureService {
       // pelo período de posse, e apagar pelo aparelho levaria junto a história
       // de quem teve a ONT antes ou depois.
       for (const [tabela, linhas] of [
-        ['sgp_events', eventos], ['device_samples', amostras], ['device_sample_hours', horas]
+        ['sgp_events', eventos], ['device_samples', amostras], ['device_sample_hours', horas],
+        // Quem uma queda atingiu leva nome e telefone: sai junto.
+        ['outage_incident_devices', quedas]
       ]) {
         for (let i = 0; i < linhas.length; i += 500) {
           await tdb(tabela, trx).whereIn('id', idsDe(linhas.slice(i, i + 500))).del();
