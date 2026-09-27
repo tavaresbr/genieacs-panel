@@ -2758,6 +2758,7 @@ const zhCN: Dictionary = {
   'audit.action.userMfaDisabled': '关闭两步登录',
   'audit.action.userMfaRecoveryRegenerated': '更换恢复代码',
   'audit.action.userMfaRecoveryUsed': '使用恢复代码登录',
+  'audit.action.userAccountLocked': '因多次失败尝试锁定账户',
   'audit.action.alertsTelegramChanged': '告警 Telegram 机器人或群组已更改',
   'audit.action.tenantMfaRequiredChanged': '两步登录要求已更改',
   'audit.action.operatorMfaReset': '团队关闭了操作员的两步登录',

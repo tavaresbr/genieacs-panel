@@ -2764,6 +2764,7 @@ const it: Dictionary = {
   'audit.action.userMfaDisabled': 'Accesso in due passaggi disattivato',
   'audit.action.userMfaRecoveryRegenerated': 'Codici di recupero sostituiti',
   'audit.action.userMfaRecoveryUsed': 'Accesso con codice di recupero',
+  'audit.action.userAccountLocked': 'Account bloccato dopo tentativi falliti',
   'audit.action.alertsTelegramChanged': 'Bot o gruppo Telegram degli avvisi modificato',
   'audit.action.tenantMfaRequiredChanged': 'Requisito dell’accesso in due passaggi modificato',
   'audit.action.operatorMfaReset': 'Accesso in due passaggi di un operatore disattivato dal team',

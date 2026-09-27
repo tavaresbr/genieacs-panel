@@ -24,6 +24,7 @@ export default {
   'auth.insufficientPermissions': '권한이 부족합니다',
   'auth.credentialsRequired': '사용자 이름과 비밀번호가 필요합니다',
   'auth.invalidCredentials': '사용자 이름 또는 비밀번호가 올바르지 않습니다',
+  'auth.accountLocked': '이 계정에서 실패한 시도가 너무 많습니다. 몇 분 후에 다시 시도하세요.',
   'auth.loginSuccess': '로그인했습니다',
   'auth.chooseDestination': '로그인할 곳을 선택하세요',
   'auth.logoutSuccess': '로그아웃했습니다',

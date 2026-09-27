@@ -2758,6 +2758,7 @@ const fr: Dictionary = {
   'audit.action.userMfaDisabled': 'Connexion en deux étapes désactivée',
   'audit.action.userMfaRecoveryRegenerated': 'Codes de récupération remplacés',
   'audit.action.userMfaRecoveryUsed': 'Connexion avec un code de récupération',
+  'audit.action.userAccountLocked': 'Compte verrouillé après des tentatives échouées',
   'audit.action.alertsTelegramChanged': 'Bot ou groupe Telegram des alertes modifié',
   'audit.action.tenantMfaRequiredChanged': 'Exigence de connexion en deux étapes modifiée',
   'audit.action.operatorMfaReset': 'Connexion en deux étapes d’un opérateur désactivée par l’équipe',

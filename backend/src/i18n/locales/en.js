@@ -24,6 +24,7 @@ export default {
   'auth.insufficientPermissions': 'Insufficient permissions',
   'auth.credentialsRequired': 'Username and password are required',
   'auth.invalidCredentials': 'Invalid username or password',
+  'auth.accountLocked': 'Too many unsuccessful attempts on this account. Wait a few minutes and try again.',
   'auth.loginSuccess': 'Login successful',
   'auth.chooseDestination': 'Choose where to sign in',
   'auth.logoutSuccess': 'Logout successful',

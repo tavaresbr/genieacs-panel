@@ -1567,6 +1567,29 @@ const MFA_TABLES = [
   ['user_recovery_codes', userRecoveryCodesTable]
 ];
 
+/**
+ * A contagem de tentativas por conta — ver `models/AccountLockout.js`.
+ *
+ * Sem chave estrangeira para `users`, de propósito: o sujeito é `user:<id>` para
+ * quem existe e `login:<sha256>` para o login inventado, e o segundo não aponta
+ * para linha nenhuma — é justamente o caso que impede a trava de virar oráculo
+ * de quem tem conta. Os instantes são milissegundos em `bigInteger`, e não
+ * `timestamp`: a comparação é feita contra `Date.now()` nos três dialetos, sem
+ * fuso nem precisão de coluna para discordar entre eles.
+ */
+const accountLockoutsTable = () => (t) => {
+  t.string('subject', 96).primary();
+  t.integer('attempts').notNullable().defaultTo(0);
+  t.bigInteger('window_started_at').notNullable();
+  t.bigInteger('locked_until').nullable();
+  t.bigInteger('updated_at').notNullable();
+  t.index(['updated_at'], 'account_lockouts_updated_idx');
+};
+
+const LOCKOUT_TABLES = [
+  ['account_lockouts', accountLockoutsTable]
+];
+
 const SGP_CONTACT_TABLES = [
   ['sgp_contacts', sgpContactsTable],
   ['sgp_clients', sgpClientsTable]
@@ -1634,7 +1657,8 @@ export const SCHEMA_TABLES = [
   ...OUTAGE_HISTORY_TABLES,
   ...SGP_CONTACT_TABLES,
   ...MFA_TABLES,
-  ...OUTAGE_TABLES
+  ...OUTAGE_TABLES,
+  ...LOCKOUT_TABLES
 ].map(([name]) => name);
 
 /**
@@ -3994,6 +4018,23 @@ export const migrations = [
     },
     async up(db) {
       await createTableIfMissing(db, 'outage_events', outageEventsTable(db));
+    }
+  },
+  {
+    /**
+     * A trava por conta contra força bruta — ver `accountLockoutsTable`. Nasce
+     * vazia: ninguém começa travado, e quem já errou a senha antes do upgrade
+     * começa a contar do zero.
+     */
+    id: '0068_account_lockouts',
+    async isApplied(db) {
+      return db.schema.hasTable('account_lockouts');
+    },
+    async up(db) {
+      for (const [nome, construtor] of LOCKOUT_TABLES) {
+        // eslint-disable-next-line no-await-in-loop -- uma tabela só, hoje
+        await createTableIfMissing(db, nome, construtor(db));
+      }
     }
   }
 ];

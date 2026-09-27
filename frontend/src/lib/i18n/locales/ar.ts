@@ -2767,6 +2767,7 @@ const ar: Dictionary = {
   'audit.action.userMfaDisabled': 'تم إيقاف تسجيل الدخول بخطوتين',
   'audit.action.userMfaRecoveryRegenerated': 'تم استبدال رموز الاسترداد',
   'audit.action.userMfaRecoveryUsed': 'تسجيل دخول برمز استرداد',
+  'audit.action.userAccountLocked': 'تم قفل الحساب بعد محاولات فاشلة',
   'audit.action.alertsTelegramChanged': 'تم تغيير بوت أو مجموعة تيليجرام للتنبيهات',
   'audit.action.tenantMfaRequiredChanged': 'تم تغيير اشتراط تسجيل الدخول بخطوتين',
   'audit.action.operatorMfaReset': 'أوقف الفريق تسجيل الدخول بخطوتين لمشغل',

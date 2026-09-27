@@ -2765,6 +2765,7 @@ const ko: Dictionary = {
   'audit.action.userMfaDisabled': '2단계 로그인 꺼짐',
   'audit.action.userMfaRecoveryRegenerated': '복구 코드 교체',
   'audit.action.userMfaRecoveryUsed': '복구 코드로 로그인',
+  'audit.action.userAccountLocked': '실패한 시도로 계정 잠김',
   'audit.action.alertsTelegramChanged': '알림 텔레그램 봇 또는 그룹 변경',
   'audit.action.tenantMfaRequiredChanged': '2단계 로그인 요구 설정 변경',
   'audit.action.operatorMfaReset': '팀이 운영자의 2단계 로그인을 끔',

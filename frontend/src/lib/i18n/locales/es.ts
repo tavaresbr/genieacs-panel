@@ -2758,6 +2758,7 @@ const es: Dictionary = {
   'audit.action.userMfaDisabled': 'Inicio de sesión en dos pasos desactivado',
   'audit.action.userMfaRecoveryRegenerated': 'Códigos de recuperación reemplazados',
   'audit.action.userMfaRecoveryUsed': 'Ingresó con un código de recuperación',
+  'audit.action.userAccountLocked': 'Cuenta bloqueada por intentos fallidos',
   'audit.action.alertsTelegramChanged': 'Bot o grupo de Telegram de alertas cambiado',
   'audit.action.tenantMfaRequiredChanged': 'Requisito de inicio de sesión en dos pasos cambiado',
   'audit.action.operatorMfaReset': 'Inicio de sesión en dos pasos de operador desactivado por el equipo',
