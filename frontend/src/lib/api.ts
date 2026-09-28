@@ -3404,6 +3404,102 @@ export interface WhatsAppSkipCounts {
   templateIncomplete: number
 }
 
+/** One day of the automatic cadence's send window. `day` follows `Date#getDay`. */
+export interface WhatsAppDunningWindowDay {
+  day: number
+  closed: boolean
+  open: string
+  close: string
+}
+
+/** One step of the automatic cadence: which template, how many days from the due date. */
+export interface WhatsAppDunningStep {
+  offsetDays: number
+  templateId: number
+}
+
+export type WhatsAppDunningSkipReason = 'noPhone' | 'optOut' | 'templateIncomplete' | 'maxReached' | 'interval' | 'sgpRefused'
+
+export interface WhatsAppDunningRunSummary {
+  at: string
+  manual: boolean
+  checked: number
+  queued: number
+  paid: number
+  thanked: number
+  skipped: Record<WhatsAppDunningSkipReason, number>
+  truncated: boolean
+}
+
+/** The automatic billing cadence. It SENDS, so `enabled` has its own route. */
+export interface WhatsAppDunningRule {
+  enabled: boolean
+  steps: WhatsAppDunningStep[]
+  maxPerInvoice: number
+  minIntervalHours: number
+  maxPerRun: number
+  thanksTemplateId: number | null
+  window: { timezone: string; week: WhatsAppDunningWindowDay[] }
+  enabledAt: string | null
+  updatedAt: string | null
+  inWindowNow: boolean
+  running: boolean
+  lastRun: WhatsAppDunningRunSummary | null
+}
+
+export interface WhatsAppDunningPreviewItem {
+  contract: string
+  clientName: string | null
+  phone: string | null
+  dueDate: string | null
+  amount: number | null
+  daysOverdue: number
+  stepOffset: number
+  templateName: string | null
+  status: 'queued' | 'skipped' | 'deferred'
+  reason: WhatsAppDunningSkipReason | null
+}
+
+export interface WhatsAppDunningPreview {
+  checked: number
+  queued: number
+  truncated: boolean
+  skipped: Record<WhatsAppDunningSkipReason, number>
+  items: WhatsAppDunningPreviewItem[]
+}
+
+export interface WhatsAppDunningSend {
+  id: number
+  kind: 'step' | 'thanks'
+  stepOffset: number
+  contract: string
+  invoiceKey: string
+  dueDate: string | null
+  amount: number | null
+  clientName: string | null
+  phone: string | null
+  templateName: string | null
+  status: 'queued' | 'skipped' | 'canceled'
+  reason: string | null
+  deliveryStatus: string | null
+  paidAt: string | null
+  createdAt: string | null
+}
+
+export interface WhatsAppDunningStats {
+  days: number
+  messages: number
+  failed: number
+  thanks: number
+  invoices: number
+  invoicesPaid: number
+  amountCharged: number
+  amountRecovered: number
+  recoveryRate: number
+  byStep: { offsetDays: number; sent: number; paidAfter: number }[]
+  skipped: Record<string, number>
+}
+
 export interface WhatsAppBroadcast {
   id: number
   title: string
@@ -3857,6 +3953,38 @@ export const whatsappAPI = {
       '/whatsapp/billing/campaign',
       payload
     ),
+
+  // ── Automatic billing cadence ────────────────────────────────────────
+  // Unlike the builder above, this one SENDS. Saving never switches it on.
+  getDunningRule: () =>
+    apiClient.get<WhatsAppDunningRule>('/whatsapp/dunning/rule'),
+
+  saveDunningRule: (payload: Partial<Pick<WhatsAppDunningRule,
+    'steps' | 'window' | 'maxPerInvoice' | 'minIntervalHours' | 'maxPerRun' | 'thanksTemplateId'>>) =>
+    apiClient.put<WhatsAppDunningRule>('/whatsapp/dunning/rule', payload),
+
+  setDunningEnabled: (enabled: boolean) =>
+    apiClient.post<WhatsAppDunningRule>('/whatsapp/dunning/enabled', { enabled }),
+
+  previewDunning: () =>
+    apiClient.post<WhatsAppDunningPreview>('/whatsapp/dunning/preview', {}),
+
+  runDunning: () =>
+    apiClient.post<{ started: boolean }>('/whatsapp/dunning/run', {}),
+
+  listDunningSends: (params: { contract?: string; status?: string; kind?: string; limit?: number; offset?: number } = {}) => {
+    const query = new URLSearchParams()
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') query.set(key, String(value))
+    })
+    const suffix = query.toString()
+    return apiClient.get<{ items: WhatsAppDunningSend[]; hasMore: boolean }>(
+      `/whatsapp/dunning/sends${suffix ? `?${suffix}` : ''}`
+    )
+  },
+
+  getDunningStats: (days = 30) =>
+    apiClient.get<WhatsAppDunningStats>(`/whatsapp/dunning/stats?days=${days}`),
 
   // ── Campaigns ────────────────────────────────────────────────────────
   listBroadcasts: () =>

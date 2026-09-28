@@ -35,6 +35,17 @@ router.post('/billing/campaign', ...gestao, WhatsAppBillingController.buildCampa
 // back to what the ERP last synced.
 router.put('/subscribers/:contract/phone', ...gestao, WhatsAppBillingController.setSubscriberPhone);
 
+// ── Automatic billing cadence ─────────────────────────────────────────
+// Unlike the manual cadence above, this one SENDS. Saving the steps never
+// switches it on: `enabled` is its own request, and it goes to the audit trail.
+router.get('/dunning/rule', ...leitura, WhatsAppBillingController.getDunningRule);
+router.put('/dunning/rule', ...gestao, WhatsAppBillingController.saveDunningRule);
+router.post('/dunning/enabled', ...gestao, WhatsAppBillingController.setDunningEnabled);
+router.post('/dunning/preview', ...gestao, WhatsAppBillingController.previewDunning);
+router.post('/dunning/run', ...gestao, WhatsAppBillingController.runDunning);
+router.get('/dunning/sends', ...leitura, WhatsAppBillingController.listDunningSends);
+router.get('/dunning/stats', ...leitura, WhatsAppBillingController.dunningStats);
+
 // ── Campaigns ──────────────────────────────────────────────────────────
 router.get('/broadcasts', ...leitura, WhatsAppBillingController.listBroadcasts);
 router.post('/broadcasts/:id/status', ...gestao, WhatsAppBillingController.setBroadcastStatus);
