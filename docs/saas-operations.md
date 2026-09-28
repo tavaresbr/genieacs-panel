@@ -951,3 +951,34 @@ resto (assinantes, WhatsApp, cobrança) segue normal.
   `PANEL_URL` que o instalador traz vem do domínio-base (ou de `PUBLIC_BASE_URL` numa
   instalação de um provedor só), **nunca** do `Host` do pedido; sem nenhum dos dois, o
   instalador pergunta.
+
+## 13. A página pública e o cadastro com plano
+
+O ápice (`TENANT_BASE_DOMAIN`) serve a **página pública** em `/`: hero, recursos, como
+funciona, planos, dúvidas e "Pedir demonstração". O console continua em `/login` e
+`/platform` no mesmo endereço. Para o domínio de marketing (ex.: `tr69.com.br`) mostrar
+esta página, aponte-o para o mesmo painel como o ápice — ou use o próprio ápice como
+domínio do site.
+
+- **Planos no site.** Console → Planos → Editar → "Página pública": marque *Mostrar na
+  página pública*, escolha a ordem, o destaque ("Mais popular"), a descrição, os recursos
+  (um por linha) e, se houver, o preço anual. Só planos **ativos e públicos** aparecem, lidos
+  de `GET /api/public/plans`. Nenhum plano nasce público.
+- **Contratar.** Cada card leva a `/signup?plano=<código>`. O cadastro nasce em **teste no
+  plano escolhido** (os dias de teste do plano, ou o padrão se ele não tiver) e, no fim do
+  teste, segue o fluxo de cobrança de sempre (seção 10). Plano que não está à venda é
+  ignorado e o provedor recebe o teste padrão.
+- **CNPJ e WhatsApp no cadastro.** Opcionais. O CNPJ é consultado na Receita
+  (`GET /api/public/cnpj`) e vira `billing_tax_id`/razão social/cidade; o WhatsApp vira
+  `billing_phone`. O subdomínio é conferido enquanto se digita
+  (`GET /api/public/slug-available`).
+- **Avisos por WhatsApp.** Pelo número conectado na caixa da plataforma: boas-vindas ao
+  provedor novo e, junto com o e-mail, o aviso de fim de teste/vencimento para o
+  `billing_phone`. Sem número conectado, nada é enviado e nada quebra.
+- **Pedidos de demonstração.** Gravados em `leads` e listados na aba **Leads** do console
+  (novo → contatado → ganho/perdido, com anotações). A equipe é avisada em
+  `PLATFORM_NOTIFY_WHATSAPP` e/ou `PLATFORM_NOTIFY_EMAIL`.
+- `PLATFORM_CONTACT_WHATSAPP` é o número do botão flutuante do site.
+
+Limites por endereço: catálogo e subdomínio 60/min, CNPJ 20 a cada 15 min, pedido de
+demonstração 5 por hora.

@@ -35,6 +35,8 @@ import platformRoutes from './routes/platform.js';
 import platformMemberRoutes from './routes/platformMembers.js';
 import platformAdminRoutes from './routes/platformAdmins.js';
 import platformBillingRoutes from './routes/platformBilling.js';
+import platformLeadsRoutes from './routes/platformLeads.js';
+import publicRoutes from './routes/public.js';
 import platformIntegrationsRoutes from './routes/platformIntegrations.js';
 import userRoutes from './routes/users.js';
 import inviteRoutes from './routes/invites.js';
@@ -325,6 +327,12 @@ if (IS_SAAS) {
   // E a quarta: a conta da plataforma nos sistemas de fora (o Asaas), e o
   // provedor criado como cliente lá dentro.
   app.use('/api/platform', platformIntegrationsRoutes);
+  // E a quinta: os pedidos de demonstração que a página pública recebe.
+  app.use('/api/platform', platformLeadsRoutes);
+  // A página pública do ápice — o catálogo e o que o cadastro pergunta antes
+  // de existir conta. Mesma regra do console: só no endereço da plataforma.
+  app.use('/api/public', platformHostOnly);
+  app.use('/api/public', publicRoutes);
 }
 app.use('/api/users', userRoutes);
 app.use('/api/invites', inviteRoutes);

@@ -16,11 +16,42 @@ import { runUnscoped } from '../config/tenantContext.js';
  */
 export const PLAN_LIMIT_COLUMNS = Object.freeze(['max_operators', 'max_subscribers', 'max_devices']);
 
+/** A lista `features` como texto guardado → array de frases, tolerante a lixo. */
+export function parsePlanFeatures(raw) {
+  if (!raw) return [];
+  try {
+    const list = JSON.parse(raw);
+    return Array.isArray(list) ? list.map((item) => String(item)).filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+}
+
 class Plan {
   static async list({ activeOnly = false } = {}) {
     let query = getDb()('plans').orderBy('id', 'asc');
     if (activeOnly) query = query.where({ active: true });
     return query;
+  }
+
+  /**
+   * O que a página pública oferece: ativo E marcado como público, na ordem que
+   * o console escolheu. A vitrine nunca vê um plano que o console não soltou.
+   */
+  static async listPublic() {
+    return getDb()('plans')
+      .where({ active: true, public: true })
+      .orderBy('sort_order', 'asc')
+      .orderBy('price_cents', 'asc')
+      .orderBy('id', 'asc');
+  }
+
+  /** Um plano que um cadastro pode escolher: só os da vitrine. */
+  static async findPublicByCode(code) {
+    if (!code) return null;
+    return (await getDb()('plans')
+      .where({ code: String(code), active: true, public: true })
+      .first()) || null;
   }
 
   static async findById(id) {

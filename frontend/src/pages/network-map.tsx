@@ -857,14 +857,14 @@ export default function NetworkMap() {
   }
 
   // O diálogo abre onde o mapa está olhando agora — lido no clique, não no render.
-  const openPlace = (pppoe: string, name?: string) => {
+  const openPlace = (pppoe: string, name?: string, deviceId?: string | null) => {
     // Com o mapa escondido (outra aba), o centro dele pode ser qualquer coisa;
     // o centro dos pontos da rede é uma aposta melhor.
     const current = mapView === 'map' ? mapRef.current?.getCenter() : null
     const middle = nodes.length
       ? [nodes.reduce((sum, node) => sum + node.latitude, 0) / nodes.length, nodes.reduce((sum, node) => sum + node.longitude, 0) / nodes.length] as [number, number]
       : undefined
-    setPlaceTarget({ pppoe, name, center: current ? [current.lat, current.lng] : middle })
+    setPlaceTarget({ pppoe, name, deviceId, center: current ? [current.lat, current.lng] : middle })
   }
 
   // Depois de colocar um cliente, a recarga traz o ponto novo: abre-o.
@@ -888,10 +888,11 @@ export default function NetworkMap() {
     placeParamHandled.current = true
     const existing = nodes.find((node) => String(node.pppoe ?? '').trim().toLowerCase() === pppoe.toLowerCase())
     if (existing) focusBox(existing.node_id)
-    else if (canEditMap) openPlace(pppoe, searchParams.get('name') || undefined)
+    else if (canEditMap) openPlace(pppoe, searchParams.get('name') || undefined, searchParams.get('device'))
     const next = new URLSearchParams(searchParams)
     next.delete('place')
     next.delete('name')
+    next.delete('device')
     setSearchParams(next, { replace: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, loading, lastRefresh, nodes, canEditMap])
@@ -1262,7 +1263,7 @@ export default function NetworkMap() {
         {nodeEditor && <NodeEditor initial={nodeEditor} editing={editingNode} saving={saving} onClose={() => setNodeEditor(null)} onSave={(value) => void saveNode(value)} />}
         {unmappedOpen && (
           <UnmappedDialog canWrite={canEditMap} onClose={() => setUnmappedOpen(false)}
-            onPlace={(device) => { setUnmappedOpen(false); openPlace(device.pppoe) }} />
+            onPlace={(device) => { setUnmappedOpen(false); openPlace(device.pppoe, undefined, device.deviceId) }} />
         )}
         {placeTarget && (
           <PlaceClientDialog target={placeTarget} nodes={nodes} edges={edges} edgeIds={edges.map((edge) => edge.edge_id)}

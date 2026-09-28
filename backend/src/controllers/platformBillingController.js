@@ -1,4 +1,4 @@
-import Plan, { PLAN_LIMIT_COLUMNS } from '../models/Plan.js';
+import Plan, { PLAN_LIMIT_COLUMNS, parsePlanFeatures } from '../models/Plan.js';
 import Subscription from '../models/Subscription.js';
 import BillingEvent from '../models/BillingEvent.js';
 import Tenant from '../models/Tenant.js';
@@ -80,6 +80,47 @@ function readRetentionCaps(body, target) {
   return null;
 }
 
+const FEATURES_MAX = 20;
+const FEATURE_MAX_LENGTH = 160;
+const DESCRIPTION_MAX_LENGTH = 1000;
+
+/**
+ * Os campos de vitrine (ver `PLAN_MARKETING_COLUMNS`) do corpo em `target`;
+ * devolve a mensagem de erro, ou `null`. Ausente é "não mexer".
+ */
+function readMarketing(body, target) {
+  for (const [key, column] of [['public', 'public'], ['featured', 'featured']]) {
+    if (body[key] !== undefined) target[column] = Boolean(body[key]);
+  }
+  if (body.sortOrder !== undefined) {
+    const n = Number(body.sortOrder);
+    if (!Number.isInteger(n) || n < -1000 || n > 1000) return 'sortOrder must be an integer between -1000 and 1000';
+    target.sort_order = n;
+  }
+  if (body.description !== undefined) {
+    const text = body.description === null ? '' : String(body.description).trim();
+    if (text.length > DESCRIPTION_MAX_LENGTH) return `description must be at most ${DESCRIPTION_MAX_LENGTH} characters`;
+    target.description = text || null;
+  }
+  if (body.features !== undefined) {
+    const list = body.features === null ? [] : body.features;
+    if (!Array.isArray(list) || list.length > FEATURES_MAX) {
+      return `features must be a list of at most ${FEATURES_MAX} items`;
+    }
+    const clean = list.map((item) => String(item ?? '').trim()).filter(Boolean);
+    if (clean.some((item) => item.length > FEATURE_MAX_LENGTH)) {
+      return `each feature must be at most ${FEATURE_MAX_LENGTH} characters`;
+    }
+    target.features = clean.length ? JSON.stringify(clean) : null;
+  }
+  if (body.priceYearlyCents !== undefined) {
+    const parsed = parseLimit(body.priceYearlyCents);
+    if (!parsed.ok) return 'priceYearlyCents must be a non-negative integer or null';
+    target.price_yearly_cents = parsed.value;
+  }
+  return null;
+}
+
 function presentPlan(plan) {
   return {
     id: plan.id,
@@ -95,6 +136,15 @@ function presentPlan(plan) {
     // Até quantos dias o provedor pode guardar trilha, mensagens e anexos.
     retention: SubscriptionService.retentionCapsOf(plan),
     active: Boolean(plan.active),
+    // A vitrine: se a página pública mostra, em que ordem e com que frases.
+    public: Boolean(plan.public),
+    featured: Boolean(plan.featured),
+    sortOrder: Number(plan.sort_order ?? 0),
+    description: plan.description ?? null,
+    features: parsePlanFeatures(plan.features),
+    priceYearlyCents: plan.price_yearly_cents === null || plan.price_yearly_cents === undefined
+      ? null
+      : Number(plan.price_yearly_cents),
     createdAt: plan.created_at ?? null
   };
 }
@@ -211,6 +261,8 @@ class PlatformBillingController {
       if (periodo.value !== null) row.period_days = periodo.value;
       const erroRetencao = readRetentionCaps(body, row);
       if (erroRetencao) return res.status(400).json(createErrorResponse(erroRetencao));
+      const erroVitrine = readMarketing(body, row);
+      if (erroVitrine) return res.status(400).json(createErrorResponse(erroVitrine));
       row.currency = String(body.currency ?? 'BRL').toUpperCase().slice(0, 3);
       row.active = body.active === undefined ? true : Boolean(body.active);
 
@@ -274,6 +326,8 @@ class PlatformBillingController {
       }
       const erroRetencao = readRetentionCaps(body, patch);
       if (erroRetencao) return res.status(400).json(createErrorResponse(erroRetencao));
+      const erroVitrine = readMarketing(body, patch);
+      if (erroVitrine) return res.status(400).json(createErrorResponse(erroVitrine));
       if (body.currency !== undefined) patch.currency = String(body.currency).toUpperCase().slice(0, 3);
       if (body.active !== undefined) patch.active = Boolean(body.active);
       if (Object.keys(patch).length === 0) {

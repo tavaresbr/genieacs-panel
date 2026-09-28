@@ -1175,6 +1175,52 @@ const OUTAGE_HISTORY_TABLES = [
  * mostra. Preço em centavos e moeda ao lado, porque o mercado é o brasileiro
  * mas o código não precisa saber disso.
  */
+/**
+ * A vitrine do plano: o que a página pública mostra dele — ver 0079.
+ *
+ * `public` nasce falso: um plano que existe no catálogo não vira oferta no
+ * site só porque alguém o criou. É o console que decide o que se vende ali.
+ * `features` é uma lista JSON de frases curtas, a mesma forma de
+ * `plan_patterns`. `price_yearly_cents` é só o preço anunciado da opção anual;
+ * o que se cobra continua sendo `price_cents` por `period_days`.
+ */
+const PLAN_MARKETING_COLUMNS = [
+  ['public', (t) => t.boolean('public').notNullable().defaultTo(false)],
+  ['featured', (t) => t.boolean('featured').notNullable().defaultTo(false)],
+  ['sort_order', (t) => t.integer('sort_order').notNullable().defaultTo(0)],
+  ['description', (t) => t.text('description')],
+  ['features', (t) => t.text('features')],
+  ['price_yearly_cents', (t) => t.integer('price_yearly_cents').unsigned()]
+];
+
+/**
+ * Quem pediu demonstração pela página pública. Da PLATAFORMA, e não de um
+ * provedor: é gente que ainda não é cliente — o provedor dela não existe.
+ */
+const leadsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.string('name', 128).notNullable();
+  t.string('company', 160);
+  t.string('email', 160);
+  t.string('phone', 32);
+  t.string('city', 80);
+  t.integer('devices_estimate').unsigned();
+  t.text('message');
+  t.string('plan_code', 32);
+  // new | contacted | won | lost
+  t.string('status', 16).notNullable().defaultTo('new');
+  t.text('notes');
+  t.string('source', 32).notNullable().defaultTo('landing');
+  t.string('ip', 64);
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  t.timestamp('updated_at').defaultTo(db.fn.now());
+  t.index(['status', 'created_at'], 'leads_status_created_idx');
+};
+
+const LEAD_TABLES = [
+  ['leads', leadsTable]
+];
+
 const plansTable = (db) => (t) => {
   t.increments('id').primary();
   t.string('code', 32).notNullable().unique();
@@ -1210,6 +1256,7 @@ const plansTable = (db) => (t) => {
   t.integer('max_audit_retention_days').unsigned();
   t.integer('max_message_retention_days').unsigned();
   t.integer('max_media_retention_days').unsigned();
+  for (const [, add] of PLAN_MARKETING_COLUMNS) add(t);
   // Um plano desativado não some — assinaturas ainda apontam para ele — mas
   // deixa de ser oferecido a provedor novo.
   t.boolean('active').notNullable().defaultTo(true);
@@ -1926,6 +1973,7 @@ export const SCHEMA_TABLES = [
   ...LOCKOUT_TABLES,
   ...MAINTENANCE_TABLES,
   ...TEIAH_TABLES,
+  ...LEAD_TABLES,
   ...DUNNING_TABLES
 ].map(([name]) => name);
 
@@ -4574,11 +4622,43 @@ export const migrations = [
   },
   {
     /**
+     * O plano como a página pública o mostra: se aparece, em que ordem, se é
+     * o destaque, e as frases que o vendem. Ver `PLAN_MARKETING_COLUMNS`.
+     */
+    id: '0079_plans_marketing',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('plans'))) return true;
+      return (await missingColumns(db, 'plans', PLAN_MARKETING_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('plans'))) return;
+      const missing = await missingColumns(db, 'plans', PLAN_MARKETING_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('plans', (t) => {
+        for (const add of missing) add(t);
+      });
+    }
+  },
+  {
+    /** Os pedidos de demonstração da página pública — ver `leadsTable`. */
+    id: '0080_leads',
+    async isApplied(db) {
+      return db.schema.hasTable('leads');
+    },
+    async up(db) {
+      for (const [nome, construtor] of LEAD_TABLES) {
+        // eslint-disable-next-line no-await-in-loop -- uma tabela só
+        await createTableIfMissing(db, nome, construtor(db));
+      }
+    }
+  },
+  {
+    /**
      * A régua de cobrança automática — ver `waDunningSendsTable`. A tabela
      * nasce com o provedor, como as outras desde a 0053, e por isso depende de
      * `tenants` e de `wa_templates`/`wa_messages` existirem.
      */
-    id: '0079_wa_dunning_sends',
+    id: '0081_wa_dunning_sends',
     async isApplied(db) {
       if (!(await db.schema.hasTable('tenants'))) return true;
       return db.schema.hasTable('wa_dunning_sends');

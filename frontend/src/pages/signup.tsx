@@ -1,13 +1,23 @@
 'use client'
 
-import { useState } from 'react'
-import { Link } from 'react-router'
-import { authAPI, type SignupResult } from '@/lib/api'
+import { useEffect, useState } from 'react'
+import { Link, useSearchParams } from 'react-router'
+import { authAPI, publicAPI, type PublicPlan, type SignupResult } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
 import { BrandMark } from '@/components/brand-mark'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import { useTranslation } from '@/contexts/language-context'
 import { useTenant } from '@/contexts/tenant-context'
+
+/** O nome do provedor como subdomínio: minúsculas, sem acento, hífens. */
+function slugFromName(value: string) {
+  return value
+    .toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 63)
+}
 
 /**
  * An ISP signing up on its own. Only reachable where the deployment gives
@@ -20,17 +30,73 @@ export default function Signup() {
   const { t } = useTranslation()
   const { tenant, name: hostName, isPlatformHost } = useTenant()
   const base = tenant?.panelBaseDomain ?? null
-  const [form, setForm] = useState({ providerName: '', slug: '', username: '', email: '', password: '', confirm: '' })
+  const [params] = useSearchParams()
+  const [form, setForm] = useState({
+    providerName: '', slug: '', username: '', email: '', password: '', confirm: '',
+    planCode: params.get('plano') ?? params.get('plan') ?? '', taxId: '', phone: ''
+  })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState<SignupResult | null>(null)
+  // O catálogo da página pública, para o plano escolhido vir marcado e poder
+  // ser trocado aqui mesmo. Fora do ápice a rota não existe, e a lista fica vazia.
+  const [plans, setPlans] = useState<PublicPlan[]>([])
+  const [slugState, setSlugState] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid'>('idle')
+  const [cnpj, setCnpj] = useState<{ state: 'idle' | 'checking' | 'found' | 'invalid' | 'failed'; legalName?: string; city?: string; state_?: string }>({ state: 'idle' })
 
-  const slugFromName = (value: string) => value
-    .toLowerCase()
-    .normalize('NFD').replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 63)
+  useEffect(() => {
+    if (!isPlatformHost) return
+    let vivo = true
+    publicAPI.plans()
+      .then((res) => { if (vivo && res.success && res.data) setPlans(res.data.plans) })
+      .catch(() => {})
+    return () => { vivo = false }
+  }, [isPlatformHost])
+
+  // O subdomínio conferido enquanto se digita, com a mesma regra do cadastro.
+  useEffect(() => {
+    if (!isPlatformHost || !form.slug) { setSlugState('idle'); return }
+    setSlugState('checking')
+    const timer = window.setTimeout(() => {
+      publicAPI.slugAvailable(form.slug)
+        .then((res) => {
+          if (!res.success || !res.data) return setSlugState('idle')
+          setSlugState(res.data.available ? 'available' : (res.data.problem === 'taken' ? 'taken' : 'invalid'))
+        })
+        .catch(() => setSlugState('idle'))
+    }, 400)
+    return () => window.clearTimeout(timer)
+  }, [form.slug, isPlatformHost])
+
+  // O CNPJ completo vai à Receita e preenche o nome, se ainda estiver vazio.
+  useEffect(() => {
+    const digitos = form.taxId.replace(/\D/g, '')
+    if (!isPlatformHost || digitos.length !== 14) { setCnpj({ state: 'idle' }); return }
+    let vivo = true
+    setCnpj({ state: 'checking' })
+    publicAPI.cnpj(digitos)
+      .then((res) => {
+        if (!vivo) return
+        if (res.success && res.data) {
+          const dados = res.data
+          setCnpj({ state: 'found', legalName: dados.legalName, city: dados.city, state_: dados.state })
+          setForm((f) => {
+            if (f.providerName.trim()) return f
+            const nome = dados.tradeName || dados.legalName || ''
+            return { ...f, providerName: nome, slug: f.slug || slugFromName(nome) }
+          })
+        } else {
+          setCnpj({ state: res.message && /inv/i.test(res.message) ? 'invalid' : 'failed' })
+        }
+      })
+      .catch(() => { if (vivo) setCnpj({ state: 'failed' }) })
+    return () => { vivo = false }
+  }, [form.taxId, isPlatformHost])
+
+  const escolhido = plans.find((plan) => plan.code === form.planCode) ?? null
+  const dinheiro = (cents: number, currency: string) => {
+    try { return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(cents / 100) } catch { return `${(cents / 100).toFixed(2)} ${currency}` }
+  }
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -41,10 +107,20 @@ export default function Signup() {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) return setError(t('setup.error.emailInvalid'))
     if (form.password.length < 8) return setError(t('setup.error.passwordTooShort'))
     if (form.password !== form.confirm) return setError(t('setup.error.passwordMismatch'))
+    const telefone = form.phone.replace(/\D/g, '')
+    if (telefone && (telefone.length < 10 || telefone.length > 13)) return setError(t('signup.error.phone'))
+    const taxId = form.taxId.replace(/\D/g, '')
+    if (taxId && taxId.length !== 14) return setError(t('signup.taxIdInvalid'))
     setLoading(true)
     try {
       const res = await authAPI.signup({
-        providerName: form.providerName.trim(), slug: form.slug, username: form.username.trim(), email: form.email.trim(), password: form.password
+        providerName: form.providerName.trim(), slug: form.slug, username: form.username.trim(), email: form.email.trim(), password: form.password,
+        planCode: form.planCode || undefined,
+        taxId: taxId || undefined,
+        phone: telefone || undefined,
+        legalName: cnpj.state === 'found' ? cnpj.legalName : undefined,
+        city: cnpj.state === 'found' ? cnpj.city : undefined,
+        state: cnpj.state === 'found' ? cnpj.state_ : undefined
       })
       if (res.success && res.data) setDone(res.data)
       else setError(res.message || t('signup.error.failed'))
@@ -105,6 +181,43 @@ export default function Signup() {
                     <span>{error}</span>
                   </div>
                 )}
+                {plans.length > 0 && (
+                  <div>
+                    <label htmlFor="planCode" className="field-label">{t('signup.planLabel')}</label>
+                    <select
+                      id="planCode" className="modern-input" value={form.planCode}
+                      onChange={(e) => setForm((f) => ({ ...f, planCode: e.target.value }))}
+                    >
+                      <option value="">{t('signup.planDefault')}</option>
+                      {plans.map((plan) => (
+                        <option key={plan.code} value={plan.code}>
+                          {plan.name} — {dinheiro(plan.priceCents, plan.currency)}
+                        </option>
+                      ))}
+                    </select>
+                    {escolhido && escolhido.trialDays > 0 && (
+                      <p className="field-hint">{t('signup.planTrial', { days: escolhido.trialDays })}</p>
+                    )}
+                  </div>
+                )}
+                {isPlatformHost && (
+                  <div>
+                    <label htmlFor="taxId" className="field-label">{t('signup.taxId')}</label>
+                    <input
+                      id="taxId" className="modern-input font-mono" inputMode="numeric" maxLength={18}
+                      value={form.taxId} placeholder="00.000.000/0000-00"
+                      onChange={(e) => setForm((f) => ({ ...f, taxId: e.target.value }))}
+                      aria-describedby="taxId-hint"
+                    />
+                    <p id="taxId-hint" className="field-hint" aria-live="polite">
+                      {cnpj.state === 'checking' ? t('signup.slugChecking')
+                        : cnpj.state === 'found' ? t('signup.taxIdFound', { name: cnpj.legalName ?? '' })
+                          : cnpj.state === 'invalid' ? t('signup.taxIdInvalid')
+                            : cnpj.state === 'failed' ? t('signup.taxIdLookupFailed')
+                              : t('signup.taxIdHint')}
+                    </p>
+                  </div>
+                )}
                 <div>
                   <label htmlFor="providerName" className="field-label">{t('signup.providerName')}</label>
                   <input
@@ -124,7 +237,13 @@ export default function Signup() {
                     />
                     <span className="min-w-0 max-w-[55%] text-sm text-muted-foreground [overflow-wrap:anywhere]">.{base}</span>
                   </div>
-                  <p id="slug-hint" className="field-hint">{t('platform.slugHint')}</p>
+                  <p id="slug-hint" className="field-hint" aria-live="polite">
+                    {slugState === 'checking' ? t('signup.slugChecking')
+                      : slugState === 'available' ? <span className="text-emerald-500">✓ {t('signup.slugAvailable')}</span>
+                        : slugState === 'taken' ? <span className="text-destructive">✗ {t('signup.slugTaken')}</span>
+                          : slugState === 'invalid' ? <span className="text-destructive">✗ {t('signup.slugInvalid')}</span>
+                            : t('platform.slugHint')}
+                  </p>
                 </div>
                 <div>
                   <label htmlFor="username" className="field-label">{t('signup.username')}</label>
@@ -137,6 +256,14 @@ export default function Signup() {
                     onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
                   <p className="field-hint">{t('setup.emailHint')}</p>
                 </div>
+                {isPlatformHost && (
+                  <div>
+                    <label htmlFor="phone" className="field-label">{t('signup.phone')}</label>
+                    <input id="phone" type="tel" className="modern-input" autoComplete="tel" placeholder="(11) 99999-9999" value={form.phone}
+                      onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
+                    <p className="field-hint">{t('signup.phoneHint')}</p>
+                  </div>
+                )}
                 <div>
                   <label htmlFor="password" className="field-label">{t('login.password')}</label>
                   <input id="password" type="password" className="modern-input" required autoComplete="new-password" value={form.password}
@@ -156,9 +283,13 @@ export default function Signup() {
         </div>
         {/* The platform's own host has no login to go back to: whoever has a
             panel signs in at that panel's address. */}
-        {!isPlatformHost && (
+        {!isPlatformHost ? (
           <p className="mt-5 text-center text-xs leading-5 text-muted-foreground">
             <Link to="/login" className="underline">{t('signup.backToLogin')}</Link>
+          </p>
+        ) : (
+          <p className="mt-5 text-center text-xs leading-5 text-muted-foreground">
+            <Link to="/" className="underline">{t('signup.backToSite')}</Link>
           </p>
         )}
       </div>

@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from '@/contexts/language-context'
 import { Icon } from '@/components/ui/icon'
 import { LocationPicker } from '@/components/location-picker'
-import { mappingAPI } from '@/lib/api'
+import { mappingAPI, type ClientLocation } from '@/lib/api'
+import { MapAddressSearch } from '@/components/map-address-search'
 import { allBoxOccupancy, type OccupancyEdge, type OccupancyNode } from '@/lib/box-occupancy'
 import { haversineMeters, slugify } from '@/lib/kml-import'
 
@@ -20,6 +21,8 @@ export interface PlaceClientTarget {
   name?: string
   /** Onde o mapa do diálogo abre. */
   center?: [number, number]
+  /** O equipamento, para achar o contrato pelo vínculo do SGP quando o login não basta. */
+  deviceId?: string | null
 }
 
 const uniqueId = (base: string, taken: Set<string>) => {
@@ -45,6 +48,29 @@ export function PlaceClientDialog<T extends OccupancyNode>({
   const [boxId, setBoxId] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // O endereço do cliente no SGP: o marcador já abre na casa dele quando dá.
+  const [location, setLocation] = useState<ClientLocation | null>(null)
+  const [locating, setLocating] = useState(true)
+  useEffect(() => {
+    let cancelled = false
+    void mappingAPI.clientLocation(target.pppoe, target.deviceId)
+      .then((response) => {
+        if (cancelled || !response.success || !response.data) return
+        const found = response.data
+        setLocation(found)
+        if (typeof found.lat === 'number' && typeof found.lng === 'number') {
+          setPoint((current) => current ?? { lat: found.lat as number, lng: found.lng as number })
+        }
+        if (found.clientName) setName((current) => (current === target.pppoe ? found.clientName as string : current))
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLocating(false) })
+    return () => { cancelled = true }
+  }, [target.pppoe, target.deviceId])
+  const precisionKey = location?.precision === 'sgp' ? 'map.place.fromSgp'
+    : location?.precision === 'address' ? 'map.place.fromAddress'
+      : location?.precision === 'city' ? 'map.place.fromCity'
+        : null
 
   const boxes = useMemo(() => {
     const rows = allBoxOccupancy(nodes, edges)
@@ -91,6 +117,29 @@ export function PlaceClientDialog<T extends OccupancyNode>({
         <label className="field-label" htmlFor="place-name">{t('map.table.name')}</label>
         <input id="place-name" className="modern-input w-full" maxLength={255} value={name} onChange={(event) => setName(event.target.value)} />
         <p className="field-label mt-4">{t('map.place.where')}</p>
+        <div className="mb-2 rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-3 text-sm" aria-live="polite">
+          {locating ? (
+            <p className="flex items-center gap-2 text-muted-foreground"><Icon name="refresh" size={15} className="animate-spin" />{t('map.place.locating')}</p>
+          ) : (
+            <>
+              {location?.address
+                ? <p><span className="font-semibold">{t('map.place.address')}</span> {location.address}</p>
+                : <p className="text-muted-foreground">{t('map.place.noAddress')}</p>}
+              {precisionKey && (
+                <p className={`mt-1 flex items-center gap-1.5 text-xs ${location?.precision === 'sgp' ? 'text-emerald-600' : 'text-amber-600'}`}>
+                  <Icon name={location?.precision === 'sgp' ? 'check' : 'warning'} size={13} />{t(precisionKey)}
+                </p>
+              )}
+              {location?.precision !== 'sgp' && (
+                <div className="mt-2">
+                  <p className="mb-1 text-xs text-muted-foreground">{t('map.place.search')}</p>
+                  <MapAddressSearch className="relative w-full" initialQuery={location?.address?.replace(/ · /g, ', ') ?? ''}
+                    onPick={(place) => setPoint({ lat: place.lat, lng: place.lng })} />
+                </div>
+              )}
+            </>
+          )}
+        </div>
         <LocationPicker lat={point?.lat ?? null} lng={point?.lng ?? null} fallback={center} fallbackZoom={16} onChange={(lat, lng) => setPoint({ lat, lng })} />
         <p className="field-hint">{point ? `${point.lat}, ${point.lng}` : t('map.place.clickHint')}</p>
         <label className="field-label mt-4" htmlFor="place-box">{t('map.place.box')}</label>

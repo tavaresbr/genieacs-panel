@@ -73,7 +73,7 @@ export const LEGACY_DEFAULT_SETTINGS = {
  * O caminho continua sendo um só: é a mesma função, com a mesma sequência,
  * sobre uma lista menor. O que muda é quantos provedores ela visita.
  */
-export async function seedDefaults(db = getDb(), { tenantIds = null } = {}) {
+export async function seedDefaults(db = getDb(), { tenantIds = null, planId = null } = {}) {
   // Settings belong to a provider, so every provider gets the defaults — the
   // panel's name, its GenieACS, its VirtualParameter mapping.
   //
@@ -127,7 +127,7 @@ export async function seedDefaults(db = getDb(), { tenantIds = null } = {}) {
   }
 
   await seedVendorCatalogue(db, tenants);
-  await seedSubscriptions(db, tenants);
+  await seedSubscriptions(db, tenants, { planId });
   if (!tenantIds) await adoptPlatformWhatsAppServer(db);
 }
 
@@ -232,15 +232,21 @@ export async function catalogueSizes(db) {
  * Escrita crua, como o resto deste arquivo: roda no boot, sem escopo, e às
  * vezes contra o banco de DESTINO de uma troca. `tenant_id` vai na mão.
  */
-async function seedSubscriptions(db, tenants) {
+async function seedSubscriptions(db, tenants, { planId = null } = {}) {
   if (!(await db.schema.hasTable('subscriptions'))) return;
+  // O plano que o cadastro escolheu na página pública. Só vale se ainda está à
+  // venda — quem chamou já conferiu, mas o seed não confia numa id solta.
+  const escolhido = planId
+    ? await db('plans').where({ id: planId, active: true }).first()
+    : null;
   const withTrial = await db('plans')
     .where({ active: true })
     .where('trial_days', '>', 0)
     .orderBy('trial_days', 'desc')
     .orderBy('id', 'asc')
     .first();
-  const plan = withTrial
+  const plan = escolhido
+    || withTrial
     || await db('plans').where({ code: 'unlimited' }).first()
     || await db('plans').where({ active: true }).orderBy('id', 'asc').first();
   if (!plan) return;

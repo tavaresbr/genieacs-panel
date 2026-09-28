@@ -7,6 +7,7 @@ import { mailTransport, panelUrlFor } from './mail/index.js';
 import SubscriptionService from './subscriptionService.js';
 import BillingCharge from '../models/BillingCharge.js';
 import { PRODUCT_NAME } from '../config/brand.js';
+import PlatformNotifyService from './platformNotifyService.js';
 
 /**
  * O aviso que chega ANTES do bloqueio.
@@ -72,7 +73,9 @@ class SubscriptionNoticeService {
    */
   static async notifyCurrent({ now = new Date(), tenant: doLaco = null } = {}) {
     const transporte = mailTransport();
-    if (transporte.name === 'none') return { sent: false, reason: 'no_transport' };
+    const temEmail = transporte.name !== 'none';
+    // O WhatsApp é o segundo canal: o da plataforma, para o telefone de
+    // cobrança do provedor. Sem e-mail o aviso ainda sai por ele, se houver.
 
     // O plano junto, porque é dele que sai a janela do aviso: num plano anual
     // sete dias não é aviso, é notificação de que já era.
@@ -89,8 +92,11 @@ class SubscriptionNoticeService {
     // parece defeito.
     if (tenant.kind === 'platform') return { sent: false, reason: 'platform_tenant' };
 
-    const para = await this.recipients(tenant);
-    if (!para.length) return { sent: false, reason: 'no_recipient' };
+    const para = temEmail ? await this.recipients(tenant) : [];
+    const fone = String(tenant.billing_phone ?? '').trim();
+    if (!para.length && !fone) {
+      return { sent: false, reason: temEmail ? 'no_recipient' : 'no_transport' };
+    }
 
     const dias = Math.max(0, Math.ceil((pendente.deadline.getTime() - now.getTime()) / 86_400_000));
 
@@ -122,10 +128,17 @@ class SubscriptionNoticeService {
       text: translate(DEFAULT_LOCALE, `${chave}Body`, vars)
     }).catch(() => false)));
 
-    if (!enviados.some(Boolean)) return { sent: false, reason: 'send_failed' };
+    // O WhatsApp vai junto, com o mesmo texto do e-mail. Melhor esforço.
+    const porWhatsapp = fone
+      ? await PlatformNotifyService.sendWhatsapp(fone, translate(DEFAULT_LOCALE, `${chave}Body`, vars))
+      : false;
+
+    if (!enviados.some(Boolean) && !porWhatsapp) {
+      return { sent: false, reason: para.length ? 'send_failed' : (temEmail ? 'no_recipient' : 'no_transport') };
+    }
 
     await SubscriptionService.markExpiryWarned(pendente.deadline);
-    return { sent: true, kind: pendente.kind, expired: pendente.expired, recipients: para.length };
+    return { sent: true, kind: pendente.kind, expired: pendente.expired, recipients: para.length, whatsapp: porWhatsapp };
   }
 }
 
