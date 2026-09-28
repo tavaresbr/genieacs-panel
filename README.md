@@ -384,6 +384,19 @@ plan, status) is cached for 24 hours and re-read after that, and a cached link
 recorded for a different customer account than the device currently serves is
 discarded rather than shown.
 
+### New clients from the Contacts screen
+
+**New client** (*Novo cliente*) starts with the CPF or CNPJ:
+
+- If the client is already in SGP, the panel opens their record instead of creating a duplicate.
+- For a company, the form is filled from the Receita. A CPF has no public lookup, so a person's
+  details are typed by hand.
+- The postal code fills the street, district, city and state.
+- With **Also register in SGP**, the client is created in SGP first through
+  `POST /api/crm/cliente/F` or `/J`, without a contract, and filed in the panel under SGP's own
+  client id, so the contacts sync does not duplicate it. This needs both `contacts.edit` and
+  `sgp.act`.
+
 ## TeiaH Valid Integration
 
 Open **Settings → TeiaH Valid** to send the addresses of contracts that were

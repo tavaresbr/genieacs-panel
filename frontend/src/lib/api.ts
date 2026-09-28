@@ -2708,6 +2708,39 @@ export type ContactProfilePatch = Partial<{
   whatsappPhone: string | null
 }>
 
+/** What the panel knows about a CPF/CNPJ before the "Novo cliente" form. */
+export interface ContactDocumentLookup {
+  document: string
+  personType: 'PF' | 'PJ'
+  /** Whether the SGP was asked at all (it is not when the integration is off). */
+  sgpChecked: boolean
+  inSgp: { key: string; name: string | null; contract: string | null; state: string }[]
+  inPanel: { key: string; name: string | null } | null
+  /** The Receita's record, for a CNPJ nobody has yet. */
+  prefill: {
+    name: string | null
+    tradeName: string | null
+    email: string | null
+    phone: string | null
+    address: ContactAddress
+  } | null
+  prefillError: boolean
+}
+
+/** The body of `POST /contacts/sgp`: the client created in the SGP, then filed here. */
+export interface ContactCreateInSgp {
+  document: string
+  name: string
+  tradeName?: string
+  responsibleName?: string
+  responsibleDocument?: string
+  email?: string
+  whatsappPhone?: string
+  birthDate?: string
+  notes?: string
+  address: ContactAddress & { latitude?: number; longitude?: number }
+}
+
 /** What a spreadsheet import did — or, in a preview, would do. */
 export interface ContactImportResult {
   total: number
@@ -2729,6 +2762,20 @@ export const contactsAPI = {
 
   create: (data: ContactProfilePatch & { name: string }) =>
     apiClient.post<ContactProfile>('/contacts', data),
+
+  /** Before the form: the SGP by document and, for a new company, the Receita. */
+  lookupDocument: (document: string) =>
+    apiClient.get<ContactDocumentLookup>(`/contacts/lookup/document?document=${encodeURIComponent(document.replace(/\D/g, ''))}`),
+
+  /** The address of a CEP, to fill the form. */
+  lookupCep: (cep: string) =>
+    apiClient.get<{ postalCode?: string; addressLine?: string; district?: string; city?: string; state?: string; lat?: number; lng?: number }>(
+      `/contacts/lookup/cep?cep=${encodeURIComponent(cep.replace(/\D/g, ''))}`
+    ),
+
+  /** Creates the client in the SGP, then files it here under the SGP's id. */
+  createInSgp: (data: ContactCreateInSgp) =>
+    apiClient.post<ContactProfile>('/contacts/sgp', data),
 
   /** The contacts as a CSV, with the list's search and state filter. */
   exportSheet: (filters: { search?: string; state?: string } = {}) => {

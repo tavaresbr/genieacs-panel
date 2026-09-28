@@ -4670,6 +4670,27 @@ export const migrations = [
         await createTableIfMissing(db, nome, construtor(db));
       }
     }
+  },
+  {
+    /**
+     * As colunas da TeiaH em `sgp_contacts` para quem rodou a primeira versão
+     * da 0077, de antes de `equipment_rented` existir: a 0077 ficou marcada
+     * como aplicada e não volta a rodar. Numa instalação nova a 0077 já cria
+     * tudo e este passo não acha nada a fazer.
+     */
+    id: '0082_sgp_contacts_teiah_columns',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('sgp_contacts'))) return true;
+      return (await missingColumns(db, 'sgp_contacts', SGP_CONTACT_TEIAH_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('sgp_contacts'))) return;
+      const faltando = await missingColumns(db, 'sgp_contacts', SGP_CONTACT_TEIAH_COLUMNS);
+      if (!faltando.length) return;
+      await db.schema.alterTable('sgp_contacts', (t) => {
+        for (const add of faltando) add(t);
+      });
+    }
   }
 ];
 export default migrations;

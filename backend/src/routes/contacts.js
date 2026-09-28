@@ -13,6 +13,26 @@ const router = express.Router();
  * provider finds nothing.
  */
 router.post('/', authenticateToken, requirePermission('contacts.edit'), ContactController.create);
+// "Novo cliente": the CPF/CNPJ first (the SGP and, for a company, the Receita),
+// the CEP next. Both ask outside services by hand, so they take the SGP
+// operator budget. Before `/:key`, like `export`.
+router.get(
+  '/lookup/document',
+  authenticateToken,
+  requirePermission('contacts.edit'),
+  sgpAdminLimiter,
+  ContactController.lookupDocument
+);
+router.get('/lookup/cep', authenticateToken, requirePermission('contacts.edit'), sgpAdminLimiter, ContactController.lookupCep);
+// Writes to the ERP: the contact permission AND the SGP one.
+router.post(
+  '/sgp',
+  authenticateToken,
+  requirePermission('contacts.edit'),
+  requirePermission('sgp.act'),
+  sgpAdminLimiter,
+  ContactController.createInSgp
+);
 // Before `/:key`, or `export` would be read as a key. The whole base in one
 // file — admin and owner only, like `tenant.export`.
 router.get('/export', authenticateToken, requirePermission('contacts.export'), ContactController.exportSheet);
