@@ -284,6 +284,7 @@ export default {
   'mapping.statusReady': "नेटवर्क की स्थिति मिल गई",
   'mapping.statusFailed': "अभी डिवाइस की स्थिति नहीं पढ़ी जा सकी",
   'mapping.outagesReady': "फ़ाइबर कट का इतिहास मिला",
+  'mapping.clientLocationMissing': "ग्राहक का PPPoE या डिवाइस बताएँ",
   'mapping.searchTooShort': "खोजने के लिए कम से कम 3 अक्षर लिखें।",
   'mapping.searchDone': "खोज पूरी हुई",
   'mapping.searchFailed': "अभी पता नहीं खोजा जा सका। थोड़ी देर में फिर कोशिश करें।",

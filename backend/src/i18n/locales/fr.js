@@ -286,6 +286,7 @@ export default {
   'mapping.statusReady': "État du réseau récupéré",
   'mapping.statusFailed': "Impossible de lire l'état des équipements pour le moment",
   'mapping.outagesReady': "Historique des coupures récupéré",
+  'mapping.clientLocationMissing': "Indiquez le PPPoE ou l'équipement du client",
   'mapping.searchTooShort': "Saisissez au moins 3 caractères pour rechercher.",
   'mapping.searchDone': "Recherche terminée",
   'mapping.searchFailed': "Impossible de rechercher l'adresse pour le moment. Réessayez dans un instant.",

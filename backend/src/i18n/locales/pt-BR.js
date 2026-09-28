@@ -283,6 +283,7 @@ export default {
   'mapping.statusReady': "Estado da rede obtido",
   'mapping.statusFailed': "Não foi possível ler o estado dos equipamentos agora",
   'mapping.outagesReady': "Histórico de rompimentos obtido",
+  'mapping.clientLocationMissing': "Informe o PPPoE ou o equipamento do cliente",
   'mapping.searchTooShort': "Digite ao menos 3 letras para buscar.",
   'mapping.searchDone': "Busca concluída",
   'mapping.searchFailed': "Não foi possível buscar o endereço agora. Tente de novo em instantes.",

@@ -286,6 +286,7 @@ export default {
   'mapping.statusReady': "Netzstatus abgerufen",
   'mapping.statusFailed': "Der Gerätestatus kann gerade nicht gelesen werden",
   'mapping.outagesReady': "Ausfallverlauf abgerufen",
+  'mapping.clientLocationMissing': "PPPoE oder Gerät des Kunden angeben",
   'mapping.searchTooShort': "Geben Sie mindestens 3 Zeichen ein, um zu suchen.",
   'mapping.searchDone': "Suche abgeschlossen",
   'mapping.searchFailed': "Die Adresse konnte gerade nicht gesucht werden. Versuchen Sie es gleich erneut.",

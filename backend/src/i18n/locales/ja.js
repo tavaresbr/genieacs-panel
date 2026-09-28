@@ -285,6 +285,7 @@ export default {
   'mapping.statusReady': "ネットワークの状態を取得しました",
   'mapping.statusFailed': "現在デバイスの状態を読み取れません",
   'mapping.outagesReady': "断線の履歴を取得しました",
+  'mapping.clientLocationMissing': "顧客の PPPoE または機器を指定してください",
   'mapping.searchTooShort': "検索するには3文字以上入力してください。",
   'mapping.searchDone': "検索が完了しました",
   'mapping.searchFailed': "現在住所を検索できません。しばらくしてから再度お試しください。",
