@@ -103,7 +103,19 @@ function periodoDoPlano(plano) {
 async function valorPedido({ externalId, plano, currency }) {
   const moedaPaga = String(currency || '').toUpperCase();
 
-  const cobranca = externalId ? await BillingCharge.byGatewayId(externalId) : null;
+  // 1a. A cobrança que NUNCA chegou ao gateway, marcada paga à mão pelo
+  //     console: sem id do lado de lá, a baixa manual usa `charge:<id da
+  //     linha>` como referência (ver `PlatformSubscriptionsController.settle`),
+  //     e é por ele que a linha se acha. Sem isto, a conferência cairia no
+  //     preço do plano — e uma cobrança cujo valor o console acabou de ajustar
+  //     seria conferida contra um número que não é o que se pediu. `tdb` por
+  //     baixo: o id de uma linha do vizinho simplesmente não é achado.
+  const daLinha = /^charge:(\d+)$/.exec(String(externalId ?? ''));
+  const cobranca = !externalId
+    ? null
+    : daLinha
+      ? await BillingCharge.findById(Number(daLinha[1]))
+      : await BillingCharge.byGatewayId(externalId);
   if (cobranca) {
     const valor = Number(cobranca.amount_cents);
     if (Number.isFinite(valor) && valor > 0) {
@@ -748,6 +760,101 @@ class SubscriptionService {
       type: BILLING_EVENT_TYPES.STATUS_CHANGED,
       createdBy: actorUserId,
       detail: { from: before.status, to: status, reason }
+    });
+    cache.invalidate();
+    return subscription;
+  }
+
+  /**
+   * Mexe nos PRAZOS do provedor em escopo sem mexer no estado — a cortesia de
+   * alguns dias, a data corrigida à mão pelo console.
+   *
+   * Três formas de pedir, e o controlador garante que venha uma só:
+   *
+   *   - `extendDays`: soma ao prazo VIVO. Em `trial`, o fim do teste; em
+   *     qualquer outro estado, a renovação. Soma a partir do maior entre o
+   *     prazo e agora — estender em cinco dias quem venceu há dez não pode
+   *     devolver um prazo que continua vencido, e estender quem vence daqui a
+   *     vinte não pode jogar fora os vinte.
+   *   - `renewsAt` e/ou `trialEndsAt`: a data exata. `trialEndsAt: null` apaga
+   *     o prazo do teste; `renewsAt` nulo não é aceito lá em cima, porque
+   *     "sem renovação" é assinatura fora de ciclo, e isso é decisão de
+   *     status, não de prazo.
+   *
+   * O status NÃO muda, e é o que separa isto de `setStatus`. Mas o estado que
+   * VALE pode mudar, e é o ponto: `effectiveStatus` calcula `past_due` a partir
+   * do prazo, então um `active` vencido volta a passar no instante em que o
+   * prazo anda — sem ninguém gravar `active` à mão e sem registrar pagamento
+   * que não houve.
+   *
+   * A descida agendada (0074) que estava marcada para o fim do período anda
+   * junto com ele: ela quer dizer "na renovação", e deixá-la na data velha a
+   * aplicaria no meio do período que a cortesia acabou de esticar. Só quando
+   * ela está exatamente na renovação antiga — uma agendada para outra data é
+   * outra decisão, e fica como está.
+   *
+   * Uma linha no extrato (`deadline.changed`, com `courtesy: true` quando é
+   * uma extensão), porque é o extrato que responde "por que este provedor
+   * renovou sem pagar?".
+   *
+   * @returns {Promise<object>} a assinatura depois da mudança.
+   */
+  static async setDeadlines({
+    renewsAt = undefined, trialEndsAt = undefined, extendDays = null,
+    reason = null, actorUserId = null, now = new Date()
+  }) {
+    const tenantId = currentTenantId();
+    const before = await Subscription.forTenant(tenantId);
+    if (!before) throw new Error('Subscription not found');
+
+    const patch = {};
+    if (extendDays !== null && extendDays !== undefined) {
+      const dias = Number(extendDays);
+      if (!Number.isInteger(dias) || dias < 1) throw new Error('extendDays must be a positive integer');
+      const coluna = before.status === 'trial' ? 'trial_ends_at' : 'renews_at';
+      const atual = asDate(before[coluna]);
+      const base = atual && atual.getTime() > now.getTime() ? atual : now;
+      patch[coluna] = new Date(base.getTime() + dias * DAY_MS);
+    } else {
+      if (renewsAt !== undefined) {
+        const data = asDate(renewsAt);
+        if (!data) throw new Error('renewsAt must be a date');
+        patch.renews_at = data;
+      }
+      if (trialEndsAt !== undefined) {
+        const data = trialEndsAt === null ? null : asDate(trialEndsAt);
+        if (trialEndsAt !== null && !data) throw new Error('trialEndsAt must be a date or null');
+        patch.trial_ends_at = data;
+      }
+    }
+    if (!Object.keys(patch).length) throw new Error('Nothing to change');
+
+    const renovacaoAntiga = asDate(before.renews_at);
+    const agendada = asDate(before.pending_plan_at);
+    if (patch.renews_at && before.pending_plan_id && renovacaoAntiga && agendada
+      && agendada.getTime() === renovacaoAntiga.getTime()) {
+      patch.pending_plan_at = patch.renews_at;
+    }
+
+    const iso = (valor) => {
+      const data = asDate(valor);
+      return data ? data.toISOString() : null;
+    };
+    const subscription = await getDb().transaction(async (trx) => {
+      const depois = await Subscription.upsertForTenant(tenantId, patch, trx);
+      await BillingEvent.record({
+        subscriptionId: before.id,
+        type: BILLING_EVENT_TYPES.DEADLINE_CHANGED,
+        createdBy: actorUserId,
+        detail: {
+          ...(extendDays ? { courtesy: true, extendDays: Number(extendDays) } : {}),
+          from: { renewsAt: iso(before.renews_at), trialEndsAt: iso(before.trial_ends_at) },
+          to: { renewsAt: iso(depois.renews_at), trialEndsAt: iso(depois.trial_ends_at) },
+          status: before.status,
+          reason
+        }
+      }, trx);
+      return depois;
     });
     cache.invalidate();
     return subscription;

@@ -50,7 +50,12 @@ class Subscription {
         'plans.name as plan_name',
         'plans.max_operators',
         'plans.max_subscribers',
-        'plans.max_devices'
+        'plans.max_devices',
+        // O preço vem junto para a tela de Assinaturas, que mostra quanto cada
+        // um paga — e uma segunda leitura de `plans` por linha seria a
+        // consulta N+1 que esta junção existe para não fazer.
+        'plans.price_cents as plan_price_cents',
+        'plans.currency as plan_currency'
       ));
   }
 

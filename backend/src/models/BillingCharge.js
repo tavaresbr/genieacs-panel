@@ -1,4 +1,5 @@
-import { tdb, tinsertReturningId } from '../config/database.js';
+import { getDb, tdb, tinsertReturningId } from '../config/database.js';
+import { runUnscoped } from '../config/tenantContext.js';
 
 /**
  * A cobrança que o painel emitiu a um provedor.
@@ -47,6 +48,26 @@ export const CHARGE_STATUSES = Object.freeze([
  * aberto" é exatamente a que some da tela de quem precisa cobrar.
  */
 export const OPEN_CHARGE_STATUSES = Object.freeze(['pending', 'failed', 'overdue']);
+
+/**
+ * `due_date` como `YYYY-MM-DD`, venha como vier.
+ *
+ * A coluna é `date`, e cada banco a devolve de um jeito: o SQLite, como o texto
+ * gravado; o Postgres e o MySQL, como um `Date` à meia-noite LOCAL do processo.
+ * Serializar esse `Date` com `toISOString` o levaria para UTC — e num servidor
+ * a leste de Greenwich, o dia anterior. Os campos locais são os que o driver
+ * preencheu, e são eles que se leem.
+ */
+function isoDateOf(valor) {
+  if (valor === null || valor === undefined || valor === '') return null;
+  if (valor instanceof Date) {
+    if (Number.isNaN(valor.getTime())) return null;
+    const mes = String(valor.getMonth() + 1).padStart(2, '0');
+    const dia = String(valor.getDate()).padStart(2, '0');
+    return `${valor.getFullYear()}-${mes}-${dia}`;
+  }
+  return String(valor).slice(0, 10);
+}
 
 class BillingCharge {
   /** A cobrança de um período, ou nada. É a leitura de idempotência da emissão. */
@@ -312,6 +333,64 @@ class BillingCharge {
   }
 
   /**
+   * As cobranças em aberto de TODOS os provedores, numa consulta só — o que a
+   * tela de Assinaturas do console soma e mostra ao lado de cada provedor.
+   *
+   * `runUnscoped` e o marcador pelo mesmo motivo de
+   * `Subscription.listWithPlans`: a leitura não tem filtro de provedor DE
+   * PROPÓSITO, porque quem pergunta está acima de todos eles, e a sentinela de
+   * SQL derrubaria a consulta crua sem a razão escrita. Uma consulta, e não uma
+   * por provedor: com cinquenta clientes, cinquenta `runInTenant` seriam a
+   * tela mais lenta do console para responder a pergunta mais simples dele.
+   *
+   * O índice `(tenant_id, status)` não serve a um `WHERE status IN (...)` sem
+   * provedor, e não precisa: em aberto há no máximo uma ou duas por provedor.
+   */
+  static async openAcrossTenants() {
+    // tenant-scope-exempt: listagem do plano de controle, acima dos provedores.
+    return runUnscoped('the console sums every provider\'s open charges', () => getDb()('billing_charges')
+      .whereIn('status', OPEN_CHARGE_STATUSES)
+      .orderBy('period_end', 'desc')
+      .orderBy('id', 'desc'));
+  }
+
+  /**
+   * Uma cobrança como o CONSOLE a vê: tudo o que `present` esconde do provedor.
+   *
+   * O id no gateway (é por ele que alguém acha a cobrança no painel da Asaas),
+   * as tentativas e o último erro (é o que diz por que ela não saiu) e as
+   * cobranças que esta linha JÁ FOI — a troca de plano cancela no gateway e
+   * reemite, e o boleto velho ainda pode ser pago: quem olha a linha precisa
+   * saber que existe um id antigo que também quita este período.
+   *
+   * O link de pagamento vai cru, de qualquer estado: quem opera o console abre
+   * a página do gateway de uma cobrança paga para conferir o recibo, que é
+   * exatamente o que a tela do provedor não deve convidar a fazer.
+   */
+  static presentForConsole(row) {
+    if (!row) return null;
+    return {
+      id: row.id,
+      periodEnd: row.period_end,
+      amountCents: Number(row.amount_cents),
+      currency: row.currency,
+      status: row.status,
+      dueDate: isoDateOf(row.due_date),
+      invoiceUrl: row.invoice_url ?? null,
+      provider: row.provider ?? null,
+      gatewayChargeId: row.gateway_charge_id ?? null,
+      attempts: Number(row.attempts ?? 0),
+      lastError: row.last_error ?? null,
+      createdAt: row.created_at ?? null,
+      updatedAt: row.updated_at ?? null,
+      superseded: BillingCharge.supersededOf(row).map((item) => ({
+        gatewayChargeId: String(item.id),
+        amountCents: Number(item.amountCents)
+      }))
+    };
+  }
+
+  /**
    * Uma cobrança como o PROVEDOR pode vê-la.
    *
    * A lista de colunas é curta de propósito, e o que ficou de fora é a parte
@@ -344,4 +423,4 @@ class BillingCharge {
 }
 
 export default BillingCharge;
-export { BillingCharge };
+export { BillingCharge, isoDateOf };

@@ -124,6 +124,35 @@ async function recordBoth(req, tenant, { platformAction, detail }) {
   }));
 }
 
+/**
+ * A assinatura de um provedor como o console a lê: o estado, o plano e o
+ * extrato recente.
+ *
+ * Função e não só o corpo de `getSubscription` porque a tela de Assinaturas
+ * responde a mudança de prazo com EXATAMENTE isto (ver
+ * `PlatformSubscriptionsController.setDeadlines`) — e duas cópias do mesmo
+ * objeto são duas telas que um dia discordam sobre o que é uma assinatura.
+ */
+async function subscriptionView(tenant) {
+  const state = await runInTenant(tenant.id, () => SubscriptionService.current());
+  const events = await runInTenant(tenant.id, () => BillingEvent.listRecent({ limit: 50 }));
+  return {
+    tenant: { id: tenant.id, slug: tenant.slug, name: tenant.name },
+    subscription: SubscriptionService.present(state),
+    planId: state.subscription?.plan_id ?? null,
+    events: events.map((event) => ({
+      id: event.id,
+      type: event.type,
+      amountCents: event.amount_cents,
+      currency: event.currency,
+      provider: event.provider,
+      externalId: event.external_id,
+      detail: event.detail ? JSON.parse(event.detail) : null,
+      at: event.created_at
+    }))
+  };
+}
+
 class PlatformBillingController {
   // ── Planos ───────────────────────────────────────────────────────────
 
@@ -268,23 +297,7 @@ class PlatformBillingController {
     try {
       const tenant = await tenantOr404(req, res);
       if (!tenant) return undefined;
-      const state = await runInTenant(tenant.id, () => SubscriptionService.current());
-      const events = await runInTenant(tenant.id, () => BillingEvent.listRecent({ limit: 50 }));
-      return res.json(createResponse('Subscription retrieved', {
-        tenant: { id: tenant.id, slug: tenant.slug, name: tenant.name },
-        subscription: SubscriptionService.present(state),
-        planId: state.subscription?.plan_id ?? null,
-        events: events.map((event) => ({
-          id: event.id,
-          type: event.type,
-          amountCents: event.amount_cents,
-          currency: event.currency,
-          provider: event.provider,
-          externalId: event.external_id,
-          detail: event.detail ? JSON.parse(event.detail) : null,
-          at: event.created_at
-        }))
-      }));
+      return res.json(createResponse('Subscription retrieved', await subscriptionView(tenant)));
     } catch (error) {
       console.error('Get subscription error:', error);
       return res.status(500).json(createErrorResponse('Failed to read the subscription', error.message));
@@ -475,5 +488,5 @@ class PlatformBillingController {
   }
 }
 
-export { PLAN_LIMIT_COLUMNS };
+export { PLAN_LIMIT_COLUMNS, recordBoth, subscriptionView };
 export default PlatformBillingController;
