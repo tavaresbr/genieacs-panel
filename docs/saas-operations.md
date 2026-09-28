@@ -956,9 +956,29 @@ resto (assinantes, WhatsApp, cobrança) segue normal.
 
 O ápice (`TENANT_BASE_DOMAIN`) serve a **página pública** em `/`: hero, recursos, como
 funciona, planos, dúvidas e "Pedir demonstração". O console continua em `/login` e
-`/platform` no mesmo endereço. Para o domínio de marketing (ex.: `tr69.com.br`) mostrar
-esta página, aponte-o para o mesmo painel como o ápice — ou use o próprio ápice como
-domínio do site.
+`/platform` no mesmo endereço.
+
+**Mostrar a página no domínio de marketing** (ex.: `tr69.com.br`, com o ápice em
+`painel.tr69.com.br`). Só apontar o DNS **não basta**: o painel responde 404 a um host
+que não conhece. Três caminhos:
+
+1. **Não mexer no domínio.** O site atual continua onde está e os links de "Planos" e
+   "Contratar" passam a apontar para `https://painel.tr69.com.br/#planos`.
+2. **Redirecionar.** `tr69.com.br` → `https://painel.tr69.com.br/` com 301 (nginx,
+   Cloudflare Page Rule/Redirect Rule, ou o painel da hospedagem).
+3. **Servir direto, sem redirecionar.**
+   - DNS de `tr69.com.br` e `www.tr69.com.br` para o servidor do painel.
+   - No proxy, um bloco igual ao do ápice com `server_name tr69.com.br www.tr69.com.br`
+     e o certificado desse nome (ver o comentário em
+     `deploy/proxy/nginx-saas.conf.example`). O `Host` tem que chegar intacto.
+   - `PLATFORM_EXTRA_HOSTS=tr69.com.br` no `.env` e reiniciar o painel. Vários nomes
+     vão separados por vírgula; o `www.` de cada um já está incluído.
+
+   O nome extra vale **exatamente como o ápice**: a página pública, o `/signup` e também
+   o login e o console da plataforma respondem nele. Um nome que o painel leria como
+   provedor (o próprio domínio-base, o do portal, ou `x.painel.tr69.com.br`) é ignorado
+   no boot, com aviso no log. O endereço dos provedores não muda: continua
+   `<slug>.painel.tr69.com.br`.
 
 - **Planos no site.** Console → Planos → Editar → "Página pública": marque *Mostrar na
   página pública*, escolha a ordem, o destaque ("Mais popular"), a descrição, os recursos

@@ -1,6 +1,7 @@
 import { getDb } from '../config/database.js';
 import { runInTenant } from '../config/tenantContext.js';
 import { IS_SAAS } from '../config/edition.js';
+import { log } from '../utils/logger.js';
 
 /**
  * Puts a provider into scope before anything under `/api` runs.
@@ -220,9 +221,46 @@ const PLATFORM_HOST_PATHS = new Set([
 // não é provedor. Só no SaaS, onde o ápice é a vitrine.
 const PLATFORM_HOST_PREFIXES = IS_SAAS ? ['/api/platform/', '/api/public/'] : [];
 
+/**
+ * Outros nomes do ápice: o domínio de marketing (`tr69.com.br`) servindo a
+ * mesma página pública e o mesmo console que `TENANT_BASE_DOMAIN`, sem
+ * redirecionar.
+ *
+ * Lista explícita e não "qualquer host que não nomeia provedor": um host que
+ * ninguém configurou continua 404, que é o que impede um DNS apontado por
+ * engano (ou por outra pessoa) de virar uma porta do console.
+ *
+ * Um nome que o resolvedor leria como provedor — o próprio domínio-base, o do
+ * portal, ou `x.<base>` — é descartado no boot, com aviso: aceitá-lo tornaria
+ * o mesmo host plataforma e provedor ao mesmo tempo, e a ordem dos `if` é que
+ * decidiria qual.
+ */
+function parseExtraHosts(raw) {
+  if (!IS_SAAS || !PANEL_BASE_DOMAIN) return [];
+  const hosts = [];
+  for (const item of String(raw ?? '').split(',')) {
+    const host = normalizeDomain(item);
+    if (!host) continue;
+    if (host === PANEL_BASE_DOMAIN || host === PORTAL_BASE_DOMAIN || tenantSlugFromHost(host)) {
+      log.warn('PLATFORM_EXTRA_HOSTS ignores a host that names the panel or a provider', { host });
+      continue;
+    }
+    if (!hosts.includes(host)) hosts.push(host);
+  }
+  return hosts;
+}
+
+const PLATFORM_EXTRA_HOSTS = parseExtraHosts(process.env.PLATFORM_EXTRA_HOSTS);
+
+/** Os nomes extras do ápice, já filtrados. */
+export function platformExtraHosts() {
+  return [...PLATFORM_EXTRA_HOSTS];
+}
+
 export function isPlatformHost(host) {
   if (!PANEL_BASE_DOMAIN || !host) return false;
-  return host === PANEL_BASE_DOMAIN || host === `www.${PANEL_BASE_DOMAIN}`;
+  return [PANEL_BASE_DOMAIN, ...PLATFORM_EXTRA_HOSTS]
+    .some((apex) => host === apex || host === `www.${apex}`);
 }
 
 function servedOnPlatformHost(req) {
