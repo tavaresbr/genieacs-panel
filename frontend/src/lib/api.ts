@@ -1468,6 +1468,59 @@ export interface TenantChargeView {
   createdAt: string | null
 }
 
+/**
+ * Uma cobrança como o CONSOLE a vê: além do que o provedor enxerga, quem a
+ * emitiu, quantas vezes se tentou, o último erro do gateway e as cobranças que
+ * esta substituiu (valor alterado ou reemissão geram um id novo na Asaas).
+ */
+export interface ChargeConsoleView {
+  id: number
+  periodEnd: string
+  amountCents: number
+  currency: string
+  status: TenantChargeView['status']
+  dueDate: string | null
+  invoiceUrl: string | null
+  provider: string
+  gatewayChargeId: string | null
+  attempts: number
+  lastError: string | null
+  createdAt: string | null
+  updatedAt: string | null
+  superseded: { gatewayChargeId: string; amountCents: number }[]
+}
+
+/** A assinatura resumida de uma linha da aba Assinaturas do console. */
+export interface SubscriptionConsoleSubscription {
+  status: SubscriptionStatus
+  storedStatus: SubscriptionStatus
+  planId: number | null
+  planCode: string | null
+  planName: string | null
+  priceCents: number | null
+  currency: string | null
+  trialEndsAt: string | null
+  renewsAt: string | null
+  pendingPlan: { id: number; name: string; priceCents: number; effectiveAt: string; locked: boolean } | null
+}
+
+/** Uma linha da aba Assinaturas: o provedor, a assinatura, o gateway e o boleto em aberto. */
+export interface SubscriptionConsoleRow {
+  tenant: { id: number; name: string; slug: string; status: string }
+  subscription: SubscriptionConsoleSubscription | null
+  gateway: { gateway: string | null; linked: boolean }
+  openCharge: ChargeConsoleView | null
+}
+
+/** O estado de uma linha; `none` é o provedor sem assinatura nenhuma. */
+export type SubscriptionConsoleStatus = SubscriptionStatus | 'none'
+
+export interface SubscriptionConsoleSummary {
+  byStatus: Record<SubscriptionConsoleStatus, number>
+  openTotalCents: number
+  overdueCount: number
+}
+
 export interface BillingEventView {
   id: number
   type: string
@@ -1734,6 +1787,50 @@ export const platformAPI = {
     // no tipo, a tela não tinha como contar a diferença.
     apiClient.post<{ subscription: SubscriptionView; duplicate?: boolean }>(
       `/platform/tenants/${tenantId}/payments`, payload
+    ),
+
+  // ── A aba Assinaturas: a carteira inteira e a mão nas cobranças ─────
+  listSubscriptions: () =>
+    apiClient.get<{ rows: SubscriptionConsoleRow[]; summary: SubscriptionConsoleSummary }>(
+      '/platform/subscriptions'
+    ),
+
+  listTenantCharges: (tenantId: number) =>
+    apiClient.get<{ charges: ChargeConsoleView[] }>(`/platform/tenants/${tenantId}/charges`),
+
+  /** Mexe nos prazos sem mexer no estado: data exata ou `extendDays` a mais. */
+  updateSubscriptionDeadlines: (tenantId: number, payload: {
+    renewsAt?: string; trialEndsAt?: string; extendDays?: number; reason?: string
+  }) =>
+    apiClient.requestWithBody<{ subscription: SubscriptionView }>(
+      'PATCH', `/platform/tenants/${tenantId}/subscription/deadlines`, payload
+    ),
+
+  /**
+   * Dá baixa numa cobrança paga fora do gateway (ou que o webhook perdeu).
+   * 409 `underpaid` traz `paidCents`/`expectedCents`; reenviar com
+   * `allowUnderpayment` registra mesmo assim.
+   */
+  settleCharge: (tenantId: number, chargeId: number, payload: {
+    paidAt: string; amountCents: number; allowUnderpayment?: boolean; note?: string
+  }) =>
+    apiClient.post<{ charge: ChargeConsoleView; subscription: SubscriptionView | null; duplicate: boolean }>(
+      `/platform/tenants/${tenantId}/charges/${chargeId}/settle`, payload
+    ),
+
+  cancelCharge: (tenantId: number, chargeId: number, payload: { reason?: string }) =>
+    apiClient.post<{ charge: ChargeConsoleView }>(
+      `/platform/tenants/${tenantId}/charges/${chargeId}/cancel`, payload
+    ),
+
+  updateCharge: (tenantId: number, chargeId: number, payload: { dueDate?: string; amountCents?: number }) =>
+    apiClient.requestWithBody<{ charge: ChargeConsoleView }>(
+      'PATCH', `/platform/tenants/${tenantId}/charges/${chargeId}`, payload
+    ),
+
+  reissueCharge: (tenantId: number, chargeId: number) =>
+    apiClient.post<{ charge: ChargeConsoleView }>(
+      `/platform/tenants/${tenantId}/charges/${chargeId}/reissue`, {}
     ),
 
   getUsage: (tenantId: number) =>
