@@ -47,6 +47,8 @@ let gateway;
 let recebidas = [];
 /** O que o gateway de mentira diz de cada cobrança no `GET /payments/{id}` — RECEIVED quando não diz nada. */
 const estadoNoGateway = new Map();
+/** O que o gateway de mentira faz antes de responder ao `refund` de um id. */
+const antesDoEstorno = new Map();
 let panelUrl;
 let consoleServer;
 let consoleUrl;
@@ -56,6 +58,7 @@ let beta;
 let gama;
 let caixa;
 let plano;
+let planoMini;
 
 function subirGateway() {
   gateway = http.createServer((req, res) => {
@@ -76,12 +79,24 @@ function subirGateway() {
         const id = decodeURIComponent(gesto[1]);
         if (id === 'pay_recusa') return responder(400, { errors: [{ description: 'saldo insuficiente para estorno' }] });
         const status = { refund: 'REFUNDED', undoReceivedInCash: 'PENDING', receiveInCash: 'RECEIVED_IN_CASH' }[gesto[2]];
+        // A corrida de verdade: a Asaas avisa do estorno ANTES de responder
+        // ao pedido dele — o webhook ganha do próprio console.
+        const antesDeResponder = gesto[2] === 'refund' ? antesDoEstorno.get(id) : null;
+        if (antesDeResponder) {
+          antesDeResponder().then(() => responder(200, { id, status }), () => responder(500, {}));
+          return undefined;
+        }
         return responder(200, { id, status });
       }
       const umaCobranca = /^\/payments\/([^/]+)$/.exec(caminho);
       if (req.method === 'GET' && umaCobranca) {
         const id = decodeURIComponent(umaCobranca[1]);
         return responder(200, { id, status: estadoNoGateway.get(id) ?? 'RECEIVED', value: 100 });
+      }
+      if (req.method === 'DELETE' && umaCobranca) {
+        const id = decodeURIComponent(umaCobranca[1]);
+        if (id === 'pay_nao_cancela') return responder(500, { errors: [{ description: 'fora do ar' }] });
+        return responder(200, { deleted: true, id });
       }
       return responder(404, {});
     });
@@ -146,9 +161,9 @@ async function abrirCobranca(tenantId, {
 }
 
 /** O Pix que o webhook creditou — o caminho de todo pagamento de verdade. */
-async function pagaPeloGateway(tenantId, gatewayChargeId, { value = 100 } = {}) {
+async function pagaPeloGateway(tenantId, gatewayChargeId, { value = 100, amountCents = 10000 } = {}) {
   const periodo = await periodoAtual(tenantId);
-  const id = await abrirCobranca(tenantId, { gatewayChargeId });
+  const id = await abrirCobranca(tenantId, { gatewayChargeId, amountCents });
   const aviso = await entregar({
     event: 'PAYMENT_RECEIVED',
     payment: { id: gatewayChargeId, value, externalReference: `tenant:${tenantId}:${periodo}` }
@@ -201,6 +216,9 @@ before(async () => {
   plano = await Plan.create({
     code: 'estorno-pro', name: 'Pro', price_cents: 10000, currency: 'BRL', period_days: 30, trial_days: 0, active: true
   });
+  planoMini = await Plan.create({
+    code: 'estorno-mini', name: 'Mini', price_cents: 5000, currency: 'BRL', period_days: 30, trial_days: 0, active: true
+  });
 });
 
 after(async () => {
@@ -215,6 +233,7 @@ after(async () => {
 beforeEach(async () => {
   recebidas = [];
   estadoNoGateway.clear();
+  antesDoEstorno.clear();
   const db = getDb();
   await db('billing_charges').whereIn('tenant_id', [beta, gama]).del();
   await db('billing_events').whereIn('tenant_id', [beta, gama]).del();
@@ -267,7 +286,7 @@ describe('o estorno pelo console', () => {
     const detalhe = JSON.parse(estorno.detail);
     assert.equal(detalhe.source, 'console');
     assert.equal(detalhe.reason, 'cliente desistiu');
-    assert.equal(detalhe.basis, 'recorded');
+    assert.equal(detalhe.basis, 'restored', 'nada mexeu no prazo depois: volta exatamente ao de antes');
     assert.equal(detalhe.reversedDays, 30);
 
     const trilha = await getDb()('platform_audit').where({ action: 'charge.refunded', tenant_id: beta }).first();
@@ -293,7 +312,7 @@ describe('o estorno pelo console', () => {
     assert.equal(outra.body.status, 'refunded');
   });
 
-  it('baixa em dinheiro: desfaz o recebimento no gateway em vez de estornar', async () => {
+  it('baixa em dinheiro: desfaz o recebimento e CANCELA no gateway — e um pagamento depois não some calado', async () => {
     const antes = await assinaturaDe(beta);
     const id = await abrirCobranca(beta, { gatewayChargeId: 'pay_dinheiro' });
     estadoNoGateway.set('pay_dinheiro', 'PENDING');
@@ -307,22 +326,118 @@ describe('o estorno pelo console', () => {
     const res = await estornar(beta, id);
     assert.equal(res.status, 200, JSON.stringify(res.body));
     assert.deepEqual(recebidas.map((r) => `${r.method} ${r.path}`), [
-      'GET /payments/pay_dinheiro', 'POST /payments/pay_dinheiro/undoReceivedInCash'
+      'GET /payments/pay_dinheiro', 'POST /payments/pay_dinheiro/undoReceivedInCash', 'DELETE /payments/pay_dinheiro'
     ]);
     assert.equal(ms((await assinaturaDe(beta)).renews_at), ms(antes.renews_at));
     assert.equal((await cobrancaDe(beta, id)).status, 'refunded');
+    const trilha = await getDb()('platform_audit').where({ action: 'charge.refunded', tenant_id: beta }).first();
+    assert.equal(JSON.parse(trilha.detail).atGateway, 'undo_received_in_cash');
+
+    // Se mesmo assim um pagamento chegar com esse id, ele não vira `duplicate`
+    // em silêncio: código próprio, nada creditado, nada marcado pago.
+    const aviso = await entregar({
+      event: 'PAYMENT_RECEIVED',
+      payment: { id: 'pay_dinheiro', value: 100, externalReference: `tenant:${beta}` }
+    });
+    assert.equal(aviso.status, 200);
+    assert.equal(aviso.body.code, 'refunded_reference');
+    assert.equal(ms((await assinaturaDe(beta)).renews_at), ms(antes.renews_at));
+    assert.equal((await cobrancaDe(beta, id)).status, 'refunded');
+    assert.equal((await eventosDe(beta)).filter((e) => e.type === 'payment.recorded').length, 1);
+  });
+
+  it('baixa em dinheiro desfeita, mas o cancelamento no gateway falhou: 502, e nada muda aqui', async () => {
+    const id = await abrirCobranca(beta, { gatewayChargeId: 'pay_nao_cancela' });
+    estadoNoGateway.set('pay_nao_cancela', 'PENDING');
+    const baixa = await platform(`/tenants/${beta}/charges/${id}/settle`, {
+      method: 'POST', body: { paidAt: hoje(), amountCents: 10000 }
+    });
+    assert.equal(baixa.status, 200, JSON.stringify(baixa.body));
+    const pago = await assinaturaDe(beta);
+    estadoNoGateway.set('pay_nao_cancela', 'RECEIVED_IN_CASH');
+
+    const res = await estornar(beta, id);
+    assert.equal(res.status, 502);
+    assert.equal(res.body.code, 'gateway_failed');
+    assert.equal((await cobrancaDe(beta, id)).status, 'paid');
+    assert.equal(ms((await assinaturaDe(beta)).renews_at), ms(pago.renews_at));
+    assert.equal((await estornosDe(beta)).length, 0);
+  });
+
+  it('o webhook do próprio estorno chega antes da resposta: não é "já estornado", e as datas são as do registro', async () => {
+    const antes = await assinaturaDe(beta);
+    const { id } = await pagaPeloGateway(beta, 'pay_corrida');
+    const pago = await assinaturaDe(beta);
+    let aviso;
+    antesDoEstorno.set('pay_corrida', async () => {
+      aviso = await entregar({
+        event: 'PAYMENT_REFUNDED', payment: { id: 'pay_corrida', value: 100, externalReference: `tenant:${beta}` }
+      });
+    });
+
+    const res = await estornar(beta, id);
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(aviso.body.reversal, 'reversed', 'o webhook desfez primeiro');
+    assert.equal(res.body.data.alreadyRefunded, false);
+    assert.equal(ms(res.body.data.renewsAtBefore), ms(pago.renews_at));
+    assert.equal(ms(res.body.data.renewsAtAfter), ms(antes.renews_at));
+    assert.equal(ms((await assinaturaDe(beta)).renews_at), ms(antes.renews_at), 'uma vez só');
+    assert.equal((await estornosDe(beta)).length, 1);
+    const trilha = JSON.parse((await getDb()('platform_audit')
+      .where({ action: 'charge.refunded', tenant_id: beta }).first()).detail);
+    assert.equal(trilha.alreadyRefunded, false);
+    assert.equal(ms(trilha.renewsAtBefore), ms(pago.renews_at));
+    assert.equal(ms(trilha.renewsAtAfter), ms(antes.renews_at));
+  });
+
+  it('pago atrasado e o prazo mexido depois: desfaz só o período comprado, não os dias vencidos', async () => {
+    // O prazo venceu há dez dias; o pagamento A chega atrasado e conta de
+    // agora (+30); o B chega adiantado e soma mais 30. Estornar A tira os 30
+    // que A comprou — e não os 40 entre o prazo vencido e o fim de A, que
+    // comeriam dez dias do B.
+    const vencido = new Date(Math.floor((Date.now() - 10 * DAY) / 1000) * 1000);
+    await Subscription.upsertForTenant(beta, { renews_at: vencido });
+    await SubscriptionService.invalidate(beta);
+    const { id: cobrancaA } = await pagaPeloGateway(beta, 'pay_a_atrasado');
+    const depoisDeA = await assinaturaDe(beta);
+    await pagaPeloGateway(beta, 'pay_b_adiantado');
+    const depoisDeB = await assinaturaDe(beta);
+    assert.equal(ms(depoisDeB.renews_at), ms(depoisDeA.renews_at) + 30 * DAY);
+
+    const res = await estornar(beta, cobrancaA);
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(ms((await assinaturaDe(beta)).renews_at), ms(depoisDeB.renews_at) - 30 * DAY);
+    const [estorno] = await estornosDe(beta);
+    assert.equal(JSON.parse(estorno.detail).basis, 'purchased');
+    assert.equal(JSON.parse(estorno.detail).reversedDays, 30);
   });
 
   it('já estornada no painel da Asaas, sem o webhook: segue sem chamar o estorno e desfaz o lado de cá', async () => {
     const antes = await assinaturaDe(beta);
     const { id } = await pagaPeloGateway(beta, 'pay_la_dentro');
-    estadoNoGateway.set('pay_la_dentro', 'REFUND_REQUESTED');
+    estadoNoGateway.set('pay_la_dentro', 'REFUNDED');
     recebidas = [];
 
     const res = await estornar(beta, id);
     assert.equal(res.status, 200, JSON.stringify(res.body));
     assert.deepEqual(recebidas.map((r) => `${r.method} ${r.path}`), ['GET /payments/pay_la_dentro']);
     assert.equal(ms((await assinaturaDe(beta)).renews_at), ms(antes.renews_at));
+    const trilha = await getDb()('platform_audit').where({ action: 'charge.refunded', tenant_id: beta }).first();
+    assert.equal(JSON.parse(trilha.detail).atGateway, 'already_refunded');
+  });
+
+  it('com o estorno a caminho no gateway: segue, e a trilha diz que ele não é final', async () => {
+    const antes = await assinaturaDe(beta);
+    const { id } = await pagaPeloGateway(beta, 'pay_a_caminho');
+    estadoNoGateway.set('pay_a_caminho', 'REFUND_IN_PROGRESS');
+    recebidas = [];
+
+    const res = await estornar(beta, id);
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.deepEqual(recebidas.map((r) => `${r.method} ${r.path}`), ['GET /payments/pay_a_caminho']);
+    assert.equal(ms((await assinaturaDe(beta)).renews_at), ms(antes.renews_at));
+    const trilha = await getDb()('platform_audit').where({ action: 'charge.refunded', tenant_id: beta }).first();
+    assert.equal(JSON.parse(trilha.detail).atGateway, 'refund_in_progress');
   });
 
   it('o gateway recusou: 502, e nada muda', async () => {
@@ -466,6 +581,38 @@ describe('o estorno pelo console', () => {
   });
 });
 
+describe('a trava da descida agendada', () => {
+  /** A descida para o Mini na renovação, paga adiantada pelo preço dele — o que a trava. */
+  async function descidaPaga(gatewayChargeId) {
+    const sub = await assinaturaDe(beta);
+    await Subscription.upsertForTenant(beta, { pending_plan_id: planoMini.id, pending_plan_at: sub.renews_at });
+    await SubscriptionService.invalidate(beta);
+    const { id } = await pagaPeloGateway(beta, gatewayChargeId, { value: 50, amountCents: 5000 });
+    const travada = await assinaturaDe(beta);
+    assert.ok(travada.pending_plan_locked_at, 'pagou o preço do Mini: a descida travou');
+    return id;
+  }
+
+  it('sai com o estorno do pagamento que a pôs', async () => {
+    const id = await descidaPaga('pay_trava');
+    const res = await estornar(beta, id);
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    const depois = await assinaturaDe(beta);
+    assert.equal(depois.pending_plan_locked_at, null);
+    assert.equal(Number(depois.pending_plan_id), planoMini.id, 'a descida continua agendada, só destravada');
+    assert.equal(JSON.parse((await estornosDe(beta))[0].detail).pendingUnlocked, true);
+  });
+
+  it('e fica quando a trava de agora não é a que ele pôs', async () => {
+    const id = await descidaPaga('pay_trava_outra');
+    const outraTrava = new Date(Math.floor((Date.now() + 3600_000) / 1000) * 1000);
+    await Subscription.upsertForTenant(beta, { pending_plan_locked_at: outraTrava });
+    const res = await estornar(beta, id);
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(ms((await assinaturaDe(beta)).pending_plan_locked_at), outraTrava.getTime());
+  });
+});
+
 describe('o estorno pelo painel da Asaas (webhook)', () => {
   it('desfaz o período, e o botão do console depois não tem o que estornar', async () => {
     const antes = await assinaturaDe(beta);
@@ -493,6 +640,37 @@ describe('o estorno pelo painel da Asaas (webhook)', () => {
     assert.equal(ms((await assinaturaDe(beta)).renews_at), ms(antes.renews_at));
     const [estorno] = await estornosDe(beta);
     assert.equal(JSON.parse(estorno.detail).basis, 'not_extended');
+  });
+
+  it('o estorno parcial não desfaz nada, nem a etiqueta', async () => {
+    const pago = await (async () => { await pagaPeloGateway(beta, 'pay_parcial'); return assinaturaDe(beta); })();
+    const aviso = await entregar({
+      event: 'PAYMENT_REFUNDED',
+      payment: {
+        id: 'pay_parcial', value: 100, externalReference: `tenant:${beta}`,
+        refunds: [{ status: 'DONE', value: 40 }]
+      }
+    });
+    assert.equal(aviso.status, 200);
+    assert.equal(aviso.body.code, 'partial_refund');
+    assert.equal(ms((await assinaturaDe(beta)).renews_at), ms(pago.renews_at));
+    const linha = await getDb()('billing_charges').where({ tenant_id: beta, gateway_charge_id: 'pay_parcial' }).first();
+    assert.equal(linha.status, 'paid');
+    assert.equal((await estornosDe(beta)).length, 0);
+  });
+
+  it('os outros eventos de estorno (negado, em andamento) só vão para o log', async () => {
+    const pago = await (async () => { await pagaPeloGateway(beta, 'pay_negado'); return assinaturaDe(beta); })();
+    for (const event of ['PAYMENT_REFUND_DENIED', 'PAYMENT_REFUND_IN_PROGRESS', 'PAYMENT_PARTIALLY_REFUNDED']) {
+      const aviso = await entregar({
+        event, payment: { id: 'pay_negado', value: 100, externalReference: `tenant:${beta}` }
+      });
+      assert.equal(aviso.status, 200);
+      assert.equal(aviso.body.code, 'refund_event_logged', event);
+    }
+    assert.equal(ms((await assinaturaDe(beta)).renews_at), ms(pago.renews_at));
+    const linha = await getDb()('billing_charges').where({ tenant_id: beta, gateway_charge_id: 'pay_negado' }).first();
+    assert.equal(linha.status, 'paid');
   });
 
   it('o estorno de um pagamento que o extrato não conhece não mexe em nada', async () => {

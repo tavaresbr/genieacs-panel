@@ -159,15 +159,32 @@ async function tomar(cobranca, now = new Date()) {
 const RECEBIDA_NO_GATEWAY = new Set(['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH']);
 
 /**
- * Os estados do gateway em que o dinheiro JÁ VOLTOU, ou está voltando — o
- * estorno pedido no painel da Asaas, ou por uma tentativa anterior deste botão
- * cuja resposta se perdeu. Pedir o estorno de novo seria recusado; o console
- * segue sem ele e desfaz só o lado de cá. Conferido contra a documentação da
- * Asaas em setembro de 2026: `REFUNDED` (devolvido), `REFUND_REQUESTED` e
- * `REFUND_IN_PROGRESS` (pedido, a caminho). O dinheiro já não é nosso em
- * nenhum dos três, e o período que ele comprou não deve continuar valendo.
+ * O estado do gateway em que o dinheiro JÁ VOLTOU, e é final: o estorno
+ * pedido no painel da Asaas, ou por uma tentativa anterior deste botão cuja
+ * resposta se perdeu. Pedir o estorno de novo seria recusado; o console segue
+ * sem ele e desfaz só o lado de cá. Conferido contra a documentação da Asaas
+ * em setembro de 2026.
  */
-const ESTORNADA_NO_GATEWAY = new Set(['REFUNDED', 'REFUND_REQUESTED', 'REFUND_IN_PROGRESS']);
+const ESTORNADA_NO_GATEWAY = new Set(['REFUNDED']);
+
+/**
+ * Os estados em que o estorno foi PEDIDO e ainda não terminou
+ * (`REFUND_REQUESTED`, `REFUND_IN_PROGRESS`). Não são finais — a Asaas ainda
+ * pode negar (`PAYMENT_REFUND_DENIED`, que o webhook registra aos gritos) —,
+ * mas o console segue do mesmo jeito: o dinheiro está a caminho de volta, pedir
+ * de novo seria recusado, e deixar o período valendo enquanto ele volta seria
+ * entregar o que já está sendo devolvido. A trilha diz qual dos dois foi
+ * (`atGateway: 'refund_in_progress'`), para quem for conferir a negativa.
+ */
+const ESTORNO_A_CAMINHO = new Set(['REFUND_REQUESTED', 'REFUND_IN_PROGRESS']);
+
+/**
+ * Os gestos em que ESTA requisição moveu o dinheiro no gateway. Com eles, um
+ * estorno que o extrato já tem (`duplicate`) não é "já estornado": é o
+ * `PAYMENT_REFUNDED` do próprio gesto chegando antes da resposta — e a tela
+ * precisa dizer que estornou, não que alguém estornou antes.
+ */
+const GESTOS_QUE_MOVEM = new Set(['refunded', 'undo_received_in_cash']);
 
 /**
  * A baixa de uma cobrança cuja referência JÁ tem pagamento no extrato — o
@@ -848,12 +865,18 @@ class PlatformSubscriptionsController {
    *      Primeiro a LEITURA (`getCharge`), e ela escolhe o gesto:
    *        - `RECEIVED_IN_CASH` (a baixa manual que o console deu lá dentro):
    *          não há dinheiro do lado de lá, e o que se desfaz é a etiqueta —
-   *          `undoReceivedInCash`;
+   *          `undoReceivedInCash` — e, NO MESMO PASSO, a cobrança é cancelada
+   *          lá (`cancelCharge`, 404 é sucesso). Desfeita a baixa, a Asaas a
+   *          devolve a `PENDING`, com o link de pagamento valendo; um
+   *          pagamento de verdade nela chegaria com o id que o extrato já
+   *          conhece, cairia como `duplicate` e o dinheiro entraria sem crédito
+   *          nenhum. Se o cancelamento falha, 502 e nada é gravado aqui;
    *        - `RECEIVED`/`CONFIRMED`: o dinheiro entrou pelo gateway e volta
    *          por ele — `refundCharge`;
-   *        - já estornada ou a caminho (`ESTORNADA_NO_GATEWAY`): alguém
-   *          estornou no painel da Asaas, ou uma tentativa anterior deste
-   *          botão caiu depois do gateway. Segue sem chamada nenhuma;
+   *        - já estornada (`REFUNDED`) ou com o estorno a caminho
+   *          (`ESTORNO_A_CAMINHO`): alguém estornou no painel da Asaas, ou uma
+   *          tentativa anterior deste botão caiu depois do gateway. Segue sem
+   *          chamada nenhuma;
    *        - qualquer outro estado: o gateway não tem o dinheiro que o painel
    *          diz ter recebido. 409 `not_paid` com os dois estados — quem sabe
    *          que o dinheiro veio por fora manda de novo com `outsideGateway`.
@@ -913,8 +936,14 @@ class PlatformSubscriptionsController {
               const status = String(situacao?.status ?? '').toUpperCase();
               if (ESTORNADA_NO_GATEWAY.has(status)) {
                 atGateway = 'already_refunded';
+              } else if (ESTORNO_A_CAMINHO.has(status)) {
+                atGateway = 'refund_in_progress';
               } else if (status === 'RECEIVED_IN_CASH' && typeof gateway.undoReceivedInCash === 'function') {
                 await noGateway(() => gateway.undoReceivedInCash(id));
+                // Sem isto a cobrança volta a ser pagável lá — ver o topo.
+                if (typeof gateway.cancelCharge === 'function') {
+                  await noGateway(() => gateway.cancelCharge(id));
+                }
                 atGateway = 'undo_received_in_cash';
               } else if (status === 'RECEIVED' || status === 'CONFIRMED') {
                 await noGateway(() => gateway.refundCharge(id));
@@ -969,6 +998,11 @@ class PlatformSubscriptionsController {
       }
 
       const { estorno } = resultado;
+      // O `duplicate` de quem acabou de mover o dinheiro é o webhook do
+      // próprio gesto chegando antes — não um estorno anterior. As datas vêm
+      // do registro que ganhou a corrida (ver `reversePayment`), e são as
+      // mesmas que este gesto teria gravado.
+      const alreadyRefunded = Boolean(estorno.duplicate) && !GESTOS_QUE_MOVEM.has(resultado.atGateway);
       await recordBoth(req, tenant, {
         platformAction: PlatformAudit.ACTIONS.CHARGE_REFUNDED,
         detail: {
@@ -981,7 +1015,7 @@ class PlatformSubscriptionsController {
           outsideGateway,
           atGateway: resultado.atGateway,
           reference: estorno.reference ?? null,
-          alreadyRefunded: estorno.duplicate,
+          alreadyRefunded,
           reason
         }
       });
@@ -990,7 +1024,7 @@ class PlatformSubscriptionsController {
         subscription: await subscriptionView(tenant),
         renewsAtBefore: estorno.renewsAtBefore,
         renewsAtAfter: estorno.renewsAtAfter,
-        alreadyRefunded: estorno.duplicate
+        alreadyRefunded
       }));
     } catch (error) {
       console.error('Refund charge error:', error);

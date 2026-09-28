@@ -232,12 +232,34 @@ export class AsaasBillingProvider extends BillingProvider {
     const externalId = String(pagamento.id ?? '').trim();
     if (!externalId) return null;
 
+    // O estorno PARCIAL, quando o corpo deixa dizer: a soma dos estornos da
+    // lista `refunds` (os cancelados não contam), ou `refundedValue` quando a
+    // lista não vem, contra o valor do pagamento. Sem nenhum dos dois, não se
+    // sabe — e "não sei" é tratado como inteiro, que é o que o
+    // `PAYMENT_REFUNDED` diz por nome. Conservador na outra direção: só é
+    // parcial o que o corpo PROVA que é.
+    let refundedCents = null;
+    if (Array.isArray(pagamento.refunds) && pagamento.refunds.length) {
+      const validos = pagamento.refunds
+        .filter((item) => item && String(item.status ?? '').toUpperCase() !== 'CANCELLED')
+        .map((item) => paraCentavos(item.value));
+      if (validos.length && validos.every((valor) => valor !== null)) {
+        refundedCents = validos.reduce((soma, valor) => soma + valor, 0);
+      }
+    } else if (pagamento.refundedValue !== undefined && pagamento.refundedValue !== null) {
+      refundedCents = paraCentavos(pagamento.refundedValue);
+    }
+    const valueCents = paraCentavos(pagamento.value);
+    const partial = status === 'refunded' && refundedCents !== null && valueCents !== null
+      && refundedCents < valueCents;
+
     return {
       event: evento,
       status,
       externalId,
       customerRef: pagamento.customer ? String(pagamento.customer) : null,
-      reference: pagamento.externalReference ? String(pagamento.externalReference) : null
+      reference: pagamento.externalReference ? String(pagamento.externalReference) : null,
+      ...(status === 'refunded' ? { partial, refundedCents, valueCents } : {})
     };
   }
 

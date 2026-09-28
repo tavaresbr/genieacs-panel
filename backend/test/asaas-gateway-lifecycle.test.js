@@ -218,8 +218,21 @@ describe('a leitura dos eventos do ciclo, pura', () => {
     const estorno = AsaasBillingProvider.interpretarCiclo(corpo('PAYMENT_REFUNDED'));
     assert.deepEqual(estorno, {
       event: 'PAYMENT_REFUNDED', status: 'refunded', externalId: 'pay_c',
-      customerRef: 'cus_x', reference: 'tenant:3:2026-10-01'
+      customerRef: 'cus_x', reference: 'tenant:3:2026-10-01',
+      partial: false, refundedCents: null, valueCents: null
     });
+  });
+
+  it('e só chama de parcial o estorno que o corpo PROVA que é', () => {
+    const ler = (extra) => AsaasBillingProvider.interpretarCiclo(corpo('PAYMENT_REFUNDED', extra));
+    const parcial = ler({ value: 100, refunds: [{ status: 'DONE', value: 40 }, { status: 'CANCELLED', value: 60 }] });
+    assert.equal(parcial.partial, true);
+    assert.equal(parcial.refundedCents, 4000);
+    assert.equal(parcial.valueCents, 10000);
+    assert.equal(ler({ value: 100, refunds: [{ status: 'DONE', value: 100 }] }).partial, false);
+    assert.equal(ler({ value: 100, refundedValue: 30 }).partial, true);
+    assert.equal(ler({ value: 100 }).partial, false, 'sem como saber, é o inteiro que o nome diz');
+    assert.equal(AsaasBillingProvider.interpretarCiclo(corpo('PAYMENT_OVERDUE', { value: 100 })).partial, undefined);
   });
 
   it('e nunca lê um evento de crédito, nem um corpo sem id', () => {

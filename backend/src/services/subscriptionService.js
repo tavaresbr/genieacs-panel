@@ -227,47 +227,40 @@ function detalheDe(evento) {
 const ESTADOS_QUE_ESTENDEM = new Set(['trial', 'active', 'past_due']);
 
 /**
- * Quanto o pagamento de `detalhe` empurrou o prazo, em milissegundos, e de
- * onde saiu a conta. Ver `reversePayment`.
+ * O que o pagamento de `detalhe` comprou, e de onde saiu a conta. Ver
+ * `reversePayment`, que é quem decide QUANTO disto se desfaz.
  *
- * Três respostas, da mais exata para a menos:
- *
- *   - `recorded`: o evento gravou o prazo de antes (`renewsBefore`, desde o
- *     estorno) e o de depois (`renewsAt`). A diferença é exatamente o que ele
- *     deu — inclusive o pagamento atrasado, que contou de agora e não do
- *     prazo vencido: desfazê-lo devolve o prazo vencido, que é onde o
- *     provedor estava antes de pagar. Arredondada ao segundo, porque o MySQL
- *     guarda o prazo ao segundo e o `renewsAt` do evento saiu da memória,
- *     com milissegundos que o banco não viu.
- *   - `period_days`: o prazo de antes não existia (vinha do teste, sem
- *     renovação) ou o evento é de antes do estorno existir. Vale o período
- *     que o evento diz ter creditado, ou o do plano do evento, ou o do plano
- *     de hoje — nessa ordem, que é a da confiança.
- *   - `not_extended`: o pagamento não empurrou nada — foi a menos e ninguém
- *     aceitou a diferença, ou a assinatura estava parada por gente
- *     (`suspended`, `canceled`). Estornar não devolve dia nenhum.
+ *   - `from`/`to`: o prazo de antes (`renewsBefore`, gravado desde o estorno)
+ *     e o de depois (`renewsAt`). É o que permite a `reversePayment` devolver
+ *     EXATAMENTE o prazo de antes quando nada o mexeu depois do pagamento.
+ *   - `ms`: o período COMPRADO — e só ele. O prazo novo de um pagamento é
+ *     sempre `base + periodDays`, com `base` o maior entre o prazo de antes e
+ *     o instante do pagamento; `renewsAt − max(renewsBefore, pago em)` é,
+ *     então, os `periodDays` que ele gravou. É isto que se subtrai quando
+ *     outra coisa mexeu no prazo depois (outro pagamento, uma cortesia): a
+ *     diferença crua `renewsAt − renewsBefore` de um pagamento ATRASADO
+ *     incluiria os dias vencidos entre o prazo velho e o pagamento — que
+ *     ninguém comprou — e tiraria do pagamento seguinte o que era dele.
+ *   - `basis`: `purchased` (o evento gravou `periodDays`), `period_days` (o
+ *     evento é de antes do estorno existir: o período do plano do evento, se
+ *     gravado, ou o de hoje) ou `not_extended` — o pagamento não empurrou
+ *     nada, porque foi a menos e ninguém aceitou a diferença, ou porque a
+ *     assinatura estava parada por gente (`suspended`, `canceled`). Estornar
+ *     esse não devolve dia nenhum.
  */
 async function duracaoCreditada(detalhe, planoAtual) {
-  if (!detalhe || detalhe.underpaid) return { ms: 0, basis: 'not_extended' };
+  if (!detalhe || detalhe.underpaid) return { ms: 0, basis: 'not_extended', from: null, to: null };
   if (detalhe.statusBefore && !ESTADOS_QUE_ESTENDEM.has(detalhe.statusBefore)) {
-    return { ms: 0, basis: 'not_extended' };
+    return { ms: 0, basis: 'not_extended', from: null, to: null };
   }
-  const antes = asDate(detalhe.renewsBefore);
-  const depois = asDate(detalhe.renewsAt);
-  if (antes && depois) {
-    return {
-      ms: Math.max(0, Math.round((depois.getTime() - antes.getTime()) / 1000) * 1000),
-      basis: 'recorded',
-      from: antes,
-      to: depois
-    };
+  const from = asDate(detalhe.renewsBefore);
+  const to = asDate(detalhe.renewsAt);
+  const gravado = Number(detalhe.periodDays);
+  if (Number.isFinite(gravado) && gravado > 0) {
+    return { ms: Math.floor(gravado) * DAY_MS, basis: 'purchased', from, to };
   }
-  let dias = Number(detalhe.periodDays);
-  if (!Number.isFinite(dias) || dias <= 0) {
-    const planoDoEvento = detalhe.planId ? await Plan.findById(detalhe.planId) : null;
-    dias = periodoDoPlano(planoDoEvento ?? planoAtual);
-  }
-  return { ms: Math.floor(dias) * DAY_MS, basis: 'period_days' };
+  const planoDoEvento = detalhe.planId ? await Plan.findById(detalhe.planId) : null;
+  return { ms: periodoDoPlano(planoDoEvento ?? planoAtual) * DAY_MS, basis: 'period_days', from, to };
 }
 
 class SubscriptionService {
@@ -1189,9 +1182,12 @@ class SubscriptionService {
             // do plano de hoje, que pode não ser o de quando se pagou.
             renewsBefore: isoOf(before.renews_at),
             ...(reactivates ? { periodDays: dias, planId: plano?.id ?? null } : {}),
-            // A trava da descida agendada foi posta POR este pagamento: o
-            // estorno dele a tira, porque o que a pagou voltou.
-            ...(patch.pending_plan_locked_at ? { pendingLocked: true } : {}),
+            // A trava da descida agendada foi posta POR este pagamento, e
+            // QUANDO: o estorno dele a tira, porque o que a pagou voltou — mas
+            // só se ela ainda tem este instante (ver `reversePayment`).
+            ...(patch.pending_plan_locked_at
+              ? { pendingLocked: true, pendingLockedAt: patch.pending_plan_locked_at.toISOString() }
+              : {}),
             // O que foi pedido viaja com o evento porque o extrato é o único
             // lugar onde alguém reconstrói, meses depois, por que aquele
             // pagamento não esticou o período.
@@ -1248,8 +1244,10 @@ class SubscriptionService {
    * O dinheiro de um pagamento VOLTOU: desfaz o período que ele comprou.
    *
    * Decisão de quem opera o SaaS: o estorno é só o inteiro, e desfaz o período
-   * pago — `renews_at` volta exatamente o quanto aquele pagamento o empurrou
-   * (ver `duracaoCreditada`). Se a data que sobra já passou, o provedor é
+   * pago. Quando nada mexeu no prazo depois do pagamento, `renews_at` volta
+   * EXATAMENTE ao prazo de antes dele; quando algo mexeu (outro pagamento,
+   * uma cortesia), volta só o período que ele COMPROU (ver
+   * `duracaoCreditada`), e o que os outros deram fica. Se a data que sobra já passou, o provedor é
    * `past_due` pela regra de sempre (`effectiveStatus`), e nenhum `past_due` é
    * gravado aqui: o status da coluna não muda, do mesmo jeito que o prazo que
    * vence sozinho não o muda. Um `trial` que pagou e virou `active` não volta a
@@ -1282,8 +1280,10 @@ class SubscriptionService {
    * A descida agendada que o pagamento APLICOU (pagou atrasado e o período
    * novo nasceu no plano novo) continua aplicada, e a marca de subida no meio
    * do período que ele apagou continua apagada: trocar o plano de novo é
-   * decisão de gente, com o console. A trava da descida que ele PÔS
-   * (`pendingLocked`) sai — o que a pagou voltou —, e a descida marcada para a
+   * decisão de gente, com o console. A trava da descida que ele PÔS sai — o
+   * que a pagou voltou —, mas só se ainda é a MESMA trava: o evento grava o
+   * instante em que travou (`pendingLockedAt`), e uma trava posta depois, por
+   * outro pagamento, tem outro instante e fica. A descida marcada para a
    * renovação anda junto com ela, como na cortesia (`setDeadlines`).
    *
    * @returns {Promise<{ subscription: object, duplicate: boolean, found: boolean,
@@ -1305,8 +1305,26 @@ class SubscriptionService {
       basis: null,
       ...extra
     });
+    // O estorno que já aconteceu responde com as datas DELE — as que o
+    // primeiro a gravar moveu —, e não com o prazo de agora repetido nos dois
+    // campos: quem chega depois (o botão do console que perdeu a corrida para
+    // o próprio webhook) precisa dizer na tela e na trilha o que de fato
+    // mudou.
+    const jaFeito = async (marca) => {
+      const agora = await Subscription.forTenant(tenantId);
+      const lido = detalheDe(marca);
+      return {
+        subscription: agora,
+        duplicate: true,
+        found: true,
+        renewsAtBefore: lido && 'renewsBefore' in lido ? lido.renewsBefore : isoOf(agora?.renews_at),
+        renewsAtAfter: lido && 'renewsAt' in lido ? lido.renewsAt : isoOf(agora?.renews_at),
+        basis: lido?.basis ?? null
+      };
+    };
 
-    if (await BillingEvent.findByExternalId(referenciaDoEstorno)) return intacta({ duplicate: true, found: true });
+    const marcaAnterior = await BillingEvent.findByExternalId(referenciaDoEstorno);
+    if (marcaAnterior) return jaFeito(marcaAnterior);
 
     // O pagamento que se estorna. Sem ele não há período a desfazer — e nem
     // marca a gravar: um estorno de algo que o extrato não conhece (a
@@ -1323,7 +1341,9 @@ class SubscriptionService {
       quemEstendeu = aceite?.type === BILLING_EVENT_TYPES.PAYMENT_RECORDED ? detalheDe(aceite) : null;
     }
     const planoAtual = before.plan_id ? await Plan.findById(before.plan_id) : null;
-    const { ms, basis, from, to } = await duracaoCreditada(quemEstendeu, planoAtual);
+    const credito = await duracaoCreditada(quemEstendeu, planoAtual);
+    const { ms, from, to } = credito;
+    let { basis } = credito;
 
     const patch = {};
     const prazo = asDate(before.renews_at);
@@ -1335,6 +1355,7 @@ class SubscriptionService {
       // este deu, e o resto fica.
       const intocado = from && to && Math.abs(prazo.getTime() - to.getTime()) < 1000;
       patch.renews_at = intocado ? new Date(from.getTime()) : new Date(prazo.getTime() - ms);
+      if (intocado) basis = 'restored';
       const agendada = asDate(before.pending_plan_at);
       if (before.pending_plan_id && agendada && agendada.getTime() === prazo.getTime()) {
         patch.pending_plan_at = patch.renews_at;
@@ -1345,7 +1366,14 @@ class SubscriptionService {
       // segue registrado.
       console.warn(`Refund of payment ${referencia} for provider ${tenantId}: the subscription has no renewal date to roll back`);
     }
-    if (quemEstendeu?.pendingLocked && before.pending_plan_locked_at) patch.pending_plan_locked_at = null;
+    // A trava só sai se é a que ESTE pagamento pôs — o mesmo instante, com a
+    // folga do segundo que o MySQL arredonda. Evento antigo, sem o instante
+    // gravado, não destrava nada: sem como provar de quem é a trava, ela fica.
+    const travouEm = asDate(quemEstendeu?.pendingLockedAt);
+    const travaAtual = asDate(before.pending_plan_locked_at);
+    if (travouEm && travaAtual && Math.abs(travouEm.getTime() - travaAtual.getTime()) < 1000) {
+      patch.pending_plan_locked_at = null;
+    }
 
     try {
       const subscription = await getDb().transaction(async (trx) => {
@@ -1365,7 +1393,9 @@ class SubscriptionService {
             status: before.status,
             renewsBefore: isoOf(before.renews_at),
             renewsAt: patch.renews_at ? patch.renews_at.toISOString() : isoOf(before.renews_at),
-            reversedDays: Math.round((ms / DAY_MS) * 1000) / 1000,
+            reversedDays: patch.renews_at && prazo
+              ? Math.round(((prazo.getTime() - patch.renews_at.getTime()) / DAY_MS) * 1000) / 1000
+              : 0,
             basis,
             ...(patch.pending_plan_locked_at === null ? { pendingUnlocked: true } : {})
           }
@@ -1386,15 +1416,7 @@ class SubscriptionService {
       // A corrida: o console e o webhook estornando o mesmo pagamento ao mesmo
       // tempo. Quem gravou primeiro desfez o período; este não desfaz outro.
       if (isUniqueViolation(error)) {
-        const agora = await Subscription.forTenant(tenantId);
-        return {
-          subscription: agora,
-          duplicate: true,
-          found: true,
-          renewsAtBefore: isoOf(agora?.renews_at),
-          renewsAtAfter: isoOf(agora?.renews_at),
-          basis: null
-        };
+        return jaFeito(await BillingEvent.findByExternalId(referenciaDoEstorno));
       }
       throw error;
     } finally {

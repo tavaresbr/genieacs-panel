@@ -4,6 +4,7 @@ import { runInTenant } from '../config/tenantContext.js';
 import { asaasBilling, AsaasBillingProvider } from '../services/billing/asaasBillingProvider.js';
 import BillingCharge from '../models/BillingCharge.js';
 import SubscriptionService from '../services/subscriptionService.js';
+import BillingEvent from '../models/BillingEvent.js';
 import { effectiveWebhookToken } from '../services/billing/asaasSettingsService.js';
 
 /**
@@ -165,6 +166,18 @@ class BillingWebhookController {
       return res.json({ success: true, code: 'unattributed' });
     }
 
+    // O estorno PARCIAL: o console só sabe desfazer o período inteiro, e uma
+    // parte do dinheiro de volta não diz qual parte do período se desfaz.
+    // Nada muda — nem a etiqueta da cobrança, que continua paga pelo que
+    // ficou —, e o log grita para alguém decidir.
+    if (ciclo.status === 'refunded' && ciclo.partial) {
+      console.error(
+        `Billing webhook: payment ${ciclo.externalId} for provider ${tenantId} was PARTIALLY refunded `
+        + `(${ciclo.refundedCents} of ${ciclo.valueCents} cents) — nothing was changed; review it in the console`
+      );
+      return res.json({ success: true, code: 'partial_refund' });
+    }
+
     try {
       const code = await runInTenant(tenantId, async () => {
         const cobranca = await BillingCharge.byGatewayId(ciclo.externalId);
@@ -246,6 +259,24 @@ class BillingWebhookController {
       const ciclo = AsaasBillingProvider.interpretarCiclo(req.body);
       if (ciclo) return BillingWebhookController.atualizarCiclo(ciclo, res);
 
+      // Os OUTROS eventos de estorno — pedido em andamento, negado, parcial
+      // (`PAYMENT_REFUND_IN_PROGRESS`, `PAYMENT_REFUND_DENIED`,
+      // `PAYMENT_PARTIALLY_REFUNDED` e o que a Asaas vier a nomear com
+      // REFUND). Nenhum muda estado aqui: o período só se desfaz no
+      // `PAYMENT_REFUNDED` inteiro. Mas o console pode ter desfeito o período
+      // com o estorno ainda a caminho, e uma NEGATIVA dele quer dizer que o
+      // dinheiro ficou conosco e o provedor perdeu o período à toa — é o
+      // tipo de coisa que precisa estar no log com o id do pagamento, e não
+      // perdida entre os eventos ignorados.
+      const nomeDoEvento = String(req.body?.event ?? '');
+      if (/REFUND/.test(nomeDoEvento)) {
+        console.error(
+          `Billing webhook: ${nomeDoEvento} for payment ${req.body?.payment?.id ?? '(no id)'} — `
+          + 'no state was changed; review the refund in the console and at the gateway'
+        );
+        return res.json({ success: true, code: 'refund_event_logged' });
+      }
+
       // O caminho de todo evento que não é dinheiro entrando — e também o de um
       // campo que mudou de nome do outro lado. O corpo vai para o log do
       // processo porque é ele que diz qual dos dois aconteceu, e essa é a
@@ -273,7 +304,18 @@ class BillingWebhookController {
       // Daqui para baixo, como o provedor que pagou. É o escopo que diz de quem
       // é o dinheiro — `recordPayment` não recebe `tenantId` justamente para
       // que ninguém credite o provedor errado passando o id errado.
-      const { duplicate, underpaid, expectedCents, paidCents } = await runInTenant(tenantId, async () => {
+      const { duplicate, underpaid, expectedCents, paidCents, refundedReference } = await runInTenant(tenantId, async () => {
+        // O pagamento cujo estorno JÁ está no extrato. O caso que importa é o
+        // da baixa em dinheiro desfeita pelo console: se o cancelamento no
+        // gateway não pegou, a cobrança voltou a ser pagável lá, e um
+        // pagamento de verdade nela chega com o MESMO id — que o extrato
+        // conhece e `recordPayment` chamaria de `duplicate`. Dinheiro entrando
+        // sem crédito, em silêncio, é o pior resultado possível desta rota; é
+        // gente que precisa olhar (registrar o pagamento avulso, ou devolver),
+        // e o log é onde ela procura. Nada é creditado nem marcado pago.
+        if (await BillingEvent.findByExternalId(`${leitura.externalId}:refund`)) {
+          return { refundedReference: true };
+        }
         const resultado = await asaasBilling.recordPayment({
           amountCents: leitura.amountCents,
           currency: 'BRL',
@@ -309,6 +351,15 @@ class BillingWebhookController {
         }
         return resultado;
       });
+
+      if (refundedReference) {
+        console.error(
+          `Billing webhook: ${leitura.event} for payment ${leitura.externalId} (provider ${tenantId}, `
+          + `${leitura.amountCents} cents) arrived AFTER that payment was refunded — NOT credited; `
+          + 'record it by hand in the console or return the money'
+        );
+        return res.json({ success: true, code: 'refunded_reference' });
+      }
 
       if (underpaid) {
         // No log do processo, e não só no extrato: é a única coisa nesta rota
