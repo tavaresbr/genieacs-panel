@@ -57,7 +57,10 @@ export const DEFAULT_ENDPOINTS = Object.freeze({
   // `app`/`token` and accepts `cpfcnpj` as a filter; whether it lists everyone
   // without one depends on the install, which is what the test button in
   // Settings answers before any sync runs.
-  customerList: '/api/ura/clientes/'
+  customerList: '/api/ura/clientes/',
+  // Client creation (the SGP's CRM API): `F` or `J` is appended for a person or
+  // a company — `/api/crm/cliente/F`. Answers `{ cliente_id, message }`.
+  crmClient: '/api/crm/cliente/'
 });
 
 /** How a listing page is addressed: by row offset, or by page number from 1. */
@@ -1154,6 +1157,9 @@ class SgpService {
         ),
         customerList: this.normalizeEndpoint(
           patch.endpoints?.customerList ?? current.endpoints.customerList, DEFAULT_ENDPOINTS.customerList
+        ),
+        crmClient: this.normalizeEndpoint(
+          patch.endpoints?.crmClient ?? current.endpoints.crmClient, DEFAULT_ENDPOINTS.crmClient
         )
       },
       ...this.readContactsSync(patch, current),
@@ -1249,11 +1255,13 @@ class SgpService {
    * @param {object} [limits] - `listing: true` for the client listing: its own
    *   deadline and body ceiling, and errors that say it was the listing.
    */
-  static async request(endpointKey, payload = {}, configOverride = null, { listing = false } = {}) {
+  static async request(endpointKey, payload = {}, configOverride = null, { listing = false, pathSuffix = '' } = {}) {
     const config = this.requireReady(configOverride || await this.getConfig());
 
     const endpoint = config.endpoints[endpointKey] || DEFAULT_ENDPOINTS[endpointKey];
-    const url = `${config.baseUrl}${endpoint}`;
+    // A suffix is a fixed segment the caller names (`F`/`J`), never input.
+    const suffix = pathSuffix ? `${endpoint.endsWith('/') ? '' : '/'}${pathSuffix}` : '';
+    const url = `${config.baseUrl}${endpoint}${suffix}`;
     const body = { app: config.app, token: config.token, ...payload };
 
     const controller = new AbortController();
@@ -1672,6 +1680,109 @@ class SgpService {
       if (isNotFound(error)) return [];
       throw error;
     }
+  }
+
+  /**
+   * The body of `POST /api/crm/cliente/{F|J}`, as the SGP documents it: the
+   * address nested under `endereco`, the document and the CEP punctuated, the
+   * dates as DD/MM/AAAA and the mobile as national digits. Empty fields are
+   * left out rather than sent blank, so the SGP's own defaults apply.
+   *
+   * @param {object} input
+   * @param {'PF'|'PJ'} input.personType
+   * @param {string} input.document digits
+   * @param {string} input.name the person's name, or the company's legal name
+   * @param {object} input.address `{ street, number, complement, district, city, state, zip, reference, latitude, longitude }`
+   */
+  static buildCrmClientBody(input) {
+    const digits = String(input.document ?? '').replace(/\D/g, '');
+    const cpfcnpj = digits.length === 14
+      ? digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5')
+      : digits.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4');
+    const zip = String(input.address?.zip ?? '').replace(/\D/g, '');
+    const brDate = (value) => {
+      const text = String(value ?? '').trim();
+      const iso = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
+      return /^\d{2}\/\d{2}\/\d{4}$/.test(text) ? text : '';
+    };
+    // National digits: the SGP formats it itself, and "55" in front would read
+    // as a two-digit area code.
+    const phone = normalizarTelefoneBr(input.phone);
+    const celular = phone ? phone.replace(/^55/, '') : '';
+    const number = String(input.address?.number ?? '').trim();
+    const lat = Number(input.address?.latitude);
+    const lng = Number(input.address?.longitude);
+
+    const endereco = {
+      logradouro: input.address?.street,
+      // An integer to the SGP: "S/N" and "120A" are left to the complement.
+      numero: /^\d+$/.test(number) ? number : '',
+      complemento: [input.address?.complement, /^\d+$/.test(number) ? '' : number]
+        .map((part) => String(part ?? '').trim()).filter(Boolean).join(' - '),
+      bairro: input.address?.district,
+      cidade: input.address?.city,
+      cep: zip.length === 8 ? `${zip.slice(0, 5)}-${zip.slice(5)}` : zip,
+      uf: String(input.address?.state ?? '').toUpperCase(),
+      pais: 'BR',
+      pontoreferencia: input.address?.reference,
+      map_ll: Number.isFinite(lat) && Number.isFinite(lng) && lat !== 0 && lng !== 0 ? `${lat},${lng}` : ''
+    };
+    const body = {
+      nome: input.name,
+      cpfcnpj,
+      email: input.email,
+      celular,
+      endereco,
+      observacao: input.notes
+    };
+    if (input.personType === 'PJ') {
+      Object.assign(body, {
+        nomefantasia: input.tradeName,
+        respempresa: input.responsibleName,
+        respcpf: String(input.responsibleDocument ?? '').replace(/\D/g, ''),
+        datafundacao: brDate(input.birthDate)
+      });
+    } else {
+      Object.assign(body, { datanasc: brDate(input.birthDate) });
+    }
+    const compact = (object) => Object.fromEntries(Object.entries(object)
+      .map(([key, value]) => [key, value && typeof value === 'object' ? compact(value) : value])
+      .filter(([, value]) => value !== undefined && value !== null && String(value).trim?.() !== ''
+        && !(typeof value === 'object' && Object.keys(value).length === 0)));
+    return compact(body);
+  }
+
+  /**
+   * Creates the client in the SGP and answers its id.
+   *
+   * The only proof of success is the `cliente_id`: an install that answers a
+   * refusal as HTTP 200 with a `message` and no status flag would otherwise
+   * read as a client created.
+   *
+   * @returns {Promise<{ clientId: string, message: string|null }>}
+   */
+  static async createClient(input) {
+    const body = this.buildCrmClientBody(input);
+    let data;
+    try {
+      data = await this.request('crmClient', body, null, { pathSuffix: input.personType === 'PJ' ? 'J' : 'F' });
+    } catch (error) {
+      // The SGP's own words on a refusal ("CPF já cadastrado", a missing
+      // field) are what the operator needs, and only it can phrase them.
+      if (error instanceof SgpError && error.code === 'http_error' && error.details) {
+        throw new SgpError(String(error.details), { code: 'sgp_rejected', status: 502, raw: true });
+      }
+      throw error;
+    }
+    const clientId = asText(pick(data || {}, ['cliente_id', 'clienteId', 'id']));
+    const message = asText(pick(data || {}, ['message', 'msg', 'mensagem']));
+    if (!clientId) {
+      throw message
+        ? new SgpError(message, { code: 'sgp_rejected', status: 502, raw: true })
+        : new SgpError('sgp.error.clientCreateFailed', { code: 'client_create_failed', status: 502 });
+    }
+    return { clientId, message };
   }
 
   /** The `sgp_contacts` row for one contract — `contractToLinkRow` without the equipment. */

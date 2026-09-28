@@ -2,6 +2,7 @@ import AuditLog from '../models/AuditLog.js';
 import ContactProfileService, { ContactProfileError } from '../services/contactProfileService.js';
 import ContactSheetService from '../services/contactSheetService.js';
 import ContactInvoiceService from '../services/contactInvoiceService.js';
+import ContactOnboardingService from '../services/contactOnboardingService.js';
 import { WaError } from '../services/whatsappConfigService.js';
 import { SgpError } from '../services/sgpService.js';
 import { translateError } from '../i18n/index.js';
@@ -102,6 +103,51 @@ class ContactController {
         detail: { fields: Object.keys(profile.fields).filter((field) => profile.fields[field].edited) }
       });
       return res.status(201).json(createResponse(req.t('contacts.created'), profile));
+    } catch (error) {
+      return handleError(req, res, error, 'contacts.saveFailed');
+    }
+  }
+
+  /**
+   * `GET /api/contacts/lookup/document?document=` — before the form: is this
+   * CPF/CNPJ already a client (in the SGP or typed here), and, for a company
+   * nobody has, what the Receita says. Writes only what the SGP lookup files.
+   */
+  static async lookupDocument(req, res) {
+    try {
+      const result = await ContactOnboardingService.lookupDocument(req.query?.document);
+      return res.json(createResponse(req.t('contacts.lookupDone'), result));
+    } catch (error) {
+      return handleError(req, res, error, 'contacts.lookupFailed');
+    }
+  }
+
+  /** `GET /api/contacts/lookup/cep?cep=` — the address of a CEP, to fill the form. */
+  static async lookupCep(req, res) {
+    try {
+      const result = await ContactOnboardingService.lookupCep(req.query?.cep);
+      if (!result.found) {
+        return res.status(404).json({ ...createErrorResponse(req.t('contacts.cepNotFound')), code: 'cep_not_found' });
+      }
+      return res.json(createResponse(req.t('contacts.lookupDone'), result.data));
+    } catch (error) {
+      if (error instanceof ContactProfileError) return handleError(req, res, error, 'contacts.lookupFailed');
+      return res.status(502).json({ ...createErrorResponse(req.t('contacts.lookupFailed')), code: 'cep_lookup_failed' });
+    }
+  }
+
+  /** `POST /api/contacts/sgp` — the client created in the SGP, then filed here. */
+  static async createInSgp(req, res) {
+    try {
+      const { profile, clientId } = await ContactOnboardingService.createInSgp(req.body);
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.CONTACT_CREATED,
+        subjectType: 'contact',
+        subjectId: profile.key,
+        // Where it was created and the SGP's id — never the values typed.
+        detail: { sgp: true, sgpClientId: clientId }
+      });
+      return res.status(201).json(createResponse(req.t('contacts.createdInSgp'), profile));
     } catch (error) {
       return handleError(req, res, error, 'contacts.saveFailed');
     }

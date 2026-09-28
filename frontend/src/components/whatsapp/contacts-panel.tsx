@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { Link } from 'react-router'
 import { contactsAPI, type ContactImportResult, whatsappAPI, type WhatsAppContact, type WhatsAppContactState, type WhatsAppConversation } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
@@ -10,6 +10,7 @@ import type { TranslationKey } from '@/lib/i18n/dictionary'
 import { useAuth } from '@/contexts/auth-context'
 import { whatsappErrorMessage } from '@/components/whatsapp-connection'
 import { SGP_CONTACTS_HREF } from '@/components/settings/sgp-contacts-sync-panel'
+import { NewContactModal } from '@/components/whatsapp/new-contact-modal'
 
 /** Same pause as the inbox search: one request per word, not per letter. */
 const SEARCH_DEBOUNCE_MS = 350
@@ -492,63 +493,6 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
         </div>
       )}
     </section>
-  )
-}
-
-/** A client with no SGP behind it: the name is enough, the rest goes in the record after. */
-function NewContactModal({ onClose }: { onClose: () => void }) {
-  const { t } = useTranslation()
-  const toast = useToast()
-  const navigate = useNavigate()
-  const [form, setForm] = useState({ name: '', document: '', whatsappPhone: '' })
-  const [saving, setSaving] = useState(false)
-
-  const create = async () => {
-    setSaving(true)
-    const res = await contactsAPI.create({
-      name: form.name.trim(),
-      ...(form.document.trim() ? { document: form.document.trim() } : {}),
-      ...(form.whatsappPhone.trim() ? { whatsappPhone: form.whatsappPhone.trim() } : {})
-    })
-    setSaving(false)
-    if (!res.success || !res.data) {
-      toast.error(res.message || t('contacts.profile.saveFailed'))
-      return
-    }
-    toast.success(t('contacts.profile.created'))
-    navigate(`/contacts/${encodeURIComponent(res.data.key)}`)
-  }
-
-  return (
-    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="new-contact-title">
-      <div className="modal-panel modern-card max-w-md p-5 sm:p-6">
-        <h2 id="new-contact-title" className="section-heading mb-1">{t('contacts.profile.new')}</h2>
-        <p className="section-description mb-5">{t('contacts.profile.newHint')}</p>
-        <div className="grid gap-4">
-          {([
-            ['name', 'contacts.profile.name'],
-            ['document', 'contacts.profile.document'],
-            ['whatsappPhone', 'contacts.profile.whatsappPhone']
-          ] as const).map(([field, labelKey]) => (
-            <div key={field}>
-              <label className="field-label" htmlFor={`new-contact-${field}`}>{t(labelKey)}</label>
-              <input
-                id={`new-contact-${field}`}
-                className="modern-input"
-                value={form[field]}
-                onChange={(event) => setForm((current) => ({ ...current, [field]: event.target.value }))}
-              />
-            </div>
-          ))}
-        </div>
-        <div className="mt-6 flex flex-wrap justify-end gap-2">
-          <button type="button" className="modern-button-secondary" onClick={onClose} disabled={saving}>{t('common.cancel')}</button>
-          <button type="button" className="modern-button" disabled={saving || !form.name.trim()} onClick={() => void create()}>
-            {t('common.save')}
-          </button>
-        </div>
-      </div>
-    </div>
   )
 }
 
