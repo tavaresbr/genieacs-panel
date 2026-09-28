@@ -15,7 +15,7 @@ import { ConversationList } from '@/components/whatsapp/conversation-list'
 import { ConversationThread } from '@/components/whatsapp/conversation-thread'
 import { SubscriberPanel } from '@/components/whatsapp/subscriber-panel'
 import { ThreadComposer, type ComposerAttachment } from '@/components/whatsapp/thread-composer'
-import { BillingPanel } from '@/components/whatsapp/billing-panel'
+import { DunningSection } from '@/components/whatsapp/dunning-section'
 import { CampaignsPanel } from '@/components/whatsapp/campaigns-panel'
 import { TemplatesPanel } from '@/components/whatsapp/templates-panel'
 import { OptOutPanel } from '@/components/whatsapp/opt-out-panel'
@@ -1023,7 +1023,7 @@ export default function WhatsAppPage() {
             }}
           />
         )}
-        {tab === 'billing' && <BillingPanel />}
+        {tab === 'billing' && <DunningSection />}
         {tab === 'campaigns' && <CampaignsPanel />}
         {tab === 'templates' && <TemplatesPanel />}
         {tab === 'optOut' && <OptOutPanel />}

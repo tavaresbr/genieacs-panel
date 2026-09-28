@@ -1525,3 +1525,68 @@ Dois minutos não dão esse tempo, e o preço de estourar é a campanha toda.
   `listPendingIds` pergunta.
 - O ramo do `sending` velho **ignora** a hora devida de propósito: retomada de
   claim travado é recuperação de queda, não espera que alguém agendou.
+
+## Régua de cobrança automática
+
+A "Régua de cobrança" passou a ter duas metades. A **avulsa** (a de sempre)
+monta rascunho e nunca envia. A **automática** envia sozinha, e por isso
+nasce desligada: salvar as etapas não liga nada.
+
+### Configuração (uma por provedor, em `app_state` → `wa_dunning_rule`)
+
+| Campo | O que é |
+|---|---|
+| `steps[]` | `{ offsetDays, templateId }`. `offsetDays` é o dia em relação ao vencimento: −3 é três dias antes, 0 é o dia do vencimento, 5 é cinco dias de atraso. De −30 a 120, até 12 etapas, uma por dia. |
+| `maxPerInvoice` | Teto de cobranças enviadas por fatura (1–30, padrão 6). |
+| `minIntervalHours` | Intervalo mínimo entre duas mensagens ao mesmo **contrato** (0–720, padrão 24). Adia a etapa; não a gasta. |
+| `maxPerRun` | Teto de envios por passada (padrão 500). O resto sai na próxima. |
+| `window` | Janela de envio no mesmo formato do horário do chatbot (`timezone`, `week[]`). Padrão: seg–sex 08–20, sáb 08–12, domingo sem envio. |
+| `thanksTemplateId` | Modelo de agradecimento, opcional. Não pode citar `{{dias_atraso}}` nem `{{dias_para_vencer}}`. |
+
+O modelo de uma etapa com `offsetDays > 0` não pode ser lembrete (citar
+`{{dias_para_vencer}}`), e o de uma etapa com `offsetDays ≤ 0` não pode citar
+`{{dias_atraso}}`: a mesma regra dos espelhos de `waCobranca.js`, conferida
+ao salvar e não na hora de enviar.
+
+### A passada (`waDunningService.run`)
+
+O agendador roda uma passada a cada 3 horas, **só com a régua ligada e
+dentro da janela**. Cada passada:
+
+1. lê as faturas em aberto de cada contrato no SGP, ao vivo, no mesmo ritmo
+   da listagem manual;
+2. escolhe a fatura em aberto mais antiga e a **etapa mais recente já
+   alcançada, do mesmo lado do vencimento**. Etapas perdidas não saem em
+   rajada;
+3. pula e registra o motivo: sem celular, não-perturbe, variável do modelo
+   vazia, teto por fatura. O intervalo mínimo só adia;
+4. grava a decisão em `wa_dunning_sends` **antes** de enfileirar. O índice
+   único `(tenant, contrato, fatura, tipo, etapa)` é o que garante uma vez por
+   etapa por fatura, mesmo com duas passadas ao mesmo tempo;
+5. enfileira no outbox (`source: 'campaign'`), que cuida do teto por minuto
+   e das novas tentativas.
+
+### Pagamento
+
+- Uma fatura paga não está entre as em aberto, então não gera etapa.
+- O webhook `payment_confirmed` do SGP chama `WaDunningService.onPayment`.
+  Ele confere a lista **completa** de títulos do contrato: cancelada não é
+  paga. Depois marca `paid_at`, tira da fila a cobrança que ainda não saiu
+  (remoção condicional a `delivery_status = 'queued'`) e, dentro da janela,
+  manda o agradecimento.
+- Sem webhook, a passada percebe a fatura cobrada que sumiu das em aberto e
+  faz a mesma conferência.
+- Agradecimento: uma vez por fatura, só para quem recebeu cobrança de fato,
+  até 3 dias depois do pagamento, respeitando o não-perturbe.
+
+### Rotas (`/api/whatsapp`)
+
+| Rota | Permissão | |
+|---|---|---|
+| `GET /dunning/rule` | `campaigns.read` | Configuração, `inWindowNow`, `running`, `lastRun`. |
+| `PUT /dunning/rule` | `campaigns.manage` | Salva. Não liga. Vai para a trilha (`whatsapp.dunning_saved`). |
+| `POST /dunning/enabled` | `campaigns.manage` | `{ enabled }`. Ligar exige etapa válida e número de cobrança conectado. Trilha: `whatsapp.dunning_enabled` / `_disabled`. |
+| `POST /dunning/preview` | `campaigns.manage` | Quem receberia qual etapa hoje, sem gravar nada. Limitada aos primeiros 300 contratos. |
+| `POST /dunning/run` | `campaigns.manage` | Uma passada agora, em segundo plano (202). Recusa com a régua desligada, fora da janela ou com outra passada em curso. |
+| `GET /dunning/sends` | `campaigns.read` | Histórico paginado, filtros `contract`, `status`, `kind`. |
+| `GET /dunning/stats?days=30` | `campaigns.read` | Mensagens, faturas pagas após cobrança, valor recuperado, por etapa. "Recuperado" é correlação, não prova. |
