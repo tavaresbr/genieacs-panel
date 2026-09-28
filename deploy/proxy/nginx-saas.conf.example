@@ -123,6 +123,11 @@ server {
 #
 # Quem faz esse recorte é o painel, não o proxy — por isso o bloco é igual ao
 # dos provedores.
+#
+# Domínio de marketing servindo a mesma página (PLATFORM_EXTRA_HOSTS=exemplo.com):
+# copie este bloco com `server_name exemplo.com www.exemplo.com;`, o certificado
+# desse nome, e acrescente os dois ao `server_name` do bloco da porta 80 acima.
+# O `Host` tem que chegar intacto ao painel (`proxy_set_header Host $host`).
 server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
