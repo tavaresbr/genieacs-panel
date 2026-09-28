@@ -7,7 +7,12 @@ import { WaError } from './whatsappConfigService.js';
 import SgpLink from '../models/SgpLink.js';
 import SgpContact from '../models/SgpContact.js';
 import WaConversation from '../models/WaConversation.js';
+import WaSendService from './waSendService.js';
+import AuditLog from '../models/AuditLog.js';
+import { DEFAULT_LOCALE, translate } from '../i18n/index.js';
 import {
+  comoDataBr,
+  comoReal,
   maisAntigaEmAberto,
   modeloEhLembrete,
   renderCobranca,
@@ -332,6 +337,58 @@ class WaSubscriberPanelService {
       throw new WaError('whatsapp.error.secondCopyIncomplete', { code: 'template_incomplete', status: 409 });
     }
     return { contract: clean, invoiceId: fatura.id ?? null, text };
+  }
+
+  /**
+   * "Enviar na conversa": uma fatura em aberto vai ao cliente em mensagens
+   * separadas — o resumo com o link do boleto, depois o PIX sozinho e a linha
+   * digitável sozinha, para o cliente copiar só o código no celular.
+   *
+   * Nada do que vai na mensagem vem do navegador: o contrato passa pela mesma
+   * conferência das outras ações (`actionContract`) e a fatura é relida do
+   * SGP pelo id, entre as em aberto daquele contrato. Um operador não manda a
+   * fatura de outro assinante, nem um código que ele mesmo digitou.
+   */
+  static async sendInvoice(conversationId, { contract, invoiceId }, { userId = null, req = null } = {}) {
+    const { contract: clean } = await this.actionContract(conversationId, contract);
+    const wanted = String(invoiceId ?? '').trim();
+    const { invoices } = await SgpService.listInvoices({ contract: clean, onlyOpen: true });
+    const fatura = wanted
+      ? invoices.find((entry) => entry.id !== null && entry.id !== undefined && String(entry.id) === wanted)
+      : null;
+    if (!fatura) throw new WaError('whatsapp.error.invoiceNotFound', { code: 'invoice_not_found', status: 404 });
+
+    const t = (chave, vars) => translate(DEFAULT_LOCALE, chave, vars);
+    const pix = String(fatura.pix ?? '').trim();
+    const linha = String(fatura.digitableLine ?? '').trim();
+    const link = String(fatura.link ?? '').trim();
+    if (!pix && !linha && !link) {
+      throw new WaError('whatsapp.error.invoiceNoCodes', { code: 'invoice_no_codes', status: 409 });
+    }
+
+    const resumo = [t('whatsapp.invoiceSend.summary', { amount: comoReal(fatura.amount), dueDate: comoDataBr(fatura.dueDate) })];
+    if (link) resumo.push('', t('whatsapp.bot.invoiceLink', { value: link }));
+    if (pix || linha) resumo.push('', t('whatsapp.invoiceSend.codesFollow'));
+    const corpos = [resumo.join('\n'), pix, linha].filter(Boolean);
+
+    // Na ordem, uma de cada vez: o cliente tem de ler o resumo antes dos códigos.
+    const messages = [];
+    for (const body of corpos) {
+      // eslint-disable-next-line no-await-in-loop -- a ordem das mensagens importa
+      const message = await WaSendService.enqueue({ conversationId, body, userId, source: 'operator' });
+      messages.push(WaSendService.publicMessage(message));
+    }
+
+    const auditoria = {
+      action: AuditLog.ACTIONS.WHATSAPP_INVOICE_SENT,
+      subjectType: 'wa_conversation',
+      subjectId: conversationId,
+      // Os códigos ficam fora da trilha: são o que paga a conta, não o que se audita.
+      detail: { contract: clean, invoiceId: String(fatura.id), messages: messages.length }
+    };
+    if (req) await AuditLog.fromRequest(req, auditoria);
+    else await AuditLog.record({ ...auditoria, actorUserId: userId, actorUsername: null });
+    return { contract: clean, invoiceId: String(fatura.id), messages };
   }
 
   /**

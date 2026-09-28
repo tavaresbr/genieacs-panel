@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
-import { whatsappAPI, type WaSubscriberPanel, type WaSubscriberPartError, type WhatsAppTemplate } from '@/lib/api'
+import { whatsappAPI, type SgpInvoice, type WaSubscriberPanel, type WaSubscriberPartError, type WhatsAppMessage, type WhatsAppTemplate } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
@@ -33,6 +33,8 @@ interface SubscriberPanelProps {
   onBound?: () => void
   /** Hands a text to the reply box. Absent where there is no box to fill. */
   onDraft?: (text: string) => void
+  /** Mensagens que o painel acabou de mandar, para o fio mostrar sem recarregar. */
+  onSent?: (messages: WhatsAppMessage[]) => void
 }
 
 function Card({ icon, title, children }: { icon: string; title: string; children: ReactNode }) {
@@ -72,7 +74,7 @@ const MATCHED_ON: Record<string, TranslationKey> = {
   conversation: 'whatsapp.sgp.matchedConversation'
 }
 
-export function SubscriberPanel({ conversationId, boundContract = null, onClose, onBound, onDraft }: SubscriberPanelProps) {
+export function SubscriberPanel({ conversationId, boundContract = null, onClose, onBound, onDraft, onSent }: SubscriberPanelProps) {
   const { t, formatDateTime, intlLocale } = useTranslation()
   const { can } = useAuth()
   const toast = useToast()
@@ -80,6 +82,7 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
   // The second copy needs the templates (campaigns.read) and ends in a reply
   // (whatsapp.send); the manual phone is the billing screen's own write.
   const canSecondCopy = Boolean(onDraft) && can('whatsapp.send') && can('campaigns.read')
+  const canSendInvoice = can('whatsapp.send')
   const canSavePhone = can('campaigns.manage')
 
   const [panel, setPanel] = useState<WaSubscriberPanel | null>(null)
@@ -88,7 +91,7 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
   const [contract, setContract] = useState<string | null>(null)
   const [document, setDocument] = useState('')
   const [searchedDocument, setSearchedDocument] = useState<string | null>(null)
-  const [busy, setBusy] = useState<'unlock' | 'ticket' | 'bind' | 'secondCopy' | 'phone' | null>(null)
+  const [busy, setBusy] = useState<'unlock' | 'ticket' | 'bind' | 'secondCopy' | 'phone' | `invoice:${string}` | null>(null)
   const [templates, setTemplates] = useState<WhatsAppTemplate[] | null>(null)
   const [templateId, setTemplateId] = useState('')
   const [ticketOpen, setTicketOpen] = useState(false)
@@ -225,6 +228,35 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
       }
       onDraft(res.data.text)
       toast.success(t('whatsapp.sgp.secondCopyReady'))
+    } catch {
+      toast.error(t('api.requestFailed'))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  /**
+   * "Enviar na conversa": o servidor relê a fatura no SGP e manda o resumo
+   * com o boleto, o PIX e a linha em mensagens separadas. Daqui só vão o
+   * contrato e o id da fatura.
+   */
+  const sendInvoice = async (invoice: SgpInvoice) => {
+    if (!contract || invoice.id === null || invoice.id === undefined) return
+    const count = 1 + (invoice.pix ? 1 : 0) + (invoice.digitableLine ? 1 : 0)
+    if (!window.confirm(t('whatsapp.sgp.sendInvoiceConfirm', {
+      amount: formatBrl(invoice.amount, intlLocale),
+      due: invoice.dueDate ?? '—',
+      count
+    }))) return
+    setBusy(`invoice:${invoice.id}`)
+    try {
+      const res = await whatsappAPI.subscriberSendInvoice(conversationId, { contract, invoiceId: String(invoice.id) })
+      if (!res.success || !res.data) {
+        toast.error(res.message || t('api.requestFailed'))
+        return
+      }
+      onSent?.(res.data.messages)
+      toast.success(t('whatsapp.sgp.invoiceSent'))
     } catch {
       toast.error(t('api.requestFailed'))
     } finally {
@@ -697,6 +729,17 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
                               >
                                 <Icon name="copy" size={13} />
                                 {t('detail.sgp.copyPix')}
+                              </button>
+                            )}
+                            {canSendInvoice && contract && (invoice.pix || invoice.digitableLine || invoice.link) && (
+                              <button
+                                type="button"
+                                className="modern-button min-h-10 px-2 py-1 text-xs lg:min-h-8"
+                                disabled={busy !== null}
+                                onClick={() => void sendInvoice(invoice)}
+                              >
+                                <Icon name="chat" size={13} />
+                                {busy === `invoice:${invoice.id}` ? t('whatsapp.sgp.sending') : t('whatsapp.sgp.sendInvoice')}
                               </button>
                             )}
                             {isSafeExternalUrl(invoice.link) && (
