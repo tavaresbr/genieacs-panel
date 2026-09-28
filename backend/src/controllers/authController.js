@@ -13,7 +13,7 @@ import PlatformAudit from '../models/PlatformAudit.js';
 import { getDb } from '../config/database.js';
 import { seedDefaults } from '../config/seed.js';
 import { slugProblem } from '../utils/slug.js';
-import { hostMatchesTenant, panelBaseDomain, usesTenantSubdomains } from '../middleware/tenantResolver.js';
+import { hostMatchesTenant, usesTenantSubdomains } from '../middleware/tenantResolver.js';
 import AuditLog from '../models/AuditLog.js';
 import { runInTenant } from '../config/tenantContext.js';
 import { recordPanelActivity } from '../services/dashboardSchedule.js';
@@ -245,7 +245,10 @@ class AuthController {
    */
   static async signup(req, res) {
     try {
-      if (!usesTenantSubdomains()) {
+      // Com subdomínio por provedor, ou no endereço da plataforma de um deploy
+      // de endereço único (`PLATFORM_EXTRA_HOSTS`). No endereço compartilhado
+      // dos painéis, não: ali quem chega já é de algum provedor.
+      if (!usesTenantSubdomains() && !req.platformHost) {
         return res.status(404).json(createErrorResponse(req.t('common.routeNotFound')));
       }
       const body = req.body ?? {};
@@ -377,8 +380,9 @@ class AuthController {
         corpo: 'auth.emailVerifyMailBody'
       });
 
-      const base = panelBaseDomain();
-      const panelUrl = base ? `https://${tenant.slug}.${base}` : null;
+      // Sem subdomínio, o painel do provedor novo é o endereço compartilhado
+      // (`PUBLIC_BASE_URL`), onde ele entra com o login que acabou de criar.
+      const panelUrl = panelUrlFor(tenant);
 
       // Boas-vindas pelo WhatsApp da plataforma, e o aviso para a equipe.
       // Fora do caminho da resposta: nenhum dos dois pode atrasar nem

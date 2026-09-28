@@ -239,6 +239,9 @@ export default function Landing() {
     ? [produto.split(' ')[0].replace(/\d+$/, ''), produto.split(' ')[0].match(/\d+$/)?.[0] ?? '']
     : [produto, '']
   const whatsapp = info?.contactWhatsapp ? `https://wa.me/${info.contactWhatsapp}` : null
+  // Num deploy de endereço único os provedores entram no endereço
+  // compartilhado, e não no login do console desta página.
+  const painelExterno = !user?.platform && info?.panelUrl ? `${info.panelUrl}/login` : null
   const entrar = user?.platform ? '/platform' : '/login'
 
   return (
@@ -256,9 +259,15 @@ export default function Landing() {
           </nav>
           <div className="ml-auto flex items-center gap-2 sm:gap-3">
             <LanguageSwitcher variant="dark" compact className="hidden w-12 sm:flex" />
-            <Link to={entrar} className="rounded-lg border border-white/15 px-3 py-2 text-sm font-semibold text-white hover:bg-white/5 sm:px-5 sm:py-2.5">
-              {copy.nav.signIn}
-            </Link>
+            {painelExterno ? (
+              <a href={painelExterno} className="rounded-lg border border-white/15 px-3 py-2 text-sm font-semibold text-white hover:bg-white/5 sm:px-5 sm:py-2.5">
+                {copy.nav.signIn}
+              </a>
+            ) : (
+              <Link to={entrar} className="rounded-lg border border-white/15 px-3 py-2 text-sm font-semibold text-white hover:bg-white/5 sm:px-5 sm:py-2.5">
+                {copy.nav.signIn}
+              </Link>
+            )}
             <a href="#planos" className="rounded-lg bg-emerald-400 px-3 py-2 text-sm font-bold text-emerald-950 hover:bg-emerald-300 sm:px-5 sm:py-2.5">
               {copy.nav.signUp}
             </a>

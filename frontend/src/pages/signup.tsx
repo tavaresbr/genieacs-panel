@@ -146,7 +146,7 @@ export default function Signup() {
         </div>
 
         <div className="auth-panel">
-          {!base ? (
+          {!base && !isPlatformHost ? (
             <p className="text-sm text-muted-foreground">{t('signup.unavailable')}</p>
           ) : done ? (
             <div className="space-y-4">
@@ -235,7 +235,9 @@ export default function Signup() {
                       onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
                       aria-describedby="slug-hint"
                     />
-                    <span className="min-w-0 max-w-[55%] text-sm text-muted-foreground [overflow-wrap:anywhere]">.{base}</span>
+                    {base && (
+                      <span className="min-w-0 max-w-[55%] text-sm text-muted-foreground [overflow-wrap:anywhere]">.{base}</span>
+                    )}
                   </div>
                   <p id="slug-hint" className="field-hint" aria-live="polite">
                     {slugState === 'checking' ? t('signup.slugChecking')
