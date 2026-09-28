@@ -82,6 +82,18 @@ class WhatsAppSubscriberController {
     }
   }
 
+  static async sendInvoice(req, res) {
+    try {
+      const result = await WaSubscriberPanelService.sendInvoice(req.params?.id, {
+        contract: req.body?.contract,
+        invoiceId: req.body?.invoiceId
+      }, { userId: req.user?.userId ?? null, req });
+      return res.status(201).json(createResponse(req.t('whatsapp.invoiceSend.sent'), result));
+    } catch (error) {
+      return handleError(req, res, error, 'sgp.dataLoadFailed');
+    }
+  }
+
   static async savePhone(req, res) {
     try {
       const panel = await WaSubscriberPanelService.savePhone(req.params?.id, { contract: req.body?.contract });

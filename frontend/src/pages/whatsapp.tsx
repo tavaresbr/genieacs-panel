@@ -719,6 +719,16 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
                   boundContract={conversation.contract}
                   onClose={toggleSgpPanel}
                   onDraft={(text) => setDraft((current) => ({ id: (current?.id ?? 0) + 1, text }))}
+                  onSent={(sent) => {
+                    // As linhas que a rota gravou, como no `submit`: a mais nova primeiro.
+                    if (sent.length === 0) return
+                    const last = sent[sent.length - 1]
+                    if (selectedIdRef.current === conversation.id) setMessages((rows) => [...[...sent].reverse(), ...rows])
+                    setConversations((rows) => rows.map((row) => (
+                      row.id === conversation.id ? { ...row, lastMessageAt: last.createdAt ?? row.lastMessageAt } : row
+                    )))
+                    threadStampRef.current = last.createdAt ?? threadStampRef.current
+                  }}
                   onBound={() => {
                     void loadList(false)
                     void loadThreadRef.current(conversation.id, true)

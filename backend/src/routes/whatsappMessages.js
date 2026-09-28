@@ -129,6 +129,19 @@ router.post(
   WhatsAppSubscriberController.secondCopy
 );
 
+// "Enviar na conversa": manda a fatura ao cliente. `whatsapp.send` porque é
+// uma mensagem, `sgp.read` porque relê a fatura no ERP; os dois limitadores,
+// porque é as duas coisas ao mesmo tempo.
+router.post(
+  '/conversations/:id/subscriber/invoice',
+  authenticateToken,
+  requirePermission('whatsapp.send'),
+  requirePermission('sgp.read'),
+  whatsappSendLimiter,
+  sgpAdminLimiter,
+  WhatsAppSubscriberController.sendInvoice
+);
+
 // The same capability the billing screen asks for the same write.
 router.post(
   '/conversations/:id/subscriber/phone',

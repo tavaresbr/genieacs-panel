@@ -4008,6 +4008,13 @@ export const whatsappAPI = {
 
   // The billing text for the subscriber's invoice, rendered by the server with
   // the same rules as a campaign. It comes back to the composer; nothing is sent.
+  /** Manda a fatura ao cliente, em mensagens separadas; o servidor relê tudo no SGP. */
+  subscriberSendInvoice: (conversationId: number, payload: { contract: string; invoiceId: string }) =>
+    apiClient.post<{ contract: string; invoiceId: string; messages: WhatsAppMessage[] }>(
+      `/whatsapp/conversations/${conversationId}/subscriber/invoice`,
+      payload
+    ),
+
   subscriberSecondCopy: (conversationId: number, payload: { contract: string; template: string }) =>
     apiClient.post<{ contract: string; invoiceId: string | null; text: string }>(
       `/whatsapp/conversations/${conversationId}/subscriber/second-copy`,

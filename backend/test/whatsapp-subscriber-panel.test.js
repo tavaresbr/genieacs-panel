@@ -19,6 +19,8 @@ const ASSINANTE = '5593981215425';
 const DESCONHECIDO = '5511900000009';
 const WAN_IP = '100.64.10.20';
 const LINHA = '34191790010104351004791020150008699999999999';
+const LINHA_T3 = '34191790010104351004791020150008699999990003';
+const PIX_T3 = '00020126580014br.gov.bcb.pix0136provedor-t3-pix5204000053039865406119.505802BR6304ABCD';
 
 let panelUrl;
 let token;
@@ -76,7 +78,17 @@ function startSgpStub() {
           titulos: [
             { numerodocumento: 'T-0', valor: '99,90', vencimento: '2019-01-10', status: 'Cancelado' },
             { numerodocumento: 'T-2', valor: '99,90', vencimento: '2099-12-10', status: 'Em aberto' },
-            { numerodocumento: 'T-1', valor: '99,90', vencimento: '2020-01-10', status: 'Em aberto', linhadigitavel: LINHA }
+            { numerodocumento: 'T-1', valor: '99,90', vencimento: '2020-01-10', status: 'Em aberto', linhadigitavel: LINHA },
+            // Uma fatura com tudo — boleto, PIX e linha — para o "Enviar na conversa".
+            {
+              numerodocumento: 'T-3',
+              valor: '119,50',
+              vencimento: '2020-03-10',
+              status: 'Em aberto',
+              linhadigitavel: LINHA_T3,
+              pix: PIX_T3,
+              link: 'https://sgp.provedor.test/boleto/T-3'
+            }
           ]
         });
       }
@@ -213,7 +225,7 @@ describe('the SGP module beside a thread', () => {
 
   it('points at the oldest overdue invoice, and never at a cancelled one', async () => {
     const { body } = await painel(fios.assinante);
-    assert.deepEqual(body.data.invoices.items.map((i) => i.id).sort(), ['T-1', 'T-2']);
+    assert.deepEqual(body.data.invoices.items.map((i) => i.id).sort(), ['T-1', 'T-2', 'T-3']);
     assert.equal(body.data.invoices.highlight, 'T-1');
   });
 
@@ -328,5 +340,57 @@ describe('the second copy and the number, from the thread', () => {
 
     const outro = await agir(fios.estranho, 'phone', { contract: '9999' });
     assert.equal(outro.status, 409);
+  });
+});
+
+describe('"Enviar na conversa": a fatura em mensagens separadas', () => {
+  const enviar = (body) => agir(fios.assinante, 'invoice', body);
+  const saidas = () => getDb()('wa_messages')
+    .where({ conversation_id: fios.assinante, direction: 'out' })
+    .orderBy('id');
+
+  it('manda o resumo com o boleto, depois o PIX puro e a linha pura, em ordem', async () => {
+    const antes = (await saidas()).length;
+    const { status, body } = await enviar({ contract: ATIVO, invoiceId: 'T-3' });
+    assert.equal(status, 201, JSON.stringify(body));
+    assert.equal(body.data.messages.length, 3);
+    const novas = (await saidas()).slice(antes);
+    assert.equal(novas.length, 3);
+    assert.match(novas[0].body, /R\$ 119,50/);
+    assert.match(novas[0].body, /https:\/\/sgp\.provedor\.test\/boleto\/T-3/);
+    assert.equal(novas[1].body, PIX_T3, 'o PIX vai sozinho, para copiar');
+    assert.equal(novas[2].body, LINHA_T3, 'a linha vai sozinha, para copiar');
+    for (const m of novas) {
+      assert.equal(m.source, 'operator');
+      assert.ok(m.sent_by, 'a mensagem não ficou com o operador');
+    }
+    const trilha = await getDb()('audit_log').where({ action: 'whatsapp.invoice_sent' }).orderBy('id', 'desc').first();
+    assert.ok(trilha, 'o envio não foi para a trilha');
+    assert.ok(!String(trilha.detail).includes(PIX_T3), 'o código de pagamento foi para a trilha');
+  });
+
+  it('sem PIX nem link, manda só o resumo e a linha', async () => {
+    const antes = (await saidas()).length;
+    const { status, body } = await enviar({ contract: ATIVO, invoiceId: 'T-1' });
+    assert.equal(status, 201, JSON.stringify(body));
+    const novas = (await saidas()).slice(antes);
+    assert.equal(novas.length, 2);
+    assert.equal(novas[1].body, LINHA);
+  });
+
+  it('uma fatura que não está em aberto neste contrato não sai', async () => {
+    const antes = (await saidas()).length;
+    const { status, body } = await enviar({ contract: ATIVO, invoiceId: 'T-0' });
+    assert.equal(status, 404);
+    assert.equal(body.code, 'invoice_not_found');
+    assert.equal((await saidas()).length, antes);
+  });
+
+  it('um contrato que não é desta conversa não sai', async () => {
+    const antes = (await saidas()).length;
+    const { status, body } = await enviar({ contract: '9999', invoiceId: 'T-3' });
+    assert.equal(status, 409);
+    assert.equal(body.code, 'contract_not_in_conversation');
+    assert.equal((await saidas()).length, antes);
   });
 });

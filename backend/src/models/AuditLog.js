@@ -54,6 +54,8 @@ class AuditLog {
     // tinha onde olhar.
     SUBSCRIBER_ACCOUNT_RETIRED: 'subscriber_account.retired',
     WHATSAPP_BOT_TRUST_UNLOCK: 'whatsapp.bot_trust_unlock',
+    // Uma fatura do SGP foi mandada ao cliente pelo painel da conversa.
+    WHATSAPP_INVOICE_SENT: 'whatsapp.invoice_sent',
     // Os clientes de uma queda em massa foram avisados por WhatsApp.
     OUTAGE_NOTIFIED: 'outage.notified',
     // Manutenção programada: agendar, avisar os clientes e cancelar mexem com
