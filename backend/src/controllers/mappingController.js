@@ -6,6 +6,7 @@ import { createResponse, createErrorResponse } from '../utils/helpers.js';
 import { searchPlaces } from '../services/addressLookupService.js';
 import MapStatusService from '../services/mapStatusService.js';
 import OutageEvent from '../models/OutageEvent.js';
+import ClientLocationService from '../services/clientLocationService.js';
 import { classifySyncError } from '../services/customerSyncErrors.js';
 
 /**
@@ -141,6 +142,21 @@ class MappingController {
         ? req.t('mapping.statusFailed')
         : req.t(reason.reasonKey, reason.status ? { status: reason.status } : undefined);
       return res.status(502).json(createErrorResponse(message, error.message, reason.code));
+    }
+  }
+
+  /** Onde fica a casa do cliente (endereço do SGP), para o "Colocar no mapa". */
+  static async clientLocation(req, res) {
+    try {
+      const pppoe = String(req.query.pppoe ?? '').slice(0, 255);
+      const deviceId = String(req.query.deviceId ?? '').slice(0, 255);
+      if (!pppoe.trim() && !deviceId.trim()) {
+        return res.status(400).json(createErrorResponse(req.t('mapping.clientLocationMissing')));
+      }
+      return res.json(createResponse(req.t('mapping.statusReady'), await ClientLocationService.locate({ pppoe, deviceId })));
+    } catch (error) {
+      console.error('Client location error:', error);
+      return res.status(500).json(createErrorResponse(req.t('common.internalError'), error.message));
     }
   }
 

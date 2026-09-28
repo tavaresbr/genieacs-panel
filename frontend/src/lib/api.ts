@@ -692,7 +692,10 @@ export const authAPI = {
     apiClient.post('/auth/logout'),
 
   /** SaaS only; answers 404 on a self-hosted install, where the route is not mounted. */
-  signup: (payload: { providerName: string; slug: string; username: string; email: string; password: string }) =>
+  signup: (payload: {
+    providerName: string; slug: string; username: string; email: string; password: string
+    planCode?: string; taxId?: string; phone?: string; legalName?: string; city?: string; state?: string
+  }) =>
     apiClient.post<SignupResult>('/auth/signup', payload),
 
   /**
@@ -1354,9 +1357,77 @@ export interface Plan {
   /** Tetos de retenção do plano, em dias. */
   retention: RetentionCaps
   active: boolean
+  /** A vitrine: se a página pública mostra, em que ordem e com que frases. */
+  public: boolean
+  featured: boolean
+  sortOrder: number
+  description: string | null
+  features: string[]
+  /** Preço anunciado da opção anual, em centavos; null é sem opção anual. */
+  priceYearlyCents: number | null
   createdAt: string | null
   /** How many providers are on it — only from the console's list. */
   subscribers?: number
+}
+
+/** O plano como a página pública o mostra. */
+export interface PublicPlan {
+  code: string
+  name: string
+  description: string | null
+  features: string[]
+  limits: PlanLimits
+  priceCents: number
+  priceYearlyCents: number | null
+  currency: string
+  periodDays: number
+  trialDays: number
+  featured: boolean
+}
+
+export interface PublicInfo {
+  productName: string
+  baseDomain: string | null
+  contactWhatsapp: string | null
+}
+
+export interface CnpjData {
+  taxId: string
+  legalName?: string
+  tradeName?: string
+  city?: string
+  state?: string
+  email?: string
+  phone?: string
+}
+
+export type LeadStatus = 'new' | 'contacted' | 'won' | 'lost'
+
+export interface Lead {
+  id: number
+  name: string
+  company: string | null
+  email: string | null
+  phone: string | null
+  city: string | null
+  devicesEstimate: number | null
+  message: string | null
+  planCode: string | null
+  status: LeadStatus
+  notes: string | null
+  source: string
+  createdAt: string | null
+  updatedAt: string | null
+}
+
+/** A vitrine do plano, como o console a edita. */
+export interface PlanMarketingPayload {
+  public?: boolean
+  featured?: boolean
+  sortOrder?: number
+  description?: string | null
+  features?: string[]
+  priceYearlyCents?: number | null
 }
 
 /** Uma linha da trilha do plano de controle. */
@@ -1769,15 +1840,24 @@ export const platformAPI = {
     maxDevices: number | null; priceCents: number; currency: string; trialDays: number
     periodDays?: number; active?: boolean
     maxAuditRetentionDays?: number | null; maxMessageRetentionDays?: number | null; maxMediaRetentionDays?: number | null
-  }) =>
+  } & PlanMarketingPayload) =>
     apiClient.post<{ plan: Plan }>('/platform/plans', payload),
 
   updatePlan: (id: number, payload: Partial<{
     name: string; maxOperators: number | null; maxSubscribers: number | null; maxDevices: number | null
     priceCents: number; currency: string; trialDays: number; periodDays: number; active: boolean
     maxAuditRetentionDays: number | null; maxMessageRetentionDays: number | null; maxMediaRetentionDays: number | null
-  }>) =>
+  }> & PlanMarketingPayload) =>
     apiClient.requestWithBody<{ plan: Plan }>('PATCH', `/platform/plans/${id}`, payload),
+
+  // ── Os pedidos de demonstração da página pública ─────────────────────
+  listLeads: (status?: LeadStatus) =>
+    apiClient.get<{ leads: Lead[]; counts: Partial<Record<LeadStatus, number>> }>(
+      `/platform/leads${status ? `?status=${status}` : ''}`
+    ),
+
+  updateLead: (id: number, payload: { status?: LeadStatus; notes?: string | null }) =>
+    apiClient.requestWithBody<{ lead: Lead }>('PATCH', `/platform/leads/${id}`, payload),
 
   getSubscription: (tenantId: number) =>
     apiClient.get<{ subscription: SubscriptionView | null; planId: number | null; events: BillingEventView[] }>(
@@ -3136,6 +3216,10 @@ export const mappingAPI = {
   outageHistory: (days = 90) =>
     apiClient.get<OutageHistory>(`/mapping-data/outages?days=${days}`),
 
+  /** Onde fica a casa do cliente, pelo endereço do SGP (coordenadas ou endereço geocodificado). */
+  clientLocation: (pppoe: string, deviceId?: string | null) =>
+    apiClient.get<ClientLocation>(`/mapping-data/client-location?${new URLSearchParams({ pppoe, ...(deviceId ? { deviceId } : {}) })}`),
+
   /** Equipamentos com PPPoE que ainda não estão no mapa. */
   unmappedDevices: () =>
     apiClient.get<{ total: number; items: UnmappedDevice[] }>('/mapping-data/unmapped'),
@@ -3184,6 +3268,17 @@ export interface OutageHistory {
     total_clients: number
   }>
   byNode: Array<{ node_id: string; node_name: string | null; count: number; minutes: number; last_at: string }>
+}
+
+export interface ClientLocation {
+  found: boolean
+  contract?: string | null
+  clientName?: string | null
+  address?: string | null
+  lat?: number
+  lng?: number
+  /** `sgp`: coordenadas do SGP; `address`: achado pela rua; `city`: só a cidade. */
+  precision?: 'sgp' | 'address' | 'city'
 }
 
 export interface UnmappedDevice {
@@ -3434,6 +3529,102 @@ export interface WhatsAppSkipCounts {
   futureOnly: number
   sgpRefused: number
   templateIncomplete: number
+}
+
+/** One day of the automatic cadence's send window. `day` follows `Date#getDay`. */
+export interface WhatsAppDunningWindowDay {
+  day: number
+  closed: boolean
+  open: string
+  close: string
+}
+
+/** One step of the automatic cadence: which template, how many days from the due date. */
+export interface WhatsAppDunningStep {
+  offsetDays: number
+  templateId: number
+}
+
+export type WhatsAppDunningSkipReason = 'noPhone' | 'optOut' | 'templateIncomplete' | 'maxReached' | 'interval' | 'sgpRefused'
+
+export interface WhatsAppDunningRunSummary {
+  at: string
+  manual: boolean
+  checked: number
+  queued: number
+  paid: number
+  thanked: number
+  skipped: Record<WhatsAppDunningSkipReason, number>
+  truncated: boolean
+}
+
+/** The automatic billing cadence. It SENDS, so `enabled` has its own route. */
+export interface WhatsAppDunningRule {
+  enabled: boolean
+  steps: WhatsAppDunningStep[]
+  maxPerInvoice: number
+  minIntervalHours: number
+  maxPerRun: number
+  thanksTemplateId: number | null
+  window: { timezone: string; week: WhatsAppDunningWindowDay[] }
+  enabledAt: string | null
+  updatedAt: string | null
+  inWindowNow: boolean
+  running: boolean
+  lastRun: WhatsAppDunningRunSummary | null
+}
+
+export interface WhatsAppDunningPreviewItem {
+  contract: string
+  clientName: string | null
+  phone: string | null
+  dueDate: string | null
+  amount: number | null
+  daysOverdue: number
+  stepOffset: number
+  templateName: string | null
+  status: 'queued' | 'skipped' | 'deferred'
+  reason: WhatsAppDunningSkipReason | null
+}
+
+export interface WhatsAppDunningPreview {
+  checked: number
+  queued: number
+  truncated: boolean
+  skipped: Record<WhatsAppDunningSkipReason, number>
+  items: WhatsAppDunningPreviewItem[]
+}
+
+export interface WhatsAppDunningSend {
+  id: number
+  kind: 'step' | 'thanks'
+  stepOffset: number
+  contract: string
+  invoiceKey: string
+  dueDate: string | null
+  amount: number | null
+  clientName: string | null
+  phone: string | null
+  templateName: string | null
+  status: 'queued' | 'skipped' | 'canceled'
+  reason: string | null
+  deliveryStatus: string | null
+  paidAt: string | null
+  createdAt: string | null
+}
+
+export interface WhatsAppDunningStats {
+  days: number
+  messages: number
+  failed: number
+  thanks: number
+  invoices: number
+  invoicesPaid: number
+  amountCharged: number
+  amountRecovered: number
+  recoveryRate: number
+  byStep: { offsetDays: number; sent: number; paidAfter: number }[]
+  skipped: Record<string, number>
 }
 
 export interface WhatsAppBroadcast {
@@ -3890,6 +4081,38 @@ export const whatsappAPI = {
       payload
     ),
 
+  // ── Automatic billing cadence ────────────────────────────────────────
+  // Unlike the builder above, this one SENDS. Saving never switches it on.
+  getDunningRule: () =>
+    apiClient.get<WhatsAppDunningRule>('/whatsapp/dunning/rule'),
+
+  saveDunningRule: (payload: Partial<Pick<WhatsAppDunningRule,
+    'steps' | 'window' | 'maxPerInvoice' | 'minIntervalHours' | 'maxPerRun' | 'thanksTemplateId'>>) =>
+    apiClient.put<WhatsAppDunningRule>('/whatsapp/dunning/rule', payload),
+
+  setDunningEnabled: (enabled: boolean) =>
+    apiClient.post<WhatsAppDunningRule>('/whatsapp/dunning/enabled', { enabled }),
+
+  previewDunning: () =>
+    apiClient.post<WhatsAppDunningPreview>('/whatsapp/dunning/preview', {}),
+
+  runDunning: () =>
+    apiClient.post<{ started: boolean }>('/whatsapp/dunning/run', {}),
+
+  listDunningSends: (params: { contract?: string; status?: string; kind?: string; limit?: number; offset?: number } = {}) => {
+    const query = new URLSearchParams()
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') query.set(key, String(value))
+    })
+    const suffix = query.toString()
+    return apiClient.get<{ items: WhatsAppDunningSend[]; hasMore: boolean }>(
+      `/whatsapp/dunning/sends${suffix ? `?${suffix}` : ''}`
+    )
+  },
+
+  getDunningStats: (days = 30) =>
+    apiClient.get<WhatsAppDunningStats>(`/whatsapp/dunning/stats?days=${days}`),
+
   // ── Campaigns ────────────────────────────────────────────────────────
   listBroadcasts: () =>
     apiClient.get<WhatsAppBroadcast[]>('/whatsapp/broadcasts'),
@@ -4211,3 +4434,20 @@ export const outagesAPI = {
   resolve: (id: number) => apiClient.post<OutageIncidentDetail>(`/whatsapp/outages/${id}/resolve`, {}),
 }
 
+/**
+ * A página pública do ápice: sem sessão. O catálogo à venda, o subdomínio
+ * livre, o CNPJ na Receita e o pedido de demonstração.
+ */
+export const publicAPI = {
+  info: () => apiClient.get<PublicInfo>('/public/info'),
+  plans: () => apiClient.get<{ plans: PublicPlan[] }>('/public/plans'),
+  slugAvailable: (slug: string) =>
+    apiClient.get<{ slug: string; available: boolean; problem: 'invalid' | 'taken' | null }>(
+      `/public/slug-available?slug=${encodeURIComponent(slug)}`
+    ),
+  cnpj: (cnpj: string) => apiClient.get<CnpjData>(`/public/cnpj?cnpj=${encodeURIComponent(cnpj)}`),
+  createLead: (payload: {
+    name: string; company?: string; email?: string; phone?: string; city?: string
+    devicesEstimate?: number | null; message?: string; planCode?: string | null; website?: string
+  }) => apiClient.post<{ ok: boolean }>('/public/leads', payload),
+}

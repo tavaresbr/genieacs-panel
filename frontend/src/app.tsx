@@ -31,6 +31,7 @@ const PlatformPage = lazy(() => import('@/pages/platform'))
 const LoginPage = lazy(() => import('@/pages/login'))
 const SetupPage = lazy(() => import('@/pages/setup'))
 const SignupPage = lazy(() => import('@/pages/signup'))
+const LandingPage = lazy(() => import('@/pages/landing'))
 const PlanPage = lazy(() => import('@/pages/plan'))
 const OnboardingPage = lazy(() => import('@/pages/onboarding'))
 const InvitePage = lazy(() => import('@/pages/invite'))
@@ -288,9 +289,21 @@ function SetupRoute() {
  * `/signup` fica porque o ápice é a porta de entrada das duas pessoas que
  * chegam sem conta: o ISP que ainda não existe e quem opera a plataforma.
  */
+/**
+ * A vitrine do ápice. Só onde o ápice É a plataforma: numa instalação de host
+ * único a árvore do console também monta (por sessão), e ali não há o que
+ * vender — a raiz continua levando ao console.
+ */
+function LandingRoute() {
+  const { isPlatformHost } = useTenant()
+  if (!isPlatformHost) return <Navigate to="/platform" replace />
+  return <LandingPage />
+}
+
 function ConsoleRoutes() {
   return (
     <Routes>
+      <Route path="/" element={<Suspense fallback={<AuthFallback />}><LandingRoute /></Suspense>} />
       <Route path="/login" element={<Suspense fallback={<AuthFallback />}><ConsoleLoginRoute /></Suspense>} />
       <Route path="/signup" element={<Suspense fallback={<AuthFallback />}><SignupRoute /></Suspense>} />
       {/* O resgate da personificação também mora aqui. Num deploy de host

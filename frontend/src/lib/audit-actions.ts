@@ -84,7 +84,10 @@ export const AUDIT_ACTION_LABEL_KEYS: Record<string, TranslationKey> = {
   'maintenance.notified': 'audit.action.maintenanceNotified',
   'maintenance.cancelled': 'audit.action.maintenanceCancelled',
   'whatsapp.config_tested': 'audit.action.whatsappConfigTested',
-  'alerts.telegram_changed': 'audit.action.alertsTelegramChanged'
+  'alerts.telegram_changed': 'audit.action.alertsTelegramChanged',
+  'whatsapp.dunning_enabled': 'audit.action.whatsappDunningEnabled',
+  'whatsapp.dunning_disabled': 'audit.action.whatsappDunningDisabled',
+  'whatsapp.dunning_saved': 'audit.action.whatsappDunningSaved'
 }
 
 /** A chave da frase, ou `null` para a ação que este frontend não conhece. */

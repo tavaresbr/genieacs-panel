@@ -7,6 +7,7 @@ import SgpService from './sgpService.js';
 import SgpContactSyncService from './sgpContactSyncService.js';
 import TeiahService from './teiahService.js';
 import TeiahExportService from './teiahExportService.js';
+import WaDunningService from './waDunningService.js';
 import { forEachTenant, forEveryTenant } from '../config/tenantJobs.js';
 import { currentTenantId } from '../config/tenantContext.js';
 import AuditLog from '../models/AuditLog.js';
@@ -372,6 +373,18 @@ class SchedulerService {
         summary.teiah = 'started';
         void TeiahExportService.exportAll().catch((error) => {
           console.warn(`TeiaH export failed: ${error.code || error.message}`);
+        });
+      }
+
+      // A régua de cobrança automática. Mesma forma das duas de cima —
+      // relógio antes, passada no fundo — porque é uma ida ao SGP por
+      // contrato. `due` responde não, barato, com a régua desligada ou fora
+      // da janela de envio; o relógio só anda quando a passada sai de fato.
+      if (await WaDunningService.due(state.lastDunningAt).catch(() => false)) {
+        await this.writeState({ lastDunningAt: new Date().toISOString() });
+        summary.dunning = 'started';
+        void WaDunningService.run({}).catch((error) => {
+          console.warn(`WhatsApp dunning pass failed: ${error.code || error.message}`);
         });
       }
     }

@@ -58,6 +58,9 @@ export const SCOPED_TABLES = new Set([
   // O que foi enviado à TeiaH Valid: contrato e valor em aberto de quem
   // cancelou devendo. Dado de assinante, e de um provedor só.
   'teiah_exports',
+  // A régua de cobrança automática: contrato, telefone e valor devido de cada
+  // assinante cobrado, e quando pagou. Dado de assinante, de um provedor só.
+  'wa_dunning_sends',
   // The ERP event log, and the heaviest concentration of personal data here:
   // contract, document, PPPoE login, device id and a redacted payload, per
   // event. Deployment-wide it also had a second failure that read as no
@@ -186,7 +189,10 @@ export const SHARED_TABLES = new Set([
   'auth_tickets',
   // A tabela de preços. É uma só para o deploy inteiro, e um provedor não
   // edita o próprio plano — ele o lê, por `subscriptions.plan_id`.
-  'plans'
+  'plans',
+  // Os pedidos de demonstração da página pública. Da plataforma: quem pede
+  // ainda não é provedor, e só o console os lê.
+  'leads'
 ]);
 
 /** Tables still to be converted. Shrinks to empty as the phase progresses. */

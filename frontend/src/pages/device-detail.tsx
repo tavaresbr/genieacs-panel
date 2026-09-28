@@ -1553,7 +1553,7 @@ export default function DeviceDetailPage() {
           key="placeOnMap"
           type="button"
           className="modern-button-secondary"
-          onClick={() => navigate(`/network-map?place=${encodeURIComponent(devicePppoe)}`)}
+          onClick={() => navigate(`/network-map?place=${encodeURIComponent(devicePppoe)}&device=${encodeURIComponent(device?._id ?? '')}`)}
         >
           <Icon name="map" size={16} />
           {t('detail.placeOnMap')}
