@@ -71,6 +71,12 @@ class PlatformAudit {
     CHARGE_CANCELED: 'charge.canceled',
     CHARGE_UPDATED: 'charge.updated',
     CHARGE_REISSUED: 'charge.reissued',
+    // O estorno de uma cobrança paga, pelo console: o dinheiro volta (no
+    // gateway, ou por fora) e o período que ele comprou é desfeito. Ação
+    // própria, e não `CHARGE_CANCELED`: cancelar é "ninguém pagou"; estornar é
+    // "pagou, e devolvemos" — e é a segunda que alguém procura quando o
+    // provedor pergunta por que voltou a dever.
+    CHARGE_REFUNDED: 'charge.refunded',
     // Quem trabalha para qual provedor, decidido de fora dele. É a ação mais
     // forte que o plano de controle tem: um vínculo escrito aqui vira uma
     // sessão legítima DENTRO de um ISP, com o cadastro inteiro atrás dela. Sem

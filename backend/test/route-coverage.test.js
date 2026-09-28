@@ -156,6 +156,7 @@ const POR_ID = new Map([
   ['POST /api/platform/tenants/:id/charges/:chargeId/settle', 'plano de controle; prova em platform-subscriptions.test.js — inclusive a de que a cobrança do vizinho responde 404'],
   ['POST /api/platform/tenants/:id/charges/:chargeId/cancel', 'plano de controle; prova em platform-subscriptions.test.js — inclusive a de que a cobrança do vizinho responde 404'],
   ['POST /api/platform/tenants/:id/charges/:chargeId/reissue', 'plano de controle; prova em platform-subscriptions.test.js — inclusive a de que a cobrança do vizinho responde 404'],
+  ['POST /api/platform/tenants/:id/charges/:chargeId/refund', 'plano de controle; prova em platform-charge-refund.test.js — inclusive a de que a cobrança do vizinho responde 404'],
   ['POST /api/platform/tenants/:id/impersonate', 'plano de controle; prova em impersonation.test.js — inclusive a de que a própria personificação não alcança esta rota'],
   // A exportação vista de cima. O id é de um PROVEDOR, e olhá-lo pelo id é o
   // trabalho do console — mas esta é a rota do console que mais se parece com
@@ -349,7 +350,12 @@ describe('toda rota endereçada por um parâmetro', () => {
   // aqui. O `:chargeId` é linha de tabela escopada, e por isso a prova vai
   // além do 404 de quem não é da plataforma: platform-subscriptions.test.js
   // pede, pela URL do alfa, a cobrança do beta — e recebe 404. São 59.
-  const TETO_DE_EXCECOES = 59;
+  //
+  // E o estorno de uma cobrança paga (`POST .../charges/:chargeId/refund`),
+  // da mesma tela e pelo mesmo pedágio: uma linha em `DO_CONSOLE` e mais uma
+  // aqui. A prova de que a cobrança do vizinho responde 404 está em
+  // platform-charge-refund.test.js. São 60.
+  const TETO_DE_EXCECOES = 60;
 
 
   /**
@@ -388,6 +394,7 @@ describe('toda rota endereçada por um parâmetro', () => {
     'POST /api/platform/tenants/:id/charges/:chargeId/settle',
     'POST /api/platform/tenants/:id/charges/:chargeId/cancel',
     'POST /api/platform/tenants/:id/charges/:chargeId/reissue',
+    'POST /api/platform/tenants/:id/charges/:chargeId/refund',
     'GET /api/platform/tenants/:id/export',
     'GET /api/platform/tenants/:id/genieacs',
     'PUT /api/platform/tenants/:id/genieacs',

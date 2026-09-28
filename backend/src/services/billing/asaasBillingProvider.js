@@ -5,6 +5,8 @@ import {
   cancelCharge as cancelarCobranca,
   getCharge as lerCobranca,
   receiveInCash as receberEmDinheiro,
+  refundCharge as estornarCobranca,
+  undoReceivedInCash as desfazerRecebimentoEmDinheiro,
   updateCharge as atualizarCobranca,
   apiKey
 } from './asaasClient.js';
@@ -124,6 +126,19 @@ export class AsaasBillingProvider extends BillingProvider {
     return lerCobranca(gatewayChargeId);
   }
 
+  /**
+   * Estorna inteiro o pagamento que entrou pelo gateway. Mesma costura — e o
+   * `manual`, que não tem o método, estorna só do lado de cá.
+   */
+  async refundCharge(gatewayChargeId) {
+    return estornarCobranca(gatewayChargeId);
+  }
+
+  /** Desfaz a baixa em dinheiro que o console deu lá dentro. Mesma costura. */
+  async undoReceivedInCash(gatewayChargeId) {
+    return desfazerRecebimentoEmDinheiro(gatewayChargeId);
+  }
+
   /** Muda vencimento e/ou valor de uma cobrança já emitida. Mesma costura. */
   async updateCharge(gatewayChargeId, mudanca) {
     return atualizarCobranca(gatewayChargeId, mudanca);
@@ -197,7 +212,8 @@ export class AsaasBillingProvider extends BillingProvider {
    * - `PAYMENT_DELETED` → `canceled`: alguém removeu a cobrança no painel do
    *   gateway. É o mesmo `canceled` do console e da faxina de períodos velhos.
    * - `PAYMENT_REFUNDED` → `refunded`: o dinheiro voltou para quem pagou. O
-   *   período que ele comprou NÃO é desfeito aqui — ver o controlador.
+   *   período que ele comprou é desfeito pelo controlador, e não aqui — esta
+   *   função só lê o corpo.
    *
    * Mesma direção de falha de `interpretar`: um campo que muda de nome devolve
    * nulo, e nulo é "não faço nada".

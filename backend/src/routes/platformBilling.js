@@ -22,7 +22,7 @@ router.post('/tenants/:id/payments', ...guard, PlatformBillingController.recordP
 router.get('/tenants/:id/usage', ...guard, PlatformBillingController.getUsage);
 
 // A tela de Assinaturas: todos de uma vez, as cobranças de um, e os gestos
-// sobre uma cobrança. Trocar plano, suspender e reativar continuam no `PUT`
+// sobre uma cobrança (o estorno inclusive, que desfaz o período pago). Trocar plano, suspender e reativar continuam no `PUT`
 // da assinatura, logo acima — esta tela o chama em vez de duplicá-lo.
 router.get('/subscriptions', ...guard, PlatformSubscriptionsController.listSubscriptions);
 router.patch('/tenants/:id/subscription/deadlines', ...guard, PlatformSubscriptionsController.setDeadlines);
@@ -31,5 +31,6 @@ router.patch('/tenants/:id/charges/:chargeId', ...guard, PlatformSubscriptionsCo
 router.post('/tenants/:id/charges/:chargeId/settle', ...guard, PlatformSubscriptionsController.settle);
 router.post('/tenants/:id/charges/:chargeId/cancel', ...guard, PlatformSubscriptionsController.cancel);
 router.post('/tenants/:id/charges/:chargeId/reissue', ...guard, PlatformSubscriptionsController.reissue);
+router.post('/tenants/:id/charges/:chargeId/refund', ...guard, PlatformSubscriptionsController.refund);
 
 export default router;

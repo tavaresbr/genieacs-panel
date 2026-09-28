@@ -34,9 +34,10 @@ export const CHARGE_STATUSES = Object.freeze([
    */
   'overdue',
   /**
-   * O dinheiro voltou para quem pagou (`PAYMENT_REFUNDED`). Fechada: não há o
-   * que pagar nela. O período que ela comprou NÃO é desfeito sozinho — quem
-   * decide isso é gente, pelo console.
+   * O dinheiro voltou para quem pagou — pelo botão de estorno do console, ou
+   * no painel do gateway (`PAYMENT_REFUNDED`). Fechada: não há o que pagar
+   * nela. O período que ela comprou é desfeito junto, pelos dois caminhos
+   * (`SubscriptionService.reversePayment`), uma vez só.
    */
   'refunded'
 ]);
@@ -166,7 +167,9 @@ class BillingCharge {
    *
    * @returns {Promise<boolean>} se esta chamada ficou com a linha.
    */
-  static async claim(id, { until, now = new Date(), unissued = true, openOnly = false } = {}) {
+  static async claim(id, {
+    until, now = new Date(), unissued = true, openOnly = false, statuses = null
+  } = {}) {
     let query = tdb('billing_charges').where({ id })
       .where((livre) => livre.whereNull('issuing_until').orWhere('issuing_until', '<', now));
     if (unissued) query = query.whereNull('gateway_charge_id');
@@ -175,6 +178,10 @@ class BillingCharge {
     // quitado a linha. Na mesma condição do `UPDATE`, quem toma a garra toma
     // uma linha que AINDA está em aberto — ou não toma nada.
     if (openOnly) query = query.whereIn('status', OPEN_CHARGE_STATUSES);
+    // `statuses` é a mesma trava para o gesto que quer uma linha FECHADA — o
+    // estorno, que só toma a cobrança que ainda está `paid`: entre a leitura e
+    // a garra, o `PAYMENT_REFUNDED` do gateway pode tê-la estornado.
+    if (Array.isArray(statuses) && statuses.length) query = query.whereIn('status', statuses);
     const changed = await query.update({ issuing_until: until, updated_at: new Date() });
     return changed > 0;
   }
