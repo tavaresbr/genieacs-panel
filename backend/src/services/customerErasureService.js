@@ -234,6 +234,7 @@ class CustomerErasureService {
             address: null,
             address_parts: null,
             contract_cancelled_at: null,
+            equipment_rented: null,
             updated_at: new Date()
           });
       }

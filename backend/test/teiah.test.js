@@ -6,7 +6,7 @@ import { asTenant, authHeaders, call, getDb, runInTenant, startTestServers, stop
 const { default: SgpService } = await import('../src/services/sgpService.js');
 const { default: TeiahService } = await import('../src/services/teiahService.js');
 const {
-  default: TeiahExportService, buildImportItem, toMonthYear, toCep, toUf, hashItem
+  default: TeiahExportService, buildImportItem, toMonthYear, toCep, toUf, hashItem, rentalFor
 } = await import('../src/services/teiahExportService.js');
 const { default: AppState } = await import('../src/models/AppState.js');
 const { refreshDeploymentSharing, resetDeploymentSharing } = await import('../src/services/genieacsEgress.js');
@@ -37,7 +37,7 @@ const clientes = [
     cpfcnpj: '11122233344',
     contratos: [{
       contrato: 'C-DEVE', contratoStatus: 'Cancelado', dataCadastro: '15/01/2020',
-      dataCancelamento: '10/12/2023', endereco: { ...ENDERECO, latitude: '-23,5614', longitude: '-46.6559' }
+      dataCancelamento: '10/12/2023', comodato: 'S', endereco: { ...ENDERECO, latitude: '-23,5614', longitude: '-46.6559' }
     }]
   },
   {
@@ -233,6 +233,17 @@ describe('conversões do DTO', () => {
     assert.equal(buildImportItem({ address: { ...address, number: '' }, startedAt: '01/05/2022', cancelledAt: '01/06/2022', amount: 5 }).reason, 'missing_address');
   });
 
+  it('aluguel: o SGP prevalece, o padrão cobre o silêncio', () => {
+    assert.equal(rentalFor({ equipment_rented: 1 }, { rentalDefault: 'false' }), true);
+    assert.equal(rentalFor({ equipment_rented: false }, { rentalDefault: 'true' }), false);
+    assert.equal(rentalFor({ equipment_rented: null }, { rentalDefault: 'true' }), true);
+    assert.equal(rentalFor({ equipment_rented: null }, { rentalDefault: 'omit' }), null);
+    const address = { street: 'R', number: '1', district: 'B', city: 'C', state: 'SP', zip: '01310100' };
+    const base = { address, startedAt: '01/05/2022', cancelledAt: '01/06/2022', amount: 5 };
+    assert.equal('aluguel' in buildImportItem(base).item, false);
+    assert.equal(buildImportItem({ ...base, rental: false }).item.aluguel, false);
+  });
+
   it('o hash não depende da ordem das chaves', () => {
     assert.equal(hashItem({ a: 1, b: 2 }), hashItem({ b: 2, a: 1 }));
   });
@@ -303,12 +314,16 @@ describe('envio dos inadimplentes', () => {
       complemento: 'Apto 101',
       latitude: -23.5614,
       longitude: -46.6559,
+      // O SGP diz "S" no comodato.
+      aluguel: true,
       // O título cancelado não entra na soma.
       inadimplente_valor: 1500,
       data_inicio: '01/2020',
       data_cancelamento: '12/2023'
     });
     const doCliente = enviados.find((item) => item.numero === '200');
+    // O SGP não diz nada e o padrão é não enviar.
+    assert.equal('aluguel' in doCliente, false);
     assert.equal(doCliente.cep, '01310-200');
     assert.equal(doCliente.inadimplente_valor, 250);
     assert.equal(doCliente.data_inicio, '03/2021');
@@ -343,6 +358,22 @@ describe('envio dos inadimplentes', () => {
     const third = await runExport();
     assert.equal(third.sent, 1);
     assert.equal(teiah.batches.flat()[0].inadimplente_valor, 300);
+  });
+
+  it('o padrão da configuração preenche o aluguel só onde o SGP não diz', async () => {
+    teiah.batches.length = 0;
+    await asTenant(() => TeiahService.saveConfig({ rentalDefault: 'false' }));
+    const result = await runExport();
+    // Só o contrato sem informação do SGP muda (ganha `aluguel: false`); o outro
+    // continua `true` e igual ao já enviado.
+    assert.equal(result.sent, 1, JSON.stringify(result));
+    const [item] = teiah.batches.flat();
+    assert.equal(item.numero, '200');
+    assert.equal(item.aluguel, false);
+    const cfg = await call(`${panelUrl}/api/teiah/config`, auth());
+    assert.equal(cfg.body.data.rentalDefault, 'false');
+    await asTenant(() => TeiahService.saveConfig({ rentalDefault: 'nao-existe' }));
+    assert.equal((await asTenant(() => TeiahService.getConfig())).rentalDefault, 'false');
   });
 
   it('usa o evento de cancelamento quando o SGP não manda a data', async () => {

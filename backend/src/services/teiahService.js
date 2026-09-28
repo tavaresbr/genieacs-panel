@@ -33,8 +33,12 @@ const DEFAULT_CONFIG = Object.freeze({
   baseUrl: DEFAULT_BASE_URL,
   exportEnabled: false,
   exportIntervalHours: 24,
-  batchSize: 50
+  batchSize: 50,
+  rentalDefault: 'omit'
 });
+
+/** What `aluguel` says when the SGP does not: leave it out, or always false/true. */
+export const RENTAL_DEFAULTS = Object.freeze(['omit', 'false', 'true']);
 
 const apiKeyBox = createSecretBox('skygenpanel-teiah-apikey-v1');
 
@@ -126,6 +130,7 @@ class TeiahService {
       exportEnabled: stored.exportEnabled === true,
       exportIntervalHours: clampNumber(stored.exportIntervalHours, 1, 168, DEFAULT_CONFIG.exportIntervalHours),
       batchSize: clampNumber(stored.batchSize, 1, 500, DEFAULT_CONFIG.batchSize),
+      rentalDefault: RENTAL_DEFAULTS.includes(stored.rentalDefault) ? stored.rentalDefault : DEFAULT_CONFIG.rentalDefault,
       updatedAt: stored.updatedAt || null
     };
     this.configCache.set(config);
@@ -170,6 +175,7 @@ class TeiahService {
       batchSize: patch.batchSize === undefined
         ? current.batchSize
         : clampNumber(patch.batchSize, 1, 500, DEFAULT_CONFIG.batchSize),
+      rentalDefault: RENTAL_DEFAULTS.includes(patch.rentalDefault) ? patch.rentalDefault : current.rentalDefault,
       updatedAt: new Date().toISOString()
     };
 

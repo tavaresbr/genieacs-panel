@@ -1466,11 +1466,15 @@ const SGP_CONTACT_PROFILE_COLUMNS = [
  * O que o importador da TeiaH Valid (0077) precisa de cada contrato e a linha
  * do endereço não guarda: o endereço em partes (rua, número, bairro, cidade,
  * UF, CEP, e as coordenadas quando o SGP as manda), em JSON como o de
- * `sgp_clients.address`, e a data de cancelamento como o SGP a escreveu.
+ * `sgp_clients.address`, a data de cancelamento como o SGP a escreveu, e se o
+ * equipamento ficou em comodato.
  */
 const SGP_CONTACT_TEIAH_COLUMNS = [
   ['address_parts', (t) => t.text('address_parts')],
-  ['contract_cancelled_at', (t) => t.string('contract_cancelled_at', 32)]
+  ['contract_cancelled_at', (t) => t.string('contract_cancelled_at', 32)],
+  // Se o equipamento ficou com o cliente em aluguel ou comodato — o `aluguel`
+  // da TeiaH. Nulo é "o SGP não diz", que não é o mesmo que "não".
+  ['equipment_rented', (t) => t.boolean('equipment_rented')]
 ];
 
 /** Os tetos de retenção de `plans`, para a migração que os acrescenta. */

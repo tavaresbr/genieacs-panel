@@ -2597,6 +2597,9 @@ export interface ContactInvoiceSent {
 }
 
 // SGP (Sistema de Gestão de Provedores) integration API
+/** What `aluguel` says when the SGP does not. */
+export type TeiahRentalDefault = 'omit' | 'false' | 'true'
+
 /** TeiaH Valid: the settings, without the API key. */
 export interface TeiahConfig {
   enabled: boolean
@@ -2604,6 +2607,7 @@ export interface TeiahConfig {
   exportEnabled: boolean
   exportIntervalHours: number
   batchSize: number
+  rentalDefault: TeiahRentalDefault
   updatedAt: string | null
   apiKeyConfigured: boolean
   ready: boolean
@@ -2660,6 +2664,8 @@ export interface TeiahImportItem {
   complemento?: string
   latitude?: number
   longitude?: number
+  /** Equipment left with the customer on rent or loan (comodato). */
+  aluguel?: boolean
   inadimplente_valor: number
   data_inicio: string
   data_cancelamento: string

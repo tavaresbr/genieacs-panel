@@ -393,6 +393,32 @@ function addressLine(address) {
   return [street, address.complement, place, address.zip].filter(Boolean).join(' · ') || null;
 }
 
+/**
+ * Whether the contract's equipment stayed with the customer on rent or loan
+ * (comodato) — the TeiaH Valid `aluguel`. A flag under one of several names, or
+ * a list of loaned equipment where non-empty means yes. `null` is "the SGP does
+ * not say", which is not the same as "no".
+ */
+const RENTAL_FLAG_NAMES = Object.freeze([
+  'comodato', 'emComodato', 'possuiComodato', 'equipamentoComodato',
+  'aluguel', 'aluguelEquipamento', 'equipamentoAlugado', 'locacao', 'locacaoEquipamento'
+]);
+const RENTAL_LIST_NAMES = Object.freeze(['comodatos', 'equipamentosComodato', 'equipamentosAlugados']);
+
+function equipmentRentedFrom(entry) {
+  const list = pick(entry, RENTAL_LIST_NAMES);
+  if (Array.isArray(list)) return list.length > 0;
+  const value = pick(entry, RENTAL_FLAG_NAMES);
+  if (value === null) return null;
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value !== 0;
+  if (typeof value === 'object') return Array.isArray(value) ? value.length > 0 : null;
+  const text = stripAccents(value).trim();
+  if (['1', 'true', 'sim', 's', 'yes', 'y'].includes(text)) return true;
+  if (['0', 'false', 'nao', 'n', 'no'].includes(text)) return false;
+  return null;
+}
+
 const CONTRACT_ADDRESS_NAMES = Object.freeze(['endereco', 'enderecoCompleto', 'contratoEndereco', 'enderecoInstalacao']);
 
 function normalizeContract(entry, { includeSecrets = false } = {}) {
@@ -431,6 +457,7 @@ function normalizeContract(entry, { includeSecrets = false } = {}) {
     // the outbox as the same value. The ninth digit is never invented — see
     // utils/wa/waDestino.js for why guessing it addresses a stranger.
     phone: normalizarTelefoneBr(pick(entry, PHONE_NAMES)) || null,
+    equipmentRented: equipmentRentedFrom(entry),
     blocked: (() => {
       const value = pick(entry, ['bloqueado', 'contratoBloqueado', 'bloqueio']);
       if (value === null) return null;
@@ -1683,7 +1710,8 @@ class SgpService {
       address: contract.address ? String(contract.address).slice(0, 2000) : null,
       contract_created_at: contract.createdAt ? String(contract.createdAt).slice(0, 32) : null,
       address_parts: contract.addressParts ? JSON.stringify(contract.addressParts).slice(0, 4000) : null,
-      contract_cancelled_at: contract.cancelledAt ? String(contract.cancelledAt).slice(0, 32) : null
+      contract_cancelled_at: contract.cancelledAt ? String(contract.cancelledAt).slice(0, 32) : null,
+      equipment_rented: typeof contract.equipmentRented === 'boolean' ? contract.equipmentRented : null
     };
   }
 

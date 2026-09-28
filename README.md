@@ -399,7 +399,10 @@ adds up the open invoices in SGP and sends an `ImportAddressDto` to
 - the street, number, district, city, state and postal code;
 - the coordinates, when SGP has them;
 - the amount owed;
-- the start and cancellation months.
+- the start and cancellation months;
+- `aluguel`, whether the equipment stayed with the customer on rent or loan
+  (comodato). It comes from the contract's own field in SGP when there is one;
+  otherwise the tab's default applies, which is to leave the field out.
 
 Name, tax ID, phone and contract number are never sent. A contract without a
 complete address, a start date, a cancellation date or any debt is skipped and

@@ -37,7 +37,8 @@ class TeiahController {
         apiKey: body.apiKey === undefined ? undefined : body.apiKey,
         exportEnabled: body.exportEnabled,
         exportIntervalHours: body.exportIntervalHours,
-        batchSize: body.batchSize
+        batchSize: body.batchSize,
+        rentalDefault: body.rentalDefault
       });
       return res.json(createResponse(req.t('teiah.configSaved'), config));
     } catch (error) {

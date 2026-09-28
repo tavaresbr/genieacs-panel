@@ -102,9 +102,11 @@ function monthIndex(monthYear) {
  * @param {string|null} input.startedAt the contract's start, as the SGP wrote it
  * @param {string|Date|null} input.cancelledAt its cancellation
  * @param {number} input.amount what is still owed
+ * @param {boolean|null} [input.rental] whether the equipment stayed with the
+ *   customer on rent or loan (`aluguel`); null leaves the field out
  * @returns {{ item: object } | { reason: string }}
  */
-export function buildImportItem({ address, startedAt, cancelledAt, amount }) {
+export function buildImportItem({ address, startedAt, cancelledAt, amount, rental = null }) {
   const estado = toUf(address?.state);
   const cep = toCep(address?.zip);
   const cidade = clean(address?.city, 128);
@@ -144,7 +146,22 @@ export function buildImportItem({ address, startedAt, cancelledAt, amount }) {
     item.latitude = latitude;
     item.longitude = longitude;
   }
+  if (typeof rental === 'boolean') item.aluguel = rental;
   return { item };
+}
+
+/**
+ * `aluguel`: whether the equipment stayed with the customer on rent or loan.
+ * The SGP's own answer wins; when it says nothing (`null`), the provider's
+ * default from Settings — and `omit`, the default's default, leaves it out.
+ */
+export function rentalFor(contact, config) {
+  const stored = contact?.equipment_rented;
+  // SQLite and MySQL hand the boolean back as 0/1, Postgres as false/true.
+  if (stored !== null && stored !== undefined) return Boolean(Number(stored));
+  if (config?.rentalDefault === 'true') return true;
+  if (config?.rentalDefault === 'false') return false;
+  return null;
 }
 
 /** Stable across key order, so the same item always hashes the same. */
@@ -280,7 +297,7 @@ class TeiahExportService {
    * address and dates already allow an item: a contract without a CEP costs no
    * invoice lookup.
    */
-  static async prepare(contact) {
+  static async prepare(contact, config = null) {
     const address = await this.addressFor(contact);
     const cancelledAt = await this.cancelledAtFor(contact);
     // Checked with a placeholder amount first, so a contract that cannot go
@@ -294,7 +311,8 @@ class TeiahExportService {
       if (error?.code === 'unauthorized') throw error;
       return { reason: 'invoices_failed' };
     }
-    return { ...buildImportItem({ address, startedAt: contact.contract_created_at, cancelledAt, amount }), amount };
+    const rental = rentalFor(contact, config ?? await TeiahService.getConfig());
+    return { ...buildImportItem({ address, startedAt: contact.contract_created_at, cancelledAt, amount, rental }), amount };
   }
 
   static async record(contract, values) {
@@ -309,10 +327,11 @@ class TeiahExportService {
   static async preview({ limit = 5 } = {}) {
     SgpService.requireReady(await SgpService.getConfig());
     const contacts = await this.candidates(Math.min(Math.max(Number(limit) || 5, 1), 20));
+    const config = await TeiahService.getConfig();
     const items = [];
     for (const contact of contacts) {
       // eslint-disable-next-line no-await-in-loop -- paced on purpose
-      const prepared = await this.prepare(contact);
+      const prepared = await this.prepare(contact, config);
       items.push({
         contract: contact.contract,
         clientName: contact.client_name ?? null,
@@ -361,7 +380,7 @@ class TeiahExportService {
     for (const [index, contact] of contacts.entries()) {
       summary.total += 1;
       if (index > 0) await sleep(this.INVOICE_PACE_MS);
-      const prepared = await this.prepare(contact);
+      const prepared = await this.prepare(contact, config);
       if (prepared.reason) {
         summary.skipped += 1;
         summary.reasons[prepared.reason] = (summary.reasons[prepared.reason] ?? 0) + 1;

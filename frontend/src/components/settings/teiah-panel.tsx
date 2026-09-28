@@ -7,6 +7,7 @@ import {
   type TeiahExportItem,
   type TeiahExportStatus,
   type TeiahPreviewItem,
+  type TeiahRentalDefault,
   type TeiahSkipReason
 } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
@@ -16,6 +17,8 @@ import { useAuth } from '@/contexts/auth-context'
 import type { TranslationKey } from '@/lib/i18n'
 
 const EXPORT_POLL_MS = 3000
+
+const RENTAL_DEFAULTS: TeiahRentalDefault[] = ['omit', 'false', 'true']
 
 const REASON_KEYS: Record<TeiahSkipReason, TranslationKey> = {
   missing_address: 'settings.teiah.reason.missing_address',
@@ -58,7 +61,8 @@ export function TeiahPanel() {
     apiKey: '',
     exportEnabled: false,
     exportIntervalHours: 24,
-    batchSize: 50
+    batchSize: 50,
+    rentalDefault: 'omit' as TeiahRentalDefault
   })
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
@@ -77,7 +81,8 @@ export function TeiahPanel() {
       apiKey: '',
       exportEnabled: next.exportEnabled,
       exportIntervalHours: next.exportIntervalHours,
-      batchSize: next.batchSize
+      batchSize: next.batchSize,
+      rentalDefault: next.rentalDefault
     })
   }, [])
 
@@ -130,6 +135,7 @@ export function TeiahPanel() {
         exportEnabled: form.exportEnabled,
         exportIntervalHours: form.exportIntervalHours,
         batchSize: form.batchSize,
+        rentalDefault: form.rentalDefault,
         // Blank keeps the stored key; the clear button sends "" on purpose.
         ...(clearKey ? { apiKey: '' } : form.apiKey.trim() ? { apiKey: form.apiKey.trim() } : {})
       })
@@ -282,6 +288,25 @@ export function TeiahPanel() {
               value={form.batchSize}
               onChange={(event) => setForm((current) => ({ ...current, batchSize: Number(event.target.value) || 50 }))}
             />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="field-label" htmlFor="teiah-rental">{t('settings.teiah.export.rental')}</label>
+            <select
+              id="teiah-rental"
+              className="modern-input"
+              value={form.rentalDefault}
+              onChange={(event) => setForm((current) => ({
+                ...current,
+                rentalDefault: RENTAL_DEFAULTS.includes(event.target.value as TeiahRentalDefault)
+                  ? event.target.value as TeiahRentalDefault
+                  : 'omit'
+              }))}
+            >
+              <option value="omit">{t('settings.teiah.export.rentalOmit')}</option>
+              <option value="false">{t('settings.teiah.export.rentalFalse')}</option>
+              <option value="true">{t('settings.teiah.export.rentalTrue')}</option>
+            </select>
+            <p className="mt-1 text-xs text-muted-foreground">{t('settings.teiah.export.rentalHint')}</p>
           </div>
         </div>
       )}
