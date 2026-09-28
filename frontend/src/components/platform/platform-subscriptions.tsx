@@ -35,6 +35,7 @@ import {
   isChargeLate,
   openTotalsByCurrency,
   parseExtendDays,
+  refundPreview,
   summaryStatusCards,
   todayIso,
   type AmountMode,
@@ -470,6 +471,7 @@ type DialogState =
   | { kind: 'amount'; charge: ChargeConsoleView }
   | { kind: 'cancelCharge'; charge: ChargeConsoleView }
   | { kind: 'reissue'; charge: ChargeConsoleView }
+  | { kind: 'refund'; charge: ChargeConsoleView }
 
 /**
  * Traduz as recusas conhecidas das rotas de cobrança pelo `code`: o backend
@@ -480,6 +482,7 @@ function useRefusal() {
   const { t } = useTranslation()
   return (res: { code?: string; message?: string }) => {
     if (res.code === 'not_open') return t('platform.subs.err.notOpen')
+    if (res.code === 'not_paid') return t('platform.subs.err.notPaid')
     if (res.code === 'busy') return t('platform.subs.err.busy')
     if (res.code === 'gateway_failed') return t('platform.subs.err.gatewayFailed')
     return res.message || t('platform.saveFailed')
@@ -562,6 +565,9 @@ function SubscriptionDetail({ row, plans, onChanged }: { row: SubscriptionRow; p
   }
 
   const stored = sub?.storedStatus ?? null
+  // Os dias que um pagamento compra, para a prévia do estorno: os do plano
+  // atual, ou os 30 que o backend assume quando o plano não diz.
+  const periodDays = plans.find((plan) => plan.id === sub?.planId)?.periodDays ?? 30
 
   return (
     <div className="space-y-5 py-3">
@@ -700,11 +706,21 @@ function SubscriptionDetail({ row, plans, onChanged }: { row: SubscriptionRow; p
       {dialog?.kind === 'reissue' && (
         <ReissueDialog tenantId={tenantId} charge={dialog.charge} onClose={fechar} onDone={recarregar} />
       )}
+      {dialog?.kind === 'refund' && (
+        <RefundDialog
+          tenantId={tenantId}
+          charge={dialog.charge}
+          renewsAt={sub?.renewsAt ?? null}
+          periodDays={periodDays}
+          onClose={fechar}
+          onDone={recarregar}
+        />
+      )}
     </div>
   )
 }
 
-type ChargeDialogKind = 'settle' | 'dueDate' | 'amount' | 'cancelCharge' | 'reissue'
+type ChargeDialogKind = 'settle' | 'dueDate' | 'amount' | 'cancelCharge' | 'reissue' | 'refund'
 
 function ChargeItem({
   charge,
@@ -801,6 +817,12 @@ function ChargeItem({
           <button type="button" className="modern-button-secondary text-destructive" onClick={() => onAction('cancelCharge')}>
             <Icon name="x" size={16} />
             {t('platform.subs.cancelCharge')}
+          </button>
+        )}
+        {acoes.refund && (
+          <button type="button" className="modern-button-secondary text-destructive" onClick={() => onAction('refund')}>
+            <Icon name="back" size={16} />
+            {t('platform.subs.refund')}
           </button>
         )}
       </div>
@@ -1371,6 +1393,143 @@ function ReissueDialog({ tenantId, charge, onClose, onDone }: ActionDialogProps 
       <p className="text-foreground">
         {t('platform.subs.reissueText', { amount: formatMoney(charge.amountCents, charge.currency), date: formatDay(charge.periodEnd) })}
       </p>
+    </Dialog>
+  )
+}
+
+function RefundDialog({
+  tenantId,
+  charge,
+  renewsAt,
+  periodDays,
+  onClose,
+  onDone
+}: ActionDialogProps & { charge: ChargeConsoleView; renewsAt: string | null; periodDays: number }) {
+  const { t } = useTranslation()
+  const toast = useToast()
+  const recusa = useRefusal()
+  const [reason, setReason] = useState('')
+  const [outsideGateway, setOutsideGateway] = useState(false)
+  const [busy, setBusy] = useState(false)
+  /**
+   * A recusa do gateway fica NA TELA, com o texto dele: o caminho de saída é
+   * estornar lá e marcar a caixa, e isso não cabe num toast que some.
+   */
+  const [falhaGateway, setFalhaGateway] = useState<string | null>(null)
+  const previa = refundPreview(renewsAt, periodDays)
+  // Quem cobrou é quem estorna: o provider da cobrança, não o de hoje do
+  // provedor. Sem id lá, ou emitida à mão, não há gateway a chamar — o dinheiro
+  // volta por fora e o painel só registra.
+  const badge = gatewayBadge({ gateway: charge.provider, linked: true })
+  const viaGateway = badge.kind !== 'manual' && Boolean(charge.gatewayChargeId)
+  const gateway = badge.kind === 'manual' ? '' : badge.name
+
+  const enviar = async () => {
+    setBusy(true)
+    try {
+      const res = await platformAPI.refundCharge(tenantId, charge.id, {
+        reason: reason.trim() || undefined,
+        ...(viaGateway && outsideGateway ? { outsideGateway: true } : {})
+      })
+      if (!res.success && res.code === 'gateway_failed') {
+        setFalhaGateway(res.detail || '')
+        return
+      }
+      if (res.success) {
+        // "Já estava estornada" e "estornei agora" são frases diferentes, como
+        // na baixa: é dinheiro, e a diferença não pode depender de alguém reparar.
+        if (res.data?.alreadyRefunded) {
+          toast.info(t('platform.subs.refundAlready'))
+        } else {
+          toast.success(t('platform.subs.refunded', {
+            from: formatDay(res.data?.renewsAtBefore),
+            to: formatDay(res.data?.renewsAtAfter)
+          }))
+        }
+        onClose()
+        await onDone()
+      } else {
+        toast.error(recusa(res))
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Dialog
+      title={t('platform.subs.refund')}
+      onClose={onClose}
+      busy={busy}
+      footer={(
+        <>
+          <button type="button" className="modern-button-secondary" onClick={onClose} disabled={busy}>{t('common.back')}</button>
+          <button type="button" className="modern-button-danger" onClick={() => void enviar()} disabled={busy}>
+            {busy ? t('common.saving') : t('platform.subs.refundConfirm')}
+          </button>
+        </>
+      )}
+    >
+      <p className="text-foreground">
+        {t('platform.subs.refundText', { date: formatDay(charge.periodEnd) })}
+      </p>
+      <Field label={t('platform.subs.refundAmount')} hint={t('platform.subs.refundAmountHint')}>
+        {(id) => (
+          <input
+            id={id}
+            value={formatMoney(charge.amountCents, charge.currency)}
+            readOnly
+            className="modern-input w-full font-mono tabular-nums"
+          />
+        )}
+      </Field>
+      <Field label={t('platform.subscription.reason')}>
+        {(id) => (
+          <textarea
+            id={id}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            className="modern-input w-full"
+            rows={2}
+            maxLength={255}
+          />
+        )}
+      </Field>
+      {renewsAt && (
+        <p className="text-foreground">
+          {previa
+            ? t('platform.subs.refundPreview', { from: formatDay(renewsAt), to: formatDay(previa.renewsAt) })
+            : `${t('platform.subs.paidUntil')}: ${formatDay(renewsAt)}`}
+        </p>
+      )}
+      {previa?.past && (
+        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3" role="alert">
+          <p className="text-foreground">{t('platform.subs.refundPastWarning')}</p>
+        </div>
+      )}
+      {viaGateway ? (
+        <label className="flex items-start gap-2 text-foreground">
+          <input
+            type="checkbox"
+            className="mt-1"
+            checked={outsideGateway}
+            onChange={(e) => { setOutsideGateway(e.target.checked); setFalhaGateway(null) }}
+          />
+          <span>{t('platform.subs.refundOutside', { gateway })}</span>
+        </label>
+      ) : (
+        <p className="field-hint">{t('platform.subs.refundManualHint')}</p>
+      )}
+      {falhaGateway !== null && (
+        <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3" role="alert">
+          <p className="text-foreground [overflow-wrap:anywhere]">
+            {falhaGateway
+              ? t('platform.subs.refundGatewayFailed', { gateway, detail: falhaGateway })
+              : t('platform.subs.err.gatewayFailed')}
+          </p>
+          <p className="field-hint">{t('platform.subs.refundGatewayHint', { gateway })}</p>
+        </div>
+      )}
     </Dialog>
   )
 }
