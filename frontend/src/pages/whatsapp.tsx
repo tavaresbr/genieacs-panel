@@ -601,7 +601,7 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
           // página, nesta aba, troca o respiro de baixo pela área segura do
           // iPhone (ver `WhatsAppPage`), e a conta desconta o mesmo.
           <section
-            className={`modern-card grid h-[calc(100dvh-13.5rem-env(safe-area-inset-bottom))] min-h-[22rem] grid-cols-1 overflow-hidden lg:h-[calc(100vh-10.5rem)] lg:min-h-[32rem] lg:grid-cols-[minmax(17rem,22rem)_1fr] ${
+            className={`modern-card grid h-[calc(100dvh-9rem-env(safe-area-inset-bottom))] min-h-[22rem] grid-cols-1 overflow-hidden lg:h-[calc(100vh-6.875rem)] lg:min-h-[32rem] lg:grid-cols-[minmax(17rem,22rem)_1fr] ${
               showSgpPanel && conversation ? 'xl:grid-cols-[minmax(16rem,20rem)_1fr_minmax(18rem,22rem)]' : ''
             }`}
           >
@@ -962,17 +962,36 @@ export default function WhatsAppPage() {
     <div className={`page-shell ${tab === 'inbox' ? 'pb-[calc(0.75rem+env(safe-area-inset-bottom))] lg:pb-8' : ''}`}>
       <div className="page-frame">
         {/*
-          Uma linha só: o título à esquerda e o sino de "Está funcionando?" à
-          direita. Os avisos e as duas ações de manutenção moram no painel do
-          sino — como tira, com vários avisos, ocupavam três linhas acima da
-          caixa de entrada numa ferramenta de trabalho o dia todo.
+          O título "WhatsApp" repetia o menu lateral e custava uma linha inteira
+          acima da caixa de entrada: fica só para leitor de tela, e o sino de
+          "Está funcionando?" vai para a ponta da linha das abas. Os avisos e as
+          duas ações de manutenção moram no painel do sino.
 
-          O sino fica aqui, fora da troca de abas, de propósito: tem que
-          continuar respondendo "está funcionando?" em qualquer aba — montado
-          dentro de uma delas, a integração sumiria ao abrir Campanhas.
+          O sino fica fora da troca de abas de propósito: tem que continuar
+          respondendo "está funcionando?" em qualquer aba — montado dentro de
+          uma delas, a integração sumiria ao abrir Campanhas.
         */}
-        <header className="mb-4 flex items-center gap-3 border-b border-border pb-3">
-          <h1 className="text-xl font-bold leading-tight text-foreground">{t('sidebar.nav.whatsapp')}</h1>
+        <h1 className="sr-only">{t('sidebar.nav.whatsapp')}</h1>
+        {/* A caixa de entrada conta a altura exata da tela; as outras abas ganham um respiro. */}
+        <div className={`flex items-center gap-2 border-b border-border ${tab === 'inbox' ? '' : 'mb-4'}`}>
+          <div className="tab-rail min-w-0 flex-1 border-b-0" role="tablist" aria-label={t('sidebar.nav.whatsapp')}>
+            {visibleTabs.map(([id, labelKey]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => {
+                  setTab(id)
+                  setHandOver(null)
+                }}
+                className="tab-button"
+                data-active={tab === id}
+                role="tab"
+                aria-selected={tab === id}
+              >
+                {t(labelKey)}
+              </button>
+            ))}
+          </div>
           <HealthBell
             actions={(disponivel) => (
               <>
@@ -983,26 +1002,6 @@ export default function WhatsAppPage() {
               </>
             )}
           />
-        </header>
-
-        {/* A caixa de entrada conta a altura exata da tela; as outras abas ganham um respiro. */}
-        <div className={`tab-rail ${tab === 'inbox' ? '' : 'mb-4'}`} role="tablist" aria-label={t('sidebar.nav.whatsapp')}>
-          {visibleTabs.map(([id, labelKey]) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => {
-                setTab(id)
-                setHandOver(null)
-              }}
-              className="tab-button"
-              data-active={tab === id}
-              role="tab"
-              aria-selected={tab === id}
-            >
-              {t(labelKey)}
-            </button>
-          ))}
         </div>
 
         {tab === 'inbox' && (
