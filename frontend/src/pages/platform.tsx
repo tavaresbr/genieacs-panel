@@ -9,6 +9,7 @@ import { DefaultCatalogueTab } from '@/components/platform/default-catalogue'
 import { PlatformAdmins } from '@/components/platform/platform-admins'
 import { PlatformAudit } from '@/components/platform/platform-audit'
 import { PlatformIntegrations } from '@/components/platform/platform-integrations'
+import { PlatformLeads } from '@/components/platform/platform-leads'
 import { PlatformSubscriptions } from '@/components/platform/platform-subscriptions'
 import { TenantData } from '@/components/platform/tenant-data'
 import { TenantGateway } from '@/components/platform/tenant-gateway'
@@ -69,7 +70,7 @@ export default function PlatformPage() {
    * alguma coisa; as outras três são consulta ou manutenção rara.
    */
   const estreito = useEstreito()
-  const [aba, setAba] = useState<'tenants' | 'plans' | 'subscriptions' | 'admins' | 'audit' | 'integrations' | 'deployment' | 'catalogue'>('tenants')
+  const [aba, setAba] = useState<'tenants' | 'plans' | 'subscriptions' | 'leads' | 'admins' | 'audit' | 'integrations' | 'deployment' | 'catalogue'>('tenants')
 
   const loadTenants = useCallback(async () => {
     const plansRes = await platformAPI.listPlans()
@@ -491,6 +492,9 @@ export default function PlatformPage() {
             // Ao lado de Planos: é o catálogo visto do lado de quem paga — quem
             // está em dia, quem deve, e a mão para dar baixa ou renegociar.
             ['subscriptions', 'platform.tabs.subscriptions'],
+            // Quem pediu demonstração pela página pública — o funil antes da
+            // assinatura.
+            ['leads', 'platform.tabs.leads'],
             ['admins', 'platform.tabs.admins'],
             ['audit', 'platform.tabs.audit'],
             // Integrações antes das de consulta: é tela de configurar, mas de
@@ -517,6 +521,7 @@ export default function PlatformPage() {
 
         {aba === 'plans' && <PlanCatalog plans={plans} onChange={() => void loadTenants()} />}
         {aba === 'subscriptions' && <PlatformSubscriptions plans={plans} estreito={estreito} />}
+        {aba === 'leads' && <PlatformLeads />}
         {aba === 'admins' && <PlatformAdmins />}
         {aba === 'audit' && <PlatformAudit />}
         {aba === 'integrations' && <PlatformIntegrations />}

@@ -21,6 +21,12 @@ import { mailTransport, panelUrlFor } from '../services/mail/index.js';
 import MfaService, { mfaEnabled } from '../services/mfaService.js';
 import AccountLockout from '../models/AccountLockout.js';
 import { PRODUCT_NAME } from '../config/brand.js';
+import Plan from '../models/Plan.js';
+import PlatformNotifyService from '../services/platformNotifyService.js';
+import { normalizeTaxId, isValidCnpj } from '../utils/taxId.js';
+import { normalizarTelefoneBr } from '../utils/wa/waDestino.js';
+import { translate } from '../i18n/index.js';
+import { DEFAULT_LOCALE } from '../i18n/config.js';
 
 const DUMMY_PASSWORD_HASH = bcrypt.hashSync('skygenpanel-invalid-login-placeholder', 12);
 
@@ -262,6 +268,31 @@ class AuthController {
       if (!email || !isValidEmail(email)) {
         return res.status(400).json(createErrorResponse(req.t('auth.emailInvalid')));
       }
+      // O que a página pública acrescenta, tudo opcional: o plano escolhido na
+      // vitrine, o CNPJ (que já vira o cadastro fiscal) e o WhatsApp do dono.
+      //
+      // Plano que não está à venda é ignorado, e não recusado: o link com
+      // `?plano=` pode ser de ontem, e o provedor ainda ganha o teste padrão.
+      const chosenPlan = body.planCode ? await Plan.findPublicByCode(body.planCode) : null;
+      const taxId = body.taxId ? normalizeTaxId(body.taxId) : '';
+      if (taxId && !isValidCnpj(taxId)) {
+        return res.status(400).json(createErrorResponse(req.t('tenant.billingTaxIdInvalid')));
+      }
+      const phone = body.phone ? normalizarTelefoneBr(body.phone) : '';
+      if (body.phone && !phone) {
+        return res.status(400).json(createErrorResponse(req.t('auth.signupPhoneInvalid')));
+      }
+      const fiscal = {};
+      if (taxId) fiscal.billing_tax_id = taxId;
+      if (phone) fiscal.billing_phone = phone;
+      if (taxId) {
+        const legalName = String(body.legalName ?? '').trim().slice(0, 160);
+        if (legalName) fiscal.billing_legal_name = legalName;
+        const cidade = String(body.city ?? '').trim().slice(0, 80);
+        if (cidade) fiscal.billing_city = cidade;
+        const uf = String(body.state ?? '').trim().toUpperCase();
+        if (/^[A-Z]{2}$/.test(uf)) fiscal.billing_state = uf;
+      }
       // As duas colisões respondem 409 com palavras diferentes, porque as duas
       // correções são diferentes: outro subdomínio, ou outro login. O login é
       // conferido contra o espaço de nomes inteiro — nome e e-mail vivem no
@@ -281,7 +312,10 @@ class AuthController {
           // Só o provedor que acabou de nascer. A passagem completa custa
           // dezessete consultas por provedor existente, e esta é uma rota
           // pública — ver `seedDefaults`.
-          await seedDefaults(trx, { tenantIds: [tenantId] });
+          if (Object.keys(fiscal).length) {
+            await trx('tenants').where({ id: tenantId }).update(fiscal);
+          }
+          await seedDefaults(trx, { tenantIds: [tenantId], planId: chosenPlan?.id ?? null });
           userId = await User.create({
             username,
             password: await bcrypt.hash(password, BCRYPT_ROUNDS),
@@ -344,9 +378,34 @@ class AuthController {
       });
 
       const base = panelBaseDomain();
+      const panelUrl = base ? `https://${tenant.slug}.${base}` : null;
+
+      // Boas-vindas pelo WhatsApp da plataforma, e o aviso para a equipe.
+      // Fora do caminho da resposta: nenhum dos dois pode atrasar nem
+      // derrubar o cadastro.
+      if (phone) {
+        PlatformNotifyService.sendWhatsapp(phone, translate(DEFAULT_LOCALE, 'auth.signupWelcomeWhatsapp', {
+          provider: tenant.name,
+          product: PRODUCT_NAME,
+          link: panelUrl || '',
+          username
+        })).catch(() => {});
+      }
+      PlatformNotifyService.notifyTeam({
+        subject: translate(DEFAULT_LOCALE, 'auth.signupTeamSubject', { provider: tenant.name }),
+        text: translate(DEFAULT_LOCALE, 'auth.signupTeamBody', {
+          provider: tenant.name,
+          slug: tenant.slug,
+          email,
+          phone: phone || '-',
+          taxId: taxId || '-',
+          plan: chosenPlan?.code || '-'
+        })
+      }).catch(() => {});
+
       return res.status(201).json(createResponse(req.t('auth.signupCreated'), {
         tenant: { slug: tenant.slug, name: tenant.name },
-        panelUrl: base ? `https://${tenant.slug}.${base}` : null,
+        panelUrl,
         emailed: provado
       }));
     } catch (error) {

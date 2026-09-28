@@ -186,7 +186,10 @@ export const SHARED_TABLES = new Set([
   'auth_tickets',
   // A tabela de preços. É uma só para o deploy inteiro, e um provedor não
   // edita o próprio plano — ele o lê, por `subscriptions.plan_id`.
-  'plans'
+  'plans',
+  // Os pedidos de demonstração da página pública. Da plataforma: quem pede
+  // ainda não é provedor, e só o console os lê.
+  'leads'
 ]);
 
 /** Tables still to be converted. Shrinks to empty as the phase progresses. */

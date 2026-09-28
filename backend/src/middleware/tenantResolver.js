@@ -216,7 +216,9 @@ const PLATFORM_HOST_PATHS = new Set([
  * opens the scope it needs with an explicit `runInTenant`, so it is the one
  * family of routes that has no business being resolved by host.
  */
-const PLATFORM_HOST_PREFIXES = IS_SAAS ? ['/api/platform/'] : [];
+// E a página pública (`/api/public/*`): o catálogo e o cadastro de quem ainda
+// não é provedor. Só no SaaS, onde o ápice é a vitrine.
+const PLATFORM_HOST_PREFIXES = IS_SAAS ? ['/api/platform/', '/api/public/'] : [];
 
 export function isPlatformHost(host) {
   if (!PANEL_BASE_DOMAIN || !host) return false;

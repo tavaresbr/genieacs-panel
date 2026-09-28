@@ -30,12 +30,21 @@ interface Rascunho {
   maxMessageRetentionDays: string
   maxMediaRetentionDays: string
   active: boolean
+  /** A vitrine: página pública, destaque, ordem, texto e recursos. */
+  public: boolean
+  featured: boolean
+  sortOrder: string
+  pitch: string
+  /** Um recurso por linha. */
+  features: string
+  priceYearly: string
 }
 
 const VAZIO: Rascunho = {
   code: '', name: '', maxOperators: '', maxSubscribers: '', maxDevices: '',
   price: '', currency: 'BRL', trialDays: '14', periodDays: '30',
-  maxAuditRetentionDays: '', maxMessageRetentionDays: '', maxMediaRetentionDays: '', active: true
+  maxAuditRetentionDays: '', maxMessageRetentionDays: '', maxMediaRetentionDays: '', active: true,
+  public: false, featured: false, sortOrder: '0', pitch: '', features: '', priceYearly: ''
 }
 
 /**
@@ -78,7 +87,13 @@ function paraRascunho(plan: Plan): Rascunho {
     maxAuditRetentionDays: plan.retention?.audit == null ? '' : String(plan.retention.audit),
     maxMessageRetentionDays: plan.retention?.messages == null ? '' : String(plan.retention.messages),
     maxMediaRetentionDays: plan.retention?.media == null ? '' : String(plan.retention.media),
-    active: plan.active
+    active: plan.active,
+    public: plan.public ?? false,
+    featured: plan.featured ?? false,
+    sortOrder: String(plan.sortOrder ?? 0),
+    pitch: plan.description ?? '',
+    features: (plan.features ?? []).join('\n'),
+    priceYearly: plan.priceYearlyCents == null ? '' : (plan.priceYearlyCents / 100).toFixed(2)
   }
 }
 
@@ -157,6 +172,13 @@ export function PlanCatalog({ plans, onChange }: Props) {
       return
     }
 
+    // Preço anual: vazio é "sem opção anual", e não zero.
+    const anualCentavos = rascunho.priceYearly.trim() ? parseAmountToCents(rascunho.priceYearly) : null
+    if (rascunho.priceYearly.trim() && anualCentavos === null) {
+      toast.error(t('platform.plans.priceInvalid'))
+      return
+    }
+
     const comum = {
       name: nome,
       maxOperators: limite(rascunho.maxOperators),
@@ -171,7 +193,13 @@ export function PlanCatalog({ plans, onChange }: Props) {
       maxAuditRetentionDays: teto(rascunho.maxAuditRetentionDays),
       maxMessageRetentionDays: teto(rascunho.maxMessageRetentionDays),
       maxMediaRetentionDays: teto(rascunho.maxMediaRetentionDays),
-      active: rascunho.active
+      active: rascunho.active,
+      public: rascunho.public,
+      featured: rascunho.featured,
+      sortOrder: Math.trunc(Number(rascunho.sortOrder) || 0),
+      description: rascunho.pitch.trim() || null,
+      features: rascunho.features.split('\n').map((linha) => linha.trim()).filter(Boolean),
+      priceYearlyCents: anualCentavos
     }
 
     setSalvando(true)
@@ -316,6 +344,64 @@ export function PlanCatalog({ plans, onChange }: Props) {
       </div>
       <p className="field-hint">{t('platform.plans.retentionHint')}</p>
 
+      {/* A vitrine: o que a página pública do ápice mostra deste plano. */}
+      <fieldset className="space-y-4 rounded-md border border-border p-4">
+        <legend className="px-1 text-sm font-semibold text-foreground">{t('platform.plans.showcase')}</legend>
+        <p className="field-hint">{t('platform.plans.showcaseHint')}</p>
+        <div className="flex flex-wrap gap-x-6 gap-y-2">
+          <label className="flex items-center gap-2 text-sm text-foreground">
+            <input
+              type="checkbox" checked={rascunho.public}
+              onChange={(e) => setRascunho((r) => ({ ...r, public: e.target.checked }))}
+            />
+            {t('platform.plans.public')}
+          </label>
+          <label className="flex items-center gap-2 text-sm text-foreground">
+            <input
+              type="checkbox" checked={rascunho.featured}
+              onChange={(e) => setRascunho((r) => ({ ...r, featured: e.target.checked }))}
+            />
+            {t('platform.plans.featured')}
+          </label>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label className="field-label" htmlFor="plan-sort">{t('platform.plans.sortOrder')}</label>
+            <input
+              id="plan-sort" type="number" className="modern-input w-full"
+              value={rascunho.sortOrder}
+              onChange={(e) => setRascunho((r) => ({ ...r, sortOrder: e.target.value }))}
+            />
+          </div>
+          <div>
+            <label className="field-label" htmlFor="plan-price-yearly">{t('platform.plans.priceYearly')}</label>
+            <input
+              id="plan-price-yearly" className="modern-input w-full" inputMode="decimal"
+              value={rascunho.priceYearly}
+              onChange={(e) => setRascunho((r) => ({ ...r, priceYearly: e.target.value }))}
+              placeholder={t('platform.plans.priceYearlyPlaceholder')}
+            />
+          </div>
+        </div>
+        <div>
+          <label className="field-label" htmlFor="plan-pitch">{t('platform.plans.pitch')}</label>
+          <input
+            id="plan-pitch" className="modern-input w-full" maxLength={1000}
+            value={rascunho.pitch}
+            onChange={(e) => setRascunho((r) => ({ ...r, pitch: e.target.value }))}
+          />
+        </div>
+        <div>
+          <label className="field-label" htmlFor="plan-features">{t('platform.plans.features')}</label>
+          <textarea
+            id="plan-features" rows={5} className="modern-input w-full"
+            value={rascunho.features}
+            onChange={(e) => setRascunho((r) => ({ ...r, features: e.target.value }))}
+          />
+          <p className="field-hint">{t('platform.plans.featuresHint')}</p>
+        </div>
+      </fieldset>
+
       <label className="flex items-center gap-2 text-sm text-foreground">
         <input
           type="checkbox" checked={rascunho.active}
@@ -367,6 +453,8 @@ export function PlanCatalog({ plans, onChange }: Props) {
                   <span className={`capitalize ${plan.active ? 'modern-badge-success' : 'modern-badge-error'}`}>
                     {t(plan.active ? 'platform.plans.active' : 'platform.plans.inactive')}
                   </span>
+                  {plan.public && <span className="modern-badge-info">{t('platform.plans.publicBadge')}</span>}
+                  {plan.featured && <span className="modern-badge-warning">{t('platform.plans.featuredBadge')}</span>}
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {t('platform.plans.summaryPrice', {

@@ -69,7 +69,15 @@ const PUBLICAS = new Map([
   // sai (origem conferida, nenhum segredo, 404 limpo) está em
   // genieacs-agent-files.test.js.
   ['GET /api/genieacs-agent/install.sh', 'o instalador do agente: arquivo do disco sem segredo, com a origem do painel vinda do resolvedor, nunca do Host cru'],
-  ['GET /api/genieacs-agent/agent.mjs', 'o programa do agente, na versão deste painel: arquivo do disco sem segredo, inútil sem a chave']
+  ['GET /api/genieacs-agent/agent.mjs', 'o programa do agente, na versão deste painel: arquivo do disco sem segredo, inútil sem a chave'],
+  // A página pública do ápice. Só existem no endereço da plataforma
+  // (`platformHostOnly`), e nenhuma lê ou escreve dado de provedor; a prova
+  // está em public-landing.test.js.
+  ['GET /api/public/info', 'o nome do produto e o WhatsApp de contato, do ambiente'],
+  ['GET /api/public/plans', 'o catálogo à venda: só planos ativos e marcados como públicos, sem id nem contagem'],
+  ['GET /api/public/slug-available', 'a mesma pergunta que o cadastro faz ao gravar, feita antes; responde só livre/ocupado'],
+  ['GET /api/public/cnpj', 'o cadastro da Receita, que é público; limite apertado porque sai para uma API de fora'],
+  ['POST /api/public/leads', 'o pedido de demonstração; só insere, com honeypot e limite por endereço']
 ]);
 
 /**
@@ -142,6 +150,8 @@ const POR_ID = new Map([
   // cadastro recebe 404 — e, junto, que o último não sai.
   ['DELETE /api/platform/admins/:userId', 'plano de controle; prova em platform-admins.test.js'],
   ['PATCH /api/platform/plans/:id', 'plano de controle; prova em platform-billing.test.js'],
+  // Tabela da plataforma, sem `tenant_id`: não há vizinho a alcançar.
+  ['PATCH /api/platform/leads/:id', 'plano de controle; prova em public-landing.test.js'],
   ['GET /api/platform/tenants/:id/subscription', 'plano de controle; prova em platform-billing.test.js'],
   ['PUT /api/platform/tenants/:id/subscription', 'plano de controle; prova em platform-billing.test.js'],
   ['POST /api/platform/tenants/:id/payments', 'plano de controle; prova em platform-billing.test.js'],
@@ -249,6 +259,10 @@ describe('toda rota sem sessão', () => {
       // lista pergunta pelo MÉTODO, que é o recorte certo para ela — e a
       // exceção fica escrita aqui em vez de a pergunta ser afrouxada.
       'POST /api/invites/token/preview',
+      // O pedido de demonstração da página pública. Só INSERE em `leads`, que
+      // é tabela da plataforma, sem `tenant_id` — não há cadastro de provedor
+      // nenhum ao alcance dela.
+      'POST /api/public/leads',
       'POST /api/sgp/events/webhook',
       'POST /api/whatsapp-webhook'
     ]);
@@ -349,7 +363,9 @@ describe('toda rota endereçada por um parâmetro', () => {
   // aqui. O `:chargeId` é linha de tabela escopada, e por isso a prova vai
   // além do 404 de quem não é da plataforma: platform-subscriptions.test.js
   // pede, pela URL do alfa, a cobrança do beta — e recebe 404. São 59.
-  const TETO_DE_EXCECOES = 59;
+  // E os pedidos de demonstração (`PATCH /api/platform/leads/:id`): tabela da
+  // plataforma, sem vizinho a alcançar. São 60.
+  const TETO_DE_EXCECOES = 60;
 
 
   /**
@@ -568,7 +584,9 @@ describe('a allowlist do endereço da plataforma', () => {
   it('serve por prefixo só a família do plano de controle', () => {
     // `/api/auth/` nunca: a redefinição de senha e a verificação de e-mail
     // gravam na trilha DO PROVEDOR, e no ápice não há escopo em que gravar.
-    assert.deepEqual(listaDe('PLATFORM_HOST_PREFIXES'), ['/api/platform/']);
+    // `/api/public/` é a página pública: catálogo, subdomínio livre, CNPJ e
+    // pedido de demonstração — nenhuma grava em trilha de provedor.
+    assert.deepEqual(listaDe('PLATFORM_HOST_PREFIXES'), ['/api/platform/', '/api/public/']);
   });
 });
 
