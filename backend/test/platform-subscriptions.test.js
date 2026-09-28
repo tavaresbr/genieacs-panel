@@ -700,7 +700,8 @@ describe('o prazo que se move leva a cobrança em aberto junto', () => {
 
   it('pelo PUT da assinatura com data também, e um prazo que já tem cobrança cancela a velha', async () => {
     const velha = await abrirCobranca(beta, { gatewayChargeId: 'pay_do_prazo_velho' });
-    const destino = new Date(Date.now() + 40 * DAY);
+    // Sem milissegundos: o MySQL grava o timestamp arredondado ao segundo.
+    const destino = new Date(Math.floor((Date.now() + 40 * DAY) / 1000) * 1000);
     const jaTem = await abrirCobranca(beta, { periodEnd: chaveDe(destino), gatewayChargeId: 'pay_do_prazo_novo' });
     const res = await platform(`/tenants/${beta}/subscription`, {
       method: 'PUT', body: { status: 'active', renewsAt: destino.toISOString() }
