@@ -107,6 +107,33 @@ export const authLimiter = limiter({
  * only per-customer signal available. Pairing it with the source address keeps
  * one visitor's failures from locking out the rest of the customer base.
  */
+/**
+ * A página pública: o catálogo, o subdomínio livre, a consulta de CNPJ e o
+ * pedido de demonstração. Por endereço, sem provedor — só existem no ápice.
+ * A leitura é folgada (a página abre e digita); a consulta de CNPJ sai para
+ * uma API de fora e o lead grava, então as duas têm balde apertado.
+ */
+export const publicReadLimiter = limiter({
+  windowMs: 60 * 1000,
+  max: 60,
+  keyGenerator: ipKey,
+  message: limitMessage('rateLimit.requests', 'rate_limited')
+});
+
+export const publicCnpjLimiter = limiter({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  keyGenerator: ipKey,
+  message: limitMessage('rateLimit.requests', 'rate_limited')
+});
+
+export const publicLeadLimiter = limiter({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  keyGenerator: ipKey,
+  message: limitMessage('rateLimit.attempts', 'rate_limited')
+});
+
 export const portalLoginLimiter = limiter({
   windowMs: 15 * 60 * 1000,
   max: 10,
