@@ -19,7 +19,14 @@ export const BILLING_EVENT_TYPES = Object.freeze({
   // corrigida à mão. Tipo próprio, e não `status.changed` com o prazo no
   // detalhe, porque a pergunta que se faz ao extrato é "por que este provedor
   // renovou sem pagar?", e ela precisa de uma linha que diga exatamente isso.
-  DEADLINE_CHANGED: 'deadline.changed'
+  DEADLINE_CHANGED: 'deadline.changed',
+  // O dinheiro de um pagamento VOLTOU — estornado pelo console ou pelo painel
+  // do gateway — e o período que ele comprou foi desfeito. A referência é a do
+  // pagamento com `:refund` no fim (ver `SubscriptionService.reversePayment`):
+  // o índice único `(tenant_id, external_id)` é o que faz o estorno do console
+  // e o `PAYMENT_REFUNDED` que o gateway manda depois desfazerem o período UMA
+  // vez só, do mesmo jeito que faz o pagamento creditar uma vez só.
+  PAYMENT_REFUNDED: 'payment.refunded'
 });
 
 class BillingEvent {

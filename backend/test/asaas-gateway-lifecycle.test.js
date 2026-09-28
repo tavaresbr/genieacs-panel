@@ -218,8 +218,21 @@ describe('a leitura dos eventos do ciclo, pura', () => {
     const estorno = AsaasBillingProvider.interpretarCiclo(corpo('PAYMENT_REFUNDED'));
     assert.deepEqual(estorno, {
       event: 'PAYMENT_REFUNDED', status: 'refunded', externalId: 'pay_c',
-      customerRef: 'cus_x', reference: 'tenant:3:2026-10-01'
+      customerRef: 'cus_x', reference: 'tenant:3:2026-10-01',
+      partial: false, refundedCents: null, valueCents: null
     });
+  });
+
+  it('e só chama de parcial o estorno que o corpo PROVA que é', () => {
+    const ler = (extra) => AsaasBillingProvider.interpretarCiclo(corpo('PAYMENT_REFUNDED', extra));
+    const parcial = ler({ value: 100, refunds: [{ status: 'DONE', value: 40 }, { status: 'CANCELLED', value: 60 }] });
+    assert.equal(parcial.partial, true);
+    assert.equal(parcial.refundedCents, 4000);
+    assert.equal(parcial.valueCents, 10000);
+    assert.equal(ler({ value: 100, refunds: [{ status: 'DONE', value: 100 }] }).partial, false);
+    assert.equal(ler({ value: 100, refundedValue: 30 }).partial, true);
+    assert.equal(ler({ value: 100 }).partial, false, 'sem como saber, é o inteiro que o nome diz');
+    assert.equal(AsaasBillingProvider.interpretarCiclo(corpo('PAYMENT_OVERDUE', { value: 100 })).partial, undefined);
   });
 
   it('e nunca lê um evento de crédito, nem um corpo sem id', () => {
@@ -301,7 +314,7 @@ describe('os eventos do ciclo chegando pela rota', () => {
     assert.equal(await estadoDe('pay_apagada'), 'canceled');
   });
 
-  it('PAYMENT_REFUNDED marca `refunded` e NÃO desfaz o crédito', async () => {
+  it('PAYMENT_REFUNDED marca `refunded` e desfaz o período que o pagamento comprou — uma vez', async () => {
     await emitida('pay_estornada');
     await entregar(evento('PAYMENT_RECEIVED', 'pay_estornada'));
     const depoisDoPagamento = await runInTenant(alfa, () => Subscription.forTenant(alfa));
@@ -309,16 +322,23 @@ describe('os eventos do ciclo chegando pela rota', () => {
 
     const res = await entregar(evento('PAYMENT_REFUNDED', 'pay_estornada'));
     assert.equal(res.status, 200);
+    assert.equal(res.body.reversal, 'reversed');
     assert.equal(await estadoDe('pay_estornada'), 'refunded');
 
+    // Pago atrasado, o período contou de agora; desfeito, o prazo volta ao
+    // vencido de antes do pagamento — e o provedor volta a dever.
     const depoisDoEstorno = await runInTenant(alfa, () => Subscription.forTenant(alfa));
-    assert.equal(
-      new Date(depoisDoEstorno.renews_at).getTime(),
-      new Date(depoisDoPagamento.renews_at).getTime(),
-      'o período comprado fica — desfazer é decisão de gente'
-    );
-    const eventos = await getDb()('billing_events').where({ tenant_id: alfa });
-    assert.equal(eventos.length, 1, 'e o estorno não vira linha de crédito');
+    assert.equal(new Date(depoisDoEstorno.renews_at).getTime(), RENOVA.getTime());
+    const eventos = await getDb()('billing_events').where({ tenant_id: alfa }).orderBy('id', 'asc');
+    assert.deepEqual(eventos.map((e) => e.type), ['payment.recorded', 'payment.refunded'],
+      'o estorno vira linha própria, e não de crédito');
+    assert.equal(eventos[1].external_id, 'pay_estornada:refund');
+
+    const reentrega = await entregar(evento('PAYMENT_REFUNDED', 'pay_estornada'));
+    assert.equal(reentrega.status, 200);
+    assert.equal(reentrega.body.reversal, 'duplicate');
+    const depoisDaReentrega = await runInTenant(alfa, () => Subscription.forTenant(alfa));
+    assert.equal(new Date(depoisDaReentrega.renews_at).getTime(), RENOVA.getTime(), 'nenhum período a menos');
   });
 
   it('200 para cobrança que o painel não emitiu e para quem não resolve provedor', async () => {

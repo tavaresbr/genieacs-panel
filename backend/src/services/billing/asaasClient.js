@@ -311,6 +311,50 @@ export async function getCharge(chargeId) {
 }
 
 /**
+ * Estorna, INTEIRO, um pagamento recebido pelo gateway —
+ * `POST /payments/{id}/refund`.
+ *
+ * Sem `value` no corpo, de propósito: a documentação do gateway lê a ausência
+ * como "o valor todo", e o estorno do console é só o inteiro (decisão de quem
+ * opera o SaaS — o estorno parcial desfaria um pedaço de período, e ninguém
+ * sabe dizer qual). Mandar o valor que o painel acha que a cobrança tinha
+ * arriscaria estornar a menos uma cobrança paga com juros.
+ *
+ * Só para o que entrou PELO gateway (`RECEIVED`, `CONFIRMED`): o recebimento
+ * em dinheiro marcado à mão não tem dinheiro do lado de lá para devolver, e é
+ * desfeito por `undoReceivedInCash`. Quem escolhe entre os dois é o console,
+ * depois de ler a cobrança (`getCharge`).
+ *
+ * 404 NÃO é sucesso, pelo mesmo motivo de `receiveInCash`: uma cobrança que
+ * não existe do lado de lá não teve estorno nenhum, e dizer que teve seria
+ * desfazer um período sobre um recibo que ninguém emitiu.
+ *
+ * @returns {Promise<{ status: string|null }>}
+ */
+export async function refundCharge(chargeId) {
+  const resposta = await chamar(`/payments/${idNoCaminho(chargeId)}/refund`, { payload: {} });
+  return { status: resposta?.status ? String(resposta.status) : null };
+}
+
+/**
+ * Desfaz a baixa em dinheiro de uma cobrança — `POST
+ * /payments/{id}/undoReceivedInCash`.
+ *
+ * O avesso de `receiveInCash`: o console deu baixa numa cobrança paga por fora
+ * e agora estorna. Não há dinheiro do lado do gateway para devolver (quem
+ * devolve é gente, pelo mesmo caminho por fora por onde ele entrou); o que se
+ * desfaz lá é a etiqueta de "recebida". A cobrança volta a `PENDING` no
+ * gateway — e é o console quem decide, depois, se a cancela ou a cobra de
+ * novo.
+ *
+ * @returns {Promise<{ status: string|null }>}
+ */
+export async function undoReceivedInCash(chargeId) {
+  const resposta = await chamar(`/payments/${idNoCaminho(chargeId)}/undoReceivedInCash`, { payload: {} });
+  return { status: resposta?.status ? String(resposta.status) : null };
+}
+
+/**
  * Muda o vencimento e/ou o valor de uma cobrança já emitida —
  * `POST /payments/{id}`.
  *
@@ -380,5 +424,6 @@ export async function createCustomer(payload) {
 }
 
 export default {
-  createCharge, cancelCharge, getCharge, receiveInCash, updateCharge, createCustomer, testConnection, apiKey, baseUrl, AsaasError
+  createCharge, cancelCharge, getCharge, receiveInCash, refundCharge, undoReceivedInCash, updateCharge,
+  createCustomer, testConnection, apiKey, baseUrl, AsaasError
 };

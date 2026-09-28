@@ -5,6 +5,8 @@ import {
   cancelCharge as cancelarCobranca,
   getCharge as lerCobranca,
   receiveInCash as receberEmDinheiro,
+  refundCharge as estornarCobranca,
+  undoReceivedInCash as desfazerRecebimentoEmDinheiro,
   updateCharge as atualizarCobranca,
   apiKey
 } from './asaasClient.js';
@@ -124,6 +126,19 @@ export class AsaasBillingProvider extends BillingProvider {
     return lerCobranca(gatewayChargeId);
   }
 
+  /**
+   * Estorna inteiro o pagamento que entrou pelo gateway. Mesma costura — e o
+   * `manual`, que não tem o método, estorna só do lado de cá.
+   */
+  async refundCharge(gatewayChargeId) {
+    return estornarCobranca(gatewayChargeId);
+  }
+
+  /** Desfaz a baixa em dinheiro que o console deu lá dentro. Mesma costura. */
+  async undoReceivedInCash(gatewayChargeId) {
+    return desfazerRecebimentoEmDinheiro(gatewayChargeId);
+  }
+
   /** Muda vencimento e/ou valor de uma cobrança já emitida. Mesma costura. */
   async updateCharge(gatewayChargeId, mudanca) {
     return atualizarCobranca(gatewayChargeId, mudanca);
@@ -197,7 +212,8 @@ export class AsaasBillingProvider extends BillingProvider {
    * - `PAYMENT_DELETED` → `canceled`: alguém removeu a cobrança no painel do
    *   gateway. É o mesmo `canceled` do console e da faxina de períodos velhos.
    * - `PAYMENT_REFUNDED` → `refunded`: o dinheiro voltou para quem pagou. O
-   *   período que ele comprou NÃO é desfeito aqui — ver o controlador.
+   *   período que ele comprou é desfeito pelo controlador, e não aqui — esta
+   *   função só lê o corpo.
    *
    * Mesma direção de falha de `interpretar`: um campo que muda de nome devolve
    * nulo, e nulo é "não faço nada".
@@ -216,12 +232,34 @@ export class AsaasBillingProvider extends BillingProvider {
     const externalId = String(pagamento.id ?? '').trim();
     if (!externalId) return null;
 
+    // O estorno PARCIAL, quando o corpo deixa dizer: a soma dos estornos da
+    // lista `refunds` (os cancelados não contam), ou `refundedValue` quando a
+    // lista não vem, contra o valor do pagamento. Sem nenhum dos dois, não se
+    // sabe — e "não sei" é tratado como inteiro, que é o que o
+    // `PAYMENT_REFUNDED` diz por nome. Conservador na outra direção: só é
+    // parcial o que o corpo PROVA que é.
+    let refundedCents = null;
+    if (Array.isArray(pagamento.refunds) && pagamento.refunds.length) {
+      const validos = pagamento.refunds
+        .filter((item) => item && String(item.status ?? '').toUpperCase() !== 'CANCELLED')
+        .map((item) => paraCentavos(item.value));
+      if (validos.length && validos.every((valor) => valor !== null)) {
+        refundedCents = validos.reduce((soma, valor) => soma + valor, 0);
+      }
+    } else if (pagamento.refundedValue !== undefined && pagamento.refundedValue !== null) {
+      refundedCents = paraCentavos(pagamento.refundedValue);
+    }
+    const valueCents = paraCentavos(pagamento.value);
+    const partial = status === 'refunded' && refundedCents !== null && valueCents !== null
+      && refundedCents < valueCents;
+
     return {
       event: evento,
       status,
       externalId,
       customerRef: pagamento.customer ? String(pagamento.customer) : null,
-      reference: pagamento.externalReference ? String(pagamento.externalReference) : null
+      reference: pagamento.externalReference ? String(pagamento.externalReference) : null,
+      ...(status === 'refunded' ? { partial, refundedCents, valueCents } : {})
     };
   }
 

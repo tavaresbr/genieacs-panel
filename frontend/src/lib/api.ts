@@ -156,6 +156,17 @@ export interface ApiResponse<T = any> {
    * data inteira em vez do "há 3 horas".
    */
   lastSeenAt?: string | null
+  /**
+   * Só no 502 `gateway_failed` das rotas de cobrança do console: o texto que o
+   * gateway devolveu. Quem lê opera a conta de lá, e é essa frase que resolve
+   * o chamado — a `message` é a nossa, genérica.
+   */
+  detail?: string
+  /**
+   * Só no 409 `not_paid` do estorno quando o gateway discorda: aqui a
+   * cobrança está paga, lá ela está neste estado (`PENDING`, por exemplo).
+   */
+  gatewayStatus?: string
 }
 
 /**
@@ -343,6 +354,10 @@ class ApiClient {
           // O 409 do login, pelo mesmo desenho: a tela precisa da LISTA para
           // perguntar em qual provedor entrar, e ela só existe no servidor.
           ...(data.destinations ? { destinations: data.destinations } : {}),
+          // O 502 do gateway: o motivo dele, literal, para quem opera a conta lá.
+          ...(typeof data.detail === 'string' ? { detail: data.detail } : {}),
+          // O 409 `not_paid` do estorno: o estado que o gateway diz ter.
+          ...(typeof data.gatewayStatus === 'string' ? { gatewayStatus: data.gatewayStatus } : {}),
         }
       }
 
@@ -1908,6 +1923,23 @@ export const platformAPI = {
   updateCharge: (tenantId: number, chargeId: number, payload: { dueDate?: string; amountCents?: number }) =>
     apiClient.requestWithBody<{ charge: ChargeConsoleView }>(
       'PATCH', `/platform/tenants/${tenantId}/charges/${chargeId}`, payload
+    ),
+
+  /**
+   * Estorna a cobrança paga, inteira, e desfaz o período que ela pagou: o
+   * `renewsAt` volta os dias que aquele pagamento comprou. `outsideGateway`
+   * só registra no painel o estorno já feito fora do gateway. 409 `not_paid`
+   * e `busy`, 502 `gateway_failed` (com `detail`), 404 `not_found`.
+   */
+  refundCharge: (tenantId: number, chargeId: number, payload: { reason?: string; outsideGateway?: boolean }) =>
+    apiClient.post<{
+      charge: ChargeConsoleView
+      subscription: SubscriptionView | null
+      renewsAtBefore: string | null
+      renewsAtAfter: string | null
+      alreadyRefunded: boolean
+    }>(
+      `/platform/tenants/${tenantId}/charges/${chargeId}/refund`, payload
     ),
 
   reissueCharge: (tenantId: number, chargeId: number) =>

@@ -33,6 +33,7 @@ export interface ChargeActions {
   changeAmount: boolean
   cancel: boolean
   reissue: boolean
+  refund: boolean
 }
 
 /**
@@ -57,6 +58,8 @@ export interface ChargeContext {
  *   com o provedor ligado a um gateway e a assinatura não suspensa nem
  *   cancelada. Período velho não se cobra de novo por aqui.
  * - O link da fatura depende de ele existir; a emissão manual não tem página.
+ * - Estornar é só da paga, venha ela do gateway ou da baixa manual: na manual
+ *   o dinheiro volta por fora e o painel só registra.
  */
 export function chargeActions(
   charge: Pick<ChargeConsoleView, 'status' | 'invoiceUrl' | 'gatewayChargeId' | 'periodEnd'>,
@@ -81,8 +84,45 @@ export function chargeActions(
     changeAmount: editable,
     cancel: open,
     reissue: (charge.status === 'canceled' || charge.status === 'failed')
-      && badge.kind === 'gateway' && !bloqueada && periodoAtual
+      && badge.kind === 'gateway' && !bloqueada && periodoAtual,
+    refund: charge.status === 'paid'
   }
+}
+
+const DIA_MS = 24 * 60 * 60 * 1000
+
+/**
+ * O "pago até" que um estorno deixaria, para a tela avisar ANTES de confirmar.
+ *
+ * O estorno desfaz o período que o pagamento comprou: o prazo volta
+ * `periodDays` dias. É estimativa — quem decide é o servidor, que sabe quantos
+ * dias aquele pagamento comprou de fato; a tela usa os dias do plano atual. O
+ * número de verdade chega na resposta (`renewsAtAfter`).
+ *
+ * `past` diz se o prazo novo já passou: aí o provedor fica em atraso e o painel
+ * dele é bloqueado, e isso tem que estar escrito no diálogo. Sem prazo ou com
+ * dias inválidos não há o que prever: nulo.
+ */
+export function refundPreview(
+  renewsAt: string | null | undefined,
+  periodDays: number | null | undefined,
+  now: Date = new Date()
+): { renewsAt: string; past: boolean } | null {
+  const dias = Number(periodDays)
+  if (!renewsAt || !Number.isInteger(dias) || dias < 1) return null
+  if (/^\d{4}-\d{2}-\d{2}$/.test(renewsAt)) {
+    // Dia puro: conta no calendário, ao meio-dia UTC para o horário de verão
+    // de lugar nenhum mudar o dia.
+    const data = new Date(`${renewsAt}T12:00:00Z`)
+    if (Number.isNaN(data.getTime())) return null
+    data.setUTCDate(data.getUTCDate() - dias)
+    const dia = data.toISOString().slice(0, 10)
+    return { renewsAt: dia, past: dia < todayIso(now) }
+  }
+  const instante = new Date(renewsAt)
+  if (Number.isNaN(instante.getTime())) return null
+  const novo = new Date(instante.getTime() - dias * DIA_MS)
+  return { renewsAt: novo.toISOString(), past: novo.getTime() <= now.getTime() }
 }
 
 export type AmountMode = 'value' | 'discountAmount' | 'discountPercent'

@@ -15,6 +15,7 @@ import {
   parseDay,
   parseExtendDays,
   parsePercent,
+  refundPreview,
   saoPauloDay,
   summaryStatusCards,
   todayIso
@@ -117,7 +118,8 @@ describe('chargeActions', () => {
       changeDueDate: true,
       changeAmount: true,
       cancel: true,
-      reissue: false
+      reissue: false,
+      refund: false
     })
   })
 
@@ -162,10 +164,48 @@ describe('chargeActions', () => {
     expect(chargeActions(c({ status: 'failed', periodEnd: '2026-10-01' }), { gateway: asaas, subscription: trial }).reissue).toBe(true)
   })
 
-  it('paga e estornada não oferecem nada', () => {
-    for (const status of ['paid', 'refunded'] as const) {
-      expect(Object.values(chargeActions(c({ status }), ctx)).some(Boolean)).toBe(false)
+  it('paga oferece só o estorno, com gateway ou manual', () => {
+    for (const context of [ctx, { gateway: manual, subscription: sub() }, { gateway: asaas, subscription: null }]) {
+      const acoes = chargeActions(c({ status: 'paid' }), context)
+      expect(acoes.refund).toBe(true)
+      expect(Object.entries(acoes).filter(([, v]) => v).map(([k]) => k)).toEqual(['refund'])
     }
+    expect(chargeActions(c({ status: 'paid', gatewayChargeId: null, invoiceUrl: null }), ctx).refund).toBe(true)
+  })
+
+  it('estornada não oferece nada, e nenhuma outra situação estorna', () => {
+    expect(Object.values(chargeActions(c({ status: 'refunded' }), ctx)).some(Boolean)).toBe(false)
+    for (const status of ['pending', 'overdue', 'failed', 'canceled'] as const) {
+      expect(chargeActions(c({ status }), ctx).refund).toBe(false)
+    }
+  })
+})
+
+describe('refundPreview', () => {
+  const agora = new Date('2026-09-28T15:00:00Z')
+
+  it('volta os dias do período a partir do instante', () => {
+    expect(refundPreview('2026-11-10T02:59:59.000Z', 30, agora))
+      .toEqual({ renewsAt: '2026-10-11T02:59:59.000Z', past: false })
+  })
+
+  it('avisa quando o prazo novo já passou', () => {
+    expect(refundPreview('2026-10-10T02:59:59.000Z', 30, agora))
+      .toEqual({ renewsAt: '2026-09-10T02:59:59.000Z', past: true })
+  })
+
+  it('conta dia puro no calendário, com hoje ainda valendo', () => {
+    expect(refundPreview('2026-10-28', 30, agora)).toEqual({ renewsAt: '2026-09-28', past: false })
+    expect(refundPreview('2026-10-27', 30, agora)).toEqual({ renewsAt: '2026-09-27', past: true })
+    expect(refundPreview('2026-03-01', 1, agora)?.renewsAt).toBe('2026-02-28')
+  })
+
+  it('sem prazo ou com dias inválidos não prevê nada', () => {
+    expect(refundPreview(null, 30, agora)).toBeNull()
+    expect(refundPreview('lixo', 30, agora)).toBeNull()
+    expect(refundPreview('2026-10-10', 0, agora)).toBeNull()
+    expect(refundPreview('2026-10-10', 2.5, agora)).toBeNull()
+    expect(refundPreview('2026-10-10', null, agora)).toBeNull()
   })
 })
 

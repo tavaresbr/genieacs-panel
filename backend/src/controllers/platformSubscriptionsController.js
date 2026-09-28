@@ -15,7 +15,7 @@ import { recordBoth, subscriptionView } from './platformBillingController.js';
 /**
  * A tela de Assinaturas do console: todos os provedores de uma vez, com o que
  * cada um deve, e os gestos sobre UMA cobrança — dar baixa, cancelar, mudar
- * vencimento ou valor, reemitir — mais o prazo mexido à mão.
+ * vencimento ou valor, reemitir, estornar — mais o prazo mexido à mão.
  *
  * O resto do que se faz com uma assinatura (trocar o plano, suspender,
  * reativar) continua em `PUT /tenants/:id/subscription`, que já existia: esta
@@ -157,6 +157,34 @@ async function tomar(cobranca, now = new Date()) {
  * baixa manual feita lá dentro).
  */
 const RECEBIDA_NO_GATEWAY = new Set(['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH']);
+
+/**
+ * O estado do gateway em que o dinheiro JÁ VOLTOU, e é final: o estorno
+ * pedido no painel da Asaas, ou por uma tentativa anterior deste botão cuja
+ * resposta se perdeu. Pedir o estorno de novo seria recusado; o console segue
+ * sem ele e desfaz só o lado de cá. Conferido contra a documentação da Asaas
+ * em setembro de 2026.
+ */
+const ESTORNADA_NO_GATEWAY = new Set(['REFUNDED']);
+
+/**
+ * Os estados em que o estorno foi PEDIDO e ainda não terminou
+ * (`REFUND_REQUESTED`, `REFUND_IN_PROGRESS`). Não são finais — a Asaas ainda
+ * pode negar (`PAYMENT_REFUND_DENIED`, que o webhook registra aos gritos) —,
+ * mas o console segue do mesmo jeito: o dinheiro está a caminho de volta, pedir
+ * de novo seria recusado, e deixar o período valendo enquanto ele volta seria
+ * entregar o que já está sendo devolvido. A trilha diz qual dos dois foi
+ * (`atGateway: 'refund_in_progress'`), para quem for conferir a negativa.
+ */
+const ESTORNO_A_CAMINHO = new Set(['REFUND_REQUESTED', 'REFUND_IN_PROGRESS']);
+
+/**
+ * Os gestos em que ESTA requisição moveu o dinheiro no gateway. Com eles, um
+ * estorno que o extrato já tem (`duplicate`) não é "já estornado": é o
+ * `PAYMENT_REFUNDED` do próprio gesto chegando antes da resposta — e a tela
+ * precisa dizer que estornou, não que alguém estornou antes.
+ */
+const GESTOS_QUE_MOVEM = new Set(['refunded', 'undo_received_in_cash']);
 
 /**
  * A baixa de uma cobrança cuja referência JÁ tem pagamento no extrato — o
@@ -816,6 +844,191 @@ class PlatformSubscriptionsController {
     } catch (error) {
       console.error('Update charge error:', error);
       return res.status(500).json(createErrorResponse('Failed to update the charge', error.message));
+    }
+  }
+
+  /**
+   * `POST /api/platform/tenants/:id/charges/:chargeId/refund` — o dinheiro de
+   * uma cobrança PAGA volta, e o período que ele comprou é desfeito.
+   *
+   * Só o estorno inteiro (decisão de quem opera o SaaS): o parcial desfaria um
+   * pedaço de período, e ninguém saberia dizer qual.
+   *
+   * ## A ordem, que é a da baixa ao contrário
+   *
+   *   1. **A garra**, só sobre linha que AINDA está `paid` (`statuses` na
+   *      própria condição do `UPDATE`): entre a leitura e a garra, o
+   *      `PAYMENT_REFUNDED` do gateway pode tê-la estornado.
+   *   2. **O gateway**, a menos que a cobrança nunca tenha chegado lá (sem id,
+   *      ou o provider `manual`) ou que venha `outsideGateway: true` — o
+   *      dinheiro vai voltar por fora, e o console só desfaz o lado de cá.
+   *      Primeiro a LEITURA (`getCharge`), e ela escolhe o gesto:
+   *        - `RECEIVED_IN_CASH` (a baixa manual que o console deu lá dentro):
+   *          não há dinheiro do lado de lá, e o que se desfaz é a etiqueta —
+   *          `undoReceivedInCash` — e, NO MESMO PASSO, a cobrança é cancelada
+   *          lá (`cancelCharge`, 404 é sucesso). Desfeita a baixa, a Asaas a
+   *          devolve a `PENDING`, com o link de pagamento valendo; um
+   *          pagamento de verdade nela chegaria com o id que o extrato já
+   *          conhece, cairia como `duplicate` e o dinheiro entraria sem crédito
+   *          nenhum. Se o cancelamento falha, 502 e nada é gravado aqui;
+   *        - `RECEIVED`/`CONFIRMED`: o dinheiro entrou pelo gateway e volta
+   *          por ele — `refundCharge`;
+   *        - já estornada (`REFUNDED`) ou com o estorno a caminho
+   *          (`ESTORNO_A_CAMINHO`): alguém estornou no painel da Asaas, ou uma
+   *          tentativa anterior deste botão caiu depois do gateway. Segue sem
+   *          chamada nenhuma;
+   *        - qualquer outro estado: o gateway não tem o dinheiro que o painel
+   *          diz ter recebido. 409 `not_paid` com os dois estados — quem sabe
+   *          que o dinheiro veio por fora manda de novo com `outsideGateway`.
+   *      Qualquer recusa: 502 `gateway_failed`, e NADA é gravado.
+   *   3. **O período**, por `SubscriptionService.reversePayment` — pela mesma
+   *      referência com que o pagamento foi registrado: o id no gateway, ou
+   *      `charge:<id>` da baixa sem gateway (ver `settle`). É a mesma trava
+   *      de idempotência do pagamento, e é ela que faz o `PAYMENT_REFUNDED`
+   *      que a Asaas manda depois cair como no-op — ou, ao contrário, faz
+   *      este botão responder `alreadyRefunded` quando o webhook chegou antes.
+   *   4. **A linha vira `refunded`**, e a garra sai.
+   *
+   * A cobrança estornada NÃO é reemitida sozinha: a emissão trata `refunded`
+   * como período resolvido. Se o provedor ainda deve aquele período, é o
+   * vencimento (`effectiveStatus`) que o diz, e cobrá-lo de novo é gesto de
+   * gente.
+   */
+  static async refund(req, res) {
+    try {
+      const chargeId = parseId(req.params?.chargeId);
+      if (!chargeId) return res.status(400).json(createErrorResponse('Invalid charge id'));
+      const body = req.body ?? {};
+      const reason = body.reason ? String(body.reason).slice(0, 255) : null;
+      const outsideGateway = body.outsideGateway === true;
+      const tenant = await tenantOr404(req, res);
+      if (!tenant) return undefined;
+      const actorUserId = req.user?.userId ?? null;
+      const now = new Date();
+
+      let resultado;
+      try {
+        resultado = await runInTenant(tenant.id, async () => {
+          const cobranca = await BillingCharge.findById(chargeId);
+          if (!cobranca) throw new ConsoleChargeError(404, 'Charge not found', 'not_found');
+          const naoPaga = (status) => new ConsoleChargeError(
+            409, `The charge is ${status}, not paid`, 'not_paid', { status }
+          );
+          if (cobranca.status !== 'paid') throw naoPaga(cobranca.status);
+
+          const minha = await BillingCharge.claim(cobranca.id, {
+            until: new Date(now.getTime() + CLAIM_MS), now, unissued: false, statuses: ['paid']
+          });
+          if (!minha) {
+            const agora = await BillingCharge.findById(cobranca.id);
+            if (agora && agora.status !== 'paid') throw naoPaga(agora.status);
+            throw new ConsoleChargeError(409, 'The charge is being changed by another process; try again shortly', 'busy');
+          }
+
+          try {
+            let atGateway = 'skipped';
+            const gateway = outsideGateway ? null : gatewayDa(cobranca, 'refundCharge');
+            if (gateway) {
+              const id = cobranca.gateway_charge_id;
+              const situacao = typeof gateway.getCharge === 'function'
+                ? await noGateway(() => gateway.getCharge(id))
+                : { status: 'RECEIVED' };
+              const status = String(situacao?.status ?? '').toUpperCase();
+              if (ESTORNADA_NO_GATEWAY.has(status)) {
+                atGateway = 'already_refunded';
+              } else if (ESTORNO_A_CAMINHO.has(status)) {
+                atGateway = 'refund_in_progress';
+              } else if (status === 'RECEIVED_IN_CASH' && typeof gateway.undoReceivedInCash === 'function') {
+                await noGateway(() => gateway.undoReceivedInCash(id));
+                // Sem isto a cobrança volta a ser pagável lá — ver o topo.
+                if (typeof gateway.cancelCharge === 'function') {
+                  await noGateway(() => gateway.cancelCharge(id));
+                }
+                atGateway = 'undo_received_in_cash';
+              } else if (status === 'RECEIVED' || status === 'CONFIRMED') {
+                await noGateway(() => gateway.refundCharge(id));
+                atGateway = 'refunded';
+              } else {
+                throw new ConsoleChargeError(
+                  409,
+                  `The payment gateway has this charge as ${status || 'unknown'}, not paid; `
+                  + 'refund it outside the gateway if the money came another way',
+                  'not_paid',
+                  { status: cobranca.status, gatewayStatus: status || null }
+                );
+              }
+            }
+
+            // As referências com que ESTA cobrança pode ter sido creditada, na
+            // ordem de `settle`: o id no gateway, e a da baixa sem gateway. A
+            // primeira que o extrato conhece é a que se desfaz.
+            const referencias = [cobranca.gateway_charge_id, `charge:${cobranca.id}`].filter(Boolean);
+            let estorno = null;
+            for (const referencia of referencias) {
+              estorno = await SubscriptionService.reversePayment({
+                externalId: referencia, reason, actorUserId, source: 'console'
+              });
+              if (estorno.found) {
+                estorno.reference = referencia;
+                break;
+              }
+            }
+            if (!estorno.found) {
+              // Paga sem pagamento no extrato: uma linha mexida à mão, ou paga
+              // por um id que a troca de plano substituiu. O dinheiro volta
+              // igual, mas não há período conhecido a desfazer — dito em voz
+              // alta, e o prazo fica como está.
+              console.warn(
+                `Console refund of charge ${cobranca.id} (provider ${tenant.id}): no recorded payment `
+                + `under ${referencias.join(' or ')}; the subscription period was not changed`
+              );
+            }
+
+            await BillingCharge.update(cobranca.id, { status: 'refunded', issuing_until: null });
+            return {
+              cobranca, estorno, atGateway, charge: await BillingCharge.findById(cobranca.id)
+            };
+          } finally {
+            await BillingCharge.release(cobranca.id);
+          }
+        });
+      } catch (error) {
+        if (error instanceof ConsoleChargeError) return responderRecusa(res, error);
+        throw error;
+      }
+
+      const { estorno } = resultado;
+      // O `duplicate` de quem acabou de mover o dinheiro é o webhook do
+      // próprio gesto chegando antes — não um estorno anterior. As datas vêm
+      // do registro que ganhou a corrida (ver `reversePayment`), e são as
+      // mesmas que este gesto teria gravado.
+      const alreadyRefunded = Boolean(estorno.duplicate) && !GESTOS_QUE_MOVEM.has(resultado.atGateway);
+      await recordBoth(req, tenant, {
+        platformAction: PlatformAudit.ACTIONS.CHARGE_REFUNDED,
+        detail: {
+          chargeId: resultado.cobranca.id,
+          periodEnd: resultado.cobranca.period_end,
+          amountCents: Number(resultado.cobranca.amount_cents),
+          currency: resultado.cobranca.currency,
+          renewsAtBefore: estorno.renewsAtBefore,
+          renewsAtAfter: estorno.renewsAtAfter,
+          outsideGateway,
+          atGateway: resultado.atGateway,
+          reference: estorno.reference ?? null,
+          alreadyRefunded,
+          reason
+        }
+      });
+      return res.json(createResponse('Charge refunded', {
+        charge: BillingCharge.presentForConsole(resultado.charge),
+        subscription: await subscriptionView(tenant),
+        renewsAtBefore: estorno.renewsAtBefore,
+        renewsAtAfter: estorno.renewsAtAfter,
+        alreadyRefunded
+      }));
+    } catch (error) {
+      console.error('Refund charge error:', error);
+      return res.status(500).json(createErrorResponse('Failed to refund the charge', error.message));
     }
   }
 
