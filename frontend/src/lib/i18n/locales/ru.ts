@@ -3291,6 +3291,8 @@ const ru: Dictionary = {
   'platform.subs.refundManualHint': 'Счёт без шлюза: верните деньги другим способом; панель лишь фиксирует возврат.',
   'platform.subs.refundGatewayFailed': '{gateway} отклонил возврат: {detail}',
   'platform.subs.refundGatewayHint': 'При желании выполните возврат прямо в {gateway}, отметьте «Я уже вернул деньги вне {gateway}» и подтвердите, чтобы только записать его здесь.',
+  'platform.subs.refundGatewayStatus': 'В панели счёт оплачен, но {gateway} сообщает статус {status}: там нет платежа для возврата.',
+  'platform.subs.refundGatewayStatusHint': 'Проверьте в {gateway}. Если деньги уже возвращены другим способом, отметьте «Я уже вернул деньги вне {gateway}» и подтвердите, чтобы только записать возврат здесь.',
   'platform.subs.refunded': 'Возврат записан. Оплачено до: {from} → {to}.',
   'platform.subs.refundAlready': 'По этому счёту возврат уже был выполнен. Ничего не изменено.',
   'platform.subs.chargeCanceled': 'Счёт отменён',

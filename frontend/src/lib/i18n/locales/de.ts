@@ -3287,6 +3287,8 @@ const de: Dictionary = {
   'platform.subs.refundManualHint': 'Rechnung ohne Gateway: Zahlen Sie das Geld auf anderem Weg zurück; das Panel erfasst nur die Erstattung.',
   'platform.subs.refundGatewayFailed': '{gateway} hat die Erstattung abgelehnt: {detail}',
   'platform.subs.refundGatewayHint': 'Sie können auch direkt in {gateway} erstatten, „Ich habe bereits außerhalb von {gateway} erstattet“ ankreuzen und bestätigen, um es hier nur zu erfassen.',
+  'platform.subs.refundGatewayStatus': 'Die Rechnung ist im Panel bezahlt, aber {gateway} meldet den Status {status}: Dort gibt es keine Zahlung zu erstatten.',
+  'platform.subs.refundGatewayStatusHint': 'Prüfen Sie in {gateway}. Wenn das Geld bereits auf anderem Weg zurückgezahlt wurde, kreuzen Sie „Ich habe bereits außerhalb von {gateway} erstattet“ an und bestätigen Sie, um es hier nur zu erfassen.',
   'platform.subs.refunded': 'Erstattung erfasst. Bezahlt bis: {from} → {to}.',
   'platform.subs.refundAlready': 'Diese Rechnung war bereits erstattet. Nichts wurde geändert.',
   'platform.subs.chargeCanceled': 'Rechnung storniert',

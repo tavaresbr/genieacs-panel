@@ -3290,6 +3290,8 @@ const ko: Dictionary = {
   'platform.subs.refundManualHint': '게이트웨이가 없는 청구입니다. 다른 방법으로 금액을 돌려주세요. 패널은 환불을 기록만 합니다.',
   'platform.subs.refundGatewayFailed': '{gateway}이(가) 환불을 거부했습니다: {detail}',
   'platform.subs.refundGatewayHint': '원하면 {gateway}에서 직접 환불한 뒤 "{gateway} 외부에서 이미 환불함"을 선택하고 확인해 여기에는 기록만 하세요.',
+  'platform.subs.refundGatewayStatus': '패널에서는 결제된 청구이지만 {gateway}은(는) 상태를 {status}(으)로 보고합니다. 그쪽에는 환불할 결제가 없습니다.',
+  'platform.subs.refundGatewayStatusHint': '{gateway}에서 확인하세요. 이미 다른 방법으로 금액을 돌려주었다면 "{gateway} 외부에서 이미 환불함"을 선택하고 확인해 여기에는 기록만 하세요.',
   'platform.subs.refunded': '환불이 기록되었습니다. 결제 기한: {from} → {to}.',
   'platform.subs.refundAlready': '이 청구는 이미 환불되었습니다. 변경된 내용은 없습니다.',
   'platform.subs.chargeCanceled': '청구가 취소되었습니다',

@@ -3283,6 +3283,8 @@ const zhCN: Dictionary = {
   'platform.subs.refundManualHint': '无网关的账单：请通过其他方式退还款项；面板仅记录退款。',
   'platform.subs.refundGatewayFailed': '{gateway} 拒绝了退款：{detail}',
   'platform.subs.refundGatewayHint': '如有需要，可直接在 {gateway} 中退款，勾选“我已在 {gateway} 之外退款”并确认，仅在此处记录。',
+  'platform.subs.refundGatewayStatus': '该账单在面板中已支付，但 {gateway} 显示状态为 {status}：那里没有可退款的付款。',
+  'platform.subs.refundGatewayStatusHint': '请在 {gateway} 中核实。如果款项已通过其他方式退还，请勾选“我已在 {gateway} 之外退款”并确认，仅在此处记录。',
   'platform.subs.refunded': '退款已记录。已付至：{from} → {to}。',
   'platform.subs.refundAlready': '该账单此前已退款。未做任何更改。',
   'platform.subs.chargeCanceled': '账单已取消',

@@ -3283,6 +3283,8 @@ const es: Dictionary = {
   'platform.subs.refundManualHint': 'Cobro sin pasarela: devuelva el dinero por fuera; el panel solo registra el reembolso.',
   'platform.subs.refundGatewayFailed': '{gateway} rechazó el reembolso: {detail}',
   'platform.subs.refundGatewayHint': 'Si lo prefiere, reembolse directamente en {gateway}, marque "Ya reembolsé fuera de {gateway}" y confirme para solo registrarlo aquí.',
+  'platform.subs.refundGatewayStatus': 'El cobro está pagado en el panel, pero {gateway} informa el estado {status}: allí no hay pago que reembolsar.',
+  'platform.subs.refundGatewayStatusHint': 'Verifique en {gateway}. Si el dinero ya se devolvió por fuera, marque "Ya reembolsé fuera de {gateway}" y confirme para solo registrarlo aquí.',
   'platform.subs.refunded': 'Reembolso registrado. Pagado hasta: {from} → {to}.',
   'platform.subs.refundAlready': 'Este cobro ya estaba reembolsado. No se cambió nada.',
   'platform.subs.chargeCanceled': 'Cobro cancelado',

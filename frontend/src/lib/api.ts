@@ -162,6 +162,11 @@ export interface ApiResponse<T = any> {
    * o chamado — a `message` é a nossa, genérica.
    */
   detail?: string
+  /**
+   * Só no 409 `not_paid` do estorno quando o gateway discorda: aqui a
+   * cobrança está paga, lá ela está neste estado (`PENDING`, por exemplo).
+   */
+  gatewayStatus?: string
 }
 
 /**
@@ -351,6 +356,8 @@ class ApiClient {
           ...(data.destinations ? { destinations: data.destinations } : {}),
           // O 502 do gateway: o motivo dele, literal, para quem opera a conta lá.
           ...(typeof data.detail === 'string' ? { detail: data.detail } : {}),
+          // O 409 `not_paid` do estorno: o estado que o gateway diz ter.
+          ...(typeof data.gatewayStatus === 'string' ? { gatewayStatus: data.gatewayStatus } : {}),
         }
       }
 

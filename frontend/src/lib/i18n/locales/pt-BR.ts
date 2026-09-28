@@ -3283,6 +3283,8 @@ const ptBR: Dictionary = {
   'platform.subs.refundManualHint': 'Cobrança sem gateway: devolva o dinheiro por fora; o painel só registra o estorno.',
   'platform.subs.refundGatewayFailed': 'O {gateway} recusou o estorno: {detail}',
   'platform.subs.refundGatewayHint': 'Se preferir, estorne direto no {gateway}, marque "Já estornei fora do {gateway}" e confirme para só registrar aqui.',
+  'platform.subs.refundGatewayStatus': 'A cobrança está paga no painel, mas o {gateway} informa o estado {status}: lá não há pagamento para estornar.',
+  'platform.subs.refundGatewayStatusHint': 'Confira no {gateway}. Se o dinheiro já foi devolvido por fora, marque "Já estornei fora do {gateway}" e confirme para só registrar aqui.',
   'platform.subs.refunded': 'Estorno registrado. Pago até: {from} → {to}.',
   'platform.subs.refundAlready': 'Esta cobrança já estava estornada. Nada foi alterado.',
   'platform.subs.chargeCanceled': 'Cobrança cancelada',

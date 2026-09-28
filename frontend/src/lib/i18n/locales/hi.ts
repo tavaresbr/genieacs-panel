@@ -3291,6 +3291,8 @@ const hi: Dictionary = {
   'platform.subs.refundManualHint': 'बिना गेटवे का शुल्क: पैसा किसी और तरीके से लौटाएँ; पैनल केवल रिफ़ंड दर्ज करता है।',
   'platform.subs.refundGatewayFailed': '{gateway} ने रिफ़ंड अस्वीकार कर दिया: {detail}',
   'platform.subs.refundGatewayHint': 'चाहें तो सीधे {gateway} में रिफ़ंड करें, "मैंने {gateway} के बाहर पहले ही रिफ़ंड कर दिया है" चुनें और यहाँ केवल दर्ज करने के लिए पुष्टि करें।',
+  'platform.subs.refundGatewayStatus': 'पैनल में यह शुल्क भुगतान किया हुआ है, लेकिन {gateway} स्थिति {status} बताता है: वहाँ रिफ़ंड के लिए कोई भुगतान नहीं है।',
+  'platform.subs.refundGatewayStatusHint': '{gateway} में जाँचें। अगर पैसा पहले ही किसी और तरीके से लौटा दिया गया है, तो "मैंने {gateway} के बाहर पहले ही रिफ़ंड कर दिया है" चुनें और यहाँ केवल दर्ज करने के लिए पुष्टि करें।',
   'platform.subs.refunded': 'रिफ़ंड दर्ज किया गया। भुगतान तक: {from} → {to}।',
   'platform.subs.refundAlready': 'इस शुल्क का रिफ़ंड पहले ही हो चुका था। कुछ नहीं बदला।',
   'platform.subs.chargeCanceled': 'शुल्क रद्द किया गया',

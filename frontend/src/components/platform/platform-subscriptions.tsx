@@ -1416,6 +1416,12 @@ function RefundDialog({
    * estornar lá e marcar a caixa, e isso não cabe num toast que some.
    */
   const [falhaGateway, setFalhaGateway] = useState<string | null>(null)
+  /**
+   * Aqui paga, lá em outro estado: o gateway não tem o que estornar. Fica na
+   * tela pelo mesmo motivo da recusa acima — a saída é conferir lá e, se o
+   * dinheiro já voltou por fora, marcar a caixa.
+   */
+  const [statusGateway, setStatusGateway] = useState<string | null>(null)
   const previa = refundPreview(renewsAt, periodDays)
   // Quem cobrou é quem estorna: o provider da cobrança, não o de hoje do
   // provedor. Sem id lá, ou emitida à mão, não há gateway a chamar — o dinheiro
@@ -1433,6 +1439,19 @@ function RefundDialog({
       })
       if (!res.success && res.code === 'gateway_failed') {
         setFalhaGateway(res.detail || '')
+        setStatusGateway(null)
+        return
+      }
+      if (!res.success && res.code === 'not_paid') {
+        if (res.gatewayStatus) {
+          setStatusGateway(res.gatewayStatus)
+          setFalhaGateway(null)
+          return
+        }
+        // Não está mais paga do lado de cá: a linha mudou, recarrega.
+        toast.error(recusa(res))
+        onClose()
+        await onDone()
         return
       }
       if (res.success) {
@@ -1513,7 +1532,7 @@ function RefundDialog({
             type="checkbox"
             className="mt-1"
             checked={outsideGateway}
-            onChange={(e) => { setOutsideGateway(e.target.checked); setFalhaGateway(null) }}
+            onChange={(e) => { setOutsideGateway(e.target.checked); setFalhaGateway(null); setStatusGateway(null) }}
           />
           <span>{t('platform.subs.refundOutside', { gateway })}</span>
         </label>
@@ -1528,6 +1547,14 @@ function RefundDialog({
               : t('platform.subs.err.gatewayFailed')}
           </p>
           <p className="field-hint">{t('platform.subs.refundGatewayHint', { gateway })}</p>
+        </div>
+      )}
+      {statusGateway !== null && (
+        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3" role="alert">
+          <p className="text-foreground [overflow-wrap:anywhere]">
+            {t('platform.subs.refundGatewayStatus', { gateway: gateway || charge.provider, status: statusGateway })}
+          </p>
+          {viaGateway && <p className="field-hint">{t('platform.subs.refundGatewayStatusHint', { gateway })}</p>}
         </div>
       )}
     </Dialog>

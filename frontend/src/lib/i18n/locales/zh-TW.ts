@@ -3284,6 +3284,8 @@ const zhTW: Dictionary = {
   'platform.subs.refundManualHint': '無閘道的帳單：請透過其他方式退還款項；面板僅記錄退款。',
   'platform.subs.refundGatewayFailed': '{gateway} 拒絕了退款：{detail}',
   'platform.subs.refundGatewayHint': '如有需要，可直接在 {gateway} 中退款，勾選「我已在 {gateway} 以外退款」並確認，僅在此處記錄。',
+  'platform.subs.refundGatewayStatus': '此帳單在面板中已付款，但 {gateway} 顯示狀態為 {status}：那裡沒有可退款的付款。',
+  'platform.subs.refundGatewayStatusHint': '請在 {gateway} 中核對。若款項已透過其他方式退還，請勾選「我已在 {gateway} 以外退款」並確認，僅在此處記錄。',
   'platform.subs.refunded': '退款已記錄。已付至：{from} → {to}。',
   'platform.subs.refundAlready': '此帳單先前已退款。未做任何變更。',
   'platform.subs.chargeCanceled': '帳單已取消',

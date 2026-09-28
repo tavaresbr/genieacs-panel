@@ -3289,6 +3289,8 @@ const it: Dictionary = {
   'platform.subs.refundManualHint': 'Addebito senza gateway: restituisci il denaro per altra via; il pannello registra solo il rimborso.',
   'platform.subs.refundGatewayFailed': '{gateway} ha rifiutato il rimborso: {detail}',
   'platform.subs.refundGatewayHint': 'Se preferisci, rimborsa direttamente su {gateway}, spunta "Ho già rimborsato fuori da {gateway}" e conferma per registrarlo solo qui.',
+  'platform.subs.refundGatewayStatus': 'L\'addebito risulta pagato nel pannello, ma {gateway} riporta lo stato {status}: lì non c\'è alcun pagamento da rimborsare.',
+  'platform.subs.refundGatewayStatusHint': 'Verifica su {gateway}. Se il denaro è già stato restituito per altra via, spunta "Ho già rimborsato fuori da {gateway}" e conferma per registrarlo solo qui.',
   'platform.subs.refunded': 'Rimborso registrato. Pagato fino al: {from} → {to}.',
   'platform.subs.refundAlready': 'Questo addebito era già rimborsato. Nulla è stato modificato.',
   'platform.subs.chargeCanceled': 'Addebito annullato',

@@ -3283,6 +3283,8 @@ const ja: Dictionary = {
   'platform.subs.refundManualHint': 'ゲートウェイのない請求です。お金は別の方法で返金してください。パネルは返金を記録するだけです。',
   'platform.subs.refundGatewayFailed': '{gateway} が返金を拒否しました：{detail}',
   'platform.subs.refundGatewayHint': '必要であれば {gateway} で直接返金し、「{gateway} の外で返金済み」にチェックを入れて確定すると、ここでは記録だけ行います。',
+  'platform.subs.refundGatewayStatus': 'この請求はパネルでは支払済みですが、{gateway} の状態は {status} です。そちらには返金できる支払いがありません。',
+  'platform.subs.refundGatewayStatusHint': '{gateway} で確認してください。すでに別の方法で返金済みなら、「{gateway} の外で返金済み」にチェックを入れて確定すると、ここでは記録だけ行います。',
   'platform.subs.refunded': '返金を記録しました。支払済み期限：{from} → {to}。',
   'platform.subs.refundAlready': 'この請求はすでに返金済みでした。何も変更されていません。',
   'platform.subs.chargeCanceled': '請求を取り消しました',

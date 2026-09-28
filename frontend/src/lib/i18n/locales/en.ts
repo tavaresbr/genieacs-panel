@@ -3285,6 +3285,8 @@ const en = {
   'platform.subs.refundManualHint': 'Charge without a gateway: return the money outside the panel; the panel only records the refund.',
   'platform.subs.refundGatewayFailed': '{gateway} refused the refund: {detail}',
   'platform.subs.refundGatewayHint': 'If you prefer, refund directly in {gateway}, tick "I already refunded outside {gateway}" and confirm to only record it here.',
+  'platform.subs.refundGatewayStatus': 'The charge is paid in the panel, but {gateway} reports the status {status}: there is no payment there to refund.',
+  'platform.subs.refundGatewayStatusHint': 'Check in {gateway}. If the money was already returned outside it, tick "I already refunded outside {gateway}" and confirm to only record it here.',
   'platform.subs.refunded': 'Refund recorded. Paid until: {from} → {to}.',
   'platform.subs.refundAlready': 'This charge was already refunded. Nothing was changed.',
   'platform.subs.chargeCanceled': 'Charge canceled',

@@ -3283,6 +3283,8 @@ const fr: Dictionary = {
   'platform.subs.refundManualHint': 'Facture sans passerelle : rendez l\'argent par un autre moyen ; le panneau ne fait qu\'enregistrer le remboursement.',
   'platform.subs.refundGatewayFailed': '{gateway} a refusé le remboursement : {detail}',
   'platform.subs.refundGatewayHint': 'Si vous préférez, remboursez directement dans {gateway}, cochez « J\'ai déjà remboursé hors de {gateway} » et confirmez pour seulement l\'enregistrer ici.',
+  'platform.subs.refundGatewayStatus': 'Le paiement est réglé dans le panneau, mais {gateway} indique le statut {status} : il n\'y a là-bas aucun paiement à rembourser.',
+  'platform.subs.refundGatewayStatusHint': 'Vérifiez dans {gateway}. Si l\'argent a déjà été rendu par un autre moyen, cochez « J\'ai déjà remboursé hors de {gateway} » et confirmez pour seulement l\'enregistrer ici.',
   'platform.subs.refunded': 'Remboursement enregistré. Payé jusqu\'au : {from} → {to}.',
   'platform.subs.refundAlready': 'Ce paiement était déjà remboursé. Rien n\'a été modifié.',
   'platform.subs.chargeCanceled': 'Facture annulée',

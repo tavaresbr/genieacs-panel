@@ -3292,6 +3292,8 @@ const ar: Dictionary = {
   'platform.subs.refundManualHint': 'فاتورة بلا بوابة: أعد المبلغ بطريقة أخرى؛ اللوحة تسجّل الاسترداد فقط.',
   'platform.subs.refundGatewayFailed': 'رفضت {gateway} الاسترداد: {detail}',
   'platform.subs.refundGatewayHint': 'إن شئت، استرد المبلغ مباشرة في {gateway}، وحدّد "استرددت المبلغ بالفعل خارج {gateway}" ثم أكّد للتسجيل هنا فقط.',
+  'platform.subs.refundGatewayStatus': 'الفاتورة مدفوعة في اللوحة، لكن {gateway} تُبلغ بالحالة {status}: لا توجد هناك دفعة لاستردادها.',
+  'platform.subs.refundGatewayStatusHint': 'تحقّق في {gateway}. إذا أُعيد المبلغ بالفعل بطريقة أخرى، فحدّد "استرددت المبلغ بالفعل خارج {gateway}" ثم أكّد للتسجيل هنا فقط.',
   'platform.subs.refunded': 'تم تسجيل الاسترداد. مدفوع حتى: {from} ← {to}.',
   'platform.subs.refundAlready': 'كانت هذه الفاتورة مستردة بالفعل. لم يتغير شيء.',
   'platform.subs.chargeCanceled': 'تم إلغاء الفاتورة',
