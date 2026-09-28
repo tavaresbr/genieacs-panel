@@ -166,10 +166,15 @@ class BillingCharge {
    *
    * @returns {Promise<boolean>} se esta chamada ficou com a linha.
    */
-  static async claim(id, { until, now = new Date(), unissued = true } = {}) {
+  static async claim(id, { until, now = new Date(), unissued = true, openOnly = false } = {}) {
     let query = tdb('billing_charges').where({ id })
       .where((livre) => livre.whereNull('issuing_until').orWhere('issuing_until', '<', now));
     if (unissued) query = query.whereNull('gateway_charge_id');
+    // `openOnly` é o dos gestos do console: a leitura que decidiu "está em
+    // aberto" e a garra são dois comandos, e entre eles o webhook pode ter
+    // quitado a linha. Na mesma condição do `UPDATE`, quem toma a garra toma
+    // uma linha que AINDA está em aberto — ou não toma nada.
+    if (openOnly) query = query.whereIn('status', OPEN_CHARGE_STATUSES);
     const changed = await query.update({ issuing_until: until, updated_at: new Date() });
     return changed > 0;
   }
@@ -266,6 +271,9 @@ class BillingCharge {
       // ainda diz. Quem a segura a solta logo antes de reemitir.
       issuing_until: holdUntil,
       superseded_charges: anteriores.length ? JSON.stringify(anteriores) : null,
+      // O valor novo é o preço de um plano: o desconto dado à cobrança velha
+      // pelo console não passa para a reemitida.
+      amount_overridden_at: null,
       updated_at: new Date()
     });
     return changed > 0;
@@ -380,6 +388,9 @@ class BillingCharge {
       provider: row.provider ?? null,
       gatewayChargeId: row.gateway_charge_id ?? null,
       attempts: Number(row.attempts ?? 0),
+      // Quando o console mudou o valor à mão — nulo quando o valor é o preço
+      // de um plano. A emissão não reprecifica uma cobrança marcada assim.
+      amountOverriddenAt: row.amount_overridden_at ?? null,
       lastError: row.last_error ?? null,
       createdAt: row.created_at ?? null,
       updatedAt: row.updated_at ?? null,

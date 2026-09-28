@@ -121,7 +121,11 @@ async function valorPedido({ externalId, plano, currency }) {
     if (Number.isFinite(valor) && valor > 0) {
       const moeda = String(cobranca.currency || '').toUpperCase();
       if (moeda && moeda !== moedaPaga) return { cents: null, motivo: 'currency_mismatch', fonte: 'charge' };
-      return { cents: Math.floor(valor), motivo: null, fonte: 'charge' };
+      // `overridden`: o valor foi mudado à mão pelo console (0078) e não é o
+      // preço de plano nenhum — ver o destino da descida em `recordPayment`.
+      return {
+        cents: Math.floor(valor), motivo: null, fonte: 'charge', overridden: Boolean(cobranca.amount_overridden_at)
+      };
     }
   }
 
@@ -157,6 +161,32 @@ async function valorPedido({ externalId, plano, currency }) {
   const moedaPlano = String(plano?.currency || '').toUpperCase();
   if (moedaPlano && moedaPlano !== moedaPaga) return { cents: null, motivo: 'currency_mismatch', fonte: 'plan' };
   return { cents: Math.floor(preco), motivo: null, fonte: 'plan' };
+}
+
+/**
+ * O prazo vivo de uma assinatura — o mesmo que a emissão lê, na mesma ordem:
+ * a renovação, ou o fim do teste para quem nunca pagou.
+ */
+function prazoVivo(linha) {
+  return asDate(linha?.renews_at) ?? asDate(linha?.trial_ends_at);
+}
+
+/**
+ * Leva a cobrança em aberto do prazo velho para o novo, quando um prazo muda
+ * à mão (`setDeadlines`, `setStatus` com data). Ver
+ * `ChargeIssuingService.followDeadline`, que é quem fala com o gateway.
+ *
+ * Importado na hora, e não no topo: `chargeIssuingService` importa ESTE
+ * arquivo, e o caminho de volta só é preciso quando um prazo é mexido à mão.
+ * A recusa (`ChargeFollowError`) sobe como está, e quem chama não grava nada.
+ */
+async function followOpenCharge(before, patch, now = new Date()) {
+  const depois = { ...before, ...patch };
+  const de = prazoVivo(before);
+  const para = prazoVivo(depois);
+  if (!de || !para || de.getTime() === para.getTime()) return null;
+  const { default: ChargeIssuingService } = await import('./chargeIssuingService.js');
+  return ChargeIssuingService.followDeadline({ from: de, to: para, now });
 }
 
 export class PlanLimitError extends Error {
@@ -754,6 +784,9 @@ class SubscriptionService {
     if (trialEndsAt !== undefined) patch.trial_ends_at = asDate(trialEndsAt);
     if (renewsAt !== undefined) patch.renews_at = asDate(renewsAt);
     patch.canceled_at = status === 'canceled' ? new Date() : null;
+    // O prazo mudado junto com o status leva a cobrança em aberto com ele,
+    // ANTES de ser gravado — ver `followOpenCharge`.
+    if (trialEndsAt !== undefined || renewsAt !== undefined) await followOpenCharge(before, patch);
     const subscription = await Subscription.upsertForTenant(tenantId, patch);
     await BillingEvent.record({
       subscriptionId: subscription.id,
@@ -781,7 +814,9 @@ class SubscriptionService {
    *     "sem renovação" é assinatura fora de ciclo, e isso é decisão de
    *     status, não de prazo.
    *
-   * O status NÃO muda, e é o que separa isto de `setStatus`. Mas o estado que
+   * O status NÃO muda — com uma exceção, a do `past_due` GRAVADO que ganha um
+   * prazo no futuro, e que volta a `active` (ver abaixo) —, e é o que separa
+   * isto de `setStatus`. Mas o estado que
    * VALE pode mudar, e é o ponto: `effectiveStatus` calcula `past_due` a partir
    * do prazo, então um `active` vencido volta a passar no instante em que o
    * prazo anda — sem ninguém gravar `active` à mão e sem registrar pagamento
@@ -792,6 +827,11 @@ class SubscriptionService {
    * aplicaria no meio do período que a cortesia acabou de esticar. Só quando
    * ela está exatamente na renovação antiga — uma agendada para outra data é
    * outra decisão, e fica como está.
+   *
+   * A cobrança em aberto do prazo velho vai junto para o novo — no gateway
+   * e na linha —, antes de o prazo ser gravado (`followOpenCharge`). Sem
+   * isso, a emissão abriria outra para o prazo novo com a primeira ainda viva
+   * na Asaas: duas faturas, e o provedor cobrado pela que o painel esqueceu.
    *
    * Uma linha no extrato (`deadline.changed`, com `courtesy: true` quando é
    * uma extensão), porque é o extrato que responde "por que este provedor
@@ -829,6 +869,20 @@ class SubscriptionService {
     }
     if (!Object.keys(patch).length) throw new Error('Nothing to change');
 
+    // A cortesia a quem está `past_due` GRAVADO (o console o pôs lá à mão)
+    // precisa destravá-lo, ou não é cortesia nenhuma: `effectiveStatus` só
+    // calcula `past_due` a partir do prazo em `active`, e um `past_due`
+    // gravado continua bloqueando escrita com a renovação no ano que vem. Só
+    // quando o prazo novo está de fato no futuro — mexer num prazo e deixá-lo
+    // vencido não destrava nada, e o status fica como estava.
+    if (before.status === 'past_due' && patch.renews_at && patch.renews_at.getTime() > now.getTime()) {
+      patch.status = 'active';
+    }
+
+    // A cobrança em aberto acompanha o prazo, e ANTES de ele ser gravado: se o
+    // gateway recusa, o prazo não se move — ver `followOpenCharge`.
+    await followOpenCharge(before, patch, now);
+
     const renovacaoAntiga = asDate(before.renews_at);
     const agendada = asDate(before.pending_plan_at);
     if (patch.renews_at && before.pending_plan_id && renovacaoAntiga && agendada
@@ -851,6 +905,7 @@ class SubscriptionService {
           from: { renewsAt: iso(before.renews_at), trialEndsAt: iso(before.trial_ends_at) },
           to: { renewsAt: iso(depois.renews_at), trialEndsAt: iso(depois.trial_ends_at) },
           status: before.status,
+          ...(patch.status ? { statusAfter: patch.status } : {}),
           reason
         }
       }, trx);
@@ -1015,7 +1070,15 @@ class SubscriptionService {
     let destinoDaDescida = null;
     if (reactivates && planoAgendado) {
       const precoAtual = Number(planoAtual?.price_cents ?? 0);
-      const pagoBarato = pedido.cents !== null ? pedido.cents < precoAtual : plano === planoAgendado;
+      // A cobrança com valor mudado à mão pelo console (o desconto) não diz
+      // nada sobre QUAL plano foi pago: menos que o preço do atual ali é
+      // abatimento, não o preço do barato. Aí vale o plano que a cobrança
+      // teria pedido sem o desconto — o agendado, se a descida cabe no uso;
+      // o atual, se não cabe —, que é a mesma resposta de quando não há
+      // cobrança nenhuma.
+      const pagoBarato = pedido.cents !== null && !pedido.overridden
+        ? pedido.cents < precoAtual
+        : plano === planoAgendado;
       destinoDaDescida = pagoBarato ? 'lock' : 'postpone';
     }
     const descidaVenceu = !dataDaDescida || dataDaDescida.getTime() <= now.getTime();

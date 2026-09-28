@@ -6,6 +6,7 @@ import PlatformAudit from '../models/PlatformAudit.js';
 import AuditLog from '../models/AuditLog.js';
 import SubscriptionService, { STATUSES } from '../services/subscriptionService.js';
 import { manualBilling } from '../services/billing/manualBillingProvider.js';
+import { ChargeFollowError } from '../services/chargeIssuingService.js';
 import DeviceService from '../services/deviceService.js';
 import { runInTenant } from '../config/tenantContext.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
@@ -336,20 +337,35 @@ class PlatformBillingController {
 
       const before = await Subscription.forTenant(tenant.id);
       const actorUserId = req.user?.userId ?? null;
-      await runInTenant(tenant.id, async () => {
-        if (planId !== undefined) {
-          await SubscriptionService.changePlan({ planId, actorUserId });
-        }
-        if (status !== undefined) {
-          await SubscriptionService.setStatus({
-            status,
-            reason: body.reason ? String(body.reason).slice(0, 255) : null,
-            actorUserId,
-            trialEndsAt: body.trialEndsAt,
-            renewsAt: body.renewsAt
+      try {
+        await runInTenant(tenant.id, async () => {
+          // O status (com as datas) ANTES do plano: é ele que pode ser recusado
+          // — a cobrança em aberto acompanha o prazo novo no gateway, e o
+          // gateway pode dizer não (ver `ChargeIssuingService.followDeadline`).
+          // Na ordem inversa, a recusa chegaria com o plano já trocado, e o
+          // pedido teria valido pela metade.
+          if (status !== undefined) {
+            await SubscriptionService.setStatus({
+              status,
+              reason: body.reason ? String(body.reason).slice(0, 255) : null,
+              actorUserId,
+              trialEndsAt: body.trialEndsAt,
+              renewsAt: body.renewsAt
+            });
+          }
+          if (planId !== undefined) {
+            await SubscriptionService.changePlan({ planId, actorUserId });
+          }
+        });
+      } catch (error) {
+        if (error instanceof ChargeFollowError) {
+          return res.status(error.status).json({
+            ...createErrorResponse(error.message, null, error.code),
+            ...(error.detail ? { detail: error.detail } : {})
           });
         }
-      });
+        throw error;
+      }
       const after = await Subscription.forTenant(tenant.id);
 
       if (planId !== undefined) {

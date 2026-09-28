@@ -1,4 +1,4 @@
-import BillingCharge from '../models/BillingCharge.js';
+import BillingCharge, { OPEN_CHARGE_STATUSES } from '../models/BillingCharge.js';
 import Tenant from '../models/Tenant.js';
 import { currentTenantId } from '../config/tenantContext.js';
 import { isUniqueViolation } from '../config/database.js';
@@ -51,6 +51,20 @@ import SubscriptionService from './subscriptionService.js';
  * onde perceber. Uma cobrança duplicada no gateway é um problema visível e
  * corrigível; uma cobrança que nunca saiu, não.
  */
+/**
+ * A recusa de `followDeadline`, com o status HTTP que o console responde:
+ * 409 `busy` (a linha é de outra passada agora) ou 502 `gateway_failed`.
+ */
+export class ChargeFollowError extends Error {
+  constructor(status, code, message, detail = null) {
+    super(message);
+    this.name = 'ChargeFollowError';
+    this.status = status;
+    this.code = code;
+    this.detail = detail;
+  }
+}
+
 class ChargeIssuingService {
   /** Quantos dias antes do vencimento a cobrança sai. */
   static LEAD_DAYS = 5;
@@ -138,13 +152,144 @@ class ChargeIssuingService {
    * `canceled` e não `failed`: nada falhou — o período simplesmente acabou, e o
    * provedor está em dia por outro caminho. A diferença importa para quem for
    * ler o histórico depois, e é a razão de os dois estados existirem.
+   *
+   * ## No gateway primeiro, e só depois aqui
+   *
+   * Esta faxina cancelava só a LINHA. A cobrança emitida continuava viva na
+   * Asaas — com link, lembrete e, depois do vencimento, aviso de atraso —, e a
+   * emissão logo abaixo abria a do período novo: duas faturas vivas na mão do
+   * provedor, e ele sendo cobrado pela que o painel já dava por encerrada. O
+   * caso comum é o prazo mexido à mão (a cortesia do console, a data
+   * corrigida), que `followDeadline` agora resolve na hora; esta é a segunda
+   * tranca, para o que chegar aqui por qualquer outro caminho — o pagamento
+   * avulso que empurrou `renews_at`, um banco mexido à mão.
+   *
+   * Com a garra, como toda escrita que fala com o gateway por uma linha. E a
+   * recusa do gateway deixa a linha EM ABERTO: o motivo mais provável é a
+   * cobrança já ter sido paga lá (a Asaas não apaga cobrança recebida), e
+   * aí fechá-la aqui como cancelada esconderia um pagamento que o webhook
+   * perdeu. O motivo fica em `last_error` e a próxima tentativa espera
+   * `RETRY_AFTER_MS` (`next_attempt_at`, que numa linha de período vencido não
+   * significa mais nada para a emissão): o agendador passa a cada minuto, e um
+   * DELETE recusado por minuto por cobrança seria martelar o gateway.
    */
-  static async cancelStale(periodoAtual) {
+  static async cancelStale(periodoAtual, { now = new Date() } = {}) {
     const velhas = await BillingCharge.openBefore(periodoAtual);
+    let canceladas = 0;
     for (const cobranca of velhas) {
-      await BillingCharge.update(cobranca.id, { status: 'canceled' });
+      const provider = cobranca.gateway_charge_id ? providerFor(cobranca.provider) : null;
+      const noGateway = typeof provider?.cancelCharge === 'function';
+      if (noGateway && cobranca.next_attempt_at) {
+        const espera = new Date(cobranca.next_attempt_at);
+        if (!Number.isNaN(espera.getTime()) && espera.getTime() > now.getTime()) continue;
+      }
+      // eslint-disable-next-line no-await-in-loop -- uma ou duas por provedor, e cada uma fala com o gateway
+      const minha = await BillingCharge.claim(cobranca.id, {
+        until: new Date(now.getTime() + this.CLAIM_MS), now, unissued: false, openOnly: true
+      });
+      if (!minha) continue;
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        if (noGateway) await provider.cancelCharge(cobranca.gateway_charge_id);
+        // eslint-disable-next-line no-await-in-loop
+        await BillingCharge.update(cobranca.id, { status: 'canceled', issuing_until: null, next_attempt_at: null });
+        canceladas += 1;
+      } catch (error) {
+        // eslint-disable-next-line no-await-in-loop
+        await BillingCharge.update(cobranca.id, {
+          last_error: String(error.message ?? '').slice(0, 500),
+          next_attempt_at: new Date(now.getTime() + this.RETRY_AFTER_MS),
+          issuing_until: null
+        });
+        console.warn(
+          `Stale charge ${cobranca.id} (period ${cobranca.period_end}) could not be canceled at the gateway `
+          + `and stays open — it may have been paid there: ${error.message}`
+        );
+      }
     }
-    return velhas.length;
+    return canceladas;
+  }
+
+  /**
+   * A cobrança em aberto acompanha o prazo que se moveu sem pagamento.
+   *
+   * Chamada por quem mexe no prazo à mão (`SubscriptionService.setDeadlines`
+   * e `setStatus` com data), no escopo do provedor, ANTES de gravar o prazo
+   * novo. A chave de uma cobrança é o prazo que ela compra; mudado o prazo, a
+   * cobrança emitida para a chave velha ficaria órfã — a faxina a fecharia, a
+   * emissão abriria outra para a chave nova, e o provedor teria duas faturas.
+   * Aqui ela vira a cobrança do prazo novo:
+   *
+   *   - no gateway, o vencimento muda para o do prazo novo (`dueDateFor`, o
+   *     mesmo cálculo da emissão — com a folga de quem já está vencido);
+   *   - na linha, `period_end` passa a ser a chave nova, e o vencimento é o
+   *     que o gateway aceitou. Uma `overdue` volta a `pending`: com o
+   *     vencimento novo, não está mais atrasada.
+   *
+   * Se o prazo novo JÁ tem cobrança (voltou-se a um prazo que teve uma), duas
+   * linhas não cabem numa chave: a velha é cancelada no gateway e aqui.
+   *
+   * A recusa do gateway LANÇA (`ChargeFollowError`, 502) e nada é gravado —
+   * nem a linha nem, porque quem chama grava depois, o prazo. Mover o prazo
+   * deixando a fatura velha viva é exatamente o dano que isto existe para
+   * evitar. A linha tomada por outra passada lança 409 `busy`.
+   *
+   * Uma linha sem id no gateway só troca de chave: é a emissão que a leva lá,
+   * pela porta de sempre, com o vencimento do prazo novo.
+   *
+   * @returns {Promise<{ moved: boolean, canceled?: boolean, reason?: string, chargeId?: number }>}
+   */
+  static async followDeadline({ from, to, now = new Date() }) {
+    const de = from ? new Date(from) : null;
+    const para = to ? new Date(to) : null;
+    if (!de || !para || Number.isNaN(de.getTime()) || Number.isNaN(para.getTime())) {
+      return { moved: false, reason: 'no_deadline' };
+    }
+    const chaveVelha = this.periodKey(de);
+    const chaveNova = this.periodKey(para);
+    if (chaveVelha === chaveNova) return { moved: false, reason: 'same_period' };
+    const cobranca = await BillingCharge.forPeriod(chaveVelha);
+    if (!cobranca || !OPEN_CHARGE_STATUSES.includes(cobranca.status)) {
+      return { moved: false, reason: 'no_open_charge' };
+    }
+
+    const minha = await BillingCharge.claim(cobranca.id, {
+      until: new Date(now.getTime() + this.CLAIM_MS), now, unissued: false, openOnly: true
+    });
+    if (!minha) {
+      throw new ChargeFollowError(409, 'busy', 'The open charge is being changed by another process; try again shortly');
+    }
+    const noGateway = async (fn) => {
+      try {
+        return await fn();
+      } catch (error) {
+        throw new ChargeFollowError(502, 'gateway_failed', `The payment gateway refused: ${error.message}`, error.message);
+      }
+    };
+    try {
+      const provider = cobranca.gateway_charge_id ? providerFor(cobranca.provider) : null;
+      const vencimento = this.dueDateFor(para, now);
+      if (await BillingCharge.forPeriod(chaveNova)) {
+        if (typeof provider?.cancelCharge === 'function') {
+          await noGateway(() => provider.cancelCharge(cobranca.gateway_charge_id));
+        }
+        await BillingCharge.update(cobranca.id, { status: 'canceled', issuing_until: null });
+        return { moved: false, canceled: true, chargeId: cobranca.id };
+      }
+      let respondido = null;
+      if (typeof provider?.updateCharge === 'function') {
+        respondido = await noGateway(() => provider.updateCharge(cobranca.gateway_charge_id, { dueDate: vencimento }));
+      }
+      await BillingCharge.update(cobranca.id, {
+        period_end: chaveNova,
+        due_date: respondido?.dueDate || vencimento,
+        ...(cobranca.status === 'overdue' ? { status: 'pending' } : {}),
+        issuing_until: null
+      });
+      return { moved: true, chargeId: cobranca.id };
+    } finally {
+      await BillingCharge.release(cobranca.id);
+    }
   }
 
   /**
@@ -273,7 +418,7 @@ class ChargeIssuingService {
     // marcada à mão — e `renews_at` andou sem quitar cobrança nenhuma. A linha
     // antiga ficaria `pending` para sempre, e "o que está em aberto" passaria a
     // responder errado a cada ciclo.
-    await this.cancelStale(periodo);
+    await this.cancelStale(periodo, { now });
 
     const antecedencia = now.getTime() + this.LEAD_DAYS * 86_400_000;
     if (!manual && vencimento.getTime() > antecedencia) return { issued: false, reason: 'not_due_yet' };
@@ -360,7 +505,10 @@ class ChargeIssuingService {
       // Só nessa direção. A contrária (bloqueada quando saiu, cabe agora)
       // fica com o preço cheio até a renovação: um uso oscilando em volta do
       // teto viraria uma fatura nova por oscilação na caixa de quem paga.
-      if (existente.gateway_charge_id && descidaBloqueada && Number(existente.amount_cents) !== preco) {
+      // Nunca a de valor mudado à mão pelo console (0078): o desconto dado a
+      // ela é decisão de gente, e reprecificá-la pelo plano o desfaria.
+      if (existente.gateway_charge_id && descidaBloqueada && !existente.amount_overridden_at
+        && Number(existente.amount_cents) !== preco) {
         return this.repriceBlockedDowngrade({
           subscription, plan, tenant, charge: existente, blockedBy: descidaBloqueada, now
         });
@@ -403,7 +551,11 @@ class ChargeIssuingService {
       // vai ao gateway logo abaixo. Uma linha aberta com um preço e emitida com
       // outro faria a conferência do pagamento (`valorPedido`, que lê a linha)
       // chamar de "pago a menos" quem pagou exatamente o que viu.
-      if (Number(existente.amount_cents) !== preco || String(existente.currency || '').toUpperCase() !== moeda.toUpperCase()) {
+      // O valor mudado à mão pelo console (0078) fica — e é ele que vai ao
+      // gateway logo abaixo, e não o preço do plano.
+      if (existente.amount_overridden_at) {
+        preco = Number(existente.amount_cents);
+      } else if (Number(existente.amount_cents) !== preco || String(existente.currency || '').toUpperCase() !== moeda.toUpperCase()) {
         patch.amount_cents = preco;
         patch.currency = String(moeda).toUpperCase().slice(0, 3);
       }

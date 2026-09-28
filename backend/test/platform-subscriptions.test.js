@@ -47,6 +47,8 @@ const DAY = 24 * 60 * 60 * 1000;
 let gateway;
 let recebidas = [];
 let proximoId = 0;
+/** O que o gateway de mentira diz de cada cobrança no `GET /payments/{id}` — PENDING quando não diz nada. */
+const estadoNoGateway = new Map();
 let panelUrl;
 let consoleServer;
 let consoleUrl;
@@ -57,6 +59,8 @@ let beta;
 let gama;
 let caixa;
 let plano;
+let planoMini;
+let donoId;
 
 function subirGateway() {
   gateway = http.createServer((req, res) => {
@@ -87,6 +91,10 @@ function subirGateway() {
         });
       }
       const umaCobranca = /^\/payments\/([^/]+)$/.exec(caminho);
+      if (req.method === 'GET' && umaCobranca) {
+        const id = decodeURIComponent(umaCobranca[1]);
+        return responder(200, { id, status: estadoNoGateway.get(id) ?? 'PENDING', value: 100 });
+      }
       if (req.method === 'POST' && umaCobranca) {
         const id = decodeURIComponent(umaCobranca[1]);
         if (id === 'pay_recusa') return responder(400, { errors: [{ description: 'não pode mudar' }] });
@@ -175,6 +183,7 @@ before(async () => {
   });
   assert.equal(setup.status, 201);
   donoToken = setup.body.data.token;
+  donoId = setup.body.data.user.id;
   await getDb()('platform_admins').insert({ user_id: setup.body.data.user.id });
 
   const contratado = await call(`${panelUrl}/api/users`, {
@@ -210,6 +219,12 @@ before(async () => {
   plano = await Plan.create({
     code: 'assin-pro', name: 'Pro', price_cents: 10000, currency: 'BRL', period_days: 30, trial_days: 0, active: true
   });
+  // O plano de baixo, que não comporta operador nenhum: com uma pessoa na
+  // equipe do beta, a descida para ele fica BLOQUEADA pelo uso.
+  planoMini = await Plan.create({
+    code: 'assin-mini', name: 'Mini', price_cents: 5000, currency: 'BRL', period_days: 30, trial_days: 0,
+    active: true, max_operators: 0
+  });
 });
 
 after(async () => {
@@ -224,10 +239,12 @@ after(async () => {
 /** Estado limpo a cada caso: cobrar é destrutivo, e o caso seguinte veria o rastro. */
 beforeEach(async () => {
   recebidas = [];
+  estadoNoGateway.clear();
   const db = getDb();
   await db('billing_charges').whereIn('tenant_id', [beta, gama]).del();
   await db('billing_events').whereIn('tenant_id', [beta, gama]).del();
   await db('platform_audit').del();
+  await db('tenant_users').where({ tenant_id: beta }).del();
   const agora = Date.now();
   await Subscription.upsertForTenant(beta, {
     plan_id: plano.id, status: 'active', renews_at: new Date(agora + 10 * DAY), trial_ends_at: null,
@@ -275,7 +292,7 @@ describe('a lista de todos', () => {
     assert.equal(linhaBeta.openCharge.id, daBeta, 'a mais recente em aberto, e não a velha');
     assert.equal(linhaBeta.openCharge.gatewayChargeId, 'pay_beta_atual');
     assert.deepEqual(Object.keys(linhaBeta.openCharge).sort(), [
-      'amountCents', 'attempts', 'createdAt', 'currency', 'dueDate', 'gatewayChargeId', 'id', 'invoiceUrl',
+      'amountCents', 'amountOverriddenAt', 'attempts', 'createdAt', 'currency', 'dueDate', 'gatewayChargeId', 'id', 'invoiceUrl',
       'lastError', 'periodEnd', 'provider', 'status', 'superseded', 'updatedAt'
     ]);
 
@@ -406,8 +423,11 @@ describe('a baixa manual de uma cobrança', () => {
     assert.equal(res.body.data.charge.status, 'paid');
     assert.equal(res.body.data.subscription.status, 'active');
 
-    assert.deepEqual(recebidas.map((r) => `${r.method} ${r.path}`), ['POST /payments/pay_beta_1/receiveInCash']);
-    assert.deepEqual(recebidas[0].payload, { paymentDate: hoje(), value: 100, notifyCustomer: false });
+    assert.deepEqual(recebidas.map((r) => `${r.method} ${r.path}`), [
+      'GET /payments/pay_beta_1', 'POST /payments/pay_beta_1/receiveInCash'
+    ]);
+    assert.deepEqual(recebidas[1].payload, { paymentDate: hoje(), value: 100, notifyCustomer: false });
+    assert.equal(res.body.data.acceptedUnderpayment, false);
 
     const depois = await assinaturaDe(beta);
     assert.equal(ms(depois.renews_at), ms(antes.renews_at) + 30 * DAY, 'um período, contado do prazo');
@@ -465,7 +485,7 @@ describe('a baixa manual de uma cobrança', () => {
       method: 'POST', body: { paidAt: hoje(), amountCents: 9000, allowUnderpayment: true }
     });
     assert.equal(aceito.status, 200, JSON.stringify(aceito.body));
-    assert.deepEqual(recebidas.map((r) => r.path), ['/payments/pay_curta/receiveInCash']);
+    assert.deepEqual(recebidas.map((r) => r.path), ['/payments/pay_curta', '/payments/pay_curta/receiveInCash']);
     assert.equal(ms((await assinaturaDe(beta)).renews_at), ms(antes.renews_at) + 30 * DAY);
   });
 
@@ -636,5 +656,232 @@ describe('a cobrança do vizinho', () => {
     assert.equal(res.status, 404);
     assert.equal((await cobrancaDe(beta, id)).status, 'pending');
     assert.equal(recebidas.length, 0);
+  });
+});
+
+describe('o prazo que se move leva a cobrança em aberto junto', () => {
+  const chaveDe = (instante) => ChargeIssuingService.periodKey(new Date(instante));
+
+  it('a cortesia muda o vencimento no gateway e a chave da linha — e a emissão não abre outra', async () => {
+    const id = await abrirCobranca(beta, { gatewayChargeId: 'pay_segue', status: 'overdue' });
+    const res = await platform(`/tenants/${beta}/subscription/deadlines`, { method: 'PATCH', body: { extendDays: 10 } });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    const depois = await assinaturaDe(beta);
+    const chaveNova = chaveDe(depois.renews_at);
+
+    assert.deepEqual(recebidas.map((r) => `${r.method} ${r.path}`), ['POST /payments/pay_segue']);
+    assert.deepEqual(recebidas[0].payload, { billingType: 'UNDEFINED', dueDate: chaveNova });
+    const linha = await cobrancaDe(beta, id);
+    assert.equal(linha.period_end, chaveNova);
+    assert.equal(linha.status, 'pending', 'com vencimento novo, não está mais atrasada');
+    assert.equal(linha.issuing_until, null);
+
+    // A emissão do período novo acha ESTA linha, já emitida: nenhuma fatura a mais.
+    recebidas = [];
+    const emissao = await runInTenant(beta, () => ChargeIssuingService.issueCurrent({ manual: true }));
+    assert.equal(emissao.reason, 'already_issued');
+    assert.equal(emissao.charge.id, id);
+    assert.equal(recebidas.length, 0);
+  });
+
+  it('o gateway recusou: 502, e nem o prazo nem a linha se movem', async () => {
+    const id = await abrirCobranca(beta, { gatewayChargeId: 'pay_recusa' });
+    const antes = await assinaturaDe(beta);
+    const chaveVelha = chaveDe(antes.renews_at);
+    const res = await platform(`/tenants/${beta}/subscription/deadlines`, { method: 'PATCH', body: { extendDays: 10 } });
+    assert.equal(res.status, 502);
+    assert.equal(res.body.code, 'gateway_failed');
+    assert.equal(ms((await assinaturaDe(beta)).renews_at), ms(antes.renews_at));
+    const linha = await cobrancaDe(beta, id);
+    assert.equal(linha.period_end, chaveVelha);
+    assert.equal(linha.issuing_until, null, 'a garra é solta');
+    assert.equal((await eventosDe(beta)).filter((e) => e.type === 'deadline.changed').length, 0);
+  });
+
+  it('pelo PUT da assinatura com data também, e um prazo que já tem cobrança cancela a velha', async () => {
+    const velha = await abrirCobranca(beta, { gatewayChargeId: 'pay_do_prazo_velho' });
+    const destino = new Date(Date.now() + 40 * DAY);
+    const jaTem = await abrirCobranca(beta, { periodEnd: chaveDe(destino), gatewayChargeId: 'pay_do_prazo_novo' });
+    const res = await platform(`/tenants/${beta}/subscription`, {
+      method: 'PUT', body: { status: 'active', renewsAt: destino.toISOString() }
+    });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.deepEqual(recebidas.map((r) => `${r.method} ${r.path}`), ['DELETE /payments/pay_do_prazo_velho']);
+    assert.equal((await cobrancaDe(beta, velha)).status, 'canceled');
+    assert.equal((await cobrancaDe(beta, jaTem)).status, 'pending');
+    assert.equal(ms((await assinaturaDe(beta)).renews_at), destino.getTime());
+  });
+
+  it('a cortesia a quem está past_due gravado o destrava', async () => {
+    await Subscription.upsertForTenant(beta, { status: 'past_due', renews_at: new Date(Date.now() - 2 * DAY) });
+    const res = await platform(`/tenants/${beta}/subscription/deadlines`, { method: 'PATCH', body: { extendDays: 5 } });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    const depois = await assinaturaDe(beta);
+    assert.equal(depois.status, 'active');
+    assert.ok(Math.abs(ms(depois.renews_at) - (Date.now() + 5 * DAY)) < 60_000);
+    assert.equal(res.body.data.subscription.status, 'active');
+  });
+});
+
+describe('a faxina de períodos vencidos fala com o gateway', () => {
+  it('cancela lá antes de cancelar aqui', async () => {
+    const id = await abrirCobranca(beta, { periodEnd: '2026-01-01', gatewayChargeId: 'pay_esquecida' });
+    const n = await runInTenant(beta, () => ChargeIssuingService.cancelStale('2026-06-01'));
+    assert.equal(n, 1);
+    assert.deepEqual(recebidas.map((r) => `${r.method} ${r.path}`), ['DELETE /payments/pay_esquecida']);
+    assert.equal((await cobrancaDe(beta, id)).status, 'canceled');
+  });
+
+  it('e a recusa deixa a linha em aberto, com espera — sem um DELETE por passada', async () => {
+    const id = await abrirCobranca(beta, { periodEnd: '2026-01-01', gatewayChargeId: 'pay_recusa' });
+    assert.equal(await runInTenant(beta, () => ChargeIssuingService.cancelStale('2026-06-01')), 0);
+    const linha = await cobrancaDe(beta, id);
+    assert.equal(linha.status, 'pending', 'pode ter sido paga lá: não se esconde');
+    assert.ok(linha.last_error);
+    assert.ok(ms(linha.next_attempt_at) > Date.now());
+    assert.equal(linha.issuing_until, null);
+
+    await runInTenant(beta, () => ChargeIssuingService.cancelStale('2026-06-01'));
+    assert.equal(recebidas.filter((r) => r.method === 'DELETE').length, 1, 'a segunda passada espera');
+  });
+});
+
+describe('a baixa quando o gateway ou o extrato já sabem do pagamento', () => {
+  const hoje = () => ChargeIssuingService.isoDate(new Date());
+
+  it('o webhook se perdeu e a Asaas já recebeu: a baixa segue sem receiveInCash, e credita uma vez', async () => {
+    const id = await abrirCobranca(beta, { gatewayChargeId: 'pay_perdida' });
+    const periodo = await periodoAtual(beta);
+    estadoNoGateway.set('pay_perdida', 'RECEIVED');
+    const antes = await assinaturaDe(beta);
+    const res = await platform(`/tenants/${beta}/charges/${id}/settle`, {
+      method: 'POST', body: { paidAt: hoje(), amountCents: 10000 }
+    });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.deepEqual(recebidas.map((r) => `${r.method} ${r.path}`), ['GET /payments/pay_perdida']);
+    assert.equal(ms((await assinaturaDe(beta)).renews_at), ms(antes.renews_at) + 30 * DAY);
+
+    const reentrega = await entregar({
+      event: 'PAYMENT_RECEIVED', payment: { id: 'pay_perdida', value: 100, externalReference: `tenant:${beta}:${periodo}` }
+    });
+    assert.equal(reentrega.body.code, 'duplicate');
+    assert.equal(ms((await assinaturaDe(beta)).renews_at), ms(antes.renews_at) + 30 * DAY);
+    const trilha = await getDb()('platform_audit').where({ action: 'charge.settled', tenant_id: beta }).first();
+    assert.equal(JSON.parse(trilha.detail).alreadyReceivedAtGateway, true);
+  });
+
+  it('o webhook registrou a menos: a baixa recusa, e só o aceite explícito estende — uma vez', async () => {
+    const id = await abrirCobranca(beta, { gatewayChargeId: 'pay_curtinha' });
+    const periodo = await periodoAtual(beta);
+    const antes = await assinaturaDe(beta);
+    const curto = await entregar({
+      event: 'PAYMENT_RECEIVED', payment: { id: 'pay_curtinha', value: 90, externalReference: `tenant:${beta}:${periodo}` }
+    });
+    assert.equal(curto.body.code, 'underpaid');
+    assert.equal((await cobrancaDe(beta, id)).status, 'pending');
+
+    const recusa = await platform(`/tenants/${beta}/charges/${id}/settle`, {
+      method: 'POST', body: { paidAt: hoje(), amountCents: 10000 }
+    });
+    assert.equal(recusa.status, 409);
+    assert.equal(recusa.body.code, 'already_recorded_underpaid');
+    assert.equal(recusa.body.paidCents, 9000);
+    assert.equal(recusa.body.expectedCents, 10000);
+    assert.equal((await cobrancaDe(beta, id)).status, 'pending', 'não fecha o que ninguém pagou inteiro');
+    assert.equal(recebidas.length, 0, 'e nem pergunta ao gateway');
+
+    const aceite = await platform(`/tenants/${beta}/charges/${id}/settle`, {
+      method: 'POST', body: { paidAt: hoje(), amountCents: 9000, allowUnderpayment: true }
+    });
+    assert.equal(aceite.status, 200, JSON.stringify(aceite.body));
+    assert.equal(aceite.body.data.acceptedUnderpayment, true);
+    assert.equal(aceite.body.data.charge.status, 'paid');
+    const depois = await assinaturaDe(beta);
+    assert.equal(ms(depois.renews_at), ms(antes.renews_at) + 30 * DAY);
+
+    const eventos = (await eventosDe(beta)).filter((e) => e.type === 'payment.recorded');
+    assert.deepEqual(eventos.map((e) => e.external_id), ['pay_curtinha', 'pay_curtinha:accepted']);
+    assert.equal(eventos[1].amount_cents, 0, 'o dinheiro já está no extrato; o aceite não o soma de novo');
+
+    // O mesmo aceite outra vez não estende nada: a cobrança já está paga, e a
+    // referência do aceite já existe.
+    const deNovo = await platform(`/tenants/${beta}/charges/${id}/settle`, {
+      method: 'POST', body: { paidAt: hoje(), amountCents: 9000, allowUnderpayment: true }
+    });
+    assert.equal(deNovo.status, 409);
+    assert.equal(deNovo.body.code, 'not_open');
+    const reentrega = await entregar({
+      event: 'PAYMENT_RECEIVED', payment: { id: 'pay_curtinha', value: 90, externalReference: `tenant:${beta}:${periodo}` }
+    });
+    assert.equal(reentrega.body.code, 'duplicate');
+    assert.equal(ms((await assinaturaDe(beta)).renews_at), ms(depois.renews_at));
+  });
+
+  it('assinatura suspensa: 409 subscription_inactive, a menos que se force', async () => {
+    await Subscription.upsertForTenant(beta, { status: 'suspended' });
+    const id = await abrirCobranca(beta, { gatewayChargeId: 'pay_suspensa' });
+    const res = await platform(`/tenants/${beta}/charges/${id}/settle`, {
+      method: 'POST', body: { paidAt: hoje(), amountCents: 10000 }
+    });
+    assert.equal(res.status, 409);
+    assert.equal(res.body.code, 'subscription_inactive');
+    assert.equal(res.body.subscriptionStatus, 'suspended');
+    assert.equal(recebidas.length, 0);
+
+    const forcado = await platform(`/tenants/${beta}/charges/${id}/settle`, {
+      method: 'POST', body: { paidAt: hoje(), amountCents: 10000, force: true }
+    });
+    assert.equal(forcado.status, 200, JSON.stringify(forcado.body));
+    assert.equal((await cobrancaDe(beta, id)).status, 'paid');
+    assert.equal((await assinaturaDe(beta)).status, 'suspended', 'pagamento não reativa quem alguém desligou');
+  });
+
+  it('a garra do console só toma linha em aberto', async () => {
+    const paga = await abrirCobranca(beta, { status: 'paid', gatewayChargeId: 'pay_garra' });
+    const tomou = await runInTenant(beta, () => BillingCharge.claim(paga, {
+      until: new Date(Date.now() + 60_000), unissued: false, openOnly: true
+    }));
+    assert.equal(tomou, false);
+  });
+});
+
+describe('o valor mudado à mão pelo console', () => {
+  /**
+   * O cenário do dano: o beta pediu a descida para o Mini, mas tem uma pessoa
+   * na equipe e o Mini não comporta nenhuma — a descida está bloqueada, e a
+   * cobrança da renovação sai pelo Pro. O console dá um desconto nela.
+   */
+  async function descidaBloqueadaComDesconto() {
+    const sub = await assinaturaDe(beta);
+    await Subscription.upsertForTenant(beta, { pending_plan_id: planoMini.id, pending_plan_at: sub.renews_at });
+    await getDb()('tenant_users').insert({ tenant_id: beta, user_id: donoId, role: 'admin' });
+    const id = await abrirCobranca(beta, { gatewayChargeId: 'pay_com_desconto' });
+    const res = await platform(`/tenants/${beta}/charges/${id}`, { method: 'PATCH', body: { amountCents: 7000 } });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.ok(res.body.data.charge.amountOverriddenAt, 'a linha fica marcada');
+    recebidas = [];
+    return id;
+  }
+
+  it('a emissão não reprecifica a cobrança com desconto', async () => {
+    const id = await descidaBloqueadaComDesconto();
+    const emissao = await runInTenant(beta, () => ChargeIssuingService.issueCurrent({ manual: true }));
+    assert.equal(emissao.reason, 'already_issued');
+    assert.equal(recebidas.length, 0, 'nem DELETE nem POST: o desconto fica');
+    assert.equal(Number((await cobrancaDe(beta, id)).amount_cents), 7000);
+  });
+
+  it('e o pagamento com desconto não trava a descida bloqueada como se fosse o preço do barato', async () => {
+    await descidaBloqueadaComDesconto();
+    const periodo = await periodoAtual(beta);
+    const aviso = await entregar({
+      event: 'PAYMENT_RECEIVED', payment: { id: 'pay_com_desconto', value: 70, externalReference: `tenant:${beta}:${periodo}` }
+    });
+    assert.equal(aviso.body.code, 'recorded');
+    const depois = await assinaturaDe(beta);
+    assert.equal(depois.plan_id, plano.id);
+    assert.equal(depois.pending_plan_id, planoMini.id);
+    assert.equal(depois.pending_plan_locked_at, null, 'pagou o Pro com desconto — não o Mini');
+    assert.equal(ms(depois.pending_plan_at), ms(depois.renews_at), 'a descida vai para a renovação seguinte');
   });
 });

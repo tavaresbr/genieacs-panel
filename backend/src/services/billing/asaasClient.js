@@ -288,6 +288,29 @@ export async function receiveInCash(chargeId, { paymentDate, value }) {
 }
 
 /**
+ * Lê uma cobrança como o gateway a vê agora — `GET /payments/{id}`.
+ *
+ * É a pergunta que a baixa manual do console faz ANTES de mandar o
+ * `receiveInCash`: o webhook pode ter se perdido, e aí a Asaas já tem a
+ * cobrança como paga (`RECEIVED`, `CONFIRMED`) enquanto o painel a mostra em
+ * aberto. O `receiveInCash` numa cobrança já recebida é recusado — e sem esta
+ * leitura a baixa ficaria respondendo 502 para sempre, empurrando quem opera
+ * para o pagamento avulso, que o webhook reentregue depois creditaria de novo.
+ *
+ * @returns {Promise<{ id: string, status: string|null, valueCents: number|null }>}
+ */
+export async function getCharge(chargeId) {
+  const resposta = await chamar(`/payments/${idNoCaminho(chargeId)}`, { method: 'GET' });
+  const valor = Number(resposta?.value);
+  return {
+    id: String(resposta?.id ?? chargeId),
+    status: resposta?.status ? String(resposta.status) : null,
+    // Arredondado sobre o produto, pelo motivo de `paraCentavos` no provider.
+    valueCents: Number.isFinite(valor) ? Math.round(valor * 100) : null
+  };
+}
+
+/**
  * Muda o vencimento e/ou o valor de uma cobrança já emitida —
  * `POST /payments/{id}`.
  *
@@ -357,5 +380,5 @@ export async function createCustomer(payload) {
 }
 
 export default {
-  createCharge, cancelCharge, receiveInCash, updateCharge, createCustomer, testConnection, apiKey, baseUrl, AsaasError
+  createCharge, cancelCharge, getCharge, receiveInCash, updateCharge, createCustomer, testConnection, apiKey, baseUrl, AsaasError
 };

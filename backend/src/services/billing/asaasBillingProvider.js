@@ -3,6 +3,7 @@ import SubscriptionService from '../subscriptionService.js';
 import {
   createCharge as criarCobranca,
   cancelCharge as cancelarCobranca,
+  getCharge as lerCobranca,
   receiveInCash as receberEmDinheiro,
   updateCharge as atualizarCobranca,
   apiKey
@@ -116,6 +117,11 @@ export class AsaasBillingProvider extends BillingProvider {
    */
   async receiveInCash(gatewayChargeId, recebimento) {
     return receberEmDinheiro(gatewayChargeId, recebimento);
+  }
+
+  /** Como o gateway vê a cobrança agora. Mesma costura. */
+  async getCharge(gatewayChargeId) {
+    return lerCobranca(gatewayChargeId);
   }
 
   /** Muda vencimento e/ou valor de uma cobrança já emitida. Mesma costura. */

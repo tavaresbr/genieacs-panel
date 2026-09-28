@@ -3,8 +3,9 @@ import Plan from '../models/Plan.js';
 import Subscription from '../models/Subscription.js';
 import BillingCharge, { OPEN_CHARGE_STATUSES, isoDateOf } from '../models/BillingCharge.js';
 import PlatformAudit from '../models/PlatformAudit.js';
+import BillingEvent from '../models/BillingEvent.js';
 import SubscriptionService from '../services/subscriptionService.js';
-import ChargeIssuingService from '../services/chargeIssuingService.js';
+import ChargeIssuingService, { ChargeFollowError } from '../services/chargeIssuingService.js';
 import { providerFor } from '../services/billing/registry.js';
 import { AsaasError } from '../services/billing/asaasClient.js';
 import { runInTenant } from '../config/tenantContext.js';
@@ -102,6 +103,14 @@ function responderRecusa(res, error) {
   });
 }
 
+/** A recusa de `ChargeIssuingService.followDeadline`, no mesmo formato das outras. */
+function responderFollow(res, error) {
+  return res.status(error.status).json({
+    ...createErrorResponse(error.message, null, error.code),
+    ...(error.detail ? { detail: error.detail } : {})
+  });
+}
+
 /**
  * A cobrança da URL, dentro do escopo do provedor, e EM ABERTO.
  *
@@ -121,14 +130,100 @@ async function cobrancaEmAberto(chargeId) {
   return cobranca;
 }
 
-/** Toma a linha para o console, ou recusa com `busy`. */
+/**
+ * Toma a linha para o console — só se ela AINDA está em aberto —, ou recusa.
+ *
+ * `openOnly` na própria garra: a leitura que disse "em aberto" e o `UPDATE`
+ * que toma a linha são dois comandos, e entre eles o webhook pode tê-la
+ * quitado. Quem não tomou relê para dizer o motivo certo: fechada é
+ * `not_open`, ocupada é `busy`.
+ */
 async function tomar(cobranca, now = new Date()) {
   const minha = await BillingCharge.claim(cobranca.id, {
-    until: new Date(now.getTime() + CLAIM_MS), now, unissued: false
+    until: new Date(now.getTime() + CLAIM_MS), now, unissued: false, openOnly: true
   });
-  if (!minha) {
-    throw new ConsoleChargeError(409, 'The charge is being changed by another process; try again shortly', 'busy');
+  if (minha) return;
+  const agora = await BillingCharge.findById(cobranca.id);
+  if (agora && !OPEN_CHARGE_STATUSES.includes(agora.status)) {
+    throw new ConsoleChargeError(409, `The charge is ${agora.status}, not open`, 'not_open', { status: agora.status });
   }
+  throw new ConsoleChargeError(409, 'The charge is being changed by another process; try again shortly', 'busy');
+}
+
+/**
+ * Os estados do gateway em que o dinheiro JÁ entrou por lá. Conferido contra
+ * a documentação da Asaas em setembro de 2026: `CONFIRMED` (cartão aprovado,
+ * boleto compensando), `RECEIVED` (caiu na conta) e `RECEIVED_IN_CASH` (a
+ * baixa manual feita lá dentro).
+ */
+const RECEBIDA_NO_GATEWAY = new Set(['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH']);
+
+/**
+ * A baixa de uma cobrança cuja referência JÁ tem pagamento no extrato — o
+ * webhook chegou antes, ou numa corrida com esta mesma requisição.
+ *
+ * Dois casos, e a diferença é o que o registro anterior fez com o período:
+ *
+ *   - **Creditou** (pagamento cheio, ou a menos já aceito): a baixa só fecha
+ *     a linha e responde `duplicate: true`. Nenhum segundo crédito.
+ *   - **Registrou a menos e NÃO estendeu** (`detail.underpaid`): fechar a
+ *     linha como paga aqui esconderia de "o que está em aberto" um período
+ *     que ninguém pagou inteiro. A baixa recusa (`already_recorded_underpaid`,
+ *     com quanto entrou e quanto se pedia) — e só com `allowUnderpayment`
+ *     aceita a diferença.
+ *
+ * ## Aceitar a diferença sem poder creditar duas vezes
+ *
+ * O aceite é um SEGUNDO evento, com a referência `<referência>:accepted` e
+ * valor zero — zero porque o dinheiro já está no extrato, no evento do
+ * webhook, e somá-lo de novo mentiria sobre quanto o provedor mandou. É ele
+ * que estende o período, por `recordPayment` com `allowUnderpayment`, e é a
+ * mesma idempotência de sempre que o faz valer uma vez só: a referência é
+ * única por provedor, e um segundo aceite cai como `duplicate` — tanto na
+ * leitura quanto no índice, numa corrida de dois cliques.
+ */
+async function fecharPeloRegistro(evento, { cobranca, externalId, allowUnderpayment, actorUserId, now }) {
+  let detalhe = null;
+  try { detalhe = evento?.detail ? JSON.parse(evento.detail) : null; } catch { detalhe = null; }
+  let aceitou = false;
+  if (detalhe?.underpaid) {
+    const referenciaDoAceite = `${externalId}:accepted`;
+    if (!(await BillingEvent.findByExternalId(referenciaDoAceite))) {
+      if (!allowUnderpayment) {
+        throw new ConsoleChargeError(
+          409,
+          'A short payment was already recorded for this charge; accept the difference to settle it',
+          'already_recorded_underpaid',
+          {
+            paidCents: Number(evento.amount_cents ?? 0),
+            expectedCents: detalhe.expectedCents ?? Number(cobranca.amount_cents),
+            currency: evento.currency || cobranca.currency
+          }
+        );
+      }
+      const aceite = await SubscriptionService.recordPayment({
+        amountCents: 0,
+        currency: evento.currency || cobranca.currency,
+        provider: 'manual',
+        externalId: referenciaDoAceite,
+        actorUserId,
+        allowUnderpayment: true,
+        now
+      });
+      aceitou = !aceite.duplicate;
+    }
+  }
+  await BillingCharge.update(cobranca.id, { status: 'paid', last_error: null, issuing_until: null });
+  return {
+    cobranca,
+    externalId,
+    duplicate: !aceitou,
+    acceptedUnderpayment: aceitou,
+    gateway: false,
+    alreadyReceivedAtGateway: false,
+    charge: await BillingCharge.findById(cobranca.id),
+    state: await SubscriptionService.current()
+  };
 }
 
 /**
@@ -319,13 +414,21 @@ class PlatformSubscriptionsController {
       const before = await Subscription.forTenant(tenant.id);
       if (!before) return res.status(404).json(createErrorResponse('Subscription not found'));
 
-      const after = await runInTenant(tenant.id, () => SubscriptionService.setDeadlines({
-        renewsAt: body.renewsAt,
-        trialEndsAt: body.trialEndsAt,
-        extendDays,
-        reason,
-        actorUserId: req.user?.userId ?? null
-      }));
+      let after;
+      try {
+        after = await runInTenant(tenant.id, () => SubscriptionService.setDeadlines({
+          renewsAt: body.renewsAt,
+          trialEndsAt: body.trialEndsAt,
+          extendDays,
+          reason,
+          actorUserId: req.user?.userId ?? null
+        }));
+      } catch (error) {
+        // A cobrança em aberto não pôde acompanhar o prazo (o gateway recusou,
+        // ou a linha é de outra passada) — e o prazo não se moveu.
+        if (error instanceof ChargeFollowError) return responderFollow(res, error);
+        throw error;
+      }
 
       await recordBoth(req, tenant, {
         platformAction: PlatformAudit.ACTIONS.SUBSCRIPTION_DEADLINE_CHANGED,
@@ -350,27 +453,40 @@ class PlatformSubscriptionsController {
    *
    * ## A ordem é o que importa
    *
-   *   1. **A conferência do valor, antes de tudo.** Contra o valor DA
-   *      COBRANÇA, que é o que se pediu. Se ela recusasse depois do gateway, a
-   *      Asaas já teria a cobrança como recebida — o provedor veria "pago" lá
-   *      e "em aberto" aqui, e desfazer um recebimento no gateway é outro
-   *      chamado. Pago a menos só passa com `allowUnderpayment`, explícito,
-   *      como no botão de pagamento avulso.
-   *   2. **A garra**, para ninguém reemitir ou cancelar esta linha no meio.
-   *   3. **O gateway** (`receiveInCash`), quando a cobrança está lá. Se ele
-   *      recusa, NADA é gravado: o crédito sem o recebimento do lado de lá
-   *      deixaria uma cobrança viva no gateway para um período já pago — e o
-   *      gateway continuaria cobrando o provedor por ela.
-   *   4. **O crédito**, por `SubscriptionService.recordPayment` — a mesma porta
+   *   0. **A assinatura parada por gente** (`suspended`, `canceled`) recusa
+   *      com `subscription_inactive`, a menos que venha `force: true`. O
+   *      pagamento seria registrado e o período NÃO andaria (é a regra de
+   *      `recordPayment`: pagamento não reativa quem alguém desligou) — e uma
+   *      baixa que fecha a cobrança sem mudar nada no acesso é a surpresa que
+   *      a pessoa precisa ver antes, e não depois.
+   *   1. **A garra**, antes de qualquer leitura que decida: ninguém reemite,
+   *      cancela ou quita esta linha no meio.
+   *   2. **O que já foi registrado por esta referência.** O webhook pode ter
+   *      creditado (e aí não há o que fazer além de fechar a linha) ou ter
+   *      registrado um pagamento A MENOS, que não estendeu nada — aí a baixa
+   *      responde `already_recorded_underpaid`, e só com `allowUnderpayment`
+   *      aceita a diferença (ver `fecharPeloRegistro`).
+   *   3. **A conferência do valor**, contra o valor DA COBRANÇA, antes do
+   *      gateway. Se ela recusasse depois, a Asaas já teria a cobrança como
+   *      recebida — o provedor veria "pago" lá e "em aberto" aqui.
+   *   4. **O gateway.** Primeiro a LEITURA (`getCharge`): se a Asaas já tem a
+   *      cobrança como recebida (o webhook se perdeu), o `receiveInCash` seria
+   *      recusado para sempre, e a baixa segue sem ele. Senão, o
+   *      `receiveInCash`. Qualquer recusa: 502, e NADA é gravado.
+   *   5. **O crédito**, por `SubscriptionService.recordPayment` — a mesma porta
    *      do webhook, com a mesma idempotência. A referência é o id da cobrança
    *      no gateway, e é isso que faz o `PAYMENT_RECEIVED` que a Asaas manda
-   *      depois do `receiveInCash` cair como `duplicate` em vez de creditar o
-   *      período outra vez. Sem id no gateway, `charge:<id da linha>`.
-   *   5. **A linha vira `paid`**, e a garra sai.
+   *      depois cair como `duplicate`. Sem id no gateway, `charge:<id>`.
+   *   6. **A linha vira `paid`**, e a garra sai.
    *
-   * Se o webhook ganhar a corrida — a Asaas avisa o recebimento enquanto esta
-   * requisição ainda não gravou —, é o crédito DELE que vale, e o daqui
-   * responde `duplicate: true`: um crédito só, venha de onde vier.
+   * ## O período conta do prazo, não de `paidAt`
+   *
+   * `paidAt` vai ao gateway (é a data do recebimento lá) e à trilha. O período
+   * que o pagamento compra é o de sempre em `recordPayment`: a partir do maior
+   * entre o prazo atual e agora. Contar de `paidAt` daria a quem pagou há dez
+   * dias e só agora teve a baixa dez dias a menos — ou, com uma data errada
+   * digitada, dias de graça a mais —, e a regra deixaria de ser a mesma do
+   * webhook, que é a que o provedor conhece.
    */
   static async settle(req, res) {
     try {
@@ -386,6 +502,7 @@ class PlatformSubscriptionsController {
         return res.status(400).json(createErrorResponse('amountCents must be a positive integer'));
       }
       const allowUnderpayment = body.allowUnderpayment === true;
+      const force = body.force === true;
       const note = body.note ? String(body.note).slice(0, 255) : null;
       const chargeId = parseId(req.params?.chargeId);
       if (!chargeId) return res.status(400).json(createErrorResponse('Invalid charge id'));
@@ -398,23 +515,49 @@ class PlatformSubscriptionsController {
       try {
         resultado = await runInTenant(tenant.id, async () => {
           const cobranca = await cobrancaEmAberto(chargeId);
-          const pedido = Number(cobranca.amount_cents);
-          if (amount < pedido && !allowUnderpayment) {
-            throw new ConsoleChargeError(409, 'The amount is short of what was charged', 'underpaid', {
-              paidCents: amount, expectedCents: pedido, currency: cobranca.currency
-            });
+          const assinatura = await Subscription.forTenant(tenant.id);
+          if (!force && (assinatura?.status === 'suspended' || assinatura?.status === 'canceled')) {
+            throw new ConsoleChargeError(
+              409,
+              `The subscription is ${assinatura.status}: a payment would not extend it (send force to settle anyway)`,
+              'subscription_inactive',
+              { subscriptionStatus: assinatura.status }
+            );
           }
 
           await tomar(cobranca, now);
           try {
-            const gateway = gatewayDa(cobranca, 'receiveInCash');
-            if (gateway) {
-              await noGateway(() => gateway.receiveInCash(cobranca.gateway_charge_id, {
-                paymentDate: paidAt, value: amount
-              }));
+            const externalId = cobranca.gateway_charge_id || `charge:${cobranca.id}`;
+            const contexto = { cobranca, externalId, allowUnderpayment, actorUserId, now };
+
+            // `return await`, e não só `return`, nos dois pontos: dentro de um
+            // `try/finally` a promessa devolvida sem espera fica pendurada
+            // enquanto o `finally` solta a garra — a garra sairia antes de a
+            // baixa terminar, e a recusa dela viraria rejeição sem dono.
+            const anterior = await BillingEvent.findByExternalId(externalId);
+            if (anterior) return await fecharPeloRegistro(anterior, contexto);
+
+            const pedido = Number(cobranca.amount_cents);
+            if (amount < pedido && !allowUnderpayment) {
+              throw new ConsoleChargeError(409, 'The amount is short of what was charged', 'underpaid', {
+                paidCents: amount, expectedCents: pedido, currency: cobranca.currency
+              });
             }
 
-            const externalId = cobranca.gateway_charge_id || `charge:${cobranca.id}`;
+            const gateway = gatewayDa(cobranca, 'receiveInCash');
+            let jaRecebida = false;
+            if (gateway) {
+              if (typeof gateway.getCharge === 'function') {
+                const situacao = await noGateway(() => gateway.getCharge(cobranca.gateway_charge_id));
+                jaRecebida = RECEBIDA_NO_GATEWAY.has(String(situacao?.status ?? '').toUpperCase());
+              }
+              if (!jaRecebida) {
+                await noGateway(() => gateway.receiveInCash(cobranca.gateway_charge_id, {
+                  paymentDate: paidAt, value: amount
+                }));
+              }
+            }
+
             const pagamento = await SubscriptionService.recordPayment({
               amountCents: amount,
               currency: cobranca.currency,
@@ -424,6 +567,11 @@ class PlatformSubscriptionsController {
               allowUnderpayment,
               now
             });
+            // A corrida com o webhook: ele gravou esta referência entre a
+            // leitura lá em cima e aqui. O registro dele é o que vale.
+            if (pagamento.duplicate) {
+              return await fecharPeloRegistro(await BillingEvent.findByExternalId(externalId), contexto);
+            }
             if (pagamento.underpaid) {
               // Só numa corrida: a conferência lá em cima olhou a MESMA linha.
               // Se chegou aqui, o valor dela mudou entre as duas leituras — e o
@@ -441,8 +589,10 @@ class PlatformSubscriptionsController {
             return {
               cobranca,
               externalId,
-              duplicate: Boolean(pagamento.duplicate),
+              duplicate: false,
+              acceptedUnderpayment: false,
               gateway: Boolean(gateway),
+              alreadyReceivedAtGateway: jaRecebida,
               charge: await BillingCharge.findById(cobranca.id),
               state: await SubscriptionService.current()
             };
@@ -468,13 +618,17 @@ class PlatformSubscriptionsController {
           reference: resultado.externalId,
           atGateway: resultado.gateway,
           duplicate: resultado.duplicate,
+          ...(resultado.alreadyReceivedAtGateway ? { alreadyReceivedAtGateway: true } : {}),
+          ...(resultado.acceptedUnderpayment ? { acceptedRecordedUnderpayment: true } : {}),
+          ...(force ? { forced: true } : {}),
           ...(amount < Number(resultado.cobranca.amount_cents) ? { underpaymentAccepted: true } : {})
         }
       });
       return res.json(createResponse('Charge settled', {
         charge: BillingCharge.presentForConsole(resultado.charge),
         subscription: SubscriptionService.present(resultado.state),
-        duplicate: resultado.duplicate
+        duplicate: resultado.duplicate,
+        acceptedUnderpayment: resultado.acceptedUnderpayment
       }));
     } catch (error) {
       console.error('Settle charge error:', error);
@@ -614,7 +768,12 @@ class PlatformSubscriptionsController {
               }));
             }
             const patch = { issuing_until: null };
-            if (mudaValor) patch.amount_cents = amount;
+            // Marcada (0078): daqui em diante o valor desta linha não é o preço
+            // de plano nenhum, e a emissão não o reprecifica.
+            if (mudaValor) {
+              patch.amount_cents = amount;
+              patch.amount_overridden_at = now;
+            }
             if (mudaData) {
               // O que o gateway aceitou, quando ele diz: é a data em que o
               // boleto de fato vence, se ele a tiver ajustado.
@@ -749,4 +908,5 @@ class PlatformSubscriptionsController {
   }
 }
 
+export { responderFollow };
 export default PlatformSubscriptionsController;
