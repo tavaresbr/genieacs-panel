@@ -5,15 +5,19 @@ import {
   chargeActions,
   computeChargeAmount,
   dayInputValue,
+  dayKeySaoPaulo,
   endOfDayIso,
   deadlineOf,
   filterRows,
   gatewayBadge,
   isChargeLate,
+  openTotalsByCurrency,
   parseDay,
   parseExtendDays,
   parsePercent,
-  summaryStatusCards
+  saoPauloDay,
+  summaryStatusCards,
+  todayIso
 } from '@/lib/subscription-console'
 
 function row(
@@ -86,8 +90,27 @@ describe('parsePercent', () => {
 })
 
 describe('chargeActions', () => {
-  it('cobrança pendente com link oferece tudo menos reemitir', () => {
-    expect(chargeActions({ status: 'pending', invoiceUrl: 'https://x' })).toEqual({
+  const sub = (over: Partial<NonNullable<SubscriptionConsoleRow['subscription']>> = {}) => ({
+    ...row(1, 'X', 'active').subscription!,
+    renewsAt: '2026-10-10T02:59:59.000Z',
+    ...over
+  })
+  const asaas = { gateway: 'asaas', linked: true }
+  const manual = { gateway: null, linked: false }
+  const ctx = { gateway: asaas, subscription: sub() }
+  // 2026-10-10T02:59:59Z é 23:59:59 do dia 09/10 em São Paulo.
+  const atual = '2026-10-09'
+
+  const c = (over: Partial<ChargeConsoleView>) => ({
+    status: 'pending' as const,
+    invoiceUrl: 'https://x',
+    gatewayChargeId: 'pay_1',
+    periodEnd: atual,
+    ...over
+  })
+
+  it('cobrança pendente no gateway oferece tudo menos reemitir', () => {
+    expect(chargeActions(c({}), ctx)).toEqual({
       openInvoice: true,
       copyLink: true,
       settle: true,
@@ -99,25 +122,85 @@ describe('chargeActions', () => {
   })
 
   it('sem link, não há fatura para abrir nem copiar', () => {
-    const acoes = chargeActions({ status: 'overdue', invoiceUrl: null })
+    const acoes = chargeActions(c({ status: 'overdue', invoiceUrl: null }), ctx)
     expect(acoes.openInvoice).toBe(false)
     expect(acoes.copyLink).toBe(false)
     expect(acoes.settle).toBe(true)
   })
 
-  it('a que falhou ainda se cobra e também se reemite', () => {
-    const acoes = chargeActions({ status: 'failed', invoiceUrl: null })
-    expect(acoes.settle).toBe(true)
-    expect(acoes.reissue).toBe(true)
+  it('valor e vencimento pedem o id no gateway, ou provedor manual', () => {
+    const semId = chargeActions(c({ gatewayChargeId: null }), ctx)
+    expect(semId.changeAmount).toBe(false)
+    expect(semId.changeDueDate).toBe(false)
+    expect(semId.settle).toBe(true)
+    const manualSemId = chargeActions(c({ gatewayChargeId: null }), { gateway: manual, subscription: sub() })
+    expect(manualSemId.changeAmount).toBe(true)
+    expect(manualSemId.changeDueDate).toBe(true)
   })
 
-  it('cancelada só se reemite; paga e estornada não oferecem nada', () => {
-    expect(chargeActions({ status: 'canceled', invoiceUrl: 'https://x' })).toEqual({
-      openInvoice: false, copyLink: false, settle: false, changeDueDate: false, changeAmount: false, cancel: false, reissue: true
-    })
-    for (const status of ['paid', 'refunded'] as const) {
-      expect(Object.values(chargeActions({ status, invoiceUrl: 'https://x' })).some(Boolean)).toBe(false)
+  it('reemite a cancelada ou falha do período atual com gateway ligado', () => {
+    expect(chargeActions(c({ status: 'failed', gatewayChargeId: null }), ctx).reissue).toBe(true)
+    expect(chargeActions(c({ status: 'canceled' }), ctx).reissue).toBe(true)
+    // Período atual lido como instante também casa pelo dia de São Paulo.
+    expect(chargeActions(c({ status: 'canceled', periodEnd: '2026-10-10T02:59:59.000Z' }), ctx).reissue).toBe(true)
+  })
+
+  it('não reemite período velho, sem gateway ligado, nem assinatura parada', () => {
+    expect(chargeActions(c({ status: 'canceled', periodEnd: '2026-09-09' }), ctx).reissue).toBe(false)
+    expect(chargeActions(c({ status: 'canceled' }), { gateway: manual, subscription: sub() }).reissue).toBe(false)
+    expect(chargeActions(c({ status: 'canceled' }), { gateway: { gateway: 'asaas', linked: false }, subscription: sub() }).reissue)
+      .toBe(false)
+    for (const status of ['suspended', 'canceled'] as const) {
+      expect(chargeActions(c({ status: 'canceled' }), { gateway: asaas, subscription: sub({ status, storedStatus: status }) }).reissue)
+        .toBe(false)
     }
+    expect(chargeActions(c({ status: 'canceled' }), { gateway: asaas, subscription: null }).reissue).toBe(false)
+  })
+
+  it('em teste, o período atual é o fim do teste', () => {
+    const trial = sub({ status: 'trial', storedStatus: 'trial', trialEndsAt: '2026-10-01', renewsAt: null })
+    expect(chargeActions(c({ status: 'failed', periodEnd: '2026-10-01' }), { gateway: asaas, subscription: trial }).reissue).toBe(true)
+  })
+
+  it('paga e estornada não oferecem nada', () => {
+    for (const status of ['paid', 'refunded'] as const) {
+      expect(Object.values(chargeActions(c({ status }), ctx)).some(Boolean)).toBe(false)
+    }
+  })
+})
+
+describe('calendário de São Paulo', () => {
+  it('hoje é o dia de São Paulo, não o do navegador', () => {
+    // 01:30 UTC do dia 29 ainda é 22:30 do dia 28 em São Paulo (UTC-3).
+    expect(todayIso(new Date('2026-09-29T01:30:00Z'))).toBe('2026-09-28')
+    expect(todayIso(new Date('2026-09-29T03:30:00Z'))).toBe('2026-09-29')
+    expect(saoPauloDay(new Date('2026-12-31T23:00:00Z'))).toBe('2026-12-31')
+  })
+
+  it('a chave de dia mantém AAAA-MM-DD e converte instantes', () => {
+    expect(dayKeySaoPaulo('2026-10-10')).toBe('2026-10-10')
+    expect(dayKeySaoPaulo('2026-10-10T02:00:00.000Z')).toBe('2026-10-09')
+    expect(dayKeySaoPaulo(null)).toBe('')
+    expect(dayKeySaoPaulo('lixo')).toBe('')
+  })
+
+  it('vencida conta pelo dia de São Paulo', () => {
+    const noite = new Date('2026-09-29T01:30:00Z') // 28/09 em São Paulo
+    expect(isChargeLate({ status: 'pending', dueDate: '2026-09-28' }, noite)).toBe(false)
+    expect(isChargeLate({ status: 'pending', dueDate: '2026-09-27' }, noite)).toBe(true)
+  })
+})
+
+describe('openTotalsByCurrency', () => {
+  const com = (currency: string, amountCents: number) =>
+    ({ openCharge: { currency, amountCents } as ChargeConsoleView })
+
+  it('soma por moeda, BRL primeiro, e ignora quem não tem cobrança', () => {
+    expect(openTotalsByCurrency([com('USD', 500), com('BRL', 1000), { openCharge: null }, com('brl', 250)])).toEqual([
+      { currency: 'BRL', cents: 1250 },
+      { currency: 'USD', cents: 500 }
+    ])
+    expect(openTotalsByCurrency([])).toEqual([])
   })
 })
 

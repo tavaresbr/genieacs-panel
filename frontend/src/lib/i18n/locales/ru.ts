@@ -3277,6 +3277,11 @@ const ru: Dictionary = {
   'platform.subs.chargeCanceled': 'Счёт отменён',
   'platform.subs.reissueText': 'Выставить заново счёт на {amount} за период, заканчивающийся {date}?',
   'platform.subs.reissued': 'Счёт выставлен заново',
+  'platform.subs.alreadyRecordedUnderpaid': 'По этому счёту уже записана неполная оплата: {paid} из {expected}.',
+  'platform.subs.acceptUnderpayment': 'Принять неполную оплату',
+  'platform.subs.subscriptionInactive': 'Подписка этого провайдера приостановлена или отменена. Подтвердите, что действительно хотите погасить этот счёт.',
+  'platform.subs.settleAnyway': 'Всё равно погасить',
+  'platform.subs.openTotalByCurrency': 'Несколько валют: суммы по каждой валюте по открытому счёту каждого провайдера.',
 }
 
 export default ru

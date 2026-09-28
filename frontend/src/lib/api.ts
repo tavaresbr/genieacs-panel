@@ -1808,11 +1808,13 @@ export const platformAPI = {
 
   /**
    * Dá baixa numa cobrança paga fora do gateway (ou que o webhook perdeu).
-   * 409 `underpaid` traz `paidCents`/`expectedCents`; reenviar com
-   * `allowUnderpayment` registra mesmo assim.
+   * 409 `underpaid` e `already_recorded_underpaid` trazem
+   * `paidCents`/`expectedCents`; reenviar com `allowUnderpayment` registra
+   * mesmo assim. 409 `subscription_inactive` (assinatura suspensa ou
+   * cancelada) se contorna com `force`.
    */
   settleCharge: (tenantId: number, chargeId: number, payload: {
-    paidAt: string; amountCents: number; allowUnderpayment?: boolean; note?: string
+    paidAt: string; amountCents: number; allowUnderpayment?: boolean; force?: boolean; note?: string
   }) =>
     apiClient.post<{ charge: ChargeConsoleView; subscription: SubscriptionView | null; duplicate: boolean }>(
       `/platform/tenants/${tenantId}/charges/${chargeId}/settle`, payload

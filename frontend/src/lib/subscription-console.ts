@@ -36,24 +36,52 @@ export interface ChargeActions {
 }
 
 /**
- * Quais ações uma cobrança oferece.
- *
- * Tudo o que mexe em dinheiro só vale para a cobrança em aberto — quitar uma
- * paga ou mudar o valor de uma cancelada é pedir ao servidor um 409. Reemitir é
- * o contrário: é justamente o caminho de volta da cancelada e da que falhou.
- * O link da fatura depende de ele existir; a emissão manual não tem página.
+ * O que, da linha, decide as ações de uma cobrança: quem cobra este provedor e
+ * em que pé está a assinatura dele.
  */
-export function chargeActions(charge: Pick<ChargeConsoleView, 'status' | 'invoiceUrl'>): ChargeActions {
+export interface ChargeContext {
+  gateway: SubscriptionConsoleRow['gateway']
+  subscription: SubscriptionConsoleRow['subscription']
+}
+
+/**
+ * Quais ações uma cobrança oferece — espelho das regras do backend, para a tela
+ * não oferecer botão que só vai render um 409.
+ *
+ * - Tudo o que mexe em dinheiro só vale para a cobrança em aberto.
+ * - Mudar valor ou vencimento exige a cobrança existir no gateway (tem
+ *   `gatewayChargeId`) ou o provedor ser cobrado à mão: com gateway e sem o id,
+ *   a emissão falhou e não há lá o que alterar — o caminho é reemitir.
+ * - Reemitir é o caminho de volta da cancelada e da que falhou, mas só da
+ *   cobrança do período ATUAL (a que vence no prazo corrente da assinatura),
+ *   com o provedor ligado a um gateway e a assinatura não suspensa nem
+ *   cancelada. Período velho não se cobra de novo por aqui.
+ * - O link da fatura depende de ele existir; a emissão manual não tem página.
+ */
+export function chargeActions(
+  charge: Pick<ChargeConsoleView, 'status' | 'invoiceUrl' | 'gatewayChargeId' | 'periodEnd'>,
+  context: ChargeContext
+): ChargeActions {
   const open = isChargeOpen(charge.status)
   const link = open && Boolean(charge.invoiceUrl)
+  const badge = gatewayBadge(context.gateway)
+  const manual = badge.kind === 'manual'
+  const editable = open && (Boolean(charge.gatewayChargeId) || manual)
+  const sub = context.subscription
+  const bloqueada = !sub
+    || sub.storedStatus === 'suspended' || sub.storedStatus === 'canceled'
+    || sub.status === 'suspended' || sub.status === 'canceled'
+  const prazo = deadlineOf(sub)
+  const periodoAtual = prazo !== null && dayKeySaoPaulo(prazo.date) === dayKeySaoPaulo(charge.periodEnd)
   return {
     openInvoice: link,
     copyLink: link,
     settle: open,
-    changeDueDate: open,
-    changeAmount: open,
+    changeDueDate: editable,
+    changeAmount: editable,
     cancel: open,
-    reissue: charge.status === 'canceled' || charge.status === 'failed'
+    reissue: (charge.status === 'canceled' || charge.status === 'failed')
+      && badge.kind === 'gateway' && !bloqueada && periodoAtual
   }
 }
 
@@ -208,8 +236,40 @@ export function toIsoDay(date: Date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
 }
 
+/**
+ * O fuso da operação. A plataforma cobra no calendário de São Paulo — é nele
+ * que o backend decide o que venceu e qual é o dia de hoje — e a tela precisa
+ * contar os dias igual, esteja o navegador de quem olha onde estiver.
+ */
+export const BILLING_TIME_ZONE = 'America/Sao_Paulo'
+
+const DIA_SP = new Intl.DateTimeFormat('en-CA', {
+  timeZone: BILLING_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit'
+})
+
+/** O dia (AAAA-MM-DD) que um instante é em São Paulo. */
+export function saoPauloDay(date: Date): string {
+  return DIA_SP.format(date)
+}
+
+/**
+ * A chave de dia de uma data do backend no calendário de São Paulo: o
+ * "AAAA-MM-DD" puro já é o dia e fica como está; um instante vira o dia que ele
+ * é lá. Vazio para nulo ou ilegível.
+ */
+export function dayKeySaoPaulo(value: string | null | undefined): string {
+  if (!value) return ''
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? '' : saoPauloDay(date)
+}
+
+/** Hoje, no calendário de São Paulo: o padrão e o teto das datas de cobrança. */
 export function todayIso(now: Date = new Date()) {
-  return toIsoDay(now)
+  return saoPauloDay(now)
 }
 
 /**
@@ -264,7 +324,7 @@ export function parseExtendDays(digitado: string): number | null {
 export function isChargeLate(charge: Pick<ChargeConsoleView, 'status' | 'dueDate'>, now: Date = new Date()) {
   if (charge.status === 'overdue') return true
   if (charge.status !== 'pending') return false
-  const due = charge.dueDate ? dayInputValue(charge.dueDate) : ''
+  const due = dayKeySaoPaulo(charge.dueDate)
   return due !== '' && due < todayIso(now)
 }
 
@@ -282,4 +342,23 @@ export const CHARGE_STATUS_LABEL_KEYS: Record<ChargeStatus, TranslationKey> = {
   failed: 'charges.status.failed',
   overdue: 'charges.status.overdue',
   refunded: 'charges.status.refunded'
+}
+
+/**
+ * O total em aberto por moeda, somado das cobranças em aberto das linhas.
+ *
+ * O resumo do backend traz um número só; somar centavos de moedas diferentes
+ * daria um valor que não existe. Quando as linhas mostram mais de uma moeda, a
+ * tela troca o total único por este, uma linha por moeda.
+ */
+export function openTotalsByCurrency(rows: readonly Pick<SubscriptionConsoleRow, 'openCharge'>[]) {
+  const totais = new Map<string, number>()
+  for (const row of rows) {
+    if (!row.openCharge) continue
+    const moeda = (row.openCharge.currency || 'BRL').toUpperCase()
+    totais.set(moeda, (totais.get(moeda) ?? 0) + (Number(row.openCharge.amountCents) || 0))
+  }
+  return [...totais.entries()]
+    .sort(([a], [b]) => (a === 'BRL' ? -1 : b === 'BRL' ? 1 : a.localeCompare(b)))
+    .map(([currency, cents]) => ({ currency, cents }))
 }

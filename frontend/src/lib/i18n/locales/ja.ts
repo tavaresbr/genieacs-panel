@@ -3269,6 +3269,11 @@ const ja: Dictionary = {
   'platform.subs.chargeCanceled': '請求を取り消しました',
   'platform.subs.reissueText': '{date} に終わる期間の {amount} の請求を再発行しますか？',
   'platform.subs.reissued': '請求を再発行しました',
+  'platform.subs.alreadyRecordedUnderpaid': 'この請求にはすでに不足額での支払いが記録されています：{expected} のうち {paid}。',
+  'platform.subs.acceptUnderpayment': '不足額の支払いを受け入れる',
+  'platform.subs.subscriptionInactive': 'このプロバイダーのサブスクリプションは停止中または解約済みです。本当にこの請求を消し込むか確認してください。',
+  'platform.subs.settleAnyway': 'それでも消し込む',
+  'platform.subs.openTotalByCurrency': '複数の通貨：各プロバイダーの未払い請求から通貨ごとに合計しています。',
 }
 
 export default ja

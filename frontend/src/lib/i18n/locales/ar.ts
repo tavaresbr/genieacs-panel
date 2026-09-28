@@ -3278,6 +3278,11 @@ const ar: Dictionary = {
   'platform.subs.chargeCanceled': 'تم إلغاء الفاتورة',
   'platform.subs.reissueText': 'إعادة إصدار الفاتورة بقيمة {amount} عن الفترة المنتهية في {date}؟',
   'platform.subs.reissued': 'تمت إعادة إصدار الفاتورة',
+  'platform.subs.alreadyRecordedUnderpaid': 'سُجّلت بالفعل دفعة ناقصة على هذه الفاتورة: {paid} من {expected}.',
+  'platform.subs.acceptUnderpayment': 'قبول الدفعة الناقصة',
+  'platform.subs.subscriptionInactive': 'اشتراك هذا المزوّد موقوف أو ملغى. أكّد أنك تريد فعلًا تسوية هذه الفاتورة.',
+  'platform.subs.settleAnyway': 'التسوية على أي حال',
+  'platform.subs.openTotalByCurrency': 'عملات متعددة: المجموع لكل عملة من الفاتورة المفتوحة لكل مزوّد.',
 }
 
 export default ar

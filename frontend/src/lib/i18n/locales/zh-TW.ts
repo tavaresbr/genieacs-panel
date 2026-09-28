@@ -3270,6 +3270,11 @@ const zhTW: Dictionary = {
   'platform.subs.chargeCanceled': '帳單已取消',
   'platform.subs.reissueText': '重新開立截至 {date} 期間、金額 {amount} 的帳單？',
   'platform.subs.reissued': '帳單已重新開立',
+  'platform.subs.alreadyRecordedUnderpaid': '此帳單已記錄一筆不足額付款：{paid}（應付 {expected}）。',
+  'platform.subs.acceptUnderpayment': '接受不足額付款',
+  'platform.subs.subscriptionInactive': '此服務商的訂閱已暫停或已取消。請確認確實要結清此帳單。',
+  'platform.subs.settleAnyway': '仍然結清',
+  'platform.subs.openTotalByCurrency': '多種貨幣：依貨幣分別加總各服務商的未付帳單。',
 }
 
 export default zhTW

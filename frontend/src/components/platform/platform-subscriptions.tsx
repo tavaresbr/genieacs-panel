@@ -26,16 +26,19 @@ import {
   chargeBadgeClass,
   computeChargeAmount,
   dayInputValue,
+  dayKeySaoPaulo,
   deadlineOf,
   endOfDayIso,
   filterRows,
   formatDay,
   gatewayBadge,
   isChargeLate,
+  openTotalsByCurrency,
   parseExtendDays,
   summaryStatusCards,
   todayIso,
-  type AmountMode
+  type AmountMode,
+  type ChargeContext
 } from '@/lib/subscription-console'
 
 /**
@@ -100,10 +103,13 @@ export function PlatformSubscriptions({ plans, estreito }: Props) {
     setStatuses((atual) => (atual.includes(status) ? atual.filter((s) => s !== status) : [...atual, status]))
   }
 
-  // Moeda do total: a do primeiro plano do catálogo, e BRL sem catálogo. A
-  // plataforma cobra numa moeda só; se um dia cobrar em duas, o total em
-  // aberto precisa virar um por moeda no servidor, não aqui.
-  const moedaTotal = plans[0]?.currency || 'BRL'
+  // O total em aberto. O resumo do backend é um número só; se as cobranças em
+  // aberto das linhas vêm em mais de uma moeda, somar tudo seria inventar um
+  // valor, e a tela mostra uma linha por moeda. Com uma moeda só (o caso de
+  // sempre), vale o número do servidor, na moeda dessas cobranças.
+  const totaisPorMoeda = useMemo(() => openTotalsByCurrency(rows), [rows])
+  const variasMoedas = totaisPorMoeda.length > 1
+  const moedaTotal = totaisPorMoeda[0]?.currency || plans[0]?.currency || 'BRL'
 
   const vazio = loading
     ? t('common.loading')
@@ -136,9 +142,20 @@ export function PlatformSubscriptions({ plans, estreito }: Props) {
           ))}
           <div className="modern-card p-3">
             <p className="metric-label">{t('platform.subs.openTotal')}</p>
-            <p className="mt-1 font-mono text-lg font-semibold tabular-nums text-foreground">
-              {formatMoney(summary?.openTotalCents ?? 0, moedaTotal)}
-            </p>
+            {variasMoedas ? (
+              <>
+                <ul className="mt-1 font-mono text-sm font-semibold tabular-nums text-foreground">
+                  {totaisPorMoeda.map((total) => (
+                    <li key={total.currency}>{formatMoney(total.cents, total.currency)}</li>
+                  ))}
+                </ul>
+                <p className="field-hint">{t('platform.subs.openTotalByCurrency')}</p>
+              </>
+            ) : (
+              <p className="mt-1 font-mono text-lg font-semibold tabular-nums text-foreground">
+                {formatMoney(summary?.openTotalCents ?? 0, moedaTotal)}
+              </p>
+            )}
           </div>
           <div className="modern-card p-3">
             <p className="metric-label">{t('platform.subs.overdueCount')}</p>
@@ -634,6 +651,7 @@ function SubscriptionDetail({ row, plans, onChanged }: { row: SubscriptionRow; p
               <ChargeItem
                 key={charge.id}
                 charge={charge}
+                context={{ gateway: row.gateway, subscription: row.subscription }}
                 onAction={(kind) => setDialog({ kind, charge })}
                 onCopy={(url) => void copiar(url)}
               />
@@ -690,15 +708,18 @@ type ChargeDialogKind = 'settle' | 'dueDate' | 'amount' | 'cancelCharge' | 'reis
 
 function ChargeItem({
   charge,
+  context,
   onAction,
   onCopy
 }: {
   charge: ChargeConsoleView
+  /** A linha decide parte das ações: gateway, prazo e estado da assinatura. */
+  context: ChargeContext
   onAction: (kind: ChargeDialogKind) => void
   onCopy: (url: string) => void
 }) {
   const { t } = useTranslation()
-  const acoes = chargeActions(charge)
+  const acoes = chargeActions(charge, context)
   const late = isChargeLate(charge)
   // A tentativa e o último erro vão no `title` e também visíveis: tooltip
   // sozinho não existe no celular, e é lá que se atende cobrança de manhã.
@@ -969,24 +990,51 @@ function SettleDialog({ tenantId, charge, onClose, onDone }: ActionDialogProps &
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   /**
-   * O 409 de valor curto fica NA TELA, não num toast: o que vem depois dele é
-   * uma decisão sobre dinheiro, e um toast some antes de alguém decidir.
+   * As recusas que pedem uma decisão ficam NA TELA, não num toast: o que vem
+   * depois delas é uma decisão sobre dinheiro, e um toast some antes de alguém
+   * decidir.
+   *
+   * - `underpaid`: o valor digitado é menor que o cobrado.
+   * - `already_recorded_underpaid`: um pagamento a menor já foi registrado
+   *   nesta cobrança (pelo webhook ou por outra baixa); aceitar fecha com ele.
+   * - `subscription_inactive`: a assinatura está suspensa ou cancelada.
+   *
+   * Cada "sim" vira uma bandeira que fica ligada nos reenvios seguintes: quem
+   * aceitou o valor menor e depois esbarra na assinatura inativa não precisa
+   * aceitar o valor de novo.
    */
-  const [underpaid, setUnderpaid] = useState<{ paid: number; expected: number } | null>(null)
+  const [aviso, setAviso] = useState<
+    | { kind: 'underpaid' | 'alreadyUnderpaid'; paid: number; expected: number }
+    | { kind: 'inactive' }
+    | null
+  >(null)
+  const [aceites, setAceites] = useState<{ allowUnderpayment?: boolean; force?: boolean }>({})
   const cents = parseAmountToCents(amount)
 
-  const enviar = async (force = false) => {
+  const enviar = async (extra: { allowUnderpayment?: boolean; force?: boolean } = {}) => {
     if (cents === null || cents <= 0 || !paidAt) return
+    const flags = { ...aceites, ...extra }
+    setAceites(flags)
     setBusy(true)
     try {
       const res = await platformAPI.settleCharge(tenantId, charge.id, {
         paidAt,
         amountCents: cents,
         note: note.trim() || undefined,
-        ...(force ? { allowUnderpayment: true } : {})
+        ...(flags.allowUnderpayment ? { allowUnderpayment: true } : {}),
+        ...(flags.force ? { force: true } : {})
       })
-      if (!res.success && res.code === 'underpaid' && typeof res.expectedCents === 'number') {
-        setUnderpaid({ paid: res.paidCents ?? cents, expected: res.expectedCents })
+      if (!res.success && (res.code === 'underpaid' || res.code === 'already_recorded_underpaid')
+        && typeof res.expectedCents === 'number') {
+        setAviso({
+          kind: res.code === 'underpaid' ? 'underpaid' : 'alreadyUnderpaid',
+          paid: res.paidCents ?? cents,
+          expected: res.expectedCents
+        })
+        return
+      }
+      if (!res.success && res.code === 'subscription_inactive') {
+        setAviso({ kind: 'inactive' })
         return
       }
       if (res.success) {
@@ -1016,7 +1064,7 @@ function SettleDialog({ tenantId, charge, onClose, onDone }: ActionDialogProps &
             type="button"
             className="modern-button"
             onClick={() => void enviar()}
-            disabled={busy || cents === null || cents <= 0 || !paidAt}
+            disabled={busy || cents === null || cents <= 0 || !paidAt || aviso !== null}
           >
             {busy ? t('common.saving') : t('platform.subs.settleConfirm')}
           </button>
@@ -1036,7 +1084,7 @@ function SettleDialog({ tenantId, charge, onClose, onDone }: ActionDialogProps &
           <input
             id={id}
             value={amount}
-            onChange={(e) => { setAmount(e.target.value); setUnderpaid(null) }}
+            onChange={(e) => { setAmount(e.target.value); setAviso(null); setAceites({}) }}
             className="modern-input w-full"
             inputMode="decimal"
           />
@@ -1047,18 +1095,46 @@ function SettleDialog({ tenantId, charge, onClose, onDone }: ActionDialogProps &
           <input id={id} value={note} onChange={(e) => setNote(e.target.value)} className="modern-input w-full" maxLength={255} />
         )}
       </Field>
-      {underpaid !== null && (
+      {aviso !== null && aviso.kind !== 'inactive' && (
         <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3" role="alert">
           <p className="text-foreground">
-            {t('platform.subscription.underpaid', {
-              paid: formatMoney(underpaid.paid, charge.currency),
-              expected: formatMoney(underpaid.expected, charge.currency)
-            })}
+            {aviso.kind === 'underpaid'
+              ? t('platform.subscription.underpaid', {
+                paid: formatMoney(aviso.paid, charge.currency),
+                expected: formatMoney(aviso.expected, charge.currency)
+              })
+              : t('platform.subs.alreadyRecordedUnderpaid', {
+                paid: formatMoney(aviso.paid, charge.currency),
+                expected: formatMoney(aviso.expected, charge.currency)
+              })}
           </p>
           <p className="field-hint">{t('platform.subs.underpaidHint')}</p>
-          <button type="button" className="modern-button-secondary mt-2" disabled={busy} onClick={() => void enviar(true)}>
-            {t('platform.subs.confirmAnyway')}
-          </button>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="modern-button-secondary"
+              disabled={busy}
+              onClick={() => void enviar({ allowUnderpayment: true })}
+            >
+              {t(aviso.kind === 'underpaid' ? 'platform.subs.confirmAnyway' : 'platform.subs.acceptUnderpayment')}
+            </button>
+            <button type="button" className="modern-button-secondary" disabled={busy} onClick={() => setAviso(null)}>
+              {t('common.back')}
+            </button>
+          </div>
+        </div>
+      )}
+      {aviso?.kind === 'inactive' && (
+        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3" role="alert">
+          <p className="text-foreground">{t('platform.subs.subscriptionInactive')}</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button type="button" className="modern-button-secondary" disabled={busy} onClick={() => void enviar({ force: true })}>
+              {t('platform.subs.settleAnyway')}
+            </button>
+            <button type="button" className="modern-button-secondary" disabled={busy} onClick={() => setAviso(null)}>
+              {t('common.back')}
+            </button>
+          </div>
         </div>
       )}
     </Dialog>
@@ -1070,7 +1146,7 @@ function DueDateDialog({ tenantId, charge, onClose, onDone }: ActionDialogProps 
   const toast = useToast()
   const recusa = useRefusal()
   const hoje = todayIso()
-  const atual = dayInputValue(charge.dueDate)
+  const atual = dayKeySaoPaulo(charge.dueDate)
   const [dueDate, setDueDate] = useState(atual && atual >= hoje ? atual : hoje)
   const [busy, setBusy] = useState(false)
   const valido = Boolean(dueDate) && dueDate >= hoje && dueDate !== atual

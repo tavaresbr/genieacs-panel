@@ -3269,6 +3269,11 @@ const es: Dictionary = {
   'platform.subs.chargeCanceled': 'Cobro cancelado',
   'platform.subs.reissueText': '¿Emitir de nuevo el cobro de {amount} del período que termina el {date}?',
   'platform.subs.reissued': 'Cobro reemitido',
+  'platform.subs.alreadyRecordedUnderpaid': 'Ya hay un pago inferior registrado en este cobro: {paid} de {expected}.',
+  'platform.subs.acceptUnderpayment': 'Aceptar el pago inferior',
+  'platform.subs.subscriptionInactive': 'La suscripción de este proveedor está suspendida o cancelada. Confirme que realmente quiere liquidar este cobro.',
+  'platform.subs.settleAnyway': 'Liquidar de todos modos',
+  'platform.subs.openTotalByCurrency': 'Varias monedas: sumado por moneda a partir del cobro pendiente de cada proveedor.',
 }
 
 export default es

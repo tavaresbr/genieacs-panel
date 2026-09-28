@@ -3273,6 +3273,11 @@ const de: Dictionary = {
   'platform.subs.chargeCanceled': 'Rechnung storniert',
   'platform.subs.reissueText': 'Die Rechnung über {amount} für den Zeitraum bis {date} neu ausstellen?',
   'platform.subs.reissued': 'Rechnung neu ausgestellt',
+  'platform.subs.alreadyRecordedUnderpaid': 'Für diese Rechnung ist bereits eine Unterzahlung erfasst: {paid} von {expected}.',
+  'platform.subs.acceptUnderpayment': 'Unterzahlung akzeptieren',
+  'platform.subs.subscriptionInactive': 'Das Abonnement dieses Anbieters ist gesperrt oder gekündigt. Bestätigen Sie, dass Sie diese Rechnung wirklich begleichen möchten.',
+  'platform.subs.settleAnyway': 'Trotzdem begleichen',
+  'platform.subs.openTotalByCurrency': 'Mehrere Währungen: pro Währung summiert, aus der offenen Rechnung jedes Anbieters.',
 }
 
 export default de

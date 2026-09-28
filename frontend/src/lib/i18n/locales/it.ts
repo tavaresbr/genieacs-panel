@@ -3275,6 +3275,11 @@ const it: Dictionary = {
   'platform.subs.chargeCanceled': 'Addebito annullato',
   'platform.subs.reissueText': 'Emettere di nuovo l\'addebito di {amount} per il periodo che termina il {date}?',
   'platform.subs.reissued': 'Addebito riemesso',
+  'platform.subs.alreadyRecordedUnderpaid': 'Su questo addebito è già registrato un pagamento inferiore: {paid} su {expected}.',
+  'platform.subs.acceptUnderpayment': 'Accetta il pagamento inferiore',
+  'platform.subs.subscriptionInactive': 'L\'abbonamento di questo provider è sospeso o annullato. Conferma di voler davvero saldare questo addebito.',
+  'platform.subs.settleAnyway': 'Salda comunque',
+  'platform.subs.openTotalByCurrency': 'Più valute: sommato per valuta, dall\'addebito aperto di ciascun provider.',
 }
 
 export default it

@@ -3276,6 +3276,11 @@ const ko: Dictionary = {
   'platform.subs.chargeCanceled': '청구가 취소되었습니다',
   'platform.subs.reissueText': '{date}에 끝나는 기간의 {amount} 청구를 다시 발행할까요?',
   'platform.subs.reissued': '청구가 재발행되었습니다',
+  'platform.subs.alreadyRecordedUnderpaid': '이 청구에는 이미 부족한 결제가 기록되어 있습니다: {expected} 중 {paid}.',
+  'platform.subs.acceptUnderpayment': '부족한 결제 수락',
+  'platform.subs.subscriptionInactive': '이 제공업체의 구독이 정지되었거나 해지되었습니다. 이 청구를 정말 정산할지 확인하세요.',
+  'platform.subs.settleAnyway': '그래도 정산',
+  'platform.subs.openTotalByCurrency': '여러 통화: 각 제공업체의 미결제 청구를 통화별로 합산했습니다.',
 }
 
 export default ko

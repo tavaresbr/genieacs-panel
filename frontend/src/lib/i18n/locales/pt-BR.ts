@@ -3269,6 +3269,11 @@ const ptBR: Dictionary = {
   'platform.subs.chargeCanceled': 'Cobrança cancelada',
   'platform.subs.reissueText': 'Emitir de novo a cobrança de {amount} do período que termina em {date}?',
   'platform.subs.reissued': 'Cobrança reemitida',
+  'platform.subs.alreadyRecordedUnderpaid': 'Já há um pagamento a menor registrado nesta cobrança: {paid} de {expected}.',
+  'platform.subs.acceptUnderpayment': 'Aceitar pagamento a menor',
+  'platform.subs.subscriptionInactive': 'A assinatura deste provedor está suspensa ou cancelada. Confirme que quer mesmo dar baixa nesta cobrança.',
+  'platform.subs.settleAnyway': 'Quitar mesmo assim',
+  'platform.subs.openTotalByCurrency': 'Moedas diferentes: somado por moeda, a partir da cobrança em aberto de cada provedor.',
 }
 
 export default ptBR

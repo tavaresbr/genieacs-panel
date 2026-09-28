@@ -3269,6 +3269,11 @@ const fr: Dictionary = {
   'platform.subs.chargeCanceled': 'Facture annulée',
   'platform.subs.reissueText': 'Émettre à nouveau la facture de {amount} pour la période se terminant le {date} ?',
   'platform.subs.reissued': 'Facture réémise',
+  'platform.subs.alreadyRecordedUnderpaid': 'Un paiement inférieur est déjà enregistré sur cette facture : {paid} sur {expected}.',
+  'platform.subs.acceptUnderpayment': 'Accepter le paiement inférieur',
+  'platform.subs.subscriptionInactive': 'L\'abonnement de ce fournisseur est suspendu ou résilié. Confirmez que vous voulez vraiment solder cette facture.',
+  'platform.subs.settleAnyway': 'Solder quand même',
+  'platform.subs.openTotalByCurrency': 'Plusieurs devises : total par devise, à partir de la facture ouverte de chaque fournisseur.',
 }
 
 export default fr

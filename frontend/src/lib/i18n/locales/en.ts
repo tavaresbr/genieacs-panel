@@ -3271,6 +3271,11 @@ const en = {
   'platform.subs.chargeCanceled': 'Charge canceled',
   'platform.subs.reissueText': 'Issue again the charge of {amount} for the period ending on {date}?',
   'platform.subs.reissued': 'Charge reissued',
+  'platform.subs.alreadyRecordedUnderpaid': 'An underpayment is already recorded on this charge: {paid} of {expected}.',
+  'platform.subs.acceptUnderpayment': 'Accept the underpayment',
+  'platform.subs.subscriptionInactive': 'This provider\'s subscription is suspended or canceled. Confirm that you really want to settle this charge.',
+  'platform.subs.settleAnyway': 'Settle anyway',
+  'platform.subs.openTotalByCurrency': 'Several currencies: summed per currency from each provider\'s open charge.',
 }
 
 export default en

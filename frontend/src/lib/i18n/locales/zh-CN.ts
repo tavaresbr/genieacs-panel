@@ -3269,6 +3269,11 @@ const zhCN: Dictionary = {
   'platform.subs.chargeCanceled': '账单已取消',
   'platform.subs.reissueText': '重新开具截至 {date} 期间、金额 {amount} 的账单？',
   'platform.subs.reissued': '账单已重新开具',
+  'platform.subs.alreadyRecordedUnderpaid': '此账单已记录了一笔不足额付款：{paid}（应付 {expected}）。',
+  'platform.subs.acceptUnderpayment': '接受不足额付款',
+  'platform.subs.subscriptionInactive': '该服务商的订阅已暂停或已取消。请确认确实要结清此账单。',
+  'platform.subs.settleAnyway': '仍然结清',
+  'platform.subs.openTotalByCurrency': '多种货币：按货币分别汇总各服务商的未付账单。',
 }
 
 export default zhCN

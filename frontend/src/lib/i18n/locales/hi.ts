@@ -3277,6 +3277,11 @@ const hi: Dictionary = {
   'platform.subs.chargeCanceled': 'शुल्क रद्द किया गया',
   'platform.subs.reissueText': '{date} को समाप्त अवधि का {amount} का शुल्क फिर से जारी करें?',
   'platform.subs.reissued': 'शुल्क फिर से जारी किया गया',
+  'platform.subs.alreadyRecordedUnderpaid': 'इस शुल्क पर पहले से कम भुगतान दर्ज है: {expected} में से {paid}।',
+  'platform.subs.acceptUnderpayment': 'कम भुगतान स्वीकार करें',
+  'platform.subs.subscriptionInactive': 'इस प्रदाता की सदस्यता निलंबित या रद्द है। पुष्टि करें कि आप सच में यह शुल्क चुकता करना चाहते हैं।',
+  'platform.subs.settleAnyway': 'फिर भी चुकता करें',
+  'platform.subs.openTotalByCurrency': 'कई मुद्राएँ: हर प्रदाता के खुले शुल्क से मुद्रा-वार जोड़ा गया।',
 }
 
 export default hi
