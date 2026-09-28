@@ -234,9 +234,14 @@ const PLATFORM_HOST_PREFIXES = IS_SAAS ? ['/api/platform/', '/api/public/'] : []
  * portal, ou `x.<base>` — é descartado no boot, com aviso: aceitá-lo tornaria
  * o mesmo host plataforma e provedor ao mesmo tempo, e a ordem dos `if` é que
  * decidiria qual.
+ *
+ * Vale também SEM domínio-base (SaaS de endereço único, todos os provedores
+ * entrando por `painel.tr69.com.br`): aí o nome extra é a ÚNICA porta de
+ * plataforma que existe — a vitrine e o cadastro —, e o endereço
+ * compartilhado continua servindo os painéis como sempre.
  */
 function parseExtraHosts(raw) {
-  if (!IS_SAAS || !PANEL_BASE_DOMAIN) return [];
+  if (!IS_SAAS) return [];
   const hosts = [];
   for (const item of String(raw ?? '').split(',')) {
     const host = normalizeDomain(item);
@@ -258,9 +263,9 @@ export function platformExtraHosts() {
 }
 
 export function isPlatformHost(host) {
-  if (!PANEL_BASE_DOMAIN || !host) return false;
-  return [PANEL_BASE_DOMAIN, ...PLATFORM_EXTRA_HOSTS]
-    .some((apex) => host === apex || host === `www.${apex}`);
+  if (!host) return false;
+  const apexes = PANEL_BASE_DOMAIN ? [PANEL_BASE_DOMAIN, ...PLATFORM_EXTRA_HOSTS] : PLATFORM_EXTRA_HOSTS;
+  return apexes.some((apex) => host === apex || host === `www.${apex}`);
 }
 
 function servedOnPlatformHost(req) {
@@ -336,9 +341,13 @@ export function resolveTenant(req, res, next) {
   // A deployment with subdomains has no default to fall back to: the host is
   // how a provider is named there, so a host that names none is a request that
   // did not say who it is for.
+  //
+  // O endereço da plataforma também não cai no padrão, com ou sem subdomínio:
+  // num deploy de endereço único com `PLATFORM_EXTRA_HOSTS`, o fallback daria
+  // à vitrine o painel inteiro do primeiro provedor.
   const resolved = slug
     ? resolveTenantIdBySlug(slug).then((id) => ({ id, named: true }))
-    : usesTenantSubdomains()
+    : usesTenantSubdomains() || isPlatformHost(host)
       ? Promise.resolve({ id: null, named: true })
       : resolveDefaultTenantId().then((id) => ({ id, named: false }));
 

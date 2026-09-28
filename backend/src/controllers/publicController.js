@@ -9,6 +9,7 @@ import { slugProblem } from '../utils/slug.js';
 import { createResponse, createErrorResponse, isValidEmail } from '../utils/helpers.js';
 import { panelBaseDomain } from '../middleware/tenantResolver.js';
 import { PRODUCT_NAME } from '../config/brand.js';
+import { panelUrlFor } from '../services/mail/index.js';
 import { translate } from '../i18n/index.js';
 import { DEFAULT_LOCALE } from '../i18n/config.js';
 
@@ -52,6 +53,10 @@ class PublicController {
     return res.json(createResponse('ok', {
       productName: PRODUCT_NAME,
       baseDomain: panelBaseDomain() || null,
+      // Onde um provedor entra, quando é um endereço só para todos (sem
+      // subdomínio): o "Entrar" da vitrine leva para lá, e não para o login do
+      // console. Com subdomínio, cada um entra no seu, e isto é nulo.
+      panelUrl: panelBaseDomain() ? null : panelUrlFor(null),
       // O número do botão flutuante de WhatsApp. Só dígitos.
       contactWhatsapp: String(process.env.PLATFORM_CONTACT_WHATSAPP || '').replace(/\D/g, '') || null
     }));

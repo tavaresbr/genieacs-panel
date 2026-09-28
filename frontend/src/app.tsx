@@ -173,10 +173,12 @@ function ProtectedShell() {
 /** Signup only exists where a provider can be given an address. */
 function SignupRoute() {
   const { isAuthenticated, loading } = useAuth()
-  const { tenant, loading: tenantLoading } = useTenant()
+  const { tenant, isPlatformHost, loading: tenantLoading } = useTenant()
   if (loading || tenantLoading) return <AuthFallback />
   if (isAuthenticated) return <Navigate to="/dashboard" replace />
-  if (tenant?.edition !== 'saas' || !tenant.panelBaseDomain) return <Navigate to="/login" replace />
+  // Com subdomínio por provedor, ou no endereço da plataforma de um deploy de
+  // endereço único (`PLATFORM_EXTRA_HOSTS`), onde o backend também aceita.
+  if (tenant?.edition !== 'saas' || (!tenant.panelBaseDomain && !isPlatformHost)) return <Navigate to="/login" replace />
   return <SignupPage />
 }
 

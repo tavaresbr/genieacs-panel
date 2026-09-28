@@ -974,6 +974,14 @@ que não conhece. Três caminhos:
    - `PLATFORM_EXTRA_HOSTS=tr69.com.br` no `.env` e reiniciar o painel. Vários nomes
      vão separados por vírgula; o `www.` de cada um já está incluído.
 
+   **Deploy de endereço único** (sem `TENANT_BASE_DOMAIN`, todos os provedores entrando
+   por `painel.tr69.com.br`): o `PLATFORM_EXTRA_HOSTS` também funciona, e é o único jeito
+   de ter a vitrine e o cadastro nesse modo. Configure também
+   `PUBLIC_BASE_URL=https://painel.tr69.com.br`: é para lá que o "Entrar" da página, o
+   fim do cadastro e o WhatsApp de boas-vindas mandam o provedor novo. O endereço
+   compartilhado continua exatamente como era (sem cadastro), e o nome extra não serve o
+   painel de provedor nenhum.
+
    O nome extra vale **exatamente como o ápice**: a página pública, o `/signup` e também
    o login e o console da plataforma respondem nele. Um nome que o painel leria como
    provedor (o próprio domínio-base, o do portal, ou `x.painel.tr69.com.br`) é ignorado

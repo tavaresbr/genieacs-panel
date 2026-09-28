@@ -1389,6 +1389,8 @@ export interface PublicInfo {
   productName: string
   baseDomain: string | null
   contactWhatsapp: string | null
+  /** Onde os provedores entram num deploy de endereço único; null com subdomínios. */
+  panelUrl: string | null
 }
 
 export interface CnpjData {
