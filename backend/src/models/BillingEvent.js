@@ -13,7 +13,13 @@ export const BILLING_EVENT_TYPES = Object.freeze({
   TRIAL_STARTED: 'trial.started',
   PAYMENT_RECORDED: 'payment.recorded',
   PLAN_CHANGED: 'plan.changed',
-  STATUS_CHANGED: 'status.changed'
+  STATUS_CHANGED: 'status.changed',
+  // O console mexeu num PRAZO — a renovação ou o fim do teste — sem que
+  // dinheiro entrasse nem o estado mudasse: a cortesia de alguns dias, a data
+  // corrigida à mão. Tipo próprio, e não `status.changed` com o prazo no
+  // detalhe, porque a pergunta que se faz ao extrato é "por que este provedor
+  // renovou sem pagar?", e ela precisa de uma linha que diga exatamente isso.
+  DEADLINE_CHANGED: 'deadline.changed'
 });
 
 class BillingEvent {

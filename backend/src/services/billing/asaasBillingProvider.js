@@ -1,6 +1,13 @@
 import { BillingProvider } from './billingProvider.js';
 import SubscriptionService from '../subscriptionService.js';
-import { createCharge as criarCobranca, cancelCharge as cancelarCobranca, apiKey } from './asaasClient.js';
+import {
+  createCharge as criarCobranca,
+  cancelCharge as cancelarCobranca,
+  getCharge as lerCobranca,
+  receiveInCash as receberEmDinheiro,
+  updateCharge as atualizarCobranca,
+  apiKey
+} from './asaasClient.js';
 
 /**
  * O Asaas, que era o nome escrito no comentário da interface desde que ela
@@ -100,6 +107,26 @@ export class AsaasBillingProvider extends BillingProvider {
    */
   async cancelCharge(gatewayChargeId) {
     return cancelarCobranca(gatewayChargeId);
+  }
+
+  /**
+   * Dá como recebida no gateway a cobrança que o console marcou paga à mão.
+   * Mesma costura das duas acima: quem chama pergunta ao provider da LINHA,
+   * e um provider que não sabe fazer isto (o `manual`) simplesmente não tem o
+   * método — o console marca só do lado de cá.
+   */
+  async receiveInCash(gatewayChargeId, recebimento) {
+    return receberEmDinheiro(gatewayChargeId, recebimento);
+  }
+
+  /** Como o gateway vê a cobrança agora. Mesma costura. */
+  async getCharge(gatewayChargeId) {
+    return lerCobranca(gatewayChargeId);
+  }
+
+  /** Muda vencimento e/ou valor de uma cobrança já emitida. Mesma costura. */
+  async updateCharge(gatewayChargeId, mudanca) {
+    return atualizarCobranca(gatewayChargeId, mudanca);
   }
 
   /**

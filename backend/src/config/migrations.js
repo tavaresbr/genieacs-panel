@@ -1384,6 +1384,15 @@ const BILLING_CHARGE_CLAIM_COLUMNS = [
 ];
 
 /**
+ * A coluna da 0078 — ver a migração. Um instante e não um booleano, pela razão
+ * de sempre neste arquivo: "quando" responde "quem mexeu nisto, e antes ou
+ * depois daquele pagamento?", e um booleano não responde nada.
+ */
+const BILLING_CHARGE_OVERRIDE_COLUMNS = [
+  ['amount_overridden_at', (t) => t.timestamp('amount_overridden_at').nullable()]
+];
+
+/**
  * As colunas da 0074 — ver a migração.
  *
  * `pending_plan_id` com o MESMO tipo de `subscriptions.plan_id` (inteiro sem
@@ -4474,6 +4483,39 @@ export const migrations = [
         // eslint-disable-next-line no-await-in-loop -- uma tabela só, hoje
         await createTableIfMissing(db, nome, construtor(db));
       }
+    }
+  },
+  {
+    /**
+     * O valor de uma cobrança que o CONSOLE mudou à mão (o desconto, o acordo).
+     *
+     * Duas leituras dependem de saber que o valor da linha não é o preço de
+     * plano nenhum:
+     *
+     * - a emissão, que reprecifica a cobrança da renovação quando a descida
+     *   agendada fica bloqueada pelo uso (`repriceBlockedDowngrade`) e acerta
+     *   o valor de uma linha ainda não emitida com o preço de agora. As duas
+     *   desfariam em silêncio o desconto que alguém deu;
+     * - `recordPayment`, que decide se a descida agendada fica TRAVADA pelo
+     *   preço que se pagou: "pagou menos que o plano atual" quer dizer "pagou
+     *   o barato" — a menos que o menos seja um desconto, e aí travaria a
+     *   descida de quem pagou o plano caro com abatimento.
+     *
+     * Nula nas linhas que já existem, que é o estado certo: nenhuma foi
+     * mexida pelo console antes desta coluna existir.
+     */
+    id: '0078_billing_charge_amount_override',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('billing_charges'))) return true;
+      return (await missingColumns(db, 'billing_charges', BILLING_CHARGE_OVERRIDE_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('billing_charges'))) return;
+      const missing = await missingColumns(db, 'billing_charges', BILLING_CHARGE_OVERRIDE_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('billing_charges', (t) => {
+        for (const add of missing) add(t);
+      });
     }
   }
 ];

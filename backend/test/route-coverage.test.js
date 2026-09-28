@@ -146,6 +146,16 @@ const POR_ID = new Map([
   ['PUT /api/platform/tenants/:id/subscription', 'plano de controle; prova em platform-billing.test.js'],
   ['POST /api/platform/tenants/:id/payments', 'plano de controle; prova em platform-billing.test.js'],
   ['GET /api/platform/tenants/:id/usage', 'plano de controle; prova em platform-billing.test.js'],
+  // A tela de Assinaturas. O id do provedor é visto de cima, como nas de
+  // cima; o `:chargeId` é linha de tabela ESCOPADA, e a prova de que o do
+  // vizinho não alcança a dele (404, lida por `tdb` dentro do escopo do
+  // provedor da URL) está no mesmo arquivo.
+  ['GET /api/platform/tenants/:id/charges', 'plano de controle; prova em platform-subscriptions.test.js'],
+  ['PATCH /api/platform/tenants/:id/subscription/deadlines', 'plano de controle; prova em platform-subscriptions.test.js'],
+  ['PATCH /api/platform/tenants/:id/charges/:chargeId', 'plano de controle; prova em platform-subscriptions.test.js — inclusive a de que a cobrança do vizinho responde 404'],
+  ['POST /api/platform/tenants/:id/charges/:chargeId/settle', 'plano de controle; prova em platform-subscriptions.test.js — inclusive a de que a cobrança do vizinho responde 404'],
+  ['POST /api/platform/tenants/:id/charges/:chargeId/cancel', 'plano de controle; prova em platform-subscriptions.test.js — inclusive a de que a cobrança do vizinho responde 404'],
+  ['POST /api/platform/tenants/:id/charges/:chargeId/reissue', 'plano de controle; prova em platform-subscriptions.test.js — inclusive a de que a cobrança do vizinho responde 404'],
   ['POST /api/platform/tenants/:id/impersonate', 'plano de controle; prova em impersonation.test.js — inclusive a de que a própria personificação não alcança esta rota'],
   // A exportação vista de cima. O id é de um PROVEDOR, e olhá-lo pelo id é o
   // trabalho do console — mas esta é a rota do console que mais se parece com
@@ -332,7 +342,14 @@ describe('toda rota endereçada por um parâmetro', () => {
   // agente do GenieACS de um provedor (modo `agent`). Mesmo pedágio — uma
   // linha em `DO_CONSOLE` e mais uma aqui; a prova de que a chave vai só para
   // o provedor pedido está em genieacs-agent-saas.test.js. São 53.
-  const TETO_DE_EXCECOES = 53;
+  //
+  // E as seis da tela de Assinaturas do console (as cobranças de um provedor,
+  // o prazo mexido à mão, e baixa, cancelamento, mudança e reemissão de uma
+  // cobrança). Mesmo pedágio, seis vezes: seis linhas em `DO_CONSOLE` e seis
+  // aqui. O `:chargeId` é linha de tabela escopada, e por isso a prova vai
+  // além do 404 de quem não é da plataforma: platform-subscriptions.test.js
+  // pede, pela URL do alfa, a cobrança do beta — e recebe 404. São 59.
+  const TETO_DE_EXCECOES = 59;
 
 
   /**
@@ -365,6 +382,12 @@ describe('toda rota endereçada por um parâmetro', () => {
     'PUT /api/platform/tenants/:id/subscription',
     'POST /api/platform/tenants/:id/payments',
     'GET /api/platform/tenants/:id/usage',
+    'GET /api/platform/tenants/:id/charges',
+    'PATCH /api/platform/tenants/:id/subscription/deadlines',
+    'PATCH /api/platform/tenants/:id/charges/:chargeId',
+    'POST /api/platform/tenants/:id/charges/:chargeId/settle',
+    'POST /api/platform/tenants/:id/charges/:chargeId/cancel',
+    'POST /api/platform/tenants/:id/charges/:chargeId/reissue',
     'GET /api/platform/tenants/:id/export',
     'GET /api/platform/tenants/:id/genieacs',
     'PUT /api/platform/tenants/:id/genieacs',

@@ -1,5 +1,6 @@
 import express from 'express';
 import PlatformBillingController from '../controllers/platformBillingController.js';
+import PlatformSubscriptionsController from '../controllers/platformSubscriptionsController.js';
 import { authenticateToken, requirePlatformAdmin } from '../middleware/auth.js';
 
 /**
@@ -19,5 +20,16 @@ router.get('/tenants/:id/subscription', ...guard, PlatformBillingController.getS
 router.put('/tenants/:id/subscription', ...guard, PlatformBillingController.updateSubscription);
 router.post('/tenants/:id/payments', ...guard, PlatformBillingController.recordPayment);
 router.get('/tenants/:id/usage', ...guard, PlatformBillingController.getUsage);
+
+// A tela de Assinaturas: todos de uma vez, as cobranças de um, e os gestos
+// sobre uma cobrança. Trocar plano, suspender e reativar continuam no `PUT`
+// da assinatura, logo acima — esta tela o chama em vez de duplicá-lo.
+router.get('/subscriptions', ...guard, PlatformSubscriptionsController.listSubscriptions);
+router.patch('/tenants/:id/subscription/deadlines', ...guard, PlatformSubscriptionsController.setDeadlines);
+router.get('/tenants/:id/charges', ...guard, PlatformSubscriptionsController.listCharges);
+router.patch('/tenants/:id/charges/:chargeId', ...guard, PlatformSubscriptionsController.update);
+router.post('/tenants/:id/charges/:chargeId/settle', ...guard, PlatformSubscriptionsController.settle);
+router.post('/tenants/:id/charges/:chargeId/cancel', ...guard, PlatformSubscriptionsController.cancel);
+router.post('/tenants/:id/charges/:chargeId/reissue', ...guard, PlatformSubscriptionsController.reissue);
 
 export default router;

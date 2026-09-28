@@ -103,13 +103,29 @@ function periodoDoPlano(plano) {
 async function valorPedido({ externalId, plano, currency }) {
   const moedaPaga = String(currency || '').toUpperCase();
 
-  const cobranca = externalId ? await BillingCharge.byGatewayId(externalId) : null;
+  // 1a. A cobrança que NUNCA chegou ao gateway, marcada paga à mão pelo
+  //     console: sem id do lado de lá, a baixa manual usa `charge:<id da
+  //     linha>` como referência (ver `PlatformSubscriptionsController.settle`),
+  //     e é por ele que a linha se acha. Sem isto, a conferência cairia no
+  //     preço do plano — e uma cobrança cujo valor o console acabou de ajustar
+  //     seria conferida contra um número que não é o que se pediu. `tdb` por
+  //     baixo: o id de uma linha do vizinho simplesmente não é achado.
+  const daLinha = /^charge:(\d+)$/.exec(String(externalId ?? ''));
+  const cobranca = !externalId
+    ? null
+    : daLinha
+      ? await BillingCharge.findById(Number(daLinha[1]))
+      : await BillingCharge.byGatewayId(externalId);
   if (cobranca) {
     const valor = Number(cobranca.amount_cents);
     if (Number.isFinite(valor) && valor > 0) {
       const moeda = String(cobranca.currency || '').toUpperCase();
       if (moeda && moeda !== moedaPaga) return { cents: null, motivo: 'currency_mismatch', fonte: 'charge' };
-      return { cents: Math.floor(valor), motivo: null, fonte: 'charge' };
+      // `overridden`: o valor foi mudado à mão pelo console (0078) e não é o
+      // preço de plano nenhum — ver o destino da descida em `recordPayment`.
+      return {
+        cents: Math.floor(valor), motivo: null, fonte: 'charge', overridden: Boolean(cobranca.amount_overridden_at)
+      };
     }
   }
 
@@ -145,6 +161,32 @@ async function valorPedido({ externalId, plano, currency }) {
   const moedaPlano = String(plano?.currency || '').toUpperCase();
   if (moedaPlano && moedaPlano !== moedaPaga) return { cents: null, motivo: 'currency_mismatch', fonte: 'plan' };
   return { cents: Math.floor(preco), motivo: null, fonte: 'plan' };
+}
+
+/**
+ * O prazo vivo de uma assinatura — o mesmo que a emissão lê, na mesma ordem:
+ * a renovação, ou o fim do teste para quem nunca pagou.
+ */
+function prazoVivo(linha) {
+  return asDate(linha?.renews_at) ?? asDate(linha?.trial_ends_at);
+}
+
+/**
+ * Leva a cobrança em aberto do prazo velho para o novo, quando um prazo muda
+ * à mão (`setDeadlines`, `setStatus` com data). Ver
+ * `ChargeIssuingService.followDeadline`, que é quem fala com o gateway.
+ *
+ * Importado na hora, e não no topo: `chargeIssuingService` importa ESTE
+ * arquivo, e o caminho de volta só é preciso quando um prazo é mexido à mão.
+ * A recusa (`ChargeFollowError`) sobe como está, e quem chama não grava nada.
+ */
+async function followOpenCharge(before, patch, now = new Date()) {
+  const depois = { ...before, ...patch };
+  const de = prazoVivo(before);
+  const para = prazoVivo(depois);
+  if (!de || !para || de.getTime() === para.getTime()) return null;
+  const { default: ChargeIssuingService } = await import('./chargeIssuingService.js');
+  return ChargeIssuingService.followDeadline({ from: de, to: para, now });
 }
 
 export class PlanLimitError extends Error {
@@ -742,12 +784,132 @@ class SubscriptionService {
     if (trialEndsAt !== undefined) patch.trial_ends_at = asDate(trialEndsAt);
     if (renewsAt !== undefined) patch.renews_at = asDate(renewsAt);
     patch.canceled_at = status === 'canceled' ? new Date() : null;
+    // O prazo mudado junto com o status leva a cobrança em aberto com ele,
+    // ANTES de ser gravado — ver `followOpenCharge`.
+    if (trialEndsAt !== undefined || renewsAt !== undefined) await followOpenCharge(before, patch);
     const subscription = await Subscription.upsertForTenant(tenantId, patch);
     await BillingEvent.record({
       subscriptionId: subscription.id,
       type: BILLING_EVENT_TYPES.STATUS_CHANGED,
       createdBy: actorUserId,
       detail: { from: before.status, to: status, reason }
+    });
+    cache.invalidate();
+    return subscription;
+  }
+
+  /**
+   * Mexe nos PRAZOS do provedor em escopo sem mexer no estado — a cortesia de
+   * alguns dias, a data corrigida à mão pelo console.
+   *
+   * Três formas de pedir, e o controlador garante que venha uma só:
+   *
+   *   - `extendDays`: soma ao prazo VIVO. Em `trial`, o fim do teste; em
+   *     qualquer outro estado, a renovação. Soma a partir do maior entre o
+   *     prazo e agora — estender em cinco dias quem venceu há dez não pode
+   *     devolver um prazo que continua vencido, e estender quem vence daqui a
+   *     vinte não pode jogar fora os vinte.
+   *   - `renewsAt` e/ou `trialEndsAt`: a data exata. `trialEndsAt: null` apaga
+   *     o prazo do teste; `renewsAt` nulo não é aceito lá em cima, porque
+   *     "sem renovação" é assinatura fora de ciclo, e isso é decisão de
+   *     status, não de prazo.
+   *
+   * O status NÃO muda — com uma exceção, a do `past_due` GRAVADO que ganha um
+   * prazo no futuro, e que volta a `active` (ver abaixo) —, e é o que separa
+   * isto de `setStatus`. Mas o estado que
+   * VALE pode mudar, e é o ponto: `effectiveStatus` calcula `past_due` a partir
+   * do prazo, então um `active` vencido volta a passar no instante em que o
+   * prazo anda — sem ninguém gravar `active` à mão e sem registrar pagamento
+   * que não houve.
+   *
+   * A descida agendada (0074) que estava marcada para o fim do período anda
+   * junto com ele: ela quer dizer "na renovação", e deixá-la na data velha a
+   * aplicaria no meio do período que a cortesia acabou de esticar. Só quando
+   * ela está exatamente na renovação antiga — uma agendada para outra data é
+   * outra decisão, e fica como está.
+   *
+   * A cobrança em aberto do prazo velho vai junto para o novo — no gateway
+   * e na linha —, antes de o prazo ser gravado (`followOpenCharge`). Sem
+   * isso, a emissão abriria outra para o prazo novo com a primeira ainda viva
+   * na Asaas: duas faturas, e o provedor cobrado pela que o painel esqueceu.
+   *
+   * Uma linha no extrato (`deadline.changed`, com `courtesy: true` quando é
+   * uma extensão), porque é o extrato que responde "por que este provedor
+   * renovou sem pagar?".
+   *
+   * @returns {Promise<object>} a assinatura depois da mudança.
+   */
+  static async setDeadlines({
+    renewsAt = undefined, trialEndsAt = undefined, extendDays = null,
+    reason = null, actorUserId = null, now = new Date()
+  }) {
+    const tenantId = currentTenantId();
+    const before = await Subscription.forTenant(tenantId);
+    if (!before) throw new Error('Subscription not found');
+
+    const patch = {};
+    if (extendDays !== null && extendDays !== undefined) {
+      const dias = Number(extendDays);
+      if (!Number.isInteger(dias) || dias < 1) throw new Error('extendDays must be a positive integer');
+      const coluna = before.status === 'trial' ? 'trial_ends_at' : 'renews_at';
+      const atual = asDate(before[coluna]);
+      const base = atual && atual.getTime() > now.getTime() ? atual : now;
+      patch[coluna] = new Date(base.getTime() + dias * DAY_MS);
+    } else {
+      if (renewsAt !== undefined) {
+        const data = asDate(renewsAt);
+        if (!data) throw new Error('renewsAt must be a date');
+        patch.renews_at = data;
+      }
+      if (trialEndsAt !== undefined) {
+        const data = trialEndsAt === null ? null : asDate(trialEndsAt);
+        if (trialEndsAt !== null && !data) throw new Error('trialEndsAt must be a date or null');
+        patch.trial_ends_at = data;
+      }
+    }
+    if (!Object.keys(patch).length) throw new Error('Nothing to change');
+
+    // A cortesia a quem está `past_due` GRAVADO (o console o pôs lá à mão)
+    // precisa destravá-lo, ou não é cortesia nenhuma: `effectiveStatus` só
+    // calcula `past_due` a partir do prazo em `active`, e um `past_due`
+    // gravado continua bloqueando escrita com a renovação no ano que vem. Só
+    // quando o prazo novo está de fato no futuro — mexer num prazo e deixá-lo
+    // vencido não destrava nada, e o status fica como estava.
+    if (before.status === 'past_due' && patch.renews_at && patch.renews_at.getTime() > now.getTime()) {
+      patch.status = 'active';
+    }
+
+    // A cobrança em aberto acompanha o prazo, e ANTES de ele ser gravado: se o
+    // gateway recusa, o prazo não se move — ver `followOpenCharge`.
+    await followOpenCharge(before, patch, now);
+
+    const renovacaoAntiga = asDate(before.renews_at);
+    const agendada = asDate(before.pending_plan_at);
+    if (patch.renews_at && before.pending_plan_id && renovacaoAntiga && agendada
+      && agendada.getTime() === renovacaoAntiga.getTime()) {
+      patch.pending_plan_at = patch.renews_at;
+    }
+
+    const iso = (valor) => {
+      const data = asDate(valor);
+      return data ? data.toISOString() : null;
+    };
+    const subscription = await getDb().transaction(async (trx) => {
+      const depois = await Subscription.upsertForTenant(tenantId, patch, trx);
+      await BillingEvent.record({
+        subscriptionId: before.id,
+        type: BILLING_EVENT_TYPES.DEADLINE_CHANGED,
+        createdBy: actorUserId,
+        detail: {
+          ...(extendDays ? { courtesy: true, extendDays: Number(extendDays) } : {}),
+          from: { renewsAt: iso(before.renews_at), trialEndsAt: iso(before.trial_ends_at) },
+          to: { renewsAt: iso(depois.renews_at), trialEndsAt: iso(depois.trial_ends_at) },
+          status: before.status,
+          ...(patch.status ? { statusAfter: patch.status } : {}),
+          reason
+        }
+      }, trx);
+      return depois;
     });
     cache.invalidate();
     return subscription;
@@ -908,7 +1070,15 @@ class SubscriptionService {
     let destinoDaDescida = null;
     if (reactivates && planoAgendado) {
       const precoAtual = Number(planoAtual?.price_cents ?? 0);
-      const pagoBarato = pedido.cents !== null ? pedido.cents < precoAtual : plano === planoAgendado;
+      // A cobrança com valor mudado à mão pelo console (o desconto) não diz
+      // nada sobre QUAL plano foi pago: menos que o preço do atual ali é
+      // abatimento, não o preço do barato. Aí vale o plano que a cobrança
+      // teria pedido sem o desconto — o agendado, se a descida cabe no uso;
+      // o atual, se não cabe —, que é a mesma resposta de quando não há
+      // cobrança nenhuma.
+      const pagoBarato = pedido.cents !== null && !pedido.overridden
+        ? pedido.cents < precoAtual
+        : plano === planoAgendado;
       destinoDaDescida = pagoBarato ? 'lock' : 'postpone';
     }
     const descidaVenceu = !dataDaDescida || dataDaDescida.getTime() <= now.getTime();

@@ -246,6 +246,95 @@ export async function cancelCharge(chargeId) {
   }
 }
 
+/** O id de uma cobrança no gateway, pronto para ir no caminho — ou o erro. */
+function idNoCaminho(chargeId) {
+  const id = String(chargeId ?? '').trim();
+  if (!id) throw new AsaasError('no gateway charge id', { code: 'bad_request' });
+  // Codificado pelo mesmo motivo de `cancelCharge`: o id veio do gateway, mas
+  // mora no nosso banco, e um caractere de caminho nele mudaria QUAL recurso
+  // se toca.
+  return encodeURIComponent(id);
+}
+
+/** Centavos para reais, como o gateway fala. Um ponto só, como em `createCharge`. */
+function paraReais(amountCents) {
+  return Number((Number(amountCents) / 100).toFixed(2));
+}
+
+/**
+ * Dá como recebida em dinheiro uma cobrança que o gateway emitiu —
+ * `POST /payments/{id}/receiveInCash`.
+ *
+ * Existe para o "marcar como paga" do console: o provedor pagou por fora (uma
+ * transferência para a conta, um acerto em mãos) e a cobrança continua viva do
+ * lado de lá. Sem esta chamada ela ficaria `PENDING` no gateway, e o gateway
+ * faria o que faz com toda cobrança pendente: lembraria o provedor, depois o
+ * chamaria de atrasado — por uma fatura que ele já pagou.
+ *
+ * `notifyCustomer: false` de propósito: o aviso de "recebemos o seu pagamento"
+ * é conversa nossa com o cliente, e quem registra à mão sabe se ela cabe.
+ *
+ * Ao contrário de `cancelCharge`, 404 aqui NÃO é sucesso: uma cobrança que não
+ * existe mais no gateway não foi recebida por ninguém, e dizer que foi seria
+ * registrar dinheiro sobre um recibo que não existe. Quem chama decide o que
+ * fazer com a recusa — e o console, que é quem chama, para tudo.
+ */
+export async function receiveInCash(chargeId, { paymentDate, value }) {
+  const caminho = `/payments/${idNoCaminho(chargeId)}/receiveInCash`;
+  const resposta = await chamar(caminho, {
+    payload: { paymentDate, value: paraReais(value), notifyCustomer: false }
+  });
+  return { status: resposta?.status ? String(resposta.status) : null };
+}
+
+/**
+ * Lê uma cobrança como o gateway a vê agora — `GET /payments/{id}`.
+ *
+ * É a pergunta que a baixa manual do console faz ANTES de mandar o
+ * `receiveInCash`: o webhook pode ter se perdido, e aí a Asaas já tem a
+ * cobrança como paga (`RECEIVED`, `CONFIRMED`) enquanto o painel a mostra em
+ * aberto. O `receiveInCash` numa cobrança já recebida é recusado — e sem esta
+ * leitura a baixa ficaria respondendo 502 para sempre, empurrando quem opera
+ * para o pagamento avulso, que o webhook reentregue depois creditaria de novo.
+ *
+ * @returns {Promise<{ id: string, status: string|null, valueCents: number|null }>}
+ */
+export async function getCharge(chargeId) {
+  const resposta = await chamar(`/payments/${idNoCaminho(chargeId)}`, { method: 'GET' });
+  const valor = Number(resposta?.value);
+  return {
+    id: String(resposta?.id ?? chargeId),
+    status: resposta?.status ? String(resposta.status) : null,
+    // Arredondado sobre o produto, pelo motivo de `paraCentavos` no provider.
+    valueCents: Number.isFinite(valor) ? Math.round(valor * 100) : null
+  };
+}
+
+/**
+ * Muda o vencimento e/ou o valor de uma cobrança já emitida —
+ * `POST /payments/{id}`.
+ *
+ * Só os campos que mudam vão no corpo, mais o `billingType` com que ela nasceu
+ * (`UNDEFINED`, ver `createCharge`): a documentação do gateway o pede na
+ * atualização, e mandar outro trocaria em silêncio a página de Pix-ou-boleto
+ * por uma de um meio só.
+ *
+ * A resposta traz a cobrança como ficou, e o que se devolve é o que o painel
+ * guarda dela — o vencimento que o gateway de fato aceitou, que é o que vale
+ * se ele arredondar para um dia útil.
+ */
+export async function updateCharge(chargeId, { dueDate = undefined, value = undefined } = {}) {
+  const payload = { billingType: 'UNDEFINED' };
+  if (dueDate !== undefined) payload.dueDate = dueDate;
+  if (value !== undefined) payload.value = paraReais(value);
+  const resposta = await chamar(`/payments/${idNoCaminho(chargeId)}`, { payload });
+  return {
+    dueDate: resposta?.dueDate ? String(resposta.dueDate).slice(0, 10) : null,
+    invoiceUrl: resposta?.invoiceUrl ? String(resposta.invoiceUrl) : null,
+    status: resposta?.status ? String(resposta.status) : null
+  };
+}
+
 /**
  * Confere se a chave responde, e em nome de quem — o botão "Testar conexão" do
  * console.
@@ -290,4 +379,6 @@ export async function createCustomer(payload) {
   return { customerId };
 }
 
-export default { createCharge, cancelCharge, createCustomer, testConnection, apiKey, baseUrl, AsaasError };
+export default {
+  createCharge, cancelCharge, getCharge, receiveInCash, updateCharge, createCustomer, testConnection, apiKey, baseUrl, AsaasError
+};

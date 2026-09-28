@@ -60,6 +60,17 @@ class PlatformAudit {
     SUBSCRIPTION_PLAN_CHANGED: 'subscription.plan_changed',
     SUBSCRIPTION_STATUS_CHANGED: 'subscription.status_changed',
     PAYMENT_RECORDED: 'subscription.payment_recorded',
+    // A tela de Assinaturas do console. O prazo mexido à mão (cortesia ou
+    // correção) e o que se fez com UMA cobrança: marcada paga por fora,
+    // cancelada, com vencimento ou valor trocados, reemitida. Uma ação por
+    // gesto, e não `PAYMENT_RECORDED` para a baixa manual: aquela é o botão
+    // de pagamento avulso, sem cobrança por trás; esta fecha uma cobrança que
+    // o painel emitiu — e, quando ela está no gateway, fala com ele.
+    SUBSCRIPTION_DEADLINE_CHANGED: 'subscription.deadline_changed',
+    CHARGE_SETTLED: 'charge.settled',
+    CHARGE_CANCELED: 'charge.canceled',
+    CHARGE_UPDATED: 'charge.updated',
+    CHARGE_REISSUED: 'charge.reissued',
     // Quem trabalha para qual provedor, decidido de fora dele. É a ação mais
     // forte que o plano de controle tem: um vínculo escrito aqui vira uma
     // sessão legítima DENTRO de um ISP, com o cadastro inteiro atrás dela. Sem
