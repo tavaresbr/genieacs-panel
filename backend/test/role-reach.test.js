@@ -27,9 +27,9 @@ import assert from 'node:assert/strict';
  *
  * ## O que este arquivo NÃO afirma
  *
- * São **57 rotas**, não as 91. A amostra foi escolhida para que cada uma das
- * 34 capacidades apareça pelo menos uma vez, e a garantia de não-regressão que
- * o teste do `admin` dá vale **sobre estas 57** — não sobre o painel inteiro.
+ * São **60 rotas**, não as 91. A amostra foi escolhida para que cada uma das
+ * 37 capacidades apareça pelo menos uma vez, e a garantia de não-regressão que
+ * o teste do `admin` dá vale **sobre estas 60** — não sobre o painel inteiro.
  * Quem quiser a afirmação forte ("nenhuma das 91 rotas mudou de dono") precisa
  * de outra prova; a varredura estática de `permissions.test.js` é o que existe
  * hoje mais perto disso, e ela olha o nome da capacidade, não o alcance.
@@ -80,6 +80,7 @@ const QUEM_TEM = {
   'map.write': ['owner', 'admin', 'tech'],
   'sgp.read': ['owner', 'admin', 'tech'],
   'sgp.act': ['owner', 'admin', 'tech'],
+  'teiah.read': ['owner', 'admin', 'tech'],
   'provisioning.read': ['owner', 'admin', 'tech'],
   'provisioning.run': ['owner', 'admin', 'tech'],
   'whatsapp.read': ['owner', 'admin', 'tech'],
@@ -90,6 +91,8 @@ const QUEM_TEM = {
 
   'catalogue.write': ['owner', 'admin'],
   'sgp.config': ['owner', 'admin'],
+  'teiah.act': ['owner', 'admin'],
+  'teiah.config': ['owner', 'admin'],
   'provisioning.write': ['owner', 'admin'],
   'whatsapp.config': ['owner', 'admin'],
   'campaigns.manage': ['owner', 'admin'],
@@ -432,6 +435,30 @@ const CASOS = [
     label: 'GET /api/sgp/config',
     method: 'GET',
     path: () => '/api/sgp/config',
+    aceito: [200]
+  },
+  {
+    cap: 'teiah.read',
+    label: 'GET /api/teiah/export',
+    method: 'GET',
+    path: () => '/api/teiah/export',
+    aceito: [200]
+  },
+  {
+    // Sem a TeiaH configurada o envio é recusado com 409 — DEPOIS da guarda, e
+    // repetível: nada é enviado a ninguém.
+    cap: 'teiah.act',
+    label: 'POST /api/teiah/export/run',
+    method: 'POST',
+    path: () => '/api/teiah/export/run',
+    aceito: [409],
+    codigoAceito: 'not_configured'
+  },
+  {
+    cap: 'teiah.config',
+    label: 'GET /api/teiah/config',
+    method: 'GET',
+    path: () => '/api/teiah/config',
     aceito: [200]
   },
   {
@@ -784,7 +811,7 @@ describe('a matriz e a expectativa deste arquivo', () => {
     }
   });
 
-  it('cobre as 34 capacidades', () => {
+  it('cobre as 37 capacidades', () => {
     // Uma capacidade fora da amostra é uma rota sem prova de alcance nenhuma.
     const deFora = PERMISSIONS.filter((cap) => !QUEM_TEM[cap]);
     assert.deepEqual(deFora, [], `capacidades sem caso: ${deFora.join(', ')}`);
@@ -794,26 +821,27 @@ describe('a matriz e a expectativa deste arquivo', () => {
 
   it('tem par de recusa para toda capacidade que algum papel não tem', () => {
     /**
-     * A afirmação central do arquivo, conferida sobre a própria amostra: 31 das
-     * 34 capacidades têm alguém do lado de fora, e cada uma delas precisa de
+     * A afirmação central do arquivo, conferida sobre a própria amostra: 34 das
+     * 37 capacidades têm alguém do lado de fora, e cada uma delas precisa de
      * pelo menos uma rota onde essa recusa é exercitada. As 3 restantes são as
      * do `viewer`, que TODO papel tem — para elas não existe par de recusa a
      * escrever, e dizer o número aqui é o que impede que uma capacidade caia
      * silenciosamente para dentro do `viewer` sem ninguém notar.
      */
     const comRecusa = PERMISSIONS.filter((cap) => QUEM_TEM[cap].length < ROLES.length);
-    assert.equal(comRecusa.length, 31);
+    assert.equal(comRecusa.length, 34);
     for (const cap of comRecusa) {
       assert.ok(CASOS.some((caso) => caso.cap === cap), `${cap} sem rota para recusar`);
     }
   });
 
   it('não encolhe sem que alguém diga', () => {
-    // O cabeçalho promete uma amostra de 57 rotas e a promessa de não-regressão
+    // O cabeçalho promete uma amostra de 60 rotas e a promessa de não-regressão
     // do `admin` vale sobre ELA. Uma rota apagada por um merge desajeitado
     // deixaria a promessa valendo sobre menos coisa, calada.
-    // Eram 54; as três da conexão com o GenieACS (modo agente) entraram juntas.
-    assert.equal(CASOS.length, 57);
+    // Eram 54; as três da conexão com o GenieACS (modo agente) entraram juntas,
+    // e depois as três da TeiaH Valid.
+    assert.equal(CASOS.length, 60);
   });
 });
 
@@ -840,7 +868,7 @@ describe('quem não tem a capacidade toma 403', () => {
 
 /**
  * O par que dá sentido ao de cima, e a garantia de não-regressão do `admin`:
- * ele aparece aqui em TODAS as 57 rotas, porque a matriz lhe dá as 34
+ * ele aparece aqui em TODAS as 60 rotas, porque a matriz lhe dá as 37
  * capacidades. Nenhuma das rotas desta amostra saiu do alcance dele na onda 17.
  */
 describe('quem tem a capacidade passa pela guarda', () => {
@@ -880,9 +908,9 @@ describe('o alcance do viewer, sobre a amostra', () => {
 
   it('não alcança nada que mexa em aparelho, em gente ou em configuração', () => {
     // A amostra inteira menos as três acima, numa afirmação só: o que o
-    // `viewer` NÃO alcança é 31 das 34 capacidades.
+    // `viewer` NÃO alcança é 34 das 37 capacidades.
     const fechadas = PERMISSIONS.filter((cap) => !QUEM_TEM[cap].includes('viewer'));
-    assert.equal(fechadas.length, 31, fechadas.join(', '));
+    assert.equal(fechadas.length, 34, fechadas.join(', '));
   });
 });
 

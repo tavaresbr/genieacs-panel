@@ -364,11 +364,24 @@ function normalizeAddress(value) {
     city: asText(pick(value, ['cidade', 'municipio', 'city'])),
     state: asText(pick(value, ['uf', 'estado', 'state'])),
     zip: asText(pick(value, ['cep', 'zip', 'zipcode'])),
-    reference: asText(pick(value, ['pontoReferencia', 'ponto_referencia', 'referencia']))
+    reference: asText(pick(value, ['pontoReferencia', 'ponto_referencia', 'referencia'])),
+    latitude: asCoordinate(pick(value, ['latitude', 'lat']), 90),
+    longitude: asCoordinate(pick(value, ['longitude', 'lng', 'lon']), 180)
   };
   return Object.values(parts).some(Boolean)
     ? Object.fromEntries(Object.entries(parts).filter(([, part]) => part))
     : null;
+}
+
+/**
+ * A coordinate as a number, or null. SGP sends it as a number, as "-23.55" or
+ * as "-23,55"; zero is what an empty map pin saves, and is no place anyone lives.
+ */
+function asCoordinate(value, limit) {
+  if (value === null || value === undefined || value === '') return null;
+  const number = Number(String(value).trim().replace(',', '.'));
+  if (!Number.isFinite(number) || number === 0 || Math.abs(number) > limit) return null;
+  return number;
 }
 
 /** One line of an address, for a contract row and for the listing. */
@@ -380,9 +393,38 @@ function addressLine(address) {
   return [street, address.complement, place, address.zip].filter(Boolean).join(' · ') || null;
 }
 
+/**
+ * Whether the contract's equipment stayed with the customer on rent or loan
+ * (comodato) — the TeiaH Valid `aluguel`. A flag under one of several names, or
+ * a list of loaned equipment where non-empty means yes. `null` is "the SGP does
+ * not say", which is not the same as "no".
+ */
+const RENTAL_FLAG_NAMES = Object.freeze([
+  'comodato', 'emComodato', 'possuiComodato', 'equipamentoComodato',
+  'aluguel', 'aluguelEquipamento', 'equipamentoAlugado', 'locacao', 'locacaoEquipamento'
+]);
+const RENTAL_LIST_NAMES = Object.freeze(['comodatos', 'equipamentosComodato', 'equipamentosAlugados']);
+
+function equipmentRentedFrom(entry) {
+  const list = pick(entry, RENTAL_LIST_NAMES);
+  if (Array.isArray(list)) return list.length > 0;
+  const value = pick(entry, RENTAL_FLAG_NAMES);
+  if (value === null) return null;
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value !== 0;
+  if (typeof value === 'object') return Array.isArray(value) ? value.length > 0 : null;
+  const text = stripAccents(value).trim();
+  if (['1', 'true', 'sim', 's', 'yes', 'y'].includes(text)) return true;
+  if (['0', 'false', 'nao', 'n', 'no'].includes(text)) return false;
+  return null;
+}
+
+const CONTRACT_ADDRESS_NAMES = Object.freeze(['endereco', 'enderecoCompleto', 'contratoEndereco', 'enderecoInstalacao']);
+
 function normalizeContract(entry, { includeSecrets = false } = {}) {
   const contract = asText(pick(entry, ['contrato', 'contratoId', 'idContrato', 'contract']));
   if (!contract) return null;
+  const addressParts = normalizeAddress(pick(entry, CONTRACT_ADDRESS_NAMES));
   return {
     contract,
     ...(includeSecrets
@@ -398,16 +440,24 @@ function normalizeContract(entry, { includeSecrets = false } = {}) {
     // the contract's, and a wrong client id opens someone else's page in SGP.
     clientId: asText(pick(entry, ['clienteId', 'idCliente', 'cliente_id', 'codigoCliente'])),
     document: asText(pick(entry, ['cpfcnpj', 'cpfCnpj', 'documento'])),
-    address: addressLine(normalizeAddress(pick(entry, ['endereco', 'enderecoCompleto', 'contratoEndereco']))),
+    address: addressLine(addressParts),
+    // The same address in parts, for what needs the street apart from the city
+    // (the TeiaH Valid import). Null when the SGP only sent one line of text.
+    addressParts: addressParts && !addressParts.line ? addressParts : null,
     dueDay: asText(pick(entry, ['vencimento', 'diaVencimento', 'dia_vencimento', 'vencimentoDia'])),
     statusReason: asText(pick(entry, ['motivo_status', 'motivoStatus', 'motivoSituacao'])),
     createdAt: asText(pick(entry, ['dataCadastro', 'data_cadastro', 'dataAtivacao', 'dataInicio'])),
+    cancelledAt: asText(pick(entry, [
+      'dataCancelamento', 'data_cancelamento', 'dataCancelado', 'dataInativacao',
+      'dataEncerramento', 'dataRescisao', 'data_rescisao'
+    ])),
     login: asText(pick(entry, ['login', 'usuario', 'pppoe', 'loginPppoe'])),
     // Normalized to sendable digits here rather than at send time, so a cadastre
     // that stores "(93) 98111-0449" and one that stores "5593981110449" reach
     // the outbox as the same value. The ninth digit is never invented — see
     // utils/wa/waDestino.js for why guessing it addresses a stranger.
     phone: normalizarTelefoneBr(pick(entry, PHONE_NAMES)) || null,
+    equipmentRented: equipmentRentedFrom(entry),
     blocked: (() => {
       const value = pick(entry, ['bloqueado', 'contratoBloqueado', 'bloqueio']);
       if (value === null) return null;
@@ -603,8 +653,12 @@ function normalizeCustomer(entry) {
             ? normalizeContract({ ...item, contrato: pick(item, ['id']) })
             : null);
         if (!contract) return null;
+        const clientAddress = contract.addressParts ? null : normalizeAddress(pick(entry, CONTRACT_ADDRESS_NAMES));
         return {
           ...contract,
+          // A contract that carries no address of its own is at its client's.
+          ...(clientAddress && !contract.address ? { address: addressLine(clientAddress) } : {}),
+          ...(clientAddress && !clientAddress.line && !contract.address ? { addressParts: clientAddress } : {}),
           clientId: client.clientId,
           name: contract.name || client.name,
           document: contract.document || client.document,
@@ -1654,7 +1708,10 @@ class SgpService {
       status_reason: contract.statusReason ? String(contract.statusReason).slice(0, 255) : null,
       login: contract.login ? String(contract.login).slice(0, 128) : null,
       address: contract.address ? String(contract.address).slice(0, 2000) : null,
-      contract_created_at: contract.createdAt ? String(contract.createdAt).slice(0, 32) : null
+      contract_created_at: contract.createdAt ? String(contract.createdAt).slice(0, 32) : null,
+      address_parts: contract.addressParts ? JSON.stringify(contract.addressParts).slice(0, 4000) : null,
+      contract_cancelled_at: contract.cancelledAt ? String(contract.cancelledAt).slice(0, 32) : null,
+      equipment_rented: typeof contract.equipmentRented === 'boolean' ? contract.equipmentRented : null
     };
   }
 

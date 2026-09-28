@@ -75,6 +75,7 @@ export default {
   'rateLimit.telegramTest': 'Too many Telegram tests, wait a minute',
   'rateLimit.platformExport': 'Too many exports, please slow down',
   'rateLimit.sgpSync': 'Too many fleet synchronizations. Try again later.',
+  'rateLimit.teiah': 'Too many TeiaH Valid requests. Try again later.',
 
   // Devices
   'device.idRequired': 'The device ID is required',
@@ -889,4 +890,28 @@ export default {
   'contacts.import.badHeader': 'The first line needs the export columns (Chave, Contrato, CPF/CNPJ or Nome)',
   'contacts.import.rowNotFound': 'Key or contract not found',
   'contacts.import.rowNoName': 'New client without a name',
+
+  // TeiaH Valid
+  'teiah.configLoaded': 'TeiaH Valid configuration loaded',
+  'teiah.configLoadFailed': 'Failed to load the TeiaH Valid configuration',
+  'teiah.configSaved': 'TeiaH Valid configuration saved',
+  'teiah.configSaveFailed': 'Failed to save the TeiaH Valid configuration',
+  'teiah.connectionOk': 'Connected to TeiaH Valid and the key was accepted',
+  'teiah.connectionTestFailed': 'Failed to test the TeiaH Valid connection',
+  'teiah.exportLoaded': 'TeiaH Valid export loaded',
+  'teiah.exportPreviewed': 'TeiaH Valid export preview generated',
+  'teiah.exportStarted': 'TeiaH Valid export started',
+  'teiah.exportFailed': 'TeiaH Valid export failed',
+  'teiah.error.urlInvalid': 'Invalid TeiaH Valid API address',
+  'teiah.error.notConfigured': 'The TeiaH Valid integration is not configured',
+  'teiah.error.apiKeyInvalid': 'Invalid API key',
+  'teiah.error.apiKeyMissing': 'Enter the TeiaH Valid API key',
+  'teiah.error.blockedHost': 'This address is not allowed for TeiaH Valid',
+  'teiah.error.unreachable': 'Could not reach TeiaH Valid',
+  'teiah.error.timeout': 'TeiaH Valid did not respond within the time limit',
+  'teiah.error.invalidResponse': 'TeiaH Valid sent an invalid response',
+  'teiah.error.credentialsRejected': 'TeiaH Valid rejected the API key',
+  'teiah.error.rateLimited': 'TeiaH Valid is rate limiting requests; try again later',
+  'teiah.error.status': 'TeiaH Valid responded with status {status}',
+  'teiah.error.exportRunning': 'A TeiaH Valid export is already running'
 };

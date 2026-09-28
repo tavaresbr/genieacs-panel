@@ -75,6 +75,7 @@ export default {
   'rateLimit.telegramTest': 'Слишком много проверок Telegram, подождите минуту',
   'rateLimit.platformExport': 'Слишком много выгрузок, снизьте частоту обращений',
   'rateLimit.sgpSync': 'Слишком много запросов полной синхронизации. Повторите попытку позже.',
+  'rateLimit.teiah': 'Слишком много запросов к TeiaH Valid. Повторите попытку позже.',
 
   // Устройства
   'device.idRequired': 'Требуется идентификатор устройства',
@@ -890,4 +891,28 @@ export default {
   'contacts.import.badHeader': 'В первой строке нужны столбцы экспорта (Chave, Contrato, CPF/CNPJ или Nome)',
   'contacts.import.rowNotFound': 'Ключ или договор не найден',
   'contacts.import.rowNoName': 'Новый клиент без имени',
+
+  // TeiaH Valid
+  'teiah.configLoaded': 'Настройки TeiaH Valid загружены',
+  'teiah.configLoadFailed': 'Не удалось загрузить настройки TeiaH Valid',
+  'teiah.configSaved': 'Настройки TeiaH Valid сохранены',
+  'teiah.configSaveFailed': 'Не удалось сохранить настройки TeiaH Valid',
+  'teiah.connectionOk': 'Подключение к TeiaH Valid установлено, ключ принят',
+  'teiah.connectionTestFailed': 'Не удалось проверить подключение к TeiaH Valid',
+  'teiah.exportLoaded': 'Выгрузка в TeiaH Valid загружена',
+  'teiah.exportPreviewed': 'Предпросмотр выгрузки в TeiaH Valid готов',
+  'teiah.exportStarted': 'Выгрузка в TeiaH Valid запущена',
+  'teiah.exportFailed': 'Ошибка выгрузки в TeiaH Valid',
+  'teiah.error.urlInvalid': 'Неверный адрес API TeiaH Valid',
+  'teiah.error.notConfigured': 'Интеграция с TeiaH Valid не настроена',
+  'teiah.error.apiKeyInvalid': 'Неверный ключ API',
+  'teiah.error.apiKeyMissing': 'Введите ключ API TeiaH Valid',
+  'teiah.error.blockedHost': 'Этот адрес запрещён для TeiaH Valid',
+  'teiah.error.unreachable': 'Не удалось связаться с TeiaH Valid',
+  'teiah.error.timeout': 'TeiaH Valid не ответила вовремя',
+  'teiah.error.invalidResponse': 'TeiaH Valid прислала неверный ответ',
+  'teiah.error.credentialsRejected': 'TeiaH Valid отклонила ключ API',
+  'teiah.error.rateLimited': 'TeiaH Valid ограничивает запросы; повторите позже',
+  'teiah.error.status': 'TeiaH Valid ответила кодом состояния {status}',
+  'teiah.error.exportRunning': 'Выгрузка в TeiaH Valid уже выполняется'
 };

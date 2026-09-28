@@ -75,6 +75,7 @@ export default {
   'rateLimit.telegramTest': 'Telegram 測試過多，請等待一分鐘',
   'rateLimit.platformExport': '匯出過於頻繁，請放慢速度',
   'rateLimit.sgpSync': '設備同步過於頻繁。請稍後重試。',
+  'rateLimit.teiah': '對 TeiaH Valid 的請求過多。請稍後重試。',
 
   // 設備
   'device.idRequired': '需要提供設備 ID',
@@ -889,4 +890,28 @@ export default {
   'contacts.import.badHeader': '第一列需要匯出時的欄位（Chave、Contrato、CPF/CNPJ 或 Nome）',
   'contacts.import.rowNotFound': '找不到鍵或合約',
   'contacts.import.rowNoName': '新客戶沒有姓名',
+
+  // TeiaH Valid
+  'teiah.configLoaded': '已載入 TeiaH Valid 設定',
+  'teiah.configLoadFailed': '無法載入 TeiaH Valid 設定',
+  'teiah.configSaved': '已儲存 TeiaH Valid 設定',
+  'teiah.configSaveFailed': '無法儲存 TeiaH Valid 設定',
+  'teiah.connectionOk': '已連線 TeiaH Valid，金鑰已被接受',
+  'teiah.connectionTestFailed': 'TeiaH Valid 連線測試失敗',
+  'teiah.exportLoaded': '已載入 TeiaH Valid 傳送狀態',
+  'teiah.exportPreviewed': '已產生 TeiaH Valid 傳送預覽',
+  'teiah.exportStarted': '已開始傳送到 TeiaH Valid',
+  'teiah.exportFailed': '傳送到 TeiaH Valid 失敗',
+  'teiah.error.urlInvalid': 'TeiaH Valid API 位址無效',
+  'teiah.error.notConfigured': 'TeiaH Valid 整合尚未設定',
+  'teiah.error.apiKeyInvalid': 'API 金鑰無效',
+  'teiah.error.apiKeyMissing': '請輸入 TeiaH Valid API 金鑰',
+  'teiah.error.blockedHost': '此位址不允許用於 TeiaH Valid',
+  'teiah.error.unreachable': '無法連線 TeiaH Valid',
+  'teiah.error.timeout': 'TeiaH Valid 未在時限內回應',
+  'teiah.error.invalidResponse': 'TeiaH Valid 回傳了無效回應',
+  'teiah.error.credentialsRejected': 'TeiaH Valid 拒絕了 API 金鑰',
+  'teiah.error.rateLimited': 'TeiaH Valid 正在限制請求，請稍後重試',
+  'teiah.error.status': 'TeiaH Valid 回傳狀態碼 {status}',
+  'teiah.error.exportRunning': '已有傳送到 TeiaH Valid 的工作正在進行'
 };

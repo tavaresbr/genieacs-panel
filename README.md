@@ -384,6 +384,32 @@ plan, status) is cached for 24 hours and re-read after that, and a cached link
 recorded for a different customer account than the device currently serves is
 discarded rather than shown.
 
+## TeiaH Valid Integration
+
+Open **Settings → TeiaH Valid** to send the addresses of contracts that were
+cancelled with invoices still open to [TeiaH Valid](https://valid.teiah.ai), a
+shared base that other providers check before activating a customer at the same
+address. The provider's API key (`x-api-key`) is encrypted like the SGP token.
+
+The export works from the SGP integration. Its candidates are the cancelled
+contracts that the SGP contacts sync already stored. For each one, the panel
+adds up the open invoices in SGP and sends an `ImportAddressDto` to
+`POST /api/import/addresses` with these fields:
+
+- the street, number, district, city, state and postal code;
+- the coordinates, when SGP has them;
+- the amount owed;
+- the start and cancellation months;
+- `aluguel`, whether the equipment stayed with the customer on rent or loan
+  (comodato). It comes from the contract's own field in SGP when there is one;
+  otherwise the tab's default applies, which is to leave the field out.
+
+Name, tax ID, phone and contract number are never sent. A contract without a
+complete address, a start date, a cancellation date or any debt is skipped and
+listed with the reason. A contract already sent with the same content is not
+sent again. The export can run on a schedule or from the **Send now** button, and
+**Preview** shows the payloads without sending anything.
+
 ## Automatic activation
 
 Open **Settings → Automatic activation** to let a newly installed ONT configure

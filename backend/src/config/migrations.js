@@ -1462,6 +1462,21 @@ const SGP_CONTACT_PROFILE_COLUMNS = [
   ['contract_created_at', (t) => t.string('contract_created_at', 32)]
 ];
 
+/**
+ * O que o importador da TeiaH Valid (0077) precisa de cada contrato e a linha
+ * do endereço não guarda: o endereço em partes (rua, número, bairro, cidade,
+ * UF, CEP, e as coordenadas quando o SGP as manda), em JSON como o de
+ * `sgp_clients.address`, a data de cancelamento como o SGP a escreveu, e se o
+ * equipamento ficou em comodato.
+ */
+const SGP_CONTACT_TEIAH_COLUMNS = [
+  ['address_parts', (t) => t.text('address_parts')],
+  ['contract_cancelled_at', (t) => t.string('contract_cancelled_at', 32)],
+  // Se o equipamento ficou com o cliente em aluguel ou comodato — o `aluguel`
+  // da TeiaH. Nulo é "o SGP não diz", que não é o mesmo que "não".
+  ['equipment_rented', (t) => t.boolean('equipment_rented')]
+];
+
 /** Os tetos de retenção de `plans`, para a migração que os acrescenta. */
 const PLAN_RETENTION_COLUMNS = [
   ['max_audit_retention_days', (t) => t.integer('max_audit_retention_days').unsigned()],
@@ -1483,6 +1498,7 @@ const sgpContactsTable = (db) => (t) => {
   addSgpPhoneColumns(t);
   for (const [, add] of SGP_CONTACT_SYNC_COLUMNS) add(t);
   for (const [, add] of SGP_CONTACT_PROFILE_COLUMNS) add(t);
+  for (const [, add] of SGP_CONTACT_TEIAH_COLUMNS) add(t);
   t.timestamp('last_synced_at').defaultTo(db.fn.now());
   t.timestamp('created_at').defaultTo(db.fn.now());
   t.timestamp('updated_at').defaultTo(db.fn.now());
@@ -1529,6 +1545,35 @@ const sgpClientsTable = (db) => (t) => {
   t.unique(['tenant_id', 'sgp_client_id'], 'sgp_clients_client_uq');
   t.index(['tenant_id', 'document'], 'sgp_clients_document_idx');
 };
+
+/**
+ * O que o painel mandou à TeiaH Valid, um contrato por linha — ver
+ * `teiahExportService.js`.
+ *
+ * Guarda o hash do que foi enviado e não o envio em si: o endereço já mora em
+ * `sgp_contacts`, e uma segunda cópia seria só mais um lugar a apagar. O hash
+ * basta para não reenviar o que não mudou. `status` é `sent`, `skipped` (faltou
+ * dado; `reason` diz qual) ou `error`.
+ */
+const teiahExportsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.string('contract', 64).notNullable();
+  t.string('status', 16).notNullable();
+  t.string('reason', 64);
+  t.string('payload_hash', 64);
+  t.decimal('amount', 12, 2);
+  t.timestamp('sent_at');
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['tenant_id', 'contract'], 'teiah_exports_contract_uq');
+  t.index(['tenant_id', 'status'], 'teiah_exports_status_idx');
+};
+
+const TEIAH_TABLES = [
+  ['teiah_exports', teiahExportsTable]
+];
 
 /**
  * Os códigos de recuperação do login em duas etapas — ver `0059_user_totp`.
@@ -1817,7 +1862,8 @@ export const SCHEMA_TABLES = [
   ...WA_BOT_EVENT_TABLES,
   ...GENIEACS_CONNECTION_TABLES,
   ...LOCKOUT_TABLES,
-  ...MAINTENANCE_TABLES
+  ...MAINTENANCE_TABLES,
+  ...TEIAH_TABLES
 ].map(([name]) => name);
 
 /**
@@ -4396,6 +4442,38 @@ export const migrations = [
         for (const add of faltando) add(t);
         if (semHash) t.unique(['agent_token_hash'], GENIEACS_AGENT_TOKEN_INDEX);
       });
+    }
+  },
+  {
+    /**
+     * O importador da TeiaH Valid.
+     *
+     * - Em `sgp_contacts`, o endereço em partes e a data de cancelamento — ver
+     *   `SGP_CONTACT_TEIAH_COLUMNS`. As linhas antigas ficam vazias até a
+     *   próxima sincronização de contatos, que as preenche.
+     * - `teiah_exports`, o que já foi enviado — ver `teiahExportsTable`.
+     */
+    id: '0077_teiah_valid',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      if (await db.schema.hasTable('sgp_contacts')
+        && (await missingColumns(db, 'sgp_contacts', SGP_CONTACT_TEIAH_COLUMNS)).length) return false;
+      return db.schema.hasTable('teiah_exports');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      if (await db.schema.hasTable('sgp_contacts')) {
+        const faltando = await missingColumns(db, 'sgp_contacts', SGP_CONTACT_TEIAH_COLUMNS);
+        if (faltando.length) {
+          await db.schema.alterTable('sgp_contacts', (t) => {
+            for (const add of faltando) add(t);
+          });
+        }
+      }
+      for (const [nome, construtor] of TEIAH_TABLES) {
+        // eslint-disable-next-line no-await-in-loop -- uma tabela só, hoje
+        await createTableIfMissing(db, nome, construtor(db));
+      }
     }
   }
 ];

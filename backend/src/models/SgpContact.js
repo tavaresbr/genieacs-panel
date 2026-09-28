@@ -61,6 +61,9 @@ class SgpContact {
       login: row.login ?? null,
       address: row.address ?? null,
       contract_created_at: row.contract_created_at ?? null,
+      address_parts: row.address_parts ?? null,
+      contract_cancelled_at: row.contract_cancelled_at ?? null,
+      equipment_rented: row.equipment_rented ?? null,
       last_synced_at: now,
       updated_at: now,
       ...(seenAt ? { last_seen_at: seenAt } : {})

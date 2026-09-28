@@ -75,6 +75,7 @@ export default {
   'rateLimit.telegramTest': 'Telegram のテストが多すぎます。1分待ってください',
   'rateLimit.platformExport': 'エクスポートが多すぎます。間隔を空けてください',
   'rateLimit.sgpSync': '設備の同期が多すぎます。しばらくしてから再試行してください。',
+  'rateLimit.teiah': 'TeiaH Valid へのリクエストが多すぎます。しばらくしてから再試行してください。',
 
   // 機器
   'device.idRequired': '機器 ID が必要です',
@@ -889,4 +890,28 @@ export default {
   'contacts.import.badHeader': '1 行目にエクスポートの列 (Chave、Contrato、CPF/CNPJ、Nome) が必要です',
   'contacts.import.rowNotFound': 'キーまたは契約が見つかりません',
   'contacts.import.rowNoName': '名前のない新規顧客',
+
+  // TeiaH Valid
+  'teiah.configLoaded': 'TeiaH Valid の設定を読み込みました',
+  'teiah.configLoadFailed': 'TeiaH Valid の設定を読み込めませんでした',
+  'teiah.configSaved': 'TeiaH Valid の設定を保存しました',
+  'teiah.configSaveFailed': 'TeiaH Valid の設定を保存できませんでした',
+  'teiah.connectionOk': 'TeiaH Valid に接続し、キーが受け入れられました',
+  'teiah.connectionTestFailed': 'TeiaH Valid の接続テストに失敗しました',
+  'teiah.exportLoaded': 'TeiaH Valid への送信状況を読み込みました',
+  'teiah.exportPreviewed': 'TeiaH Valid への送信プレビューを作成しました',
+  'teiah.exportStarted': 'TeiaH Valid への送信を開始しました',
+  'teiah.exportFailed': 'TeiaH Valid への送信に失敗しました',
+  'teiah.error.urlInvalid': 'TeiaH Valid の API アドレスが無効です',
+  'teiah.error.notConfigured': 'TeiaH Valid 連携が設定されていません',
+  'teiah.error.apiKeyInvalid': 'API キーが無効です',
+  'teiah.error.apiKeyMissing': 'TeiaH Valid の API キーを入力してください',
+  'teiah.error.blockedHost': 'このアドレスは TeiaH Valid に使用できません',
+  'teiah.error.unreachable': 'TeiaH Valid に接続できませんでした',
+  'teiah.error.timeout': 'TeiaH Valid が制限時間内に応答しませんでした',
+  'teiah.error.invalidResponse': 'TeiaH Valid が無効な応答を返しました',
+  'teiah.error.credentialsRejected': 'TeiaH Valid が API キーを拒否しました',
+  'teiah.error.rateLimited': 'TeiaH Valid がリクエストを制限しています。後で再試行してください',
+  'teiah.error.status': 'TeiaH Valid がステータス {status} を返しました',
+  'teiah.error.exportRunning': 'TeiaH Valid への送信はすでに実行中です'
 };

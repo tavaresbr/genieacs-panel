@@ -55,6 +55,9 @@ export const SCOPED_TABLES = new Set([
   // A ficha completa de cada cliente do SGP: endereço, nascimento, todos os
   // telefones e e-mails. O dado mais pessoal do painel inteiro.
   'sgp_clients',
+  // O que foi enviado à TeiaH Valid: contrato e valor em aberto de quem
+  // cancelou devendo. Dado de assinante, e de um provedor só.
+  'teiah_exports',
   // The ERP event log, and the heaviest concentration of personal data here:
   // contract, document, PPPoE login, device id and a redacted payload, per
   // event. Deployment-wide it also had a second failure that read as no

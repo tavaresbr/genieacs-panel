@@ -75,6 +75,7 @@ export default {
   'rateLimit.telegramTest': '텔레그램 테스트가 너무 많습니다. 1분 기다리세요',
   'rateLimit.platformExport': '내보내기 요청이 너무 많습니다. 잠시 후 다시 시도하십시오',
   'rateLimit.sgpSync': '전체 동기화 요청이 너무 많습니다. 나중에 다시 시도하십시오.',
+  'rateLimit.teiah': 'TeiaH Valid 요청이 너무 많습니다. 나중에 다시 시도하십시오.',
 
   // 장비
   'device.idRequired': '장비 ID가 필요합니다',
@@ -892,4 +893,28 @@ export default {
   'contacts.import.badHeader': '첫 줄에 내보내기 열(Chave, Contrato, CPF/CNPJ 또는 Nome)이 있어야 합니다',
   'contacts.import.rowNotFound': '키 또는 계약을 찾을 수 없습니다',
   'contacts.import.rowNoName': '이름 없는 새 고객',
+
+  // TeiaH Valid
+  'teiah.configLoaded': 'TeiaH Valid 설정을 불러왔습니다',
+  'teiah.configLoadFailed': 'TeiaH Valid 설정을 불러오지 못했습니다',
+  'teiah.configSaved': 'TeiaH Valid 설정을 저장했습니다',
+  'teiah.configSaveFailed': 'TeiaH Valid 설정을 저장하지 못했습니다',
+  'teiah.connectionOk': 'TeiaH Valid에 연결되었고 키가 승인되었습니다',
+  'teiah.connectionTestFailed': 'TeiaH Valid 연결 테스트에 실패했습니다',
+  'teiah.exportLoaded': 'TeiaH Valid 전송 상태를 불러왔습니다',
+  'teiah.exportPreviewed': 'TeiaH Valid 전송 미리보기를 만들었습니다',
+  'teiah.exportStarted': 'TeiaH Valid 전송을 시작했습니다',
+  'teiah.exportFailed': 'TeiaH Valid 전송에 실패했습니다',
+  'teiah.error.urlInvalid': 'TeiaH Valid API 주소가 올바르지 않습니다',
+  'teiah.error.notConfigured': 'TeiaH Valid 연동이 설정되지 않았습니다',
+  'teiah.error.apiKeyInvalid': 'API 키가 올바르지 않습니다',
+  'teiah.error.apiKeyMissing': 'TeiaH Valid API 키를 입력하십시오',
+  'teiah.error.blockedHost': '이 주소는 TeiaH Valid에 허용되지 않습니다',
+  'teiah.error.unreachable': 'TeiaH Valid에 연결할 수 없습니다',
+  'teiah.error.timeout': 'TeiaH Valid가 제한 시간 내에 응답하지 않았습니다',
+  'teiah.error.invalidResponse': 'TeiaH Valid가 잘못된 응답을 보냈습니다',
+  'teiah.error.credentialsRejected': 'TeiaH Valid가 API 키를 거부했습니다',
+  'teiah.error.rateLimited': 'TeiaH Valid가 요청을 제한하고 있습니다. 나중에 다시 시도하십시오',
+  'teiah.error.status': 'TeiaH Valid가 상태 코드 {status}(으)로 응답했습니다',
+  'teiah.error.exportRunning': 'TeiaH Valid 전송이 이미 진행 중입니다'
 };
