@@ -286,6 +286,7 @@ export default {
   'mapping.statusReady': "已获取网络状态",
   'mapping.statusFailed': "暂时无法读取设备状态",
   'mapping.outagesReady': "已获取断纤历史",
+  'mapping.clientLocationMissing': "请提供客户的 PPPoE 或设备",
   'mapping.searchTooShort': "请至少输入 3 个字符进行搜索。",
   'mapping.searchDone': "搜索完成",
   'mapping.searchFailed': "暂时无法搜索地址，请稍后再试。",

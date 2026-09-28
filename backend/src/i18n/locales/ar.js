@@ -285,6 +285,7 @@ export default {
   'mapping.statusReady': "تم جلب حالة الشبكة",
   'mapping.statusFailed': "تعذّر قراءة حالة الأجهزة الآن",
   'mapping.outagesReady': "تم جلب سجل الانقطاعات",
+  'mapping.clientLocationMissing': "أدخل PPPoE العميل أو جهازه",
   'mapping.searchTooShort': "اكتب 3 أحرف على الأقل للبحث.",
   'mapping.searchDone': "اكتمل البحث",
   'mapping.searchFailed': "تعذّر البحث عن العنوان الآن. حاول مرة أخرى بعد قليل.",

@@ -9,9 +9,14 @@ import { Icon } from '@/components/ui/icon'
  * Busca só ao Enter ou no botão, nunca a cada tecla: quem responde é o
  * Nominatim, que pede uma consulta por segundo para o painel inteiro.
  */
-export function MapAddressSearch({ onPick }: { onPick: (place: PlaceResult) => void }) {
+export function MapAddressSearch({ onPick, initialQuery = '', className }: {
+  onPick: (place: PlaceResult) => void
+  /** O que a caixa já traz escrito — o endereço do SGP, no "Colocar no mapa". */
+  initialQuery?: string
+  className?: string
+}) {
   const { t } = useTranslation()
-  const [q, setQ] = useState('')
+  const [q, setQ] = useState(initialQuery)
   const [busy, setBusy] = useState(false)
   const [results, setResults] = useState<PlaceResult[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -47,7 +52,7 @@ export function MapAddressSearch({ onPick }: { onPick: (place: PlaceResult) => v
   }
 
   return (
-    <div className="relative w-full sm:w-80">
+    <div className={className ?? 'relative w-full sm:w-80'}>
       <form onSubmit={search} className="flex gap-2" role="search">
         <input
           type="search"

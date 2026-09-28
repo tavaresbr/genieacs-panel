@@ -284,6 +284,7 @@ export default {
   'mapping.statusReady': "Stato della rete ottenuto",
   'mapping.statusFailed': "Impossibile leggere lo stato dei dispositivi in questo momento",
   'mapping.outagesReady': "Cronologia delle interruzioni ottenuta",
+  'mapping.clientLocationMissing': "Indica il PPPoE o il dispositivo del cliente",
   'mapping.searchTooShort': "Digita almeno 3 caratteri per cercare.",
   'mapping.searchDone': "Ricerca completata",
   'mapping.searchFailed': "Impossibile cercare l'indirizzo in questo momento. Riprova tra poco.",

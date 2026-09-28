@@ -286,6 +286,7 @@ export default {
   'mapping.statusReady': "Network status retrieved",
   'mapping.statusFailed': "Could not read the device status right now",
   'mapping.outagesReady': "Outage history retrieved",
+  'mapping.clientLocationMissing': "Provide the client's PPPoE or device",
   'mapping.searchTooShort': "Type at least 3 characters to search.",
   'mapping.searchDone': "Search complete",
   'mapping.searchFailed': "Could not search the address right now. Try again shortly.",

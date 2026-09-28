@@ -3104,6 +3104,10 @@ export const mappingAPI = {
   outageHistory: (days = 90) =>
     apiClient.get<OutageHistory>(`/mapping-data/outages?days=${days}`),
 
+  /** Onde fica a casa do cliente, pelo endereço do SGP (coordenadas ou endereço geocodificado). */
+  clientLocation: (pppoe: string, deviceId?: string | null) =>
+    apiClient.get<ClientLocation>(`/mapping-data/client-location?${new URLSearchParams({ pppoe, ...(deviceId ? { deviceId } : {}) })}`),
+
   /** Equipamentos com PPPoE que ainda não estão no mapa. */
   unmappedDevices: () =>
     apiClient.get<{ total: number; items: UnmappedDevice[] }>('/mapping-data/unmapped'),
@@ -3152,6 +3156,17 @@ export interface OutageHistory {
     total_clients: number
   }>
   byNode: Array<{ node_id: string; node_name: string | null; count: number; minutes: number; last_at: string }>
+}
+
+export interface ClientLocation {
+  found: boolean
+  contract?: string | null
+  clientName?: string | null
+  address?: string | null
+  lat?: number
+  lng?: number
+  /** `sgp`: coordenadas do SGP; `address`: achado pela rua; `city`: só a cidade. */
+  precision?: 'sgp' | 'address' | 'city'
 }
 
 export interface UnmappedDevice {
