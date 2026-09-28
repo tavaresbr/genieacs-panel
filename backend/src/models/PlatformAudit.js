@@ -57,6 +57,8 @@ class PlatformAudit {
     // A Fase 5: o que o plano de controle fez com a assinatura de um provedor.
     PLAN_CREATED: 'plan.created',
     PLAN_UPDATED: 'plan.updated',
+    // Um pedido de demonstração da página pública mudou de etapa.
+    LEAD_UPDATED: 'lead.updated',
     SUBSCRIPTION_PLAN_CHANGED: 'subscription.plan_changed',
     SUBSCRIPTION_STATUS_CHANGED: 'subscription.status_changed',
     PAYMENT_RECORDED: 'subscription.payment_recorded',

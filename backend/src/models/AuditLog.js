@@ -46,6 +46,13 @@ class AuditLog {
     // O bot ou o grupo do Telegram dos alertas mudou. `{ tokenChanged, chatId }`
     // — o grupo não é segredo e é o que se procura; o token nunca vem aqui.
     ALERTS_TELEGRAM_CHANGED: 'alerts.telegram_changed',
+    // A régua de cobrança automática foi ligada, desligada ou teve as etapas
+    // trocadas. Ligar é o ato que faz o painel mandar mensagem sozinho para
+    // centenas de assinantes, e a pergunta "quem ligou isso?" tem que ter
+    // resposta. O `detail` guarda as etapas e os limites, nunca um telefone.
+    WHATSAPP_DUNNING_ENABLED: 'whatsapp.dunning_enabled',
+    WHATSAPP_DUNNING_DISABLED: 'whatsapp.dunning_disabled',
+    WHATSAPP_DUNNING_SAVED: 'whatsapp.dunning_saved',
     // A conta de portal do assinante ANTERIOR de uma ONT foi encerrada, porque
     // o aparelho passou a reportar outro login PPPoE. É destrutivo — o Customer
     // ID muda, a senha do portal é recunhada e o vínculo com o ERP é apagado —

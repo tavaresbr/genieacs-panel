@@ -15,7 +15,7 @@ import { ConversationList } from '@/components/whatsapp/conversation-list'
 import { ConversationThread } from '@/components/whatsapp/conversation-thread'
 import { SubscriberPanel } from '@/components/whatsapp/subscriber-panel'
 import { ThreadComposer, type ComposerAttachment } from '@/components/whatsapp/thread-composer'
-import { BillingPanel } from '@/components/whatsapp/billing-panel'
+import { DunningSection } from '@/components/whatsapp/dunning-section'
 import { CampaignsPanel } from '@/components/whatsapp/campaigns-panel'
 import { TemplatesPanel } from '@/components/whatsapp/templates-panel'
 import { OptOutPanel } from '@/components/whatsapp/opt-out-panel'
@@ -601,11 +601,18 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
           // página, nesta aba, troca o respiro de baixo pela área segura do
           // iPhone (ver `WhatsAppPage`), e a conta desconta o mesmo.
           <section
-            className={`modern-card grid h-[calc(100dvh-9rem-env(safe-area-inset-bottom))] min-h-[22rem] grid-cols-1 overflow-hidden lg:h-[calc(100vh-6.875rem)] lg:min-h-[32rem] lg:grid-cols-[minmax(17rem,22rem)_1fr] ${
-              showSgpPanel && conversation ? 'xl:grid-cols-[minmax(16rem,20rem)_1fr_minmax(18rem,22rem)]' : ''
+            className={`modern-card grid h-[calc(100dvh-9rem-env(safe-area-inset-bottom))] min-h-[22rem] grid-cols-1 overflow-hidden lg:h-[calc(100vh-6.875rem)] lg:min-h-[32rem] ${
+              // Uma classe de colunas por vez: duas `lg:grid-cols-*` juntas
+              // dependem da ordem do CSS gerado, e o painel caía numa segunda linha.
+              // Com o Módulo SGP aberto, o painel é sempre uma coluna (nunca por
+              // cima da conversa). Abaixo de 1200 px não cabem três: a lista de
+              // conversas sai enquanto o módulo está aberto.
+              showSgpPanel && conversation
+                ? 'lg:grid-cols-[1fr_minmax(16rem,20rem)] min-[1200px]:grid-cols-[minmax(14rem,17rem)_1fr_minmax(16rem,19rem)] xl:grid-cols-[minmax(16rem,20rem)_1fr_minmax(18rem,22rem)]'
+                : 'lg:grid-cols-[minmax(17rem,22rem)_1fr]'
             }`}
           >
-            <div className={`${panes.list} min-h-0 flex-col border-border lg:border-e`}>
+            <div className={`${showSgpPanel && conversation ? 'hidden min-[1200px]:flex' : panes.list} min-h-0 flex-col border-border lg:border-e`}>
               <div className="space-y-2 border-b border-border px-3 py-3">
                 <div className="flex items-center gap-2">
                   <input
@@ -713,7 +720,7 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
               />
             )}
             {showSgpPanel && conversation && (
-              <div className="fixed inset-y-0 end-0 z-[1500] w-[min(22rem,100vw)] border-s border-border bg-card pr-[env(safe-area-inset-right)] shadow-xl xl:static xl:pr-0 xl:z-auto xl:h-full xl:min-h-0 xl:w-auto xl:shadow-none">
+              <div className="fixed inset-y-0 end-0 z-[1500] w-[min(22rem,100vw)] border-s border-border bg-card pr-[env(safe-area-inset-right)] shadow-xl lg:static lg:pr-0 lg:z-auto lg:h-full lg:min-h-0 lg:w-auto lg:shadow-none">
                 <SubscriberPanel
                   conversationId={conversation.id}
                   boundContract={conversation.contract}
@@ -1015,7 +1022,7 @@ export default function WhatsAppPage() {
             }}
           />
         )}
-        {tab === 'billing' && <BillingPanel />}
+        {tab === 'billing' && <DunningSection />}
         {tab === 'campaigns' && <CampaignsPanel />}
         {tab === 'templates' && <TemplatesPanel />}
         {tab === 'optOut' && <OptOutPanel />}

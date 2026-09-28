@@ -1,6 +1,8 @@
 import WaBillingService from '../services/waBillingService.js';
 import WaBroadcastService from '../services/waBroadcastService.js';
 import WaTemplateService from '../services/waTemplateService.js';
+import WaDunningService from '../services/waDunningService.js';
+import AuditLog from '../models/AuditLog.js';
 import WaOptOut from '../models/WaOptOut.js';
 import { WaError } from '../services/whatsappConfigService.js';
 import { SgpError } from '../services/sgpService.js';
@@ -39,6 +41,17 @@ function publicOptOut(row) {
     origin: row.origin,
     reasonText: row.reason_text || null,
     createdAt: row.created_at || null
+  };
+}
+
+/** What the audit trail keeps of a cadence: its shape, never a phone. */
+function auditDetail(rule) {
+  return {
+    enabled: rule.enabled === true,
+    steps: (rule.steps || []).map((step) => ({ offsetDays: step.offsetDays, templateId: step.templateId })),
+    maxPerInvoice: rule.maxPerInvoice,
+    minIntervalHours: rule.minIntervalHours,
+    thanksTemplateId: rule.thanksTemplateId ?? null
   };
 }
 
@@ -231,6 +244,114 @@ class WhatsAppBillingController {
       ));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.broadcast.loadFailed');
+    }
+  }
+
+  // ── Automatic billing cadence ────────────────────────────────────────
+
+  static async getDunningRule(req, res) {
+    try {
+      return res.json(createResponse(req.t('whatsapp.dunning.loaded'), await WaDunningService.publicRule()));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.dunning.loadFailed');
+    }
+  }
+
+  /** Saves steps, window and limits. It never switches the cadence on. */
+  static async saveDunningRule(req, res) {
+    try {
+      const body = req.body ?? {};
+      const rule = await WaDunningService.saveRule({
+        steps: body.steps,
+        window: body.window,
+        maxPerInvoice: body.maxPerInvoice,
+        minIntervalHours: body.minIntervalHours,
+        maxPerRun: body.maxPerRun,
+        thanksTemplateId: body.thanksTemplateId
+      });
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.WHATSAPP_DUNNING_SAVED,
+        subjectType: 'dunning',
+        subjectId: null,
+        detail: auditDetail(rule)
+      });
+      return res.json(createResponse(req.t('whatsapp.dunning.saved'), await WaDunningService.publicRule()));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.dunning.saveFailed');
+    }
+  }
+
+  /**
+   * The switch. Its own route, and its own line in the audit trail: turning
+   * this on is what makes the panel message subscribers by itself.
+   */
+  static async setDunningEnabled(req, res) {
+    try {
+      const enabled = req.body?.enabled === true;
+      const rule = await WaDunningService.setEnabled(enabled, req.user?.userId ?? null);
+      await AuditLog.fromRequest(req, {
+        action: enabled ? AuditLog.ACTIONS.WHATSAPP_DUNNING_ENABLED : AuditLog.ACTIONS.WHATSAPP_DUNNING_DISABLED,
+        subjectType: 'dunning',
+        subjectId: null,
+        detail: auditDetail(rule)
+      });
+      return res.json(createResponse(
+        req.t(enabled ? 'whatsapp.dunning.enabled' : 'whatsapp.dunning.disabled'),
+        await WaDunningService.publicRule()
+      ));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.dunning.saveFailed');
+    }
+  }
+
+  /** Who would get which step today. Sends nothing. */
+  static async previewDunning(req, res) {
+    try {
+      const summary = await WaDunningService.run({ dryRun: true });
+      return res.json(createResponse(req.t('whatsapp.dunning.previewReady', { count: summary.queued }), summary));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.dunning.previewFailed');
+    }
+  }
+
+  /**
+   * One pass now, in the background. A pass is one ERP round trip per
+   * contract, which on a real provider is minutes: the request answers as soon
+   * as the pass has started, and the screen reads the outcome from `lastRun`.
+   */
+  static async runDunning(req, res) {
+    try {
+      await WaDunningService.assertCanRun();
+      void WaDunningService.run({ manual: true }).catch((error) => {
+        console.warn(`[wa] régua: passada manual falhou: ${error.code || error.message}`);
+      });
+      return res.status(202).json(createResponse(req.t('whatsapp.dunning.runStarted'), { started: true }));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.dunning.runFailed');
+    }
+  }
+
+  static async listDunningSends(req, res) {
+    try {
+      const page = await WaDunningService.listSends({
+        contract: req.query?.contract,
+        status: req.query?.status,
+        kind: req.query?.kind,
+        limit: req.query?.limit,
+        offset: req.query?.offset
+      });
+      return res.json(createResponse(req.t('whatsapp.dunning.sendsLoaded', { count: page.items.length }), page));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.dunning.loadFailed');
+    }
+  }
+
+  static async dunningStats(req, res) {
+    try {
+      const stats = await WaDunningService.stats({ days: req.query?.days });
+      return res.json(createResponse(req.t('whatsapp.dunning.statsLoaded'), stats));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.dunning.loadFailed');
     }
   }
 

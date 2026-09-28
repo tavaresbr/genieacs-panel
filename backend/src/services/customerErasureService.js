@@ -142,6 +142,12 @@ class CustomerErasureService {
           if (contratos.length) w.orWhereIn('contract', contratos);
         }))
         : 0,
+      wa_dunning_sends: (telefones.length || contratos.length)
+        ? await contar('wa_dunning_sends', (q) => q.where((w) => {
+          if (telefones.length) w.whereIn('phone_e164', telefones);
+          if (contratos.length) w.orWhereIn('contract', contratos);
+        }))
+        : 0,
       mapping_nodes: nos.length
     };
 
@@ -270,6 +276,17 @@ class CustomerErasureService {
           if (telefones.length) q.whereIn('phone_e164', telefones);
           if (contratos.length) q.orWhereIn('contract', contratos);
         }).update({ phone_e164: '', client_name: null, rendered_body: '' });
+      }
+
+      // O histórico da régua automática sai inteiro: é quem foi cobrado,
+      // quanto e em que número — e nada nele é do provedor. A trava contra
+      // cobrança repetida vai junto, e é o certo: um contrato apagado não
+      // tem mais fatura a cobrar.
+      if (telefones.length || contratos.length) {
+        await tdb('wa_dunning_sends', trx).where((q) => {
+          if (telefones.length) q.whereIn('phone_e164', telefones);
+          if (contratos.length) q.orWhereIn('contract', contratos);
+        }).del();
       }
 
       if (noIds.length) {

@@ -1175,6 +1175,52 @@ const OUTAGE_HISTORY_TABLES = [
  * mostra. Preço em centavos e moeda ao lado, porque o mercado é o brasileiro
  * mas o código não precisa saber disso.
  */
+/**
+ * A vitrine do plano: o que a página pública mostra dele — ver 0079.
+ *
+ * `public` nasce falso: um plano que existe no catálogo não vira oferta no
+ * site só porque alguém o criou. É o console que decide o que se vende ali.
+ * `features` é uma lista JSON de frases curtas, a mesma forma de
+ * `plan_patterns`. `price_yearly_cents` é só o preço anunciado da opção anual;
+ * o que se cobra continua sendo `price_cents` por `period_days`.
+ */
+const PLAN_MARKETING_COLUMNS = [
+  ['public', (t) => t.boolean('public').notNullable().defaultTo(false)],
+  ['featured', (t) => t.boolean('featured').notNullable().defaultTo(false)],
+  ['sort_order', (t) => t.integer('sort_order').notNullable().defaultTo(0)],
+  ['description', (t) => t.text('description')],
+  ['features', (t) => t.text('features')],
+  ['price_yearly_cents', (t) => t.integer('price_yearly_cents').unsigned()]
+];
+
+/**
+ * Quem pediu demonstração pela página pública. Da PLATAFORMA, e não de um
+ * provedor: é gente que ainda não é cliente — o provedor dela não existe.
+ */
+const leadsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.string('name', 128).notNullable();
+  t.string('company', 160);
+  t.string('email', 160);
+  t.string('phone', 32);
+  t.string('city', 80);
+  t.integer('devices_estimate').unsigned();
+  t.text('message');
+  t.string('plan_code', 32);
+  // new | contacted | won | lost
+  t.string('status', 16).notNullable().defaultTo('new');
+  t.text('notes');
+  t.string('source', 32).notNullable().defaultTo('landing');
+  t.string('ip', 64);
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  t.timestamp('updated_at').defaultTo(db.fn.now());
+  t.index(['status', 'created_at'], 'leads_status_created_idx');
+};
+
+const LEAD_TABLES = [
+  ['leads', leadsTable]
+];
+
 const plansTable = (db) => (t) => {
   t.increments('id').primary();
   t.string('code', 32).notNullable().unique();
@@ -1210,6 +1256,7 @@ const plansTable = (db) => (t) => {
   t.integer('max_audit_retention_days').unsigned();
   t.integer('max_message_retention_days').unsigned();
   t.integer('max_media_retention_days').unsigned();
+  for (const [, add] of PLAN_MARKETING_COLUMNS) add(t);
   // Um plano desativado não some — assinaturas ainda apontam para ele — mas
   // deixa de ser oferecido a provedor novo.
   t.boolean('active').notNullable().defaultTo(true);
@@ -1585,6 +1632,59 @@ const TEIAH_TABLES = [
 ];
 
 /**
+ * A régua de cobrança automática: cada mensagem que ela decidiu mandar — ou
+ * decidiu NÃO mandar, e por quê — para uma fatura. Ver `waDunningService.js`.
+ *
+ * A configuração da régua (etapas, janela, teto) mora em `app_state`, como a
+ * do chatbot: é uma por provedor. Esta tabela é o histórico, e é também a
+ * trava. O índice único (fatura, tipo, etapa) é o que faz "uma vez por etapa
+ * por fatura" valer mesmo com duas passadas ao mesmo tempo: a segunda esbarra
+ * no índice e não enfileira nada.
+ *
+ * `step_offset` é NOT NULL de propósito, com 0 no agradecimento: NULL não
+ * colide em índice único em nenhum dos três bancos, e um agradecimento
+ * repetido é exatamente o que o índice tem de recusar. `kind` separa o 0 do
+ * agradecimento do 0 da etapa "vence hoje".
+ *
+ * Se a mensagem saiu ou falhou, quem sabe é `wa_messages.delivery_status`,
+ * lido por junção: guardar aqui de novo seria uma segunda memória com chance
+ * de discordar da primeira.
+ */
+const waDunningSendsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.string('kind', 8).notNullable(); // step | thanks
+  t.integer('step_offset').notNullable().defaultTo(0);
+  t.string('contract', 64).notNullable();
+  // O número do título no SGP, ou `venc:<data>:<valor>` quando o ERP não dá um.
+  t.string('invoice_key', 128).notNullable();
+  t.string('due_date', 10);
+  t.decimal('amount', 12, 2);
+  t.string('client_name', 255);
+  t.string('phone_e164', 24);
+  t.integer('template_id').unsigned()
+    .references('id').inTable('wa_templates').onDelete('SET NULL');
+  t.integer('message_id').unsigned()
+    .references('id').inTable('wa_messages').onDelete('SET NULL');
+  // queued | skipped | canceled
+  t.string('status', 16).notNullable();
+  t.string('reason', 32);
+  // Quando o painel soube que a fatura foi paga — pelo webhook do SGP ou por
+  // ela ter sumido das em aberto numa passada.
+  t.timestamp('paid_at');
+  t.timestamp('created_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('updated_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['tenant_id', 'contract', 'invoice_key', 'kind', 'step_offset'], 'wa_dunning_sends_step_uq');
+  t.index(['tenant_id', 'created_at'], 'wa_dunning_sends_created_idx');
+  t.index(['tenant_id', 'contract'], 'wa_dunning_sends_contract_idx');
+};
+
+const DUNNING_TABLES = [
+  ['wa_dunning_sends', waDunningSendsTable]
+];
+
+/**
  * Os códigos de recuperação do login em duas etapas — ver `0059_user_totp`.
  * Só o hash de cada código: são senhas de uso único.
  */
@@ -1872,7 +1972,9 @@ export const SCHEMA_TABLES = [
   ...GENIEACS_CONNECTION_TABLES,
   ...LOCKOUT_TABLES,
   ...MAINTENANCE_TABLES,
-  ...TEIAH_TABLES
+  ...TEIAH_TABLES,
+  ...LEAD_TABLES,
+  ...DUNNING_TABLES
 ].map(([name]) => name);
 
 /**
@@ -4516,6 +4618,57 @@ export const migrations = [
       await db.schema.alterTable('billing_charges', (t) => {
         for (const add of missing) add(t);
       });
+    }
+  },
+  {
+    /**
+     * O plano como a página pública o mostra: se aparece, em que ordem, se é
+     * o destaque, e as frases que o vendem. Ver `PLAN_MARKETING_COLUMNS`.
+     */
+    id: '0079_plans_marketing',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('plans'))) return true;
+      return (await missingColumns(db, 'plans', PLAN_MARKETING_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('plans'))) return;
+      const missing = await missingColumns(db, 'plans', PLAN_MARKETING_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('plans', (t) => {
+        for (const add of missing) add(t);
+      });
+    }
+  },
+  {
+    /** Os pedidos de demonstração da página pública — ver `leadsTable`. */
+    id: '0080_leads',
+    async isApplied(db) {
+      return db.schema.hasTable('leads');
+    },
+    async up(db) {
+      for (const [nome, construtor] of LEAD_TABLES) {
+        // eslint-disable-next-line no-await-in-loop -- uma tabela só
+        await createTableIfMissing(db, nome, construtor(db));
+      }
+    }
+  },
+  {
+    /**
+     * A régua de cobrança automática — ver `waDunningSendsTable`. A tabela
+     * nasce com o provedor, como as outras desde a 0053, e por isso depende de
+     * `tenants` e de `wa_templates`/`wa_messages` existirem.
+     */
+    id: '0081_wa_dunning_sends',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      return db.schema.hasTable('wa_dunning_sends');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      for (const [nome, construtor] of DUNNING_TABLES) {
+        // eslint-disable-next-line no-await-in-loop -- uma tabela só, hoje
+        await createTableIfMissing(db, nome, construtor(db));
+      }
     }
   }
 ];

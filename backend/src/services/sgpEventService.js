@@ -5,6 +5,7 @@ import SgpEvent from '../models/SgpEvent.js';
 import SgpLink from '../models/SgpLink.js';
 import ProvisioningService from './provisioningService.js';
 import SgpService, { SgpError } from './sgpService.js';
+import WaDunningService from './waDunningService.js';
 
 const RECONCILE_STATE_KEY = 'sgp_reconcile_state';
 const MAX_PAYLOAD_CHARS = 64_000;
@@ -101,6 +102,14 @@ class SgpEventService {
    * network's job, not the panel's.
    */
   static async processEvent(event, { skipRefresh = false } = {}) {
+    // Pagou, a régua para: a cobrança que ainda está na fila sai dela, e o
+    // agradecimento, se configurado, vai. Antes de resolver aparelhos porque
+    // não depende deles — um contrato sem ONT no painel também é cobrado — e
+    // sem lançar: `onPayment` engole os próprios erros.
+    if (event.type === 'payment_confirmed' && event.contract) {
+      await WaDunningService.onPayment(event.contract);
+    }
+
     const deviceIds = await this.resolveDevices(event);
     const details = [];
 

@@ -427,6 +427,15 @@ class CustomerDataExportService {
       }).orderBy('id')
       : []);
 
+    // A régua automática: cada cobrança e agradecimento mandados a esta
+    // pessoa, com o valor e o telefone de então.
+    guardar('wa_dunning_sends', (todosTelefones.length || contratos.length)
+      ? await tdb('wa_dunning_sends').where((q) => {
+        if (todosTelefones.length) q.whereIn('phone_e164', todosTelefones);
+        if (contratos.length) q.orWhereIn('contract', contratos);
+      }).orderBy('id')
+      : []);
+
     guardar('mapping_nodes', nos);
     guardar('mapping_edges', noIds.length
       ? await tdb('mapping_edges').where((q) => {
