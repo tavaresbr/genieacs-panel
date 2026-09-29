@@ -126,7 +126,10 @@ describe('a conversa que só recebeu cobrança', () => {
 describe('a conversa que já tem gente', () => {
   it('não sobe para o topo com uma cobrança automática', async () => {
     const id = await cobranca('5593981120004');
-    const antes = new Date(Date.now() - 3600_000);
+    // Em segundos inteiros: o TIMESTAMP do MySQL não guarda milissegundos, e
+    // um `…839` gravado volta `…000` — a comparação acusaria uma mudança que
+    // não houve.
+    const antes = new Date(Math.floor((Date.now() - 3600_000) / 1000) * 1000);
     await asTenant(() => WaConversation.update(id, { engaged_at: antes, last_message_at: antes }));
 
     await asTenant(() => WaSendService.enqueue({ conversationId: id, body: 'Lembrete.', source: 'campaign' }));
