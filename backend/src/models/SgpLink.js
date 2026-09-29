@@ -105,6 +105,12 @@ class SgpLink {
     return Number(row?.total ?? 0);
   }
 
+  /** The links of several contracts at once — one `IN`, for the billing cadence. */
+  static async getByContracts(contracts) {
+    if (!Array.isArray(contracts) || contracts.length === 0) return [];
+    return tdb('sgp_links').whereIn('contract', contracts.map(String)).orderBy('device_id', 'asc');
+  }
+
   static async getAll() {
     return tdb('sgp_links').orderBy('device_id', 'asc');
   }
