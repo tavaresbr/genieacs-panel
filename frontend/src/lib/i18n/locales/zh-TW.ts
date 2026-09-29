@@ -2140,6 +2140,7 @@ const zhTW: Dictionary = {
   'whatsapp.inbox.closed': '已結束',
   'whatsapp.inbox.closeHint': '這是歸檔而非刪除。紀錄會保留，對方再次來訊時會重新開啟。',
   'whatsapp.inbox.filterOpen': '開啟中',
+  'whatsapp.inbox.filterNoReply': '未回覆',
   'whatsapp.inbox.filterClosed': '已結束',
   'whatsapp.inbox.filterAll': '全部',
   'whatsapp.inbox.searchPlaceholder': '號碼、姓名或合約',

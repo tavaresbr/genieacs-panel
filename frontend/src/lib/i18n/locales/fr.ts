@@ -2427,6 +2427,7 @@ const fr: Dictionary = {
   'whatsapp.inbox.closed': 'Clôturée',
   'whatsapp.inbox.closeHint': 'Classée, pas supprimée. L’historique reste, et un nouveau message la rouvre.',
   'whatsapp.inbox.filterOpen': 'Ouvertes',
+  'whatsapp.inbox.filterNoReply': 'Sans réponse',
   'whatsapp.inbox.filterClosed': 'Clôturées',
   'whatsapp.inbox.filterAll': 'Toutes',
   'whatsapp.inbox.searchPlaceholder': 'Numéro, nom ou contrat',

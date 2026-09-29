@@ -2145,6 +2145,7 @@ const ko: Dictionary = {
   'whatsapp.inbox.closed': '종료됨',
   'whatsapp.inbox.closeHint': '삭제가 아니라 보관입니다. 기록은 유지되며 상대가 새 메시지를 보내면 다시 열립니다.',
   'whatsapp.inbox.filterOpen': '열림',
+  'whatsapp.inbox.filterNoReply': '응답 없음',
   'whatsapp.inbox.filterClosed': '종료됨',
   'whatsapp.inbox.filterAll': '전체',
   'whatsapp.inbox.searchPlaceholder': '번호, 이름 또는 계약',

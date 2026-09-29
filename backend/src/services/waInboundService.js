@@ -365,6 +365,10 @@ async function gravarMensagem(account, item) {
 
   // 8. O topo da lista de conversas.
   const patch = { last_message_at: agora };
+  // Gente dos dois lados: o cliente escreveu, ou o provedor respondeu pelo
+  // próprio celular (o eco `fromMe`). Qualquer um dos dois tira a conversa de
+  // "Sem resposta" e a põe em "Abertas".
+  if (!conversation.engaged_at) patch.engaged_at = agora;
   if (!fromMe) {
     patch.last_inbound_at = agora;
     // Quem escreveu de novo reabre o próprio fio. Encerrar é arquivar, e um

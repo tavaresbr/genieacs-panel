@@ -123,7 +123,22 @@ class WaSendService {
 
     // The conversation list is ordered by this column, so a thread the operator
     // just answered has to rise even before the worker despatches the message.
-    await WaConversation.update(conversation.id, { last_message_at: now });
+    //
+    // Só o que tem gente por trás mexe na caixa de entrada. A cobrança, a
+    // campanha e o alerta ficam no histórico da conversa, mas não a trazem
+    // para o topo nem para "Abertas": com a régua ligada, cada fatura do mês
+    // viraria uma conversa ali. A exceção é a conversa que ainda não teve
+    // gente (`engaged_at` nulo) — ela vive em "Sem resposta", e é lá que o
+    // envio automático a ordena.
+    const humano = source === 'operator';
+    if (humano) {
+      await WaConversation.update(conversation.id, {
+        last_message_at: now,
+        ...(conversation.engaged_at ? {} : { engaged_at: now })
+      });
+    } else if (source === 'bot' || !conversation.engaged_at) {
+      await WaConversation.update(conversation.id, { last_message_at: now });
+    }
     return message;
   }
 

@@ -4725,6 +4725,43 @@ export const migrations = [
         for (const add of missing) add(t);
       });
     }
+  },
+  {
+    /**
+     * Desde quando a conversa tem gente dos dois lados: o cliente escreveu, ou
+     * um atendente escreveu nela. Nula é a conversa que só recebeu envio
+     * automático (régua, campanha, alerta) — ela sai de "Abertas" e fica em
+     * "Sem resposta", para a cobrança do mês não encher a caixa de entrada.
+     *
+     * O preenchimento das linhas antigas é o que evita esvaziar a caixa de
+     * quem já usa o painel: conta como engajada toda conversa que já teve
+     * entrada do cliente ou mensagem de atendente. A que só tem envio
+     * automático fica nula, que é exatamente onde ela deveria estar.
+     */
+    id: '0084_wa_conversations_engaged_at',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('wa_conversations'))) return true;
+      return db.schema.hasColumn('wa_conversations', 'engaged_at');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('wa_conversations'))) return;
+      if (!(await db.schema.hasColumn('wa_conversations', 'engaged_at'))) {
+        await db.schema.alterTable('wa_conversations', (t) => {
+          t.timestamp('engaged_at').nullable();
+          t.index(['tenant_id', 'closed_at', 'engaged_at'], 'wa_conversations_engaged_idx');
+        });
+      }
+      await db('wa_conversations')
+        .whereNull('engaged_at')
+        .where((q) => q
+          .whereNotNull('last_inbound_at')
+          .orWhereExists((sub) => sub
+            .select(db.raw('1'))
+            .from('wa_messages')
+            .whereRaw('wa_messages.conversation_id = wa_conversations.id')
+            .where({ direction: 'out', source: 'operator' })))
+        .update({ engaged_at: db.raw('COALESCE(last_inbound_at, last_message_at, created_at)') });
+    }
   }
 ];
 export default migrations;

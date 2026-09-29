@@ -4330,7 +4330,8 @@ export const whatsappAPI = {
     limit?: number
     offset?: number
     search?: string
-    status?: 'open' | 'closed' | 'all'
+    /** 'noreply': só envios automáticos, o cliente ainda não respondeu. */
+    status?: 'open' | 'noreply' | 'closed' | 'all'
   } = {}) => {
     const query = new URLSearchParams()
     if (params.limit) query.set('limit', String(params.limit))

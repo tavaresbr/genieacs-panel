@@ -385,7 +385,12 @@ class WaContactService {
     } else {
       const [contact] = await this.decorate([subscriber]);
       if (contact.conversationId) {
-        const existing = await WaConversation.getById(contact.conversationId);
+        let existing = await WaConversation.getById(contact.conversationId);
+        // A conversa que só tinha cobrança automática: o atendente abriu, ela
+        // passa a "Abertas".
+        if (existing && !existing.engaged_at) {
+          existing = await WaConversation.update(existing.id, { engaged_at: new Date() });
+        }
         return { conversation: await WaConversationService.decorate(existing), created: false };
       }
     }
@@ -412,19 +417,23 @@ class WaContactService {
       pushName: subscriber.clientName || null
     });
     const customer = subscriber.deviceId ? await CustomerAccount.getByDeviceId(subscriber.deviceId) : null;
+    // Foi o atendente quem abriu: a conversa vai para "Abertas" mesmo que até
+    // aqui ela só tivesse cobrança automática.
+    const engaged = conversation.engaged_at ? {} : { engaged_at: new Date() };
     const alreadyBound = conversation.contract || conversation.sgp_contact_id;
     const bound = alreadyBound
-      ? conversation
+      ? (conversation.engaged_at ? conversation : await WaConversation.update(conversation.id, engaged))
       : await WaConversation.update(conversation.id, subscriber.contract
         ? {
           contract: subscriber.contract,
           device_id: subscriber.deviceId,
-          customer_account_id: conversation.customer_account_id ?? customer?.id ?? null
+          customer_account_id: conversation.customer_account_id ?? customer?.id ?? null,
+          ...engaged
         }
         // A client with no contract is bound by its row: there is no contract
         // to write, and inventing one would send billing looking for invoices
         // under it.
-        : { sgp_contact_id: subscriber.contactId });
+        : { sgp_contact_id: subscriber.contactId, ...engaged });
     return { conversation: await WaConversationService.decorate(bound), created: true };
   }
 }

@@ -803,6 +803,24 @@ Serviço: `services/waConversationService.js`.
 }
 ```
 
+**Pilhas (`status`)** de `GET /conversations`:
+
+| `status` | Mostra |
+| --- | --- |
+| `open` (padrão) | não encerradas **com gente dos dois lados** (`engaged_at` preenchido) |
+| `noreply` | não encerradas que só receberam envio automático (`engaged_at` nulo) |
+| `closed` | encerradas |
+| `all` | tudo |
+
+`engaged_at` (migration `0084`) é gravado uma vez, na primeira mensagem do
+cliente, no eco `fromMe` do celular do provedor, na primeira mensagem ou nota de
+atendente (`source='operator'`) e quando o atendente abre a conversa pelo
+cadastro (`openConversation`). Envio automático (`campaign`, `alert`) nunca
+grava, e numa conversa já engajada também **não** atualiza `last_message_at`:
+a régua e as campanhas não sobem conversa para o topo. Com termo de busca, a
+pilha `open` inclui as `noreply`, para a busca por nome ou telefone achar o
+cliente em qualquer uma delas.
+
 `before` é o id da mensagem mais antiga que a tela já tem — cursor, não
 offset. Este fio cresce enquanto é lido: um cliente respondendo no meio da
 rolagem desloca todo offset em um, e a página seguinte repetiria uma

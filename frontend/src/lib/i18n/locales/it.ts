@@ -2146,6 +2146,7 @@ const it: Dictionary = {
   'whatsapp.inbox.closed': 'Chiusa',
   'whatsapp.inbox.closeHint': 'Archiviata, non eliminata. Lo storico resta e un nuovo messaggio la riapre.',
   'whatsapp.inbox.filterOpen': 'Aperte',
+  'whatsapp.inbox.filterNoReply': 'Senza risposta',
   'whatsapp.inbox.filterClosed': 'Chiuse',
   'whatsapp.inbox.filterAll': 'Tutte',
   'whatsapp.inbox.searchPlaceholder': 'Numero, nome o contratto',
