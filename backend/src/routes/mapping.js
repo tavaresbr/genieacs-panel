@@ -7,6 +7,7 @@ const router = express.Router();
 router.get('/client-location', authenticateToken, requirePermission('map.read'), MappingController.clientLocation);
 
 router.get('/unmapped', authenticateToken, requirePermission('map.read'), MappingController.unmappedDevices);
+router.get('/bulk-placement', authenticateToken, requirePermission('map.write'), MappingController.bulkPlacement);
 
 router.get('/outages', authenticateToken, requirePermission('map.read'), MappingController.outageHistory);
 

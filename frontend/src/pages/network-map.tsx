@@ -23,6 +23,7 @@ import { BoxOccupancyView } from '@/components/map/box-occupancy-view'
 import { OutageHistoryView } from '@/components/map/outage-history-view'
 import { PlaceClientDialog, type PlaceClientTarget } from '@/components/map/place-client-dialog'
 import { UnmappedDialog } from '@/components/map/unmapped-dialog'
+import { BulkPlaceDialog } from '@/components/map/bulk-place-dialog'
 import { BOX_TYPES, NEARBY_METERS, boxOccupancy, capacityOf } from '@/lib/box-occupancy'
 import 'leaflet/dist/leaflet.css'
 import { MaintenanceForm } from '@/components/maintenance/maintenance-panel'
@@ -516,6 +517,7 @@ export default function NetworkMap() {
   const [editingEdge, setEditingEdge] = useState(false)
   const [mapView, setMapView] = useState<'map' | 'list' | 'boxes' | 'outages'>('map')
   const [unmappedOpen, setUnmappedOpen] = useState(false)
+  const [bulkOpen, setBulkOpen] = useState(false)
   const [placeTarget, setPlaceTarget] = useState<PlaceClientTarget | null>(null)
   // `?place=<pppoe>` vem do botão "Colocar no mapa" da tela do equipamento.
   const [searchParams, setSearchParams] = useSearchParams()
@@ -1263,7 +1265,18 @@ export default function NetworkMap() {
         {nodeEditor && <NodeEditor initial={nodeEditor} editing={editingNode} saving={saving} onClose={() => setNodeEditor(null)} onSave={(value) => void saveNode(value)} />}
         {unmappedOpen && (
           <UnmappedDialog canWrite={canEditMap} onClose={() => setUnmappedOpen(false)}
-            onPlace={(device) => { setUnmappedOpen(false); openPlace(device.pppoe, undefined, device.deviceId) }} />
+            onPlace={(device) => { setUnmappedOpen(false); openPlace(device.pppoe, undefined, device.deviceId) }}
+            onPlaceAll={() => { setUnmappedOpen(false); setBulkOpen(true) }} />
+        )}
+        {bulkOpen && (
+          <BulkPlaceDialog existingIds={nodes.map((node) => node.node_id)} onClose={() => setBulkOpen(false)}
+            onDone={(created) => {
+              setBulkOpen(false)
+              toast.success(t('map.bulk.done', { count: created }))
+              hasCenteredAssetsRef.current = false
+              void loadData(false)
+              void loadLive()
+            }} />
         )}
         {placeTarget && (
           <PlaceClientDialog target={placeTarget} nodes={nodes} edges={edges} edgeIds={edges.map((edge) => edge.edge_id)}
