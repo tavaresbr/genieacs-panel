@@ -8,8 +8,10 @@ import {
   dayKeySaoPaulo,
   endOfDayIso,
   deadlineOf,
+  exemptCount,
   filterRows,
   gatewayBadge,
+  isBillingExempt,
   isChargeLate,
   openTotalsByCurrency,
   parseDay,
@@ -159,6 +161,12 @@ describe('chargeActions', () => {
     expect(chargeActions(c({ status: 'canceled' }), { gateway: asaas, subscription: null }).reissue).toBe(false)
   })
 
+  it('isento de cobrança não reemite', () => {
+    expect(chargeActions(c({ status: 'canceled' }), ctx).reissue).toBe(true)
+    expect(chargeActions(c({ status: 'canceled' }), { gateway: asaas, subscription: sub({ billingExempt: true }) }).reissue)
+      .toBe(false)
+  })
+
   it('em teste, o período atual é o fim do teste', () => {
     const trial = sub({ status: 'trial', storedStatus: 'trial', trialEndsAt: '2026-10-01', renewsAt: null })
     expect(chargeActions(c({ status: 'failed', periodEnd: '2026-10-01' }), { gateway: asaas, subscription: trial }).reissue).toBe(true)
@@ -270,9 +278,34 @@ describe('filterRows', () => {
     expect(filterRows(rows, { statuses: [], onlyOpenCharge: false, search: 'rede-norte' }).map((r) => r.tenant.id)).toEqual([3])
   })
 
+  it('filtra só os isentos de cobrança', () => {
+    const comIsento = [...rows, { ...row(5, 'Isenta', 'active'), subscription: { ...row(5, 'Isenta', 'active').subscription!, billingExempt: true } }]
+    expect(filterRows(comIsento, { statuses: [], onlyOpenCharge: false, search: '', onlyExempt: true }).map((r) => r.tenant.id))
+      .toEqual([5])
+    expect(filterRows(comIsento, { statuses: ['active'], onlyOpenCharge: false, search: '', onlyExempt: false }).map((r) => r.tenant.id))
+      .toEqual([1, 5])
+  })
+
   it('combina os filtros', () => {
     expect(filterRows(rows, { statuses: ['active', 'trial'], onlyOpenCharge: true, search: 'net' }).map((r) => r.tenant.id))
       .toEqual([1])
+  })
+})
+
+describe('isenção de cobrança', () => {
+  it('campo ausente ou falso não é isento', () => {
+    expect(isBillingExempt(null)).toBe(false)
+    expect(isBillingExempt({})).toBe(false)
+    expect(isBillingExempt({ billingExempt: false })).toBe(false)
+    expect(isBillingExempt({ billingExempt: true })).toBe(true)
+  })
+
+  it('conta pelo resumo do servidor, ou pelas linhas sem o campo', () => {
+    const isenta = { ...row(1, 'A', 'active'), subscription: { ...row(1, 'A', 'active').subscription!, billingExempt: true } }
+    const linhas = [isenta, row(2, 'B', 'active')]
+    expect(exemptCount({ exempt: 7 }, linhas)).toBe(7)
+    expect(exemptCount(null, linhas)).toBe(1)
+    expect(exemptCount({}, linhas)).toBe(1)
   })
 })
 

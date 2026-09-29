@@ -819,6 +819,7 @@ export default {
   'charges.missingName': 'भुगतान से पहले बिलिंग विवरण में कानूनी नाम भरें',
   'charges.freePlan': 'आपका प्लान मुफ़्त है: भुगतान के लिए कुछ नहीं है',
   'charges.notBillable': 'इस सदस्यता का भुगतान यहाँ से नहीं किया जा सकता',
+  'charges.billingExempt': 'यह सदस्यता बिलिंग से मुक्त है: भुगतान करने के लिए कुछ नहीं है',
   'charges.gatewayNotConfigured': 'ऑनलाइन भुगतान अभी उपलब्ध नहीं है',
   'charges.gatewayFailed': 'पेमेंट गेटवे ने बिल जारी नहीं किया: {detail}',
   'billing.busy': 'बिलिंग का एक और काम चल रहा है; थोड़ी देर बाद फिर से कोशिश करें',

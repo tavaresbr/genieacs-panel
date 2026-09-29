@@ -11,7 +11,7 @@ import {
   type SubscriptionConsoleSummary,
   type SubscriptionStatus
 } from '@/lib/api'
-import { STATUS_LABEL_KEYS, statusBadgeClass } from '@/components/platform/tenant-plan'
+import { BillingExemptControl, STATUS_LABEL_KEYS, statusBadgeClass } from '@/components/platform/tenant-plan'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
@@ -29,9 +29,11 @@ import {
   dayKeySaoPaulo,
   deadlineOf,
   endOfDayIso,
+  exemptCount,
   filterRows,
   formatDay,
   gatewayBadge,
+  isBillingExempt,
   isChargeLate,
   openTotalsByCurrency,
   parseExtendDays,
@@ -76,6 +78,7 @@ export function PlatformSubscriptions({ plans, estreito }: Props) {
 
   const [statuses, setStatuses] = useState<SubscriptionConsoleStatus[]>([])
   const [onlyOpenCharge, setOnlyOpenCharge] = useState(false)
+  const [onlyExempt, setOnlyExempt] = useState(false)
   const [search, setSearch] = useState('')
 
   const load = useCallback(async () => {
@@ -96,8 +99,8 @@ export function PlatformSubscriptions({ plans, estreito }: Props) {
   }, [load])
 
   const visiveis = useMemo(
-    () => filterRows(rows, { statuses, onlyOpenCharge, search }),
-    [rows, statuses, onlyOpenCharge, search]
+    () => filterRows(rows, { statuses, onlyOpenCharge, search, onlyExempt }),
+    [rows, statuses, onlyOpenCharge, search, onlyExempt]
   )
 
   const alternarStatus = (status: SubscriptionConsoleStatus) => {
@@ -122,6 +125,8 @@ export function PlatformSubscriptions({ plans, estreito }: Props) {
           ? t('platform.subs.noMatch')
           : null
 
+  const isentos = exemptCount(summary, rows)
+
   const alternarLinha = (id: number) => setExpandedId((atual) => (atual === id ? null : id))
 
   return (
@@ -134,13 +139,17 @@ export function PlatformSubscriptions({ plans, estreito }: Props) {
             {t('common.refresh')}
           </button>
         </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9">
           {summaryStatusCards(summary).map((card) => (
             <div key={card.status} className="modern-card p-3">
               <p className="metric-label">{t(card.labelKey)}</p>
               <p className="mt-1 font-mono text-2xl font-semibold tabular-nums text-foreground">{card.count}</p>
             </div>
           ))}
+          <div className="modern-card p-3">
+            <p className="metric-label">{t('platform.subs.filterExempt')}</p>
+            <p className="mt-1 font-mono text-2xl font-semibold tabular-nums text-foreground">{isentos}</p>
+          </div>
           <div className="modern-card p-3">
             <p className="metric-label">{t('platform.subs.openTotal')}</p>
             {variasMoedas ? (
@@ -184,8 +193,25 @@ export function PlatformSubscriptions({ plans, estreito }: Props) {
               </button>
             )
           })}
-          {statuses.length > 0 && (
-            <button type="button" className="modern-button-secondary" onClick={() => setStatuses([])}>
+          {/* Isento continua `active`: é um recorte à parte, que combina com os estados. */}
+          <button
+            type="button"
+            aria-pressed={onlyExempt}
+            onClick={() => setOnlyExempt((atual) => !atual)}
+            className={onlyExempt ? 'modern-button' : 'modern-button-secondary'}
+          >
+            {t('platform.subs.filterExempt')}
+            <span className="font-mono text-xs opacity-80">{isentos}</span>
+          </button>
+          {(statuses.length > 0 || onlyExempt) && (
+            <button
+              type="button"
+              className="modern-button-secondary"
+              onClick={() => {
+                setStatuses([])
+                setOnlyExempt(false)
+              }}
+            >
               {t('platform.subs.clearFilters')}
             </button>
           )}
@@ -324,8 +350,15 @@ function StatusBadge({ row }: { row: SubscriptionRow }) {
   const { t } = useTranslation()
   if (!row.subscription) return <span className="modern-badge">{t('platform.subs.status.none')}</span>
   return (
-    <span className={statusBadgeClass(row.subscription.status)}>
-      {t(STATUS_LABEL_KEYS[row.subscription.status])}
+    <span className="inline-flex flex-wrap items-center gap-1">
+      <span className={statusBadgeClass(row.subscription.status)}>
+        {t(STATUS_LABEL_KEYS[row.subscription.status])}
+      </span>
+      {isBillingExempt(row.subscription) && (
+        <span className="modern-badge-info" title={row.subscription.billingExemptReason ?? undefined}>
+          {t('platform.subs.exempt')}
+        </span>
+      )}
     </span>
   )
 }
@@ -622,6 +655,7 @@ function SubscriptionDetail({ row, plans, onChanged }: { row: SubscriptionRow; p
             )}
           </div>
           <p className="field-hint">{t('platform.subscription.statusHint')}</p>
+          <BillingExemptControl tenantId={tenantId} subscription={sub} onChanged={recarregar} />
         </div>
 
         <div className="rounded-md border border-border bg-card p-3">

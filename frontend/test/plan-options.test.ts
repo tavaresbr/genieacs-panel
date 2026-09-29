@@ -5,6 +5,8 @@ import {
   canCancelPending,
   canPayNow,
   canSwitchTo,
+  isBillingExempt,
+  isBillingExemptRefusal,
   isBusy,
   isPendingLocked,
   isPendingLockedRefusal,
@@ -142,6 +144,20 @@ describe('plan-options', () => {
     expect(canPayNow([plano({ current: true })], true, { status: 'suspended' })).toBe(false)
     expect(canPayNow([plano({ current: true })], true, { status: 'canceled' })).toBe(false)
     expect(canPayNow([plano({ current: true })], true, null)).toBe(false)
+  })
+
+  it('isento de cobrança não paga agora nem gera cobrança', () => {
+    expect(canPayNow([plano({ current: true })], true, { status: 'active', billingExempt: true })).toBe(false)
+    expect(canPayNow([plano({ current: true })], true, { status: 'active', billingExempt: false })).toBe(true)
+    expect(isBillingExempt({ billingExempt: true })).toBe(true)
+    expect(isBillingExempt({})).toBe(false)
+    expect(isBillingExempt(null)).toBe(false)
+    expect(isBillingExemptRefusal('billing_exempt')).toBe(true)
+    expect(isBillingExemptRefusal('free_plan')).toBe(false)
+    expect(canGenerateCharge({
+      code: 'subscription_past_due', paymentUrl: null, chargesLoaded: true, canWrite: true,
+      plans: [plano({ current: true })], billingExempt: true
+    })).toBe(false)
   })
 
   it('lê o over_limit só quando vem completo', () => {

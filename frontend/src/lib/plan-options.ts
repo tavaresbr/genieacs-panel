@@ -144,14 +144,30 @@ export function confirmKey(kind: Exclude<PlanChangeKind, 'same'>): TranslationKe
  * "Pagar agora" só faz sentido com plano pago: no grátis o backend responderia
  * `free_plan`, e um botão que sempre falha é pior do que botão nenhum. Sem a
  * lista (ainda carregando, ou sem plano atual nela), não mostra. Nem com a
- * assinatura suspensa, cancelada ou ausente — o backend responde 409.
+ * assinatura suspensa, cancelada, ausente ou isenta de cobrança — o backend
+ * responde 409.
  */
 export function canPayNow(
   plans: TenantPlanOption[] | null | undefined,
   canWrite: boolean,
-  subscription: Pick<SubscriptionView, 'status'> | null | undefined
+  subscription: Pick<SubscriptionView, 'status' | 'billingExempt'> | null | undefined
 ) {
-  return canWrite && subscriptionAllowsChanges(subscription) && currentPlanIsPaid(plans)
+  return canWrite && subscriptionAllowsChanges(subscription) && !isBillingExempt(subscription)
+    && currentPlanIsPaid(plans)
+}
+
+/**
+ * A plataforma isentou esta assinatura de cobrança: fica ativa, não vence e não
+ * gera fatura até ser desligada. Some o "pagar agora" e o aviso de vencimento.
+ * Campo ausente (servidor antigo) é não isento.
+ */
+export function isBillingExempt(subscription: Pick<SubscriptionView, 'billingExempt'> | null | undefined) {
+  return subscription?.billingExempt === true
+}
+
+/** O 409 `billing_exempt` do "pagar agora": não há o que pagar. */
+export function isBillingExemptRefusal(code: string | undefined) {
+  return code === 'billing_exempt'
 }
 
 function currentPlanIsPaid(plans: TenantPlanOption[] | null | undefined) {
@@ -240,8 +256,11 @@ export function canGenerateCharge(opts: {
   chargesLoaded: boolean
   canWrite: boolean
   plans: TenantPlanOption[] | null
+  /** Isento de cobrança não tem fatura a gerar (o backend responde `billing_exempt`). */
+  billingExempt?: boolean
 }) {
   if (!PAYABLE_GATE_CODES.has(opts.code)) return false
+  if (opts.billingExempt) return false
   if (opts.paymentUrl || !opts.chargesLoaded) return false
   // O código já garante um estado que se paga (atraso ou teste vencido).
   return opts.canWrite && currentPlanIsPaid(opts.plans)

@@ -812,6 +812,7 @@ export default {
   'charges.missingName': '付款前请在账单信息中填写公司法定名称',
   'charges.freePlan': '您的套餐是免费的：无需支付',
   'charges.notBillable': '此订阅无法在此支付',
+  'charges.billingExempt': '此订阅已免除计费：无需支付任何费用',
   'charges.gatewayNotConfigured': '目前无法在线支付',
   'charges.gatewayFailed': '支付网关未开具账单：{detail}',
   'billing.busy': '另一项计费操作正在进行中，请稍后再试',

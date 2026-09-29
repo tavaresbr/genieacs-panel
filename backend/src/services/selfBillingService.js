@@ -131,6 +131,11 @@ async function cobrancaEmAberto(subscription) {
  */
 async function reprecificarCobranca(subscription, plano) {
   const nada = { acao: 'none', linhaId: null };
+  // Isento de cobrança: a troca de plano continua valendo, mas não há fatura
+  // a reprecificar — e mexer numa que ficou em aberto porque o gateway recusou
+  // o cancelamento a deixaria sem id e sem reemissão (`issueCurrent` para no
+  // `billing_exempt`). Ela fica como está, visível no console.
+  if (subscription?.billing_exempt_at) return nada;
   const preco = Number(plano?.price_cents ?? 0);
   const moeda = String(plano?.currency || 'BRL').toUpperCase();
   // Um plano sem preço não tem cobrança a reemitir: a do prazo fica como está,
@@ -544,6 +549,12 @@ class SelfBillingService {
     if (!subscription || !ESTADOS_VIVOS.has(subscription.status)) {
       throw new SelfBillingError('charges.notBillable', { code: 'not_billable', status: 409 });
     }
+    // Isento de cobrança pelo console: não há fatura a pagar, e o clique não
+    // pode abrir uma — nem criar cliente no gateway para ela. Código próprio,
+    // e não `not_billable`, para a tela dizer por quê.
+    if (subscription.billing_exempt_at) {
+      throw new SelfBillingError('charges.billingExempt', { code: 'billing_exempt', status: 409 });
+    }
     const plan = subscription.plan_id ? await Plan.findById(subscription.plan_id) : null;
     if (!(Number(plan?.price_cents ?? 0) > 0)) {
       throw new SelfBillingError('charges.freePlan', { code: 'free_plan', status: 409 });
@@ -664,6 +675,8 @@ class SelfBillingService {
     switch (resultado.reason) {
       case 'free_plan':
         return new SelfBillingError('charges.freePlan', { code: 'free_plan', status: 409 });
+      case 'billing_exempt':
+        return new SelfBillingError('charges.billingExempt', { code: 'billing_exempt', status: 409 });
       case 'gateway_not_configured':
         return new SelfBillingError('charges.gatewayNotConfigured', { code: 'gateway_not_configured', status: 503 });
       case 'gateway_failed':

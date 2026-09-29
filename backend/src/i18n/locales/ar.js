@@ -811,6 +811,7 @@ export default {
   'charges.missingName': 'أدخل الاسم القانوني في بيانات الفوترة قبل الدفع',
   'charges.freePlan': 'خطتك مجانية: لا يوجد ما يُدفع',
   'charges.notBillable': 'لا يمكن دفع هذا الاشتراك من هنا',
+  'charges.billingExempt': 'هذا الاشتراك معفى من الفوترة: لا يوجد ما يُدفع',
   'charges.gatewayNotConfigured': 'الدفع عبر الإنترنت غير متاح حاليًا',
   'charges.gatewayFailed': 'لم تُصدر بوابة الدفع الفاتورة: {detail}',
   'billing.busy': 'هناك عملية فوترة أخرى قيد التنفيذ؛ حاول مرة أخرى بعد لحظات',

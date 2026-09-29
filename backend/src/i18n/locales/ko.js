@@ -815,6 +815,7 @@ export default {
   'charges.missingName': '결제 전에 청구 정보에 법인명을 입력하세요',
   'charges.freePlan': '무료 요금제이므로 결제할 금액이 없습니다',
   'charges.notBillable': '이 구독은 여기에서 결제할 수 없습니다',
+  'charges.billingExempt': '이 구독은 청구가 면제되었습니다. 결제할 금액이 없습니다',
   'charges.gatewayNotConfigured': '지금은 온라인 결제를 사용할 수 없습니다',
   'charges.gatewayFailed': '결제 게이트웨이가 청구를 발행하지 않았습니다: {detail}',
   'billing.busy': '다른 청구 작업이 진행 중입니다. 잠시 후 다시 시도하세요',

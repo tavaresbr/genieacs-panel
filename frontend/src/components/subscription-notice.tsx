@@ -13,7 +13,7 @@ import { useAuth } from '@/contexts/auth-context'
 import { useTranslation } from '@/contexts/language-context'
 import { BrandMark } from '@/components/brand-mark'
 import { cobrancaEmAberto } from '@/components/tenant-charges'
-import { canGenerateCharge, payInNewTab } from '@/lib/plan-options'
+import { canGenerateCharge, isBillingExemptRefusal, payInNewTab } from '@/lib/plan-options'
 import type { TenantPlanOption } from '@/lib/api'
 
 /**
@@ -91,7 +91,8 @@ export function SubscriptionNotice() {
   // resolve pagando (atraso, teste vencido) e o plano é pago. As regras
   // moram em `canGenerateCharge`.
   const canGenerate = canGenerateCharge({
-    code: blocked.code, paymentUrl, chargesLoaded, canWrite: can('settings.write'), plans
+    code: blocked.code, paymentUrl, chargesLoaded, canWrite: can('settings.write'), plans,
+    billingExempt: blocked.subscription?.billingExempt === true
   })
 
   // Síncrono até o `payInNewTab`: a aba nova precisa nascer dentro do clique.
@@ -105,6 +106,7 @@ export function SubscriptionNotice() {
       // `busy` também cai aqui: a frase do servidor já diz "tente de novo em
       // instantes", e o botão volta a ficar habilitado para isso.
       else if (res.success) setPayError(t('plan.payNoLink'))
+      else if (isBillingExemptRefusal(res.code)) setPayError(t('plan.billingExemptNote'))
       else setPayError(res.message || t('plan.payFailed'))
     })
   }

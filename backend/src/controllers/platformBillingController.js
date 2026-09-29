@@ -4,7 +4,7 @@ import BillingEvent from '../models/BillingEvent.js';
 import Tenant from '../models/Tenant.js';
 import PlatformAudit from '../models/PlatformAudit.js';
 import AuditLog from '../models/AuditLog.js';
-import SubscriptionService, { STATUSES } from '../services/subscriptionService.js';
+import SubscriptionService, { STATUSES, BillingExemptError } from '../services/subscriptionService.js';
 import { manualBilling } from '../services/billing/manualBillingProvider.js';
 import { ChargeFollowError } from '../services/chargeIssuingService.js';
 import DeviceService from '../services/deviceService.js';
@@ -163,15 +163,21 @@ async function tenantOr404(req, res) {
   return tenant;
 }
 
-/** As duas trilhas, de uma vez. */
-async function recordBoth(req, tenant, { platformAction, detail }) {
+/**
+ * As duas trilhas, de uma vez.
+ *
+ * `tenantDetail` é o que vai à trilha do PROVEDOR quando ela não pode levar
+ * tudo o que a da plataforma leva — o motivo da isenção de cobrança, que é
+ * anotação interna do console. Sem ele, as duas levam o mesmo `detail`.
+ */
+async function recordBoth(req, tenant, { platformAction, detail, tenantDetail = detail }) {
   await PlatformAudit.fromRequest(req, { action: platformAction, tenant, detail });
   await runInTenant(tenant.id, () => AuditLog.fromRequest(req, {
     action: AuditLog.ACTIONS.SUBSCRIPTION_CHANGED,
     actorKind: 'platform',
     subjectType: 'subscription',
     subjectId: tenant.id,
-    detail: { ...detail, platformAction }
+    detail: { ...tenantDetail, platformAction }
   }));
 }
 
@@ -189,7 +195,7 @@ async function subscriptionView(tenant) {
   const events = await runInTenant(tenant.id, () => BillingEvent.listRecent({ limit: 50 }));
   return {
     tenant: { id: tenant.id, slug: tenant.slug, name: tenant.name },
-    subscription: SubscriptionService.present(state),
+    subscription: SubscriptionService.present(state, { withExemptReason: true }),
     planId: state.subscription?.plan_id ?? null,
     events: events.map((event) => ({
       id: event.id,
@@ -437,12 +443,100 @@ class PlatformBillingController {
 
       const state = await runInTenant(tenant.id, () => SubscriptionService.current());
       return res.json(createResponse('Subscription updated', {
-        subscription: SubscriptionService.present(state),
+        subscription: SubscriptionService.present(state, { withExemptReason: true }),
         planId: after?.plan_id ?? null
       }));
     } catch (error) {
       console.error('Update subscription error:', error);
       return res.status(500).json(createErrorResponse('Failed to update the subscription', error.message));
+    }
+  }
+
+  /**
+   * `PUT /tenants/:id/subscription/billing-exempt` — `{ exempt, reason? }`:
+   * liga ou desliga o "isento de cobrança" (ver
+   * `SubscriptionService.setBillingExempt`).
+   *
+   * Responde `{ subscription, canceledCharges, failedCharges, alreadyInState }`
+   * (`failedCharges` é quantas ficaram em aberto), com
+   * `subscription` no MESMO formato de `GET /tenants/:id/subscription`
+   * (`subscriptionView`), para a tela trocar o que mostra sem perguntar de
+   * novo. Pedir o estado em que já está não é erro nem gesto: 200 com
+   * `alreadyInState: true`, e nenhuma linha em trilha nenhuma.
+   *
+   * A caixa da plataforma responde 404, como na tela de Assinaturas: ela não
+   * é cliente e não tem cobrança de que isentar.
+   */
+  static async setBillingExempt(req, res) {
+    try {
+      const body = req.body ?? {};
+      if (typeof body.exempt !== 'boolean') {
+        return res.status(400).json(createErrorResponse('exempt must be true or false'));
+      }
+      if (body.reason !== undefined && body.reason !== null && typeof body.reason !== 'string') {
+        return res.status(400).json(createErrorResponse('reason must be a string'));
+      }
+      const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
+      if (reason.length > 255) {
+        return res.status(400).json(createErrorResponse('reason must be at most 255 characters'));
+      }
+
+      const tenant = await tenantOr404(req, res);
+      if (!tenant) return undefined;
+      if (tenant.kind === 'platform') return res.status(404).json(createErrorResponse('Provider not found'));
+
+      let resultado;
+      try {
+        resultado = await SubscriptionService.setBillingExempt({
+          tenantId: tenant.id,
+          exempt: body.exempt,
+          reason: reason || null,
+          actorUserId: req.user?.userId ?? null
+        });
+      } catch (error) {
+        if (error instanceof BillingExemptError) {
+          return res.status(error.status).json(createErrorResponse(error.message, null, error.code));
+        }
+        throw error;
+      }
+
+      if (!resultado.alreadyInState) {
+        const detail = {
+          exempt: body.exempt,
+          reason: reason || null,
+          statusBefore: resultado.statusBefore,
+          statusAfter: resultado.statusAfter,
+          canceledCharges: resultado.canceledCharges,
+          // As que o gateway não cancelou e ficaram em aberto: é a trilha
+          // que responde "por que este isento ainda tem fatura viva?".
+          ...(resultado.failedCharges.length ? { chargesLeftOpen: resultado.failedCharges } : {}),
+          ...(resultado.reopenedCharge ? { reopenedCharge: true } : {}),
+          renewsAt: resultado.subscription?.renews_at ?? null
+        };
+        // O motivo fica só na trilha da plataforma: o provedor lê a dele, e o
+        // motivo é anotação interna do console (ver `presentBillingExempt`).
+        const { reason: _motivo, ...tenantDetail } = detail;
+        await recordBoth(req, tenant, {
+          platformAction: PlatformAudit.ACTIONS.SUBSCRIPTION_BILLING_EXEMPT_CHANGED,
+          detail,
+          tenantDetail
+        });
+      }
+
+      return res.json(createResponse(
+        body.exempt ? 'Billing exemption enabled' : 'Billing exemption disabled',
+        {
+          subscription: await subscriptionView(tenant),
+          canceledCharges: resultado.canceledCharges,
+          // As que ficaram em aberto (o gateway recusou, ou estavam ocupadas):
+          // a tela avisa, e a varredura do agendador tenta de novo.
+          failedCharges: resultado.failedCharges.length,
+          alreadyInState: resultado.alreadyInState
+        }
+      ));
+    } catch (error) {
+      console.error('Set billing exemption error:', error);
+      return res.status(500).json(createErrorResponse('Failed to change the billing exemption', error.message));
     }
   }
 
@@ -508,7 +602,7 @@ class PlatformBillingController {
       if (duplicate) {
         const state = await runInTenant(tenant.id, () => SubscriptionService.current());
         return res.status(200).json(createResponse('Payment already recorded', {
-          subscription: SubscriptionService.present(state),
+          subscription: SubscriptionService.present(state, { withExemptReason: true }),
           duplicate: true
         }));
       }
@@ -531,7 +625,7 @@ class PlatformBillingController {
       });
       const state = await runInTenant(tenant.id, () => SubscriptionService.current());
       return res.status(201).json(createResponse('Payment recorded', {
-        subscription: SubscriptionService.present(state)
+        subscription: SubscriptionService.present(state, { withExemptReason: true })
       }));
     } catch (error) {
       console.error('Record payment error:', error);

@@ -79,6 +79,11 @@ class PlatformAudit {
     // "pagou, e devolvemos" — e é a segunda que alguém procura quando o
     // provedor pergunta por que voltou a dever.
     CHARGE_REFUNDED: 'charge.refunded',
+    // O console ligou ou desligou o "isento de cobrança" de um provedor: ativo
+    // sem gerar fatura, até alguém desligar. Ação própria porque é a resposta
+    // a "por que este provedor não paga?", e ela precisa de uma linha que diga
+    // exatamente isso — quem, quando e com que motivo.
+    SUBSCRIPTION_BILLING_EXEMPT_CHANGED: 'subscription.billing_exempt_changed',
     // Quem trabalha para qual provedor, decidido de fora dele. É a ação mais
     // forte que o plano de controle tem: um vínculo escrito aqui vira uma
     // sessão legítima DENTRO de um ISP, com o cadastro inteiro atrás dela. Sem

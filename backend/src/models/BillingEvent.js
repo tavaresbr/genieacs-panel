@@ -26,7 +26,13 @@ export const BILLING_EVENT_TYPES = Object.freeze({
   // o índice único `(tenant_id, external_id)` é o que faz o estorno do console
   // e o `PAYMENT_REFUNDED` que o gateway manda depois desfazerem o período UMA
   // vez só, do mesmo jeito que faz o pagamento creditar uma vez só.
-  PAYMENT_REFUNDED: 'payment.refunded'
+  PAYMENT_REFUNDED: 'payment.refunded',
+  // O console ligou ou desligou o "isento de cobrança" (ver
+  // `SubscriptionService.setBillingExempt`). Sem referência externa: o índice
+  // único `(tenant_id, external_id)` não colide em nulo, e ligar e desligar
+  // várias vezes é o uso esperado, não uma reentrega.
+  BILLING_EXEMPT_ENABLED: 'billing_exempt.enabled',
+  BILLING_EXEMPT_DISABLED: 'billing_exempt.disabled'
 });
 
 class BillingEvent {

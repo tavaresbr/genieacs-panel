@@ -813,6 +813,7 @@ export default {
   'charges.missingName': 'Tragen Sie vor der Zahlung den Firmennamen in den Rechnungsdaten ein',
   'charges.freePlan': 'Ihr Tarif ist kostenlos: Es gibt nichts zu bezahlen',
   'charges.notBillable': 'Dieses Abonnement kann hier nicht bezahlt werden',
+  'charges.billingExempt': 'Dieses Abonnement ist von der Abrechnung befreit: Es gibt nichts zu bezahlen',
   'charges.gatewayNotConfigured': 'Online-Zahlung ist derzeit nicht verfügbar',
   'charges.gatewayFailed': 'Der Zahlungsanbieter hat die Rechnung nicht ausgestellt: {detail}',
   'billing.busy': 'Ein anderer Abrechnungsvorgang läuft gerade; versuchen Sie es gleich noch einmal',

@@ -812,6 +812,7 @@ export default {
   'charges.missingName': '付款前請在帳單資料中填寫公司法定名稱',
   'charges.freePlan': '您的方案是免費的：無需付款',
   'charges.notBillable': '此訂閱無法在此付款',
+  'charges.billingExempt': '此訂閱已免除計費：無需支付任何費用',
   'charges.gatewayNotConfigured': '目前無法線上付款',
   'charges.gatewayFailed': '付款閘道未開立帳單：{detail}',
   'billing.busy': '另一項計費作業正在進行中，請稍後再試',

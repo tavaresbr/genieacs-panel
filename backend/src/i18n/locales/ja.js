@@ -812,6 +812,7 @@ export default {
   'charges.missingName': '支払い前に請求情報に正式名称を入力してください',
   'charges.freePlan': '無料プランのため、支払うものはありません',
   'charges.notBillable': 'このサブスクリプションはここから支払えません',
+  'charges.billingExempt': 'このサブスクリプションは請求が免除されています。支払うものはありません',
   'charges.gatewayNotConfigured': '現在オンライン決済は利用できません',
   'charges.gatewayFailed': '決済ゲートウェイが請求を発行しませんでした: {detail}',
   'billing.busy': '別の請求処理が進行中です。しばらくしてからもう一度お試しください',

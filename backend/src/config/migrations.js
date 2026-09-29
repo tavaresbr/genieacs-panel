@@ -1465,6 +1465,16 @@ const SUBSCRIPTION_PLAN_GUARD_COLUMNS = [
   ['pending_plan_locked_at', (t) => t.timestamp('pending_plan_locked_at').nullable()]
 ];
 
+/**
+ * As colunas da 0083 — ver a migração. Um instante e não um booleano, como as
+ * outras marcas deste arquivo: "isento desde quando" é a primeira pergunta de
+ * quem olha a assinatura, e nulo continua querendo dizer "não".
+ */
+const SUBSCRIPTION_BILLING_EXEMPT_COLUMNS = [
+  ['billing_exempt_at', (t) => t.timestamp('billing_exempt_at').nullable()],
+  ['billing_exempt_reason', (t) => t.string('billing_exempt_reason', 255).nullable()]
+];
+
 const BILLING_TABLES = [
   ['plans', plansTable],
   ['subscriptions', subscriptionsTable],
@@ -4689,6 +4699,30 @@ export const migrations = [
       if (!faltando.length) return;
       await db.schema.alterTable('sgp_contacts', (t) => {
         for (const add of faltando) add(t);
+      });
+    }
+  },
+  {
+    /**
+     * "Isento de cobrança": o console marca a assinatura de um provedor para
+     * ficar ativa sem gerar fatura, até alguém desligar. `billing_exempt_at` é
+     * desde quando, `billing_exempt_reason` é o porquê que o console escreveu.
+     * Ver `SubscriptionService.setBillingExempt`.
+     *
+     * Nulas nas linhas que já existem, que é o estado certo: ninguém é isento
+     * antes desta coluna existir.
+     */
+    id: '0083_subscription_billing_exempt',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('subscriptions'))) return true;
+      return (await missingColumns(db, 'subscriptions', SUBSCRIPTION_BILLING_EXEMPT_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('subscriptions'))) return;
+      const missing = await missingColumns(db, 'subscriptions', SUBSCRIPTION_BILLING_EXEMPT_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('subscriptions', (t) => {
+        for (const add of missing) add(t);
       });
     }
   }

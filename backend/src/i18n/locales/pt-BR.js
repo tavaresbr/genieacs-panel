@@ -811,6 +811,7 @@ export default {
   'charges.missingName': 'Preencha a razão social no cadastro fiscal antes de pagar',
   'charges.freePlan': 'Seu plano é gratuito: não há nada a pagar',
   'charges.notBillable': 'Esta assinatura não pode ser paga por aqui',
+  'charges.billingExempt': 'Esta assinatura está isenta de cobrança: não há nada a pagar',
   'charges.gatewayNotConfigured': 'O pagamento online não está disponível agora',
   'charges.gatewayFailed': 'O gateway de pagamento não emitiu a cobrança: {detail}',
   'billing.busy': 'Outra operação de cobrança está em andamento; tente de novo em instantes',
