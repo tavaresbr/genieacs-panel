@@ -28,6 +28,7 @@ import { HealthBell } from '@/components/whatsapp/health-strip'
 import { inboxPanes } from '@/lib/wa-inbox-pane'
 import { useAuth } from '@/contexts/auth-context'
 import { useLocation } from 'react-router'
+import { firstName, type QuickReply } from '@/lib/quick-replies'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Polling
@@ -139,7 +140,21 @@ interface InboxTabProps {
 function InboxTab({ initialConversation = null }: InboxTabProps) {
   const { t } = useTranslation()
   const toast = useToast()
-  const { can } = useAuth()
+  const { can, user } = useAuth()
+  // Respostas rápidas: os modelos `atendimento`, lidos uma vez. `null` para
+  // quem não pode listar modelos — aí nem o "/" nem o botão aparecem.
+  const canQuickReply = can('campaigns.read')
+  const [quickReplies, setQuickReplies] = useState<QuickReply[] | null>(null)
+  useEffect(() => {
+    if (!canQuickReply) return
+    let vivo = true
+    void whatsappAPI.listTemplates({ category: 'atendimento' }).then((res) => {
+      if (vivo) setQuickReplies(res.success && Array.isArray(res.data) ? res.data : [])
+    })
+    return () => {
+      vivo = false
+    }
+  }, [canQuickReply])
   // The module reads the ERP, so it is there only for whoever may read it;
   // an inbox-only operator keeps the two-column screen they had.
   const canSeeSgp = can('sgp.read')
@@ -695,7 +710,19 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
                     onLinked={linked}
                     onBack={closeThread}
                   />
-                  <ThreadComposer optedOut={conversation.optedOut} sending={sending} onSend={send} draft={draft} />
+                  <ThreadComposer
+                    optedOut={conversation.optedOut}
+                    sending={sending}
+                    onSend={send}
+                    draft={draft}
+                    quickReplies={canQuickReply ? quickReplies ?? [] : null}
+                    quickReplyVars={{
+                      nome: conversation.clientName ?? conversation.pushName,
+                      primeiro_nome: firstName(conversation.clientName ?? conversation.pushName),
+                      contrato: conversation.contract,
+                      atendente: user?.username ?? null
+                    }}
+                  />
                 </>
               ) : (
                 <div className="empty-state flex-1">

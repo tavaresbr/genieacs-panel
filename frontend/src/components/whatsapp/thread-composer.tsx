@@ -19,6 +19,13 @@ import {
   planSend,
   resolveAttachmentType
 } from '@/lib/wa-attachments'
+import {
+  fillQuickReply,
+  matchQuickReplies,
+  quickReplyQuery,
+  type QuickReply,
+  type QuickReplyVars
+} from '@/lib/quick-replies'
 
 export interface ComposerAttachment {
   url: string
@@ -38,6 +45,13 @@ interface ThreadComposerProps {
    * two hand-overs.
    */
   draft?: { id: number; text: string } | null
+  /**
+   * As respostas rápidas (modelos da categoria `atendimento`). `null` quando
+   * quem está logado não pode listá-las: nem o "/" nem o botão aparecem.
+   */
+  quickReplies?: QuickReply[] | null
+  /** O que se sabe da conversa aberta, para preencher as variáveis. */
+  quickReplyVars?: QuickReplyVars
 }
 
 /**
@@ -89,7 +103,7 @@ const carriesFiles = (event: DragEvent) => Array.from(event.dataTransfer.types).
  * modo nota continua ligado, porque o resto do lote ainda é nota e virar
  * resposta no meio do caminho é justamente a direção perigosa.
  */
-export function ThreadComposer({ optedOut, sending, onSend, draft = null }: ThreadComposerProps) {
+export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickReplies = null, quickReplyVars = {} }: ThreadComposerProps) {
   const { t } = useTranslation()
   const toast = useToast()
   const [body, setBody] = useState('')
@@ -99,6 +113,12 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null }: Thre
   const [progress, setProgress] = useState<{ n: number; total: number } | null>(null)
   const [dragging, setDragging] = useState(false)
   const boxRef = useRef<HTMLTextAreaElement>(null)
+  // Respostas rápidas: abrem com "/" no começo da caixa ou pelo botão.
+  // `dismissedFor` guarda o texto em que o Esc fechou a lista, para ela não
+  // reabrir sozinha até a pessoa digitar outra coisa.
+  const [pickerByButton, setPickerByButton] = useState(false)
+  const [dismissedFor, setDismissedFor] = useState<string | null>(null)
+  const [activeRaw, setActiveRaw] = useState(0)
   const fileRef = useRef<HTMLInputElement>(null)
   const nextId = useRef(1)
   // `dragenter`/`dragleave` disparam a cada filho atravessado; só a contagem
@@ -128,6 +148,30 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null }: Thre
   useEffect(() => {
     if (draft) boxRef.current?.focus()
   }, [draft])
+
+  const slashQuery = quickReplyQuery(body)
+  const pickerOpen = quickReplies !== null
+    && (pickerByButton || (slashQuery !== null && body !== dismissedFor))
+  const matches = pickerOpen ? matchQuickReplies(quickReplies ?? [], pickerByButton ? '' : slashQuery ?? '') : []
+  const active = Math.min(activeRaw, Math.max(0, matches.length - 1))
+
+  const closePicker = () => {
+    setPickerByButton(false)
+    setDismissedFor(body)
+    setActiveRaw(0)
+  }
+
+  // Troca o "/texto" (ou o que estiver na caixa, pelo botão) pela resposta já
+  // preenchida. Não envia: o atendente revisa e aperta Enviar.
+  const chooseQuickReply = (item: QuickReply) => {
+    const filled = fillQuickReply(item.body, quickReplyVars)
+    setBody(pickerByButton && body.trim() && slashQuery === null ? `${body.trimEnd()}\n${filled}` : filled)
+    setPickerByButton(false)
+    setDismissedFor(null)
+    setActiveRaw(0)
+    setIsNote(false)
+    boxRef.current?.focus()
+  }
 
   // `sending` volta a false entre um arquivo e outro do lote; `working` cobre
   // o lote inteiro, para ninguém mexer na fila enquanto ela anda.
@@ -328,11 +372,69 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null }: Thre
         onChange={(event) => setBody(event.target.value)}
         onPaste={paste}
         onKeyDown={(event) => {
+          if (pickerOpen) {
+            // Com a lista aberta, as setas andam nela e o Enter escolhe —
+            // nunca envia um "/pra" pela metade.
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+              event.preventDefault()
+              if (matches.length) {
+                setActiveRaw((active + (event.key === 'ArrowDown' ? 1 : matches.length - 1)) % matches.length)
+              }
+              return
+            }
+            if (event.key === 'Escape') {
+              event.preventDefault()
+              closePicker()
+              return
+            }
+            if ((event.key === 'Enter' && !event.shiftKey) || event.key === 'Tab') {
+              event.preventDefault()
+              if (matches[active]) chooseQuickReply(matches[active])
+              return
+            }
+          }
           if (event.key !== 'Enter' || event.shiftKey) return
           event.preventDefault()
           void submit()
         }}
+        aria-expanded={pickerOpen}
+        aria-controls={pickerOpen ? 'quick-reply-list' : undefined}
+        aria-activedescendant={pickerOpen && matches[active] ? `quick-reply-${matches[active].id}` : undefined}
       />
+
+      {pickerOpen && (
+        <div className="mt-1.5 rounded-md border border-border bg-card shadow-sm">
+          {matches.length === 0 ? (
+            <p className="px-3 py-2 text-sm text-muted-foreground">
+              {(quickReplies ?? []).length === 0
+                ? t('whatsapp.quickReplies.empty')
+                : t('whatsapp.quickReplies.noMatch', { query: slashQuery ?? '' })}
+            </p>
+          ) : (
+            <ul id="quick-reply-list" role="listbox" aria-label={t('whatsapp.quickReplies.listLabel')} className="max-h-56 overflow-y-auto py-1">
+              {matches.map((item, index) => (
+                <li
+                  key={item.id}
+                  id={`quick-reply-${item.id}`}
+                  role="option"
+                  aria-selected={index === active}
+                  className={`cursor-pointer px-3 py-1.5 text-sm ${index === active ? 'bg-muted' : ''}`}
+                  // mousedown e não click: o click chega depois do blur da caixa.
+                  onMouseDown={(event) => {
+                    event.preventDefault()
+                    chooseQuickReply(item)
+                  }}
+                  onMouseEnter={() => setActiveRaw(index)}
+                >
+                  <span className="block font-semibold text-foreground">/{item.name}</span>
+                  <span className="block truncate text-xs text-muted-foreground">{fillQuickReply(item.body, quickReplyVars)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="border-t border-border px-3 py-1 text-xs text-muted-foreground">{t('whatsapp.quickReplies.hint')}</p>
+        </div>
+      )}
 
       {items.length === 0 ? (
         // Arrastar e Ctrl+V não existem no celular: a dica só aparece onde vale.
@@ -410,6 +512,27 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null }: Thre
               event.target.value = ''
             }}
           />
+          {quickReplies !== null && (
+            <button
+              type="button"
+              className="modern-button-secondary shrink-0 px-3 sm:px-4"
+              aria-label={t('whatsapp.quickReplies.button')}
+              title={t('whatsapp.quickReplies.button')}
+              aria-pressed={pickerOpen}
+              disabled={busy}
+              onClick={() => {
+                if (pickerOpen) closePicker()
+                else {
+                  setPickerByButton(true)
+                  setActiveRaw(0)
+                }
+                boxRef.current?.focus()
+              }}
+            >
+              <Icon name="chat" size={16} />
+              <span className="hidden sm:inline">{t('whatsapp.quickReplies.button')}</span>
+            </button>
+          )}
           <button
             type="button"
             className="modern-button-secondary shrink-0 px-3 sm:px-4"

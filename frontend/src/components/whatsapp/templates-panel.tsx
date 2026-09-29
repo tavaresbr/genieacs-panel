@@ -32,6 +32,31 @@ const VARIABLES = [
   'link_boleto'
 ] as const
 
+/**
+ * As variáveis de uma resposta rápida (categoria `atendimento`): quem preenche
+ * é a tela da conversa, não o disparo de cobrança. Espelho de
+ * `VARIAVEIS_DE_ATENDIMENTO` no backend (`waTemplateService.js`).
+ */
+const QUICK_REPLY_VARIABLES = ['nome', 'primeiro_nome', 'contrato', 'atendente'] as const
+
+export const TEMPLATE_CATEGORIES = ['cobranca', 'atendimento', 'suporte', 'alerta', 'geral'] as const
+type TemplateCategory = (typeof TEMPLATE_CATEGORIES)[number]
+
+const CATEGORY_LABEL = {
+  cobranca: 'whatsapp.templates.categoryCobranca',
+  atendimento: 'whatsapp.templates.categoryAtendimento',
+  suporte: 'whatsapp.templates.categorySuporte',
+  alerta: 'whatsapp.templates.categoryAlerta',
+  geral: 'whatsapp.templates.categoryGeral'
+} as const satisfies Record<TemplateCategory, string>
+
+const asCategory = (value: string | null | undefined): TemplateCategory =>
+  (TEMPLATE_CATEGORIES as readonly string[]).includes(String(value)) ? (value as TemplateCategory) : 'geral'
+
+/** As variáveis que a categoria aceita — a mesma regra do servidor. */
+const variablesFor = (category: TemplateCategory): readonly string[] =>
+  category === 'atendimento' ? QUICK_REPLY_VARIABLES : VARIABLES
+
 /** The backend's own placeholder pattern, character for character. */
 const PLACEHOLDER = /\{\{\s*([a-zA-Z_][\w.-]*)\s*\}\}/g
 
@@ -43,8 +68,9 @@ function citedVariables(body: string): string[] {
 }
 
 /** What the server will refuse the body for, computed before asking it. */
-function unknownVariables(body: string): string[] {
-  return citedVariables(body).filter((name) => !VARIABLES.includes(name as (typeof VARIABLES)[number]))
+function unknownVariables(body: string, category: TemplateCategory): string[] {
+  const allowed = variablesFor(category)
+  return citedVariables(body).filter((name) => !allowed.includes(name))
 }
 
 type Classification = 'reminder' | 'dunning' | 'both' | 'none'
@@ -106,9 +132,10 @@ interface Draft {
   id: number | null
   name: string
   body: string
+  category: TemplateCategory
 }
 
-const EMPTY_DRAFT: Draft = { id: null, name: '', body: '' }
+const EMPTY_DRAFT: Draft = { id: null, name: '', body: '', category: 'cobranca' }
 
 /**
  * The message-template editor.
@@ -208,9 +235,10 @@ export function TemplatesPanel() {
 
     setSaving(true)
     setRefusal('')
+    const { category } = draft
     const res = draft.id === null
-      ? await whatsappAPI.createTemplate({ name, body })
-      : await whatsappAPI.updateTemplate(draft.id, { name, body })
+      ? await whatsappAPI.createTemplate({ name, body, category })
+      : await whatsappAPI.updateTemplate(draft.id, { name, body, category })
     if (!alive.current) return
     setSaving(false)
 
@@ -225,7 +253,7 @@ export function TemplatesPanel() {
     // refusal that can name what is wrong, and it names it from the body in the
     // box — not by parsing the server's prose back apart.
     if (res.code === 'unknown_variable') {
-      const offenders = unknownVariables(body).map((v) => `{{${v}}}`)
+      const offenders = unknownVariables(body, category).map((v) => `{{${v}}}`)
       const message = t('whatsapp.templates.unknownVariable', {
         name: offenders.length > 0 ? offenders.join(', ') : '{{…}}'
       })
@@ -309,6 +337,28 @@ export function TemplatesPanel() {
           </div>
 
           <div>
+            <label className="field-label" htmlFor="wa-template-category">
+              {t('whatsapp.templates.category')}
+            </label>
+            <select
+              id="wa-template-category"
+              className="modern-input"
+              value={draft.category}
+              onChange={(event) => {
+                setDraft({ ...draft, category: asCategory(event.target.value) })
+                setRefusal('')
+              }}
+            >
+              {TEMPLATE_CATEGORIES.map((category) => (
+                <option key={category} value={category}>{t(CATEGORY_LABEL[category])}</option>
+              ))}
+            </select>
+            {draft.category === 'atendimento' && (
+              <p className="field-hint">{t('whatsapp.templates.quickReplyHint')}</p>
+            )}
+          </div>
+
+          <div>
             <label className="field-label" htmlFor="wa-template-body">
               {t('whatsapp.templates.body')}
             </label>
@@ -327,7 +377,7 @@ export function TemplatesPanel() {
           <div>
             <span className="field-label">{t('whatsapp.templates.variables')}</span>
             <div className="flex flex-wrap gap-1.5">
-              {VARIABLES.map((name) => (
+              {variablesFor(draft.category).map((name) => (
                 <button
                   key={name}
                   type="button"
@@ -411,7 +461,8 @@ export function TemplatesPanel() {
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="truncate text-sm font-semibold text-foreground">{template.name}</span>
-                    <ClassificationBadge body={template.body} />
+                    <span className="modern-badge">{t(CATEGORY_LABEL[asCategory(template.category)])}</span>
+                    {asCategory(template.category) !== 'atendimento' && <ClassificationBadge body={template.body} />}
                   </div>
                   <p className="mt-2 whitespace-pre-wrap break-words font-mono text-[0.78rem] leading-6 text-muted-foreground">
                     {template.body}
@@ -428,7 +479,7 @@ export function TemplatesPanel() {
                     className="modern-button-secondary"
                     onClick={() => {
                       setRefusal('')
-                      setDraft({ id: template.id, name: template.name, body: template.body })
+                      setDraft({ id: template.id, name: template.name, body: template.body, category: asCategory(template.category) })
                     }}
                   >
                     <Icon name="edit" size={16} />
