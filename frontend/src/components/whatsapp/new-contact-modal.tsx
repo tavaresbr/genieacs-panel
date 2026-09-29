@@ -112,9 +112,10 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
         ...(prefill ? {
           name: prefill.name ?? '',
           tradeName: prefill.tradeName ?? '',
+          birthDate: prefill.birthDate ?? '',
           email: prefill.email ?? '',
           whatsappPhone: prefill.phone ?? '',
-          zip: prefill.address.zip ?? '',
+          zip: (prefill.address.zip ?? '').replace(/\D/g, '').slice(0, 8).replace(/^(\d{5})(\d)/, '$1-$2'),
           street: prefill.address.street ?? '',
           number: prefill.address.number ?? '',
           complement: prefill.address.complement ?? '',
@@ -292,11 +293,37 @@ export function NewContactModal({ onClose }: { onClose: () => void }) {
                 <span>
                   {!lookup.sgpChecked
                     ? t('contacts.new.sgpNotChecked')
-                    : isCompany
-                      ? t(lookup.prefill ? 'contacts.new.cnpjPrefilled' : 'contacts.new.cnpjFailed')
-                      : t('contacts.new.cpfNoSource')}
+                    : lookup.prefill?.source === 'teiah'
+                      ? t('contacts.new.teiahPrefilled')
+                      : isCompany
+                        ? t(lookup.prefill ? 'contacts.new.cnpjPrefilled' : 'contacts.new.cnpjFailed')
+                        : t(lookup.teiahConsulted ? 'contacts.new.teiahNotFound' : 'contacts.new.cpfNoSource')}
                 </span>
               </p>
+            )}
+            {lookup?.deceased && (
+              <p className="mt-3 flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
+                <Icon name="warning" size={16} />
+                <span>{t('contacts.new.teiahDeceased')}</span>
+              </p>
+            )}
+            {lookup?.teiahScore && (
+              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md border border-border p-3 text-sm" data-testid="new-contact-teiah-score">
+                <span className="font-semibold">
+                  {t('contacts.new.teiahScore', { score: lookup.teiahScore.score ?? '—' })}
+                </span>
+                {lookup.teiahScore.risk && (
+                  <span className="text-muted-foreground">{t('contacts.new.teiahRisk', { risk: lookup.teiahScore.risk })}</span>
+                )}
+                {lookup.teiahScore.paymentDescription && (
+                  <span className="text-muted-foreground">{lookup.teiahScore.paymentDescription}</span>
+                )}
+                {lookup.teiahScore.paymentProbability && (
+                  <span className="text-muted-foreground">
+                    {t('contacts.new.teiahPaymentProbability', { value: lookup.teiahScore.paymentProbability })}
+                  </span>
+                )}
+              </div>
             )}
 
             <div className="mt-4 grid gap-4 sm:grid-cols-6">

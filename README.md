@@ -389,8 +389,10 @@ discarded rather than shown.
 **New client** (*Novo cliente*) starts with the CPF or CNPJ:
 
 - If the client is already in SGP, the panel opens their record instead of creating a duplicate.
-- For a company, the form is filled from the Receita. A CPF has no public lookup, so a person's
-  details are typed by hand.
+- When nobody has the document yet and TeiaH Valid is configured, the form is filled from TeiaH's
+  `POST /api/whatsapp/consulta-cpf` (name, birth date, e-mail, phone, address) and its score is
+  shown. Only the fields the form uses reach the browser; the lookup is recorded in the audit
+  trail without the document. A company TeiaH does not know is filled from the Receita.
 - The postal code fills the street, district, city and state.
 - With **Also register in SGP**, the client is created in SGP first through
   `POST /api/crm/cliente/F` or `/J`, without a contract, and filed in the panel under SGP's own

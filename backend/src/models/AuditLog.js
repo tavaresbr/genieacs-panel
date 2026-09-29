@@ -100,6 +100,10 @@ class AuditLog {
     // mesmo motivo de `tenant.billing_changed`.
     CONTACT_UPDATED: 'contact.updated',
     CONTACT_CREATED: 'contact.created',
+    // O CPF/CNPJ de quem ia ser cadastrado foi consultado na TeiaH Valid — um
+    // birô de dados pessoais. O `detail` diz se achou, nunca o documento nem
+    // o que veio.
+    CONTACT_TEIAH_LOOKUP: 'contact.teiah_lookup',
     // Um título em aberto foi mandado ao cliente pelo WhatsApp, pela ficha. O
     // `detail` diz qual título e qual conversa, nunca o texto (tem o PIX).
     CONTACT_INVOICE_SENT: 'contact.invoice_sent',

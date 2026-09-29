@@ -2750,8 +2750,10 @@ export interface ContactDocumentLookup {
   sgpChecked: boolean
   inSgp: { key: string; name: string | null; contract: string | null; state: string }[]
   inPanel: { key: string; name: string | null } | null
-  /** The Receita's record, for a CNPJ nobody has yet. */
+  /** The TeiaH's record (or, for a company, the Receita's), for a document nobody has yet. */
   prefill: {
+    source: 'teiah' | 'receita'
+    birthDate: string | null
     name: string | null
     tradeName: string | null
     email: string | null
@@ -2759,6 +2761,16 @@ export interface ContactDocumentLookup {
     address: ContactAddress
   } | null
   prefillError: boolean
+  /** Whether the TeiaH was asked (the document is nobody's yet and the integration is on). */
+  teiahConsulted: boolean
+  teiahScore: {
+    score: number | null
+    risk: string | null
+    paymentDescription: string | null
+    paymentProbability: string | null
+  } | null
+  /** The TeiaH says the person has died. */
+  deceased: boolean
 }
 
 /** The body of `POST /contacts/sgp`: the client created in the SGP, then filed here. */

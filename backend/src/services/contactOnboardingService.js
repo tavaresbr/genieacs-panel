@@ -4,6 +4,7 @@ import SgpContact from '../models/SgpContact.js';
 import WaContactService from './waContactService.js';
 import ContactProfileService, { ContactProfileError } from './contactProfileService.js';
 import { lookupCnpj } from './cnpjLookupService.js';
+import TeiahService from './teiahService.js';
 import { lookupCep } from './addressLookupService.js';
 import { isValidCnpj, isValidCpf } from '../utils/taxId.js';
 import { normalizarTelefoneBr } from '../utils/wa/waDestino.js';
@@ -77,14 +78,47 @@ class ContactOnboardingService {
 
     let prefill = null;
     let prefillError = false;
-    if (personType === 'PJ' && inSgp.length === 0) {
+    let teiahScore = null;
+    let teiahConsulted = false;
+    let deceased = false;
+    const known = inSgp.length > 0 || Boolean(inPanel);
+
+    // Nobody here knows this document: the TeiaH, when the provider has it,
+    // fills the form — a CPF has no other source.
+    if (!known && TeiahService.isReady(await TeiahService.getConfig())) {
+      teiahConsulted = true;
+      try {
+        const found = await TeiahService.consultDocument(digits);
+        teiahScore = found.score ?? null;
+        deceased = found.deceased === true;
+        if (found.found) {
+          prefill = {
+            source: 'teiah',
+            name: found.name,
+            tradeName: found.tradeName,
+            birthDate: found.birthDate,
+            email: found.emails?.[0] ?? null,
+            phone: found.phones?.[0] ?? null,
+            address: found.address ?? {}
+          };
+        }
+      } catch (error) {
+        console.warn(`TeiaH document lookup failed: ${error.code || error.message}`);
+        prefillError = true;
+      }
+    }
+
+    // A company the TeiaH did not fill: the Receita, as before.
+    if (!prefill && personType === 'PJ' && inSgp.length === 0) {
       try {
         const result = await lookupCnpj(digits);
         if (result.found) {
           const data = result.data;
           prefill = {
+            source: 'receita',
             name: data.legalName || null,
             tradeName: data.tradeName || null,
+            birthDate: null,
             email: data.email || null,
             phone: data.phone || null,
             address: {
@@ -97,6 +131,7 @@ class ContactOnboardingService {
               zip: data.postalCode || null
             }
           };
+          prefillError = false;
         }
       } catch {
         // The Receita down is a form typed by hand, not a failed lookup.
@@ -104,7 +139,18 @@ class ContactOnboardingService {
       }
     }
 
-    return { document: digits, personType, sgpChecked, inSgp, inPanel, prefill, prefillError };
+    return {
+      document: digits,
+      personType,
+      sgpChecked,
+      inSgp,
+      inPanel,
+      prefill,
+      prefillError,
+      teiahConsulted,
+      teiahScore,
+      deceased
+    };
   }
 
   static async lookupCep(cep) {

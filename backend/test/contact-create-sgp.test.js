@@ -4,6 +4,7 @@ import http from 'node:http';
 import { asTenant, authHeaders, call, getDb, startTestServers, stopTestServers } from './helpers/harness.js';
 
 const { default: SgpService } = await import('../src/services/sgpService.js');
+const { default: TeiahService, normalizeConsult } = await import('../src/services/teiahService.js');
 
 /**
  * "Novo cliente": o CPF/CNPJ primeiro, depois o cadastro, e — quando o
@@ -302,5 +303,140 @@ describe('cadastrar no SGP', () => {
       method: 'POST', headers: authHeaders(login.body.data.token), body: PESSOA
     });
     assert.equal(res.status, 403);
+  });
+});
+
+/**
+ * Quem não está no SGP nem no painel: a TeiaH preenche. A TeiaH falsa responde
+ * `consulta-cpf` com o formato visto no Swagger (`resultado.mix.*.data`), mais
+ * endereço e telefones, e guarda o que recebeu.
+ */
+describe('preencher pela TeiaH', () => {
+  const TEIAH_KEY = 'chave-teiah-consulta';
+  let teiahServer;
+  let teiahModo = 'ok';
+  const consultas = [];
+
+  const RESPOSTA = {
+    resultado: {
+      mix: {
+        score: { data: { risco: 'BAIXO', score: 390, descricaoPagamento: null, probabilidadePagamento: null } },
+        emails: { data: ['FULANO@EXEMPLO.TEST', 'outro@exemplo.test'] },
+        pessoa: {
+          data: {
+            cpf: CPF_NOVO,
+            nome: 'FULANO DA TEIAH',
+            idade: 41,
+            obito: null,
+            nomeMae: 'MAE DO FULANO',
+            dataNascimento: '01/04/1985'
+          }
+        },
+        telefones: { data: [{ ddd: '93', numero: '35221234' }, { ddd: '93', numero: '991234567' }] },
+        enderecos: {
+          data: [{
+            tipoLogradouro: 'RUA', logradouro: 'DAS FLORES', numero: '10', bairro: 'CENTRO',
+            cidade: 'ITAITUBA', uf: 'pa', cep: '68180-000'
+          }]
+        }
+      }
+    }
+  };
+
+  before(async () => {
+    teiahServer = http.createServer((req, res) => {
+      let raw = '';
+      req.on('data', (chunk) => { raw += chunk; });
+      req.on('end', () => {
+        consultas.push({ path: req.url, key: req.headers['x-api-key'], body: JSON.parse(raw || 'null') });
+        const send = (status, body) => {
+          res.writeHead(status, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(body));
+        };
+        if (req.headers['x-api-key'] !== TEIAH_KEY || teiahModo === '401') {
+          return send(401, { statusCode: 401, message: 'API Key inválida ou revogada' });
+        }
+        if (req.url === '/api/whatsapp/consulta-cpf') return send(201, RESPOSTA);
+        return send(404, {});
+      });
+    });
+    const url = await new Promise((resolve) => {
+      teiahServer.listen(0, '127.0.0.1', () => resolve(`http://127.0.0.1:${teiahServer.address().port}`));
+    });
+    await asTenant(() => TeiahService.saveConfig({ enabled: true, baseUrl: url, apiKey: TEIAH_KEY }));
+  });
+
+  after(async () => {
+    await asTenant(() => TeiahService.saveConfig({ enabled: false }));
+    await new Promise((done) => teiahServer.close(done));
+  });
+
+  beforeEach(() => {
+    teiahModo = 'ok';
+    consultas.length = 0;
+  });
+
+  it('um CPF fora do SGP vem preenchido pela TeiaH, com o score', async () => {
+    const res = await lookup('111.444.777-35');
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    const { prefill, teiahScore, deceased } = res.body.data;
+    assert.equal(prefill.source, 'teiah');
+    assert.equal(prefill.name, 'FULANO DA TEIAH');
+    assert.equal(prefill.birthDate, '1985-04-01');
+    assert.equal(prefill.email, 'fulano@exemplo.test');
+    // O celular primeiro: é o número que o WhatsApp alcança.
+    assert.equal(prefill.phone, '5593991234567');
+    assert.deepEqual(prefill.address, {
+      street: 'RUA DAS FLORES', number: '10', district: 'CENTRO', city: 'ITAITUBA', state: 'PA', zip: '68180000'
+    });
+    assert.equal(teiahScore.score, 390);
+    assert.equal(deceased, false);
+    assert.equal(consultas.length, 1);
+    assert.equal(consultas[0].path, '/api/whatsapp/consulta-cpf');
+    assert.equal(consultas[0].key, TEIAH_KEY);
+    assert.deepEqual(consultas[0].body, { cpf: '11144477735' });
+    // O resto da ficha da TeiaH não chega à tela.
+    assert.equal(JSON.stringify(res.body).includes('MAE DO FULANO'), false);
+
+    const trilha = await asTenant(() => getDb()('audit_log').where({ action: 'contact.teiah_lookup' }).orderBy('id', 'desc').first());
+    assert.ok(trilha, 'a consulta à TeiaH não deixou rastro');
+    assert.equal(trilha.detail.includes('11144477735'), false, 'a trilha guardou o documento');
+    assert.equal(JSON.parse(trilha.detail).found, true);
+  });
+
+  it('quem já está no SGP não é consultado na TeiaH', async () => {
+    const res = await lookup(CPF_EXISTENTE);
+    assert.equal(res.status, 200);
+    assert.equal(res.body.data.inSgp.length, 1);
+    assert.equal(res.body.data.teiahConsulted, false);
+    assert.deepEqual(consultas, []);
+  });
+
+  it('a TeiaH recusando a chave vira formulário em branco, não erro', async () => {
+    teiahModo = '401';
+    const res = await lookup('111.444.777-35');
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.data.prefill, null);
+    assert.equal(res.body.data.prefillError, true);
+  });
+
+  it('a leitura aceita outros nomes e formatos', () => {
+    const lido = normalizeConsult({
+      resultado: {
+        mix: {
+          pessoa: { nome: 'SEM DATA', obito: 'S', data_nascimento: '1990-02-03' },
+          telefones: ['(93) 99123-4567'],
+          endereco: { data: { logradouro: 'AV BRASIL', municipio: 'SANTAREM', uf: 'PA', cep: '68000000' } },
+          email: { data: [{ email: 'X@Y.TEST' }] }
+        }
+      }
+    });
+    assert.equal(lido.name, 'SEM DATA');
+    assert.equal(lido.deceased, true);
+    assert.equal(lido.birthDate, '1990-02-03');
+    assert.deepEqual(lido.phones, ['5593991234567']);
+    assert.equal(lido.address.city, 'SANTAREM');
+    assert.deepEqual(lido.emails, ['x@y.test']);
+    assert.equal(normalizeConsult({}).found, false);
   });
 });
