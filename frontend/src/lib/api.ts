@@ -1395,6 +1395,11 @@ export interface PublicInfo {
   contactWhatsapp: string | null
   /** Onde os provedores entram num deploy de endereço único; null com subdomínios. */
   panelUrl: string | null
+  /** O rodapé da vitrine; cada um é opcional. */
+  contactEmail?: string | null
+  legalName?: string | null
+  taxId?: string | null
+  address?: string | null
 }
 
 export interface CnpjData {
