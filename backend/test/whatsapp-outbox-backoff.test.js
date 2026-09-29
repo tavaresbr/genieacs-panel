@@ -104,7 +104,10 @@ async function seedMessage(patch = {}) {
     direction: 'out',
     body: 'a mensagem',
     is_note: false,
-    source: 'campaign',
+    // 'operator', e não 'campaign': a automática sai no ritmo do worker (uma a
+    // cada 20–45 s), e o que este arquivo mede é a espera entre TENTATIVAS,
+    // não entre mensagens. O ritmo tem teste próprio em whatsapp-outbox-pace.
+    source: 'operator',
     delivery_status: 'queued',
     created_at: wholeSecond(Date.now() - 60_000),
     updated_at: wholeSecond(Date.now() - 60_000),

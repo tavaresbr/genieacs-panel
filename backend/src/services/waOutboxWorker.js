@@ -6,6 +6,7 @@ import { isPermanentFailure } from './waSendFailure.js';
 import { forEachTenant } from '../config/tenantJobs.js';
 import { currentTenantId } from '../config/tenantContext.js';
 import { isUniqueViolation } from '../config/database.js';
+import { esperaMaximaMs, proximaVez } from '../utils/wa/waCadencia.js';
 
 /** How often a pass runs. Short, because a reply typed by a human is waiting. */
 const TICK_INTERVAL_MS = 5_000;
@@ -129,6 +130,22 @@ class WaOutboxWorker {
   /** Onde a janela do provedor fica entre um processo e o seguinte. */
   static WINDOW_KEY = 'wa_outbox_window';
 
+  /**
+   * O ritmo das mensagens automáticas, POR PROVEDOR: `{ proximaEm, sequencia }`.
+   *
+   * O teto por minuto diz quantas saem; ele não diz quando. Sem isto a passada
+   * mandava as vinte do minuto coladas uma na outra — a rajada que o WhatsApp
+   * lê como disparo em massa e bloqueia. Só `source='campaign'` espera por ele
+   * (régua, cobrança avulsa e campanhas): resposta de atendente, do bot e
+   * alerta têm alguém do outro lado e saem na hora.
+   *
+   * Gravado a cada avanço e lido de volta em `hydrate()`, pelo mesmo motivo da
+   * janela: um deploy no meio de uma campanha não pode zerar o intervalo.
+   */
+  static paces = new Map();
+
+  static PACE_KEY = 'wa_outbox_bulk_pace';
+
   static start() {
     if (this.timer) return this.timer;
     this.timer = setInterval(() => {
@@ -149,6 +166,7 @@ class WaOutboxWorker {
     // passagem depois de subir o lê de volta — que é a diferença entre o teto
     // valer e o teto ser um enfeite que todo deploy zera.
     this.windows.clear();
+    this.paces.clear();
     this.hydrated.clear();
   }
 
@@ -214,7 +232,9 @@ class WaOutboxWorker {
         return summary;
       }
 
-      const ids = await WaMessage.listSendable(Math.min(budget, BATCH_LIMIT));
+      // Primeiro o que tem gente esperando: uma campanha de mil nunca fica na
+      // frente da resposta de um atendente.
+      const ids = await WaMessage.listSendable(Math.min(budget, BATCH_LIMIT), { bulk: false });
       for (const id of ids) {
         // Reserved before the claim rather than after it. A slot burnt on a
         // message another pass had already taken is a rounding error; a slot
@@ -230,6 +250,12 @@ class WaOutboxWorker {
         if (outcome === 'sent') summary.sent += 1;
         else if (outcome !== 'claimed_elsewhere') summary.failed += 1;
       }
+      // Depois, no máximo UMA automática, e só se o ritmo já deixa. A passada
+      // roda a cada cinco segundos, então o intervalo real fica entre o
+      // sorteado e o sorteado mais cinco — folga a favor do número.
+      if (summary.skipped !== 'rate_limited' && this.budget(config.rateLimitPerMin) > 0) {
+        await this.deliverBulk(config, summary);
+      }
       // Reported whether the pass ran out of budget mid-loop or was cut to the
       // budget when it asked for work: either way the minute is spent, and the
       // rest of the queue is waiting on the clock rather than on a failure.
@@ -240,6 +266,42 @@ class WaOutboxWorker {
       summary.skipped = 'error';
       return summary;
     }
+  }
+
+  /**
+   * Uma mensagem automática, se o ritmo do provedor já deixa sair.
+   *
+   * O ritmo avança ANTES do envio e na mesma volta síncrona que o confere, como
+   * a vaga do minuto em `reserve`: duas passadas sobrepostas não podem ambas
+   * achar que a vez é delas. Se a outra passada levou a linha, a vez se perde —
+   * um intervalo a mais, que é o erro para o lado seguro.
+   */
+  static async deliverBulk(config, summary) {
+    const tenantId = currentTenantId();
+    const ritmo = this.paces.get(tenantId) || { proximaEm: 0, sequencia: 0 };
+    if (Date.now() < ritmo.proximaEm) return;
+
+    const [id] = await WaMessage.listSendable(1, { bulk: true });
+    if (!id) return;
+
+    const atual = this.paces.get(tenantId) || { proximaEm: 0, sequencia: 0 };
+    const agora = Date.now();
+    if (agora < atual.proximaEm) return;
+    const proximo = proximaVez({ agora, sequencia: atual.sequencia, cfg: config });
+    this.paces.set(tenantId, proximo);
+    try {
+      await AppState.upsert(this.PACE_KEY, JSON.stringify(proximo));
+    } catch (error) {
+      console.warn(`WhatsApp outbox pace not stored: ${error.message}`);
+    }
+
+    if (!await this.reserve(config.rateLimitPerMin)) {
+      summary.skipped = 'rate_limited';
+      return;
+    }
+    const outcome = await this.deliver(id);
+    if (outcome === 'sent') summary.sent += 1;
+    else if (outcome !== 'claimed_elsewhere') summary.failed += 1;
   }
 
   /**
@@ -431,6 +493,23 @@ class WaOutboxWorker {
       console.warn(`WhatsApp outbox window unreadable: ${error.message}`);
     }
     this.windows.set(tenantId, instantes);
+
+    // O ritmo: um `proximaEm` além da espera mais longa possível só pode vir
+    // de um relógio que andou para trás, e seguraria a fila até ele alcançar.
+    let ritmo = { proximaEm: 0, sequencia: 0 };
+    try {
+      const bruto = await AppState.get(this.PACE_KEY);
+      const lido = bruto ? JSON.parse(bruto) : null;
+      const proximaEm = Number(lido?.proximaEm);
+      const sequencia = Number(lido?.sequencia);
+      const config = await WhatsAppConfigService.getConfig();
+      if (Number.isFinite(proximaEm) && proximaEm <= agora + esperaMaximaMs(config)) {
+        ritmo = { proximaEm, sequencia: Number.isFinite(sequencia) && sequencia > 0 ? sequencia : 0 };
+      }
+    } catch (error) {
+      console.warn(`WhatsApp outbox pace unreadable: ${error.message}`);
+    }
+    this.paces.set(tenantId, ritmo);
   }
 }
 

@@ -86,6 +86,10 @@ webhook de entrada, que é público e tem credencial própria.
   rejectCallMessage: string
   portalPublicUrl: string       // onde o portal do cliente responde, de fora
   rateLimitPerMin: number       // 1..120
+  bulkIntervalMinSec: number    // 5..600, padrão 20 — ritmo das automáticas
+  bulkIntervalMaxSec: number    // mínimo..600, padrão 45 (abaixo do mínimo vira o mínimo)
+  bulkBurstSize: number         // 0..500, padrão 30; 0 desliga a pausa longa
+  bulkBurstPauseMin: number     // 1..120, padrão 5
   managedUrl: string
   managed: boolean              // derivado: managedUrl preenchido
   managedAdminKeyConfigured: boolean
@@ -403,6 +407,17 @@ no shutdown. `wa_messages` **é** a fila; não existe tabela paralela.
   em `app_state` a cada vaga tomada e lida de volta na primeira passagem de cada
   provedor: o teto é o que o WhatsApp impõe, e ele não reinicia junto com o
   processo do painel.
+- **Ritmo das automáticas** (`source='campaign'`: régua, cobrança avulsa e
+  campanhas). Cada passada manda primeiro o resto da fila (atendente, bot,
+  alerta), na hora, e depois **no máximo uma** automática, e só quando chegou a
+  vez dela: entre uma e outra, uma espera sorteada entre `bulkIntervalMinSec` e
+  `bulkIntervalMaxSec`; a cada `bulkBurstSize` mensagens, uma pausa de
+  `bulkBurstPauseMin` minutos. Como a passada é de 5 s, a espera real fica entre
+  o sorteado e o sorteado + 5 s. O estado `{ proximaEm, sequencia }` é por
+  provedor e fica em `app_state` (`wa_outbox_bulk_pace`), lido de volta depois
+  de um restart; um `proximaEm` além da maior espera possível é descartado. A
+  regra pura está em `utils/wa/waCadencia.js`. O teto por minuto continua
+  valendo para tudo.
 - Roteamento: a conta da conversa primeiro (quem escreveu para o suporte tem de
   ser respondido pelo suporte); só se ela não estiver `connected` cai para
   `WhatsAppAccount.getForPurpose()`, **no mesmo purpose**.
