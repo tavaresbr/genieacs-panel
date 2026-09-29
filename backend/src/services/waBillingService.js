@@ -1,5 +1,7 @@
 import SgpService, { SgpError } from './sgpService.js';
 import SgpLink from '../models/SgpLink.js';
+import SgpContact from '../models/SgpContact.js';
+import { whatsappPhoneOf } from './contactProfileService.js';
 import WaBroadcast from '../models/WaBroadcast.js';
 import WaOptOut from '../models/WaOptOut.js';
 import WhatsAppAccount from '../models/WhatsAppAccount.js';
@@ -99,7 +101,7 @@ class WaBillingService {
     const cap = Math.min(Math.max(Number(limit) || DEFAULT_LIST_LIMIT, 1), MAX_RECIPIENTS);
     const needle = String(search ?? '').trim().toLowerCase();
 
-    const subscribers = this.subscribersFrom(await SgpLink.getAll())
+    const subscribers = (await this.subscribers())
       .filter((row) => !needle || [row.contract, row.clientName, row.phone]
         .some((field) => String(field ?? '').toLowerCase().includes(needle)))
       .slice(0, cap);
@@ -175,7 +177,7 @@ class WaBillingService {
 
     const wantedSet = new Set(wanted);
     const byContract = new Map(
-      this.subscribersFrom((await SgpLink.getAll()).filter((link) => wantedSet.has(String(link.contract ?? '').trim())))
+      (await this.subscribers({ contracts: [...wantedSet] }))
         .map((row) => [row.contract, row])
     );
 
@@ -309,8 +311,11 @@ class WaBillingService {
     // Read before write: `update` reports rows touched, which on a contract
     // that does not exist and on one whose number is already the typed value
     // is the same zero. Only one of those is a 404.
+    // The contract may live in either table: linked to an ONT (`sgp_links`)
+    // or known only from the SGP sync (`sgp_contacts`). Either one is enough.
     const existing = key ? await SgpLink.getByContract(key) : [];
-    if (existing.length === 0) {
+    const contact = key ? await SgpContact.getByContract(key) : null;
+    if (existing.length === 0 && !contact) {
       throw new WaError('whatsapp.error.subscriberNotFound', {
         code: 'subscriber_not_found',
         status: 404
@@ -331,30 +336,94 @@ class WaBillingService {
     // 98111-0449" would leave the correction looking right on screen and
     // matching nothing at dispatch time — the same failure the do-not-disturb
     // list normalises on the way in to avoid.
-    await SgpLink.setManualPhone(key, digits || null);
+    //
+    // Written to BOTH rows the contract has. The reader (`whatsappPhoneOf`)
+    // prefers the contact's manual number over the link's, the same order the
+    // Contacts screen uses — so a correction written to the link alone would
+    // lose to an older one typed on the contact page, and look ignored.
+    if (existing.length > 0) await SgpLink.setManualPhone(key, digits || null);
+    if (contact) await SgpContact.setManualPhone(key, digits || null);
 
-    const [subscriber] = this.subscribersFrom(await SgpLink.getByContract(key));
+    const [subscriber] = await this.subscribers({ contracts: [key] });
     return subscriber;
   }
 
-  /** `sgp_links` rows as subscribers, one per contract. */
-  static subscribersFrom(links) {
+  /**
+   * Every subscriber the billing cadence can reach, one per contract.
+   *
+   * Two sources, because the panel knows a subscriber from two places:
+   * `sgp_links` — a contract tied to an ONT — and `sgp_contacts` — every
+   * client the SGP sync brought in, with or without an ONT on this panel.
+   * Reading only the first was the bug: most links carry no phone (the number
+   * lives on the synced contact), so subscribers whose mobile the Contacts
+   * screen shows landed in `noPhone`, and a contract with no ONT here was never
+   * considered at all.
+   *
+   * The number is chosen by `whatsappPhoneOf`, the same function and the same
+   * order the Contacts screen uses, so the cadence can never disagree with what
+   * the operator sees on the subscriber's page.
+   *
+   * @param {{ contracts?: string[] }} [options] restrict to these contracts
+   */
+  static async subscribers({ contracts } = {}) {
+    let links;
+    let contacts;
+    if (Array.isArray(contracts)) {
+      const wanted = [...new Set(contracts.map((c) => String(c ?? '').trim()).filter(Boolean))];
+      if (wanted.length === 0) return [];
+      links = [];
+      contacts = [];
+      // Chunked: an `IN` list has a ceiling on every engine, and a campaign
+      // can name hundreds of contracts.
+      for (let i = 0; i < wanted.length; i += 200) {
+        const chunk = wanted.slice(i, i + 200);
+        // eslint-disable-next-line no-await-in-loop -- a handful of chunks
+        links.push(...await SgpLink.getByContracts(chunk));
+        // eslint-disable-next-line no-await-in-loop -- idem
+        contacts.push(...await SgpContact.getByContracts(chunk));
+      }
+    } else {
+      links = await SgpLink.getAll();
+      contacts = await SgpContact.listWithContract();
+    }
+    return this.subscribersFrom(links, contacts);
+  }
+
+  /**
+   * `sgp_links` and `sgp_contacts` rows as subscribers, one per contract.
+   *
+   * Links come first, so the order a listing shows is the one it always had;
+   * contracts known only from the SGP sync follow. The phone of each is
+   * `whatsappPhoneOf(link, contact)`: the operator's correction wins over the
+   * ERP's number, and the contact's over the link's.
+   */
+  static subscribersFrom(links, contacts = []) {
+    const contactByContract = new Map();
+    for (const contact of contacts || []) {
+      const contract = String(contact.contract ?? '').trim();
+      if (contract && !contactByContract.has(contract)) contactByContract.set(contract, contact);
+    }
+
     const byContract = new Map();
+    const add = (contract, link, contact) => {
+      const { phone, phoneSource } = whatsappPhoneOf(link, contact);
+      byContract.set(contract, {
+        contract,
+        clientName: link?.client_name || contact?.client_name || null,
+        document: link?.document || contact?.document || null,
+        deviceId: link?.device_id || null,
+        phone,
+        phoneSource
+      });
+    };
+
     for (const link of links || []) {
       const contract = String(link.contract ?? '').trim();
       if (!contract || byContract.has(contract)) continue;
-      // The manual override wins and a sync never touches it: an operator who
-      // corrected a number did so because the ERP's is wrong.
-      const manual = normalizarTelefoneBr(link.phone_manual);
-      const fromSgp = normalizarTelefoneBr(link.phone_e164);
-      byContract.set(contract, {
-        contract,
-        clientName: link.client_name || null,
-        document: link.document || null,
-        deviceId: link.device_id || null,
-        phone: manual || fromSgp || null,
-        phoneSource: manual ? 'manual' : (fromSgp ? 'sgp' : null)
-      });
+      add(contract, link, contactByContract.get(contract) || null);
+    }
+    for (const [contract, contact] of contactByContract) {
+      if (!byContract.has(contract)) add(contract, null, contact);
     }
     return [...byContract.values()];
   }

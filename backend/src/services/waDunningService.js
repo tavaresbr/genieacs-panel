@@ -513,7 +513,7 @@ class WaDunningService {
       items: []
     };
 
-    let subscribers = WaBillingService.subscribersFrom(await SgpLink.getAll());
+    let subscribers = await WaBillingService.subscribers();
     if (dryRun && subscribers.length > PREVIEW_CONTRACTS) {
       subscribers = subscribers.slice(0, PREVIEW_CONTRACTS);
       summary.truncated = true;

@@ -23,6 +23,17 @@ class SgpContact {
     return tdb('sgp_contacts').whereIn('contract', contracts.map(String));
   }
 
+  /**
+   * Every synced row that has a contract — the billing cadence's address book
+   * for subscribers with no ONT on this panel. Only the columns it reads.
+   */
+  static async listWithContract() {
+    return tdb('sgp_contacts')
+      .whereNotNull('contract')
+      .select('contract', 'client_name', 'document', 'phone_e164', 'phone_manual')
+      .orderBy('id');
+  }
+
   /** The contract-less row of one SGP client, if there is one. */
   static async getClientRow(clientId) {
     if (!clientId) return null;
