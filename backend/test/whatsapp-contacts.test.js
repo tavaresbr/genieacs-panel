@@ -244,7 +244,7 @@ describe('os fios antigos', () => {
       pushName: 'Luiz Carlos Souza'
     }));
     assert.equal(antigo.contract, null);
-    await asTenant(() => WaConversation.update(antigo.id, { last_message_at: new Date() }));
+    await asTenant(() => WaConversation.update(antigo.id, { last_message_at: new Date(), engaged_at: new Date() }));
 
     const res = await call(`${panelUrl}/api/whatsapp/conversations`, { headers: authHeaders(token) });
     const linha = res.body.data.find((row) => row.id === antigo.id);

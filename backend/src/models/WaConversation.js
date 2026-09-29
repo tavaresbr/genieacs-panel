@@ -104,10 +104,19 @@ class WaConversation {
   } = {}) {
     const query = tdb('wa_conversations');
 
-    if (status === 'closed') query.whereNotNull('closed_at');
-    else if (status !== 'all') query.whereNull('closed_at');
-
     const raw = String(search ?? '').trim();
+
+    if (status === 'closed') query.whereNotNull('closed_at');
+    else if (status === 'noreply') query.whereNull('closed_at').whereNull('engaged_at');
+    else if (status !== 'all') {
+      query.whereNull('closed_at');
+      // "Abertas" é onde há gente dos dois lados. A conversa que só recebeu
+      // envio automático mora em "Sem resposta" — mas uma busca pelo nome ou
+      // pelo telefone a encontra daqui também, porque quem procura um cliente
+      // não sabe, nem precisa saber, em qual das duas pilhas ele está.
+      if (!raw) query.whereNotNull('engaged_at');
+    }
+
     const term = this.likeTerm(raw);
     if (raw) {
       const like = `%${term}%`;

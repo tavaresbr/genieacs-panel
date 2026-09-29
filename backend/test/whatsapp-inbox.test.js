@@ -62,7 +62,10 @@ async function semear({ apelido, phone, pushName, contract, minutos }) {
   }));
   await asTenant(() => WaConversation.update(conversa.id, {
     contract: contract ?? null,
-    last_message_at: new Date(Date.now() - minutos * 60_000)
+    last_message_at: new Date(Date.now() - minutos * 60_000),
+    // Conversas com gente dos dois lados: as que só receberam envio
+    // automático ficam em "Sem resposta" (whatsapp-inbox-engaged.test.js).
+    engaged_at: new Date(Date.now() - minutos * 60_000)
   }));
   fios[apelido] = conversa.id;
   return conversa.id;

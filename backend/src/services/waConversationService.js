@@ -301,7 +301,7 @@ class WaConversationService {
     const rows = await WaConversation.listRecent({
       limit: Math.min(Math.max(Number(limit) || 50, 1), 200),
       offset: Math.max(Number(offset) || 0, 0),
-      status: ['open', 'closed', 'all'].includes(status) ? status : 'open',
+      status: ['open', 'noreply', 'closed', 'all'].includes(status) ? status : 'open',
       search: term,
       searchContracts: term ? await this.contractsMatchingClientName(term) : [],
       searchContactIds: term ? await this.contactIdsMatchingClientName(term) : []

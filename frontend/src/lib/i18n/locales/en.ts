@@ -2142,6 +2142,7 @@ const en = {
   'whatsapp.inbox.closed': 'Closed',
   'whatsapp.inbox.closeHint': 'Filed away, not deleted. The history stays, and a new message from them reopens it.',
   'whatsapp.inbox.filterOpen': 'Open',
+  'whatsapp.inbox.filterNoReply': 'No reply',
   'whatsapp.inbox.filterClosed': 'Closed',
   'whatsapp.inbox.filterAll': 'All',
   'whatsapp.inbox.searchPlaceholder': 'Number, name or contract',

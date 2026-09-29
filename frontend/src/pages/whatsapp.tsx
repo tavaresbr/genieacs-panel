@@ -73,11 +73,14 @@ const BACKOFF_CAP = 6
  */
 const SEARCH_DEBOUNCE_MS = 350
 
-type ConversationStatus = 'open' | 'closed' | 'all'
+type ConversationStatus = 'open' | 'noreply' | 'closed' | 'all'
 
-/** The three piles, in the order an operator reaches for them. */
+/** The piles, in the order an operator reaches for them. */
 const FILTERS = [
   ['open', 'whatsapp.inbox.filterOpen'],
+  // Conversas que só receberam envio automático (régua, campanha, alerta):
+  // ficam fora de "Abertas" até o cliente responder.
+  ['noreply', 'whatsapp.inbox.filterNoReply'],
   ['closed', 'whatsapp.inbox.filterClosed'],
   ['all', 'whatsapp.inbox.filterAll']
 ] as const
@@ -659,7 +662,9 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
                         key={id}
                         type="button"
                         onClick={() => setStatus(id)}
-                        className="tab-button"
+                        // Quatro pilhas numa coluna estreita: com o respiro
+                        // padrão a última ficava cortada na borda.
+                        className="tab-button px-2"
                         data-active={status === id}
                         role="tab"
                         aria-selected={status === id}
