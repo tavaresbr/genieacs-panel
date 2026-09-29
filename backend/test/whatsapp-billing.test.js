@@ -314,6 +314,42 @@ describe('templates', () => {
     assert.equal(after2.body.data.length, 0);
   });
 
+  const criar = (payload) => call(`${panelUrl}/api/whatsapp/templates`, {
+    method: 'POST', headers: authHeaders(token), body: payload
+  });
+
+  it('aceita uma resposta rápida de atendimento com as variáveis da conversa', async () => {
+    const { status, body } = await criar({
+      name: 'boas-vindas',
+      body: 'Olá {{primeiro_nome}}, aqui é {{atendente}}. Contrato {{contrato}}, {{nome}}.',
+      category: 'atendimento'
+    });
+    assert.equal(status, 201, JSON.stringify(body));
+    assert.equal(body.data.category, 'atendimento');
+    const lista = await call(`${panelUrl}/api/whatsapp/templates?category=atendimento`, { headers: authHeaders(token) });
+    assert.ok(lista.body.data.every((t) => t.category === 'atendimento'));
+    assert.ok(lista.body.data.some((t) => t.name === 'boas-vindas'));
+  });
+
+  it('cada categoria só aceita as suas variáveis', async () => {
+    const pix = await criar({ name: 'rapida-pix', body: 'Seu PIX: {{pix}}', category: 'atendimento' });
+    assert.equal(pix.status, 400);
+    assert.equal(pix.body.code, 'unknown_variable');
+    const primeiro = await criar({ name: 'cobranca-primeiro', body: 'Oi {{primeiro_nome}}', category: 'cobranca' });
+    assert.equal(primeiro.status, 400);
+    assert.equal(primeiro.body.code, 'unknown_variable');
+  });
+
+  it('mudar só a categoria revalida o texto gravado', async () => {
+    const criado = await criar({ name: 'rapida-atendente', body: 'Aqui é {{atendente}}.', category: 'atendimento' });
+    assert.equal(criado.status, 201, JSON.stringify(criado.body));
+    const mudou = await call(`${panelUrl}/api/whatsapp/templates/${criado.body.data.id}`, {
+      method: 'PUT', headers: authHeaders(token), body: { category: 'cobranca' }
+    });
+    assert.equal(mudou.status, 400);
+    assert.equal(mudou.body.code, 'unknown_variable');
+  });
+
   it('requires an administrator session', async () => {
     const { status } = await call(`${panelUrl}/api/whatsapp/templates`);
     assert.equal(status, 401);

@@ -10,7 +10,22 @@ import {
 const NAME_LIMIT = 80;
 const CATEGORY_LIMIT = 32;
 
-const CATEGORIES = Object.freeze(['cobranca', 'alerta', 'suporte', 'geral']);
+const CATEGORIES = Object.freeze(['cobranca', 'alerta', 'suporte', 'geral', 'atendimento']);
+
+/**
+ * As respostas rápidas do atendimento (categoria `atendimento`): textos que o
+ * atendente escolhe na conversa digitando "/". Quem preenche é a tela, com o
+ * que ela sabe da conversa aberta — não o disparo de cobrança —, então as
+ * variáveis são outras, e só elas.
+ */
+export const VARIAVEIS_DE_ATENDIMENTO = Object.freeze(['nome', 'primeiro_nome', 'contrato', 'atendente']);
+
+/** As variáveis que uma categoria aceita. */
+function variaveisDaCategoria(category) {
+  return category === 'atendimento' ? VARIAVEIS_DE_ATENDIMENTO : VARIAVEIS_DE_COBRANCA;
+}
+
+const PLACEHOLDER = /\{\{\s*([a-zA-Z_][\w.-]*)\s*\}\}/g;
 
 /**
  * Saved message bodies.
@@ -95,8 +110,13 @@ class WaTemplateService {
     return { body, templateId: stored?.id ?? null, name: stored?.name ?? null };
   }
 
-  static assertKnownVariables(body) {
-    const unknown = variaveisDesconhecidas(body);
+  static assertKnownVariables(body, category = null) {
+    // Uma resposta rápida tem as suas variáveis; todo o resto (e um corpo
+    // digitado direto numa campanha) segue a lista do disparo de cobrança.
+    const unknown = category === 'atendimento'
+      ? [...new Set([...String(body).matchAll(PLACEHOLDER)].map((m) => m[1]))]
+        .filter((name) => !variaveisDaCategoria(category).includes(name))
+      : variaveisDesconhecidas(body);
     if (unknown.length > 0) {
       const names = unknown.map((name) => `{{${name}}}`).join(', ');
       throw new WaError('whatsapp.error.unknownVariable', {
@@ -116,7 +136,11 @@ class WaTemplateService {
     if (!cleanName || !cleanBody) {
       throw new WaError('whatsapp.error.templateEmpty', { code: 'template_empty', status: 400 });
     }
-    this.assertKnownVariables(cleanBody);
+    const cleanCategory = String(category ?? '').trim().slice(0, CATEGORY_LIMIT);
+    const finalCategory = CATEGORIES.includes(cleanCategory) ? cleanCategory : 'geral';
+    // Contra a categoria FINAL: um PUT que muda só a categoria revalida o
+    // corpo que já estava gravado.
+    this.assertKnownVariables(cleanBody, finalCategory);
     // A body citing both mirrors passes every other check and can never render
     // for anybody: one of the two is always empty, and an empty cited variable
     // refuses the whole message. Left to the dispatcher it shows up as a
@@ -127,11 +151,10 @@ class WaTemplateService {
         status: 400
       });
     }
-    const cleanCategory = String(category ?? '').trim().slice(0, CATEGORY_LIMIT);
     return {
       name: cleanName,
       body: cleanBody,
-      category: CATEGORIES.includes(cleanCategory) ? cleanCategory : 'geral'
+      category: finalCategory
     };
   }
 
