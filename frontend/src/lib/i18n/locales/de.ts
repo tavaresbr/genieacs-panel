@@ -3342,6 +3342,8 @@ const de: Dictionary = {
   'platform.subscription.exempt.enabledCanceled': 'Abrechnungsbefreiung aktiviert. {count} offene Rechnung(en) storniert.',
   'platform.subscription.exempt.disabled': 'Abrechnungsbefreiung deaktiviert. Der Anbieter wird wieder abgerechnet.',
   'platform.subscription.exempt.notBillable': 'Ein gekündigtes Abonnement kann nicht von der Abrechnung befreit werden.',
+  'platform.subscription.exempt.chargesLeftOpen': '{count} Rechnung(en) konnten beim Gateway nicht storniert werden und bleiben offen. Es wird automatisch erneut versucht.',
+  'platform.subscription.exempt.reactivatesSuspended': 'Dieser Anbieter ist gesperrt: Das Aktivieren der Befreiung reaktiviert ihn.',
   'platform.subs.exempt': 'Befreit',
   'platform.subs.filterExempt': 'Befreite',
   'plan.billingExemptNote': 'Ihr Abonnement ist von der Abrechnung befreit.',

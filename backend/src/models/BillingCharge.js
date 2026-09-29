@@ -13,6 +13,14 @@ import { runUnscoped } from '../config/tenantContext.js';
  * justifica a tabela: uma cobrança tem ciclo de vida, e o extrato não tem.
  */
 
+/**
+ * O `last_error` da cobrança que o "isento de cobrança" cancelou — a marca que
+ * o desligar procura para reabrir a do período atual
+ * (`ChargeIssuingService.reopenExemptCanceled`). Não é erro: o console não a
+ * mostra como "último erro". Cabe folgada nos 500 caracteres da coluna.
+ */
+export const EXEMPT_CANCEL_MARKER = 'billing_exempt: canceled by the billing exemption';
+
 export const CHARGE_STATUSES = Object.freeze([
   /** Emitida, ninguém pagou ainda. É o estado em que ela nasce. */
   'pending',
@@ -409,7 +417,8 @@ class BillingCharge {
       // Quando o console mudou o valor à mão — nulo quando o valor é o preço
       // de um plano. A emissão não reprecifica uma cobrança marcada assim.
       amountOverriddenAt: row.amount_overridden_at ?? null,
-      lastError: row.last_error ?? null,
+      // A marca da isenção não é erro de ninguém (ver `EXEMPT_CANCEL_MARKER`).
+      lastError: row.last_error && row.last_error !== EXEMPT_CANCEL_MARKER ? row.last_error : null,
       createdAt: row.created_at ?? null,
       updatedAt: row.updated_at ?? null,
       superseded: BillingCharge.supersededOf(row).map((item) => ({

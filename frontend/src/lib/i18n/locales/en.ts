@@ -3340,6 +3340,8 @@ const en = {
   'platform.subscription.exempt.enabledCanceled': 'Billing exemption turned on. {count} open charge(s) canceled.',
   'platform.subscription.exempt.disabled': 'Billing exemption turned off. The provider will be billed again.',
   'platform.subscription.exempt.notBillable': 'A canceled subscription cannot be made billing exempt.',
+  'platform.subscription.exempt.chargesLeftOpen': '{count} charge(s) could not be canceled at the gateway and remain open. They will be retried automatically.',
+  'platform.subscription.exempt.reactivatesSuspended': 'This provider is suspended: turning on the exemption will reactivate it.',
   'platform.subs.exempt': 'Exempt',
   'platform.subs.filterExempt': 'Exempt',
   'plan.billingExemptNote': 'Your subscription is exempt from billing.',

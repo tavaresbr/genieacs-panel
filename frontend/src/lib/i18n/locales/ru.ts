@@ -3346,6 +3346,8 @@ const ru: Dictionary = {
   'platform.subscription.exempt.enabledCanceled': 'Освобождение от оплаты включено. Отменено открытых счетов: {count}.',
   'platform.subscription.exempt.disabled': 'Освобождение от оплаты отключено. Провайдеру снова будут выставляться счета.',
   'platform.subscription.exempt.notBillable': 'Отменённую подписку нельзя освободить от оплаты.',
+  'platform.subscription.exempt.chargesLeftOpen': 'Не удалось отменить в платёжном шлюзе счета ({count}); они остаются открытыми. Повторная попытка будет выполнена автоматически.',
+  'platform.subscription.exempt.reactivatesSuspended': 'Этот провайдер приостановлен: включение освобождения снова активирует его.',
   'platform.subs.exempt': 'Освобождён',
   'platform.subs.filterExempt': 'Освобождённые',
   'plan.billingExemptNote': 'Ваша подписка освобождена от оплаты.',

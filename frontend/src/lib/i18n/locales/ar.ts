@@ -3347,6 +3347,8 @@ const ar: Dictionary = {
   'platform.subscription.exempt.enabledCanceled': 'تم تفعيل الإعفاء من الفوترة. عدد الفواتير المفتوحة الملغاة: {count}.',
   'platform.subscription.exempt.disabled': 'تم إيقاف الإعفاء من الفوترة. ستتم فوترة المزوّد مجددًا.',
   'platform.subscription.exempt.notBillable': 'لا يمكن إعفاء اشتراك ملغى من الفوترة.',
+  'platform.subscription.exempt.chargesLeftOpen': 'تعذّر إلغاء {count} من الفواتير لدى بوابة الدفع وما زالت مفتوحة. ستتم إعادة المحاولة تلقائيًا.',
+  'platform.subscription.exempt.reactivatesSuspended': 'هذا المزوّد معلّق: تفعيل الإعفاء سيعيد تنشيطه.',
   'platform.subs.exempt': 'معفى',
   'platform.subs.filterExempt': 'المعفون',
   'plan.billingExemptNote': 'اشتراكك معفى من الفوترة.',

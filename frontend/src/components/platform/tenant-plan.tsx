@@ -115,9 +115,13 @@ export function BillingExemptControl({
       })
       if (res.success && res.data) {
         const canceled = res.data.canceledCharges ?? 0
+        const failed = res.data.failedCharges ?? 0
         if (!confirming) toast.success(t('platform.subscription.exempt.disabled'))
         else if (canceled > 0) toast.success(t('platform.subscription.exempt.enabledCanceled', { count: canceled }))
         else toast.success(t('platform.subscription.exempt.enabled'))
+        // As que o gateway não cancelou continuam vivas lá: quem ligou precisa
+        // saber, e o agendador tenta cancelá-las de novo.
+        if (confirming && failed > 0) toast.warning(t('platform.subscription.exempt.chargesLeftOpen', { count: failed }))
         fechar()
         await onChanged()
       } else if (res.code === 'not_billable') {
@@ -171,6 +175,13 @@ export function BillingExemptControl({
               <p className="text-foreground">
                 {t(confirming ? 'platform.subscription.exempt.enableWarning' : 'platform.subscription.exempt.disableWarning')}
               </p>
+              {/* Ligar a isenção de quem está suspenso o reativa ("manter
+                  ativo"): dito com todas as letras antes do clique. */}
+              {confirming && subscription?.storedStatus === 'suspended' && (
+                <p className="font-medium text-[hsl(var(--status-warning))]">
+                  {t('platform.subscription.exempt.reactivatesSuspended')}
+                </p>
+              )}
               <div>
                 <label htmlFor={reasonId} className="mb-1 block text-sm font-medium">
                   {t('platform.subscription.exempt.reason')}

@@ -458,8 +458,10 @@ class SubscriptionService {
    * também o que a porta da assinatura põe no corpo do 402, e ali a pergunta
    * é "por que parei", não "quanto custa".
    */
-  static present({ subscription, plan, pendingPlan = null }, now = new Date()) {
+  static present({ subscription, plan, pendingPlan = null }, opcoes = {}) {
     if (!subscription) return null;
+    // O segundo argumento já foi só `now`; continua aceito assim.
+    const { now = new Date(), withExemptReason = false } = opcoes instanceof Date ? { now: opcoes } : (opcoes ?? {});
     const effective = this.effectiveStatus(subscription, now);
     return {
       status: effective.status,
@@ -475,7 +477,7 @@ class SubscriptionService {
       renewsAt: subscription.renews_at ?? null,
       canceledAt: subscription.canceled_at ?? null,
       pendingPlan: this.presentPendingPlan(subscription, pendingPlan),
-      ...this.presentBillingExempt(subscription)
+      ...this.presentBillingExempt(subscription, { withReason: withExemptReason })
     };
   }
 
@@ -484,12 +486,19 @@ class SubscriptionService {
    * quando, e o motivo que o console escreveu. Função própria porque a lista
    * de Assinaturas monta a linha dela à mão, e duas cópias destes três campos
    * seriam duas telas que um dia discordam.
+   *
+   * O motivo é anotação interna do console ("parceiro", "acordo comercial"):
+   * o provedor sabe que está isento, não por que o anotamos. Por isso ele sai
+   * NULO por padrão, e só as telas do console o pedem (`withReason`) — quem
+   * esquecer de pedir mostra menos, e não o contrário.
    */
-  static presentBillingExempt(subscription) {
+  static presentBillingExempt(subscription, { withReason = false } = {}) {
     return {
       billingExempt: Boolean(subscription?.billing_exempt_at),
       billingExemptSince: isoOf(subscription?.billing_exempt_at),
-      billingExemptReason: subscription?.billing_exempt_at ? (subscription.billing_exempt_reason ?? null) : null
+      billingExemptReason: withReason && subscription?.billing_exempt_at
+        ? (subscription.billing_exempt_reason ?? null)
+        : null
     };
   }
 
@@ -1044,7 +1053,10 @@ class SubscriptionService {
    * já passou — ou, num plano pago, não existe —, ganha `LEAD_DAYS` a partir de
    * agora: sem isso o provedor ficaria vencido no mesmo segundo em que a
    * isenção sai, sem ter recebido fatura nenhuma. Com isso a emissão acha o
-   * prazo dentro da janela e manda a fatura na próxima passada.
+   * prazo dentro da janela e manda a fatura na próxima passada. O `past_due`
+   * gravado com o prazo no futuro volta a `active` (a regra de `setDeadlines`),
+   * e a cobrança do período atual que a própria isenção cancelou é reaberta
+   * para a emissão (`ChargeIssuingService.reopenExemptCanceled`).
    *
    * ## Uma linha no extrato, e idempotente
    *
@@ -1053,8 +1065,8 @@ class SubscriptionService {
    * responde `alreadyInState: true`.
    *
    * @returns {Promise<{ subscription: object, canceledCharges: number,
-   *   alreadyInState: boolean, failedCharges: number[], statusBefore: string,
-   *   statusAfter: string }>}
+   *   alreadyInState: boolean, failedCharges: number[], reopenedCharge: boolean,
+   *   statusBefore: string, statusAfter: string }>}
    */
   static async setBillingExempt({
     tenantId, exempt, reason = null, actorUserId = null, now = new Date()
@@ -1069,6 +1081,7 @@ class SubscriptionService {
         subscription: before,
         canceledCharges: 0,
         failedCharges: [],
+        reopenedCharge: false,
         alreadyInState: true,
         statusBefore: before.status,
         statusAfter: before.status
@@ -1108,6 +1121,15 @@ class SubscriptionService {
             patch.pending_plan_at = patch.renews_at;
           }
         }
+        // O `past_due` GRAVADO com o prazo (talvez o de agora mesmo) no futuro
+        // volta a `active`, pela mesma regra da cortesia (`setDeadlines`): quem
+        // lê o estado não o recalcula a partir do prazo quando o gravado já
+        // diz `past_due`, e o provedor sairia da isenção direto para o
+        // bloqueio sem ter recebido a fatura do prazo que ainda nem venceu.
+        const prazoDepois = coluna === 'renews_at' ? (patch.renews_at ?? prazo) : null;
+        if (before.status === 'past_due' && prazoDepois && prazoDepois.getTime() > now.getTime()) {
+          patch.status = 'active';
+        }
       }
       if (patch.status) detalhe.statusAfter = patch.status;
 
@@ -1124,13 +1146,30 @@ class SubscriptionService {
       cache.invalidate();
 
       let cancelamento = { canceled: 0, failed: [] };
+      let reaberta = false;
       if (ligar) {
         try {
           cancelamento = await ChargeIssuingService.cancelOpenCharges({ now });
         } catch (error) {
-          // A isenção já está gravada e vale; o que sobrou em aberto aparece no
-          // console, e o "cancelar" de cada uma resolve depois.
+          // A isenção já está gravada e vale; o que sobrou em aberto a
+          // varredura do agendador cancela (`issueCurrent` → `billing_exempt`).
           console.warn(`Could not cancel the open charges of provider ${tenantId} after exempting it: ${error.message}`);
+        }
+      } else {
+        // A cobrança do período atual que a isenção cancelou volta à emissão:
+        // sem isto ela ficaria `canceled`, o agendador responderia
+        // `already_settled` e o provedor venceria sem fatura. O período é o do
+        // prazo de AGORA (talvez o que acabou de ganhar `LEAD_DAYS`), lido como
+        // a emissão o lê.
+        const prazoVivo = asDate(subscription?.renews_at ?? subscription?.trial_ends_at);
+        if (prazoVivo) {
+          try {
+            reaberta = await ChargeIssuingService.reopenExemptCanceled(
+              ChargeIssuingService.periodKey(prazoVivo), { now }
+            );
+          } catch (error) {
+            console.warn(`Could not reopen the exempted charge of provider ${tenantId}: ${error.message}`);
+          }
         }
       }
 
@@ -1138,6 +1177,7 @@ class SubscriptionService {
         subscription,
         canceledCharges: cancelamento.canceled,
         failedCharges: cancelamento.failed,
+        reopenedCharge: reaberta,
         alreadyInState: false,
         statusBefore: before.status,
         statusAfter: subscription?.status ?? before.status

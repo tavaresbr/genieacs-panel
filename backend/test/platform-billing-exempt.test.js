@@ -9,7 +9,7 @@ import {
 
 const { default: Subscription } = await import('../src/models/Subscription.js');
 const { default: Plan } = await import('../src/models/Plan.js');
-const { default: BillingCharge } = await import('../src/models/BillingCharge.js');
+const { default: BillingCharge, EXEMPT_CANCEL_MARKER } = await import('../src/models/BillingCharge.js');
 const { default: ChargeIssuingService } = await import('../src/services/chargeIssuingService.js');
 const { default: SubscriptionService } = await import('../src/services/subscriptionService.js');
 const { default: SelfBillingService, SelfBillingError } = await import('../src/services/selfBillingService.js');
@@ -35,6 +35,8 @@ const DAY = 24 * 60 * 60 * 1000;
 
 let gateway;
 let recebidas = [];
+/** Enquanto verdadeiro, o gateway recusa o DELETE de `pay_nao_cancela` — a queda que depois volta. */
+let naoCancelaFalha = true;
 let panelUrl;
 let consoleServer;
 let consoleUrl;
@@ -70,7 +72,7 @@ function subirGateway() {
       const umaCobranca = /^\/payments\/([^/]+)$/.exec(caminho);
       if (req.method === 'DELETE' && umaCobranca) {
         const id = decodeURIComponent(umaCobranca[1]);
-        if (id === 'pay_nao_cancela') return responder(500, { errors: [{ description: 'fora do ar' }] });
+        if (id === 'pay_nao_cancela' && naoCancelaFalha) return responder(500, { errors: [{ description: 'fora do ar' }] });
         return responder(200, { deleted: true, id });
       }
       return responder(404, {});
@@ -188,6 +190,7 @@ after(async () => {
 
 beforeEach(async () => {
   recebidas = [];
+  naoCancelaFalha = true;
   const db = getDb();
   await db('billing_charges').whereIn('tenant_id', [beta, gama]).del();
   await db('billing_events').whereIn('tenant_id', [beta, gama]).del();
@@ -264,6 +267,33 @@ describe('ligar a isenção', () => {
       .orderBy('id', 'desc').first();
     assert.ok(doProvedor, 'a trilha do provedor também');
     assert.equal(JSON.parse(doProvedor.detail).platformAction, 'subscription.billing_exempt_changed');
+    assert.equal(auditado.reason, 'parceria comercial', 'a trilha da plataforma guarda o motivo');
+    assert.equal(data.failedCharges, 0);
+    for (const id of [vencida, velha, semGateway]) {
+      assert.equal((await cobrancaDe(beta, id)).last_error, EXEMPT_CANCEL_MARKER, 'marcada como cancelada pela isenção');
+    }
+  });
+
+  it('o motivo não chega ao provedor: nem na tela dele, nem no 402, nem na trilha dele', async () => {
+    assert.equal((await isentar(beta, { exempt: true, reason: 'acordo interno' })).status, 200);
+
+    const doProvedor = await getDb()('audit_log').where({ tenant_id: beta, action: 'subscription.changed' })
+      .orderBy('id', 'desc').first();
+    const detalhe = JSON.parse(doProvedor.detail);
+    assert.equal(detalhe.exempt, true);
+    assert.equal('reason' in detalhe, false, 'a trilha do provedor não leva o motivo');
+    assert.equal(JSON.stringify(detalhe).includes('acordo interno'), false);
+
+    const uso = await runInTenant(beta, () => SubscriptionService.usage());
+    assert.equal(uso.subscription.billingExempt, true);
+    assert.equal(uso.subscription.billingExemptReason, null, 'GET /api/tenant/subscription');
+    const estado = await runInTenant(beta, () => SubscriptionService.current());
+    assert.equal(SubscriptionService.present(estado).billingExemptReason, null, 'o padrão, que o 402 usa');
+    assert.equal(SubscriptionService.present(estado, { withExemptReason: true }).billingExemptReason, 'acordo interno');
+
+    const detalheConsole = await platform(`/tenants/${beta}/subscription`);
+    assert.equal(detalheConsole.status, 200);
+    assert.equal(detalheConsole.body.data.subscription.billingExemptReason, 'acordo interno', 'o console vê');
   });
 
   it('o gateway que recusa o cancelamento deixa aquela cobrança em aberto, e a isenção vale mesmo assim', async () => {
@@ -271,14 +301,46 @@ describe('ligar a isenção', () => {
     const res = await isentar(beta, { exempt: true });
     assert.equal(res.status, 200, JSON.stringify(res.body));
     assert.equal(res.body.data.canceledCharges, 0);
+    assert.equal(res.body.data.failedCharges, 1, 'a tela avisa das que ficaram');
     assert.equal(res.body.data.subscription.subscription.billingExempt, true);
     assert.equal(res.body.data.subscription.subscription.billingExemptReason, null);
     const linha = await cobrancaDe(beta, recusada);
     assert.equal(linha.status, 'pending', 'viva no gateway, viva aqui');
     assert.match(linha.last_error, /fora do ar/);
     assert.equal(linha.issuing_until, null);
+    assert.ok(linha.next_attempt_at, 'a próxima tentativa espera');
     const [trilha] = await trilhaDe(beta);
     assert.deepEqual(JSON.parse(trilha.detail).chargesLeftOpen, [recusada]);
+  });
+
+  it('a que ficou em aberto a varredura do agendador cancela depois da espera, quando o gateway volta', async () => {
+    const recusada = await abrirCobranca(beta, { gatewayChargeId: 'pay_nao_cancela' });
+    const res = await isentar(beta, { exempt: true });
+    assert.equal(res.body.data.failedCharges, 1);
+    naoCancelaFalha = false;
+
+    // Dentro da espera: a passada do agendador não martela o gateway.
+    recebidas = [];
+    const cedo = await runInTenant(beta, () => ChargeIssuingService.issueCurrent());
+    assert.equal(cedo.reason, 'billing_exempt');
+    assert.equal(recebidas.length, 0, 'respeita next_attempt_at');
+    assert.equal((await cobrancaDe(beta, recusada)).status, 'pending');
+
+    // O clique não varre: a varredura é do agendador.
+    const depois = new Date(Date.now() + ChargeIssuingService.RETRY_AFTER_MS + 60_000);
+    const clique = await runInTenant(beta, () => ChargeIssuingService.issueCurrent({ manual: true, now: depois }));
+    assert.equal(clique.reason, 'billing_exempt');
+    assert.equal(recebidas.length, 0);
+
+    const tarde = await runInTenant(beta, () => ChargeIssuingService.issueCurrent({ now: depois }));
+    assert.equal(tarde.reason, 'billing_exempt');
+    assert.equal(tarde.canceledCharges, 1);
+    assert.deepEqual(recebidas.filter((r) => r.method === 'DELETE').map((r) => r.path), ['/payments/pay_nao_cancela']);
+    assert.equal(recebidas.filter((r) => r.method === 'POST').length, 0, 'nada emitido');
+    const linha = await cobrancaDe(beta, recusada);
+    assert.equal(linha.status, 'canceled');
+    assert.equal(linha.last_error, EXEMPT_CANCEL_MARKER);
+    assert.equal(linha.next_attempt_at, null);
   });
 
   it('é idempotente: pedir de novo não grava nada nem fala com o gateway', async () => {
@@ -374,7 +436,91 @@ describe('enquanto está isento', () => {
   });
 });
 
+describe('a isenção ligada no meio de uma emissão', () => {
+  it('relida logo antes do gateway: a linha sai cancelada com a marca, e nada é emitido', async () => {
+    await Subscription.upsertForTenant(beta, { renews_at: new Date(Date.now() + 2 * DAY) });
+    // A isenção entra entre a leitura da assinatura e a chamada ao gateway —
+    // exatamente quando a emissão abre a linha dela.
+    const abrir = BillingCharge.open;
+    BillingCharge.open = async (...args) => {
+      const id = await abrir.apply(BillingCharge, args);
+      await Subscription.upsertForTenant(beta, { billing_exempt_at: new Date(Math.floor(Date.now() / 1000) * 1000) });
+      return id;
+    };
+    let resultado;
+    try {
+      resultado = await runInTenant(beta, () => ChargeIssuingService.issueCurrent());
+    } finally {
+      BillingCharge.open = abrir;
+    }
+    assert.equal(resultado.issued, false);
+    assert.equal(resultado.reason, 'billing_exempt');
+    assert.equal(recebidas.filter((r) => r.method === 'POST').length, 0, 'nenhuma cobrança viva no gateway');
+    const [linha] = await getDb()('billing_charges').where({ tenant_id: beta });
+    assert.equal(linha.status, 'canceled');
+    assert.equal(linha.last_error, EXEMPT_CANCEL_MARKER);
+    assert.equal(linha.issuing_until, null);
+  });
+});
+
 describe('desligar a isenção', () => {
+  it('com o prazo no futuro, a cobrança do período que a isenção cancelou volta e o agendador a emite', async () => {
+    await Subscription.upsertForTenant(beta, { renews_at: new Date(Date.now() + 3 * DAY) });
+    const emitida = await abrirCobranca(beta, { gatewayChargeId: 'pay_emitida_antes' });
+    const ligou = await isentar(beta, { exempt: true });
+    assert.equal(ligou.body.data.canceledCharges, 1);
+    assert.equal((await cobrancaDe(beta, emitida)).status, 'canceled');
+
+    const desligou = await isentar(beta, { exempt: false });
+    assert.equal(desligou.status, 200, JSON.stringify(desligou.body));
+    const reaberta = await cobrancaDe(beta, emitida);
+    assert.equal(reaberta.status, 'pending', 'de volta à emissão');
+    assert.equal(reaberta.gateway_charge_id, null);
+    assert.equal(reaberta.last_error, null);
+    assert.ok(BillingCharge.supersededOf(reaberta).some((item) => String(item.id) === 'pay_emitida_antes'),
+      'o id velho fica como já-foi');
+    const [trilha] = (await trilhaDe(beta)).slice(-1);
+    assert.equal(JSON.parse(trilha.detail).reopenedCharge, true);
+
+    recebidas = [];
+    const emissao = await runInTenant(beta, () => ChargeIssuingService.issueCurrent());
+    assert.equal(emissao.issued, true, JSON.stringify(emissao));
+    assert.equal(emissao.charge.id, emitida, 'a mesma linha do período');
+    assert.equal(recebidas.filter((r) => r.method === 'POST' && r.path === '/payments').length, 1);
+    assert.notEqual(emissao.chargeId, 'pay_emitida_antes');
+  });
+
+  it('a cancelada a dedo pelo console continua cancelada', async () => {
+    await Subscription.upsertForTenant(beta, { renews_at: new Date(Date.now() + 3 * DAY) });
+    const cancelada = await abrirCobranca(beta, { gatewayChargeId: 'pay_do_console', status: 'canceled' });
+    assert.equal((await isentar(beta, { exempt: true })).status, 200);
+    assert.equal((await isentar(beta, { exempt: false })).status, 200);
+    assert.equal((await cobrancaDe(beta, cancelada)).status, 'canceled');
+    const emissao = await runInTenant(beta, () => ChargeIssuingService.issueCurrent());
+    assert.equal(emissao.reason, 'already_settled');
+  });
+
+  it('o past_due gravado com o prazo no futuro volta a active', async () => {
+    assert.equal((await isentar(beta, { exempt: true })).status, 200);
+    await Subscription.upsertForTenant(beta, { status: 'past_due' });
+    const res = await isentar(beta, { exempt: false });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    const depois = await assinaturaDe(beta);
+    assert.equal(depois.status, 'active');
+    assert.equal(res.body.data.subscription.subscription.status, 'active');
+    const [evento] = (await eventosDe(beta)).filter((e) => e.type === 'billing_exempt.disabled');
+    assert.equal(JSON.parse(evento.detail).statusAfter, 'active');
+  });
+
+  it('o past_due gravado com o prazo vencido ganha LEAD_DAYS e volta a active', async () => {
+    assert.equal((await isentar(beta, { exempt: true })).status, 200);
+    await Subscription.upsertForTenant(beta, { status: 'past_due', renews_at: new Date(Date.now() - 2 * DAY) });
+    assert.equal((await isentar(beta, { exempt: false })).status, 200);
+    const depois = await assinaturaDe(beta);
+    assert.equal(depois.status, 'active');
+    assert.ok(new Date(depois.renews_at).getTime() > Date.now());
+  });
+
   it('com o prazo vencido, ganha LEAD_DAYS a partir de agora, e a emissão volta', async () => {
     await Subscription.upsertForTenant(beta, { renews_at: new Date(Date.now() - 20 * DAY) });
     assert.equal((await isentar(beta, { exempt: true })).status, 200);

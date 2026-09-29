@@ -3338,6 +3338,8 @@ const fr: Dictionary = {
   'platform.subscription.exempt.enabledCanceled': 'Exonération de facturation activée. {count} facture(s) ouverte(s) annulée(s).',
   'platform.subscription.exempt.disabled': 'Exonération de facturation désactivée. Le fournisseur sera de nouveau facturé.',
   'platform.subscription.exempt.notBillable': 'Un abonnement annulé ne peut pas être exonéré de facturation.',
+  'platform.subscription.exempt.chargesLeftOpen': '{count} facture(s) n\'ont pas pu être annulées auprès de la passerelle et restent ouvertes. Une nouvelle tentative sera faite automatiquement.',
+  'platform.subscription.exempt.reactivatesSuspended': 'Ce fournisseur est suspendu : activer l\'exonération le réactivera.',
   'platform.subs.exempt': 'Exonéré',
   'platform.subs.filterExempt': 'Exonérés',
   'plan.billingExemptNote': 'Votre abonnement est exonéré de facturation.',

@@ -3338,6 +3338,8 @@ const ja: Dictionary = {
   'platform.subscription.exempt.enabledCanceled': '請求免除をオンにしました。未払いの請求 {count} 件をキャンセルしました。',
   'platform.subscription.exempt.disabled': '請求免除をオフにしました。プロバイダーへの請求が再開されます。',
   'platform.subscription.exempt.notBillable': 'キャンセル済みのサブスクリプションは請求免除にできません。',
+  'platform.subscription.exempt.chargesLeftOpen': '{count} 件の請求をゲートウェイで取り消せず、未払いのまま残っています。自動的に再試行されます。',
+  'platform.subscription.exempt.reactivatesSuspended': 'このプロバイダーは停止中です。免除をオンにすると再有効化されます。',
   'platform.subs.exempt': '免除',
   'platform.subs.filterExempt': '免除中',
   'plan.billingExemptNote': 'ご利用のサブスクリプションは請求が免除されています。',

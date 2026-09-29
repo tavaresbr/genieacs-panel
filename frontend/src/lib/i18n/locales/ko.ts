@@ -3345,6 +3345,8 @@ const ko: Dictionary = {
   'platform.subscription.exempt.enabledCanceled': '청구 면제를 켰습니다. 미결제 청구 {count}건이 취소되었습니다.',
   'platform.subscription.exempt.disabled': '청구 면제를 껐습니다. 제공업체에 다시 청구됩니다.',
   'platform.subscription.exempt.notBillable': '취소된 구독은 청구 면제로 설정할 수 없습니다.',
+  'platform.subscription.exempt.chargesLeftOpen': '{count}건의 청구를 게이트웨이에서 취소하지 못해 열린 상태로 남아 있습니다. 자동으로 다시 시도합니다.',
+  'platform.subscription.exempt.reactivatesSuspended': '이 공급자는 일시 중지 상태입니다. 면제를 켜면 다시 활성화됩니다.',
   'platform.subs.exempt': '면제',
   'platform.subs.filterExempt': '면제됨',
   'plan.billingExemptNote': '구독이 청구 면제 상태입니다.',

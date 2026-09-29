@@ -3339,6 +3339,8 @@ const zhTW: Dictionary = {
   'platform.subscription.exempt.enabledCanceled': '已開啟免除計費。已取消 {count} 筆未付帳單。',
   'platform.subscription.exempt.disabled': '已關閉免除計費。該服務商將重新被計費。',
   'platform.subscription.exempt.notBillable': '已取消的訂閱無法免除計費。',
+  'platform.subscription.exempt.chargesLeftOpen': '有 {count} 筆帳單未能在支付閘道取消，仍處於未結狀態。系統將自動重試。',
+  'platform.subscription.exempt.reactivatesSuspended': '該服務商已暫停：開啟免除計費將重新啟用它。',
   'platform.subs.exempt': '免除',
   'platform.subs.filterExempt': '已免除',
   'plan.billingExemptNote': '您的訂閱已免除計費。',

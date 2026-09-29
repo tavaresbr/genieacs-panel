@@ -3338,6 +3338,8 @@ const zhCN: Dictionary = {
   'platform.subscription.exempt.enabledCanceled': '已开启免除计费。已取消 {count} 笔未付账单。',
   'platform.subscription.exempt.disabled': '已关闭免除计费。该服务商将重新被计费。',
   'platform.subscription.exempt.notBillable': '已取消的订阅无法免除计费。',
+  'platform.subscription.exempt.chargesLeftOpen': '有 {count} 笔账单未能在支付网关取消，仍处于未结状态。系统将自动重试。',
+  'platform.subscription.exempt.reactivatesSuspended': '该服务商已暂停：开启免除计费将重新激活它。',
   'platform.subs.exempt': '免除',
   'platform.subs.filterExempt': '已免除',
   'plan.billingExemptNote': '您的订阅已免除计费。',

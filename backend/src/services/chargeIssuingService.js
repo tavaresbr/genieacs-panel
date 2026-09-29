@@ -1,4 +1,4 @@
-import BillingCharge, { OPEN_CHARGE_STATUSES } from '../models/BillingCharge.js';
+import BillingCharge, { OPEN_CHARGE_STATUSES, EXEMPT_CANCEL_MARKER } from '../models/BillingCharge.js';
 import Tenant from '../models/Tenant.js';
 import { currentTenantId } from '../config/tenantContext.js';
 import { isUniqueViolation } from '../config/database.js';
@@ -55,6 +55,8 @@ import SubscriptionService from './subscriptionService.js';
  * A recusa de `followDeadline`, com o status HTTP que o console responde:
  * 409 `busy` (a linha é de outra passada agora) ou 502 `gateway_failed`.
  */
+export { EXEMPT_CANCEL_MARKER };
+
 export class ChargeFollowError extends Error {
   constructor(status, code, message, detail = null) {
     super(message);
@@ -212,26 +214,47 @@ class ChargeIssuingService {
 
   /**
    * Cancela TODAS as cobranças em aberto do provedor em escopo — o que o
-   * "isento de cobrança" faz ao ser ligado (`SubscriptionService.setBillingExempt`).
+   * "isento de cobrança" faz ao ser ligado (`SubscriptionService.setBillingExempt`),
+   * e a varredura que o agendador repete enquanto a isenção vale
+   * (`issueCurrent` → `billing_exempt`).
    *
    * O mesmo gesto do "cancelar" da tela de Assinaturas, linha a linha: a
    * garra (`claim` com `openOnly`), o gateway primeiro e a linha depois. A
    * diferença é o que a recusa faz: lá ela para tudo e responde 502; aqui a
    * linha que o gateway não cancelou FICA em aberto — com o motivo em
-   * `last_error` e em voz alta no log —, e a isenção vale mesmo assim. Fechar
-   * aqui uma cobrança viva no gateway seria esconder um link de pagamento que
-   * ainda funciona; e deixar de isentar porque o gateway está fora seria o
-   * console sem como cumprir o que decidiu. A linha aberta aparece no console,
-   * e o "cancelar" dela resolve depois.
+   * `last_error`, a próxima tentativa em `next_attempt_at` e em voz alta no
+   * log —, e a isenção vale mesmo assim. Fechar aqui uma cobrança viva no
+   * gateway seria esconder um link de pagamento que ainda funciona; e deixar
+   * de isentar porque o gateway está fora seria o console sem como cumprir o
+   * que decidiu. A varredura do agendador tenta de novo depois da espera.
+   *
+   * A cancelada por aqui leva `EXEMPT_CANCEL_MARKER` em `last_error`: é por
+   * essa marca que o desligar acha a cobrança do período atual e a reabre
+   * (`reopenExemptCanceled`) — sem ela a linha ficaria `canceled`, a emissão
+   * responderia `already_settled` para sempre e o provedor venceria sem fatura.
+   *
+   * `honorBackoff` é o da varredura: ela passa a cada minuto, e um DELETE
+   * recusado por minuto por cobrança seria martelar o gateway (a mesma espera
+   * de `cancelStale`). O clique do console tenta na hora.
    *
    * @returns {Promise<{ canceled: number, failed: number[] }>} quantas saíram,
-   *   e os ids das que ficaram (recusa do gateway, ou tomadas por outra passada).
+   *   e os ids das que ficaram (recusa do gateway, em espera, ou tomadas por
+   *   outra passada).
    */
-  static async cancelOpenCharges({ now = new Date() } = {}) {
+  static async cancelOpenCharges({ now = new Date(), honorBackoff = false } = {}) {
     const abertas = await BillingCharge.openAll();
     let canceladas = 0;
     const ficaram = [];
     for (const cobranca of abertas) {
+      const provider = cobranca.gateway_charge_id ? providerFor(cobranca.provider) : null;
+      const noGateway = typeof provider?.cancelCharge === 'function';
+      if (honorBackoff && noGateway && cobranca.next_attempt_at) {
+        const espera = new Date(cobranca.next_attempt_at);
+        if (!Number.isNaN(espera.getTime()) && espera.getTime() > now.getTime()) {
+          ficaram.push(cobranca.id);
+          continue;
+        }
+      }
       // eslint-disable-next-line no-await-in-loop -- uma ou duas por provedor, e cada uma fala com o gateway
       const minha = await BillingCharge.claim(cobranca.id, {
         until: new Date(now.getTime() + this.CLAIM_MS), now, unissued: false, openOnly: true
@@ -242,16 +265,18 @@ class ChargeIssuingService {
         continue;
       }
       try {
-        const provider = cobranca.gateway_charge_id ? providerFor(cobranca.provider) : null;
         // eslint-disable-next-line no-await-in-loop
-        if (typeof provider?.cancelCharge === 'function') await provider.cancelCharge(cobranca.gateway_charge_id);
+        if (noGateway) await provider.cancelCharge(cobranca.gateway_charge_id);
         // eslint-disable-next-line no-await-in-loop
-        await BillingCharge.update(cobranca.id, { status: 'canceled', issuing_until: null, next_attempt_at: null });
+        await BillingCharge.update(cobranca.id, {
+          status: 'canceled', issuing_until: null, next_attempt_at: null, last_error: EXEMPT_CANCEL_MARKER
+        });
         canceladas += 1;
       } catch (error) {
         // eslint-disable-next-line no-await-in-loop
         await BillingCharge.update(cobranca.id, {
           last_error: String(error.message ?? '').slice(0, 500),
+          next_attempt_at: new Date(now.getTime() + this.RETRY_AFTER_MS),
           issuing_until: null
         });
         console.warn(
@@ -262,6 +287,45 @@ class ChargeIssuingService {
       }
     }
     return { canceled: canceladas, failed: ficaram };
+  }
+
+  /**
+   * Desligar a isenção devolve à emissão a cobrança do período que ELA
+   * cancelou — a do prazo que continua no futuro.
+   *
+   * Sem isto, a linha do período atual ficaria `canceled` e a emissão do
+   * agendador responderia `already_settled` a cada passada (só o clique
+   * reabre cancelada): o provedor chegaria ao prazo sem fatura nenhuma e
+   * venceria. Só a cancelada PELA ISENÇÃO (`EXEMPT_CANCEL_MARKER`): a que o
+   * console cancelou a dedo continua cancelada, como sempre.
+   *
+   * Pela mesma porta da reemissão (`resetForReissue`, com a garra): o id
+   * velho do gateway vai para `superseded_charges` e a linha volta `pending`,
+   * sem id, para a próxima passada emitir. O valor mudado à mão pelo console
+   * (0078) volta junto: o desconto foi dado ao período, e a isenção não o
+   * desfaz.
+   *
+   * @returns {Promise<boolean>} se reabriu.
+   */
+  static async reopenExemptCanceled(periodEnd, { now = new Date() } = {}) {
+    const linha = await BillingCharge.forPeriod(periodEnd);
+    if (!linha || linha.status !== 'canceled' || linha.last_error !== EXEMPT_CANCEL_MARKER) return false;
+    const minha = await BillingCharge.claim(linha.id, {
+      until: new Date(now.getTime() + this.CLAIM_MS), now, unissued: false, statuses: ['canceled']
+    });
+    if (!minha) return false;
+    const reaberta = await BillingCharge.resetForReissue(linha.id, {
+      amountCents: Number(linha.amount_cents),
+      currency: linha.currency
+    });
+    if (!reaberta) {
+      await BillingCharge.release(linha.id);
+      return false;
+    }
+    if (linha.amount_overridden_at) {
+      await BillingCharge.update(linha.id, { amount_overridden_at: linha.amount_overridden_at });
+    }
+    return true;
   }
 
   /**
@@ -429,7 +493,22 @@ class ChargeIssuingService {
     // Antes de tudo que cobra — a faxina, a reprecificação, a reemissão — e
     // valendo também para o clique (`manual`): o "pagar agora", o "Reemitir"
     // e o "Gerar cobrança" do console passam por aqui e param aqui.
-    if (subscription.billing_exempt_at) return { issued: false, reason: 'billing_exempt' };
+    //
+    // A passada do agendador (não o clique) varre também o que ficou em aberto
+    // — a cobrança que o gateway recusou cancelar ao ligar, ou a que uma
+    // emissão em curso gravou enquanto a isenção era ligada —, respeitando a
+    // espera de cada uma. Assim nenhuma fatura viva sobra na mão de um isento.
+    if (subscription.billing_exempt_at) {
+      let varridas = 0;
+      if (!manual) {
+        try {
+          varridas = (await this.cancelOpenCharges({ now, honorBackoff: true })).canceled;
+        } catch (error) {
+          console.warn(`Could not sweep the open charges of exempt provider ${tenant.id}: ${error.message}`);
+        }
+      }
+      return { issued: false, reason: 'billing_exempt', ...(varridas ? { canceledCharges: varridas } : {}) };
+    }
     const plan = subscription.plan_id ? await Plan.findById(subscription.plan_id) : null;
 
     // `suspended` e `canceled` são decisões de gente. Emitir cobrança a quem
@@ -645,6 +724,21 @@ class ChargeIssuingService {
         }
         throw error;
       }
+    }
+
+    // A isenção pode ter sido ligada entre a leitura lá de cima e aqui — a
+    // garra e a linha já são desta passada, e o cancelamento do console não
+    // toma linha com garra. Relida agora, logo antes de falar com o gateway:
+    // se ligou, a linha sai cancelada com a marca da isenção (sem id no
+    // gateway, não há o que cancelar lá) e nada é emitido. O que escapar desta
+    // janela — a isenção ligada DURANTE o `createCharge` — a varredura do
+    // agendador cancela na próxima passada.
+    const releitura = await Subscription.forTenant(currentTenantId());
+    if (releitura?.billing_exempt_at) {
+      await BillingCharge.update(chargeId, {
+        status: 'canceled', issuing_until: null, next_attempt_at: null, last_error: EXEMPT_CANCEL_MARKER
+      });
+      return { issued: false, reason: 'billing_exempt' };
     }
 
     let criada;

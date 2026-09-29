@@ -3346,6 +3346,8 @@ const hi: Dictionary = {
   'platform.subscription.exempt.enabledCanceled': 'बिलिंग छूट चालू की गई। {count} खुले शुल्क रद्द किए गए।',
   'platform.subscription.exempt.disabled': 'बिलिंग छूट बंद की गई। प्रदाता से फिर से शुल्क लिया जाएगा।',
   'platform.subscription.exempt.notBillable': 'रद्द की गई सदस्यता को बिलिंग से छूट नहीं दी जा सकती।',
+  'platform.subscription.exempt.chargesLeftOpen': '{count} शुल्क गेटवे पर रद्द नहीं किए जा सके और खुले हैं। स्वचालित रूप से फिर से प्रयास किया जाएगा।',
+  'platform.subscription.exempt.reactivatesSuspended': 'यह प्रदाता निलंबित है: छूट चालू करने से यह फिर से सक्रिय हो जाएगा।',
   'platform.subs.exempt': 'छूट प्राप्त',
   'platform.subs.filterExempt': 'छूट प्राप्त',
   'plan.billingExemptNote': 'आपकी सदस्यता बिलिंग से मुक्त है।',

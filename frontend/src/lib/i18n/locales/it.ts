@@ -3344,6 +3344,8 @@ const it: Dictionary = {
   'platform.subscription.exempt.enabledCanceled': 'Esenzione dalla fatturazione attivata. {count} addebito/i aperto/i annullato/i.',
   'platform.subscription.exempt.disabled': 'Esenzione dalla fatturazione disattivata. Il provider tornerà a essere fatturato.',
   'platform.subscription.exempt.notBillable': 'Un abbonamento annullato non può essere esentato dalla fatturazione.',
+  'platform.subscription.exempt.chargesLeftOpen': 'Non è stato possibile annullare {count} addebito/i sul gateway: restano aperti. Verrà ritentato automaticamente.',
+  'platform.subscription.exempt.reactivatesSuspended': 'Questo provider è sospeso: attivare l\'esenzione lo riattiverà.',
   'platform.subs.exempt': 'Esente',
   'platform.subs.filterExempt': 'Esenti',
   'plan.billingExemptNote': 'Il tuo abbonamento è esente da fatturazione.',

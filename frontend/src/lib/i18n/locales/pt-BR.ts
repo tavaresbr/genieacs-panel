@@ -3338,6 +3338,8 @@ const ptBR: Dictionary = {
   'platform.subscription.exempt.enabledCanceled': 'Isenção de cobrança ligada. {count} cobrança(s) aberta(s) cancelada(s).',
   'platform.subscription.exempt.disabled': 'Isenção de cobrança desligada. O provedor volta a ser cobrado.',
   'platform.subscription.exempt.notBillable': 'Assinatura cancelada não pode ser isenta de cobrança.',
+  'platform.subscription.exempt.chargesLeftOpen': '{count} cobrança(s) não puderam ser canceladas no gateway e continuam abertas. Uma nova tentativa será feita automaticamente.',
+  'platform.subscription.exempt.reactivatesSuspended': 'Este provedor está suspenso: ligar a isenção vai reativá-lo.',
   'platform.subs.exempt': 'Isento',
   'platform.subs.filterExempt': 'Isentos',
   'plan.billingExemptNote': 'Sua assinatura está isenta de cobrança.',

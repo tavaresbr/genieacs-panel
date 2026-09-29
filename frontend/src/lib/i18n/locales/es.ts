@@ -3338,6 +3338,8 @@ const es: Dictionary = {
   'platform.subscription.exempt.enabledCanceled': 'Exención de cobro activada. {count} cobro(s) pendiente(s) cancelado(s).',
   'platform.subscription.exempt.disabled': 'Exención de cobro desactivada. El proveedor vuelve a ser cobrado.',
   'platform.subscription.exempt.notBillable': 'Una suscripción cancelada no puede quedar exenta de cobro.',
+  'platform.subscription.exempt.chargesLeftOpen': '{count} cobro(s) no se pudieron cancelar en la pasarela y siguen abiertos. Se reintentará automáticamente.',
+  'platform.subscription.exempt.reactivatesSuspended': 'Este proveedor está suspendido: activar la exención lo reactivará.',
   'platform.subs.exempt': 'Exento',
   'platform.subs.filterExempt': 'Exentos',
   'plan.billingExemptNote': 'Tu suscripción está exenta de cobro.',

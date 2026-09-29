@@ -1911,11 +1911,25 @@ export const platformAPI = {
   /**
    * Liga ou desliga a isenção de cobrança: a assinatura fica ativa, não vence
    * e não gera fatura até desligar. Ao ligar, as cobranças abertas são
-   * canceladas no gateway (`canceledCharges` diz quantas). 409 `not_billable`
+   * canceladas no gateway (`canceledCharges` diz quantas, `failedCharges`
+   * quantas ficaram em aberto porque o gateway recusou). 409 `not_billable`
    * numa assinatura cancelada.
+   *
+   * `subscription` é o MESMO corpo de `getSubscription` — a tela troca o que
+   * mostra sem perguntar de novo.
    */
   setBillingExempt: (tenantId: number, payload: { exempt: boolean; reason?: string }) =>
-    apiClient.requestWithBody<{ subscription: SubscriptionView; canceledCharges: number; alreadyInState: boolean }>(
+    apiClient.requestWithBody<{
+      subscription: {
+        tenant: { id: number; slug: string; name: string }
+        subscription: SubscriptionView | null
+        planId: number | null
+        events: BillingEventView[]
+      }
+      canceledCharges: number
+      failedCharges: number
+      alreadyInState: boolean
+    }>(
       'PUT', `/platform/tenants/${tenantId}/subscription/billing-exempt`, payload
     ),
 

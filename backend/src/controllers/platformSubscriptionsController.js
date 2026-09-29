@@ -350,7 +350,7 @@ class PlatformSubscriptionsController {
             trialEndsAt: sub.trial_ends_at ?? null,
             renewsAt: sub.renews_at ?? null,
             pendingPlan: SubscriptionService.presentPendingPlan(sub, pendente),
-            ...SubscriptionService.presentBillingExempt(sub)
+            ...SubscriptionService.presentBillingExempt(sub, { withReason: true })
           } : null,
           // SE há vínculo, e nunca o id do cliente no gateway — a mesma regra
           // da trilha (`TENANT_GATEWAY_CHANGED`): é a chave que decide para
@@ -385,7 +385,7 @@ class PlatformSubscriptionsController {
       let visiveis = rows;
       if (filtro === 'exempt') {
         visiveis = rows.filter((row) => row.subscription?.billingExempt);
-      } else if (filtro && filtro in byStatus) {
+      } else if (filtro && Object.hasOwn(byStatus, filtro)) {
         visiveis = rows.filter((row) => (row.subscription?.status ?? 'none') === filtro);
       }
 
@@ -671,7 +671,7 @@ class PlatformSubscriptionsController {
       });
       return res.json(createResponse('Charge settled', {
         charge: BillingCharge.presentForConsole(resultado.charge),
-        subscription: SubscriptionService.present(resultado.state),
+        subscription: SubscriptionService.present(resultado.state, { withExemptReason: true }),
         duplicate: resultado.duplicate,
         acceptedUnderpayment: resultado.acceptedUnderpayment
       }));
