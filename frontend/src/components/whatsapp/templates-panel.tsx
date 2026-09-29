@@ -7,6 +7,7 @@ import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import { whatsappErrorMessage } from '@/components/whatsapp-connection'
 import type { TranslationKey } from '@/lib/i18n'
+import { copyName } from './template-copy'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The variables the dispatcher knows how to fill.
@@ -159,6 +160,7 @@ export function TemplatesPanel() {
   const [refusal, setRefusal] = useState('')
 
   const bodyRef = useRef<HTMLTextAreaElement | null>(null)
+  const formRef = useRef<HTMLFormElement | null>(null)
   const alive = useRef(true)
 
   useEffect(() => {
@@ -316,6 +318,7 @@ export function TemplatesPanel() {
 
       {draft && (
         <form
+          ref={formRef}
           className="modern-card flex flex-col gap-4 p-4 sm:p-5"
           onSubmit={(event) => {
             event.preventDefault()
@@ -484,6 +487,27 @@ export function TemplatesPanel() {
                   >
                     <Icon name="edit" size={16} />
                     {t('common.edit')}
+                  </button>
+                  <button
+                    type="button"
+                    className="modern-button-secondary"
+                    onClick={() => {
+                      // A new template, pre-filled: nothing is written until
+                      // Save, and the server checks the copy like any other.
+                      setRefusal('')
+                      setDraft({
+                        id: null,
+                        name: copyName(template.name, templates.map((entry) => entry.name), t('whatsapp.templates.copySuffix')),
+                        body: template.body,
+                        category: asCategory(template.category)
+                      })
+                      // The editor sits above the list; a click at the bottom
+                      // of a long list would otherwise open it off screen.
+                      requestAnimationFrame(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+                    }}
+                  >
+                    <Icon name="copy" size={16} />
+                    {t('whatsapp.templates.duplicate')}
                   </button>
                   <button
                     type="button"

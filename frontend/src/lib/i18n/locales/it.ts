@@ -2333,6 +2333,8 @@ const it: Dictionary = {
   'whatsapp.templates.insertVariable': 'Inserisci',
   'whatsapp.templates.isReminder': 'Promemoria — prima della scadenza',
   'whatsapp.templates.isDunning': 'Sollecito — già scaduto',
+  'whatsapp.templates.duplicate': "Duplica",
+  'whatsapp.templates.copySuffix': "copia",
   'whatsapp.templates.empty': 'Nessun modello finora.',
   'whatsapp.templates.variables': 'Variabili disponibili',
   'whatsapp.templates.unknownVariable': 'Il modello usa {name}, che l’invio non sa compilare.',

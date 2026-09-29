@@ -2327,6 +2327,8 @@ const ptBR: Dictionary = {
   'whatsapp.templates.insertVariable': 'Inserir',
   'whatsapp.templates.isReminder': 'Lembrete — antes de vencer',
   'whatsapp.templates.isDunning': 'Cobrança — já em atraso',
+  'whatsapp.templates.duplicate': "Duplicar",
+  'whatsapp.templates.copySuffix': "cópia",
   'whatsapp.templates.empty': 'Nenhum modelo ainda.',
   'whatsapp.templates.variables': 'Variáveis disponíveis',
   'whatsapp.templates.unknownVariable': 'O modelo usa {name}, que o disparo não sabe preencher.',

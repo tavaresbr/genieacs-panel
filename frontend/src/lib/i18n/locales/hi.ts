@@ -2307,6 +2307,8 @@ const hi: Dictionary = {
   'whatsapp.templates.insertVariable': 'डालें',
   'whatsapp.templates.isReminder': 'अनुस्मारक — देय तिथि से पहले',
   'whatsapp.templates.isDunning': 'तक़ाज़ा — पहले से बकाया',
+  'whatsapp.templates.duplicate': "डुप्लिकेट करें",
+  'whatsapp.templates.copySuffix': "प्रति",
   'whatsapp.templates.empty': 'अभी कोई टेम्पलेट नहीं।',
   'whatsapp.templates.variables': 'उपलब्ध चर',
   'whatsapp.templates.unknownVariable': 'टेम्पलेट {name} का उपयोग करता है, जिसे भेजने वाला भर नहीं सकता।',

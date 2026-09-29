@@ -2329,6 +2329,8 @@ const en = {
   'whatsapp.templates.insertVariable': 'Insert',
   'whatsapp.templates.isReminder': 'Reminder — before it is due',
   'whatsapp.templates.isDunning': 'Dunning — already overdue',
+  'whatsapp.templates.duplicate': "Duplicate",
+  'whatsapp.templates.copySuffix': "copy",
   'whatsapp.templates.empty': 'No template yet.',
   'whatsapp.templates.variables': 'Available variables',
   'whatsapp.templates.unknownVariable': 'The template uses {name}, which the dispatcher cannot fill.',

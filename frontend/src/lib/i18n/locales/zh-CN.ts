@@ -2327,6 +2327,8 @@ const zhCN: Dictionary = {
   'whatsapp.templates.insertVariable': '插入',
   'whatsapp.templates.isReminder': '催缴提醒 — 到期前',
   'whatsapp.templates.isDunning': '欠费催收 — 已逾期',
+  'whatsapp.templates.duplicate': "复制",
+  'whatsapp.templates.copySuffix': "副本",
   'whatsapp.templates.empty': '暂无模板。',
   'whatsapp.templates.variables': '可用变量',
   'whatsapp.templates.unknownVariable': '该模板使用了 {name}，发送程序无法为其取值。',

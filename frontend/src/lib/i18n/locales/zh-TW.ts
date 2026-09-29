@@ -2327,6 +2327,8 @@ const zhTW: Dictionary = {
   'whatsapp.templates.insertVariable': '插入',
   'whatsapp.templates.isReminder': '繳費提醒 — 到期前',
   'whatsapp.templates.isDunning': '欠費催繳 — 已逾期',
+  'whatsapp.templates.duplicate': "複製",
+  'whatsapp.templates.copySuffix': "副本",
   'whatsapp.templates.empty': '尚無範本。',
   'whatsapp.templates.variables': '可用變數',
   'whatsapp.templates.unknownVariable': '該範本使用了 {name}，傳送程式無法為其取值。',

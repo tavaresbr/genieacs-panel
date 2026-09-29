@@ -2334,6 +2334,8 @@ const ru: Dictionary = {
   'whatsapp.templates.insertVariable': 'Вставить',
   'whatsapp.templates.isReminder': 'Напоминание — до наступления срока',
   'whatsapp.templates.isDunning': 'Требование — срок уже прошёл',
+  'whatsapp.templates.duplicate': "Дублировать",
+  'whatsapp.templates.copySuffix': "копия",
   'whatsapp.templates.empty': 'Шаблонов пока нет.',
   'whatsapp.templates.variables': 'Доступные переменные',
   'whatsapp.templates.unknownVariable': 'Шаблон использует {name}, которую отправитель не может заполнить.',

@@ -2405,6 +2405,8 @@ const ja: Dictionary = {
   'whatsapp.templates.insertVariable': '挿入',
   'whatsapp.templates.isReminder': 'リマインダー — 支払期日前',
   'whatsapp.templates.isDunning': '督促 — すでに期日超過',
+  'whatsapp.templates.duplicate': "複製",
+  'whatsapp.templates.copySuffix': "コピー",
   'whatsapp.templates.nameTaken': 'この名前は別のテンプレートが使っています。',
   'whatsapp.templates.notFound': 'テンプレートが見つかりません。',
   'whatsapp.templates.category': 'カテゴリ',

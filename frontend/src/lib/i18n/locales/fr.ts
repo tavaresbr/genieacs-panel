@@ -2141,6 +2141,8 @@ const fr: Dictionary = {
   'whatsapp.templates.insertVariable': 'Insérer',
   'whatsapp.templates.isReminder': 'Rappel — avant échéance',
   'whatsapp.templates.isDunning': 'Relance — déjà en retard',
+  'whatsapp.templates.duplicate': "Dupliquer",
+  'whatsapp.templates.copySuffix': "copie",
   'whatsapp.templates.empty': 'Aucun modèle pour l’instant.',
   'whatsapp.templates.variables': 'Variables disponibles',
   'whatsapp.templates.unknownVariable': 'Le modèle utilise {name}, que le distributeur ne peut pas renseigner.',
