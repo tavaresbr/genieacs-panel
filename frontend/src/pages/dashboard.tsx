@@ -5,6 +5,7 @@ import { Link } from 'react-router'
 import { devicesAPI, sgpAPI, type SgpFleetOverview } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
 import { useAuth } from '@/contexts/auth-context'
+import { readDashboardSnapshot, writeDashboardSnapshot } from '@/lib/dashboard-snapshot'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
 import { useToast } from '@/components/ui/toast'
@@ -60,8 +61,6 @@ const PALETTES = {
   clients: { '0': '#64748b', '1–5': '#3b82f6', '6–15': '#8b5cf6', '16+': '#f97316', Unknown: '#94a3b8' },
 }
 
-const DASHBOARD_SESSION_KEY = 'skygenpanel.dashboard.snapshot.v1'
-
 const SGP_PREVIEW_ROWS = 4
 
 interface SgpDivergenceGroup {
@@ -99,23 +98,9 @@ const BUCKET_LABEL_KEYS: Record<string, TranslationKey> = {
   '16+': 'dashboard.bucket.clients16plus',
 }
 
-function readDashboardSession(): DashboardData | null {
-  try {
-    const raw = sessionStorage.getItem(DASHBOARD_SESSION_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw)
-    return parsed?.stats && parsed?.rxDistribution ? parsed as DashboardData : null
-  } catch {
-    return null
-  }
-}
-
-function writeDashboardSession(data: DashboardData) {
-  try {
-    sessionStorage.setItem(DASHBOARD_SESSION_KEY, JSON.stringify(data))
-  } catch {
-    // Storage can be disabled by browser privacy settings.
-  }
+function readDashboardSession(owner: string | null): DashboardData | null {
+  const parsed = readDashboardSnapshot<DashboardData>(owner)
+  return parsed?.stats && parsed?.rxDistribution ? parsed : null
 }
 
 function pieData(
@@ -132,8 +117,18 @@ function pieData(
     .filter((entry) => entry.value > 0)
 }
 
+/**
+ * O dono da cópia guardada: provedor e usuário. A `key` remonta a tela quando
+ * ele muda, para nenhum estado de um provedor atravessar para o outro.
+ */
 export default function DashboardPage() {
-  const [cachedDashboard] = useState<DashboardData | null>(() => readDashboardSession())
+  const { user } = useAuth()
+  const owner = user ? `${user.tenant?.slug ?? '-'}:${user.id}` : null
+  return <DashboardView key={owner ?? 'anon'} owner={owner} />
+}
+
+function DashboardView({ owner }: { owner: string | null }) {
+  const [cachedDashboard] = useState<DashboardData | null>(() => readDashboardSession(owner))
   const [data, setData] = useState<DashboardData>(cachedDashboard || EMPTY)
   const [initialLoading, setInitialLoading] = useState(!cachedDashboard)
   const [refreshing, setRefreshing] = useState(false)
@@ -164,7 +159,7 @@ export default function DashboardPage() {
         const next = faultsLoadedRef.current
           ? { ...incoming, faults: current.faults, faultsError: current.faultsError }
           : incoming
-        writeDashboardSession(next)
+        writeDashboardSnapshot(owner, next)
         return next
       })
       const generatedAt = incoming.generatedAt ? new Date(incoming.generatedAt) : new Date()
@@ -175,7 +170,7 @@ export default function DashboardPage() {
       setInitialLoading(false)
       setRefreshing(false)
     }
-  }, [t])
+  }, [owner, t])
 
   const loadFaults = useCallback(async () => {
     setFaultsLoading(true)
@@ -187,7 +182,7 @@ export default function DashboardPage() {
       faultsLoadedRef.current = true
       setData((current) => {
         const next = { ...current, faults: response.data as Fault[], faultsError: null }
-        writeDashboardSession(next)
+        writeDashboardSnapshot(owner, next)
         return next
       })
     } catch {
@@ -196,7 +191,7 @@ export default function DashboardPage() {
     } finally {
       setFaultsLoading(false)
     }
-  }, [t])
+  }, [owner, t])
 
   // The reconciliation card disappears when SGP is off or unreachable; there is
   // nothing an operator could do about it from the dashboard.
