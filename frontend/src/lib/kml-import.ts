@@ -327,7 +327,7 @@ export function slugify(value: string, fallback: string): string {
   return slug || fallback
 }
 
-function uniqueId(base: string, taken: Set<string>): string {
+export function uniqueId(base: string, taken: Set<string>): string {
   let id = base
   for (let n = 2; taken.has(id); n += 1) id = `${base}-${n}`
   taken.add(id)

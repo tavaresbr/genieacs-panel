@@ -174,6 +174,26 @@ class MappingController {
     }
   }
 
+  /**
+   * "Colocar todos no mapa": os equipamentos fora do mapa, separados entre os
+   * que o SGP já dá as coordenadas, os que só têm endereço e os sem endereço.
+   * A gravação vai pelo `/import`, que acrescenta e ignora o que já existe.
+   */
+  static async bulkPlacement(req, res) {
+    try {
+      const { total, items } = await MapStatusService.unmapped({ limit: 5000 });
+      const groups = await ClientLocationService.locateMany(items);
+      return res.json(createResponse(req.t('mapping.statusReady'), { total, truncated: total > items.length, ...groups }));
+    } catch (error) {
+      console.warn(`Bulk placement failed: ${error.message}`);
+      const reason = classifySyncError(error);
+      const message = reason.code === 'database'
+        ? req.t('mapping.statusFailed')
+        : req.t(reason.reasonKey, reason.status ? { status: reason.status } : undefined);
+      return res.status(502).json(createErrorResponse(message, error.message, reason.code));
+    }
+  }
+
   /** Histórico de rompimentos: as ocorrências e o resumo por caixa. */
   static async outageHistory(req, res) {
     try {

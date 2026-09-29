@@ -8,10 +8,12 @@ import { LIVE_COLORS } from '@/lib/map-status'
  * Os equipamentos que ainda não estão no mapa (pelo PPPoE), com busca e o
  * botão "Colocar" em cada um.
  */
-export function UnmappedDialog({ canWrite, onClose, onPlace }: {
+export function UnmappedDialog({ canWrite, onClose, onPlace, onPlaceAll }: {
   canWrite: boolean
   onClose: () => void
   onPlace: (device: UnmappedDevice) => void
+  /** "Colocar todos": os que o SGP já dá o endereço, de uma vez. */
+  onPlaceAll?: () => void
 }) {
   const { t } = useTranslation()
   const [data, setData] = useState<{ total: number; items: UnmappedDevice[] } | null>(null)
@@ -43,6 +45,14 @@ export function UnmappedDialog({ canWrite, onClose, onPlace }: {
           <button type="button" onClick={onClose} className="icon-button" aria-label={t('common.close')}><Icon name="x" size={20} /></button>
         </div>
         <p className="mb-3 text-sm text-muted-foreground">{t('map.unmapped.hint')}</p>
+        {canWrite && onPlaceAll && data && data.total > 0 && (
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-border bg-[hsl(var(--surface-subtle))] p-3 text-sm">
+            <span className="min-w-0 flex-1 text-muted-foreground">{t('map.bulk.offer')}</span>
+            <button type="button" className="modern-button min-h-9 shrink-0 px-3 text-sm" onClick={onPlaceAll}>
+              <Icon name="pin" size={15} />{t('map.bulk.button')}
+            </button>
+          </div>
+        )}
         <input type="search" className="modern-input mb-3 w-full" placeholder={t('map.unmapped.search')} aria-label={t('map.unmapped.search')}
           value={query} onChange={(event) => setQuery(event.target.value)} />
         {error && <p className="text-sm text-destructive" role="alert">{error}</p>}

@@ -3289,6 +3289,10 @@ export const mappingAPI = {
   unmappedDevices: () =>
     apiClient.get<{ total: number; items: UnmappedDevice[] }>('/mapping-data/unmapped'),
 
+  /** "Colocar todos no mapa": os fora do mapa, separados pelo que o SGP já guardou. */
+  bulkPlacement: () =>
+    apiClient.get<BulkPlacement>('/mapping-data/bulk-placement'),
+
   /** Busca livre de um lugar no Brasil (Nominatim, pelo servidor). */
   searchAddress: (q: string) =>
     apiClient.get<PlaceResult[]>(`/mapping-data/geocode?q=${encodeURIComponent(q)}`),
@@ -3333,6 +3337,27 @@ export interface OutageHistory {
     total_clients: number
   }>
   byNode: Array<{ node_id: string; node_name: string | null; count: number; minutes: number; last_at: string }>
+}
+
+export interface BulkPlacementItem {
+  pppoe: string
+  deviceId: string | null
+  contract?: string | null
+  clientName?: string | null
+  address?: string | null
+  lat?: number
+  lng?: number
+}
+
+export interface BulkPlacement {
+  total: number
+  truncated: boolean
+  /** Com coordenadas no SGP. */
+  ready: (BulkPlacementItem & { lat: number; lng: number })[]
+  /** Com endereço (ao menos a cidade), sem coordenadas. */
+  needsAddress: BulkPlacementItem[]
+  /** Sem contato no SGP, ou o contrato sem nem a cidade. */
+  noAddress: (BulkPlacementItem & { reason: 'no_contract' | 'no_address' })[]
 }
 
 export interface ClientLocation {
