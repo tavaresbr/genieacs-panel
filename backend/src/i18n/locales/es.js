@@ -551,6 +551,8 @@ export default {
   'whatsapp.dunning.runFailed': "No se pudo iniciar la pasada de la regla",
   'whatsapp.dunning.sendsLoaded': "{count} registro(s) cargado(s)",
   'whatsapp.dunning.statsLoaded': "Resultados de la regla cargados",
+  'whatsapp.dunning.starterInstalled': "{created} plantilla(s) creada(s), {reused} ya existía(n)",
+  'whatsapp.dunning.starterFailed': "No se pudieron crear las plantillas listas",
   'whatsapp.dunning.error.invalidWindow': "Ventana de envío inválida: revise la zona horaria y el horario de cada día",
   'whatsapp.dunning.error.invalidMaxPerInvoice': "El máximo de cobros por factura debe estar entre {min} y {max}",
   'whatsapp.dunning.error.invalidMinInterval': "El intervalo mínimo debe estar entre {min} y {max} horas",

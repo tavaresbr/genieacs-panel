@@ -554,6 +554,8 @@ export default {
   'whatsapp.dunning.runFailed': "无法开始催缴运行",
   'whatsapp.dunning.sendsLoaded': "已加载 {count} 条记录",
   'whatsapp.dunning.statsLoaded': "已加载催缴结果",
+  'whatsapp.dunning.starterInstalled': "已创建 {created} 个模板，{reused} 个已存在",
+  'whatsapp.dunning.starterFailed': "无法创建预设模板",
   'whatsapp.dunning.error.invalidWindow': "发送时间窗无效：请检查时区和每天的时间",
   'whatsapp.dunning.error.invalidMaxPerInvoice': "每张账单的最多催缴次数须在 {min} 到 {max} 之间",
   'whatsapp.dunning.error.invalidMinInterval': "最小间隔须在 {min} 到 {max} 小时之间",

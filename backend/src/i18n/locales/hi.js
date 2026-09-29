@@ -554,6 +554,8 @@ export default {
   'whatsapp.dunning.runFailed': "अनुस्मारक रन शुरू नहीं हो सका",
   'whatsapp.dunning.sendsLoaded': "{count} रिकॉर्ड लोड हुए",
   'whatsapp.dunning.statsLoaded': "अनुस्मारक के परिणाम लोड हुए",
+  'whatsapp.dunning.starterInstalled': "{created} टेम्पलेट बनाए गए, {reused} पहले से मौजूद थे",
+  'whatsapp.dunning.starterFailed': "तैयार टेम्पलेट नहीं बनाए जा सके",
   'whatsapp.dunning.error.invalidWindow': "अमान्य भेजने की विंडो: समय क्षेत्र और हर दिन का समय जांचें",
   'whatsapp.dunning.error.invalidMaxPerInvoice': "प्रति बिल अधिकतम अनुस्मारक {min} और {max} के बीच होने चाहिए",
   'whatsapp.dunning.error.invalidMinInterval': "न्यूनतम अंतराल {min} और {max} घंटे के बीच होना चाहिए",

@@ -7,6 +7,7 @@ import WhatsAppAccount from '../models/WhatsAppAccount.js';
 import SgpService, { SgpError } from './sgpService.js';
 import WaBillingService from './waBillingService.js';
 import WaSendService from './waSendService.js';
+import WaTemplateService from './waTemplateService.js';
 import WhatsAppConfigService, { WaError } from './whatsappConfigService.js';
 import { isUniqueViolation, tdb, tinsertReturningId, withDeadlockRetry } from '../config/database.js';
 import { currentTenantId } from '../config/tenantContext.js';
@@ -139,6 +140,73 @@ export function etapaDevida(steps, dias) {
   return candidatas[0] || null;
 }
 
+/**
+ * Os modelos prontos do botão "Usar modelos prontos".
+ *
+ * Um provedor que abre a régua pela primeira vez não tem modelo nenhum, e uma
+ * etapa sem modelo não salva. Estes são o ponto de partida: passam na mesma
+ * validação de qualquer modelo (`WaTemplateService.validate`), obedecem à
+ * regra dos espelhos — lembrete só cita `{{dias_para_vencer}}`, cobrança só
+ * `{{dias_atraso}}`, "vence hoje" e o agradecimento nenhum dos dois — e são
+ * só texto: o operador edita na aba Modelos como qualquer outro.
+ *
+ * Citam PIX, boleto e linha digitável juntos. Pela regra 1 de `waCobranca.js`
+ * isso quer dizer que uma fatura sem um dos três no SGP fica de fora, com o
+ * motivo "Faltou variável do modelo" — a prévia mostra quem, antes de ligar.
+ *
+ * Em português de propósito: o texto vai para o assinante, não para a tela.
+ */
+export const STARTER_TEMPLATES = Object.freeze([
+  {
+    offsetDays: -3,
+    name: 'Régua · Lembrete (3 dias antes)',
+    category: 'cobranca',
+    body: 'Olá, {{nome}}! Passando para lembrar que sua fatura de {{valor}} vence em {{dias_para_vencer}} dias ({{vencimento}}).'
+      + '\n\nPIX copia e cola:\n{{pix}}\n\nBoleto: {{link_boleto}}\nLinha digitável: {{linha_digitavel}}\n\nSe já pagou, desconsidere esta mensagem.'
+  },
+  {
+    offsetDays: 0,
+    name: 'Régua · Vence hoje',
+    category: 'cobranca',
+    body: 'Olá, {{nome}}! Sua fatura de {{valor}} vence hoje ({{vencimento}}). Pague agora e evite atrasos.'
+      + '\n\nPIX copia e cola:\n{{pix}}\n\nBoleto: {{link_boleto}}\nLinha digitável: {{linha_digitavel}}\n\nSe já pagou, desconsidere esta mensagem.'
+  },
+  {
+    offsetDays: 1,
+    name: 'Régua · 1 dia de atraso',
+    category: 'cobranca',
+    body: 'Olá, {{nome}}. Não identificamos o pagamento da sua fatura de {{valor}}, vencida em {{vencimento}} ({{dias_atraso}} dia de atraso).'
+      + '\n\nPIX copia e cola:\n{{pix}}\n\nBoleto: {{link_boleto}}\nLinha digitável: {{linha_digitavel}}\n\nSe já pagou, desconsidere esta mensagem.'
+  },
+  {
+    offsetDays: 5,
+    name: 'Régua · 5 dias de atraso',
+    category: 'cobranca',
+    body: 'Olá, {{nome}}. Sua fatura de {{valor}}, vencida em {{vencimento}}, está em aberto há {{dias_atraso}} dias. Regularize para manter sua internet funcionando normalmente.'
+      + '\n\nPIX copia e cola:\n{{pix}}\n\nBoleto: {{link_boleto}}\nLinha digitável: {{linha_digitavel}}\n\nSe já pagou, desconsidere esta mensagem.'
+  },
+  {
+    offsetDays: 10,
+    name: 'Régua · 10 dias (aviso de suspensão)',
+    category: 'cobranca',
+    body: 'Olá, {{nome}}. Sua fatura de {{valor}}, vencida em {{vencimento}}, está em aberto há {{dias_atraso}} dias. Para evitar a suspensão da sua conexão, faça o pagamento o quanto antes.'
+      + '\n\nPIX copia e cola:\n{{pix}}\n\nBoleto: {{link_boleto}}\nLinha digitável: {{linha_digitavel}}\n\nSe já pagou, desconsidere esta mensagem.'
+  },
+  {
+    offsetDays: 20,
+    name: 'Régua · 20 dias (último aviso)',
+    category: 'cobranca',
+    body: 'Olá, {{nome}}. ÚLTIMO AVISO: sua fatura de {{valor}}, vencida em {{vencimento}}, está em aberto há {{dias_atraso}} dias e sua conexão está sujeita a suspensão. Pague agora ou fale com a gente para negociar.'
+      + '\n\nPIX copia e cola:\n{{pix}}\n\nBoleto: {{link_boleto}}\nLinha digitável: {{linha_digitavel}}\n\nSe já pagou, desconsidere esta mensagem.'
+  },
+  {
+    offsetDays: null,
+    name: 'Régua · Agradecimento',
+    category: 'geral',
+    body: 'Olá, {{nome}}! Recebemos o pagamento da sua fatura de {{valor}} (vencimento {{vencimento}}). Obrigado por estar com a gente!'
+  }
+]);
+
 class WaDunningService {
   /** Passadas em andamento, por provedor. */
   static running = new Set();
@@ -238,6 +306,65 @@ class WaDunningService {
       throw invalido('thanks_template_days');
     }
     return template.id;
+  }
+
+  /**
+   * Cria os modelos prontos e, numa régua ainda sem etapas, preenche as etapas
+   * e o agradecimento com eles. NÃO liga a régua.
+   *
+   * Um modelo com o mesmo nome que já existe é reaproveitado e nunca
+   * sobrescrito: o operador pode ter editado o texto, e apertar o botão de
+   * novo não pode desfazer isso. Uma régua que já tem etapas também fica como
+   * está — o botão só cria os modelos, e quem quiser usá-los escolhe na tela.
+   *
+   * @returns {Promise<{ created: number, reused: number, stepsFilled: boolean, rule: object }>}
+   */
+  static async installStarter() {
+    let created = 0;
+    let reused = 0;
+    const ids = new Map();
+    for (const starter of STARTER_TEMPLATES) {
+      // eslint-disable-next-line no-await-in-loop -- sete modelos
+      const existing = await WaTemplate.getByName(starter.name);
+      if (existing) {
+        reused += 1;
+        ids.set(starter.name, existing);
+        continue;
+      }
+      // eslint-disable-next-line no-await-in-loop -- idem
+      const template = await WaTemplateService.create({
+        name: starter.name, body: starter.body, category: starter.category
+      });
+      created += 1;
+      ids.set(starter.name, template);
+    }
+
+    const atual = await this.getRule();
+    let rule = atual;
+    let stepsFilled = false;
+    if (atual.steps.length === 0) {
+      // Só os modelos ATIVOS e de lado certo entram: um reaproveitado que o
+      // operador desativou, ou reescreveu citando o espelho errado, faria o
+      // `saveRule` recusar a régua inteira por causa de uma etapa.
+      const steps = [];
+      for (const starter of STARTER_TEMPLATES) {
+        const template = ids.get(starter.name);
+        if (starter.offsetDays === null || !template || !template.active) continue;
+        const lembrete = modeloEhLembrete(template.body);
+        const citaAtraso = /\{\{\s*dias_atraso\s*\}\}/.test(template.body);
+        if (starter.offsetDays > 0 && lembrete) continue;
+        if (starter.offsetDays <= 0 && citaAtraso) continue;
+        steps.push({ offsetDays: starter.offsetDays, templateId: template.id });
+      }
+      const thanks = ids.get(STARTER_TEMPLATES.find((t) => t.offsetDays === null).name);
+      const thanksOk = thanks && thanks.active && !/\{\{\s*(dias_atraso|dias_para_vencer)\s*\}\}/.test(thanks.body);
+      rule = await this.saveRule({
+        steps,
+        ...(atual.thanksTemplateId ? {} : { thanksTemplateId: thanksOk ? thanks.id : null })
+      });
+      stepsFilled = steps.length > 0;
+    }
+    return { created, reused, stepsFilled, rule };
   }
 
   /** Liga ou desliga. Ligar exige etapas e o WhatsApp de cobrança pronto. */

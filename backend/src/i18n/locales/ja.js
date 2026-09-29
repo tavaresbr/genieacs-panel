@@ -553,6 +553,8 @@ export default {
   'whatsapp.dunning.runFailed': "督促の実行を開始できませんでした",
   'whatsapp.dunning.sendsLoaded': "{count} 件を読み込みました",
   'whatsapp.dunning.statsLoaded': "督促の結果を読み込みました",
+  'whatsapp.dunning.starterInstalled': "テンプレートを {created} 件作成しました({reused} 件は既存)",
+  'whatsapp.dunning.starterFailed': "既定のテンプレートを作成できませんでした",
   'whatsapp.dunning.error.invalidWindow': "送信時間帯が無効です: タイムゾーンと各曜日の時間を確認してください",
   'whatsapp.dunning.error.invalidMaxPerInvoice': "請求書ごとの督促上限は {min} から {max} の間で指定してください",
   'whatsapp.dunning.error.invalidMinInterval': "最小間隔は {min} から {max} 時間の間で指定してください",

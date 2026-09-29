@@ -4161,6 +4161,14 @@ export const whatsappAPI = {
   previewDunning: () =>
     apiClient.post<WhatsAppDunningPreview>('/whatsapp/dunning/preview', {}),
 
+  // The ready-made templates and, on a cadence with no steps yet, the steps
+  // that use them. Never switches the cadence on.
+  installDunningStarter: () =>
+    apiClient.post<{ created: number; reused: number; stepsFilled: boolean; rule: WhatsAppDunningRule }>(
+      '/whatsapp/dunning/starter',
+      {}
+    ),
+
   runDunning: () =>
     apiClient.post<{ started: boolean }>('/whatsapp/dunning/run', {}),
 
