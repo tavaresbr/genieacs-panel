@@ -1488,6 +1488,14 @@ export interface SubscriptionView {
    * valendo. Opcional porque servidores antigos não mandam o campo.
    */
   pendingPlan?: PendingPlan | null
+  /**
+   * Isento de cobrança: a plataforma manteve a assinatura ativa sem gerar
+   * fatura nem vencer, até desligar. Opcional porque servidores antigos não
+   * mandam o campo.
+   */
+  billingExempt?: boolean
+  billingExemptSince?: string | null
+  billingExemptReason?: string | null
 }
 
 /**
@@ -1594,6 +1602,14 @@ export interface SubscriptionConsoleSubscription {
   trialEndsAt: string | null
   renewsAt: string | null
   pendingPlan: { id: number; name: string; priceCents: number; effectiveAt: string; locked: boolean } | null
+  /**
+   * Isento de cobrança: a plataforma manteve a assinatura ativa sem gerar
+   * fatura nem vencer, até desligar. Opcional porque servidores antigos não
+   * mandam o campo.
+   */
+  billingExempt?: boolean
+  billingExemptSince?: string | null
+  billingExemptReason?: string | null
 }
 
 /** Uma linha da aba Assinaturas: o provedor, a assinatura, o gateway e o boleto em aberto. */
@@ -1611,6 +1627,8 @@ export interface SubscriptionConsoleSummary {
   byStatus: Record<SubscriptionConsoleStatus, number>
   openTotalCents: number
   overdueCount: number
+  /** Quantos estão isentos de cobrança. Opcional: servidores antigos não mandam. */
+  exempt?: number
 }
 
 export interface BillingEventView {
@@ -1890,6 +1908,17 @@ export const platformAPI = {
       `/platform/tenants/${tenantId}/payments`, payload
     ),
 
+  /**
+   * Liga ou desliga a isenção de cobrança: a assinatura fica ativa, não vence
+   * e não gera fatura até desligar. Ao ligar, as cobranças abertas são
+   * canceladas no gateway (`canceledCharges` diz quantas). 409 `not_billable`
+   * numa assinatura cancelada.
+   */
+  setBillingExempt: (tenantId: number, payload: { exempt: boolean; reason?: string }) =>
+    apiClient.requestWithBody<{ subscription: SubscriptionView; canceledCharges: number; alreadyInState: boolean }>(
+      'PUT', `/platform/tenants/${tenantId}/subscription/billing-exempt`, payload
+    ),
+
   // ── A aba Assinaturas: a carteira inteira e a mão nas cobranças ─────
   listSubscriptions: () =>
     apiClient.get<{ rows: SubscriptionConsoleRow[]; summary: SubscriptionConsoleSummary }>(
@@ -2082,7 +2111,8 @@ export const subscriptionAPI = {
   /**
    * Emite (ou reaproveita) a cobrança do período e devolve o link de
    * pagamento. Recusa sem cadastro fiscal (`missing_tax_id`,
-   * `invalid_tax_id`, `missing_name`) e em plano grátis (`free_plan`).
+   * `invalid_tax_id`, `missing_name`), em plano grátis (`free_plan`) e com a
+   * assinatura isenta de cobrança (409 `billing_exempt`).
    *
    * 201 (cobrança nova) e 200 (reaproveitada) são ambos sucesso: `request`
    * olha `response.ok`, não o número, então os dois chegam iguais aqui.

@@ -53,6 +53,7 @@ export interface ChargeContext {
  * - Mudar valor ou vencimento exige a cobrança existir no gateway (tem
  *   `gatewayChargeId`) ou o provedor ser cobrado à mão: com gateway e sem o id,
  *   a emissão falhou e não há lá o que alterar — o caminho é reemitir.
+ * - Com a assinatura isenta de cobrança, não se reemite nada.
  * - Reemitir é o caminho de volta da cancelada e da que falhou, mas só da
  *   cobrança do período ATUAL (a que vence no prazo corrente da assinatura),
  *   com o provedor ligado a um gateway e a assinatura não suspensa nem
@@ -75,6 +76,9 @@ export function chargeActions(
     || sub.storedStatus === 'suspended' || sub.storedStatus === 'canceled'
     || sub.status === 'suspended' || sub.status === 'canceled'
   const prazo = deadlineOf(sub)
+  // Isento não recebe fatura: reemitir geraria justamente a cobrança que a
+  // isenção cancelou (o backend recusa).
+  const isento = isBillingExempt(sub)
   const periodoAtual = prazo !== null && dayKeySaoPaulo(prazo.date) === dayKeySaoPaulo(charge.periodEnd)
   return {
     openInvoice: link,
@@ -84,7 +88,7 @@ export function chargeActions(
     changeAmount: editable,
     cancel: open,
     reissue: (charge.status === 'canceled' || charge.status === 'failed')
-      && badge.kind === 'gateway' && !bloqueada && periodoAtual,
+      && badge.kind === 'gateway' && !bloqueada && !isento && periodoAtual,
     refund: charge.status === 'paid'
   }
 }
@@ -182,11 +186,18 @@ export function rowStatus(row: Pick<SubscriptionConsoleRow, 'subscription'>): Su
   return row.subscription?.status ?? 'none'
 }
 
+/** A assinatura está isenta de cobrança? Campo ausente (servidor antigo) é não. */
+export function isBillingExempt(subscription: { billingExempt?: boolean } | null | undefined) {
+  return subscription?.billingExempt === true
+}
+
 export interface RowFilter {
   /** Vazio é "todos". */
   statuses: readonly SubscriptionConsoleStatus[]
   onlyOpenCharge: boolean
   search: string
+  /** Só os isentos de cobrança. Combina com os estados (isento continua `active`). */
+  onlyExempt?: boolean
 }
 
 /** Minúsculas e sem acento: "Sao Joao" acha "São João". */
@@ -203,6 +214,7 @@ export function filterRows<T extends Pick<SubscriptionConsoleRow, 'tenant' | 'su
   return rows.filter((row) => {
     if (filter.statuses.length > 0 && !filter.statuses.includes(rowStatus(row))) return false
     if (filter.onlyOpenCharge && !row.openCharge) return false
+    if (filter.onlyExempt && !isBillingExempt(row.subscription)) return false
     if (termo) {
       const alvo = normalizeSearch(`${row.tenant.name} ${row.tenant.slug}`)
       if (!alvo.includes(termo)) return false
@@ -226,6 +238,18 @@ export const CONSOLE_STATUS_LABEL_KEYS: Record<SubscriptionConsoleStatus, Transl
   suspended: 'platform.subs.status.suspended',
   canceled: 'platform.subs.status.canceled',
   none: 'platform.subs.status.none'
+}
+
+/**
+ * Quantos estão isentos: o número do servidor, ou — servidor antigo, sem o
+ * campo — a contagem das linhas.
+ */
+export function exemptCount(
+  summary: Pick<SubscriptionConsoleSummary, 'exempt'> | null,
+  rows: readonly Pick<SubscriptionConsoleRow, 'subscription'>[]
+) {
+  if (typeof summary?.exempt === 'number') return summary.exempt
+  return rows.filter((row) => isBillingExempt(row.subscription)).length
 }
 
 /** Os cartões de contagem do resumo, na ordem da tela. Estado ausente conta zero. */

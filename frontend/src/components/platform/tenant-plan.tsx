@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useId, useState } from 'react'
 import {
   platformAPI,
   type BillingEventView,
@@ -50,6 +50,154 @@ function formatDate(value: string | null | undefined) {
   if (!value) return '—'
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString()
+}
+
+/** O que o interruptor de isenção lê da assinatura — a do painel e a da linha da aba Assinaturas. */
+export interface BillingExemptSubscription {
+  storedStatus: SubscriptionStatus
+  billingExempt?: boolean
+  billingExemptSince?: string | null
+  billingExemptReason?: string | null
+}
+
+/**
+ * "Isento de cobrança": a assinatura fica ativa, não vence e não gera fatura
+ * até alguém desligar. Ligar e desligar passam pelos dois por uma confirmação —
+ * ligar cancela as cobranças abertas no gateway, desligar volta a cobrar.
+ *
+ * O interruptor não muda sozinho: ele mostra o que o servidor diz, e só depois
+ * da resposta (e da recarga) é que passa para o outro lado.
+ */
+export function BillingExemptControl({
+  tenantId,
+  subscription,
+  onChanged
+}: {
+  tenantId: number
+  subscription: BillingExemptSubscription | null
+  onChanged: () => void | Promise<void>
+}) {
+  const { t } = useTranslation()
+  const toast = useToast()
+  const switchId = useId()
+  const titleId = useId()
+  const reasonId = useId()
+  const [confirming, setConfirming] = useState<boolean | null>(null)
+  const [reason, setReason] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const exempt = subscription?.billingExempt === true
+  // Cancelada não tem o que isentar (o backend responde `not_billable`); a
+  // isenção já ligada pode sempre ser desligada.
+  const disabled = !subscription || (!exempt && subscription.storedStatus === 'canceled')
+
+  const fechar = useCallback(() => {
+    setConfirming(null)
+    setReason('')
+  }, [])
+
+  useEffect(() => {
+    if (confirming === null) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !busy) fechar()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [confirming, busy, fechar])
+
+  const enviar = async () => {
+    if (confirming === null) return
+    setBusy(true)
+    try {
+      const res = await platformAPI.setBillingExempt(tenantId, {
+        exempt: confirming,
+        reason: reason.trim() || undefined
+      })
+      if (res.success && res.data) {
+        const canceled = res.data.canceledCharges ?? 0
+        if (!confirming) toast.success(t('platform.subscription.exempt.disabled'))
+        else if (canceled > 0) toast.success(t('platform.subscription.exempt.enabledCanceled', { count: canceled }))
+        else toast.success(t('platform.subscription.exempt.enabled'))
+        fechar()
+        await onChanged()
+      } else if (res.code === 'not_billable') {
+        toast.error(t('platform.subscription.exempt.notBillable'))
+      } else {
+        toast.error(res.message || t('platform.saveFailed'))
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="mt-3 border-t border-border pt-3">
+      <label htmlFor={switchId} className={`flex items-start gap-2 text-sm ${disabled ? 'opacity-60' : 'cursor-pointer'}`}>
+        <input
+          id={switchId}
+          type="checkbox"
+          role="switch"
+          className="mt-0.5"
+          checked={exempt}
+          aria-checked={exempt}
+          disabled={disabled || busy}
+          // Controlado pelo servidor: o clique só abre a confirmação.
+          onChange={() => setConfirming(!exempt)}
+        />
+        <span className="font-medium text-foreground">{t('platform.subscription.exempt.toggle')}</span>
+      </label>
+      {exempt && (
+        <div className="mt-2 space-y-1 text-sm">
+          <span className="modern-badge-info">
+            {subscription?.billingExemptSince
+              ? t('platform.subscription.exempt.since', { date: formatDate(subscription.billingExemptSince) })
+              : t('platform.subs.exempt')}
+          </span>
+          {subscription?.billingExemptReason && (
+            <p className="text-muted-foreground [overflow-wrap:anywhere]">{subscription.billingExemptReason}</p>
+          )}
+        </div>
+      )}
+
+      {confirming !== null && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+          <div className="modal-panel modern-card flex max-w-lg flex-col">
+            <div className="border-b border-border p-5">
+              <h3 id={titleId} className="text-lg font-semibold text-foreground">
+                {t(confirming ? 'platform.subscription.exempt.enableTitle' : 'platform.subscription.exempt.disableTitle')}
+              </h3>
+            </div>
+            <div className="space-y-3 p-5 text-sm">
+              <p className="text-foreground">
+                {t(confirming ? 'platform.subscription.exempt.enableWarning' : 'platform.subscription.exempt.disableWarning')}
+              </p>
+              <div>
+                <label htmlFor={reasonId} className="mb-1 block text-sm font-medium">
+                  {t('platform.subscription.exempt.reason')}
+                </label>
+                <textarea
+                  id={reasonId}
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  className="modern-input w-full"
+                  rows={3}
+                  maxLength={255}
+                />
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center justify-end gap-3 border-t border-border p-5">
+              <button type="button" className="modern-button-secondary" onClick={fechar} disabled={busy}>
+                {t('common.cancel')}
+              </button>
+              <button type="button" className="modern-button" onClick={() => void enviar()} disabled={busy}>
+                {busy ? t('common.saving') : t('common.confirm')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 /**
@@ -223,6 +371,9 @@ export function TenantPlan({ tenant, plans, onSubscriptionChange }: Props) {
           <span className={statusBadgeClass(subscription.status)}>
             {t(STATUS_LABEL_KEYS[subscription.status])}
           </span>
+          {subscription.billingExempt && (
+            <span className="modern-badge-info">{t('platform.subs.exempt')}</span>
+          )}
           {subscription.reason === 'trial_expired' && (
             <span className="text-muted-foreground">{t('platform.subscription.trialExpiredNote')}</span>
           )}
@@ -234,7 +385,7 @@ export function TenantPlan({ tenant, plans, onSubscriptionChange }: Props) {
               {t('platform.subscription.trialEnds', { date: formatDate(subscription.trialEndsAt) })}
             </span>
           )}
-          {subscription.renewsAt && (
+          {subscription.renewsAt && !subscription.billingExempt && (
             <span className="text-muted-foreground">
               {t(
                 expirou(subscription.renewsAt)
@@ -303,6 +454,14 @@ export function TenantPlan({ tenant, plans, onSubscriptionChange }: Props) {
             {saving === 'status' ? t('common.saving') : t('platform.subscription.changeStatus')}
           </button>
           <p className="field-hint">{t('platform.subscription.statusHint')}</p>
+          <BillingExemptControl
+            tenantId={tenantId}
+            subscription={subscription}
+            onChanged={async () => {
+              await load()
+              onSubscriptionChange()
+            }}
+          />
         </div>
 
         {/* Pagamento */}

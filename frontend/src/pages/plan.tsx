@@ -16,6 +16,8 @@ import {
   canPayNow,
   canSwitchTo,
   confirmKey,
+  isBillingExempt,
+  isBillingExemptRefusal,
   isBusy,
   isPendingLocked,
   isPendingLockedRefusal,
@@ -182,6 +184,13 @@ export default function PlanPage() {
         setAviso({ tipo: 'erro', texto: t('plan.payNoLink') })
         return
       }
+      if (isBillingExemptRefusal(res.code)) {
+        // A isenção nasceu depois da última carga: recarrega para o botão
+        // sumir e a nota aparecer.
+        setAviso({ tipo: 'info', texto: t('plan.billingExemptNote') })
+        void load()
+        return
+      }
       const texto = res.message || t('plan.payFailed')
       if (isBusy(res.code)) {
         // A aba em branco já foi fechada por `payInNewTab`.
@@ -204,7 +213,10 @@ export default function PlanPage() {
   }, [load])
 
   const subscription = data?.subscription ?? null
-  const venceu = expirou(subscription?.renewsAt)
+  // Isento: não vence nem recebe fatura. Some o prazo, o aviso de vencido e o
+  // "pagar agora"; fica a nota.
+  const isento = isBillingExempt(subscription)
+  const venceu = !isento && expirou(subscription?.renewsAt)
   const pendente = subscription?.pendingPlan ?? null
   const pendenteBloqueio = pendingBlockedDetail(pendente)
   const planoAtualId = plans?.find((p) => p.current)?.id ?? null
@@ -244,21 +256,27 @@ export default function PlanPage() {
                 <span className={badgeClass(subscription.status)}>
                   {t(STATUS_KEYS[subscription.status] ?? 'platform.subscription.suspended')}
                 </span>
-                {subscription.reason === 'trial_expired' && (
+                {!isento && subscription.reason === 'trial_expired' && (
                   <span className="text-muted-foreground">{t('platform.subscription.trialExpiredNote')}</span>
                 )}
-                {subscription.reason === 'renewal_expired' && (
+                {!isento && subscription.reason === 'renewal_expired' && (
                   <span className="text-muted-foreground">{t('platform.subscription.renewalExpiredNote')}</span>
                 )}
               </div>
+              {isento && (
+                <p role="status" className="mt-3 flex items-start gap-2 text-sm text-foreground">
+                  <Icon name="info" size={16} className="mt-0.5 shrink-0 text-[hsl(var(--status-info))]" />
+                  {t('plan.billingExemptNote')}
+                </p>
+              )}
               <dl className="mt-4 space-y-2 text-sm">
-                {subscription.storedStatus === 'trial' && formatDate(subscription.trialEndsAt) && (
+                {!isento && subscription.storedStatus === 'trial' && formatDate(subscription.trialEndsAt) && (
                   <div className="flex justify-between gap-3">
                     <dt className="text-muted-foreground">{t('plan.trialEnds')}</dt>
                     <dd className="font-medium">{formatDate(subscription.trialEndsAt)}</dd>
                   </div>
                 )}
-                {formatDate(subscription.renewsAt) && (
+                {!isento && formatDate(subscription.renewsAt) && (
                   <div className="flex justify-between gap-3">
                     {/* "Pago até 12/03" com hoje em 12/09 era o painel publicando
                         ao cliente uma data que ele mesmo não respeitava. Agora
