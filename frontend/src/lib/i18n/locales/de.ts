@@ -2210,6 +2210,8 @@ const de: Dictionary = {
   'whatsapp.templates.insertVariable': 'Einfügen',
   'whatsapp.templates.isReminder': 'Erinnerung — vor Fälligkeit',
   'whatsapp.templates.isDunning': 'Mahnung — bereits überfällig',
+  'whatsapp.templates.duplicate': "Duplizieren",
+  'whatsapp.templates.copySuffix': "Kopie",
   'whatsapp.templates.empty': 'Noch keine Vorlage.',
   'whatsapp.templates.variables': 'Verfügbare Variablen',
   'whatsapp.templates.unknownVariable': 'Die Vorlage nutzt {name}, was der Versand nicht füllen kann.',

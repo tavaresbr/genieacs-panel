@@ -2307,6 +2307,8 @@ const ar: Dictionary = {
   'whatsapp.templates.insertVariable': 'إدراج',
   'whatsapp.templates.isReminder': 'تذكير — قبل الاستحقاق',
   'whatsapp.templates.isDunning': 'مطالبة — بعد التأخّر',
+  'whatsapp.templates.duplicate': "تكرار",
+  'whatsapp.templates.copySuffix': "نسخة",
   'whatsapp.templates.empty': 'لا توجد قوالب بعد.',
   'whatsapp.templates.variables': 'المتغيّرات المتاحة',
   'whatsapp.templates.unknownVariable': 'يستخدم القالب {name}، وهو ما لا يستطيع المُرسِل ملأه.',

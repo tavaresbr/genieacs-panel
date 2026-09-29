@@ -2332,6 +2332,8 @@ const ko: Dictionary = {
   'whatsapp.templates.insertVariable': '삽입',
   'whatsapp.templates.isReminder': '알림 — 납기 전',
   'whatsapp.templates.isDunning': '독촉 — 이미 연체',
+  'whatsapp.templates.duplicate': "복제",
+  'whatsapp.templates.copySuffix': "사본",
   'whatsapp.templates.empty': '아직 템플릿이 없습니다.',
   'whatsapp.templates.variables': '사용 가능한 변수',
   'whatsapp.templates.unknownVariable': '이 템플릿은 발송기가 채울 수 없는 {name}을(를) 사용합니다.',
