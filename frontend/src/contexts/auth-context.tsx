@@ -10,6 +10,7 @@ import { MFA_ENROLLMENT_EVENT } from '@/lib/mfa-enrollment'
 import { useNavigate } from 'react-router'
 import { roleHas, type Permission } from '@/lib/permissions'
 import type { User } from '@/types'
+import { clearDashboardSnapshot } from '@/lib/dashboard-snapshot'
 
 interface AuthContextType {
   user: User | null
@@ -160,6 +161,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           refreshToken: string
           user: User
         }
+        // Entrar em outro provedor não passa por `clearTokens`.
+        clearDashboardSnapshot()
         apiClient.setTokens(token, refreshToken)
 
         setUser(user)

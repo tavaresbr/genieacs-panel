@@ -4,6 +4,7 @@ import { MFA_ENROLLMENT_EVENT, isMfaEnrollmentRefusal } from '@/lib/mfa-enrollme
 import type { LiveStatus } from '@/lib/map-status'
 import { offlineMessageKey } from '@/lib/genieacs-agent'
 import { formatRelativeTime } from '@/lib/utils'
+import { clearDashboardSnapshot } from '@/lib/dashboard-snapshot'
 
 // Acima de `apiClient`, que o dispara: um `const` de módulo lido antes da
 // declaração é uma ReferenceError no primeiro 402.
@@ -564,6 +565,8 @@ class ApiClient {
     if (typeof window !== 'undefined') {
       sessionStorage.setItem('token', token)
       sessionStorage.removeItem('refreshToken')
+      // A aba nova herdou o `sessionStorage` da aba do console.
+      clearDashboardSnapshot()
     }
   }
 
@@ -577,6 +580,7 @@ class ApiClient {
     if (typeof window !== 'undefined') {
       sessionStorage.removeItem('token')
       sessionStorage.removeItem('refreshToken')
+      clearDashboardSnapshot()
       if (!eraDaAba) {
         localStorage.removeItem('token')
         localStorage.removeItem('refreshToken')
