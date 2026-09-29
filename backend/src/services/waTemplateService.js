@@ -35,9 +35,10 @@ const PLACEHOLDER = /\{\{\s*([a-zA-Z_][\w.-]*)\s*\}\}/g;
  * category, rather than at send time — by then the render has already refused
  * (`renderCobranca` returns null on an empty variable) and the operator is
  * looking at a campaign that silently dropped everybody, with no way to tell
- * why from the screen. The category is not part of the test on purpose: a
- * template's category can be changed with a `PUT` later, so accepting
- * `{{fatura_anterior}}` into a 'suporte' row would only move the failure.
+ * why from the screen. The test runs against the FINAL category — the one a
+ * `PUT` leaves the row with —, so a category change re-checks the stored body:
+ * `atendimento` (quick replies) has its own variables, filled by the inbox
+ * screen; every other category uses the billing dispatcher's.
  */
 class WaTemplateService {
   static async list({ category, includeInactive } = {}) {
