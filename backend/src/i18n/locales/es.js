@@ -546,6 +546,7 @@ export default {
   'whatsapp.dunning.enabled': "Regla de cobranza automática activada",
   'whatsapp.dunning.disabled': "Regla de cobranza automática desactivada",
   'whatsapp.dunning.previewReady': "Hoy saldrían {count} mensaje(s)",
+  'whatsapp.dunning.previewStarted': "Simulación iniciada",
   'whatsapp.dunning.previewFailed': "No se pudo simular la regla de cobranza",
   'whatsapp.dunning.runStarted': "Pasada de la regla iniciada",
   'whatsapp.dunning.runFailed': "No se pudo iniciar la pasada de la regla",

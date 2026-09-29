@@ -2207,6 +2207,7 @@ const fr: Dictionary = {
   'whatsapp.dunning.needsSteps': "Ajoutez au moins une étape et enregistrez avant d'activer la relance.",
   'whatsapp.dunning.preview': "Simuler aujourd'hui",
   'whatsapp.dunning.previewing': "Simulation…",
+  'whatsapp.dunning.previewProgress': "Vérification de {checked} sur {total} contrats dans le SGP…",
   'whatsapp.dunning.previewTitle': "{count} message(s) partiraient aujourd'hui ({checked} contrat(s) vérifié(s))",
   'whatsapp.dunning.previewTruncated': "Aperçu limité aux {count} premiers contrats.",
   'whatsapp.dunning.previewEmpty': "Personne n'a d'étape due aujourd'hui.",

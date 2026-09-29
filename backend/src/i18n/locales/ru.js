@@ -550,6 +550,7 @@ export default {
   'whatsapp.dunning.enabled': "Автоматические напоминания включены",
   'whatsapp.dunning.disabled': "Автоматические напоминания выключены",
   'whatsapp.dunning.previewReady': "Сегодня было бы отправлено сообщений: {count}",
+  'whatsapp.dunning.previewStarted': "Моделирование запущено",
   'whatsapp.dunning.previewFailed': "Не удалось смоделировать напоминания",
   'whatsapp.dunning.runStarted': "Проход напоминаний запущен",
   'whatsapp.dunning.runFailed': "Не удалось запустить проход напоминаний",

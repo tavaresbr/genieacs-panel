@@ -553,6 +553,7 @@ export default {
   'whatsapp.dunning.enabled': "Relance automatique activée",
   'whatsapp.dunning.disabled': "Relance automatique désactivée",
   'whatsapp.dunning.previewReady': "{count} message(s) partiraient aujourd'hui",
+  'whatsapp.dunning.previewStarted': "Simulation démarrée",
   'whatsapp.dunning.previewFailed': "Impossible de simuler la relance",
   'whatsapp.dunning.runStarted': "Passage de la relance démarré",
   'whatsapp.dunning.runFailed': "Impossible de démarrer le passage de la relance",

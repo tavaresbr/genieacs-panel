@@ -242,8 +242,22 @@ describe('cadastrar a régua', () => {
 
 describe('a prévia', () => {
   it('diz quem receberia qual etapa e não grava nada', async () => {
-    const { status, body } = await api('/dunning/preview', { method: 'POST' });
-    assert.equal(status, 200, JSON.stringify(body));
+    // Começa em segundo plano e responde na hora — uma ida ao SGP por contrato
+    // não cabe no minuto que um proxy espera. A tela consulta até terminar.
+    const inicio = await api('/dunning/preview', { method: 'POST' });
+    assert.equal(inicio.status, 202, JSON.stringify(inicio.body));
+    assert.equal(inicio.body.data.status, 'running');
+    let estado;
+    for (let i = 0; i < 100; i += 1) {
+      // eslint-disable-next-line no-await-in-loop -- a consulta repetida é o que se testa
+      estado = (await api('/dunning/preview')).body.data;
+      if (estado.status !== 'running') break;
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise((resolve) => { setTimeout(resolve, 100); });
+    }
+    assert.equal(estado.status, 'done', JSON.stringify(estado));
+    assert.equal(estado.checked, estado.total, 'o progresso chega ao total');
+    const body = { data: estado.result };
     const por = new Map(body.data.items.map((item) => [item.contract, item]));
     assert.equal(por.get('R-ATRASO-10').stepOffset, 5);
     assert.equal(por.get('R-ATRASO-2').stepOffset, 1);
@@ -254,6 +268,17 @@ describe('a prévia', () => {
     assert.equal(por.has('R-EM-DIA'), false);
     assert.equal(body.data.queued, 3);
     assert.equal((await sends()).length, 0, 'a prévia não pode gravar decisão nenhuma');
+  });
+});
+
+describe('a prévia recusa na hora o que não precisa do SGP', () => {
+  it('sem etapa, a resposta já é o erro — e não uma prévia que falha depois', async () => {
+    const atual = (await api('/dunning/rule')).body.data;
+    await saveRule({ steps: [] });
+    const res = await api('/dunning/preview', { method: 'POST' });
+    assert.equal(res.status, 400);
+    assert.equal(res.body.code, 'no_steps');
+    await saveRule({ steps: atual.steps });
   });
 });
 

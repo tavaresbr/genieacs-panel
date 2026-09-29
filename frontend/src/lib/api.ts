@@ -3734,6 +3734,16 @@ export interface WhatsAppDunningPreview {
   items: WhatsAppDunningPreviewItem[]
 }
 
+export interface WhatsAppDunningPreviewState {
+  status: 'idle' | 'running' | 'done' | 'failed'
+  checked: number
+  total: number | null
+  startedAt?: string | null
+  finishedAt?: string | null
+  result: WhatsAppDunningPreview | null
+  error: { code: string; message: string } | null
+}
+
 export interface WhatsAppDunningSend {
   id: number
   kind: 'step' | 'thanks'
@@ -4232,8 +4242,13 @@ export const whatsappAPI = {
   setDunningEnabled: (enabled: boolean) =>
     apiClient.post<WhatsAppDunningRule>('/whatsapp/dunning/enabled', { enabled }),
 
-  previewDunning: () =>
-    apiClient.post<WhatsAppDunningPreview>('/whatsapp/dunning/preview', {}),
+  // The preview runs in the background — one ERP round trip per contract is
+  // minutes, past what a reverse proxy waits. Start it, then poll.
+  startDunningPreview: () =>
+    apiClient.post<WhatsAppDunningPreviewState>('/whatsapp/dunning/preview', {}),
+
+  getDunningPreview: () =>
+    apiClient.get<WhatsAppDunningPreviewState>('/whatsapp/dunning/preview'),
 
   // The ready-made templates and, on a cadence with no steps yet, the steps
   // that use them. Never switches the cadence on.

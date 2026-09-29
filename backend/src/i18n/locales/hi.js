@@ -549,6 +549,7 @@ export default {
   'whatsapp.dunning.enabled': "स्वचालित अनुस्मारक चालू किया गया",
   'whatsapp.dunning.disabled': "स्वचालित अनुस्मारक बंद किया गया",
   'whatsapp.dunning.previewReady': "आज {count} संदेश भेजे जाएंगे",
+  'whatsapp.dunning.previewStarted': "सिमुलेशन शुरू हुआ",
   'whatsapp.dunning.previewFailed': "अनुस्मारक का सिमुलेशन नहीं हो सका",
   'whatsapp.dunning.runStarted': "अनुस्मारक रन शुरू हुआ",
   'whatsapp.dunning.runFailed': "अनुस्मारक रन शुरू नहीं हो सका",

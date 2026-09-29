@@ -2374,6 +2374,7 @@ const hi: Dictionary = {
   'whatsapp.dunning.needsSteps': "चालू करने से पहले कम से कम एक चरण जोड़ें और सहेजें।",
   'whatsapp.dunning.preview': "आज का सिमुलेशन",
   'whatsapp.dunning.previewing': "सिमुलेशन हो रहा है…",
+  'whatsapp.dunning.previewProgress': "SGP में {total} में से {checked} अनुबंध जांचे जा रहे हैं…",
   'whatsapp.dunning.previewTitle': "आज {count} संदेश जाएंगे ({checked} अनुबंध जांचे गए)",
   'whatsapp.dunning.previewTruncated': "पूर्वावलोकन पहले {count} अनुबंधों तक सीमित है।",
   'whatsapp.dunning.previewEmpty': "आज किसी का कोई चरण देय नहीं है।",

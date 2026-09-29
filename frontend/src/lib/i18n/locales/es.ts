@@ -2393,6 +2393,7 @@ const es: Dictionary = {
   'whatsapp.dunning.needsSteps': "Agregue al menos una etapa y guarde antes de activar la regla.",
   'whatsapp.dunning.preview': "Simular hoy",
   'whatsapp.dunning.previewing': "Simulando…",
+  'whatsapp.dunning.previewProgress': "Revisando {checked} de {total} contratos en el SGP…",
   'whatsapp.dunning.previewTitle': "Hoy saldrían {count} mensaje(s) ({checked} contrato(s) revisado(s))",
   'whatsapp.dunning.previewTruncated': "Vista previa limitada a los primeros {count} contratos.",
   'whatsapp.dunning.previewEmpty': "Nadie tiene una etapa pendiente hoy.",

@@ -55,6 +55,28 @@ function auditDetail(rule) {
   };
 }
 
+/**
+ * A preview as the screen sees it. The failure is translated here, at read
+ * time, in the language of whoever is polling — not of whoever clicked.
+ */
+function publicPreview(req, state) {
+  if (!state) return { status: 'idle', checked: 0, total: null, result: null, error: null };
+  return {
+    status: state.status,
+    checked: state.checked,
+    total: state.total,
+    startedAt: state.startedAt,
+    finishedAt: state.finishedAt,
+    result: state.status === 'done' ? state.result : null,
+    error: state.status === 'failed'
+      ? {
+        code: state.error?.code || 'preview_failed',
+        message: state.error?.translationKey ? translateError(req.t, state.error) : req.t('whatsapp.dunning.previewFailed')
+      }
+      : null
+  };
+}
+
 class WhatsAppBillingController {
   // ── Templates ────────────────────────────────────────────────────────
 
@@ -328,11 +350,26 @@ class WhatsAppBillingController {
     }
   }
 
-  /** Who would get which step today. Sends nothing. */
-  static async previewDunning(req, res) {
+  /**
+   * Who would get which step today. Sends nothing.
+   *
+   * Started in the background and answered at once: one ERP round trip per
+   * contract takes minutes on a real provider, far past the minute a reverse
+   * proxy waits for a response. The screen polls `GET /dunning/preview`.
+   */
+  static async startDunningPreview(req, res) {
     try {
-      const summary = await WaDunningService.run({ dryRun: true });
-      return res.json(createResponse(req.t('whatsapp.dunning.previewReady', { count: summary.queued }), summary));
+      const state = await WaDunningService.startPreview();
+      return res.status(202).json(createResponse(req.t('whatsapp.dunning.previewStarted'), publicPreview(req, state)));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.dunning.previewFailed');
+    }
+  }
+
+  static async getDunningPreview(req, res) {
+    try {
+      const state = WaDunningService.getPreview();
+      return res.json(createResponse(req.t('whatsapp.dunning.loaded'), publicPreview(req, state)));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.dunning.previewFailed');
     }

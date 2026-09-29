@@ -2457,6 +2457,7 @@ const ja: Dictionary = {
   'whatsapp.dunning.needsSteps': "オンにする前にステップを 1 つ以上追加して保存してください。",
   'whatsapp.dunning.preview': "今日をシミュレーション",
   'whatsapp.dunning.previewing': "シミュレーション中…",
+  'whatsapp.dunning.previewProgress': "SGP で {total} 件中 {checked} 件の契約を確認中…",
   'whatsapp.dunning.previewTitle': "本日 {count} 件のメッセージが送信されます(確認した契約 {checked} 件)",
   'whatsapp.dunning.previewTruncated': "プレビューは最初の {count} 件の契約に限定されています。",
   'whatsapp.dunning.previewEmpty': "本日期限のステップはありません。",

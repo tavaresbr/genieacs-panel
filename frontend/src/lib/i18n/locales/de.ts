@@ -2276,6 +2276,7 @@ const de: Dictionary = {
   'whatsapp.dunning.needsSteps': "Legen Sie mindestens eine Stufe an und speichern Sie, bevor Sie das Mahnwesen einschalten.",
   'whatsapp.dunning.preview': "Heute simulieren",
   'whatsapp.dunning.previewing': "Simuliere…",
+  'whatsapp.dunning.previewProgress': "{checked} von {total} Verträgen im SGP geprüft…",
   'whatsapp.dunning.previewTitle': "Heute würden {count} Nachricht(en) versendet ({checked} Vertrag/Verträge geprüft)",
   'whatsapp.dunning.previewTruncated': "Vorschau auf die ersten {count} Verträge begrenzt.",
   'whatsapp.dunning.previewEmpty': "Heute ist bei niemandem eine Stufe fällig.",

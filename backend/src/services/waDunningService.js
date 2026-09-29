@@ -69,8 +69,15 @@ const MAX_PER_RUN_LIMIT = 2000;
  */
 export const RUN_INTERVAL_MS = 3 * 3600_000;
 
-/** Prévia: quantos contratos no máximo, pelo mesmo motivo do teto da listagem. */
-const PREVIEW_CONTRACTS = 300;
+/**
+ * Prévia: quantos contratos no máximo.
+ *
+ * A prévia roda em segundo plano (`startPreview`) — uma ida ao SGP por
+ * contrato, a 150 ms uma da outra, passa fácil do minuto que um proxy à frente
+ * do painel espera por uma resposta. O teto existe para ela terminar num tempo
+ * que alguém espera olhando a barra, não para caber numa requisição.
+ */
+export const PREVIEW_CONTRACTS = 1000;
 
 /** Por quanto tempo um pagamento ainda rende agradecimento. */
 const THANKS_WINDOW_MS = 3 * 24 * 3600_000;
@@ -210,6 +217,13 @@ export const STARTER_TEMPLATES = Object.freeze([
 class WaDunningService {
   /** Passadas em andamento, por provedor. */
   static running = new Set();
+
+  /**
+   * A prévia de cada provedor: `{ status, checked, total, startedAt, finishedAt, result, error }`.
+   * Em memória de propósito — é o resultado de um clique, não um registro, e
+   * um restart no meio só pede outro clique.
+   */
+  static previews = new Map();
 
   // ── A configuração ─────────────────────────────────────────────────
 
@@ -464,7 +478,51 @@ class WaDunningService {
     return { rule, account };
   }
 
-  static async run({ dryRun = false, manual = false, now = new Date() } = {}) {
+  /**
+   * Começa a prévia em segundo plano e responde na hora.
+   *
+   * As recusas que dá para saber sem ir ao SGP — régua sem etapa, SGP
+   * desligado — saem daqui mesmo, como erro da requisição. Uma prévia que já
+   * está rodando não começa outra: devolve a que está em andamento.
+   */
+  static async startPreview(now = new Date()) {
+    const tenantId = currentTenantId();
+    const atual = this.previews.get(tenantId);
+    if (atual?.status === 'running') return atual;
+
+    const rule = await this.getRule();
+    if (rule.steps.length === 0) throw invalido('no_steps');
+    SgpService.requireReady(await SgpService.getConfig());
+
+    const state = { status: 'running', checked: 0, total: null, startedAt: new Date().toISOString(), finishedAt: null, result: null, error: null };
+    this.previews.set(tenantId, state);
+    void this.run({
+      dryRun: true,
+      now,
+      onProgress: ({ checked, total }) => {
+        state.checked = checked;
+        if (total !== undefined) state.total = total;
+      }
+    }).then((result) => {
+      state.status = 'done';
+      state.result = result;
+      state.checked = result.checked;
+    }).catch((error) => {
+      console.warn(`[wa] régua: prévia falhou: ${error.code || error.message}`);
+      state.status = 'failed';
+      state.error = error;
+    }).finally(() => {
+      state.finishedAt = new Date().toISOString();
+    });
+    return state;
+  }
+
+  /** A prévia deste provedor, ou `null` se nenhuma foi pedida desde o último restart. */
+  static getPreview() {
+    return this.previews.get(currentTenantId()) || null;
+  }
+
+  static async run({ dryRun = false, manual = false, now = new Date(), onProgress = null } = {}) {
     let rule;
     let account = null;
     if (dryRun) {
@@ -481,7 +539,7 @@ class WaDunningService {
       this.running.add(tenantId);
     }
     try {
-      const summary = await this.pass({ rule, account, dryRun, now });
+      const summary = await this.pass({ rule, account, dryRun, now, onProgress });
       if (!dryRun) {
         await AppState.upsert(LAST_RUN_KEY, JSON.stringify({
           at: now.toISOString(),
@@ -500,7 +558,7 @@ class WaDunningService {
     }
   }
 
-  static async pass({ rule, account, dryRun, now }) {
+  static async pass({ rule, account, dryRun, now, onProgress = null }) {
     const templates = await this.loadTemplates(rule);
     const reminders = rule.steps.some((s) => s.offsetDays <= 0);
     const summary = {
@@ -519,6 +577,7 @@ class WaDunningService {
       summary.truncated = true;
     }
 
+    onProgress?.({ checked: 0, total: subscribers.length });
     const blocked = await WaOptOut.activePhones(subscribers.map((s) => s.phone).filter(Boolean));
     const open = await this.openSendsByContract();
     let calls = 0;
@@ -531,6 +590,7 @@ class WaDunningService {
       // eslint-disable-next-line no-await-in-loop -- uma ida ao SGP por contrato, no ritmo de WaBillingService
       const invoices = await WaBillingService.pacedInvoices(subscriber.contract, calls++ > 0);
       summary.checked += 1;
+      onProgress?.({ checked: summary.checked });
       if (invoices === null) {
         summary.skipped.sgpRefused += 1;
         continue;

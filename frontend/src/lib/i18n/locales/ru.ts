@@ -2400,6 +2400,7 @@ const ru: Dictionary = {
   'whatsapp.dunning.needsSteps': "Добавьте хотя бы один этап и сохраните перед включением.",
   'whatsapp.dunning.preview': "Смоделировать сегодня",
   'whatsapp.dunning.previewing': "Моделирование…",
+  'whatsapp.dunning.previewProgress': "Проверено договоров в SGP: {checked} из {total}…",
   'whatsapp.dunning.previewTitle': "Сегодня было бы отправлено: {count} (проверено договоров: {checked})",
   'whatsapp.dunning.previewTruncated': "Предпросмотр ограничен первыми {count} договорами.",
   'whatsapp.dunning.previewEmpty': "Сегодня ни у кого нет этапа.",

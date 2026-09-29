@@ -549,6 +549,7 @@ export default {
   'whatsapp.dunning.enabled': "已开启自动催缴",
   'whatsapp.dunning.disabled': "已关闭自动催缴",
   'whatsapp.dunning.previewReady': "今天将发送 {count} 条消息",
+  'whatsapp.dunning.previewStarted': "模拟已开始",
   'whatsapp.dunning.previewFailed': "无法模拟催缴",
   'whatsapp.dunning.runStarted': "催缴运行已开始",
   'whatsapp.dunning.runFailed': "无法开始催缴运行",

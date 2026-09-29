@@ -550,6 +550,7 @@ export default {
   'whatsapp.dunning.enabled': "Automatisches Mahnwesen eingeschaltet",
   'whatsapp.dunning.disabled': "Automatisches Mahnwesen ausgeschaltet",
   'whatsapp.dunning.previewReady': "Heute würden {count} Nachricht(en) versendet",
+  'whatsapp.dunning.previewStarted': "Simulation gestartet",
   'whatsapp.dunning.previewFailed': "Mahnwesen konnte nicht simuliert werden",
   'whatsapp.dunning.runStarted': "Mahnlauf gestartet",
   'whatsapp.dunning.runFailed': "Mahnlauf konnte nicht gestartet werden",

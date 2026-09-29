@@ -548,6 +548,7 @@ export default {
   'whatsapp.dunning.enabled': "تم تشغيل التذكير التلقائي",
   'whatsapp.dunning.disabled': "تم إيقاف التذكير التلقائي",
   'whatsapp.dunning.previewReady': "سيتم إرسال {count} رسالة اليوم",
+  'whatsapp.dunning.previewStarted': "بدأت المحاكاة",
   'whatsapp.dunning.previewFailed': "تعذّرت محاكاة التذكير",
   'whatsapp.dunning.runStarted': "بدأت جولة التذكير",
   'whatsapp.dunning.runFailed': "تعذّر بدء جولة التذكير",

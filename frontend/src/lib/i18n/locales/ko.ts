@@ -2398,6 +2398,7 @@ const ko: Dictionary = {
   'whatsapp.dunning.needsSteps': "켜기 전에 단계를 하나 이상 추가하고 저장하세요.",
   'whatsapp.dunning.preview': "오늘 시뮬레이션",
   'whatsapp.dunning.previewing': "시뮬레이션 중…",
+  'whatsapp.dunning.previewProgress': "SGP에서 {total}개 중 {checked}개 계약 확인 중…",
   'whatsapp.dunning.previewTitle': "오늘 {count}건의 메시지가 발송됩니다(확인한 계약 {checked}건)",
   'whatsapp.dunning.previewTruncated': "미리보기는 처음 {count}개 계약으로 제한됩니다.",
   'whatsapp.dunning.previewEmpty': "오늘 해당하는 단계가 없습니다.",

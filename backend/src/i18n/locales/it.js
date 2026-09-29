@@ -547,6 +547,7 @@ export default {
   'whatsapp.dunning.enabled': "Sollecito automatico attivato",
   'whatsapp.dunning.disabled': "Sollecito automatico disattivato",
   'whatsapp.dunning.previewReady': "Oggi partirebbero {count} messaggio/i",
+  'whatsapp.dunning.previewStarted': "Simulazione avviata",
   'whatsapp.dunning.previewFailed': "Impossibile simulare il sollecito",
   'whatsapp.dunning.runStarted': "Passaggio del sollecito avviato",
   'whatsapp.dunning.runFailed': "Impossibile avviare il passaggio del sollecito",
