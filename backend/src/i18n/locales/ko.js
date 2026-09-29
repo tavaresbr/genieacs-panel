@@ -547,6 +547,7 @@ export default {
   'whatsapp.dunning.enabled': "자동 독촉을 켰습니다",
   'whatsapp.dunning.disabled': "자동 독촉을 껐습니다",
   'whatsapp.dunning.previewReady': "오늘 {count}건의 메시지가 발송됩니다",
+  'whatsapp.dunning.previewStarted': "시뮬레이션을 시작했습니다",
   'whatsapp.dunning.previewFailed': "독촉을 시뮬레이션할 수 없습니다",
   'whatsapp.dunning.runStarted': "독촉 실행을 시작했습니다",
   'whatsapp.dunning.runFailed': "독촉 실행을 시작할 수 없습니다",

@@ -2393,6 +2393,7 @@ const zhCN: Dictionary = {
   'whatsapp.dunning.needsSteps': "开启前请至少添加一个步骤并保存。",
   'whatsapp.dunning.preview': "模拟今天",
   'whatsapp.dunning.previewing': "模拟中…",
+  'whatsapp.dunning.previewProgress': "正在 SGP 中检查第 {checked}/{total} 个合同…",
   'whatsapp.dunning.previewTitle': "今天将发送 {count} 条消息（已检查 {checked} 个合同）",
   'whatsapp.dunning.previewTruncated': "预览仅限前 {count} 个合同。",
   'whatsapp.dunning.previewEmpty': "今天没有需要发送的步骤。",

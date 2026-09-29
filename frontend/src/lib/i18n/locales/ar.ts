@@ -2374,6 +2374,7 @@ const ar: Dictionary = {
   'whatsapp.dunning.needsSteps': "أضف مرحلة واحدة على الأقل واحفظ قبل التشغيل.",
   'whatsapp.dunning.preview': "محاكاة اليوم",
   'whatsapp.dunning.previewing': "جارٍ المحاكاة…",
+  'whatsapp.dunning.previewProgress': "جارٍ فحص {checked} من {total} عقد في SGP…",
   'whatsapp.dunning.previewTitle': "سيتم إرسال {count} رسالة اليوم (تم فحص {checked} عقد)",
   'whatsapp.dunning.previewTruncated': "المعاينة مقتصرة على أول {count} عقد.",
   'whatsapp.dunning.previewEmpty': "لا توجد مراحل مستحقة اليوم.",

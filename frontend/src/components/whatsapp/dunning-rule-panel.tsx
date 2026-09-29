@@ -118,6 +118,7 @@ export function DunningRulePanel() {
   const [switching, setSwitching] = useState(false)
   const [previewing, setPreviewing] = useState(false)
   const [preview, setPreview] = useState<WhatsAppDunningPreview | null>(null)
+  const [previewProgress, setPreviewProgress] = useState<{ checked: number; total: number | null } | null>(null)
   const [starting, setStarting] = useState(false)
   const [installing, setInstalling] = useState(false)
 
@@ -276,15 +277,38 @@ export function DunningRulePanel() {
     }
   }
 
+  // The preview runs on the server in the background; this starts it and
+  // polls until it is done, showing how many contracts the ERP has answered.
   const simulate = async () => {
     setPreviewing(true)
+    setPreview(null)
+    setPreviewProgress(null)
     try {
-      const res = await whatsappAPI.previewDunning()
+      const started = await whatsappAPI.startDunningPreview()
       if (!alive.current) return
-      if (res.success && res.data) setPreview(res.data)
-      else toast.error(errorText(res, t, 'whatsapp.dunning.previewFailed'))
+      if (!started.success || !started.data) {
+        toast.error(errorText(started, t, 'whatsapp.dunning.previewFailed'))
+        return
+      }
+      let state = started.data
+      while (alive.current && state.status === 'running') {
+        setPreviewProgress({ checked: state.checked, total: state.total })
+        await new Promise((resolve) => { window.setTimeout(resolve, 2000) })
+        const res = await whatsappAPI.getDunningPreview()
+        if (!res.success || !res.data) {
+          toast.error(errorText(res, t, 'whatsapp.dunning.previewFailed'))
+          return
+        }
+        state = res.data
+      }
+      if (!alive.current) return
+      if (state.status === 'done' && state.result) setPreview(state.result)
+      else toast.error(state.error?.message || t('whatsapp.dunning.previewFailed'))
     } finally {
-      if (alive.current) setPreviewing(false)
+      if (alive.current) {
+        setPreviewing(false)
+        setPreviewProgress(null)
+      }
     }
   }
 
@@ -386,6 +410,22 @@ export function DunningRulePanel() {
           </p>
         )}
       </div>
+
+      {previewing && previewProgress && (
+        <div className="modern-card p-4 text-sm text-muted-foreground" role="status">
+          {previewProgress.total
+            ? t('whatsapp.dunning.previewProgress', { checked: previewProgress.checked, total: previewProgress.total })
+            : t('whatsapp.dunning.previewing')}
+          {previewProgress.total ? (
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded bg-muted">
+              <div
+                className="h-full bg-primary transition-all"
+                style={{ width: `${Math.min(100, Math.round((previewProgress.checked / previewProgress.total) * 100))}%` }}
+              />
+            </div>
+          ) : null}
+        </div>
+      )}
 
       {/* ── The preview ────────────────────────────────────────────────── */}
       {preview && (

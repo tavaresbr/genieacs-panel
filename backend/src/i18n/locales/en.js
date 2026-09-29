@@ -549,6 +549,7 @@ export default {
   'whatsapp.dunning.enabled': "Automatic billing cadence switched on",
   'whatsapp.dunning.disabled': "Automatic billing cadence switched off",
   'whatsapp.dunning.previewReady': "{count} message(s) would be sent today",
+  'whatsapp.dunning.previewStarted': "Simulation started",
   'whatsapp.dunning.previewFailed': "Could not simulate the billing cadence",
   'whatsapp.dunning.runStarted': "Billing cadence pass started",
   'whatsapp.dunning.runFailed': "Could not start the billing cadence pass",

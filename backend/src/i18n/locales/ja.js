@@ -548,6 +548,7 @@ export default {
   'whatsapp.dunning.enabled': "自動督促をオンにしました",
   'whatsapp.dunning.disabled': "自動督促をオフにしました",
   'whatsapp.dunning.previewReady': "本日送信されるメッセージ: {count} 件",
+  'whatsapp.dunning.previewStarted': "シミュレーションを開始しました",
   'whatsapp.dunning.previewFailed': "督促をシミュレーションできませんでした",
   'whatsapp.dunning.runStarted': "督促の実行を開始しました",
   'whatsapp.dunning.runFailed': "督促の実行を開始できませんでした",

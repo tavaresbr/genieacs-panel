@@ -546,6 +546,7 @@ export default {
   'whatsapp.dunning.enabled': "Régua automática ligada",
   'whatsapp.dunning.disabled': "Régua automática desligada",
   'whatsapp.dunning.previewReady': "{count} mensagem(ns) sairia(m) hoje",
+  'whatsapp.dunning.previewStarted': "Simulação iniciada",
   'whatsapp.dunning.previewFailed': "Não foi possível simular a régua",
   'whatsapp.dunning.runStarted': "Passada da régua iniciada",
   'whatsapp.dunning.runFailed': "Não foi possível iniciar a passada da régua",

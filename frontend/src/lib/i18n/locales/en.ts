@@ -2395,6 +2395,7 @@ const en = {
   'whatsapp.dunning.needsSteps': "Add at least one step and save before switching the cadence on.",
   'whatsapp.dunning.preview': "Simulate today",
   'whatsapp.dunning.previewing': "Simulating…",
+  'whatsapp.dunning.previewProgress': "Checking {checked} of {total} contracts with SGP…",
   'whatsapp.dunning.previewTitle': "{count} message(s) would go out today ({checked} contract(s) checked)",
   'whatsapp.dunning.previewTruncated': "Preview limited to the first {count} contracts.",
   'whatsapp.dunning.previewEmpty': "Nobody has a step due today.",

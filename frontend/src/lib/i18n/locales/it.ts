@@ -2399,6 +2399,7 @@ const it: Dictionary = {
   'whatsapp.dunning.needsSteps': "Aggiungi almeno una fase e salva prima di attivare il sollecito.",
   'whatsapp.dunning.preview': "Simula oggi",
   'whatsapp.dunning.previewing': "Simulazione…",
+  'whatsapp.dunning.previewProgress': "Controllo di {checked} su {total} contratti nel SGP…",
   'whatsapp.dunning.previewTitle': "Oggi partirebbero {count} messaggio/i ({checked} contratto/i controllati)",
   'whatsapp.dunning.previewTruncated': "Anteprima limitata ai primi {count} contratti.",
   'whatsapp.dunning.previewEmpty': "Nessuno ha una fase dovuta oggi.",

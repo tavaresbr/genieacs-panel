@@ -2393,6 +2393,7 @@ const ptBR: Dictionary = {
   'whatsapp.dunning.needsSteps': "Cadastre ao menos uma etapa e salve antes de ligar a régua.",
   'whatsapp.dunning.preview': "Simular hoje",
   'whatsapp.dunning.previewing': "Simulando…",
+  'whatsapp.dunning.previewProgress': "Conferindo {checked} de {total} contratos no SGP…",
   'whatsapp.dunning.previewTitle': "{count} mensagem(ns) sairia(m) hoje ({checked} contrato(s) conferido(s))",
   'whatsapp.dunning.previewTruncated': "Prévia limitada aos primeiros {count} contratos.",
   'whatsapp.dunning.previewEmpty': "Ninguém tem etapa devida hoje.",
