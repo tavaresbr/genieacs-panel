@@ -1007,6 +1007,12 @@ que não conhece. Três caminhos:
   (novo → contatado → ganho/perdido, com anotações). A equipe é avisada em
   `PLATFORM_NOTIFY_WHATSAPP` e/ou `PLATFORM_NOTIFY_EMAIL`.
 - `PLATFORM_CONTACT_WHATSAPP` é o número do botão flutuante do site.
+- O rodapé do site mostra, se configurados, `PLATFORM_CONTACT_EMAIL`, `PLATFORM_LEGAL_NAME`
+  (razão social), `PLATFORM_TAX_ID` (CNPJ) e `PLATFORM_ADDRESS`. O que não estiver no `.env`
+  simplesmente não aparece.
+- Os textos de venda (hero, números, fabricantes, recursos, perguntas e depoimentos) ficam
+  em `frontend/src/components/landing/content.ts`. A seção de depoimentos só aparece quando
+  a lista `testimonials` tem itens: preencha com depoimentos reais de clientes.
 
 Limites por endereço: catálogo e subdomínio 60/min, CNPJ 20 a cada 15 min, pedido de
 demonstração 5 por hora.

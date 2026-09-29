@@ -40,6 +40,12 @@ export function presentPublicPlan(plan) {
   };
 }
 
+/** Um texto do ambiente, aparado e cortado; `null` quando vazio. */
+function envText(name, max) {
+  const text = String(process.env[name] ?? '').trim();
+  return text ? text.slice(0, max) : null;
+}
+
 const LEAD_LIMITS = { name: 128, company: 160, email: 160, phone: 32, city: 80, message: 2000 };
 
 function clip(value, max) {
@@ -58,7 +64,12 @@ class PublicController {
       // console. Com subdomínio, cada um entra no seu, e isto é nulo.
       panelUrl: panelBaseDomain() ? null : panelUrlFor(null),
       // O número do botão flutuante de WhatsApp. Só dígitos.
-      contactWhatsapp: String(process.env.PLATFORM_CONTACT_WHATSAPP || '').replace(/\D/g, '') || null
+      contactWhatsapp: String(process.env.PLATFORM_CONTACT_WHATSAPP || '').replace(/\D/g, '') || null,
+      // O rodapé da vitrine: quem vende. Tudo opcional; o que não vier some da tela.
+      contactEmail: envText('PLATFORM_CONTACT_EMAIL', 160),
+      legalName: envText('PLATFORM_LEGAL_NAME', 160),
+      taxId: envText('PLATFORM_TAX_ID', 32),
+      address: envText('PLATFORM_ADDRESS', 240)
     }));
   }
 

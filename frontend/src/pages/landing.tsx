@@ -8,6 +8,8 @@ import { LanguageSwitcher } from '@/components/language-switcher'
 import { useTranslation } from '@/contexts/language-context'
 import { useAuth } from '@/contexts/auth-context'
 import { fill, landingCopy, type LandingCopy } from '@/components/landing/content'
+import { HeroMockup } from '@/components/landing/hero-mockup'
+import { Reveal } from '@/components/landing/reveal'
 
 /**
  * A página pública do ápice: a vitrine de quem ainda não é provedor.
@@ -19,6 +21,14 @@ import { fill, landingCopy, type LandingCopy } from '@/components/landing/conten
  * Tema escuro fixo, de propósito: é a identidade da marca, e a página não é
  * tela de trabalho — ninguém passa oito horas nela.
  */
+
+/** `5593991935695` → `(93) 99193-5695`; o que não for número do Brasil sai como veio. */
+function formatPhone(digits: string) {
+  const d = digits.replace(/^55(?=\d{10,11}$)/, '')
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`
+  return `+${digits}`
+}
 
 function money(cents: number, currency: string, locale: string) {
   try {
@@ -55,7 +65,7 @@ function PlanCard({
 
   return (
     <div
-      className={`relative flex flex-col rounded-2xl border p-6 ${plan.featured
+      className={`relative flex flex-col rounded-2xl border p-7 transition duration-300 hover:-translate-y-1 ${plan.featured
         ? 'border-emerald-400/70 bg-emerald-400/[0.06] shadow-[0_0_40px_-12px] shadow-emerald-400/40'
         : 'border-white/10 bg-white/[0.03]'}`}
     >
@@ -276,65 +286,125 @@ export default function Landing() {
       </header>
 
       <main id="topo">
-        <section className="mx-auto max-w-4xl px-4 pb-20 pt-20 text-center sm:px-6 sm:pt-28">
-          <h1 className="text-4xl font-extrabold leading-tight tracking-tight text-white sm:text-6xl">
-            {copy.hero.titleA} <span className="text-emerald-400">{copy.hero.titleHighlight}</span>
-          </h1>
-          <p className="mx-auto mt-6 max-w-2xl text-base leading-7 text-slate-400 sm:text-lg">{copy.hero.subtitle}</p>
-          <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-            <a href="#planos" className="rounded-lg bg-emerald-400 px-6 py-3.5 text-sm font-bold text-emerald-950 hover:bg-emerald-300">
-              {copy.hero.ctaPlans}
-            </a>
-            <button type="button" onClick={() => setDemo('')} className="rounded-lg border border-white/15 px-6 py-3.5 text-sm font-bold text-white hover:bg-white/5">
-              {copy.hero.ctaDemo}
-            </button>
+        <section className="relative overflow-hidden">
+          {/* Fundo: brilho verde e uma grade sutil que some nas bordas. */}
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+            <div className="absolute left-1/2 top-[-18rem] h-[36rem] w-[60rem] -translate-x-1/2 rounded-full bg-emerald-500/15 blur-3xl" />
+            <div
+              className="absolute inset-0 opacity-[0.07]"
+              style={{
+                backgroundImage: 'linear-gradient(rgb(255 255 255) 1px, transparent 1px), linear-gradient(90deg, rgb(255 255 255) 1px, transparent 1px)',
+                backgroundSize: '48px 48px',
+                maskImage: 'radial-gradient(ellipse at center, black 30%, transparent 75%)',
+                WebkitMaskImage: 'radial-gradient(ellipse at center, black 30%, transparent 75%)'
+              }}
+            />
           </div>
-          <div className="mt-8 flex flex-wrap justify-center gap-2">
-            {copy.hero.chips.map((chip) => (
-              <span key={chip} className="rounded-full border border-white/10 px-3 py-1.5 text-xs text-slate-400">{chip}</span>
-            ))}
+
+          <div className="relative mx-auto grid max-w-6xl items-center gap-14 px-4 pb-20 pt-16 sm:px-6 sm:pt-24 lg:grid-cols-[1.05fr_1fr] lg:gap-10 lg:pb-28">
+            <div className="text-center lg:text-left">
+              <span className="inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-300">
+                <span className="size-1.5 rounded-full bg-emerald-400" />
+                {copy.hero.kicker}
+              </span>
+              <h1 className="mt-5 text-4xl font-extrabold leading-[1.08] tracking-tight text-white sm:text-5xl lg:text-[3.5rem]">
+                {copy.hero.titleA}{' '}
+                <span className="bg-gradient-to-r from-emerald-300 to-emerald-500 bg-clip-text text-transparent">{copy.hero.titleHighlight}</span>
+              </h1>
+              <p className="mx-auto mt-6 max-w-xl text-base leading-7 text-slate-400 sm:text-lg lg:mx-0">{copy.hero.subtitle}</p>
+              <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row lg:justify-start">
+                <a href="#planos" className="rounded-lg bg-emerald-400 px-6 py-3.5 text-center text-sm font-bold text-emerald-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-300">
+                  {copy.hero.ctaPlans}
+                </a>
+                <button type="button" onClick={() => setDemo('')} className="rounded-lg border border-white/15 px-6 py-3.5 text-sm font-bold text-white transition hover:bg-white/5">
+                  {copy.hero.ctaDemo}
+                </button>
+              </div>
+              <ul className="mt-8 flex flex-col items-center gap-2 text-sm text-slate-400 sm:flex-row sm:flex-wrap sm:justify-center lg:justify-start">
+                {copy.hero.chips.map((chip) => (
+                  <li key={chip} className="flex items-center gap-1.5">
+                    <Icon name="check" size={16} className="text-emerald-400" />
+                    {chip}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <Reveal delay={150}>
+              <HeroMockup copy={copy} />
+            </Reveal>
           </div>
         </section>
 
-        <section id="recursos" className="scroll-mt-20 border-t border-white/5 py-20">
+        {/* A faixa de números e fabricantes. */}
+        <section className="border-y border-white/5 bg-white/[0.02]">
+          <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+            <dl className="grid grid-cols-2 gap-6 text-center lg:grid-cols-4">
+              {copy.stats.map((stat) => (
+                <div key={stat.label}>
+                  <dt className="sr-only">{stat.label}</dt>
+                  <dd className="text-3xl font-extrabold tracking-tight text-white">{stat.value}</dd>
+                  <dd className="mt-1 text-sm text-slate-400">{stat.label}</dd>
+                </div>
+              ))}
+            </dl>
+            <div className="mt-10 border-t border-white/5 pt-8 text-center">
+              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">{copy.vendors.title}</p>
+              <ul className="mt-4 flex flex-wrap items-center justify-center gap-x-8 gap-y-3">
+                {copy.vendors.items.map((vendor) => (
+                  <li key={vendor} className="text-lg font-bold tracking-tight text-slate-500 transition hover:text-slate-200">{vendor}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section id="recursos" className="scroll-mt-20 py-24">
           <div className="mx-auto max-w-6xl px-4 sm:px-6">
             <div className="mx-auto max-w-2xl text-center">
               <h2 className="text-3xl font-bold text-white sm:text-4xl">{copy.features.title}</h2>
               <p className="mt-3 text-slate-400">{copy.features.subtitle}</p>
             </div>
-            <div className="mt-12 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {copy.features.items.map((item) => (
-                <div key={item.title} className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-                  <span className="inline-flex size-10 items-center justify-center rounded-lg bg-emerald-400/10 text-emerald-400">
-                    <Icon name={item.icon} size={22} />
-                  </span>
-                  <h3 className="mt-4 font-bold text-white">{item.title}</h3>
-                  <p className="mt-2 text-sm leading-6 text-slate-400">{item.text}</p>
-                </div>
+            <div className="mt-14 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {copy.features.items.map((item, i) => (
+                <Reveal key={item.title} delay={(i % 3) * 100}>
+                  <div className="group h-full rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.05] to-white/[0.01] p-7 transition duration-300 hover:-translate-y-1 hover:border-emerald-400/40 hover:shadow-xl hover:shadow-emerald-500/5">
+                    <span className="inline-flex size-12 items-center justify-center rounded-xl bg-emerald-400/10 text-emerald-400 ring-1 ring-emerald-400/20 transition group-hover:bg-emerald-400 group-hover:text-emerald-950">
+                      <Icon name={item.icon} size={24} />
+                    </span>
+                    <h3 className="mt-5 text-lg font-bold text-white">{item.title}</h3>
+                    <p className="mt-2 text-sm leading-6 text-slate-400">{item.text}</p>
+                  </div>
+                </Reveal>
               ))}
             </div>
           </div>
         </section>
 
-        <section id="como-funciona" className="scroll-mt-20 border-t border-white/5 py-20">
+        <section id="como-funciona" className="scroll-mt-20 border-y border-white/5 bg-white/[0.02] py-24">
           <div className="mx-auto max-w-6xl px-4 sm:px-6">
             <div className="mx-auto max-w-2xl text-center">
               <h2 className="text-3xl font-bold text-white sm:text-4xl">{copy.how.title}</h2>
               <p className="mt-3 text-slate-400">{copy.how.subtitle}</p>
             </div>
-            <ol className="mt-12 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            <ol className="relative mt-14 grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-4 lg:gap-6">
+              {/* A linha que liga os passos, só onde eles ficam lado a lado. */}
+              <span aria-hidden="true" className="absolute left-[12.5%] right-[12.5%] top-6 hidden h-px bg-gradient-to-r from-emerald-400/0 via-emerald-400/50 to-emerald-400/0 lg:block" />
               {copy.how.steps.map((step, i) => (
-                <li key={step.title} className="rounded-2xl border border-white/10 p-6">
-                  <span className="text-sm font-bold text-emerald-400">0{i + 1}</span>
-                  <h3 className="mt-2 font-bold text-white">{step.title}</h3>
-                  <p className="mt-2 text-sm leading-6 text-slate-400">{step.text}</p>
+                <li key={step.title} className="relative text-center">
+                  <Reveal delay={i * 120}>
+                    <span className="relative mx-auto flex size-12 items-center justify-center rounded-full border border-emerald-400/40 bg-[#0a1411] text-lg font-extrabold text-emerald-300 shadow-lg shadow-emerald-500/10">
+                      {i + 1}
+                    </span>
+                    <h3 className="mt-5 text-lg font-bold text-white">{step.title}</h3>
+                    <p className="mx-auto mt-2 max-w-xs text-sm leading-6 text-slate-400">{step.text}</p>
+                  </Reveal>
                 </li>
               ))}
             </ol>
           </div>
         </section>
 
-        <section id="planos" className="scroll-mt-20 border-t border-white/5 py-20">
+        <section id="planos" className="scroll-mt-20 py-24">
           <div className="mx-auto max-w-6xl px-4 sm:px-6">
             <div className="mx-auto max-w-2xl text-center">
               <h2 className="text-3xl font-bold text-white sm:text-4xl">{copy.plans.title}</h2>
@@ -374,7 +444,28 @@ export default function Landing() {
           </div>
         </section>
 
-        <section id="duvidas" className="scroll-mt-20 border-t border-white/5 py-20">
+        {copy.testimonials.items.length > 0 && (
+          <section className="border-t border-white/5 py-24">
+            <div className="mx-auto max-w-6xl px-4 sm:px-6">
+              <h2 className="text-center text-3xl font-bold text-white sm:text-4xl">{copy.testimonials.title}</h2>
+              <div className="mt-12 grid grid-cols-1 gap-5 md:grid-cols-3">
+                {copy.testimonials.items.map((item, i) => (
+                  <Reveal key={item.name} delay={i * 100}>
+                    <figure className="h-full rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+                      <blockquote className="text-sm leading-6 text-slate-300">“{item.quote}”</blockquote>
+                      <figcaption className="mt-4 text-sm">
+                        <span className="font-semibold text-white">{item.name}</span>
+                        <span className="block text-slate-500">{item.role}</span>
+                      </figcaption>
+                    </figure>
+                  </Reveal>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        <section id="duvidas" className="scroll-mt-20 border-t border-white/5 py-24">
           <div className="mx-auto max-w-3xl px-4 sm:px-6">
             <h2 className="text-center text-3xl font-bold text-white sm:text-4xl">{copy.faq.title}</h2>
             <div className="mt-10 divide-y divide-white/10 rounded-2xl border border-white/10">
@@ -394,11 +485,12 @@ export default function Landing() {
           </div>
         </section>
 
-        <section className="border-t border-white/5 py-20">
-          <div className="mx-auto max-w-3xl px-4 text-center sm:px-6">
-            <h2 className="text-3xl font-bold text-white">{copy.cta.title}</h2>
-            <p className="mt-3 text-slate-400">{copy.cta.text}</p>
-            <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+        <section className="px-4 pb-24 sm:px-6">
+          <div className="relative mx-auto max-w-5xl overflow-hidden rounded-3xl border border-emerald-400/20 bg-gradient-to-br from-emerald-500/20 via-emerald-500/5 to-transparent px-6 py-14 text-center sm:px-12">
+            <div aria-hidden="true" className="absolute -right-20 -top-20 size-64 rounded-full bg-emerald-400/20 blur-3xl" />
+            <h2 className="relative text-3xl font-bold text-white sm:text-4xl">{copy.cta.title}</h2>
+            <p className="relative mt-3 text-slate-300">{copy.cta.text}</p>
+            <div className="relative mt-8 flex flex-col justify-center gap-3 sm:flex-row">
               <Link to="/signup" className="rounded-lg bg-emerald-400 px-6 py-3.5 text-sm font-bold text-emerald-950 hover:bg-emerald-300">
                 {copy.cta.button}
               </Link>
@@ -410,10 +502,63 @@ export default function Landing() {
         </section>
       </main>
 
-      <footer className="border-t border-white/10 py-8">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-4 text-xs text-slate-500 sm:flex-row sm:px-6">
-          <span>© {new Date().getFullYear()} {produto}. {copy.footer.rights}</span>
-          <Link to="/login" className="hover:text-slate-300">{copy.footer.console}</Link>
+      <footer className="border-t border-white/10 bg-black/20">
+        <div className="mx-auto grid max-w-6xl gap-10 px-4 py-14 sm:grid-cols-2 sm:px-6 lg:grid-cols-4">
+          <div className="lg:col-span-1">
+            <span className="text-xl font-extrabold tracking-tight text-white">
+              {marcaA}<span className="text-emerald-400">{marcaB}</span>
+            </span>
+            <p className="mt-3 text-sm leading-6 text-slate-400">{copy.footer.tagline}</p>
+          </div>
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">{copy.footer.product}</h3>
+            <ul className="mt-4 space-y-2.5 text-sm">
+              <li><a href="#recursos" className="text-slate-300 hover:text-white">{copy.nav.features}</a></li>
+              <li><a href="#como-funciona" className="text-slate-300 hover:text-white">{copy.nav.how}</a></li>
+              <li><a href="#planos" className="text-slate-300 hover:text-white">{copy.nav.plans}</a></li>
+              <li><a href="#duvidas" className="text-slate-300 hover:text-white">{copy.nav.faq}</a></li>
+            </ul>
+          </div>
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">{copy.footer.contact}</h3>
+            <ul className="mt-4 space-y-2.5 text-sm">
+              {whatsapp && info?.contactWhatsapp && (
+                <li>
+                  <a href={whatsapp} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-slate-300 hover:text-white">
+                    <Icon name="chat" size={16} className="text-emerald-400" />
+                    {formatPhone(info.contactWhatsapp)}
+                  </a>
+                </li>
+              )}
+              {info?.contactEmail && (
+                <li>
+                  <a href={`mailto:${info.contactEmail}`} className="text-slate-300 [overflow-wrap:anywhere] hover:text-white">{info.contactEmail}</a>
+                </li>
+              )}
+              <li>
+                <button type="button" onClick={() => setDemo('')} className="text-slate-300 hover:text-white">{copy.hero.ctaDemo}</button>
+              </li>
+            </ul>
+          </div>
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">{copy.footer.company}</h3>
+            <ul className="mt-4 space-y-2.5 text-sm text-slate-400">
+              {info?.legalName && <li className="text-slate-300">{info.legalName}</li>}
+              {info?.taxId && <li>{copy.footer.taxId} {info.taxId}</li>}
+              {info?.address && <li className="leading-6">{info.address}</li>}
+              <li>
+                {painelExterno
+                  ? <a href={painelExterno} className="text-slate-300 hover:text-white">{copy.nav.signIn}</a>
+                  : <Link to={entrar} className="text-slate-300 hover:text-white">{copy.nav.signIn}</Link>}
+              </li>
+            </ul>
+          </div>
+        </div>
+        <div className="border-t border-white/5">
+          <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-4 py-6 text-xs text-slate-500 sm:flex-row sm:px-6">
+            <span>© {new Date().getFullYear()} {info?.legalName || produto}. {copy.footer.rights}</span>
+            <Link to="/login" className="hover:text-slate-300">{copy.footer.console}</Link>
+          </div>
         </div>
       </footer>
 

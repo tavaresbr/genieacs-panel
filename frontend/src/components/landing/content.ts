@@ -11,7 +11,15 @@ type IconName = string
  */
 export interface LandingCopy {
   nav: { features: string; how: string; plans: string; faq: string; signIn: string; signUp: string }
-  hero: { titleA: string; titleHighlight: string; subtitle: string; ctaPlans: string; ctaDemo: string; chips: string[] }
+  hero: { kicker: string; titleA: string; titleHighlight: string; subtitle: string; ctaPlans: string; ctaDemo: string; chips: string[] }
+  /** A ilustração do painel no hero: rótulos da janela de exemplo. */
+  mockup: {
+    title: string; online: string; alerts: string; signal: string; devices: string; wifiChanged: string
+    customer: string; waFrom: string; waText: string; ok: string; weak: string
+  }
+  /** A faixa logo abaixo do hero: números e fabricantes compatíveis. */
+  stats: { value: string; label: string }[]
+  vendors: { title: string; items: string[] }
   features: { title: string; subtitle: string; items: { icon: IconName; title: string; text: string }[] }
   how: { title: string; subtitle: string; steps: { title: string; text: string }[] }
   plans: {
@@ -22,24 +30,56 @@ export interface LandingCopy {
     yearlySave: string
   }
   faq: { title: string; items: { q: string; a: string }[] }
+  /**
+   * Depoimentos. A seção só aparece com a lista preenchida — e só com
+   * depoimentos REAIS, de clientes que autorizaram o nome.
+   */
+  testimonials: { title: string; items: { quote: string; name: string; role: string }[] }
   cta: { title: string; text: string; button: string }
   demo: {
     title: string; text: string; name: string; company: string; email: string; phone: string; city: string
     devices: string; message: string; submit: string; sending: string; done: string; error: string; close: string
     plan: string; anyPlan: string
   }
-  footer: { rights: string; console: string }
+  footer: {
+    rights: string; console: string; tagline: string; product: string; contact: string; company: string
+    taxId: string; whatsapp: string; email: string
+  }
 }
 
 const ptBR: LandingCopy = {
   nav: { features: 'Recursos', how: 'Como funciona', plans: 'Planos', faq: 'Dúvidas', signIn: 'Entrar', signUp: 'Contratar' },
   hero: {
+    kicker: 'Gestão TR-069 para provedores',
     titleA: 'Gerencie os roteadores dos seus assinantes',
     titleHighlight: 'sem rolar caminhão',
     subtitle: 'Plataforma completa de gestão TR-069 para provedores: ACS, painel de operações, portal do assinante e integração com SGP e WhatsApp — pronta em 24 horas, sem obra na sua rede.',
     ctaPlans: 'Ver planos',
     ctaDemo: 'Pedir demonstração',
     chips: ['Multi-vendor: Nokia, ZTE, Huawei e mais', 'Integração nativa com SGP', 'Notificações por WhatsApp']
+  },
+  mockup: {
+    title: 'Painel do provedor',
+    online: 'Online',
+    alerts: 'Alertas',
+    signal: 'Sinal óptico médio',
+    devices: 'Equipamentos',
+    wifiChanged: 'Senha do Wi-Fi alterada pelo portal',
+    customer: 'Cliente',
+    waFrom: 'WhatsApp',
+    waText: 'Detectamos instabilidade na sua região. Já estamos trabalhando nisso.',
+    ok: 'OK',
+    weak: 'Fraco'
+  },
+  stats: [
+    { value: '24h', label: 'para o provedor começar a operar' },
+    { value: '0', label: 'obras na rede para ativar' },
+    { value: 'TR-069', label: 'padrão aberto, multi-fabricante' },
+    { value: '24/7', label: 'monitoramento do ACS' }
+  ],
+  vendors: {
+    title: 'Compatível com os principais fabricantes',
+    items: ['Nokia', 'ZTE', 'Huawei', 'Fiberhome', 'Intelbras', 'TP-Link', 'Parks']
   },
   features: {
     title: 'Tudo que sua operação precisa, num só painel',
@@ -94,6 +134,7 @@ const ptBR: LandingCopy = {
       { q: 'Posso trocar de plano depois?', a: 'Sim, a qualquer momento, pelo próprio painel. A mudança vale a partir do próximo ciclo.' }
     ]
   },
+  testimonials: { title: 'Quem já usa', items: [] },
   cta: {
     title: 'Pronto para reduzir as visitas técnicas?',
     text: 'Crie sua conta agora ou fale com a gente para uma demonstração guiada.',
@@ -117,18 +158,52 @@ const ptBR: LandingCopy = {
     plan: 'Plano de interesse',
     anyPlan: 'Ainda não sei'
   },
-  footer: { rights: 'Todos os direitos reservados.', console: 'Console da plataforma' }
+  footer: {
+    rights: 'Todos os direitos reservados.',
+    console: 'Console da plataforma',
+    tagline: 'Gestão TR-069 para provedores de internet: ACS, painel, portal do assinante e WhatsApp.',
+    product: 'Produto',
+    contact: 'Contato',
+    company: 'Empresa',
+    taxId: 'CNPJ',
+    whatsapp: 'WhatsApp',
+    email: 'E-mail'
+  }
 }
 
 const en: LandingCopy = {
   nav: { features: 'Features', how: 'How it works', plans: 'Plans', faq: 'FAQ', signIn: 'Sign in', signUp: 'Get started' },
   hero: {
+    kicker: 'TR-069 management for ISPs',
     titleA: 'Manage your subscribers’ routers',
     titleHighlight: 'without rolling a truck',
     subtitle: 'A complete TR-069 management platform for ISPs: ACS, operations panel, subscriber portal and ERP and WhatsApp integration — ready in 24 hours, no changes to your network.',
     ctaPlans: 'See plans',
     ctaDemo: 'Request a demo',
     chips: ['Multi-vendor: Nokia, ZTE, Huawei and more', 'Native SGP integration', 'WhatsApp notifications']
+  },
+  mockup: {
+    title: 'Provider panel',
+    online: 'Online',
+    alerts: 'Alerts',
+    signal: 'Average optical signal',
+    devices: 'Devices',
+    wifiChanged: 'Wi-Fi password changed from the portal',
+    customer: 'Customer',
+    waFrom: 'WhatsApp',
+    waText: 'We detected instability in your area. We are already working on it.',
+    ok: 'OK',
+    weak: 'Weak'
+  },
+  stats: [
+    { value: '24h', label: 'for the ISP to start operating' },
+    { value: '0', label: 'network changes to activate' },
+    { value: 'TR-069', label: 'open standard, multi-vendor' },
+    { value: '24/7', label: 'ACS monitoring' }
+  ],
+  vendors: {
+    title: 'Works with the main vendors',
+    items: ['Nokia', 'ZTE', 'Huawei', 'Fiberhome', 'Intelbras', 'TP-Link', 'Parks']
   },
   features: {
     title: 'Everything your operation needs, in one panel',
@@ -183,6 +258,7 @@ const en: LandingCopy = {
       { q: 'Can I change plans later?', a: 'Yes, at any time, from the panel itself. The change applies from the next cycle.' }
     ]
   },
+  testimonials: { title: 'Who uses it', items: [] },
   cta: {
     title: 'Ready to cut down on truck rolls?',
     text: 'Create your account now or talk to us for a guided demo.',
@@ -206,7 +282,17 @@ const en: LandingCopy = {
     plan: 'Plan of interest',
     anyPlan: 'Not sure yet'
   },
-  footer: { rights: 'All rights reserved.', console: 'Platform console' }
+  footer: {
+    rights: 'All rights reserved.',
+    console: 'Platform console',
+    tagline: 'TR-069 management for internet providers: ACS, panel, subscriber portal and WhatsApp.',
+    product: 'Product',
+    contact: 'Contact',
+    company: 'Company',
+    taxId: 'Tax ID',
+    whatsapp: 'WhatsApp',
+    email: 'Email'
+  }
 }
 
 export function landingCopy(locale: string): LandingCopy {
