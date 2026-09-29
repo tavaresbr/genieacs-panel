@@ -553,6 +553,8 @@ export default {
   'whatsapp.dunning.runFailed': "تعذّر بدء جولة التذكير",
   'whatsapp.dunning.sendsLoaded': "تم تحميل {count} سجل",
   'whatsapp.dunning.statsLoaded': "تم تحميل نتائج التذكير",
+  'whatsapp.dunning.starterInstalled': "تم إنشاء {created} قالب، و{reused} موجود مسبقًا",
+  'whatsapp.dunning.starterFailed': "تعذّر إنشاء القوالب الجاهزة",
   'whatsapp.dunning.error.invalidWindow': "نافذة الإرسال غير صالحة: تحقّق من المنطقة الزمنية ومواعيد كل يوم",
   'whatsapp.dunning.error.invalidMaxPerInvoice': "يجب أن يكون الحد الأقصى للتذكيرات لكل فاتورة بين {min} و{max}",
   'whatsapp.dunning.error.invalidMinInterval': "يجب أن تكون الفترة الدنيا بين {min} و{max} ساعة",

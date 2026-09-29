@@ -41,6 +41,7 @@ router.put('/subscribers/:contract/phone', ...gestao, WhatsAppBillingController.
 router.get('/dunning/rule', ...leitura, WhatsAppBillingController.getDunningRule);
 router.put('/dunning/rule', ...gestao, WhatsAppBillingController.saveDunningRule);
 router.post('/dunning/enabled', ...gestao, WhatsAppBillingController.setDunningEnabled);
+router.post('/dunning/starter', ...gestao, WhatsAppBillingController.installDunningStarter);
 router.post('/dunning/preview', ...gestao, WhatsAppBillingController.previewDunning);
 router.post('/dunning/run', ...gestao, WhatsAppBillingController.runDunning);
 router.get('/dunning/sends', ...leitura, WhatsAppBillingController.listDunningSends);

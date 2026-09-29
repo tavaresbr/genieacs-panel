@@ -552,6 +552,8 @@ export default {
   'whatsapp.dunning.runFailed': "독촉 실행을 시작할 수 없습니다",
   'whatsapp.dunning.sendsLoaded': "{count}건을 불러왔습니다",
   'whatsapp.dunning.statsLoaded': "독촉 결과를 불러왔습니다",
+  'whatsapp.dunning.starterInstalled': "템플릿 {created}개를 만들었습니다({reused}개는 이미 있음)",
+  'whatsapp.dunning.starterFailed': "기본 템플릿을 만들 수 없습니다",
   'whatsapp.dunning.error.invalidWindow': "발송 시간대가 올바르지 않습니다: 시간대와 요일별 시간을 확인하세요",
   'whatsapp.dunning.error.invalidMaxPerInvoice': "청구서당 최대 독촉 횟수는 {min}에서 {max} 사이여야 합니다",
   'whatsapp.dunning.error.invalidMinInterval': "최소 간격은 {min}에서 {max}시간 사이여야 합니다",

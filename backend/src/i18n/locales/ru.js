@@ -555,6 +555,8 @@ export default {
   'whatsapp.dunning.runFailed': "Не удалось запустить проход напоминаний",
   'whatsapp.dunning.sendsLoaded': "Загружено записей: {count}",
   'whatsapp.dunning.statsLoaded': "Результаты напоминаний загружены",
+  'whatsapp.dunning.starterInstalled': "Создано шаблонов: {created}, уже было: {reused}",
+  'whatsapp.dunning.starterFailed': "Не удалось создать готовые шаблоны",
   'whatsapp.dunning.error.invalidWindow': "Неверное окно отправки: проверьте часовой пояс и часы каждого дня",
   'whatsapp.dunning.error.invalidMaxPerInvoice': "Максимум напоминаний на счёт должен быть от {min} до {max}",
   'whatsapp.dunning.error.invalidMinInterval': "Минимальный интервал должен быть от {min} до {max} часов",

@@ -551,6 +551,8 @@ export default {
   'whatsapp.dunning.runFailed': "Não foi possível iniciar a passada da régua",
   'whatsapp.dunning.sendsLoaded': "{count} registro(s) carregado(s)",
   'whatsapp.dunning.statsLoaded': "Resultados da régua carregados",
+  'whatsapp.dunning.starterInstalled': "{created} modelo(s) criado(s), {reused} já existia(m)",
+  'whatsapp.dunning.starterFailed': "Não foi possível criar os modelos prontos",
   'whatsapp.dunning.error.invalidWindow': "Janela de envio inválida: confira o fuso e o horário de cada dia",
   'whatsapp.dunning.error.invalidMaxPerInvoice': "O máximo de cobranças por fatura deve ficar entre {min} e {max}",
   'whatsapp.dunning.error.invalidMinInterval': "O intervalo mínimo deve ficar entre {min} e {max} horas",
