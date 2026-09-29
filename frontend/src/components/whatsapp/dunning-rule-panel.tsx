@@ -119,6 +119,7 @@ export function DunningRulePanel() {
   const [previewing, setPreviewing] = useState(false)
   const [preview, setPreview] = useState<WhatsAppDunningPreview | null>(null)
   const [starting, setStarting] = useState(false)
+  const [installing, setInstalling] = useState(false)
 
   const alive = useRef(true)
   useEffect(() => {
@@ -246,6 +247,32 @@ export function DunningRulePanel() {
       }
     } finally {
       if (alive.current) setSwitching(false)
+    }
+  }
+
+  // One click from an empty cadence to a reviewable one: the suggested
+  // templates, and the steps that use them. The server never overwrites a
+  // template the operator edited and never switches the cadence on.
+  const installStarter = async () => {
+    if (!window.confirm(t('whatsapp.dunning.starterConfirm'))) return
+    setInstalling(true)
+    try {
+      const res = await whatsappAPI.installDunningStarter()
+      if (!alive.current) return
+      if (res.success && res.data) {
+        const { rule: next, stepsFilled } = res.data
+        const templatesRes = await whatsappAPI.listTemplates()
+        if (!alive.current) return
+        if (templatesRes.success && templatesRes.data) setTemplates(templatesRes.data)
+        setRule(next)
+        if (stepsFilled) setDraft(toDraft(next))
+        setPreview(null)
+        toast.success(res.message || t('whatsapp.dunning.starter'))
+      } else {
+        toast.error(errorText(res, t, 'whatsapp.dunning.saveFailed'))
+      }
+    } finally {
+      if (alive.current) setInstalling(false)
     }
   }
 
@@ -422,6 +449,21 @@ export function DunningRulePanel() {
       <div className="modern-card p-4 sm:p-5">
         <h3 className="field-label">{t('whatsapp.dunning.stepsTitle')}</h3>
         <p className="field-hint mb-4">{t('whatsapp.dunning.stepsHint')}</p>
+
+        {canManage && (rule.steps.length === 0 || templates.length === 0) && (
+          <div className="mb-4 rounded-md border border-dashed border-border p-3">
+            <button
+              type="button"
+              className="modern-button"
+              disabled={installing}
+              onClick={() => void installStarter()}
+            >
+              <Icon name="document" size={16} />
+              {installing ? t('common.saving') : t('whatsapp.dunning.starter')}
+            </button>
+            <p className="field-hint mt-2">{t('whatsapp.dunning.starterHint')}</p>
+          </div>
+        )}
 
         {draft.steps.length === 0 && (
           <p className="mb-4 text-sm text-muted-foreground">{t('whatsapp.dunning.noSteps')}</p>

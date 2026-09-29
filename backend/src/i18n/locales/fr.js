@@ -558,6 +558,8 @@ export default {
   'whatsapp.dunning.runFailed': "Impossible de démarrer le passage de la relance",
   'whatsapp.dunning.sendsLoaded': "{count} enregistrement(s) chargé(s)",
   'whatsapp.dunning.statsLoaded': "Résultats de la relance chargés",
+  'whatsapp.dunning.starterInstalled': "{created} modèle(s) créé(s), {reused} existai(en)t déjà",
+  'whatsapp.dunning.starterFailed': "Impossible de créer les modèles prêts à l'emploi",
   'whatsapp.dunning.error.invalidWindow': "Fenêtre d'envoi invalide : vérifiez le fuseau horaire et les horaires de chaque jour",
   'whatsapp.dunning.error.invalidMaxPerInvoice': "Le nombre maximal de relances par facture doit être compris entre {min} et {max}",
   'whatsapp.dunning.error.invalidMinInterval': "L'intervalle minimal doit être compris entre {min} et {max} heures",

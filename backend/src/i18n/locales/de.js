@@ -555,6 +555,8 @@ export default {
   'whatsapp.dunning.runFailed': "Mahnlauf konnte nicht gestartet werden",
   'whatsapp.dunning.sendsLoaded': "{count} Eintrag/Einträge geladen",
   'whatsapp.dunning.statsLoaded': "Ergebnisse des Mahnwesens geladen",
+  'whatsapp.dunning.starterInstalled': "{created} Vorlage(n) erstellt, {reused} bereits vorhanden",
+  'whatsapp.dunning.starterFailed': "Die vorgefertigten Vorlagen konnten nicht erstellt werden",
   'whatsapp.dunning.error.invalidWindow': "Ungültiges Sendefenster: Zeitzone und Uhrzeiten jedes Tages prüfen",
   'whatsapp.dunning.error.invalidMaxPerInvoice': "Die maximale Anzahl Mahnungen pro Rechnung muss zwischen {min} und {max} liegen",
   'whatsapp.dunning.error.invalidMinInterval': "Der Mindestabstand muss zwischen {min} und {max} Stunden liegen",

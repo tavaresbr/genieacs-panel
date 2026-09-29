@@ -554,6 +554,8 @@ export default {
   'whatsapp.dunning.runFailed': "Could not start the billing cadence pass",
   'whatsapp.dunning.sendsLoaded': "{count} record(s) loaded",
   'whatsapp.dunning.statsLoaded': "Billing cadence results loaded",
+  'whatsapp.dunning.starterInstalled': "{created} template(s) created, {reused} already existed",
+  'whatsapp.dunning.starterFailed': "Could not create the ready-made templates",
   'whatsapp.dunning.error.invalidWindow': "Invalid send window: check the time zone and the hours of each day",
   'whatsapp.dunning.error.invalidMaxPerInvoice': "Maximum reminders per invoice must be between {min} and {max}",
   'whatsapp.dunning.error.invalidMinInterval': "Minimum interval must be between {min} and {max} hours",

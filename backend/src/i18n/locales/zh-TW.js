@@ -553,6 +553,8 @@ export default {
   'whatsapp.dunning.runFailed': "無法開始催繳執行",
   'whatsapp.dunning.sendsLoaded': "已載入 {count} 筆記錄",
   'whatsapp.dunning.statsLoaded': "已載入催繳結果",
+  'whatsapp.dunning.starterInstalled': "已建立 {created} 個範本，{reused} 個已存在",
+  'whatsapp.dunning.starterFailed': "無法建立預設範本",
   'whatsapp.dunning.error.invalidWindow': "發送時段無效：請檢查時區與每天的時間",
   'whatsapp.dunning.error.invalidMaxPerInvoice': "每張帳單的催繳上限須介於 {min} 到 {max}",
   'whatsapp.dunning.error.invalidMinInterval': "最小間隔須介於 {min} 到 {max} 小時",

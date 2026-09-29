@@ -304,6 +304,30 @@ class WhatsAppBillingController {
     }
   }
 
+  /**
+   * The ready-made templates, and — on a cadence with no steps yet — the steps
+   * that use them. It never switches the cadence on.
+   */
+  static async installDunningStarter(req, res) {
+    try {
+      const { created, reused, stepsFilled, rule } = await WaDunningService.installStarter();
+      if (stepsFilled) {
+        await AuditLog.fromRequest(req, {
+          action: AuditLog.ACTIONS.WHATSAPP_DUNNING_SAVED,
+          subjectType: 'dunning',
+          subjectId: null,
+          detail: { ...auditDetail(rule), starter: true }
+        });
+      }
+      return res.status(created > 0 ? 201 : 200).json(createResponse(
+        req.t('whatsapp.dunning.starterInstalled', { created, reused }),
+        { created, reused, stepsFilled, rule: await WaDunningService.publicRule() }
+      ));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.dunning.starterFailed');
+    }
+  }
+
   /** Who would get which step today. Sends nothing. */
   static async previewDunning(req, res) {
     try {

@@ -552,6 +552,8 @@ export default {
   'whatsapp.dunning.runFailed': "Impossibile avviare il passaggio del sollecito",
   'whatsapp.dunning.sendsLoaded': "{count} record caricati",
   'whatsapp.dunning.statsLoaded': "Risultati del sollecito caricati",
+  'whatsapp.dunning.starterInstalled': "{created} modello/i creato/i, {reused} già esistente/i",
+  'whatsapp.dunning.starterFailed': "Impossibile creare i modelli pronti",
   'whatsapp.dunning.error.invalidWindow': "Finestra di invio non valida: controlla il fuso orario e gli orari di ogni giorno",
   'whatsapp.dunning.error.invalidMaxPerInvoice': "Il massimo di solleciti per fattura deve essere tra {min} e {max}",
   'whatsapp.dunning.error.invalidMinInterval': "L'intervallo minimo deve essere tra {min} e {max} ore",
