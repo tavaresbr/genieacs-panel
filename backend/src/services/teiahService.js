@@ -3,6 +3,7 @@ import { createSecretBox } from '../utils/secretBox.js';
 import { PinnedTransport, RESPONSE_TOO_LARGE } from '../utils/net/pinnedFetch.js';
 import { deploymentIsShared } from './genieacsEgress.js';
 import { TenantCache } from '../config/tenantCache.js';
+import { normalizarTelefoneBr } from '../utils/wa/waDestino.js';
 
 /**
  * TeiaH Valid — a shared base of addresses that left a provider owing money.
@@ -27,6 +28,7 @@ const MAX_RESPONSE_BYTES = 1024 * 1024;
 export const DEFAULT_BASE_URL = 'https://api.valid.teiah.ai';
 export const IMPORT_ONE_PATH = '/api/import/address';
 export const IMPORT_MANY_PATH = '/api/import/addresses';
+export const CONSULT_DOCUMENT_PATH = '/api/whatsapp/consulta-cpf';
 
 const DEFAULT_CONFIG = Object.freeze({
   enabled: false,
@@ -76,6 +78,142 @@ function apiMessage(data) {
   const message = data && typeof data === 'object' ? (data.message ?? data.error ?? data.msg) : null;
   if (Array.isArray(message)) return message.map(String).join('; ').slice(0, 500) || null;
   return typeof message === 'string' && message.trim() ? message.trim().slice(0, 500) : null;
+}
+
+/** A key compared the way the SGP's `pick` does: accents, case and punctuation aside. */
+function normalizeKey(key) {
+  return String(key).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function pick(source, names) {
+  if (!source || typeof source !== 'object' || Array.isArray(source)) return null;
+  const index = new Map(Object.entries(source).map(([key, value]) => [normalizeKey(key), value]));
+  for (const name of names) {
+    const value = index.get(normalizeKey(name));
+    if (value !== undefined && value !== null && value !== '') return value;
+  }
+  return null;
+}
+
+function text(value, max = 255) {
+  if (value === null || value === undefined || typeof value === 'object') return null;
+  const cleaned = String(value).replace(/\s+/g, ' ').trim();
+  return cleaned ? cleaned.slice(0, max) : null;
+}
+
+/** A section of the `mix`: `{ data: ... }` or the data itself. */
+function section(mix, names) {
+  const found = pick(mix, names);
+  if (found && typeof found === 'object' && !Array.isArray(found) && 'data' in found) return found.data;
+  return found;
+}
+
+function asList(value) {
+  if (Array.isArray(value)) return value;
+  return value && typeof value === 'object' ? [value] : [];
+}
+
+/** DD/MM/AAAA, AAAA-MM-DD or an ISO moment → AAAA-MM-DD. */
+function isoDate(value) {
+  const raw = text(value, 40);
+  if (!raw) return null;
+  const br = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (br) return `${br[3]}-${br[2]}-${br[1]}`;
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return iso ? iso[0] : null;
+}
+
+function truthy(value) {
+  if (value === true) return true;
+  if (typeof value === 'number') return value !== 0;
+  return ['1', 'true', 's', 'sim', 'y', 'yes'].includes(String(value ?? '').trim().toLowerCase());
+}
+
+function addressFrom(entry) {
+  if (!entry || typeof entry !== 'object') return null;
+  const type = text(pick(entry, ['tipoLogradouro', 'tipo_logradouro', 'tipo']), 40);
+  const street = text(pick(entry, ['logradouro', 'endereco', 'rua', 'street']));
+  const address = {
+    street: street && type && !street.toLowerCase().startsWith(type.toLowerCase()) ? `${type} ${street}` : street,
+    number: text(pick(entry, ['numero', 'num', 'number']), 32),
+    complement: text(pick(entry, ['complemento', 'complement'])),
+    district: text(pick(entry, ['bairro', 'district'])),
+    city: text(pick(entry, ['cidade', 'municipio', 'city'])),
+    state: text(pick(entry, ['uf', 'estado', 'state']), 2)?.toUpperCase() ?? null,
+    zip: String(pick(entry, ['cep', 'zip']) ?? '').replace(/\D/g, '').slice(0, 8) || null
+  };
+  return Object.values(address).some(Boolean)
+    ? Object.fromEntries(Object.entries(address).filter(([, value]) => value))
+    : null;
+}
+
+function phoneFrom(entry) {
+  if (entry === null || entry === undefined) return null;
+  if (typeof entry !== 'object') return normalizarTelefoneBr(entry);
+  const ddd = String(pick(entry, ['ddd', 'codigoArea']) ?? '').replace(/\D/g, '');
+  const number = String(pick(entry, ['numero', 'telefone', 'fone', 'phone', 'celular']) ?? '').replace(/\D/g, '');
+  return normalizarTelefoneBr(number.length <= 9 && ddd ? `${ddd}${number}` : number);
+}
+
+/**
+ * What the "Novo cliente" form uses out of a `consulta-cpf` answer — the rest
+ * of it (25 KB of a person's life) is neither kept nor sent to the browser.
+ *
+ * The answer's shape as seen: `resultado.mix.{score,emails,pessoa}.data`; the
+ * address and phone sections were not in view, so every section and field is
+ * looked up under several names, the way the SGP's are.
+ */
+export function normalizeConsult(payload) {
+  const root = pick(payload, ['resultado', 'result', 'data']) ?? payload;
+  const mix = pick(root, ['mix']) ?? root;
+  if (!mix || typeof mix !== 'object') return { found: false };
+
+  const person = section(mix, ['pessoa', 'pessoaFisica', 'dadosCadastrais', 'cadastro']) ?? {};
+  const company = section(mix, ['empresa', 'pessoaJuridica', 'dadosEmpresa']) ?? {};
+  const scoreData = section(mix, ['score']) ?? {};
+
+  const name = text(pick(person, ['nome', 'nomeCompleto', 'name']))
+    ?? text(pick(company, ['razaoSocial', 'razao_social', 'nome']));
+  const tradeName = text(pick(company, ['nomeFantasia', 'nome_fantasia', 'fantasia']));
+
+  const emails = [...new Set(asList(section(mix, ['emails', 'email']))
+    .map((entry) => text(typeof entry === 'object' ? pick(entry, ['email', 'endereco', 'valor']) : entry)?.toLowerCase())
+    .filter((email) => email && /^[^\s@]+@[^\s@]+$/.test(email)))];
+
+  // Mobiles first: the form's number is the one WhatsApp reaches.
+  const phones = [...new Set(asList(section(mix, ['telefones', 'celulares', 'telefone', 'phones']))
+    .map(phoneFrom)
+    .filter(Boolean))]
+    .sort((a, b) => Number(b.length === 13) - Number(a.length === 13));
+
+  const addresses = asList(section(mix, ['enderecos', 'endereco', 'addresses']))
+    .map(addressFrom)
+    .filter(Boolean);
+
+  const scoreValue = Number(pick(scoreData, ['score', 'pontuacao']));
+  const score = Number.isFinite(scoreValue) || text(pick(scoreData, ['risco', 'descricaoPagamento']))
+    ? {
+      score: Number.isFinite(scoreValue) ? scoreValue : null,
+      risk: text(pick(scoreData, ['risco', 'faixaRisco'])),
+      paymentDescription: text(pick(scoreData, ['descricaoPagamento'])),
+      paymentProbability: text(pick(scoreData, ['probabilidadePagamento']))
+    }
+    : null;
+
+  const result = {
+    found: Boolean(name || emails.length || phones.length || addresses.length),
+    name,
+    tradeName,
+    birthDate: isoDate(pick(person, ['dataNascimento', 'nascimento', 'data_nascimento', 'dataNasc']))
+      ?? isoDate(pick(company, ['dataAbertura', 'dataFundacao', 'fundacao'])),
+    motherName: text(pick(person, ['nomeMae', 'nome_mae', 'mae'])),
+    deceased: truthy(pick(person, ['obito', 'falecido'])),
+    emails,
+    phones,
+    address: addresses[0] ?? null,
+    score
+  };
+  return result;
 }
 
 class TeiahService {
@@ -314,6 +452,19 @@ class TeiahService {
       }
     }
     return outcomes;
+  }
+
+  /**
+   * The TeiaH's record of a CPF/CNPJ, normalized — see `normalizeConsult`.
+   * Asked only by an operator filling "Novo cliente" for someone the SGP does
+   * not know.
+   */
+  static async consultDocument(document, configOverride = null) {
+    const digits = String(document ?? '').replace(/\D/g, '');
+    const { status, data } = await this.request(CONSULT_DOCUMENT_PATH, { cpf: digits }, configOverride);
+    if (status === 404) return { found: false };
+    if (status < 200 || status >= 300) throw this.failure(status, data);
+    return normalizeConsult(data);
   }
 
   /**

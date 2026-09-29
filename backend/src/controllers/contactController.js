@@ -116,6 +116,14 @@ class ContactController {
   static async lookupDocument(req, res) {
     try {
       const result = await ContactOnboardingService.lookupDocument(req.query?.document);
+      if (result.teiahConsulted) {
+        await AuditLog.fromRequest(req, {
+          action: AuditLog.ACTIONS.CONTACT_TEIAH_LOOKUP,
+          subjectType: 'contact',
+          subjectId: null,
+          detail: { found: Boolean(result.prefill?.source === 'teiah'), error: result.prefillError }
+        });
+      }
       return res.json(createResponse(req.t('contacts.lookupDone'), result));
     } catch (error) {
       return handleError(req, res, error, 'contacts.lookupFailed');
