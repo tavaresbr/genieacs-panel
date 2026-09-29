@@ -108,6 +108,9 @@ async function subscriptionPayload(req) {
   // porta a mais no inventário custa mais do que quatro campos a mais num
   // corpo que esta tela já busca.
   const provedor = await Tenant.findById(req.tenantId);
+  // O motivo da isenção é anotação interna do console ("parceiro", "acordo
+  // comercial"): o provedor sabe que está isento, não por que o anotamos.
+  if (usage?.subscription) usage.subscription.billingExemptReason = null;
   return { ...usage, billing: Tenant.presentBilling(provedor) };
 }
 

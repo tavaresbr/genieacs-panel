@@ -806,6 +806,7 @@ export default {
   'charges.missingName': 'Renseignez la raison sociale dans les informations de facturation avant de payer',
   'charges.freePlan': 'Votre offre est gratuite : il n\'y a rien à payer',
   'charges.notBillable': 'Cet abonnement ne peut pas être payé d\'ici',
+  'charges.billingExempt': 'Cet abonnement est exempté de facturation : il n\'y a rien à payer',
   'charges.gatewayNotConfigured': 'Le paiement en ligne n\'est pas disponible pour le moment',
   'charges.gatewayFailed': 'La passerelle de paiement n\'a pas émis la facture : {detail}',
   'billing.busy': 'Une autre opération de facturation est en cours ; réessayez dans un instant',

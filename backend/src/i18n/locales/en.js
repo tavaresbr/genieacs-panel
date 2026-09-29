@@ -810,6 +810,7 @@ export default {
   'charges.missingName': 'Fill in the legal name in the billing details before paying',
   'charges.freePlan': 'Your plan is free: there is nothing to pay',
   'charges.notBillable': 'This subscription cannot be paid from here',
+  'charges.billingExempt': 'This subscription is exempt from billing: there is nothing to pay',
   'charges.gatewayNotConfigured': 'Online payment is not available right now',
   'charges.gatewayFailed': 'The payment gateway did not issue the charge: {detail}',
   'billing.busy': 'Another billing operation is in progress; try again in a moment',

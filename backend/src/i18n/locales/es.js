@@ -807,6 +807,7 @@ export default {
   'charges.missingName': 'Completa la razón social en los datos fiscales antes de pagar',
   'charges.freePlan': 'Tu plan es gratuito: no hay nada que pagar',
   'charges.notBillable': 'Esta suscripción no se puede pagar desde aquí',
+  'charges.billingExempt': 'Esta suscripción está exenta de cobro: no hay nada que pagar',
   'charges.gatewayNotConfigured': 'El pago en línea no está disponible ahora',
   'charges.gatewayFailed': 'La pasarela de pago no emitió el cobro: {detail}',
   'billing.busy': 'Hay otra operación de cobro en curso; inténtalo de nuevo en un momento',

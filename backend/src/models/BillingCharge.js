@@ -334,6 +334,17 @@ class BillingCharge {
       .orderBy('period_end');
   }
 
+  /**
+   * Todas as cobranças em aberto deste provedor, de qualquer período — o que
+   * o "isento de cobrança" cancela ao ser ligado.
+   */
+  static async openAll() {
+    return tdb('billing_charges')
+      .whereIn('status', OPEN_CHARGE_STATUSES)
+      .orderBy('period_end')
+      .orderBy('id');
+  }
+
   /** A cobrança em aberto mais recente deste provedor — a que o aviso linka. */
   static async currentOpen() {
     return (await tdb('billing_charges')

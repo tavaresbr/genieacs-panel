@@ -327,10 +327,15 @@ class PlatformSubscriptionsController {
       }
 
       const byStatus = { trial: 0, active: 0, past_due: 0, suspended: 0, canceled: 0, none: 0 };
+      // Os isentos de cobrança contam À PARTE e TAMBÉM no estado deles (que é
+      // `active`, por `effectiveStatus`): o resumo responde "quantos estão
+      // ativos" e "quantos não pagam" — duas perguntas, dois números.
+      let exempt = 0;
       const rows = tenants.map((tenant) => {
         const sub = assinaturas.get(Number(tenant.id)) || null;
         const status = sub ? SubscriptionService.effectiveStatus(sub, now).status : null;
         byStatus[status && status in byStatus ? status : 'none'] += 1;
+        if (sub?.billing_exempt_at) exempt += 1;
         const pendente = sub?.pending_plan_id ? planos.get(Number(sub.pending_plan_id)) : null;
         return {
           tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug, status: tenant.status },
@@ -344,7 +349,8 @@ class PlatformSubscriptionsController {
             currency: sub.plan_currency ?? null,
             trialEndsAt: sub.trial_ends_at ?? null,
             renewsAt: sub.renews_at ?? null,
-            pendingPlan: SubscriptionService.presentPendingPlan(sub, pendente)
+            pendingPlan: SubscriptionService.presentPendingPlan(sub, pendente),
+            ...SubscriptionService.presentBillingExempt(sub)
           } : null,
           // SE há vínculo, e nunca o id do cliente no gateway — a mesma regra
           // da trilha (`TENANT_GATEWAY_CHANGED`): é a chave que decide para
@@ -372,9 +378,20 @@ class PlatformSubscriptionsController {
         if (row.status === 'overdue' || (vencimento && vencimento < dia)) overdueCount += 1;
       }
 
+      // O filtro da tela (`?status=`): o estado que VALE, `none` para quem não
+      // tem assinatura, ou `exempt` para os isentos de cobrança. O resumo é
+      // sempre de todos — é ele que mostra quantos há em cada filtro.
+      const filtro = String(req.query?.status ?? '').trim();
+      let visiveis = rows;
+      if (filtro === 'exempt') {
+        visiveis = rows.filter((row) => row.subscription?.billingExempt);
+      } else if (filtro && filtro in byStatus) {
+        visiveis = rows.filter((row) => (row.subscription?.status ?? 'none') === filtro);
+      }
+
       return res.json(createResponse('Subscriptions retrieved', {
-        rows,
-        summary: { byStatus, openTotalCents, overdueCount }
+        rows: visiveis,
+        summary: { byStatus, exempt, openTotalCents, overdueCount }
       }));
     } catch (error) {
       console.error('List subscriptions error:', error);

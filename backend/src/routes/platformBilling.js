@@ -26,6 +26,8 @@ router.get('/tenants/:id/usage', ...guard, PlatformBillingController.getUsage);
 // da assinatura, logo acima — esta tela o chama em vez de duplicá-lo.
 router.get('/subscriptions', ...guard, PlatformSubscriptionsController.listSubscriptions);
 router.patch('/tenants/:id/subscription/deadlines', ...guard, PlatformSubscriptionsController.setDeadlines);
+// O "isento de cobrança": ativo sem gerar fatura, até alguém desligar.
+router.put('/tenants/:id/subscription/billing-exempt', ...guard, PlatformBillingController.setBillingExempt);
 router.get('/tenants/:id/charges', ...guard, PlatformSubscriptionsController.listCharges);
 router.patch('/tenants/:id/charges/:chargeId', ...guard, PlatformSubscriptionsController.update);
 router.post('/tenants/:id/charges/:chargeId/settle', ...guard, PlatformSubscriptionsController.settle);

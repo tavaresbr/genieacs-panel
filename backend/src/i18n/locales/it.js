@@ -808,6 +808,7 @@ export default {
   'charges.missingName': 'Compila la ragione sociale nei dati di fatturazione prima di pagare',
   'charges.freePlan': 'Il tuo piano è gratuito: non c\'è nulla da pagare',
   'charges.notBillable': 'Questo abbonamento non può essere pagato da qui',
+  'charges.billingExempt': 'Questo abbonamento è esente da addebiti: non c\'è nulla da pagare',
   'charges.gatewayNotConfigured': 'Il pagamento online non è disponibile al momento',
   'charges.gatewayFailed': 'Il gateway di pagamento non ha emesso l\'addebito: {detail}',
   'billing.busy': 'È in corso un\'altra operazione di addebito; riprova tra un momento',

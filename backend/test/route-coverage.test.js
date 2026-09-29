@@ -162,6 +162,7 @@ const POR_ID = new Map([
   // provedor da URL) está no mesmo arquivo.
   ['GET /api/platform/tenants/:id/charges', 'plano de controle; prova em platform-subscriptions.test.js'],
   ['PATCH /api/platform/tenants/:id/subscription/deadlines', 'plano de controle; prova em platform-subscriptions.test.js'],
+  ['PUT /api/platform/tenants/:id/subscription/billing-exempt', 'plano de controle; prova em platform-billing-exempt.test.js — inclusive a de que a caixa da plataforma e um id desconhecido respondem 404'],
   ['PATCH /api/platform/tenants/:id/charges/:chargeId', 'plano de controle; prova em platform-subscriptions.test.js — inclusive a de que a cobrança do vizinho responde 404'],
   ['POST /api/platform/tenants/:id/charges/:chargeId/settle', 'plano de controle; prova em platform-subscriptions.test.js — inclusive a de que a cobrança do vizinho responde 404'],
   ['POST /api/platform/tenants/:id/charges/:chargeId/cancel', 'plano de controle; prova em platform-subscriptions.test.js — inclusive a de que a cobrança do vizinho responde 404'],
@@ -371,7 +372,13 @@ describe('toda rota endereçada por um parâmetro', () => {
   // platform-charge-refund.test.js.
   // E os pedidos de demonstração (`PATCH /api/platform/leads/:id`): tabela da
   // plataforma, sem vizinho a alcançar. São 61.
-  const TETO_DE_EXCECOES = 61;
+  //
+  // E o "isento de cobrança" (`PUT .../subscription/billing-exempt`), o
+  // interruptor do painel Plano e da tela de Assinaturas. Mesmo pedágio: uma
+  // linha em `DO_CONSOLE` e mais uma aqui. O id é de PROVEDOR visto de cima, e
+  // a prova de que o gesto só mexe no provedor da URL (e de que a caixa da
+  // plataforma responde 404) está em platform-billing-exempt.test.js. São 62.
+  const TETO_DE_EXCECOES = 62;
 
 
   /**
@@ -406,6 +413,7 @@ describe('toda rota endereçada por um parâmetro', () => {
     'GET /api/platform/tenants/:id/usage',
     'GET /api/platform/tenants/:id/charges',
     'PATCH /api/platform/tenants/:id/subscription/deadlines',
+    'PUT /api/platform/tenants/:id/subscription/billing-exempt',
     'PATCH /api/platform/tenants/:id/charges/:chargeId',
     'POST /api/platform/tenants/:id/charges/:chargeId/settle',
     'POST /api/platform/tenants/:id/charges/:chargeId/cancel',
