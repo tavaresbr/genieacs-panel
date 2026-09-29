@@ -9,6 +9,7 @@ import { currentTenantId, runInTenant } from '../config/tenantContext.js';
 import { WA_SERVER_FIELDS, platformManagesCurrentTenant } from '../config/platformManaged.js';
 import Tenant from '../models/Tenant.js';
 import SubscriptionService from './subscriptionService.js';
+import { CADENCIA_PADRAO, lerCadencia } from '../utils/wa/waCadencia.js';
 
 const CONFIG_KEY = 'whatsapp_evolution_config';
 const CONFIG_CACHE_TTL_MS = 30_000;
@@ -86,6 +87,10 @@ const DEFAULT_CONFIG = Object.freeze({
   // Per-minute ceiling for outbound messages, shared by the outbox worker and
   // any campaign that does not set its own.
   rateLimitPerMin: 20,
+  // O ritmo das mensagens automáticas (`source='campaign'`): um intervalo
+  // sorteado entre uma e outra e uma pausa longa a cada tantas. Respostas de
+  // operador, bot e alertas não esperam por ele. Ver `utils/wa/waCadencia.js`.
+  ...CADENCIA_PADRAO,
   // How many days a stored attachment is kept before the sweeper deletes it.
   //
   // Zero means forever, and forever is the default because this setting arrived
@@ -190,6 +195,7 @@ class WhatsAppConfigService {
       rateLimitPerMin: Number(stored.rateLimitPerMin) > 0
         ? Math.min(Number(stored.rateLimitPerMin), 120)
         : DEFAULT_CONFIG.rateLimitPerMin,
+      ...lerCadencia(stored),
       mediaRetentionDays: normalizeRetentionDays(stored.mediaRetentionDays),
       messageRetentionDays: normalizeRetentionDays(stored.messageRetentionDays),
       managedUrl: normalizeEvoUrl(stored.managedUrl || ''),
@@ -215,6 +221,7 @@ class WhatsAppConfigService {
       rateLimitPerMin: Number(stored.rateLimitPerMin) > 0
         ? Math.min(Number(stored.rateLimitPerMin), 120)
         : DEFAULT_CONFIG.rateLimitPerMin,
+      ...lerCadencia(stored),
       // O que vale, e não só o que foi escolhido: com teto no plano, é o
       // menor dos dois — e é este número que as duas varreduras leem.
       mediaRetentionDays: SubscriptionService.capRetention(
@@ -310,6 +317,9 @@ class WhatsAppConfigService {
       rateLimitPerMin: patch.rateLimitPerMin === undefined
         ? current.rateLimitPerMin
         : Math.min(Math.max(Number(patch.rateLimitPerMin) || DEFAULT_CONFIG.rateLimitPerMin, 1), 120),
+      // Campo a campo sobre o que já vale, para que um PATCH que só fala do
+      // intervalo não devolva a pausa ao padrão.
+      ...lerCadencia(patch, lerCadencia(current)),
       managedUrl: patch.managedUrl === undefined
         ? current.managedUrl
         : normalizeEvoUrl(patch.managedUrl),

@@ -106,6 +106,24 @@ const ICON_ACTION = 'inline-flex h-10 w-10 items-center justify-center rounded-m
  * first, so the element may not exist yet on the first frames; a few short
  * retries cover that without a timer that outlives the page.
  */
+/**
+ * Quantas mensagens automáticas saem por hora no ritmo escolhido, em média:
+ * o intervalo médio entre elas e, a cada lote, a pausa longa no lugar de um
+ * intervalo. É a conta que a pessoa precisa para saber se a régua cabe no dia.
+ */
+function bulkPerHour(pace: {
+  bulkIntervalMinSec: number
+  bulkIntervalMaxSec: number
+  bulkBurstSize: number
+  bulkBurstPauseMin: number
+}): number {
+  const min = Math.max(pace.bulkIntervalMinSec, 1)
+  const average = (min + Math.max(pace.bulkIntervalMaxSec, min)) / 2
+  if (pace.bulkBurstSize <= 0) return Math.round(3600 / average)
+  const cycle = (pace.bulkBurstSize - 1) * average + pace.bulkBurstPauseMin * 60
+  return Math.round((3600 * pace.bulkBurstSize) / cycle)
+}
+
 function scrollToSection(id: string, attempts = 20) {
   const element = document.getElementById(id)
   if (element) {
@@ -255,6 +273,10 @@ export default function Settings() {
     managedAdminKey: '',
     rejectCallMessage: '',
     rateLimitPerMin: 20,
+    bulkIntervalMinSec: 20,
+    bulkIntervalMaxSec: 45,
+    bulkBurstSize: 30,
+    bulkBurstPauseMin: 5,
     // 0 is forever, and it is what an installation that never touches this
     // field keeps. Anything else is a day count after which a stored
     // attachment is deleted off the disk.
@@ -421,6 +443,12 @@ export default function Settings() {
         managedAdminKey: '',
         rejectCallMessage: config.rejectCallMessage,
         rateLimitPerMin: config.rateLimitPerMin,
+        // Mesmo cuidado dos campos de retenção: um backend anterior ao ritmo
+        // responde sem eles, e o padrão aqui é o mesmo do servidor.
+        bulkIntervalMinSec: config.bulkIntervalMinSec ?? 20,
+        bulkIntervalMaxSec: config.bulkIntervalMaxSec ?? 45,
+        bulkBurstSize: config.bulkBurstSize ?? 30,
+        bulkBurstPauseMin: config.bulkBurstPauseMin ?? 5,
         // Defaulted here rather than trusted: a panel talking to a backend
         // from before this field existed answers without it, and `undefined`
         // in a number input makes it uncontrolled from that point on. The
@@ -566,6 +594,10 @@ export default function Settings() {
         managedUrl: waForm.managedUrl,
         rejectCallMessage: waForm.rejectCallMessage,
         rateLimitPerMin: waForm.rateLimitPerMin,
+        bulkIntervalMinSec: waForm.bulkIntervalMinSec,
+        bulkIntervalMaxSec: waForm.bulkIntervalMaxSec,
+        bulkBurstSize: waForm.bulkBurstSize,
+        bulkBurstPauseMin: waForm.bulkBurstPauseMin,
         mediaRetentionDays: waForm.mediaRetentionDays,
         messageRetentionDays: waForm.messageRetentionDays,
         // Same rule as the SGP token: only send a key the operator typed.
@@ -2627,6 +2659,82 @@ export default function Settings() {
                     }))}
                   />
                   <p className="field-hint">{t('settings.whatsapp.rateLimitHint')}</p>
+                </div>
+                <div className="sm:col-span-2">
+                  <p className="field-label">{t('settings.whatsapp.bulkPace')}</p>
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <div>
+                      <label htmlFor="wa-bulkIntervalMinSec" className="field-label">
+                        {t('settings.whatsapp.bulkPaceMin')}
+                      </label>
+                      <input
+                        id="wa-bulkIntervalMinSec"
+                        type="number"
+                        min={5}
+                        max={600}
+                        className="modern-input w-full"
+                        value={waForm.bulkIntervalMinSec}
+                        onChange={(event) => setWaForm((current) => ({
+                          ...current,
+                          bulkIntervalMinSec: Math.max(Number(event.target.value) || 5, 5)
+                        }))}
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="wa-bulkIntervalMaxSec" className="field-label">
+                        {t('settings.whatsapp.bulkPaceMax')}
+                      </label>
+                      <input
+                        id="wa-bulkIntervalMaxSec"
+                        type="number"
+                        min={5}
+                        max={600}
+                        className="modern-input w-full"
+                        value={waForm.bulkIntervalMaxSec}
+                        onChange={(event) => setWaForm((current) => ({
+                          ...current,
+                          bulkIntervalMaxSec: Math.max(Number(event.target.value) || 5, 5)
+                        }))}
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="wa-bulkBurstSize" className="field-label">
+                        {t('settings.whatsapp.bulkPaceBurst')}
+                      </label>
+                      <input
+                        id="wa-bulkBurstSize"
+                        type="number"
+                        min={0}
+                        max={500}
+                        className="modern-input w-full"
+                        value={waForm.bulkBurstSize}
+                        onChange={(event) => setWaForm((current) => ({
+                          ...current,
+                          bulkBurstSize: Math.max(Number(event.target.value) || 0, 0)
+                        }))}
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="wa-bulkBurstPauseMin" className="field-label">
+                        {t('settings.whatsapp.bulkPacePause')}
+                      </label>
+                      <input
+                        id="wa-bulkBurstPauseMin"
+                        type="number"
+                        min={1}
+                        max={120}
+                        className="modern-input w-full"
+                        value={waForm.bulkBurstPauseMin}
+                        onChange={(event) => setWaForm((current) => ({
+                          ...current,
+                          bulkBurstPauseMin: Math.max(Number(event.target.value) || 1, 1)
+                        }))}
+                      />
+                    </div>
+                  </div>
+                  <p className="field-hint">
+                    {t('settings.whatsapp.bulkPaceHint', { perHour: bulkPerHour(waForm) })}
+                  </p>
                 </div>
                 <div>
                   <label htmlFor="wa-media-retention" className="field-label">

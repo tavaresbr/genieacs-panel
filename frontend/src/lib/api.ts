@@ -3485,6 +3485,15 @@ export interface WhatsAppConfig {
   /** Days a message row is kept. 0 is forever, and is the default. */
   messageRetentionDays: number
   rateLimitPerMin: number
+  /**
+   * O ritmo das mensagens automáticas (régua, cobrança avulsa e campanhas):
+   * intervalo sorteado entre uma e outra, em segundos, e uma pausa longa, em
+   * minutos, a cada `bulkBurstSize` mensagens (0 desliga a pausa).
+   */
+  bulkIntervalMinSec: number
+  bulkIntervalMaxSec: number
+  bulkBurstSize: number
+  bulkBurstPauseMin: number
   managedUrl: string
   managed: boolean
   managedAdminKeyConfigured: boolean

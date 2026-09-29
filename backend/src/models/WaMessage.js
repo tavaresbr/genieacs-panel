@@ -229,12 +229,21 @@ class WaMessage {
     return rows.map((row) => Number(row.tenant_id)).filter(Number.isInteger);
   }
 
-  /** Ids the outbox worker should try next, oldest first. */
-  static async listSendable(limit) {
+  /**
+   * Ids the outbox worker should try next, oldest first.
+   *
+   * `bulk: true` só as automáticas (`source='campaign'`), que saem no ritmo do
+   * worker; `bulk: false` todas as outras, que saem na hora. Sem a opção, a
+   * fila inteira.
+   */
+  static async listSendable(limit, { bulk } = {}) {
     const now = new Date();
-    return tdb('wa_messages')
+    const query = tdb('wa_messages')
       .whereNull('external_id')
-      .where((q) => sendable(q, now))
+      .where((q) => sendable(q, now));
+    if (bulk === true) query.where('source', 'campaign');
+    else if (bulk === false) query.whereNot('source', 'campaign');
+    return query
       .orderBy('created_at')
       .limit(limit)
       .pluck('id');
