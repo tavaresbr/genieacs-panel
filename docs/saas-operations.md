@@ -1007,6 +1007,12 @@ que não conhece. Três caminhos:
   (novo → contatado → ganho/perdido, com anotações). A equipe é avisada em
   `PLATFORM_NOTIFY_WHATSAPP` e/ou `PLATFORM_NOTIFY_EMAIL`.
 - `PLATFORM_CONTACT_WHATSAPP` é o número do botão flutuante do site.
+- **Dados do site pelo console:** Console → **Configurações → Dados do SaaS** cadastra
+  nome fantasia (vira a marca do site), razão social, CNPJ, endereço, e-mail e WhatsApp de
+  contato, os destinos dos avisos (WhatsApp/e-mail) e as redes sociais (Instagram, Facebook,
+  YouTube, LinkedIn). Vale na hora, sem reiniciar. O `.env` fica como valor inicial: cada
+  campo que nunca foi salvo no console usa a variável correspondente, e salvar o campo vazio
+  devolve o valor ao `.env`. Guardado no `app_state` da caixa da plataforma.
 - O rodapé do site mostra, se configurados, `PLATFORM_CONTACT_EMAIL`, `PLATFORM_LEGAL_NAME`
   (razão social), `PLATFORM_TAX_ID` (CNPJ) e `PLATFORM_ADDRESS`. O que não estiver no `.env`
   simplesmente não aparece.

@@ -47,6 +47,9 @@ class PlatformAudit {
     TENANT_GENIEACS_CHANGED: 'tenant.genieacs_changed',
     // O servidor Evolution que atende todos os provedores.
     PLATFORM_WHATSAPP_CHANGED: 'platform.whatsapp_changed',
+    // Os dados da empresa que vende o SaaS (Configurações → Dados do SaaS).
+    // O detalhe lista os campos que mudaram, não os valores.
+    PLATFORM_PROFILE_CHANGED: 'platform.profile_changed',
     // A conta da plataforma num sistema de fora — hoje o Asaas: ambiente,
     // chave da API, token do webhook. O detalhe diz O QUE mudou (qual
     // integração, o ambiente, se a chave e o token foram trocados), nunca o

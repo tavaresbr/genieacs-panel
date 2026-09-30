@@ -1,5 +1,6 @@
 import express from 'express';
 import PlatformIntegrationsController from '../controllers/platformIntegrationsController.js';
+import PlatformSettingsController from '../controllers/platformSettingsController.js';
 import { authenticateToken, requirePlatformAdmin } from '../middleware/auth.js';
 
 /**
@@ -15,6 +16,10 @@ router.get('/integrations/asaas', ...guard, PlatformIntegrationsController.getAs
 router.put('/integrations/asaas', ...guard, PlatformIntegrationsController.updateAsaas);
 router.post('/integrations/asaas/test', ...guard, PlatformIntegrationsController.testAsaas);
 router.post('/integrations/asaas/webhook-token', ...guard, PlatformIntegrationsController.rotateWebhookToken);
+
+// Configurações → Dados do SaaS: a empresa que vende, como o site a mostra.
+router.get('/settings/profile', ...guard, PlatformSettingsController.getProfile);
+router.put('/settings/profile', ...guard, PlatformSettingsController.updateProfile);
 
 // O provedor como cliente na conta Asaas da plataforma: cria lá e liga aqui.
 router.post('/tenants/:id/gateway/asaas-customer', ...guard, PlatformIntegrationsController.createAsaasCustomer);

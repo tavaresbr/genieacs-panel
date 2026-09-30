@@ -1389,12 +1389,34 @@ export interface PublicPlan {
   featured: boolean
 }
 
+/** Os campos de Configurações → Dados do SaaS. */
+export const PLATFORM_PROFILE_FIELDS = [
+  'legalName', 'tradeName', 'taxId', 'address',
+  'contactEmail', 'contactWhatsapp',
+  'notifyEmail', 'notifyWhatsapp',
+  'instagram', 'facebook', 'youtube', 'linkedin'
+] as const
+export type PlatformProfileField = typeof PLATFORM_PROFILE_FIELDS[number]
+
+export interface PlatformProfile {
+  values: Record<PlatformProfileField, string | null>
+  /** De onde vem cada valor: gravado no console, do `.env`, ou nenhum. */
+  sources: Record<PlatformProfileField, 'db' | 'env' | null>
+  /** Falso quando não há caixa da plataforma onde gravar. */
+  canSave: boolean
+  updatedAt: string | null
+}
+
 export interface PublicInfo {
   productName: string
   baseDomain: string | null
   contactWhatsapp: string | null
   /** Onde os provedores entram num deploy de endereço único; null com subdomínios. */
   panelUrl: string | null
+  /** Nome fantasia de Configurações → Dados do SaaS; `productName` já o usa. */
+  tradeName?: string | null
+  /** Links das redes sociais, cada um opcional. */
+  social?: { instagram: string | null; facebook: string | null; youtube: string | null; linkedin: string | null }
   /** O rodapé da vitrine; cada um é opcional. */
   contactEmail?: string | null
   legalName?: string | null
@@ -1812,6 +1834,13 @@ export const platformAPI = {
     apiClient.put<AsaasIntegration>('/platform/integrations/asaas', body),
 
   /** Chama a Asaas com a chave gravada. `ok: false` vem com o motivo em `message`. */
+  // ── Configurações → Dados do SaaS ───────────────────────────────────
+  getPlatformProfile: () => apiClient.get<PlatformProfile>('/platform/settings/profile'),
+
+  /** Ausente mantém; vazio apaga o gravado (o `.env` volta a valer). */
+  updatePlatformProfile: (payload: Partial<Record<PlatformProfileField, string>>) =>
+    apiClient.put<PlatformProfile & { changed: PlatformProfileField[] }>('/platform/settings/profile', payload),
+
   testAsaasIntegration: () =>
     apiClient.post<AsaasConnectionTest>('/platform/integrations/asaas/test'),
 

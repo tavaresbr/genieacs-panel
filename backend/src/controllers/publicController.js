@@ -10,6 +10,7 @@ import { createResponse, createErrorResponse, isValidEmail } from '../utils/help
 import { panelBaseDomain } from '../middleware/tenantResolver.js';
 import { PRODUCT_NAME } from '../config/brand.js';
 import { panelUrlFor } from '../services/mail/index.js';
+import { readProfile } from '../services/platformProfileService.js';
 import { translate } from '../i18n/index.js';
 import { DEFAULT_LOCALE } from '../i18n/config.js';
 
@@ -40,12 +41,6 @@ export function presentPublicPlan(plan) {
   };
 }
 
-/** Um texto do ambiente, aparado e cortado; `null` quando vazio. */
-function envText(name, max) {
-  const text = String(process.env[name] ?? '').trim();
-  return text ? text.slice(0, max) : null;
-}
-
 const LEAD_LIMITS = { name: 128, company: 160, email: 160, phone: 32, city: 80, message: 2000 };
 
 function clip(value, max) {
@@ -56,21 +51,35 @@ function clip(value, max) {
 class PublicController {
   /** `GET /api/public/info` — o que a página precisa saber da plataforma. */
   static async info(req, res) {
-    return res.json(createResponse('ok', {
-      productName: PRODUCT_NAME,
-      baseDomain: panelBaseDomain() || null,
-      // Onde um provedor entra, quando é um endereço só para todos (sem
-      // subdomínio): o "Entrar" da vitrine leva para lá, e não para o login do
-      // console. Com subdomínio, cada um entra no seu, e isto é nulo.
-      panelUrl: panelBaseDomain() ? null : panelUrlFor(null),
-      // O número do botão flutuante de WhatsApp. Só dígitos.
-      contactWhatsapp: String(process.env.PLATFORM_CONTACT_WHATSAPP || '').replace(/\D/g, '') || null,
-      // O rodapé da vitrine: quem vende. Tudo opcional; o que não vier some da tela.
-      contactEmail: envText('PLATFORM_CONTACT_EMAIL', 160),
-      legalName: envText('PLATFORM_LEGAL_NAME', 160),
-      taxId: envText('PLATFORM_TAX_ID', 32),
-      address: envText('PLATFORM_ADDRESS', 240)
-    }));
+    try {
+      // Os dados da empresa vêm de Configurações → Dados do SaaS, com o `.env`
+      // valendo para o que o console nunca gravou.
+      const { values: p } = await readProfile();
+      return res.json(createResponse('ok', {
+        productName: p.tradeName || PRODUCT_NAME,
+        tradeName: p.tradeName,
+        baseDomain: panelBaseDomain() || null,
+        // Onde um provedor entra, quando é um endereço só para todos (sem
+        // subdomínio): o "Entrar" da vitrine leva para lá, e não para o login do
+        // console. Com subdomínio, cada um entra no seu, e isto é nulo.
+        panelUrl: panelBaseDomain() ? null : panelUrlFor(null),
+        // O número do botão flutuante de WhatsApp. Só dígitos.
+        contactWhatsapp: p.contactWhatsapp,
+        contactEmail: p.contactEmail,
+        legalName: p.legalName,
+        taxId: p.taxId,
+        address: p.address,
+        social: {
+          instagram: p.instagram,
+          facebook: p.facebook,
+          youtube: p.youtube,
+          linkedin: p.linkedin
+        }
+      }));
+    } catch (error) {
+      console.error('Public info error:', error);
+      return res.status(500).json(createErrorResponse(req.t('common.internalError'), error.message));
+    }
   }
 
   /** `GET /api/public/plans` — o catálogo à venda, na ordem do console. */
