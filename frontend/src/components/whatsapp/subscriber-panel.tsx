@@ -7,7 +7,7 @@ import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import { useAuth } from '@/contexts/auth-context'
-import { copyToClipboard, formatBrl, isSafeExternalUrl, sgpBadge } from '@/lib/sgp'
+import { copyToClipboard, formatBrl, formatSgpDate, isSafeExternalUrl, sgpBadge } from '@/lib/sgp'
 import type { TranslationKey } from '@/lib/i18n'
 
 /**
@@ -245,7 +245,7 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
     const count = 1 + (invoice.pix ? 1 : 0) + (invoice.digitableLine ? 1 : 0)
     if (!window.confirm(t('whatsapp.sgp.sendInvoiceConfirm', {
       amount: formatBrl(invoice.amount, intlLocale),
-      due: invoice.dueDate ?? '—',
+      due: formatSgpDate(invoice.dueDate, intlLocale),
       count
     }))) return
     setBusy(`invoice:${invoice.id}`)
@@ -703,7 +703,7 @@ export function SubscriberPanel({ conversationId, boundContract = null, onClose,
                             <span className="text-sm font-semibold">{formatBrl(invoice.amount, intlLocale)}</span>
                             {invoice.dueDate && (
                               <span className="text-xs text-muted-foreground">
-                                {t('detail.sgp.dueOn', { date: invoice.dueDate })}
+                                {t('detail.sgp.dueOn', { date: formatSgpDate(invoice.dueDate, intlLocale) })}
                               </span>
                             )}
                           </div>

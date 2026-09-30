@@ -68,6 +68,21 @@ export function formatBrl(amount: number | null, intlLocale: string) {
   return amount.toLocaleString(intlLocale, { style: 'currency', currency: 'BRL' })
 }
 
+/**
+ * Uma data do SGP no formato do leitor (no Brasil, 03/10/2026).
+ *
+ * O SGP manda vencimento como `YYYY-MM-DD`, sem hora: ancorada ao meio-dia
+ * local, nenhum fuso a empurra para o dia vizinho. Uma data com hora passa
+ * direto; o que não for data volta como veio, para nunca sumir da tela.
+ */
+export function formatSgpDate(value: string | null | undefined, intlLocale: string) {
+  if (!value) return '—'
+  const texto = String(value).trim()
+  const data = /^\d{4}-\d{2}-\d{2}$/.test(texto) ? new Date(`${texto}T12:00:00`) : new Date(texto)
+  if (Number.isNaN(data.getTime())) return texto
+  return new Intl.DateTimeFormat(intlLocale, { day: '2-digit', month: '2-digit', year: 'numeric' }).format(data)
+}
+
 export function isSafeExternalUrl(value: string | null): value is string {
   if (!value) return false
   try {

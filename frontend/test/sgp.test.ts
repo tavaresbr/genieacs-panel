@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { routerUrl, sgpBadge } from '@/lib/sgp'
+import { formatSgpDate, routerUrl, sgpBadge } from '@/lib/sgp'
 
 /**
  * A cor do selo de um contrato do ERP.
@@ -98,5 +98,18 @@ describe('routerUrl', () => {
     expect(routerUrl('javascript:alert(1)')).toBeNull()
     expect(routerUrl('evil.example/1.2.3.4')).toBeNull()
     expect(routerUrl('2804:14c::1')).toBeNull()
+  })
+})
+
+describe('formatSgpDate', () => {
+  it('mostra o vencimento do SGP no padrão brasileiro, sem escorregar de dia', () => {
+    expect(formatSgpDate('2026-10-03', 'pt-BR')).toBe('03/10/2026')
+    expect(formatSgpDate('2026-01-01', 'pt-BR')).toBe('01/01/2026')
+  })
+
+  it('vazio vira travessão e o que não é data volta como veio', () => {
+    expect(formatSgpDate(null, 'pt-BR')).toBe('—')
+    expect(formatSgpDate('', 'pt-BR')).toBe('—')
+    expect(formatSgpDate('sem data', 'pt-BR')).toBe('sem data')
   })
 })
