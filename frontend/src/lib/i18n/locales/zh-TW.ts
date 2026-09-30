@@ -3568,6 +3568,10 @@ const zhTW: Dictionary = {
   'platform.profile.saved': '已儲存。網站已顯示。',
   'platform.profile.nothingChanged': '沒有變更',
   'platform.profile.emptyHint': '以空白儲存欄位會刪除這裡儲存的值,並重新使用 .env 中的值。',
+  'platform.profile.cnpjLookup': '依 CNPJ 查詢',
+  'platform.profile.cnpjLooking': '正在查詢 CNPJ…',
+  'platform.profile.cnpjFound': '已找到：{name}。請核對欄位後儲存。',
+  'platform.profile.cnpjFailed': '暫時無法查詢 CNPJ；請手動填寫。',
 }
 
 export default zhTW

@@ -3575,6 +3575,10 @@ const ru: Dictionary = {
   'platform.profile.saved': 'Данные сохранены. Сайт уже их показывает.',
   'platform.profile.nothingChanged': 'Ничего не изменилось',
   'platform.profile.emptyHint': 'Сохранение пустого поля удаляет сохранённое здесь значение, и снова действует значение из .env.',
+  'platform.profile.cnpjLookup': 'Найти по CNPJ',
+  'platform.profile.cnpjLooking': 'Проверяем CNPJ…',
+  'platform.profile.cnpjFound': 'Найдено: {name}. Проверьте поля и сохраните.',
+  'platform.profile.cnpjFailed': 'Сейчас не удалось проверить CNPJ; заполните вручную.',
 }
 
 export default ru

@@ -3567,6 +3567,10 @@ const zhCN: Dictionary = {
   'platform.profile.saved': '已保存。网站已显示。',
   'platform.profile.nothingChanged': '没有更改',
   'platform.profile.emptyHint': '保存空字段会删除此处保存的值,并重新使用 .env 中的值。',
+  'platform.profile.cnpjLookup': '按 CNPJ 查询',
+  'platform.profile.cnpjLooking': '正在查询 CNPJ…',
+  'platform.profile.cnpjFound': '已找到：{name}。请核对字段后保存。',
+  'platform.profile.cnpjFailed': '暂时无法查询 CNPJ；请手动填写。',
 }
 
 export default zhCN

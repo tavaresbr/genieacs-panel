@@ -3567,6 +3567,10 @@ const ja: Dictionary = {
   'platform.profile.saved': '保存しました。サイトにすでに反映されています。',
   'platform.profile.nothingChanged': '変更はありません',
   'platform.profile.emptyHint': '空欄で保存するとここで保存した値が消え、.env の値が再び使われます。',
+  'platform.profile.cnpjLookup': 'CNPJ で検索',
+  'platform.profile.cnpjLooking': 'CNPJ を照会中…',
+  'platform.profile.cnpjFound': '見つかりました: {name}。内容を確認して保存してください。',
+  'platform.profile.cnpjFailed': '現在 CNPJ を照会できません。手動で入力してください。',
 }
 
 export default ja

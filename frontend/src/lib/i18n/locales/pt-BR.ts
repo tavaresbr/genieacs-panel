@@ -3567,6 +3567,10 @@ const ptBR: Dictionary = {
   'platform.profile.saved': 'Dados salvos. O site já mostra.',
   'platform.profile.nothingChanged': 'Nada mudou',
   'platform.profile.emptyHint': 'Salvar um campo vazio apaga o que foi gravado aqui e o valor do .env volta a valer.',
+  'platform.profile.cnpjLookup': 'Buscar pelo CNPJ',
+  'platform.profile.cnpjLooking': 'Consultando o CNPJ…',
+  'platform.profile.cnpjFound': 'Encontrado: {name}. Confira os campos e salve.',
+  'platform.profile.cnpjFailed': 'Não foi possível consultar o CNPJ agora; preencha à mão.',
 }
 
 export default ptBR

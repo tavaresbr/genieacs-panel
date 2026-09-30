@@ -3567,6 +3567,10 @@ const es: Dictionary = {
   'platform.profile.saved': 'Datos guardados. El sitio ya los muestra.',
   'platform.profile.nothingChanged': 'No cambió nada',
   'platform.profile.emptyHint': 'Guardar un campo vacío borra lo guardado aquí y vuelve a valer el valor del .env.',
+  'platform.profile.cnpjLookup': 'Buscar por CNPJ',
+  'platform.profile.cnpjLooking': 'Consultando el CNPJ…',
+  'platform.profile.cnpjFound': 'Encontrado: {name}. Revisa los campos y guarda.',
+  'platform.profile.cnpjFailed': 'No se pudo consultar el CNPJ ahora; complétalo a mano.',
 }
 
 export default es

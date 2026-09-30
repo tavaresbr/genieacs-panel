@@ -3574,6 +3574,10 @@ const ko: Dictionary = {
   'platform.profile.saved': '저장했습니다. 사이트에 이미 반영됩니다.',
   'platform.profile.nothingChanged': '변경 사항 없음',
   'platform.profile.emptyHint': '빈 칸으로 저장하면 여기 저장한 값이 지워지고 .env 값이 다시 적용됩니다.',
+  'platform.profile.cnpjLookup': 'CNPJ로 조회',
+  'platform.profile.cnpjLooking': 'CNPJ 조회 중…',
+  'platform.profile.cnpjFound': '찾음: {name}. 항목을 확인하고 저장하세요.',
+  'platform.profile.cnpjFailed': '지금은 CNPJ를 조회할 수 없습니다. 직접 입력하세요.',
 }
 
 export default ko
