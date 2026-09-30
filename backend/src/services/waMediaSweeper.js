@@ -505,6 +505,17 @@ class WaMediaSweeper {
       if (known) known.push(row.id);
       else rowsByPath.set(absolute, [row.id]);
     }
+    // O anexo de uma campanha que ainda vai enviar: um só arquivo para todos
+    // os destinatários, e a maioria deles ainda nem virou linha em
+    // `wa_messages` — sem isto, o arquivo contaria como órfão.
+    const campaigns = await tdb('wa_broadcasts')
+      .whereNotNull('attachment_path')
+      .whereIn('status', ['draft', 'queued', 'running', 'paused'])
+      .pluck('attachment_path');
+    for (const relativo of campaigns) {
+      const absolute = absoluteFor(relativo);
+      if (absolute) protect.add(absolute);
+    }
     return { protect, rowsByPath };
   }
 

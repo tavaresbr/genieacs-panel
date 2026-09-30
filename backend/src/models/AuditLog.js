@@ -53,6 +53,9 @@ class AuditLog {
     WHATSAPP_DUNNING_ENABLED: 'whatsapp.dunning_enabled',
     WHATSAPP_DUNNING_DISABLED: 'whatsapp.dunning_disabled',
     WHATSAPP_DUNNING_SAVED: 'whatsapp.dunning_saved',
+    // Uma campanha de aviso foi criada (rascunho ou agendada). O `detail`
+    // guarda os filtros e quantos vão receber, nunca um telefone.
+    WHATSAPP_CAMPAIGN_CREATED: 'whatsapp.campaign_created',
     // A conta de portal do assinante ANTERIOR de uma ONT foi encerrada, porque
     // o aparelho passou a reportar outro login PPPoE. É destrutivo — o Customer
     // ID muda, a senha do portal é recunhada e o vínculo com o ERP é apagado —

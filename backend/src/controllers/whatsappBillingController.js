@@ -2,6 +2,7 @@ import WaBillingService from '../services/waBillingService.js';
 import WaBroadcastService from '../services/waBroadcastService.js';
 import WaTemplateService from '../services/waTemplateService.js';
 import WaDunningService from '../services/waDunningService.js';
+import WaCampaignService from '../services/waCampaignService.js';
 import AuditLog from '../models/AuditLog.js';
 import WaOptOut from '../models/WaOptOut.js';
 import { WaError } from '../services/whatsappConfigService.js';
@@ -413,6 +414,64 @@ class WhatsAppBillingController {
       return res.json(createResponse(req.t('whatsapp.dunning.statsLoaded'), stats));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.dunning.loadFailed');
+    }
+  }
+
+  // ── Campanhas de aviso ───────────────────────────────────────────────
+
+  static async campaignAudienceOptions(req, res) {
+    try {
+      return res.json(createResponse(req.t('whatsapp.campaign.optionsLoaded'), await WaCampaignService.audienceOptions()));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.campaign.optionsFailed');
+    }
+  }
+
+  static async previewCampaign(req, res) {
+    try {
+      const body = req.body ?? {};
+      const preview = await WaCampaignService.preview({
+        filters: body.filters,
+        templateId: body.templateId,
+        body: body.body
+      });
+      return res.json(createResponse(req.t('whatsapp.campaign.previewReady', { count: preview.counts.reachable }), preview));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.campaign.previewFailed');
+    }
+  }
+
+  static async createCampaign(req, res) {
+    try {
+      const body = req.body ?? {};
+      const { broadcast, recipients, skipped } = await WaCampaignService.create({
+        title: body.title,
+        filters: body.filters,
+        templateId: body.templateId,
+        body: body.body,
+        attachment: body.attachment,
+        scheduledAt: body.scheduledAt,
+        userId: req.user?.userId ?? null
+      });
+      const publico = WaBroadcastService.publicBroadcast(broadcast);
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.WHATSAPP_CAMPAIGN_CREATED,
+        subjectType: 'broadcast',
+        subjectId: String(broadcast.id),
+        detail: {
+          title: publico.title,
+          recipients,
+          scheduledAt: publico.scheduledAt,
+          attachment: Boolean(publico.attachment),
+          audience: publico.audience
+        }
+      });
+      return res.status(201).json(createResponse(
+        req.t('whatsapp.campaign.created', { count: recipients }),
+        { broadcast: publico, recipients, skipped }
+      ));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.campaign.createFailed');
     }
   }
 

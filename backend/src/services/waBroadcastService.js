@@ -176,6 +176,10 @@ class WaBroadcastService {
       // effect within one pass, with no lifecycle to keep in sync.
       if (!WhatsAppConfigService.isReady(config)) return summary;
 
+      // As agendadas cuja hora chegou começam aqui, na mesma passada: a
+      // campanha marcada para as 9h vira 'running' e já entra no laço abaixo.
+      await this.startScheduled();
+
       const running = await WaBroadcast.listByStatus('running');
       for (const broadcast of running) {
         // eslint-disable-next-line no-await-in-loop -- campaigns share the outbox's minute; running them at once would burst it
@@ -186,6 +190,31 @@ class WaBroadcastService {
       console.warn(`WhatsApp broadcast tick failed: ${error.message}`);
       return summary;
     }
+  }
+
+  /**
+   * Inicia as campanhas agendadas (`queued` com `scheduled_at` vencido).
+   *
+   * Sem número conectado, a campanha fica onde está e a próxima passada tenta
+   * de novo: começar sem ter por onde enviar só gastaria as tentativas de cada
+   * destinatário. Nunca lança — é chamada de dentro do tick.
+   */
+  static async startScheduled(now = new Date()) {
+    let started = 0;
+    try {
+      const due = (await WaBroadcast.listByStatus('queued'))
+        .filter((row) => row.scheduled_at && new Date(row.scheduled_at).getTime() <= now.getTime());
+      if (due.length === 0) return 0;
+      if (!await WhatsAppAccount.getForPurpose('billing')) return 0;
+      for (const row of due) {
+        // eslint-disable-next-line no-await-in-loop -- poucas por passada
+        await WaBroadcast.update(row.id, { status: 'running', start_at: row.start_at || now });
+        started += 1;
+      }
+    } catch (error) {
+      console.warn(`WhatsApp scheduled campaigns not started: ${error.message}`);
+    }
+    return started;
   }
 
   /** One campaign's share of this minute. Never throws. */
@@ -204,7 +233,7 @@ class WaBroadcastService {
       const ids = await WaBroadcast.listPendingIds(broadcast.id, budget);
       for (const id of ids) {
         // eslint-disable-next-line no-await-in-loop -- one at a time is what a rate limit means
-        const outcome = await this.deliver(id, account);
+        const outcome = await this.deliver(id, account, broadcast);
         if (outcome === 'sent') summary.enqueued += 1;
         else if (outcome === 'skipped') summary.skipped += 1;
         else if (outcome === 'failed') summary.failed += 1;
@@ -237,7 +266,7 @@ class WaBroadcastService {
    *
    * @returns {Promise<'sent'|'skipped'|'failed'|'retry'|'claimed_elsewhere'>}
    */
-  static async deliver(id, account) {
+  static async deliver(id, account, broadcast = null) {
     const recipient = await WaBroadcast.claimRecipient(id);
     // A null claim means another tick already owns this row. That is the
     // conditional UPDATE working, not a failure.
@@ -284,6 +313,11 @@ class WaBroadcastService {
       const message = await WaSendService.enqueue({
         conversationId: conversation.id,
         body: recipient.rendered_body,
+        // O anexo da campanha (um só arquivo para todos). O caminho passa de
+        // novo pelo confinamento de `normalizeAttachment` dentro do enqueue.
+        attachment: broadcast?.attachment_path
+          ? { path: broadcast.attachment_path, name: broadcast.attachment_name }
+          : undefined,
         // Into the subscriber's OWN thread, which is where this mattered: with
         // no origin on the row the bot read a dunning message as one of its own
         // three replies and went quiet on the person it had just charged.
@@ -378,10 +412,27 @@ class WaBroadcastService {
       sentCount: Number(row.sent_count || 0),
       failedCount: Number(row.failed_count || 0),
       rateLimitPerMin: row.rate_limit_per_min ?? null,
+      kind: row.kind === 'general' ? 'general' : 'billing',
+      scheduledAt: this.asIso(row.scheduled_at),
+      attachment: row.attachment_path
+        ? { name: row.attachment_name || null, type: row.attachment_type || null }
+        : null,
+      audience: readAudience(row.audience_json),
       startAt: this.asIso(row.start_at),
       createdAt: this.asIso(row.created_at),
       updatedAt: this.asIso(row.updated_at)
     };
+  }
+}
+
+/** Os filtros com que a campanha foi montada, para o cartão mostrar. */
+function readAudience(raw) {
+  if (!raw) return null;
+  try {
+    const lido = JSON.parse(raw);
+    return lido && typeof lido === 'object' ? lido : null;
+  } catch {
+    return null;
   }
 }
 

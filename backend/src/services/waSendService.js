@@ -367,7 +367,7 @@ const TYPE_BY_STORED_EXTENSION = new Map(
  * sai da extensão gravada e o nome passa pela mesma limpeza do upload,
  * terminando na extensão desse tipo.
  */
-function normalizeAttachment(attachment) {
+export function normalizeAttachment(attachment) {
   if (!attachment || typeof attachment !== 'object') return null;
   const caminho = String(attachment.url ?? attachment.path ?? '').trim();
   if (!caminho) return null;
