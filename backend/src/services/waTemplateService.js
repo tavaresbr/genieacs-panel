@@ -20,9 +20,22 @@ const CATEGORIES = Object.freeze(['cobranca', 'alerta', 'suporte', 'geral', 'ate
  */
 export const VARIAVEIS_DE_ATENDIMENTO = Object.freeze(['nome', 'primeiro_nome', 'contrato', 'atendente']);
 
-/** As variáveis que uma categoria aceita. */
+/**
+ * As variáveis do módulo de campanhas de aviso, que saem do cadastro e não de
+ * uma fatura. Repetidas aqui (e não importadas de `waCampaignService`) para
+ * este arquivo não depender do serviço que depende dele.
+ */
+export const VARIAVEIS_DE_AVISO = Object.freeze(['nome', 'primeiro_nome', 'contrato', 'plano']);
+
+/**
+ * As variáveis que uma categoria aceita. `geral` serve às duas telas — a
+ * cobrança avulsa e a campanha de aviso —, e cada uma recusa na hora de montar
+ * o que não sabe preencher.
+ */
 function variaveisDaCategoria(category) {
-  return category === 'atendimento' ? VARIAVEIS_DE_ATENDIMENTO : VARIAVEIS_DE_COBRANCA;
+  if (category === 'atendimento') return VARIAVEIS_DE_ATENDIMENTO;
+  if (category === 'geral') return [...new Set([...VARIAVEIS_DE_COBRANCA, ...VARIAVEIS_DE_AVISO])];
+  return VARIAVEIS_DE_COBRANCA;
 }
 
 const PLACEHOLDER = /\{\{\s*([a-zA-Z_][\w.-]*)\s*\}\}/g;
@@ -114,7 +127,7 @@ class WaTemplateService {
   static assertKnownVariables(body, category = null) {
     // Uma resposta rápida tem as suas variáveis; todo o resto (e um corpo
     // digitado direto numa campanha) segue a lista do disparo de cobrança.
-    const unknown = category === 'atendimento'
+    const unknown = category === 'atendimento' || category === 'geral'
       ? [...new Set([...String(body).matchAll(PLACEHOLDER)].map((m) => m[1]))]
         .filter((name) => !variaveisDaCategoria(category).includes(name))
       : variaveisDesconhecidas(body);

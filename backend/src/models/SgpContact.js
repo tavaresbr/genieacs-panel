@@ -34,6 +34,25 @@ class SgpContact {
       .orderBy('id');
   }
 
+  /**
+   * O que o módulo de campanhas precisa de cada contrato para filtrar o
+   * público: situação, plano e endereço (bairro e cidade vêm do JSON de
+   * `address_parts`, que se filtra em JS — JSON não se consulta igual nos três
+   * bancos). Situação e plano já saem filtrados daqui.
+   */
+  static async listForAudience({ states = [], plans = [] } = {}) {
+    const query = tdb('sgp_contacts')
+      .whereNotNull('contract')
+      .select(
+        'contract', 'client_name', 'document', 'phone_e164', 'phone_manual',
+        'plan', 'state', 'address_parts'
+      )
+      .orderBy('id');
+    if (states.length > 0) query.whereIn('state', states);
+    if (plans.length > 0) query.whereIn('plan', plans);
+    return query;
+  }
+
   /** The contract-less row of one SGP client, if there is one. */
   static async getClientRow(clientId) {
     if (!clientId) return null;

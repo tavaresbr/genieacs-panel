@@ -3828,9 +3828,59 @@ export interface WhatsAppBroadcast {
   sentCount: number
   failedCount: number
   rateLimitPerMin: number | null
+  /** 'general' é a campanha de aviso ("Nova campanha"); 'billing', a da cobrança avulsa. */
+  kind?: 'billing' | 'general'
+  /** Quando a campanha agendada ('queued') começa sozinha. */
+  scheduledAt?: string | null
+  attachment?: { name: string | null; type: string | null } | null
+  audience?: (Omit<WhatsAppCampaignFilters, 'contracts'> & { contracts: number }) | null
   startAt: string | null
   createdAt: string | null
   updatedAt: string | null
+}
+
+/** O público de uma campanha de aviso. Grupos diferentes combinam com E; valores do mesmo grupo, com OU. */
+export interface WhatsAppCampaignFilters {
+  states: string[]
+  plans: string[]
+  districts: string[]
+  cities: string[]
+  contracts: string[]
+}
+
+export interface WhatsAppCampaignOption {
+  value: string
+  count: number
+}
+
+export interface WhatsAppCampaignAudienceOptions {
+  states: WhatsAppCampaignOption[]
+  plans: WhatsAppCampaignOption[]
+  districts: WhatsAppCampaignOption[]
+  cities: WhatsAppCampaignOption[]
+  total: number
+}
+
+export interface WhatsAppCampaignPreview {
+  counts: {
+    matched: number
+    noPhone: number
+    optOut: number
+    duplicate: number
+    templateIncomplete: number
+    reachable: number
+  }
+  max: number
+  sample: { contract: string; clientName: string | null; phone: string; body: string }[]
+}
+
+export interface WhatsAppCampaignInput {
+  title: string
+  filters: WhatsAppCampaignFilters
+  templateId?: number
+  body?: string
+  attachment?: { path: string; name: string } | null
+  scheduledAt?: string | null
 }
 
 /**
@@ -4324,6 +4374,16 @@ export const whatsappAPI = {
 
   setBroadcastStatus: (id: number, status: 'running' | 'paused' | 'canceled') =>
     apiClient.post<WhatsAppBroadcast>(`/whatsapp/broadcasts/${id}/status`, { status }),
+
+  // ── Campanha de aviso ("Nova campanha") ──────────────────────────────
+  getCampaignAudienceOptions: () =>
+    apiClient.get<WhatsAppCampaignAudienceOptions>('/whatsapp/broadcasts/audience-options'),
+
+  previewCampaign: (input: Omit<WhatsAppCampaignInput, 'title' | 'attachment' | 'scheduledAt'>) =>
+    apiClient.post<WhatsAppCampaignPreview>('/whatsapp/broadcasts/preview', input),
+
+  createCampaign: (input: WhatsAppCampaignInput) =>
+    apiClient.post<{ broadcast: WhatsAppBroadcast; recipients: number }>('/whatsapp/broadcasts', input),
 
   // ── The subscriber's number ──────────────────────────────────────────
   // What an operator typed always beats what SGP synced, because the ERP

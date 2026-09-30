@@ -50,6 +50,12 @@ router.get('/dunning/stats', ...leitura, WhatsAppBillingController.dunningStats)
 
 // ── Campaigns ──────────────────────────────────────────────────────────
 router.get('/broadcasts', ...leitura, WhatsAppBillingController.listBroadcasts);
+// Campanha de aviso: o público sai do cadastro (situação, plano, bairro,
+// cidade, contratos colados). A prévia não grava nada; criar grava um
+// rascunho ou uma campanha agendada — nunca envia na hora.
+router.get('/broadcasts/audience-options', ...leitura, WhatsAppBillingController.campaignAudienceOptions);
+router.post('/broadcasts/preview', ...gestao, WhatsAppBillingController.previewCampaign);
+router.post('/broadcasts', ...gestao, WhatsAppBillingController.createCampaign);
 router.post('/broadcasts/:id/status', ...gestao, WhatsAppBillingController.setBroadcastStatus);
 
 export default router;

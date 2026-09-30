@@ -1543,6 +1543,20 @@ const SGP_CONTACT_TEIAH_COLUMNS = [
   ['equipment_rented', (t) => t.boolean('equipment_rented')]
 ];
 
+/**
+ * O que uma campanha de aviso (não de cobrança) guarda além do que
+ * `wa_broadcasts` já tinha: de que tipo ela é, quando deve começar sozinha, o
+ * anexo que vai junto com cada mensagem e os filtros que escolheram o público.
+ */
+const WA_BROADCAST_CAMPAIGN_COLUMNS = [
+  ['kind', (t) => t.string('kind', 16).notNullable().defaultTo('billing')],
+  ['scheduled_at', (t) => t.timestamp('scheduled_at').nullable()],
+  ['attachment_path', (t) => t.string('attachment_path', 255)],
+  ['attachment_type', (t) => t.string('attachment_type', 128)],
+  ['attachment_name', (t) => t.string('attachment_name', 255)],
+  ['audience_json', (t) => t.text('audience_json')]
+];
+
 /** Os tetos de retenção de `plans`, para a migração que os acrescenta. */
 const PLAN_RETENTION_COLUMNS = [
   ['max_audit_retention_days', (t) => t.integer('max_audit_retention_days').unsigned()],
@@ -4761,6 +4775,29 @@ export const migrations = [
             .whereRaw('wa_messages.conversation_id = wa_conversations.id')
             .where({ direction: 'out', source: 'operator' })))
         .update({ engaged_at: db.raw('COALESCE(last_inbound_at, last_message_at, created_at)') });
+    }
+  },
+  {
+    /**
+     * Campanhas de aviso: o módulo "Nova campanha" monta públicos pelo
+     * cadastro (situação, plano, bairro, cidade, lista de contratos), agenda o
+     * início e leva um anexo. Ver `WA_BROADCAST_CAMPAIGN_COLUMNS`.
+     *
+     * As campanhas que já existem nasceram todas da cobrança avulsa, e é o que
+     * o padrão de `kind` diz delas.
+     */
+    id: '0085_wa_broadcast_campaigns',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('wa_broadcasts'))) return true;
+      return (await missingColumns(db, 'wa_broadcasts', WA_BROADCAST_CAMPAIGN_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('wa_broadcasts'))) return;
+      const missing = await missingColumns(db, 'wa_broadcasts', WA_BROADCAST_CAMPAIGN_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('wa_broadcasts', (t) => {
+        for (const add of missing) add(t);
+      });
     }
   }
 ];

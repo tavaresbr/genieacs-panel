@@ -721,8 +721,43 @@ Detalhes que a tela pode contar com:
 
 ```ts
 { id, title, body, status, totalCount, sentCount, failedCount,
-  rateLimitPerMin, startAt, createdAt, updatedAt }
+  rateLimitPerMin, startAt, createdAt, updatedAt,
+  kind: 'billing' | 'general',          // 'general' = campanha de aviso
+  scheduledAt: string | null,           // agendada ('queued') começa sozinha
+  attachment: { name, type } | null,
+  audience: { states, plans, districts, cities, contracts: number } | null }
 ```
+
+#### Campanha de aviso ("Nova campanha")
+
+Público pelo cadastro (`sgp_contacts`), sem consultar fatura:
+
+| Rota | Permissão | Faz |
+| --- | --- | --- |
+| `GET /broadcasts/audience-options` | `campaigns.read` | valores de `state`, `plan`, bairro (`address_parts.district`) e cidade (`address_parts.city`) com contagem |
+| `POST /broadcasts/preview` | `campaigns.manage` | `{ filters, templateId? , body? }` → contagens + até 50 exemplos renderizados; não grava nada |
+| `POST /broadcasts` | `campaigns.manage` | `{ title, filters, templateId?, body?, attachment?, scheduledAt? }` → rascunho, ou `queued` com `scheduledAt` |
+
+- `filters = { states[], plans[], districts[], cities[], contracts[] }`. Entre
+  grupos vale E; dentro do grupo, OU; grupo vazio não restringe. Bairro e
+  cidade comparam sem maiúsculas nem acentos. Um contrato colado que só existe
+  em `sgp_links` entra apenas quando nenhum filtro de cadastro foi pedido.
+- Telefone por `whatsappPhoneOf` (a mesma ordem da tela de Contatos); fica de
+  fora quem não tem celular, quem está no não perturbe e o número repetido (um
+  cliente com dois contratos recebe uma mensagem).
+- Variáveis: `{{nome}}`, `{{primeiro_nome}}`, `{{contrato}}`, `{{plano}}`.
+  Variável de cobrança → 400 `billing_variables` (a cobrança é a Cobrança
+  avulsa). Faltou o dado citado → o destinatário é pulado
+  (`templateIncomplete`), como na cobrança. Modelos da categoria `geral`
+  aceitam essas variáveis além das de cobrança.
+- Teto de 5000 destinatários; mesma janela de montagens da cobrança avulsa.
+- `scheduledAt`: de 1 minuto a 60 dias à frente. O laço inicia as `queued`
+  vencidas no começo de cada passada (e só se houver número conectado).
+- `attachment`: o `{ path, name }` devolvido por `POST /attachments`,
+  conferido pelo mesmo `normalizeAttachment` do envio. Um arquivo para todos os
+  destinatários; o sweeper de mídia não apaga o anexo de campanha em
+  `draft`/`queued`/`running`/`paused`.
+- Na Trilha: `whatsapp.campaign_created`, com os filtros e a contagem.
 
 Transições aceitas — só `running`, `paused` e `canceled` podem ser pedidos:
 

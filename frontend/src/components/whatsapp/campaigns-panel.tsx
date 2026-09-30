@@ -7,6 +7,8 @@ import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import { whatsappErrorMessage } from '@/components/whatsapp-connection'
 import type { TranslationKey } from '@/lib/i18n'
+import { useAuth } from '@/contexts/auth-context'
+import { CampaignForm, STATE_LABEL } from './campaign-form'
 
 /**
  * The campaigns list.
@@ -56,6 +58,25 @@ const ALLOWED: Record<BroadcastStatus, ('running' | 'paused' | 'canceled')[]> = 
   failed: []
 }
 
+/** Os filtros de uma campanha de aviso, numa linha: "Situação: active · Bairro: Centro · 12 contratos". */
+function audienceSummary(
+  broadcast: WhatsAppBroadcast,
+  t: (key: TranslationKey, vars?: Record<string, string | number>) => string
+): string {
+  const audience = broadcast.audience
+  if (!audience) return ''
+  const parts: string[] = []
+  if (audience.states?.length) {
+    const states = audience.states.map((state) => (STATE_LABEL[state] ? t(STATE_LABEL[state]) : state))
+    parts.push(`${t('whatsapp.campaign.filterStates')}: ${states.join(', ')}`)
+  }
+  if (audience.plans?.length) parts.push(`${t('whatsapp.campaign.filterPlans')}: ${audience.plans.join(', ')}`)
+  if (audience.districts?.length) parts.push(`${t('whatsapp.campaign.filterDistricts')}: ${audience.districts.join(', ')}`)
+  if (audience.cities?.length) parts.push(`${t('whatsapp.campaign.filterCities')}: ${audience.cities.join(', ')}`)
+  if (audience.contracts) parts.push(t('whatsapp.campaign.contractsCount', { count: audience.contracts }))
+  return parts.length ? parts.join(' · ') : t('whatsapp.campaign.audienceAll')
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Polling
 //
@@ -82,6 +103,9 @@ export function CampaignsPanel() {
   const [broadcasts, setBroadcasts] = useState<WhatsAppBroadcast[]>([])
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<number | null>(null)
+  const [creating, setCreating] = useState(false)
+  const { can } = useAuth()
+  const canManage = can('campaigns.manage')
 
   const alive = useRef(true)
   const inFlight = useRef(false)
@@ -179,15 +203,30 @@ export function CampaignsPanel() {
           <h2 className="section-heading">{t('whatsapp.broadcast.title')}</h2>
           <p className="section-description">{t('whatsapp.broadcast.description')}</p>
         </div>
-        <button
-          type="button"
-          className="modern-button-secondary"
-          onClick={() => { setLoading(true); void load(true) }}
-        >
-          <Icon name="refresh" size={16} />
-          {t('common.refresh')}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {canManage && (
+            <button type="button" className="modern-button" data-testid="wa-campaign-new" onClick={() => setCreating(true)}>
+              <Icon name="chat" size={16} />
+              {t('whatsapp.campaign.new')}
+            </button>
+          )}
+          <button
+            type="button"
+            className="modern-button-secondary"
+            onClick={() => { setLoading(true); void load(true) }}
+          >
+            <Icon name="refresh" size={16} />
+            {t('common.refresh')}
+          </button>
+        </div>
       </header>
+
+      {creating && (
+        <CampaignForm
+          onClose={() => setCreating(false)}
+          onCreated={() => { setCreating(false); void load(true) }}
+        />
+      )}
 
       {broadcasts.length === 0 ? (
         <div className="modern-card">
@@ -224,8 +263,25 @@ export function CampaignsPanel() {
                     <p className="mt-1 text-xs text-muted-foreground">
                       {formatDateTime(broadcast.createdAt)}
                     </p>
+                    {broadcast.status === 'queued' && broadcast.scheduledAt && (
+                      <p className="mt-1 text-xs font-semibold text-foreground" data-testid="wa-broadcast-scheduled">
+                        {t('whatsapp.campaign.scheduledFor', { when: formatDateTime(broadcast.scheduledAt) })}
+                      </p>
+                    )}
+                    {audienceSummary(broadcast, t) && (
+                      <p className="mt-1 text-xs text-muted-foreground">{audienceSummary(broadcast, t)}</p>
+                    )}
+                    {broadcast.attachment && (
+                      <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                        <Icon name="paperclip" size={14} />
+                        {broadcast.attachment.name || t('whatsapp.campaign.attachment')}
+                      </p>
+                    )}
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
+                    <span className="modern-badge">
+                      {t(broadcast.kind === 'general' ? 'whatsapp.campaign.kindGeneral' : 'whatsapp.campaign.kindBilling')}
+                    </span>
                     <span className={STATUS_BADGE[broadcast.status]} data-testid="wa-broadcast-status">
                       <span className="status-dot" />
                       {t(STATUS_LABEL[broadcast.status])}
