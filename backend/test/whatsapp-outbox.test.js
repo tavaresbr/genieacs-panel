@@ -11,6 +11,7 @@ const { default: WaMessage, RECLAIM_MS } = await import('../src/models/WaMessage
 const { currentTenantId } = await import('../src/config/tenantContext.js');
 const { default: WaOptOut } = await import('../src/models/WaOptOut.js');
 const { default: WaOutboxWorker } = await import('../src/services/waOutboxWorker.js');
+const { default: WaSendService } = await import('../src/services/waSendService.js');
 const { default: AppState } = await import('../src/models/AppState.js');
 const { whatsappBulkRequeueLimiter, whatsappSendLimiter } = await import('../src/middleware/rateLimit.js');
 const { outDir } = await import('../src/services/waAttachmentService.js');
@@ -54,6 +55,8 @@ const anexoDeSaida = (nome, type) => ({ url: `${saida}/${nome}`, type, name: nom
 
 /** What the stub answers with, per test. */
 const stub = {
+  /** O que o `connectionState` responde; `null` = rota inexistente (404). */
+  connectionState: null,
   textStatus: 200,
   textBody: null,
   audioStatus: 200,
@@ -83,6 +86,11 @@ function startEvolutionStub() {
         return { key: { id: `EVO-${stub.nextId}`, remoteJid: payload.number }, status: 'PENDING' };
       };
 
+      if (path.startsWith('/instance/connectionState/')) {
+        return stub.connectionState
+          ? send(200, { instance: { instanceName: path.split('/').pop(), state: stub.connectionState } })
+          : send(404, { message: 'unknown route' });
+      }
       if (path.startsWith('/message/sendText/')) {
         return stub.textStatus === 200
           ? send(200, accepted())
@@ -494,14 +502,36 @@ describe('routing picks the number the thread belongs to', () => {
     }
   });
 
+  it('um número marcado fora do ar, mas que o Evolution diz aberto, envia e volta a "conectado"', async () => {
+    // O aviso de reconexão se perdeu: o banco diz "conectando", o servidor diz
+    // "open". Recusar aqui era o "Nenhum número conectado" de uma conversa viva.
+    const conversation = await newConversation({ accountId: supportId });
+    await asTenant(() => WhatsAppAccount.update(supportId, { status: 'connecting' }));
+    WaSendService.forgetLiveChecks();
+    stub.connectionState = 'open';
+    try {
+      const { status, body } = await post(conversation.id, { body: 'o número está vivo' });
+      assert.equal(status, 201, JSON.stringify(body));
+      assert.equal((await asTenant(() => WhatsAppAccount.getById(supportId))).status, 'connected');
+    } finally {
+      stub.connectionState = null;
+      WaSendService.forgetLiveChecks();
+      await asTenant(() => WhatsAppAccount.update(supportId, { status: 'connected' }));
+    }
+  });
+
   it('refuses to enqueue at all when no number is connected', async () => {
     const conversation = await newConversation({ accountId: supportId });
     await asTenant(() => WhatsAppAccount.update(supportId, { status: 'disconnected' }));
+    // O Evolution também diz fechado: aí sim, ninguém para enviar.
+    WaSendService.forgetLiveChecks();
+    stub.connectionState = 'close';
     try {
       const { status, body } = await post(conversation.id, { body: 'ninguém conectado' });
       assert.equal(status, 409);
       assert.equal(body.code, 'no_account');
     } finally {
+      stub.connectionState = null;
       await asTenant(() => WhatsAppAccount.update(supportId, { status: 'connected' }));
     }
   });

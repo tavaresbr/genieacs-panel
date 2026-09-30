@@ -17,6 +17,11 @@ import {
 import { destinoWa, normalizarTelefoneBr } from '../utils/wa/waDestino.js';
 import { sign as signMediaToken } from '../utils/wa/waMediaToken.js';
 
+/** De quanto em quanto tempo um número fora do ar pode ser reconsultado no Evolution. */
+const LIVE_CHECK_MS = 30_000;
+/** id da conta → quando foi a última consulta ao vivo (por processo). */
+const liveChecks = new Map();
+
 /** Column widths from `wa_messages`; truncating here beats a driver error. */
 const BODY_ATTACHMENT_PATH_LIMIT = 255;
 const ATTACHMENT_TYPE_LIMIT = 128;
@@ -186,7 +191,34 @@ class WaSendService {
       ? await WhatsAppAccount.getById(conversation.account_id)
       : null;
     if (own && own.status === 'connected') return own;
+    // O status no banco vem dos avisos de conexão do Evolution, e um aviso de
+    // reconexão perdido deixa um número que está funcionando preso em
+    // "conectando". Antes de recusar o envio (ou de desviar para outro
+    // número), pergunta ao servidor — no máximo uma vez a cada 30 s por
+    // número, para a fila não martelar o Evolution enquanto ele está fora.
+    if (own && await this.confirmLive(own)) return { ...own, status: 'connected' };
     return WhatsAppAccount.getForPurpose(own?.purpose || 'general');
+  }
+
+  /** Para os testes: esquece quando cada número foi consultado ao vivo. */
+  static forgetLiveChecks() {
+    liveChecks.clear();
+  }
+
+  static async confirmLive(account) {
+    const agora = Date.now();
+    const ultima = liveChecks.get(account.id) ?? 0;
+    if (agora - ultima < LIVE_CHECK_MS) return false;
+    liveChecks.set(account.id, agora);
+    try {
+      // Import tardio: o serviço de instâncias é pesado e não depende deste.
+      const { default: EvolutionInstanceService } = await import('./evolutionInstanceService.js');
+      const { account: atual } = await EvolutionInstanceService.checkStatus(account.id);
+      return atual?.status === 'connected';
+    } catch (error) {
+      console.warn(`waSend: live status check for account ${account.id} failed: ${error?.message || error}`);
+      return false;
+    }
   }
 
   static async requireConversation(conversationId) {

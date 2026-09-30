@@ -538,6 +538,18 @@ class WaInboundService {
    * @returns {Promise<{handled: boolean, skipped?: string}>}
    */
   static async handle(account, evento, body) {
+    // Mensagem ou recibo chegando por um número é prova de sessão viva. Um
+    // número preso em "conectando" (o aviso de reconexão se perdeu) volta a
+    // "conectado" aqui — sem isso o painel recusava responder um cliente que
+    // acabara de escrever. "Desconectado" não sobe por este caminho: um evento
+    // atrasado não pode desfazer um logout; o envio confere ao vivo.
+    if ((evento === EVENTOS.MENSAGEM || evento === EVENTOS.RECIBO) && account.status === 'connecting' && !account.qr_code) {
+      try {
+        await WhatsAppAccount.update(account.id, { status: 'connected', last_seen_at: new Date(), last_error: null });
+      } catch (error) {
+        console.warn(`[wa] could not mark account ${account.id} connected: ${error?.message || error}`);
+      }
+    }
     switch (evento) {
       case EVENTOS.QR: return tratarQr(account, body);
       case EVENTOS.CONEXAO: return tratarConexao(account, body);
