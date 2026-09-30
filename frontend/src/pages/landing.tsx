@@ -22,6 +22,26 @@ import { Reveal } from '@/components/landing/reveal'
  * tela de trabalho — ninguém passa oito horas nela.
  */
 
+/** Os ícones das redes, em traço simples (24×24), no tom do texto. */
+const SOCIAL_ICONS: Record<'instagram' | 'facebook' | 'youtube' | 'linkedin', { label: string; path: string }> = {
+  instagram: {
+    label: 'Instagram',
+    path: 'M7 2h10a5 5 0 0 1 5 5v10a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V7a5 5 0 0 1 5-5Zm5 5.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9Zm0 2a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5Zm5.25-3.5a1.25 1.25 0 1 0 0 2.5 1.25 1.25 0 0 0 0-2.5Z'
+  },
+  facebook: {
+    label: 'Facebook',
+    path: 'M14 8.5V6.8c0-.8.5-1.3 1.3-1.3H17V2h-2.8C11.5 2 10 3.7 10 6.3v2.2H7.5V12H10v10h4V12h2.7l.5-3.5H14Z'
+  },
+  youtube: {
+    label: 'YouTube',
+    path: 'M21.6 7.2a2.7 2.7 0 0 0-1.9-1.9C18 4.8 12 4.8 12 4.8s-6 0-7.7.5a2.7 2.7 0 0 0-1.9 1.9A28 28 0 0 0 2 12a28 28 0 0 0 .4 4.8 2.7 2.7 0 0 0 1.9 1.9c1.7.5 7.7.5 7.7.5s6 0 7.7-.5a2.7 2.7 0 0 0 1.9-1.9A28 28 0 0 0 22 12a28 28 0 0 0-.4-4.8ZM10 15V9l5.2 3L10 15Z'
+  },
+  linkedin: {
+    label: 'LinkedIn',
+    path: 'M4.98 3.5a2.48 2.48 0 1 1 0 4.96 2.48 2.48 0 0 1 0-4.96ZM3 9.5h4v11H3v-11Zm6.5 0h3.8v1.6h.05c.53-1 1.83-2.05 3.77-2.05 4.03 0 4.78 2.65 4.78 6.1v5.35h-4v-4.74c0-1.13-.02-2.59-1.58-2.59-1.58 0-1.82 1.23-1.82 2.5v4.83h-4v-11Z'
+  }
+}
+
 /** `5593991935695` → `(93) 99193-5695`; o que não for número do Brasil sai como veio. */
 function formatPhone(digits: string) {
   const d = digits.replace(/^55(?=\d{10,11}$)/, '')
@@ -249,6 +269,10 @@ export default function Landing() {
     ? [produto.split(' ')[0].replace(/\d+$/, ''), produto.split(' ')[0].match(/\d+$/)?.[0] ?? '']
     : [produto, '']
   const whatsapp = info?.contactWhatsapp ? `https://wa.me/${info.contactWhatsapp}` : null
+  // As redes preenchidas em Configurações → Dados do SaaS, na ordem fixa.
+  const redes = (['instagram', 'facebook', 'youtube', 'linkedin'] as const)
+    .map((rede) => [rede, info?.social?.[rede] ?? null] as const)
+    .filter((par): par is readonly [typeof par[0], string] => Boolean(par[1]))
   // Num deploy de endereço único os provedores entram no endereço
   // compartilhado, e não no login do console desta página.
   const painelExterno = !user?.platform && info?.panelUrl ? `${info.panelUrl}/login` : null
@@ -509,6 +533,22 @@ export default function Landing() {
               {marcaA}<span className="text-emerald-400">{marcaB}</span>
             </span>
             <p className="mt-3 text-sm leading-6 text-slate-400">{copy.footer.tagline}</p>
+            {redes.length > 0 && (
+              <ul className="mt-5 flex gap-3">
+                {redes.map(([rede, url]) => (
+                  <li key={rede}>
+                    <a
+                      href={url} target="_blank" rel="noreferrer" aria-label={SOCIAL_ICONS[rede].label}
+                      className="inline-flex size-9 items-center justify-center rounded-full border border-white/10 text-slate-400 transition hover:border-emerald-400/50 hover:text-emerald-300"
+                    >
+                      <svg viewBox="0 0 24 24" className="size-4" fill="currentColor" aria-hidden="true">
+                        <path d={SOCIAL_ICONS[rede].path} fillRule="evenodd" />
+                      </svg>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
           <div>
             <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">{copy.footer.product}</h3>

@@ -7,6 +7,7 @@ import { sendTextRequest } from '../utils/wa/evolutionApi.js';
 import { normalizarTelefoneBr } from '../utils/wa/waDestino.js';
 import { mailTransport } from './mail/index.js';
 import { log } from '../utils/logger.js';
+import { readProfile } from './platformProfileService.js';
 
 /**
  * A plataforma falando com quem ainda não é — ou acabou de virar — provedor.
@@ -43,13 +44,15 @@ class PlatformNotifyService {
 
   /**
    * Avisa quem opera a plataforma de algo que chegou pela página pública (um
-   * pedido de demonstração). Os destinos vêm do ambiente, porque são da
-   * operação e não de provedor nenhum: `PLATFORM_NOTIFY_WHATSAPP` e
-   * `PLATFORM_NOTIFY_EMAIL`. Sem nenhum dos dois, não faz nada.
+   * pedido de demonstração). Os destinos vêm de Configurações → Dados do SaaS
+   * (ou do `.env`: `PLATFORM_NOTIFY_WHATSAPP` e `PLATFORM_NOTIFY_EMAIL`).
+   * Sem nenhum dos dois, não faz nada.
    */
   static async notifyTeam({ subject, text }) {
-    const phone = String(process.env.PLATFORM_NOTIFY_WHATSAPP || '').trim();
-    const email = String(process.env.PLATFORM_NOTIFY_EMAIL || '').trim();
+    // Configurações → Dados do SaaS, com o `.env` como valor inicial.
+    const { values } = await readProfile().catch(() => ({ values: {} }));
+    const phone = String(values.notifyWhatsapp || '').trim();
+    const email = String(values.notifyEmail || '').trim();
     const results = await Promise.all([
       phone ? this.sendWhatsapp(phone, `*${subject}*\n\n${text}`) : false,
       email

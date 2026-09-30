@@ -8,7 +8,7 @@ import { DeploymentHealth } from '@/components/platform/deployment-health'
 import { DefaultCatalogueTab } from '@/components/platform/default-catalogue'
 import { PlatformAdmins } from '@/components/platform/platform-admins'
 import { PlatformAudit } from '@/components/platform/platform-audit'
-import { PlatformIntegrations } from '@/components/platform/platform-integrations'
+import { PlatformSettings } from '@/components/platform/platform-settings'
 import { PlatformLeads } from '@/components/platform/platform-leads'
 import { PlatformSubscriptions } from '@/components/platform/platform-subscriptions'
 import { TenantData } from '@/components/platform/tenant-data'
@@ -70,7 +70,7 @@ export default function PlatformPage() {
    * alguma coisa; as outras três são consulta ou manutenção rara.
    */
   const estreito = useEstreito()
-  const [aba, setAba] = useState<'tenants' | 'plans' | 'subscriptions' | 'leads' | 'admins' | 'audit' | 'integrations' | 'deployment' | 'catalogue'>('tenants')
+  const [aba, setAba] = useState<'tenants' | 'plans' | 'subscriptions' | 'leads' | 'admins' | 'audit' | 'settings' | 'deployment' | 'catalogue'>('tenants')
 
   const loadTenants = useCallback(async () => {
     const plansRes = await platformAPI.listPlans()
@@ -497,9 +497,10 @@ export default function PlatformPage() {
             ['leads', 'platform.tabs.leads'],
             ['admins', 'platform.tabs.admins'],
             ['audit', 'platform.tabs.audit'],
-            // Integrações antes das de consulta: é tela de configurar, mas de
-            // configurar uma vez — a chave e o webhook da Asaas, e pronto.
-            ['integrations', 'platform.tabs.integrations'],
+            // Configurações: os dados da empresa que vende o SaaS (o que o site
+            // mostra) e as integrações (a conta Asaas). Telas de configurar
+            // uma vez, antes das de consulta.
+            ['settings', 'platform.tabs.settings'],
             // As duas últimas são as de consulta mais rara: não se abre o
             // console para olhar variável de ambiente nem catálogo de
             // fabricante, abre-se quando alguma coisa não chegou ou um
@@ -524,7 +525,7 @@ export default function PlatformPage() {
         {aba === 'leads' && <PlatformLeads />}
         {aba === 'admins' && <PlatformAdmins />}
         {aba === 'audit' && <PlatformAudit />}
-        {aba === 'integrations' && <PlatformIntegrations />}
+        {aba === 'settings' && <PlatformSettings />}
         {aba === 'deployment' && <DeploymentHealth />}
         {aba === 'catalogue' && <DefaultCatalogueTab />}
 
