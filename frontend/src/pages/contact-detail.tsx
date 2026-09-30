@@ -17,7 +17,7 @@ import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useAuth } from '@/contexts/auth-context'
 import { useTranslation } from '@/contexts/language-context'
-import { copyToClipboard, formatBrl, isSafeExternalUrl } from '@/lib/sgp'
+import { copyToClipboard, formatBrl, formatSgpDate, isSafeExternalUrl } from '@/lib/sgp'
 
 const ADDRESS_PARTS = ['street', 'number', 'complement', 'district', 'city', 'state', 'zip', 'reference'] as const
 
@@ -438,7 +438,7 @@ function InvoicesCard({ contactKey, whatsappPhone }: { contactKey: string; whats
             <li key={`${invoice.contract}-${invoice.id ?? index}`} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
               <span>
                 <span className="font-semibold">{formatBrl(invoice.amount, intlLocale)}</span>
-                <span className="ms-2 text-muted-foreground">{t('contacts.profile.dueOn', { date: invoice.dueDate ?? '—' })}</span>
+                <span className="ms-2 text-muted-foreground">{t('contacts.profile.dueOn', { date: formatSgpDate(invoice.dueDate, intlLocale) })}</span>
                 <span className="ms-2 font-mono text-xs text-muted-foreground">{invoice.contract}</span>
               </span>
               <span className="flex flex-wrap gap-2">
