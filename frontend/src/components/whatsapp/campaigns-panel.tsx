@@ -9,6 +9,7 @@ import { whatsappErrorMessage } from '@/components/whatsapp-connection'
 import type { TranslationKey } from '@/lib/i18n'
 import { useAuth } from '@/contexts/auth-context'
 import { CampaignForm, STATE_LABEL } from './campaign-form'
+import { CampaignDetail } from './campaign-detail'
 
 /**
  * The campaigns list.
@@ -104,6 +105,7 @@ export function CampaignsPanel() {
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<number | null>(null)
   const [creating, setCreating] = useState(false)
+  const [viewing, setViewing] = useState<WhatsAppBroadcast | null>(null)
   const { can } = useAuth()
   const canManage = can('campaigns.manage')
 
@@ -228,6 +230,8 @@ export function CampaignsPanel() {
         />
       )}
 
+      {viewing && <CampaignDetail broadcast={viewing} onClose={() => setViewing(null)} />}
+
       {broadcasts.length === 0 ? (
         <div className="modern-card">
           <div className="empty-state">
@@ -322,8 +326,16 @@ export function CampaignsPanel() {
                   </pre>
                 </div>
 
-                {allowed.length > 0 && (
-                  <div className="mt-4 flex flex-wrap gap-2">
+                <div className="mt-4 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="modern-button-secondary"
+                      data-testid="wa-broadcast-recipients"
+                      onClick={() => setViewing(broadcast)}
+                    >
+                      <Icon name="contacts" size={16} />
+                      {t('whatsapp.campaign.detail.open')}
+                    </button>
                     {allowed.includes('running') && (
                       <button
                         type="button"
@@ -359,8 +371,7 @@ export function CampaignsPanel() {
                         {t('whatsapp.broadcast.cancel')}
                       </button>
                     )}
-                  </div>
-                )}
+                </div>
               </li>
             )
           })}

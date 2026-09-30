@@ -10,12 +10,14 @@ import WhatsAppConfigService, { WaError } from './whatsappConfigService.js';
 import { normalizarTelefoneBr } from '../utils/wa/waDestino.js';
 import { currentTenantId } from '../config/tenantContext.js';
 import {
+  chaveDaFatura,
   comoDataBr,
   diasEntre,
   maisAntigaEmAberto,
   modeloEhLembrete,
   renderCobranca,
-  variaveisDeCobranca
+  variaveisDeCobranca,
+  variaveisVazias
 } from '../utils/wa/waCobranca.js';
 
 /**
@@ -160,7 +162,9 @@ class WaBillingService {
       noInvoice: 0,
       futureOnly: 0,
       sgpRefused: 0,
-      templateIncomplete: 0
+      templateIncomplete: 0,
+      // Which variables the `templateIncomplete` ones lacked: `{ pix: 12 }`.
+      missing: {}
     };
 
     if (wanted.length === 0) {
@@ -224,22 +228,25 @@ class WaBillingService {
         else skipped.noInvoice += 1;
         continue;
       }
-      const rendered = renderCobranca(
-        body,
-        variaveisDeCobranca(fatura, subscriber.clientName, hoje)
-      );
+      const vars = variaveisDeCobranca(fatura, subscriber.clientName, hoje);
+      const rendered = renderCobranca(body, vars);
       // A null render means a variable the body cites has no value. The
       // recipient is DROPPED — never sent a partial message. "PIX: " with
       // nothing after it tells a subscriber to pay a placeholder.
       if (rendered === null) {
         skipped.templateIncomplete += 1;
+        for (const name of variaveisVazias(body, vars)) skipped.missing[name] = (skipped.missing[name] || 0) + 1;
         continue;
       }
       recipients.push({
         contract: subscriber.contract,
         clientName: subscriber.clientName,
         phone: subscriber.phone,
-        body: rendered
+        body: rendered,
+        // The invoice the message cites, so the flush can check it was not
+        // paid while the campaign sat in draft.
+        invoiceKey: chaveDaFatura(fatura),
+        dueDate: fatura.dueDate ? String(fatura.dueDate).slice(0, 10) : null
       });
     }
 

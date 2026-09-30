@@ -3711,6 +3711,8 @@ export interface WhatsAppSkipCounts {
   futureOnly: number
   sgpRefused: number
   templateIncomplete: number
+  /** Which variables the `templateIncomplete` ones lacked: `{ pix: 12 }`. */
+  missing?: Record<string, number>
 }
 
 /** One day of the automatic cadence's send window. `day` follows `Date#getDay`. */
@@ -3767,6 +3769,8 @@ export interface WhatsAppDunningPreviewItem {
   templateName: string | null
   status: 'queued' | 'skipped' | 'deferred'
   reason: WhatsAppDunningSkipReason | null
+  /** With `templateIncomplete`: the variables the template cites that were empty. */
+  missing?: string[]
 }
 
 export interface WhatsAppDunningPreview {
@@ -3800,6 +3804,8 @@ export interface WhatsAppDunningSend {
   templateName: string | null
   status: 'queued' | 'skipped' | 'canceled'
   reason: string | null
+  /** With `template_incomplete`: the variables the template cites that were empty. */
+  missing?: string[]
   deliveryStatus: string | null
   paidAt: string | null
   createdAt: string | null
@@ -3817,6 +3823,44 @@ export interface WhatsAppDunningStats {
   recoveryRate: number
   byStep: { offsetDays: number; sent: number; paidAfter: number }[]
   skipped: Record<string, number>
+}
+
+/** One person a campaign was addressed to, and what became of the message. */
+export interface WhatsAppBroadcastRecipient {
+  id: number
+  contract: string | null
+  clientName: string | null
+  phone: string
+  status: 'pending' | 'sending' | 'sent' | 'skipped' | 'failed'
+  /** `opt_out`, `paid`, `no_destination`, or the send error. */
+  error: string | null
+  deliveryStatus: string | null
+  /** Wrote in the same thread after the send. */
+  replied: boolean
+  /** Asked to stop after the send. */
+  optedOut: boolean
+  sentAt: string | null
+}
+
+export interface WhatsAppBroadcastSummary {
+  total: number
+  pending: number
+  sent: number
+  delivered: number
+  read: number
+  replied: number
+  optedOut: number
+  failed: number
+  skipped: number
+  paid: number
+}
+
+export interface WhatsAppBroadcastDetail {
+  broadcast: WhatsAppBroadcast
+  summary: WhatsAppBroadcastSummary
+  items: WhatsAppBroadcastRecipient[]
+  total: number
+  hasMore: boolean
 }
 
 export interface WhatsAppBroadcast {
@@ -4371,6 +4415,15 @@ export const whatsappAPI = {
   // ── Campaigns ────────────────────────────────────────────────────────
   listBroadcasts: () =>
     apiClient.get<WhatsAppBroadcast[]>('/whatsapp/broadcasts'),
+
+  getBroadcastRecipients: (id: number, params: { status?: string; limit?: number; offset?: number } = {}) => {
+    const query = new URLSearchParams()
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') query.set(key, String(value))
+    })
+    const suffix = query.toString()
+    return apiClient.get<WhatsAppBroadcastDetail>(`/whatsapp/broadcasts/${id}/recipients${suffix ? `?${suffix}` : ''}`)
+  },
 
   setBroadcastStatus: (id: number, status: 'running' | 'paused' | 'canceled') =>
     apiClient.post<WhatsAppBroadcast>(`/whatsapp/broadcasts/${id}/status`, { status }),

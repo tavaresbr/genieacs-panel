@@ -114,6 +114,8 @@ class WaBroadcast {
       contract: recipient.contract || null,
       client_name: recipient.clientName || null,
       rendered_body: recipient.body,
+      invoice_key: recipient.invoiceKey || null,
+      due_date: recipient.dueDate || null,
       status: 'pending',
       created_at: now
     }));

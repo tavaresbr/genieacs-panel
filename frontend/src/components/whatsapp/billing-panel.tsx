@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ContactLink } from './contact-link'
+import { variableLabel } from './wa-variables'
 import {
   whatsappAPI,
   type WhatsAppOverdueSubscriber,
@@ -39,7 +40,9 @@ const DEFAULT_LIMIT = 50
  * that must be respected. Each reason therefore carries its own key, and the
  * panel never adds them together.
  */
-const SKIP_REASONS: { key: keyof WhatsAppSkipCounts; label: TranslationKey }[] = [
+type SkipCountKey = Exclude<keyof WhatsAppSkipCounts, 'missing'>
+
+const SKIP_REASONS: { key: SkipCountKey; label: TranslationKey }[] = [
   { key: 'noPhone', label: 'whatsapp.billing.skippedNoPhone' },
   { key: 'optOut', label: 'whatsapp.billing.skippedOptOut' },
   { key: 'noInvoice', label: 'whatsapp.billing.skippedNoInvoice' },
@@ -276,6 +279,15 @@ export function BillingPanel() {
       if (alive.current) setBuilding(false)
     }
   }, [campaignTitle, selected, t, template, toast])
+
+  // "Missing: PIX (12), boleto link (3)" — which field to fix in the SGP.
+  const missingBreakdown = useMemo(() => {
+    const entries = Object.entries(built?.skipped.missing ?? {}).filter(([, count]) => count > 0)
+    if (entries.length === 0) return null
+    return t('whatsapp.dunning.skip.templateMissing', {
+      names: entries.map(([name, count]) => `${variableLabel(t, name)} (${count})`).join(', ')
+    })
+  }, [built, t])
 
   const skippedReasons = useMemo(() => {
     if (!built) return []
@@ -620,6 +632,7 @@ export function BillingPanel() {
                     <Icon name="warning" size={14} className="mt-0.5 shrink-0 text-muted-foreground" />
                     <span className="text-xs leading-5 text-muted-foreground">
                       {t(reason.label, { count: reason.count })}
+                      {reason.key === 'templateIncomplete' && missingBreakdown && ` — ${missingBreakdown}`}
                     </span>
                   </li>
                 ))}

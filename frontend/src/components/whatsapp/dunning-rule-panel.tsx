@@ -16,6 +16,7 @@ import { useTranslation } from '@/contexts/language-context'
 import { whatsappErrorMessage } from '@/components/whatsapp-connection'
 import type { TranslationKey } from '@/lib/i18n'
 import { ContactLink } from './contact-link'
+import { missingText } from './wa-variables'
 import {
   MAX_STEPS,
   OFFSET_MAX,
@@ -475,7 +476,7 @@ export function DunningRulePanel() {
                       <td>
                         {item.status === 'queued'
                           ? <span className="modern-badge-success">{t('whatsapp.dunning.wouldSend')}</span>
-                          : <span className="modern-badge-warning">{item.reason ? t(SKIP_LABELS[item.reason]) : '—'}</span>}
+                          : <span className="modern-badge-warning">{missingText(t, item.missing) ?? (item.reason ? t(SKIP_LABELS[item.reason]) : '—')}</span>}
                       </td>
                     </tr>
                   ))}
