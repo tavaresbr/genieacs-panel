@@ -163,6 +163,25 @@ export function variaveisDesconhecidas(modelo) {
 }
 
 /**
+ * As variáveis que o modelo cita e que estão vazias — o porquê de um
+ * `renderCobranca` que recusou. Na ordem em que aparecem, sem repetir.
+ */
+export function variaveisVazias(modelo, vars) {
+  const citadas = [...String(modelo ?? '').matchAll(PLACEHOLDER)].map((m) => m[1]);
+  return [...new Set(citadas)].filter((chave) => {
+    const v = vars?.[chave];
+    return v === undefined || v === null || v === '';
+  });
+}
+
+/** A chave de uma fatura: o número do título, ou vencimento e valor. */
+export function chaveDaFatura(fatura) {
+  const id = String(fatura?.id ?? '').trim();
+  if (id) return id.slice(0, 128);
+  return `venc:${String(fatura?.dueDate ?? '').slice(0, 10)}:${fatura?.amount ?? ''}`.slice(0, 128);
+}
+
+/**
  * A fatura que o disparo deve citar, entre as em aberto.
  *
  * A mais antiga vencida, porque é a que o cliente precisa resolver primeiro e a

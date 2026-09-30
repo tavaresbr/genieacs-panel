@@ -8,6 +8,7 @@ import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
 import { errorText } from './dunning-rule-panel'
 import { ContactLink } from './contact-link'
+import { missingText } from './wa-variables'
 
 /**
  * What the automatic cadence did, and what it was worth.
@@ -96,7 +97,8 @@ export function DunningHistoryPanel() {
   const result = (row: WhatsAppDunningSend) => {
     if (row.status === 'skipped') {
       const key = row.reason ? REASON_LABELS[row.reason] : undefined
-      return <span className="modern-badge-warning">{key ? t(key) : (row.reason || t('whatsapp.dunning.statusSkipped'))}</span>
+      const text = missingText(t, row.missing) ?? (key ? t(key) : (row.reason || t('whatsapp.dunning.statusSkipped')))
+      return <span className="modern-badge-warning">{text}</span>
     }
     if (row.status === 'canceled') {
       return <span className="modern-badge-info">{t('whatsapp.dunning.statusCanceled')}</span>

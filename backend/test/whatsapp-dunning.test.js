@@ -8,6 +8,7 @@ const { default: WhatsAppConfigService } = await import('../src/services/whatsap
 const { default: WhatsAppAccount } = await import('../src/models/WhatsAppAccount.js');
 const { default: WaOptOut } = await import('../src/models/WaOptOut.js');
 const { default: WaDunningService, etapaDevida, chaveDaFatura } = await import('../src/services/waDunningService.js');
+const { variaveisVazias } = await import('../src/utils/wa/waCobranca.js');
 const { dentroDaJanela, lerJanela } = await import('../src/utils/wa/waJanela.js');
 
 /**
@@ -176,6 +177,13 @@ describe('as regras puras', () => {
     assert.equal(etapaDevida([{ offsetDays: 2 }], -1), null, 'fatura a vencer não recebe cobrança');
   });
 
+  it('diz quais variáveis citadas estão vazias', () => {
+    const vars = { nome: 'Ana', pix: '', link_boleto: null, valor: 'R$ 1,00' };
+    assert.deepEqual(variaveisVazias('Oi {{nome}}, {{pix}} {{ link_boleto }} {{pix}} {{linha_digitavel}}', vars),
+      ['pix', 'link_boleto', 'linha_digitavel']);
+    assert.deepEqual(variaveisVazias('Oi {{nome}}: {{valor}}', vars), []);
+  });
+
   it('identifica a fatura pelo título, ou por vencimento e valor', () => {
     assert.equal(chaveDaFatura({ id: 'T1', dueDate: '2026-01-01', amount: 10 }), 'T1');
     assert.equal(chaveDaFatura({ id: null, dueDate: '2026-01-01', amount: 10 }), 'venc:2026-01-01:10');
@@ -265,6 +273,8 @@ describe('a prévia', () => {
     assert.equal(por.get('R-SEM-FONE').reason, 'noPhone');
     assert.equal(por.get('R-OPTOUT').reason, 'optOut');
     assert.equal(por.get('R-SEM-PIX').reason, 'templateIncomplete');
+    assert.deepEqual(por.get('R-SEM-PIX').missing, ['pix'], 'e diz qual variável faltou');
+    assert.deepEqual(por.get('R-OPTOUT').missing, []);
     assert.equal(por.has('R-EM-DIA'), false);
     assert.equal(body.data.queued, 3);
     assert.equal((await sends()).length, 0, 'a prévia não pode gravar decisão nenhuma');
@@ -458,6 +468,10 @@ describe('histórico e resultado', () => {
     const optout = body.data.items.find((i) => i.contract === 'R-OPTOUT');
     assert.equal(optout.status, 'skipped');
     assert.equal(optout.reason, 'opt_out');
+    assert.deepEqual(optout.missing, []);
+    const semPix = body.data.items.find((i) => i.contract === 'R-SEM-PIX' && i.kind === 'step');
+    assert.equal(semPix.reason, 'template_incomplete');
+    assert.deepEqual(semPix.missing, ['pix'], 'o histórico guarda qual variável faltou');
     const joao = body.data.items.find((i) => i.contract === 'R-ATRASO-10' && i.kind === 'step' && i.status === 'queued');
     assert.equal(joao.deliveryStatus, 'sent');
     assert.equal(joao.templateName, 'régua cobrança');

@@ -13,11 +13,13 @@ import { isUniqueViolation, tdb, tinsertReturningId, withDeadlockRetry } from '.
 import { currentTenantId } from '../config/tenantContext.js';
 import { normalizarTelefoneBr } from '../utils/wa/waDestino.js';
 import {
+  chaveDaFatura,
   diasEntre,
   maisAntigaEmAberto,
   modeloEhLembrete,
   renderCobranca,
-  variaveisDeCobranca
+  variaveisDeCobranca,
+  variaveisVazias
 } from '../utils/wa/waCobranca.js';
 import { dentroDaJanela, lerJanela, semanaPadraoCobranca } from '../utils/wa/waJanela.js';
 
@@ -116,18 +118,24 @@ const invalido = (code, vars) => new WaError(
   { code, status: code === 'already_running' ? 409 : 400, vars }
 );
 
+/** As variáveis que faltaram, como `pix, link_boleto`; `null` sem nenhuma. */
+function detalhe(missing) {
+  return missing?.length ? missing.join(', ').slice(0, 255) : null;
+}
+
+/** O contrário de `detalhe`. */
+function lerDetalhe(raw) {
+  return String(raw ?? '').split(',').map((v) => v.trim()).filter(Boolean);
+}
+
 function inteiro(raw, { min, max, code }) {
   const n = Number(raw);
   if (!Number.isInteger(n) || n < min || n > max) throw invalido(code, { min, max });
   return n;
 }
 
-/** A chave de uma fatura: o número do título, ou vencimento e valor. */
-export function chaveDaFatura(fatura) {
-  const id = String(fatura?.id ?? '').trim();
-  if (id) return id.slice(0, 128);
-  return `venc:${String(fatura?.dueDate ?? '').slice(0, 10)}:${fatura?.amount ?? ''}`.slice(0, 128);
-}
+/** A chave de uma fatura — mora em `waCobranca.js`, reexportada aqui. */
+export { chaveDaFatura };
 
 /**
  * A etapa que vale para uma fatura com `dias` de atraso (negativo: a vencer).
@@ -651,9 +659,10 @@ class WaDunningService {
       stepOffset: step.offsetDays,
       templateName: template?.name ?? null,
       status: 'queued',
-      reason: null
+      reason: null,
+      missing: []
     };
-    const skip = (reason) => ({ status: 'skipped', reason, item: { ...item, status: 'skipped', reason } });
+    const skip = (reason, missing = []) => ({ status: 'skipped', reason, item: { ...item, status: 'skipped', reason, missing } });
 
     const enviadas = anteriores.filter((row) => row.status === 'queued').length;
     let result = null;
@@ -663,8 +672,10 @@ class WaDunningService {
 
     let body = null;
     if (!result) {
-      body = template ? renderCobranca(template.body, variaveisDeCobranca(fatura, subscriber.clientName, now)) : null;
-      if (body === null) result = skip('templateIncomplete');
+      const vars = variaveisDeCobranca(fatura, subscriber.clientName, now);
+      body = template ? renderCobranca(template.body, vars) : null;
+      // Sem modelo, a lista fica vazia e o rótulo continua o genérico.
+      if (body === null) result = skip('templateIncomplete', template ? variaveisVazias(template.body, vars) : []);
     }
 
     // O intervalo mínimo é por CONTRATO, não por fatura: duas faturas em
@@ -688,6 +699,7 @@ class WaDunningService {
       template_id: template?.id ?? null,
       status: result ? 'skipped' : 'queued',
       reason: result ? REASON_COLUMN[result.reason] : null,
+      reason_detail: detalhe(result?.item?.missing),
       created_at: now,
       updated_at: now
     };
@@ -891,7 +903,8 @@ class WaDunningService {
     let sent = 0;
     for (const row of alvo) {
       const fatura = { amount: row.amount === null ? null : Number(row.amount), dueDate: row.due_date, id: row.invoice_key };
-      const body = renderCobranca(template.body, variaveisDeCobranca(fatura, row.client_name, now));
+      const vars = variaveisDeCobranca(fatura, row.client_name, now);
+      const body = renderCobranca(template.body, vars);
       const motivo = !row.phone_e164 ? 'no_phone'
         : blocked.has(row.phone_e164) ? 'opt_out'
           : body === null ? 'template_incomplete' : null;
@@ -908,6 +921,7 @@ class WaDunningService {
         template_id: template.id,
         status: motivo ? 'skipped' : 'queued',
         reason: motivo,
+        reason_detail: motivo === 'template_incomplete' ? detalhe(variaveisVazias(template.body, vars)) : null,
         paid_at: now,
         created_at: now,
         updated_at: now
@@ -1062,6 +1076,7 @@ function publicSend(row) {
     templateName: row.template_name || null,
     status: row.status,
     reason: row.reason || null,
+    missing: lerDetalhe(row.reason_detail),
     deliveryStatus: row.delivery_status || null,
     paidAt: asIso(row.paid_at),
     createdAt: asIso(row.created_at)

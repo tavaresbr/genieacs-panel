@@ -175,6 +175,13 @@ export const casos = [
     tabela: 'wa_broadcasts'
   },
   {
+    chave: 'broadcast',
+    label: 'GET /api/whatsapp/broadcasts/:id/recipients',
+    method: 'GET',
+    path: (id) => `/api/whatsapp/broadcasts/${id}/recipients`,
+    tabela: 'wa_broadcasts'
+  },
+  {
     chave: 'account',
     label: 'GET /api/whatsapp/accounts/:id/qr',
     method: 'GET',

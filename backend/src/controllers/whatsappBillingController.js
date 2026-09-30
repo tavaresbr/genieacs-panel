@@ -475,6 +475,19 @@ class WhatsAppBillingController {
     }
   }
 
+  static async broadcastRecipients(req, res) {
+    try {
+      const detail = await WaBroadcastService.recipients(req.params.id, {
+        status: req.query?.status,
+        limit: req.query?.limit,
+        offset: req.query?.offset
+      });
+      return res.json(createResponse(req.t('whatsapp.broadcast.loaded', { count: detail.total }), detail));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.broadcast.loadFailed');
+    }
+  }
+
   static async setBroadcastStatus(req, res) {
     try {
       const broadcast = await WaBroadcastService.setStatus(req.params.id, req.body?.status);

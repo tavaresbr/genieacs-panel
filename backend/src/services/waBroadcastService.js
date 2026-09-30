@@ -6,8 +6,12 @@ import WaOptOut from '../models/WaOptOut.js';
 import WhatsAppAccount from '../models/WhatsAppAccount.js';
 import { forEachTenant } from '../config/tenantJobs.js';
 import WaSendService from './waSendService.js';
+import WaBillingService from './waBillingService.js';
 import WhatsAppConfigService, { WaError } from './whatsappConfigService.js';
 import { normalizarTelefoneBr } from '../utils/wa/waDestino.js';
+import { chaveDaFatura } from '../utils/wa/waCobranca.js';
+import { tdb } from '../config/database.js';
+import { timestampMs } from '../utils/helpers.js';
 
 /**
  * One pass a minute, because the campaign's budget is written per minute.
@@ -17,6 +21,15 @@ import { normalizarTelefoneBr } from '../utils/wa/waDestino.js';
  * point rather than a compromise.
  */
 const TICK_INTERVAL_MS = 60_000;
+
+/**
+ * How many billing recipients one flush may check against the SGP.
+ *
+ * Each one is an SGP round trip before the send, and the SGP is the provider's
+ * production billing system. The outbox paces the sends anyway (one automatic
+ * message every 20–45 s), so a smaller slice per minute costs nothing.
+ */
+const BILLING_CHECKS_PER_FLUSH = 10;
 
 /** `wa_broadcast_recipients.error_msg` is 500 characters wide. */
 const ERROR_LIMIT = 500;
@@ -100,6 +113,114 @@ class WaBroadcastService {
       throw new WaError('whatsapp.broadcast.notFound', { code: 'broadcast_not_found', status: 404 });
     }
     return row;
+  }
+
+  // ── Detail ─────────────────────────────────────────────────────────
+
+  /**
+   * Who a campaign reached, and what each person did with it.
+   *
+   * A campaign is at most `MAX_CAMPAIGN_RECIPIENTS` rows, so the whole of it is
+   * read once and enriched in memory: the summary needs every row anyway, and
+   * each join is a scoped `whereIn` in blocks rather than an aliased join
+   * across two scoped tables.
+   *
+   * - delivered/read: the outbox's `delivery_status` on the queued message;
+   * - replied: the subscriber wrote in the same thread AFTER the send;
+   * - optedOut: they asked to stop AFTER the send.
+   */
+  static async recipients(id, { status, limit, offset } = {}) {
+    const broadcast = await this.require(id);
+    const rows = await tdb('wa_broadcast_recipients')
+      .where({ broadcast_id: broadcast.id })
+      .orderBy('id')
+      .select('id', 'contract', 'client_name', 'phone_e164', 'status', 'error_msg', 'message_id', 'sent_at');
+
+    const messages = new Map();
+    for (const part of blocks(rows.map((r) => r.message_id).filter(Boolean))) {
+      // eslint-disable-next-line no-await-in-loop -- a few blocks at most
+      const found = await tdb('wa_messages').whereIn('id', part).select('id', 'delivery_status', 'conversation_id');
+      for (const m of found) messages.set(Number(m.id), m);
+    }
+
+    const lastInbound = new Map();
+    const conversations = [...new Set([...messages.values()].map((m) => m.conversation_id).filter(Boolean))];
+    for (const part of blocks(conversations)) {
+      // eslint-disable-next-line no-await-in-loop -- idem
+      const found = await tdb('wa_messages')
+        .whereIn('conversation_id', part)
+        .where({ direction: 'in' })
+        .select('conversation_id')
+        .max({ last: 'created_at' })
+        .groupBy('conversation_id');
+      for (const m of found) lastInbound.set(Number(m.conversation_id), timestampMs(m.last));
+    }
+
+    const lastOptOut = new Map();
+    for (const part of blocks([...new Set(rows.map((r) => r.phone_e164).filter(Boolean))])) {
+      // eslint-disable-next-line no-await-in-loop -- idem
+      const found = await tdb('wa_opt_outs')
+        .whereIn('wa_phone_e164', part)
+        .select('wa_phone_e164')
+        .max({ last: 'created_at' })
+        .groupBy('wa_phone_e164');
+      for (const o of found) lastOptOut.set(o.wa_phone_e164, timestampMs(o.last));
+    }
+
+    const items = rows.map((row) => {
+      const message = row.message_id ? messages.get(Number(row.message_id)) : null;
+      const sentAt = timestampMs(row.sent_at);
+      const after = (when) => Number.isFinite(sentAt) && Number.isFinite(when) && when >= sentAt;
+      return {
+        id: row.id,
+        contract: row.contract || null,
+        clientName: row.client_name || null,
+        phone: row.phone_e164,
+        status: row.status,
+        error: row.error_msg || null,
+        deliveryStatus: message?.delivery_status || null,
+        replied: Boolean(message) && after(lastInbound.get(Number(message.conversation_id))),
+        optedOut: row.status === 'sent' && after(lastOptOut.get(row.phone_e164)),
+        sentAt: this.asIso(row.sent_at)
+      };
+    });
+
+    const summary = {
+      total: items.length,
+      pending: 0,
+      sent: 0,
+      delivered: 0,
+      read: 0,
+      replied: 0,
+      optedOut: 0,
+      failed: 0,
+      skipped: 0,
+      paid: 0
+    };
+    for (const item of items) {
+      if (item.status === 'pending' || item.status === 'sending') summary.pending += 1;
+      else if (item.status in summary) summary[item.status] += 1;
+      if (item.error === 'paid') summary.paid += 1;
+      if (item.deliveryStatus === 'delivered' || item.deliveryStatus === 'read') summary.delivered += 1;
+      if (item.deliveryStatus === 'read') summary.read += 1;
+      if (item.replied) summary.replied += 1;
+      if (item.optedOut) summary.optedOut += 1;
+    }
+
+    const filtro = String(status ?? '').trim();
+    const filtered = !filtro ? items
+      : filtro === 'replied' ? items.filter((i) => i.replied)
+        : filtro === 'pending' ? items.filter((i) => i.status === 'pending' || i.status === 'sending')
+          : items.filter((i) => i.status === filtro);
+    const cap = Math.min(Math.max(Number(limit) || 100, 1), 500);
+    const skip = Math.max(Number(offset) || 0, 0);
+    return {
+      broadcast: this.publicBroadcast(broadcast),
+      summary,
+      items: filtered.slice(skip, skip + cap),
+      total: filtered.length,
+      hasMore: skip + cap < filtered.length
+    };
   }
 
   // ── The flush loop ─────────────────────────────────────────────────
@@ -228,12 +349,14 @@ class WaBroadcastService {
 
       const budget = Math.min(
         Math.max(Number(broadcast.rate_limit_per_min) || Number(config.rateLimitPerMin) || 1, 1),
-        120
+        broadcast.kind === 'general' ? 120 : BILLING_CHECKS_PER_FLUSH
       );
       const ids = await WaBroadcast.listPendingIds(broadcast.id, budget);
+      // Shared across this flush so only the SECOND SGP call onwards waits.
+      const ritmo = { sgpCalls: 0 };
       for (const id of ids) {
         // eslint-disable-next-line no-await-in-loop -- one at a time is what a rate limit means
-        const outcome = await this.deliver(id, account, broadcast);
+        const outcome = await this.deliver(id, account, broadcast, ritmo);
         if (outcome === 'sent') summary.enqueued += 1;
         else if (outcome === 'skipped') summary.skipped += 1;
         else if (outcome === 'failed') summary.failed += 1;
@@ -261,12 +384,13 @@ class WaBroadcastService {
    *
    * The guards run in this order and no other: opt-out first, because a person
    * who asked not to be contacted must not have their number examined for
-   * anything else; then whether the number is addressable at all; then the
-   * send.
+   * anything else; then, for a billing campaign, whether the invoice was paid
+   * after the campaign was built; then whether the number is addressable at
+   * all; then the send.
    *
    * @returns {Promise<'sent'|'skipped'|'failed'|'retry'|'claimed_elsewhere'>}
    */
-  static async deliver(id, account, broadcast = null) {
+  static async deliver(id, account, broadcast = null, ritmo = { sgpCalls: 0 }) {
     const recipient = await WaBroadcast.claimRecipient(id);
     // A null claim means another tick already owns this row. That is the
     // conditional UPDATE working, not a failure.
@@ -278,6 +402,18 @@ class WaBroadcastService {
       await WaBroadcast.updateRecipient(recipient.id, {
         status: 'skipped',
         error_msg: 'opt_out'
+      });
+      return 'skipped';
+    }
+
+    // 1b. Paid since the build. A draft can sit for days, and charging someone
+    // who has already paid is the complaint that makes a provider switch the
+    // whole thing off.
+    if (broadcast?.kind !== 'general' && recipient.invoice_key
+      && await this.invoicePaid(recipient, ritmo)) {
+      await WaBroadcast.updateRecipient(recipient.id, {
+        status: 'skipped',
+        error_msg: 'paid'
       });
       return 'skipped';
     }
@@ -380,6 +516,25 @@ class WaBroadcastService {
   }
 
   /**
+   * Whether the invoice this recipient's message cites is no longer open.
+   *
+   * Asked the same way the build asked (open invoices only), so "gone from
+   * the list" means paid or cancelled — either way, nothing to charge. An SGP
+   * that does not answer lets the message go: the build already saw the
+   * invoice open, and an ERP outage must not freeze every campaign.
+   */
+  static async invoicePaid(recipient, ritmo) {
+    try {
+      const invoices = await WaBillingService.pacedInvoices(recipient.contract, ritmo.sgpCalls++ > 0);
+      if (invoices === null) return false;
+      return !invoices.some((fatura) => chaveDaFatura(fatura) === recipient.invoice_key);
+    } catch (error) {
+      console.warn(`[wa] campanha: conferência de pagamento do contrato ${recipient.contract}: ${error.message}`);
+      return false;
+    }
+  }
+
+  /**
    * The shape the browser may see.
    *
    * Built field by field like `publicAccount`, and for the same reason: a
@@ -423,6 +578,13 @@ class WaBroadcastService {
       updatedAt: this.asIso(row.updated_at)
     };
   }
+}
+
+/** `whereIn` in blocks of 500: every driver's parameter limit is above that. */
+function blocks(list, size = 500) {
+  const out = [];
+  for (let i = 0; i < list.length; i += size) out.push(list.slice(i, i + size));
+  return out;
 }
 
 /** Os filtros com que a campanha foi montada, para o cartão mostrar. */

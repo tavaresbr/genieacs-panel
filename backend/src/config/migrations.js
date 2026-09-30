@@ -1557,6 +1557,28 @@ const WA_BROADCAST_CAMPAIGN_COLUMNS = [
   ['audience_json', (t) => t.text('audience_json')]
 ];
 
+/**
+ * O detalhe de um pulo que `reason` não cabe: quais variáveis do modelo
+ * faltaram. Coluna própria porque `stats()` agrupa por `reason`.
+ */
+const WA_DUNNING_DETAIL_COLUMNS = [
+  ['reason_detail', (t) => t.string('reason_detail', 255)]
+];
+
+/**
+ * A fatura que um destinatário da cobrança avulsa cita — para conferir, na
+ * hora de enviar, se ela não foi paga depois que a campanha foi montada.
+ */
+const WA_BROADCAST_INVOICE_COLUMNS = [
+  ['invoice_key', (t) => t.string('invoice_key', 128)],
+  ['due_date', (t) => t.string('due_date', 16)]
+];
+
+const SKIP_DETAIL_TABLES = [
+  ['wa_dunning_sends', WA_DUNNING_DETAIL_COLUMNS],
+  ['wa_broadcast_recipients', WA_BROADCAST_INVOICE_COLUMNS]
+];
+
 /** Os tetos de retenção de `plans`, para a migração que os acrescenta. */
 const PLAN_RETENTION_COLUMNS = [
   ['max_audit_retention_days', (t) => t.integer('max_audit_retention_days').unsigned()],
@@ -4798,6 +4820,26 @@ export const migrations = [
       await db.schema.alterTable('wa_broadcasts', (t) => {
         for (const add of missing) add(t);
       });
+    }
+  },
+  {
+    id: '0086_wa_skip_details',
+    async isApplied(db) {
+      for (const [table, columns] of SKIP_DETAIL_TABLES) {
+        if (!(await db.schema.hasTable(table))) continue;
+        if ((await missingColumns(db, table, columns)).length) return false;
+      }
+      return true;
+    },
+    async up(db) {
+      for (const [table, columns] of SKIP_DETAIL_TABLES) {
+        if (!(await db.schema.hasTable(table))) continue;
+        const missing = await missingColumns(db, table, columns);
+        if (!missing.length) continue;
+        await db.schema.alterTable(table, (t) => {
+          for (const add of missing) add(t);
+        });
+      }
     }
   }
 ];

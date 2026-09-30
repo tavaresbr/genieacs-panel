@@ -417,11 +417,15 @@ describe('building a campaign', () => {
       noInvoice: 1,
       futureOnly: 1,
       sgpRefused: 1,
-      templateIncomplete: 1
+      templateIncomplete: 1,
+      // …and says WHICH variable the incomplete one lacked.
+      missing: { pix: 1 }
     });
 
     // The counts explain the whole input, with nothing falling between them.
-    const skippedTotal = Object.values(body.data.skipped).reduce((a, b) => a + b, 0);
+    const skippedTotal = Object.values(body.data.skipped)
+      .filter((n) => typeof n === 'number')
+      .reduce((a, b) => a + b, 0);
     assert.equal(body.data.recipients + skippedTotal, contracts.length);
 
     const after2 = await queuedMessages();
@@ -615,6 +619,38 @@ describe('the flush loop', () => {
     const reopened = await move('running');
     assert.equal(reopened.status, 409);
     assert.equal(reopened.body.code, 'invalid_status');
+  });
+
+  it('does not charge an invoice paid after the build, and sends when the SGP is down', async () => {
+    // The test above left C-ATRASO-2 on the do-not-disturb list; take it off.
+    await getDb()('wa_opt_outs').where({ wa_phone_e164: '5593981110002' }).update({ revoked_at: new Date() });
+    const { body } = await buildCampaign({ template: COBRANCA, contracts: ['C-ATRASO-1', 'C-SEM-PIX', 'C-ATRASO-2'] });
+    const broadcastId = body.data.broadcast.id;
+    const built = await campaign.listRecipients(broadcastId);
+    assert.deepEqual(built.map((row) => row.invoice_key).sort(), ['1', '2'], 'the invoice each message cites');
+
+    // C-ATRASO-2 pays while the campaign sits in draft: the open list no
+    // longer has its invoice. C-ATRASO-1's SGP refuses to answer.
+    const pagou = byContract.get('C-ATRASO-2');
+    const recusou = byContract.get('C-ATRASO-1');
+    const [faturas2, faturas1] = [pagou.invoices, recusou.invoices];
+    pagou.invoices = [];
+    recusou.invoices = null;
+    try {
+      await asTenant(() => WaBroadcastService.setStatus(broadcastId, 'running'));
+      await WaBroadcastService.tick();
+    } finally {
+      pagou.invoices = faturas2;
+      recusou.invoices = faturas1;
+    }
+
+    const recipients = await campaign.listRecipients(broadcastId);
+    const paid = recipients.find((row) => row.contract === 'C-ATRASO-2');
+    assert.equal(paid.status, 'skipped');
+    assert.equal(paid.error_msg, 'paid');
+    assert.equal(paid.message_id, null, 'nothing was queued for the payer');
+    const sent = recipients.find((row) => row.contract === 'C-ATRASO-1');
+    assert.equal(sent.status, 'sent', 'an SGP that does not answer does not freeze the campaign');
   });
 
   it('lists campaigns newest first', async () => {

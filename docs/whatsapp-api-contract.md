@@ -694,6 +694,10 @@ lê os corpos já renderizados, e aperta o play.
 | `sgpRefused` | o SGP recusou aquele contrato; os outros seguem |
 | `templateIncomplete` | o render devolveu `null` — variável citada sem valor |
 
+Junto dos contadores vem `skipped.missing = { pix: 12, link_boleto: 3 }`:
+quais variáveis faltaram nos `templateIncomplete`, para a tela dizer qual campo
+consertar no SGP.
+
 "412 pulados" não diz nada a quem opera; "83 sem celular no cadastro, 12
 pediram para não ser contatados" diz o que dá para consertar.
 
@@ -727,6 +731,36 @@ Detalhes que a tela pode contar com:
   attachment: { name, type } | null,
   audience: { states, plans, districts, cities, contracts: number } | null }
 ```
+
+#### Detalhe — `GET /broadcasts/:id/recipients?status=&limit=&offset=`
+
+`campaigns.read`. Cada destinatário e o que aconteceu com a mensagem dele:
+
+```ts
+{ broadcast, total, hasMore,
+  summary: { total, pending, sent, delivered, read, replied, optedOut, failed, skipped, paid },
+  items: [{ id, contract, clientName, phone, status, error, deliveryStatus,
+            replied, optedOut, sentAt }] }
+```
+
+- `delivered`/`read` vêm do `delivery_status` da mensagem na fila;
+  `replied` é o assinante ter escrito na mesma conversa **depois** do envio;
+  `optedOut`, ter pedido para sair **depois** do envio.
+- `status`: `pending` (inclui `sending`), `sent`, `skipped`, `failed` ou
+  `replied`. O `summary` é sempre da campanha inteira; `limit` até 500
+  (padrão 100). Campanha inexistente → 404 `broadcast_not_found`.
+- `error`: `opt_out`, `paid`, `no_destination`, ou o erro do envio.
+
+#### Pagamento depois da montagem (cobrança avulsa)
+
+Cada destinatário da cobrança avulsa guarda a fatura que a mensagem cita
+(`invoice_key`, `due_date`). Na hora de enviar, depois da checagem de não
+perturbe, o laço consulta de novo as faturas em aberto do contrato no SGP: se a
+fatura não está mais lá (paga ou cancelada), o destinatário fica
+`skipped/paid` e nada sai. SGP sem resposta deixa enviar — a montagem já viu a
+fatura aberta, e uma queda do ERP não pode travar a campanha. Campanhas de
+cobrança processam no máximo 10 destinatários por passada, com ~150 ms entre as
+consultas.
 
 #### Campanha de aviso ("Nova campanha")
 
@@ -1656,5 +1690,5 @@ dentro da janela**. Cada passada:
 | `POST /dunning/enabled` | `campaigns.manage` | `{ enabled }`. Ligar exige etapa válida e número de cobrança conectado. Trilha: `whatsapp.dunning_enabled` / `_disabled`. |
 | `POST /dunning/preview` | `campaigns.manage` | Quem receberia qual etapa hoje, sem gravar nada. Limitada aos primeiros 300 contratos. |
 | `POST /dunning/run` | `campaigns.manage` | Uma passada agora, em segundo plano (202). Recusa com a régua desligada, fora da janela ou com outra passada em curso. |
-| `GET /dunning/sends` | `campaigns.read` | Histórico paginado, filtros `contract`, `status`, `kind`. |
+| `GET /dunning/sends` | `campaigns.read` | Histórico paginado, filtros `contract`, `status`, `kind`. Um pulo por `template_incomplete` traz `missing: ['pix', …]` — as variáveis que faltaram (coluna `reason_detail`); a prévia traz o mesmo `missing` em cada item. |
 | `GET /dunning/stats?days=30` | `campaigns.read` | Mensagens, faturas pagas após cobrança, valor recuperado, por etapa. "Recuperado" é correlação, não prova. |
