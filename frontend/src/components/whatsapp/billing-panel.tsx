@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ContactLink } from './contact-link'
 import {
   whatsappAPI,
   type WhatsAppOverdueSubscriber,
@@ -470,7 +471,7 @@ export function BillingPanel() {
                       </td>
                       <td className={`${MOBILE_CELL} font-semibold`}>{row.contract}</td>
                       <td className={MOBILE_CELL}>
-                        <span className="block">{row.clientName || '—'}</span>
+                        <span className="block"><ContactLink contract={row.contract} name={row.clientName} /></span>
                         {row.document && (
                           <span className="text-xs text-muted-foreground">{row.document}</span>
                         )}

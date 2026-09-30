@@ -15,6 +15,7 @@ import { useAuth } from '@/contexts/auth-context'
 import { useTranslation } from '@/contexts/language-context'
 import { whatsappErrorMessage } from '@/components/whatsapp-connection'
 import type { TranslationKey } from '@/lib/i18n'
+import { ContactLink } from './contact-link'
 import {
   MAX_STEPS,
   OFFSET_MAX,
@@ -467,7 +468,7 @@ export function DunningRulePanel() {
                   {preview.items.map((item) => (
                     <tr key={item.contract}>
                       <td className="font-mono text-xs">{item.contract}</td>
-                      <td>{item.clientName || '—'}</td>
+                      <td><ContactLink contract={item.contract} name={item.clientName} /></td>
                       <td>{money(item.amount)}</td>
                       <td>{item.dueDate ? formatDate(`${item.dueDate}T12:00:00`) : '—'}</td>
                       <td>{stepLabel(item.stepOffset)}</td>

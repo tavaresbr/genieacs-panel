@@ -7,6 +7,7 @@ import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
 import { errorText } from './dunning-rule-panel'
+import { ContactLink } from './contact-link'
 
 /**
  * What the automatic cadence did, and what it was worth.
@@ -221,7 +222,7 @@ export function DunningHistoryPanel() {
                   <tr key={row.id}>
                     <td className="whitespace-nowrap">{row.createdAt ? formatDateTime(row.createdAt) : '—'}</td>
                     <td className="font-mono text-xs">{row.contract}</td>
-                    <td>{row.clientName || '—'}</td>
+                    <td><ContactLink contract={row.contract} name={row.clientName} /></td>
                     <td className="whitespace-nowrap">{stepLabel(row)}</td>
                     <td>{money(row.amount)}</td>
                     <td className="whitespace-nowrap">
