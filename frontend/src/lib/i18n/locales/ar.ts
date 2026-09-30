@@ -3576,6 +3576,10 @@ const ar: Dictionary = {
   'platform.profile.saved': 'تم حفظ البيانات. يعرضها الموقع الآن.',
   'platform.profile.nothingChanged': 'لم يتغير شيء',
   'platform.profile.emptyHint': 'حفظ حقل فارغ يحذف ما حُفظ هنا ويعود العمل بقيمة ‎.env.',
+  'platform.profile.cnpjLookup': 'البحث بواسطة CNPJ',
+  'platform.profile.cnpjLooking': 'جارٍ الاستعلام عن CNPJ…',
+  'platform.profile.cnpjFound': 'تم العثور: {name}. راجع الحقول ثم احفظ.',
+  'platform.profile.cnpjFailed': 'تعذّر الاستعلام عن CNPJ الآن؛ املأ الحقول يدويًا.',
 }
 
 export default ar

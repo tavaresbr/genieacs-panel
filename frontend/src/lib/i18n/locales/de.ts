@@ -3571,6 +3571,10 @@ const de: Dictionary = {
   'platform.profile.saved': 'Daten gespeichert. Die Website zeigt sie bereits.',
   'platform.profile.nothingChanged': 'Nichts geändert',
   'platform.profile.emptyHint': 'Ein leer gespeichertes Feld löscht den hier gespeicherten Wert, und der Wert aus der .env gilt wieder.',
+  'platform.profile.cnpjLookup': 'CNPJ abfragen',
+  'platform.profile.cnpjLooking': 'CNPJ wird abgefragt…',
+  'platform.profile.cnpjFound': 'Gefunden: {name}. Felder prüfen und speichern.',
+  'platform.profile.cnpjFailed': 'Die CNPJ kann gerade nicht abgefragt werden; bitte manuell ausfüllen.',
 }
 
 export default de

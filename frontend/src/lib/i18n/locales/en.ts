@@ -3569,6 +3569,10 @@ const en = {
   'platform.profile.saved': 'Details saved. The site already shows them.',
   'platform.profile.nothingChanged': 'Nothing changed',
   'platform.profile.emptyHint': 'Saving a field empty removes what was saved here and the .env value applies again.',
+  'platform.profile.cnpjLookup': 'Look up CNPJ',
+  'platform.profile.cnpjLooking': 'Looking up the CNPJ…',
+  'platform.profile.cnpjFound': 'Found: {name}. Review the fields and save.',
+  'platform.profile.cnpjFailed': 'Could not look up the CNPJ right now; fill it in by hand.',
 }
 
 export default en

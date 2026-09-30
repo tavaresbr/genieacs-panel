@@ -1428,6 +1428,11 @@ export interface CnpjData {
   taxId: string
   legalName?: string
   tradeName?: string
+  postalCode?: string
+  addressLine?: string
+  addressNumber?: string
+  addressExtra?: string
+  district?: string
   city?: string
   state?: string
   email?: string

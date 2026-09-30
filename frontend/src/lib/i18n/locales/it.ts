@@ -3573,6 +3573,10 @@ const it: Dictionary = {
   'platform.profile.saved': 'Dati salvati. Il sito li mostra già.',
   'platform.profile.nothingChanged': 'Nessuna modifica',
   'platform.profile.emptyHint': 'Salvare un campo vuoto cancella il valore salvato qui e torna a valere quello del .env.',
+  'platform.profile.cnpjLookup': 'Cerca per CNPJ',
+  'platform.profile.cnpjLooking': 'Consultazione del CNPJ…',
+  'platform.profile.cnpjFound': 'Trovato: {name}. Controlla i campi e salva.',
+  'platform.profile.cnpjFailed': 'Impossibile consultare il CNPJ ora; compila a mano.',
 }
 
 export default it

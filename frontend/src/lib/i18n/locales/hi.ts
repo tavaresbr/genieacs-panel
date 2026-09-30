@@ -3575,6 +3575,10 @@ const hi: Dictionary = {
   'platform.profile.saved': 'जानकारी सहेजी गई। साइट पर दिख रही है।',
   'platform.profile.nothingChanged': 'कुछ नहीं बदला',
   'platform.profile.emptyHint': 'खाली फ़ील्ड सहेजने से यहाँ सहेजा गया मान हट जाता है और .env का मान फिर लागू होता है।',
+  'platform.profile.cnpjLookup': 'CNPJ से खोजें',
+  'platform.profile.cnpjLooking': 'CNPJ खोजा जा रहा है…',
+  'platform.profile.cnpjFound': 'मिला: {name}। फ़ील्ड जाँचें और सहेजें।',
+  'platform.profile.cnpjFailed': 'अभी CNPJ नहीं खोजा जा सका; हाथ से भरें।',
 }
 
 export default hi

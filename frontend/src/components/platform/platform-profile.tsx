@@ -1,9 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   platformAPI,
+  publicAPI,
   PLATFORM_PROFILE_FIELDS,
+  type CnpjData,
   type PlatformProfile,
   type PlatformProfileField
 } from '@/lib/api'
@@ -80,6 +82,27 @@ function mascaraCnpj(texto: string) {
 }
 
 /**
+ * O endereço da Receita numa linha: `Rua X, 100 - Sala 2 - Centro, Cidade/UF, CEP 00000-000`.
+ * Parte vazia é pulada, para não sobrar vírgula nem traço solto.
+ */
+function enderecoDoCnpj(d: CnpjData) {
+  const rua = [d.addressLine, d.addressNumber].filter(Boolean).join(', ')
+  const inicio = [rua, d.addressExtra, d.district].filter(Boolean).join(' - ')
+  const cidade = [d.city, d.state].filter(Boolean).join('/')
+  const cep = d.postalCode && /^\d{8}$/.test(d.postalCode.replace(/\D/g, ''))
+    ? `CEP ${d.postalCode.replace(/\D/g, '').replace(/^(\d{5})(\d{3})$/, '$1-$2')}`
+    : ''
+  return [inicio, cidade, cep].filter(Boolean).join(', ')
+}
+
+/** O telefone da Receita (`ddd_telefone_1`) como a tela mostra, se for um número do Brasil. */
+function telefoneDoCnpj(bruto: string | undefined) {
+  const d = String(bruto ?? '').replace(/\D/g, '')
+  if (d.length !== 10 && d.length !== 11) return ''
+  return paraTela('contactWhatsapp', d)
+}
+
+/**
  * Configurações → Dados do SaaS: a empresa que vende, como o site a mostra, e
  * para onde vão os avisos de cadastro e de pedido de demonstração.
  *
@@ -94,8 +117,13 @@ export function PlatformProfileForm() {
   const [rascunho, setRascunho] = useState<Rascunho>(VAZIO)
   const [erro, setErro] = useState<string | null>(null)
   const [salvando, setSalvando] = useState(false)
+  // A consulta do CNPJ na Receita: o estado da tela, e qual CNPJ já foi
+  // consultado — para não repetir a consulta a cada tecla nem ao carregar.
+  const [cnpj, setCnpj] = useState<{ estado: 'idle' | 'looking' | 'found' | 'error'; texto?: string }>({ estado: 'idle' })
+  const consultado = useRef('')
 
   const aplicar = useCallback((dados: PlatformProfile) => {
+    consultado.current = String(dados.values.taxId ?? '').replace(/\D/g, '')
     setPerfil(dados)
     setRascunho(Object.fromEntries(
       PLATFORM_PROFILE_FIELDS.map((campo) => [campo, paraTela(campo, dados.values[campo])])
@@ -111,6 +139,46 @@ export function PlatformProfileForm() {
     }).catch(() => { if (vivo) setErro(t('platform.profile.loadFailed')) })
     return () => { vivo = false }
   }, [aplicar, t])
+
+  /**
+   * Busca o CNPJ na Receita e preenche o rascunho — sem salvar: a pessoa
+   * confere e clica em Salvar.
+   *
+   * Razão social e endereço são sobrescritos, porque o CNPJ é a fonte deles.
+   * Nome fantasia, e-mail e WhatsApp só entram se estiverem vazios: são a
+   * marca e o contato que a pessoa escolheu, e a Receita não sabe disso.
+   */
+  const buscarCnpj = useCallback(async (digitos: string) => {
+    consultado.current = digitos
+    setCnpj({ estado: 'looking' })
+    try {
+      const res = await publicAPI.cnpj(digitos)
+      if (!res.success || !res.data) {
+        setCnpj({ estado: 'error', texto: res.message || t('platform.profile.cnpjFailed') })
+        return
+      }
+      const d = res.data
+      setRascunho((r) => ({
+        ...r,
+        legalName: d.legalName || r.legalName,
+        address: enderecoDoCnpj(d) || r.address,
+        tradeName: r.tradeName.trim() ? r.tradeName : (d.tradeName || ''),
+        contactEmail: r.contactEmail.trim() ? r.contactEmail : (d.email?.toLowerCase() || ''),
+        contactWhatsapp: r.contactWhatsapp.trim() ? r.contactWhatsapp : telefoneDoCnpj(d.phone)
+      }))
+      setCnpj({ estado: 'found', texto: d.legalName })
+    } catch {
+      setCnpj({ estado: 'error', texto: t('platform.profile.cnpjFailed') })
+    }
+  }, [t])
+
+  // Completou os 14 dígitos de um CNPJ novo: consulta sozinho, depois de uma pausa.
+  useEffect(() => {
+    const digitos = rascunho.taxId.replace(/\D/g, '')
+    if (digitos.length !== 14 || digitos === consultado.current) return undefined
+    const timer = window.setTimeout(() => { void buscarCnpj(digitos) }, 400)
+    return () => window.clearTimeout(timer)
+  }, [rascunho.taxId, buscarCnpj])
 
   const salvar = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -174,18 +242,44 @@ export function PlatformProfileForm() {
                   {t(rotulo)}
                   {selo(campo)}
                 </label>
-                <input
-                  id={`profile-${campo}`}
-                  type={tipo ?? 'text'}
-                  className="modern-input w-full"
-                  placeholder={placeholder}
-                  value={rascunho[campo]}
-                  disabled={!perfil.canSave}
-                  onChange={(e) => {
-                    const valor = campo === 'taxId' ? mascaraCnpj(e.target.value) : e.target.value
-                    setRascunho((r) => ({ ...r, [campo]: valor }))
-                  }}
-                />
+                <div className={campo === 'taxId' ? 'flex gap-2' : ''}>
+                  <input
+                    id={`profile-${campo}`}
+                    type={tipo ?? 'text'}
+                    className="modern-input w-full min-w-0"
+                    placeholder={placeholder}
+                    value={rascunho[campo]}
+                    disabled={!perfil.canSave}
+                    aria-describedby={campo === 'taxId' ? 'profile-taxId-status' : undefined}
+                    onChange={(e) => {
+                      const valor = campo === 'taxId' ? mascaraCnpj(e.target.value) : e.target.value
+                      setRascunho((r) => ({ ...r, [campo]: valor }))
+                    }}
+                  />
+                  {campo === 'taxId' && (
+                    <button
+                      type="button"
+                      className="modern-button-secondary shrink-0"
+                      disabled={!perfil.canSave || cnpj.estado === 'looking' || rascunho.taxId.replace(/\D/g, '').length !== 14}
+                      onClick={() => void buscarCnpj(rascunho.taxId.replace(/\D/g, ''))}
+                    >
+                      {t('platform.profile.cnpjLookup')}
+                    </button>
+                  )}
+                </div>
+                {campo === 'taxId' && cnpj.estado !== 'idle' && (
+                  <p
+                    id="profile-taxId-status"
+                    aria-live="polite"
+                    className={`field-hint ${cnpj.estado === 'error' ? 'text-destructive' : cnpj.estado === 'found' ? 'text-emerald-600 dark:text-emerald-400' : ''}`}
+                  >
+                    {cnpj.estado === 'looking'
+                      ? t('platform.profile.cnpjLooking')
+                      : cnpj.estado === 'found'
+                        ? t('platform.profile.cnpjFound', { name: cnpj.texto ?? '' })
+                        : cnpj.texto}
+                  </p>
+                )}
               </div>
             ))}
           </div>
