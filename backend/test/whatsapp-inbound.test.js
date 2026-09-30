@@ -528,6 +528,22 @@ describe('qr and connection', () => {
     assert.equal((await asTenant(() => WhatsAppAccount.getById(accountId))).status, 'connected');
   });
 
+  it('uma mensagem chegando tira o número de "conectando": a sessão está viva', async () => {
+    // O aviso de reconexão se perdeu e o número ficou em "conectando",
+    // recebendo mensagens — e o painel recusava responder.
+    await asTenant(() => WhatsAppAccount.update(accountId, { status: 'connecting', qr_code: null }));
+    const { body } = await hook(eventoV2({ id: 'VIVO-1', remoteJid: '5593981110449@s.whatsapp.net', texto: 'oi' }));
+    assert.equal(body.handled, true);
+    assert.equal((await asTenant(() => WhatsAppAccount.getById(accountId))).status, 'connected');
+  });
+
+  it('mas não desfaz um logout: "desconectado" só sobe pela conferência ao vivo', async () => {
+    await asTenant(() => WhatsAppAccount.update(accountId, { status: 'disconnected' }));
+    await hook(eventoV2({ id: 'ATRASADO-1', remoteJid: '5593981110449@s.whatsapp.net', texto: 'oi' }));
+    assert.equal((await asTenant(() => WhatsAppAccount.getById(accountId))).status, 'disconnected');
+    await asTenant(() => WhatsAppAccount.update(accountId, { status: 'connected' }));
+  });
+
   it('answers 200 with a reason for an event it does not handle', async () => {
     const { status, body } = await hook({ event: 'presence.update', instance: INSTANCE, data: {} });
     assert.equal(status, 200);
