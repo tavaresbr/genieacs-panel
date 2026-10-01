@@ -144,6 +144,15 @@ export function MetaTemplatesPanel({ onSynced }: { onSynced?: () => void }) {
         {' · '}
         {t('whatsapp.metaTemplates.costHint')}
       </p>
+      <a
+        href="https://business.facebook.com/wa/manage/message-templates/"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex w-fit items-center gap-1 text-xs font-semibold text-primary hover:underline"
+      >
+        <Icon name="external" size={12} />
+        {t('whatsapp.cloud.linkTemplates')}
+      </a>
       {account?.metaTemplatesError && (
         <p className="break-all font-mono text-xs text-[hsl(var(--status-danger))]">{account.metaTemplatesError}</p>
       )}

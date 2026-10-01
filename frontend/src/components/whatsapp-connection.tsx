@@ -439,6 +439,17 @@ interface Props {
   compact?: boolean
 }
 
+/**
+ * Os endereços da Meta que o passo a passo cita. São páginas fixas da Meta,
+ * e não do painel: abrir em outra aba, sem `referrer`.
+ */
+const META_LINKS: { href: string; label: TranslationKey }[] = [
+  { href: 'https://developers.facebook.com/apps/creation/', label: 'whatsapp.cloud.linkCreateApp' },
+  { href: 'https://business.facebook.com/settings/system-users', label: 'whatsapp.cloud.linkSystemUsers' },
+  { href: 'https://business.facebook.com/wa/manage/message-templates/', label: 'whatsapp.cloud.linkTemplates' },
+  { href: 'https://developers.facebook.com/docs/whatsapp/cloud-api/get-started', label: 'whatsapp.cloud.linkDocs' }
+]
+
 /** Uma linha com valor e botão de copiar, para colar no app da Meta. */
 function CopyField({ label, value }: { label: string; value: string }) {
   const { t } = useTranslation()
@@ -483,7 +494,22 @@ export function MetaWebhookGuide({ callbackUrl, verifyToken }: { callbackUrl: st
       ) : (
         <p className="text-xs text-[hsl(var(--status-warning))]">{t('whatsapp.cloud.notConfigured')}</p>
       )}
+      <div className="flex flex-wrap gap-2">
+        {META_LINKS.map((link) => (
+          <a
+            key={link.href}
+            href={link.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="modern-button-secondary min-h-9 px-3 py-1 text-xs"
+          >
+            <Icon name="external" size={14} />
+            {t(link.label)}
+          </a>
+        ))}
+      </div>
       <ol className="list-decimal space-y-1 pl-5 text-xs text-muted-foreground">
+        <li>{t('whatsapp.cloud.step0')}</li>
         <li>{t('whatsapp.cloud.step1')}</li>
         <li>{t('whatsapp.cloud.step2')}</li>
         <li>{t('whatsapp.cloud.step3')}</li>

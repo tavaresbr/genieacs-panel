@@ -3766,6 +3766,11 @@ const de: Dictionary = {
   'whatsapp.error.metaTemplatesCloudOnly': "Meta-Vorlagen gibt es nur bei einer Nummer der offiziellen API.",
   'whatsapp.error.metaTemplateUnavailable': "Diese Vorlage ist für diese Nummer nicht von Meta genehmigt (oder ein Parameter fehlt). Synchronisieren und prüfen Sie die Vorlagen.",
   'whatsapp.error.metaParamMismatch': "Die Parameterzahl passt nicht zur Meta-Vorlage: Wählen Sie für jeden eine Variable.",
+  'whatsapp.cloud.step0': "Erstellen Sie in Meta for Developers eine App vom Typ „Unternehmen“, verknüpfen Sie sie mit Ihrem Business Manager und fügen Sie das Produkt WhatsApp hinzu.",
+  'whatsapp.cloud.linkCreateApp': "Meta-App erstellen",
+  'whatsapp.cloud.linkSystemUsers': "Systembenutzer (Token)",
+  'whatsapp.cloud.linkTemplates': "Vorlagen-Manager",
+  'whatsapp.cloud.linkDocs': "Cloud-API-Leitfaden",
 }
 
 export default de

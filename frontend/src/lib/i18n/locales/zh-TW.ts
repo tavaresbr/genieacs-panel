@@ -3763,6 +3763,11 @@ const zhTW: Dictionary = {
   'whatsapp.error.metaTemplatesCloudOnly': "Meta 範本僅存在於官方 API 號碼。",
   'whatsapp.error.metaTemplateUnavailable': "此範本未獲 Meta 核准用於此號碼（或缺少參數）。請同步範本並檢查。",
   'whatsapp.error.metaParamMismatch': "參數數量與 Meta 範本不符：請為每個參數選擇變數。",
+  'whatsapp.cloud.step0': "在 Meta for Developers 建立「商家」類型應用程式，連結到你的企業管理平台並新增 WhatsApp 產品。",
+  'whatsapp.cloud.linkCreateApp': "建立 Meta 應用程式",
+  'whatsapp.cloud.linkSystemUsers': "系統使用者（權杖）",
+  'whatsapp.cloud.linkTemplates': "範本管理工具",
+  'whatsapp.cloud.linkDocs': "Cloud API 指南",
 }
 
 export default zhTW

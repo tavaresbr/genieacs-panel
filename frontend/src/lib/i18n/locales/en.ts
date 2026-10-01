@@ -3764,6 +3764,11 @@ const en = {
   'whatsapp.error.metaTemplatesCloudOnly': "Meta templates only exist on an official API number.",
   'whatsapp.error.metaTemplateUnavailable': "That template is not approved by Meta for this number (or a parameter is missing). Sync the templates and check.",
   'whatsapp.error.metaParamMismatch': "The parameter count does not match the Meta template: pick one variable for each.",
+  'whatsapp.cloud.step0': "In Meta for Developers, create a \"Business\" type app, link it to your Business Manager and add the WhatsApp product.",
+  'whatsapp.cloud.linkCreateApp': "Create a Meta app",
+  'whatsapp.cloud.linkSystemUsers': "System users (token)",
+  'whatsapp.cloud.linkTemplates': "Template manager",
+  'whatsapp.cloud.linkDocs': "Cloud API guide",
 }
 
 export default en
