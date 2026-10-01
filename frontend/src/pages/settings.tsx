@@ -60,6 +60,7 @@ import type { Vendor as VendorType, WifiSecurityConfig as WifiSecurityConfigType
 import { MfaCard } from '@/components/mfa-card'
 import { AboutTab } from '@/components/settings/about-tab'
 import { ChatbotTab } from '@/components/settings/chatbot-tab'
+import { IntegrationsHub } from '@/components/settings/integrations-hub'
 import { MfaPolicyCard } from '@/components/mfa-policy-card'
 import { canOfferMfaReset, canOfferPasswordReset } from '@/lib/mfa-enrollment'
 
@@ -94,9 +95,16 @@ const GENIE_SECRET_STATE_BADGES: Record<GenieSecretState, string> = {
 
 /** The tabs `?tab=` may open. */
 const SETTINGS_TABS = [
-  'provider', 'general', 'virtual-params', 'customer-portal', 'sgp', 'teiah', 'provisioning',
+  'provider', 'general', 'virtual-params', 'customer-portal', 'integrations', 'sgp', 'teiah', 'provisioning',
   'whatsapp', 'chatbot', 'security', 'vendors', 'wifi-security', 'database', 'about'
 ]
+
+/**
+ * As abas que moram dentro de "Integrações": saem da trilha e viram cards.
+ * Continuam abrindo por `?tab=sgp` etc., e a trilha acende "Integrações"
+ * enquanto uma delas está aberta.
+ */
+const INTEGRATION_TABS = ['sgp', 'teiah', 'whatsapp', 'chatbot']
 
 // Botão só de ícone nas listas: 40px de alvo abaixo do desktop, onde o toque
 // precisa; no lg a linha da tabela volta ao tamanho do ícone.
@@ -1690,26 +1698,17 @@ export default function Settings() {
             >
               {t('settings.tab.customerPortal')}
             </button>
+            {/* As integrações (SGP, TeiaH, WhatsApp, chatbot) moram numa aba
+                só, em cards; a trilha a acende enquanto uma delas está aberta. */}
             <button
-              onClick={() => setActiveTab('sgp')}
+              onClick={() => setActiveTab('integrations')}
               className="tab-button"
-              data-active={activeTab === 'sgp'}
+              data-active={activeTab === 'integrations' || INTEGRATION_TABS.includes(activeTab)}
               role="tab"
-              aria-selected={activeTab === 'sgp'}
+              aria-selected={activeTab === 'integrations' || INTEGRATION_TABS.includes(activeTab)}
             >
-              {t('settings.tab.sgp')}
+              {t('settings.tab.integrations')}
             </button>
-            {can('teiah.read') && (
-              <button
-                onClick={() => setActiveTab('teiah')}
-                className="tab-button"
-                data-active={activeTab === 'teiah'}
-                role="tab"
-                aria-selected={activeTab === 'teiah'}
-              >
-                {t('settings.tab.teiah')}
-              </button>
-            )}
             <button
               onClick={() => setActiveTab('provisioning')}
               className="tab-button"
@@ -1719,29 +1718,6 @@ export default function Settings() {
             >
               {t('settings.tab.provisioning')}
             </button>
-            <button
-              onClick={() => setActiveTab('whatsapp')}
-              className="tab-button"
-              data-active={activeTab === 'whatsapp'}
-              role="tab"
-              aria-selected={activeTab === 'whatsapp'}
-            >
-              {/* The dictionary has no `settings.tab.whatsapp`; the navigation
-                  label is the same word in every locale and adding a key would
-                  mean editing five files another agent owns. */}
-              {t('sidebar.nav.whatsapp')}
-            </button>
-            {can('whatsapp.config') && (
-              <button
-                onClick={() => setActiveTab('chatbot')}
-                className="tab-button"
-                data-active={activeTab === 'chatbot'}
-                role="tab"
-                aria-selected={activeTab === 'chatbot'}
-              >
-                {t('settings.tab.chatbot')}
-              </button>
-            )}
             <button
               onClick={() => setActiveTab('security')}
               className="tab-button"
@@ -1795,6 +1771,23 @@ export default function Settings() {
         </div>
 
         {/* Content */}
+        {activeTab === 'integrations' && (
+          <IntegrationsHub
+            onOpen={setActiveTab}
+            canTeiah={can('teiah.read')}
+            canChatbot={can('whatsapp.config')}
+          />
+        )}
+        {INTEGRATION_TABS.includes(activeTab) && (
+          <button
+            type="button"
+            onClick={() => setActiveTab('integrations')}
+            className="mb-4 inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-foreground"
+          >
+            <Icon name="chevron-left" size={16} />
+            {t('settings.integrations.back')}
+          </button>
+        )}
         {activeTab === 'provider' && canEditProvider && (
           <div className="space-y-6">
             <ProviderAddressPanel />

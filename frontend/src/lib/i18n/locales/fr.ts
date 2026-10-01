@@ -3657,6 +3657,16 @@ const fr: Dictionary = {
   'platform.profile.cnpjLooking': 'Recherche du CNPJ…',
   'platform.profile.cnpjFound': 'Trouvé : {name}. Vérifiez les champs et enregistrez.',
   'platform.profile.cnpjFailed': 'Impossible de consulter le CNPJ pour le moment ; remplissez à la main.',
+  // Configuração → Integrações
+  'settings.tab.integrations': 'Intégrations',
+  'settings.integrations.title': 'Intégrations',
+  'settings.integrations.description': 'Les systèmes externes avec lesquels ce panneau communique. Choisissez-en un pour le configurer.',
+  'settings.integrations.back': 'Retour aux intégrations',
+  'settings.integrations.open': 'Ouvrir',
+  'settings.integrations.sgpDesc': 'Contrats, offres et suspensions de l’ERP, provisionnement automatique par offre et événements par webhook.',
+  'settings.integrations.teiahDesc': 'Validation d’identité des abonnés avec TeiaH Valid.',
+  'settings.integrations.whatsappDesc': 'Numéros WhatsApp via Evolution API : alertes, facturation et boîte de support.',
+  'settings.integrations.chatbotDesc': 'Le bot WhatsApp : menu, réponses automatiques et transfert à un agent.',
 }
 
 export default fr

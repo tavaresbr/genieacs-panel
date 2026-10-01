@@ -3659,6 +3659,16 @@ const en = {
   'platform.profile.cnpjLooking': 'Looking up the CNPJ…',
   'platform.profile.cnpjFound': 'Found: {name}. Review the fields and save.',
   'platform.profile.cnpjFailed': 'Could not look up the CNPJ right now; fill it in by hand.',
+  // Configuração → Integrações
+  'settings.tab.integrations': 'Integrations',
+  'settings.integrations.title': 'Integrations',
+  'settings.integrations.description': 'The external systems this panel talks to. Pick one to configure it.',
+  'settings.integrations.back': 'Back to integrations',
+  'settings.integrations.open': 'Open',
+  'settings.integrations.sgpDesc': 'Contracts, plans and suspensions from the ERP, automatic provisioning by plan and events via webhook.',
+  'settings.integrations.teiahDesc': 'Identity validation of subscribers with TeiaH Valid.',
+  'settings.integrations.whatsappDesc': 'WhatsApp numbers via Evolution API: alerts, billing and the support inbox.',
+  'settings.integrations.chatbotDesc': 'The WhatsApp bot: menu, automatic replies and handoff to a human.',
 }
 
 export default en

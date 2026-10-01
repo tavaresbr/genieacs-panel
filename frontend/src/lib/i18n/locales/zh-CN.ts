@@ -3657,6 +3657,16 @@ const zhCN: Dictionary = {
   'platform.profile.cnpjLooking': '正在查询 CNPJ…',
   'platform.profile.cnpjFound': '已找到：{name}。请核对字段后保存。',
   'platform.profile.cnpjFailed': '暂时无法查询 CNPJ；请手动填写。',
+  // Configuração → Integrações
+  'settings.tab.integrations': '集成',
+  'settings.integrations.title': '集成',
+  'settings.integrations.description': '此面板对接的外部系统。选择一个进行配置。',
+  'settings.integrations.back': '返回集成',
+  'settings.integrations.open': '打开',
+  'settings.integrations.sgpDesc': '来自 ERP 的合同、套餐和停机，按套餐自动开通，以及通过 Webhook 的事件。',
+  'settings.integrations.teiahDesc': '通过 TeiaH Valid 验证用户身份。',
+  'settings.integrations.whatsappDesc': '通过 Evolution API 接入的 WhatsApp 号码：告警、账单和客服收件箱。',
+  'settings.integrations.chatbotDesc': 'WhatsApp 机器人：菜单、自动回复和转人工。',
 }
 
 export default zhCN
