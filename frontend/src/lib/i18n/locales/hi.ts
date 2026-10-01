@@ -3658,6 +3658,16 @@ const hi: Dictionary = {
   'platform.profile.cnpjLooking': 'CNPJ खोजा जा रहा है…',
   'platform.profile.cnpjFound': 'मिला: {name}। फ़ील्ड जाँचें और सहेजें।',
   'platform.profile.cnpjFailed': 'अभी CNPJ नहीं खोजा जा सका; हाथ से भरें।',
+  // Configuração → Integrações
+  'settings.tab.integrations': 'इंटीग्रेशन',
+  'settings.integrations.title': 'इंटीग्रेशन',
+  'settings.integrations.description': 'वे बाहरी सिस्टम जिनसे यह पैनल बात करता है। सेट करने के लिए एक चुनें।',
+  'settings.integrations.back': 'इंटीग्रेशन पर वापस',
+  'settings.integrations.open': 'खोलें',
+  'settings.integrations.sgpDesc': 'ERP से अनुबंध, प्लान और ब्लॉक, प्लान के अनुसार स्वचालित प्रोविज़निंग और वेबहुक से इवेंट।',
+  'settings.integrations.teiahDesc': 'TeiaH Valid से सब्सक्राइबर की पहचान जाँच।',
+  'settings.integrations.whatsappDesc': 'Evolution API से WhatsApp नंबर: अलर्ट, बिलिंग और सपोर्ट इनबॉक्स।',
+  'settings.integrations.chatbotDesc': 'WhatsApp बॉट: मेनू, स्वचालित जवाब और एजेंट को हस्तांतरण।',
 }
 
 export default hi

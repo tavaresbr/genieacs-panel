@@ -3650,6 +3650,16 @@ const ptBR: Dictionary = {
   'platform.profile.cnpjLooking': 'Consultando o CNPJ…',
   'platform.profile.cnpjFound': 'Encontrado: {name}. Confira os campos e salve.',
   'platform.profile.cnpjFailed': 'Não foi possível consultar o CNPJ agora; preencha à mão.',
+  // Configuração → Integrações
+  'settings.tab.integrations': 'Integrações',
+  'settings.integrations.title': 'Integrações',
+  'settings.integrations.description': 'Os sistemas de fora com que este painel conversa. Escolha um para configurar.',
+  'settings.integrations.back': 'Voltar para integrações',
+  'settings.integrations.open': 'Abrir',
+  'settings.integrations.sgpDesc': 'Contratos, planos e bloqueios do ERP, provisionamento automático por plano e eventos por webhook.',
+  'settings.integrations.teiahDesc': 'Validação de identidade dos assinantes com a TeiaH Valid.',
+  'settings.integrations.whatsappDesc': 'Números de WhatsApp pela Evolution API: alertas, cobrança e caixa de atendimento.',
+  'settings.integrations.chatbotDesc': 'O bot do WhatsApp: menu, respostas automáticas e passagem para um atendente.',
 }
 
 export default ptBR

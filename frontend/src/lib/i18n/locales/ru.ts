@@ -3658,6 +3658,16 @@ const ru: Dictionary = {
   'platform.profile.cnpjLooking': 'Проверяем CNPJ…',
   'platform.profile.cnpjFound': 'Найдено: {name}. Проверьте поля и сохраните.',
   'platform.profile.cnpjFailed': 'Сейчас не удалось проверить CNPJ; заполните вручную.',
+  // Configuração → Integrações
+  'settings.tab.integrations': 'Интеграции',
+  'settings.integrations.title': 'Интеграции',
+  'settings.integrations.description': 'Внешние системы, с которыми работает эта панель. Выберите одну для настройки.',
+  'settings.integrations.back': 'Назад к интеграциям',
+  'settings.integrations.open': 'Открыть',
+  'settings.integrations.sgpDesc': 'Договоры, тарифы и блокировки из ERP, автоматическая настройка по тарифу и события через вебхук.',
+  'settings.integrations.teiahDesc': 'Проверка личности абонентов через TeiaH Valid.',
+  'settings.integrations.whatsappDesc': 'Номера WhatsApp через Evolution API: оповещения, биллинг и входящие поддержки.',
+  'settings.integrations.chatbotDesc': 'Бот WhatsApp: меню, автоответы и передача оператору.',
 }
 
 export default ru

@@ -3659,6 +3659,16 @@ const ar: Dictionary = {
   'platform.profile.cnpjLooking': 'جارٍ الاستعلام عن CNPJ…',
   'platform.profile.cnpjFound': 'تم العثور: {name}. راجع الحقول ثم احفظ.',
   'platform.profile.cnpjFailed': 'تعذّر الاستعلام عن CNPJ الآن؛ املأ الحقول يدويًا.',
+  // Configuração → Integrações
+  'settings.tab.integrations': 'التكاملات',
+  'settings.integrations.title': 'التكاملات',
+  'settings.integrations.description': 'الأنظمة الخارجية التي تتواصل معها هذه اللوحة. اختر واحدًا لإعداده.',
+  'settings.integrations.back': 'العودة إلى التكاملات',
+  'settings.integrations.open': 'فتح',
+  'settings.integrations.sgpDesc': 'العقود والخطط والإيقاف من ERP، والتهيئة التلقائية حسب الخطة، والأحداث عبر webhook.',
+  'settings.integrations.teiahDesc': 'التحقق من هوية المشتركين عبر TeiaH Valid.',
+  'settings.integrations.whatsappDesc': 'أرقام واتساب عبر Evolution API: التنبيهات والفوترة وصندوق الدعم.',
+  'settings.integrations.chatbotDesc': 'بوت واتساب: القائمة والردود التلقائية والتحويل إلى موظف.',
 }
 
 export default ar

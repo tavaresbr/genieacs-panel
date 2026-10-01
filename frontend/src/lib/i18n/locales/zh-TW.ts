@@ -3651,6 +3651,16 @@ const zhTW: Dictionary = {
   'platform.profile.cnpjLooking': '正在查詢 CNPJ…',
   'platform.profile.cnpjFound': '已找到：{name}。請核對欄位後儲存。',
   'platform.profile.cnpjFailed': '暫時無法查詢 CNPJ；請手動填寫。',
+  // Configuração → Integrações
+  'settings.tab.integrations': '整合',
+  'settings.integrations.title': '整合',
+  'settings.integrations.description': '此面板對接的外部系統。選擇一個進行設定。',
+  'settings.integrations.back': '返回整合',
+  'settings.integrations.open': '開啟',
+  'settings.integrations.sgpDesc': '來自 ERP 的合約、方案與停機，依方案自動開通，以及透過 Webhook 的事件。',
+  'settings.integrations.teiahDesc': '透過 TeiaH Valid 驗證用戶身分。',
+  'settings.integrations.whatsappDesc': '透過 Evolution API 接入的 WhatsApp 號碼：告警、帳單與客服收件匣。',
+  'settings.integrations.chatbotDesc': 'WhatsApp 機器人：選單、自動回覆與轉真人。',
 }
 
 export default zhTW

@@ -3657,6 +3657,16 @@ const ko: Dictionary = {
   'platform.profile.cnpjLooking': 'CNPJ 조회 중…',
   'platform.profile.cnpjFound': '찾음: {name}. 항목을 확인하고 저장하세요.',
   'platform.profile.cnpjFailed': '지금은 CNPJ를 조회할 수 없습니다. 직접 입력하세요.',
+  // Configuração → Integrações
+  'settings.tab.integrations': '연동',
+  'settings.integrations.title': '연동',
+  'settings.integrations.description': '이 패널이 연결하는 외부 시스템입니다. 설정할 항목을 선택하세요.',
+  'settings.integrations.back': '연동으로 돌아가기',
+  'settings.integrations.open': '열기',
+  'settings.integrations.sgpDesc': 'ERP의 계약·요금제·차단, 요금제별 자동 프로비저닝, 웹훅 이벤트.',
+  'settings.integrations.teiahDesc': 'TeiaH Valid를 통한 가입자 본인 확인.',
+  'settings.integrations.whatsappDesc': 'Evolution API를 통한 WhatsApp 번호: 알림, 청구, 상담함.',
+  'settings.integrations.chatbotDesc': 'WhatsApp 봇: 메뉴, 자동 응답, 상담원 연결.',
 }
 
 export default ko

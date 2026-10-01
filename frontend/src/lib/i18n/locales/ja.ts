@@ -3650,6 +3650,16 @@ const ja: Dictionary = {
   'platform.profile.cnpjLooking': 'CNPJ を照会中…',
   'platform.profile.cnpjFound': '見つかりました: {name}。内容を確認して保存してください。',
   'platform.profile.cnpjFailed': '現在 CNPJ を照会できません。手動で入力してください。',
+  // Configuração → Integrações
+  'settings.tab.integrations': '連携',
+  'settings.integrations.title': '連携',
+  'settings.integrations.description': 'このパネルが連携する外部システム。設定するものを選んでください。',
+  'settings.integrations.back': '連携に戻る',
+  'settings.integrations.open': '開く',
+  'settings.integrations.sgpDesc': 'ERP の契約・プラン・停止、プランごとの自動プロビジョニング、Webhook によるイベント。',
+  'settings.integrations.teiahDesc': 'TeiaH Valid による加入者の本人確認。',
+  'settings.integrations.whatsappDesc': 'Evolution API 経由の WhatsApp 番号: アラート、請求、サポート受信箱。',
+  'settings.integrations.chatbotDesc': 'WhatsApp ボット: メニュー、自動応答、担当者への引き継ぎ。',
 }
 
 export default ja
