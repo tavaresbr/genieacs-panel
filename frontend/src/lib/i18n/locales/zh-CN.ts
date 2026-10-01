@@ -3762,6 +3762,11 @@ const zhCN: Dictionary = {
   'whatsapp.error.metaTemplatesCloudOnly': "Meta 模板仅存在于官方 API 号码。",
   'whatsapp.error.metaTemplateUnavailable': "该模板未获 Meta 批准用于此号码（或缺少参数）。请同步模板并检查。",
   'whatsapp.error.metaParamMismatch': "参数数量与 Meta 模板不符：请为每个参数选择变量。",
+  'whatsapp.cloud.step0': "在 Meta for Developers 中创建“商务”类型应用，关联到你的商务管理平台并添加 WhatsApp 产品。",
+  'whatsapp.cloud.linkCreateApp': "创建 Meta 应用",
+  'whatsapp.cloud.linkSystemUsers': "系统用户（令牌）",
+  'whatsapp.cloud.linkTemplates': "模板管理器",
+  'whatsapp.cloud.linkDocs': "Cloud API 指南",
 }
 
 export default zhCN

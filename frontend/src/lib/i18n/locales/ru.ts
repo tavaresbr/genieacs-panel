@@ -3770,6 +3770,11 @@ const ru: Dictionary = {
   'whatsapp.error.metaTemplatesCloudOnly': "Шаблоны Meta есть только у номера официального API.",
   'whatsapp.error.metaTemplateUnavailable': "Этот шаблон не одобрен Meta для этого номера (или не хватает параметра). Синхронизируйте шаблоны и проверьте.",
   'whatsapp.error.metaParamMismatch': "Число параметров не совпадает с шаблоном Meta: выберите переменную для каждого.",
+  'whatsapp.cloud.step0': "В Meta for Developers создайте приложение типа «Бизнес», привяжите его к Business Manager и добавьте продукт WhatsApp.",
+  'whatsapp.cloud.linkCreateApp': "Создать приложение Meta",
+  'whatsapp.cloud.linkSystemUsers': "Системные пользователи (токен)",
+  'whatsapp.cloud.linkTemplates': "Менеджер шаблонов",
+  'whatsapp.cloud.linkDocs': "Руководство по Cloud API",
 }
 
 export default ru

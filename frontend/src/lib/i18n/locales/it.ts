@@ -3768,6 +3768,11 @@ const it: Dictionary = {
   'whatsapp.error.metaTemplatesCloudOnly': "I modelli Meta esistono solo su un numero dell’API ufficiale.",
   'whatsapp.error.metaTemplateUnavailable': "Questo modello non è approvato da Meta per questo numero (o manca un parametro). Sincronizza i modelli e controlla.",
   'whatsapp.error.metaParamMismatch': "Il numero di parametri non corrisponde al modello Meta: scegli una variabile per ciascuno.",
+  'whatsapp.cloud.step0': "In Meta for Developers, crea un’app di tipo \"Business\", collegala al tuo Business Manager e aggiungi il prodotto WhatsApp.",
+  'whatsapp.cloud.linkCreateApp': "Crea app Meta",
+  'whatsapp.cloud.linkSystemUsers': "Utenti di sistema (token)",
+  'whatsapp.cloud.linkTemplates': "Gestione modelli",
+  'whatsapp.cloud.linkDocs': "Guida Cloud API",
 }
 
 export default it

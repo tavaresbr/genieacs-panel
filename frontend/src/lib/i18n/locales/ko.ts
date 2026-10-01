@@ -3769,6 +3769,11 @@ const ko: Dictionary = {
   'whatsapp.error.metaTemplatesCloudOnly': "Meta 템플릿은 공식 API 번호에만 있습니다.",
   'whatsapp.error.metaTemplateUnavailable': "이 템플릿은 이 번호에서 Meta 승인을 받지 않았거나 매개변수가 빠졌습니다. 템플릿을 동기화하고 확인하세요.",
   'whatsapp.error.metaParamMismatch': "매개변수 수가 Meta 템플릿과 맞지 않습니다. 각각에 변수를 고르세요.",
+  'whatsapp.cloud.step0': "Meta for Developers에서 \"비즈니스\" 유형 앱을 만들고 비즈니스 관리자에 연결한 뒤 WhatsApp 제품을 추가하세요.",
+  'whatsapp.cloud.linkCreateApp': "Meta 앱 만들기",
+  'whatsapp.cloud.linkSystemUsers': "시스템 사용자(토큰)",
+  'whatsapp.cloud.linkTemplates': "템플릿 관리자",
+  'whatsapp.cloud.linkDocs': "Cloud API 가이드",
 }
 
 export default ko

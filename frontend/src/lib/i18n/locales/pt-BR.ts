@@ -3762,6 +3762,11 @@ const ptBR: Dictionary = {
   'whatsapp.error.metaTemplatesCloudOnly': "Modelos da Meta só existem em número da API oficial.",
   'whatsapp.error.metaTemplateUnavailable': "Esse modelo não está aprovado na Meta para este número (ou falta preencher um parâmetro). Sincronize os modelos e confira.",
   'whatsapp.error.metaParamMismatch': "A quantidade de parâmetros não bate com o modelo da Meta: escolha uma variável para cada um.",
+  'whatsapp.cloud.step0': "Em Meta for Developers, crie um app do tipo \"Empresa\", ligue-o ao seu Gerenciador de Negócios e adicione o produto WhatsApp.",
+  'whatsapp.cloud.linkCreateApp': "Criar app na Meta",
+  'whatsapp.cloud.linkSystemUsers': "Usuários do sistema (token)",
+  'whatsapp.cloud.linkTemplates': "Gerenciador de modelos",
+  'whatsapp.cloud.linkDocs': "Guia da Cloud API",
 }
 
 export default ptBR

@@ -3762,6 +3762,11 @@ const es: Dictionary = {
   'whatsapp.error.metaTemplatesCloudOnly': "Las plantillas de Meta solo existen en un número de la API oficial.",
   'whatsapp.error.metaTemplateUnavailable': "Esa plantilla no está aprobada por Meta para este número (o falta un parámetro). Sincronice las plantillas y revise.",
   'whatsapp.error.metaParamMismatch': "La cantidad de parámetros no coincide con la plantilla de Meta: elija una variable para cada uno.",
+  'whatsapp.cloud.step0': "En Meta for Developers, cree una app de tipo \"Empresa\", vincúlela a su Business Manager y agregue el producto WhatsApp.",
+  'whatsapp.cloud.linkCreateApp': "Crear app en Meta",
+  'whatsapp.cloud.linkSystemUsers': "Usuarios del sistema (token)",
+  'whatsapp.cloud.linkTemplates': "Administrador de plantillas",
+  'whatsapp.cloud.linkDocs': "Guía de la Cloud API",
 }
 
 export default es

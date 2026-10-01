@@ -3770,6 +3770,11 @@ const hi: Dictionary = {
   'whatsapp.error.metaTemplatesCloudOnly': "Meta टेम्पलेट केवल आधिकारिक API नंबर पर होते हैं।",
   'whatsapp.error.metaTemplateUnavailable': "यह टेम्पलेट इस नंबर के लिए Meta द्वारा स्वीकृत नहीं है (या कोई पैरामीटर छूटा है)। टेम्पलेट सिंक करके जाँचें।",
   'whatsapp.error.metaParamMismatch': "पैरामीटर की संख्या Meta टेम्पलेट से मेल नहीं खाती: हर एक के लिए वेरिएबल चुनें।",
+  'whatsapp.cloud.step0': "Meta for Developers में \"Business\" प्रकार का ऐप बनाएँ, उसे अपने Business Manager से जोड़ें और WhatsApp प्रोडक्ट जोड़ें।",
+  'whatsapp.cloud.linkCreateApp': "Meta ऐप बनाएँ",
+  'whatsapp.cloud.linkSystemUsers': "सिस्टम यूज़र (टोकन)",
+  'whatsapp.cloud.linkTemplates': "टेम्पलेट मैनेजर",
+  'whatsapp.cloud.linkDocs': "Cloud API गाइड",
 }
 
 export default hi

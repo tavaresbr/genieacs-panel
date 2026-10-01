@@ -269,6 +269,14 @@ No servidor Evolution: `WA_BUSINESS_TOKEN_WEBHOOK`, `WA_BUSINESS_URL=https://gra
 pela internet. Um único callback serve todos os provedores: o Evolution roteia
 pelo `phone_number_id`.
 
+**Um app da Meta por provedor.** Cada provedor cria o próprio app (tipo
+Empresa, com o produto WhatsApp) no Gerenciador de Negócios dele, gera o token
+permanente de um usuário do sistema e cola no painel; o callback e o token de
+verificação são os mesmos para todos (os da plataforma). Um app único da
+plataforma servindo os números dos provedores exige virar *Tech Provider* na
+Meta (verificação da empresa e Embedded Signup) — fica para depois.
+
+
 **Janela de 24 horas.** Num número oficial, texto livre só é aceito até 24 h
 depois da última mensagem do cliente **naquele número**
 (`wa_conversations.last_inbound_at`, com 30 min de folga para a fila). Regra

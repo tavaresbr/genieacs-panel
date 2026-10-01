@@ -3771,6 +3771,11 @@ const ar: Dictionary = {
   'whatsapp.error.metaTemplatesCloudOnly': "قوالب Meta موجودة فقط في رقم الواجهة الرسمية.",
   'whatsapp.error.metaTemplateUnavailable': "هذا القالب غير معتمد من Meta لهذا الرقم (أو ينقص معامل). زامن القوالب وتحقق.",
   'whatsapp.error.metaParamMismatch': "عدد المعاملات لا يطابق قالب Meta: اختر متغيرًا لكل منها.",
+  'whatsapp.cloud.step0': "في Meta for Developers أنشئ تطبيقًا من نوع \"أعمال\" واربطه بمدير الأعمال وأضف منتج WhatsApp.",
+  'whatsapp.cloud.linkCreateApp': "إنشاء تطبيق Meta",
+  'whatsapp.cloud.linkSystemUsers': "مستخدمو النظام (الرمز)",
+  'whatsapp.cloud.linkTemplates': "مدير القوالب",
+  'whatsapp.cloud.linkDocs': "دليل Cloud API",
 }
 
 export default ar

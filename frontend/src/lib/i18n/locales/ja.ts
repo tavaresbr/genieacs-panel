@@ -3762,6 +3762,11 @@ const ja: Dictionary = {
   'whatsapp.error.metaTemplatesCloudOnly': "Meta テンプレートは公式 API の番号にのみ存在します。",
   'whatsapp.error.metaTemplateUnavailable': "このテンプレートはこの番号で Meta に承認されていません（またはパラメーターが不足しています）。同期して確認してください。",
   'whatsapp.error.metaParamMismatch': "パラメーター数が Meta テンプレートと一致しません。それぞれに変数を選んでください。",
+  'whatsapp.cloud.step0': "Meta for Developers で「ビジネス」タイプのアプリを作成し、ビジネスマネージャに紐づけて WhatsApp 製品を追加します。",
+  'whatsapp.cloud.linkCreateApp': "Meta アプリを作成",
+  'whatsapp.cloud.linkSystemUsers': "システムユーザー（トークン）",
+  'whatsapp.cloud.linkTemplates': "テンプレートマネージャ",
+  'whatsapp.cloud.linkDocs': "Cloud API ガイド",
 }
 
 export default ja
