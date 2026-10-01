@@ -16,6 +16,10 @@ router.get('/templates', ...leitura, WhatsAppBillingController.listTemplates);
 router.post('/templates', ...gestao, WhatsAppBillingController.createTemplate);
 router.put('/templates/:id', ...gestao, WhatsAppBillingController.updateTemplate);
 router.delete('/templates/:id', ...gestao, WhatsAppBillingController.deleteTemplate);
+// Os avisos automáticos (manutenção, queda, alerta) ligados a modelos da Meta,
+// para o número oficial mandar fora da janela de 24 h.
+router.get('/meta-notice-bindings', ...leitura, WhatsAppBillingController.getMetaNoticeBindings);
+router.put('/meta-notice-bindings', ...gestao, WhatsAppBillingController.saveMetaNoticeBindings);
 
 // ── Do not disturb ─────────────────────────────────────────────────────
 router.get('/opt-outs', ...leitura, WhatsAppBillingController.listOptOuts);

@@ -3687,8 +3687,40 @@ export interface WhatsAppTemplate {
   body: string
   category: string
   active: boolean
+  /** O modelo aprovado da Meta usado fora da janela de 24 h, num número oficial. */
+  metaTemplateName?: string | null
+  metaLanguage?: string | null
+  /** Nossas variáveis, na ordem de `{{1}}`, `{{2}}`… (`texto` = o texto inteiro). */
+  metaParams?: string[]
   createdAt: string | null
   updatedAt: string | null
+}
+
+/** Um modelo (template) da conta WABA de um número oficial, sincronizado da Meta. */
+export interface WhatsAppMetaTemplate {
+  id: number
+  accountId: number
+  name: string
+  language: string
+  category: string | null
+  status: string | null
+  bodyText: string
+  paramCount: number
+  paramFormat: 'positional' | 'named'
+  supported: boolean
+  /** Aprovado e com formato que o painel sabe enviar. */
+  usable: boolean
+  syncedAt: string | null
+}
+
+export type MetaNoticeKey = 'maintenance' | 'outage' | 'alert'
+export type MetaNoticeBindings = Record<MetaNoticeKey, { name: string; language: string; paramCount: number } | null>
+
+/** O modelo da Meta de um envio: nome, idioma e os parâmetros já preenchidos. */
+export interface MetaTemplatePayload {
+  name: string
+  language: string
+  params: string[]
 }
 
 export interface WhatsAppOptOut {
@@ -4381,11 +4413,44 @@ export const whatsappAPI = {
     return apiClient.get<WhatsAppTemplate[]>(`/whatsapp/templates${suffix ? `?${suffix}` : ''}`)
   },
 
-  createTemplate: (payload: { name: string; body: string; category?: string }) =>
+  createTemplate: (payload: {
+    name: string
+    body: string
+    category?: string
+    metaTemplateName?: string
+    metaLanguage?: string
+    metaParams?: string[]
+  }) =>
     apiClient.post<WhatsAppTemplate>('/whatsapp/templates', payload),
 
-  updateTemplate: (id: number, patch: Partial<{ name: string; body: string; category: string; active: boolean }>) =>
+  updateTemplate: (id: number, patch: Partial<{
+    name: string
+    body: string
+    category: string
+    active: boolean
+    metaTemplateName: string
+    metaLanguage: string
+    metaParams: string[]
+  }>) =>
     apiClient.put<WhatsAppTemplate>(`/whatsapp/templates/${id}`, patch),
+
+  // ── Modelos aprovados da Meta (número oficial) ───────────────────────
+  syncMetaTemplates: (accountId: number) =>
+    apiClient.post<WhatsAppMetaTemplate[]>(`/whatsapp/accounts/${accountId}/templates/sync`, {}),
+
+  listMetaTemplates: (params: { accountId?: number; usable?: boolean } = {}) => {
+    const query = new URLSearchParams()
+    if (params.accountId) query.set('accountId', String(params.accountId))
+    if (params.usable) query.set('usable', '1')
+    const suffix = query.toString()
+    return apiClient.get<WhatsAppMetaTemplate[]>(`/whatsapp/meta-templates${suffix ? `?${suffix}` : ''}`)
+  },
+
+  getMetaNoticeBindings: () =>
+    apiClient.get<MetaNoticeBindings>('/whatsapp/meta-notice-bindings'),
+
+  saveMetaNoticeBindings: (bindings: Partial<Record<MetaNoticeKey, { name: string; language: string } | null>>) =>
+    apiClient.put<MetaNoticeBindings>('/whatsapp/meta-notice-bindings', bindings),
 
   deleteTemplate: (id: number) =>
     apiClient.delete(`/whatsapp/templates/${id}`),
@@ -4692,7 +4757,7 @@ export const whatsappAPI = {
 
   // Enqueues and returns; the outbox worker delivers. An internal note is
   // stored and never sent.
-  sendMessage: (conversationId: number, payload: { body?: string; attachment?: { url: string; type?: string; name?: string }; isNote?: boolean }) =>
+  sendMessage: (conversationId: number, payload: { body?: string; attachment?: { url: string; type?: string; name?: string }; isNote?: boolean; metaTemplate?: MetaTemplatePayload }) =>
     apiClient.post<WhatsAppMessage>(`/whatsapp/conversations/${conversationId}/messages`, payload),
 
   // ── Subscriber phone ─────────────────────────────────────────────────

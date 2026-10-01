@@ -66,6 +66,9 @@ webhook de entrada, que é público e tem credencial própria.
 | `not_applicable_cloud` | QR, reinício ou desconexão num número oficial | `whatsapp.error.notApplicableCloud` |
 | `not_supported_cloud` | consulta de números sem nenhum número por QR | `whatsapp.error.notSupportedCloud` |
 | `invalid_cloud_callback_url` | URL de callback da Meta inválida | `whatsapp.error.invalidCloudCallbackUrl` |
+| `meta_templates_cloud_only` | sincronizar modelos de um número por QR | `whatsapp.error.metaTemplatesCloudOnly` |
+| `meta_template_unavailable` | modelo da Meta não aprovado, não suportado ou com parâmetro faltando | `whatsapp.error.metaTemplateUnavailable` |
+| `meta_param_mismatch` | variáveis ligadas não batem com os parâmetros do modelo | `whatsapp.error.metaParamMismatch` |
 | `timeout` / `unreachable` | o Evolution não respondeu | `whatsapp.error.timeout` / `…unreachable` |
 | `no_session` | reiniciar sem sessão viva | `whatsapp.error.noSession` |
 | `no_account` | nenhum número conectado | `whatsapp.error.noAccount` |
@@ -287,6 +290,37 @@ fila; 190 (token) e 130429/131056 (vazão) voltam. A Meta às vezes recusa
 `wa_messages.meta_template` guarda o modelo da mensagem (`{name, language, params}`)
 e `sent_as` diz como ela saiu (`text`/`template`); `publicMessage` expõe `sentAs`.
 Recibos da Meta chegam como `SENT`/`DELIVERED`/`READ` e são lidos como os do Baileys.
+
+#### Modelos aprovados da Meta
+
+O painel não cria modelo na Meta; o provedor cria e aprova no Gerenciador do
+WhatsApp, e o painel **sincroniza** a lista (`wa_meta_templates`, por número).
+
+| rota | permissão | o que faz |
+| --- | --- | --- |
+| `POST /api/whatsapp/accounts/:id/templates/sync` | `whatsapp.config` | busca em `GET /template/find/{instância}` e troca a cópia local (o que sumiu da Meta some daqui) |
+| `GET /api/whatsapp/meta-templates?accountId=&usable=1` | `whatsapp.read` | lista; `usable` = `APPROVED` e formato suportado |
+| `GET/PUT /api/whatsapp/meta-notice-bindings` | `campaigns.read` / `campaigns.manage` | modelo de cada aviso automático (`maintenance`, `outage`, `alert`) |
+
+Suportado = corpo com parâmetros posicionais; cabeçalho com mídia ou
+variável, botão com URL dinâmica, parâmetro nomeado e AUTHENTICATION ficam
+de fora do seletor.
+
+**Ligações.**
+
+- Modelo do painel (`wa_templates`): `metaTemplateName`, `metaLanguage` e
+  `metaParams` — a lista ordenada das nossas variáveis que preenchem `{{1}}`,
+  `{{2}}`…; `texto` é o texto inteiro já renderizado. Conferido ao salvar
+  (`meta_param_mismatch`, `meta_template_unavailable`). A régua, a cobrança
+  avulsa e a campanha montam a foto `{name, language, params}` por
+  destinatário (`wa_broadcast_recipients.meta_template`); variável vazia pula
+  o destinatário como `templateIncomplete`.
+- Aviso automático: um modelo de até um parâmetro, que recebe o aviso inteiro.
+- Atendente: `POST /conversations/:id/messages` aceita `metaTemplate`
+  `{name, language, params}`, conferido contra o número que envia; a conversa
+  mostra o texto do modelo preenchido.
+
+O envio decide pela janela: aberta, texto; fechada, o modelo, se houver.
 
 ## Webhook — `POST /api/whatsapp-webhook?t=<token>`
 

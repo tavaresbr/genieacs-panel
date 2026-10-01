@@ -1784,6 +1784,58 @@ const waSatisfactionTable = (db) => (t) => {
   t.index(['tenant_id', 'conversation_id'], 'wa_satisfaction_conversation_idx');
 };
 
+/**
+ * Os modelos (templates) aprovados na conta WABA de um número oficial, como a
+ * Meta os devolve pela integração do Evolution — uma cópia, sincronizada pelo
+ * botão da tela. Só os aprovados e `supported` aparecem no seletor; o resto
+ * fica visível para o provedor saber por que não aparece.
+ */
+const waMetaTemplatesTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.integer('account_id').unsigned().notNullable()
+    .references('id').inTable('whatsapp_accounts').onDelete('CASCADE');
+  t.string('meta_id', 64);
+  t.string('name', 255).notNullable();
+  t.string('language', 16).notNullable();
+  t.string('category', 24);
+  t.string('status', 24);
+  t.text('body_text');
+  t.integer('param_count').notNullable().defaultTo(0);
+  t.string('param_format', 12).notNullable().defaultTo('positional');
+  t.boolean('supported').notNullable().defaultTo(false);
+  t.text('components_json');
+  t.timestamp('synced_at').notNullable().defaultTo(db.fn.now());
+  t.unique(['account_id', 'name', 'language'], 'wa_meta_templates_unique');
+  t.index(['tenant_id', 'account_id'], 'wa_meta_templates_account_idx');
+};
+
+const WA_META_TEMPLATE_TABLES = [
+  ['wa_meta_templates', waMetaTemplatesTable]
+];
+
+/**
+ * O modelo da Meta que um modelo do painel usa fora da janela de 24 h:
+ * nome, idioma e a lista ORDENADA das nossas variáveis que preenchem `{{1}}`,
+ * `{{2}}`… (`texto` é o texto inteiro já renderizado).
+ */
+const WA_TEMPLATE_META_COLUMNS = [
+  ['meta_template_name', (t) => t.string('meta_template_name', 255)],
+  ['meta_language', (t) => t.string('meta_language', 16)],
+  ['meta_params', (t) => t.text('meta_params')]
+];
+
+/** A foto do modelo Meta de cada destinatário, tirada na montagem da campanha. */
+const WA_RECIPIENT_META_COLUMNS = [
+  ['meta_template', (t) => t.text('meta_template')]
+];
+
+const WA_META_TEMPLATE_COLUMN_TABLES = [
+  ['wa_templates', WA_TEMPLATE_META_COLUMNS],
+  ['wa_broadcast_recipients', WA_RECIPIENT_META_COLUMNS]
+];
+
 const SATISFACTION_TABLES = [
   ['wa_satisfaction', waSatisfactionTable]
 ];
@@ -2079,7 +2131,8 @@ export const SCHEMA_TABLES = [
   ...TEIAH_TABLES,
   ...LEAD_TABLES,
   ...DUNNING_TABLES,
-  ...SATISFACTION_TABLES
+  ...SATISFACTION_TABLES,
+  ...WA_META_TEMPLATE_TABLES
 ].map(([name]) => name);
 
 /**
@@ -4928,6 +4981,37 @@ export const migrations = [
     },
     async up(db) {
       for (const [table, columns] of WA_CLOUD_TABLES) {
+        if (!(await db.schema.hasTable(table))) continue;
+        const missing = await missingColumns(db, table, columns);
+        if (!missing.length) continue;
+        await db.schema.alterTable(table, (t) => {
+          for (const add of missing) add(t);
+        });
+      }
+    }
+  },
+  {
+    /**
+     * Os modelos aprovados da Meta e o que liga cada modelo do painel a um
+     * deles — ver `waMetaTemplatesTable` e `WA_TEMPLATE_META_COLUMNS`.
+     */
+    id: '0089_wa_meta_templates',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      if (!(await db.schema.hasTable('wa_meta_templates'))) return false;
+      for (const [table, columns] of WA_META_TEMPLATE_COLUMN_TABLES) {
+        if (!(await db.schema.hasTable(table))) continue;
+        if ((await missingColumns(db, table, columns)).length) return false;
+      }
+      return true;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      for (const [nome, construtor] of WA_META_TEMPLATE_TABLES) {
+        // eslint-disable-next-line no-await-in-loop
+        await createTableIfMissing(db, nome, construtor(db));
+      }
+      for (const [table, columns] of WA_META_TEMPLATE_COLUMN_TABLES) {
         if (!(await db.schema.hasTable(table))) continue;
         const missing = await missingColumns(db, table, columns);
         if (!missing.length) continue;

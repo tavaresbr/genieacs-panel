@@ -110,10 +110,20 @@ class WaSendService {
       }
     }
     const modelo = note ? null : normalizeMetaTemplate(metaTemplate);
+    let textoDoModelo = null;
     if (!note) {
       const account = await this.resolveAccount(conversation);
       if (!account) {
         throw new WaError('whatsapp.error.noAccount', { code: 'no_account', status: 409 });
+      }
+      // O modelo escolhido pelo atendente na conversa é conferido contra o
+      // número que vai enviar: aprovado, suportado e com todos os parâmetros.
+      // Os automáticos (régua, campanha, aviso) chegam já montados por uma
+      // ligação conferida na hora de salvar.
+      if (modelo && source === 'operator') {
+        const { default: WaMetaTemplateService } = await import('./waMetaTemplateService.js');
+        const row = await WaMetaTemplateService.checkForAccount(account, modelo);
+        textoDoModelo = WaMetaTemplateService.renderBody(row, modelo.params);
       }
       // Número oficial fora da janela de 24 h sem modelo aprovado: a Meta vai
       // recusar. Dizer agora, com o texto ainda na caixa, é melhor que uma
@@ -125,7 +135,7 @@ class WaSendService {
     const message = await WaMessage.create({
       conversation_id: conversation.id,
       direction: 'out',
-      body: text || (modelo ? modelo.name : null),
+      body: text || textoDoModelo || (modelo ? modelo.name : null),
       meta_template: modelo ? JSON.stringify(modelo) : null,
       attachment_path: anexo?.path ?? null,
       attachment_type: anexo?.type ?? null,

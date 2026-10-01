@@ -53,6 +53,16 @@ const TRANSITIONS = Object.freeze({
   failed: []
 });
 
+/** O `meta_template` gravado no destinatário, ou null. */
+function lerModeloMeta(raw) {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Running a campaign: the state machine an operator drives, and the loop that
  * feeds the outbox.
@@ -449,6 +459,9 @@ class WaBroadcastService {
       const message = await WaSendService.enqueue({
         conversationId: conversation.id,
         body: recipient.rendered_body,
+        // A foto do modelo da Meta tirada na montagem; o envio decide pela
+        // janela se ela é usada.
+        metaTemplate: lerModeloMeta(recipient.meta_template),
         // O anexo da campanha (um só arquivo para todos). O caminho passa de
         // novo pelo confinamento de `normalizeAttachment` dentro do enqueue.
         attachment: broadcast?.attachment_path

@@ -5,7 +5,7 @@ import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { whatsappErrorMessage } from '@/components/whatsapp-connection'
 import { useTranslation } from '@/contexts/language-context'
-import { whatsappAPI } from '@/lib/api'
+import { whatsappAPI, type MetaTemplatePayload, type WhatsAppMetaTemplate } from '@/lib/api'
 import { formatFileSize } from '@/lib/firmware'
 import {
   MAX_ATTACHMENT_MB,
@@ -58,6 +58,10 @@ interface ThreadComposerProps {
    * servidor recusaria a resposta com `meta_window_closed`.
    */
   metaWindow?: MetaWindow | null
+  /** Os modelos aprovados da Meta do número da conversa (número oficial). */
+  metaTemplates?: WhatsAppMetaTemplate[]
+  /** Envia um modelo aprovado — o único envio aceito fora da janela. */
+  onSendTemplate?: (payload: MetaTemplatePayload) => Promise<boolean>
 }
 
 /**
@@ -109,7 +113,7 @@ const carriesFiles = (event: DragEvent) => Array.from(event.dataTransfer.types).
  * modo nota continua ligado, porque o resto do lote ainda é nota e virar
  * resposta no meio do caminho é justamente a direção perigosa.
  */
-export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickReplies = null, quickReplyVars = {}, metaWindow = null }: ThreadComposerProps) {
+export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickReplies = null, quickReplyVars = {}, metaWindow = null, metaTemplates = [], onSendTemplate }: ThreadComposerProps) {
   const { t } = useTranslation()
   const toast = useToast()
   const [body, setBody] = useState('')
@@ -354,10 +358,15 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
       )}
 
       {metaWindow?.state === 'closed' && (
-        <p className="mb-2.5 flex items-start gap-2 rounded-md border border-[hsl(var(--status-danger))]/40 bg-[hsl(var(--status-danger))]/[0.08] px-3 py-2 text-xs leading-5 text-foreground">
-          <Icon name="lock" size={14} className="mt-0.5 shrink-0 text-[hsl(var(--status-danger))]" />
-          <span>{t('whatsapp.cloud.windowClosed')}</span>
-        </p>
+        <div className="mb-2.5 rounded-md border border-[hsl(var(--status-danger))]/40 bg-[hsl(var(--status-danger))]/[0.08] px-3 py-2 text-xs leading-5 text-foreground">
+          <p className="flex items-start gap-2">
+            <Icon name="lock" size={14} className="mt-0.5 shrink-0 text-[hsl(var(--status-danger))]" />
+            <span>{t('whatsapp.cloud.windowClosed')}</span>
+          </p>
+          {onSendTemplate && (
+            <MetaTemplatePicker templates={metaTemplates} busy={sending} onSend={onSendTemplate} />
+          )}
+        </div>
       )}
       {metaWindow?.state === 'open' && (
         <p className="mb-2 text-xs text-muted-foreground">
@@ -578,6 +587,97 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+/**
+ * O modelo aprovado que o atendente manda quando a janela de 24 h fechou:
+ * escolhe o modelo, preenche cada `{{n}}` e vê o texto como vai sair.
+ */
+function MetaTemplatePicker({
+  templates,
+  busy,
+  onSend
+}: {
+  templates: WhatsAppMetaTemplate[]
+  busy: boolean
+  onSend: (payload: MetaTemplatePayload) => Promise<boolean>
+}) {
+  const { t } = useTranslation()
+  const [open, setOpen] = useState(false)
+  const [chosenId, setChosenId] = useState<number | null>(null)
+  const [params, setParams] = useState<string[]>([])
+  const chosen = templates.find((m) => m.id === chosenId) ?? null
+  const preview = chosen
+    ? chosen.bodyText.replace(/\{\{\s*(\d+)\s*\}\}/g, (all, n: string) => params[Number(n) - 1] || all)
+    : ''
+  const ready = Boolean(chosen) && params.length === chosen!.paramCount && params.every((p) => p.trim())
+
+  if (!open) {
+    return (
+      <button type="button" className="modern-button-secondary mt-2 min-h-9 px-3 py-1 text-xs" onClick={() => setOpen(true)}>
+        <Icon name="document" size={14} />
+        {t('whatsapp.metaTemplates.sendApproved')}
+      </button>
+    )
+  }
+
+  if (templates.length === 0) {
+    return <p className="mt-2 text-muted-foreground">{t('whatsapp.metaTemplates.noneForNumber')}</p>
+  }
+
+  return (
+    <div className="mt-2 flex flex-col gap-2">
+      <select
+        aria-label={t('whatsapp.metaTemplates.pick')}
+        className="modern-input"
+        value={chosenId ?? ''}
+        onChange={(event) => {
+          const id = Number(event.target.value) || null
+          const m = templates.find((x) => x.id === id)
+          setChosenId(id)
+          setParams(Array.from({ length: m?.paramCount ?? 0 }, () => ''))
+        }}
+      >
+        <option value="">{t('whatsapp.metaTemplates.pick')}</option>
+        {templates.map((m) => (
+          <option key={m.id} value={m.id}>{`${m.name} · ${m.language}`}</option>
+        ))}
+      </select>
+      {chosen && (
+        <>
+          {params.map((value, i) => (
+            <input
+              key={i}
+              className="modern-input"
+              placeholder={t('whatsapp.metaTemplates.paramLabel', { n: i + 1 })}
+              value={value}
+              onChange={(event) => setParams((c) => c.map((v, j) => (j === i ? event.target.value : v)))}
+            />
+          ))}
+          <p className="whitespace-pre-wrap break-words rounded border border-border bg-background/60 px-2 py-1.5 text-foreground">{preview}</p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="modern-button min-h-9 px-3 py-1 text-xs"
+              disabled={!ready || busy}
+              onClick={() => void onSend({ name: chosen.name, language: chosen.language, params: params.map((p) => p.trim()) })
+                .then((ok) => {
+                  if (!ok) return
+                  setOpen(false)
+                  setChosenId(null)
+                  setParams([])
+                })}
+            >
+              {t('whatsapp.metaTemplates.sendTemplate')}
+            </button>
+            <button type="button" className="modern-button-secondary min-h-9 px-3 py-1 text-xs" onClick={() => setOpen(false)}>
+              {t('common.cancel')}
+            </button>
+          </div>
+        </>
+      )}
     </div>
   )
 }

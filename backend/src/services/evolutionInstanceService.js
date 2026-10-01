@@ -460,6 +460,15 @@ class EvolutionInstanceService {
     } catch (error) {
       account = await WhatsAppAccount.update(account.id, { last_error: describeFailure(error) });
     }
+    // Os modelos aprovados já na criação, para a tela de modelos não abrir
+    // vazia. Falha aqui fica gravada no número e não desfaz nada.
+    try {
+      const { default: WaMetaTemplateService } = await import('./waMetaTemplateService.js');
+      await WaMetaTemplateService.sync(account.id);
+      account = await WhatsAppAccount.getById(account.id);
+    } catch {
+      account = await WhatsAppAccount.getById(account.id);
+    }
     return { account, qr: null, pending: false };
   }
 

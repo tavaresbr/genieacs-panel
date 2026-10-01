@@ -234,6 +234,14 @@ export const casos = [
   },
   {
     chave: 'account',
+    label: 'POST /api/whatsapp/accounts/:id/templates/sync',
+    method: 'POST',
+    path: (id) => `/api/whatsapp/accounts/${id}/templates/sync`,
+    tabela: 'whatsapp_accounts',
+    controleSoNaoAchou: true
+  },
+  {
+    chave: 'account',
     label: 'POST /api/whatsapp/accounts/:id/webhook/probe',
     method: 'POST',
     path: (id) => `/api/whatsapp/accounts/${id}/webhook/probe`,

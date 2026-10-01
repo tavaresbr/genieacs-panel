@@ -62,6 +62,7 @@ const SEM_DADO_DE_ASSINANTE = Object.freeze({
   provisioning_profiles: 'perfis de provisionamento',
   whatsapp_accounts: 'instâncias de WhatsApp do provedor',
   wa_templates: 'modelos de mensagem',
+  wa_meta_templates: 'modelos aprovados da Meta (texto do provedor, sem assinante)',
   wa_broadcasts: 'campanhas — o destinatário sai em wa_broadcast_recipients',
   subscriptions: 'assinatura do provedor conosco',
   billing_events: 'extrato do provedor conosco',

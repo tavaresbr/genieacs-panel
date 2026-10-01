@@ -1,3 +1,4 @@
+import WaMetaTemplateService from './waMetaTemplateService.js';
 import SgpLink from '../models/SgpLink.js';
 import WaConversation from '../models/WaConversation.js';
 import WaOptOut from '../models/WaOptOut.js';
@@ -32,7 +33,10 @@ async function enfileirar(account, phone, body) {
     waLid: null,
     pushName: null
   });
-  await WaSendService.enqueue({ conversationId: conversation.id, body, userId: null, source: 'alert' });
+  // Número oficial fora da janela: o aviso sai pelo modelo da Meta ligado a
+  // ele, com o texto inteiro no parâmetro.
+  const metaTemplate = await WaMetaTemplateService.noticePayload('outage', body);
+  await WaSendService.enqueue({ conversationId: conversation.id, body, userId: null, source: 'alert', metaTemplate });
 }
 
 /**

@@ -1,3 +1,4 @@
+import WaMetaTemplateService from './waMetaTemplateService.js';
 import SgpService, { SgpError } from './sgpService.js';
 import SgpLink from '../models/SgpLink.js';
 import SgpContact from '../models/SgpContact.js';
@@ -149,7 +150,7 @@ class WaBillingService {
     // round trips, and a build that ends with nobody to contact spent them too.
     this.reserveBuild();
 
-    const { body, templateId, name } = await WaTemplateService.resolveBody(template);
+    const { body, templateId, name, template: stored } = await WaTemplateService.resolveBody(template);
     const wanted = [...new Set(
       (Array.isArray(contracts) ? contracts : [])
         .map((entry) => String(entry ?? '').trim())
@@ -238,11 +239,19 @@ class WaBillingService {
         for (const name of variaveisVazias(body, vars)) skipped.missing[name] = (skipped.missing[name] || 0) + 1;
         continue;
       }
+      // O modelo da Meta do número oficial, com as mesmas variáveis.
+      const metaTemplate = WaMetaTemplateService.buildPayload(stored, vars, rendered);
+      if (metaTemplate?.incomplete) {
+        skipped.templateIncomplete += 1;
+        for (const name of metaTemplate.incomplete) skipped.missing[name] = (skipped.missing[name] || 0) + 1;
+        continue;
+      }
       recipients.push({
         contract: subscriber.contract,
         clientName: subscriber.clientName,
         phone: subscriber.phone,
         body: rendered,
+        metaTemplate,
         // The invoice the message cites, so the flush can check it was not
         // paid while the campaign sat in draft.
         invoiceKey: chaveDaFatura(fatura),
