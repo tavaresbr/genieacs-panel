@@ -20,6 +20,7 @@ import { CampaignsPanel } from '@/components/whatsapp/campaigns-panel'
 import { TemplatesPanel } from '@/components/whatsapp/templates-panel'
 import { OptOutPanel } from '@/components/whatsapp/opt-out-panel'
 import { BotReportPanel } from '@/components/whatsapp/bot-report-panel'
+import { SatisfactionPanel } from '@/components/whatsapp/satisfaction-panel'
 import { MaintenancePanel } from '@/components/maintenance/maintenance-panel'
 import { AlertsPanel } from '@/components/whatsapp/alerts-panel'
 import { OutagePanel } from '@/components/outages/outage-panel'
@@ -1058,7 +1059,12 @@ export default function WhatsAppPage() {
         {tab === 'campaigns' && <CampaignsPanel />}
         {tab === 'templates' && <TemplatesPanel />}
         {tab === 'optOut' && <OptOutPanel />}
-        {tab === 'botReport' && <BotReportPanel />}
+        {tab === 'botReport' && (
+          <div className="grid gap-8">
+            <BotReportPanel />
+            <SatisfactionPanel />
+          </div>
+        )}
         {tab === 'maintenance' && <MaintenancePanel />}
         {/* Pela capacidade e não pela aba escolhida: o estado inicial é `inbox`,
             mas um papel que perca `whatsapp.config` enquanto está em Alertas

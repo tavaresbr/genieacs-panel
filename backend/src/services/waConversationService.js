@@ -6,6 +6,7 @@ import SgpContact from '../models/SgpContact.js';
 import CustomerAccount from '../models/CustomerAccount.js';
 import { WaError } from './whatsappConfigService.js';
 import WaSendService from './waSendService.js';
+import WaSatisfactionService from './waSatisfactionService.js';
 import { tdb } from '../config/database.js';
 import { normalizarTelefoneBr, variantesTelefoneBr } from '../utils/wa/waDestino.js';
 
@@ -377,15 +378,19 @@ class WaConversationService {
    * counterpart lives in `waInboundService` — a customer who writes again
    * reopens their own thread, because an archive cannot answer anybody.
    */
-  static async setStatus(id, status) {
+  static async setStatus(id, status, { userId = null } = {}) {
     const conversation = await this.get(id);
     const closing = status === 'closed';
+    const wasOpen = !conversation.closed_at;
     // Reopening an open thread and closing a closed one are both writes that
     // change nothing; letting them through keeps the route idempotent, which is
     // what a double-click on the button deserves.
     const updated = await WaConversation.update(conversation.id, {
       closed_at: closing ? new Date() : null
     });
+    // Encerrar de verdade (não o segundo clique) é o momento da pesquisa de
+    // satisfação. Ela decide sozinha se pergunta e nunca lança.
+    if (closing && wasOpen) await WaSatisfactionService.onClosed(updated, { userId });
     return this.decorate(updated);
   }
 

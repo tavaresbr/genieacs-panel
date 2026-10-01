@@ -52,6 +52,8 @@ export const SCOPED_TABLES = new Set([
   'maintenance_windows',
   'maintenance_window_devices',
   'wa_bot_events',
+  // A nota e o comentário que o assinante deu ao atendimento.
+  'wa_satisfaction',
   // A ficha completa de cada cliente do SGP: endereço, nascimento, todos os
   // telefones e e-mails. O dado mais pessoal do painel inteiro.
   'sgp_clients',

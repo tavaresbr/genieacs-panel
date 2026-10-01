@@ -11,6 +11,9 @@ const MESSAGE_KEYS: BotMessageKey[] = [
   'greeting', 'askDocument', 'notRecognised', 'noOpenInvoice', 'handoffQueued', 'handoff', 'outsideHours'
 ]
 
+/** Os textos da pesquisa de satisfação, na ordem em que o cliente os recebe. */
+const SURVEY_KEYS: BotMessageKey[] = ['surveyQuestion', 'surveyAskComment', 'surveyThanks']
+
 /** Os fusos do Brasil, onde está a base; o gravado entra na lista se for outro. */
 const TIMEZONES = [
   'America/Sao_Paulo', 'America/Manaus', 'America/Belem', 'America/Fortaleza', 'America/Recife',
@@ -97,6 +100,31 @@ export function ChatbotTab() {
     ...(config.unlockEnabled ? [`4 — ${t('settings.chatbot.option.unlock')}`] : [])
   ].join('\n')
 
+  const campoDeTexto = (key: BotMessageKey, disabled = false) => (
+    <div key={key}>
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+        <label htmlFor={`bot-msg-${key}`} className="text-sm font-medium">
+          {t(`settings.chatbot.message.${key}` as TranslationKey)}
+        </label>
+        {config.messages[key] && !disabled && (
+          <button type="button" className="text-sm underline" onClick={() => setMessage(key, '')}>
+            {t('settings.chatbot.restoreDefault')}
+          </button>
+        )}
+      </div>
+      <textarea
+        id={`bot-msg-${key}`}
+        className="modern-input w-full text-sm"
+        rows={2}
+        maxLength={1000}
+        disabled={disabled}
+        value={config.messages[key]}
+        placeholder={config.defaults[key]}
+        onChange={(event) => setMessage(key, event.target.value)}
+      />
+    </div>
+  )
+
   const timezones = TIMEZONES.includes(config.hours.timezone) ? TIMEZONES : [config.hours.timezone, ...TIMEZONES]
 
   const salvar = async () => {
@@ -107,7 +135,8 @@ export function ChatbotTab() {
         unlockEnabled: config.unlockEnabled,
         options: config.options,
         messages: config.messages,
-        hours: config.hours
+        hours: config.hours,
+        satisfaction: config.satisfaction
       })
       if (res.success && res.data) {
         setConfig(res.data)
@@ -175,29 +204,21 @@ export function ChatbotTab() {
         <h2 className="section-heading">{t('settings.chatbot.messagesTitle')}</h2>
         <p className="field-hint mt-1">{t('settings.chatbot.messagesHint')}</p>
         <div className="mt-4 grid gap-5">
-          {MESSAGE_KEYS.map((key) => (
-            <div key={key}>
-              <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-                <label htmlFor={`bot-msg-${key}`} className="text-sm font-medium">
-                  {t(`settings.chatbot.message.${key}` as TranslationKey)}
-                </label>
-                {config.messages[key] && (
-                  <button type="button" className="text-sm underline" onClick={() => setMessage(key, '')}>
-                    {t('settings.chatbot.restoreDefault')}
-                  </button>
-                )}
-              </div>
-              <textarea
-                id={`bot-msg-${key}`}
-                className="modern-input w-full text-sm"
-                rows={2}
-                maxLength={1000}
-                value={config.messages[key]}
-                placeholder={config.defaults[key]}
-                onChange={(event) => setMessage(key, event.target.value)}
-              />
-            </div>
-          ))}
+          {MESSAGE_KEYS.map((key) => campoDeTexto(key))}
+        </div>
+      </section>
+
+      <section className="modern-card p-5 sm:p-6">
+        <h2 className="section-heading">{t('settings.chatbot.surveyTitle')}</h2>
+        <p className="field-hint mt-1">{t('settings.chatbot.surveyHint')}</p>
+        <div className="mt-4 grid gap-5">
+          <Caixa
+            checked={config.satisfaction.enabled}
+            onChange={(value) => patch({ satisfaction: { ...config.satisfaction, enabled: value } })}
+            title={t('settings.chatbot.surveyEnabled')}
+            hint={t('settings.chatbot.surveyEnabledHint')}
+          />
+          {SURVEY_KEYS.map((key) => campoDeTexto(key, !config.satisfaction.enabled))}
         </div>
       </section>
 

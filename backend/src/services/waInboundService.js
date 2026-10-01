@@ -10,6 +10,7 @@ import { lerRecibo } from '../utils/wa/waRecibo.js';
 import { pedeSaida } from '../utils/wa/waOptOutTexto.js';
 import WaMediaService from './waMediaService.js';
 import WaBotService from './waBotService.js';
+import WaSatisfactionService from './waSatisfactionService.js';
 import WaConversationService from './waConversationService.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -363,6 +364,13 @@ async function gravarMensagem(account, item) {
     });
   }
 
+  // 7b. A resposta da pesquisa de satisfação, numa conversa encerrada. Uma
+  // nota não reabre o fio nem cai no bot; outro assunto segue o fluxo normal.
+  const pesquisa = !fromMe && conversation.closed_at
+    ? await WaSatisfactionService.captureReply({ conversation, text: texto })
+    : null;
+  const soPesquisa = pesquisa?.consumed === true && pesquisa.reopen === false;
+
   // 8. O topo da lista de conversas.
   const patch = { last_message_at: agora };
   // Gente dos dois lados: o cliente escreveu, ou o provedor respondeu pelo
@@ -376,10 +384,10 @@ async function gravarMensagem(account, item) {
     // fora da lista padrão do operador e vira invisível — que é exatamente o
     // contrário do que a lista existe para fazer. Só na ENTRADA: um eco de
     // saída é o operador digitando, e não é notícia do cliente.
-    if (conversation.closed_at) patch.closed_at = null;
+    if (conversation.closed_at && !soPesquisa) patch.closed_at = null;
     // Incremento no banco, não `lido + 1` em memória: dois eventos do mesmo
     // contato chegam concorrentes e um leria o contador antes do outro escrever.
-    patch.unread_count = getDb().raw('unread_count + 1');
+    if (!soPesquisa) patch.unread_count = getDb().raw('unread_count + 1');
   }
   await WaConversation.update(conversation.id, patch);
 
@@ -407,12 +415,14 @@ async function gravarMensagem(account, item) {
   // com try: `responder` engole tudo por contrato (ver `waBotService.js`), e
   // tem que engolir — uma falha dele virando 500 aqui faria o servidor reenviar
   // este evento para sempre.
-  await WaBotService.responder({
-    conversation,
-    messageId,
-    body: texto,
-    direction: linha.direction
-  });
+  if (!pesquisa?.consumed) {
+    await WaBotService.responder({
+      conversation,
+      messageId,
+      body: texto,
+      direction: linha.direction
+    });
+  }
 
   return { handled: true, conversationId: conversation.id, direction: linha.direction };
 }

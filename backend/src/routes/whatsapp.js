@@ -18,6 +18,8 @@ router.get('/bot-config', authenticateToken, requirePermission('whatsapp.config'
 router.put('/bot-config', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.updateBotConfig);
 // O relatório do bot é leitura de quem atende, não de quem configura.
 router.get('/bot-report', authenticateToken, requirePermission('whatsapp.read'), WhatsAppController.getBotReport);
+// A pesquisa de satisfação: leitura de quem atende, como o relatório do bot.
+router.get('/satisfaction-report', authenticateToken, requirePermission('whatsapp.read'), WhatsAppController.getSatisfactionReport);
 router.get('/accounts', authenticateToken, requirePermission('whatsapp.read'), WhatsAppController.listAccounts);
 
 // O diagnóstico da configuração, e a única rota deste roteador com limitador.

@@ -411,6 +411,10 @@ class CustomerDataExportService {
     guardar('wa_bot_events', conversaIds.length
       ? await tdb('wa_bot_events').whereIn('conversation_id', conversaIds).orderBy('id')
       : []);
+    // A nota e o comentário que o assinante deu ao atendimento.
+    guardar('wa_satisfaction', conversaIds.length
+      ? await tdb('wa_satisfaction').whereIn('conversation_id', conversaIds).orderBy('id')
+      : []);
     guardar('wa_messages', conversaIds.length
       ? await tdb('wa_messages').whereIn('conversation_id', conversaIds).orderBy('id')
       : []);

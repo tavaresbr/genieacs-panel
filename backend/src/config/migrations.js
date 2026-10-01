@@ -1731,6 +1731,32 @@ const DUNNING_TABLES = [
 ];
 
 /**
+ * A pesquisa de satisfação: uma linha por pergunta mandada ao encerrar uma
+ * conversa com atendente. `status` anda `pending` → (`comment` →) `answered`,
+ * ou para em `skipped` quando o cliente respondeu outra coisa. `agent_user_id`
+ * é quem atendeu — a última mensagem de gente na conversa —, e não quem
+ * apertou "Encerrar".
+ */
+const waSatisfactionTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.integer('conversation_id').unsigned().notNullable();
+  t.integer('agent_user_id').unsigned().nullable();
+  t.string('status', 16).notNullable().defaultTo('pending');
+  t.integer('score').nullable();
+  t.text('comment');
+  t.timestamp('asked_at').notNullable().defaultTo(db.fn.now());
+  t.timestamp('answered_at');
+  t.index(['tenant_id', 'asked_at'], 'wa_satisfaction_asked_idx');
+  t.index(['tenant_id', 'conversation_id'], 'wa_satisfaction_conversation_idx');
+};
+
+const SATISFACTION_TABLES = [
+  ['wa_satisfaction', waSatisfactionTable]
+];
+
+/**
  * Os códigos de recuperação do login em duas etapas — ver `0059_user_totp`.
  * Só o hash de cada código: são senhas de uso único.
  */
@@ -2020,7 +2046,8 @@ export const SCHEMA_TABLES = [
   ...MAINTENANCE_TABLES,
   ...TEIAH_TABLES,
   ...LEAD_TABLES,
-  ...DUNNING_TABLES
+  ...DUNNING_TABLES,
+  ...SATISFACTION_TABLES
 ].map(([name]) => name);
 
 /**
@@ -4839,6 +4866,21 @@ export const migrations = [
         await db.schema.alterTable(table, (t) => {
           for (const add of missing) add(t);
         });
+      }
+    }
+  },
+  {
+    /** A pesquisa de satisfação — ver `waSatisfactionTable`. */
+    id: '0087_wa_satisfaction',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      return db.schema.hasTable('wa_satisfaction');
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      for (const [nome, construtor] of SATISFACTION_TABLES) {
+        // eslint-disable-next-line no-await-in-loop
+        await createTableIfMissing(db, nome, construtor(db));
       }
     }
   }
