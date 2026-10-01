@@ -100,7 +100,7 @@ class WhatsAppMessageController {
       ));
     }
     try {
-      const conversation = await WaConversationService.setStatus(req.params?.id, status);
+      const conversation = await WaConversationService.setStatus(req.params?.id, status, { userId: req.user?.id ?? null });
       return res.json(createResponse(
         req.t(status === 'closed' ? 'whatsapp.conversationClosed' : 'whatsapp.conversationReopened'),
         conversation
