@@ -77,6 +77,17 @@ const RULES: ReadonlyArray<{
     min: 2,
     max: 500,
     step: 1
+  },
+  {
+    // O limite é a carência em minutos: uma queda que se resolve sozinha
+    // antes dela não avisa ninguém.
+    rule: 'wa_disconnected',
+    icon: 'chat',
+    label: 'whatsapp.alerts.waDisconnected',
+    hint: 'whatsapp.alerts.waDisconnectedHint',
+    min: 0,
+    max: 120,
+    step: 1
   }
 ]
 

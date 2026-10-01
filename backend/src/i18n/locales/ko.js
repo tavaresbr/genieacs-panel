@@ -722,6 +722,8 @@ export default {
   'whatsapp.alerts.temperatureHighCleared': 'ONT {device}의 온도가 정상으로 돌아왔습니다',
   'whatsapp.alerts.massOutage': "{node} 단선 가능성: 고객 {total}명 중 {count}명이 {minutes}분째 오프라인입니다. 위치: {link}",
   'whatsapp.alerts.massOutageCleared': '{node}이(가) 복구되어 ONT가 다시 응답하고 있습니다',
+  'whatsapp.alerts.waDisconnected': 'WhatsApp 연결 끊김: 번호 {account}이(가) {minutes}분 전부터 중단되어 고객 메시지가 발송되지 않습니다. 설정 › WhatsApp에서 QR로 다시 연결하세요{link}',
+  'whatsapp.alerts.waDisconnectedCleared': 'WhatsApp 재연결: 번호 {account}이(가) 다시 작동합니다',
   // WhatsApp — 봇 응답 본문
   'whatsapp.bot.invoiceDigitableLine': '바코드 번호: {value}',
   'whatsapp.bot.invoicePix': 'PIX 복사 코드: {value}',

@@ -724,6 +724,8 @@ export default {
   'whatsapp.alerts.temperatureHighCleared': 'ONT {device} 的温度已恢复正常',
   'whatsapp.alerts.massOutage': "{node} 可能断纤：{total} 个客户中 {count} 个已离线 {minutes} 分钟。位置：{link}",
   'whatsapp.alerts.massOutageCleared': '{node} 已恢复：ONT 重新开始应答',
+  'whatsapp.alerts.waDisconnected': 'WhatsApp 已断开：号码 {account} 已中断 {minutes} 分钟，发给客户的消息无法发送。请在 设置 › WhatsApp 中扫描二维码重新连接{link}',
+  'whatsapp.alerts.waDisconnectedCleared': 'WhatsApp 已重新连接：号码 {account} 恢复正常',
   // WhatsApp — 机器人回复的正文
   'whatsapp.bot.invoiceDigitableLine': '条形码号：{value}',
   'whatsapp.bot.invoicePix': 'PIX 复制粘贴码：{value}',

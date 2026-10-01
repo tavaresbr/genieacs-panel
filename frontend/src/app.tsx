@@ -9,6 +9,7 @@ import { BrandMark } from '@/components/brand-mark'
 import { LanguageProvider, useTranslation } from '@/contexts/language-context'
 import { SubscriptionNotice } from '@/components/subscription-notice'
 import { ImpersonationBanner } from '@/components/impersonation-banner'
+import { WhatsAppDisconnectedBanner } from '@/components/whatsapp/disconnected-banner'
 import { ConsoleHeader } from '@/components/console-header'
 import { MfaEnrollmentScreen } from '@/components/mfa-enrollment-screen'
 import { mustEnroll } from '@/lib/mfa-enrollment'
@@ -159,6 +160,9 @@ function ProtectedShell() {
         <div className="sticky top-16 z-[1100] lg:top-0">
           <ImpersonationBanner />
           <SubscriptionNotice />
+          {/* Número de WhatsApp caído: em toda tela, porque o atendente só
+              descobriria quando tentasse responder. */}
+          <WhatsAppDisconnectedBanner />
         </div>
         <Suspense fallback={<PageFallback />}>
           <OnboardingGate>

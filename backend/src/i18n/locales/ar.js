@@ -721,6 +721,8 @@ export default {
   'whatsapp.alerts.temperatureHighCleared': 'عادت حرارة الجهاز {device} إلى وضعها الطبيعي',
   'whatsapp.alerts.massOutage': "انقطاع محتمل في الألياف عند {node}: {count} من {total} عملاء غير متصلين منذ {minutes} دقيقة. الموقع: {link}",
   'whatsapp.alerts.massOutageCleared': 'عاد {node}: الأجهزة تستجيب مجددًا',
+  'whatsapp.alerts.waDisconnected': 'واتساب غير متصل: الرقم {account} متوقف منذ {minutes} دقيقة ولا تُرسل الرسائل إلى العملاء. أعد ربطه برمز QR من الإعدادات › WhatsApp{link}',
+  'whatsapp.alerts.waDisconnectedCleared': 'تمت إعادة اتصال واتساب: الرقم {account} يعمل مجددًا',
   'whatsapp.bot.invoiceDigitableLine': 'رقم السداد: {value}',
   'whatsapp.bot.invoicePix': 'رمز Pix للنسخ واللصق: {value}',
   'whatsapp.bot.invoiceLink': 'نسخة ثانية: {value}',

@@ -725,6 +725,8 @@ export default {
   'whatsapp.alerts.temperatureHighCleared': 'La température de l’ONT {device} est revenue à la normale',
   'whatsapp.alerts.massOutage': "Coupure de fibre probable à {node} : {count} clients sur {total} hors ligne depuis {minutes} min. Emplacement : {link}",
   'whatsapp.alerts.massOutageCleared': '{node} est rétabli : les ONT répondent de nouveau',
+  'whatsapp.alerts.waDisconnected': 'WhatsApp déconnecté : le numéro {account} est tombé il y a {minutes} min et les messages aux clients ne partent plus. Reconnectez-le avec le QR dans Paramètres › WhatsApp{link}',
+  'whatsapp.alerts.waDisconnectedCleared': 'WhatsApp reconnecté : le numéro {account} fonctionne à nouveau',
   'whatsapp.messageRequeued': 'Message remis dans la file',
   'whatsapp.messageNotRequeueable': 'Seul un message en échec peut être renvoyé.',
   'whatsapp.messagesRequeued': '{count} message(s) remis dans la file',

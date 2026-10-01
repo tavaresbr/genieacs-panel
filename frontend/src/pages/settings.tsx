@@ -2892,7 +2892,10 @@ export default function Settings() {
             </div>
             <p className="field-hint mt-2">{t('settings.whatsapp.test.savedOnly')}</p>
 
-            <WhatsAppConnection config={waConfig} />
+            {/* A âncora da faixa de "número caído" (`#wa-accounts`). */}
+            <div id="wa-accounts" className="scroll-mt-24">
+              <WhatsAppConnection config={waConfig} />
+            </div>
 
             {can('sgp.read') && (
               <SgpContactsShortcut
