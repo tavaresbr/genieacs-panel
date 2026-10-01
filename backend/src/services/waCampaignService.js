@@ -1,3 +1,4 @@
+import WaMetaTemplateService from './waMetaTemplateService.js';
 import SgpContact from '../models/SgpContact.js';
 import SgpLink from '../models/SgpLink.js';
 import WaBroadcast from '../models/WaBroadcast.js';
@@ -254,26 +255,36 @@ class WaCampaignService {
         names: desconhecidas.map((v) => `{{${v}}}`).join(', ')
       });
     }
-    return { body: texto, templateId: modelo?.id ?? null };
+    return { body: texto, templateId: modelo?.id ?? null, template: modelo };
   }
 
   /** A mensagem de um destinatário, ou `null` quando falta algo que o texto cita. */
-  static render(body, recipient) {
-    return renderCobranca(body, {
+  static vars(recipient) {
+    return {
       nome: recipient.clientName || '',
       primeiro_nome: primeiroNome(recipient.clientName),
       contrato: recipient.contract || '',
       plano: recipient.plan || ''
-    });
+    };
   }
 
-  static renderAll(body, recipients) {
+  static render(body, recipient) {
+    return renderCobranca(body, this.vars(recipient));
+  }
+
+  /**
+   * `template` é o modelo do painel, quando a campanha usa um: se ele aponta
+   * para um modelo da Meta, cada destinatário leva a sua foto dele, para o
+   * número oficial poder mandar fora da janela de 24 h.
+   */
+  static renderAll(body, recipients, template = null) {
     const prontos = [];
     let templateIncomplete = 0;
     for (const recipient of recipients) {
       const texto = this.render(body, recipient);
-      if (texto === null) templateIncomplete += 1;
-      else prontos.push({ ...recipient, body: texto });
+      const meta = texto === null ? null : WaMetaTemplateService.buildPayload(template, this.vars(recipient), texto);
+      if (texto === null || meta?.incomplete) templateIncomplete += 1;
+      else prontos.push({ ...recipient, body: texto, metaTemplate: meta });
     }
     return { prontos, templateIncomplete };
   }
@@ -282,7 +293,7 @@ class WaCampaignService {
   static async preview({ filters, templateId, body } = {}) {
     const mensagem = await this.resolveMessage({ templateId, body });
     const { recipients, counts } = await this.resolveAudience(filters);
-    const { prontos, templateIncomplete } = this.renderAll(mensagem.body, recipients);
+    const { prontos, templateIncomplete } = this.renderAll(mensagem.body, recipients, mensagem.template);
     return {
       counts: { ...counts, templateIncomplete, reachable: prontos.length },
       max: MAX_CAMPAIGN_RECIPIENTS,
@@ -319,7 +330,7 @@ class WaCampaignService {
     WaBillingService.reserveBuild();
 
     const { recipients, counts, filters: filtros } = await this.resolveAudience(filters);
-    const { prontos, templateIncomplete } = this.renderAll(mensagem.body, recipients);
+    const { prontos, templateIncomplete } = this.renderAll(mensagem.body, recipients, mensagem.template);
     if (prontos.length === 0) {
       throw new WaError('whatsapp.campaign.noRecipients', { code: 'no_recipients', status: 409 });
     }

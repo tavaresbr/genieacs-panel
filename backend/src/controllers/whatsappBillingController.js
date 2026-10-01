@@ -1,3 +1,4 @@
+import WaMetaTemplateService from '../services/waMetaTemplateService.js';
 import WaBillingService from '../services/waBillingService.js';
 import WaBroadcastService from '../services/waBroadcastService.js';
 import WaTemplateService from '../services/waTemplateService.js';
@@ -102,7 +103,10 @@ class WhatsAppBillingController {
       const template = await WaTemplateService.create({
         name: body.name,
         body: body.body,
-        category: body.category
+        category: body.category,
+        metaTemplateName: body.metaTemplateName,
+        metaLanguage: body.metaLanguage,
+        metaParams: body.metaParams
       });
       return res.status(201).json(createResponse(req.t('whatsapp.templates.created'), template));
     } catch (error) {
@@ -117,9 +121,30 @@ class WhatsAppBillingController {
         name: body.name,
         body: body.body,
         category: body.category,
-        active: body.active
+        active: body.active,
+        metaTemplateName: body.metaTemplateName,
+        metaLanguage: body.metaLanguage,
+        metaParams: body.metaParams
       });
       return res.json(createResponse(req.t('whatsapp.templates.updated'), template));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.templates.saveFailed');
+    }
+  }
+
+  /** Os avisos automáticos ligados a modelos da Meta (manutenção, queda, alerta). */
+  static async getMetaNoticeBindings(req, res) {
+    try {
+      return res.json(createResponse(req.t('whatsapp.metaTemplates.bindingsLoaded'), await WaMetaTemplateService.getNoticeBindings()));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.templates.loadFailed');
+    }
+  }
+
+  static async saveMetaNoticeBindings(req, res) {
+    try {
+      const saved = await WaMetaTemplateService.saveNoticeBindings(req.body ?? {});
+      return res.json(createResponse(req.t('whatsapp.metaTemplates.bindingsSaved'), saved));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.templates.saveFailed');
     }

@@ -58,6 +58,9 @@ const ERROR_KEYS: Record<string, TranslationKey> = {
   not_applicable_cloud: 'whatsapp.error.notApplicableCloud',
   not_supported_cloud: 'whatsapp.error.notSupportedCloud',
   invalid_cloud_callback_url: 'whatsapp.error.invalidCloudCallbackUrl',
+  meta_templates_cloud_only: 'whatsapp.error.metaTemplatesCloudOnly',
+  meta_template_unavailable: 'whatsapp.error.metaTemplateUnavailable',
+  meta_param_mismatch: 'whatsapp.error.metaParamMismatch',
   // Both reachable only from the inbox, and both were missing until the screen
   // that provokes them was built: an unknown code degrades to the generic
   // failure, which is not wrong but tells the operator nothing.

@@ -7,6 +7,7 @@ import WhatsAppAccount from '../models/WhatsAppAccount.js';
 import SgpService, { SgpError } from './sgpService.js';
 import WaBillingService from './waBillingService.js';
 import WaSendService from './waSendService.js';
+import WaMetaTemplateService from './waMetaTemplateService.js';
 import WaTemplateService from './waTemplateService.js';
 import WhatsAppConfigService, { WaError } from './whatsappConfigService.js';
 import { isUniqueViolation, tdb, tinsertReturningId, withDeadlockRetry } from '../config/database.js';
@@ -671,11 +672,18 @@ class WaDunningService {
     else if (enviadas >= rule.maxPerInvoice) result = skip('maxReached');
 
     let body = null;
+    let metaTemplate = null;
     if (!result) {
       const vars = variaveisDeCobranca(fatura, subscriber.clientName, now);
       body = template ? renderCobranca(template.body, vars) : null;
       // Sem modelo, a lista fica vazia e o rótulo continua o genérico.
       if (body === null) result = skip('templateIncomplete', template ? variaveisVazias(template.body, vars) : []);
+      else {
+        // O modelo da Meta para número oficial fora da janela, com as mesmas
+        // variáveis. Variável vazia lá também pula, com o mesmo motivo.
+        metaTemplate = WaMetaTemplateService.buildPayload(template, vars, body);
+        if (metaTemplate?.incomplete) result = skip('templateIncomplete', metaTemplate.incomplete);
+      }
     }
 
     // O intervalo mínimo é por CONTRATO, não por fatura: duas faturas em
@@ -709,7 +717,7 @@ class WaDunningService {
     if (result) return result;
 
     try {
-      const message = await this.enqueue({ account, subscriber, body });
+      const message = await this.enqueue({ account, subscriber, body, metaTemplate });
       await tdb('wa_dunning_sends').where({ id: sendId }).update({ message_id: message.id, updated_at: new Date() });
       return { status: 'queued', item };
     } catch (error) {
@@ -733,7 +741,7 @@ class WaDunningService {
   }
 
   /** Para a conversa do assinante, na fila de saída — quem envia é o outbox. */
-  static async enqueue({ account, subscriber, body }) {
+  static async enqueue({ account, subscriber, body, metaTemplate = null }) {
     const number = normalizarTelefoneBr(subscriber.phone);
     if (!number) throw new WaError('whatsapp.error.noDestination', { code: 'no_destination', status: 409 });
     const conversation = await WaConversation.ensure({
@@ -747,7 +755,7 @@ class WaDunningService {
     }
     // 'campaign' e não um valor novo: é o que diz ao teto do bot que esta
     // mensagem não é resposta dele.
-    return WaSendService.enqueue({ conversationId: conversation.id, body, source: 'campaign' });
+    return WaSendService.enqueue({ conversationId: conversation.id, body, source: 'campaign', metaTemplate });
   }
 
   static async sentRecently(contract, hours, now) {
@@ -905,9 +913,10 @@ class WaDunningService {
       const fatura = { amount: row.amount === null ? null : Number(row.amount), dueDate: row.due_date, id: row.invoice_key };
       const vars = variaveisDeCobranca(fatura, row.client_name, now);
       const body = renderCobranca(template.body, vars);
+      const metaTemplate = body === null ? null : WaMetaTemplateService.buildPayload(template, vars, body);
       const motivo = !row.phone_e164 ? 'no_phone'
         : blocked.has(row.phone_e164) ? 'opt_out'
-          : body === null ? 'template_incomplete' : null;
+          : body === null || metaTemplate?.incomplete ? 'template_incomplete' : null;
       // eslint-disable-next-line no-await-in-loop -- uma linha por pagamento
       const id = await this.claim({
         kind: 'thanks',
@@ -930,7 +939,7 @@ class WaDunningService {
       try {
         // eslint-disable-next-line no-await-in-loop -- idem
         const message = await this.enqueue({
-          account, subscriber: { contract: row.contract, clientName: row.client_name, phone: row.phone_e164 }, body
+          account, subscriber: { contract: row.contract, clientName: row.client_name, phone: row.phone_e164 }, body, metaTemplate
         });
         // eslint-disable-next-line no-await-in-loop -- idem
         await tdb('wa_dunning_sends').where({ id }).update({ message_id: message.id, updated_at: new Date() });

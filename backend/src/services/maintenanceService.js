@@ -1,3 +1,4 @@
+import WaMetaTemplateService from './waMetaTemplateService.js';
 import MappingEdge from '../models/MappingEdge.js';
 import MappingNode from '../models/MappingNode.js';
 import SgpLink from '../models/SgpLink.js';
@@ -40,7 +41,10 @@ async function enfileirar(account, phone, body) {
     waLid: null,
     pushName: null
   });
-  await WaSendService.enqueue({ conversationId: conversation.id, body, userId: null, source: 'alert' });
+  // Número oficial fora da janela: o aviso sai pelo modelo da Meta ligado a
+  // ele, com o texto inteiro no parâmetro.
+  const metaTemplate = await WaMetaTemplateService.noticePayload('maintenance', body);
+  await WaSendService.enqueue({ conversationId: conversation.id, body, userId: null, source: 'alert', metaTemplate });
 }
 
 function erro(chave, status = 400, code = 'maintenance_invalid') {

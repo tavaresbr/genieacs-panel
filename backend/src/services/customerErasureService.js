@@ -279,7 +279,7 @@ class CustomerErasureService {
         await tdb('wa_broadcast_recipients', trx).where((q) => {
           if (telefones.length) q.whereIn('phone_e164', telefones);
           if (contratos.length) q.orWhereIn('contract', contratos);
-        }).update({ phone_e164: '', client_name: null, rendered_body: '' });
+        }).update({ phone_e164: '', client_name: null, rendered_body: '', meta_template: null });
       }
 
       // O histórico da régua automática sai inteiro: é quem foi cobrado,

@@ -40,6 +40,10 @@ router.post('/accounts', authenticateToken, requirePermission('whatsapp.config')
 router.post('/accounts/check-number', authenticateToken, requirePermission('whatsapp.send'), WhatsAppController.checkNumbers);
 
 router.get('/accounts/:id/qr', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.getQr);
+// Modelos aprovados da Meta (número oficial): buscar na Meta é configuração;
+// listar serve a quem responde fora da janela de 24 h.
+router.post('/accounts/:id/templates/sync', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.syncMetaTemplates);
+router.get('/meta-templates', authenticateToken, requirePermission('whatsapp.read'), WhatsAppController.listMetaTemplates);
 router.get('/accounts/:id/status', authenticateToken, requirePermission('whatsapp.read'), WhatsAppController.getStatus);
 router.post('/accounts/:id/restart', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.restartAccount);
 // Conferir é leitura e pede `whatsapp.read`; reescrever muda o servidor e pede

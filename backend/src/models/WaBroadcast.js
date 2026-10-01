@@ -114,6 +114,7 @@ class WaBroadcast {
       contract: recipient.contract || null,
       client_name: recipient.clientName || null,
       rendered_body: recipient.body,
+      meta_template: recipient.metaTemplate ? JSON.stringify(recipient.metaTemplate) : null,
       invoice_key: recipient.invoiceKey || null,
       due_date: recipient.dueDate || null,
       status: 'pending',

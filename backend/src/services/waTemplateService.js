@@ -1,4 +1,5 @@
 import WaTemplate from '../models/WaTemplate.js';
+import WaMetaTemplateService from './waMetaTemplateService.js';
 import { WaError } from './whatsappConfigService.js';
 import {
   VARIAVEIS_DE_COBRANCA,
@@ -32,10 +33,20 @@ export const VARIAVEIS_DE_AVISO = Object.freeze(['nome', 'primeiro_nome', 'contr
  * cobrança avulsa e a campanha de aviso —, e cada uma recusa na hora de montar
  * o que não sabe preencher.
  */
-function variaveisDaCategoria(category) {
+export function variaveisDaCategoria(category) {
   if (category === 'atendimento') return VARIAVEIS_DE_ATENDIMENTO;
   if (category === 'geral') return [...new Set([...VARIAVEIS_DE_COBRANCA, ...VARIAVEIS_DE_AVISO])];
   return VARIAVEIS_DE_COBRANCA;
+}
+
+function lerParamsMeta(raw) {
+  if (!raw) return [];
+  try {
+    const lista = JSON.parse(raw);
+    return Array.isArray(lista) ? lista.map(String) : [];
+  } catch {
+    return [];
+  }
 }
 
 const PLACEHOLDER = /\{\{\s*([a-zA-Z_][\w.-]*)\s*\}\}/g;
@@ -62,8 +73,11 @@ class WaTemplateService {
     return rows.map((row) => this.publicTemplate(row));
   }
 
-  static async create({ name, body, category } = {}) {
+  static async create({ name, body, category, metaTemplateName, metaLanguage, metaParams } = {}) {
     const clean = this.validate({ name, body, category });
+    const meta = await WaMetaTemplateService.validateMapping(
+      { metaTemplateName, metaLanguage, metaParams }, variaveisDaCategoria(clean.category)
+    );
     if (await WaTemplate.getByName(clean.name)) {
       throw new WaError('whatsapp.templates.nameTaken', { code: 'name_taken', status: 409 });
     }
@@ -71,7 +85,8 @@ class WaTemplateService {
       name: clean.name,
       body: clean.body,
       category: clean.category,
-      active: true
+      active: true,
+      ...meta
     }));
   }
 
@@ -87,11 +102,24 @@ class WaTemplateService {
     if (merged.name !== existing.name && await WaTemplate.getByName(merged.name)) {
       throw new WaError('whatsapp.templates.nameTaken', { code: 'name_taken', status: 409 });
     }
+    // A ligação com a Meta só muda quando o pedido fala dela: um PUT que só
+    // renomeia não a apaga. Mudar a categoria revalida as variáveis ligadas.
+    let meta = {};
+    if (patch.metaTemplateName !== undefined) {
+      meta = await WaMetaTemplateService.validateMapping(patch, variaveisDaCategoria(merged.category));
+    } else if (existing.meta_template_name && merged.category !== existing.category) {
+      meta = await WaMetaTemplateService.validateMapping({
+        metaTemplateName: existing.meta_template_name,
+        metaLanguage: existing.meta_language,
+        metaParams: JSON.parse(existing.meta_params || '[]')
+      }, variaveisDaCategoria(merged.category));
+    }
     return this.publicTemplate(await WaTemplate.update(existing.id, {
       name: merged.name,
       body: merged.body,
       category: merged.category,
-      active: patch.active === undefined ? existing.active : patch.active === true
+      active: patch.active === undefined ? existing.active : patch.active === true,
+      ...meta
     }));
   }
 
@@ -121,7 +149,7 @@ class WaTemplateService {
       : await WaTemplate.getByName(raw);
     const body = stored ? String(stored.body) : raw;
     this.assertKnownVariables(body);
-    return { body, templateId: stored?.id ?? null, name: stored?.name ?? null };
+    return { body, templateId: stored?.id ?? null, name: stored?.name ?? null, template: stored };
   }
 
   static assertKnownVariables(body, category = null) {
@@ -195,6 +223,10 @@ class WaTemplateService {
       body: row.body,
       category: row.category,
       active: Boolean(row.active),
+      // O modelo da Meta que este usa fora da janela de 24 h, num número oficial.
+      metaTemplateName: row.meta_template_name || null,
+      metaLanguage: row.meta_language || null,
+      metaParams: lerParamsMeta(row.meta_params),
       createdAt: row.created_at || null,
       updatedAt: row.updated_at || null
     };

@@ -1,3 +1,4 @@
+import WaMetaTemplateService from './waMetaTemplateService.js';
 import AppState from '../models/AppState.js';
 import MappingEdge from '../models/MappingEdge.js';
 import MappingNode from '../models/MappingNode.js';
@@ -1080,7 +1081,10 @@ class WaAlertService {
         // The on-duty staff thread is a conversation like any other, so the bot
         // reads it too: an unlabelled alert counted against the ceiling for
         // whoever is on call.
-        await WaSendService.enqueue({ conversationId: conversation.id, body, source: 'alert' });
+        // Número oficial fora da janela: o alerta sai pelo modelo da Meta
+        // ligado aos alertas, com o texto inteiro no parâmetro.
+        const metaTemplate = await WaMetaTemplateService.noticePayload('alert', body);
+        await WaSendService.enqueue({ conversationId: conversation.id, body, source: 'alert', metaTemplate });
         sent += 1;
       } catch (error) {
         console.warn(`WhatsApp alert to ${number} not enqueued: ${error.message}`);

@@ -193,6 +193,9 @@ class WhatsAppMessageController {
         body: body.body,
         attachment: body.attachment,
         isNote: body.isNote === true,
+        // Modelo aprovado da Meta, para responder fora da janela de 24 h num
+        // número oficial. Conferido no enqueue contra o número que envia.
+        metaTemplate: body.metaTemplate,
         userId: req.user?.userId ?? null,
         // Said rather than left to the default: this route is the one place a
         // human is demonstrably behind the message, and the row should say so

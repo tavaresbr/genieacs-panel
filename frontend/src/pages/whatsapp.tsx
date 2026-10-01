@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   whatsappAPI,
+  type MetaTemplatePayload,
   type WhatsAppAccount,
+  type WhatsAppMetaTemplate,
   type WhatsAppConversation,
   type WhatsAppMessage
 } from '@/lib/api'
@@ -182,6 +184,7 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
   // Os números do provedor, para cada conversa dizer por qual deles chegou.
   // Lidos uma vez: número novo é raro, e entra na próxima abertura da tela.
   const [accounts, setAccounts] = useState<ReadonlyMap<number, WhatsAppAccount>>(() => new Map())
+  const [metaTemplates, setMetaTemplates] = useState<WhatsAppMetaTemplate[]>([])
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [conversation, setConversation] = useState<WhatsAppConversation | null>(null)
   const [messages, setMessages] = useState<WhatsAppMessage[]>([])
@@ -348,6 +351,12 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
     void whatsappAPI.listAccounts().then((res) => {
       if (!vivo || !res.success || !Array.isArray(res.data)) return
       setAccounts(new Map(res.data.map((account) => [account.id, account])))
+      // Os modelos aprovados da Meta só interessam a quem tem número oficial.
+      if (res.data.some((account) => account.integration === 'cloud')) {
+        void whatsappAPI.listMetaTemplates({ usable: true }).then((r) => {
+          if (vivo && r.success && Array.isArray(r.data)) setMetaTemplates(r.data)
+        }).catch(() => {})
+      }
     }).catch(() => {})
     return () => { vivo = false }
   }, [])
@@ -508,7 +517,8 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
   const submit = useCallback(async (
     body: string,
     isNote: boolean,
-    attachment?: ComposerAttachment
+    attachment?: ComposerAttachment,
+    metaTemplate?: MetaTemplatePayload
   ): Promise<boolean> => {
     const id = selectedIdRef.current
     if (id === null) return false
@@ -516,7 +526,7 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
       // The composer uploads the file first and hands back what the upload
       // route stored; this call is what puts it on a row. A caption is
       // optional, so `body` can be empty as long as there is a file.
-      const res = await whatsappAPI.sendMessage(id, { body, attachment, isNote })
+      const res = await whatsappAPI.sendMessage(id, { body, attachment, isNote, metaTemplate })
       if (!alive.current) return false
       if (!res.success || !res.data) {
         // Only the machine `code` is ever translated. The `message` beside it
@@ -544,6 +554,16 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
     setSending(true)
     try {
       return await submit(body, isNote, attachment)
+    } finally {
+      if (alive.current) setSending(false)
+    }
+  }, [submit])
+
+  /** Fora da janela de 24 h num número oficial: um modelo aprovado da Meta. */
+  const sendTemplate = useCallback(async (metaTemplate: MetaTemplatePayload) => {
+    setSending(true)
+    try {
+      return await submit('', false, undefined, metaTemplate)
     } finally {
       if (alive.current) setSending(false)
     }
@@ -724,6 +744,8 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
                     draft={draft}
                     quickReplies={canQuickReply ? quickReplies ?? [] : null}
                     metaWindow={metaWindowFor(accounts.get(conversation.accountId), conversation)}
+                    metaTemplates={metaTemplates.filter((m) => m.accountId === conversation.accountId)}
+                    onSendTemplate={sendTemplate}
                     quickReplyVars={{
                       nome: conversation.clientName ?? conversation.pushName,
                       primeiro_nome: firstName(conversation.clientName ?? conversation.pushName),

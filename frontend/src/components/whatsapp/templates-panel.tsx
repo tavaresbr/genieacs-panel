@@ -1,13 +1,14 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { whatsappAPI, type WhatsAppTemplate } from '@/lib/api'
+import { whatsappAPI, type WhatsAppMetaTemplate, type WhatsAppTemplate } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import { whatsappErrorMessage } from '@/components/whatsapp-connection'
 import type { TranslationKey } from '@/lib/i18n'
 import { copyName } from './template-copy'
+import { MetaTemplatesPanel, metaKey } from './meta-templates-panel'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The variables the dispatcher knows how to fill.
@@ -134,9 +135,21 @@ interface Draft {
   name: string
   body: string
   category: TemplateCategory
+  /** `nome|idioma` do modelo da Meta ligado, ou vazio. */
+  meta: string
+  /** Nossa variável para cada `{{n}}` do modelo da Meta, em ordem. */
+  metaParams: string[]
 }
 
-const EMPTY_DRAFT: Draft = { id: null, name: '', body: '', category: 'cobranca' }
+const EMPTY_DRAFT: Draft = { id: null, name: '', body: '', category: 'cobranca', meta: '', metaParams: [] }
+
+/** O texto inteiro da mensagem, como parâmetro de um modelo da Meta. */
+const FULL_TEXT = 'texto'
+
+const draftFrom = (template: WhatsAppTemplate) => ({
+  meta: template.metaTemplateName ? `${template.metaTemplateName}|${template.metaLanguage ?? ''}` : '',
+  metaParams: template.metaParams ?? []
+})
 
 /**
  * The message-template editor.
@@ -169,6 +182,21 @@ export function TemplatesPanel() {
       alive.current = false
     }
   }, [])
+
+  // Os modelos aprovados da Meta, para ligar um modelo do painel a um deles.
+  // Vazio para quem não tem número oficial — e aí a seção nem aparece.
+  const [metaTemplates, setMetaTemplates] = useState<WhatsAppMetaTemplate[]>([])
+  const loadMeta = useCallback(async () => {
+    const res = await whatsappAPI.listMetaTemplates({ usable: true })
+    if (alive.current && res.success && Array.isArray(res.data)) {
+      // O mesmo modelo em dois números aparece uma vez só.
+      const unicos = new Map(res.data.map((m) => [metaKey(m), m]))
+      setMetaTemplates([...unicos.values()])
+    }
+  }, [])
+  useEffect(() => {
+    void loadMeta()
+  }, [loadMeta])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -238,9 +266,11 @@ export function TemplatesPanel() {
     setSaving(true)
     setRefusal('')
     const { category } = draft
+    const [metaTemplateName = '', metaLanguage = ''] = draft.meta ? draft.meta.split('|') : []
+    const meta = { metaTemplateName, metaLanguage, metaParams: metaTemplateName ? draft.metaParams : [] }
     const res = draft.id === null
-      ? await whatsappAPI.createTemplate({ name, body, category })
-      : await whatsappAPI.updateTemplate(draft.id, { name, body, category })
+      ? await whatsappAPI.createTemplate({ name, body, category, ...meta })
+      : await whatsappAPI.updateTemplate(draft.id, { name, body, category, ...meta })
     if (!alive.current) return
     setSaving(false)
 
@@ -286,9 +316,13 @@ export function TemplatesPanel() {
     [draft, load, t, toast]
   )
 
+  const draftMeta = draft?.meta ? metaTemplates.find((m) => metaKey(m) === draft.meta) ?? null : null
+  // O botão só arma com uma variável escolhida para cada parâmetro do modelo.
+  const metaIncomplete = Boolean(draft?.meta)
+    && (!draftMeta || draft!.metaParams.length !== draftMeta.paramCount || draft!.metaParams.some((v) => !v))
   const draftBody = draft?.body ?? ''
   const draftKind = useMemo(() => classify(draftBody), [draftBody])
-  const canSave = Boolean(draft && draft.name.trim() && draft.body.trim())
+  const canSave = Boolean(draft && draft.name.trim() && draft.body.trim()) && !metaIncomplete
 
   return (
     <section className="flex flex-col gap-5">
@@ -315,6 +349,8 @@ export function TemplatesPanel() {
           </button>
         </div>
       </header>
+
+      <MetaTemplatesPanel onSynced={() => void loadMeta()} />
 
       {draft && (
         <form
@@ -396,6 +432,61 @@ export function TemplatesPanel() {
             </div>
           </div>
 
+          {metaTemplates.length > 0 && draft.category !== 'atendimento' && (
+            <fieldset className="rounded-md border border-border p-3">
+              <legend className="px-1 text-sm font-semibold text-foreground">{t('whatsapp.metaTemplates.mapTitle')}</legend>
+              <p className="field-hint">{t('whatsapp.metaTemplates.mapHint')}</p>
+              <select
+                aria-label={t('whatsapp.metaTemplates.mapTitle')}
+                className="modern-input mt-2"
+                value={draft.meta}
+                onChange={(event) => {
+                  const escolhido = metaTemplates.find((m) => metaKey(m) === event.target.value)
+                  setDraft({
+                    ...draft,
+                    meta: event.target.value,
+                    metaParams: Array.from({ length: escolhido?.paramCount ?? 0 }, () => '')
+                  })
+                }}
+              >
+                <option value="">{t('whatsapp.metaTemplates.mapNone')}</option>
+                {draft.meta && !draftMeta && <option value={draft.meta}>{draft.meta.replace('|', ' · ')}</option>}
+                {metaTemplates.map((m) => (
+                  <option key={metaKey(m)} value={metaKey(m)}>{`${m.name} · ${m.language}`}</option>
+                ))}
+              </select>
+              {draftMeta && (
+                <>
+                  <p className="mt-2 whitespace-pre-wrap break-words font-mono text-[0.78rem] leading-6 text-muted-foreground">
+                    {draftMeta.bodyText}
+                  </p>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    {Array.from({ length: draftMeta.paramCount }, (_, i) => (
+                      <label key={i} className="text-xs text-muted-foreground">
+                        {t('whatsapp.metaTemplates.paramLabel', { n: i + 1 })}
+                        <select
+                          className="modern-input mt-1 w-full"
+                          value={draft.metaParams[i] ?? ''}
+                          onChange={(event) => {
+                            const next = [...draft.metaParams]
+                            next[i] = event.target.value
+                            setDraft({ ...draft, metaParams: next })
+                          }}
+                        >
+                          <option value="">—</option>
+                          <option value={FULL_TEXT}>{t('whatsapp.metaTemplates.fullText')}</option>
+                          {variablesFor(draft.category).map((name) => (
+                            <option key={name} value={name}>{`{{${name}}}`}</option>
+                          ))}
+                        </select>
+                      </label>
+                    ))}
+                  </div>
+                </>
+              )}
+            </fieldset>
+          )}
+
           {/* The badge is the same one the list rows carry, so the operator
               learns what it means here. It is dropped for `both`, where the
               paragraph below says the whole thing in words. */}
@@ -466,6 +557,9 @@ export function TemplatesPanel() {
                     <span className="truncate text-sm font-semibold text-foreground">{template.name}</span>
                     <span className="modern-badge">{t(CATEGORY_LABEL[asCategory(template.category)])}</span>
                     {asCategory(template.category) !== 'atendimento' && <ClassificationBadge body={template.body} />}
+                    {template.metaTemplateName && (
+                      <span className="modern-badge-info">{t('whatsapp.metaTemplates.mapBadge', { name: template.metaTemplateName })}</span>
+                    )}
                   </div>
                   <p className="mt-2 whitespace-pre-wrap break-words font-mono text-[0.78rem] leading-6 text-muted-foreground">
                     {template.body}
@@ -482,7 +576,7 @@ export function TemplatesPanel() {
                     className="modern-button-secondary"
                     onClick={() => {
                       setRefusal('')
-                      setDraft({ id: template.id, name: template.name, body: template.body, category: asCategory(template.category) })
+                      setDraft({ id: template.id, name: template.name, body: template.body, category: asCategory(template.category), ...draftFrom(template) })
                     }}
                   >
                     <Icon name="edit" size={16} />
@@ -499,7 +593,8 @@ export function TemplatesPanel() {
                         id: null,
                         name: copyName(template.name, templates.map((entry) => entry.name), t('whatsapp.templates.copySuffix')),
                         body: template.body,
-                        category: asCategory(template.category)
+                        category: asCategory(template.category),
+                        ...draftFrom(template)
                       })
                       // The editor sits above the list; a click at the bottom
                       // of a long list would otherwise open it off screen.

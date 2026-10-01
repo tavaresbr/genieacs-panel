@@ -1,3 +1,4 @@
+import WaMetaTemplateService from '../services/waMetaTemplateService.js';
 import WhatsAppConfigService, { WaError } from '../services/whatsappConfigService.js';
 import EvolutionInstanceService from '../services/evolutionInstanceService.js';
 import WaBotConfigService from '../services/waBotConfigService.js';
@@ -152,6 +153,28 @@ class WhatsAppController {
       }));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.accountActionFailed');
+    }
+  }
+
+  /** Busca na Meta os modelos aprovados de um número oficial. */
+  static async syncMetaTemplates(req, res) {
+    try {
+      const templates = await WaMetaTemplateService.sync(req.params?.id);
+      return res.json(createResponse(req.t('whatsapp.metaTemplates.synced', { count: templates.length }), templates));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.metaTemplates.syncFailed');
+    }
+  }
+
+  static async listMetaTemplates(req, res) {
+    try {
+      const templates = await WaMetaTemplateService.list({
+        accountId: req.query?.accountId ? Number(req.query.accountId) : null,
+        usableOnly: ['1', 'true'].includes(String(req.query?.usable ?? ''))
+      });
+      return res.json(createResponse(req.t('whatsapp.metaTemplates.loaded', { count: templates.length }), templates));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.metaTemplates.loadFailed');
     }
   }
 
