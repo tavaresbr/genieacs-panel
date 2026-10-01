@@ -16,7 +16,7 @@ import { timestampMs } from '../utils/helpers.js';
 import { DEFAULT_LOCALE, translatorFor } from '../i18n/index.js';
 import { TenantCache } from '../config/tenantCache.js';
 import { currentTenantId } from '../config/tenantContext.js';
-import { mailConfigured, mailTransport } from './mail/index.js';
+import { mailConfigured, mailTransport, panelUrlFor } from './mail/index.js';
 import { isValidEmail } from '../utils/helpers.js';
 import Tenant from '../models/Tenant.js';
 import { createSecretBox } from '../utils/secretBox.js';
@@ -47,8 +47,17 @@ export const ALERT_RULES = Object.freeze([
   'ont_offline',
   'rx_power_low',
   'temperature_high',
-  'mass_outage'
+  'mass_outage',
+  'wa_disconnected'
 ]);
+
+/**
+ * Os estados em que um número de WhatsApp está caído DE VERDADE.
+ *
+ * `connecting` e `pending` ficam de fora: são o número sendo pareado ou
+ * reiniciado por alguém que está olhando a tela, não uma queda.
+ */
+export const ACCOUNT_DOWN_STATUSES = Object.freeze(['disconnected', 'expired']);
 
 /**
  * The translation key each rule's message is built from.
@@ -63,7 +72,8 @@ const RULE_KEYS = Object.freeze({
   ont_offline: { firing: 'whatsapp.alerts.ontOffline', cleared: 'whatsapp.alerts.ontOfflineCleared' },
   rx_power_low: { firing: 'whatsapp.alerts.rxPowerLow', cleared: 'whatsapp.alerts.rxPowerLowCleared' },
   temperature_high: { firing: 'whatsapp.alerts.temperatureHigh', cleared: 'whatsapp.alerts.temperatureHighCleared' },
-  mass_outage: { firing: 'whatsapp.alerts.massOutage', cleared: 'whatsapp.alerts.massOutageCleared' }
+  mass_outage: { firing: 'whatsapp.alerts.massOutage', cleared: 'whatsapp.alerts.massOutageCleared' },
+  wa_disconnected: { firing: 'whatsapp.alerts.waDisconnected', cleared: 'whatsapp.alerts.waDisconnectedCleared' }
 });
 
 /**
@@ -96,7 +106,12 @@ const DEFAULT_RULES = Object.freeze({
   ont_offline: { enabled: true, threshold: 30, cooldownMinutes: 120 },
   rx_power_low: { enabled: true, threshold: -27, cooldownMinutes: 360 },
   temperature_high: { enabled: true, threshold: 70, cooldownMinutes: 360 },
-  mass_outage: { enabled: true, threshold: 5, cooldownMinutes: 120 }
+  mass_outage: { enabled: true, threshold: 5, cooldownMinutes: 120 },
+  // O limite é a carência, em minutos: um `connectfailure` que o Evolution
+  // resolve sozinho em segundos não pode acordar ninguém. A repetição é de
+  // hora em hora porque, enquanto o número está caído, nenhum cliente recebe
+  // resposta — é mais urgente que uma ONT quente.
+  wa_disconnected: { enabled: true, threshold: 5, cooldownMinutes: 60 }
 });
 
 const DEFAULT_SETTINGS = Object.freeze({
@@ -578,6 +593,12 @@ class WaAlertService {
         return summary;
       }
 
+      // Os números de WhatsApp primeiro, e com o seu próprio acerto de contas:
+      // um GenieACS fora do ar não pode calar o aviso de que o atendimento
+      // parou — são problemas diferentes, e o segundo nem passa pela frota.
+      const contas = await this.evaluateAccounts(settings, now);
+      await this.reconcile({ ...contas, settings, channels, now, summary, scope: (rule) => rule === 'wa_disconnected' });
+
       const devices = await DeviceService.getDashboardDevices();
       if (!Array.isArray(devices) || devices.length === 0) {
         // An empty fleet read is far more likely to be a broken GenieACS than a
@@ -588,7 +609,7 @@ class WaAlertService {
       }
 
       const { firing, unknown } = await this.evaluate(devices, settings, now);
-      await this.reconcile({ firing, unknown, settings, channels, now, summary });
+      await this.reconcile({ firing, unknown, settings, channels, now, summary, scope: (rule) => rule !== 'wa_disconnected' });
       // O incidente de queda — o que o operador usa para avisar os CLIENTES.
       // À parte e calado: um incidente que não abre não derruba o alerta da
       // equipe, que já saiu.
@@ -789,6 +810,62 @@ class WaAlertService {
   }
 
   /**
+   * Os números de WhatsApp caídos agora, como condições da regra
+   * `wa_disconnected`.
+   *
+   * Lê o estado que o painel guarda — o webhook `connection_update` e a
+   * conferência no envio é que o mantêm —, sem perguntar ao Evolution: uma
+   * passagem que dependesse do servidor de WhatsApp responder não saberia
+   * avisar justamente quando ele está fora.
+   */
+  static async evaluateAccounts(settings, now) {
+    const firing = new Map();
+    const unknown = new Set();
+    const rule = settings.rules.wa_disconnected;
+    if (!rule?.enabled) return { firing, unknown };
+    const accounts = await WhatsAppAccount.getAll();
+    const open = new Map(
+      (await WaAlertState.listOpen())
+        .filter((row) => row.rule === 'wa_disconnected')
+        .map((row) => [String(row.subject), row])
+    );
+    const link = await this.reconnectLink();
+    for (const account of accounts) {
+      if (!ACCOUNT_DOWN_STATUSES.includes(account.status)) continue;
+      const subject = String(account.id);
+      const firedAt = timestampMs(open.get(subject)?.fired_at);
+      firing.set(conditionKey('wa_disconnected', subject), {
+        rule: 'wa_disconnected',
+        subject,
+        graceMinutes: Math.max(0, Number(rule.threshold) || 0),
+        vars: {
+          ...this.accountVars(account),
+          minutes: Number.isFinite(firedAt) ? Math.max(0, Math.round((now - firedAt) / 60_000)) : 0,
+          link
+        }
+      });
+    }
+    return { firing, unknown };
+  }
+
+  /** Como o número aparece na mensagem: o apelido, e o telefone quando há. */
+  static accountVars(account) {
+    const phone = account.phone_e164 ? `+${String(account.phone_e164).replace(/^\+/, '')}` : '';
+    const nome = account.label || phone || account.name;
+    return { account: phone && nome !== phone ? `${nome} (${phone})` : nome };
+  }
+
+  /**
+   * Onde reconectar: o endereço da aba de WhatsApp das Configurações quando o
+   * painel sabe o próprio endereço, ou só o caminho na tela.
+   */
+  static async reconnectLink() {
+    const tenant = await Tenant.findPublicById(currentTenantId()).catch(() => null);
+    const base = panelUrlFor(tenant);
+    return base ? `: ${base}/settings?tab=whatsapp#wa-accounts` : '';
+  }
+
+  /**
    * Groups the offline ONTs by the node they hang off, raises one alert per
    * node that is over the threshold, and takes the individual `ont_offline`
    * entries for those devices back out.
@@ -878,23 +955,34 @@ class WaAlertService {
    * notify once; still firing → nothing until the cooldown passes; recovered →
    * one message and the row goes; can't tell → leave it exactly as it was.
    */
-  static async reconcile({ firing, unknown, settings, channels, now, summary }) {
-    const open = await WaAlertState.listOpen();
+  static async reconcile({ firing, unknown, settings, channels, now, summary, scope = null }) {
+    // `scope` diz quais regras esta passada julga: as linhas das outras ficam
+    // como estão, nem disparam de novo nem são dadas como resolvidas.
+    const open = (await WaAlertState.listOpen()).filter((row) => !scope || scope(row.rule));
     const openByKey = new Map(open.map((row) => [conditionKey(row.rule, row.subject), row]));
     const stamp = new Date(now);
 
     for (const [key, condition] of firing) {
       const row = openByKey.get(key);
       const rule = settings.rules[condition.rule];
+      const graceMs = (condition.graceMinutes ?? 0) * 60_000;
       if (!row) {
         const opened = await WaAlertState.open({ rule: condition.rule, subject: condition.subject, now: stamp });
         summary.fired += 1;
+        // Com carência, a linha abre calada e só fala se ainda estiver valendo
+        // quando a carência passar; o que se resolve antes some sem mensagem.
+        if (graceMs > 0) continue;
         const sent = await this.notify({ channels, condition, cleared: false });
         if (sent > 0) {
           summary.notified += sent;
             await WaAlertState.markNotified(opened.id, stamp);
         }
         continue;
+      }
+
+      if (graceMs > 0 && !row.notify_count) {
+        const firedAt = timestampMs(row.fired_at);
+        if (Number.isFinite(firedAt) && now - firedAt < graceMs) continue;
       }
 
       const lastNotified = timestampMs(row.last_notified_at);
@@ -919,11 +1007,20 @@ class WaAlertService {
         // A caixa pelo nome, como no alerta que abriu: o id interno
         // ("cto-01-2") não diz nada a quem lê no celular.
         const box = row.rule === 'mass_outage' ? await MappingNode.getByNodeId(row.subject).catch(() => null) : null;
-        summary.notified += await this.notify({
-          channels,
-          condition: { rule: row.rule, subject: row.subject, vars: { device: row.subject, node: box?.name || row.subject } },
-          cleared: true
-        });
+        // O número pelo nome, como no aviso que abriu. Um número apagado não
+        // "voltou": a linha sai calada.
+        const conta = row.rule === 'wa_disconnected' ? await WhatsAppAccount.getById(row.subject).catch(() => null) : null;
+        if (row.rule !== 'wa_disconnected' || conta) {
+          summary.notified += await this.notify({
+            channels,
+            condition: {
+              rule: row.rule,
+              subject: row.subject,
+              vars: { device: row.subject, node: box?.name || row.subject, ...(conta ? this.accountVars(conta) : {}) }
+            },
+            cleared: true
+          });
+        }
       }
       await WaAlertState.removeById(row.id);
       summary.cleared += 1;

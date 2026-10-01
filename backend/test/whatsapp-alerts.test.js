@@ -81,6 +81,7 @@ const onlyRule = (rule, patch = {}) => ({
   rx_power_low: { enabled: false },
   temperature_high: { enabled: false },
   mass_outage: { enabled: false },
+  wa_disconnected: { enabled: false },
   [rule]: { enabled: true, ...patch }
 });
 
@@ -126,14 +127,14 @@ after(async () => {
 beforeEach(reset);
 
 describe('the settings routes', () => {
-  it('hands back the four rules with their thresholds', async () => {
+  it('hands back the five rules with their thresholds', async () => {
     const { status, body } = await call(`${panelUrl}/api/whatsapp/alerts/settings`, {
       headers: authHeaders(token)
     });
     assert.equal(status, 200);
     assert.deepEqual(
       Object.keys(body.data.rules).sort(),
-      ['mass_outage', 'ont_offline', 'rx_power_low', 'temperature_high']
+      ['mass_outage', 'ont_offline', 'rx_power_low', 'temperature_high', 'wa_disconnected']
     );
     for (const rule of Object.values(body.data.rules)) {
       assert.equal(typeof rule.enabled, 'boolean');
@@ -588,5 +589,90 @@ describe('the scan interval survives a restart', () => {
       await getDb()('app_state').where({ key: LAST_SCAN_KEY }).del();
       WaAlertService.lastScanAt.clear();
     }
+  });
+});
+
+describe('a WhatsApp number that drops tells the team', () => {
+  let atendimentoId;
+
+  before(async () => {
+    const account = await asTenant(() => WhatsAppAccount.create({
+      name: 'painel-atendimento',
+      label: 'Atendimento',
+      purpose: 'general',
+      flavor: 'v2',
+      base_url: 'https://evo.provedor.test',
+      status: 'connected',
+      phone_e164: '5593981119999',
+      ...WhatsAppConfigService.encryptInstanceToken('token-atendimento'),
+      ...WhatsAppConfigService.encryptWebhookToken('webhook-atendimento')
+    }));
+    atendimentoId = account.id;
+  });
+
+  const setStatus = (status) => getDb()('whatsapp_accounts').where({ id: atendimentoId }).update({ status });
+
+  after(async () => {
+    await getDb()('whatsapp_accounts').where({ id: atendimentoId }).del();
+  });
+
+  it('warns once the grace has passed, even with GenieACS unreadable, and says when it is back', async () => {
+    await setStatus('disconnected');
+    await setRules(onlyRule('wa_disconnected', { threshold: 5 }));
+
+    // Dentro da carência: a condição abre calada.
+    const first = await scan({ now: now() });
+    assert.equal(first.skipped, 'no_devices', 'a frota vazia continua sendo dita');
+    assert.equal((await alertRows()).length, 1);
+    assert.equal((await outbox()).length, 0);
+
+    const second = await scan({ now: now() + 6 * MINUTE });
+    assert.equal(second.notified, 1);
+    const [sent] = await outbox();
+    assert.match(sent.body, /Atendimento \(\+5593981119999\)/);
+    assert.match(sent.body, /Configurações › WhatsApp/);
+
+    // Não repete antes do intervalo.
+    await scan({ now: now() + 10 * MINUTE });
+    assert.equal((await outbox()).length, 1);
+
+    await setStatus('connected');
+    const back = await scan({ now: now() + 12 * MINUTE });
+    assert.equal(back.cleared, 1);
+    const messages = await outbox();
+    assert.equal(messages.length, 2);
+    assert.match(messages[1].body, /reconectado/);
+    assert.equal((await alertRows()).length, 0);
+  });
+
+  it('a drop that heals inside the grace never says anything', async () => {
+    await setStatus('disconnected');
+    await setRules(onlyRule('wa_disconnected', { threshold: 5 }));
+    await scan({ now: now() });
+    await setStatus('connected');
+    const summary = await scan({ now: now() + MINUTE });
+    assert.equal(summary.cleared, 1);
+    assert.equal((await outbox()).length, 0);
+  });
+
+  it('a number still pairing is not a drop', async () => {
+    await setStatus('connecting');
+    await setRules(onlyRule('wa_disconnected', { threshold: 0 }));
+    await scan({ now: now() });
+    assert.equal((await alertRows()).length, 0);
+    await setStatus('connected');
+  });
+
+  it('does not touch the fleet alerts while GenieACS is unreadable', async () => {
+    await setStatus('connected');
+    const { default: WaAlertState } = await import('../src/models/WaAlertState.js');
+    await asTenant(async () => {
+      const row = await WaAlertState.open({ rule: 'ont_offline', subject: 'ONT-QUIETA' });
+      await WaAlertState.markNotified(row.id, new Date());
+    });
+    const before = (await alertRows()).filter((row) => row.rule === 'ont_offline').length;
+    await setRules(onlyRule('wa_disconnected', { threshold: 0 }));
+    await scan({ now: now() });
+    assert.equal((await alertRows()).filter((row) => row.rule === 'ont_offline').length, before);
   });
 });

@@ -3997,7 +3997,7 @@ export interface WhatsAppHealth {
   }
 }
 
-export type WhatsAppAlertRule = 'ont_offline' | 'rx_power_low' | 'temperature_high' | 'mass_outage'
+export type WhatsAppAlertRule = 'ont_offline' | 'rx_power_low' | 'temperature_high' | 'mass_outage' | 'wa_disconnected'
 
 export interface WhatsAppAlertSettings {
   enabled: boolean

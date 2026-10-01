@@ -725,6 +725,8 @@ export default {
   'whatsapp.alerts.temperatureHighCleared': 'ONT {device} Temperatur wieder normal',
   'whatsapp.alerts.massOutage': "Wahrscheinlicher Faserbruch an {node}: {count} von {total} Kunden seit {minutes} Min. offline. Standort: {link}",
   'whatsapp.alerts.massOutageCleared': '{node} wiederhergestellt: die ONTs antworten wieder',
+  'whatsapp.alerts.waDisconnected': 'WhatsApp getrennt: Die Nummer {account} ist seit {minutes} Min. ausgefallen, Nachrichten an Kunden werden nicht gesendet. Per QR-Code unter Einstellungen › WhatsApp neu verbinden{link}',
+  'whatsapp.alerts.waDisconnectedCleared': 'WhatsApp wieder verbunden: Die Nummer {account} funktioniert wieder',
   // WhatsApp — corpo das respostas do bot
   'whatsapp.bot.invoiceDigitableLine': 'Zahlcode: {value}',
   'whatsapp.bot.invoicePix': 'PIX zum Kopieren: {value}',
