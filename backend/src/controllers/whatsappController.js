@@ -2,6 +2,7 @@ import WhatsAppConfigService, { WaError } from '../services/whatsappConfigServic
 import EvolutionInstanceService from '../services/evolutionInstanceService.js';
 import WaBotConfigService from '../services/waBotConfigService.js';
 import WaBotReportService from '../services/waBotReportService.js';
+import WaSatisfactionService from '../services/waSatisfactionService.js';
 import WaHealthService from '../services/waHealthService.js';
 import WhatsAppAccount from '../models/WhatsAppAccount.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
@@ -43,6 +44,18 @@ class WhatsAppController {
     }
   }
 
+  /** `GET /api/whatsapp/satisfaction-report?days=` — a pesquisa de satisfação. */
+  static async getSatisfactionReport(req, res) {
+    try {
+      return res.json(createResponse(
+        req.t('whatsapp.configLoaded'),
+        await WaSatisfactionService.report({ days: Number(req.query?.days) })
+      ));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.configLoadFailed');
+    }
+  }
+
   /** `PUT /api/whatsapp/bot-config` — campo ausente mantém o que está gravado. */
   static async updateBotConfig(req, res) {
     try {
@@ -52,7 +65,8 @@ class WhatsAppController {
         unlockEnabled: body.unlockEnabled,
         options: body.options,
         messages: body.messages,
-        hours: body.hours
+        hours: body.hours,
+        satisfaction: body.satisfaction
       }, req.locale);
       return res.json(createResponse(req.t('whatsapp.configSaved'), config));
     } catch (error) {

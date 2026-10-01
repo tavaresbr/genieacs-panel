@@ -16,7 +16,8 @@ const CONFIG_KEY = 'wa_bot_config';
 
 /** Os textos que o provedor pode trocar. Só os SEM variável: um `{amount}` apagado sem querer vira uma fatura sem valor. */
 export const EDITABLE_MESSAGES = Object.freeze([
-  'greeting', 'askDocument', 'handoffQueued', 'handoff', 'notRecognised', 'noOpenInvoice', 'outsideHours'
+  'greeting', 'askDocument', 'handoffQueued', 'handoff', 'notRecognised', 'noOpenInvoice', 'outsideHours',
+  'surveyQuestion', 'surveyAskComment', 'surveyThanks'
 ]);
 
 /** A chave de i18n do padrão de cada texto editável. */
@@ -27,7 +28,10 @@ const DEFAULT_KEYS = Object.freeze({
   handoff: 'whatsapp.bot.handoff',
   notRecognised: 'whatsapp.bot.notRecognised',
   noOpenInvoice: 'whatsapp.bot.noOpenInvoice',
-  outsideHours: 'whatsapp.bot.outsideHours'
+  outsideHours: 'whatsapp.bot.outsideHours',
+  surveyQuestion: 'whatsapp.survey.question',
+  surveyAskComment: 'whatsapp.survey.askComment',
+  surveyThanks: 'whatsapp.survey.thanks'
 });
 
 const MESSAGE_MAX = 1000;
@@ -48,8 +52,16 @@ function padroes() {
   return {
     options: Object.fromEntries(OPTION_KEYS.map((k) => [k, true])),
     messages: Object.fromEntries(EDITABLE_MESSAGES.map((k) => [k, ''])),
-    hours: { enabled: false, timezone: 'America/Sao_Paulo', week: semanaPadrao() }
+    hours: { enabled: false, timezone: 'America/Sao_Paulo', week: semanaPadrao() },
+    // Desligada até o provedor ligar: é uma mensagem a mais para o cliente.
+    satisfaction: { enabled: false }
   };
+}
+
+function lerPesquisa(raw, atual) {
+  if (raw === undefined) return atual;
+  if (!raw || typeof raw !== 'object') throw invalido('whatsapp.error.invalidBotConfig', 'invalid_bot_satisfaction');
+  return { enabled: raw.enabled === undefined ? atual.enabled : raw.enabled === true };
 }
 
 function fusoValido(tz) {
@@ -129,7 +141,8 @@ class WaBotConfigService {
         ...base.hours,
         ...(salvo.hours || {}),
         week: Array.isArray(salvo.hours?.week) && salvo.hours.week.length === 7 ? salvo.hours.week : base.hours.week
-      }
+      },
+      satisfaction: { ...base.satisfaction, ...(salvo.satisfaction || {}) }
     };
     this.cache.set(config);
     return config;
@@ -162,7 +175,8 @@ class WaBotConfigService {
     const proximo = {
       options: lerOpcoes(patch.options, atual.options),
       messages: lerMensagens(patch.messages, atual.messages),
-      hours: lerHorario(patch.hours, atual.hours)
+      hours: lerHorario(patch.hours, atual.hours),
+      satisfaction: lerPesquisa(patch.satisfaction, atual.satisfaction)
     };
     const interruptores = {};
     if (patch.enabled !== undefined) interruptores.botEnabled = patch.enabled !== false;

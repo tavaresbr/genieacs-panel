@@ -4189,6 +4189,7 @@ export interface WhatsAppMessage {
 /** Os textos do bot que o provedor pode trocar — só os sem variável. */
 export type BotMessageKey =
   | 'greeting' | 'askDocument' | 'handoffQueued' | 'handoff' | 'notRecognised' | 'noOpenInvoice' | 'outsideHours'
+  | 'surveyQuestion' | 'surveyAskComment' | 'surveyThanks'
 
 export interface BotHoursDay {
   /** 0 é domingo, como `Date#getDay`. */
@@ -4208,6 +4209,33 @@ export interface BotConfig {
   /** Os textos padrão, no idioma de quem olha. */
   defaults: Record<BotMessageKey, string>
   hours: { enabled: boolean; timezone: string; week: BotHoursDay[] }
+  /** A pesquisa de satisfação ao encerrar uma conversa com atendente. */
+  satisfaction: { enabled: boolean }
+}
+
+/** A pesquisa de satisfação: `GET /whatsapp/satisfaction-report`. */
+export interface SatisfactionReport {
+  days: 7 | 30 | 90
+  asked: number
+  answered: number
+  /** `null` sem nenhuma pergunta no período. */
+  responseRate: number | null
+  /** De 1 a 5, uma casa; `null` sem resposta. */
+  average: number | null
+  /** Notas 4 e 5 sobre as respondidas. */
+  satisfiedRate: number | null
+  /** Quantas notas 1, 2, 3, 4 e 5. */
+  distribution: [number, number, number, number, number]
+  byAgent: Array<{ userId: number | null; name: string | null; asked: number; answered: number; average: number | null }>
+  lowScores: Array<{
+    conversationId: number
+    contact: string | null
+    contract: string | null
+    score: number
+    comment: string | null
+    answeredAt: string | null
+    agent: string | null
+  }>
 }
 
 /** O relatório do chatbot: `GET /whatsapp/bot-report`. */
@@ -4246,6 +4274,9 @@ export const whatsappAPI = {
 
   getBotReport: (days: 7 | 30 | 90) =>
     apiClient.get<BotReport>(`/whatsapp/bot-report?days=${days}`),
+
+  getSatisfactionReport: (days: 7 | 30 | 90) =>
+    apiClient.get<SatisfactionReport>(`/whatsapp/satisfaction-report?days=${days}`),
 
   // An omitted managedAdminKey keeps the stored one; "" clears it. The server
   // never returns it either way.
