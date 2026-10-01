@@ -4,9 +4,9 @@ import WaMessage from '../models/WaMessage.js';
 import WaOptOut from '../models/WaOptOut.js';
 import WhatsAppAccount from '../models/WhatsAppAccount.js';
 import { EVENTOS } from '../utils/wa/waEventos.js';
-import { readQr, readStatus } from '../utils/wa/evolutionApi.js';
+import { readMetaError, readQr, readStatus } from '../utils/wa/evolutionApi.js';
 import { classificarJid, telefoneDoJid } from '../utils/wa/waJid.js';
-import { lerRecibo } from '../utils/wa/waRecibo.js';
+import { lerFalhaDeEnvio, lerRecibo } from '../utils/wa/waRecibo.js';
 import { pedeSaida } from '../utils/wa/waOptOutTexto.js';
 import WaMediaService from './waMediaService.js';
 import WaBotService from './waBotService.js';
@@ -511,6 +511,17 @@ async function tratarMensagens(account, body) {
 // ────────────────────────────────────────────────────────────────────
 
 async function tratarRecibo(account, body) {
+  const falha = lerFalhaDeEnvio(body);
+  if (falha) {
+    const ids = falha.ids
+      .filter((id) => typeof id === 'string' && id && id.length <= MAX.externalId)
+      .slice(0, MAX.recibos);
+    if (!ids.length) return pular('no_receipt');
+    const janela = readMetaError(falha.errorText).windowClosed;
+    const motivo = janela ? 'meta_window_closed' : `meta_failed ${falha.errorText}`.trim();
+    const atualizadas = await WaMessage.markFailedByExternalId(ids, motivo);
+    return { handled: true, status: 'failed', updated: atualizadas };
+  }
   const recibo = lerRecibo(body);
   // `null` é legítimo: um `messages.update` de edição de texto não carrega
   // estado nenhum. Não é o mesmo que formato desconhecido, mas os dois viram um

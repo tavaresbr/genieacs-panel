@@ -12,7 +12,7 @@ import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
-import { formatRelativeTime } from '@/lib/utils'
+import { copyToClipboard, formatRelativeTime } from '@/lib/utils'
 import {
   WA_ACCOUNT_CLASS,
   WA_ACCOUNT_COLORS,
@@ -51,6 +51,13 @@ const ERROR_KEYS: Record<string, TranslationKey> = {
   no_session: 'whatsapp.error.noSession',
   no_account: 'whatsapp.error.noAccount',
   no_destination: 'whatsapp.error.noDestination',
+  // A API oficial da Meta.
+  meta_window_closed: 'whatsapp.error.metaWindowClosed',
+  cloud_requires_v2: 'whatsapp.error.cloudRequiresV2',
+  invalid_meta_credentials: 'whatsapp.error.invalidMetaCredentials',
+  not_applicable_cloud: 'whatsapp.error.notApplicableCloud',
+  not_supported_cloud: 'whatsapp.error.notSupportedCloud',
+  invalid_cloud_callback_url: 'whatsapp.error.invalidCloudCallbackUrl',
   // Both reachable only from the inbox, and both were missing until the screen
   // that provokes them was built: an unknown code degrades to the generic
   // failure, which is not wrong but tells the operator nothing.
@@ -429,6 +436,60 @@ interface Props {
   compact?: boolean
 }
 
+/** Uma linha com valor e botão de copiar, para colar no app da Meta. */
+function CopyField({ label, value }: { label: string; value: string }) {
+  const { t } = useTranslation()
+  const toast = useToast()
+  return (
+    <div>
+      <p className="field-label">{label}</p>
+      <div className="flex items-center gap-2">
+        <code className="min-w-0 flex-1 break-all rounded-md border border-border bg-muted/40 px-3 py-2 font-mono text-xs text-foreground">
+          {value}
+        </code>
+        <button
+          type="button"
+          className="modern-button-secondary shrink-0"
+          onClick={() => void copyToClipboard(value).then((ok) => {
+            if (ok) toast.success(t('common.copied'))
+          })}
+        >
+          <Icon name="copy" size={16} />
+          {t('common.copy')}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * O que o provedor precisa colar no app dele na Meta para o número oficial
+ * receber mensagens. A Meta não fala com o painel: ela chama o
+ * `/webhook/meta` do servidor Evolution, que repassa ao painel.
+ */
+export function MetaWebhookGuide({ callbackUrl, verifyToken }: { callbackUrl: string; verifyToken: string }) {
+  const { t } = useTranslation()
+  return (
+    <div className="space-y-3 rounded-md border border-border bg-muted/20 p-4">
+      <p className="text-sm font-semibold text-foreground">{t('whatsapp.cloud.guideTitle')}</p>
+      {callbackUrl && verifyToken ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <CopyField label={t('whatsapp.cloud.callbackUrl')} value={callbackUrl} />
+          <CopyField label={t('whatsapp.cloud.verifyToken')} value={verifyToken} />
+        </div>
+      ) : (
+        <p className="text-xs text-[hsl(var(--status-warning))]">{t('whatsapp.cloud.notConfigured')}</p>
+      )}
+      <ol className="list-decimal space-y-1 pl-5 text-xs text-muted-foreground">
+        <li>{t('whatsapp.cloud.step1')}</li>
+        <li>{t('whatsapp.cloud.step2')}</li>
+        <li>{t('whatsapp.cloud.step3')}</li>
+        <li>{t('whatsapp.cloud.step4')}</li>
+      </ol>
+    </div>
+  )
+}
+
 /**
  * The connected numbers, one card each. It lives outside `settings.tsx` so the
  * pairing state machine does not have to share a component with nine other
@@ -453,12 +514,17 @@ export function WhatsAppConnection({ config, compact = false }: Props) {
   const [creating, setCreating] = useState(false)
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState<number | null>(null)
-  const [form, setForm] = useState<{
-    label: string
-    purpose: WhatsAppPurpose
-    baseUrl: string
-    adminKey: string
-  }>({ label: '', purpose: 'general', baseUrl: '', adminKey: '' })
+  const emptyForm = {
+    kind: 'baileys' as 'baileys' | 'cloud',
+    label: '',
+    purpose: 'general' as WhatsAppPurpose,
+    baseUrl: '',
+    adminKey: '',
+    metaToken: '',
+    phoneNumberId: '',
+    wabaId: ''
+  }
+  const [form, setForm] = useState(emptyForm)
   const [edit, setEdit] = useState<{ label: string; purpose: WhatsAppPurpose; color: WaAccountColor }>({
     label: '',
     purpose: 'general',
@@ -466,6 +532,10 @@ export function WhatsAppConnection({ config, compact = false }: Props) {
   })
 
   const managed = Boolean(config?.managed)
+  /** O callback da Meta: o publicado pela configuração, ou o do servidor próprio. */
+  const metaCallback = (baseUrl: string) =>
+    config?.cloudWebhook?.callbackUrl || (baseUrl ? `${baseUrl.replace(/\/+$/, '')}/webhook/meta` : '')
+  const metaVerifyToken = config?.cloudWebhook?.verifyToken ?? ''
 
   const load = useCallback(async () => {
     const res = await whatsappAPI.listAccounts()
@@ -494,7 +564,13 @@ export function WhatsAppConnection({ config, compact = false }: Props) {
         ...(managed ? {} : {
           ...(form.baseUrl ? { baseUrl: form.baseUrl } : {}),
           ...(form.adminKey ? { adminKey: form.adminKey } : {})
-        })
+        }),
+        ...(form.kind === 'cloud' ? {
+          kind: 'cloud' as const,
+          metaToken: form.metaToken.trim(),
+          phoneNumberId: form.phoneNumberId.trim(),
+          wabaId: form.wabaId.trim()
+        } : {})
       })
       if (!res.success || !res.data) {
         toast.error(whatsappErrorMessage(t, res.code))
@@ -507,10 +583,11 @@ export function WhatsAppConnection({ config, compact = false }: Props) {
       if (qrDaCriacao) setQrSeeds((current) => ({ ...current, [created.id]: qrDaCriacao }))
       setAccounts((current) => [...current, created])
       setAdding(false)
-      setForm({ label: '', purpose: 'general', baseUrl: '', adminKey: '' })
+      setForm(emptyForm)
     } finally {
       setCreating(false)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- `emptyForm` é constante
   }, [form, managed, t, toast])
 
   /**
@@ -630,6 +707,32 @@ export function WhatsAppConnection({ config, compact = false }: Props) {
 
       {adding && (
         <div className="mt-4 space-y-4 rounded-md border border-border p-4">
+          <fieldset>
+            <legend className="field-label">{t('whatsapp.cloud.kindTitle')}</legend>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {(['baileys', 'cloud'] as const).map((kind) => (
+                <button
+                  key={kind}
+                  type="button"
+                  aria-pressed={form.kind === kind}
+                  onClick={() => setForm((c) => ({ ...c, kind }))}
+                  className={`rounded-md border p-3 text-left transition-colors ${
+                    form.kind === kind
+                      ? 'border-primary bg-primary/10'
+                      : 'border-border hover:border-primary/50'
+                  }`}
+                >
+                  <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <Icon name={kind === 'cloud' ? 'lock' : 'phone'} size={16} />
+                    {t(kind === 'cloud' ? 'whatsapp.cloud.kindCloud' : 'whatsapp.cloud.kindQr')}
+                  </span>
+                  <span className="mt-1 block text-xs text-muted-foreground">
+                    {t(kind === 'cloud' ? 'whatsapp.cloud.kindCloudHint' : 'whatsapp.cloud.kindQrHint')}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </fieldset>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="wa-new-label" className="field-label">
@@ -694,14 +797,64 @@ export function WhatsAppConnection({ config, compact = false }: Props) {
             </div>
           )}
 
+          {form.kind === 'cloud' && (
+            <>
+              <div>
+                <label htmlFor="wa-new-meta-token" className="field-label">
+                  {t('whatsapp.cloud.token')}
+                </label>
+                <input
+                  id="wa-new-meta-token"
+                  type="password"
+                  autoComplete="new-password"
+                  className="modern-input w-full"
+                  value={form.metaToken}
+                  onChange={(event) => setForm((c) => ({ ...c, metaToken: event.target.value }))}
+                />
+                <p className="field-hint">{t('whatsapp.cloud.tokenHint')}</p>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="wa-new-phone-number-id" className="field-label">
+                    {t('whatsapp.cloud.phoneNumberId')}
+                  </label>
+                  <input
+                    id="wa-new-phone-number-id"
+                    type="text"
+                    inputMode="numeric"
+                    className="modern-input w-full font-mono"
+                    value={form.phoneNumberId}
+                    onChange={(event) => setForm((c) => ({ ...c, phoneNumberId: event.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="wa-new-waba-id" className="field-label">
+                    {t('whatsapp.cloud.wabaId')}
+                  </label>
+                  <input
+                    id="wa-new-waba-id"
+                    type="text"
+                    inputMode="numeric"
+                    className="modern-input w-full font-mono"
+                    value={form.wabaId}
+                    onChange={(event) => setForm((c) => ({ ...c, wabaId: event.target.value }))}
+                  />
+                </div>
+                <p className="field-hint sm:col-span-2">{t('whatsapp.cloud.idsHint')}</p>
+              </div>
+              <MetaWebhookGuide callbackUrl={metaCallback(form.baseUrl)} verifyToken={metaVerifyToken} />
+            </>
+          )}
+
           <div className="flex flex-wrap gap-3">
             <button
               type="button"
               className="modern-button"
-              disabled={creating}
+              disabled={creating || (form.kind === 'cloud'
+                && !(form.metaToken.trim() && form.phoneNumberId.trim() && form.wabaId.trim()))}
               onClick={() => void createAccount()}
             >
-              {creating ? t('common.saving') : t('whatsapp.actions.connect')}
+              {creating ? t('common.saving') : t(form.kind === 'cloud' ? 'whatsapp.cloud.connect' : 'whatsapp.actions.connect')}
             </button>
             <button
               type="button"
@@ -722,8 +875,11 @@ export function WhatsAppConnection({ config, compact = false }: Props) {
         <ul className="mt-4 space-y-3">
           {accounts.map((account) => {
             const busy = busyId === account.id
-            const pairing = account.status === 'pending' || account.status === 'connecting'
-            const down = account.status === 'disconnected' || account.status === 'expired'
+            // Número oficial não pareia nem tem sessão: nada de QR, reconectar,
+            // reiniciar ou desconectar — o estado vem da Meta.
+            const cloud = account.integration === 'cloud'
+            const pairing = !cloud && (account.status === 'pending' || account.status === 'connecting')
+            const down = !cloud && (account.status === 'disconnected' || account.status === 'expired')
             return (
               <li key={account.id} className="rounded-md border border-border p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -739,7 +895,10 @@ export function WhatsAppConnection({ config, compact = false }: Props) {
                       {account.label || account.name}
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {account.phoneE164 || t('common.notAvailable')}
+                      {account.phoneE164
+                        || (cloud && account.metaPhoneNumberId
+                          ? t('whatsapp.cloud.phoneId', { id: account.metaPhoneNumberId })
+                          : t('common.notAvailable'))}
                       {' · '}
                       {t(`whatsapp.purpose.${account.purpose}`)}
                       {' · '}
@@ -747,6 +906,9 @@ export function WhatsAppConnection({ config, compact = false }: Props) {
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
+                    {cloud && (
+                      <span className="modern-badge-info">{t('whatsapp.cloud.badge')}</span>
+                    )}
                     {account.isDefault && (
                       <span className="modern-badge-info">{t('whatsapp.accounts.isDefault')}</span>
                     )}
@@ -941,7 +1103,17 @@ export function WhatsAppConnection({ config, compact = false }: Props) {
                         {t('whatsapp.actions.reapplyWebhook')}
                       </button>
                     )}
-                    {account.status === 'connected' && (
+                    {cloud && account.status !== 'connected' && (
+                      <button
+                        type="button"
+                        className="modern-button-secondary"
+                        disabled={busy}
+                        onClick={() => void act(account, () => whatsappAPI.getStatus(account.id))}
+                      >
+                        {t('whatsapp.cloud.checkStatus')}
+                      </button>
+                    )}
+                    {!cloud && account.status === 'connected' && (
                       <>
                         <button
                           type="button"
@@ -993,6 +1165,17 @@ export function WhatsAppConnection({ config, compact = false }: Props) {
                       {t('whatsapp.actions.delete')}
                     </button>
                   </div>
+                )}
+
+                {cloud && (
+                  <details className="mt-3">
+                    <summary className="cursor-pointer text-xs font-semibold text-muted-foreground hover:text-foreground">
+                      {t('whatsapp.cloud.guideTitle')}
+                    </summary>
+                    <div className="mt-2">
+                      <MetaWebhookGuide callbackUrl={metaCallback(account.baseUrl)} verifyToken={metaVerifyToken} />
+                    </div>
+                  </details>
                 )}
 
                 {pairing && (

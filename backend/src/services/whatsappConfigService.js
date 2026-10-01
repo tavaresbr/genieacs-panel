@@ -32,6 +32,10 @@ export const ACCOUNT_STATUSES = Object.freeze(['pending', 'connecting', 'connect
 const instanceTokenBox = createSecretBox('skygenpanel-evolution-instance-token-v1');
 const webhookTokenBox = createSecretBox('skygenpanel-evolution-webhook-token-v1');
 const adminKeyBox = createSecretBox('skygenpanel-evolution-admin-key-v1');
+const metaVerifyBox = createSecretBox('skygenpanel-evolution-meta-verify-token-v1');
+
+/** Caminho do Evolution v2 que recebe os eventos da Meta (API oficial). */
+export const META_WEBHOOK_SUFFIX = '/webhook/meta';
 
 /**
  * The panel's own error shape for everything WhatsApp, mirroring SgpError so the
@@ -105,6 +109,10 @@ const DEFAULT_CONFIG = Object.freeze({
   // operator turns it on and can see the number they turned it on to.
   messageRetentionDays: 0,
   managedUrl: '',
+  // Para onde a Meta manda os eventos de um número oficial — o
+  // `/webhook/meta` do servidor Evolution. Vazio usa `managedUrl` + o caminho;
+  // existe separado para quem publica o servidor atrás de outro endereço.
+  cloudCallbackUrl: '',
   updatedAt: null
 });
 
@@ -149,11 +157,11 @@ class WhatsAppConfigService {
 
   static async readStoredConfig() {
     const raw = await AppState.get(CONFIG_KEY);
-    if (!raw) return { ...DEFAULT_CONFIG, managedAdminKey: null };
+    if (!raw) return { ...DEFAULT_CONFIG, managedAdminKey: null, cloudVerifyToken: null };
     try {
       return { ...DEFAULT_CONFIG, ...JSON.parse(raw) };
     } catch {
-      return { ...DEFAULT_CONFIG, managedAdminKey: null };
+      return { ...DEFAULT_CONFIG, managedAdminKey: null, cloudVerifyToken: null };
     }
   }
 
@@ -175,7 +183,7 @@ class WhatsAppConfigService {
     const platform = await Tenant.platform();
     const server = platform
       ? await runInTenant(platform.id, () => this.readStoredConfig())
-      : { ...DEFAULT_CONFIG, managedAdminKey: null };
+      : { ...DEFAULT_CONFIG, managedAdminKey: null, cloudVerifyToken: null };
     const merged = { ...stored, platformManaged: true };
     for (const field of WA_SERVER_FIELDS) merged[field] = server[field];
     return merged;
@@ -199,7 +207,9 @@ class WhatsAppConfigService {
       mediaRetentionDays: normalizeRetentionDays(stored.mediaRetentionDays),
       messageRetentionDays: normalizeRetentionDays(stored.messageRetentionDays),
       managedUrl: normalizeEvoUrl(stored.managedUrl || ''),
-      managedAdminKey: decryptSecret(adminKeyBox, stored.managedAdminKey)
+      managedAdminKey: decryptSecret(adminKeyBox, stored.managedAdminKey),
+      cloudCallbackUrl: String(stored.cloudCallbackUrl || ''),
+      cloudVerifyToken: decryptSecret(metaVerifyBox, stored.cloudVerifyToken)
     };
   }
 
@@ -233,6 +243,8 @@ class WhatsAppConfigService {
       retentionCaps: { media: caps.media, messages: caps.messages },
       managedUrl: normalizeEvoUrl(stored.managedUrl || ''),
       managedAdminKey: decryptSecret(adminKeyBox, stored.managedAdminKey),
+      cloudCallbackUrl: String(stored.cloudCallbackUrl || ''),
+      cloudVerifyToken: decryptSecret(metaVerifyBox, stored.cloudVerifyToken),
       platformManaged: stored.platformManaged === true,
       updatedAt: stored.updatedAt || null
     };
@@ -243,13 +255,27 @@ class WhatsAppConfigService {
   /** The shape the browser is allowed to see: no secret, ever. */
   static async getPublicConfig() {
     const config = await this.getConfig();
-    const { managedAdminKey, ...rest } = config;
+    const { managedAdminKey, cloudVerifyToken, ...rest } = config;
     return {
       ...rest,
       managed: Boolean(config.managedUrl),
       managedAdminKeyConfigured: Boolean(managedAdminKey),
+      // O token de verificação da Meta sai de propósito: o provedor precisa
+      // colá-lo no app dele na Meta. Ele só serve para confirmar a assinatura
+      // do webhook — não envia nem lê mensagem nenhuma.
+      cloudWebhook: {
+        callbackUrl: this.cloudCallbackUrl(config),
+        verifyToken: cloudVerifyToken || ''
+      },
       ready: this.isReady(config)
     };
+  }
+
+  /** Para onde a Meta deve mandar os eventos de um número oficial. */
+  static cloudCallbackUrl(config, baseUrl = '') {
+    if (config.cloudCallbackUrl) return config.cloudCallbackUrl;
+    const servidor = String(baseUrl || config.managedUrl || '').replace(/\/+$/, '');
+    return servidor ? `${servidor}${META_WEBHOOK_SUFFIX}` : '';
   }
 
   static isReady(config) {
@@ -323,6 +349,13 @@ class WhatsAppConfigService {
       managedUrl: patch.managedUrl === undefined
         ? current.managedUrl
         : normalizeEvoUrl(patch.managedUrl),
+      cloudCallbackUrl: patch.cloudCallbackUrl === undefined
+        ? current.cloudCallbackUrl
+        : this.normalizePublicUrl(
+          patch.cloudCallbackUrl,
+          'whatsapp.error.invalidCloudCallbackUrl',
+          'invalid_cloud_callback_url'
+        ),
       updatedAt: new Date().toISOString()
     };
 
@@ -330,6 +363,8 @@ class WhatsAppConfigService {
     // it, so the integration can be revoked without wiping the setup.
     let managedAdminKey = current.managedAdminKey;
     if (patch.managedAdminKey !== undefined) managedAdminKey = String(patch.managedAdminKey).trim();
+    let cloudVerifyToken = current.cloudVerifyToken;
+    if (patch.cloudVerifyToken !== undefined) cloudVerifyToken = String(patch.cloudVerifyToken).trim().slice(0, 255);
 
     // O servidor do provedor gerenciado é o da plataforma: é ELE que precisa
     // de webhook. O que o provedor tinha guardado de antes fica como estava —
@@ -345,7 +380,8 @@ class WhatsAppConfigService {
 
     await AppState.upsert(CONFIG_KEY, JSON.stringify({
       ...next,
-      managedAdminKey: managedAdminKey ? encryptSecret(adminKeyBox, managedAdminKey) : null
+      managedAdminKey: managedAdminKey ? encryptSecret(adminKeyBox, managedAdminKey) : null,
+      cloudVerifyToken: cloudVerifyToken ? encryptSecret(metaVerifyBox, cloudVerifyToken) : null
     }));
     // A caixa da plataforma, na SaaS, acabou de trocar o servidor de TODO
     // provedor — cada um guarda a sua cópia mesclada no cache, então aqui é
@@ -484,6 +520,13 @@ class WhatsAppConfigService {
       // A cor do número na caixa de entrada. Não é segredo: sai para quem lê.
       color: row.color || null,
       flavor: row.flavor,
+      // `cloud` é o número oficial da Meta; os ids da Meta não são segredo —
+      // o token, que é, não sai daqui.
+      integration: row.integration === 'cloud' ? 'cloud' : 'baileys',
+      metaPhoneNumberId: row.meta_phone_number_id || null,
+      metaWabaId: row.meta_waba_id || null,
+      metaTemplatesSyncedAt: row.meta_templates_synced_at || null,
+      metaTemplatesError: row.meta_templates_error || null,
       baseUrl: row.base_url,
       status: row.status,
       // O QR NÃO sai daqui.

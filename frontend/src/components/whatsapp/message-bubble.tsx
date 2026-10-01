@@ -303,6 +303,11 @@ export function MessageBubble({ message, onResend, resending, accountTinted = fa
         {attachment}
 
         <div className="mt-1.5 flex flex-wrap items-center justify-end gap-x-2 gap-y-1">
+          {message.sentAs === 'template' && (
+            <span className="rounded-full border border-border px-1.5 text-[0.6rem] font-semibold text-muted-foreground">
+              {t('whatsapp.cloud.sentAsTemplate')}
+            </span>
+          )}
           <span className="font-mono text-[0.62rem] tabular-nums text-muted-foreground">{stamp}</span>
           {message.deliveryStatus && (
             <span
@@ -335,9 +340,13 @@ export function MessageBubble({ message, onResend, resending, accountTinted = fa
               className="break-words text-xs leading-5 text-[hsl(var(--status-danger))] [overflow-wrap:anywhere]"
               title={message.deliveryError || undefined}
             >
-              {t('whatsapp.inbox.deliveryFailed', {
-                reason: truncateReason(message.deliveryError || t('common.unknown'))
-              })}
+              {/* A recusa por janela tem frase própria: o código cru não diz ao
+                  operador que basta o cliente responder. */}
+              {message.deliveryError?.startsWith('meta_window_closed')
+                ? t('whatsapp.error.metaWindowClosed')
+                : t('whatsapp.inbox.deliveryFailed', {
+                  reason: truncateReason(message.deliveryError || t('common.unknown'))
+                })}
             </p>
             {/* The queue gave up, and how many times it tried before doing so
                 is what separates "the number is wrong" from "the server was

@@ -368,6 +368,170 @@ export function sendMediaRequest(flavor, name, p) {
 }
 
 // ────────────────────────────────────────────────────────────────────
+// API oficial (Cloud API da Meta) pela integração WHATSAPP-BUSINESS do v2
+//
+// O Evolution v2 sabe falar com a Graph API da Meta no lugar do Baileys: a
+// instância é criada com `integration: 'WHATSAPP-BUSINESS'`, sem QR, e o
+// servidor usa o token da Meta para enviar. Três diferenças guiam o resto:
+//
+//   - o `token` do create É o token permanente da Meta, e o servidor o adota
+//     como `apikey` da instância. Não há token nosso aqui: quem guarda a
+//     credencial da instância guarda a da Meta;
+//   - `number` é o Phone Number ID e `businessId` é o id da conta WABA —
+//     identificadores da Meta, não telefones;
+//   - a entrada vem da Meta para `<servidor>/webhook/meta` (configurado no app
+//     da Meta pelo provedor), e o servidor repassa ao nosso webhook no formato
+//     de sempre.
+//
+// Só o v2 tem essa integração. No GO estas funções não existem — quem chama
+// recusa antes.
+// ────────────────────────────────────────────────────────────────────
+
+/**
+ * @param {{ name: string, metaToken: string, phoneNumberId: string, wabaId: string, webhookUrl: string }} p
+ * @returns {EvoRequest}
+ */
+export function createBusinessInstanceRequest(p) {
+  return {
+    path: '/instance/create',
+    method: 'POST',
+    key: 'admin',
+    body: {
+      name: p.name,
+      instanceName: p.name,
+      token: p.metaToken,
+      number: p.phoneNumberId,
+      businessId: p.wabaId,
+      qrcode: false,
+      integration: 'WHATSAPP-BUSINESS',
+      webhook: {
+        enabled: true,
+        url: p.webhookUrl,
+        // Mesmo motivo do create Baileys: com byEvents o `?t=` deixa de ser query.
+        byEvents: false,
+        base64: true,
+        events: V2_WEBHOOK_EVENTS
+      }
+    }
+  };
+}
+
+/** Modelos (templates) da conta WABA, como a Meta os devolve. */
+export function findMetaTemplatesRequest(name) {
+  return { path: `/template/find/${enc(name)}`, method: 'GET', key: 'instance' };
+}
+
+/**
+ * Envio de modelo aprovado — o único envio que a Meta aceita fora da janela de
+ * 24 horas desde a última mensagem do cliente.
+ *
+ * Só parâmetros posicionais de corpo: `{{1}}`, `{{2}}`… na ordem de `params`.
+ * Modelo sem variável vai sem `components`.
+ *
+ * @param {string} name instância
+ * @param {string} number destino
+ * @param {{ name: string, language: string, params: string[] }} t
+ * @returns {EvoRequest}
+ */
+export function sendTemplateRequest(name, number, t) {
+  const params = Array.isArray(t.params) ? t.params : [];
+  return {
+    path: `/message/sendTemplate/${enc(name)}`,
+    method: 'POST',
+    key: 'instance',
+    body: {
+      number,
+      name: t.name,
+      language: t.language,
+      components: params.length
+        ? [{ type: 'body', parameters: params.map((text) => ({ type: 'text', text: String(text) })) }]
+        : []
+    }
+  };
+}
+
+/**
+ * A Meta recusa parâmetro com quebra de linha, tab ou mais de quatro espaços
+ * seguidos. O texto do painel tem os três — avisos são escritos em parágrafos.
+ */
+export function sanitizeMetaParam(text) {
+  return String(text ?? '')
+    .replace(/\s*[\r\n]+\s*/g, ' · ')
+    .replace(/\t/g, ' ')
+    .replace(/ {4,}/g, '   ')
+    .trim()
+    .slice(0, 1024);
+}
+
+/**
+ * Lê o erro da Meta repassado pelo servidor.
+ *
+ * 131047 é a recusa por janela: "Re-engagement message — more than 24 hours
+ * have passed since the recipient last replied". Repetir não adianta; só um
+ * modelo aprovado passa.
+ *
+ * @returns {{ code: number|null, windowClosed: boolean }}
+ */
+export function readMetaError(bodyText) {
+  const texto = String(bodyText ?? '');
+  const m = /"code"\s*:\s*(\d{3,6})/.exec(texto);
+  const code = m ? Number(m[1]) : null;
+  const windowClosed = code === 131047 || /re-?engagement/i.test(texto) || /24 hours/i.test(texto);
+  return { code, windowClosed };
+}
+
+const META_HEADER_MEDIA = new Set(['IMAGE', 'VIDEO', 'DOCUMENT', 'LOCATION']);
+
+/**
+ * Modelos da Meta no formato que guardamos.
+ *
+ * `supported` diz se o painel sabe enviar o modelo: só corpo com parâmetros
+ * posicionais. Cabeçalho com mídia ou variável, botão com URL dinâmica,
+ * parâmetro nomeado e modelo de autenticação ficam visíveis mas fora do
+ * seletor — mandar sem os componentes que faltam é recusa certa.
+ */
+export function readMetaTemplates(data) {
+  const raw = data ?? {};
+  let arr = [];
+  if (Array.isArray(raw)) arr = raw;
+  else if (Array.isArray(raw.data)) arr = raw.data;
+  else if (raw.data && Array.isArray(raw.data.data)) arr = raw.data.data;
+  const out = [];
+  for (const item of arr) {
+    const it = item ?? {};
+    const name = String(it.name ?? '').trim();
+    const language = String(it.language ?? '').trim();
+    if (!name || !language) continue;
+    const components = Array.isArray(it.components) ? it.components : [];
+    const corpo = components.find((c) => String(c?.type ?? '').toUpperCase() === 'BODY');
+    const bodyText = String(corpo?.text ?? '');
+    const posicionais = [...bodyText.matchAll(/\{\{\s*(\d+)\s*\}\}/g)].map((m) => Number(m[1]));
+    const nomeados = /\{\{\s*[A-Za-z_][\w]*\s*\}\}/.test(bodyText) || String(it.parameter_format ?? '').toUpperCase() === 'NAMED';
+    const header = components.find((c) => String(c?.type ?? '').toUpperCase() === 'HEADER');
+    const headerProblema = header
+      ? META_HEADER_MEDIA.has(String(header.format ?? '').toUpperCase()) || /\{\{/.test(String(header.text ?? ''))
+      : false;
+    const botoes = components.find((c) => String(c?.type ?? '').toUpperCase() === 'BUTTONS');
+    const botaoDinamico = Array.isArray(botoes?.buttons)
+      && botoes.buttons.some((b) => /\{\{/.test(String(b?.url ?? '')));
+    const category = String(it.category ?? '').toUpperCase();
+    out.push({
+      metaId: String(it.id ?? ''),
+      name,
+      language,
+      category,
+      status: String(it.status ?? '').toUpperCase(),
+      bodyText,
+      paramCount: posicionais.length ? Math.max(...posicionais) : 0,
+      paramFormat: nomeados ? 'named' : 'positional',
+      supported: !nomeados && !headerProblema && !botaoDinamico && category !== 'AUTHENTICATION',
+      components
+    });
+  }
+  return out;
+}
+
+// ────────────────────────────────────────────────────────────────────
 // Leitura das respostas
 //
 // O GO embrulha tudo em {message:"success", data:{...}}; o v2 devolve o objeto

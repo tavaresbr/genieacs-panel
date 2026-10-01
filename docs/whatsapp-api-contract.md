@@ -60,6 +60,12 @@ webhook de entrada, que é público e tem credencial própria.
 | `blocked_host` | endereço interno, barrado pelo guard SSRF | `whatsapp.error.blockedHost` |
 | `unauthorized` | o Evolution recusou a credencial | `whatsapp.error.unauthorized` |
 | `license_required` | licença do Evolution não ativada | `whatsapp.error.licenseRequired` |
+| `meta_window_closed` | número oficial, cliente sem escrever há mais de 24 h e sem modelo aprovado | `whatsapp.error.metaWindowClosed` |
+| `cloud_requires_v2` | API oficial pedida num servidor Evolution GO | `whatsapp.error.cloudRequiresV2` |
+| `invalid_meta_credentials` | token, Phone Number ID ou WABA fora do formato | `whatsapp.error.invalidMetaCredentials` |
+| `not_applicable_cloud` | QR, reinício ou desconexão num número oficial | `whatsapp.error.notApplicableCloud` |
+| `not_supported_cloud` | consulta de números sem nenhum número por QR | `whatsapp.error.notSupportedCloud` |
+| `invalid_cloud_callback_url` | URL de callback da Meta inválida | `whatsapp.error.invalidCloudCallbackUrl` |
 | `timeout` / `unreachable` | o Evolution não respondeu | `whatsapp.error.timeout` / `…unreachable` |
 | `no_session` | reiniciar sem sessão viva | `whatsapp.error.noSession` |
 | `no_account` | nenhum número conectado | `whatsapp.error.noAccount` |
@@ -205,6 +211,82 @@ as palavras do próprio servidor) e, quando falta credencial para a rota pedida,
 `admin_key_missing` / `instance_token_missing` (`400`).
 
 ---
+
+### API oficial (Meta) — integração `WHATSAPP-BUSINESS`
+
+Além do número pareado por QR (Baileys), um número pode ser **oficial**: a
+instância do Evolution v2 é criada com `integration: 'WHATSAPP-BUSINESS'` e
+fala com a Graph API da Meta no lugar do Baileys. Só o v2 tem essa
+integração; num servidor GO a criação responde `cloud_requires_v2`.
+
+`POST /api/whatsapp/accounts` com:
+
+```json
+{ "kind": "cloud", "label": "Atendimento", "purpose": "support",
+  "metaToken": "<token permanente da Meta>",
+  "phoneNumberId": "<Phone Number ID>", "wabaId": "<ID da conta WABA>" }
+```
+
+O create enviado ao servidor:
+
+```json
+{ "instanceName": "skygp_…", "integration": "WHATSAPP-BUSINESS", "qrcode": false,
+  "token": "<token da Meta>", "number": "<Phone Number ID>", "businessId": "<WABA>",
+  "webhook": { "enabled": true, "url": "<webhook do painel>?t=…", "byEvents": false, "base64": true } }
+```
+
+- O **token da Meta é a chave da instância** (o servidor o adota como
+  `apikey`), então ele é o que fica cifrado em `token_ciphertext`. Nunca sai
+  para o navegador.
+- `whatsapp_accounts.integration` = `cloud` (o padrão é `baileys`), com
+  `meta_phone_number_id` e `meta_waba_id`. O `flavor` continua `v2`: ele é o
+  dialeto do servidor, não do número.
+- Sem QR e sem sessão: `GET /qr`, `POST /restart` e `POST /disconnect`
+  respondem `409 not_applicable_cloud`; a remoção só apaga a instância.
+- A consulta "este número tem WhatsApp?" usa um número por QR; sem nenhum,
+  `409 not_supported_cloud`.
+
+**Entrada.** A Meta não chama o painel: ela chama `<servidor Evolution>/webhook/meta`,
+configurado pelo provedor no app dele na Meta, e o servidor repassa ao
+webhook do painel no formato de sempre (`messages.upsert`, `messages.update`).
+A configuração ganhou dois campos do servidor (`WA_SERVER_FIELDS`, ou seja,
+da plataforma na SaaS):
+
+| campo | o que é |
+| --- | --- |
+| `cloudCallbackUrl` | para onde a Meta chama. Vazio = `managedUrl` + `/webhook/meta` |
+| `cloudVerifyToken` | o token que a Meta confere; igual ao `WA_BUSINESS_TOKEN_WEBHOOK` do Evolution. Cifrado no banco |
+
+`GET /api/whatsapp/config` devolve `cloudWebhook: { callbackUrl, verifyToken }`
+para a tela mostrar ao provedor com botão de copiar — o token de verificação só
+confirma a assinatura do webhook, não envia nem lê mensagem.
+
+No servidor Evolution: `WA_BUSINESS_TOKEN_WEBHOOK`, `WA_BUSINESS_URL=https://graph.facebook.com`,
+`WA_BUSINESS_VERSION` e `WA_BUSINESS_LANGUAGE`, e `/webhook/meta` alcançável
+pela internet. Um único callback serve todos os provedores: o Evolution roteia
+pelo `phone_number_id`.
+
+**Janela de 24 horas.** Num número oficial, texto livre só é aceito até 24 h
+depois da última mensagem do cliente **naquele número**
+(`wa_conversations.last_inbound_at`, com 30 min de folga para a fila). Regra
+em `utils/wa/waJanelaMeta.js` (`decidirEnvioCloud`):
+
+| número | janela | modelo Meta na mensagem | sai como |
+| --- | --- | --- | --- |
+| QR | — | — | texto |
+| oficial | aberta | qualquer | texto |
+| oficial | fechada (ou outro número) | sim | `sendTemplate` |
+| oficial | fechada (ou outro número) | não | recusa `meta_window_closed` |
+
+A regra roda no enfileiramento (409 com o texto ainda na caixa) e de novo no
+envio (a campanha anda por horas). `meta_window_closed` e as recusas
+definitivas da Meta (131047, 131026, 131051, 131049, 1320xx) não voltam para a
+fila; 190 (token) e 130429/131056 (vazão) voltam. A Meta às vezes recusa
+**depois** de aceitar: o recibo `FAILED` marca a mensagem como `failed`.
+
+`wa_messages.meta_template` guarda o modelo da mensagem (`{name, language, params}`)
+e `sent_as` diz como ela saiu (`text`/`template`); `publicMessage` expõe `sentAs`.
+Recibos da Meta chegam como `SENT`/`DELIVERED`/`READ` e são lidos como os do Baileys.
 
 ## Webhook — `POST /api/whatsapp-webhook?t=<token>`
 

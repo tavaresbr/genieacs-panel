@@ -262,6 +262,8 @@ export default function Settings() {
     allowedHosts: '',
     managedUrl: '',
     managedAdminKey: '',
+    cloudCallbackUrl: '',
+    cloudVerifyToken: '',
     rejectCallMessage: '',
     rateLimitPerMin: 20,
     bulkIntervalMinSec: 20,
@@ -432,6 +434,10 @@ export default function Settings() {
         managedUrl: config.managedUrl,
         // The stored admin key never leaves the server; an empty field keeps it.
         managedAdminKey: '',
+        // O token da Meta, ao contrário da chave, sai: os provedores o colam no
+        // app deles na Meta, então mostrá-lo aqui não revela nada novo.
+        cloudCallbackUrl: config.cloudCallbackUrl ?? '',
+        cloudVerifyToken: config.cloudWebhook?.verifyToken ?? '',
         rejectCallMessage: config.rejectCallMessage,
         rateLimitPerMin: config.rateLimitPerMin,
         // Mesmo cuidado dos campos de retenção: um backend anterior ao ritmo
@@ -594,7 +600,9 @@ export default function Settings() {
         // Same rule as the SGP token: only send a key the operator typed.
         // Omitting it keeps the stored one, so saving this form can never
         // revoke the integration by accident.
-        ...(waForm.managedAdminKey ? { managedAdminKey: waForm.managedAdminKey } : {})
+        ...(waForm.managedAdminKey ? { managedAdminKey: waForm.managedAdminKey } : {}),
+        cloudCallbackUrl: waForm.cloudCallbackUrl,
+        cloudVerifyToken: waForm.cloudVerifyToken
       })
       if (res.success && res.data) {
         const salvo = res.data
@@ -619,7 +627,9 @@ export default function Settings() {
           managedUrl: salvo.managedUrl,
           allowedHosts: salvo.allowedHosts.join('\n'),
           rejectCallMessage: salvo.rejectCallMessage,
-          managedAdminKey: ''
+          managedAdminKey: '',
+          cloudCallbackUrl: salvo.cloudCallbackUrl ?? '',
+          cloudVerifyToken: salvo.cloudWebhook?.verifyToken ?? ''
         }))
         toast.success(res.message || t('common.success'))
         return
@@ -2600,6 +2610,37 @@ export default function Settings() {
                     onChange={(event) => setWaForm((current) => ({ ...current, managedAdminKey: event.target.value }))}
                   />
                   <p className="field-hint">{t('settings.whatsapp.adminKeyHint')}</p>
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="wa-cloud-callback" className="field-label">
+                    {t('settings.whatsapp.cloudCallbackUrl')}
+                  </label>
+                  <input
+                    id="wa-cloud-callback"
+                    type="url"
+                    className="modern-input w-full"
+                    placeholder="https://evolution.exemplo.com/webhook/meta"
+                    value={waForm.cloudCallbackUrl}
+                    onChange={(event) => setWaForm((current) => ({ ...current, cloudCallbackUrl: event.target.value }))}
+                  />
+                  <p className="field-hint">{t('settings.whatsapp.cloudCallbackUrlHint')}</p>
+                </div>
+                <div>
+                  <label htmlFor="wa-cloud-verify" className="field-label">
+                    {t('settings.whatsapp.cloudVerifyToken')}
+                  </label>
+                  <input
+                    id="wa-cloud-verify"
+                    type="text"
+                    autoComplete="off"
+                    className="modern-input w-full font-mono"
+                    value={waForm.cloudVerifyToken}
+                    onChange={(event) => setWaForm((current) => ({ ...current, cloudVerifyToken: event.target.value }))}
+                  />
+                  <p className="field-hint">{t('settings.whatsapp.cloudVerifyTokenHint')}</p>
                 </div>
               </div>
               </>

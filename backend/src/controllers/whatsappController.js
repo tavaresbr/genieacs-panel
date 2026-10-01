@@ -91,7 +91,11 @@ class WhatsAppController {
         messageRetentionDays: body.messageRetentionDays,
         managedUrl: body.managedUrl,
         // An absent key keeps the stored one; "" clears it.
-        managedAdminKey: body.managedAdminKey === undefined ? undefined : body.managedAdminKey
+        managedAdminKey: body.managedAdminKey === undefined ? undefined : body.managedAdminKey,
+        // A entrada da API oficial: para onde a Meta chama e o token que ela
+        // confere. O token segue a regra da chave: ausente mantém, "" apaga.
+        cloudCallbackUrl: body.cloudCallbackUrl,
+        cloudVerifyToken: body.cloudVerifyToken === undefined ? undefined : body.cloudVerifyToken
       });
       return res.json(createResponse(req.t('whatsapp.configSaved'), config));
     } catch (error) {
@@ -120,7 +124,12 @@ class WhatsAppController {
         baseUrl: body.baseUrl,
         adminKey: body.adminKey,
         label: body.label,
-        purpose: body.purpose
+        purpose: body.purpose,
+        // Número oficial da Meta: `kind: 'cloud'` e as três credenciais dela.
+        kind: body.kind === 'cloud' ? 'cloud' : 'baileys',
+        metaToken: body.metaToken,
+        phoneNumberId: body.phoneNumberId,
+        wabaId: body.wabaId
       });
       return res.status(201).json(createResponse(req.t('whatsapp.accountConnecting'), {
         account: WhatsAppConfigService.publicAccount(account),

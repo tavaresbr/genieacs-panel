@@ -37,7 +37,27 @@ import { WaError } from './whatsappConfigService.js';
  * itself was sendable the whole time. `unauthorized` and `license_required` are
  * the same story with a different fix.
  */
-const PERMANENT_CODES = new Set(['no_destination']);
+const PERMANENT_CODES = new Set(['no_destination', 'meta_window_closed']);
+
+/**
+ * Recusas da Meta (API oficial) que não mudam com o tempo, pelo código numérico
+ * que o servidor repassa no corpo:
+ *
+ *   131047  fora da janela de 24 h — só modelo aprovado passa
+ *   131026  o destino não pode receber (não tem WhatsApp, versão antiga…)
+ *   131051  tipo de mensagem não suportado
+ *   131049  a Meta escolheu não entregar (limite de marketing por pessoa)
+ *   132000  quantidade de parâmetros não bate com o modelo
+ *   132001  o modelo não existe naquele idioma
+ *   132005  texto do modelo grande demais depois de preenchido
+ *   132007  o modelo viola política
+ *   132012  formato de parâmetro errado
+ *   132015/132016  modelo pausado ou desativado
+ *
+ * Ficam DE FORA, e caem na nova tentativa: 190 (token vencido — conserta-se
+ * trocando o token, como `unauthorized`) e 130429/131056 (limite de vazão).
+ */
+const META_PERMANENT = /"code"\s*:\s*(?:131047|131026|131051|131049|132000|132001|132005|132007|132012|132015|132016)\b/;
 
 /**
  * The server saying this recipient is not a WhatsApp user.
@@ -98,6 +118,9 @@ export function isPermanentFailure(error) {
   if (status >= 500 || status === 408 || status === 429) return false;
 
   const words = String(vars.body ?? '');
+  // Antes do LOOKS_TEMPORARY: a mensagem da Meta para o 131047 diz "try again"
+  // depois que o cliente responder — e isso não é uma nova tentativa da fila.
+  if (META_PERMANENT.test(words)) return true;
   if (LOOKS_TEMPORARY.test(words)) return false;
   return NOT_A_RECIPIENT.test(words) || CONTENT_REFUSED.test(words);
 }

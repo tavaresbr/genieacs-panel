@@ -3531,6 +3531,9 @@ export interface WhatsAppConfig {
   managedUrl: string
   managed: boolean
   managedAdminKeyConfigured: boolean
+  /** Para onde a Meta chama (API oficial) e o token que ela confere. */
+  cloudCallbackUrl?: string
+  cloudWebhook?: { callbackUrl: string; verifyToken: string }
   /**
    * Se o servidor (endereço, chave, hosts, webhook) é o da plataforma. Na SaaS
    * é, para todo provedor: a tela esconde esses campos e mostra só o uso.
@@ -3556,6 +3559,12 @@ export interface WhatsAppAccount {
    */
   color: string | null
   flavor: 'go' | 'v2'
+  /** `cloud` é o número da API oficial da Meta: sem QR, com janela de 24 h. */
+  integration?: 'baileys' | 'cloud'
+  metaPhoneNumberId?: string | null
+  metaWabaId?: string | null
+  metaTemplatesSyncedAt?: string | null
+  metaTemplatesError?: string | null
   baseUrl: string
   status: WhatsAppStatus
   /**
@@ -4181,6 +4190,8 @@ export interface WhatsAppMessage {
    */
   nextAttemptAt: string | null
   sentBy: number | null
+  /** `template` quando saiu como modelo aprovado da Meta, fora da janela. */
+  sentAs?: 'text' | 'template' | null
   readAt: string | null
   createdAt: string | null
   updatedAt: string | null
@@ -4249,7 +4260,7 @@ export const whatsappAPI = {
 
   // An omitted managedAdminKey keeps the stored one; "" clears it. The server
   // never returns it either way.
-  updateConfig: (config: Partial<Omit<WhatsAppConfig, 'allowedHosts'>> & { allowedHosts?: string | string[]; managedAdminKey?: string }) =>
+  updateConfig: (config: Partial<Omit<WhatsAppConfig, 'allowedHosts'>> & { allowedHosts?: string | string[]; managedAdminKey?: string; cloudVerifyToken?: string }) =>
     apiClient.put<WhatsAppConfig>('/whatsapp/config', config),
 
   /**
@@ -4268,7 +4279,17 @@ export const whatsappAPI = {
 
   // `baseUrl`/`adminKey` are ignored in managed mode, where the panel owns the
   // server and the operator never sees its address or its key.
-  createAccount: (payload: { baseUrl?: string; adminKey?: string; label?: string; purpose?: WhatsAppPurpose }) =>
+  createAccount: (payload: {
+    baseUrl?: string
+    adminKey?: string
+    label?: string
+    purpose?: WhatsAppPurpose
+    /** `cloud`: número oficial da Meta, com as três credenciais dela. */
+    kind?: 'baileys' | 'cloud'
+    metaToken?: string
+    phoneNumberId?: string
+    wabaId?: string
+  }) =>
     apiClient.post<WhatsAppQrResult>('/whatsapp/accounts', payload),
 
   getQr: (id: number) =>

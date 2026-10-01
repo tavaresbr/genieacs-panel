@@ -44,7 +44,12 @@ export const PLATFORM_MANAGED_SETTING_KEYS = Object.freeze(['genieAcsUrl', ...VI
  * Os campos do WhatsApp que descrevem o SERVIDOR Evolution, e não o uso que o
  * provedor faz dele. Na SaaS eles vêm da caixa da plataforma.
  */
-export const WA_SERVER_FIELDS = Object.freeze(['allowedHosts', 'webhookBaseUrl', 'managedUrl', 'managedAdminKey']);
+export const WA_SERVER_FIELDS = Object.freeze([
+  'allowedHosts', 'webhookBaseUrl', 'managedUrl', 'managedAdminKey',
+  // A entrada da API oficial: a Meta chama `<servidor>/webhook/meta`, e quem
+  // confere o token de verificação é o servidor Evolution. Os dois são dele.
+  'cloudCallbackUrl', 'cloudVerifyToken'
+]);
 
 /** Se ESTE tenant tem a configuração de infraestrutura nas mãos da plataforma. */
 export function platformManages(tenant) {

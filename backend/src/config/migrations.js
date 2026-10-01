@@ -1579,6 +1579,38 @@ const SKIP_DETAIL_TABLES = [
   ['wa_broadcast_recipients', WA_BROADCAST_INVOICE_COLUMNS]
 ];
 
+/**
+ * A API oficial da Meta pela integração WHATSAPP-BUSINESS do Evolution v2.
+ *
+ * `integration` separa o número pareado por QR (`baileys`) do número oficial
+ * (`cloud`). Não é o `flavor`: aquele é o dialeto do SERVIDOR (v2 ou GO), e um
+ * número oficial roda num servidor v2 como qualquer outro. Os ids da Meta são
+ * identificadores, não segredos — o token da Meta, esse sim, vai cifrado no
+ * `token_ciphertext` que já existe, porque é ele a chave da instância.
+ */
+const WA_ACCOUNT_CLOUD_COLUMNS = [
+  ['integration', (t) => t.string('integration', 16).notNullable().defaultTo('baileys')],
+  ['meta_phone_number_id', (t) => t.string('meta_phone_number_id', 32)],
+  ['meta_waba_id', (t) => t.string('meta_waba_id', 32)],
+  ['meta_templates_synced_at', (t) => t.timestamp('meta_templates_synced_at').nullable()],
+  ['meta_templates_error', (t) => t.string('meta_templates_error', 255)]
+];
+
+/**
+ * Como a mensagem saiu: texto livre ou modelo aprovado da Meta. `meta_template`
+ * é a foto do modelo no momento do enfileiramento ({name, language, params}) —
+ * o envio fora da janela de 24 h só é aceito assim.
+ */
+const WA_MESSAGE_CLOUD_COLUMNS = [
+  ['meta_template', (t) => t.text('meta_template')],
+  ['sent_as', (t) => t.string('sent_as', 8)]
+];
+
+const WA_CLOUD_TABLES = [
+  ['whatsapp_accounts', WA_ACCOUNT_CLOUD_COLUMNS],
+  ['wa_messages', WA_MESSAGE_CLOUD_COLUMNS]
+];
+
 /** Os tetos de retenção de `plans`, para a migração que os acrescenta. */
 const PLAN_RETENTION_COLUMNS = [
   ['max_audit_retention_days', (t) => t.integer('max_audit_retention_days').unsigned()],
@@ -4833,6 +4865,27 @@ export const migrations = [
     },
     async up(db) {
       for (const [table, columns] of SKIP_DETAIL_TABLES) {
+        if (!(await db.schema.hasTable(table))) continue;
+        const missing = await missingColumns(db, table, columns);
+        if (!missing.length) continue;
+        await db.schema.alterTable(table, (t) => {
+          for (const add of missing) add(t);
+        });
+      }
+    }
+  },
+  {
+    /** Número oficial da Meta pelo Evolution — ver `WA_ACCOUNT_CLOUD_COLUMNS`. */
+    id: '0087_wa_meta_cloud',
+    async isApplied(db) {
+      for (const [table, columns] of WA_CLOUD_TABLES) {
+        if (!(await db.schema.hasTable(table))) continue;
+        if ((await missingColumns(db, table, columns)).length) return false;
+      }
+      return true;
+    },
+    async up(db) {
+      for (const [table, columns] of WA_CLOUD_TABLES) {
         if (!(await db.schema.hasTable(table))) continue;
         const missing = await missingColumns(db, table, columns);
         if (!missing.length) continue;

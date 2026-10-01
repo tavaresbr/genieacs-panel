@@ -147,6 +147,12 @@ const BLOBS = Object.freeze([
     contexto: 'skygenpanel-evolution-admin-key-v1'
   },
   {
+    // O token de verificação do webhook da Meta (API oficial), no mesmo blob.
+    chave: 'whatsapp_evolution_config',
+    caminho: ['cloudVerifyToken'],
+    contexto: 'skygenpanel-evolution-meta-verify-token-v1'
+  },
+  {
     // O token do bot do Telegram dos alertas, dentro dos ajustes de alerta.
     chave: 'whatsapp_alert_settings',
     caminho: ['telegram', 'botToken'],

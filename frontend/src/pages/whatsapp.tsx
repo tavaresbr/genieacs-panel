@@ -29,6 +29,7 @@ import { inboxPanes } from '@/lib/wa-inbox-pane'
 import { useAuth } from '@/contexts/auth-context'
 import { useLocation } from 'react-router'
 import { firstName, type QuickReply } from '@/lib/quick-replies'
+import { metaWindowFor } from '@/lib/wa-meta-window'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Polling
@@ -721,6 +722,7 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
                     onSend={send}
                     draft={draft}
                     quickReplies={canQuickReply ? quickReplies ?? [] : null}
+                    metaWindow={metaWindowFor(accounts.get(conversation.accountId), conversation)}
                     quickReplyVars={{
                       nome: conversation.clientName ?? conversation.pushName,
                       primeiro_nome: firstName(conversation.clientName ?? conversation.pushName),

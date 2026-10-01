@@ -74,10 +74,33 @@ function idsDoEvento(data) {
  * 3 = DELIVERY_ACK, 4 = READ. O v2 manda ora o nome, ora o número.
  */
 function estadoDoEvento(bruto) {
-  if (bruto === 'READ' || bruto === 4 || bruto === 'Read') return 'read';
-  if (bruto === 'DELIVERY_ACK' || bruto === 3 || bruto === 'Delivered') return 'delivered';
-  if (bruto === 'SERVER_ACK' || bruto === 2) return 'sent';
+  // A integração WHATSAPP-BUSINESS (API oficial) repassa os estados da Meta:
+  // `sent`, `delivered`, `read`, em maiúsculas ou não.
+  const texto = typeof bruto === 'string' ? bruto.toUpperCase() : bruto;
+  if (texto === 'READ' || bruto === 4) return 'read';
+  if (texto === 'DELIVERY_ACK' || bruto === 3 || texto === 'DELIVERED') return 'delivered';
+  if (texto === 'SERVER_ACK' || bruto === 2 || texto === 'SENT') return 'sent';
   return null;
+}
+
+/**
+ * A Meta recusando DEPOIS de aceitar: o envio volta 200 com id e, segundos
+ * depois, o estado chega como `failed` — o caso clássico é a janela de 24 h
+ * (131047). Sem ler isto, a mensagem fica "✓ Enviada" para sempre.
+ *
+ * @returns {{ ids: string[], errorText: string }|null}
+ */
+export function lerFalhaDeEnvio(body) {
+  const env = body ?? {};
+  const data = env.data ?? {};
+  const ids = idsDoEvento(data);
+  if (!ids.length) return null;
+  const bruto = String(data?.update?.status ?? data?.status ?? env.state ?? '').toUpperCase();
+  if (bruto !== 'FAILED' && bruto !== 'ERROR') return null;
+  const erros = data.errors ?? data.error ?? data?.update?.errors ?? null;
+  let errorText = '';
+  if (erros) errorText = typeof erros === 'string' ? erros : JSON.stringify(erros);
+  return { ids, errorText: errorText.slice(0, 300) };
 }
 
 /**

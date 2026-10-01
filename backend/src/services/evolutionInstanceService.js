@@ -11,6 +11,7 @@ import {
   checkNumbersRequest,
   connectRequest,
   createInstanceRequest,
+  createBusinessInstanceRequest,
   deleteRequest,
   listInstancesRequest,
   logoutRequest,
@@ -31,6 +32,22 @@ import {
   redigirToken,
   flavorFromProbes
 } from '../utils/wa/evolutionApi.js';
+
+/**
+ * Formato das credenciais da Meta. O token permanente não tem espaço (é um
+ * bearer); os ids são numéricos. Conferir aqui transforma o erro mais comum —
+ * colar o número de telefone no lugar do Phone Number ID — numa frase na tela
+ * em vez de um 400 da Graph repassado pelo servidor.
+ */
+const META_ID = /^\d{5,32}$/;
+const META_TOKEN = /^\S{20,1024}$/;
+
+/** Ações de sessão do Baileys que não existem num número oficial. */
+function assertNotCloud(account) {
+  if (WhatsAppAccount.isCloud(account)) {
+    throw new WaError('whatsapp.error.notApplicableCloud', { code: 'not_applicable_cloud', status: 409 });
+  }
+}
 
 /** How much of a server message is kept in `last_error` / `serverError`. */
 const FAILURE_TEXT_LIMIT = 300;
@@ -278,7 +295,10 @@ class EvolutionInstanceService {
    * touches is therefore recorded, including a create that only got half way —
    * see the persist step.
    */
-  static async createAccount({ baseUrl, adminKey, label, purpose } = {}) {
+  static async createAccount({ baseUrl, adminKey, label, purpose, kind, metaToken, phoneNumberId, wabaId } = {}) {
+    if (kind === 'cloud') {
+      return this.createCloudAccount({ baseUrl, adminKey, label, purpose, metaToken, phoneNumberId, wabaId });
+    }
     const config = await this.requireConfig({ requireWebhook: true });
     const target = this.resolveTarget(config, { baseUrl, adminKey });
     const chosenPurpose = this.normalizePurpose(purpose);
@@ -363,6 +383,86 @@ class EvolutionInstanceService {
     return { account, qr, pending: !qr };
   }
 
+  /**
+   * Número oficial da Meta pela integração WHATSAPP-BUSINESS do Evolution v2.
+   *
+   * Sem QR: a instância nasce com o token, o Phone Number ID e a conta WABA da
+   * Meta, e o servidor passa a falar com a Graph API no lugar do Baileys. O
+   * token da Meta É a chave da instância — o servidor o adota como `apikey` —,
+   * então é ele que vai cifrado no lugar do token que o painel geraria.
+   *
+   * A entrada não passa por aqui: a Meta chama `<servidor>/webhook/meta`, que o
+   * provedor configura no app dele, e o servidor repassa ao webhook do painel
+   * gravado abaixo, no formato de sempre.
+   */
+  static async createCloudAccount({ baseUrl, adminKey, label, purpose, metaToken, phoneNumberId, wabaId } = {}) {
+    const token = String(metaToken ?? '').trim();
+    const numberId = String(phoneNumberId ?? '').trim();
+    const businessId = String(wabaId ?? '').trim();
+    if (!META_TOKEN.test(token) || !META_ID.test(numberId) || !META_ID.test(businessId)) {
+      throw new WaError('whatsapp.error.invalidMetaCredentials', { code: 'invalid_meta_credentials', status: 400 });
+    }
+    const config = await this.requireConfig({ requireWebhook: true });
+    const target = this.resolveTarget(config, { baseUrl, adminKey });
+    const chosenPurpose = this.normalizePurpose(purpose);
+
+    const client = new EvolutionClient({
+      baseUrl: target.baseUrl,
+      allowedHosts: config.allowedHosts,
+      adminKey: target.adminKey
+    });
+    const flavor = await client.detectFlavor();
+    if (flavor !== 'v2') {
+      throw new WaError('whatsapp.error.cloudRequiresV2', { code: 'cloud_requires_v2', status: 409 });
+    }
+
+    const name = mintName();
+    const webhookToken = randomToken();
+    const webhookUrl = webhookUrlWithToken(config.webhookBaseUrl, webhookToken);
+    let instanceId = null;
+
+    const created = await client.send(createBusinessInstanceRequest({
+      name, metaToken: token, phoneNumberId: numberId, wabaId: businessId, webhookUrl
+    }));
+    let apiKey = token;
+    if (created.ok) {
+      instanceId = readInstanceId(created.data) || null;
+      apiKey = readApiKey(created.data) || token;
+    } else {
+      if (!ALREADY_EXISTS.test(bodyText(created.data))) throw httpError(created);
+      instanceId = await this.findServerId(client, flavor, name);
+    }
+
+    const outros = await WhatsAppAccount.getAll();
+    let account = await WhatsAppAccount.create({
+      name,
+      label: label ? String(label).trim().slice(0, 128) : null,
+      purpose: chosenPurpose,
+      color: nextAccountColor(outros.map((row) => row.color)),
+      flavor,
+      integration: 'cloud',
+      meta_phone_number_id: numberId,
+      meta_waba_id: businessId,
+      base_url: client.baseUrl,
+      instance_id: instanceId,
+      status: 'connecting',
+      qr_code: null,
+      qr_updated_at: null,
+      ...WhatsAppConfigService.encryptInstanceToken(apiKey),
+      ...WhatsAppConfigService.encryptWebhookToken(webhookToken)
+    });
+
+    // O estado sai da Graph: com o token certo a instância já nasce `open`.
+    // Falha aqui não desfaz nada — a linha é o único jeito de mexer na
+    // instância que acabou de ser criada.
+    try {
+      account = (await this.checkStatus(account.id)).account;
+    } catch (error) {
+      account = await WhatsAppAccount.update(account.id, { last_error: describeFailure(error) });
+    }
+    return { account, qr: null, pending: false };
+  }
+
   /** The server's own id for an instance it says it already has. */
   static async findServerId(client, flavor, name) {
     const listed = await client.send(listInstancesRequest(flavor));
@@ -389,6 +489,7 @@ class EvolutionInstanceService {
   static async refreshQr(id) {
     const config = await this.requireConfig();
     const account = await this.loadAccount(id);
+    assertNotCloud(account);
     const client = this.clientFor(account, config);
     const qr = await this.readFreshQr(client, account.flavor, account.name);
     if (!qr) return { account, qr: null, pending: true };
@@ -895,6 +996,7 @@ class EvolutionInstanceService {
   static async restart(id) {
     const config = await this.requireConfig();
     const account = await this.loadAccount(id);
+    assertNotCloud(account);
     const client = this.clientFor(account, config);
     const result = await client.send(reconnectRequest(account.flavor, account.name));
     if (!result.ok) {
@@ -912,6 +1014,7 @@ class EvolutionInstanceService {
   static async disconnect(id) {
     const config = await this.requireConfig();
     const account = await this.loadAccount(id);
+    assertNotCloud(account);
     const client = this.clientFor(account, config);
     await client.sendOrThrow(logoutRequest(account.flavor, account.name));
     return {
@@ -945,7 +1048,10 @@ class EvolutionInstanceService {
     try {
       // Best effort: an instance that cannot log out is one we are deleting
       // anyway, and its failure must not stop the delete below.
-      await client.send(logoutRequest(account.flavor, account.name)).catch(() => null);
+      // Número oficial não tem sessão para encerrar: o logout só existe no Baileys.
+      if (!WhatsAppAccount.isCloud(account)) {
+        await client.send(logoutRequest(account.flavor, account.name)).catch(() => null);
+      }
 
       const request = deleteRequest(account.flavor, account.name, account.instance_id);
       if (!request) {
@@ -998,8 +1104,13 @@ class EvolutionInstanceService {
       .slice(0, MAX_NUMBER_CHECK);
     if (!requested.length) return [];
 
-    const account = await WhatsAppAccount.getForPurpose('general');
+    // A Cloud API não responde "este número tem WhatsApp?": a pergunta só vai
+    // por um número pareado por QR.
+    const account = await WhatsAppAccount.getForPurpose('general', { integration: 'baileys' });
     if (!account) {
+      if (await WhatsAppAccount.getForPurpose('general')) {
+        throw new WaError('whatsapp.error.notSupportedCloud', { code: 'not_supported_cloud', status: 409 });
+      }
       throw new WaError('whatsapp.error.noAccount', { code: 'no_account', status: 400 });
     }
     const client = this.clientFor(account, config);
