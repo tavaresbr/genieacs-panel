@@ -317,7 +317,7 @@ class WaOutboxWorker {
     if (!message) return 'claimed_elsewhere';
 
     try {
-      const { externalId } = await WaSendService.dispatch(message);
+      const { externalId, sentAs = null } = await WaSendService.dispatch(message);
 
       // ── Ponto de não-retorno ────────────────────────────────────────────
       // A linha acima já entregou ao Evolution: o destinatário VAI receber.
@@ -338,7 +338,8 @@ class WaOutboxWorker {
         await WaMessage.update(message.id, {
           external_id: externalId,
           delivery_status: 'sent',
-          delivery_error: null
+          delivery_error: null,
+          sent_as: sentAs
         });
       } catch (error) {
         if (!isUniqueViolation(error)) throw error;
@@ -355,7 +356,8 @@ class WaOutboxWorker {
         // duas vezes.
         await WaMessage.update(message.id, {
           delivery_status: 'sent',
-          delivery_error: null
+          delivery_error: null,
+          sent_as: sentAs
         });
         console.warn(
           `[wa] mensagem ${message.id}: o eco de entrada gravou ${externalId} antes `

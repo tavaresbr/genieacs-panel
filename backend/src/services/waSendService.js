@@ -9,11 +9,15 @@ import { ATTACHMENT_TYPES } from '../config/waAttachmentTypes.js';
 import { safeContentType } from './waMediaFile.js';
 import { clientForAccount } from './evolutionClient.js';
 import {
+  readMetaError,
   readSentId,
+  sanitizeMetaParam,
   sendAudioRequest,
   sendMediaRequest,
+  sendTemplateRequest,
   sendTextRequest
 } from '../utils/wa/evolutionApi.js';
+import { decidirEnvioCloud } from '../utils/wa/waJanelaMeta.js';
 import { destinoWa, normalizarTelefoneBr } from '../utils/wa/waDestino.js';
 import { sign as signMediaToken } from '../utils/wa/waMediaToken.js';
 
@@ -75,7 +79,8 @@ class WaSendService {
     attachment,
     isNote = false,
     userId = null,
-    source = 'operator'
+    source = 'operator',
+    metaTemplate = null
   } = {}) {
     // Defaulting to 'operator' rather than to the caller's intent: a sender
     // that forgets to say must never end up claiming to be the bot, because
@@ -91,7 +96,7 @@ class WaSendService {
     const text = String(body ?? '').trim();
     const anexo = normalizeAttachment(attachment);
 
-    if (!text && !anexo) {
+    if (!text && !anexo && !metaTemplate) {
       throw new WaError('whatsapp.error.messageEmpty', { code: 'message_empty', status: 400 });
     }
 
@@ -103,16 +108,25 @@ class WaSendService {
       if (!destinationFor(conversation)) {
         throw new WaError('whatsapp.error.noDestination', { code: 'no_destination', status: 409 });
       }
-      if (!await this.resolveAccount(conversation)) {
+    }
+    const modelo = note ? null : normalizeMetaTemplate(metaTemplate);
+    if (!note) {
+      const account = await this.resolveAccount(conversation);
+      if (!account) {
         throw new WaError('whatsapp.error.noAccount', { code: 'no_account', status: 409 });
       }
+      // Número oficial fora da janela de 24 h sem modelo aprovado: a Meta vai
+      // recusar. Dizer agora, com o texto ainda na caixa, é melhor que uma
+      // linha que falha sozinha minutos depois.
+      if (cloudDecision(account, conversation, modelo) === 'refuse') throw windowClosed();
     }
 
     const now = new Date();
     const message = await WaMessage.create({
       conversation_id: conversation.id,
       direction: 'out',
-      body: text || null,
+      body: text || (modelo ? modelo.name : null),
+      meta_template: modelo ? JSON.stringify(modelo) : null,
       attachment_path: anexo?.path ?? null,
       attachment_type: anexo?.type ?? null,
       attachment_name: anexo?.name ?? null,
@@ -173,8 +187,19 @@ class WaSendService {
       config,
       WhatsAppConfigService.decryptInstanceToken(account)
     );
-    const externalId = await sendThrough(client, account, message, number, config);
-    return { accountId: account.id, externalId };
+    // De novo na hora do envio, e esta é a que vale: a campanha anda por
+    // horas, e a janela que estava aberta no enfileiramento pode ter fechado.
+    const modelo = parseMetaTemplate(message.meta_template);
+    const decisao = cloudDecision(account, conversation, modelo);
+    if (decisao === 'refuse') throw windowClosed();
+    if (decisao === 'template') {
+      const { data } = await sendCloud(() => client.sendOrThrow(sendTemplateRequest(account.name, number, modelo)));
+      return { accountId: account.id, externalId: readSentId(data), sentAs: 'template' };
+    }
+    const externalId = WhatsAppAccount.isCloud(account)
+      ? await sendCloud(() => sendThrough(client, account, message, number, config))
+      : await sendThrough(client, account, message, number, config);
+    return { accountId: account.id, externalId, sentAs: 'text' };
   }
 
   /**
@@ -270,10 +295,62 @@ class WaSendService {
       // The column is NOT NULL, so the fallback is only for a row a test or a
       // fixture built by hand; the browser's type has no null in it.
       source: row.source || 'operator',
+      // `template` quando saiu como modelo aprovado da Meta (fora da janela).
+      sentAs: row.sent_as || null,
       readAt: row.read_at || null,
       createdAt: row.created_at || null,
       updatedAt: row.updated_at || null
     };
+  }
+}
+
+function windowClosed() {
+  return new WaError('whatsapp.error.metaWindowClosed', { code: 'meta_window_closed', status: 409 });
+}
+
+/** A regra da janela para ESTE número e ESTA conversa. */
+function cloudDecision(account, conversation, modelo) {
+  return decidirEnvioCloud({
+    isCloud: WhatsAppAccount.isCloud(account),
+    sameAccount: Number(account.id) === Number(conversation.account_id),
+    lastInboundAt: conversation.last_inbound_at,
+    hasTemplate: Boolean(modelo)
+  });
+}
+
+/**
+ * Envio por número oficial: a recusa por janela (131047) vira o código do
+ * painel, que a fila trata como definitivo — repetir não muda a resposta.
+ */
+async function sendCloud(fn) {
+  try {
+    return await fn();
+  } catch (error) {
+    const corpo = String(error?.translationVars?.body ?? error?.details ?? '');
+    if (error?.code === 'http_error' && readMetaError(corpo).windowClosed) throw windowClosed();
+    throw error;
+  }
+}
+
+/**
+ * O modelo da Meta como ele vai para a fila: nome, idioma e os parâmetros já
+ * prontos, na ordem do `{{1}}`, `{{2}}`… Qualquer coisa fora disso é ignorada.
+ */
+export function normalizeMetaTemplate(input) {
+  if (!input || typeof input !== 'object') return null;
+  const name = String(input.name ?? '').trim().slice(0, 255);
+  const language = String(input.language ?? '').trim().slice(0, 16);
+  if (!/^[a-z0-9_]+$/.test(name) || !/^[A-Za-z]{2,3}(_[A-Za-z0-9]{2,8})?$/.test(language)) return null;
+  const params = (Array.isArray(input.params) ? input.params : []).slice(0, 20).map(sanitizeMetaParam);
+  return { name, language, params };
+}
+
+function parseMetaTemplate(raw) {
+  if (!raw) return null;
+  try {
+    return normalizeMetaTemplate(typeof raw === 'string' ? JSON.parse(raw) : raw);
+  } catch {
+    return null;
   }
 }
 
@@ -453,7 +530,8 @@ async function sendThrough(client, account, message, number, config) {
   }
 
   const kind = mediaKind(message.attachment_type);
-  if (kind === 'audio') {
+  // Número oficial não tem a rota de voz do Baileys: o áudio vai como mídia.
+  if (kind === 'audio' && !WhatsAppAccount.isCloud(account)) {
     // Null on Evolution GO, whose PTT route has never been measured — and a
     // guessed path is exactly the mistake this integration already paid for.
     const request = sendAudioRequest(flavor, name, { number, url: mediaUrl });

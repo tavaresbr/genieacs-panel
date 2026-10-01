@@ -284,6 +284,21 @@ class WaMessage {
    * Never walks the status backwards: a 'delivered' event arriving after 'read'
    * (the two can cross on the wire) must not turn the blue ticks grey again.
    */
+  /**
+   * A Meta recusou depois de aceitar. Só mexe em quem ainda está a caminho:
+   * uma mensagem já entregue ou lida não "falha" por um evento atrasado.
+   */
+  static async markFailedByExternalId(externalIds, errorText) {
+    return tdb('wa_messages')
+      .whereIn('external_id', externalIds)
+      .whereIn('delivery_status', ['sending', 'sent'])
+      .update({
+        delivery_status: 'failed',
+        delivery_error: String(errorText || '').slice(0, 500),
+        updated_at: new Date()
+      });
+  }
+
   static async applyReceipt(externalIds, status) {
     const rank = { sent: 1, delivered: 2, read: 3 };
     const weaker = Object.keys(rank).filter((s) => rank[s] < rank[status]);

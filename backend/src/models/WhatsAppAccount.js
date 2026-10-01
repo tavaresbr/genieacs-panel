@@ -49,14 +49,19 @@ class WhatsAppAccount {
    * must not stop because nobody labelled a number "billing", but it also must
    * not silently use a disconnected one.
    */
-  static async getForPurpose(purpose) {
-    const connected = { status: 'connected' };
+  static async getForPurpose(purpose, { integration = null } = {}) {
+    const connected = integration ? { status: 'connected', integration } : { status: 'connected' };
     return (
       (await tdb('whatsapp_accounts').where({ ...connected, purpose }).orderBy('id').first())
       || (await tdb('whatsapp_accounts').where({ ...connected, is_default: true }).orderBy('id').first())
       || (await tdb('whatsapp_accounts').where(connected).orderBy('id').first())
       || null
     );
+  }
+
+  /** Número oficial da Meta (integração WHATSAPP-BUSINESS do Evolution). */
+  static isCloud(row) {
+    return row?.integration === 'cloud';
   }
 
   static async create(account) {

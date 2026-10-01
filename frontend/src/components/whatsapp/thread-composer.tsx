@@ -26,6 +26,7 @@ import {
   type QuickReply,
   type QuickReplyVars
 } from '@/lib/quick-replies'
+import type { MetaWindow } from '@/lib/wa-meta-window'
 
 export interface ComposerAttachment {
   url: string
@@ -52,6 +53,11 @@ interface ThreadComposerProps {
   quickReplies?: QuickReply[] | null
   /** O que se sabe da conversa aberta, para preencher as variáveis. */
   quickReplyVars?: QuickReplyVars
+  /**
+   * A janela de 24 h da API oficial. Fechada, só nota interna sai — o
+   * servidor recusaria a resposta com `meta_window_closed`.
+   */
+  metaWindow?: MetaWindow | null
 }
 
 /**
@@ -103,7 +109,7 @@ const carriesFiles = (event: DragEvent) => Array.from(event.dataTransfer.types).
  * modo nota continua ligado, porque o resto do lote ainda é nota e virar
  * resposta no meio do caminho é justamente a direção perigosa.
  */
-export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickReplies = null, quickReplyVars = {} }: ThreadComposerProps) {
+export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickReplies = null, quickReplyVars = {}, metaWindow = null }: ThreadComposerProps) {
   const { t } = useTranslation()
   const toast = useToast()
   const [body, setBody] = useState('')
@@ -177,6 +183,9 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
   // o lote inteiro, para ninguém mexer na fila enquanto ela anda.
   const busy = sending || working
   const empty = body.trim().length === 0 && items.length === 0
+  // Fora da janela da Meta a resposta não sai; a nota interna sai, porque
+  // não vai para o cliente.
+  const windowBlocked = metaWindow?.state === 'closed' && !isNote
 
   const release = (item: PickedFile) => {
     if (!item.preview) return
@@ -273,7 +282,7 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
     // Guarded here rather than left to the server: `message_empty` is a refusal
     // the box can simply never provoke, and a disabled button says so before
     // the operator presses it.
-    if (empty || busy) return
+    if (empty || busy || windowBlocked) return
 
     const steps = planSend({ body, files: items })
     const total = steps.length
@@ -342,6 +351,18 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
           <Icon name="paperclip" size={18} />
           {t('whatsapp.inbox.attachDrop')}
         </div>
+      )}
+
+      {metaWindow?.state === 'closed' && (
+        <p className="mb-2.5 flex items-start gap-2 rounded-md border border-[hsl(var(--status-danger))]/40 bg-[hsl(var(--status-danger))]/[0.08] px-3 py-2 text-xs leading-5 text-foreground">
+          <Icon name="lock" size={14} className="mt-0.5 shrink-0 text-[hsl(var(--status-danger))]" />
+          <span>{t('whatsapp.cloud.windowClosed')}</span>
+        </p>
+      )}
+      {metaWindow?.state === 'open' && (
+        <p className="mb-2 text-xs text-muted-foreground">
+          {t('whatsapp.cloud.windowOpen', { hours: metaWindow.hoursLeft })}
+        </p>
       )}
 
       {optedOut && (
@@ -548,7 +569,7 @@ export function ThreadComposer({ optedOut, sending, onSend, draft = null, quickR
           <button
             type="button"
             className={isNote ? 'modern-button-secondary shrink-0 border-[hsl(var(--status-warning))]/70' : 'modern-button shrink-0'}
-            disabled={empty || busy}
+            disabled={empty || busy || windowBlocked}
             aria-live="polite"
             onClick={() => void submit()}
           >
