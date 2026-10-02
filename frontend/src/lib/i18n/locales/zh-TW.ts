@@ -2260,6 +2260,7 @@ const zhTW: Dictionary = {
   'whatsapp.contacts.filterBlocked': '暫停',
   'whatsapp.contacts.filterCancelled': '已取消',
   'whatsapp.contacts.filterNoContract': '無合約',
+  'whatsapp.contacts.filterNoPhone': "無電話",
   'whatsapp.contacts.stateBlocked': '暫停',
   'whatsapp.contacts.stateCancelled': '已取消',
   'whatsapp.contacts.syncHint': '要將 SGP 的全部客戶匯入這裡，請在 設定 → SGP 中設定聯絡人同步。',

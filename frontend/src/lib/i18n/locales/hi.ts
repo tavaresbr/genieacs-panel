@@ -2240,6 +2240,7 @@ const hi: Dictionary = {
   'whatsapp.contacts.filterBlocked': 'निलंबित',
   'whatsapp.contacts.filterCancelled': 'रद्द',
   'whatsapp.contacts.filterNoContract': 'अनुबंध नहीं',
+  'whatsapp.contacts.filterNoPhone': "बिना फ़ोन",
   'whatsapp.contacts.stateBlocked': 'निलंबित',
   'whatsapp.contacts.stateCancelled': 'रद्द',
   'whatsapp.contacts.syncHint': 'SGP के सभी ग्राहकों को यहाँ लाने के लिए सेटिंग्स → SGP में संपर्क सिंक सेट करें।',

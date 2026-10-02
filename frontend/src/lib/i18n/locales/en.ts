@@ -2262,6 +2262,7 @@ const en = {
   'whatsapp.contacts.filterBlocked': 'Suspended',
   'whatsapp.contacts.filterCancelled': 'Cancelled',
   'whatsapp.contacts.filterNoContract': 'No contract',
+  'whatsapp.contacts.filterNoPhone': "No phone",
   'whatsapp.contacts.stateBlocked': 'Suspended',
   'whatsapp.contacts.stateCancelled': 'Cancelled',
   'whatsapp.contacts.syncHint': 'To bring every SGP client here, set up the contacts sync under Settings → SGP.',

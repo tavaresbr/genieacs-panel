@@ -67,10 +67,10 @@ function maskDocument(document) {
  * subscribers an operator looked up in the SGP that have no ONT in the panel.
  */
 class WaContactService {
-  static async list({ search = '', limit = DEFAULT_LIMIT, offset = 0, state = '' } = {}) {
+  static async list({ search = '', limit = DEFAULT_LIMIT, offset = 0, state = '', noPhone = false } = {}) {
     const size = Math.min(Math.max(Number(limit) || DEFAULT_LIMIT, 1), MAX_LIMIT);
     const skip = Math.max(Number(offset) || 0, 0);
-    const subscribers = await this.collect({ search, state });
+    const subscribers = await this.collect({ search, state, noPhone });
     const page = await this.withEditedNames(subscribers.slice(skip, skip + size));
     return {
       total: subscribers.length,
@@ -81,8 +81,12 @@ class WaContactService {
   /**
    * Every subscriber the list would show for this search and state, in its
    * order and unpaged — the list pages it, the spreadsheet export takes it all.
+   *
+   * `noPhone` keeps only who has no number the panel could message — the same
+   * "Sem telefone" the list shows, after the record's number filled the gap.
+   * It combines with `state`: "active with no phone" is the list to fix first.
    */
-  static async collect({ search = '', state = '' } = {}) {
+  static async collect({ search = '', state = '', noPhone = false } = {}) {
     const raw = String(search ?? '').trim();
 
     const linkRows = await this.searchTable('sgp_links', raw);
@@ -104,6 +108,7 @@ class WaContactService {
     const wanted = CONTACT_STATES.includes(state) ? state : null;
     return [...withDevice, ...withoutDevice]
       .filter((subscriber) => !wanted || subscriber.state === wanted)
+      .filter((subscriber) => !noPhone || !subscriber.phone)
       .sort((a, b) => (
       String(a.clientName ?? '').localeCompare(String(b.clientName ?? ''), 'pt-BR')
       || String(a.contract).localeCompare(String(b.contract))

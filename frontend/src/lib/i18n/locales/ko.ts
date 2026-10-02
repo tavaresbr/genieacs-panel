@@ -2265,6 +2265,7 @@ const ko: Dictionary = {
   'whatsapp.contacts.filterBlocked': '정지',
   'whatsapp.contacts.filterCancelled': '해지',
   'whatsapp.contacts.filterNoContract': '계약 없음',
+  'whatsapp.contacts.filterNoPhone': "전화번호 없음",
   'whatsapp.contacts.stateBlocked': '정지',
   'whatsapp.contacts.stateCancelled': '해지',
   'whatsapp.contacts.syncHint': 'SGP의 모든 고객을 여기로 가져오려면 설정 → SGP에서 연락처 동기화를 설정하세요.',

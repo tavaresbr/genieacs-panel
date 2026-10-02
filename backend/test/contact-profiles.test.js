@@ -279,6 +279,21 @@ describe('a planilha', () => {
     assert.deepEqual(res.body.data.errors, []);
   });
 
+  it('com "Sem telefone", exporta só quem a lista mostra nesse filtro', async () => {
+    const contratosDo = (csv) => csv.replace(/^\uFEFF/, '').split('\r\n').slice(1)
+      .filter(Boolean).map((line) => line.split(';')[1]).filter(Boolean).sort();
+    await getDb()('sgp_links').insert({
+      tenant_id: 1, device_id: 'ONT-PLANILHA-SEM-FONE', contract: '9990', client_name: 'Sem Fone Planilha', state: 'active', link_mode: 'auto'
+    });
+    const lista = await call(`${panelUrl}/api/whatsapp/contacts?noPhone=true&limit=200`, { headers: authHeaders(token) });
+    assert.equal(lista.status, 200);
+    const esperados = lista.body.data.contacts.map((c) => c.contract).filter(Boolean).sort();
+    assert.ok(esperados.length > 0, 'a base do teste tem quem esteja sem telefone');
+    const filtrado = contratosDo(await (await exportar('?noPhone=true')).text());
+    assert.deepEqual(filtrado, esperados);
+    assert.ok(contratosDo(await (await exportar()).text()).length > filtrado.length, 'sem o filtro, vêm também os com telefone');
+  });
+
   it('a prévia diz o que muda sem gravar; aplicar grava como edição do painel', async () => {
     const csv = [
       'Contrato;Nome;E-mails;Cidade',

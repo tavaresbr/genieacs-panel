@@ -2260,6 +2260,7 @@ const es: Dictionary = {
   'whatsapp.contacts.filterBlocked': 'Suspendidos',
   'whatsapp.contacts.filterCancelled': 'Cancelados',
   'whatsapp.contacts.filterNoContract': 'Sin contrato',
+  'whatsapp.contacts.filterNoPhone': "Sin teléfono",
   'whatsapp.contacts.stateBlocked': 'Suspendido',
   'whatsapp.contacts.stateCancelled': 'Cancelado',
   'whatsapp.contacts.syncHint': 'Para traer aquí todos los clientes del SGP, configure la sincronización de contactos en Configuración → SGP.',

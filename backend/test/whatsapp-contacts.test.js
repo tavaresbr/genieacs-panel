@@ -149,6 +149,26 @@ describe('a lista de contatos', () => {
     assert.deepEqual(porDocumento.body.data.contacts.map((c) => c.contract), ['9001']);
   });
 
+  it('filtra quem está sem telefone, combinando com a situação', async () => {
+    // Suspenso e sem telefone; e um sem telefone na ONT mas com o celular no
+    // cadastro do SGP — este tem número, e não entra no filtro.
+    await link({ device_id: 'ONT-SUSPENSO', contract: '9010', client_name: 'Suspenso Sem Fone', state: 'blocked' });
+    await link({ device_id: 'ONT-FONE-CADASTRO', contract: '9011', client_name: 'Fone No Cadastro' });
+    await getDb()('sgp_contacts').insert({ tenant_id: 1, contract: '9011', client_name: 'Fone No Cadastro', phone_e164: '5593981110011' });
+
+    const semFone = await contatos('?noPhone=true');
+    assert.equal(semFone.status, 200);
+    assert.deepEqual(semFone.body.data.contacts.map((c) => c.contract).sort(), ['9003', '9010']);
+    assert.equal(semFone.body.data.total, 2);
+    assert.ok(semFone.body.data.contacts.every((c) => !c.phone));
+
+    const ativosSemFone = await contatos('?state=active&noPhone=true');
+    assert.deepEqual(ativosSemFone.body.data.contacts.map((c) => c.contract), ['9003']);
+
+    const todos = await contatos('?noPhone=false');
+    assert.ok(todos.body.data.contacts.some((c) => c.contract === '9011' && c.phone === '5593981110011'));
+  });
+
   it('não mostra o assinante do vizinho', async () => {
     const res = await contatos('?search=beta');
     assert.equal(res.status, 200);

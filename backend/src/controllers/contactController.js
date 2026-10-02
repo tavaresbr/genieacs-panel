@@ -169,7 +169,11 @@ function today() {
 
 ContactController.exportSheet = async function exportSheet(req, res) {
   try {
-    const filters = { search: String(req.query.search ?? ''), state: String(req.query.state ?? '') };
+    const filters = {
+      search: String(req.query.search ?? ''),
+      state: String(req.query.state ?? ''),
+      noPhone: req.query.noPhone === 'true'
+    };
     const { csv, count } = await ContactSheetService.exportCsv(filters);
     await AuditLog.fromRequest(req, {
       action: AuditLog.ACTIONS.CONTACTS_EXPORTED,

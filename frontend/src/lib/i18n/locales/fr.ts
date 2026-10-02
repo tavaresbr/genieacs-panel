@@ -2652,6 +2652,7 @@ const fr: Dictionary = {
   'whatsapp.contacts.filterBlocked': 'Suspendus',
   'whatsapp.contacts.filterCancelled': 'Résiliés',
   'whatsapp.contacts.filterNoContract': 'Sans contrat',
+  'whatsapp.contacts.filterNoPhone': "Sans téléphone",
   'whatsapp.contacts.stateBlocked': 'Suspendu',
   'whatsapp.contacts.stateCancelled': 'Résilié',
   'whatsapp.contacts.syncHint': 'Pour importer ici tous les clients du SGP, configurez la synchronisation des contacts dans Paramètres → SGP.',
