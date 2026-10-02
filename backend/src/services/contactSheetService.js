@@ -154,8 +154,8 @@ class ContactSheetService {
   static COLUMNS = COLUMNS;
 
   /** The rows of the export, for the contacts the list shows with this search and state. */
-  static async exportRows({ search = '', state = '' } = {}) {
-    const subscribers = await WaContactService.collect({ search, state });
+  static async exportRows({ search = '', state = '', noPhone = false } = {}) {
+    const subscribers = await WaContactService.collect({ search, state, noPhone });
     if (subscribers.length === 0) return [];
 
     const contacts = await tdb('sgp_contacts');

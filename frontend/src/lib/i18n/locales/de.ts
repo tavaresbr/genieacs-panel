@@ -2143,6 +2143,7 @@ const de: Dictionary = {
   'whatsapp.contacts.filterBlocked': 'Gesperrt',
   'whatsapp.contacts.filterCancelled': 'Gekündigt',
   'whatsapp.contacts.filterNoContract': 'Ohne Vertrag',
+  'whatsapp.contacts.filterNoPhone': "Ohne Telefon",
   'whatsapp.contacts.stateBlocked': 'Gesperrt',
   'whatsapp.contacts.stateCancelled': 'Gekündigt',
   'whatsapp.contacts.syncHint': 'Um alle SGP-Kunden hierher zu holen, richten Sie die Kontaktsynchronisierung unter Einstellungen → SGP ein.',

@@ -63,6 +63,9 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
   const [sgpResult, setSgpResult] = useState<{ term: string; contacts: WhatsAppContact[] } | null>(null)
   const [lookingUp, setLookingUp] = useState(false)
   const [stateFilter, setStateFilter] = useState<StateFilter>(defaultState)
+  // Só quem está sem telefone — combina com a aba: "Ativos sem telefone" é a
+  // lista para corrigir primeiro, porque quem está nela fica fora da cobrança.
+  const [noPhone, setNoPhone] = useState(false)
 
   const alive = useRef(true)
   // The newest request wins: a slow answer for "ben" must not overwrite the
@@ -106,13 +109,14 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
     }
   }, [search, t, toast])
 
-  const load = useCallback(async (term: string, state: StateFilter) => {
+  const load = useCallback(async (term: string, state: StateFilter, onlyNoPhone: boolean) => {
     const seq = ++requestSeq.current
     setLoading(true)
     const res = await whatsappAPI.listContacts({
       search: term || undefined,
       limit: PAGE,
-      state: (state || undefined) as WhatsAppContactState | undefined
+      state: (state || undefined) as WhatsAppContactState | undefined,
+      noPhone: onlyNoPhone
     })
     if (!alive.current || seq !== requestSeq.current) return
     if (res.success && res.data) {
@@ -125,7 +129,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
     setLoading(false)
   }, [t])
 
-  useEffect(() => { void load(debounced, stateFilter) }, [debounced, stateFilter, load])
+  useEffect(() => { void load(debounced, stateFilter, noPhone) }, [debounced, stateFilter, noPhone, load])
 
   const loadMore = useCallback(async () => {
     const seq = requestSeq.current
@@ -134,7 +138,8 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
       search: debounced || undefined,
       limit: PAGE,
       offset: contacts.length,
-      state: (stateFilter || undefined) as WhatsAppContactState | undefined
+      state: (stateFilter || undefined) as WhatsAppContactState | undefined,
+      noPhone
     })
     if (!alive.current) return
     setLoadingMore(false)
@@ -149,7 +154,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
       ...page.filter((row) => !current.some((held) => held.key === row.key))
     ])
     setTotal(res.data.total)
-  }, [contacts.length, debounced, stateFilter, t, toast])
+  }, [contacts.length, debounced, stateFilter, noPhone, t, toast])
 
   const open = useCallback(async (contact: WhatsAppContact) => {
     setOpeningContract(contact.key)
@@ -185,7 +190,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
   const exportSheet = async () => {
     setExporting(true)
     try {
-      const res = await contactsAPI.exportSheet({ search: debounced, state: stateFilter })
+      const res = await contactsAPI.exportSheet({ search: debounced, state: stateFilter, noPhone })
       if (!res.success || !res.blob) {
         toast.error(res.message || t('contacts.sheet.exportFailed'))
         return
@@ -304,7 +309,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
           <button
             type="button"
             className="modern-button-secondary"
-            onClick={() => void load(debounced, stateFilter)}
+            onClick={() => void load(debounced, stateFilter, noPhone)}
             disabled={loading}
           >
             <Icon name="refresh" size={16} className={loading ? 'animate-spin' : ''} />
@@ -318,7 +323,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
           onClose={() => setImporting(false)}
           onApplied={() => {
             setImporting(false)
-            void load(debounced, stateFilter)
+            void load(debounced, stateFilter, noPhone)
           }}
         />
       )}
@@ -355,20 +360,33 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
       </form>
 
       {!sgpResult && (
-        <div className="tab-rail" role="tablist" aria-label={t('whatsapp.contacts.title')}>
-          {STATE_FILTERS.map(([id, labelKey]) => (
-            <button
-              key={id || 'all'}
-              type="button"
-              className="tab-button"
-              data-active={stateFilter === id}
-              role="tab"
-              aria-selected={stateFilter === id}
-              onClick={() => setStateFilter(id)}
-            >
-              {t(labelKey)}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="tab-rail" role="tablist" aria-label={t('whatsapp.contacts.title')}>
+            {STATE_FILTERS.map(([id, labelKey]) => (
+              <button
+                key={id || 'all'}
+                type="button"
+                className="tab-button"
+                data-active={stateFilter === id}
+                role="tab"
+                aria-selected={stateFilter === id}
+                onClick={() => setStateFilter(id)}
+              >
+                {t(labelKey)}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            className={noPhone ? 'modern-button' : 'modern-button-secondary'}
+            aria-pressed={noPhone}
+            data-testid="wa-contacts-no-phone"
+            onClick={() => setNoPhone((current) => !current)}
+          >
+            <Icon name="phone" size={16} />
+            {t('whatsapp.contacts.filterNoPhone')}
+            {noPhone && <Icon name="x" size={14} />}
+          </button>
         </div>
       )}
 

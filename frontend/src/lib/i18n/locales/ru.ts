@@ -2267,6 +2267,7 @@ const ru: Dictionary = {
   'whatsapp.contacts.filterBlocked': 'Приостановленные',
   'whatsapp.contacts.filterCancelled': 'Расторгнутые',
   'whatsapp.contacts.filterNoContract': 'Без договора',
+  'whatsapp.contacts.filterNoPhone': "Без телефона",
   'whatsapp.contacts.stateBlocked': 'Приостановлен',
   'whatsapp.contacts.stateCancelled': 'Расторгнут',
   'whatsapp.contacts.syncHint': 'Чтобы загрузить сюда всех клиентов SGP, настройте синхронизацию контактов в Настройки → SGP.',

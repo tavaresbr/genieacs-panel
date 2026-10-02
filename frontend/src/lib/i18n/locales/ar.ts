@@ -2240,6 +2240,7 @@ const ar: Dictionary = {
   'whatsapp.contacts.filterBlocked': 'موقوف',
   'whatsapp.contacts.filterCancelled': 'ملغى',
   'whatsapp.contacts.filterNoContract': 'بدون عقد',
+  'whatsapp.contacts.filterNoPhone': "بدون هاتف",
   'whatsapp.contacts.stateBlocked': 'موقوف',
   'whatsapp.contacts.stateCancelled': 'ملغى',
   'whatsapp.contacts.syncHint': 'لجلب جميع عملاء SGP إلى هنا، اضبط مزامنة جهات الاتصال في الإعدادات ← SGP.',

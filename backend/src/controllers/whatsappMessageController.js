@@ -144,7 +144,8 @@ class WhatsAppMessageController {
         search: req.query?.search,
         limit: req.query?.limit,
         offset: req.query?.offset,
-        state: req.query?.state
+        state: req.query?.state,
+        noPhone: req.query?.noPhone === 'true'
       });
       return res.json(createResponse(
         req.t('whatsapp.contactsLoaded', { count: data.contacts.length }),
