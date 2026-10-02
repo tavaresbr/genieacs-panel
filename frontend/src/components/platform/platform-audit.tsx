@@ -3,13 +3,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { platformAPI, type PlatformAuditEntry } from '@/lib/api'
 import { useTranslation } from '@/contexts/language-context'
+import { displayDateTime } from '@/lib/date-format'
 
 const POR_PAGINA = 50
 
 function quando(valor: string | null) {
   if (!valor) return '—'
-  const data = new Date(valor)
-  return Number.isNaN(data.getTime()) ? '—' : data.toLocaleString()
+  return displayDateTime(valor) ?? '—'
 }
 
 /**

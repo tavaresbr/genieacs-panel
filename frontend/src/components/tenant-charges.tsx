@@ -6,6 +6,7 @@ import { formatMoney } from '@/lib/money'
 import { Icon } from '@/components/ui/icon'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
+import { displayDate } from '@/lib/date-format'
 
 /**
  * O que foi cobrado deste provedor, e onde ele paga.
@@ -43,8 +44,7 @@ function badgeClass(status: TenantChargeView['status']) {
 
 function formatDate(value: string | null | undefined) {
   if (!value) return null
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? null : date.toLocaleDateString()
+  return displayDate(value)
 }
 
 /**

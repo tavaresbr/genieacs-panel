@@ -10,6 +10,7 @@ import { LanguageSwitcher } from '@/components/language-switcher'
 import { useTranslation } from '@/contexts/language-context'
 import { getActiveLocale, isCustomerSessionCode, translate } from '@/lib/i18n'
 import { billingFailure } from '@/lib/portal-billing'
+import { setActiveDateFormat } from '@/lib/date-format'
 
 type PortalOverview = {
   customerId: string
@@ -130,7 +131,7 @@ function MetricCard({
 }
 
 export default function CustomerPortal() {
-  const { t, formatDateTime, intlLocale } = useTranslation()
+  const { t, formatDate, formatDateTime, intlLocale } = useTranslation()
   const [checkingSession, setCheckingSession] = useState(true)
   const [authenticated, setAuthenticated] = useState(false)
   const [customerId, setCustomerId] = useState('')
@@ -216,11 +217,7 @@ export default function CustomerPortal() {
 
   // An SGP due date is a plain YYYY-MM-DD; anchor it to local midnight so the
   // reader's locale, not UTC, decides the displayed day.
-  const invoiceDueDate = (value: string | null) => (
-    value
-      ? new Intl.DateTimeFormat(intlLocale, { dateStyle: 'short' }).format(new Date(`${value}T00:00:00`))
-      : '—'
-  )
+  const invoiceDueDate = (value: string | null) => (value ? formatDate(value) : '—')
 
   // O contato é opcional e secundário: falhar aqui não vira erro na tela,
   // o cartão simplesmente não aparece.
@@ -291,11 +288,13 @@ export default function CustomerPortal() {
 
   useEffect(() => {
     let cancelled = false
-    void portalRequest<{ customerId: string }>('/session')
+    void portalRequest<{ customerId: string; dateFormat?: string }>('/session')
       .then((result) => {
         if (cancelled) return
         setAuthenticated(result.success)
         if (result.success) {
+          // As datas do portal saem no formato que o provedor escolheu.
+          setActiveDateFormat(result.data?.dateFormat)
           void loadOverview()
           void loadBilling()
           void loadProvider()
@@ -345,6 +344,8 @@ export default function CustomerPortal() {
       setAuthenticated(true)
       setPassword('')
       setShowLoginPassword(false)
+      void portalRequest<{ dateFormat?: string }>('/session')
+        .then((session) => { if (session.success) setActiveDateFormat(session.data?.dateFormat) })
       await loadOverview()
       void loadBilling()
       void loadProvider()

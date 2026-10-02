@@ -5,6 +5,7 @@ import { Icon } from '@/components/ui/icon'
 import { useTranslation } from '@/contexts/language-context'
 import { whatsappAPI, type WhatsAppMessage } from '@/lib/api'
 import type { TranslationKey } from '@/lib/i18n'
+import { formatDayMonth, getActiveDateFormat, toDate } from '@/lib/date-format'
 
 type DeliveryStatus = NonNullable<WhatsAppMessage['deliveryStatus']>
 
@@ -187,15 +188,10 @@ function Attachment({ message }: { message: WhatsAppMessage }) {
 
 function clock(iso: string | null, intlLocale: string): string {
   if (!iso) return ''
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return ''
-  return new Intl.DateTimeFormat(intlLocale, {
-    day: '2-digit',
-    month: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
-  }).format(date)
+  const date = toDate(iso)
+  if (!date) return ''
+  const hora = new Intl.DateTimeFormat(intlLocale, { hour: '2-digit', minute: '2-digit', hour12: false }).format(date)
+  return `${formatDayMonth(date, getActiveDateFormat(), intlLocale)} ${hora}`
 }
 
 /**

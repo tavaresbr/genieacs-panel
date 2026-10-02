@@ -194,6 +194,7 @@ export default {
   'settings.validation.appName': 'Il nome dell’applicazione deve avere da 1 a 80 caratteri',
   "settings.validation.auditRetentionDays": "Il periodo di conservazione del registro di controllo deve essere un numero intero di giorni tra 30 e 3650",
   'settings.validation.portalContactToggle': "Mostra contatto del provider deve essere true o false",
+  'settings.validation.dateFormat': "Formato data sconosciuto",
   'settings.validation.portalContactPhone': "Telefono non valido: indica prefisso e numero (da 10 a 13 cifre)",
   'settings.validation.portalContactEmail': "E-mail di contatto non valida",
 

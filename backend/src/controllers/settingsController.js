@@ -96,6 +96,7 @@ import OnboardingService from '../services/onboardingService.js';
 import { classifySyncError } from '../services/customerSyncErrors.js';
 import CustomerIdSyncJob from '../services/customerIdSyncJob.js';
 
+import { isDateFormat, readDateFormat } from '../utils/dateFormat.js';
 const ALLOWED_SETTING_KEYS = new Set([
   'appName',
   'genieAcsUrl',
@@ -122,7 +123,9 @@ const ALLOWED_SETTING_KEYS = new Set([
   'portalShowProviderContact',
   'portalContactPhone',
   'portalContactWhatsapp',
-  'portalContactEmail'
+  'portalContactEmail',
+  // Como as datas aparecem em todo o painel e no portal. Ver utils/dateFormat.js.
+  'dateFormat'
 ]);
 
 // Validation runs without a request, so it reports translation keys and the
@@ -160,6 +163,9 @@ function validateSetting(key, value) {
       return { errorKey: 'settings.validation.auditRetentionDays' };
     }
   }
+  if (key === 'dateFormat' && !isDateFormat(normalized)) {
+    return { errorKey: 'settings.validation.dateFormat' };
+  }
   if (key === 'portalShowProviderContact' && !['true', 'false'].includes(normalized)) {
     return { errorKey: 'settings.validation.portalContactToggle' };
   }
@@ -185,6 +191,20 @@ function validateSetting(key, value) {
 }
 
 class SettingsController {
+  /**
+   * O que muda como o painel se DESENHA para qualquer pessoa da equipe — hoje,
+   * só o formato da data. Sem `settings.read`: um técnico que não abre as
+   * configurações também vê datas, e precisa vê-las no formato do provedor.
+   */
+  static async getDisplayPreferences(req, res) {
+    try {
+      return res.json(createResponse(req.t('settings.listRetrieved'), { dateFormat: await readDateFormat() }));
+    } catch (error) {
+      console.error('Display preferences error:', error);
+      return res.status(500).json(createErrorResponse(req.t('common.internalError'), error.message));
+    }
+  }
+
   /**
    * Os primeiros passos do provedor: o checklist do Dashboard e a marca de que
    * o assistente de boas-vindas já foi visto. Ver `OnboardingService`.

@@ -194,6 +194,7 @@ export default {
   'settings.validation.appName': 'يجب أن يتراوح اسم التطبيق بين حرف واحد و٨٠ حرفًا',
   "settings.validation.auditRetentionDays": "يجب أن تكون مدة حفظ سجل التدقيق عددًا صحيحًا من الأيام بين 30 و3650",
   'settings.validation.portalContactToggle': "يجب أن تكون قيمة إظهار بيانات الاتصال بالمزوّد true أو false",
+  'settings.validation.dateFormat': "تنسيق تاريخ غير معروف",
   'settings.validation.portalContactPhone': "رقم هاتف غير صالح: أدخل رمز المنطقة والرقم (من 10 إلى 13 رقمًا)",
   'settings.validation.portalContactEmail': "بريد الاتصال غير صالح",
 

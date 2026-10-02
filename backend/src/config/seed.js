@@ -39,7 +39,10 @@ export const DEFAULT_SETTINGS = {
   portalShowProviderContact: 'false',
   portalContactPhone: '',
   portalContactWhatsapp: '',
-  portalContactEmail: ''
+  portalContactEmail: '',
+  // Como as datas aparecem no painel e no portal (utils/dateFormat.js).
+  // `auto` segue o idioma de quem olha — o que o painel sempre fez.
+  dateFormat: 'auto'
 };
 
 // Values shipped by older releases. Only these exact values are migrated, so

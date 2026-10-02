@@ -197,6 +197,7 @@ export default {
   'settings.validation.appName': '애플리케이션 이름은 1자에서 80자 사이여야 합니다',
   "settings.validation.auditRetentionDays": "감사 추적 보존 기간은 30일에서 3650일 사이의 정수여야 합니다",
   'settings.validation.portalContactToggle': "공급자 연락처 표시는 true 또는 false여야 합니다",
+  'settings.validation.dateFormat': "알 수 없는 날짜 형식",
   'settings.validation.portalContactPhone': "잘못된 전화번호: 지역 번호와 번호(10~13자리)를 입력하세요",
   'settings.validation.portalContactEmail': "잘못된 연락처 이메일",
 

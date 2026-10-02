@@ -196,6 +196,7 @@ export default {
   'settings.validation.appName': 'Der Anwendungsname muss zwischen 1 und 80 Zeichen lang sein',
   "settings.validation.auditRetentionDays": "Die Aufbewahrungsfrist des Prüfpfads muss eine ganze Zahl von Tagen zwischen 30 und 3650 sein",
   'settings.validation.portalContactToggle': "Anbieterkontakt anzeigen muss true oder false sein",
+  'settings.validation.dateFormat': "Unbekanntes Datumsformat",
   'settings.validation.portalContactPhone': "Ungültige Telefonnummer: Vorwahl und Nummer angeben (10 bis 13 Ziffern)",
   'settings.validation.portalContactEmail': "Ungültige Kontakt-E-Mail",
 

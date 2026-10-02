@@ -24,7 +24,7 @@ function optOutAddress(entry: WhatsAppOptOut): string {
  * Self-contained: it owns its own fetch, its own form and its own refusals.
  */
 export function OptOutPanel() {
-  const { t, intlLocale } = useTranslation()
+  const { t, intlLocale, formatDateTime } = useTranslation()
   const toast = useToast()
 
   const [entries, setEntries] = useState<WhatsAppOptOut[]>([])
@@ -65,11 +65,9 @@ export function OptOutPanel() {
   const stamp = useCallback(
     (iso: string | null) => {
       if (!iso) return ''
-      const date = new Date(iso)
-      if (Number.isNaN(date.getTime())) return ''
-      return new Intl.DateTimeFormat(intlLocale, { dateStyle: 'short', timeStyle: 'short' }).format(date)
+      return formatDateTime(iso)
     },
-    [intlLocale]
+    [formatDateTime]
   )
 
   const add = useCallback(async () => {

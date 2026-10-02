@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { whatsappAPI, type BotReport } from '@/lib/api'
 import { useTranslation } from '@/contexts/language-context'
 import { whatsappErrorMessage } from '@/components/whatsapp-connection'
+import { formatDayMonth, toDate } from '@/lib/date-format'
 
 const PERIODS = [7, 30, 90] as const
 type Period = (typeof PERIODS)[number]
@@ -113,7 +114,7 @@ function Tile({ label, value, hint }: { label: string; value: string; hint?: str
  * dias, não de minutos.
  */
 export function BotReportPanel() {
-  const { t, intlLocale } = useTranslation()
+  const { t, intlLocale, dateFormat } = useTranslation()
   const [days, setDays] = useState<Period>(7)
   const [report, setReport] = useState<BotReport | null>(null)
   const [error, setError] = useState('')
@@ -141,8 +142,10 @@ export function BotReportPanel() {
   const numero = (n: number) => new Intl.NumberFormat(intlLocale).format(n)
   // O dia chega como `YYYY-MM-DD` já no fuso do provedor: formatado ao meio-dia
   // UTC, nenhum fuso do navegador o empurra para o dia vizinho.
-  const dia = (d: string) =>
-    new Intl.DateTimeFormat(intlLocale, { day: '2-digit', month: '2-digit', timeZone: 'UTC' }).format(new Date(`${d}T12:00:00Z`))
+  const dia = (d: string) => {
+    const data = toDate(d)
+    return data ? formatDayMonth(data, dateFormat, intlLocale) : d
+  }
 
   const vazio = report !== null && report.replies === 0
 

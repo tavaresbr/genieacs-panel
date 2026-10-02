@@ -196,6 +196,7 @@ export default {
   'settings.validation.appName': 'Le nom de l’application doit comporter entre 1 et 80 caractères',
   "settings.validation.auditRetentionDays": "La durée de conservation de la piste d'audit doit être un nombre entier de jours entre 30 et 3650",
   'settings.validation.portalContactToggle': "Afficher le contact du fournisseur doit être true ou false",
+  'settings.validation.dateFormat': "Format de date inconnu",
   'settings.validation.portalContactPhone': "Téléphone invalide : indiquez l'indicatif et le numéro (10 à 13 chiffres)",
   'settings.validation.portalContactEmail': "E-mail de contact invalide",
 

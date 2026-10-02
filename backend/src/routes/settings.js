@@ -52,6 +52,11 @@ router.post('/onboarding/dismiss', authenticateToken, requirePermission('setting
 // razão das rotas acima.
 router.get('/customer-id-sync', authenticateToken, requirePermission('settings.read'), SettingsController.customerIdSyncStatus);
 
+// O formato da data e o que mais mudar como o painel se desenha para TODA a
+// equipe: só sessão, sem `settings.read`. Antes de `/:key`, pela mesma razão
+// das rotas acima.
+router.get('/display', authenticateToken, SettingsController.getDisplayPreferences);
+
 router.get('/:key', authenticateToken, requirePermission('settings.read'), SettingsController.getSettingByKey);
 
 router.post('/', authenticateToken, requirePermission('settings.write'), SettingsController.createSetting);

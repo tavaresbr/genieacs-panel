@@ -29,6 +29,7 @@ import {
   planChangeKind,
   resourceLabelKey
 } from '@/lib/plan-options'
+import { displayDate } from '@/lib/date-format'
 
 /**
  * O "plano e uso" do próprio provedor: qual plano, em que estado, quanto dele
@@ -60,8 +61,7 @@ function badgeClass(status: string | undefined) {
 
 function formatDate(value: string | null | undefined) {
   if (!value) return null
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? null : date.toLocaleDateString()
+  return displayDate(value)
 }
 
 /** A data de renovação já passou? Nulo e data inválida não venceram. */

@@ -4,6 +4,7 @@ import { Icon } from '@/components/ui/icon'
 import { useTranslation } from '@/contexts/language-context'
 import type { WhatsAppAccount, WhatsAppConversation } from '@/lib/api'
 import { accountTag } from '@/lib/wa-account-color'
+import { formatDayMonth, getActiveDateFormat } from '@/lib/date-format'
 
 /**
  * What to call the person on the other end.
@@ -47,12 +48,9 @@ function stamp(iso: string | null, intlLocale: string): string {
   const sameDay = date.getFullYear() === now.getFullYear()
     && date.getMonth() === now.getMonth()
     && date.getDate() === now.getDate()
-  return new Intl.DateTimeFormat(
-    intlLocale,
-    sameDay
-      ? { hour: '2-digit', minute: '2-digit', hour12: false }
-      : { day: '2-digit', month: '2-digit' }
-  ).format(date)
+  return sameDay
+    ? new Intl.DateTimeFormat(intlLocale, { hour: '2-digit', minute: '2-digit', hour12: false }).format(date)
+    : formatDayMonth(date, getActiveDateFormat(), intlLocale)
 }
 
 interface ConversationListProps {

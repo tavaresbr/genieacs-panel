@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, useRef } from 'react'
 import type { LoginDestination, LoginDestinations } from '@/lib/api'
 import { sessionKind } from '@/lib/shell'
-import { apiClient, authAPI, storedSession } from '@/lib/api'
+import { apiClient, authAPI, settingsAPI, storedSession } from '@/lib/api'
 import { destinosDaResposta } from '@/lib/login-destinations'
 import { contaBloqueadaNaResposta, mfaStepDaResposta, type MfaStep } from '@/lib/login-mfa'
 import { MFA_ENROLLMENT_EVENT } from '@/lib/mfa-enrollment'
@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router'
 import { roleHas, type Permission } from '@/lib/permissions'
 import type { User } from '@/types'
 import { clearDashboardSnapshot } from '@/lib/dashboard-snapshot'
+import { setActiveDateFormat } from '@/lib/date-format'
 
 interface AuthContextType {
   user: User | null
@@ -253,6 +254,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setIsAuthenticated(false)
     navigate('/login')
   }
+
+  // O formato de data do provedor desta sessão. Lido de novo a cada troca de
+  // provedor (personificação, outro login); sem provedor, segue o idioma.
+  const tenantId = user && !user.platform ? (user.tenantId ?? user.tenant?.slug ?? null) : null
+  useEffect(() => {
+    if (!isAuthenticated || tenantId === null) {
+      setActiveDateFormat('auto')
+      return
+    }
+    let cancelled = false
+    void settingsAPI.display().then((res) => {
+      if (!cancelled && res.success && res.data) setActiveDateFormat(res.data.dateFormat)
+    })
+    return () => { cancelled = true }
+  }, [isAuthenticated, tenantId])
 
   const can = (permission: Permission) => roleHas(user?.role, permission)
 

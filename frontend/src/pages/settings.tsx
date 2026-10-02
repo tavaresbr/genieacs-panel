@@ -49,6 +49,7 @@ import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
 import { OPERATOR_ROLES, ROLE_LABEL_KEYS, ROLE_SUMMARY_KEYS } from '@/lib/permissions'
 import { exportFileName } from '@/lib/utils'
+import { DATE_FORMATS, dateFormatExample, setActiveDateFormat, type DateFormat } from '@/lib/date-format'
 import { InvitePanel } from '@/components/settings/invite-panel'
 import { ProviderAddressPanel } from '@/components/settings/provider-address-panel'
 import { GenieAcsConnectionCard } from '@/components/settings/genieacs-connection-card'
@@ -124,8 +125,17 @@ function scrollToSection(id: string, attempts = 20) {
   if (attempts > 0) window.setTimeout(() => scrollToSection(id, attempts - 1), 150)
 }
 
+/**
+ * How a fixed order reads to the operator: "DD/MM/AAAA" in Portuguese,
+ * "DD/MM/YYYY" in English. `tokens` is the translated "day|month|year".
+ */
+function dateFormatLabel(format: DateFormat, tokens: string) {
+  const [day = 'DD', month = 'MM', year = 'YYYY'] = tokens.split('|')
+  return format.replace('yyyy', year).replace('MM', month).replace('dd', day)
+}
+
 export default function Settings() {
-  const { t, formatDateTime } = useTranslation()
+  const { t, formatDateTime, intlLocale } = useTranslation()
   const { user: currentUser, can, refreshUser } = useAuth()
   const { name: tenantName, isSaas, platformManaged, tenant, refresh: refreshTenant } = useTenant()
   // Lidos aqui em cima, antes de qualquer handler que os feche: um `const`
@@ -160,6 +170,8 @@ export default function Settings() {
     portalContactPhone: '',
     portalContactWhatsapp: '',
     portalContactEmail: '',
+    // Como as datas aparecem em todo o painel e no portal; `auto` segue o idioma.
+    dateFormat: 'auto' as string,
     ...INSTALLER_VIRTUAL_PARAMETERS
   })
   const [loading, setLoading] = useState(false)
@@ -1134,6 +1146,9 @@ export default function Settings() {
         }
       }
 
+      // O formato da data vale na hora, sem recarregar a página.
+      if (ok) setActiveDateFormat(settings.dateFormat)
+
       if (ok && !genieAcsManaged) {
         // A URL acabou de ser gravada, então é ela que o servidor vai comparar
         // com o endereço testado daqui em diante — o aviso de teste anônimo
@@ -1427,6 +1442,24 @@ export default function Settings() {
         <p className="field-label">{t('settings.general.language')}</p>
         <LanguageSwitcher className="w-full sm:w-72" />
         <p className="field-hint">{t('settings.general.languageHint')}</p>
+      </div>
+      <div>
+        <label htmlFor="date-format" className="field-label">{t('settings.general.dateFormat')}</label>
+        <select
+          id="date-format"
+          className="modern-input w-full sm:w-72"
+          value={settings.dateFormat}
+          onChange={(e) => setSettings({ ...settings, dateFormat: e.target.value })}
+        >
+          {DATE_FORMATS.map((format: DateFormat) => (
+            <option key={format} value={format}>
+              {format === 'auto'
+                ? t('settings.general.dateFormatAuto', { example: dateFormatExample('auto', intlLocale) })
+                : `${dateFormatLabel(format, t('settings.general.dateFormatTokens'))} — ${dateFormatExample(format, intlLocale)}`}
+            </option>
+          ))}
+        </select>
+        <p className="field-hint">{t('settings.general.dateFormatHint')}</p>
       </div>
     </>
   )
