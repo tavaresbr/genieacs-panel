@@ -6,11 +6,11 @@ import { useAuth } from '@/contexts/auth-context'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
+import { displayDate } from '@/lib/date-format'
 
 function quando(valor: string | null) {
   if (!valor) return '—'
-  const data = new Date(valor)
-  return Number.isNaN(data.getTime()) ? '—' : data.toLocaleDateString()
+  return displayDate(valor) ?? '—'
 }
 
 /**

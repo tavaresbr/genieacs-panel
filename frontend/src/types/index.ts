@@ -82,6 +82,8 @@ export interface User {
    * traz o campo; até ele responder, a tela usa o perfil público do host.
    */
   tenant?: { slug: string | null; name: string } | null
+  /** O id do provedor desta sessão; nulo na sessão do console. */
+  tenantId?: number | null
   /**
    * Presente só numa sessão de personificação: quem, do plano de controle,
    * está olhando este painel.

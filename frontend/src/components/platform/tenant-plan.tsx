@@ -14,6 +14,7 @@ import { useToast } from '@/components/ui/toast'
 import { parseAmountToCents } from '@/lib/utils'
 import { formatMoney } from '@/lib/money'
 import { useTranslation } from '@/contexts/language-context'
+import { displayDate } from '@/lib/date-format'
 
 interface Props {
   tenant: Tenant
@@ -48,8 +49,7 @@ export function statusBadgeClass(status: SubscriptionStatus | null | undefined) 
 
 function formatDate(value: string | null | undefined) {
   if (!value) return '—'
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString()
+  return displayDate(value) ?? '—'
 }
 
 /** O que o interruptor de isenção lê da assinatura — a do painel e a da linha da aba Assinaturas. */

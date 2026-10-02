@@ -76,6 +76,16 @@ after(async () => {
 const contato = (headers = { Cookie: cookie }) => call(`${portalUrl}/api/customer/provider`, { headers });
 const salvar = (key, value) => call(`${panelUrl}/api/settings/${key}`, { method: 'PUT', headers: authHeaders(token), body: { value } });
 
+describe('GET /api/customer/session', () => {
+  it('leva o formato de data do provedor', async () => {
+    const sessao = () => call(`${portalUrl}/api/customer/session`, { headers: { Cookie: cookie } });
+    assert.equal((await sessao()).body.data.dateFormat, 'auto');
+    assert.equal((await salvar('dateFormat', 'dd/MM/yyyy')).status, 200);
+    assert.equal((await sessao()).body.data.dateFormat, 'dd/MM/yyyy');
+    assert.equal((await salvar('dateFormat', 'auto')).status, 200);
+  });
+});
+
 describe('GET /api/customer/provider', () => {
   it('sem sessão do portal, 401', async () => {
     const res = await contato({});

@@ -18,6 +18,7 @@ import { useToast } from '@/components/ui/toast'
 import { useAuth } from '@/contexts/auth-context'
 import { useTranslation } from '@/contexts/language-context'
 import { copyToClipboard, formatBrl, formatSgpDate, isSafeExternalUrl } from '@/lib/sgp'
+import { isoDay } from '@/lib/date-format'
 
 const ADDRESS_PARTS = ['street', 'number', 'complement', 'district', 'city', 'state', 'zip', 'reference'] as const
 
@@ -68,7 +69,13 @@ function documentText(document: string | null) {
 
 export default function ContactDetailPage() {
   const { key = '' } = useParams()
-  const { t } = useTranslation()
+  const { t, formatDate, formatDateTime } = useTranslation()
+  // Um dia do cadastro (nascimento, cliente desde) no formato do provedor; o
+  // que o SGP mandar fora do padrão aparece como veio, para nunca sumir.
+  const day = (value: string | null | undefined) => {
+    const iso = isoDay(value)
+    return iso ? formatDate(iso) : (value || '—')
+  }
   const { can } = useAuth()
   const toast = useToast()
   const navigate = useNavigate()
@@ -169,7 +176,7 @@ export default function ContactDetailPage() {
                 ? <span className="modern-badge-info">{t('contacts.profile.sourcePanel')}</span>
                 : profile.clientId && <span>{t('contacts.profile.sgpClient', { id: profile.clientId })}</span>}
               {profile.lastSeenAt && (
-                <span>{t('contacts.profile.lastSeen', { time: new Date(profile.lastSeenAt).toLocaleString() })}</span>
+                <span>{t('contacts.profile.lastSeen', { time: formatDateTime(profile.lastSeenAt) })}</span>
               )}
             </p>
           </div>
@@ -211,12 +218,12 @@ export default function ContactDetailPage() {
                 {documentText(fields.document.value)}
               </FieldRow>
               <FieldRow label={t('contacts.profile.birthDate')} field={fields.birthDate} canEdit={canEdit} onRestore={restore('birthDate')}>
-                {fields.birthDate.value}
+                {day(fields.birthDate.value)}
               </FieldRow>
               <FieldRow label={t('contacts.profile.gender')} field={fields.gender} canEdit={canEdit} onRestore={restore('gender')}>
                 {fields.gender.value}
               </FieldRow>
-              <Row label={t('contacts.profile.registeredAt')}>{profile.registeredAt}</Row>
+              <Row label={t('contacts.profile.registeredAt')}>{day(profile.registeredAt)}</Row>
             </dl>
           </Card>
 
@@ -301,7 +308,7 @@ export default function ContactDetailPage() {
                         </td>
                         <td>{contract.plan || '—'}</td>
                         <td>{contract.dueDay || '—'}</td>
-                        <td>{contract.createdAt || '—'}</td>
+                        <td>{day(contract.createdAt)}</td>
                         <td>
                           {contract.deviceId
                             ? <Link className="text-primary hover:underline" to={`/devices/detail?id=${encodeURIComponent(contract.deviceId)}`}>{contract.deviceId}</Link>
@@ -324,7 +331,7 @@ export default function ContactDetailPage() {
                     {contract.statusReason && <p className="text-xs text-muted-foreground">{contract.statusReason}</p>}
                     <p className="break-words">{contract.plan || '—'}</p>
                     <p className="text-xs text-muted-foreground">
-                      {t('contacts.profile.dueDay')}: {contract.dueDay || '—'} · {t('contacts.profile.since')}: {contract.createdAt || '—'}
+                      {t('contacts.profile.dueDay')}: {contract.dueDay || '—'} · {t('contacts.profile.since')}: {day(contract.createdAt)}
                     </p>
                     {contract.deviceId
                       ? <Link className="block break-all text-primary hover:underline" to={`/devices/detail?id=${encodeURIComponent(contract.deviceId)}`}>{contract.deviceId}</Link>

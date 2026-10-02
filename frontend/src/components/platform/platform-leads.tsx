@@ -6,6 +6,7 @@ import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n/dictionary'
+import { displayDateTime } from '@/lib/date-format'
 
 const STATUSES: LeadStatus[] = ['new', 'contacted', 'won', 'lost']
 
@@ -25,8 +26,7 @@ const STATUS_BADGE: Record<LeadStatus, string> = {
 
 function quando(valor: string | null) {
   if (!valor) return '—'
-  const data = new Date(valor)
-  return Number.isNaN(data.getTime()) ? '—' : data.toLocaleString()
+  return displayDateTime(valor) ?? '—'
 }
 
 /** Só dígitos, com o 55 do Brasil quando falta — o que o link do WhatsApp quer. */

@@ -1,4 +1,5 @@
 import { getActiveLocale, getIntlLocale, translate } from "@/lib/i18n"
+import { formatDateValue, getActiveDateFormat, toDate } from "@/lib/date-format"
 
 export function formatNumber(num: number): string {
   if (num >= 1000000) {
@@ -125,8 +126,12 @@ export function formatDate(isoString: string | undefined | null): string {
   if (!isoString) return translate(getActiveLocale(), 'common.na');
 
   try {
-    const date = new Date(isoString);
-    if (Number.isNaN(date.getTime())) return translate(getActiveLocale(), 'common.invalidDate');
+    const date = toDate(isoString);
+    if (!date) return translate(getActiveLocale(), 'common.invalidDate');
+    // The provider's date order, when one was chosen in Settings.
+    if (getActiveDateFormat() !== 'auto') {
+      return formatDateValue(date, { intlLocale: getIntlLocale(), time: 'seconds' }) ?? translate(getActiveLocale(), 'common.invalidDate');
+    }
 
     return new Intl.DateTimeFormat(getIntlLocale(), {
       year: 'numeric',

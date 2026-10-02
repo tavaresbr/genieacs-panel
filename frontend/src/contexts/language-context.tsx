@@ -17,6 +17,14 @@ import {
   type TranslationKey,
   type TranslationVars,
 } from '@/lib/i18n'
+import {
+  DATE_FORMAT_CHANGED_EVENT,
+  formatDateValue,
+  getActiveDateFormat,
+  isDateFormat,
+  toDate,
+  type DateFormat,
+} from '@/lib/date-format'
 
 interface LanguageContextType {
   /** Active locale, e.g. `pt-BR`. */
@@ -31,17 +39,13 @@ interface LanguageContextType {
   formatDateTime: (value: Date | string | number | null | undefined, options?: Intl.DateTimeFormatOptions) => string
   formatTime: (value: Date | string | number | null | undefined, options?: Intl.DateTimeFormatOptions) => string
   formatNumber: (value: number | null | undefined, options?: Intl.NumberFormatOptions) => string
+  /** The provider's date order (Settings → General); `auto` follows the language. */
+  dateFormat: DateFormat
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined)
 
 const EMPTY_VALUE = '—'
-
-function toDate(value: Date | string | number | null | undefined): Date | null {
-  if (value === null || value === undefined || value === '') return null
-  const date = value instanceof Date ? value : new Date(value)
-  return Number.isNaN(date.getTime()) ? null : date
-}
 
 /** English ships with the bundle, so it can always be rendered right away. */
 const BUNDLED_LOCALE: Locale = 'en'
@@ -110,6 +114,19 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  // The provider's date format, set from outside React (`setActiveDateFormat`)
+  // once the session or the portal knows it.
+  const [dateFormat, setDateFormat] = useState<DateFormat>(() => getActiveDateFormat())
+  useEffect(() => {
+    const sync = (event: Event) => {
+      const detail = (event as CustomEvent<DateFormat>).detail
+      setDateFormat(isDateFormat(detail) ? detail : 'auto')
+    }
+    window.addEventListener(DATE_FORMAT_CHANGED_EVENT, sync)
+    setDateFormat(getActiveDateFormat())
+    return () => window.removeEventListener(DATE_FORMAT_CHANGED_EVENT, sync)
+  }, [])
+
   const setLocale = useCallback((next: Locale) => {
     setRequestedLocale(next)
     try {
@@ -131,21 +148,37 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
       return new Intl.DateTimeFormat(intlLocale, options).format(date)
     }
 
+    // A fixed order replaces the locale's numeric date wherever a screen asked
+    // for the plain one (no options, or a `dateStyle`). A screen that spelled
+    // out its own parts — "2 de outubro de 2026" — keeps them.
+    const numeric = (options?: Intl.DateTimeFormatOptions) =>
+      dateFormat !== 'auto' && (!options || (options.dateStyle !== undefined
+        && options.dateStyle !== 'full' && options.dateStyle !== 'long'))
+    const custom = (
+      value: Date | string | number | null | undefined,
+      time: 'none' | 'short' | 'seconds',
+    ) => formatDateValue(value, { format: dateFormat, intlLocale, time }) ?? EMPTY_VALUE
+
     return {
       locale,
       intlLocale,
       locales: LOCALES,
       setLocale,
+      dateFormat,
       t: (key, vars) => translate(locale, key, vars),
-      formatDate: (date, options) => format(date, options ?? { dateStyle: 'short' }),
-      formatDateTime: (date, options) => format(date, options ?? { dateStyle: 'short', timeStyle: 'short' }),
+      formatDate: (date, options) => (numeric(options)
+        ? custom(date, 'none')
+        : format(date, options ?? { dateStyle: 'short' })),
+      formatDateTime: (date, options) => (numeric(options)
+        ? custom(date, options?.timeStyle === 'medium' ? 'seconds' : 'short')
+        : format(date, options ?? { dateStyle: 'short', timeStyle: 'short' })),
       formatTime: (date, options) => format(date, options ?? { hour: '2-digit', minute: '2-digit' }),
       formatNumber: (number, options) =>
         typeof number === 'number' && Number.isFinite(number)
           ? new Intl.NumberFormat(intlLocale, options).format(number)
           : EMPTY_VALUE,
     }
-  }, [locale, setLocale])
+  }, [locale, setLocale, dateFormat])
 
   return (
     <LanguageContext.Provider value={value}>

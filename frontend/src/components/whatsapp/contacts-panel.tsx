@@ -46,7 +46,7 @@ interface ContactsPanelProps {
  * Starting sends nothing; the operator lands in an empty thread and writes.
  */
 export function ContactsPanel({ onOpenConversation, defaultState = '' }: ContactsPanelProps) {
-  const { t, intlLocale } = useTranslation()
+  const { t, intlLocale, formatDateTime } = useTranslation()
   const { can } = useAuth()
   const toast = useToast()
 
@@ -170,9 +170,7 @@ export function ContactsPanel({ onOpenConversation, defaultState = '' }: Contact
 
   const stamp = (iso: string | null) => {
     if (!iso) return ''
-    const date = new Date(iso)
-    if (Number.isNaN(date.getTime())) return ''
-    return new Intl.DateTimeFormat(intlLocale, { dateStyle: 'short', timeStyle: 'short' }).format(date)
+    return formatDateTime(iso)
   }
 
   const canSend = can('whatsapp.send')

@@ -15,6 +15,7 @@ import { translateError } from '../i18n/index.js';
 import Setting from '../models/Setting.js';
 import Tenant from '../models/Tenant.js';
 import { currentTenantId } from '../config/tenantContext.js';
+import { readDateFormat } from '../utils/dateFormat.js';
 
 // Entries are only worth keeping for their 30 second lifetime, so the map is
 // swept whenever it grows past this many customers instead of retaining one
@@ -110,7 +111,9 @@ class CustomerPortalController {
 
   static async session(req, res) {
     return res.json(createResponse(req.t('portal.sessionActive'), {
-      customerId: req.customer.customer_id
+      customerId: req.customer.customer_id,
+      // O portal escreve as datas como o painel do provedor.
+      dateFormat: await readDateFormat().catch(() => 'auto')
     }, 'session_active'));
   }
 

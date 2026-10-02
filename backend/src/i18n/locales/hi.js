@@ -194,6 +194,7 @@ export default {
   'settings.validation.appName': 'ऐप्लिकेशन का नाम 1 से 80 अक्षरों के बीच होना चाहिए',
   "settings.validation.auditRetentionDays": "ऑडिट ट्रेल की अवधि 30 से 3650 दिनों के बीच पूर्ण संख्या होनी चाहिए",
   'settings.validation.portalContactToggle': "प्रदाता संपर्क दिखाने का मान true या false होना चाहिए",
+  'settings.validation.dateFormat': "अज्ञात तिथि प्रारूप",
   'settings.validation.portalContactPhone': "अमान्य फ़ोन: क्षेत्र कोड और नंबर लिखें (10 से 13 अंक)",
   'settings.validation.portalContactEmail': "अमान्य संपर्क ईमेल",
 

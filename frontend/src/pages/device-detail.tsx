@@ -812,7 +812,7 @@ export default function DeviceDetailPage() {
   // O que não tem volta é do admin: o plantão reinicia, mas não apaga a
   // configuração do cliente.
   const canMaintainDevice = can('devices.maintain')
-  const { t, formatDateTime, intlLocale } = useTranslation()
+  const { t, formatDateTime, formatDate: formatDay, intlLocale } = useTranslation()
   const toast = useToast()
   const loadingCtl = useLoading()
   const [isWanModalOpen, setIsWanModalOpen] = useState(false)
@@ -994,11 +994,7 @@ export default function DeviceDetailPage() {
 
   // An SGP due date is a plain YYYY-MM-DD; anchor it to local midnight so the
   // reader's locale, not UTC, decides the displayed day.
-  const invoiceDueDate = (value: string | null) => (
-    value
-      ? new Intl.DateTimeFormat(intlLocale, { dateStyle: 'short' }).format(new Date(`${value}T00:00:00`))
-      : '—'
-  )
+  const invoiceDueDate = (value: string | null) => (value ? formatDay(value) : '—')
 
   /* O selo de situação, calculado uma vez e usado nos dois lugares que o
      mostram: a faixa do topo e o bloco do SGP. Aguenta `sgpLink` nulo, então

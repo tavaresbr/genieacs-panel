@@ -158,7 +158,7 @@ const draftFrom = (template: WhatsAppTemplate) => ({
  * and the page only has to mount it.
  */
 export function TemplatesPanel() {
-  const { t, intlLocale } = useTranslation()
+  const { t, intlLocale, formatDateTime } = useTranslation()
   const toast = useToast()
 
   const [templates, setTemplates] = useState<WhatsAppTemplate[]>([])
@@ -218,11 +218,9 @@ export function TemplatesPanel() {
   const stamp = useCallback(
     (iso: string | null) => {
       if (!iso) return ''
-      const date = new Date(iso)
-      if (Number.isNaN(date.getTime())) return ''
-      return new Intl.DateTimeFormat(intlLocale, { dateStyle: 'short', timeStyle: 'short' }).format(date)
+      return formatDateTime(iso)
     },
-    [intlLocale]
+    [formatDateTime]
   )
 
   /**

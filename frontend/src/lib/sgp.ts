@@ -1,3 +1,4 @@
+import { formatDayPart, getActiveDateFormat, toDate } from '@/lib/date-format'
 import type { SgpContractLink, SgpContractState } from '@/lib/api'
 import type { TranslationKey } from '@/lib/i18n'
 
@@ -78,8 +79,10 @@ export function formatBrl(amount: number | null, intlLocale: string) {
 export function formatSgpDate(value: string | null | undefined, intlLocale: string) {
   if (!value) return '—'
   const texto = String(value).trim()
-  const data = /^\d{4}-\d{2}-\d{2}$/.test(texto) ? new Date(`${texto}T12:00:00`) : new Date(texto)
-  if (Number.isNaN(data.getTime())) return texto
+  const data = toDate(texto)
+  if (!data) return texto
+  // No formato escolhido em Configurações; em `auto`, o do idioma.
+  if (getActiveDateFormat() !== 'auto') return formatDayPart(data, getActiveDateFormat(), intlLocale)
   return new Intl.DateTimeFormat(intlLocale, { day: '2-digit', month: '2-digit', year: 'numeric' }).format(data)
 }
 

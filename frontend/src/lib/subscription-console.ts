@@ -1,3 +1,5 @@
+import { formatDayPart, getActiveDateFormat } from '@/lib/date-format'
+import { getIntlLocale } from '@/lib/i18n'
 import type {
   ChargeConsoleView,
   SubscriptionConsoleRow,
@@ -350,7 +352,7 @@ export function parseDay(value: string | null | undefined): Date | null {
 
 export function formatDay(value: string | null | undefined) {
   const date = parseDay(value)
-  return date ? date.toLocaleDateString() : '—'
+  return date ? formatDayPart(date, getActiveDateFormat(), getIntlLocale()) : '—'
 }
 
 /** A data de um prazo para preencher um `<input type="date">`, ou vazio. */

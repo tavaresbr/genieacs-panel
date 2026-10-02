@@ -2426,6 +2426,10 @@ export const settingsAPI = {
   getAll: () =>
     apiClient.get('/settings'),
 
+  /** O que muda como o painel se desenha para toda a equipe (hoje, o formato da data). Só pede sessão. */
+  display: () =>
+    apiClient.get<{ dateFormat: string }>('/settings/display'),
+
   get: (key: string) =>
     apiClient.get(`/settings/${key}`),
 
