@@ -23,6 +23,7 @@ import { TemplatesPanel } from '@/components/whatsapp/templates-panel'
 import { OptOutPanel } from '@/components/whatsapp/opt-out-panel'
 import { BotReportPanel } from '@/components/whatsapp/bot-report-panel'
 import { SatisfactionPanel } from '@/components/whatsapp/satisfaction-panel'
+import { ResponseTimePanel } from '@/components/whatsapp/response-time-panel'
 import { MaintenancePanel } from '@/components/maintenance/maintenance-panel'
 import { AlertsPanel } from '@/components/whatsapp/alerts-panel'
 import { OutagePanel } from '@/components/outages/outage-panel'
@@ -1144,6 +1145,7 @@ export default function WhatsAppPage() {
         {tab === 'botReport' && (
           <div className="grid gap-8">
             <BotReportPanel />
+            <ResponseTimePanel />
             <SatisfactionPanel />
           </div>
         )}

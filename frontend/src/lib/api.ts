@@ -4279,6 +4279,25 @@ export interface BotConfig {
   distribution: { enabled: boolean }
 }
 
+/** Quanto o cliente espera por gente: `GET /whatsapp/response-time-report`. Tempos em segundos. */
+export interface ResponseTimeReport {
+  days: 7 | 30 | 90
+  timezone: string
+  /** Com horário de atendimento, os números principais contam só as esperas que começaram dentro dele. */
+  hoursEnabled: boolean
+  answered: number
+  medianSeconds: number | null
+  p90Seconds: number | null
+  averageSeconds: number | null
+  /** Fração respondida em até 5, 15 e 60 min. */
+  within: Array<{ seconds: number; rate: number | null }>
+  outsideHours: { answered: number; medianSeconds: number | null }
+  byAgent: Array<{ userId: number | null; name: string | null; answered: number; medianSeconds: number | null }>
+  /** 24 posições, pela hora em que o cliente começou a esperar. */
+  byHour: Array<{ answered: number; medianSeconds: number | null }>
+  waitingNow: { count: number; oldestSince: string | null }
+}
+
 /** A pesquisa de satisfação: `GET /whatsapp/satisfaction-report`. */
 export interface SatisfactionReport {
   days: 7 | 30 | 90
@@ -4340,6 +4359,9 @@ export const whatsappAPI = {
 
   getBotReport: (days: 7 | 30 | 90) =>
     apiClient.get<BotReport>(`/whatsapp/bot-report?days=${days}`),
+
+  getResponseTimeReport: (days: 7 | 30 | 90) =>
+    apiClient.get<ResponseTimeReport>(`/whatsapp/response-time-report?days=${days}`),
 
   getSatisfactionReport: (days: 7 | 30 | 90) =>
     apiClient.get<SatisfactionReport>(`/whatsapp/satisfaction-report?days=${days}`),
