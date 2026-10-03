@@ -2040,6 +2040,7 @@ const en = {
   "settings.whatsapp.test.license.ok": "Active.",
   "settings.whatsapp.test.license.required": "The server refuses everything for want of a licence. Activate it in its own manager: {detail}",
   "settings.whatsapp.test.adminKey.ok": "Accepted. Instances on the server: {detail}",
+  "settings.whatsapp.test.adminKey.okNoCount": "Accepted.",
   "settings.whatsapp.test.adminKey.unauthorized": "The server refused the stored admin key.",
   "settings.whatsapp.test.adminKey.httpError": "The server answered with an error ({detail}) to the instance listing.",
   "settings.whatsapp.test.roundTrip.reached": "Arrived: the address reaches this panel.",

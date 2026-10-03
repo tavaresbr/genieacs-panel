@@ -1921,6 +1921,7 @@ const de: Dictionary = {
   "settings.whatsapp.test.license.ok": "Aktiv.",
   "settings.whatsapp.test.license.required": "Der Server verweigert mangels Lizenz alles. Im eigenen Manager aktivieren: {detail}",
   "settings.whatsapp.test.adminKey.ok": "Akzeptiert. Instanzen auf dem Server: {detail}",
+  "settings.whatsapp.test.adminKey.okNoCount": "Akzeptiert.",
   "settings.whatsapp.test.adminKey.unauthorized": "Der Server hat den gespeicherten Admin-Schlüssel abgelehnt.",
   "settings.whatsapp.test.adminKey.httpError": "Der Server antwortete mit einem Fehler ({detail}) auf die Instanzliste.",
   "settings.whatsapp.test.roundTrip.reached": "Angekommen: die Adresse erreicht dieses Panel.",

@@ -151,7 +151,13 @@ export function toneOf(passo: string, veredito: string): TestTone {
 
 /** O texto de um passo, com o detalhe quando ele acrescenta alguma coisa. */
 function textOf(step: WhatsAppTestStepResult, t: Translate): string {
-  const chave = PHRASE[`${step.passo}.${step.veredito}`]
+  // A chave aceita sem contagem: no servidor da plataforma o total é dos
+  // números de todos os provedores, e o backend não o manda.
+  const semContagem = step.passo === 'adminKey' && step.veredito === 'ok'
+    && (step.detalhe === null || step.detalhe === undefined)
+  const chave = semContagem
+    ? 'settings.whatsapp.test.adminKey.okNoCount'
+    : PHRASE[`${step.passo}.${step.veredito}`]
   // Veredito que este frontend não conhece — um backend mais novo, por exemplo.
   // Mostrar o código cru é pouco, e é mais do que uma célula vazia.
   if (!chave) return step.veredito

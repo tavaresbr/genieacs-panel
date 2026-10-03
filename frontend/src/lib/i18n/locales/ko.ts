@@ -2042,6 +2042,7 @@ const ko: Dictionary = {
   "settings.whatsapp.test.license.ok": "활성입니다.",
   "settings.whatsapp.test.license.required": "라이선스가 없어 서버가 모든 것을 거부합니다. 서버 자체 매니저에서 활성화하세요: {detail}",
   "settings.whatsapp.test.adminKey.ok": "수락되었습니다. 서버의 인스턴스: {detail}",
+  "settings.whatsapp.test.adminKey.okNoCount": "수락되었습니다.",
   "settings.whatsapp.test.adminKey.unauthorized": "서버가 저장된 관리자 키를 거부했습니다.",
   "settings.whatsapp.test.adminKey.httpError": "인스턴스 목록 요청에 서버가 오류({detail})로 응답했습니다.",
   "settings.whatsapp.test.roundTrip.reached": "도달했습니다: 이 주소는 이 패널에 닿습니다.",

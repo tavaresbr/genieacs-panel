@@ -2038,6 +2038,7 @@ const ptBR: Dictionary = {
   "settings.whatsapp.test.license.ok": "Ativa.",
   "settings.whatsapp.test.license.required": "O servidor recusa tudo por falta de licença. Ative no manager dele: {detail}",
   "settings.whatsapp.test.adminKey.ok": "Aceita. Instâncias no servidor: {detail}",
+  "settings.whatsapp.test.adminKey.okNoCount": "Aceita.",
   "settings.whatsapp.test.adminKey.unauthorized": "O servidor recusou a chave admin salva.",
   "settings.whatsapp.test.adminKey.httpError": "O servidor respondeu com erro ({detail}) à listagem de instâncias.",
   "settings.whatsapp.test.roundTrip.reached": "Chegou: o endereço alcança este painel.",

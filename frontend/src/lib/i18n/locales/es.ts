@@ -2038,6 +2038,7 @@ const es: Dictionary = {
   "settings.whatsapp.test.license.ok": "Activa.",
   "settings.whatsapp.test.license.required": "El servidor rechaza todo por falta de licencia. Actívala en su propio manager: {detail}",
   "settings.whatsapp.test.adminKey.ok": "Aceptada. Instancias en el servidor: {detail}",
+  "settings.whatsapp.test.adminKey.okNoCount": "Aceptada.",
   "settings.whatsapp.test.adminKey.unauthorized": "El servidor rechazó la clave admin guardada.",
   "settings.whatsapp.test.adminKey.httpError": "El servidor respondió con error ({detail}) al listado de instancias.",
   "settings.whatsapp.test.roundTrip.reached": "Llegó: la dirección alcanza este panel.",

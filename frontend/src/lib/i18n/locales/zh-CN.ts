@@ -2038,6 +2038,7 @@ const zhCN: Dictionary = {
   "settings.whatsapp.test.license.ok": "有效。",
   "settings.whatsapp.test.license.required": "服务器因缺少许可证而拒绝一切。请在其自带的 manager 中激活：{detail}",
   "settings.whatsapp.test.adminKey.ok": "已接受。服务器上的实例数：{detail}",
+  "settings.whatsapp.test.adminKey.okNoCount": "已接受。",
   "settings.whatsapp.test.adminKey.unauthorized": "服务器拒绝了已保存的管理密钥。",
   "settings.whatsapp.test.adminKey.httpError": "服务器对实例列表请求返回了错误（{detail}）。",
   "settings.whatsapp.test.roundTrip.reached": "已抵达：该地址能到达本面板。",

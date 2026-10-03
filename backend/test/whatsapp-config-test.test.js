@@ -1,4 +1,4 @@
-import { after, before, beforeEach, describe, it } from 'node:test';
+import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { asTenant, authHeaders, call, getDb, startTestServers, stopTestServers } from './helpers/harness.js';
@@ -174,6 +174,8 @@ describe('a configuração inteira certa', () => {
     assert.equal(detalhe(body, 'server'), 'v2');
     assert.equal(veredito(body, 'license'), 'ok');
     assert.equal(veredito(body, 'adminKey'), 'ok');
+    // Self-hosted: o servidor é do provedor, e a contagem é dele.
+    assert.equal(detalhe(body, 'adminKey'), 1);
     assert.equal(veredito(body, 'roundTrip'), 'reached');
     assert.equal(stub.adminKeyVisto, ADMIN_KEY, 'a listagem foi sem a chave admin salva');
   });
@@ -410,6 +412,47 @@ describe('o painel e o servidor comparados', () => {
       !JSON.stringify(body).includes('nome-que-nao-pode-vazar'),
       'o nome da instância apareceu na resposta'
     );
+  });
+
+  describe('com o servidor da PLATAFORMA (SaaS)', () => {
+    /**
+     * Na SaaS a chave admin é da plataforma e o servidor é de todos os
+     * provedores. Aqui o `getConfig` é trocado pelo mesmo resultado com
+     * `platformManaged` ligado — é só essa marca que o diagnóstico lê, e o
+     * resto do caminho (servidor, listagem, comparação) roda inteiro.
+     */
+    let getConfigReal;
+    beforeEach(() => {
+      getConfigReal = WhatsAppConfigService.getConfig;
+      WhatsAppConfigService.getConfig = async function () {
+        return { ...(await getConfigReal.call(this)), platformManaged: true };
+      };
+    });
+    afterEach(() => {
+      WhatsAppConfigService.getConfig = getConfigReal;
+    });
+
+    it('a chave aceita sai SEM a contagem de instâncias do servidor', async () => {
+      stub.listBody = [
+        { name: 'de-outro-provedor-1', connectionStatus: 'open' },
+        { name: 'de-outro-provedor-2', connectionStatus: 'open' },
+        { name: 'de-outro-provedor-3', connectionStatus: 'open' }
+      ];
+      const { body } = await testar();
+      assert.equal(veredito(body, 'adminKey'), 'ok');
+      assert.equal(detalhe(body, 'adminKey'), null, 'a contagem do servidor compartilhado vazou');
+      // Os números dos outros não são "órfãs" deste provedor.
+      assert.equal(veredito(body, 'instances'), 'ok');
+      assert.equal(detalhe(body, 'instances'), 0);
+    });
+
+    it('a metade que é deste provedor — FALTANDO — continua conferida', async () => {
+      stub.listBody = [{ name: 'de-outro-provedor', connectionStatus: 'open' }];
+      await conta('painel-fantasma');
+      const { body } = await testar();
+      assert.equal(veredito(body, 'instances'), 'missing', 'virou "both" por causa do vizinho');
+      assert.equal(detalhe(body, 'instances'), 1);
+    });
   });
 
   it('sem chave admin aceita, o passo não afirma nada', async () => {

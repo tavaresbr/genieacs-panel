@@ -2018,6 +2018,7 @@ const ar: Dictionary = {
   "settings.whatsapp.test.license.ok": "نشط.",
   "settings.whatsapp.test.license.required": "يرفض الخادم كل شيء لغياب الترخيص. فعّله من مدير الخادم نفسه: {detail}",
   "settings.whatsapp.test.adminKey.ok": "مقبول. عدد النسخ على الخادم: {detail}",
+  "settings.whatsapp.test.adminKey.okNoCount": "مقبول.",
   "settings.whatsapp.test.adminKey.unauthorized": "رفض الخادم مفتاح المشرف المحفوظ.",
   "settings.whatsapp.test.adminKey.httpError": "استجاب الخادم بخطأ ({detail}) لطلب قائمة النسخ.",
   "settings.whatsapp.test.roundTrip.reached": "وصل: العنوان يبلغ هذه اللوحة.",
