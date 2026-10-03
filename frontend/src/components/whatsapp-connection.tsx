@@ -69,6 +69,7 @@ const ERROR_KEYS: Record<string, TranslationKey> = {
   meta_header_mismatch: 'whatsapp.error.metaHeaderMismatch',
   meta_button_mismatch: 'whatsapp.error.metaButtonMismatch',
   meta_header_missing: 'whatsapp.error.metaHeaderMissing',
+  invalid_meta_template: 'whatsapp.error.invalidMetaTemplate',
   // Both reachable only from the inbox, and both were missing until the screen
   // that provokes them was built: an unknown code degrades to the generic
   // failure, which is not wrong but tells the operator nothing.

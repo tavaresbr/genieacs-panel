@@ -3745,6 +3745,23 @@ export interface WhatsAppMetaTemplate {
   syncedAt: string | null
 }
 
+/**
+ * Um modelo novo para a Meta revisar. Só o que o painel sabe enviar depois:
+ * cabeçalho de texto sem variável, corpo com `{{1}}`, `{{2}}`… posicionais (um
+ * exemplo por variável, exigência da revisão) e botões de URL fixa ou resposta
+ * rápida.
+ */
+export interface MetaTemplateCreatePayload {
+  name: string
+  category: 'UTILITY' | 'MARKETING'
+  language: string
+  bodyText: string
+  examples: string[]
+  headerText?: string
+  footerText?: string
+  buttons: { type: 'URL' | 'QUICK_REPLY'; text: string; url?: string }[]
+}
+
 export type MetaNoticeKey = 'maintenance' | 'outage' | 'alert'
 export type MetaNoticeBindings = Record<MetaNoticeKey, { name: string; language: string; paramCount: number } | null>
 
@@ -4504,6 +4521,10 @@ export const whatsappAPI = {
       metaToken,
       ...(adminKey ? { adminKey } : {})
     }),
+
+  /** Sai PENDING: a Meta revisa, e só a sincronização depois da aprovação o libera. */
+  createMetaTemplate: (accountId: number, payload: MetaTemplateCreatePayload) =>
+    apiClient.post<WhatsAppMetaTemplate>(`/whatsapp/accounts/${accountId}/templates`, payload),
 
   listMetaTemplates: (params: { accountId?: number; usable?: boolean } = {}) => {
     const query = new URLSearchParams()

@@ -186,6 +186,19 @@ class WhatsAppController {
     }
   }
 
+  /**
+   * Pede à Meta um modelo novo no número oficial. Sai PENDING: a Meta revisa,
+   * e só uma sincronização depois da aprovação o deixa utilizável.
+   */
+  static async createMetaTemplate(req, res) {
+    try {
+      const template = await WaMetaTemplateService.create(req.params?.id, req.body ?? {});
+      return res.status(201).json(createResponse(req.t('whatsapp.metaTemplates.created'), template));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.metaTemplates.createFailed');
+    }
+  }
+
   static async listMetaTemplates(req, res) {
     try {
       const templates = await WaMetaTemplateService.list({

@@ -317,12 +317,14 @@ Recibos da Meta chegam como `SENT`/`DELIVERED`/`READ` e são lidos como os do Ba
 
 #### Modelos aprovados da Meta
 
-O painel não cria modelo na Meta; o provedor cria e aprova no Gerenciador do
-WhatsApp, e o painel **sincroniza** a lista (`wa_meta_templates`, por número).
+O painel **sincroniza** a lista da Meta (`wa_meta_templates`, por número) e
+pode **pedir** modelos novos; quem aprova é sempre a Meta (pelo painel ou pelo
+Gerenciador do WhatsApp, o resultado é o mesmo).
 
 | rota | permissão | o que faz |
 | --- | --- | --- |
 | `POST /api/whatsapp/accounts/:id/templates/sync` | `whatsapp.config` | busca em `GET /template/find/{instância}` e troca a cópia local (o que sumiu da Meta some daqui) |
+| `POST /api/whatsapp/accounts/:id/templates` | `whatsapp.config` | cria o modelo em `POST /template/create/{instância}` e sincroniza; responde 201 com o modelo (`PENDING`) |
 | `GET /api/whatsapp/meta-templates?accountId=&usable=1` | `whatsapp.read` | lista; `usable` = `APPROVED` e formato suportado |
 | `GET/PUT /api/whatsapp/meta-notice-bindings` | `campaigns.read` / `campaigns.manage` | modelo de cada aviso automático (`maintenance`, `outage`, `alert`) |
 
@@ -343,6 +345,36 @@ Cada modelo sincronizado traz `headerFormat` (`NONE`, `TEXT`, `IMAGE`,
 (`header_format`, `header_param_count`, `buttons_json` — migration `0091`).
 Uma cópia sincronizada antes da `0091` continua "não suportada" até a próxima
 sincronização.
+
+**Criar.** Corpo da rota:
+
+```json
+{
+  "name": "aviso_fatura", "category": "UTILITY", "language": "pt_BR",
+  "headerText": "Sua fatura", "bodyText": "Olá {{1}}, vence {{2}}.",
+  "examples": ["Ana", "10/10"], "footerText": "Provedor",
+  "buttons": [{ "type": "URL", "text": "Pagar", "url": "https://..." }, { "type": "QUICK_REPLY", "text": "Já paguei" }]
+}
+```
+
+Só o formato que o painel sabe enviar depois — o modelo criado aqui sai
+`supported`. A ordem das recusas: conta (`account_not_found` 404,
+`meta_templates_cloud_only` 409), depois o corpo (`invalid_meta_template` 400,
+com o campo em `{field}` na mensagem), e só então a rede. Regras: nome
+normalizado (minúsculas, espaço → `_`, `^[a-z0-9_]{1,512}$`); categoria
+`UTILITY` ou `MARKETING` (AUTHENTICATION fora); idioma `xx` ou `xx_YY` (padrão
+`pt_BR`); corpo de 1 a 1024; variáveis só `{{n}}` de 1 até o maior, sem pulo;
+um exemplo não vazio por variável; cabeçalho e rodapé até 60, cabeçalho sem
+variável; até 3 botões de texto até 25, URL só `https://` e fixa.
+
+O servidor recebe o formato da Graph API (`components` HEADER/BODY/FOOTER/
+BUTTONS, `example.body_text` só quando há variável, `allowCategoryChange:
+true`). A recusa da Meta volta como `http_error` (502) com o corpo dela na
+mensagem — o formulário mostra esse texto. Depois de aceitar, o painel
+sincroniza; se a sincronização falhar, devolve o mínimo (`id: null`, `status`
+da resposta da Meta ou `PENDING`, `metaId`) e a próxima sincronização traz a
+linha. O modelo só fica `usable` quando a Meta aprova e uma sincronização
+traz o `APPROVED`.
 
 **Ligações.**
 
