@@ -1,4 +1,5 @@
 import WaMetaTemplateService from '../services/waMetaTemplateService.js';
+import WaMetaUsageService from '../services/waMetaUsageService.js';
 import WaBillingService from '../services/waBillingService.js';
 import WaBroadcastService from '../services/waBroadcastService.js';
 import WaTemplateService from '../services/waTemplateService.js';
@@ -106,7 +107,9 @@ class WhatsAppBillingController {
         category: body.category,
         metaTemplateName: body.metaTemplateName,
         metaLanguage: body.metaLanguage,
-        metaParams: body.metaParams
+        metaParams: body.metaParams,
+        metaHeader: body.metaHeader,
+        metaButtonParam: body.metaButtonParam
       });
       return res.status(201).json(createResponse(req.t('whatsapp.templates.created'), template));
     } catch (error) {
@@ -124,7 +127,9 @@ class WhatsAppBillingController {
         active: body.active,
         metaTemplateName: body.metaTemplateName,
         metaLanguage: body.metaLanguage,
-        metaParams: body.metaParams
+        metaParams: body.metaParams,
+        metaHeader: body.metaHeader,
+        metaButtonParam: body.metaButtonParam
       });
       return res.json(createResponse(req.t('whatsapp.templates.updated'), template));
     } catch (error) {
@@ -145,6 +150,34 @@ class WhatsAppBillingController {
     try {
       const saved = await WaMetaTemplateService.saveNoticeBindings(req.body ?? {});
       return res.json(createResponse(req.t('whatsapp.metaTemplates.bindingsSaved'), saved));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.templates.saveFailed');
+    }
+  }
+
+  // ── Uso dos modelos da Meta ──────────────────────────────────────────
+
+  static async getMetaUsage(req, res) {
+    try {
+      const report = await WaMetaUsageService.report({ months: Number(req.query.months) || 6 });
+      return res.json(createResponse(req.t('whatsapp.metaUsage.loaded'), report));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.metaUsage.loadFailed');
+    }
+  }
+
+  static async getMetaPrices(req, res) {
+    try {
+      return res.json(createResponse(req.t('whatsapp.metaUsage.loaded'), await WaMetaUsageService.getPrices()));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.metaUsage.loadFailed');
+    }
+  }
+
+  static async saveMetaPrices(req, res) {
+    try {
+      const saved = await WaMetaUsageService.savePrices(req.body ?? {});
+      return res.json(createResponse(req.t('whatsapp.metaUsage.pricesSaved'), saved));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.templates.saveFailed');
     }

@@ -1884,6 +1884,35 @@ const WA_META_TEMPLATE_COLUMN_TABLES = [
   ['wa_broadcast_recipients', WA_RECIPIENT_META_COLUMNS]
 ];
 
+/**
+ * Cabeçalho e botões dos modelos da Meta (0091).
+ *
+ * Na cópia sincronizada: o formato do cabeçalho (`NONE`, `TEXT`, `IMAGE`,
+ * `VIDEO`, `DOCUMENT`, `LOCATION`), quantas variáveis o cabeçalho de texto tem
+ * e a lista dos botões (`[{index, type, urlHasParam}]`).
+ *
+ * Na ligação do modelo do painel: de onde vem o cabeçalho
+ * (`{source: 'attachment'|'variable'|'url', value, type}`), qual variável
+ * preenche o sufixo da URL do botão dinâmico e o índice desse botão no modelo
+ * — a Meta identifica o botão pela posição.
+ */
+const WA_META_TEMPLATE_MEDIA_COLUMNS = [
+  ['header_format', (t) => t.string('header_format', 12)],
+  ['header_param_count', (t) => t.integer('header_param_count').notNullable().defaultTo(0)],
+  ['buttons_json', (t) => t.text('buttons_json')]
+];
+
+const WA_TEMPLATE_META_MEDIA_COLUMNS = [
+  ['meta_header', (t) => t.text('meta_header')],
+  ['meta_button_param', (t) => t.string('meta_button_param', 64)],
+  ['meta_button_index', (t) => t.integer('meta_button_index')]
+];
+
+const WA_META_MEDIA_COLUMN_TABLES = [
+  ['wa_meta_templates', WA_META_TEMPLATE_MEDIA_COLUMNS],
+  ['wa_templates', WA_TEMPLATE_META_MEDIA_COLUMNS]
+];
+
 const SATISFACTION_TABLES = [
   ['wa_satisfaction', waSatisfactionTable]
 ];
@@ -5328,6 +5357,31 @@ export const migrations = [
       for (const [nome, construtor] of BILLING_INVOICE_TABLES) {
         // eslint-disable-next-line no-await-in-loop
         await createTableIfMissing(db, nome, construtor(db));
+      }
+    }
+  },
+  {
+    /**
+     * Cabeçalho de mídia e botão de URL dinâmica nos modelos da Meta — ver
+     * `WA_META_TEMPLATE_MEDIA_COLUMNS`. A cópia antiga fica com o formato vazio
+     * e continua "não suportada" até a próxima sincronização.
+     */
+    id: '0095_wa_meta_template_media',
+    async isApplied(db) {
+      for (const [table, columns] of WA_META_MEDIA_COLUMN_TABLES) {
+        if (!(await db.schema.hasTable(table))) continue;
+        if ((await missingColumns(db, table, columns)).length) return false;
+      }
+      return true;
+    },
+    async up(db) {
+      for (const [table, columns] of WA_META_MEDIA_COLUMN_TABLES) {
+        if (!(await db.schema.hasTable(table))) continue;
+        const missing = await missingColumns(db, table, columns);
+        if (!missing.length) continue;
+        await db.schema.alterTable(table, (t) => {
+          for (const add of missing) add(t);
+        });
       }
     }
   }

@@ -3905,8 +3905,31 @@ export interface WhatsAppTemplate {
   metaLanguage?: string | null
   /** Nossas variáveis, na ordem de `{{1}}`, `{{2}}`… (`texto` = o texto inteiro). */
   metaParams?: string[]
+  /** De onde vem o cabeçalho do modelo da Meta (mídia ou texto com variável). */
+  metaHeader?: MetaHeaderBinding | null
+  /** A variável que completa a URL do botão dinâmico do modelo da Meta. */
+  metaButtonParam?: string | null
   createdAt: string | null
   updatedAt: string | null
+}
+
+/**
+ * A origem do cabeçalho na ligação de um modelo do painel: o anexo da
+ * campanha, uma variável (o link, ex. `link_boleto`, ou o texto do cabeçalho)
+ * ou uma URL https fixa.
+ */
+export interface MetaHeaderBinding {
+  source: 'attachment' | 'variable' | 'url'
+  value: string | null
+}
+
+export type MetaHeaderFormat = 'NONE' | 'TEXT' | 'IMAGE' | 'VIDEO' | 'DOCUMENT' | 'LOCATION' | 'UNKNOWN'
+
+/** Um botão do modelo; `urlHasParam` = URL com `{{1}}`, que pede o sufixo no envio. */
+export interface WhatsAppMetaTemplateButton {
+  index: number
+  type: string
+  urlHasParam: boolean
 }
 
 /** Um modelo (template) da conta WABA de um número oficial, sincronizado da Meta. */
@@ -3920,20 +3943,96 @@ export interface WhatsAppMetaTemplate {
   bodyText: string
   paramCount: number
   paramFormat: 'positional' | 'named'
+  headerFormat: MetaHeaderFormat
+  /** Variáveis no cabeçalho de texto (no máximo 1). */
+  headerParamCount: number
+  buttons: WhatsAppMetaTemplateButton[]
   supported: boolean
   /** Aprovado e com formato que o painel sabe enviar. */
   usable: boolean
   syncedAt: string | null
 }
 
+/**
+ * Um modelo novo para a Meta revisar. Só o que o painel sabe enviar depois:
+ * cabeçalho de texto sem variável, corpo com `{{1}}`, `{{2}}`… posicionais (um
+ * exemplo por variável, exigência da revisão) e botões de URL fixa ou resposta
+ * rápida.
+ */
+export interface MetaTemplateCreatePayload {
+  name: string
+  category: 'UTILITY' | 'MARKETING'
+  language: string
+  bodyText: string
+  examples: string[]
+  headerText?: string
+  footerText?: string
+  buttons: { type: 'URL' | 'QUICK_REPLY'; text: string; url?: string }[]
+}
+
 export type MetaNoticeKey = 'maintenance' | 'outage' | 'alert'
 export type MetaNoticeBindings = Record<MetaNoticeKey, { name: string; language: string; paramCount: number } | null>
+
+/** Os períodos do relatório de modelos da Meta, em meses (o corrente incluso). */
+export type MetaUsagePeriod = 3 | 6 | 12
+/** As categorias que a Meta cobra. `UNKNOWN` só aparece no relatório. */
+export type MetaPriceCategory = 'MARKETING' | 'UTILITY' | 'AUTHENTICATION' | 'SERVICE'
+/** Preço por mensagem, em reais, que o provedor digitou; `null` = não digitou. */
+export type MetaPrices = Record<MetaPriceCategory, number | null>
+
+export interface MetaUsageCount {
+  /** Aceitos pela Meta, por categoria (sent/delivered/read). */
+  byCategory: Record<string, number>
+  total: number
+  /** Recusados pela Meta depois do aceite; fora da estimativa. */
+  failed: number
+}
+
+export interface MetaUsageMonth extends MetaUsageCount {
+  /** `YYYY-MM`, no fuso do servidor. */
+  month: string
+}
+
+export interface MetaUsageTemplate {
+  name: string
+  language: string
+  category: string
+  count: number
+  failed: number
+}
+
+export interface MetaUsageAccount extends MetaUsageCount {
+  accountId: number | null
+  label: string | null
+  name: string | null
+}
+
+/** Modelos da Meta enviados pelo painel, por mês e categoria. */
+export interface MetaUsageReport {
+  months: MetaUsagePeriod
+  since: string
+  /** O fuso do servidor, onde o mês vira. */
+  timezone: string | null
+  /** O teto de linhas lidas foi atingido; os números estão incompletos. */
+  truncated: boolean
+  categories: string[]
+  monthly: MetaUsageMonth[]
+  totals: MetaUsageCount
+  templates: MetaUsageTemplate[]
+  accounts: MetaUsageAccount[]
+  prices: MetaPrices
+  estimate: { byCategory: Partial<Record<MetaPriceCategory, number>>; total: number; currency: 'BRL' } | null
+}
 
 /** O modelo da Meta de um envio: nome, idioma e os parâmetros já preenchidos. */
 export interface MetaTemplatePayload {
   name: string
   language: string
   params: string[]
+  /** Mídia por link https, ou o texto do cabeçalho com a sua variável. */
+  header?: { type: 'image' | 'video' | 'document'; link: string; filename?: string } | { type: 'text'; params: string[] }
+  /** O sufixo de cada botão de URL dinâmica, pelo índice do botão no modelo. */
+  buttons?: { index: number; param: string }[]
 }
 
 export interface WhatsAppOptOut {
@@ -4673,6 +4772,8 @@ export const whatsappAPI = {
     metaTemplateName?: string
     metaLanguage?: string
     metaParams?: string[]
+    metaHeader?: MetaHeaderBinding | null
+    metaButtonParam?: string | null
   }) =>
     apiClient.post<WhatsAppTemplate>('/whatsapp/templates', payload),
 
@@ -4684,12 +4785,27 @@ export const whatsappAPI = {
     metaTemplateName: string
     metaLanguage: string
     metaParams: string[]
+    metaHeader: MetaHeaderBinding | null
+    metaButtonParam: string | null
   }>) =>
     apiClient.put<WhatsAppTemplate>(`/whatsapp/templates/${id}`, patch),
 
   // ── Modelos aprovados da Meta (número oficial) ───────────────────────
   syncMetaTemplates: (accountId: number) =>
     apiClient.post<WhatsAppMetaTemplate[]>(`/whatsapp/accounts/${accountId}/templates/sync`, {}),
+
+  // Token da Meta vencido ou revogado: o servidor recria a instância com o
+  // mesmo nome e o mesmo webhook. A chave admin só vai no self-host — num
+  // servidor gerenciado ela é da configuração, e nem aparece na tela.
+  updateMetaToken: (id: number, metaToken: string, adminKey?: string) =>
+    apiClient.post<{ account: WhatsAppAccount }>(`/whatsapp/accounts/${id}/meta-token`, {
+      metaToken,
+      ...(adminKey ? { adminKey } : {})
+    }),
+
+  /** Sai PENDING: a Meta revisa, e só a sincronização depois da aprovação o libera. */
+  createMetaTemplate: (accountId: number, payload: MetaTemplateCreatePayload) =>
+    apiClient.post<WhatsAppMetaTemplate>(`/whatsapp/accounts/${accountId}/templates`, payload),
 
   listMetaTemplates: (params: { accountId?: number; usable?: boolean } = {}) => {
     const query = new URLSearchParams()
@@ -4704,6 +4820,15 @@ export const whatsappAPI = {
 
   saveMetaNoticeBindings: (bindings: Partial<Record<MetaNoticeKey, { name: string; language: string } | null>>) =>
     apiClient.put<MetaNoticeBindings>('/whatsapp/meta-notice-bindings', bindings),
+
+  getMetaUsage: (months: MetaUsagePeriod) =>
+    apiClient.get<MetaUsageReport>(`/whatsapp/meta-usage?months=${months}`),
+
+  getMetaPrices: () =>
+    apiClient.get<MetaPrices>('/whatsapp/meta-prices'),
+
+  saveMetaPrices: (prices: Partial<Record<MetaPriceCategory, number | string | null>>) =>
+    apiClient.put<MetaPrices>('/whatsapp/meta-prices', prices),
 
   deleteTemplate: (id: number) =>
     apiClient.delete(`/whatsapp/templates/${id}`),

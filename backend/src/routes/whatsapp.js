@@ -44,6 +44,13 @@ router.get('/accounts/:id/qr', authenticateToken, requirePermission('whatsapp.co
 // Modelos aprovados da Meta (número oficial): buscar na Meta é configuração;
 // listar serve a quem responde fora da janela de 24 h.
 router.post('/accounts/:id/templates/sync', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.syncMetaTemplates);
+// Token da Meta vencido ou revogado: a instância é recriada no servidor com o
+// mesmo nome e o mesmo webhook, só com o token novo.
+router.post('/accounts/:id/meta-token', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.updateMetaToken);
+// Criar pede a mesma permissão da sincronização: o modelo vai para a conta
+// WABA do número (custo por categoria, nota de qualidade, revisão da Meta) —
+// é configuração do número, não campanha.
+router.post('/accounts/:id/templates', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.createMetaTemplate);
 router.get('/meta-templates', authenticateToken, requirePermission('whatsapp.read'), WhatsAppController.listMetaTemplates);
 router.get('/accounts/:id/status', authenticateToken, requirePermission('whatsapp.read'), WhatsAppController.getStatus);
 router.post('/accounts/:id/restart', authenticateToken, requirePermission('whatsapp.config'), WhatsAppController.restartAccount);

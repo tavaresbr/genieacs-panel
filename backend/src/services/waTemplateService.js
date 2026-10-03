@@ -39,6 +39,16 @@ export function variaveisDaCategoria(category) {
   return VARIAVEIS_DE_COBRANCA;
 }
 
+function lerHeaderMeta(raw) {
+  if (!raw) return null;
+  try {
+    const h = JSON.parse(raw);
+    return h && typeof h === 'object' ? { source: String(h.source ?? ''), value: h.value ?? null } : null;
+  } catch {
+    return null;
+  }
+}
+
 function lerParamsMeta(raw) {
   if (!raw) return [];
   try {
@@ -73,10 +83,10 @@ class WaTemplateService {
     return rows.map((row) => this.publicTemplate(row));
   }
 
-  static async create({ name, body, category, metaTemplateName, metaLanguage, metaParams } = {}) {
+  static async create({ name, body, category, metaTemplateName, metaLanguage, metaParams, metaHeader, metaButtonParam } = {}) {
     const clean = this.validate({ name, body, category });
     const meta = await WaMetaTemplateService.validateMapping(
-      { metaTemplateName, metaLanguage, metaParams }, variaveisDaCategoria(clean.category)
+      { metaTemplateName, metaLanguage, metaParams, metaHeader, metaButtonParam }, variaveisDaCategoria(clean.category)
     );
     if (await WaTemplate.getByName(clean.name)) {
       throw new WaError('whatsapp.templates.nameTaken', { code: 'name_taken', status: 409 });
@@ -111,7 +121,9 @@ class WaTemplateService {
       meta = await WaMetaTemplateService.validateMapping({
         metaTemplateName: existing.meta_template_name,
         metaLanguage: existing.meta_language,
-        metaParams: JSON.parse(existing.meta_params || '[]')
+        metaParams: JSON.parse(existing.meta_params || '[]'),
+        metaHeader: lerHeaderMeta(existing.meta_header),
+        metaButtonParam: existing.meta_button_param
       }, variaveisDaCategoria(merged.category));
     }
     return this.publicTemplate(await WaTemplate.update(existing.id, {
@@ -227,6 +239,9 @@ class WaTemplateService {
       metaTemplateName: row.meta_template_name || null,
       metaLanguage: row.meta_language || null,
       metaParams: lerParamsMeta(row.meta_params),
+      // De onde vem o cabeçalho de mídia/texto e a variável do botão dinâmico.
+      metaHeader: lerHeaderMeta(row.meta_header),
+      metaButtonParam: row.meta_button_param || null,
       createdAt: row.created_at || null,
       updatedAt: row.updated_at || null
     };

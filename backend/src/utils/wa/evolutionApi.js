@@ -422,19 +422,132 @@ export function findMetaTemplatesRequest(name) {
 }
 
 /**
+ * Pede à Meta (pelo servidor Evolution) um modelo novo na conta WABA do número.
+ *
+ * O servidor repassa o corpo à Graph API (`POST /{waba}/message_templates`)
+ * quase sem tocar, então o formato é o da Meta: `components` com HEADER, BODY,
+ * FOOTER e BUTTONS, nessa ordem. Só o que o painel sabe ENVIAR depois entra
+ * aqui — cabeçalho de texto sem variável, corpo com `{{n}}` posicionais e
+ * botões sem URL dinâmica —, para o modelo criado aqui sair `supported` na
+ * sincronização em vez de ficar visível e inútil.
+ *
+ * `example.body_text` é obrigatório na Meta quando o corpo tem variável (a
+ * revisão recusa sem exemplo) e proibido quando não tem; vai uma linha só, com
+ * um valor por variável. `allowCategoryChange` deixa a Meta reclassificar
+ * (UTILITY que parece promoção vira MARKETING) em vez de recusar o modelo.
+ *
+ * Recebe o modelo já validado (`validateMetaTemplateInput`): o builder não
+ * confere nada, só monta.
+ *
+ * @param {string} instanceName
+ * @param {{ name: string, category: string, language: string, bodyText: string,
+ *           examples?: string[], headerText?: string, footerText?: string,
+ *           buttons?: { type: 'URL'|'QUICK_REPLY', text: string, url?: string }[] }} t
+ * @returns {EvoRequest}
+ */
+export function createMetaTemplateRequest(instanceName, t) {
+  const components = [];
+  if (t.headerText) components.push({ type: 'HEADER', format: 'TEXT', text: t.headerText });
+  const corpo = { type: 'BODY', text: t.bodyText };
+  const examples = Array.isArray(t.examples) ? t.examples : [];
+  if (/\{\{\s*\d+\s*\}\}/.test(String(t.bodyText ?? '')) && examples.length) {
+    corpo.example = { body_text: [examples.map((v) => String(v))] };
+  }
+  components.push(corpo);
+  if (t.footerText) components.push({ type: 'FOOTER', text: t.footerText });
+  const buttons = Array.isArray(t.buttons) ? t.buttons : [];
+  if (buttons.length) {
+    components.push({
+      type: 'BUTTONS',
+      buttons: buttons.map((b) => (b.type === 'URL'
+        ? { type: 'URL', text: b.text, url: b.url }
+        : { type: 'QUICK_REPLY', text: b.text }))
+    });
+  }
+  return {
+    path: `/template/create/${enc(instanceName)}`,
+    method: 'POST',
+    key: 'instance',
+    body: {
+      name: t.name,
+      category: t.category,
+      allowCategoryChange: true,
+      language: t.language,
+      components
+    }
+  };
+}
+
+/**
+ * O que a Meta devolve ao criar: `{ id, status, category }` — o status quase
+ * sempre PENDING (a revisão leva de minutos a horas), e a categoria pode vir
+ * trocada quando `allowCategoryChange` deixou a Meta reclassificar. O servidor
+ * ora repassa na raiz, ora embrulha em `data`; os dois servem.
+ *
+ * @returns {{ id: string|null, status: string|null, category: string|null }}
+ */
+export function readCreatedTemplate(data) {
+  const raw = data && typeof data === 'object' ? data : {};
+  const inner = raw.data && typeof raw.data === 'object' && !Array.isArray(raw.data) ? raw.data : null;
+  const pick = (campo) => {
+    const v = raw[campo] ?? inner?.[campo];
+    return v === undefined || v === null || v === '' ? null : String(v);
+  };
+  const status = pick('status');
+  const category = pick('category');
+  return {
+    id: pick('id'),
+    status: status ? status.toUpperCase() : null,
+    category: category ? category.toUpperCase() : null
+  };
+}
+
+/**
  * Envio de modelo aprovado — o único envio que a Meta aceita fora da janela de
  * 24 horas desde a última mensagem do cliente.
  *
- * Só parâmetros posicionais de corpo: `{{1}}`, `{{2}}`… na ordem de `params`.
- * Modelo sem variável vai sem `components`.
+ * Os componentes saem no formato da Cloud API, que o servidor repassa à Meta
+ * como recebe, nesta ordem:
+ *
+ *   - cabeçalho: mídia (`image`/`video`/`document`, por `link` — a Meta baixa
+ *     o arquivo) ou texto com a sua única variável;
+ *   - corpo: `{{1}}`, `{{2}}`… na ordem de `params`;
+ *   - botão de URL dinâmica: o sufixo que completa o `{{1}}` da URL, um por
+ *     botão, pelo `index` do botão no modelo (a Meta quer o índice em texto).
+ *
+ * Modelo sem variável nem mídia vai sem `components`. O que chega aqui já
+ * passou por `normalizeMetaHeader`/`normalizeMetaButtons`; o builder só
+ * descarta o que não conhece.
  *
  * @param {string} name instância
  * @param {string} number destino
- * @param {{ name: string, language: string, params: string[] }} t
+ * @param {{ name: string, language: string, params: string[],
+ *   header?: { type: 'image'|'video'|'document', link: string, filename?: string } | { type: 'text', params: string[] },
+ *   buttons?: { index: number, param: string }[] }} t
  * @returns {EvoRequest}
  */
 export function sendTemplateRequest(name, number, t) {
   const params = Array.isArray(t.params) ? t.params : [];
+  const components = [];
+  const header = t.header;
+  if (header && META_MEDIA_TYPES.has(header.type) && header.link) {
+    const midia = { link: String(header.link) };
+    if (header.type === 'document' && header.filename) midia.filename = String(header.filename);
+    components.push({ type: 'header', parameters: [{ type: header.type, [header.type]: midia }] });
+  } else if (header?.type === 'text' && Array.isArray(header.params) && header.params.length) {
+    components.push({ type: 'header', parameters: header.params.map((text) => ({ type: 'text', text: String(text) })) });
+  }
+  if (params.length) {
+    components.push({ type: 'body', parameters: params.map((text) => ({ type: 'text', text: String(text) })) });
+  }
+  for (const b of Array.isArray(t.buttons) ? t.buttons : []) {
+    components.push({
+      type: 'button',
+      sub_type: 'url',
+      index: String(b.index),
+      parameters: [{ type: 'text', text: String(b.param) }]
+    });
+  }
   return {
     path: `/message/sendTemplate/${enc(name)}`,
     method: 'POST',
@@ -443,11 +556,87 @@ export function sendTemplateRequest(name, number, t) {
       number,
       name: t.name,
       language: t.language,
-      components: params.length
-        ? [{ type: 'body', parameters: params.map((text) => ({ type: 'text', text: String(text) })) }]
-        : []
+      components
     }
   };
+}
+
+/** Os tipos de mídia que um cabeçalho de modelo aceita por `link`. */
+const META_MEDIA_TYPES = new Set(['image', 'video', 'document']);
+/** Até onde vai um link de mídia ou um nome de arquivo no cabeçalho. */
+const META_LINK_MAX = 1024;
+const META_FILENAME_MAX = 80;
+
+/**
+ * Um link de mídia que a Meta vai buscar: só `https`, sem usuário e senha na
+ * URL, e de tamanho razoável. `null` para qualquer outra coisa — mandar um
+ * `http://` ou um `javascript:` é recusa da Meta na melhor das hipóteses.
+ */
+export function sanitizeMetaLink(raw) {
+  const texto = String(raw ?? '').trim();
+  if (!texto || texto.length > META_LINK_MAX) return null;
+  let url;
+  try {
+    url = new URL(texto);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'https:' || !url.hostname || url.username || url.password) return null;
+  return url.toString();
+}
+
+/**
+ * O nome que o cliente vê no documento: sem caminho, sem caractere de
+ * controle, curto. Vazio quando não sobra nada.
+ */
+export function sanitizeMetaFilename(raw) {
+  const base = String(raw ?? '').split(/[\\/]/).pop() ?? '';
+  // eslint-disable-next-line no-control-regex -- é exatamente o que sai
+  const limpo = base.replace(/[\u0000-\u001f\u007f"<>|*?:]/g, '').replace(/\s+/g, ' ').trim();
+  if (limpo.length <= META_FILENAME_MAX) return limpo;
+  // Corta o meio, não a extensão: "boleto.pdf" sem o ".pdf" abre como nada.
+  const ponto = limpo.lastIndexOf('.');
+  const ext = ponto > 0 && limpo.length - ponto <= 10 ? limpo.slice(ponto) : '';
+  return limpo.slice(0, META_FILENAME_MAX - ext.length) + ext;
+}
+
+/**
+ * O cabeçalho de um envio, como ele vai para a fila. Mídia por link (https)
+ * ou, para a campanha com anexo, `{ type, source: 'attachment' }` — o link do
+ * anexo só existe na hora do envio. Texto leva no máximo a única variável que
+ * a Meta permite num cabeçalho. `null` para o resto.
+ */
+export function normalizeMetaHeader(input) {
+  if (!input || typeof input !== 'object') return null;
+  const type = String(input.type ?? '').trim().toLowerCase();
+  if (type === 'text') {
+    const params = (Array.isArray(input.params) ? input.params : []).slice(0, 1).map(sanitizeMetaParam);
+    return params.length && params.every(Boolean) ? { type, params } : null;
+  }
+  if (!META_MEDIA_TYPES.has(type)) return null;
+  if (input.source === 'attachment') return { type, source: 'attachment' };
+  const link = sanitizeMetaLink(input.link);
+  if (!link) return null;
+  const out = { type, link };
+  if (type === 'document') {
+    const filename = sanitizeMetaFilename(input.filename);
+    if (filename) out.filename = filename;
+  }
+  return out;
+}
+
+/** Os sufixos dos botões de URL dinâmica: um por índice (0–9), sem vazio. */
+export function normalizeMetaButtons(input) {
+  const vistos = new Set();
+  const out = [];
+  for (const b of Array.isArray(input) ? input.slice(0, 10) : []) {
+    const index = Number(b?.index);
+    const param = sanitizeMetaParam(b?.param);
+    if (!Number.isInteger(index) || index < 0 || index > 9 || !param || vistos.has(index)) continue;
+    vistos.add(index);
+    out.push({ index, param });
+  }
+  return out.sort((a, b) => a.index - b.index);
 }
 
 /**
@@ -480,15 +669,33 @@ export function readMetaError(bodyText) {
   return { code, windowClosed };
 }
 
-const META_HEADER_MEDIA = new Set(['IMAGE', 'VIDEO', 'DOCUMENT', 'LOCATION']);
+const META_HEADER_FORMATS = new Set(['TEXT', 'IMAGE', 'VIDEO', 'DOCUMENT', 'LOCATION']);
+const POSICIONAL = /\{\{\s*(\d+)\s*\}\}/g;
+const NOMEADO = /\{\{\s*[A-Za-z_][\w]*\s*\}\}/;
+
+/** O maior `{{n}}` do texto — a Meta numera de 1 sem pular. */
+function maiorIndice(texto) {
+  const nums = [...String(texto ?? '').matchAll(POSICIONAL)].map((m) => Number(m[1]));
+  return nums.length ? Math.max(...nums) : 0;
+}
 
 /**
  * Modelos da Meta no formato que guardamos.
  *
- * `supported` diz se o painel sabe enviar o modelo: só corpo com parâmetros
- * posicionais. Cabeçalho com mídia ou variável, botão com URL dinâmica,
- * parâmetro nomeado e modelo de autenticação ficam visíveis mas fora do
- * seletor — mandar sem os componentes que faltam é recusa certa.
+ * `supported` diz se o painel sabe enviar o modelo:
+ *
+ *   - corpo com parâmetros posicionais;
+ *   - cabeçalho sem nada, com mídia por link (IMAGE, VIDEO, DOCUMENT) ou texto
+ *     com no máximo a única variável que a Meta permite ali;
+ *   - botão de URL com UM sufixo dinâmico (`https://x/{{1}}`), no máximo um
+ *     botão assim por modelo — a ligação do painel tem uma variável só.
+ *
+ * Cabeçalho LOCATION, parâmetro nomeado e modelo de autenticação ficam
+ * visíveis mas fora do seletor — mandar sem os componentes que faltam é
+ * recusa certa.
+ *
+ * `headerFormat` é `NONE` sem cabeçalho; `buttons` lista todos os botões, e
+ * `urlHasParam` marca os que pedem o sufixo no envio.
  */
 export function readMetaTemplates(data) {
   const raw = data ?? {};
@@ -505,15 +712,25 @@ export function readMetaTemplates(data) {
     const components = Array.isArray(it.components) ? it.components : [];
     const corpo = components.find((c) => String(c?.type ?? '').toUpperCase() === 'BODY');
     const bodyText = String(corpo?.text ?? '');
-    const posicionais = [...bodyText.matchAll(/\{\{\s*(\d+)\s*\}\}/g)].map((m) => Number(m[1]));
-    const nomeados = /\{\{\s*[A-Za-z_][\w]*\s*\}\}/.test(bodyText) || String(it.parameter_format ?? '').toUpperCase() === 'NAMED';
     const header = components.find((c) => String(c?.type ?? '').toUpperCase() === 'HEADER');
-    const headerProblema = header
-      ? META_HEADER_MEDIA.has(String(header.format ?? '').toUpperCase()) || /\{\{/.test(String(header.text ?? ''))
-      : false;
-    const botoes = components.find((c) => String(c?.type ?? '').toUpperCase() === 'BUTTONS');
-    const botaoDinamico = Array.isArray(botoes?.buttons)
-      && botoes.buttons.some((b) => /\{\{/.test(String(b?.url ?? '')));
+    const headerText = String(header?.text ?? '');
+    const formato = String(header?.format ?? (header ? 'TEXT' : '')).toUpperCase();
+    const headerFormat = header ? (META_HEADER_FORMATS.has(formato) ? formato : 'UNKNOWN') : 'NONE';
+    const headerParamCount = headerFormat === 'TEXT' ? maiorIndice(headerText) : 0;
+    const nomeados = NOMEADO.test(bodyText) || NOMEADO.test(headerText)
+      || String(it.parameter_format ?? '').toUpperCase() === 'NAMED';
+    const headerOk = ['NONE', 'IMAGE', 'VIDEO', 'DOCUMENT'].includes(headerFormat)
+      || (headerFormat === 'TEXT' && headerParamCount <= 1);
+    const grupo = components.find((c) => String(c?.type ?? '').toUpperCase() === 'BUTTONS');
+    const buttons = (Array.isArray(grupo?.buttons) ? grupo.buttons : []).map((b, index) => {
+      const type = String(b?.type ?? '').toUpperCase();
+      const url = String(b?.url ?? '');
+      return { index, type, urlHasParam: type === 'URL' && /\{\{/.test(url), url };
+    });
+    // Botão de URL dinâmica: só o `{{1}}` no fim, e um botão assim por modelo.
+    const dinamicos = buttons.filter((b) => b.urlHasParam);
+    const botoesOk = dinamicos.length <= 1
+      && dinamicos.every((b) => /^[^{}]*\{\{\s*1\s*\}\}$/.test(b.url.trim()));
     const category = String(it.category ?? '').toUpperCase();
     out.push({
       metaId: String(it.id ?? ''),
@@ -522,9 +739,12 @@ export function readMetaTemplates(data) {
       category,
       status: String(it.status ?? '').toUpperCase(),
       bodyText,
-      paramCount: posicionais.length ? Math.max(...posicionais) : 0,
+      paramCount: maiorIndice(bodyText),
       paramFormat: nomeados ? 'named' : 'positional',
-      supported: !nomeados && !headerProblema && !botaoDinamico && category !== 'AUTHENTICATION',
+      headerFormat,
+      headerParamCount,
+      buttons: buttons.map(({ index, type, urlHasParam }) => ({ index, type, urlHasParam })),
+      supported: !nomeados && headerOk && botoesOk && category !== 'AUTHENTICATION',
       components
     });
   }

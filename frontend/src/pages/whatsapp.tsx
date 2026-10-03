@@ -24,6 +24,7 @@ import { TemplatesPanel } from '@/components/whatsapp/templates-panel'
 import { OptOutPanel } from '@/components/whatsapp/opt-out-panel'
 import { BotReportPanel } from '@/components/whatsapp/bot-report-panel'
 import { SatisfactionPanel } from '@/components/whatsapp/satisfaction-panel'
+import { MetaUsagePanel } from '@/components/whatsapp/meta-usage-panel'
 import { ResponseTimePanel } from '@/components/whatsapp/response-time-panel'
 import { MaintenancePanel } from '@/components/maintenance/maintenance-panel'
 import { AlertsPanel } from '@/components/whatsapp/alerts-panel'
@@ -1180,6 +1181,7 @@ export default function WhatsAppPage() {
             <BotReportPanel />
             <ResponseTimePanel />
             <SatisfactionPanel />
+            <MetaUsagePanel />
           </div>
         )}
         {tab === 'maintenance' && <MaintenancePanel />}

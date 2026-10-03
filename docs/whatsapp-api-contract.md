@@ -249,6 +249,22 @@ O create enviado ao servidor:
 - A consulta "este número tem WhatsApp?" usa um número por QR; sem nenhum,
   `409 not_supported_cloud`.
 
+**Trocar o token.** `POST /api/whatsapp/accounts/:id/meta-token` com
+`{ "metaToken": "<token novo>", "adminKey": "<chave global, só no self-host>" }`
+(permissão `whatsapp.config`). O v2 não tem rota para trocar o token de uma
+instância `WHATSAPP-BUSINESS` — nela o token é a `apikey` —, então o painel
+apaga (`DELETE /instance/delete/<name>`, chave admin) e cria de novo com o
+**mesmo** `instanceName`, os mesmos Phone Number ID e WABA ID e o **mesmo**
+`?t=` no webhook: conversas, linha e URL do webhook não mudam. Um 404 no delete
+é tolerado (é a retentativa depois de um create que falhou), então repetir a
+ação é seguro. Qualquer falha grava `last_error` e a linha **nunca** é apagada;
+o token antigo só é substituído depois do create aceito. Recusas, todas antes
+de falar com o servidor quando possível: `409 not_cloud` (número QR),
+`400 invalid_meta_credentials` (token fora do formato), `400 admin_key_missing`
+(self-host sem chave); depois do delete, `409 cloud_instance_still_exists` se o
+servidor ainda segura o nome (tentar de novo em segundos). No sucesso o estado
+é conferido na Graph e os modelos aprovados são sincronizados de novo.
+
 **Entrada.** A Meta não chama o painel: ela chama `<servidor Evolution>/webhook/meta`,
 configurado pelo provedor no app dele na Meta, e o servidor repassa ao
 webhook do painel no formato de sempre (`messages.upsert`, `messages.update`).
@@ -301,18 +317,66 @@ Recibos da Meta chegam como `SENT`/`DELIVERED`/`READ` e são lidos como os do Ba
 
 #### Modelos aprovados da Meta
 
-O painel não cria modelo na Meta; o provedor cria e aprova no Gerenciador do
-WhatsApp, e o painel **sincroniza** a lista (`wa_meta_templates`, por número).
+O painel **sincroniza** a lista da Meta (`wa_meta_templates`, por número) e
+pode **pedir** modelos novos; quem aprova é sempre a Meta (pelo painel ou pelo
+Gerenciador do WhatsApp, o resultado é o mesmo).
 
 | rota | permissão | o que faz |
 | --- | --- | --- |
 | `POST /api/whatsapp/accounts/:id/templates/sync` | `whatsapp.config` | busca em `GET /template/find/{instância}` e troca a cópia local (o que sumiu da Meta some daqui) |
+| `POST /api/whatsapp/accounts/:id/templates` | `whatsapp.config` | cria o modelo em `POST /template/create/{instância}` e sincroniza; responde 201 com o modelo (`PENDING`) |
 | `GET /api/whatsapp/meta-templates?accountId=&usable=1` | `whatsapp.read` | lista; `usable` = `APPROVED` e formato suportado |
 | `GET/PUT /api/whatsapp/meta-notice-bindings` | `campaigns.read` / `campaigns.manage` | modelo de cada aviso automático (`maintenance`, `outage`, `alert`) |
+| `GET /api/whatsapp/meta-usage?months=3\|6\|12` | `campaigns.read` | modelos enviados por mês e categoria (outro valor de `months` vira 6) |
+| `GET/PUT /api/whatsapp/meta-prices` | `campaigns.read` / `campaigns.manage` | preço por mensagem (R$) de `MARKETING`, `UTILITY`, `AUTHENTICATION`, `SERVICE`, só para a estimativa |
 
-Suportado = corpo com parâmetros posicionais; cabeçalho com mídia ou
-variável, botão com URL dinâmica, parâmetro nomeado e AUTHENTICATION ficam
-de fora do seletor.
+Suportado = corpo com parâmetros posicionais, e:
+
+- cabeçalho ausente, de mídia (`IMAGE`, `VIDEO`, `DOCUMENT`, enviada por
+  link) ou de texto com no máximo uma variável;
+- botão de URL com o sufixo dinâmico `{{1}}` no fim da URL, no máximo um
+  botão assim por modelo.
+
+Ficam de fora do seletor: cabeçalho `LOCATION`, parâmetro nomeado (no corpo
+ou no cabeçalho), sufixo no meio da URL, dois botões dinâmicos e
+AUTHENTICATION.
+
+Cada modelo sincronizado traz `headerFormat` (`NONE`, `TEXT`, `IMAGE`,
+`VIDEO`, `DOCUMENT`, `LOCATION`), `headerParamCount` e `buttons`
+(`[{index, type, urlHasParam}]`), guardados em `wa_meta_templates`
+(`header_format`, `header_param_count`, `buttons_json` — migration `0091`).
+Uma cópia sincronizada antes da `0091` continua "não suportada" até a próxima
+sincronização.
+
+**Criar.** Corpo da rota:
+
+```json
+{
+  "name": "aviso_fatura", "category": "UTILITY", "language": "pt_BR",
+  "headerText": "Sua fatura", "bodyText": "Olá {{1}}, vence {{2}}.",
+  "examples": ["Ana", "10/10"], "footerText": "Provedor",
+  "buttons": [{ "type": "URL", "text": "Pagar", "url": "https://..." }, { "type": "QUICK_REPLY", "text": "Já paguei" }]
+}
+```
+
+Só o formato que o painel sabe enviar depois — o modelo criado aqui sai
+`supported`. A ordem das recusas: conta (`account_not_found` 404,
+`meta_templates_cloud_only` 409), depois o corpo (`invalid_meta_template` 400,
+com o campo em `{field}` na mensagem), e só então a rede. Regras: nome
+normalizado (minúsculas, espaço → `_`, `^[a-z0-9_]{1,512}$`); categoria
+`UTILITY` ou `MARKETING` (AUTHENTICATION fora); idioma `xx` ou `xx_YY` (padrão
+`pt_BR`); corpo de 1 a 1024; variáveis só `{{n}}` de 1 até o maior, sem pulo;
+um exemplo não vazio por variável; cabeçalho e rodapé até 60, cabeçalho sem
+variável; até 3 botões de texto até 25, URL só `https://` e fixa.
+
+O servidor recebe o formato da Graph API (`components` HEADER/BODY/FOOTER/
+BUTTONS, `example.body_text` só quando há variável, `allowCategoryChange:
+true`). A recusa da Meta volta como `http_error` (502) com o corpo dela na
+mensagem — o formulário mostra esse texto. Depois de aceitar, o painel
+sincroniza; se a sincronização falhar, devolve o mínimo (`id: null`, `status`
+da resposta da Meta ou `PENDING`, `metaId`) e a próxima sincronização traz a
+linha. O modelo só fica `usable` quando a Meta aprova e uma sincronização
+traz o `APPROVED`.
 
 **Ligações.**
 
@@ -320,15 +384,79 @@ de fora do seletor.
   `metaParams` — a lista ordenada das nossas variáveis que preenchem `{{1}}`,
   `{{2}}`…; `texto` é o texto inteiro já renderizado. Conferido ao salvar
   (`meta_param_mismatch`, `meta_template_unavailable`). A régua, a cobrança
-  avulsa e a campanha montam a foto `{name, language, params}` por
-  destinatário (`wa_broadcast_recipients.meta_template`); variável vazia pula
-  o destinatário como `templateIncomplete`.
-- Aviso automático: um modelo de até um parâmetro, que recebe o aviso inteiro.
+  avulsa e a campanha montam a foto `{name, language, params, header?,
+  buttons?}` por destinatário (`wa_broadcast_recipients.meta_template`);
+  variável vazia pula o destinatário como `templateIncomplete`.
+- Cabeçalho do modelo (`metaHeader`, coluna `meta_header`):
+  `{source, value}`, obrigatório quando o modelo tem cabeçalho de mídia ou de
+  texto com variável (`meta_header_mismatch`):
+  - `variable` — uma variável da categoria; na mídia, o valor é o link (ex.
+    `link_boleto` → documento com `filename` `boleto.pdf`, ou o nome do fim
+    do link quando ele tem extensão). Link vazio ou que não é `https` conta
+    como variável vazia;
+  - `url` — um endereço `https` fixo, conferido ao salvar;
+  - `attachment` — o anexo da campanha, resolvido no envio como
+    `publicMediaUrl(webhookBaseUrl, id da mensagem)`; mensagem sem anexo
+    falha com `meta_header_missing` (sem endereço público, `no_public_url`).
+  O cabeçalho de texto aceita só `variable`.
+- Botão dinâmico (`metaButtonParam`, colunas `meta_button_param` e
+  `meta_button_index`): a variável que completa a URL, obrigatória quando o
+  modelo tem o botão (`meta_button_mismatch`). O índice do botão no modelo é
+  guardado na ligação, porque a Meta identifica o botão pela posição.
+- O que o modelo escolhido não pede é descartado ao salvar.
+- Aviso automático: um modelo de até um parâmetro, que recebe o aviso
+  inteiro, sem cabeçalho de mídia/variável nem botão dinâmico.
 - Atendente: `POST /conversations/:id/messages` aceita `metaTemplate`
-  `{name, language, params}`, conferido contra o número que envia; a conversa
-  mostra o texto do modelo preenchido.
+  `{name, language, params, header?, buttons?}`, conferido contra o número
+  que envia (o cabeçalho e os botões que o modelo pede, nem mais nem menos;
+  `meta_template_unavailable`); a conversa mostra o texto do modelo
+  preenchido. `header` é `{type: 'image'|'video'|'document', link,
+  filename?}` ou `{type: 'text', params: [texto]}`; `buttons` é
+  `[{index, param}]`.
+
+Na fila (`wa_messages.meta_template`) o link da mídia só passa se for
+`https` (sem usuário/senha, até 1024 caracteres) e o `filename` é cortado a
+80 caracteres, sem caminho nem caractere de controle.
+
+O corpo enviado a `POST /message/sendTemplate/{instância}` segue a Cloud
+API, que o Evolution repassa à Meta:
+
+```json
+{
+  "number": "5593…", "name": "boleto_documento", "language": "pt_BR",
+  "components": [
+    { "type": "header", "parameters": [{ "type": "document", "document": { "link": "https://…", "filename": "boleto.pdf" } }] },
+    { "type": "body", "parameters": [{ "type": "text", "text": "Maria" }] },
+    { "type": "button", "sub_type": "url", "index": "1", "parameters": [{ "type": "text", "text": "23790001" }] }
+  ]
+}
+```
+
+Imagem e vídeo: `{type: 'image', image: {link}}` / `{type: 'video', video:
+{link}}`.
 
 O envio decide pela janela: aberta, texto; fechada, o modelo, se houver.
+
+**Relatório de uso.** Conta as mensagens de `wa_messages` com
+`sent_as='template'` e `direction='out'`: `sent`, `delivered` e `read` entram
+no total; `failed` (a Meta recusou depois de aceitar) é contado à parte e fica
+fora da estimativa. Envio que falhou antes do aceite do Evolution não tem
+`sent_as` e não aparece. O mês é o do **fuso do servidor** (o período começa no
+dia 1º, 00:00 local, `months - 1` meses atrás; a resposta traz `timezone`). A
+categoria vem de `wa_meta_templates` por número + nome + idioma, depois por
+nome + idioma em qualquer número do provedor; sem achar, `UNKNOWN`. A resposta
+traz `monthly` (todos os meses do período, inclusive vazios), `totals`,
+`templates` (ranking), `accounts` (por número), `prices` e `estimate`
+(`null` sem preço nenhum). Lê no máximo 50 000 mensagens; acima disso,
+`truncated: true`.
+
+Os preços ficam em `app_state.wa_meta_prices` por provedor; `null` ou `''`
+limpa uma categoria, e valor negativo, não numérico ou acima de R$ 100 é
+recusado com `400 invalid_meta_price`. A permissão segue o par das campanhas
+(gasto com modelos é decisão de quem dispara campanha e régua). A estimativa é
+só estimativa: preço por país do destinatário, faixa de volume, conversas de
+serviço e janelas gratuitas da Meta não são modelados, e envios feitos fora do
+painel (Gerenciador da Meta) não entram.
 
 ## Webhook — `POST /api/whatsapp-webhook?t=<token>`
 

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   whatsappAPI,
   type MetaNoticeBindings,
+  type MetaTemplateCreatePayload,
   type MetaNoticeKey,
   type WhatsAppAccount,
   type WhatsAppMetaTemplate
@@ -12,8 +13,15 @@ import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import { whatsappErrorMessage } from '@/components/whatsapp-connection'
+import { MetaTemplateCreateForm } from '@/components/whatsapp/meta-template-create'
 
 const NOTICE_KEYS: MetaNoticeKey[] = ['maintenance', 'outage', 'alert']
+
+/** Se o modelo pede mais que o corpo: mídia no cabeçalho, variável no cabeçalho ou sufixo de botão. */
+export const needsExtras = (m: WhatsAppMetaTemplate) =>
+  ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(m.headerFormat)
+  || (m.headerFormat === 'TEXT' && m.headerParamCount > 0)
+  || m.buttons.some((b) => b.urlHasParam)
 
 /** A chave de um modelo no `<select>`: nome e idioma, que juntos o identificam. */
 export const metaKey = (m: { name: string; language: string }) => `${m.name}|${m.language}`
@@ -21,10 +29,10 @@ export const metaKey = (m: { name: string; language: string }) => `${m.name}|${m
 /**
  * Os modelos aprovados da Meta dos números oficiais.
  *
- * O painel não cria modelo na Meta — o provedor cria e aprova lá. Aqui ele
- * sincroniza a lista e liga os avisos automáticos (manutenção, queda, alerta)
- * a um modelo, para o número oficial conseguir mandá-los fora da janela de
- * 24 h. Some sozinho quando o provedor não tem número oficial.
+ * Aqui o painel sincroniza a lista, pede modelos novos à Meta (que nascem em
+ * análise: quem aprova é ela) e liga os avisos automáticos (manutenção, queda,
+ * alerta) a um modelo, para o número oficial conseguir mandá-los fora da
+ * janela de 24 h. Some sozinho quando o provedor não tem número oficial.
  */
 export function MetaTemplatesPanel({ onSynced }: { onSynced?: () => void }) {
   const { t, formatDateTime } = useTranslation()
@@ -35,6 +43,7 @@ export function MetaTemplatesPanel({ onSynced }: { onSynced?: () => void }) {
   const [syncing, setSyncing] = useState(false)
   const [bindings, setBindings] = useState<Record<MetaNoticeKey, string>>({ maintenance: '', outage: '', alert: '' })
   const [savingBindings, setSavingBindings] = useState(false)
+  const [creating, setCreating] = useState(false)
 
   const loadAccounts = useCallback(async () => {
     const res = await whatsappAPI.listAccounts()
@@ -71,8 +80,9 @@ export function MetaTemplatesPanel({ onSynced }: { onSynced?: () => void }) {
 
   const account = accounts.find((a) => a.id === accountId) ?? null
   // Um aviso é texto livre: só serve modelo com no máximo um parâmetro, que
-  // recebe o aviso inteiro.
-  const forNotices = useMemo(() => templates.filter((m) => m.usable && m.paramCount <= 1), [templates])
+  // recebe o aviso inteiro — e sem cabeçalho de mídia/variável nem botão
+  // dinâmico, que o aviso não teria de onde preencher.
+  const forNotices = useMemo(() => templates.filter((m) => m.usable && m.paramCount <= 1 && !needsExtras(m)), [templates])
 
   const sync = async () => {
     if (!accountId) return
@@ -90,6 +100,27 @@ export function MetaTemplatesPanel({ onSynced }: { onSynced?: () => void }) {
     } finally {
       setSyncing(false)
     }
+  }
+
+  /**
+   * Devolve o texto da recusa para o formulário mostrar sem fechar. A recusa da
+   * Meta (`http_error`) traz o motivo dela — nome repetido, texto proibido —, e
+   * é com ele que a pessoa corrige; as outras viram a frase traduzida.
+   */
+  const createTemplate = async (payload: MetaTemplateCreatePayload): Promise<string | null> => {
+    if (!accountId) return null
+    const res = await whatsappAPI.createMetaTemplate(accountId, payload)
+    if (!res.success) {
+      const texto = whatsappErrorMessage(t, res.code)
+      toast.error(texto)
+      return res.code === 'http_error' && res.message ? res.message : texto
+    }
+    toast.success(t('whatsapp.metaTemplates.createSent'))
+    setCreating(false)
+    await loadTemplates(accountId)
+    await loadAccounts()
+    onSynced?.()
+    return null
   }
 
   const saveBindings = async () => {
@@ -130,6 +161,15 @@ export function MetaTemplatesPanel({ onSynced }: { onSynced?: () => void }) {
               ))}
             </select>
           )}
+          <button
+            type="button"
+            className="modern-button-secondary"
+            disabled={creating || !accountId}
+            onClick={() => setCreating(true)}
+          >
+            <Icon name="edit" size={16} />
+            {t('whatsapp.metaTemplates.create')}
+          </button>
           <button type="button" className="modern-button" disabled={syncing || !accountId} onClick={() => void sync()}>
             <Icon name="refresh" size={16} className={syncing ? 'animate-spin' : ''} />
             {syncing ? t('whatsapp.metaTemplates.syncing') : t('whatsapp.metaTemplates.sync')}
@@ -157,6 +197,14 @@ export function MetaTemplatesPanel({ onSynced }: { onSynced?: () => void }) {
         <p className="break-all font-mono text-xs text-[hsl(var(--status-danger))]">{account.metaTemplatesError}</p>
       )}
 
+      {creating && accountId && (
+        <MetaTemplateCreateForm
+          key={accountId}
+          onSubmit={createTemplate}
+          onCancel={() => setCreating(false)}
+        />
+      )}
+
       {templates.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t('whatsapp.metaTemplates.empty')}</p>
       ) : (
@@ -177,6 +225,20 @@ export function MetaTemplatesPanel({ onSynced }: { onSynced?: () => void }) {
                 <span className="text-xs text-muted-foreground">
                   {t('whatsapp.metaTemplates.params', { count: m.paramCount })}
                 </span>
+                {m.headerFormat !== 'NONE' && (
+                  <span className="modern-badge-info">
+                    {t('whatsapp.metaTemplates.headerBadge', { format: t(`whatsapp.metaTemplates.headerFormat.${m.headerFormat}`) })}
+                  </span>
+                )}
+                {m.buttons.length > 0 && (
+                  <span className="text-xs text-muted-foreground">
+                    {t('whatsapp.metaTemplates.buttonsBadge', {
+                      list: m.buttons
+                        .map((b) => (b.urlHasParam ? t('whatsapp.metaTemplates.buttonDynamic') : b.type))
+                        .join(', ')
+                    })}
+                  </span>
+                )}
               </div>
               {m.bodyText && (
                 <p className="mt-2 whitespace-pre-wrap break-words font-mono text-[0.78rem] leading-6 text-muted-foreground">

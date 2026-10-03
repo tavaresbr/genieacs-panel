@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { whatsappAPI, type WhatsAppMetaTemplate, type WhatsAppTemplate } from '@/lib/api'
+import { whatsappAPI, type MetaHeaderBinding, type WhatsAppMetaTemplate, type WhatsAppTemplate } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
@@ -139,16 +139,45 @@ interface Draft {
   meta: string
   /** Nossa variável para cada `{{n}}` do modelo da Meta, em ordem. */
   metaParams: string[]
+  /** De onde vem o cabeçalho, quando o modelo da Meta tem mídia ou texto com variável. */
+  metaHeader: MetaHeaderBinding | null
+  /** A variável que completa a URL do botão dinâmico. */
+  metaButtonParam: string
 }
 
-const EMPTY_DRAFT: Draft = { id: null, name: '', body: '', category: 'cobranca', meta: '', metaParams: [] }
+const EMPTY_DRAFT: Draft = {
+  id: null, name: '', body: '', category: 'cobranca', meta: '', metaParams: [], metaHeader: null, metaButtonParam: ''
+}
+
+/** Cabeçalhos que saem por link de mídia. */
+const MEDIA_HEADERS = new Set(['IMAGE', 'VIDEO', 'DOCUMENT'])
+
+/** O que o modelo da Meta pede além do corpo: origem do cabeçalho e variável do botão. */
+const metaNeeds = (m: WhatsAppMetaTemplate | null) => ({
+  mediaHeader: Boolean(m && MEDIA_HEADERS.has(m.headerFormat)),
+  textHeader: Boolean(m && m.headerFormat === 'TEXT' && m.headerParamCount > 0),
+  button: Boolean(m && m.buttons.some((b) => b.urlHasParam))
+})
+
+/** Se a ligação do cabeçalho está completa para o modelo escolhido. */
+const headerReady = (m: WhatsAppMetaTemplate | null, h: MetaHeaderBinding | null) => {
+  const needs = metaNeeds(m)
+  if (needs.textHeader) return h?.source === 'variable' && Boolean(h.value)
+  if (!needs.mediaHeader) return true
+  if (!h) return false
+  if (h.source === 'attachment') return true
+  if (h.source === 'url') return /^https:\/\/\S+$/i.test(h.value ?? '')
+  return Boolean(h.value)
+}
 
 /** O texto inteiro da mensagem, como parâmetro de um modelo da Meta. */
 const FULL_TEXT = 'texto'
 
 const draftFrom = (template: WhatsAppTemplate) => ({
   meta: template.metaTemplateName ? `${template.metaTemplateName}|${template.metaLanguage ?? ''}` : '',
-  metaParams: template.metaParams ?? []
+  metaParams: template.metaParams ?? [],
+  metaHeader: template.metaHeader ?? null,
+  metaButtonParam: template.metaButtonParam ?? ''
 })
 
 /**
@@ -265,7 +294,16 @@ export function TemplatesPanel() {
     setRefusal('')
     const { category } = draft
     const [metaTemplateName = '', metaLanguage = ''] = draft.meta ? draft.meta.split('|') : []
-    const meta = { metaTemplateName, metaLanguage, metaParams: metaTemplateName ? draft.metaParams : [] }
+    // O que o modelo escolhido não pede vai nulo: o servidor descartaria de todo jeito.
+    const escolhido = metaTemplates.find((m) => metaKey(m) === draft.meta) ?? null
+    const needs = metaNeeds(escolhido)
+    const meta = {
+      metaTemplateName,
+      metaLanguage,
+      metaParams: metaTemplateName ? draft.metaParams : [],
+      metaHeader: metaTemplateName && (needs.mediaHeader || needs.textHeader) ? draft.metaHeader : null,
+      metaButtonParam: metaTemplateName && needs.button ? draft.metaButtonParam : null
+    }
     const res = draft.id === null
       ? await whatsappAPI.createTemplate({ name, body, category, ...meta })
       : await whatsappAPI.updateTemplate(draft.id, { name, body, category, ...meta })
@@ -294,7 +332,7 @@ export function TemplatesPanel() {
     const message = whatsappErrorMessage(t, res.code)
     setRefusal(message)
     toast.error(message)
-  }, [draft, load, t, toast])
+  }, [draft, load, metaTemplates, t, toast])
 
   const remove = useCallback(
     async (template: WhatsAppTemplate) => {
@@ -316,8 +354,11 @@ export function TemplatesPanel() {
 
   const draftMeta = draft?.meta ? metaTemplates.find((m) => metaKey(m) === draft.meta) ?? null : null
   // O botão só arma com uma variável escolhida para cada parâmetro do modelo.
+  const draftNeeds = metaNeeds(draftMeta)
   const metaIncomplete = Boolean(draft?.meta)
-    && (!draftMeta || draft!.metaParams.length !== draftMeta.paramCount || draft!.metaParams.some((v) => !v))
+    && (!draftMeta || draft!.metaParams.length !== draftMeta.paramCount || draft!.metaParams.some((v) => !v)
+      || !headerReady(draftMeta, draft!.metaHeader)
+      || (draftNeeds.button && !draft!.metaButtonParam))
   const draftBody = draft?.body ?? ''
   const draftKind = useMemo(() => classify(draftBody), [draftBody])
   const canSave = Boolean(draft && draft.name.trim() && draft.body.trim()) && !metaIncomplete
@@ -443,7 +484,9 @@ export function TemplatesPanel() {
                   setDraft({
                     ...draft,
                     meta: event.target.value,
-                    metaParams: Array.from({ length: escolhido?.paramCount ?? 0 }, () => '')
+                    metaParams: Array.from({ length: escolhido?.paramCount ?? 0 }, () => ''),
+                    metaHeader: null,
+                    metaButtonParam: ''
                   })
                 }}
               >
@@ -480,6 +523,14 @@ export function TemplatesPanel() {
                       </label>
                     ))}
                   </div>
+                  <MetaExtrasEditor
+                    template={draftMeta}
+                    variables={variablesFor(draft.category)}
+                    header={draft.metaHeader}
+                    buttonParam={draft.metaButtonParam}
+                    onHeader={(metaHeader) => setDraft({ ...draft, metaHeader })}
+                    onButtonParam={(metaButtonParam) => setDraft({ ...draft, metaButtonParam })}
+                  />
                 </>
               )}
             </fieldset>
@@ -618,5 +669,117 @@ export function TemplatesPanel() {
         </ul>
       )}
     </section>
+  )
+}
+
+/**
+ * O que o modelo da Meta pede além do corpo: a origem da mídia do cabeçalho
+ * (anexo da campanha, variável com o link, URL fixa), a variável do cabeçalho
+ * de texto e a variável que completa a URL do botão dinâmico.
+ */
+function MetaExtrasEditor({
+  template,
+  variables,
+  header,
+  buttonParam,
+  onHeader,
+  onButtonParam
+}: {
+  template: WhatsAppMetaTemplate
+  variables: readonly string[]
+  header: MetaHeaderBinding | null
+  buttonParam: string
+  onHeader: (header: MetaHeaderBinding | null) => void
+  onButtonParam: (value: string) => void
+}) {
+  const { t } = useTranslation()
+  const needs = metaNeeds(template)
+  if (!needs.mediaHeader && !needs.textHeader && !needs.button) return null
+  const formatLabel = t(`whatsapp.metaTemplates.headerFormat.${template.headerFormat}`)
+  const variableOptions = variables.map((name) => (
+    <option key={name} value={name}>{`{{${name}}}`}</option>
+  ))
+  return (
+    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+      {needs.mediaHeader && (
+        <>
+          <label className="text-xs text-muted-foreground">
+            {t('whatsapp.metaTemplates.headerSource', { format: formatLabel })}
+            <select
+              className="modern-input mt-1 w-full"
+              value={header?.source ?? ''}
+              onChange={(event) => {
+                const source = event.target.value
+                if (source === 'attachment' || source === 'variable' || source === 'url') {
+                  onHeader({ source, value: source === 'variable' && variables.includes('link_boleto') ? 'link_boleto' : null })
+                } else {
+                  onHeader(null)
+                }
+              }}
+            >
+              <option value="">—</option>
+              <option value="attachment">{t('whatsapp.metaTemplates.headerSourceAttachment')}</option>
+              <option value="variable">{t('whatsapp.metaTemplates.headerSourceVariable')}</option>
+              <option value="url">{t('whatsapp.metaTemplates.headerSourceUrl')}</option>
+            </select>
+          </label>
+          {header?.source === 'variable' && (
+            <label className="text-xs text-muted-foreground">
+              {t('whatsapp.metaTemplates.headerSourceVariable')}
+              <select
+                className="modern-input mt-1 w-full"
+                value={header.value ?? ''}
+                onChange={(event) => onHeader({ source: 'variable', value: event.target.value || null })}
+              >
+                <option value="">—</option>
+                {variableOptions}
+              </select>
+            </label>
+          )}
+          {header?.source === 'url' && (
+            <label className="text-xs text-muted-foreground">
+              {t('whatsapp.metaTemplates.headerSourceUrl')}
+              <input
+                type="url"
+                inputMode="url"
+                className="modern-input mt-1 w-full"
+                placeholder="https://"
+                value={header.value ?? ''}
+                onChange={(event) => onHeader({ source: 'url', value: event.target.value.trim() || null })}
+              />
+            </label>
+          )}
+          {header?.source === 'attachment' && (
+            <p className="field-hint sm:col-span-2">{t('whatsapp.metaTemplates.headerAttachmentHint')}</p>
+          )}
+        </>
+      )}
+      {needs.textHeader && (
+        <label className="text-xs text-muted-foreground">
+          {t('whatsapp.metaTemplates.headerTextVariable')}
+          <select
+            className="modern-input mt-1 w-full"
+            value={header?.source === 'variable' ? header.value ?? '' : ''}
+            onChange={(event) => onHeader(event.target.value ? { source: 'variable', value: event.target.value } : null)}
+          >
+            <option value="">—</option>
+            {variableOptions}
+          </select>
+        </label>
+      )}
+      {needs.button && (
+        <label className="text-xs text-muted-foreground">
+          {t('whatsapp.metaTemplates.buttonParam')}
+          <select
+            className="modern-input mt-1 w-full"
+            value={buttonParam}
+            onChange={(event) => onButtonParam(event.target.value)}
+          >
+            <option value="">—</option>
+            {variableOptions}
+          </select>
+        </label>
+      )}
+    </div>
   )
 }
