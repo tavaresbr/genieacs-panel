@@ -87,6 +87,14 @@ class PlatformAudit {
     // a "por que este provedor não paga?", e ela precisa de uma linha que diga
     // exatamente isso — quem, quando e com que motivo.
     SUBSCRIPTION_BILLING_EXEMPT_CHANGED: 'subscription.billing_exempt_changed',
+    // Os cupons de desconto (0093): o catálogo deles, mexido pelo console, e
+    // o cupom entrando ou saindo da assinatura de um provedor — pelo console
+    // ou pelo próprio provedor (`selfService: true`). É a trilha que responde
+    // "por que este provedor paga menos que o plano?".
+    COUPON_CREATED: 'coupon.created',
+    COUPON_UPDATED: 'coupon.updated',
+    COUPON_DELETED: 'coupon.deleted',
+    SUBSCRIPTION_COUPON_CHANGED: 'subscription.coupon_changed',
     // Quem trabalha para qual provedor, decidido de fora dele. É a ação mais
     // forte que o plano de controle tem: um vínculo escrito aqui vira uma
     // sessão legítima DENTRO de um ISP, com o cadastro inteiro atrás dela. Sem

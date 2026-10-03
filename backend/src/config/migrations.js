@@ -1863,6 +1863,52 @@ const WA_AGENT_TABLES = [
   ['wa_agents', waAgentsTable]
 ];
 
+/**
+ * Os cupons de desconto da assinatura (0093). Da PLATAFORMA, como `plans`: um
+ * cupom é do catálogo comercial do deploy inteiro, e um provedor o resgata —
+ * não tem o seu. Por isso sem `tenant_id`, e só o console escreve aqui.
+ *
+ * `code` único e sempre em maiúsculas (quem grava normaliza). `value` é o
+ * percentual inteiro (1–99: o de 100% é recusado na criação, porque a fatura
+ * de valor zero seria um caminho de dinheiro novo) ou centavos. `duration`:
+ * `once` (só a 1ª fatura), `repeating` (`duration_cycles` faturas) ou
+ * `forever`. `plan_ids` é uma lista JSON opcional dos planos em que ele vale.
+ * `redemptions` sobe por atualização condicional, nunca por leitura e escrita
+ * — é ela que segura o `max_redemptions` sob corrida.
+ */
+const couponsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.string('code', 32).notNullable().unique();
+  t.string('kind', 16).notNullable();
+  t.integer('value').unsigned().notNullable();
+  t.string('duration', 16).notNullable();
+  t.integer('duration_cycles').unsigned();
+  t.integer('max_redemptions').unsigned();
+  t.integer('redemptions').unsigned().notNullable().defaultTo(0);
+  t.timestamp('valid_until').nullable();
+  t.text('plan_ids');
+  t.boolean('active').notNullable().defaultTo(true);
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  t.timestamp('updated_at').defaultTo(db.fn.now());
+};
+
+const COUPON_TABLES = [
+  ['coupons', couponsTable]
+];
+
+/**
+ * O cupom na assinatura (0093). Sem `.references`, pelo motivo de
+ * `pending_plan_id`: acrescentar chave estrangeira a uma tabela que já existe
+ * é recriá-la no SQLite, e quem escreve a coluna acabou de ler o cupom.
+ * `coupon_cycles_left` nulo é o `forever`; `coupon_applied_at` é quando foi
+ * aplicado, e volta junto quando um estorno devolve o ciclo que o tirou.
+ */
+const SUBSCRIPTION_COUPON_COLUMNS = [
+  ['coupon_id', (t) => t.integer('coupon_id').unsigned().nullable()],
+  ['coupon_cycles_left', (t) => t.integer('coupon_cycles_left').unsigned().nullable()],
+  ['coupon_applied_at', (t) => t.timestamp('coupon_applied_at').nullable()]
+];
+
 /** A conversa com dono: quem atende, desde quando, e desde quando espera um. */
 const WA_ASSIGNMENT_COLUMNS = [
   ['assigned_user_id', (t) => t.integer('assigned_user_id').unsigned().nullable()],
@@ -2163,7 +2209,8 @@ export const SCHEMA_TABLES = [
   ...DUNNING_TABLES,
   ...SATISFACTION_TABLES,
   ...WA_AGENT_TABLES,
-  ...WA_META_TEMPLATE_TABLES
+  ...WA_META_TEMPLATE_TABLES,
+  ...COUPON_TABLES
 ].map(([name]) => name);
 
 /**
@@ -5073,6 +5120,27 @@ export const migrations = [
       await db.schema.alterTable('wa_conversations', (t) => {
         for (const add of missing) add(t);
         t.index(['tenant_id', 'assigned_user_id', 'closed_at'], 'wa_conversations_assigned_idx');
+      });
+    }
+  },
+  {
+    /** Os cupons de desconto — ver `couponsTable` e `SUBSCRIPTION_COUPON_COLUMNS`. */
+    id: '0093_coupons',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('coupons'))) return false;
+      if (!(await db.schema.hasTable('subscriptions'))) return true;
+      return (await missingColumns(db, 'subscriptions', SUBSCRIPTION_COUPON_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      for (const [nome, construtor] of COUPON_TABLES) {
+        // eslint-disable-next-line no-await-in-loop -- uma tabela só
+        await createTableIfMissing(db, nome, construtor(db));
+      }
+      if (!(await db.schema.hasTable('subscriptions'))) return;
+      const missing = await missingColumns(db, 'subscriptions', SUBSCRIPTION_COUPON_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('subscriptions', (t) => {
+        for (const add of missing) add(t);
       });
     }
   }

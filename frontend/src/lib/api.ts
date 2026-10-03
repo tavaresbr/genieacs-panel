@@ -1528,6 +1528,8 @@ export interface SubscriptionView {
   billingExempt?: boolean
   billingExemptSince?: string | null
   billingExemptReason?: string | null
+  /** O cupom de desconto na assinatura. Opcional: servidores antigos não mandam. */
+  coupon?: SubscriptionCoupon | null
 }
 
 /**
@@ -1642,6 +1644,50 @@ export interface SubscriptionConsoleSubscription {
   billingExempt?: boolean
   billingExemptSince?: string | null
   billingExemptReason?: string | null
+  /** O cupom de desconto. Opcional: servidores antigos não mandam. */
+  coupon?: SubscriptionCoupon | null
+}
+
+export type CouponKind = 'percent' | 'fixed'
+export type CouponDuration = 'once' | 'repeating' | 'forever'
+
+/**
+ * O cupom de desconto aplicado a uma assinatura. `priceCents` é o que a
+ * próxima fatura do plano atual pede, já com o desconto e o piso;
+ * `appliesToPlan` falso é o cupom restrito a outros planos (fica, sem
+ * desconto). `cyclesLeft` nulo é o `forever`.
+ */
+export interface SubscriptionCoupon {
+  id: number
+  code: string
+  kind: CouponKind
+  /** Percentual (1–99) ou centavos. */
+  value: number
+  duration: CouponDuration
+  durationCycles: number | null
+  cyclesLeft: number | null
+  planIds: number[] | null
+  appliesToPlan: boolean
+  priceCents: number
+  appliedAt: string | null
+}
+
+/** Um cupom do catálogo, como a aba Cupons do console o lê. */
+export interface CouponView {
+  id: number
+  code: string
+  kind: CouponKind
+  value: number
+  duration: CouponDuration
+  durationCycles: number | null
+  maxRedemptions: number | null
+  redemptions: number
+  validUntil: string | null
+  planIds: number[] | null
+  active: boolean
+  createdAt: string | null
+  /** Quantas assinaturas têm o cupom aplicado agora. */
+  inUse: number
 }
 
 /** Uma linha da aba Assinaturas: o provedor, a assinatura, o gateway e o boleto em aberto. */
@@ -2131,7 +2177,44 @@ export const platformAPI = {
     apiClient.post<{ admin: PlatformAdminView }>('/platform/admins', payload),
 
   removeAdmin: (userId: number) =>
-    apiClient.delete<{ userId: number }>(`/platform/admins/${userId}`)
+    apiClient.delete<{ userId: number }>(`/platform/admins/${userId}`),
+
+  // ── Os cupons de desconto ───────────────────────────────────────────
+  listCoupons: () =>
+    apiClient.get<{ coupons: CouponView[] }>('/platform/coupons'),
+
+  /** Recusa o de 100% (`coupon_full_discount`) e o código repetido (409 `coupon_code_taken`). */
+  createCoupon: (payload: {
+    code: string; kind: CouponKind; value: number; duration: CouponDuration; durationCycles?: number | null
+    maxRedemptions?: number | null; validUntil?: string | null; planIds?: number[] | null; active?: boolean
+  }) =>
+    apiClient.post<{ coupon: CouponView }>('/platform/coupons', payload),
+
+  /** Só as portas do resgate mudam; código, desconto e duração são fixos. */
+  updateCoupon: (id: number, payload: Partial<{ active: boolean; validUntil: string | null; maxRedemptions: number | null }>) =>
+    apiClient.requestWithBody<{ coupon: CouponView }>('PATCH', `/platform/coupons/${id}`, payload),
+
+  /** Apaga o nunca resgatado; o resgatado é desativado (`deactivated: true`). */
+  deleteCoupon: (id: number) =>
+    apiClient.delete<{ deleted: boolean; deactivated: boolean; coupon: CouponView | null }>(`/platform/coupons/${id}`),
+
+  /**
+   * Aplica (`code`, substituindo o que houver) ou tira (`null`) o cupom de um
+   * provedor. 409 `coupon_invalid`, `coupon_expired`, `coupon_exhausted`,
+   * `coupon_plan_mismatch`, `coupon_already_applied`; 502 `gateway_failed`
+   * quando a fatura em aberto não pôde ser cancelada (nada muda).
+   */
+  setSubscriptionCoupon: (tenantId: number, code: string | null) =>
+    apiClient.requestWithBody<{
+      subscription: {
+        tenant: { id: number; slug: string; name: string }
+        subscription: SubscriptionView | null
+        planId: number | null
+        events: BillingEventView[]
+      }
+      charge: 'none' | 'reissued'
+      changed: boolean
+    }>('PUT', `/platform/tenants/${tenantId}/subscription/coupon`, { code })
 }
 
 /** The provider's own plan, state and usage — the "plan and usage" screen, and what the block screen reads. */
@@ -2171,7 +2254,14 @@ export const subscriptionAPI = {
    * olha `response.ok`, não o número, então os dois chegam iguais aqui.
    */
   payNow: () =>
-    apiClient.post<{ charge: TenantChargeView }>('/tenant/charges/pay', {})
+    apiClient.post<{ charge: TenantChargeView }>('/tenant/charges/pay', {}),
+
+  /**
+   * "Tenho um cupom": aplica o código à assinatura e devolve a mesma tela de
+   * `current()`, com `subscription.coupon`. 409 com `coupon_*` na recusa.
+   */
+  applyCoupon: (code: string) =>
+    apiClient.post<SubscriptionUsage>('/tenant/subscription/coupon', { code })
 }
 
 export const usersAPI = {

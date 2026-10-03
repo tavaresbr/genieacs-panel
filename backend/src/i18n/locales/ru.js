@@ -850,6 +850,13 @@ export default {
   'charges.gatewayNotConfigured': 'Онлайн-оплата сейчас недоступна',
   'charges.gatewayFailed': 'Платёжный шлюз не выставил счёт: {detail}',
   'billing.busy': 'Выполняется другая операция с оплатой; попробуйте ещё раз через минуту',
+  'coupon.invalid': 'Этот код купона недействителен',
+  'coupon.expired': 'Срок действия купона истёк',
+  'coupon.exhausted': 'Купон исчерпал лимит использований',
+  'coupon.planMismatch': 'Этот купон не действует для вашего тарифа',
+  'coupon.alreadyApplied': 'К этой подписке уже применён купон',
+  'coupon.applied': 'Купон {code} применён',
+  'coupon.applyFailed': 'Не удалось применить купон',
 
   'tenant.renamed': 'Провайдер переименован',
   'tenant.securityInvalid': 'Укажите, обязателен ли двухэтапный вход (да или нет)',

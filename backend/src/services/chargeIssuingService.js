@@ -4,6 +4,7 @@ import { currentTenantId } from '../config/tenantContext.js';
 import { isUniqueViolation } from '../config/database.js';
 import Subscription from '../models/Subscription.js';
 import Plan from '../models/Plan.js';
+import Coupon from '../models/Coupon.js';
 import { providerFor } from './billing/registry.js';
 import { PRODUCT_NAME } from '../config/brand.js';
 import SubscriptionService from './subscriptionService.js';
@@ -518,9 +519,14 @@ class ChargeIssuingService {
       return { issued: false, reason: 'not_billable' };
     }
 
-    let preco = Number(plan?.price_cents ?? 0);
+    // O preço com o cupom da assinatura, quando há um que vale neste plano
+    // (0093, `effectivePriceCents`) — lido uma vez e reaproveitado para o
+    // plano da descida agendada logo abaixo.
+    const cupom = subscription.coupon_id ? await Coupon.findById(subscription.coupon_id) : null;
+    let preco = await SubscriptionService.effectivePriceCents(subscription, plan, { coupon: cupom });
     // Plano de graça não gera cobrança de R$ 0,00 — o gateway a recusaria, e
-    // com razão. É o caso do `unlimited`, que todo provedor herdado tem.
+    // com razão. É o caso do `unlimited`, que todo provedor herdado tem. O
+    // cupom nunca leva um plano pago a zero (o piso de `COUPON_FLOOR_CENTS`).
     if (!(preco > 0)) return { issued: false, reason: 'free_plan' };
 
     // O prazo vivo: o do período pago, ou o do teste para quem ainda não pagou
@@ -608,7 +614,9 @@ class ChargeIssuingService {
           }
           if (!descidaBloqueada) {
             planoDoPeriodo = agendado;
-            preco = Number(agendado.price_cents);
+            // O cupom vale no plano novo só se ele está na lista do cupom: o
+            // período que esta cobrança paga já é do plano agendado.
+            preco = await SubscriptionService.effectivePriceCents(subscription, agendado, { coupon: cupom });
           }
         }
       }

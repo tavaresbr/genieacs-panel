@@ -2,6 +2,7 @@ import Plan from '../models/Plan.js';
 import Subscription, { SUBSCRIPTION_STATUSES } from '../models/Subscription.js';
 import BillingEvent, { BILLING_EVENT_TYPES } from '../models/BillingEvent.js';
 import BillingCharge from '../models/BillingCharge.js';
+import Coupon, { parseCouponPlanIds } from '../models/Coupon.js';
 import { getDb, tdb, isUniqueViolation } from '../config/database.js';
 import { TenantCache } from '../config/tenantCache.js';
 import { currentTenantId, runInTenant } from '../config/tenantContext.js';
@@ -74,6 +75,15 @@ const avisosDeBloqueio = new Map();
  */
 const PAID_PERIOD_DAYS = 30;
 
+/**
+ * O menor valor que um cupom deixa uma fatura ter: R$ 5,00, o mínimo que o
+ * Asaas aceita numa cobrança. Sem piso, um desconto grande daria uma fatura
+ * que o gateway recusa — ou, no limite, uma de valor zero, que exigiria um
+ * caminho de dinheiro que não existe (período pago sem pagamento). Um plano
+ * que já custa menos que o piso fica com o preço dele: o cupom não sobe preço.
+ */
+export const COUPON_FLOOR_CENTS = 500;
+
 /** Os dias que um pagamento compra neste plano, ou a reserva. */
 function periodoDoPlano(plano) {
   const dias = Number(plano?.period_days);
@@ -100,7 +110,7 @@ function periodoDoPlano(plano) {
  * não é a da referência: comparar centavos de moedas diferentes não é uma
  * conferência frouxa, é uma conta errada.
  */
-async function valorPedido({ externalId, plano, currency }) {
+async function valorPedido({ externalId, plano, currency, precoDoPlano = null }) {
   const moedaPaga = String(currency || '').toUpperCase();
 
   // 1a. A cobrança que NUNCA chegou ao gateway, marcada paga à mão pelo
@@ -156,7 +166,10 @@ async function valorPedido({ externalId, plano, currency }) {
     }
   }
 
-  const preco = Number(plano?.price_cents);
+  // O preço que a emissão teria pedido: o do plano com o cupom, quando há um
+  // (`precoDoPlano`, ver `effectivePriceCents`) — senão o pagamento manual do
+  // valor com desconto seria chamado de "pago a menos".
+  const preco = precoDoPlano ?? Number(plano?.price_cents);
   if (!Number.isFinite(preco) || preco <= 0) return { cents: null, motivo: 'nothing_asked', fonte: null };
   const moedaPlano = String(plano?.currency || '').toUpperCase();
   if (moedaPlano && moedaPlano !== moedaPaga) return { cents: null, motivo: 'currency_mismatch', fonte: 'plan' };
@@ -439,7 +452,9 @@ class SubscriptionService {
     // mostram ao lado do plano atual — e uma consulta a mais só para quem tem
     // uma, que é quase ninguém.
     const pendingPlan = subscription?.pending_plan_id ? await Plan.findById(subscription.pending_plan_id) : null;
-    return cache.set({ subscription, plan, pendingPlan });
+    // O cupom (0093) pela mesma razão: a tela mostra o preço com desconto.
+    const coupon = subscription?.coupon_id ? await Coupon.findById(subscription.coupon_id) : null;
+    return cache.set({ subscription, plan, pendingPlan, coupon });
   }
 
   /** Esquece a leitura de UM provedor — a que o console acabou de mudar. */
@@ -458,7 +473,7 @@ class SubscriptionService {
    * também o que a porta da assinatura põe no corpo do 402, e ali a pergunta
    * é "por que parei", não "quanto custa".
    */
-  static present({ subscription, plan, pendingPlan = null }, opcoes = {}) {
+  static present({ subscription, plan, pendingPlan = null, coupon = null }, opcoes = {}) {
     if (!subscription) return null;
     // O segundo argumento já foi só `now`; continua aceito assim.
     const { now = new Date(), withExemptReason = false } = opcoes instanceof Date ? { now: opcoes } : (opcoes ?? {});
@@ -477,7 +492,103 @@ class SubscriptionService {
       renewsAt: subscription.renews_at ?? null,
       canceledAt: subscription.canceled_at ?? null,
       pendingPlan: this.presentPendingPlan(subscription, pendingPlan),
+      coupon: this.presentCoupon(subscription, plan, coupon),
       ...this.presentBillingExempt(subscription, { withReason: withExemptReason })
+    };
+  }
+
+  // ── Cupom de desconto (0093) ─────────────────────────────────────────
+
+  /**
+   * Se o cupom `coupon` vale para a fatura de `plan` desta assinatura.
+   *
+   * Vale quando é o cupom DA assinatura, ainda tem ciclo (o `forever` não
+   * conta ciclo) e o plano está na lista dele, quando ele tem lista. A
+   * validade, o teto de resgates e o `active` NÃO entram: são regras do
+   * RESGATE. Quem já resgatou fica com o desconto que resgatou — desativar um
+   * cupom fecha a porta para os próximos, não tira de quem entrou.
+   *
+   * O plano conta a cada fatura, e não só na aplicação: a descida para um
+   * plano fora da lista faz o cupom parar de valer ali (e voltar a valer se o
+   * provedor voltar a um plano da lista, enquanto houver ciclo).
+   */
+  static couponApplies(subscription, plan, coupon) {
+    if (!subscription?.coupon_id || !coupon || !plan) return false;
+    if (Number(coupon.id) !== Number(subscription.coupon_id)) return false;
+    if (coupon.duration !== 'forever') {
+      const restantes = Number(subscription.coupon_cycles_left);
+      if (!Number.isFinite(restantes) || restantes <= 0) return false;
+    }
+    const planos = parseCouponPlanIds(coupon.plan_ids);
+    return planos === null || planos.includes(Number(plan.id));
+  }
+
+  /**
+   * `priceCents` com o desconto de `coupon`, respeitando o piso
+   * (`COUPON_FLOOR_CENTS`). Percentual arredonda o DESCONTO para baixo: o
+   * centavo que sobra fica com quem cobra, e a conta é a mesma em toda tela.
+   */
+  static priceWithCoupon(priceCents, coupon) {
+    const preco = Math.floor(Number(priceCents));
+    if (!Number.isFinite(preco) || preco <= 0) return 0;
+    if (!coupon || preco <= COUPON_FLOOR_CENTS) return preco;
+    const valor = Math.floor(Number(coupon.value));
+    if (!Number.isFinite(valor) || valor <= 0) return preco;
+    const desconto = coupon.kind === 'percent' ? Math.floor((preco * valor) / 100) : valor;
+    return Math.max(COUPON_FLOOR_CENTS, preco - desconto);
+  }
+
+  /**
+   * O preço da fatura de `plan` para esta assinatura, com o cupom já lido —
+   * a versão síncrona de `effectivePriceCents`, para quem lista muitas
+   * assinaturas de uma vez com os cupons em mãos.
+   */
+  static priceFor(subscription, plan, coupon) {
+    const preco = Math.max(0, Math.floor(Number(plan?.price_cents ?? 0)) || 0);
+    return this.couponApplies(subscription, plan, coupon) ? this.priceWithCoupon(preco, coupon) : preco;
+  }
+
+  /**
+   * O preço que a fatura de `plan` vai pedir a esta assinatura: o do plano,
+   * com o cupom dela quando ele vale (`couponApplies`), nunca abaixo do piso.
+   *
+   * É a ÚNICA conta de preço da cobrança: a emissão (`issueCurrent`, inclusive
+   * o preço da descida agendada), a reprecificação da fatura em aberto
+   * (`reprecificarCobranca`), o "pagar agora" e a conferência do pagamento
+   * leem daqui. O valor mudado à mão pelo console numa cobrança (0078) vence
+   * isto — quem decide isso é quem lê a cobrança.
+   *
+   * Assíncrona porque lê o cupom; `{ coupon }` poupa a leitura a quem já o
+   * tem (nulo é "sem cupom").
+   */
+  static async effectivePriceCents(subscription, plan, { coupon } = {}) {
+    if (!subscription?.coupon_id) return this.priceFor(subscription, plan, null);
+    const cupom = coupon !== undefined ? coupon : await Coupon.findById(subscription.coupon_id);
+    return this.priceFor(subscription, plan, cupom);
+  }
+
+  /**
+   * O cupom como a tela e o console o leem — ou nulo. `priceCents` é o preço
+   * que a próxima fatura do plano atual vai pedir; `appliesToPlan` diz se o
+   * cupom vale no plano de agora (um cupom restrito a outros planos fica na
+   * assinatura, sem desconto, até o provedor voltar a um deles ou ele sair).
+   */
+  static presentCoupon(subscription, plan, coupon) {
+    if (!subscription?.coupon_id || !coupon || Number(coupon.id) !== Number(subscription.coupon_id)) return null;
+    const restantes = subscription.coupon_cycles_left;
+    return {
+      id: Number(coupon.id),
+      code: coupon.code,
+      kind: coupon.kind,
+      value: Number(coupon.value),
+      duration: coupon.duration,
+      durationCycles: coupon.duration_cycles === null || coupon.duration_cycles === undefined
+        ? null : Number(coupon.duration_cycles),
+      cyclesLeft: restantes === null || restantes === undefined ? null : Number(restantes),
+      planIds: parseCouponPlanIds(coupon.plan_ids),
+      appliesToPlan: this.couponApplies(subscription, plan, coupon),
+      priceCents: this.priceFor(subscription, plan, coupon),
+      appliedAt: isoOf(subscription.coupon_applied_at)
     };
   }
 
@@ -1288,6 +1399,10 @@ class SubscriptionService {
     const plano = planoAgendado && !descidaBloqueada ? planoAgendado : planoAtual;
     const dias = periodDays ?? periodoDoPlano(plano);
 
+    // O cupom (0093): o preço que a fatura deste período pediu já tem o
+    // desconto, e é contra ele que se confere quando não há cobrança.
+    const cupom = before.coupon_id ? await Coupon.findById(before.coupon_id) : null;
+
     // A conferência do valor, que é o que separa "recebi dinheiro" de "esta
     // conta está paga".
     //
@@ -1307,7 +1422,9 @@ class SubscriptionService {
     // `renews_at` — e `past_due` deixa ler e para de deixar escrever, que é
     // onde alguém que pagou a menos deve ficar: visível, avisado e recuperável,
     // não trancado do lado de fora.
-    const pedido = await valorPedido({ externalId, plano, currency });
+    const pedido = await valorPedido({
+      externalId, plano, currency, precoDoPlano: this.priceFor(before, plano, cupom)
+    });
     const faltou = pedido.cents !== null && amount < pedido.cents;
     const underpaid = faltou && !allowUnderpayment;
     if (pedido.motivo === 'currency_mismatch') {
@@ -1339,7 +1456,9 @@ class SubscriptionService {
     //     vai para a renovação SEGUINTE — tenta de novo lá, pela mesma regra.
     let destinoDaDescida = null;
     if (reactivates && planoAgendado) {
-      const precoAtual = Number(planoAtual?.price_cents ?? 0);
+      // Com o cupom, quando ele vale no plano atual: a fatura do atual teria
+      // saído com o desconto, e é com ela que a do agendado se compara.
+      const precoAtual = this.priceFor(before, planoAtual, cupom);
       // A cobrança com valor mudado à mão pelo console (o desconto) não diz
       // nada sobre QUAL plano foi pago: menos que o preço do atual ali é
       // abatimento, não o preço do barato. Aí vale o plano que a cobrança
@@ -1374,8 +1493,19 @@ class SubscriptionService {
     const statusAfter = patch.status ?? before.status;
     const renewsAt = patch.renews_at ?? before.renews_at ?? null;
 
+    // O ciclo do cupom que ESTE pagamento gasta: só quando ele estende o
+    // período (é a fatura com desconto sendo paga), só nos cupons que contam
+    // ciclo, e só se o cupom vale no plano do período pago — a fatura de um
+    // plano fora da lista saiu sem desconto, e não gastou nada.
+    const gastaCupom = reactivates && cupom && cupom.duration !== 'forever'
+      && this.couponApplies(before, plano, cupom);
+
     try {
       const subscription = await getDb().transaction(async (trx) => {
+        // Dentro da transação do evento: a reentrega do mesmo pagamento morre
+        // no índice único do evento logo abaixo, e o ciclo gasto aqui volta
+        // junto no rollback — o cupom é consumido uma vez por pagamento.
+        const consumo = gastaCupom ? await Subscription.consumeCouponCycle(tenantId, cupom.id, trx) : null;
         await BillingEvent.record({
           subscriptionId: before.id,
           type: BILLING_EVENT_TYPES.PAYMENT_RECORDED,
@@ -1407,7 +1537,10 @@ class SubscriptionService {
             expectedCents: pedido.cents,
             ...(pedido.motivo ? { amountCheck: pedido.motivo } : {}),
             ...(underpaid ? { underpaid: true, shortfallCents: pedido.cents - amount } : {}),
-            ...(faltou && allowUnderpayment ? { underpaymentAccepted: true } : {})
+            ...(faltou && allowUnderpayment ? { underpaymentAccepted: true } : {}),
+            // O ciclo do cupom que este pagamento gastou, para o estorno o
+            // devolver (`reversePayment`) — e, se o zerou, o cupom inteiro.
+            ...(consumo ? { coupon: { id: Number(cupom.id), code: cupom.code, ...consumo } } : {})
           }
         }, trx);
         // Na mesma transação do pagamento: um período novo que começasse no
@@ -1590,6 +1723,11 @@ class SubscriptionService {
 
     try {
       const subscription = await getDb().transaction(async (trx) => {
+        // O ciclo do cupom que o pagamento gastou volta com o dinheiro — na
+        // mesma transação da marca do estorno, então o segundo estorno do
+        // mesmo pagamento (o webhook depois do console) não devolve outro.
+        const gastou = quemEstendeu?.coupon?.id ? quemEstendeu.coupon : null;
+        const devolucao = gastou ? await Subscription.restoreCouponCycle(tenantId, gastou, trx) : null;
         await BillingEvent.record({
           subscriptionId: before.id,
           type: BILLING_EVENT_TYPES.PAYMENT_REFUNDED,
@@ -1610,7 +1748,8 @@ class SubscriptionService {
               ? Math.round(((prazo.getTime() - patch.renews_at.getTime()) / DAY_MS) * 1000) / 1000
               : 0,
             basis,
-            ...(patch.pending_plan_locked_at === null ? { pendingUnlocked: true } : {})
+            ...(patch.pending_plan_locked_at === null ? { pendingUnlocked: true } : {}),
+            ...(devolucao ? { couponRestored: { id: Number(gastou.id), code: gastou.code ?? null, ...devolucao } } : {})
           }
         }, trx);
         return Object.keys(patch).length

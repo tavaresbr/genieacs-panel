@@ -848,6 +848,13 @@ export default {
   'charges.gatewayNotConfigured': 'O pagamento online não está disponível agora',
   'charges.gatewayFailed': 'O gateway de pagamento não emitiu a cobrança: {detail}',
   'billing.busy': 'Outra operação de cobrança está em andamento; tente de novo em instantes',
+  'coupon.invalid': 'Este código de cupom não é válido',
+  'coupon.expired': 'Este cupom expirou',
+  'coupon.exhausted': 'Este cupom atingiu o limite de usos',
+  'coupon.planMismatch': 'Este cupom não vale para o seu plano',
+  'coupon.alreadyApplied': 'Esta assinatura já tem um cupom aplicado',
+  'coupon.applied': 'Cupom {code} aplicado',
+  'coupon.applyFailed': 'Falha ao aplicar o cupom',
 
   'tenant.renamed': 'Provedor renomeado',
   'tenant.securityInvalid': 'Informe se o login em duas etapas é exigido (verdadeiro ou falso)',

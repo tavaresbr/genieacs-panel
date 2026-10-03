@@ -850,6 +850,13 @@ export default {
   'charges.gatewayNotConfigured': 'Online-Zahlung ist derzeit nicht verfügbar',
   'charges.gatewayFailed': 'Der Zahlungsanbieter hat die Rechnung nicht ausgestellt: {detail}',
   'billing.busy': 'Ein anderer Abrechnungsvorgang läuft gerade; versuchen Sie es gleich noch einmal',
+  'coupon.invalid': 'Dieser Gutscheincode ist ungültig',
+  'coupon.expired': 'Dieser Gutschein ist abgelaufen',
+  'coupon.exhausted': 'Dieser Gutschein hat sein Nutzungslimit erreicht',
+  'coupon.planMismatch': 'Dieser Gutschein gilt nicht für Ihren Tarif',
+  'coupon.alreadyApplied': 'Auf dieses Abonnement ist bereits ein Gutschein angewendet',
+  'coupon.applied': 'Gutschein {code} angewendet',
+  'coupon.applyFailed': 'Der Gutschein konnte nicht angewendet werden',
 
   'tenant.renamed': 'Anbieter umbenannt',
   'tenant.securityInvalid': 'Geben Sie an, ob die Anmeldung in zwei Schritten verlangt wird (wahr oder falsch)',

@@ -846,6 +846,13 @@ export default {
   'charges.gatewayNotConfigured': 'El pago en línea no está disponible ahora',
   'charges.gatewayFailed': 'La pasarela de pago no emitió el cobro: {detail}',
   'billing.busy': 'Hay otra operación de cobro en curso; inténtalo de nuevo en un momento',
+  'coupon.invalid': 'Este código de cupón no es válido',
+  'coupon.expired': 'Este cupón ha caducado',
+  'coupon.exhausted': 'Este cupón alcanzó su límite de usos',
+  'coupon.planMismatch': 'Este cupón no se aplica a tu plan',
+  'coupon.alreadyApplied': 'Esta suscripción ya tiene un cupón aplicado',
+  'coupon.applied': 'Cupón {code} aplicado',
+  'coupon.applyFailed': 'No se pudo aplicar el cupón',
 
   'tenant.renamed': 'Proveedor renombrado',
   'tenant.securityInvalid': 'Indique si el inicio de sesión en dos pasos es obligatorio (verdadero o falso)',

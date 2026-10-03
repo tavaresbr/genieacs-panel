@@ -198,7 +198,10 @@ export const SHARED_TABLES = new Set([
   'plans',
   // Os pedidos de demonstração da página pública. Da plataforma: quem pede
   // ainda não é provedor, e só o console os lê.
-  'leads'
+  'leads',
+  // Os cupons de desconto. Do catálogo comercial, como `plans`: o provedor
+  // resgata um cupom da plataforma, e só o console escreve nesta tabela.
+  'coupons'
 ]);
 
 /** Tables still to be converted. Shrinks to empty as the phase progresses. */

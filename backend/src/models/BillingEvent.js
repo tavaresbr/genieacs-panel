@@ -32,7 +32,13 @@ export const BILLING_EVENT_TYPES = Object.freeze({
   // único `(tenant_id, external_id)` não colide em nulo, e ligar e desligar
   // várias vezes é o uso esperado, não uma reentrega.
   BILLING_EXEMPT_ENABLED: 'billing_exempt.enabled',
-  BILLING_EXEMPT_DISABLED: 'billing_exempt.disabled'
+  BILLING_EXEMPT_DISABLED: 'billing_exempt.disabled',
+  // Um cupom de desconto entrou ou saiu da assinatura (0093) — pelo provedor
+  // ou pelo console. O consumo de um ciclo não tem linha própria: viaja no
+  // `detail` do pagamento que o gastou (`coupon`), e a devolução no do
+  // estorno (`couponRestored`).
+  COUPON_APPLIED: 'coupon.applied',
+  COUPON_REMOVED: 'coupon.removed'
 });
 
 class BillingEvent {

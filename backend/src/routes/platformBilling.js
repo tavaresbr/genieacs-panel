@@ -1,6 +1,7 @@
 import express from 'express';
 import PlatformBillingController from '../controllers/platformBillingController.js';
 import PlatformSubscriptionsController from '../controllers/platformSubscriptionsController.js';
+import PlatformCouponsController from '../controllers/platformCouponsController.js';
 import { authenticateToken, requirePlatformAdmin } from '../middleware/auth.js';
 
 /**
@@ -34,5 +35,13 @@ router.post('/tenants/:id/charges/:chargeId/settle', ...guard, PlatformSubscript
 router.post('/tenants/:id/charges/:chargeId/cancel', ...guard, PlatformSubscriptionsController.cancel);
 router.post('/tenants/:id/charges/:chargeId/reissue', ...guard, PlatformSubscriptionsController.reissue);
 router.post('/tenants/:id/charges/:chargeId/refund', ...guard, PlatformSubscriptionsController.refund);
+
+// Os cupons de desconto (0093): o catálogo deles, e o cupom de UM provedor —
+// `{ code }` aplica (substituindo o que houver), `{ code: null }` tira.
+router.get('/coupons', ...guard, PlatformCouponsController.list);
+router.post('/coupons', ...guard, PlatformCouponsController.create);
+router.patch('/coupons/:id', ...guard, PlatformCouponsController.update);
+router.delete('/coupons/:id', ...guard, PlatformCouponsController.remove);
+router.put('/tenants/:id/subscription/coupon', ...guard, PlatformBillingController.setCoupon);
 
 export default router;
