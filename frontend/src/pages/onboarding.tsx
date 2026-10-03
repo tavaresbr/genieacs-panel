@@ -41,8 +41,8 @@ export default function Onboarding() {
   const { t } = useTranslation()
   const toast = useToast()
   const navigate = useNavigate()
-  const { tenant, name: currentName, refresh, platformManaged } = useTenant()
-  const { can } = useAuth()
+  const { name: currentName, refresh, platformManaged } = useTenant()
+  const { can, user } = useAuth()
   const [step, setStep] = useState<Step>('welcome')
   const [busy, setBusy] = useState(false)
   // Na SaaS o ACS é da plataforma, salvo quando o console marcou que o
@@ -223,13 +223,17 @@ export default function Onboarding() {
     // No provedor, para outro administrador ou outro navegador não receberem o
     // assistente de novo. Se a gravação falhar, o '1' local faz o gate subir a
     // marca na próxima visita.
+    //
+    // O espelho é o do provedor da sessão, não o do host: no host compartilhado
+    // o `tenant` é o do primeiro provedor. Sem slug na sessão, só o servidor.
+    const sessionSlug = user?.tenant?.slug
     void settingsAPI.dismissOnboarding('wizard').then((res) => {
-      if (res.success && tenant?.slug) {
-        try { localStorage.setItem(onboardingDismissKey(tenant.slug), '2') } catch {}
+      if (res.success && sessionSlug) {
+        try { localStorage.setItem(onboardingDismissKey(sessionSlug), '2') } catch {}
       }
     }).catch(() => {})
-    if (tenant?.slug) {
-      try { localStorage.setItem(onboardingDismissKey(tenant.slug), '1') } catch {}
+    if (sessionSlug) {
+      try { localStorage.setItem(onboardingDismissKey(sessionSlug), '1') } catch {}
     }
     navigate('/dashboard', { replace: true })
   }

@@ -6,6 +6,7 @@ import { mappingAPI, type ClientLocation } from '@/lib/api'
 import { MapAddressSearch } from '@/components/map-address-search'
 import { allBoxOccupancy, type OccupancyEdge, type OccupancyNode } from '@/lib/box-occupancy'
 import { haversineMeters, slugify } from '@/lib/kml-import'
+import { nearestBoxes, SUGGEST_METERS } from '@/lib/nearest-box'
 
 /**
  * "Colocar no mapa": cria o ponto do cliente (ONT) já com o PPPoE e, se o
@@ -46,6 +47,8 @@ export function PlaceClientDialog<T extends OccupancyNode>({
   const [name, setName] = useState(target.name || target.pppoe)
   const [point, setPoint] = useState<{ lat: number; lng: number } | null>(null)
   const [boxId, setBoxId] = useState('')
+  // Enquanto o técnico não escolhe, vale a sugestão: a caixa livre mais próxima.
+  const [boxTouched, setBoxTouched] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // O endereço do cliente no SGP: o marcador já abre na casa dele quando dá.
@@ -72,12 +75,14 @@ export function PlaceClientDialog<T extends OccupancyNode>({
       : location?.precision === 'city' ? 'map.place.fromCity'
         : null
 
+  const rows = useMemo(() => allBoxOccupancy(nodes, edges), [edges, nodes])
+  const suggestion = useMemo(() => (point ? nearestBoxes(point, rows, { maxMeters: SUGGEST_METERS, limit: 1 })[0] ?? null : null), [point, rows])
+  const selectedBoxId = boxTouched ? boxId : suggestion?.box.node_id ?? ''
   const boxes = useMemo(() => {
-    const rows = allBoxOccupancy(nodes, edges)
     return rows
       .map((row) => ({ ...row, distance: point ? Math.round(haversineMeters([point.lat, point.lng], [row.box.latitude, row.box.longitude])) : null }))
       .sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0) || a.box.name.localeCompare(b.box.name))
-  }, [edges, nodes, point])
+  }, [point, rows])
 
   const save = async () => {
     if (!point) { setError(t('map.place.needPoint')); return }
@@ -90,7 +95,7 @@ export function PlaceClientDialog<T extends OccupancyNode>({
         latitude: point.lat, longitude: point.lng, pppoe: target.pppoe
       })
       if (!created.success) throw new Error(created.message || t('map.place.failed'))
-      const box = boxes.find((row) => row.box.node_id === boxId)
+      const box = boxes.find((row) => row.box.node_id === selectedBoxId)
       if (box) {
         const cable = await mappingAPI.createEdge({
           edge_id: uniqueId(`drop-${nodeId}`, new Set(edgeIds)),
@@ -143,7 +148,7 @@ export function PlaceClientDialog<T extends OccupancyNode>({
         <LocationPicker lat={point?.lat ?? null} lng={point?.lng ?? null} fallback={center} fallbackZoom={16} onChange={(lat, lng) => setPoint({ lat, lng })} />
         <p className="field-hint">{point ? `${point.lat}, ${point.lng}` : t('map.place.clickHint')}</p>
         <label className="field-label mt-4" htmlFor="place-box">{t('map.place.box')}</label>
-        <select id="place-box" className="modern-input w-full" value={boxId} onChange={(event) => setBoxId(event.target.value)}>
+        <select id="place-box" className="modern-input w-full" value={selectedBoxId} onChange={(event) => { setBoxId(event.target.value); setBoxTouched(true) }}>
           <option value="">{t('map.place.noBox')}</option>
           {boxes.map((row) => (
             <option key={row.box.node_id} value={row.box.node_id} disabled={row.free === 0}>
@@ -153,7 +158,9 @@ export function PlaceClientDialog<T extends OccupancyNode>({
             </option>
           ))}
         </select>
-        <p className="field-hint">{t('map.place.boxHint')}</p>
+        {!boxTouched && suggestion
+          ? <p className="field-hint text-emerald-700 dark:text-emerald-400">{t('map.place.suggested', { meters: suggestion.distance })}</p>
+          : <p className="field-hint">{t('map.place.boxHint')}</p>}
         {error && <p className="mt-3 text-sm text-destructive" role="alert">{error}</p>}
         <div className="mt-6 flex flex-wrap justify-end gap-2">
           <button type="button" className="modern-button-secondary" onClick={onClose} disabled={saving}>{t('common.cancel')}</button>

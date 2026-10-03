@@ -263,6 +263,11 @@ class WhatsAppConfigService {
       // O token de verificação da Meta sai de propósito: o provedor precisa
       // colá-lo no app dele na Meta. Ele só serve para confirmar a assinatura
       // do webhook — não envia nem lê mensagem nenhuma.
+      //
+      // Na SaaS ele é o da plataforma, o mesmo para todos os provedores, e
+      // ainda assim sai: cada provedor configura o webhook no app DELE na
+      // Meta, e o Evolution só aceita um token (WA_BUSINESS_TOKEN_WEBHOOK).
+      // Escondê-lo deixaria o número oficial sem como receber mensagens.
       cloudWebhook: {
         callbackUrl: this.cloudCallbackUrl(config),
         verifyToken: cloudVerifyToken || ''

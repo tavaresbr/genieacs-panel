@@ -10,7 +10,14 @@ import { handleError } from './whatsappController.js';
 class OutageController {
   static async list(req, res) {
     try {
-      return res.json(createResponse(req.t('whatsapp.outage.listed'), { incidents: await OutageIncidentService.list() }));
+      return res.json(createResponse(req.t('whatsapp.outage.listed'), {
+        incidents: await OutageIncidentService.list({
+          days: req.query?.days,
+          status: req.query?.status,
+          search: req.query?.search,
+          notified: req.query?.notified
+        })
+      }));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.outage.failed');
     }

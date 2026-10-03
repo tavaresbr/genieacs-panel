@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { outagesAPI, type OutageIncident, type OutageIncidentDetail } from '@/lib/api'
+import { outagesAPI, type OutageFilters, type OutageIncident, type OutageIncidentDetail } from '@/lib/api'
 import { useToast } from '@/components/ui/toast'
 import { Icon } from '@/components/ui/icon'
 import { useAuth } from '@/contexts/auth-context'
@@ -9,6 +9,9 @@ import { useTranslation } from '@/contexts/language-context'
 
 /** De quanto em quanto tempo a lista é relida: a varredura dos alertas roda a cada poucos minutos. */
 const POLL_MS = 60_000
+/** Mesma pausa da busca de contatos: uma consulta por palavra, não por letra. */
+const SEARCH_DEBOUNCE_MS = 350
+const PERIODS = [1, 7, 30, 90] as const
 
 function Incidente({ incident, onChange }: { incident: OutageIncident; onChange: () => void }) {
   const { t, formatDateTime } = useTranslation()
@@ -150,11 +153,24 @@ function Incidente({ incident, onChange }: { incident: OutageIncident; onChange:
 export function OutagePanel({ onlyOpen = false }: { onlyOpen?: boolean }) {
   const { t } = useTranslation()
   const [incidents, setIncidents] = useState<OutageIncident[] | null>(null)
+  const [days, setDays] = useState<NonNullable<OutageFilters['days']>>(1)
+  const [status, setStatus] = useState<NonNullable<OutageFilters['status']>>('')
+  const [notified, setNotified] = useState<NonNullable<OutageFilters['notified']>>('')
+  const [search, setSearch] = useState('')
+  const [debounced, setDebounced] = useState('')
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebounced(search.trim()), SEARCH_DEBOUNCE_MS)
+    return () => window.clearTimeout(timer)
+  }, [search])
+
+  const filtered = days !== 1 || status !== '' || notified !== '' || debounced !== ''
 
   const load = useCallback(async () => {
-    const res = await outagesAPI.list()
+    // O Dashboard pede só os abertos; o quadro do WhatsApp, o que os filtros dizem.
+    const res = await outagesAPI.list(onlyOpen ? { status: 'open' } : { days, status, notified, search: debounced })
     if (res.success && res.data) setIncidents(res.data.incidents)
-  }, [])
+  }, [onlyOpen, days, status, notified, debounced])
 
   useEffect(() => {
     void load()
@@ -169,9 +185,55 @@ export function OutagePanel({ onlyOpen = false }: { onlyOpen?: boolean }) {
     <section className="modern-card mb-5 p-5 sm:p-6">
       <h2 className="section-heading">{t('outage.title')}</h2>
       <p className="field-hint mt-1">{t('outage.description')}</p>
+      {!onlyOpen && (
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4" data-testid="outage-filters">
+          <select
+            className="modern-input"
+            aria-label={t('outage.filter.period')}
+            value={days}
+            onChange={(event) => setDays(Number(event.target.value) as NonNullable<OutageFilters['days']>)}
+          >
+            {PERIODS.map((period) => (
+              <option key={period} value={period}>
+                {period === 1 ? t('outage.filter.last24h') : t('outage.filter.lastDays', { count: period })}
+              </option>
+            ))}
+          </select>
+          <select
+            className="modern-input"
+            aria-label={t('outage.filter.status')}
+            value={status}
+            onChange={(event) => setStatus(event.target.value as NonNullable<OutageFilters['status']>)}
+          >
+            <option value="">{t('outage.filter.allStatus')}</option>
+            <option value="open">{t('outage.statusOpen')}</option>
+            <option value="resolved">{t('outage.statusResolved')}</option>
+          </select>
+          <select
+            className="modern-input"
+            aria-label={t('outage.filter.notified')}
+            value={notified}
+            onChange={(event) => setNotified(event.target.value as NonNullable<OutageFilters['notified']>)}
+          >
+            <option value="">{t('outage.filter.allNotified')}</option>
+            <option value="pending">{t('outage.filter.notNotified')}</option>
+            <option value="sent">{t('outage.filter.notifiedOnly')}</option>
+          </select>
+          <input
+            type="search"
+            className="modern-input"
+            aria-label={t('outage.filter.search')}
+            placeholder={t('outage.filter.search')}
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+        </div>
+      )}
       <div className="mt-4 grid gap-3">
         {incidents === null && <p className="text-sm text-muted-foreground">{t('common.loading')}</p>}
-        {incidents !== null && lista.length === 0 && <p className="text-sm text-muted-foreground">{t('outage.empty')}</p>}
+        {incidents !== null && lista.length === 0 && (
+          <p className="text-sm text-muted-foreground">{t(filtered ? 'outage.emptyFiltered' : 'outage.empty')}</p>
+        )}
         {lista.map((incident) => (
           <Incidente key={`${incident.id}-${incident.status}-${incident.noticeSentAt ?? ''}`} incident={incident} onChange={() => void load()} />
         ))}

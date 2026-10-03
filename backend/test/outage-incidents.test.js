@@ -236,3 +236,53 @@ describe('o incidente de queda em massa', () => {
     assert.equal(status, 404);
   });
 });
+
+describe('os filtros do quadro', () => {
+  const nos = (incidentes) => incidentes.map((i) => i.nodeName);
+  const filtrar = async (query) => (await call(`${panelUrl}/api/whatsapp/outages${query}`, { headers: authHeaders(token) })).body.data.incidents;
+  // Em segundos inteiros: o TIMESTAMP do MySQL não guarda milissegundos.
+  const horasAtras = (h) => new Date(Math.floor((Date.now() - h * 3600_000) / 1000) * 1000);
+
+  beforeEach(async () => {
+    const incidente = (node, { aberto = false, horas, avisado = false }) => ({
+      tenant_id: 1,
+      node_id: node.toLowerCase().replace(/\s+/g, '-'),
+      node_name: node,
+      status: aberto ? 'open' : 'resolved',
+      started_at: horasAtras(horas + 1),
+      resolved_at: aberto ? null : horasAtras(horas),
+      notice_sent_at: avisado ? horasAtras(horas + 0.5) : null
+    });
+    await getDb()('outage_incidents').insert([
+      incidente('CTO-12 Centro', { aberto: true, horas: 1 }),
+      incidente('CTO-30', { horas: 2, avisado: true }),
+      incidente('CTO-12 Bairro', { horas: 72 }),
+      incidente('CTO-99', { horas: 24 * 40 })
+    ]);
+  });
+
+  it('sem filtro, os abertos e os resolvidos nas últimas 24 h', async () => {
+    assert.deepEqual(nos(await filtrar('')), ['CTO-12 Centro', 'CTO-30']);
+  });
+
+  it('o período olha mais para trás, e o aberto aparece em qualquer período', async () => {
+    assert.deepEqual(nos(await filtrar('?days=7')), ['CTO-12 Centro', 'CTO-30', 'CTO-12 Bairro']);
+    assert.deepEqual(nos(await filtrar('?days=90')), ['CTO-12 Centro', 'CTO-30', 'CTO-12 Bairro', 'CTO-99']);
+    assert.deepEqual(nos(await filtrar('?days=999')), ['CTO-12 Centro', 'CTO-30'], 'período fora da lista vale 24 h');
+  });
+
+  it('a situação separa em andamento e normalizadas', async () => {
+    assert.deepEqual(nos(await filtrar('?status=open&days=90')), ['CTO-12 Centro']);
+    assert.deepEqual(nos(await filtrar('?status=resolved&days=7')), ['CTO-30', 'CTO-12 Bairro']);
+  });
+
+  it('procura pelo ponto do mapa, sem diferenciar maiúsculas', async () => {
+    assert.deepEqual(nos(await filtrar('?search=cto-12&days=90')), ['CTO-12 Centro', 'CTO-12 Bairro']);
+    assert.deepEqual(await filtrar('?search=%25&days=90'), [], 'um termo só de curinga não acha nada');
+  });
+
+  it('separa as que ainda não tiveram aviso', async () => {
+    assert.deepEqual(nos(await filtrar('?notified=pending&days=90')), ['CTO-12 Centro', 'CTO-12 Bairro', 'CTO-99']);
+    assert.deepEqual(nos(await filtrar('?notified=sent&days=90')), ['CTO-30']);
+  });
+});

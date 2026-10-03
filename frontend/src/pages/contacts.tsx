@@ -3,6 +3,8 @@
 import { useCallback } from 'react'
 import { useNavigate } from 'react-router'
 import type { WhatsAppConversation } from '@/lib/api'
+import { useAuth } from '@/contexts/auth-context'
+import { sessionOwner } from '@/lib/session-owner'
 import { ContactsPanel } from '@/components/whatsapp/contacts-panel'
 
 /**
@@ -12,9 +14,10 @@ import { ContactsPanel } from '@/components/whatsapp/contacts-panel'
  */
 export default function ContactsPage() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const openConversation = useCallback((conversation: WhatsAppConversation) => {
-    navigate('/whatsapp', { state: { conversation } })
-  }, [navigate])
+    navigate('/whatsapp', { state: { conversation, owner: sessionOwner(user) } })
+  }, [navigate, user])
 
   return (
     <div className="page-shell">

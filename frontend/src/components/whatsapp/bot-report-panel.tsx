@@ -24,7 +24,7 @@ interface Column {
  * que um dia com zero também possa ser lido. A tabela em `<details>` é a
  * mesma informação sem depender de ver as barras.
  */
-function ColumnChart({ columns, ticks, ariaLabel, valueLabel, tableHeader }: {
+export function ColumnChart({ columns, ticks, ariaLabel, valueLabel, tableHeader }: {
   columns: Column[]
   /** Índices que ganham rótulo no eixo: todos poluiriam 30 ou 90 barras. */
   ticks: Set<number>

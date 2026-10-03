@@ -780,7 +780,9 @@ export default function Settings() {
       const url = URL.createObjectURL(res.blob)
       const link = document.createElement('a')
       link.href = url
-      link.download = res.filename || exportFileName(tenant?.slug)
+      // O slug da sessão: no host compartilhado o do `TenantProvider` é o do
+      // primeiro provedor.
+      link.download = res.filename || exportFileName(currentUser?.tenant?.slug || tenant?.slug)
       document.body.appendChild(link)
       link.click()
       link.remove()
