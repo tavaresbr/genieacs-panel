@@ -3765,6 +3765,57 @@ export interface MetaTemplateCreatePayload {
 export type MetaNoticeKey = 'maintenance' | 'outage' | 'alert'
 export type MetaNoticeBindings = Record<MetaNoticeKey, { name: string; language: string; paramCount: number } | null>
 
+/** Os períodos do relatório de modelos da Meta, em meses (o corrente incluso). */
+export type MetaUsagePeriod = 3 | 6 | 12
+/** As categorias que a Meta cobra. `UNKNOWN` só aparece no relatório. */
+export type MetaPriceCategory = 'MARKETING' | 'UTILITY' | 'AUTHENTICATION' | 'SERVICE'
+/** Preço por mensagem, em reais, que o provedor digitou; `null` = não digitou. */
+export type MetaPrices = Record<MetaPriceCategory, number | null>
+
+export interface MetaUsageCount {
+  /** Aceitos pela Meta, por categoria (sent/delivered/read). */
+  byCategory: Record<string, number>
+  total: number
+  /** Recusados pela Meta depois do aceite; fora da estimativa. */
+  failed: number
+}
+
+export interface MetaUsageMonth extends MetaUsageCount {
+  /** `YYYY-MM`, no fuso do servidor. */
+  month: string
+}
+
+export interface MetaUsageTemplate {
+  name: string
+  language: string
+  category: string
+  count: number
+  failed: number
+}
+
+export interface MetaUsageAccount extends MetaUsageCount {
+  accountId: number | null
+  label: string | null
+  name: string | null
+}
+
+/** Modelos da Meta enviados pelo painel, por mês e categoria. */
+export interface MetaUsageReport {
+  months: MetaUsagePeriod
+  since: string
+  /** O fuso do servidor, onde o mês vira. */
+  timezone: string | null
+  /** O teto de linhas lidas foi atingido; os números estão incompletos. */
+  truncated: boolean
+  categories: string[]
+  monthly: MetaUsageMonth[]
+  totals: MetaUsageCount
+  templates: MetaUsageTemplate[]
+  accounts: MetaUsageAccount[]
+  prices: MetaPrices
+  estimate: { byCategory: Partial<Record<MetaPriceCategory, number>>; total: number; currency: 'BRL' } | null
+}
+
 /** O modelo da Meta de um envio: nome, idioma e os parâmetros já preenchidos. */
 export interface MetaTemplatePayload {
   name: string
@@ -4539,6 +4590,15 @@ export const whatsappAPI = {
 
   saveMetaNoticeBindings: (bindings: Partial<Record<MetaNoticeKey, { name: string; language: string } | null>>) =>
     apiClient.put<MetaNoticeBindings>('/whatsapp/meta-notice-bindings', bindings),
+
+  getMetaUsage: (months: MetaUsagePeriod) =>
+    apiClient.get<MetaUsageReport>(`/whatsapp/meta-usage?months=${months}`),
+
+  getMetaPrices: () =>
+    apiClient.get<MetaPrices>('/whatsapp/meta-prices'),
+
+  saveMetaPrices: (prices: Partial<Record<MetaPriceCategory, number | string | null>>) =>
+    apiClient.put<MetaPrices>('/whatsapp/meta-prices', prices),
 
   deleteTemplate: (id: number) =>
     apiClient.delete(`/whatsapp/templates/${id}`),

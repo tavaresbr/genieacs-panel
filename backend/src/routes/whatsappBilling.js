@@ -20,6 +20,15 @@ router.delete('/templates/:id', ...gestao, WhatsAppBillingController.deleteTempl
 // para o número oficial mandar fora da janela de 24 h.
 router.get('/meta-notice-bindings', ...leitura, WhatsAppBillingController.getMetaNoticeBindings);
 router.put('/meta-notice-bindings', ...gestao, WhatsAppBillingController.saveMetaNoticeBindings);
+// Relatório de modelos da Meta enviados por mês, e os preços que o provedor
+// paga por categoria (só para a estimativa). Fica no par leitura/gestão das
+// campanhas porque é gasto com modelos, e quem dispara modelos — campanha,
+// régua de cobrança, avisos — é quem tem `campaigns.*`. Na matriz de papéis
+// quem tem `whatsapp.read` tem `campaigns.read`, então a aba de relatórios não
+// perde ninguém; mudar o preço é decisão de gestão, como ligar os avisos.
+router.get('/meta-usage', ...leitura, WhatsAppBillingController.getMetaUsage);
+router.get('/meta-prices', ...leitura, WhatsAppBillingController.getMetaPrices);
+router.put('/meta-prices', ...gestao, WhatsAppBillingController.saveMetaPrices);
 
 // ── Do not disturb ─────────────────────────────────────────────────────
 router.get('/opt-outs', ...leitura, WhatsAppBillingController.listOptOuts);

@@ -327,6 +327,8 @@ Gerenciador do WhatsApp, o resultado é o mesmo).
 | `POST /api/whatsapp/accounts/:id/templates` | `whatsapp.config` | cria o modelo em `POST /template/create/{instância}` e sincroniza; responde 201 com o modelo (`PENDING`) |
 | `GET /api/whatsapp/meta-templates?accountId=&usable=1` | `whatsapp.read` | lista; `usable` = `APPROVED` e formato suportado |
 | `GET/PUT /api/whatsapp/meta-notice-bindings` | `campaigns.read` / `campaigns.manage` | modelo de cada aviso automático (`maintenance`, `outage`, `alert`) |
+| `GET /api/whatsapp/meta-usage?months=3\|6\|12` | `campaigns.read` | modelos enviados por mês e categoria (outro valor de `months` vira 6) |
+| `GET/PUT /api/whatsapp/meta-prices` | `campaigns.read` / `campaigns.manage` | preço por mensagem (R$) de `MARKETING`, `UTILITY`, `AUTHENTICATION`, `SERVICE`, só para a estimativa |
 
 Suportado = corpo com parâmetros posicionais, e:
 
@@ -434,6 +436,27 @@ Imagem e vídeo: `{type: 'image', image: {link}}` / `{type: 'video', video:
 {link}}`.
 
 O envio decide pela janela: aberta, texto; fechada, o modelo, se houver.
+
+**Relatório de uso.** Conta as mensagens de `wa_messages` com
+`sent_as='template'` e `direction='out'`: `sent`, `delivered` e `read` entram
+no total; `failed` (a Meta recusou depois de aceitar) é contado à parte e fica
+fora da estimativa. Envio que falhou antes do aceite do Evolution não tem
+`sent_as` e não aparece. O mês é o do **fuso do servidor** (o período começa no
+dia 1º, 00:00 local, `months - 1` meses atrás; a resposta traz `timezone`). A
+categoria vem de `wa_meta_templates` por número + nome + idioma, depois por
+nome + idioma em qualquer número do provedor; sem achar, `UNKNOWN`. A resposta
+traz `monthly` (todos os meses do período, inclusive vazios), `totals`,
+`templates` (ranking), `accounts` (por número), `prices` e `estimate`
+(`null` sem preço nenhum). Lê no máximo 50 000 mensagens; acima disso,
+`truncated: true`.
+
+Os preços ficam em `app_state.wa_meta_prices` por provedor; `null` ou `''`
+limpa uma categoria, e valor negativo, não numérico ou acima de R$ 100 é
+recusado com `400 invalid_meta_price`. A permissão segue o par das campanhas
+(gasto com modelos é decisão de quem dispara campanha e régua). A estimativa é
+só estimativa: preço por país do destinatário, faixa de volume, conversas de
+serviço e janelas gratuitas da Meta não são modelados, e envios feitos fora do
+painel (Gerenciador da Meta) não entram.
 
 ## Webhook — `POST /api/whatsapp-webhook?t=<token>`
 
