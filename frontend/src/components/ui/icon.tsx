@@ -46,7 +46,10 @@ import {
   ClipboardDocumentListIcon,
   UsersIcon,
   DocumentIcon,
-  PaperClipIcon
+  PaperClipIcon,
+  MicrophoneIcon,
+  PlayIcon,
+  StopIcon
 } from '@heroicons/react/24/outline'
 
 const ICONS: Record<string, React.ComponentType<React.SVGProps<SVGSVGElement>>> = {
@@ -96,7 +99,10 @@ const ICONS: Record<string, React.ComponentType<React.SVGProps<SVGSVGElement>>> 
   contacts: UsersIcon,
   'eye-off': EyeSlashIcon,
   document: DocumentIcon,
-  paperclip: PaperClipIcon
+  paperclip: PaperClipIcon,
+  mic: MicrophoneIcon,
+  play: PlayIcon,
+  stop: StopIcon
 }
 
 interface IconProps extends React.SVGProps<SVGSVGElement> {

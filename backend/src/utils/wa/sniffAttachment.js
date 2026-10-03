@@ -74,6 +74,9 @@ const RULES = {
   'text/csv': looksLikeText,
   'video/mp4': (b) => ftypBrand(b) !== null,
   'audio/ogg': (b) => startsWithAscii(b, 'OggS'),
+  // O cabeçalho EBML, comum ao WebM e ao Matroska.
+  'audio/webm': (b) => startsWith(b, [0x1a, 0x45, 0xdf, 0xa3]),
+  'audio/mp4': (b) => ftypBrand(b) !== null,
   // Com etiqueta ID3 na frente, ou direto no primeiro quadro (11 bits de sync).
   'audio/mpeg': (b) => startsWithAscii(b, 'ID3') || (b.length >= 2 && b[0] === 0xff && (b[1] & 0xe0) === 0xe0)
 };

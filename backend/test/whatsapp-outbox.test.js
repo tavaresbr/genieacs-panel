@@ -401,6 +401,18 @@ describe('audio is a voice bubble before it is a file', () => {
     }
   });
 
+  it('sends a browser recording (WebM) through the voice-note route too', async () => {
+    await clearOutbox();
+    const conversation = await newConversation();
+    await post(conversation.id, { body: '', attachment: anexoDeSaida('audio-gravado.webm', 'audio/webm') });
+    requests.length = 0;
+
+    await WaOutboxWorker.tick();
+
+    assert.equal(audioCalls().length, 1, 'o Evolution v2 converte para mensagem de voz');
+    assert.equal(mediaCalls().length, 0);
+  });
+
   it('sends anything else straight through sendMedia', async () => {
     await clearOutbox();
     const conversation = await newConversation();

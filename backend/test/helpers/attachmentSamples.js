@@ -43,7 +43,11 @@ export const SAMPLES = Object.freeze({
   'application/zip': ZIP,
   'video/mp4': bytes([0, 0, 0, 0x18], 'ftypmp42', [0, 0, 0, 0], 'isommp42'),
   'audio/ogg': bytes('OggS', [0, 2], Buffer.alloc(20)),
-  'audio/mpeg': bytes('ID3', [4, 0, 0, 0, 0, 0, 0])
+  'audio/mpeg': bytes('ID3', [4, 0, 0, 0, 0, 0, 0]),
+  // O cabeçalho EBML de um WebM gravado pelo Chrome.
+  'audio/webm': bytes([0x1a, 0x45, 0xdf, 0xa3, 0x9f, 0x42, 0x86, 0x81, 0x01]),
+  // Um M4A gravado pelo Safari: caixa `ftyp` com a marca M4A.
+  'audio/mp4': bytes([0, 0, 0, 0x18], 'ftypM4A ', [0, 0, 0, 0], 'M4A isom')
 });
 
 /** Bytes que não são de tipo nenhum da lista (a não ser texto). */
