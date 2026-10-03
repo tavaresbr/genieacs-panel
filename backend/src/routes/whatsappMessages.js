@@ -27,6 +27,20 @@ router.get(
   WhatsAppMessageController.listMessages
 );
 
+// Assumir, transferir ou soltar uma conversa. Quem responde no WhatsApp pode
+// passar a conversa para outro colega; o destino é conferido no serviço.
+router.post(
+  '/conversations/:id/assign',
+  authenticateToken,
+  requirePermission('whatsapp.send'),
+  WhatsAppMessageController.assign
+);
+
+// A equipe e a disponibilidade de cada um: quem lê a caixa vê quem atende.
+router.get('/agents', authenticateToken, requirePermission('whatsapp.read'), WhatsAppMessageController.listAgents);
+// O próprio interruptor, e só o próprio: ninguém fica "disponível" por outro.
+router.post('/agents/me', authenticateToken, requirePermission('whatsapp.send'), WhatsAppMessageController.setAvailability);
+
 // Filing, not deleting: the thread and its history stay, and an inbound
 // message takes it back out of the archive on its own.
 router.post(

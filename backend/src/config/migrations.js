@@ -1841,6 +1841,36 @@ const SATISFACTION_TABLES = [
 ];
 
 /**
+ * Quem está atendendo o WhatsApp agora. `available` é o interruptor da
+ * pessoa; `last_seen_at` é o pulso da tela aberta — disponível com a aba
+ * fechada há dez minutos não é disponível. `last_assigned_at` desempata o
+ * rodízio entre quem tem a mesma carga.
+ */
+const waAgentsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.integer('user_id').unsigned().notNullable()
+    .references('id').inTable('users').onDelete('CASCADE');
+  t.boolean('available').notNullable().defaultTo(false);
+  t.timestamp('last_seen_at');
+  t.timestamp('last_assigned_at');
+  t.timestamp('updated_at').defaultTo(db.fn.now());
+  t.unique(['tenant_id', 'user_id'], { indexName: 'wa_agents_tenant_user_unique' });
+};
+
+const WA_AGENT_TABLES = [
+  ['wa_agents', waAgentsTable]
+];
+
+/** A conversa com dono: quem atende, desde quando, e desde quando espera um. */
+const WA_ASSIGNMENT_COLUMNS = [
+  ['assigned_user_id', (t) => t.integer('assigned_user_id').unsigned().nullable()],
+  ['assigned_at', (t) => t.timestamp('assigned_at').nullable()],
+  ['waiting_since', (t) => t.timestamp('waiting_since').nullable()]
+];
+
+/**
  * Os códigos de recuperação do login em duas etapas — ver `0059_user_totp`.
  * Só o hash de cada código: são senhas de uso único.
  */
@@ -2132,6 +2162,7 @@ export const SCHEMA_TABLES = [
   ...LEAD_TABLES,
   ...DUNNING_TABLES,
   ...SATISFACTION_TABLES,
+  ...WA_AGENT_TABLES,
   ...WA_META_TEMPLATE_TABLES
 ].map(([name]) => name);
 
@@ -5019,6 +5050,30 @@ export const migrations = [
           for (const add of missing) add(t);
         });
       }
+    }
+  },
+  {
+    /** A distribuição de conversas — ver `waAgentsTable` e `WA_ASSIGNMENT_COLUMNS`. */
+    id: '0090_wa_assignment',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      if (!(await db.schema.hasTable('wa_agents'))) return false;
+      if (!(await db.schema.hasTable('wa_conversations'))) return true;
+      return (await missingColumns(db, 'wa_conversations', WA_ASSIGNMENT_COLUMNS)).length === 0;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      for (const [nome, construtor] of WA_AGENT_TABLES) {
+        // eslint-disable-next-line no-await-in-loop
+        await createTableIfMissing(db, nome, construtor(db));
+      }
+      if (!(await db.schema.hasTable('wa_conversations'))) return;
+      const missing = await missingColumns(db, 'wa_conversations', WA_ASSIGNMENT_COLUMNS);
+      if (!missing.length) return;
+      await db.schema.alterTable('wa_conversations', (t) => {
+        for (const add of missing) add(t);
+        t.index(['tenant_id', 'assigned_user_id', 'closed_at'], 'wa_conversations_assigned_idx');
+      });
     }
   }
 ];

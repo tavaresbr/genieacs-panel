@@ -11,6 +11,7 @@ import { pedeSaida } from '../utils/wa/waOptOutTexto.js';
 import WaMediaService from './waMediaService.js';
 import WaBotService from './waBotService.js';
 import WaSatisfactionService from './waSatisfactionService.js';
+import WaAssignmentService from './waAssignmentService.js';
 import WaConversationService from './waConversationService.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -415,13 +416,20 @@ async function gravarMensagem(account, item) {
   // com try: `responder` engole tudo por contrato (ver `waBotService.js`), e
   // tem que engolir — uma falha dele virando 500 aqui faria o servidor reenviar
   // este evento para sempre.
+  let resultadoDoBot = null;
   if (!pesquisa?.consumed) {
-    await WaBotService.responder({
+    resultadoDoBot = await WaBotService.responder({
       conversation,
       messageId,
       body: texto,
       direction: linha.direction
     });
+  }
+
+  // 10. A distribuição: a conversa que precisa de gente ganha um atendente
+  // (ou entra na fila). Só na entrada, e nunca por uma nota da pesquisa.
+  if (!fromMe && !soPesquisa) {
+    await WaAssignmentService.afterInbound({ conversation, botResult: resultadoDoBot });
   }
 
   return { handled: true, conversationId: conversation.id, direction: linha.direction };

@@ -54,8 +54,17 @@ function padroes() {
     messages: Object.fromEntries(EDITABLE_MESSAGES.map((k) => [k, ''])),
     hours: { enabled: false, timezone: 'America/Sao_Paulo', week: semanaPadrao() },
     // Desligada até o provedor ligar: é uma mensagem a mais para o cliente.
-    satisfaction: { enabled: false }
+    satisfaction: { enabled: false },
+    // A distribuição automática para quem está disponível. Desligada: atribuir
+    // à mão (assumir, transferir) funciona sempre.
+    distribution: { enabled: false }
   };
+}
+
+function lerDistribuicao(raw, atual) {
+  if (raw === undefined) return atual;
+  if (!raw || typeof raw !== 'object') throw invalido('whatsapp.error.invalidBotConfig', 'invalid_bot_distribution');
+  return { enabled: raw.enabled === undefined ? atual.enabled : raw.enabled === true };
 }
 
 function lerPesquisa(raw, atual) {
@@ -142,7 +151,8 @@ class WaBotConfigService {
         ...(salvo.hours || {}),
         week: Array.isArray(salvo.hours?.week) && salvo.hours.week.length === 7 ? salvo.hours.week : base.hours.week
       },
-      satisfaction: { ...base.satisfaction, ...(salvo.satisfaction || {}) }
+      satisfaction: { ...base.satisfaction, ...(salvo.satisfaction || {}) },
+      distribution: { ...base.distribution, ...(salvo.distribution || {}) }
     };
     this.cache.set(config);
     return config;
@@ -176,7 +186,8 @@ class WaBotConfigService {
       options: lerOpcoes(patch.options, atual.options),
       messages: lerMensagens(patch.messages, atual.messages),
       hours: lerHorario(patch.hours, atual.hours),
-      satisfaction: lerPesquisa(patch.satisfaction, atual.satisfaction)
+      satisfaction: lerPesquisa(patch.satisfaction, atual.satisfaction),
+      distribution: lerDistribuicao(patch.distribution, atual.distribution)
     };
     const interruptores = {};
     if (patch.enabled !== undefined) interruptores.botEnabled = patch.enabled !== false;

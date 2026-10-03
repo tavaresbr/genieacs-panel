@@ -1,6 +1,7 @@
 import WaSendService from '../services/waSendService.js';
 import WaConversationService from '../services/waConversationService.js';
 import WaContactService from '../services/waContactService.js';
+import WaAssignmentService from '../services/waAssignmentService.js';
 import { SgpError } from '../services/sgpService.js';
 import { roleHas } from '../config/permissions.js';
 import WaMessage from '../models/WaMessage.js';
@@ -57,7 +58,9 @@ class WhatsAppMessageController {
         limit: req.query?.limit,
         offset: req.query?.offset,
         search: req.query?.search,
-        status: req.query?.status
+        status: req.query?.status,
+        assignee: req.query?.assignee,
+        userId: req.user?.userId ?? null
       });
       return res.json(createResponse(req.t('whatsapp.conversationsLoaded', { count: rows.length }), rows));
     } catch (error) {
@@ -87,6 +90,41 @@ class WhatsAppMessageController {
    * rather than a silent close, because the difference between the two is what
    * an operator sees in their list tomorrow morning.
    */
+  /** `POST /conversations/:id/assign` — assumir (o próprio id), transferir, ou `null` para soltar. */
+  static async assign(req, res) {
+    try {
+      const conversation = await WaConversationService.get(req.params?.id);
+      await WaAssignmentService.transfer(conversation, req.body?.userId ?? null);
+      return res.json(createResponse(
+        req.t('whatsapp.conversationAssigned'),
+        await WaConversationService.decorate(await WaConversationService.get(conversation.id))
+      ));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.conversationStatusFailed');
+    }
+  }
+
+  /** `GET /agents` — a equipe, quem está disponível e quantas conversas tem. */
+  static async listAgents(req, res) {
+    try {
+      return res.json(createResponse(req.t('whatsapp.configLoaded'), await WaAssignmentService.listAgents()));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.configLoadFailed');
+    }
+  }
+
+  /** `POST /agents/me` — o interruptor "Disponível", que a tela reenvia como pulso. */
+  static async setAvailability(req, res) {
+    try {
+      return res.json(createResponse(
+        req.t('whatsapp.configSaved'),
+        await WaAssignmentService.setAvailability(req.user.userId, req.body?.available === true)
+      ));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.configSaveFailed');
+    }
+  }
+
   static async setStatus(req, res) {
     const status = req.body?.status;
     if (status !== 'open' && status !== 'closed') {
@@ -100,7 +138,7 @@ class WhatsAppMessageController {
       ));
     }
     try {
-      const conversation = await WaConversationService.setStatus(req.params?.id, status, { userId: req.user?.id ?? null });
+      const conversation = await WaConversationService.setStatus(req.params?.id, status, { userId: req.user?.userId ?? null });
       return res.json(createResponse(
         req.t(status === 'closed' ? 'whatsapp.conversationClosed' : 'whatsapp.conversationReopened'),
         conversation

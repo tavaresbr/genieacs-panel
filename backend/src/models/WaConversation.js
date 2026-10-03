@@ -100,9 +100,13 @@ class WaConversation {
    * query and hands the result down; matching it here would mean a join per row.
    */
   static async listRecent({
-    limit = 50, offset = 0, status = 'open', search = '', searchContracts = [], searchContactIds = []
+    limit = 50, offset = 0, status = 'open', search = '', searchContracts = [], searchContactIds = [], assignee = null
   } = {}) {
     const query = tdb('wa_conversations');
+
+    // "Minhas" e "Sem atendente": um recorte por cima de qualquer pilha.
+    if (assignee === 'unassigned') query.whereNull('assigned_user_id');
+    else if (assignee?.userId) query.where('assigned_user_id', assignee.userId);
 
     const raw = String(search ?? '').trim();
 

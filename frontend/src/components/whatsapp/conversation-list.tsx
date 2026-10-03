@@ -152,6 +152,16 @@ export function ConversationList({ conversations, accounts, selectedId, onSelect
                     {t('whatsapp.inbox.optedOut')}
                   </span>
                 )}
+                {conversation.assignedTo ? (
+                  <span className="modern-badge" title={t('whatsapp.assign.agent')}>
+                    <Icon name="contacts" size={12} />
+                    {conversation.assignedTo}
+                  </span>
+                ) : conversation.waitingSince ? (
+                  <span className="modern-badge-warning" title={t('whatsapp.assign.waitingHint')}>
+                    {t('whatsapp.assign.waiting')}
+                  </span>
+                ) : null}
                 {conversation.contract ? (
                   <span className="modern-badge">
                     <Icon name="invoice" size={12} />

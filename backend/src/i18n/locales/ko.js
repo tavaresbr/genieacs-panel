@@ -663,6 +663,8 @@ export default {
   // WhatsApp — 수신함 및 셀프서비스 봇 (3차)
   'whatsapp.error.conversationNotFound': '대화를 찾을 수 없습니다',
   'whatsapp.conversationClosed': '대화를 종료했습니다',
+  'whatsapp.conversationAssigned': '대화 담당자가 변경되었습니다',
+  'whatsapp.error.invalidAssignee': 'WhatsApp에 응답하는 팀원을 선택하세요.',
   'whatsapp.conversationReopened': '대화를 다시 열었습니다',
   'whatsapp.conversationStatusFailed': '대화를 업데이트하지 못했습니다',
   'whatsapp.error.invalidConversationStatus': '대화는 열림 또는 종료 상태만 가질 수 있습니다',

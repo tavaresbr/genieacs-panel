@@ -136,7 +136,8 @@ export function ChatbotTab() {
         options: config.options,
         messages: config.messages,
         hours: config.hours,
-        satisfaction: config.satisfaction
+        satisfaction: config.satisfaction,
+        distribution: config.distribution
       })
       if (res.success && res.data) {
         setConfig(res.data)
@@ -205,6 +206,19 @@ export function ChatbotTab() {
         <p className="field-hint mt-1">{t('settings.chatbot.messagesHint')}</p>
         <div className="mt-4 grid gap-5">
           {MESSAGE_KEYS.map((key) => campoDeTexto(key))}
+        </div>
+      </section>
+
+      <section className="modern-card p-5 sm:p-6">
+        <h2 className="section-heading">{t('settings.chatbot.distributionTitle')}</h2>
+        <p className="field-hint mt-1">{t('settings.chatbot.distributionHint')}</p>
+        <div className="mt-4">
+          <Caixa
+            checked={config.distribution.enabled}
+            onChange={(value) => patch({ distribution: { ...config.distribution, enabled: value } })}
+            title={t('settings.chatbot.distributionEnabled')}
+            hint={t('settings.chatbot.distributionEnabledHint')}
+          />
         </div>
       </section>
 

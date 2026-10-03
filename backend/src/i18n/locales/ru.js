@@ -666,6 +666,8 @@ export default {
   // WhatsApp — входящие и бот самообслуживания (этап 3)
   'whatsapp.error.conversationNotFound': 'Диалог не найден',
   'whatsapp.conversationClosed': 'Диалог завершён',
+  'whatsapp.conversationAssigned': 'Ответственный за диалог обновлён',
+  'whatsapp.error.invalidAssignee': 'Выберите сотрудника, который отвечает в WhatsApp.',
   'whatsapp.conversationReopened': 'Диалог открыт снова',
   'whatsapp.conversationStatusFailed': 'Не удалось обновить диалог',
   'whatsapp.error.invalidConversationStatus': 'Диалог может быть только открытым или завершённым',

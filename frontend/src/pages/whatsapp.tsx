@@ -28,6 +28,7 @@ import { AlertsPanel } from '@/components/whatsapp/alerts-panel'
 import { OutagePanel } from '@/components/outages/outage-panel'
 import { ContactsPanel } from '@/components/whatsapp/contacts-panel'
 import { HealthBell } from '@/components/whatsapp/health-strip'
+import { AvailabilityToggle } from '@/components/whatsapp/assignment'
 import { inboxPanes } from '@/lib/wa-inbox-pane'
 import { useAuth } from '@/contexts/auth-context'
 import { useLocation } from 'react-router'
@@ -78,6 +79,14 @@ const BACKOFF_CAP = 6
 const SEARCH_DEBOUNCE_MS = 350
 
 type ConversationStatus = 'open' | 'noreply' | 'closed' | 'all'
+type AssigneeFilter = 'all' | 'me' | 'unassigned'
+
+/** O recorte por atendente, por cima de qualquer pilha. */
+const ASSIGNEE_FILTERS = [
+  ['all', 'whatsapp.assign.filterAll'],
+  ['me', 'whatsapp.assign.filterMine'],
+  ['unassigned', 'whatsapp.assign.filterUnassigned']
+] as const
 
 /** The piles, in the order an operator reaches for them. */
 const FILTERS = [
@@ -194,6 +203,7 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [status, setStatus] = useState<ConversationStatus>('open')
+  const [assignee, setAssignee] = useState<AssigneeFilter>('all')
 
   const [loadingList, setLoadingList] = useState(true)
   const [loadingThread, setLoadingThread] = useState(false)
@@ -223,7 +233,7 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
   // The filter belongs in a ref for the same reason: a poll must ask for what
   // is on screen now, without the interval being torn down and restarted — and
   // its clock reset — every time the operator types a letter.
-  const filterRef = useRef<{ search: string; status: ConversationStatus }>({ search: '', status: 'open' })
+  const filterRef = useRef<{ search: string; status: ConversationStatus; assignee: AssigneeFilter }>({ search: '', status: 'open', assignee: 'all' })
 
   useEffect(() => { selectedIdRef.current = selectedId }, [selectedId])
 
@@ -294,10 +304,11 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
     }
     listInFlight.current = true
     try {
-      const { search: term, status: pile } = filterRef.current
+      const { search: term, status: pile, assignee: dono } = filterRef.current
       const res = await whatsappAPI.listConversations({
         limit: LIST_LIMIT,
         status: pile,
+        ...(dono === 'all' ? {} : { assignee: dono }),
         ...(term ? { search: term } : {})
       })
       if (!alive.current) return
@@ -365,14 +376,14 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
   // The ref is written here, immediately before the reload it belongs to, so
   // the two can never describe different filters.
   useEffect(() => {
-    const next = { search: debouncedSearch, status }
+    const next = { search: debouncedSearch, status, assignee }
     const shown = filterRef.current
     // Unchanged on the first run, which is what keeps this from doubling the
     // initial load that the effect above already fired.
-    if (shown.search === next.search && shown.status === next.status) return
+    if (shown.search === next.search && shown.status === next.status && shown.assignee === next.assignee) return
     filterRef.current = next
     void loadListRef.current?.(false)
-  }, [debouncedSearch, status])
+  }, [debouncedSearch, status, assignee])
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -699,6 +710,24 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
                     <span className="modern-badge-success shrink-0">{t('whatsapp.inbox.unread', { count: unreadTotal })}</span>
                   )}
                 </div>
+                <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={t('whatsapp.assign.agent')}>
+                  {ASSIGNEE_FILTERS.map(([id, labelKey]) => (
+                    <button
+                      key={id}
+                      type="button"
+                      role="radio"
+                      aria-checked={assignee === id}
+                      onClick={() => setAssignee(id)}
+                      className={`min-h-7 rounded-full border px-2.5 text-xs font-medium transition-colors ${
+                        assignee === id
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-border text-muted-foreground hover:bg-[hsl(var(--surface-subtle))]'
+                      }`}
+                    >
+                      {t(labelKey)}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
                 {loadingList
@@ -712,7 +741,7 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
                       // An empty list under a search term is a different fact
                       // from an empty inbox, and only one of the two is worth
                       // clearing the box for.
-                      filtered={debouncedSearch !== '' || status !== 'open'}
+                      filtered={debouncedSearch !== '' || status !== 'open' || assignee !== 'all'}
                     />
                   )}
               </div>
@@ -1056,6 +1085,7 @@ export default function WhatsAppPage() {
               </button>
             ))}
           </div>
+          {tab === 'inbox' && <AvailabilityToggle />}
           <HealthBell
             actions={(disponivel) => (
               <>

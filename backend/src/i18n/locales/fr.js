@@ -555,6 +555,8 @@ export default {
   'whatsapp.error.invalidBotHours': 'Horaires invalides : vérifiez le fuseau horaire et que chaque jour ouvre avant de fermer',
   'whatsapp.error.conversationNotFound': 'Conversation introuvable',
   'whatsapp.conversationClosed': 'Conversation clôturée',
+  'whatsapp.conversationAssigned': 'Agent de la conversation mis à jour',
+  'whatsapp.error.invalidAssignee': 'Choisissez une personne de l\'équipe qui répond sur WhatsApp.',
   'whatsapp.conversationReopened': 'Conversation rouverte',
   'whatsapp.conversationStatusFailed': 'La conversation n’a pas pu être mise à jour',
   'whatsapp.error.invalidConversationStatus': 'Une conversation est ouverte ou clôturée',

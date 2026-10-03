@@ -4077,8 +4077,24 @@ export interface WhatsAppConversation {
   closedAt: string | null
   /** Até quando o bot fica calado porque o assinante pediu um atendente; null fora da pausa. */
   botPausedUntil?: string | null
+  /** Quem atende a conversa; null sem dono. */
+  assignedUserId?: number | null
+  assignedTo?: string | null
+  /** Desde quando espera um atendente (a fila da distribuição); null fora dela. */
+  waitingSince?: string | null
   createdAt: string | null
   updatedAt: string | null
+}
+
+/** Alguém da equipe que atende o WhatsApp: `GET /whatsapp/agents`. */
+export interface WhatsAppAgent {
+  userId: number
+  name: string | null
+  /** O interruptor da pessoa. */
+  available: boolean
+  /** Disponível E com a tela aberta há pouco: só esses recebem conversa. */
+  online: boolean
+  openConversations: number
 }
 
 /** One contract as the SGP lookup returned it, with the state the server derived. */
@@ -4259,6 +4275,8 @@ export interface BotConfig {
   hours: { enabled: boolean; timezone: string; week: BotHoursDay[] }
   /** A pesquisa de satisfação ao encerrar uma conversa com atendente. */
   satisfaction: { enabled: boolean }
+  /** A distribuição automática das conversas entre quem está disponível. */
+  distribution: { enabled: boolean }
 }
 
 /** A pesquisa de satisfação: `GET /whatsapp/satisfaction-report`. */
@@ -4601,12 +4619,15 @@ export const whatsappAPI = {
     search?: string
     /** 'noreply': só envios automáticos, o cliente ainda não respondeu. */
     status?: 'open' | 'noreply' | 'closed' | 'all'
+    /** 'me': só as minhas; 'unassigned': sem atendente. */
+    assignee?: 'me' | 'unassigned'
   } = {}) => {
     const query = new URLSearchParams()
     if (params.limit) query.set('limit', String(params.limit))
     if (params.offset) query.set('offset', String(params.offset))
     if (params.search) query.set('search', params.search)
     if (params.status) query.set('status', params.status)
+    if (params.assignee) query.set('assignee', params.assignee)
     const suffix = query.toString()
     return apiClient.get<WhatsAppConversation[]>(`/whatsapp/conversations${suffix ? `?${suffix}` : ''}`)
   },
@@ -4616,6 +4637,17 @@ export const whatsappAPI = {
   // not answered by an archive.
   setConversationStatus: (conversationId: number, status: 'open' | 'closed') =>
     apiClient.post<WhatsAppConversation>(`/whatsapp/conversations/${conversationId}/status`, { status }),
+
+  /** Assumir (o próprio id), transferir para um colega, ou `null` para soltar. */
+  assignConversation: (conversationId: number, userId: number | null) =>
+    apiClient.post<WhatsAppConversation>(`/whatsapp/conversations/${conversationId}/assign`, { userId }),
+
+  listAgents: () =>
+    apiClient.get<WhatsAppAgent[]>('/whatsapp/agents'),
+
+  /** O interruptor "Disponível"; a tela reenvia a cada minuto como pulso. */
+  setAvailability: (available: boolean) =>
+    apiClient.post<WhatsAppAgent>('/whatsapp/agents/me', { available }),
 
   // Says by hand which SGP subscriber a thread belongs to. `savePhone` also
   // writes the thread's number onto the contract, and needs `campaigns.manage`.
