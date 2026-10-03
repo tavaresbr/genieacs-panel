@@ -1,6 +1,7 @@
 import Tenant from '../models/Tenant.js';
 import Plan from '../models/Plan.js';
 import Subscription from '../models/Subscription.js';
+import Coupon from '../models/Coupon.js';
 import BillingCharge, { OPEN_CHARGE_STATUSES, isoDateOf } from '../models/BillingCharge.js';
 import BillingInvoice from '../models/BillingInvoice.js';
 import BillingInvoiceService, { InvoiceRequestError } from '../services/billing/billingInvoiceService.js';
@@ -323,6 +324,9 @@ class PlatformSubscriptionsController {
         (await Subscription.listWithPlans()).map((row) => [Number(row.tenant_id), row])
       );
       const planos = new Map((await Plan.list()).map((plan) => [Number(plan.id), plan]));
+      // Os cupons (0093), numa leitura só: a linha mostra o selo e o preço com
+      // desconto (`effectivePriceCents`, na versão que recebe o cupom pronto).
+      const cupons = new Map((await Coupon.list()).map((cupom) => [Number(cupom.id), cupom]));
       const ids = new Set(tenants.map((tenant) => Number(tenant.id)));
 
       // A mais recente em aberto de cada um (a lista vem por `period_end`
@@ -359,6 +363,9 @@ class PlatformSubscriptionsController {
             trialEndsAt: sub.trial_ends_at ?? null,
             renewsAt: sub.renews_at ?? null,
             pendingPlan: SubscriptionService.presentPendingPlan(sub, pendente),
+            coupon: SubscriptionService.presentCoupon(
+              sub, planos.get(Number(sub.plan_id)) ?? null, sub.coupon_id ? cupons.get(Number(sub.coupon_id)) ?? null : null
+            ),
             ...SubscriptionService.presentBillingExempt(sub, { withReason: true })
           } : null,
           // SE há vínculo, e nunca o id do cliente no gateway — a mesma regra

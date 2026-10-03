@@ -849,6 +849,13 @@ export default {
   'charges.gatewayNotConfigured': '目前无法在线支付',
   'charges.gatewayFailed': '支付网关未开具账单：{detail}',
   'billing.busy': '另一项计费操作正在进行中，请稍后再试',
+  'coupon.invalid': '此优惠码无效',
+  'coupon.expired': '此优惠券已过期',
+  'coupon.exhausted': '此优惠券已达到使用上限',
+  'coupon.planMismatch': '此优惠券不适用于您的套餐',
+  'coupon.alreadyApplied': '此订阅已应用优惠券',
+  'coupon.applied': '已应用优惠券 {code}',
+  'coupon.applyFailed': '应用优惠券失败',
 
   'tenant.renamed': '运营商已重命名',
   'tenant.securityInvalid': '请说明是否要求两步登录（true 或 false）',

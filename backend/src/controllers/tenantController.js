@@ -11,6 +11,7 @@ import BillingInvoice from '../models/BillingInvoice.js';
 import DeviceService from '../services/deviceService.js';
 import SelfBillingService, { SelfBillingError } from '../services/selfBillingService.js';
 import ChargeIssuingService from '../services/chargeIssuingService.js';
+import CouponService, { couponTrail } from '../services/couponService.js';
 import PlatformAudit from '../models/PlatformAudit.js';
 import { translateError } from '../i18n/index.js';
 import { EDITION } from '../config/edition.js';
@@ -470,6 +471,55 @@ class TenantController {
       if (error instanceof SelfBillingError) return selfBillingRefusal(req, res, error);
       console.error('Self-service plan change error:', error);
       return res.status(500).json(createErrorResponse(req.t('subscription.planChangeFailed'), error.message));
+    }
+  }
+
+  /**
+   * `POST /api/tenant/subscription/coupon` — `{ code }`: o provedor aplica um
+   * cupom de desconto (0093). Só quando ainda não tem um; trocar de cupom é
+   * com o console. A fatura em aberto do prazo vivo é reprecificada pela
+   * porta da troca de plano. As recusas são 409 com o código que a tela lê.
+   *
+   * As duas trilhas, como na troca de plano: a do provedor (quem aplicou) e a
+   * da plataforma (o que este cliente paga mudou), com `selfService: true`.
+   */
+  static async applyCoupon(req, res) {
+    try {
+      const code = req.body?.code;
+      if (typeof code !== 'string' || !code.trim()) {
+        return selfBillingRefusal(req, res, new SelfBillingError('coupon.invalid', { code: 'coupon_invalid', status: 409 }));
+      }
+      const resultado = await CouponService.apply({
+        tenantId: req.tenantId,
+        code,
+        actorUserId: req.user?.userId ?? null,
+        source: 'provider',
+        countDevices: () => DeviceService.countDevicesFromGenieAcs()
+      });
+      const detail = {
+        coupon: couponTrail(resultado.coupon),
+        priceCents: resultado.priceCents,
+        selfService: true,
+        ...(resultado.charge !== 'none' ? { openCharge: resultado.charge } : {})
+      };
+      await AuditLog.fromRequest(req, {
+        action: AuditLog.ACTIONS.SUBSCRIPTION_CHANGED,
+        subjectType: 'subscription',
+        subjectId: req.tenantId,
+        detail
+      });
+      const provedor = await Tenant.findById(req.tenantId);
+      const registrada = await PlatformAudit.fromRequest(req, {
+        action: PlatformAudit.ACTIONS.SUBSCRIPTION_COUPON_CHANGED,
+        tenant: provedor,
+        detail
+      });
+      if (!registrada) console.warn(`Provider ${req.tenantId} applied a coupon without a platform trail line`);
+      return res.json(createResponse(req.t('coupon.applied', { code: resultado.coupon.code }), await subscriptionPayload(req)));
+    } catch (error) {
+      if (error instanceof SelfBillingError) return selfBillingRefusal(req, res, error);
+      console.error('Apply coupon error:', error);
+      return res.status(500).json(createErrorResponse(req.t('coupon.applyFailed'), error.message));
     }
   }
 

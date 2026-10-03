@@ -12,6 +12,7 @@ import { PlatformSettings } from '@/components/platform/platform-settings'
 import { PlatformLeads } from '@/components/platform/platform-leads'
 import { PlatformSubscriptions } from '@/components/platform/platform-subscriptions'
 import { PlatformRevenue } from '@/components/platform/platform-revenue'
+import { PlatformCoupons } from '@/components/platform/platform-coupons'
 import { TenantData } from '@/components/platform/tenant-data'
 import { TenantGateway } from '@/components/platform/tenant-gateway'
 import { TenantGenieAcs } from '@/components/platform/tenant-genieacs'
@@ -71,7 +72,7 @@ export default function PlatformPage() {
    * alguma coisa; as outras três são consulta ou manutenção rara.
    */
   const estreito = useEstreito()
-  const [aba, setAba] = useState<'tenants' | 'plans' | 'subscriptions' | 'revenue' | 'leads' | 'admins' | 'audit' | 'settings' | 'deployment' | 'catalogue'>('tenants')
+  const [aba, setAba] = useState<'tenants' | 'plans' | 'subscriptions' | 'revenue' | 'coupons' | 'leads' | 'admins' | 'audit' | 'settings' | 'deployment' | 'catalogue'>('tenants')
 
   const loadTenants = useCallback(async () => {
     const plansRes = await platformAPI.listPlans()
@@ -496,6 +497,8 @@ export default function PlatformPage() {
             // Depois de Assinaturas: a mesma carteira, somada — quanto entra por
             // mês, quanto entrou e voltou, e de que plano vem.
             ['revenue', 'platform.tabs.revenue'],
+            // Os cupons de desconto, ao lado de quem os usa.
+            ['coupons', 'platform.tabs.coupons'],
             // Quem pediu demonstração pela página pública — o funil antes da
             // assinatura.
             ['leads', 'platform.tabs.leads'],
@@ -527,6 +530,7 @@ export default function PlatformPage() {
         {aba === 'plans' && <PlanCatalog plans={plans} onChange={() => void loadTenants()} />}
         {aba === 'subscriptions' && <PlatformSubscriptions plans={plans} estreito={estreito} />}
         {aba === 'revenue' && <PlatformRevenue />}
+        {aba === 'coupons' && <PlatformCoupons plans={plans} />}
         {aba === 'leads' && <PlatformLeads />}
         {aba === 'admins' && <PlatformAdmins />}
         {aba === 'audit' && <PlatformAudit />}

@@ -849,6 +849,13 @@ export default {
   'charges.gatewayNotConfigured': 'Online payment is not available right now',
   'charges.gatewayFailed': 'The payment gateway did not issue the charge: {detail}',
   'billing.busy': 'Another billing operation is in progress; try again in a moment',
+  'coupon.invalid': 'This coupon code is not valid',
+  'coupon.expired': 'This coupon has expired',
+  'coupon.exhausted': 'This coupon has reached its usage limit',
+  'coupon.planMismatch': 'This coupon does not apply to your plan',
+  'coupon.alreadyApplied': 'A coupon is already applied to this subscription',
+  'coupon.applied': 'Coupon {code} applied',
+  'coupon.applyFailed': 'Failed to apply the coupon',
 
   'tenant.renamed': 'Provider renamed',
   'tenant.securityInvalid': 'State whether two-step login is required (true or false)',

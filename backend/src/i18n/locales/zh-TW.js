@@ -849,6 +849,13 @@ export default {
   'charges.gatewayNotConfigured': '目前無法線上付款',
   'charges.gatewayFailed': '付款閘道未開立帳單：{detail}',
   'billing.busy': '另一項計費作業正在進行中，請稍後再試',
+  'coupon.invalid': '此優惠碼無效',
+  'coupon.expired': '此優惠券已過期',
+  'coupon.exhausted': '此優惠券已達使用上限',
+  'coupon.planMismatch': '此優惠券不適用於您的方案',
+  'coupon.alreadyApplied': '此訂閱已套用優惠券',
+  'coupon.applied': '已套用優惠券 {code}',
+  'coupon.applyFailed': '套用優惠券失敗',
 
   'tenant.renamed': '業者已重新命名',
   'tenant.securityInvalid': '請說明是否要求兩步驟登入（true 或 false）',

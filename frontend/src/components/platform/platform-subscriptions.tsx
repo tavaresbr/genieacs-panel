@@ -13,6 +13,7 @@ import {
 } from '@/lib/api'
 import { BillingExemptControl, STATUS_LABEL_KEYS, exemptUntilLabel, statusBadgeClass } from '@/components/platform/tenant-plan'
 import { InvoiceSummary, IssueInvoiceButton } from '@/components/platform/charge-invoice'
+import { CouponBadge, CouponControl } from '@/components/platform/coupon-control'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
@@ -375,6 +376,17 @@ function PlanCell({ row }: { row: SubscriptionRow }) {
       {sub.priceCents !== null && (
         <span className="block text-xs text-muted-foreground">{formatMoney(sub.priceCents, sub.currency)}</span>
       )}
+      {/* O cupom: o selo e o que a próxima fatura de fato pede. */}
+      {sub.coupon && (
+        <span className="mt-1 flex flex-wrap items-center gap-1 text-xs">
+          <CouponBadge coupon={sub.coupon} currency={sub.currency} />
+          {sub.coupon.appliesToPlan && sub.coupon.priceCents !== sub.priceCents && (
+            <span className="text-muted-foreground">
+              {t('coupons.priceWithCoupon', { price: formatMoney(sub.coupon.priceCents, sub.currency) })}
+            </span>
+          )}
+        </span>
+      )}
       {/* A descida agendada: até a data, o plano de cima continua valendo — e
           quem olha a carteira precisa saber que a receita vai cair. */}
       {sub.pendingPlan && (
@@ -632,6 +644,15 @@ function SubscriptionDetail({ row, plans, onChanged }: { row: SubscriptionRow; p
           >
             {savingPlan ? t('common.saving') : t('platform.subscription.changePlan')}
           </button>
+          {sub && (
+            <CouponControl
+              tenantId={tenantId}
+              coupon={sub.coupon}
+              currency={sub.currency}
+              storedStatus={sub.storedStatus}
+              onChanged={recarregar}
+            />
+          )}
         </div>
 
         <div className="rounded-md border border-border bg-card p-3">

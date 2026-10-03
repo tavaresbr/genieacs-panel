@@ -85,6 +85,8 @@ const EXEMPT_PATHS = new Set([
   '/api/tenant/plans',
   '/api/tenant/subscription/plan',
   '/api/tenant/charges/pay',
+  // O cupom (0093): como a troca de plano, uma saída de quem está atrasado.
+  '/api/tenant/subscription/coupon',
   '/api/auth'
 ]);
 // Os caminhos EXATOS das entregas de fora. `/api/sgp/events` sem o

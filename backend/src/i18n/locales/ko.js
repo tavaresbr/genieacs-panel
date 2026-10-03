@@ -852,6 +852,13 @@ export default {
   'charges.gatewayNotConfigured': '지금은 온라인 결제를 사용할 수 없습니다',
   'charges.gatewayFailed': '결제 게이트웨이가 청구를 발행하지 않았습니다: {detail}',
   'billing.busy': '다른 청구 작업이 진행 중입니다. 잠시 후 다시 시도하세요',
+  'coupon.invalid': '유효하지 않은 쿠폰 코드입니다',
+  'coupon.expired': '만료된 쿠폰입니다',
+  'coupon.exhausted': '이 쿠폰은 사용 한도에 도달했습니다',
+  'coupon.planMismatch': '이 쿠폰은 현재 요금제에 적용되지 않습니다',
+  'coupon.alreadyApplied': '이 구독에는 이미 쿠폰이 적용되어 있습니다',
+  'coupon.applied': '쿠폰 {code}이(가) 적용되었습니다',
+  'coupon.applyFailed': '쿠폰을 적용하지 못했습니다',
 
   'tenant.renamed': '사업자 이름이 변경되었습니다',
   'tenant.securityInvalid': '2단계 로그인 필수 여부(true 또는 false)를 지정하세요',

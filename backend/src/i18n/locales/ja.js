@@ -849,6 +849,13 @@ export default {
   'charges.gatewayNotConfigured': '現在オンライン決済は利用できません',
   'charges.gatewayFailed': '決済ゲートウェイが請求を発行しませんでした: {detail}',
   'billing.busy': '別の請求処理が進行中です。しばらくしてからもう一度お試しください',
+  'coupon.invalid': 'このクーポンコードは無効です',
+  'coupon.expired': 'このクーポンは有効期限が切れています',
+  'coupon.exhausted': 'このクーポンは利用上限に達しています',
+  'coupon.planMismatch': 'このクーポンはご利用のプランには適用されません',
+  'coupon.alreadyApplied': 'このサブスクリプションにはすでにクーポンが適用されています',
+  'coupon.applied': 'クーポン {code} を適用しました',
+  'coupon.applyFailed': 'クーポンを適用できませんでした',
 
   'tenant.renamed': 'プロバイダー名を変更しました',
   'tenant.securityInvalid': '2段階ログインを必須にするかどうか（true または false）を指定してください',

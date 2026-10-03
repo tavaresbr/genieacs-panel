@@ -845,6 +845,13 @@ export default {
   'charges.gatewayNotConfigured': 'Le paiement en ligne n\'est pas disponible pour le moment',
   'charges.gatewayFailed': 'La passerelle de paiement n\'a pas émis la facture : {detail}',
   'billing.busy': 'Une autre opération de facturation est en cours ; réessayez dans un instant',
+  'coupon.invalid': 'Ce code promo n\'est pas valide',
+  'coupon.expired': 'Ce code promo a expiré',
+  'coupon.exhausted': 'Ce code promo a atteint sa limite d\'utilisations',
+  'coupon.planMismatch': 'Ce code promo ne s\'applique pas à votre offre',
+  'coupon.alreadyApplied': 'Un code promo est déjà appliqué à cet abonnement',
+  'coupon.applied': 'Code promo {code} appliqué',
+  'coupon.applyFailed': 'Échec de l\'application du code promo',
 
   'tenant.renamed': 'Fournisseur renommé',
   'tenant.securityInvalid': 'Indiquez si la connexion en deux étapes est exigée (vrai ou faux)',

@@ -847,6 +847,13 @@ export default {
   'charges.gatewayNotConfigured': 'Il pagamento online non è disponibile al momento',
   'charges.gatewayFailed': 'Il gateway di pagamento non ha emesso l\'addebito: {detail}',
   'billing.busy': 'È in corso un\'altra operazione di addebito; riprova tra un momento',
+  'coupon.invalid': 'Questo codice coupon non è valido',
+  'coupon.expired': 'Questo coupon è scaduto',
+  'coupon.exhausted': 'Questo coupon ha raggiunto il limite di utilizzi',
+  'coupon.planMismatch': 'Questo coupon non vale per il tuo piano',
+  'coupon.alreadyApplied': 'A questo abbonamento è già applicato un coupon',
+  'coupon.applied': 'Coupon {code} applicato',
+  'coupon.applyFailed': 'Impossibile applicare il coupon',
 
   'tenant.renamed': 'Provider rinominato',
   'tenant.securityInvalid': 'Indica se l\'accesso in due passaggi è obbligatorio (vero o falso)',

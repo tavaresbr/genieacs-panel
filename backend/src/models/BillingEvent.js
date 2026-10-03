@@ -35,7 +35,13 @@ export const BILLING_EVENT_TYPES = Object.freeze({
   BILLING_EXEMPT_DISABLED: 'billing_exempt.disabled',
   // A data de fim de uma isenção que continua ligada mudou (o console
   // estendeu, encurtou ou tirou a data). O fim em si é `disabled`.
-  BILLING_EXEMPT_UPDATED: 'billing_exempt.updated'
+  BILLING_EXEMPT_UPDATED: 'billing_exempt.updated',
+  // Um cupom de desconto entrou ou saiu da assinatura (0093) — pelo provedor
+  // ou pelo console. O consumo de um ciclo não tem linha própria: viaja no
+  // `detail` do pagamento que o gastou (`coupon`), e a devolução no do
+  // estorno (`couponRestored`).
+  COUPON_APPLIED: 'coupon.applied',
+  COUPON_REMOVED: 'coupon.removed'
 });
 
 class BillingEvent {

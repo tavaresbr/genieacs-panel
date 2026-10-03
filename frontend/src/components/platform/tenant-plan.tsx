@@ -18,6 +18,7 @@ import { canIssueInvoiceForEvent } from '@/lib/invoice'
 import { useTranslation } from '@/contexts/language-context'
 import { displayDate, displayDayMonth } from '@/lib/date-format'
 import { exemptUntilFromDateInput, todayIso } from '@/lib/subscription-console'
+import { CouponBadge, CouponControl } from '@/components/platform/coupon-control'
 
 interface Props {
   tenant: Tenant
@@ -434,6 +435,7 @@ export function TenantPlan({ tenant, plans, onSubscriptionChange }: Props) {
           {subscription.billingExempt && (
             <span className="modern-badge-info">{exemptUntilLabel(subscription, t) ?? t('platform.subs.exempt')}</span>
           )}
+          {subscription.coupon && <CouponBadge coupon={subscription.coupon} currency={moedaDoPlano} />}
           {subscription.reason === 'trial_expired' && (
             <span className="text-muted-foreground">{t('platform.subscription.trialExpiredNote')}</span>
           )}
@@ -482,6 +484,16 @@ export function TenantPlan({ tenant, plans, onSubscriptionChange }: Props) {
           >
             {saving === 'plan' ? t('common.saving') : t('platform.subscription.changePlan')}
           </button>
+          <CouponControl
+            tenantId={tenantId}
+            coupon={subscription?.coupon}
+            currency={moedaDoPlano}
+            storedStatus={subscription?.storedStatus}
+            onChanged={async () => {
+              await load()
+              onSubscriptionChange()
+            }}
+          />
         </div>
 
         {/* Estado */}

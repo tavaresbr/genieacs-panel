@@ -12,6 +12,9 @@ import { runInTenant } from '../config/tenantContext.js';
 import { tdb } from '../config/database.js';
 import BillingInvoice from '../models/BillingInvoice.js';
 import { createResponse, createErrorResponse } from '../utils/helpers.js';
+import CouponService, { couponTrail } from '../services/couponService.js';
+import { SelfBillingError } from '../services/selfBillingService.js';
+import { translateError } from '../i18n/index.js';
 
 /**
  * A metade comercial do plano de controle: planos, a assinatura de cada
@@ -593,6 +596,73 @@ class PlatformBillingController {
     } catch (error) {
       console.error('Set billing exemption error:', error);
       return res.status(500).json(createErrorResponse('Failed to change the billing exemption', error.message));
+    }
+  }
+
+  /**
+   * `PUT /tenants/:id/subscription/coupon` — `{ code }` aplica (substituindo
+   * o que houver), `{ code: null }` tira. As recusas do cupom são 409 com o
+   * código que a tela lê (`coupon_invalid`, `coupon_expired`,
+   * `coupon_exhausted`, `coupon_plan_mismatch`, `coupon_already_applied`); o
+   * gateway que recusa cancelar a fatura em aberto é 502 e nada muda.
+   */
+  static async setCoupon(req, res) {
+    try {
+      const body = req.body ?? {};
+      if (!('code' in body) || (body.code !== null && typeof body.code !== 'string')) {
+        return res.status(400).json(createErrorResponse('code must be a string or null'));
+      }
+      const tenant = await tenantOr404(req, res);
+      if (!tenant) return undefined;
+      if (tenant.kind === 'platform') return res.status(404).json(createErrorResponse('Provider not found'));
+
+      const tirar = body.code === null || body.code.trim() === '';
+      let resultado;
+      try {
+        resultado = tirar
+          ? await CouponService.remove({
+            tenantId: tenant.id,
+            actorUserId: req.user?.userId ?? null,
+            countDevices: () => runInTenant(tenant.id, () => DeviceService.countDevicesFromGenieAcs())
+          })
+          : await CouponService.apply({
+            tenantId: tenant.id,
+            code: body.code,
+            actorUserId: req.user?.userId ?? null,
+            source: 'console',
+            countDevices: () => runInTenant(tenant.id, () => DeviceService.countDevicesFromGenieAcs())
+          });
+      } catch (error) {
+        if (error instanceof SelfBillingError) {
+          return res.status(error.status || 409).json({
+            ...createErrorResponse(translateError(req.t ?? ((k) => k), error), error.detail ?? null, error.code),
+            ...(error.extra ?? {})
+          });
+        }
+        throw error;
+      }
+
+      if (tirar ? resultado.changed : true) {
+        await recordBoth(req, tenant, {
+          platformAction: PlatformAudit.ACTIONS.SUBSCRIPTION_COUPON_CHANGED,
+          detail: {
+            coupon: tirar ? null : couponTrail(resultado.coupon),
+            ...(tirar ? { removedCoupon: couponTrail(resultado.coupon) } : {}),
+            ...(resultado.replacedCouponId ? { replacedCouponId: resultado.replacedCouponId } : {}),
+            ...(resultado.priceCents !== undefined ? { priceCents: resultado.priceCents } : {}),
+            ...(resultado.charge !== 'none' ? { openCharge: resultado.charge } : {})
+          }
+        });
+      }
+
+      return res.json(createResponse(tirar ? 'Coupon removed' : 'Coupon applied', {
+        subscription: await subscriptionView(tenant),
+        charge: resultado.charge,
+        changed: tirar ? resultado.changed : true
+      }));
+    } catch (error) {
+      console.error('Set subscription coupon error:', error);
+      return res.status(500).json(createErrorResponse('Failed to change the coupon', error.message));
     }
   }
 
