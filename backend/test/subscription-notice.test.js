@@ -344,7 +344,9 @@ describe('só marca o que saiu', () => {
   });
 
   it('e continua gravando expiry_warned_for, por compatibilidade', async () => {
-    const prazo = new Date(Date.now() + 2 * DIA);
+    // No segundo inteiro: o MySQL arredonda (não trunca) os milissegundos, e
+    // um prazo em .6s voltaria um segundo à frente.
+    const prazo = new Date(Math.floor((Date.now() + 2 * DIA) / 1000) * 1000);
     await comAssinatura({ renews_at: prazo });
     await avisar(new Date());
     const linha = await getDb()('subscriptions').where({ tenant_id: alfa }).first();
