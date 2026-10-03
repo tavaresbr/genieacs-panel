@@ -56,6 +56,9 @@ export const SCOPED_TABLES = new Set([
   'wa_satisfaction',
   // Quem está disponível para atender o WhatsApp, por provedor.
   'wa_agents',
+  // As etiquetas das conversas, e quem tem qual.
+  'wa_tags',
+  'wa_conversation_tags',
   // A ficha completa de cada cliente do SGP: endereço, nascimento, todos os
   // telefones e e-mails. O dado mais pessoal do painel inteiro.
   'sgp_clients',

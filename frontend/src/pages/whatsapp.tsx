@@ -7,7 +7,8 @@ import {
   type WhatsAppAccount,
   type WhatsAppMetaTemplate,
   type WhatsAppConversation,
-  type WhatsAppMessage
+  type WhatsAppMessage,
+  type WhatsAppTag
 } from '@/lib/api'
 import { Icon } from '@/components/ui/icon'
 import { useToast } from '@/components/ui/toast'
@@ -26,6 +27,7 @@ import { BotReportPanel } from '@/components/whatsapp/bot-report-panel'
 import { SatisfactionPanel } from '@/components/whatsapp/satisfaction-panel'
 import { MetaUsagePanel } from '@/components/whatsapp/meta-usage-panel'
 import { ResponseTimePanel } from '@/components/whatsapp/response-time-panel'
+import { TagsReportPanel } from '@/components/whatsapp/tags-report-panel'
 import { MaintenancePanel } from '@/components/maintenance/maintenance-panel'
 import { AlertsPanel } from '@/components/whatsapp/alerts-panel'
 import { OutagePanel } from '@/components/outages/outage-panel'
@@ -209,6 +211,8 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [status, setStatus] = useState<ConversationStatus>('open')
   const [assignee, setAssignee] = useState<AssigneeFilter>('all')
+  const [tagFilter, setTagFilter] = useState<number | null>(null)
+  const [tagOptions, setTagOptions] = useState<WhatsAppTag[]>([])
 
   const [loadingList, setLoadingList] = useState(true)
   const [loadingThread, setLoadingThread] = useState(false)
@@ -238,7 +242,7 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
   // The filter belongs in a ref for the same reason: a poll must ask for what
   // is on screen now, without the interval being torn down and restarted — and
   // its clock reset — every time the operator types a letter.
-  const filterRef = useRef<{ search: string; status: ConversationStatus; assignee: AssigneeFilter }>({ search: '', status: 'open', assignee: 'all' })
+  const filterRef = useRef<{ search: string; status: ConversationStatus; assignee: AssigneeFilter; tag: number | null }>({ search: '', status: 'open', assignee: 'all', tag: null })
 
   useEffect(() => { selectedIdRef.current = selectedId }, [selectedId])
 
@@ -325,11 +329,12 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
     }
     listInFlight.current = true
     try {
-      const { search: term, status: pile, assignee: dono } = filterRef.current
+      const { search: term, status: pile, assignee: dono, tag } = filterRef.current
       const res = await whatsappAPI.listConversations({
         limit: LIST_LIMIT,
         status: pile,
         ...(dono === 'all' ? {} : { assignee: dono }),
+        ...(tag ? { tag } : {}),
         ...(term ? { search: term } : {})
       })
       if (!alive.current) return
@@ -397,14 +402,23 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
   // The ref is written here, immediately before the reload it belongs to, so
   // the two can never describe different filters.
   useEffect(() => {
-    const next = { search: debouncedSearch, status, assignee }
+    const next = { search: debouncedSearch, status, assignee, tag: tagFilter }
     const shown = filterRef.current
     // Unchanged on the first run, which is what keeps this from doubling the
     // initial load that the effect above already fired.
-    if (shown.search === next.search && shown.status === next.status && shown.assignee === next.assignee) return
+    if (shown.search === next.search && shown.status === next.status && shown.assignee === next.assignee && shown.tag === next.tag) return
     filterRef.current = next
     void loadListRef.current?.(false)
-  }, [debouncedSearch, status, assignee])
+  }, [debouncedSearch, status, assignee, tagFilter])
+
+  // As etiquetas do filtro: lidas uma vez ao abrir a caixa de entrada.
+  useEffect(() => {
+    let vivo = true
+    void whatsappAPI.listTags().then((res) => {
+      if (vivo && res.success && res.data) setTagOptions(res.data)
+    })
+    return () => { vivo = false }
+  }, [])
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -478,6 +492,14 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
    * name follows.
    */
   const linked = useCallback((next: WhatsAppConversation) => {
+    // Uma etiqueta criada agora pelo seletor entra no filtro sem recarregar.
+    const novas = next.tags ?? []
+    if (novas.length) {
+      setTagOptions((atuais) => {
+        const faltam = novas.filter((tag) => !atuais.some((x) => x.id === tag.id))
+        return faltam.length ? [...atuais, ...faltam].sort((a, b) => a.name.localeCompare(b.name)) : atuais
+      })
+    }
     if (selectedIdRef.current === next.id) setConversation(next)
     setConversations((rows) => rows.map((row) => (row.id === next.id ? { ...row, ...next } : row)))
     void loadListRef.current?.(false)
@@ -775,6 +797,17 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
                       {t(labelKey)}
                     </button>
                   ))}
+                  {tagOptions.length > 0 && (
+                    <select
+                      className="h-7 max-w-[10rem] rounded-full border border-border bg-background px-2 text-xs text-foreground"
+                      aria-label={t('whatsapp.tags.filter')}
+                      value={tagFilter ?? ''}
+                      onChange={(event) => setTagFilter(event.target.value ? Number(event.target.value) : null)}
+                    >
+                      <option value="">{t('whatsapp.tags.filterAll')}</option>
+                      {tagOptions.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
+                    </select>
+                  )}
                 </div>
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
@@ -789,7 +822,7 @@ function InboxTab({ initialConversation = null }: InboxTabProps) {
                       // An empty list under a search term is a different fact
                       // from an empty inbox, and only one of the two is worth
                       // clearing the box for.
-                      filtered={debouncedSearch !== '' || status !== 'open' || assignee !== 'all'}
+                      filtered={debouncedSearch !== '' || status !== 'open' || assignee !== 'all' || tagFilter !== null}
                     />
                   )}
               </div>
@@ -1181,6 +1214,7 @@ export default function WhatsAppPage() {
             <BotReportPanel />
             <ResponseTimePanel />
             <SatisfactionPanel />
+            <TagsReportPanel />
             <MetaUsagePanel />
           </div>
         )}

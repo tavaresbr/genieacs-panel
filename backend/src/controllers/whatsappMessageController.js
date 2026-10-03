@@ -2,6 +2,7 @@ import WaSendService from '../services/waSendService.js';
 import WaConversationService from '../services/waConversationService.js';
 import WaContactService from '../services/waContactService.js';
 import WaAssignmentService from '../services/waAssignmentService.js';
+import WaTagService from '../services/waTagService.js';
 import { SgpError } from '../services/sgpService.js';
 import { roleHas } from '../config/permissions.js';
 import WaMessage from '../models/WaMessage.js';
@@ -60,6 +61,7 @@ class WhatsAppMessageController {
         search: req.query?.search,
         status: req.query?.status,
         assignee: req.query?.assignee,
+        tagId: req.query?.tag,
         userId: req.user?.userId ?? null
       });
       return res.json(createResponse(req.t('whatsapp.conversationsLoaded', { count: rows.length }), rows));
@@ -101,6 +103,63 @@ class WhatsAppMessageController {
       ));
     } catch (error) {
       return handleError(req, res, error, 'whatsapp.conversationStatusFailed');
+    }
+  }
+
+  /** `PUT /conversations/:id/tags` — troca o conjunto de etiquetas da conversa. */
+  static async setTags(req, res) {
+    try {
+      const conversation = await WaConversationService.get(req.params?.id);
+      await WaTagService.setConversationTags(conversation.id, req.body?.tagIds);
+      return res.json(createResponse(
+        req.t('whatsapp.tags.saved'),
+        await WaConversationService.decorate(await WaConversationService.get(conversation.id))
+      ));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.conversationStatusFailed');
+    }
+  }
+
+  static async listTags(req, res) {
+    try {
+      return res.json(createResponse(req.t('whatsapp.configLoaded'), await WaTagService.list()));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.configLoadFailed');
+    }
+  }
+
+  static async tagsReport(req, res) {
+    try {
+      return res.json(createResponse(req.t('whatsapp.configLoaded'), await WaTagService.report({ days: Number(req.query?.days) })));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.configLoadFailed');
+    }
+  }
+
+  static async createTag(req, res) {
+    try {
+      const tag = await WaTagService.create({ name: req.body?.name, color: req.body?.color });
+      return res.status(201).json(createResponse(req.t('whatsapp.tags.saved'), tag));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.configSaveFailed');
+    }
+  }
+
+  static async updateTag(req, res) {
+    try {
+      const tag = await WaTagService.update(req.params?.id, { name: req.body?.name, color: req.body?.color });
+      return res.json(createResponse(req.t('whatsapp.tags.saved'), tag));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.configSaveFailed');
+    }
+  }
+
+  static async deleteTag(req, res) {
+    try {
+      await WaTagService.remove(req.params?.id);
+      return res.json(createResponse(req.t('whatsapp.tags.deleted'), null));
+    } catch (error) {
+      return handleError(req, res, error, 'whatsapp.configSaveFailed');
     }
   }
 

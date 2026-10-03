@@ -54,6 +54,7 @@ import { timestampMs } from '../utils/helpers.js';
 const SEM_DADO_DE_ASSINANTE = Object.freeze({
   settings: 'configuração do provedor',
   wa_agents: 'disponibilidade da equipe no WhatsApp',
+  wa_tags: 'as etiquetas que o provedor criou para as conversas',
   app_state: 'relógios dos jobs do provedor',
   vendors: 'catálogo de fabricantes',
   wifi_security_config: 'política de WiFi do provedor',
@@ -415,6 +416,10 @@ class CustomerDataExportService {
     // O que o bot respondeu nessas conversas: só a intenção e a hora.
     guardar('wa_bot_events', conversaIds.length
       ? await tdb('wa_bot_events').whereIn('conversation_id', conversaIds).orderBy('id')
+      : []);
+    // As etiquetas que a equipe pôs nas conversas deste assinante.
+    guardar('wa_conversation_tags', conversaIds.length
+      ? await tdb('wa_conversation_tags').whereIn('conversation_id', conversaIds).orderBy('id')
       : []);
     // A nota e o comentário que o assinante deu ao atendimento.
     guardar('wa_satisfaction', conversaIds.length

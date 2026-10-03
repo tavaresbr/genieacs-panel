@@ -36,6 +36,15 @@ router.post(
   WhatsAppMessageController.assign
 );
 
+// Etiquetas: pôr e tirar de uma conversa é de quem atende; criar, renomear e
+// excluir a lista é de quem configura. O relatório é leitura.
+router.put('/conversations/:id/tags', authenticateToken, requirePermission('whatsapp.send'), WhatsAppMessageController.setTags);
+router.get('/tags', authenticateToken, requirePermission('whatsapp.read'), WhatsAppMessageController.listTags);
+router.get('/tags/report', authenticateToken, requirePermission('whatsapp.read'), WhatsAppMessageController.tagsReport);
+router.post('/tags', authenticateToken, requirePermission('whatsapp.config'), WhatsAppMessageController.createTag);
+router.patch('/tags/:id', authenticateToken, requirePermission('whatsapp.config'), WhatsAppMessageController.updateTag);
+router.delete('/tags/:id', authenticateToken, requirePermission('whatsapp.config'), WhatsAppMessageController.deleteTag);
+
 // A equipe e a disponibilidade de cada um: quem lê a caixa vê quem atende.
 router.get('/agents', authenticateToken, requirePermission('whatsapp.read'), WhatsAppMessageController.listAgents);
 // O próprio interruptor, e só o próprio: ninguém fica "disponível" por outro.

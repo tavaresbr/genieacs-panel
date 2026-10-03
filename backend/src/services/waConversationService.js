@@ -8,6 +8,7 @@ import { WaError } from './whatsappConfigService.js';
 import WaSendService from './waSendService.js';
 import WaSatisfactionService from './waSatisfactionService.js';
 import WaAssignmentService from './waAssignmentService.js';
+import WaTagService from './waTagService.js';
 import { tdb } from '../config/database.js';
 import { normalizarTelefoneBr, variantesTelefoneBr } from '../utils/wa/waDestino.js';
 
@@ -254,6 +255,7 @@ class WaConversationService {
       // o selo "pediu atendente" nela seria um aviso sobre o passado.
       assignedUserId: row.assigned_user_id ? Number(row.assigned_user_id) : null,
       assignedTo: extra.assignedTo ?? null,
+      tags: extra.tags ?? [],
       waitingSince: row.waiting_since || null,
       botPausedUntil: row.bot_paused_until && new Date(row.bot_paused_until).getTime() > Date.now()
         ? new Date(row.bot_paused_until).toISOString()
@@ -301,9 +303,11 @@ class WaConversationService {
    * started — a list nobody can read past its first hundred rows. Closing is
    * still not deletion, so `closed` and `all` are one parameter away.
    */
-  static async list({ limit = 50, offset = 0, search = '', status = 'open', assignee = null, userId = null } = {}) {
+  static async list({ limit = 50, offset = 0, search = '', status = 'open', assignee = null, userId = null, tagId = null } = {}) {
     const term = String(search ?? '').trim();
+    const etiqueta = Number.parseInt(String(tagId ?? ''), 10);
     const rows = await WaConversation.listRecent({
+      tagId: Number.isInteger(etiqueta) && etiqueta > 0 ? etiqueta : null,
       assignee: assignee === 'me' ? { userId } : (assignee === 'unassigned' ? 'unassigned' : null),
       limit: Math.min(Math.max(Number(limit) || 50, 1), 200),
       offset: Math.max(Number(offset) || 0, 0),
@@ -334,8 +338,10 @@ class WaConversationService {
     }
     const blocked = await WaOptOut.activePhones(rows.map((r) => r.wa_phone_e164));
     const atendentes = await WaAssignmentService.names(rows.map((r) => r.assigned_user_id));
+    const etiquetas = await WaTagService.tagsFor(rows.map((r) => r.id));
 
     return rows.map((row) => this.publicConversation(row, {
+      tags: etiquetas.get(Number(row.id)) ?? [],
       assignedTo: row.assigned_user_id ? atendentes.get(Number(row.assigned_user_id)) ?? null : null,
       clientName: row.contract
         ? names.get(row.contract) ?? null
@@ -369,7 +375,9 @@ class WaConversationService {
         ? await SgpContact.getByContract(conversation.contract)
         : (conversation.sgp_contact_id ? await SgpContact.getById(conversation.sgp_contact_id) : null));
     const atendentes = await WaAssignmentService.names([conversation.assigned_user_id]);
+    const etiquetas = await WaTagService.tagsFor([conversation.id]);
     return this.publicConversation(conversation, {
+      tags: etiquetas.get(Number(conversation.id)) ?? [],
       assignedTo: conversation.assigned_user_id ? atendentes.get(Number(conversation.assigned_user_id)) ?? null : null,
       clientName: link?.client_name ?? contact?.client_name ?? null,
       optedOut: await WaOptOut.isActive({

@@ -5,6 +5,7 @@ import { whatsappAPI, type BotConfig, type BotHoursDay, type BotMessageKey } fro
 import { useToast } from '@/components/ui/toast'
 import { useTranslation } from '@/contexts/language-context'
 import type { TranslationKey } from '@/lib/i18n'
+import { TagsManager } from '@/components/whatsapp/tags'
 
 /** A ordem em que os textos aparecem na tela: do primeiro contato à despedida. */
 const MESSAGE_KEYS: BotMessageKey[] = [
@@ -207,6 +208,12 @@ export function ChatbotTab() {
         <div className="mt-4 grid gap-5">
           {MESSAGE_KEYS.map((key) => campoDeTexto(key))}
         </div>
+      </section>
+
+      <section className="modern-card p-5 sm:p-6">
+        <h2 className="section-heading">{t('whatsapp.tags.manageTitle')}</h2>
+        <p className="field-hint mt-1">{t('whatsapp.tags.manageHint')}</p>
+        <div className="mt-4"><TagsManager /></div>
       </section>
 
       <section className="modern-card p-5 sm:p-6">

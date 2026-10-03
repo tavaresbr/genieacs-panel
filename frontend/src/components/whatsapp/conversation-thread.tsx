@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { AssigneeControl } from '@/components/whatsapp/assignment'
+import { TagPicker } from '@/components/whatsapp/tags'
 import { Icon } from '@/components/ui/icon'
 import { useTranslation } from '@/contexts/language-context'
 import type { WhatsAppAccount, WhatsAppConversation, WhatsAppMessage } from '@/lib/api'
@@ -181,6 +182,7 @@ export function ConversationThread({
               </span>
             )}
             <AssigneeControl conversation={conversation} onChange={onLinked} />
+            <TagPicker conversation={conversation} onChange={onLinked} />
             {closed && (
               <span className="modern-badge" title={t('whatsapp.inbox.closeHint')}>
                 <Icon name="check" size={12} />

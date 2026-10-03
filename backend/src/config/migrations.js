@@ -1941,6 +1941,37 @@ const WA_AGENT_TABLES = [
 ];
 
 /**
+ * As etiquetas das conversas: a lista do provedor (`wa_tags`, cor da mesma
+ * paleta fechada dos números) e quem tem qual (`wa_conversation_tags`). O
+ * vínculo guarda quando foi feito — é o que o relatório conta por período.
+ */
+const waTagsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.string('name', 40).notNullable();
+  t.string('color', 16).notNullable();
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  t.unique(['tenant_id', 'name'], { indexName: 'wa_tags_tenant_name_unique' });
+};
+
+const waConversationTagsTable = (db) => (t) => {
+  t.increments('id').primary();
+  t.integer('tenant_id').unsigned().notNullable()
+    .references('id').inTable('tenants').onDelete('CASCADE');
+  t.integer('conversation_id').unsigned().notNullable();
+  t.integer('tag_id').unsigned().notNullable();
+  t.timestamp('created_at').defaultTo(db.fn.now());
+  t.unique(['tenant_id', 'conversation_id', 'tag_id'], { indexName: 'wa_conversation_tags_unique' });
+  t.index(['tenant_id', 'tag_id'], 'wa_conversation_tags_tag_idx');
+};
+
+const WA_TAG_TABLES = [
+  ['wa_tags', waTagsTable],
+  ['wa_conversation_tags', waConversationTagsTable]
+];
+
+/**
  * Os cupons de desconto da assinatura (0093). Da PLATAFORMA, como `plans`: um
  * cupom é do catálogo comercial do deploy inteiro, e um provedor o resgata —
  * não tem o seu. Por isso sem `tenant_id`, e só o console escreve aqui.
@@ -2355,6 +2386,7 @@ export const SCHEMA_TABLES = [
   ...DUNNING_TABLES,
   ...SATISFACTION_TABLES,
   ...WA_AGENT_TABLES,
+  ...WA_TAG_TABLES,
   ...WA_META_TEMPLATE_TABLES,
   ...BILLING_INVOICE_TABLES,
   ...COUPON_TABLES,
@@ -5382,6 +5414,24 @@ export const migrations = [
         await db.schema.alterTable(table, (t) => {
           for (const add of missing) add(t);
         });
+      }
+    }
+  },
+  {
+    /** As etiquetas das conversas — ver `waTagsTable`. */
+    id: '0096_wa_tags',
+    async isApplied(db) {
+      if (!(await db.schema.hasTable('tenants'))) return true;
+      for (const [nome] of WA_TAG_TABLES) {
+        if (!(await db.schema.hasTable(nome))) return false;
+      }
+      return true;
+    },
+    async up(db) {
+      if (!(await db.schema.hasTable('tenants'))) return;
+      for (const [nome, construtor] of WA_TAG_TABLES) {
+        // eslint-disable-next-line no-await-in-loop
+        await createTableIfMissing(db, nome, construtor(db));
       }
     }
   }
